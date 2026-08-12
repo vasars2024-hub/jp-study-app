@@ -320,6 +320,10 @@ declare global {
       lookupWord(query: string): Promise<DictResult>;
       lookupTerm(query: string): Promise<DictResult>;
       lookupTermOffline(query: string): Promise<DictResult>;
+      lookupOfflineInterlinear(
+        text: string,
+        options?: import('../shared/lexiconInterlinear').LexiconInterlinearOptions,
+      ): Promise<import('../shared/lexiconInterlinear').LexiconInterlinearResult>;
       lookupChinese(query: string): Promise<DictResult>;
       resetChineseDictCache(): Promise<void>;
       lookupTermsBatch(

@@ -13849,3 +13849,70 @@ workspace remain open because their destinations remain open. The latter still n
 decision for an ad-hoc OCR passage surface; the former needs a receiver that actually honors the
 resolved Workbench lens. Do not widen `LEXICON_HANDOFF_KINDS` or point the passage at Novels merely
 to make the plan bullet look complete.
+
+## The offline Workbench ladder crosses the process boundary — 2026-08-12
+
+### Why this returned to Track 2
+
+The last ledger entry correctly named ReadingLens sentence and passage hand-offs, but the plan's
+dependency order puts the Lexicon Workbench before both the Agent and ReadingLens. Re-derived from
+source, Track 2 still had only `lexiconWorkbench.ts`'s classifier/route vocabulary and
+`lookupOfflineInterlinear()`'s tested main-process service. There was no canonical Workbench
+renderer and, more immediately, no bridge through which any renderer could consume the already
+implemented offline segmentation and grounded glossary ladder. Continuing to widen the lens
+handoff first would have routed into a receiver that still cannot exist.
+
+### What landed
+
+- `lookupOfflineInterlinearFromStore()` exposes the existing read-only SQLite-backed service via
+  the managed dictionary database; the injected-database function remains intact for focused
+  service tests.
+- `dict:lookupOfflineInterlinear` is registered in the real dictionary main boundary and exposed
+  through preload plus `window.d.ts` with the shared result/options contract.
+- The IPC boundary treats renderer data as untrusted: non-string text becomes empty; raw text is
+  bounded before normalization; language lists are type-filtered, normalized and capped; and
+  caller-supplied character/merge ceilings can only narrow the shared 4,000-character / eight-
+  segment limits, never widen them.
+- The service regression now proves the managed-store entry point returns a grounded SQLite gloss.
+  No model, network call, persistence write or invented fallback participates.
+
+Touched paths: `src/main/dictionary/service.ts`, `src/main/dictionary.ts`, `src/preload.ts`,
+`src/renderer/window.d.ts`, `src/main/__tests__/dictionaryInterlinear.test.ts`, and this ledger.
+
+### Gates and live acceptance
+
+| evidence | result |
+|---|---|
+| focused Vitest | 2 files, **9 passed / 0 failed** |
+| full Vitest, shared tree | **7,356 passed / 0 failed / 6 skipped**, 553 files |
+| `node tools/i18n-check.cjs` | all **9,343** English keys translated in ja/zh/ru |
+| `node tools/architecture-audit.cjs` | 1,739 modules, 17 findings, nothing new, same 2 known pending |
+| ESLint, touched code paths | no new error; `window.d.ts` still has its two pre-existing non-adjacent subtitle-harvest overload errors, outside this hunk |
+
+The checkpoint itself was then checked in a detached worktree at `2c8df9d`, sharing only the
+installed `node_modules`. Its full suite had **6,993 passed / 9 failed / 6 skipped** across 527
+files: exactly the nine clean-HEAD failures already recorded by the boss audit (two i18n hygiene,
+five Blanc confirmation/queue, one local Agent queue reachability, one novel-reader progress
+guard), with no failure in this slice. The detached i18n gate passed all **9,172** keys and the
+architecture gate reported the same 17 findings / two known pending. ESLint over the four touched
+code/test paths outside global `window.d.ts` had no errors (the seven legacy `any` warnings in
+`dictionary.ts` predate this hunk).
+
+A fresh Electron main was started and the call was made through
+`window.api.lookupOfflineInterlinear`, reaching the real `ipcMain` handler. The input
+`猫。未知` with deliberately oversized `maxChars` and `maxMergeSegments` returned the exact
+normalized passage, two token rows and the punctuation separator. This installation's managed
+SQLite database has no matching rows, so `matchedCount: 0` and absent glosses were the honest
+result rather than fabricated data. The probe global was deleted (`typeof === 'undefined'`) and
+only the process tree started for this check was stopped. The call is read-only; no userData
+backup or persisted-setting toggle was used.
+
+### What remains
+
+This is infrastructure, not a claim that Track 2 is complete. The next decision-free Track 2
+slice is the first real scale-adaptive Workbench renderer consuming this bridge and the existing
+dictionary/translation services, followed by compatibility aliases from Dictionary and Translate.
+That surface must render offline segmentation, dictionary lookup and interlinear gloss before
+waiting on translation or AI. ReadingLens sentence handoff should follow only once that receiver
+honors its requested lens. Passage → Reading remains parked on the already-recorded destination
+product decision.

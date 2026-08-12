@@ -11,9 +11,9 @@ vi.mock('electron', () => ({
   app: { getPath: () => tempRoot },
 }));
 
-import { openDictionaryDb, type SqliteDb } from '../dictionary/db';
+import { closeDictionaryDb, openDictionaryDb, type SqliteDb } from '../dictionary/db';
 import { importLegacyIndex } from '../dictionary/migrate';
-import { lookupOfflineInterlinear } from '../dictionary/service';
+import { lookupOfflineInterlinear, lookupOfflineInterlinearFromStore } from '../dictionary/service';
 import type { LexiconInterlinearToken } from '../../shared/lexiconInterlinear';
 import type { YomitanDictInfo } from '../../shared/types';
 
@@ -56,6 +56,7 @@ beforeEach(() => {
 
 afterEach(() => {
   if (db.open) db.close();
+  closeDictionaryDb();
   fs.rmSync(tempRoot, { recursive: true, force: true });
 });
 
@@ -92,5 +93,23 @@ describe('lookupOfflineInterlinear', () => {
     expect(result.matchedCount).toBe(0);
     expect(tokens.every((part) => !part.match)).toBe(true);
     expect(after.count).toBe(before.count);
+  });
+
+  it('exposes the managed database through the renderer-facing service entry point', () => {
+    const result = lookupOfflineInterlinearFromStore('猫', {
+      sourceLangs: ['ja'],
+      glossLangs: ['en'],
+    });
+
+    expect(result).toMatchObject({
+      text: '猫',
+      tokenCount: 1,
+      matchedCount: 1,
+      parts: [{
+        kind: 'token',
+        text: '猫',
+        match: { text: '猫', reading: 'ねこ', glosses: [{ lang: 'en', text: 'cat' }] },
+      }],
+    });
   });
 });

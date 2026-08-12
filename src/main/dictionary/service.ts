@@ -174,6 +174,14 @@ export function lookupOfflineInterlinear(
   );
 }
 
+/** Main-process entry point for the renderer bridge, using the managed database. */
+export function lookupOfflineInterlinearFromStore(
+  text: string,
+  options: LexiconInterlinearOptions = {},
+): LexiconInterlinearResult {
+  return lookupOfflineInterlinear(dictionaryDb(), text, options);
+}
+
 // ----- the Chinese surface's lookup path -------------------------------------
 //
 // Phase 4 moved `renderer/chineseDict.ts`'s engine here. The deps below are the

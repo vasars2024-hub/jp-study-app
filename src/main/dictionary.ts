@@ -40,9 +40,16 @@ import { enrichLexiconResultMetadata, lookupResultToDictResult } from './diction
 import {
   lookupChineseInDictionary,
   lookupInDictionaryDb,
+  lookupOfflineInterlinearFromStore,
   resetChineseDictionaryCache,
 } from './dictionary/service';
 import { normalizeLexiconText } from '../shared/lexiconWorkbench';
+import {
+  MAX_OFFLINE_INTERLINEAR_CHARS,
+  MAX_OFFLINE_INTERLINEAR_MERGE_SEGMENTS,
+  type LexiconInterlinearOptions,
+  type LexiconInterlinearResult,
+} from '../shared/lexiconInterlinear';
 
 // Dictionary lookups go through Jisho.org (the same JMdict data Yomitan's main
 // dictionary is built on). We fetch here in the main process so the renderer
@@ -395,6 +402,41 @@ export function registerDictionaryIpc(): void {
   // Read-only structured pitch data for the Blanc pitch panel.
   ipcMain.handle('dict:pitch', (_e, term: string, reading?: string) => getPitchData(term, reading));
   ipcMain.handle('dict:lookupTermOffline', (_e, query: string) => lookupTermOffline(query));
+  ipcMain.handle(
+    'dict:lookupOfflineInterlinear',
+    (_e, text: unknown, options?: unknown): LexiconInterlinearResult => {
+      const raw = options && typeof options === 'object' && !Array.isArray(options)
+        ? options as Record<string, unknown>
+        : {};
+      const languages = (value: unknown): string[] | undefined => {
+        if (!Array.isArray(value)) return undefined;
+        const normalized = value
+          .filter((item): item is string => typeof item === 'string')
+          .map((item) => item.trim().toLowerCase().slice(0, 16))
+          .filter(Boolean)
+          .slice(0, 8);
+        return normalized.length ? normalized : undefined;
+      };
+      const boundedOptions: LexiconInterlinearOptions = {
+        sourceLangs: languages(raw.sourceLangs),
+        glossLangs: languages(raw.glossLangs),
+        maxChars: Math.min(
+          MAX_OFFLINE_INTERLINEAR_CHARS,
+          Math.max(1, Number.isFinite(raw.maxChars) ? Math.floor(Number(raw.maxChars)) : MAX_OFFLINE_INTERLINEAR_CHARS),
+        ),
+        maxMergeSegments: Math.min(
+          MAX_OFFLINE_INTERLINEAR_MERGE_SEGMENTS,
+          Math.max(1, Number.isFinite(raw.maxMergeSegments)
+            ? Math.floor(Number(raw.maxMergeSegments))
+            : MAX_OFFLINE_INTERLINEAR_MERGE_SEGMENTS),
+        ),
+      };
+      const boundedText = typeof text === 'string'
+        ? text.slice(0, MAX_OFFLINE_INTERLINEAR_CHARS * 2)
+        : '';
+      return lookupOfflineInterlinearFromStore(boundedText, boundedOptions);
+    },
+  );
   ipcMain.handle(
     'dict:lookupTermsBatch',
     (_e, queries: GlossLookupQuery[], langs: CandidateGlossLang[]) =>

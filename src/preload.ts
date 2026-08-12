@@ -59,6 +59,7 @@ import type {
 } from './shared/anki';
 import type { DueForecast } from './shared/reviewForecast';
 import type { PitchLookup } from './shared/pitchAccent';
+import type { LexiconInterlinearOptions, LexiconInterlinearResult } from './shared/lexiconInterlinear';
 import type { ApkgImportResult } from './shared/apkgParse';
 import type { ApkgCardsResult } from './shared/apkgCards';
 import type {
@@ -434,6 +435,12 @@ const api = {
   /** Offline-only Yomitan glossary lookup (no Jisho). */
   lookupTermOffline: (query: string): Promise<DictResult> =>
     ipcRenderer.invoke('dict:lookupTermOffline', query),
+  /** Offline segmentation and grounded glossary rows for the Lexicon Workbench. */
+  lookupOfflineInterlinear: (
+    text: string,
+    options?: LexiconInterlinearOptions,
+  ): Promise<LexiconInterlinearResult> =>
+    ipcRenderer.invoke('dict:lookupOfflineInterlinear', text, options),
   lookupTermsBatch: (
     queries: Array<{ expression: string; reading?: string }>,
     langs: string[],
