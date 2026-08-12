@@ -72,7 +72,7 @@ describe('LexiconWorkbenchResults', () => {
     root = createRoot(host);
     await act(async () => root?.render(<LexiconWorkbenchResults query="猫" lang="ja" lookupAttempt={1} />));
     const translate = [...host.querySelectorAll('button')]
-      .find((button) => button.textContent === 'lexicon.workbench.interlinear');
+      .find((button) => button.textContent === 'lexicon.lens.interlinear');
     await act(async () => {
       translate?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       await Promise.resolve();
@@ -106,5 +106,23 @@ describe('LexiconWorkbenchResults', () => {
     expect(lookup).toHaveBeenCalledWith('猫', { sourceLangs: ['ja'], glossLangs: ['ru'] });
     expect(host.querySelector('.lexicon-interlinear-flow')?.textContent).toBe('猫');
     expect(host.querySelector('[data-testid="dictionary-results"]')).toBeNull();
+  });
+
+  it('has a real catalog string for every lens label and overridable scale', async () => {
+    const { en } = await import('../../shared/i18n/catalogs/en');
+    const keys = [
+      'lexicon.lens.group',
+      'lexicon.lens.auto',
+      'lexicon.lens.lookup',
+      'lexicon.lens.interlinear',
+      // A manual lens sends character/word input through the interlinear meta line.
+      'lexicon.kind.character',
+      'lexicon.kind.word',
+      'lexicon.kind.sentence',
+      'lexicon.kind.paragraph',
+      'lexicon.kind.document',
+    ];
+    const catalog = en as Record<string, string>;
+    expect(keys.filter((key) => !catalog[key])).toEqual([]);
   });
 });

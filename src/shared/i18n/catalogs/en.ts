@@ -8717,7 +8717,13 @@ export const en: Catalog = {
   'lexicon.workbench.detected': 'Detected scale: {kind}',
   'lexicon.workbench.truncated': 'Input was shortened for offline analysis',
   'lexicon.workbench.offlineFailed': 'Offline analysis could not be loaded.',
+  'lexicon.kind.character': 'character',
+  'lexicon.kind.word': 'word',
   'lexicon.kind.sentence': 'sentence',
   'lexicon.kind.paragraph': 'passage',
   'lexicon.kind.document': 'document',
+  'lexicon.lens.group': 'Analysis lens',
+  'lexicon.lens.auto': 'Automatic',
+  'lexicon.lens.lookup': 'Dictionary',
+  'lexicon.lens.interlinear': 'Interlinear',
 };

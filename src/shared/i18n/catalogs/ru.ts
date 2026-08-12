@@ -9101,7 +9101,13 @@ export const ru: Catalog = {
   'lexicon.workbench.detected': 'Определённый масштаб: {kind}',
   'lexicon.workbench.truncated': 'Текст сокращён для автономного анализа',
   'lexicon.workbench.offlineFailed': 'Не удалось загрузить автономный разбор.',
+  'lexicon.kind.character': 'символ',
+  'lexicon.kind.word': 'слово',
   'lexicon.kind.sentence': 'предложение',
   'lexicon.kind.paragraph': 'отрывок',
   'lexicon.kind.document': 'документ',
+  'lexicon.lens.group': 'Режим разбора',
+  'lexicon.lens.auto': 'Автоматически',
+  'lexicon.lens.lookup': 'Словарь',
+  'lexicon.lens.interlinear': 'Подстрочник',
 };

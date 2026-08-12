@@ -8311,7 +8311,13 @@ export const ja: Catalog = {
   'lexicon.workbench.detected': '検出した範囲：{kind}',
   'lexicon.workbench.truncated': 'オフライン解析のため入力を短縮しました',
   'lexicon.workbench.offlineFailed': 'オフライン解析を読み込めませんでした。',
+  'lexicon.kind.character': '文字',
+  'lexicon.kind.word': '単語',
   'lexicon.kind.sentence': '文',
   'lexicon.kind.paragraph': '文章',
   'lexicon.kind.document': '文書',
+  'lexicon.lens.group': '解析レンズ',
+  'lexicon.lens.auto': '自動',
+  'lexicon.lens.lookup': '辞書',
+  'lexicon.lens.interlinear': '逐語',
 };

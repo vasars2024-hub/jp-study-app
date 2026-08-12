@@ -8276,7 +8276,13 @@ export const zh: Catalog = {
   'lexicon.workbench.detected': '检测范围：{kind}',
   'lexicon.workbench.truncated': '为进行离线分析，输入已缩短',
   'lexicon.workbench.offlineFailed': '无法加载离线分析。',
+  'lexicon.kind.character': '单字',
+  'lexicon.kind.word': '词语',
   'lexicon.kind.sentence': '句子',
   'lexicon.kind.paragraph': '段落',
   'lexicon.kind.document': '文档',
+  'lexicon.lens.group': '分析视角',
+  'lexicon.lens.auto': '自动',
+  'lexicon.lens.lookup': '词典',
+  'lexicon.lens.interlinear': '逐词',
 };

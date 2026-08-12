@@ -14033,3 +14033,53 @@ persisted setting was changed and no userData backup was taken.
 Track 2 remains open. The immediate offline ladder and compatibility routing are real, but sense
 pinning/retranslation, parallel targets, semantic diff, composition checking, vocabulary harvest,
 difficulty/concordance, and the grounded AI enrichment bullets still require source-derived slices.
+
+## The manual lens no longer leaks raw i18n keys — 2026-08-12
+
+Recovery hop. Re-derived the interrupted worker's state first: `3270bed` had already landed its
+code, tests and ledger entry, the index was empty, and nothing was written to disk after
+`17:54`, so there was no half-finished slice to rescue. The boss audit's two clean-HEAD
+failures were already closed by `bef3b2e`. Re-auditing that last commit against source instead
+of trusting its summary found a defect it introduced.
+
+The manual lens override made `character` and `word` input reachable by the interlinear branch
+for the first time. That branch renders `t('lexicon.kind.' + kind)`, and
+`lexicon.kind.character` / `lexicon.kind.word` existed in **no** catalog at HEAD (`git grep`
+over all of `src` at HEAD returns nothing), so the meta line rendered the raw key string to the
+user. Both keys now exist in en/ja/zh/ru. The lens buttons also borrowed
+`settings.home.auto` and `dict.view.search` from unrelated surfaces, and the picker's group
+label reused the section's own `lexicon.workbench.interlinear` string; all four now have
+dedicated `lexicon.lens.*` keys. Note for the next worker: `dict.view.search` **does** resolve —
+it lives in the `miningUi` split module, not `catalogs/en.ts`. A grep scoped to `catalogs/*.ts`
+alone reports a false missing key.
+
+`glossLang` was also typed `DictLang` (`'ja' | 'zh'`) while defaulting to `'en'` and receiving
+Translate's `TransLang`. That is a gloss *target*, which follows the imported dictionaries and
+is not the source-side pair, so it is now a documented string. `tsc --noEmit` (not a gate here)
+reported two errors matching `lexicon` before this change and reports zero after; the rest of
+the tree's pre-existing errors are unchanged.
+
+Focused Vitest passed **5/5** in the workbench file, including a new guard that asserts every
+lens label and every overridable scale key resolves in the merged English catalog — the check
+that would have caught this at the previous commit. The four required gates passed in the
+shared tree: full Vitest **7,362 passed / 0 failed / 6 skipped** across 555 files; i18n
+**9,356** English keys complete in ja/zh/ru; architecture 1,742 modules / 17 findings with
+nothing new and the same two pending; ESLint over every touched code/test/catalog path clean.
+
+Live Electron acceptance used a fresh main started by this worker and the authenticated debug
+bridge only. `lexiconHandoffStage('猫')` returned `kind=character, lens=lookup` from the real
+main handler; `popOut('dictionary')` opened the receiver, which claimed the staged character.
+The picker rendered `Automatic / Dictionary / Interlinear` with group label `Analysis lens` and
+Auto pressed. After clicking Interlinear it was the sole pressed lens, the meta line read
+**`Detected scale: character`** where it previously would have read `lexicon.kind.character`,
+the offline handler rendered the exact `猫`, and the workbench contained no `lexicon.` substring
+anywhere. The bridge error log was empty. Probe globals were deleted, the popped-out window was
+closed, no persisted setting was touched, no userData backup was taken, and only the process
+tree started by this worker was stopped.
+
+Track 2 remains open and its remaining bullets are unchanged: sense pinning/retranslation,
+parallel gloss targets, round-trip semantic diff, composition checking, vocabulary harvest,
+difficulty scoring, personal concordance, and the grounded AI enrichment bullets. Parallel
+targets is the most decision-free of those — `buildOfflineInterlinear` already accepts
+`glossLangs: readonly string[]` and every match carries its gloss `lang`, but no caller ever
+passes more than one and the renderer joins all glosses into a single `<rt>`.
