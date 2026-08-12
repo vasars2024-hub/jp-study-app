@@ -10655,3 +10655,138 @@ from Track 7 after checking the last ledger section and current source; the broa
 not evidence that any named subsystem is still open. The synthetic-display path is now a proven
 way to discriminate future multi-monitor claims, and it should be preferred over reasoning from
 one main window.
+
+## The key check was red, and the one call site that made it lie — 2026-08-12
+
+Track 7's architecture lane was re-derived from its own sources before picking, not from the
+previous section's closing note. `node tools/architecture-audit.cjs` reports 18 findings with
+exactly 3 pending, and all three were read against the tree rather than against their baseline
+notes:
+
+- `shared/mediaProviderSyncJournal.ts` — the note is still accurate. Wiring it means inventing
+  cross-device sync (no deviceId, no surface, no reader). A product decision, deliberately left.
+- `shared/episodeProcessing.ts` — the baseline note says "no connector exists". That note is now
+  **stale in its reasoning but right in its conclusion**: `main/scraper/episodeProcessingRules.ts`
+  exists and is wired, and its own header explains why it does not reuse the shared module —
+  the engine deals in `EpisodeRow`, the shared module in `ExtractedEpisode`, and round-tripping
+  would drop fields. The shared module is the extraction-layer parser for a DOM extraction path
+  that does not exist. Also deliberate.
+- `shared/csvPaste.ts` — a 57-line duplicate of `shared/csvEditor.ts`. `detectDelimiter` is
+  character-identical; `splitCsvLine` differs only by a tab fast-path that skips quoting, which
+  is strictly worse. Real dead code, but deleting it is a separate slice and is recorded here so
+  the next worker does not re-derive it: **the honest resolution is deletion, not wiring.**
+
+So the architecture lane had nothing decision-free left. The red gate did.
+
+### What was actually broken
+
+`node tools/i18n-missing-key-check.cjs` exited **1**, reporting `lens.mode.` as a key
+"asked for by name and defined nowhere" and therefore rendered raw at the user. Its own header
+says this check "is a hard zero, and it should stay that way", so a branch sitting on exit 1 is
+a broken invariant either way — but the finding itself was false. `LensClipboardPassage.tsx`
+called `t('lens.mode.' + item)`, and the scanner's `KEY_CALL` regex captured the quoted prefix
+as if it were a whole key. Only `lens.mode.dictionary` and `lens.mode.ai` are ever built, and
+both exist in all four catalogs.
+
+That is the same dynamic-key shape the scanner already skips as a template, wearing different
+syntax — and worse, because a template is visibly not a key while a quoted prefix looks exactly
+like one. Both halves were fixed:
+
+- The **call site** now uses the template form its own sibling already used
+  (`ReadingLensOverlay.tsx`), so the two lens surfaces read the same.
+- The **scanner** now captures a trailing `+` and skips those matches. Probed on five shapes:
+  `t('a.b' + x)` and `t('lens.mode.' + item)` skip; `t('lens.mode.label')`,
+  `t('malSync.title', vars)` and `t('never.defined.key')` are still checked. A genuinely missing
+  literal is still caught — the guard narrows the regex, it does not disarm the check.
+
+### The gate that replaces the one that could not see it
+
+Skipping a dynamic key is only safe if something else covers its arms, which is the rule
+`agentNavigation.test.ts` already set for the `agent.navigate.error` codes. The lens modes had
+no such cover, and the list itself was duplicated as a bare `['dictionary', 'ai']` literal in
+both lens components.
+
+`READING_LENS_MODES` now lives in `shared/readingLens.ts` beside `READING_LENS_DEPTHS` and
+`READING_LENS_SOURCES`, in that file's existing `as const` idiom, and both components render
+from it. `shared/__tests__/readingLensModes.test.ts` asserts every mode defines
+`lens.mode.<mode>` and `lens.mode.<mode>.hint` in **all four** catalogs read as source text, and
+that English declares no `lens.mode.*` arm the list does not have.
+
+**Negative control, not just a green run:** a third mode was temporarily added to the tuple and
+the new test went from 6 passed to 5 failed / 1 passed — the four language checks and the
+arm-parity check all fired. `readingLens.ts` was then restored and confirmed byte-identical
+with `-ceq`. Without that, "the test passes" would have proved nothing about whether it can fail.
+
+Two smaller things went with it. `loadMode()` in the overlay read `localStorage` against one
+hardcoded arm, which would silently coerce any future mode to the default; it now resolves
+through the shared list. And the clipboard passage's mode buttons gained the
+`lens.mode.<mode>.hint` tooltip the overlay's identical radiogroup already had — no new strings,
+both keys already translated in all four languages.
+
+### Live acceptance: the real renderer, the real catalog, in Russian
+
+`npm start`, then driven only through the authenticated HTTP debug bridge. `/logs?match=hot`
+returned 0 before and after, so no other track was editing the tree during the pass.
+
+Bare specifiers do not resolve through `/eval` (`import('react')` fails — the injected code is
+not Vite-transformed), so React and `react-dom/client` were reached by fetching a real module's
+**transformed** source and reading the dep URLs Vite had already rewritten into it. Both
+namespaces put their exports on `default`. Recorded here because it is the reusable way to mount
+a live component through this bridge.
+
+1. `import('/src/shared/readingLens.ts')` in the running renderer exports `READING_LENS_MODES`
+   = `['dictionary', 'ai']`. The shared list is what the live module graph has, not just source.
+2. `LensClipboardPassage` was mounted into a transient off-screen root with the live `t`. The UI
+   language was **ru**, and the two buttons rendered `Словарь ИИ` and `ИИ OCR` with their two
+   Russian tooltips, `role="radio"` inside a `role="radiogroup"` labelled `Что открывает скан`.
+   Template keys resolving to real Russian is the discriminating result: a raw
+   `lens.mode.dictionary` on the button is exactly what the scanner was warning about, and it is
+   not what the live app renders.
+3. `className` came out `lens-mode-btn active` and `lens-mode-btn ` — byte-identical to what the
+   old string concatenation produced, so the template-literal rewrite changed no markup.
+4. The live-served sources of both lens modules no longer contain `['dictionary', 'ai']`, and
+   the clipboard passage no longer contains the concatenated key call.
+5. `ReadingLensOverlay.tsx` imports cleanly in the live graph with its new named imports.
+6. The real profile's stored mode was `ai`. New `loadMode()` and the old expression both resolve
+   it to `ai`. **This is parity, not a discriminating case** — with only two modes the rewrite
+   cannot behave differently, and the guard it adds is for a mode that does not exist yet. Said
+   plainly rather than dressed up as live proof of something.
+
+`/logs?level=error` returned 0 across the pass. Nothing was written to `localStorage`, verified
+by reading the key before and after. No clipboard read or write, no real setting touched, no
+userData file read or written. The app was closed; the bridge file is gone and no Electron
+process remains. The start log under `debug/` and four probe files under the system temp
+directory were deleted after use.
+
+### Gates
+
+- `node node_modules/vitest/vitest.mjs run` (the direct entry point; this worker cannot launch
+  `.cmd` shims): **539 files passed, 1 skipped; 7,251 tests passed, 6 skipped; 0 failed.** The
+  previous section measured 538/7,245 on the same tree, and the delta is exactly this slice's
+  one new file and six new cases.
+- `node tools/i18n-check.cjs`: exit 0, all 9,324 English keys translated in ja/zh/ru.
+- `node tools/i18n-missing-key-check.cjs`: exit **0** — it was 1 at the start of this hop.
+- `node tools/architecture-audit.cjs`: exit 0, "Nothing new", still 3 known pending.
+- ESLint on the five touched paths: the only output is three
+  `@typescript-eslint/no-var-requires` errors on `tools/i18n-missing-key-check.cjs` lines 31-33,
+  which are the pre-existing `require` block — `git diff -U0` shows this hop's hunks start at
+  line 47. **Zero new problems**; the four `src/` paths are clean.
+- `tsc --noEmit` was not run; it is not a gate.
+
+### Exact next slice
+
+The lens-mode thread is closed; do not reopen it. Main V1 is still in dependency-order item 8.
+Two decision-free items are now derived and waiting, in this order:
+
+1. **Delete `shared/csvPaste.ts` and its test**, and drop the entry from
+   `tools/architecture-baseline.json`. The evidence is in this section — it is a strictly
+   inferior duplicate of `shared/csvEditor.ts`, which is wired and shipped. This closes one of
+   the three pending architecture findings for real. The other two should stay pending; both
+   reasons are recorded above and neither is a mistake to correct.
+2. **The 21 `untested` entries in `renderer/components/scraper/featureStatus.ts`.** That file's
+   own rule is "promote an entry only after actually exercising it", so each one is a bounded
+   live-acceptance task, not a code change. Take a small cluster, not the list.
+
+`TASKS.md` is stale as a source of open work — its "Task 4: UI Emoji Eradication" was checked
+against the tree this hop and the only pictographs left in `src/` are minimalist glyph icons
+(`✓ ✕ ★ ♪ ▢`), which the project style calls for. Do not re-run that sweep.

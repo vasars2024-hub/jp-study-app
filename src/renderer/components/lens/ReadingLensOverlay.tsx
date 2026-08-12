@@ -13,9 +13,11 @@ import {
 } from '../../../shared/visualNovelOcrTarget';
 import {
   normalizeReadingLensCapture,
+  READING_LENS_MODES,
   resolveReadingLensWorkflow,
   type ReadingLensCapture,
   type ReadingLensLine,
+  type ReadingLensMode,
 } from '../../../shared/readingLens';
 import {
   readingLensConfidenceLevel,
@@ -103,12 +105,15 @@ function passageRegion(width: number, height: number): Rect {
  * are not exclusive in practice: a word inside the AI panel still opens the
  * dictionary, so AI mode is a superset reached by one toggle.
  */
-type LensMode = 'dictionary' | 'ai';
+type LensMode = ReadingLensMode;
 const MODE_KEY = 'jp-study-lens-mode';
 
 function loadMode(): LensMode {
   try {
-    return localStorage.getItem(MODE_KEY) === 'ai' ? 'ai' : 'dictionary';
+    // Read against the shared list rather than one hardcoded arm, so a mode
+    // added there is restored rather than silently coerced to the default.
+    const stored = localStorage.getItem(MODE_KEY);
+    return READING_LENS_MODES.find((m) => m === stored) ?? 'dictionary';
   } catch {
     return 'dictionary';
   }
@@ -860,7 +865,7 @@ export function LensChrome({
         {t('lens.action.askAgent')}
       </button>
       <div className="lens-mode" role="radiogroup" aria-label={t('lens.mode.label')}>
-        {(['dictionary', 'ai'] as const).map((m) => (
+        {READING_LENS_MODES.map((m) => (
           <button
             key={m}
             type="button"

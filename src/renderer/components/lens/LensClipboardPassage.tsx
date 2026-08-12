@@ -1,9 +1,13 @@
 import type { CSSProperties, MouseEvent } from 'react';
-import type { ReadingLensCapture } from '../../../shared/readingLens';
+import {
+  READING_LENS_MODES,
+  type ReadingLensCapture,
+  type ReadingLensMode,
+} from '../../../shared/readingLens';
 import type { JpToken } from '../../tokenizer';
 import './lensClipboardPassage.css';
 
-type LensMode = 'dictionary' | 'ai';
+type LensMode = ReadingLensMode;
 
 interface Props {
   capture: ReadingLensCapture;
@@ -47,16 +51,17 @@ export default function LensClipboardPassage({
       <div className="lens-clipboard-head">
         <span className="lens-source-badge">{t('lens.badge.source.clipboard')}</span>
         <div className="lens-mode" role="radiogroup" aria-label={t('lens.mode.label')}>
-          {(['dictionary', 'ai'] as const).map((item) => (
+          {READING_LENS_MODES.map((item) => (
             <button
               key={item}
               type="button"
               role="radio"
               aria-checked={mode === item}
-              className={'lens-mode-btn ' + (mode === item ? 'active' : '')}
+              className={`lens-mode-btn ${mode === item ? 'active' : ''}`}
+              title={t(`lens.mode.${item}.hint`)}
               onClick={() => onModeChange(item)}
             >
-              {t('lens.mode.' + item)}
+              {t(`lens.mode.${item}`)}
             </button>
           ))}
         </div>

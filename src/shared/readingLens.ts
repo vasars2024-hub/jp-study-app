@@ -22,6 +22,18 @@ export type ReadingLensDepthRequest = ReadingLensDepth | 'auto';
 export const READING_LENS_SOURCES = ['screen', 'clipboard', 'image', 'text'] as const;
 export type ReadingLensSource = (typeof READING_LENS_SOURCES)[number];
 
+/**
+ * What a scan opens once it lands.
+ *
+ * Both lens surfaces — the box overlay and the clipboard passage — render one
+ * button per entry and name its label `lens.mode.<mode>` and its tooltip
+ * `lens.mode.<mode>.hint`. Those are template keys, so
+ * `tools/i18n-missing-key-check.cjs` cannot see them; `readingLensModes.test.ts`
+ * is what keeps the list and the four catalogs in agreement instead.
+ */
+export const READING_LENS_MODES = ['dictionary', 'ai'] as const;
+export type ReadingLensMode = (typeof READING_LENS_MODES)[number];
+
 export type ReadingLensEngine = 'auto' | 'manga' | 'web' | 'none' | 'import';
 
 export interface ReadingLensLine {

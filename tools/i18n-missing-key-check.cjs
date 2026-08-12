@@ -44,8 +44,15 @@ const SCAN_DIRS = [
  * Only literal keys can be checked. `t(\`malSync.error.${code}\`)` is a template
  * and is deliberately skipped — its arms are covered by the catalog's own tests,
  * and guessing at interpolation would produce false failures.
+ *
+ * `t('lens.mode.' + item)` is the same dynamic key wearing a different syntax,
+ * and it is worse: the prefix is itself a quoted literal, so an unguarded match
+ * reports `lens.mode.` as a key the app renders raw at the user. It does not —
+ * only `lens.mode.dictionary` and `lens.mode.ai` are ever built. The trailing
+ * group catches the concatenation so those sites are skipped like templates,
+ * and the same compensating-test rule applies to them.
  */
-const KEY_CALL = /\bt\(\s*'([a-zA-Z][\w.-]*\.[\w.-]+)'/g;
+const KEY_CALL = /\bt\(\s*'([a-zA-Z][\w.-]*\.[\w.-]+)'(\s*\+)?/g;
 
 function loadEnglish() {
   const { outputFiles } = esbuild.buildSync({
@@ -89,7 +96,11 @@ function scan() {
       .readFileSync(file, 'utf8')
       .replace(/\/\*[\s\S]*?\*\//g, '')
       .replace(/^\s*\/\/.*$/gm, '');
-    const keys = [...new Set([...src.matchAll(KEY_CALL)].map((m) => m[1]))];
+    const keys = [
+      ...new Set(
+        [...src.matchAll(KEY_CALL)].filter((m) => m[2] === undefined).map((m) => m[1]),
+      ),
+    ];
     const missing = keys.filter((k) => en[k] === undefined);
     if (missing.length > 0) {
       offenders.push({ file: path.relative(ROOT, file).split(path.sep).join('/'), missing });
