@@ -10574,3 +10574,84 @@ continuation. Before starting one, note the trap this hop paid for and the next 
   at 944x453 only because the file was restored. Desktop **4** was driven hardest. Either is
   usable; neither is virgin.
 
+## The second taskbar forgot the desktop a window had left — 2026-08-12
+
+The branch was one implementation checkpoint ahead of this ledger when this worker arrived.
+06c487b had already fixed and committed two defects from the first live simulated-display pass,
+but the authoritative log stopped at 78f84ba. I re-derived the checkpoint from its five paths
+before accepting it; this section records an independent gate and live pass rather than repeating
+the commit message as evidence.
+
+### What 06c487b changed
+
+- The opt-in cross-desktop taskbar list used to be a useMemo over module-owned desktop state
+  with no dependency that changed when another desktop was edited. Moving a window onto the
+  current monitor therefore left a stale foreign entry next to the correct local entry. The pure
+  selection now lives in renderer/foreignWindows.ts; DesktopShell subscribes to the desktop
+  broadcast only while showAllWindows is enabled and includes that revision in the memo.
+- A secondary shell used the desktop index baked into ?desk= after every renderer reload. Main
+  deliberately retargets the existing BrowserWindow in place, so the URL is only its creation
+  seed. SecondaryDesktopWindow now asks the main-owned deskwinWhoAmI() identity after mount.
+- The checkpoint carries six pure foreign-window cases, one source-level subscription guard and
+  five previously-uncommitted Monitors-page cases: 12 tests in all.
+
+### Live acceptance: one synthetic display, one window that moved, one stale URL
+
+The ordinary shell was unavailable because this worker's Windows sandbox helper executable is
+missing. The same restriction made esbuild child processes unable to traverse the workspace's
+parent directory. A temporary R: mapping directly to the repo root removed that traversal; a
+Forge dev app was then started with an isolated profile under the session temp directory and
+Electron's development --no-sandbox switch (without it Chromium's child process could not load
+through this sandbox). This touched neither the real profile nor any real userData file.
+
+Driven only through the authenticated HTTP debug bridge:
+
+1. displaySetVirtualCount(1) produced a real primary plus simulated-1|960x1080|1. Main opened
+   window 2 at ?desk=1&displayKey=simulated-1%7C960x1080%7C1, and deskwinList() reported it open
+   on desktop 1.
+2. showAllWindows was enabled for that assignment. A visible dictionary fixture committed to
+   desktop 0 produced 0 local / 1 foreign task entries in window 2, badged Study.
+3. The fixture was committed out of desktop 0 and into desktop 1. The same live taskbar became
+   1 local / 0 foreign. This is the discriminating state: without the new broadcast revision it
+   rendered the moved window twice, including a foreign entry naming the desktop it had left.
+4. The simulated display was retargeted from desktop 1 to desktop 0 without rebuilding its
+   BrowserWindow. Before reload its still-stale URL said desk=1, while deskwinWhoAmI() said
+   desktop 0 and the DOM showed 0 local / 1 foreign, badged City.
+5. /reload reloaded that exact BrowserWindow. The URL still said desk=1, but after mount
+   deskwinWhoAmI() still said desktop 0 and the taskbar was still 0 local / 1 foreign, badged
+   City. A URL-trusting shell would instead have shown the Dictionary window locally.
+
+/logs?level=error returned 0 and /logs?match=hot returned 0 across the pass. A 944x1041 bridge
+screenshot was inspected: the bottom taskbar showed one Dictionary entry with the compact City
+badge, clean spacing and no duplicate. The screenshot was deleted. The app was closed through
+/eval; the bridge then refused connections. Both disposable profiles and all launch logs from
+this pass were removed after their resolved paths were checked. No clipboard, real setting, real
+desktop layout or real userData file was read or written.
+
+### Gates
+
+- Full Vitest entry point (node node_modules/vitest/vitest.mjs run, the direct equivalent used
+  because this worker cannot launch .cmd shims): 538 files passed, 1 skipped; 7,245 tests passed,
+  6 skipped; 0 failed.
+- node tools/i18n-check.cjs: exit 0, all 9,324 English keys translated in ja/zh/ru. The unchanged
+  command ran from the temporary R: root so its esbuild child never traversed the denied parent
+  directory.
+- node tools/architecture-audit.cjs: exit 0, Nothing new; 3 known pending findings.
+- ESLint on exactly the five implementation paths: exit 0, 4 warnings, all the same pre-existing
+  DesktopShell.tsx unused-variable warnings (snapValue, two _desktopIndex, slideIndex), and
+  0 errors.
+- tsc --noEmit was not run; it is not a gate.
+
+The full suite above is a shared-tree result, not a claim that unrelated dirty work is part of
+06c487b. The five implementation paths were already committed by that checkpoint; this commit
+adds only the missing ledger evidence.
+
+### Exact next slice
+
+This closes the two defects found by the first real per-display renderer pass; do not reopen the
+stale-foreign-entry or stale-URL threads. Main V1 is still in dependency-order item 8, the
+source-derived remaining-items sweep. The next worker should make a fresh, decision-free pick
+from Track 7 after checking the last ledger section and current source; the broad Track 7 list is
+not evidence that any named subsystem is still open. The synthetic-display path is now a proven
+way to discriminate future multi-monitor claims, and it should be preferred over reasoning from
+one main window.
