@@ -98,8 +98,11 @@ export const FEATURE_STATUS: Record<string, FeatureStatus> = {
   // this machine has no configured torrent client or debrid account to read from,
   // so the populated states have never been seen. Deliberately not promoted.
   'page.torrents.acquisition': 'untested',
-  // Profiles edit the settings document and nothing else reads them yet.
-  'page.profiles': 'untested',
+  // Live-accepted 2026-08-12: cards, activation, duplicate/create/delete,
+  // comparison, identity editing, overrides, revisions and JSON transfer all
+  // persisted through the shared settings document; runtime consumers are
+  // covered by the focused settings-model suite.
+  'page.profiles': 'ready',
   // Verified live: a real cron computed in main, "Run now" starting a job that
   // ran to completion, the run record surviving a restart, and an edited cron
   // recomputing instead of keeping a stale next-run time.
@@ -200,7 +203,7 @@ export const FEATURE_STATUS: Record<string, FeatureStatus> = {
   'set.logging': 'ready',
   'set.export': 'untested',
   'set.developer': 'ready',
-  'set.profiles': 'untested',
+  'set.profiles': 'ready',
   // 2026-08-02: five of these groups gained a consumer in src/main/scraper and
   // moved to 'untested'. Each is implemented and covered by vitest against a
   // local server; none has been driven through the running app, which is the

@@ -12157,3 +12157,55 @@ Dashboard/data/status paths and focused `git diff --check`.
 Take `page.profiles` and `set.profiles` together. Snapshot the full settings blob, exercise the
 page and drawer contracts, and restore the exact blob rather than reconstructing it field by
 field. Keep Metadata amber until its provider runtime is observed deterministically.
+
+## Profiles page and profile settings are live-accepted — 2026-08-12
+
+Main V1 remains in dependency-order item 8. `page.profiles` and `set.profiles` are now `ready`,
+moving the Scraper registry to **39 ready / 10 untested / 49 total (79.6%)**.
+
+### Persisted workflow evidence
+
+The running Scraper pop-out was driven through its authenticated debug bridge. Before any action,
+the complete `jp-scraper-settings-v1` value (**50,755 bytes**) and shell value were retained as
+exact strings outside the renderer so a reload could not destroy the restoration source.
+
+The mounted Profiles page then proved these state transitions through its real controls:
+
+- duplicated the active `relay-probe` profile and activated the copy;
+- edited the copy's identity fields and observed the persisted document update;
+- created a named profile from the active settings, activated it, then deleted it;
+- added and removed the reserved `profile-acceptance.invalid` site override;
+- exported a parseable six-profile portable JSON document, enabled Import, and imported it back
+  with byte-identical persisted output;
+- applied the Fast preset, changing the active profile to `fast`, restoring its expected 8-request,
+  15-second and one-retry values, and adding an `Applied fast preset` revision;
+- restored the earlier Fast revision and observed a third history entry whose reason names the
+  rolled-back revision;
+- confirmed the five-profile comparison table renders all six operational rows and identifies the
+  active profile.
+
+The page therefore no longer matches its obsolete registry note that profiles merely edit an
+unconsumed document: scrape startup, scheduler/runtime scope creation, the settings drawer and
+this management surface share the same persisted profile model.
+
+### Gates, visual check and exact restoration
+
+- `scraperSettingsStore.test.ts`, `scraperSettings.test.ts`, and `scraperSettingsV3.test.ts`:
+  **3 files / 25 tests passed**.
+- Focused ESLint reached only the existing project configuration defect: five inline
+  `react-hooks/exhaustive-deps` directives in `ManagementPages.tsx` reference a rule that is not
+  installed. No profile assertion or runtime check failed.
+- At **900 x 640**, profile metrics, action, cards and the first comparison rows were legible with
+  no horizontal clipping, decorative emoji or redundant internal window title.
+- The debug bridge error ring remained **0**.
+
+Finally both local-storage strings were restored and reloaded. They compare byte-for-byte equal
+to their pre-test snapshots; the active profile is again `relay-probe`, there are exactly five
+profiles, zero site overrides, and the original five aggregate revisions. The inspected screenshot
+was deleted.
+
+### Exact next local slice
+
+Take `page.images` and `set.images` together. Verify preview/fallback and image-output settings
+without public provider traffic, then restore exact profile state. Metadata remains amber until
+its catalogue-provider runtime can be accepted deterministically.
