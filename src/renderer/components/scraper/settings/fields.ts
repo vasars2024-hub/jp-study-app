@@ -31,6 +31,9 @@ import {
   SCRAPER_SOURCE_MODES,
   SCRAPER_TORRENT_PROTOCOLS,
 } from '../../../../shared/scraperSourceSettings';
+// The Columns hint names the real vocabulary rather than restating it, so the
+// two cannot drift the way a hand-copied list would.
+import { SCRAPER_EXPORT_COLUMNS } from '../data/exportBuilder';
 
 export type ScraperFieldKind =
   | 'toggle'
@@ -44,7 +47,16 @@ export type ScraperFieldKind =
   /** Opens a sub-editor and shows how many entries it holds. */
   | 'counted'
   /** Read-only status readout with an action, e.g. Test Connection. */
-  | 'status';
+  | 'status'
+  /**
+   * A statement, not a control — no input, nothing to change.
+   *
+   * Added 2026-08-05 for the two Logging fields whose honest disposition is
+   * "this is guaranteed, and you cannot turn it off". Reusing 'status' would
+   * have rendered a disabled Change button beside the words "not set", which
+   * says the opposite of what is true.
+   */
+  | 'note';
 
 export interface ScraperFieldOption {
   value: string;
@@ -303,24 +315,35 @@ export const SCRAPER_FIELDS: ScraperFieldDef[] = [
   { path: 'cache.maxSizeMb', group: 'cache', kind: 'number', label: 'Cache Size Limit', min: 16, max: 1_048_576, step: 16, unit: 'MB' },
 
   // --------------------------------------------------------- performance ---
+  // maxParallelJobs gates job admission and batchSize sets the progress
+  // cadence; the other five have no consumer to wire them to. Re-derived per
+  // field 2026-08-04 — see the `inert` flag's own note.
   { path: 'performance.maxParallelJobs', group: 'performance', kind: 'number', label: 'Parallel Jobs', min: 1, max: 16 },
-  { path: 'performance.maxParallelDownloads', group: 'performance', kind: 'number', label: 'Parallel Downloads', min: 1, max: 32 },
-  { path: 'performance.memoryBudgetMb', group: 'performance', kind: 'number', label: 'Memory Budget', min: 128, max: 32_768, step: 128, unit: 'MB' },
-  { path: 'performance.cpuThrottlePercent', group: 'performance', kind: 'number', label: 'CPU Ceiling', min: 10, max: 100, unit: '%' },
+  { path: 'performance.maxParallelDownloads', group: 'performance', kind: 'number', label: 'Parallel Downloads', min: 1, max: 32, inert: true },
+  { path: 'performance.memoryBudgetMb', group: 'performance', kind: 'number', label: 'Memory Budget', min: 128, max: 32_768, step: 128, unit: 'MB', inert: true },
+  { path: 'performance.cpuThrottlePercent', group: 'performance', kind: 'number', label: 'CPU Ceiling', min: 10, max: 100, unit: '%', inert: true },
   { path: 'performance.batchSize', group: 'performance', kind: 'number', label: 'Batch Size', min: 1, max: 500 },
-  { path: 'performance.reuseBrowserContext', group: 'performance', kind: 'toggle', label: 'Reuse Browser Context' },
-  { path: 'performance.prefetchNextPage', group: 'performance', kind: 'toggle', label: 'Prefetch Next Page' },
+  { path: 'performance.reuseBrowserContext', group: 'performance', kind: 'toggle', label: 'Reuse Browser Context', inert: true },
+  { path: 'performance.prefetchNextPage', group: 'performance', kind: 'toggle', label: 'Prefetch Next Page', inert: true },
 
   // ------------------------------------------------------------- logging ---
-  { path: 'logging.level', group: 'logging', kind: 'select', label: 'Log Level', options: opts(SCRAPER_LOG_LEVELS, { silent: 'Silent', error: 'Errors only', warn: 'Warnings', info: 'Info', debug: 'Debug', trace: 'Trace' }) },
-  { path: 'logging.channels', group: 'logging', kind: 'tags', label: 'Channels', hint: `One or more of: ${SCRAPER_LOG_CHANNELS.join(', ')}.` },
-  { path: 'logging.persistToDisk', group: 'logging', kind: 'toggle', label: 'Write Logs to Disk' },
-  { path: 'logging.retentionDays', group: 'logging', kind: 'number', label: 'Retention', min: 0, max: 365, unit: 'days' },
-  { path: 'logging.maxFileSizeMb', group: 'logging', kind: 'number', label: 'Max Log File Size', min: 1, max: 4_096, unit: 'MB' },
-  { path: 'logging.redactCookies', group: 'logging', kind: 'toggle', label: 'Redact Cookies', hint: 'A log that leaks a session cookie is a security incident. Leave this on.' },
-  { path: 'logging.redactCredentials', group: 'logging', kind: 'toggle', label: 'Redact Credentials' },
-  { path: 'logging.captureScreenshotsOnError', group: 'logging', kind: 'toggle', label: 'Screenshot on Failure' },
-  { path: 'logging.captureHar', group: 'logging', kind: 'toggle', label: 'Capture HAR', advanced: true },
+  // 2026-08-05: was nine fields, EVERY one inert. Five act now, read by
+  // `main/scraper/logBus.ts`. Four controls were removed rather than wired:
+  //
+  //   redactCookies / redactCredentials — the redaction they name is
+  //     unconditional in logBus and always was, so a toggle could only ever
+  //     turn a guarantee into an option. The read-only row below states the
+  //     guarantee instead; both fields stay in the schema so stored documents
+  //     keep parsing.
+  //   captureScreenshotsOnError / captureHar — both need a browser, and this
+  //     project has none. Deleted on the same grounds as the whole `browser`
+  //     category on 2026-08-02.
+  { path: 'logging.level', group: 'logging', kind: 'select', label: 'Log Level', options: opts(SCRAPER_LOG_LEVELS, { silent: 'Silent', error: 'Errors only', warn: 'Warnings', info: 'Info', debug: 'Debug', trace: 'Trace' }), hint: 'Lines below this level are not recorded anywhere — not the Logs tab, not the job result, not the file.' },
+  { path: 'logging.channels', group: 'logging', kind: 'tags', label: 'Channels', hint: `Leave empty for every channel. Any of: ${SCRAPER_LOG_CHANNELS.join(', ')}.` },
+  { path: 'logging.persistToDisk', group: 'logging', kind: 'toggle', label: 'Write Logs to Disk', hint: 'Appends to scraper/logs/scraper-<date>.log under your app data folder.' },
+  { path: 'logging.retentionDays', group: 'logging', kind: 'number', label: 'Retention', min: 0, max: 365, unit: 'days', hint: '0 keeps every log file forever.' },
+  { path: 'logging.maxFileSizeMb', group: 'logging', kind: 'number', label: 'Max Log File Size', min: 1, max: 4_096, unit: 'MB', hint: 'Reaching the ceiling rolls over to a numbered file rather than truncating.' },
+  { path: 'logging.redaction', group: 'logging', kind: 'note', label: 'Cookies and credentials', hint: 'Always redacted, with no way to turn it off: cookie and authorization headers, credentials in a URL, and token/api_key query parameters are replaced before a line is recorded or returned.', keywords: ['redact', 'cookies', 'credentials', 'secrets', 'privacy'] },
 
   // ---------------------------------------------------------- validation ---
   { path: 'validation.requirePlayableStream', group: 'validation', kind: 'toggle', label: 'Require a Playable Stream' },
@@ -333,13 +356,19 @@ export const SCRAPER_FIELDS: ScraperFieldDef[] = [
   { path: 'validation.onFailure', group: 'validation', kind: 'select', label: 'On Failure', options: opts(SCRAPER_VALIDATION_FAILURE_MODES, { warn: 'Warn and keep', skip: 'Skip the item', abort: 'Abort the job' }) },
 
   // -------------------------------------------------------------- export ---
+  // 2026-08-05: NOTHING here is inert any more. `buildEpisodeExport` takes the
+  // group (renderer/components/scraper/data/exportBuilder.ts), the Exports page
+  // reads format and template from the document instead of from two useState
+  // locals, and `destinationRef`/`openAfterExport` reach main's writeExport.
+  // The comment this replaces said the Results page chose its format and columns
+  // "independently of this panel" — that was the defect, not the design.
   { path: 'export.format', group: 'export', kind: 'select', label: 'Format', options: opts(SCRAPER_EXPORT_FORMATS, { json: 'JSON', csv: 'CSV', ndjson: 'NDJSON', m3u: 'M3U playlist', 'torrent-list': 'Torrent list' }) },
-  { path: 'export.destinationRef', group: 'export', kind: 'text', label: 'Destination', placeholder: 'Choose a folder' },
-  { path: 'export.filenameTemplate', group: 'export', kind: 'text', label: 'Filename Template' },
-  { path: 'export.includeColumns', group: 'export', kind: 'tags', label: 'Columns' },
+  { path: 'export.destinationRef', group: 'export', kind: 'text', label: 'Destination', placeholder: 'Choose a folder', hint: 'An absolute folder path the save dialog opens in. The file still lands wherever you confirm the dialog; an unreadable path falls back to Downloads.' },
+  { path: 'export.filenameTemplate', group: 'export', kind: 'text', label: 'Filename Template', hint: 'Supports {series} and {date}.' },
+  { path: 'export.includeColumns', group: 'export', kind: 'tags', label: 'Columns', hint: `Any of: ${SCRAPER_EXPORT_COLUMNS.join(', ')}. Unknown names are ignored; clearing the field exports every column.` },
   { path: 'export.includeSubtitleColumn', group: 'export', kind: 'toggle', label: 'Include Subtitle Availability' },
-  { path: 'export.splitBySeason', group: 'export', kind: 'toggle', label: 'Split by Season' },
-  { path: 'export.prettyPrint', group: 'export', kind: 'toggle', label: 'Pretty Print' },
+  { path: 'export.splitBySeason', group: 'export', kind: 'toggle', label: 'Split by Season', hint: 'JSON is keyed by season, M3U gains #EXTGRP, and the flat formats gain a season column.' },
+  { path: 'export.prettyPrint', group: 'export', kind: 'toggle', label: 'Pretty Print', hint: 'JSON only.' },
   { path: 'export.openAfterExport', group: 'export', kind: 'toggle', label: 'Open After Export' },
 
   // ----------------------------------------------------------- scheduler ---

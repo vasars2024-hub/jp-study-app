@@ -167,11 +167,30 @@ export const FEATURE_STATUS: Record<string, FeatureStatus> = {
   // is whether anything consumes the values yet.
   'set.sources': 'ready',
   'set.torrent': 'ready',
+  // All ten fields act on rows as of 2026-08-04. Six always did, read straight
+  // by the engine; detectMissingNumbers, mergeDuplicateSources,
+  // keepHighestQuality and renameEpisodes were inert until
+  // `main/scraper/episodeProcessingRules.ts` was wired into both build paths
+  // (audit F5). Nothing in this group is inert now.
   'set.episodes': 'ready',
   'set.validation': 'ready',
   // The client and the credential vault are implemented and tested; a live
   // qBittorrent was not available to run against.
   'set.qbittorrent': 'untested',
+  // 2026-08-05: was INERT IN FULL. `main/scraper/logBus.ts` reads the group now.
+  // `level` and `channels` decide whether a line is recorded at all;
+  // `persistToDisk`, `maxFileSizeMb` and `retentionDays` own a real file sink
+  // under `<userData>/scraper/logs`. `runtime.ts` pushes the active profile's
+  // group as each job scope is built.
+  //
+  // Four of the nine were resolved by removing the control rather than wiring
+  // it, on the `set.browser` precedent:
+  //   redactCookies / redactCredentials — the redaction is unconditional and
+  //     always was, so a toggle could only weaken it. A read-only 'note' row
+  //     states the guarantee; the schema fields remain so stored documents parse.
+  //   captureScreenshotsOnError / captureHar — both need a browser this project
+  //     does not have.
+  //
   // 2026-08-12: lines written through the running app. Seven real jobs were
   // started over `scraper:startScrape` with the active profile's document and
   // only its Logging group varied; each used `contentType: 'manga'`, which
@@ -201,6 +220,17 @@ export const FEATURE_STATUS: Record<string, FeatureStatus> = {
   // can be driven further without writing into or deleting from the userData
   // tree, which is not a trade this check is allowed to make.
   'set.logging': 'ready',
+  // 2026-08-05: was INERT IN FULL. `buildEpisodeExport` takes the group
+  // (data/exportBuilder.ts) and every field reaches the bytes or the dialog:
+  // includeColumns and includeSubtitleColumn choose the columns, splitBySeason
+  // groups them, prettyPrint sets JSON indentation, format picks the branch,
+  // filenameTemplate names the file, destinationRef is the folder the save
+  // dialog opens in (validated in main as an existing directory) and
+  // openAfterExport reveals the result. The Exports page no longer keeps its own
+  // copy of format and template — that duplication was the whole defect.
+  //
+  // Held at 'untested': 11 builder assertions with two positive controls seen
+  // red, but no file has been written through a save dialog in a running app.
   'set.export': 'untested',
   'set.developer': 'ready',
   'set.profiles': 'ready',
