@@ -298,12 +298,21 @@ export const SCRAPER_FIELDS: ScraperFieldDef[] = [
   { path: 'metadata.providerOrder', group: 'metadata', kind: 'tags', label: 'Provider Order', hint: 'Ordered. The first provider with a value wins.' },
   { path: 'metadata.titleLanguage', group: 'metadata', kind: 'select', label: 'Title Language', options: opts(SCRAPER_TITLE_LANGUAGES, { romaji: 'Romaji', english: 'English', native: 'Japanese' }) },
   { path: 'metadata.alsoStoreNativeTitle', group: 'metadata', kind: 'toggle', label: 'Also Store Japanese Title', hint: 'Shown as the second line under each result.' },
-  { path: 'metadata.mergeStrategy', group: 'metadata', kind: 'select', label: 'Merge Strategy', options: opts(SCRAPER_MERGE_STRATEGIES, { 'first-wins': 'First provider wins', 'prefer-complete': 'Prefer the most complete', manual: 'Ask me' }) },
-  { path: 'metadata.fetchSynopsis', group: 'metadata', kind: 'toggle', label: 'Fetch Synopsis' },
-  { path: 'metadata.fetchGenres', group: 'metadata', kind: 'toggle', label: 'Fetch Genres' },
-  { path: 'metadata.fetchAirDates', group: 'metadata', kind: 'toggle', label: 'Fetch Air Dates' },
-  { path: 'metadata.fetchRatings', group: 'metadata', kind: 'toggle', label: 'Fetch Ratings' },
-  { path: 'metadata.fetchStaff', group: 'metadata', kind: 'toggle', label: 'Fetch Staff and Cast', advanced: true },
+  { path: 'metadata.mergeStrategy', group: 'metadata', kind: 'select', label: 'Merge Strategy', options: opts(SCRAPER_MERGE_STRATEGIES, { 'first-wins': 'First provider wins', 'prefer-complete': 'Prefer the most complete', manual: 'Ask me' }), hint: 'Stored for a future multi-provider merge. The search returns as soon as one provider answers, so only ever one record exists and there is nothing to merge.', inert: true },
+  // 2026-08-12: these four were labelled "Fetch". They do not decide what is
+  // requested — the AniList query document and the Jikan URL are fixed, and both
+  // ask for the full record every time. The toggles run in `toSeriesMetadata`
+  // (and, for air dates, in the engine's row build) on an answer that has
+  // already arrived. "Fetch" told a user that turning one off meant asking for
+  // less, which is the one thing it does not do; the `note` row below states
+  // what actually goes over the wire. `keywords` keeps them findable by the old
+  // word.
+  { path: 'metadata.fetchSynopsis', group: 'metadata', kind: 'toggle', label: 'Store Synopsis', keywords: ['fetch'] },
+  { path: 'metadata.fetchGenres', group: 'metadata', kind: 'toggle', label: 'Store Genres', keywords: ['fetch'] },
+  { path: 'metadata.fetchAirDates', group: 'metadata', kind: 'toggle', label: 'Store Air Dates', keywords: ['fetch'] },
+  { path: 'metadata.fetchRatings', group: 'metadata', kind: 'toggle', label: 'Store Ratings', keywords: ['fetch'] },
+  { path: 'metadata.requestScope', group: 'metadata', kind: 'note', label: 'What is requested', hint: 'Each provider is asked for its whole record in a single request, and there is no way to ask it for less. The four toggles above decide what is kept from that answer: turning one off empties the field and drops it from the provenance record, but it does not make the request smaller or keep the provider from seeing what was searched for.', keywords: ['fetch', 'request', 'network', 'privacy', 'bandwidth'] },
+  { path: 'metadata.fetchStaff', group: 'metadata', kind: 'toggle', label: 'Fetch Staff and Cast', advanced: true, hint: 'Stored for a future staff lookup. Neither catalogue endpoint returns staff or cast, and the studio credit is a separate field that is kept whatever this is set to.', inert: true },
   { path: 'metadata.cacheHours', group: 'metadata', kind: 'number', label: 'Metadata Cache', min: 0, max: 8_760, unit: 'h' },
 
   // --------------------------------------------------------------- cache ---

@@ -12954,3 +12954,116 @@ differs, then `git diff HEAD <commit>` — if that diff is dominated by **deleti
 the older draft and the only question left is whether its few additions are wanted. For `9e6e82d`
 it was +9/−69, for `87dd97c` +2/−55, and for `99c8747` the 15 remaining additions had a recorded
 rejection.
+
+## Metadata's last two audit claims, closed: two inert controls disclosed, and four toggles that were never a fetch — 2026-08-12
+
+Picks up the two `set.metadata` claims that `2bd2cd5` left standing. That entry fixed three of
+the five defects the read-only Codex audit reported and named the other two without acting on
+them; both are now re-derived from source and resolved. `set.metadata` stays **`untested`** — this
+is a labelling and disclosure slice, and nothing here is live provider acceptance.
+
+### Claim 3: `mergeStrategy` and `fetchStaff` are inert but presented as working — CONFIRMED, disclosed
+
+Both were already documented as inert in `featureStatus.ts:337-338` and in
+`PHASE_4_SEANIME_SCRAPER_STATE.md:348-349`, and both still rendered in the drawer identically to
+the eight wired controls. That is the F5 defect the `inert` flag exists for, in the one group
+whose own comment already named it — the mechanism was built (`fields.ts:88-98`,
+`FieldRow.tsx:262-265`, `set.inert` / `set.inertHint` in `strings.ts:424-425`) and applied to
+`images`, `performance` and `scheduler`, but never to `metadata`.
+
+Both now carry `inert: true` plus a hint that says why, and each hint is a re-derived claim:
+
+- **`mergeStrategy`** — `searchCatalogue` (`catalogue.ts:424-455`) returns on the first provider
+  whose result array is non-empty, so a second record never exists to merge with. Verified in
+  source, not taken from the older comment.
+- **`fetchStaff`** — `toSeriesMetadata` deliberately does not read it (`catalogue.ts:664-668`);
+  neither endpoint returns staff or cast, and gating the unrelated `studios` credit on it would
+  empty a populated field to make a setting look wired.
+
+### Claim 4: the "Fetch" toggles redact output but still request the fields — CONFIRMED, relabelled
+
+This one is real and was the more misleading of the two. `fetchSynopsis`, `fetchGenres`,
+`fetchAirDates` and `fetchRatings` never governed a request:
+
+- `searchAnilist` sends a **fixed GraphQL document** that asks for `description`, `genres` and
+  `averageScore` unconditionally (`catalogue.ts:220-222`);
+- `searchJikan` builds a **fixed URL** (`catalogue.ts:381`) against an endpoint that returns the
+  whole record either way;
+- the settings are read only *afterwards*, in `toSeriesMetadata` (`catalogue.ts:661-663`) and, for
+  air dates, in the engine's row build (`engine.ts:472`).
+
+So a user turning "Fetch Synopsis" off for bandwidth or privacy got exactly the same request on
+the wire and a blanked field on arrival. The word "Fetch" asserted the one thing the control does
+not do. The four are now **"Store Synopsis / Store Genres / Store Air Dates / Store Ratings"**,
+which is what they actually decide, and a `note` row — `metadata.requestScope`, "What is
+requested" — states what leaves the machine: one request for the whole record, no way to ask for
+less, and no reduction in what the provider learns about the search. `note` was the right kind
+here for the same reason it was right for `logging.redaction`: there is nothing to operate, and
+rendering a control would imply the scope is negotiable.
+
+The settings **paths are unchanged** (`metadata.fetchSynopsis` and friends), so no stored document
+migrates, and each toggle carries `keywords: ['fetch']` so the old word still finds it.
+
+**This is a labelling fix, not a wiring one.** Nothing about the network changed — which is
+precisely why the old label was wrong. If either request ever does become conditional, the new
+`scraperMetadataFieldTruth` suite fails on the source assertion below and "Fetch" becomes the
+honest word again.
+
+### Gates
+
+| gate | result |
+|---|---|
+| `npx vitest run` | **547 files passed**, 1 skipped; **7313 tests passed**, 6 skipped, **0 failed**, exit 0. No suite failure at all this time — the `visualNovelI18n.test.tsx` hook-timeout flake recorded in the previous entry did not recur. |
+| `node tools/i18n-check.cjs` | exit 0 — all **9340** English keys translated in ja/zh/ru |
+| `node tools/architecture-audit.cjs` | exit 0 — 1731 modules, "Nothing new", same 2 pending known findings |
+| `npx eslint` on the 3 touched paths | exit 0, **0 errors, 0 warnings** |
+
+Standing caveat still applies: the in-situ vitest number describes the shared tree, which carries
+other tracks' unlanded work. This slice touches three files that were **clean at HEAD** before the
+edit, so the eslint and focused-suite results are about the change itself.
+
+New suite: `renderer/__tests__/scraperMetadataFieldTruth.test.ts`, in the shape of the existing
+`scraperImageFieldTruth` / `scraperSchedulerNotificationsFieldTruth` pairs — active-field list,
+inert-field list, the `^Store ` label guard with its `fetch` keyword, the note row, and a
+source-level assertion that neither `searchAnilist` nor `searchJikan` mentions any of the four
+setting keys. That last one is the guard that keeps the labels honest if the runtime changes.
+
+### Live Electron acceptance
+
+Driven through the debug bridge against the running dev app (window 1, `Скрапер` — the UI language
+is Russian; the scraper subtree is deliberately pre-i18n English). The renderer was **reloaded**
+first so the measured modules were the edited ones rather than an HMR patch — this slice is
+renderer-only, so no main restart was needed.
+
+All eleven Metadata rows read back from the live DOM:
+
+| row | `data-inert` | badge | control rendered |
+|---|---|---|---|
+| Provider Order, Title Language, Also Store Japanese Title | — | — | yes |
+| **Merge Strategy** | `"true"` | **Not wired** | yes |
+| **Store Synopsis / Store Genres / Store Air Dates / Store Ratings** | — | — | yes |
+| **What is requested** | — | — | **no — `control: false`** |
+| **Fetch Staff and Cast** | `"true"` | **Not wired** | yes |
+| Metadata Cache | — | — | yes |
+
+The note row rendering with **no operable element** is the part worth stating: it is the
+difference between a statement and a disabled control, and it is what `kind: 'note'` promises.
+
+**The relabel did not cost discoverability, measured rather than assumed.** Typing `fetch` into the
+drawer's own "Search settings…" field returned **7 rows** — all four `Store …` toggles, the *What
+is requested* note (matched on its `fetch` keyword), plus `Fetch Staff and Cast` and
+`Prefetch Next Page`. Screenshot corroboration in `debug/shots/win1-1786527612410.png` shows the
+greyed **Not wired** badge beside Merge Strategy with its hint beneath.
+
+**Nothing persisted was changed.** `jp-scraper-advanced-v1` was captured as `"1"` before the run
+and asserted `=== '1'` after (it was already on, so `fetchStaff`'s `advanced: true` row was visible
+without touching it). No toggle was flipped, "Save Settings" was never clicked, the drawer reported
+zero dirty state, both search inputs were cleared back to `""`, and the scraper window was closed
+to leave the desktop at zero windows. No userData backup was taken. The active profile is still the
+earlier hop's `Relay Probe MOUSE`, untouched.
+
+### What this does not claim
+
+`set.metadata` remains `untested` and should stay that way until the strict loopback
+provider-proxy path is built. Eight controls have runtime consumers and two are now honestly
+marked, but no live provider call was made and none should be made merely to turn a dot green.

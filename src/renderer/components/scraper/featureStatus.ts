@@ -336,6 +336,20 @@ export const FEATURE_STATUS: Record<string, FeatureStatus> = {
   // alsoStoreNativeTitle, fetchSynopsis/Genres/Ratings/AirDates shape the result;
   // cacheHours is the metadata cache's own lifetime. Inert: mergeStrategy (only
   // one provider ever answers) and fetchStaff (nothing here fetches staff).
+  //
+  // 2026-08-12: both inert fields now carry `inert: true` in fields.ts, so the
+  // drawer marks them. They were documented as inert here since the group was
+  // first censused while still rendering exactly like the wired controls — the
+  // F5 defect, in the one group whose own comment already named it.
+  //
+  // The four projection toggles were also relabelled "Fetch X" -> "Store X".
+  // They never governed the request: `searchAnilist` sends a fixed GraphQL
+  // document (catalogue.ts:220-222 asks for description, genres and
+  // averageScore unconditionally) and `searchJikan` a fixed URL, and the
+  // toggles are read afterwards in `toSeriesMetadata` / engine.ts:472. A
+  // `note` row states what actually leaves the machine. This is a labelling
+  // fix, not a wiring one: nothing about the network changed, which is
+  // precisely why the old label was wrong.
   'set.metadata': 'untested',
   // safety.* is enforced per host in `main/scraper/safetyPolicy.ts` (crawl delay,
   // the per-minute window, domainRateLimits, and a failure circuit breaker),
