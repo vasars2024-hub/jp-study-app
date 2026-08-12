@@ -12774,3 +12774,23 @@ Six integrated (`27c74b6`, `9c046cc`, `20f72eb`, `2545cd5`, `c3ae5b6`, `28a239c`
 obsolete (`9e6e82d`), **three open**: `c48b266` (ReadingLens pinned captures — touches
 `preload.ts`; invoke its main handler live, do not grep the channel), and `87dd97c` / `99c8747`,
 both 148–152 behind and per-hunk salvage only.
+
+### Correction to this entry's own gate table — read before quoting any gate result
+
+The `npx vitest run` line above (546 files / 7291 tests, exit 0) was run **in the shared working
+tree**, and that is now known to be a weaker claim than it looks. Verifying `0f5d1cc` in a
+**detached worktree** turned up two `i18n.test.ts` "catalog hygiene" failures that the shared
+tree hides — and they are equally present at the parent `73c241b`, with the identical counts
+(36 and 2), so this commit introduces **zero** new failures. That set-difference is the real
+evidence; the clean run was not.
+
+The cause is other tracks' uncommitted work: ~1 760 changed lines of i18n conversion across
+seven large surfaces (`ScraperPage.tsx`, `VisualNovelPanel.tsx`, `VerifiedSitesManager.tsx`,
+`NovelsContent.tsx`, `ReaderCollectionPanel.tsx`, `VideoServerProfilesManager.tsx`,
+`ArcadeGames.tsx`) exist only in the working tree, while the baselines that account for them are
+already committed. Full write-up and the loss risk are in
+`docs/audit/RELAY_BOSS_AUDIT.md` under "does not pass its own i18n gate when checked out clean".
+
+**Practical rule for the next worker:** run the gates in the shared tree for speed, but if a gate
+number is going into a ledger as proof, re-run it detached at your commit and report the delta
+against your commit's parent. `npx vitest run` in situ currently cannot fail on these two.

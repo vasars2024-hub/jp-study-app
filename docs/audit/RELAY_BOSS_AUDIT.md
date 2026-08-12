@@ -123,3 +123,60 @@ Append to this table when you integrate one. Evidence lives in
 
 Method worth reusing: `git rev-parse <commit>:<path>` against `git rev-parse HEAD:<path>`
 falsifies "is this still needed?" in one command per file, before any merge is attempted.
+
+## 2026-08-12 (later) — `feat/nyaa-subtitles` does not pass its own i18n gate when checked out clean
+
+Found while verifying the `28a239c` integration in a **detached worktree** rather than in the
+shared tree. Not caused by that commit, and not caused by the relay — but it is the same
+"work exists only in a working tree" loss risk that triggered the rescue audit above, so it
+belongs here.
+
+### The finding
+
+`src/shared/__tests__/i18n.test.ts` "catalog hygiene" has **two failing tests at branch HEAD**
+(`73c241b`, and equally at `0f5d1cc`) when the commit is checked out into a fresh worktree:
+
+- *does not let a new component render UI text without adopting i18n* — **36** entries
+- *does not let a date or time be formatted in the OS locale* — **2** entries
+
+In the shared working tree both pass. The difference is **not** the baselines, which are
+committed and (for the hardcoded one) clean. It is that the *source fixes those baselines
+already account for* are *uncommitted*.
+
+### Proof, and why it is not a false alarm
+
+`tools/i18n-hardcoded-baseline.json` at HEAD lists **6** files, none of them the offenders. The
+seven files that actually carry the conversion work are **all dirty in the shared tree**, to the
+tune of **685 insertions / 1 076 deletions**:
+
+    ScraperPage.tsx (744 lines changed)   VisualNovelPanel.tsx (239)
+    VerifiedSitesManager.tsx (211)        NovelsContent.tsx (175)
+    ReaderCollectionPanel.tsx (163)       VideoServerProfilesManager.tsx (128)
+    ArcadeGames.tsx (101)
+
+Run `node tools/i18n-hardcoded-check.cjs` in the shared tree and it says "no new component…, 6
+file(s) baselined". Run it at the same HEAD in a clean worktree and `ScraperPage.tsx` alone
+reports **184 hardcoded strings**. Same commit, opposite verdicts — the passing one is reading
+uncommitted files.
+
+The locale-arg failure is the same shape on a different track: `Lockscreen.tsx:171-172` still
+call bare `.toLocaleTimeString()` / `.toLocaleDateString()` at HEAD, and three more files
+(`VisualNovelSentenceAssist.tsx`, `MediaTrackingCalendar.tsx`, `ReaderCollectionPanel.tsx`)
+"gained bare toLocaleString() since the baseline". `tools/i18n-locale-arg-baseline.json` is
+itself dirty (one entry removed, for `ScraperPage.tsx`), so that track's baseline edit is
+uncommitted too.
+
+### What this means for the relay, and what NOT to do
+
+1. **A green gate run in the shared tree is not evidence about the commit you just made.** It is
+   evidence about the tree, which contains several tracks' unlanded work. If a gate result is
+   going to be quoted in a ledger as proof, run it in a detached worktree at the commit.
+2. **~1 760 changed lines of i18n conversion currently exist nowhere but this working tree.** No
+   commit, no stash (correctly — stashing is banned here), no tag. If that tree is lost, the work
+   is lost *and* the committed baselines are left describing a state that no longer exists.
+3. **Do not commit it on that track's behalf.** It is mid-flight, it spans seven large surfaces,
+   and a relay worker cannot tell a finished conversion from a half-finished one. Whoever owns
+   the scraper/VN/novels i18n pass should land it; until then treat these two test failures as
+   **known-failing at HEAD** and prove your own changes by set-difference, not by a clean run.
+4. The honest status line: this branch's i18n gate is currently **green only in situ**. Say that
+   rather than "i18n passes".
