@@ -10976,3 +10976,105 @@ Consequence: **a plain `git add` of that file sweeps in another track's uncommit
 Promoting even one entry there needs the reconstruct-HEAD-plus-your-hunk discipline, not a
 straight stage. Confirm the foreign hunks are still uncommitted before starting — if that track
 has landed them by then, the file is clean again and this whole caution is void.
+
+## The Script Console earned its green dot — 2026-08-12
+
+Main V1 remains in dependency-order item 8. The newest ledger section left 21 entries in
+`renderer/components/scraper/featureStatus.ts` at `untested` and explicitly required a
+small live-acceptance cluster rather than a speculative implementation pass. This slice took one
+bounded member: `page.script-console`.
+
+### Re-derived starting state
+
+- The page was implemented, routed by `ScraperApp`, and guarded by the active profile's
+  `developer.allowScriptConsole` setting.
+- Its ten commands come from the frozen allow-list in `shared/scraperConsole.ts`. The page
+  adapts the real `ScraperPort` plus its current settings/log state; arbitrary input is never
+  evaluated.
+- The registry still said `untested`, exactly matching its comment: unit coverage existed,
+  but the page had not been exercised through a running app.
+- The file still carried another track's +33 comment-only lines. They were preserved in the
+  working tree and are excluded from this checkpoint by reconstructing HEAD plus this slice's
+  own hunk.
+
+### Live Electron acceptance
+
+The already-running scraper pop-out was driven only through the authenticated debug bridge. It
+was not restarted or stopped because another relay track owned that process.
+
+1. Before unlock, the input and all ten command-palette buttons were disabled and the locked
+   card was visible.
+2. The active settings document was cloned and dispatched to the mounted page **in memory** with
+   `allowScriptConsole=true`; no settings write was needed.
+3. Every palette button was invoked through the shipped UI:
+   `help`, `backend.capabilities`, `system.stats`, `jobs.active`,
+   `jobs.recent`, `sources.health`, `plugins.installed`, `exports.recent`,
+   `profile.active`, and `logs.tail`.
+4. All ten produced an `ok` transcript row with the live/outline badge. Discriminating
+   readings included 8 persisted jobs, 6 source-health rows, 2 installed plugin records, live
+   process stats, and the main-owned log tail. `backend.capabilities` named 25 implemented
+   methods and only `testSelector` as sample data.
+5. At 900x640 the page had no body or page-level horizontal overflow. The deliberately nowrap
+   command palette measured 1,099 px inside a 768 px viewport with `overflow-x:auto`, so its
+   last commands remain reachable by scroll and keyboard rather than being clipped dead.
+
+The original `jp-scraper-settings-v1` and `jp-scraper-shell-v1` strings were captured
+before the run and compared with `===` after returning to the prior Profiles page: both were
+byte-identical. The two probe globals were deleted and their absence confirmed. The bridge
+reported 0 errors. Its screenshot endpoint created two temporary PNGs: the first GET
+accidentally captured the main window because that route reads its target from the request body,
+then the targeted POST captured the scraper. Both were inspected and deleted; no proof artifact
+or userData backup was retained.
+
+After the source edit, a cache-busted import from Vite's running served graph returned
+`statusOf('page.script-console') === 'ready'`. The already-cached module instance still
+returned `untested` because this registry is not an HMR acceptance boundary; this entry does
+not pretend the open pop-out re-rendered its dot without a reload. The behavior being promoted
+was exercised before the edit, and the edited module was separately read from the served graph.
+
+### Changed paths
+
+- `src/renderer/components/scraper/featureStatus.ts` — promote only
+  `page.script-console` and record the live acceptance.
+- `src/MAIN_V1_EVIDENCE_LEDGER.md` — this evidence.
+
+No UI string was added.
+
+### Gates
+
+- Focused: `scraperConsole.test.ts` + `scraperRegistry.test.ts` — **2 files,
+  35 tests passed**.
+- `npx vitest run` — **538 files passed, 1 skipped; 7,251 tests passed, 6 skipped**.
+- `node tools/i18n-check.cjs` — exit 0, all **9,324** English keys translated in ja/zh/ru.
+  The normal launcher could not start in this session because
+  `codex-windows-sandbox-setup.exe` was missing. Running the unchanged command through a
+  temporary `subst` drive avoided esbuild traversing the denied parent directory; the mapping
+  was removed and its absence verified immediately afterward.
+- `node tools/architecture-audit.cjs` — exit 0, **17 findings, 2 pending**, nothing new.
+- `npx eslint src/renderer/components/scraper/featureStatus.ts` — exit 0, no output.
+- `git diff --check` on the changed registry — no whitespace error.
+- `tsc --noEmit` was not run; it is not a gate.
+
+### Exact next slice
+
+There are now **20** `untested` entries. Main V1 remains in dependency-order item 8; do not
+move to Blanc. Take another small, decision-free acceptance cluster. `set.ui` is the cleanest
+next member: exercise its six hand-rendered controls through the running Settings drawer, prove
+each changes the shell state it claims to own, then restore `jp-scraper-shell-v1`
+byte-identically. Keep using reconstruct-HEAD-plus-own-hunk staging while the foreign +33 comment
+lines remain uncommitted.
+
+### Checkpoint blocked by this worker's execution sandbox
+
+No checkpoint commit was created in this session. The normal shell and patch tools could not
+start because the installed Codex bundle is missing
+`codex-windows-sandbox-setup.exe`. The fallback persistent Node host could run every gate and
+write the workspace, but its token has read-only access to `.git`; a temporary-index
+`git add` stopped with `insufficient permission for adding an object to repository
+database .git/objects`. It stopped before changing the real index or a ref. HEAD remains
+`056e3204c2d76acd632f16875297d85b77a4c6d0`.
+
+The next worker's **first action** is to create the one path-scoped checkpoint containing this
+ledger section and only the `page.script-console` promotion/comment hunk. Do not sweep in the
+foreign +33 comment lines from `featureStatus.ts`. Only after that checkpoint exists should
+the `set.ui` live-acceptance slice begin.

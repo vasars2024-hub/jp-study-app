@@ -135,7 +135,11 @@ export const FEATURE_STATUS: Record<string, FeatureStatus> = {
   // fixture can never pass for a reading. `developer.allowScriptConsole` gates
   // it and is what makes that toggle mean something.
   // Nothing here is inert. Nothing here executes user input, by design.
-  'page.script-console': 'untested',
+  // Re-verified live 2026-08-12: the locked state disabled the input and all
+  // ten palette buttons; after an in-memory unlock, all ten commands returned
+  // live readings through the running Electron app. No persisted setting was
+  // changed by the acceptance pass.
+  'page.script-console': 'ready',
 
   // ---- Result tabs ----
   // Rows, metadata and logs come from the job that produced them.
