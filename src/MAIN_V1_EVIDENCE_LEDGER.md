@@ -14009,3 +14009,27 @@ Track 2's decision-free compatibility and sentence route are now complete. Passa
 parked on its destination decision. The next worker should re-audit the remaining Track 2
 AI/enrichment bullets against current source before advancing dependency order; do not infer Track
 2 completion from this one route.
+
+## The automatic Workbench lens can now be overridden — 2026-08-12
+
+Re-deriving Track 2 against source found that `resolveLexiconInput` and
+`LexiconWorkbenchResults` accepted a manual lens only as an internal prop. The canonical automatic
+Workbench gave the user no way to correct an ambiguous classification, despite the plan explicitly
+requiring manual override. It now exposes localized automatic, lookup, and interlinear controls with
+pressed-state semantics. Dictionary and Translate compatibility aliases remain pinned and do not
+show the route-changing controls.
+
+Focused Vitest passed **4/4**. The four required gates passed in the shared tree: full Vitest
+**7,361 passed / 0 failed / 6 skipped** across 555 files; i18n **9,350** English keys complete in
+ja/zh/ru; architecture 1,742 modules / 17 findings with nothing new and the same two pending;
+ESLint over every touched code/test/catalog path clean.
+
+Live Electron acceptance used a fresh main started by this worker and the authenticated debug bridge
+only. A one-character `猫` query initially rendered the Dictionary surface with Auto pressed. The
+Interlinear control then became the sole pressed lens, the real offline interlinear handler returned
+and rendered the exact `猫`, and the surface showed no alert; the bridge error log was empty. No
+persisted setting was changed and no userData backup was taken.
+
+Track 2 remains open. The immediate offline ladder and compatibility routing are real, but sense
+pinning/retranslation, parallel targets, semantic diff, composition checking, vocabulary harvest,
+difficulty/concordance, and the grounded AI enrichment bullets still require source-derived slices.

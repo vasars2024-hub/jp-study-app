@@ -21,10 +21,13 @@ export default function LexiconWorkbenchResults({
   glossLang = 'en',
 }: Props) {
   const { t } = useT();
-  const resolution = resolveLexiconInput(query, lens);
+  const [selectedLens, setSelectedLens] = useState<LexiconLensOverride>(lens);
+  const resolution = resolveLexiconInput(query, selectedLens);
   const interlinear = resolution.kind !== 'empty' && resolution.lens === 'translate';
   const [result, setResult] = useState<LexiconInterlinearResult | null>(null);
   const [state, setState] = useState<'idle' | 'loading' | 'error'>('idle');
+
+  useEffect(() => setSelectedLens(lens), [lens]);
 
   useEffect(() => {
     if (!interlinear) {
@@ -48,12 +51,30 @@ export default function LexiconWorkbenchResults({
     return () => { alive = false; };
   }, [glossLang, interlinear, lang, lookupAttempt, query]);
 
-  if (!interlinear) {
-    return <DictionaryResults key={lookupAttempt} query={query} variant="page" lang={lang} />;
-  }
-
   return (
-    <section className="lexicon-interlinear" aria-label={t('lexicon.workbench.interlinear')}>
+    <section className="lexicon-workbench" aria-label={t('lexicon.workbench.interlinear')}>
+      {lens === 'auto' && (
+        <div className="lexicon-lens-picker" role="group" aria-label={t('lexicon.workbench.interlinear')}>
+          {(['auto', 'lookup', 'translate'] as const).map((option) => (
+            <button
+              className={selectedLens === option ? 'active' : undefined}
+              key={option}
+              onClick={() => setSelectedLens(option)}
+              type="button"
+              aria-pressed={selectedLens === option}
+            >
+              {t(option === 'auto'
+                ? 'settings.home.auto'
+                : option === 'lookup'
+                  ? 'dict.view.search'
+                  : 'lexicon.workbench.interlinear')}
+            </button>
+          ))}
+        </div>
+      )}
+      {!interlinear ? (
+        <DictionaryResults key={lookupAttempt} query={query} variant="page" lang={lang} />
+      ) : <div className="lexicon-interlinear" aria-label={t('lexicon.workbench.interlinear')}>
       <div className="lexicon-interlinear-meta">
         <span>{t('lexicon.workbench.detected', { kind: t(`lexicon.kind.${resolution.kind}`) })}</span>
         {result?.truncated && <span>{t('lexicon.workbench.truncated')}</span>}
@@ -72,6 +93,7 @@ export default function LexiconWorkbenchResults({
           ))}
         </div>
       )}
+      </div>}
     </section>
   );
 }

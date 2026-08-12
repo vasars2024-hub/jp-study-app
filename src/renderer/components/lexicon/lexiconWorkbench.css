@@ -32,3 +32,22 @@
   color: var(--text-muted, currentColor);
   font-size: 0.5em;
 }
+.lexicon-lens-picker {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.lexicon-lens-picker button {
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.35));
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+}
+
+.lexicon-lens-picker button.active {
+  border-color: var(--accent, #5588cc);
+  background: color-mix(in srgb, var(--accent, #5588cc) 14%, transparent);
+}

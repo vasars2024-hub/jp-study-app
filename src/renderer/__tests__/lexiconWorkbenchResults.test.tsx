@@ -61,6 +61,26 @@ describe('LexiconWorkbenchResults', () => {
     expect(host.querySelector('ruby.is-grounded')?.textContent).toContain('cat');
   });
 
+  it('lets the user override an ambiguous automatic lens', async () => {
+    const lookup = vi.fn().mockResolvedValue({
+      text: '猫', detectedLangs: ['ja'], glossLangs: ['en'], tokenCount: 1, matchedCount: 0,
+      truncated: false, parts: [{ kind: 'token', text: '猫', start: 0, end: 1 }],
+    });
+    Object.defineProperty(window, 'api', { configurable: true, value: { lookupOfflineInterlinear: lookup } });
+    const host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => root?.render(<LexiconWorkbenchResults query="猫" lang="ja" lookupAttempt={1} />));
+    const translate = [...host.querySelectorAll('button')]
+      .find((button) => button.textContent === 'lexicon.workbench.interlinear');
+    await act(async () => {
+      translate?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    expect(lookup).toHaveBeenCalledWith('猫', { sourceLangs: ['ja'], glossLangs: ['en'] });
+    expect(host.querySelector('[data-testid="dictionary-results"]')).toBeNull();
+  });
+
   it('lets the Translate compatibility route pin its lens and target gloss language', async () => {
     const lookup = vi.fn().mockResolvedValue({
       text: '猫', detectedLangs: ['ja'], glossLangs: ['ru'], tokenCount: 1, matchedCount: 0,
