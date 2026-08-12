@@ -8303,4 +8303,10 @@ export const zh: Catalog = {
   'lexicon.sense.none': '不固定义项',
   'lexicon.sense.use': '使用义项{index}：{gloss}',
   'lexicon.sense.close': '关闭',
+  'lexicon.retranslate.action': '按这些义项重新翻译',
+  'lexicon.retranslate.title': '附上你指定义项后重新翻译的结果',
+  'lexicon.retranslate.applied': '已交给翻译模型的义项数：{count}',
+  'lexicon.retranslate.running': '正在重新翻译…',
+  'lexicon.retranslate.failed': '离线翻译无法重新翻译这段文本。',
+  'lexicon.retranslate.unusable': '指定的义项在目标语言中没有释义。',
 };

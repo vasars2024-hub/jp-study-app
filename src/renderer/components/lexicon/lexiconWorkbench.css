@@ -256,3 +256,64 @@
   border-color: var(--accent, #5588cc);
   background: color-mix(in srgb, var(--accent, #5588cc) 14%, transparent);
 }
+
+/* The retranslation sits between the flow it was constrained by and the harvest
+   it does not affect, so the reader reads pins -> prose in one downward pass. */
+.lexicon-retranslate {
+  margin: 12px 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--border, rgba(127, 127, 127, 0.25));
+}
+
+.lexicon-retranslate-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.lexicon-retranslate-run {
+  min-height: 32px;
+  padding: 4px 14px;
+  border: 1px solid var(--accent, #5588cc);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent, #5588cc) 12%, transparent);
+  color: inherit;
+}
+
+.lexicon-retranslate-run:disabled {
+  border-color: var(--border, rgba(127, 127, 127, 0.35));
+  background: transparent;
+  opacity: 0.65;
+  cursor: default;
+}
+
+.lexicon-retranslate-note {
+  font-size: 0.8rem;
+}
+
+.lexicon-retranslate-error {
+  margin: 8px 0 0;
+  color: var(--danger, #c0392b);
+  font-size: 0.85rem;
+}
+
+/* Prose, not a gloss: this is the one place in the Workbench the reader reads a
+   whole sentence, so it gets reading measure and line height rather than the
+   dense interlinear treatment. */
+.lexicon-retranslate-output {
+  margin: 10px 0 0;
+}
+
+.lexicon-retranslate-output figcaption {
+  margin-bottom: 4px;
+  font-size: 0.78rem;
+  opacity: 0.75;
+}
+
+.lexicon-retranslate-output p {
+  margin: 0;
+  max-width: 68ch;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}

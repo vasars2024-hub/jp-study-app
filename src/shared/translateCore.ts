@@ -14,6 +14,105 @@ export interface TranslateBatchItem {
   strict?: boolean;
 }
 
+/**
+ * One word whose meaning the reader has already settled.
+ *
+ * The translator model resolves polysemy on its own and silently: 見る becomes
+ * "saw" or "looked after" with nothing to appeal to. A hint is the reader's own
+ * disambiguation — a gloss the dictionary supplied and the reader pinned —
+ * handed to the model as a constraint rather than a suggestion the prose has to
+ * imply. It carries no invented text: `gloss` always comes from a dictionary
+ * entry the user has installed.
+ */
+export interface TranslateSenseHint {
+  /** The dictionary headword, not the surface form: hints are per lemma. */
+  text: string;
+  reading?: string;
+  gloss: string;
+}
+
+/** A prompt is a budget. Beyond this many hints the passage itself gets crowded out. */
+export const MAX_SENSE_HINTS = 12;
+/** Long enough for a real multi-gloss sense, short enough that 12 of them still fit. */
+const MAX_SENSE_HINT_CHARS = 160;
+
+/**
+ * Coerce renderer-supplied hints into the shape the prompt builder trusts.
+ *
+ * This crosses an IPC boundary, so the main process cannot assume the array is
+ * well-formed or bounded — an unsanitized list would let a caller push the
+ * passage itself out of the model's context. A hint missing either the word or
+ * the gloss says nothing and is dropped rather than rendered as a blank rule.
+ */
+export function sanitizeSenseHints(value: unknown): TranslateSenseHint[] {
+  if (!Array.isArray(value)) return [];
+  const out: TranslateSenseHint[] = [];
+  for (const raw of value) {
+    if (!raw || typeof raw !== 'object') continue;
+    const item = raw as Record<string, unknown>;
+    const text = typeof item.text === 'string' ? item.text.trim().slice(0, MAX_SENSE_HINT_CHARS) : '';
+    const gloss = typeof item.gloss === 'string' ? item.gloss.trim().slice(0, MAX_SENSE_HINT_CHARS) : '';
+    if (!text || !gloss) continue;
+    const reading = typeof item.reading === 'string'
+      ? item.reading.trim().slice(0, MAX_SENSE_HINT_CHARS)
+      : '';
+    out.push(reading && reading !== text ? { text, reading, gloss } : { text, gloss });
+    if (out.length >= MAX_SENSE_HINTS) break;
+  }
+  return out;
+}
+
+/**
+ * The literal opening of the constraint block.
+ *
+ * Exported because it is also the echo detector: the phrase is distinctive
+ * enough that a "translation" containing it is the model repeating its own
+ * instructions rather than translating. See `looksLikeSenseHintEcho`.
+ */
+export const SENSE_HINT_MARKER = 'Word meanings to use:';
+
+/**
+ * The constraint block prefixed to a translation prompt.
+ *
+ * The shape here was decided by the model this app actually ships, not by what
+ * reads best. A first attempt spelled the constraint out over three lines of
+ * prose with one bullet per word; driven live against Qwen3-1.7B it made the
+ * model echo the whole instruction block back as the translation, five times
+ * over, and the result passed the existing validator because it was fluent
+ * English containing no kana. So: one line, no bullets, no readings, no
+ * explanation of why. The imperative and the `Text:` marker stay last, where a
+ * small model's instruction-following is strongest.
+ *
+ * Returns the empty string when there are no hints, so every existing prompt is
+ * byte-identical to what it was before this layer existed — an unpinned
+ * translation must not change because the pinning feature shipped.
+ */
+export function buildSenseHintBlock(hints: readonly TranslateSenseHint[] | undefined): string {
+  if (!hints?.length) return '';
+  const pairs = hints.map((hint) => `${hint.text} = ${hint.gloss}`);
+  return `${SENSE_HINT_MARKER} ${pairs.join(' / ')}\n`;
+}
+
+/**
+ * Did the model hand back its own instructions instead of a translation?
+ *
+ * `isValidCrossLangTranslation` cannot see this: an echoed English instruction
+ * block is fluent target-language text containing none of the source, which is
+ * exactly what it checks for. Without this guard the reader is shown the prompt
+ * as though it were a translation of their passage.
+ */
+export function looksLikeSenseHintEcho(
+  text: string,
+  hints?: readonly TranslateSenseHint[],
+): boolean {
+  if (text.includes(SENSE_HINT_MARKER)) return true;
+  // Observed live: the model dropped the marker phrase and echoed only the
+  // `word = gloss` pairs, which the marker check alone sailed straight past. No
+  // translation of a passage contains its own glossary syntax, so the pair form
+  // is as reliable a tell as the marker.
+  return !!hints?.some((hint) => text.includes(`${hint.text} = `));
+}
+
 export function cleanLlmOutput(raw: string): string {
   return raw
     .replace(/<think>[\s\S]*?<\/think>/gi, '')
@@ -68,21 +167,38 @@ export function buildBatchPrompt(items: TranslateBatchItem[]): string {
   );
 }
 
-/** Stricter single-item retry prompt used after a validation failure. */
-export function buildStrictPrompt(item: TranslateBatchItem): string {
+/**
+ * Stricter single-item retry prompt used after a validation failure.
+ *
+ * The retry carries the same hints as the first pass. Dropping them here would
+ * make the reader's pins hold only when the model happened to succeed first
+ * time — a constraint that silently lapses on the retry path is worse than no
+ * constraint, because nothing in the output says which pass produced it.
+ */
+export function buildStrictPrompt(
+  item: TranslateBatchItem,
+  hints?: readonly TranslateSenseHint[],
+): string {
   const source = langLabel(item.source);
   const target = langLabel(item.target);
   return (
-    `/no_think\nTranslate this ${source} term into ${target}. ` +
+    `/no_think\n${buildSenseHintBlock(hints)}` +
+    `Translate this ${source} term into ${target}. ` +
     `Respond with ONLY the ${target} translation written in ${target} — ` +
     `no ${source} characters, no romanization, no explanations, no quotes.\n\n` +
     `Term: ${item.text}`
   );
 }
 
-export function buildSentencePrompt(text: string, source: string, target: string): string {
+export function buildSentencePrompt(
+  text: string,
+  source: string,
+  target: string,
+  hints?: readonly TranslateSenseHint[],
+): string {
   return (
-    `/no_think\nTranslate the following ${langLabel(source)} text to ${langLabel(target)}. ` +
+    `/no_think\n${buildSenseHintBlock(hints)}` +
+    `Translate the following ${langLabel(source)} text to ${langLabel(target)}. ` +
     `Output ONLY the translation, nothing else.\n\nText: ${text}`
   );
 }

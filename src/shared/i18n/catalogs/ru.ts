@@ -9128,4 +9128,10 @@ export const ru: Catalog = {
   'lexicon.sense.none': 'Значение не закреплено',
   'lexicon.sense.use': 'Использовать значение {index}: {gloss}',
   'lexicon.sense.close': 'Закрыть',
+  'lexicon.retranslate.action': 'Перевести заново с этими значениями',
+  'lexicon.retranslate.title': 'Перевод, запрошенный заново с вашими значениями',
+  'lexicon.retranslate.applied': 'Значений передано переводчику: {count}.',
+  'lexicon.retranslate.running': 'Переводим заново…',
+  'lexicon.retranslate.failed': 'Офлайн-переводчик не смог перевести этот отрывок заново.',
+  'lexicon.retranslate.unusable': 'Ни у одного выбранного значения нет перевода на нужный язык.',
 };

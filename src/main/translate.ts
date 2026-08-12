@@ -11,8 +11,11 @@ import {
   buildSentencePrompt,
   buildStrictPrompt,
   cleanLlmOutput,
+  looksLikeSenseHintEcho,
   parseBatchJson,
+  sanitizeSenseHints,
   type TranslateBatchItem,
+  type TranslateSenseHint,
 } from '../shared/translateCore';
 
 /** Any language code from shared/langs.ts (kept as an alias for callers). */
@@ -426,16 +429,28 @@ export async function ensureTranslateReady(): Promise<{ ok: boolean; error?: str
   }
 }
 
-async function translateSentence(text: string, source: TransLang, target: TransLang): Promise<string> {
+async function translateSentence(
+  text: string,
+  source: TransLang,
+  target: TransLang,
+  hints?: readonly TranslateSenseHint[],
+): Promise<string> {
   const s = await ensureSession();
   const raw = await promptWithTimeout(
     s,
-    buildSentencePrompt(text, source, target),
+    buildSentencePrompt(text, source, target, hints),
     400,
     SENTENCE_PROMPT_TIMEOUT_MS,
   );
   const first = cleanLlmOutput(raw);
-  if (isValidCrossLangTranslation(source, target, text, first)) return first;
+  // A constrained prompt gives a small model one more way to fail: repeating the
+  // constraint block back instead of translating. That output is fluent target
+  // language with none of the source in it, so the cross-language validator
+  // passes it — the echo has to be rejected by name.
+  const usable = (candidate: string): boolean =>
+    isValidCrossLangTranslation(source, target, text, candidate)
+    && !looksLikeSenseHintEcho(candidate, hints);
+  if (usable(first)) return first;
 
   // The batch path has always validated its output and retried once with the
   // stricter prompt; this path did not, so a model that echoed its input — or
@@ -443,12 +458,12 @@ async function translateSentence(text: string, source: TransLang, target: TransL
   // and was indistinguishable from a real one. Same treatment here.
   const strictRaw = await promptWithTimeout(
     s,
-    buildStrictPrompt({ id: 's0', text, source, target }),
+    buildStrictPrompt({ id: 's0', text, source, target }, hints),
     200,
     STRICT_PROMPT_TIMEOUT_MS,
   );
   const strict = cleanLlmOutput(strictRaw).replace(/^["'«]|["'»]$/g, '').trim();
-  return isValidCrossLangTranslation(source, target, text, strict) ? strict : '';
+  return usable(strict) ? strict : '';
 }
 
 function enqueue<T>(fn: () => Promise<T>): Promise<T> {
@@ -534,6 +549,7 @@ async function translateText(
   source: TransLang,
   target: TransLang,
   onPartial?: (progress: number) => void,
+  hints?: readonly TranslateSenseHint[],
 ): Promise<string> {
   if (!text.trim()) return text;
   // A missing or unrecognized code used to fall into the `source === target`
@@ -558,7 +574,10 @@ async function translateText(
   const out: string[] = [];
   let translatedCount = 0;
   for (let i = 0; i < parts.length; i++) {
-    const translated = await enqueue(() => translateSentence(parts[i], source, target));
+    // Hints apply to every sentence of the passage: a pin is recorded against a
+    // headword, not an offset, so a word pinned once is pinned wherever the
+    // splitter happens to have cut.
+    const translated = await enqueue(() => translateSentence(parts[i], source, target, hints));
     // An untranslatable sentence is dropped rather than back-filled with its
     // own source text: a Japanese clause sitting inside an English paragraph
     // reads as part of the translation.
@@ -605,12 +624,21 @@ export function registerTranslateIpc(): void {
     'translate:run',
     async (
       e,
-      req: { id: number; text: string; source: string; target: string },
+      req: {
+        id: number;
+        text: string;
+        source: string;
+        target: string;
+        senseHints?: unknown;
+      },
     ): Promise<{ ok: boolean; text?: string; error?: string }> => {
       try {
+        // Sanitized rather than trusted: the hints reach the prompt verbatim, so
+        // an unbounded list from a renderer would crowd out the passage itself.
+        const hints = sanitizeSenseHints(req.senseHints);
         const text = await translateText(req.text, req.source, req.target, (progress) => {
           e.sender.send('translate:partial', { id: req.id, progress });
-        });
+        }, hints);
         return { ok: true, text };
       } catch (err) {
         console.error('[translate]', err);

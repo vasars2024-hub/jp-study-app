@@ -8338,4 +8338,10 @@ export const ja: Catalog = {
   'lexicon.sense.none': '語義を固定しない',
   'lexicon.sense.use': '語義{index}を使う：{gloss}',
   'lexicon.sense.close': '閉じる',
+  'lexicon.retranslate.action': 'この語義で訳し直す',
+  'lexicon.retranslate.title': '指定した語義を添えて訳し直した結果',
+  'lexicon.retranslate.applied': '翻訳に渡した語義: {count} 件',
+  'lexicon.retranslate.running': '訳し直しています…',
+  'lexicon.retranslate.failed': 'オフライン翻訳でこの文章を訳し直せませんでした。',
+  'lexicon.retranslate.unusable': '指定した語義に翻訳先言語の訳語がありません。',
 };

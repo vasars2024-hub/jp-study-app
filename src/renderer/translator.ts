@@ -2,6 +2,8 @@
 // One shared model serves the Translate view, readers, media subtitles, and
 // Anki mining field translation.
 
+import type { TranslateSenseHint } from '../shared/translateCore';
+
 export interface ModelProgress {
   status?: string;
   file?: string;
@@ -44,12 +46,17 @@ export function translate(
 /**
  * Translate `text` from `source` to `target` offline via Qwen3. Any language
  * pair is handled directly (no English pivot). `onProgress` reports 0..1.
+ *
+ * `senseHints` are the reader's own pinned word senses. They are optional and
+ * omitted entirely when absent, so every existing caller sends the exact
+ * request it sent before sense pinning existed.
  */
 export function translateTo(
   text: string,
   source: TransLang,
   target: TransLang,
   onProgress?: (p: number) => void,
+  senseHints?: readonly TranslateSenseHint[],
 ): Promise<string> {
   ensureIpcHooks();
   const id = nextId++;
@@ -58,7 +65,13 @@ export function translateTo(
   };
   partialListeners.add(onPartial);
   return window.api
-    .translateRun({ id, text, source, target })
+    .translateRun({
+      id,
+      text,
+      source,
+      target,
+      ...(senseHints?.length ? { senseHints: [...senseHints] } : {}),
+    })
     .then((res) => {
       if (!res.ok) throw new Error(res.error ?? 'Translation failed.');
       return res.text ?? '';

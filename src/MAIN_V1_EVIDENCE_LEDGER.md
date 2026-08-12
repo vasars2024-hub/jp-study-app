@@ -14515,3 +14515,105 @@ Track 2 remains open. Still source-derived, minus the item this entry closed: re
 pinned passage, round-trip semantic diff, composition checking, difficulty scoring (still blocked on
 a real frequency source), personal concordance, and the grounded AI enrichment bullets. Retranslation
 is the natural next one — the pins now exist and nothing yet feeds them back to the model.
+
+## The pins reach the translator, and the model is the limit — 2026-08-13
+
+Relay hop, `primary`. Track 2. The previous entry named retranslation of a pinned passage as the
+natural next slice — "the pins now exist and nothing yet feeds them back to the model" — and that is
+what this hop built. Re-derived first rather than inherited: the boss audit's last actionable
+section (14:36) asks the next ladder worker to close two clean-HEAD failures before continuing. Both
+are already closed at `aad63d9` — `agentSessionContext.test.ts` now expects the floor-up
+`allowed: true, context: []` semantics and `jp-os-filedrop-prefs-v1` is present in
+`src/renderer/storage/settingsCatalog.ts` — and both files run green (29 tests). The audit's third
+ask, re-running `tools/i18n-check.cjs` in a shell where esbuild can traverse the repo, passes from
+PowerShell at exit 0. So the ladder stayed on Track 2.
+
+What the slice does: pinning already narrowed the ruby, the harvest row and the mined card, but the
+prose translation above them was produced by a model that resolved 見る on its own and could not
+hear the correction. A reader could watch the gloss line say "to look after" while the sentence
+under it said "saw". The Workbench now offers, only once something is pinned, a retranslation that
+hands the reader's chosen glosses to the local model as constraints.
+
+Where each decision sits, and why:
+
+- `collectSenseHints` (`shared/lexiconRetranslate.ts`) is pure and derived from the already-pinned
+  result, so whether a retranslation can say anything is known before the model is woken. It
+  deduplicates by `sensePinKey` — one constraint per headword however often the word occurs — and
+  emits only glosses that speak the language being translated into. A pin with nothing to say in
+  the target is dropped rather than emitted as a blank rule, and the UI says so instead of running.
+- `sanitizeSenseHints` (`shared/translateCore.ts`) runs main-side on the IPC payload. The hints reach
+  the prompt verbatim, so an unbounded renderer list would push the passage itself out of the
+  model's context; it is capped at `MAX_SENSE_HINTS = 12` and 160 chars a field.
+- The hint block returns the empty string when there are no hints, and the tests assert both prompts
+  are **byte-identical** to their pre-slice form in that case. An unpinned translation must not
+  change because the pinning feature shipped.
+- The strict retry carries the same constraints as the first pass. A constraint that silently lapses
+  on the retry path is worse than none, because nothing in the output says which pass produced it.
+
+Two things only the live run could have decided, and both changed the code.
+
+1. **The first prompt shape made the model echo its own instructions.** Driven against the user's
+   real Qwen3-1.7B, a three-line bulleted constraint block came back as the "translation": the
+   instruction text repeated five times over. It passed `isValidCrossLangTranslation` because it is
+   fluent English containing no kana — the reader would have been shown the prompt as though it were
+   their passage. The block is now one line, no bullets, no readings, placed *before* the imperative
+   so `Text:` stays last where a small model's instruction-following is strongest.
+   `looksLikeSenseHintEcho` rejects an echo by name, and after that change no run echoed again.
+2. **The echo guard's first version missed the real failure.** The next live run dropped the marker
+   phrase and echoed only the `word = gloss` pairs, which the marker check sailed past. The guard now
+   also rejects any output containing a hint's own `word = ` syntax.
+
+Gates, all four, on the full shared tree: Vitest **7,441 passed / 6 skipped / 0 failed** across 560
+files (+18 over the previous entry's 7,423). `node tools/i18n-check.cjs` exit 0, **9,380** English
+keys complete in ja/zh/ru — the previous 9,374 plus these six. `node tools/architecture-audit.cjs`
+exit 0, **nothing new**, the same two pending. `npx eslint` over the touched paths: 0 errors. The one
+warning (`translate.ts` `return session!`) and the two `window.d.ts` `adjacent-overload-signatures`
+errors are pre-existing — the duplicated `subtitleHarvestList`/`subtitleHarvestFetch` declarations
+exist at HEAD too, from the nyaa-subtitles track.
+
+Live Electron acceptance, three app starts (the main process changed twice, so HMR could not serve).
+Final instance pid 24032, bridge 39273, Vite 5175 because other tracks own 5173/5174.
+
+- The Workbench answered from the user's real 97 MB JMdict: three pinnable tokens for `猫を見た。`,
+  and 見る's picker listed **7 senses** with JMdict's own sequence.
+- Pinning sense 3 produced the retranslate control — absent before any pin, as intended — reading
+  "Retranslate with these senses" and "Pinned senses given to the translator: 1".
+- Clicking it drove the real main handler end to end: model load, generation, and the result rendered
+  under its caption. Unpinning removed the panel, the output and `ruby.is-pinned` together, so the
+  reverse transition is proven rather than assumed.
+
+**One correction to my own measurements, recorded because it nearly became a false finding.** An
+early A/B run through `curl` reported that even the *unhinted* translator returned
+"Unknown Unknown Unknown Unknown Unknown" for `猫を見た。`, which reads as a serious pre-existing
+defect. It is not one. The Japanese was being mangled to `?????` in the shell's JSON body before it
+ever reached the app — the model was faithfully describing a string of question marks. Re-run through
+the bridge's own PowerShell path, where the same text survives intact, the unhinted baseline is
+**"I saw a cat."** Do not quote the curl numbers; drive Japanese through `eval.ps1`.
+
+**The honest limit, and it is the load-bearing one.** The hints reach the model and demonstrably move
+its output, but Qwen3-1.7B does not reliably obey them. The same request — `猫を見た。` with
+見る = "to look after" — returned "Cat was looked after." on one run and "Cat was seen." on the next,
+so the model is sampling and the constraint is a strong nudge, not an enforcement. Three glosses
+diluted it further than one, though at n=1 per variant that is an observation, not a proven lever.
+The UI was reworded to match what is true: the caption says the translation was *re-asked with* the
+pinned senses and the note says how many were *given to* the translator. Neither claims the model
+applied them. Enforcing a pinned sense would need either a larger local model or a cloud provider,
+which is a product decision with a cost and a privacy dimension, and is recorded here rather than
+guessed at.
+
+Also honest: nothing was mined this hop, ja/zh/ru were not switched on live (`ui-lang` is unset and
+changing it is a persisted write plus a reload), and the first-run onboarding dialog was left
+unanswered — it is a persisted decision and not a relay hop's to make, so the flow was driven
+programmatically rather than by coordinate clicks.
+
+State left as found: textarea cleared and asserted empty, every probe global deleted and its absence
+verified, `jp-grammarx-translation-history-v1` still `0` entries, no persisted setting written, no
+userData backup taken, no other track's dirty paths touched. Six of the fourteen touched files carry
+other tracks' hunks (`preload.ts`, `window.d.ts` and all four catalogs), so those were staged as
+reconstructed HEAD+own-hunk blobs rather than whole-file adds; the staged diff is +2/+1/+6x4 on them.
+The dev app started by this hop is left running for the next worker.
+
+Track 2 remains open. Still source-derived, minus this entry's item: round-trip semantic diff,
+composition checking, difficulty scoring (still blocked on a real frequency source), personal
+concordance, and the grounded AI enrichment bullets. Round-trip semantic diff is the natural next
+one — a retranslation now exists to diff against.

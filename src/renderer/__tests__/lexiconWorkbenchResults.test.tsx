@@ -414,6 +414,200 @@ describe('LexiconWorkbenchResults', () => {
     expect(host.querySelector('.lexicon-harvest-gloss')?.textContent).toBe('to see; to look after');
   });
 
+  it('retranslates the passage under the pins, and only offers it once something is pinned', async () => {
+    const lookup = vi.fn().mockResolvedValue({
+      text: '猫を見た。', detectedLangs: ['ja'], glossLangs: ['en'], tokenCount: 2, matchedCount: 1,
+      truncated: false,
+      parts: [
+        { kind: 'separator', text: '猫を', start: 0, end: 2 },
+        {
+          kind: 'token', text: '見た', start: 2, end: 4,
+          match: {
+            text: '見る', reading: 'みる', dictId: 'jmdict-en', dictTitle: 'JMdict (English)',
+            headwordId: 3,
+            glosses: [{ lang: 'en', text: 'to see' }, { lang: 'en', text: 'to look after' }],
+            senses: [
+              { index: 0, glosses: [{ lang: 'en', text: 'to see' }] },
+              { index: 2, glosses: [{ lang: 'en', text: 'to look after' }] },
+            ],
+          },
+        },
+        { kind: 'separator', text: '。', start: 4, end: 5 },
+      ],
+    });
+    const translateRun = vi.fn().mockResolvedValue({ ok: true, text: 'I looked after the cat.' });
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        lookupOfflineInterlinear: lookup,
+        translateRun,
+        onTranslateModelProgress: () => () => undefined,
+        onTranslatePartial: () => () => undefined,
+      },
+    });
+    const host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root?.render(<LexiconWorkbenchResults query="猫を見た。" lang="ja" lookupAttempt={11} />);
+      await Promise.resolve();
+    });
+
+    // With nothing pinned this would only repeat the translation already on screen.
+    expect(host.querySelector('.lexicon-retranslate')).toBeNull();
+
+    await act(async () => {
+      host.querySelector('.lexicon-sense-token')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      [...host.querySelectorAll('.lexicon-sense-list button')][2]
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    const run = host.querySelector<HTMLButtonElement>('.lexicon-retranslate-run');
+    expect(run?.disabled).toBe(false);
+    expect(host.querySelector('.lexicon-retranslate-note')?.textContent)
+      .toBe('lexicon.retranslate.applied:1');
+    // Pinning alone must not wake the model — the call is the reader's to make.
+    expect(translateRun).not.toHaveBeenCalled();
+
+    await act(async () => {
+      run?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    expect(translateRun.mock.calls[0][0]).toMatchObject({
+      text: '猫を見た。',
+      source: 'ja',
+      target: 'en',
+      senseHints: [{ text: '見る', reading: 'みる', gloss: 'to look after' }],
+    });
+    expect(host.querySelector('.lexicon-retranslate-output p')?.textContent)
+      .toBe('I looked after the cat.');
+
+    // Changing a pin makes the prose stale in a way the reader cannot see, so it goes.
+    await act(async () => {
+      host.querySelector('.lexicon-sense-list button')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    expect(host.querySelector('.lexicon-retranslate-output')).toBeNull();
+    expect(host.querySelector('.lexicon-retranslate')).toBeNull();
+  });
+
+  it('reports an empty retranslation as the failure it is rather than a blank panel', async () => {
+    const lookup = vi.fn().mockResolvedValue({
+      text: '見た。', detectedLangs: ['ja'], glossLangs: ['en'], tokenCount: 1, matchedCount: 1,
+      truncated: false,
+      parts: [
+        {
+          kind: 'token', text: '見た', start: 0, end: 2,
+          match: {
+            text: '見る', reading: 'みる', dictId: 'jmdict-en', dictTitle: 'JMdict (English)',
+            headwordId: 3,
+            glosses: [{ lang: 'en', text: 'to see' }],
+            senses: [
+              { index: 0, glosses: [{ lang: 'en', text: 'to see' }] },
+              { index: 1, glosses: [{ lang: 'en', text: 'to look after' }] },
+            ],
+          },
+        },
+      ],
+    });
+    // Every sentence failed the translator's validation and was dropped: `ok`, empty.
+    const translateRun = vi.fn().mockResolvedValue({ ok: true, text: '   ' });
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        lookupOfflineInterlinear: lookup,
+        translateRun,
+        onTranslateModelProgress: () => () => undefined,
+        onTranslatePartial: () => () => undefined,
+      },
+    });
+    const host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root?.render(<LexiconWorkbenchResults query="見た。" lang="ja" lookupAttempt={12} />);
+      await Promise.resolve();
+    });
+    await act(async () => {
+      host.querySelector('.lexicon-sense-token')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      [...host.querySelectorAll('.lexicon-sense-list button')][2]
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      host.querySelector('.lexicon-retranslate-run')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    expect(host.querySelector('.lexicon-retranslate-error')?.getAttribute('role')).toBe('alert');
+    expect(host.querySelector('.lexicon-retranslate-output')).toBeNull();
+  });
+
+  it('offers no retranslation when the pinned sense says nothing in the translation language', async () => {
+    const lookup = vi.fn().mockResolvedValue({
+      text: '見た。', detectedLangs: ['ja'], glossLangs: ['ru'], tokenCount: 1, matchedCount: 1,
+      truncated: false,
+      parts: [
+        {
+          kind: 'token', text: '見た', start: 0, end: 2,
+          match: {
+            text: '見る', reading: 'みる', dictId: 'jmdict-ru', dictTitle: 'JMdict (Russian)',
+            headwordId: 3,
+            glosses: [{ lang: 'ru', text: 'видеть' }],
+            parallel: [
+              {
+                lang: 'ru', dictId: 'jmdict-ru', dictTitle: 'JMdict (Russian)',
+                glosses: [{ lang: 'ru', text: 'видеть' }],
+              },
+            ],
+            senses: [
+              { index: 0, glosses: [{ lang: 'ru', text: 'видеть' }] },
+              { index: 1, glosses: [{ lang: 'ru', text: 'присматривать' }] },
+            ],
+          },
+        },
+      ],
+    });
+    const translateRun = vi.fn();
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        lookupOfflineInterlinear: lookup,
+        translateRun,
+        onTranslateModelProgress: () => () => undefined,
+        onTranslatePartial: () => () => undefined,
+      },
+    });
+    const host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root?.render(<LexiconWorkbenchResults query="見た。" lang="ja" lookupAttempt={13} glossLang="en" />);
+      await Promise.resolve();
+    });
+    await act(async () => {
+      host.querySelector('.lexicon-sense-token')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      [...host.querySelectorAll('.lexicon-sense-list button')][2]
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    // The control is present and honestly says why it cannot run, rather than
+    // running and passing the model a rule it cannot apply.
+    expect(host.querySelector<HTMLButtonElement>('.lexicon-retranslate-run')?.disabled).toBe(true);
+    expect(host.querySelector('.lexicon-retranslate-note')?.textContent)
+      .toBe('lexicon.retranslate.unusable');
+    expect(translateRun).not.toHaveBeenCalled();
+  });
+
   it('leaves a single-sense token as plain reading flow rather than a control', async () => {
     const lookup = vi.fn().mockResolvedValue({
       text: '猫', detectedLangs: ['ja'], glossLangs: ['en'], tokenCount: 1, matchedCount: 1,
@@ -490,6 +684,13 @@ describe('LexiconWorkbenchResults', () => {
       'lexicon.sense.none',
       'lexicon.sense.use',
       'lexicon.sense.close',
+      // Every state the sense-constrained retranslation can reach.
+      'lexicon.retranslate.action',
+      'lexicon.retranslate.title',
+      'lexicon.retranslate.applied',
+      'lexicon.retranslate.running',
+      'lexicon.retranslate.failed',
+      'lexicon.retranslate.unusable',
     ];
     const catalog = en as Record<string, string>;
     expect(keys.filter((key) => !catalog[key])).toEqual([]);

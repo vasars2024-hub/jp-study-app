@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   parallelGlossTargets,
   type LexiconInterlinearResult,
@@ -16,8 +16,10 @@ import {
   sensePinKey,
   type LexiconSensePins,
 } from '../../../shared/lexiconSensePin';
+import { collectSenseHints } from '../../../shared/lexiconRetranslate';
 import { resolveLexiconInput, type LexiconLensOverride } from '../../../shared/lexiconWorkbench';
 import DictionaryResults, { type DictLang } from '../DictionaryResults';
+import { translateTo } from '../../translator';
 import { useT } from '../../i18n';
 import './lexiconWorkbench.css';
 
@@ -97,6 +99,11 @@ export default function LexiconWorkbenchResults({
   const [mineError, setMineError] = useState<Record<string, string>>({});
   const [pins, setPins] = useState<LexiconSensePins>({});
   const [openSense, setOpenSense] = useState<string | null>(null);
+  const [retranslation, setRetranslation] = useState<string | null>(null);
+  const [retranslateState, setRetranslateState] = useState<'idle' | 'running' | 'error'>('idle');
+  // A model call outlives the pins it was made for. This token lets a late
+  // answer from a superseded run be discarded instead of overwriting the panel.
+  const retranslateRun = useRef(0);
 
   useEffect(() => setSelectedLens(lens), [lens]);
 
@@ -107,6 +114,11 @@ export default function LexiconWorkbenchResults({
   // Purely derived from the grounded result, so it costs one pass per lookup
   // rather than a second bridge call.
   const harvest = useMemo(() => (pinned ? harvestLexiconVocabulary(pinned) : null), [pinned]);
+
+  // Pure and derived from the pinned result, so whether a retranslation can say
+  // anything is known before the model is woken, not after it answers.
+  const senseHints = useMemo(() => collectSenseHints(pinned, glossLang), [glossLang, pinned]);
+  const pinCount = Object.keys(pins).length;
 
   // The sense picker is one contextual panel rather than a popover per token, so
   // the open token is looked up by its pin key instead of held as a second copy.
@@ -128,9 +140,23 @@ export default function LexiconWorkbenchResults({
     setMineError({});
     setPins({});
     setOpenSense(null);
+    clearRetranslation();
+  }
+
+  /**
+   * A retranslation is only true of the pins it was produced from. Changing a
+   * pin makes the displayed prose stale in a way the reader cannot see, so the
+   * old text is dropped rather than left sitting under a different set of
+   * senses.
+   */
+  function clearRetranslation() {
+    retranslateRun.current += 1;
+    setRetranslation(null);
+    setRetranslateState('idle');
   }
 
   function pinSense(key: string, senseIndex: number | null) {
+    clearRetranslation();
     setPins((prev) => {
       const next = { ...prev };
       if (senseIndex === null) delete next[key];
@@ -171,6 +197,35 @@ export default function LexiconWorkbenchResults({
       });
     return () => { alive = false; };
   }, [glossLang, interlinear, lang, lookupAttempt, query]);
+
+  /**
+   * Retranslate the passage with the reader's pins as translator constraints.
+   *
+   * The lookup that produced the interlinear is offline and instant; this is the
+   * one place in the Workbench that wakes the local model, so it is explicitly
+   * asked for rather than run on every pin.
+   */
+  async function retranslate() {
+    if (!senseHints.length || retranslateState === 'running') return;
+    const run = ++retranslateRun.current;
+    setRetranslateState('running');
+    setRetranslation(null);
+    try {
+      const text = await translateTo(query, lang, glossLang, undefined, senseHints);
+      // A passage whose every sentence failed the translator's own validation
+      // comes back empty rather than as a rejection. Showing that as a result
+      // would be a blank panel indistinguishable from success.
+      if (run !== retranslateRun.current) return;
+      if (!text.trim()) {
+        setRetranslateState('error');
+        return;
+      }
+      setRetranslation(text);
+      setRetranslateState('idle');
+    } catch {
+      if (run === retranslateRun.current) setRetranslateState('error');
+    }
+  }
 
   /**
    * Mine one harvested word. The request is built from the passage the row was
@@ -311,6 +366,40 @@ export default function LexiconWorkbenchResults({
                   );
                 })}
               </ul>
+            </div>
+          )}
+          {/* Offered only once the reader has actually pinned something: with no
+              pins this is just the translation they already have. */}
+          {pinCount > 0 && (
+            <div className="lexicon-retranslate">
+              <div className="lexicon-retranslate-head">
+                <button
+                  className="lexicon-retranslate-run"
+                  disabled={!senseHints.length || retranslateState === 'running'}
+                  onClick={() => void retranslate()}
+                  type="button"
+                >
+                  {retranslateState === 'running'
+                    ? t('lexicon.retranslate.running')
+                    : t('lexicon.retranslate.action')}
+                </button>
+                <span className="lexicon-retranslate-note muted">
+                  {senseHints.length
+                    ? t('lexicon.retranslate.applied', { count: senseHints.length })
+                    : t('lexicon.retranslate.unusable')}
+                </span>
+              </div>
+              {retranslateState === 'error' && (
+                <p className="lexicon-retranslate-error" role="alert">
+                  {t('lexicon.retranslate.failed')}
+                </p>
+              )}
+              {retranslation && (
+                <figure className="lexicon-retranslate-output">
+                  <figcaption>{t('lexicon.retranslate.title')}</figcaption>
+                  <p lang={glossLang}>{retranslation}</p>
+                </figure>
+              )}
             </div>
           )}
           {harvest && harvest.items.length > 0 && (
