@@ -344,6 +344,28 @@ The existing popup is a foundation, not completion.
 - Support VN, manga, video, PDF, and browser workflows through the same shared pipeline.
 - Add privacy/retention, OCR/model defaults, shortcuts, keyboard-only use, and honest offline/cloud indicators.
 
+### Track 5 implementation checkpoint — 2026-08-12
+
+- **Searchable capture/session history: done.** Persistent captures, pinning, and — as of
+  `0f15a2a` — the source and **pinned-only** filters, all resolved in main against the whole
+  history rather than over an already-fetched page. That commit landed a finished slice that
+  existed only in the working tree, with its own tests and all four translations; see the
+  ledger's "A finished ReadingLens slice was living only in the working tree". Live-accepted
+  read-only against the real `ipcMain` handler, including the strict `=== true` guard that makes
+  a stringy `"false"` from IPC widen the result instead of silently hiding rows.
+- **Still open — the Lexicon/Workbench/Reading hand-offs, and they are not a small wiring job.**
+  `resolveReadingLensWorkflow`'s `lexicon` and `reading` targets are **dead code**: the only
+  caller hard-codes `'compact'` and uses the result to seed local AI text. `LEXICON_WORKBENCH_ROUTE`
+  and `resolveLexiconRoute` have no consumer outside their own test. The transport is
+  decision-free (copy `agentImageStaging.ts`'s fourth route — main memory, bounded, expiring,
+  single-use, no `fs`; `popOut` carries a section name and nothing else). The **destination for a
+  passage is not**: `ReadingWorkspaceView` routes only to Library, Finder and Novels, and an ad-hoc
+  OCR passage has no surface among them. That half is deliberately parked on a product decision;
+  the word/sentence → `DictionaryView` half has a real destination and can go first.
+- Still open beyond that: progressive passage **Read** mode, and the privacy/retention and
+  OCR/model default controls. Alternate OCR candidates and the mixed-panel order model still
+  need explicit provider/product decisions and have not been forced.
+
 ## Track 6: repair Media shell, then finish Liquid
 
 - Treat the current workspace screenshot state as a release-blocking regression: no sidebar, search, discovery, or useful library structure and a giant empty canvas.

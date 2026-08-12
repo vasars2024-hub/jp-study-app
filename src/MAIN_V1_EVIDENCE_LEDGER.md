@@ -13611,3 +13611,137 @@ before trusting it — do the same.
 
 No new UI text, so no catalog work. The two i18n hygiene failures at clean HEAD remain owned by
 the scraper/VN i18n track, exactly as the earlier boss-audit section instructs.
+
+## A finished ReadingLens slice was living only in the working tree — landed, with a clean-worktree gate run — 2026-08-12
+
+### Recovery first: there was nothing half-done to rescue
+
+The relay handed this hop an interrupted-work mandate — worker `backup` died on a usage limit at
+15:51:31. Re-derived rather than assumed: its checkpoint `c68ffb7` was committed at **15:48:58**,
+two and a half minutes *before* the limit, and `git status --short` over its two files
+(`MAIN_V1_COMPLETION_PLAN.md`, `MAIN_V1_EVIDENCE_LEDGER.md`) is empty. Nothing was lost but the
+closing handoff text. The boss audit's standing instruction was likewise already spent — both
+clean-HEAD regressions it named were closed by `bef3b2e`, as the previous entry records.
+
+### What was actually open: a complete slice with no commit
+
+Walking Track 5 against the tree rather than against the last disposition line turned up
+`pinnedOnly` — a capture-history filter that exists in the working tree across **six files with
+its own tests and all four translations**, and nowhere in the branch's history. `git show
+HEAD:src/shared/readingLensHistory.ts` has no `pinnedOnly`; neither does the main half. It sits on
+top of `8b55470` (persist pinned captures) and was never committed.
+
+This is the exact loss shape the earlier boss-audit section warned about, one track over: pinning
+is what exempts a capture from the rolling ~200-row limit, so the pinned set is precisely the part
+of the history the user chose to keep — and without the filter it could only be reached by
+scrolling past the rows it was pinned to outlive.
+
+### Staging it without taking a single foreign hunk
+
+Five of the nine files were dirty **only** with this slice, so a plain `git add` of the whole file
+is HEAD-plus-my-edit by construction. The four catalogs were not: the i18n-conversion track holds
+~1,160 changed lines in each of them, uncommitted.
+
+Those four were reconstructed rather than staged. For each language the HEAD blob was dumped byte-
+faithfully through `cmd` redirection (PowerShell's pipeline re-encodes and would have corrupted the
+ja/zh/ru text), the anchor `'settings.lens.history.source.text':` was asserted **unique at HEAD**
+and the three new keys asserted **absent at HEAD**, the three lines were lifted verbatim from the
+working tree so the translations are byte-exact, and the result was written UTF-8 no-BOM and staged
+with `git hash-object -w --path` + `git update-index --cacheinfo`.
+
+The check that this worked: `git diff --cached` over the four catalogs is **+12 / −0, three lines
+each, and nothing else**. `src/renderer/window.d.ts` was examined and **deliberately excluded** — its
+entire diff is other tracks' work (detached Study Blocks, MAL, the credentials vault, subtitle
+sync) and it carries no `pinnedOnly` hunk, because `lensHistoryList` is already declared against
+`ReadingLensHistoryQuery` and needed no change.
+
+Landed as `0f15a2a`, nine files, +254 / −25.
+
+### Gates — run in a detached worktree at the commit, not in the shared tree
+
+This is the discipline the earlier boss-audit section asked for by name, and it is the reason the
+numbers below mean anything.
+
+| gate | where | result |
+|---|---|---|
+| `npx vitest run` (the three lens files) | **clean worktree at `0f15a2a`** | 3 files, **99 passed / 0 failed** |
+| `npx vitest run` (full) | **clean worktree at `0f15a2a`** | **9 failed / 6,967 passed / 6 skipped**, 523 files |
+| `node tools/i18n-check.cjs` | **clean worktree at `0f15a2a`** | exit 0 — all **9,169** English keys translated in ja/zh/ru |
+| `node tools/architecture-audit.cjs` | shared tree | exit 0 — 1,732 modules, 17 findings, "Nothing new", same 2 known pending |
+| `npx eslint` (the five touched source/test paths) | shared tree | exit 0 |
+
+The nine full-suite failures are all pre-existing and all other tracks': the two catalog-hygiene
+tests (the scraper/VN i18n track's unlanded conversion), five in `blancAgentStepConfirmGate.test.ts`,
+one in `localAgentQueueRun.test.ts` and one in `novelReaderProgressGuard.test.ts`. **None is in
+ReadingLens.** The count reconciles exactly with the audit trail: the boss audit measured **11** at
+`d0d1be0`, `bef3b2e` closed two of them, and 11 − 2 = 9. This slice added none.
+
+The clean-worktree run is what makes the catalog reconstruction trustworthy: the renderer test
+asserts the *translated* option text (`All sources`, `Screen`, `Clipboard`, `Image`, `Text`), so it
+would fail on a blob whose keys were missing or misplaced. It passed at the commit, with the
+working tree's catalogs nowhere in sight.
+
+### Live acceptance — read-only, against the real main handler
+
+The app was down and `debug/bridge.json` was stale (pid 42124, no Electron process). Started fresh;
+bridge on 39273, one window, Vite on 5174 because another server already owns 5173.
+
+The real history on this machine already held three probe rows left by an **earlier** session —
+`__p_clip_pin__` (clipboard, pinned), `__p_clip_plain__` (clipboard, unpinned) and
+`__p_screen_pin__` (screen, pinned). That made the whole proof possible **without writing
+anything**. Nine queries through `window.api.lensHistoryList` — the real `ipcMain` handler, not the
+preload binding:
+
+| query | returned |
+|---|---|
+| `{}` | all three |
+| `{pinnedOnly: true}` | `__p_clip_pin__`, `__p_screen_pin__` |
+| `{pinnedOnly: 'false'}` | **all three** |
+| `{pinnedOnly: 1}` | **all three** |
+| `{source: 'clipboard'}` | the two clipboard rows |
+| `{source: 'clipboard', pinnedOnly: true}` | `__p_clip_pin__` |
+| `{source: 'screen', pinnedOnly: true}` | `__p_screen_pin__` |
+| `{pinnedOnly: true, query: '留めた'}` | `__p_clip_pin__` |
+
+Rows three and four are the load-bearing ones: the strict `=== true` guard means a renderer that
+sends a stringy `"false"` over IPC **widens** the result rather than silently hiding captures the
+user asked to see.
+
+Then the UI half, live. `settings:navigate` → `study` (the section is on StudyPage; the visible nav
+has no "Reading Lens" entry of its own, and "Reading" is the reader-typography page — worth knowing
+before hunting for it). Both controls render: the select offers `all/screen/clipboard/image/text`
+labelled **`All sources, Screen, Clipboard, Image, Text`** — translated, not raw keys — and the
+`Pinned only` button starts `aria-pressed="false"`. Clicking it flips `aria-pressed` to `true` and
+the **unpinned** clipboard row disappears while both pinned rows stay. Selecting source `screen`
+leaves only `画面のキャプチャ`.
+
+**Restoration, asserted not eyeballed.** No userData backup was taken. The history file was
+`1135` bytes / SHA-256 `1EAE26E7…310B` before the run and is **byte-identical after** (`-ceq`, not
+by eye) — listing never writes. Probe globals deleted (`typeof` is `undefined` for both). The two
+filters are component-local `useState`, and both were returned to their defaults anyway; the
+Settings window this hop opened was closed, leaving the same two windows (Scraper, Agent) that were
+open on arrival.
+
+### Two things the next hop should not have to rediscover
+
+1. **`resolveReadingLensWorkflow`'s `lexicon` and `reading` targets are dead code.** The shared
+   contract in `shared/readingLens.ts` resolves a capture to `{target: 'lexicon'}` or
+   `{target: 'reading'}`, but its **only** caller is `ReadingLensOverlay.tsx:342`, which hard-codes
+   `'compact'` and uses the result solely to seed local AI analysis text. Nothing routes anywhere.
+   `LEXICON_WORKBENCH_ROUTE`, `resolveLexiconRoute` and `LexiconLens` in `shared/lexiconWorkbench.ts`
+   likewise have **no consumer outside their own test** — only `normalizeLexiconText` and
+   `resolveLexiconInput` are used. So Track 5's "send a word to Lexicon, a sentence to Workbench,
+   a passage to the Reading workspace" bullet is genuinely open, and it is *not* a small wiring job.
+2. **The passage → Reading workspace half needs a product decision, and is recorded here rather
+   than forced.** `popOut` takes a section name and nothing else, so a payload needs a transport;
+   the blessed precedent is `agentImageStaging.ts`'s fourth route (main memory, bounded, expiring,
+   single-use, no `fs`), and copying its shape for a lens hand-off is decision-free. The
+   *destination* is not: `ReadingWorkspaceView` routes only to Library, Finder and Novels, and an
+   ad-hoc OCR passage has no surface among them. Inventing one — or importing a screen capture as a
+   "novel" — is a design call this worker is not positioned to make. The Lexicon half has a real
+   destination (`DictionaryView`, which already holds `input`/`query` state) and could be done
+   first; note it is one of the files the i18n-conversion track currently holds dirty.
+
+Also worth saying plainly: those `__p_*` rows are probe data from an earlier session sitting in the
+user's **real** capture history. They were left exactly as found — removing them is a mutation, and
+this hop asserted byte-identical restoration — but someone's probe did not clean up after itself.
