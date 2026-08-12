@@ -11211,3 +11211,157 @@ and say why.
 `featureStatus.ts` is still dirty with the same foreign +33 comment lines, which are *not* in
 either of this hop's commits. Keep using reconstruct-HEAD-plus-your-own-hunk staging until that
 track lands them; re-check first, because once it does, the file is clean and the caution is void.
+
+## Seven jobs, no network, and the log policy that outlives the job that set it — 2026-08-12
+
+Main V1 remains in dependency-order item 8. The previous section named `set.logging` as the
+next clean acceptance member and it was taken as written. `featureStatus.ts` was re-checked
+first: still dirty with the same **+33 comment-only lines** from the concurrent settings-group
+track, not yet landed, so the reconstruct-HEAD-plus-your-own-hunk staging is still required and
+was used.
+
+**One thing about those 33 lines that the last two sections got wrong, and it matters.** They
+were described as a foreign block sitting *near* this work. They are not near it — `set.logging`
+has **no comment at all in HEAD**; `git show HEAD:…featureStatus.ts` puts `'set.logging':
+'untested',` directly under `'set.qbittorrent'`. Every comment above that entry, including the
+2026-08-05 "was INERT IN FULL" paragraph and the "Held at 'untested': covered by
+scraperLogBus.test.ts … no line has been written through a running app" sentence the previous
+section quoted as "its own comment already states the exact gap", is part of the concurrent
+track's **uncommitted** work. That quotation was of a file, not of the branch.
+
+Three of those uncommitted lines — the "Held at 'untested'" sentence — were replaced in the
+working tree by this hop's block, because they assert the exact opposite of what was then
+measured and leaving them would have put "no line has been written through a running app"
+directly above `'set.logging': 'ready',`. The rest of the concurrent track's text is untouched;
+its unstaged remainder is now **+30 insertions, 0 deletions** rather than +33, and it is still
+uncommitted. Nothing else of that track's was read, moved or reflowed.
+
+Because HEAD has no comment there, the hunk-slicing trick the previous section used does not
+apply — the foreign lines and this edit collapse into a single `@@` hunk at `--unified=3`. The
+index was built the other way instead: `git show HEAD:<path>` was re-serialised and confirmed
+byte-identical to HEAD's blob by `git hash-object` (`786abe2…`, equal to `git rev-parse
+HEAD:<path>`), the one-line entry was replaced in that copy, and the result was written with
+`git hash-object -w --path` and installed with `git update-index --cacheinfo`. The working file
+was never overwritten to do it. `git diff --cached` then measured exactly **29 added, 1
+removed**.
+
+### How a whole job scope was driven without a single request
+
+`configureScraperLogging` is only called from `scraperRuntimeFor` (`runtime.ts:48`), so nothing
+short of a real job scope exercises this group. A real scrape would have gone to AniList and
+nyaa. It did not have to: `engine.ts:726` throws for any `contentType` other than `anime`, and
+it throws **after** `runWithScraperRuntime(scraperRuntimeFor(...))` has built the scope and
+**before** `resolveQuery` makes the first call. So seven jobs were started over
+`scraper:startScrape` with `contentType: 'manga'` and a target of
+`probe://set.logging/<tag>` — full scope construction, zero network, deterministic failure.
+
+Each job was sent the **app's own active settings document**, read live from the running
+renderer via `getActiveScraperSettings()` (a pure localStorage read — nothing was saved), with
+only the `logging` group varied. Active profile is `relay-probe`: level `info`, channels `[]`,
+`persistToDisk: true`, `retentionDays: 14`, `maxFileSizeMb: 64`. `notifications.channel` was
+overridden to `none` on the probe input alone, so seven deliberate failures did not fire seven
+toasts at the user; that field is not on the path under test.
+
+Two witnesses were read after every job: the in-app stream (`window.api.scraperTailLogs`, which
+is `scraper:logs:subscribe` plus the `scraper:log` push) and the byte length of
+`<userData>/scraper/logs/scraper-2026-08-12.log`. The subscription was taken from **window 1**,
+which has no `.scr-shell` mounted, because `subscribeLogs` is keyed on `sender.id` and calls
+`unsubscribeLogs` on itself first — subscribing from the scraper pop-out would have stolen that
+window's own handle and unsubscribing would have silenced its Logs tab.
+
+### The matrix, and what each row rules out
+
+Every row was predicted before it was run. The file was 1162 bytes at the start.
+
+| job | logging sent | prediction | measured |
+| --- | --- | --- | --- |
+| j1 | `info`, all channels, persist | both lines recorded | ring +2, file 1162 to 1422 |
+| j2 | `silent` | its own error line nowhere; its queued line still lands, under j1's policy | ring +1 (the `info`), file 1422 to 1541 |
+| j3 | `error`, `channels:['engine']` | error line lands; queued `info` dropped by j2's policy | ring +1 (the `error`), file 1541 to 1689 |
+| j4 | `error`, `channels:['http']` | identical to j3 but for one field — nothing lands | ring +0, file **1689 to 1689** |
+| j5 | `error`, all channels, **no persist** | line reaches the stream, not the disk | ring +1, file **1689 to 1689** |
+| j6 | the profile's own group, unmodified | error line lands and is written again | ring +1, file 1689 to 1837 |
+| j7 | same, target carries `?token=SUPERSECRET123` | `info` recorded again, so the level really is back | ring +2, file 1837 to 2131 |
+
+j3 against j4 is the one that matters for `channels`: same level, same line, same channel on the
+line, one field different, opposite outcomes. j5 against j6 is the same trick for `persistToDisk`
+— and it also shows the two halves are independent, because j5's line is in the app's Logs
+stream while being absent from the file.
+
+### Three things the run establishes that a test could not
+
+1. **The process-wide scope note at the top of `logBus.ts` is true, and it is observable.** Each
+   job's `Job ... queued` line is logged in `startScrape` **before** the scope is built, so it is
+   governed by the *previous* job's policy. Every time — j3, j4, j5, j6 — the queued `info` line
+   was dropped by a policy some earlier job had installed. The comment says the policy outlives
+   the job; this is that sentence, measured.
+2. **Redaction is unconditional in the shipped path, not just in the unit test.** j7's target was
+   `probe://set.logging/j7-restore-verify?token=SUPERSECRET123`. Both the in-app line and the
+   line on disk read `token=<redacted>` (with the real guillemets). The literal never reached
+   either. That is the read-only 'note' row's guarantee, verified live.
+3. **`pruneOldLogs` ran live and correctly deleted nothing.** j6 flips `persistToDisk` back to
+   true, which sets `rotated` and fires the prune. With `retentionDays: 14` and nothing on disk
+   older than 7 days, the right answer is zero. All seven older files were byte-identical before
+   and after (`scraper-2026-08-05.log=1738` through `scraper-2026-08-11.log=2713`).
+
+### What the dot deliberately does not claim
+
+`maxFileSizeMb` rotation was **not** driven live. `appendToDisk` computes
+`Math.max(1, policy.maxFileSizeMb) * 1024 * 1024`, so the floor is 1 MB and there is no small
+setting that provokes a rollover — reaching it means writing ~1 MB of synthetic lines into the
+userData tree and leaving both a bloated file and a `.1.log` behind, with no way to undo it that
+does not rewrite a file holding the user's real history. `retentionDays` can only be driven to a
+deletion by making a real log file expire. Both are covered by `scraperLogBus.test.ts`; both are
+named in the entry as test-only so the green dot is not read as covering them. This is the
+"if the check cannot be made additive, say why" branch of the previous section's instruction,
+taken for two of five fields rather than for the whole slice.
+
+### The tree was left as found
+
+No userData file other than the append-only log changed: `history.json` is still 3305 bytes from
+2026-07-29, because `onFinished` writes history and all seven jobs failed. `listJobs` still
+returns the same 8 historical rows and none of the probe jobs appears among them. The log
+subscription was released, all six probe globals were deleted and their absence confirmed, and
+`/logs?level=error` returned **0** across the whole pass. Nothing was clicked in window 2 and no
+page was navigated in either window.
+
+### Changed paths
+
+- `src/renderer/components/scraper/featureStatus.ts` — promote `set.logging` to `ready`, record
+  the acceptance, and state the two fields that stay test-only.
+- `src/MAIN_V1_EVIDENCE_LEDGER.md` — this evidence.
+
+No UI string was added.
+
+### Gates
+
+- `npx vitest run` — **538 files passed / 1 skipped; 7,251 passed / 6 skipped; 0 failed.**
+- `node tools/i18n-check.cjs` — exit 0, all **9,324** English keys translated in ja/zh/ru.
+- `node tools/architecture-audit.cjs` — exit 0, **17 findings, 2 pending**, nothing new.
+- `npx eslint src/renderer/components/scraper/featureStatus.ts` — exit 0, no output.
+- `tsc --noEmit` was not run; it is not a gate.
+- A cache-busted import from Vite's running served graph returned `statusOf('set.logging')`
+  as `ready` and **31 ready / 18 untested**, so the edit reached the graph and not just the
+  disk.
+
+### Exact next slice
+
+**18** `untested` entries remain and Main V1 is still in dependency-order item 8. Do not move to
+Blanc.
+
+The next member with a comparable, decision-free live check is **`set.network`** — the group the
+previous section offered as this one's fallback and which nothing has claimed since. Its policy
+reaches the wire through `networkPolicyFrom` and, unlike logging, it *is* carried per-job in the
+`ScraperRuntime` scope, so the process-wide caveat above does not apply to it. The same
+zero-network trick will **not** work there: a network policy is only observable against a real
+request, so plan for either the HTTP Inspector (`scraper:fetchHttp`, which runs outside any job
+scope and therefore keeps the module defaults — read `runtime.ts:15-18` before assuming
+otherwise) or a real single-source job, and say in advance which one is being driven and why.
+
+`featureStatus.ts` is *still* dirty with the concurrent track's comment lines — **+30 now, not
++33**, for the reason given at the top of this section — and they are in none of this branch's
+commits. Do not slice by hunk: at `--unified=3` they share one `@@` with anything you change in
+that file. Reconstruct the blob from `git show HEAD:<path>`, prove the round-trip against `git
+rev-parse HEAD:<path>` before editing it, and install it with `git update-index --cacheinfo`.
+Re-check first — once that track lands, the file is clean and a plain `git add` is correct
+again.

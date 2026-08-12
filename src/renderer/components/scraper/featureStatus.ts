@@ -167,7 +167,35 @@ export const FEATURE_STATUS: Record<string, FeatureStatus> = {
   // The client and the credential vault are implemented and tested; a live
   // qBittorrent was not available to run against.
   'set.qbittorrent': 'untested',
-  'set.logging': 'untested',
+  // 2026-08-12: lines written through the running app. Seven real jobs were
+  // started over `scraper:startScrape` with the active profile's document and
+  // only its Logging group varied; each used `contentType: 'manga'`, which
+  // throws in `engine.ts:726` after the scope is built and before any network
+  // call, so a whole job scope is exercised without a single request. Both the
+  // in-app stream (`scraper:logs:subscribe`) and the file under
+  // `<userData>/scraper/logs` were read after every job:
+  //   level     — a `silent` job's own error line reached neither; the info line
+  //               queued under the previous job's policy still did.
+  //   channels  — two jobs identical but for `channels`: `['engine']` recorded
+  //               the engine line, `['http']` recorded nothing. Empty is "all".
+  //   persist   — `persistToDisk: false` put the line in the stream and added
+  //               zero bytes to the file; the next job put it back on disk.
+  //   redaction — a `?token=…` in the job's target reached both the stream and
+  //               the file as `token=‹redacted›`, so the read-only 'note' row's
+  //               guarantee holds live, not just in the unit test.
+  // The scope note at the top of logBus.ts is confirmed rather than assumed: a
+  // policy set by one job governed the *next* job's pre-scope line every time.
+  //
+  // Two fields stay test-only, deliberately, and the dot does not claim them:
+  // `maxFileSizeMb` rotation cannot be provoked with less than 1 MB of synthetic
+  // lines (`appendToDisk` floors at `Math.max(1, …) * 1024 * 1024`), and
+  // `retentionDays` only deletes when a file is older than the window — 14 days
+  // here, with nothing on disk older than 7. `pruneOldLogs` did run live on the
+  // persist toggle and correctly removed nothing; all seven older files stayed
+  // byte-identical. Both paths are covered by scraperLogBus.test.ts and neither
+  // can be driven further without writing into or deleting from the userData
+  // tree, which is not a trade this check is allowed to make.
+  'set.logging': 'ready',
   'set.export': 'untested',
   'set.developer': 'ready',
   'set.profiles': 'untested',
