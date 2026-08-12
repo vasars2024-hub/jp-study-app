@@ -11738,3 +11738,223 @@ difference has two explanations.
 in none of this branch's commits. Both of this hop's commits were staged by reconstructing the
 blob from `git cat-file blob HEAD:<path>`; re-check first, because once that track lands a plain
 `git add` is correct again.
+
+## The group that was never the variable, and the vehicle the last note got wrong — 2026-08-12
+
+Main V1 is still in dependency-order item 8. The previous section named **`set.safety`** as the
+next member and sketched a vehicle for it. Two corrections before any evidence, because both
+would have cost the next hop real time.
+
+**There is no `set.safety` entry.** The registry has 49 keys and none of them is that. The
+`safety.*` fields are five of the eight controls in the **Anti-Bot** group, `set.antibot`,
+alongside the three `session.*` ones — `settings/fields.ts:204-211`. That is the entry that was
+`untested`, and it is the one now driven. A next-slice note naming a key that does not exist is
+worth more scepticism than one that names nothing.
+
+**The redirect vehicle would have measured nothing.** The note proposed a redirect chain to get
+several requests into one scope, and asked — correctly — to check first whether the governor is
+consulted per hop. It is not. `waitForTurn` is called in `scraperRequest` (`http.ts:637`); the
+redirect recursion is inside `performRequest` (`:387`) and never re-enters the policy layer. So
+a chain is **one governed request and N sockets**. Measured, not inferred: a four-hop 302 chain
+under `crawlDelayMs: 2000` opened its four sockets 1-2 ms apart. Had that been the vehicle, the
+honest reading of the result would have been "crawl delay does nothing".
+
+### The retry ladder
+
+What does put several governed requests in one scope is the **retry loop**, and its own comment
+says so: "Per host, per attempt: a retry is another request arriving at the same server"
+(`http.ts:634-636`). A route answering a permanent 503 turns one job into `retryAttempts + 1`
+requests on one host — and it is the better vehicle anyway, because the circuit breaker needs
+exactly the same failing route. One vehicle, four pacing fields.
+
+Everything else is unchanged from the previous two sections: a site rule for `127.0.0.1` whose
+`episodeSelector` matches nothing, so the job fails before `onFinished` and never reaches
+AniList, nyaa or the job history. Four plain HTTP origins on 127.0.0.1 (39901 general and no
+robots.txt, 39902 `Disallow: /`, 39903 `Disallow: /` plus `Allow: /public/`, 39904 a second
+clean bucket) share one request log recording the instant, Host, user-agent and cookie of every
+request that reached a socket. `network` was pinned quiet throughout (`retryDelayMs: 0`, no
+random delay) so only the group under test varied.
+
+### Pace, by the clock at the server
+
+| job | setting | measured |
+| --- | --- | --- |
+| s1 | `crawlDelayMs: 0`, 5 requests | 0 / 2 / 3 / 4 ms apart |
+| s2 | `crawlDelayMs: 800`, 5 requests | **809 / 806 / 799 / 787 ms** apart |
+| s3 | `maxRequestsPerMinute: 2`, 3 requests | 0, 2 ms, then **60004 ms** |
+
+s3 is the sliding window's arithmetic to the millisecond: the third start is held to
+`window[0] + WINDOW_MS`, measured from the *first* request rather than the second.
+
+### The breaker, separated three ways
+
+Against the permanent 503, with `retryAttempts: 5` so six requests are available.
+
+| job | threshold / duration | gaps between the six requests |
+| --- | --- | --- |
+| s4 | 3 / 5000 ms | 0, 1, 1, **5011**, 0, 2 |
+| s5 | 3 / 15000 ms | 0, 1, 1, **15004**, 1, 0 |
+| s6 | 2 / 5000 ms | 0, 2, **5016**, 1, **5009**, 1 |
+
+s4 against s5 isolates `pauseDurationMs`; s4 against s6 isolates `pauseAfterFailures`, since the
+gap *moves* to after the second failure. s6 also earns something nobody asked for: the breaker
+re-arms and trips a second time, which is `noteFailure` resetting the streak on trip rather than
+leaving it parked at the threshold — the behaviour its own comment claims, and the reason one
+dead host does not stall a run for `pauseDurationMs` per attempt.
+
+A second, independent witness agrees. `<userData>/scraper/logs/scraper-2026-08-12.log` carries
+one `WARN [http] ... Pausing requests to 127.0.0.1 after repeated failures.` per trip — one line
+each for s4 and s5, two for s6 — with timestamps 5009 ms and 3006 ms apart matching the request
+log's gaps. The request log and the app's own log were produced by different mechanisms and say
+the same thing.
+
+### domainRateLimits, the field with no control
+
+It has no drawer field; it is model-only, and the group comment names it. Driven anyway, at a
+global `maxRequestsPerMinute: 2` with only the map varying:
+
+| job | map | third request |
+| --- | --- | --- |
+| s19 | `{"127.0.0.1": 600}` | immediate — the override wins |
+| s21 | `{".0.0.1": 600}` | immediate — the leading-dot suffix form matches |
+| s22 | `{"localhost": 600}` | **60022 ms** — wrong host, so the global applies |
+
+s22 is what makes s19 and s21 mean anything. And all three are the *raising* direction, the case
+`rateLimitFor`'s comment singles out: a clamp to the global would have left an override that
+lowers a limit working while one that raises it silently did nothing.
+
+### robots.txt, mostly by what never happened
+
+| job | origin / setting | server saw |
+| --- | --- | --- |
+| s7 | 39902 `Disallow: /`, on | `/robots.txt` only — **the page was never requested**; job failed `robots.txt disallows ...` |
+| s8 | 39902, **off** | `/p/unblocked` only — robots was never asked for |
+| s9 | 39903 `Allow: /public/`, on | `/robots.txt`, then `/public/ok` |
+| s10 | 39903, on, `/private/no` | **nothing at all** |
+| s11 | 39904, robots 404s, on | `/robots.txt`, then the page — failure is open |
+
+s7 and s8 are exact complements: the switch decides which of the two requests happens, and each
+row's evidence is a socket that was not opened. s9 against s10 is `isPathAllowed`'s longest-match
+rule live — and s10 opening **zero** sockets is also the robots cache, which is per origin and
+holds for the process's life. `resetRobotsCache` has no production caller, so **one origin can
+only be measured against one robots.txt per app run**; that is why each scenario got its own
+port, and it is the trap most likely to waste the next session's time here.
+
+### The session half
+
+The identity pool, on the retry ladder so all five requests share one runtime scope:
+
+| job | setting | distinct user-agents across 5 requests |
+| --- | --- | --- |
+| s12 | `consistentFingerprint: true` | **1** — a Safari/605 string, so from the pool, not the hard-coded fallback |
+| s13 | `consistentFingerprint: false` | **4**, all from the pool |
+| s14 | false, but `network.userAgent` named | **1** — exactly the named agent |
+
+s12's single value matters more than its being single: `SCRAPER_USER_AGENT` is a Windows Chrome
+string, so a Mac Safari one proves the pool actually chose. s14 is the precedence rule — the pool
+only ever fills a gap.
+
+The cookie jar, against a route that sets `sid` on every response:
+
+| job | setting | cookie on requests 1 through 4 |
+| --- | --- | --- |
+| s15 | `persistAuthenticatedSession: true` | `''`, then `sid=abc123` on all three later ones |
+| s16 | false | `''` throughout |
+| s17 | true plus profile `cookieHeader: sid=mine` | `sid=mine` throughout — the profile wins the collision |
+| s18 | true, server sends `Max-Age=0` | `''` throughout — deleted, not replayed |
+
+s18 is the one attribute `rememberSetCookie` says it must read, and s17 is the merge rule that
+stops a mid-run session cookie from overwriting a login the user configured. Every row's first
+request carried no cookie, including rows that ran straight after one which had filled a jar —
+the jar is per job, as documented.
+
+### What the dot does not claim
+
+**`session.sessionLabel` is inert.** `sessionStateFrom` copies it to `ScraperSessionState.label`
+and nothing reads that field: `runtime.session` is touched at exactly four places in `http.ts`
+(`:539`, `:543`, `:549`, `:550`) and none is `.label`. session.ts calls it "only for the log
+line" — there is no such log line. One of the group's eight controls does nothing, and the
+comment now says so, on the `set.network`/`concurrentRequests` precedent that the honest unit is
+the field.
+
+**Pacing does not reach redirect hops** (the measurement at the top). `http.ts:24` justifies
+keeping the recursion below the policy layer so a hop needs no second concurrency slot — with
+`concurrentRequests: 1` that would deadlock — but the same structure exempts hops from crawl
+delay and the per-minute window too, which that comment does not mention. Moving `waitForTurn`
+into the recursion is a product call about whether a redirect chain is one request or four to a
+rate limit; it is not something to decide inside an acceptance pass, so it is recorded here and
+named in the registry rather than changed.
+
+### Why `set.antibot` still goes green
+
+Seven of the eight drawer controls were driven live and each has a witness a no-op could not
+produce; the eighth is named inert in the entry itself. That is the rule the file already set for
+`set.network`, which is `ready` while explicitly not claiming `concurrentRequests`.
+
+### The tree was left as found
+
+`localStorage['jp-scraper-settings-v1']` (44,490 bytes) read back after the pass: `safety` is
+still `{respectRobotsTxt: true, crawlDelayMs: 500, maxRequestsPerMinute: 60, pauseAfterFailures:
+5, pauseDurationMs: 60000, domainRateLimits: {}}`, `session` still `{consistentFingerprint: true,
+persistAuthenticatedSession: true, sessionLabel: ''}`, `network.retryAttempts` still 3 with an
+empty `userAgent` and `cookieHeader`, `cache` still standard/1440/512, `metadata.cacheHours`
+still 168, `extraction.siteRules` still **0** and `notifications.channel` still `toast`. Every
+job carried its settings in the `startScrape` payload; nothing was ever saved. `history.json`
+still 3,305 bytes from 2026-07-29 — every job failed before `onFinished`. All probe globals
+deleted and confirmed gone, the harness killed and all four ports confirmed closed,
+`/logs?level=error` **0**.
+
+`activeProfileId` is `relay-probe`, which predates this hop and was not touched.
+
+### Changed paths
+
+- `src/renderer/components/scraper/featureStatus.ts` — promote `set.antibot` to `ready`, record
+  the acceptance field by field, and name both things the dot does not claim.
+- `src/MAIN_V1_EVIDENCE_LEDGER.md` — this evidence.
+
+No UI string was added.
+
+### Gates
+
+- `npx vitest run` — **538 files passed / 1 skipped; 7,251 passed / 6 skipped; 0 failed.** The
+  first invocation failed `visualNovelI18n.test.tsx` on a 10s `beforeAll` hook timeout while the
+  Electron dev app and the four-server harness were still running; with the harness down the
+  re-run was clean and matches the previous hop's counts exactly. Load flake, not a regression —
+  but it is why that suite is worth re-running rather than trusting a single red.
+- `node tools/i18n-check.cjs` — exit 0, all **9,324** English keys translated in ja/zh/ru.
+- `node tools/architecture-audit.cjs` — exit 0, 1,720 modules, nothing new, 2 known pending.
+- `npx eslint src/renderer/components/scraper/featureStatus.ts` — exit 0, no output.
+- `tsc --noEmit` was not run; it is not a gate.
+- A cache-busted import from Vite's running served graph returned `set.antibot` as `ready` and
+  **34 ready / 15 untested** of 49.
+
+### Exact next slice
+
+**15** `untested` entries remain and Main V1 is still in dependency-order item 8. Do not move to
+Blanc.
+
+The retry-ladder harness described above is the asset; rebuilding it is ten minutes and it now
+covers pacing, failure and session state as well as plain request policy. The next member it
+fits without modification is **`set.performance`** — its entry already claims `maxParallelJobs`
+"gates job admission" and `batchSize` "sets the progress cadence" while naming five inert
+fields, and both live claims are about a *scope*, which is what this vehicle constructs. Check
+before designing: `maxParallelJobs` is admission across jobs, so it needs two jobs in flight at
+once, which the single-job renderer helper used here does not do — start two without awaiting
+the first, and use the server's request log to see whether the second job's socket opens before
+the first job's last one. `batchSize` needs a job that *emits rows*, which the
+`episodeSelector`-matches-nothing rule deliberately never does; point a rule at a selector that
+**does** match several rows in the served page and count `kind: 'row'` / `progress` events
+instead, or say plainly that it cannot be driven on this vehicle and mark it test-only.
+
+Two traps carry forward from this hop specifically. The **robots cache is per origin for the
+life of the process** and nothing resets it, so a second robots scenario needs a second port.
+And the job-event stream carries **no `log` lines** for a job that fails — `scraperLogsFor` is
+read into the *result* (`engine.ts:695`, `:867`), which a failing job never builds, so the disk
+log at `<userData>/scraper/logs/scraper-<day>.log` is where a run's own warnings actually are.
+That is not a defect; it is where to look.
+
+`featureStatus.ts` is **still** dirty with the concurrent settings-group track's 30 comment
+lines, in none of this branch's commits. This hop's commit was staged the same way as the last
+three — reconstructing the blob from `git cat-file blob HEAD:<path>` — because a plain `git add`
+would carry that track's work into this branch. Re-check first: once that track lands, a plain
+`git add` is correct again.

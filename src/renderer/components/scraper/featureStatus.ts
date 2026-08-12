@@ -299,7 +299,65 @@ export const FEATURE_STATUS: Record<string, FeatureStatus> = {
   // own catalogue and index endpoints — and session.* in `session.ts`, which is
   // where "Random (Recommended)" stopped being the option that did nothing.
   // The cookie jar is in memory, per job, never written to disk or logged.
-  'set.antibot': 'untested',
+  //
+  // 2026-08-12: driven live on the same vehicle as `set.network` and `set.cache`
+  // above, with one change that is the whole reason this group could be measured.
+  // Pacing needs several requests inside ONE runtime scope and a site rule makes
+  // exactly one — so the vehicle is the **retry ladder**: a route answering a
+  // permanent 503 turns one job into `retryAttempts + 1` requests on one host,
+  // because `waitForTurn` is called per attempt (http.ts:637). The witness is a
+  // local server's request log, read only as "when did a socket open here".
+  //   crawlDelayMs — five requests 0/2/3/4ms apart at 0, and 809/806/799/787ms
+  //     apart at 800. Same URL, same profile, nothing else varied.
+  //   maxRequestsPerMinute — at a limit of 2 the third request arrived 60004ms
+  //     after the first, which is `window[0] + WINDOW_MS` to the millisecond.
+  //   pauseAfterFailures/pauseDurationMs — separated three ways against the
+  //     permanent 503: threshold 3 / 5s paused 5011ms after the third failure,
+  //     threshold 3 / 15s paused 15004ms, and threshold 2 / 5s moved the gap to
+  //     after the second *and* re-armed once more (5016ms, then 5009ms) — which
+  //     is `noteFailure` resetting the streak when it trips rather than leaving
+  //     it at the threshold. The disk log's own "Pausing requests to …" lines
+  //     agree with the request log on every trip.
+  //   domainRateLimits — no drawer control, driven anyway at a global limit of 2:
+  //     key `127.0.0.1` and key `.0.0.1` each raised it to 600 and the job ran
+  //     unthrottled, while key `localhost` against that same host did not match
+  //     and the third request waited 60022ms. An override that *raises* a limit
+  //     wins, which is the half a clamp would have quietly broken.
+  //   respectRobotsTxt — on, against `Disallow: /`, the server logged the
+  //     `/robots.txt` fetch and **never the page**, and the job failed
+  //     `robots.txt disallows …`; off, the same origin fetched the page and never
+  //     asked for robots at all. `Allow: /public/` beat `Disallow: /` on a longer
+  //     path, and an origin whose robots.txt 404s got its page — failure is open,
+  //     as the module says. Rules are cached per origin for the process's life
+  //     and `resetRobotsCache` has no production caller, so one origin can only
+  //     ever be measured against one robots.txt per app run.
+  //   consistentFingerprint — five requests carried one pool identity with it on
+  //     (a Safari string, so demonstrably not the hard-coded fallback) and four
+  //     distinct pool identities with it off. A named `network.userAgent` was
+  //     never overridden either way.
+  //   persistAuthenticatedSession — with it on, the first request carried no
+  //     cookie and every later one carried the `sid` the server had set; with it
+  //     off, none ever did. A profile `cookieHeader` won the name collision, and
+  //     a `Max-Age=0` response left the jar empty rather than replaying a cookie
+  //     the server had just deleted.
+  //
+  // Two things this dot deliberately does not claim.
+  //
+  // `session.sessionLabel` is **inert** — the one control here that does nothing.
+  // `sessionStateFrom` copies it to `ScraperSessionState.label` and nothing reads
+  // that field; session.ts calling it "only for the log line" describes a log
+  // line that does not exist.
+  //
+  // Pacing does not reach redirect hops, and that is measured rather than
+  // inferred: a four-hop 302 chain ran 1-2ms apart under `crawlDelayMs: 2000`.
+  // `waitForTurn` sits in `scraperRequest` while the redirect recursion is inside
+  // `performRequest` (http.ts:387), so a chain is one governed request and N
+  // sockets. http.ts:24 justifies that split for the concurrency gate — a hop
+  // must not need a second slot, or a limit of 1 deadlocks — but the same
+  // structure silently exempts hops from crawl delay and the per-minute window
+  // too. Whether that is right is a product call about what "one request" means
+  // to a rate limit, not something to settle inside an acceptance pass.
+  'set.antibot': 'ready',
   // The three Download switches decide whether the run collects that image at
   // all, which is what causes the only fetch there is; maxPerEntry caps the list
   // and preferredFormat picks among published variants. Inert, and named as such
