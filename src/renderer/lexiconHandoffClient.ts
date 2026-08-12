@@ -16,6 +16,7 @@ import {
   normalizeLexiconHandoffStageResult,
   normalizeLexiconHandoffTakeResult,
   type LexiconHandoffRequest,
+  type LexiconHandoffTakeRequest,
   type LexiconHandoffStageResult,
   type LexiconHandoffTakeResult,
 } from '../shared/lexiconHandoff';
@@ -23,7 +24,7 @@ import type { ReadingLensCapture } from '../shared/readingLens';
 
 interface LexiconHandoffBridge {
   lexiconHandoffStage(request: LexiconHandoffRequest): Promise<unknown>;
-  lexiconHandoffTake(): Promise<unknown>;
+  lexiconHandoffTake(request: LexiconHandoffTakeRequest): Promise<unknown>;
   onLexiconHandoffStaged(callback: () => void): () => void;
   popOut(section: string): Promise<void>;
 }
@@ -49,11 +50,11 @@ export async function stageLexiconHandoff(
   }
 }
 
-export async function takeLexiconHandoff(): Promise<LexiconHandoffTakeResult> {
+export async function takeLexiconHandoff(lens: LexiconHandoffTakeRequest['lens']): Promise<LexiconHandoffTakeResult> {
   const method = bridgeMethod('lexiconHandoffTake');
   if (!method) return { ok: false, code: 'bridge-unavailable' };
   try {
-    return normalizeLexiconHandoffTakeResult(await method());
+    return normalizeLexiconHandoffTakeResult(await method({ lens }));
   } catch {
     return { ok: false, code: 'bridge-unavailable' };
   }
@@ -112,7 +113,7 @@ export async function handOffCaptureToLexicon(
     // Main's pop-out route rather than the desktop-only `os:open` event, for the
     // reason `openAgentSurface` records: the lens is not a `DesktopShell`, so it
     // has no listener for that event, and `popOut` deduplicates by section.
-    await popOut('dictionary');
+    await popOut(staged.lens === 'translate' ? 'translate' : 'dictionary');
     return 'handed-off';
   } catch {
     return 'open-failed';

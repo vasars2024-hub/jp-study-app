@@ -36,13 +36,17 @@ describe('lexicon handoff renderer client', () => {
     expect(calls).toEqual(['stage', 'open:dictionary']);
   });
 
-  it('does not stage a sentence or paragraph with no receiving surface', async () => {
-    const stage = vi.fn();
-    installApi({ lexiconHandoffStage: stage, popOut: vi.fn() });
+  it('routes a sentence to Translate and still refuses a paragraph', async () => {
+    const stage = vi.fn(async () => ({ ok: true, kind: 'sentence', lens: 'translate' }));
+    const popOut = vi.fn();
+    installApi({ lexiconHandoffStage: stage, popOut });
 
     await expect(handOffCaptureToLexicon(capture('今日は寒いですね。')))
+      .resolves.toBe('handed-off');
+    expect(popOut).toHaveBeenCalledWith('translate');
+
+    await expect(handOffCaptureToLexicon(capture('一文です。二文です。三文です。')))
       .resolves.toBe('not-lexicon-scale');
-    expect(stage).not.toHaveBeenCalled();
   });
 
   it('does not open after a refused or unavailable stage', async () => {
@@ -74,10 +78,12 @@ describe('lexicon handoff renderer client', () => {
       onLexiconHandoffStaged: subscribe,
     });
 
-    await expect(takeLexiconHandoff()).resolves.toMatchObject({
+    await expect(takeLexiconHandoff('lookup')).resolves.toMatchObject({
       ok: true,
       handoff: { text: '猫', kind: 'word' },
     });
+    expect((window.api as unknown as { lexiconHandoffTake: ReturnType<typeof vi.fn> }).lexiconHandoffTake)
+      .toBeDefined();
     const callback = vi.fn();
     expect(onLexiconHandoffStaged(callback)).toBe(off);
     expect(subscribe).toHaveBeenCalledWith(expect.any(Function));

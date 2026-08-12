@@ -83,7 +83,7 @@ export const LEXICON_HANDOFF_TEXT_MAX = 400;
  * accepting them here would quietly answer the product question that target is
  * still waiting on by dumping a passage into a dictionary search box.
  */
-export const LEXICON_HANDOFF_KINDS = ['character', 'word'] as const;
+export const LEXICON_HANDOFF_KINDS = ['character', 'word', 'sentence'] as const;
 export type LexiconHandoffKind = (typeof LEXICON_HANDOFF_KINDS)[number];
 
 const SOURCE_LABEL_MAX = 120;
@@ -98,6 +98,10 @@ export interface LexiconHandoffRequest {
   text: string;
   source: ReadingLensSource;
   sourceLabel?: string;
+}
+
+export interface LexiconHandoffTakeRequest {
+  lens: LexiconLens;
 }
 
 /** What main holds, and what a claim hands back. */
@@ -202,9 +206,6 @@ export function lexiconHandoffFromCapture(
 ): LexiconHandoffRequest | null {
   const workflow = resolveReadingLensWorkflow(capture);
   if (workflow.target !== 'lexicon') return null;
-  // `resolveReadingLensWorkflow` also calls a sentence "compact", but the
-  // current Dictionary receiver cannot honor its translate/analysis lens. Keep
-  // that gesture absent until the Workbench has a real receiving surface.
   if (!isHandoffKind(workflow.input.kind)) return null;
   const text = workflow.input.text;
   if (!text || text.length > LEXICON_HANDOFF_TEXT_MAX) return null;
@@ -222,7 +223,7 @@ function normalizeStagedHandoff(value: unknown): LexiconHandoff | null {
   const lens = value.lens;
   if (!text || value.route !== LEXICON_WORKBENCH_ROUTE) return null;
   if (!(LEXICON_HANDOFF_KINDS as readonly string[]).includes(kind as string)) return null;
-  if (lens !== 'lookup') return null;
+  if (lens !== 'lookup' && lens !== 'translate') return null;
   const stagedAt = typeof value.stagedAt === 'number' && Number.isFinite(value.stagedAt)
     ? value.stagedAt
     : 0;
@@ -259,7 +260,7 @@ export function normalizeLexiconHandoffStageResult(value: unknown): LexiconHando
   if (!isRecord(value)) return { ok: false, code: 'bridge-unavailable' };
   if (value.ok === true
     && (LEXICON_HANDOFF_KINDS as readonly string[]).includes(value.kind as string)
-    && value.lens === 'lookup') {
+    && (value.lens === 'lookup' || value.lens === 'translate')) {
     return { ok: true, kind: value.kind as LexiconHandoffKind, lens: value.lens };
   }
   return { ok: false, code: failureCode(value.code) };

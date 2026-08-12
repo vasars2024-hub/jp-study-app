@@ -44,11 +44,11 @@ describe('lexicon handoff store', () => {
     expect(store.stage({ text: '猫', source: 'screen' }, 1_000)).toMatchObject({ ok: true });
     expect(store.stage({ text: '食べる', source: 'clipboard' }, 1_001)).toMatchObject({ ok: true });
 
-    expect(store.take(1_002)).toMatchObject({
+    expect(store.take({ lens: 'lookup' }, 1_002)).toMatchObject({
       ok: true,
       handoff: { text: '食べる', source: 'clipboard', stagedAt: 1_001 },
     });
-    expect(store.take(1_003)).toEqual({ ok: true, handoff: null });
+    expect(store.take({ lens: 'lookup' }, 1_003)).toEqual({ ok: true, handoff: null });
     expect(store.pending(1_003)).toBe(false);
   });
 
@@ -56,14 +56,19 @@ describe('lexicon handoff store', () => {
     const store = createLexiconHandoffStore();
     store.stage({ text: '猫', source: 'screen' }, 5_000);
     expect(store.pending(5_000 + LEXICON_HANDOFF_TTL_MS - 1)).toBe(true);
-    expect(store.take(5_000 + LEXICON_HANDOFF_TTL_MS)).toEqual({ ok: true, handoff: null });
+    expect(store.take({ lens: 'lookup' }, 5_000 + LEXICON_HANDOFF_TTL_MS)).toEqual({ ok: true, handoff: null });
   });
 
-  it('refuses sentence-scale text rather than sending it to Dictionary', () => {
+  it('lets only the matching Workbench lens claim sentence-scale text', () => {
     const store = createLexiconHandoffStore();
     expect(store.stage({ text: '今日は寒いですね。', source: 'screen' }))
-      .toEqual({ ok: false, code: 'not-lexicon-scale' });
-    expect(store.pending()).toBe(false);
+      .toEqual({ ok: true, kind: 'sentence', lens: 'translate' });
+    expect(store.take({ lens: 'lookup' })).toEqual({ ok: true, handoff: null });
+    expect(store.pending()).toBe(true);
+    expect(store.take({ lens: 'translate' })).toMatchObject({
+      ok: true,
+      handoff: { text: '今日は寒いですね。', lens: 'translate' },
+    });
   });
 });
 
@@ -88,10 +93,8 @@ describe('lexicon handoff IPC', () => {
     expect(stage?.(null, { text: '猫', source: 'screen' })).toMatchObject({ ok: true });
     expect(registry.windows[0].sent).toEqual([LEXICON_HANDOFF_CHANNELS.staged]);
     expect(registry.windows[1].sent).toEqual([]);
-    expect(take?.(null)).toMatchObject({ ok: true, handoff: { text: '猫' } });
+    expect(take?.(null, { lens: 'lookup' })).toMatchObject({ ok: true, handoff: { text: '猫' } });
 
-    expect(stage?.(null, { text: '今日は寒いですね。', source: 'screen' }))
-      .toEqual({ ok: false, code: 'not-lexicon-scale' });
-    expect(registry.windows[0].sent).toHaveLength(1);
+    expect(take?.(null, {})).toEqual({ ok: false, code: 'invalid-request' });
   });
 });

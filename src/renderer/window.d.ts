@@ -1339,7 +1339,9 @@ declare global {
       lexiconHandoffStage(
         request: import('../shared/lexiconHandoff').LexiconHandoffRequest,
       ): Promise<import('../shared/lexiconHandoff').LexiconHandoffStageResult>;
-      lexiconHandoffTake(): Promise<import('../shared/lexiconHandoff').LexiconHandoffTakeResult>;
+      lexiconHandoffTake(
+        request: import('../shared/lexiconHandoff').LexiconHandoffTakeRequest,
+      ): Promise<import('../shared/lexiconHandoff').LexiconHandoffTakeResult>;
       onLexiconHandoffStaged(cb: () => void): () => void;
       onLensOpen(cb: (init: LensInit) => void): () => void;
       onLensSettingsChanged(cb: (status: ReadingLensStatus) => void): () => void;

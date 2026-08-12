@@ -29,10 +29,13 @@ describe('lexicon handoff request', () => {
     });
   });
 
-  it('refuses a sentence until Workbench analysis has a real receiver', () => {
+  it('accepts a sentence for the grounded Translate Workbench receiver', () => {
     const request = { text: '今日は寒いですね。' };
-    expect(normalizeLexiconHandoffRequest(request)).toBeNull();
-    expect(lexiconHandoffRejection(request)).toBe('not-lexicon-scale');
+    expect(normalizeLexiconHandoffRequest(request)).toMatchObject({
+      kind: 'sentence',
+      lens: 'translate',
+      text: request.text,
+    });
   });
 
   it('refuses a paragraph, which belongs to the Reading workspace target', () => {
@@ -82,12 +85,15 @@ describe('lexiconHandoffFromCapture', () => {
     expect(lexiconHandoffFromCapture(paragraph)).toBeNull();
   });
 
-  it('returns null for a sentence capture, which belongs to the future Workbench receiver', () => {
-    expect(lexiconHandoffFromCapture(capture('今日は寒いですね。'))).toBeNull();
+  it('produces a request for a sentence capture now that Workbench has a receiver', () => {
+    expect(lexiconHandoffFromCapture(capture('今日は寒いですね。'))).toMatchObject({
+      text: '今日は寒いですね。',
+      source: 'screen',
+    });
   });
 
   it('agrees with the boundary: anything it produces is accepted by main', () => {
-    for (const text of ['猫', '食べる', 'hello world']) {
+    for (const text of ['猫', '食べる', 'hello world', '今日は寒いですね。']) {
       const request = lexiconHandoffFromCapture(capture(text, 'clipboard'));
       expect(request, text).not.toBeNull();
       expect(normalizeLexiconHandoffRequest(request), text).not.toBeNull();

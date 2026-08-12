@@ -28,12 +28,13 @@ import {
   normalizeLexiconHandoffRequest,
   type LexiconHandoff,
   type LexiconHandoffStageResult,
+  type LexiconHandoffTakeRequest,
   type LexiconHandoffTakeResult,
 } from '../shared/lexiconHandoff';
 
 export interface LexiconHandoffStore {
   stage(request: unknown, now?: number): LexiconHandoffStageResult;
-  take(now?: number): LexiconHandoffTakeResult;
+  take(request: LexiconHandoffTakeRequest, now?: number): LexiconHandoffTakeResult;
   /** Test seam: whether a live handoff is currently resident. */
   pending(now?: number): boolean;
 }
@@ -54,8 +55,9 @@ export function createLexiconHandoffStore(): LexiconHandoffStore {
     return { ok: true, kind: normalized.kind, lens: normalized.lens };
   };
 
-  const take = (now = Date.now()): LexiconHandoffTakeResult => {
+  const take = (request: LexiconHandoffTakeRequest, now = Date.now()): LexiconHandoffTakeResult => {
     expire(now);
+    if (!staged || staged.lens !== request.lens) return { ok: true, handoff: null };
     const claimed = staged;
     staged = null;
     return { ok: true, handoff: claimed };
@@ -119,6 +121,12 @@ export function registerLexiconHandoffIpc(
   );
   ipcMain.handle(
     LEXICON_HANDOFF_CHANNELS.take,
-    (): LexiconHandoffTakeResult => resolveStore().take(),
+    (_event, raw: unknown): LexiconHandoffTakeResult => {
+      const lens = (raw as { lens?: unknown } | null)?.lens;
+      if (lens !== 'lookup' && lens !== 'translate') {
+        return { ok: false, code: 'invalid-request' };
+      }
+      return resolveStore().take({ lens });
+    },
   );
 }

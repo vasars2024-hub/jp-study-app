@@ -48,10 +48,12 @@ afterEach(async () => {
   document.body.replaceChildren();
   bridge.take.mockReset();
   bridge.subscribe.mockClear();
+  window.history.replaceState(null, '', '/');
 });
 
 describe('Dictionary Lexicon handoff receiver', () => {
   it('keeps the first single-use claim through the StrictMode effect replay', async () => {
+    window.history.replaceState(null, '', '/?popout=dictionary');
     let resolveFirst!: (value: unknown) => void;
     bridge.take
       .mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }))

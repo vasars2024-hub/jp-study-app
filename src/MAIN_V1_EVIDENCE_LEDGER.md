@@ -13970,3 +13970,42 @@ entries. Only the process tree started by this worker was stopped.
 
 Track 2 remains incomplete. The next adjacent slice is ReadingLens sentence handoff into this real
 receiver; passage → Reading remains parked on the already-recorded destination product decision.
+
+## ReadingLens sentences reach the grounded Workbench — 2026-08-12
+
+Re-derived from the ledger tail and dependency order: Track 2/ReadingLens sentence routing was the
+next decision-free slice, not Agent vision input. The shared handoff now accepts sentence scale and
+preserves its resolved `translate` lens. The renderer opens Translate for that lens, while character
+and word captures still open Dictionary; paragraph/document remain refused because their Reading
+destination still needs the previously recorded product decision.
+
+The first live drive found a race that source inspection did not: main broadcasts an empty staged
+signal to every window, and an already-mounted Translate surface in the desktop claimed the
+single-use sentence before the new pop-out painted. Claims are now both lens-scoped in main and
+route-scoped in renderers. An open Dictionary cannot consume a Translate handoff, and embedded
+desktop surfaces do not consume payloads intended for the explicit pop-out route.
+
+Focused coverage spans shared normalization, main store/IPC selection, renderer routing, the
+Dictionary StrictMode receiver and the new Translate receiver: **5 files / 25 passed**. The four
+required gates passed in the shared tree: full Vitest **7,360 passed / 0 failed / 6 skipped** across
+555 files; i18n **9,350** English keys complete in ja/zh/ru; architecture 1,742 modules / 17 findings
+with nothing new and the same two pending; ESLint over every touched code/test path clean.
+
+The path-exact checkpoint was also gated in a detached worktree. Its focused slice remains green;
+the full suite is the established clean-HEAD baseline (**6,997 passed / 9 failed / 6 skipped**):
+two i18n hygiene tests, five Blanc confirmation/queue tests, one local-Agent queue reachability test
+and one novel-reader progress guard, none touched here. Detached i18n passed all **9,179** committed
+keys, architecture reported the same 17 findings/two pending, and touched-path ESLint was clean.
+
+Live Electron acceptance used a fresh main and authenticated debug bridge only. Dictionary was
+opened first, then `来週は京都へ旅行します。` was staged through the real preload/main handler.
+Dictionary stayed empty; the Translate pop-out received the exact sentence, reported sentence
+scale, and rendered the grounded offline Workbench rung. The first process was restarted after the
+race fix so preload and main were not mistaken for hot-reloaded renderer proof. Probe globals were
+deleted, no persistent store or setting was touched, and only the process trees started by this
+worker were stopped.
+
+Track 2's decision-free compatibility and sentence route are now complete. Passage → Reading stays
+parked on its destination decision. The next worker should re-audit the remaining Track 2
+AI/enrichment bullets against current source before advancing dependency order; do not infer Track
+2 completion from this one route.

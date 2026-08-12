@@ -33,6 +33,7 @@ export default function DictionaryView() {
    * opening the window and leaving it empty.
    */
   useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('popout') !== 'dictionary') return;
     // React StrictMode replays this effect as setup → cleanup → setup. A local
     // `alive` flag makes the first setup consume main's single-use handoff and
     // then discard its reply after the replay cleanup; this component-level ref
@@ -40,7 +41,7 @@ export default function DictionaryView() {
     // false, so the ordinary post-unmount state-update guard still holds.
     acceptingHandoffRef.current = true;
     const claim = (): void => {
-      void takeLexiconHandoff().then((result) => {
+      void takeLexiconHandoff('lookup').then((result) => {
         if (!acceptingHandoffRef.current || !result.ok || !result.handoff) return;
         setInput(result.handoff.text);
         setQuery(result.handoff.text);

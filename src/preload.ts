@@ -17,6 +17,7 @@ import type {
 import {
   LEXICON_HANDOFF_CHANNELS,
   type LexiconHandoffRequest,
+  type LexiconHandoffTakeRequest,
   type LexiconHandoffStageResult,
   type LexiconHandoffTakeResult,
 } from './shared/lexiconHandoff';
@@ -2069,8 +2070,8 @@ const api = {
    */
   lexiconHandoffStage: (request: LexiconHandoffRequest): Promise<LexiconHandoffStageResult> =>
     ipcRenderer.invoke(LEXICON_HANDOFF_CHANNELS.stage, request),
-  lexiconHandoffTake: (): Promise<LexiconHandoffTakeResult> =>
-    ipcRenderer.invoke(LEXICON_HANDOFF_CHANNELS.take),
+  lexiconHandoffTake: (request: LexiconHandoffTakeRequest): Promise<LexiconHandoffTakeResult> =>
+    ipcRenderer.invoke(LEXICON_HANDOFF_CHANNELS.take, request),
   onLexiconHandoffStaged: (cb: () => void): (() => void) => {
     const handler = (): void => cb();
     ipcRenderer.on(LEXICON_HANDOFF_CHANNELS.staged, handler);

@@ -18,13 +18,34 @@ import {
   TranslateHistoryList,
   useTranslate,
 } from '../components/translate/TranslateContent';
+import { useEffect, useRef } from 'react';
 import { useT } from '../i18n';
+import { onLexiconHandoffStaged, takeLexiconHandoff } from '../lexiconHandoffClient';
 
 export default function TranslateView() {
   const aero = useAeroMaterials();
   const { t } = useT();
   const state = useTranslate();
   const { tab, source, target, input, output, msg, error, busy, run, swap } = state;
+  const acceptingHandoffRef = useRef(false);
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('popout') !== 'translate') return;
+    acceptingHandoffRef.current = true;
+    const claim = (): void => {
+      void takeLexiconHandoff('translate').then((result) => {
+        if (!acceptingHandoffRef.current || !result.ok || !result.handoff) return;
+        state.setTab('translate');
+        state.setInput(result.handoff.text);
+      });
+    };
+    claim();
+    const off = onLexiconHandoffStaged(claim);
+    return () => {
+      acceptingHandoffRef.current = false;
+      off();
+    };
+  }, [state.setInput, state.setTab]);
 
   const menus: MenuBarMenu[] = [
     {
