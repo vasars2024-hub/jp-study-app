@@ -13745,3 +13745,107 @@ open on arrival.
 Also worth saying plainly: those `__p_*` rows are probe data from an earlier session sitting in the
 user's **real** capture history. They were left exactly as found — removing them is a mutation, and
 this hop asserted byte-identical restoration — but someone's probe did not clean up after itself.
+
+## The Lexicon hand-off survived interruption, then live driving found the claim it ate — 2026-08-12
+
+### Recovery: the slice was twelve seconds from having no trail at all
+
+Worker `primary` hit its usage limit at 16:23:34. The index was empty. HEAD was `f461361`, and the
+last ledger section still named the next decision-free half: character/word capture → Dictionary.
+The relevant mtimes formed one uninterrupted chain from 16:18:34 through 16:23:16: shared contract,
+main store, the `readingLens.ts` registration, preload, renderer typing/client, both lens surfaces,
+Dictionary, styles, four translations, then the shared test. None existed in branch history.
+
+The standing boss-audit instruction was already closed by `bef3b2e`; re-reading the last audit
+section before touching this work confirmed there was no earlier finding to pre-empt the rescue.
+
+One recovery mistake is recorded because it is the exact kind of false wiring proof this ledger
+exists to prevent. The first mtime view omitted `main/readingLens.ts`, so main looked unwired and a
+second top-level registration was briefly added. A fresh Electron main refused to create a window
+with `Attempted to register a second handler for 'lexiconHandoff:stage'`. Searching the complete
+tree found the interrupted worker's real registration inside `registerReadingLensIpc()`; the
+duplicate was removed. The final staged tree has one registration, at the existing production lens
+main boundary.
+
+### What landed, and what deliberately did not
+
+- `shared/lexiconHandoff.ts`: one main-memory slot, 400 raw UTF-16 code units before
+  classification, a two-minute TTL, newest-wins replacement, single-use claim, no `fs` and no
+  persistence. Main revalidates untrusted text/source input; renderer revalidates main replies.
+- `main/lexiconHandoff.ts` + `main/readingLens.ts`: stage/take handlers and an empty staged
+  broadcast to every live window. The captured text stays in main until one Dictionary claims it.
+- `preload.ts`, `window.d.ts`, and `renderer/lexiconHandoffClient.ts`: the typed bridge and the
+  stage-before-open gesture. A failed stage never opens a window; a failed open is reported back to
+  the lens instead of being presented as success.
+- Both OCR-line and clipboard-passage lens surfaces show the localized action only when the
+  capture has a real receiver. Sending disables the button; failure stays in place as a retryable
+  localized state; success closes the always-on-top lens after Dictionary has been opened.
+- `DictionaryView.tsx` claims on mount (cold pop-out) and on the staged broadcast (already-open
+  pop-out), puts the text in the input, and actually starts the lookup.
+- The boundary accepts **character and word only**. The interrupted draft also accepted a
+  sentence, but today's Dictionary receiver ignores the resolved `translate` lens and would only
+  run a whole-sentence dictionary query. That is not Workbench analysis. Sentence and paragraph
+  gestures therefore remain absent until the product has their real Workbench and Reading
+  receivers; they are not forced through a misleading compatibility route.
+
+### The live defect: StrictMode consumed the only copy, then threw it away
+
+The first real cold-open drive staged `__lexicon_probe_alpha__`, opened a Dictionary pop-out, and
+showed an empty input. A second `lexiconHandoffTake()` correctly returned `handoff: null`: main had
+done exactly what single-use promised. React StrictMode had run the receiver effect as setup →
+cleanup → setup. The first setup consumed the payload, its local `alive` flag was made false by the
+replay cleanup, and its eventual reply was discarded; the second setup could only claim an empty
+slot.
+
+The receiver now uses a component-level mounted ref. It becomes true again during the StrictMode
+replay before the first promise settles, while a real unmount still leaves it false. The focused
+regression resolves the first single-use claim only after the replay and asserts both input and
+results receive `食べる`.
+
+### Live acceptance — real main handler, no input automation, no retained probe state
+
+The old relay-owned `npm start` tree was stopped exactly by its recorded root PID. A first fresh
+main exposed the duplicate-registration recovery mistake above; after correction, the next start
+hit this machine's known Chromium network-service crash while `session.clearCache()` held the
+window blank. One bounded `--disable-gpu` retry loaded the app and was the process used below.
+
+All interaction went through `debug/bridge.json` and `window.api`, never mouse/keyboard automation:
+
+| probe | real result |
+|---|---|
+| preload surface | stage, take, staged subscription and pop-out are all functions |
+| stage word | `{ok:true, kind:'word', lens:'lookup'}` |
+| already-open Dictionary | staged `__lexicon_probe_gamma__`; existing window input became that exact text |
+| cold-open Dictionary | staged `__lexicon_probe_delta__`, then opened; new window input became that exact text through the StrictMode replay |
+| stage sentence | `{ok:false, code:'not-lexicon-scale'}` and Dictionary kept the prior word |
+| second claim | `{ok:true, handoff:null}` |
+
+The probes deliberately used non-dictionary tokens, so `DictionaryResults` found no entry and never
+called `recordLookup`. `jp-lookup-history` was `null` before, throughout, and after. No userData
+backup was taken. All probe globals were deleted, the Dictionary pop-out was closed, and only the
+retry process tree started by this worker was stopped.
+
+### Exact-tree staging and gates
+
+The repository remained a shared dirty tree. Thirteen paths containing only this slice were staged
+directly. `preload.ts`, `window.d.ts`, `DictionaryView.tsx`, and all four catalogs also contain
+foreign work; each staged blob was reconstructed from `HEAD` plus only the Lexicon additions, with
+unique anchors asserted. The resulting checkpoint candidate is 20 paths, **+1,136 / -1**. The
+working tree still contains every foreign hunk.
+
+| gate | result |
+|---|---|
+| focused Vitest, exact staged candidate | 5 files, **26 passed / 0 failed** |
+| full Vitest, shared in-situ tree | **7,355 passed / 0 failed / 6 skipped**, 553 files |
+| full Vitest, exact staged candidate | **6,992 passed / 9 failed / 6 skipped**, 527 files; exactly the nine clean-HEAD failures already recorded (2 i18n hygiene, 5 Blanc confirmation/queue, 1 local-agent queue reachability, 1 novel-reader progress guard), none in this slice |
+| `node tools/i18n-check.cjs` | shared tree: all **9,343** keys; exact candidate: all **9,172** keys translated in ja/zh/ru |
+| `node tools/architecture-audit.cjs` | shared: 1,739 modules; exact candidate: 1,679 modules; both 17 findings, nothing new, same 2 known pending |
+| ESLint | every touched TS/TSX path except global `window.d.ts`: exit 0. `window.d.ts` has the same two pre-existing subtitle-harvest adjacent-overload identities at parent and candidate; the five inserted bridge lines only shift them +5, adding no identity |
+
+### Remaining Track 5 decision
+
+Character/word → Dictionary is real now. Sentence → Workbench analysis and passage → Reading
+workspace remain open because their destinations remain open. The latter still needs a product
+decision for an ad-hoc OCR passage surface; the former needs a receiver that actually honors the
+resolved Workbench lens. Do not widen `LEXICON_HANDOFF_KINDS` or point the passage at Novels merely
+to make the plan bullet look complete.

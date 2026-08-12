@@ -38,6 +38,7 @@ import {
 import type { ReadingLensHistoryEntry } from '../shared/readingLensHistory';
 import type { ReadingLensCapture } from '../shared/readingLens';
 import { createReadingLensClipboardCapture } from './readingLensClipboard';
+import { registerLexiconHandoffIpc } from './lexiconHandoff';
 
 export interface ReadingLensSettings {
   enabled: boolean;
@@ -378,6 +379,13 @@ export function registerReadingLensIpc(): void {
   );
   ipcMain.handle('lens:history:remove', (_e, captureId: unknown): number => removeCapture(captureId));
   ipcMain.handle('lens:history:clear', (): void => clearCaptures());
+
+  // The lens → Lexicon lookup slot. Registered from here rather than from
+  // `main.ts` for the reason `agentImageStaging.ts` records about its own
+  // boundary: this is already the lens's production main entry point and is
+  // already called once at boot, so the shared bootstrap another track is
+  // rewriting needs no edit.
+  registerLexiconHandoffIpc();
 }
 
 export const __readingLensTestables = {

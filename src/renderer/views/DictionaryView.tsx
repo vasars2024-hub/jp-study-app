@@ -1,6 +1,7 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import DictionaryResults, { type DictLang } from '../components/DictionaryResults';
 import { AppChrome, StatusBarField, StatusBarSpacer, type MenuBarMenu } from '../components/ui';
+import { onLexiconHandoffStaged, takeLexiconHandoff } from '../lexiconHandoffClient';
 import { getStudyLang, onStudyLangChanged, setStudyLang, STUDY_LANG_KEY } from '../studyEnvironment';
 
 /** @deprecated Prefer STUDY_LANG_KEY / getStudyLang — kept for external imports. */
@@ -11,8 +12,47 @@ export default function DictionaryView() {
   const [input, setInput] = useState('');
   const [query, setQuery] = useState('');
   const [lookupAttempt, setLookupAttempt] = useState(0);
+  const acceptingHandoffRef = useRef(false);
 
   useEffect(() => onStudyLangChanged(setLang), []);
+
+  /**
+   * The receiving end of `shared/lexiconHandoff.ts`: a word captured by the
+   * Reading Lens, looked up here.
+   *
+   * Claimed on mount *and* on main's announcement, and both are needed. `popOut`
+   * focuses an already-open Dictionary rather than remounting it, so mount alone
+   * would deliver the first lookup of a session and silently drop every one
+   * after it; the announcement alone would lose the very first, which is staged
+   * before this window exists.
+   *
+   * The claim is single-use in main, so a stale word can never reappear, and it
+   * runs the search rather than only filling the box — the user asked for a
+   * lookup, and stopping one click short of it would be the same half-gesture as
+   * opening the window and leaving it empty.
+   */
+  useEffect(() => {
+    // React StrictMode replays this effect as setup → cleanup → setup. A local
+    // `alive` flag makes the first setup consume main's single-use handoff and
+    // then discard its reply after the replay cleanup; this component-level ref
+    // is true again by the time that reply settles. A real unmount leaves it
+    // false, so the ordinary post-unmount state-update guard still holds.
+    acceptingHandoffRef.current = true;
+    const claim = (): void => {
+      void takeLexiconHandoff().then((result) => {
+        if (!acceptingHandoffRef.current || !result.ok || !result.handoff) return;
+        setInput(result.handoff.text);
+        setQuery(result.handoff.text);
+        setLookupAttempt((attempt) => attempt + 1);
+      });
+    };
+    claim();
+    const off = onLexiconHandoffStaged(claim);
+    return () => {
+      acceptingHandoffRef.current = false;
+      off();
+    };
+  }, []);
 
   function submit(e: FormEvent) {
     e.preventDefault();

@@ -14,6 +14,12 @@ import type {
   ReadingLensHistoryEntry,
   ReadingLensHistoryQuery,
 } from './shared/readingLensHistory';
+import {
+  LEXICON_HANDOFF_CHANNELS,
+  type LexiconHandoffRequest,
+  type LexiconHandoffStageResult,
+  type LexiconHandoffTakeResult,
+} from './shared/lexiconHandoff';
 import type { LensOcrResult, RegionRect } from './main/screenOcr';
 import type { ReverifyOutcome, AssetIntegrity } from './main/downloads';
 import {
@@ -2048,6 +2054,21 @@ const api = {
   lensHistoryRemove: (captureId: string): Promise<number> =>
     ipcRenderer.invoke('lens:history:remove', captureId),
   lensHistoryClear: (): Promise<void> => ipcRenderer.invoke('lens:history:clear'),
+
+  /**
+   * The lens → Lexicon lookup slot (shared/lexiconHandoff.ts). Main holds the
+   * text because the lens window is destroyed the moment a capture lands, and
+   * the Dictionary is routinely a different window entirely.
+   */
+  lexiconHandoffStage: (request: LexiconHandoffRequest): Promise<LexiconHandoffStageResult> =>
+    ipcRenderer.invoke(LEXICON_HANDOFF_CHANNELS.stage, request),
+  lexiconHandoffTake: (): Promise<LexiconHandoffTakeResult> =>
+    ipcRenderer.invoke(LEXICON_HANDOFF_CHANNELS.take),
+  onLexiconHandoffStaged: (cb: () => void): (() => void) => {
+    const handler = (): void => cb();
+    ipcRenderer.on(LEXICON_HANDOFF_CHANNELS.staged, handler);
+    return () => ipcRenderer.removeListener(LEXICON_HANDOFF_CHANNELS.staged, handler);
+  },
 
   onLensOpen: (cb: (init: LensInit) => void): (() => void) => {
     const handler = (_e: unknown, init: LensInit): void => cb(init);

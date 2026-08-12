@@ -353,15 +353,18 @@ The existing popup is a foundation, not completion.
   ledger's "A finished ReadingLens slice was living only in the working tree". Live-accepted
   read-only against the real `ipcMain` handler, including the strict `=== true` guard that makes
   a stringy `"false"` from IPC widen the result instead of silently hiding rows.
-- **Still open — the Lexicon/Workbench/Reading hand-offs, and they are not a small wiring job.**
-  `resolveReadingLensWorkflow`'s `lexicon` and `reading` targets are **dead code**: the only
-  caller hard-codes `'compact'` and uses the result to seed local AI text. `LEXICON_WORKBENCH_ROUTE`
-  and `resolveLexiconRoute` have no consumer outside their own test. The transport is
-  decision-free (copy `agentImageStaging.ts`'s fourth route — main memory, bounded, expiring,
-  single-use, no `fs`; `popOut` carries a section name and nothing else). The **destination for a
-  passage is not**: `ReadingWorkspaceView` routes only to Library, Finder and Novels, and an ad-hoc
-  OCR passage has no surface among them. That half is deliberately parked on a product decision;
-  the word/sentence → `DictionaryView` half has a real destination and can go first.
+- **Character/word → Lexicon: done in the 2026-08-12 recovery checkpoint.** The first real
+  consumer of `resolveReadingLensWorkflow`'s `lexicon` target uses a main-owned, bounded,
+  two-minute, single-use slot; opens or focuses Dictionary only after staging succeeds; and makes
+  Dictionary claim both on mount and on the staged broadcast. The latter is required for an
+  already-open window, and the mount claim is held through React StrictMode's effect replay. Live
+  acceptance proved both paths through the real `ipcMain` handler. Sentence input is deliberately
+  refused rather than dumped into Dictionary: that receiver cannot honor the resolved
+  `translate` lens.
+- **Still open — sentence → Workbench analysis and passage → Reading workspace.** Neither has a
+  real receiving surface yet. `ReadingWorkspaceView` routes only to Library, Finder and Novels,
+  and an ad-hoc OCR passage has no surface among them. Those halves remain parked on the recorded
+  product decisions rather than being misrepresented by a Dictionary lookup or a fake novel.
 - Still open beyond that: progressive passage **Read** mode, and the privacy/retention and
   OCR/model default controls. Alternate OCR candidates and the mixed-panel order model still
   need explicit provider/product decisions and have not been forced.

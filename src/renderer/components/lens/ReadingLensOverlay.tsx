@@ -24,6 +24,8 @@ import {
   summarizeReadingLensConfidence,
 } from '../../../shared/readingLensConfidence';
 import { correctReadingLensLine } from '../../../shared/readingLensCorrection';
+import { lexiconHandoffFromCapture } from '../../../shared/lexiconHandoff';
+import { handOffCaptureToLexicon } from '../../lexiconHandoffClient';
 import './readingLens.css';
 
 /**
@@ -138,6 +140,9 @@ export default function ReadingLensOverlay() {
   const [state, setState] = useState<LensState>({ kind: 'idle' });
   const [visualNovelTarget, setVisualNovelTarget] = useState<VisualNovelOcrTarget | null>(null);
   const [visualNovelSaveState, setVisualNovelSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  // No `sent` state, unlike the visual-novel save beside it: a successful lookup
+  // closes the lens, so there is no surface left to report success on.
+  const [lookUpState, setLookUpState] = useState<'idle' | 'sending' | 'error'>('idle');
   const [popup, setPopup] = useState<{
     query: string;
     context: string;
@@ -343,6 +348,21 @@ export default function ReadingLensOverlay() {
     if (workflow.depth === 'compact' && workflow.input.text) setAnalysisText(workflow.input.text);
   }, [mode, readingCapture, editMode]);
 
+  /**
+   * Whether this capture has a Lexicon destination at all.
+   *
+   * `lexiconHandoffFromCapture` asks `resolveReadingLensWorkflow` with `'auto'`,
+   * so a paragraph or document capture resolves to the Reading workspace target
+   * instead and this is `null`. The gesture is then **not rendered** rather than
+   * rendered disabled: that target has no consumer yet, and a control that can
+   * never succeed is the kind of dead affordance this app refuses to ship.
+   */
+  const lexiconCapture = readingCapture && lexiconHandoffFromCapture(readingCapture)
+    ? readingCapture
+    : null;
+  // A rescan or a correction is a new capture, and its lookup starts fresh.
+  useEffect(() => setLookUpState('idle'), [readingCapture]);
+
   // Pass-through: once we're reading (or showing a message), let clicks fall
   // through to the app below except over interactive elements.
   useEffect(() => {
@@ -517,6 +537,31 @@ export default function ReadingLensOverlay() {
         ? { dataUrl: capture.screenshotDataUrl, name: t('agent.handoff.capture.name') }
         : undefined,
     );
+  };
+
+  /**
+   * The capture, looked up in the Lexicon — the first consumer of
+   * `resolveReadingLensWorkflow`'s `lexicon` target.
+   *
+   * The lens closes itself on success, and that is the honest ending rather than
+   * a convenience: the Dictionary window now has the focus and the word, so an
+   * always-on-top overlay left drawn over the screen would be covering the thing
+   * the user just asked to see. A failure keeps the lens exactly where it is,
+   * with the capture intact, because the text is still on screen to retry from.
+   *
+   * Failures are reported on the button rather than through `os:toast`. The lens
+   * is its own `BrowserWindow` and mounts no toast host, so a dispatched toast
+   * here would be a report nobody receives.
+   */
+  const lookUpInLexicon = async (capture: ReadingLensCapture): Promise<void> => {
+    if (lookUpState === 'sending') return;
+    setLookUpState('sending');
+    const outcome = await handOffCaptureToLexicon(capture);
+    if (outcome === 'handed-off') {
+      close();
+      return;
+    }
+    setLookUpState('error');
   };
 
   const rescan = (engine: 'auto' | 'manga' | 'web') => {
@@ -718,6 +763,8 @@ export default function ReadingLensOverlay() {
             onNewRegion={() => setState({ kind: 'selecting' })}
             onClose={close}
             onAskAgent={() => askAgent(state.lines, state.screenshotDataUrl)}
+            lookUpState={lookUpState}
+            onLookUp={lexiconCapture ? () => void lookUpInLexicon(lexiconCapture) : undefined}
             visualNovelTitle={visualNovelTarget?.title}
             visualNovelSaveState={visualNovelSaveState}
             onSaveToVisualNovel={() => void saveToVisualNovel()}
@@ -737,6 +784,8 @@ export default function ReadingLensOverlay() {
             onWordClick(event, surface, state.capture.text, state.tokens)
           }
           onAskAgent={() => askAgentCapture(state.capture)}
+          lookUpState={lookUpState}
+          onLookUp={lexiconCapture ? () => void lookUpInLexicon(lexiconCapture) : undefined}
           onNewRegion={() => setState({ kind: 'selecting' })}
           onClose={close}
         />
@@ -822,6 +871,8 @@ export function LensChrome({
   onNewRegion,
   onClose,
   onAskAgent,
+  lookUpState = 'idle',
+  onLookUp,
   visualNovelTitle,
   visualNovelSaveState,
   onSaveToVisualNovel,
@@ -837,6 +888,9 @@ export function LensChrome({
   onNewRegion: () => void;
   onClose: () => void;
   onAskAgent: () => void;
+  lookUpState?: 'idle' | 'sending' | 'error';
+  /** Absent when the capture is paragraph-scale — see `lexiconCapture` above. */
+  onLookUp?: () => void;
   visualNovelTitle?: string;
   visualNovelSaveState: 'idle' | 'saving' | 'saved' | 'error';
   onSaveToVisualNovel: () => void;
@@ -864,6 +918,21 @@ export function LensChrome({
       <button type="button" onClick={onAskAgent} title={t('lens.action.askAgent')}>
         {t('lens.action.askAgent')}
       </button>
+      {onLookUp && (
+        <button
+          type="button"
+          className={`lens-lookup${lookUpState === 'error' ? ' lens-lookup-error' : ''}`}
+          onClick={onLookUp}
+          disabled={lookUpState === 'sending'}
+          title={t('lens.action.lookUp')}
+        >
+          {lookUpState === 'sending'
+            ? t('lens.action.lookingUp')
+            : lookUpState === 'error'
+              ? t('lens.action.lookUpFailed')
+              : t('lens.action.lookUp')}
+        </button>
+      )}
       <div className="lens-mode" role="radiogroup" aria-label={t('lens.mode.label')}>
         {READING_LENS_MODES.map((m) => (
           <button

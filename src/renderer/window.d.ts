@@ -1332,6 +1332,11 @@ declare global {
       ): Promise<import('../shared/readingLensHistory').ReadingLensHistoryEntry | null>;
       lensHistoryRemove(captureId: string): Promise<number>;
       lensHistoryClear(): Promise<void>;
+      lexiconHandoffStage(
+        request: import('../shared/lexiconHandoff').LexiconHandoffRequest,
+      ): Promise<import('../shared/lexiconHandoff').LexiconHandoffStageResult>;
+      lexiconHandoffTake(): Promise<import('../shared/lexiconHandoff').LexiconHandoffTakeResult>;
+      onLexiconHandoffStaged(cb: () => void): () => void;
       onLensOpen(cb: (init: LensInit) => void): () => void;
       onLensSettingsChanged(cb: (status: ReadingLensStatus) => void): () => void;
 

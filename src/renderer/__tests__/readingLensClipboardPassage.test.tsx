@@ -60,4 +60,39 @@ describe('Reading Lens clipboard passage', () => {
     await act(async () => ask?.click());
     expect(onAskAgent).toHaveBeenCalledOnce();
   });
+
+  it('shows a retryable localized lookup action only when a receiver exists', async () => {
+    const capture = normalizeReadingLensCapture({ source: 'clipboard', text: '猫' }, 100);
+    if (!capture) throw new Error('expected capture');
+    const onLookUp = vi.fn();
+    const host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+
+    await act(async () => {
+      root?.render(
+        <LensClipboardPassage
+          capture={capture}
+          tokens={[{ surface: '猫', lemma: '猫' }]}
+          region={{ x: 0, y: 0, width: 320, height: 240 }}
+          mode="dictionary"
+          t={(key) => key}
+          onModeChange={() => undefined}
+          onWordClick={() => undefined}
+          onAskAgent={() => undefined}
+          lookUpState="error"
+          onLookUp={onLookUp}
+          onNewRegion={() => undefined}
+          onClose={() => undefined}
+        />,
+      );
+    });
+
+    const lookup = [...host.querySelectorAll('button')].find(
+      (button) => button.textContent === 'lens.action.lookUpFailed',
+    );
+    expect(lookup?.classList.contains('lens-lookup-error')).toBe(true);
+    await act(async () => lookup?.click());
+    expect(onLookUp).toHaveBeenCalledOnce();
+  });
 });

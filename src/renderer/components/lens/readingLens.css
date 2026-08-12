@@ -280,6 +280,11 @@
 .lens-chrome .lens-vn-save.error {
   background: rgba(178, 59, 71, 0.42);
 }
+/* A failed Lexicon handoff keeps the button in place to retry from, tinted like
+   the visual-novel save's own failure so one lens surface has one failure look. */
+.lens-chrome .lens-lookup-error {
+  background: rgba(178, 59, 71, 0.42);
+}
 .lens-chrome-close {
   font-size: 16px !important;
   line-height: 1;
