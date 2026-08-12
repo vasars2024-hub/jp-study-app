@@ -33,6 +33,7 @@ import {
   listCaptures,
   recordCapture,
   removeCapture,
+  setCapturePinned,
 } from './readingLensHistory';
 import type { ReadingLensHistoryEntry } from '../shared/readingLensHistory';
 import type { ReadingLensCapture } from '../shared/readingLens';
@@ -369,6 +370,11 @@ export function registerReadingLensIpc(): void {
   );
   ipcMain.handle('lens:history:list', (_e, query: unknown): ReadingLensHistoryEntry[] =>
     listCaptures(query),
+  );
+  ipcMain.handle(
+    'lens:history:pin',
+    (_e, captureId: unknown, pinned: unknown): ReadingLensHistoryEntry | null =>
+      setCapturePinned(captureId, pinned),
   );
   ipcMain.handle('lens:history:remove', (_e, captureId: unknown): number => removeCapture(captureId));
   ipcMain.handle('lens:history:clear', (): void => clearCaptures());

@@ -3235,7 +3235,7 @@ export const ru: Catalog = {
     other: 'просмотрен {count} раза',
   },
   'settings.lens.history.hint':
-    'Последние 200 захватов хранятся на этом устройстве — только текст и источник, никогда снимок экрана.',
+    'На устройстве хранится до 200 захватов — закреплённые остаются, пока вы их не открепите; только текст и источник, никогда снимок экрана.',
   'settings.lens.history.source.screen': 'Экран',
   'settings.lens.history.source.clipboard': 'Буфер обмена',
   'settings.lens.history.source.image': 'Изображение',

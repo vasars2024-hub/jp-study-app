@@ -26,7 +26,8 @@ export const READING_LENS_HISTORY_VERSION = 1 as const;
  * How many captures are kept. A lens scan is cheap and frequent, so this is a
  * ring rather than an archive: enough to cover a reading session and the days
  * around it, small enough that the whole file is read and searched in one go
- * without an index.
+ * without an index. Explicitly pinned rows are retained in addition to this
+ * rolling window.
  */
 export const READING_LENS_HISTORY_LIMIT = 200;
 
@@ -52,6 +53,8 @@ export interface ReadingLensHistoryEntry {
   lineCount: number;
   /** How many times this capture has been recorded, including the first. */
   seenCount: number;
+  /** Pinned entries survive the rolling history limit until explicitly unpinned. */
+  pinned: boolean;
 }
 
 export interface ReadingLensHistoryQuery {
@@ -104,6 +107,7 @@ export function readingLensHistoryEntryOf(
     text: body,
     lineCount: Array.isArray(capture.lines) ? capture.lines.length : 0,
     seenCount: 1,
+    pinned: false,
   };
 }
 
@@ -138,13 +142,36 @@ export function normalizeReadingLensHistoryEntry(value: unknown): ReadingLensHis
     text: body,
     lineCount: count(value.lineCount, 0),
     seenCount: Math.max(1, count(value.seenCount, 1)),
+    pinned: value.pinned === true,
   };
+}
+
+function boundedHistoryLimit(limit: number): number {
+  return Math.max(1, Math.min(limit, READING_LENS_HISTORY_LIMIT));
+}
+
+/** Keep every pinned entry in the bounded store, evicting the oldest unpinned rows first. */
+function trimReadingLensHistory(
+  entries: readonly ReadingLensHistoryEntry[],
+  limit: number,
+): ReadingLensHistoryEntry[] {
+  const cap = boundedHistoryLimit(limit);
+  if (entries.length <= cap) return entries as ReadingLensHistoryEntry[];
+
+  const pinned = entries.filter((entry) => entry.pinned);
+  if (pinned.length >= cap) return pinned;
+
+  const keepUnpinned = entries
+    .filter((entry) => !entry.pinned)
+    .slice(0, cap - pinned.length);
+  const keepIds = new Set(keepUnpinned.map((entry) => entry.captureId));
+  return entries.filter((entry) => entry.pinned || keepIds.has(entry.captureId));
 }
 
 /**
  * Validate a whole persisted history: drop unusable entries, collapse duplicate
- * ids, and return newest-first within the limit. A corrupt file degrades to the
- * entries that survive rather than to nothing.
+ * ids, and return newest-first within the rolling limit plus any pinned rows. A
+ * corrupt file degrades to the entries that survive rather than to nothing.
  */
 export function normalizeReadingLensHistory(
   value: unknown,
@@ -164,9 +191,10 @@ export function normalizeReadingLensHistory(
     if (!existing || entry.capturedAt > existing.capturedAt) byId.set(entry.captureId, entry);
   }
 
-  return [...byId.values()]
-    .sort((a, b) => b.capturedAt - a.capturedAt)
-    .slice(0, Math.max(1, Math.min(limit, READING_LENS_HISTORY_LIMIT)));
+  return trimReadingLensHistory(
+    [...byId.values()].sort((a, b) => b.capturedAt - a.capturedAt),
+    limit,
+  );
 }
 
 /**
@@ -177,14 +205,13 @@ export function normalizeReadingLensHistory(
  * entry matching an existing `captureId` (or a non-empty `hash`, which is how
  * two scans of identical text agree) updates that entry in place: newest
  * timestamp, incremented `seenCount`, and the fresher metadata, then moves to
- * the front. The list is never longer than `limit`.
+ * the front. The unpinned portion is never longer than `limit`.
  */
 export function recordReadingLensHistory(
   entries: readonly ReadingLensHistoryEntry[],
   entry: ReadingLensHistoryEntry,
   limit = READING_LENS_HISTORY_LIMIT,
 ): ReadingLensHistoryEntry[] {
-  const cap = Math.max(1, Math.min(limit, READING_LENS_HISTORY_LIMIT));
   const matches = (candidate: ReadingLensHistoryEntry): boolean =>
     candidate.captureId === entry.captureId || (!!entry.hash && candidate.hash === entry.hash);
 
@@ -195,10 +222,29 @@ export function recordReadingLensHistory(
         captureId: previous.captureId,
         capturedAt: Math.max(previous.capturedAt, entry.capturedAt),
         seenCount: previous.seenCount + entry.seenCount,
+        pinned: previous.pinned || entry.pinned,
       }
     : entry;
 
-  return [merged, ...entries.filter((candidate) => !matches(candidate))].slice(0, cap);
+  return trimReadingLensHistory([merged, ...entries.filter((candidate) => !matches(candidate))], limit);
+}
+
+/** Set one capture's retention policy without changing its text or timestamp. */
+export function setReadingLensHistoryPinned(
+  entries: readonly ReadingLensHistoryEntry[],
+  captureId: string,
+  pinned: boolean,
+): ReadingLensHistoryEntry[] {
+  const id = text(captureId, MAX_ID);
+  if (!id) return entries as ReadingLensHistoryEntry[];
+
+  let changed = false;
+  const next = entries.map((entry) => {
+    if (entry.captureId !== id || entry.pinned === pinned) return entry;
+    changed = true;
+    return { ...entry, pinned };
+  });
+  return changed ? next : (entries as ReadingLensHistoryEntry[]);
 }
 
 /** Remove one entry by id. Returns the same array reference when nothing matched. */

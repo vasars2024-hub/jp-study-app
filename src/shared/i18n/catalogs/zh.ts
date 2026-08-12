@@ -3020,7 +3020,7 @@ export const zh: Catalog = {
   'settings.lens.history.noMatches': '没有匹配该搜索的记录。',
   'settings.lens.history.seen': '已查看 {count} 次',
   'settings.lens.history.hint':
-    '最近 200 条记录保存在本设备上——只包含文本和来源，绝不保存屏幕截图。',
+    '本设备最多保留 200 条记录——置顶记录会一直保留到取消置顶；只包含文本和来源，绝不保存屏幕截图。',
   'settings.lens.history.source.screen': '屏幕',
   'settings.lens.history.source.clipboard': '剪贴板',
   'settings.lens.history.source.image': '图片',

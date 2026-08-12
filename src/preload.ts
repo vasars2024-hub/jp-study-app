@@ -2043,6 +2043,8 @@ const api = {
     ipcRenderer.invoke('lens:history:record', capture),
   lensHistoryList: (query: ReadingLensHistoryQuery = {}): Promise<ReadingLensHistoryEntry[]> =>
     ipcRenderer.invoke('lens:history:list', query),
+  lensHistoryPin: (captureId: string, pinned: boolean): Promise<ReadingLensHistoryEntry | null> =>
+    ipcRenderer.invoke('lens:history:pin', captureId, pinned),
   lensHistoryRemove: (captureId: string): Promise<number> =>
     ipcRenderer.invoke('lens:history:remove', captureId),
   lensHistoryClear: (): Promise<void> => ipcRenderer.invoke('lens:history:clear'),

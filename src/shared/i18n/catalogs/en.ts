@@ -3207,7 +3207,7 @@ export const en: Catalog = {
     other: 'seen {count} times',
   },
   'settings.lens.history.hint':
-    'The last 200 captures are kept on this device — the text and where it came from, never the screenshot.',
+    'Up to 200 captures are kept on this device — pinned captures stay until you unpin them; text and source are kept, never the screenshot.',
   'settings.lens.history.source.screen': 'Screen',
   'settings.lens.history.source.clipboard': 'Clipboard',
   'settings.lens.history.source.image': 'Image',

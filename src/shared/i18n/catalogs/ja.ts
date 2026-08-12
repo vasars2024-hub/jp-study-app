@@ -3033,7 +3033,7 @@ export const ja: Catalog = {
   'settings.lens.history.noMatches': '検索に一致するキャプチャはありません。',
   'settings.lens.history.seen': '{count} 回表示',
   'settings.lens.history.hint':
-    '直近 200 件のキャプチャをこの端末に保存します — テキストと取得元のみで、スクリーンショットは保存しません。',
+    '最大 200 件のキャプチャをこの端末に保存します — ピン留めしたキャプチャは解除するまで残り、テキストと取得元のみでスクリーンショットは保存しません。',
   'settings.lens.history.source.screen': '画面',
   'settings.lens.history.source.clipboard': 'クリップボード',
   'settings.lens.history.source.image': '画像',

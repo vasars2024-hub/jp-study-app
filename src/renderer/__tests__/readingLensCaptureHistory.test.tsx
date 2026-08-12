@@ -32,12 +32,14 @@ const entry = (patch: Partial<ReadingLensHistoryEntry> = {}): ReadingLensHistory
   text: '猫が好きです',
   lineCount: 1,
   seenCount: 1,
+  pinned: false,
   ...patch,
 });
 
 const calls = {
   list: [] as unknown[],
   remove: [] as unknown[],
+  pin: [] as unknown[],
   clear: 0,
 };
 let stored: ReadingLensHistoryEntry[] = [];
@@ -60,6 +62,11 @@ function installApiStub(): void {
       calls.remove.push(captureId);
       stored = stored.filter((item) => item.captureId !== captureId);
       return stored.length;
+    },
+    lensHistoryPin: async (captureId: unknown, pinned: unknown) => {
+      calls.pin.push({ captureId, pinned });
+      stored = stored.map((item) => item.captureId === captureId ? { ...item, pinned: pinned === true } : item);
+      return stored.find((item) => item.captureId === captureId) ?? null;
     },
     lensHistoryClear: async () => {
       calls.clear += 1;
@@ -95,6 +102,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   calls.list = [];
   calls.remove = [];
+  calls.pin = [];
   calls.clear = 0;
   stored = [
     entry({ captureId: 'a', hash: 'ha', text: '猫が好きです' }),
@@ -214,6 +222,16 @@ describe('Reading Lens capture history panel', () => {
     expect(calls.list.length).toBeGreaterThan(before);
     expect(rows()).toHaveLength(1);
     expect(rows()[0].textContent).toContain('犬も好きです');
+  });
+
+  it('pins a capture through main and reflects the durable state after refresh', async () => {
+    await render();
+
+    await act(async () => buttonWith('Pin').click());
+    await settle();
+
+    expect(calls.pin).toEqual([{ captureId: 'a', pinned: true }]);
+    expect(rows()[0].textContent).toContain('Unpin');
   });
 
   it('clears everything and lands on the empty state', async () => {

@@ -75,6 +75,14 @@ function LensCaptureHistory() {
     [query, refresh],
   );
 
+  const setPinned = useCallback(
+    async (captureId: string, pinned: boolean) => {
+      await window.api.lensHistoryPin(captureId, pinned);
+      await refresh(query);
+    },
+    [query, refresh],
+  );
+
   const clear = useCallback(async () => {
     await window.api.lensHistoryClear();
     await refresh(query);
@@ -125,6 +133,15 @@ function LensCaptureHistory() {
                   {entry.seenCount > 1 && ` · ${t('settings.lens.history.seen', { count: entry.seenCount })}`}
                 </div>
               </div>
+              <button
+                type="button"
+                className="btn small"
+                aria-pressed={entry.pinned}
+                onClick={() => void setPinned(entry.captureId, !entry.pinned)}
+                title={t(entry.pinned ? 'clipboard.unpin' : 'clipboard.pin')}
+              >
+                {t(entry.pinned ? 'clipboard.unpin' : 'clipboard.pin')}
+              </button>
               <button
                 type="button"
                 className="btn small"

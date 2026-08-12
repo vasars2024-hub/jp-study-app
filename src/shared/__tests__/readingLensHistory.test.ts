@@ -7,6 +7,7 @@ import {
   recordReadingLensHistory,
   removeReadingLensHistoryEntry,
   searchReadingLensHistory,
+  setReadingLensHistoryPinned,
   type ReadingLensHistoryEntry,
 } from '../readingLensHistory';
 
@@ -59,7 +60,12 @@ describe('Reading Lens history — entry projection', () => {
   });
 
   it('starts a fresh capture at one sighting', () => {
-    expect(readingLensHistoryEntryOf(capture())?.seenCount).toBe(1);
+    expect(readingLensHistoryEntryOf(capture())).toMatchObject({ seenCount: 1, pinned: false });
+  });
+
+  it('defaults legacy disk entries to unpinned', () => {
+    const [legacy] = normalizeReadingLensHistory([{ ...entry(), pinned: undefined }]);
+    expect(legacy?.pinned).toBe(false);
   });
 });
 
@@ -135,6 +141,54 @@ describe('Reading Lens history — record', () => {
     }
 
     expect(list.length).toBeLessThanOrEqual(READING_LENS_HISTORY_LIMIT);
+  });
+
+  it('keeps pinned captures while evicting older unpinned captures', () => {
+    let list = recordReadingLensHistory([], entry({ captureId: 'keep', hash: 'keep', capturedAt: 1 }), 3);
+    list = setReadingLensHistoryPinned(list, 'keep', true);
+    for (let i = 0; i < 4; i += 1) {
+      list = recordReadingLensHistory(
+        list,
+        entry({ captureId: `new-${i}`, hash: `new-${i}`, capturedAt: 2 + i }),
+        3,
+      );
+    }
+
+    expect(list).toHaveLength(3);
+    expect(list.map((item) => item.captureId)).toEqual(['new-3', 'new-2', 'keep']);
+    expect(list.find((item) => item.captureId === 'keep')?.pinned).toBe(true);
+    expect(list.some((item) => item.captureId === 'new-0')).toBe(false);
+  });
+
+  it('does not evict a pinned capture when pinned rows outnumber the rolling limit', () => {
+    const pinned = Array.from({ length: 4 }, (_, i) =>
+      entry({ captureId: `pin-${i}`, hash: `pin-${i}`, capturedAt: 10 + i, pinned: true }),
+    );
+
+    const list = recordReadingLensHistory(pinned, entry({ captureId: 'new', hash: 'new', capturedAt: 20 }), 3);
+
+    expect(list.map((item) => item.captureId)).toEqual(['pin-0', 'pin-1', 'pin-2', 'pin-3']);
+    expect(list.every((item) => item.pinned)).toBe(true);
+  });
+
+  it('preserves a pin when the same capture is recorded again', () => {
+    const first = setReadingLensHistoryPinned(
+      recordReadingLensHistory([], entry({ captureId: 'keep', hash: 'keep' })),
+      'keep',
+      true,
+    );
+    const repeated = recordReadingLensHistory(first, entry({ captureId: 'keep', hash: 'keep', text: 'corrected' }));
+
+    expect(repeated).toHaveLength(1);
+    expect(repeated[0]).toMatchObject({ text: 'corrected', pinned: true, seenCount: 2 });
+  });
+
+  it('is idempotent for missing ids and unchanged pin states', () => {
+    const before = [entry({ captureId: 'keep', pinned: true })];
+
+    expect(setReadingLensHistoryPinned(before, 'missing', true)).toBe(before);
+    expect(setReadingLensHistoryPinned(before, 'keep', true)).toBe(before);
+    expect(setReadingLensHistoryPinned(before, 'keep', false)[0]?.pinned).toBe(false);
   });
 });
 

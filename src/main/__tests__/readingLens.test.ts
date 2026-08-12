@@ -460,7 +460,7 @@ describe('persistence', () => {
 // ---- capture history ----------------------------------------------------
 
 /**
- * The four `lens:history:*` handlers, driven through the IPC map rather than by
+ * The five `lens:history:*` handlers, driven through the IPC map rather than by
  * calling the store directly. That is the point: `main/readingLensHistory.ts`
  * has its own pure tests, but nothing else proves the *handlers* are registered,
  * validate their argument, and write the file the next boot reads.
@@ -501,6 +501,7 @@ describe('capture history IPC', () => {
     return {
       record: (value: unknown) => handler('lens:history:record')({}, value),
       list: (query?: unknown) => handler('lens:history:list')({}, query),
+      pin: (id: unknown, pinned: unknown) => handler('lens:history:pin')({}, id, pinned),
       remove: (id: unknown) => handler('lens:history:remove')({}, id),
       clear: () => handler('lens:history:clear')({}),
     };
@@ -537,6 +538,17 @@ describe('capture history IPC', () => {
 
     const second = await withHistory();
     expect((await second.list()) as unknown[]).toHaveLength(1);
+  });
+
+  it('pins without incrementing sightings and preserves the pin across restart', async () => {
+    const first = await withHistory();
+    await first.record(capture());
+
+    expect(await first.pin('cap-1', true)).toMatchObject({ pinned: true, seenCount: 1 });
+    expect(JSON.parse(readHistoryRaw()).entries[0].pinned).toBe(true);
+
+    const second = await withHistory();
+    expect((await second.list()) as Array<{ pinned: boolean }>).toMatchObject([{ pinned: true }]);
   });
 
   it('degrades a corrupt history file to empty rather than taking the handler down', async () => {
@@ -638,7 +650,7 @@ describe('IPC registration', () => {
   it('registers every channel preload expects', async () => {
     const m = await load();
     m.registerReadingLensIpc();
-    for (const ch of ['lens:getSettings', 'lens:setEnabled', 'lens:setHotkey', 'lens:open', 'lens:getInit', 'lens:ocr', 'lens:close', 'lens:history:record', 'lens:history:list', 'lens:history:remove', 'lens:history:clear']) {
+    for (const ch of ['lens:getSettings', 'lens:setEnabled', 'lens:setHotkey', 'lens:open', 'lens:getInit', 'lens:ocr', 'lens:close', 'lens:history:record', 'lens:history:list', 'lens:history:pin', 'lens:history:remove', 'lens:history:clear']) {
       expect(h.ipc.handlers.has(ch)).toBe(true);
     }
     expect(h.ipc.listeners.has('lens:setInteractive')).toBe(true);

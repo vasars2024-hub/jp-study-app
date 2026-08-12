@@ -22,6 +22,7 @@ import {
   recordReadingLensHistory,
   removeReadingLensHistoryEntry,
   searchReadingLensHistory,
+  setReadingLensHistoryPinned,
   type ReadingLensHistoryEntry,
   type ReadingLensHistoryQuery,
 } from '../shared/readingLensHistory';
@@ -98,6 +99,17 @@ export function removeCapture(captureId: unknown): number {
     persist();
   }
   return (entries ?? []).length;
+}
+
+/** Pin or unpin one history row without recording another sighting. */
+export function setCapturePinned(captureId: unknown, pinned: unknown): ReadingLensHistoryEntry | null {
+  const id = typeof captureId === 'string' ? captureId : '';
+  const next = setReadingLensHistoryPinned(load(), id, pinned === true);
+  if (next !== entries) {
+    entries = next;
+    persist();
+  }
+  return (entries ?? []).find((entry) => entry.captureId === id) ?? null;
 }
 
 /** Forget everything. The file is rewritten empty rather than deleted, so the

@@ -1320,6 +1320,18 @@ declare global {
       ): Promise<LensOcrResult>;
       lensSetInteractive(interactive: boolean): void;
       lensClose(): Promise<void>;
+      lensHistoryRecord(
+        capture: import('../shared/readingLens').ReadingLensCapture,
+      ): Promise<import('../shared/readingLensHistory').ReadingLensHistoryEntry | null>;
+      lensHistoryList(
+        query?: import('../shared/readingLensHistory').ReadingLensHistoryQuery,
+      ): Promise<import('../shared/readingLensHistory').ReadingLensHistoryEntry[]>;
+      lensHistoryPin(
+        captureId: string,
+        pinned: boolean,
+      ): Promise<import('../shared/readingLensHistory').ReadingLensHistoryEntry | null>;
+      lensHistoryRemove(captureId: string): Promise<number>;
+      lensHistoryClear(): Promise<void>;
       onLensOpen(cb: (init: LensInit) => void): () => void;
       onLensSettingsChanged(cb: (status: ReadingLensStatus) => void): () => void;
 

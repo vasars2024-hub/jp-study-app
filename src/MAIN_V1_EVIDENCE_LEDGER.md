@@ -12794,3 +12794,91 @@ already committed. Full write-up and the loss risk are in
 **Practical rule for the next worker:** run the gates in the shared tree for speed, but if a gate
 number is going into a ledger as proof, re-run it detached at your commit and report the delta
 against your commit's parent. `npx vitest run` in situ currently cannot fail on these two.
+
+## Rescued commit 7 of 10 landed: pinned lens captures survive the ring, proved by eviction — 2026-08-12
+
+`c48b266` ("feat(reading-lens): persist pinned captures") is integrated. It adds a `pinned` flag
+to the Reading Lens capture history, a `lens:history:pin` main handler, and a Pin/Unpin control
+on the capture-history list in Reading Lens settings. Pinned rows are retained *in addition to*
+the 200-entry rolling window instead of being evicted by it.
+
+### Integration method — 9 files at the commit blob, 4 catalogs reconstructed
+
+Per-file `git rev-parse c48b266^:<path>` vs `git rev-parse HEAD:<path>` before touching anything.
+**All nine non-catalog files were `HEAD == BASE`**, so this commit applies to HEAD without a
+merge at all:
+
+- **Clean in the worktree, taken with `git checkout c48b266 --`**: `shared/readingLensHistory.ts`,
+  `main/readingLensHistory.ts`, `main/readingLens.ts`,
+  `renderer/components/settings/pages/ReadingLensSection.tsx`, and the three test files.
+- **`HEAD == BASE` but dirty from other tracks** (`preload.ts` +94/−8 from the Detached Study
+  Blocks track, `window.d.ts` +66/−1 from the same): the worktree got the hunks hand-applied, and
+  the *index* got `git update-index --cacheinfo` pointed at `c48b266:<path>` directly. Because
+  base and HEAD agree, that blob **is** HEAD-plus-this-slice — no hand-merge, and the other
+  track's uncommitted work stays in the worktree untouched.
+- **Genuinely diverged, reconstructed**: the four catalogs. Only one key changes
+  (`settings.lens.history.hint`), and its value at HEAD was verified equal to its value at
+  `c48b266^` in all four languages first. The staged blob is `git show HEAD:<catalog>` with that
+  one string replaced (occurrence count asserted `=== 1` per file), hashed with `git hash-object -w`.
+
+Result: `git diff --cached --stat` is **13 files, +195/−16** — byte-identical to the original
+commit's own stat. The Pin/Unpin button reuses the existing `clipboard.pin`/`clipboard.unpin`
+keys, which already exist in all four catalogs, so no new key was needed.
+
+### Gates
+
+| gate | result |
+|---|---|
+| `npx vitest run` | 545 files passed, 1 skipped; **7293 tests passed**, 11 skipped, **0 failed**. One *suite* failed: `visualNovelI18n.test.tsx`, a `beforeAll` **hook timeout at 10 s** under full-suite parallelism. It **passes in isolation** (5/5) and imports nothing this slice touches — load-dependent flake on another track's surface, not this commit. |
+| `node tools/i18n-check.cjs` | exit 0 — all 9337 English keys translated in ja/zh/ru |
+| `node tools/architecture-audit.cjs` | exit 0 — "Nothing new", same 2 pending known findings |
+| `npx eslint <13 touched paths>` | exit 1, **2 errors — both pre-existing, proved by set-difference**: `adjacent-overload-signatures` on `subtitleHarvestList`/`subtitleHarvestFetch` in `window.d.ts`. Linting the *HEAD blob* of that file alone reproduces the identical 2 errors (at lines 1472/1475 vs 1549/1552). **Zero new.** The 24 warnings are pre-existing non-null assertions in test files. |
+
+Per the standing rule from the previous entry: the in-situ vitest number is the weaker claim.
+What carries the weight here is the eslint set-difference and the isolation re-run.
+
+### Live Electron acceptance — and the main-restart trap, confirmed rather than assumed
+
+The repo rule "a preload binding is not proof a main handler exists" was **measured, not taken on
+faith**. Against the still-running pre-edit app, `window.api.lensHistoryPin` was already
+`typeof === 'function'` (preload had hot-reloaded), yet invoking it returned:
+
+    Error invoking remote method 'lens:history:pin': No handler registered for 'lens:history:pin'
+
+That is the trap in its exact form — a grep for the channel, or a `typeof` check, would have
+reported this slice working while main had no handler at all. `/logs` showed no foreign
+`[vite] hot updated:` paths, so the dev app was restarted (forge tree pid 91376, relaunched
+detached so it outlives this headless session) and acceptance re-run against fresh main.
+
+**The retention rule proved by a controlled eviction.** Two probe captures were recorded with an
+*identical* `capturedAt` (`1700000000000`), differing only in `pinned`, then 200 more were flooded
+in through the app's own `lensHistoryRecord` path:
+
+| observation | result |
+|---|---|
+| `pinned` on a freshly recorded capture | `false` — pinning is opt-in, nothing is pinned by default |
+| `lensHistoryPin` return | `pinned: true`, with `seenCount` still **1** and `capturedAt` **unchanged** — confirms the "without recording another sighting" contract |
+| on disk (`%APPDATA%\jp-study-app\reading-lens-history.json`) | `"pinned": true` persisted for that row only |
+| after flooding 200 more | total **200** (cap held), `__probe_pin__` **survived**, its same-timestamp unpinned twin `__probe_plain__` **evicted**, `pinnedCount` 1 |
+| oldest surviving unpinned row | `__flood_1` — i.e. `__flood_0` was dropped to make room for the pinned row |
+
+Two rows identical but for one flag, opposite fates: that is the eviction claim, not a restatement
+of it.
+
+All four languages were resolved from the running renderer's own catalogs: the hint now mentions
+pinning in each (`Up to 200 captures…` / `最大 200 件…ピン留めした…` / `本设备最多保留 200 条记录——置顶…` /
+`На устройстве хранится до 200 захватов — закреплённые…`), and the button labels are real in all
+four (`Pin`/`Unpin`, `ピン留め`/`ピン解除`, `置顶`/`取消置顶`, `Закрепить`/`Открепить`).
+
+**Restore verified, not assumed.** The baseline was captured *before* any probe and the history
+file **did not exist** — the user had no lens captures. Cleanup went through the app's own
+`lensHistoryClear`, then the file was deleted to restore the absent state. Final check:
+`Test-Path` **False** and a live `lensHistoryList({})` returns **0**. The user's userData is back
+to exactly the state this hop found it in, and no userData backup was taken.
+
+### What is left of the ten
+
+Seven integrated (`27c74b6`, `9c046cc`, `20f72eb`, `2545cd5`, `c3ae5b6`, `28a239c`, `c48b266`),
+one closed obsolete (`9e6e82d`), **two open**: `87dd97c` and `99c8747`, both 148–152 commits
+behind and per-hunk salvage only — neither is a clean take, and each needs the same per-file
+`rev-parse` triage applied hunk by hunk.
