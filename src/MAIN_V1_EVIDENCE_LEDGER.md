@@ -13941,3 +13941,32 @@ worker started was stopped.
 Track 2 is not complete. Next: make Translate a compatibility lens of this Workbench without
 regressing its history/language controls, then accept ReadingLens sentence handoff into the now-real
 receiver. Passage → Reading remains parked on the destination product decision.
+
+## Translate is now a compatibility lens of the grounded Workbench — 2026-08-12
+
+Re-derived from the preceding entry and Dependency order item 3: Track 2 remains active, so the
+Agent vision-input item is not the current slice. The old Translate route still rendered only its
+standalone fluent-translation surface even though `resolveLexiconRoute('translate')` promised a
+pinned Workbench lens.
+
+`LexiconWorkbenchResults` now accepts the shared lens override and a target gloss language. Its
+automatic Dictionary behavior is unchanged, while the Translate route pins `translate`, so even a
+single character enters the offline segmentation/dictionary/interlinear rung instead of falling
+back to the Dictionary compatibility surface. Both normal and Aero Translate layouts render this
+same immediate grounded rung and retain the existing language selectors, fluent Qwen action,
+History tab, and linguistic-analysis surface. The focused renderer regression proves the pinned
+one-character/Russian-target boundary and the existing lexical and sentence branches.
+
+All four required gates passed in the shared tree: full Vitest **7,359 passed / 0 failed / 6
+skipped** across 554 files; i18n **9,350** English keys complete in ja/zh/ru; architecture 1,741
+modules / 17 findings with nothing new and the same two pending; ESLint over the three touched code
+and test paths clean.
+
+Live Electron acceptance used a fresh process started by this worker and the authenticated debug
+bridge only. The real Translate window accepted `猫`; the new surface invoked the main
+`dict:lookupOfflineInterlinear` handler, reported the character scale, rendered `猫` in the
+interlinear flow, retained the `Translate` and `History` tabs, and produced zero bridge error
+entries. Only the process tree started by this worker was stopped.
+
+Track 2 remains incomplete. The next adjacent slice is ReadingLens sentence handoff into this real
+receiver; passage → Reading remains parked on the already-recorded destination product decision.

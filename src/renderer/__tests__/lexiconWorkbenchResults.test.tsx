@@ -60,4 +60,31 @@ describe('LexiconWorkbenchResults', () => {
     expect(host.querySelector('.lexicon-interlinear-flow')?.textContent).toContain('猫catを見た。');
     expect(host.querySelector('ruby.is-grounded')?.textContent).toContain('cat');
   });
+
+  it('lets the Translate compatibility route pin its lens and target gloss language', async () => {
+    const lookup = vi.fn().mockResolvedValue({
+      text: '猫', detectedLangs: ['ja'], glossLangs: ['ru'], tokenCount: 1, matchedCount: 0,
+      truncated: false,
+      parts: [{ kind: 'token', text: '猫', start: 0, end: 1 }],
+    });
+    Object.defineProperty(window, 'api', { configurable: true, value: { lookupOfflineInterlinear: lookup } });
+    const host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root?.render(
+        <LexiconWorkbenchResults
+          query="猫"
+          lang="ja"
+          glossLang="ru"
+          lookupAttempt={0}
+          lens="translate"
+        />,
+      );
+      await Promise.resolve();
+    });
+    expect(lookup).toHaveBeenCalledWith('猫', { sourceLangs: ['ja'], glossLangs: ['ru'] });
+    expect(host.querySelector('.lexicon-interlinear-flow')?.textContent).toBe('猫');
+    expect(host.querySelector('[data-testid="dictionary-results"]')).toBeNull();
+  });
 });

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { LexiconInterlinearResult } from '../../../shared/lexiconInterlinear';
-import { resolveLexiconInput } from '../../../shared/lexiconWorkbench';
+import { resolveLexiconInput, type LexiconLensOverride } from '../../../shared/lexiconWorkbench';
 import DictionaryResults, { type DictLang } from '../DictionaryResults';
 import { useT } from '../../i18n';
 import './lexiconWorkbench.css';
@@ -9,12 +9,20 @@ interface Props {
   query: string;
   lang: DictLang;
   lookupAttempt: number;
+  lens?: LexiconLensOverride;
+  glossLang?: DictLang;
 }
 
-export default function LexiconWorkbenchResults({ query, lang, lookupAttempt }: Props) {
+export default function LexiconWorkbenchResults({
+  query,
+  lang,
+  lookupAttempt,
+  lens = 'auto',
+  glossLang = 'en',
+}: Props) {
   const { t } = useT();
-  const resolution = resolveLexiconInput(query);
-  const interlinear = resolution.kind === 'sentence' || resolution.kind === 'paragraph' || resolution.kind === 'document';
+  const resolution = resolveLexiconInput(query, lens);
+  const interlinear = resolution.kind !== 'empty' && resolution.lens === 'translate';
   const [result, setResult] = useState<LexiconInterlinearResult | null>(null);
   const [state, setState] = useState<'idle' | 'loading' | 'error'>('idle');
 
@@ -29,7 +37,7 @@ export default function LexiconWorkbenchResults({ query, lang, lookupAttempt }: 
     setResult(null);
     void window.api.lookupOfflineInterlinear(query, {
       sourceLangs: [lang],
-      glossLangs: ['en'],
+      glossLangs: [glossLang],
     }).then((next) => {
       if (!alive) return;
       setResult(next);
@@ -38,7 +46,7 @@ export default function LexiconWorkbenchResults({ query, lang, lookupAttempt }: 
       if (alive) setState('error');
     });
     return () => { alive = false; };
-  }, [interlinear, lang, lookupAttempt, query]);
+  }, [glossLang, interlinear, lang, lookupAttempt, query]);
 
   if (!interlinear) {
     return <DictionaryResults key={lookupAttempt} query={query} variant="page" lang={lang} />;

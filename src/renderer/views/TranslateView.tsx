@@ -10,6 +10,7 @@ import {
 } from '../components/ui';
 import type { TransLang } from '../translator';
 import SentenceAnalysisPanel from '../components/SentenceAnalysisPanel';
+import LexiconWorkbenchResults from '../components/lexicon/LexiconWorkbenchResults';
 import {
   LANG_LABELS,
   LANG_ORDER,
@@ -165,6 +166,16 @@ export default function TranslateView() {
                 </section>
               </div>
 
+              {input.trim() && (
+                <LexiconWorkbenchResults
+                  query={input}
+                  lang={source}
+                  glossLang={target}
+                  lookupAttempt={0}
+                  lens="translate"
+                />
+              )}
+
               {(busy || error) && (
                 <div className="aero-translate-status">
                   {busy && (
@@ -284,6 +295,16 @@ export default function TranslateView() {
               )}
               {error && <div className="media-error tr-error">{error}</div>}
             </div>
+
+            {input.trim() && (
+              <LexiconWorkbenchResults
+                query={input}
+                lang={source}
+                glossLang={target}
+                lookupAttempt={0}
+                lens="translate"
+              />
+            )}
 
             <SentenceAnalysisPanel
               sourceText={state.translatedInput}
