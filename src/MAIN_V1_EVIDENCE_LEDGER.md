@@ -14083,3 +14083,73 @@ difficulty scoring, personal concordance, and the grounded AI enrichment bullets
 targets is the most decision-free of those — `buildOfflineInterlinear` already accepts
 `glossLangs: readonly string[]` and every match carries its gloss `lang`, but no caller ever
 passes more than one and the renderer joins all glosses into a single `<rt>`.
+
+## Parallel gloss targets are grounded in the dictionaries the user actually installed — 2026-08-12
+
+Recovery hop. Re-derived the interrupted worker's state before touching anything: the index was
+empty, `e2f4516` had landed cleanly at `20:20`, and the only lexicon path written after it was
+`src/shared/lexiconInterlinear.ts` at `20:24` — an uncommitted parallel-target implementation with
+no test, no caller, and a dead `let chosenResult = firstResult` that ESLint would have rejected.
+That is exactly the slice the previous entry named as the most decision-free remaining one, so it
+was finished rather than checkpointed. The `localAgent*` and Blanc paths written at `20:31`–`20:34`
+belong to a different concurrent track and were left untouched.
+
+`glossLangs: readonly string[]` had accepted a list since the foundation slice, but no caller ever
+passed more than one and the renderer joined every gloss into a single `<rt>`, so a second target
+was unreachable and invisible. Three things closed that:
+
+- `LexiconInterlinearMatch.parallel` groups glosses per requested language, in request order. A
+  second language almost always lives in a *different* imported dictionary, so a group is read off
+  a sibling entry of the **same headword** — `sameHeadword()` refuses a different word that merely
+  ranked nearby, which is the failure this feature invites. The flat `glosses` list stays the union
+  so an unaware consumer still shows everything, and `parallel` is omitted entirely for a
+  single-target request: the pre-existing response shape is byte-identical.
+- `parallelGlossTargets()` decides *which* languages to ask for, from the Yomitan registry rather
+  than from the UI language or a fixed table — a target no installed dictionary can answer is not
+  worth a filter pass. It skips `hasTerms: false` and disabled dictionaries, honors
+  `glossLangOverride`, dedupes, keeps the caller's primary first, and caps at
+  `MAX_PARALLEL_GLOSS_TARGETS = 3` because registry order is priority order, so the cap drops what
+  the user already ranked last.
+- `LexiconWorkbenchResults` resolves the targets through the real `dictListYomitan` bridge before
+  each lookup and renders one `.lexicon-gloss-line` per group, tagged with the gloss language code.
+  That code is registry data — the same value Settings prints for an installed dictionary — not
+  translatable chrome, so this slice adds **no** new i18n keys. A missing or failing
+  `dictListYomitan` falls back to the single primary target rather than erroring.
+
+`toMatch()` now takes the lookup result as well as the entry. It reads `resultFor(query)`, which is
+always a cache hit — `query` is one of the strings already probed for that token — so parallel
+targets cost no additional lookup, only a gloss filter per extra language.
+
+Gates: full Vitest **7,373 passed / 6 skipped**, with one failure that is **not** this change —
+`renderer/__tests__/mediaSurfaceImportGraph.test.ts` timed out at 20 s under the load of a
+concurrent Electron dev app and passes 8/8 in 4.8 s when run alone; this change adds no import
+edge to `src/media`. i18n **9,356** English keys complete in ja/zh/ru (unchanged — no new keys).
+Architecture 1,742 modules / 17 findings, nothing new, the same two pending. ESLint clean over the
+four touched paths.
+
+Live Electron acceptance used the dev instance and bridge that were already running (started
+`20:37` by another track — driven read-only, never stopped). `dictListYomitan()` returned this
+installation's four real registrations: `bundled-kanjium-pitch` (`hasTerms: false`),
+`bundled-jmdict-en`, `bundled-jmdict-ru`, `bundled-moedict-zh`. The Dictionary surface was popped
+out and given `猫を見た。`; it rendered `Detected scale: sentence` and four ruby tokens, and its live
+result state carried **`glossLangs: ['en', 'ru', 'zh']`** — the pitch dictionary correctly skipped —
+where before this change it sent exactly `['en']`. The bridge error log was empty.
+
+Two honest limits on that acceptance. `matchedCount` was **0**: this installation's SQLite term
+database still has no rows, so no grounded gloss exists for any language and the per-language
+`.lexicon-gloss-line` rows could not be shown with real data — only the request side is proven
+live, the rendering side rests on the renderer test. Separately, a first attempt to record the
+request by wrapping `window.api.lookupOfflineInterlinear` **silently did nothing and still returned
+`'recorder-installed'`** — the contextBridge object is frozen, so the assignment no-ops. The
+request was read off the component's own fiber state instead. Do not trust a `window.api` monkey
+patch in this app; it is a probe that always reports success and always observes nothing.
+
+State was left as found: the staged handoff was claimed back to empty, every probe global deleted
+(verified by re-listing them), the popped-out window closed, no persisted setting touched, no
+userData backup taken, and no process stopped.
+
+Track 2 remains open. Still source-derived work: sense pinning/retranslation, round-trip semantic
+diff, composition checking, vocabulary harvest, difficulty scoring, personal concordance, and the
+grounded AI enrichment bullets. Note for whoever takes the rendering side further — the
+per-language rows cannot be visually accepted on this machine until the dictionary migration
+actually populates the term database; that is a data prerequisite, not a UI task.

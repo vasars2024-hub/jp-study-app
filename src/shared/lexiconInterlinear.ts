@@ -39,6 +39,68 @@ export interface LexiconLookupResult {
 
 export type LexiconInterlinearLookup = (query: string) => LexiconLookupResult;
 
+/** One requested target language's grounded glosses, and the dictionary they came from. */
+export interface LexiconInterlinearParallelGloss {
+  lang: string;
+  dictId: string;
+  dictTitle: string;
+  glosses: LexiconLookupGloss[];
+}
+
+/**
+ * The fields of an installed dictionary that decide which glosses exist offline.
+ * Kept structural so the shared layer does not depend on the Yomitan registry
+ * type; `YomitanDictInfo` satisfies it.
+ */
+export interface LexiconGlossSource {
+  hasTerms?: boolean;
+  enabled?: boolean;
+  glossLangs?: string[];
+  glossLangOverride?: string;
+}
+
+/**
+ * More columns than this stops being a reading aid and starts being a table, and
+ * each extra target costs a gloss filter over every entry of every token.
+ */
+export const MAX_PARALLEL_GLOSS_TARGETS = 3;
+
+/**
+ * Decide which gloss languages to request, primary first.
+ *
+ * A parallel target is only worth asking for when a dictionary the user actually
+ * installed can answer it, so the list is derived from the registry rather than
+ * from the UI language or a fixed table. Registry order is priority order, so
+ * the cap drops the dictionaries the user already ranked last.
+ */
+export function parallelGlossTargets(
+  primary: string,
+  sources: readonly LexiconGlossSource[],
+  max: number = MAX_PARALLEL_GLOSS_TARGETS,
+): string[] {
+  const limit = Math.max(1, Math.floor(max));
+  const out: string[] = [];
+
+  const push = (lang: string | undefined): void => {
+    const code = lang?.trim().toLowerCase();
+    if (!code || out.length >= limit || out.includes(code)) return;
+    out.push(code);
+  };
+
+  push(primary);
+  for (const source of sources) {
+    if (source.hasTerms === false || source.enabled === false) continue;
+    const override = source.glossLangOverride?.trim();
+    if (override) {
+      push(override);
+      continue;
+    }
+    for (const lang of source.glossLangs ?? []) push(lang);
+  }
+
+  return out;
+}
+
 export interface LexiconInterlinearMatch {
   query: string;
   headwordId: number;
@@ -51,6 +113,12 @@ export interface LexiconInterlinearMatch {
   reasons?: string[];
   /** Only glosses in the requested target languages are exposed here. */
   glosses: LexiconLookupGloss[];
+  /**
+   * Per-language grouping, in the order the targets were requested. Populated
+   * only when more than one target language was asked for, so a single-target
+   * caller sees exactly the shape it saw before parallel targets existed.
+   */
+  parallel?: LexiconInterlinearParallelGloss[];
   /** True when the database matched the token but no requested gloss exists. */
   hasTargetGloss: boolean;
 }
@@ -231,12 +299,54 @@ function selectEntry(
   return grounded.find((entry) => entryGlosses(entry, targetLangs).length > 0) ?? grounded[0];
 }
 
+/**
+ * A second target language almost always lives in a different imported
+ * dictionary, so a parallel gloss has to be read off a sibling entry. Only the
+ * same headword qualifies — never a different word that merely ranked nearby.
+ * A dictionary that stores no reading is still the same headword.
+ */
+function sameHeadword(a: LexiconLookupEntry, b: LexiconLookupEntry): boolean {
+  if (a.headwordId === b.headwordId) return true;
+  if (a.text !== b.text) return false;
+  if (!a.reading || !b.reading) return true;
+  return a.reading === b.reading;
+}
+
+function parallelGlosses(
+  result: LexiconLookupResult,
+  entry: LexiconLookupEntry,
+  targetLangs: readonly string[],
+): LexiconInterlinearParallelGloss[] {
+  const out: LexiconInterlinearParallelGloss[] = [];
+
+  for (const lang of targetLangs) {
+    const own = entryGlosses(entry, [lang]);
+    if (own.length) {
+      out.push({ lang, dictId: entry.dictId, dictTitle: entry.dictTitle, glosses: own });
+      continue;
+    }
+    for (const sibling of result.entries) {
+      if (sibling === entry || sibling.via === 'prefix' || !sameHeadword(entry, sibling)) continue;
+      const glosses = entryGlosses(sibling, [lang]);
+      if (!glosses.length) continue;
+      out.push({ lang, dictId: sibling.dictId, dictTitle: sibling.dictTitle, glosses });
+      break;
+    }
+  }
+
+  return out;
+}
+
 function toMatch(
   query: string,
+  result: LexiconLookupResult,
   entry: LexiconLookupEntry,
   targetLangs: readonly string[],
 ): LexiconInterlinearMatch {
-  const glosses = entryGlosses(entry, targetLangs);
+  const parallel = targetLangs.length > 1 ? parallelGlosses(result, entry, targetLangs) : [];
+  const glosses = parallel.length
+    ? uniqueGlosses(parallel.flatMap((group) => group.glosses))
+    : entryGlosses(entry, targetLangs);
   return {
     query,
     headwordId: entry.headwordId,
@@ -248,6 +358,7 @@ function toMatch(
     score: entry.score,
     ...(entry.reasons?.length ? { reasons: [...entry.reasons] } : {}),
     glosses,
+    ...(parallel.length ? { parallel } : {}),
     hasTargetGloss: glosses.length > 0,
   };
 }
@@ -359,7 +470,11 @@ export function buildOfflineInterlinear(
 
     const end = segments[chosenEnd - 1].end;
     const query = bounded.text.slice(segment.start, end);
-    const match = chosenEntry ? toMatch(query, chosenEntry, targetLangs) : undefined;
+    // `query` is always one of the strings already probed above, so this reads
+    // the memoized result rather than issuing a second lookup for the token.
+    const match = chosenEntry
+      ? toMatch(query, resultFor(query), chosenEntry, targetLangs)
+      : undefined;
     parts.push({ kind: 'token', text: query, start: segment.start, end, ...(match ? { match } : {}) });
     tokenCount += 1;
     if (match) matchedCount += 1;

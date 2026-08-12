@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react';
-import type { LexiconInterlinearResult } from '../../../shared/lexiconInterlinear';
+import {
+  parallelGlossTargets,
+  type LexiconInterlinearResult,
+  type LexiconInterlinearMatch,
+} from '../../../shared/lexiconInterlinear';
 import { resolveLexiconInput, type LexiconLensOverride } from '../../../shared/lexiconWorkbench';
 import DictionaryResults, { type DictLang } from '../DictionaryResults';
 import { useT } from '../../i18n';
@@ -15,6 +19,25 @@ const LENS_LABEL_KEYS: Record<(typeof LENS_OPTIONS)[number], string> = {
   lookup: 'lexicon.lens.lookup',
   translate: 'lexicon.lens.interlinear',
 };
+
+/**
+ * One gloss line per requested target, each tagged with the language code the
+ * dictionary itself stores. The code is registry data — the same value Settings
+ * prints for an installed dictionary — not translatable chrome. A single-target
+ * match carries no `parallel` grouping and keeps the original one-line ruby.
+ */
+function glossRt(match: LexiconInterlinearMatch | undefined) {
+  if (!match) return '';
+  if (match.parallel?.length) {
+    return match.parallel.map((group) => (
+      <span className="lexicon-gloss-line" key={group.lang}>
+        <span className="lexicon-gloss-lang">{group.lang.toUpperCase()}</span>
+        {group.glosses.map((gloss) => gloss.text).join('; ')}
+      </span>
+    ));
+  }
+  return match.glosses.map((gloss) => gloss.text).join('; ') || match.reading || '';
+}
 
 interface Props {
   query: string;
@@ -49,16 +72,25 @@ export default function LexiconWorkbenchResults({
     let alive = true;
     setState('loading');
     setResult(null);
-    void window.api.lookupOfflineInterlinear(query, {
-      sourceLangs: [lang],
-      glossLangs: [glossLang],
-    }).then((next) => {
-      if (!alive) return;
-      setResult(next);
-      setState('idle');
-    }).catch(() => {
-      if (alive) setState('error');
-    });
+    const primary = glossLang.trim().toLowerCase() || 'en';
+    // The extra targets are whatever the installed dictionaries can actually
+    // answer offline, so a user with only one dictionary keeps the exact
+    // single-target request — and response shape — they had before.
+    void Promise.resolve(window.api.dictListYomitan?.())
+      .then((dicts) => parallelGlossTargets(primary, dicts ?? []))
+      .catch(() => [primary])
+      .then((glossLangs) => window.api.lookupOfflineInterlinear(query, {
+        sourceLangs: [lang],
+        glossLangs,
+      }))
+      .then((next) => {
+        if (!alive) return;
+        setResult(next);
+        setState('idle');
+      })
+      .catch(() => {
+        if (alive) setState('error');
+      });
     return () => { alive = false; };
   }, [glossLang, interlinear, lang, lookupAttempt, query]);
 
@@ -96,7 +128,7 @@ export default function LexiconWorkbenchResults({
               ) : (
                 <ruby className={part.match ? 'is-grounded' : undefined} key={`${part.start}-${part.end}`}>
                   {part.text}
-                  <rt>{part.match?.glosses.map((gloss) => gloss.text).join('; ') || part.match?.reading || ''}</rt>
+                  <rt>{glossRt(part.match)}</rt>
                 </ruby>
               ))}
             </div>

@@ -32,6 +32,20 @@
   color: var(--text-muted, currentColor);
   font-size: 0.5em;
 }
+
+/* Parallel targets stack: one line per gloss language, primary first. */
+.lexicon-interlinear-flow rt .lexicon-gloss-line {
+  display: block;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.lexicon-interlinear-flow rt .lexicon-gloss-lang {
+  margin-right: 0.4em;
+  opacity: 0.72;
+  font-size: 0.85em;
+  letter-spacing: 0.04em;
+}
 .lexicon-lens-picker {
   display: flex;
   gap: 6px;

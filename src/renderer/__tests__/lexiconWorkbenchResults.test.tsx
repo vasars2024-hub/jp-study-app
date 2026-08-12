@@ -108,6 +108,46 @@ describe('LexiconWorkbenchResults', () => {
     expect(host.querySelector('[data-testid="dictionary-results"]')).toBeNull();
   });
 
+  it('asks every installed gloss language and shows each target on its own line', async () => {
+    const lookup = vi.fn().mockResolvedValue({
+      text: '猫', detectedLangs: ['ja'], glossLangs: ['ru', 'en'], tokenCount: 1, matchedCount: 1,
+      truncated: false,
+      parts: [{
+        kind: 'token', text: '猫', start: 0, end: 1,
+        match: {
+          reading: 'ねこ',
+          glosses: [{ lang: 'ru', text: 'кошка' }, { lang: 'en', text: 'cat' }],
+          parallel: [
+            { lang: 'ru', dictId: 'jmdict-ru', dictTitle: 'JMdict (Russian)', glosses: [{ lang: 'ru', text: 'кошка' }] },
+            { lang: 'en', dictId: 'jmdict-en', dictTitle: 'JMdict (English)', glosses: [{ lang: 'en', text: 'cat' }] },
+          ],
+        },
+      }],
+    });
+    const dictListYomitan = vi.fn().mockResolvedValue([
+      { hasTerms: true, glossLangs: ['en'] },
+      { hasTerms: true, glossLangs: ['ru'] },
+      { hasTerms: true, enabled: false, glossLangs: ['fr'] },
+    ]);
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: { lookupOfflineInterlinear: lookup, dictListYomitan },
+    });
+    const host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root?.render(
+        <LexiconWorkbenchResults query="猫" lang="ja" glossLang="ru" lookupAttempt={0} lens="translate" />,
+      );
+      await Promise.resolve();
+    });
+
+    expect(lookup).toHaveBeenCalledWith('猫', { sourceLangs: ['ja'], glossLangs: ['ru', 'en'] });
+    const lines = [...host.querySelectorAll('rt .lexicon-gloss-line')].map((line) => line.textContent);
+    expect(lines).toEqual(['RUкошка', 'ENcat']);
+  });
+
   it('has a real catalog string for every lens label and overridable scale', async () => {
     const { en } = await import('../../shared/i18n/catalogs/en');
     const keys = [
