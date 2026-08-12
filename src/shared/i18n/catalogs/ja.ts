@@ -8307,4 +8307,11 @@ export const ja: Catalog = {
   'agent.timeline.effect.execute-step': 'プランのステップを実行',
   'agent.timeline.effect.plan-control': 'プランを更新',
   'agent.timeline.effect.plan-save': 'プランの進行状況を保存',
+  'lexicon.workbench.interlinear': 'オフライン逐語解析',
+  'lexicon.workbench.detected': '検出した範囲：{kind}',
+  'lexicon.workbench.truncated': 'オフライン解析のため入力を短縮しました',
+  'lexicon.workbench.offlineFailed': 'オフライン解析を読み込めませんでした。',
+  'lexicon.kind.sentence': '文',
+  'lexicon.kind.paragraph': '文章',
+  'lexicon.kind.document': '文書',
 };

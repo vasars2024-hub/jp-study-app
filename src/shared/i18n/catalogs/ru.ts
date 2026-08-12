@@ -9097,4 +9097,11 @@ export const ru: Catalog = {
   'agent.timeline.effect.execute-step': 'Выполнить шаг плана',
   'agent.timeline.effect.plan-control': 'Изменить план',
   'agent.timeline.effect.plan-save': 'Сохранить прогресс плана',
+  'lexicon.workbench.interlinear': 'Автономный подстрочный разбор',
+  'lexicon.workbench.detected': 'Определённый масштаб: {kind}',
+  'lexicon.workbench.truncated': 'Текст сокращён для автономного анализа',
+  'lexicon.workbench.offlineFailed': 'Не удалось загрузить автономный разбор.',
+  'lexicon.kind.sentence': 'предложение',
+  'lexicon.kind.paragraph': 'отрывок',
+  'lexicon.kind.document': 'документ',
 };

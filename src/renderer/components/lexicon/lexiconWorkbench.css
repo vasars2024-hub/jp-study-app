@@ -1,0 +1,34 @@
+.lexicon-interlinear {
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--surface, rgba(255, 255, 255, 0.72));
+}
+
+.lexicon-interlinear-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+  color: var(--text-muted, currentColor);
+  font-size: 0.82rem;
+}
+
+.lexicon-interlinear-flow {
+  font-size: clamp(1.15rem, 2vw, 1.55rem);
+  line-height: 2.5;
+  overflow-wrap: anywhere;
+}
+
+.lexicon-interlinear-flow ruby {
+  padding: 0 0.08em;
+  border-radius: 0.25em;
+}
+
+.lexicon-interlinear-flow ruby.is-grounded {
+  background: color-mix(in srgb, var(--accent, #5588cc) 12%, transparent);
+}
+
+.lexicon-interlinear-flow rt {
+  color: var(--text-muted, currentColor);
+  font-size: 0.5em;
+}

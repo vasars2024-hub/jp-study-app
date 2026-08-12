@@ -8713,4 +8713,11 @@ export const en: Catalog = {
   'agent.timeline.effect.execute-step': 'Run a plan step',
   'agent.timeline.effect.plan-control': 'Update a plan',
   'agent.timeline.effect.plan-save': 'Save plan progress',
+  'lexicon.workbench.interlinear': 'Offline interlinear analysis',
+  'lexicon.workbench.detected': 'Detected scale: {kind}',
+  'lexicon.workbench.truncated': 'Input was shortened for offline analysis',
+  'lexicon.workbench.offlineFailed': 'Offline analysis could not be loaded.',
+  'lexicon.kind.sentence': 'sentence',
+  'lexicon.kind.paragraph': 'passage',
+  'lexicon.kind.document': 'document',
 };

@@ -8272,4 +8272,11 @@ export const zh: Catalog = {
   'agent.timeline.effect.execute-step': '运行计划步骤',
   'agent.timeline.effect.plan-control': '更新计划',
   'agent.timeline.effect.plan-save': '保存计划进度',
+  'lexicon.workbench.interlinear': '离线逐词分析',
+  'lexicon.workbench.detected': '检测范围：{kind}',
+  'lexicon.workbench.truncated': '为进行离线分析，输入已缩短',
+  'lexicon.workbench.offlineFailed': '无法加载离线分析。',
+  'lexicon.kind.sentence': '句子',
+  'lexicon.kind.paragraph': '段落',
+  'lexicon.kind.document': '文档',
 };

@@ -13916,3 +13916,28 @@ That surface must render offline segmentation, dictionary lookup and interlinear
 waiting on translation or AI. ReadingLens sentence handoff should follow only once that receiver
 honors its requested lens. Passage → Reading remains parked on the already-recorded destination
 product decision.
+
+## The first scale-adaptive Lexicon Workbench renderer is real — 2026-08-12
+
+Re-derived from the final ledger entry and the dependency order, Track 2 still came before the
+Agent and ReadingLens. The committed bridge had no renderer consumer. The Dictionary compatibility
+route now keeps character/word input on its feature-complete `DictionaryResults` surface and sends
+sentence/paragraph/document input through `lookupOfflineInterlinear`. The new result surface shows
+every source token and separator in order, adds only SQLite-grounded reading/gloss ruby, reports
+truncation honestly, and has explicit loading/error states. It does not call translation or AI.
+
+The renderer regression proves the lexical and sentence branches independently. The four gates
+passed in the shared tree: full Vitest **7,358 passed / 0 failed / 6 skipped** across 554 files;
+i18n **9,350** English keys complete in ja/zh/ru; architecture 1,741 modules / 17 findings with
+nothing new and the same two pending; ESLint over every touched code/catalog path clean.
+
+Live Electron acceptance used a fresh process started by this worker and the debug bridge only.
+The real Dictionary pop-out received `猫を見た。`, rendered the localized `Offline interlinear
+analysis` surface, preserved the exact text, produced four ruby tokens, and showed no alert. This
+exercised the renderer plus `dict:lookupOfflineInterlinear`; this installation honestly returned
+no gloss text because its managed SQLite store has no matching entry. Only the process tree this
+worker started was stopped.
+
+Track 2 is not complete. Next: make Translate a compatibility lens of this Workbench without
+regressing its history/language controls, then accept ReadingLens sentence handoff into the now-real
+receiver. Passage → Reading remains parked on the destination product decision.

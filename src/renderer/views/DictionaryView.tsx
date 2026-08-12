@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import DictionaryResults, { type DictLang } from '../components/DictionaryResults';
+import type { DictLang } from '../components/DictionaryResults';
+import LexiconWorkbenchResults from '../components/lexicon/LexiconWorkbenchResults';
 import { AppChrome, StatusBarField, StatusBarSpacer, type MenuBarMenu } from '../components/ui';
 import { onLexiconHandoffStaged, takeLexiconHandoff } from '../lexiconHandoffClient';
 import { getStudyLang, onStudyLangChanged, setStudyLang, STUDY_LANG_KEY } from '../studyEnvironment';
@@ -138,7 +139,7 @@ export default function DictionaryView() {
             : 'Tip: while reading a book you can highlight any word to look it up instantly. Tap the star icon on a result to save it to Flashcards.'}
         </p>
       ) : (
-        <DictionaryResults key={lookupAttempt} query={query} variant="page" lang={lang} />
+        <LexiconWorkbenchResults query={query} lang={lang} lookupAttempt={lookupAttempt} />
       )}
     </div>
     </AppChrome>
