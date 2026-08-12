@@ -11549,3 +11549,192 @@ every row.
 
 `featureStatus.ts` is *still* dirty with the concurrent track's 30 comment lines. Re-check
 first — once that track lands, the file is clean and a plain `git add` is correct again.
+
+## The cache admits when it did not open a socket, and the one row that was mispredicted — 2026-08-12
+
+Second slice of the same hop. Main V1 is still in dependency-order item 8. The previous section
+built a vehicle for `set.network` and named `set.cache` as the next member on the grounds that
+the same harness fits it better; that held, and every one of its six fields plus the
+`metadata.cacheHours` override is now driven live. `set.cache` goes to `ready`.
+
+The vehicle is unchanged: a site rule for 127.0.0.1 whose `episodeSelector` matches nothing, so
+`runWithSiteRule` makes exactly one `scraperRequest` and then throws before `onFinished`. What
+makes it the right harness for a *cache* is that the witness sits outside the app. A cache hit
+and a fast local fetch look identical from the renderer — both return in single-digit
+milliseconds. They are not identical at the server: **a hit means no socket was opened**, and
+the harness's request log says so unambiguously. Every row below is read as "how many requests
+reached the origin", never as "how long the job took".
+
+`network` was pinned quiet for every row (`retryAttempts: 0`, no random delay, 30s timeout) and
+`safety` pinned neutral exactly as in the previous section, so the only varying groups are
+`cache` and, in three rows, `metadata.cacheHours`.
+
+### The three kind switches
+
+Each was driven as a triple: store it, prove the repeat is a hit, then flip that one switch off
+and watch the same URL go back to the network.
+
+| job | url | cache group | server hits |
+| --- | --- | --- | --- |
+| c1 | `/p/c1` | html on | 1 — stored |
+| c2 | `/p/c1` | unchanged | **0** — served from cache |
+| c3 | `/p/c1` | `htmlEnabled: false` | 1 |
+| c4 | `/api/c4.json` | metadata on, **html off** | 1 — stored |
+| c5 | `/api/c4.json` | unchanged | **0** |
+| c6 | `/api/c4.json` | `metadataEnabled: false` | 1 |
+| c7 | `/img/c7.png` | thumbnails on, **html and metadata off** | 1 — stored |
+| c8 | `/img/c7.png` | unchanged | **0** |
+| c9 | `/img/c7.png` | `thumbnailsEnabled: false` | 1 |
+
+c4 and c7 ran with `htmlEnabled: false` throughout. That is what makes them evidence about
+`cacheKindFor` rather than about the cache merely being switched on: a `.json` path under `/api/`
+and a `.png` path were classified, stored and served while the html switch was off the whole
+time.
+
+### Offline is a closed socket, not a preference
+
+| job | url | measured |
+| --- | --- | --- |
+| c10 | `/p/c10-never-fetched`, `mode: 'offline'` | **0 requests**, job failed `Offline cache mode: … is not in the cache.` |
+| c11 | `/p/c1` (already stored), `mode: 'offline'` | **0 requests**, the stored page was served |
+
+c10 is the half worth having. The module's own comment says "Offline — never refetch has to mean
+the socket is not opened", and the negative is what proves it: the origin logged nothing at all,
+so the failure is not a request that failed, it is a request that never happened.
+
+### Lifetime, by the clock rather than by a seam
+
+`isCacheEntryFresh` takes `now` as a parameter, which is exactly the shape that lets a unit test
+prove nothing about real elapsed time. So this was driven on the wall clock.
+
+| job | url | lifetimeMinutes | measured |
+| --- | --- | --- | --- |
+| c12 | `/p/c12` | 1 | 1 — stored |
+| c13 | `/p/c12`, immediately | 1 | **0** — hit |
+| c14 | `/p/c12`, **66 seconds later** | 1 | 1 — expired, refetched |
+
+Same URL, same settings, same profile in all three. Nothing differs between c13 and c14 except
+elapsed time.
+
+### The metadata override, separated three ways
+
+`cachePolicyFrom` lets `metadata.cacheHours` win over the shared lifetime for the metadata kind
+only. All three rows below ran at `cache.lifetimeMinutes: 0`, which on its own means "store
+nothing" (`writeScraperCache` returns early when `lifetimeMs <= 0`).
+
+| job pair | url kind | cacheHours | measured |
+| --- | --- | --- | --- |
+| c15 / c16 | metadata (`/api/c15.json`) | 168 | 1 then **0** — cached anyway |
+| c17 / c18 | html (`/p/c17`) | 168 | 1 then 1 — never cached |
+| c19 / c20 | metadata (`/api/c19.json`) | 0 | 1 then 1 — never cached |
+
+c15 against c17 shows the override is per kind. c15 against c19 shows it is the override doing
+the work and not the URL shape.
+
+### maxSizeMb, and the row that was predicted wrong
+
+Five 3.4 MB bodies (3,481,688 chars each) against `maxSizeMb: 16` — a budget of 16,777,216, so
+capacity is exactly **four**. b1…b5 were stored in order, then each subsequent row predicted
+which entry the next store would evict before it ran.
+
+| job | predicted | measured |
+| --- | --- | --- |
+| b1…b5 | five stores, the fifth evicts b1 | five requests |
+| b1r | miss (b1 was evicted) | **miss** — and its own re-store evicted b2 |
+| b2r | *hit* | **miss** — b1r had just evicted it |
+| b5r | hit | **hit** |
+| b4r | hit | **hit** |
+| b3r | miss | **miss** |
+| b5r2 | *miss* | **hit** |
+| b1r2 | miss (b3r evicted it) | **miss** |
+
+Two rows were mispredicted, and both mispredictions are the interesting part.
+
+b2r was called a hit because the prediction forgot that b1r's own *store* costs 3.4 MB and
+evicts the front. b5r2 was called a miss for a better reason: the prediction assumed b5 was
+still near the front of the eviction order — but b5r had been a **hit**, and `readScraperCache`
+deletes and re-sets on a hit specifically so that "the freshest use sits at the end". So b3r
+evicted b1, not b5, and b1r2 confirms it directly.
+
+That is the module comment's claim — "insertion order is the eviction order, and a hit
+re-inserts, so the Map is the LRU list — no second structure to keep in step with it" — measured
+from outside the process, in the only way that could have falsified it. A prediction that fails
+and then explains itself from the source is worth more here than eight that pass.
+
+### Not driven, and why the dot is still green
+
+"The cache does not survive a restart" was **not** tested. It is structural rather than
+behavioural: `store` is a module-level `const … = new Map()` at `httpCache.ts:149` with no disk
+path anywhere in the module, so there is nothing to drive — proving it would mean restarting the
+dev app to observe an absence. The sentence stays in the comment as a description of the design,
+not as a claim this run verified.
+
+### The tree was left as found
+
+`localStorage['jp-scraper-settings-v1']` read back after the pass: the active profile's `cache`
+group is still `{standard, all three enabled, lifetimeMinutes: 1440, maxSizeMb: 512}`,
+`metadata.cacheHours` still 168, `network.retryAttempts` still 3, `safety.respectRobotsTxt` still
+true, `extraction.siteRules` still empty, `notifications.channel` still `toast`. Nothing was
+saved. `history.json` still 3305 bytes from 2026-07-29 — every job failed before `onFinished`.
+All probe globals deleted and confirmed gone, `/logs?level=error` **0**, the harness process
+killed and all four ports confirmed closed.
+
+One piece of cleanup is worth naming because it is also a measurement. The run left ~13.9 MB of
+probe bodies in the main process's in-memory cache, and there is no IPC channel that clears it.
+So a final job (`z1`) was sent with `maxSizeMb: 1` — below the UI's own floor of 16, which the
+`startScrape` handler does not enforce because it passes `input.settings` through unvalidated —
+and a single tiny store under a 1 MB budget evicted everything ahead of it. `b3r2` then
+re-requested a body that had been cached and reached the origin, which is the proof the eviction
+happened; it ran with all three kind switches off so it could not re-store the 3.4 MB it
+fetched. The cache is back to a handful of sub-kilobyte entries.
+
+### Changed paths
+
+- `src/renderer/components/scraper/featureStatus.ts` — promote `set.cache` to `ready` and record
+  the acceptance field by field.
+- `src/MAIN_V1_EVIDENCE_LEDGER.md` — this evidence.
+
+No UI string was added.
+
+### Gates
+
+- `npx vitest run` — **538 files passed / 1 skipped; 7,251 passed / 6 skipped; 0 failed.**
+- `node tools/i18n-check.cjs` — exit 0, all **9,324** English keys translated in ja/zh/ru.
+- `node tools/architecture-audit.cjs` — exit 0, nothing new, 2 known pending.
+- `npx eslint src/renderer/components/scraper/featureStatus.ts` — exit 0, no output.
+- `tsc --noEmit` was not run; it is not a gate.
+- A cache-busted import from Vite's running served graph returned `set.cache` as `ready` and
+  **33 ready / 16 untested** of 49.
+
+### Exact next slice
+
+**16** `untested` entries remain and Main V1 is still in dependency-order item 8. Do not move to
+Blanc.
+
+The obvious next member on this harness is **`set.safety`** — it is the group this hop and the
+last one both deliberately *pinned neutral* in order to isolate something else, which means it
+has never been the variable. It fits the same vehicle with one change worth planning for: a site
+rule makes one request per job, and `crawlDelayMs`/`maxRequestsPerMinute` are per-host pacing
+that only shows up across several requests in **one** scope, since `HostGovernor` is constructed
+per runtime scope like `RequestGate`. The way to get several requests into one site-rule job is
+a **redirect chain** — `performRequest` recurses per hop and `MAX_REDIRECTS` is 5 — but check
+first whether the governor is consulted per hop or once per `scraperRequest` (read `http.ts:637`
+against the recursion at `:387` before designing the matrix; if pacing sits outside the
+recursion, say so and mark those two fields test-only rather than inventing a vehicle).
+`respectRobotsTxt` is the easy half and is genuinely decisive: with it on, the harness sees a
+second, ungated request for `/robots.txt`, and a `Disallow: /` served there must make the job
+fail `ERR_ROBOTS` with the page itself never requested — another negative of the c10 shape.
+`pauseAfterFailures`/`pauseDurationMs` need a permanent 503 and `retryAttempts` above the failure
+threshold, which the `/flaky` route already serves.
+
+The harness that produced both sections is described in full in the previous one; it is four
+Node servers on 127.0.0.1 (39901 http origin, 39902 https on a self-signed cert, 39903/39904
+absolute-form proxies) sharing one request log read over `/__log`. Rebuilding it is ten minutes.
+Two traps carry forward: **cache keys** (a repeated URL is a hit unless you meant it to be) and
+**the groups you are not testing**, which must be pinned identically across every row or a
+difference has two explanations.
+
+`featureStatus.ts` is *still* dirty with the concurrent settings-group track's 30 comment lines,
+in none of this branch's commits. Both of this hop's commits were staged by reconstructing the
+blob from `git cat-file blob HEAD:<path>`; re-check first, because once that track lands a plain
+`git add` is correct again.

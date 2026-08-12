@@ -247,7 +247,37 @@ export const FEATURE_STATUS: Record<string, FeatureStatus> = {
   // Reads and writes a real response cache keyed per kind, with the lifetime,
   // the per-kind switches, the size ceiling and "Offline — never refetch" all
   // acting. maxSizeMb is a memory ceiling: the cache does not survive a restart.
-  'set.cache': 'untested',
+  //
+  // 2026-08-12: driven live on the same vehicle as `set.network` above — a site
+  // rule for 127.0.0.1 whose selector matches nothing, so each job makes exactly
+  // one `scraperRequest` and then fails before `onFinished`. The witness is the
+  // local server's request log, which is the only one that can tell a cache hit
+  // from a fast fetch: a hit means **no socket was opened at all**.
+  //   htmlEnabled/metadataEnabled/thumbnailsEnabled — each switch was driven as
+  //     a triple (store, hit, then the same URL with only that switch off, which
+  //     went back to the network). The metadata and thumbnail triples ran with
+  //     `htmlEnabled: false` throughout, so they prove `cacheKindFor` routing
+  //     and not merely "the cache is on".
+  //   mode — `offline` against a URL never fetched threw `Offline cache mode: …
+  //     is not in the cache` with the server logging **zero** requests, so the
+  //     socket really is not opened; `offline` against a URL already stored
+  //     served it, also with zero requests.
+  //   lifetimeMinutes — driven by real elapsed time, not by a clock seam: stored
+  //     at `lifetimeMinutes: 1`, an immediate repeat was a hit, and the same URL
+  //     under the same settings 66s later went back to the network.
+  //   metadata.cacheHours — the override in `cachePolicyFrom` is load-bearing
+  //     and was separated three ways at `lifetimeMinutes: 0`: a metadata URL
+  //     with `cacheHours: 168` cached, an html URL did not, and a metadata URL
+  //     with `cacheHours: 0` did not either.
+  //   maxSizeMb — five 3.4 MB bodies against a 16 MB budget. Capacity is four,
+  //     and every subsequent request predicted which entry the next store would
+  //     evict; nine rows agreed. One predicted hit came back a miss, and the
+  //     reason is the property the module comment claims: a *hit* re-inserts, so
+  //     it moves its entry off the front of the eviction order. This is the LRU
+  //     it says it is, and the order is observable from outside the process.
+  // Not driven: "does not survive a restart", which is structural — `store` is a
+  // module-level `Map` (httpCache.ts:149) with no disk path to test.
+  'set.cache': 'ready',
   // maxParallelJobs gates job admission; batchSize sets the progress cadence.
   // Inert, with no consumer to wire them to: maxParallelDownloads,
   // memoryBudgetMb, cpuThrottlePercent, reuseBrowserContext, prefetchNextPage.
