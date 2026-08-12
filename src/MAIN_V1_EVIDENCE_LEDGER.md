@@ -12251,3 +12251,59 @@ However, the historical Results and History inspectors do not reopen a completed
 only to reach that transient tab would spend public-provider traffic. Accept the result workspace
 with a deterministic local catalogue fixture or first add a truthful reopen-result handoff; until
 then `result.images` remains amber.
+
+## Rescued commit 1 of 10 landed: the Mooncap orphan is gone and its parity is now a test — 2026-08-12
+
+First integration from `docs/audit/RELAY_BOSS_AUDIT.md` §1, which tagged ten Codex-worktree commits
+that were not ancestors of this branch. Taken from `rescued/codex-worktree/27c74b6-*`, re-derived
+here rather than cherry-picked on trust.
+
+### What was re-derived, not assumed
+
+- **No importer exists.** `git grep -w MOONCAP_PHASE_LORE -- 'src/*'` returns exactly one hit, a
+  prose comment inside `shared/__tests__/i18n.test.ts`. Every path reference to
+  `catalogs/mooncapLore.ts` outside that is historical ledger text. The four runtime catalogs
+  consume `shared/i18n/mooncapLore/{en,ja,zh,ru}.ts` instead.
+- **The orphan was the stale copy, and the rescued session's specific evidence for that holds.**
+  Its phase-32 English observation reads `Twisted columns hold a empire of purple night`; canonical
+  `mooncapLore/en.ts:238` reads `an empire`. The corrected string is the one the app renders.
+- **The deletion was already live in the working tree** — the file was absent from disk before this
+  slice, tracked-but-deleted and uncommitted, which is why `architecture-audit` already reported
+  exit 0 with 17 findings rather than the 18 the rescued entry recorded against its own worktree.
+  This commit lands that deletion in the index; it changes no runtime behaviour, because no running
+  renderer could have loaded a file that was not on disk.
+
+### What is new
+
+`shared/__tests__/mooncapLore.test.ts` converts the removal into a standing contract: each of the
+four canonical lore modules must expose exactly the 200 expected `mooncap.phase.<1-50>.<field>`
+keys, every value must be a non-empty string, and the runtime catalog for that language must return
+the canonical module's value — so a future divergence between the split modules and the catalogs
+fails a test instead of quietly reintroducing an orphan.
+
+Automated gates, run on this branch and this tree:
+
+- focused parity test: **1 file / 4 tests passed**;
+- `npx vitest run`: **538 files / 7,256 tests passed**, 1 skipped file, with **two timeouts that are
+  not failures** — `i18nSplit.test.ts` ("no app code imports the all-languages aggregate") and
+  `mediaSurfaceImportGraph.test.ts` ("reaches none of the anime-library screens") both hit the 20 s
+  limit under full-suite load. Re-run in isolation the same minute they pass together in **6.45 s,
+  12/12**. Both are whole-tree `readFileSync` scans; treat a timeout there as load, and confirm by
+  isolation before calling it a regression;
+- `node tools/i18n-check.cjs`: exit 0, all **9,324** English keys translated in ja/zh/ru;
+- `node tools/architecture-audit.cjs`: exit 0, 1,721 modules, 17 findings, nothing new, the same 2
+  known findings still pending;
+- `npx eslint src/shared/__tests__/mooncapLore.test.ts`: exit 0.
+
+No live Electron acceptance. The debug bridge was not available to this session, and this slice has
+no runtime delta to observe: the module was already off disk, and the only added file is a test.
+
+### For whoever takes the next rescued commit
+
+`9c046cc` (Lexicon offline interlinear, +666 across four files) is both the audit's highest-value
+item and the only remaining one whose files are **all clean in this shared tree** — checked path by
+path. `2545cd5`, `28a239c` and `c3ae5b6` each collide with the four `catalogs/{en,ja,zh,ru}.ts`
+files, which carry other tracks' uncommitted hunks, so they need the reconstruct-HEAD-plus-your-edit
+discipline rather than a plain `git add`. `20f72eb` touches `scraper/featureStatus.ts` and
+`scraper/settings/fields.ts`, which commit `bfac09d` has since rewritten — re-derive it against the
+tree before assuming it still applies.
