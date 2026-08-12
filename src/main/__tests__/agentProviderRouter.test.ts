@@ -28,6 +28,7 @@ function policy(overrides: Partial<AgentProviderPolicy> = {}): AgentProviderPoli
   return {
     target: { kind: 'local', backend: 'local-qwen' },
     allowCloud: false,
+    excludeSensitiveContext: false,
     allowSensitiveContext: false,
     maxInputChars: 10_000,
     maxOutputTokens: 800,
@@ -338,6 +339,48 @@ describe('Agent provider router', () => {
       .rejects.toMatchObject({ code: 'sensitive-context' });
 
     expect(cloud).not.toHaveBeenCalled();
+  });
+
+  it('keeps persistently excluded sensitive attachments out of the cloud request even with consent', async () => {
+    let captured: providerRuntime.AiProviderRequest | null = null;
+    vi.spyOn(providerRuntime, 'runCloudAiRequest').mockImplementation(async (request) => {
+      captured = request;
+      return {
+        text: 'cloud answer without private attachment',
+        providerId: 'gemini-2.5-flash',
+        model: 'gemini-2.5-flash',
+        credentialBucket: 'gemini',
+        inputChars: request.prompt.length,
+        startedAt: 100,
+        completedAt: 110,
+        attempts: 1,
+        cached: false,
+        delivery: 'buffered',
+        usage: {},
+      };
+    });
+
+    const result = await runAgentProviderPrompt(policy({
+      target: { kind: 'cloud', providerId: 'gemini-2.5-flash' },
+      allowCloud: true,
+      excludeSensitiveContext: true,
+      allowSensitiveContext: true,
+    }), 'Answer without private material.', {
+      apiKey: 'key',
+      attachments: [image()],
+      context: [
+        context('sensitive'),
+        { ...context('ordinary'), id: 'ctx-ordinary', preview: 'Public study route' },
+      ],
+    });
+
+    const request = captured as unknown as providerRuntime.AiProviderRequest;
+    expect(request.images).toBeUndefined();
+    expect(request.prompt).not.toContain('設定');
+    expect(request.prompt).not.toContain('短い文');
+    expect(request.prompt).toContain('Public study route');
+    expect(result.provider.contextIds).toEqual(['ctx-ordinary']);
+    expect(result.provider.attachmentIds).toEqual([]);
   });
 
   it('includes accepted attachment metadata and content in the actual local prompt', async () => {

@@ -248,6 +248,23 @@ export function AgentGovernancePanel({
         </p>
       </div>
 
+      <div className="agent-governance-field">
+        <label className="agent-governance-switch">
+          <input
+            type="checkbox"
+            data-testid="agent-governance-sensitive-exclusion"
+            checked={settings.excludeSensitiveContext}
+            onChange={(event) => writeSettings({ excludeSensitiveContext: event.target.checked })}
+          />
+          <span>{t('agent.governance.sensitiveExclusion.label')}</span>
+        </label>
+        <p className="agent-governance-note" data-testid="agent-governance-sensitive-exclusion-note">
+          {settings.excludeSensitiveContext
+            ? t('agent.governance.sensitiveExclusion.onNote')
+            : t('agent.governance.sensitiveExclusion.offNote')}
+        </p>
+      </div>
+
       <AgentContextSuggestionSettings />
     </section>
   );

@@ -276,12 +276,14 @@ Still required before the Track 3 acceptance can be called complete:
   nothing, which is the user's own choice; the two are deliberately
   distinguishable, and that migration path was measured against the real stored
   settings document on this machine (2026-08-11 — see the ledger's "The two
-  privacy controls that had no state behind them"). **Still open** from this
-  bullet: automations, whose created entry freezes `effectiveAgentPermission` at
-  creation time, which is a product decision rather than a missing writer; and
-  sensitive-context exclusion as a *persistent* setting rather than the
-  per-request consent checkbox it is today, which would need to interact with
-  that consent rather than sit beside it;
+  privacy controls that had no state behind them"). **Persistent sensitive-context
+  exclusion is implemented; live acceptance remains.** The setting defaults on
+  for older documents and removes sensitive context and attachments at the main
+  provider boundary. Turning it off only makes that material eligible: each
+  cloud request still requires the existing explicit consent. **Still open**
+  from this bullet: automations, whose created entry freezes
+  `effectiveAgentPermission` at creation time, which is a product decision
+  rather than a missing writer;
 - **Final compact-width and complete keyboard/reduced-motion visual matrices:
   done.** Run for the first time — the only prior mention of this bullet in the
   ledger is one line saying it "also remains required". Measured live at fifteen

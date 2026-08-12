@@ -12587,3 +12587,91 @@ worth re-running the base-blob-vs-HEAD check on them first, because for `2545cd5
 still matched HEAD and that made the staging mechanical. `c48b266` additionally touches `preload.ts`
 and needs its main handler invoked live rather than grepped. `87dd97c` and `99c8747` remain
 per-hunk salvage only.
+
+## Rescued commit 5 of 10 landed: the sensitive-context privacy floor, proved against a real legacy settings document — 2026-08-12
+
+`c3ae5b6` ("feat(agent): persist sensitive cloud exclusion") is integrated. It adds a
+**persistent privacy floor**: `excludeSensitiveContext`, on by default, which strips
+`sensitivity: 'sensitive'` context entries and attachments out of cloud-bound requests
+*before* per-request consent is even evaluated.
+
+### The tree was already staged when this hop started — and it was correct
+
+A previous hop had staged the whole integration and exited before committing. That is not
+evidence, so it was re-derived rather than trusted:
+
+- for the 12 code files plus `MAIN_V1_COMPLETION_PLAN.md`, `git diff --cached HEAD` over those
+  paths is **byte-identical** (modulo `index` lines) to `git diff c3ae5b6^ c3ae5b6`;
+- the four catalogs could not be staged at the commit blob — other tracks have ~1150 lines of
+  live edits in each — so they carry HEAD-plus-our-hunks. Their staged hunks are **content-
+  identical** to the rescued commit's, differing only in line offset. The worktree keeps the
+  other tracks' catalog work untouched, and `gameArena.ts`'s unstaged deletion is left alone.
+
+### What the floor actually is
+
+`evaluateAgentProviderPrivacy` gates the exclusion on `cloud && policy.excludeSensitiveContext
+!== false`, so it is **cloud-only** — a local model still sees everything, which is the point of
+running one. Absent is treated as enabled in all three normalizers
+(`normalizeLocalAgentSettings`, `normalizePolicy`, and the `defaultAgentExecutionPolicy` seed).
+
+The behavioural change is not merely "less is sent". Previously a cloud request carrying
+sensitive material without consent was **refused** with `sensitive-context`; with the floor on it
+is **allowed**, with the sensitive items removed. The request now succeeds in a reduced form
+instead of failing.
+
+Wiring is end-to-end, not foundation-only: `AgentGovernancePanel` toggle →
+`localAgentSettingsStore` → `onLocalAgentSettingsChanged` subscription in `AgentWorkspaceShell` →
+request `policy` at submit → `normalizePolicy` → `main/agentProviderRouter.ts:365`. The three CSS
+classes it uses (`agent-governance-field`/`-switch`/`-note`) all have real rules in
+`components/agent/agentGovernance.css` — no dead class was introduced.
+
+### Gates
+
+| gate | result |
+|---|---|
+| `npx vitest run` | **544 files passed**, 1 skipped; **7282 tests passed**, 6 skipped; exit 0 |
+| `node tools/i18n-check.cjs` | exit 0 — all 9335 English keys translated in ja/zh/ru |
+| `node tools/architecture-audit.cjs` | exit 0 — 1727 modules, 17 known findings, **nothing new** |
+| `npx eslint <11 touched paths>` | exit 0 |
+
+### Live Electron acceptance through the debug bridge
+
+Bridge on port 39273, main window id 1. Two traps cost time and are worth recording:
+
+- **`/eval` does not await a promise** — it serialises the pending `Promise` as `{}`. Stash the
+  result on a `window.__x` global and read it back in a second call.
+- **`defaultAgentExecutionPolicy` does not validate its argument.** Passing `'openai'` yields
+  `{kind:'cloud', providerId:'openai'}`, which `normalizeAgentExecutionRequest` then rejects
+  outright, so every probe returns `REJECTED` and looks like a defect in the change. The real ids
+  are `gemini-2.5-flash` / `deepseek-v4-flash` / `deepseek-v4-pro` (`shared/aiProviders.ts:1`).
+
+Against the **real modules in the running renderer**, with two context items and two attachments
+(one of each sensitive):
+
+| case | allowed | context | attachments |
+|---|---|---|---|
+| cloud, exclusion **on** (default) | yes | `a` only | `x` only |
+| cloud, exclusion off, consent given | yes | `a`, `b` | `x`, `y` |
+| cloud, exclusion off, no consent | **no** — `sensitive-context` | — | — |
+| **local** target | yes | `a`, `b` | `x`, `y` |
+
+The floor holds against a hostile sender: round-tripping a valid policy through
+`normalizeAgentExecutionRequest` with the field **omitted**, or set to `'no'` / `null` / `0`, all
+come back `true`. Only an explicit boolean `false` lowers it.
+
+**The strongest evidence was already on disk.** This machine's real persisted
+`jp-study-local-agent-settings-v1` is a **pre-setting document** — it has no
+`excludeSensitiveContext` key at all (nor `chatHistory`/`memoryScope`). The live toggle
+nevertheless renders `checked: true` with the ON note, so the upgrade path really does default an
+existing user to private rather than silently making their sensitive material cloud-eligible.
+The label rendered as `Исключать конфиденциальный контекст из облачных запросов` — the app's UI is
+set to Russian, so the new keys are resolving through i18n, not sitting as literals.
+
+No persisted setting was written: the run was read-only, and the probe globals were deleted after.
+
+### What is left of the ten
+
+Five integrated (`27c74b6`, `9c046cc`, `20f72eb`, `2545cd5`, `c3ae5b6`), one closed obsolete
+(`9e6e82d`), four open. `28a239c` is the last of the cheap base-`732f30b` five and additionally
+touches `styles.css`. `c48b266` touches `preload.ts` — invoke its main handler live, do not grep
+the channel. `87dd97c` and `99c8747` remain per-hunk salvage only.

@@ -75,6 +75,12 @@ export const AGENT_HISTORY_TURN_CEILING = 12;
 export interface AgentProviderPolicy {
   target: AgentProviderTarget;
   allowCloud: boolean;
+  /**
+   * Persistent privacy floor. Absent is treated as enabled for callers written
+   * before the setting existed. It outranks per-request consent by removing
+   * sensitive material before `allowSensitiveContext` is evaluated.
+   */
+  excludeSensitiveContext?: boolean;
   allowSensitiveContext: boolean;
   maxInputChars: number;
   maxOutputTokens: number;
@@ -618,8 +624,14 @@ export function evaluateAgentProviderPrivacy(
   attachments: readonly AgentAttachment[],
 ): AgentProviderPrivacyDecision {
   const cloud = policy.target.kind === 'cloud';
-  const selectedContext = context.filter(carriesDisclosableContext);
-  const selectedAttachments = [...attachments];
+  const excludeSensitiveContext = cloud && policy.excludeSensitiveContext !== false;
+  const selectedContext = context.filter((entry) => (
+    carriesDisclosableContext(entry)
+    && (!excludeSensitiveContext || entry.sensitivity !== 'sensitive')
+  ));
+  const selectedAttachments = attachments.filter((entry) => (
+    !excludeSensitiveContext || entry.sensitivity !== 'sensitive'
+  ));
   const inputChars = prompt.length
     + selectedContext.reduce((sum, entry) => sum + entry.preview.length, 0);
 

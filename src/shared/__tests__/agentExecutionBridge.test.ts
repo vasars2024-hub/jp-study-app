@@ -17,10 +17,28 @@ describe('Agent execution bridge contract', () => {
     expect(defaultAgentExecutionPolicy()).toMatchObject({
       target: { kind: 'local', backend: 'local-qwen' },
       allowCloud: false,
+      excludeSensitiveContext: true,
       allowSensitiveContext: false,
       cache: 'off',
       streaming: true,
     });
+  });
+
+  it('normalizes persistent sensitive exclusion as a fail-closed policy', () => {
+    const request = (excludeSensitiveContext: unknown) => normalizeAgentExecutionRequest({
+      requestId: 'run-sensitive-policy',
+      conversationId: 'chat-sensitive-policy',
+      prompt: 'Explain this',
+      policy: {
+        ...defaultAgentExecutionPolicy('gemini-2.5-flash'),
+        excludeSensitiveContext,
+      },
+      allowLocalFallback: false,
+    });
+
+    expect(request(undefined)?.policy.excludeSensitiveContext).toBe(true);
+    expect(request('no')?.policy.excludeSensitiveContext).toBe(true);
+    expect(request(false)?.policy.excludeSensitiveContext).toBe(false);
   });
 
   it('builds an explicit cloud policy only when the user selects a provider', () => {

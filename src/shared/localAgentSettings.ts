@@ -57,6 +57,12 @@ export interface LocalAgentSettings {
   memoryScope: AgentMemoryCategory[];
   /** How much of the conversation may be replayed to a provider. */
   chatHistory: LocalAgentChatHistory;
+  /**
+   * Keeps sensitive context and attachments out of cloud-bound requests.
+   * Turning this off only makes them eligible: the composer still requires
+   * explicit consent for each request that would disclose them.
+   */
+  excludeSensitiveContext: boolean;
   privacyMode: boolean;
   debugMode: boolean;
 }
@@ -79,6 +85,7 @@ export const DEFAULT_LOCAL_AGENT_SETTINGS: LocalAgentSettings = {
   memoryEnabled: true,
   memoryScope: [...LOCAL_AGENT_MEMORY_CATEGORIES],
   chatHistory: 'full',
+  excludeSensitiveContext: true,
   privacyMode: true,
   debugMode: false,
 };
@@ -165,6 +172,9 @@ export function normalizeLocalAgentSettings(input: unknown): LocalAgentSettings 
     chatHistory: CHAT_HISTORIES.has(raw.chatHistory as LocalAgentChatHistory)
       ? raw.chatHistory as LocalAgentChatHistory
       : DEFAULT_LOCAL_AGENT_SETTINGS.chatHistory,
+    // Absent means private. A pre-setting document must not silently make
+    // sensitive material eligible for a cloud request after an upgrade.
+    excludeSensitiveContext: raw.excludeSensitiveContext !== false,
     privacyMode: raw.privacyMode !== false,
     debugMode: raw.debugMode === true,
   };

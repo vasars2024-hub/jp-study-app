@@ -84,6 +84,14 @@ describe('local agent settings', () => {
     expect(normalizeLocalAgentSettings({ chatHistory: 'off' }).chatHistory).toBe('off');
   });
 
+  it('defaults old settings to excluding sensitive cloud context and preserves an explicit opt-out', () => {
+    expect(normalizeLocalAgentSettings({ version: 1 }).excludeSensitiveContext).toBe(true);
+    expect(normalizeLocalAgentSettings({
+      version: 1,
+      excludeSensitiveContext: false,
+    }).excludeSensitiveContext).toBe(false);
+  });
+
   /**
    * The `full` policy is the router's ceiling itself, not a second copy of it.
    * A literal 12 here would be the thing that drifts the first time the router's

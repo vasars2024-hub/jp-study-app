@@ -406,6 +406,9 @@ function normalizePolicy(value: unknown): AgentProviderPolicy | null {
   return {
     target: normalizedTarget,
     allowCloud: raw.allowCloud === true,
+    // This is a privacy floor, so an older or malformed sender cannot omit the
+    // field to make sensitive material cloud-eligible.
+    excludeSensitiveContext: raw.excludeSensitiveContext !== false,
     allowSensitiveContext: raw.allowSensitiveContext === true,
     ...(historyTurns !== undefined ? { historyTurns } : {}),
     maxInputChars: boundedInteger(
@@ -438,6 +441,7 @@ export function defaultAgentExecutionPolicy(
       ? { kind: 'local', backend: 'local-qwen' }
       : { kind: 'cloud', providerId: target },
     allowCloud: !local,
+    excludeSensitiveContext: true,
     allowSensitiveContext: false,
     maxInputChars: AGENT_EXECUTION_DEFAULT_INPUT_BUDGET,
     maxOutputTokens: AGENT_EXECUTION_DEFAULT_OUTPUT_BUDGET,

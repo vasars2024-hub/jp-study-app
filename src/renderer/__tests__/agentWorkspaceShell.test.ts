@@ -23,6 +23,8 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const SETTINGS_KEY = 'jp-study-local-agent-settings-v1';
+
 // `section` is echoed alongside `count` because the navigation review step
 // resolves a section's own label key and interpolates it. Swallowing that var
 // would make "the destination text names what main resolved" unassertable.
@@ -466,6 +468,7 @@ beforeEach(() => {
   // environment declares itself. The navigation gate resolves through the bridge
   // before it renders, so it is the first test here that needs it.
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify({ version: 1 }));
   stored = state();
   loadResult = null;
   stagedImages = new Map();
@@ -1562,7 +1565,6 @@ describe('Agent workspace shell', () => {
    * production execution client rather than off a mocked policy.
    */
   it('forwards the stored retained-chat policy on the request it sends', async () => {
-    const SETTINGS_KEY = 'jp-study-local-agent-settings-v1';
     const previous = localStorage.getItem(SETTINGS_KEY);
     localStorage.setItem(SETTINGS_KEY, JSON.stringify({ version: 1, chatHistory: 'off' }));
     try {
@@ -1582,6 +1584,10 @@ describe('Agent workspace shell', () => {
   });
 
   it('blocks cloud attachment sending until the visible per-request consent is checked', async () => {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+      version: 1,
+      excludeSensitiveContext: false,
+    }));
     stored = populated();
     await mount();
     await selectFile('cloud-notes.txt', 'send only with consent');
@@ -1618,6 +1624,10 @@ describe('Agent workspace shell', () => {
   });
 
   it('requires per-request consent for selected sensitive context without an attachment', async () => {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+      version: 1,
+      excludeSensitiveContext: false,
+    }));
     stored = populated();
     stored.conversations[0].context[0].sensitivity = 'sensitive';
     await mount();
@@ -1673,6 +1683,38 @@ describe('Agent workspace shell', () => {
     expect(request.attachments).toEqual([]);
   });
 
+  it('submits cloud prompts without sensitive material when persistent exclusion is on', async () => {
+    stored = populated();
+    stored.conversations[0].context[0].sensitivity = 'sensitive';
+    await mount();
+    await selectFile('private-cloud-notes.txt', 'must stay local');
+    await setTextarea('Answer from public information');
+
+    const provider = host.querySelector('.agent-composer-options select') as HTMLSelectElement;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set
+        ?.call(provider, 'gemini-2.5-flash');
+      provider.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    expect(host.querySelector('.agent-attachment-consent')).toBeNull();
+    expect(text()).toContain('agent.execute.sensitiveExcluded');
+    expect(buttonWith('agent.execute.send').disabled).toBe(false);
+    await click(buttonWith('agent.execute.send'));
+
+    const request = calls.find((call) => call.method === 'execute')?.args[0] as {
+      policy: { excludeSensitiveContext: boolean; allowSensitiveContext: boolean };
+      attachments: unknown[];
+    };
+    expect(request.policy).toMatchObject({
+      excludeSensitiveContext: true,
+      allowSensitiveContext: false,
+    });
+    // The execution bridge carries the session-only payload to main, where the
+    // policy filter is enforced and tested independently.
+    expect(request.attachments).toHaveLength(1);
+  });
+
   /**
    * The receiving end of the capture staging area.
    *
@@ -1694,6 +1736,10 @@ describe('Agent workspace shell', () => {
     });
 
     it('attaches what main was holding for the conversation it opens', async () => {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+        version: 1,
+        excludeSensitiveContext: false,
+      }));
       stored = populated();
       stagedImages.set('chat-1', [capture('capture-1')]);
       await mount();

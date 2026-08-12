@@ -294,4 +294,18 @@ describe('AgentGovernancePanel writes the authority the main app could only read
     expect(JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}').chatHistory).toBe('recent');
     expect(panel.text('agent-governance-history-note')).toContain('4');
   });
+
+  it('persists sensitive-context exclusion and explains that consent still applies when off', async () => {
+    const panel = await mountPanel();
+    expect(loadLocalAgentSettings().excludeSensitiveContext).toBe(true);
+    expect(panel.text('agent-governance-sensitive-exclusion-note'))
+      .toContain('stay local');
+
+    await panel.toggle('agent-governance-sensitive-exclusion');
+
+    expect(JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}').excludeSensitiveContext)
+      .toBe(false);
+    expect(panel.text('agent-governance-sensitive-exclusion-note'))
+      .toContain('requires explicit consent');
+  });
 });

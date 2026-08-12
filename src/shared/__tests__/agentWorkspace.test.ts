@@ -35,6 +35,7 @@ const attachment = (sensitivity: AgentAttachment['sensitivity'] = 'ordinary'): A
 const policy = (over: Partial<AgentProviderPolicy> = {}): AgentProviderPolicy => ({
   target: { kind: 'local', backend: 'local-qwen' },
   allowCloud: false,
+  excludeSensitiveContext: false,
   allowSensitiveContext: false,
   maxInputChars: 10_000,
   maxOutputTokens: 2_000,
@@ -349,6 +350,34 @@ describe('provider privacy boundary', () => {
       allowSensitiveContext: true,
     }), 'Explain', [context('sensitive')], [attachment('sensitive')]);
     expect(result).toMatchObject({ allowed: true, context: [{ id: 'ctx-1' }], attachments: [{ id: 'file-1' }] });
+  });
+
+  it('lets persistent exclusion outrank per-request consent and keeps ordinary context', () => {
+    const ordinary = { ...context('ordinary'), id: 'ctx-ordinary' };
+    const sensitive = { ...context('sensitive'), id: 'ctx-sensitive' };
+    const result = evaluateAgentProviderPrivacy(policy({
+      target: { kind: 'cloud', providerId: 'gemini-2.5-flash' },
+      allowCloud: true,
+      excludeSensitiveContext: true,
+      allowSensitiveContext: true,
+    }), 'Explain', [ordinary, sensitive], [attachment('sensitive')]);
+
+    expect(result).toMatchObject({
+      allowed: true,
+      context: [{ id: 'ctx-ordinary' }],
+      attachments: [],
+    });
+  });
+
+  it('treats an absent persistent exclusion policy as enabled', () => {
+    const result = evaluateAgentProviderPrivacy(policy({
+      target: { kind: 'cloud', providerId: 'gemini-2.5-flash' },
+      allowCloud: true,
+      excludeSensitiveContext: undefined,
+      allowSensitiveContext: true,
+    }), 'Explain', [context('sensitive')], [attachment('sensitive')]);
+
+    expect(result).toMatchObject({ allowed: true, context: [], attachments: [] });
   });
 
   it('discloses a place item that has no preview, and still drops an empty one', () => {

@@ -82,7 +82,10 @@ import { AgentConversationPlanQueue } from './AgentConversationPlanQueue';
 import { AgentCapabilityDirectory } from './AgentCapabilityDirectory';
 import { AgentGovernancePanel } from './AgentGovernancePanel';
 import { LOCAL_AGENT_CHAT_HISTORY_TURNS } from '../../../shared/localAgentSettings';
-import { loadLocalAgentSettings } from '../../localAgentSettingsStore';
+import {
+  loadLocalAgentSettings,
+  onLocalAgentSettingsChanged,
+} from '../../localAgentSettingsStore';
 import { AgentPromptLibrary } from './AgentPromptLibrary';
 import { AgentContextSuggestions } from './AgentContextSuggestions';
 import { AgentPipelineTerminal } from './AgentPipelineTerminal';
@@ -1413,6 +1416,7 @@ export default function AgentWorkspaceShell() {
   } | null>(null);
   const [attachmentReading, setAttachmentReading] = useState(false);
   const [cloudSensitiveConsent, setCloudSensitiveConsent] = useState(false);
+  const [agentSettings, setAgentSettings] = useState(loadLocalAgentSettings);
   const [runningRequestId, setRunningRequestId] = useState<string | null>(null);
   const [runningPrompt, setRunningPrompt] = useState('');
   const [streamedText, setStreamedText] = useState('');
@@ -1512,15 +1516,24 @@ export default function AgentWorkspaceShell() {
   const hasSensitiveContext = selected?.context.some(
     (item) => item.sensitivity === 'sensitive',
   ) ?? false;
+  const hasSensitiveMaterial = attachments.length > 0 || hasSensitiveContext;
+  const sensitiveContextExcluded = target !== 'local'
+    && agentSettings.excludeSensitiveContext
+    && hasSensitiveMaterial;
   const sensitiveConsentRequired = target !== 'local'
-    && (attachments.length > 0 || hasSensitiveContext);
+    && !agentSettings.excludeSensitiveContext
+    && hasSensitiveMaterial;
   // Main refuses this combination with `vision-unsupported` rather than
   // answering from the prompt alone. Saying so here, and refusing to submit,
   // turns a failed round trip into a visible reason and a target the user can
   // change — `providerAcceptsImageInput` is false for `'local'` too.
-  const visionUnsupported = attachments.some((attachment) => attachment.kind === 'image')
+  const visionUnsupported = !sensitiveContextExcluded
+    && attachments.some((attachment) => attachment.kind === 'image')
     && !providerAcceptsImageInput(target);
-  const knownInputChars = agentKnownInputChars(draft, attachments);
+  const knownInputChars = agentKnownInputChars(
+    draft,
+    sensitiveContextExcluded ? [] : attachments,
+  );
   const knownInputOverBudget = knownInputChars > maxInputChars;
   const planObjectiveTooLong = draft.trim().length > AGENT_CONVERSATION_PLAN_OBJECTIVE_LIMIT;
   const selectedPrice = agentProviderPrice(pricingTable, target);
@@ -1544,7 +1557,9 @@ export default function AgentWorkspaceShell() {
   // A context shelf update or conversation switch must require a fresh choice.
   useEffect(() => {
     setCloudSensitiveConsent(false);
-  }, [sensitiveContextKey]);
+  }, [agentSettings.excludeSensitiveContext, sensitiveContextKey]);
+
+  useEffect(() => onLocalAgentSettingsChanged(setAgentSettings), []);
 
   // A rate entered in the pop-out Agent has to reach the docked one, and the
   // reverse. Rates are the only piece of this panel that is not per-window.
@@ -1661,15 +1676,16 @@ export default function AgentWorkspaceShell() {
     // Read at submit rather than held in state: this is the policy the user had
     // set when they pressed send, and it cannot go stale behind a governance
     // edit made in this window or a sibling one between renders.
-    const retainedChat = loadLocalAgentSettings().chatHistory;
+    const executionSettings = loadLocalAgentSettings();
     const request: AgentExecutionRequest = {
       requestId,
       conversationId: selected.id,
       prompt,
       policy: {
         ...basePolicy,
+        excludeSensitiveContext: executionSettings.excludeSensitiveContext,
         allowSensitiveContext: sensitiveConsentRequired && cloudSensitiveConsent,
-        historyTurns: LOCAL_AGENT_CHAT_HISTORY_TURNS[retainedChat],
+        historyTurns: LOCAL_AGENT_CHAT_HISTORY_TURNS[executionSettings.chatHistory],
         maxInputChars,
         maxOutputTokens,
         // Both or neither. The bridge normalizer drops a cap that arrives
@@ -2459,6 +2475,12 @@ export default function AgentWorkspaceShell() {
                     />
                     <span>{t('agent.execute.sensitiveConsent', { provider: target })}</span>
                   </label>
+                ) : null}
+
+                {sensitiveContextExcluded ? (
+                  <p className="agent-governance-note" role="status">
+                    {t('agent.execute.sensitiveExcluded')}
+                  </p>
                 ) : null}
 
                 <AgentContextSuggestions conversation={selected} onUse={(text) => setDraft(text)} />
