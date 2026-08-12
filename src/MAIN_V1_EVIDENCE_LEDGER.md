@@ -10948,3 +10948,31 @@ One transferable lesson from this hop, worth more than the slice: **when deletin
 check what its tests were the only cover for.** Dead code can hold the only test of a live
 behaviour, and deleting both at once reads as pure cleanup while quietly reducing what the
 shipped path guarantees.
+
+### Addendum: `48afe05` verified at HEAD, and a trap waiting in the next slice
+
+The gates above ran on the shared working tree, which is the exact thing the previous section
+warned tells you nothing about the branch. So `48afe05` was re-run in a detached worktree with a
+`node_modules` junction, **with the control run at its parent `a7d1dc7`**:
+
+| gate | at parent `a7d1dc7` | at `48afe05` |
+| --- | --- | --- |
+| `architecture-audit` | exit 1 — `test-only-module` **7, 3 pending**; 1 unclassified | exit 1 — `test-only-module` **6, 2 pending**; the **same** 1 unclassified |
+| `csvEditor` + `csvPaste` tests | 2 files, 5 tests | (1 file, 5 tests — same count, one fewer file) |
+
+So the finding closed **at HEAD**, not merely in the shared tree, and nothing new appeared. The
+residual exit 1 at both commits is the inherited `catalogs/mooncapLore.ts` orphan recorded one
+section above — still someone else's uncommitted importer to land, still not papered over here.
+
+**The trap, for whoever takes the featureStatus slice.** Its 21 `untested` entries are real and
+the count is accurate — 21 at HEAD *and* 21 in the working tree, checked both ways. But
+`renderer/components/scraper/featureStatus.ts` is **already dirty with +33 lines from another
+track**, and those insertions are pure comment blocks from a settings-group audit (episode
+processing acting on rows, `logBus.ts` reading the logging group, four controls resolved by
+removal on the `set.browser` precedent). They change no status value, which is why the count
+holds at 21 and why the dirt is invisible from the numbers alone.
+
+Consequence: **a plain `git add` of that file sweeps in another track's uncommitted audit prose.**
+Promoting even one entry there needs the reconstruct-HEAD-plus-your-hunk discipline, not a
+straight stage. Confirm the foreign hunks are still uncommitted before starting — if that track
+has landed them by then, the file is clean again and this whole caution is void.
