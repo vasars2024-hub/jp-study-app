@@ -100,6 +100,16 @@ export const SETTINGS_DOMAINS: SettingsDomainDef[] = [
     clearConfirm: 'Reset desktop layout preferences?',
   },
   {
+    id: 'file-drop-prefs',
+    label: 'File drop routing',
+    description:
+      'Auto-route on drop, triage-sheet behaviour, per-extension destinations, undo depth.',
+    category: 'System',
+    lsKeys: ['jp-os-filedrop-prefs-v1'],
+    clearable: true,
+    clearConfirm: 'Reset file drop routing to defaults?',
+  },
+  {
     id: 'desktop-layout-host',
     label: 'Desktop layout (windows, icons, wall)',
     description: 'Host desktop layout snapshot: windows, icons, notes, wallpaper, widgets.',

@@ -13067,3 +13067,69 @@ earlier hop's `Relay Probe MOUSE`, untouched.
 `set.metadata` remains `untested` and should stay that way until the strict loopback
 provider-proxy path is built. Eight controls have runtime consumers and two are now honestly
 marked, but no live provider call was made and none should be made merely to turn a dot green.
+
+
+## Boss-audit clean-HEAD regressions closed without taking foreign hunks — 2026-08-12
+
+The latest `docs/audit/RELAY_BOSS_AUDIT.md` section outranked the normal ladder. It found two
+failures introduced in the audited commit window but hidden by this shared working tree. Both
+were re-derived against `d0d1be0`, not accepted from the audit summary:
+
+- `evaluateAgentProviderPrivacy` filters sensitive cloud context while the persistent
+  `excludeSensitiveContext` floor is enabled (including when the field is omitted), before the
+  per-request consent gate runs. The pre-existing session-context test asserted the superseded
+  refusal. It now covers floor omitted, floor on, floor explicitly off with and without consent,
+  consent unable to override the floor, and the unchanged local-target case.
+- `FileDropsPage` persists `jp-os-filedrop-prefs-v1`, and the already-committed
+  `monitorsPage.test.ts` requires every such preference to participate in Memory & storage
+  backup/clear. A dedicated `file-drop-prefs` domain now owns that key.
+
+Both files were already dirty from other tracks. The session test's only worktree diff was the
+semantic correction above, so that exact blob was staged. `settingsCatalog.ts` also contained
+unrelated Secret OS safe-mode and Whisper ownership edits; its staged blob was reconstructed from
+`HEAD` plus only the ten-line File Drops domain. `git diff --cached` therefore contains none of
+those foreign hunks, while the working tree still does.
+
+### Clean-tree set-difference proof
+
+A synthetic commit tree containing only those two staged paths was checked out detached beside a
+second detached `d0d1be0` worktree. Both used the same dependency junction; neither read the
+shared source files.
+
+- Parent focused run: **27 passed / 2 failed**. The failures were exactly
+  `Agent session context store > leaves the cloud privacy boundary in charge of sensitive session
+  context` and `settings wiring > the new prefs key is registered for backup`.
+- Candidate full run: **6,922 passed / 9 failed / 6 skipped** across 6,937 tests. Its nine failure
+  identities are exactly the nine older clean-HEAD baseline failures enumerated by the boss audit:
+  five Blanc confirmation/queue cases, one local-Agent queue reachability case, one detached
+  `pdf.worker` resolution case, and the two known i18n hygiene cases. Neither corrected identity
+  remains and no replacement identity appeared.
+
+The temporary worktrees, report files and dependency junctions were removed after the comparison.
+
+### Required gates
+
+| gate | result |
+|---|---|
+| `npx vitest run` | First in-situ run hit one unrelated `scraperSources.test.ts` temp-directory `ENOTEMPTY` cleanup race; immediate full rerun exited 0: **548 files passed**, 1 skipped; **7,330 tests passed**, 6 skipped. Neither owned suite failed in either run. |
+| `node tools/i18n-check.cjs` | exit 0 — all **9,340** English keys translated in ja/zh/ru. This closes the audit's esbuild-environment gap; it is an in-situ result, while the two known clean-HEAD hygiene failures remain documented above. |
+| `node tools/architecture-audit.cjs` | exit 0 — 1,732 modules / 17 known findings, nothing new; the same 2 test-only findings remain pending. |
+| `npx eslint src/main/__tests__/agentSessionContext.test.ts src/renderer/storage/settingsCatalog.ts` | exit 0, no findings. |
+
+### Live Electron acceptance gap closed
+
+The audit also required one bridge check before the normal ladder resumed. A fresh Electron main
+and preload were launched against the existing frozen renderer with an empty disposable
+`--user-data-dir`; the real profile was never opened. Through the authenticated debug bridge,
+window 1 reported visible at 1,280 x 860, and the renderer confirmed `lensHistoryRecord`,
+`lensHistoryList`, `lensHistoryPin` and `lensHistoryRemove` were functions. A Japanese capture
+(`監査`) was recorded, pinned, returned by `list({ pinnedOnly: true })` with `pinned: true`, then
+removed and confirmed absent. That invokes the real main handlers after a fresh main start rather
+than trusting preload presence. The disposable profile and stale bridge marker were removed, and
+no persisted real-user setting changed.
+
+This is an audit-regression checkpoint, not a feature-status promotion. The shared tree still
+contains the separately owned, uncheckpointed CONNECT/Metadata slice documented immediately
+above; its owner or the next relay worker must re-derive and checkpoint that boundary before
+following its `result.images` + `set.images` next slice. Main V1 remains open; do not advance to
+Blanc.

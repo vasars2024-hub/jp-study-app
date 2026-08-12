@@ -536,19 +536,55 @@ describe('Agent session context store', () => {
     // retention is refused above `ordinary`, so before the session transport the
     // only context that could reach a provider was reference data. The gate is
     // therefore load-bearing now rather than theoretical.
-    const policy = (allowSensitiveContext: boolean): AgentProviderPolicy => ({
+    //
+    // There are two regimes and both have to hold. `excludeSensitiveContext` is
+    // a persistent privacy *floor* that outranks per-request consent: with the
+    // floor up, sensitive items are dropped before the consent gate is read, so
+    // the request proceeds without them rather than being refused. Only with the
+    // floor explicitly lowered does the per-request consent gate decide. Either
+    // way the assertion that matters is the same one — a sensitive item never
+    // appears in the disclosed context unless consent was given for it.
+    const policy = (
+      allowSensitiveContext: boolean,
+      extra: Partial<AgentProviderPolicy> = {},
+    ): AgentProviderPolicy => ({
       target: { kind: 'cloud', providerId: 'gemini-2.5-flash' },
       allowCloud: true,
       allowSensitiveContext,
       maxInputChars: 10_000,
       maxOutputTokens: 500,
+      ...extra,
     });
     const sensitive = [item('secret', false, { sensitivity: 'sensitive' })];
 
+    // Floor up (the default, and what an omitted field means for a caller
+    // written before the setting existed): stripped, not refused.
     expect(evaluateAgentProviderPrivacy(policy(false), 'explain', sensitive, []))
-      .toMatchObject({ allowed: false, reason: 'sensitive-context', context: [] });
+      .toMatchObject({ allowed: true, context: [] });
+    expect(evaluateAgentProviderPrivacy(
+      policy(false, { excludeSensitiveContext: true }),
+      'explain',
+      sensitive,
+      [],
+    )).toMatchObject({ allowed: true, context: [] });
+
+    // Floor down: the per-request consent gate is what decides.
+    expect(evaluateAgentProviderPrivacy(
+      policy(false, { excludeSensitiveContext: false }),
+      'explain',
+      sensitive,
+      [],
+    )).toMatchObject({ allowed: false, reason: 'sensitive-context', context: [] });
+    expect(evaluateAgentProviderPrivacy(
+      policy(true, { excludeSensitiveContext: false }),
+      'explain',
+      sensitive,
+      [],
+    )).toMatchObject({ allowed: true, context: sensitive });
+
+    // Consent alone does not lift the floor — the floor is the outer gate.
     expect(evaluateAgentProviderPrivacy(policy(true), 'explain', sensitive, []))
-      .toMatchObject({ allowed: true });
+      .toMatchObject({ allowed: true, context: [] });
 
     // A local target never consults the flag.
     expect(evaluateAgentProviderPrivacy(
