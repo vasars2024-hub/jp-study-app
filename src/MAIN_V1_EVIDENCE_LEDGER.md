@@ -10829,3 +10829,122 @@ you green and tell you nothing about the branch. `i18n-missing-key-check` and
 `architecture-audit` are both **red at HEAD before you start**, so treat "exit 1" from either
 as a question — diff the offender list against the parent commit — rather than as evidence
 your slice broke something.
+
+## The dead copy went, and it took the only test of the live paste shape with it — 2026-08-12
+
+The previous section's first named item was "delete `shared/csvPaste.ts` and its test". That was
+re-derived from source before acting rather than taken on the note's word, and the re-derivation
+held on every count — but it also turned up the reason a bare delete would have been the wrong
+shape of commit.
+
+### The deletion is correct, re-derived
+
+- Nothing imports it. The only importer in the repo is its own test; `analyzeCsvPaste`,
+  `CsvPasteStats` and the file name appear nowhere else in `src/`.
+- It has never been wired. `git log -- src/shared/csvPaste.ts` returns exactly one commit,
+  `eafa4ac`, the pre-Phase-1 baseline snapshot. The baseline note's "either the CSV editor
+  stopped using it or it was never wired" resolves to **never wired**.
+- The live paste path uses the other module. `DeckImportPanel.tsx:36-38` branches on
+  `,`/`\t`/`;` and calls `parseCsvText` from `shared/csvEditor.ts`.
+- Its `detectDelimiter` is character-identical to `csvEditor`'s. Its `splitCsvLine` differs only
+  by a `if (delimiter === '\t') return line.split('\t')` fast-path that ignores quoting, so
+  `"a\tb"\tc` splits into three fields where the shipped parser gives two. Strictly worse.
+
+So: deletion, not wiring. **The baseline entry had to go in the same commit** — `stale.length`
+feeds the exit code (`architecture-audit.cjs:501`, `:528`), so removing the module while leaving
+its entry turns the gate red on a *stale* finding instead of closing it.
+
+### What a bare delete would have thrown away
+
+`csvPaste.test.ts` asserted two things: CRLF normalization and tab-delimiter detection. Grepping
+the whole `__tests__` tree for those shapes, **no other test covers either against the shipped
+parser.** `csvEditor.test.ts` tested quoted newlines and `setCell`; `csvExport.test.ts` is the
+serializer. `detectDelimiter` returning `'\t'` had exactly one test in this repo and it was
+pointed at the dead copy.
+
+That is the live Excel-clipboard shape — CRLF plus tabs is what a Windows spreadsheet paste
+delivers into the very `onPaste` handler that then calls `parseCsvText`. So the two guarantees
+were ported onto the module that actually ships, plus the quoting case that is the whole reason
+the shipped one is better. `csvEditor.test.ts` goes 2 cases → 4.
+
+### The negative control, including the one that caught a false green
+
+Three mutations, each verified to have actually landed in the source before the run — the first
+attempt used a regex that silently matched nothing, and a control that does not mutate is not a
+control, it is a second green run wearing a disguise.
+
+| mutation | result |
+| --- | --- |
+| regex attempt, `-cne` said **False** | vacuous — discarded, not recorded as a pass |
+| tab can never win `detectDelimiter` | **2 failed** (both new cases), 3 pre-existing still pass |
+| `parseCsvRecords` stops normalizing CRLF, v1 of the test | **0 failed — the test was wrong** |
+| same mutation, v2 of the test | **1 failed** (the CRLF case) |
+
+The third row is the finding. The first version of the CRLF test asserted on `headers`, and
+`parseCsvText` **trims header cells** (`csvEditor.ts:189`) — so a surviving `\r` was scrubbed on
+the way in and the assertion passed against a parser with CRLF handling deliberately removed. It
+would have shipped as coverage that could not fail. The fix is that the fixture now carries two
+data rows and the assertion lands on a **row** cell, which is not trimmed. Source restored
+`-ceq` byte-identical after every mutation.
+
+### Live acceptance: the running module graph, not the source tree
+
+`npm start`, driven only through the authenticated HTTP debug bridge. `/logs?match=hot` returned
+0 before and after, so no other track was editing the tree during the pass.
+
+1. `import('/src/shared/csvPaste.ts')` in the running renderer **fails to fetch**. The deletion
+   reached the served graph; this is the discriminating check that a file-system `Test-Path`
+   cannot give.
+2. The real paste chain was run end to end on the CRLF+tab fixture, in the live graph, in the
+   order `DeckImportPanel.importRaw` runs it: `parseCsvText` → `guessColumnMapping` →
+   `rowsToDeckEntries`. Delimiter `"\t"`, headers `[word, reading, meaning]`, 2 rows, 2 entries,
+   first entry `本 / ほん / book`.
+3. No `\r` survived anywhere in the result — checked by character code, not by eye. The last
+   header character is code **103** (`g`), not 13, and the last cell serializes to exactly
+   `"book"`.
+
+**Stated plainly: the chain was exercised, the textarea was not clicked.** The step after
+`rowsToDeckEntries` is `importDeckFromEntries`, which writes a deck to persisted storage, and
+this repo has no restore point. Everything up to that write is the panel's own composition; the
+write itself is not this slice's to prove.
+
+`/logs?level=error` returned 0 across the pass. The probe global was deleted and its absence
+confirmed. No `localStorage` write, no clipboard access, no real setting, no userData file read
+or written. The app was closed; `debug/bridge.json` is gone, no Electron process remains, and the
+start log was removed.
+
+### Gates
+
+- `node node_modules/vitest/vitest.mjs run`: **538 files passed, 1 skipped; 7,251 passed,
+  6 skipped; 0 failed.** The previous section measured 539 files / 7,251 tests. The delta
+  reconciles exactly: one fewer test *file* (`csvPaste.test.ts`), and an unchanged test count
+  because two cases were deleted and two added.
+- `node tools/architecture-audit.cjs`: exit 0, "Nothing new" — **17 findings, 2 pending**, down
+  from 18 and 3. One of the three long-standing pending findings is now genuinely closed rather
+  than reclassified.
+- `node tools/i18n-check.cjs`: exit 0, all 9,324 English keys translated in ja/zh/ru.
+- `node tools/i18n-missing-key-check.cjs`: exit 0.
+- `npx eslint src/shared/__tests__/csvEditor.test.ts`: exit 0, no output.
+- `tsc --noEmit` was not run; it is not a gate.
+
+The two gates the previous section recorded as **red at HEAD** are unaffected by this slice and
+remain someone else's lane to close: `blanc.agent.error.cardNotFound` and
+`catalogs/mooncapLore.ts` both still need their uncommitted files landed. Nothing here touches
+either, and neither was papered over.
+
+### Exact next slice
+
+`csvPaste` is closed — do not reopen it, and do not "restore" it from history. The remaining two
+pending architecture findings (`mediaProviderSyncJournal`, `episodeProcessing`) should **stay**
+pending; both reasons are recorded two sections above and neither is a mistake to correct.
+
+Main V1 is still in dependency-order item 8. The next decision-free item is unchanged and is now
+the only one queued: **the 21 `untested` entries in
+`renderer/components/scraper/featureStatus.ts`.** That file's own rule is "promote an entry only
+after actually exercising it", so each is a bounded live-acceptance task rather than a code
+change. Take a small cluster, not the list.
+
+One transferable lesson from this hop, worth more than the slice: **when deleting a module,
+check what its tests were the only cover for.** Dead code can hold the only test of a live
+behaviour, and deleting both at once reads as pure cleanup while quietly reducing what the
+shipped path guarantees.

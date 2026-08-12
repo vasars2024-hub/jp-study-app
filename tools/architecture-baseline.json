@@ -71,10 +71,6 @@
    "status": "accepted",
    "note": "The typed mirror of tokens.css and the source THEME_TOKEN_REFERENCE.md is generated from; PHASE_1_IMPLEMENTATION_PLAN.md and UI_UX_CORE_SHELL_EXECUTION_PLAN.md §12 both say to keep it in sync. It was an orphan — nothing read it, so nothing noticed drift. renderer/__tests__/themeTokenMirror.test.ts now checks every mirrored token against the CSS, which is why it reads as test-only: the test is the consumer, deliberately."
   },
-  "test-only-module:src/shared/csvPaste.ts": {
-   "status": "pending",
-   "note": "Shipped parser with tests and no caller — either the CSV editor stopped using it or it was never wired. Unreviewed."
-  },
   "test-only-module:src/shared/episodeProcessing.ts": {
    "status": "pending",
    "note": "§1 episode processing: built and tested, no consumer. The settings UI edits the rules; nothing applies them, because no connector exists to apply them to. Matches the boundary §1/§2 state honestly."
