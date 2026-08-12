@@ -8726,4 +8726,11 @@ export const en: Catalog = {
   'lexicon.lens.auto': 'Automatic',
   'lexicon.lens.lookup': 'Dictionary',
   'lexicon.lens.interlinear': 'Interlinear',
+  'lexicon.harvest.title': 'Vocabulary harvest',
+  'lexicon.harvest.summary': '{unique} words, {grounded} found in your dictionaries',
+  'lexicon.harvest.capped': 'Showing the {max} most frequent.',
+  'lexicon.harvest.occurrenceBadge': '×{count}',
+  'lexicon.harvest.occurrences': 'Occurrences: {count}',
+  'lexicon.harvest.ungrounded': 'Not in your dictionaries',
+  'lexicon.harvest.noGloss': 'No gloss in the selected languages',
 };

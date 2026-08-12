@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   parallelGlossTargets,
   type LexiconInterlinearResult,
   type LexiconInterlinearMatch,
 } from '../../../shared/lexiconInterlinear';
+import { MAX_HARVEST_ITEMS, harvestLexiconVocabulary } from '../../../shared/lexiconHarvest';
 import { resolveLexiconInput, type LexiconLensOverride } from '../../../shared/lexiconWorkbench';
 import DictionaryResults, { type DictLang } from '../DictionaryResults';
 import { useT } from '../../i18n';
@@ -62,6 +63,10 @@ export default function LexiconWorkbenchResults({
   const [state, setState] = useState<'idle' | 'loading' | 'error'>('idle');
 
   useEffect(() => setSelectedLens(lens), [lens]);
+
+  // Purely derived from the grounded result, so it costs one pass per lookup
+  // rather than a second bridge call.
+  const harvest = useMemo(() => (result ? harvestLexiconVocabulary(result) : null), [result]);
 
   useEffect(() => {
     if (!interlinear) {
@@ -132,6 +137,41 @@ export default function LexiconWorkbenchResults({
                 </ruby>
               ))}
             </div>
+          )}
+          {harvest && harvest.items.length > 0 && (
+            <details className="lexicon-harvest" open>
+              <summary>{t('lexicon.harvest.title')}</summary>
+              <p className="lexicon-harvest-summary muted">
+                {t('lexicon.harvest.summary', {
+                  unique: harvest.uniqueCount,
+                  grounded: harvest.groundedCount,
+                })}
+                {harvest.capped ? ` ${t('lexicon.harvest.capped', { max: MAX_HARVEST_ITEMS })}` : ''}
+              </p>
+              <ul className="lexicon-harvest-list">
+                {harvest.items.map((item) => (
+                  <li className={item.grounded ? 'is-grounded' : undefined} key={item.key}>
+                    <span className="lexicon-harvest-word" lang={lang}>{item.text}</span>
+                    {item.reading && (
+                      <span className="lexicon-harvest-reading" lang={lang}>{item.reading}</span>
+                    )}
+                    <span
+                      aria-label={t('lexicon.harvest.occurrences', { count: item.count })}
+                      className="lexicon-harvest-count"
+                    >
+                      {t('lexicon.harvest.occurrenceBadge', { count: item.count })}
+                    </span>
+                    <span className="lexicon-harvest-gloss">
+                      {!item.grounded
+                        ? t('lexicon.harvest.ungrounded')
+                        : item.glosses.length
+                          ? item.glosses.map((gloss) => gloss.text).join('; ')
+                          : t('lexicon.harvest.noGloss')}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </details>
           )}
         </div>
       )}

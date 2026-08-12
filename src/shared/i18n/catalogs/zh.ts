@@ -8285,4 +8285,11 @@ export const zh: Catalog = {
   'lexicon.lens.auto': '自动',
   'lexicon.lens.lookup': '词典',
   'lexicon.lens.interlinear': '逐词',
+  'lexicon.harvest.title': '词汇提取',
+  'lexicon.harvest.summary': '共 {unique} 个词，其中 {grounded} 个在你的词典中',
+  'lexicon.harvest.capped': '仅显示最常见的 {max} 个。',
+  'lexicon.harvest.occurrenceBadge': '×{count}',
+  'lexicon.harvest.occurrences': '出现次数：{count}',
+  'lexicon.harvest.ungrounded': '你的词典中没有',
+  'lexicon.harvest.noGloss': '所选语言没有释义',
 };

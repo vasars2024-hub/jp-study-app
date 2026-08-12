@@ -8320,4 +8320,11 @@ export const ja: Catalog = {
   'lexicon.lens.auto': '自動',
   'lexicon.lens.lookup': '辞書',
   'lexicon.lens.interlinear': '逐語',
+  'lexicon.harvest.title': '語彙の抽出',
+  'lexicon.harvest.summary': '{unique} 語、うち {grounded} 語が辞書にあります',
+  'lexicon.harvest.capped': '頻度の高い {max} 語を表示しています。',
+  'lexicon.harvest.occurrenceBadge': '×{count}',
+  'lexicon.harvest.occurrences': '出現回数：{count}',
+  'lexicon.harvest.ungrounded': '辞書に見つかりません',
+  'lexicon.harvest.noGloss': '選択した言語の訳がありません',
 };

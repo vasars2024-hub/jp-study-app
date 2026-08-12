@@ -14153,3 +14153,77 @@ diff, composition checking, vocabulary harvest, difficulty scoring, personal con
 grounded AI enrichment bullets. Note for whoever takes the rendering side further — the
 per-language rows cannot be visually accepted on this machine until the dictionary migration
 actually populates the term database; that is a data prerequisite, not a UI task.
+
+## Vocabulary harvest turns a passage into the distinct words it actually used — 2026-08-12
+
+Re-derived first. The boss audit's standing instruction (`docs/audit/RELAY_BOSS_AUDIT.md`,
+14:36 section) was already discharged: `bef3b2e` landed the `agentSessionContext.test.ts` semantic
+update and the `settingsCatalog.ts` File Drops registration, and `c68ffb7` paid the live-acceptance
+debt. Nothing there was left open, so this hop went back to the Track 2 ladder.
+
+Of the items the previous entry listed as still source-derived, vocabulary harvest is the only one
+that needs no product decision and no model: it is a pure fold over the grounded interlinear result
+that already exists. Sense pinning needs a persistence decision, round-trip diff and composition
+checking need a model round trip, and difficulty scoring needs a corpus-frequency source this
+installation does not have — inventing a score from what is in `LexiconLookupEntry` today would be
+an ungrounded number, which is exactly what this track forbids.
+
+`src/shared/lexiconHarvest.ts` is new and deliberately derives everything from the interlinear
+result rather than issuing a second lookup:
+
+- Grouping is by **headword**, not surface. `食べた` and `食べる` collapse onto one row, which is the
+  whole point of a harvest, and the key excludes the dictionary id so the same headword found in an
+  English and a Russian dictionary stays one row rather than two.
+- An ungrounded token is **kept and marked**, not dropped. "This passage uses a word your
+  dictionaries cannot answer" is information a learner needs, and dropping it would quietly
+  overstate coverage.
+- The only filter is `\p{L}` — a token must contain a letter. That is deterministic and
+  language-neutral; anything finer would be a per-language stopword table with no grounded source.
+  Note the iteration mark `々` **is** a Unicode letter and is therefore kept; a test asserting
+  otherwise failed and was corrected rather than the rule being bent.
+- Ordering is frequency-first with first-appearance as the tie-break, so the `MAX_HARVEST_ITEMS`
+  cap drops the words the passage leans on least. The cap is reported as `capped`, kept distinct
+  from the interlinear `truncated` flag, which means something else entirely (input shortening).
+
+The renderer renders it as a `<details open>` panel under the interlinear flow, so the reverse
+transition is native and needs no new state. Rows sit on the anchor surface, not a Liquid material —
+a dense study list is exactly the case the UI invariants say to keep high-contrast. A grounded row
+with no gloss in the selected target languages says so (`lexicon.harvest.noGloss`) instead of
+rendering an empty cell.
+
+Seven new i18n keys in all four catalogs. `lexicon.harvest.occurrenceBadge` (`×{count}`) is
+identical in ja/zh/ru because it is a pure format string, so it is baselined in
+`tools/i18n-untranslated-baseline.json` — the mechanism the check itself prescribes — rather than
+given four fake translations. The visible badge is a catalog string and its `aria-label` is the
+spelled-out `lexicon.harvest.occurrences`, so the count is never a bare literal.
+
+Gates: full Vitest **7,385 passed / 6 skipped / 0 failed** (556 files). i18n check exit 0, 9,363
+English keys complete in ja/zh/ru. Architecture 1,744 modules / 17 findings, nothing new, the same
+two pending. ESLint clean over the four touched source paths.
+
+Live Electron acceptance used the dev instance and bridge already running on port 39273 (started by
+another track; driven read-only, never stopped, no foreign HMR paths in `/logs`). A Translate window
+was already open, which is the compatibility route into the Workbench with `lens="translate"`. Its
+textarea was driven through React's own native value setter plus an `input` event — not by writing
+state — with `猫を見た。猫はまた見た。`. The panel rendered live: summary **"6 words, 0 found in your
+dictionaries"**, rows `猫 ×2`, `見 ×2`, `た ×2`, `を ×1` …, each `aria-label="Occurrences: N"`, each
+gloss cell reading "Not in your dictionaries". Repeat-token grouping across two sentences is
+therefore proven against real segmentation, not only against a fixture. The bridge error log was
+empty for the whole run.
+
+Two honest limits. The `0 found` is this installation's empty SQLite term database again — the same
+data prerequisite the previous entry recorded — so the **grounded** row styling (`is-grounded`,
+reading, real glosses) is proven by the renderer test and not yet by live data. And the ja/zh/ru
+strings were not switched on live: `ui-lang` is unset here and changing it means writing a persisted
+key plus a reload, which was not worth disturbing another track's window for; the catalogs are
+covered by the i18n gate and by a test that asserts every harvest key exists in `en`.
+
+State was left as found: the Translate input was restored to its original empty value and asserted
+equal, the one probe global was deleted and its absence verified, no persisted setting was touched,
+no userData backup was taken, and no process was started or stopped.
+
+Track 2 remains open. Still source-derived: sense pinning/retranslation, round-trip semantic diff,
+composition checking, difficulty scoring (blocked on a real frequency source — see above), personal
+concordance, and the grounded AI enrichment bullets. The natural next slice on top of this one is
+mining the harvest — a row is already carrying everything a Flashcards/Anki card needs — which the
+plan lists under Track 2's exports bullet.

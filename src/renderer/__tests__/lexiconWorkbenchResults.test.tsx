@@ -8,7 +8,10 @@ vi.mock('../components/DictionaryResults', () => ({
 }));
 
 vi.mock('../i18n', () => ({
-  useT: () => ({ t: (key: string, vars?: { kind?: string }) => vars?.kind ? `${key}:${vars.kind}` : key }),
+  useT: () => ({
+    t: (key: string, vars?: Record<string, string | number>) =>
+      vars ? `${key}:${Object.values(vars).join(',')}` : key,
+  }),
 }));
 
 import LexiconWorkbenchResults from '../components/lexicon/LexiconWorkbenchResults';
@@ -148,6 +151,68 @@ describe('LexiconWorkbenchResults', () => {
     expect(lines).toEqual(['RUкошка', 'ENcat']);
   });
 
+  it('harvests the passage vocabulary, collapsing inflections and marking unknown words', async () => {
+    const lookup = vi.fn().mockResolvedValue({
+      text: '猫を見た。猫。', detectedLangs: ['ja'], glossLangs: ['en'], tokenCount: 3, matchedCount: 2,
+      truncated: false,
+      parts: [
+        {
+          kind: 'token', text: '猫', start: 0, end: 1,
+          match: {
+            text: '猫', reading: 'ねこ', dictId: 'jmdict-en', dictTitle: 'JMdict (English)',
+            headwordId: 7, glosses: [{ lang: 'en', text: 'cat' }],
+          },
+        },
+        { kind: 'token', text: 'を見た', start: 1, end: 4 },
+        { kind: 'separator', text: '。', start: 4, end: 5 },
+        {
+          kind: 'token', text: '猫', start: 5, end: 6,
+          match: {
+            text: '猫', reading: 'ねこ', dictId: 'jmdict-en', dictTitle: 'JMdict (English)',
+            headwordId: 7, glosses: [{ lang: 'en', text: 'cat' }],
+          },
+        },
+      ],
+    });
+    Object.defineProperty(window, 'api', { configurable: true, value: { lookupOfflineInterlinear: lookup } });
+    const host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root?.render(<LexiconWorkbenchResults query="猫を見た。猫。" lang="ja" lookupAttempt={3} />);
+      await Promise.resolve();
+    });
+
+    const rows = [...host.querySelectorAll('.lexicon-harvest-list li')];
+    expect(rows).toHaveLength(2);
+    expect(rows[0].className).toBe('is-grounded');
+    expect(rows[0].querySelector('.lexicon-harvest-word')?.textContent).toBe('猫');
+    expect(rows[0].querySelector('.lexicon-harvest-reading')?.textContent).toBe('ねこ');
+    expect(rows[0].querySelector('.lexicon-harvest-count')?.textContent)
+      .toBe('lexicon.harvest.occurrenceBadge:2');
+    expect(rows[0].querySelector('.lexicon-harvest-gloss')?.textContent).toBe('cat');
+    expect(rows[1].querySelector('.lexicon-harvest-gloss')?.textContent)
+      .toBe('lexicon.harvest.ungrounded');
+    expect(host.querySelector('.lexicon-harvest-summary')?.textContent)
+      .toBe('lexicon.harvest.summary:2,1');
+  });
+
+  it('leaves the harvest out entirely when nothing was segmented', async () => {
+    const lookup = vi.fn().mockResolvedValue({
+      text: '。', detectedLangs: ['ja'], glossLangs: ['en'], tokenCount: 0, matchedCount: 0,
+      truncated: false, parts: [{ kind: 'separator', text: '。', start: 0, end: 1 }],
+    });
+    Object.defineProperty(window, 'api', { configurable: true, value: { lookupOfflineInterlinear: lookup } });
+    const host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root?.render(<LexiconWorkbenchResults query="。" lang="ja" lookupAttempt={4} lens="translate" />);
+      await Promise.resolve();
+    });
+    expect(host.querySelector('.lexicon-harvest')).toBeNull();
+  });
+
   it('has a real catalog string for every lens label and overridable scale', async () => {
     const { en } = await import('../../shared/i18n/catalogs/en');
     const keys = [
@@ -161,6 +226,15 @@ describe('LexiconWorkbenchResults', () => {
       'lexicon.kind.sentence',
       'lexicon.kind.paragraph',
       'lexicon.kind.document',
+      // Every harvest string the panel can render, including both honest
+      // empty-gloss labels.
+      'lexicon.harvest.title',
+      'lexicon.harvest.summary',
+      'lexicon.harvest.capped',
+      'lexicon.harvest.occurrenceBadge',
+      'lexicon.harvest.occurrences',
+      'lexicon.harvest.ungrounded',
+      'lexicon.harvest.noGloss',
     ];
     const catalog = en as Record<string, string>;
     expect(keys.filter((key) => !catalog[key])).toEqual([]);

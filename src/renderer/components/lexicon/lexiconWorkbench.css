@@ -46,6 +46,68 @@
   font-size: 0.85em;
   letter-spacing: 0.04em;
 }
+/* The harvest is a dense study list, so it stays on the anchor surface. */
+.lexicon-harvest {
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border, rgba(127, 127, 127, 0.28));
+}
+
+.lexicon-harvest > summary {
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.lexicon-harvest-summary {
+  margin: 6px 0 10px;
+  color: var(--text-muted, currentColor);
+  font-size: 0.82rem;
+}
+
+.lexicon-harvest-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lexicon-harvest-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 8px;
+}
+
+.lexicon-harvest-list li.is-grounded {
+  background: color-mix(in srgb, var(--accent, #5588cc) 8%, transparent);
+}
+
+.lexicon-harvest-word {
+  font-size: 1.05rem;
+}
+
+.lexicon-harvest-reading,
+.lexicon-harvest-count {
+  color: var(--text-muted, currentColor);
+  font-size: 0.78rem;
+}
+
+.lexicon-harvest-count {
+  margin-left: auto;
+  order: 3;
+}
+
+.lexicon-harvest-gloss {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.85rem;
+}
+
 .lexicon-lens-picker {
   display: flex;
   gap: 6px;

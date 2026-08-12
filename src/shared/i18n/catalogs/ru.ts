@@ -9110,4 +9110,11 @@ export const ru: Catalog = {
   'lexicon.lens.auto': 'Автоматически',
   'lexicon.lens.lookup': 'Словарь',
   'lexicon.lens.interlinear': 'Подстрочник',
+  'lexicon.harvest.title': 'Сбор лексики',
+  'lexicon.harvest.summary': 'Слов: {unique}, из них в ваших словарях: {grounded}',
+  'lexicon.harvest.capped': 'Показаны {max} самых частых.',
+  'lexicon.harvest.occurrenceBadge': '×{count}',
+  'lexicon.harvest.occurrences': 'Вхождений: {count}',
+  'lexicon.harvest.ungrounded': 'Нет в ваших словарях',
+  'lexicon.harvest.noGloss': 'Нет перевода на выбранные языки',
 };
