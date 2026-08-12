@@ -12021,3 +12021,61 @@ compare emitted rows. Keep `cssSelectors`, `xpathSelectors`, `regexPattern`, `re
 `attribute` explicitly inert; the backend has no generic extractor for them. The existing
 focused automated seam is the extraction-rules suite; do not redesign the extractor while
 performing acceptance.
+
+## Seven extraction switches against a page that could distinguish them — 2026-08-12
+
+Main V1 remains in dependency-order item 8. `set.extraction` is now `ready`, leaving **13
+`untested` entries** in the 49-entry Scraper registry.
+
+### Live before/after matrix
+
+The running Electron app received two real `scraper:startScrape` requests against the same
+loopback site-rule page. The page contained four matched rows: one hidden template, two copies
+of episode 1, doubly encoded entity references, a zero-width character, season markers, and
+OVA/Special labels. HTTP/cache/pacing and episode-processing settings were held quiet; only the
+seven live Extraction switches changed.
+
+With all seven off, the job completed with all **4 rows**. The hidden template survived, both
+episode-1 rows survived, entity text remained `&amp;`, the zero-width character remained, every
+row stayed season 1 / kind episode, and titles retained their leading `Episode N` markers.
+
+With all seven on, the job completed with the correct **2 rows**:
+
+- `ignoreHiddenElements` removed the hidden template;
+- `decodeHtmlEntities` changed `&amp;` to `&`;
+- `cleanText` removed the zero-width character;
+- `normalizeEpisodeNumbering` removed both leading episode markers and retained canonical labels;
+- `detectSeasonNumbers` produced seasons 2 and 3;
+- `detectSpecials` produced `ova` and `special`;
+- `removeDuplicateEpisodes` removed the repeated season-2 episode 1 after season detection.
+
+The ordering is evidence too: deduplication kept the season-2 episode 1 while preserving the
+season-3 episode 2, so the group did not collapse equal numbers across different seasons.
+
+### What remains inert
+
+`cssSelectors`, `xpathSelectors`, `regexPattern`, `regexFlags`, and `attribute` have no generic
+extractor to configure. The site-rule path owns its selectors. They remain marked inert in the
+drawer and are not claimed by the green status.
+
+### Gates and restoration
+
+- `npx vitest run src/main/__tests__/scraperExtractionRules.test.ts`: **54/54 passed**.
+- The repository-wide sweep immediately before this slice: **538 files passed / 1 skipped;
+  7,251 tests passed / 6 skipped**; i18n **9,324/9,324** across ja/zh/ru; architecture exit 0,
+  1,720 modules, nothing new, 2 known pending test-only findings.
+- Full ESLint remains red at **72 errors / 307 warnings** across 16 error-bearing files. This is
+  recorded as a release blocker, not attributed to this slice; the focused extraction source and
+  tests introduce no new lint surface.
+
+The temporary loopback server was identity-checked and stopped; port 39419 is closed. The probe
+global was deleted, the active profile remains `relay-probe`, its persisted site-rule list remains
+empty, and the debug bridge error ring remains empty.
+
+### Exact next slice
+
+Continue the settings acceptance queue with `set.metadata`. Its live claims are provider order,
+title-language choice, optional native title, field-fetch toggles and cache duration. Use a local
+or deterministic provider fixture where possible; do not spend credentials or call a real cloud
+provider. Keep any schema-only or provider-unobservable fields named rather than forcing a false
+green.

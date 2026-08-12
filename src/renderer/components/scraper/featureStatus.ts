@@ -291,7 +291,12 @@ export const FEATURE_STATUS: Record<string, FeatureStatus> = {
   // rows; siteRules already did. Inert: cssSelectors, xpathSelectors,
   // regexPattern, regexFlags, attribute — they configure a generic extractor
   // this backend does not have.
-  'set.extraction': 'untested',
+  // 2026-08-12 live acceptance compared the same four-row site-rule page with
+  // all seven switches off and on. The enabled run skipped a hidden template,
+  // decoded entities, removed zero-width text, normalized episode titles,
+  // detected seasons 2/3 and OVA/Special kinds, and removed the repeated S2E1.
+  // The five generic-extractor fields above remain explicitly inert.
+  'set.extraction': 'ready',
   // providerOrder picks which catalogue is asked first; titleLanguage,
   // alsoStoreNativeTitle, fetchSynopsis/Genres/Ratings/AirDates shape the result;
   // cacheHours is the metadata cache's own lifetime. Inert: mergeStrategy (only
