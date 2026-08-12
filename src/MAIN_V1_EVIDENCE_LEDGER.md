@@ -11365,3 +11365,187 @@ that file. Reconstruct the blob from `git show HEAD:<path>`, prove the round-tri
 rev-parse HEAD:<path>` before editing it, and install it with `git update-index --cacheinfo`.
 Re-check first — once that track lands, the file is clean and a plain `git add` is correct
 again.
+
+## Fourteen jobs against a server on this machine, and the field the note called unproven — 2026-08-12
+
+Main V1 remains in dependency-order item 8. The previous section named `set.network` as the
+next member and said the zero-network trick would not work for it, because a network policy is
+only observable against a real request. That is true. It also offered two vehicles — the HTTP
+Inspector or a real single-source job — and **both were rejected**, for the same reason: one
+runs outside any runtime scope and so measures the module defaults (`runtime.ts:15-18`), and the
+other goes to AniList and nyaa and writes the user's job history.
+
+There is a third vehicle the previous section did not consider, and it is strictly better than
+either. **A site rule wins over the catalogue for its own host**, and it wins *before* the
+`contentType` guard:
+
+```ts
+const rule = ruleForUrl(settings.extraction.siteRules, request.targetUrl);   // engine.ts:720
+if (rule) { await runWithSiteRule(job, rule, emit, stage, progress); return; }
+if (request.contentType && request.contentType !== 'anime') throw new Error(...);  // :726
+```
+
+`runWithSiteRule` makes exactly one call — `scraperRequest(request.targetUrl, { correlationId,
+crawl: true })` at `engine.ts:604` — with **no per-call network options at all**, so every field
+under test comes from the policy and nothing from the call site. That request happens inside a
+real `runWithScraperRuntime` scope. So a site rule pointed at **a server running on this
+machine** puts the shipped policy on a real socket, with a witness at the other end, and never
+touches the network.
+
+Because `siteRules` lives in the settings document the renderer *sends with the job*, the rule
+existed only in the probe input. Nothing was saved: `extraction.siteRules` in
+`localStorage['jp-scraper-settings-v1']` is still `[]`, checked after the run.
+
+### Why every job failed on purpose
+
+The rule's `episodeSelector` is `tr.netprobe-never-matches`. `runWithSiteRule` fetches the page,
+parses it, and throws `The rule for <host> matched nothing on <url>` when `extraction.rows` is
+empty — **after** the request and **before** `onFinished`. So all fourteen jobs made their
+request and then failed, and `onFinished` (which writes `history.json`) never ran once.
+Confirmed after the pass: `history.json` still 3305 bytes from 2026-07-29, `listJobs` still the
+same 8 historical rows, none of them a probe job.
+
+### The harness, and what was held constant
+
+Four servers in one Node process outside the app, all on 127.0.0.1: an HTTP origin (39901), an
+HTTPS origin on a 3-day self-signed certificate (39902), and two absolute-form forwarding
+proxies (39903, 39904). Every server appended `{at, server, method, url, headers}` to one shared
+list, read back over `/__log`. Ports were confirmed free first; the process was killed and all
+four ports confirmed closed at the end.
+
+Every job was sent the **active profile's own settings document** (`relay-probe`), read live
+from the running renderer, with three things changed and stated in advance:
+
+- the `network` group — the variable under test;
+- `notifications.channel: 'none'`, so fourteen deliberate failures did not fire fourteen toasts;
+- the `safety` group **pinned neutral for every row** —
+  `{respectRobotsTxt: false, crawlDelayMs: 0, maxRequestsPerMinute: 0, pauseAfterFailures: 5,
+  pauseDurationMs: 0}`. This is the load-bearing one. Safety and Network both act on the same
+  request: `HostGovernor.waitForTurn` runs inside the retry loop and `respectRobotsTxt` adds a
+  second, ungated fetch. Holding it constant is what makes a difference between two rows
+  attributable to the one `network` field that differs and to nothing else.
+
+### The matrix
+
+Every row was predicted before it ran. Rows are named by the tag in their own URL, so no two
+jobs shared a cache key — `scraperRequest` caches any 200, and a shared key would have made a
+later row measure an earlier row's response.
+
+| job | network field varied | prediction | measured |
+| --- | --- | --- | --- |
+| n1 | UA `JP-Netprobe/1.0 (n1)`, header `X-Netprobe: row-n1`, cookie `np=n1` | all three arrive verbatim | 1 hit, `ua=JP-Netprobe/1.0 (n1)`, `x-netprobe=row-n1`, `cookie=np=n1` |
+| n2 | the same three fields **empty** | none of the three; some other agent | 1 hit, no `x-netprobe`, no `cookie`, UA a session fingerprint |
+| n3 | `followRedirects: true` on a 302 | two paths fetched | `/redir/n3` then `/p/n3-hop2` |
+| n4 | `followRedirects: false`, same 302 | one path fetched | `/redir/n4` only |
+| n5 | `requestTimeoutMs: 1000` vs a 2500ms responder | fails as a timeout | job failed at **1059ms**: `Timed out after 1000ms.` |
+| n6 | `requestTimeoutMs: 5000`, same responder | the page arrives | job failed at **2515ms** with `matched nothing` — i.e. it got the page |
+| n7 | `retryAttempts: 0` vs a permanent 503 | one request | 1 hit, `answered 503` |
+| n8 | `retryAttempts: 2, retryDelayMs: 700` | three requests, ~700ms apart | 3 hits, gaps **708ms and 710ms** |
+| n9 | `proxyUrl` = proxy A | proxy sees it in absolute form, then origin | `proxyA http://127.0.0.1:39901/p/n9` then `originHttp /p/n9` |
+| n10 | proxies `[A, B]`, `retryAttempts: 1`, permanent 503 | attempt 0 via A, retry via B | `proxyA` then origin, then 308ms later `proxyB` then origin |
+| n11 | `randomDelay` 0..0 | no pause before the socket | **2ms** from `startScrape` to the server hit |
+| n12 | `randomDelay` 1500..1500 | a 1.5s pause | **1508ms** |
+| n13 | `verifySsl: true` vs the self-signed origin | rejected in the handshake | job failed `self signed certificate`; the HTTPS server logged **zero** requests |
+| n14 | `verifySsl: false`, same URL | 200 through | 1 hit on the HTTPS origin, job failed with `matched nothing` |
+
+n5/n6, n3/n4, n7/n8 and n13/n14 are each one field apart with the same server behaviour on both
+sides, which is what rules out "the server did it".
+
+### Three things worth naming separately
+
+1. **`verifySsl` was the field this entry's own note called unproven** — "Unproven: verifySsl
+   off, which needs a bad certificate to observe." A bad certificate is three lines of `openssl
+   req -x509`, and the pair n13/n14 closes it. n13 is the more interesting half: the origin
+   logged **no request at all**, because the flag decides the handshake, not the response.
+2. **n2 does not show what it looks like it shows.** With `network.userAgent` empty the request
+   still carried a browser UA — but from the *session* group's fingerprint pool, not from
+   `http.ts`'s `SCRAPER_USER_AGENT`. That is `session.ts`'s stated precedence ("the pool only
+   ever fills a gap"), confirmed live rather than assumed. n1 is what proves the Network field
+   wins when it is set.
+3. **The proxy rows go through a real proxy protocol.** `http.ts:458-475` sends an absolute-form
+   request URI with `host:` naming the origin; the harness proxies only forward what parses as
+   an absolute URI, and both did.
+
+### What the dot deliberately does not claim
+
+`concurrentRequests` was **not** driven live, and the entry says so. `RequestGate` is constructed
+per runtime scope, and the only vehicle into a scope that needs no real network makes exactly
+one gated request — so a limit of 1 and a limit of 4 produce an identical trace. Making it
+observable means a run that issues many requests, which means a catalogue walk against AniList.
+`scraperNetworkPolicy.test.ts` asserts the semaphore's high-water mark directly (`maxInFlight`
+under `concurrentRequests` 1 and 3), so the mechanism is covered; what is not available is a
+live witness. Same branch as the previous section took for `maxFileSizeMb`.
+
+`randomDelayMinMs`/`MaxMs` were driven with min equal to max, which reads both fields but does
+not exercise the randomisation between them; that arithmetic is `randomDelayMs`'s unit test.
+
+### The tree was left as found
+
+`localStorage['jp-scraper-settings-v1']` was read back after the pass: the active profile's
+`network` group is byte-for-byte the pre-run values (`retryAttempts: 3`, `requestTimeoutMs:
+30000`, `concurrentRequests: 4`, `randomDelay` 350..900, empty UA/headers/cookie/proxy), the
+`safety` group still `respectRobotsTxt: true, crawlDelayMs: 500, maxRequestsPerMinute: 60`,
+`extraction.siteRules` still empty and `notifications.channel` still `toast`. Nothing was ever
+saved — `saveScraperSettingsDocument` was not called. All six probe globals were deleted and
+their absence confirmed. `/logs?level=error` returned **0** across the whole pass. Nothing was
+clicked in window 2 and no page was navigated in either window. The only file that grew is the
+append-only scraper log, which fourteen jobs' worth of lines is the expected cost of.
+
+### Changed paths
+
+- `src/renderer/components/scraper/featureStatus.ts` — promote `set.network` to `ready`, record
+  the acceptance field by field, and state the one field that stays test-only.
+- `src/MAIN_V1_EVIDENCE_LEDGER.md` — this evidence.
+
+No UI string was added.
+
+### Gates
+
+- `npx vitest run` — **538 files passed / 1 skipped; 7,251 passed / 6 skipped; 0 failed.**
+- `node tools/i18n-check.cjs` — exit 0, all **9,324** English keys translated in ja/zh/ru.
+- `node tools/architecture-audit.cjs` — exit 0, **17 findings, 2 pending**, nothing new.
+- `npx eslint src/renderer/components/scraper/featureStatus.ts` — exit 0, no output.
+- `tsc --noEmit` was not run; it is not a gate.
+- A cache-busted import from Vite's running served graph returned `FEATURE_STATUS['set.network']`
+  as `ready` and **32 ready / 17 untested** of 49, so the edit reached the graph and not only
+  the disk.
+
+### Staging, because the file is still not clean
+
+`featureStatus.ts` still carries the concurrent settings-group track's uncommitted comment lines
+— at `--unified=1` they are three hunks (`@@ -164,2 +164,7 @@`, `@@ -169,2 +174,16 @@`,
+`@@ -198,2 +217,13 @@`), 30 added lines, in none of this branch's commits. This hop's edit does
+land in its own hunk at `--unified=3`, but the ledger's instruction was followed anyway rather
+than relied on being unnecessary: `git cat-file blob HEAD:<path>` was round-tripped through
+`git hash-object --stdin` and confirmed equal to `git rev-parse HEAD:<path>` (`3c5921ee...`), the
+five-line block was replaced with the thirty-eight-line one in that copy, and the result was
+installed with `git hash-object -w --path` (`88a5ee83...`) plus `git update-index --cacheinfo`.
+`git diff --cached` then measured exactly **35 added, 2 removed**. The working file was never
+overwritten to do it, and the other track's 30 lines are untouched and still unstaged.
+
+### Exact next slice
+
+**17** `untested` entries remain and Main V1 is still in dependency-order item 8. Do not move to
+Blanc.
+
+The next member is **`set.cache`**, and the vehicle this section built is exactly the one it
+needs — better than for `set.network`, in fact. The cache is keyed on method+URL and read inside
+`scraperRequest` before the gate, so two site-rule jobs against the *same* local path are a hit
+and a miss by construction; `mode: 'offline'` must throw `ERR_OFFLINE` **without opening a
+socket**, which the harness's request log proves negatively the way n13 did for `verifySsl`; the
+per-kind switches are selected by `cacheKindFor`, which returns `metadata` for a path ending
+`.json` or containing `/api/` and `thumbnails` for an image extension — so one origin can serve
+all three kinds from three paths in one run. `lifetimeMinutes` is honest to drive by waiting out
+a small value. `maxSizeMb` is a memory ceiling with an LRU (`httpCache.ts:147-150`) and
+`scraperCacheStats()` exposes `evictions`, but that counter is not on any IPC channel — check
+before planning to read it live, and if it is not reachable from the renderer, say so and leave
+that field test-only rather than adding a channel for a probe.
+
+Re-read the harness section above before rebuilding it: the two traps were **cache keys**
+(unique tags per row, or a later row silently measures an earlier row's response — for
+`set.cache` that is the *subject*, so vary it deliberately and say which rows share a key) and
+**the safety group**, which acts on the same request and must be pinned identically across
+every row.
+
+`featureStatus.ts` is *still* dirty with the concurrent track's 30 comment lines. Re-check
+first — once that track lands, the file is clean and a plain `git add` is correct again.

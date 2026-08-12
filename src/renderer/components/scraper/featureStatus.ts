@@ -209,8 +209,41 @@ export const FEATURE_STATUS: Record<string, FeatureStatus> = {
   // Every request a run makes now resolves its user agent, headers, cookie,
   // timeout, redirect policy, retries, proxy (incl. rotation on retry),
   // concurrency limit and inter-request pause from the profile.
-  // Unproven: verifySsl off, which needs a bad certificate to observe.
-  'set.network': 'untested',
+  //
+  // 2026-08-12: driven through the running app against a local origin, so the
+  // policy was measured where it lands — at the server — and not at the call
+  // site. A site rule wins over the catalogue for its own host
+  // (`engine.ts:720`), so a rule for 127.0.0.1 whose `episodeSelector` matches
+  // nothing makes `runWithSiteRule` issue exactly one `scraperRequest` inside a
+  // real runtime scope and then fail, which is why no run reached AniList, nyaa
+  // or the job history. Fourteen jobs over `scraper:startScrape`, each sent the
+  // active profile's own document with only the Network group varied and the
+  // Safety group pinned neutral so nothing else could explain a difference:
+  //   userAgent/headers/cookieHeader — a named agent, `X-Netprobe` and `np=n1`
+  //     arrived verbatim; with the three fields empty the same request carried
+  //     a session-pool fingerprint instead, which is session.ts's documented
+  //     "the pool only ever fills a gap".
+  //   requestTimeoutMs — 1000 against a 2500ms responder failed at 1059ms with
+  //     `Timed out after 1000ms`; 5000 against the same responder got its page.
+  //   followRedirects — one 302 fetched two paths with it on, one with it off.
+  //   retryAttempts/retryDelayMs — a permanent 503 was requested once at 0 and
+  //     three times at 2, spaced 708ms and 710ms for a 700ms delay.
+  //   proxyUrl/proxyRotation — the request arrived at the proxy in absolute
+  //     form; with a rotation entry added, attempt 0 went through the first
+  //     proxy and the retry through the second.
+  //   randomDelayMinMs/MaxMs — 2ms from `startScrape` to the socket at 0, and
+  //     1508ms at 1500.
+  //   verifySsl — the field the note above called unproven. Against a
+  //     self-signed HTTPS origin, `true` failed with `self signed certificate`
+  //     and the server logged no request at all; `false` on the same URL got a
+  //     200 through. The handshake, not the response, is what the flag decides.
+  //
+  // `concurrentRequests` stays test-only and the dot does not claim it: the
+  // gate is per job scope, and the only vehicle into a scope that needs no real
+  // network makes exactly one gated request, so a limit of 1 and a limit of 4
+  // are indistinguishable from here. scraperNetworkPolicy.test.ts asserts the
+  // semaphore's high-water mark directly.
+  'set.network': 'ready',
   // Reads and writes a real response cache keyed per kind, with the lifetime,
   // the per-kind switches, the size ceiling and "Offline — never refetch" all
   // acting. maxSizeMb is a memory ceiling: the cache does not survive a restart.
