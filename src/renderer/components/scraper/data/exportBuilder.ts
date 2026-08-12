@@ -7,6 +7,30 @@ export interface EpisodeExportOutput {
   mimeType: string;
 }
 
+/**
+ * The column vocabulary `export.includeColumns` is written in.
+ *
+ * This is the source of truth the Columns field's hint names, rather than a
+ * hand-copied list that would drift from it. The builder below does not consume
+ * it yet — the export slice that reads it is still in flight — but
+ * `settings/fields.ts` already imports it, and that import is unresolvable
+ * without it, so it lives here where that slice will need it.
+ */
+export const SCRAPER_EXPORT_COLUMNS = [
+  'index',
+  'title',
+  'type',
+  'language',
+  'resolution',
+  'source',
+  'size',
+  'season',
+  'duration',
+  'airDate',
+  'status',
+  'url',
+] as const;
+
 function recordFor(row: EpisodeRow) {
   return {
     number: row.number,

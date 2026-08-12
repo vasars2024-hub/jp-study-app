@@ -13382,3 +13382,95 @@ Unchanged from the entry above, and now actually reachable from a committed base
 poster/episode still through a fresh deterministic provider fixture, prove the three active
 Download switches, cap and preferred format, and keep the four explicitly inert image fields
 outside the ready claim. Main V1 remains open; do not advance to Blanc.
+
+## The Scraper settings drawer does not load at committed HEAD — found by verifying the commit above — 2026-08-12
+
+Verifying `8aa3813` in a clean worktree (rather than in situ) turned up a defect that **no
+previous audit or ledger entry has recorded**, and that the boss audit's method structurally
+could not see. It is a production breakage, not a test artifact.
+
+### The defect
+
+At committed HEAD, `settings/fields.ts:36` imports `SCRAPER_EXPORT_COLUMNS` from
+`../data/exportBuilder`, and the committed `exportBuilder.ts` **does not export it** — that symbol
+lives only in the Export track's uncommitted rewrite of that file. The import is evaluated at
+module scope, so `fields.ts` throws `TypeError: Cannot read properties of undefined (reading
+'join')` the moment it loads.
+
+`fields.ts` is not a test helper. `ScraperSettingsDrawer.tsx` and `FieldRow.tsx` both import it,
+so **the entire Scraper settings drawer is dead at HEAD** for anyone who checks this branch out.
+It works for us only because the shared tree has the unlanded rewrite sitting in it.
+
+This is the `commit-slices-must-close-import-graph` failure mode again: `fields.ts` was landed
+ahead of the only module that satisfies its import.
+
+### Why the boss audit missed it, which is the more useful finding
+
+The audit compared **failing test identities** between HEAD and a pre-window baseline. These five
+files fail at *collection* — they contribute zero test identities, at both HEAD and the baseline,
+so they cancelled out of the set-difference and never appeared in either list:
+
+    scraperFields.test.ts   scraperImageFieldTruth.test.ts   scraperMetadataFieldTruth.test.ts
+    scraperSchedulerNotificationsFieldTruth.test.ts           scraperSettingActions.test.ts
+
+Concretely: clean HEAD collected **6,938** tests where the shared tree collects **7,336**. A
+~400-test collection hole is invisible to an identity diff and obvious in the totals. **Compare
+collected totals, not just failure identities** — a suite that cannot load is not a suite that
+passes.
+
+### A second gap, which the first was hiding
+
+With the import repaired, those five files load and a real assertion fails:
+`scraperFields.test.ts` requires every declared field path to resolve to a value in
+`DEFAULT_SCRAPER_SETTINGS`, and `d0d1be0` added the `metadata.requestScope` **note** row — a
+non-operable disclosure that deliberately binds to nothing. The production row landed; the test
+update exempting `kind: 'note'` rows did not. Same shape as the audit's `dd9364e` finding:
+production changed, its own test left behind.
+
+The correction already existed uncommitted, is correct, and its whole diff is that one concern
+(+13 lines, no foreign hunks), so it was staged as-is. It skips note rows rather than giving them
+a dummy path — a dummy path is precisely the silently-dead control the assertion exists to catch —
+and adds a companion test that every note row carries a hint, since the hint is its entire content.
+
+### Fix, kept minimal on purpose
+
+`exportBuilder.ts` is dirty with the Export track's in-flight 158/−42 rewrite, which is **not**
+mine to land. Only `SCRAPER_EXPORT_COLUMNS` is needed to close the graph: at HEAD nothing else
+imports the missing symbols (`DataPages.tsx` takes only `buildEpisodeExport`/`exportExtension`,
+both present). So the staged blob was reconstructed from `HEAD` plus that one constant — **+24
+insertions, 0 deletions** — and `git diff --cached` contains none of the rewrite, which remains
+unstaged in the working tree for its owner.
+
+### Clean-tree set-difference proof
+
+Same detached worktree, same dependency junction, no shared source read:
+
+| tree | files | tests collected | failed |
+|---|---|---|---|
+| `8aa3813` (before) | 9 failed / 513 passed | 6,938 | 9 |
+| with both fixes | **4 failed** / 518 passed | **6,972** | 9 |
+
+The five collection failures are gone and 34 previously-unrunnable tests now execute. The nine
+remaining failing identities are **byte-identical** to the known baseline — five Blanc
+confirmation/queue cases, one local-Agent queue reachability case, one `novelReaderProgressGuard`
+case and the two known i18n hygiene cases. No new identity appeared.
+
+Note for future audits: that baseline list is *not* the previously recorded one. Earlier entries
+name "one detached `pdf.worker` resolution case"; at this HEAD the seventh is
+`novelReaderProgressGuard`. Re-derive the baseline, do not quote it.
+
+### Gates
+
+| gate | result |
+|---|---|
+| `npx vitest run` (clean worktree) | the table above — the authoritative run for this change |
+| `node tools/i18n-check.cjs` | exit 0 — 9,340 keys; no UI string added |
+| `node tools/architecture-audit.cjs` | exit 0 — nothing new; same 2 known pending |
+| `npx eslint` on both touched paths | exit 0. Four pre-existing non-null-assertion warnings in `scraperFields.test.ts` at lines 74/102/103/150, none inside the 13 added lines. |
+
+### Live acceptance
+
+Not run, and not claimed: no Electron token here, as recorded in the entry above. Note that the
+natural live check for this fix — opening the Scraper settings drawer — is exactly what cannot be
+performed from a clean checkout without it, so the next worker with a token should open that
+drawer first and confirm it renders.

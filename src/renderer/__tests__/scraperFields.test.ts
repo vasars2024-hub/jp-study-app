@@ -15,8 +15,21 @@ describe('drawer field schema', () => {
   it('points every field at a value that actually exists in the settings model', () => {
     // The whole drawer is data-driven, so a typo in a path would render a
     // silently dead control rather than failing loudly. This is that check.
+    //
+    // 'note' rows are the deliberate exception: they state a guarantee and bind
+    // to nothing, so requiring a backing value would be requiring the settings
+    // model to hold a field no one can set. They are excluded here rather than
+    // given a dummy path, because a dummy path is exactly the silently-dead
+    // control this assertion exists to catch.
     for (const field of SCRAPER_FIELDS) {
+      if (field.kind === 'note') continue;
       expect(readField(DEFAULT_SCRAPER_SETTINGS, field.path), field.path).toBeDefined();
+    }
+  });
+
+  it('gives every note row a hint, since the hint is its whole content', () => {
+    for (const field of SCRAPER_FIELDS.filter((f) => f.kind === 'note')) {
+      expect(field.hint, field.path).toBeTruthy();
     }
   });
 
