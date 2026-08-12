@@ -439,22 +439,48 @@ async function performRequest(
 
     let request: http.ClientRequest;
     if (tunnel) {
+      // `createConnection` on the request options is ignored when paired with
+      // `agent: false`: Node creates its own one-shot Agent and opens a fresh,
+      // direct connection to `parsed` after we have already established the
+      // CONNECT tunnel. Besides wasting the tunnel, that silently bypasses the
+      // proxy the profile explicitly selected. Put the connection factory on
+      // the Agent itself so the only socket this request can use is the TLS
+      // layer over `tunnel`.
+      const tunnelAgent = new https.Agent({
+        keepAlive: false,
+        maxCachedSessions: 0,
+        rejectUnauthorized: resolved.verifySsl,
+      });
+      tunnelAgent.createConnection = (_options, callback) => {
+        const secureSocket = tls.connect({
+          socket: tunnel,
+          servername: parsed.hostname,
+          rejectUnauthorized: resolved.verifySsl,
+        });
+        if (callback) {
+          let settled = false;
+          const finish = (error: Error | null) => {
+            if (settled) return;
+            settled = true;
+            callback(error, secureSocket);
+          };
+          secureSocket.once('secureConnect', () => finish(null));
+          secureSocket.once('error', finish);
+        }
+        return secureSocket;
+      };
       request = https.request(
         parsed,
         {
           method: resolved.method,
           headers: resolved.headers,
           timeout: resolved.timeoutMs,
-          agent: false,
+          agent: tunnelAgent,
           rejectUnauthorized: resolved.verifySsl,
-          createConnection: () => tls.connect({
-            socket: tunnel,
-            servername: parsed.hostname,
-            rejectUnauthorized: resolved.verifySsl,
-          }),
         },
         onResponse,
       );
+      request.once('close', () => tunnelAgent.destroy());
     } else if (proxy) {
       // Absolute-form request URI: the old, plain-http half of proxying. The
       // Host header has to name the origin, not the proxy.

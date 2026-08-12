@@ -10,8 +10,10 @@
 // did before this work.
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import fs from 'node:fs';
 import http from 'node:http';
-import type { AddressInfo } from 'node:net';
+import net, { type AddressInfo } from 'node:net';
+import tls from 'node:tls';
 import {
   createDefaultScraperSettingsDocument,
   resolveScraperSettings,
@@ -527,6 +529,81 @@ describe('proxyUrl', () => {
       () => scraperRequest('https://example.test/anything'),
     )).rejects.toThrow(/proxy refused connect/i);
     expect(connects).toEqual(['example.test:443']);
+  });
+
+  it('carries the https request through a successful CONNECT tunnel without a direct fallback', async () => {
+    const key = fs.readFileSync(new URL('./fixtures/proxy-test-key.pem', import.meta.url));
+    const cert = fs.readFileSync(new URL('./fixtures/proxy-test-cert.pem', import.meta.url));
+    const requests: string[] = [];
+    const authorities: string[] = [];
+    const tunnelSockets: net.Socket[] = [];
+
+    const origin = tls.createServer({ key, cert }, (socket) => {
+      let received = '';
+      socket.on('data', (chunk: Buffer) => {
+        received += chunk.toString('utf8');
+        if (!received.includes('\r\n\r\n')) return;
+        requests.push(received.split('\r\n', 1)[0]);
+        socket.end(
+          'HTTP/1.1 200 OK\r\n'
+          + 'Content-Type: text/plain\r\n'
+          + 'Content-Length: 13\r\n'
+          + 'Connection: close\r\n\r\n'
+          + 'through-proxy',
+        );
+      });
+    });
+    await new Promise<void>((resolve) => origin.listen(0, '127.0.0.1', resolve));
+    const originPort = (origin.address() as AddressInfo).port;
+
+    const acceptingProxy = http.createServer();
+    acceptingProxy.on('connect', (req, client, head) => {
+      authorities.push(req.url ?? '');
+      const upstream = net.connect(originPort, '127.0.0.1', () => {
+        client.write('HTTP/1.1 200 Connection Established\r\n\r\n');
+        if (head.length) upstream.write(head);
+        client.pipe(upstream);
+        upstream.pipe(client);
+      });
+      tunnelSockets.push(client, upstream);
+      upstream.on('error', () => client.destroy());
+    });
+    await new Promise<void>((resolve) => acceptingProxy.listen(0, '127.0.0.1', resolve));
+    const acceptingProxyUrl = 'http://127.0.0.1:' + (acceptingProxy.address() as AddressInfo).port;
+
+    try {
+      await expect(underProfile(
+        settings((s) => {
+          s.network.proxyUrl = acceptingProxyUrl;
+          // Keep the default verification-on policy for the first request.
+        }),
+        () => scraperRequest('https://proxy-proof.invalid/rejected'),
+      )).rejects.toThrow(/self-signed certificate/i);
+
+      const response = await underProfile(
+        settings((s) => {
+          s.network.proxyUrl = acceptingProxyUrl;
+          // The fixture certificate is deliberately local and self-signed.
+          s.network.verifySsl = false;
+        }),
+        // `.invalid` can never resolve publicly. A passing response therefore
+        // proves the request used the accepted tunnel instead of going direct.
+        () => scraperRequest('https://proxy-proof.invalid/through'),
+      );
+      expect(response.status).toBe(200);
+      expect(response.body).toBe('through-proxy');
+      expect(authorities).toEqual([
+        'proxy-proof.invalid:443',
+        'proxy-proof.invalid:443',
+      ]);
+      expect(requests).toEqual(['GET /through HTTP/1.1']);
+    } finally {
+      for (const socket of tunnelSockets) socket.destroy();
+      acceptingProxy.closeAllConnections?.();
+      await new Promise<void>((resolve) => acceptingProxy.close(() => resolve()));
+      origin.closeAllConnections?.();
+      await new Promise<void>((resolve) => origin.close(() => resolve()));
+    }
   });
 
   it('rotates to the next proxy on a retry', async () => {

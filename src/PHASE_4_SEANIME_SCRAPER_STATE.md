@@ -213,7 +213,7 @@ Outside a scope the store is empty and every module keeps its previous defaults.
 That is why the HTTP Inspector, the source probes and the qBittorrent client are
 unchanged: those are the user acting directly, not a profile acting for them.
 
-### `set.network` → `untested`
+### `set.network` → `ready`
 
 Wired in `networkPolicy.ts` (policy, concurrency gate, proxy rotation, retry
 classification) and `http.ts`, which was split into `performRequest` (one
@@ -226,7 +226,7 @@ Also removed: the hard-coded `timeoutMs: 20_000` at four call sites in
 traffic. A call site that still passes a timeout — `sources.perSourceTimeoutMs`
 through `searchTorrents` — still wins, so `set.sources` is unaffected.
 
-Proved by `src/main/__tests__/scraperNetworkPolicy.test.ts` (33 tests) against a
+Proved by `src/main/__tests__/scraperNetworkPolicy.test.ts` (34 tests) against a
 real local server and a real local forward proxy:
 
 - the profile's user agent, custom headers and cookie arrive at the server;
@@ -242,14 +242,31 @@ real local server and a real local forward proxy:
 - a plain-http request arrives at the proxy in absolute form with the origin's
   own Host; an https target arrives as `CONNECT example.test:443`
 - a retry rotates to the next proxy in the list
+
 - `socks5://` is refused with a clear error and no request is made — the
   settings validator accepts SOCKS, and connecting directly instead would tell
   the user their traffic went somewhere it did not
 
-**Unproven:** SSL Verification off. Observing it needs a server with a bad
-certificate, which means minting one; the flag is passed as `rejectUnauthorized`
-and asserted at the options level only. Treat it as the one field of this group
-still on trust.
+A later strict proxy probe found that this was not enough evidence. The test
+deliberately returned 502 from CONNECT, so it proved only that a tunnel was
+*opened*, not that a successful tunnel carried the request. On CONNECT 200,
+Node ignored the request-level `createConnection` paired with
+`agent: false` and opened a second, direct TLS connection to the origin.
+`http.ts` now supplies TLS-over-CONNECT through a one-shot
+`https.Agent`. Test 34 terminates that tunnel at a local TLS fixture and
+uses `proxy-proof.invalid` as the requested host; the 200 response cannot
+possibly have come from a direct fallback.
+
+SSL Verification off is covered against the same self-signed TLS fixture: the
+successful tunnel is rejected when verification is on and accepted only when
+the profile disables it.
+
+Fresh-main Electron acceptance then used a strict loopback CONNECT proxy that
+allowed only `api.jikan.moe:443` and `graphql.anilist.co:443`. Nine
+accepted tunnels delivered nine fixture requests across four real jobs, with
+zero rejected or unexpected authorities. The results contained fixture-only
+titles, ids and provenance, so the old failure mode — opening CONNECT and then
+using a second direct socket — cannot satisfy the observation.
 
 ### `set.cache` → `untested`
 
@@ -331,7 +348,7 @@ row has no usable number of its own. A catalogue's numbering is evidence; a
 number scraped from a title is a guess, and letting the guess overwrite the
 evidence is the kind of silent corruption that surfaces three screens later.
 
-### `set.metadata` → `untested`, partially
+### `set.metadata` → `ready`
 
 - `providerOrder` now decides which catalogue `searchCatalogue` asks first, and
   whether the other is asked at all. An unknown id is skipped with a log line
@@ -353,10 +370,23 @@ emptied the Metadata tab for every user on default settings. There is a test tha
 asserts the studio list survives both positions of that toggle, so a future
 session does not "finish the job" by wiring it to the nearest field.
 
-Proved by `src/main/__tests__/scraperMetadataSettings.test.ts` (22 tests).
-Provider Order is asserted against a stubbed transport, because the two hosts are
-module constants and the question is *which host is asked, in what order* — a
-local server cannot answer that without the suite depending on two public APIs.
+The four projection controls are labelled **Store**, not Fetch: both providers
+return whole records and the switches decide which received values survive in
+the result. The drawer also discloses that request scope in a non-operable note.
+
+Proved by `src/main/__tests__/scraperMetadataSettings.test.ts` (22 tests)
+and by fresh-main Electron acceptance through a strict local TLS terminator:
+
+- Jikan-first made search, full-detail and episode-list requests and returned
+  Jikan provenance.
+- Turning Store Synopsis, Genres, Air Dates and Ratings off made the same three
+  requests, then blanked those four values and their provenance.
+- AniList-first made one GraphQL request and no Jikan request.
+- A destroyed Jikan response socket logged `socket hang up`, then the same
+  job asked AniList and completed with AniList provenance.
+
+The two inert controls remain explicitly disclosed and are not included in the
+ready claim.
 
 ### Two things that contradicted the registry
 

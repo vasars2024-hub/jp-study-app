@@ -13069,6 +13069,188 @@ provider-proxy path is built. Eight controls have runtime consumers and two are 
 marked, but no live provider call was made and none should be made merely to turn a dot green.
 
 
+## HTTPS proxy CONNECT was opening a second, direct connection — fixed in source, live rerun blocked — 2026-08-12
+
+The next source-derived slice was still `set.metadata`: its last entry explicitly
+left the group `untested` until a strict loopback CONNECT proxy could answer
+deterministic Jikan and AniList fixtures. That acceptance probe found a lower-level
+Network defect before any Metadata claim could be measured.
+
+### What the strict proxy falsified
+
+The existing Network suite's HTTPS case asserted only that the proxy saw
+`CONNECT example.test:443`, then deliberately refused the tunnel with 502. A
+successful CONNECT took a different path in `main/scraper/http.ts`:
+`https.request(parsed, { agent: false, createConnection })`. Node opened the
+CONNECT socket, ignored that request-level connection factory, and then opened a
+fresh direct TLS connection to `parsed`. The live app made the CONNECT to the
+loopback fixture but sent no TLS bytes through it; an isolated reproduction of the
+exact branch received a real public Jikan 504 while the fixture origin saw no
+request. The configured proxy was therefore bypassed for HTTPS.
+
+The fix uses a one-shot `https.Agent` whose own `createConnection` callback
+returns TLS layered over the accepted tunnel. It disables keep-alive and TLS
+session caching and destroys the agent when the request closes. The new
+real-socket regression terminates CONNECT at a local self-signed TLS origin and
+requests `https://proxy-proof.invalid/through`. That reserved host cannot resolve
+publicly: 200 plus `GET /through` at the fixture proves there was no direct
+fallback. The focused Network suite is now 34/34.
+
+### Gates and live boundary
+
+| gate | result |
+|---|---|
+| `npx vitest run` | **548 files passed**, 1 skipped; **7330 tests passed**, 6 skipped; exit 0 |
+| `node tools/i18n-check.cjs` | **environment-blocked** before catalog evaluation: its esbuild helper was denied access to `../..` and could not resolve `src/shared/i18n/catalogs/all.ts`. The full suite's 21-test i18n suite passed, and this slice adds no UI strings. |
+| `node tools/architecture-audit.cjs` | exit 0 — 1732 modules, 17 known findings, nothing new; 2 known test-only findings remain pending |
+| `npx eslint <touched TS paths>` | exit 0, no findings |
+| focused Network suite | **34/34 passed**, including the successful-CONNECT regression |
+
+A main-process restart was required before live acceptance. The prior Electron
+instance had already exited, and every fresh Forge launch failed while loading
+`vite.renderer.config.ts`: the managed filesystem denied esbuild access to
+`../..`. No patched main process came up, so no claim was laundered through a
+stale preload/renderer. `set.network` is deliberately demoted from `ready`
+to `untested` until the next worker can restart Electron and run the strict
+proxy. `set.metadata` also remains `untested`; none of its eight active
+controls is promoted by this slice.
+
+The attempted live job failed before completion and the success-only history hook
+never ran. `history.json` and `results/` contain no `job-mspxmtnt-1`
+entry. No userData backup was created and no persisted setting was changed.
+
+### Exact next slice
+
+Restart the dev app in an environment where Forge/esbuild can read the workspace,
+then repeat the strict allowlisted CONNECT fixture. First prove the HTTPS request
+arrives inside the tunnel (which promotes `set.network` back to `ready`);
+then run deterministic Jikan-full, projection-off, AniList-first and
+Jikan-to-AniList-fallback jobs, restore their history entries exactly, and only
+then promote `set.metadata`.
+
+
+### This slice's checkpoint blocker
+
+The required path-scoped checkpoint could not be created in this worker. The
+index was confirmed empty, then exact-path `git add --` over the seven owned
+paths failed before staging anything:
+
+    fatal: Unable to create '.git/index.lock': Permission denied
+
+The managed permission profile exposes `.git` read-only. No plumbing write
+was attempted to bypass it, and `git diff --cached --name-only` remains empty.
+The source, tests and ledger changes are left unstaged for the next relay worker
+to review and checkpoint.
+
+
+## The repaired CONNECT tunnel carries all four Metadata acceptance jobs — 2026-08-12
+
+This closes the exact next slice above. The boss audit's ten rescued commits are
+already closed, and its later i18n finding explicitly belongs to another
+in-flight track, so the first open Main V1 item remained the uncheckpointed
+HTTPS-proxy repair and the deterministic `set.metadata` acceptance behind it.
+
+### One test claim tightened before accepting the inherited fix
+
+The pending real-socket test already proved that `verifySsl: false` accepts
+the local self-signed TLS endpoint, but the phase document also said
+verification-on rejects it without asserting that half. The same test now makes
+the default verification-on request first and requires
+`self-signed certificate`, then repeats through the same proxy with
+verification off and requires the fixture response. It remains one test because
+the acceptance boundary is the pair: reject by default, accept only after the
+explicit opt-out.
+
+### Fresh-main Electron acceptance
+
+Ordinary `npm start` reproduced the managed-environment failure before
+Electron launched: esbuild was denied the parent-directory read while bundling
+`vite.renderer.config.ts`. No root config was edited. Instead, Vite's public
+programmatic API was invoked with `configFile: false` and the repository's
+existing main/preload/renderer config values supplied in memory. That produced a
+fresh main and preload from the current source plus a frozen renderer bundle,
+served on IPv4 loopback. Electron then ran against an empty temporary
+`--user-data-dir` and exposed the normal authenticated debug bridge.
+
+The strict fixture terminated CONNECT at a local self-signed TLS origin and
+allowed exactly `api.jikan.moe:443` and
+`graphql.anilist.co:443`. It accepted **nine** tunnels and received **nine**
+HTTP requests; no authority was rejected or unexpected. The fixture returned
+ids, titles and provenance that do not exist at either public provider, so the
+old failure mode — open CONNECT, discard it, then make a direct request — cannot
+produce any passing result.
+
+| job | observed requests | accepted result |
+|---|---|---|
+| `job-mspz9gic-1` — Jikan full | Jikan search, `/anime/777/full`, episode page 1 | one real episode; `mal-777`; synopsis, genres, studio, rating and Jikan provenance |
+| `job-mspz9vo7-2` — projection off | the same three request classes | synopsis `''`, genres `[]`, rating `0`, air date `null`; those provenance keys absent |
+| `job-mspzalc6-3` — AniList first | one GraphQL POST, zero Jikan requests | `anilist-888`, AniList episode still and AniList provenance |
+| `job-mspzas7p-4` — exception fallback | one Jikan CONNECT whose response socket was destroyed, then one AniList POST | log contains `Jikan request failed: Error: socket hang up` followed by `asking AniList`; job completes with AniList provenance |
+
+The projection-off run is also the live proof behind the **Store**, not Fetch,
+labels: its provider requests did not shrink; only the stored result did.
+`set.network` and `set.metadata` are therefore promoted to `ready`.
+The two Metadata controls already disclosed as inert — merge strategy and staff
+— remain outside that claim.
+
+The frozen-renderer harness did not serve the large public dictionary blobs, so
+dictionary bootstrap logged four typed-array `RangeError` lines before the
+jobs began. They are a harness limitation, not claimed clean. The Scraper jobs
+themselves all reached `done` and their own per-job logs contain no error
+except the intentionally destroyed Jikan socket in the fallback case.
+
+### Gates
+
+| gate | result |
+|---|---|
+| `npx vitest run` | exit 0; collection is **548 files / 7,330 tests**. A second dot-reporter run also exited 0. |
+| focused Network suite | **34/34 passed**, including verification-on rejection, verification-off acceptance and successful CONNECT transport |
+| `node tools/i18n-check.cjs` | **environment-blocked before catalog evaluation** by the same native esbuild `../..` access denial. The focused `shared/__tests__/i18n.test.ts` fallback passed **21/21**, and this slice adds no UI string. |
+| `node tools/architecture-audit.cjs` | exit 0 — 1,732 modules, nothing new; the same 2 known test-only findings remain pending |
+| touched-path ESLint | exit 0 on `http.ts`, `scraperNetworkPolicy.test.ts` and `featureStatus.ts` |
+| `git diff --check` | exit 0 on the seven owned paths |
+
+No userData backup was taken. The real profile was never opened. All four jobs
+and their history lived only in the isolated temporary profile; after the app
+closed, every temporary profile created by this run was removed. The bridge,
+renderer server, TLS origin and proxy ports were verified closed.
+
+### Exact next slice
+
+Main V1 is still open; do not advance to Blanc. The current feature-status
+census has seven `untested` entries. Three depend on an externally configured
+qBittorrent/debrid client (acquisition, Downloads and `set.qbittorrent`), and
+the Export pair's remaining claim is a native save-dialog interaction that the
+debug bridge cannot drive. The next adjacent, decision-free acceptance slice is
+**`result.images` + `set.images`**: drive the published Jikan jpg/webp
+variants and AniList poster/episode still through a fresh deterministic
+provider fixture, prove the three active Download switches, cap and preferred
+format, and keep the four explicitly inert image fields outside the ready
+claim.
+
+### Checkpoint boundary
+
+The owned checkpoint is the existing seven-path CONNECT slice plus this test
+assertion/status evidence:
+
+- `src/main/scraper/http.ts`
+- `src/main/__tests__/scraperNetworkPolicy.test.ts`
+- `src/main/__tests__/fixtures/proxy-test-cert.pem`
+- `src/main/__tests__/fixtures/proxy-test-key.pem`
+- `src/renderer/components/scraper/featureStatus.ts`
+- `src/PHASE_4_SEANIME_SCRAPER_STATE.md`
+- `src/MAIN_V1_EVIDENCE_LEDGER.md`
+
+Exact-path `git add --` over those seven paths was attempted after confirming
+the index empty and failed before staging anything:
+
+    fatal: Unable to create '.git/index.lock': Permission denied
+
+The managed profile still exposes `.git` read-only. The index was checked
+again and remains empty, so no partial checkpoint exists and no plumbing bypass
+was attempted.
+
+
 ## Boss-audit clean-HEAD regressions closed without taking foreign hunks — 2026-08-12
 
 The latest `docs/audit/RELAY_BOSS_AUDIT.md` section outranked the normal ladder. It found two
@@ -13133,3 +13315,70 @@ contains the separately owned, uncheckpointed CONNECT/Metadata slice documented 
 above; its owner or the next relay worker must re-derive and checkpoint that boundary before
 following its `result.images` + `set.images` next slice. Main V1 remains open; do not advance to
 Blanc.
+
+## The CONNECT/Metadata slice is finally checkpointed — the `.git` block was the sandbox, not the repo — 2026-08-12
+
+Two consecutive workers left the seven-path CONNECT/Metadata slice unstaged, each recording the
+same blocker: `fatal: Unable to create '.git/index.lock': Permission denied`, attributed to a
+managed profile exposing `.git` read-only. **That is not a property of this repository.** A plain
+`git add --` of one owned path from this worker's shell succeeded immediately, exit 0. The denial
+was that worker's sandbox, and it cost two hops. Any future worker hitting it should test the
+index with a single throwaway `git add` before concluding the repo is read-only, and should say
+"my sandbox denied the index write" rather than "`.git` is read-only".
+
+That mattered because the work was real and existed nowhere but a shared working tree that
+several tracks write to — precisely the loss mode the boss audit flagged twice.
+
+### What was re-derived rather than inherited
+
+The boss audit's own instruction was checked first and found already discharged: `bef3b2e`
+closed both clean-HEAD regressions. Verified independently in a fresh detached worktree at that
+commit (dependency junction, no shared source read) — `agentSessionContext.test.ts` and
+`monitorsPage.test.ts` together are **29 passed / 0 failed**. The audit's second follow-up, the
+esbuild-blocked `i18n-check`, also runs cleanly here: exit 0.
+
+The inherited source claim was then tested rather than accepted. `scraperNetworkPolicy.test.ts`
+is **34/34**, including the real-socket regression that terminates a successful CONNECT at a
+local self-signed TLS origin and requests `https://proxy-proof.invalid/through`. Because that
+reserved host cannot resolve publicly, a 200 with `GET /through` observed at the fixture is
+positive proof no direct fallback occurred. The `agent: false` → one-shot `https.Agent` fix in
+`http.ts` is therefore confirmed by execution, not by reading.
+
+All five modified owned paths were diff-reviewed hunk by hunk before staging; unlike the
+`settingsCatalog.ts` case in the previous entry, none of them carried foreign hunks, so each was
+staged whole. The live `featureStatus.ts` census is **42 ready / 7 untested / 49 total**, matching
+the boss audit's independent count.
+
+### One defect found and fixed in the inherited work
+
+`PHASE_4_SEANIME_SCRAPER_STATE.md` inserted the new strict-proxy paragraph *between* two bullets
+of the `set.network` evidence list, orphaning the `socks5://` bullet into a second list. The
+paragraph now follows the complete list. Prose only; no claim changed.
+
+### Gates
+
+| gate | result |
+|---|---|
+| `npx vitest run` | First run reproduced the known unrelated `scraperSources.test.ts` `ENOTEMPTY` temp-dir cleanup race (1 failed / 7,329 passed). Immediate rerun exit 0: **548 files passed**, 1 skipped; **7,330 tests passed**, 6 skipped. The race is not in any owned path and has now been observed by two consecutive workers — it is flaky, not a regression. |
+| `node tools/i18n-check.cjs` | exit 0 — all **9,340** English keys translated in ja/zh/ru. No esbuild block in this shell. |
+| `node tools/architecture-audit.cjs` | exit 0 — 1,732 modules / 17 known findings, nothing new; the same 2 test-only findings remain pending. |
+| `npx eslint` on the three touched TS paths | exit 0, no findings. |
+
+### Live acceptance: inherited, and explicitly not re-witnessed here
+
+No bridge existed (`debug/bridge.json` absent) and no Electron process was running. This headless
+token is the same one under which the boss audit lost Electron's GPU process repeatedly. **I did
+not re-witness the four-job Metadata acceptance**; the `set.metadata` → `ready` promotion in this
+checkpoint rests on the previous worker's fresh-main evidence, recorded in the entry above, plus
+the unit-level proof of the transport it depends on. `set.network` → `ready` is additionally
+carried by the real-socket test I ran myself. Whoever next has an interactive Electron token
+should re-run one Metadata job through the strict fixture to convert that inherited half into
+first-hand evidence. No userData backup was taken and no persisted setting was changed.
+
+### Exact next slice
+
+Unchanged from the entry above, and now actually reachable from a committed base:
+**`result.images` + `set.images`** — drive the published Jikan jpg/webp variants and the AniList
+poster/episode still through a fresh deterministic provider fixture, prove the three active
+Download switches, cap and preferred format, and keep the four explicitly inert image fields
+outside the ready claim. Main V1 remains open; do not advance to Blanc.

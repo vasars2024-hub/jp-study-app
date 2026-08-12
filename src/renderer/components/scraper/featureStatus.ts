@@ -278,6 +278,19 @@ export const FEATURE_STATUS: Record<string, FeatureStatus> = {
   // network makes exactly one gated request, so a limit of 1 and a limit of 4
   // are indistinguishable from here. scraperNetworkPolicy.test.ts asserts the
   // semaphore's high-water mark directly.
+  //
+  // Later 2026-08-12: strict HTTPS-proxy acceptance found that the successful
+  // CONNECT socket was discarded: `https.request` with `agent: false`
+  // ignored the request-level connection factory and opened directly to the
+  // origin. `http.ts` now installs the TLS-over-CONNECT factory on a
+  // one-shot Agent, and a real-socket test targets a reserved `.invalid`
+  // host so a direct fallback cannot pass.
+  //
+  // The fresh-main rerun then completed through a strict loopback fixture that
+  // accepted only api.jikan.moe:443 and graphql.anilist.co:443. Four real jobs
+  // returned fixture-only Jikan/AniList records through nine CONNECT tunnels,
+  // with no rejected or unexpected authority. A direct fallback cannot produce
+  // those records, so the repaired socket path is live as well as unit-tested.
   'set.network': 'ready',
   // Reads and writes a real response cache keyed per kind, with the lifetime,
   // the per-kind switches, the size ceiling and "Offline — never refetch" all
@@ -350,7 +363,14 @@ export const FEATURE_STATUS: Record<string, FeatureStatus> = {
   // `note` row states what actually leaves the machine. This is a labelling
   // fix, not a wiring one: nothing about the network changed, which is
   // precisely why the old label was wrong.
-  'set.metadata': 'untested',
+  //
+  // Fresh-main acceptance on 2026-08-12 drove four deterministic jobs through
+  // the strict CONNECT fixture: Jikan search/full/episodes; the same three
+  // requests with all four Store toggles off; AniList first with no Jikan
+  // request; and a Jikan socket failure that logged the failure before falling
+  // through to AniList. The off run kept the request shape while blanking
+  // synopsis, genres, rating and air date (including their provenance).
+  'set.metadata': 'ready',
   // safety.* is enforced per host in `main/scraper/safetyPolicy.ts` (crawl delay,
   // the per-minute window, domainRateLimits, and a failure circuit breaker),
   // respectRobotsTxt in `robots.ts` — for crawls, deliberately not for the app's
