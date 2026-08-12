@@ -12882,3 +12882,75 @@ Seven integrated (`27c74b6`, `9c046cc`, `20f72eb`, `2545cd5`, `c3ae5b6`, `28a239
 one closed obsolete (`9e6e82d`), **two open**: `87dd97c` and `99c8747`, both 148–152 commits
 behind and per-hunk salvage only — neither is a clean take, and each needs the same per-file
 `rev-parse` triage applied hunk by hunk.
+
+## The last two rescued commits are both obsolete — the ten-commit rescue list is closed — 2026-08-12
+
+No code changed in this entry. `87dd97c` and `99c8747` were the two commits the boss audit left
+open as "partly absorbed, per-hunk salvage only". Applying the same per-file
+`git rev-parse <commit>:<path>` vs `git rev-parse HEAD:<path>` triage that closed `9e6e82d`, both
+turn out to be **superseded rather than unlanded**, and one of them would actively regress HEAD.
+Final tally for the ten: **seven integrated, three closed obsolete**.
+
+### `87dd97c` (feat(reading): add unified workspace contract) — closed obsolete
+
+Three files. `shared/readingIpc.ts` is **blob-identical to HEAD**. The other two are not "diverged
+in both directions" — HEAD is a strict superset. `git diff HEAD 87dd97c` over them is
+**+2 / −55**, and both additions are regressions:
+
+| what applying it would do | why that is wrong at HEAD |
+|---|---|
+| delete `readingWorkspaceSurfaceForSection` + `ReadingWorkspaceSurface` | **live production consumer** at `renderer/views/ReadingWorkspaceView.tsx:111`, which imports it at line 13 and calls it to pick the retained surface. Deleting it breaks that view. |
+| delete `normalizeCoverRef` and replace the sanitized `ref` with `text(cover.ref, 2_000)` | that function is the cover-ref **injection guard** — it rejects `javascript:`/`data:`/`vbscript:` refs and non-http(s) remote URLs, and rejects the whole entry when a `remote`/`local-cache` cover fails to sanitize. HEAD's own test asserts `javascript:alert(1)` normalizes to `null`; `87dd97c`'s copy of that test does not contain the assertion. |
+| change `value.slice(0, 5_000)` back to `value` in `normalizeReadingWorkspaceLibrary` | removes the unbounded-input cap. |
+
+There is nothing in `87dd97c` that HEAD lacks. Same shape as `9e6e82d`: the orphan is the earlier
+draft and the branch is the later evolution. **No code change — do not revisit.**
+
+### `99c8747` (fix(media): restore shared media shell) — closed obsolete, superseded by its own twin
+
+This one was never really orphaned work: **`f258ef7` on this branch is the same commit's landed
+review**, same subject, authored 14 minutes 49 seconds later (12:21:53 → 12:36:42, 2026-08-08).
+`f258ef7`'s ledger entry names `99c874791810dd6a3f984b25e55518c8d6c2566a` explicitly and says the
+primary orchestrator "reviewed its complete four-path diff and integrated only the Luna-owned
+hunks". Per-file at HEAD:
+
+- `views/mediaCenter.css` — **blob-identical** to `99c8747`. Fully landed.
+- `components/AppSection.tsx` — the commit's entire stated purpose is already live: HEAD routes
+  `player`→`<MediaCenterView initialTab="library" />` (76), `video`→`"video"` (82),
+  `music`→`"music"` (88). Taking `99c8747`'s version would **delete 152 commits of later
+  routing** — the `agent`→`AgentWorkspaceShell` case, `novels`/`reading`→`ReadingWorkspaceView`,
+  and the `ReadingFinderView` import.
+- `__tests__/mediaCenterIntegration.test.ts` — its assertion is `not.toContain('MediaWorkspaceSectionView')`
+  where HEAD asserts `not.toContain('<MediaWorkspaceSectionView')`. HEAD's is not a weakened
+  version: line 15 deliberately keeps `export const MediaWorkspaceCompatibilityView` as a
+  compatibility surface for old deep links, so the stricter substring check would fail on an
+  export that is intentionally there. (This file is dirty from another track and was not touched.)
+- `views/MediaCenterView.tsx` — the only residual code delta in the whole commit: **15 lines**
+  adding an automatic `onOpenSeanime({ localFilePath: item.path })` to item-play in `HomePanel`,
+  `LibraryPanel` and the `VideoPanel` card list.
+
+Those 15 lines were **rejected on purpose**, not missed. `f258ef7`'s ledger: "Primary review
+removed Luna's automatic item-play handoffs … the explicit Seanime controls remain and a single
+click can no longer dispatch the workspace twice." The contract comment still standing at
+`MediaCenterView.tsx:1363-1366` says the adopted surface "must never replace the sidebar or
+auto-open during mount", and `openSeanime` (1372-1380) falls back to `window.api.popOut('player')`
+when no host exists — so auto-firing it on every card click would spawn a pop-out from an ordinary
+play. The explicit handoff button at 668-676 is the sanctioned path and is live.
+
+**Correction to `f258ef7`'s stated reason, re-derived rather than repeated.** That entry justified
+the removal with "the dirty main tree already owns that behavior inside `playItem`". That is **not
+true at HEAD**: `MediaContent.tsx:951` `playItem` awaits `openItem(id)` and then dispatches
+`os:open` → `'video'` — a route navigation, not a workspace open. Nothing in the `playItem` path
+opens Seanime. The *decision* to drop the auto-handoff still stands on its own merits (explicit
+handoff, no double dispatch, no pop-out on a play click), but the reason recorded for it does not
+describe the tree. Anyone reopening this should argue it as a product question, not as
+de-duplication.
+
+### Method note
+
+The cheap falsifier for "is this orphan still needed?" is two commands, and it answered all three
+obsolete cases: `git rev-parse <commit>:<path>` vs `HEAD:<path>` per file to find what genuinely
+differs, then `git diff HEAD <commit>` — if that diff is dominated by **deletions**, the orphan is
+the older draft and the only question left is whether its few additions are wanted. For `9e6e82d`
+it was +9/−69, for `87dd97c` +2/−55, and for `99c8747` the 15 remaining additions had a recorded
+rejection.

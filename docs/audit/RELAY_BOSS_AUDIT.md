@@ -108,6 +108,11 @@ rediscovering them.
 Append to this table when you integrate one. Evidence lives in
 `src/MAIN_V1_EVIDENCE_LEDGER.md`, not here.
 
+**Status 2026-08-12: this list is CLOSED — 7 integrated, 3 closed obsolete, 0 open.** The
+instruction at the top of section 1 ("this outranks the normal ladder") is therefore spent; later
+workers should go straight to the ladder. Do not re-open a row marked *closed obsolete* without
+first reading its ledger reasoning — all three were falsified against HEAD, not skipped.
+
 | commit | state | landed as | notes |
 |---|---|---|---|
 | `27c74b6` | **integrated** 2026-08-12 | `4e5ea28` | Orphan had zero importers and was the stale copy (`a empire` vs canonical `an empire`). Deletion was already live on disk, so no runtime delta. Parity test added. |
@@ -116,10 +121,10 @@ Append to this table when you integrate one. Evidence lives in
 | `28a239c` | **integrated** 2026-08-12 | _(see ledger)_ | Split cleanly: 3 files new at both ends, 4 with base blob == HEAD taken whole at the commit blob, only `styles.css` + the 4 catalogs hand-applied. The `flash.unknownOnly` → `flash.dueOnly` rename was safe because both its consumers were in the blob-identical set. Live proof: the real deck is 3 218 epub cards with **zero** `srs`, and a synthetic probe driven through `addDeckCardsTracked`→`reviewDeckCard`→`removeDeckCard` gave Good=+1d / Again=+10min with ease 2.5→2.3, then restored the store byte-identical (1 320 982 bytes). |
 | `c3ae5b6` | **integrated** 2026-08-12 | `dd9364e` | Found already staged by a hop that exited before committing; re-derived rather than trusted — the 12 code files + plan doc were byte-identical to the commit's own diff, and the four catalogs carried content-identical hunks at shifted offsets. Wired end-to-end to `main/agentProviderRouter.ts:365`, not foundation-only. Live proof: this machine's real settings document has **no** `excludeSensitiveContext` key and the toggle still renders checked. |
 | `20f72eb` | **integrated** 2026-08-12 | `e4ad781` | Re-derived: `bfac09d` only touched the images/performance groups, so no real conflict. Seven of nine files applied verbatim (base blob == HEAD); `featureStatus.ts` and `fields.ts` hand-applied. Both honesty claims confirmed against source — `run-all` really does coalesce, `requireUnmeteredNetwork` really has no reader. |
-| `c48b266` | open | — | Touches `preload.ts`; invoke the handler live, do not grep the channel. |
-| `87dd97c` | open, partly absorbed | — | `shared/readingIpc.ts` is byte-identical at HEAD; `readingWorkspace.ts` is 462 lines there vs **493 at HEAD**. Per-hunk salvage only. |
+| `c48b266` | **integrated** 2026-08-12 | `8b55470` | Nine of thirteen files were `HEAD == BASE`; only the four catalogs were reconstructed, and the staged diff matched the original stat exactly (+195/−16 over 13 files). The preload trap fired for real: `window.api.lensHistoryPin` was already a function via hot reload while main still answered "No handler registered". After a restart, two captures identical but for `pinned` had opposite fates under a 200-capture flood. |
+| `87dd97c` | **closed obsolete** 2026-08-12 | — | Confirmed. `readingIpc.ts` blob-identical at HEAD; `git diff HEAD 87dd97c` over the other two is **+2 / −55**. Applying it would delete `readingWorkspaceSurfaceForSection` (live consumer at `ReadingWorkspaceView.tsx:111`), the `javascript:`/`data:`/`vbscript:` cover-ref guard, and the 5 000-entry input cap. Nothing there that HEAD lacks. No code change — do not revisit. |
 | `9e6e82d` | **closed obsolete** 2026-08-12 | — | Confirmed. `git diff HEAD 9e6e82d` over its three differing files is **+9 / −69**; applying it would delete `enrichLexiconResultMetadata`, which has a live consumer at `main/dictionary.ts:140` and its own tests. HEAD is the later evolution. No code change — do not revisit. |
-| `99c8747` | open, partly absorbed | — | `mediaCenter.css` identical at HEAD; the three renderer files look genuinely unlanded. |
+| `99c8747` | **closed obsolete** 2026-08-12 | — | Superseded by its own twin: **`f258ef7` is on this branch**, same subject, 14m49s later, and its ledger entry names `99c8747` as the worktree commit it reviewed. `mediaCenter.css` blob-identical; `AppSection.tsx` already routes player/video/music to `MediaCenterView` and taking the orphan's copy would delete 152 commits of later routes; the test's stricter assertion is incompatible with HEAD's deliberate `MediaWorkspaceCompatibilityView` export. Only 15 lines remain — auto-`onOpenSeanime` on item play — and those were **rejected on purpose** by the primary review. Earlier "three renderer files look genuinely unlanded" was a stat-level read; per-file it is one file, 15 lines. |
 
 Method worth reusing: `git rev-parse <commit>:<path>` against `git rev-parse HEAD:<path>`
 falsifies "is this still needed?" in one command per file, before any merge is attempted.
