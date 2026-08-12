@@ -45,6 +45,11 @@ import {
   type ChineseLookupDeps,
 } from './chineseLookup';
 import type { DictResult } from '../../shared/types';
+import {
+  buildOfflineInterlinear,
+  type LexiconInterlinearOptions,
+  type LexiconInterlinearResult,
+} from '../../shared/lexiconInterlinear';
 
 export interface DictionaryStatus {
   /** Absolute path of the database file. */
@@ -144,6 +149,29 @@ export function importCedictFileNow(filePath: string, dictId?: string): CedictIm
  */
 export function lookupInDictionaryDb(query: LookupQuery): LookupResult {
   return lookup(dictionaryDb(), query);
+}
+
+/**
+ * Build the Workbench's offline segmentation and interlinear glossary rows.
+ *
+ * This remains a service function rather than a new IPC channel until a
+ * first-class Workbench renderer consumer exists. It is intentionally read-only
+ * and uses the same SQLite lookup path as individual dictionary queries.
+ */
+export function lookupOfflineInterlinear(
+  db: SqliteDb,
+  text: string,
+  options: LexiconInterlinearOptions = {},
+): LexiconInterlinearResult {
+  return buildOfflineInterlinear(
+    text,
+    (query) => lookup(db, {
+      text: query,
+      sourceLangs: options.sourceLangs ? [...options.sourceLangs] : undefined,
+      limit: 8,
+    }),
+    options,
+  );
 }
 
 // ----- the Chinese surface's lookup path -------------------------------------

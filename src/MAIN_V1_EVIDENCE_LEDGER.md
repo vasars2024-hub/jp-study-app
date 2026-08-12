@@ -12307,3 +12307,86 @@ files, which carry other tracks' uncommitted hunks, so they need the reconstruct
 discipline rather than a plain `git add`. `20f72eb` touches `scraper/featureStatus.ts` and
 `scraper/settings/fields.ts`, which commit `bfac09d` has since rewritten — re-derive it against the
 tree before assuming it still applies.
+
+## Rescued commit 2 of 10 landed: offline interlinear grounding, and the "105 tests" claim corrected — 2026-08-12
+
+Second integration from `docs/audit/RELAY_BOSS_AUDIT.md` §1, taken from
+`rescued/codex-worktree/9c046cc-*`. All four of its files were byte-identical to HEAD or absent
+from it, so this applied cleanly with no reconstruction and no foreign hunk.
+
+### The stated acceptance criterion was re-run, not taken on trust
+
+The audit recorded a specific falsifiable claim: `食べた。猫` must resolve from SQLite as
+`食べた` → `食べる / たべる / to eat` by de-inflection, with `。` preserved and unmatched tokens shown
+without an invented gloss. `main/__tests__/dictionaryInterlinear.test.ts` is exactly that test, and
+it is not a mock — it opens a real dictionary database in a temp dir, imports a two-term legacy
+index, and asserts on the result. It passes. The second case looks up `未知`, gets
+`matchedCount: 0` with no `match` on any token, and asserts the `headwords` row count is unchanged
+before and after, which is what makes "read-only" a measured property rather than an intention.
+
+**One claim from that session does not survive.** It reported **105 tests passing**; the two suites
+this commit adds are **8 tests** (2 main + 6 shared). The larger number appears to have described
+the surrounding dictionary and lexicon area, which measures **125 passed / 6 skipped across 9 files**
+here. Both figures are fine; only the attribution was wrong. Quote the 8 when talking about this
+commit.
+
+### What it actually adds, and what it deliberately does not
+
+`shared/lexiconInterlinear.ts` (+378) segments a passage with `Intl.Segmenter`, falling back to a
+per-code-point splitter when the runtime's ICU lacks it, and emits an alternating token/separator
+stream whose concatenation is byte-identical to the normalized input — so punctuation and newlines
+survive rendering. Its lookup is an injected callback, so the shared layer never imports SQLite. Two
+properties are worth keeping: `prefix` hits are excluded from grounding (useful in a search list,
+not a gloss), and a token with a database match but no gloss in the requested language is reported
+as `hasTargetGloss: false` rather than being back-filled. Nothing here translates, infers, or calls
+a model.
+
+`main/dictionary/service.ts` (+28) wires it to the canonical SQLite lookup as
+`lookupOfflineInterlinear`.
+
+**There is no IPC channel and no renderer consumer.** Verified by grep: outside its own two tests,
+`lookupOfflineInterlinear` is referenced only where it is defined. This is a foundation slice — the
+Workbench interlinear does not ship to a user with this commit, and no surface should be marked
+ready on the strength of it. The architecture audit stays at exit 0 because `service.ts` itself has
+real main-process importers, so the import graph is closed; that is a weaker statement than "the
+feature is reachable".
+
+Automated gates on this branch and tree:
+
+- the two new suites: **2 files / 8 tests passed**;
+- surrounding dictionary + lexicon area: **8 files passed, 1 skipped / 125 passed, 6 skipped**;
+- `npx vitest run --testTimeout=60000`: exit 0, **542 files / 7,266 tests passed**, 1 file and 6
+  tests skipped, **zero failures**. Raising the per-test timeout from the default 20 s is what
+  removes the two whole-tree scan timeouts noted one section above; that is the cheap way to tell a
+  loaded machine apart from a regression on this suite;
+- `node tools/architecture-audit.cjs`: exit 0, **1,725** modules (up from 1,721), 17 findings,
+  nothing new, the same 2 known findings pending;
+- `node tools/i18n-check.cjs`: exit 0 — this slice adds no UI string, correctly, since it has no UI;
+- `npx eslint` on all four touched paths: exit 0.
+
+No live Electron acceptance: the debug bridge was not reachable from this session, and there is no
+user-facing surface to drive. When a Workbench consumer is built, that is the point at which live
+acceptance becomes meaningful — and the point at which the missing IPC channel has to be designed
+rather than assumed.
+
+### The three 08-08 commits are partly absorbed already — blob evidence
+
+The audit flagged `87dd97c`, `9e6e82d` and `99c8747` as 148–152 behind and told the next worker to
+re-derive whether they are still needed. Cheapest possible falsification, done here so nobody
+repeats it: compare each file's **blob hash** at the rescued commit against `HEAD`.
+
+| commit | identical at HEAD | still differs |
+|---|---|---|
+| `87dd97c` | `shared/readingIpc.ts` | `readingWorkspace.ts`, its test |
+| `9e6e82d` | `shared/lexiconWorkbench.ts`, its test | `main/dictionary.ts`, `dictionary/lexiconAdapter.ts`, its test |
+| `99c8747` | `renderer/views/mediaCenter.css` | `MediaCenterView.tsx`, `AppSection.tsx`, its test |
+
+**`9e6e82d` looks obsolete and should probably be closed, not integrated.** Its two shared files are
+byte-identical at HEAD, and `git diff HEAD 9e6e82d` on the two that differ is **+8 / −54** — i.e.
+applying it would *remove* 54 lines the branch has since grown. HEAD is the later evolution of that
+adapter, not a tree missing it. Confirm that read before closing it out, but do not cherry-pick it
+blind.
+
+`87dd97c`'s `readingWorkspace.ts` is **462 lines at the commit and 493 at HEAD**, the same shape of
+"already landed and extended". `99c8747` is the only one of the three whose renderer changes look
+genuinely unlanded. Treat all three as per-hunk salvage, never as cherry-picks.
