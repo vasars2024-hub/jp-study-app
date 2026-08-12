@@ -12111,3 +12111,49 @@ Automated gates:
 Next acceptance decision: either use the strict loopback provider-proxy design recorded by the
 audit, or leave Metadata amber and take the completely read-only Dashboard slice. Do not contact
 public catalogue providers merely to turn the status green.
+
+## Dashboard is live data, not its old fixture description — 2026-08-12
+
+Main V1 remains in dependency-order item 8. `page.dashboard` is now `ready`, moving the Scraper
+registry to **37 ready / 12 untested / 49 total (75.5%)**.
+
+### Direct IPC versus rendered page
+
+The already-running Scraper pop-out was driven through the authenticated debug bridge. A direct
+snapshot from `scraperCapabilities`, `scraperListSources`, `scraperListJobs`,
+`scraperListDownloads`, `scraperSystemStats` and the first twenty `scraperGetResult` calls was
+compared with the mounted Dashboard:
+
+- the renderer showed **Live data**, backed by 25 advertised main capabilities;
+- **6 sources**, **1 healthy source**, **2,458 indexed episodes**, **0 Japanese subtitle
+  tracks**, **6 distinct series**, **0 queued downloads** and **0 failed downloads** matched;
+- the current profile note named `relay-probe`, the newest job profile returned by main;
+- the six source-health rows matched main's labels, hosts, kinds, states, latency and history;
+- recent jobs/results, aggregate bytes, and live memory/CPU/active-job values rendered without
+  substituting a fixture. Memory and CPU were treated as moving measurements, not frozen equality
+  checks between polling instants.
+
+Five quick-access controls were clicked through their actual buttons and landed on New Scrape,
+Results, Downloads, Source Manager and Profiles. The Discover action's handler is the same direct
+navigation contract, but it was not clicked because mounting discovery can issue public catalogue
+requests and this read-only acceptance did not need that side effect.
+
+### Visual and restoration evidence
+
+At **900 x 640**, the header, live badge, command-center hero, primary actions, three live counts
+and first quick cards rendered without horizontal clipping, decorative emoji, invented poster art
+or a redundant internal app title. The inspected screenshot was deleted afterwards. The debug
+error ring remained **0**.
+
+The pop-out was returned to Profiles, the active profile remains `relay-probe`, advanced mode
+remains enabled, and both Dashboard probe globals were deleted and confirmed absent. No setting,
+profile, userData document or external service was mutated by this slice.
+
+Focused automated gate: `scraperDashboardResultLink.test.ts`, plus targeted ESLint for the
+Dashboard/data/status paths and focused `git diff --check`.
+
+### Exact next local slice
+
+Take `page.profiles` and `set.profiles` together. Snapshot the full settings blob, exercise the
+page and drawer contracts, and restore the exact blob rather than reconstructing it field by
+field. Keep Metadata amber until its provider runtime is observed deterministically.

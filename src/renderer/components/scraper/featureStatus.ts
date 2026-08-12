@@ -71,9 +71,11 @@ export const FEATURE_STATUS: Record<string, FeatureStatus> = {
   'shell.persistence': 'ready',
 
   // ---- Pages ----
-  // The hero counts are live (sources, indexed episodes, subtitle tracks); the
-  // panels below them — storage, learning, the activity strip — are not.
-  'page.dashboard': 'untested',
+  // 2026-08-12 live acceptance matched the rendered page to direct IPC:
+  // capabilities, sources, jobs/results, downloads and system stats. The Live
+  // data badge, hero/tiles, recent jobs, source health and runtime all agreed;
+  // five quick routes landed on their owning pages at 900x640 with no errors.
+  'page.dashboard': 'ready',
   // The one surface that already had a backend: discovery:search|browse|detail.
   'page.discover': 'ready',
   // Verified live: a run against a title and against a URL, both producing real
