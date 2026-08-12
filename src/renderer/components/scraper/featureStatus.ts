@@ -279,9 +279,13 @@ export const FEATURE_STATUS: Record<string, FeatureStatus> = {
   // module-level `Map` (httpCache.ts:149) with no disk path to test.
   'set.cache': 'ready',
   // maxParallelJobs gates job admission; batchSize sets the progress cadence.
-  // Inert, with no consumer to wire them to: maxParallelDownloads,
-  // memoryBudgetMb, cpuThrottlePercent, reuseBrowserContext, prefetchNextPage.
-  'set.performance': 'untested',
+  // 2026-08-12 live acceptance used two simultaneous three-attempt jobs: at 1,
+  // every socket for A opened before B; at 2, A and B interleaved. A three-row
+  // site-rule run emitted progress 1/2/3 at batchSize 1 and only 3 at 50 while
+  // emitting all three row events in both cases. Inert, with no consumer to
+  // wire them to: maxParallelDownloads, memoryBudgetMb, cpuThrottlePercent,
+  // reuseBrowserContext, prefetchNextPage. The status does not claim those five.
+  'set.performance': 'ready',
   // cleanText, decodeHtmlEntities, ignoreHiddenElements, normalizeEpisodeNumbering,
   // detectSeasonNumbers, detectSpecials and removeDuplicateEpisodes all act on
   // rows; siteRules already did. Inert: cssSelectors, xpathSelectors,

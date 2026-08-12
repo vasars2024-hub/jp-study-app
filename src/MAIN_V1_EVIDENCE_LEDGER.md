@@ -11958,3 +11958,66 @@ lines, in none of this branch's commits. This hop's commit was staged the same w
 three — reconstructing the blob from `git cat-file blob HEAD:<path>` — because a plain `git add`
 would carry that track's work into this branch. Re-check first: once that track lands, a plain
 `git add` is correct again.
+
+## The queue limit and the cadence it was actually limiting — 2026-08-12
+
+Main V1 remains in dependency-order item 8. `set.performance` is now `ready`, reducing the
+registry to **14 `untested` entries**. This status is deliberately narrower than the seven-field
+drawer group: two controls have runtime consumers and were driven through the running Electron
+app; five remain explicitly inert.
+
+### Live admission evidence
+
+The existing loopback probe and the running app's real `scraper:startScrape` bridge were used.
+Each admission run started two jobs together against distinct permanent-503 paths, with three
+HTTP attempts per job. Only `performance.maxParallelJobs` varied.
+
+- At `maxParallelJobs: 1`, the server order was `A, A, A, B, B, B`. Job B's first socket opened
+  2 ms after job A's final socket, and its `searching`/`fetching` events arrived only after A's
+  `failed`/`error` events.
+- At `maxParallelJobs: 2`, the order was `A, B, A, B, A, B`; both jobs entered `searching` and
+  `fetching` in the same millisecond.
+
+This separates admission from request concurrency: both payloads allowed eight concurrent
+requests, so the serialization at 1 belongs to the job queue, not the HTTP governor.
+
+### Live progress evidence
+
+Two more jobs used the same real bridge and a site-rule page containing exactly three rows.
+Both emitted all three `row` events and completed with `found: 3` / `failed: 0`.
+
+- `batchSize: 1` emitted progress at `1/3`, `2/3`, and `3/3`.
+- `batchSize: 50` emitted one progress event at `3/3`.
+
+The setting therefore changes IPC progress cadence without delaying row delivery, and the final
+partial batch is always reported.
+
+### What the dot does not claim
+
+`maxParallelDownloads`, `memoryBudgetMb`, `cpuThrottlePercent`, `reuseBrowserContext`, and
+`prefetchNextPage` still have no runtime consumer. Their drawer rows remain marked inert. The
+group is green on the same established rule used by `set.network` and `set.antibot`: every live
+field is accepted, and every non-live field is named instead of being implied functional.
+
+The probe passed settings only in each `startScrape` payload. It did not write localStorage, did
+not change the active profile (`relay-probe`), and did not persist a site rule.
+
+### Changed paths and gates
+
+- `src/renderer/components/scraper/featureStatus.ts` — promote `set.performance` and record the
+  exact live scope.
+- `src/MAIN_V1_EVIDENCE_LEDGER.md` — this evidence.
+
+Focused automated gate: `npx vitest run src/main/__tests__/scraperEnginePerformance.test.ts`.
+The suite exercises the engine itself through a real local HTTP server and covers serial/parallel
+admission, queued completion, batch sizes 1 and 50, and the final partial batch.
+
+### Exact next slice
+
+`set.extraction` is the next settings member. Reuse the live site-rule page, but make its three
+rows deliberately contain HTML entities, hidden text, duplicate/special/season-shaped numbers,
+and whitespace noise. Vary only the seven fields that `applyExtractionSettings` consumes and
+compare emitted rows. Keep `cssSelectors`, `xpathSelectors`, `regexPattern`, `regexFlags`, and
+`attribute` explicitly inert; the backend has no generic extractor for them. The existing
+focused automated seam is the extraction-rules suite; do not redesign the extractor while
+performing acceptance.
