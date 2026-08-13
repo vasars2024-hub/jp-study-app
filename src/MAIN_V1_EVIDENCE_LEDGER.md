@@ -17364,3 +17364,43 @@ placement choice in the older V1 audit is a later reversible Main V1 product dec
 standing approval, not a present Track 2 blocker. Seanime routing decisions are already recorded
 resolved; hardware/third-party availability and publication remain external or deferred. The
 archive-wide sweep is still not exhaustive, so `retrospectiveComplete` remains false.
+
+## Track 2 — responsive transactional cancellation for synchronous imports — 2026-08-13 19:36 MSK
+
+Re-deriving the failed bundled-provenance live pass exposed a process-boundary defect, not a slow
+loop alone. The utility process runs synchronous `better-sqlite3` work inside its MessagePort
+callback; while that callback is running, the process cannot receive the later `cancel` message.
+Every importer therefore had a nominal cooperative callback that could remain false until after the
+work returned. Legacy migration compounded this by polling only between whole stores.
+
+Standing approval selected a per-job cancellation marker under the existing dictionary database
+directory. Main creates no marker on start, writes the empty marker only when Cancel is requested,
+and removes it on every terminal/dispose path. The worker polls marker existence alongside the
+MessagePort boolean, so synchronous import code observes cancellation without yielding its event
+loop. Legacy row, pitch, and frequency loops now poll that callback inside the existing per-store
+transaction; cancellation throws an internal sentinel, rolls the active store back, and remains an
+honest `cancelled` outcome rather than a skipped-source failure. This is additive, local, contains no
+dictionary content, survives no terminal path, and preserves the existing hard-kill fallback.
+
+Live Electron acceptance used one fresh Forge process owned and stopped by this hop, driven only
+through the authenticated debug bridge. The real renderer API started migration of the installed
+bundled stores (including the 524,106-headword JMdict EN store); Cancel was requested 100 ms after
+the running snapshot and returned `ok:true`. A status reread reached terminal `cancelled` with zero
+committed stores. `JSON.stringify` of the complete four-source list before and after was exactly
+equal, proving the active transaction rolled back without replacing existing rows. The error-level
+bridge ring was empty. All descendants of the started process were enumerated and stopped; no
+userData backup, input automation, external write, or persisted-setting toggle was used.
+
+Gates: full Vitest **578 passed / 1 skipped files; 7,614 passed / 6 skipped tests**; i18n **9,487**
+keys complete; architecture **1,789 modules / 18 known findings / 2 pending**, nothing new; focused
+ESLint passed. Focused import job/worker/migration coverage passed **3 files / 45 tests**, including
+active-store rollback between rows.
+
+Retrospective decision-blocker sweep increment: the current boss-audit tail has no unaddressed
+finding. Worker/build permission remains superseded; cancellation signaling and transaction
+granularity were reversible internal architecture choices and are now implemented and live-proven.
+The older translator Settings placement is reserved for its dependency-ordered stage. Hardware or
+credential availability, publication, purchase, and user-data deletion remain external/deferred.
+The archive-wide historical sweep is not yet exhaustive, so `retrospectiveComplete` correctly
+remains false. Track 2 remains active: rerun bundled provenance to a terminal commit now that Cancel
+is safe, then re-derive remaining source provisioning, deep-search, and Workbench gaps.

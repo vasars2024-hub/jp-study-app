@@ -185,6 +185,7 @@ describe('attachDictionaryImportWorker', () => {
       request: { kind: 'cedict', filePath: file },
       dbDir,
       legacyRoot: tempRoot,
+      cancelPath: path.join(tempRoot, 'cancel-job-1'),
     });
 
     const terminals = harness.out.filter((message) => message.type === 'terminal');
@@ -213,6 +214,7 @@ describe('attachDictionaryImportWorker', () => {
       request: { kind: 'legacy' as const },
       dbDir,
       legacyRoot: path.join(tempRoot, 'yomitan'),
+      cancelPath: path.join(tempRoot, 'cancel-job-1'),
     };
     harness.send(start);
     harness.send({ ...start, jobId: 'job-2' });
@@ -234,6 +236,7 @@ describe('attachDictionaryImportWorker', () => {
       request: { kind: 'cedict', filePath: path.join(tempRoot, 'nope.u8') },
       dbDir,
       legacyRoot: tempRoot,
+      cancelPath: path.join(tempRoot, 'cancel-job-1'),
     });
 
     const terminal = harness.out.find((message) => message.type === 'terminal');

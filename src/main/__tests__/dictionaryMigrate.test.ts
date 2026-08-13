@@ -337,8 +337,8 @@ describe('scanning userData/yomitan', () => {
     writeStore(path.join(root, 'a-first'), fixture({ info: { ...fixture().info, id: 'a-first', title: 'First' } }));
     writeStore(path.join(root, 'b-second'), fixture({ info: { ...fixture().info, id: 'b-second', title: 'Second' } }));
 
-    let seen = 0;
-    const result = migrateLegacyYomitanStores(db, root, () => { seen += 1; }, () => seen >= 1);
+    let polls = 0;
+    const result = migrateLegacyYomitanStores(db, root, undefined, () => (polls += 1) >= 5);
 
     expect(result.cancelled).toBe(true);
     expect(result.imported.map((row) => row.dictId)).toEqual(['a-first']);
@@ -347,6 +347,24 @@ describe('scanning userData/yomitan', () => {
     expect(result.skipped).toEqual([]);
     const rows = db.prepare('select id from dictionaries').all() as { id: string }[];
     expect(rows.map((row) => row.id)).toEqual(['a-first']);
+  });
+
+  it('rolls back the active store when cancellation arrives between its rows', () => {
+    const root = path.join(tempRoot, 'yomitan');
+    writeStore(path.join(root, 'large'), fixture({
+      info: { ...fixture().info, id: 'large', title: 'Large' },
+      terms: {
+        一: [entry('一', 'いち', ['one'])],
+        二: [entry('二', 'に', ['two'])],
+      },
+    }));
+
+    let polls = 0;
+    const result = migrateLegacyYomitanStores(db, root, undefined, () => (polls += 1) >= 3);
+
+    expect(result).toEqual({ imported: [], skipped: [], cancelled: true });
+    expect(db.prepare('select count(*) c from dictionaries where id = ?').get('large')).toEqual({ c: 0 });
+    expect(db.prepare('select count(*) c from headwords').get()).toEqual({ c: 0 });
   });
 
   it('does not set cancelled when nothing asked it to stop', () => {

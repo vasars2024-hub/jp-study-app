@@ -238,7 +238,7 @@ export function attachDictionaryImportWorker(port: ParentPort): void {
     if (message.type !== 'start' || started) return;
     started = true;
 
-    const { jobId, request, dbDir, legacyRoot } = message;
+    const { jobId, request, dbDir, legacyRoot, cancelPath } = message;
     const kind: DictionaryImportKind = request.kind;
     const send = (out: DictionaryImportWorkerOut): void => port.postMessage(out);
 
@@ -246,7 +246,7 @@ export function attachDictionaryImportWorker(port: ParentPort): void {
     try {
       terminal = runDictionaryImport(request, dbDir, legacyRoot, {
         onProgress: (lines, phase) => send({ type: 'progress', progress: { jobId, kind, lines, phase } }),
-        shouldCancel: () => cancelRequested,
+        shouldCancel: () => cancelRequested || fs.existsSync(cancelPath),
         openDb: (dir) => openDictionaryDb({ dir }),
       });
     } catch (error) {

@@ -129,7 +129,13 @@ export function glossLangOf(info: YomitanDictInfo): string {
  * their index entries. Doing it any other way is how a re-import leaves a search
  * index answering with rows that no longer exist.
  */
-export function importLegacyIndex(db: SqliteDb, index: LegacyDictIndex): ImportedCounts {
+class LegacyMigrationCancelled extends Error {}
+
+export function importLegacyIndex(
+  db: SqliteDb,
+  index: LegacyDictIndex,
+  shouldCancel?: () => boolean,
+): ImportedCounts {
   const info = index.info;
   const dictId = info.id;
   const glossLang = glossLangOf(info);
@@ -164,6 +170,7 @@ export function importLegacyIndex(db: SqliteDb, index: LegacyDictIndex): Importe
 
     for (const [norm, entries] of Object.entries(index.terms ?? {})) {
       for (const entry of entries) {
+        if (shouldCancel?.()) throw new LegacyMigrationCancelled();
         const headwordId = Number(
           insertHeadword.run(
             dictId,
@@ -203,6 +210,7 @@ export function importLegacyIndex(db: SqliteDb, index: LegacyDictIndex): Importe
       values (?, 'ja', ?, ?, ?)
     `);
     for (const [key, value] of Object.entries(index.pitch ?? {})) {
+      if (shouldCancel?.()) throw new LegacyMigrationCancelled();
       const [term] = key.split(LEGACY_KEY_SEP);
       insertPitch.run(dictId, term, value.reading ?? '', (value.positions ?? []).join(','));
       counts.pitch += 1;
@@ -213,6 +221,7 @@ export function importLegacyIndex(db: SqliteDb, index: LegacyDictIndex): Importe
       values ('ja', ?, ?, ?, null)
     `);
     for (const [key, rank] of Object.entries(index.freq ?? {})) {
+      if (shouldCancel?.()) throw new LegacyMigrationCancelled();
       const [term] = key.split(LEGACY_KEY_SEP);
       insertFreq.run(term, dictId, rank);
       counts.freq += 1;
@@ -318,11 +327,15 @@ export function migrateLegacyYomitanStores(
     }
     onProgress?.({ current: position + 1, total: dirs.length, dictId: parsed.info.id, title: parsed.info.title });
     try {
-      const counts = importLegacyIndex(db, parsed);
+      const counts = importLegacyIndex(db, parsed, shouldCancel);
       const bytes = fs.statSync(file).size;
       db.prepare('update dictionaries set bytes = ? where id = ?').run(bytes, parsed.info.id);
       result.imported.push(counts);
     } catch (err) {
+      if (err instanceof LegacyMigrationCancelled) {
+        result.cancelled = true;
+        return;
+      }
       result.skipped.push({ dictId: parsed.info.id, reason: `import failed: ${(err as Error).message}` });
     }
   });

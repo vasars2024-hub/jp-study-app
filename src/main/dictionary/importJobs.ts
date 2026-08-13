@@ -16,6 +16,7 @@
 //   * **A dead worker is a failure, not a silence.** If the process exits
 //     without sending a terminal message, that is reported as `failed`.
 
+import fs from 'node:fs';
 import path from 'node:path';
 import type {
   DictionaryImportJobSnapshot,
@@ -53,6 +54,7 @@ interface ActiveJob {
   snapshot: DictionaryImportJobSnapshot;
   worker: ImportWorkerHandle;
   cancelling: boolean;
+  cancelPath: string;
 }
 
 export class DictionaryImportJobs {
@@ -93,7 +95,10 @@ export class DictionaryImportJobs {
       return { ok: true, snapshot: terminal };
     }
 
-    this.active = { snapshot, worker, cancelling: false };
+    const dbDir = this.deps.dbDir();
+    const cancelPath = path.join(dbDir, `.import-cancel-${jobId.replace(/[^a-zA-Z0-9_-]/g, '_')}`);
+    fs.rmSync(cancelPath, { force: true });
+    this.active = { snapshot, worker, cancelling: false, cancelPath };
     this.last = null;
 
     worker.on('message', (message) => this.receive(jobId, message));
@@ -114,8 +119,9 @@ export class DictionaryImportJobs {
       type: 'start',
       jobId,
       request,
-      dbDir: this.deps.dbDir(),
+      dbDir,
       legacyRoot: this.deps.legacyRoot(),
+      cancelPath,
     });
     this.deps.onSnapshot?.(snapshot);
     return { ok: true, snapshot };
@@ -129,6 +135,10 @@ export class DictionaryImportJobs {
     if (!this.active) return { ok: false, snapshot: this.last };
     if (jobId && jobId !== this.active.snapshot.jobId) return { ok: false, snapshot: this.active.snapshot };
     this.active.cancelling = true;
+    // The worker's SQLite loop is synchronous, so its MessagePort cannot deliver
+    // the cancel message until that loop yields. A tiny marker gives the loop a
+    // process-independent signal it can poll while retaining transactional rollback.
+    fs.writeFileSync(this.active.cancelPath, '', { flag: 'w' });
     this.active.worker.postMessage({ type: 'cancel' });
     return { ok: true, snapshot: this.active.snapshot };
   }
@@ -137,6 +147,7 @@ export class DictionaryImportJobs {
   dispose(): void {
     if (!this.active) return;
     const worker = this.active.worker;
+    fs.rmSync(this.active.cancelPath, { force: true });
     this.active = null;
     worker.kill();
   }
@@ -170,6 +181,9 @@ export class DictionaryImportJobs {
       status: terminal.state,
       terminal,
     };
+    if (this.active?.snapshot.jobId === snapshot.jobId) {
+      fs.rmSync(this.active.cancelPath, { force: true });
+    }
     this.active = null;
     this.last = settled;
     this.deps.onSnapshot?.(settled);

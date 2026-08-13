@@ -142,7 +142,7 @@ export function normalizeDictionaryImportRequest(value: unknown): DictionaryImpo
 
 /** Main -> worker. The worker serves exactly one job and then exits. */
 export type DictionaryImportWorkerIn =
-  | { type: 'start'; jobId: string; request: DictionaryImportRequest; dbDir: string; legacyRoot: string }
+  | { type: 'start'; jobId: string; request: DictionaryImportRequest; dbDir: string; legacyRoot: string; cancelPath: string }
   | { type: 'cancel' };
 
 /** Worker -> main. Anything else on the channel is dropped, not guessed at. */

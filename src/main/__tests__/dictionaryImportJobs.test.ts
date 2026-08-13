@@ -59,7 +59,7 @@ function harness() {
       workers.push(worker);
       return worker;
     },
-    dbDir: () => '/tmp/dict',
+    dbDir: () => process.cwd(),
     legacyRoot: () => '/tmp/yomitan',
     onSnapshot: (snapshot) => snapshots.push(snapshot),
     newJobId: () => `job-${(counter += 1)}`,
@@ -78,8 +78,9 @@ describe('DictionaryImportJobs', () => {
       type: 'start',
       jobId: 'job-1',
       request: { kind: 'cedict', filePath: '/tmp/cedict.u8' },
-      dbDir: '/tmp/dict',
+      dbDir: process.cwd(),
       legacyRoot: '/tmp/yomitan',
+      cancelPath: expect.stringMatching(/\.import-cancel-job-1$/),
     });
 
     workers[0].emit({
