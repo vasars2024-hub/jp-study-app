@@ -95,6 +95,13 @@ describe('runDictionaryImport', () => {
       .toEqual({ source_lang: 'ru', target_langs: 'en' });
   });
 
+  it('routes JMnedict XML through the worker', () => {
+    const file = path.join(tempRoot, 'JMnedict.xml');
+    fs.writeFileSync(file, '<JMnedict><entry><k_ele><keb>山田</keb></k_ele><r_ele><reb>やまだ</reb></r_ele><trans><name_type>&surname;</name_type><trans_det>Yamada</trans_det></trans></entry></JMnedict>', 'utf8');
+    const terminal = runDictionaryImport({ kind: 'jmnedict', filePath: file }, dbDir, tempRoot, deps());
+    expect(terminal).toEqual({ state: 'committed', counts: { entries: 1, skipped: 0, headwords: 2, variants: 1, senses: 1, glosses: 1 } });
+  });
+
   it('reports a cancel as cancelled with no counts, and leaves nothing behind', () => {
     const file = path.join(tempRoot, 'cedict.u8');
     fs.writeFileSync(file, CEDICT, 'utf8');

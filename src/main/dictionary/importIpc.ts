@@ -37,12 +37,13 @@ const PICKABLE = {
   cedict: { titleKey: 'dialog.importCedict.title', filterKey: 'dialog.filter.cedict', extensions: ['u8', 'txt'] },
   wiktextract: { titleKey: 'dialog.importWiktextract.title', filterKey: 'dialog.filter.jsonl', extensions: ['jsonl', 'json'] },
   dsl: { titleKey: 'dialog.importDsl.title', filterKey: 'dialog.filter.dsl', extensions: ['dsl', 'txt'] },
+  jmnedict: { titleKey: 'dialog.importJmnedict.title', filterKey: 'dialog.filter.jmnedict', extensions: ['xml'] },
 } as const;
 
 type PickableKind = keyof typeof PICKABLE;
 
 function pickableKind(value: unknown): PickableKind | null {
-  return value === 'cedict' || value === 'wiktextract' || value === 'dsl' ? value : null;
+  return value === 'cedict' || value === 'wiktextract' || value === 'dsl' || value === 'jmnedict' ? value : null;
 }
 
 let jobs: DictionaryImportJobs | null = null;

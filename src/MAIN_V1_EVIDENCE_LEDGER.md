@@ -17088,3 +17088,35 @@ correctly remains false.
 Track 2 remains active. The next source-coverage slice should re-derive KANJIDIC/JMnedict/Tatoeba
 versus binary StarDict from the current import graph; do not treat this DSL checkpoint as closing
 the plan's broader StarDict/DSL row.
+
+## Track 2 — JMnedict names import through the utility process — 2026-08-13 17:53 MSK
+
+Relay hop `codexB` re-derived the next source-coverage slice from the current schema and import
+graph. JMnedict was the smallest coherent next source: names fit the existing
+dictionary/headword/sense cascade, while KANJIDIC still needs provenance ownership for the global
+`chars` table and Tatoeba needs a paired-file request contract. This reversible ordering decision
+is covered by standing approval and does not weaken either later importer.
+
+The new JMnedict XML importer runs inside the existing utility process, replaces one named source
+in a single transaction, cooperatively cancels with rollback, stores kanji spellings as primaries
+and readings/alternate spellings as variants, retains translation languages, and exposes the
+source through the existing recoverable Settings import card. Named XML entities such as
+`&surname;` become readable type labels rather than being discarded.
+
+Live Electron acceptance used one fresh Forge process and the authenticated debug bridge only.
+A one-entry fixture imported as `relay-jmnedict-live` and reached terminal `committed` with exact
+counts `{entries:1, skipped:0, headwords:2, variants:1, senses:1, glosses:1}`. A real
+`lookupTerm('継電試験名')` returned reading `けいでんしけんめい`, part of speech `surname`, gloss
+`Relay Test Name`, and source `JMnedict`. The source was removed through `dictRemoveSource`; a
+fresh app restart confirmed the pre-probe empty source list was restored. Dictionary error logs
+were empty. Both Forge process trees started by this hop were stopped; no userData backup or
+input automation was used.
+
+Gates: full Vitest **575 passed / 1 skipped files; 7,598 passed / 6 skipped tests**; i18n **9,473**
+keys complete; architecture **1,783 modules / 18 known findings / 2 known pending**, nothing new;
+focused ESLint passed; focused importer/worker/contract suites passed **3 files / 25 tests**.
+
+The retrospective sweep remains incomplete: no irreversible external blocker was found, but the
+historical archive is not yet exhaustively reconciled. Track 2 remains active. Next re-derive
+KANJIDIC versus Tatoeba versus binary StarDict; do not claim the importer phase complete from this
+JMnedict checkpoint.

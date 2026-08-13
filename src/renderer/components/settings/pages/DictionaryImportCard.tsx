@@ -6,7 +6,7 @@ import type {
 import { useT } from '../../../i18n';
 import SettingsCard from '../SettingsCard';
 
-const FILE_KINDS = ['cedict', 'wiktextract', 'dsl'] as const;
+const FILE_KINDS = ['cedict', 'wiktextract', 'dsl', 'jmnedict'] as const;
 
 export function dictionaryImportStatusKey(snapshot: DictionaryImportJobSnapshot | null): string {
   if (!snapshot) return 'storage.dictionaryImport.idle';
