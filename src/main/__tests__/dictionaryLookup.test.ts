@@ -412,6 +412,24 @@ describe('ranking and shape', () => {
     ]);
   });
 
+  it('keeps licence and attribution on every merged contributing source', () => {
+    db.prepare('update dictionaries set licence = ?, attribution = ? where id = ?')
+      .run('CC BY-SA 4.0', 'EDRDG', 'jmdict-en');
+    db.prepare('update dictionaries set licence = ?, attribution = ? where id = ?')
+      .run('CC BY-SA 4.0', 'JMdict Russian project', 'jmdict-ru');
+
+    expect(lookup(db, { text: '食べる' }).entries[0].sources).toEqual([
+      {
+        dictId: 'jmdict-en', dictTitle: 'JMdict (English)', priority: 0,
+        licence: 'CC BY-SA 4.0', attribution: 'EDRDG',
+      },
+      {
+        dictId: 'jmdict-ru', dictTitle: 'JMdict (Russian)', priority: 1,
+        licence: 'CC BY-SA 4.0', attribution: 'JMdict Russian project',
+      },
+    ]);
+  });
+
   it('honours the limit', () => {
     expect(lookup(db, { text: '食', limit: 1 }).entries).toHaveLength(1);
   });

@@ -17265,3 +17265,39 @@ publication or purchase remain genuinely external/deferred. The archive-wide ret
 yet exhaustive, so `retrospectiveComplete` remains false. Track 2 remains active; next re-derive
 bundled-source provisioning and the remaining deep-search/workbench gaps rather than skipping to
 the later screenshot/OCR Agent slice.
+
+## Track 2 — merged lookup provenance retains licence obligations — 2026-08-13 18:51 MSK
+
+Re-deriving source management after the paired Tatoeba checkpoint found a narrow contract split.
+`dictionaries` persisted `licence` and `attribution`, and Settings displayed them, but the unified
+lookup projection reduced every contributing source to id/title/priority. A merged entry could
+therefore name all of its sources while dropping the metadata needed to discharge their licence
+and attribution obligations outside Settings.
+
+The lookup source contract now carries non-empty licence and attribution values through both
+headword and reverse-gloss queries. Merge order and backward-compatible primary `dictId` remain
+unchanged: sources are still ordered by deterministic dictionary priority and deduplicated by
+source id. Empty legacy metadata stays omitted rather than being invented. Regression coverage
+proves that two semantically merged dictionaries retain two distinct provenance records.
+
+The earlier Tatoeba live debt is also closed. One fresh Forge process owned and stopped by this
+hop was driven only through the authenticated debug bridge. The real preload/main/utility-process
+path committed a disposable Japanese sentence with linked English and Russian translations as
+`relay-tatoeba-live`, terminal counts `{entries:1, skipped:0, headwords:1, senses:1, glosses:2}`.
+`dictListSources` returned `CC BY 2.0 FR` and `Tatoeba — https://tatoeba.org/`; removal through
+`dictRemoveSource` restored the exact empty pre-probe source list. No userData backup or input
+automation was used, and the disposable TSV files were removed.
+
+Gates: full Vitest **578 passed / 1 skipped files; 7,610 passed / 6 skipped tests**; i18n
+**9,487 keys** complete; architecture **1,789 modules / 18 known findings / 2 pending, nothing
+new**; focused ESLint passed; focused lookup suite **1 file / 53 tests passed**.
+
+Retrospective sweep increment: the latest boss audit has no unaddressed finding. Source-provenance
+shape and Tatoeba's paired-file contract are reversible internal decisions covered by standing
+approval and are now implemented/live-proven. Earlier utility-process/configuration, KANJIDIC
+ownership, and source-licence display blockers remain closed. Hardware/credential availability,
+publication, purchase, and user-data deletion remain genuinely external/deferred. The historical
+archive is not yet exhaustively reconciled, so `retrospectiveComplete` remains false.
+
+Track 2 remains active. Next re-derive automatic bundled-source provisioning and the remaining
+deep-search/workbench capability gaps; do not skip forward to the later Agent/Reading tracks.

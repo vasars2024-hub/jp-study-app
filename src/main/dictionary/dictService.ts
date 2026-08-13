@@ -60,6 +60,9 @@ export interface LookupSource {
   dictId: string;
   dictTitle: string;
   priority: number;
+  /** Licence and attribution travel with each contributing source when supplied. */
+  licence?: string;
+  attribution?: string;
 }
 
 export interface LookupEntry {
@@ -171,11 +174,13 @@ interface HeadwordRow {
   score: number;
   freq_rank: number | null;
   priority: number;
+  licence: string | null;
+  attribution: string | null;
 }
 
 const HEADWORD_SELECT = `
   select h.id, h.dict_id, d.title as dict_title, h.lang, h.text, h.norm, h.reading, h.reading_norm,
-         h.variant_of, h.score, h.freq_rank, d.priority
+         h.variant_of, h.score, h.freq_rank, d.priority, d.licence, d.attribution
   from headwords h
   join dictionaries d on d.id = h.dict_id
   where d.enabled = 1
@@ -232,7 +237,13 @@ function toEntry(
     ...(reasons.length ? { reasons } : {}),
     score: row.score,
     dictionaryPriority: row.priority,
-    sources: [{ dictId: row.dict_id, dictTitle: row.dict_title, priority: row.priority }],
+    sources: [{
+      dictId: row.dict_id,
+      dictTitle: row.dict_title,
+      priority: row.priority,
+      ...(row.licence ? { licence: row.licence } : {}),
+      ...(row.attribution ? { attribution: row.attribution } : {}),
+    }],
     ...(fuzzyDistance === undefined ? {} : { fuzzyDistance }),
   };
 }
@@ -470,7 +481,7 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
     const glossRows = db
       .prepare(`
         select h.id, h.dict_id, d.title as dict_title, h.lang, h.text, h.norm, h.reading, h.reading_norm,
-               h.variant_of, h.score, h.freq_rank, d.priority
+               h.variant_of, h.score, h.freq_rank, d.priority, d.licence, d.attribution
         from glosses_fts
         join glosses g on g.id = glosses_fts.rowid
         join senses  s on s.id = g.sense_id
