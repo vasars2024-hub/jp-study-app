@@ -3,7 +3,7 @@
  * The worker/main bridge owns execution; this module only describes the
  * observable state so renderer recovery cannot infer success from progress.
  */
-export type DictionaryImportKind = 'cedict' | 'wiktextract' | 'dsl' | 'jmnedict' | 'legacy';
+export type DictionaryImportKind = 'cedict' | 'wiktextract' | 'dsl' | 'jmnedict' | 'stardict' | 'legacy';
 
 export type DictionaryImportTerminal =
   | { state: 'committed'; counts: Record<string, number> }
@@ -26,7 +26,7 @@ export interface DictionaryImportJobSnapshot {
   terminal?: DictionaryImportTerminal;
 }
 
-const KINDS = new Set<DictionaryImportKind>(['cedict', 'wiktextract', 'dsl', 'jmnedict', 'legacy']);
+const KINDS = new Set<DictionaryImportKind>(['cedict', 'wiktextract', 'dsl', 'jmnedict', 'stardict', 'legacy']);
 const PHASES = new Set<DictionaryImportProgress['phase']>(['reading', 'importing', 'committing']);
 const TERMINAL_STATES = new Set<DictionaryImportTerminal['state']>(['committed', 'cancelled', 'failed']);
 const JOB_ID_MAX = 128;

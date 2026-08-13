@@ -102,6 +102,20 @@ describe('runDictionaryImport', () => {
     expect(terminal).toEqual({ state: 'committed', counts: { entries: 1, skipped: 0, headwords: 2, variants: 1, senses: 1, glosses: 1 } });
   });
 
+  it('routes a StarDict file set through the worker', () => {
+    const base = path.join(tempRoot, 'fixture');
+    fs.writeFileSync(`${base}.ifo`, "StarDict's dict ifo file\nversion=3.0.0\nbookname=Fixture\nwordcount=1\nsametypesequence=m\n");
+    const idx = Buffer.alloc(Buffer.byteLength('猫') + 1 + 8);
+    idx.write('猫', 0, 'utf8');
+    const tail = Buffer.byteLength('猫') + 1;
+    idx.writeUInt32BE(0, tail);
+    idx.writeUInt32BE(3, tail + 4);
+    fs.writeFileSync(`${base}.idx`, idx);
+    fs.writeFileSync(`${base}.dict`, 'cat');
+    expect(runDictionaryImport({ kind: 'stardict', filePath: `${base}.ifo` }, dbDir, tempRoot, deps()))
+      .toEqual({ state: 'committed', counts: { entries: 1, skipped: 0, headwords: 1, senses: 1, glosses: 1 } });
+  });
+
   it('reports a cancel as cancelled with no counts, and leaves nothing behind', () => {
     const file = path.join(tempRoot, 'cedict.u8');
     fs.writeFileSync(file, CEDICT, 'utf8');

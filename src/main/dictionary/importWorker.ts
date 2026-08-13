@@ -31,6 +31,7 @@ import { importCedict } from './importers/cedict';
 import { importWiktextract, readJsonlLines } from './importers/wiktextract';
 import { importDsl, readDslFile } from './importers/dsl';
 import { importJmnedict } from './importers/jmnedict';
+import { importStarDict } from './importers/stardict';
 import { migrateLegacyYomitanStores } from './migrate';
 import type {
   DictionaryImportKind,
@@ -147,6 +148,18 @@ export function runDictionaryImport(
       const xml = fs.readFileSync(request.filePath as string, 'utf8');
       deps.onProgress(0, 'importing');
       const counts = importJmnedict(db, xml, {
+        ...(request.dictId ? { dictId: request.dictId } : {}),
+        progressEvery: PROGRESS_EVERY,
+        onProgress: (entries) => deps.onProgress(entries, 'importing'),
+        shouldCancel: deps.shouldCancel,
+      });
+      const { cancelled, ...rest } = counts;
+      return cancelled ? { state: 'cancelled', counts: {} } : { state: 'committed', counts: numericCounts(rest) };
+    }
+
+    if (request.kind === 'stardict') {
+      deps.onProgress(0, 'reading');
+      const counts = importStarDict(db, request.filePath as string, {
         ...(request.dictId ? { dictId: request.dictId } : {}),
         progressEvery: PROGRESS_EVERY,
         onProgress: (entries) => deps.onProgress(entries, 'importing'),

@@ -17120,3 +17120,37 @@ The retrospective sweep remains incomplete: no irreversible external blocker was
 historical archive is not yet exhaustively reconciled. Track 2 remains active. Next re-derive
 KANJIDIC versus Tatoeba versus binary StarDict; do not claim the importer phase complete from this
 JMnedict checkpoint.
+## Track 2 — binary StarDict import and unknown-language lookup — 2026-08-13 18:07 MSK
+
+Relay hop `codexB` re-derived KANJIDIC, Tatoeba, and binary StarDict against the current source.
+KANJIDIC needs a versioned provenance/ownership migration for the global `chars(lang,char)` table;
+Tatoeba's existing importer writes a separate main-process JSON index and needs paired-file atomic
+replacement. StarDict fits the already-live dictionary/headword/sense ownership graph, so standing
+approval selected it as the smallest reversible next slice.
+
+The importer accepts uncompressed StarDict 3.0 `.ifo` + sibling `.idx`/`.dict` sets with plain-text
+`sametypesequence=m`, 32- or 64-bit offsets, transaction rollback, cancellation, count validation,
+and explicit failures for unsupported entry encodings or `.dict.dz`. Because StarDict metadata does
+not reliably identify source/target languages, rows are honestly stored as `und`; lookup now searches
+`und` after detected languages instead of guessing. The Settings picker/card and EN/JA/ZH/RU catalogs
+expose the new kind.
+
+Live Electron acceptance used two fresh Forge processes, both stopped afterward, and only the
+authenticated debug bridge. A one-entry fixture committed through preload/main/utility process.
+The first live lookup exposed that `und` rows were unreachable; after the fallback fix and fresh
+restart, `lookupTerm('継電星語')` returned `Relay live meaning`, source `Relay StarDict fixture`, and
+`sourceLangs:['und']`. Removal through `dictRemoveSource` restored the source list to the exact empty
+pre-probe value. No userData backup or input automation was used.
+
+Gates: full Vitest **576 passed / 1 skipped files; 7,602 passed / 6 skipped tests**; i18n **9,477**
+keys complete; architecture **1,785 modules / 18 known findings / 2 known pending**, nothing new.
+Focused importer/worker tests passed **2 files / 14 tests**. ESLint passed on owned
+implementation/test/UI paths; `window.d.ts` retains exactly its two pre-existing subtitle-harvest
+adjacent-overload errors.
+
+Retrospective blocker sweep increment: the latest boss audit has no unaddressed finding. Historical
+worker/build permission remains closed. KANJIDIC provenance and Tatoeba paired-file shape are routine,
+reversible internal contracts covered by standing approval, not external blockers. The archive-wide
+sweep remains incomplete, so `retrospectiveComplete` correctly remains false. Track 2 remains active;
+next re-derive KANJIDIC provenance versus Tatoeba atomic paired import rather than claiming source
+coverage complete.

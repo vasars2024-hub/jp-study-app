@@ -366,6 +366,11 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
   const text = query.text.trim();
   const limit = query.limit ?? 40;
   const detected = query.sourceLangs?.length ? query.sourceLangs : detectQueryLangs(text);
+  // User-imported formats such as StarDict do not carry a reliable language
+  // code. Search their honest `und` rows after detected languages rather than
+  // guessing a language at import time and making the dictionary unreachable
+  // whenever that guess is wrong.
+  const searchLangs = detected.includes('und') ? detected : [...detected, 'und'];
   const result: LookupResult = { query: text, detectedLangs: detected, entries: [] };
   if (!text) return result;
 
@@ -406,7 +411,7 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
     `${HEADWORD_SELECT} and h.lang = ? and h.norm > ? and h.norm < ? order by length(h.norm), d.priority, h.id limit ?`,
   );
 
-  for (const lang of detected) {
+  for (const lang of searchLangs) {
     const forms = candidateForms(lang, text);
     for (const { form, reasons } of forms) {
       const via = reasons.length ? 'deinflected' : 'exact';
@@ -498,7 +503,7 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
         if (distance <= budget) matches.push({ row, distance });
       };
 
-      for (const lang of detected) {
+      for (const lang of searchLangs) {
         for (const row of byFuzzyPrefix.all(
           lang, prefix, `${prefix}￿`, prefix, `${prefix}￿`, FUZZY_CANDIDATE_LIMIT,
         ) as HeadwordRow[]) {
