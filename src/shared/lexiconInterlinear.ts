@@ -177,12 +177,52 @@ export interface LexiconInterlinearMatch {
   hasTargetGloss: boolean;
 }
 
+/**
+ * What a token is for a learner counting vocabulary.
+ *
+ * - `content` — a word to study: nouns, verbs, adjectives, adverbs, interjections.
+ * - `function` — grammar rather than vocabulary: particles, auxiliaries,
+ *   conjunctions, pronouns, numerals, bound nouns, prefixes and suffixes. The
+ *   linguistic sense of the term, which is why pronouns are here and not in
+ *   `content`.
+ * - `name` — a proper noun. Kept separate because a character or place name is
+ *   real vocabulary in a passage but not something a learner is behind on.
+ * - `other` — punctuation, symbols, fillers, and anything the analyser labelled
+ *   with a tag the classifier does not know. Explicitly "no opinion".
+ *
+ * The classifier that produces these lives in `lexiconPartOfSpeech.ts`; the type
+ * lives here because it is part of the token contract every consumer reads.
+ */
+export type LexiconWordClass = 'content' | 'function' | 'name' | 'other';
+
+/**
+ * One token's morphological analysis.
+ *
+ * Present only when an analyser actually ran over the passage — the offline
+ * dictionary stores carry no part of speech, so a token with no `pos` means "not
+ * analysed", never "not a word".
+ */
+export interface LexiconPartOfSpeech {
+  /** IPADIC top-level part of speech, e.g. 名詞 / 動詞 / 助詞. */
+  tag: string;
+  /** IPADIC `pos_detail_1` subtype, present only when the analyser gave one. */
+  detail?: string;
+  wordClass: LexiconWordClass;
+}
+
 export interface LexiconInterlinearToken {
   kind: 'token';
   text: string;
   start: number;
   end: number;
   match?: LexiconInterlinearMatch;
+  /**
+   * What the morphological analyser said this surface was doing here. A
+   * property of the token rather than of the match, because it describes the
+   * passage's own grammar and is therefore just as available for a word no
+   * dictionary grounded.
+   */
+  pos?: LexiconPartOfSpeech;
 }
 
 export interface LexiconInterlinearSeparator {
@@ -210,6 +250,16 @@ export interface LexiconInterlinearOptions {
    * render.
    */
   withFrequency?: boolean;
+  /**
+   * Ask for a part of speech on each token.
+   *
+   * Opt-in for the same reason `withFrequency` is: the analysis comes from the
+   * morphological analyser, whose dictionary is built once and costs a second on
+   * first use, and a reading path that only wants a gloss should not pay for a
+   * passage-analysis feature it never renders. Only a passage the analyser
+   * actually covers gets an answer; nothing is inferred for the rest.
+   */
+  withPartOfSpeech?: boolean;
 }
 
 export interface LexiconInterlinearResult {

@@ -4,6 +4,7 @@ import type {
   LexiconInterlinearResult,
   LexiconInterlinearToken,
   LexiconLookupGloss,
+  LexiconWordClass,
 } from './lexiconInterlinear';
 
 /**
@@ -39,6 +40,16 @@ export interface LexiconVocabularyItem {
    * often the passage repeats it.
    */
   frequency?: LexiconFrequency;
+  /**
+   * What the morphological analyser called this word, when one ran.
+   *
+   * Read from the **first** occurrence, matching every other field here. A
+   * surface can genuinely change class between sentences — で is a particle in
+   * 学校で and a copula form elsewhere — but the harvest groups by headword and
+   * has exactly one row to say it in, so the row reports the first reading of
+   * the word rather than inventing a majority vote over the passage.
+   */
+  wordClass?: LexiconWordClass;
   dictId?: string;
   dictTitle?: string;
   headwordId?: number;
@@ -143,6 +154,7 @@ export function harvestLexiconVocabulary(
       grounded: Boolean(match),
       glosses: match ? [...match.glosses] : [],
       ...(match?.frequency ? { frequency: match.frequency } : {}),
+      ...(part.pos ? { wordClass: part.pos.wordClass } : {}),
       ...(match ? { dictId: match.dictId, dictTitle: match.dictTitle, headwordId: match.headwordId } : {}),
     });
   }

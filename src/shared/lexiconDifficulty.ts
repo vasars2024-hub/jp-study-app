@@ -19,6 +19,12 @@
  *   ratio — a passage of names would otherwise read as trivially easy.
  * - It weighs a word once. A passage that says 猫 forty times is not forty words
  *   of difficulty, so the profile is built over the harvest's distinct entries.
+ * - It does not count the grammar as vocabulary. When a morphological analysis
+ *   is attached, particles, auxiliaries and other function words are set aside
+ *   and reported as their own number rather than folded into the bands: を at
+ *   rank 4 and で at rank 8 made a passage look like it was built from the most
+ *   common words in the language, which is a statement about Japanese and not
+ *   about the passage. A passage with no analysis is scored exactly as before.
  */
 
 import { harvestLexiconVocabulary, type LexiconVocabularyItem } from './lexiconHarvest';
@@ -84,7 +90,15 @@ export interface LexiconDifficultyProfile {
   unranked: number;
   /** Words no installed dictionary knows at all. */
   ungrounded: number;
-  /** Distinct words in the passage, i.e. ranked + unranked + ungrounded. */
+  /**
+   * Distinct function words the analyser identified and this profile left out.
+   * Zero when nothing analysed the passage, which is not the same as a passage
+   * that genuinely contains no grammar.
+   */
+  functionWords: number;
+  /** Whether a morphological analysis reached this passage at all. */
+  analyzed: boolean;
+  /** Distinct scored words, i.e. ranked + unranked + ungrounded. */
   distinct: number;
   /** Middle rank of the ranked words; absent when nothing was ranked. */
   medianRank?: number;
@@ -179,8 +193,18 @@ export function scoreLexiconDifficulty(
   const sources: string[] = [];
   let unranked = 0;
   let ungrounded = 0;
+  let functionWords = 0;
+  let analyzed = false;
 
   for (const item of items) {
+    if (item.wordClass) analyzed = true;
+    // Only an explicit `function` is set aside. An unknown tag classifies as
+    // `other`, and dropping those would let a gap in the analyser's dictionary
+    // silently delete real words from the passage's profile.
+    if (item.wordClass === 'function') {
+      functionWords += 1;
+      continue;
+    }
     if (!item.grounded) {
       ungrounded += 1;
       continue;
@@ -209,7 +233,9 @@ export function scoreLexiconDifficulty(
     ranked: ranked.length,
     unranked,
     ungrounded,
-    distinct: items.length,
+    functionWords,
+    analyzed,
+    distinct: items.length - functionWords,
     ...(rankValues.length ? { medianRank: median(rankValues) } : {}),
     hardest: hardest.slice(0, limit),
     sources,

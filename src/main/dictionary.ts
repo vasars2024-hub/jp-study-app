@@ -29,7 +29,7 @@ import {
   setYomitanLang,
 } from './dictionary/yomitan';
 import { candidateLookupKey, glossFromEntry } from '../shared/epubEnrichment';
-import { textMatchesLang } from '../shared/langs';
+import { hasKana, textMatchesLang } from '../shared/langs';
 import {
   cacheExamples,
   importOfflineExamples,
@@ -45,7 +45,12 @@ import {
   resetChineseDictionaryCache,
 } from './dictionary/service';
 import { resolveCustomFrequencyRanks } from './mining';
+import { getMainJapaneseTokenizer } from './japaneseTokenizer';
 import { attachLexiconFrequency } from '../shared/lexiconDifficulty';
+import {
+  alignLexiconMorphemes,
+  attachLexiconPartOfSpeech,
+} from '../shared/lexiconPartOfSpeech';
 import { normalizeLexiconText } from '../shared/lexiconWorkbench';
 import {
   MAX_OFFLINE_INTERLINEAR_CHARS,
@@ -201,9 +206,46 @@ export async function lookupOfflineInterlinearMerged(
     // A legacy store that will not load must not take the database path down.
     result = lookupOfflineInterlinearFromStore(text, options);
   }
-  return options.withFrequency
+  const ranked = options.withFrequency
     ? attachLexiconFrequency(result, interlinearFrequencyResolver(result))
     : result;
+  return options.withPartOfSpeech ? analyzeInterlinearPartOfSpeech(ranked) : ranked;
+}
+
+/**
+ * Label each token of a Japanese passage with what it was doing there.
+ *
+ * The gate is kana in the passage itself, not the caller's requested source
+ * language. IPADIC is a Japanese dictionary and would happily label a Chinese
+ * sentence with Japanese parts of speech, so a wrong `sourceLangs` must not be
+ * able to invent an analysis; kana, meanwhile, appears in essentially every real
+ * Japanese passage precisely because it carries the particles this exists to
+ * identify. A pure-kanji fragment therefore goes unanalysed, which the profile
+ * reports as "not analysed" rather than as "no grammar here".
+ *
+ * The analyser is shared with mining and Study analysis and its dictionary is
+ * built once per process, so this is a lookup after the first passage. A failure
+ * to load it returns the passage untouched: an unlabelled result is the exact
+ * shape every consumer already handles.
+ */
+async function analyzeInterlinearPartOfSpeech(
+  result: LexiconInterlinearResult,
+): Promise<LexiconInterlinearResult> {
+  if (!hasKana(result.text)) return result;
+  try {
+    const tokenizer = await getMainJapaneseTokenizer();
+    if (!tokenizer) return result;
+    const morphemes = tokenizer.tokenize(result.text).map((token) => ({
+      surface: token.surface_form,
+      pos: token.pos,
+      detail: token.pos_detail_1,
+    }));
+    return attachLexiconPartOfSpeech(result, alignLexiconMorphemes(result.text, morphemes));
+  } catch {
+    // A passage is fully readable with no analysis attached; it must never be
+    // the reason a gloss lookup fails.
+    return result;
+  }
 }
 
 /** The list languages the bundled frequency dictionaries are tagged with. */
@@ -515,6 +557,7 @@ export function registerDictionaryIpc(): void {
         // Only an explicit `true` opts in: a truthy string from an untrusted
         // caller must not silently enable the list-parsing path.
         withFrequency: raw.withFrequency === true,
+        withPartOfSpeech: raw.withPartOfSpeech === true,
       };
       const boundedText = typeof text === 'string'
         ? text.slice(0, MAX_OFFLINE_INTERLINEAR_CHARS * 2)

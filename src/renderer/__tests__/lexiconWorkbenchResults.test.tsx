@@ -60,7 +60,7 @@ describe('LexiconWorkbenchResults', () => {
       await Promise.resolve();
     });
     expect(lookup).toHaveBeenCalledWith('猫を見た。', {
-      sourceLangs: ['ja'], glossLangs: ['en'], withFrequency: true,
+      sourceLangs: ['ja'], glossLangs: ['en'], withFrequency: true, withPartOfSpeech: true,
     });
     expect(host.querySelector('.lexicon-interlinear-flow')?.textContent).toContain('猫catを見た。');
     expect(host.querySelector('ruby.is-grounded')?.textContent).toContain('cat');
@@ -83,7 +83,7 @@ describe('LexiconWorkbenchResults', () => {
       await Promise.resolve();
     });
     expect(lookup).toHaveBeenCalledWith('猫', {
-      sourceLangs: ['ja'], glossLangs: ['en'], withFrequency: true,
+      sourceLangs: ['ja'], glossLangs: ['en'], withFrequency: true, withPartOfSpeech: true,
     });
     expect(host.querySelector('[data-testid="dictionary-results"]')).toBeNull();
   });
@@ -111,7 +111,7 @@ describe('LexiconWorkbenchResults', () => {
       await Promise.resolve();
     });
     expect(lookup).toHaveBeenCalledWith('猫', {
-      sourceLangs: ['ja'], glossLangs: ['ru'], withFrequency: true,
+      sourceLangs: ['ja'], glossLangs: ['ru'], withFrequency: true, withPartOfSpeech: true,
     });
     expect(host.querySelector('.lexicon-interlinear-flow')?.textContent).toBe('猫');
     expect(host.querySelector('[data-testid="dictionary-results"]')).toBeNull();
@@ -153,7 +153,7 @@ describe('LexiconWorkbenchResults', () => {
     });
 
     expect(lookup).toHaveBeenCalledWith('猫', {
-      sourceLangs: ['ja'], glossLangs: ['ru', 'en'], withFrequency: true,
+      sourceLangs: ['ja'], glossLangs: ['ru', 'en'], withFrequency: true, withPartOfSpeech: true,
     });
     const lines = [...host.querySelectorAll('rt .lexicon-gloss-line')].map((line) => line.textContent);
     expect(lines).toEqual(['RUкошка', 'ENcat']);

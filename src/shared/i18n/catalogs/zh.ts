@@ -8336,5 +8336,7 @@ export const zh: Catalog = {
   'lexicon.difficulty.occurrences': '出现{count}次',
   'lexicon.difficulty.sources': '排名来自：{sources}',
   'lexicon.difficulty.unscored': '这些词都不在你的词频表里，因此无法说明这段文字有多难。',
-  'lexicon.difficulty.note': '排名是词在该词表中的位置，也就是该词表认为更常用的词有多少个，而不是等级。词表里没有的词也可能是很平常的词。',
+  'lexicon.difficulty.functionWords': '作为语法排除：助词、词尾等虚词{count}个。',
+  'lexicon.difficulty.note': '排名是词在该词表中的位置，也就是该词表认为更常用的词有多少个，而不是等级。这段文字已逐词分析，因此助词和词尾被排除，不计入词汇。词表里没有的词也可能是很平常的词。',
+  'lexicon.difficulty.noteUnanalyzed': '排名是词在该词表中的位置，也就是该词表认为更常用的词有多少个，而不是等级。这段文字的语法无法分析，因此助词和词尾也被当作词汇计入。词表里没有的词也可能是很平常的词。',
 };

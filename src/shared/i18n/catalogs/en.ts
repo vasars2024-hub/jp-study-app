@@ -8780,5 +8780,7 @@ export const en: Catalog = {
   'lexicon.difficulty.occurrences': 'used {count} times',
   'lexicon.difficulty.sources': 'Ranks from {sources}.',
   'lexicon.difficulty.unscored': 'None of these words is in your frequency lists, so they cannot say how hard this passage is.',
-  'lexicon.difficulty.note': 'A rank is a position in that list — how many words the list considers more common — not a level. Particles and word endings are counted here as well: your dictionary entries carry no part of speech, so this cannot tell them from vocabulary. A word can also be missing from a list and still be ordinary.',
+  'lexicon.difficulty.functionWords': 'Set aside as grammar: {count} particles, endings and other function words.',
+  'lexicon.difficulty.note': 'A rank is a position in that list — how many words the list considers more common — not a level. The passage was analysed word by word, so particles and word endings are set aside instead of counted as vocabulary. A word can also be missing from a list and still be ordinary.',
+  'lexicon.difficulty.noteUnanalyzed': 'A rank is a position in that list — how many words the list considers more common — not a level. Nothing could analyse this passage’s grammar, so particles and word endings are counted here as vocabulary. A word can also be missing from a list and still be ordinary.',
 };

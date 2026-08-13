@@ -8,18 +8,21 @@ import type {
   LexiconInterlinearMatch,
   LexiconInterlinearPart,
   LexiconInterlinearResult,
+  LexiconWordClass,
 } from '../lexiconInterlinear';
 
 function token(
   text: string,
   start: number,
   match?: Partial<LexiconInterlinearMatch>,
+  wordClass?: LexiconWordClass,
 ): LexiconInterlinearPart {
   return {
     kind: 'token',
     text,
     start,
     end: start + text.length,
+    ...(wordClass ? { pos: { tag: 'test', wordClass } } : {}),
     ...(match
       ? {
         match: {
@@ -149,6 +152,39 @@ describe('scoreLexiconDifficulty', () => {
     expect(profile.unranked).toBe(1);
     expect(profile.ungrounded).toBe(1);
     expect(profile.distinct).toBe(5);
+    expect(profile.analyzed).toBe(false);
+    expect(profile.functionWords).toBe(0);
+  });
+
+  it('sets analysed grammar aside instead of calling it easy vocabulary', () => {
+    const profile = scoreLexiconDifficulty(attachLexiconFrequency(
+      passage([
+        token('猫', 0, { text: '猫', reading: 'ねこ' }, 'content'),
+        token('を', 1, { text: 'を', reading: 'を' }, 'function'),
+        token('見る', 2, { text: '見る', reading: 'みる' }, 'content'),
+      ]),
+      (text) => ({
+        rank: text === 'を' ? 4 : (JPDB[text] ?? 100),
+        source: 'Japanese frequency (JPDB v2.2)',
+      }),
+    ));
+
+    expect(profile.analyzed).toBe(true);
+    expect(profile.functionWords).toBe(1);
+    expect(profile.distinct).toBe(2);
+    expect(profile.ranked).toBe(2);
+    expect(profile.hardest.map((word) => word.text)).toEqual(['猫', '見る']);
+  });
+
+  it('keeps an unknown analyser class in the profile', () => {
+    const profile = scoreLexiconDifficulty(attachLexiconFrequency(
+      passage([token('未知', 0, { text: '未知', reading: 'みち' }, 'other')]),
+      () => ({ rank: 999, source: 'test list' }),
+    ));
+
+    expect(profile.analyzed).toBe(true);
+    expect(profile.functionWords).toBe(0);
+    expect(profile.ranked).toBe(1);
   });
 
   it('leads with the rarest word, which is what to look up first', () => {

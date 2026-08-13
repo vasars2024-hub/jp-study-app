@@ -14964,3 +14964,39 @@ from this hop:** the difficulty panel counts particles as vocabulary *and* ranks
 で 8, から 142,901), which makes "the middle word here ranks 638" a statistic about a passage's
 grammar as much as its words — the shipped note discloses this, but the profile will not mean what
 a reader assumes until POS lands.
+
+## Particles are grammar again, not easy vocabulary — 2026-08-13
+
+Relay hop, `codexB`. Track 2. **Interrupted-work recovery.** HEAD was `caa890d`, the index was empty,
+and the only Main V1 files written after that commit were the seven-file part-of-speech slice plus
+its two new tests; the worker stopped at 07:35 before gates or a ledger handoff. The boss-audit's
+integration table is closed, so this recovered the slice instead of reopening old audit work.
+
+The Workbench now opts into the app's existing kuromoji/IPADIC analyser. Its morphemes are aligned
+to interlinear tokens using JavaScript code-unit offsets (including whitespace and surrogate-pair
+coverage), then classified as content, function, proper name, or other. Only an explicit `function`
+classification is excluded from difficulty scoring; missing analysis and unknown tags preserve the
+old score. This is narrowing-only and keeps dictionary lookup usable if the analyser cannot load.
+The profile reports the excluded count and says honestly whether grammar was analysed. The new UI
+copy is present in EN/JA/ZH/RU.
+
+Recovery added the assertions the interrupted worker had not reached: the Workbench request test
+now pins `withPartOfSpeech: true`, and difficulty tests prove particles disappear while an unknown
+class remains. Focused proof: 54 tests across the Workbench, classifier, and difficulty files pass.
+
+All four Main V1 gates pass on the shared tree: `npx vitest run --hookTimeout=60000` — **564 files
+passed / 1 skipped, 7,502 tests passed / 6 skipped**; `node tools/i18n-check.cjs` — **9,410 keys**
+complete; `node tools/architecture-audit.cjs` — **1,760 modules**, nothing new, the same two pending;
+and touched-path ESLint — **0 errors**, with seven pre-existing `no-explicit-any` warnings in
+`main/dictionary.ts`.
+
+Live Electron acceptance rebuilt and restarted main, then invoked the real
+`dict:lookupOfflineInterlinear` handler through the debug bridge. For
+`昨日は学校で面白い本を読んだ。`, は/で/を came back as function words while the five content
+words remained ranked; the rendered profile says **5 of 5 ranked**, **Set aside as grammar: 3**, and
+names only Japanese frequency (JPDB v2.2). Screenshot:
+`debug/shots/win1-1786596301245.png`. The input was cleared, the probe global deleted, no persisted
+setting or userData was written, and only this hop's dev process is stopped after checkpointing.
+
+Track 2 remains open: composition checking, personal concordance, and grounded AI enrichment. POS
+is no longer their shared blocker; composition checking is the next decision-free analysis rung.

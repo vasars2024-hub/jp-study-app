@@ -228,11 +228,13 @@ export default function LexiconWorkbenchResults({
       .then((dicts) => parallelGlossTargets(primary, dicts ?? []))
       .catch(() => [primary])
       // The Workbench is the surface that renders a difficulty profile, so it is
-      // the one that asks main to pay for the frequency lists.
+      // the one that asks main to pay for the frequency lists — and for the
+      // morphological analysis that keeps particles out of that profile.
       .then((glossLangs) => window.api.lookupOfflineInterlinear(query, {
         sourceLangs: [lang],
         glossLangs,
         withFrequency: true,
+        withPartOfSpeech: true,
       }))
       .then((next) => {
         if (!alive) return;
@@ -666,10 +668,23 @@ export default function LexiconWorkbenchResults({
                       {t('lexicon.difficulty.ungrounded', { count: difficulty.ungrounded })}
                     </p>
                   )}
+                  {difficulty.functionWords > 0 && (
+                    <p className="muted">
+                      {t('lexicon.difficulty.functionWords', { count: difficulty.functionWords })}
+                    </p>
+                  )}
                   <p className="muted">
                     {t('lexicon.difficulty.sources', { sources: difficulty.sources.join(', ') })}
                   </p>
-                  <p className="muted lexicon-difficulty-note">{t('lexicon.difficulty.note')}</p>
+                  {/* The note has to say which of the two profiles this is: the
+                      grammar is only separated out when an analyser reached the
+                      passage, and a reader cannot tell a passage with no
+                      particles from one nothing analysed. */}
+                  <p className="muted lexicon-difficulty-note">
+                    {t(difficulty.analyzed
+                      ? 'lexicon.difficulty.note'
+                      : 'lexicon.difficulty.noteUnanalyzed')}
+                  </p>
                 </>
               )}
             </details>
