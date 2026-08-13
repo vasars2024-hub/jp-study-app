@@ -105,7 +105,7 @@ export const SETTINGS_DOMAINS: SettingsDomainDef[] = [
     description:
       'Auto-route on drop, triage-sheet behaviour, per-extension destinations, undo depth.',
     category: 'System',
-    lsKeys: ['jp-os-filedrop-prefs-v1'],
+    lsKeys: ['jp-os-filedrop-prefs-v1', 'jp-os-filedrop-backup-v1'],
     clearable: true,
     clearConfirm: 'Reset file drop routing to defaults?',
   },
