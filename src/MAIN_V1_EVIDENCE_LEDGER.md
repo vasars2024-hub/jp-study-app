@@ -15288,3 +15288,41 @@ Track 2 remains open. Etymology, mnemonics and graded examples remain as adjacen
 facets; explicit explanation-language selection, caching and batch explanation also remain. The
 next worker must re-derive which bounded slice is next, retain the distinction between attached
 evidence and general language knowledge, and keep execution in the centralized Agent.
+
+## Etymology is separated from a plausible story — 2026-08-13
+
+Relay hop, `codexX`. Track 2. The latest boss-audit section hands off no unresolved regression,
+and the final ledger section made etymology the next bounded, decision-free Contextual Explain
+facet rather than the launcher's stale OCR hint.
+
+The central Agent's Dictionary suggestion now includes a separate **Etymology** section. It must
+quote the exact form under discussion, distinguish attested historical origin from modern memory
+aids and folk etymology, and never infer origin from current spelling alone. A historical claim
+that cannot be established from reliable language knowledge must be labelled uncertain together
+with the kind of source needed to verify it. The existing context-as-data, evidence, uncertainty,
+grammar, usage, collocation, mistake and comparison boundaries remain in force. This is
+model-facing prompt text only: no UI copy, provider, persistence, privacy, budget or second
+execution path was added, and requesting etymology is not proof that a provider's account is
+correct.
+
+Live Electron acceptance used one fresh Forge process owned by this hop and the authenticated
+debug bridge only. The stale bridge record refused connections and port 5173 belonged to a
+separate Vite listener, so Forge selected 5174. Importing the real shared builder through the
+renderer returned the complete nine-section prompt for `猫が来た。` with the exact-form,
+attested-versus-mnemonic, no-spelling-inference and verification-source rules. The bridge error
+ring contained **0** entries. The temporary probe global was deleted, no model request ran, and
+no user state was written. All 13 processes in this hop's recorded process tree were stopped and
+verified absent; the unrelated 5173 listener was not touched.
+
+Verification on the shared tree: focused suggestion tests **6/6**. The first full-suite attempt
+passed 7,511 tests but three unrelated repository-scan tests hit their 20-second timeout under
+shared process load; rerunning those exact identities at a 60-second timeout passed **31/31**.
+After the live process stopped, the required literal `npx vitest run` passed **566 files / 1
+skipped, 7,514 tests / 6 skipped**. `node tools/i18n-check.cjs`: **9,430 keys** complete. `node
+tools/architecture-audit.cjs`: **1,764 modules**, nothing new, the same two pending. ESLint over
+the two touched TS paths: **0 errors, 0 warnings**.
+
+Track 2 remains open. Mnemonics and graded examples remain as adjacent structured facets;
+explicit explanation-language selection, caching and batch explanation also remain. Re-derive the
+next bounded slice from source, keep mnemonic usefulness separate from historical truth, and keep
+execution in the centralized Agent.

@@ -89,7 +89,7 @@ describe('Agent context suggestions', () => {
     });
   });
 
-  it('gives dictionary explanations a bounded evidence, grammar, usage, mistakes, collocation, and comparison contract', () => {
+  it('gives dictionary explanations a bounded evidence, grammar, usage, mistakes, etymology, collocation, and comparison contract', () => {
     const [suggestion] = deriveAgentContextSuggestions(conversation([
       context('dictionary-new', 'dictionary-entry', 'Dictionary'),
     ]), DEFAULT_AGENT_CONTEXT_SUGGESTION_PREFERENCES);
@@ -111,6 +111,10 @@ describe('Agent context suggestions', () => {
     expect(prompt).toContain('Never say the learner made a mistake unless you can quote the exact problematic form.');
     expect(prompt).toContain('If the form is acceptable, say so');
     expect(prompt).toContain('give a correction and explain the smallest relevant difference');
+    expect(prompt).toContain('In Etymology');
+    expect(prompt).toContain('separate attested historical origin from a modern memory aid or folk etymology');
+    expect(prompt).toContain('Do not infer origin from the current spelling alone.');
+    expect(prompt).toContain('label it uncertain and say what kind of source would be needed to verify it');
     expect(prompt).toContain('Compare at most two similar words.');
     expect(prompt).toContain('quote the exact word or phrase');
     expect(prompt).toContain('general language knowledge');
