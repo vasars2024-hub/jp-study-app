@@ -8783,4 +8783,13 @@ export const en: Catalog = {
   'lexicon.difficulty.functionWords': 'Set aside as grammar: {count} particles, endings and other function words.',
   'lexicon.difficulty.note': 'A rank is a position in that list — how many words the list considers more common — not a level. The passage was analysed word by word, so particles and word endings are set aside instead of counted as vocabulary. A word can also be missing from a list and still be ordinary.',
   'lexicon.difficulty.noteUnanalyzed': 'A rank is a position in that list — how many words the list considers more common — not a level. Nothing could analyse this passage’s grammar, so particles and word endings are counted here as vocabulary. A word can also be missing from a list and still be ordinary.',
+  'lexicon.composition.title': 'Composition check',
+  'lexicon.composition.clear': 'No mechanical issues were found.',
+  'lexicon.composition.clearUnanalyzed': 'Paired marks and punctuation look consistent.',
+  'lexicon.composition.duplicate-function': 'The same grammar word appears twice in a row.',
+  'lexicon.composition.repeated-punctuation': 'The same sentence punctuation is repeated.',
+  'lexicon.composition.unclosed-pair': 'This opening mark has no matching close.',
+  'lexicon.composition.unexpected-close': 'This closing mark has no matching open.',
+  'lexicon.composition.note': 'This checks paired marks, repeated sentence punctuation, and adjacent duplicate grammar identified by the word analyser. It does not judge whether the sentence is grammatically correct.',
+  'lexicon.composition.noteUnanalyzed': 'The word analyser did not reach this passage, so this checks paired marks and repeated sentence punctuation only. It does not judge whether the sentence is grammatically correct.',
 };

@@ -15000,3 +15000,41 @@ setting or userData was written, and only this hop's dev process is stopped afte
 
 Track 2 remains open: composition checking, personal concordance, and grounded AI enrichment. POS
 is no longer their shared blocker; composition checking is the next decision-free analysis rung.
+
+## Composition checking reports only what the passage can prove — 2026-08-13
+
+Relay hop, `codexB`. Track 2. The boss-audit tail was checked first. Both actionable clean-HEAD
+findings it named are already resolved in current HEAD `5cac934`: the privacy test covers the
+persistent exclusion floor in both positions, and `jp-os-filedrop-prefs-v1` is committed in the
+settings backup catalog. The ladder therefore resumed at the last ledger section's explicit next
+slice: composition checking.
+
+The Workbench now performs a conservative mechanical composition check over the same grounded
+interlinear result it already renders. It reports unmatched Japanese/ASCII paired marks, repeated
+sentence punctuation, and adjacent duplicate function words. The last observation is emitted only
+when the existing kuromoji/IPADIC analysis classifies both tokens as function words; missing
+analysis narrows the check to facts visible in the source text. The panel explicitly says that it
+does not judge grammatical correctness, so a small deterministic checker cannot be mistaken for
+the later grounded-AI analysis promised by Track 2. All nine new UI strings are present in
+EN/JA/ZH/RU.
+
+Live acceptance found and corrected a contract mistake that the first fixture had hidden: POS is a
+property of the contextual interlinear token, not its dictionary match. Before correction the
+rendered panel found punctuation but said analysis was unavailable. After correcting both consumer
+and fixture, `猫は は走る。` rendered `は は` with “The same grammar word appears twice in a row”
+and the analyzer-backed scope note. A clean result (`猫はは走る。`, which kuromoji reads as the
+noun 母 rather than two particles) honestly rendered “No mechanical issues were found.” Screenshot:
+`debug/shots/win1-1786597137070.png`. The input was cleared, the Dictionary window was closed through
+the app event bus, no setting or userData was written, and only this hop's recorded Electron/npm
+process tree was stopped.
+
+Verification: focused Workbench/composition tests **23/23**. Final full `npx vitest run
+--hookTimeout=60000`, with Electron stopped: **565 files passed / 1 skipped, 7,505 tests passed / 6
+skipped**. One earlier full attempt overlapped the live app and timed out in five unrelated renderer
+tests; after stopping that process all five passed alone (**21/21**) and the final full run above was
+green. `node tools/i18n-check.cjs`: **9,419 keys** complete. `node tools/architecture-audit.cjs`:
+**1,762 modules**, nothing new, the same two pending. Touched-path ESLint: **0 errors**.
+
+Track 2 remains open: personal concordance and the grounded AI enrichment bullets. Personal
+concordance is the next decision-free slice because it can derive citations from the user's existing
+library/subtitle data without inventing provider behavior or explanation policy.

@@ -8374,4 +8374,13 @@ export const ja: Catalog = {
   'lexicon.difficulty.functionWords': '文法として除外：助詞・語尾などの機能語{count}語。',
   'lexicon.difficulty.note': '順位はそのリストの中での位置、つまりそのリストがより一般的だと見なす語の数であり、レベルではありません。この文章は語ごとに解析したので、助詞や語尾は語彙として数えず除外しています。リストに載っていなくても普通の語であることがあります。',
   'lexicon.difficulty.noteUnanalyzed': '順位はそのリストの中での位置、つまりそのリストがより一般的だと見なす語の数であり、レベルではありません。この文章の文法を解析できなかったため、助詞や語尾も語彙として数えられています。リストに載っていなくても普通の語であることがあります。',
+  'lexicon.composition.title': '文章の機械チェック',
+  'lexicon.composition.clear': '機械的な問題は見つかりませんでした。',
+  'lexicon.composition.clearUnanalyzed': '括弧と句読点に不整合は見つかりませんでした。',
+  'lexicon.composition.duplicate-function': '同じ文法語が続けて使われています。',
+  'lexicon.composition.repeated-punctuation': '同じ文末記号が繰り返されています。',
+  'lexicon.composition.unclosed-pair': 'この開始記号に対応する終了記号がありません。',
+  'lexicon.composition.unexpected-close': 'この終了記号に対応する開始記号がありません。',
+  'lexicon.composition.note': '括弧、文末記号の重複、形態素解析で判定した文法語の連続重複だけを確認します。文法的に正しい文章かどうかは判定しません。',
+  'lexicon.composition.noteUnanalyzed': '形態素解析を利用できなかったため、括弧と文末記号の重複だけを確認します。文法的に正しい文章かどうかは判定しません。',
 };

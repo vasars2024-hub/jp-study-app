@@ -14,6 +14,7 @@ import {
   LEXICON_DIFFICULTY_BANDS,
   scoreLexiconDifficulty,
 } from '../../../shared/lexiconDifficulty';
+import { checkLexiconComposition } from '../../../shared/lexiconComposition';
 import {
   applySensePins,
   canPinSense,
@@ -146,6 +147,7 @@ export default function LexiconWorkbenchResults({
   // Same deal: the ranks arrived with the lookup, so the profile is a fold over
   // data already in hand and never a second trip to main.
   const difficulty = useMemo(() => (pinned ? scoreLexiconDifficulty(pinned) : null), [pinned]);
+  const composition = useMemo(() => (pinned ? checkLexiconComposition(pinned) : null), [pinned]);
 
   // Pure and derived from the pinned result, so whether a retranslation can say
   // anything is known before the model is woken, not after it answers.
@@ -687,6 +689,32 @@ export default function LexiconWorkbenchResults({
                   </p>
                 </>
               )}
+            </details>
+          )}
+          {composition && (
+            <details className="lexicon-composition" open>
+              <summary>{t('lexicon.composition.title')}</summary>
+              {composition.issues.length === 0 ? (
+                <p className="muted">
+                  {t(composition.analyzed
+                    ? 'lexicon.composition.clear'
+                    : 'lexicon.composition.clearUnanalyzed')}
+                </p>
+              ) : (
+                <ul className="lexicon-composition-list">
+                  {composition.issues.map((issue) => (
+                    <li key={`${issue.kind}-${issue.start}-${issue.end}`}>
+                      <code lang={lang}>{issue.text}</code>
+                      <span>{t(`lexicon.composition.${issue.kind}`)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="muted lexicon-composition-note">
+                {t(composition.analyzed
+                  ? 'lexicon.composition.note'
+                  : 'lexicon.composition.noteUnanalyzed')}
+              </p>
             </details>
           )}
           {harvest && harvest.items.length > 0 && (

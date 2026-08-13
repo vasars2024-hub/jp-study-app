@@ -8339,4 +8339,13 @@ export const zh: Catalog = {
   'lexicon.difficulty.functionWords': '作为语法排除：助词、词尾等虚词{count}个。',
   'lexicon.difficulty.note': '排名是词在该词表中的位置，也就是该词表认为更常用的词有多少个，而不是等级。这段文字已逐词分析，因此助词和词尾被排除，不计入词汇。词表里没有的词也可能是很平常的词。',
   'lexicon.difficulty.noteUnanalyzed': '排名是词在该词表中的位置，也就是该词表认为更常用的词有多少个，而不是等级。这段文字的语法无法分析，因此助词和词尾也被当作词汇计入。词表里没有的词也可能是很平常的词。',
+  'lexicon.composition.title': '写作机械检查',
+  'lexicon.composition.clear': '未发现机械性问题。',
+  'lexicon.composition.clearUnanalyzed': '成对符号和标点看起来一致。',
+  'lexicon.composition.duplicate-function': '同一个语法词连续出现了两次。',
+  'lexicon.composition.repeated-punctuation': '同一个句末标点被重复使用。',
+  'lexicon.composition.unclosed-pair': '这个起始符号没有对应的结束符号。',
+  'lexicon.composition.unexpected-close': '这个结束符号没有对应的起始符号。',
+  'lexicon.composition.note': '这里只检查成对符号、重复的句末标点，以及分词器识别出的相邻重复语法词；不会判断句子在语法上是否正确。',
+  'lexicon.composition.noteUnanalyzed': '分词器未能分析这段文字，因此这里只检查成对符号和重复的句末标点；不会判断句子在语法上是否正确。',
 };
