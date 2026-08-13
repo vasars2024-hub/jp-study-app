@@ -15783,3 +15783,118 @@ reconstructed blobs with the shared tree's — it landed 3,055 insertions of ano
 catalog work. It was reset with `git reset --mixed` before anything else touched it and remade
 from the index alone. **Do not pass a pathspec to `git commit` in this repo**; stage
 deliberately, then commit with no paths at all.
+
+## The inflection table finally has a writer, and the import half of the dictionary is proven dead in the built app — 2026-08-13
+
+Relay hop, `backup`. Track 2. The boss audit's last section (09:01) handed off no unresolved
+regression and told the next worker to keep the clean-HEAD set-difference discipline; nothing
+needed recovering. Re-deriving Track 2's remaining list against the tree — safe cancellable
+imports, missing source formats, source controls, cross-source deduplication, saved searches —
+turned up one gap that is not a matter of taste: **`inflections` had a reader and no writer.**
+`lookup()` probes it before the reading and prefix passes (landed two hops ago), `dictService.ts`'s
+own header says "a lemma table that no importer supplies yet", and a grep confirms no `insert into
+inflections` exists anywhere outside the schema DDL. The same is true of `xrefs`, `etymology` and
+`chars`. So the tested code path was answering over data that nothing could ever produce.
+
+Wiktextract is the importer the plan already names for it, and the only listed source that is
+genuinely multilingual — one extraction carries ja/zh/en/ru headwords, which is what makes the
+schema's any-to-any claim reachable with real data. It is also the only one that needs no new
+dependency: JSONL is `JSON.parse` per line, where KANJIDIC2 and JMdict are XML and a parser is a
+`package.json` change this repo's scope rule forbids.
+
+`importers/wiktextract.ts` writes **only the four tables that have live readers** — `headwords`,
+`senses`, `glosses`, `inflections`. The dump also carries etymology, synonyms and IPA, and the
+schema has `etymology`/`xrefs` tables for two of those; those are deliberately not written, because
+rows no query consults are data that is never wrong because it is never read. They land with their
+readers.
+
+Four things shaped the implementation and are the places it could have been silently wrong.
+**`forms[]` is not a paradigm** — it mixes real inflections with template scaffolding whose form
+is a placeholder (`no-table-tags`, `ru-noun-table`), with transliterations, and with the kana or
+pinyin *reading*, distinguished only by tags; `classifyForms` separates all four, and an untagged
+form is dropped because it would index as a `deinflected` hit with an empty reason chain, which the
+UI cannot tell from an exact match reached by the wrong route. **Stress marks**: wiktextract writes
+`соба́ки` with U+0301 and no user types it, so an inflection key stored as written could never be
+found; `inflectionKey` strips U+0300/U+0301 only, because U+0308 is not stress — `ё` and `е` are
+different Russian letters. **Tone marks**: `pinyinSearchKey` strips *numeric* tones because
+CC-CEDICT writes `gou3`, and wiktextract writes `gǒu`, so reusing it directly would have left the
+mark in the reading index and quietly disagreed with the CC-CEDICT importer about the same word;
+`pinyinReadingKey` decomposes and removes the four tone marks first while keeping the `ü` of `lǜ`.
+That one was found by the test, not by reading. **Chunked reads**: these dumps exceed V8's maximum
+string length, so `readFileSync().split()` — what the CC-CEDICT importer does — does not survive
+here; `readJsonlLines` carries its leftover as **bytes**, not as a decoded string, because a 1 MiB
+read routinely ends mid-character and a per-chunk decode turns exactly the CJK and Cyrillic
+headwords this importer exists for into U+FFFD.
+
+Cancellation is cooperative and checked on the progress cadence. A cancel throws inside the
+transaction, so SQLite rolls the whole import back and the counts returned are all zero — reporting
+the tallies the aborted pass had reached would describe rows that are not in the database. That is
+the plan's "restart safety" bullet for this one importer; the CC-CEDICT importer and the legacy
+migration still cannot be cancelled.
+
+### The finding: nothing in the built main process can import a dictionary at all
+
+Verified, not inferred, and it reframes a standing note. The Forge/Vite main bundle
+(`.vite/build/main-j1f336cE.js`, **not minified** — identifiers and SQL literals survive verbatim)
+contains `glosses_fts` (8), `dict:lookupTerm` (3) and `dict:importYomitan` (1), and contains
+**zero** occurrences of `insert into headwords`, `delete from dictionaries where id`, `importCedict`,
+`migrateLegacyStoresNow`, `cc-cedict.org` or `wiktextract`. A recursive listing over the whole
+`.vite/` output finds the new module in no chunk at all. Rollup drops them because **no caller
+exists in the main graph**: `importCedictFileNow` and `migrateLegacyStoresNow` are exported from
+`service.ts` and invoked only by tests. So the read half of the dictionary database ships and the
+write half does not, in the running app, today.
+
+The `dictionary-term-db-is-empty` note explains that emptiness as "the migration has nowhere to
+run". That is true but not the binding constraint: **there is no import path at all**, wired or
+unwired, threading question or none. My slice lands the same way its CC-CEDICT precedent did, and
+this entry is the place that says so plainly rather than letting a green test suite imply
+otherwise. The importer is correct, tested and live-verified as a module; it is **not** reachable by
+a user, and no claim here should be read as saying it is.
+
+### Live Electron acceptance
+
+One fresh Forge process owned by this hop, driven only through the authenticated debug bridge;
+port 5173 belonged to an unrelated listener again, so Forge selected 5174. The stale
+`debug/bridge.json` from an earlier unclean exit refused connections and was not trusted.
+
+The real Vite-loaded `importers/wiktextract.ts` imported cleanly in the renderer — its only runtime
+Node dependency is `node:fs`, since `SqliteDb` is a type-only import — exporting all eight symbols.
+Driven live against realistic records: the Russian one kept **only** `собаки` (`genitive,singular`)
+and dropped the `inflection-template` row, the romanization, the nominative identical to the
+headword and the untagged form; the Japanese one read `たべる` as the reading and kept `食べた` as
+`past`. The two cross-module claims that the unit tests can only assert about themselves were
+checked against the real neighbouring modules: `inflectionKey('соба́ки')` equals `dictService`'s own
+`normalizeForLookup('собаки')` → **true**, so the key the writer stores is byte-identical to the key
+the reader probes with; and `pinyinReadingKey('gǒu')` equals `shared/pinyin`'s
+`pinyinSearchKey('gou3')` → **true**, so the two importers agree on one reading key, with `lǜ` → `lü`
+preserved.
+
+End to end through the real preload and main handler after the `service.ts` change,
+`lookupTerm('食べる')` returned **3** entries from the legacy store and `lookupTerm('собаки')`
+returned **0** with no error — this machine has no Russian dictionary installed, and the path stayed
+honest rather than inventing a result. The bridge log ring held **7** entries, no errors and no
+foreign HMR. Probe globals were deleted (`'__wx' in window` → false, three times), no dictionary or
+user state was written, and the complete recorded process tree started by this hop was stopped; zero
+`electron.exe` remained and the unrelated listener on 5173 was untouched.
+
+### Gates
+
+Focused new suite **14/14**. Adjacent dictionary suites re-run together — wiktextract, lookup,
+cedict, migrate, db, chineseLookup — **142/142**. Full literal `npx vitest run`: **567 passed /
+1 skipped files, 7,552 passed / 6 skipped tests, exit 0**, with none of the flakiness the previous
+hop saw. `node tools/i18n-check.cjs`: **9,434 keys** complete, exit 0 — this slice adds no UI string,
+so no catalog changed. `node tools/architecture-audit.cjs`: **1,766 modules** (1,764 plus the two
+new files), 17 findings, the same 2 pending, **nothing new** — in particular no `orphan-module`,
+which is the check that the new module's import graph is closed. ESLint over the three touched
+paths: **0 errors, 0 warnings**.
+
+Track 2 remains open. The next slice is the one this hop's finding names and deliberately did not
+force: **wire an import path that survives the bundler** — an IPC channel plus preload binding
+plus a real Settings surface calling `importWiktextractFileNow`/`importCedictFileNow`, with its
+strings in all four catalogs, a progress and cancel affordance, and source controls (enable,
+disable, reorder, remove) for the `dictionaries` rows, whose `enabled`/`priority` columns `lookup()`
+already honours and nothing can currently write. That is a UI slice with a file-picker and
+threading decision in it, which is why it is not bolted onto this one; an IPC handler with no
+surface would only move the dead end one layer outward. Two limits here are deliberate and should
+not be rediscovered as defects: no `xrefs`/`etymology` rows until something reads them, and no
+cancellation for CC-CEDICT or the legacy migration.

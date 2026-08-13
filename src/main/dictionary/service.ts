@@ -38,6 +38,12 @@ import {
   type MigrationResult,
 } from './migrate';
 import { importCedict, type CedictImportCounts } from './importers/cedict';
+import {
+  importWiktextract,
+  readJsonlLines,
+  type WiktextractImportCounts,
+  type WiktextractImportOptions,
+} from './importers/wiktextract';
 import { lookup, type LookupQuery, type LookupResult } from './dictService';
 import {
   lookupChineseTerm,
@@ -135,6 +141,21 @@ export function migrateLegacyStoresNow(onProgress?: (progress: MigrationProgress
 export function importCedictFileNow(filePath: string, dictId?: string): CedictImportCounts {
   const text = fs.readFileSync(filePath, 'utf8');
   return importCedict(dictionaryDb(), text, dictId ? { dictId } : {});
+}
+
+/**
+ * Imports a Wiktextract JSONL dump from disk. Same threading caveat as above.
+ *
+ * Streamed rather than read whole, because these dumps are the one source in the
+ * plan's list that does not fit in a JavaScript string. `shouldCancel` is passed
+ * straight through: it is the only import here that can be stopped, and a stop
+ * rolls the transaction back rather than leaving a partial dictionary behind.
+ */
+export function importWiktextractFileNow(
+  filePath: string,
+  options: WiktextractImportOptions = {},
+): WiktextractImportCounts {
+  return importWiktextract(dictionaryDb(), readJsonlLines(filePath), options);
 }
 
 /**
