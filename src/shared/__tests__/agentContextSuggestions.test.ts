@@ -89,13 +89,17 @@ describe('Agent context suggestions', () => {
     });
   });
 
-  it('gives dictionary explanations a bounded evidence and comparison contract', () => {
+  it('gives dictionary explanations a bounded evidence, usage, collocation, and comparison contract', () => {
     const [suggestion] = deriveAgentContextSuggestions(conversation([
       context('dictionary-new', 'dictionary-entry', 'Dictionary'),
     ]), DEFAULT_AGENT_CONTEXT_SUGGESTION_PREFERENCES);
     const prompt = agentContextSuggestionPrompt(suggestion, '  Explain 猫.  ');
 
     expect(prompt).toContain('Explain 猫.\n\nAnswer with these sections:');
+    expect(prompt).toContain('Usage and register');
+    expect(prompt).toContain('formality, tone, and spoken or written fit');
+    expect(prompt).toContain('In Collocations');
+    expect(prompt).toContain('Do not claim that a single example proves frequency or exclusivity.');
     expect(prompt).toContain('Compare at most two similar words.');
     expect(prompt).toContain('quote the exact word or phrase');
     expect(prompt).toContain('general language knowledge');

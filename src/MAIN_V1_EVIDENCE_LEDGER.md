@@ -15186,3 +15186,38 @@ Usage/register or collocations are adjacent and can reuse it; explicit explanati
 selection, caching, batch explanation, learner mistakes, etymology, grammar, mnemonics and graded
 examples remain open. Do not infer that a requested section guarantees a correct model answer, and
 do not add a second provider client to obtain one.
+
+## Usage and collocations are explicit, bounded explanation facets — 2026-08-13
+
+Relay hop, `codexB`. Track 2. The latest boss-audit section hands off no unresolved regression: its
+two earlier clean-HEAD failures are already closed, and its current instruction is to continue the
+Contextual Explain matrix. Re-deriving the final ledger section kept this slice on the adjacent
+usage/register and collocation facets rather than the launcher's stale OCR hint.
+
+The central Agent's Dictionary suggestion now asks for separate **Usage and register** and
+**Collocations** result sections. Register claims must identify formality, tone, and spoken/written
+fit only when the attached passage supports them; otherwise they are labelled general language
+knowledge. Collocations visible in the passage must be separated from common combinations supplied
+from general knowledge, and one example may not be presented as proof of frequency or exclusivity.
+The existing exact-quote, uncertainty, and two-similar-word limits remain intact. This changes only
+the shared model-facing contract: no UI copy, provider, persistence, privacy, budget, or execution
+path was added.
+
+Live Electron acceptance used one fresh process owned by this hop and the authenticated debug bridge
+only. The edited module was imported by the real renderer on Vite 5174; calling the shared prompt
+builder returned all six requested sections and both new evidence-boundary rules for `猫が来た。`.
+The bridge error ring contained **0** entries. The probe global was deleted. No model request ran and
+no persisted setting or workspace state was changed. The owned process tree was stopped; its child
+processes exited concurrently during the first stop pass, then the exact recorded PID set was
+verified absent.
+
+Verification: focused suggestion tests **6/6**. Full `npx vitest run --hookTimeout=60000` on the
+shared tree: **566 files passed / 1 skipped, 7,514 tests passed / 6 skipped**. `node
+tools/i18n-check.cjs`: **9,430 keys** complete. `node tools/architecture-audit.cjs`: **1,764
+modules**, nothing new, the same two pending. ESLint over the two touched TS paths: **0 errors, 0
+warnings**.
+
+Track 2 remains open. The next bounded Contextual Explain work must be re-derived from source;
+learner-mistake analysis or grammar is adjacent, while explicit explanation-language selection,
+caching, batch explanation, etymology, mnemonics and graded examples also remain. Do not treat this
+prompt shape as proof of model correctness, and keep all execution in the centralized Agent.
