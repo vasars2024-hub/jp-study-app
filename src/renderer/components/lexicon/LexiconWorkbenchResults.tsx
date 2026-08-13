@@ -17,6 +17,11 @@ import {
   type LexiconSensePins,
 } from '../../../shared/lexiconSensePin';
 import { collectSenseHints } from '../../../shared/lexiconRetranslate';
+import {
+  diffLexiconRoundTrip,
+  type LexiconRoundTripBucket,
+  type LexiconRoundTripDiff,
+} from '../../../shared/lexiconRoundTrip';
 import { resolveLexiconInput, type LexiconLensOverride } from '../../../shared/lexiconWorkbench';
 import DictionaryResults, { type DictLang } from '../DictionaryResults';
 import { translateTo } from '../../translator';
@@ -104,6 +109,9 @@ export default function LexiconWorkbenchResults({
   // A model call outlives the pins it was made for. This token lets a late
   // answer from a superseded run be discarded instead of overwriting the panel.
   const retranslateRun = useRef(0);
+  const [roundTrip, setRoundTrip] = useState<{ text: string; diff: LexiconRoundTripDiff } | null>(null);
+  const [roundTripState, setRoundTripState] = useState<'idle' | 'running' | 'error'>('idle');
+  const roundTripRun = useRef(0);
 
   useEffect(() => setSelectedLens(lens), [lens]);
 
@@ -153,6 +161,18 @@ export default function LexiconWorkbenchResults({
     retranslateRun.current += 1;
     setRetranslation(null);
     setRetranslateState('idle');
+    clearRoundTrip();
+  }
+
+  /**
+   * A round trip is a statement about one translation. The moment that
+   * translation is replaced — or re-run and about to be — the diff underneath it
+   * describes prose the reader can no longer see, so it goes with it.
+   */
+  function clearRoundTrip() {
+    roundTripRun.current += 1;
+    setRoundTrip(null);
+    setRoundTripState('idle');
   }
 
   function pinSense(key: string, senseIndex: number | null) {
@@ -210,6 +230,7 @@ export default function LexiconWorkbenchResults({
     const run = ++retranslateRun.current;
     setRetranslateState('running');
     setRetranslation(null);
+    clearRoundTrip();
     try {
       const text = await translateTo(query, lang, glossLang, undefined, senseHints);
       // A passage whose every sentence failed the translator's own validation
@@ -224,6 +245,44 @@ export default function LexiconWorkbenchResults({
       setRetranslateState('idle');
     } catch {
       if (run === retranslateRun.current) setRetranslateState('error');
+    }
+  }
+
+  /**
+   * Translate the retranslation back and show which of the passage's words came
+   * with it.
+   *
+   * The return leg is deliberately sent **without** the sense hints. The
+   * question this asks is whether the English prose still carries the reader's
+   * words; handing the model the pinned glosses on the way back would plant the
+   * very words the check is looking for, and every round trip would flatter the
+   * translation it is supposed to audit.
+   */
+  async function checkRoundTrip() {
+    if (!retranslation || !pinned || roundTripState === 'running') return;
+    const run = ++roundTripRun.current;
+    setRoundTripState('running');
+    setRoundTrip(null);
+    try {
+      const back = await translateTo(retranslation, glossLang, lang);
+      if (run !== roundTripRun.current) return;
+      // A back-translation that failed the translator's own validation comes
+      // back empty. Diffing that would report the whole passage as lost, which
+      // reads as a damning result for the translation rather than what it is:
+      // no answer at all.
+      if (!back.trim()) {
+        setRoundTripState('error');
+        return;
+      }
+      const result = await window.api.lookupOfflineInterlinear(back, {
+        sourceLangs: [lang],
+        glossLangs: [glossLang.trim().toLowerCase() || 'en'],
+      });
+      if (run !== roundTripRun.current) return;
+      setRoundTrip({ text: back, diff: diffLexiconRoundTrip(pinned, result) });
+      setRoundTripState('idle');
+    } catch {
+      if (run === roundTripRun.current) setRoundTripState('error');
     }
   }
 
@@ -258,6 +317,44 @@ export default function LexiconWorkbenchResults({
     } catch {
       fail(t('lexicon.harvest.mineFailed'));
     }
+  }
+
+  /**
+   * One diff bucket. An empty bucket renders nothing rather than an empty list:
+   * "Did not come back" over no rows reads as a failure to load.
+   */
+  function roundTripBucket(kind: 'lost' | 'added' | 'kept', bucket: LexiconRoundTripBucket) {
+    if (!bucket.total) return null;
+    const title = t(`lexicon.roundTrip.${kind}`);
+    return (
+      <div aria-label={title} className={`lexicon-roundtrip-bucket is-${kind}`} role="group">
+        <p className="lexicon-roundtrip-bucket-title">
+          {title}
+          <span className="lexicon-roundtrip-bucket-count">{bucket.total}</span>
+        </p>
+        <ul>
+          {bucket.words.map((word) => (
+            <li className={word.pinned ? 'is-pinned' : undefined} key={word.key}>
+              <span className="lexicon-roundtrip-word" lang={lang}>{word.text}</span>
+              {word.reading && (
+                <span className="lexicon-roundtrip-reading" lang={lang}>{word.reading}</span>
+              )}
+              {word.pinned && (
+                <span className="lexicon-roundtrip-badge">{t('lexicon.roundTrip.pinnedBadge')}</span>
+              )}
+              {word.glosses.length > 0 && (
+                <span className="lexicon-roundtrip-gloss">{word.glosses.join('; ')}</span>
+              )}
+            </li>
+          ))}
+        </ul>
+        {bucket.total > bucket.words.length && (
+          <p className="muted">
+            {t('lexicon.roundTrip.more', { count: bucket.total - bucket.words.length })}
+          </p>
+        )}
+      </div>
+    );
   }
 
   return (
@@ -399,6 +496,68 @@ export default function LexiconWorkbenchResults({
                   <figcaption>{t('lexicon.retranslate.title')}</figcaption>
                   <p lang={glossLang}>{retranslation}</p>
                 </figure>
+              )}
+              {/* Offered only once a translation exists to send back: there is
+                  nothing to read back before one has been produced. */}
+              {retranslation && (
+                <div className="lexicon-roundtrip">
+                  <button
+                    className="lexicon-roundtrip-run"
+                    disabled={roundTripState === 'running'}
+                    onClick={() => void checkRoundTrip()}
+                    type="button"
+                  >
+                    {roundTripState === 'running'
+                      ? t('lexicon.roundTrip.running')
+                      : t('lexicon.roundTrip.action')}
+                  </button>
+                  {roundTripState === 'error' && (
+                    <p className="lexicon-roundtrip-error" role="alert">
+                      {t('lexicon.roundTrip.failed')}
+                    </p>
+                  )}
+                  {roundTrip && (
+                    <div className="lexicon-roundtrip-body">
+                      <figure className="lexicon-roundtrip-output">
+                        <figcaption>{t('lexicon.roundTrip.title')}</figcaption>
+                        <p lang={lang}>{roundTrip.text}</p>
+                      </figure>
+                      {/* A round trip nothing could be grounded in says nothing
+                          about the translation. Reporting "0 of 5 came back"
+                          here would blame the prose for a missing dictionary. */}
+                      {!roundTrip.diff.comparable ? (
+                        <p className="muted">{t('lexicon.roundTrip.incomparable')}</p>
+                      ) : (
+                        <>
+                          <p className="lexicon-roundtrip-summary">
+                            {t('lexicon.roundTrip.summary', {
+                              kept: roundTrip.diff.kept.total,
+                              total: roundTrip.diff.originalCount,
+                            })}
+                          </p>
+                          {roundTrip.diff.pinnedLost > 0 && (
+                            <p className="lexicon-roundtrip-pinned-lost">
+                              {t('lexicon.roundTrip.pinnedLost', { count: roundTrip.diff.pinnedLost })}
+                            </p>
+                          )}
+                          {roundTripBucket('lost', roundTrip.diff.lost)}
+                          {roundTripBucket('added', roundTrip.diff.added)}
+                          {roundTripBucket('kept', roundTrip.diff.kept)}
+                          {(roundTrip.diff.ungrounded.original > 0
+                            || roundTrip.diff.ungrounded.roundTrip > 0) && (
+                            <p className="muted">
+                              {t('lexicon.roundTrip.ungrounded', {
+                                original: roundTrip.diff.ungrounded.original,
+                                roundTrip: roundTrip.diff.ungrounded.roundTrip,
+                              })}
+                            </p>
+                          )}
+                          <p className="muted lexicon-roundtrip-note">{t('lexicon.roundTrip.note')}</p>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           )}

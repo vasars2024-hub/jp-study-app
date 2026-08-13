@@ -14617,3 +14617,119 @@ Track 2 remains open. Still source-derived, minus this entry's item: round-trip 
 composition checking, difficulty scoring (still blocked on a real frequency source), personal
 concordance, and the grounded AI enrichment bullets. Round-trip semantic diff is the natural next
 one — a retranslation now exists to diff against.
+
+## The round trip makes the translator auditable, and names what it cannot see — 2026-08-13
+
+Relay hop, `backup`. Track 2. Recovery first: the relay reported the previous `backup` worker
+exhausted at 06:02 without a clean handoff, so state was re-derived rather than inherited. That run
+lasted **13 seconds** (`~\.claude-runs\logs\20260813-060226-run-backup.log`) and died on the session
+limit before touching anything; the real last hop was `primary`, which committed `91596f6` at 02:44
+with a full ledger entry. No file under `src/`, `docs/`, `tools/` or `.claude/` has an mtime after
+02:44:38, the index was empty, and every path the previous entry names is committed. There was no
+interrupted slice to finish. The boss audit's last actionable section is still the 14:36 one, whose
+three asks the previous entry closed and re-verified; its later section is the Phase 9.75 planning
+directive, which explicitly sequences itself after this ladder.
+
+So the ladder stayed on Track 2 and built the item the previous entry named next: the round-trip
+semantic diff.
+
+**What it does.** A translation is the one rung of the ladder the reader cannot check — the
+interlinear is auditable token by token against the entry it came from, but the prose above it is a
+model's single unsourced sentence. Once a retranslation exists, the Workbench now offers to
+translate it *back* into the source language, segment the result with the same offline pipeline, and
+report which of the passage's own words came back. Three buckets: came back, did not come back, only
+in the round trip. A word the reader **pinned** that does not survive leads its bucket with a badge,
+because that is the concrete form of "the model did not carry your sense" — the thing the previous
+entry could only record as a caveat.
+
+Where each decision sits, and why:
+
+- `diffLexiconRoundTrip` (`shared/lexiconRoundTrip.ts`) is pure and offline and derived entirely
+  from two grounded results, so it invents nothing and costs nothing until a round trip is asked
+  for.
+- Identity is the **harvest's own** grouping key. `groundedVocabularyKey` was exported from
+  `lexiconHarvest.ts` rather than re-spelled here: two callers disagreeing about what "the same
+  word" means would surface as a word silently reported lost, which is the exact failure this
+  feature exists to prevent. It includes the reading, so 生(なま) and 生(せい) stay distinct.
+- **Ungrounded tokens are excluded from the comparison on both sides**, and their counts reported
+  instead. The return leg rewrites surface forms by construction, so string-comparing words no
+  dictionary knows would report noise as meaning. Silence about them would overstate every ratio,
+  hence the count.
+- **The return leg is sent without the sense hints.** Handing the model the pinned glosses on the
+  way back would plant the very words the check is asking whether the prose still carries, and every
+  round trip would flatter the translation it is supposed to audit. The component test asserts
+  `senseHints` is absent from the second `translateRun` call.
+- An empty back-translation is an error, not a result. The validator drops every failed sentence, so
+  diffing that would report the whole passage as lost — a damning verdict on the prose for what is
+  actually no answer at all. The test asserts the offline lookup is never reached in that case.
+- `comparable` is false when either side grounded nothing, and the panel then says so instead of
+  printing "0 of 5 came back", which would blame the translation for a missing dictionary.
+- Buckets are capped at `MAX_ROUND_TRIP_WORDS = 24` but each carries the `total` it was capped from,
+  so the summary stays true when the list does not.
+
+**The live run changed the shipped copy, and this is the load-bearing part of the entry.** Driven
+against the user's real dictionaries and real Qwen3-1.7B, `猫を見た。` with 見る pinned to JMdict
+sense 3 ("to look after") retranslated to **"Cat was seen."** — the model again ignoring the pin,
+exactly the limit the previous entry recorded — and the round trip came back as **`猫が見られた。`**.
+The panel read: *1 of 3 words came back*, *Words you pinned that did not come back: 1*, with 見る
+badged and first under "Did not come back".
+
+That headline is **misleading, and only a live run could have shown it**. 見られた *is* 見る — the
+passive. The offline segmenter deinflected 見た to 見る in the original but split 見られた into
+見 + ら + れる, so the headword genuinely was absent from the round trip's grounded lemmas while the
+model had in fact used the word. Two of the six diffed rows were also bare particles (を lost,
+が/ら/れる added), which say nothing about meaning.
+
+Neither is fixable at this layer without inventing data. Separating function words from content
+words needs part of speech, and `LexiconInterlinearMatch` carries no POS field; a stopword list or a
+"single kana" rule would be exactly the ungrounded heuristic `lexiconHarvest.ts` already refuses by
+name. Widening the match to substrings would trade a conservative miss for a confident false
+positive. So the code stays strict and **the copy stopped overclaiming**: the note now reads "This
+compares dictionary headwords, not meaning. A word also reads as missing when the model chose a
+synonym, or wrote an inflected form your dictionaries could not fold back to it." The bucket titles
+were already observations ("Did not come back") rather than accusations ("Lost"), and stay that way.
+Re-driven live after the change, the amended note renders and the run reproduces identically.
+
+**The grounded fix, recorded rather than guessed at:** surface each entry's part of speech through
+`LexiconInterlinearMatch` so the diff can separate content words from particles, and report an
+unrecognised inflection as its own third state rather than as a loss. That is a dictionary-schema
+change with its own migration, which is why it is named here instead of being forced into this
+slice.
+
+Gates, all four, on the full shared tree. Vitest **7,450 passed / 11 skipped / 1 failed** across 562
+files. Both failures are **`Hook timed out in 10000ms` under full-suite load, not regressions**:
+`dictionaryDb.test.ts` and `visualNovelI18n.test.tsx` pass together in **4.0 s** when re-run alone
+with `--hookTimeout=60000`. Note for whoever hits this next — the knob is **`hookTimeout`, not
+`testTimeout`**; `--testTimeout=60000` alone does not raise it and the run still fails.
+`node tools/i18n-check.cjs` exit 0, **9,394** English keys complete in ja/zh/ru (the previous 9,380
+plus these fourteen). `node tools/architecture-audit.cjs` exit 0, **nothing new**, the same two
+pending. `npx eslint` over all nine touched source paths: **0 errors, 0 warnings**.
+
+Live Electron acceptance used the instance and bridge the previous hop left running (pid 24032,
+bridge 39273, Vite 5174) — no main-process file changed, so HMR served every edit and no restart was
+needed. `/logs` showed only this track's own `[vite] hot updated:` paths for
+`LexiconWorkbenchResults.tsx` and `lexiconWorkbench.css`, so the running renderer is this code and
+no foreign track was mid-edit. Proven live, in order: the round-trip control is **absent** before a
+retranslation exists and appears the moment one does; clicking it drove a real second model call the
+other way (en→ja) and then the real offline lookup; the diff rendered with correct `role="group"`
+and `aria-label` on all three buckets, the pinned row at 2px border and its text badge (colour is
+never the only carrier), and **no raw `lexicon.` key anywhere in the panel**. Screenshot:
+`debug/shots/win1-1786591171933.png`.
+
+Also honest: the buckets were driven only at sentence scale, ja/zh/ru were not switched on live for
+the fourth entry running (`ui-lang` is unset and changing it is a persisted write plus a reload), and
+the `incomparable` and `ungrounded` lines were exercised by unit test only — every token on both
+sides grounded here, so neither could be reached live without uninstalling a dictionary.
+
+State left as found: textarea cleared and asserted empty, the two first-run overlays hidden in the
+DOM only for one screenshot and their `display` values restored and re-read (`flex` / `block`), every
+probe global deleted and its absence verified, `jp-grammarx-translation-history-v1` still `[]`, no
+persisted setting written, no userData backup taken, no window moved or resized, no other track's
+dirty paths touched. The four catalogs carry other tracks' hunks, so they were staged as
+reconstructed HEAD+own-hunk blobs rather than whole-file adds. The dev app is left running for the
+next worker.
+
+Track 2 remains open. Still source-derived, minus this entry's item: composition checking, difficulty
+scoring (still blocked on a real frequency source), personal concordance, and the grounded AI
+enrichment bullets. Composition checking is the natural next one — it is the last analysis rung that
+needs no data this installation does not already have.

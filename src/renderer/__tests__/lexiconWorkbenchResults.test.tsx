@@ -649,6 +649,214 @@ describe('LexiconWorkbenchResults', () => {
     expect(host.querySelector('.lexicon-harvest')).toBeNull();
   });
 
+  it('reads the retranslation back and reports which of the passage words came with it', async () => {
+    const original = {
+      text: '猫を見た。', detectedLangs: ['ja'], glossLangs: ['en'], tokenCount: 2, matchedCount: 2,
+      truncated: false,
+      parts: [
+        {
+          kind: 'token', text: '猫', start: 0, end: 1,
+          match: {
+            text: '猫', reading: 'ねこ', dictId: 'jmdict-en', dictTitle: 'JMdict (English)',
+            headwordId: 7, glosses: [{ lang: 'en', text: 'cat' }],
+          },
+        },
+        { kind: 'separator', text: 'を', start: 1, end: 2 },
+        {
+          kind: 'token', text: '見た', start: 2, end: 4,
+          match: {
+            text: '見る', reading: 'みる', dictId: 'jmdict-en', dictTitle: 'JMdict (English)',
+            headwordId: 3,
+            glosses: [{ lang: 'en', text: 'to see' }, { lang: 'en', text: 'to look after' }],
+            senses: [
+              { index: 0, glosses: [{ lang: 'en', text: 'to see' }] },
+              { index: 2, glosses: [{ lang: 'en', text: 'to look after' }] },
+            ],
+          },
+        },
+        { kind: 'separator', text: '。', start: 4, end: 5 },
+      ],
+    };
+    // The model's own way back: it kept 猫, dropped 見る entirely and reached
+    // for 世話 instead — exactly the shape a pinned sense failing to survive has.
+    const back = {
+      text: '猫の世話をした。', detectedLangs: ['ja'], glossLangs: ['en'], tokenCount: 2, matchedCount: 2,
+      truncated: false,
+      parts: [
+        {
+          kind: 'token', text: '猫', start: 0, end: 1,
+          match: {
+            text: '猫', reading: 'ねこ', dictId: 'jmdict-en', dictTitle: 'JMdict (English)',
+            headwordId: 7, glosses: [{ lang: 'en', text: 'cat' }],
+          },
+        },
+        { kind: 'separator', text: 'の', start: 1, end: 2 },
+        {
+          kind: 'token', text: '世話', start: 2, end: 4,
+          match: {
+            text: '世話', reading: 'せわ', dictId: 'jmdict-en', dictTitle: 'JMdict (English)',
+            headwordId: 9, glosses: [{ lang: 'en', text: 'care' }],
+          },
+        },
+        { kind: 'separator', text: 'をした。', start: 4, end: 8 },
+      ],
+    };
+    const lookup = vi.fn().mockImplementation((text: string) => Promise.resolve(
+      text === '猫を見た。' ? original : back,
+    ));
+    const translateRun = vi.fn()
+      .mockResolvedValueOnce({ ok: true, text: 'I looked after the cat.' })
+      .mockResolvedValueOnce({ ok: true, text: '猫の世話をした。' });
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        lookupOfflineInterlinear: lookup,
+        translateRun,
+        onTranslateModelProgress: () => () => undefined,
+        onTranslatePartial: () => () => undefined,
+      },
+    });
+    const host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root?.render(<LexiconWorkbenchResults query="猫を見た。" lang="ja" lookupAttempt={21} />);
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      host.querySelector('.lexicon-sense-token')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      [...host.querySelectorAll('.lexicon-sense-list button')][2]
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    // There is nothing to read back before a translation has been produced.
+    expect(host.querySelector('.lexicon-roundtrip')).toBeNull();
+
+    await act(async () => {
+      host.querySelector('.lexicon-retranslate-run')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    const roundTripRun = host.querySelector<HTMLButtonElement>('.lexicon-roundtrip-run');
+    expect(roundTripRun).not.toBeNull();
+    // Offering it is not running it: the return leg is a second model call.
+    expect(translateRun).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      roundTripRun?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // The return leg goes back the other way, and deliberately carries no
+    // hints: handing the model the pinned glosses would plant the very words
+    // this check is asking whether the prose still carries.
+    expect(translateRun.mock.calls[1][0]).toMatchObject({
+      text: 'I looked after the cat.',
+      source: 'en',
+      target: 'ja',
+    });
+    expect(translateRun.mock.calls[1][0].senseHints).toBeUndefined();
+    expect(lookup).toHaveBeenLastCalledWith('猫の世話をした。', {
+      sourceLangs: ['ja'], glossLangs: ['en'],
+    });
+
+    expect(host.querySelector('.lexicon-roundtrip-output p')?.textContent).toBe('猫の世話をした。');
+    expect(host.querySelector('.lexicon-roundtrip-summary')?.textContent)
+      .toBe('lexicon.roundTrip.summary:1,2');
+    expect(host.querySelector('.lexicon-roundtrip-pinned-lost')?.textContent)
+      .toBe('lexicon.roundTrip.pinnedLost:1');
+    expect(host.querySelector('.is-lost .lexicon-roundtrip-word')?.textContent).toBe('見る');
+    expect(host.querySelector('.is-lost li')?.className).toBe('is-pinned');
+    expect(host.querySelector('.is-lost .lexicon-roundtrip-badge')?.textContent)
+      .toBe('lexicon.roundTrip.pinnedBadge');
+    expect(host.querySelector('.is-added .lexicon-roundtrip-word')?.textContent).toBe('世話');
+    expect(host.querySelector('.is-kept .lexicon-roundtrip-word')?.textContent).toBe('猫');
+
+    // The diff is a statement about one translation. Repinning replaces that
+    // translation, so the diff underneath it cannot outlive it.
+    await act(async () => {
+      host.querySelector('.lexicon-sense-list button')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    expect(host.querySelector('.lexicon-roundtrip')).toBeNull();
+  });
+
+  it('reports an unusable back-translation as a failure rather than as a lost passage', async () => {
+    const original = {
+      text: '猫。', detectedLangs: ['ja'], glossLangs: ['en'], tokenCount: 1, matchedCount: 1,
+      truncated: false,
+      parts: [
+        {
+          kind: 'token', text: '猫', start: 0, end: 1,
+          match: {
+            text: '猫', reading: 'ねこ', dictId: 'jmdict-en', dictTitle: 'JMdict (English)',
+            headwordId: 7,
+            glosses: [{ lang: 'en', text: 'cat' }, { lang: 'en', text: 'kitty' }],
+            senses: [
+              { index: 0, glosses: [{ lang: 'en', text: 'cat' }] },
+              { index: 1, glosses: [{ lang: 'en', text: 'kitty' }] },
+            ],
+          },
+        },
+        { kind: 'separator', text: '。', start: 1, end: 2 },
+      ],
+    };
+    const lookup = vi.fn().mockResolvedValue(original);
+    // Every sentence of the return leg failed the translator's validation: `ok`,
+    // empty. Diffing that would report the whole passage as lost.
+    const translateRun = vi.fn()
+      .mockResolvedValueOnce({ ok: true, text: 'A kitty.' })
+      .mockResolvedValueOnce({ ok: true, text: '  ' });
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        lookupOfflineInterlinear: lookup,
+        translateRun,
+        onTranslateModelProgress: () => () => undefined,
+        onTranslatePartial: () => () => undefined,
+      },
+    });
+    const host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root?.render(<LexiconWorkbenchResults query="猫。" lang="ja" lookupAttempt={22} />);
+      await Promise.resolve();
+    });
+    await act(async () => {
+      host.querySelector('.lexicon-sense-token')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      [...host.querySelectorAll('.lexicon-sense-list button')][1]
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      host.querySelector('.lexicon-retranslate-run')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      host.querySelector('.lexicon-roundtrip-run')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(host.querySelector('.lexicon-roundtrip-error')?.getAttribute('role')).toBe('alert');
+    expect(host.querySelector('.lexicon-roundtrip-body')).toBeNull();
+    // The failed leg must not have reached the offline lookup at all.
+    expect(lookup).toHaveBeenCalledTimes(1);
+  });
+
   it('has a real catalog string for every lens label and overridable scale', async () => {
     const { en } = await import('../../shared/i18n/catalogs/en');
     const keys = [
@@ -691,6 +899,22 @@ describe('LexiconWorkbenchResults', () => {
       'lexicon.retranslate.running',
       'lexicon.retranslate.failed',
       'lexicon.retranslate.unusable',
+      // Every string the round-trip check can render, including the two that
+      // only appear when the comparison could not speak for the whole passage.
+      'lexicon.roundTrip.action',
+      'lexicon.roundTrip.running',
+      'lexicon.roundTrip.title',
+      'lexicon.roundTrip.failed',
+      'lexicon.roundTrip.summary',
+      'lexicon.roundTrip.incomparable',
+      'lexicon.roundTrip.pinnedLost',
+      'lexicon.roundTrip.lost',
+      'lexicon.roundTrip.added',
+      'lexicon.roundTrip.kept',
+      'lexicon.roundTrip.pinnedBadge',
+      'lexicon.roundTrip.more',
+      'lexicon.roundTrip.ungrounded',
+      'lexicon.roundTrip.note',
     ];
     const catalog = en as Record<string, string>;
     expect(keys.filter((key) => !catalog[key])).toEqual([]);

@@ -1,4 +1,5 @@
 import type {
+  LexiconInterlinearMatch,
   LexiconInterlinearResult,
   LexiconInterlinearToken,
   LexiconLookupGloss,
@@ -66,12 +67,29 @@ function surfaceKey(text: string): string {
   return text.toLocaleLowerCase();
 }
 
+/**
+ * The grouping identity of a grounded token.
+ *
+ * Exported because a comparison *between* two passages — the round-trip diff —
+ * has to ask "is this the same word?" with exactly the rule the harvest rows
+ * already group by. A second copy of the format elsewhere would drift, and the
+ * first symptom would be a word silently reported as lost because two callers
+ * disagreed about its key.
+ *
+ * Grouping deliberately excludes the dictionary: the same headword found in an
+ * English and a Russian dictionary is one vocabulary row, not two. It
+ * deliberately *includes* the reading, so 生 (なま) and 生 (せい) stay distinct —
+ * they are different words that happen to share a spelling.
+ */
+export function groundedVocabularyKey(
+  match: Pick<LexiconInterlinearMatch, 'text' | 'reading'>,
+): string {
+  return `g\u0000${match.text}\u0000${match.reading}`;
+}
+
 function itemKey(part: LexiconInterlinearToken): string {
   const match = part.match;
-  if (!match) return `s\u0000${surfaceKey(part.text)}`;
-  // Grouping deliberately excludes the dictionary: the same headword found in
-  // an English and a Russian dictionary is one vocabulary row, not two.
-  return `g\u0000${match.text}\u0000${match.reading}`;
+  return match ? groundedVocabularyKey(match) : `s\u0000${surfaceKey(part.text)}`;
 }
 
 /**

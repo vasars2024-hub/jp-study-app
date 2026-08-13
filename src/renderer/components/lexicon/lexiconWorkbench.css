@@ -317,3 +317,143 @@
   line-height: 1.55;
   overflow-wrap: anywhere;
 }
+
+/* The round trip sits under the retranslation it audits, indented so it reads
+   as a statement about that prose rather than a third independent panel. */
+.lexicon-roundtrip {
+  margin: 12px 0 0;
+  padding-left: 12px;
+  border-left: 2px solid var(--border, rgba(127, 127, 127, 0.25));
+}
+
+.lexicon-roundtrip-run {
+  min-height: 30px;
+  padding: 3px 12px;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.45));
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font-size: 0.85rem;
+}
+
+.lexicon-roundtrip-run:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
+.lexicon-roundtrip-error {
+  margin: 8px 0 0;
+  color: var(--danger, #c0392b);
+  font-size: 0.85rem;
+}
+
+.lexicon-roundtrip-output {
+  margin: 10px 0 0;
+}
+
+.lexicon-roundtrip-output figcaption {
+  margin-bottom: 4px;
+  font-size: 0.78rem;
+  opacity: 0.75;
+}
+
+.lexicon-roundtrip-output p {
+  margin: 0;
+  max-width: 68ch;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.lexicon-roundtrip-summary {
+  margin: 10px 0 0;
+  font-size: 0.9rem;
+}
+
+/* The one line the reader came for when they had pinned something. It is a
+   finding, not a failure, so it is emphasised without the error colour. */
+.lexicon-roundtrip-pinned-lost {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.lexicon-roundtrip-bucket {
+  margin: 10px 0 0;
+}
+
+.lexicon-roundtrip-bucket-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 4px;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.75;
+}
+
+.lexicon-roundtrip-bucket-count {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  font-size: 0.75rem;
+  letter-spacing: 0;
+}
+
+.lexicon-roundtrip-bucket ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lexicon-roundtrip-bucket li {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  max-width: 100%;
+  padding: 2px 8px;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.3));
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+
+/* Colour is never the only carrier: the bucket has its own labelled heading and
+   the pinned rows also carry a text badge. */
+.lexicon-roundtrip-bucket.is-lost li {
+  border-color: color-mix(in srgb, var(--danger, #c0392b) 45%, transparent);
+}
+
+.lexicon-roundtrip-bucket.is-added li {
+  border-style: dashed;
+}
+
+.lexicon-roundtrip-bucket li.is-pinned {
+  border-width: 2px;
+}
+
+.lexicon-roundtrip-word {
+  font-weight: 600;
+}
+
+.lexicon-roundtrip-reading,
+.lexicon-roundtrip-gloss {
+  font-size: 0.8rem;
+  opacity: 0.8;
+  overflow-wrap: anywhere;
+}
+
+.lexicon-roundtrip-badge {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent, #5588cc) 22%, transparent);
+  font-size: 0.72rem;
+}
+
+.lexicon-roundtrip-note {
+  margin: 8px 0 0;
+  max-width: 68ch;
+  font-size: 0.78rem;
+}
