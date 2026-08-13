@@ -17724,3 +17724,27 @@ Vitest **1 file / 4 tests passed**; i18n **9,504 keys complete**; architecture *
 touched TypeScript path to pass to ESLint. Live Electron acceptance was not repeated: this turn removed a duplicate
 unwired primitive and changed no shipped behavior; the earlier Workbench concordance wiring and tests remain the
 applicable product evidence.
+
+## Track 2 — Workbench handwriting recognition checkpoint closure — 2026-08-14 00:32 MSK
+
+Re-derived the slice from the final ledger section and current source. The prior focused test only rendered the parent
+metadata panel; it did not exercise the OCR call or either recovery path. The checkpoint adds direct regression coverage
+for the bounded 180×180 PNG payload, CJK feedback extraction, rejected-IPC feedback, and clear/reset behavior. The canvas
+now has an accessible label, duplicate recognition while busy is ignored, and completed/cancelled pointers release their
+capture. No new persistence, provider, IPC channel, model claim, or translated string was introduced.
+
+Live Electron acceptance used one fresh Forge process owned by this hop and the authenticated debug bridge only. The
+production component was mounted from the real Vite module with a bounded target fixture. Its labelled 180×180 canvas
+sent a rendered input through the real `mangaOcr:recognizeImage` main handler; the installed OCR engine returned `狩宙`,
+and the component honestly displayed the first CJK feedback character, `狩`, rather than claiming correctness or a
+stroke score. A separate reverse probe painted the canvas, activated the production Clear control, and measured alpha
+0 at its centre with no output remaining. Screenshot: `debug/shots/win1-1786656660309.png`. The error ring contained
+**0 entries**. Probe DOM/globals were removed, and all 13 processes in the recorded Forge tree were stopped. No profile
+or persisted setting was read or changed.
+
+Gates: full Vitest **579 passed / 1 skipped files; 7,635 passed / 6 skipped tests**; i18n **9,504 keys** complete;
+architecture **1,792 modules / 18 known findings / 2 pending**, nothing new; touched-path ESLint passed. The latest boss
+audit findings remain closed by `5bfe45b` and later bridge evidence; this slice did not reopen importer or attribution
+work. Track 2 still cannot claim stroke-order teaching because no source-backed stroke geometry exists. The next worker
+must re-derive the remaining Lexicon Workbench requirements against source rather than infer that handwriting feedback
+completes Track 2.

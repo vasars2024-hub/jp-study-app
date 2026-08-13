@@ -99,3 +99,9 @@
 .lexicon-character-sources li span {
   display: block;
 }
+.lexicon-character-practice { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-subtle); }
+.lexicon-character-practice-heading { display: flex; justify-content: space-between; align-items: center; }
+.lexicon-character-practice-canvas { display: block; width: 180px; height: 180px; margin: 8px auto; touch-action: none; background: var(--surface-strong); border: 1px solid var(--border-subtle); border-radius: 8px; cursor: crosshair; }
+.lexicon-character-practice-canvas { stroke: var(--text-primary); stroke-width: 4; stroke-linecap: round; }
+.lexicon-character-practice-actions { display: flex; gap: 8px; justify-content: center; }
+.lexicon-character-practice-result { display: block; margin-top: 8px; text-align: center; font-size: 1.5rem; }

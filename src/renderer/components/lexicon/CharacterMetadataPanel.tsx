@@ -1,6 +1,7 @@
 import type { DictResult } from '../../../shared/types';
 import { useT } from '../../i18n';
 import './characterMetadataPanel.css';
+import CharacterWritingPractice from './CharacterWritingPractice';
 
 type CharacterMetadata = NonNullable<DictResult['character']>;
 
@@ -74,6 +75,7 @@ export default function CharacterMetadataPanel({ character }: Props) {
           <span>{joined(character.meanings)}</span>
         </div>
       )}
+      <CharacterWritingPractice target={character.char} />
       <details className="lexicon-character-sources">
         <summary>{t('lexicon.character.sources', { count: character.sources.length })}</summary>
         <ul>
