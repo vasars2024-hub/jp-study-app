@@ -55,6 +55,10 @@ describe('Agent execution bridge parity', () => {
 });
 
 describe('Agent execution renderer client', () => {
+  it('sends the centralized session-cache policy through the renderer bridge', () => {
+    expect(request().policy.cache).toBe('session');
+  });
+
   it('subscribes before invoke, filters foreign chunks and releases afterward', async () => {
     let listener: ((event: unknown) => void) | null = null;
     const release = vi.fn();

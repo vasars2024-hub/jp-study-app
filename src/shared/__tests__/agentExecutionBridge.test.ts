@@ -19,7 +19,7 @@ describe('Agent execution bridge contract', () => {
       allowCloud: false,
       excludeSensitiveContext: true,
       allowSensitiveContext: false,
-      cache: 'off',
+      cache: 'session',
       streaming: true,
     });
   });
@@ -45,7 +45,7 @@ describe('Agent execution bridge contract', () => {
     expect(defaultAgentExecutionPolicy('gemini-2.5-flash')).toMatchObject({
       target: { kind: 'cloud', providerId: 'gemini-2.5-flash' },
       allowCloud: true,
-      cache: 'off',
+      cache: 'session',
     });
   });
 

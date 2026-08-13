@@ -445,7 +445,11 @@ export function defaultAgentExecutionPolicy(
     allowSensitiveContext: false,
     maxInputChars: AGENT_EXECUTION_DEFAULT_INPUT_BUDGET,
     maxOutputTokens: AGENT_EXECUTION_DEFAULT_OUTPUT_BUDGET,
-    cache: 'off',
+    // The provider runtime's cache is process-memory only, bounded by the
+    // current Electron session, and keys the complete provider request
+    // (including image digests). This makes repeated explanations reusable
+    // without creating a second Dictionary cache or retaining answers on disk.
+    cache: 'session',
     retryAttempts: 1,
     timeoutMs: 120_000,
     streaming: true,

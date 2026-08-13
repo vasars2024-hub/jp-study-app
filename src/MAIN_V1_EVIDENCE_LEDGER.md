@@ -15429,3 +15429,36 @@ Verification on the shared tree: focused shared/UI suggestion tests **11/11**. F
 Track 2 remains open. Cached contextual answers and batch explanation remain in the plan. Re-derive
 the existing central provider cache contract before adding any result reuse, and do not create a
 second cache or provider path inside Dictionary.
+
+## Contextual answers now use the existing session cache — 2026-08-13
+
+Relay hop, `codexX`. Track 2. The latest boss-audit section hands off no unresolved regression,
+and the final ledger section left cached contextual answers and batch explanation. Re-deriving the
+execution path found that the centralized provider runtime already had a prompt-safe, image-aware
+session cache, but every production Agent request was built with `cache: 'off'`. The cache existed
+and its direct unit test passed; the renderer-to-main path never selected it.
+
+The default Agent execution policy now selects `cache: 'session'` for local and cloud targets. The
+existing main-process cache keys the complete provider request, including image digests, and lasts
+only for the current Electron process. Nothing is written to disk, persistent caching remains
+explicitly refused until encrypted retention exists, and Dictionary gains no separate cache or
+provider path. A repeated identical contextual explanation can now reuse the centralized result;
+a changed prompt, context, model, output limit, system prompt, or image produces a different key.
+
+Live Electron acceptance used one fresh Forge process owned by this hop and the authenticated debug
+bridge only. Port 5173 belonged to an unrelated listener, so Forge selected 5174. Importing the
+real shared execution bridge through the renderer returned a Gemini policy with
+`cache: 'session'`, sensitive-context exclusion still enabled, and streaming still enabled. The
+bridge error ring contained **0** entries. The temporary probe was deleted, no provider request ran,
+and no user state was written. All 13 processes in this hop's recorded process tree exited; the
+unrelated 5173 listener was untouched.
+
+Verification on the shared tree: focused bridge/provider/cache tests **56/56**. Full `npx vitest
+run --hookTimeout=60000`: **566 files passed / 1 skipped, 7,516 tests passed / 6 skipped**. `node
+tools/i18n-check.cjs`: **9,431 keys** complete. `node tools/architecture-audit.cjs`: **1,764
+modules**, nothing new, the same two pending. ESLint over the three touched TS paths: **0 errors,
+0 warnings**.
+
+Track 2 remains open. Batch explanation is the next explicit Contextual Explain item in the plan.
+Re-derive its UX and provider-budget boundary before implementation; do not turn one oversized
+prompt into a hidden batch or bypass the centralized Agent execution path.
