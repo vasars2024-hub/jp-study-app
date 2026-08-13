@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   agentContextSuggestionPrompt,
+  agentContextBatchSuggestionPrompt,
   deriveAgentContextSuggestions,
+  deriveAgentContextBatchSuggestion,
   type AgentContextSuggestionPreferences,
   type AgentContextSuggestionSource,
 } from '../../../shared/agentContextSuggestions';
@@ -61,6 +63,11 @@ export function AgentContextSuggestions({
       ? deriveAgentContextSuggestions(conversation, preferences ?? livePreferences)
       : []
   ), [conversation, livePreferences, preferences]);
+  const batchSuggestion = useMemo(() => (
+    conversation
+      ? deriveAgentContextBatchSuggestion(conversation, preferences ?? livePreferences)
+      : null
+  ), [conversation, livePreferences, preferences]);
 
   if (suggestions.length === 0) return null;
 
@@ -83,6 +90,31 @@ export function AgentContextSuggestions({
         </label>
       </div>
       <div className="agent-context-suggestion-list">
+        {batchSuggestion ? (
+          <button
+            key={batchSuggestion.id}
+            type="button"
+            className="agent-context-suggestion"
+            title={t('agent.suggestions.useTitle', {
+              action: t('agent.suggestions.action.dictionaryBatch', {
+                count: batchSuggestion.contextIds.length,
+              }),
+              context: batchSuggestion.contextLabels.join(', '),
+            })}
+            onClick={() => onUse(agentContextBatchSuggestionPrompt(
+              batchSuggestion,
+              t('agent.suggestions.prompt.dictionaryBatch', {
+                count: batchSuggestion.contextIds.length,
+              }),
+              explanationLanguage,
+            ))}
+          >
+            <span>{t('agent.suggestions.action.dictionaryBatch', {
+              count: batchSuggestion.contextIds.length,
+            })}</span>
+            <small>{batchSuggestion.contextLabels.join(', ')}</small>
+          </button>
+        ) : null}
         {suggestions.map((suggestion) => {
           const action = t(ACTION_KEYS[suggestion.source]);
           return (

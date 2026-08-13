@@ -56,10 +56,28 @@ describe('AgentContextSuggestions', () => {
     expect(html).toBe('');
   });
 
+  it('renders a batch action only when multiple dictionary entries are attached', () => {
+    const html = renderToStaticMarkup(createElement(AgentContextSuggestions, {
+      conversation: {
+        ...conversation,
+        context: [
+          conversation.context[0],
+          { ...conversation.context[0], id: 'dictionary:犬', label: '犬', createdAt: 2 },
+        ],
+      },
+      preferences: DEFAULT_AGENT_CONTEXT_SUGGESTION_PREFERENCES,
+      onUse: () => undefined,
+    }));
+    expect(html).toContain('Explain 2 entries');
+    expect(html).toContain('犬, 猫');
+  });
+
   it('ships component and settings strings in all UI languages', () => {
     const keys = [
       'agent.suggestions.title',
       'agent.suggestions.explanationLanguage',
+      'agent.suggestions.action.dictionaryBatch',
+      'agent.suggestions.prompt.dictionaryBatch',
       'agent.suggestions.prompt.dictionary',
       'agent.suggestions.action.readingLens',
       'blanc.agent.suggestions.description',

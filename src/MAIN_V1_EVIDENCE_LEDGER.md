@@ -15460,5 +15460,44 @@ modules**, nothing new, the same two pending. ESLint over the three touched TS p
 0 warnings**.
 
 Track 2 remains open. Batch explanation is the next explicit Contextual Explain item in the plan.
+
+## Attached Dictionary entries can be explained as one bounded batch — 2026-08-13
+
+Relay hop, `codexB`. Track 2. The latest boss-audit section handed off no unresolved regression,
+and the final ledger section—not the launcher's stale OCR hint—left batch explanation as the sole
+remaining item in the explicit Contextual Explain delivery line.
+
+The central Agent now offers one inert batch composer action when a conversation contains at least
+two substantive Dictionary context items. It uses only context already attached to that
+conversation, orders newest first, caps the request at eight entries, honors the existing global
+and Dictionary suggestion switches, and does not call a provider by itself. The generated prompt
+applies the complete contextual-explanation contract to every entry while requiring separate
+evidence, uncertainty, and generated examples for each. User-controlled labels are JSON-quoted and
+declared source-data identifiers rather than instructions; an ambiguous or missing context match
+must be disclosed instead of inferred. Execution, consent, privacy, caching, cancellation, and
+cost accounting remain in the centralized Agent path. The action and lead text are translated in
+English, Japanese, Chinese, and Russian.
+
+Live Electron acceptance used one fresh Forge process owned by this hop and the authenticated
+debug bridge only. Port 5173 belonged to an unrelated listener, so Forge selected 5174. Importing
+the real shared module through the renderer and providing attached `犬` and `猫` entries returned
+newest-first ids and labels, count `2`, the selected Russian explanation-language contract, the
+per-entry evidence-isolation rule, and the label instruction boundary. No provider request ran,
+no user state was written, and the temporary probe global was deleted. One malformed diagnostic
+eval produced one syntax-error log before the corrected probe; it was a probe error, not an app
+flow failure. All 14 processes in the recorded owned process tree were stopped and verified absent;
+the unrelated 5173 listener was not touched.
+
+Verification on the shared tree: focused suggestion tests **14/14**. Full literal
+`npx vitest run`: **566 files passed / 1 skipped, 7,519 tests passed / 6 skipped**.
+`node tools/i18n-check.cjs`: **9,433 keys** complete. `node tools/architecture-audit.cjs`:
+**1,764 modules**, nothing new, the same two pending. ESLint over the eight touched TS/TSX/catalog
+paths: **0 errors, 0 warnings**.
+
+The explicit Contextual Explain facet list and its streamed/cached/language/batch delivery items
+are now implemented, but Track 2 remains broadly open. Re-derive the next decision-free gap from
+the earlier Track 2 requirements: language-specific Japanese/Chinese/Russian analysis and explicit
+source-versus-AI result labeling/cost controls are still candidates, as are the larger dictionary
+source/import/search requirements. Do not advance to Track 3 merely because this sub-line closed.
 Re-derive its UX and provider-budget boundary before implementation; do not turn one oversized
 prompt into a hidden batch or bypass the centralized Agent execution path.
