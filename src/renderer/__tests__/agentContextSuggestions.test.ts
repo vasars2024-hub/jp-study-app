@@ -41,6 +41,8 @@ describe('AgentContextSuggestions', () => {
     }));
     expect(html).toContain('aria-labelledby="agent-context-suggestions-title"');
     expect(html).toContain('Explain nuance');
+    expect(html).toContain('Explanation language');
+    expect(html).toContain('<option value="ru" lang="ru">Русский</option>');
     expect(html).toContain('猫');
     expect(html).not.toContain('agent.suggestions.');
   });
@@ -57,6 +59,7 @@ describe('AgentContextSuggestions', () => {
   it('ships component and settings strings in all UI languages', () => {
     const keys = [
       'agent.suggestions.title',
+      'agent.suggestions.explanationLanguage',
       'agent.suggestions.prompt.dictionary',
       'agent.suggestions.action.readingLens',
       'blanc.agent.suggestions.description',

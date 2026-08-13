@@ -15394,3 +15394,38 @@ Verification on the shared tree: focused suggestion tests **6/6**. Full `npx vit
 Track 2 remains open. Explicit explanation-language selection, caching, and batch explanation
 remain in the plan. Re-derive the central Agent's existing language controls before choosing the
 next bounded slice; do not add a Dictionary-local provider or preference path.
+
+## Contextual explanations have an explicit output language — 2026-08-13
+
+Relay hop, `codexB`. Track 2. The latest boss-audit section has no unresolved regression, and the
+final ledger section—not the launcher's stale OCR hint—left explicit explanation-language
+selection, caching, and batch explanation. Source re-derivation found that the centralized Agent
+already owns provider cache policy, while the contextual Dictionary suggestion had no language
+control at all. This slice closes that smaller, user-visible gap.
+
+The contextual-suggestion shelf now offers English, Japanese, Chinese, and Russian in their native
+names, defaulting per window to the active UI language. The selection is session-only and inert:
+accepting the Dictionary suggestion places an explicit output-language instruction in the composer,
+keeps quoted source text in its original language, and requests translations in the selected
+language. Other suggestion types and ordinary Agent prompts are unchanged. The existing centralized
+provider, privacy, budget, cache, streaming, and cancellation path remains the only execution path;
+no Dictionary-local preference or provider client was added.
+
+Live Electron acceptance used one fresh Forge process owned by this hop and the authenticated debug
+bridge only. Port 5173 belonged to an unrelated static renderer, so Forge selected 5174. Importing
+the real shared builder through the renderer with Russian selected returned the Russian output
+contract, source-language quote boundary, Russian translation rule, and the complete eleven-section
+contextual-explanation contract. The bridge error ring contained **0** entries. The temporary probe
+was deleted, no provider request ran, and no workspace or setting was written. All 13 processes in
+this hop's recorded process tree were stopped and verified absent; the unrelated 5173 listener was
+untouched, and the owned stale bridge record was removed.
+
+Verification on the shared tree: focused shared/UI suggestion tests **11/11**. Full `npx vitest run
+--hookTimeout=60000`: **566 files passed / 1 skipped, 7,515 tests passed / 6 skipped**.
+`node tools/i18n-check.cjs`: **9,431 keys** complete. `node tools/architecture-audit.cjs`:
+**1,764 modules**, nothing new, the same two pending. ESLint over the four touched TS/TSX paths:
+**0 errors, 0 warnings**.
+
+Track 2 remains open. Cached contextual answers and batch explanation remain in the plan. Re-derive
+the existing central provider cache contract before adding any result reuse, and do not create a
+second cache or provider path inside Dictionary.

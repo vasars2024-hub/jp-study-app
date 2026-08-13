@@ -23,6 +23,30 @@
   font-weight: 400;
 }
 
+.agent-context-suggestion-language {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--agent-muted, #b6a4a8);
+  font-size: 0.69rem;
+  font-weight: 400;
+}
+
+.agent-context-suggestion-language select {
+  max-width: 9rem;
+  min-height: 28px;
+  border: 1px solid var(--agent-line, #493338);
+  border-radius: 7px;
+  color: var(--agent-text, #f5edef);
+  background: var(--agent-surface, #171214);
+  font: inherit;
+}
+
+.agent-context-suggestion-language select:focus-visible {
+  outline: 2px solid var(--agent-accent, #c84b5f);
+  outline-offset: 2px;
+}
+
 .agent-context-suggestion-list {
   display: flex;
   flex-wrap: wrap;

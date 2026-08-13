@@ -6,6 +6,7 @@ import {
   type AgentContextSuggestionSource,
 } from '../../../shared/agentContextSuggestions';
 import type { AgentConversation } from '../../../shared/agentWorkspace';
+import { LANG_LABELS, LANG_TAGS, UI_LANGS, type UiLang } from '../../../shared/i18n/core';
 import {
   loadAgentContextSuggestionPreferences,
   onAgentContextSuggestionPreferencesChanged,
@@ -43,7 +44,8 @@ export function AgentContextSuggestions({
   onUse,
   preferences,
 }: AgentContextSuggestionsProps) {
-  const { t } = useT();
+  const { t, lang } = useT();
+  const [explanationLanguage, setExplanationLanguage] = useState<UiLang>(lang);
   const [livePreferences, setLivePreferences] = useState(
     loadAgentContextSuggestionPreferences,
   );
@@ -66,7 +68,19 @@ export function AgentContextSuggestions({
     <section className="agent-context-suggestions" aria-labelledby="agent-context-suggestions-title">
       <div className="agent-context-suggestions-heading">
         <span id="agent-context-suggestions-title">{t('agent.suggestions.title')}</span>
-        <span>{t('agent.suggestions.hint')}</span>
+        <label className="agent-context-suggestion-language">
+          <span>{t('agent.suggestions.explanationLanguage')}</span>
+          <select
+            value={explanationLanguage}
+            onChange={(event) => setExplanationLanguage(event.currentTarget.value as UiLang)}
+          >
+            {UI_LANGS.map((language) => (
+              <option key={language} value={language} lang={LANG_TAGS[language]}>
+                {LANG_LABELS[language]}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
       <div className="agent-context-suggestion-list">
         {suggestions.map((suggestion) => {
@@ -80,6 +94,7 @@ export function AgentContextSuggestions({
               onClick={() => onUse(agentContextSuggestionPrompt(
                 suggestion,
                 t(PROMPT_KEYS[suggestion.source], { context: suggestion.contextLabel }),
+                explanationLanguage,
               ))}
             >
               <span>{action}</span>

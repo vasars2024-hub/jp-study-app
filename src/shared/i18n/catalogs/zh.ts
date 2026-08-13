@@ -6728,6 +6728,7 @@ export const zh: Catalog = {
   'credential.use.malSync': 'MyAnimeList 同步',
   'agent.suggestions.title': '基于上下文的建议',
   'agent.suggestions.hint': '只会把文字填入输入框',
+  'agent.suggestions.explanationLanguage': '讲解语言',
   'agent.suggestions.useTitle': '建议：{action} — {context}',
   'agent.suggestions.action.dictionary': '解释语感',
   'agent.suggestions.action.reading': '分析文章',

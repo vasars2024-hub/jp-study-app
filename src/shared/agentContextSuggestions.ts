@@ -2,6 +2,7 @@ import type {
   AgentContextItem,
   AgentConversation,
 } from './agentWorkspace';
+import { LANG_LABELS, type UiLang } from './i18n/core';
 
 export const AGENT_CONTEXT_SUGGESTION_PREFERENCES_VERSION = 1 as const;
 
@@ -125,10 +126,14 @@ const DICTIONARY_EXPLANATION_CONTRACT = [
 export function agentContextSuggestionPrompt(
   suggestion: AgentContextSuggestion,
   localizedLead: string,
+  explanationLanguage?: UiLang,
 ): string {
   const lead = localizedLead.trim();
   if (suggestion.source !== 'dictionary') return lead;
-  return `${lead}\n\n${DICTIONARY_EXPLANATION_CONTRACT}`;
+  const languageContract = explanationLanguage
+    ? `Write the complete explanation in ${LANG_LABELS[explanationLanguage]}. Keep quoted source text in its original language, and provide translations in ${LANG_LABELS[explanationLanguage]}.`
+    : '';
+  return `${lead}\n\n${[languageContract, DICTIONARY_EXPLANATION_CONTRACT].filter(Boolean).join('\n')}`;
 }
 
 export const AGENT_CONTEXT_SUGGESTION_LIMIT = 3;

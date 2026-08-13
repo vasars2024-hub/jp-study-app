@@ -141,6 +141,18 @@ describe('Agent context suggestions', () => {
       .toBe('Analyze this passage.');
   });
 
+  it('makes the selected explanation language explicit without translating source quotes', () => {
+    const [suggestion] = deriveAgentContextSuggestions(conversation([
+      context('dictionary-new', 'dictionary-entry', 'Dictionary'),
+    ]), DEFAULT_AGENT_CONTEXT_SUGGESTION_PREFERENCES);
+
+    const prompt = agentContextSuggestionPrompt(suggestion, 'Explain 猫.', 'ru');
+
+    expect(prompt).toContain('Write the complete explanation in Русский.');
+    expect(prompt).toContain('Keep quoted source text in its original language');
+    expect(prompt).toContain('provide translations in Русский.');
+  });
+
   it('preserves both an active execution claim and suggestions through operational normalization', () => {
     const task: AgentTask = {
       id: 'task', objective: 'test', status: 'running', createdAt: 1, updatedAt: 1, steps: [],

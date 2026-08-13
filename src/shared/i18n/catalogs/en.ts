@@ -7106,6 +7106,7 @@ export const en: Catalog = {
   'credential.use.malSync': 'MyAnimeList sync',
   'agent.suggestions.title': 'Suggestions from your context',
   'agent.suggestions.hint': 'Adds text to the composer only',
+  'agent.suggestions.explanationLanguage': 'Explanation language',
   'agent.suggestions.useTitle': '{action} — {context}',
   'agent.suggestions.action.dictionary': 'Explain nuance',
   'agent.suggestions.action.reading': 'Analyze passage',

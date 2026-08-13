@@ -6761,6 +6761,7 @@ export const ja: Catalog = {
   'credential.use.malSync': 'MyAnimeList 同期',
   'agent.suggestions.title': 'コンテキストからの提案',
   'agent.suggestions.hint': '入力欄にテキストを追加するだけです',
+  'agent.suggestions.explanationLanguage': '説明の言語',
   'agent.suggestions.useTitle': '提案：{action} — {context}',
   'agent.suggestions.action.dictionary': 'ニュアンスを説明',
   'agent.suggestions.action.reading': '文章を分析',

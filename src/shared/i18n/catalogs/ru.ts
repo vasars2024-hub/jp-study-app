@@ -7397,6 +7397,7 @@ export const ru: Catalog = {
   'credential.use.malSync': 'синхронизация с MyAnimeList',
   'agent.suggestions.title': 'Предложения из контекста',
   'agent.suggestions.hint': 'Только добавляет текст в поле ввода',
+  'agent.suggestions.explanationLanguage': 'Язык объяснения',
   'agent.suggestions.useTitle': 'Предложение: {action} — {context}',
   'agent.suggestions.action.dictionary': 'Объяснить нюанс',
   'agent.suggestions.action.reading': 'Разобрать отрывок',
