@@ -348,7 +348,7 @@ declare global {
         snapshot: import('../shared/dictionaryImportJob').DictionaryImportJobSnapshot | null;
       }>;
       dictImportStatus(): Promise<import('../shared/dictionaryImportJob').DictionaryImportJobSnapshot | null>;
-      dictImportPick(kind: 'cedict' | 'wiktextract' | 'dsl' | 'jmnedict' | 'kanjidic' | 'stardict'): Promise<{ canceled: boolean; filePath?: string }>;
+      dictImportPick(kind: 'cedict' | 'wiktextract' | 'dsl' | 'jmnedict' | 'kanjidic' | 'stardict' | 'tatoeba'): Promise<{ canceled: boolean; filePath?: string; linksFilePath?: string }>;
       onDictImportChanged(
         cb: (snapshot: import('../shared/dictionaryImportJob').DictionaryImportJobSnapshot) => void,
       ): () => void;

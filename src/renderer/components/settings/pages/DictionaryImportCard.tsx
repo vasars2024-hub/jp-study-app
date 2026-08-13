@@ -6,7 +6,7 @@ import type {
 import { useT } from '../../../i18n';
 import SettingsCard from '../SettingsCard';
 
-const FILE_KINDS = ['cedict', 'wiktextract', 'dsl', 'jmnedict', 'kanjidic', 'stardict'] as const;
+const FILE_KINDS = ['cedict', 'wiktextract', 'dsl', 'jmnedict', 'kanjidic', 'stardict', 'tatoeba'] as const;
 
 export function dictionaryImportStatusKey(snapshot: DictionaryImportJobSnapshot | null): string {
   if (!snapshot) return 'storage.dictionaryImport.idle';
@@ -42,13 +42,15 @@ export default function DictionaryImportCard() {
     setNotice(null);
     try {
       let filePath: string | undefined;
+      let linksFilePath: string | undefined;
       if (kind !== 'legacy') {
         const picked = await window.api.dictImportPick(kind);
         if (picked.canceled || !picked.filePath) return;
         filePath = picked.filePath;
+        linksFilePath = picked.linksFilePath;
       }
       const result = await window.api.dictImportStart(
-        filePath ? { kind, filePath } : { kind },
+        filePath ? { kind, filePath, ...(linksFilePath ? { linksFilePath } : {}) } : { kind },
       );
       if (result.snapshot) setSnapshot(result.snapshot);
       if (!result.ok) setNotice(t(`storage.dictionaryImport.error.${result.error}`));

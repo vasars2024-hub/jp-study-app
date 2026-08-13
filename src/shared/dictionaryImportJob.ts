@@ -3,7 +3,7 @@
  * The worker/main bridge owns execution; this module only describes the
  * observable state so renderer recovery cannot infer success from progress.
  */
-export type DictionaryImportKind = 'cedict' | 'wiktextract' | 'dsl' | 'jmnedict' | 'kanjidic' | 'stardict' | 'legacy';
+export type DictionaryImportKind = 'cedict' | 'wiktextract' | 'dsl' | 'jmnedict' | 'kanjidic' | 'stardict' | 'tatoeba' | 'legacy';
 
 export type DictionaryImportTerminal =
   | { state: 'committed'; counts: Record<string, number> }
@@ -26,7 +26,7 @@ export interface DictionaryImportJobSnapshot {
   terminal?: DictionaryImportTerminal;
 }
 
-const KINDS = new Set<DictionaryImportKind>(['cedict', 'wiktextract', 'dsl', 'jmnedict', 'kanjidic', 'stardict', 'legacy']);
+const KINDS = new Set<DictionaryImportKind>(['cedict', 'wiktextract', 'dsl', 'jmnedict', 'kanjidic', 'stardict', 'tatoeba', 'legacy']);
 const PHASES = new Set<DictionaryImportProgress['phase']>(['reading', 'importing', 'committing']);
 const TERMINAL_STATES = new Set<DictionaryImportTerminal['state']>(['committed', 'cancelled', 'failed']);
 const JOB_ID_MAX = 128;
@@ -102,6 +102,8 @@ export function isDictionaryImportTerminal(
 export interface DictionaryImportRequest {
   kind: DictionaryImportKind;
   filePath?: string;
+  /** Tatoeba's links TSV; required together with its sentence TSV. */
+  linksFilePath?: string;
   /** Overrides the importer's own default dictionary id. Bounded like `jobId`. */
   dictId?: string;
 }
@@ -122,10 +124,14 @@ export function normalizeDictionaryImportRequest(value: unknown): DictionaryImpo
   const request: DictionaryImportRequest = { kind };
   if (kind === 'legacy') {
     // A path would be ignored; accepting one would imply it was honoured.
-    if (raw.filePath !== undefined) return null;
+    if (raw.filePath !== undefined || raw.linksFilePath !== undefined) return null;
   } else {
     if (!boundedText(raw.filePath, PATH_MAX)) return null;
     request.filePath = raw.filePath;
+    if (kind === 'tatoeba') {
+      if (!boundedText(raw.linksFilePath, PATH_MAX)) return null;
+      request.linksFilePath = raw.linksFilePath;
+    } else if (raw.linksFilePath !== undefined) return null;
   }
   if (raw.dictId !== undefined) {
     if (!boundedText(raw.dictId, JOB_ID_MAX)) return null;

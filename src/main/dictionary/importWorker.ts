@@ -33,6 +33,7 @@ import { importDsl, readDslFile } from './importers/dsl';
 import { importJmnedict } from './importers/jmnedict';
 import { importKanjidic } from './importers/kanjidic';
 import { importStarDict } from './importers/stardict';
+import { importTatoeba } from './importers/tatoeba';
 import { migrateLegacyYomitanStores } from './migrate';
 import type {
   DictionaryImportKind,
@@ -179,6 +180,16 @@ export function runDictionaryImport(
         progressEvery: PROGRESS_EVERY,
         onProgress: (entries) => deps.onProgress(entries, 'importing'),
         shouldCancel: deps.shouldCancel,
+      });
+      const { cancelled, ...rest } = counts;
+      return cancelled ? { state: 'cancelled', counts: {} } : { state: 'committed', counts: numericCounts(rest) };
+    }
+
+    if (request.kind === 'tatoeba') {
+      deps.onProgress(0, 'reading');
+      const counts = importTatoeba(db, request.filePath as string, request.linksFilePath as string, {
+        ...(request.dictId ? { dictId: request.dictId } : {}), progressEvery: PROGRESS_EVERY,
+        onProgress: (lines) => deps.onProgress(lines, 'importing'), shouldCancel: deps.shouldCancel,
       });
       const { cancelled, ...rest } = counts;
       return cancelled ? { state: 'cancelled', counts: {} } : { state: 'committed', counts: numericCounts(rest) };

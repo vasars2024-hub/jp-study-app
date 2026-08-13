@@ -93,6 +93,9 @@ describe('dictionary import request validation', () => {
       .toEqual({ kind: 'wiktextract', filePath: '/tmp/d.jsonl', dictId: 'wikt-ja' });
     expect(normalizeDictionaryImportRequest({ kind: 'jmnedict', filePath: '/tmp/JMnedict.xml' }))
       .toEqual({ kind: 'jmnedict', filePath: '/tmp/JMnedict.xml' });
+    expect(normalizeDictionaryImportRequest({ kind: 'tatoeba', filePath: '/tmp/s.tsv', linksFilePath: '/tmp/l.tsv' }))
+      .toEqual({ kind: 'tatoeba', filePath: '/tmp/s.tsv', linksFilePath: '/tmp/l.tsv' });
+    expect(normalizeDictionaryImportRequest({ kind: 'tatoeba', filePath: '/tmp/s.tsv' })).toBeNull();
   });
 
   it('refuses a file-backed kind with no path rather than importing nothing', () => {

@@ -40,12 +40,13 @@ const PICKABLE = {
   jmnedict: { titleKey: 'dialog.importJmnedict.title', filterKey: 'dialog.filter.jmnedict', extensions: ['xml'] },
   kanjidic: { titleKey: 'dialog.importKanjidic.title', filterKey: 'dialog.filter.kanjidic', extensions: ['xml'] },
   stardict: { titleKey: 'dialog.importStardict.title', filterKey: 'dialog.filter.stardict', extensions: ['ifo'] },
+  tatoeba: { titleKey: 'dialog.importTatoeba.title', filterKey: 'dialog.filter.tatoeba', extensions: ['tsv', 'csv'] },
 } as const;
 
 type PickableKind = keyof typeof PICKABLE;
 
 function pickableKind(value: unknown): PickableKind | null {
-  return value === 'cedict' || value === 'wiktextract' || value === 'dsl' || value === 'jmnedict' || value === 'kanjidic' || value === 'stardict' ? value : null;
+  return value === 'cedict' || value === 'wiktextract' || value === 'dsl' || value === 'jmnedict' || value === 'kanjidic' || value === 'stardict' || value === 'tatoeba' ? value : null;
 }
 
 let jobs: DictionaryImportJobs | null = null;
@@ -123,6 +124,16 @@ export function registerDictionaryImportIpc(): void {
     });
     const filePath = picked.filePaths[0];
     if (picked.canceled || !filePath) return { canceled: true as const };
+    if (kind === 'tatoeba') {
+      const links = await dialog.showOpenDialog({
+        title: mt('dialog.importTatoebaLinks.title'),
+        filters: [{ name: mt('dialog.filter.tatoebaLinks'), extensions: ['tsv', 'csv'] }, { name: mt('dialog.filter.allFiles'), extensions: ['*'] }],
+        properties: ['openFile'],
+      });
+      const linksFilePath = links.filePaths[0];
+      if (links.canceled || !linksFilePath) return { canceled: true as const };
+      return { canceled: false as const, filePath, linksFilePath };
+    }
     return { canceled: false as const, filePath };
   });
 

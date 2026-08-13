@@ -17187,3 +17187,27 @@ belongs to its later ordered stage; credentials, hardware-only microphone/multi-
 third-party availability remain external/deferred. The archive-wide sweep is not yet exhaustive, so
 `retrospectiveComplete` remains false. Track 2 remains active; next re-derive Tatoeba paired-file
 atomic import versus the other still-missing source formats and capabilities.
+
+## Track 2 — atomic Tatoeba paired-file import — 2026-08-13 18:28 MSK
+
+Re-deriving the ledger tail made Tatoeba the next dependency-ordered gap. Standing approval selected
+one strict request carrying both sentence and link paths: main opens two native pickers, validation
+refuses either half alone, and the existing utility process owns parsing and SQLite work. Either-file
+failure or cancellation therefore rolls back the whole source replacement.
+
+The importer retains source and translation languages, deterministic link order, Tatoeba
+attribution, and CC BY 2.0 FR licence in the existing headword/sense/gloss graph. Settings exposes
+the paired flow with EN/JA/ZH/RU copy. Tests prove multilingual links, attribution, strict paired
+request validation, and cancellation preserving the prior committed source.
+
+Gates: full Vitest **578 passed / 1 skipped files; 7,607 passed / 6 skipped tests**; i18n **9,487**
+keys complete; architecture **1,789 modules / 18 known findings / 2 known pending**, nothing new;
+focused importer/contract/worker/card run **4 files / 26 tests passed**. Focused ESLint found no
+owned error; `window.d.ts` retains exactly its two pre-existing subtitle-harvest adjacent-overload
+errors. Live Electron acceptance was not claimed: the bridge record was stale and no Electron
+process existed, so a real paired picker/import/remove journey remains the first gate next hop.
+
+Retrospective sweep increment: Tatoeba's paired-file API and atomicity were reversible internal
+decisions now closed under standing approval. The archive-wide sweep is still not exhaustive, so
+`retrospectiveComplete` remains false. Track 2 remains active: next re-derive bundled/user-licensed
+source coverage and remaining merge/search/workbench capabilities.
