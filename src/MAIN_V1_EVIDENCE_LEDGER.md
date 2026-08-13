@@ -17541,3 +17541,85 @@ the +1 is the new test). `node tools/i18n-check.cjs` 0, all 9,487 English keys t
 `node tools/architecture-audit.cjs` 0, 1,789 modules, 18 known findings, nothing new.
 `npx eslint src/main/__tests__/dictionaryImportJobs.test.ts` 0. No product string changed, so no
 i18n work was required.
+
+## Track 2 — per-language-pair source priority — 2026-08-14 00:05 MSK
+
+Relay worker `backup`. Re-derived Track 2 against the plan rather than the last hop's summary. Every
+importer the plan names (Yomitan, CEDICT, KANJIDIC, JMnedict, Tatoeba, StarDict/DSL, Wiktextract,
+bundled) exists under `src/main/dictionary/importers/`, and saved searches exist in
+`src/renderer/dictionarySavedSearches.ts`. One bullet had **no implementation anywhere**:
+"multi-source merge, deduplication, source attribution, **per-language-pair priority**". `sourcePriority`
+/ `languagePairPriority` matched zero files; `dictionaries.priority` is a single global integer read by
+seven SQL statements. That is the slice this hop closed.
+
+**The defect in product terms.** One global order cannot express what the plan asks for. CC-CEDICT
+should outrank JMdict for ZH→EN and lose to it for JA→EN; with one column, one of those is always wrong.
+
+**Decision (standing auto-approval; reversible, internal).** Overrides, not a second full ordering.
+Schema v4 adds `dict_pair_priority(dict_id, source_lang, target_lang, priority)` with an ON DELETE
+CASCADE to `dictionaries`. Absent rows fall through `coalesce(pp.priority, d.priority)`, so a pair
+nobody has touched keeps the global order and a newly imported source never needs backfilling across
+every pair in existence. Rejected alternative: resolving the override in JS after the query. The prefix
+and reverse-gloss probes carry `limit`, so ordering there decides which rows *survive*, not merely how
+they are displayed — reordering post-truncation would silently drop a source the user had just promoted.
+The override therefore resolves in SQL, in `HEADWORD_SELECT` and the gloss query.
+
+**The pair boundary.** `LookupQuery` states the target only through `glossLangs`, so `pairTarget()`
+returns a pair only when exactly one gloss language is named. None (every target at once) or several
+means there is no single pair whose override could apply, and both bind `''`, which matches no row.
+Existing callers are therefore unchanged by construction.
+
+**Write side.** `moveDictionarySourceInPair` materialises the *whole* pair's order on first edit.
+Storing only the moved source's number would leave its neighbours reading `dictionaries.priority`, so a
+later global reorder would scramble a pair the user had deliberately arranged. `resetDictionaryPairPriority`
+is the reverse action; `dictionaryPairHasOverride` drives its enabled state. `listDictionaryPairs` reads
+`dictionaries.target_langs` rather than `select distinct lang from glosses` — the latter is a scan of
+over a million rows on a path that opens a settings page.
+
+**UI.** `DictionarySettingsSection` gains a pair selector above the source list; the existing ↑/↓ write
+pair overrides when a pair is selected and the global order otherwise. Enable/remove answer with the
+global order, so the renderer re-reads for the active pair instead of trusting that list. Five new keys
+in en/ja/zh/ru.
+
+**Mutation controls.** *A* — `pairTarget()` forced to `''`: two intended failures
+(`expected [ 'jmdict-en', 'alt-jmdict-en' ] to deeply equal [ 'alt-jmdict-en', 'jmdict-en' ]`, and
+`expected +0 to be -1`). Restored → pass. *B* — `source_lang` dropped from the join key: **first pass
+still green**, proving that half of the join had zero coverage. Added
+"does not let one pair’s override leak into another source language" (an override on zh→en must not
+touch ja→en; both share a target, so only `source_lang` separates them). Mutation B then failed exactly
+there and passed on restore.
+
+**Live falsification** through the debug bridge (pid 91180, `url=http://localhost:5174/`, port 5173 held
+by a foreign process as before). All probes hit main-process handlers, not preload bindings:
+
+| Probe | Result |
+| --- | --- |
+| `dictListPairs()` | `[ja→en, ja→zh]`, derived from the four real bundled sources |
+| ja→en before | `kanjium -100, jmdict-en 0, jmdict-ru 1, moedict 2`; `pairHasOverride` false |
+| move `jmdict-ru` up in ja→en | pair becomes `kanjium, jmdict-ru, jmdict-en, moedict`; override true |
+| **global order after** | `-100, 0, 1, 2` — **unchanged** |
+| **ja→zh after** | **unchanged** — no cross-pair leak |
+| move top item up | `{ok:false, error:"edge"}`, list still correct. Honest failure |
+| renderer reload | pair order and override survived; `window.__marker` gone, proving a fresh JS context |
+| `dictResetPairPriority` | `ok:true`, order back to `-100, 0, 1, 2`, override false |
+| reset again | `ok:false` — honest about doing nothing |
+
+`dict_pair_priority` was left empty, exactly as found; the global order was captured before and verified
+identical after. Probe globals deleted. Main/renderer error ring: 0 entries.
+
+**One pre-existing test corrected.** `dictionaryDb.test.ts` winds `user_version` back to 2 to exercise
+migration 3, and asserted the literal `3`. With a step 4 present the rewind re-ran that step against its
+own output (`table dict_pair_priority already exists`). The rewind is artificial, so it now drops what
+later steps create and asserts `DICT_SCHEMA_VERSION`. The migration itself was **not** made idempotent —
+a real database at version 3 cannot already have the table, and `IF NOT EXISTS` would hide that.
+
+Gates: `npx vitest run` 578 files passed / 1 skipped, **7632** tests passed / 6 skipped (was 7617; +15 is
+exactly the new tests). `node tools/i18n-check.cjs` 0, **9492** English keys translated (was 9487; +5).
+`node tools/architecture-audit.cjs` 0, 1,789 modules, 18 known findings, nothing new.
+`npx eslint` 0 on every path this hop owns. Two `adjacent-overload-signatures` errors in
+`src/renderer/window.d.ts` are **pre-existing at HEAD** (`subtitleHarvestList` is declared twice there)
+and belong to the subtitle track, not to this change.
+
+Staging note: `preload.ts`, `window.d.ts`, the four i18n catalogs and this ledger all carry other tracks'
+uncommitted hunks. Those six were staged as HEAD-plus-this-hop's-edit reconstructed blobs rather than
+`git add`; the working tree keeps the foreign work untouched.

@@ -51,7 +51,13 @@ import {
   type ChineseLookupDeps,
 } from './chineseLookup';
 import type { DictResult } from '../../shared/types';
-import type { DictionarySourceInfo, DictionarySourceMutationResult } from '../../shared/dictionarySources';
+import {
+  isGlobalPair,
+  pairKey,
+  type DictionaryLanguagePair,
+  type DictionarySourceInfo,
+  type DictionarySourceMutationResult,
+} from '../../shared/dictionarySources';
 import {
   buildOfflineInterlinear,
   type LexiconInterlinearOptions,
@@ -72,10 +78,24 @@ export interface DictionaryStatus {
   bytes: number;
 }
 
-export function listDictionarySources(db: SqliteDb = dictionaryDb()): DictionarySourceInfo[] {
-  const rows = db.prepare(
-    'select id, title, kind, source_lang, licence, attribution, entry_count, enabled, priority from dictionaries order by priority, id',
-  ).all() as Array<{
+export function listDictionarySources(
+  db: SqliteDb = dictionaryDb(),
+  pair?: DictionaryLanguagePair,
+): DictionarySourceInfo[] {
+  // Same `coalesce` the lookup engine uses, so what Settings shows as the order
+  // for a pair is the order results actually come back in. Binding '' for the
+  // global view matches no override row and leaves `d.priority` in charge.
+  const scoped = isGlobalPair(pair) ? undefined : pair;
+  const source = scoped?.sourceLang ?? '';
+  const target = scoped?.targetLang ?? '';
+  const rows = db.prepare(`
+    select d.id, d.title, d.kind, d.source_lang, d.licence, d.attribution, d.entry_count, d.enabled,
+           coalesce(pp.priority, d.priority) as priority
+    from dictionaries d
+    left join dict_pair_priority pp
+      on pp.dict_id = d.id and pp.source_lang = ? and pp.target_lang = ?
+    order by priority, d.id
+  `).all(source, target) as Array<{
     id: string; title: string; kind: string; source_lang: string; licence: string; attribution: string;
     entry_count: number; enabled: number; priority: number;
   }>;
@@ -84,6 +104,91 @@ export function listDictionarySources(db: SqliteDb = dictionaryDb()): Dictionary
     licence: row.licence, attribution: row.attribution,
     entryCount: row.entry_count, enabled: row.enabled !== 0, priority: row.priority,
   }));
+}
+
+/**
+ * Every language pair the installed sources can actually answer.
+ *
+ * Read off `dictionaries.target_langs` rather than `select distinct lang from
+ * glosses`: the latter is a scan of over a million rows on a real install, on a
+ * path that opens a settings page.
+ */
+export function listDictionaryPairs(db: SqliteDb = dictionaryDb()): DictionaryLanguagePair[] {
+  const rows = db.prepare('select source_lang, target_langs from dictionaries').all() as
+    Array<{ source_lang: string; target_langs: string }>;
+  const seen = new Map<string, DictionaryLanguagePair>();
+  for (const row of rows) {
+    const sourceLang = row.source_lang?.trim();
+    if (!sourceLang) continue;
+    for (const raw of (row.target_langs ?? '').split(',')) {
+      const targetLang = raw.trim();
+      if (!targetLang) continue;
+      const pair = { sourceLang, targetLang };
+      seen.set(pairKey(pair), pair);
+    }
+  }
+  return [...seen.values()].sort((a, b) =>
+    a.sourceLang.localeCompare(b.sourceLang) || a.targetLang.localeCompare(b.targetLang));
+}
+
+/**
+ * Move a source up or down within one language pair, leaving every other pair
+ * and the global order untouched.
+ *
+ * The whole pair's order is materialised on the first edit. Storing only the
+ * moved source's number would leave its neighbours reading `dictionaries.
+ * priority`, so a later global reorder would silently scramble a pair the user
+ * had deliberately arranged — and two sources that happened to share a global
+ * number would have no defined order at all.
+ */
+export function moveDictionarySourceInPair(
+  id: string,
+  direction: -1 | 1,
+  pair: DictionaryLanguagePair,
+  db: SqliteDb = dictionaryDb(),
+): DictionarySourceMutationResult {
+  if (isGlobalPair(pair)) return moveDictionarySource(id, direction, db);
+  const sources = listDictionarySources(db, pair);
+  const index = sources.findIndex((source) => source.id === id);
+  if (index < 0) return { ok: false, error: 'not-found', sources };
+  const target = index + direction;
+  if (target < 0 || target >= sources.length) return { ok: false, error: 'edge', sources };
+  const reordered = [...sources];
+  [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+  db.transaction(() => {
+    const upsert = db.prepare(`
+      insert into dict_pair_priority (dict_id, source_lang, target_lang, priority)
+      values (?, ?, ?, ?)
+      on conflict(dict_id, source_lang, target_lang) do update set priority = excluded.priority
+    `);
+    reordered.forEach((source, priority) =>
+      upsert.run(source.id, pair.sourceLang, pair.targetLang, priority));
+  })();
+  return { ok: true, sources: listDictionarySources(db, pair) };
+}
+
+/** Drop a pair's overrides so it follows the global order again. */
+export function resetDictionaryPairPriority(
+  pair: DictionaryLanguagePair,
+  db: SqliteDb = dictionaryDb(),
+): DictionarySourceMutationResult {
+  if (isGlobalPair(pair)) return { ok: false, error: 'not-found', sources: listDictionarySources(db) };
+  const result = db
+    .prepare('delete from dict_pair_priority where source_lang = ? and target_lang = ?')
+    .run(pair.sourceLang, pair.targetLang);
+  return { ok: result.changes > 0, sources: listDictionarySources(db, pair) };
+}
+
+/** Whether this pair has an order of its own, i.e. whether resetting it would do anything. */
+export function dictionaryPairHasOverride(
+  pair: DictionaryLanguagePair,
+  db: SqliteDb = dictionaryDb(),
+): boolean {
+  if (isGlobalPair(pair)) return false;
+  const row = db
+    .prepare('select 1 from dict_pair_priority where source_lang = ? and target_lang = ? limit 1')
+    .get(pair.sourceLang, pair.targetLang);
+  return row !== undefined;
 }
 
 export function setDictionarySourceEnabled(

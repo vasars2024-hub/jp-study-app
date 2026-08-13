@@ -1,8 +1,14 @@
 import { useEffect, useState } from 'react';
 import { confirmDialog } from '../components/ui';
-import { KNOWN_LANGS } from '../../shared/langs';
+import { KNOWN_LANGS, langNativeLabel } from '../../shared/langs';
 import type { YomitanDictInfo } from '../../shared/types';
-import type { DictionarySourceInfo } from '../../shared/dictionarySources';
+import {
+  GLOBAL_PAIR,
+  isGlobalPair,
+  pairKey,
+  type DictionaryLanguagePair,
+  type DictionarySourceInfo,
+} from '../../shared/dictionarySources';
 import {
   bumpZoom,
   getZoom,
@@ -41,6 +47,11 @@ export function DictionarySettingsSection() {
   const { t, lang } = useT();
   const [dicts, setDicts] = useState<YomitanDictInfo[]>([]);
   const [sources, setSources] = useState<DictionarySourceInfo[]>([]);
+  const [pairs, setPairs] = useState<DictionaryLanguagePair[]>([]);
+  // Which language pair the source order below applies to. GLOBAL_PAIR is the
+  // single `dictionaries.priority` order every pair falls back to.
+  const [activePair, setActivePair] = useState<DictionaryLanguagePair>(GLOBAL_PAIR);
+  const [pairOverridden, setPairOverridden] = useState(false);
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
@@ -52,20 +63,64 @@ export function DictionarySettingsSection() {
   const [exImporting, setExImporting] = useState(false);
   const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
 
+  /** Load the source list for `pair`, plus whether that pair has its own order. */
+  async function refreshSources(pair: DictionaryLanguagePair) {
+    const scoped = isGlobalPair(pair) ? undefined : pair;
+    const [importedSources, overridden] = await Promise.all([
+      window.api.dictListSources(scoped),
+      scoped ? window.api.dictPairHasOverride(scoped) : Promise.resolve(false),
+    ]);
+    setSources(importedSources);
+    setPairOverridden(overridden);
+  }
+
   async function refresh() {
     setLoading(true);
     try {
-      const [list, importedSources, offline] = await Promise.all([
+      const [list, availablePairs, offline] = await Promise.all([
         window.api.dictListYomitan(),
-        window.api.dictListSources(),
+        window.api.dictListPairs(),
         window.api.examplesOfflineStatus(),
       ]);
       setDicts(list);
-      setSources(importedSources);
+      setPairs(availablePairs);
       setExOffline(offline);
+      // A pair can disappear when its last source is removed; fall back rather
+      // than leaving the list showing an order nothing can produce any more.
+      const stillThere = isGlobalPair(activePair)
+        || availablePairs.some((pair) => pairKey(pair) === pairKey(activePair));
+      const next = stillThere ? activePair : GLOBAL_PAIR;
+      setActivePair(next);
+      await refreshSources(next);
     } finally {
       setLoading(false);
     }
+  }
+
+  async function onSelectPair(key: string) {
+    const next = pairs.find((pair) => pairKey(pair) === key) ?? GLOBAL_PAIR;
+    setActivePair(next);
+    setMsg(null);
+    await refreshSources(next);
+  }
+
+  async function onMoveSource(id: string, direction: -1 | 1) {
+    setMsg(null);
+    const scoped = isGlobalPair(activePair) ? undefined : activePair;
+    const next = await window.api.dictMoveSource(id, direction, scoped);
+    setSources(next.sources);
+    // The first move within a pair is what creates its own order, so this is
+    // also what enables the reset control.
+    if (next.ok && scoped) setPairOverridden(true);
+    if (!next.ok && next.error !== 'edge') setMsg({ kind: 'err', text: t('settings.study.dict.updateFailed') });
+  }
+
+  async function onResetPair() {
+    if (isGlobalPair(activePair)) return;
+    setMsg(null);
+    const next = await window.api.dictResetPairPriority(activePair);
+    setSources(next.sources);
+    setPairOverridden(false);
   }
 
   useEffect(() => {
@@ -154,7 +209,11 @@ export function DictionarySettingsSection() {
   async function updateSource(result: Promise<{ ok: boolean; error?: string; sources: DictionarySourceInfo[] }>) {
     setMsg(null);
     const next = await result;
-    setSources(next.sources);
+    // Enable/remove are pair-agnostic and answer with the global order, so the
+    // returned list would silently replace a pair's order with the global one.
+    // Re-read for whichever pair is on screen instead.
+    if (isGlobalPair(activePair)) setSources(next.sources);
+    else await refreshSources(activePair);
     if (!next.ok && next.error !== 'edge') setMsg({ kind: 'err', text: t('settings.study.dict.updateFailed') });
   }
 
@@ -265,6 +324,38 @@ export function DictionarySettingsSection() {
 
       <h3 className="set-subhead">{t('settings.study.dict.sources.title')}</h3>
       <p className="set-row-desc muted">{t('settings.study.dict.sources.intro')}</p>
+      {!loading && pairs.length > 0 && (
+        <div className="set-row">
+          <label className="set-row-title" htmlFor="dict-pair-order">
+            {t('settings.study.dict.sources.pairLabel')}
+          </label>
+          <select
+            id="dict-pair-order"
+            className="input"
+            value={pairKey(activePair)}
+            onChange={(event) => void onSelectPair(event.target.value)}
+          >
+            <option value={pairKey(GLOBAL_PAIR)}>{t('settings.study.dict.sources.pairGlobal')}</option>
+            {pairs.map((pair) => (
+              <option key={pairKey(pair)} value={pairKey(pair)}>
+                {`${langNativeLabel(pair.sourceLang)} → ${langNativeLabel(pair.targetLang)}`}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      {!loading && !isGlobalPair(activePair) && (
+        <div className="set-row">
+          <p className="set-row-desc muted">
+            {pairOverridden
+              ? t('settings.study.dict.sources.pairCustom')
+              : t('settings.study.dict.sources.pairInherited')}
+          </p>
+          <button className="btn small" disabled={!pairOverridden} onClick={() => void onResetPair()}>
+            {t('settings.study.dict.sources.pairReset')}
+          </button>
+        </div>
+      )}
       {!loading && sources.length === 0 && <div className="form-msg">{t('settings.study.dict.sources.empty')}</div>}
       {!loading && sources.length > 0 && (
         <ul className="dict-manage-list">
@@ -283,8 +374,8 @@ export function DictionarySettingsSection() {
                 )}
               </div>
               <div className="dict-manage-actions">
-                <button className="btn small" title={t('settings.study.dict.higherPriority')} disabled={index === 0} onClick={() => void updateSource(window.api.dictMoveSource(source.id, -1))}>↑</button>
-                <button className="btn small" title={t('settings.study.dict.lowerPriority')} disabled={index === sources.length - 1} onClick={() => void updateSource(window.api.dictMoveSource(source.id, 1))}>↓</button>
+                <button className="btn small" title={t('settings.study.dict.higherPriority')} disabled={index === 0} onClick={() => void onMoveSource(source.id, -1)}>↑</button>
+                <button className="btn small" title={t('settings.study.dict.lowerPriority')} disabled={index === sources.length - 1} onClick={() => void onMoveSource(source.id, 1)}>↓</button>
                 <button className="btn small" onClick={() => void onRemoveSource(source)}>{t('common.remove')}</button>
               </div>
             </li>

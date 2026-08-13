@@ -116,8 +116,12 @@ describe('dictionary database — opening and migrating', () => {
       values (?, ?, 'ja', 'en', ?, ?)
     `).run('user-jmdict-copy', 'JMdict copy', null, null);
 
+    // Wind back to just before migration 3, the one under test. The rewind is
+    // artificial, so every table a later step creates has to go with it —
+    // otherwise that step re-runs against its own output and throws.
+    db.exec('drop table if exists dict_pair_priority');
     db.pragma('user_version = 2');
-    expect(migrateDictionaryDb(db)).toBe(3);
+    expect(migrateDictionaryDb(db)).toBe(DICT_SCHEMA_VERSION);
 
     expect(db.prepare('select licence, attribution from dictionaries where id = ?').get('bundled-jmdict-en')).toEqual({
       licence: 'CC BY-SA 4.0',

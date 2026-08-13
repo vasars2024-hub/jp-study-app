@@ -471,3 +471,102 @@ describe('FTS query escaping', () => {
     expect(lookup(db, { text: 'to run (away)' }).entries.map((e) => e.text)).toContain('逃げる');
   });
 });
+
+describe('per-language-pair source priority', () => {
+  // Two dictionaries covering the SAME pair is the only situation in which an
+  // ordering is observable at all, and the seed has only one ja→en source.
+  function seedSecondJapaneseEnglishSource(): void {
+    importLegacyIndex(db, {
+      version: 1,
+      info: INFO({ id: 'alt-jmdict-en', title: 'Alt JMdict (English)', priority: 9 }),
+      terms: {
+        食べる: [{ word: '食べる', reading: 'たべる', score: 5, senses: [{ partsOfSpeech: ['v1'], definitions: ['to consume'], tags: [] }] }],
+      },
+    });
+  }
+
+  const setPairPriority = (dictId: string, source: string, target: string, priority: number): void => {
+    db.prepare(
+      'insert into dict_pair_priority (dict_id, source_lang, target_lang, priority) values (?, ?, ?, ?)',
+    ).run(dictId, source, target, priority);
+  };
+
+  const sourceIds = (glossLangs?: string[]): string[] => {
+    const hit = lookup(db, { text: '食べる', ...(glossLangs ? { glossLangs } : {}) }).entries
+      .find((entry) => entry.text === '食べる');
+    return hit?.sources.map((source) => source.dictId) ?? [];
+  };
+
+  it('leaves the global order in charge until an override exists', () => {
+    seedSecondJapaneseEnglishSource();
+    expect(sourceIds(['en'])).toEqual(['jmdict-en', 'alt-jmdict-en']);
+  });
+
+  it('reorders one pair without touching dictionaries.priority', () => {
+    seedSecondJapaneseEnglishSource();
+    setPairPriority('alt-jmdict-en', 'ja', 'en', -1);
+
+    expect(sourceIds(['en'])).toEqual(['alt-jmdict-en', 'jmdict-en']);
+    // The global column is what every other pair still reads. Rewriting it here
+    // would make "prefer this source for ja→en" silently reorder ja→ru too.
+    const global = db.prepare('select priority from dictionaries where id = ?')
+      .get('alt-jmdict-en') as { priority: number };
+    expect(global.priority).toBe(9);
+  });
+
+  it('reports the pair-specific number as the entry priority', () => {
+    seedSecondJapaneseEnglishSource();
+    setPairPriority('alt-jmdict-en', 'ja', 'en', -1);
+    const hit = lookup(db, { text: '食べる', glossLangs: ['en'] }).entries
+      .find((entry) => entry.text === '食べる');
+    expect(hit?.dictionaryPriority).toBe(-1);
+    expect(hit?.sources.find((s) => s.dictId === 'alt-jmdict-en')?.priority).toBe(-1);
+  });
+
+  it('does not let one pair\u2019s override leak into another target language', () => {
+    seedSecondJapaneseEnglishSource();
+    // The override names ja→ru. ja→en must not see it.
+    setPairPriority('alt-jmdict-en', 'ja', 'ru', -1);
+    expect(sourceIds(['en'])).toEqual(['jmdict-en', 'alt-jmdict-en']);
+  });
+
+  it('does not let one pair’s override leak into another source language', () => {
+    // The case the whole feature exists for: a source promoted for zh→en must
+    // keep its global place in ja→en. Both pairs share a target language, so
+    // only `source_lang` in the join key can tell them apart.
+    seedSecondJapaneseEnglishSource();
+    setPairPriority('alt-jmdict-en', 'zh', 'en', -1);
+    expect(sourceIds(['en'])).toEqual(['jmdict-en', 'alt-jmdict-en']);
+  });
+
+  it('falls back to the global order when the request names no single pair', () => {
+    seedSecondJapaneseEnglishSource();
+    setPairPriority('alt-jmdict-en', 'ja', 'en', -1);
+    // No gloss language at all: the caller asked for every target at once, so
+    // there is no one pair whose override could apply.
+    expect(sourceIds()).toEqual(['jmdict-en', 'jmdict-ru', 'alt-jmdict-en']);
+    // Several gloss languages: same reasoning.
+    expect(sourceIds(['en', 'ru'])).toEqual(['jmdict-en', 'jmdict-ru', 'alt-jmdict-en']);
+  });
+
+  it('applies the override in the reverse gloss direction too', () => {
+    // The gloss probe is capped by `limit`, so ordering there decides which rows
+    // survive rather than merely how they are displayed.
+    seedSecondJapaneseEnglishSource();
+    db.prepare('insert into glosses (sense_id, lang, text, ord) select s.id, ?, ?, 1 from senses s join headwords h on h.id = s.headword_id where h.dict_id = ?')
+      .run('en', 'to devour', 'alt-jmdict-en');
+    setPairPriority('alt-jmdict-en', 'ja', 'en', -1);
+    const hit = lookup(db, { text: 'to devour', glossLangs: ['en'] }).entries
+      .find((entry) => entry.text === '食べる');
+    expect(hit?.via).toBe('gloss');
+    expect(hit?.sources[0].dictId).toBe('alt-jmdict-en');
+  });
+
+  it('drops overrides with the dictionary they belong to', () => {
+    seedSecondJapaneseEnglishSource();
+    setPairPriority('alt-jmdict-en', 'ja', 'en', -1);
+    db.prepare('delete from dictionaries where id = ?').run('alt-jmdict-en');
+    const left = db.prepare('select count(*) c from dict_pair_priority').get() as { c: number };
+    expect(left.c).toBe(0);
+  });
+});

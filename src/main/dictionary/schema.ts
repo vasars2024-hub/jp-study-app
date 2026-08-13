@@ -28,7 +28,7 @@
 import type { SqliteDb } from './db';
 
 /** Bumped by appending to MIGRATIONS. Never edit a released step. */
-export const DICT_SCHEMA_VERSION = 3;
+export const DICT_SCHEMA_VERSION = 4;
 
 export interface MigrationStep {
   version: number;
@@ -354,6 +354,32 @@ export const MIGRATIONS: MigrationStep[] = [
       );
     },
   },
+  {
+    version: 4,
+    name: 'per-language-pair source priority overrides',
+    up(db) {
+      // `dictionaries.priority` is one number per source, applied to every
+      // direction at once. That cannot express the ordering people actually
+      // want: CC-CEDICT should outrank JMdict for ZH→EN and lose to it for
+      // JA→EN, and the single column forces one of those to be wrong.
+      //
+      // Overrides rather than a full ordering, deliberately. A row here means
+      // "for this pair only, use this number instead of dictionaries.priority";
+      // absent rows fall back through `coalesce`, so a pair nobody has touched
+      // keeps its global order and importing a new source never leaves a hole
+      // that would have to be backfilled for every pair in existence.
+      db.exec(`
+        CREATE TABLE dict_pair_priority (
+          dict_id     TEXT NOT NULL REFERENCES dictionaries(id) ON DELETE CASCADE,
+          source_lang TEXT NOT NULL,
+          target_lang TEXT NOT NULL,
+          priority    INTEGER NOT NULL,
+          PRIMARY KEY (dict_id, source_lang, target_lang)
+        );
+        CREATE INDEX idx_pair_priority ON dict_pair_priority(source_lang, target_lang, priority);
+      `);
+    },
+  },
 ];
 
 /** Every table name the schema owns, for the "did it actually build" assertion. */
@@ -361,6 +387,7 @@ export const DICT_TABLES = [
   'dictionaries', 'headwords', 'senses', 'glosses', 'xrefs', 'inflections',
   'collocations', 'etymology', 'audio', 'pitch', 'freq_corpora', 'user_notes',
   'explanations', 'chars', 'char_sources', 'examples', 'example_translations',
+  'dict_pair_priority',
 ] as const;
 
 export const DICT_FTS_TABLES = ['headwords_fts', 'glosses_fts', 'examples_fts'] as const;

@@ -472,12 +472,22 @@ const api = {
     ipcRenderer.invoke('dict:setYomitanEnabled', id, enabled),
   dictMoveYomitan: (id: string, dir: number): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('dict:moveYomitan', id, dir),
-  dictListSources: (): Promise<import('./shared/dictionarySources').DictionarySourceInfo[]> =>
-    ipcRenderer.invoke('dict:listSources'),
+  /** Omit `pair` for the global order; pass one to see that pair's own order. */
+  dictListSources: (pair?: import('./shared/dictionarySources').DictionaryLanguagePair): Promise<import('./shared/dictionarySources').DictionarySourceInfo[]> =>
+    ipcRenderer.invoke('dict:listSources', pair),
+  /** Every language pair the installed sources can answer. */
+  dictListPairs: (): Promise<import('./shared/dictionarySources').DictionaryLanguagePair[]> =>
+    ipcRenderer.invoke('dict:listPairs'),
+  /** Whether this pair has an order of its own rather than following the global one. */
+  dictPairHasOverride: (pair: import('./shared/dictionarySources').DictionaryLanguagePair): Promise<boolean> =>
+    ipcRenderer.invoke('dict:pairHasOverride', pair),
+  /** Drop a pair's own order so it follows the global one again. */
+  dictResetPairPriority: (pair: import('./shared/dictionarySources').DictionaryLanguagePair): Promise<import('./shared/dictionarySources').DictionarySourceMutationResult> =>
+    ipcRenderer.invoke('dict:resetPairPriority', pair),
   dictSetSourceEnabled: (id: string, enabled: boolean): Promise<import('./shared/dictionarySources').DictionarySourceMutationResult> =>
     ipcRenderer.invoke('dict:setSourceEnabled', id, enabled),
-  dictMoveSource: (id: string, direction: -1 | 1): Promise<import('./shared/dictionarySources').DictionarySourceMutationResult> =>
-    ipcRenderer.invoke('dict:moveSource', id, direction),
+  dictMoveSource: (id: string, direction: -1 | 1, pair?: import('./shared/dictionarySources').DictionaryLanguagePair): Promise<import('./shared/dictionarySources').DictionarySourceMutationResult> =>
+    ipcRenderer.invoke('dict:moveSource', id, direction, pair),
   dictRemoveSource: (id: string): Promise<import('./shared/dictionarySources').DictionarySourceMutationResult> =>
     ipcRenderer.invoke('dict:removeSource', id),
   /** Set or clear ('' clears) the manual gloss-language override for a dictionary. */

@@ -44,10 +44,19 @@ import {
   lookupOfflineInterlinearFromStore,
   resetChineseDictionaryCache,
   listDictionarySources,
+  listDictionaryPairs,
+  dictionaryPairHasOverride,
+  moveDictionarySourceInPair,
+  resetDictionaryPairPriority,
   setDictionarySourceEnabled,
   moveDictionarySource,
   removeDictionarySource,
 } from './dictionary/service';
+import {
+  GLOBAL_PAIR,
+  isGlobalPair,
+  type DictionaryLanguagePair,
+} from '../shared/dictionarySources';
 import {
   registerDictionaryImportIpc,
   startPendingLegacyDictionaryMigration,
@@ -538,17 +547,41 @@ export async function searchExamples(query: string, limit = DEFAULT_FETCH_LIMIT)
 
 // ----- IPC ---------------------------------------------------------------
 
+/**
+ * A language pair off the wire, or undefined for "the global order".
+ *
+ * The two codes reach SQL as bound parameters, but they are also compared
+ * against `headwords.lang`, so anything that is not a plain non-empty string is
+ * rejected here rather than silently matching nothing three layers down.
+ */
+function readPair(value: unknown): DictionaryLanguagePair | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const { sourceLang, targetLang } = value as Record<string, unknown>;
+  if (typeof sourceLang !== 'string' || typeof targetLang !== 'string') return undefined;
+  const pair = { sourceLang: sourceLang.trim(), targetLang: targetLang.trim() };
+  return isGlobalPair(pair) ? undefined : pair;
+}
+
 export function registerDictionaryIpc(): void {
   ipcMain.handle('dict:lookup', (_e, query: string) => lookupWord(query));
   ipcMain.handle('dict:lookupTerm', (_e, query: string) => lookupTerm(query));
   // Phase 4: the Chinese surfaces' lookup, moved out of `renderer/chineseDict.ts`.
   ipcMain.handle('dict:lookupChinese', (_e, query: string) => lookupChineseInDictionary(query));
   ipcMain.handle('dict:resetChineseCache', () => resetChineseDictionaryCache());
-  ipcMain.handle('dict:listSources', () => listDictionarySources());
+  ipcMain.handle('dict:listSources', (_e, pair?: unknown) =>
+    listDictionarySources(undefined, readPair(pair)));
+  ipcMain.handle('dict:listPairs', () => listDictionaryPairs());
+  ipcMain.handle('dict:pairHasOverride', (_e, pair: unknown) =>
+    dictionaryPairHasOverride(readPair(pair) ?? GLOBAL_PAIR));
+  ipcMain.handle('dict:resetPairPriority', (_e, pair: unknown) =>
+    resetDictionaryPairPriority(readPair(pair) ?? GLOBAL_PAIR));
   ipcMain.handle('dict:setSourceEnabled', (_e, id: string, enabled: boolean) =>
     setDictionarySourceEnabled(id, enabled));
-  ipcMain.handle('dict:moveSource', (_e, id: string, direction: -1 | 1) =>
-    moveDictionarySource(id, direction === -1 ? -1 : 1));
+  ipcMain.handle('dict:moveSource', (_e, id: string, direction: -1 | 1, pair?: unknown) => {
+    const dir = direction === -1 ? -1 : 1;
+    const scoped = readPair(pair);
+    return scoped ? moveDictionarySourceInPair(id, dir, scoped) : moveDictionarySource(id, dir);
+  });
   ipcMain.handle('dict:removeSource', (_e, id: string) => removeDictionarySource(id));
   // Read-only structured pitch data for the Blanc pitch panel.
   ipcMain.handle('dict:pitch', (_e, term: string, reading?: string) => getPitchData(term, reading));

@@ -178,13 +178,39 @@ interface HeadwordRow {
   attribution: string | null;
 }
 
+// `coalesce(pp.priority, d.priority)` is the whole per-language-pair feature.
+// The join key is `h.lang` on one side and the caller's single requested gloss
+// language on the other, which is exactly the pair the schema comment calls the
+// two halves of "any-to-any". Because the override is resolved in SQL rather
+// than after the fact, it also decides which rows survive the `limit` on the
+// prefix and gloss probes — reordering results that were already truncated by
+// the global order would demote a source the user had just promoted.
+//
+// Every statement below is prefixed by this text, so the pair parameter is
+// always bound first. `pairTarget()` returns '' when there is no unambiguous
+// pair, which matches no row and leaves `d.priority` in charge.
 const HEADWORD_SELECT = `
   select h.id, h.dict_id, d.title as dict_title, h.lang, h.text, h.norm, h.reading, h.reading_norm,
-         h.variant_of, h.score, h.freq_rank, d.priority, d.licence, d.attribution
+         h.variant_of, h.score, h.freq_rank,
+         coalesce(pp.priority, d.priority) as priority, d.licence, d.attribution
   from headwords h
   join dictionaries d on d.id = h.dict_id
+  left join dict_pair_priority pp
+    on pp.dict_id = d.id and pp.source_lang = h.lang and pp.target_lang = ?
   where d.enabled = 1
 `;
+
+/**
+ * The target language of the pair this query is about, or '' when there isn't one.
+ *
+ * A pair needs both halves named. `glossLangs` is the only place the caller
+ * states the target, so exactly one entry is the only unambiguous case: with
+ * none, the caller asked for every language at once, and with several there is
+ * no single pair whose override should apply. Both fall back to global order.
+ */
+export function pairTarget(query: LookupQuery): string {
+  return query.glossLangs?.length === 1 ? query.glossLangs[0] : '';
+}
 
 function readSenses(db: SqliteDb, headwordId: number, glossLangs?: string[]): LookupSense[] {
   const senses = db
@@ -372,6 +398,10 @@ export function boundedEditDistance(a: string, b: string, max: number): number {
  * before a gloss hit), then dictionary priority, then the entry's own score. Ties
  * are broken by headword id so the order is stable between runs — an unstable
  * order makes the UI reshuffle on every keystroke.
+ *
+ * "Dictionary priority" is the pair-specific override when the caller named a
+ * single gloss language and the user has set one for that pair, and the global
+ * `dictionaries.priority` otherwise. See `HEADWORD_SELECT`.
  */
 export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
   const text = query.text.trim();
@@ -410,23 +440,24 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
     result.entries.push(entry);
   };
 
-  const byNorm = db.prepare(`${HEADWORD_SELECT} and h.lang = ? and h.norm = ? order by d.priority, h.id`);
-  const byReading = db.prepare(`${HEADWORD_SELECT} and h.lang = ? and h.reading_norm = ? order by d.priority, h.id`);
+  const pair = pairTarget(query);
+  const byNorm = db.prepare(`${HEADWORD_SELECT} and h.lang = ? and h.norm = ? order by priority, h.id`);
+  const byReading = db.prepare(`${HEADWORD_SELECT} and h.lang = ? and h.reading_norm = ? order by priority, h.id`);
   const byInflection = db.prepare(`
     ${HEADWORD_SELECT}
     and h.lang = ?
     and h.id in (select headword_id from inflections where form = ?)
-    order by d.priority, h.id
+    order by priority, h.id
   `);
   const byPrefix = db.prepare(
-    `${HEADWORD_SELECT} and h.lang = ? and h.norm > ? and h.norm < ? order by length(h.norm), d.priority, h.id limit ?`,
+    `${HEADWORD_SELECT} and h.lang = ? and h.norm > ? and h.norm < ? order by length(h.norm), priority, h.id limit ?`,
   );
 
   for (const lang of searchLangs) {
     const forms = candidateForms(lang, text);
     for (const { form, reasons } of forms) {
       const via = reasons.length ? 'deinflected' : 'exact';
-      for (const row of byNorm.all(lang, form) as HeadwordRow[]) push(row, via, reasons);
+      for (const row of byNorm.all(pair, lang, form) as HeadwordRow[]) push(row, via, reasons);
     }
 
     // Importers can supply forms that a generic suffix heuristic or Japanese
@@ -441,7 +472,7 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
       'select headword_id, name, tags from inflections where form = ? order by headword_id, rowid',
     ).all(normalizeForLookup(text)) as { headword_id: number; name: string | null; tags: string | null }[];
     const inflectionReasons = collectInflectionReasons(inflectionRows);
-    for (const row of byInflection.all(lang, normalizeForLookup(text)) as HeadwordRow[]) {
+    for (const row of byInflection.all(pair, lang, normalizeForLookup(text)) as HeadwordRow[]) {
       push(row, 'deinflected', inflectionReasons.get(row.id) ?? []);
     }
 
@@ -452,7 +483,7 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
       : [normalizeForLookup(text)];
     for (const key of readingKeys) {
       if (!key) continue;
-      for (const row of byReading.all(lang, key) as HeadwordRow[]) push(row, 'reading', []);
+      for (const row of byReading.all(pair, lang, key) as HeadwordRow[]) push(row, 'reading', []);
     }
 
     if (result.entries.length < limit) {
@@ -460,7 +491,7 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
       // Prefix range scan: norm > 'base' and norm < 'base' + U+FFFF. Cheaper and
       // index-friendly compared with LIKE, which cannot use the index for a
       // non-ASCII pattern.
-      for (const row of byPrefix.all(lang, base, `${base}￿`, limit) as HeadwordRow[]) {
+      for (const row of byPrefix.all(pair, lang, base, `${base}￿`, limit) as HeadwordRow[]) {
         push(row, 'prefix', []);
       }
     }
@@ -481,17 +512,20 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
     const glossRows = db
       .prepare(`
         select h.id, h.dict_id, d.title as dict_title, h.lang, h.text, h.norm, h.reading, h.reading_norm,
-               h.variant_of, h.score, h.freq_rank, d.priority, d.licence, d.attribution
+               h.variant_of, h.score, h.freq_rank,
+               coalesce(pp.priority, d.priority) as priority, d.licence, d.attribution
         from glosses_fts
         join glosses g on g.id = glosses_fts.rowid
         join senses  s on s.id = g.sense_id
         join headwords h on h.id = s.headword_id
         join dictionaries d on d.id = h.dict_id
+        left join dict_pair_priority pp
+          on pp.dict_id = d.id and pp.source_lang = h.lang and pp.target_lang = ?
         where glosses_fts match ? and d.enabled = 1${reverseLangFilter}
-        order by d.priority, h.id
+        order by priority, h.id
         limit ?
       `)
-      .all(ftsQuery(text), ...reverseSourceLangs, limit) as HeadwordRow[];
+      .all(pair, ftsQuery(text), ...reverseSourceLangs, limit) as HeadwordRow[];
     for (const row of glossRows) push(row, 'gloss', []);
   }
 
@@ -525,7 +559,7 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
 
       for (const lang of searchLangs) {
         for (const row of byFuzzyPrefix.all(
-          lang, prefix, `${prefix}￿`, prefix, `${prefix}￿`, FUZZY_CANDIDATE_LIMIT,
+          pair, lang, prefix, `${prefix}￿`, prefix, `${prefix}￿`, FUZZY_CANDIDATE_LIMIT,
         ) as HeadwordRow[]) {
           consider(row);
         }
@@ -536,8 +570,8 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
         // *reading*, and the headword it belongs to is written in Han.
         for (let i = 0; i < chars.length; i += 1) {
           const deleted = [...chars.slice(0, i), ...chars.slice(i + 1)].join('');
-          for (const row of byNorm.all(lang, deleted) as HeadwordRow[]) consider(row);
-          for (const row of byReading.all(lang, deleted) as HeadwordRow[]) consider(row);
+          for (const row of byNorm.all(pair, lang, deleted) as HeadwordRow[]) consider(row);
+          for (const row of byReading.all(pair, lang, deleted) as HeadwordRow[]) consider(row);
         }
       }
 
