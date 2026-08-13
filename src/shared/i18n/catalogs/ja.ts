@@ -8383,4 +8383,12 @@ export const ja: Catalog = {
   'lexicon.composition.unexpected-close': 'この終了記号に対応する開始記号がありません。',
   'lexicon.composition.note': '括弧、文末記号の重複、形態素解析で判定した文法語の連続重複だけを確認します。文法的に正しい文章かどうかは判定しません。',
   'lexicon.composition.noteUnanalyzed': '形態素解析を利用できなかったため、括弧と文末記号の重複だけを確認します。文法的に正しい文章かどうかは判定しません。',
+  'lexicon.concordance.title': '自分の字幕にある用例',
+  'lexicon.concordance.note': 'ローカルのメディアライブラリの先頭{max}件を検索します。字幕テキストはこの端末の外へ送信されません。',
+  'lexicon.concordance.action': '自分の字幕を検索',
+  'lexicon.concordance.running': '検索中…',
+  'lexicon.concordance.failed': 'ローカル字幕を検索できませんでした。',
+  'lexicon.concordance.empty': '読み取り可能な字幕{count}本に文字列の一致はありませんでした。',
+  'lexicon.concordance.summary': '読み取り可能な字幕{sources}本から{count}件の用例',
+  'lexicon.concordance.scope': '文字列が一致した用例だけです。活用形や文脈から推測される語は含みません。',
 };

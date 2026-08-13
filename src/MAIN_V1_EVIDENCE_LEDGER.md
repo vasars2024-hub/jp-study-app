@@ -15038,3 +15038,55 @@ green. `node tools/i18n-check.cjs`: **9,419 keys** complete. `node tools/archite
 Track 2 remains open: personal concordance and the grounded AI enrichment bullets. Personal
 concordance is the next decision-free slice because it can derive citations from the user's existing
 library/subtitle data without inventing provider behavior or explanation policy.
+
+## Personal concordance cites the subtitles the learner already owns — 2026-08-13
+
+Relay hop, `codexB`. Track 2. The boss-audit tail was checked first and its two actionable
+clean-HEAD findings were re-derived as already closed by `bef3b2e`. The latest ledger section then
+named personal concordance as the next decision-free slice, and source confirmed that no such
+consumer existed.
+
+The Workbench now offers an opt-in **My subtitle examples** panel for a grounded interlinear
+passage. It reuses the existing local `media:list` and side-effect-free `media:subtitleForPath`
+bridge methods plus the renderer's shipped SRT/VTT/ASS/LRC parser; no new IPC channel, provider,
+network request, persistence, or subtitle copy was added. Search is literal and deterministic over
+dictionary-grounded content words from the passage. Analyzer-identified function words are excluded
+after live acceptance showed that the particle が consumed 11 of the first 12 citations. The UI
+explicitly says inflections and context-implied words are not included, so a string match is not
+presented as semantic or sense-ranked evidence.
+
+The scan runs only after the learner clicks, reads at most the first **40** library items, returns at
+most **12** citations, and keeps source title, cue timestamp, exact subtitle line, and matched
+headword together. Superseded runs are discarded when the passage changes. Empty, running and
+failure states are explicit, and all eight new strings are present in EN/JA/ZH/RU.
+
+Live Electron acceptance used a fresh app process and the authenticated debug bridge only. The real
+profile's passage `猫が来た。` grounded 猫 / が / 来る. Clicking the real panel searched two readable
+subtitle tracks and rendered five content-word citations from `The Big O - 13` and `The Big O - 01`,
+each with timestamp, exact line and the matched 来る chip. No が rows remained after the grounded
+function-word correction. The panel also rendered the 40-item/local-only privacy statement and the
+literal-match limitation. Screenshot: `debug/shots/win1-1786598133632.png`. The query changed only
+ephemeral renderer state; no setting was toggled, and only this hop's recorded npm/Electron process
+tree was stopped.
+
+Verification: focused concordance/Workbench tests **25/25**. Full `npx vitest run
+--hookTimeout=60000`: **566 files passed / 1 skipped, 7,510 tests passed / 6 skipped**.
+`node tools/i18n-check.cjs`: **9,427 keys** complete. `node tools/architecture-audit.cjs`:
+**1,764 modules**, nothing new, the same two pending. ESLint over the touched TS/TSX/catalog paths:
+**0 errors**. (An initial command incorrectly handed the CSS file to the TypeScript ESLint parser;
+that unsupported invocation produced only a CSS parse error, and the correctly scoped gate passed.)
+
+Because the four catalogs carry foreign working-tree changes, the resulting checkpoint was also
+checked in a detached worktree with only its own reconstructed blobs. Focused tests remained
+**25/25**, catalog completeness, architecture and touched-path ESLint passed. The detached full
+suite reported the exact **nine known clean-HEAD failures** already recorded by the boss audit:
+the two i18n hygiene identities plus seven older Novel Reader / Blanc Agent / local queue identities.
+None touches this slice. This distinction matters: the 7,510-test green result above is the required
+in-situ gate over the shared tree; it is not being presented as a clean-commit full-suite result.
+
+Track 2 remains open. The next plan bullet is the grounded AI language-feature group: Contextual
+Explain across nuance/register/collocations/mistakes/etymology/grammar/examples, language-specific
+analysis, streamed/cached answers, explanation-language choice, batch mode, cost limits, and clear
+sourced-versus-generated labels. Re-derive the existing sentence-analysis and provider paths before
+choosing its first bounded slice; do not treat this literal personal concordance as the broader
+sense-ranked multi-source “find in the wild” promise.

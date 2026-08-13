@@ -16,6 +16,12 @@ import {
 } from '../../../shared/lexiconDifficulty';
 import { checkLexiconComposition } from '../../../shared/lexiconComposition';
 import {
+  MAX_CONCORDANCE_MEDIA_ITEMS,
+  findLexiconConcordance,
+  type LexiconConcordanceCitation,
+  type LexiconConcordanceSource,
+} from '../../../shared/lexiconConcordance';
+import {
   applySensePins,
   canPinSense,
   sensePinKey,
@@ -31,6 +37,7 @@ import { resolveLexiconInput, type LexiconLensOverride } from '../../../shared/l
 import DictionaryResults, { type DictLang } from '../DictionaryResults';
 import { translateTo } from '../../translator';
 import { useT } from '../../i18n';
+import { parseSubtitles } from '../../subtitles';
 import './lexiconWorkbench.css';
 
 /** Gloss targets follow the imported dictionaries, not the source-side DictLang pair. */
@@ -42,6 +49,14 @@ type GlossLang = string;
  * state that stays retryable.
  */
 type MineState = 'adding' | 'added' | 'dup' | 'error';
+
+type ConcordanceState = 'idle' | 'running' | 'done' | 'error';
+
+function cueTimestamp(seconds: number): string {
+  const whole = Math.max(0, Math.floor(seconds));
+  const minutes = Math.floor(whole / 60);
+  return `${minutes}:${String(whole % 60).padStart(2, '0')}`;
+}
 
 const MINE_LABEL_KEYS: Record<MineState, string> = {
   adding: 'lexicon.harvest.mining',
@@ -133,6 +148,10 @@ export default function LexiconWorkbenchResults({
   const [roundTrip, setRoundTrip] = useState<{ text: string; diff: LexiconRoundTripDiff } | null>(null);
   const [roundTripState, setRoundTripState] = useState<'idle' | 'running' | 'error'>('idle');
   const roundTripRun = useRef(0);
+  const [concordance, setConcordance] = useState<LexiconConcordanceCitation[]>([]);
+  const [concordanceState, setConcordanceState] = useState<ConcordanceState>('idle');
+  const [concordanceScanned, setConcordanceScanned] = useState(0);
+  const concordanceRun = useRef(0);
 
   useEffect(() => setSelectedLens(lens), [lens]);
 
@@ -143,6 +162,13 @@ export default function LexiconWorkbenchResults({
   // Purely derived from the grounded result, so it costs one pass per lookup
   // rather than a second bridge call.
   const harvest = useMemo(() => (pinned ? harvestLexiconVocabulary(pinned) : null), [pinned]);
+  // Only dictionary-grounded terms belong in a concordance. An unmatched token
+  // may be an inflected phrase or a tokenizer gap; treating it as a word would
+  // make a literal line match look lexically authoritative when it is not.
+  const concordanceTerms = useMemo(
+    () => harvest?.items.filter((item) => item.grounded && item.wordClass !== 'function') ?? [],
+    [harvest],
+  );
 
   // Same deal: the ranks arrived with the lookup, so the profile is a fold over
   // data already in hand and never a second trip to main.
@@ -174,7 +200,45 @@ export default function LexiconWorkbenchResults({
     setMineError({});
     setPins({});
     setOpenSense(null);
+    concordanceRun.current += 1;
+    setConcordance([]);
+    setConcordanceState('idle');
+    setConcordanceScanned(0);
     clearRetranslation();
+  }
+
+  /**
+   * Search only subtitle bytes already reachable through the local media bridge.
+   * It is opt-in because even local disk I/O is surprising when a lookup itself
+   * is otherwise instant. The hard media/result caps keep a large library from
+   * turning one click into an unbounded main-process file scan.
+   */
+  async function searchPersonalConcordance() {
+    if (!concordanceTerms.length || concordanceState === 'running') return;
+    const run = ++concordanceRun.current;
+    setConcordance([]);
+    setConcordanceScanned(0);
+    setConcordanceState('running');
+    try {
+      const media = (await window.api.listMedia()).slice(0, MAX_CONCORDANCE_MEDIA_ITEMS);
+      const sources: LexiconConcordanceSource[] = [];
+      for (const item of media) {
+        const subtitle = await window.api.subtitleForPath(item.path);
+        if (run !== concordanceRun.current) return;
+        if (!subtitle?.text) continue;
+        const cues = parseSubtitles(subtitle.text);
+        if (cues.length) sources.push({ mediaId: item.id, title: item.title, cues });
+      }
+      if (run !== concordanceRun.current) return;
+      setConcordanceScanned(sources.length);
+      setConcordance(findLexiconConcordance(
+        concordanceTerms.map((item) => ({ key: item.key, text: item.text })),
+        sources,
+      ));
+      setConcordanceState('done');
+    } catch {
+      if (run === concordanceRun.current) setConcordanceState('error');
+    }
   }
 
   /**
@@ -715,6 +779,65 @@ export default function LexiconWorkbenchResults({
                   ? 'lexicon.composition.note'
                   : 'lexicon.composition.noteUnanalyzed')}
               </p>
+            </details>
+          )}
+          {concordanceTerms.length > 0 && (
+            <details className="lexicon-concordance">
+              <summary>{t('lexicon.concordance.title')}</summary>
+              <p className="muted lexicon-concordance-note">
+                {t('lexicon.concordance.note', { max: MAX_CONCORDANCE_MEDIA_ITEMS })}
+              </p>
+              <button
+                className="lexicon-concordance-run"
+                disabled={concordanceState === 'running'}
+                onClick={() => void searchPersonalConcordance()}
+                type="button"
+              >
+                {t(concordanceState === 'running'
+                  ? 'lexicon.concordance.running'
+                  : 'lexicon.concordance.action')}
+              </button>
+              {concordanceState === 'error' && (
+                <p className="lexicon-concordance-error" role="alert">
+                  {t('lexicon.concordance.failed')}
+                </p>
+              )}
+              {concordanceState === 'done' && concordance.length === 0 && (
+                <p className="muted">
+                  {t('lexicon.concordance.empty', { count: concordanceScanned })}
+                </p>
+              )}
+              {concordance.length > 0 && (
+                <>
+                  <p className="muted">
+                    {t('lexicon.concordance.summary', {
+                      count: concordance.length,
+                      sources: concordanceScanned,
+                    })}
+                  </p>
+                  <ol className="lexicon-concordance-list">
+                    {concordance.map((citation) => (
+                      <li key={`${citation.mediaId}-${citation.start}-${citation.end}`}>
+                        <div className="lexicon-concordance-source">
+                          <strong>{citation.title}</strong>
+                          <span>{cueTimestamp(citation.start)}</span>
+                        </div>
+                        <blockquote lang={lang}>{citation.text}</blockquote>
+                        <div className="lexicon-concordance-terms">
+                          {citation.terms.map((key) => (
+                            <span key={key}>
+                              {harvest.items.find((item) => item.key === key)?.text ?? key}
+                            </span>
+                          ))}
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                  <p className="muted lexicon-concordance-scope">
+                    {t('lexicon.concordance.scope')}
+                  </p>
+                </>
+              )}
             </details>
           )}
           {harvest && harvest.items.length > 0 && (

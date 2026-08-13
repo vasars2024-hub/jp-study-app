@@ -1014,8 +1014,67 @@ describe('LexiconWorkbenchResults', () => {
       'lexicon.difficulty.sources',
       'lexicon.difficulty.unscored',
       'lexicon.difficulty.note',
+      // Personal concordance is local and opt-in, with honest running, empty,
+      // error and literal-match scope states.
+      'lexicon.concordance.title',
+      'lexicon.concordance.note',
+      'lexicon.concordance.action',
+      'lexicon.concordance.running',
+      'lexicon.concordance.failed',
+      'lexicon.concordance.empty',
+      'lexicon.concordance.summary',
+      'lexicon.concordance.scope',
     ];
     const catalog = en as Record<string, string>;
     expect(keys.filter((key) => !catalog[key])).toEqual([]);
+  });
+
+  it('searches owned subtitle tracks only after the user asks and renders citations', async () => {
+    const lookup = vi.fn().mockResolvedValue({
+      text: '猫が来た。', detectedLangs: ['ja'], glossLangs: ['en'], tokenCount: 2,
+      matchedCount: 1, truncated: false,
+      parts: [
+        {
+          kind: 'token', text: '猫', start: 0, end: 1, wordClass: 'content',
+          match: {
+            text: '猫', reading: 'ねこ', dictId: 'jmdict', dictTitle: 'JMdict',
+            headwordId: 1, glosses: [{ lang: 'en', text: 'cat' }],
+          },
+        },
+        { kind: 'token', text: 'が来た', start: 1, end: 4 },
+        { kind: 'separator', text: '。', start: 4, end: 5 },
+      ],
+    });
+    const listMedia = vi.fn().mockResolvedValue([
+      { id: 'episode-1', path: 'D:/Anime/Episode 1.mkv', title: 'Episode 1' },
+    ]);
+    const subtitleForPath = vi.fn().mockResolvedValue({
+      name: 'Japanese', text: '1\n00:00:04,000 --> 00:00:06,000\n猫が来た。\n',
+    });
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: { lookupOfflineInterlinear: lookup, listMedia, subtitleForPath },
+    });
+    const host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root?.render(<LexiconWorkbenchResults query="猫が来た。" lang="ja" lookupAttempt={31} />);
+      await Promise.resolve();
+    });
+    expect(listMedia).not.toHaveBeenCalled();
+
+    await act(async () => {
+      host.querySelector('.lexicon-concordance-run')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(subtitleForPath).toHaveBeenCalledWith('D:/Anime/Episode 1.mkv');
+    expect(host.querySelector('.lexicon-concordance-source')?.textContent).toBe('Episode 10:04');
+    expect(host.querySelector('.lexicon-concordance-list blockquote')?.textContent).toBe('猫が来た。');
+    expect(host.querySelector('.lexicon-concordance-terms')?.textContent).toBe('猫');
+    expect(host.textContent).toContain('lexicon.concordance.scope');
   });
 });

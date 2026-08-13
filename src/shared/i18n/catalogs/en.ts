@@ -8792,4 +8792,12 @@ export const en: Catalog = {
   'lexicon.composition.unexpected-close': 'This closing mark has no matching open.',
   'lexicon.composition.note': 'This checks paired marks, repeated sentence punctuation, and adjacent duplicate grammar identified by the word analyser. It does not judge whether the sentence is grammatically correct.',
   'lexicon.composition.noteUnanalyzed': 'The word analyser did not reach this passage, so this checks paired marks and repeated sentence punctuation only. It does not judge whether the sentence is grammatically correct.',
+  'lexicon.concordance.title': 'My subtitle examples',
+  'lexicon.concordance.note': 'Searches the first {max} items in your local media library. Subtitle text stays on this device.',
+  'lexicon.concordance.action': 'Search my subtitles',
+  'lexicon.concordance.running': 'Searching…',
+  'lexicon.concordance.failed': 'Your local subtitles could not be searched.',
+  'lexicon.concordance.empty': 'No literal matches were found in {count} readable subtitle tracks.',
+  'lexicon.concordance.summary': '{count} examples from {sources} readable subtitle tracks',
+  'lexicon.concordance.scope': 'Literal matches only. Inflections and words implied by context are not included.',
 };

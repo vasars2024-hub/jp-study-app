@@ -596,3 +596,70 @@
 .lexicon-composition-note {
   margin-bottom: 0;
 }
+
+.lexicon-concordance {
+  margin-top: 14px;
+}
+
+.lexicon-concordance-note,
+.lexicon-concordance-scope {
+  margin: 8px 0;
+  font-size: 0.82rem;
+}
+
+.lexicon-concordance-run {
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.35));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent, #5588cc) 10%, transparent);
+  color: inherit;
+}
+
+.lexicon-concordance-run:disabled {
+  opacity: 0.65;
+}
+
+.lexicon-concordance-error {
+  color: var(--danger, #c0392b);
+}
+
+.lexicon-concordance-list {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lexicon-concordance-list li {
+  padding: 10px 12px;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.25));
+  border-radius: 10px;
+  background: color-mix(in srgb, currentColor 3%, transparent);
+}
+
+.lexicon-concordance-source {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.8rem;
+}
+
+.lexicon-concordance-list blockquote {
+  margin: 8px 0;
+  font-size: 0.95rem;
+}
+
+.lexicon-concordance-terms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.lexicon-concordance-terms span {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent, #5588cc) 12%, transparent);
+  font-size: 0.75rem;
+}

@@ -8348,4 +8348,12 @@ export const zh: Catalog = {
   'lexicon.composition.unexpected-close': '这个结束符号没有对应的起始符号。',
   'lexicon.composition.note': '这里只检查成对符号、重复的句末标点，以及分词器识别出的相邻重复语法词；不会判断句子在语法上是否正确。',
   'lexicon.composition.noteUnanalyzed': '分词器未能分析这段文字，因此这里只检查成对符号和重复的句末标点；不会判断句子在语法上是否正确。',
+  'lexicon.concordance.title': '我的字幕例句',
+  'lexicon.concordance.note': '搜索本地媒体库中的前 {max} 个项目。字幕文本不会离开此设备。',
+  'lexicon.concordance.action': '搜索我的字幕',
+  'lexicon.concordance.running': '正在搜索…',
+  'lexicon.concordance.failed': '无法搜索本地字幕。',
+  'lexicon.concordance.empty': '在 {count} 条可读字幕轨道中未找到字面匹配。',
+  'lexicon.concordance.summary': '从 {sources} 条可读字幕轨道中找到 {count} 个例句',
+  'lexicon.concordance.scope': '仅包含字面匹配，不包含活用形式或由上下文暗示的词。',
 };
