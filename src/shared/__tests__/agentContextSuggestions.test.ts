@@ -89,7 +89,7 @@ describe('Agent context suggestions', () => {
     });
   });
 
-  it('gives dictionary explanations a bounded evidence, grammar, usage, mistakes, etymology, mnemonic, collocation, and comparison contract', () => {
+  it('gives dictionary explanations a bounded evidence, grammar, usage, mistakes, etymology, mnemonic, graded-example, collocation, and comparison contract', () => {
     const [suggestion] = deriveAgentContextSuggestions(conversation([
       context('dictionary-new', 'dictionary-entry', 'Dictionary'),
     ]), DEFAULT_AGENT_CONTEXT_SUGGESTION_PREFERENCES);
@@ -119,6 +119,13 @@ describe('Agent context suggestions', () => {
     expect(prompt).toContain('Label it explicitly as an invented learning aid, not etymology or evidence.');
     expect(prompt).toContain('Do not encode a false pronunciation, spelling, component meaning, or cultural claim');
     expect(prompt).toContain('no reliable mnemonic is available');
+    expect(prompt).toContain('In Graded examples');
+    expect(prompt).toContain('at most three new examples');
+    expect(prompt).toContain('ordered beginner, intermediate, then advanced');
+    expect(prompt).toContain('Label every example as AI-generated');
+    expect(prompt).toContain('include a translation');
+    expect(prompt).toContain('vocabulary, grammar, or sentence-complexity feature that justifies its level');
+    expect(prompt).toContain('Do not present a generated example as a sourced quotation or evidence');
     expect(prompt).toContain('Compare at most two similar words.');
     expect(prompt).toContain('quote the exact word or phrase');
     expect(prompt).toContain('general language knowledge');

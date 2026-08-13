@@ -15361,3 +15361,36 @@ Track 2 remains open. Graded examples are the next adjacent structured facet; ex
 explanation-language selection, caching and batch explanation also remain. Re-derive the next
 bounded slice from source, require examples to disclose their generated status and level criteria,
 and keep execution in the centralized Agent.
+
+## Graded examples disclose both their origin and their level — 2026-08-13
+
+Relay hop, `codexX`. Track 2. The latest boss audit hands off no unresolved regression, and the
+final ledger section made graded examples the next bounded Contextual Explain facet. Source
+confirmed that the centralized Dictionary suggestion had no example section or level contract.
+
+The central Agent's Dictionary suggestion now requests at most three new examples, ordered
+beginner, intermediate, then advanced. Every example must be labelled AI-generated, include a
+translation, preserve the requested meaning or usage, and name the concrete vocabulary, grammar,
+or sentence-complexity feature that justifies its level. The contract also forbids presenting a
+generated example as a sourced quotation or as evidence about the attached passage. Existing
+provider, privacy, explanation-language, streaming and budget controls remain the only execution
+path. This is model-facing prompt text only, so it adds no UI string, persistence, provider, or
+second model client.
+
+Live Electron acceptance used one fresh Forge process owned by this hop and the authenticated
+debug bridge only. Port 5173 belonged to an older unrelated Vite listener, so Forge selected 5174.
+Importing the real shared builder through the renderer returned the new Graded examples section
+and all count, ordering, generated-origin, translation, level-criterion and source-boundary rules
+for `猫が来た。`. The bridge log contained zero error entries. The temporary probe global was
+deleted, no model request ran, and no user state was written. All 13 processes in this hop's
+recorded process tree were stopped and verified absent; the unrelated 5173 listener was untouched.
+
+Verification on the shared tree: focused suggestion tests **6/6**. Full `npx vitest run
+--hookTimeout=60000`: **566 files passed / 1 skipped, 7,514 tests passed / 6 skipped**.
+`node tools/i18n-check.cjs`: **9,430 keys** complete. `node tools/architecture-audit.cjs`:
+**1,764 modules**, nothing new, the same two pending. ESLint over the two touched TS paths:
+**0 errors, 0 warnings**.
+
+Track 2 remains open. Explicit explanation-language selection, caching, and batch explanation
+remain in the plan. Re-derive the central Agent's existing language controls before choosing the
+next bounded slice; do not add a Dictionary-local provider or preference path.
