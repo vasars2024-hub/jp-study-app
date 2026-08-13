@@ -12,6 +12,7 @@
 
 import { BrowserWindow, app, ipcMain, utilityProcess } from 'electron';
 import path from 'node:path';
+import { mt } from '../i18n';
 import {
   normalizeDictionaryImportRequest,
   type DictionaryImportJobSnapshot,
@@ -27,8 +28,21 @@ export const DICTIONARY_IMPORT_CHANNELS = {
   start: 'dictImport:start',
   cancel: 'dictImport:cancel',
   status: 'dictImport:status',
+  pick: 'dictImport:pick',
   changed: 'dictImport:changed',
 } as const;
+
+/** What each file-backed kind's native picker offers. `legacy` reads a tree, so it has none. */
+const PICKABLE = {
+  cedict: { titleKey: 'dialog.importCedict.title', filterKey: 'dialog.filter.cedict', extensions: ['u8', 'txt'] },
+  wiktextract: { titleKey: 'dialog.importWiktextract.title', filterKey: 'dialog.filter.jsonl', extensions: ['jsonl', 'json'] },
+} as const;
+
+type PickableKind = keyof typeof PICKABLE;
+
+function pickableKind(value: unknown): PickableKind | null {
+  return value === 'cedict' || value === 'wiktextract' ? value : null;
+}
 
 let jobs: DictionaryImportJobs | null = null;
 
@@ -85,6 +99,28 @@ export function registerDictionaryImportIpc(): void {
     manager.cancel(typeof jobId === 'string' ? jobId : undefined));
 
   ipcMain.handle(DICTIONARY_IMPORT_CHANNELS.status, () => manager.current());
+
+  // A separate channel rather than "start with no path opens a picker":
+  // `normalizeDictionaryImportRequest` refuses a cedict/wiktextract request that
+  // names no file, and relaxing that would mean a start request no longer says
+  // which file it read. The renderer picks first, then starts with the path.
+  ipcMain.handle(DICTIONARY_IMPORT_CHANNELS.pick, async (_event, rawKind: unknown) => {
+    const kind = pickableKind(rawKind);
+    if (!kind) return { canceled: true as const };
+    const { dialog } = await import('electron');
+    const { titleKey, filterKey, extensions } = PICKABLE[kind];
+    const picked = await dialog.showOpenDialog({
+      title: mt(titleKey),
+      filters: [
+        { name: mt(filterKey), extensions: [...extensions] },
+        { name: mt('dialog.filter.allFiles'), extensions: ['*'] },
+      ],
+      properties: ['openFile'],
+    });
+    const filePath = picked.filePaths[0];
+    if (picked.canceled || !filePath) return { canceled: true as const };
+    return { canceled: false as const, filePath };
+  });
 
   app.on('before-quit', () => manager.dispose());
 }

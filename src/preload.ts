@@ -504,6 +504,8 @@ const api = {
   /** The running job, or the last outcome. How a reloaded window recovers. */
   dictImportStatus: (): Promise<import('./shared/dictionaryImportJob').DictionaryImportJobSnapshot | null> =>
     ipcRenderer.invoke('dictImport:status'),
+  dictImportPick: (kind: 'cedict' | 'wiktextract'): Promise<{ canceled: boolean; filePath?: string }> =>
+    ipcRenderer.invoke('dictImport:pick', kind),
   onDictImportChanged: (
     cb: (snapshot: import('./shared/dictionaryImportJob').DictionaryImportJobSnapshot) => void,
   ): (() => void) => {

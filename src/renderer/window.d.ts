@@ -337,6 +337,21 @@ declare global {
         linksPath?: string;
       }): Promise<{ ok: boolean; added: number; error?: string }>;
       dictImportYomitan(filePath?: string): Promise<{ ok: boolean; error?: string; info?: YomitanDictInfo }>;
+      dictImportStart(
+        request: import('../shared/dictionaryImportJob').DictionaryImportRequest,
+      ): Promise<
+        | { ok: true; snapshot: import('../shared/dictionaryImportJob').DictionaryImportJobSnapshot }
+        | { ok: false; error: string; snapshot?: import('../shared/dictionaryImportJob').DictionaryImportJobSnapshot }
+      >;
+      dictImportCancel(jobId?: string): Promise<{
+        ok: boolean;
+        snapshot: import('../shared/dictionaryImportJob').DictionaryImportJobSnapshot | null;
+      }>;
+      dictImportStatus(): Promise<import('../shared/dictionaryImportJob').DictionaryImportJobSnapshot | null>;
+      dictImportPick(kind: 'cedict' | 'wiktextract'): Promise<{ canceled: boolean; filePath?: string }>;
+      onDictImportChanged(
+        cb: (snapshot: import('../shared/dictionaryImportJob').DictionaryImportJobSnapshot) => void,
+      ): () => void;
       dictListYomitan(): Promise<YomitanDictInfo[]>;
       dictRemoveYomitan(id: string): Promise<{ ok: boolean; error?: string }>;
       dictSetYomitanEnabled(id: string, enabled: boolean): Promise<{ ok: boolean; error?: string }>;

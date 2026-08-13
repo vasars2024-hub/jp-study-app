@@ -16966,3 +16966,70 @@ on the main thread should call them.
 
 Retrospective state remains **false**: the historical importer blocker is now genuinely resolved
 rather than reworded, but the full historical sweep across the other tracks is not reconciled.
+
+## Track 2 — interrupted Dictionaries settings UI recovered and live-proven — 2026-08-13 17:24 MSK
+
+Relay hop `codexB` began by inspecting `HEAD` (`a655712`), the empty staged index, the shared dirty
+tree, recent mtimes, the last ledger section, and the boss-audit tail. The interrupted worker had
+started the exact next slice at 16:39–16:42: native picker IPC, preload/type exposure, and picker
+catalog keys existed, but there was no renderer consumer, recovery/cancel UI, or regression test.
+Those partial edits were retained and completed rather than restarted or discarded.
+
+### Product decision and completed behavior
+
+- Dictionary management lives in **Settings → Models & dictionaries**, beside downloaded
+  dictionary assets. This keeps stable reading/search surfaces separate from infrequent import
+  administration and avoids adding another Settings rail page.
+- CC-CEDICT and Wiktextract use an explicit native picker before `dictImportStart`; legacy Yomitan
+  migration remains pathless because main owns its known legacy root. Cancel is offered only for a
+  recovered/running job. A terminal failure prints the worker's bounded real error rather than a
+  success-shaped notice.
+- The card calls `dictImportStatus` on mount, subscribes to `dictImport:changed`, disables all
+  starts while one writer runs, reports phase/line progress, and re-enables reversible actions on
+  committed/cancelled/failed terminal state. All new copy is present in EN/JA/ZH/RU.
+- `window.d.ts` now declares the already-shipped start/cancel/status/change listener as well as the
+  new picker, closing the renderer contract hole left by the utility-process commit.
+
+### Live Electron acceptance
+
+One fresh Forge process tree owned by this hop was started and driven only through the authenticated
+debug bridge; all 13 descendant processes were enumerated and stopped afterward. The existing
+foreign static renderer on port 5173 was untouched; Forge correctly used 5174.
+
+- Navigating to Models & dictionaries rendered the new card, two **Choose file** actions, one
+  **Migrate** action, and the recoverable idle state.
+- Through the real preload/main/utility-process path, a deliberately missing non-persistent path
+  (`C:\\nope\\codexB-missing.u8`) began as `running`, then the card rendered the exact terminal
+  `ENOENT`. Cancel disappeared and all three import actions re-enabled. This wrote no dictionary
+  rows and changed no persisted setting.
+- The bridge reported zero error-level log entries. No mouse/keyboard automation and no userData
+  backup were used.
+
+### Gates
+
+- `npx vitest run` — **573 files passed, 1 skipped; 7,590 tests passed, 6 skipped, 0 failed**.
+- `node tools/i18n-check.cjs` — exit 0, **9,465** English keys complete in JA/ZH/RU.
+- `node tools/architecture-audit.cjs` — exit 0, **1,779 modules / 18 known findings / 2 known
+  pending**, nothing new.
+- `npx eslint <owned implementation/test/catalog paths>` — exit 0. Detached HEAD confirms the
+  dictionary API additions introduce no new lint identity; `window.d.ts` retains the same two
+  pre-existing adjacent-overload errors in subtitle-harvest declarations as its parent.
+- Focused importer/card run — **4 files / 29 tests passed**.
+
+### Retrospective decision-blocker sweep, incremental result
+
+The active plans, ledger, boss-audit tail, coordination handoffs, `docs/ACTIVE` entry points, and
+decision-state were searched again under standing approval.
+
+| Historical blocker | Re-derived decision / safety | Action or ordered next action |
+| --- | --- | --- |
+| Dictionary `utilityProcess` needed root build permission | Superseded: minimal third Vite entry is reversible and already live-proven | Closed by `a655712`; this slice completed its UI |
+| Media route/player choice in old study-mode handoffs | Stale: later entries explicitly adopted `video-core` and closed both retirement blockers | Do not reopen; current Main V1 dependency order governs |
+| V1 audit 5.2 Display/Monitors ownership dependency | Not a user-decision blocker: the implementation exists only in foreign dirty work and must not be absorbed out of order | Preserve; re-derive when Main V1, Blanc, and Aero reach that stage |
+| V1 audit 5.4 translator Settings placement | Reversible routine product choice, superseded by standing approval | Decide and implement at its ordered owning stage, not ahead of open Main V1 Track 2 |
+| qBittorrent/debrid, live provider data, microphone/multi-monitor proofs | External environment/hardware/credential conditions, or explicitly deferred acceptance | Remain external/deferred; no internal authority is missing |
+
+This is a real incremental reconciliation, but not yet a defensible full historical sweep of every
+archived track. `relay-decision-state.json` therefore remains `retrospectiveComplete: false` rather
+than claiming completion at turn end. The normal ladder remains in Main V1 Track 2; re-derive the
+next Lexicon Workbench item from the new ledger tail and the plan before starting it.

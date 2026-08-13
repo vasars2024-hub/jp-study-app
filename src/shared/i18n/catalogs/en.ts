@@ -2223,6 +2223,28 @@ export const en: Catalog = {
   'storage.reading': 'Reading installed models…',
   'storage.removed': '{name} removed. You can download it again at any time.',
 
+  'storage.dictionaryImport.title': 'Import dictionaries',
+  'storage.dictionaryImport.desc': 'Add large local dictionaries without pausing the desktop. Imports continue if Settings is closed, and their last result is restored when you return.',
+  'storage.dictionaryImport.kind.cedict': 'CC-CEDICT',
+  'storage.dictionaryImport.kind.cedict.desc': 'Chinese–English dictionary in .u8 or .txt format.',
+  'storage.dictionaryImport.kind.wiktextract': 'Wiktextract',
+  'storage.dictionaryImport.kind.wiktextract.desc': 'Wiktionary extraction in JSONL or JSON format.',
+  'storage.dictionaryImport.kind.legacy': 'Legacy Yomitan dictionaries',
+  'storage.dictionaryImport.kind.legacy.desc': 'Migrate dictionaries already stored by an earlier version of this app.',
+  'storage.dictionaryImport.choose': 'Choose file',
+  'storage.dictionaryImport.migrate': 'Migrate',
+  'storage.dictionaryImport.idle': 'No dictionary import has run in this session.',
+  'storage.dictionaryImport.phase.reading': 'Reading source… {lines} lines',
+  'storage.dictionaryImport.phase.importing': 'Importing… {lines} lines',
+  'storage.dictionaryImport.phase.committing': 'Saving imported entries… {lines} lines',
+  'storage.dictionaryImport.status.committed': 'Import complete · {count} recorded items',
+  'storage.dictionaryImport.status.cancelled': 'Import cancelled · {count} recorded items',
+  'storage.dictionaryImport.status.failed': 'Import failed.',
+  'storage.dictionaryImport.error.busy': 'Another dictionary import is already running.',
+  'storage.dictionaryImport.error.unsupported': 'That dictionary import request is not supported.',
+  'storage.dictionaryImport.error.cancel': 'The running import could not be cancelled.',
+  'storage.dictionaryImport.error.bridge': 'Dictionary imports are unavailable in this window. Reopen the app.',
+
   /*
    * Asset integrity (audit T6). The wording is the whole point of the row:
    * `sizeChecked` must NOT read as "verified", because size verification
@@ -3070,6 +3092,10 @@ export const en: Catalog = {
   'analysis.level': 'Level',
   'analysis.meaning': 'Meaning / function',
   'analysis.openDictionary': 'Open in dictionary',
+  'dialog.importCedict.title': 'Import CC-CEDICT',
+  'dialog.importWiktextract.title': 'Import Wiktextract JSONL',
+  'dialog.filter.cedict': 'CC-CEDICT',
+  'dialog.filter.jsonl': 'JSONL',
   'analysis.showTranslations': 'Show all translations',
   'analysis.hideTranslations': 'Hide translations',
   'analysis.paraphrase': 'simplified',
@@ -8814,3 +8840,4 @@ export const en: Catalog = {
   'dict.saved.save': 'Save search',
   'dict.saved.remove': 'Remove saved search',
 };
+

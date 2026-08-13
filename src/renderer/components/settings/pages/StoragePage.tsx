@@ -6,6 +6,7 @@ import type { AssetIntegrity, ReverifyOutcome } from '../../../../main/downloads
 import { formatBytes, isBusy, type AssetKind } from '../../../../shared/assetRegistry';
 import { useT } from '../../../i18n';
 import type { TVars } from '../../../../shared/i18n/core';
+import DictionaryImportCard from './DictionaryImportCard';
 
 // The one place that lists every downloadable model and dictionary, with its
 // size, version and a delete button. Download buttons also appear inline on the
@@ -208,6 +209,8 @@ export default function StoragePage() {
         )}
         {loading && <div className="muted">{t('storage.reading')}</div>}
       </SettingsCard>
+
+      <DictionaryImportCard />
 
       {groups.map((group) => (
         <SettingsCard key={group.key} id={`storage-${group.key}`} title={t(group.key)}>
