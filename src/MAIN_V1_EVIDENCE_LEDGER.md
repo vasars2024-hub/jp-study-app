@@ -15537,3 +15537,39 @@ Track 2 remains open. The language-specific AI-analysis line is now covered, but
 dictionary source/import/search requirements still need source re-derivation. The next worker
 should choose a bounded decision-free gap there and must not infer that Track 2 is complete from
 the closure of its AI-language sub-line.
+
+## Dictionary priority survives the final unified-result sort — 2026-08-13
+
+Relay hop, `codexB`. Track 2. The latest boss-audit section handed off no unresolved regression,
+and the final ledger section moved the work back from the completed AI-language matrix to the
+larger source/import/search requirements. Re-deriving the unified SQLite lookup found a concrete
+defect in the already-claimed multi-source priority contract: every SQL branch selected
+`d.priority` and initially ordered by it, but the final cross-branch sort compared only match kind,
+entry score and headword id. A high-scored row from a lower-priority dictionary could therefore
+beat the source the user had placed first.
+
+`LookupEntry` now carries the source priority selected by the database, and the shared final
+comparator orders by match kind, dictionary priority, entry score and stable headword id, matching
+the function's existing documented contract. The priority is optional only so callers constructing
+legacy/synthetic lookup entries keep a conservative last-place fallback; every database result
+sets it. A regression deliberately lowers the preferred source's entry score and proves it still
+ranks before the higher-scored lower-priority source. No UI copy, schema, persistence, importer or
+provider path changed.
+
+Live Electron acceptance used one fresh Forge process owned by this hop and the authenticated
+debug bridge only. The real Vite-loaded comparator sorted a synthetic exact-match pair as
+`priority 0 / score 1` before `priority 4 / score 99`; the bridge error ring contained **0**
+entries. The temporary renderer global was deleted. No dictionary or user state was written. All
+13 processes in the recorded owned process tree were stopped and verified absent.
+
+Verification on the shared tree: focused dictionary lookup tests **35/35**. Full literal
+`npx vitest run`: **566 files passed / 1 skipped, 7,520 tests passed / 6 skipped**. `node
+tools/i18n-check.cjs`: **9,433 keys** complete. `node tools/architecture-audit.cjs`: **1,764
+modules**, nothing new, the same two pending. ESLint over the two touched TS paths: **0 errors,
+0 warnings**.
+
+Track 2 remains open. This closes one ranking defect, not the broad source-management row. The
+next worker should re-derive another bounded gap among cancellable imports, missing source formats,
+source metadata/controls, deduplication, fuzzy search or saved searches. Worker-backed imports
+still intersect the repository's explicit root-configuration constraint, so do not put synchronous
+multi-minute parsing on Electron's main event loop to make that line look complete.

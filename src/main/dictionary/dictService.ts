@@ -63,6 +63,8 @@ export interface LookupEntry {
   /** Conjugation chain, when `via` is 'deinflected'. */
   reasons?: string[];
   score: number;
+  /** Source order selected by the user; lower values rank first. */
+  dictionaryPriority?: number;
 }
 
 export interface LookupResult {
@@ -210,12 +212,21 @@ function toEntry(
     via: row.variant_of ? 'variant' : via,
     ...(reasons.length ? { reasons } : {}),
     score: row.score,
+    dictionaryPriority: row.priority,
   };
 }
 
 const VIA_RANK: Record<LookupEntry['via'], number> = {
   exact: 0, variant: 1, reading: 2, deinflected: 3, prefix: 4, gloss: 5,
 };
+
+export function compareLookupEntries(a: LookupEntry, b: LookupEntry): number {
+  return VIA_RANK[a.via] - VIA_RANK[b.via] ||
+    (a.dictionaryPriority ?? Number.MAX_SAFE_INTEGER) -
+      (b.dictionaryPriority ?? Number.MAX_SAFE_INTEGER) ||
+    b.score - a.score ||
+    a.headwordId - b.headwordId;
+}
 
 /**
  * Look a query up across every enabled dictionary, in any direction.
@@ -293,11 +304,7 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
     for (const row of glossRows) push(row, 'gloss', []);
   }
 
-  result.entries.sort((a, b) =>
-    VIA_RANK[a.via] - VIA_RANK[b.via] ||
-    b.score - a.score ||
-    a.headwordId - b.headwordId,
-  );
+  result.entries.sort(compareLookupEntries);
   result.entries = result.entries.slice(0, limit);
   return result;
 }

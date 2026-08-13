@@ -213,6 +213,20 @@ describe('gloss language selection — study language and gloss language are sep
 });
 
 describe('ranking and shape', () => {
+  it('ranks the preferred dictionary before a higher-scored lower-priority source', () => {
+    db.prepare('update headwords set score = 1 where dict_id = ? and norm = ?')
+      .run('jmdict-en', '食べる');
+    const out = lookup(db, { text: '食べる' });
+    expect(out.entries.slice(0, 2).map((entry) => ({
+      source: entry.dictId,
+      priority: entry.dictionaryPriority,
+      score: entry.score,
+    }))).toEqual([
+      { source: 'jmdict-en', priority: 0, score: 1 },
+      { source: 'jmdict-ru', priority: 1, score: 5 },
+    ]);
+  });
+
   it('puts an exact match before a prefix match', () => {
     const out = lookup(db, { text: '食べ' });
     const exactIdx = out.entries.findIndex((e) => e.via === 'exact');
