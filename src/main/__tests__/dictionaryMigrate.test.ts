@@ -125,6 +125,36 @@ describe('migration parity — every term the old Map could answer, the database
     expect(db.prepare('select entry_count c from dictionaries where id = ?').get('jmdict-en')).toEqual({ c: 3 });
   });
 
+  it('restores provenance only for app-provisioned legacy source ids', () => {
+    importLegacyIndex(db, fixture({ info: { ...fixture().info, id: 'bundled-jmdict-en' } }));
+    importLegacyIndex(db, fixture({ info: { ...fixture().info, id: 'user-jmdict-copy' } }));
+
+    expect(db.prepare('select licence, attribution from dictionaries where id = ?').get('bundled-jmdict-en')).toEqual({
+      licence: 'CC BY-SA 4.0',
+      attribution: expect.stringContaining('Electronic Dictionary Research and Development Group'),
+    });
+    expect(db.prepare('select licence, attribution from dictionaries where id = ?').get('user-jmdict-copy')).toEqual({
+      licence: null,
+      attribution: null,
+    });
+  });
+
+  it('records the distinct bundled Moedict and Kanjium obligations', () => {
+    importLegacyIndex(db, fixture({ info: { ...fixture().info, id: 'bundled-moedict-zh' } }));
+    importLegacyIndex(db, fixture({
+      info: { ...fixture().info, id: 'bundled-kanjium-pitch', hasTerms: false, hasPitch: true },
+      terms: {},
+    }));
+
+    expect(db.prepare('select licence from dictionaries where id = ?').get('bundled-moedict-zh')).toEqual({
+      licence: 'CC BY-ND 3.0 TW',
+    });
+    expect(db.prepare('select licence, attribution from dictionaries where id = ?').get('bundled-kanjium-pitch')).toEqual({
+      licence: 'CC BY-SA 4.0',
+      attribution: expect.stringContaining('Uros O.'),
+    });
+  });
+
   it('makes migrated terms searchable through FTS, which the JSON store never was', () => {
     importLegacyIndex(db, fixture());
     const hits = db.prepare('select rowid from headwords_fts where headwords_fts match ?').all('食べる');

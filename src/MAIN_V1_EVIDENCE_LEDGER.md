@@ -17333,3 +17333,34 @@ stored them. Do not invent those values; re-derive them from authoritative upstr
 the next source-coverage slice. Hardware/credential availability, publication, purchase, and
 user-data deletion remain external/deferred. The archive-wide retrospective remains incomplete,
 so `retrospectiveComplete` stays false. Track 2 remains active.
+
+## Track 2 — bundled legacy-source provenance — 2026-08-13 19:24 MSK
+
+Re-deriving the automatic migration tail found that the legacy `index.json` format has no licence
+fields, but the application owns stable ids and download URLs for exactly four auto-provisioned
+stores. Standing approval selected an id-scoped metadata map: JMdict EN/RU retain EDRDG's CC BY-SA
+4.0 attribution, Kanjium retains CC BY-SA 4.0 and Uros O. attribution, and Moedict retains the
+Taiwan Ministry of Education source and CC BY-ND 3.0 TW notice. Arbitrary user-imported Yomitan
+stores deliberately remain null; matching titles or guessing from content would misattribute data.
+
+Focused migration coverage proves all four bundled identities and proves a similarly named user
+copy receives no invented metadata. Full gates pass: Vitest **578 passed / 1 skipped files; 7,613
+passed / 6 skipped tests**; i18n **9,487 keys** complete; architecture **1,789 modules / 18 known
+findings / 2 pending**, nothing new; touched-path ESLint passed.
+
+Live Electron acceptance was attempted through one fresh authenticated debug bridge and is **not
+claimed passed**. A real legacy rebuild entered the isolated utility process, but after more than
+twenty minutes remained CPU-active in store 1's transaction. Cooperative cancel was accepted but,
+by the current store-boundary contract, could not interrupt that transaction. Only the Electron
+process started by this hop was then closed through the bridge; SQLite rollback protects the
+uncommitted replacement and the bridge file was removed. The next Track 2 slice must make
+large-store cancellation responsive (and re-check import throughput), then rerun this live
+provenance proof to a terminal snapshot before calling bundled provenance complete.
+
+Retrospective sweep increment: the current boss audit has no unaddressed finding. The historical
+utility-process/build-entry blocker in `docs/ACTIVE/START_HERE.md` and
+`docs/ACTIVE/DICTIONARY_BUILD_LOG.md` is superseded and implemented. The translator Settings
+placement choice in the older V1 audit is a later reversible Main V1 product decision covered by
+standing approval, not a present Track 2 blocker. Seanime routing decisions are already recorded
+resolved; hardware/third-party availability and publication remain external or deferred. The
+archive-wide sweep is still not exhaustive, so `retrospectiveComplete` remains false.

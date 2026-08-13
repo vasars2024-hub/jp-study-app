@@ -82,6 +82,36 @@ export interface MigrationResult {
   cancelled?: boolean;
 }
 
+interface LegacySourceProvenance {
+  licence: string;
+  attribution: string;
+}
+
+/**
+ * Provenance for stores provisioned by this application before the legacy
+ * index format had licence fields. Keep this keyed by the app-owned stable id:
+ * titles are user-editable/format-dependent, while assigning metadata to an
+ * arbitrary user-imported Yomitan archive would be an unsafe guess.
+ */
+const BUNDLED_LEGACY_PROVENANCE: Readonly<Record<string, LegacySourceProvenance>> = {
+  'bundled-jmdict-en': {
+    licence: 'CC BY-SA 4.0',
+    attribution: 'JMdict — Electronic Dictionary Research and Development Group (EDRDG) — https://www.edrdg.org/jmdict/j_jmdict.html',
+  },
+  'bundled-jmdict-ru': {
+    licence: 'CC BY-SA 4.0',
+    attribution: 'JMdict — Electronic Dictionary Research and Development Group (EDRDG) — https://www.edrdg.org/jmdict/j_jmdict.html',
+  },
+  'bundled-kanjium-pitch': {
+    licence: 'CC BY-SA 4.0',
+    attribution: 'Kanjium pitch accent data — Uros O. — https://github.com/mifunetoshiro/kanjium',
+  },
+  'bundled-moedict-zh': {
+    licence: 'CC BY-ND 3.0 TW',
+    attribution: 'Ministry of Education, Taiwan dictionaries — https://language.moe.gov.tw/001/Upload/Files/site_content/M0001/respub/index.html',
+  },
+};
+
 /** The gloss language a dictionary's definitions are written in. */
 export function glossLangOf(info: YomitanDictInfo): string {
   const override = info.glossLangOverride?.trim();
@@ -103,14 +133,15 @@ export function importLegacyIndex(db: SqliteDb, index: LegacyDictIndex): Importe
   const info = index.info;
   const dictId = info.id;
   const glossLang = glossLangOf(info);
+  const provenance = BUNDLED_LEGACY_PROVENANCE[dictId];
   const counts: ImportedCounts = { dictId, headwords: 0, senses: 0, glosses: 0, pitch: 0, freq: 0 };
 
   const run = db.transaction(() => {
     db.prepare('delete from dictionaries where id = ?').run(dictId);
     db.prepare(`
       insert into dictionaries (id, title, revision, source_lang, target_langs, priority,
-                                enabled, kind, entry_count, bytes, imported_at)
-      values (?, ?, ?, 'ja', ?, ?, ?, ?, 0, 0, ?)
+                                enabled, kind, licence, attribution, entry_count, bytes, imported_at)
+      values (?, ?, ?, 'ja', ?, ?, ?, ?, ?, ?, 0, 0, ?)
     `).run(
       dictId,
       info.title,
@@ -119,6 +150,8 @@ export function importLegacyIndex(db: SqliteDb, index: LegacyDictIndex): Importe
       info.priority ?? 0,
       info.enabled === false ? 0 : 1,
       info.hasTerms ? 'term' : info.hasPitch ? 'pitch' : 'freq',
+      provenance?.licence ?? null,
+      provenance?.attribution ?? null,
       info.importedAt ?? 0,
     );
 
