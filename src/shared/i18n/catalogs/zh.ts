@@ -2039,6 +2039,7 @@ export const zh: Catalog = {
   'mining.vars.image.hint': '从剪贴板抓取的图片',
   'dict.results.lookingUp': '查询中…',
   'dict.results.noMatch': '没有与“{query}”匹配的词典条目。',
+  'dict.results.approximate': '没有与“{query}”完全匹配的条目。显示拼写相近的结果。',
   'dict.results.common': '常用',
   'dict.results.freqTitle': '语料库频率排名',
   'dict.results.copyClipboard': '复制到剪贴板历史',

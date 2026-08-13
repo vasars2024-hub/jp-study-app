@@ -15706,3 +15706,69 @@ Track 2 remains open. This makes ambiguous imported morphology deterministic; it
 broad importer/source-management row. Re-derive the next bounded gap among safe cancellable imports,
 missing source formats, source controls, cross-source deduplication, fuzzy search or saved searches;
 do not move to Track 3 yet.
+
+## A mistyped query now finds close spellings, and says that is what it did — 2026-08-13
+
+Relay hop, `backup`. Track 2. Recovery first: the preceding worker ended on a usage limit at
+11:02:41 MSK, one minute after committing `dfb7e6b`. That commit is complete — product change,
+regression, and its own ledger section — the index was empty and no partial slice was in the
+tree, so there was nothing to finish or checkpoint. The last boss-audit section (09:01) handed
+off no unresolved regression. The ledger's last section left the same Track 2 list open, and
+re-deriving it against the tree picked **fuzzy search**: `lookup()` reached headwords by exact
+norm, reading, imported inflection, de-inflection, variant, prefix and gloss FTS, and every one
+of those requires the query to be exactly right somewhere in the index. One mistyped character
+returned nothing at all.
+
+`LookupQuery.fuzzy` (default off) adds an approximate pass. Two constraints shaped it. The first
+is CLAUDE.md's threading rule: scoring an edit distance against every headword in a 300 MB
+database is exactly the main-loop CPU work that is forbidden, so candidates are never scanned —
+they come from a short prefix range over the same `norm` / `reading_norm` indexes the strict
+probes use, capped at 400 rows per language, plus one exact probe per single-character deletion
+so a doubled or inserted character in the first two positions is still reachable. Both indexes
+are probed on that deletion path, because a mistyped Chinese query is a mistyped *reading* whose
+headword is written in Han. `boundedEditDistance` abandons a comparison as soon as every cell in
+a row is over budget and iterates code points, so a surrogate pair counts as the one character
+the user typed. The budget is zero below three characters: at that length an edit is a different
+word, and for CJK it always is — 犬 and 大 are not near-misses.
+
+The second constraint is honesty. Approximate rows are admitted **only when the strict result is
+empty**, so a result is wholly exact or wholly fuzzy and never a silent mixture; `via: 'fuzzy'`
+and `fuzzyDistance` rank the closest spelling first. The adapter derives `DictResult.approximate`
+from the entries rather than from the call site, because asking for a fuzzy lookup is not the
+same as receiving fuzzy rows. `lookupTerm` is the only caller that opts in, and only after both
+the database and the legacy Yomitan/Jisho paths have already failed, so an approximation can
+never displace a real match. The Dictionary surface renders `dict.results.approximate` above the
+entries — "No exact match for “X”. Showing close spellings." — in all four languages, reusing the
+existing de-inflection banner treatment, so no stylesheet changed. No schema, import format,
+persistence, provider or IPC channel changed.
+
+Live Electron acceptance used one fresh Forge process owned by this hop and the authenticated
+debug bridge only; port 5173 belonged to an unrelated listener, so Forge selected 5174. The real
+Vite-loaded `dictService` and `lexiconAdapter` modules, driven over a stub row: `goa` returned
+**0** entries with fuzzy off and, with it on, `狗` via `fuzzy` at distance **1** carrying its real
+`dog` gloss; `gu` returned **0** because two characters are below the budget; an exact `狗` query
+with `fuzzy: true` still came back `via: exact` with `approximate` unset. `dict.results.approximate`
+resolved through the app's own `translate()` with its own key present in en/ja/zh/ru — four
+distinct strings, no English fallback. End to end through the real preload and main handler,
+`lookupTerm('zzqqxxvv')` and `lookupTerm('tradionn')` executed the new branch and returned **0**
+entries with no error and no `approximate` flag: **this machine's SQLite dictionary is empty**, so
+the branch cannot produce a positive result live, and it stayed honest instead of inventing one.
+That empty-database limit is the reason the positive case is proven through the real modules
+rather than through the IPC round trip. The bridge error ring contained **0** entries. Probe
+globals were deleted, no dictionary or user state was written, and the complete recorded process
+tree started by this hop was stopped; the unrelated listener on 5173 was untouched.
+
+Verification on the shared tree: focused dictionary lookup **50/50**, lexicon adapter **7/7**,
+dictionary/Lexicon handoff **1/1**. Full literal `npx vitest run`: **7,537 passed / 6 skipped**
+with **one** failure, `scraperSources.test.ts > caps the stored history so it cannot grow forever`,
+an `ENOTEMPTY` temp-directory teardown race that passes **13/13** when the file is run alone and
+touches no dictionary code. `node tools/i18n-check.cjs`: **9,434 keys** complete. `node
+tools/architecture-audit.cjs`: **1,764 modules**, nothing new, the same two pending. ESLint over
+the eleven touched paths: **0 errors**, 7 warnings, all pre-existing `no-explicit-any` in
+`dictionary.ts` outside the added lines.
+
+Track 2 remains open. This closes fuzzy search only. Two limits are deliberate and should not be
+rediscovered as defects: a substitution or transposition inside the **first two characters** is
+out of reach of the prefix probe by design, and the gloss (reverse) direction has no fuzzy pass at
+all. Re-derive the next bounded gap among safe cancellable imports, missing source formats, source
+controls, cross-source deduplication or saved searches; do not move to Track 3 yet.

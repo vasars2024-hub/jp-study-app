@@ -2196,6 +2196,7 @@ export const ru: Catalog = {
   'mining.vars.image.hint': 'Изображение из буфера обмена',
   'dict.results.lookingUp': 'Поиск…',
   'dict.results.noMatch': 'Нет словарного совпадения для «{query}».',
+  'dict.results.approximate': 'Точного совпадения для «{query}» нет. Показаны близкие написания.',
   'dict.results.common': 'частое',
   'dict.results.freqTitle': 'Ранг частоты в корпусе',
   'dict.results.copyClipboard': 'Копировать в историю буфера',

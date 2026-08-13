@@ -93,6 +93,31 @@ describe('lookupResultToDictResult', () => {
     });
   });
 
+  it('marks a wholly approximate result as approximate', () => {
+    const mapped = lookupResultToDictResult(result({
+      query: 'たべりゅ',
+      entries: [{ ...result().entries[0], via: 'fuzzy', reasons: [], fuzzyDistance: 1 }],
+    }));
+    expect(mapped.approximate).toBe(true);
+    expect(mapped.deinflection).toBeUndefined();
+  });
+
+  it('does not call a result approximate while any entry really matched', () => {
+    // The flag describes the rows being rendered, not the request that produced
+    // them. One exact entry means the user's word was found.
+    const mapped = lookupResultToDictResult(result({
+      entries: [
+        result().entries[0],
+        { ...result().entries[0], headwordId: 2, via: 'fuzzy', reasons: [], fuzzyDistance: 1 },
+      ],
+    }));
+    expect(mapped.approximate).toBeUndefined();
+  });
+
+  it('leaves an empty result unmarked', () => {
+    expect(lookupResultToDictResult(result({ entries: [] })).approximate).toBeUndefined();
+  });
+
   it('restores legacy pitch and frequency metadata after SQLite conversion', () => {
     const mapped = enrichLexiconResultMetadata(lookupResultToDictResult(result()), {
       pitchHtml: (word) => word === '食べる' ? '<span>たべる</span>' : '',

@@ -41,6 +41,13 @@ export interface LookupQuery {
   limit?: number;
   /** Skip the reverse (gloss → headword) direction. */
   headwordsOnly?: boolean;
+  /**
+   * Allow approximate (mistyped) matches when nothing matched exactly.
+   *
+   * Off by default and never mixed into an exact result — see the fuzzy block in
+   * `lookup()` for why both of those are load-bearing.
+   */
+  fuzzy?: boolean;
 }
 
 export interface LookupSense {
@@ -59,12 +66,14 @@ export interface LookupEntry {
   readingNorm: string;
   senses: LookupSense[];
   /** How this entry was reached — shown to the user and used for ranking. */
-  via: 'exact' | 'reading' | 'deinflected' | 'variant' | 'prefix' | 'gloss';
+  via: 'exact' | 'reading' | 'deinflected' | 'variant' | 'prefix' | 'gloss' | 'fuzzy';
   /** Conjugation chain, when `via` is 'deinflected'. */
   reasons?: string[];
   score: number;
   /** Source order selected by the user; lower values rank first. */
   dictionaryPriority?: number;
+  /** Edit distance from the query, when `via` is 'fuzzy'. Closer ranks first. */
+  fuzzyDistance?: number;
 }
 
 export interface LookupResult {
@@ -147,6 +156,7 @@ interface HeadwordRow {
   dict_title: string;
   lang: string;
   text: string;
+  norm: string;
   reading: string | null;
   reading_norm: string | null;
   variant_of: number | null;
@@ -156,7 +166,7 @@ interface HeadwordRow {
 }
 
 const HEADWORD_SELECT = `
-  select h.id, h.dict_id, d.title as dict_title, h.lang, h.text, h.reading, h.reading_norm,
+  select h.id, h.dict_id, d.title as dict_title, h.lang, h.text, h.norm, h.reading, h.reading_norm,
          h.variant_of, h.score, h.freq_rank, d.priority
   from headwords h
   join dictionaries d on d.id = h.dict_id
@@ -195,6 +205,7 @@ function toEntry(
   via: LookupEntry['via'],
   reasons: string[],
   glossLangs?: string[],
+  fuzzyDistance?: number,
 ): LookupEntry {
   // A traditional-Chinese headword carries no senses of its own; it points at the
   // simplified row that does. Every reader has to follow that or half of Chinese
@@ -213,15 +224,19 @@ function toEntry(
     ...(reasons.length ? { reasons } : {}),
     score: row.score,
     dictionaryPriority: row.priority,
+    ...(fuzzyDistance === undefined ? {} : { fuzzyDistance }),
   };
 }
 
 const VIA_RANK: Record<LookupEntry['via'], number> = {
-  exact: 0, variant: 1, reading: 2, deinflected: 3, prefix: 4, gloss: 5,
+  exact: 0, variant: 1, reading: 2, deinflected: 3, prefix: 4, gloss: 5, fuzzy: 6,
 };
 
 export function compareLookupEntries(a: LookupEntry, b: LookupEntry): number {
   return VIA_RANK[a.via] - VIA_RANK[b.via] ||
+    // Only fuzzy entries carry a distance, and they never share a result with
+    // exact ones, so this term is inert for every other kind of match.
+    (a.fuzzyDistance ?? 0) - (b.fuzzyDistance ?? 0) ||
     (a.dictionaryPriority ?? Number.MAX_SAFE_INTEGER) -
       (b.dictionaryPriority ?? Number.MAX_SAFE_INTEGER) ||
     b.score - a.score ||
@@ -241,6 +256,71 @@ export function collectInflectionReasons(
   return byHeadword;
 }
 
+// ----- approximate matching --------------------------------------------------
+//
+// Every probe above requires the query to be exactly right *somewhere* in the
+// index. A learner who mistypes one character gets nothing at all, which is the
+// one search behaviour people notice immediately when it is missing.
+//
+// The constraint that shapes this is CLAUDE.md's: no CPU-heavy work on the main
+// event loop. Scoring an edit distance against every headword in a 300 MB
+// database is exactly that, so candidates are not scanned — they come from the
+// same `norm` / `reading_norm` indexes the strict probes use, from a short
+// prefix range, capped. What that buys is cheapness; what it costs is stated in
+// `FUZZY_PREFIX_CHARS` below.
+
+/** How much of the query has to be typed correctly for the index probe to find it. */
+const FUZZY_PREFIX_CHARS = 2;
+/** Upper bound on rows scored per language. Keeps the worst case bounded. */
+const FUZZY_CANDIDATE_LIMIT = 400;
+
+/**
+ * How wrong a query of this length is allowed to be.
+ *
+ * Zero below three characters on purpose: at that length a one-character edit is
+ * usually a different word rather than a typo, and for CJK it is *always* one —
+ * 犬 and 大 are not near-misses for each other.
+ */
+export function fuzzyDistanceBudget(text: string): number {
+  const length = [...text].length;
+  if (length < 3) return 0;
+  return length <= 4 ? 1 : 2;
+}
+
+/**
+ * Levenshtein distance, abandoned as soon as it provably exceeds `max`.
+ *
+ * Returns `max + 1` for "further away than you asked about" rather than the true
+ * distance, which is what makes the early exit sound: once every cell in a row is
+ * over budget, no later row can come back under it.
+ *
+ * Iterates code points, not UTF-16 units, so a surrogate pair counts as the one
+ * character the user actually typed.
+ */
+export function boundedEditDistance(a: string, b: string, max: number): number {
+  const source = [...a];
+  const target = [...b];
+  if (Math.abs(source.length - target.length) > max) return max + 1;
+
+  let previous = Array.from({ length: target.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= source.length; i += 1) {
+    const current = new Array<number>(target.length + 1);
+    current[0] = i;
+    let best = i;
+    for (let j = 1; j <= target.length; j += 1) {
+      current[j] = Math.min(
+        previous[j] + 1,
+        current[j - 1] + 1,
+        previous[j - 1] + (source[i - 1] === target[j - 1] ? 0 : 1),
+      );
+      if (current[j] < best) best = current[j];
+    }
+    if (best > max) return max + 1;
+    previous = current;
+  }
+  return previous[target.length];
+}
+
 /**
  * Look a query up across every enabled dictionary, in any direction.
  *
@@ -257,9 +337,14 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
   if (!text) return result;
 
   const seen = new Set<number>();
-  const push = (row: HeadwordRow, via: LookupEntry['via'], reasons: string[]) => {
+  const push = (
+    row: HeadwordRow,
+    via: LookupEntry['via'],
+    reasons: string[],
+    fuzzyDistance?: number,
+  ) => {
     if (seen.has(row.id)) return;
-    const entry = toEntry(db, row, via, reasons, query.glossLangs);
+    const entry = toEntry(db, row, via, reasons, query.glossLangs, fuzzyDistance);
     // A target-language filter can remove every sourced sense from an otherwise
     // matching headword. Do not let that empty shell consume the result limit or
     // render as a definition-less card; it is not a result in the requested pair.
@@ -329,7 +414,7 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
   if (!query.headwordsOnly && result.entries.length < limit) {
     const glossRows = db
       .prepare(`
-        select h.id, h.dict_id, d.title as dict_title, h.lang, h.text, h.reading, h.reading_norm,
+        select h.id, h.dict_id, d.title as dict_title, h.lang, h.text, h.norm, h.reading, h.reading_norm,
                h.variant_of, h.score, h.freq_rank, d.priority
         from glosses_fts
         join glosses g on g.id = glosses_fts.rowid
@@ -342,6 +427,60 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
       `)
       .all(ftsQuery(text), limit) as HeadwordRow[];
     for (const row of glossRows) push(row, 'gloss', []);
+  }
+
+  // Approximate matching, opt-in and strictly last. The `length === 0` guard is
+  // the honesty rule: a near-miss must never be quietly interleaved with entries
+  // that really do match, so a result is either wholly exact or wholly fuzzy and
+  // callers can label it as such.
+  if (query.fuzzy && result.entries.length === 0) {
+    const norm = normalizeForLookup(text);
+    const budget = fuzzyDistanceBudget(norm);
+    const chars = [...norm];
+    if (budget > 0) {
+      const prefix = chars.slice(0, Math.min(FUZZY_PREFIX_CHARS, chars.length - 1)).join('');
+      const byFuzzyPrefix = db.prepare(`
+        ${HEADWORD_SELECT}
+        and h.lang = ?
+        and ((h.norm >= ? and h.norm < ?) or (h.reading_norm >= ? and h.reading_norm < ?))
+        order by h.score desc, h.id
+        limit ?
+      `);
+
+      const matches: { row: HeadwordRow; distance: number }[] = [];
+      const consider = (row: HeadwordRow) => {
+        if (seen.has(row.id)) return;
+        const distance = Math.min(
+          boundedEditDistance(norm, row.norm, budget),
+          row.reading_norm ? boundedEditDistance(norm, row.reading_norm, budget) : budget + 1,
+        );
+        if (distance <= budget) matches.push({ row, distance });
+      };
+
+      for (const lang of detected) {
+        for (const row of byFuzzyPrefix.all(
+          lang, prefix, `${prefix}￿`, prefix, `${prefix}￿`, FUZZY_CANDIDATE_LIMIT,
+        ) as HeadwordRow[]) {
+          consider(row);
+        }
+        // A doubled or inserted character in the first two positions puts the real
+        // headword outside that prefix range entirely. One exact probe per
+        // single-character deletion covers it and is another index hit, not a scan.
+        // Both indexes have to be probed: a mistyped Chinese query is a mistyped
+        // *reading*, and the headword it belongs to is written in Han.
+        for (let i = 0; i < chars.length; i += 1) {
+          const deleted = [...chars.slice(0, i), ...chars.slice(i + 1)].join('');
+          for (const row of byNorm.all(lang, deleted) as HeadwordRow[]) consider(row);
+          for (const row of byReading.all(lang, deleted) as HeadwordRow[]) consider(row);
+        }
+      }
+
+      matches.sort((a, b) => a.distance - b.distance ||
+        a.row.priority - b.row.priority ||
+        b.row.score - a.row.score ||
+        a.row.id - b.row.id);
+      for (const match of matches) push(match.row, 'fuzzy', [], match.distance);
+    }
   }
 
   result.entries.sort(compareLookupEntries);

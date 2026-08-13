@@ -2170,6 +2170,7 @@ export const en: Catalog = {
   'mining.vars.image.hint': 'Image grabbed from your clipboard',
   'dict.results.lookingUp': 'Looking up…',
   'dict.results.noMatch': 'No dictionary match for “{query}”.',
+  'dict.results.approximate': 'No exact match for “{query}”. Showing close spellings.',
   'dict.results.common': 'common',
   'dict.results.freqTitle': 'Corpus frequency rank',
   'dict.results.copyClipboard': 'Copy to clipboard history',

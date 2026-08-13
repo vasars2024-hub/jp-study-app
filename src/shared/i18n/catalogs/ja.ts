@@ -2048,6 +2048,7 @@ export const ja: Catalog = {
   'mining.vars.image.hint': 'クリップボードから取得した画像',
   'dict.results.lookingUp': '検索中…',
   'dict.results.noMatch': '「{query}」に一致する辞書項目がありません。',
+  'dict.results.approximate': '「{query}」に完全一致はありません。表記の近い候補を表示します。',
   'dict.results.common': '常用',
   'dict.results.freqTitle': 'コーパス頻度ランク',
   'dict.results.copyClipboard': 'クリップボード履歴にコピー',

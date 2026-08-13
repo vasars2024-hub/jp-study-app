@@ -165,7 +165,20 @@ export async function lookupTerm(query: string): Promise<DictResult> {
   }
 
   await initYomitan();
-  return lookupTermMerged(q, lookupWord);
+  const merged = await lookupTermMerged(q, lookupWord);
+  if (merged.entries.length || merged.error) return merged;
+
+  // Nothing matched exactly in either store. Before reporting "no match", ask the
+  // database for close spellings — this is the only caller that opts into fuzzy
+  // matching, and only once every exact path has already failed, so an
+  // approximate answer can never displace a real one.
+  try {
+    const approximate = lookupResultToDictResult(lookupInDictionaryDb({ text: q, limit: 8, fuzzy: true }));
+    if (approximate.approximate) return approximate;
+  } catch {
+    // A database read must never take the established dictionary fallback down.
+  }
+  return merged;
 }
 
 /** Offline-only Yomitan glossary lookup (de-inflection aware) — no Jisho HTTP. */

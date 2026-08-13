@@ -80,6 +80,14 @@ export interface DictResult {
   entries: DictEntry[];
   /** Present when `entries` were found by de-inflecting a conjugated `query`. */
   deinflection?: DeinflectionInfo;
+  /**
+   * Every entry is a close spelling of `query`, not a match for it.
+   *
+   * Only ever set on a result that had no exact match at all, so a surface can
+   * say so plainly instead of presenting near-misses as if the user's word had
+   * been found.
+   */
+  approximate?: boolean;
   /** Set when the lookup itself failed (e.g. offline). */
   error?: string;
 }

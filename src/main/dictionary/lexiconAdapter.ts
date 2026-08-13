@@ -49,6 +49,18 @@ function deinflectionFor(result: LookupResult): DeinflectionInfo | undefined {
   };
 }
 
+/**
+ * Whether this whole result is approximate rather than exact.
+ *
+ * Derived from the entries instead of from the call site on purpose: the flag has
+ * to describe the rows actually being rendered, and asking for a fuzzy lookup is
+ * not the same as receiving fuzzy rows — the service only falls back to them when
+ * nothing matched exactly.
+ */
+function isApproximate(result: LookupResult): boolean {
+  return result.entries.length > 0 && result.entries.every((entry) => entry.via === 'fuzzy');
+}
+
 /** Convert one unified SQLite lookup into the stable legacy renderer shape. */
 export function lookupResultToDictResult(result: LookupResult): DictResult {
   const deinflection = deinflectionFor(result);
@@ -56,6 +68,7 @@ export function lookupResultToDictResult(result: LookupResult): DictResult {
     query: result.query,
     entries: result.entries.map(toLegacyEntry),
     ...(deinflection ? { deinflection } : {}),
+    ...(isApproximate(result) ? { approximate: true } : {}),
   };
 }
 

@@ -19,9 +19,11 @@ import { openDictionaryDb, type SqliteDb } from '../dictionary/db';
 import { importCedict } from '../dictionary/importers/cedict';
 import { importLegacyIndex } from '../dictionary/migrate';
 import {
+  boundedEditDistance,
   candidateForms,
   detectQueryLangs,
   ftsQuery,
+  fuzzyDistanceBudget,
   lookup,
   normalizeForLookup,
 } from '../dictionary/dictService';
@@ -127,6 +129,77 @@ describe('candidateForms', () => {
 
   it('normalizes width and case', () => {
     expect(normalizeForLookup('Ｔａｂｌｅ')).toBe('table');
+  });
+});
+
+describe('boundedEditDistance', () => {
+  it('measures ordinary edits', () => {
+    expect(boundedEditDistance('gou', 'gou', 2)).toBe(0);
+    expect(boundedEditDistance('goa', 'gou', 2)).toBe(1);
+    expect(boundedEditDistance('gu', 'gou', 2)).toBe(1);
+    expect(boundedEditDistance('goua', 'gou', 2)).toBe(1);
+  });
+
+  it('reports max + 1 rather than the true distance once over budget', () => {
+    // The early exit is only sound if the caller reads this as "further than you
+    // asked", never as a real distance.
+    expect(boundedEditDistance('tradition', 'dog', 2)).toBe(3);
+    expect(boundedEditDistance('abcdef', 'ghijkl', 1)).toBe(2);
+  });
+
+  it('counts code points, not UTF-16 units', () => {
+    // Two surrogate pairs. Length-16 arithmetic would call this distance 2.
+    expect(boundedEditDistance('𠮷野', '𠮟野', 2)).toBe(1);
+  });
+});
+
+describe('fuzzyDistanceBudget', () => {
+  it('refuses to guess at one or two characters', () => {
+    expect(fuzzyDistanceBudget('犬')).toBe(0);
+    expect(fuzzyDistanceBudget('gu')).toBe(0);
+  });
+
+  it('allows one edit for short queries and two for longer ones', () => {
+    expect(fuzzyDistanceBudget('gou')).toBe(1);
+    expect(fuzzyDistanceBudget('tradition')).toBe(2);
+  });
+});
+
+describe('approximate matching', () => {
+  it('returns nothing for a typo unless fuzzy matching was asked for', () => {
+    expect(lookup(db, { text: 'goa' }).entries).toEqual([]);
+  });
+
+  it('finds the close spelling when nothing matched exactly', () => {
+    const out = lookup(db, { text: 'goa', fuzzy: true });
+    const hit = out.entries.find((e) => e.text === '狗');
+    expect(hit).toBeDefined();
+    expect(hit?.via).toBe('fuzzy');
+    expect(hit?.fuzzyDistance).toBe(1);
+    expect(hit?.senses[0].glosses.map((g) => g.text)).toEqual(['dog']);
+  });
+
+  it('reaches a headword whose first characters were mistyped as doubles', () => {
+    // 'ggou' is outside the two-character prefix range entirely; only the
+    // single-deletion probe can recover it.
+    const out = lookup(db, { text: 'ggou', fuzzy: true });
+    expect(out.entries.map((e) => e.text)).toContain('狗');
+  });
+
+  it('never mixes approximate entries into a result that matched exactly', () => {
+    const out = lookup(db, { text: '狗', fuzzy: true });
+    expect(out.entries.length).toBeGreaterThan(0);
+    expect(out.entries.every((e) => e.via !== 'fuzzy')).toBe(true);
+  });
+
+  it('does not guess at a query too short to have a typo', () => {
+    expect(lookup(db, { text: 'gu', fuzzy: true }).entries).toEqual([]);
+  });
+
+  it('ranks the closest spelling first', () => {
+    const out = lookup(db, { text: 'たべりゅ', fuzzy: true });
+    const distances = out.entries.map((e) => e.fuzzyDistance ?? 0);
+    expect([...distances].sort((a, b) => a - b)).toEqual(distances);
   });
 });
 

@@ -796,6 +796,12 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
         <div className="dict-empty">{t('dict.results.noMatch', { query })}</div>
       )}
 
+      {result?.approximate && entries.length > 0 && (
+        <div className="dict-deinflection">
+          <span className="dict-deinflection-forms">{t('dict.results.approximate', { query })}</span>
+        </div>
+      )}
+
       {result?.deinflection && (
         <div className="dict-deinflection">
           <span className="dict-deinflection-forms" lang="ja">
