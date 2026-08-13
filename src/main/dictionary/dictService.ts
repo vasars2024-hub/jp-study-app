@@ -56,6 +56,12 @@ export interface LookupSense {
   glosses: { lang: string; text: string; html?: string }[];
 }
 
+export interface LookupSource {
+  dictId: string;
+  dictTitle: string;
+  priority: number;
+}
+
 export interface LookupEntry {
   headwordId: number;
   dictId: string;
@@ -72,6 +78,8 @@ export interface LookupEntry {
   score: number;
   /** Source order selected by the user; lower values rank first. */
   dictionaryPriority?: number;
+  /** All dictionaries contributing this semantic entry, primary source first. */
+  sources: LookupSource[];
   /** Edit distance from the query, when `via` is 'fuzzy'. Closer ranks first. */
   fuzzyDistance?: number;
 }
@@ -224,8 +232,33 @@ function toEntry(
     ...(reasons.length ? { reasons } : {}),
     score: row.score,
     dictionaryPriority: row.priority,
+    sources: [{ dictId: row.dict_id, dictTitle: row.dict_title, priority: row.priority }],
     ...(fuzzyDistance === undefined ? {} : { fuzzyDistance }),
   };
+}
+
+function sameSemanticEntry(a: LookupEntry, b: LookupEntry): boolean {
+  return a.lang === b.lang && a.text === b.text && a.readingNorm === b.readingNorm &&
+    a.via === b.via && a.fuzzyDistance === b.fuzzyDistance;
+}
+
+function mergeSenses(a: LookupSense[], b: LookupSense[]): LookupSense[] {
+  const out = [...a];
+  for (const sense of b) {
+    const key = JSON.stringify(sense);
+    if (!out.some((candidate) => JSON.stringify(candidate) === key)) out.push(sense);
+  }
+  return out;
+}
+
+/** Merge duplicate semantic rows without losing the dictionaries that supplied them. */
+export function mergeLookupEntry(existing: LookupEntry, incoming: LookupEntry): LookupEntry {
+  if (!sameSemanticEntry(existing, incoming)) return existing;
+  const sources = [...existing.sources];
+  for (const source of incoming.sources) {
+    if (!sources.some((candidate) => candidate.dictId === source.dictId)) sources.push(source);
+  }
+  return { ...existing, senses: mergeSenses(existing.senses, incoming.senses), sources };
 }
 
 const VIA_RANK: Record<LookupEntry['via'], number> = {
@@ -337,19 +370,27 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
   if (!text) return result;
 
   const seen = new Set<number>();
+  const semanticEntries = new Map<string, number>();
   const push = (
     row: HeadwordRow,
     via: LookupEntry['via'],
     reasons: string[],
     fuzzyDistance?: number,
   ) => {
-    if (seen.has(row.id)) return;
     const entry = toEntry(db, row, via, reasons, query.glossLangs, fuzzyDistance);
     // A target-language filter can remove every sourced sense from an otherwise
     // matching headword. Do not let that empty shell consume the result limit or
     // render as a definition-less card; it is not a result in the requested pair.
     if (entry.senses.length === 0) return;
+    const semanticKey = [entry.lang, entry.text, entry.readingNorm, entry.via, entry.fuzzyDistance ?? ''].join('\u0000');
+    const existingIndex = semanticEntries.get(semanticKey);
+    if (existingIndex !== undefined) {
+      result.entries[existingIndex] = mergeLookupEntry(result.entries[existingIndex], entry);
+      seen.add(row.id);
+      return;
+    }
     seen.add(row.id);
+    semanticEntries.set(semanticKey, result.entries.length);
     result.entries.push(entry);
   };
 

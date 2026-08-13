@@ -348,13 +348,10 @@ describe('ranking and shape', () => {
     db.prepare('update headwords set score = 1 where dict_id = ? and norm = ?')
       .run('jmdict-en', '食べる');
     const out = lookup(db, { text: '食べる' });
-    expect(out.entries.slice(0, 2).map((entry) => ({
-      source: entry.dictId,
-      priority: entry.dictionaryPriority,
-      score: entry.score,
-    }))).toEqual([
-      { source: 'jmdict-en', priority: 0, score: 1 },
-      { source: 'jmdict-ru', priority: 1, score: 5 },
+    expect(out.entries[0]).toMatchObject({ dictId: 'jmdict-en', dictionaryPriority: 0, score: 1 });
+    expect(out.entries[0].sources).toEqual([
+      { dictId: 'jmdict-en', dictTitle: 'JMdict (English)', priority: 0 },
+      { dictId: 'jmdict-ru', dictTitle: 'JMdict (Russian)', priority: 1 },
     ]);
   });
 
@@ -379,8 +376,9 @@ describe('ranking and shape', () => {
 
   it('names the dictionary each entry came from, which CC BY-SA requires', () => {
     const out = lookup(db, { text: '食べる' });
-    expect(out.entries.map((e) => e.dictTitle)).toContain('JMdict (English)');
-    expect(out.entries.map((e) => e.dictTitle)).toContain('JMdict (Russian)');
+    expect(out.entries[0].sources.map((source) => source.dictTitle)).toEqual([
+      'JMdict (English)', 'JMdict (Russian)',
+    ]);
   });
 
   it('honours the limit', () => {
