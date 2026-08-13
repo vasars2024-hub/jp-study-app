@@ -17404,3 +17404,43 @@ credential availability, publication, purchase, and user-data deletion remain ex
 The archive-wide historical sweep is not yet exhaustive, so `retrospectiveComplete` correctly
 remains false. Track 2 remains active: rerun bundled provenance to a terminal commit now that Cancel
 is safe, then re-derive remaining source provisioning, deep-search, and Workbench gaps.
+
+## Track 2 — cancellation during large-source replacement — 2026-08-13 19:46 MSK
+
+Re-running the bundled-provenance acceptance against the installed four-source database falsified
+part of the preceding cancellation claim. The marker was observed during row insertion, but a
+rebuild first executed one `delete from dictionaries`, whose foreign-key cascades held SQLite for
+minutes while deleting the existing 524,106-headword JMdict source. The utility process could not
+poll the marker inside that single synchronous statement: Cancel returned `ok:true`, yet the job
+remained `running` and CPU-active. The process owned by this hop was stopped, allowing SQLite to
+roll the uncommitted replacement back.
+
+Standing approval selected bounded deletion inside the existing per-source transaction. Legacy
+headwords (and their cascaded senses/glosses/FTS rows), pitch rows, and corpus-frequency rows are
+now removed in 1,000-row statements with marker checks between statements. The dictionary row is
+deleted only after its large children are gone. Cancellation still throws the existing internal
+sentinel, so every completed batch rolls back and the previous source remains queryable; no source
+JSON or user setting is changed. A regression seeds 2,100 existing headwords, cancels between delete
+batches, and proves the original title, entry count, and all headwords survive.
+
+Live Electron acceptance used a second fresh Forge process owned and stopped by this hop, driven
+only through the authenticated debug bridge. The real renderer API began replacement of the same
+installed JMdict source and requested Cancel after the job entered `running`. It reached terminal
+`cancelled` within seconds with zero committed stores. `JSON.stringify` of the complete four-source
+list before and after was exactly equal, and the bridge error ring was empty. This closes responsive
+replacement cancellation; the earlier bundled-provenance terminal commit is still not claimed and
+remains the next live debt.
+
+Gates: full Vitest **578 passed / 1 skipped files; 7,615 passed / 6 skipped tests**; i18n **9,487
+keys** complete; architecture **1,789 modules / 18 known findings / 2 pending**, nothing new;
+focused ESLint passed; focused migration/job/worker coverage **3 files / 46 tests passed**.
+
+Retrospective decision-blocker sweep increment: the boss-audit tail has no unaddressed finding.
+The historical utility-process/configuration blocker is superseded and implemented. Replacement
+granularity is a reversible internal safety decision covered by standing approval and is now
+implemented and live-proven. Older Seanime routing/removal choices are already resolved; translator
+Settings placement remains a later dependency-ordered decision. Hardware/credential availability,
+publication, purchase, and third-party availability remain external or deferred. The archive-wide
+sweep is not yet exhaustive, so `retrospectiveComplete` remains false. Track 2 remains active: run
+the bundled provenance rebuild to terminal completion, then re-derive remaining source, deep-search,
+and Workbench gaps.

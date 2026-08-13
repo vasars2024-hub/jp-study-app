@@ -367,6 +367,33 @@ describe('scanning userData/yomitan', () => {
     expect(db.prepare('select count(*) c from headwords').get()).toEqual({ c: 0 });
   });
 
+  it('can cancel while replacing a large existing source and rolls every delete batch back', () => {
+    const original = fixture({
+      info: { ...fixture().info, id: 'large', title: 'Original' },
+      terms: Object.fromEntries(
+        Array.from({ length: 2_100 }, (_, index) => [
+          `語${index}`,
+          [entry(`語${index}`, `ご${index}`, [`meaning ${index}`])],
+        ]),
+      ),
+    });
+    importLegacyIndex(db, original);
+
+    let polls = 0;
+    expect(() => importLegacyIndex(
+      db,
+      fixture({ info: { ...fixture().info, id: 'large', title: 'Replacement' } }),
+      () => (polls += 1) >= 3,
+    )).toThrow();
+
+    expect(polls).toBe(3);
+    expect(db.prepare('select title, entry_count from dictionaries where id = ?').get('large')).toEqual({
+      title: 'Original',
+      entry_count: 2_100,
+    });
+    expect(db.prepare('select count(*) c from headwords where dict_id = ?').get('large')).toEqual({ c: 2_100 });
+  });
+
   it('does not set cancelled when nothing asked it to stop', () => {
     const root = path.join(tempRoot, 'yomitan');
     writeStore(path.join(root, 'jmdict-en'), fixture());

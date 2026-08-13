@@ -131,6 +131,58 @@ export function glossLangOf(info: YomitanDictInfo): string {
  */
 class LegacyMigrationCancelled extends Error {}
 
+const LEGACY_DELETE_BATCH = 1_000;
+
+/**
+ * Remove the rows owned by a legacy source in bounded statements. A single
+ * `delete from dictionaries` asks SQLite to cascade through hundreds of
+ * thousands of headwords without returning to JavaScript, which makes the
+ * utility-process cancel marker impossible to observe during a rebuild.
+ *
+ * This still runs inside the caller's replacement transaction. Cancellation
+ * throws, so every completed batch is rolled back and the old source remains
+ * byte-for-byte queryable.
+ */
+function deleteLegacySourceRows(db: SqliteDb, dictId: string, shouldCancel?: () => boolean): void {
+  const exists = db.prepare('select 1 as present from dictionaries where id = ?').get(dictId);
+  if (!exists) return;
+
+  const checkCancelled = (): void => {
+    if (shouldCancel?.()) throw new LegacyMigrationCancelled();
+  };
+  const deleteBatch = (sql: string, value: string): void => {
+    const statement = db.prepare(sql);
+    let changes: number;
+    do {
+      checkCancelled();
+      const result = statement.run(value);
+      changes = result.changes;
+      checkCancelled();
+    } while (changes === LEGACY_DELETE_BATCH);
+  };
+
+  deleteBatch(
+    `delete from headwords where id in (
+       select id from headwords where dict_id = ? limit ${LEGACY_DELETE_BATCH}
+     )`,
+    dictId,
+  );
+  deleteBatch(
+    `delete from pitch where rowid in (
+       select rowid from pitch where dict_id = ? limit ${LEGACY_DELETE_BATCH}
+     )`,
+    dictId,
+  );
+  deleteBatch(
+    `delete from freq_corpora where rowid in (
+       select rowid from freq_corpora where corpus = ? limit ${LEGACY_DELETE_BATCH}
+     )`,
+    dictId,
+  );
+  db.prepare('delete from dictionaries where id = ?').run(dictId);
+  checkCancelled();
+}
+
 export function importLegacyIndex(
   db: SqliteDb,
   index: LegacyDictIndex,
@@ -143,7 +195,7 @@ export function importLegacyIndex(
   const counts: ImportedCounts = { dictId, headwords: 0, senses: 0, glosses: 0, pitch: 0, freq: 0 };
 
   const run = db.transaction(() => {
-    db.prepare('delete from dictionaries where id = ?').run(dictId);
+    deleteLegacySourceRows(db, dictId, shouldCancel);
     db.prepare(`
       insert into dictionaries (id, title, revision, source_lang, target_langs, priority,
                                 enabled, kind, licence, attribution, entry_count, bytes, imported_at)
