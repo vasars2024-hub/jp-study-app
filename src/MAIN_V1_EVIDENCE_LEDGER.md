@@ -17667,3 +17667,30 @@ them. Publication, purchases, personal credentials and third-party availability 
 external. The archive-wide retrospective is not yet exhaustive, so `retrospectiveComplete` remains
 false. Track 2 remains active; next re-derive the remaining character practice/decomposition and
 find-in-the-wild gaps against current source.
+
+## Track 2 — grounded decomposition checkpoint closure — 2026-08-14 00:13 MSK
+
+Relay worker `codexB` closed the gates deliberately left open by the preceding decomposition slice. Re-reading the
+newest boss-audit section first confirmed that its importer mutation, live IPC and media-attribution findings were
+already closed by `5bfe45b` plus the recorded bridge probes; no audit defect was reopened. The retrospective sweep also
+reconfirmed that the earlier utility-process/configuration, provenance, pair-priority, character-contract and Agent
+vision decisions are reversible internal choices already superseded by standing approval and implemented. No external
+authority was exercised. The archive-wide sweep remains incomplete, so `retrospectiveComplete` stays false.
+
+Fresh gates at `4871d02`: full Vitest **579 passed / 1 skipped files; 7,634 passed / 6 skipped tests**; i18n **9,504
+keys** complete; architecture **1,791 modules / 18 known findings / 2 pending**, nothing new; touched-TypeScript ESLint
+passed for `CharacterMetadataPanel.tsx` and `characterMetadataPanel.test.tsx`.
+
+Live Electron acceptance used one fresh Forge process owned by this hop and the authenticated debug bridge only. The
+production decomposition stylesheet rendered a bounded two-component fixture as an accessible flex surface: two
+separate labelled tokens (`犭`, `苗`), a labelled `Components` group, 6px gap and 8px token radius at 1264×821. A
+screenshot was captured at `debug/shots/win1-1786655572790.png`; the post-clear error ring contained **0 entries**.
+The focused React test is the evidence that the production component emits this structure; this bridge probe is only
+claimed as real-engine style/layout evidence, not as an installed KANJIDIC data journey. Probe DOM/globals were removed,
+all six processes in the owned Electron tree were stopped, and the stale generated bridge record was removed only after
+verifying that it still named the owned dead PID.
+
+The decomposition slice is now checkpoint-complete. Stroke/handwriting practice still lacks source-backed geometry;
+the next dependency-ordered Track 2 action is to re-derive the broader find-in-the-wild sources beyond the already
+implemented local-subtitle concordance, without pretending the subtitle-only search satisfies news, encyclopedic and
+spoken-source coverage.
