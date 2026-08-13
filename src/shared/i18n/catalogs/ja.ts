@@ -8476,5 +8476,6 @@ export const ja: Catalog = {
   'lexicon.character.readings': '読み',
   'lexicon.character.meanings': '意味',
   'lexicon.character.sources': '出典（{count}）',
+  'lexicon.character.wordsContaining': 'この文字を含む単語',
 };
 

@@ -109,6 +109,7 @@ describe('CharacterMetadataPanel', () => {
 
     await act(async () => {
       canvas.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+      canvas.dispatchEvent(new Event('pointermove', { bubbles: true }));
       canvas.dispatchEvent(new Event('pointerup', { bubbles: true }));
     });
     expect(host.querySelector('.lexicon-character-practice-strokes')?.textContent)
@@ -117,5 +118,26 @@ describe('CharacterMetadataPanel', () => {
     await act(async () => host.querySelector<HTMLButtonElement>('.lexicon-character-practice-actions button')?.click());
     expect(host.querySelector('.lexicon-character-practice-strokes')?.textContent)
       .toBe('lexicon.character.strokes: 0 / 11');
+  });
+
+  it('shows only returned dictionary words that contain the character', async () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    const entry = (word: string, reading: string) => ({
+      word, reading, isCommon: false, jlpt: [], senses: [],
+    });
+    await act(async () => root?.render(<CharacterMetadataPanel
+      character={{
+        lang: 'ja', char: '猫', components: [], readings: [], meanings: [], sources: [],
+      }}
+      entries={[entry('子猫', 'こねこ'), entry('犬', 'いぬ')]}
+    />));
+
+    const words = host.querySelector('.lexicon-character-words');
+    expect(words?.textContent).toContain('lexicon.character.wordsContaining');
+    expect(words?.textContent).toContain('子猫');
+    expect(words?.textContent).toContain('こねこ');
+    expect(words?.textContent).not.toContain('犬');
   });
 });

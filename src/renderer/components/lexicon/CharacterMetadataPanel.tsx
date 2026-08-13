@@ -1,4 +1,4 @@
-import type { DictResult } from '../../../shared/types';
+import type { DictEntry, DictResult } from '../../../shared/types';
 import { useT } from '../../i18n';
 import './characterMetadataPanel.css';
 import CharacterWritingPractice from './CharacterWritingPractice';
@@ -7,14 +7,18 @@ type CharacterMetadata = NonNullable<DictResult['character']>;
 
 interface Props {
   character: CharacterMetadata;
+  entries?: DictEntry[];
 }
 
 function joined(values: string[]): string | null {
   return values.length > 0 ? values.join(' · ') : null;
 }
 
-export default function CharacterMetadataPanel({ character }: Props) {
+export default function CharacterMetadataPanel({ character, entries = [] }: Props) {
   const { t } = useT();
+  const containingEntries = entries
+    .filter((entry) => entry.word.includes(character.char))
+    .slice(0, 12);
   const components = joined(character.components);
   const facts = [
     character.strokes === undefined
@@ -73,6 +77,21 @@ export default function CharacterMetadataPanel({ character }: Props) {
         <div className="lexicon-character-list">
           <strong>{t('lexicon.character.meanings')}</strong>
           <span>{joined(character.meanings)}</span>
+        </div>
+      )}
+      {containingEntries.length > 0 && (
+        <div className="lexicon-character-words">
+          <strong>{t('lexicon.character.wordsContaining')}</strong>
+          <ul>
+            {containingEntries.map((entry) => (
+              <li key={`${entry.word}-${entry.reading}`}>
+                <span lang={character.lang}>{entry.word}</span>
+                {entry.reading && entry.reading !== entry.word && (
+                  <span lang={character.lang}>（{entry.reading}）</span>
+                )}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
       <CharacterWritingPractice target={character.char} expectedStrokes={character.strokes} />

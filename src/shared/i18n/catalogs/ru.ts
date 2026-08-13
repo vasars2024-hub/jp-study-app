@@ -9266,5 +9266,6 @@ export const ru: Catalog = {
   'lexicon.character.readings': 'Чтения',
   'lexicon.character.meanings': 'Значения',
   'lexicon.character.sources': 'Источники ({count})',
+  'lexicon.character.wordsContaining': 'Слова с этим иероглифом',
 };
 

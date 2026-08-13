@@ -8441,5 +8441,6 @@ export const zh: Catalog = {
   'lexicon.character.readings': '读音',
   'lexicon.character.meanings': '释义',
   'lexicon.character.sources': '来源（{count}）',
+  'lexicon.character.wordsContaining': '包含此字符的词语',
 };
 

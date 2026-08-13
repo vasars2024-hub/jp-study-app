@@ -817,7 +817,7 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
         </div>
       )}
 
-      {result?.character && <CharacterMetadataPanel character={result.character} />}
+      {result?.character && <CharacterMetadataPanel character={result.character} entries={entries} />}
 
       <div className="dict-entries">
         {entries.map((entry, i) => {

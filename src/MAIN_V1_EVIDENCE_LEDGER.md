@@ -17478,6 +17478,18 @@ approval when dependency order reaches them. Publication and live personal-accou
 external. The archive-wide sweep is not yet exhaustive, so `retrospectiveComplete` remains false. Track 2 stays
 active; next re-derive remaining deep-search, character/workbench, and find-in-the-wild gaps from current source.
 
+## Interrupted codexB media CSS slice safely checkpointed — 2026-08-13 23:02 MSK
+
+Relay recovery by `codexA`. The interrupted notice named `mediaCenter.css` and reported a literal-token
+cleanup in progress. Re-derivation found `src/renderer/views/mediaCenter.css` already clean relative to
+`HEAD` (no diff, no staged hunk, and an older mtime), with the current counts at 136 hex and 431 rgba
+literals. The surrounding media/study files are mixed unstaged and untracked work from other slices;
+there is no reliable codexB ownership boundary to finish or stage safely. No files were edited, staged,
+reset, stashed, or deleted. The CSS slice remains open for a future worker to re-derive from source.
+
+The index remains empty; the shared dirty tree is intentionally preserved. The focused media containment
+check remains for the next media-owned worker because this recovery found no attributable implementation.
+
 ## Track 2 — the cancel marker had no regression test — 2026-08-13 23:15 MSK
 
 Relay worker `backup`. This hop answered the boss audit's two standing evidence gaps
@@ -17620,10 +17632,52 @@ exactly the new tests). `node tools/i18n-check.cjs` 0, **9492** English keys tra
 `src/renderer/window.d.ts` are **pre-existing at HEAD** (`subtitleHarvestList` is declared twice there)
 and belong to the subtitle track, not to this change.
 
+## Track 2 — grounded single-character metadata service — 2026-08-13 23:45 MSK
+
+Re-derivation found that KANJIDIC2 already populated the merged, provenance-aware `chars` projection,
+but no dictionary service read it: a single-character lookup could return the synthetic glossary
+headword while strokes, radical, readings, levels, frequency, and their contributing source remained
+dead database rows. This slice adds that grounded metadata to the canonical `LookupResult` for exact
+one-code-point queries. It preserves the ordered source-id list, resolves licence and attribution from
+the dictionary registry, and suppresses both the record and its provenance when every contributing
+source is disabled. Malformed additive JSON fields fail closed to empty arrays rather than failing the
+whole dictionary lookup.
+
+Standing-approval decision: enrich the existing result instead of creating another character-search
+service or IPC channel. It is additive and reversible, keeps one lookup path, and cannot expose a
+disabled dataset. The Workbench presentation panel is deliberately not claimed by this backend slice;
+propagating and rendering the field through the interlinear contract is the next character/workbench
+action before stroke practice or decomposition can be accepted.
+
+Gates: full Vitest **578 passed / 1 skipped files; 7,633 passed / 6 skipped tests**; i18n **9,492 keys**
+complete; architecture **1,789 modules / 18 known findings / 2 pending**, nothing new; focused KANJIDIC
+coverage **1 file / 4 tests passed**; touched-path ESLint passed. Live Electron acceptance was not
+claimed because the shipped bridge does not yet surface this new field.
+
+Retrospective sweep increment: the current boss-audit findings are closed at HEAD. This slice required
+no external authority; source visibility followed the reversible enabled/disabled registry state.
+Translator placement and remaining Track 2 product composition choices are covered by standing approval
+when reached. Publication, purchases, personal credentials, and third-party availability remain external.
+The archive-wide sweep remains incomplete, so `retrospectiveComplete` stays false.
+
 Staging note: `preload.ts`, `window.d.ts`, the four i18n catalogs and this ledger all carry other tracks'
 uncommitted hunks. Those six were staged as HEAD-plus-this-hop's-edit reconstructed blobs rather than
 `git add`; the working tree keeps the foreign work untouched.
 
+## Track 2 — grounded character metadata crosses the legacy dictionary contract — 2026-08-13 23:48 MSK
+
+Re-derivation found that the canonical SQLite lookup already returns enabled-source character metadata,
+but `lookupResultToDictResult` discarded it at the boundary used by the renderer and preload. The smallest
+reversible decision is to extend the existing `DictResult` additively rather than introduce another IPC
+channel or character service. The bridge copies strokes, radical, components, readings, meanings, levels,
+frequency, and ordered licence-bearing provenance; absent optional values remain absent, and source objects
+are copied rather than shared.
+
+Changed `src/shared/types.ts` and `src/main/dictionary/lexiconAdapter.ts`. Focused KANJIDIC and lookup tests:
+**2 files / 65 tests passed**. Touched-path ESLint passed. Live Electron acceptance is not claimed: the
+renderer presentation panel is still the next product slice. Full Vitest, i18n, architecture, and live
+debug-bridge gates remain for the path-scoped checkpoint. No external blocker; standing approval covers
+this additive internal contract decision.
 ## Track 2 — grounded character facts reach the Workbench — 2026-08-13 23:58 MSK
 
 Re-derivation started from the current plan and source, not the prior hop's closing sentence. The
@@ -17668,6 +17722,42 @@ external. The archive-wide retrospective is not yet exhaustive, so `retrospectiv
 false. Track 2 remains active; next re-derive the remaining character practice/decomposition and
 find-in-the-wild gaps against current source.
 
+## Relay retrospective reconciliation — 2026-08-14
+
+Re-derived the active Main V1 plan, dependency order, Anki Workbench plan, newest boss-audit
+section, and latest ledger section. The audit's importer mutation/live-bridge findings are already
+closed by intervening focused gates and live dictionary/Workbench probes; the remaining live-bridge
+limitation is environmental because no sanctioned Electron bridge is available in this turn. The
+screenshot/OCR attachment context is complete in source and ledger, so it is not reopened.
+
+Historical blocker sweep: reversible internal choices (dictionary service/contract shape, worker
+import architecture, provenance migration, pair priority, and Agent vision transport) are
+superseded by standing approval and have landed with tests. Notes elsewhere that still say “needs
+user decision” were not silently changed: source review classifies them as either already resolved
+in their authoritative record or genuinely external/irreversible (publication, credentials,
+third-party availability, hardware, or environment). No external authority was exercised.
+
+No product mutation is claimed in this reconciliation. The next dependency-ordered Main V1 slice
+remains Track 2 character practice/decomposition or confirmed find-in-the-wild work; both require
+re-deriving their concrete contract before implementation. `retrospectiveComplete` intentionally
+remains false because the archive-wide historical sweep and sanctioned live acceptance are not
+complete. Gates were not rerun for this ledger-only entry.
+
+## Track 2 — explicit grounded character decomposition view — 2026-08-14 00:06 MSK
+
+Re-derived the remaining character requirements against the current contract. The database already supplies an
+ordered `components` list, but the Workbench presented it only as inline fact text; no stroke geometry or additional
+decomposition data exists to support a stronger claim. This slice makes the sourced decomposition visible as discrete,
+accessible component tokens while preserving the existing inline fact and source attribution.
+
+Changed `CharacterMetadataPanel.tsx`, its stylesheet, and the focused renderer test. No new contract, IPC channel,
+placeholder, or AI-derived structure was introduced. Focused Vitest: **1 file / 1 test passed**. Touched TypeScript
+ESLint passed; the repository ESLint parser rejects CSS input, so the stylesheet was not linted as TypeScript.
+
+Live Electron acceptance was not claimed in this turn. Full Vitest, i18n, architecture, and live bridge gates remain
+for the next path-scoped checkpoint. Stroke practice, handwriting geometry, and find-in-the-wild remain open because
+their source-backed contracts are not present yet.
+
 ## Track 2 — grounded decomposition checkpoint closure — 2026-08-14 00:13 MSK
 
 Relay worker `codexB` closed the gates deliberately left open by the preceding decomposition slice. Re-reading the
@@ -17695,6 +17785,23 @@ the next dependency-ordered Track 2 action is to re-derive the broader find-in-t
 implemented local-subtitle concordance, without pretending the subtitle-only search satisfies news, encyclopedic and
 spoken-source coverage.
 
+## Track 2 — bounded cross-title local subtitle concordance — 2026-08-14 00:18 MSK
+
+Re-derived the next open find-in-the-wild gap against the current source: `findSubtitleMatches` only searches the
+currently open player's cues, while the media audit calls for cross-title subtitle/vocabulary search. The broader
+news, encyclopedic, and spoken-source providers remain absent and are not represented as if available.
+
+Added `shared/subtitleConcordance.ts`, a pure offline-first primitive that searches already-loaded local cues across
+titles in stable library/cue order, normalizes the query through the existing subtitle normalization, preserves title,
+cue index, text, and timestamp, and caps results at 500. Added two focused tests covering normalization/order, blank
+queries, and the bound. No IPC, persistence, provider, or UI claim was introduced; wiring this contract into a
+cross-title media surface remains the next implementation slice.
+
+Verification: focused Vitest **1 file / 2 tests passed**; touched-path ESLint passed. Full gates and live Electron
+acceptance were not run in this small contract slice. No checkpoint commit was created because the shared working tree
+already contains extensive unrelated modifications and the ledger itself is pre-dirty; the two new source/test files
+remain attributable and unstaged.
+
 ## Track 2 — duplicate concordance claim retracted; retrospective sweep closed — 2026-08-14 00:43 MSK
 
 Re-derived the preceding uncommitted slice against the whole current tree before wiring it. It was not a new
@@ -17718,12 +17825,18 @@ The next worker must not recreate `subtitleConcordance.ts`. Track 2 remains acti
 is handwriting/stroke practice (handwriting recognition exists in Manga but is not a Workbench affordance, while
 stroke geometry is absent) or another requirement re-derived against the existing Workbench before implementation.
 
-Gates: full Vitest **579 passed / 1 skipped files; 7,634 passed / 6 skipped tests**; focused existing concordance
-Vitest **1 file / 4 tests passed**; i18n **9,504 keys complete**; architecture **1,791 modules / 18 known findings /
-2 pending**, nothing new. No TypeScript product path remained touched after retracting the duplicate, so there was no
-touched TypeScript path to pass to ESLint. Live Electron acceptance was not repeated: this turn removed a duplicate
-unwired primitive and changed no shipped behavior; the earlier Workbench concordance wiring and tests remain the
-applicable product evidence.
+## Track 2 — Workbench handwriting recognition practice — 2026-08-14 00:27 MSK
+
+Re-derived the remaining character gap against the current source: KANJIDIC supplies stroke counts and components,
+but no stroke geometry, while the existing Manga handwriting popup already exposes a real OCR IPC recognizer. Added a
+bounded `CharacterWritingPractice` surface to the grounded Workbench metadata panel. It lets a learner draw the target
+character, clear/retry, and submit the canvas through `mangaOcrRecognizeImage`; the result is shown as recognition
+feedback only. No stroke-order animation, handwriting scoring, or geometry claim was introduced.
+
+Focused Vitest: **1 file / 1 test passed** (`characterMetadataPanel.test.tsx`). Touched TypeScript ESLint passed.
+The test environment reports its existing missing-canvas implementation notice; it does not fail the test. Full Vitest,
+i18n, architecture, and live Electron acceptance were not run in this hop. The next Track 2 action is to perform the
+live Workbench recognition/recovery probe and decide whether source-backed stroke geometry becomes available.
 
 ## Track 2 — Workbench handwriting recognition checkpoint closure — 2026-08-14 00:32 MSK
 
@@ -17748,3 +17861,97 @@ audit findings remain closed by `5bfe45b` and later bridge evidence; this slice 
 work. Track 2 still cannot claim stroke-order teaching because no source-backed stroke geometry exists. The next worker
 must re-derive the remaining Lexicon Workbench requirements against source rather than infer that handwriting feedback
 completes Track 2.
+
+Gates: full Vitest **579 passed / 1 skipped files; 7,634 passed / 6 skipped tests**; focused existing concordance
+Vitest **1 file / 4 tests passed**; i18n **9,504 keys complete**; architecture **1,791 modules / 18 known findings /
+2 pending**, nothing new. No TypeScript product path remained touched after retracting the duplicate, so there was no
+touched TypeScript path to pass to ESLint. Live Electron acceptance was not repeated: this turn removed a duplicate
+unwired primitive and changed no shipped behavior; the earlier Workbench concordance wiring and tests remain the
+applicable product evidence.
+
+## Track 2 — grounded stroke-count practice — 2026-08-14 00:40 MSK
+
+Re-derived the remaining character-practice requirement from the plan and shipped Workbench. The recognition canvas
+accepted a finished glyph but did not represent separate pen strokes, while the enabled dictionary sources already
+provide an attributed expected stroke count. This checkpoint passes that optional grounded count into the canvas,
+counts only completed pointer strokes, and shows attempt versus expected count using the existing translated Strokes
+label. Clear resets both ink and the attempt count; cancelled pointers are not counted. This is deliberately not a
+stroke-order or geometry claim: no source-backed path data exists yet, and recognition remains the separate OCR check.
+
+Focused Vitest passed **1 file / 3 tests**. Full Vitest passed **579 files / 7,636 tests** with the existing skips;
+i18n passed at **9,504 English keys**; architecture scanned **1,792 modules**, with **18 known / 2 pending** and nothing
+new; touched-path ESLint passed without warnings. Live Electron was not repeated in this headless checkpoint, so the
+new visible counter still requires one debug-bridge acceptance before this slice can be called fully closed. Track 2
+remains active; words-containing-character and source-backed stroke-order geometry remain explicit gaps.
+
+## Track 2 — completed-stroke counting guard — 2026-08-14 00:42 MSK
+
+Re-derived the existing handwriting practice behavior: the canvas counted every pointer-up as a stroke, including a
+tap with no drawn segment, and pointer cancellation unconditionally attempted pointer capture release. Added a local
+movement guard so only a pointer sequence with actual motion increments the grounded attempt count; cancelled and
+uncaptured pointer sequences now reset safely. This preserves the existing source-backed expected stroke-count
+comparison without implying stroke-order recognition or geometry validation.
+
+Focused `npx vitest run src/renderer/__tests__/lexiconWorkbenchResults.test.tsx` passed **1 file / 21 tests**;
+touched-path ESLint passed. Full Vitest, i18n, architecture, and live Electron acceptance were not rerun in this
+micro-slice. The component file was already dirty in the shared tree, so no checkpoint commit was created to avoid
+absorbing foreign hunks; the change is read back above and remains visible for the owning relay worker. Track 2
+remains active with words-containing-character, source-backed stroke-order geometry, and live bridge acceptance open.
+
+## Track 2 audit follow-up — no-active-import cancellation guard — 2026-08-14 00:47 MSK
+
+Re-derived the latest boss-audit finding before resuming product work. The importer suite already covered the
+load-bearing on-disk cancellation marker, duplicate starts, active cancellation, terminal recovery, and worker
+failure, but it did not directly assert the first guard in `DictionaryImportJobs.cancel()`: cancelling with no
+active import must refuse the request without spawning or signalling a worker. Added that focused assertion.
+
+Mutation proof used a disposable exact-HEAD worktree with the new test applied and a junction to the primary
+checkout's dependencies. Baseline passed **1 file / 11 tests**. Replacing `if (!this.active)` with `if (false)`
+failed exactly the new test with `Cannot set properties of null (setting 'cancelling')`; restoring the guard
+passed **1 file / 11 tests** again. The disposable worktree and its junction were removed after verification.
+
+Live runtime behavior was not changed by this test-only slice. The preceding importer audit evidence in this ledger
+remains the live acceptance: real main-process handlers proved cold status, invalid-path failure, reload recovery,
+duplicate-start refusal, active cancellation, and unchanged dictionary sources through the authenticated debug
+bridge. No userData mutation or backup was performed here.
+
+Required gates: focused importer Vitest passed **1 file / 11 tests**; i18n passed at **9,504** English keys;
+architecture audit passed at **1,792** modules with 18 known findings and nothing new; touched-path ESLint passed.
+The full Vitest run was not green: **578 passed / 1 failed / 1 skipped files; 7,636 passed / 1 failed / 6 skipped
+tests**. Its sole failure is outside this slice in the pre-existing shared dirty
+`CharacterWritingPractice.tsx`: jsdom lacks `event.currentTarget.hasPointerCapture`, so
+`characterMetadataPanel.test.tsx` observed `0 / 11` instead of `1 / 11`. The importer suite passed within that
+same run. This audit follow-up closes the branch-specific cancellation-test finding; Track 2 remains active.
+
+## Track 2 — grounded words-containing character view — 2026-08-14 00:50 MSK
+
+Re-derived the next open character requirement against the current source. Dictionary lookup already returns real
+source-backed entries alongside exact character metadata, but the metadata panel did not expose which returned words
+contain the character. Added a bounded list (12 entries) to `CharacterMetadataPanel`, preserving the existing word and
+reading values and passing the actual lookup entries from `DictionaryResults`. This is explicitly a view over returned
+dictionary evidence, not an exhaustive corpus search or a new provider.
+
+Added the label in all four shared catalogs. `node tools/i18n-check.cjs` passed with 9,505 keys and touched-path ESLint
+passed. Focused `characterMetadataPanel.test.tsx` remains blocked by the pre-existing jsdom `hasPointerCapture`
+failure in `CharacterWritingPractice` (2 passed, 1 failed); the failure occurs in the existing handwriting path and
+does not exercise the new words list. No live Electron acceptance was available in this headless hop. The shared tree
+was already dirty across the touched product files, so no checkpoint commit was created or staged.
+
+## Track 2 — character practice and containing-words checkpoint closure — 2026-08-14 00:55 MSK
+
+Re-derived the red focused test left by the preceding two slices. The completed-stroke guard correctly rejects a
+tap-only pointer sequence, but its test still expected that tap to count and jsdom does not implement
+`hasPointerCapture`. The practice surface now feature-detects all pointer-capture methods, and the test dispatches a
+real moved stroke. Direct coverage also proves that the containing-words view includes only returned dictionary
+entries containing the selected character and preserves their readings.
+
+Required gates are green: full Vitest **579 passed / 1 skipped files; 7,638 passed / 6 skipped tests**; i18n passed at
+**9,505 English keys**; architecture scanned **1,792 modules** with **18 known / 2 pending** and nothing new; touched-
+path ESLint passed. Focused character coverage passed **1 file / 4 tests**.
+
+Live Electron acceptance was not repeated in this headless closure. The immediately preceding bridge run already
+proved the production 180×180 recognition canvas, real OCR handler, clear/recovery path, and empty error ring, but the
+new visible containing-words list and moved-stroke counter have not been observed together in a fresh live Workbench
+journey. Track 2 therefore remains active: the next worker should run that bounded live journey, then re-derive the
+remaining Lexicon Workbench requirements. Source-backed stroke-order geometry is still unavailable and must not be
+claimed.

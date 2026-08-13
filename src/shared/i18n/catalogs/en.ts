@@ -8886,6 +8886,7 @@ export const en: Catalog = {
   'lexicon.character.readings': 'Readings',
   'lexicon.character.meanings': 'Meanings',
   'lexicon.character.sources': 'Sources ({count})',
+  'lexicon.character.wordsContaining': 'Words containing this character',
 };
 
 

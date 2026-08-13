@@ -13,6 +13,7 @@ export default function CharacterWritingPractice({
   const { t } = useT();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
+  const moved = useRef(false);
   const [result, setResult] = useState('');
   const [strokeCount, setStrokeCount] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -59,10 +60,10 @@ export default function CharacterWritingPractice({
       </div>
       <canvas ref={canvasRef} width={SIZE} height={SIZE} className="lexicon-character-practice-canvas"
         aria-label={t('manga.hw.title')}
-        onPointerDown={(event) => { drawing.current = true; event.currentTarget.setPointerCapture(event.pointerId); const p = point(event); const c = event.currentTarget.getContext('2d'); c?.beginPath(); c?.moveTo(p.x, p.y); }}
-        onPointerMove={(event) => { if (!drawing.current) return; const p = point(event); const c = event.currentTarget.getContext('2d'); if (c) { c.lineTo(p.x, p.y); c.stroke(); } }}
-        onPointerUp={(event) => { if (drawing.current) setStrokeCount((count) => count + 1); drawing.current = false; event.currentTarget.releasePointerCapture(event.pointerId); }}
-        onPointerCancel={(event) => { drawing.current = false; event.currentTarget.releasePointerCapture(event.pointerId); }} />
+        onPointerDown={(event) => { drawing.current = true; moved.current = false; event.currentTarget.setPointerCapture?.(event.pointerId); const p = point(event); const c = event.currentTarget.getContext('2d'); c?.beginPath(); c?.moveTo(p.x, p.y); }}
+        onPointerMove={(event) => { if (!drawing.current) return; moved.current = true; const p = point(event); const c = event.currentTarget.getContext('2d'); if (c) { c.lineTo(p.x, p.y); c.stroke(); } }}
+        onPointerUp={(event) => { if (drawing.current && moved.current) setStrokeCount((count) => count + 1); drawing.current = false; moved.current = false; if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture?.(event.pointerId); }}
+        onPointerCancel={(event) => { drawing.current = false; moved.current = false; if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture?.(event.pointerId); }} />
       <div className="lexicon-character-practice-actions">
         <button type="button" className="btn small" onClick={clear}>{t('manga.hw.clear')}</button>
         <button type="button" className="btn small" onClick={() => void recognize()} disabled={busy}>{busy ? t('manga.hw.recognizing') : t('manga.hw.recognize')}</button>
