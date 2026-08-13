@@ -532,6 +532,14 @@ describe('proxyUrl', () => {
   });
 
   it('carries the https request through a successful CONNECT tunnel without a direct fallback', async () => {
+    // The fixture pair is self-signed `CN=fixture` and valid until 2126. That
+    // expiry is not decoration: the original pair was minted with a two-day
+    // validity on 2026-08-11 and expired on 2026-08-13, at which point node
+    // reported "certificate has expired" instead of "self-signed certificate"
+    // and the assertion below failed for everyone, permanently, for a reason
+    // that had nothing to do with the proxy policy under test. Regenerate with
+    //   openssl req -x509 -newkey rsa:2048 -keyout proxy-test-key.pem \
+    //     -out proxy-test-cert.pem -days 36500 -nodes -subj "/CN=fixture"
     const key = fs.readFileSync(new URL('./fixtures/proxy-test-key.pem', import.meta.url));
     const cert = fs.readFileSync(new URL('./fixtures/proxy-test-cert.pem', import.meta.url));
     const requests: string[] = [];
