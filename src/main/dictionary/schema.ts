@@ -28,7 +28,7 @@
 import type { SqliteDb } from './db';
 
 /** Bumped by appending to MIGRATIONS. Never edit a released step. */
-export const DICT_SCHEMA_VERSION = 2;
+export const DICT_SCHEMA_VERSION = 3;
 
 export interface MigrationStep {
   version: number;
@@ -320,6 +320,38 @@ export const MIGRATIONS: MigrationStep[] = [
         );
         CREATE INDEX idx_char_sources_lookup ON char_sources(lang, char);
       `);
+    },
+  },
+  {
+    version: 3,
+    name: 'bundled legacy-source licence and attribution backfill',
+    up(db) {
+      const update = db.prepare(`
+        update dictionaries
+        set licence = case when licence is null or trim(licence) = '' then ? else licence end,
+            attribution = case when attribution is null or trim(attribution) = '' then ? else attribution end
+        where id = ?
+      `);
+      update.run(
+        'CC BY-SA 4.0',
+        'JMdict — Electronic Dictionary Research and Development Group (EDRDG) — https://www.edrdg.org/jmdict/j_jmdict.html',
+        'bundled-jmdict-en',
+      );
+      update.run(
+        'CC BY-SA 4.0',
+        'JMdict — Electronic Dictionary Research and Development Group (EDRDG) — https://www.edrdg.org/jmdict/j_jmdict.html',
+        'bundled-jmdict-ru',
+      );
+      update.run(
+        'CC BY-SA 4.0',
+        'Kanjium pitch accent data — Uros O. — https://github.com/mifunetoshiro/kanjium',
+        'bundled-kanjium-pitch',
+      );
+      update.run(
+        'CC BY-ND 3.0 TW',
+        'Ministry of Education, Taiwan dictionaries — https://language.moe.gov.tw/001/Upload/Files/site_content/M0001/respub/index.html',
+        'bundled-moedict-zh',
+      );
     },
   },
 ];

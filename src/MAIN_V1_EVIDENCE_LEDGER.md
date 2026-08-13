@@ -17444,3 +17444,36 @@ publication, purchase, and third-party availability remain external or deferred.
 sweep is not yet exhaustive, so `retrospectiveComplete` remains false. Track 2 remains active: run
 the bundled provenance rebuild to terminal completion, then re-derive remaining source, deep-search,
 and Workbench gaps.
+
+## Track 2 — existing bundled sources receive provenance without rebuilding — 2026-08-13 20:23 MSK
+
+The required live rerun falsified the previous next action rather than closing it. A real legacy replacement
+remained compute-bound for thirty minutes while still reporting only source 1 of 4. More importantly, the
+pre-run source snapshot proved the installed rows still had null licence and attribution: the provenance map
+added in `migrate.ts` only applies while replacing hundreds of thousands of entries. Existing installations
+therefore had no automatic upgrade path and were being asked to perform a long, destructive replacement for
+four rows of metadata.
+
+Standing approval selected the smaller additive repair: dictionary schema v3 updates only the four stable,
+app-owned bundled ids. It fills null/blank licence and attribution independently, preserves any existing
+non-empty value, and does not infer metadata for similarly named or arbitrary user imports. The interrupted
+replacement was cancelled through the shipped API and reached terminal `cancelled` with zero committed stores.
+No source JSON, user setting, or dictionary row was deleted.
+
+Live Electron acceptance then restarted one fresh Forge process on the real installed v2 database. The v3
+migration completed during normal database open. `dictListSources()` returned all four original counts
+(JMdict EN **524,106**, JMdict RU **101,843**, Moedict **71,888**, Kanjium pitch **0** term rows) with the
+expected CC BY-SA 4.0 / CC BY-ND 3.0 TW notices and source attributions. The bridge error ring was empty. Both
+process trees started by this hop were enumerated and stopped; no userData backup or input automation was used.
+
+Gates: full Vitest **578 passed / 1 skipped files; 7,616 passed / 6 skipped tests**; i18n **9,487 keys**
+complete; architecture **1,789 modules / 18 known findings / 2 pending**, nothing new; focused schema/migration
+coverage **2 files / 47 tests passed**; touched-path ESLint passed.
+
+Retrospective decision-blocker sweep increment: the boss-audit tail has no unaddressed finding. The historical
+dictionary utility-process/root-build blocker and Vitest TSX-glob permission blocker are implemented at HEAD;
+Seanime's architecture, i18n, and root-config choices are recorded resolved. Translator Settings placement,
+offline-Agent scope, and localStorage hardening are reversible later-stage choices now covered by standing
+approval when dependency order reaches them. Publication and live personal-account checks remain genuinely
+external. The archive-wide sweep is not yet exhaustive, so `retrospectiveComplete` remains false. Track 2 stays
+active; next re-derive remaining deep-search, character/workbench, and find-in-the-wild gaps from current source.

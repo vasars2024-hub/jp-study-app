@@ -102,6 +102,37 @@ describe('dictionary database — opening and migrating', () => {
     again.close();
   });
 
+  it('backfills provenance for app-owned legacy sources without overwriting user metadata', () => {
+    db.prepare(`
+      insert into dictionaries (id, title, source_lang, target_langs, licence, attribution)
+      values (?, ?, 'ja', 'en', ?, ?)
+    `).run('bundled-jmdict-en', 'JMdict', null, null);
+    db.prepare(`
+      insert into dictionaries (id, title, source_lang, target_langs, licence, attribution)
+      values (?, ?, 'ja', 'en', ?, ?)
+    `).run('bundled-moedict-zh', 'Moedict', 'Custom licence', 'Custom attribution');
+    db.prepare(`
+      insert into dictionaries (id, title, source_lang, target_langs, licence, attribution)
+      values (?, ?, 'ja', 'en', ?, ?)
+    `).run('user-jmdict-copy', 'JMdict copy', null, null);
+
+    db.pragma('user_version = 2');
+    expect(migrateDictionaryDb(db)).toBe(3);
+
+    expect(db.prepare('select licence, attribution from dictionaries where id = ?').get('bundled-jmdict-en')).toEqual({
+      licence: 'CC BY-SA 4.0',
+      attribution: 'JMdict — Electronic Dictionary Research and Development Group (EDRDG) — https://www.edrdg.org/jmdict/j_jmdict.html',
+    });
+    expect(db.prepare('select licence, attribution from dictionaries where id = ?').get('bundled-moedict-zh')).toEqual({
+      licence: 'Custom licence',
+      attribution: 'Custom attribution',
+    });
+    expect(db.prepare('select licence, attribution from dictionaries where id = ?').get('user-jmdict-copy')).toEqual({
+      licence: null,
+      attribution: null,
+    });
+  });
+
   it('reports the failing step and leaves the version behind when a migration throws', () => {
     const broken = openDictionaryDb({ dir: path.join(tempRoot, 'broken') });
     broken.pragma('user_version = 0');
