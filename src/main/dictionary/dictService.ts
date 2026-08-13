@@ -87,10 +87,35 @@ export interface LookupEntry {
   fuzzyDistance?: number;
 }
 
+export interface CharacterSource {
+  dictId: string;
+  dictTitle: string;
+  licence?: string;
+  attribution?: string;
+}
+
+/** Grounded metadata for a single-character query, when an enabled source supplies it. */
+export interface CharacterLookup {
+  lang: string;
+  char: string;
+  strokes?: number;
+  radical?: string;
+  components: string[];
+  readings: string[];
+  meanings: string[];
+  jlpt?: string;
+  hsk?: string;
+  grade?: number;
+  frequency?: number;
+  sources: CharacterSource[];
+}
+
 export interface LookupResult {
   query: string;
   detectedLangs: DictLangCode[];
   entries: LookupEntry[];
+  /** Present only for an exact one-character query backed by an enabled source. */
+  character?: CharacterLookup;
 }
 
 // ----- language detection ----------------------------------------------------
@@ -412,7 +437,13 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
   // guessing a language at import time and making the dictionary unreachable
   // whenever that guess is wrong.
   const searchLangs = detected.includes('und') ? detected : [...detected, 'und'];
-  const result: LookupResult = { query: text, detectedLangs: detected, entries: [] };
+  const result: LookupResult = {
+    query: text,
+    detectedLangs: detected,
+    entries: [],
+    ...([...text].length === 1 ? { character: lookupCharacter(db, text, detected) } : {}),
+  };
+  if (!result.character) delete result.character;
   if (!text) return result;
 
   const seen = new Set<number>();
@@ -586,6 +617,80 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
   result.entries.sort(compareLookupEntries);
   result.entries = result.entries.slice(0, limit);
   return result;
+}
+
+/**
+ * Read the normalized character projection without trusting disabled sources.
+ *
+ * `chars` is deliberately a merged projection, so provenance is resolved back
+ * through `dictionaries`: a disabled dictionary neither makes the character
+ * visible nor remains in the returned attribution list.
+ */
+export function lookupCharacter(
+  db: SqliteDb,
+  char: string,
+  sourceLangs: readonly string[] = detectQueryLangs(char),
+): CharacterLookup | undefined {
+  if ([...char].length !== 1 || sourceLangs.length === 0) return undefined;
+  const placeholders = sourceLangs.map(() => '?').join(',');
+  const rows = db.prepare(`
+    select lang, char, strokes, radical, components, readings, meanings, jlpt, hsk, grade, freq, source_ids
+    from chars
+    where char = ? and lang in (${placeholders})
+    order by case lang when 'ja' then 0 when 'zh' then 1 else 2 end
+  `).all(char, ...sourceLangs) as Array<{
+    lang: string; char: string; strokes: number | null; radical: string | null;
+    components: string; readings: string; meanings: string; jlpt: string | null;
+    hsk: string | null; grade: number | null; freq: number | null; source_ids: string;
+  }>;
+
+  for (const row of rows) {
+    const ids = jsonStringArray(row.source_ids);
+    if (ids.length === 0) continue;
+    const sourceSlots = ids.map(() => '?').join(',');
+    const sourceRows = db.prepare(`
+      select id, title, licence, attribution
+      from dictionaries
+      where enabled = 1 and id in (${sourceSlots})
+    `).all(...ids) as Array<{
+      id: string; title: string; licence: string | null; attribution: string | null;
+    }>;
+    const byId = new Map(sourceRows.map((source) => [source.id, source]));
+    const sources = ids.flatMap((id) => {
+      const source = byId.get(id);
+      return source ? [{
+        dictId: source.id,
+        dictTitle: source.title,
+        ...(source.licence ? { licence: source.licence } : {}),
+        ...(source.attribution ? { attribution: source.attribution } : {}),
+      }] : [];
+    });
+    if (sources.length === 0) continue;
+    return {
+      lang: row.lang,
+      char: row.char,
+      ...(row.strokes != null ? { strokes: row.strokes } : {}),
+      ...(row.radical ? { radical: row.radical } : {}),
+      components: jsonStringArray(row.components),
+      readings: jsonStringArray(row.readings),
+      meanings: jsonStringArray(row.meanings),
+      ...(row.jlpt ? { jlpt: row.jlpt } : {}),
+      ...(row.hsk ? { hsk: row.hsk } : {}),
+      ...(row.grade != null ? { grade: row.grade } : {}),
+      ...(row.freq != null ? { frequency: row.freq } : {}),
+      sources,
+    };
+  }
+  return undefined;
+}
+
+function jsonStringArray(value: string): string[] {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+  } catch {
+    return [];
+  }
 }
 
 /**

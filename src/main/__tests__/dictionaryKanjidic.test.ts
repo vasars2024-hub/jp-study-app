@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { openDictionaryDb, type SqliteDb } from '../dictionary/db';
 import { importKanjidic } from '../dictionary/importers/kanjidic';
 import { removeDictionarySource } from '../dictionary/service';
+import { lookup } from '../dictionary/dictService';
 
 const XML = `<?xml version="1.0"?><kanjidic2><character><literal>猫</literal><misc><grade>8</grade><stroke_count>11</stroke_count><freq>1702</freq><jlpt>2</jlpt></misc><radical><rad_value rad_type="classical">94</rad_value></radical><reading_meaning><rmgroup><reading r_type="ja_on">ビョウ</reading><reading r_type="ja_kun">ねこ</reading><meaning>cat</meaning><meaning m_lang="ru">кошка</meaning></rmgroup></reading_meaning></character></kanjidic2>`;
 
@@ -21,6 +22,33 @@ describe('KANJIDIC2 importer', () => {
       primary_source_id: 'kanjidic-fixture', source_ids: '["kanjidic-fixture"]',
     });
     expect(db.prepare(`select dict_id, char from char_sources where char='猫'`).get()).toEqual({ dict_id: 'kanjidic-fixture', char: '猫' });
+  });
+
+  it('returns grounded character metadata only while its source is enabled', () => {
+    importKanjidic(db, XML, { dictId: 'kanjidic-fixture' });
+
+    expect(lookup(db, { text: '猫', sourceLangs: ['ja'], glossLangs: ['en'] }).character).toEqual({
+      lang: 'ja',
+      char: '猫',
+      strokes: 11,
+      radical: '94',
+      components: [],
+      readings: ['ビョウ', 'ねこ'],
+      meanings: ['cat', 'кошка'],
+      jlpt: '2',
+      grade: 8,
+      frequency: 1702,
+      sources: [{
+        dictId: 'kanjidic-fixture',
+        dictTitle: 'KANJIDIC2',
+        licence: 'CC BY-SA 4.0',
+        attribution: 'KANJIDIC2 — EDRDG',
+      }],
+    });
+
+    db.prepare(`update dictionaries set enabled = 0 where id = 'kanjidic-fixture'`).run();
+    expect(lookup(db, { text: '猫', sourceLangs: ['ja'] }).character).toBeUndefined();
+    expect(lookup(db, { text: '猫語', sourceLangs: ['ja'] }).character).toBeUndefined();
   });
 
   it('rolls the source and projection back on cancellation', () => {
