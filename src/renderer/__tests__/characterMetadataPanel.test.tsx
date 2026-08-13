@@ -91,4 +91,31 @@ describe('CharacterMetadataPanel', () => {
     expect(clearRect).toHaveBeenCalledWith(0, 0, 180, 180);
     expect(host.querySelector('output')).toBeNull();
   });
+
+  it('counts completed pen strokes against the grounded total and resets them', async () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => root?.render(<CharacterMetadataPanel character={{
+      lang: 'ja', char: '猫', strokes: 11, components: [], readings: [], meanings: [], sources: [],
+    }} />));
+
+    const canvas = host.querySelector('canvas');
+    expect(canvas).not.toBeNull();
+    if (!canvas) throw new Error('Expected the handwriting canvas to render.');
+    Object.assign(canvas, { setPointerCapture: vi.fn(), releasePointerCapture: vi.fn() });
+    expect(host.querySelector('.lexicon-character-practice-strokes')?.textContent)
+      .toBe('lexicon.character.strokes: 0 / 11');
+
+    await act(async () => {
+      canvas.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+      canvas.dispatchEvent(new Event('pointerup', { bubbles: true }));
+    });
+    expect(host.querySelector('.lexicon-character-practice-strokes')?.textContent)
+      .toBe('lexicon.character.strokes: 1 / 11');
+
+    await act(async () => host.querySelector<HTMLButtonElement>('.lexicon-character-practice-actions button')?.click());
+    expect(host.querySelector('.lexicon-character-practice-strokes')?.textContent)
+      .toBe('lexicon.character.strokes: 0 / 11');
+  });
 });

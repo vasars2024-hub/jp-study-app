@@ -3,11 +3,18 @@ import { useT } from '../../i18n';
 
 const SIZE = 180;
 
-export default function CharacterWritingPractice({ target }: { target: string }) {
+export default function CharacterWritingPractice({
+  target,
+  expectedStrokes,
+}: {
+  target: string;
+  expectedStrokes?: number;
+}) {
   const { t } = useT();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
   const [result, setResult] = useState('');
+  const [strokeCount, setStrokeCount] = useState(0);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     const context = canvasRef.current?.getContext('2d');
@@ -20,6 +27,7 @@ export default function CharacterWritingPractice({ target }: { target: string })
     if (!canvas || !context) return;
     context.clearRect(0, 0, SIZE, SIZE);
     setResult('');
+    setStrokeCount(0);
   };
   const point = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -43,12 +51,17 @@ export default function CharacterWritingPractice({ target }: { target: string })
       <div className="lexicon-character-practice-heading">
         <strong>{t('manga.hw.title')}</strong>
         <span lang="ja">{target}</span>
+        {expectedStrokes !== undefined && (
+          <span className="lexicon-character-practice-strokes">
+            {t('lexicon.character.strokes')}: {strokeCount} / {expectedStrokes}
+          </span>
+        )}
       </div>
       <canvas ref={canvasRef} width={SIZE} height={SIZE} className="lexicon-character-practice-canvas"
         aria-label={t('manga.hw.title')}
         onPointerDown={(event) => { drawing.current = true; event.currentTarget.setPointerCapture(event.pointerId); const p = point(event); const c = event.currentTarget.getContext('2d'); c?.beginPath(); c?.moveTo(p.x, p.y); }}
         onPointerMove={(event) => { if (!drawing.current) return; const p = point(event); const c = event.currentTarget.getContext('2d'); if (c) { c.lineTo(p.x, p.y); c.stroke(); } }}
-        onPointerUp={(event) => { drawing.current = false; event.currentTarget.releasePointerCapture(event.pointerId); }}
+        onPointerUp={(event) => { if (drawing.current) setStrokeCount((count) => count + 1); drawing.current = false; event.currentTarget.releasePointerCapture(event.pointerId); }}
         onPointerCancel={(event) => { drawing.current = false; event.currentTarget.releasePointerCapture(event.pointerId); }} />
       <div className="lexicon-character-practice-actions">
         <button type="button" className="btn small" onClick={clear}>{t('manga.hw.clear')}</button>
