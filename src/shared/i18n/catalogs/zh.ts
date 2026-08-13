@@ -8429,5 +8429,17 @@ export const zh: Catalog = {
   'dict.saved.title': '已保存的搜索',
   'dict.saved.save': '保存搜索',
   'dict.saved.remove': '删除已保存的搜索',
+  'lexicon.character.title': '字符信息',
+  'lexicon.character.grounded': '基于已启用的词典来源',
+  'lexicon.character.strokes': '笔画',
+  'lexicon.character.radical': '部首',
+  'lexicon.character.components': '构件',
+  'lexicon.character.jlpt': 'JLPT 等级',
+  'lexicon.character.hsk': 'HSK 等级',
+  'lexicon.character.grade': '年级',
+  'lexicon.character.frequency': '词频排名',
+  'lexicon.character.readings': '读音',
+  'lexicon.character.meanings': '释义',
+  'lexicon.character.sources': '来源（{count}）',
 };
 

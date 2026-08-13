@@ -17623,3 +17623,47 @@ and belong to the subtitle track, not to this change.
 Staging note: `preload.ts`, `window.d.ts`, the four i18n catalogs and this ledger all carry other tracks'
 uncommitted hunks. Those six were staged as HEAD-plus-this-hop's-edit reconstructed blobs rather than
 `git add`; the working tree keeps the foreign work untouched.
+
+## Track 2 — grounded character facts reach the Workbench — 2026-08-13 23:58 MSK
+
+Re-derivation started from the current plan and source, not the prior hop's closing sentence. The
+SQLite lookup and legacy `DictResult` contract already carried enabled-source character metadata,
+but the renderer consumed none of it: exact character lookup still looked identical to an ordinary
+headword search. This slice closes that boundary with `CharacterMetadataPanel`, mounted in the
+existing `DictionaryResults` path used by the Lexicon Workbench and dictionary compatibility route.
+
+The panel shows only fields actually returned by the database: strokes, radical, components,
+readings, meanings, JLPT/HSK, school grade and frequency. Missing values produce no placeholder.
+Every contributing dictionary remains visible as an ordered source row with its licence and
+attribution. This deliberately does not claim stroke animation, handwriting practice or a
+decomposition diagram: the current contract does not contain the geometry needed to ground those
+features. Twelve new chrome keys are translated in all four catalogs.
+
+Standing-approval decision: extend the existing result composition with one stable, reusable facts
+panel rather than add another lookup, IPC channel or model explanation. It is additive, reversible,
+offline-first, and preserves the source enable/disable boundary established by the service.
+
+Live Electron acceptance used one fresh Forge process owned by this hop and the authenticated debug
+bridge only. A real lookup for 猫 returned the expected JMdict/Moedict entries and no `character`
+field because the installed profile has no enabled character dataset; the UI therefore rendered no
+misleading empty panel. In the same real Vite renderer, the production panel was mounted with a
+bounded contract fixture and rendered 猫, 11 strokes, 犬, 犭/苗, both readings, level/frequency facts,
+and the KANJIDIC2 licence plus attribution. The bridge error ring remained empty. The probe DOM and
+globals were removed. All 13 processes in the owned Forge tree were enumerated and are no longer
+running; one child exited between enumeration and `Stop-Process`, and the follow-up process query
+confirmed the tree empty.
+
+Gates: full Vitest **579 passed / 1 skipped files; 7,634 passed / 6 skipped tests**; i18n **9,504
+keys** complete; architecture **1,791 modules / 18 known findings / 2 pending**, nothing new; touched-
+path ESLint passed. Focused character/lookup coverage: **2 files / 62 tests passed**.
+
+Retrospective decision-blocker sweep increment: the latest boss-audit mutation/live/attribution
+findings are closed at HEAD. The historical utility-process and root-build permission choice,
+cancel-marker evidence gap, bundled-provenance migration choice, pair-priority architecture choice,
+and character-service/contract choices are implemented and verified. Later translator placement,
+offline-Agent scope, localStorage hardening, Workbench interaction composition and Anki parity
+choices are reversible internal decisions covered by standing approval when dependency order reaches
+them. Publication, purchases, personal credentials and third-party availability remain genuinely
+external. The archive-wide retrospective is not yet exhaustive, so `retrospectiveComplete` remains
+false. Track 2 remains active; next re-derive the remaining character practice/decomposition and
+find-in-the-wild gaps against current source.

@@ -8874,6 +8874,18 @@ export const en: Catalog = {
   'dict.saved.title': 'Saved searches',
   'dict.saved.save': 'Save search',
   'dict.saved.remove': 'Remove saved search',
+  'lexicon.character.title': 'Character facts',
+  'lexicon.character.grounded': 'Grounded in enabled dictionary sources',
+  'lexicon.character.strokes': 'Strokes',
+  'lexicon.character.radical': 'Radical',
+  'lexicon.character.components': 'Components',
+  'lexicon.character.jlpt': 'JLPT',
+  'lexicon.character.hsk': 'HSK',
+  'lexicon.character.grade': 'School grade',
+  'lexicon.character.frequency': 'Frequency rank',
+  'lexicon.character.readings': 'Readings',
+  'lexicon.character.meanings': 'Meanings',
+  'lexicon.character.sources': 'Sources ({count})',
 };
 
 

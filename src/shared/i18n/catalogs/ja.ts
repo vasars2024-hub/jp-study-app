@@ -8464,5 +8464,17 @@ export const ja: Catalog = {
   'dict.saved.title': '保存した検索',
   'dict.saved.save': '検索を保存',
   'dict.saved.remove': '保存した検索を削除',
+  'lexicon.character.title': '文字情報',
+  'lexicon.character.grounded': '有効な辞書ソースに基づく情報',
+  'lexicon.character.strokes': '画数',
+  'lexicon.character.radical': '部首',
+  'lexicon.character.components': '構成要素',
+  'lexicon.character.jlpt': '日本語能力試験',
+  'lexicon.character.hsk': '漢語水平考試',
+  'lexicon.character.grade': '学年',
+  'lexicon.character.frequency': '頻度順位',
+  'lexicon.character.readings': '読み',
+  'lexicon.character.meanings': '意味',
+  'lexicon.character.sources': '出典（{count}）',
 };
 

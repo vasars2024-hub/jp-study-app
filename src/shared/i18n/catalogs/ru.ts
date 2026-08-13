@@ -9254,5 +9254,17 @@ export const ru: Catalog = {
   'dict.saved.title': 'Сохранённые запросы',
   'dict.saved.save': 'Сохранить запрос',
   'dict.saved.remove': 'Удалить сохранённый запрос',
+  'lexicon.character.title': 'Сведения об иероглифе',
+  'lexicon.character.grounded': 'Данные из включённых словарных источников',
+  'lexicon.character.strokes': 'Черты',
+  'lexicon.character.radical': 'Ключ',
+  'lexicon.character.components': 'Компоненты',
+  'lexicon.character.jlpt': 'Уровень JLPT',
+  'lexicon.character.hsk': 'Уровень HSK',
+  'lexicon.character.grade': 'Школьный класс',
+  'lexicon.character.frequency': 'Ранг частотности',
+  'lexicon.character.readings': 'Чтения',
+  'lexicon.character.meanings': 'Значения',
+  'lexicon.character.sources': 'Источники ({count})',
 };
 

@@ -29,6 +29,7 @@ import { glossForLangFromEntries } from '../../shared/fieldRouter';
 import { recordDictionaryEntry } from '../clipboardHistory';
 import { recordLookup } from '../lookupHistory';
 import { useT } from '../i18n';
+import CharacterMetadataPanel from './lexicon/CharacterMetadataPanel';
 
 type TFn = (key: string) => string;
 
@@ -815,6 +816,8 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
           </span>
         </div>
       )}
+
+      {result?.character && <CharacterMetadataPanel character={result.character} />}
 
       <div className="dict-entries">
         {entries.map((entry, i) => {
