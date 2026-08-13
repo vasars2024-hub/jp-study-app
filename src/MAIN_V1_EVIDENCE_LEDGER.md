@@ -15772,3 +15772,14 @@ rediscovered as defects: a substitution or transposition inside the **first two 
 out of reach of the prefix probe by design, and the gloss (reverse) direction has no fuzzy pass at
 all. Re-derive the next bounded gap among safe cancellable imports, missing source formats, source
 controls, cross-source deduplication or saved searches; do not move to Track 3 yet.
+
+Checked detached as well, because reconstructed catalog blobs are only trustworthy when the
+commit is exercised without the shared tree around it. A junctioned worktree at `57684a0` ran
+`node tools/i18n-check.cjs` to **9,263 committed keys** complete (exit 0),
+`node tools/architecture-audit.cjs` to nothing new with the same two pending (exit 0), and the
+three focused suites to **58/58**. The first attempt at this commit was made with
+`git commit --only -- <paths>`, which re-stages from the working tree and silently replaced the
+reconstructed blobs with the shared tree's — it landed 3,055 insertions of another track's
+catalog work. It was reset with `git reset --mixed` before anything else touched it and remade
+from the index alone. **Do not pass a pathspec to `git commit` in this repo**; stage
+deliberately, then commit with no paths at all.
