@@ -15898,3 +15898,17 @@ threading decision in it, which is why it is not bolted onto this one; an IPC ha
 surface would only move the dead end one layer outward. Two limits here are deliberate and should
 not be rediscovered as defects: no `xrefs`/`etymology` rows until something reads them, and no
 cancellation for CC-CEDICT or the legacy migration.
+
+### Detached verification of `4026e87`
+
+Checked without the shared tree around it, because every gate above ran in situ on a working tree
+carrying several hundred other-track paths and that cannot distinguish "this commit is green" from
+"the tree it sat in was green". A junctioned worktree at `4026e87` ran
+`node tools/i18n-check.cjs` to **9,263 committed keys** complete (exit 0, unchanged — the slice
+touches no catalog), `node tools/architecture-audit.cjs` to **1,706 modules** with nothing new and
+the same 2 pending (1,704 at the parent plus the two files this commit adds, so the import graph is
+closed at the commit and not merely in the dirty tree), and the six dictionary suites —
+wiktextract, lookup, cedict, migrate, db, chineseLookup — to **142/142**. The junction was deleted
+before `git worktree remove` so the real `node_modules` was not taken with it, and `esbuild`
+survives. The commit was staged path by path and committed with **no pathspec**, per the trap the
+previous hop recorded.
