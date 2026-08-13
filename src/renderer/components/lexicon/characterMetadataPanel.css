@@ -58,6 +58,28 @@
   margin-top: 10px;
 }
 
+.lexicon-character-decomposition {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.lexicon-character-components {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.lexicon-character-components span {
+  min-width: 2.25rem;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  font-size: 1.2rem;
+  text-align: center;
+}
+
 .lexicon-character-sources {
   margin-top: 14px;
 }

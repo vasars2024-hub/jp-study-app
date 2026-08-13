@@ -52,6 +52,16 @@ export default function CharacterMetadataPanel({ character }: Props) {
           ))}
         </dl>
       )}
+      {character.components.length > 0 && (
+        <div className="lexicon-character-decomposition" aria-label={t('lexicon.character.components')}>
+          <strong>{t('lexicon.character.components')}</strong>
+          <div className="lexicon-character-components" lang={character.lang}>
+            {character.components.map((component, index) => (
+              <span key={`${component}-${index}`} aria-label={component}>{component}</span>
+            ))}
+          </div>
+        </div>
+      )}
       {character.readings.length > 0 && (
         <div className="lexicon-character-list">
           <strong>{t('lexicon.character.readings')}</strong>

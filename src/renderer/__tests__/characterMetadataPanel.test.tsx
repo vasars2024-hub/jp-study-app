@@ -42,6 +42,7 @@ describe('CharacterMetadataPanel', () => {
     expect(host.textContent).toContain('猫');
     expect(host.textContent).toContain('11');
     expect(host.textContent).toContain('犭 · 苗');
+    expect(host.querySelector('.lexicon-character-components')?.textContent).toContain('犭');
     expect(host.textContent).toContain('ビョウ · ねこ');
     expect(host.textContent).toContain('KANJIDIC2');
     expect(host.textContent).toContain('CC BY-SA 4.0');
