@@ -89,7 +89,7 @@ describe('Agent context suggestions', () => {
     });
   });
 
-  it('gives dictionary explanations a bounded evidence, grammar, usage, mistakes, etymology, collocation, and comparison contract', () => {
+  it('gives dictionary explanations a bounded evidence, grammar, usage, mistakes, etymology, mnemonic, collocation, and comparison contract', () => {
     const [suggestion] = deriveAgentContextSuggestions(conversation([
       context('dictionary-new', 'dictionary-entry', 'Dictionary'),
     ]), DEFAULT_AGENT_CONTEXT_SUGGESTION_PREFERENCES);
@@ -115,6 +115,10 @@ describe('Agent context suggestions', () => {
     expect(prompt).toContain('separate attested historical origin from a modern memory aid or folk etymology');
     expect(prompt).toContain('Do not infer origin from the current spelling alone.');
     expect(prompt).toContain('label it uncertain and say what kind of source would be needed to verify it');
+    expect(prompt).toContain('In Mnemonic');
+    expect(prompt).toContain('Label it explicitly as an invented learning aid, not etymology or evidence.');
+    expect(prompt).toContain('Do not encode a false pronunciation, spelling, component meaning, or cultural claim');
+    expect(prompt).toContain('no reliable mnemonic is available');
     expect(prompt).toContain('Compare at most two similar words.');
     expect(prompt).toContain('quote the exact word or phrase');
     expect(prompt).toContain('general language knowledge');

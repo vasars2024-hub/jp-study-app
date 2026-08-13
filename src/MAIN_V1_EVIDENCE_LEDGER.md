@@ -15326,3 +15326,38 @@ Track 2 remains open. Mnemonics and graded examples remain as adjacent structure
 explicit explanation-language selection, caching and batch explanation also remain. Re-derive the
 next bounded slice from source, keep mnemonic usefulness separate from historical truth, and keep
 execution in the centralized Agent.
+
+## Mnemonics are learning aids, never disguised language facts — 2026-08-13
+
+Relay hop, `codexB`. Track 2. The latest boss-audit section hands off no unresolved regression,
+and the final ledger section made mnemonics the next bounded, decision-free Contextual Explain
+facet rather than the launcher's stale OCR hint.
+
+The central Agent's Dictionary suggestion now includes a separate **Mnemonic** section. It asks
+for one concise aid tied to the requested meaning or usage and requires it to be labelled as an
+invented learning aid, never etymology or evidence. A mnemonic may not encode a false
+pronunciation, spelling, component meaning, or cultural claim; when a safe aid would require one,
+the answer must say that no reliable mnemonic is available. The existing context-as-data,
+evidence, uncertainty, etymology, grammar, usage, collocation, mistake and comparison boundaries
+remain in force. This is model-facing prompt text only: no UI copy, provider, persistence,
+privacy, budget or second execution path was added, and requesting a mnemonic is not proof that a
+provider's aid is correct or useful.
+
+Live Electron acceptance used one fresh Forge process owned by this hop and the authenticated
+debug bridge only. The stale bridge record refused connections and port 5173 belonged to a
+separate Vite listener, so Forge selected 5174. Importing the real shared builder through the
+renderer returned the mnemonic section plus the invented-aid, false-form/cultural-claim and safe
+fallback rules for `猫が来た。`. The bridge error ring contained **0** entries. The temporary probe
+global was deleted, no model request ran, and no user state was written. All 11 processes in this
+hop's recorded process tree were stopped and verified absent; the unrelated 5173 listener was not
+touched.
+
+Verification on the shared tree: focused suggestion tests **6/6**. Full literal `npx vitest run`:
+**566 files passed / 1 skipped, 7,514 tests passed / 6 skipped**. `node tools/i18n-check.cjs`:
+**9,430 keys** complete. `node tools/architecture-audit.cjs`: **1,764 modules**, nothing new, the
+same two pending. ESLint over the two touched TS paths: **0 errors, 0 warnings**.
+
+Track 2 remains open. Graded examples are the next adjacent structured facet; explicit
+explanation-language selection, caching and batch explanation also remain. Re-derive the next
+bounded slice from source, require examples to disclose their generated status and level criteria,
+and keep execution in the centralized Agent.
