@@ -3,6 +3,8 @@ export interface DictionarySourceInfo {
   title: string;
   kind: string;
   sourceLang: string;
+  licence: string;
+  attribution: string;
   entryCount: number;
   enabled: boolean;
   priority: number;

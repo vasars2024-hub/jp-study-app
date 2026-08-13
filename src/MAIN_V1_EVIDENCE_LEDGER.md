@@ -17211,3 +17211,23 @@ Retrospective sweep increment: Tatoeba's paired-file API and atomicity were reve
 decisions now closed under standing approval. The archive-wide sweep is still not exhaustive, so
 `retrospectiveComplete` remains false. Track 2 remains active: next re-derive bundled/user-licensed
 source coverage and remaining merge/search/workbench capabilities.
+
+## Track 2 — imported-source provenance reaches Settings — 2026-08-13 18:36 MSK
+
+The source plan requires the Dictionary sources panel to discharge each dataset's licence and
+attribution obligation. Re-derivation found that every relevant importer already persisted both
+columns, and source enable/priority/remove controls were complete, but `DictionarySourceInfo`
+discarded the columns before they reached Settings. The smallest reversible fix widens that
+existing read-only contract and renders non-empty licence/attribution beside the source metadata;
+it adds no new persistence or importer path and exposes no file contents.
+
+Focused source/character tests pass **2 files / 4 tests**, including an explicit provenance
+round-trip assertion. Path-scoped ESLint, i18n (**9,487 keys**) and architecture (**1,789 modules,
+18 known findings / 2 pending, nothing new**) are green. The prior Tatoeba live debt remains: the
+bridge record points to a dead process, so no live acceptance is claimed in this checkpoint.
+
+Retrospective sweep increment: licence-encumbered sources were already decided as "importer ships,
+data does not" in the professional plan; standing approval requires no further user decision.
+External publication, purchase, credential, or user-data deletion is not involved. The historical
+sweep remains incomplete, so `retrospectiveComplete` remains false. Track 2 remains active at
+bundled-source provisioning and the remaining merge/search/workbench capability ladder.

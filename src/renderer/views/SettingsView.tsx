@@ -273,7 +273,15 @@ export function DictionarySettingsSection() {
               <label className="dict-manage-toggle" title={t('settings.study.dict.useTitle')}>
                 <input type="checkbox" checked={source.enabled} onChange={(event) => void updateSource(window.api.dictSetSourceEnabled(source.id, event.target.checked))} />
               </label>
-              <div className="dict-manage-info"><div className="set-row-title">{source.title}</div><div className="set-row-desc muted">{source.sourceLang} · {source.kind} · {source.entryCount.toLocaleString(LANG_TAGS[lang])}</div></div>
+              <div className="dict-manage-info">
+                <div className="set-row-title">{source.title}</div>
+                <div className="set-row-desc muted">{source.sourceLang} · {source.kind} · {source.entryCount.toLocaleString(LANG_TAGS[lang])}</div>
+                {(source.licence || source.attribution) && (
+                  <div className="set-row-desc muted">
+                    {[source.licence, source.attribution].filter(Boolean).join(' · ')}
+                  </div>
+                )}
+              </div>
               <div className="dict-manage-actions">
                 <button className="btn small" title={t('settings.study.dict.higherPriority')} disabled={index === 0} onClick={() => void updateSource(window.api.dictMoveSource(source.id, -1))}>↑</button>
                 <button className="btn small" title={t('settings.study.dict.lowerPriority')} disabled={index === sources.length - 1} onClick={() => void updateSource(window.api.dictMoveSource(source.id, 1))}>↓</button>

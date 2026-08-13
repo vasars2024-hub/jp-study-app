@@ -74,13 +74,14 @@ export interface DictionaryStatus {
 
 export function listDictionarySources(db: SqliteDb = dictionaryDb()): DictionarySourceInfo[] {
   const rows = db.prepare(
-    'select id, title, kind, source_lang, entry_count, enabled, priority from dictionaries order by priority, id',
+    'select id, title, kind, source_lang, licence, attribution, entry_count, enabled, priority from dictionaries order by priority, id',
   ).all() as Array<{
-    id: string; title: string; kind: string; source_lang: string;
+    id: string; title: string; kind: string; source_lang: string; licence: string; attribution: string;
     entry_count: number; enabled: number; priority: number;
   }>;
   return rows.map((row) => ({
     id: row.id, title: row.title, kind: row.kind, sourceLang: row.source_lang,
+    licence: row.licence, attribution: row.attribution,
     entryCount: row.entry_count, enabled: row.enabled !== 0, priority: row.priority,
   }));
 }
