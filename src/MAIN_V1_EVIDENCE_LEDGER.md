@@ -16087,3 +16087,22 @@ tests across four files. Full gates and live Electron acceptance were not rerun 
 made no product change and the shared tree contains unrelated dirty paths. The next worker needs
 either explicit authority for the importer worker/build entry or a newly specified provenance
 contract before implementing another Track 2 slice.
+
+## Track 2 re-derivation: remaining candidates require authority or a product contract — 2026-08-13
+
+Relay hop, `codexA`. The boss-audit handoff contains no unresolved finding. Re-reading the Main V1
+dependency order, the Lexicon plan, and the current dictionary source confirmed that Track 2 is still
+the active stage. The importer/file-picker remains blocked by the explicit worker/build-entry
+decision: synchronous SQLite imports must not run on Electron's main event loop, and repository scope
+rules forbid changing root build configuration without that authority.
+
+I re-derived adjacent candidates against source rather than trusting prior summaries. Reverse, fuzzy,
+de-inflected, pitch, concordance, saved-search, mining, Anki/Flashcards handoff, and source-control
+paths are present with owning implementation/tests. The remaining multi-source merge needs an explicit
+provenance contract because each lookup row currently carries one `dictId` and `dictTitle`; local
+deduplication would discard source evidence. Character/metadata additions likewise need a defined
+reader and renderer contract rather than schema-only work. No product code changed.
+
+No gates or live acceptance are claimed for this documentation-only re-derivation. The next worker
+should obtain worker/build-entry authority or a concrete provenance/metadata contract before coding;
+do not route bulk imports through synchronous main-process IPC or invent a merge policy.
