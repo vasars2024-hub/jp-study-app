@@ -15943,3 +15943,46 @@ forbidden. The next hop must invoke `dict:listSources`, toggle and restore one d
 and exercise the rendered Settings controls after a safe fresh restart. The main remaining Track 2
 slice is still the importer worker/progress/cancel decision and its real file-picker surface; source
 controls no longer belong on that list.
+
+## Unified dictionary source controls are now live-accepted — 2026-08-13
+
+Relay hop, `codexB`. Track 2 remains open. Re-derived from the final ledger section and the
+plan's dependency order; no later track was started. The boss audit's last section has no
+unresolved finding against this slice. The preceding checkpoint had complete source-control code
+and automated evidence but explicitly lacked a restarted-main acceptance, so this hop closed that
+evidence gap rather than pretending the blocked importer worker was safe to bolt onto main IPC.
+
+Started one fresh Forge process owned by this hop. Port 5173 was already occupied, so its renderer
+used 5174; the authenticated debug bridge was freshly rewritten for Electron PID 79104. Through
+the real preload and the restarted `ipcMain` handler, `window.api.dictListSources()` resolved to an
+empty array without error. That is the real state of this profile's SQLite dictionary database,
+not a fixture. Through DOM-driven React clicks over `/eval`, opened Settings, selected **Profile &
+dictionary**, and verified the rendered **Imported dictionary sources** section, its explanatory
+copy, and the honest **No unified dictionary sources have been imported yet** empty state. The
+existing first-run overlays did not block programmatic React events and were not dismissed, because
+dismissing them would write unrelated user preferences.
+
+The requested reversible mutation could not honestly run: there is no unified source row in this
+profile to toggle, reorder, or remove. No disposable row was manufactured in userData merely to
+make the proof look fuller, and no user data or setting was written. This proves the list handler,
+preload binding, renderer refresh, navigation, and empty-state UI in the built app; mutation remains
+covered by the focused real-SQLite regression from the preceding checkpoint, not by live evidence.
+The complete process tree started by this hop was enumerated and stopped; the unrelated listener on
+5173 was untouched.
+
+Required gates on the shared tree: full literal `npx vitest run` passed **568 files / 1 skipped,
+7,553 tests / 6 skipped**. `node tools/i18n-check.cjs` passed with **9,437 keys** complete.
+`node tools/architecture-audit.cjs` scanned **1,768 modules**, found nothing new, and retained the
+same two known pending findings. The preceding checkpoint's implementation-path ESLint command was
+re-run and reproduced only its already-recorded adjacent foreign-tree issues: two
+`adjacent-overload-signatures` errors in `renderer/window.d.ts` and seven `no-explicit-any`
+warnings in `main/dictionary.ts`, none introduced by this documentation-only hop. No product or
+catalog source was edited here.
+
+Track 2 is still open. The next product slice remains cooperative dictionary import with progress,
+cancel, restart safety, and a file-picker surface. It is blocked on an explicit build-configuration
+decision: `better-sqlite3` import work cannot run on Electron's main event loop, while every safe
+`utilityProcess`, worker-thread, or child-process implementation needs a new build entry, and the
+repository scope rule forbids changing Forge/Vite/root configuration without an explicit request.
+Do not route the synchronous import through IPC. Re-derive another adjacent decision-free Track 2
+gap if that authority is still absent.
