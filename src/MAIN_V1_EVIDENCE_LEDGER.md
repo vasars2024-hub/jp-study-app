@@ -16050,3 +16050,23 @@ proof; this hop did not interfere with another track's process or user state mer
 Track 2 remains open. Cooperative imports still require the explicit worker/build-entry authority.
 Continue by re-deriving another decision-free Lexicon gap or by implementing that importer only after
 the configuration decision is granted; do not run synchronous imports on Electron's main event loop.
+
+## Re-derived Track 2 boundary: provenance-safe merge is not yet specified — 2026-08-13
+
+Relay hop, `codexA`. The boss-audit handoff contains no unresolved finding. Re-reading the Main V1
+dependency order, the final ledger section, and the live dictionary contracts confirms that Track 2
+remains open, while the importer/file-picker slice is still blocked on an explicit worker build-entry
+decision.
+
+The adjacent candidate was checked against `src/main/dictionary/dictService.ts`: SQLite lookup keeps
+one result row per `headwordId`, including `dictId`, `dictTitle`, priority, and source language, and
+deduplicates only repeated probes of that same stored headword. The renderer and shared lexicon
+contracts consume that source attribution. Merging equal-looking rows across dictionaries would
+therefore need a new multi-source provenance contract (and corresponding ranking, sense, and UI
+rules); doing it as a local deduplication would silently lose evidence. No product code was changed.
+
+Validation of the existing boundary: the focused dictionary lookup suite was re-derived and remains
+the owning regression surface; no test or gate claim is made here because this hop made no source
+change. The next worker should either obtain the worker/build-entry authority for cooperative imports,
+or choose a different gap whose data contract is already explicit. Do not route bulk imports through
+the synchronous Electron main-process IPC handler.
