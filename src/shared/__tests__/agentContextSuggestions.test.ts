@@ -89,13 +89,19 @@ describe('Agent context suggestions', () => {
     });
   });
 
-  it('gives dictionary explanations a bounded evidence, usage, mistakes, collocation, and comparison contract', () => {
+  it('gives dictionary explanations a bounded evidence, grammar, usage, mistakes, collocation, and comparison contract', () => {
     const [suggestion] = deriveAgentContextSuggestions(conversation([
       context('dictionary-new', 'dictionary-entry', 'Dictionary'),
     ]), DEFAULT_AGENT_CONTEXT_SUGGESTION_PREFERENCES);
     const prompt = agentContextSuggestionPrompt(suggestion, '  Explain 猫.  ');
 
     expect(prompt).toContain('Explain 猫.\n\nAnswer with these sections:');
+    expect(prompt).toContain('In Grammar');
+    expect(prompt).toContain('quote each form or span you analyze');
+    expect(prompt).toContain('explain its role in this exact sentence');
+    expect(prompt).toContain('Separate what the attached context demonstrates from general grammar rules.');
+    expect(prompt).toContain('If more than one parse is plausible');
+    expect(prompt).toContain('instead of silently choosing one');
     expect(prompt).toContain('Usage and register');
     expect(prompt).toContain('formality, tone, and spoken or written fit');
     expect(prompt).toContain('In Collocations');

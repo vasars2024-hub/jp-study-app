@@ -15254,3 +15254,37 @@ warnings**.
 Track 2 remains open. Grammar is the next adjacent decision-free facet; explicit explanation-language
 selection, caching, batch explanation, etymology, mnemonics and graded examples also remain. Keep
 the work in the centralized Agent and preserve the evidence boundary when adding any facet.
+
+## Grammar explanations expose their parse and their evidence — 2026-08-13
+
+Relay hop, `codexB`. Track 2. The latest boss-audit section hands off no unresolved regression,
+and the final ledger section—not the launcher's stale OCR hint—made grammar the next bounded,
+decision-free Contextual Explain facet.
+
+The central Agent's Dictionary suggestion now includes a separate **Grammar** section. It requires
+every analyzed form or span to be quoted and its role explained in this exact sentence, separates
+what the attachment demonstrates from general grammar rules, and requires plausible alternative
+parses plus the context needed to resolve them instead of silently choosing one. The existing
+context-as-data, evidence, uncertainty, usage, collocation, mistake and similar-word boundaries
+remain in force. This is model-facing prompt text only: no UI copy, provider, persistence, privacy,
+budget or second execution path was added, and requesting a grammar analysis is not proof that a
+provider's parse is correct.
+
+Live Electron acceptance used one fresh Forge process owned by this hop and the authenticated
+debug bridge only. The existing bridge record was stale and port 5173 belonged to a separate Vite
+listener, so Forge selected 5174. Importing the real shared builder through the renderer returned
+the complete eight-section prompt for `猫が来た。` with every grammar span, sentence-role,
+source-boundary and ambiguity rule. The bridge error ring contained **0** entries. The temporary
+probe global was deleted, no model request ran, and no user state was written. All 13 processes in
+the recorded owned process tree were stopped; the unrelated 5173 listener was not touched.
+
+Verification on the shared tree: focused suggestion tests **6/6**. Full `npx vitest run
+--hookTimeout=60000`: **566 files passed / 1 skipped, 7,514 tests passed / 6 skipped**. `node
+tools/i18n-check.cjs`: **9,430 keys** complete. `node tools/architecture-audit.cjs`: **1,764
+modules**, nothing new, the same two pending. ESLint over the two touched TS paths: **0 errors, 0
+warnings**.
+
+Track 2 remains open. Etymology, mnemonics and graded examples remain as adjacent structured
+facets; explicit explanation-language selection, caching and batch explanation also remain. The
+next worker must re-derive which bounded slice is next, retain the distinction between attached
+evidence and general language knowledge, and keep execution in the centralized Agent.
