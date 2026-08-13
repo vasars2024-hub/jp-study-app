@@ -89,7 +89,7 @@ describe('Agent context suggestions', () => {
     });
   });
 
-  it('gives dictionary explanations a bounded evidence, usage, collocation, and comparison contract', () => {
+  it('gives dictionary explanations a bounded evidence, usage, mistakes, collocation, and comparison contract', () => {
     const [suggestion] = deriveAgentContextSuggestions(conversation([
       context('dictionary-new', 'dictionary-entry', 'Dictionary'),
     ]), DEFAULT_AGENT_CONTEXT_SUGGESTION_PREFERENCES);
@@ -100,6 +100,11 @@ describe('Agent context suggestions', () => {
     expect(prompt).toContain('formality, tone, and spoken or written fit');
     expect(prompt).toContain('In Collocations');
     expect(prompt).toContain('Do not claim that a single example proves frequency or exclusivity.');
+    expect(prompt).toContain('Common learner mistakes');
+    expect(prompt).toContain('distinguish an error actually visible in the attached context from a general caution');
+    expect(prompt).toContain('Never say the learner made a mistake unless you can quote the exact problematic form.');
+    expect(prompt).toContain('If the form is acceptable, say so');
+    expect(prompt).toContain('give a correction and explain the smallest relevant difference');
     expect(prompt).toContain('Compare at most two similar words.');
     expect(prompt).toContain('quote the exact word or phrase');
     expect(prompt).toContain('general language knowledge');

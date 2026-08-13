@@ -15221,3 +15221,36 @@ Track 2 remains open. The next bounded Contextual Explain work must be re-derive
 learner-mistake analysis or grammar is adjacent, while explicit explanation-language selection,
 caching, batch explanation, etymology, mnemonics and graded examples also remain. Do not treat this
 prompt shape as proof of model correctness, and keep all execution in the centralized Agent.
+
+## Learner-mistake guidance cannot invent a learner mistake — 2026-08-13
+
+Relay hop, `codexX`. Track 2. The latest boss audit has no unresolved regression, and the final
+ledger section—not the launcher's stale OCR hint—made learner-mistake analysis or grammar the next
+bounded Contextual Explain facet. This slice takes the smaller learner-mistake contract.
+
+The central Agent's Dictionary suggestion now includes a separate **Common learner mistakes**
+section. It must distinguish an error actually visible in the attached context from a general
+caution, and it may not tell the learner they made a mistake without quoting the exact problematic
+form. An acceptable form must be identified as acceptable; an unacceptable one gets a correction
+and the smallest relevant distinction. The existing context-as-data, exact-evidence,
+general-knowledge, uncertainty, usage, collocation and similar-word boundaries remain in force.
+This is model-facing prompt text only: no UI copy, provider, persistence, privacy, budget or second
+execution path was added, and requesting the section is not proof that a provider's answer is
+correct.
+
+Live Electron acceptance used one fresh process owned by this hop and the authenticated debug
+bridge only. Importing the real shared builder through the renderer produced all seven requested
+sections and the exact-evidence, acceptable-form and minimal-correction rules. The bridge error ring
+contained **0** entries. The temporary probe global was deleted, no model request ran, and no user
+state was written. Only the recorded process tree started by this hop was stopped and verified
+absent.
+
+Verification on the shared tree: focused suggestion tests **6/6**. Full `npx vitest run
+--hookTimeout=60000`: **566 files passed / 1 skipped, 7,514 tests passed / 6 skipped**. `node
+tools/i18n-check.cjs`: **9,430 keys** complete. `node tools/architecture-audit.cjs`: **1,764
+modules**, nothing new, the same two pending. ESLint over the two touched TS paths: **0 errors, 0
+warnings**.
+
+Track 2 remains open. Grammar is the next adjacent decision-free facet; explicit explanation-language
+selection, caching, batch explanation, etymology, mnemonics and graded examples also remain. Keep
+the work in the centralized Agent and preserve the evidence boundary when adding any facet.
