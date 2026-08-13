@@ -2114,6 +2114,8 @@ export const ja: Catalog = {
   'storage.dictionaryImport.kind.dsl.desc': 'ユーザー提供の .dsl 形式テキスト辞書です。',
   'storage.dictionaryImport.kind.jmnedict': 'JMnedict固有名詞辞書',
   'storage.dictionaryImport.kind.jmnedict.desc': 'JMnedict XMLの日本語固有名詞と読みをインポートします。',
+  'storage.dictionaryImport.kind.kanjidic': 'KANJIDIC2 漢字辞典',
+  'storage.dictionaryImport.kind.kanjidic.desc': 'KANJIDIC2 XMLから漢字の読み、意味、部首、級、頻度をインポートします。',
   'storage.dictionaryImport.kind.stardict': 'スターディクト',
   'storage.dictionaryImport.kind.stardict.desc': '非圧縮のStarDict 3.0辞書（.ifoと同じ場所にある.idxおよび.dictファイル）。',
   'storage.dictionaryImport.kind.legacy': '従来のYomitan辞書',
@@ -2670,11 +2672,13 @@ export const ja: Catalog = {
   'dialog.importDsl.title': 'Lingvo DSL辞書をインポート',
   'dialog.importJmnedict.title': 'JMnedict固有名詞をインポート',
   'dialog.importStardict.title': 'StarDict辞書をインポート',
+  'dialog.importKanjidic.title': 'KANJIDIC2漢字辞書をインポート',
   'dialog.filter.cedict': 'CC-CEDICT辞書',
   'dialog.filter.jsonl': 'JSONL形式',
   'dialog.filter.dsl': 'Lingvo DSL形式',
   'dialog.filter.jmnedict': 'JMnedict XML形式',
   'dialog.filter.stardict': 'StarDictインデックス',
+  'dialog.filter.kanjidic': 'KANJIDIC2 XMLファイル',
   'dialog.importAnkiDeck.title': 'Ankiデッキ（.apkg）をインポート',
   'dialog.filter.ankiDeck': 'Ankiデッキ',
 
@@ -8450,3 +8454,4 @@ export const ja: Catalog = {
   'dict.saved.save': '検索を保存',
   'dict.saved.remove': '保存した検索を削除',
 };
+

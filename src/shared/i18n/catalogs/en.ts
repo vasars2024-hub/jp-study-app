@@ -2233,6 +2233,8 @@ export const en: Catalog = {
   'storage.dictionaryImport.kind.dsl.desc': 'User-supplied text dictionary in .dsl format.',
   'storage.dictionaryImport.kind.jmnedict': 'JMnedict',
   'storage.dictionaryImport.kind.jmnedict.desc': 'Japanese proper names and readings from JMnedict XML.',
+  'storage.dictionaryImport.kind.kanjidic': 'KANJIDIC2',
+  'storage.dictionaryImport.kind.kanjidic.desc': 'Japanese character readings, meanings, radicals, levels, and frequency from KANJIDIC2 XML.',
   'storage.dictionaryImport.kind.stardict': 'StarDict',
   'storage.dictionaryImport.kind.stardict.desc': 'Uncompressed StarDict 3.0 dictionary (.ifo with sibling .idx and .dict files).',
   'storage.dictionaryImport.kind.legacy': 'Legacy Yomitan dictionaries',
@@ -2823,11 +2825,13 @@ export const en: Catalog = {
   'dialog.importDsl.title': 'Import Lingvo DSL dictionary',
   'dialog.importJmnedict.title': 'Import JMnedict names',
   'dialog.importStardict.title': 'Import StarDict dictionary',
+  'dialog.importKanjidic.title': 'Import KANJIDIC2 character dictionary',
   'dialog.filter.cedict': 'CC-CEDICT',
   'dialog.filter.jsonl': 'JSONL',
   'dialog.filter.dsl': 'Lingvo DSL',
   'dialog.filter.jmnedict': 'JMnedict XML',
   'dialog.filter.stardict': 'StarDict index',
+  'dialog.filter.kanjidic': 'KANJIDIC2 XML',
   'dialog.importAnkiDeck.title': 'Import an Anki deck (.apkg)',
   'dialog.filter.ankiDeck': 'Anki deck',
 
@@ -8860,4 +8864,5 @@ export const en: Catalog = {
   'dict.saved.save': 'Save search',
   'dict.saved.remove': 'Remove saved search',
 };
+
 

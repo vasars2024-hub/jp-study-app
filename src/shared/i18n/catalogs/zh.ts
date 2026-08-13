@@ -2105,6 +2105,8 @@ export const zh: Catalog = {
   'storage.dictionaryImport.kind.dsl.desc': '用户提供的 .dsl 格式文本词典。',
   'storage.dictionaryImport.kind.jmnedict': 'JMnedict 专有名词词典',
   'storage.dictionaryImport.kind.jmnedict.desc': '导入 JMnedict XML 中的日语专有名词和读音。',
+  'storage.dictionaryImport.kind.kanjidic': 'KANJIDIC2 汉字词典',
+  'storage.dictionaryImport.kind.kanjidic.desc': '从 KANJIDIC2 XML 导入日语汉字读音、释义、部首、等级和频率。',
   'storage.dictionaryImport.kind.stardict': '星际词典',
   'storage.dictionaryImport.kind.stardict.desc': '未压缩的 StarDict 3.0 词典（.ifo 及同目录下的 .idx 和 .dict 文件）。',
   'storage.dictionaryImport.kind.legacy': '旧版 Yomitan 词典',
@@ -2660,11 +2662,13 @@ export const zh: Catalog = {
   'dialog.importDsl.title': '导入 Lingvo DSL 词典',
   'dialog.importJmnedict.title': '导入 JMnedict 专有名词',
   'dialog.importStardict.title': '导入 StarDict 词典',
+  'dialog.importKanjidic.title': '导入 KANJIDIC2 汉字词典',
   'dialog.filter.cedict': 'CC-CEDICT 词典',
   'dialog.filter.jsonl': 'JSONL 文件',
   'dialog.filter.dsl': 'Lingvo DSL 文件',
   'dialog.filter.jmnedict': 'JMnedict XML 文件',
   'dialog.filter.stardict': 'StarDict 索引',
+  'dialog.filter.kanjidic': 'KANJIDIC2 XML 文件',
   'dialog.importAnkiDeck.title': '导入 Anki 卡组（.apkg）',
   'dialog.filter.ankiDeck': 'Anki 卡组',
 
@@ -8415,3 +8419,4 @@ export const zh: Catalog = {
   'dict.saved.save': '保存搜索',
   'dict.saved.remove': '删除已保存的搜索',
 };
+

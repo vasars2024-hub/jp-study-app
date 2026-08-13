@@ -2262,6 +2262,8 @@ export const ru: Catalog = {
   'storage.dictionaryImport.kind.dsl.desc': 'Пользовательский текстовый словарь в формате .dsl.',
   'storage.dictionaryImport.kind.jmnedict': 'Словарь имён JMnedict',
   'storage.dictionaryImport.kind.jmnedict.desc': 'Японские имена собственные и чтения из JMnedict XML.',
+  'storage.dictionaryImport.kind.kanjidic': 'Словарь иероглифов KANJIDIC2',
+  'storage.dictionaryImport.kind.kanjidic.desc': 'Чтения, значения, радикалы, уровни и частотность японских иероглифов из KANJIDIC2 XML.',
   'storage.dictionaryImport.kind.stardict': 'СтарДикт',
   'storage.dictionaryImport.kind.stardict.desc': 'Несжатый словарь StarDict 3.0 (.ifo и соседние файлы .idx и .dict).',
   'storage.dictionaryImport.kind.legacy': 'Старые словари Yomitan',
@@ -2850,11 +2852,13 @@ export const ru: Catalog = {
   'dialog.importDsl.title': 'Импорт словаря Lingvo DSL',
   'dialog.importJmnedict.title': 'Импорт имён JMnedict',
   'dialog.importStardict.title': 'Импорт словаря StarDict',
+  'dialog.importKanjidic.title': 'Импорт словаря иероглифов KANJIDIC2',
   'dialog.filter.cedict': 'Словарь CC-CEDICT',
   'dialog.filter.jsonl': 'Файлы JSONL',
   'dialog.filter.dsl': 'Файлы Lingvo DSL',
   'dialog.filter.jmnedict': 'Файлы JMnedict XML',
   'dialog.filter.stardict': 'Индекс StarDict',
+  'dialog.filter.kanjidic': 'Файл KANJIDIC2 XML',
   'dialog.importAnkiDeck.title': 'Импорт колоды Anki (.apkg)',
   'dialog.filter.ankiDeck': 'Колода Anki',
 
@@ -9240,3 +9244,4 @@ export const ru: Catalog = {
   'dict.saved.save': 'Сохранить запрос',
   'dict.saved.remove': 'Удалить сохранённый запрос',
 };
+

@@ -17154,3 +17154,36 @@ reversible internal contracts covered by standing approval, not external blocker
 sweep remains incomplete, so `retrospectiveComplete` correctly remains false. Track 2 remains active;
 next re-derive KANJIDIC provenance versus Tatoeba atomic paired import rather than claiming source
 coverage complete.
+
+## Track 2 — KANJIDIC2 ownership, provenance, and utility-process import — 2026-08-13 18:21 MSK
+
+The latest boss-audit finding was already corrected. Re-deriving the current ledger tail showed that
+Track 2 source coverage, not the older OCR hint, remains dependency-ordered next. Standing approval
+selected KANJIDIC2 before Tatoeba: it needs one additive SQLite migration but fits the existing
+single-file utility-process request; Tatoeba still needs a paired-file atomic request contract.
+
+Schema v2 adds `char_sources(dict_id,lang,char)` ownership and ordered source ids to the existing
+`chars` compatibility projection. KANJIDIC2 XML import now runs in the isolated utility process,
+replaces one source transactionally, cooperatively cancels, and retains readings, meanings, radical,
+strokes, JLPT, grade, frequency, primary source, and deterministic provenance. Enable, reorder, and
+remove rebuild affected projections, so reversible source controls do not leave stale character rows.
+The Settings importer and native picker expose the format with EN/JA/ZH/RU copy.
+
+Live Electron acceptance used two fresh Forge processes owned and stopped by this hop, driven only
+through the authenticated debug bridge. A one-character fixture traversed renderer → preload → main
+→ utility process and committed `{entries:1, skipped:0, characters:1}` as `relay-kanjidic-live`.
+Removal returned an exact empty source list; the regression test proves its final compatibility row
+is removed too. Error-level bridge logs were empty. No input automation or userData backup was used.
+
+Gates: full Vitest **577 passed / 1 skipped files; 7,605 passed / 6 skipped tests**; i18n **9,481**
+keys complete; architecture **1,787 modules / 18 known findings / 2 known pending**, nothing new;
+focused ESLint passed. A broader lint invocation showed only the two pre-existing `window.d.ts`
+subtitle-harvest adjacent-overload identities, with no owned finding.
+
+Retrospective blocker sweep increment: utility-process/configuration permission, KANJIDIC schema
+shape, and source-priority/provenance behavior are reversible internal decisions now closed under
+standing approval. Historical media-route blockers are stale/closed; translator Settings placement
+belongs to its later ordered stage; credentials, hardware-only microphone/multi-monitor proofs, and
+third-party availability remain external/deferred. The archive-wide sweep is not yet exhaustive, so
+`retrospectiveComplete` remains false. Track 2 remains active; next re-derive Tatoeba paired-file
+atomic import versus the other still-missing source formats and capabilities.

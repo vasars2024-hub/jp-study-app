@@ -37,6 +37,7 @@ import {
   type MigrationResult,
 } from './migrate';
 import { importCedict, type CedictImportCounts } from './importers/cedict';
+import { rebuildCharacterProjection } from './importers/kanjidic';
 import {
   importWiktextract,
   readJsonlLines,
@@ -89,7 +90,12 @@ export function setDictionarySourceEnabled(
   enabled: boolean,
   db: SqliteDb = dictionaryDb(),
 ): DictionarySourceMutationResult {
-  const result = db.prepare('update dictionaries set enabled = ? where id = ?').run(enabled ? 1 : 0, id);
+  const affected = (db.prepare('select char from char_sources where dict_id = ?').all(id) as Array<{ char: string }>).map((row) => row.char);
+  let result: { changes: number } = { changes: 0 };
+  db.transaction(() => {
+    result = db.prepare('update dictionaries set enabled = ? where id = ?').run(enabled ? 1 : 0, id);
+    if (result.changes) rebuildCharacterProjection(db, affected);
+  })();
   return { ok: result.changes > 0, error: result.changes ? undefined : 'not-found', sources: listDictionarySources(db) };
 }
 
@@ -108,6 +114,9 @@ export function moveDictionarySource(
   const swap = db.transaction(() => {
     const update = db.prepare('update dictionaries set priority = ? where id = ?');
     reordered.forEach((source, priority) => update.run(priority, source.id));
+    const ids = [reordered[index].id, reordered[target].id];
+    const affected = db.prepare('select distinct char from char_sources where dict_id in (?, ?)').all(...ids) as Array<{ char: string }>;
+    rebuildCharacterProjection(db, affected.map((row) => row.char));
   });
   swap();
   return { ok: true, sources: listDictionarySources(db) };
@@ -117,7 +126,12 @@ export function removeDictionarySource(
   id: string,
   db: SqliteDb = dictionaryDb(),
 ): DictionarySourceMutationResult {
-  const result = db.prepare('delete from dictionaries where id = ?').run(id);
+  const affected = (db.prepare('select char from char_sources where dict_id = ?').all(id) as Array<{ char: string }>).map((row) => row.char);
+  let result: { changes: number } = { changes: 0 };
+  db.transaction(() => {
+    result = db.prepare('delete from dictionaries where id = ?').run(id);
+    if (result.changes) rebuildCharacterProjection(db, affected);
+  })();
   return { ok: result.changes > 0, error: result.changes ? undefined : 'not-found', sources: listDictionarySources(db) };
 }
 

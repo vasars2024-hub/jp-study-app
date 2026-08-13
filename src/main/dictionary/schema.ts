@@ -28,7 +28,7 @@
 import type { SqliteDb } from './db';
 
 /** Bumped by appending to MIGRATIONS. Never edit a released step. */
-export const DICT_SCHEMA_VERSION = 1;
+export const DICT_SCHEMA_VERSION = 2;
 
 export interface MigrationStep {
   version: number;
@@ -297,13 +297,38 @@ export const MIGRATIONS: MigrationStep[] = [
       db.exec(V1_TRIGGERS);
     },
   },
+  {
+    version: 2,
+    name: 'versioned character-source ownership and provenance',
+    up(db) {
+      db.exec(`
+        ALTER TABLE chars ADD COLUMN primary_source_id TEXT;
+        ALTER TABLE chars ADD COLUMN source_ids TEXT NOT NULL DEFAULT '[]';
+        CREATE TABLE char_sources (
+          dict_id    TEXT NOT NULL REFERENCES dictionaries(id) ON DELETE CASCADE,
+          lang       TEXT NOT NULL,
+          char       TEXT NOT NULL,
+          strokes    INTEGER,
+          radical    TEXT,
+          components TEXT,
+          readings   TEXT,
+          meanings   TEXT,
+          jlpt       TEXT,
+          grade      INTEGER,
+          freq       INTEGER,
+          PRIMARY KEY (dict_id, lang, char)
+        );
+        CREATE INDEX idx_char_sources_lookup ON char_sources(lang, char);
+      `);
+    },
+  },
 ];
 
 /** Every table name the schema owns, for the "did it actually build" assertion. */
 export const DICT_TABLES = [
   'dictionaries', 'headwords', 'senses', 'glosses', 'xrefs', 'inflections',
   'collocations', 'etymology', 'audio', 'pitch', 'freq_corpora', 'user_notes',
-  'explanations', 'chars', 'examples', 'example_translations',
+  'explanations', 'chars', 'char_sources', 'examples', 'example_translations',
 ] as const;
 
 export const DICT_FTS_TABLES = ['headwords_fts', 'glosses_fts', 'examples_fts'] as const;
