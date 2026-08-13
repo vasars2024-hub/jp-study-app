@@ -17694,3 +17694,33 @@ The decomposition slice is now checkpoint-complete. Stroke/handwriting practice 
 the next dependency-ordered Track 2 action is to re-derive the broader find-in-the-wild sources beyond the already
 implemented local-subtitle concordance, without pretending the subtitle-only search satisfies news, encyclopedic and
 spoken-source coverage.
+
+## Track 2 — duplicate concordance claim retracted; retrospective sweep closed — 2026-08-14 00:43 MSK
+
+Re-derived the preceding uncommitted slice against the whole current tree before wiring it. It was not a new
+capability: `shared/lexiconConcordance.ts` already provides normalized, deterministic, bounded cross-title subtitle
+search, and `LexiconWorkbenchResults` already opts into the real `listMedia` / `subtitleForPath` bridge, parses local
+tracks, renders source-addressed citations, and exposes honest running/empty/error states. Its focused suite already
+covers source order, normalization, non-invented inflections, deduplication, the hard cap, and an empty term set.
+The two attributable untracked duplicate files from the preceding entry were therefore removed rather than wired into
+a second competing path. No existing or foreign working-tree hunk was changed.
+
+The one-time retrospective decision-blocker sweep is complete. The active Main V1 plan, Anki Workbench plan, latest
+boss-audit receipt and its later closure evidence, active coordination handoffs, migrated known-issue records, and
+decision-language matches in the active documentation were reconciled against source. Reversible internal blockers
+are superseded by the standing approval: worker/import architecture, schema and provenance shape, per-language-pair
+priority, Agent image transport/privacy bounds, media routing, and minimal build wiring are decided or already landed.
+Old notes that still use blocker language are either superseded by later authoritative entries or describe external
+facts. The only surviving external/irreversible gates are publication or spending, use of personal credentials/accounts,
+unavailable third-party services or hardware, and final user visual approval. None was exercised here.
+
+The next worker must not recreate `subtitleConcordance.ts`. Track 2 remains active; the next honest source-backed gap
+is handwriting/stroke practice (handwriting recognition exists in Manga but is not a Workbench affordance, while
+stroke geometry is absent) or another requirement re-derived against the existing Workbench before implementation.
+
+Gates: full Vitest **579 passed / 1 skipped files; 7,634 passed / 6 skipped tests**; focused existing concordance
+Vitest **1 file / 4 tests passed**; i18n **9,504 keys complete**; architecture **1,791 modules / 18 known findings /
+2 pending**, nothing new. No TypeScript product path remained touched after retracting the duplicate, so there was no
+touched TypeScript path to pass to ESLint. Live Electron acceptance was not repeated: this turn removed a duplicate
+unwired primitive and changed no shipped behavior; the earlier Workbench concordance wiring and tests remain the
+applicable product evidence.
