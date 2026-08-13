@@ -82,6 +82,10 @@
   "test-only-module:src/shared/mediaWorkspaceI18n.ts": {
    "status": "accepted",
    "note": "ADR-003's exit gate. The allowlist must be empty and the adopted-surface list is what mediaWorkspaceI18n.test.ts parses — a gate whose only consumer is its own test is the point, not an accident."
+  },
+  "test-only-module:src/shared/dictionaryImportJob.ts": {
+   "status": "pending",
+   "note": "Dictionary importer job snapshots are the versioned worker/main/renderer boundary. The contract is built and focused-tested, while the utility-process bridge remains the next dependency-ordered slice; classifying it pending avoids hiding an unwired channel or pretending import success."
   }
- }
+}
 }
