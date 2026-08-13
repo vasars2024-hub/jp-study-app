@@ -15641,3 +15641,35 @@ Track 2 remains open. This activates one pre-existing morphology contract; it do
 broad importer/source-management row. Re-derive the next bounded gap among cancellable imports,
 missing source formats, source metadata/controls, deduplication, fuzzy search or saved searches;
 do not move to Track 3 yet.
+
+## Ambiguous imported inflections retain every analysis — 2026-08-13
+
+Relay hop, `codexB`. Track 2. The latest boss-audit section handed off no unresolved regression,
+and the final ledger section kept the source/import/search requirements open. Re-deriving the
+newly activated inflection path found a data-loss defect: the query correctly read every matching
+`inflections` row, but then constructed a `Map` directly from those rows. When one surface form had
+multiple analyses for the same headword, each row replaced the preceding row and only the last
+analysis reached the result.
+
+The lookup now accumulates names and tags for each headword in database order and removes repeated
+tags without discarding distinct analyses. A regression supplies two analyses for the same
+irregular form and proves the result retains both analysis names plus their shared tags. No schema,
+import format, persistence, provider or UI copy changed.
+
+Live Electron acceptance used one fresh Forge process owned by this hop and the authenticated
+debug bridge only. Importing the real Vite-loaded lookup module and passing two analyses for one
+headword returned `simple past`, `finite`, `irregular`, and `past participle` in stable order. The
+bridge error ring contained **0** entries. The temporary renderer global was not persisted, no
+dictionary or user state was written, and the complete recorded process tree was stopped. The
+unrelated listener on port 5173 was untouched.
+
+Verification on the shared tree: focused dictionary lookup tests **38/38**. Full literal
+`npx vitest run`: **566 files passed / 1 skipped, 7,523 tests passed / 6 skipped**.
+`node tools/i18n-check.cjs`: **9,433 keys** complete. `node tools/architecture-audit.cjs`:
+**1,764 modules**, nothing new, the same two pending. ESLint over the two touched TS paths:
+**0 errors, 0 warnings**.
+
+Track 2 remains open. This closes one imported-morphology data-loss defect, not the broad
+importer/source-management row. Re-derive the next bounded gap among safe cancellable imports,
+missing source formats, source controls, cross-source deduplication, fuzzy search or saved searches;
+do not move to Track 3 yet.

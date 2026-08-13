@@ -197,6 +197,24 @@ describe('one code path, four languages', () => {
     });
   });
 
+  it('preserves every imported analysis for an ambiguous inflection', () => {
+    const headword = db.prepare('select id from headwords where dict_id = ? and norm = ?')
+      .get('jmdict-en', '走る') as { id: number };
+    const insert = db.prepare(
+      'insert into inflections (headword_id, form, name, tags) values (?, ?, ?, ?)',
+    );
+    insert.run(headword.id, 'ran', 'simple past', 'finite,irregular');
+    insert.run(headword.id, 'ran', 'past participle', 'finite,irregular');
+
+    const hit = lookup(db, { text: 'ran', sourceLangs: ['ja'] }).entries
+      .find((entry) => entry.text === '走る');
+
+    expect(hit).toMatchObject({
+      via: 'deinflected',
+      reasons: ['simple past', 'finite', 'irregular', 'past participle'],
+    });
+  });
+
   it('English → Chinese through the same call', () => {
     expect(lookup(db, { text: 'dog' }).entries.map((e) => e.text)).toContain('狗');
   });

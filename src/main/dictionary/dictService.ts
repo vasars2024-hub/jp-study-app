@@ -228,6 +228,19 @@ export function compareLookupEntries(a: LookupEntry, b: LookupEntry): number {
     a.headwordId - b.headwordId;
 }
 
+export function collectInflectionReasons(
+  rows: { headword_id: number; name: string | null; tags: string | null }[],
+): Map<number, string[]> {
+  const byHeadword = new Map<number, string[]>();
+  for (const row of rows) {
+    const existing = byHeadword.get(row.headword_id) ?? [];
+    const reasons = [row.name, ...(row.tags?.split(',') ?? [])]
+      .filter((value): value is string => Boolean(value));
+    byHeadword.set(row.headword_id, [...new Set([...existing, ...reasons])]);
+  }
+  return byHeadword;
+}
+
 /**
  * Look a query up across every enabled dictionary, in any direction.
  *
@@ -281,12 +294,7 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
     const inflectionRows = db.prepare(
       'select headword_id, name, tags from inflections where form = ? order by headword_id',
     ).all(normalizeForLookup(text)) as { headword_id: number; name: string | null; tags: string | null }[];
-    const inflectionReasons = new Map(
-      inflectionRows.map((row) => [
-        row.headword_id,
-        [row.name, ...(row.tags?.split(',') ?? [])].filter((value): value is string => Boolean(value)),
-      ]),
-    );
+    const inflectionReasons = collectInflectionReasons(inflectionRows);
     for (const row of byInflection.all(lang, normalizeForLookup(text)) as HeadwordRow[]) {
       push(row, 'deinflected', inflectionReasons.get(row.id) ?? []);
     }
