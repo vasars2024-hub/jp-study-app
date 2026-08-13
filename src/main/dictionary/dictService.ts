@@ -458,6 +458,15 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
   // The reverse direction: the query is a gloss, not a headword. This is what the
   // old term→entries Map could not answer at all.
   if (!query.headwordsOnly && result.entries.length < limit) {
+    // `sourceLangs` is a real language-pair boundary, not merely a hint for the
+    // headword probes above. Without this predicate an explicit EN→ZH request can
+    // leak Japanese (or any other language) entries whose gloss happens to match.
+    // Keep `und` in the boundary for imported dictionaries that honestly cannot
+    // declare a source language, just as the forward path does.
+    const reverseSourceLangs = query.sourceLangs?.length ? searchLangs : [];
+    const reverseLangFilter = reverseSourceLangs.length
+      ? ` and h.lang in (${reverseSourceLangs.map(() => '?').join(',')})`
+      : '';
     const glossRows = db
       .prepare(`
         select h.id, h.dict_id, d.title as dict_title, h.lang, h.text, h.norm, h.reading, h.reading_norm,
@@ -467,11 +476,11 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
         join senses  s on s.id = g.sense_id
         join headwords h on h.id = s.headword_id
         join dictionaries d on d.id = h.dict_id
-        where glosses_fts match ? and d.enabled = 1
+        where glosses_fts match ? and d.enabled = 1${reverseLangFilter}
         order by d.priority, h.id
         limit ?
       `)
-      .all(ftsQuery(text), limit) as HeadwordRow[];
+      .all(ftsQuery(text), ...reverseSourceLangs, limit) as HeadwordRow[];
     for (const row of glossRows) push(row, 'gloss', []);
   }
 

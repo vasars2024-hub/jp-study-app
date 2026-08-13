@@ -17231,3 +17231,37 @@ data does not" in the professional plan; standing approval requires no further u
 External publication, purchase, credential, or user-data deletion is not involved. The historical
 sweep remains incomplete, so `retrospectiveComplete` remains false. Track 2 remains active at
 bundled-source provisioning and the remaining merge/search/workbench capability ladder.
+
+## Track 2 — reverse-gloss lookup respects the requested source language — 2026-08-13 18:43 MSK
+
+Re-deriving the unified lookup path found a language-pair correctness defect before the next
+source-provisioning slice: `sourceLangs` constrained forward headword probes but the FTS5 reverse
+gloss query ignored it. An explicit EN→ZH-style request could therefore return Japanese, Russian,
+or other headwords whose gloss happened to match. The smallest reversible correction keeps
+unscoped reverse lookup multilingual, adds a parameterized headword-language predicate only when
+the caller explicitly supplies `sourceLangs`, and retains `und` as the honest fallback for sources
+such as StarDict that cannot declare a language.
+
+Regression coverage proves that a Chinese-scoped `dog` gloss lookup includes 狗, excludes a seeded
+English headword with the same gloss, and still includes an `und` source. The existing English→JA,
+Russian→JA, punctuation, and all other unified lookup cases remain green.
+
+Live Electron acceptance used one fresh Forge process owned and stopped by this hop and the
+authenticated debug bridge only. The real preload/main `lookupTerm('dog')` journey returned five
+database-backed Japanese entries headed by `トックリ形`, `犬の顔`, and `犬`; the bridge error
+ring was empty. The explicit source-language boundary is an internal service option rather than a
+preload argument, so its exact filtering claim is covered by the in-process SQLite regression,
+not overstated as a renderer interaction.
+
+Gates: full Vitest **578 passed / 1 skipped files; 7,609 passed / 6 skipped tests**; i18n **9,487**
+keys complete; architecture **1,789 modules / 18 known findings / 2 pending, nothing new**; focused
+ESLint passed; focused lookup suite **1 file / 52 tests passed**.
+
+Retrospective sweep increment: the latest boss-audit finding is already addressed. Reverse-search
+language semantics are a reversible internal contract covered by standing approval; no external
+authority was required. Earlier utility-process/configuration, KANJIDIC provenance, Tatoeba paired
+input, and source-licence display decisions remain closed. Hardware/credential availability and
+publication or purchase remain genuinely external/deferred. The archive-wide retrospective is not
+yet exhaustive, so `retrospectiveComplete` remains false. Track 2 remains active; next re-derive
+bundled-source provisioning and the remaining deep-search/workbench gaps rather than skipping to
+the later screenshot/OCR Agent slice.

@@ -311,6 +311,37 @@ describe('one code path, four languages', () => {
   it('English → Chinese through the same call', () => {
     expect(lookup(db, { text: 'dog' }).entries.map((e) => e.text)).toContain('狗');
   });
+
+  it('keeps reverse gloss results inside an explicit source-language boundary', () => {
+    importLegacyIndex(db, {
+      version: 1,
+      info: INFO({ id: 'english-headwords', title: 'English headwords', priority: 3, glossLangs: ['en'] }),
+      terms: {
+        hound: [{ word: 'hound', reading: '', score: 2, senses: [{ partsOfSpeech: ['n'], definitions: ['dog'], tags: [] }] }],
+      },
+    });
+    db.prepare("update dictionaries set source_lang = 'en' where id = 'english-headwords'").run();
+    db.prepare("update headwords set lang = 'en' where dict_id = 'english-headwords'").run();
+
+    const chineseOnly = lookup(db, { text: 'dog', sourceLangs: ['zh'] });
+    expect(chineseOnly.entries.map((entry) => entry.text)).toContain('狗');
+    expect(chineseOnly.entries.map((entry) => entry.text)).not.toContain('hound');
+  });
+
+  it('still includes honest unknown-language sources in scoped reverse lookup', () => {
+    importLegacyIndex(db, {
+      version: 1,
+      info: INFO({ id: 'unknown-headwords', title: 'Unknown-language source', priority: 3, glossLangs: ['en'] }),
+      terms: {
+        relayword: [{ word: 'relayword', reading: '', score: 2, senses: [{ partsOfSpeech: ['n'], definitions: ['dog'], tags: [] }] }],
+      },
+    });
+    db.prepare("update dictionaries set source_lang = 'und' where id = 'unknown-headwords'").run();
+    db.prepare("update headwords set lang = 'und' where dict_id = 'unknown-headwords'").run();
+
+    expect(lookup(db, { text: 'dog', sourceLangs: ['zh'] }).entries.map((entry) => entry.text))
+      .toContain('relayword');
+  });
 });
 
 describe('gloss language selection — study language and gloss language are separate', () => {
