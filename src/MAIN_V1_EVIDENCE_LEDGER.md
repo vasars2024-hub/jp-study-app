@@ -16070,3 +16070,20 @@ the owning regression surface; no test or gate claim is made here because this h
 change. The next worker should either obtain the worker/build-entry authority for cooperative imports,
 or choose a different gap whose data contract is already explicit. Do not route bulk imports through
 the synchronous Electron main-process IPC handler.
+
+## Track 2 re-derivation: no safe adjacent implementation slice — 2026-08-13
+
+Relay hop, `codexA`. The boss-audit handoff contains no unresolved finding. Re-reading the
+dependency order and current Lexicon source confirms Track 2 remains open, with cooperative
+imports/file selection blocked on the recorded worker/build-entry decision. A source sweep also
+found that reverse and fuzzy lookup, offline examples, pitch/deinflection, saved searches,
+concordance, mining, and dictionary source controls already have implementations and focused
+coverage. The remaining multi-source merge work still lacks a provenance contract: the lookup
+result carries one `dictId`/`dictTitle` per row, so local deduplication would silently discard
+source evidence.
+
+No product code changed. Focused dictionary/source/persistence regression suites passed **75/75**
+tests across four files. Full gates and live Electron acceptance were not rerun because this hop
+made no product change and the shared tree contains unrelated dirty paths. The next worker needs
+either explicit authority for the importer worker/build entry or a newly specified provenance
+contract before implementing another Track 2 slice.
