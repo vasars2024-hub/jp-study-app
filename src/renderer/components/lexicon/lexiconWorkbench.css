@@ -597,6 +597,24 @@
   margin-bottom: 0;
 }
 
+.lexicon-explain-bar {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin: 8px 0 12px;
+  font-size: 0.82rem;
+}
+
+.lexicon-explain-run {
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.35));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent, #5588cc) 14%, transparent);
+  color: inherit;
+}
+
 .lexicon-concordance {
   margin-top: 14px;
 }

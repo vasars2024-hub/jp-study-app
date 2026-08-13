@@ -38,6 +38,8 @@ import DictionaryResults, { type DictLang } from '../DictionaryResults';
 import { translateTo } from '../../translator';
 import { useT } from '../../i18n';
 import { parseSubtitles } from '../../subtitles';
+import { handOffToAgent, lexiconPassageAgentContext, routeAgentContext } from '../../agentContextHandoff';
+import { AGENT_NAVIGATION_SECTION_LABEL_KEYS } from '../../../shared/agentNavigation';
 import './lexiconWorkbench.css';
 
 /** Gloss targets follow the imported dictionaries, not the source-side DictLang pair. */
@@ -179,6 +181,14 @@ export default function LexiconWorkbenchResults({
   // anything is known before the model is woken, not after it answers.
   const senseHints = useMemo(() => collectSenseHints(pinned, glossLang), [glossLang, pinned]);
   const pinCount = Object.keys(pins).length;
+
+  function explainInAgent() {
+    void handOffToAgent(
+      lexiconPassageAgentContext(query),
+      t('lexicon.explain.conversation'),
+      routeAgentContext('dictionary', t(AGENT_NAVIGATION_SECTION_LABEL_KEYS.dictionary)),
+    );
+  }
 
   // The sense picker is one contextual panel rather than a popover per token, so
   // the open token is looked up by its pin key instead of held as a second copy.
@@ -480,7 +490,14 @@ export default function LexiconWorkbenchResults({
           {state === 'loading' && <p className="muted">{t('common.loading')}</p>}
           {state === 'error' && <p role="alert">{t('lexicon.workbench.offlineFailed')}</p>}
           {pinned && (
-            <div className="lexicon-interlinear-flow" lang={lang}>
+            <>
+              <div className="lexicon-explain-bar">
+                <button className="lexicon-explain-run" onClick={explainInAgent} type="button">
+                  {t('lexicon.explain.action')}
+                </button>
+                <span className="muted">{t('lexicon.explain.generated')}</span>
+              </div>
+              <div className="lexicon-interlinear-flow" lang={lang}>
               {pinned.parts.map((part) => {
                 const key = `${part.start}-${part.end}`;
                 if (part.kind === 'separator') return <span key={key}>{part.text}</span>;
@@ -509,7 +526,8 @@ export default function LexiconWorkbenchResults({
                   </button>
                 );
               })}
-            </div>
+              </div>
+            </>
           )}
           {openMatch && openSense && (
             <div

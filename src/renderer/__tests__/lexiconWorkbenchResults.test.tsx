@@ -14,6 +14,13 @@ vi.mock('../i18n', () => ({
   }),
 }));
 
+const agentHandoff = vi.hoisted(() => ({ handOffToAgent: vi.fn() }));
+vi.mock('../agentContextHandoff', () => ({
+  handOffToAgent: agentHandoff.handOffToAgent,
+  lexiconPassageAgentContext: (text: string) => ({ kind: 'reading-passage', preview: text }),
+  routeAgentContext: (section: string, label: string) => ({ kind: 'route', section, label }),
+}));
+
 import LexiconWorkbenchResults from '../components/lexicon/LexiconWorkbenchResults';
 
 let root: Root | null = null;
@@ -64,6 +71,19 @@ describe('LexiconWorkbenchResults', () => {
     });
     expect(host.querySelector('.lexicon-interlinear-flow')?.textContent).toContain('猫catを見た。');
     expect(host.querySelector('ruby.is-grounded')?.textContent).toContain('cat');
+    expect(host.querySelector('.lexicon-explain-run')?.textContent).toBe('lexicon.explain.action');
+    expect(host.querySelector('.lexicon-explain-bar')?.textContent)
+      .toContain('lexicon.explain.generated');
+
+    await act(async () => {
+      host.querySelector('.lexicon-explain-run')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    expect(agentHandoff.handOffToAgent).toHaveBeenCalledWith(
+      { kind: 'reading-passage', preview: '猫を見た。' },
+      'lexicon.explain.conversation',
+      expect.objectContaining({ kind: 'route', section: 'dictionary' }),
+    );
   });
 
   it('lets the user override an ambiguous automatic lens', async () => {

@@ -15090,3 +15090,50 @@ analysis, streamed/cached answers, explanation-language choice, batch mode, cost
 sourced-versus-generated labels. Re-derive the existing sentence-analysis and provider paths before
 choosing its first bounded slice; do not treat this literal personal concordance as the broader
 sense-ranked multi-source “find in the wild” promise.
+
+## Contextual Explain enters the one Agent, with an honest source boundary — 2026-08-13
+
+Relay hop, `codexB`. Track 2. The boss-audit tail was checked first: its rescue table is closed and
+the two later clean-HEAD regressions are already fixed at HEAD. Re-deriving the final ledger section
+and the plan's dependency order kept this hop on the next Track 2 bullet rather than jumping to
+Blanc or to the stale vision hint in the launcher prompt.
+
+The Lexicon Workbench now offers **Explain in Agent** after its offline interlinear result arrives.
+It does not create a second model client or hidden chat. The gesture attaches the passage to the one
+main-owned Agent conversation as `reading-passage` context, attaches the real Dictionary return
+route, and opens the existing Agent pop-out. A dedicated context producer records
+`source.app: dictionary`, collapses whitespace, and keeps the passage personal and session-only;
+the text is not retained merely because dictionary entries themselves are retainable reference
+data. The adjacent label makes the provenance boundary explicit: the interlinear is sourced from
+installed dictionaries, while the Agent explanation is AI-generated and uses the Agent's current
+provider, privacy, explanation-language and cost controls. All three new strings are present in
+EN/JA/ZH/RU.
+
+This is intentionally the first bounded part of Contextual Explain, not closure of that plan row.
+The centralized Agent already owns streaming, provider choice, privacy and cost ceilings and offers
+the context-derived **Explain nuance** suggestion. Structured coverage for similar-word
+distinctions, register, collocations, mistakes, etymology, grammar, mnemonics and graded examples;
+language-specific analysis; response caching; batch explanation; and explicit explanation-language
+selection remain open and must be re-derived against the shared Agent before another client is
+added.
+
+Live Electron acceptance used a fresh app process and the authenticated debug bridge only. In the
+real Dictionary window, `猫が来た。` produced the grounded Workbench result and rendered both
+**Explain in Agent** and the sourced-versus-generated label. Invoking the control called the real
+main workspace handler and pop-out route; the Agent context shelf showed **Passage / 猫が来た。 /
+Personal / Session / From dictionary**, alongside the retained Dictionary location. The workspace
+was captured through its bridge before the gesture, restored through the same main handler after
+the check, and verified back at three conversations with no `猫が来た。` probe context. Screenshot:
+`debug/shots/win1-1786599126592.png`. Only this hop's recorded npm/Electron process tree was stopped.
+
+Verification: focused handoff/Workbench tests **80/80**. Full `npx vitest run
+--hookTimeout=60000`: **566 files passed / 1 skipped, 7,511 tests passed / 6 skipped**.
+`node tools/i18n-check.cjs`: **9,430 keys** complete. `node tools/architecture-audit.cjs`:
+**1,764 modules**, nothing new, the same two pending. ESLint over every touched TS/TSX/catalog path:
+**0 errors**; four existing non-null-assertion warnings remain in `agentContextHandoff.test.ts`.
+
+Track 2 remains open. The next worker should re-derive the Agent's context-suggestion and prompt
+contracts, then take one structured explanation facet (nuance/similar-word distinction is adjacent
+to the already-visible suggestion) through a grounded prompt/result contract. Do not claim the
+whole Contextual Explain matrix from this routing slice, and do not bypass the centralized Agent's
+privacy, language, streaming or budget controls.

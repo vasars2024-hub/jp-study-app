@@ -428,6 +428,22 @@ export function dictionaryAgentContext(
   };
 }
 
+/** A session-only passage being analysed in the Lexicon Workbench. */
+export function lexiconPassageAgentContext(
+  passage: string,
+  now = Date.now(),
+): AgentContextInput {
+  const text = passage.trim().replace(/\s+/g, ' ');
+  return {
+    kind: 'reading-passage',
+    label: text.slice(0, 60),
+    preview: text,
+    source: { app: 'dictionary' },
+    identity: `lexicon\u0000${text}`,
+    now,
+  };
+}
+
 /**
  * A reader selection's shape of the gesture — the first producer that is
  * session-only rather than reference data.

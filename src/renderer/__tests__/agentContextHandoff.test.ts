@@ -55,6 +55,7 @@ import {
   attachAgentContextFromSurface,
   dictionaryAgentContext,
   handOffToAgent,
+  lexiconPassageAgentContext,
   mediaCueAgentContext,
   openAgentSurface,
   readingPassageAgentContext,
@@ -140,6 +141,21 @@ describe('dictionaryAgentContext', () => {
     });
     expect(persisted.conversations[0].context.map((entry) => entry.id))
       .toEqual(['dictionary-entry:食べる']);
+  });
+});
+
+describe('lexiconPassageAgentContext', () => {
+  it('keeps Workbench text session-only and identifies its real surface', () => {
+    const input = lexiconPassageAgentContext(' 一行目\n  二行目 ', NOW);
+    expect(input).toMatchObject({
+      kind: 'reading-passage',
+      label: '一行目 二行目',
+      preview: '一行目 二行目',
+      source: { app: 'dictionary' },
+      identity: 'lexicon\u0000一行目 二行目',
+    });
+    expect(input.retained).toBeUndefined();
+    expect(createAgentContextItem(input)?.sensitivity).toBe('personal');
   });
 });
 
