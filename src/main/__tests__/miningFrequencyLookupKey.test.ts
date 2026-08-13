@@ -52,7 +52,12 @@ const SEP = String.fromCharCode(1);
  * bare key left holding the *last* entry — here the rare homograph, which is the
  * shape that produced the wrong answer in production.
  */
-function writeList(id: string, label: string, ranks: Record<string, number>): void {
+function writeList(
+  id: string,
+  label: string,
+  ranks: Record<string, number>,
+  language: string | undefined = 'ja',
+): void {
   fs.mkdirSync(freqRoot, { recursive: true });
   fs.writeFileSync(
     path.join(freqRoot, `${id}.json`),
@@ -64,7 +69,7 @@ function writeList(id: string, label: string, ranks: Record<string, number>): vo
         entryCount: Object.keys(ranks).length,
         enabled: true,
         importedAt: 0,
-        language: 'ja',
+        ...(language ? { language } : {}),
       },
       ranks,
     }),
@@ -134,5 +139,52 @@ describe('resolveCustomFrequencyRanks key order', () => {
     fs.writeFileSync(file, JSON.stringify(parsed), 'utf-8');
     const { resolveCustomFrequencyRanks } = await load();
     expect(resolveCustomFrequencyRanks('猫', 'ねこ').primary).toBeUndefined();
+  });
+});
+
+/**
+ * The bundled lists cover three languages and two of them share a script, so
+ * "lowest rank across every enabled list" lets a 390-entry Chinese list outbid a
+ * 550,408-entry Japanese one on a kanji they both contain. Reproduced here with
+ * the real shape: 本 is 357 in the Japanese list and 81 in the Chinese one.
+ */
+describe('resolveCustomFrequencyRanks language filter', () => {
+  const bilingual = (): void => {
+    writeList('ja', 'Japanese frequency', { [`本${SEP}ほん`]: 357, 本: 357 }, 'ja');
+    writeList('zh', 'Chinese core frequency', { 本: 81 }, 'zh');
+  };
+
+  it('lets a Chinese list win the minimum when no language is given', async () => {
+    bilingual();
+    const { resolveCustomFrequencyRanks } = await load();
+    const ranks = resolveCustomFrequencyRanks('本', 'ほん');
+    expect(ranks.primary).toBe(81);
+    expect(ranks.byDictionary['Chinese core frequency']).toBe(81);
+  });
+
+  it('ranks a Japanese word against Japanese lists alone when told the language', async () => {
+    bilingual();
+    const { resolveCustomFrequencyRanks } = await load();
+    const ranks = resolveCustomFrequencyRanks('本', 'ほん', 'ja');
+    expect(ranks.primary).toBe(357);
+    // Not merely outvoted — the Chinese list must not be attributable at all,
+    // since the profile names every source it used.
+    expect(ranks.byDictionary).toEqual({ 'Japanese frequency': 357 });
+  });
+
+  it('still consults a list that declares no language of its own', async () => {
+    writeList('ja', 'Japanese frequency', { [`本${SEP}ほん`]: 357 }, 'ja');
+    writeList('custom', 'Imported list', { 本: 12 }, undefined);
+    const { resolveCustomFrequencyRanks } = await load();
+    const ranks = resolveCustomFrequencyRanks('本', 'ほん', 'ja');
+    expect(ranks.primary).toBe(12);
+    expect(ranks.byDictionary['Imported list']).toBe(12);
+  });
+
+  it('narrows to the asked-for language, not away from one language', async () => {
+    bilingual();
+    const { resolveCustomFrequencyRanks } = await load();
+    expect(resolveCustomFrequencyRanks('本', undefined, 'zh').byDictionary)
+      .toEqual({ 'Chinese core frequency': 81 });
   });
 });

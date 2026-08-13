@@ -878,14 +878,34 @@ function frequencyLookupKey(expression: string, reading?: string): string[] {
   return out;
 }
 
+/**
+ * Rank one word across the enabled lists, optionally only the ones that speak
+ * its language.
+ *
+ * `language` is optional and narrowing-only: a caller that knows what it is
+ * reading passes it and gets ranks from that language's lists alone; a caller
+ * that does not passes nothing and keeps the old, wider behaviour. A list that
+ * declares no language is always consulted either way, because an imported list
+ * carries no `language` field and dropping those would lose ranks the user
+ * installed on purpose.
+ *
+ * Without it, `primary` is the minimum across *every* enabled list, and the
+ * bundled lists cover three languages that share a script. Measured on this
+ * installation: 本 in a Japanese passage answered **81** from `Chinese core
+ * frequency` (390 entries) instead of **357** from JPDB v2.2 (550,408) — the
+ * Chinese rank is lower, so it won the minimum. The difficulty profile then
+ * printed a Japanese passage's ranks and attributed them to a Chinese list.
+ */
 export function resolveCustomFrequencyRanks(
   expression: string,
   reading: string | undefined,
+  language?: FrequencyDictionarySummary['language'],
 ): { primary?: number; byDictionary: Record<string, number> } {
   const byDictionary: Record<string, number> = {};
   let primary: number | undefined;
   for (const dict of listFrequencyDictionaryFiles()) {
     if (!dict.summary.enabled) continue;
+    if (language && dict.summary.language && dict.summary.language !== language) continue;
     const keys = frequencyLookupKey(expression, reading);
     let found: number | undefined;
     for (const key of keys) {
@@ -1611,7 +1631,13 @@ async function analyzeBook(
   const blacklist = traditional.limits;
   let candidates: MiningCandidate[] = [...tokens.values()]
     .map((token) => {
-      const frequencies = resolveCustomFrequencyRanks(token.expression, token.reading);
+      // `japanese` is all this path knows: a book that is not Japanese may be
+      // Chinese, Russian or English, so it narrows only when it is sure.
+      const frequencies = resolveCustomFrequencyRanks(
+        token.expression,
+        token.reading,
+        japanese ? 'ja' : undefined,
+      );
       return {
         expression: token.expression,
         reading: token.reading || undefined,

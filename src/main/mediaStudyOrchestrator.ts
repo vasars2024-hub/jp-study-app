@@ -222,7 +222,9 @@ async function prepare(request: StudyAnalysisRequest): Promise<StudyPreparationR
       };
     });
   }, Date.now(), (word, reading) =>
-    resolveCustomFrequencyRanks(word, reading).primary);
+    // These tokens come out of the Japanese morphological analyser above (the
+    // 名詞/動詞 filter), so the language is not in doubt here.
+    resolveCustomFrequencyRanks(word, reading, 'ja').primary);
   const previousWorkspace = current.workspaces[result.workspace.id];
   if (previousWorkspace) {
     const filters = normalizeStudyFilters(previousWorkspace.filters);
@@ -295,7 +297,7 @@ function prepareLookupPack(request: StudyLookupPackRequest): StudyLookupPackResu
       ...(() => {
         const rank = resolveCustomFrequencyRanks(word, typeof candidate.reading === 'string'
           ? candidate.reading
-          : '').primary;
+          : '', 'ja').primary;
         return typeof rank === 'number' && Number.isFinite(rank)
           ? { frequencyRank: Math.max(1, Math.round(rank)) }
           : {};

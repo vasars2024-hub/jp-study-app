@@ -164,7 +164,14 @@ async function gatherMiningValues(
   };
 
   const mergedFrequencies = {
-    ...resolveCustomFrequencyRanks(term, reading).byDictionary,
+    // `unknown` is the profile's own "could not tell", so it narrows nothing —
+    // ranking against every list is the honest answer when the language is not
+    // established, and the caller's own `frequencies` still win the merge.
+    ...resolveCustomFrequencyRanks(
+      term,
+      reading,
+      req.language && req.language !== 'unknown' ? req.language : undefined,
+    ).byDictionary,
     ...(req.frequencies ?? {}),
   };
 

@@ -201,24 +201,54 @@ export async function lookupOfflineInterlinearMerged(
     // A legacy store that will not load must not take the database path down.
     result = lookupOfflineInterlinearFromStore(text, options);
   }
-  return options.withFrequency ? attachLexiconFrequency(result, resolveInterlinearFrequency) : result;
+  return options.withFrequency
+    ? attachLexiconFrequency(result, interlinearFrequencyResolver(result))
+    : result;
+}
+
+/** The list languages the bundled frequency dictionaries are tagged with. */
+const FREQUENCY_LIST_LANGS = ['ja', 'zh', 'ru'] as const;
+
+/**
+ * Which language's frequency lists this passage should be ranked against.
+ *
+ * Taken from the segmenter's own detection rather than the caller's requested
+ * `sourceLangs`, because the request is a filter over what to *try* and the
+ * result says what the text turned out to be. Ambiguity narrows nothing: a
+ * passage detected as several languages, or as none the lists cover, is ranked
+ * the old wide way rather than under a guess.
+ */
+function interlinearListLanguage(
+  result: LexiconInterlinearResult,
+): (typeof FREQUENCY_LIST_LANGS)[number] | undefined {
+  const known = FREQUENCY_LIST_LANGS.filter((lang) => result.detectedLangs.includes(lang));
+  return known.length === 1 ? known[0] : undefined;
 }
 
 /**
- * One headword's rank, from the frequency lists the user has enabled.
+ * One headword's rank, from the frequency lists the user has enabled *in this
+ * passage's language*.
  *
- * `resolveCustomFrequencyRanks` already ranks across every enabled list and
- * falls back to a Yomitan-imported list, so this only has to name which list
- * produced the winning rank — the lowest one, i.e. the list that considers the
- * word most common. A rank with no list to attribute it to is dropped rather
- * than shown under a made-up source.
+ * `resolveCustomFrequencyRanks` ranks across every enabled list and falls back
+ * to a Yomitan-imported list, so this only has to name which list produced the
+ * winning rank — the lowest one, i.e. the list that considers the word most
+ * common. A rank with no list to attribute it to is dropped rather than shown
+ * under a made-up source.
+ *
+ * The language argument is what stops a cross-script list from winning that
+ * minimum: Japanese, Chinese and Russian lists are all enabled at once here and
+ * the CJK ones share characters. See `resolveCustomFrequencyRanks` for the
+ * measurement.
  */
-function resolveInterlinearFrequency(text: string, reading: string) {
-  const ranks = resolveCustomFrequencyRanks(text, reading || undefined);
-  if (ranks.primary == null) return undefined;
-  const source = Object.entries(ranks.byDictionary)
-    .find(([, rank]) => rank === ranks.primary)?.[0];
-  return source ? { rank: ranks.primary, source } : undefined;
+function interlinearFrequencyResolver(result: LexiconInterlinearResult) {
+  const language = interlinearListLanguage(result);
+  return (text: string, reading: string) => {
+    const ranks = resolveCustomFrequencyRanks(text, reading || undefined, language);
+    if (ranks.primary == null) return undefined;
+    const source = Object.entries(ranks.byDictionary)
+      .find(([, rank]) => rank === ranks.primary)?.[0];
+    return source ? { rank: ranks.primary, source } : undefined;
+  };
 }
 
 // ----- Persistent gloss cache ----------------------------------------------

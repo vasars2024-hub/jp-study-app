@@ -14860,3 +14860,107 @@ The part-of-speech gap named above and in the previous entry is now the highest-
 unblock on this track — it is a `LexiconInterlinearMatch` schema change with a dictionary migration
 behind it, and it would let both the round-trip diff and this difficulty profile stop counting
 particles as vocabulary.
+## A Chinese list was ranking Japanese words, and the new panel said so out loud — 2026-08-13
+
+Relay hop, `primary`. Track 2. **Recovery hop that collided with a sibling.** The relay reported the
+previous worker cut off at 07:01:23 mid-slice, and the tree agreed: three untracked files, six
+modified, an empty index, and an Electron instance from 06:50:19. That slice was the difficulty
+profile. It was re-derived and finished here — gates re-run, the live acceptance the interrupted
+worker never reached — and then, at 07:08:17, **another live worker committed the same slice** as
+`c6e1151`, plus this hop's trailing-newline fix as `90110dc`. Recorded plainly rather than
+quietly: two workers were on one slice, the sibling landed it, and no work was lost because the
+overlap was byte-identical. What this entry commits is the part that was **not** in `c6e1151` — a
+production defect the live run found.
+
+**The defect.** `resolveCustomFrequencyRanks` takes `primary` as the minimum rank across *every*
+enabled frequency list, with no language filter. The bundled set covers three languages and two of
+them share a script. So on the very first live passage the new panel printed:
+
+    Ranks from Japanese frequency (JPDB v2.2), Chinese core frequency.
+
+That line is what made it visible, and it is why the panel naming its sources was worth building.
+Measured against the real files in `%APPDATA%\jp-study-app\mining\frequency-dicts`:
+
+- 本 is **357** in `Japanese frequency (JPDB v2.2)` — 550,408 entries, `language: ja`.
+- 本 is **81** in `Chinese core frequency` — **390** entries, `language: zh`.
+- 81 < 357, so the 390-entry Chinese list won the minimum and a Japanese passage was told 本 is its
+  81st most common word.
+
+This is not new to the panel. `resolveCustomFrequencyRanks` has been feeding the EPUB mining table,
+the Anki `frequency` field and the media study workspace all along, silently. The panel only made
+the wrong number legible by printing the list it came from.
+
+**The fix, and why it is a parameter rather than a rule.** `language` is a new optional third
+argument that is **narrowing-only**: pass it and the resolver consults that language's lists alone;
+pass nothing and behaviour is exactly as before. Two decisions inside it:
+
+- **A list that declares no language is always consulted.** `FrequencyDictionarySummary.language` is
+  optional and set on bundled lists only, so filtering it out would silently drop every list a user
+  imported themselves. The narrowing is "exclude a list that says it is a different language", not
+  "require a list to say it is this one".
+- **Every call site passes only what it actually knows.** `main/dictionary.ts` derives it from the
+  segmenter's own `detectedLangs`, not from the caller's requested `sourceLangs` — the request says
+  what to try, the result says what the text turned out to be — and narrows only when exactly one
+  known list language is detected, so a mixed or unrecognised passage keeps the old wide behaviour.
+  `mining.ts` has a `japanese` boolean and nothing finer, so it passes `ja` or nothing; a non-Japanese
+  EPUB may be Chinese, Russian or English and guessing would trade one wrong rank for another.
+  `mediaStudyOrchestrator.ts` passes `ja` outright, because its tokens come out of the Japanese
+  morphological analyser two lines above (the 名詞/動詞 filter). `anki/index.ts` uses the request's
+  own `MineLanguage`, whose `unknown` member maps to "narrow nothing" — the profile already
+  distinguishes "could not tell" from a language, so no new judgement was invented.
+
+That is all four production call sites. The type's own comment already said `language` was "used to
+show only relevant dicts for Japanese EPUB mining" — the filter existed for **display** and had
+simply never reached **resolution**.
+
+**Proof, in the order it was obtained.**
+
+- The list files were read directly off disk before any code changed, so the two ranks above are
+  measured, not inferred from a UI.
+- Four tests added to `main/__tests__/miningFrequencyLookupKey.test.ts` (10 in the file now, all
+  passing). The first of them asserts the **unfiltered** call still returns 81 from the Chinese
+  list: that pins the parameter as narrowing-only, and it fails if someone later makes filtering the
+  default. The others cover the narrowed answer (357, and `byDictionary` holding the Japanese list
+  *alone* — the Chinese one must not be attributable at all, since the panel names every source it
+  used), a language-less imported list still winning, and narrowing to `zh` on purpose.
+- **Live, through the bridge on 39273**, main rebuilt and restarted so the change was actually in the
+  main process rather than only in preload. Same passage, before and after:
+  昨日は学校で面白い本を読んだ。猫が窓から邂逅を見ていた。 — 本 went **81 → 357**, all fifteen
+  ranked tokens now attributed to `Japanese frequency (JPDB v2.2)` alone, and the panel's source line
+  lost the Chinese list. `detectedLangs` was `["ja"]`, i.e. the narrowing path was the one taken.
+  Screenshot of the rendered panel: `debug/shots/win1-1786594639616.png`.
+- The rest of the profile is unchanged by the fix and matches the sibling's entry: 14 of 15 ranked,
+  median 638, bands 9 / 2 / 1 / 2, rarest-first, no raw `lexicon.` key rendered.
+
+**A caveat this hop could not close, stated rather than buried.** The first live probe was taken
+against the 06:50 build and returned the *same* answer as the rebuilt one for 私 (28,801). So that
+run is **not** a before/after of the key-order fix — the interrupted worker had already restarted
+into it. The sibling's entry claims that fix on a fail-the-test-without-it basis, which stands on
+its own; this entry adds only an independent confirmation of its premise, read straight from the
+list file: bare 私 is **291,201** and 私+わたし is **32**, exactly as claimed.
+
+Gates, all four, on the shared tree. `npx eslint` over the five touched paths: **0 errors**; the
+seven `no-explicit-any` warnings on `main/dictionary.ts` are pre-existing and none is in new code.
+`node tools/i18n-check.cjs` exit 0, 9,408 keys complete — this slice adds no user-visible string.
+`node tools/architecture-audit.cjs` exit 0, 1,758 modules, nothing new, same two pending.
+`npx vitest run --hookTimeout=60000` on the shared tree: **563 files passed / 0 failed**,
+**7,483 tests passed / 6 skipped**, exit 0. Worth naming, because two runs earlier in this same hop
+each had one red file and neither was a regression: `readingFinderModes.test.ts` timed out in its
+`beforeAll` under full-suite parallelism and passed 3/3 alone, and the sibling's entry records
+`subtitleNyaaFetch.test.ts` dying in teardown on a Windows `ENOTEMPTY`. Both are load-dependent
+temp-directory races; the clean run above is the same tree with a longer hook timeout.
+
+State left as found: the two first-run overlays were hidden **in the DOM only** for the drive, per
+the precedent set on 2026-08-12 — `ConsentScreen` persists a choice and pings a country on either
+button, so clicking one would answer a privacy question on the user's behalf. `localStorage` held 17
+keys before and 17 after, with no `consent`/`telemetry`/`tour` key present at either end. No userData
+backup taken, no persisted setting written, no window moved or resized. The dev server on **5173** is
+a different, older instance belonging to another track and was left untouched; only the 5174
+instance this hop owns was restarted. The dev app is left running.
+
+Track 2 still open, unchanged by this entry: composition checking, personal concordance, grounded AI
+enrichment. The part-of-speech gap remains the highest-value shared unblock. **New, smaller debt
+from this hop:** the difficulty panel counts particles as vocabulary *and* ranks them well (を 4,
+で 8, から 142,901), which makes "the middle word here ranks 638" a statistic about a passage's
+grammar as much as its words — the shipped note discloses this, but the profile will not mean what
+a reader assumes until POS lands.
