@@ -246,8 +246,13 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
   const seen = new Set<number>();
   const push = (row: HeadwordRow, via: LookupEntry['via'], reasons: string[]) => {
     if (seen.has(row.id)) return;
+    const entry = toEntry(db, row, via, reasons, query.glossLangs);
+    // A target-language filter can remove every sourced sense from an otherwise
+    // matching headword. Do not let that empty shell consume the result limit or
+    // render as a definition-less card; it is not a result in the requested pair.
+    if (entry.senses.length === 0) return;
     seen.add(row.id);
-    result.entries.push(toEntry(db, row, via, reasons, query.glossLangs));
+    result.entries.push(entry);
   };
 
   const byNorm = db.prepare(`${HEADWORD_SELECT} and h.lang = ? and h.norm = ? order by d.priority, h.id`);

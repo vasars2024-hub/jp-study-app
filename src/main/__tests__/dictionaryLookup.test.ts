@@ -210,6 +210,11 @@ describe('gloss language selection — study language and gloss language are sep
     const empty = out.entries.filter((e) => e.senses.some((s) => s.glosses.length === 0));
     expect(empty).toEqual([]);
   });
+
+  it('drops a headword whose every sense was filtered out, rather than returning an empty card', () => {
+    const out = lookup(db, { text: '走る', glossLangs: ['ru'] });
+    expect(out.entries).toEqual([]);
+  });
 });
 
 describe('ranking and shape', () => {

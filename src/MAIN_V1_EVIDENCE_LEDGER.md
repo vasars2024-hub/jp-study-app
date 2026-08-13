@@ -15573,3 +15573,36 @@ next worker should re-derive another bounded gap among cancellable imports, miss
 source metadata/controls, deduplication, fuzzy search or saved searches. Worker-backed imports
 still intersect the repository's explicit root-configuration constraint, so do not put synchronous
 multi-minute parsing on Electron's main event loop to make that line look complete.
+
+## Target-language filtering no longer returns definition-less entries — 2026-08-13
+
+Relay hop, `codexX`. Track 2. The latest boss-audit section handed off no unresolved regression,
+and the final ledger section kept the broader Lexicon source/import/search line open. Re-deriving
+the unified lookup found a smaller correctness defect in its already-claimed any-to-any language
+contract: `readSenses` removed senses whose glosses did not match `glossLangs`, but `lookup` still
+returned the surrounding headword. An English-only entry could therefore render as an empty card
+and consume the result limit when the user requested Russian.
+
+The shared lookup boundary now discards an entry when target-language filtering leaves it with no
+sourced senses. The entry is marked seen only after that check, so a definition-less shell neither
+occupies the result budget nor suppresses a later usable result. A regression proves that looking
+up English-only `走る` with Russian selected returns no entry, not a card without a definition. No
+schema, persistence, importer, provider, UI copy or result ranking changed.
+
+Live Electron acceptance used one fresh Forge process owned by this hop and the authenticated
+debug bridge only. The real Vite-loaded `dictService` received a Japanese headword row whose only
+gloss was filtered out by a Russian target and returned `entries: 0`, while retaining query `走る`
+and detected language `ja`. The bridge error ring contained **0** entries. The temporary renderer
+probe was deleted and no dictionary or user state was written. The development process tree was
+stopped after the check.
+
+Verification on the shared tree: focused dictionary lookup tests **36/36**. Full `npx vitest run
+--hookTimeout=60000`: **566 files passed / 1 skipped, 7,521 tests passed / 6 skipped**. `node
+tools/i18n-check.cjs`: **9,433 keys** complete. `node tools/architecture-audit.cjs`: **1,764
+modules**, nothing new, the same two pending. ESLint over the two touched TS paths: **0 errors,
+0 warnings**.
+
+Track 2 remains open. This closes a language-pair result-shape defect, not the broad source and
+search requirements. Re-derive the next bounded gap among cancellable imports, missing source
+formats, source metadata/controls, deduplication, fuzzy search or saved searches; do not move to
+Track 3 yet.
