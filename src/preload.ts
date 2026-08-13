@@ -485,6 +485,36 @@ const api = {
     ipcRenderer.invoke('dict:setYomitanLang', id, lang),
   /** Gloss languages served by the enabled dictionaries (e.g. ['en','ru']). */
   dictAvailableLangs: (): Promise<string[]> => ipcRenderer.invoke('dict:availableLangs'),
+
+  // ----- Long dictionary imports (utility process) ------------------------------
+  // These take minutes and run off the main thread. The snapshot separates
+  // `status` from `terminal` on purpose: progress must never read as success.
+  // Contract and validation: `shared/dictionaryImportJob.ts`.
+  dictImportStart: (
+    request: import('./shared/dictionaryImportJob').DictionaryImportRequest,
+  ): Promise<
+    | { ok: true; snapshot: import('./shared/dictionaryImportJob').DictionaryImportJobSnapshot }
+    | { ok: false; error: string; snapshot?: import('./shared/dictionaryImportJob').DictionaryImportJobSnapshot }
+  > => ipcRenderer.invoke('dictImport:start', request),
+  /** Cooperative — the importer rolls its transaction back rather than half-importing. */
+  dictImportCancel: (
+    jobId?: string,
+  ): Promise<{ ok: boolean; snapshot: import('./shared/dictionaryImportJob').DictionaryImportJobSnapshot | null }> =>
+    ipcRenderer.invoke('dictImport:cancel', jobId),
+  /** The running job, or the last outcome. How a reloaded window recovers. */
+  dictImportStatus: (): Promise<import('./shared/dictionaryImportJob').DictionaryImportJobSnapshot | null> =>
+    ipcRenderer.invoke('dictImport:status'),
+  onDictImportChanged: (
+    cb: (snapshot: import('./shared/dictionaryImportJob').DictionaryImportJobSnapshot) => void,
+  ): (() => void) => {
+    const handler = (
+      _e: unknown,
+      snapshot: import('./shared/dictionaryImportJob').DictionaryImportJobSnapshot,
+    ): void => cb(snapshot);
+    ipcRenderer.on('dictImport:changed', handler);
+    return () => ipcRenderer.removeListener('dictImport:changed', handler);
+  },
+
   ankiStatus: (): Promise<AnkiStatus> => ipcRenderer.invoke('anki:status'),
   ankiAddNote: (req: AnkiAddRequest): Promise<AnkiAddResult> =>
     ipcRenderer.invoke('anki:addNote', req),

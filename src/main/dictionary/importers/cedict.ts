@@ -26,6 +26,8 @@ export interface CedictImportOptions {
   /** Called every `progressEvery` lines so a long import can report itself. */
   onProgress?: (lines: number) => void;
   progressEvery?: number;
+  /** Returning true aborts the transaction; no partial dictionary is retained. */
+  shouldCancel?: () => boolean;
 }
 
 export interface CedictImportCounts {
@@ -40,6 +42,7 @@ export interface CedictImportCounts {
   variants: number;
   senses: number;
   glosses: number;
+  cancelled?: boolean;
 }
 
 export const CEDICT_LICENCE = 'CC BY-SA 4.0';
@@ -57,10 +60,14 @@ export function importCedict(db: SqliteDb, text: string, options: CedictImportOp
   const glossLang = options.glossLang ?? 'en';
   const progressEvery = options.progressEvery ?? 20_000;
   const counts: CedictImportCounts = {
-    dictId, entries: 0, skipped: 0, headwords: 0, variants: 0, senses: 0, glosses: 0,
+    dictId, entries: 0, skipped: 0, headwords: 0, variants: 0, senses: 0, glosses: 0, cancelled: false,
   };
+  const CANCELLED = Symbol('cedict-cancelled');
 
   const run = db.transaction(() => {
+    // Honor cancellation before deleting the previous source. This matters for
+    // short files where the normal progress cadence is never reached.
+    if (options.shouldCancel?.()) throw CANCELLED;
     db.prepare('delete from dictionaries where id = ?').run(dictId);
     db.prepare(`
       insert into dictionaries (id, title, revision, source_lang, target_langs, priority,
@@ -87,7 +94,10 @@ export function importCedict(db: SqliteDb, text: string, options: CedictImportOp
     let line = 0;
     for (const raw of text.split('\n')) {
       line += 1;
-      if (progressEvery > 0 && line % progressEvery === 0) options.onProgress?.(line);
+      if (progressEvery > 0 && line % progressEvery === 0) {
+        options.onProgress?.(line);
+        if (options.shouldCancel?.()) throw CANCELLED;
+      }
 
       const entry = parseCedictLine(raw.endsWith('\r') ? raw.slice(0, -1) : raw);
       if (!entry) {
@@ -133,7 +143,17 @@ export function importCedict(db: SqliteDb, text: string, options: CedictImportOp
     }
   });
 
-  run();
+  try {
+    run();
+  } catch (error) {
+    if (error === CANCELLED) {
+      counts.entries = 0; counts.skipped = 0; counts.headwords = 0;
+      counts.variants = 0; counts.senses = 0; counts.glosses = 0;
+      counts.cancelled = true;
+      return counts;
+    }
+    throw error;
+  }
   return counts;
 }
 

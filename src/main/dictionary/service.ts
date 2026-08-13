@@ -14,17 +14,16 @@
 // is a second the main process cannot answer an IPC call: the window would be frozen
 // solid for the whole import, on first launch, with no way to cancel.
 //
-// The source plan's answer is a `utilityProcess`. That is correct and it is also
-// **blocked by this repo's scope rule**: a utilityProcess (or a `worker_threads`
-// Worker, or a forked child) needs its own build entry point, and CLAUDE.md forbids
-// touching `forge.config.ts` / `vite.*.config.ts`. My plan file already recorded that
-// utilityProcess is net-new infrastructure rather than an existing pattern; this is
-// the sharper version of that finding — it is not merely unbudgeted, it cannot be
-// added without a build-config change that is out of scope for this work.
+// The source plan's answer is a `utilityProcess`, and **that now exists**:
+// `importWorker.ts` is the worker, `importJobs.ts` owns its lifecycle, and
+// `importIpc.ts` exposes start/cancel/status to the renderer. The build entry that
+// blocked it for several phases is one array element in `forge.config.ts`; the
+// scope rule that forbade adding it was lifted explicitly for this feature.
 //
-// So the migration is exposed as `migrateLegacyStoresNow()`, is never called on boot,
-// and the status object tells a caller whether there is anything to migrate. Wiring
-// it to a button is safe only once it has somewhere to run.
+// The `*Now` functions below are therefore **not** the product path any more. They
+// remain because they are the synchronous core the worker and the tests both call,
+// and because a CLI or a test wants them without a child process. Nothing on the
+// main thread should call them: use `dictionaryImportJobs().start()` instead.
 
 import fs from 'node:fs';
 import path from 'node:path';

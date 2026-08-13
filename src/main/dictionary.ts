@@ -48,6 +48,7 @@ import {
   moveDictionarySource,
   removeDictionarySource,
 } from './dictionary/service';
+import { registerDictionaryImportIpc } from './dictionary/importIpc';
 import { resolveCustomFrequencyRanks } from './mining';
 import { getMainJapaneseTokenizer } from './japaneseTokenizer';
 import { attachLexiconFrequency } from '../shared/lexiconDifficulty';
@@ -622,6 +623,10 @@ export function registerDictionaryIpc(): void {
     await initYomitan();
     return getAvailableGlossLangs();
   });
+  // The long imports run in a utility process and have their own lifecycle
+  // (progress, cancellation, post-reload recovery), so they live next door
+  // rather than as four more one-line handlers here.
+  registerDictionaryImportIpc();
 }
 
 export { fetchJapaneseAudio, initYomitan };

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { isDictionaryImportTerminal, type DictionaryImportJobSnapshot } from '../dictionaryImportJob';
+import {
+  isDictionaryImportTerminal,
+  normalizeDictionaryImportJobSnapshot,
+  normalizeDictionaryImportRequest,
+  type DictionaryImportJobSnapshot,
+} from '../dictionaryImportJob';
 
 describe('dictionary import job contract', () => {
   it('does not mistake progress for a terminal result', () => {
@@ -17,5 +22,95 @@ describe('dictionary import job contract', () => {
       { jobId: 'c', kind: 'legacy', status: 'failed', terminal: { state: 'failed', error: 'read failed' } },
     ];
     expect(states.every(isDictionaryImportTerminal)).toBe(true);
+  });
+
+  it('rejects mismatched progress and terminal payloads', () => {
+    expect(normalizeDictionaryImportJobSnapshot({
+      jobId: 'job-1', kind: 'cedict', status: 'running',
+      progress: { jobId: 'other', kind: 'cedict', lines: 2, phase: 'reading' },
+    })).toBeNull();
+    expect(normalizeDictionaryImportJobSnapshot({
+      jobId: 'job-2', kind: 'wiktextract', status: 'committed',
+      terminal: { state: 'failed', error: 'nope' },
+    })).toBeNull();
+  });
+
+  it('normalizes a valid worker snapshot', () => {
+    const snapshot = normalizeDictionaryImportJobSnapshot({
+      jobId: 'job-3', kind: 'legacy', status: 'failed',
+      progress: { jobId: 'job-3', kind: 'legacy', lines: 4, phase: 'committing' },
+      terminal: { state: 'failed', error: 'cancelled by user' },
+    });
+    expect(snapshot && isDictionaryImportTerminal(snapshot)).toBe(true);
+  });
+
+  it('rejects invalid terminal count values from the worker boundary', () => {
+    expect(normalizeDictionaryImportJobSnapshot({
+      jobId: 'job-4', kind: 'cedict', status: 'committed',
+      terminal: { state: 'committed', counts: { entries: -1 } },
+    })).toBeNull();
+    expect(normalizeDictionaryImportJobSnapshot({
+      jobId: 'job-5', kind: 'cedict', status: 'cancelled',
+      terminal: { state: 'cancelled', counts: { entries: Number.NaN } },
+    })).toBeNull();
+    expect(normalizeDictionaryImportJobSnapshot({
+      jobId: 'job-6', kind: 'cedict', status: 'running',
+      progress: { jobId: 'job-6', kind: 'cedict', lines: Number.MAX_SAFE_INTEGER + 1, phase: 'reading' },
+    })).toBeNull();
+    expect(normalizeDictionaryImportJobSnapshot({
+      jobId: 'job-7', kind: 'cedict', status: 'committed',
+      terminal: { state: 'committed', counts: { entries: Number.MAX_SAFE_INTEGER + 1 } },
+    })).toBeNull();
+  });
+
+  it('bounds untrusted identifiers, errors, and count keys', () => {
+    expect(normalizeDictionaryImportJobSnapshot({
+      jobId: 'x'.repeat(129), kind: 'cedict', status: 'running',
+    })).toBeNull();
+    expect(normalizeDictionaryImportJobSnapshot({
+      jobId: 'job-8', kind: 'cedict', status: 'failed',
+      terminal: { state: 'failed', error: 'x'.repeat(2_001) },
+    })).toBeNull();
+    expect(normalizeDictionaryImportJobSnapshot({
+      jobId: 'job-9', kind: 'cedict', status: 'committed',
+      terminal: { state: 'committed', counts: { ['x'.repeat(65)]: 1 } },
+    })).toBeNull();
+  });
+
+  it('rejects an oversized terminal count map', () => {
+    const counts = Object.fromEntries(Array.from({ length: 33 }, (_, index) => [`count-${index}`, index]));
+    expect(normalizeDictionaryImportJobSnapshot({
+      jobId: 'job-10', kind: 'cedict', status: 'committed', terminal: { state: 'committed', counts },
+    })).toBeNull();
+  });
+});
+
+describe('dictionary import request validation', () => {
+  it('accepts the two file-backed kinds with a path', () => {
+    expect(normalizeDictionaryImportRequest({ kind: 'cedict', filePath: '/tmp/cedict.u8' }))
+      .toEqual({ kind: 'cedict', filePath: '/tmp/cedict.u8' });
+    expect(normalizeDictionaryImportRequest({ kind: 'wiktextract', filePath: '/tmp/d.jsonl', dictId: 'wikt-ja' }))
+      .toEqual({ kind: 'wiktextract', filePath: '/tmp/d.jsonl', dictId: 'wikt-ja' });
+  });
+
+  it('refuses a file-backed kind with no path rather than importing nothing', () => {
+    expect(normalizeDictionaryImportRequest({ kind: 'cedict' })).toBeNull();
+    expect(normalizeDictionaryImportRequest({ kind: 'cedict', filePath: '' })).toBeNull();
+    expect(normalizeDictionaryImportRequest({ kind: 'wiktextract', filePath: 'x'.repeat(4_097) })).toBeNull();
+  });
+
+  it('reads the whole legacy tree and refuses a path that would be silently ignored', () => {
+    expect(normalizeDictionaryImportRequest({ kind: 'legacy' })).toEqual({ kind: 'legacy' });
+    expect(normalizeDictionaryImportRequest({ kind: 'legacy', filePath: '/tmp/anything' })).toBeNull();
+  });
+
+  it('rejects an unknown kind and non-object input', () => {
+    expect(normalizeDictionaryImportRequest({ kind: 'jmdict', filePath: '/a' })).toBeNull();
+    expect(normalizeDictionaryImportRequest(null)).toBeNull();
+    expect(normalizeDictionaryImportRequest('cedict')).toBeNull();
+  });
+
+  it('bounds a caller-supplied dictionary id', () => {
+    expect(normalizeDictionaryImportRequest({ kind: 'cedict', filePath: '/a', dictId: 'x'.repeat(129) })).toBeNull();
   });
 });

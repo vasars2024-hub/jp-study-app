@@ -297,4 +297,33 @@ describe('scanning userData/yomitan', () => {
     migrateLegacyYomitanStores(db, root);
     expect(fs.existsSync(file)).toBe(true);
   });
+
+  // Cancellation exists so a user can stop a migration that takes minutes. It is
+  // per store, not per row: each store is its own transaction, so the honest
+  // stopping point is a whole-dictionary boundary and the stores already written
+  // stay written. `imported` has to say which, or the next run looks idle.
+  it('stops at the next store boundary when asked, and reports what did land', () => {
+    const root = path.join(tempRoot, 'yomitan');
+    writeStore(path.join(root, 'a-first'), fixture({ info: { ...fixture().info, id: 'a-first', title: 'First' } }));
+    writeStore(path.join(root, 'b-second'), fixture({ info: { ...fixture().info, id: 'b-second', title: 'Second' } }));
+
+    let seen = 0;
+    const result = migrateLegacyYomitanStores(db, root, () => { seen += 1; }, () => seen >= 1);
+
+    expect(result.cancelled).toBe(true);
+    expect(result.imported.map((row) => row.dictId)).toEqual(['a-first']);
+    // The store that was never started must not appear as skipped-with-a-reason:
+    // it was not broken, it simply was not reached.
+    expect(result.skipped).toEqual([]);
+    const rows = db.prepare('select id from dictionaries').all() as { id: string }[];
+    expect(rows.map((row) => row.id)).toEqual(['a-first']);
+  });
+
+  it('does not set cancelled when nothing asked it to stop', () => {
+    const root = path.join(tempRoot, 'yomitan');
+    writeStore(path.join(root, 'jmdict-en'), fixture());
+    const result = migrateLegacyYomitanStores(db, root, undefined, () => false);
+    expect(result.cancelled).toBeUndefined();
+    expect(result.imported.map((row) => row.dictId)).toEqual(['jmdict-en']);
+  });
 });

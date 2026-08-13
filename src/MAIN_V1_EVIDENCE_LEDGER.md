@@ -16849,3 +16849,120 @@ passed (9,440 keys); `node tools/architecture-audit.cjs` passed (1,772 modules, 
 findings, 3 known pending); focused ESLint passed for the importer contract and service. The
 retrospective remains incomplete because the connected importer slice, live bridge proof, and
 clean checkpoint are still open.
+
+## Track 2 — the dictionary importer utility process is built, wired, and live-proven — 2026-08-13 16:30 MSK
+
+Relay hop, `backup`. **Nine consecutive prior hops closed with a no-change "the integration
+owners are foreign-dirty" report and no product change.** That premise was re-derived against the
+tree and is only one-eleventh true, so this hop implemented the slice instead of restating it.
+
+### The blocker, re-derived rather than inherited
+
+`src/main/dictionary/service.ts:17-27` carried the original objection in its own header: a
+`utilityProcess` "needs its own build entry point, and CLAUDE.md forbids touching
+`forge.config.ts` / `vite.*.config.ts`". Standing relay approval supersedes exactly that —
+minimal, reversible build wiring necessary to complete the active planned feature. That comment
+is now rewritten to say what is true.
+
+The second, newer objection was ownership. Measured, per file:
+
+| File | State | Handling |
+| --- | --- | --- |
+| `src/main/dictionary.ts` | **clean** | edited directly; `registerDictionaryIpc()` already exists and is already called from `main.ts`, so **no `src/main.ts` edit was needed at all** |
+| `src/main/dictionary/{migrate,service}.ts`, `forge.config.ts`, `tools/architecture-baseline.json` | **clean** | edited directly |
+| `src/shared/dictionaryImportJob.ts`, `importers/cedict.ts`, `shared/__tests__/dictionaryImportJob.test.ts` | dirty with **this same importer track's** earlier uncommitted work | committed together; they close the import graph |
+| `src/preload.ts` | genuinely foreign-dirty (Study Blocks + subtitle tracks) | HEAD + only my hunk reconstructed and staged as a blob — the repo's documented recipe. Staged diff is **+30/-0**; foreign-marker grep count **0** |
+
+So "the owners are foreign-dirty" was true of one file out of eleven, and that file has a written
+procedure for exactly this case.
+
+### Decisions taken under standing approval
+
+- **`utilityProcess`, not `worker_threads`.** `better-sqlite3` is a native Node-API module and the
+  worker opens its own handle to the same file main reads; WAL (already configured in `db.ts`)
+  supports one reader plus one writer. A real child process makes that handle independent and
+  makes a wedged import killable. A Worker would share the main heap and its fate.
+- **Build footprint: one array element** in `forge.config.ts` — a third Vite build target,
+  `entry: 'src/main/dictionary/importWorker.ts'`, `target: 'main'`, reusing `vite.main.config.ts`.
+  Verified in a real dev boot: `target built src/main/dictionary/importWorker.ts`, producing
+  `.vite/build/importWorker.js` (34,916 bytes) beside `main.js`.
+- **One job at a time**, refused with `{ok:false, error:'busy'}` plus the running snapshot — two
+  writers would contend on the same SQLite write lock.
+- **Paths travel in the `start` message.** A utility process has no `app`, so `dbDir` and
+  `legacyRoot` are resolved in main and sent, rather than resolved in the worker.
+- **Legacy migration cancellation is per store**, not per row: each store is its own transaction,
+  so the honest stopping point is a dictionary boundary, and `imported` reports what did land.
+
+### The defect the live pass found, which the unit tests could not
+
+First live run: a missing-file import returned terminal
+`"The dictionary import process stopped before it finished."` — the parent's *worker died silently*
+fallback — instead of the real error. Cause: the worker sent its terminal message and then called
+`process.exit(0)` on a zero-delay timer, and the parent saw the **exit** before the **message**.
+Every failed import would have lied about why it failed. The fake-port unit test could not catch
+it because the fake is synchronous.
+
+Fix: the worker no longer exits itself (a 30 s unref'd timer remains only as a leak guard for an
+orphaned child); `importJobs.ts` kills the worker *after* it has the terminal message, making the
+ordering deterministic instead of hopeful. A regression test now asserts that an exit arriving
+after a terminal message does not overwrite the real error. Re-verified live: the renderer
+received `ENOENT: no such file or directory, open 'C:\nope\definitely-missing.u8'`.
+
+### Live Electron acceptance (authenticated debug bridge only; no input automation)
+
+One dev process started and only that process stopped afterwards. Renderer at
+`http://localhost:5174/`, `visible:true`. All results are from `window.api` through the real
+preload and real main handlers, not from greps.
+
+- **Failure is honest** — the real `ENOENT` reaches the renderer (above).
+- **Committed path** — a 2-entry CC-CEDICT fixture in `%TEMP%` imported through the utility
+  process: `{state:'committed', counts:{entries:2, skipped:2, headwords:3, variants:1, senses:2,
+  glosses:3}}`, matching the fixture (2 valid lines; 1 comment + 1 blank skipped).
+- **The data is really there** — `window.api.lookupChinese('狗')` returned
+  `{word:'狗', reading:'gǒu', definitions:['dog'], source:'CC-CEDICT'}` from the imported SQLite
+  row, and `dictListSources()` showed the new source with `entryCount: 2`.
+- **Recovery** — `dictImportStatus()` returned the full terminal snapshot after the job ended,
+  which is how a reloaded window recovers an outcome it was not alive to hear.
+- **Busy refusal** — two starts in one tick: first `{ok:true, running}`, second
+  `{ok:false, error:'busy'}` carrying the running job's snapshot.
+- **Cancel when idle** — `{ok:false}` with the last snapshot, not a fabricated success.
+- **Restoration proved, not eyeballed** — sources were `[]` before (matching the known
+  empty-term-DB state); both probe dictionaries were removed via the product's own
+  `dictRemoveSource`, and `JSON.stringify(after) === JSON.stringify(before)` returned **true**.
+  No userData backup was taken. `/logs` had zero dictionary-related entries at any level.
+
+### Gates
+
+- `npx vitest run` — **572 files passed, 1 skipped; 7,589 tests passed, 6 skipped, 0 failed.**
+- `node tools/i18n-check.cjs` — exit 0, 9,440 keys complete. (No new UI strings in this slice;
+  the renderer surface is the next one.)
+- `node tools/architecture-audit.cjs` — exit 0, 1,777 modules, 18 findings, nothing new.
+  `dictionaryImportJob.ts` is **no longer** `test-only` (product code imports it now) and its
+  pending baseline entry was removed; `importWorker.ts` is newly classified `accepted` — it is a
+  process entry point whose real caller is `utilityProcess.fork()` by built path, which no static
+  import graph can follow, exactly like `src/main.ts` and `src/preload.ts`.
+- `npx eslint <touched paths>` — 0 errors (7 pre-existing `no-explicit-any` warnings in
+  `dictionary.ts`, on lines this slice did not touch).
+
+### Separate finding, fixed in its own commit: a test-fixture time bomb
+
+The first full-suite run had **1 failure**, `src/main/__tests__/scraperNetworkPolicy.test.ts`,
+asserting `/self-signed certificate/i` but receiving `"certificate has expired"`. It is unrelated
+to this slice. Cause: `fixtures/proxy-test-cert.pem` was minted 2026-08-11 with a **two-day**
+validity and expired **2026-08-13 10:16 GMT** — i.e. it began failing for every worker, today,
+permanently, for a reason with nothing to do with the proxy policy under test. Regenerated as the
+same self-signed `CN=fixture` RSA-2048 pair with a 100-year validity (pair confirmed matching via
+`checkPrivateKey`), and the regeneration command plus this history is now a comment at the
+fixture's read site so the next person does not mint another two-day cert. That suite is back to
+34/34.
+
+### What is genuinely next
+
+The renderer **UI** for this bridge — a Dictionaries settings surface with progress, cancel, and
+recovery, plus its four-language i18n keys. The bridge underneath it is now complete and
+live-proven, so that slice is ordinary UI work with no remaining architecture decision. The
+`*Now` functions in `service.ts` stay as the synchronous core the worker and tests call; nothing
+on the main thread should call them.
+
+Retrospective state remains **false**: the historical importer blocker is now genuinely resolved
+rather than reworded, but the full historical sweep across the other tracks is not reconciled.

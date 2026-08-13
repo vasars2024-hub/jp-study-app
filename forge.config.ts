@@ -170,6 +170,20 @@ const config: ForgeConfig = {
           config: 'vite.preload.config.ts',
           target: 'preload',
         },
+        {
+          // The dictionary import utility process. `src/main/dictionary/service.ts`
+          // recorded for several phases that the imports it exposes block the main
+          // thread for minutes and that the `utilityProcess` which would host them
+          // was unbuildable without an entry point — this is that entry point.
+          //
+          // `target: 'main'` because it is a Node/Electron child, built with the
+          // same externals and CJS output as the main bundle; Vite names the output
+          // after the entry file, so `importJobs.ts` resolves it as
+          // `<.vite/build>/importWorker.js` beside `main.js`.
+          entry: 'src/main/dictionary/importWorker.ts',
+          config: 'vite.main.config.ts',
+          target: 'main',
+        },
       ],
       renderer: [
         {

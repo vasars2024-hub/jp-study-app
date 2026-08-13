@@ -78,6 +78,8 @@ export interface MigrationResult {
   imported: ImportedCounts[];
   /** Stores that could not be read, with the reason. Never throws for these. */
   skipped: { dictId: string; reason: string }[];
+  /** Set when `shouldCancel` fired; `imported` is then a partial, honest list. */
+  cancelled?: boolean;
 }
 
 /** The gloss language a dictionary's definitions are written in. */
@@ -247,6 +249,7 @@ export function migrateLegacyYomitanStores(
   db: SqliteDb,
   root: string,
   onProgress?: (progress: MigrationProgress) => void,
+  shouldCancel?: () => boolean,
 ): MigrationResult {
   const result: MigrationResult = { imported: [], skipped: [] };
   if (!fs.existsSync(root)) return result;
@@ -257,6 +260,13 @@ export function migrateLegacyYomitanStores(
     .map((entry) => entry.name);
 
   dirs.forEach((dirName, position) => {
+    // Cancellation is per store, not per row: each store is its own transaction,
+    // so the honest stopping point is a whole-dictionary boundary. The stores
+    // already imported stay — `result.imported` says exactly which.
+    if (result.cancelled || shouldCancel?.()) {
+      result.cancelled = true;
+      return;
+    }
     const file = path.join(root, dirName, 'index.json');
     if (!fs.existsSync(file)) {
       result.skipped.push({ dictId: dirName, reason: 'no index.json' });
