@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  agentContextSuggestionPrompt,
   deriveAgentContextSuggestions,
   type AgentContextSuggestionPreferences,
   type AgentContextSuggestionSource,
@@ -76,9 +77,10 @@ export function AgentContextSuggestions({
               type="button"
               className="agent-context-suggestion"
               title={t('agent.suggestions.useTitle', { action, context: suggestion.contextLabel })}
-              onClick={() => onUse(t(PROMPT_KEYS[suggestion.source], {
-                context: suggestion.contextLabel,
-              }))}
+              onClick={() => onUse(agentContextSuggestionPrompt(
+                suggestion,
+                t(PROMPT_KEYS[suggestion.source], { context: suggestion.contextLabel }),
+              ))}
             >
               <span>{action}</span>
               <small>{suggestion.contextLabel}</small>

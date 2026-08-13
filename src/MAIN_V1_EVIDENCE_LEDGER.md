@@ -15137,3 +15137,52 @@ contracts, then take one structured explanation facet (nuance/similar-word disti
 to the already-visible suggestion) through a grounded prompt/result contract. Do not claim the
 whole Contextual Explain matrix from this routing slice, and do not bypass the centralized Agent's
 privacy, language, streaming or budget controls.
+
+## Nuance explanations now have an evidence contract, not just a friendly verb — 2026-08-13
+
+Relay hop, `codexB`. Track 2. The boss-audit tail was checked first: `bef3b2e` already owns both
+clean-HEAD corrections and their files are clean. The final ledger section, rather than the stale
+vision hint in the launcher, made the next bounded slice the existing **Explain nuance** Agent
+suggestion.
+
+That suggestion used to insert one broad sentence. The provider received attached context, but no
+contract said which claims had to come from it, what a similar-word comparison meant, or what to do
+when the passage could not prove a distinction. Dictionary-sourced suggestions now append an
+invariant model-facing contract with four explicit sections: **Meaning in this context**, **Nuance**,
+**Similar words**, and **Evidence and uncertainty**. It requires an exact supporting quote for every
+context-specific claim, caps comparisons at two, asks for the practical register/collocation and
+substitution difference, labels general-language knowledge separately, and requires an honest
+insufficiency statement instead of invented evidence. The localized lead remains localized; the
+new text is provider-facing instruction and still runs exclusively through the central Agent's
+provider, privacy, language, streaming and budget controls.
+
+Live acceptance found and fixed an adjacent defect before checkpointing. The real conversation had
+an older retained Dictionary route before the newly attached `猫が来た。` passage. Deduplication took
+the first item for the source, so the chip visibly said **Explain nuance / Dictionary** and composed a
+question about the window. Selection now preserves source order while preferring substantive
+material over route chrome and, within the same class, the newest item. Equal timestamps keep shelf
+order, so the previous deterministic behavior is preserved where recency cannot decide.
+
+Live Electron acceptance used a fresh app process and the authenticated debug bridge only. The real
+Dictionary Interlinear flow analysed `猫が来た。`, **Explain in Agent** attached it to the real
+main-owned conversation, and the Agent shelf showed it as personal/session-only. After the selection
+fix, the chip read **Explain nuance / 猫が来た。** and filled the composer with all four section names,
+the two-comparison ceiling, exact-quote evidence rule, general-knowledge disclosure and insufficiency
+rule. The message count stayed at four: acceptance did not execute a model request. Headless page
+capture returned Electron `UnknownVizError`, so this evidence is DOM/state rather than a screenshot.
+The probe passage was removed through `agentWorkspaceSave` and verified absent with three
+conversations remaining; the two first-run local-storage keys created while dismissing blocking
+overlays were removed and verified absent. Only this hop's recorded npm/Electron process tree was
+stopped.
+
+Verification: focused suggestion/shell tests **66/66**. Full `npx vitest run
+--hookTimeout=60000`: **566 files passed / 1 skipped, 7,514 tests passed / 6 skipped**.
+`node tools/i18n-check.cjs`: **9,430 keys** complete. `node tools/architecture-audit.cjs`:
+**1,764 modules**, nothing new, the same two pending. ESLint over all three touched TS/TSX paths:
+**0 errors, 0 warnings**.
+
+Track 2 remains open. Re-derive the next Contextual Explain facet against this evidence boundary.
+Usage/register or collocations are adjacent and can reuse it; explicit explanation-language
+selection, caching, batch explanation, learner mistakes, etymology, grammar, mnemonics and graded
+examples remain open. Do not infer that a requested section guarantees a correct model answer, and
+do not add a second provider client to obtain one.

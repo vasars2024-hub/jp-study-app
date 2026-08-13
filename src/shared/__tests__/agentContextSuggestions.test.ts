@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  agentContextSuggestionPrompt,
   DEFAULT_AGENT_CONTEXT_SUGGESTION_PREFERENCES,
   deriveAgentContextSuggestions,
   normalizeAgentContextSuggestionPreferences,
@@ -70,6 +71,44 @@ describe('Agent context suggestions', () => {
       ['dictionary', 'dictionary-new'],
       ['flashcards', 'deck'],
     ]);
+  });
+
+  it('prefers new substantive context over older route chrome from the same source', () => {
+    const route = { ...context('dictionary-route', 'route', 'Dictionary'), createdAt: 10 };
+    const oldEntry = { ...context('old-word', 'dictionary-entry', 'Dictionary'), createdAt: 20 };
+    const passage = { ...context('猫が来た。', 'reading-passage', 'Dictionary'), createdAt: 30 };
+
+    expect(deriveAgentContextSuggestions(conversation([
+      route,
+      oldEntry,
+      passage,
+    ]), DEFAULT_AGENT_CONTEXT_SUGGESTION_PREFERENCES)[0]).toMatchObject({
+      source: 'dictionary',
+      contextId: '猫が来た。',
+      contextLabel: '猫が来た。',
+    });
+  });
+
+  it('gives dictionary explanations a bounded evidence and comparison contract', () => {
+    const [suggestion] = deriveAgentContextSuggestions(conversation([
+      context('dictionary-new', 'dictionary-entry', 'Dictionary'),
+    ]), DEFAULT_AGENT_CONTEXT_SUGGESTION_PREFERENCES);
+    const prompt = agentContextSuggestionPrompt(suggestion, '  Explain 猫.  ');
+
+    expect(prompt).toContain('Explain 猫.\n\nAnswer with these sections:');
+    expect(prompt).toContain('Compare at most two similar words.');
+    expect(prompt).toContain('quote the exact word or phrase');
+    expect(prompt).toContain('general language knowledge');
+    expect(prompt).toContain('instead of inventing evidence');
+  });
+
+  it('does not impose the dictionary result shape on another workflow', () => {
+    const [suggestion] = deriveAgentContextSuggestions(conversation([
+      context('passage', 'reading-passage', 'Reading'),
+    ]), DEFAULT_AGENT_CONTEXT_SUGGESTION_PREFERENCES);
+
+    expect(agentContextSuggestionPrompt(suggestion, '  Analyze this passage.  '))
+      .toBe('Analyze this passage.');
   });
 
   it('preserves both an active execution claim and suggestions through operational normalization', () => {
