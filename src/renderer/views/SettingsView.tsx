@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { confirmDialog } from '../components/ui';
 import { KNOWN_LANGS } from '../../shared/langs';
 import type { YomitanDictInfo } from '../../shared/types';
+import type { DictionarySourceInfo } from '../../shared/dictionarySources';
 import {
   bumpZoom,
   getZoom,
@@ -18,6 +19,7 @@ import { loadClipboardSettings, saveClipboardSettings } from '../clipboardHistor
 import { TELEMETRY_CONSENT_KEY } from '../../shared/stats';
 import { sendTelemetryPingIfNeeded } from '../telemetryPing';
 import { useT } from '../i18n';
+import { LANG_TAGS } from '../../shared/i18n/core';
 
 /** Study-profile picker and controls — shared by Settings and Anki views. */
 export function ProfileSettingsSection() {
@@ -36,8 +38,9 @@ function dictKindLabel(d: YomitanDictInfo, t: (key: string) => string): string {
 
 /** Import / remove offline Yomitan dictionaries for the pop-up and mining. */
 export function DictionarySettingsSection() {
-  const { t } = useT();
+  const { t, lang } = useT();
   const [dicts, setDicts] = useState<YomitanDictInfo[]>([]);
+  const [sources, setSources] = useState<DictionarySourceInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
@@ -52,11 +55,13 @@ export function DictionarySettingsSection() {
   async function refresh() {
     setLoading(true);
     try {
-      const [list, offline] = await Promise.all([
+      const [list, importedSources, offline] = await Promise.all([
         window.api.dictListYomitan(),
+        window.api.dictListSources(),
         window.api.examplesOfflineStatus(),
       ]);
       setDicts(list);
+      setSources(importedSources);
       setExOffline(offline);
     } finally {
       setLoading(false);
@@ -144,6 +149,18 @@ export function DictionarySettingsSection() {
     const res = await window.api.dictSetYomitanLang(id, glossLang);
     if (res.ok) await refresh();
     else setMsg({ kind: 'err', text: res.error ?? t('settings.study.dict.langFailed') });
+  }
+
+  async function updateSource(result: Promise<{ ok: boolean; error?: string; sources: DictionarySourceInfo[] }>) {
+    setMsg(null);
+    const next = await result;
+    setSources(next.sources);
+    if (!next.ok && next.error !== 'edge') setMsg({ kind: 'err', text: t('settings.study.dict.updateFailed') });
+  }
+
+  async function onRemoveSource(source: DictionarySourceInfo) {
+    const ok = await confirmDialog({ title: t('settings.study.dict.removeTitle'), message: t('settings.study.dict.removeMsg', { title: source.title }), confirmLabel: t('common.remove'), danger: true });
+    if (ok) await updateSource(window.api.dictRemoveSource(source.id));
   }
 
   return (
@@ -240,6 +257,27 @@ export function DictionarySettingsSection() {
                       : t('common.remove')}
                   </button>
                 )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <h3 className="set-subhead">{t('settings.study.dict.sources.title')}</h3>
+      <p className="set-row-desc muted">{t('settings.study.dict.sources.intro')}</p>
+      {!loading && sources.length === 0 && <div className="form-msg">{t('settings.study.dict.sources.empty')}</div>}
+      {!loading && sources.length > 0 && (
+        <ul className="dict-manage-list">
+          {sources.map((source, index) => (
+            <li className={`dict-manage-row ${source.enabled ? '' : 'off'}`} key={source.id}>
+              <label className="dict-manage-toggle" title={t('settings.study.dict.useTitle')}>
+                <input type="checkbox" checked={source.enabled} onChange={(event) => void updateSource(window.api.dictSetSourceEnabled(source.id, event.target.checked))} />
+              </label>
+              <div className="dict-manage-info"><div className="set-row-title">{source.title}</div><div className="set-row-desc muted">{source.sourceLang} · {source.kind} · {source.entryCount.toLocaleString(LANG_TAGS[lang])}</div></div>
+              <div className="dict-manage-actions">
+                <button className="btn small" title={t('settings.study.dict.higherPriority')} disabled={index === 0} onClick={() => void updateSource(window.api.dictMoveSource(source.id, -1))}>↑</button>
+                <button className="btn small" title={t('settings.study.dict.lowerPriority')} disabled={index === sources.length - 1} onClick={() => void updateSource(window.api.dictMoveSource(source.id, 1))}>↓</button>
+                <button className="btn small" onClick={() => void onRemoveSource(source)}>{t('common.remove')}</button>
               </div>
             </li>
           ))}

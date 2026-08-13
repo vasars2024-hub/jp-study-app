@@ -15912,3 +15912,34 @@ wiktextract, lookup, cedict, migrate, db, chineseLookup — to **142/142**. The 
 before `git worktree remove` so the real `node_modules` was not taken with it, and `esbuild`
 survives. The commit was staged path by path and committed with **no pathspec**, per the trap the
 previous hop recorded.
+
+## Unified dictionary sources can finally be controlled from Settings — 2026-08-13
+
+Relay hop, `codexX`. Track 2 remains open. The preceding entry correctly found that the new SQLite
+dictionary importers are unreachable in the built app, but exposing their synchronous functions
+directly through IPC would freeze Electron's main event loop for a large dump. The planned worker
+requires a new build entry and therefore a configuration decision outside this track's current
+scope. I did not disguise that unsafe path as a working import button.
+
+The adjacent decision-free part is now complete. The `dictionaries.enabled` and `priority` columns
+that unified lookup already honors have real writers: a shared source contract, service operations,
+main handlers, preload bindings, and a Settings list. Users can inspect source language, kind and
+entry count; enable or disable a source; reorder even sources imported with identical priorities;
+and remove a source through the existing confirmation flow. Every mutation returns a fresh database
+read rather than optimistic renderer state. A focused real-SQLite test covers listing, disabling,
+equal-priority reorder, edge refusal, removal, and missing ids.
+
+Focused dictionary suites: **51/51**. Full `npx vitest run`: **568 passed / 1 skipped files,
+7,553 passed / 6 skipped tests**. The first full run found this slice's bare `toLocaleString()`;
+it was corrected to `LANG_TAGS[lang]`, and the complete rerun passed. `node tools/i18n-check.cjs`:
+**9,437 keys** complete. `node tools/architecture-audit.cjs`: **1,768 modules**, nothing new and
+the same 2 known pending findings. ESLint over the owned implementation/test paths passed; the
+whole touched-path invocation also exposed two pre-existing adjacent-overload errors in the
+foreign-dirty `window.d.ts` and seven pre-existing warnings in `dictionary.ts`.
+
+Live acceptance was not claimed. A foreign Electron instance and bridge were already active; a
+main-process restart is required for these new handlers, and stopping another track's process is
+forbidden. The next hop must invoke `dict:listSources`, toggle and restore one disposable source,
+and exercise the rendered Settings controls after a safe fresh restart. The main remaining Track 2
+slice is still the importer worker/progress/cancel decision and its real file-picker surface; source
+controls no longer belong on that list.

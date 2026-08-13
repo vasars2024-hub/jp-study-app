@@ -472,6 +472,14 @@ const api = {
     ipcRenderer.invoke('dict:setYomitanEnabled', id, enabled),
   dictMoveYomitan: (id: string, dir: number): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('dict:moveYomitan', id, dir),
+  dictListSources: (): Promise<import('./shared/dictionarySources').DictionarySourceInfo[]> =>
+    ipcRenderer.invoke('dict:listSources'),
+  dictSetSourceEnabled: (id: string, enabled: boolean): Promise<import('./shared/dictionarySources').DictionarySourceMutationResult> =>
+    ipcRenderer.invoke('dict:setSourceEnabled', id, enabled),
+  dictMoveSource: (id: string, direction: -1 | 1): Promise<import('./shared/dictionarySources').DictionarySourceMutationResult> =>
+    ipcRenderer.invoke('dict:moveSource', id, direction),
+  dictRemoveSource: (id: string): Promise<import('./shared/dictionarySources').DictionarySourceMutationResult> =>
+    ipcRenderer.invoke('dict:removeSource', id),
   /** Set or clear ('' clears) the manual gloss-language override for a dictionary. */
   dictSetYomitanLang: (id: string, lang: string): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('dict:setYomitanLang', id, lang),

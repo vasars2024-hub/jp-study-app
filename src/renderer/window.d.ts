@@ -341,6 +341,10 @@ declare global {
       dictRemoveYomitan(id: string): Promise<{ ok: boolean; error?: string }>;
       dictSetYomitanEnabled(id: string, enabled: boolean): Promise<{ ok: boolean; error?: string }>;
       dictMoveYomitan(id: string, dir: number): Promise<{ ok: boolean; error?: string }>;
+      dictListSources(): Promise<import('../shared/dictionarySources').DictionarySourceInfo[]>;
+      dictSetSourceEnabled(id: string, enabled: boolean): Promise<import('../shared/dictionarySources').DictionarySourceMutationResult>;
+      dictMoveSource(id: string, direction: -1 | 1): Promise<import('../shared/dictionarySources').DictionarySourceMutationResult>;
+      dictRemoveSource(id: string): Promise<import('../shared/dictionarySources').DictionarySourceMutationResult>;
       ankiStatus(): Promise<AnkiStatus>;
       ankiAddNote(req: AnkiAddRequest): Promise<AnkiAddResult>;
       ankiKnownWords(): Promise<{ ok: boolean; error?: string; words?: Record<string, number> }>;

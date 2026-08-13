@@ -43,6 +43,10 @@ import {
   lookupInDictionaryDb,
   lookupOfflineInterlinearFromStore,
   resetChineseDictionaryCache,
+  listDictionarySources,
+  setDictionarySourceEnabled,
+  moveDictionarySource,
+  removeDictionarySource,
 } from './dictionary/service';
 import { resolveCustomFrequencyRanks } from './mining';
 import { getMainJapaneseTokenizer } from './japaneseTokenizer';
@@ -536,6 +540,12 @@ export function registerDictionaryIpc(): void {
   // Phase 4: the Chinese surfaces' lookup, moved out of `renderer/chineseDict.ts`.
   ipcMain.handle('dict:lookupChinese', (_e, query: string) => lookupChineseInDictionary(query));
   ipcMain.handle('dict:resetChineseCache', () => resetChineseDictionaryCache());
+  ipcMain.handle('dict:listSources', () => listDictionarySources());
+  ipcMain.handle('dict:setSourceEnabled', (_e, id: string, enabled: boolean) =>
+    setDictionarySourceEnabled(id, enabled));
+  ipcMain.handle('dict:moveSource', (_e, id: string, direction: -1 | 1) =>
+    moveDictionarySource(id, direction === -1 ? -1 : 1));
+  ipcMain.handle('dict:removeSource', (_e, id: string) => removeDictionarySource(id));
   // Read-only structured pitch data for the Blanc pitch panel.
   ipcMain.handle('dict:pitch', (_e, term: string, reading?: string) => getPitchData(term, reading));
   ipcMain.handle('dict:lookupTermOffline', (_e, query: string) => lookupTermOffline(query));

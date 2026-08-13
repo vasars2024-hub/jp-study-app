@@ -51,6 +51,7 @@ import {
   type ChineseLookupDeps,
 } from './chineseLookup';
 import type { DictResult } from '../../shared/types';
+import type { DictionarySourceInfo, DictionarySourceMutationResult } from '../../shared/dictionarySources';
 import {
   buildOfflineInterlinear,
   type LexiconInterlinearOptions,
@@ -69,6 +70,56 @@ export interface DictionaryStatus {
   pendingLegacyStores: string[];
   /** Bytes on disk, or 0 when the file has not been created yet. */
   bytes: number;
+}
+
+export function listDictionarySources(db: SqliteDb = dictionaryDb()): DictionarySourceInfo[] {
+  const rows = db.prepare(
+    'select id, title, kind, source_lang, entry_count, enabled, priority from dictionaries order by priority, id',
+  ).all() as Array<{
+    id: string; title: string; kind: string; source_lang: string;
+    entry_count: number; enabled: number; priority: number;
+  }>;
+  return rows.map((row) => ({
+    id: row.id, title: row.title, kind: row.kind, sourceLang: row.source_lang,
+    entryCount: row.entry_count, enabled: row.enabled !== 0, priority: row.priority,
+  }));
+}
+
+export function setDictionarySourceEnabled(
+  id: string,
+  enabled: boolean,
+  db: SqliteDb = dictionaryDb(),
+): DictionarySourceMutationResult {
+  const result = db.prepare('update dictionaries set enabled = ? where id = ?').run(enabled ? 1 : 0, id);
+  return { ok: result.changes > 0, error: result.changes ? undefined : 'not-found', sources: listDictionarySources(db) };
+}
+
+export function moveDictionarySource(
+  id: string,
+  direction: -1 | 1,
+  db: SqliteDb = dictionaryDb(),
+): DictionarySourceMutationResult {
+  const sources = listDictionarySources(db);
+  const index = sources.findIndex((source) => source.id === id);
+  if (index < 0) return { ok: false, error: 'not-found', sources };
+  const target = index + direction;
+  if (target < 0 || target >= sources.length) return { ok: false, error: 'edge', sources };
+  const reordered = [...sources];
+  [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+  const swap = db.transaction(() => {
+    const update = db.prepare('update dictionaries set priority = ? where id = ?');
+    reordered.forEach((source, priority) => update.run(priority, source.id));
+  });
+  swap();
+  return { ok: true, sources: listDictionarySources(db) };
+}
+
+export function removeDictionarySource(
+  id: string,
+  db: SqliteDb = dictionaryDb(),
+): DictionarySourceMutationResult {
+  const result = db.prepare('delete from dictionaries where id = ?').run(id);
+  return { ok: result.changes > 0, error: result.changes ? undefined : 'not-found', sources: listDictionarySources(db) };
 }
 
 let ready = false;
