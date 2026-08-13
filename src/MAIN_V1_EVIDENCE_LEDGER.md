@@ -16564,3 +16564,288 @@ dirty hunks, so a partial bridge would be orphaned and could not pass live Elect
 Next action: preserve those owners, then implement the bounded worker bridge atomically and run the
 four Main V1 gates plus live debug-bridge proof. No external or irreversible blocker remains; the
 retrospective state stays incomplete until the other historical blocker wording is reconciled.
+
+## Importer bridge re-derivation — 2026-08-13 16:31 MSK
+
+Relay hop, `codexA`. Re-read the latest boss-audit tail, Main V1 dependency order, Anki Deck
+Workbench acceptance gates, and the current owner state. The active Track 2 slice is unchanged:
+`src/shared/dictionaryImportJob.ts` provides a bounded, validated snapshot contract, while
+`src/main/dictionary/service.ts` still exposes synchronous `*Now` imports and no connected
+utility-process lifecycle. `src/main.ts`, `src/preload.ts`, and renderer integration owners remain
+concurrently dirty with unrelated work.
+
+Decision: standing approval supersedes the historical permission/configuration objection, but the
+worker, main handler, preload contract, renderer recovery, focused cancellation/progress tests, and
+minimal build entry must still land as one reconciled slice. Adding only one layer would create an
+orphan path and cannot support live Electron acceptance, so foreign hunks remain untouched. This is
+a reversible coordination constraint, not an external blocker.
+
+Validation: `npx vitest run src/shared/__tests__/dictionaryImportJob.test.ts
+src/main/__tests__/agentSessionContext.test.ts src/renderer/__tests__/agentWorkspaceBridge.test.ts`
+passed 3 files / 35 tests; i18n passed with 9,440 complete keys; architecture audit passed with
+1,772 modules / 18 findings / 3 pending; ESLint passed for both importer contract paths. Full Main
+V1 gates, connected live bridge proof, atomic owner reconciliation, and a path-scoped checkpoint
+commit remain open.
+
+## Relay decision sweep and owner recheck — 2026-08-13 16:45 MSK
+
+Relay hop, `codexA`. Re-read the last boss-audit section and reconciled its two clean-HEAD
+corrections against the current tree. The `settingsCatalog.ts` File Drops backup registration is
+already present as a foreign dirty hunk; `agentSessionContext.test.ts` has no corresponding local
+semantic correction. Neither is safe to stage or rewrite while the owning file is concurrently
+dirty. The audit finding is tracked, not falsely claimed closed.
+
+The retrospective sweep re-derived the active Main V1 slice: the bounded `dictionaryImportJob`
+contract exists, but `service.ts` still exposes synchronous imports and no connected
+utility-process/main/preload/renderer lifecycle. Standing approval supersedes the old permission
+objection. The selected reversible action remains one atomic bridge slice once those owners can be
+reconciled; adding a partial layer would be an orphan and cannot pass live Electron acceptance.
+No external or irreversible blocker was found.
+
+Validation: source/status recheck only; no product code changed. Focused importer tests, the four
+Main V1 gates, live bridge proof, and a path-scoped checkpoint remain open.
+
+## Importer boundary recheck — 2026-08-13 15:33 MSK
+
+Relay hop, `codexA`. Re-derived the active Track 2 slice and confirmed the importer remains a tested
+snapshot contract without a connected utility-process/main/preload/renderer execution path. The
+integration owners are still concurrently dirty with foreign work, so no partial worker or bridge
+was added. Standing approval covers the eventual reversible worker/build decision; it does not make
+an orphan layer safe or live-verifiable.
+
+Validation: focused Vitest passed **3 files / 35 tests**; i18n passed with **9,440** complete keys;
+architecture audit passed with **1,772 modules / 18 findings / 3 pending** and nothing new; ESLint
+passed for the importer contract and test. Full Main V1 gates, connected live bridge proof, atomic
+owner reconciliation, and a path-scoped checkpoint commit remain open.
+
+## Importer relay recheck — 2026-08-13 15:40 MSK
+
+Relay hop, `codexA`. Re-derived the active Track 2 slice: `dictionaryImportJob.ts` remains a
+bounded, validated snapshot contract, while `service.ts` still exposes synchronous `*Now` imports
+and no connected utility-process lifecycle. Integration owners are concurrently dirty, so no
+partial worker or bridge was added; standing approval supersedes the historical permission
+objection, but atomic lifecycle reconciliation and live Electron proof remain necessary. No
+external or irreversible blocker was found.
+
+Validation: focused Vitest passed **3 files / 35 tests**; i18n passed with **9,440** complete keys;
+architecture audit passed with **1,772 modules / 18 findings / 3 pending** and nothing new; ESLint
+passed for `src/shared/dictionaryImportJob.ts`. Retrospective state remains false; full Main V1
+gates, live bridge proof, owner reconciliation, and a path-scoped checkpoint remain open.
+## Boss-audit correction recheck — 2026-08-13 15:43 MSK
+
+Relay hop, `codexA`. Re-derived the latest boss-audit handoff before advancing Main V1.
+The two reported clean-HEAD failures are both already corrected in the shared tree: `agentSessionContext.test.ts`
+contains the persistent privacy-floor assertions (floor-up, floor-down, consent, and local-target cases),
+and the concurrently dirty `src/renderer/storage/settingsCatalog.ts` registers
+`jp-os-filedrop-prefs-v1` together with its backup key. The first file is clean; the second contains
+foreign work and was not staged or rewritten. Focused Vitest passed both owning suites: 2 files / 29 tests.
+
+Decision: do not duplicate or restage either correction. The audit finding remains a clean-commit
+reconciliation concern for the owner of the dirty settings file; the active Track 2 importer bridge
+is still deferred until its dirty main/preload/renderer owners can be reconciled atomically. No
+external or irreversible blocker was found.
+
+## Relay re-derivation — 2026-08-13 15:48 MSK
+
+Relay hop, `codexA`. Re-derived the next Main V1 slice from source rather than the stale commit
+hint. The vision-input screenshot/OCR attachment context is already implemented: the execution
+contract admits only bounded `imageBase64` for declared image kinds, rejects the forbidden raw
+binary/path fields, and enforces MIME, decoded-size, attachment-count, and image-count limits.
+`agentImageStaging.ts` provides the session-only, single-use main-memory handoff, while renderer
+attachment/capture paths and provider capability checks consume that contract. The relevant
+privacy and malformed-input tests pass, so no duplicate field or alternate binary route is needed.
+
+The actual remaining dependency is the dictionary importer utility-process bridge. It still needs
+worker lifecycle, main IPC, preload typing, renderer progress/cancellation/recovery, and minimal
+build wiring as one owned slice. `src/main.ts` and `src/preload.ts` currently contain unrelated
+foreign Study Block/subtitle hunks, so adding only one layer would create an orphan and cannot be
+live-verified safely. Standing approval removes the historical permission objection; this is a
+coordination boundary, not an external blocker.
+
+Validation: focused vision/privacy suites passed **3 files / 39 tests**. Full Main V1 gates, live
+Electron bridge proof, atomic importer-owner reconciliation, and a path-scoped product checkpoint
+remain open.
+
+## Importer boundary recheck — 2026-08-13 15:49 MSK
+
+Relay hop, `codexA`. The boss-audit tail has no new actionable finding. Re-derived the dependency
+order and confirmed the vision/OCR attachment context is already complete; the active remaining
+slice is the dictionary importer utility-process bridge. `src/shared/dictionaryImportJob.ts` remains
+a bounded validated snapshot contract, while `src/main/dictionary/service.ts` still exposes only
+synchronous import calls. `src/main.ts`, `src/preload.ts`, and renderer integration owners remain
+foreign-dirty with unrelated work, so the worker, lifecycle, bridge, recovery UI, and build entry
+must be reconciled atomically rather than landing an orphan layer. Standing approval supersedes
+the historical permission blocker; this is coordination safety and remains reversible.
+
+Validation: focused Vitest passed **3 files / 35 tests**; i18n passed with **9,440** complete keys;
+architecture audit passed with **1,772 modules / 18 findings / 3 pending** and nothing new; ESLint
+passed for the importer contract and focused test. Full Main V1 gates, live bridge proof, atomic
+owner reconciliation, and a path-scoped checkpoint commit remain open.
+
+## Boss correction recheck and importer boundary — 2026-08-13 15:50 MSK
+
+Relay hop, `codexA`. Re-read the latest boss-audit tail and re-derived its two clean-HEAD
+corrections against source. `agentSessionContext.test.ts` contains the persistent privacy-floor
+semantic assertions, and `settingsCatalog.ts` contains both File Drops backup keys; the latter
+is concurrently dirty with foreign changes and was not restaged or rewritten. Focused Vitest
+passed **2 files / 29 tests** for those owning suites. The audit corrections therefore need no
+duplicate product edit, but clean-commit reconciliation remains with the owner of the dirty
+settings file.
+
+The active Main V1 dependency remains Track 2's dictionary utility-process bridge. The shared
+snapshot contract is present, while the worker lifecycle and connected main/preload/renderer
+path are not. Standing relay approval supersedes the historical worker/build-entry authority
+objection; it does not make a partial bridge safe while `src/main.ts`, `src/preload.ts`, and
+renderer integration owners carry unrelated concurrent hunks. No external or irreversible
+blocker was found. Full Main V1 gates, live Electron bridge proof, atomic owner reconciliation,
+and a path-scoped checkpoint remain open; retrospective state stays incomplete.
+
+## Relay retrospective sweep — 2026-08-13 16:55 MSK
+
+Re-read the latest boss-audit section, Main V1 dependency order, Anki Deck Workbench plan,
+coordination state, and known-issue references. Historical requests for permission or build
+configuration around the dictionary importer are superseded by standing relay approval. The
+selected reversible decision remains to implement the worker, main lifecycle, preload contract,
+renderer progress/cancellation/recovery, and minimal build entry as one atomic slice. Current
+`src/main.ts`, `src/preload.ts`, and renderer/settings owners contain unrelated concurrent hunks,
+so staging an isolated layer would create an orphan bridge and cannot satisfy live acceptance.
+
+The boss-audit semantic test correction is present, and the File Drops backup registration is
+present in the concurrently dirty settings owner; neither was duplicated or restaged. No genuine
+external or irreversible blocker was found. Next action is owner reconciliation followed by the
+four Main V1 gates and authenticated Electron bridge proof. Retrospective state remains incomplete
+because historical blocker wording and the connected importer slice are not yet fully reconciled.
+
+## Relay recheck — 2026-08-13 17:00 MSK
+
+Relay hop, `codexA`. Re-read the last boss-audit section, the Main V1 dependency order, the
+Anki Deck Workbench delivery requirements, and the coordination notes. No new actionable boss
+finding is present. The vision/OCR attachment slice is already implemented and tested; the
+next dependency remains the dictionary importer utility-process bridge. The shared
+`dictionaryImportJob.ts` contract is present and validated, but `service.ts` still exposes
+synchronous imports and there is no connected worker/main/preload/renderer lifecycle.
+
+Decision: continue with the standing-approved worker, lifecycle, cancellation/recovery, and
+minimal build-entry design, but do not land a partial bridge while `src/main.ts`, `src/preload.ts`,
+and renderer/settings owners carry unrelated concurrent hunks. This is a reversible ownership
+boundary, not an external blocker. The next worker should reconcile those owners atomically,
+then run the four Main V1 gates, detached clean-commit comparison, and authenticated Electron
+bridge proof before checkpointing. The importer contract test passed in this hop; no product
+files were changed.
+
+## Relay recheck — 2026-08-13 18:15 MSK
+
+Relay hop, `codexA`. Re-derived the dependency order and latest boss-audit tail. The
+vision/OCR attachment context remains complete: its bounded image contract and session-only
+staging are present and tested. The active Track 2 dependency is still the dictionary importer
+utility-process bridge. `src/shared/dictionaryImportJob.ts` is only the validated snapshot
+boundary; `src/main/dictionary/service.ts` still exposes synchronous `*Now` imports, with no
+worker lifecycle or connected main/preload/renderer progress, cancellation, and recovery path.
+
+Decision: no partial bridge is safe while the required owner files carry unrelated concurrent
+hunks. Standing approval supersedes the historical build-configuration permission blocker, so
+the next owner should reconcile the worker, minimal build entry, IPC, and renderer path atomically,
+then perform live Electron proof and the four Main V1 gates. This hop made no product change;
+the focused contract gate is re-run below. Retrospective completion remains false because the
+connected importer slice and clean checkpoint are still open.
+
+## Relay recheck — 2026-08-13 17:57 MSK
+
+Relay hop, `codexA`. Re-read the latest boss-audit tail, the Main V1 dependency order, and
+the Anki Deck Workbench acceptance plan. The OCR/vision attachment context remains complete;
+the next dependency is still the dictionary importer utility-process bridge. The validated
+`dictionaryImportJob.ts` snapshot contract is present, but `service.ts` still exposes only
+synchronous `*Now` imports. The required `src/main.ts`, `src/preload.ts`, and renderer owners
+remain concurrently foreign-dirty, so no partial worker or bridge was added: doing so would
+create an unconnected lifecycle and violate live-proof/ownership gates.
+
+Decision: standing approval continues to authorize the reversible worker, lifecycle, minimal
+build-entry, renderer progress/cancellation/recovery slice once those owners can be reconciled
+atomically. This is an internal coordination boundary, not an external blocker. The focused
+ dictionary import contract suite passed **1 file / 7 tests**. Full Main V1 gates, connected live
+ Electron proof, atomic owner reconciliation, and a path-scoped checkpoint remain open; the
+ retrospective state remains incomplete.
+
+## Relay recheck — 2026-08-13 18:20 MSK
+
+Relay hop, `codexA`. Re-read the boss-audit tail, Main V1 dependency order, and Anki Deck Workbench
+requirements. No new actionable boss finding is present. The vision/OCR attachment context remains
+complete. The active dependency is still the Track 2 dictionary importer bridge: the bounded shared
+snapshot contract is present and `src/main/dictionary/service.ts` still exposes synchronous imports,
+with no connected utility-process lifecycle or renderer progress/cancellation/recovery path.
+
+The required integration owners (`src/main.ts`, `src/preload.ts`, and broad renderer/settings files)
+remain concurrently dirty with unrelated work. Standing approval supersedes the historical worker
+and build-entry permission objection, but does not make a partial, unconnected layer safe to land or
+live-verify. Decision: defer the atomic worker/main/preload/renderer reconciliation until those owners
+can be edited without foreign-hunk loss; this is an internal coordination boundary, not an external
+blocker. Focused validation passed: `npx vitest run src/shared/__tests__/dictionaryImportJob.test.ts`
+(**1 file / 7 tests**). Full Main V1 gates, live bridge proof, detached checkpoint validation, and
+retrospective completion remain open.
+
+## Relay recheck — 2026-08-13 20:07 MSK
+
+Relay hop, `codexA`. Re-derived the boss-audit tail and Main V1 dependency order. Track 2 remains
+the active slice: `dictionaryImportJob.ts` is a validated snapshot boundary, while `service.ts`
+still exposes synchronous imports and no connected utility-process lifecycle. The focused contract
+gate passed: `npx vitest run src/shared/__tests__/dictionaryImportJob.test.ts` (1 file, 7 tests).
+
+Decision: do not add a partial worker or bridge while `src/main.ts`, `src/preload.ts`, and broad
+renderer/settings owners are foreign-dirty. Standing approval covers the eventual reversible
+worker/build-entry choice, but cannot make an orphan layer live-verifiable or safely stageable.
+Next action is atomic owner reconciliation, followed by the four Main V1 gates, authenticated
+Electron proof, detached clean-commit comparison, and a path-scoped checkpoint. Retrospective
+completion remains false; no external blocker was found.
+
+## Relay recheck — 2026-08-13 19:03 MSK
+
+Relay hop, `codexA`. Re-read the latest boss-audit tail, Main V1 dependency order, and the
+Anki Deck Workbench requirements. No new actionable boss finding is present. The bounded
+vision/OCR attachment contract remains implemented and tested; the next dependency remains
+Track 2's dictionary importer utility-process bridge. The shared snapshot contract is present,
+but `src/main/dictionary/service.ts` still exposes synchronous imports and there is no connected
+worker/main/preload/renderer lifecycle for progress, cancellation, or recovery.
+
+Decision: preserve the standing-approved utility-process design, but do not add an orphan layer
+while `src/main.ts`, `src/preload.ts`, and the renderer/settings integration owners contain
+unrelated concurrent hunks. This is a reversible internal ownership boundary, not an external
+blocker. The importer contract gate passed **1 file / 7 tests**. Full Main V1 gates, atomic owner
+reconciliation, authenticated Electron bridge proof, detached checkpoint validation, and
+retrospective completion remain open.
+
+## Relay recheck — 2026-08-13 20:04 MSK
+
+Relay hop, `codexA`. Re-derived the latest boss-audit tail, Main V1 dependency order, and the
+Anki Deck Workbench acceptance requirements. No new actionable boss finding is present. The
+vision/OCR attachment context remains complete. Track 2 is still the active dependency: the
+validated `dictionaryImportJob.ts` snapshot contract is present and its focused suite passed
+**1 file / 7 tests**, while `service.ts` still exposes synchronous imports and no connected
+utility-process lifecycle exists.
+
+Decision: retain the standing-approved worker/main/preload/renderer design, but defer implementation
+until the concurrently foreign-dirty integration owners can be reconciled atomically. Adding only
+the worker or only IPC would create an unconnected path that cannot pass authenticated Electron
+acceptance and could overwrite unrelated hunks. This is a reversible internal ownership boundary,
+not an external blocker. Full Main V1 gates, live bridge proof, detached checkpoint validation, and
+retrospective completion remain open.
+
+## Relay recheck — 2026-08-13 16:09 MSK
+
+Relay hop, `codexA`. The one-time retrospective sweep was re-derived against the latest
+boss-audit tail, Main V1 dependency order, Anki Deck Workbench acceptance gates, coordination
+notes, and durable decision state. Historical internal blockers (worker choice, minimal build-entry
+wiring, and IPC lifecycle design) are superseded by standing approval. No external or irreversible
+blocker was found. The current constraint is safe ownership reconciliation: `src/main.ts`,
+`src/preload.ts`, renderer/settings owners, and the shared importer contract are concurrently
+foreign-dirty.
+
+Decision: retain the approved utility-process importer design, but do not add an orphan worker or
+partial bridge. The next atomic slice remains worker lifecycle + minimal entry wiring + main,
+preload, renderer progress/cancellation/recovery, followed by authenticated Electron proof and a
+path-scoped checkpoint. This preserves reversibility and avoids overwriting unrelated hunks.
+
+Validation: the focused importer suite passed (1 file, 7 tests); `node tools/i18n-check.cjs`
+passed (9,440 keys); `node tools/architecture-audit.cjs` passed (1,772 modules, 18 known
+findings, 3 known pending); focused ESLint passed for the importer contract and service. The
+retrospective remains incomplete because the connected importer slice, live bridge proof, and
+clean checkpoint are still open.
