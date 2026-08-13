@@ -20,9 +20,11 @@ import {
 import {
   DictionaryImportJobs,
   dictionaryImportWorkerPath,
+  startLegacyMigrationIfPending,
   type ImportWorkerHandle,
 } from './importJobs';
 import { legacyYomitanRoot } from './migrate';
+import { pendingLegacyStores } from './service';
 
 export const DICTIONARY_IMPORT_CHANNELS = {
   start: 'dictImport:start',
@@ -87,6 +89,18 @@ export function dictionaryImportJobs(): DictionaryImportJobs {
     onSnapshot: broadcast,
   });
   return jobs;
+}
+
+/**
+ * Starts the first-boot JSON -> SQLite migration after Yomitan provisioning.
+ *
+ * The caller waits for `initYomitan()` first, so newly downloaded bundled stores
+ * are included. The scan is synchronous but only reads directory entries and the
+ * dictionaries table; all large JSON parsing remains in the utility process.
+ */
+export function startPendingLegacyDictionaryMigration(): void {
+  const manager = dictionaryImportJobs();
+  startLegacyMigrationIfPending(manager, pendingLegacyStores().length);
 }
 
 export function registerDictionaryImportIpc(): void {

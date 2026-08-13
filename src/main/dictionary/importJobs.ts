@@ -177,6 +177,15 @@ export class DictionaryImportJobs {
   }
 }
 
+/** Idempotent boot policy kept separate from Electron/path discovery for tests. */
+export function startLegacyMigrationIfPending(
+  jobs: DictionaryImportJobs,
+  pendingStoreCount: number,
+): DictionaryImportStartResult | null {
+  if (pendingStoreCount <= 0 || jobs.running()) return null;
+  return jobs.start({ kind: 'legacy' });
+}
+
 /**
  * Where Vite writes the worker bundle.
  *

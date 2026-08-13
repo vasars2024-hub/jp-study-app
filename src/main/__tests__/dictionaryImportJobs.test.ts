@@ -6,7 +6,11 @@
 // the four ways this bridge can lie to a user, so they are the four tests.
 
 import { describe, expect, it } from 'vitest';
-import { DictionaryImportJobs, type ImportWorkerHandle } from '../dictionary/importJobs';
+import {
+  DictionaryImportJobs,
+  startLegacyMigrationIfPending,
+  type ImportWorkerHandle,
+} from '../dictionary/importJobs';
 import type {
   DictionaryImportJobSnapshot,
   DictionaryImportWorkerIn,
@@ -218,5 +222,24 @@ describe('DictionaryImportJobs', () => {
     jobs.dispose();
     expect(workers[0].killed).toBe(true);
     expect(jobs.running()).toBe(false);
+  });
+
+  it('automatically starts legacy migration only when stores are pending and no writer is active', () => {
+    const empty = harness();
+    expect(startLegacyMigrationIfPending(empty.jobs, 0)).toBeNull();
+    expect(empty.workers).toHaveLength(0);
+
+    const pending = harness();
+    expect(startLegacyMigrationIfPending(pending.jobs, 3)).toMatchObject({
+      ok: true,
+      snapshot: { kind: 'legacy', status: 'running' },
+    });
+    expect(pending.workers[0].sent[0]).toMatchObject({
+      type: 'start',
+      request: { kind: 'legacy' },
+    });
+
+    expect(startLegacyMigrationIfPending(pending.jobs, 3)).toBeNull();
+    expect(pending.workers).toHaveLength(1);
   });
 });

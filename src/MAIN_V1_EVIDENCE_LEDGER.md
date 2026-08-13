@@ -17301,3 +17301,35 @@ archive is not yet exhaustively reconciled, so `retrospectiveComplete` remains f
 
 Track 2 remains active. Next re-derive automatic bundled-source provisioning and the remaining
 deep-search/workbench capability gaps; do not skip forward to the later Agent/Reading tracks.
+
+## Track 2 — automatic bundled-source migration — 2026-08-13 19:00 MSK
+
+Re-deriving the ledger tail and current boot graph found that the utility-process migration was
+complete but remained manual: first boot downloaded the four legacy stores, opened SQLite, and
+then left every store pending until the user found “Rebuild index”. Standing approval selected an
+automatic, idempotent start after `initYomitan()` settles. The pending scan reads only directory
+entries and the dictionaries table; all JSON parsing and SQLite writes remain in the existing
+one-writer utility process. The existing status recovery, cancellation, failure reporting, and
+manual rebuild path remain unchanged, and source JSON is never deleted.
+
+Live Electron acceptance used one fresh Forge process owned and stopped by this hop and the
+authenticated debug bridge only. After real bundled provisioning, `dictImportStatus` exposed one
+automatic `legacy` job as `running/importing`, then terminal `committed` with **4 stores, 0
+skipped, 697,837 headwords, 697,837 senses, and 1,333,201 glosses**. `dictListSources` returned the
+four migrated sources with their exact entry counts; bridge error logs were empty. No input
+automation or userData backup was used. The migration is additive and retained every legacy
+`index.json` by contract.
+
+Gates: full Vitest **578 passed / 1 skipped files; 7,611 passed / 6 skipped tests**; i18n **9,487
+keys** complete; architecture **1,789 modules / 18 known findings / 2 pending, nothing new**;
+focused import job/worker suites **2 files / 20 tests passed**; touched-path ESLint had zero errors
+and seven pre-existing `dictionary.ts` warnings.
+
+Retrospective sweep increment: the latest boss audit has no unaddressed finding. Automatic
+provisioning timing and worker ownership are reversible internal decisions covered by standing
+approval and are now implemented/live-proven. The live source list exposed a remaining provenance
+gap: legacy bundled rows have null licence/attribution because the legacy index format never
+stored them. Do not invent those values; re-derive them from authoritative upstream metadata in
+the next source-coverage slice. Hardware/credential availability, publication, purchase, and
+user-data deletion remain external/deferred. The archive-wide retrospective remains incomplete,
+so `retrospectiveComplete` stays false. Track 2 remains active.

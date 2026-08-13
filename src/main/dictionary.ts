@@ -48,7 +48,10 @@ import {
   moveDictionarySource,
   removeDictionarySource,
 } from './dictionary/service';
-import { registerDictionaryImportIpc } from './dictionary/importIpc';
+import {
+  registerDictionaryImportIpc,
+  startPendingLegacyDictionaryMigration,
+} from './dictionary/importIpc';
 import { resolveCustomFrequencyRanks } from './mining';
 import { getMainJapaneseTokenizer } from './japaneseTokenizer';
 import { attachLexiconFrequency } from '../shared/lexiconDifficulty';
@@ -627,6 +630,12 @@ export function registerDictionaryIpc(): void {
   // (progress, cancellation, post-reload recovery), so they live next door
   // rather than as four more one-line handlers here.
   registerDictionaryImportIpc();
+  // Provisioning is already asynchronous. Once it has named every bundled
+  // legacy store, migrate only the stores SQLite does not yet own. The job stays
+  // observable/cancellable through the same Settings card as a manual rebuild.
+  void initYomitan().then(startPendingLegacyDictionaryMigration).catch((error: unknown) => {
+    console.warn('[dictionary] automatic bundled-source migration did not start:', error);
+  });
 }
 
 export { fetchJapaneseAudio, initYomitan };
