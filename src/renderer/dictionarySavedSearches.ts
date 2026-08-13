@@ -34,7 +34,12 @@ function readPersisted(): DictionarySavedSearch[] | null {
 }
 
 function persist(): void {
-  localStorage.setItem(DICTIONARY_SAVED_SEARCHES_KEY, JSON.stringify(memory));
+  try {
+    localStorage.setItem(DICTIONARY_SAVED_SEARCHES_KEY, JSON.stringify(memory));
+  } catch {
+    // Keep the bounded in-memory copy usable when storage is unavailable or
+    // over quota. A later successful read/write can recover persistence.
+  }
 }
 
 export function loadDictionarySavedSearches(): DictionarySavedSearch[] {
@@ -64,5 +69,9 @@ export function removeDictionarySavedSearch(item: DictionarySavedSearch): Dictio
 
 export function clearDictionarySavedSearches(): void {
   memory = [];
-  localStorage.removeItem(DICTIONARY_SAVED_SEARCHES_KEY);
+  try {
+    localStorage.removeItem(DICTIONARY_SAVED_SEARCHES_KEY);
+  } catch {
+    // Clearing the active in-memory list is still a valid recovery path.
+  }
 }

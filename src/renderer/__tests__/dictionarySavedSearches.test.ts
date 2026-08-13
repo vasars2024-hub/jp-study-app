@@ -42,4 +42,21 @@ describe('dictionary saved searches', () => {
     localStorage.setItem(store.DICTIONARY_SAVED_SEARCHES_KEY, JSON.stringify([{ query: '', lang: 'ja' }, { query: 'ok', lang: 'xx' }]));
     expect(store.loadDictionarySavedSearches()).toEqual([]);
   });
+
+  it('keeps save, remove, and clear usable when storage writes are denied', async () => {
+    const store = await import('../dictionarySavedSearches');
+    vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+      throw new DOMException('Quota exceeded', 'QuotaExceededError');
+    });
+    vi.spyOn(localStorage, 'removeItem').mockImplementation(() => {
+      throw new DOMException('Storage denied', 'SecurityError');
+    });
+
+    expect(store.saveDictionarySearch({ query: '猫', lang: 'ja' })).toEqual([
+      { query: '猫', lang: 'ja' },
+    ]);
+    expect(store.removeDictionarySavedSearch({ query: '猫', lang: 'ja' })).toEqual([]);
+    expect(() => store.clearDictionarySavedSearches()).not.toThrow();
+    expect(store.loadDictionarySavedSearches()).toEqual([]);
+  });
 });

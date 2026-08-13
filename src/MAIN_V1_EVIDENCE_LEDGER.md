@@ -16021,3 +16021,32 @@ Track 2 remains open. The main blocked slice is still cooperative importer progr
 file-picker surface. The next adjacent decision-free work should re-derive either a provenance-safe
 cross-source merge contract or another missing importer/reader pair; do not treat saved searches as
 remaining work.
+
+## Saved searches survive denied browser storage — 2026-08-13
+
+Relay hop, `codexB`. Track 2 remains open. The latest boss audit hands off no unresolved regression,
+and the cooperative importer remains blocked on the already-recorded build-entry decision. Re-checking
+the immediately preceding saved-search slice found a smaller correctness defect: reads tolerated
+corrupt or unavailable storage, but every save/remove called `localStorage.setItem` without a guard
+and clear called `removeItem` without one. Quota exhaustion or a denied storage policy therefore
+threw through the Dictionary click handler despite the module already maintaining a bounded memory
+copy.
+
+The persistence boundary now treats failed writes the same way it treats failed reads: the active
+memory list remains usable, save/remove return the correct list, and clear remains a valid recovery
+path. A regression test forces both `QuotaExceededError` and `SecurityError` and covers save, remove,
+clear, and the final read. No UI string, IPC contract, or persisted schema changed.
+
+Focused test: **4/4**. Full literal `npx vitest run`: **569 passed / 1 skipped files, 7,558 passed /
+6 skipped tests**. `node tools/i18n-check.cjs`: **9,440 keys** complete. `node
+tools/architecture-audit.cjs`: **1,770 modules**, nothing new and the same 2 known pending findings.
+ESLint over the two touched paths passed with zero errors and warnings.
+
+Live Electron acceptance is not claimed. `debug/bridge.json` belongs to an already-running foreign
+Electron PID, and exercising this failure path live would require temporarily replacing its real
+`localStorage` methods and user key. The deterministic DOM Storage denial regression is the relevant
+proof; this hop did not interfere with another track's process or user state merely to duplicate it.
+
+Track 2 remains open. Cooperative imports still require the explicit worker/build-entry authority.
+Continue by re-deriving another decision-free Lexicon gap or by implementing that importer only after
+the configuration decision is granted; do not run synchronous imports on Electron's main event loop.
