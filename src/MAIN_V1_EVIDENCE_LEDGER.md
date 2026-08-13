@@ -17477,3 +17477,67 @@ offline-Agent scope, and localStorage hardening are reversible later-stage choic
 approval when dependency order reaches them. Publication and live personal-account checks remain genuinely
 external. The archive-wide sweep is not yet exhaustive, so `retrospectiveComplete` remains false. Track 2 stays
 active; next re-derive remaining deep-search, character/workbench, and find-in-the-wild gaps from current source.
+
+## Track 2 — the cancel marker had no regression test — 2026-08-13 23:15 MSK
+
+Relay worker `backup`. This hop answered the boss audit's two standing evidence gaps
+(`docs/audit/RELAY_BOSS_AUDIT.md`, 51 consecutive BLOCKED retries) rather than opening new scope.
+Both are now closed with fresh evidence, and closing the first one found a real defect.
+
+**Mutation controls (audit finding 1).** Run in the disposable exact-HEAD worktree
+`C:\Users\Arseniy\Projects\jp-study-app-audit26-clean-20260813`, made runnable with a
+`node_modules` junction to the primary checkout (the earlier retry that "could not resolve
+`vitest/config`" was missing exactly this step).
+
+- *Mutation A* — delete `fs.writeFileSync(this.active.cancelPath, …)` from
+  `DictionaryImportJobs.cancel()` (`src/main/dictionary/importJobs.ts:141`). **All 79 tests across
+  the five importer suites still passed.** The load-bearing half of `a44073a`
+  ("make import cancellation responsive") had *zero* regression coverage: the existing test asserts
+  `sent[1] === {type:'cancel'}` — the `postMessage` — and the whole point of `a44073a` is that the
+  worker's synchronous SQLite loop *cannot receive that message* until it yields. Silently deleting
+  the fix would have shipped green.
+- *Mutation B* — force `cancelling = false` in the worker `exit` handler
+  (`importJobs.ts:109`). Failed precisely, as it should:
+  `expected 'failed' to be 'cancelled'` at `dictionaryImportJobs.test.ts:165`. Restored → pass.
+
+**Fix.** Added `writes a cancel marker the running worker can poll, and never leaves one behind`
+to `src/main/__tests__/dictionaryImportJobs.test.ts`, covering the whole marker lifecycle: a stale
+marker from a crashed run is cleared at `start()`, absent before `cancel()`, present after it, and
+removed by `dispose()`. `harness()` gained an optional `dbDir` so the test uses a real temp dir
+instead of `process.cwd()`. Re-running mutation A against the new test now fails at
+`expect(fs.existsSync(stale)).toBe(true)`; restoring the implementation passes. Fail-then-restore
+proven in both directions.
+
+**Clean-vs-shared set difference (audit finding 1, second half).** Clean exact-HEAD worktree ran the
+five importer suites at 5 files / 79 tests passed — identical to the shared tree's figures. The
+difference set is empty; the shared tree's dirt does not flatter these suites. Also corrected: the
+audit repeatedly called these test files "partly untracked". All six are tracked at HEAD.
+
+**Live falsification through the debug bridge (audit finding 2).** Fifty-one retries recorded "no
+bridge available"; the actual state was a stale `debug/bridge.json` pointing at dead pid 80948.
+`npm start` brought up a real session (window visible/focused, `url=http://localhost:5174/` — port
+5173 was held by a foreign process, the known collision). All five required probes ran against live
+main-process handlers, not preload bindings:
+
+| Probe | Result |
+| --- | --- |
+| `dictImportStatus()` cold | returns `null`, handler live |
+| Invalid path `C:\definitely\not\here\nope.u8` | `status:"failed"`, `terminal.error` = the real `ENOENT: … open 'C:\definitely\not\here\nope.u8'`, `lines: 0`. No fabricated success. |
+| Renderer reload mid-state | terminal snapshot survived byte-for-byte; `window.__p3` gone, proving a genuinely fresh JS context |
+| Duplicate `dictImportStart` while running | `{ok:false, error:"busy"}` with the running job's snapshot attached |
+| `dictImportCancel()` | `{ok:true}` with the running snapshot |
+
+`dictListSources()` was captured before and after (4 sources, 1179 chars) and re-verified identical
+afterwards — no state pollution. Probe globals were deleted. No real import was ever started, so no
+rows entered the dictionary DB.
+
+**Audit finding 3 (codexB attribution)** was independently re-derived and matches codexA's 23:02
+entry above: `src/renderer/views/mediaCenter.css` exists, is tracked, and is *clean* against HEAD.
+Most audit retries reported the path "absent" because they looked for `src/media/mediaCenter.css`,
+which has never existed. Left untouched.
+
+Gates: `npx vitest run` 578 files passed / 1 skipped, **7617** tests passed / 6 skipped (was 7616 —
+the +1 is the new test). `node tools/i18n-check.cjs` 0, all 9,487 English keys translated.
+`node tools/architecture-audit.cjs` 0, 1,789 modules, 18 known findings, nothing new.
+`npx eslint src/main/__tests__/dictionaryImportJobs.test.ts` 0. No product string changed, so no
+i18n work was required.

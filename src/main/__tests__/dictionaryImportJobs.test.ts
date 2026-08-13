@@ -5,6 +5,9 @@
 // terminal snapshot after the renderer went away — are testable at all. They are
 // the four ways this bridge can lie to a user, so they are the four tests.
 
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   DictionaryImportJobs,
@@ -49,7 +52,7 @@ class FakeWorker implements ImportWorkerHandle {
   }
 }
 
-function harness() {
+function harness(dbDir = process.cwd()) {
   const workers: FakeWorker[] = [];
   const snapshots: DictionaryImportJobSnapshot[] = [];
   let counter = 0;
@@ -59,7 +62,7 @@ function harness() {
       workers.push(worker);
       return worker;
     },
-    dbDir: () => process.cwd(),
+    dbDir: () => dbDir,
     legacyRoot: () => '/tmp/yomitan',
     onSnapshot: (snapshot) => snapshots.push(snapshot),
     newJobId: () => `job-${(counter += 1)}`,
@@ -215,6 +218,38 @@ describe('DictionaryImportJobs', () => {
     workers[0].exit(0);
 
     expect(jobs.current()).toEqual({ jobId: 'job-2', kind: 'legacy', status: 'running' });
+  });
+
+  // `postMessage({type:'cancel'})` alone cannot stop an import. The worker's
+  // SQLite loop is synchronous, so its MessagePort cannot deliver that message
+  // until the loop yields — which is exactly when the import is already over.
+  // The on-disk marker is the only signal the loop can poll mid-run, so it is
+  // the part of cancellation that actually works, and it needs its own test:
+  // deleting the `writeFileSync` leaves every other assertion here green.
+  it('writes a cancel marker the running worker can poll, and never leaves one behind', () => {
+    const dbDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jp-import-cancel-'));
+    try {
+      // A marker left by a previous crashed run must not cancel the next job
+      // the instant it starts.
+      const stale = path.join(dbDir, '.import-cancel-job-1');
+      fs.writeFileSync(stale, '');
+
+      const { jobs, workers } = harness(dbDir);
+      jobs.start({ kind: 'legacy' });
+
+      const started = workers[0].sent[0] as Extract<DictionaryImportWorkerIn, { type: 'start' }>;
+      expect(started.cancelPath).toBe(stale);
+      expect(fs.existsSync(stale)).toBe(false);
+
+      expect(jobs.cancel('job-1').ok).toBe(true);
+      expect(fs.existsSync(stale)).toBe(true);
+
+      // Shutdown clears it, so the next launch does not inherit a cancel.
+      jobs.dispose();
+      expect(fs.existsSync(stale)).toBe(false);
+    } finally {
+      fs.rmSync(dbDir, { recursive: true, force: true });
+    }
   });
 
   it('dispose kills a running worker and stops tracking it', () => {
