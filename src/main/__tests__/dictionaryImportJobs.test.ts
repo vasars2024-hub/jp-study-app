@@ -179,6 +179,14 @@ describe('DictionaryImportJobs', () => {
     });
   });
 
+  it('refuses cancellation when no import is active without spawning or signalling a worker', () => {
+    const { jobs, workers } = harness();
+
+    expect(jobs.cancel()).toEqual({ ok: false, snapshot: null });
+    expect(jobs.running()).toBe(false);
+    expect(workers).toHaveLength(0);
+  });
+
   it('turns a worker that cannot be spawned into a failed job rather than a thrown call', () => {
     const jobs = new DictionaryImportJobs({
       spawn: () => {
