@@ -64,9 +64,26 @@ function isApproximate(result: LookupResult): boolean {
 /** Convert one unified SQLite lookup into the stable legacy renderer shape. */
 export function lookupResultToDictResult(result: LookupResult): DictResult {
   const deinflection = deinflectionFor(result);
+  const character = result.character
+    ? {
+        lang: result.character.lang,
+        char: result.character.char,
+        ...(result.character.strokes !== undefined ? { strokes: result.character.strokes } : {}),
+        ...(result.character.radical ? { radical: result.character.radical } : {}),
+        components: [...result.character.components],
+        readings: [...result.character.readings],
+        meanings: [...result.character.meanings],
+        ...(result.character.jlpt ? { jlpt: result.character.jlpt } : {}),
+        ...(result.character.hsk ? { hsk: result.character.hsk } : {}),
+        ...(result.character.grade !== undefined ? { grade: result.character.grade } : {}),
+        ...(result.character.frequency !== undefined ? { frequency: result.character.frequency } : {}),
+        sources: result.character.sources.map((source) => ({ ...source })),
+      }
+    : undefined;
   return {
     query: result.query,
     entries: result.entries.map(toLegacyEntry),
+    ...(character ? { character } : {}),
     ...(deinflection ? { deinflection } : {}),
     ...(isApproximate(result) ? { approximate: true } : {}),
   };

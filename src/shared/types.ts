@@ -78,6 +78,26 @@ export interface DeinflectionInfo {
 export interface DictResult {
   query: string;
   entries: DictEntry[];
+  /** Grounded metadata for an exact one-character lookup, when available. */
+  character?: {
+    lang: string;
+    char: string;
+    strokes?: number;
+    radical?: string;
+    components: string[];
+    readings: string[];
+    meanings: string[];
+    jlpt?: string;
+    hsk?: string;
+    grade?: number;
+    frequency?: number;
+    sources: Array<{
+      dictId: string;
+      dictTitle: string;
+      licence?: string;
+      attribution?: string;
+    }>;
+  };
   /** Present when `entries` were found by de-inflecting a conjugated `query`. */
   deinflection?: DeinflectionInfo;
   /**
