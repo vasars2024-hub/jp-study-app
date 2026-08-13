@@ -15986,3 +15986,38 @@ decision: `better-sqlite3` import work cannot run on Electron's main event loop,
 repository scope rule forbids changing Forge/Vite/root configuration without an explicit request.
 Do not route the synchronous import through IPC. Re-derive another adjacent decision-free Track 2
 gap if that authority is still absent.
+
+## Dictionary searches can now be saved and recovered — 2026-08-13
+
+Relay hop, `codexB`. Track 2 remains open. The last boss-audit section handed off no unresolved
+regression, and the ledger's final section still blocks the next importer surface on an explicit
+build-entry decision. Re-deriving the adjacent Track 2 list against source found no dictionary
+saved-search implementation: only the separate unified settings search had history. Cross-source
+deduplication was not forced because the current result contract exposes one source attribution per
+entry; silently merging those rows would discard provenance before a product contract defines how
+all contributing dictionaries are represented.
+
+The decision-free saved-search slice is now complete. `dictionarySavedSearches.ts` owns a bounded,
+versioned local list, validates persisted rows, deduplicates queries within a language, survives
+corrupt storage without discarding valid memory, and provides explicit remove and clear paths. The
+Dictionary surface can save the active query, rerun it in its recorded Japanese/Chinese mode, and
+remove it. All three new strings are translated in EN/JA/ZH/RU.
+
+Focused persistence tests passed **3/3**. Full literal `npx vitest run` passed **569 files / 1
+skipped, 7,556 tests / 6 skipped**. `node tools/i18n-check.cjs` passed with **9,440 keys**.
+`node tools/architecture-audit.cjs` scanned **1,770 modules**, found nothing new, and retained the
+same two known pending findings. ESLint over the three implementation/test paths passed with zero
+errors and warnings.
+
+Live acceptance used one fresh Forge process owned by this hop, with Vite on 5174 because an
+unrelated listener owned 5173. Through authenticated bridge `/eval` only, the real React input was
+set to `猫`, the search form submitted, and the rendered **Save search** control clicked. The
+surface rendered `猫` in **Saved searches** and localStorage contained exactly
+`[{"query":"猫","lang":"ja"}]`. The key was absent before the probe and was removed afterwards;
+the post-restore read was `null`. The complete process tree started by this hop was stopped, leaving
+no Electron process and the unrelated 5173 listener untouched.
+
+Track 2 remains open. The main blocked slice is still cooperative importer progress/cancel plus its
+file-picker surface. The next adjacent decision-free work should re-derive either a provenance-safe
+cross-source merge contract or another missing importer/reader pair; do not treat saved searches as
+remaining work.

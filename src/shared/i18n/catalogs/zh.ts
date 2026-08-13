@@ -8366,4 +8366,7 @@ export const zh: Catalog = {
   'lexicon.concordance.empty': '在 {count} 条可读字幕轨道中未找到字面匹配。',
   'lexicon.concordance.summary': '从 {sources} 条可读字幕轨道中找到 {count} 个例句',
   'lexicon.concordance.scope': '仅包含字面匹配，不包含活用形式或由上下文暗示的词。',
+  'dict.saved.title': '已保存的搜索',
+  'dict.saved.save': '保存搜索',
+  'dict.saved.remove': '删除已保存的搜索',
 };

@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import type { DictLang } from '../components/DictionaryResults';
 import LexiconWorkbenchResults from '../components/lexicon/LexiconWorkbenchResults';
 import { AppChrome, StatusBarField, StatusBarSpacer, type MenuBarMenu } from '../components/ui';
+import { loadDictionarySavedSearches, removeDictionarySavedSearch, saveDictionarySearch, type DictionarySavedSearch } from '../dictionarySavedSearches';
+import { useT } from '../i18n';
 import { onLexiconHandoffStaged, takeLexiconHandoff } from '../lexiconHandoffClient';
 import { getStudyLang, onStudyLangChanged, setStudyLang, STUDY_LANG_KEY } from '../studyEnvironment';
 
@@ -9,10 +11,12 @@ import { getStudyLang, onStudyLangChanged, setStudyLang, STUDY_LANG_KEY } from '
 export const DICT_LANG_KEY = STUDY_LANG_KEY;
 
 export default function DictionaryView() {
+  const { t } = useT();
   const [lang, setLang] = useState<DictLang>(() => getStudyLang());
   const [input, setInput] = useState('');
   const [query, setQuery] = useState('');
   const [lookupAttempt, setLookupAttempt] = useState(0);
+  const [savedSearches, setSavedSearches] = useState<DictionarySavedSearch[]>(loadDictionarySavedSearches);
   const acceptingHandoffRef = useRef(false);
 
   useEffect(() => onStudyLangChanged(setLang), []);
@@ -70,6 +74,13 @@ export default function DictionaryView() {
   function pickLang(l: DictLang) {
     setStudyLang(l);
     setLang(l);
+  }
+
+  function runSavedSearch(saved: DictionarySavedSearch) {
+    pickLang(saved.lang);
+    setInput(saved.query);
+    setQuery(saved.query);
+    setLookupAttempt((attempt) => attempt + 1);
   }
 
   const isZh = lang === 'zh';
@@ -133,6 +144,26 @@ export default function DictionaryView() {
         </button>
       </form>
 
+      <div className="dict-saved-searches" aria-label={t('dict.saved.title')}>
+        <div className="dict-saved-searches-head">
+          <span className="muted">{t('dict.saved.title')}</span>
+          {query && (
+            <button className="btn" type="button" onClick={() => setSavedSearches(saveDictionarySearch({ query, lang }))}>
+              {t('dict.saved.save')}
+            </button>
+          )}
+        </div>
+        {savedSearches.length > 0 && (
+          <div className="dict-saved-search-list">
+            {savedSearches.map((saved) => (
+              <span className="dict-saved-search" key={`${saved.lang}:${saved.query}`}>
+                <button className="btn" type="button" onClick={() => runSavedSearch(saved)}>{saved.query}</button>
+                <button className="btn" type="button" aria-label={t('dict.saved.remove')} onClick={() => setSavedSearches(removeDictionarySavedSearch(saved))}>×</button>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
       {!query ? (
         <p className="dict-hint muted">
           {isZh

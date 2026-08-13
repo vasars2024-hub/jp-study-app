@@ -8401,4 +8401,7 @@ export const ja: Catalog = {
   'lexicon.concordance.empty': '読み取り可能な字幕{count}本に文字列の一致はありませんでした。',
   'lexicon.concordance.summary': '読み取り可能な字幕{sources}本から{count}件の用例',
   'lexicon.concordance.scope': '文字列が一致した用例だけです。活用形や文脈から推測される語は含みません。',
+  'dict.saved.title': '保存した検索',
+  'dict.saved.save': '検索を保存',
+  'dict.saved.remove': '保存した検索を削除',
 };

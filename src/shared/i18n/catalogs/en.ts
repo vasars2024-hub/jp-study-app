@@ -8810,4 +8810,7 @@ export const en: Catalog = {
   'lexicon.concordance.empty': 'No literal matches were found in {count} readable subtitle tracks.',
   'lexicon.concordance.summary': '{count} examples from {sources} readable subtitle tracks',
   'lexicon.concordance.scope': 'Literal matches only. Inflections and words implied by context are not included.',
+  'dict.saved.title': 'Saved searches',
+  'dict.saved.save': 'Save search',
+  'dict.saved.remove': 'Remove saved search',
 };

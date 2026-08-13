@@ -9191,4 +9191,7 @@ export const ru: Catalog = {
   'lexicon.concordance.empty': 'В {count} доступных дорожках субтитров точных совпадений нет.',
   'lexicon.concordance.summary': '{count} примеров из {sources} доступных дорожек субтитров',
   'lexicon.concordance.scope': 'Только точные совпадения текста. Словоформы и слова, подразумеваемые контекстом, не включены.',
+  'dict.saved.title': 'Сохранённые запросы',
+  'dict.saved.save': 'Сохранить запрос',
+  'dict.saved.remove': 'Удалить сохранённый запрос',
 };
