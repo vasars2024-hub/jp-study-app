@@ -11,6 +11,10 @@ import {
 } from '../../../shared/lexiconHarvest';
 import { buildHarvestMineRequest, canMineHarvestItem } from '../../../shared/lexiconHarvestMining';
 import {
+  LEXICON_DIFFICULTY_BANDS,
+  scoreLexiconDifficulty,
+} from '../../../shared/lexiconDifficulty';
+import {
   applySensePins,
   canPinSense,
   sensePinKey,
@@ -45,6 +49,22 @@ const MINE_LABEL_KEYS: Record<MineState, string> = {
   // A failure returns the button to its offer: this is the one retryable state.
   error: 'lexicon.harvest.mine',
 };
+
+/**
+ * A band's label, built from the threshold it is actually defined by.
+ *
+ * The numbers are interpolated rather than written into the catalog string so a
+ * band edge can never move without the label moving with it — a row reading
+ * "Top 1,500" over a band that now ends at 2,000 is a lie no test would catch.
+ * The open-ended band is named by where it starts, which is the previous edge.
+ */
+function bandLabelKey(index: number): { key: string; max: number } {
+  const band = LEXICON_DIFFICULTY_BANDS[index];
+  if (Number.isFinite(band.maxRank)) {
+    return { key: 'lexicon.difficulty.bandTop', max: band.maxRank };
+  }
+  return { key: 'lexicon.difficulty.bandBeyond', max: LEXICON_DIFFICULTY_BANDS[index - 1].maxRank };
+}
 
 const LENS_OPTIONS = ['auto', 'lookup', 'translate'] as const;
 
@@ -122,6 +142,10 @@ export default function LexiconWorkbenchResults({
   // Purely derived from the grounded result, so it costs one pass per lookup
   // rather than a second bridge call.
   const harvest = useMemo(() => (pinned ? harvestLexiconVocabulary(pinned) : null), [pinned]);
+
+  // Same deal: the ranks arrived with the lookup, so the profile is a fold over
+  // data already in hand and never a second trip to main.
+  const difficulty = useMemo(() => (pinned ? scoreLexiconDifficulty(pinned) : null), [pinned]);
 
   // Pure and derived from the pinned result, so whether a retranslation can say
   // anything is known before the model is woken, not after it answers.
@@ -203,9 +227,12 @@ export default function LexiconWorkbenchResults({
     void Promise.resolve(window.api.dictListYomitan?.())
       .then((dicts) => parallelGlossTargets(primary, dicts ?? []))
       .catch(() => [primary])
+      // The Workbench is the surface that renders a difficulty profile, so it is
+      // the one that asks main to pay for the frequency lists.
       .then((glossLangs) => window.api.lookupOfflineInterlinear(query, {
         sourceLangs: [lang],
         glossLangs,
+        withFrequency: true,
       }))
       .then((next) => {
         if (!alive) return;
@@ -560,6 +587,92 @@ export default function LexiconWorkbenchResults({
                 </div>
               )}
             </div>
+          )}
+          {difficulty && difficulty.distinct > 0 && (
+            <details className="lexicon-difficulty" open>
+              <summary>{t('lexicon.difficulty.title')}</summary>
+              {/* Every rank came back empty. Printing four zero-count bands here
+                  would read as "every word in this passage is rare", which is
+                  the opposite of what an empty frequency list means. */}
+              {!difficulty.scored ? (
+                <p className="muted">{t('lexicon.difficulty.unscored')}</p>
+              ) : (
+                <>
+                  <p className="lexicon-difficulty-summary">
+                    {t('lexicon.difficulty.coverage', {
+                      ranked: difficulty.ranked,
+                      distinct: difficulty.distinct,
+                    })}
+                    {difficulty.medianRank !== undefined
+                      && ` ${t('lexicon.difficulty.median', { rank: difficulty.medianRank })}`}
+                  </p>
+                  {/* Every band is shown, including the empty ones: unlike a diff
+                      bucket, "no words past 15,000" is itself the answer the
+                      reader came for. */}
+                  <ul
+                    aria-label={t('lexicon.difficulty.bandGroup')}
+                    className="lexicon-difficulty-bands"
+                  >
+                    {difficulty.bands.map((band, index) => {
+                      const label = bandLabelKey(index);
+                      return (
+                        <li className={`is-${band.id}`} key={band.id}>
+                          <span className="lexicon-difficulty-band-label">
+                            {t(label.key, { max: label.max })}
+                          </span>
+                          <span className="lexicon-difficulty-band-count">{band.count}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  {difficulty.hardest.length > 0 && (
+                    <div
+                      aria-label={t('lexicon.difficulty.hardest')}
+                      className="lexicon-difficulty-hardest"
+                      role="group"
+                    >
+                      <p className="lexicon-difficulty-hardest-title">
+                        {t('lexicon.difficulty.hardest')}
+                      </p>
+                      <ul>
+                        {difficulty.hardest.map((word) => (
+                          <li key={word.key}>
+                            <span className="lexicon-difficulty-word" lang={lang}>{word.text}</span>
+                            {word.reading && (
+                              <span className="lexicon-difficulty-reading" lang={lang}>
+                                {word.reading}
+                              </span>
+                            )}
+                            <span className="lexicon-difficulty-rank">
+                              {t('lexicon.difficulty.rankBadge', { rank: word.rank })}
+                            </span>
+                            {word.count > 1 && (
+                              <span className="lexicon-difficulty-count muted">
+                                {t('lexicon.difficulty.occurrences', { count: word.count })}
+                              </span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {difficulty.unranked > 0 && (
+                    <p className="muted">
+                      {t('lexicon.difficulty.unranked', { count: difficulty.unranked })}
+                    </p>
+                  )}
+                  {difficulty.ungrounded > 0 && (
+                    <p className="muted">
+                      {t('lexicon.difficulty.ungrounded', { count: difficulty.ungrounded })}
+                    </p>
+                  )}
+                  <p className="muted">
+                    {t('lexicon.difficulty.sources', { sources: difficulty.sources.join(', ') })}
+                  </p>
+                  <p className="muted lexicon-difficulty-note">{t('lexicon.difficulty.note')}</p>
+                </>
+              )}
+            </details>
           )}
           {harvest && harvest.items.length > 0 && (
             <details className="lexicon-harvest" open>

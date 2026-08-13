@@ -44,6 +44,8 @@ import {
   lookupOfflineInterlinearFromStore,
   resetChineseDictionaryCache,
 } from './dictionary/service';
+import { resolveCustomFrequencyRanks } from './mining';
+import { attachLexiconFrequency } from '../shared/lexiconDifficulty';
 import { normalizeLexiconText } from '../shared/lexiconWorkbench';
 import {
   MAX_OFFLINE_INTERLINEAR_CHARS,
@@ -189,15 +191,34 @@ export async function lookupOfflineInterlinearMerged(
   text: string,
   options: LexiconInterlinearOptions = {},
 ): Promise<LexiconInterlinearResult> {
+  let result: LexiconInterlinearResult;
   try {
     await initYomitan();
+    const dicts = listYomitanDicts();
+    result = lookupOfflineInterlinearFromStore(text, options, (query) =>
+      legacyBatchToLookupResult(query, lookupOfflineDeinflected(query, true), dicts));
   } catch {
     // A legacy store that will not load must not take the database path down.
-    return lookupOfflineInterlinearFromStore(text, options);
+    result = lookupOfflineInterlinearFromStore(text, options);
   }
-  const dicts = listYomitanDicts();
-  return lookupOfflineInterlinearFromStore(text, options, (query) =>
-    legacyBatchToLookupResult(query, lookupOfflineDeinflected(query, true), dicts));
+  return options.withFrequency ? attachLexiconFrequency(result, resolveInterlinearFrequency) : result;
+}
+
+/**
+ * One headword's rank, from the frequency lists the user has enabled.
+ *
+ * `resolveCustomFrequencyRanks` already ranks across every enabled list and
+ * falls back to a Yomitan-imported list, so this only has to name which list
+ * produced the winning rank — the lowest one, i.e. the list that considers the
+ * word most common. A rank with no list to attribute it to is dropped rather
+ * than shown under a made-up source.
+ */
+function resolveInterlinearFrequency(text: string, reading: string) {
+  const ranks = resolveCustomFrequencyRanks(text, reading || undefined);
+  if (ranks.primary == null) return undefined;
+  const source = Object.entries(ranks.byDictionary)
+    .find(([, rank]) => rank === ranks.primary)?.[0];
+  return source ? { rank: ranks.primary, source } : undefined;
 }
 
 // ----- Persistent gloss cache ----------------------------------------------
@@ -461,6 +482,9 @@ export function registerDictionaryIpc(): void {
             ? Math.floor(Number(raw.maxMergeSegments))
             : MAX_OFFLINE_INTERLINEAR_MERGE_SEGMENTS),
         ),
+        // Only an explicit `true` opts in: a truthy string from an untrusted
+        // caller must not silently enable the list-parsing path.
+        withFrequency: raw.withFrequency === true,
       };
       const boundedText = typeof text === 'string'
         ? text.slice(0, MAX_OFFLINE_INTERLINEAR_CHARS * 2)

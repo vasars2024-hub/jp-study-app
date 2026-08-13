@@ -121,6 +121,23 @@ export interface LexiconInterlinearSense {
  */
 export const MAX_PINNABLE_SENSES = 8;
 
+/**
+ * A headword's position in an installed frequency list.
+ *
+ * `rank` is the list's own ordinal — 1 is the most common word it knows — and is
+ * never derived, smoothed or converted into a level here. `source` is the list
+ * that supplied it, because two installed lists rank the same word differently
+ * and a number with no attribution cannot be checked by the reader.
+ *
+ * Absent means "no enabled list ranks this word", which is not the same as
+ * "rare": a list covers what it covers. Consumers have to say which one they
+ * are looking at.
+ */
+export interface LexiconFrequency {
+  rank: number;
+  source: string;
+}
+
 export interface LexiconInterlinearMatch {
   query: string;
   headwordId: number;
@@ -150,6 +167,12 @@ export interface LexiconInterlinearMatch {
    * a lookup never decides which sense a passage meant.
    */
   pinnedSense?: number;
+  /**
+   * The matched headword's rank in an installed frequency list. Present only
+   * when the caller asked for it and a list actually ranks the word, so a token
+   * carries a number or nothing — never a placeholder rank.
+   */
+  frequency?: LexiconFrequency;
   /** True when the database matched the token but no requested gloss exists. */
   hasTargetGloss: boolean;
 }
@@ -178,6 +201,15 @@ export interface LexiconInterlinearOptions {
   glossLangs?: readonly string[];
   maxChars?: number;
   maxMergeSegments?: number;
+  /**
+   * Ask for frequency ranks on the matched headwords.
+   *
+   * Opt-in rather than always-on: the ranks live in separate list files that the
+   * main process parses on first use, and the reading paths that want a gloss as
+   * fast as possible should not pay for a passage-analysis feature they never
+   * render.
+   */
+  withFrequency?: boolean;
 }
 
 export interface LexiconInterlinearResult {

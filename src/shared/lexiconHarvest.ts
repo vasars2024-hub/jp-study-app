@@ -1,4 +1,5 @@
 import type {
+  LexiconFrequency,
   LexiconInterlinearMatch,
   LexiconInterlinearResult,
   LexiconInterlinearToken,
@@ -32,6 +33,12 @@ export interface LexiconVocabularyItem {
   grounded: boolean;
   /** Only glosses in the requested target languages, from the first occurrence. */
   glosses: LexiconLookupGloss[];
+  /**
+   * The headword's frequency rank, when the lookup was asked for one and a list
+   * ranked it. Carried here so difficulty scoring counts a word once however
+   * often the passage repeats it.
+   */
+  frequency?: LexiconFrequency;
   dictId?: string;
   dictTitle?: string;
   headwordId?: number;
@@ -135,6 +142,7 @@ export function harvestLexiconVocabulary(
       firstStart: part.start,
       grounded: Boolean(match),
       glosses: match ? [...match.glosses] : [],
+      ...(match?.frequency ? { frequency: match.frequency } : {}),
       ...(match ? { dictId: match.dictId, dictTitle: match.dictTitle, headwordId: match.headwordId } : {}),
     });
   }

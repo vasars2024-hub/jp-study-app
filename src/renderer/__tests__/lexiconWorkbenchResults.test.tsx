@@ -59,7 +59,9 @@ describe('LexiconWorkbenchResults', () => {
       root?.render(<LexiconWorkbenchResults query="猫を見た。" lang="ja" lookupAttempt={2} />);
       await Promise.resolve();
     });
-    expect(lookup).toHaveBeenCalledWith('猫を見た。', { sourceLangs: ['ja'], glossLangs: ['en'] });
+    expect(lookup).toHaveBeenCalledWith('猫を見た。', {
+      sourceLangs: ['ja'], glossLangs: ['en'], withFrequency: true,
+    });
     expect(host.querySelector('.lexicon-interlinear-flow')?.textContent).toContain('猫catを見た。');
     expect(host.querySelector('ruby.is-grounded')?.textContent).toContain('cat');
   });
@@ -80,7 +82,9 @@ describe('LexiconWorkbenchResults', () => {
       translate?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       await Promise.resolve();
     });
-    expect(lookup).toHaveBeenCalledWith('猫', { sourceLangs: ['ja'], glossLangs: ['en'] });
+    expect(lookup).toHaveBeenCalledWith('猫', {
+      sourceLangs: ['ja'], glossLangs: ['en'], withFrequency: true,
+    });
     expect(host.querySelector('[data-testid="dictionary-results"]')).toBeNull();
   });
 
@@ -106,7 +110,9 @@ describe('LexiconWorkbenchResults', () => {
       );
       await Promise.resolve();
     });
-    expect(lookup).toHaveBeenCalledWith('猫', { sourceLangs: ['ja'], glossLangs: ['ru'] });
+    expect(lookup).toHaveBeenCalledWith('猫', {
+      sourceLangs: ['ja'], glossLangs: ['ru'], withFrequency: true,
+    });
     expect(host.querySelector('.lexicon-interlinear-flow')?.textContent).toBe('猫');
     expect(host.querySelector('[data-testid="dictionary-results"]')).toBeNull();
   });
@@ -146,7 +152,9 @@ describe('LexiconWorkbenchResults', () => {
       await Promise.resolve();
     });
 
-    expect(lookup).toHaveBeenCalledWith('猫', { sourceLangs: ['ja'], glossLangs: ['ru', 'en'] });
+    expect(lookup).toHaveBeenCalledWith('猫', {
+      sourceLangs: ['ja'], glossLangs: ['ru', 'en'], withFrequency: true,
+    });
     const lines = [...host.querySelectorAll('rt .lexicon-gloss-line')].map((line) => line.textContent);
     expect(lines).toEqual(['RUкошка', 'ENcat']);
   });
@@ -647,6 +655,81 @@ describe('LexiconWorkbenchResults', () => {
       await Promise.resolve();
     });
     expect(host.querySelector('.lexicon-harvest')).toBeNull();
+    expect(host.querySelector('.lexicon-difficulty')).toBeNull();
+  });
+
+  /** 猫を見た。 with the ranks this installation's JPDB list really returns. */
+  function rankedPassage(withRanks: boolean) {
+    const frequency = (rank: number) =>
+      (withRanks ? { frequency: { rank, source: 'JPDB v2.2' } } : {});
+    return {
+      text: '猫を見た。', detectedLangs: ['ja'], glossLangs: ['en'], tokenCount: 3, matchedCount: 2,
+      truncated: false,
+      parts: [
+        {
+          kind: 'token', text: '猫', start: 0, end: 1,
+          match: {
+            text: '猫', reading: 'ねこ', glosses: [{ lang: 'en', text: 'cat' }], ...frequency(1509),
+          },
+        },
+        { kind: 'separator', text: 'を', start: 1, end: 2 },
+        {
+          kind: 'token', text: '見た', start: 2, end: 4,
+          match: {
+            text: '見る', reading: 'みる', glosses: [{ lang: 'en', text: 'to see' }], ...frequency(36),
+          },
+        },
+        { kind: 'token', text: '田中', start: 4, end: 6 },
+        { kind: 'separator', text: '。', start: 6, end: 7 },
+      ],
+    };
+  }
+
+  it('profiles how hard the passage is from the ranks the lookup carried', async () => {
+    const lookup = vi.fn().mockResolvedValue(rankedPassage(true));
+    Object.defineProperty(window, 'api', { configurable: true, value: { lookupOfflineInterlinear: lookup } });
+    const host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root?.render(<LexiconWorkbenchResults query="猫を見た。" lang="ja" lookupAttempt={9} lens="translate" />);
+      await Promise.resolve();
+    });
+
+    // Two of the three distinct words were ranked; 田中 is grounded by nothing.
+    expect(host.querySelector('.lexicon-difficulty-summary')?.textContent)
+      .toBe('lexicon.difficulty.coverage:2,3 lexicon.difficulty.median:773');
+    const bands = [...host.querySelectorAll('.lexicon-difficulty-bands li')]
+      .map((row) => row.textContent);
+    expect(bands).toEqual([
+      'lexicon.difficulty.bandTop:15001',
+      'lexicon.difficulty.bandTop:50001',
+      'lexicon.difficulty.bandTop:150000',
+      'lexicon.difficulty.bandBeyond:150000',
+    ]);
+    // Rarest first: 猫 at 1,509 leads 見る at 36.
+    expect([...host.querySelectorAll('.lexicon-difficulty-word')].map((el) => el.textContent))
+      .toEqual(['猫', '見る']);
+    expect(host.querySelector('.lexicon-difficulty-rank')?.textContent)
+      .toBe('lexicon.difficulty.rankBadge:1509');
+    expect(host.textContent).toContain('lexicon.difficulty.ungrounded:1');
+    expect(host.textContent).toContain('lexicon.difficulty.sources:JPDB v2.2');
+    expect(host.textContent).not.toContain('lexicon.difficulty.unscored');
+  });
+
+  it('says the lists could not speak for the passage rather than printing zeroes', async () => {
+    const lookup = vi.fn().mockResolvedValue(rankedPassage(false));
+    Object.defineProperty(window, 'api', { configurable: true, value: { lookupOfflineInterlinear: lookup } });
+    const host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root?.render(<LexiconWorkbenchResults query="猫を見た。" lang="ja" lookupAttempt={10} lens="translate" />);
+      await Promise.resolve();
+    });
+    expect(host.querySelector('.lexicon-difficulty')?.textContent)
+      .toBe('lexicon.difficulty.titlelexicon.difficulty.unscored');
+    expect(host.querySelector('.lexicon-difficulty-bands')).toBeNull();
   });
 
   it('reads the retranslation back and reports which of the passage words came with it', async () => {
@@ -915,6 +998,22 @@ describe('LexiconWorkbenchResults', () => {
       'lexicon.roundTrip.more',
       'lexicon.roundTrip.ungrounded',
       'lexicon.roundTrip.note',
+      // Every string the difficulty profile can render, including the line that
+      // replaces the whole profile when no list ranked anything.
+      'lexicon.difficulty.title',
+      'lexicon.difficulty.bandGroup',
+      'lexicon.difficulty.bandTop',
+      'lexicon.difficulty.bandBeyond',
+      'lexicon.difficulty.median',
+      'lexicon.difficulty.coverage',
+      'lexicon.difficulty.unranked',
+      'lexicon.difficulty.ungrounded',
+      'lexicon.difficulty.hardest',
+      'lexicon.difficulty.rankBadge',
+      'lexicon.difficulty.occurrences',
+      'lexicon.difficulty.sources',
+      'lexicon.difficulty.unscored',
+      'lexicon.difficulty.note',
     ];
     const catalog = en as Record<string, string>;
     expect(keys.filter((key) => !catalog[key])).toEqual([]);

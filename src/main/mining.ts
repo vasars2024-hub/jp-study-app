@@ -849,9 +849,22 @@ function listFrequencyDictionaries(): FrequencyDictionarySummary[] {
   return listFrequencyDictionaryFiles().map((entry) => entry.summary);
 }
 
+/**
+ * The keys to try for one word, most specific first.
+ *
+ * A reading-keyed entry is tried before the bare expression, and the order is
+ * load-bearing. `parseFrequencyDictionaryPayload` writes both keys for every
+ * entry, so a homograph's bare key is overwritten by each reading in turn and
+ * ends up holding whichever reading the list happened to store last - an
+ * arbitrary one. Measured on the bundled JPDB v2.2 list, the bare key for the
+ * pronoun "watashi" answers 291,201 while the same word keyed with its reading
+ * answers 32. Reading first turns that arbitrary pick into the word the caller
+ * actually meant, and the bare key stays as the fallback for callers with no
+ * reading and for lists that store none.
+ */
 function frequencyLookupKey(expression: string, reading?: string): string[] {
   const expr = expression.trim();
-  const out = [expr];
+  const out: string[] = [];
   const r = reading?.trim();
   if (r) {
     // Readings are stored as hiragana now; older imports may key by katakana.
@@ -861,6 +874,7 @@ function frequencyLookupKey(expression: string, reading?: string): string[] {
     if (hira !== r) out.push(`${expr}\x01${hira}`);
     if (kata !== r) out.push(`${expr}\x01${kata}`);
   }
+  out.push(expr);
   return out;
 }
 

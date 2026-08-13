@@ -14733,3 +14733,130 @@ Track 2 remains open. Still source-derived, minus this entry's item: composition
 scoring (still blocked on a real frequency source), personal concordance, and the grounded AI
 enrichment bullets. Composition checking is the natural next one — it is the last analysis rung that
 needs no data this installation does not already have.
+
+## Difficulty scoring was never blocked on data, only on a wire — 2026-08-13
+
+Relay hop, `primary`. Track 2. **Recovery hop**: the `backup` worker before this one was cut off by
+its usage limit at 06:51:34 with no handoff, mid-slice. The tree said so plainly — `git status`
+showed two untracked files (`shared/lexiconDifficulty.ts`, its test) and six modified ones whose
+mtimes ran 06:37:50 → 06:51:24, an empty index, and an Electron instance restarted at 06:50:19 (main
+had changed, so it had to be). This entry finishes that slice rather than starting a new one.
+
+The previous entry named the next item as composition checking and recorded difficulty scoring as
+"still blocked on a real frequency source". **That was wrong, and the interrupted worker was right
+to skip past it.** The source is present and enabled on this installation — JPDB v2.2, 550,408
+entries — and `resolveCustomFrequencyRanks` in `main/mining.ts` has been ranking words for the
+mining table all along. Nothing was missing but a wire from that resolver to the Workbench. Recorded
+here so the "blocked on data" note is not re-inherited a third time.
+
+**What the slice does.** Every earlier rung answers "what does this say?". This one answers "is this
+worth my time?" — the question a reader asks before reading. The lookup can now be asked for
+frequency ranks (`withFrequency`, opt-in), and the Workbench folds them into a profile: four bands
+by rank, a coverage line, a median, the rarest dozen words, and separate counts for what the lists
+do not rank and what no dictionary knows.
+
+Where the decisions sit, and why:
+
+- `shared/lexiconDifficulty.ts` is pure. The resolver is **injected**, not imported, because the
+  lists live in main behind file I/O; that is what lets the same code score a passage in a test, in
+  the renderer, and in main.
+- The profile is built over **the harvest's own distinct items**, not the token stream. A passage
+  that says 猫 forty times is not forty words of difficulty, and a row in "rarest words here" is
+  then literally the same row the reader can mine one panel below.
+- **A rank is reported as a position in a named list, never as a level.** No JLPT band, no CEFR
+  letter, no 1–10 score — none of those are in the data. `sources` names every list that supplied a
+  rank, because two installed lists rank the same word differently and an unattributed number cannot
+  be checked.
+- **Unranked and ungrounded are counted separately and excluded from the ratio.** A passage of names
+  would otherwise read as trivially easy. `scored: false` when nothing ranked, and the panel then
+  says the lists could not speak for this passage instead of printing four zero bands, which reads
+  as "every word here is rare".
+- Band labels are **interpolated from the constants they are defined by** (`Top {max}`), so an edge
+  cannot move without its label moving with it.
+
+**The production correction inside this slice, and the reason it needed its own test.** Wiring the
+resolver up surfaced a real defect in the existing lookup. `parseFrequencyDictionaryPayload` writes
+**two** keys per imported entry — the bare expression *and* `expression\x01reading` — and it writes
+the bare one unconditionally, so a homograph's bare key is overwritten once per entry and ends up
+holding whichever reading the list file happened to store last. `frequencyLookupKey` asked for that
+bare key **first**. Measured on this machine's JPDB list, the bare key for 私 answers **291,201**
+while the same word keyed with its reading answers **32**. The fix is the order: reading-keyed
+first, bare expression last as the fallback for callers with no reading and for lists that store
+none. That is a silent-correctness change to a shipped surface — the mining table has been showing
+these ranks — so `main/__tests__/miningFrequencyLookupKey.test.ts` was added and **proven to fail
+without it**: flipping the one line back and re-running gives 1 failed / 5 passed, and `mining.ts`
+was restored byte-identical (`SequenceEqual` true) rather than by eye.
+
+**`shared/lexiconDifficulty.ts` arrived as a binary file.** `git diff --stat` said
+`Bin 0 -> 8023 bytes`: a raw `0x00` byte at offset 4964, inside the cache key template literal — the
+Write-tool artefact this machine has hit before. Replaced with the `\u0000` **escape**, which is
+what the sibling `groundedVocabularyKey` in `lexiconHarvest.ts` already writes, and the file stages
+as 218 text insertions. Behaviour is unchanged; the tests pass either way, which is exactly why only
+`--stat` caught it. Whoever adds the next module here should look at `--stat` before committing.
+
+**Live acceptance, against the real dictionaries and the real JPDB list**, through the bridge on
+39273 (window 1, Vite 5174, the instance the interrupted worker left). `/logs` showed only
+`[vite] connected` and this app's own selftests — no foreign HMR, so no other track was mid-edit.
+The app was opened with its own `os:open` event rather than a click, and driven through the
+Dictionary search form.
+
+- The IPC leg first, because a preload binding is not proof of a main handler: `withFrequency: true`
+  through `window.api.lookupOfflineInterlinear` came back with real ranks — 猫 1,509 · 見る 36 ·
+  面白い 660 · 学校 616 · 邂逅 16,703 — every one attributed to `Japanese frequency (JPDB v2.2)`.
+  Those are the same values the unit test hard-codes as this installation's real answers.
+- The panel then rendered from the form: *10 of 10 words in this passage are ranked. The middle word
+  here ranks 356.*, bands 7 / 2 / 0 / 1, rarest-first ordering, `aria-label` on the band list and
+  `role="group"` + `aria-label` on the rarest list, `lang="ja"` on each word, a 740×323 box, and
+  **no raw `lexicon.` key anywhere in the panel**. Screenshot:
+  `debug/shots/win1-1786593791135.png`.
+
+**What the live run showed that the tests could not.** Two things, both recorded rather than papered
+over:
+
+1. **Particles rank, and rank well.** を came back 4, の 1, は 1,501, だ 10 — they are dictionary
+   headwords like any other, and with no part of speech on `LexiconInterlinearMatch` this layer
+   cannot tell them from vocabulary. The shipped note says so in as many words. This is the *same*
+   missing-POS constraint the previous entry recorded against the round-trip diff; it now blocks two
+   features, which is the argument for fixing it at the dictionary schema rather than per-consumer.
+2. **The key-order fix makes the rank follow the segmenter's chosen reading — including when that
+   reading is not the one a reader would expect.** 私 in the probe passage grounded as わたくし and
+   so ranked **28,801**, not わたし's 32. That is the resolver behaving correctly on the reading it
+   was handed; the questionable choice is upstream, in which JMdict reading the lookup picks for a
+   kana-ambiguous headword. Before the fix the same word answered with the bare key's arbitrary
+   291,201, so this is strictly better and still not right. Naming it here because it is invisible
+   from the unit tests, which supply the reading themselves.
+
+Contrast was measured rather than eyeballed, and the honest result is a **relative** one: with
+ancestor backgrounds alpha-composited, every new element measures identically to its already-shipped
+sibling in `.lexicon-harvest` (1.76 for body text, 1.48 for `.muted`, both panels). So this slice
+introduces no contrast delta. The **absolute** numbers are not a WCAG verdict — the panel sits on
+translucent surfaces over a backdrop that computed styles cannot resolve, and a real ratio needs
+pixel sampling of the capture. That is a surface-wide question, not one this slice created.
+
+Gates, all four. Full `npx vitest run --hookTimeout=60000` on the shared tree: **7,479 passed / 6
+skipped**, 562 files passed, one file failed — `subtitleNyaaFetch.test.ts`, and **not a regression**:
+all 10 of its tests passed and the suite died in teardown on `ENOTEMPTY: rmdir …\nyaa-fetch-…\scraper`,
+a Windows temp-cleanup race. It passes alone (10/10) and the run immediately before this slice's own
+test was added was **562 passed / 0 failed** at 7,473. `node tools/i18n-check.cjs` exit 0, **9,408**
+English keys complete in ja/zh/ru (the previous 9,394 plus these fourteen).
+`node tools/architecture-audit.cjs` exit 0, 1,758 modules, **nothing new**, the same two pending.
+`npx eslint` over all nine touched source paths plus the new test: **0 errors**. The seven
+`no-explicit-any` warnings on `main/dictionary.ts` are pre-existing — HEAD's blob has the same seven
+`any` occurrences, none of them in the new code.
+
+State left as found: search input cleared and asserted empty, the Dictionary window closed and
+`.fwin` count re-read as 0, the two first-run overlays (`.consent`, `.tour-root`) hidden in the DOM
+for one screenshot only and their inline `display` restored to `''` with computed values re-read as
+`flex` / `block`, both probe globals deleted and their absence verified, no persisted setting
+written, no userData backup taken, no window moved or resized, no other track's dirty paths touched.
+The four catalogs carry other tracks' hunks, so they were staged as reconstructed HEAD + own-14-line
+blobs (`debug/relay-stage-catalogs.cjs`, which refuses on a non-contiguous block, a non-unique
+anchor, or a HEAD that already has the keys) rather than whole-file adds — each staged as exactly
+`14 ++`. The dev app is left running for the next worker.
+
+Track 2 remains open. Still source-derived, minus this entry's item: composition checking, personal
+concordance, and the grounded AI enrichment bullets. Composition checking is the natural next one.
+The part-of-speech gap named above and in the previous entry is now the highest-value **shared**
+unblock on this track — it is a `LexiconInterlinearMatch` schema change with a dictionary migration
+behind it, and it would let both the round-trip diff and this difficulty profile stop counting
+particles as vocabulary.

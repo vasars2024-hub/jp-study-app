@@ -457,3 +457,114 @@
   max-width: 68ch;
   font-size: 0.78rem;
 }
+
+/* The difficulty profile sits directly above the harvest it shares its rows
+   with: read how hard the passage is, then read the words themselves. */
+.lexicon-difficulty {
+  margin: 12px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--border, rgba(127, 127, 127, 0.25));
+}
+
+.lexicon-difficulty > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.lexicon-difficulty-summary {
+  margin: 8px 0 0;
+  font-size: 0.9rem;
+}
+
+/* The bands reflow into as many columns as fit rather than scrolling: four
+   counts are a shape to take in at a glance, not a table to read down. */
+.lexicon-difficulty-bands {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lexicon-difficulty-bands li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 10px;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.3));
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+
+/* The rarest band is the one worth noticing, so it is the one that changes
+   weight. The label already names the band, so this is never the only carrier. */
+.lexicon-difficulty-bands li.is-rare {
+  border-color: color-mix(in srgb, var(--accent, #5588cc) 45%, transparent);
+}
+
+.lexicon-difficulty-band-label {
+  opacity: 0.85;
+}
+
+.lexicon-difficulty-band-count {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.lexicon-difficulty-hardest {
+  margin: 10px 0 0;
+}
+
+.lexicon-difficulty-hardest-title {
+  margin: 0 0 4px;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.75;
+}
+
+.lexicon-difficulty-hardest ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lexicon-difficulty-hardest li {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  max-width: 100%;
+  padding: 2px 8px;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.3));
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+
+.lexicon-difficulty-word {
+  font-weight: 600;
+}
+
+.lexicon-difficulty-reading,
+.lexicon-difficulty-count {
+  font-size: 0.8rem;
+  opacity: 0.8;
+  overflow-wrap: anywhere;
+}
+
+.lexicon-difficulty-rank {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.lexicon-difficulty-note {
+  margin: 8px 0 0;
+  max-width: 68ch;
+  font-size: 0.78rem;
+}
