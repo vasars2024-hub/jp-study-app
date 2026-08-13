@@ -185,3 +185,60 @@ uncommitted too.
    **known-failing at HEAD** and prove your own changes by set-difference, not by a clean run.
 4. The honest status line: this branch's i18n gate is currently **green only in situ**. Say that
    rather than "i18n passes".
+
+## 2026-08-13 09:01 MSK — Boss audit: Workbench relay window survives; one stale plan claim corrected
+
+Reviewed all 29 commits returned by `git log --all` after
+`2026-08-12T14:11:29.6385541+03:00`: the 28-commit `feat/nyaa-subtitles` ancestry from `bef3b2e`
+through `dc5f0f3`, plus branch-only sibling `45ab70c`. The sibling and integrated `8e28b8d` have
+identical product/test trees; `8e28b8d` only adds six honest detached-worktree gate lines to the
+ledger. I inspected every commit's paths/stat, the cumulative 82-path diff, added gate claims, and
+added tests instead of accepting commit messages at face value.
+
+### What I tried to break and what survived
+
+- Current shared tree: `npx vitest run` exited 0 at **566 passed / 1 skipped files, 7,514 passed /
+  6 skipped tests**. `node tools/i18n-check.cjs` exited 0 with **9,430** keys complete.
+  `node tools/architecture-audit.cjs` exited 0 with **1,764 modules / 17 known findings / 2 known
+  pending**, nothing new. These numbers describe the dirty shared tree, not committed HEAD.
+- Clean detached `dc5f0f3`: the full suite has the documented clean-HEAD baseline of **9 failed /
+  7,144 passed / 6 skipped tests** in four files; i18n exits 0 at **9,259** committed keys and
+  architecture exits 0 at **1,704 modules / 17 findings / 2 pending**. The pre-window parent
+  `d0d1be0` has all nine of those identities plus the two failures the preceding boss audit handed
+  off and five scraper import-time suite failures. Set difference therefore finds **no new HEAD
+  failure**; this relay window removed failures and introduced none. Do not report the raw nine as
+  a relay regression.
+- The cumulative touched-test patch adds no `skip`, `todo`, `xdescribe`, `xit`, or `xtest`. The
+  six current skips remain outside this window. The focused claims are subsumed by the clean and
+  in-situ full runs; no claimed green owned test failed.
+- Commit hygiene survived review. The 11,497-addition cumulative footprint is large, but it is a
+  sequence of bounded Workbench/ReadingLens features plus their tests, locale keys, and ledger
+  entries, not a single unrelated bulk-stage. Individual large commits remain internally scoped.
+  The branch-only duplicate is untidy history but contains no divergent product hunk and needs no
+  cherry-pick or repair.
+
+### Live falsification through the debug bridge
+
+Started one dev process, drove it only through the authenticated bridge, and stopped exactly that
+process tree afterwards. No foreign HMR appeared. Staging `猫はかわいい。` through the real preload
+and main handler opened the Translate pop-out and rendered the exact sentence, immediate installed-
+dictionary interlinear glosses, difficulty, composition, subtitle-example, and vocabulary-harvest
+surfaces. “Explain in Agent” opened the shared Agent with the passage marked Personal/Session, and
+the “Explain nuance” suggestion populated (without sending) the constrained prompt requiring
+meaning, nuance, at most two similar words, exact evidence, and explicit uncertainty. Those recent
+Workbench, handoff, privacy, and grounded-suggestion claims survived a live attempt to falsify them.
+
+### Finding and correction
+
+`src/MAIN_V1_COMPLETION_PLAN.md` still said both sentence → Workbench and passage → Reading had no
+receiver, contradicting `8e28b8d`, all later Workbench entries, and the live result above. I changed
+only that stale status: sentence → Workbench is done; passage → Reading remains open. No product
+code needed an audit fix.
+
+### Instruction to the next normal ladder worker
+
+No new relay regression is handed off. Preserve the clean-HEAD set-difference discipline and do not
+reopen sentence routing. Continue from the actual remaining item: passage → Reading workspace (and
+the later progressive Read/privacy/OCR decisions), while respecting the newer Phase 9.75 ordering
+entry above. Treat the shared-tree green suite as in-situ evidence only until your own commit is
+also checked detached.

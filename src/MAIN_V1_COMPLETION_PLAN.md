@@ -361,10 +361,12 @@ The existing popup is a foundation, not completion.
   acceptance proved both paths through the real `ipcMain` handler. Sentence input is deliberately
   refused rather than dumped into Dictionary: that receiver cannot honor the resolved
   `translate` lens.
-- **Still open — sentence → Workbench analysis and passage → Reading workspace.** Neither has a
-  real receiving surface yet. `ReadingWorkspaceView` routes only to Library, Finder and Novels,
-  and an ad-hoc OCR passage has no surface among them. Those halves remain parked on the recorded
-  product decisions rather than being misrepresented by a Dictionary lookup or a fake novel.
+- **Sentence → Workbench analysis: done in the 2026-08-12 grounded Workbench checkpoints.** The
+  Translate compatibility route now claims the sentence handoff and renders the offline
+  interlinear result immediately, with the later grounded analysis tools layered onto that result.
+- **Still open — passage → Reading workspace.** `ReadingWorkspaceView` routes only to Library,
+  Finder and Novels, and an ad-hoc OCR passage has no surface among them. That half remains parked
+  on the recorded product decision rather than being misrepresented by a fake novel.
 - Still open beyond that: progressive passage **Read** mode, and the privacy/retention and
   OCR/model default controls. Alternate OCR candidates and the mixed-panel order model still
   need explicit provider/product decisions and have not been forced.
