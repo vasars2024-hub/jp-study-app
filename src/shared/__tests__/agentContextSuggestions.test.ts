@@ -91,7 +91,7 @@ describe('Agent context suggestions', () => {
     });
   });
 
-  it('gives dictionary explanations a bounded evidence, grammar, usage, mistakes, etymology, mnemonic, graded-example, collocation, and comparison contract', () => {
+  it('gives dictionary explanations a bounded evidence, language-specific grammar, usage, mistakes, etymology, mnemonic, graded-example, collocation, and comparison contract', () => {
     const [suggestion] = deriveAgentContextSuggestions(conversation([
       context('dictionary-new', 'dictionary-entry', 'Dictionary'),
     ]), DEFAULT_AGENT_CONTEXT_SUGGESTION_PREFERENCES);
@@ -104,6 +104,14 @@ describe('Agent context suggestions', () => {
     expect(prompt).toContain('Separate what the attached context demonstrates from general grammar rules.');
     expect(prompt).toContain('If more than one parse is plausible');
     expect(prompt).toContain('instead of silently choosing one');
+    expect(prompt).toContain('matching language-specific grammar checklist only when that language is present');
+    expect(prompt).toContain('for Japanese, identify particles and the exact relation each one marks');
+    expect(prompt).toContain('omitted arguments only when recoverable');
+    expect(prompt).toContain('for Chinese, identify classifiers or measure words, aspect markers');
+    expect(prompt).toContain('for Russian, identify case and the word or construction that governs it');
+    expect(prompt).toContain('agreement features, verbal aspect, and formality variants');
+    expect(prompt).toContain('Do not force a checklist from one language onto another');
+    expect(prompt).toContain('say when a requested feature is not present rather than inventing an example');
     expect(prompt).toContain('Usage and register');
     expect(prompt).toContain('formality, tone, and spoken or written fit');
     expect(prompt).toContain('In Collocations');

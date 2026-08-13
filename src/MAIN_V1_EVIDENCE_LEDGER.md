@@ -15501,3 +15501,39 @@ source-versus-AI result labeling/cost controls are still candidates, as are the 
 source/import/search requirements. Do not advance to Track 3 merely because this sub-line closed.
 Re-derive its UX and provider-budget boundary before implementation; do not turn one oversized
 prompt into a hidden batch or bypass the centralized Agent execution path.
+
+## One evidence-bound grammar contract now covers all three study languages — 2026-08-13
+
+Relay hop, `codexX`. Track 2. The latest boss-audit section handed off no unresolved regression,
+and source re-derivation found that the explicit source-versus-AI label and central request-cost
+controls were already present at HEAD. The remaining decision-free AI-language gap was the
+language-specific Japanese, Chinese and Russian analysis line.
+
+The centralized Dictionary explanation contract now applies a checklist only when its language is
+present in the attached context. Japanese analysis names particles and the exact relation each
+marks, recoverable omitted arguments, and politeness/formality variants. Chinese analysis names
+classifiers or measure words, aspect markers, and formality variants. Russian analysis names case
+and its governing word or construction, agreement features, verbal aspect, and formality variants.
+Every claim must quote its supporting form; the model must not project one language's checklist
+onto another or invent an example when a feature is absent. Single and bounded-batch suggestions
+share this contract. The existing central provider, privacy, language, streaming, session-cache,
+cancellation and cost paths remain unchanged; this adds no UI copy, provider or persistence.
+
+Live Electron acceptance used one fresh Forge process owned by this hop and the authenticated debug
+bridge only. Port 5173 belonged to an unrelated listener, so Forge selected 5174. Importing the
+real shared builder through the renderer for `猫が来た。` returned all Japanese, Chinese, Russian,
+cross-language and absent-feature boundaries. All seven probe checks were true and the bridge error
+ring contained **0** entries. The temporary probe was deleted; no provider request or user-state
+write ran. The complete owned process tree was stopped and verified absent; the unrelated 5173
+listener was untouched.
+
+Verification on the shared tree: focused suggestion tests **9/9**. Full `npx vitest run
+--hookTimeout=60000`: **566 files passed / 1 skipped, 7,519 tests passed / 6 skipped**. `node
+tools/i18n-check.cjs`: **9,433 keys** complete. `node tools/architecture-audit.cjs`: **1,764
+modules**, nothing new, the same two pending. ESLint over the two touched TS paths: **0 errors, 0
+warnings**.
+
+Track 2 remains open. The language-specific AI-analysis line is now covered, but the larger
+dictionary source/import/search requirements still need source re-derivation. The next worker
+should choose a bounded decision-free gap there and must not infer that Track 2 is complete from
+the closure of its AI-language sub-line.
