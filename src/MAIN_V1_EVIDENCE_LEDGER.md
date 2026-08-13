@@ -15606,3 +15606,38 @@ Track 2 remains open. This closes a language-pair result-shape defect, not the b
 search requirements. Re-derive the next bounded gap among cancellable imports, missing source
 formats, source metadata/controls, deduplication, fuzzy search or saved searches; do not move to
 Track 3 yet.
+
+## Imported irregular inflections now participate in unified lookup — 2026-08-13
+
+Relay hop, `codexB`. Track 2. The latest boss-audit section handed off no unresolved regression,
+and the final ledger section kept the broader Lexicon source/import/search line open. Re-deriving
+the shared SQLite path found that the schema had always created and indexed `inflections`, but
+`lookup` never read it. Any importer that preserved an irregular or otherwise non-derivable form
+there produced dead data: exact, suffix and Japanese deinflection probes could not reach its
+headword.
+
+The unified lookup now probes the existing inflection index before its looser reading and prefix
+searches. A matched form returns the same sourced senses and attribution as its headword, uses the
+existing `deinflected` result shape, and carries the imported inflection name and tags as its
+reason chain. A regression uses English `went` as a deliberately irregular surface linked to a
+Japanese headword and proves the generic suffix heuristics are not what made it pass. No schema,
+import format, provider, persistence or UI copy changed.
+
+Live Electron acceptance used one fresh Forge process owned by this hop and the authenticated
+debug bridge only. The real Vite-loaded lookup module received a non-persistent in-memory database
+seam containing `went` → `走る`; it returned `走る`, `deinflected`, both imported reasons, and one
+sourced sense. The bridge error ring contained **0** entries. The temporary renderer global was
+deleted, no database or user state was written, all 13 processes in the recorded owned tree were
+stopped, and the verified-stale owned bridge record was removed. The unrelated listener on port
+5173 was untouched.
+
+Verification on the shared tree: focused dictionary lookup tests **37/37**. Full literal
+`npx vitest run`: **566 files passed / 1 skipped, 7,522 tests passed / 6 skipped**. `node
+tools/i18n-check.cjs`: **9,433 keys** complete. `node tools/architecture-audit.cjs`: **1,764
+modules**, nothing new, the same two pending. ESLint over the two touched TS paths: **0 errors,
+0 warnings**.
+
+Track 2 remains open. This activates one pre-existing morphology contract; it does not close the
+broad importer/source-management row. Re-derive the next bounded gap among cancellable imports,
+missing source formats, source metadata/controls, deduplication, fuzzy search or saved searches;
+do not move to Track 3 yet.

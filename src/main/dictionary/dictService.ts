@@ -257,6 +257,12 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
 
   const byNorm = db.prepare(`${HEADWORD_SELECT} and h.lang = ? and h.norm = ? order by d.priority, h.id`);
   const byReading = db.prepare(`${HEADWORD_SELECT} and h.lang = ? and h.reading_norm = ? order by d.priority, h.id`);
+  const byInflection = db.prepare(`
+    ${HEADWORD_SELECT}
+    and h.lang = ?
+    and h.id in (select headword_id from inflections where form = ?)
+    order by d.priority, h.id
+  `);
   const byPrefix = db.prepare(
     `${HEADWORD_SELECT} and h.lang = ? and h.norm > ? and h.norm < ? order by length(h.norm), d.priority, h.id limit ?`,
   );
@@ -266,6 +272,23 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
     for (const { form, reasons } of forms) {
       const via = reasons.length ? 'deinflected' : 'exact';
       for (const row of byNorm.all(lang, form) as HeadwordRow[]) push(row, via, reasons);
+    }
+
+    // Importers can supply forms that a generic suffix heuristic or Japanese
+    // de-inflector cannot derive (irregular paradigms are the important case).
+    // The schema has always indexed these rows; consult that index before the
+    // looser reading and prefix probes so imported morphology is not dead data.
+    const inflectionRows = db.prepare(
+      'select headword_id, name, tags from inflections where form = ? order by headword_id',
+    ).all(normalizeForLookup(text)) as { headword_id: number; name: string | null; tags: string | null }[];
+    const inflectionReasons = new Map(
+      inflectionRows.map((row) => [
+        row.headword_id,
+        [row.name, ...(row.tags?.split(',') ?? [])].filter((value): value is string => Boolean(value)),
+      ]),
+    );
+    for (const row of byInflection.all(lang, normalizeForLookup(text)) as HeadwordRow[]) {
+      push(row, 'deinflected', inflectionReasons.get(row.id) ?? []);
     }
 
     // Reading-side probes. Kana for Japanese, toneless pinyin for Chinese — the

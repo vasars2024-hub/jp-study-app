@@ -182,6 +182,21 @@ describe('one code path, four languages', () => {
     expect(out.entries.map((e) => e.text)).toContain('食べる');
   });
 
+  it('uses imported irregular inflections that the suffix heuristics cannot derive', () => {
+    const headword = db.prepare('select id from headwords where dict_id = ? and norm = ?')
+      .get('jmdict-en', '走る') as { id: number };
+    db.prepare('insert into inflections (headword_id, form, name, tags) values (?, ?, ?, ?)')
+      .run(headword.id, 'went', 'past tense', 'irregular');
+
+    const hit = lookup(db, { text: 'went', sourceLangs: ['ja'] }).entries
+      .find((entry) => entry.text === '走る');
+
+    expect(hit).toMatchObject({
+      via: 'deinflected',
+      reasons: ['past tense', 'irregular'],
+    });
+  });
+
   it('English → Chinese through the same call', () => {
     expect(lookup(db, { text: 'dog' }).entries.map((e) => e.text)).toContain('狗');
   });
