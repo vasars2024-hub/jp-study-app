@@ -15673,3 +15673,36 @@ Track 2 remains open. This closes one imported-morphology data-loss defect, not 
 importer/source-management row. Re-derive the next bounded gap among safe cancellable imports,
 missing source formats, source controls, cross-source deduplication, fuzzy search or saved searches;
 do not move to Track 3 yet.
+
+## Ambiguous inflection explanations have a stable order — 2026-08-13
+
+Relay hop, `codexB`. Track 2. The latest boss-audit section handed off no unresolved regression,
+and the final ledger section kept the source/import/search requirements open. Re-deriving the
+ambiguous-inflection path found that its accumulator retained every analysis but the SQL ordered
+only by `headword_id`. Multiple analyses for the same headword therefore had no declared order;
+their displayed explanation chain could change with SQLite's query plan instead of preserving the
+importer's order.
+
+The inflection query now orders by headword and then SQLite row id. That keeps rows grouped for the
+existing accumulator while making the order within one headword explicitly match insertion/import
+order. A regression supplies two analyses with different tags and proves the exact four-part reason
+chain. No schema, import format, persistence, provider or UI copy changed.
+
+Live Electron acceptance used one fresh Forge process owned by this hop and the authenticated debug
+bridge only. Port 5173 belonged to an unrelated listener, so Forge selected 5174. Importing the real
+Vite-loaded lookup module confirmed the production query contains the stable secondary ordering and
+that two analyses accumulate as `simple past`, `finite`, `past participle`, `irregular`. The bridge
+error ring contained **0** entries. The temporary renderer probe was deleted, no dictionary or user
+state was written, and the complete validated process tree started by this hop was stopped. The
+unrelated listener on port 5173 was untouched.
+
+Verification on the shared tree: focused dictionary lookup tests **39/39**. Full literal `npx
+vitest run`: **566 files passed / 1 skipped, 7,524 tests passed / 6 skipped**. `node
+tools/i18n-check.cjs`: **9,433 keys** complete. `node tools/architecture-audit.cjs`: **1,764
+modules**, nothing new, the same two pending. ESLint over the two touched TS paths: **0 errors,
+0 warnings**.
+
+Track 2 remains open. This makes ambiguous imported morphology deterministic; it does not close the
+broad importer/source-management row. Re-derive the next bounded gap among safe cancellable imports,
+missing source formats, source controls, cross-source deduplication, fuzzy search or saved searches;
+do not move to Track 3 yet.

@@ -215,6 +215,26 @@ describe('one code path, four languages', () => {
     });
   });
 
+  it('keeps ambiguous imported analyses in importer order', () => {
+    const headword = db.prepare('select id from headwords where dict_id = ? and norm = ?')
+      .get('jmdict-en', '走る') as { id: number };
+    const insert = db.prepare(
+      'insert into inflections (headword_id, form, name, tags) values (?, ?, ?, ?)',
+    );
+    insert.run(headword.id, 'saw', 'simple past', 'finite');
+    insert.run(headword.id, 'saw', 'past participle', 'nonstandard');
+
+    const hit = lookup(db, { text: 'saw', sourceLangs: ['ja'] }).entries
+      .find((entry) => entry.text === '走る');
+
+    expect(hit?.reasons).toEqual([
+      'simple past',
+      'finite',
+      'past participle',
+      'nonstandard',
+    ]);
+  });
+
   it('English → Chinese through the same call', () => {
     expect(lookup(db, { text: 'dog' }).entries.map((e) => e.text)).toContain('狗');
   });

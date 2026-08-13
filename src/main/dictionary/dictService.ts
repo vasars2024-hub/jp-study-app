@@ -292,7 +292,11 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
     // The schema has always indexed these rows; consult that index before the
     // looser reading and prefix probes so imported morphology is not dead data.
     const inflectionRows = db.prepare(
-      'select headword_id, name, tags from inflections where form = ? order by headword_id',
+      // One surface may have several analyses for the same headword. `headword_id`
+      // alone leaves their order undefined, which makes the displayed reason chain
+      // depend on SQLite's query plan. `rowid` preserves importer order within a
+      // headword while keeping headwords grouped for the accumulator.
+      'select headword_id, name, tags from inflections where form = ? order by headword_id, rowid',
     ).all(normalizeForLookup(text)) as { headword_id: number; name: string | null; tags: string | null }[];
     const inflectionReasons = collectInflectionReasons(inflectionRows);
     for (const row of byInflection.all(lang, normalizeForLookup(text)) as HeadwordRow[]) {
