@@ -79,6 +79,22 @@ describe('runDictionaryImport', () => {
     expect(Object.values(counts).every((value) => typeof value === 'number')).toBe(true);
   });
 
+  it('routes a DSL file through the worker and preserves its language directives', () => {
+    const file = path.join(tempRoot, 'learner.dsl');
+    fs.writeFileSync(file, '#INDEX_LANGUAGE "ru"\n#CONTENTS_LANGUAGE "en"\nсобака\n dog\n', 'utf8');
+
+    const terminal = runDictionaryImport({ kind: 'dsl', filePath: file }, dbDir, tempRoot, deps());
+
+    expect(terminal).toEqual({
+      state: 'committed',
+      counts: { entries: 1, skipped: 0, headwords: 1, senses: 1, glosses: 1 },
+    });
+    const check = openDictionaryDb({ dir: dbDir });
+    open.push(check);
+    expect(check.prepare('select source_lang, target_langs from dictionaries where id = ?').get('dsl-user'))
+      .toEqual({ source_lang: 'ru', target_langs: 'en' });
+  });
+
   it('reports a cancel as cancelled with no counts, and leaves nothing behind', () => {
     const file = path.join(tempRoot, 'cedict.u8');
     fs.writeFileSync(file, CEDICT, 'utf8');

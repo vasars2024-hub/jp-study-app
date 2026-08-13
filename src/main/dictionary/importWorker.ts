@@ -29,6 +29,7 @@
 import { openDictionaryDb, type SqliteDb } from './db';
 import { importCedict } from './importers/cedict';
 import { importWiktextract, readJsonlLines } from './importers/wiktextract';
+import { importDsl, readDslFile } from './importers/dsl';
 import { migrateLegacyYomitanStores } from './migrate';
 import type {
   DictionaryImportKind,
@@ -124,6 +125,20 @@ export function runDictionaryImport(
       return cancelled
         ? { state: 'cancelled', counts: {} }
         : { state: 'committed', counts: numericCounts(rest) };
+    }
+
+    if (request.kind === 'dsl') {
+      deps.onProgress(0, 'reading');
+      const text = readDslFile(request.filePath as string);
+      deps.onProgress(0, 'importing');
+      const counts = importDsl(db, text, {
+        ...(request.dictId ? { dictId: request.dictId } : {}),
+        progressEvery: PROGRESS_EVERY,
+        onProgress: (lines) => deps.onProgress(lines, 'importing'),
+        shouldCancel: deps.shouldCancel,
+      });
+      const { cancelled, ...rest } = counts;
+      return cancelled ? { state: 'cancelled', counts: {} } : { state: 'committed', counts: numericCounts(rest) };
     }
 
     const result = migrateLegacyYomitanStores(

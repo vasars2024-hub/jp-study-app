@@ -17033,3 +17033,58 @@ This is a real incremental reconciliation, but not yet a defensible full histori
 archived track. `relay-decision-state.json` therefore remains `retrospectiveComplete: false` rather
 than claiming completion at turn end. The normal ladder remains in Main V1 Track 2; re-derive the
 next Lexicon Workbench item from the new ledger tail and the plan before starting it.
+
+## Track 2 — Lingvo DSL import through the existing utility process — 2026-08-13 17:42 MSK
+
+Relay hop `codexB` re-derived the dependency ladder after the importer-process and Settings UI
+checkpoints. Track 2 remains open: source coverage named by the plan had only legacy Yomitan,
+CC-CEDICT, and Wiktextract. The smallest next required source was StarDict/DSL; this checkpoint
+adds the text-based Lingvo DSL half without creating a second import architecture.
+
+### Decision and safety
+
+- `.dsl` stays a file-backed `DictionaryImportKind` and runs in the already-live utility process.
+  It inherits one-writer refusal, progress recovery, cancellation, and hard process isolation.
+- A dictionary is one SQLite transaction. Cancellation rolls back the replacement and preserves
+  the prior source. Multiple DSL headwords are stored as an ordered primary plus `variant_of`
+  aliases, so lookup resolves one sense rather than duplicating it.
+- `#INDEX_LANGUAGE`, `#CONTENTS_LANGUAGE`, and `#NAME` supply source/target language and title;
+  absent language directives are honestly stored as `und`, not guessed from a filename.
+- UTF-8 and the common UTF-16LE BOM form are accepted. Binary StarDict `.ifo/.idx/.dict` remains a
+  separate future importer because pretending a text parser supports it would be dishonest.
+
+### Live Electron acceptance
+
+One fresh Forge process tree owned by this hop was started and stopped. Through the authenticated
+debug bridge, the real renderer API started a Russian→English DSL import with one entry and two
+aliases. The utility process returned `committed` with `{entries:1, headwords:2, senses:1,
+glosses:1}`. `lookupTerm('собака')` returned the exact `dog` definition attributed to `Relay DSL
+fixture`. The source was removed through `dictRemoveSource`; serialized sources after cleanup were
+byte-identical to the empty pre-probe list. Error-level bridge logs were empty. No userData backup,
+mouse automation, or keyboard automation was used.
+
+### Gates
+
+- `npx vitest run` — **574 files passed, 1 skipped; 7,594 tests passed, 6 skipped, 0 failed**.
+- `node tools/i18n-check.cjs` — exit 0, **9,469** English keys complete in JA/ZH/RU.
+- `node tools/architecture-audit.cjs` — exit 0, **1,781 modules / 18 known findings / 2 known
+  pending**, nothing new.
+- Focused importer/worker/contract/card suite — **4 files / 25 tests passed**. Focused ESLint on
+  owned paths excluding `window.d.ts` exited 0; the touched declaration retains exactly the same
+  two pre-existing subtitle-harvest adjacent-overload identities as committed HEAD (set-difference
+  zero).
+
+### Retrospective blocker sweep increment
+
+The latest boss audit has no unaddressed relay regression. Historical importer build/configuration
+permission is closed by standing approval and the live-proven utility process. Display/Monitors is
+an internal foreign-owner sequencing issue for its later ordered stage, not a user-authority
+blocker. Translator Settings placement is a reversible product choice covered by standing approval
+at its owning stage. qBittorrent/debrid credentials, microphone hardware, multi-monitor hardware,
+and final visual approval remain external/deferred gates rather than internal permission gaps.
+The full historical archive has not yet been exhaustively reconciled, so retrospective state
+correctly remains false.
+
+Track 2 remains active. The next source-coverage slice should re-derive KANJIDIC/JMnedict/Tatoeba
+versus binary StarDict from the current import graph; do not treat this DSL checkpoint as closing
+the plan's broader StarDict/DSL row.

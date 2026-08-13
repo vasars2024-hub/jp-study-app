@@ -3,7 +3,7 @@
  * The worker/main bridge owns execution; this module only describes the
  * observable state so renderer recovery cannot infer success from progress.
  */
-export type DictionaryImportKind = 'cedict' | 'wiktextract' | 'legacy';
+export type DictionaryImportKind = 'cedict' | 'wiktextract' | 'dsl' | 'legacy';
 
 export type DictionaryImportTerminal =
   | { state: 'committed'; counts: Record<string, number> }
@@ -26,7 +26,7 @@ export interface DictionaryImportJobSnapshot {
   terminal?: DictionaryImportTerminal;
 }
 
-const KINDS = new Set<DictionaryImportKind>(['cedict', 'wiktextract', 'legacy']);
+const KINDS = new Set<DictionaryImportKind>(['cedict', 'wiktextract', 'dsl', 'legacy']);
 const PHASES = new Set<DictionaryImportProgress['phase']>(['reading', 'importing', 'committing']);
 const TERMINAL_STATES = new Set<DictionaryImportTerminal['state']>(['committed', 'cancelled', 'failed']);
 const JOB_ID_MAX = 128;
@@ -95,8 +95,8 @@ export function isDictionaryImportTerminal(
 // ----- what a caller asks for, and what crosses the worker boundary ----------
 
 /**
- * A request to import one source. `filePath` is required for `cedict` and
- * `wiktextract` and meaningless for `legacy`, which reads the whole
+ * A request to import one source. `filePath` is required for file importers and
+ * meaningless for `legacy`, which reads the whole
  * `userData/yomitan` tree the main process names for it.
  */
 export interface DictionaryImportRequest {
