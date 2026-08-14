@@ -19092,3 +19092,256 @@ off the file. The other six had hunk counts equal to this slice's own edit count
 with a plain `git add`. The shared tree's foreign dirty state is untouched.
 
 Commits: `e3cf9fc` (the slice), `a615fd8` (the locale tag).
+
+## Track 2 — the notes archive gets a way out of the app — 2026-08-14 19:05 MSK primary
+
+Boss-audit state re-derived first, before anything else: the last two sections of
+`docs/audit/RELAY_BOSS_AUDIT.md` are retry-53 and its resolution note, and all four retry-53
+findings are closed (`f61f59c`, `9703c1f` + `89791ce`, `9eecb3e`). Nothing outstanding there, so
+this hop is a normal Track 2 ladder slice.
+
+### Why this slice, re-derived rather than inherited
+
+The previous hop (`e3cf9fc`) closed the browse-all-notes surface and listed five things it left
+open. Four of them are deliberate non-features (no sort control, no tag facet, a read-only list,
+the ASCII-only body filter). The fifth was not: "**Notes are still not exported.** The plan lists
+`exports` separately and it remains open." The plan's Track 2 line 42 lists `exports` between
+`known-word overlays` and `Flashcards`, so this is a named plan item and not an invention.
+
+The gap was checked rather than assumed. `dictNoteExport` did not exist; `listUserNotes` was the
+only reader that does not need the word in advance, and it had no writer-out. The neighbouring
+Track 2 bullets were re-checked too and remain honestly blocked on data a default install lacks —
+the previous hop's live probe found `inflections`, `collocations`, `etymology`, `audio`,
+`examples`, `xrefs` and `freq_corpora` all at **0 rows**. Notes are still the one item whose data
+source is the user.
+
+Two neighbouring items were re-derived as **already done** rather than taken from any summary, so
+they are not picked up again: `history` is `src/renderer/lookupHistory.ts`, bounded at 40 entries
+and consumed by Recent Lookups, the Notebook and Study Mode; `stars` is `src/renderer/savedWords.ts`,
+per study language and consumed by Flashcards, AI Card Studio, Blanc and the widgets. Neither is
+DB-backed, and moving them would be a 29-file rewrite, not this slice.
+
+### The decisions the slice needed, and the options taken
+
+All under the standing auto-approval for reversible choices.
+
+- **CSV, not JSON.** JSON would be lossless for free. CSV wins anyway because the neighbouring
+  destinations on this very plan line — a spreadsheet, Flashcards, Anki — all read CSV, and the
+  app already ships `aiSaveCsv` for mined cards. Losslessness is then *bought back* rather than
+  given up: every field is quoted unconditionally, so commas and newlines inside a note body
+  survive, and tags go through `serializeNoteTags` so the file carries the stored shape rather
+  than a second serialization invented at the export.
+- **A UTF-8 BOM, and it is load-bearing.** Without it every mainstream spreadsheet reads a UTF-8
+  CSV in the system code page, and a file of Japanese and Cyrillic notes opens as mojibake on the
+  machine that wrote it. Verified live as the bytes `EF BB BF`.
+- **A cell beginning `=`, `+`, `-` or `@` gets a leading apostrophe.** This is not a security
+  flourish; it is a correctness one. "-> see also 飲む" is an ordinary thing to write in a note
+  and opens as `#NAME?` without it, and the crafted case executes. The cost is stated rather than
+  hidden: that cell differs from the stored note by exactly one character, which is why the guard
+  is applied only to fields that actually start that way, and never to the other five columns'
+  ordinary content.
+- **ISO 8601 dates, not the UI locale.** An export outlives the locale that wrote it, and
+  `2026-08-14T…` is unambiguous everywhere `08/14/2026` is not. The *list* still shows a localized
+  date; that is a reading surface and this is a file.
+- **The export takes the filter and scope, never the page.** "Export what I am looking at" means
+  the 300 matches, not the 50 rows rendered. `readNoteExportQuery` therefore delegates to
+  `readNoteListQuery` and drops only `limit`/`offset` — so the file and the screen cannot select
+  by two drifting sets of rules — and main re-runs the query unpaged at
+  `NOTE_EXPORT_MAX_ROWS = 5000`, returning `total` alongside `count` so a partial export says so.
+- **Nothing to write is not a file.** The handler returns before opening the dialog on an empty
+  match. Prompting for a path and then producing a header-only CSV would look like a successful
+  export of an empty archive.
+- **A dismissed dialog is a decision, not a failure.** `error: 'cancelled'` renders no status at
+  all; only a real failure gets the failure string.
+- **The status is dropped when the scope changes.** A result naming a real path and a count that
+  belongs to a filter the reader has since retyped is worse than no result.
+
+### Mutation controls
+
+Ten scored, applied to the files in place and restored afterwards, with each restore asserted
+byte-identical (`-ceq`) rather than eyeballed. Focused suites: 62 tests.
+
+| mutation | actual |
+|---|---|
+| formula guard dropped | 1 failed / 61 passed |
+| `""` quote doubling dropped | 1 failed / 61 passed |
+| CRLF record separator → LF | 6 failed / 56 passed |
+| ISO date → `toLocaleDateString()` | 1 failed / 61 passed |
+| tags re-serialized at the export instead of via `serializeNoteTags` | 1 failed / 61 passed |
+| `readNoteExportQuery` keeps the caller's paging | 2 failed / 60 passed |
+| the surface exports its page instead of its scope | 1 failed / 61 passed |
+| `cancelled` reported as a failure | 1 failed / 61 passed |
+| the in-flight lock dropped | 1 failed / 61 passed |
+| stale status kept across a scope change | 1 failed / 61 passed |
+
+### Gates — shared tree
+
+`npx vitest run --testTimeout=60000 --hookTimeout=60000`: **589 passed / 1 skipped files,
+7,782 passed / 6 skipped tests**, exit 0. Per the retry-53 finding-1 lesson this is
+**shared-tree evidence and is deliberately not offered as committed-HEAD evidence**; the
+committed numbers are in their own section below and they are not the same. `node tools/i18n-check.cjs`
+exit 0 at **9,540** English keys translated in ja/zh/ru (9,536 + the four new ones).
+`node tools/architecture-audit.cjs` exit 0, 18 known / 2 pending, nothing new — the slice added no
+module, so there is no orphan to create. `npx eslint` on the touched paths: **0 errors, 0 warnings**
+on every file this slice owns. `src/main/dictionary.ts` reports 7 `no-explicit-any` warnings and
+`window.d.ts` 2 `adjacent-overload-signatures` errors; both were proved pre-existing mechanically
+rather than asserted — see below.
+
+### Both lint findings proved pre-existing, not asserted
+
+- `src/main/dictionary.ts`: its **HEAD blob** was linted in place (bytes captured, HEAD written,
+  linted, restored, restore asserted byte-identical). HEAD reports the same 7 findings at
+  128/133/161/483/489/503/509; this tree reports them at 132/137/165/487/493/507/513 — the same
+  findings shifted by exactly the 4 import lines this slice adds. Zero new.
+- `src/renderer/window.d.ts`: the duplicate `subtitleHarvestList`/`subtitleHarvestFetch`
+  declaration pair exists **at HEAD** (773/776 and 1533/1536) as well as in the tree (825/828 and
+  1601/1604), so the two errors are committed foreign-track findings, not this slice's.
+
+### Live acceptance
+
+Own dev app, `npm start`; bridge pid **1908** on 127.0.0.1:39273. The previous hop's
+`debug/bridge.json` was stale (pid 30036, port refusing) — started fresh rather than driving a
+corpse. `/logs` showed **0** `[vite] hot updated` lines before starting, so no other track was
+editing the tree during the run. The Dictionary was driven as a real pop-out window
+(`window.api.popOut('dictionary')`, window id 2), `/focus`ed before measuring. This profile's UI
+language is **Russian**, so all three new renderer strings are live-verified in a non-English
+locale.
+
+- **The real main handler, not the preload binding.** `window.api.dictNoteExport({filter:'zzz…'})`
+  returned `{ok:false, count:0, total:0, error:'empty'}`. An unregistered channel would have
+  rejected with "No handler registered"; a resolved structured answer is the handler itself.
+- **Seven scoped queries, each chosen to match zero notes so no dialog could open.** Cross-language
+  scoping (`ja` + a tag only the `zh` note carries, and the reverse), a literal `%`, a literal `_`,
+  a literal `\`, an unmatched filter and a non-existent language — **all seven** answered
+  `error:'empty'` with `total:0`. The wildcard and backslash escaping is therefore live-verified
+  against the real database, not only in a unit test.
+- **Sixteen malformed queries straight at the handler**, run with the archive emptied first so
+  none could reach a dialog: `null`, `undefined`, `[]`, `'x'`, `5`, `true`, `[[1]]`, `lang:999`,
+  `filter:{}`, `filter:['a']`, `lang:'  ZH  '`, a 5,000-character filter, `{limit:1, offset:900}`,
+  `{limit:NaN, offset:Infinity}`, `limit:-1`, and a `__proto__` payload parsed from JSON.
+  **All sixteen were clamped and answered; none rejected**, and `({}).polluted` stayed `undefined`.
+- **The real shipped serializer on real database rows.** `/src/shared/lexiconNotes.ts` was
+  dynamically imported in the live renderer — the Vite-transformed module the app actually runs —
+  and handed the rows `dictNoteList` returned from the real `dict.db` for four seeded notes.
+  Result: header `"language","word","reading","note","tags","updated"`; **4** records for 4 notes
+  even though one body contains a newline, proving the embedded LF is not read as a record break;
+  `endsWith('\r\n')` true; first three bytes of the file **239, 187, 191** (`EF BB BF`);
+  `""to eat""` doubled; `not\nto drink` preserved; `"verbs\nN5"` tags; `"'-> see also` guarded;
+  4 ISO timestamps. 419 bytes total.
+- **The real surface, in the live window.** Collapsed on arrival with **0 rows fetched** and no
+  export control at all. Opened: 4 rows, summary "Ваши заметки", foot "Показано 4 из 4", export
+  button labelled **"Экспорт CSV"**.
+- **The real button, clicked once, hit-tested to match.** The button went **disabled** and no
+  status paragraph appeared. Every other path in the handler resolves synchronously, so a promise
+  still pending after a round trip is the handler awaiting `dialog.showSaveDialog` — that is the
+  live evidence the button → preload → main → dialog chain is complete. Main kept serving IPC
+  while the dialog was open, which is how the probe note was then removed.
+- **The change announcement.** `dictNoteSet` through the preload deliberately does **not** dispatch
+  `LEXICON_NOTES_CHANGED_EVENT` — that is the editor component's job — so the list stayed stale
+  until the event was dispatched, at which point it re-read to 1 row. That is the contract working,
+  and it is recorded because a stale list at that moment reads exactly like a broken one.
+- **Geometry and contrast.** Export button **103×32** — a usable hit target — contrast **14.02:1**
+  at 13.3 px; the count line 6.08:1 at 12.6 px. `margin-inline-start: auto` resolved to 524 px, so
+  the control sits at the trailing edge as intended. Reflow at 900/640/480/320 px (the window
+  clamps at 344): panel 492/492/492/534 px, the button keeps its full 103×32 at every width, and
+  **no horizontal overflow at any width** (`scrollWidth > clientWidth + 1` over every descendant of
+  the panel).
+- `/logs?level=error` returned **0 entries** across the entire run. Probe globals deleted, all
+  probe notes removed **through the app's own `dictNoteSet`** rather than by writing SQL at the
+  live database, and `dictNoteList` confirmed `total: 0` — the archive is back to the 0 it started
+  at. No persisted setting toggled, no userData backup taken, no input automation. localStorage
+  ends at **80 keys** with `jp-telemetry-consent` still `yes` and `jp-lookup-history` still
+  **2,836** chars, matching the previous hop's recorded end state exactly. The pop-out window's
+  bounds were restored to 900×640. All **12** owned pids stopped, nothing else.
+
+### One thing that could not be verified live, stated rather than glossed
+
+**The `fs.writeFileSync` line and the user's path choice were not exercised.** Completing an OS
+save dialog needs either a human or mouse/keyboard automation, and this relay is forbidden the
+latter. Shadowing the binding to synthesize a result was tried and is impossible: `window.api` is
+`Object.isFrozen` and `dictNoteExport` is `writable:false, configurable:false`. So the success
+status string `lexicon.notes.exported` has unit coverage and no live measurement, and the same is
+true of the three lines that write the file. What *is* live-verified is everything on either side
+of them: the handler reaches the dialog, and the exact bytes it would write were produced by the
+real shipped serializer from the real database. A later hop with a human present can close this in
+one click; it should not be re-derived from scratch.
+
+### Committed-HEAD verification, run after the checkpoint commit
+
+Two disposable detached worktrees with `node_modules` supplied by an NTFS junction — one at
+`ebbcd97`, one at the parent `11fe331` to derive the baseline here rather than inherit it.
+
+- The three touched test files pass in isolation at committed HEAD: **3 files / 75 tests**, exit 0
+  (57 before this slice, +18).
+- `node tools/i18n-check.cjs` exit 0 at **9,369** keys. That is the *committed* count; the 9,540 in
+  the gates section is the shared tree, which carries other tracks' uncommitted catalog keys. Both
+  are green; they are different trees and are not interchangeable.
+- `node tools/architecture-audit.cjs` exit 0, nothing new.
+- Full `npx vitest run --testTimeout=60000 --hookTimeout=60000` at `ebbcd97`: exit 1, **4 failed /
+  559 passed / 1 skipped files, 9 failed / 7,410 passed / 6 skipped tests** — five
+  `blancAgentStepConfirmGate`, one `localAgentQueueRun`, one `novelReaderProgressGuard`, two
+  `i18n.test.ts` catalog-hygiene. The parent `11fe331` fails with the **identical 9 identities**
+  (9 failed / 7,392 passed), re-measured rather than quoted. The set difference introduced by this
+  commit is **empty**, and the +18 passed tests are exactly this slice's own. HEAD remains red for
+  reasons other tracks own.
+- Both `i18n.test.ts` failures were checked rather than waved through. `tools/i18n-hardcoded-check.cjs`
+  at `ebbcd97` names **no** path from this slice, and the locale-argument failure names only
+  `Lockscreen.tsx:171-172` — the same foreign finding the last four hops reproduced. This slice adds
+  no date formatting of its own; the list's existing `toLocaleDateString(LANG_TAGS[uiLang])` already
+  passes a locale.
+
+### A near-miss worth more than the slice itself
+
+The **first** full-suite run at `ebbcd97` reported **10** failures against the parent's 9. The extra
+one was `shimejiPhysics > ceiling walk does not exit on the entry wall edge` — which, taken at face
+value, is a regression introduced by this commit and would have been a false report in either
+direction. It was run down instead of assumed:
+
+1. the commit touches **no** shimeji file (`git show --stat` names none);
+2. the test passes in isolation at `ebbcd97` (12/12);
+3. the parent's full suite, re-run, still gave exactly 9 — no shimeji;
+4. `ebbcd97`'s full suite, **re-run**, also gave exactly 9 — no shimeji;
+5. `shimejiPhysics.test.ts:48-60` **documents this exact flake in its own comment**: the roll is
+   `Math.random() < dt * 0.025 * activity` = 0.0375 with this test's arguments, "so it failed
+   roughly one full-suite run in 27". A `mockReturnValue(1)` was added to mitigate it and evidently
+   does not fully.
+
+So it is a known pre-existing flake, and the honest form of that claim is the four re-measurements
+above, not the one-line dismissal it would have been tempting to write. **A single full-suite run is
+not enough to establish a set difference in this repo.** Re-run both sides before reporting one.
+
+### Deliberately open, stated rather than absorbed
+
+- **There is no importer.** The CSV is an export, not a round trip. Reading one back would need a
+  merge policy for a note that already exists at that identity, which is a product decision worth
+  its own slice rather than a silent last-write-wins.
+- **A tag containing a newline cannot exist, so the tag column is unambiguous — but a tag column is
+  still not a list to a spreadsheet.** Splitting it into columns would make the file's shape depend
+  on the data, which is worse.
+- **The formula guard changes one character.** Documented at `csvField` and above. Anyone who wants
+  byte-exact note bodies wants the JSON export that does not exist yet.
+- **`NOTE_EXPORT_MAX_ROWS` is 5,000 and is not paged.** Past it the export is partial and says so
+  via `count` vs `total`. Streaming would matter only for an archive nobody has.
+- **The export is not offered anywhere but the notes archive.** The entry's own note editor has no
+  "export this one", deliberately: a one-row CSV is not a feature.
+
+### Staging
+
+Six of the twelve touched tracked files — `preload.ts`, `window.d.ts` and the four catalogs —
+carry other tracks' uncommitted hunks (11, 7, 22, 22, 22 and 24 hunks respectively against this
+slice's 1, 1, 2, 2, 2 and 2), so those were staged as reconstructed **HEAD-plus-this-edit** blobs:
+HEAD bytes via `git cat-file blob`, the insertion anchored on an exact line, the EOL read **off that
+anchor line** rather than off the file, byte accounting asserted with `Buffer.byteLength(…, 'utf8')`
+rather than `String.length`, a NUL scan on the result, then `git hash-object -w --no-filters` and
+`git update-index --cacheinfo`. The other six had hunk counts equal to this slice's own edit counts
+and were staged with a plain `git add`. `git diff --cached --stat` showed **12 files, 435
+insertions, 2 deletions** and **no** file staged as `Bin`. The shared tree's foreign dirty state,
+including the unrelated `D src/shared/i18n/catalogs/gameArena.ts`, is untouched.
+
+One trap paid for again and worth repeating: **`Write` emitted a literal U+FEFF into
+`src/main/dictionary.ts`** where the source was meant to contain the escape `\uFEFF`. It is
+invisible in every editor and every test passed with it in place. It was caught by scanning the
+file's bytes for `EF BB BF` and replaced at the byte level. Scan new source bytes for U+FEFF as
+well as for NUL.
+
+Commit: `ebbcd97`.
