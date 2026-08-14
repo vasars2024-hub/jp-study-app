@@ -19550,3 +19550,180 @@ hop ago, **a single full-suite run still cannot establish a set difference in th
   next touches that surface, not to this one — but it is now *understated* rather than wrong.
 
 Commit: `e771089`.
+
+## Track 2 — the dictionary's own usage labels, and the import that had been dropping them — 2026-08-14 19:30 MSK backup
+
+**This hop began as interrupted-work recovery, not a fresh slice.** Worker `primary` hit its usage
+limit at **18:42:01 +03:00** with no handoff. Nothing was staged; HEAD was `16b4afb`. The
+in-progress slice was identified from mtimes alone — eleven paths written between **18:37:15 and
+18:41:16**, five of them untracked (`src/shared/dictTagBank.ts`,
+`src/renderer/components/lexicon/UsageLabels.tsx` + `usageLabels.css`, and two test files) and the
+rest tracked edits to `yomitan.ts`, `DictionaryResults.tsx` and the four catalogs. It is a coherent
+slice and it is re-derived below rather than trusted.
+
+### What the slice is
+
+`DictSense.tags` — how a sense is *used*: colloquial, derogatory, archaic, dialect, a term of art —
+has been on the shared contract since the first Jisho mapper and **no surface has ever rendered
+it**. The slice is two halves:
+
+- **A producer that had been throwing the data away.** A Yomitan term-bank row is
+  `[term, reading, definitionTags, rules, score, glossary, sequence, termTags]` and `parseTermBank`
+  read only 0, 1, 4 and 5. **Column 2 was dropped at import** — which is also the mechanical reason
+  every legacy sense carries `partsOfSpeech: []`. `src/shared/dictTagBank.ts` now resolves those
+  codes through the dictionary's **own** `tag_bank_*.json`, and the rule it holds to is the
+  Workbench's: **a tag the dictionary does not describe is not shown.** No built-in JMdict code
+  table, no guessing that `col` means "colloquial" — that would be exactly the fabrication this
+  track exists to refuse. The bank's own `category` decides the grammar/usage split, and resolution
+  runs *after* the whole zip is read, because a tag bank may sit after the term banks in the
+  archive. Column 7 (`termTags`) is deliberately excluded: those are headword priority markers like
+  `P`/`news1`, which are corpus frequency, not register, and folding them in would put
+  "common word" among the usage labels.
+- **A surface that renders them.** `UsageLabels` on each sense, collapsing to the entry when a
+  structured glossary arrives as one HTML block with no sense boundaries left to attribute to.
+
+### The regression the interrupted worker left behind, found by the full suite
+
+`UsageLabels` read `tags.length` unguarded. `DictSense.tags` is declared required, so this
+type-checks — but a `DictResult` crosses IPC and comes out of persisted caches, and **four
+unrelated suites' fixtures omit the field**. The full run was **27 failed / 7,791 passed**:
+
+- `characterMetadataUnavailable` 9/9 failed
+- `wordKnowledgeOverlay` 9/9 failed — *the previous hop's own slice*
+- `semanticNeighbors` 6/7, `dictionaryExampleCredit` 2/2
+
+all with one identity: `TypeError: Cannot read properties of undefined (reading 'length')` at
+`UsageLabels.tsx:26`. It threw during render, so **nothing mounted at all** — which is why suites
+that never heard of usage labels went to zero. Fixed by making the prop optional (`tags?`) and
+`entryUsageTags` read `sense.tags ?? []`. A display component treating an absent list as "the
+dictionary said nothing" is the honest reading; hardening the type would not have helped, because
+the value arrives off the wire where the type is not enforced.
+
+Two regression tests were added for the absent-field case specifically, one at the
+`entryUsageTags` unit level and one that renders a full `DictionaryResults` from a sense with no
+`tags` key — the exact shape that took down the four suites.
+
+### The 27th failure was not this slice
+
+`scraperSources > probeSource > caps the stored history so it cannot grow forever`, failing with
+`ENOTEMPTY: directory not empty, rmdir …\scraper\logs`. **13/13 pass in isolation.** Same
+full-suite-load flake in the same file the previous hop recorded at `c57e868`; a temp-dir teardown
+race, attributable to this commit in neither direction.
+
+### Gates — all four, after the fix
+
+- `npx vitest run --testTimeout=60000 --hookTimeout=60000`: **592 passed / 1 skipped files, 7,820
+  passed / 6 skipped tests, exit 0.** Zero failures, including the five `blancAgentStepConfirmGate`
+  / `localAgentQueueRun` / `novelReaderProgressGuard` / `i18n.test.ts` identities the ledger has
+  carried all week — this tree is currently clean of them.
+- `node tools/i18n-check.cjs`: exit 0, **9,546** English keys all translated in ja/zh/ru.
+- `node tools/architecture-audit.cjs`: exit 0, 1,818 modules, nothing new.
+- `npx eslint` on the six touched paths: exit 0. Two `no-non-null-assertion` **warnings** in
+  `yomitan.ts` at lines 647 and 914 — both pre-existing lines, neither in a hunk this slice wrote.
+
+### Live acceptance, through the debug bridge
+
+Dev app started fresh (no `bridge.json` existed); bridge on 39273, one window, focused and visible.
+The **real Vite-transformed `UsageLabels`** was mounted off-screen via
+`import('/src/renderer/components/lexicon/UsageLabels.tsx')` with React taken from Vite's optimized
+deps (the bare specifier `'react'` does not resolve in that context — and
+`react-dom_client.js` puts `createRoot` on `.default`, not on the namespace).
+
+- Renders `colloquialism | derogatory | Kansai-ben` as three `.dict-usage-tag` chips.
+- **The i18n key is live-verified in a non-English locale.** The running app is in Russian and the
+  screen-reader prefix came back as **`Употребление:`** — the catalog entry resolving through the
+  real `useT()`, not a raw literal and not the English fallback.
+- `.sr-only` is genuinely hidden: `position: absolute`, **1x1 px**.
+- Chip box **78x20**, `font-size: 11px`, **`cursor: auto`** — it is not dressed as a button, which
+  is the dead-control shape the honesty probe exists to catch.
+- **Contrast 6.08:1** — `rgb(127,160,142)` on `rgb(18,28,23)`, live theme `forest-night`, computed
+  from the sampled values rather than from the token names. Passes AA for normal text at 11 px.
+- Both empty cases proven on the same root: `tags: []` and `tags` **absent** each render an empty
+  DOM — no stray container, no gap. That is the regression fix, live.
+- Probe host removed and asserted **0 remaining**, all five globals deleted. One orphan host from
+  an earlier failed import attempt was found and removed in the same sweep. No persisted setting
+  touched, no userData backup, no input automation.
+
+### The honest hole: this renders nothing on this installation, and that is not a bug in the surface
+
+Looked up **貴様, 拙者, あかん, 飯, 猫** against the real bundled dictionary through
+`window.api.lookupTerm`. Every sense of every entry came back `tags: []` **and** `pos: []`, source
+`JMdict (Japanese–English)`. 貴様 is marked derogatory in JMdict, 拙者 archaic, あかん Kansai —
+so the data exists upstream and is absent downstream.
+
+That is the *same* defect this slice fixes, one layer earlier: the installed `dict.db` (374 MB) was
+built by an import that already dropped column 2, and `yomitan.ts` **fixes new imports going
+forward — it does not backfill an existing store**. `senses.tags` is a real column
+(`schema.ts:86`) and `migrate.ts:261` writes it, so the path is not dead; it was fed nothing.
+
+So, stated plainly rather than absorbed: **on this profile, and on any profile whose dictionaries
+were imported before this commit, the usage-label surface is correct and renders nothing.** It
+becomes visible on the next dictionary import. The end-to-end producer half is covered by
+`importYomitanZip tag resolution` (8 cases, including bank-position independence, an undescribed
+code showing nothing, and `termTags` staying out), which drives a real zip through import and out
+the other side at lookup — that is why this is recorded as a data-provenance gap rather than as an
+unverified feature. **Backfilling the bundled `dict.db` is a separate slice** and needs a real
+decision about re-import cost on a 374 MB store; it is not smuggled in here.
+
+### Deliberately open
+
+- **No backfill of the existing `dict.db`**, per above. The next hop should not rediscover the
+  empty-tags reading as if it were new.
+- **Nothing displays `partsOfSpeech` recovered by the same path yet** beyond the existing
+  `dict-pos` line, which now receives real codes from newly imported dictionaries for the first
+  time. Not separately verified live, for the same empty-store reason.
+- **The labels are never translated**, by decision: they are the dictionary's own words. Only the
+  screen-reader prefix goes through i18n.
+
+### Committed-HEAD verification, run after the checkpoint commit
+
+Two disposable detached worktrees with `node_modules` supplied by an NTFS junction — one at
+`ca13d55`, one at the parent `16b4afb` to derive the baseline here rather than inherit it.
+
+- `node tools/i18n-check.cjs` at `ca13d55`: exit 0, **9,375** keys — the *committed* count, and
+  exactly the parent's 9,374 plus this slice's one key. The 9,546 in the gate section above is the
+  shared tree, which carries other tracks' uncommitted catalog keys. Both green, different trees,
+  not interchangeable. **This number is the proof the four catalog blobs are correct**, because
+  they were not staged from the working tree: those files carry another track's 20+ hunks each, so
+  the index entries were built by hand as HEAD-plus-one-line and written with `git hash-object -w
+  --no-filters`. A CRLF slip on the first attempt made all four stage as whole-file rewrites; it
+  was caught by diffing the index against HEAD before committing, not after.
+- `node tools/architecture-audit.cjs` at `ca13d55`: exit 0, nothing new. This is the check that
+  `dictTagBank.ts` did not land ahead of its importer — the commit carries the module and both of
+  its consumers together.
+- Focused suites at committed HEAD: **6 files / 56 tests**, exit 0 — this slice's two files plus
+  the four the regression had taken down.
+- Full `npx vitest run` at `ca13d55`: exit 1, **4 failed / 562 passed / 1 skipped files, 9 failed /
+  7,448 passed / 6 skipped tests**. The parent: **5 failed / 559 passed / 1 skipped files, 9 failed
+  / 7,420 passed / 6 skipped tests**. **Set difference of failure identities: empty** — the same
+  five `blancAgentStepConfirmGate`, one `localAgentQueueRun`, one `novelReaderProgressGuard` and
+  two `i18n.test.ts` on both sides.
+- **Collected totals reconciled, not just failures.** 7,463 at HEAD − 7,435 at the parent = **28**,
+  which is exactly this slice's two new files (28 tests, confirmed in isolation). The parent's
+  *fifth* failed file is `subtitleNyaaFetch`, which passes **10/10 in isolation** and reports in
+  the bracket form — a file-level error after its tests ran, so its 10 tests are inside both
+  totals and cancel correctly. Had it failed to *collect*, the arithmetic would have been 10 short
+  and the empty set difference would have been hiding a suite. It was checked rather than assumed.
+- **The new-component i18n policer was checked, not waved through.** This slice adds a component,
+  which is precisely what `i18n.test.ts > does not let a new component render UI text without
+  adopting i18n` exists to catch. `tools/i18n-hardcoded-check.cjs` names **no** path from this
+  slice, and its offender list is **identical, 145 lines, at the parent and at HEAD** by
+  `Compare-Object`. The only literal strings in `UsageLabels.tsx` are the dictionary's own labels,
+  which are data and are deliberately not translated.
+
+### A commit that silently dropped four files, caught before it was reported
+
+`git commit -F msg --only -- <seven paths>` committed **seven** files, not eleven: `--only` with a
+pathspec re-stages from the working tree and **discards the index** for everything outside it, so
+the four hand-built catalog blobs were thrown away. The commit looked completely successful. Had
+it been trusted, HEAD would have shipped `UsageLabels` calling `t('dict.results.usage')` against
+four catalogs that do not define it — a key missing in every language, on a component whose only
+translated string is that key, and `i18n-check` would have failed at that commit.
+
+Caught by reading `git show --stat` back instead of the commit's own exit code, and repaired with
+`git commit --amend --no-edit`, which commits the index as it stands and had the four entries
+still in it. Final commit `ca13d55`, **11 files**. The trap is already recorded in this machine's
+memory as `git-commit-pathspec-discards-index`; it is recorded again here because the failure is
+silent, exit 0, and the wrong result is a commit that looks right in every summary line.
+
+Commit: `ca13d55`.
