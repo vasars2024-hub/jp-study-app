@@ -30,6 +30,7 @@ import { recordDictionaryEntry } from '../clipboardHistory';
 import { recordLookup } from '../lookupHistory';
 import { useT } from '../i18n';
 import CharacterMetadataPanel from './lexicon/CharacterMetadataPanel';
+import CharacterMetadataUnavailable from './lexicon/CharacterMetadataUnavailable';
 
 type TFn = (key: string) => string;
 
@@ -818,6 +819,9 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
       )}
 
       {result?.character && <CharacterMetadataPanel character={result.character} entries={entries} />}
+      {result && !result.character && [...(result.query ?? '')].length === 1 && (
+        <CharacterMetadataUnavailable char={result.query} />
+      )}
 
       <div className="dict-entries">
         {entries.map((entry, i) => {

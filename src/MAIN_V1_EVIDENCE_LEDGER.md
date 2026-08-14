@@ -18048,3 +18048,124 @@ mine button was clicked.
 Track 2's remaining item is unchanged and was **not** closed here: the fresh production Lexicon Workbench journey
 observing the containing-words list and moved-stroke counter together. The bridge is now proven reachable on this
 machine, so the next hop has no excuse to record it as blocked — start the app with `npm start` and expect 5174.
+
+## Track 2 — the character panel never rendered for anyone; grounded-gap note added — 2026-08-14 05:05 MSK backup
+
+### The gate did not pass. It could not have.
+
+The previous section left one item open: a fresh production Lexicon Workbench journey observing the
+containing-words list and the moved-stroke counter together. Driving that live is what produced the real
+finding, and it is not a small one.
+
+`CharacterMetadataPanel` mounts only on `result.character` (`DictionaryResults.tsx:820`). That field is set
+only when `[...text].length === 1` **and** `lookupCharacter()` finds a row (`dictService.ts:444`), and
+`lookupCharacter` reads exactly one place: the `chars` table (`dictService.ts:636`). Measured against the
+real profile DB (`%APPDATA%/jp-study-app/dictionary/dict.db`, 369 MB, read-only open):
+
+| table | rows |
+|---|---|
+| headwords | 697,837 |
+| glosses | 1,333,201 |
+| pitch | 107,978 |
+| **chars** | **0** |
+| **char_sources** | **0** |
+
+Confirmed through the app's own IPC on the live renderer, not by reading source — `window.api.lookupTerm`
+for 猫 / 食 / 水 / 日 each returned **8 real entries and `hasCharacter: false`**.
+
+So every ledger section from `Track 2 — grounded decomposition` onward — character facts, decomposition,
+containing words, handwriting recognition, the stroke counter — has shipped behind a condition that is
+**false for every user on every install**. Nothing is faked and nothing is broken; the surface is simply
+unreachable. The four bundled sources are `bundled-jmdict-en`, `-ru`, `bundled-kanjium-pitch`,
+`bundled-moedict-zh`; none carries a kanji bank (verified: 0 `kanji*bank*.json` across all four yomitan
+dirs), and KANJIDIC2 is a manual file-picker import in Settings that nothing in the product ever mentions.
+
+### Decision (standing auto-approval, reversible)
+
+Two options were live: import a KANJIDIC2 source into the user's real dictionary DB, or make the empty
+state honest and discoverable. **Chose the second.** The first writes thousands of rows into an 8.6 GB
+userData tree with no restore point, requires a dataset the repo does not ship, and would prove the panel
+works on *this* machine while leaving every other install exactly as dead. It is also not mine to do:
+bundling a kanji source is a build-asset and licensing decision, not a reversible slice.
+
+`CharacterMetadataUnavailable` now renders for a one-character lookup that has no grounded character data.
+It names the character, names the missing source, and spells out the route — composed from the existing
+localized labels (`storage.dictionaryImport.kind.kanjidic`, `settings.nav.storage`,
+`storage.dictionaryImport.title`) rather than a hardcoded path, so it cannot drift when those are renamed.
+Two new keys in all four catalogs.
+
+### The second defect, found only because the surface finally rendered
+
+`characterMetadataPanel.css` was written against `--text-primary`, `--text-secondary`, `--text-muted`,
+`--bg-secondary`, `--border-subtle`, `--surface-strong`. **None of the six is defined in any CSS file in
+`src/`** (grep: 0 files each), confirmed live by enumerating every `:root` custom property in the running
+renderer. The app's real tokens are `--text`, `--muted`, `--surface-1`/`-2`, `--border`. Every one of those
+declarations was invalid at computed-value time — the panel had no background at all.
+
+The worst of it: `.lexicon-character-practice-canvas { background: var(--surface-strong) }` resolved to
+nothing, so the writing canvas was transparent over `--panel` `#1a1823`, while the ink is a hardcoded
+`#111` set on the 2D context (`CharacterWritingPractice.tsx:22`). **Handwriting practice drew near-black
+ink on a near-black surface.** Fixed by giving the canvas an explicit `#ffffff` paper background — fixed on
+both sides deliberately, because the recognizer is fed this canvas verbatim and wants dark-on-light in
+every theme (`#111` on `#fff` = 18.9:1). The dead `stroke: var(--text-primary)` rule was dropped; `stroke`
+does nothing on a `<canvas>` element.
+
+### Coverage, with the mutation controls
+
+New: `src/renderer/__tests__/characterMetadataUnavailable.test.tsx` — 3 tests. Two **independent**
+mutations, each restored byte-identically (`-ceq`) and re-passed:
+
+| Mutation | Guard removed | Result |
+|---|---|---|
+| Drop `[...(result.query ?? '')].length === 1` | the one-character gate | `stays silent for a multi-character lookup` FAILS, then restored PASS |
+| Drop `!result.character` | the yield-to-grounded-panel gate | `yields to the grounded panel when character facts do exist` FAILS, then restored PASS |
+
+Each mutation failed a *different* test, so neither assertion carries the other.
+
+### Gates
+
+- `npx vitest run` — **582 files collected, 581 passed / 1 skipped; 7,649 tests, 7,643 passed / 6 skipped**,
+  exit 0. Compared as collected totals against the previous section's 581/7,646: `+1` file and `+3` tests
+  are exactly this slice's, so nothing dropped out of collection.
+- `node tools/i18n-check.cjs` — exit 0, **9,507** English keys translated in ja/zh/ru (`+2`, mine).
+- `node tools/architecture-audit.cjs` — exit 0, **1,795** modules (`+2`, mine), 18 known findings, nothing new.
+- `npx eslint` on all seven touched paths — exit 0, clean.
+
+### Live acceptance
+
+`npm start`, forge on 5174 (5173 held by a foreign node process from 08-12). Bridge pid 67328 live,
+`visible:true`, non-empty url. Consent screen and tour are both up, so — as before — the real
+Vite-transformed modules were mounted off-screen and driven through real IPC rather than clicked.
+
+**Probe 1, `DictionaryResults` for 猫 through the app's own lookup:** 8 real entries, `groundedPanel:false`,
+note present with `role="note"`, box 520×111. Text came back fully resolved in the real UI language, not as
+keys: *"No enabled dictionary source has character facts for 猫. Import KANJIDIC2 under Models &
+dictionaries → Import dictionaries to add strokes, radicals, components, and writing practice."*
+Every colour resolved to a real token value — bg `rgb(39,36,51)` = `--surface-2`, text `rgb(245,244,247)` =
+`--text`, hint `rgb(157,151,166)` = `--muted`, border `rgb(45,43,55)` = `--border`. Under the old token
+names these were all empty, which is the direct proof of the CSS defect and its fix.
+
+**Probe 2, `CharacterMetadataPanel` — the gate the previous section left open.** Production has no character
+data, so the `character` prop was constructed; the component, catalogs, stylesheet and event handling are
+the real live ones. Stated plainly because it matters: this is not a production-data journey, and it cannot
+be one until a kanji source exists.
+
+- containing-words list: `猫（ねこ）`, `子猫（こねこ）`, `猫舌（ねこじた）` — and `犬` correctly excluded;
+- moved-stroke counter, **observed in the same mount**: `Strokes: 0 / 11` → real pointerdown/move/up →
+  `Strokes: 1 / 11` → motionless down/up → still `Strokes: 1 / 11`. The moved-guard holds live, not just in
+  jsdom;
+- canvas background now `rgb(255,255,255)` at 180×180 with the panel at `rgb(26,24,35)` — the ink is
+  visible for the first time.
+
+`recordLookup` writes `localStorage['jp-lookup-history']`; captured before probe 1 and restored after —
+`{"hostGone":true,"restoredExact":true}`, then `{"globalsGone":true}`. No userData backup was taken, no
+mine button was clicked, and no persisted setting was toggled.
+
+### State
+
+Track 2's live gate for the containing-words list and stroke counter is **closed** at component level and
+**explicitly not closed** at production-data level. The blocking item is now a product/asset decision that
+is outside a reversible slice and should not be quietly re-derived as an implementation task: **the app
+ships no kanji source, so `chars` is empty on every install.** Either bundle a KANJIDIC2-derived source
+(licensing + build-asset work, EDRDG CC BY-SA) or offer an in-app fetch. Until then the character panel is
+correct, tested, styled, and unreachable — and at least now it says so.

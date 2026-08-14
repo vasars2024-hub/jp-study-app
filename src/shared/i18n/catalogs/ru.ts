@@ -9267,5 +9267,7 @@ export const ru: Catalog = {
   'lexicon.character.meanings': 'Значения',
   'lexicon.character.sources': 'Источники ({count})',
   'lexicon.character.wordsContaining': 'Слова с этим иероглифом',
+  'lexicon.character.unavailable': 'Ни один включённый словарный источник не содержит данных о знаке {char}.',
+  'lexicon.character.unavailable.hint': 'Импортируйте {source} в разделе «{section} → {card}», чтобы получить черты, ключи, компоненты и практику письма.',
 };
 

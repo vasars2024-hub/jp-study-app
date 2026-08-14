@@ -8887,6 +8887,8 @@ export const en: Catalog = {
   'lexicon.character.meanings': 'Meanings',
   'lexicon.character.sources': 'Sources ({count})',
   'lexicon.character.wordsContaining': 'Words containing this character',
+  'lexicon.character.unavailable': 'No enabled dictionary source has character facts for {char}.',
+  'lexicon.character.unavailable.hint': 'Import {source} under {section} → {card} to add strokes, radicals, components, and writing practice.',
 };
 
 

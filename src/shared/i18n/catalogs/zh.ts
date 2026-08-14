@@ -8442,5 +8442,7 @@ export const zh: Catalog = {
   'lexicon.character.meanings': '释义',
   'lexicon.character.sources': '来源（{count}）',
   'lexicon.character.wordsContaining': '包含此字符的词语',
+  'lexicon.character.unavailable': '没有已启用的词典来源提供 {char} 的字符信息。',
+  'lexicon.character.unavailable.hint': '在{section} → {card}中导入 {source}，即可获得笔画、部首、构件与书写练习。',
 };
 

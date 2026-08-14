@@ -3,8 +3,8 @@
   padding: 16px;
   border: 1px solid var(--border);
   border-radius: 12px;
-  background: var(--surface, var(--bg-secondary));
-  color: var(--text-primary);
+  background: var(--surface-1);
+  color: var(--text);
 }
 
 .lexicon-character > header {
@@ -25,7 +25,7 @@
 
 .lexicon-character p,
 .lexicon-character-sources span {
-  color: var(--text-muted);
+  color: var(--muted);
 }
 
 .lexicon-character-facts {
@@ -38,11 +38,11 @@
 .lexicon-character-facts > div {
   padding: 8px 10px;
   border-radius: 8px;
-  background: var(--bg-secondary);
+  background: var(--surface-2);
 }
 
 .lexicon-character-facts dt {
-  color: var(--text-muted);
+  color: var(--muted);
   font-size: 0.75rem;
 }
 
@@ -75,7 +75,7 @@
   padding: 7px 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: var(--bg-secondary);
+  background: var(--surface-2);
   font-size: 1.2rem;
   text-align: center;
 }
@@ -99,9 +99,29 @@
 .lexicon-character-sources li span {
   display: block;
 }
-.lexicon-character-practice { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-subtle); }
+.lexicon-character-practice { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
 .lexicon-character-practice-heading { display: flex; justify-content: space-between; align-items: center; }
-.lexicon-character-practice-canvas { display: block; width: 180px; height: 180px; margin: 8px auto; touch-action: none; background: var(--surface-strong); border: 1px solid var(--border-subtle); border-radius: 8px; cursor: crosshair; }
-.lexicon-character-practice-canvas { stroke: var(--text-primary); stroke-width: 4; stroke-linecap: round; }
+/* Paper, not a themed surface: the ink is a fixed dark colour set on the 2D context
+   (CharacterWritingPractice.tsx), and the recognizer is fed this canvas verbatim, so the
+   writing area stays dark-on-light in every theme. */
+.lexicon-character-practice-canvas { display: block; width: 180px; height: 180px; margin: 8px auto; touch-action: none; background: #ffffff; border: 1px solid var(--border); border-radius: 8px; cursor: crosshair; }
 .lexicon-character-practice-actions { display: flex; gap: 8px; justify-content: center; }
 .lexicon-character-practice-result { display: block; margin-top: 8px; text-align: center; font-size: 1.5rem; }
+
+.lexicon-character-unavailable {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.lexicon-character-unavailable p {
+  margin: 6px 0 0;
+}
+
+.lexicon-character-unavailable-hint {
+  color: var(--muted);
+  font-size: 0.9em;
+}

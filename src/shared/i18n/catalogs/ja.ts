@@ -8477,5 +8477,7 @@ export const ja: Catalog = {
   'lexicon.character.meanings': '意味',
   'lexicon.character.sources': '出典（{count}）',
   'lexicon.character.wordsContaining': 'この文字を含む単語',
+  'lexicon.character.unavailable': '{char} の文字情報を持つ有効な辞書ソースがありません。',
+  'lexicon.character.unavailable.hint': '{section} → {card} から {source} を取り込むと、画数・部首・構成要素・書き取り練習が使えます。',
 };
 
