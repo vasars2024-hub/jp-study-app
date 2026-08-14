@@ -20270,3 +20270,25 @@ dead, from the previous hop's unclean exit.
 - Another track was editing `src/shared/i18n/catalogs/*` and `src/preload.ts` during this hop
   (mtimes inside the run). Nothing of theirs was staged, and no foreign HMR reached the measured
   window.
+
+### The same gates at the committed commit, not the shared tree
+
+`f552e09` checked out into a detached worktree (`node_modules` supplied by an NTFS junction),
+which is what the section above deliberately did **not** claim:
+
+- Focused: `dictionaryMigrate`, `dictionaryNotes`, `dictionaryDb`, `dictionaryChineseLookup`,
+  `dictionaryCompounds`, `dictionarySources` — **149 passed / 6 files**, exit 0.
+- `i18n-check`: exit 0 at **9,382** committed keys — unchanged from `d756f04`, as expected of a
+  slice that adds no string. The shared tree's 9,553 belong to other tracks' uncommitted work.
+- `architecture-audit`: exit 0, nothing new, 2 known pending.
+- Full `npx vitest run`: **4 failed / 567 passed / 1 skipped files, 9 failed / 7,499 passed /
+  6 skipped tests**. Against `d756f04`'s recorded **4 / 567 / 1 files, 9 / 7,486 / 6 tests**
+  (`fabd524` between them is docs-only), the **set difference is empty**: the same nine
+  long-standing identities in the same four files.
+- **The arithmetic reconciles exactly.** `dictionaryMigrate.test.ts` goes from **35** `it(` to
+  **48** — 13 new tests — and the totals move by exactly 13: 7,501 → 7,514 total, 7,486 → 7,499
+  passed. No test moved out of the passed column, and no test file was added, so the
+  architecture audit's orphan check has nothing new to find.
+
+The `scraperSources` `ENOTEMPTY` seen on the shared tree did **not** reproduce here, which
+confirms it as temp-directory contention rather than anything in the tree.
