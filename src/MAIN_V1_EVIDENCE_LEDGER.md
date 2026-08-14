@@ -18311,3 +18311,89 @@ HEAD) is untouched by this slice and remains open. The four failing files it nam
 this shared tree and belong to other tracks' uncommitted work, so this run could not honestly close it by
 running the suite here. Findings 3 and 4 (the kana/digit wording of `CharacterMetadataUnavailable`, and a
 surrogate-pair case) are small and still ride with the next lexicon slice.
+
+## Boss-audit findings 3 and 4 — the empty-state note stopped prescribing an import that cannot help — 2026-08-14 14:35 MSK backup
+
+Not a ladder slice. This closes the last two open items from `docs/audit/RELAY_BOSS_AUDIT.md`'s 2026-08-14
+09:29 section (retry-53). Findings 1 and 2 were landed earlier today (`f61f59c`, `9703c1f` + `89791ce`);
+these two were left to "ride with the next lexicon slice". They are that slice.
+
+**Recovered work, not fresh work.** The previous `backup` hop hit its usage limit at 14:12 MSK mid-slice.
+It left three unstaged files (`src/shared/langs.ts`, `src/renderer/components/DictionaryResults.tsx`,
+`src/renderer/__tests__/characterMetadataUnavailable.test.tsx`, all last written 10:07-10:09) and a live
+probe at `debug/b53-probe.js`, with **no commit, no staged hunk and no ledger entry**. Nothing was
+discarded; the edits were re-derived against the audit finding, verified, and are landed here.
+
+### The defect, restated from source
+
+`01a9a25` gated the note on "exactly one code point" with no script test, so `あ`, `ア`, `5`, `a` and `々`
+all rendered "No enabled dictionary source has character facts for X. Import KANJIDIC2 ... to add strokes,
+radicals, components, and writing practice." KANJIDIC2's importer keys on `<literal>`
+(`src/main/dictionary/importers/kanjidic.ts:83-90`), which is ideograph-only, so that import can never
+ground any of them. A surface whose entire purpose is honesty about an empty state was prescribing a large
+manual import that cannot fix the state it describes.
+
+### The fix, and why the predicate lives in `shared/langs.ts`
+
+New `isGroundableCharacter(text)` in `src/shared/langs.ts` — one code point, and that code point must be a
+Unified Ideograph — replacing the inline gate at `DictionaryResults.tsx:823`. It sits next to
+`hasHan`/`hasCyrillic` because it is a script predicate, not a component concern, and because the next
+surface that needs the same question should not re-derive it. Two deliberate choices:
+
+- **Code points, not UTF-16 units.** That is finding 4: `'𠮷'.length` is 2, so a `.length === 1` test
+  silently hides the note for every extension-B kanji.
+- **The Unified_Ideograph property, not `Script=Han`.** Narrower on purpose — it excludes `々` and `〆`,
+  which no character source carries either, so they stay silent rather than being promised a fix.
+
+No new i18n key: the existing wording is accurate once the gate only admits ideographs. The component's
+doc comment was corrected in the same commit, since it still said "one-character lookup" and that is now
+the wrong contract to hand the next reader.
+
+### Mutation controls, because 13 green tests prove nothing on their own
+
+Both run against `langs.ts` in place, then restored and asserted byte-identical (`SequenceEqual` on the
+raw bytes, both `True` — not compared by eye):
+
+| mutation | expected to break | actual |
+|---|---|---|
+| code-point count replaced by `text.length === 1` | the astral case only | 1 failed / 8 passed — `names an astral ideograph` |
+| ideograph property test dropped | the five non-ideograph cases | 5 failed / 4 passed — `あ ア 5 a 々` |
+
+### Gates
+
+`npx vitest run` in this shared tree: **580 passed / 1 skipped files, 7,658 passed / 6 skipped tests, zero
+failed tests**; one file, `src/main/__tests__/scraperScheduler.test.ts` (another track's), exited its
+*suite* on `ENOTEMPTY: rmdir ...\scraper-scheduler-6NQLkl\scraper` — a Windows teardown flake, not a test
+failure: re-run alone it is **37/37 green**. Per finding 1's lesson this number is **shared-tree, not
+committed-HEAD** evidence and is not offered as the latter. `node tools/i18n-check.cjs` exit 0 at 9,507
+English keys translated in ja/zh/ru. `node tools/architecture-audit.cjs` exit 0, 1,796 modules, nothing
+new. `npx eslint` on the three touched paths exit 0.
+
+### Live acceptance
+
+Existing dev app (bridge pid 92564, port 39273, Vite 5174) — started 10:11 MSK, *after* the edits, and
+`/src/shared/langs.ts` served by Vite already carried the new predicate. `debug/b53-probe.js` mounted the
+real Vite-transformed `DictionaryResults` off-screen against live IPC for eight code points:
+
+| query | UTF-16 len | note | entries |
+|---|---|---|---|
+| 猫 U+732B, 日 U+65E5 | 1 | **shown**, 900x94, names the character | 8 |
+| 𠮷 U+20BB7 | **2** | **shown**, 900x93, names the character | 2 |
+| あ, ア, 5, a, 々 | 1 | **silent** | 8 / 8 / 4 / 8 / 8 |
+
+**One measurement was wrong before it was right, and the reason matters.** The first run reported `𠮷` as
+`note:false, entries:0` — which reads exactly like a real gap. It was not: the window was unfocused, the
+probe stalled at `done:false` for ~40s, and only settled after `/focus`. A direct
+`window.api.lookupTerm('𠮷')` returned `query:'𠮷'`, 2 entries, `hasCharacter:false`, so the note branch
+was always reachable; the focused re-run agrees. Chromium's background throttling can fabricate a
+zero-result finding — do not score an unfocused window. `/logs?level=error` returned **0 entries** across
+every probe. `jp-lookup-history` was captured and restored with a `===` assertion (`restoredExact:true`),
+localStorage still 17 keys, no persisted setting toggled, no userData backup taken, no input automation,
+and the pre-existing dev app was left running as found.
+
+### Deliberately open
+
+A rare ideograph outside KANJIDIC2's ~13k coverage still gets told to import KANJIDIC2. Narrowing the note
+to characters KANJIDIC2 actually carries would mean shipping or querying a coverage set, which is a real
+feature, not a wording fix — out of scope for closing this finding and recorded here rather than silently
+absorbed. All four boss-audit findings from retry-53 are now closed.

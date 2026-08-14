@@ -2,10 +2,14 @@ import { useT } from '../../i18n';
 import './characterMetadataPanel.css';
 
 /**
- * Shown for a one-character lookup that no enabled dictionary source can ground.
+ * Shown for a single-ideograph lookup that no enabled dictionary source can ground.
  * The character panel is deliberately absent in that state; without this note the
  * whole surface — facts, decomposition, containing words, writing practice — is
  * invisible and undiscoverable until the user happens to import KANJIDIC2.
+ *
+ * The caller gates on `isGroundableCharacter`, not on "one character": the import
+ * this note prescribes keys on KANJIDIC2's `<literal>`, so kana, digits and Latin
+ * letters can never be grounded and must never be told to import anything.
  */
 export default function CharacterMetadataUnavailable({ char }: { char: string }) {
   const { t } = useT();

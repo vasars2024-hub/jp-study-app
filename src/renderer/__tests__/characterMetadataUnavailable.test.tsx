@@ -94,6 +94,32 @@ describe('Ungrounded character lookup', () => {
     expect(note()).toBeNull();
   });
 
+  it('names an astral ideograph, which is one character but two UTF-16 units', async () => {
+    // 𠮷 is U+20BB7: `'𠮷'.length` is 2, so a UTF-16 length test would silently
+    // hide the note for every extension-B kanji.
+    stubApi({ query: '𠮷', entries: [ENTRY] } as DictResult);
+    await render(<DictionaryResults query="𠮷" variant="page" lang="ja" />);
+
+    expect(note()).not.toBeNull();
+    expect(note()?.textContent).toContain('lexicon.character.unavailable:𠮷');
+  });
+
+  it.each([
+    ['あ', 'kana'],
+    ['ア', 'katakana'],
+    ['5', 'a digit'],
+    ['a', 'a Latin letter'],
+    ['々', 'the iteration mark'],
+  ])('stays silent for %s (%s), which no character source can ever ground', async (query) => {
+    // KANJIDIC2 keys on <literal> and is kanji-only, so prescribing that import
+    // for a non-ideograph would promise a fix that cannot arrive.
+    stubApi({ query, entries: [ENTRY] } as DictResult);
+    await render(<DictionaryResults query={query} variant="page" lang="ja" />);
+
+    expect(panel()).toBeNull();
+    expect(note()).toBeNull();
+  });
+
   it('yields to the grounded panel when character facts do exist', async () => {
     stubApi({
       query: '猫',

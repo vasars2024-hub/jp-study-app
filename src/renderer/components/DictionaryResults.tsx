@@ -26,6 +26,7 @@ import { translateTo, type TransLang } from '../translator';
 // `confirmDialog` from `ui/dialogService` instead of the `ui` barrel.
 import { firstGlossSegment } from '../../shared/epubEnrichment';
 import { glossForLangFromEntries } from '../../shared/fieldRouter';
+import { isGroundableCharacter } from '../../shared/langs';
 import { recordDictionaryEntry } from '../clipboardHistory';
 import { recordLookup } from '../lookupHistory';
 import { useT } from '../i18n';
@@ -819,7 +820,7 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
       )}
 
       {result?.character && <CharacterMetadataPanel character={result.character} entries={entries} />}
-      {result && !result.character && [...(result.query ?? '')].length === 1 && (
+      {result && !result.character && isGroundableCharacter(result.query ?? '') && (
         <CharacterMetadataUnavailable char={result.query} />
       )}
 

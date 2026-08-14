@@ -57,6 +57,21 @@ export function hasHan(text: string): boolean {
   return /[\u3400-\u4dbf\u4e00-\u9fff]/.test(text);
 }
 
+/**
+ * Whether `text` is a single character that a character dictionary could ground.
+ *
+ * Only ideographs qualify: every character source this app can import keys on an
+ * ideograph (KANJIDIC2 on `<literal>`), so kana, digits and Latin letters can
+ * never gain strokes, radicals or components no matter what the user imports.
+ * Code points, not UTF-16 units — an astral ideograph such as 𠮷 is one
+ * character with `length === 2`. `\p{Unified_Ideograph}` is deliberately
+ * narrower than Script=Han: it excludes marks like 々 and 〆, which no character
+ * source carries either.
+ */
+export function isGroundableCharacter(text: string): boolean {
+  return [...text].length === 1 && /\p{Unified_Ideograph}/u.test(text);
+}
+
 export function hasCyrillic(text: string): boolean {
   return /[\u0400-\u04FF]/.test(text);
 }
