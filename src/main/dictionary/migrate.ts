@@ -114,6 +114,36 @@ const BUNDLED_LEGACY_PROVENANCE: Readonly<Record<string, LegacySourceProvenance>
 };
 
 /**
+ * Which of the three legacy payloads a store carries, in the order the legacy
+ * format itself resolves them: a store that has terms is a term dictionary even
+ * if it also ships accents.
+ */
+export function legacyKindOf(info: Pick<YomitanDictInfo, 'hasTerms' | 'hasPitch'>): 'term' | 'pitch' | 'freq' {
+  return info.hasTerms ? 'term' : info.hasPitch ? 'pitch' : 'freq';
+}
+
+/**
+ * The number a source list should print next to this dictionary.
+ *
+ * `entry_count` used to be `counts.headwords` unconditionally, which is right
+ * for a term dictionary and a lie for the other two kinds: the bundled Kanjium
+ * store owns 107,978 accent rows and no headwords at all, so Settings rendered
+ * "pitch · 0" for a dictionary that is fully populated and actively answering
+ * lookups. Count the rows the kind actually owns. Reading the kind rather than
+ * taking the largest count keeps the number stable for a hypothetical store
+ * that carries two payloads — it stays the count of the thing the row claims
+ * to be.
+ */
+export function legacyEntryCount(
+  kind: 'term' | 'pitch' | 'freq',
+  counts: Pick<ImportedCounts, 'headwords' | 'pitch' | 'freq'>,
+): number {
+  if (kind === 'pitch') return counts.pitch;
+  if (kind === 'freq') return counts.freq;
+  return counts.headwords;
+}
+
+/**
  * Every gloss language a dictionary's definitions are written in, best evidence
  * first. Legacy stores predate `glossLangs`, so an empty list here is common and
  * is precisely where the language used to be lost — see `./glossLang`.
@@ -226,6 +256,7 @@ export function importLegacyIndex(
   // disagreement makes a pair override silently stop applying.
   const sourceLang = sourceLangOf(info);
   const provenance = BUNDLED_LEGACY_PROVENANCE[dictId];
+  const kind = legacyKindOf(info);
   const counts: ImportedCounts = { dictId, headwords: 0, senses: 0, glosses: 0, pitch: 0, freq: 0 };
 
   const run = db.transaction(() => {
@@ -244,7 +275,7 @@ export function importLegacyIndex(
       (glossLangs.length ? glossLangs : [glossLang]).join(','),
       info.priority ?? 0,
       info.enabled === false ? 0 : 1,
-      info.hasTerms ? 'term' : info.hasPitch ? 'pitch' : 'freq',
+      kind,
       provenance?.licence ?? null,
       provenance?.attribution ?? null,
       info.importedAt ?? 0,
@@ -317,7 +348,8 @@ export function importLegacyIndex(
       counts.freq += 1;
     }
 
-    db.prepare('update dictionaries set entry_count = ? where id = ?').run(counts.headwords, dictId);
+    db.prepare('update dictionaries set entry_count = ? where id = ?')
+      .run(legacyEntryCount(kind, counts), dictId);
   });
 
   run();

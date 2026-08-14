@@ -137,6 +137,50 @@ describe('dictionary database — opening and migrating', () => {
     });
   });
 
+  it('repairs the zero entry_count of pitch and frequency stores already migrated', () => {
+    const declare = db.prepare(`
+      insert into dictionaries (id, title, source_lang, target_langs, kind, entry_count)
+      values (?, ?, 'ja', 'ja', ?, ?)
+    `);
+    declare.run('bundled-kanjium-pitch', 'Kanjium', 'pitch', 0);
+    declare.run('freq-narou', 'Narou', 'freq', 0);
+    declare.run('freq-counted', 'Already counted', 'freq', 7);
+    declare.run('freq-empty', 'Genuinely empty', 'freq', 0);
+    declare.run('bundled-jmdict-en', 'JMdict', 'term', 0);
+
+    const pitch = db.prepare('insert into pitch (dict_id, lang, norm, reading, positions) values (?, ?, ?, ?, ?)');
+    for (const norm of ['橋', '箸', '端']) pitch.run('bundled-kanjium-pitch', 'ja', norm, 'はし', '1');
+    const freq = db.prepare('insert into freq_corpora (lang, norm, corpus, rank) values (?, ?, ?, ?)');
+    freq.run('ja', '食べる', 'freq-narou', 42);
+    freq.run('ja', '走る', 'freq-narou', 517);
+    // A number some other path set on purpose must survive, so this store's two
+    // rows must not overwrite its declared 7.
+    freq.run('ja', '見る', 'freq-counted', 3);
+
+    db.pragma('user_version = 8');
+    expect(migrateDictionaryDb(db)).toBe(DICT_SCHEMA_VERSION);
+
+    const counted = Object.fromEntries(
+      (db.prepare('select id, entry_count from dictionaries').all() as { id: string; entry_count: number }[])
+        .map((row) => [row.id, row.entry_count]),
+    );
+    expect(counted).toEqual({
+      'bundled-kanjium-pitch': 3,
+      'freq-narou': 2,
+      'freq-counted': 7,
+      'freq-empty': 0,
+      // A term store with no headwords is honestly empty; the step must not
+      // reach for another kind's rows to make it look populated.
+      'bundled-jmdict-en': 0,
+    });
+
+    // Idempotent: the guard is `entry_count = 0`, so a second pass changes nothing.
+    db.pragma('user_version = 8');
+    migrateDictionaryDb(db);
+    expect(db.prepare('select entry_count c from dictionaries where id = ?').get('bundled-kanjium-pitch'))
+      .toEqual({ c: 3 });
+  });
+
   it('reports the failing step and leaves the version behind when a migration throws', () => {
     const broken = openDictionaryDb({ dir: path.join(tempRoot, 'broken') });
     broken.pragma('user_version = 0');

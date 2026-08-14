@@ -30,7 +30,7 @@ import { BUNDLED_GLOSS_LANGS, BUNDLED_SOURCE_LANGS, DEFAULT_SOURCE_LANG } from '
 import { relabelDictionarySourceLang } from './sourceLang';
 
 /** Bumped by appending to MIGRATIONS. Never edit a released step. */
-export const DICT_SCHEMA_VERSION = 8;
+export const DICT_SCHEMA_VERSION = 9;
 
 export interface MigrationStep {
   version: number;
@@ -563,6 +563,38 @@ export const MIGRATIONS: MigrationStep[] = [
       // `user_version` on a file that already has the index would otherwise
       // strand the whole ladder.
       db.exec('CREATE INDEX IF NOT EXISTS idx_etym_head ON etymology(headword_id)');
+    },
+  },
+  {
+    version: 9,
+    name: 'count the rows a pitch or frequency dictionary actually owns',
+    up(db) {
+      // The legacy migration wrote `entry_count = headwords`, which is zero for
+      // the two kinds that carry no headwords. On a default install the bundled
+      // Kanjium store therefore printed "pitch · 0" in Settings while owning
+      // 107,978 accent rows, and a frequency-only store printed the same. The
+      // writer now counts by kind (`legacyEntryCount` in `./migrate`); this step
+      // repairs the databases that already ran the old one.
+      //
+      // The correlated subqueries are the same joins the writer counted: pitch
+      // rows are keyed by `dict_id`, frequency rows by `corpus` (`freq_corpora`
+      // is shared across dictionaries and carries the source id in that column,
+      // not a `dict_id`).
+      //
+      // `entry_count = 0` is the guard, so a number some other path set on
+      // purpose is never overwritten, and a genuinely empty store stays at zero
+      // because both subqueries then also return zero. Re-running the step is a
+      // no-op for the same reason.
+      db.exec(`
+        UPDATE dictionaries SET entry_count =
+          (select count(*) from pitch p where p.dict_id = dictionaries.id)
+        WHERE kind = 'pitch' AND entry_count = 0
+      `);
+      db.exec(`
+        UPDATE dictionaries SET entry_count =
+          (select count(*) from freq_corpora f where f.corpus = dictionaries.id)
+        WHERE kind = 'freq' AND entry_count = 0
+      `);
     },
   },
 ];

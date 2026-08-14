@@ -247,6 +247,46 @@ describe('pitch and frequency — the parts §3.1 had nowhere to put', () => {
     importLegacyIndex(db, fixture({ info: { ...fixture().info, id: 'k', hasTerms: false, hasPitch: true }, terms: {} }));
     expect(db.prepare('select kind from dictionaries where id = ?').get('k')).toEqual({ kind: 'pitch' });
   });
+
+  // `entry_count` is what Settings prints beside the source. Counting headwords
+  // for a store that has none by definition made a fully populated dictionary
+  // read as empty.
+  it('counts the accent rows, not the headwords a pitch store never has', () => {
+    importLegacyIndex(
+      db,
+      fixture({
+        info: { ...fixture().info, id: 'kanjium', hasTerms: false, hasPitch: true },
+        terms: {},
+        pitch: {
+          [`橋${LEGACY_KEY_SEP}はし`]: { reading: 'はし', positions: [2] },
+          [`箸${LEGACY_KEY_SEP}はし`]: { reading: 'はし', positions: [1] },
+        },
+      }),
+    );
+    expect(db.prepare('select entry_count c from dictionaries where id = ?').get('kanjium')).toEqual({ c: 2 });
+  });
+
+  it('counts the ranks a frequency store supplies', () => {
+    importLegacyIndex(
+      db,
+      fixture({
+        info: { ...fixture().info, id: 'freq-narou', hasTerms: false, hasFreq: true },
+        terms: {},
+        freq: { [`食べる${LEGACY_KEY_SEP}たべる`]: 42, [`走る${LEGACY_KEY_SEP}はしる`]: 517 },
+      }),
+    );
+    expect(db.prepare('select entry_count c from dictionaries where id = ?').get('freq-narou')).toEqual({ c: 2 });
+  });
+
+  it('still counts headwords for a term store that also ships accents', () => {
+    const counts = importLegacyIndex(
+      db,
+      fixture({ pitch: { [`橋${LEGACY_KEY_SEP}はし`]: { reading: 'はし', positions: [2] } } }),
+    );
+    expect(counts).toMatchObject({ headwords: 3, pitch: 1 });
+    expect(db.prepare('select kind, entry_count c from dictionaries where id = ?').get('jmdict-en'))
+      .toEqual({ kind: 'term', c: 3 });
+  });
 });
 
 describe('gloss language', () => {
