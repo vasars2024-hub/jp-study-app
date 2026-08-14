@@ -375,3 +375,73 @@ above. (5) done.
 **Next stage: F6's per-cue sidecar**, which is now the cheapest remaining piece — `decisions`
 already carries `{basis, score, confidence}` per window and nothing persists it. F5 needs a cloud
 key and a schema; F7 needs real media and the Whisper runtime.
+
+### F6 + F8 — the sidecar, its reader, and a way to start a fusion — 2026-08-15, backup
+
+**Landed:** `9c21a98` (sidecar + a unit fix), `0d92f69` (the sync gate's missing modules),
+`112e1f5` (IPC reader + media-library UI, i18n ×4).
+
+**Decisions.**
+
+1. **Sidecar indexed by cue, not by window.** A merged window yields one cue and a dropped one
+   yields none, so window indices do not survive the SRT write. `windowDecisionsToFusedCues` is
+   now the single skip rule and `windowCuesToSubtitleCues` is defined in terms of it — two
+   independent skip rules would silently shift every badge after the first drop.
+2. **Sidecar path derived (`fusionMetaPathFor`), not stored on `SubtitleRecord`.** A path recorded
+   twice can disagree with itself, and records written before F6 would carry nothing anyway.
+   Tradeoff: renaming the track file orphans the sidecar; the job always writes both.
+3. **Reading is total.** Missing / truncated / hand-edited / future-version → `null`; one corrupt
+   cue is dropped rather than failing the file. `transcription:fusionMeta` collapses all four
+   "no sidecar" causes into `null` because no surface needs to tell them apart.
+4. **F8's entry point landed with F6** rather than after F5/F7: the sidecar needed a reader in the
+   same turn (dead-data rule), and a reader needs a surface a user can reach.
+
+**A unit bug F4 shipped, now fixed.** `SubtitleRecord.confidence` is documented and rendered as a
+**0–100** match score; F4 wrote the 0–1 fusion mean straight into it, so a track at 0.52 displayed
+as **"1% match"**. `fusionConfidencePercent` converts and clamps. Live-confirmed as "совпадение 52%".
+
+**A broken committed tree, found while staging and fixed.** `src/shared/subtitleSync.ts` and
+`src/main/subtitleSync.ts` were **never committed** — untracked in the shared tree while committed
+`transcriptionJobs.ts` imported both since F1. Every gate run in that tree was green and a fresh
+checkout could not resolve the fusion job at all. `0d92f69` lands them plus their 24 tests. Proof:
+a transitive resolve of every relative import from `HEAD:src/main/transcriptionJobs.ts` against
+`git ls-files` now visits **92 modules with nothing missing**.
+
+**Gates**, run once after the last slice, on the shared working tree. `npx vitest run
+--testTimeout=60000 --hookTimeout=60000`: **603 passed / 1 skipped files, 7,961 passed / 6 skipped
+tests**, exit 0. `node tools/i18n-check.cjs`: exit 0 at **9,564** English keys translated in
+ja/zh/ru. `node tools/architecture-audit.cjs`: exit 0, **1,837 modules, 18 findings, nothing new**,
+2 known pending. `npx eslint` on the 8 touched paths: clean apart from the two pre-existing
+`adjacent-overload-signatures` errors in `src/renderer/window.d.ts`, reproduced at HEAD (lines
+1545/1548 there) and belonging to another track. Same honest caveat as the entries above: that
+vitest number is the shared dirty tree.
+
+**Live acceptance** (owned dev app, bridge on 39273). `window.api.fusionTrackMeta` invoked against
+the **real main handler** — a real media id with a real non-fused track, an unknown track, an
+unknown item, empty strings and nulls all returned `null`, none threw, which is what proves the
+handler is registered rather than merely bridged. The real Vite-transformed `MediaDetailPanel`
+mounted off-screen against live IPC: with no English track the fuse button renders
+("Свести EN → JA", the install is in Russian), `disabled=true`, and the reason line is shown; with
+an English track present it is enabled and the reason line is gone; the fused row reads
+`jaJA (fused from EN + Whisper)Сгенерировано · SRT · совпадение 52% · Сгенерировано машиной`.
+
+**Two things NOT proven, stated rather than papered over.**
+
+1. **The badge itself has no live evidence.** The probe tried to stub `window.api.fusionTrackMeta`
+   to feed the panel a synthetic sidecar; `window.api` is a **frozen, non-configurable**
+   contextBridge object, so the assignment silently no-opped and the real handler answered `null`
+   for a fabricated record id. The resulting `badgeShown:false` is a **false negative — do not
+   record it as a defect.** Proving the badge needs a genuine fused record, i.e. a real fusion run.
+2. **No end-to-end fusion run this turn.** This install's library has 30 items, 5 with subtitles,
+   and **not one English track** — the F1/F2 podcast fixture is not in it. There is also no IPC to
+   attach an arbitrary subtitle record; the honest route is dropping an English `.srt` beside a
+   video and running discovery. Keep the English track to ~3 cues: `planAsrWindows` derives windows
+   from the cues, so a 3-cue track is a 3-window Whisper pass, not a 24-minute one.
+
+**Status against §6 "What done means":** (1) F1–F4 and F6 done, F5 open. (2) done. (3) not started
+— F7 is still the gating unknown; `FUSION_AGREE_SCORE` and the confidence constants stay
+provisional. (4) partial, see above. (5) done.
+
+**Next stage: F7's evaluation harness**, and the live badge run above is the cheapest way in —
+building the fixture (English sidecar + discovery) is the same setup F7 needs anyway. F5 remains
+behind a cloud key and a schema.
