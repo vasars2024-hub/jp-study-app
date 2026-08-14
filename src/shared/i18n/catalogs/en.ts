@@ -8911,6 +8911,15 @@ export const en: Catalog = {
   'lexicon.notes.export': 'Export CSV',
   'lexicon.notes.exported': 'Exported {count} of {total} to {path}',
   'lexicon.notes.exportFailed': 'Could not export your notes.',
+  // Knowledge chip on a result row. The four level names are the same scale the
+  // stats view and the vocabulary widget already count, kept as their own keys
+  // because those two read as sentence fragments ("known", lower case) and
+  // these are labels on a control.
+  'lexicon.knowledge.new': 'New',
+  'lexicon.knowledge.learning': 'Learning',
+  'lexicon.knowledge.familiar': 'Familiar',
+  'lexicon.knowledge.known': 'Known',
+  'lexicon.knowledge.action': '{word}: {level}. Click to mark it {next}.',
   'dict.saved.title': 'Saved searches',
   'dict.saved.save': 'Save search',
   'dict.saved.remove': 'Remove saved search',

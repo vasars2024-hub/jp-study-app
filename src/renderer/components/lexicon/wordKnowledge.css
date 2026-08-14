@@ -1,0 +1,40 @@
+/* Knowledge chip on a Lexicon result row.
+
+   Geometry is local; the colour is deliberately not. The tints come from the
+   shared `.wk-g-0…3.active` rules in styles.css that the dictionary popup and
+   the Lens reader already use, so one word cannot look "familiar" in one
+   surface and something else in another.
+
+   The one departure: level 0 does not get `.active`. In the popup the tint
+   means "this is the level you picked" and every level can carry it; here the
+   chip always shows the current level, so tinting New would light up every
+   ungraded row in the list. New stays a quiet outline instead. */
+
+.lexicon-knowledge {
+  flex: none;
+  min-height: 22px;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.lexicon-knowledge:hover {
+  color: var(--text);
+}
+
+.lexicon-knowledge.active {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.lexicon-knowledge:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

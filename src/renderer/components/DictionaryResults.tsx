@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { AnkiStatus, DictEntry, DictResult, ExampleSentence } from '../../shared/types';
 import type { StudyProfile } from '../../shared/profiles';
 import {
@@ -17,6 +17,8 @@ import {
 import AnkiSetup from './AnkiSetup';
 import Icon from './Icons';
 import { addSaved, loadSaved, onSavedChanged, removeSaved } from '../savedWords';
+import { cycleLevel, getLevel, onKnowledgeChanged, type WkLevel } from '../knownWords';
+import { getStudyLang, onStudyLangChanged } from '../studyEnvironment';
 import { getActiveProfile, onProfileChanged } from '../profileState';
 import { translateTo, type TransLang } from '../translator';
 // Imported from their defining modules rather than the `shared/mining` barrel.
@@ -35,6 +37,7 @@ import CharacterMetadataUnavailable from './lexicon/CharacterMetadataUnavailable
 import ConjugationTable from './lexicon/ConjugationTable';
 import EntryNote from './lexicon/EntryNote';
 import SemanticNeighbors from './lexicon/SemanticNeighbors';
+import WordKnowledge from './lexicon/WordKnowledge';
 
 type TFn = (key: string) => string;
 
@@ -249,6 +252,11 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
   const [addState, setAddState] = useState<Record<number, AddState>>({});
   const [addErr, setAddErr] = useState<Record<number, string>>({});
   const [savedSet, setSavedSet] = useState<Set<string>>(() => new Set(loadSaved().map((w) => w.word)));
+  const [studyLang, setStudyLang] = useState(getStudyLang);
+  // A counter rather than a copy of the store: `cycleLevel` and an Anki sync
+  // both persist and then emit, so re-reading on the emit keeps one source of
+  // truth instead of a local map that could drift from it.
+  const [knowledgeTick, setKnowledgeTick] = useState(0);
   const [exState, setExState] = useState<ExState>('idle');
   const [examples, setExamples] = useState<ExampleSentence[]>([]);
   const [exError, setExError] = useState('');
@@ -300,6 +308,11 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
 
   // Keep the star state in sync with saves from other views.
   useEffect(() => onSavedChanged(() => setSavedSet(new Set(loadSaved().map((w) => w.word)))), []);
+
+  // Grading the same word in the popup, the Lens reader or an Anki sync must
+  // show up here too — the overlay is a view of one store, not a second one.
+  useEffect(() => onKnowledgeChanged(() => setKnowledgeTick((n) => n + 1)), []);
+  useEffect(() => onStudyLangChanged(setStudyLang), []);
 
   // Refresh cached Anki status when the heartbeat reconnects or collection loads.
   useEffect(
@@ -794,6 +807,27 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
 
   const entries = result?.entries ?? [];
 
+  /**
+   * Grading is offered only when the dictionary being read is the language the
+   * knowledge store is currently keyed to. `jp-word-knowledge-*` is per study
+   * language, and this component is also rendered with a fixed `lang="ja"` from
+   * Blanc, so a Chinese headword graded while the study language is Japanese
+   * would land in the Japanese store. Hiding the control loses a feature for
+   * that combination; showing it would quietly corrupt the other language's
+   * vocabulary. The popup variant is excluded for a different reason: it and
+   * the Lens reader carry their own four-button grade control for the token
+   * that was clicked, and two controls for one word is worse than one.
+   */
+  const gradable = variant !== 'popup' && lang === studyLang;
+
+  const knowledge = useMemo(() => {
+    const levels = new Map<string, WkLevel>();
+    if (gradable) for (const entry of entries) levels.set(entry.word, getLevel(entry.word));
+    return levels;
+    // `knowledgeTick` is the subscription, not a value: it is what re-reads the
+    // store after somebody else writes to it.
+  }, [entries, gradable, knowledgeTick]);
+
   return (
     <div className={`dict-results ${variant}`}>
       {query.trim() && !result && <div className="dict-loading">{t('dict.results.lookingUp')}</div>}
@@ -864,6 +898,13 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
                 >
                   <Icon name="star" size={14} fill={saved} />
                 </button>
+                {gradable && (
+                  <WordKnowledge
+                    word={entry.word}
+                    level={knowledge.get(entry.word) ?? 0}
+                    onCycle={cycleLevel}
+                  />
+                )}
               </div>
               {entry.pitchHtml && (
                 <div className="dict-pitch" lang="ja">
