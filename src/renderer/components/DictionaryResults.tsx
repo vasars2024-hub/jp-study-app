@@ -979,6 +979,20 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
                   </li>
                 ))}
               </ul>
+              {/*
+                These are real Tatoeba sentences, and they get mined onto Anki
+                cards from this very panel — so the attribution obligation
+                follows them here exactly as it does in Grammar, which renders
+                the same credit for the same corpus
+                (`grammar/GrammarContent.tsx:147-154`). Audit F6. The browser
+                extension's Examples tab consumed the same corpus uncredited and
+                was fixed alongside this (`extension/content.js`).
+              */}
+              <p className="dict-ex-credit muted">
+                <a href="https://tatoeba.org" target="_blank" rel="noreferrer">
+                  {t('grammar.examples.tatoebaCredit')}
+                </a>
+              </p>
             </>
           )}
         </div>

@@ -9245,6 +9245,18 @@ mark.lookup-mark,
   padding: 0 4px;
   font-size: 11px;
 }
+/* Tatoeba attribution under the example list. Quiet, but present — the licence
+   requires the credit, not that anyone enjoy reading it (audit F6). Matches
+   `.gram-ex-credit`, which carries no rule of its own and inherits `.muted`. */
+.dict-ex-credit {
+  margin: 8px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+}
+.dict-ex-credit a {
+  color: inherit;
+  text-decoration: underline;
+}
 .dict-ex-list {
   list-style: none;
   margin: 0;

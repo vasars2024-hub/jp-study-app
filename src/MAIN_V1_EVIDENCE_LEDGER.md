@@ -17955,3 +17955,96 @@ new visible containing-words list and moved-stroke counter have not been observe
 journey. Track 2 therefore remains active: the next worker should run that bounded live journey, then re-derive the
 remaining Lexicon Workbench requirements. Source-backed stroke-order geometry is still unavailable and must not be
 claimed.
+
+## Track 2 — live-gate recheck — 2026-08-14 00:58 MSK codexA
+
+Re-derived the active slice from the last ledger section and current source. The bounded containing-words view,
+grounded facts, handwriting recognition recovery, and moved-stroke counter are present and covered by
+`src/renderer/__tests__/characterMetadataPanel.test.tsx`; the focused run passed **1 file / 4 tests**.
+
+No Electron process was running and no debug bridge was reachable in this headless hop. Consequently the required
+fresh production Workbench journey observing the new words list and moved-stroke counter together was not run.
+No product code or persisted user data was changed, and Track 2 remains active pending that live gate and the
+subsequent Lexicon Workbench re-derivation.
+
+## Track 2 — Tatoeba attribution closed on every surface that shows the corpus — 2026-08-14 04:20 MSK backup
+
+### What was interrupted, and what it actually was
+
+`codexB` exited on a usage limit at 01:03 MSK. The index was empty and nothing was half-staged. Re-deriving from
+mtimes and `git status --short`, the only in-flight product work was a coherent, nearly finished slice sitting
+unstaged in two files: the Tatoeba credit under the Dictionary example list
+(`src/renderer/components/DictionaryResults.tsx`, plus a `.dict-ex-credit` rule inside the heavily shared
+`src/renderer/styles.css`). It reused the existing catalog key `grammar.examples.tatoebaCredit`, already present in
+all four catalogs at HEAD, so no i18n work was outstanding. That slice is finished and committed here.
+
+The earlier audit note claiming `mediaCenter.css` was codexB's subject does not match this tree: that path does not
+exist, and the media CSS/study-workspace paths remain other-track dirty state, untouched by this hop.
+
+### The gap the in-tree comment understated
+
+The comment claimed the credit "was missing only here". Re-derived against source, that is not true. Three call
+sites consume the corpus: `GrammarContent.tsx:149` (credited), `DictionaryResults.tsx` (this slice), and
+`src/main/extensionServer.ts:1804` `/v1/examples`, which feeds the browser extension's Examples tab. That tab
+rendered the same Tatoeba sentences with **no attribution at all** — the same licence obligation, missed. Closed in
+`extension/content.js` / `extension/content.css`.
+
+**Decision (standing auto-approval, reversible):** the extension credit is a plain English literal, not a catalog
+key. `extension/` is a content script with no access to `src/shared/i18n`; every string it renders is already a
+literal (`Searching examples…`, `No example sentences found.`, `Play`). Routing one string through the app i18n
+system would mean inventing a message channel for it. Following the local pattern is the smaller, reversible
+option; `tools/i18n-check.cjs` does not scan `extension/` and stayed green.
+
+The extension has a byte-identical bundled mirror at `src/main/chrome-extension/`, enforced by
+`src/shared/__tests__/extensionManifestAudit.test.ts`. It failed on the first run and was resynced with
+`node tools/sync-extension-mirror.cjs`; both the audit and `node tools/extension-feature-check.cjs` (33/33) then
+passed.
+
+### Coverage, with the mutation controls
+
+New: `src/renderer/__tests__/dictionaryExampleCredit.test.tsx` — 2 tests. Two **independent** mutation controls were
+run against it, each restored byte-identically (`-ceq`) and re-passed:
+
+| Mutation | Guard removed | Result |
+|---|---|---|
+| Delete the `.dict-ex-credit` element | the credit itself | `expected null not to be null` at :84 — FAIL, then restored PASS |
+| Relax `exState === 'done' && examples.length > 0` to `exState === 'done'` | the empty-list guard | `expect(credit()).toBeNull()` at :101 — FAIL, then restored PASS |
+
+Each mutation failed a *different* test, so neither assertion is carrying the other.
+
+### Gates
+
+- `npx vitest run` — **581 files collected, 580 passed / 1 skipped; 7,646 tests, 7,640 passed / 6 skipped**, exit 0.
+- `node tools/i18n-check.cjs` — exit 0, 9,505 English keys translated in ja/zh/ru.
+- `node tools/architecture-audit.cjs` — exit 0, 1,793 modules, 18 known findings, nothing new.
+- `npx eslint` on every touched path — the 5 findings on `content.js` (2 `no-undef` on `globalThis` at :6-7, 3 unused
+  vars) are **pre-existing**, established by set-difference against the HEAD blob of the same file, not by counting.
+  `src/renderer/**` is clean.
+
+### Live acceptance — the bridge was available all along
+
+`debug/bridge.json` named pid 98128, which was dead; nothing listened on 39273. That is the same state 51
+consecutive audit sections recorded as "no bridge available". It was not an environment limitation: plain
+`npm start` brought the app up first try. Port 5173 is held by a foreign node process from 08-12, so forge served
+**5174** — expected, and not a fault. Three-part liveness confirmed: live pid, `visible:true`, non-empty `url`.
+
+The real Vite-transformed `DictionaryResults` was mounted into an off-screen host through `/eval` against the live
+renderer, driving a real 猫 lookup through the app's own IPC:
+
+- before loading examples: `{"exBtn":true,"credit":false}` — nothing shown, nothing credited;
+- after clicking the panel's own load button:
+  `{"examples":6,"creditText":"Example sentences from Tatoeba, licensed CC-BY 2.0 FR","href":"https://tatoeba.org","rel":"noreferrer"}`.
+
+Six real Tatoeba sentences, credited, with the resolved catalog string — not the key. The `eval.ps1 -Poll` wrapper
+reported a timeout on that call; that is a harness artifact of returning a JSON *string* (the poller can never read
+`done` off a string), not an app failure, and the settled value is quoted above.
+
+`recordLookup` persists to `localStorage['jp-lookup-history']`, so the blob was captured before the mount and
+restored after: `{"hostGone":true,"restoredExact":true,"globalsGone":true}`. No userData backup was taken and no
+mine button was clicked.
+
+### State
+
+Track 2's remaining item is unchanged and was **not** closed here: the fresh production Lexicon Workbench journey
+observing the containing-words list and moved-stroke counter together. The bridge is now proven reachable on this
+machine, so the next hop has no excuse to record it as blocked — start the app with `npm start` and expect 5174.

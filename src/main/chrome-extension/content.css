@@ -411,6 +411,15 @@ span.jp-wk-3 { background: transparent !important; }
   margin-top: 1px;
 }
 #jp-study-popup .rp-example-tools { display: flex; gap: 6px; margin-top: 4px; }
+/* Tatoeba credit under the example list — the licence requires it wherever the
+   sentences are shown. Muted like `.rp-example-en`; the link inherits its colour
+   so the popup's own theming still applies. */
+#jp-study-popup .rp-example-credit {
+  color: var(--rp-muted);
+  font-size: calc(var(--rp-font) - 3px);
+  margin: 8px 0 0;
+}
+#jp-study-popup .rp-example-credit a { color: inherit; text-decoration: underline; }
 
 #jp-study-popup .rp-more-row {
   display: grid;

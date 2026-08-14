@@ -1009,9 +1009,14 @@
       body.innerHTML = `<div class="rp-empty">${esc(res?.error || 'No example sentences found.')}</div>`;
       return;
     }
-    body.innerHTML = res.examples
-      .map(
-        (ex, i) => `
+    // These come from `/v1/examples`, which is `searchExamples` in the app's
+    // main process — the same Tatoeba corpus the desktop Dictionary and Grammar
+    // panels credit. The obligation travels with the sentences, so the tab that
+    // shows them carries the credit too.
+    body.innerHTML =
+      res.examples
+        .map(
+          (ex, i) => `
         <div class="rp-example" data-idx="${i}">
           <div class="rp-example-jp" lang="ja">${highlightTermInSentence(String(ex.jp || ''), query)}</div>
           ${ex.en ? `<div class="rp-example-en">${esc(ex.en)}</div>` : ''}
@@ -1020,8 +1025,10 @@
             <button type="button" class="rp-mini" data-act="example-save" data-text="${esc(ex.jp || '')}">Save sentence</button>
           </div>
         </div>`,
-      )
-      .join('');
+        )
+        .join('') +
+      '<p class="rp-example-credit"><a href="https://tatoeba.org" target="_blank" rel="noreferrer">' +
+      'Example sentences from Tatoeba, licensed CC-BY 2.0 FR</a></p>';
   }
 
   /* ----- More tab ----- */
