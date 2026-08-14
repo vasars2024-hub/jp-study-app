@@ -125,7 +125,21 @@ describe('buildFusionTrackMeta', () => {
       offsetSec: 0,
       offsetConfident: false,
     });
-    expect(declined).toMatchObject({ offsetSec: 0, offsetConfident: false, version: FUSION_META_VERSION });
+    expect(declined).toMatchObject({ offsetSec: 0, offsetConfident: false, version: 1 });
+  });
+
+  it('declares version 2 only for a track F5 actually arbitrated', () => {
+    const offline = decideFusedWindows(windows.map(() => 'テキスト'), windows.map(() => ''));
+    // An offline-only sidecar contains nothing a v1 reader would misread, so it
+    // stays v1 and older builds keep showing its badges.
+    expect(buildFusionTrackMeta(windows, cues, offline, track).version).toBe(1);
+
+    const arbitrated: FusedWindowDecision[] = offline.map((decision, index) => (index === 1
+      ? { ...decision, basis: 'whisper-corrected' as const, confidence: 0.75 }
+      : decision));
+    expect(buildFusionTrackMeta(windows, cues, arbitrated, track).version)
+      .toBe(FUSION_META_VERSION);
+    expect(FUSION_META_VERSION).toBe(2);
   });
 
   it('averages confidence over emitted cues only, matching the record', () => {
@@ -191,9 +205,33 @@ describe('fusionCueCounts', () => {
     expect(meta && fusionCueCounts(meta)).toEqual({
       total: 4,
       verified: 2,
+      corrected: 0,
       unverified: 1,
       reference: 1,
       uncertain: 2,
+    });
+  });
+
+  it('reads F5 bases: an arbiter-kept line is verified, a repaired one is its own count', () => {
+    const meta = parseFusionTrackMeta(JSON.stringify({
+      version: 2,
+      cues: [
+        { index: 0, basis: 'whisper' },
+        { index: 1, basis: 'whisper-as-is' },
+        { index: 2, basis: 'whisper-corrected' },
+        { index: 3, basis: 'whisper-unverified' },
+      ],
+    }));
+    expect(meta?.cues).toHaveLength(4);
+    expect(meta && fusionCueCounts(meta)).toEqual({
+      total: 4,
+      verified: 2,
+      corrected: 1,
+      unverified: 1,
+      reference: 0,
+      // A repaired line is trusted, so it is deliberately not "uncertain" —
+      // it gets its own line in the UI instead of inflating the warning.
+      uncertain: 1,
     });
   });
 });

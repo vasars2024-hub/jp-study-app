@@ -1113,6 +1113,12 @@ export const ru: Catalog = {
     many: '{count} строк, всё сверено',
     other: '{count} строки, всё сверено',
   },
+  'media.subtitles.fusion.repaired': {
+    one: 'исправлена {count} строка',
+    few: 'исправлено {count} строки',
+    many: 'исправлено {count} строк',
+    other: 'исправлено {count} строки',
+  },
   'media.subtitles.searchFailed': 'Поиск субтитров не удался.',
   'media.subtitles.none': 'Субтитры для этой серии не найдены.',
   'media.subtitles.notSearched': 'Для этой серии поиск ещё не выполнялся.',

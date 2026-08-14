@@ -990,6 +990,9 @@ export const ja: Catalog = {
   'media.subtitles.fusion.allChecked': {
     other: '{count} 行すべて照合済み',
   },
+  'media.subtitles.fusion.repaired': {
+    other: '{count} 行を修正',
+  },
   'media.subtitles.searchFailed': '字幕の検索に失敗しました。',
   'media.subtitles.none': 'このエピソードの字幕は見つかりませんでした。',
   'media.subtitles.notSearched': 'このエピソードはまだ検索していません。',

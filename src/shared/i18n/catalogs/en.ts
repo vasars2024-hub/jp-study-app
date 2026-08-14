@@ -1089,6 +1089,10 @@ export const en: Catalog = {
     one: '{count} line, all cross-checked',
     other: '{count} lines, all cross-checked',
   },
+  'media.subtitles.fusion.repaired': {
+    one: '{count} line repaired',
+    other: '{count} lines repaired',
+  },
   'media.subtitles.searchFailed': 'The subtitle search failed.',
   'media.subtitles.none': 'No subtitles found for this episode.',
   'media.subtitles.notSearched': 'No search has run for this episode yet.',

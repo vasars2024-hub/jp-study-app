@@ -33,7 +33,17 @@ import {
  * Bumped only when an older reader would *misread* a newer file. A reader that
  * sees a higher version declines the whole sidecar rather than guessing at fields.
  */
-export const FUSION_META_VERSION = 1;
+export const FUSION_META_VERSION = 2;
+
+/**
+ * The bases a version-1 reader knows. F5's arbitration added two more, and a v1
+ * reader drops a cue whose basis it does not recognise — which would under-count
+ * a track and hide every repair. So a sidecar declares **2 only when it actually
+ * contains an arbitrated cue**: an offline-only track stays readable by older
+ * builds, and the files a v1 reader would misread are exactly the ones it now
+ * refuses outright.
+ */
+const V1_BASES: readonly FusionBasis[] = ['whisper', 'whisper-unverified', 'reference', 'empty'];
 
 /** Provenance for one line of the fused track. */
 export interface FusedCueMeta {
@@ -94,8 +104,9 @@ export function buildFusionTrackMeta(
   const meanConfidence = rows.length
     ? Math.round((rows.reduce((sum, row) => sum + row.confidence, 0) / rows.length) * 1000) / 1000
     : 0;
+  const arbitrated = rows.some((row) => !V1_BASES.includes(row.basis));
   return {
-    version: FUSION_META_VERSION,
+    version: arbitrated ? FUSION_META_VERSION : 1,
     createdAt: track.createdAt,
     sourceSubtitleId: track.sourceSubtitleId,
     sourceLang: track.sourceLang,
@@ -118,7 +129,11 @@ export function serializeFusionTrackMeta(meta: FusionTrackMeta): string {
   return `${JSON.stringify(meta, null, 2)}\n`;
 }
 
-const FUSION_BASES: readonly FusionBasis[] = ['whisper', 'whisper-unverified', 'reference', 'empty'];
+const FUSION_BASES: readonly FusionBasis[] = [
+  ...V1_BASES,
+  'whisper-as-is',
+  'whisper-corrected',
+];
 
 function readNumber(value: unknown, fallback = 0): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
@@ -183,18 +198,25 @@ export function parseFusionTrackMeta(raw: string): FusionTrackMeta | null {
 export function fusionCueCounts(meta: FusionTrackMeta): {
   total: number;
   verified: number;
+  corrected: number;
   unverified: number;
   reference: number;
   uncertain: number;
 } {
   const count = (basis: FusionBasis): number =>
     meta.cues.filter((cue) => cue.basis === basis).length;
-  const verified = count('whisper');
+  // `whisper-as-is` joins `whisper` because both mean "the transcript stood up
+  // to a check" — one against the reference translation, one against the F5
+  // arbiter. `whisper-corrected` is counted apart: the line is trusted, but the
+  // user is looking at text no microphone produced, and that is worth saying.
+  const verified = count('whisper') + count('whisper-as-is');
+  const corrected = count('whisper-corrected');
   const unverified = count('whisper-unverified');
   const reference = count('reference');
   return {
     total: meta.cues.length,
     verified,
+    corrected,
     unverified,
     reference,
     uncertain: unverified + reference,

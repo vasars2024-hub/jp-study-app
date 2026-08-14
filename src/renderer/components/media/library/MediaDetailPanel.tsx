@@ -435,6 +435,12 @@ export default function MediaDetailPanel({
                         })
                         : t('media.subtitles.fusion.allChecked', { count: counts.total }))
                       : null,
+                    // Separate from the two above: a repaired line is trusted, but
+                    // it is text the arbiter wrote rather than text Whisper heard,
+                    // and a learner comparing the track to the audio should know.
+                    counts?.corrected ? t('media.subtitles.fusion.repaired', {
+                      count: counts.corrected,
+                    }) : null,
                   ].filter(Boolean).join(' · ');
 
                   const body = (

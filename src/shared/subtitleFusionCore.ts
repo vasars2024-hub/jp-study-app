@@ -301,6 +301,10 @@ export type FusionBasis =
   | 'whisper'
   /** Whisper's transcript, kept despite the reference disagreeing. */
   | 'whisper-unverified'
+  /** A disputed line the F5 arbiter looked at and kept verbatim anyway. */
+  | 'whisper-as-is'
+  /** A disputed line the F5 arbiter repaired, keeping Whisper's phonetics. */
+  | 'whisper-corrected'
   /** Whisper produced nothing usable; the translated English line stands in. */
   | 'reference'
   /** Neither side produced text. The cue is dropped from the track. */
@@ -547,4 +551,289 @@ export function windowDecisionsToFusedCues(
     });
   });
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// F5 — arbitration and repair of the disputed lines
+//
+// Everything above runs offline and is the shipping path. This section is the
+// *optional* second opinion: for the windows where the reference translation
+// disagreed with the transcript, one batched cloud call per ~16 windows asks
+// what was actually said. It is pure — the prompt, the schema, the parse and the
+// fidelity guard all live here; only the HTTP call is in main.
+//
+// The plan makes offline degradation a hard requirement, so nothing in the
+// pipeline may depend on a verdict arriving. `applyFusionArbitration([])` is the
+// no-cloud path and returns the F4 decisions unchanged, by construction rather
+// than by a separate branch.
+
+/** Windows per cloud request. Sized so one batch fits a normal JSON response. */
+export const FUSION_ARBITRATION_BATCH = 16;
+
+/**
+ * Hard ceiling on windows sent for arbitration in one job.
+ *
+ * A 24-minute episode can produce several hundred disputed windows, and one
+ * cloud request per sixteen of them is a real cost the user did not itemise when
+ * they pressed a button labelled "fuse". Capping at 160 windows bounds a job at
+ * ten requests; the windows chosen are the *lowest-scoring* ones, because those
+ * are where the transcript and the reference disagree most and where an arbiter
+ * has the most to add.
+ */
+export const FUSION_ARBITRATION_MAX_WINDOWS = 160;
+
+/**
+ * How much of Whisper's text a repair has to keep to be accepted.
+ *
+ * This is the mechanical form of the plan's "never introduce content present in
+ * neither candidate". An arbiter fixing a homophone or a name changes a few
+ * characters of a line; one that returns something sharing half its bigrams with
+ * nothing it was given has written new dialogue, and a study track that invents
+ * dialogue is worse than one that misheard it. Verdicts below this overlap are
+ * discarded and the F4 decision stands.
+ */
+export const FUSION_ARBITRATION_MIN_FIDELITY = 0.5;
+
+/** The arbiter looked and kept the transcript: checked, not merely unchecked. */
+const CONFIDENCE_ARBITRATED_AS_IS = 0.7;
+/** The arbiter repaired the transcript against the English meaning. */
+const CONFIDENCE_ARBITRATED_CORRECTED = 0.75;
+/** The arbiter judged the transcript unusable and fell back to the reference. */
+const CONFIDENCE_ARBITRATED_REFERENCE = 0.4;
+
+/** One disputed window, with everything the arbiter needs to rule on it. */
+export interface ArbitrationCandidate {
+  windowIndex: number;
+  /** The English line(s) this window covers — the ground truth for meaning. */
+  english: string;
+  /** What Whisper heard. The default answer unless it is demonstrably wrong. */
+  whisper: string;
+  /** The machine translation of `english`. A referee, not a target. */
+  reference: string;
+}
+
+/** What the arbiter decided about one window. */
+export interface ArbitrationVerdict {
+  windowIndex: number;
+  text: string;
+  basis: 'whisper-as-is' | 'whisper-corrected' | 'reference';
+  confidence: number;
+}
+
+/**
+ * The windows worth spending a cloud call on, worst disagreement first.
+ *
+ * Only `whisper-unverified` qualifies. An `asr-empty` window (`basis:
+ * 'reference'`) is deliberately excluded: there is no transcript to arbitrate
+ * between, so the arbiter would be writing the line from the English alone,
+ * which is translation wearing a transcript's clothes. A window both sides agree
+ * on is not in dispute and paying to re-litigate it would be pure cost.
+ */
+export function selectArbitrationCandidates(
+  decisions: readonly FusedWindowDecision[],
+  englishTexts: readonly string[],
+  references: readonly string[],
+  maxWindows = FUSION_ARBITRATION_MAX_WINDOWS,
+): ArbitrationCandidate[] {
+  const candidates = decisions
+    .filter((decision) => decision.basis === 'whisper-unverified')
+    .filter((decision) => {
+      const english = (englishTexts[decision.windowIndex] ?? '').trim();
+      return english.length > 0 && decision.text.trim().length > 0;
+    })
+    .map((decision) => ({
+      windowIndex: decision.windowIndex,
+      english: (englishTexts[decision.windowIndex] ?? '').trim(),
+      whisper: decision.text.trim(),
+      reference: (references[decision.windowIndex] ?? '').trim(),
+      score: decision.score,
+    }));
+
+  candidates.sort((a, b) => (a.score - b.score) || (a.windowIndex - b.windowIndex));
+  return candidates
+    .slice(0, Math.max(0, maxWindows))
+    // Back into window order, so a partial run repairs a contiguous-ish stretch
+    // rather than a scatter, and so a failed batch is easy to name.
+    .sort((a, b) => a.windowIndex - b.windowIndex)
+    .map((entry) => ({
+      windowIndex: entry.windowIndex,
+      english: entry.english,
+      whisper: entry.whisper,
+      reference: entry.reference,
+    }));
+}
+
+/** Split candidates into request-sized batches. */
+export function batchArbitrationCandidates(
+  candidates: readonly ArbitrationCandidate[],
+  size = FUSION_ARBITRATION_BATCH,
+): ArbitrationCandidate[][] {
+  const step = Math.max(1, Math.floor(size));
+  const out: ArbitrationCandidate[][] = [];
+  for (let i = 0; i < candidates.length; i += step) {
+    out.push(candidates.slice(i, i + step));
+  }
+  return out;
+}
+
+/** Response shape demanded of the provider. Model-facing; not translated. */
+export const FUSION_ARBITRATION_SCHEMA = {
+  type: 'object',
+  properties: {
+    lines: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'integer' },
+          text: { type: 'string' },
+          basis: { type: 'string', enum: ['whisper-as-is', 'whisper-corrected', 'reference'] },
+        },
+        required: ['id', 'text', 'basis'],
+      },
+    },
+  },
+  required: ['lines'],
+} as const;
+
+/**
+ * The arbitration prompt. Model-facing text, so deliberately not translated.
+ *
+ * `id` is the window index, echoed back rather than positional: a model that
+ * drops or reorders a line must not be able to shift every later verdict onto
+ * the wrong cue.
+ */
+export function buildFusionArbitrationPrompt(batch: readonly ArbitrationCandidate[]): string {
+  const rows = batch.map((candidate) => JSON.stringify({
+    id: candidate.windowIndex,
+    english: candidate.english,
+    whisper: candidate.whisper,
+    reference: candidate.reference,
+  })).join('\n');
+  return [
+    'You are correcting a Japanese speech transcript against a known English subtitle.',
+    '',
+    'For each line you get: the English subtitle for that moment (`english`), what an',
+    'ASR model heard in the Japanese audio (`whisper`), and a machine translation of the',
+    'English into Japanese (`reference`). Decide what was *actually said in Japanese*.',
+    '',
+    'Rules:',
+    '1. `whisper` is the default answer. It is a transcript of the real audio; the',
+    '   reference is only a translation and is often phrased differently on purpose.',
+    '2. Correct `whisper` only where the English meaning shows it misheard something —',
+    '   homophones, names, numbers, particles. Keep the words and word order it got',
+    '   right, and keep the same phonetic shape.',
+    '3. Never introduce content that appears in neither `whisper` nor `reference`.',
+    '   Do not translate, do not paraphrase, do not add or remove sentences.',
+    '4. Use `reference` as the answer only if `whisper` is unusable noise.',
+    '5. Set `basis` to "whisper-as-is" when you kept it, "whisper-corrected" when you',
+    '   repaired it, "reference" when you replaced it.',
+    '',
+    'Echo each line back under its own `id`. Output JSON only.',
+    '',
+    rows,
+  ].join('\n');
+}
+
+/**
+ * Read a provider response into verdicts, discarding anything unsafe.
+ *
+ * Total: malformed JSON, a missing `lines`, an unknown id, a fabricated basis, an
+ * empty text or a repair that resembles neither candidate all yield *fewer*
+ * verdicts, never an exception and never a bad line. Every dropped verdict simply
+ * leaves the F4 decision in place, which is exactly the offline behaviour.
+ */
+export function parseFusionArbitration(
+  raw: string,
+  batch: readonly ArbitrationCandidate[],
+): ArbitrationVerdict[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+  const lines = (parsed as { lines?: unknown } | null)?.lines;
+  if (!Array.isArray(lines)) return [];
+
+  const byIndex = new Map(batch.map((candidate) => [candidate.windowIndex, candidate]));
+  const seen = new Set<number>();
+  const out: ArbitrationVerdict[] = [];
+  for (const entry of lines) {
+    if (!entry || typeof entry !== 'object') continue;
+    const row = entry as Record<string, unknown>;
+    const id = row.id;
+    if (typeof id !== 'number' || !Number.isInteger(id)) continue;
+    const candidate = byIndex.get(id);
+    // An id outside the batch would write a verdict onto a window the model was
+    // never shown; a repeated id would let a later hallucination overwrite a
+    // good earlier ruling.
+    if (!candidate || seen.has(id)) continue;
+    const text = typeof row.text === 'string' ? row.text.trim() : '';
+    if (!text) continue;
+    const basis = row.basis;
+    if (basis !== 'whisper-as-is' && basis !== 'whisper-corrected' && basis !== 'reference') {
+      continue;
+    }
+
+    if (basis === 'reference') {
+      // The one verdict that may replace the transcript wholesale, so it may not
+      // improvise: it has to be the reference we supplied.
+      if (!candidate.reference
+        || normalizeForFusionCompare(text) !== normalizeForFusionCompare(candidate.reference)) {
+        continue;
+      }
+      seen.add(id);
+      out.push({
+        windowIndex: id,
+        text: candidate.reference,
+        basis,
+        confidence: CONFIDENCE_ARBITRATED_REFERENCE,
+      });
+      continue;
+    }
+
+    const fidelity = bigramDice(
+      normalizeForFusionCompare(text),
+      normalizeForFusionCompare(candidate.whisper),
+    );
+    if (fidelity < FUSION_ARBITRATION_MIN_FIDELITY) continue;
+    const kept = normalizeForFusionCompare(text) === normalizeForFusionCompare(candidate.whisper);
+    seen.add(id);
+    out.push({
+      windowIndex: id,
+      text,
+      // A model that says "corrected" and returns the identical string has not
+      // corrected anything; trust the strings over the label in both directions.
+      basis: kept ? 'whisper-as-is' : 'whisper-corrected',
+      confidence: kept ? CONFIDENCE_ARBITRATED_AS_IS : CONFIDENCE_ARBITRATED_CORRECTED,
+    });
+  }
+  return out;
+}
+
+/**
+ * Fold verdicts back into the decision list.
+ *
+ * Returns a new list in the same order. A window with no verdict — which is every
+ * window when there is no cloud key, and every window in a batch that failed — is
+ * returned exactly as F4 decided it. That is the graceful-degradation guarantee,
+ * and it holds without a branch: with no verdicts this is the identity function.
+ */
+export function applyFusionArbitration(
+  decisions: readonly FusedWindowDecision[],
+  verdicts: readonly ArbitrationVerdict[],
+): FusedWindowDecision[] {
+  if (!verdicts.length) return decisions.map((decision) => ({ ...decision }));
+  const byIndex = new Map(verdicts.map((verdict) => [verdict.windowIndex, verdict]));
+  return decisions.map((decision) => {
+    const verdict = byIndex.get(decision.windowIndex);
+    if (!verdict) return { ...decision };
+    return {
+      ...decision,
+      text: verdict.text,
+      basis: verdict.basis,
+      confidence: verdict.confidence,
+    };
+  });
 }

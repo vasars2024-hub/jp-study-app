@@ -55,6 +55,7 @@ import { cuesToSrt } from '../shared/subtitlesExport';
 import { extractAudioPcm } from './media';
 import { estimateSubtitleOffset } from './subtitleSync';
 import { isTranslateAvailable, runTranslationBatch } from './translate';
+import { arbitrateFusionDecisions } from './subtitleFusionArbiter';
 
 export interface TranscriptionHost {
   listItems: () => MediaItem[];
@@ -526,8 +527,9 @@ async function runFusionJob(job: TranscriptionJob): Promise<TranscriptionResult>
     // structurally unfair. `runTranslationBatch` already dedupes, chunks and
     // caches, so identical lines across an episode cost one call.
     emit('aligning', total);
+    const englishTexts = windows.map((window) => windowSourceText(window, cues));
     const references = await translateWindowReferences(
-      windows.map((window) => windowSourceText(window, cues)),
+      englishTexts,
       source.lang,
       job.lang,
       () => stopped(total),
@@ -537,7 +539,26 @@ async function runFusionJob(job: TranscriptionJob): Promise<TranscriptionResult>
     // changes is the confidence carried per line, and that a window Whisper
     // returned nothing for now carries the translated English instead of
     // disappearing from the track.
-    const decisions = decideFusedWindows(texts, references);
+    const scored = decideFusedWindows(texts, references);
+
+    // F5 — the optional cloud second opinion on the disputed windows only. With
+    // no key configured, no disputes, or a provider that fails, this returns
+    // `scored` unchanged; nothing downstream can tell the difference except the
+    // per-cue basis. That is the plan's offline-degradation requirement, and it
+    // is why the call sits here rather than behind a settings branch.
+    const arbitration = await arbitrateFusionDecisions(
+      scored,
+      englishTexts,
+      references,
+      {
+        isCancelled: () => cancelled.has(job.mediaId),
+        // A heartbeat, not a second progress bar: batches do not map onto the
+        // window count the bar already shows, and inventing a unit for them
+        // would make the bar jump backwards.
+        onBatch: () => emit('aligning', total),
+      },
+    );
+    const decisions = arbitration.decisions;
     const fused = windowCuesToSubtitleCues(windows, cues, decisions.map((d) => d.text));
     const srt = cuesToSrt(fused);
     if (!srt.trim()) {
