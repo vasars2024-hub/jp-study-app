@@ -448,7 +448,8 @@ behind a cloud key and a schema.
 
 ### F5 + F7 — the arbiter, and the gate that can fail it — 2026-08-15, primary
 
-**Landed:** `d23ed60` (F5 arbitration), `a02ddb5` (F7 scoring + CLI harness).
+**Landed:** `d23ed60` (F5 arbitration), `a02ddb5` (F7 scoring + CLI harness), `1abb17c` (a real
+fusion run can now emit the two baselines the gate scores against).
 
 **F5 decisions.**
 
@@ -489,8 +490,9 @@ passed / 1 skipped files, 8,011 passed / 6 skipped tests**, and the one failure 
 `architectureBaseline.test.ts` flagged `subtitleFusionEval.ts` as test-only, because the CLI loads
 it through esbuild and the static import graph cannot see that. Classified `accepted` in
 `tools/architecture-baseline.json` with the reason and a delete-me-too condition, not silenced;
-re-run green. i18n-check exit 0 at **9,568** keys. architecture-audit exit 0, **1,843 modules, 19
-findings, nothing new**, 2 known pending. eslint clean on the eleven touched TS paths;
+re-run after the third slice fully green: **607 passed / 1 skipped files, 8,015 passed / 6 skipped
+tests, exit 0**. i18n-check exit 0 at **9,568** keys. architecture-audit exit 0, **1,843 modules,
+19 findings, nothing new**, 2 known pending. eslint clean on the eleven touched TS paths;
 `tools/fusion-eval.cjs` emits the same three `no-var-requires` identities every `.cjs` tool here
 does — reproduced on `tools/grammar-audit.cjs` and `tools/i18n-check.cjs` at HEAD, and `npm run
 lint` is `--ext .ts,.tsx`, so tools are outside the project gate entirely.
@@ -504,8 +506,11 @@ not by a real provider response.
 **never run on a real episode** — this is now the only substantive gap. (4) partial, unchanged.
 (5) done.
 
-**Next stage: run F7 for real.** It needs one media item with both an EN track and a human JA
-track. Cheapest route is still the F6/F8 entry's: drop a ~3-cue English `.srt` beside a video and
-run discovery. To produce the three candidate tracks from one fusion, dump `texts` (Whisper-only)
-and `references` (MT-only) alongside `decisions` — they already exist side by side in
-`runFusionJob`; nothing new needs computing, only writing.
+**Next stage: run F7 for real** — now unblocked on the code side by `1abb17c`. Set
+`JP_FUSION_EVAL=1` before starting the app and one fusion writes
+`fused-ja.srt` plus `fused-ja.whisper-only.srt` and `fused-ja.mt-only.srt` under
+`userData/subtitles/<mediaId>/`; point `tools/fusion-eval.cjs --manifest` at those three plus the
+human JA track. What is still missing is **input, not code**: one media item carrying both an EN
+track and a human JA track, on two episodes. Cheapest route remains the F6/F8 entry's — drop a
+short English `.srt` beside a video and run discovery. Keep the EN track small on the first pass;
+`planAsrWindows` derives windows from cues, so a 3-cue track is a 3-window Whisper pass.
