@@ -10,6 +10,30 @@ export interface DictionarySourceInfo {
   priority: number;
 }
 
+/**
+ * The i18n key that names each `dictionaries.kind`, for chrome that shows a
+ * source's kind beside its localized language and count.
+ *
+ * The keys on the left are the literals the writers actually store — the legacy
+ * migration writes `term`/`pitch`/`freq`, and the importers write `name`
+ * (JMnedict), `character` (KANJIDIC2) and `examples` (Tatoeba). The schema
+ * comment on the column lists a couple more that nothing writes yet, so they are
+ * deliberately absent: an entry here that no row can carry is an untranslatable
+ * string a locale reviewer cannot check against anything.
+ *
+ * A kind with no entry must fall back to the raw column value rather than to a
+ * neighbouring label — printing "terms" for a kind this map has not learned yet
+ * would be a wrong answer where the untranslated literal is merely an ugly one.
+ */
+export const DICTIONARY_KIND_LABEL_KEYS: Readonly<Record<string, string>> = {
+  term: 'settings.study.dict.kind.terms',
+  pitch: 'settings.study.dict.kind.pitch',
+  freq: 'settings.study.dict.kind.frequency',
+  name: 'settings.study.dict.kind.names',
+  character: 'settings.study.dict.kind.characters',
+  examples: 'settings.study.dict.kind.examples',
+};
+
 export interface DictionarySourceMutationResult {
   ok: boolean;
   error?: 'not-found' | 'edge' | 'invalid-lang';

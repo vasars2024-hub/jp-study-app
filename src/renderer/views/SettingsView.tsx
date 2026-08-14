@@ -3,6 +3,7 @@ import { confirmDialog } from '../components/ui';
 import { KNOWN_LANGS, langNativeLabel } from '../../shared/langs';
 import type { YomitanDictInfo } from '../../shared/types';
 import {
+  DICTIONARY_KIND_LABEL_KEYS,
   GLOBAL_PAIR,
   isGlobalPair,
   pairKey,
@@ -77,6 +78,20 @@ function dictKindLabel(d: YomitanDictInfo, t: (key: string) => string): string {
   return parts.length
     ? parts.join(t('settings.study.dict.kindJoin'))
     : t('settings.study.dict.kind.metadata');
+}
+
+/**
+ * The same vocabulary for the SQLite source list, which stores one kind per row
+ * instead of the legacy store's three booleans. It printed the raw column, so a
+ * Russian UI read "日本語 · pitch · 107 978" with one untranslated word wedged
+ * between two localized ones.
+ *
+ * An unmapped kind keeps printing the raw value: a source whose kind this build
+ * does not know is better named in English than named wrongly.
+ */
+function sqliteDictKindLabel(kind: string, t: (key: string) => string): string {
+  const key = DICTIONARY_KIND_LABEL_KEYS[kind];
+  return key ? t(key) : kind;
 }
 
 /** Import / remove offline Yomitan dictionaries for the pop-up and mining. */
@@ -441,7 +456,7 @@ export function DictionarySettingsSection() {
               </label>
               <div className="dict-manage-info">
                 <div className="set-row-title">{source.title}</div>
-                <div className="set-row-desc muted">{langNativeLabel(source.sourceLang)} · {source.kind} · {source.entryCount.toLocaleString(LANG_TAGS[lang])}</div>
+                <div className="set-row-desc muted">{langNativeLabel(source.sourceLang)} · {sqliteDictKindLabel(source.kind, t)} · {source.entryCount.toLocaleString(LANG_TAGS[lang])}</div>
                 {relabeling === source.id && (
                   <div className="set-row-desc muted">{t('settings.study.dict.sources.langRunning')}</div>
                 )}
