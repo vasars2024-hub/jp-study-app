@@ -8878,6 +8878,13 @@ export const en: Catalog = {
   'lexicon.neighbors.failed': 'Could not search the dictionary database.',
   'lexicon.neighbors.empty': 'No other word in your dictionaries carries a gloss of {query} word for word.',
   'lexicon.neighbors.shares': 'Shares: {senses}',
+
+  // Conjugation table. The form names themselves reuse the deinflect.reason.*
+  // keys the pop-up already shows, so the two directions cannot be renamed apart.
+  'lexicon.conjugation.title': 'Conjugation',
+  'lexicon.conjugation.classIs': '{word} is a {class} — IPADIC class {type}.',
+  'lexicon.conjugation.note': 'Generated from the analyser’s conjugation class by the same engine the dictionary uses to look inflected words up.',
+  'lexicon.conjugation.form.pastNegative': 'past negative',
   'dict.saved.title': 'Saved searches',
   'dict.saved.save': 'Save search',
   'dict.saved.remove': 'Remove saved search',

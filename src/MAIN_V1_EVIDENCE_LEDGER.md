@@ -18514,3 +18514,159 @@ a foreign listener).
   highest-priority 200 rows. With one dictionary installed the distinction is invisible; with several it
   could hide a neighbour supplied only by a low-priority source. Fixing that properly means ranking
   inside SQLite, which needs an index this schema does not have.
+
+## Track 2 — conjugation and declension, grounded in the analyser's own class table — 2026-08-14 16:40 MSK primary
+
+Boss-audit state re-derived first: the last two sections of `docs/audit/RELAY_BOSS_AUDIT.md` are retry-53
+and its resolution note, and all four retry-53 findings are closed (`f61f59c`, `9703c1f` + `89791ce`,
+`9eecb3e`). Nothing there was outstanding, so this hop is a normal Track 2 ladder slice.
+
+### Why this slice, re-derived rather than inherited
+
+Track 2's bullet list in `src/MAIN_V1_COMPLETION_PLAN.md:42` reads "…pitch/tone/stress, **inflections,
+conjugation/declension**, corpus frequency, collocations, semantic neighbors…". Neighbours landed last hop
+(`04067ad`). Working left from there: pitch is shipped (`yomitan.ts` parses Kanjium, `DictionaryResults`
+renders `pitchHtml`, 107,978 rows live), and conjugation is not — `shared/conjugate.ts` exists, is
+round-trip tested against `deinflect.ts`, and is imported by exactly two places, `toolboxRegistry.ts` and
+Blanc's drill panel. The main Lexicon Workbench had no conjugation surface at all.
+
+A read-only probe of the live `dictionary/dict.db` (user_version 5) also settled which neighbouring items
+are *not* worth building yet: `headwords` 697,837, `senses` 697,837, `glosses` 1,333,201, `pitch` 107,978
+— but `inflections`, `collocations`, `etymology`, `xrefs`, `examples`, `audio`, `freq_corpora` and `chars`
+are all **0**. `wiktextract.ts:19-26` says why for two of them and says it deliberately: those tables have
+no reader, and it declines to write rows nothing consults. So a display over any of those empty tables
+would be an honestly-empty surface, whereas conjugation has a real grounded source on a default install.
+
+### The decision the slice needed, and the option taken
+
+`conjugate.ts` needs to be *told* a word class; it cannot derive one. Blanc gets away with this by shipping
+a hand-curated 21-word `DRILL_WORDS` list with the class written next to each word. A 697k-headword
+database has no such list, and three obvious sources are all unavailable:
+
+- **The dictionary entry.** `parseTermBank` in `dictionary/yomitan.ts` drops a term row's tag columns, so
+  every legacy sense on this installation carries `partsOfSpeech: []` — `lexiconPartOfSpeech.ts`'s own
+  header already records this.
+- **The word's ending.** 帰る is godan and 食べる is ichidan; both end in -eru. No suffix rule separates them.
+- **A model.** Exactly what a grounded Workbench refuses.
+
+Taken instead, under the standing auto-approval for reversible decisions: **IPADIC's own 活用型**. kuromoji
+already emits `conjugated_type` per token (`node_modules/kuromoji/src/util/IpadicFormatter.js:38`), the app
+already builds that analyser once per process in main for mining and Study analysis, and 活用型 *is* the
+godan/ichidan distinction. So the class is read off the analyser's conjugation table and the surfaces are
+derived by `conjugate.ts`, whose every output `conjugate.test.ts` round-trips back through `deinflect.ts`.
+A form shown here is therefore a form the dictionary's own lookup path would deinflect back to the word
+that produced it. No model, nothing estimated.
+
+Placement mirrors the neighbours slice: `shared/conjugationClass.ts` holds the pure classification and
+gating (unit-testable without kuromoji), `main/dictionary.ts` owns the tokenizer call, and the renderer
+reaches it through a **new** `dict:conjugation` channel. It runs in main because building a second IPADIC
+dictionary in the renderer to answer a dictionary expansion would cost far more than the lookup it hangs
+off; tokenizing one short word against an already-built dictionary is a hash lookup and a short Viterbi
+path, not the kind of parsing the main-loop rule is about.
+
+Two deliberate departures from the neighbours pattern, both recorded because they are choices:
+
+- **No button.** Neighbours costs several index probes per click and is opt-in. This costs one tokenizer
+  call, and a table that must be asked for before it can say "this word does not conjugate" is worse than
+  one that is simply absent. A non-conjugable word renders **nothing** — no empty section, no caption
+  implying a missing import.
+- **`couldConjugate()` prefilter in the renderer**, so a noun never spends the round trip. It is read off
+  `conjugate.ts`'s own guards (the nine `DICT_ENDINGS`, plus い) rather than invented, and it is strictly a
+  *necessary* condition — くつ and きれい pass it and are then refused by the analyser like anything else.
+
+### Reusing the pop-up's form names instead of minting a second set
+
+Twelve of the thirteen `ConjugationForm` ids already have an i18n key: the `deinflect.reason.*` family the
+pop-up shows when it deinflects a word. A parallel `lexicon.conjugation.form.*` family would have said the
+same words under different keys, which is how two surfaces end up disagreeing after one of them is
+retranslated. `FORM_KEY` in `ConjugationTable.tsx` therefore maps onto the existing keys, and exactly one
+new key is added — `lexicon.conjugation.form.pastNegative`, the one form `deinflect.ts` has no reason id
+for because it deinflects 〜なかった as a `negative` + `past` chain. Four new keys total (title, class line,
+provenance note, that one form) in en/ja/zh/ru.
+
+### A defect found by driving it live, not by reading it
+
+The first live render captioned 食べる's potential form 食べられる with the pattern **〜できる**. That string is
+`FormSpec.japanese` from `conjugate.ts`, and it is correct — for する, and for nothing else; 〜ません is
+likewise wrong for an i-adjective, whose polite negative is 高くないです. The field was written for the Blanc
+drill, which shows **one** word at a time and can carry a class-specific suffix hint. A table that spans
+every class cannot. The pattern column is now gone rather than fixed in place, because the form's
+translated name plus the actual surface is complete and correct information and the hint only added a
+claim the column could not keep. `conjugate.ts` and the Blanc drill are left untouched. Covered by a test
+asserting no `.lexicon-conjugation-pattern` element and no 〜できる in the section.
+
+### Mutation controls
+
+All seven run against the file in place, then restored and asserted byte-identical with `cmp`. Two of them
+**survived the first pass** and are recorded because the fix was to the tests, not to the product code:
+
+| mutation | expected to break | actual |
+|---|---|---|
+| stale-reply guard dropped (`attempt === run.current`) | the slow-reply test | 1 failed / 6 passed |
+| `couldConjugate` prefilter dropped | the "never asks" test | 1 failed / 6 passed |
+| Japanese-only guard dropped | the other-language test | **first pass: 7 passed** — the test used 出來, which the shape prefilter rejects anyway, so it never reached the guard. Re-pinned with 食べる at `lang="zh"`: 1 failed / 6 passed |
+| `rows.length === 0` guard dropped | the undemonstrable-class test | 1 failed / 16 passed |
+| tokens-spell-the-word-back check dropped | the misaligned-analysis test | 1 failed / 16 passed |
+| earlier-inflecting-token check dropped | the inflected-phrase test | **first pass: 16 passed** — the test used 高くない, whose last token is a 助動詞 and is caught by the part-of-speech arm instead. Re-pinned with 読んでいる, which ends in a genuine dictionary-form 一段 verb: 1 failed / 16 passed |
+| part-of-speech arm of the class map dropped | the 名詞-with-a-verb-table test | 1 failed / 16 passed |
+
+### Gates
+
+`npx vitest run --testTimeout=60000 --hookTimeout=60000` in this shared tree: **586 passed / 1 skipped
+files, 7,707 passed / 6 skipped tests**, exit 0. Per the retry-53 finding-1 lesson this is
+**shared-tree evidence and is not offered as committed-HEAD evidence** — the tree carries several hundred
+foreign dirty paths, and the full suite is known to be red at committed HEAD for reasons owned by other
+tracks. `node tools/i18n-check.cjs` exit 0 at **9,518** English keys translated in ja/zh/ru (9,514 + the
+four new ones). `node tools/architecture-audit.cjs` exit 0, **1,805 modules**, 18 known / 2 pending,
+nothing new. `npx eslint` on the touched paths: **no new problems** — the four new files are clean, and the
+2 errors (`subtitleHarvestList` / `subtitleHarvestFetch` adjacency in `window.d.ts`) plus 7
+`no-explicit-any` warnings in `dictionary.ts` are the same pre-existing foreign-track ones the last hop
+reproduced on their HEAD blobs.
+
+### Live acceptance
+
+Own dev app, `npm start`; bridge pid **5156** on 127.0.0.1:39273. The previous hop's `debug/bridge.json`
+was stale (pid 102256, port refusing) — an unclean exit, not a running instance. Window `/focus`ed before
+every measurement.
+
+- **Real main handler, not the preload binding.** `window.api.dictConjugation` over ten words returned a
+  class for nine and nothing for 猫. An unregistered channel would have rejected with "No handler
+  registered". Every hard case is right, which is the point of taking the class from IPADIC:
+  **帰る → godan** (五段・ラ行) → 帰った / 帰らない, the case no suffix rule gets right; **行く** → 行った / 行って
+  (irregular 音便); **勉強する** → 勉強できる (suppletive potential); **来る** → 来い; **いい** (形容詞・イイ) →
+  よくない / よかった; 話す, 見る, 食べる, 高い all correct; **猫** → no class, no rows.
+- **Real Vite-transformed `DictionaryResults`** mounted off-screen against live IPC, `食べる`: section
+  present, 13 rows, heading/class line/provenance note all rendered. This profile's UI language is
+  **Russian**, so the RU strings including the new `lexicon.conjugation.form.pastNegative`
+  ("прошедшее отрицательное") are live-verified, as is the reuse of the `deinflect.reason.*` family.
+  Class line reads `食べる — 一段 (ichidan), класс IPADIC 一段.`
+- **Reflow**: 900 px → 3 columns, 388 px tall; 640 px → 2 columns; 320 px → 1 column, 822 px tall.
+  **No horizontal overflow at any width** (`scrollWidth > clientWidth + 1` over every descendant), row
+  height a constant 42 px.
+- **Contrast**, computed from sampled `getComputedStyle` colours against the first non-transparent painted
+  ancestor background: heading 14.02:1, surface form 12.21:1 at 18.4 px, form name 12.21:1 at 14 px, class
+  line and provenance note 6.08:1 at 12.6 px. All above AA.
+- **The negative case renders nothing.** Mounting the same real component on `猫` gave 8 entries, the
+  neighbours section and the character-unavailable note, and **no `.lexicon-conjugation` at all**.
+- **Adverse input, straight at the handler**: empty, whitespace, a number, `null`, `{}`, `[]`, the
+  inflected 食べた, the phrases 読んでいる and 高くない, the noun 日本語, a 120-character repetition (truncated
+  to 32), Latin `running`, Cyrillic `бежать`, Han 出來 and an emoji string — **all** returned no class and
+  zero rows, and **nothing threw**.
+- `/logs?level=error` returned **0 entries** across every probe. localStorage untouched at 80 keys with
+  `jp-lookup-history` 2,618 chars and `jp-telemetry-consent` still `yes` before and after; no persisted
+  setting toggled, no userData backup taken, no input automation. Probe DOM and globals removed; owned pid
+  5156 and its five children stopped, nothing else.
+
+### Deliberately open, stated rather than absorbed
+
+- **Japanese only, and the heading does not pretend otherwise.** The plan bullet says
+  "conjugation/**declension**", and Russian declension is the other half. It is not built here because the
+  grounded source for it is the `inflections` table, which Wiktextract writes and which is **empty on this
+  installation** — and because `conjugate.ts` is a Japanese engine with no Russian rules. Doing that half
+  means importing Wiktextract and giving `inflections` its first headword→forms reader; it is a separate
+  slice with its own data prerequisite, not a widening of this one.
+- **An inflected query gets no table, on purpose.** 読んでいる and 食べた are answered by the lookup's own
+  deinflection chain, which the pop-up already displays. A second, half-right answer beside it would only
+  disagree with the first.
+- A rare verb IPADIC does not know is analysed as an unknown 名詞 and gets no table. The fallback is
+  silence rather than a suffix guess, which is the same trade `lexiconPartOfSpeech.ts` makes.

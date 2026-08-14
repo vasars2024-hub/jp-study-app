@@ -9253,6 +9253,11 @@ export const ru: Catalog = {
   'lexicon.concordance.scope': 'Только точные совпадения текста. Словоформы и слова, подразумеваемые контекстом, не включены.',
   'lexicon.neighbors.title': 'Слова с общим значением',
   'lexicon.neighbors.shares': 'Общее значение: {senses}',
+
+  'lexicon.conjugation.title': 'Спряжение',
+  'lexicon.conjugation.classIs': '{word} — {class}, класс IPADIC {type}.',
+  'lexicon.conjugation.note': 'Формы построены по классу спряжения из морфологического анализатора тем же механизмом, которым словарь приводит словоформы к исходной форме.',
+  'lexicon.conjugation.form.pastNegative': 'прошедшее отрицательное',
   'lexicon.neighbors.note': 'Найдено сопоставлением собственных переводов этого слова в установленных словарях. Ничего не додумано и не сгенерировано.',
   'lexicon.neighbors.action': 'Найти общие значения',
   'lexicon.neighbors.running': 'Поиск по словарям…',

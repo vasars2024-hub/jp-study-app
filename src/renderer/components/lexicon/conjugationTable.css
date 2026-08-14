@@ -1,0 +1,50 @@
+.lexicon-conjugation {
+  margin: 14px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-1);
+  color: var(--text);
+}
+
+.lexicon-conjugation-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.lexicon-conjugation-class,
+.lexicon-conjugation-note {
+  margin: 8px 0 0;
+  font-size: 0.9em;
+}
+
+.lexicon-conjugation-list {
+  display: grid;
+  /* Two columns where there is room, one when there is not. The rows are short
+     pairs, so a single tall column wastes most of a wide result panel. */
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lexicon-conjugation-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.lexicon-conjugation-label {
+  flex: 1 1 6rem;
+}
+
+.lexicon-conjugation-surface {
+  font-size: 1.15rem;
+  font-weight: 600;
+}

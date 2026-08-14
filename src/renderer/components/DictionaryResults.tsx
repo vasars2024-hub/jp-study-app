@@ -32,6 +32,7 @@ import { recordLookup } from '../lookupHistory';
 import { useT } from '../i18n';
 import CharacterMetadataPanel from './lexicon/CharacterMetadataPanel';
 import CharacterMetadataUnavailable from './lexicon/CharacterMetadataUnavailable';
+import ConjugationTable from './lexicon/ConjugationTable';
 import SemanticNeighbors from './lexicon/SemanticNeighbors';
 
 type TFn = (key: string) => string;
@@ -910,6 +911,10 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
           inflected search still expands the word it actually found. The popup
           stays out of it: it is a glance surface, not a place to widen a
           lookup. */}
+      {variant !== 'popup' && entries.length > 0 && (
+        <ConjugationTable query={entries[0].word} lang={lang} />
+      )}
+
       {variant !== 'popup' && entries.length > 0 && (
         <SemanticNeighbors query={entries[0].word} lang={lang} />
       )}

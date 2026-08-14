@@ -8,6 +8,12 @@ export interface MainKuromojiToken {
   pos: string;
   pos_detail_1: string;
   pos_detail_2: string;
+  /**
+   * IPADIC 活用型, e.g. 五段・ラ行 / 一段 / サ変・スル. '*' for a token with no
+   * conjugation table. Modelled because it is the only grounded source of a
+   * word's conjugation class — see shared/conjugationClass.ts.
+   */
+  conjugated_type: string;
 }
 
 export interface MainJapaneseTokenizer {

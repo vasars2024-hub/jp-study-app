@@ -68,6 +68,10 @@ import {
 } from './dictionary/importIpc';
 import { resolveCustomFrequencyRanks } from './mining';
 import { getMainJapaneseTokenizer } from './japaneseTokenizer';
+import {
+  analyzeConjugationTokens,
+  type ConjugationAnalysis,
+} from '../shared/conjugationClass';
 import { attachLexiconFrequency } from '../shared/lexiconDifficulty';
 import {
   alignLexiconMorphemes,
@@ -581,6 +585,45 @@ function readLangList(value: unknown): string[] | undefined {
 /** One word, not a passage: anything longer cannot be a headword worth expanding. */
 const MAX_NEIGHBOR_QUERY_CHARS = 64;
 
+/**
+ * A conjugable Japanese word is short. The cap is generous enough for the
+ * longest realistic サ変 compound and small enough that this can never be handed
+ * a passage to analyse.
+ */
+const MAX_CONJUGATION_QUERY_CHARS = 32;
+
+/**
+ * The full conjugation table for a looked-up word, or an honest "no analysis".
+ *
+ * Runs in main because the IPADIC tokenizer is built once per process here and
+ * shared with mining and Study analysis; building a second copy in the renderer
+ * to answer a dictionary expansion would cost far more than the lookup it is
+ * attached to. Tokenizing one word against an already-built dictionary is a hash
+ * lookup and a short Viterbi path, so this stays off the "heavy work on the main
+ * loop" list that parsing and importing are on.
+ *
+ * A missing or failed analyser returns no analysis rather than rejecting: the
+ * surface renders "nothing to show", which is the state it already has to
+ * handle for every non-verb.
+ */
+export async function analyzeConjugation(word: string): Promise<ConjugationAnalysis> {
+  const target = typeof word === 'string' ? word.trim().slice(0, MAX_CONJUGATION_QUERY_CHARS) : '';
+  if (!target) return { word: '', conjugationType: null, wordClass: null, rows: [] };
+  try {
+    const tokenizer = await getMainJapaneseTokenizer();
+    if (!tokenizer) return { word: target, conjugationType: null, wordClass: null, rows: [] };
+    const tokens = tokenizer.tokenize(target).map((token) => ({
+      surface: token.surface_form,
+      basicForm: token.basic_form,
+      pos: token.pos,
+      conjugationType: token.conjugated_type ?? '',
+    }));
+    return analyzeConjugationTokens(target, tokens);
+  } catch {
+    return { word: target, conjugationType: null, wordClass: null, rows: [] };
+  }
+}
+
 export function registerDictionaryIpc(): void {
   ipcMain.handle('dict:lookup', (_e, query: string) => lookupWord(query));
   ipcMain.handle('dict:lookupTerm', (_e, query: string) => lookupTerm(query));
@@ -667,6 +710,11 @@ export function registerDictionaryIpc(): void {
         return empty;
       }
     },
+  );
+  ipcMain.handle(
+    'dict:conjugation',
+    (_e, word: unknown): Promise<ConjugationAnalysis> =>
+      analyzeConjugation(typeof word === 'string' ? word : ''),
   );
   ipcMain.handle(
     'dict:lookupTermsBatch',

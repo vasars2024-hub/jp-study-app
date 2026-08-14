@@ -8433,6 +8433,11 @@ export const zh: Catalog = {
   'lexicon.neighbors.failed': '无法检索词典数据库。',
   'lexicon.neighbors.empty': '已安装词典中没有其他词与 {query} 的释义逐字相同。',
   'lexicon.neighbors.shares': '共享释义：{senses}',
+
+  'lexicon.conjugation.title': '活用变化',
+  'lexicon.conjugation.classIs': '{word} 属于{class}（IPADIC 活用型：{type}）。',
+  'lexicon.conjugation.note': '依据形态分析器给出的活用型生成，所用引擎与词典还原活用形时完全相同。',
+  'lexicon.conjugation.form.pastNegative': '过去否定',
   'dict.saved.title': '已保存的搜索',
   'dict.saved.save': '保存搜索',
   'dict.saved.remove': '删除已保存的搜索',

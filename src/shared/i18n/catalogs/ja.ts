@@ -8468,6 +8468,11 @@ export const ja: Catalog = {
   'lexicon.neighbors.failed': '辞書データベースを検索できませんでした。',
   'lexicon.neighbors.empty': '{query} の語義と完全に一致する語は、インストール済み辞書にありません。',
   'lexicon.neighbors.shares': '共通の語義: {senses}',
+
+  'lexicon.conjugation.title': '活用',
+  'lexicon.conjugation.classIs': '{word} は{class}です（IPADIC 活用型: {type}）。',
+  'lexicon.conjugation.note': '形態素解析器が示す活用型をもとに、辞書が活用形を見出し語に戻す際と同じエンジンで生成しています。',
+  'lexicon.conjugation.form.pastNegative': '過去否定',
   'dict.saved.title': '保存した検索',
   'dict.saved.save': '検索を保存',
   'dict.saved.remove': '保存した検索を削除',

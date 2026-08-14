@@ -453,6 +453,11 @@ const api = {
     options?: { sourceLangs?: string[]; glossLangs?: string[] },
   ): Promise<import('./shared/lexiconNeighbors').LexiconNeighborResult> =>
     ipcRenderer.invoke('dict:semanticNeighbors', text, options),
+  /** Every form of a conjugable Japanese word, from IPADIC's own class table. */
+  dictConjugation: (
+    word: string,
+  ): Promise<import('./shared/conjugationClass').ConjugationAnalysis> =>
+    ipcRenderer.invoke('dict:conjugation', word),
   /** Find example sentences (JP + EN) for a word or grammar pattern, via Tatoeba. */
   searchExamples: (query: string, limit?: number): Promise<ExampleResult> =>
     ipcRenderer.invoke('examples:search', query, limit),
