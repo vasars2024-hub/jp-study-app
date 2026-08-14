@@ -47,7 +47,9 @@ import {
   buildFusionTrackMeta,
   fusionConfidencePercent,
   fusionMetaPathFor,
+  parseFusionTrackMeta,
   serializeFusionTrackMeta,
+  type FusionTrackMeta,
 } from '../shared/subtitleFusionMeta';
 import { cuesToSrt } from '../shared/subtitlesExport';
 import { extractAudioPcm } from './media';
@@ -737,6 +739,32 @@ export function transcriptionQueue(): TranscriptionJob[] {
   return [...queue];
 }
 
+/**
+ * The provenance sidecar for one fused track, or `null` when there is none.
+ *
+ * `null` is the honest answer for four different situations and the caller does
+ * not need to tell them apart: the media or the record is gone, the track was not
+ * produced by fusion, the sidecar predates F6, or the file on disk is not one.
+ * Every one of them means the same thing to a surface — show the track, show no
+ * per-line provenance.
+ */
+export function readFusionTrackMeta(
+  mediaId: string,
+  subtitleId: string,
+): FusionTrackMeta | null {
+  if (!host || !mediaId || !subtitleId) return null;
+  const item = host.listItems().find((entry) => entry.id === mediaId);
+  const record = (item?.subtitles ?? []).find((entry) => entry.id === subtitleId);
+  if (!record || record.derivation !== 'en-ja-fusion') return null;
+  try {
+    return parseFusionTrackMeta(
+      fs.readFileSync(fusionMetaPathFor(subtitleFilePath(record)), 'utf-8'),
+    );
+  } catch {
+    return null;
+  }
+}
+
 export function registerTranscriptionIpc(transcriptionHost: TranscriptionHost): void {
   host = transcriptionHost;
   queue = loadQueue();
@@ -747,6 +775,11 @@ export function registerTranscriptionIpc(transcriptionHost: TranscriptionHost): 
     cancelTranscription(typeof mediaId === 'string' ? mediaId : undefined);
   });
   ipcMain.handle('transcription:queue', () => transcriptionQueue());
+  ipcMain.handle('transcription:fusionMeta', (_e, mediaId?: string, subtitleId?: string) =>
+    readFusionTrackMeta(
+      typeof mediaId === 'string' ? mediaId : '',
+      typeof subtitleId === 'string' ? subtitleId : '',
+    ));
   ipcMain.on('transcription:chunk-reply', (_e, payload: { id: string; ok: boolean; text?: string; error?: string }) => {
     if (payload && typeof payload.id === 'string') resolveTranscriptionChunk(payload.id, payload);
   });

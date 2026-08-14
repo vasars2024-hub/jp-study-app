@@ -20,6 +20,7 @@ import NyaaSubtitleDialog from './NyaaSubtitleDialog';
 import { useMediaJobs } from './useMediaJobs';
 import { episodesBySeason, providerEpisodeTitle, type LibraryEntry } from '../../../../shared/mediaLibraryEntries';
 import { mediaSubtitleStatus } from '../../../../shared/mediaSubtitleStatus';
+import { fusionCueCounts, type FusionTrackMeta } from '../../../../shared/subtitleFusionMeta';
 import type { MediaItem } from '../../../../shared/types';
 
 export interface MediaDetailPanelProps {
@@ -72,6 +73,9 @@ export default function MediaDetailPanel({
   const [matching, setMatching] = useState(false);
   const [searching, setSearching] = useState(false);
   const [nyaaOpen, setNyaaOpen] = useState(false);
+  // Provenance sidecars for fused tracks, by record id. A track with no entry has
+  // no sidecar to show — fusion before F6, or a file that is not one.
+  const [fusionMeta, setFusionMeta] = useState<Record<string, FusionTrackMeta>>({});
   const { transcribing } = useMediaJobs();
 
   const entryId = entry?.id ?? null;
@@ -89,6 +93,48 @@ export default function MediaDetailPanel({
   const seasons = useMemo(() => (entry ? episodesBySeason(entry) : []), [entry]);
   const tracks = entry?.primary.subtitles ?? [];
   const episodeLabel = entry ? (providerEpisodeTitle(entry.primary) ?? entry.primary.title) : '';
+
+  /**
+   * Fusion borrows an English track's cue timing; without one there is nothing to
+   * fuse against, and the button says that rather than failing after the queue
+   * has already spun up ffmpeg.
+   */
+  const englishTrack = useMemo(
+    () => tracks.find((track) => /^en\b/i.test(track.lang.trim())),
+    [tracks],
+  );
+
+  const primaryId = entry?.primary.id ?? null;
+  // Joined so the effect below depends on the *contents*, not on the array identity
+  // a fresh `?? []` produces on every render.
+  const fusedTrackIds = tracks
+    .filter((track) => track.derivation === 'en-ja-fusion')
+    .map((track) => track.id)
+    .join(',');
+
+  useEffect(() => {
+    setFusionMeta({});
+  }, [primaryId]);
+
+  useEffect(() => {
+    // A sidecar is optional metadata about an optional track, so a failure here
+    // costs the badge and nothing else — the track list must still render.
+    if (!primaryId || tab !== 'subtitles' || !fusedTrackIds) return undefined;
+    if (typeof window.api?.fusionTrackMeta !== 'function') return undefined;
+    let live = true;
+    void (async () => {
+      for (const trackId of fusedTrackIds.split(',')) {
+        try {
+          const meta = await window.api.fusionTrackMeta(primaryId, trackId);
+          if (!live || !meta) continue;
+          setFusionMeta((previous) => ({ ...previous, [trackId]: meta }));
+        } catch {
+          // No sidecar, no badge. Deliberately silent.
+        }
+      }
+    })();
+    return () => { live = false; };
+  }, [primaryId, tab, fusedTrackIds]);
 
   /**
    * Searches for the *primary* episode only. A whole-series sweep is the import
@@ -326,7 +372,24 @@ export default function MediaDetailPanel({
                   ? t('media.subtitles.transcribing')
                   : t('media.subtitles.transcribe')}
               </Button>
+              <Button
+                size="sm"
+                disabled={!englishTrack || transcribing.has(entry.primary.id)}
+                onClick={() => {
+                  void window.api.enqueueTranscription({
+                    mediaId: entry.primary.id,
+                    lang: 'ja',
+                    kind: 'fuse-en-ja',
+                  });
+                  showToast({ message: t('media.subtitles.fuse.queued'), kind: 'default' });
+                }}
+              >
+                {t('media.subtitles.fuse.action')}
+              </Button>
             </div>
+            {!englishTrack && (
+              <p className="muted">{t('media.subtitles.fuse.needsEnglish')}</p>
+            )}
             {nyaaOpen && (
               <NyaaSubtitleDialog
                 mediaId={entry.primary.id}
@@ -352,6 +415,10 @@ export default function MediaDetailPanel({
                 {tracks.map((track) => {
                   const label = track.label ?? track.path;
                   const active = activeSubtitleName != null && activeSubtitleName === label;
+                  // What the fusion pipeline itself thinks of the track it wrote.
+                  // Only ever present for a fused track that has its F6 sidecar.
+                  const meta = fusionMeta[track.id];
+                  const counts = meta ? fusionCueCounts(meta) : null;
                   const detail = [
                     t(`media.subtitles.source.${track.source}`),
                     track.format.toUpperCase(),
@@ -360,6 +427,14 @@ export default function MediaDetailPanel({
                       ? t('media.subtitles.confidence', { percent: Math.round(track.confidence) })
                       : null,
                     track.machineGenerated ? t('media.subtitles.machine') : null,
+                    counts
+                      ? (counts.uncertain
+                        ? t('media.subtitles.fusion.uncertain', {
+                          count: counts.uncertain,
+                          total: counts.total,
+                        })
+                        : t('media.subtitles.fusion.allChecked', { count: counts.total }))
+                      : null,
                   ].filter(Boolean).join(' · ');
 
                   const body = (

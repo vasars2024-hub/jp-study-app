@@ -981,6 +981,15 @@ export const ja: Catalog = {
   'media.subtitles.searchDone': {
     other: '{count} 件の字幕ファイルを追加しました。',
   },
+  'media.subtitles.fuse.action': '英語→日本語で合成',
+  'media.subtitles.fuse.queued': '合成をキューに追加しました。英語字幕のタイミングで日本語を書き出します。',
+  'media.subtitles.fuse.needsEnglish': '合成には英語字幕のタイミングが必要ですが、このエピソードにはまだありません。',
+  'media.subtitles.fusion.uncertain': {
+    other: '{total} 行中 {count} 行が未確認',
+  },
+  'media.subtitles.fusion.allChecked': {
+    other: '{count} 行すべて照合済み',
+  },
   'media.subtitles.searchFailed': '字幕の検索に失敗しました。',
   'media.subtitles.none': 'このエピソードの字幕は見つかりませんでした。',
   'media.subtitles.notSearched': 'このエピソードはまだ検索していません。',

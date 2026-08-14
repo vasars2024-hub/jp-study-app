@@ -2321,6 +2321,11 @@ const api = {
     ipcRenderer.invoke('transcription:cancel', mediaId),
   transcriptionQueue: (): Promise<import('./shared/transcriptionIpc').TranscriptionJob[]> =>
     ipcRenderer.invoke('transcription:queue'),
+  fusionTrackMeta: (
+    mediaId: string,
+    subtitleId: string,
+  ): Promise<import('./shared/subtitleFusionMeta').FusionTrackMeta | null> =>
+    ipcRenderer.invoke('transcription:fusionMeta', mediaId, subtitleId),
   onTranscriptionProgress: (
     cb: (p: import('./shared/transcriptionIpc').TranscriptionProgress) => void,
   ): (() => void) => {

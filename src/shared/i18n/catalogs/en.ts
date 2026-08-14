@@ -1078,6 +1078,17 @@ export const en: Catalog = {
     one: 'Attached {count} subtitle file.',
     other: 'Attached {count} subtitle files.',
   },
+  'media.subtitles.fuse.action': 'Fuse EN → JA',
+  'media.subtitles.fuse.queued': 'Fusion queued: Japanese on the English track’s timing.',
+  'media.subtitles.fuse.needsEnglish': 'Fusion borrows an English track’s cue timing, and this episode has none yet.',
+  'media.subtitles.fusion.uncertain': {
+    one: '{count} of {total} lines unverified',
+    other: '{count} of {total} lines unverified',
+  },
+  'media.subtitles.fusion.allChecked': {
+    one: '{count} line, all cross-checked',
+    other: '{count} lines, all cross-checked',
+  },
   'media.subtitles.searchFailed': 'The subtitle search failed.',
   'media.subtitles.none': 'No subtitles found for this episode.',
   'media.subtitles.notSearched': 'No search has run for this episode yet.',

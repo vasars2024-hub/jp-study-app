@@ -979,6 +979,15 @@ export const zh: Catalog = {
   'media.subtitles.searchDone': {
     other: '已添加 {count} 个字幕文件。',
   },
+  'media.subtitles.fuse.action': '英译日合成',
+  'media.subtitles.fuse.queued': '已加入合成队列：按英文字幕的时间轴生成日文。',
+  'media.subtitles.fuse.needsEnglish': '合成需要借用英文字幕的时间轴，但这一集还没有英文字幕。',
+  'media.subtitles.fusion.uncertain': {
+    other: '{total} 行中有 {count} 行未经核对',
+  },
+  'media.subtitles.fusion.allChecked': {
+    other: '{count} 行已全部核对',
+  },
   'media.subtitles.searchFailed': '字幕搜索失败。',
   'media.subtitles.none': '未找到这一集的字幕。',
   'media.subtitles.notSearched': '尚未为这一集执行搜索。',

@@ -1520,6 +1520,10 @@ declare global {
       ): () => void;
       cancelTranscription(mediaId?: string): Promise<void>;
       transcriptionQueue(): Promise<import('../../shared/transcriptionIpc').TranscriptionJob[]>;
+      fusionTrackMeta(
+        mediaId: string,
+        subtitleId: string,
+      ): Promise<import('../shared/subtitleFusionMeta').FusionTrackMeta | null>;
       onTranscriptionProgress(
         cb: (p: import('../../shared/transcriptionIpc').TranscriptionProgress) => void,
       ): () => void;
