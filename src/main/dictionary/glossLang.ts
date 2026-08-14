@@ -21,6 +21,12 @@
 // Deliberately *not* here: script sampling. It needs the parsed entries, so it
 // belongs to the caller that already holds them (`yomitan.ts`), and it is the
 // weakest signal of the five.
+//
+// The *source* side of the same question lives here too, in `BUNDLED_SOURCE_LANGS`,
+// because it failed the same way and in the same file: the migration wrote `'ja'`
+// as a literal into every headword row, so the bundled Chinese dictionary's 71,888
+// Chinese heads were stored as Japanese — leaking into Japanese-scoped results and
+// unreachable from the Chinese surface, which pins `sourceLangs: ['zh']`.
 
 /**
  * Gloss languages of the dictionaries this application provisions itself, keyed by
@@ -33,6 +39,43 @@ export const BUNDLED_GLOSS_LANGS: Readonly<Record<string, readonly string[]>> = 
   'bundled-jmdict-ru': ['ru'],
   'bundled-moedict-zh': ['zh'],
 };
+
+/**
+ * The language the *headwords* of a provisioned dictionary are written in, keyed by
+ * the same app-owned stable id.
+ *
+ * This is a separate table from `BUNDLED_GLOSS_LANGS`, not a derivation of it, and
+ * the two must not be collapsed: for a bilingual dictionary they are different
+ * languages by definition. JMdict RU glosses in Russian and heads in Japanese.
+ *
+ * Nor can the *title* answer it. `detectLangFromTitle` reads the gloss side —
+ * "JMdict (Japanese–Russian)" resolves to `ru` — so pointing it at the source side
+ * would relabel every Japanese headword of that dictionary as Russian. Only the id
+ * knows, and only for the dictionaries this app provisions itself.
+ */
+export const BUNDLED_SOURCE_LANGS: Readonly<Record<string, string>> = {
+  'bundled-jmdict-en': 'ja',
+  'bundled-jmdict-ru': 'ja',
+  'bundled-kanjium-pitch': 'ja',
+  'bundled-moedict-zh': 'zh',
+};
+
+/**
+ * What a legacy store's headwords are written in when nothing identifies it.
+ *
+ * The legacy Yomitan format carries no source-language field at all, so for a
+ * user-imported archive there is no evidence to read — and every legacy store this
+ * app has ever written was Japanese-first apart from the bundled Chinese one. This
+ * keeps that assumption where it can be seen and corrected, instead of inlined as a
+ * literal in the middle of an INSERT, which is how the Chinese dictionary came to be
+ * stored as Japanese.
+ */
+export const DEFAULT_SOURCE_LANG = 'ja';
+
+/** The headword language of a dictionary, or undefined when nothing knows it. */
+export function resolveSourceLang(info: { id?: string }): string | undefined {
+  return info.id ? BUNDLED_SOURCE_LANGS[info.id] : undefined;
+}
 
 export const TITLE_LANG_HINTS: ReadonlyArray<{ re: RegExp; lang: string }> = [
   { re: /russian|русск|ロシア/i, lang: 'ru' },

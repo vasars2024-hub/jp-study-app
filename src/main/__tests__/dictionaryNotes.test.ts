@@ -15,7 +15,7 @@ vi.mock('electron', () => ({
 }));
 
 import { closeDictionaryDb, migrateDictionaryDb, openDictionaryDb, type SqliteDb } from '../dictionary/db';
-import { MIGRATIONS } from '../dictionary/schema';
+import { DICT_SCHEMA_VERSION, MIGRATIONS } from '../dictionary/schema';
 import { normalizeForLookup } from '../dictionary/dictService';
 import { listUserNotes, noteKey, readUserNote, writeUserNote } from '../dictionary/notes';
 import {
@@ -420,7 +420,7 @@ describe('schema 6 — giving existing notes a word to hang off', () => {
     old.prepare('insert into user_notes (headword_id, note, updated_at) values (?, ?, ?)')
       .run(headwordId, 'legacy', 7);
 
-    expect(migrateDictionaryDb(old)).toBe(6);
+    expect(migrateDictionaryDb(old)).toBe(DICT_SCHEMA_VERSION);
 
     expect(readUserNote(old, TABERU)).toEqual({
       lang: 'ja',
@@ -436,7 +436,7 @@ describe('schema 6 — giving existing notes a word to hang off', () => {
     old.prepare('insert into user_notes (headword_id, note, updated_at) values (?, ?, ?)')
       .run(9_999, 'orphan', 7);
 
-    expect(migrateDictionaryDb(old)).toBe(6);
+    expect(migrateDictionaryDb(old)).toBe(DICT_SCHEMA_VERSION);
 
     // Not deleted — the text is the user's — but it names no word, so no lookup
     // can attach it to one it does not belong to.
@@ -454,14 +454,14 @@ describe('schema 6 — giving existing notes a word to hang off', () => {
     insert.run(first, 'older', 1);
     insert.run(second, 'newer', 2);
 
-    expect(migrateDictionaryDb(old)).toBe(6);
+    expect(migrateDictionaryDb(old)).toBe(DICT_SCHEMA_VERSION);
 
     expect(old.prepare('select count(*) c from user_notes').get()).toEqual({ c: 2 });
     expect(readUserNote(old, TABERU)?.note).toBe('newer');
   });
 
   it('refuses a second row for one word once the identity index exists', () => {
-    expect(migrateDictionaryDb(old)).toBe(6);
+    expect(migrateDictionaryDb(old)).toBe(DICT_SCHEMA_VERSION);
     const insert = old.prepare(`
       insert into user_notes (headword_id, lang, text, norm, reading, reading_norm, note, tags, starred, updated_at)
       values (0, 'ja', '食べる', '食べる', 'たべる', 'たべる', ?, '', 0, 0)

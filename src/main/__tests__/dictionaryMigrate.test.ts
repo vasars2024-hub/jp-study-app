@@ -21,6 +21,7 @@ import {
   LEGACY_KEY_SEP,
   glossLangOf,
   importLegacyIndex,
+  sourceLangOf,
   migrateLegacyYomitanStores,
   readMigratedEntries,
   type LegacyDictIndex,
@@ -313,6 +314,81 @@ describe('gloss language', () => {
   });
 });
 
+// The other half of the same question. `headwords.lang` is the source side of the
+// pair `glosses.lang` completes, and the migration used to write `'ja'` into it as a
+// literal — so the bundled Chinese dictionary's Chinese heads were stored as
+// Japanese, which is both a wrong `lang` attribute in the UI and a dictionary the
+// Chinese surface (`sourceLangs: ['zh']`) cannot see at all.
+describe('source language', () => {
+  const moedict = (overrides: Partial<LegacyDictIndex['info']> = {}): LegacyDictIndex => ({
+    version: 1,
+    info: {
+      ...fixture().info,
+      id: 'bundled-moedict-zh',
+      title: 'Moedict (Chinese monolingual)',
+      glossLangs: ['zh'],
+      ...overrides,
+    },
+    terms: { 熊貓: [entry('熊貓', 'xióng māo', ['哺乳動物。體型肥碩似熊。'])] },
+  });
+
+  it('identifies a bundled dictionary by its id', () => {
+    expect(sourceLangOf(moedict().info)).toBe('zh');
+  });
+
+  it('falls back to Japanese for a store nothing identifies', () => {
+    expect(sourceLangOf(moedict({ id: 'user-import-1706' }).info)).toBe('ja');
+  });
+
+  // The title names the *gloss* language, which for a bilingual dictionary is
+  // precisely not the source language. Letting it vote here would relabel every
+  // Japanese headword of the Russian JMdict as Russian.
+  it('does not let a title naming another language move the source side', () => {
+    expect(sourceLangOf({ ...fixture().info, id: 'bundled-jmdict-ru', title: 'JMdict (Japanese–Russian)' })).toBe('ja');
+    expect(sourceLangOf({ ...fixture().info, id: 'user-ru', title: 'JMdict (Japanese–Russian)' })).toBe('ja');
+  });
+
+  it('writes a bundled Chinese store as Chinese, in the rows and in source_lang', () => {
+    importLegacyIndex(db, moedict());
+    expect(db.prepare('select source_lang from dictionaries where id = ?').get('bundled-moedict-zh')).toEqual({
+      source_lang: 'zh',
+    });
+    expect(db.prepare('select distinct lang from headwords').all()).toEqual([{ lang: 'zh' }]);
+  });
+
+  // `dict_pair_priority` joins `pp.source_lang = h.lang`, so a dictionary row that
+  // disagreed with its own headwords would make every pair override for it stop
+  // applying silently.
+  it('gives the dictionary row and its headwords the same language', () => {
+    importLegacyIndex(db, moedict());
+    const rows = db
+      .prepare(`
+        select distinct d.source_lang dict_lang, h.lang head_lang
+        from dictionaries d join headwords h on h.dict_id = d.id
+      `)
+      .all() as Array<{ dict_lang: string; head_lang: string }>;
+    expect(rows).toEqual([{ dict_lang: 'zh', head_lang: 'zh' }]);
+  });
+
+  it('leaves a Japanese-first bundled dictionary Japanese', () => {
+    importLegacyIndex(db, { ...moedict({ id: 'bundled-jmdict-ru' }), terms: { 猫: [entry('猫', 'ねこ', ['кошка'])] } });
+    expect(db.prepare('select source_lang from dictionaries where id = ?').get('bundled-jmdict-ru')).toEqual({
+      source_lang: 'ja',
+    });
+    expect(db.prepare('select distinct lang from headwords').all()).toEqual([{ lang: 'ja' }]);
+  });
+
+  it('carries the same language onto pitch and frequency rows', () => {
+    importLegacyIndex(db, {
+      ...moedict(),
+      pitch: { [`熊貓${LEGACY_KEY_SEP}xióng māo`]: { reading: 'xióng māo', positions: [1] } },
+      freq: { [`熊貓${LEGACY_KEY_SEP}xióng māo`]: 12 },
+    });
+    expect(db.prepare('select distinct lang from pitch').all()).toEqual([{ lang: 'zh' }]);
+    expect(db.prepare('select distinct lang from freq_corpora').all()).toEqual([{ lang: 'zh' }]);
+  });
+});
+
 describe('scanning userData/yomitan', () => {
   function writeStore(dir: string, index: unknown): void {
     fs.mkdirSync(dir, { recursive: true });
@@ -508,6 +584,102 @@ describe('schema 5 — repairing an install that already migrated under the wron
     expect(byDict).toEqual([
       { id: 'bundled-jmdict-ru', langs: 'ru' },
       { id: 'jmdict-en', langs: 'en' },
+    ]);
+  });
+});
+
+// Same shape, other side of the row: step 7 repairs an install whose bundled
+// Chinese dictionary was migrated as Japanese.
+describe('schema 7 — repairing an install whose headwords were written as Japanese', () => {
+  /**
+   * The exact broken shape the pre-fix migration produced. There is no declared
+   * field to reproduce it through — the old code wrote `'ja'` as a literal — so the
+   * rows are relabelled back by hand after a correct import.
+   */
+  function importAsJapanese(sourceLang = 'ja'): void {
+    importLegacyIndex(db, {
+      version: 1,
+      info: {
+        ...fixture().info,
+        id: 'bundled-moedict-zh',
+        title: 'Moedict (Chinese monolingual)',
+        glossLangs: ['zh'],
+      },
+      terms: { 熊貓: [entry('熊貓', 'xióng māo', ['哺乳動物。體型肥碩似熊。'])] },
+    });
+    db.prepare('update dictionaries set source_lang = ? where id = ?').run(sourceLang, 'bundled-moedict-zh');
+    db.prepare('update headwords set lang = ? where dict_id = ?').run(sourceLang, 'bundled-moedict-zh');
+    db.pragma('user_version = 6');
+  }
+
+  it('relabels the headwords and source_lang of a bundled store written as Japanese', () => {
+    importAsJapanese();
+    expect(db.prepare('select distinct lang from headwords').all()).toEqual([{ lang: 'ja' }]);
+
+    migrateDictionaryDb(db);
+
+    expect(db.prepare('select distinct lang from headwords').all()).toEqual([{ lang: 'zh' }]);
+    expect(db.prepare('select source_lang from dictionaries where id = ?').get('bundled-moedict-zh')).toEqual({
+      source_lang: 'zh',
+    });
+  });
+
+  it('leaves the full-text index able to find the relabelled headwords', () => {
+    importAsJapanese();
+    migrateDictionaryDb(db);
+    expect(db.prepare("select count(*) c from headwords_fts where headwords_fts match '熊貓'").get()).toEqual({ c: 1 });
+  });
+
+  it('does not touch a source language that was chosen rather than defaulted', () => {
+    importAsJapanese('yue');
+    migrateDictionaryDb(db);
+    expect(db.prepare('select source_lang from dictionaries where id = ?').get('bundled-moedict-zh')).toEqual({
+      source_lang: 'yue',
+    });
+    expect(db.prepare('select distinct lang from headwords').all()).toEqual([{ lang: 'yue' }]);
+  });
+
+  it('leaves the headwords of a Japanese dictionary alone', () => {
+    importLegacyIndex(db, fixture());
+    importAsJapanese();
+    migrateDictionaryDb(db);
+    const byDict = db
+      .prepare('select dict_id id, group_concat(distinct lang) langs from headwords group by dict_id order by dict_id')
+      .all();
+    expect(byDict).toEqual([
+      { id: 'bundled-moedict-zh', langs: 'zh' },
+      { id: 'jmdict-en', langs: 'ja' },
+    ]);
+  });
+
+  // Pitch and frequency rows carry their own `lang` and are read by it. The bundled
+  // Chinese dictionary happens to ship neither, so without this the two repair
+  // statements would be guards no test could tell from their absence — the failure
+  // mode this ledger has now recorded twice.
+  it('relabels the pitch and frequency rows the same dictionary owns', () => {
+    importAsJapanese();
+    db.prepare("insert into pitch (dict_id, lang, norm, reading, positions) values ('bundled-moedict-zh', 'ja', '熊貓', 'xióng māo', '1')").run();
+    db.prepare("insert into freq_corpora (lang, norm, corpus, rank, per_million) values ('ja', '熊貓', 'bundled-moedict-zh', 12, null)").run();
+
+    migrateDictionaryDb(db);
+
+    expect(db.prepare('select distinct lang from pitch').all()).toEqual([{ lang: 'zh' }]);
+    expect(db.prepare('select distinct lang from freq_corpora').all()).toEqual([{ lang: 'zh' }]);
+  });
+
+  // The override was set while the dictionary was mislabelled, so it is keyed on
+  // `ja` and would simply stop applying once the headwords become `zh`.
+  it('carries a per-pair priority override onto the corrected language', () => {
+    importAsJapanese();
+    db.prepare(`
+      insert into dict_pair_priority (dict_id, source_lang, target_lang, priority)
+      values ('bundled-moedict-zh', 'ja', 'zh', 3)
+    `).run();
+
+    migrateDictionaryDb(db);
+
+    expect(db.prepare('select source_lang, target_lang, priority from dict_pair_priority').all()).toEqual([
+      { source_lang: 'zh', target_lang: 'zh', priority: 3 },
     ]);
   });
 });

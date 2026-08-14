@@ -26,10 +26,10 @@
 // again on any machine that already applied it.
 
 import type { SqliteDb } from './db';
-import { BUNDLED_GLOSS_LANGS } from './glossLang';
+import { BUNDLED_GLOSS_LANGS, BUNDLED_SOURCE_LANGS, DEFAULT_SOURCE_LANG } from './glossLang';
 
 /** Bumped by appending to MIGRATIONS. Never edit a released step. */
-export const DICT_SCHEMA_VERSION = 6;
+export const DICT_SCHEMA_VERSION = 7;
 
 export interface MigrationStep {
   version: number;
@@ -505,6 +505,54 @@ export const MIGRATIONS: MigrationStep[] = [
         CREATE UNIQUE INDEX IF NOT EXISTS idx_note_identity
           ON user_notes(lang, norm, reading_norm) WHERE lang IS NOT NULL
       `);
+    },
+  },
+  {
+    version: 7,
+    name: 'repair bundled dictionaries migrated under the wrong source language',
+    up(db) {
+      // Step 5's defect, on the other side of the row. The legacy migration wrote
+      // `'ja'` as a *literal* into `dictionaries.source_lang` and into every
+      // `headwords.lang`, so the bundled Chinese monolingual dictionary's 71,888
+      // Chinese headwords were stored as Japanese. Two consequences, both live:
+      //
+      //   * `lookupChineseInDb` pins `sourceLangs: ['zh']` and then keeps only
+      //     `lang === 'zh'` entries, so the Chinese surface could not see the only
+      //     Chinese dictionary the app installs — it fell through to CC-CEDICT;
+      //   * the same rows surfaced inside Japanese-scoped results instead, carrying
+      //     `lang: 'ja'` onto the `lang` attribute of everything that rendered them.
+      //
+      // Relabel, not re-import: the headwords, readings and glosses were always
+      // right. The same two guards as step 5 — only ids this app provisions itself,
+      // and only a `source_lang` that is *exactly* the silent default, so a value
+      // some later import or repair chose deliberately is never overwritten.
+      //
+      // The headword UPDATE fires the FTS synchronisation triggers once per row,
+      // which retract and re-add identical text. That is real work on a large store
+      // and it is correct work; it happens once, inside this step's transaction.
+      const readCurrent = db.prepare('select source_lang from dictionaries where id = ?');
+      const setSource = db.prepare('update dictionaries set source_lang = ? where id = ?');
+      const relabelHeadwords = db.prepare('update headwords set lang = ? where dict_id = ? and lang = ?');
+      const relabelPitch = db.prepare('update pitch set lang = ? where dict_id = ? and lang = ?');
+      const relabelFreq = db.prepare('update freq_corpora set lang = ? where corpus = ? and lang = ?');
+      // `OR REPLACE` because (dict_id, source_lang, target_lang) is the primary key.
+      // A conflicting `zh` override cannot have been set deliberately — no `zh`
+      // headword existed for this dictionary to offer that pair — so the relabelled
+      // row is the one the user actually chose, and it wins.
+      const relabelPairs = db.prepare(
+        'update or replace dict_pair_priority set source_lang = ? where dict_id = ? and source_lang = ?',
+      );
+
+      for (const [dictId, lang] of Object.entries(BUNDLED_SOURCE_LANGS)) {
+        if (!lang || lang === DEFAULT_SOURCE_LANG) continue;
+        const row = readCurrent.get(dictId) as { source_lang?: string } | undefined;
+        if (!row || (row.source_lang ?? '').trim() !== DEFAULT_SOURCE_LANG) continue;
+        setSource.run(lang, dictId);
+        relabelHeadwords.run(lang, dictId, DEFAULT_SOURCE_LANG);
+        relabelPitch.run(lang, dictId, DEFAULT_SOURCE_LANG);
+        relabelFreq.run(lang, dictId, DEFAULT_SOURCE_LANG);
+        relabelPairs.run(lang, dictId, DEFAULT_SOURCE_LANG);
+      }
     },
   },
 ];

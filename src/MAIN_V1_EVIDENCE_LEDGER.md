@@ -20103,3 +20103,170 @@ by the previous hop's unclean exit.
 - The nine long-standing full-suite failures are untouched and still belong to other tracks.
 
 Commit: `d756f04`.
+
+## Track 2 — the Chinese dictionary that was stored as Japanese — 2026-08-14 22:55 MSK primary
+
+### What was open, and why this slice rather than another
+
+The previous slice's own "Deliberately open" list opened with it: *"Moedict's Chinese headwords
+arrive labelled `lang: "ja"`, and this surface is the first place a user sees it,"* sized there
+as "a migration slice with its own acceptance, not a line in this one." Re-derived from source
+rather than taken from that note, it is worse than a wrong `lang` attribute.
+
+`importLegacyIndex` wrote **`'ja'` as a literal** into `dictionaries.source_lang`, into every
+`headwords.lang`, and into the pitch and frequency rows. Every other importer already resolves
+its own language — CEDICT writes `'zh'`, StarDict writes the honest `'und'`, DSL parameterises
+it — so the legacy Yomitan migration was the only writer that could not tell one language from
+another, and it is the writer that lands the **bundled** dictionaries. Two live consequences,
+both measured below before anything was changed:
+
+* `lookupChineseInDb` pins `sourceLangs: ['zh']` and then keeps only `lang === 'zh'` entries
+  (`chineseLookup.ts:128-130`), so on a default install it returned **null** for every query and
+  the Chinese surface silently fell through to CC-CEDICT. The only Chinese dictionary the app
+  installs — 71,888 headwords with pinyin readings — was unreachable from the surface built for
+  it.
+* The same rows surfaced inside *Japanese*-scoped results instead. `dictListPairs()` therefore
+  advertised **`ja→zh`**, a pair no dictionary in the install can actually answer.
+
+This is the same defect as the Russian-gloss one closed in `9703c1f`, on the other column of the
+same row: `headwords.lang` is the source side of the pair `glosses.lang` completes.
+
+### The decision: the id votes, the title does not
+
+`resolveGlossLangs` already resolves the gloss side through override → declared → bundled spec →
+title. The obvious move was to reuse that ladder for the source side. **It is wrong, and quietly
+so.** `detectLangFromTitle` reads the *gloss* language — "JMdict (Japanese–Russian)" resolves to
+`ru` — so pointing it at the source side would relabel all 101,843 Japanese headwords of the
+Russian JMdict as Russian. For a bilingual dictionary the two sides are different languages by
+definition, so `BUNDLED_SOURCE_LANGS` is a separate table from `BUNDLED_GLOSS_LANGS`, not a
+derivation of it, and there is a test that pins exactly this (`does not let a title naming
+another language move the source side`).
+
+The legacy Yomitan format carries **no** source-language field at all, so for a user-imported
+archive there is no evidence to read. `DEFAULT_SOURCE_LANG = 'ja'` keeps the old assumption
+where it can be seen and corrected rather than inlined in the middle of an INSERT — which is
+precisely how the Chinese dictionary came to be stored as Japanese. Widening this to
+user-imported Chinese archives needs a `sourceLangOverride` in Settings and is left open below.
+
+The dictionary row and its headwords are written from **one** resolved value, because
+`dict_pair_priority` joins them (`pp.source_lang = h.lang`): a row that disagreed with the
+headwords it owns would make every pair override for that dictionary stop applying, silently.
+
+### The repair step
+
+Schema step 7 relabels rather than re-imports — the headwords, readings and glosses were always
+right, only their label was wrong. The same two guards as step 5: only ids this app provisions
+itself, and only a `source_lang` that is **exactly** the silent default, so a value some later
+import or repair chose deliberately is never overwritten. `dict_pair_priority` is carried across
+with `UPDATE OR REPLACE`, because a conflicting `zh` override cannot have been set deliberately —
+no `zh` headword existed for that dictionary to offer the pair — so the relabelled row wins.
+
+### Four mutation controls, all of which failed for the intended reason
+
+1. `const sourceLang = sourceLangOf(info)` → `'ja'`: 3 tests fail
+   (`expected { source_lang: 'ja' } to deeply equal { source_lang: 'zh' }`).
+2. The step-7 "exactly the default" guard removed: the deliberately-chosen-language test fails
+   (`expected { source_lang: 'zh' } to deeply equal { source_lang: 'yue' }`).
+3. `relabelPairs` dropped: the pair-override test fails (`source_lang: 'ja'` survives).
+4. `relabelPitch`/`relabelFreq` dropped: the pitch/frequency test fails.
+
+Control 4 exists because of the frequency-badge lesson recorded in `fe6e1a9` and repeated in
+`d756f04`: the bundled Chinese dictionary ships **no** pitch and **no** frequency rows, so
+without a test that seeds them those two statements would have been guards no test could tell
+from their absence. They are seeded by hand for exactly that reason.
+
+### A regression this slice caused, and did not paper over
+
+Bumping `DICT_SCHEMA_VERSION` to 7 broke **four** assertions in `dictionaryNotes.test.ts` that
+read `expect(migrateDictionaryDb(old)).toBe(6)` — a hardcoded version number standing in for
+"the ladder ran to the end". They now assert `DICT_SCHEMA_VERSION`, which is what they meant and
+which will not break on step 8. The v5 fixture and the step-6 assertions around them are
+untouched.
+
+### Gates
+
+- Focused: `dictionaryMigrate` **48 tests**, exit 0 (12 new). Neighbouring dictionary suites —
+  `dictionaryDb`, `dictionaryLookup`, `dictionaryChineseLookup`, `dictionarySources`,
+  `dictionaryCompounds`, `dictionaryImportWorker` — 133 passed / 6 skipped, exit 0.
+- `node tools/i18n-check.cjs`: exit 0 at **9,553** English keys. This slice adds no UI string;
+  `langNativeLabel('zh')` already renders the new `zh→zh` pair label from the shared table.
+- `node tools/architecture-audit.cjs`: exit 0, **1,825 modules, 18 known findings, 2 pending,
+  nothing new**.
+- `npx eslint` on the five touched paths: **exit 0, no output** — no baseline arithmetic needed
+  this time.
+- Full `npx vitest run`: **596 passed / 1 skipped files, 7,870 passed / 6 skipped tests**, with
+  one failure: `scraperSources.test.ts` `ENOTEMPTY: … Temp\scraper-sources-*\scraper\logs`. Run
+  alone it passes 13/13 — the same temp-directory contention `d756f04` diagnosed, not this
+  change. **These numbers are the shared tree, not committed HEAD**, and the shared tree carries
+  other tracks' uncommitted fixes: the nine long-standing failures the 2026-08-14 09:29 boss
+  audit found at committed HEAD do not appear here. That is stated rather than absorbed.
+
+### Measured against a copy of the real 374 MB profile database
+
+Copied `dict.db` + WAL + SHM out of `%APPDATA%` and driven with the **raw driver**, not
+`openDictionaryDb` — recorded because the first attempt at this measurement was junk in a way
+that looked exactly like proof: `openDictionaryDb` **runs the ladder on open**, so a "before"
+reading taken after it is already the "after", and the repair timed at 0 ms. The live database
+was confirmed untouched (`user_version 6`) after that mistake, not assumed.
+
+| | before | after |
+| --- | --- | --- |
+| `user_version` | 6 | **7**, in 707–909 ms over two runs |
+| `bundled-moedict-zh.source_lang` | `ja` | `zh` |
+| `headwords` by lang | `ja` 697,837 | `ja` 625,949 + `zh` 71,888 |
+| `lookupChineseInDb('熊貓')` | **null** | 熊貓 / 貓熊 / 猫熊, all Moedict, with pinyin |
+| ja-scoped `lookup('熊貓')` | 3 entries tagged `ja` | **0** |
+| `headwords_fts match '熊貓'` | — | 1 (index survived the relabel) |
+
+No row was lost: 625,949 + 71,888 = 697,837. Re-running the ladder is a no-op.
+
+**The compounds surface, before and after, on real data.** This is the exact item `d756f04` left
+open. Before, a ja-scoped `findLexiconCompounds('猫')` returned five Chinese rows — 猫熊, 熊猫,
+猫头鹰, 躲猫猫, 夜猫子 — all tagged `ja`. After, those five are gone and five real Japanese
+compounds took their place (猫肉, 親猫, 外猫, 内猫, 愛猫): the panel did not merely shrink, it
+filled with correct rows. A zh-scoped `findLexiconCompounds('貓')` — a direction that returned
+nothing at all before — now returns 貓熊, 熊貓, 貓頭鷹, 躲貓貓, 夜貓子, 照貓畫虎.
+
+### Live acceptance
+
+Own dev app via `npm start`, bridge pid **12308** on 127.0.0.1:39273, window focused throughout.
+The `debug/bridge.json` present at the start of the hop was stale again — pid 24872, already
+dead, from the previous hop's unclean exit.
+
+- **The migration ran on the real profile database at boot**, which is the shipping path rather
+  than a simulation of it. Read back read-only afterwards: `user_version 7`,
+  `bundled-moedict-zh` at `source_lang zh`, `ja` 625,949 + `zh` 71,888, pitch still 107,978 `ja`
+  rows from Kanjium.
+- **The real main handlers, not the preload bindings.** `window.api.dictListSources()` reports
+  `bundled-moedict-zh | zh | 71888`. `window.api.dictListPairs()` returns **`ja→en`, `ja→ru`,
+  `zh→zh`** — the phantom `ja→zh` the audit recorded is gone, replaced by the pair the install
+  can actually answer.
+- **`window.api.lookupChinese`, end to end through IPC**: 熊貓 3 entries in 7 ms, 貓 9 in 8 ms,
+  生物 3 in 24 ms, 躲貓貓 3 in 23 ms, 猫 3 in 11 ms — every one sourced "Moedict (Chinese
+  monolingual)". Adverse inputs: `zzz` 0 entries in 1,219 ms (the CC-CEDICT fallback index being
+  built, as designed), `''` 0 entries in 2 ms, neither threw.
+- **`window.api.dictCompounds('猫', {sourceLangs:['ja']})`** returns 12 rows, **all JMdict, all
+  `lang: 'ja'`** — no Chinese leakage. `dictCompounds('貓', {sourceLangs:['zh']})` returns 6 rows
+  carrying `lang: 'zh'`, which is what `LexiconCompounds.tsx:77` puts on the `lang` attribute, so
+  the wrong-attribute half of the open item is closed at the source of the value.
+- `/logs?level=error`: **0 entries** across every probe. All three `window.__*` probe globals
+  removed and asserted gone; `localStorage` still 80 keys; `window.api` intact. Owned pid 12308
+  and its five children stopped, nothing else. **No userData backup was taken.**
+
+### Deliberately open
+
+- **A user-imported Chinese or Korean Yomitan archive is still stored as Japanese.** The legacy
+  format declares no source language and the title cannot be trusted for this side, so the only
+  honest fix is a `sourceLangOverride` in Settings beside the existing `glossLangOverride` —
+  a UI slice with its own acceptance, not a line in a migration.
+- **A note taken on a Moedict word before this migration is now keyed under the wrong language.**
+  `user_notes` keys on lang+norm+reading, and step 7 does not touch it: a note under
+  `ja`+`熊貓` cannot be attributed to Moedict rather than to a Japanese dictionary that also has
+  that spelling. This install has **0 notes**, verified before the change, so nothing was lost
+  here; it is recorded because a machine with notes would need the ambiguity resolved rather than
+  guessed.
+- **The nine long-standing full-suite failures at committed HEAD are untouched** and still belong
+  to other tracks, as is the `scraperSources` temp-directory flake.
+- Another track was editing `src/shared/i18n/catalogs/*` and `src/preload.ts` during this hop
+  (mtimes inside the run). Nothing of theirs was staged, and no foreign HMR reached the measured
+  window.

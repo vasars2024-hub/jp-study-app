@@ -21,7 +21,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { DictSense, YomitanDictInfo } from '../../shared/types';
 import type { SqliteDb } from './db';
-import { resolveGlossLangs } from './glossLang';
+import { DEFAULT_SOURCE_LANG, resolveGlossLangs, resolveSourceLang } from './glossLang';
 
 /**
  * Separator between term and reading in the legacy pitch/freq key format.
@@ -135,6 +135,20 @@ export function glossLangOf(info: YomitanDictInfo): string {
 }
 
 /**
+ * The language a dictionary's headwords are written in.
+ *
+ * Japanese is the last-resort default for the same reason `'en'` is on the gloss
+ * side: the legacy format declares no source language, so an unknown one has to be
+ * written as *something*, and every legacy store this app provisions is Japanese-
+ * first apart from the bundled Chinese one. It is reached only once the id has
+ * failed to identify the dictionary. The title deliberately does not get a vote —
+ * see `./glossLang`.
+ */
+export function sourceLangOf(info: YomitanDictInfo): string {
+  return resolveSourceLang(info) ?? DEFAULT_SOURCE_LANG;
+}
+
+/**
  * Writes one parsed `index.json` into the database, replacing any previous import
  * of the same dictionary id.
  *
@@ -206,6 +220,11 @@ export function importLegacyIndex(
   const dictId = info.id;
   const glossLangs = glossLangsOf(info);
   const glossLang = glossLangs[0] ?? 'en';
+  // Every row this import writes carries the same source language, so the
+  // dictionary's own `source_lang` can never disagree with the headwords it owns —
+  // `dict_pair_priority` joins the two together (`pp.source_lang = h.lang`) and a
+  // disagreement makes a pair override silently stop applying.
+  const sourceLang = sourceLangOf(info);
   const provenance = BUNDLED_LEGACY_PROVENANCE[dictId];
   const counts: ImportedCounts = { dictId, headwords: 0, senses: 0, glosses: 0, pitch: 0, freq: 0 };
 
@@ -214,11 +233,12 @@ export function importLegacyIndex(
     db.prepare(`
       insert into dictionaries (id, title, revision, source_lang, target_langs, priority,
                                 enabled, kind, licence, attribution, entry_count, bytes, imported_at)
-      values (?, ?, ?, 'ja', ?, ?, ?, ?, ?, ?, 0, 0, ?)
+      values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?)
     `).run(
       dictId,
       info.title,
       info.revision ?? '',
+      sourceLang,
       // The same resolution the gloss rows use, so `target_langs` can never
       // advertise a language the glosses were not written under.
       (glossLangs.length ? glossLangs : [glossLang]).join(','),
@@ -232,7 +252,7 @@ export function importLegacyIndex(
 
     const insertHeadword = db.prepare(`
       insert into headwords (dict_id, lang, text, norm, reading, reading_norm, score)
-      values (?, 'ja', ?, ?, ?, ?, ?)
+      values (?, ?, ?, ?, ?, ?, ?)
     `);
     const insertSense = db.prepare('insert into senses (headword_id, ord, pos, tags) values (?, ?, ?, ?)');
     const insertGloss = db.prepare('insert into glosses (sense_id, lang, text, html, ord) values (?, ?, ?, ?, ?)');
@@ -243,6 +263,7 @@ export function importLegacyIndex(
         const headwordId = Number(
           insertHeadword.run(
             dictId,
+            sourceLang,
             entry.word,
             norm,
             entry.reading ?? '',
@@ -276,23 +297,23 @@ export function importLegacyIndex(
 
     const insertPitch = db.prepare(`
       insert or replace into pitch (dict_id, lang, norm, reading, positions)
-      values (?, 'ja', ?, ?, ?)
+      values (?, ?, ?, ?, ?)
     `);
     for (const [key, value] of Object.entries(index.pitch ?? {})) {
       if (shouldCancel?.()) throw new LegacyMigrationCancelled();
       const [term] = key.split(LEGACY_KEY_SEP);
-      insertPitch.run(dictId, term, value.reading ?? '', (value.positions ?? []).join(','));
+      insertPitch.run(dictId, sourceLang, term, value.reading ?? '', (value.positions ?? []).join(','));
       counts.pitch += 1;
     }
 
     const insertFreq = db.prepare(`
       insert into freq_corpora (lang, norm, corpus, rank, per_million)
-      values ('ja', ?, ?, ?, null)
+      values (?, ?, ?, ?, null)
     `);
     for (const [key, rank] of Object.entries(index.freq ?? {})) {
       if (shouldCancel?.()) throw new LegacyMigrationCancelled();
       const [term] = key.split(LEGACY_KEY_SEP);
-      insertFreq.run(term, dictId, rank);
+      insertFreq.run(sourceLang, term, dictId, rank);
       counts.freq += 1;
     }
 
