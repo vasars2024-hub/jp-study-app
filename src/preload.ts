@@ -458,6 +458,16 @@ const api = {
     word: string,
   ): Promise<import('./shared/conjugationClass').ConjugationAnalysis> =>
     ipcRenderer.invoke('dict:conjugation', word),
+  /** The user's own note on a word, keyed on the word rather than a dictionary row. */
+  dictNoteGet: (
+    identity: import('./shared/lexiconNotes').LexiconNoteIdentity,
+  ): Promise<import('./shared/lexiconNotes').LexiconNote | null> =>
+    ipcRenderer.invoke('dict:noteGet', identity),
+  dictNoteSet: (
+    identity: import('./shared/lexiconNotes').LexiconNoteIdentity,
+    input: import('./shared/lexiconNotes').LexiconNoteInput,
+  ): Promise<{ ok: boolean; note: import('./shared/lexiconNotes').LexiconNote | null }> =>
+    ipcRenderer.invoke('dict:noteSet', identity, input),
   /** Find example sentences (JP + EN) for a word or grammar pattern, via Tatoeba. */
   searchExamples: (query: string, limit?: number): Promise<ExampleResult> =>
     ipcRenderer.invoke('examples:search', query, limit),

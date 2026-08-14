@@ -56,6 +56,8 @@ import {
   resetCedictIndexCache,
   type ChineseLookupDeps,
 } from './chineseLookup';
+import { readUserNote, writeUserNote } from './notes';
+import type { LexiconNote, LexiconNoteIdentity, LexiconNoteInput } from '../../shared/lexiconNotes';
 import type { DictResult } from '../../shared/types';
 import type { LexiconNeighborResult } from '../../shared/lexiconNeighbors';
 import {
@@ -359,6 +361,19 @@ export function lookupInDictionaryDb(query: LookupQuery): LookupResult {
  */
 export function findSemanticNeighborsInDb(query: NeighborQuery): LexiconNeighborResult {
   return findSemanticNeighbors(dictionaryDb(), query);
+}
+
+/** The user's own note on a word, from the managed database. */
+export function readUserNoteFromDb(identity: LexiconNoteIdentity): LexiconNote | null {
+  return readUserNote(dictionaryDb(), identity);
+}
+
+/** Store or clear the user's note on a word. Returns the note as it now stands. */
+export function writeUserNoteToDb(
+  identity: LexiconNoteIdentity,
+  input: LexiconNoteInput,
+): LexiconNote | null {
+  return writeUserNote(dictionaryDb(), identity, input);
 }
 
 /**

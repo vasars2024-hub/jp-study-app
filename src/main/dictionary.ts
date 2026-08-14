@@ -52,7 +52,14 @@ import {
   setDictionarySourceEnabled,
   moveDictionarySource,
   removeDictionarySource,
+  readUserNoteFromDb,
+  writeUserNoteToDb,
 } from './dictionary/service';
+import {
+  readNoteIdentity,
+  readNoteInput,
+  type LexiconNote,
+} from '../shared/lexiconNotes';
 import {
   GLOBAL_PAIR,
   isGlobalPair,
@@ -715,6 +722,32 @@ export function registerDictionaryIpc(): void {
     'dict:conjugation',
     (_e, word: unknown): Promise<ConjugationAnalysis> =>
       analyzeConjugation(typeof word === 'string' ? word : ''),
+  );
+  // The user's own note on a word. Both handlers answer `null` rather than
+  // rejecting when the database is not there yet: a note surface renders "no note"
+  // for a word that has none, and an un-migrated installation is that same state.
+  ipcMain.handle('dict:noteGet', (_e, identity: unknown): LexiconNote | null => {
+    const target = readNoteIdentity(identity);
+    if (!target) return null;
+    try {
+      return readUserNoteFromDb(target);
+    } catch {
+      return null;
+    }
+  });
+  // A failed write returns `{ ok: false }` instead of the note, because losing
+  // what someone typed must never be reported to them as a save.
+  ipcMain.handle(
+    'dict:noteSet',
+    (_e, identity: unknown, input: unknown): { ok: boolean; note: LexiconNote | null } => {
+      const target = readNoteIdentity(identity);
+      if (!target) return { ok: false, note: null };
+      try {
+        return { ok: true, note: writeUserNoteToDb(target, readNoteInput(input)) };
+      } catch {
+        return { ok: false, note: null };
+      }
+    },
   );
   ipcMain.handle(
     'dict:lookupTermsBatch',

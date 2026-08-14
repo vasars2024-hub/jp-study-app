@@ -29,7 +29,7 @@ import type { SqliteDb } from './db';
 import { BUNDLED_GLOSS_LANGS } from './glossLang';
 
 /** Bumped by appending to MIGRATIONS. Never edit a released step. */
-export const DICT_SCHEMA_VERSION = 5;
+export const DICT_SCHEMA_VERSION = 6;
 
 export interface MigrationStep {
   version: number;
@@ -423,6 +423,88 @@ export const MIGRATIONS: MigrationStep[] = [
         setTargets.run(expected, dictId);
         relabelGlosses.run(langs[0], 'en', dictId);
       }
+    },
+  },
+  {
+    version: 6,
+    name: 'key user notes on the word they annotate rather than a headword row id',
+    up(db) {
+      // `user_notes` shipped in v1 with a comment claiming notes key on "the
+      // headword's identity rather than its row" — while the only column it has
+      // is `headword_id`, which *is* the row. Every re-import runs
+      // `delete from dictionaries`, the cascade takes the headwords with it, and
+      // the next import hands the same autoincrement ids to different words. So
+      // a surviving note would not merely be orphaned; it would eventually be
+      // read back attached to a word its author never looked at. The v1 test
+      // asserting notes survive a dictionary removal measured the row count,
+      // which is exactly the reassurance that hid this.
+      //
+      // Identity is language + written form + reading, normalised with the same
+      // NFKC+casefold rule `headwords.norm` is built with, so the note for a
+      // word is found by the same string that found the word. The display forms
+      // are stored alongside it because the whole promise is that a note outlives
+      // its dictionary — once the headword is gone there is nothing else left to
+      // ask what the word looked like.
+      //
+      // Additive rather than a table rebuild, so no existing row is dropped.
+      // `headword_id` stays because it is NOT NULL and a released step must not
+      // be edited; nothing reads it any more, and new rows write 0 into it.
+      //
+      // Re-runnable, like every step before it. `ALTER TABLE ADD COLUMN` has no
+      // `IF NOT EXISTS`, and a step that throws on a second application would
+      // strand the whole ladder — which is exactly what happens when a caller
+      // rewinds `user_version` on a file that already has these columns.
+      const existing = new Set(
+        (db.pragma('table_info(user_notes)') as Array<{ name: string }>).map((column) => column.name),
+      );
+      for (const column of ['lang', 'text', 'norm', 'reading', 'reading_norm']) {
+        if (existing.has(column)) continue;
+        db.exec(`ALTER TABLE user_notes ADD COLUMN ${column} TEXT`);
+      }
+      // Backfill only rows whose headword is still present. One that is already
+      // orphaned cannot be resolved to a word by anything, so it keeps a null
+      // `lang`, stays in the table, and is never matched by a read.
+      //
+      // The WHERE is a narrowing, not a load-bearing guard: the correlated
+      // subqueries already yield NULL for a missing headword, so removing it
+      // produces the same rows. It stays because it says what the statement is
+      // for, and because it keeps the update off rows it has nothing to write.
+      db.exec(`
+        UPDATE user_notes SET
+          lang         = (select h.lang from headwords h where h.id = user_notes.headword_id),
+          text         = (select h.text from headwords h where h.id = user_notes.headword_id),
+          norm         = (select h.norm from headwords h where h.id = user_notes.headword_id),
+          reading      = (select coalesce(h.reading, '') from headwords h where h.id = user_notes.headword_id),
+          reading_norm = (select coalesce(h.reading_norm, '') from headwords h where h.id = user_notes.headword_id)
+        WHERE exists (select 1 from headwords h where h.id = user_notes.headword_id)
+      `);
+      // Two legacy notes can point at the same word through two dictionaries'
+      // headwords, and the identity index below would refuse the pair. Demoting
+      // the older duplicate's `lang` to null loses no text and keeps the ladder
+      // from throwing — a migration that fails leaves the whole database on the
+      // previous version, which is a far worse outcome than a shadowed note.
+      const duplicates = db.prepare(`
+        select lang, norm, reading_norm from user_notes
+        where lang is not null
+        group by lang, norm, reading_norm having count(*) > 1
+      `).all() as Array<{ lang: string; norm: string; reading_norm: string }>;
+      const demote = db.prepare(`
+        update user_notes set lang = null
+        where lang = ? and norm = ? and reading_norm = ?
+          and rowid <> (
+            select rowid from user_notes
+            where lang = ? and norm = ? and reading_norm = ?
+            order by updated_at desc, rowid desc limit 1
+          )
+      `);
+      for (const row of duplicates) {
+        demote.run(row.lang, row.norm, row.reading_norm, row.lang, row.norm, row.reading_norm);
+      }
+      // Partial, so the unresolved legacy rows above are simply not in it.
+      db.exec(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_note_identity
+          ON user_notes(lang, norm, reading_norm) WHERE lang IS NOT NULL
+      `);
     },
   },
 ];

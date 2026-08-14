@@ -8885,6 +8885,19 @@ export const en: Catalog = {
   'lexicon.conjugation.classIs': '{word} is a {class} — IPADIC class {type}.',
   'lexicon.conjugation.note': 'Generated from the analyser’s conjugation class by the same engine the dictionary uses to look inflected words up.',
   'lexicon.conjugation.form.pastNegative': 'past negative',
+
+  // Personal note on a dictionary entry. The "about" line is not decoration: it
+  // states the one guarantee that made this worth building (the note is stored on
+  // the word, not on a dictionary row) and the only way to delete a note.
+  'lexicon.note.title': 'Your note',
+  'lexicon.note.about': 'Stored on the word itself, so it survives re-importing or removing the dictionary it came from. To delete a note, clear both fields and save.',
+  'lexicon.note.placeholder': 'Anything you want to remember about this word…',
+  'lexicon.note.tags': 'Tags',
+  'lexicon.note.tagsPlaceholder': 'Separated by commas',
+  'lexicon.note.save': 'Save note',
+  'lexicon.note.saving': 'Saving…',
+  'lexicon.note.saved': 'Saved',
+  'lexicon.note.failed': 'Could not save the note. Nothing was changed.',
   'dict.saved.title': 'Saved searches',
   'dict.saved.save': 'Save search',
   'dict.saved.remove': 'Remove saved search',

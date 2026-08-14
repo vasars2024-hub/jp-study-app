@@ -230,11 +230,22 @@ describe('cascades — removing a dictionary must not orphan its rows', () => {
     expect(db.prepare('select rowid from headwords_fts where headwords_fts match ?').all('传统')).toHaveLength(1);
   });
 
-  it('keeps user notes when the dictionary they annotate is removed', () => {
-    const { headwordId } = seedEntry(db, { dict: 'jmdict', text: '食べる', gloss: 'to eat' });
-    db.prepare('insert into user_notes (headword_id, note, updated_at) values (?, ?, ?)').run(headwordId, 'mine', 1);
+  // Surviving the cascade was only ever half of it. A row that outlives its
+  // headword and still points at that headword's id is worse than a deleted one,
+  // because the next import hands the id to a different word — which is what
+  // migration 6 gave the table an identity to prevent. The row count alone
+  // asserted the harmless half, so it asserts the identity too now.
+  it('keeps user notes, and the word they name, when their dictionary is removed', () => {
+    seedEntry(db, { dict: 'jmdict', text: '食べる', gloss: 'to eat' });
+    db.prepare(`
+      insert into user_notes (headword_id, lang, text, norm, reading, reading_norm, note, updated_at)
+      values (0, 'ja', '食べる', '食べる', '', '', ?, 1)
+    `).run('mine');
     db.prepare('delete from dictionaries where id = ?').run('jmdict');
-    expect(db.prepare('select count(*) c from user_notes').get()).toEqual({ c: 1 });
+    expect(db.prepare('select count(*) c from headwords').get()).toEqual({ c: 0 });
+    expect(db.prepare('select lang, text, note from user_notes').all()).toEqual([
+      { lang: 'ja', text: '食べる', note: 'mine' },
+    ]);
   });
 
   it('refuses a headword whose dictionary does not exist', () => {

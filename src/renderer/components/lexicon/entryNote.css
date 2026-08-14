@@ -1,0 +1,90 @@
+.lexicon-note {
+  margin: 14px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-1);
+  color: var(--text);
+}
+
+.lexicon-note > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.lexicon-note-about {
+  margin: 8px 0 0;
+  font-size: 0.9em;
+}
+
+.lexicon-note-text {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  /* A note is prose, and the box has to grow with it rather than scroll a
+     four-line window over a long one. */
+  resize: vertical;
+}
+
+.lexicon-note-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.lexicon-note-tags > span {
+  flex: 0 0 auto;
+}
+
+.lexicon-note-tags > input {
+  flex: 1 1 12rem;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+}
+
+.lexicon-note-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.lexicon-note-save {
+  min-height: 32px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.lexicon-note-save:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.lexicon-note-status {
+  font-size: 0.9em;
+}
+
+.lexicon-note-error {
+  color: var(--danger, #d14343);
+}

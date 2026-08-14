@@ -33,6 +33,7 @@ import { useT } from '../i18n';
 import CharacterMetadataPanel from './lexicon/CharacterMetadataPanel';
 import CharacterMetadataUnavailable from './lexicon/CharacterMetadataUnavailable';
 import ConjugationTable from './lexicon/ConjugationTable';
+import EntryNote from './lexicon/EntryNote';
 import SemanticNeighbors from './lexicon/SemanticNeighbors';
 
 type TFn = (key: string) => string;
@@ -917,6 +918,13 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
 
       {variant !== 'popup' && entries.length > 0 && (
         <SemanticNeighbors query={entries[0].word} lang={lang} />
+      )}
+
+      {/* Anchored on the same matched headword as the expansions above, so a note
+          written after an inflected search belongs to the dictionary form rather
+          than to the form that happened to be typed. */}
+      {variant !== 'popup' && entries.length > 0 && (
+        <EntryNote word={entries[0].word} reading={entries[0].reading ?? ''} lang={lang} />
       )}
 
       {lang === 'ja' && entries.length > 0 && (

@@ -18696,3 +18696,169 @@ NTFS junction:
 The worktree was removed and pruned; the shared tree's foreign dirty state is untouched (`preload.ts`,
 `window.d.ts` and the four catalogs still carry their other-track hunks, which is why this commit staged
 reconstructed HEAD-plus-this-edit blobs for those six files rather than `git add`ing them).
+
+## Track 2 — a note that belongs to the word, not to a dictionary row — 2026-08-14 17:05 MSK primary
+
+Boss-audit state re-derived first: the last two sections of `docs/audit/RELAY_BOSS_AUDIT.md` are
+retry-53 and its resolution note, and all four retry-53 findings are closed (`f61f59c`, `9703c1f`
++ `89791ce`, `9eecb3e`). Nothing outstanding there, so this hop is a normal Track 2 ladder slice.
+
+### Why this slice, re-derived rather than inherited
+
+Track 2's bullet list in `src/MAIN_V1_COMPLETION_PLAN.md:46` ends "…semantic neighbors, etymology,
+register, audio, concordance, **notes**, history, stars, known-word overlays, exports, Flashcards,
+and Anki". Neighbours landed in `04067ad` and conjugation in `2207234`. A read-only probe of the
+live `dictionary/dict.db` settled which of the rest are buildable today: `headwords` 697,837,
+`glosses` 1,333,201, `pitch` 107,978 — but `inflections`, `collocations`, `etymology`, `audio`,
+`examples`, `xrefs`, `chars` and `freq_corpora` are all **0**, and so are `senses.register`,
+`.pos`, `.misc`, `.field`, `.dialect` and `headwords.freq_rank` (`parseTermBank` drops a Yomitan
+term row's tag columns, which `lexiconPartOfSpeech.ts` already records). Every neighbouring item is
+therefore an honestly-empty surface pending an import that does not exist on a default install.
+
+**Notes are the exception, and the only item on that list whose data source is the user.** `stars`
+is already shipped, as `renderer/savedWords.ts` feeding Flashcards. So notes it is.
+
+### The defect the slice found before it wrote a line
+
+`user_notes` has existed since schema v1 and has **zero readers and zero writers** anywhere in
+`src/` — grep returns only `schema.ts` and one test. Its v1 comment says the notes key on "the
+headword's **identity** rather than its row", and the only column it has is `headword_id`, which
+*is* the row. Every re-import runs `delete from dictionaries`, the cascade destroys every headword,
+and the next import hands the same autoincrement ids to different words. A surviving note is
+therefore not merely orphaned: it is eventually readable attached to a word its author never looked
+at. The v1 test `keeps user notes when the dictionary they annotate is removed` asserted the row
+**count**, which is exactly the reassurance that hid this; it now asserts the identity instead.
+
+### The decisions the slice needed, and the options taken
+
+All under the standing auto-approval for reversible choices.
+
+- **Identity = language + written form + reading**, normalised with `normalizeForLookup` — the same
+  NFKC+casefold rule `headwords.norm` is built with, so a note is found by the same string that
+  found the word. `shared/lexiconNotes.ts` and `dictionaryNotes.test.ts` pin the two rules together
+  mechanically rather than by comment. Katakana is deliberately **not** folded to hiragana the way
+  `neighborWordKey` folds it: a neighbour list must not return ネコ as a neighbour of ねこ, but a
+  note is written against the spelling on screen and must not surface under another one.
+- **Schema 6 is additive, not a table rebuild.** Five nullable columns, a backfill from the headword
+  each legacy row still points at, and a **partial** unique index (`WHERE lang IS NOT NULL`) so an
+  already-orphaned row stays in the table and is simply never matched. Nothing is deleted. Two
+  legacy notes that resolve to one word would fail the index, so the older one's `lang` is demoted
+  to null instead — a step that throws strands the whole database on the previous version, which is
+  far worse than a shadowed note. `headword_id` stays (it is `NOT NULL`, and a released step must
+  not be edited); nothing reads it and new rows write 0.
+- **The display forms are stored on the row too.** The whole promise is that a note outlives its
+  dictionary, and once the headword is gone there is nothing else left to ask what the word was.
+- **`user_notes.starred` is left unwritten.** Stars already exist in `savedWords.ts` and feed
+  Flashcards; mirroring them into a second store is how two surfaces end up disagreeing.
+- **Explicit save, no autosave.** An autosave has to decide when someone stopped typing, and getting
+  that wrong truncates a note silently rather than merely annoying them.
+- **Collapsed unless a note exists**, so a result the reader came here to read does not lose 276 px
+  to an empty box. Clearing both fields and saving deletes the note, and the copy says so — "gone"
+  and "stored as an empty string" must not look the same.
+
+### A regression caught by the full suite, and the fix it earned
+
+The first full run went from green to **16 failures** across `characterMetadataUnavailable`,
+`semanticNeighbors` and `dictionaryExampleCredit` — three suites that mount the real
+`DictionaryResults` against a partial `window.api` stub. `EntryNote` is the first expansion to call
+IPC unconditionally (`ConjugationTable` is prefiltered, `SemanticNeighbors` needs a click), so it
+was the first to hit a stub with no such binding. The fix is in the component, not the tests: a
+preload without `dictNoteGet` cannot read a note **or store one**, so the surface stays absent
+rather than offering a box that would swallow what someone typed. The renderer reloads
+independently of main, so that state really occurs.
+
+### Mutation controls
+
+All eight run against the file in place and restored byte-identical afterwards.
+
+| mutation | expected to break | actual |
+|---|---|---|
+| stale-read guard dropped (`attempt !== run.current`) | the slow-read test | 1 failed / 11 passed |
+| `if (!result.ok)` branch removed | the refused-write test | 1 failed / 11 passed |
+| echo the typed text instead of the stored note | the "shows what was stored" test | 1 failed / 11 passed |
+| reading dropped from the note key | the homograph test | 3 failed / 18 passed |
+| `noteIsEmpty` branch removed | the delete test | 1 failed / 20 passed |
+| language dropped from the note key | the ja/zh test | 2 failed / 19 passed |
+| duplicate demotion in migration 6 skipped | the two-legacy-notes test | 1 failed / 20 passed |
+| demotion keeps the older row (`desc` → `asc`) | the same test | 1 failed / 20 passed |
+
+One mutation **survived** and is recorded rather than papered over: dropping
+`WHERE exists (select 1 from headwords …)` from the backfill leaves all 21 tests green. It is not
+an untested guard — the correlated subqueries already yield NULL for a missing headword, so the
+clause is narrowing by construction and no test can distinguish it. A comment now says so, so the
+next reader does not take it for load-bearing.
+
+### Gates
+
+`npx vitest run --testTimeout=60000 --hookTimeout=60000` in this shared tree: **588 passed /
+1 skipped files, 7,741 passed / 6 skipped tests**, exit 0. Per the retry-53 finding-1 lesson this
+is **shared-tree evidence and is not offered as committed-HEAD evidence** — the tree carries several
+hundred foreign dirty paths and the full suite is known red at committed HEAD for reasons other
+tracks own. `node tools/i18n-check.cjs` exit 0 at **9,527** English keys translated in ja/zh/ru
+(9,518 + the nine new ones). `node tools/architecture-audit.cjs` exit 0, 18 known / 2 pending,
+nothing new. `npx eslint` on the touched paths: **0 errors, 0 warnings** on every file this slice
+owns; `preload.ts` and `window.d.ts` were excluded from that number because their only findings are
+the same pre-existing foreign-track ones the last two hops reproduced on their HEAD blobs
+(`subtitleHarvestList` / `subtitleHarvestFetch` adjacency, `no-explicit-any`).
+
+### Live acceptance
+
+Own dev app, `npm start`; bridge pid **30600** on 127.0.0.1:39273. The previous hop's
+`debug/bridge.json` was stale (pid 5156, port refusing). Window `/focus`ed before every measurement.
+
+- **The migration ran against the real database on boot.** `%APPDATA%\jp-study-app\dictionary\dict.db`
+  went from `user_version` 5 to **6**; `user_notes` now carries
+  `headword_id,note,tags,starred,updated_at,lang,text,norm,reading,reading_norm` and the partial
+  `idx_note_identity`. Read-only inspection, with the app holding the file.
+- **Real main handlers, not the preload bindings.** `window.api.dictNoteGet` returned `null` for an
+  un-annotated word; `dictNoteSet` stored one and the follow-up read returned it byte-for-byte,
+  with the duplicate tag `probe` deduplicated. An unregistered channel would have rejected with
+  "No handler registered". The row was then confirmed **on disk** independently of the app's memory.
+- **Identity, live.** 生物/せいぶつ and 生物/なまもの hold two different notes; `zh` 生物 holds a third;
+  `ja` 生物 with no reading is a fourth key and reads `null`. Clearing returned `{ok:true, note:null}`
+  and the follow-up read returned `null`.
+- **Adverse input straight at the handlers**: `null`, `undefined`, `[]`, `'x'`, `5`, `{}`,
+  `{lang}` alone, `{text}` alone, whitespace lang, whitespace text — **all ten refused**
+  (`get` → `null`, `set` → `{ok:false}`), and **nothing threw**. Two were accepted and correctly so:
+  a non-string `reading` coerces to the no-reading identity, and 500-character text/reading truncate
+  to 128 each.
+- **Real Vite-transformed `EntryNote`** mounted off-screen against live IPC. This profile's UI
+  language is **Russian**, so all nine new strings are live-verified. With a note: open, 876×276,
+  textarea carrying the stored text, tags `probe, JLPT N5`, save disabled because nothing changed.
+  Without one (猫): **collapsed**, 876×45.
+- **A full round trip through the UI**: typing `  ねこ is the everyday word  ` plus
+  `animals, N5 , animals`, then clicking Save, produced "Сохранено", a re-disabled button, the
+  **trimmed** text and the **deduplicated** tags echoed back from the database — and the row landed
+  in the real SQLite file.
+- **Reflow**: 900 px → 276 px tall, 640 px → 276 px, 320 px → 310 px as the tags row wraps.
+  **No horizontal overflow at any width** (`scrollWidth > clientWidth + 1` over every descendant).
+  Save button a constant 142×32.
+- **Contrast**, computed from sampled `getComputedStyle` colours against the first non-transparent
+  painted ancestor: summary 14.02:1 at 14 px, textarea 14.02:1 at 14 px, tags label 14.02:1 at
+  14 px, save 14.02:1 at 13.3 px, the muted provenance line 6.08:1 at 12.6 px. All above AA.
+- **An instrumentation artifact, recorded because it nearly produced a false finding.** A prop swap
+  appeared to leave the previous word's note on screen. The cause was two `#jp-note-probe` hosts
+  from an earlier failed mount: `getElementById` returns the first, and the harness was measuring a
+  root nothing was re-rendering. Removing every host and remounting showed the swap working. A
+  related trap: `import('/node_modules/.vite/deps/react.js')` without the `?v=` query Vite actually
+  served loads a **second React copy**, whose hooks fail silently and render nothing at all.
+- All six probe rows were removed **through the app's own `dictNoteSet`**, not by writing SQL at the
+  live database; `user_notes` is back to **0 rows**. `/logs?level=error` returned **0 entries**
+  across every probe. No probe wrote localStorage: it ends at 80 keys with `jp-lookup-history`
+  2,618 chars and `jp-telemetry-consent` still `yes`, matching the previous hop's reading exactly.
+  No persisted setting toggled, no userData backup taken, no input automation. Probe DOM and globals
+  removed; owned pid 30600 and its five children stopped, nothing else.
+
+### Deliberately open, stated rather than absorbed
+
+- **No browse-all-notes surface.** A note is discovered by looking the word up, which is how a
+  dictionary note works, but "show me everything I have annotated" is a separate list surface with
+  its own paging and search and belongs with the plan's `history` item, not smuggled into this one.
+- **`starred` stays a column nothing writes**, for the reason above. Unifying the localStorage star
+  with the database is its own migration, and it would have to decide what happens to a star whose
+  study language was switched.
+- **The refused-write path is covered by unit test, not live.** Making the real main handler fail on
+  a well-formed identity means breaking the database underneath a running app; the two tests that
+  assert "never report a refused or rejected write as saved" are the honest evidence there.
+- **Notes are not exported anywhere yet.** The plan lists `exports` separately, and a note that
+  cannot leave the app is a smaller promise than one that can.

@@ -357,6 +357,13 @@ declare global {
         options?: { sourceLangs?: string[]; glossLangs?: string[] },
       ): Promise<import('../shared/lexiconNeighbors').LexiconNeighborResult>;
       dictConjugation(word: string): Promise<import('../shared/conjugationClass').ConjugationAnalysis>;
+      dictNoteGet(
+        identity: import('../shared/lexiconNotes').LexiconNoteIdentity,
+      ): Promise<import('../shared/lexiconNotes').LexiconNote | null>;
+      dictNoteSet(
+        identity: import('../shared/lexiconNotes').LexiconNoteIdentity,
+        input: import('../shared/lexiconNotes').LexiconNoteInput,
+      ): Promise<{ ok: boolean; note: import('../shared/lexiconNotes').LexiconNote | null }>;
       dictListYomitan(): Promise<YomitanDictInfo[]>;
       dictRemoveYomitan(id: string): Promise<{ ok: boolean; error?: string }>;
       dictSetYomitanEnabled(id: string, enabled: boolean): Promise<{ ok: boolean; error?: string }>;
