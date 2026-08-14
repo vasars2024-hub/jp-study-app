@@ -18896,3 +18896,199 @@ HEAD-plus-this-edit blobs for those six rather than `git add`ing them). One trap
 `preload.ts` at HEAD is **mixed-ending** — CRLF in places, a bare LF on the very line this slice
 inserts after — so the reconstruction reads the EOL off the anchor line, never off the file, and
 asserts the byte delta equals the inserted block before staging.
+
+## Track 2 — a note you can find again without remembering the word — 2026-08-14 18:20 MSK primary
+
+Boss-audit state re-derived first: the last two sections of `docs/audit/RELAY_BOSS_AUDIT.md` are
+retry-53 and its resolution note, and all four retry-53 findings are closed (`f61f59c`, `9703c1f`
++ `89791ce`, `9eecb3e`). Nothing outstanding there, so this hop is a normal Track 2 ladder slice.
+
+### Why this slice, re-derived rather than inherited
+
+The previous hop (`fa6e177`) landed notes and closed with one item stated as deliberately open:
+"**No browse-all-notes surface.** A note is discovered by looking the word up … but 'show me
+everything I have annotated' is a separate list surface … and belongs with the plan's `history`
+item." That is this slice, and it is the smallest coherent next step because it needs no data a
+default install lacks — the previous hop's probe of the live `dict.db` established that
+`inflections`, `collocations`, `etymology`, `audio`, `examples`, `xrefs` and `freq_corpora` are all
+**0 rows**, so every neighbouring bullet on Track 2's list is an honestly-empty surface pending an
+import that does not exist. Notes are the one item whose data source is the user, and half of that
+item was still missing.
+
+The gap was real rather than inferred: `listUserNotes` did not exist, and `readUserNote` — the only
+reader — takes an identity, so nothing in `src/` could answer "which words have notes".
+
+### The decisions the slice needed, and the options taken
+
+All under the standing auto-approval for reversible choices.
+
+- **The filter matches four things, and folds two of them properly.** Written form and reading go
+  through `norm`/`reading_norm`, so the filter folds NFKC and case exactly the way the lookup index
+  does — live-verified with `ＣＡＴ` finding `cat`. Body and tags are matched with `like` on the
+  stored text, which folds ASCII case only. That asymmetry is written into the function's comment
+  rather than left to be discovered: the word and the reading are the filter's primary targets and
+  they are the pair that folds correctly. The alternative — a normalised search column — is
+  migration 7 and a write-path change, not worth it one commit after migration 6.
+- **A user's wildcard is a character.** `%`, `_` and `\` are escaped with an explicit `escape '\'`
+  clause. Without it a note containing `%` is unfindable and a filter of `_` returns everything,
+  which is the worst kind of wrong answer: confident and plausible.
+- **Orphaned rows stay out.** Migration 6 demoted a duplicate legacy note's `lang` to null rather
+  than throwing; those rows have no word to show, so `lang is not null` excludes them for the same
+  reason the partial index skips them. Nothing is deleted.
+- **`readNoteListQuery` clamps, it never refuses.** Unlike `readNoteIdentity`, which returns `null`
+  for a malformed identity because writing under a guessed language would misfile a note, a
+  malformed *read* should show the first page of everything. Nothing is written, so reading across
+  languages cannot misfile anything.
+- **Opening a note uses the note's own language, not the toggle's.** A Chinese note looked up under
+  the Japanese lens finds a different word or none.
+- **Collapsed, and it fetches nothing until opened.** The Workbench's job is the word in the search
+  box. The list also scrolls inside a `max-height` box rather than pushing the entry off screen.
+- **The two surfaces announce to each other.** `LEXICON_NOTES_CHANGED_EVENT` is declared in
+  `shared/lexiconNotes.ts` so neither component owns the other's contract, and it is dispatched
+  only after a write the database confirmed — announcing an attempt would imply the note landed.
+
+### Mutation controls
+
+Seven scored, run against the files in place and restored afterwards; the focused suites were
+re-run green after every restore.
+
+| mutation | expected to break | actual |
+|---|---|---|
+| `lang is not null` → `1 = 1` | the orphaned-row test | 1 failed / 30 passed |
+| `like` wildcard escaping dropped | the literal-wildcard test | 1 failed / 30 passed |
+| `order by updated_at desc` → `asc` | the newest-first tests | 4 failed / 27 passed |
+| stale-read guard dropped (`attempt !== run.current`) | the slow-reply test | 1 failed / 12 passed |
+| `onOpen(note.text, lang)` instead of `note.lang` | the own-language test | 1 failed / 12 passed |
+| empty/no-matches copy collapsed to one string | the two-empty-states test | 1 failed / 12 passed |
+| a failed read reported as `idle` instead of `error` | the failed-read test | 1 failed / 12 passed |
+
+An eighth attempt — hard-coding the page size in `.all()` — did not compile, so it measured nothing
+and is discarded rather than scored as a pass.
+
+### Gates
+
+`npx vitest run --testTimeout=60000 --hookTimeout=60000` in this shared tree: **589 passed /
+1 skipped files, 7,764 passed / 6 skipped tests**, exit 0. Per the retry-53 finding-1 lesson this is
+**shared-tree evidence and is not offered as committed-HEAD evidence**; the committed-HEAD numbers
+are in their own section below. `node tools/i18n-check.cjs` exit 0 at **9,536** English keys
+translated in ja/zh/ru (9,527 + the nine new ones). `node tools/architecture-audit.cjs` exit 0,
+18 known / 2 pending, nothing new. `npx eslint` on the touched paths: **0 errors, 0 warnings** on
+every file this slice owns. `src/main/dictionary.ts` reports 7 `no-explicit-any` warnings — proved
+pre-existing by linting its **HEAD blob** in place, which reports the same 7 at lines
+125/130/158/480/486/500/506 against this tree's 128/133/161/483/489/503/509, i.e. the same findings
+shifted by the three import lines this slice adds. `window.d.ts`'s two
+`adjacent-overload-signatures` errors are the same foreign-track `subtitleHarvestList` /
+`subtitleHarvestFetch` findings the last three hops reproduced.
+
+### Live acceptance
+
+Own dev app, `npm start`; two runs, bridge pids **30376** then **30036** on 127.0.0.1:39273. The
+previous hop's `debug/bridge.json` was stale (pid 30600, port refusing). The Dictionary was driven
+as a real pop-out window (`window.api.popOut('dictionary')`, window id 2), `/focus`ed before every
+measurement. This profile's UI language is **Russian**, so all nine new strings are live-verified.
+
+- **The real main handler, not the preload binding.** `window.api.dictNoteList()` returned
+  `{notes: [], total: 0}`; an unregistered channel would have rejected with "No handler registered".
+- **Eleven list shapes against four real notes** seeded through `dictNoteSet`: all → 4 newest-first;
+  `lang:'ja'` → 3; `lang:'zh'` → 1; `filter:'ねこ'` → the word by its reading; `filter:'ichidan'` →
+  by body; `filter:'science'` → by tag; `filter:'生物'` → both languages' homographs; `limit:2` and
+  `limit:2, offset:2` → the two halves with `total` staying 4; `filter:'%'` and `filter:'_'` → **0**,
+  the wildcards treated as characters.
+- **Fifteen malformed queries straight at the handler** — `null`, `undefined`, `[]`, `'x'`, `5`,
+  `true`, `limit:-1`, `limit:1e9`, `offset:-50`, `limit:'many'`, `lang:999`, `filter:{}`,
+  `lang:'  ZH  '`, a 5,000-character filter, `{limit:NaN, offset:Infinity}`. **All fifteen were
+  clamped and answered; none threw.** `limit:-1` returned exactly 1 row with `total` still 4;
+  `lang:'  ZH  '` trimmed and lowercased to the Chinese note; the long filter truncated to 64 and
+  matched nothing.
+- **The real surface, in the live window.** Collapsed on arrival with **0 rows fetched**, summary
+  "Ваши заметки". Opened: 4 rows with readings (せいぶつ / — / ねこ / たべる), excerpts, tags
+  (science, animals, N5, verbs), Russian dates "14 авг. 2026 г.", foot "Показано 4 из 4".
+- **Filtering and scoping, live.** `science` → 1 row, "Показано 1 из 1". A filter matching nothing
+  → "Ничего не найдено." The scope toggle → 3 ja rows, the `zh` note correctly excluded.
+- **Cross-surface consistency, live.** Typing a note into the entry's own box and clicking Save
+  produced "Сохранено" **and the archive re-read itself**, 4 → 5 rows with the new note on top.
+- **Opening a note's word, live.** Clicking the `zh` row switched the language toggle to 中文, put
+  生物 in the search box and ran the lookup — the description became the CC-CEDICT one.
+- **Geometry**: panel 760×477; the list caps at 352 px client against 451 px of content, so the
+  archive scrolls instead of pushing the entry away. Reflow at 900/640/480/320 px: 477/477/477/506,
+  and **no horizontal overflow at any width** (`scrollWidth > clientWidth + 1` over every descendant).
+- **Contrast**, computed from sampled `getComputedStyle` colours against the first non-transparent
+  painted ancestor: summary 14.02:1 at 14 px, word 14.02:1 at 15.4 px, excerpt 14.02:1 at 13.3 px,
+  scope label 14.02:1 at 14 px, tag 12.21:1 at 11.9 px, filter field 12.21:1 at 14 px, and the three
+  muted lines (reading, date, count) 6.08:1 at 11.9–12.6 px. All above AA.
+- **One measurement changed the code.** The scope checkbox paints at 13×13 and its label measured
+  **135×19** — under a usable hit target. The app was stopped before editing (a src edit under a
+  live harness measures a different build than it ships), `min-height: 32px` added to the label, and
+  the second run re-measured it at **135×32**. That second run also live-verified the first-run
+  empty state, since the probe notes were gone by then: "Вы ещё не написали ни одной заметки…",
+  which is the *other* string from the no-matches one.
+- All five probe notes were removed **through the app's own `dictNoteSet`**, not by writing SQL at
+  the live database; `dictNoteList` then reported `total: 0`. `/logs?level=error` returned
+  **0 entries** across both runs. No persisted setting was toggled, no userData backup taken, no
+  input automation. localStorage ends at **80 keys** with `jp-telemetry-consent` still `yes`,
+  matching the previous hop exactly; `jp-lookup-history` grew 2,618 → 2,836 chars, which is the
+  app's own `recordLookup` firing on the 生物 lookup I performed through the UI — a real user action,
+  not a probe artifact, and recorded here rather than quietly restored. Probe globals deleted; owned
+  pids 30376 and 30036 and their six children each stopped, nothing else.
+
+### Deliberately open, stated rather than absorbed
+
+- **The body and tag filter folds ASCII case only.** A Cyrillic capital typed into the filter finds
+  the word and the reading but not a differently-cased mention inside a note body. Fixing it means a
+  normalised search column, a migration and a write-path change; the asymmetry is documented at the
+  query instead of being left to be discovered.
+- **A note written against a word with no reading is a different key from the same word with one.**
+  Live-observed: my seeded `zh` 生物 with `reading: ''` and the note written from the CC-CEDICT entry
+  (which carries a reading) are two rows. That is the identity rule working — the same rule that
+  keeps 生物/せいぶつ apart from 生物/なまもの — but it means the archive can show what looks like one
+  word twice. Merging them would silently pick one note over the other.
+- **The list is read-only.** Deleting a note is done where it is written, under its entry, so there
+  is exactly one place a note is edited. An inline delete here would be a second one.
+- **No sort control and no tag facet.** Newest-first plus a text filter is the whole surface. Both
+  are cheap to add and neither is needed until someone has enough notes to want them.
+- **Notes are still not exported.** The plan lists `exports` separately and it remains open.
+
+### Committed-HEAD verification, run after the checkpoint commits
+
+Two disposable detached worktrees with `node_modules` supplied by an NTFS junction — one at
+`e3cf9fc`, one at the parent `8cc22a9` to derive the baseline here rather than inherit it.
+
+- The three test files this slice touches pass in isolation at committed HEAD: **3 files /
+  57 tests**, exit 0.
+- `node tools/i18n-check.cjs` exit 0 at **9,365** keys. That is the *committed* count; the 9,536 in
+  the gates section is the shared tree, which carries other tracks' uncommitted catalog keys. Both
+  are green; they are different trees and are not interchangeable.
+- `node tools/architecture-audit.cjs` exit 0, nothing new — the three new modules landed with their
+  importers, so no orphan.
+- Full `npx vitest run --testTimeout=60000 --hookTimeout=60000` at `e3cf9fc`: exit 1, **4 failed /
+  559 passed / 1 skipped files, 9 failed / 7,392 passed / 6 skipped tests** — five
+  `blancAgentStepConfirmGate`, one `localAgentQueueRun`, one `novelReaderProgressGuard`, two
+  `i18n.test.ts` catalog-hygiene. The same four files at the **parent** `8cc22a9` fail with the
+  **identical 9 identities** (9 failed / 43 passed), re-measured rather than quoted, so the set
+  difference introduced by this commit is **empty**. HEAD remains red for reasons other tracks own.
+- Both `i18n.test.ts` failures were checked rather than waved through, since a new component is
+  exactly what they catch. `tools/i18n-hardcoded-check.cjs` at `e3cf9fc` names **no** path from this
+  slice among its 35 sites, and the locale-argument failure names only `Lockscreen.tsx:171-172`. It
+  did prompt a look at my own call: `toLocaleDateString(uiLang)` passed `'zh'` where `LANG_TAGS`
+  says `'zh-Hans'`, fixed in `a615fd8`.
+
+### Two traps this slice hit, recorded so the next hop does not pay for them again
+
+- **`Write` emitted two raw NUL bytes** into `NotesBrowser.tsx` — a template-literal separator in
+  `noteRowKey` — and `git add` staged the file as `Bin 0 -> 6848 bytes`. Every test passed with it
+  in place, so nothing but the `--stat` line would have caught it. The key is now
+  `JSON.stringify([lang, text, reading])`, verified at **0 NUL bytes**. Check `--cached --stat` for
+  `Bin` on every new source file.
+- **A byte-delta assertion counted UTF-16 units, not bytes.** The blob reconstruction asserts the
+  inserted byte count, and `String.length` under-counted every non-ASCII catalog line by 2 per
+  character. It fired on *correct* content and looked like a corrupted reconstruction. Use
+  `Buffer.byteLength(…, 'utf8')`.
+
+The worktrees were removed and pruned. Six of the twelve touched tracked files — `preload.ts`,
+`window.d.ts`, `DictionaryView.tsx` and the four catalogs — carry other tracks' uncommitted hunks
+(`DictionaryView.tsx` is mid-i18n-migration by another track, raw literals → `t()`), so those were
+staged as reconstructed HEAD-plus-this-edit blobs with the EOL read off each anchor line rather than
+off the file. The other six had hunk counts equal to this slice's own edit counts and were staged
+with a plain `git add`. The shared tree's foreign dirty state is untouched.
+
+Commits: `e3cf9fc` (the slice), `a615fd8` (the locale tag).
