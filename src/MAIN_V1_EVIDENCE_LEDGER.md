@@ -20791,3 +20791,57 @@ actually mounted with before scoring it against a hand-made IPC call.**
 - **`xrefs` is still unread**, unchanged by this slice, and the importer header still says so.
 - **The nine long-standing full-suite failures at committed HEAD are untouched** and still belong
   to other tracks.
+
+## Track 2 — the language correction that froze the app, moved off the main thread — 2026-08-15 00:30 MSK backup
+
+Recovery slice, not a fresh one. The 2026-08-14 22:31 turn died on a usage limit at 00:12 with
+six files dirty and nothing committed; the relay handoff had named this as its next slice. Its
+work was re-derived from the diff and finished: `sourceLang.ts`, `importWorker.ts`,
+`dictionaryImportJob.ts`, `dictionarySources.ts` and half of `importIpc.ts` were already
+written. Missing were `importIpc.ts`'s imports, the `dict:setSourceLang` handler still calling
+the synchronous path, the preload/`window.d.ts` return type, the whole renderer side, and every
+test. **Commit `08714f6`.**
+
+**The measurement that forced it.** `setDictionarySourceLang` is 7.2 s for JMdict RU's 101,843
+headwords on the real profile — the two `lang`-keyed headword indexes, not the FTS triggers.
+JMdict EN has 524,106. It ran on the main thread, so a `<select>` that looks instant froze the
+window for up to half a minute.
+
+**Decisions.** (1) `relabel` is a kind on the *existing* import queue, not a new mechanism: it
+writes no rows, but it is the same shape of work — seconds of synchronous SQLite that must not
+sit on the event loop and that two callers must never run at once against one write lock.
+Reusing the queue inherits one-at-a-time, the reload-survivable snapshot and process isolation.
+(2) `invalid-lang` and `not-found` are settled on the main thread; discovering them in the worker
+would cost a process launch for a typo and would report "nothing to relabel" as a job that
+*failed*. (3) A source already carrying the requested language answers `unchanged` and runs
+nothing. (4) No cancel is threaded in — five UPDATEs in one transaction have no row loop to poll
+between, so the only honest check is before the transaction opens. (5) The renderer attaches its
+`onDictImportChanged` listener *before* sending the request and buffers unattributable terminal
+snapshots: a small relabel finishes inside the invoke round trip, and a listener attached
+afterwards waits forever for an event already delivered.
+
+**Trap for the next worker.** Eight of the seventeen files carry other tracks' uncommitted hunks
+(the four i18n catalogs are +700/-560 each). They were committed by reconstructing HEAD+this
+edit and staging that blob; the anchor-matching script asserts a unique match per edit, because a
+silent no-op there commits a half-wired slice. `git show HEAD:<file>` can contain a CRLF
+*somewhere* while the edited region is LF — a blanket line-ending conversion matched zero anchors.
+
+**Live acceptance** (bridge, real install, `debug/bridge.json` pid 500). Refusals, which write
+nothing: `invalid-lang`, `not-found`, and `unchanged: true` — that last field is the discriminator
+proving the new handler is live, since the old one never returned it. Then a **reversible round
+trip** on `bundled-kanjium-pitch`, ja→ko→ja: two jobs, `kind: 'relabel'`, each `running` →
+`committed` with `{headwords: 0, pitch: 107978, frequencies: 0, pairOverrides: 0, characters: 0}`.
+Source list byte-identical before and after (`restored: true`), `/logs?level=error` = 0 entries.
+Note `bundled-kanjium-pitch` reports `entryCount: 0` while owning 107,978 pitch rows — the
+counter tracks headwords only. Not this slice's defect; worth a look.
+
+**Gates.** `npx vitest run --testTimeout=60000 --hookTimeout=60000` — **601 passed / 1 failed / 1
+skipped files, 7,946 passed / 6 skipped tests**, exit 0. The failure is `scraperSources.test.ts`
+dying in *teardown* (`ENOTEMPTY … rmdir …\scraper\logs`), not in an assertion — zero tests failed —
+and it passes 13/13 in isolation. A Windows temp-dir race under full-suite load, in code this
+slice does not touch. Test count is the previous 7,937 plus this slice's 9, exactly.
+`node tools/i18n-check.cjs` — 9,559 keys (9,557 + this slice's 2). `node tools/architecture-audit.cjs`
+— 1,835 modules, 18 findings, nothing new. `npx eslint` on the 13 touched paths — clean apart from
+the two pre-existing `adjacent-overload-signatures` errors in `window.d.ts`, reproduced at the
+committed tree in a detached worktree, which also ran the slice's four suites green (47 tests)
+against the reconstructed blobs alone.
