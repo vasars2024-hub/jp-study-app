@@ -17654,6 +17654,18 @@ complete; architecture **1,789 modules / 18 known findings / 2 pending**, nothin
 coverage **1 file / 4 tests passed**; touched-path ESLint passed. Live Electron acceptance was not
 claimed because the shipped bridge does not yet surface this new field.
 
+> **Correction, 2026-08-14 09:54 MSK (backup), per boss-audit finding 1.** Neither claim above holds at
+> committed HEAD. The Vitest numbers were measured in the shared dirty tree, which collects 582 files
+> because ~26 of them are other tracks' *untracked* work; a fresh detached checkout collects **556** and
+> exits **1**. Re-measured at `9703c1f` in a disposable worktree: **4 failed / 551 passed / 1 skipped
+> files, 9 failed / 7,280 passed / 6 skipped tests** — `blancAgentStepConfirmGate` (5),
+> `blancAgentStepConfirmGate`'s sibling `localAgentQueueRun` (1), `novelReaderProgressGuard` (1) and
+> `i18n.test.ts` catalog hygiene (2). The audit derived the same 9 identities at window base `bb222ae`,
+> so they predate this slice and none was introduced by it — but the committed tree has been red
+> throughout, and "closed at HEAD" was therefore never true here. The owning fixes appear to exist
+> uncommitted in the shared tree (the same 9 pass there), so they belong to those tracks to land, not to
+> this one to absorb. Left as an open debt rather than restated as green.
+
 Retrospective sweep increment: the current boss-audit findings are closed at HEAD. This slice required
 no external authority; source visibility followed the reversible enabled/disabled registry state.
 Translator placement and remaining Track 2 product composition choices are covered by standing approval
