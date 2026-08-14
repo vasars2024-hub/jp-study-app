@@ -37,6 +37,7 @@ import CharacterMetadataUnavailable from './lexicon/CharacterMetadataUnavailable
 import ConjugationTable from './lexicon/ConjugationTable';
 import EntryNote from './lexicon/EntryNote';
 import SemanticNeighbors from './lexicon/SemanticNeighbors';
+import UsageLabels, { entryUsageTags } from './lexicon/UsageLabels';
 import WordKnowledge from './lexicon/WordKnowledge';
 
 type TFn = (key: string) => string;
@@ -916,11 +917,17 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
                 </div>
               )}
               {entry.glossaryHtml ? (
-                <div
-                  className="dict-glossary-html"
-                  lang={lang}
-                  dangerouslySetInnerHTML={{ __html: entry.glossaryHtml }}
-                />
+                <>
+                  {/* A structured glossary arrives as one HTML block with no
+                      sense boundaries left in it, so the labels collapse to the
+                      entry and sit above the block rather than inside it. */}
+                  <UsageLabels tags={entryUsageTags(entry)} />
+                  <div
+                    className="dict-glossary-html"
+                    lang={lang}
+                    dangerouslySetInnerHTML={{ __html: entry.glossaryHtml }}
+                  />
+                </>
               ) : (
                 <ol className="dict-senses">
                   {entry.senses.slice(0, 6).map((s, j) => (
@@ -928,6 +935,7 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
                       {s.partsOfSpeech.length > 0 && (
                         <span className="dict-pos">{s.partsOfSpeech.join(', ')}</span>
                       )}
+                      <UsageLabels tags={s.tags} />
                       {s.definitions.join('; ')}
                     </li>
                   ))}

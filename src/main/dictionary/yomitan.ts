@@ -14,6 +14,7 @@ import { deinflect } from '../../shared/deinflect';
 import { mt } from '../i18n';
 import { initDictionaryService } from './service';
 import { BUNDLED_GLOSS_LANGS, detectLangFromTitle } from './glossLang';
+import { parseTagBankRows, splitSenseTags, splitTagField, type DictTagBank } from '../../shared/dictTagBank';
 
 interface StoredGlossaryEntry {
   word: string;
@@ -42,6 +43,14 @@ interface StoredDictIndex {
   pitch?: Record<string, StoredPitchEntry>;
   /** key = term\x01reading → numeric rank (lower = more common) */
   freq?: Record<string, number>;
+  /**
+   * The dictionary's own `tag_bank_*.json`, kept after the senses are resolved.
+   * Nothing at lookup time reads it — `resolveSenseTags` bakes the readable
+   * labels into the senses at import — but it is the provenance for what those
+   * labels mean, and it is what a later re-resolution would need. Stores written
+   * before tags were imported simply do not have it.
+   */
+  tags?: DictTagBank;
 }
 
 interface RegistryFile {
@@ -444,11 +453,42 @@ function parseTermBank(entries: unknown[], out: StoredDictIndex): void {
     const score = typeof row[4] === 'number' ? row[4] : 0;
     const { senses, glossaryHtml } = definitionsToSenses(row[5]);
     if (!senses.length && !glossaryHtml) continue;
+    // Column 2 is this sense's own tag list. It is parked raw here and resolved
+    // once the whole zip has been read: a tag bank is free to appear after the
+    // term banks in the archive, so classifying now would depend on entry order.
+    // Column 7 (termTags) is deliberately left alone — those are headword-level
+    // priority markers like `P`/`news1`, which are corpus frequency, not register,
+    // and mixing them in would put "common word" among the usage labels.
+    const rawTags = splitTagField(row[2]);
+    if (rawTags.length) for (const sense of senses) sense.tags = rawTags;
     const key = term;
     const list = out.terms[key] ?? [];
     list.push({ word: term, reading, score, senses, glossaryHtml });
     out.terms[key] = list;
     out.info.hasTerms = true;
+  }
+}
+
+/**
+ * Turn the raw tag codes parked on every sense into what the reader sees.
+ *
+ * Run once, after every bank in the archive has been read. A store whose
+ * dictionary shipped no tag bank comes out exactly as it went in — the raw codes
+ * are cleared rather than displayed, because an undescribed `ksb` is not a
+ * usage label, and that also keeps the on-disk index the same size it was.
+ */
+function resolveSenseTags(out: StoredDictIndex): void {
+  if (!out.terms) return;
+  const bank = out.tags ?? {};
+  for (const list of Object.values(out.terms)) {
+    for (const entry of list) {
+      for (const sense of entry.senses) {
+        if (!sense.tags.length) continue;
+        const { partsOfSpeech, usage } = splitSenseTags(sense.tags, bank);
+        sense.partsOfSpeech = partsOfSpeech;
+        sense.tags = usage;
+      }
+    }
   }
 }
 
@@ -539,8 +579,15 @@ function parseYomitanZip(zipPath: string): StoredDictIndex {
     } else if (name.startsWith('term_meta_bank_') && name.endsWith('.json')) {
       const rows = JSON.parse(entry.getData().toString('utf-8')) as unknown[];
       if (Array.isArray(rows)) parseTermMetaBank(rows, stored);
+    } else if (name.startsWith('tag_bank_') && name.endsWith('.json')) {
+      const rows = JSON.parse(entry.getData().toString('utf-8')) as unknown[];
+      if (Array.isArray(rows)) {
+        if (!stored.tags) stored.tags = {};
+        parseTagBankRows(rows, stored.tags);
+      }
     }
   }
+  resolveSenseTags(stored);
 
   if (!stored.info.hasTerms && !stored.info.hasPitch && !stored.info.hasFreq) {
     throw new Error('The archive contains no usable term or metadata banks.');

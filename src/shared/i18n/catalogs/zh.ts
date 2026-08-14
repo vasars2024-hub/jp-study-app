@@ -2054,6 +2054,7 @@ export const zh: Catalog = {
   'dict.results.saveFlashcards': '保存到闪卡',
   'dict.results.savedFlashcards': '已保存到闪卡',
   'dict.results.pitch': '音调',
+  'dict.results.usage': '用法：',
   'dict.results.add': '+ 添加到 Anki',
   'dict.results.added': '已添加',
   'dict.results.alreadyInAnki': '已在 Anki 中',

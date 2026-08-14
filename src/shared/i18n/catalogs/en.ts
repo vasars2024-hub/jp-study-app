@@ -2185,6 +2185,7 @@ export const en: Catalog = {
   'dict.results.saveFlashcards': 'Save to Flashcards',
   'dict.results.savedFlashcards': 'Saved to Flashcards',
   'dict.results.pitch': 'Pitch',
+  'dict.results.usage': 'Usage:',
   'dict.results.add': '+ Add to Anki',
   'dict.results.added': 'Added',
   'dict.results.alreadyInAnki': 'Already in Anki',

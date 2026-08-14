@@ -2063,6 +2063,7 @@ export const ja: Catalog = {
   'dict.results.saveFlashcards': 'フラッシュカードに保存',
   'dict.results.savedFlashcards': 'フラッシュカードに保存済み',
   'dict.results.pitch': 'ピッチ',
+  'dict.results.usage': '用法:',
   'dict.results.add': '+ Anki に追加',
   'dict.results.added': '追加済み',
   'dict.results.alreadyInAnki': 'すでに Anki にあります',

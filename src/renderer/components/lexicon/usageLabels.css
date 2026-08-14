@@ -1,0 +1,30 @@
+/* Usage/register labels on a Lexicon sense.
+
+   Deliberately quieter than the definition it qualifies. These are the
+   dictionary's own annotations — "colloquialism", "honorific or respectful" —
+   and a reader scans them after the meaning, not before it, so they take the
+   same muted 11px register as `.dict-pos` rather than competing with the gloss.
+
+   Not interactive: nothing here is clickable, so there is no hover, no focus
+   ring and no pointer. A chip that looks like a button and does nothing is the
+   dead-control failure the honesty probe exists to catch. */
+
+.dict-usage {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  vertical-align: baseline;
+  margin-inline-end: 6px;
+}
+
+.dict-usage-tag {
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
+  line-height: 1.6;
+  white-space: nowrap;
+}

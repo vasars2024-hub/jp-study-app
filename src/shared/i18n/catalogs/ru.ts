@@ -2211,6 +2211,7 @@ export const ru: Catalog = {
   'dict.results.saveFlashcards': 'Сохранить в карточки',
   'dict.results.savedFlashcards': 'Сохранено в карточки',
   'dict.results.pitch': 'Акцент',
+  'dict.results.usage': 'Употребление:',
   'dict.results.add': '+ Добавить в Anki',
   'dict.results.added': 'Добавлено',
   'dict.results.alreadyInAnki': 'Уже в Anki',
