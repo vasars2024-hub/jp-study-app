@@ -18670,3 +18670,29 @@ every measurement.
   disagree with the first.
 - A rare verb IPADIC does not know is analysed as an unknown 名詞 and gets no table. The fallback is
   silence rather than a suffix guess, which is the same trade `lexiconPartOfSpeech.ts` makes.
+
+### Committed-HEAD verification, run after the checkpoint commit `2207234`
+
+Added because the retry-53 finding-1 lesson is specifically about not letting shared-tree green stand in
+for committed evidence. A disposable detached worktree at exact `2207234`, `node_modules` supplied by an
+NTFS junction:
+
+- The two new test files pass in isolation at committed HEAD: **2 files / 25 tests**, exit 0.
+- `node tools/i18n-check.cjs` exit 0 at **9,347** keys. That is the *committed* count; the 9,518 quoted in
+  the gates section above is the shared tree, which carries other tracks' uncommitted catalog keys. Both
+  are green; they are different trees and are not interchangeable.
+- `node tools/architecture-audit.cjs` exit 0, nothing new.
+- Full `npx vitest run --testTimeout=60000 --hookTimeout=60000` at `2207234`: exit 1, **4 failed / 556
+  passed / 1 skipped files, 9 failed / 7,335 passed / 6 skipped tests** — five `blancAgentStepConfirmGate`,
+  one `localAgentQueueRun`, one `novelReaderProgressGuard`, two `i18n.test.ts` catalog-hygiene. The same
+  four files at the **parent** `04067ad` fail with the **identical 9 identities** (9 failed / 43 passed),
+  so the set difference introduced by this commit is **empty**. HEAD remains red for reasons owned by other
+  tracks, exactly as the retry-53 audit measured at `bb222ae` and `01a9a25`.
+- One of those nine is `i18n.test.ts > does not let a new component render UI text without adopting i18n`,
+  which a new component is exactly the sort of thing to trip, so it was checked rather than waved through:
+  `tools/i18n-hardcoded-check.cjs` names 35 files and **none of them is `ConjugationTable.tsx` or any other
+  lexicon path**. Every string in this slice goes through `t()`.
+
+The worktree was removed and pruned; the shared tree's foreign dirty state is untouched (`preload.ts`,
+`window.d.ts` and the four catalogs still carry their other-track hunks, which is why this commit staged
+reconstructed HEAD-plus-this-edit blobs for those six files rather than `git add`ing them).
