@@ -447,6 +447,12 @@ const api = {
     langs: string[],
   ): Promise<Record<string, Record<string, string | undefined>>> =>
     ipcRenderer.invoke('dict:lookupTermsBatch', queries, langs),
+  /** Words that literally share a gloss with this one, from the unified database. */
+  dictSemanticNeighbors: (
+    text: string,
+    options?: { sourceLangs?: string[]; glossLangs?: string[] },
+  ): Promise<import('./shared/lexiconNeighbors').LexiconNeighborResult> =>
+    ipcRenderer.invoke('dict:semanticNeighbors', text, options),
   /** Find example sentences (JP + EN) for a word or grammar pattern, via Tatoeba. */
   searchExamples: (query: string, limit?: number): Promise<ExampleResult> =>
     ipcRenderer.invoke('examples:search', query, limit),

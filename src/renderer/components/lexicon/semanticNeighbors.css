@@ -1,0 +1,73 @@
+.lexicon-neighbors {
+  margin: 14px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-1);
+  color: var(--text);
+}
+
+.lexicon-neighbors > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.lexicon-neighbors-note,
+.lexicon-neighbors-empty {
+  margin: 8px 0 0;
+  font-size: 0.9em;
+}
+
+.lexicon-neighbors-run {
+  margin-top: 10px;
+  min-height: 32px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.lexicon-neighbors-run:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.lexicon-neighbors-error {
+  margin: 8px 0 0;
+  color: var(--danger, #d14343);
+}
+
+.lexicon-neighbors-list {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lexicon-neighbors-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.lexicon-neighbors-word {
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.lexicon-neighbors-reading,
+.lexicon-neighbors-source {
+  color: var(--muted);
+  font-size: 0.85em;
+}
+
+.lexicon-neighbors-shared {
+  flex: 1 1 12rem;
+}

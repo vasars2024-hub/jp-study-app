@@ -44,13 +44,20 @@ import {
   type WiktextractImportCounts,
   type WiktextractImportOptions,
 } from './importers/wiktextract';
-import { lookup, type LookupQuery, type LookupResult } from './dictService';
+import {
+  findSemanticNeighbors,
+  lookup,
+  type LookupQuery,
+  type LookupResult,
+  type NeighborQuery,
+} from './dictService';
 import {
   lookupChineseTerm,
   resetCedictIndexCache,
   type ChineseLookupDeps,
 } from './chineseLookup';
 import type { DictResult } from '../../shared/types';
+import type { LexiconNeighborResult } from '../../shared/lexiconNeighbors';
 import {
   isGlobalPair,
   pairKey,
@@ -341,6 +348,17 @@ export function importWiktextractFileNow(
  */
 export function lookupInDictionaryDb(query: LookupQuery): LookupResult {
   return lookup(dictionaryDb(), query);
+}
+
+/**
+ * Words sharing a gloss with the queried word, from the managed database.
+ *
+ * Kept a separate read from `lookupInDictionaryDb` on purpose: it costs several
+ * more index probes, and a lookup that a reader did not ask to expand must not
+ * pay for them. The renderer requests it explicitly.
+ */
+export function findSemanticNeighborsInDb(query: NeighborQuery): LexiconNeighborResult {
+  return findSemanticNeighbors(dictionaryDb(), query);
 }
 
 /**

@@ -43,6 +43,7 @@ import {
   lookupInDictionaryDb,
   lookupOfflineInterlinearFromStore,
   resetChineseDictionaryCache,
+  findSemanticNeighborsInDb,
   listDictionarySources,
   listDictionaryPairs,
   dictionaryPairHasOverride,
@@ -57,6 +58,10 @@ import {
   isGlobalPair,
   type DictionaryLanguagePair,
 } from '../shared/dictionarySources';
+import {
+  MAX_NEIGHBOR_RESULTS,
+  type LexiconNeighborResult,
+} from '../shared/lexiconNeighbors';
 import {
   registerDictionaryImportIpc,
   startPendingLegacyDictionaryMigration,
@@ -562,6 +567,20 @@ function readPair(value: unknown): DictionaryLanguagePair | undefined {
   return isGlobalPair(pair) ? undefined : pair;
 }
 
+/** A bounded language-code list off the wire, or undefined for "every language". */
+function readLangList(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const normalized = value
+    .filter((item): item is string => typeof item === 'string')
+    .map((item) => item.trim().toLowerCase().slice(0, 16))
+    .filter(Boolean)
+    .slice(0, 8);
+  return normalized.length ? normalized : undefined;
+}
+
+/** One word, not a passage: anything longer cannot be a headword worth expanding. */
+const MAX_NEIGHBOR_QUERY_CHARS = 64;
+
 export function registerDictionaryIpc(): void {
   ipcMain.handle('dict:lookup', (_e, query: string) => lookupWord(query));
   ipcMain.handle('dict:lookupTerm', (_e, query: string) => lookupTerm(query));
@@ -623,6 +642,30 @@ export function registerDictionaryIpc(): void {
         ? text.slice(0, MAX_OFFLINE_INTERLINEAR_CHARS * 2)
         : '';
       return lookupOfflineInterlinearMerged(boundedText, boundedOptions);
+    },
+  );
+  ipcMain.handle(
+    'dict:semanticNeighbors',
+    (_e, text: unknown, options?: unknown): LexiconNeighborResult => {
+      const raw = options && typeof options === 'object' && !Array.isArray(options)
+        ? options as Record<string, unknown>
+        : {};
+      const query = typeof text === 'string' ? text.trim().slice(0, MAX_NEIGHBOR_QUERY_CHARS) : '';
+      const empty: LexiconNeighborResult = { query, probedSenses: [], neighbors: [] };
+      if (!query) return empty;
+      try {
+        return findSemanticNeighborsInDb({
+          text: query,
+          sourceLangs: readLangList(raw.sourceLangs),
+          glossLangs: readLangList(raw.glossLangs),
+          limit: MAX_NEIGHBOR_RESULTS,
+        });
+      } catch {
+        // The unified database is still optional on an un-migrated installation.
+        // An expansion the reader asked for must degrade to "nothing to show",
+        // never to a rejected invoke the surface has to render as a defect.
+        return empty;
+      }
     },
   );
   ipcMain.handle(

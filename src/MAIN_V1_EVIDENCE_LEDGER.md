@@ -18397,3 +18397,120 @@ A rare ideograph outside KANJIDIC2's ~13k coverage still gets told to import KAN
 to characters KANJIDIC2 actually carries would mean shipping or querying a coverage set, which is a real
 feature, not a wording fix — out of scope for closing this finding and recorded here rather than silently
 absorbed. All four boss-audit findings from retry-53 are now closed.
+
+## Track 2 — grounded semantic neighbours: words that literally share a gloss — 2026-08-14 15:05 MSK backup
+
+Boss-audit state re-derived first: `docs/audit/RELAY_BOSS_AUDIT.md`'s last two sections are retry-53 and
+its resolution note, and all four retry-53 findings are closed (`f61f59c`, `9703c1f` + `89791ce`,
+`9eecb3e`). Nothing there was outstanding, so this hop is a normal Track 2 ladder slice.
+
+### Why this slice, re-derived rather than inherited
+
+Track 2's own bullet list in `src/MAIN_V1_COMPLETION_PLAN.md:42` names "semantic neighbors" between
+collocations and etymology. Grepping the tree for it returns **nothing** — no `semanticNeighbor`, no
+`relatedWords`, no `similarWords`, and no `lexicon.related*` i18n key — while its neighbours in that
+same bullet all exist (`shared/lexiconComposition.ts`, `lexiconConcordance.ts`, `lexiconDifficulty.ts`,
+`lexiconPartOfSpeech.ts`, the character panel, saved searches in `DictionaryView`). The
+`main-v1-phase-track` memory still lists composition checking and personal concordance as open; both
+are on disk and shipped, so that note is stale and this is the first genuinely unbuilt item in the list.
+
+### The decision the slice needed, and the option taken
+
+"Semantic neighbours" has an obvious implementation this track forbids and a boring one it permits.
+No installed source carries a sense embedding, a synonym set, or a thesaurus relation — `xrefs` and
+`collocations` exist in `schema.ts` but **no importer writes either table**. So a similarity score
+would have to be invented or asked of a model, which is exactly what a grounded Workbench refuses.
+
+Taken instead, under the standing auto-approval for reversible product decisions: **shared glosses**.
+The query's own gloss strings become the search terms, run back through `glosses_fts`, and a neighbour
+is a word carrying one of those glosses *word for word*. Every row is justified by text the reader can
+see on both entries, and the surface shows the shared gloss next to each word so the claim is
+checkable rather than asserted. FTS5 phrase matching is only a prefilter here — "to run" also matches
+"to run away" — so a normalized equality test on the gloss is what makes the claim true.
+
+Placement: `shared/lexiconNeighbors.ts` holds the pure selection/ranking half (unit-testable without
+SQLite, and the layer that owns word identity); `dictService.findSemanticNeighbors` holds the SQL.
+The renderer reaches it through a **new** `dict:semanticNeighbors` channel rather than widening the
+lookup payload, because it costs several more index probes and a reader who did not ask to expand a
+lookup must not pay for them. It is anchored on the matched headword (`entries[0].word`), not the raw
+query, so an inflected search still expands the word it found, and it is absent from the pop-up, which
+is a glance surface.
+
+### Two defects found by driving it live, not by reading it
+
+Both were invisible to the tests as first written and are now covered.
+
+1. **The top "neighbour" of 猫 was ネコ.** JMdict carries the katakana spelling as its own headword, so
+   a plain compare against 猫 / ねこ let the query word back in as its own best result. `neighborWordKey`
+   now folds katakana to hiragana for *word* identity only — gloss identity stays strict. The fold is
+   needed in both layers and neither covers the other: the DB layer knows the entry's reading, the pure
+   layer only knows the query string. A homophone test (神 / 紙, both glossed "spirit") pins the other
+   side: identity is the **written** form, so excluding by shared reading would have lost 紙.
+2. **A cold query blocked the main process for 2.4 s.** Measured live at 284 ms–2.4 s cold, 54–78 ms
+   warm. The cause was `order by priority, h.id` on the probe: the priority column comes from a join, so
+   SQLite materialised and sorted *every* match for a gloss as common as "to see" before applying
+   `LIMIT`. Dropping the `ORDER BY` lets it stop after `NEIGHBOR_ROWS_PER_SENSE` rows in FTS docid order
+   — deterministic for a given database — and `rankLexiconNeighbors` applies the priority order
+   afterwards on a list two orders of magnitude smaller. Re-measured after restart: worst case **284 ms**,
+   typical **60–98 ms**. `better-sqlite3` is synchronous, so this was a real violation of the repo's
+   main-event-loop rule and not a micro-optimisation.
+
+### Mutation controls
+
+All three run against the file in place, then restored and asserted byte-identical with `cmp`.
+
+| mutation | expected to break | actual |
+|---|---|---|
+| gloss equality test dropped (FTS phrase match alone decides) | the substring case | 3 failed / 4 passed — 猫背 "stoop like a cat" leaked in |
+| reading arm of the self-exclusion dropped | the query-by-reading case | 1 failed / 6 passed |
+| `neighborWordKey` stops folding kana | both katakana cases | 4 failed / 13 passed across both files |
+
+### Gates
+
+`npx vitest run --testTimeout=60000 --hookTimeout=60000` in this shared tree: **584 passed / 1 skipped
+files, 7,682 passed / 6 skipped tests**, exit 0. Per the retry-53 finding-1 lesson this is
+**shared-tree evidence and is not offered as committed-HEAD evidence** — the tree carries several
+hundred foreign dirty paths. `node tools/i18n-check.cjs` exit 0 at **9,514** English keys translated in
+ja/zh/ru. `node tools/architecture-audit.cjs` exit 0, **1,801 modules**, 18 known / 2 pending, nothing
+new. `npx eslint` on the fifteen touched paths: **no new problems** — the 2 errors
+(`subtitleHarvestList` / `subtitleHarvestFetch` adjacency in `window.d.ts`) and 7 `no-explicit-any`
+warnings in `dictionary.ts` were reproduced on the HEAD blobs of those same files and are pre-existing.
+
+### Live acceptance
+
+Own dev app, restarted three times because a new main-process IPC handler does not survive a renderer
+reload — forge rebuilds `src/main.ts` on save but does **not** restart Electron, so the bridge stays up
+serving the old handler. Final run: bridge pid **102256** on 127.0.0.1:39273, Vite on 5174 (5173 held by
+a foreign listener).
+
+- **Real main handler, not the preload binding.** `window.api.dictSemanticNeighbors('猫', {sourceLangs:['ja']})`
+  returned 6 probed senses and 12 neighbours from `JMdict (Japanese–English)`. An unregistered channel
+  would have rejected with "No handler registered".
+- **Real Vite-transformed `DictionaryResults`** mounted off-screen against live IPC: section present,
+  **0 rows before the click**, 12 after; 900×716 at full width, `rgb(245,244,247)` on `rgb(26,24,35)`;
+  button 136×32 with `cursor: pointer`; reflowed to 320 px with **no horizontal overflow**.
+- **Results are recognisably right**, which is the point of the whole slice: 見る→観る・視る ("to watch"),
+  走る→奔る・疾る ("to run"), 食べる→召し上がる ("to eat"), 水→液・液体 ("liquid"), 本→書物 ("book").
+- **Adverse input, straight at the handler**: empty, whitespace-only, a non-string, and an unknown word
+  all return 0 probes / 0 neighbours; a 4× repeated passage is truncated at 64 chars and finds nothing;
+  a malformed `sourceLangs` of `[null, 5, '  ', 'ja']` and an options value of `[]` are both sanitised
+  and still answer correctly. Nothing threw.
+- `/logs?level=error` returned **0 entries** across every probe. `jp-lookup-history` was captured and
+  restored with a `===` assertion (`restoredExact: true`), localStorage still 17 keys, no persisted
+  setting toggled, no userData backup taken, no input automation.
+
+### Deliberately open, stated rather than absorbed
+
+- **Only Japanese has neighbours on this installation.** Live probes of 狗 (zh), кошка (ru) and
+  `cat` (en) all returned **0 probed senses**, because every installed dictionary is Japanese-source —
+  `dictListPairs()` offers only `ja→en` and `ja→zh`. The code is language-agnostic and the ja→ru gloss
+  filter demonstrably probes the Cyrillic glosses; there is simply no non-Japanese headword to expand.
+  This is an installed-data limit, not a code limit, and it is not claimed as multi-language coverage.
+- **ja→ru finds nothing even though it probes correctly.** The Russian JMdict's glosses are numbered
+  full definitions ("1) кошка, кот"), so word-for-word overlap between two entries is rare. Loosening the
+  equality test to make that direction produce rows would make every direction's claim weaker; leaving
+  the Russian direction honestly empty is the smaller cost.
+- A very common gloss now takes an arbitrary-but-deterministic 200-row window rather than the
+  highest-priority 200 rows. With one dictionary installed the distinction is invisible; with several it
+  could hide a neighbour supplied only by a low-priority source. Fixing that properly means ranking
+  inside SQLite, which needs an index this schema does not have.

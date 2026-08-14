@@ -32,6 +32,7 @@ import { recordLookup } from '../lookupHistory';
 import { useT } from '../i18n';
 import CharacterMetadataPanel from './lexicon/CharacterMetadataPanel';
 import CharacterMetadataUnavailable from './lexicon/CharacterMetadataUnavailable';
+import SemanticNeighbors from './lexicon/SemanticNeighbors';
 
 type TFn = (key: string) => string;
 
@@ -904,6 +905,14 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
           );
         })}
       </div>
+
+      {/* Anchored on the matched headword rather than the raw query, so an
+          inflected search still expands the word it actually found. The popup
+          stays out of it: it is a glance surface, not a place to widen a
+          lookup. */}
+      {variant !== 'popup' && entries.length > 0 && (
+        <SemanticNeighbors query={entries[0].word} lang={lang} />
+      )}
 
       {lang === 'ja' && entries.length > 0 && (
         <div className="dict-examples">

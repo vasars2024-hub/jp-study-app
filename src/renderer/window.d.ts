@@ -352,6 +352,10 @@ declare global {
       onDictImportChanged(
         cb: (snapshot: import('../shared/dictionaryImportJob').DictionaryImportJobSnapshot) => void,
       ): () => void;
+      dictSemanticNeighbors(
+        text: string,
+        options?: { sourceLangs?: string[]; glossLangs?: string[] },
+      ): Promise<import('../shared/lexiconNeighbors').LexiconNeighborResult>;
       dictListYomitan(): Promise<YomitanDictInfo[]>;
       dictRemoveYomitan(id: string): Promise<{ ok: boolean; error?: string }>;
       dictSetYomitanEnabled(id: string, enabled: boolean): Promise<{ ok: boolean; error?: string }>;

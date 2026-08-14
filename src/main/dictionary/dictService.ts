@@ -27,6 +27,15 @@
 
 import { hasCyrillic, hasHan, hasHangul, hasKana, hasLatin } from '../../shared/langs';
 import { deinflect } from '../../shared/deinflect';
+import {
+  MAX_NEIGHBOR_RESULTS,
+  neighborWordKey,
+  normalizeNeighborText,
+  rankLexiconNeighbors,
+  selectNeighborProbeSenses,
+  type LexiconNeighborCandidate,
+  type LexiconNeighborResult,
+} from '../../shared/lexiconNeighbors';
 import { pinyinSearchKey } from '../../shared/pinyin';
 import type { SqliteDb } from './db';
 
@@ -682,6 +691,138 @@ export function lookupCharacter(
     };
   }
   return undefined;
+}
+
+export interface NeighborQuery {
+  text: string;
+  /** Source languages to search headwords in. Detected when omitted. */
+  sourceLangs?: DictLangCode[];
+  /** Gloss languages the shared senses must be written in. All of them when omitted. */
+  glossLangs?: DictLangCode[];
+  limit?: number;
+}
+
+/**
+ * Index rows read per gloss. Bounds a very common gloss such as "to do".
+ *
+ * This is the only thing standing between the main thread and a 700k-headword
+ * posting list, so it is deliberately generous rather than tight — the equality
+ * filter below discards most rows, and the surface shows twelve.
+ */
+const NEIGHBOR_ROWS_PER_SENSE = 200;
+
+/**
+ * Words that literally share a gloss with the queried word.
+ *
+ * This is the plan's "semantic neighbors" bullet built the only way this track
+ * permits: from data the database already contains. It runs the gloss index in
+ * reverse — the query's own glosses become the search terms — so every returned
+ * word is justified by a gloss string the reader can see on both entries. It
+ * never estimates similarity, because no installed source carries a sense
+ * embedding or a synonym set and inventing one is exactly what a grounded
+ * Workbench forbids.
+ *
+ * FTS5 phrase matching is a *prefilter*, not the answer: `"to run"` also matches
+ * the gloss "to run away". The normalized equality test below is what makes the
+ * claim honest, so a neighbour shares the whole sense rather than part of it.
+ *
+ * Cost is bounded by construction: at most `MAX_NEIGHBOR_PROBE_SENSES` index
+ * probes of `NEIGHBOR_ROWS_PER_SENSE` rows each, all against `glosses_fts`.
+ *
+ * The probe query has **no `ORDER BY`**, and that is a measured decision rather
+ * than an omission. `better-sqlite3` is synchronous, so every millisecond here is
+ * a millisecond the main process cannot answer IPC. Ordering by the joined
+ * dictionary priority makes SQLite materialise and sort *every* match for a gloss
+ * as common as "to see" before applying `LIMIT`, which was measured live at 2.4 s
+ * on this machine's 700k-headword database. Without it SQLite stops after
+ * `NEIGHBOR_ROWS_PER_SENSE` rows in FTS docid order — deterministic for a given
+ * database — and `rankLexiconNeighbors` applies the priority order afterwards, on
+ * a list two orders of magnitude smaller.
+ */
+export function findSemanticNeighbors(db: SqliteDb, query: NeighborQuery): LexiconNeighborResult {
+  const text = query.text.trim();
+  const empty: LexiconNeighborResult = { query: text, probedSenses: [], neighbors: [] };
+  if (!text) return empty;
+
+  // Headwords only: a gloss-direction hit would make the *query* a sense of some
+  // other word, and its glosses are then not this word's senses at all.
+  const own = lookup(db, {
+    text,
+    sourceLangs: query.sourceLangs,
+    glossLangs: query.glossLangs,
+    headwordsOnly: true,
+    limit: 8,
+  });
+  const exact = own.entries.filter((entry) => entry.via === 'exact' || entry.via === 'reading');
+  if (!exact.length) return empty;
+
+  const probeLangs = [...new Set(exact.map((entry) => entry.lang))];
+  const glossLangs = query.glossLangs?.length ? [...new Set(query.glossLangs)] : [];
+  const probes = selectNeighborProbeSenses(
+    exact.flatMap((entry) => entry.senses.flatMap((sense) => sense.glosses
+      .filter((gloss) => !glossLangs.length || glossLangs.includes(gloss.lang))
+      .map((gloss) => gloss.text))),
+  );
+  if (!probes.length) return { ...empty, query: text };
+
+  const ownKeys = new Set(exact.flatMap((entry) => [
+    neighborWordKey(entry.text),
+    neighborWordKey(entry.reading),
+  ]));
+  const pair = pairTarget({ text, glossLangs: query.glossLangs });
+  const langSlots = probeLangs.map(() => '?').join(',');
+  const glossLangFilter = glossLangs.length
+    ? ` and g.lang in (${glossLangs.map(() => '?').join(',')})`
+    : '';
+  const statement = db.prepare(`
+    select h.lang, h.text, h.reading, h.dict_id, d.title as dict_title, g.text as gloss,
+           coalesce(pp.priority, d.priority) as priority
+    from glosses_fts
+    join glosses g on g.id = glosses_fts.rowid
+    join senses  s on s.id = g.sense_id
+    join headwords h on h.id = s.headword_id
+    join dictionaries d on d.id = h.dict_id
+    left join dict_pair_priority pp
+      on pp.dict_id = d.id and pp.source_lang = h.lang and pp.target_lang = ?
+    where glosses_fts match ? and d.enabled = 1 and h.lang in (${langSlots})${glossLangFilter}
+    limit ?
+  `);
+
+  const candidates: LexiconNeighborCandidate[] = [];
+  for (const probe of probes) {
+    const probeKey = normalizeNeighborText(probe);
+    const rows = statement.all(
+      pair, ftsQuery(probe), ...probeLangs, ...glossLangs, NEIGHBOR_ROWS_PER_SENSE,
+    ) as Array<{
+      lang: string; text: string; reading: string | null; dict_id: string;
+      dict_title: string; gloss: string; priority: number;
+    }>;
+    for (const row of rows) {
+      if (normalizeNeighborText(row.gloss) !== probeKey) continue;
+      // Kana-folded, so JMdict's separate katakana headword for the same word
+      // (ネコ for 猫/ねこ) is recognised as the query rather than a neighbour.
+      // Only the *written* form is tested: a homophone such as 紙 for 神 is a
+      // different word, and excluding it by shared reading would lose it.
+      if (ownKeys.has(neighborWordKey(row.text))) continue;
+      candidates.push({
+        lang: row.lang,
+        text: row.text,
+        reading: row.reading ?? '',
+        dictId: row.dict_id,
+        dictTitle: row.dict_title,
+        // The reader is shown the query's own casing of the shared sense, so two
+        // dictionaries spelling it "Cat" and "cat" collapse into one label.
+        sense: probe,
+        priority: row.priority,
+      });
+    }
+  }
+
+  return {
+    query: text,
+    probedSenses: probes,
+    neighbors: rankLexiconNeighbors(text, candidates, query.limit ?? MAX_NEIGHBOR_RESULTS),
+  };
 }
 
 function jsonStringArray(value: string): string[] {
