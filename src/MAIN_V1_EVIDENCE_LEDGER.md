@@ -18169,3 +18169,99 @@ is outside a reversible slice and should not be quietly re-derived as an impleme
 ships no kanji source, so `chars` is empty on every install.** Either bundle a KANJIDIC2-derived source
 (licensing + build-asset work, EDRDG CC BY-SA) or offer an in-app fetch. Until then the character panel is
 correct, tested, styled, and unreachable — and at least now it says so.
+
+## Boss-audit finding 2 — 161,514 Russian glosses were labelled English — 2026-08-14 09:55 MSK backup
+
+Not a ladder slice. `docs/audit/RELAY_BOSS_AUDIT.md`'s 2026-08-14 09:29 section (retry-53) raised this as a
+P1 and its handoff ordered it done before any product work. It is live, user-visible data corruption on a
+default install, so it went first.
+
+### Re-derived independently, and two traps on the way to the number
+
+The claim was that `migrateLegacyYomitanStores` writes the bundled Russian JMdict as English. Confirmed
+against a **copy** of the real profile database — `dict.db` **plus `dict.db-wal` and `dict.db-shm`** — never
+the live file, and no userData backup was taken. Read-only pre-snapshot, then the migration, then a second
+snapshot:
+
+| | `bundled-jmdict-ru` `target_langs` | its gloss rows | all `lang='en'` glosses |
+|---|---|---|---|
+| before (`user_version` 4) | `en` | **161,514 at `lang='en'`**, 0 at `ru` | 1,226,962 |
+| after (`user_version` 5) | `ru` | **161,514 at `lang='ru'`**, 0 at `en` | 1,065,448 |
+
+`1,226,962 − 1,065,448 = 161,514` exactly, so the repair moved that dictionary and nothing else. It took
+**1,595 ms**, and `glosses_fts MATCH 'следовать'` still returns **84** rows afterwards, so the FTS triggers
+kept the index consistent through the relabel.
+
+Two ways to measure this wrong, both hit first and recorded so the next run does not repeat them:
+
+1. **Copying `dict.db` without its `-wal`.** The WAL here is 46 MB and holds the *newer* state. The base
+   file alone reports `target_langs='ru'` and 161,514 Cyrillic glosses correctly labelled — the exact
+   opposite conclusion, from a file that looks complete and opens cleanly.
+2. **`openDictionaryDb()` migrates on open.** A "before" snapshot taken through it is a snapshot taken
+   *after* the fix has already run. It reported the repaired state and made the defect look imaginary.
+   `openDictionaryDb({ readonly: true })` is the only way to see what the running app currently has.
+
+Both produced a confident, wrong, "the audit is mistaken" reading before the third attempt agreed with the
+audit exactly.
+
+### Why it happened
+
+Two modules knew different things. `yomitan.ts` held the bundled specs (`bundled-jmdict-ru → ['ru']`) and
+`detectLangFromTitle()`, which resolves "JMdict (Japanese–Russian)" on its own. `migrate.ts` — the module
+that writes the rows every lookup then filters on — had neither, and `glossLangOf` fell straight through to
+`'en'` whenever a legacy `index.json` carried no `glossLangs`. Legacy stores predate that field, so absent
+is the *normal* case. Both correct signals existed; neither was reachable from where the decision was made.
+
+### The change (standing auto-approval, reversible)
+
+New `src/main/dictionary/glossLang.ts` — no Electron import, so the utility-process importer and the
+main-process registry can both use it. It owns `BUNDLED_GLOSS_LANGS`, the title hints, and
+`resolveGlossLangs()`, whose order is override → what the store declares → the bundled id → the title →
+empty. `yomitan.ts` now imports its hints from there instead of holding a second copy, and its bundled
+specs reference the same table, so the registry and the database cannot drift apart again.
+
+Schema step **5** repairs installs that already migrated. It relabels rather than re-imports — the glosses
+themselves were always correct, only their label was wrong — under two deliberate guards: only ids this app
+provisions itself (for anything else the language would be a guess), and only a `target_langs` that is
+*exactly* the silent `'en'` default, so a language chosen by a user or a later import is never overwritten.
+
+Rejected: re-importing the store (throws away user state to fix a label), and inferring the language from
+the gloss script at migration time (that is `yomitan.ts`'s weakest signal and needs the parsed entries).
+
+### Coverage, with the mutation controls
+
+`dictionaryMigrate.test.ts` +9 tests. Two independent mutations, each restored and re-passed:
+
+| Mutation | Result |
+|---|---|
+| bundled-id lookup in `resolveGlossLangs` → always `undefined` | `identifies a bundled dictionary by id alone…` FAILS (`expected 'en' to be 'ru'`), restored PASS |
+| step 5's `target_langs !== 'en'` guard inverted | 3 tests FAIL, including `does not touch a language that was chosen rather than defaulted` (`'de'` overwritten with `'ru'`), restored PASS |
+
+The first mutation initially passed everything. The reason is worth keeping: every RU fixture had *"Russian"*
+in its title, so title detection silently covered for the id route and the new code path had no test of its
+own. The isolating case — id `bundled-jmdict-ru` with the language-free title `JMdict` — was added because
+of that, and it is what the mutation now fails.
+
+### Gates
+
+- `npx vitest run --testTimeout=60000 --hookTimeout=60000` — **582 files collected, 581 passed / 1 skipped;
+  7,658 tests, 7,652 passed / 6 skipped**, exit 0. Against the previous section's 582/7,649: `+9` tests,
+  exactly this slice's, no file dropped out of collection. **This is the shared dirty tree**, not committed
+  HEAD — see the note below, it is not interchangeable evidence.
+- Focused: the 7 dictionary suites (`Migrate`, `Db`, `Sources`, `Lookup`, `ImportJobs`, `ImportWorker`,
+  `Kanjidic`) — 7 files, **151 tests**, exit 0.
+- `node tools/i18n-check.cjs` — exit 0, 9,507 keys (unchanged; no new UI string).
+- `node tools/architecture-audit.cjs` — exit 0, **1,796** modules (`+1`, `glossLang.ts`, landed with both
+  its importers so no orphan), 18 known findings, nothing new.
+- `npx eslint` on all five touched paths — exit 0. Two pre-existing non-null-assertion warnings in
+  `yomitan.ts` at lines 600 and 867, neither in a line this slice touched.
+- `tsc --noEmit` is not a gate here; checked anyway that no error names any touched file.
+
+### Still open, deliberately
+
+The audit's **finding 1** (a `036d563` ledger claim of full-suite green that does not hold at committed
+HEAD) is untouched by this slice and remains open. The four failing files it names —
+`blancAgentStepConfirmGate`, `localAgentQueueRun`, `novelReaderProgressGuard`, `i18n.test.ts` — are green in
+this shared tree and belong to other tracks' uncommitted work, so this run could not honestly close it by
+running the suite here. Findings 3 and 4 (the kana/digit wording of `CharacterMetadataUnavailable`, and a
+surrogate-pair case) are small and still ride with the next lexicon slice.

@@ -16,7 +16,7 @@ vi.mock('electron', () => ({
   app: { getPath: () => tempRoot },
 }));
 
-import { openDictionaryDb, type SqliteDb } from '../dictionary/db';
+import { migrateDictionaryDb, openDictionaryDb, type SqliteDb } from '../dictionary/db';
 import {
   LEGACY_KEY_SEP,
   glossLangOf,
@@ -257,6 +257,49 @@ describe('gloss language', () => {
     expect(glossLangOf({ ...fixture().info, glossLangs: undefined })).toBe('en');
   });
 
+  // The legacy `index.json` format predates `glossLangs`, so "nothing is known"
+  // is the *common* case for a store that has been on disk a while — and it used
+  // to mean every Cyrillic gloss of the bundled Russian JMdict was written as
+  // English, served inside English results and unreachable as Russian.
+  const legacyRu = (overrides: Partial<LegacyDictIndex['info']> = {}): LegacyDictIndex => ({
+    version: 1,
+    info: {
+      ...fixture().info,
+      id: 'bundled-jmdict-ru',
+      title: 'JMdict (Japanese–Russian)',
+      glossLangs: undefined,
+      ...overrides,
+    },
+    terms: { 食べる: [entry('食べる', 'たべる', ['есть', 'кушать'])] },
+  });
+
+  it('identifies a bundled dictionary by its id when the store declares nothing', () => {
+    expect(glossLangOf(legacyRu().info)).toBe('ru');
+  });
+
+  // Titles are user-editable and the legacy stores were written before the
+  // current naming, so the id has to carry this on its own — with a title that
+  // names no language, the id is the only evidence left.
+  it('identifies a bundled dictionary by id alone, with no help from its title', () => {
+    expect(glossLangOf(legacyRu({ title: 'JMdict' }).info)).toBe('ru');
+  });
+
+  it('reads the language out of the title for a dictionary it did not provision', () => {
+    expect(glossLangOf(legacyRu({ id: 'user-import-1706' }).info)).toBe('ru');
+  });
+
+  it('still lets the store speak for itself when it does declare a language', () => {
+    expect(glossLangOf(legacyRu({ glossLangs: ['de'] }).info)).toBe('de');
+  });
+
+  it('writes a legacy bundled RU store as Russian, in the rows and in target_langs', () => {
+    importLegacyIndex(db, legacyRu());
+    expect(db.prepare('select distinct lang from glosses').all()).toEqual([{ lang: 'ru' }]);
+    expect(db.prepare('select target_langs from dictionaries where id = ?').get('bundled-jmdict-ru')).toEqual({
+      target_langs: 'ru',
+    });
+  });
+
   it('writes glosses under the dictionary language, so a RU dict is queryable as RU', () => {
     importLegacyIndex(
       db,
@@ -400,5 +443,71 @@ describe('scanning userData/yomitan', () => {
     const result = migrateLegacyYomitanStores(db, root, undefined, () => false);
     expect(result.cancelled).toBeUndefined();
     expect(result.imported.map((row) => row.dictId)).toEqual(['jmdict-en']);
+  });
+});
+
+// Fixing the resolution only helps a machine that has not migrated yet. Every
+// install that already ran the old path holds the mislabelled rows, so schema
+// step 5 relabels them in place — the glosses themselves were never wrong.
+describe('schema 5 — repairing an install that already migrated under the wrong language', () => {
+  /** The exact broken shape the old resolution produced: Cyrillic under `en`. */
+  function importAsEnglish(langs: string[] = ['en']): void {
+    importLegacyIndex(db, {
+      version: 1,
+      info: {
+        ...fixture().info,
+        id: 'bundled-jmdict-ru',
+        title: 'JMdict (Japanese–Russian)',
+        glossLangs: langs,
+      },
+      terms: { 食べる: [entry('食べる', 'たべる', ['есть', 'кушать'])] },
+    });
+    db.pragma('user_version = 4');
+  }
+
+  it('relabels the glosses and target_langs of a bundled store written as English', () => {
+    importAsEnglish();
+    expect(db.prepare('select distinct lang from glosses').all()).toEqual([{ lang: 'en' }]);
+
+    migrateDictionaryDb(db);
+
+    expect(db.prepare('select distinct lang from glosses').all()).toEqual([{ lang: 'ru' }]);
+    expect(db.prepare('select target_langs from dictionaries where id = ?').get('bundled-jmdict-ru')).toEqual({
+      target_langs: 'ru',
+    });
+  });
+
+  it('leaves the full-text index able to find the relabelled glosses', () => {
+    importAsEnglish();
+    migrateDictionaryDb(db);
+    expect(db.prepare("select count(*) c from glosses_fts where glosses_fts match 'есть'").get()).toEqual({ c: 1 });
+  });
+
+  it('does not touch a language that was chosen rather than defaulted', () => {
+    importAsEnglish(['de']);
+    migrateDictionaryDb(db);
+    expect(db.prepare('select target_langs from dictionaries where id = ?').get('bundled-jmdict-ru')).toEqual({
+      target_langs: 'de',
+    });
+    expect(db.prepare('select distinct lang from glosses').all()).toEqual([{ lang: 'de' }]);
+  });
+
+  it('leaves glosses belonging to another dictionary alone', () => {
+    importLegacyIndex(db, fixture());
+    importAsEnglish();
+    migrateDictionaryDb(db);
+    const byDict = db
+      .prepare(`
+        select headwords.dict_id id, group_concat(distinct glosses.lang) langs
+        from glosses
+        join senses on senses.id = glosses.sense_id
+        join headwords on headwords.id = senses.headword_id
+        group by headwords.dict_id order by headwords.dict_id
+      `)
+      .all();
+    expect(byDict).toEqual([
+      { id: 'bundled-jmdict-ru', langs: 'ru' },
+      { id: 'jmdict-en', langs: 'en' },
+    ]);
   });
 });

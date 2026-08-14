@@ -13,6 +13,7 @@ import type { DeinflectionInfo, DictEntry, DictResult, DictSense, YomitanDictInf
 import { deinflect } from '../../shared/deinflect';
 import { mt } from '../i18n';
 import { initDictionaryService } from './service';
+import { BUNDLED_GLOSS_LANGS, detectLangFromTitle } from './glossLang';
 
 interface StoredGlossaryEntry {
   word: string;
@@ -71,8 +72,10 @@ interface BundledTermDictSpec {
   url: string;
   /** Lower priority value wins glossary ties (registry order). */
   priority: number;
-  /** Known gloss languages — bundled dicts skip detection. */
-  glossLangs?: string[];
+  /** Known gloss languages — bundled dicts skip detection. Shared with the
+   *  database migration through `./glossLang`, so a store that reaches the
+   *  database without its own metadata still lands under the right language. */
+  glossLangs?: readonly string[];
 }
 
 const BUNDLED_TERM_DICTS: readonly BundledTermDictSpec[] = [
@@ -81,21 +84,21 @@ const BUNDLED_TERM_DICTS: readonly BundledTermDictSpec[] = [
     title: 'JMdict (Japanese–English)',
     url: 'https://github.com/yomidevs/jmdict-yomitan/releases/latest/download/JMdict_english.zip',
     priority: 0,
-    glossLangs: ['en'],
+    glossLangs: BUNDLED_GLOSS_LANGS['bundled-jmdict-en'],
   },
   {
     id: 'bundled-jmdict-ru',
     title: 'JMdict (Japanese–Russian)',
     url: 'https://github.com/yomidevs/jmdict-yomitan/releases/latest/download/JMdict_russian.zip',
     priority: 1,
-    glossLangs: ['ru'],
+    glossLangs: BUNDLED_GLOSS_LANGS['bundled-jmdict-ru'],
   },
   {
     id: 'bundled-moedict-zh',
     title: 'Moedict (Chinese monolingual)',
     url: 'https://github.com/username-011/moe-dict-yomitan/releases/latest/download/moe-concised-pinyin.zip',
     priority: 2,
-    glossLangs: ['zh'],
+    glossLangs: BUNDLED_GLOSS_LANGS['bundled-moedict-zh'],
   },
 ];
 
@@ -105,33 +108,12 @@ const BUNDLED_TERM_DICTS: readonly BundledTermDictSpec[] = [
 // ({expression:ru} needs a ru dictionary). Detection order: manual override →
 // index.json metadata → title keywords → gloss script sampling.
 
-const TITLE_LANG_HINTS: ReadonlyArray<{ re: RegExp; lang: string }> = [
-  { re: /russian|русск|ロシア/i, lang: 'ru' },
-  { re: /german|deutsch|ドイツ/i, lang: 'de' },
-  { re: /french|français|francais|フランス/i, lang: 'fr' },
-  { re: /spanish|español|espanol|スペイン/i, lang: 'es' },
-  { re: /italian|italiano/i, lang: 'it' },
-  { re: /portuguese|português/i, lang: 'pt' },
-  { re: /dutch|nederlands/i, lang: 'nl' },
-  { re: /korean|한국|韓国/i, lang: 'ko' },
-  { re: /chinese|中文|汉语|漢語|中国語/i, lang: 'zh' },
-  { re: /english|英語/i, lang: 'en' },
-  { re: /国語|monolingual|大辞|辞林|jmdict.*japanese.*japanese/i, lang: 'ja' },
-];
-
 function detectLangFromIndexMeta(meta: Record<string, unknown>): string | undefined {
   const candidates = [meta.targetLanguage, meta.isoLanguage, meta.language];
   for (const c of candidates) {
     if (typeof c === 'string' && /^[a-z]{2}/i.test(c.trim())) {
       return c.trim().slice(0, 2).toLowerCase();
     }
-  }
-  return undefined;
-}
-
-function detectLangFromTitle(title: string): string | undefined {
-  for (const hint of TITLE_LANG_HINTS) {
-    if (hint.re.test(title)) return hint.lang;
   }
   return undefined;
 }
@@ -670,7 +652,7 @@ async function ensureBundledTermDict(spec: BundledTermDictSpec): Promise<boolean
     stored.info.title = spec.title;
     stored.info.bundled = true;
     stored.info.priority = spec.priority;
-    if (spec.glossLangs) stored.info.glossLangs = spec.glossLangs;
+    if (spec.glossLangs) stored.info.glossLangs = [...spec.glossLangs];
     // Store compact: plain senses are enough for definitions, and dropping the
     // duplicated glossary HTML cuts the on-disk index and per-boot parse cost
     // (JMdict: ~110MB→~65MB, ~1.4s→~0.9s parse) with no loss of meaning text.

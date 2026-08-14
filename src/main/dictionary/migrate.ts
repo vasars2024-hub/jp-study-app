@@ -21,6 +21,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { DictSense, YomitanDictInfo } from '../../shared/types';
 import type { SqliteDb } from './db';
+import { resolveGlossLangs } from './glossLang';
 
 /**
  * Separator between term and reading in the legacy pitch/freq key format.
@@ -112,12 +113,25 @@ const BUNDLED_LEGACY_PROVENANCE: Readonly<Record<string, LegacySourceProvenance>
   },
 };
 
-/** The gloss language a dictionary's definitions are written in. */
+/**
+ * Every gloss language a dictionary's definitions are written in, best evidence
+ * first. Legacy stores predate `glossLangs`, so an empty list here is common and
+ * is precisely where the language used to be lost — see `./glossLang`.
+ */
+export function glossLangsOf(info: YomitanDictInfo): string[] {
+  return resolveGlossLangs(info);
+}
+
+/**
+ * The single language every gloss row of a dictionary is stored under.
+ *
+ * `'en'` is the last-resort default rather than a guess: an unknown language has
+ * to be written as *something*, and English is what the rest of the app assumes
+ * when a source declares nothing. It is only reached once the id and the title
+ * have both failed to identify the dictionary.
+ */
 export function glossLangOf(info: YomitanDictInfo): string {
-  const override = info.glossLangOverride?.trim();
-  if (override) return override;
-  const detected = info.glossLangs?.find((lang) => typeof lang === 'string' && lang.trim());
-  return detected?.trim() || 'en';
+  return glossLangsOf(info)[0] ?? 'en';
 }
 
 /**
@@ -190,7 +204,8 @@ export function importLegacyIndex(
 ): ImportedCounts {
   const info = index.info;
   const dictId = info.id;
-  const glossLang = glossLangOf(info);
+  const glossLangs = glossLangsOf(info);
+  const glossLang = glossLangs[0] ?? 'en';
   const provenance = BUNDLED_LEGACY_PROVENANCE[dictId];
   const counts: ImportedCounts = { dictId, headwords: 0, senses: 0, glosses: 0, pitch: 0, freq: 0 };
 
@@ -204,7 +219,9 @@ export function importLegacyIndex(
       dictId,
       info.title,
       info.revision ?? '',
-      (info.glossLangs ?? [glossLang]).join(','),
+      // The same resolution the gloss rows use, so `target_langs` can never
+      // advertise a language the glosses were not written under.
+      (glossLangs.length ? glossLangs : [glossLang]).join(','),
       info.priority ?? 0,
       info.enabled === false ? 0 : 1,
       info.hasTerms ? 'term' : info.hasPitch ? 'pitch' : 'freq',

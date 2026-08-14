@@ -26,9 +26,10 @@
 // again on any machine that already applied it.
 
 import type { SqliteDb } from './db';
+import { BUNDLED_GLOSS_LANGS } from './glossLang';
 
 /** Bumped by appending to MIGRATIONS. Never edit a released step. */
-export const DICT_SCHEMA_VERSION = 4;
+export const DICT_SCHEMA_VERSION = 5;
 
 export interface MigrationStep {
   version: number;
@@ -378,6 +379,50 @@ export const MIGRATIONS: MigrationStep[] = [
         );
         CREATE INDEX idx_pair_priority ON dict_pair_priority(source_lang, target_lang, priority);
       `);
+    },
+  },
+  {
+    version: 5,
+    name: 'repair bundled dictionaries migrated under the wrong gloss language',
+    up(db) {
+      // Legacy `index.json` stores predate `glossLangs`, and the migration used to
+      // fall straight through to `'en'` when the field was absent. On a default
+      // install that wrote the Russian JMdict's ~161k Cyrillic glosses as English:
+      // they surfaced inside English-scoped results, and asking for Russian
+      // returned nothing at all, so ja→ru was unreachable however it was requested.
+      //
+      // The data is intact — only its label is wrong — so this relabels rather than
+      // re-imports. Two guards keep it from touching anything it should not:
+      //
+      //   * only ids this app provisions itself are considered, because only for
+      //     those is the true language known rather than guessed;
+      //   * only `target_langs` that is *exactly* the silent `'en'` default is
+      //     rewritten, so a language a user or a later import chose deliberately
+      //     is left alone.
+      //
+      // The gloss UPDATE fires the FTS synchronisation triggers once per row. That
+      // is real work on a large store, and it is correct work: the trigger retracts
+      // and re-adds the same text, leaving the index consistent. It happens once,
+      // inside this step's transaction, and never again.
+      const readCurrent = db.prepare('select target_langs from dictionaries where id = ?');
+      const setTargets = db.prepare('update dictionaries set target_langs = ? where id = ?');
+      const relabelGlosses = db.prepare(`
+        update glosses set lang = ?
+        where lang = ? and sense_id in (
+          select senses.id from senses
+          join headwords on headwords.id = senses.headword_id
+          where headwords.dict_id = ?
+        )
+      `);
+
+      for (const [dictId, langs] of Object.entries(BUNDLED_GLOSS_LANGS)) {
+        const expected = langs.join(',');
+        if (!expected || expected === 'en') continue;
+        const row = readCurrent.get(dictId) as { target_langs?: string } | undefined;
+        if (!row || (row.target_langs ?? '').trim() !== 'en') continue;
+        setTargets.run(expected, dictId);
+        relabelGlosses.run(langs[0], 'en', dictId);
+      }
     },
   },
 ];
