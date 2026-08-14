@@ -89,23 +89,36 @@ export function lookupResultToDictResult(result: LookupResult): DictResult {
   };
 }
 
-/** Restore legacy pitch/frequency fields until the unified lookup exposes them. */
+/**
+ * Restore legacy pitch/frequency fields until the unified lookup exposes them.
+ *
+ * The frequency resolver may answer with a bare rank or with a rank that knows
+ * which dictionary produced it. Both shapes are accepted because the callers
+ * migrated at different times, and a bare number stays legal: it is the honest
+ * representation of a rank with no attributable source.
+ */
 export function enrichLexiconResultMetadata(
   result: DictResult,
   metadata: {
     pitchHtml: (word: string, reading: string) => string;
-    frequency: (word: string, reading: string) => number | undefined;
+    frequency: (
+      word: string,
+      reading: string,
+    ) => number | { rank: number; source?: string } | undefined;
   },
 ): DictResult {
   return {
     ...result,
     entries: result.entries.map((entry) => {
       const pitchHtml = metadata.pitchHtml(entry.word, entry.reading);
-      const frequency = metadata.frequency(entry.word, entry.reading);
+      const freq = metadata.frequency(entry.word, entry.reading);
+      const rank = typeof freq === 'number' ? freq : freq?.rank;
+      const source = typeof freq === 'number' ? undefined : freq?.source;
       return {
         ...entry,
         ...(pitchHtml ? { pitchHtml } : {}),
-        ...(frequency !== undefined ? { frequency } : {}),
+        ...(rank !== undefined ? { frequency: rank } : {}),
+        ...(source ? { frequencySource: source } : {}),
       };
     }),
   };

@@ -61,7 +61,16 @@ interface RegistryFile {
 
 const glossaryByTerm = new Map<string, StoredGlossaryEntry[]>();
 const pitchByKey = new Map<string, StoredPitchEntry>();
-const freqByKey = new Map<string, number>();
+/**
+ * Merged corpus ranks, each remembering which dictionary produced it.
+ *
+ * The rank alone was ambiguous in a way the user could not see: several
+ * frequency banks may cover the same word, the lowest number wins the merge
+ * below, and the banks are not all in the same language. Keeping the winning
+ * dictionary's title alongside the number is what lets a surface say where the
+ * rank came from instead of printing a bare `#81`.
+ */
+const freqByKey = new Map<string, { rank: number; source: string }>();
 let dictList: YomitanDictInfo[] = [];
 let initPromise: Promise<void> | null = null;
 
@@ -409,7 +418,7 @@ function mergeStoredIndex(stored: StoredDictIndex, sourceTitle: string, sourceLa
   if (stored.freq) {
     for (const [key, rank] of Object.entries(stored.freq)) {
       const prev = freqByKey.get(key);
-      if (prev === undefined || rank < prev) freqByKey.set(key, rank);
+      if (prev === undefined || rank < prev.rank) freqByKey.set(key, { rank, source: sourceTitle });
     }
   }
 }
@@ -769,15 +778,29 @@ export function getPitch(term: string, reading?: string): string {
   return '';
 }
 
-export function getFrequencyRank(term: string, reading?: string): number | undefined {
+/**
+ * The corpus rank *and* the dictionary that supplied it.
+ *
+ * A rank with no dictionary to attribute it to is not returned: an unnamed
+ * number is the shape this slice exists to remove, and every rank in the index
+ * has a title by construction.
+ */
+export function getFrequencyDetail(
+  term: string,
+  reading?: string,
+): { rank: number; source: string } | undefined {
   const t = normalizeQuery(term);
   const r = normalizeQuery(reading ?? term);
   const tryKeys = [metaKey(t, r), metaKey(t, t), metaKey(r, r)];
   for (const key of tryKeys) {
-    const rank = freqByKey.get(key);
-    if (rank !== undefined) return rank;
+    const hit = freqByKey.get(key);
+    if (hit !== undefined && hit.source) return { ...hit };
   }
   return undefined;
+}
+
+export function getFrequencyRank(term: string, reading?: string): number | undefined {
+  return getFrequencyDetail(term, reading)?.rank;
 }
 
 export function getFrequency(term: string, reading?: string): string {
@@ -787,8 +810,7 @@ export function getFrequency(term: string, reading?: string): string {
 
 function enrichEntry(entry: StoredGlossaryEntry): DictEntry {
   const pitchHtml = getPitch(entry.word, entry.reading);
-  const freqStr = getFrequency(entry.word, entry.reading);
-  const frequency = freqStr ? Number(freqStr) : undefined;
+  const freq = getFrequencyDetail(entry.word, entry.reading);
   return {
     word: entry.word,
     reading: entry.reading,
@@ -796,7 +818,8 @@ function enrichEntry(entry: StoredGlossaryEntry): DictEntry {
     jlpt: [],
     senses: entry.senses,
     pitchHtml: pitchHtml || undefined,
-    frequency: Number.isFinite(frequency) ? frequency : undefined,
+    frequency: freq?.rank,
+    ...(freq ? { frequencySource: freq.source } : {}),
     glossaryHtml: entry.glossaryHtml,
     source: entry.source,
     sourceLangs: entry.langs,
@@ -887,12 +910,12 @@ export async function lookupTermMerged(
 
   const enriched = jisho.entries.map((e) => {
     const pitchHtml = getPitch(e.word, e.reading);
-    const freqStr = getFrequency(e.word, e.reading);
-    const frequency = freqStr ? Number(freqStr) : undefined;
+    const freq = getFrequencyDetail(e.word, e.reading);
     return {
       ...e,
       pitchHtml: pitchHtml || undefined,
-      frequency: Number.isFinite(frequency) ? frequency : undefined,
+      frequency: freq?.rank,
+      ...(freq ? { frequencySource: freq.source } : {}),
     };
   });
   return { ...jisho, entries: enriched };

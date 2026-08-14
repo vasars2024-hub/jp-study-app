@@ -37,6 +37,16 @@ export interface DictEntry {
   pitchHtml?: string;
   /** Corpus frequency rank — lower is more common (Phase D). */
   frequency?: number;
+  /**
+   * Title of the frequency dictionary `frequency` came from.
+   *
+   * Several installed banks can rank the same word and the lowest number wins
+   * the merge, so the rank on its own does not say who counted. Absent on
+   * entries produced before this field existed, and on any rank the merge
+   * cannot attribute — a surface must then present the number unattributed
+   * rather than name a source it does not have.
+   */
+  frequencySource?: string;
   /** Structured glossary HTML from a Yomitan term bank (Phase D). */
   glossaryHtml?: string;
   /** Title of the dictionary this entry's glossary came from. */

@@ -2207,6 +2207,7 @@ export const ru: Catalog = {
   'dict.results.approximate': 'Точного совпадения для «{query}» нет. Показаны близкие написания.',
   'dict.results.common': 'частое',
   'dict.results.freqTitle': 'Ранг частоты в корпусе',
+  'dict.results.freqTitleSourced': 'Ранг частоты в корпусе, источник: {source}',
   'dict.results.copyClipboard': 'Копировать в историю буфера',
   'dict.results.saveFlashcards': 'Сохранить в карточки',
   'dict.results.savedFlashcards': 'Сохранено в карточки',

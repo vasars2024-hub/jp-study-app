@@ -2059,6 +2059,7 @@ export const ja: Catalog = {
   'dict.results.approximate': '「{query}」に完全一致はありません。表記の近い候補を表示します。',
   'dict.results.common': '常用',
   'dict.results.freqTitle': 'コーパス頻度ランク',
+  'dict.results.freqTitleSourced': 'コーパス頻度ランク（出典: {source}）',
   'dict.results.copyClipboard': 'クリップボード履歴にコピー',
   'dict.results.saveFlashcards': 'フラッシュカードに保存',
   'dict.results.savedFlashcards': 'フラッシュカードに保存済み',

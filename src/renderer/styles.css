@@ -4727,6 +4727,23 @@ h1 {
   background: rgba(160, 120, 200, 0.2);
   color: #c9b0e8;
 }
+/* The list that produced the rank. Truncated rather than dropped: a long list
+   title must not push the entry head's controls off the row, but the number
+   must never appear without saying who counted. */
+.dict-freq-source {
+  margin-left: 5px;
+  padding-left: 5px;
+  border-left: 1px solid rgba(201, 176, 232, 0.4);
+  max-width: 14ch;
+  display: inline-block;
+  vertical-align: bottom;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-transform: none;
+  letter-spacing: 0;
+  opacity: 0.85;
+}
 .dict-badge.bundled {
   margin-left: 8px;
   background: rgba(120, 180, 120, 0.2);

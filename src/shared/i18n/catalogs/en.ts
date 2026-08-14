@@ -2181,6 +2181,7 @@ export const en: Catalog = {
   'dict.results.approximate': 'No exact match for “{query}”. Showing close spellings.',
   'dict.results.common': 'common',
   'dict.results.freqTitle': 'Corpus frequency rank',
+  'dict.results.freqTitleSourced': 'Corpus frequency rank, from {source}',
   'dict.results.copyClipboard': 'Copy to clipboard history',
   'dict.results.saveFlashcards': 'Save to Flashcards',
   'dict.results.savedFlashcards': 'Saved to Flashcards',

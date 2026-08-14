@@ -881,8 +881,18 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
                 )}
                 {entry.jlpt[0] && <span className="dict-badge jlpt">{entry.jlpt[0]}</span>}
                 {entry.frequency != null && (
-                  <span className="dict-badge freq" title={t('dict.results.freqTitle')}>
+                  <span
+                    className="dict-badge freq"
+                    title={
+                      entry.frequencySource
+                        ? t('dict.results.freqTitleSourced', { source: entry.frequencySource })
+                        : t('dict.results.freqTitle')
+                    }
+                  >
                     #{entry.frequency}
+                    {entry.frequencySource && (
+                      <span className="dict-freq-source">{entry.frequencySource}</span>
+                    )}
                   </span>
                 )}
                 <button

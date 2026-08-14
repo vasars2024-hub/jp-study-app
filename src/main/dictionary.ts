@@ -14,7 +14,7 @@ import {
   fetchJapaneseAudio,
   getAvailableGlossLangs,
   getDictRegistryHash,
-  getFrequencyRank,
+  getFrequencyDetail,
   getPitch,
   importYomitanZip,
   initYomitan,
@@ -194,7 +194,7 @@ export async function lookupTerm(query: string): Promise<DictResult> {
         await initYomitan();
         return enrichLexiconResultMetadata(converted, {
           pitchHtml: getPitch,
-          frequency: getFrequencyRank,
+          frequency: getFrequencyDetail,
         });
       } catch {
         return converted;

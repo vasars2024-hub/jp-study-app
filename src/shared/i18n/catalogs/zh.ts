@@ -2050,6 +2050,7 @@ export const zh: Catalog = {
   'dict.results.approximate': '没有与“{query}”完全匹配的条目。显示拼写相近的结果。',
   'dict.results.common': '常用',
   'dict.results.freqTitle': '语料库频率排名',
+  'dict.results.freqTitleSourced': '语料库频率排名，来自 {source}',
   'dict.results.copyClipboard': '复制到剪贴板历史',
   'dict.results.saveFlashcards': '保存到闪卡',
   'dict.results.savedFlashcards': '已保存到闪卡',
