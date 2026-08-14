@@ -5,6 +5,7 @@ import {
   NOTE_LIST_DEFAULT_LIMIT,
   type LexiconNote,
 } from '../../../shared/lexiconNotes';
+import { LANG_TAGS } from '../../../shared/i18n/core';
 import { useT } from '../../i18n';
 import './notesBrowser.css';
 
@@ -152,7 +153,7 @@ export default function NotesBrowser({ lang, onOpen }: Props) {
                   ))}
                   {note.updatedAt > 0 && (
                     <span className="muted lexicon-notes-date">
-                      {new Date(note.updatedAt).toLocaleDateString(uiLang, {
+                      {new Date(note.updatedAt).toLocaleDateString(LANG_TAGS[uiLang], {
                         year: 'numeric',
                         month: 'short',
                         day: 'numeric',
