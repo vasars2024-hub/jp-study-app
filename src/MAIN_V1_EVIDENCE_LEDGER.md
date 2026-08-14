@@ -18269,6 +18269,40 @@ of that, and it is what the mutation now fails.
   `yomitan.ts` at lines 600 and 867, neither in a line this slice touched.
 - `tsc --noEmit` is not a gate here; checked anyway that no error names any touched file.
 
+### Live acceptance
+
+`npm start` (Vite fell to 5174; 5173 is held by a foreign listener). The first launch produced the known
+husk — `/health` reported `visible:true` with an **empty `url`**, `/eval` hung with no response, `/reload`
+returned `ok` and changed nothing, and the error ring was empty, alongside a
+`Network service crashed or was terminated` line in the forge log. Restarting produced a real renderer
+(`[renderer] [tokenizer] SELFTEST OK` in the log) and every probe below ran against it.
+
+**The repair ran on the real profile, through the app's own boot — not a harness.** Read back read-only
+afterwards: `%APPDATA%/jp-study-app/dictionary/dict.db` is now `user_version` **5**, `bundled-jmdict-ru`
+is `target_langs='ru'`, and its 161,514 glosses are `lang='ru'`. Whole-file gloss totals: en 1,065,448 /
+ru **161,514** / zh 106,239 — `ru` was **0** before this launch.
+
+**`dictListPairs()` now returns `ja→en`, `ja→ru`, `ja→zh`.** The audit measured only `ja→en` and `ja→zh`
+on the same install, so the pair the Russian dictionary exists to serve was genuinely unreachable and now
+is not.
+
+**`lookupOfflineInterlinear('顰', …)`**, through the real preload binding:
+
+| option | `glossLangs` returned | glosses |
+|---|---|---|
+| `{ sourceLangs:['ja'], glossLangs:['ru'] }` | `["ru"]` | 2, both Cyrillic, both `lang:"ru"` |
+| `{ sourceLangs:['ja'], glossLangs:['en'] }` | `["en"]` | 3, none Cyrillic, all `lang:"en"` |
+
+**One correction to the audit, stated because it changes what its evidence proves.** Its live symptom was
+recorded as `lookupOfflineInterlinear('顰', { languages: ['en'] })` returning the Cyrillic gloss, and
+`languages: ['ru']` yielding `glossLangs: []`. The option is named **`glossLangs`**, not `languages`
+(`LexiconInterlinearOptions`), so that key was silently ignored and both calls returned the same
+unfiltered set — I reproduced exactly that before reading the type. The *defect* was real and is confirmed
+independently above (161,514 rows mislabelled, `ja→ru` absent from `dictListPairs`); only that one symptom
+was an artifact of an unsupported option. Nothing here was measured by clicking: no input automation, no
+userData backup, no persisted setting toggled, and the error ring was empty across every probe. Both
+process trees this run started were enumerated and stopped; nothing else was touched.
+
 ### Still open, deliberately
 
 The audit's **finding 1** (a `036d563` ledger claim of full-suite green that does not hold at committed
