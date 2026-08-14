@@ -20845,3 +20845,66 @@ slice does not touch. Test count is the previous 7,937 plus this slice's 9, exac
 the two pre-existing `adjacent-overload-signatures` errors in `window.d.ts`, reproduced at the
 committed tree in a detached worktree, which also ran the slice's four suites green (47 tests)
 against the reconstructed blobs alone.
+
+## Track 2 — the two numbers and one word the source list was getting wrong — 2026-08-15 02:35 MSK primary
+
+No interrupted slice to recover. The `primary` run at 02:02 died 4 s in on a usage limit
+(`~\.claude-runs\logs\20260815-020224-run-primary.log`) before touching anything; no repo file
+has an mtime after 00:55:02 and the index was empty. The tree was exactly where `backup` left it.
+
+**Slice 1 — `9509c9e`. A pitch dictionary with 107,978 rows reported zero.** The legacy migration
+wrote `entry_count = counts.headwords` for every store. That is right for a term dictionary and
+false for the two kinds that carry no headwords by construction, so Settings printed
+`日本語 · pitch · 0` for the bundled Kanjium accents while they were answering every lookup.
+Decisions: (1) count by the row's declared `kind`, not by the largest available count — the number
+then stays the count of the thing the row claims to be, for a store carrying two payloads;
+(2) repair already-migrated installs with schema step **9**, guarded on `entry_count = 0` so a
+number some other path set deliberately survives, and idempotent for the same reason;
+(3) `freq_corpora` is shared across dictionaries and carries the source id in `corpus`, not a
+`dict_id` — the two backfill statements are not symmetric and cannot be merged.
+
+**Slice 2 — `d929dc6`. The kind was the raw database column.** `SettingsView` rendered
+`source.kind` between two localized fields, so the same Russian row read `pitch`. The legacy
+Yomitan panel directly above it has translated that vocabulary since it shipped.
+`DICTIONARY_KIND_LABEL_KEYS` (shared) maps the six kinds writers actually store —
+`term`/`pitch`/`freq` from the migration, `name`, `character`, `examples` from JMnedict, KANJIDIC2
+and Tatoeba. An unmapped kind keeps falling back to the raw value: naming an unknown kind wrongly
+is worse than naming it in English. Three new keys ×4 catalogs.
+
+**Live acceptance** (real install, `npm start`, bridge pid 34156 on 127.0.0.1:39273). Before, by
+read-only `better-sqlite3` open of `%APPDATA%\jp-study-app\dictionary\dict.db`: `user_version 8`,
+`bundled-kanjium-pitch` `kind=pitch entry_count=0` against **107,978** rows in `pitch`. After the
+app booted: `user_version 9`, `entry_count = 107978`; the three term dictionaries were untouched
+(524,106 / 101,843 / 71,888) and `freq_corpora` is empty on this install, so that half of the
+backfill is covered by unit test only. Live IPC `dictListSources()` returned the new count, and
+the rendered `.dict-manage-row` went from `日本語 · pitch · 107 978` to
+`日本語 · акцент · 107 978`, with `term` → `термины` beside it. `/logs?level=error` = 0 across
+every probe. Owned pids stopped, nothing else.
+
+**Mutation control.** `legacyEntryCount`'s pitch branch → `counts.headwords` failed exactly
+`counts the accent rows, not the headwords a pitch store never has` with `{c: +0}` vs `{c: 2}`,
+and passed again on restore.
+
+**Traps.** The four i18n catalogs carry ~1,200 foreign uncommitted lines each; the three keys were
+committed by inserting into `git cat-file blob HEAD:<path>` and staging *that* blob, with an
+assertion of exactly one anchor match per file. The same insertion also went into the working-tree
+file, so the running app and the tests see the keys on top of the other tracks' work.
+
+**Gates.** `npx vitest run --testTimeout=60000 --hookTimeout=60000` — **604 passed / 1 skipped
+files, 7,968 passed / 6 skipped tests, exit 0**, fully green: the previous turn's
+`scraperSources.test.ts` teardown `ENOTEMPTY` did not recur and no failure remains at all.
+`node tools/i18n-check.cjs` — 9,567 keys (the working tree also carries other tracks' new keys).
+`node tools/architecture-audit.cjs` — 18 findings, 2 pending, nothing new.
+`npx eslint` on all seven touched paths — zero problems.
+
+### Deliberately open
+
+- **`collocations`, `audio` and `xrefs` are still writer-less and reader-less**, unchanged from the
+  previous entry's sweep. `examples`/`example_translations` join them: the Tatoeba importer stores
+  its sentences as `headwords`/`senses`/`glosses` under `kind='examples'`, never in `examples`, so
+  `examples_fts` has triggers, no writer and no reader.
+- **Nothing filters lookups by `dictionaries.kind`** — `dictService.ts` never reads the column. A
+  `kind='examples'` source therefore contributes whole sentences to normal word lookups as if they
+  were headwords. Latent on a default install, since Tatoeba is not bundled, and deliberately not
+  "fixed" by exclusion alone: excluding those rows without first building the sentence reader would
+  turn a usable import into dead weight. That reader is the next slice's shape.
