@@ -1027,7 +1027,6 @@ export function findLexiconEtymology(db: SqliteDb, query: EtymologyQuery): Lexic
   }>;
   if (!headwords.length) return empty;
 
-  const byId = new Map(headwords.map((row) => [row.id, row]));
   const etymologyRows = db.prepare(`
     select headword_id, text, source
     from etymology
