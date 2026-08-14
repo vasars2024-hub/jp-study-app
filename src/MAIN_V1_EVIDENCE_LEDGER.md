@@ -20483,3 +20483,173 @@ changed lines each — and were staged as reconstructed HEAD-plus-my-insertion b
 by slicing the insertion back out and asserting the remainder `===` `git show HEAD:<path>`.
 `git diff --cached --numstat` for those six is `2/0, 1/0, 2/0, 2/0, 2/0, 2/0` — insertions
 only, no phantom deletion.
+
+## Track 6 — the English subtitle track becomes the Japanese cue grid — 2026-08-14 23:05 MSK primary
+
+### Which stage this is, and why it is here rather than in Main V1
+
+The relay carries two co-priority tracks. The Main V1 slice in flight closed at `cc7b3d4`, so
+the alternation rule hands the turn to `docs/ACTIVE/EN_JA_SUBTITLE_FUSION_PLAN.md`, whose own
+Progress section read *"Nothing implemented yet."* This is its first slice: stages **F1**
+(preconditions and timing correction) and **F2** (per-cue Whisper transcription). The plan's
+Progress section carries the stage-level record; this entry carries the evidence.
+
+The problem in one line: today's transcription job slices audio on a fixed 30-second grid
+(`chunksToSrt`), so a generated Japanese track is a sequence of 30-second blocks — unreadable
+to follow along with, and impossible to compare line-by-line against a translation. An English
+subtitle track already knows when each line is spoken. This slice borrows that grid.
+
+### The layer constraint that decided the file layout
+
+`main` may not import from `renderer` — `tools/architecture-audit.cjs` classifies it as
+`layer-violation`, and it is right. The fusion job runs in main, because main owns the
+persistent queue and ffmpeg, and it must parse the English track. `parseSubtitles` lived in
+`src/renderer/subtitles.ts`.
+
+That module imports nothing and touches no DOM; it was in `renderer/` by accident of where it
+was first extracted from. It moved to `src/shared/subtitleCues.ts`, and `renderer/subtitles.ts`
+is now a one-line `export * from '../shared/subtitleCues'`. **Fourteen importers, zero
+importers changed** — `liveLyrics.ts`, `VideoCoreStudyOverlay.tsx`, the Blanc and Discover
+panels and the rest all keep the path they name. The re-export also keeps the audit quiet in
+both directions: the audit collects exported names only from `export function|const|class`
+declarations (`architecture-audit.cjs:323`), so a re-export creates an import edge without
+creating a `duplicate-export`.
+
+`Cue` gained an optional `style`, filled by `parseAss` from field 3. It is the only reliable
+sign/karaoke signal: `cleanLine` strips the `{\pos(…)}` override blocks, so by the time a cue's
+text is readable, the evidence that it was typeset is already gone.
+
+### Four decisions taken under standing auto-approval, with the alternative that was rejected
+
+1. **No new `TranscriptionPhase`.** F8 proposes `'translating'`/`'fusing'`. Adding one forces
+   entries in three exhaustive `Record<TranscriptionPhase, …>` maps in
+   `shared/mediaStudyOrchestrator.ts` (`:889`, `:902`, `:914`), a `media.subStatus.phase.*` key
+   in four catalogs, and a widened `MediaTranscriptionPhase` in `mediaSubtitleStatus.ts` — for
+   two labels that describe nothing this slice does. The existing phases are accurate for
+   F1/F2. The new ones land with F3/F5, where they mean something.
+2. **`SubtitleRecord.derivation`: `'whisper' | 'en-ja-fusion'`, optional.** Rejected
+   alternative: reuse the existing replace rule. Without the field a fused track and a grid
+   transcript are both `generated`+`ja`, so each would evict the other — two artifacts with
+   different timing, one silently deleting the other. Absent means the grid pass, which is what
+   every record written before today is.
+3. **Serialization reuses `shared/subtitlesExport.ts`.** A `cuesToSrt` in the fusion core was
+   written first and the audit flagged `duplicate-export` against `subtitlesExport.ts`,
+   correctly. It was deleted rather than renamed. `windowCuesToSubtitleCues` never emits a
+   blank cue, so the existing writer needs no fusion-specific variant.
+4. **A merged window yields one cue spanning its cues, not a copy of the blob per cue.**
+   Splitting a merged transcript back onto its cues needs the F4 reference translation.
+   Guessing a split here would be an invention presented as timing; duplicating the text would
+   be worse.
+
+Queue dedup now matches on media **and kind**, so asking to fuse a file already queued for a
+plain transcript is a real second job rather than a silent no-op. `enqueueTranscription` omits
+`kind` entirely for `'transcribe'`, so a queue persisted by an older build restores unchanged.
+
+### The plan's merge rule was wrong on real data. Measured, not reasoned.
+
+F2 says "merge adjacent EN cues with gaps < ~400 ms into one ASR window". Before writing the
+constant, the real English captions of *Introduction and why I start this podcast … #1* were
+measured: **38 cues over 305 s, 37 of 37 gaps below 400 ms, and 36 of them exactly zero.**
+
+Caption tracks are routinely authored contiguously — cue *n* ends at the instant cue *n+1*
+begins — so "merge while the gap is small" merges *everything* and stops only at the 30 s cap.
+That rebuilds precisely the 30-second blocks the feature exists to escape.
+
+`FUSION_TARGET_WINDOW_SEC = 12` is now a **soft** cap on a merged window;
+`FUSION_MAX_WINDOW_SEC = 30` stays as the hard cap for a single over-long cue and for IPC
+payload size. Merging exists to give Whisper a sentence of context around a short line, not to
+accumulate audio.
+
+Re-derived independently in the live renderer, importing the real shared modules and reading
+the real file through `window.api.readSubtitleRecord`: 38 cues parsed, 38 kept, **35 windows**
+with the target and **12 windows with `targetWindowSec: 30`** — the defect, reproduced on
+demand. Longest window 12.37 s. The first three windows are one cue each.
+
+### Live acceptance, end to end, on real audio
+
+Owned dev app via plain `npm start`; bridge on 127.0.0.1:39273. The library held **no English
+track at all** (30 items, all `The Big O`, whose media files are no longer on disk), so the
+fixture was built from what is really there:
+`%APPDATA%\jp-study-app\downloads\Introduction and why I start this podcast ｜ Japanese Podcast
+with Hana #1 [yYNWwH2GlB0].mp4` — 45 MB, 305 s, with **both** an `.en.vtt` and a `.ja.vtt`
+human sidecar. Added with `addMediaPaths`, sidecars attached by `runSubtitleDiscovery`
+(`attached: 1, files: 2`).
+
+- **Queued with the new kind.** `enqueueTranscription({kind:'fuse-en-ja'})` returned `ok:true`,
+  and `transcriptionQueue()` returned the job carrying `"kind": "fuse-en-ja"` — the field
+  survives the shared type, the preload passthrough, main, and the persisted queue with no
+  preload or `window.d.ts` change, because the binding takes the whole `TranscriptionRequest`.
+- **Phases.** `queued → preparing → extracting-audio → transcribing (0…35 of 35) → done`.
+  `total` is 35, not 12 and not 10 — the window plan, live.
+- **The file.** `userData/subtitles/<id>/fused-ja.srt`, 5,901 bytes, **35 cues**, first cue
+  `00:00:05,044 --> 00:00:14,474` — byte-identical to the English track's own timestamp.
+- **The record.** `lang: ja`, `source: generated`, `machineGenerated: true`,
+  `derivation: 'en-ja-fusion'`, label `JA (fused from EN + Whisper)`. **Both human sidecars
+  survived**, which is the replace rule doing its job.
+- **Quality, measured against the human Japanese track** — informational, not the F7 gate.
+  NFKC, punctuation stripped, katakana folded to hiragana, whole-track Levenshtein:
+  1,482 human characters vs 1,500 fused, **72 edits, CER 4.86 %**. First cue, human:
+  「みなさんこんにちは！初めまして、Learn Japanese with Hana のポッドキャストへ…」 fused:
+  「みなさんこんにちは。はじめまして。 Learn Japanese with Hanaのポッドキャストへ…」
+- **Zero error-level entries** in `/logs?level=error` across the whole run.
+
+Caveats stated rather than buried: this is a favourable case — one clear studio-quality
+speaker, and the tier was temporarily raised to `whisper-large-v3-turbo` because that is the
+only model actually in the transformers cache (`whisper-small` was configured and would have
+triggered a download). Roughly 21 s per window, about 12 minutes for 305 s of audio. That
+single number is **not** the F7 ship gate, which requires beating raw-Whisper CER *and*
+MT-only CER on at least two episodes.
+
+Restored, and asserted rather than eyeballed: the media item removed (library back to 30,
+`stillThere:false`), the generated `subtitles/<id>/` directory gone, `jp-study-whisper-model`
+back to `'whisper-small'` by `===`, `localStorage.length` 80 before and after, every probe
+global deleted. The `.mp4` and both sidecars are untouched on disk — re-addable in one
+`addMediaPaths` call, which is why the path is written out above.
+
+### Gates
+
+`npx vitest run --testTimeout=60000 --hookTimeout=60000` — **598 files passed, 1 skipped;
+7,901 passed, 6 skipped**, exit 0. `node tools/i18n-check.cjs` — 9,555 English keys translated
+in ja/zh/ru, exit 0 (this slice adds no user-visible string; the fusion job has no UI yet, by
+F8's own sequencing). `node tools/architecture-audit.cjs` — 1,829 modules, 18 findings,
+**nothing new**, exit 0. `npx eslint` on the eight touched paths — clean, exit 0.
+
+`tsc --noEmit` is not a gate in this repo and was not treated as one. Filtered to the touched
+files it reports **zero** errors; the repo-wide count was not compared, per the standing rule
+against raw error counts.
+
+The vitest number is the **shared working tree**, which carries several other tracks'
+uncommitted work. Committed HEAD is red with nine failures that predate this slice
+(`docs/audit/RELAY_BOSS_AUDIT.md`, retry-53, finding 1). This slice introduces none of them and
+this entry does not claim committed green.
+
+### Deliberately open
+
+- **Windows overlap by up to twice the pad on a contiguous track.** Window 1 ends at 14.724 s
+  and window 2 starts at 14.224 s. Intended — each window needs its own head- and tail-room —
+  but it means Whisper may hear a boundary word twice. Text-level de-duplication belongs to
+  F4/F5, where the per-cue reference exists to detect it; doing it here would be string surgery
+  with no reference to check against.
+- **Song and sign filtering is untested against a real ASS release.** `selectDialogueCues`
+  excluded nothing on this fixture, because a YouTube caption track has no styles at all. The
+  unit tests cover the classification; a real `Signs`/`OP`/`Karaoke` release has not been run
+  through it, and the library currently holds no ASS file to try.
+- **`durationSec` is absent on every library item**, so the sync estimator falls back to the
+  cue track's own extent (`estimateSubtitleOffset` handles this explicitly) and
+  `planAsrWindows` gets its duration from the decoded PCM length instead. Correct, but it means
+  the `durationSec` clamp path is exercised by tests only.
+- **No UI entry point yet.** By design — F8 is a later stage, and the job is reachable through
+  `enqueueTranscription`. Nothing user-facing claims the feature exists, so nothing is
+  dishonest; but a user cannot start a fusion today.
+- **The fixture is the first real F7 candidate.** It has a human Japanese track *and* a human
+  English track on the same file. Whoever builds the evaluation harness should start there
+  rather than hunting for material.
+
+### Staging, since the tree is shared
+
+All eight source paths were confirmed clean of foreign hunks with `git status --short -- <paths>`
+immediately before staging — the four modified files showed only this slice's edits and the
+four new ones were untracked, so a plain `git add` of the named paths was safe and no
+HEAD-plus-edit blob reconstruction was needed. `src/MAIN_V1_EVIDENCE_LEDGER.md` and
+`docs/ACTIVE/EN_JA_SUBTITLE_FUSION_PLAN.md` were likewise clean. Nothing else in the ~1,000
+dirty paths was touched, staged, or cleaned.

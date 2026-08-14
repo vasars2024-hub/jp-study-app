@@ -46,6 +46,15 @@ export interface SubtitleRecord {
   confidence?: number;
   /** Machine-generated transcripts are labelled and editable, never silently trusted. */
   machineGenerated?: boolean;
+  /**
+   * How a `generated` track was produced. Absent means the plain whole-file
+   * Whisper pass, which is what every record written before EN→JA fusion is.
+   *
+   * Load-bearing rather than cosmetic: a generated track replaces the previous
+   * generated track for its language, and the two derivations must not evict each
+   * other — they are different artifacts with different timing.
+   */
+  derivation?: 'whisper' | 'en-ja-fusion';
   /** True once the user has corrected a generated transcript. */
   edited?: boolean;
   /** Stream index, for a track extracted from the container. */

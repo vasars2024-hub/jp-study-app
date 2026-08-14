@@ -35,6 +35,16 @@ export interface TranscriptionProgress {
   error?: string;
 }
 
+/**
+ * What a queued job actually does.
+ *
+ * Absent means `'transcribe'` — the original whole-file Whisper pass — so a queue
+ * persisted by an older build restores unchanged. `'fuse-en-ja'` slices the audio
+ * on an English track's own cue boundaries instead of a fixed grid; see
+ * `docs/ACTIVE/EN_JA_SUBTITLE_FUSION_PLAN.md`.
+ */
+export type TranscriptionKind = 'transcribe' | 'fuse-en-ja';
+
 export interface TranscriptionJob {
   mediaId: string;
   title: string;
@@ -43,11 +53,17 @@ export interface TranscriptionJob {
   queuedAt: number;
   /** Attempts so far, so a permanently failing file is not retried forever. */
   attempts: number;
+  kind?: TranscriptionKind;
+  /** For `fuse-en-ja`: which subtitle record supplies the cue grid. */
+  sourceSubtitleId?: string;
 }
 
 export interface TranscriptionRequest {
   mediaId: string;
   lang?: string;
+  kind?: TranscriptionKind;
+  /** For `fuse-en-ja`: pin the source track instead of letting the job pick. */
+  sourceSubtitleId?: string;
 }
 
 export interface TranscriptionResult {
@@ -56,6 +72,16 @@ export interface TranscriptionResult {
   /** Cue lines produced. */
   lines?: number;
   error?: string;
+  /** ASR windows a `fuse-en-ja` job planned from the English cue grid. */
+  windows?: number;
+  /** Which English record supplied that grid. */
+  sourceSubtitleId?: string;
+  /** Seconds the English cues were shifted by before slicing; 0 when unshifted. */
+  offsetSec?: number;
+  /** False means the sync estimator declined and the cues were used as authored. */
+  offsetConfident?: boolean;
+  /** Cues left untranscribed, by reason — songs, signs, and empties. */
+  excludedCues?: Record<string, number>;
 }
 
 /** A job is abandoned after this many failed attempts. */

@@ -31,7 +31,18 @@ import {
 } from '../shared/transcriptionIpc';
 import type { SubtitleRecord } from '../shared/subtitleRecord';
 import type { MediaItem } from '../shared/types';
+import { parseSubtitles } from '../shared/subtitleCues';
+import { shiftCues } from '../shared/subtitleSync';
+import {
+  planAsrWindows,
+  selectDialogueCues,
+  windowCuesToSubtitleCues,
+  FUSION_MAX_WINDOW_SEC,
+  type CueExclusionReason,
+} from '../shared/subtitleFusionCore';
+import { cuesToSrt } from '../shared/subtitlesExport';
 import { extractAudioPcm } from './media';
+import { estimateSubtitleOffset } from './subtitleSync';
 
 export interface TranscriptionHost {
   listItems: () => MediaItem[];
@@ -260,10 +271,7 @@ async function runJob(job: TranscriptionJob): Promise<TranscriptionResult> {
       return { ok: false, error: 'empty-transcript' };
     }
 
-    const relativeDir = path.join('subtitles', job.mediaId.replace(/[^a-zA-Z0-9_-]/g, ''));
-    const relative = path.join(relativeDir, `generated-${job.lang}.srt`);
-    fs.mkdirSync(path.join(app.getPath('userData'), relativeDir), { recursive: true });
-    fs.writeFileSync(path.join(app.getPath('userData'), relative), srt, 'utf-8');
+    const relative = writeSubtitleFile(job.mediaId, `generated-${job.lang}.srt`, srt);
 
     const record: SubtitleRecord = {
       id: crypto.randomUUID(),
@@ -273,12 +281,17 @@ async function runJob(job: TranscriptionJob): Promise<TranscriptionResult> {
       path: relative,
       label: `Whisper (${job.lang})`,
       machineGenerated: true,
+      derivation: 'whisper',
       addedAt: Date.now(),
     };
-    // Replaces any previous generated track for this language; keeps every
-    // human-sourced one, which always outranks a transcript anyway.
+    // Replaces any previous grid-transcribed track for this language; keeps every
+    // human-sourced one, which always outranks a transcript anyway, and keeps a
+    // fused track, which is a different artifact rather than an older version of
+    // this one. Records written before `derivation` existed are this kind.
     const kept = (item.subtitles ?? []).filter(
-      (entry) => !(entry.source === 'generated' && entry.lang === job.lang),
+      (entry) => !(entry.source === 'generated'
+        && entry.lang === job.lang
+        && entry.derivation !== 'en-ja-fusion'),
     );
     host.patchItems([job.mediaId], {
       subtitles: [...kept, record],
@@ -287,6 +300,211 @@ async function runJob(job: TranscriptionJob): Promise<TranscriptionResult> {
 
     emit('done', total);
     return { ok: true, mediaId: job.mediaId, lines: texts.filter((t) => t.trim()).length };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message === 'no-window') throw error; // requeue, do not count as a failure
+    emit('error', 0, { error: message });
+    return { ok: false, error: message };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// EN→JA fusion (plan stages F1 and F2)
+// ---------------------------------------------------------------------------
+
+/** Where a subtitle record's bytes actually are. Sidecars are absolute. */
+function subtitleFilePath(record: SubtitleRecord): string {
+  return record.external || path.isAbsolute(record.path)
+    ? record.path
+    : path.join(app.getPath('userData'), record.path);
+}
+
+/**
+ * The English track whose cue timing the fusion job will borrow.
+ *
+ * A human-authored track outranks a machine-generated one unconditionally: this
+ * job exists to inherit *trustworthy* timing, and a previous Whisper pass on the
+ * English audio has the same 30-second grid the fusion is trying to escape.
+ */
+function pickEnglishTrack(
+  item: MediaItem,
+  preferredId?: string,
+): SubtitleRecord | undefined {
+  const english = (item.subtitles ?? []).filter((record) => /^en\b/i.test(record.lang.trim()));
+  if (preferredId) return english.find((record) => record.id === preferredId);
+  return [...english].sort((a, b) => {
+    const human = Number(Boolean(a.machineGenerated)) - Number(Boolean(b.machineGenerated));
+    if (human !== 0) return human;
+    const confidence = (b.confidence ?? 0) - (a.confidence ?? 0);
+    if (confidence !== 0) return confidence;
+    return b.addedAt - a.addedAt;
+  })[0];
+}
+
+function writeSubtitleFile(mediaId: string, fileName: string, contents: string): string {
+  const relativeDir = path.join('subtitles', mediaId.replace(/[^a-zA-Z0-9_-]/g, ''));
+  const relative = path.join(relativeDir, fileName);
+  fs.mkdirSync(path.join(app.getPath('userData'), relativeDir), { recursive: true });
+  fs.writeFileSync(path.join(app.getPath('userData'), relative), contents, 'utf-8');
+  return relative;
+}
+
+/**
+ * Transcribe the Japanese audio on the English track's cue grid.
+ *
+ * This is F1+F2 of `docs/ACTIVE/EN_JA_SUBTITLE_FUSION_PLAN.md`, and on its own it
+ * already produces the thing the plain Whisper pass cannot: Japanese lines timed
+ * to the line, not to a 30-second block. The later stages (reference translation,
+ * agreement scoring, arbitration) refine the *text* of these same cues; they do
+ * not change the grid, which is why this lands as its own slice.
+ *
+ * The sync gate comes first and is load-bearing. An English track timed against a
+ * different release would put every window over the wrong line, and the result
+ * would be confident, well-timed nonsense — worse than no track. `subtitleSync`
+ * declines rather than guessing, and a declined estimate means "proceed unshifted",
+ * not "shift by its best guess".
+ */
+async function runFusionJob(job: TranscriptionJob): Promise<TranscriptionResult> {
+  if (!host) return { ok: false, error: 'host-not-registered' };
+  const item = host.listItems().find((entry) => entry.id === job.mediaId);
+  if (!item) return { ok: false, error: 'item-not-found' };
+
+  const startedAt = Date.now();
+  let total = 0;
+  const emit = (phase: TranscriptionPhase, done: number, extra: Partial<TranscriptionProgress> = {}): void =>
+    broadcast({
+      mediaId: job.mediaId,
+      title: job.title,
+      phase,
+      done,
+      total,
+      startedAt,
+      etaMs: estimateEtaMs(done, total, Date.now() - startedAt),
+      ...extra,
+    });
+  const stopped = (done: number): boolean => {
+    if (!cancelled.has(job.mediaId)) return false;
+    emit('cancelled', done);
+    return true;
+  };
+
+  try {
+    emit('preparing', 0);
+    if (stopped(0)) return { ok: false, error: 'cancelled' };
+
+    const source = pickEnglishTrack(item, job.sourceSubtitleId);
+    // This feature fuses tracks; it does not fetch them. Refusing by name is what
+    // lets the UI say which precondition is missing instead of "it failed".
+    if (!source) {
+      emit('error', 0, { error: 'no-english-track' });
+      return { ok: false, error: 'no-english-track' };
+    }
+    let raw: string;
+    try {
+      raw = fs.readFileSync(subtitleFilePath(source), 'utf-8');
+    } catch {
+      emit('error', 0, { error: 'source-unreadable' });
+      return { ok: false, error: 'source-unreadable' };
+    }
+
+    const selection = selectDialogueCues(parseSubtitles(raw));
+    if (!selection.cues.length) {
+      emit('error', 0, { error: 'no-dialogue-cues' });
+      return { ok: false, error: 'no-dialogue-cues' };
+    }
+    const excluded = selection.excluded.reduce<Record<CueExclusionReason, number>>(
+      (counts, entry) => ({ ...counts, [entry.reason]: counts[entry.reason] + 1 }),
+      { music: 0, sign: 0, empty: 0 },
+    );
+
+    // F1 — the timing gate. Cheap relative to ASR (four 90 s windows), and it is
+    // the difference between fusing this episode and fusing a neighbouring one.
+    emit('extracting-audio', 0);
+    const estimate = await estimateSubtitleOffset(
+      item.path,
+      selection.cues.map((cue) => ({ start: cue.start, end: cue.end })),
+      item.durationSec ?? 0,
+    );
+    const cues = estimate.confident
+      ? shiftCues(selection.cues, estimate.offsetSec)
+      : selection.cues;
+
+    const pcmBuffer = await extractAudioPcm(item.path);
+    const samples = new Float32Array(pcmBuffer);
+    const durationSec = samples.length / SAMPLE_RATE;
+    const windows = planAsrWindows(cues, { durationSec, maxWindowSec: FUSION_MAX_WINDOW_SEC });
+    total = windows.length;
+    if (!total) {
+      emit('error', 0, { error: 'no-windows' });
+      return { ok: false, error: 'no-windows' };
+    }
+
+    // F2 — one Whisper call per window. Same RPC as the grid path; only the slice
+    // boundaries changed, so nothing about the renderer worker protocol moves.
+    const texts: string[] = [];
+    for (let i = 0; i < total; i += 1) {
+      if (stopped(i)) return { ok: false, error: 'cancelled' };
+      emit('transcribing', i);
+      const from = Math.max(0, Math.floor(windows[i].startSec * SAMPLE_RATE));
+      const to = Math.min(samples.length, Math.ceil(windows[i].endSec * SAMPLE_RATE));
+      const slice = samples.subarray(from, to);
+      if (slice.length < SAMPLE_RATE / 4) {
+        texts.push('');
+        continue;
+      }
+      const reply = await requestChunk(slice, job.lang);
+      if (!reply.ok) {
+        if (reply.error === 'no-window') throw new Error('no-window');
+        texts.push('');
+        continue;
+      }
+      texts.push(reply.text ?? '');
+    }
+
+    emit('aligning', total);
+    const fused = windowCuesToSubtitleCues(windows, cues, texts);
+    const srt = cuesToSrt(fused);
+    if (!srt.trim()) {
+      emit('error', total, { error: 'empty' });
+      return { ok: false, error: 'empty-transcript' };
+    }
+    const relative = writeSubtitleFile(job.mediaId, `fused-${job.lang}.srt`, srt);
+
+    const record: SubtitleRecord = {
+      id: crypto.randomUUID(),
+      lang: job.lang,
+      source: 'generated',
+      format: 'srt',
+      path: relative,
+      label: `${job.lang.toUpperCase()} (fused from ${source.lang.toUpperCase()} + Whisper)`,
+      machineGenerated: true,
+      derivation: 'en-ja-fusion',
+      addedAt: Date.now(),
+    };
+    // Replaces the previous *fused* track only. A plain Whisper transcript for the
+    // same language is a different artifact with different timing, and evicting it
+    // here would silently delete work the user may still be reading.
+    const kept = (item.subtitles ?? []).filter(
+      (entry) => !(entry.source === 'generated'
+        && entry.lang === job.lang
+        && entry.derivation === 'en-ja-fusion'),
+    );
+    host.patchItems([job.mediaId], {
+      subtitles: [...kept, record],
+      subtitlesCheckedAt: Date.now(),
+    });
+
+    emit('done', total);
+    return {
+      ok: true,
+      mediaId: job.mediaId,
+      lines: fused.length,
+      windows: total,
+      sourceSubtitleId: source.id,
+      offsetSec: estimate.confident ? estimate.offsetSec : 0,
+      offsetConfident: estimate.confident,
+      excludedCues: excluded,
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (message === 'no-window') throw error; // requeue, do not count as a failure
@@ -309,7 +527,7 @@ async function drain(): Promise<void> {
       }
       active += 1;
       try {
-        const result = await runJob(job);
+        const result = job.kind === 'fuse-en-ja' ? await runFusionJob(job) : await runJob(job);
         queue.shift();
         if (!result.ok && result.error !== 'cancelled') {
           const attempts = job.attempts + 1;
@@ -341,7 +559,10 @@ export function enqueueTranscription(request: TranscriptionRequest): Transcripti
   if (!host) return { ok: false, error: 'host-not-registered' };
   const item = host.listItems().find((entry) => entry.id === request.mediaId);
   if (!item) return { ok: false, error: 'item-not-found' };
-  if (queue.some((job) => job.mediaId === request.mediaId)) {
+  const kind = request.kind ?? 'transcribe';
+  // Matched on kind as well as media, so asking to fuse a file that is already
+  // queued for a plain transcript is a real second job rather than a silent no-op.
+  if (queue.some((job) => job.mediaId === request.mediaId && (job.kind ?? 'transcribe') === kind)) {
     // Already queued: not an error, just nothing new to do.
     return { ok: true, mediaId: request.mediaId };
   }
@@ -352,6 +573,8 @@ export function enqueueTranscription(request: TranscriptionRequest): Transcripti
     lang: request.lang?.trim() || 'ja',
     queuedAt: Date.now(),
     attempts: 0,
+    ...(kind === 'transcribe' ? {} : { kind }),
+    ...(request.sourceSubtitleId ? { sourceSubtitleId: request.sourceSubtitleId } : {}),
   });
   saveQueue();
   broadcast({
@@ -435,5 +658,6 @@ export function registerTranscriptionIpc(transcriptionHost: TranscriptionHost): 
 export const __transcriptionTestables = {
   chunksToSrt,
   timestamp,
+  pickEnglishTrack,
   hasPendingRetry: (): boolean => retryTimer !== null,
 };
