@@ -553,6 +553,40 @@ export function windowDecisionsToFusedCues(
   return out;
 }
 
+/**
+ * The two baseline tracks F7 scores the fused one against.
+ *
+ * The plan's ship gate compares fused output to raw Whisper and to translation
+ * alone, and both already exist inside a fusion run as `texts` and `references` —
+ * side by side, on the same window list, needing no extra computation. Building
+ * them here rather than re-deriving them in the harness matters: a baseline built
+ * on a *different* cue grid would be measuring the grid, not the text, and the
+ * fused track would win on timing alone.
+ *
+ * Windows an input is empty for are skipped, exactly as the fused track skips
+ * them. That is honest — the baseline genuinely does not claim that line — and
+ * `evaluateTrack` counts it as a missed reference cue.
+ */
+export function buildBaselineTracks(
+  windows: readonly AsrWindow[],
+  cues: readonly FusionCue[],
+  whisperTexts: readonly string[],
+  references: readonly string[],
+): { whisperOnly: FusedCueRow[]; mtOnly: FusedCueRow[] } {
+  const asTrack = (texts: readonly string[]): FusedCueRow[] => windowDecisionsToFusedCues(
+    windows,
+    cues,
+    windows.map((_window, index) => ({
+      windowIndex: index,
+      text: (texts[index] ?? '').trim(),
+      basis: 'whisper' as const,
+      score: 0,
+      confidence: 0,
+    })),
+  );
+  return { whisperOnly: asTrack(whisperTexts), mtOnly: asTrack(references) };
+}
+
 // ---------------------------------------------------------------------------
 // F5 — arbitration and repair of the disputed lines
 //

@@ -12,6 +12,12 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  buildBaselineTracks,
+  planAsrWindows,
+  type AsrWindow,
+  type FusionCue,
+} from '../subtitleFusionCore';
+import {
   alignByOverlap,
   characterErrorRate,
   editDistance,
@@ -151,6 +157,62 @@ describe('evaluateEpisode', () => {
       mtOnly: [cue(0, 2, '橋を渡る'), cue(3, 5, '雨が降っている')],
     });
     expect(verdict.lostTo).toEqual(['whisperOnly', 'mtOnly']);
+  });
+});
+
+describe('buildBaselineTracks', () => {
+  const cues: FusionCue[] = [
+    { start: 0, end: 2, text: 'i like cats' },
+    { start: 3, end: 5, text: 'i cross the bridge' },
+    { start: 6, end: 8, text: 'it is raining' },
+  ];
+  const windows: AsrWindow[] = cues.map((entry, index) => ({
+    startSec: entry.start,
+    endSec: entry.end,
+    cueIndices: [index],
+  }));
+
+  it('puts both baselines on the fused track’s own cue grid', () => {
+    const { whisperOnly, mtOnly } = buildBaselineTracks(
+      windows,
+      cues,
+      ['猫が数奇です', '端を渡ります', '飴が降っています'],
+      ['猫が好きです', '橋を渡ります', '雨が降っています'],
+    );
+    // Same starts and ends on both, or the gate would be measuring timing.
+    expect(whisperOnly.map((row) => [row.start, row.end]))
+      .toEqual(mtOnly.map((row) => [row.start, row.end]));
+    expect(whisperOnly.map((row) => row.start)).toEqual([0, 3, 6]);
+    expect(whisperOnly.map((row) => row.text)).toEqual(['猫が数奇です', '端を渡ります', '飴が降っています']);
+    expect(mtOnly.map((row) => row.text)).toEqual(['猫が好きです', '橋を渡ります', '雨が降っています']);
+  });
+
+  it('lets a baseline simply not claim a line it has no text for', () => {
+    const { whisperOnly, mtOnly } = buildBaselineTracks(
+      windows,
+      cues,
+      ['猫が数奇です', '', '  '],
+      ['', '橋を渡ります', '雨が降っています'],
+    );
+    expect(whisperOnly.map((row) => row.start)).toEqual([0]);
+    expect(mtOnly.map((row) => row.start)).toEqual([3, 6]);
+    // Which `evaluateTrack` then charges as missed reference cues, not as silence.
+    expect(evaluateTrack(
+      cues.map((cue) => ({ ...cue, text: '正解' })),
+      whisperOnly,
+    ).missedCues).toBe(2);
+  });
+
+  it('is built from real planner windows, not only hand-made ones', () => {
+    const planned = planAsrWindows(cues, { durationSec: 10 });
+    const { whisperOnly } = buildBaselineTracks(
+      planned,
+      cues,
+      planned.map((_window, i) => `台詞${i}`),
+      planned.map(() => ''),
+    );
+    expect(whisperOnly).toHaveLength(planned.length);
+    expect(whisperOnly[0].start).toBe(0);
   });
 });
 

@@ -38,6 +38,7 @@ import {
   meanFusionConfidence,
   planAsrWindows,
   selectDialogueCues,
+  buildBaselineTracks,
   windowCuesToSubtitleCues,
   windowSourceText,
   FUSION_MAX_WINDOW_SEC,
@@ -566,6 +567,27 @@ async function runFusionJob(job: TranscriptionJob): Promise<TranscriptionResult>
       return { ok: false, error: 'empty-transcript' };
     }
     const relative = writeSubtitleFile(job.mediaId, `fused-${job.lang}.srt`, srt);
+
+    // F7 — the two baselines the ship gate needs, written only when asked for.
+    //
+    // `JP_FUSION_EVAL=1` is a developer escape hatch, not a feature: the harness
+    // in `tools/fusion-eval.cjs` needs raw-Whisper and MT-only tracks on the same
+    // cue grid as the fused one, and they only exist inside this function. They
+    // are written as plain files with **no `SubtitleRecord`** — a user picking a
+    // subtitle track should never be offered "the worse one we measured against".
+    // Off by default because three tracks per fusion is a cost nobody pressing
+    // "fuse" asked for; a failure to write one never fails the job.
+    if (process.env.JP_FUSION_EVAL === '1') {
+      try {
+        const baselines = buildBaselineTracks(windows, cues, texts, references);
+        writeSubtitleFile(job.mediaId, `fused-${job.lang}.whisper-only.srt`,
+          cuesToSrt(baselines.whisperOnly));
+        writeSubtitleFile(job.mediaId, `fused-${job.lang}.mt-only.srt`,
+          cuesToSrt(baselines.mtOnly));
+      } catch {
+        // Evaluation artifacts are not the product; the fused track already landed.
+      }
+    }
 
     // F6 — the provenance sidecar. Written from the same `decisions` the SRT was,
     // through the same skip rule, so cue N in the file is cue N here. A failure to
