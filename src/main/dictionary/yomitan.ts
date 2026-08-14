@@ -779,22 +779,24 @@ export function getPitch(term: string, reading?: string): string {
 }
 
 /**
- * The corpus rank *and* the dictionary that supplied it.
+ * The corpus rank, and the dictionary that supplied it when there is one.
  *
- * A rank with no dictionary to attribute it to is not returned: an unnamed
- * number is the shape this slice exists to remove, and every rank in the index
- * has a title by construction.
+ * `source` is optional because a title is not guaranteed: `importYomitanZip`
+ * builds it from `index.json`, and `String(indexJson.title ?? …)` keeps an
+ * explicit empty string rather than falling back to the file name. Withholding
+ * the whole rank in that case would delete a number the user previously saw, so
+ * the rank is always returned and only the attribution goes missing.
  */
 export function getFrequencyDetail(
   term: string,
   reading?: string,
-): { rank: number; source: string } | undefined {
+): { rank: number; source?: string } | undefined {
   const t = normalizeQuery(term);
   const r = normalizeQuery(reading ?? term);
   const tryKeys = [metaKey(t, r), metaKey(t, t), metaKey(r, r)];
   for (const key of tryKeys) {
     const hit = freqByKey.get(key);
-    if (hit !== undefined && hit.source) return { ...hit };
+    if (hit !== undefined) return hit.source ? { ...hit } : { rank: hit.rank };
   }
   return undefined;
 }
@@ -819,7 +821,7 @@ function enrichEntry(entry: StoredGlossaryEntry): DictEntry {
     senses: entry.senses,
     pitchHtml: pitchHtml || undefined,
     frequency: freq?.rank,
-    ...(freq ? { frequencySource: freq.source } : {}),
+    ...(freq?.source ? { frequencySource: freq.source } : {}),
     glossaryHtml: entry.glossaryHtml,
     source: entry.source,
     sourceLangs: entry.langs,
@@ -915,7 +917,7 @@ export async function lookupTermMerged(
       ...e,
       pitchHtml: pitchHtml || undefined,
       frequency: freq?.rank,
-      ...(freq ? { frequencySource: freq.source } : {}),
+      ...(freq?.source ? { frequencySource: freq.source } : {}),
     };
   });
   return { ...jisho, entries: enriched };

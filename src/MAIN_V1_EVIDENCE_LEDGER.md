@@ -19727,3 +19727,180 @@ memory as `git-commit-pathspec-discards-index`; it is recorded again here becaus
 silent, exit 0, and the wrong result is a commit that looks right in every summary line.
 
 Commit: `ca13d55`.
+
+## Track 2 — the frequency badge names its list, and the untitled-list hole that shipped with it — 2026-08-14 21:45 MSK primary
+
+**This hop is interrupted-work recovery.** Worker `primary` hit its usage limit at **21:02:27
++03:00** with no handoff. Nothing was staged, and unusually the interrupted work was *already
+committed*: HEAD was `fe6e1a9`, a `feat(lexicon)` commit with **no matching `docs(main-v1)` ledger
+entry**, breaking the alternating pattern of the four commits before it. The two disposable
+worktrees `%TEMP%\jp-freq-head` (`fe6e1a9`) and `%TEMP%\jp-freq-base` (`9e173fd`) had both been
+created at **19:50**, seconds after the commit, with `node_modules` already supplied — so the
+worker died inside the committed-HEAD verification, between building the worktrees and writing
+this section. Every number below was re-measured rather than inherited; nothing was carried over
+from the dead run.
+
+### What `fe6e1a9` is
+
+The corpus-frequency badge printed a bare `#81`. That number is the **minimum across every
+installed frequency bank**, and the banks are not all in the same language — the mining path had
+already measured a 390-entry Chinese list out-ranking JPDB on a Japanese word. `mergeStoredIndex`
+held the winning dictionary's title for the glossary branch and dropped it on the floor for the
+frequency branch, so nothing downstream could name a source.
+
+`freqByKey` became `Map<string, {rank, source}>`, `DictEntry` gained an optional
+`frequencySource`, and the badge renders it. Which rank *wins* is unchanged — that needs a
+per-list language signal a single-word lookup does not have, and is a separate slice.
+
+### The hole the slice shipped with, found by re-deriving instead of trusting the commit message
+
+The commit message states: *"A rank with no attributable source still renders as a bare number
+rather than under a name it does not have."* **The code did not do that.** `getFrequencyDetail`
+guarded on `hit.source` being truthy and returned `undefined` otherwise, so an unattributable rank
+did not degrade to a bare number — **it disappeared entirely**, taking `getFrequencyRank` and
+`getFrequency` down with it, and with them the mining path's ranks. The function's own doc comment
+asserted the premise that made this safe — *"every rank in the index has a title by
+construction"* — and that premise is false.
+
+`importYomitanZip` derives the title as `String(indexJson.title ?? path.basename(zipPath,
+'.zip'))`. **`??` does not treat an explicit empty string as absent**, so a bank whose `index.json`
+carries `"title": ""` imports successfully and merges with `source: ''`.
+
+Measured, not reasoned, against committed `fe6e1a9` in the isolated worktree — a throwaway probe
+importing exactly that zip through the real `importYomitanZip`:
+
+```
+IMPORT_OK {"ok":true,"info":{"id":"16056e8edbdc","title":"","revision":"r1",…,"hasFreq":true,…}}
+DETAIL    undefined
+RANK      undefined
+```
+
+The import reports success and `hasFreq: true`; both accessors then deny the rank exists. Before
+this slice `getFrequencyRank` returned `357` for that bank. **A feature that adds attribution
+deleted the number it was attributing** — narrow, but a strict regression, and user-visible as a
+badge that silently vanishes.
+
+The renderer half was never wrong: `frequencyAttribution.test.tsx:87` already asserts the
+unattributed branch renders `#357` with no `.dict-freq-source`. The slice shipped that fallback in
+the UI **and a main-process path that could never reach it**. Six tests covered attribution; none
+covered a bank without a title.
+
+### The fix
+
+`getFrequencyDetail` now returns `{rank, source?}` and yields the rank unconditionally, dropping
+only the attribution:
+
+```ts
+if (hit !== undefined) return hit.source ? { ...hit } : { rank: hit.rank };
+```
+
+`enrichLexiconResultMetadata` already accepted `{rank, source?}`, so the adapter needed nothing.
+The two spread sites in `yomitan.ts` moved from `...(freq ? …)` to `...(freq?.source ? …)` so an
+unattributed rank no longer emits `frequencySource: undefined` onto the entry. The doc comment
+that asserted the false premise is replaced with the reason the field is optional.
+
+**Negative control, both directions.** Reverting the one-line guard makes exactly the two new
+tests fail, for the intended reason — `AssertionError: expected undefined to deeply equal
+{ rank: 357 }` and `{ rank: 81 }` — while the six original attribution tests stay green, which is
+what proves the original suite could not have caught this. Restored, 12/12 pass.
+
+The second new test is worth its own line: when an untitled bank *outranks* a titled one, the
+merge replaces JPDB's entry outright, so the old guard did not degrade to 357 under JPDB's name —
+it erased the word's rank altogether. That is asserted directly.
+
+### Gates
+
+Shared tree, after the fix:
+
+- `npx vitest run` on `dictionaryFrequencySource`, `frequencyAttribution`, `dictionaryLookup`,
+  `dictionarySources`: **4 files / 81 tests**, exit 0.
+- `node tools/i18n-check.cjs`: exit 0, 9,547 keys (shared tree — other tracks' uncommitted keys
+  are in that number).
+- `node tools/architecture-audit.cjs`: exit 0, nothing new, 2 known pending.
+- `npx eslint src/main/dictionary/yomitan.ts src/main/__tests__/dictionaryFrequencySource.test.ts`:
+  exit 0, 2 warnings. Both are pre-existing `no-non-null-assertion` at committed HEAD — the same
+  two at `656` and `937`, appearing at `656`/`939` here only because this fix adds two comment
+  lines above them. Set difference, not count.
+
+### Committed-HEAD verification of `fe6e1a9` — the section the interrupted worker never wrote
+
+Two detached worktrees, `fe6e1a9` and its parent `9e173fd`, so the baseline is derived here rather
+than inherited.
+
+- `i18n-check`: **9,376** at `fe6e1a9` versus **9,375** at the parent — exactly the one key
+  `dict.results.freqTitleSourced`, present in all four catalogs.
+- `architecture-audit` at `fe6e1a9`: exit 0, nothing new.
+- Full `npx vitest run`: `fe6e1a9` **5 failed / 563 passed / 1 skipped files, 10 failed / 7,457
+  passed / 6 skipped tests**; parent **4 failed / 562 passed / 1 skipped files, 9 failed / 7,448
+  passed / 6 skipped tests**.
+- **The set difference is not empty**, and it is recorded rather than smoothed over. `fe6e1a9`
+  adds one failure identity the parent does not have:
+  `scraperSources.test.ts > probeSource > caps the stored history so it cannot grow forever`.
+  The nine long-standing failures — five `blancAgentStepConfirmGate`, one `localAgentQueueRun`,
+  one `novelReaderProgressGuard`, two `i18n.test.ts` — are byte-identical on both sides.
+- **That extra failure is infrastructure, and here is why that is a measurement and not an
+  excuse.** Its message is `Error: ENOTEMPTY: directory not empty, rmdir
+  'C:\…\Temp\scraper-sources-XDiTCZ\scraper\logs'` — a Windows teardown race in the test's own
+  temp-dir cleanup, not an assertion. The file passes **13/13 in isolation at `fe6e1a9`, three
+  runs out of three**. It is also very likely self-inflicted: this hop ran both full suites
+  **concurrently** on one machine, which is exactly the contention that produces `ENOTEMPTY`. The
+  slice touches `main/dictionary`, `shared/types` and `DictionaryResults` and has no path to the
+  scraper. Recorded as an artifact of how the baseline was taken, and the next hop that sees it
+  alone should suspect concurrency before suspecting the scraper.
+- **Collected totals reconcile.** 7,473 − 7,463 = **10**, exactly the slice's two new files
+  (6 + 4 tests). Passed rose by 9, not 10, because `scraperSources` moved one test out of the
+  passed column. Arithmetic consistent with a single lost test, not a lost suite.
+- **The new-component i18n policer was checked rather than assumed.** `i18n.test.ts`'s hardcoded
+  offender list is **identical at both commits — 37 entries, `Compare-Object` empty**. The slice
+  added a component branch to `DictionaryResults.tsx` and introduced no new offender.
+
+### Live acceptance, and the half of it that honestly could not be done
+
+Own dev app via `npm start`, bridge pid **29068** on 127.0.0.1:39273, window focused before every
+measurement. The `debug/bridge.json` present at the start of the hop was **stale** — pid 20940,
+already dead, left by the interrupted worker's unclean exit.
+
+- **The main-process half cannot be verified live on this install, and that is a fact about the
+  install.** `window.api.dictListYomitan()` returns four dictionaries — Kanjium Pitch Accents,
+  JMdict EN, JMdict RU, Moedict ZH — and **every one reports `hasFreq: false`**. There is no
+  frequency bank at all. A live `window.api.lookupTerm('本')` returns 8 entries and **not one
+  carries a `frequency` key** (`'frequency' in e === false`). So the badge's absence in the running
+  app is honest and expected, not a rendering failure — and exercising the sourced path live would
+  mean importing a frequency bank into the real 8.6 GB profile, which is persisted user data and
+  was not done.
+- **A `window.api` stub is impossible, and this cost a probe.** The first off-screen mount rendered
+  the *real* lookup results while appearing to accept the stub. `Object.getOwnPropertyDescriptor(
+  window, 'api')` returns `{writable: false, configurable: false}` with `Object.isFrozen` true —
+  `contextBridge` freezes it, so `window.api = {…}` **fails silently in non-strict mode**. The
+  giveaway was the absent JLPT badge: the stub set `jlpt: ['N5']`, real entries carry `jlpt: []`.
+  Nothing appeared in `/logs`.
+- **The renderer half was verified against the shipped stylesheet**, which is the half jsdom cannot
+  check at all. The real Vite-transformed `DictionaryResults` was mounted off-screen (host count
+  asserted `1`; React discovered at `?v=318a685f` — note `react.js` namespaces `createElement`
+  under `.default` here, same as `react-dom_client.js`), and the badge markup measured inside the
+  real `.dict-entry-head`:
+  - sourced badge **90×18**, `.dict-freq-source` **48×14**, `border-left 1px rgba(201,176,232,0.4)`,
+    `margin/padding-left 5px`, `max-width 75.47px` (the 14ch cap), `opacity 0.85`,
+    `text-transform: none` — the override that stops the badge's uppercase reaching a list name.
+  - unattributed badge — **the branch this hop's fix makes reachable** — renders **30×18** as plain
+    `#81` with **no** `.dict-freq-source` child.
+  - a 54-character list title truncates rather than pushing the row: `scrollWidth 269` against
+    `clientWidth 74`, `text-overflow: ellipsis`, and **`.dict-entry-head` does not overflow**
+    (`scrollWidth > clientWidth` false). That is the CSS comment's claim, measured.
+- `/logs?level=error`: **0 entries** across every probe. Probe host and all three `window.__*`
+  globals removed and asserted gone; `localStorage` still 80 keys; `window.api` intact. Owned pid
+  29068 and its five children stopped, nothing else. No userData backup was taken.
+
+### Deliberately open
+
+- **Which list wins a merged rank is still decided by lowest number alone**, so a small
+  out-of-language bank can still out-rank a large in-language one. The badge now *names* the
+  winner, which makes the problem visible instead of fixing it. Fixing it needs a per-list language
+  signal that a single-word lookup does not carry — unchanged from `fe6e1a9`, and restated here so
+  it is not rediscovered as new.
+- **The sourced badge has never been seen against real data**, per the empty-bank finding above.
+  The next hop that has a frequency bank installed should look at it before treating it as visually
+  settled.
+- The nine long-standing full-suite failures are untouched and still belong to other tracks.
+
+Commits: `fe6e1a9` (the slice, by the interrupted worker), and this hop's fix.

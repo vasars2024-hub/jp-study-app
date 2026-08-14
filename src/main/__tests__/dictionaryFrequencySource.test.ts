@@ -101,4 +101,40 @@ describe('corpus frequency attribution', () => {
 
     expect(getFrequencyRank('本')).toBe(357);
   });
+
+  // `importYomitanZip` derives the title from `index.json` with
+  // `String(indexJson.title ?? path.basename(...))`, and `??` does not treat an
+  // explicit empty string as absent — so an untitled bank imports fine and lands
+  // in the index with `source: ''`. Attribution is a nicety; the rank is not.
+  // Dropping the rank here would silently remove a number the user could see
+  // before this feature existed, and would take the mining path's
+  // `getFrequencyRank` down with it.
+  describe('a bank that supplies no title of its own', () => {
+    async function importUntitledFreqDict(rows: unknown[][]): Promise<void> {
+      const zipPath = path.join(tempRoot, 'untitled.zip');
+      const zip = new AdmZip();
+      zip.addFile('index.json', Buffer.from(JSON.stringify({ title: '', revision: 'r1', format: 3 })));
+      zip.addFile('term_meta_bank_1.json', Buffer.from(JSON.stringify(rows)));
+      zip.writeZip(zipPath);
+      const res = await importYomitanZip(zipPath);
+      expect(res.ok).toBe(true);
+    }
+
+    it('still yields the rank, with no source to attribute it to', async () => {
+      await importUntitledFreqDict(freqBank([['本', 'freq', 357]]));
+
+      expect(getFrequencyDetail('本')).toEqual({ rank: 357 });
+      expect(getFrequencyRank('本')).toBe(357);
+    });
+
+    it('keeps the winning rank when an untitled bank outranks a titled one', async () => {
+      await importFreqDict('JPDB Fixture', freqBank([['本', 'freq', 357]]));
+      await importUntitledFreqDict(freqBank([['本', 'freq', 81]]));
+
+      // 81 wins the merge and replaces JPDB's entry outright, so an
+      // attribution-only guard does not degrade to 357 here — it erases the
+      // word's rank altogether, which is what this asserts against.
+      expect(getFrequencyDetail('本')).toEqual({ rank: 81 });
+    });
+  });
 });
