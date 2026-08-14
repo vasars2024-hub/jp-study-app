@@ -56,8 +56,14 @@ import {
   resetCedictIndexCache,
   type ChineseLookupDeps,
 } from './chineseLookup';
-import { readUserNote, writeUserNote } from './notes';
-import type { LexiconNote, LexiconNoteIdentity, LexiconNoteInput } from '../../shared/lexiconNotes';
+import { listUserNotes, readUserNote, writeUserNote } from './notes';
+import type {
+  LexiconNote,
+  LexiconNoteIdentity,
+  LexiconNoteInput,
+  LexiconNoteListQuery,
+  LexiconNoteListResult,
+} from '../../shared/lexiconNotes';
 import type { DictResult } from '../../shared/types';
 import type { LexiconNeighborResult } from '../../shared/lexiconNeighbors';
 import {
@@ -366,6 +372,11 @@ export function findSemanticNeighborsInDb(query: NeighborQuery): LexiconNeighbor
 /** The user's own note on a word, from the managed database. */
 export function readUserNoteFromDb(identity: LexiconNoteIdentity): LexiconNote | null {
   return readUserNote(dictionaryDb(), identity);
+}
+
+/** One page of every note the user has written, from the managed database. */
+export function listUserNotesFromDb(query: LexiconNoteListQuery): LexiconNoteListResult {
+  return listUserNotes(dictionaryDb(), query);
 }
 
 /** Store or clear the user's note on a word. Returns the note as it now stands. */

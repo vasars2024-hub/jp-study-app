@@ -37,6 +37,38 @@ export interface LexiconNoteInput {
   tags: string[];
 }
 
+/** One page of the user's notes. `total` counts every match, not the page. */
+export interface LexiconNoteListQuery {
+  /** Empty means every language, which is what a browse surface opens on. */
+  lang: string;
+  /** Empty means no text filter. Matched against word, reading, body and tags. */
+  filter: string;
+  limit: number;
+  offset: number;
+}
+
+export interface LexiconNoteListResult {
+  notes: LexiconNote[];
+  /** Matches before paging, so the surface can say how many more there are. */
+  total: number;
+}
+
+/**
+ * Announced on `window` after a note is stored or cleared.
+ *
+ * The editor and the browse list are two independent components with no common
+ * ancestor holding this state, and a list that silently disagrees with the note
+ * just saved is worse than no list. Declared here rather than in either component
+ * so neither owns the other's contract.
+ */
+export const LEXICON_NOTES_CHANGED_EVENT = 'lexicon-notes-changed';
+
+/** A page big enough to scroll, small enough that one IPC reply stays cheap. */
+export const NOTE_LIST_DEFAULT_LIMIT = 50;
+export const NOTE_LIST_MAX_LIMIT = 200;
+/** A filter is a word or a tag, never a passage. */
+export const NOTE_FILTER_MAX_CHARS = 64;
+
 /**
  * NFKC + case fold.
  *
@@ -101,6 +133,32 @@ export function normalizeNoteTags(raw: unknown): string[] {
     if (out.length >= NOTE_MAX_TAGS) break;
   }
   return out;
+}
+
+/**
+ * The page an untrusted caller asked for, clamped.
+ *
+ * Unlike `readNoteIdentity` this never returns `null`: a browse surface with a
+ * malformed query should show the first page of everything, not an error. An
+ * absent language is "all languages" here precisely because nothing is being
+ * *written* — reading across languages cannot file anything under the wrong one.
+ */
+export function readNoteListQuery(raw: unknown): LexiconNoteListQuery {
+  const record = raw && typeof raw === 'object' && !Array.isArray(raw)
+    ? raw as Record<string, unknown>
+    : {};
+  const limit = typeof record.limit === 'number' && Number.isFinite(record.limit)
+    ? Math.min(NOTE_LIST_MAX_LIMIT, Math.max(1, Math.floor(record.limit)))
+    : NOTE_LIST_DEFAULT_LIMIT;
+  const offset = typeof record.offset === 'number' && Number.isFinite(record.offset)
+    ? Math.max(0, Math.floor(record.offset))
+    : 0;
+  return {
+    lang: boundedField(record.lang, 16).toLowerCase(),
+    filter: boundedField(record.filter, NOTE_FILTER_MAX_CHARS),
+    limit,
+    offset,
+  };
 }
 
 export function readNoteInput(raw: unknown): LexiconNoteInput {

@@ -17,8 +17,15 @@ vi.mock('electron', () => ({
 import { closeDictionaryDb, migrateDictionaryDb, openDictionaryDb, type SqliteDb } from '../dictionary/db';
 import { MIGRATIONS } from '../dictionary/schema';
 import { normalizeForLookup } from '../dictionary/dictService';
-import { noteKey, readUserNote, writeUserNote } from '../dictionary/notes';
-import { normalizeNoteKey, normalizeNoteTags, readNoteIdentity } from '../../shared/lexiconNotes';
+import { listUserNotes, noteKey, readUserNote, writeUserNote } from '../dictionary/notes';
+import {
+  NOTE_LIST_DEFAULT_LIMIT,
+  NOTE_LIST_MAX_LIMIT,
+  normalizeNoteKey,
+  normalizeNoteTags,
+  readNoteIdentity,
+  readNoteListQuery,
+} from '../../shared/lexiconNotes';
 
 let db: SqliteDb;
 let dir = '';
@@ -107,6 +114,105 @@ describe('user notes — storing and reading', () => {
     expect(writeUserNote(db, { lang: 'ja', text: '   ', reading: '' }, { note: 'x', tags: [] })).toBeNull();
     expect(writeUserNote(db, { lang: '', text: '食べる', reading: '' }, { note: 'x', tags: [] })).toBeNull();
     expect(db.prepare('select count(*) c from user_notes').get()).toEqual({ c: 0 });
+  });
+});
+
+describe('user notes — browsing every note without knowing the word', () => {
+  /** The whole page, which is what the browse surface asks for on open. */
+  const ALL = { lang: '', filter: '', limit: NOTE_LIST_DEFAULT_LIMIT, offset: 0 };
+
+  function seedNotes(): void {
+    writeUserNote(db, TABERU, { note: 'ichidan verb', tags: ['verbs'] }, 3_000);
+    writeUserNote(db, { lang: 'ja', text: '猫', reading: 'ねこ' }, { note: 'everyday word', tags: ['animals'] }, 1_000);
+    writeUserNote(db, { lang: 'zh', text: '生物', reading: '' }, { note: 'shēngwù', tags: [] }, 2_000);
+  }
+
+  it('lists every note newest first, with the word each one belongs to', () => {
+    seedNotes();
+    const result = listUserNotes(db, ALL);
+    expect(result.total).toBe(3);
+    expect(result.notes.map((note) => note.text)).toEqual(['食べる', '生物', '猫']);
+    expect(result.notes[0]).toEqual({
+      lang: 'ja',
+      text: '食べる',
+      reading: 'たべる',
+      note: 'ichidan verb',
+      tags: ['verbs'],
+      updatedAt: 3_000,
+    });
+  });
+
+  it('says nothing rather than something for a user who has never annotated a word', () => {
+    expect(listUserNotes(db, ALL)).toEqual({ notes: [], total: 0 });
+  });
+
+  it('drops a note from the list the moment it is cleared', () => {
+    seedNotes();
+    writeUserNote(db, TABERU, { note: '', tags: [] });
+    expect(listUserNotes(db, ALL).notes.map((note) => note.text)).toEqual(['生物', '猫']);
+  });
+
+  it('scopes to one language when asked, so a Chinese note stays out of a Japanese list', () => {
+    seedNotes();
+    const ja = listUserNotes(db, { ...ALL, lang: 'ja' });
+    expect(ja.total).toBe(2);
+    expect(ja.notes.every((note) => note.lang === 'ja')).toBe(true);
+  });
+
+  it('filters on the word, the reading, the body and the tags alike', () => {
+    seedNotes();
+    expect(listUserNotes(db, { ...ALL, filter: '猫' }).notes.map((n) => n.text)).toEqual(['猫']);
+    expect(listUserNotes(db, { ...ALL, filter: 'たべ' }).notes.map((n) => n.text)).toEqual(['食べる']);
+    expect(listUserNotes(db, { ...ALL, filter: 'ichidan' }).notes.map((n) => n.text)).toEqual(['食べる']);
+    expect(listUserNotes(db, { ...ALL, filter: 'animals' }).notes.map((n) => n.text)).toEqual(['猫']);
+  });
+
+  it('folds the filter the same way the lookup index does, so ＣＡＴ finds cat', () => {
+    writeUserNote(db, { lang: 'en', text: 'cat', reading: '' }, { note: 'x', tags: [] }, 1);
+    expect(listUserNotes(db, { ...ALL, filter: 'ＣＡＴ' }).notes.map((n) => n.text)).toEqual(['cat']);
+  });
+
+  it('treats a wildcard the user typed as a character, not as "match everything"', () => {
+    seedNotes();
+    writeUserNote(db, { lang: 'ja', text: '％', reading: '' }, { note: 'percent sign', tags: [] }, 4_000);
+    expect(listUserNotes(db, { ...ALL, filter: '%' }).notes.map((n) => n.text)).toEqual(['％']);
+    expect(listUserNotes(db, { ...ALL, filter: '_' }).total).toBe(0);
+  });
+
+  it('reports the total behind the page, so the surface can offer the rest', () => {
+    seedNotes();
+    const page = listUserNotes(db, { ...ALL, limit: 2 });
+    expect(page.notes.map((note) => note.text)).toEqual(['食べる', '生物']);
+    expect(page.total).toBe(3);
+    expect(listUserNotes(db, { ...ALL, limit: 2, offset: 2 }).notes.map((n) => n.text)).toEqual(['猫']);
+  });
+
+  it('never lists a note migration 6 could not give a word back', () => {
+    seedNotes();
+    db.prepare("update user_notes set lang = null where text = '猫'").run();
+    expect(listUserNotes(db, ALL).total).toBe(2);
+    expect(listUserNotes(db, ALL).notes.map((note) => note.text)).toEqual(['食べる', '生物']);
+  });
+
+  it('clamps a page an untrusted caller asked for instead of refusing it', () => {
+    expect(readNoteListQuery(undefined)).toEqual({
+      lang: '',
+      filter: '',
+      limit: NOTE_LIST_DEFAULT_LIMIT,
+      offset: 0,
+    });
+    expect(readNoteListQuery({ limit: 10_000 }).limit).toBe(NOTE_LIST_MAX_LIMIT);
+    expect(readNoteListQuery({ limit: 0 }).limit).toBe(1);
+    expect(readNoteListQuery({ offset: -5 }).offset).toBe(0);
+    expect(readNoteListQuery({ limit: Number.NaN }).limit).toBe(NOTE_LIST_DEFAULT_LIMIT);
+    expect(readNoteListQuery({ lang: ' JA ' }).lang).toBe('ja');
+    expect(readNoteListQuery({ filter: 'x'.repeat(500) }).filter).toHaveLength(64);
+    expect(readNoteListQuery('nonsense')).toEqual({
+      lang: '',
+      filter: '',
+      limit: NOTE_LIST_DEFAULT_LIMIT,
+      offset: 0,
+    });
   });
 });
 

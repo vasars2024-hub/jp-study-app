@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import type { DictLang } from '../components/DictionaryResults';
 import LexiconWorkbenchResults from '../components/lexicon/LexiconWorkbenchResults';
+import NotesBrowser from '../components/lexicon/NotesBrowser';
 import { AppChrome, StatusBarField, StatusBarSpacer, type MenuBarMenu } from '../components/ui';
 import { loadDictionarySavedSearches, removeDictionarySavedSearch, saveDictionarySearch, type DictionarySavedSearch } from '../dictionarySavedSearches';
 import { useT } from '../i18n';
@@ -80,6 +81,20 @@ export default function DictionaryView() {
     pickLang(saved.lang);
     setInput(saved.query);
     setQuery(saved.query);
+    setLookupAttempt((attempt) => attempt + 1);
+  }
+
+  /**
+   * Open the word a stored note hangs off.
+   *
+   * The note's own language wins over whatever the toggle currently says: a
+   * Chinese note looked up under the Japanese lens would find a different word or
+   * none at all, and the reader asked for *that* note's word.
+   */
+  function openNotedWord(word: string, noteLang: string) {
+    if (noteLang === 'ja' || noteLang === 'zh') pickLang(noteLang);
+    setInput(word);
+    setQuery(word);
     setLookupAttempt((attempt) => attempt + 1);
   }
 
@@ -164,6 +179,9 @@ export default function DictionaryView() {
           </div>
         )}
       </div>
+
+      <NotesBrowser lang={lang} onOpen={openNotedWord} />
+
       {!query ? (
         <p className="dict-hint muted">
           {isZh

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  LEXICON_NOTES_CHANGED_EVENT,
   NOTE_MAX_CHARS,
   TAG_MAX_CHARS,
   normalizeNoteTags,
@@ -101,6 +102,14 @@ export default function EntryNote({ word, reading, lang }: Props) {
       setTagField(storedTags);
       setSaved({ note: result.note?.note ?? '', tags: storedTags });
       setState('saved');
+      // Only after a write the database confirmed. Announcing an attempted save
+      // would make the browse list re-read for nothing and, worse, imply the
+      // note landed.
+      try {
+        window.dispatchEvent(new CustomEvent(LEXICON_NOTES_CHANGED_EVENT));
+      } catch {
+        /* jsdom without CustomEvent, and a missed refresh is not worth failing a save over */
+      }
     } catch {
       if (attempt === run.current) setState('error');
     }

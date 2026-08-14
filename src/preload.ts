@@ -468,6 +468,11 @@ const api = {
     input: import('./shared/lexiconNotes').LexiconNoteInput,
   ): Promise<{ ok: boolean; note: import('./shared/lexiconNotes').LexiconNote | null }> =>
     ipcRenderer.invoke('dict:noteSet', identity, input),
+  /** One page of every note the user has written, newest first. */
+  dictNoteList: (
+    query?: Partial<import('./shared/lexiconNotes').LexiconNoteListQuery>,
+  ): Promise<import('./shared/lexiconNotes').LexiconNoteListResult> =>
+    ipcRenderer.invoke('dict:noteList', query),
   /** Find example sentences (JP + EN) for a word or grammar pattern, via Tatoeba. */
   searchExamples: (query: string, limit?: number): Promise<ExampleResult> =>
     ipcRenderer.invoke('examples:search', query, limit),

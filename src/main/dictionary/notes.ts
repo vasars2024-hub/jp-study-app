@@ -18,6 +18,8 @@ import {
   type LexiconNote,
   type LexiconNoteIdentity,
   type LexiconNoteInput,
+  type LexiconNoteListQuery,
+  type LexiconNoteListResult,
 } from '../../shared/lexiconNotes';
 
 interface NoteRow {
@@ -73,6 +75,66 @@ export function readUserNote(db: SqliteDb, identity: LexiconNoteIdentity): Lexic
     `)
     .get(key.lang, key.norm, key.readingNorm) as NoteRow | undefined;
   return row ? toNote(row) : null;
+}
+
+/**
+ * A `like` pattern that matches this text anywhere, with the wildcards the user
+ * typed treated as literal characters.
+ *
+ * Without this a note containing `%` is unfindable and a filter of `_` matches
+ * everything. `\` is escaped first, or escaping the wildcards would re-escape it.
+ */
+function containsPattern(text: string): string {
+  return `%${text.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
+}
+
+/**
+ * One page of the user's notes, newest first.
+ *
+ * This is the only reader that does not know the word in advance, which is the
+ * whole point: a note written months ago is otherwise reachable only by looking
+ * up the exact word again, and nothing tells the reader which words those were.
+ *
+ * The filter matches the written form and the reading through the *normalised*
+ * columns, so it folds width and case the same way the lookup index does, and
+ * matches the body and the tags with `like` on the stored text. `like` folds
+ * ASCII case only, so a Cyrillic capital typed into the filter finds the word but
+ * not a mention of it inside an English-cased note body; the word and reading are
+ * the filter's primary targets and they are the pair that folds properly.
+ *
+ * Rows left orphaned by migration 6 have `lang is null` and are excluded here for
+ * the same reason the partial index skips them: there is no word to show.
+ */
+export function listUserNotes(db: SqliteDb, query: LexiconNoteListQuery): LexiconNoteListResult {
+  const where: string[] = ['lang is not null'];
+  const params: (string | number)[] = [];
+  if (query.lang) {
+    where.push('lang = ?');
+    params.push(query.lang.trim().toLowerCase());
+  }
+  const filter = query.filter.trim();
+  if (filter) {
+    where.push(
+      "(norm like ? escape '\\' or reading_norm like ? escape '\\'"
+      + " or note like ? escape '\\' or tags like ? escape '\\')",
+    );
+    const normPattern = containsPattern(normalizeForLookup(filter) || normalizeNoteKey(filter));
+    const rawPattern = containsPattern(filter);
+    params.push(normPattern, containsPattern(normalizeNoteKey(filter)), rawPattern, rawPattern);
+  }
+  const clause = `where ${where.join(' and ')}`;
+  const total = Number(
+    (db.prepare(`select count(*) as n from user_notes ${clause}`).get(...params) as { n: number } | undefined)?.n ?? 0,
+  );
+  const rows = db
+    .prepare(`
+      select lang, text, reading, note, tags, updated_at from user_notes
+      ${clause}
+      order by updated_at desc, text asc
+      limit ? offset ?
+    `)
+    .all(...params, query.limit, query.offset) as NoteRow[];
+  return { notes: rows.map(toNote), total };
 }
 
 /**

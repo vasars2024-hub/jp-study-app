@@ -52,13 +52,16 @@ import {
   setDictionarySourceEnabled,
   moveDictionarySource,
   removeDictionarySource,
+  listUserNotesFromDb,
   readUserNoteFromDb,
   writeUserNoteToDb,
 } from './dictionary/service';
 import {
   readNoteIdentity,
   readNoteInput,
+  readNoteListQuery,
   type LexiconNote,
+  type LexiconNoteListResult,
 } from '../shared/lexiconNotes';
 import {
   GLOBAL_PAIR,
@@ -733,6 +736,16 @@ export function registerDictionaryIpc(): void {
       return readUserNoteFromDb(target);
     } catch {
       return null;
+    }
+  });
+  // Every note the user has written, so one is reachable without already knowing
+  // the word it hangs off. An empty page is the honest answer for an un-migrated
+  // installation as well as for a user who has never annotated anything.
+  ipcMain.handle('dict:noteList', (_e, query: unknown): LexiconNoteListResult => {
+    try {
+      return listUserNotesFromDb(readNoteListQuery(query));
+    } catch {
+      return { notes: [], total: 0 };
     }
   });
   // A failed write returns `{ ok: false }` instead of the note, because losing

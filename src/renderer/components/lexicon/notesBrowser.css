@@ -1,0 +1,157 @@
+.lexicon-notes-browser {
+  margin: 14px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-1);
+  color: var(--text);
+}
+
+.lexicon-notes-browser > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.lexicon-notes-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.lexicon-notes-filter {
+  flex: 1 1 12rem;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+}
+
+.lexicon-notes-scope {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  /* The checkbox itself paints at 13 px. The label is the real hit target, so it
+     carries the height the box cannot — measured at 19 px before this line. */
+  min-height: 32px;
+  cursor: pointer;
+}
+
+.lexicon-notes-empty,
+.lexicon-notes-error {
+  margin: 10px 0 0;
+  font-size: 0.9em;
+}
+
+.lexicon-notes-error {
+  color: var(--danger, #d14343);
+}
+
+.lexicon-notes-list {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  /* The archive can grow without bound; it scrolls inside its own box rather
+     than pushing the entry the reader is actually looking at off screen. */
+  max-height: 22rem;
+  overflow-y: auto;
+}
+
+.lexicon-notes-row {
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+
+.lexicon-notes-row:first-child {
+  border-top: 0;
+}
+
+.lexicon-notes-open {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  min-height: 32px;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.lexicon-notes-open:hover {
+  background: var(--surface-2);
+}
+
+.lexicon-notes-word {
+  font-size: 1.1em;
+  font-weight: 600;
+}
+
+.lexicon-notes-reading {
+  font-size: 0.9em;
+}
+
+.lexicon-notes-excerpt {
+  margin: 2px 0 0;
+  padding: 0 4px;
+  font-size: 0.95em;
+  /* A note can be four thousand characters; the row shows enough to recognise
+     it and the entry itself shows the rest. */
+  overflow-wrap: anywhere;
+}
+
+.lexicon-notes-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 0 4px;
+}
+
+.lexicon-notes-tag {
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  font-size: 0.85em;
+}
+
+.lexicon-notes-date {
+  font-size: 0.85em;
+}
+
+.lexicon-notes-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  font-size: 0.9em;
+}
+
+.lexicon-notes-more {
+  min-height: 32px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.lexicon-notes-more:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
