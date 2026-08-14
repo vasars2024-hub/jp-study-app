@@ -19345,3 +19345,208 @@ file's bytes for `EF BB BF` and replaced at the byte level. Scan new source byte
 well as for NUL.
 
 Commit: `ebbcd97`.
+
+## Track 2 — the results list learns what the reader already knows — 2026-08-14 21:30 MSK primary
+
+Boss-audit state re-derived first: the last two sections of `docs/audit/RELAY_BOSS_AUDIT.md` are
+retry-53 and its resolution note, and all four retry-53 findings are closed (`f61f59c`, `9703c1f`
++ `89791ce`, `9eecb3e`). Nothing outstanding there, so this is a normal Track 2 ladder slice.
+
+### Why this slice, re-derived rather than inherited
+
+The plan's Track 2 line 42 lists `known-word overlays` between `stars` and `exports`. `stars`
+(`savedWords.ts`) and `exports` (the previous hop, `ebbcd97`) are done; `history`
+(`lookupHistory.ts`) was re-derived as done two hops ago. `known-word overlays` was **not**, and
+the gap was checked rather than assumed:
+
+- `DictionaryResults.tsx` — the component behind every Lexicon results surface — did not import
+  `knownWords` at all. `DictionaryPopup.tsx:3` and `LensReaderPanel.tsx:5` both do.
+- The app says so about itself. `stats.wk.note` in `catalogs/en.ts` reads *"Grade words from any
+  dictionary **popup**"* — grading has been popup-only since it shipped.
+- `cycleLevel` has existed in `knownWords.ts:103` since the store was written and **had no
+  importer anywhere in `src/`**. The write path for exactly this control was already there, unused.
+
+So the Lexicon Workbench — the surface the plan calls the professional one — could show eight
+headwords and say nothing about which of them the reader knows, while a transient popup could.
+
+The neighbouring line-42 items were re-checked and remain honestly blocked on data a default
+install lacks: the `ebbcd97` hop's live probe found `inflections`, `collocations`, `etymology`,
+`audio`, `examples`, `xrefs` and `freq_corpora` all at **0 rows**. Knowledge, like notes, is data
+the user themselves produces.
+
+### The decisions the slice needed, and the options taken
+
+All under the standing auto-approval for reversible choices.
+
+- **One cycling chip per row, not the popup's four buttons.** The popup grades one token, so four
+  buttons cost four controls. A results list is eight rows; the same treatment would put
+  **thirty-two** controls into a reading surface, against the "calm hierarchy, progressive
+  disclosure" invariant. The chip shows the current level as its label and advances on click, so
+  it is the overlay and the control at once. The cost is stated rather than hidden: reaching
+  Known from New is three clicks. Direct selection still exists in the popup and the Lens reader.
+- **Keyed on `entry.word`, with no deinflection.** The popup must call `lemmaOf(query)` because it
+  grades whatever the reader clicked. A results row already *is* the dictionary headword, which is
+  what the store is keyed by. **This is not merely simpler, it is more correct**: `wordHighlight`,
+  `comprehensibility` and `levelLists` all call `getLevel()` with the tokenizer's dictionary form,
+  so a kana lookup of たべる grades 食べる here and agrees with the reader, where the popup would
+  store `たべる` as its own separate word.
+- **Withheld when the dictionary is not the study language.** `jp-word-knowledge-*` is per study
+  language. `BlancStudyPanels.tsx:300` renders this component with a hardcoded `lang="ja"`, and
+  `TranslateView.tsx:193` passes `lang={source}` — a translation source picked from a `<select>`
+  with no relation to the study language, and which can be `en`/`ru`, for which no store exists.
+  Grading a Chinese headword into the Japanese vocabulary is silent corruption of the other
+  language's data; hiding an inapplicable control is honest. In `DictionaryView` the guard is a
+  **no-op by construction** — `lang` is initialised from `getStudyLang()` (`:16`) and every path
+  that changes it goes through `pickLang`, which calls `setStudyLang` first (`:75-78`).
+- **Withheld in the popup variant**, which already carries its own grade control for the clicked
+  token. Two controls for one word is worse than one. This also keeps the two key conventions
+  above from colliding on one screen.
+- **A counter, not a copy of the store.** `knowledgeTick` re-reads through `getLevel` on every
+  emit rather than mirroring the store into component state, so grading in the popup, the Lens
+  reader or an Anki sync cannot drift from what the list shows.
+- **Level 0 gets no tint.** The shared `wk-g-*` palette is reused so a word reads the same here as
+  in the popup, but `.active` is withheld at New: in the popup the tint means "the level you
+  picked" and every level can carry it; here the chip always shows the current level, so tinting
+  New would light up every ungraded row.
+
+### Mutation controls
+
+Eight scored, applied in place and restored afterwards, each restore asserted byte-identical
+(`Compare-Object` on the raw bytes) rather than eyeballed.
+
+| mutation | actual |
+|---|---|
+| language guard dropped | 2 failed / 8 passed |
+| popup exclusion dropped | 1 failed / 9 passed |
+| chip reads the first row's word instead of its own | 1 failed / 9 passed |
+| `knowledgeTick` dropped from the memo deps | 2 failed / 8 passed |
+| knowledge-change subscription dropped | 2 failed / 8 passed |
+| study-language subscription dropped | 1 failed / 9 passed |
+| New tinted like a graded level | 1 failed / 9 passed |
+| "next level" computed as the current level | 1 failed / 9 passed |
+
+**The sixth one found a real hole and is why the round was run twice.** On the first pass the
+study-language subscription was **unguarded — 9 passed with it deleted**. The suite covered the
+guard's two static outcomes but never the transition, so a results list already on screen would
+have kept its mount-time answer until the next lookup. A tenth test drives the app's own
+`study-lang-changed` event and now fails without the subscription.
+
+### Gates — shared tree
+
+`npx vitest run --testTimeout=60000 --hookTimeout=60000`: **590 passed / 1 skipped files,
+7,792 passed / 6 skipped tests**, exit 0. Per the retry-53 finding-1 lesson this is
+**shared-tree evidence and is deliberately not offered as committed-HEAD evidence**; the committed
+numbers are below and they are not the same. `node tools/i18n-check.cjs` exit 0 at **9,545** keys
+translated in ja/zh/ru. `node tools/architecture-audit.cjs` exit 0, 1,814 modules, 18 known / 2
+pending, nothing new — `WordKnowledge.tsx` landed with its importer, so no orphan module.
+`npx eslint` on all four touched code paths plus the four catalogs: **0 errors, 0 warnings**, with
+no pre-existing findings to disentangle this time.
+
+### Live acceptance
+
+Own dev app, `npm start`; bridge pid **31096** on 127.0.0.1:39273. The previous hop's
+`debug/bridge.json` was stale (pid 1908, port refusing) — started fresh rather than driving a
+corpse, and **removed the file on the way out this time** so the next hop does not repeat the
+diagnosis. `/logs` showed **0** `[vite] hot updated` lines before and during the run, so no other
+track was editing the tree. Driven as a real pop-out Dictionary window (`window.api.popOut`,
+window id 2), `/focus`ed before every measurement. This profile's UI language is **Russian** and
+its study language is **zh**, so the strings are verified in a non-English locale and the Chinese
+branch is the one exercised live.
+
+- **The real store, through the real control.** A hit-tested single click (`click.ps1` reported
+  `hitTest: match`) on the chip of a live CC-CEDICT lookup of 猫 advanced it to `Учу` and wrote
+  `jp-word-knowledge-zh` = `{"猫":{"l":1,"m":1}}`. Cycling on: `Знакомо` at `l:2`, `Знаю` at
+  `l:3`, then back to `Новое` with the store at **`{}`** — level 0 deletes rather than storing a
+  zero, verified against the real profile rather than a fixture.
+- **Both rows for 猫 moved together**, which is the word-keyed contract visible in the UI: the
+  level belongs to the headword, not to a row index.
+- **`jp-word-knowledge-ja` stayed `null` through every one of those writes.** The language scoping
+  is live-verified, not only unit-tested.
+- **Cross-window propagation, through the real shipped module.** `import('/src/renderer/knownWords.ts')`
+  in **window 1** (a different renderer process) followed by `setLevel('猫', 3)` moved window 2's
+  chip to `Знаю` — the actual path a popup grade or an Anki sync takes.
+- **The guard proven both ways on one mount.** The real Vite-transformed `DictionaryResults` was
+  mounted off-screen (`?v=318a685f` discovered at runtime; host count asserted **1**) with
+  `lang="ja"` while the stored study language was `zh` — exactly Blanc's hardcoded case. Result:
+  **8 entries, 0 chips**. The same root re-rendered with `lang="zh"`: **2 entries, 2 chips**,
+  reading `Знаю` from the zh store, with `jp-word-knowledge-ja` still `null`. A mount that renders
+  8 entries and no chip cannot be a broken mount.
+- **Geometry.** Chip **45.59x22.3** at `Знаю`, **51.16x22.3** at the longer `Новое`, 11 px / 600.
+  Under 24 px, so WCAG 2.5.8 was checked on its **spacing exception** rather than the raw size:
+  the nearest other control centre is **40.0 px** away (`.dict-star`), well past the 24 px the
+  criterion asks, so the exception is satisfied — the same basis on which the surrounding compact
+  dictionary chrome passes.
+- **Contrast, with the parser positive-controlled.** The sampler handles `color(srgb …)` 0..1
+  channels and composites through transparent ancestors; fed the known pair `#d8ebe0` on `#121c17`
+  it returned **14.02**, matching an independent reading, before any chip was scored. Live theme
+  `forest-night`. Text: **6.08:1** at New (resting `--muted`), **6.18** Learning, **9.62**
+  Familiar, **12.21** Known. Border against the surround: **6.87:1** at levels 1–3 (`--accent`),
+  **1.35:1** at New (`--border`) — recorded rather than waved through, and not scored as a 1.4.11
+  failure because what identifies this control is its text label at 6.08:1, not its edge.
+- **A measurement artifact caught rather than reported.** The first level-0 reading came back at
+  `--text` / 14.02 instead of `--muted`. The chip was still `:hover` from the bridge click. The
+  resting value was taken from the second, never-clicked chip (`matches(':hover')` asserted
+  `false`) and is the 6.08 above. Assert the hover state before scoring a control you just clicked.
+- **Reflow.** The results container was narrowed by inline width to 900/640/480/360/320 px and
+  restored in a `finally` (restore asserted). The chip keeps its full 51.16x22.3 at every width
+  and **no descendant overflowed horizontally at any width** (`scrollWidth > clientWidth + 1`).
+- `/logs?level=error` returned **0 entries** across the entire run. The probe host was removed and
+  its count asserted 0, all four probe globals deleted in both windows, `jp-word-knowledge-zh`
+  removed back to `null` (it did not exist before the run), `-ja` never created, study language
+  still `zh`, localStorage back to **80 keys** — the exact count read before the run. No persisted
+  setting was toggled, no userData backup taken, no input automation. All **6** owned pids stopped.
+
+### Committed-HEAD verification, run after the checkpoint commit
+
+Two disposable detached worktrees with `node_modules` supplied by an NTFS junction — one at
+`e771089`, one at the parent `c57e868` to derive the baseline here rather than inherit it.
+
+- Focused suites at committed HEAD: **2 files / 19 tests**, exit 0 (10 new, 9 the neighbouring
+  character suite).
+- `node tools/i18n-check.cjs` exit 0 at **9,374** keys — the *committed* count. The 9,545 above is
+  the shared tree, which carries other tracks' uncommitted catalog keys. Both green, different
+  trees, not interchangeable.
+- `node tools/architecture-audit.cjs` exit 0, nothing new.
+- Full `npx vitest run` at `e771089`, run **twice**, identical both times: exit 1, **4 failed /
+  560 passed / 1 skipped files, 9 failed / 7,420 passed / 6 skipped tests** — the same five
+  `blancAgentStepConfirmGate`, one `localAgentQueueRun`, one `novelReaderProgressGuard`, two
+  `i18n.test.ts` identities every hop this week has reproduced. The parent carries the identical
+  9. Set difference introduced by this commit: **empty**. The +10 passed are exactly this slice's
+  own tests.
+- **The new-component i18n failure was checked, not assumed.** This slice adds a component, which
+  is precisely what that test polices. `tools/i18n-hardcoded-check.cjs` at HEAD names **no** path
+  from this slice, and the failure's own list of offending files is **identical, 37 lines, at HEAD
+  and at the parent** by `comm`. Every string in `WordKnowledge.tsx` goes through `t()`.
+
+### The baseline was noisier than HEAD, which needed running down
+
+The parent's two runs did **not** agree with each other. Run 1 added three *collection* failures —
+`scraperScheduler`, `scraperSources`, `subtitleNyaaFetch` — contributing 0 test failures (9 failed
+/ 7,410 passed, 7 failed files). Run 2 added a different thing: a genuine test failure,
+`scraperSources > probeSource > caps the stored history so it cannot grow forever` (10 failed /
+7,409 passed). **Neither appeared in either HEAD run.**
+
+Read naively that says this commit *fixed* three scraper suites, which is not a thing it could do.
+Run down instead of assumed: the commit touches no scraper or nyaa file (`git show --stat` names
+only lexicon, dictionary and catalog paths); all three files pass **60/60 in isolation** at the
+parent; and the noise took two different shapes across two runs of the same tree. So this area is
+flaky under full-suite load on this branch, in at least two shapes, and it is attributable to this
+commit in **neither** direction. Recorded because the next hop that sees seven failed files at
+`c57e868` should not spend an hour on it — and because, as with the `shimejiPhysics` near-miss one
+hop ago, **a single full-suite run still cannot establish a set difference in this repo.**
+
+### Deliberately open, stated rather than absorbed
+
+- **The popup and the list key the same word differently.** The popup grades `lemmaOf(query)`; the
+  list grades `entry.word`. For 食べた they agree. For a kana lookup of たべる they do not — the
+  popup stores `たべる`, the list stores `食べる`. The list's convention matches every reader in
+  the app, so the popup is the one out of step. Changing it means touching the popup, the Lens
+  reader and whatever their stored keys already contain, which is a migration and its own slice.
+- **No bulk grading.** There is no "mark all results Known". A results list is not a deck.
+- **The chip is not offered in the popup or the Lens reader**, by the decision above.
+- **Cycling only goes forward.** No shift-click to step back; three clicks wrap.
+- **`stats.wk.note` still says grading happens in "any dictionary popup".** It is now also the
+  results list. That string is Stats-owned copy in four languages and belongs to whichever slice
+  next touches that surface, not to this one — but it is now *understated* rather than wrong.
+
+Commit: `e771089`.
