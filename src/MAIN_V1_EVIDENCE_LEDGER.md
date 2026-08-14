@@ -20292,3 +20292,194 @@ which is what the section above deliberately did **not** claim:
 
 The `scraperSources` `ENOTEMPTY` seen on the shared tree did **not** reproduce here, which
 confirms it as temp-directory contention rather than anything in the tree.
+
+## Track 2 — the language a user's own dictionary is written in — 2026-08-14 22:40 MSK primary
+
+### What was open, and why this slice rather than another
+
+The previous slice's "Deliberately open" list opened with it, and sized it: *"A user-imported
+Chinese or Korean Yomitan archive is still stored as Japanese. The legacy format declares no
+source language and the title cannot be trusted for this side, so the only honest fix is a
+`sourceLangOverride` in Settings beside the existing `glossLangOverride` — a UI slice with its
+own acceptance."* Re-derived from source rather than taken from that note, the shape it names
+is wrong in a way worth recording, because building it as written would have shipped a control
+that does nothing.
+
+`glossLangOverride` lives in `userData/yomitan/registry.json` and is read by
+`resolveGlossLangs` when a store is *imported*. The migration, though, reads
+`userData/yomitan/<id>/index.json` — a different file, written once at import time — and
+`startPendingLegacyDictionaryMigration` only runs for stores SQLite does not already own
+(`pendingLegacyStores`, `service.ts:281-292`). So a registry override set *after* an import
+would never reach a single row: the dictionary is already in the database and will never be
+migrated again. The user would change a dropdown, see nothing change, and be right.
+
+What the user is actually asking for is not an override consulted at import. It is a **repair of
+rows that already exist** — the same repair schema step 7 performs for the dictionaries this app
+provisions itself, applied to the ones it does not know.
+
+### The decision: repair the database, not the registry
+
+`setDictionarySourceLang` therefore lives in `service.ts` beside `setDictionarySourceEnabled`
+and `removeDictionarySource`, operates on `dictionaries`/`headwords`, and is surfaced on the
+**Imported dictionary sources** list rather than on the Yomitan registry list above it. Three
+consequences, all of them the point:
+
+* it reaches every importer, not only the legacy one — StarDict writes the honest `'und'` and
+  CEDICT writes `'zh'`, and a user with either can now correct or confirm it;
+* it needs no new persisted field, no migration and no registry write, because the database row
+  *is* the persisted state;
+* it cannot be undone by a later boot, because the migration that would have overwritten it does
+  not run for a store that already has rows.
+
+The rejected alternative is recorded because it is the one the note asked for: a
+`sourceLangOverride` in `registry.json` mirroring `glossLangOverride`. It would be dead on
+arrival for the reason above, and adding a *second* mechanism to make it live — re-reading the
+registry during migration — would mean two places that can disagree about one dictionary's
+language, which is how the original defect happened.
+
+### What a relabel has to cover, and why it is not a matter of taste
+
+One transaction, every row the source owns:
+
+| table | why it cannot be left behind |
+| --- | --- |
+| `dictionaries.source_lang` | one half of every language pair; `listDictionaryPairs` reads it |
+| `headwords.lang` | what `lookupChineseInDb` filters on, and what `dict_pair_priority` joins to (`pp.source_lang = h.lang`) — a row disagreeing with its own headwords makes every pair override for that dictionary stop applying, silently |
+| `pitch.lang`, `freq_corpora.lang` | read under the headword's language; leaving them hides the pitch pattern and the frequency rank of every word in the dictionary |
+| `dict_pair_priority.source_lang` | the user's own ordering, which otherwise points at a pair the dictionary no longer answers |
+| `char_sources.lang` | and then `rebuildCharacterProjection`, because `chars` is pinned to `'ja'` (`importers/kanjidic.ts:44-47`): a character source moving off `ja` has to leave the projection, and the characters it owned can only be read while its rows still carry the *old* language |
+
+The five statements are **extracted** from step 7 into `main/dictionary/sourceLang.ts` rather
+than copied, so a repair and a correction cannot drift apart. Step 7's guards, its id list and
+its order are unchanged, and its twelve existing tests are what proves the extraction is a
+refactor. `char_sources` is deliberately *not* in the shared helper: step 7 never touches a
+character source (only the KANJIDIC importer writes those rows, under its own id), and the
+projection rebuild needs state captured before the update.
+
+### Four mutation controls, all of which failed for the intended reason
+
+1. `update pitch set lang …` dropped from the helper → `expected [ 'ja' ] to deeply equal [ 'zh' ]`.
+2. `update char_sources set lang …` dropped → the character test fails on the same shape.
+3. `rebuildCharacterProjection` dropped → `expected { c: 1 } to deeply equal { c: +0 }`: the
+   `chars` row survives, still crediting a source that no longer answers in Japanese.
+4. `normalizeSourceLang`'s `/^[a-z]{2,3}$/` weakened to "non-empty" → the adverse-input test
+   fails: `'ja-JP'` is accepted as a language.
+
+**One guard no mutation can reach, stated rather than implied.** The "already in that language"
+early return is not behaviour-bearing — relabelling `ja` to `ja` is a no-op either way. It is
+there so a `<select>` re-emitting its own value does not fire an `UPDATE` over every headword
+of a 500,000-row dictionary. No test can tell it from its absence, and it is kept for the cost,
+not the correctness.
+
+### Gates
+
+- Focused: `dictionarySources` **15 tests** (7 new), exit 0. Neighbouring dictionary suites —
+  `dictionaryMigrate`, `dictionaryDb`, `dictionaryChineseLookup`, `dictionaryCompounds`,
+  `dictionaryLookup`, `dictionaryNotes`, `dictionaryImportWorker` — **213 passed**, exit 0.
+- `node tools/i18n-check.cjs`: exit 0 at **9,555** English keys (two new, in all four catalogs).
+- `node tools/architecture-audit.cjs`: exit 0, **1,826 modules, 18 known findings, 2 pending,
+  nothing new** — `sourceLang.ts` landed with both its importers, so no orphan module.
+- `npx eslint` on the touched paths: the only errors are the two long-standing
+  `adjacent-overload-signatures` in `window.d.ts` (`subtitleHarvestList`,
+  `subtitleHarvestFetch`). A HEAD copy of that file, linted intact, reproduces the **same two**
+  at 1540/1543 — the set difference is empty; my one inserted line simply shifts them by one.
+- Full `npx vitest run`: **597 passed / 1 skipped files, 7,878 passed / 6 skipped tests**,
+  exit 0. **These numbers are the shared tree, not committed HEAD**, and the shared tree carries
+  other tracks' uncommitted fixes.
+
+### Measured against a copy of the real 361 MB profile database
+
+Copied `dict.db` + WAL + SHM out of `%APPDATA%` and driven with the **raw driver**, never
+`openDictionaryDb` — it runs the ladder on open, so a "before" reading taken after it is
+already the "after". Target: `bundled-jmdict-ru`, 101,843 headwords.
+
+| | before | after |
+| --- | --- | --- |
+| `bundled-jmdict-ru.source_lang` | `ja` | `ko` |
+| `headwords` by lang | `ja` 625,949 + `zh` 71,888 | `ja` 524,106 + `ko` 101,843 + `zh` 71,888 |
+| `headwords_fts match '顰'` within it | 2 | **2** — the index survived the relabel |
+| ja-scoped rows still owned by it | 101,843 | **0** |
+
+No row was lost: 524,106 + 101,843 + 71,888 = 697,837, the original total. The whole transaction
+took **7.2 s**.
+
+**Where that 7.2 s goes, measured rather than guessed, because it decided a design question.**
+The obvious suspect is `headwords_au`, which fires per row and retracts/re-adds identical FTS
+text for a column FTS does not index; narrowing it to `AFTER UPDATE OF text, reading, norm,
+reading_norm` would be a small step 8. Measured on the same copy: the headword update alone is
+**2,423 ms** with the wide trigger and **2,014/2,088 ms** with the narrowed one. So the FTS
+churn is ~15% and the rest is `idx_hw_norm` and `idx_hw_reading`, both keyed on `lang`, being
+rewritten for every row — irreducible. **The step was not written.** The measurement is what
+says so.
+
+### Live acceptance
+
+Own dev app via `npm start`, bridge pid **23160** on 127.0.0.1:39273, window focused.
+`debug/bridge.json` was stale again at the start of the hop — pid 12308, already dead.
+
+- **The real main handler, not the preload binding.** Six malformed values —
+  `''`, `'ja-JP'`, `'jpan'`, `7`, `null`, `['ko']` — were each refused with
+  `ok:false, error:'invalid-lang'`, and an unknown id with `'not-found'`. The source list and
+  the pair list were byte-identical before and after all seven refusals.
+- **A real relabel on the real profile database, and back.** `bundled-kanjium-pitch` `ja→ko`
+  in **3.56 s** (107,978 pitch rows): the sources list showed `ko` and `dictListPairs()` grew a
+  fourth pair, `ko→en`. Back to `ja` in **844 ms**, and both lists returned to exactly their
+  original values (`ja→en`, `ja→ru`, `zh→zh`). Re-sending `'JA'` afterwards succeeded and
+  changed nothing, which is the early return above.
+- **Through the actual control, not the API.** Settings → Профиль и словарь (this profile runs
+  in Russian): 7 `.dict-lang-select` elements — 3 gloss selects on term dictionaries plus one
+  source select per row. The new one measures 86×26, `tabIndex 0`, white on `rgb(59,59,59)`,
+  and its `title`/`aria-label` are the translated string. Driving it to 한국어 re-rendered the
+  row as `한국어 · pitch · 0` **and added `한국어 → English` to the pair selector** — which is
+  why this handler calls `refresh()` rather than `updateSource()`. Driving it back to 日本語
+  restored all four rows (`日本語`, `日本語`, `日本語`, `中文`) and the original three pairs.
+- `/logs?level=error`: **0 entries** across every probe. All three `window.__p*` probe globals
+  removed and asserted gone. Owned pid 23160 and its five children stopped, nothing else.
+  **No userData backup was taken**; the temporary database copy was deleted.
+
+### Deliberately open
+
+- **The relabel runs synchronously on the main thread**, so a large source freezes the window for
+  the duration — 7.2 s measured for 101,843 headwords, and `bundled-jmdict-en` has 524,106.
+  Nothing in the UI can soften that, because a blocked main thread cannot paint a pending state.
+  It is accepted rather than hidden: it is an explicit, rare, user-initiated action, and the
+  `Remove` button on the *same row* already does strictly more synchronous work — a cascading
+  delete of the same headwords plus their senses and glosses. Moving it off-thread means a new
+  job kind in the import utility process with progress and cancellation, which is its own slice.
+- **A note taken before a relabel is still keyed under the old language.** Unchanged from the
+  previous slice: `user_notes` keys on lang+norm+reading and nothing here touches it. This
+  install has 0 notes.
+- **Deleting a source whose legacy `index.json` still exists re-migrates it under the default.**
+  `migrateLegacyYomitanStores` never deletes the store it read, so a remove-then-reboot cycle
+  restores the old language along with the rows. Correct in isolation; worth stating because it
+  is the one path that can undo this control.
+- **The nine long-standing full-suite failures at committed HEAD are untouched** and still belong
+  to other tracks.
+
+### The same gates at the committed commit, not the shared tree
+
+`1c751d9` checked out into a detached worktree (`node_modules` supplied by an NTFS junction):
+
+- Focused: `dictionarySources`, `dictionaryMigrate`, `dictionaryDb`, `dictionaryChineseLookup`,
+  `dictionaryCompounds`, `dictionaryNotes` — **156 passed / 6 files**, exit 0.
+- `i18n-check`: exit 0 at **9,384** committed keys — exactly two more than `f552e09`'s 9,382,
+  which is this slice's two strings. The shared tree's 9,555 belong to other tracks.
+- `architecture-audit`: exit 0, nothing new, 2 known pending.
+- Full `npx vitest run`: **4 failed / 567 passed / 1 skipped files, 9 failed / 7,506 passed /
+  6 skipped tests**. Against `f552e09`'s recorded **4 / 567 / 1 files, 9 / 7,499 / 6 tests**,
+  the **set difference is empty** — re-run alone, the same four files fail with the same nine
+  identities (5 `blancAgentStepConfirmGate`, 1 `localAgentQueueRun`, 1
+  `novelReaderProgressGuard`, 2 `i18n.test.ts`).
+- **The arithmetic reconciles exactly.** 7,499 → 7,506 passed is +7, and
+  `dictionarySources.test.ts` adds exactly 7 `it(`. No test moved out of the passed column.
+  `i18n-hardcoded-check` names 35 files; none of them is one this slice touched.
+
+### Staging, since the tree is shared
+
+Seven files were clean at HEAD and were staged normally. Six carried other tracks' uncommitted
+work — `preload.ts`, `window.d.ts` and all four catalogs, the catalogs with over a thousand
+changed lines each — and were staged as reconstructed HEAD-plus-my-insertion blobs
+(`git hash-object -w --no-filters`, terminator taken from the anchor line's own), each verified
+by slicing the insertion back out and asserting the remainder `===` `git show HEAD:<path>`.
+`git diff --cached --numstat` for those six is `2/0, 1/0, 2/0, 2/0, 2/0, 2/0` — insertions
+only, no phantom deletion.
