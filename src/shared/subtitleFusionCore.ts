@@ -260,16 +260,17 @@ export function windowCuesToSubtitleCues(
   cues: readonly FusionCue[],
   texts: readonly string[],
 ): { start: number; end: number; text: string }[] {
-  const out: { start: number; end: number; text: string }[] = [];
-  windows.forEach((window, index) => {
-    const text = (texts[index] ?? '').trim();
-    if (!text) return;
-    const first = cues[window.cueIndices[0]];
-    const last = cues[window.cueIndices[window.cueIndices.length - 1]];
-    if (!first || !last) return;
-    out.push({ start: first.start, end: Math.max(last.end, first.start + 0.001), text });
-  });
-  return out;
+  return windowDecisionsToFusedCues(
+    windows,
+    cues,
+    texts.map((text, index) => ({
+      windowIndex: index,
+      text: text ?? '',
+      basis: 'whisper' as const,
+      score: 0,
+      confidence: 0,
+    })),
+  ).map(({ start, end, text }) => ({ start, end, text }));
 }
 
 // Serialization is deliberately not here: `shared/subtitlesExport.ts` already owns
@@ -499,4 +500,51 @@ export function meanFusionConfidence(decisions: readonly FusedWindowDecision[]):
   if (!kept.length) return 0;
   const total = kept.reduce((sum, decision) => sum + decision.confidence, 0);
   return Math.round((total / kept.length) * 1000) / 1000;
+}
+
+/** One line as it will appear in the fused track, with why it says what it says. */
+export interface FusedCueRow {
+  start: number;
+  end: number;
+  text: string;
+  /** Which ASR window produced it; several cues can share one merged window. */
+  windowIndex: number;
+  basis: FusionBasis;
+  score: number;
+  confidence: number;
+}
+
+/**
+ * The fused track's cues *and* their provenance, from one skip rule.
+ *
+ * `windowCuesToSubtitleCues` is defined in terms of this deliberately. The F6
+ * sidecar is indexed by cue position in the written SRT, so if the writer and the
+ * sidecar builder each decided independently which windows to drop, one silent
+ * divergence would mis-attribute every badge after it — a confidence number
+ * pointing at the wrong line is worse than no confidence number.
+ */
+export function windowDecisionsToFusedCues(
+  windows: readonly AsrWindow[],
+  cues: readonly FusionCue[],
+  decisions: readonly FusedWindowDecision[],
+): FusedCueRow[] {
+  const out: FusedCueRow[] = [];
+  windows.forEach((window, index) => {
+    const decision = decisions[index];
+    const text = (decision?.text ?? '').trim();
+    if (!text) return;
+    const first = cues[window.cueIndices[0]];
+    const last = cues[window.cueIndices[window.cueIndices.length - 1]];
+    if (!first || !last) return;
+    out.push({
+      start: first.start,
+      end: Math.max(last.end, first.start + 0.001),
+      text,
+      windowIndex: index,
+      basis: decision?.basis ?? 'whisper',
+      score: decision?.score ?? 0,
+      confidence: decision?.confidence ?? 0,
+    });
+  });
+  return out;
 }

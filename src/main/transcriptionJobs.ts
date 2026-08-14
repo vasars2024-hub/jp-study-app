@@ -43,6 +43,12 @@ import {
   FUSION_MAX_WINDOW_SEC,
   type CueExclusionReason,
 } from '../shared/subtitleFusionCore';
+import {
+  buildFusionTrackMeta,
+  fusionConfidencePercent,
+  fusionMetaPathFor,
+  serializeFusionTrackMeta,
+} from '../shared/subtitleFusionMeta';
 import { cuesToSrt } from '../shared/subtitlesExport';
 import { extractAudioPcm } from './media';
 import { estimateSubtitleOffset } from './subtitleSync';
@@ -538,6 +544,30 @@ async function runFusionJob(job: TranscriptionJob): Promise<TranscriptionResult>
     }
     const relative = writeSubtitleFile(job.mediaId, `fused-${job.lang}.srt`, srt);
 
+    // F6 — the provenance sidecar. Written from the same `decisions` the SRT was,
+    // through the same skip rule, so cue N in the file is cue N here. A failure to
+    // write it is deliberately not a failure of the job: the track is readable
+    // without it, and losing a finished transcription over a metadata file would be
+    // the wrong trade.
+    const createdAt = Date.now();
+    const meta = buildFusionTrackMeta(windows, cues, decisions, {
+      createdAt,
+      sourceSubtitleId: source.id,
+      sourceLang: source.lang,
+      lang: job.lang,
+      offsetSec: estimate.confident ? estimate.offsetSec : 0,
+      offsetConfident: estimate.confident,
+    });
+    try {
+      writeSubtitleFile(
+        job.mediaId,
+        path.basename(fusionMetaPathFor(`fused-${job.lang}.srt`)),
+        serializeFusionTrackMeta(meta),
+      );
+    } catch {
+      // Intentionally silent; the badge simply has nothing to read.
+    }
+
     const record: SubtitleRecord = {
       id: crypto.randomUUID(),
       lang: job.lang,
@@ -547,8 +577,11 @@ async function runFusionJob(job: TranscriptionJob): Promise<TranscriptionResult>
       label: `${job.lang.toUpperCase()} (fused from ${source.lang.toUpperCase()} + Whisper)`,
       machineGenerated: true,
       derivation: 'en-ja-fusion',
-      confidence: meanFusionConfidence(decisions),
-      addedAt: Date.now(),
+      // `confidence` on a record is documented as a **0–100** match score and is
+      // rendered as a percent by the media library. F4 landed the 0–1 mean straight
+      // into it, so a track at 0.52 displayed as "1% match". Same number, right unit.
+      confidence: fusionConfidencePercent(meanFusionConfidence(decisions)),
+      addedAt: createdAt,
     };
     // Replaces the previous *fused* track only. A plain Whisper transcript for the
     // same language is a different artifact with different timing, and evicting it
