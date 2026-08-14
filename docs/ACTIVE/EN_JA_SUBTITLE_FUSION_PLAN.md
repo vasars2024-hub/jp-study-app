@@ -445,3 +445,67 @@ provisional. (4) partial, see above. (5) done.
 **Next stage: F7's evaluation harness**, and the live badge run above is the cheapest way in —
 building the fixture (English sidecar + discovery) is the same setup F7 needs anyway. F5 remains
 behind a cloud key and a schema.
+
+### F5 + F7 — the arbiter, and the gate that can fail it — 2026-08-15, primary
+
+**Landed:** `d23ed60` (F5 arbitration), `a02ddb5` (F7 scoring + CLI harness).
+
+**F5 decisions.**
+
+1. **Only `whisper-unverified` windows are sent.** An `asr-empty` window has no transcript to
+   arbitrate between, so the arbiter would write the line from the English alone — translation
+   wearing a transcript's clothes.
+2. **A fidelity floor is the mechanical form of "never introduce content present in neither
+   candidate".** A verdict under 0.5 bigram Dice against the transcript is discarded; a
+   `reference` verdict must be the supplied reference, normalized-equal. Mutation-checked.
+3. **Strings beat labels.** A model claiming `whisper-corrected` while returning the identical
+   string is recorded `whisper-as-is`. Ids are echoed, not positional — an unknown or repeated id
+   is dropped, so a reordered answer cannot shift verdicts onto the wrong cues.
+4. **Spend is bounded**: 160 windows/job, worst disagreement first, 16/request, no retry.
+5. **Sidecar declares version 2 only when it holds an arbitrated basis.** An offline-only track
+   stays v1-readable; the files a v1 reader would *misread* are exactly the ones it now refuses.
+6. `fusionCueCounts` gained `corrected`, rendered as its own line in the media library (i18n ×4)
+   rather than folded into the uncertain warning — the line is trusted, but it is text no
+   microphone produced.
+
+Offline degradation is reached by doing nothing: no key / no disputes / 502 / prose / cancelled
+all end at zero verdicts, and `applyFusionArbitration(d, [])` is the identity on F4's decisions.
+
+**F7 decisions.** `documentCer` (whole track, time-ordered) gates; `alignedCer` (per reference cue
+by overlap) is reported but does **not** gate — it punishes the fused track for borrowing the
+English grid, which is the design the feature rests on. Fused must beat both baselines
+**strictly** (a tie means fusing bought nothing) on **every** episode, and under two episodes is
+its own reason string so a thin run cannot read as green. The CLI bundles the real
+`subtitleFusionEval.ts`/`subtitleCues.ts` with esbuild (tools/grammar-audit.cjs's pattern), so
+there is no second SRT parser to drift.
+
+**CLI verified end to end** on synthetic tracks, not only unit tests: 1 episode → accuracy PASS
+but gate FAIL, exit 1; 2 → PASS, exit 0; fused swapped with its own baseline → `ep2: fused CER
+0.2500 does not beat whisperOnly 0.0000`, exit 1.
+
+**Gates** (once, after the last slice, shared working tree — same caveat as every entry above:
+committed HEAD carries other tracks' long-standing failures). vitest: first run **1 failed / 606
+passed / 1 skipped files, 8,011 passed / 6 skipped tests**, and the one failure was *mine* —
+`architectureBaseline.test.ts` flagged `subtitleFusionEval.ts` as test-only, because the CLI loads
+it through esbuild and the static import graph cannot see that. Classified `accepted` in
+`tools/architecture-baseline.json` with the reason and a delete-me-too condition, not silenced;
+re-run green. i18n-check exit 0 at **9,568** keys. architecture-audit exit 0, **1,843 modules, 19
+findings, nothing new**, 2 known pending. eslint clean on the eleven touched TS paths;
+`tools/fusion-eval.cjs` emits the same three `no-var-requires` identities every `.cjs` tool here
+does — reproduced on `tools/grammar-audit.cjs` and `tools/i18n-check.cjs` at HEAD, and `npm run
+lint` is `--ext .ts,.tsx`, so tools are outside the project gate entirely.
+
+**Not proven, stated plainly.** No live run this turn: F5's real path needs a cloud key and F7
+needs real media plus the Whisper runtime, and this install still has **no English subtitle
+track** (see the F6/F8 entry). The arbiter's HTTP call is therefore covered by an injected seam,
+not by a real provider response.
+
+**Status against §6:** (1) **F1–F6 all done.** (2) done. (3) harness built and self-verified, but
+**never run on a real episode** — this is now the only substantive gap. (4) partial, unchanged.
+(5) done.
+
+**Next stage: run F7 for real.** It needs one media item with both an EN track and a human JA
+track. Cheapest route is still the F6/F8 entry's: drop a ~3-cue English `.srt` beside a video and
+run discovery. To produce the three candidate tracks from one fusion, dump `texts` (Whisper-only)
+and `references` (MT-only) alongside `decisions` — they already exist side by side in
+`runFusionJob`; nothing new needs computing, only writing.
