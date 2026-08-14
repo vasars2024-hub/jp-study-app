@@ -70,6 +70,16 @@ export const NOTE_LIST_MAX_LIMIT = 200;
 export const NOTE_FILTER_MAX_CHARS = 64;
 
 /**
+ * The most rows one export writes.
+ *
+ * Far above any plausible hand-written archive, and low enough that the file is
+ * built in memory without thinking about it. The result reports the match total
+ * alongside the written count, so a user who somehow exceeds this is told the
+ * export is partial rather than handed a silently short file.
+ */
+export const NOTE_EXPORT_MAX_ROWS = 5_000;
+
+/**
  * NFKC + case fold.
  *
  * This must stay identical to `normalizeForLookup` in `main/dictionary/dictService.ts`,
@@ -186,4 +196,86 @@ export function serializeNoteTags(tags: readonly string[]): string {
 
 export function parseNoteTags(raw: unknown): string[] {
   return typeof raw === 'string' ? normalizeNoteTags(raw.split('\n')) : [];
+}
+
+/** Which notes to export: the same scope the browse list is showing, unpaged. */
+export interface LexiconNoteExportQuery {
+  lang: string;
+  filter: string;
+}
+
+export interface LexiconNoteExportResult {
+  ok: boolean;
+  /** Where it landed. Absent unless `ok`. */
+  path?: string;
+  /** Rows written. */
+  count: number;
+  /** Rows that matched, which exceeds `count` only past `NOTE_EXPORT_MAX_ROWS`. */
+  total: number;
+  /** `'cancelled'` when the user dismissed the save dialog — not a failure. */
+  error?: string;
+}
+
+/**
+ * The export scope an untrusted caller asked for, clamped exactly like a page.
+ *
+ * Delegating to `readNoteListQuery` rather than restating the bounds is the
+ * point: the export and the list must select the *same* rows, and two copies of
+ * the trimming and case-folding rules would eventually disagree about which.
+ */
+export function readNoteExportQuery(raw: unknown): LexiconNoteExportQuery {
+  const { lang, filter } = readNoteListQuery(raw);
+  return { lang, filter };
+}
+
+const CSV_COLUMNS = ['language', 'word', 'reading', 'note', 'tags', 'updated'] as const;
+
+/**
+ * One RFC 4180 field.
+ *
+ * Every field is quoted unconditionally: a note body routinely contains commas
+ * and newlines, so the conditional form would quote almost everything anyway and
+ * would leave one more rule to get subtly wrong.
+ *
+ * The leading apostrophe is not cosmetic. A cell whose first character is `=`,
+ * `+`, `-` or `@` is a *formula* to every mainstream spreadsheet, so a real note
+ * beginning "-> see also" opens as `#NAME?` and a crafted one would run on open.
+ * The apostrophe is the standard defence and the spreadsheet hides it, at the
+ * cost of that cell differing from the stored note by exactly one character —
+ * which is why it is added only to fields that actually start that way.
+ */
+function csvField(value: string): string {
+  const guarded = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+  return `"${guarded.replace(/"/g, '""')}"`;
+}
+
+/**
+ * The user's notes as a CSV document.
+ *
+ * Notes are the only thing in the Lexicon the user authored, so they are the one
+ * thing whose loss cannot be undone by re-importing a source. CSV rather than
+ * JSON because the neighbouring destinations on this track — a spreadsheet,
+ * Flashcards, Anki — all read CSV, and the app already exports mined cards that
+ * way.
+ *
+ * Tags go through `serializeNoteTags`, so the file carries the exact stored
+ * shape rather than a second tag serialization invented here. Timestamps are
+ * ISO 8601 rather than a localized date: an export outlives the locale that
+ * wrote it, and `2026-08-14T…` is unambiguous everywhere `08/14/2026` is not.
+ */
+export function notesToCsv(notes: readonly LexiconNote[]): string {
+  const rows = [CSV_COLUMNS.map(csvField).join(',')];
+  for (const note of notes) {
+    rows.push([
+      note.lang,
+      note.text,
+      note.reading,
+      note.note,
+      serializeNoteTags(note.tags),
+      note.updatedAt > 0 ? new Date(note.updatedAt).toISOString() : '',
+    ].map(csvField).join(','));
+  }
+  // CRLF between records is what RFC 4180 specifies. The LF inside a quoted note
+  // body is the note's own and is deliberately left alone.
+  return `${rows.join('\r\n')}\r\n`;
 }

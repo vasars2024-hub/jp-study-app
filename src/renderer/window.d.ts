@@ -367,6 +367,9 @@ declare global {
       dictNoteList(
         query?: Partial<import('../shared/lexiconNotes').LexiconNoteListQuery>,
       ): Promise<import('../shared/lexiconNotes').LexiconNoteListResult>;
+      dictNoteExport(
+        query?: Partial<import('../shared/lexiconNotes').LexiconNoteExportQuery>,
+      ): Promise<import('../shared/lexiconNotes').LexiconNoteExportResult>;
       dictListYomitan(): Promise<YomitanDictInfo[]>;
       dictRemoveYomitan(id: string): Promise<{ ok: boolean; error?: string }>;
       dictSetYomitanEnabled(id: string, enabled: boolean): Promise<{ ok: boolean; error?: string }>;

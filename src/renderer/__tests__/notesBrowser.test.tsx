@@ -5,6 +5,8 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import {
   LEXICON_NOTES_CHANGED_EVENT,
   type LexiconNote,
+  type LexiconNoteExportQuery,
+  type LexiconNoteExportResult,
   type LexiconNoteListQuery,
   type LexiconNoteListResult,
 } from '../../shared/lexiconNotes';
@@ -245,5 +247,118 @@ describe('the notes browser', () => {
     await render(<NotesBrowser lang="ja" onOpen={ignoreOpen} />);
     expect(panel()).toBeNull();
     expect(host.textContent).toBe('');
+  });
+});
+
+describe('the notes browser — taking the archive out of the app', () => {
+  let dictNoteExport: ReturnType<typeof vi.fn>;
+
+  /** The listing stub every case here shares, plus an export the case supplies. */
+  function stubExport(
+    result: (query: LexiconNoteExportQuery) => Promise<LexiconNoteExportResult>,
+    all: LexiconNote[] = [note(), SHENGWU],
+  ): void {
+    stubWith(all);
+    dictNoteExport = vi.fn(result);
+    (window as unknown as { api: Record<string, unknown> }).api = { dictNoteList, dictNoteExport };
+  }
+
+  const exportButton = () => host.querySelector<HTMLButtonElement>('.lexicon-notes-export');
+  const exportStatus = () => host.querySelector<HTMLElement>('.lexicon-notes-export-status');
+
+  const saved = async (): Promise<LexiconNoteExportResult> =>
+    ({ ok: true, path: 'C:\\notes.csv', count: 2, total: 2 });
+
+  it('exports the whole match, not the page on screen', async () => {
+    // The surface is showing one page of nine; the file must hold all nine, so
+    // the request carries the scope and deliberately carries no paging at all.
+    stubExport(async () => ({ ok: true, path: 'C:\\notes.csv', count: 9, total: 9 }));
+    await render(<NotesBrowser lang="ja" onOpen={ignoreOpen} />);
+    await openPanel();
+    await type(filterField(), 'ね');
+    await act(async () => {
+      scopeToggle().click();
+    });
+    await click(need(exportButton(), 'the export button'));
+    expect(dictNoteExport).toHaveBeenCalledWith({ lang: 'ja', filter: 'ね' });
+    expect(dictNoteExport.mock.calls[0][0]).not.toHaveProperty('limit');
+    expect(dictNoteExport.mock.calls[0][0]).not.toHaveProperty('offset');
+  });
+
+  it('names the file it wrote and how much of the archive went into it', async () => {
+    stubExport(async () => ({ ok: true, path: 'C:\\notes.csv', count: 2, total: 9 }));
+    await render(<NotesBrowser lang="ja" onOpen={ignoreOpen} />);
+    await openPanel();
+    await click(need(exportButton(), 'the export button'));
+    expect(exportStatus()?.textContent).toBe('lexicon.notes.exported:2,9,C:\\notes.csv');
+  });
+
+  it('treats a dismissed save dialog as a decision, not as a failure', async () => {
+    stubExport(async () => ({ ok: false, count: 0, total: 2, error: 'cancelled' }));
+    await render(<NotesBrowser lang="ja" onOpen={ignoreOpen} />);
+    await openPanel();
+    await click(need(exportButton(), 'the export button'));
+    expect(exportStatus()).toBeNull();
+  });
+
+  it('says a failed write failed instead of leaving the reader to assume it worked', async () => {
+    stubExport(async () => ({ ok: false, count: 0, total: 2, error: 'EACCES' }));
+    await render(<NotesBrowser lang="ja" onOpen={ignoreOpen} />);
+    await openPanel();
+    await click(need(exportButton(), 'the export button'));
+    expect(exportStatus()?.textContent).toBe('lexicon.notes.exportFailed');
+  });
+
+  it('reports a rejected invoke as a failure too, not as a silent no-op', async () => {
+    stubExport(async () => {
+      throw new Error('no handler registered');
+    });
+    await render(<NotesBrowser lang="ja" onOpen={ignoreOpen} />);
+    await openPanel();
+    await click(need(exportButton(), 'the export button'));
+    expect(exportStatus()?.textContent).toBe('lexicon.notes.exportFailed');
+  });
+
+  it('drops a result that names a path for a scope the reader has since changed', async () => {
+    stubExport(saved);
+    await render(<NotesBrowser lang="ja" onOpen={ignoreOpen} />);
+    await openPanel();
+    await click(need(exportButton(), 'the export button'));
+    expect(exportStatus()).not.toBeNull();
+    await type(filterField(), 'ね');
+    expect(exportStatus()).toBeNull();
+  });
+
+  it('refuses a second click while the first write is still open', async () => {
+    const replies: ((result: LexiconNoteExportResult) => void)[] = [];
+    stubExport(() => new Promise<LexiconNoteExportResult>((resolve) => replies.push(resolve)));
+    await render(<NotesBrowser lang="ja" onOpen={ignoreOpen} />);
+    await openPanel();
+    const button = need(exportButton(), 'the export button');
+    await click(button);
+    expect(button.disabled).toBe(true);
+    await click(button);
+    expect(dictNoteExport).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      replies[0]?.({ ok: true, path: 'C:\\notes.csv', count: 2, total: 2 });
+    });
+    expect(need(exportButton(), 'the export button').disabled).toBe(false);
+  });
+
+  it('offers nothing to export when there is nothing to export', async () => {
+    stubExport(saved, []);
+    await render(<NotesBrowser lang="ja" onOpen={ignoreOpen} />);
+    await openPanel();
+    expect(exportButton()).toBeNull();
+  });
+
+  it('hides the control on a preload that cannot export, rather than failing on click', async () => {
+    // The list binding is present and the export one is not — exactly the shape
+    // of a renderer reloaded against a main process that never registered it.
+    stubWith([note()]);
+    await render(<NotesBrowser lang="ja" onOpen={ignoreOpen} />);
+    await openPanel();
+    expect(rows()).toHaveLength(1);
+    expect(exportButton()).toBeNull();
   });
 });

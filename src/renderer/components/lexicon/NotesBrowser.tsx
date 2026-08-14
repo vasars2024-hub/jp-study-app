@@ -51,6 +51,8 @@ export default function NotesBrowser({ lang, onOpen }: Props) {
   const [total, setTotal] = useState(0);
   const [state, setState] = useState<'idle' | 'loading' | 'error'>('idle');
   const [limit, setLimit] = useState(NOTE_LIST_DEFAULT_LIMIT);
+  const [exporting, setExporting] = useState(false);
+  const [exportStatus, setExportStatus] = useState('');
   const run = useRef(0);
 
   const scope = thisLangOnly ? lang : '';
@@ -78,6 +80,40 @@ export default function NotesBrowser({ lang, onOpen }: Props) {
     if (!open) return;
     load();
   }, [open, load]);
+
+  // A result reported against a scope the user has since changed is worse than
+  // no result, because the path it names is real and the count is not this list's.
+  useEffect(() => setExportStatus(''), [scope, filter]);
+
+  /**
+   * Write out everything the current filter and scope match.
+   *
+   * Deliberately not `notes` — that is one page. Main re-runs the same query
+   * unpaged, so the file holds the 300 matches and not the 50 on screen.
+   */
+  const exportNotes = useCallback((): void => {
+    if (typeof window.api?.dictNoteExport !== 'function') return;
+    setExporting(true);
+    setExportStatus('');
+    void window.api
+      .dictNoteExport({ lang: scope, filter })
+      .then((result) => {
+        // Dismissing the save dialog is a decision, not a failure, and must not
+        // be reported back as one.
+        if (result.error === 'cancelled') return;
+        setExportStatus(
+          result.ok && result.path
+            ? t('lexicon.notes.exported', {
+              count: result.count,
+              total: result.total,
+              path: result.path,
+            })
+            : t('lexicon.notes.exportFailed'),
+        );
+      })
+      .catch(() => setExportStatus(t('lexicon.notes.exportFailed')))
+      .finally(() => setExporting(false));
+  }, [scope, filter, t]);
 
   // A note saved in the entry below has to show up here, or the two disagree.
   useEffect(() => {
@@ -178,7 +214,20 @@ export default function NotesBrowser({ lang, onOpen }: Props) {
                 {t('lexicon.notes.more')}
               </button>
             )}
+            {typeof window.api?.dictNoteExport === 'function' && (
+              <button
+                type="button"
+                className="lexicon-notes-export"
+                disabled={exporting}
+                onClick={exportNotes}
+              >
+                {t('lexicon.notes.export')}
+              </button>
+            )}
           </div>
+          {exportStatus && (
+            <p className="muted lexicon-notes-export-status" role="status">{exportStatus}</p>
+          )}
         </>
       )}
     </details>

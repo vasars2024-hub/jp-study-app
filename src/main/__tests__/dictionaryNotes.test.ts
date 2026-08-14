@@ -23,8 +23,11 @@ import {
   NOTE_LIST_MAX_LIMIT,
   normalizeNoteKey,
   normalizeNoteTags,
+  notesToCsv,
+  readNoteExportQuery,
   readNoteIdentity,
   readNoteListQuery,
+  type LexiconNote,
 } from '../../shared/lexiconNotes';
 
 let db: SqliteDb;
@@ -213,6 +216,93 @@ describe('user notes — browsing every note without knowing the word', () => {
       limit: NOTE_LIST_DEFAULT_LIMIT,
       offset: 0,
     });
+  });
+});
+
+describe('user notes — writing the archive out as a file the user owns', () => {
+  function exported(overrides: Partial<LexiconNote> = {}): LexiconNote {
+    return {
+      lang: 'ja',
+      text: '食べる',
+      reading: 'たべる',
+      note: 'ichidan verb',
+      tags: ['verbs'],
+      updatedAt: 1_700_000_000_000,
+      ...overrides,
+    };
+  }
+
+  /** Row `n` of the document, header excluded. */
+  function row(csv: string, n: number): string {
+    return csv.split('\r\n')[n + 1];
+  }
+
+  it('names its columns and writes one CRLF-terminated record per note', () => {
+    const csv = notesToCsv([exported(), exported({ text: '猫', reading: 'ねこ' })]);
+    expect(csv.split('\r\n')[0]).toBe('"language","word","reading","note","tags","updated"');
+    expect(csv.endsWith('\r\n')).toBe(true);
+    // Header + two records + the trailing terminator's empty tail.
+    expect(csv.split('\r\n')).toHaveLength(4);
+  });
+
+  it('writes a header and nothing else for an empty archive', () => {
+    expect(notesToCsv([])).toBe('"language","word","reading","note","tags","updated"\r\n');
+  });
+
+  it('quotes a body containing the delimiter, a quote and a newline without losing any of them', () => {
+    const csv = notesToCsv([exported({ note: 'means "to eat", not\nto drink' })]);
+    expect(row(csv, 0)).toContain('"means ""to eat"", not\nto drink"');
+    // The embedded LF must not be mistaken for a record separator.
+    expect(csv.split('\r\n')).toHaveLength(3);
+  });
+
+  it('carries tags in the one serialization the database already stores them in', () => {
+    const csv = notesToCsv([exported({ tags: ['verbs', 'N5'] })]);
+    expect(row(csv, 0)).toContain('"verbs\nN5"');
+  });
+
+  it('dates a note in ISO 8601, which outlives the locale that exported it', () => {
+    expect(row(notesToCsv([exported({ updatedAt: 1_700_000_000_000 })]), 0))
+      .toContain('"2023-11-14T22:13:20.000Z"');
+    // A note that has never been written has no date to invent.
+    expect(row(notesToCsv([exported({ updatedAt: 0 })]), 0)).toContain(',""');
+  });
+
+  it('defuses a note a spreadsheet would run as a formula, and leaves every other note alone', () => {
+    // "-> see also" is an ordinary thing to write and opens as #NAME? without this.
+    expect(row(notesToCsv([exported({ note: '-> see also 飲む' })]), 0)).toContain('"\'-> see also 飲む"');
+    expect(row(notesToCsv([exported({ note: '=1+1' })]), 0)).toContain('"\'=1+1"');
+    expect(row(notesToCsv([exported({ note: '@mention' })]), 0)).toContain('"\'@mention"');
+    expect(row(notesToCsv([exported({ note: '+81' })]), 0)).toContain('"\'+81"');
+    // Not everywhere — only the first character decides, and an ordinary note is untouched.
+    expect(row(notesToCsv([exported({ note: 'a - b = c' })]), 0)).toContain('"a - b = c"');
+  });
+
+  it('exports the whole match, not the page the surface happens to be showing', () => {
+    for (let i = 0; i < 5; i += 1) {
+      writeUserNote(db, { lang: 'ja', text: `語${i}`, reading: '' }, { note: 'x', tags: [] }, 1_000 + i);
+    }
+    const scope = readNoteExportQuery({ lang: '', filter: '', limit: 2 });
+    const all = listUserNotes(db, { ...scope, limit: 100, offset: 0 });
+    expect(all.notes).toHaveLength(5);
+    // Five records plus the header and the trailing terminator.
+    expect(notesToCsv(all.notes).split('\r\n')).toHaveLength(7);
+  });
+
+  it('selects by exactly the rules the list does, so the file and the screen agree', () => {
+    writeUserNote(db, TABERU, { note: 'ichidan verb', tags: ['verbs'] }, 3_000);
+    writeUserNote(db, { lang: 'zh', text: '生物', reading: '' }, { note: 'shēngwù', tags: [] }, 2_000);
+    const scope = readNoteExportQuery({ lang: ' JA ', filter: ' verbs ' });
+    expect(scope).toEqual({ lang: 'ja', filter: 'verbs' });
+    const rows = listUserNotes(db, { ...scope, limit: 100, offset: 0 }).notes;
+    expect(rows.map((note) => note.text)).toEqual(['食べる']);
+  });
+
+  it('drops the paging a caller supplied rather than letting it truncate the file', () => {
+    expect(readNoteExportQuery({ limit: 1, offset: 900 })).toEqual({ lang: '', filter: '' });
+    expect(readNoteExportQuery(undefined)).toEqual({ lang: '', filter: '' });
+    expect(readNoteExportQuery('nonsense')).toEqual({ lang: '', filter: '' });
+    expect(readNoteExportQuery({ filter: 'x'.repeat(500) }).filter).toHaveLength(64);
   });
 });
 

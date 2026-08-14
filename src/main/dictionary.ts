@@ -57,10 +57,14 @@ import {
   writeUserNoteToDb,
 } from './dictionary/service';
 import {
+  notesToCsv,
+  readNoteExportQuery,
   readNoteIdentity,
   readNoteInput,
   readNoteListQuery,
+  NOTE_EXPORT_MAX_ROWS,
   type LexiconNote,
+  type LexiconNoteExportResult,
   type LexiconNoteListResult,
 } from '../shared/lexiconNotes';
 import {
@@ -762,6 +766,50 @@ export function registerDictionaryIpc(): void {
       }
     },
   );
+  // Write the user's notes out as a file they own.
+  //
+  // Every other row in this database can be rebuilt by re-importing its source;
+  // a note cannot, so it is the one thing that needs a way out of the app. The
+  // export takes the browse surface's *filter and scope*, not the page it
+  // happens to be showing — "export what I am looking at" means the 300 matches,
+  // not the 50 rendered.
+  ipcMain.handle('dict:noteExport', async (_e, query: unknown): Promise<LexiconNoteExportResult> => {
+    const scope = readNoteExportQuery(query);
+    let page: LexiconNoteListResult;
+    try {
+      page = listUserNotesFromDb({ ...scope, limit: NOTE_EXPORT_MAX_ROWS, offset: 0 });
+    } catch {
+      // Same reasoning as `dict:noteList`: an un-migrated installation is a
+      // state to report, not an invoke for the surface to render as a defect.
+      return { ok: false, count: 0, total: 0, error: 'read' };
+    }
+    // Nothing to write is not a file. Prompting for a path and then producing a
+    // header-only CSV would look like a successful export of an empty archive.
+    if (!page.notes.length) return { ok: false, count: 0, total: page.total, error: 'empty' };
+    const { dialog } = await import('electron');
+    const picked = await dialog.showSaveDialog({
+      title: mt('dialog.saveNotes.title'),
+      defaultPath: `lexicon-notes-${new Date().toISOString().slice(0, 10)}.csv`,
+      filters: [{ name: mt('dialog.format.csv'), extensions: ['csv'] }],
+    });
+    if (picked.canceled || !picked.filePath) {
+      return { ok: false, count: 0, total: page.total, error: 'cancelled' };
+    }
+    try {
+      // The BOM is load-bearing, not decoration: without it every mainstream
+      // spreadsheet reads a UTF-8 CSV in the system code page, and a file of
+      // Japanese and Cyrillic notes opens as mojibake on the machine that wrote it.
+      fs.writeFileSync(picked.filePath, `\uFEFF${notesToCsv(page.notes)}`, 'utf-8');
+      return { ok: true, path: picked.filePath, count: page.notes.length, total: page.total };
+    } catch (error) {
+      return {
+        ok: false,
+        count: 0,
+        total: page.total,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  });
   ipcMain.handle(
     'dict:lookupTermsBatch',
     (_e, queries: GlossLookupQuery[], langs: CandidateGlossLang[]) =>

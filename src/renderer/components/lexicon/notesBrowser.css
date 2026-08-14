@@ -141,7 +141,8 @@
   font-size: 0.9em;
 }
 
-.lexicon-notes-more {
+.lexicon-notes-more,
+.lexicon-notes-export {
   min-height: 32px;
   padding: 6px 12px;
   border: 1px solid var(--border);
@@ -151,7 +152,21 @@
   cursor: pointer;
 }
 
-.lexicon-notes-more:disabled {
+/* Pushed to the trailing edge: paging the list is the frequent action and stays
+   next to the count it changes, while writing a file is the rare, terminal one. */
+.lexicon-notes-export {
+  margin-inline-start: auto;
+}
+
+.lexicon-notes-more:disabled,
+.lexicon-notes-export:disabled {
   cursor: default;
   opacity: 0.7;
+}
+
+.lexicon-notes-export-status {
+  margin: 8px 0 0;
+  font-size: 0.85em;
+  /* A saved path is long and has no spaces to wrap at. */
+  overflow-wrap: anywhere;
 }

@@ -473,6 +473,11 @@ const api = {
     query?: Partial<import('./shared/lexiconNotes').LexiconNoteListQuery>,
   ): Promise<import('./shared/lexiconNotes').LexiconNoteListResult> =>
     ipcRenderer.invoke('dict:noteList', query),
+  /** Write every note matching this scope to a CSV file the user picks. */
+  dictNoteExport: (
+    query?: Partial<import('./shared/lexiconNotes').LexiconNoteExportQuery>,
+  ): Promise<import('./shared/lexiconNotes').LexiconNoteExportResult> =>
+    ipcRenderer.invoke('dict:noteExport', query),
   /** Find example sentences (JP + EN) for a word or grammar pattern, via Tatoeba. */
   searchExamples: (query: string, limit?: number): Promise<ExampleResult> =>
     ipcRenderer.invoke('examples:search', query, limit),
