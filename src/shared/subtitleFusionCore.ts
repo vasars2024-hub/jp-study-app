@@ -275,3 +275,228 @@ export function windowCuesToSubtitleCues(
 // Serialization is deliberately not here: `shared/subtitlesExport.ts` already owns
 // `cuesToSrt`, and `windowCuesToSubtitleCues` never emits a blank cue, so that
 // writer needs no fusion-specific variant.
+
+// ---------------------------------------------------------------------------
+// F3/F4 — the reference translation, and the agreement scoring that uses it
+// ---------------------------------------------------------------------------
+//
+// F3 alone changes nothing a user can see: a per-cue translation nobody consults
+// is the same dead data the dictionary's `etymology` table was for seven schema
+// versions. So the two stages land together. F4 is what turns the reference into
+// a decision, and the decision into something observable — a window Whisper
+// returned nothing for now carries the translated English line instead of
+// vanishing from the track.
+//
+// The policy the plan fixes and this implements: **Whisper's text wins.** The
+// reference is a referee, not an author. Offline — which is the only path here,
+// F5's cloud arbitration being a later stage — a disagreement therefore still
+// yields Whisper's words, at reduced confidence. For a study app the
+// verbatim-but-possibly-misheard line still matches the audio the learner hears;
+// a fluent paraphrase does not.
+
+/** What a fused cue's text came from. */
+export type FusionBasis =
+  /** Whisper's transcript, and the reference agrees with it. */
+  | 'whisper'
+  /** Whisper's transcript, kept despite the reference disagreeing. */
+  | 'whisper-unverified'
+  /** Whisper produced nothing usable; the translated English line stands in. */
+  | 'reference'
+  /** Neither side produced text. The cue is dropped from the track. */
+  | 'empty';
+
+export interface FusedWindowDecision {
+  /** Index into the window list this decision belongs to. */
+  windowIndex: number;
+  text: string;
+  basis: FusionBasis;
+  /** Bigram Dice overlap of the two candidates, 0–1. Zero when either is empty. */
+  score: number;
+  /** How much to trust the line, 0–1. Drives the transcript UI's badge. */
+  confidence: number;
+}
+
+/**
+ * Above this overlap the two candidates are telling the same story.
+ *
+ * **Provisional, and deliberately so.** The plan's F7 harness calibrates this
+ * against human Japanese tracks; until it runs, this is a starting point, not a
+ * measured constant. It is set low because the two strings being compared are not
+ * two attempts at the same sentence: one is a transcript and the other a machine
+ * translation of a *translation*, so even a perfect pair shares only content
+ * words. A high threshold here would mark almost every correct cue as disputed.
+ */
+export const FUSION_AGREE_SCORE = 0.34;
+
+/** Confidence for a cue both sides agree on, before the overlap bonus. */
+const CONFIDENCE_AGREED = 0.6;
+/** Whisper kept over an objecting reference: usable, flagged, not trusted. */
+const CONFIDENCE_UNVERIFIED = 0.35;
+/** Whisper with nothing to check it against — no reference was produced. */
+const CONFIDENCE_UNREFEREED = 0.45;
+/** The translated line standing in for silence. Meaning, not words. */
+const CONFIDENCE_REFERENCE = 0.25;
+
+/**
+ * Fold a candidate down to the characters that carry the comparison.
+ *
+ * NFKC first, so full-width Latin and half-width kana compare with their normal
+ * forms. Then katakana→hiragana: Whisper writes ジュース where a translator writes
+ * じゅーす often enough that scoring them as different words would flag correct
+ * cues. Then every character that is not a letter or digit goes — Japanese
+ * punctuation, spaces and the ASCII punctuation a translator adds are pure noise
+ * in a bigram comparison, and Whisper's comma placement is not evidence about
+ * meaning.
+ *
+ * The prolonged sound mark ー is **kept**: it is a mora, not punctuation, and
+ * dropping it merges ビル and ビール.
+ */
+export function normalizeForFusionCompare(text: string): string {
+  return text
+    .normalize('NFKC')
+    .replace(/[ァ-ヶ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0x60))
+    .replace(/[^\p{Letter}\p{Number}ー]/gu, '');
+}
+
+/**
+ * Sørensen–Dice coefficient over character bigrams.
+ *
+ * Bigrams rather than characters because Japanese has a small alphabet and a high
+ * base rate of coincidental character overlap — two unrelated sentences routinely
+ * share の, に and し. Bigrams rather than words because there is no whitespace to
+ * split on and running a tokenizer here would drag a dictionary into a pure module.
+ *
+ * A one-character string has no bigrams, so it is compared as itself; without that
+ * every single-character cue would score 0 against everything.
+ */
+export function bigramDice(a: string, b: string): number {
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  const grams = (s: string): Map<string, number> => {
+    const out = new Map<string, number>();
+    const units = [...s];
+    if (units.length === 1) return new Map([[units[0], 1]]);
+    for (let i = 0; i < units.length - 1; i += 1) {
+      const key = units[i] + units[i + 1];
+      out.set(key, (out.get(key) ?? 0) + 1);
+    }
+    return out;
+  };
+  const left = grams(a);
+  const right = grams(b);
+  let shared = 0;
+  let leftTotal = 0;
+  let rightTotal = 0;
+  for (const count of left.values()) leftTotal += count;
+  for (const [key, count] of right) {
+    rightTotal += count;
+    const other = left.get(key);
+    if (other) shared += Math.min(other, count);
+  }
+  if (!leftTotal || !rightTotal) return 0;
+  return (2 * shared) / (leftTotal + rightTotal);
+}
+
+/**
+ * Decide one window's text from its two candidates.
+ *
+ * Pure, so the whole classification is testable without audio, a model, or a
+ * media file — which is the point of the plan putting scoring in this module.
+ */
+export function decideFusedWindow(
+  windowIndex: number,
+  whisper: string,
+  reference: string,
+): FusedWindowDecision {
+  const whisperText = whisper.trim();
+  const referenceText = reference.trim();
+
+  if (!whisperText && !referenceText) {
+    return { windowIndex, text: '', basis: 'empty', score: 0, confidence: 0 };
+  }
+  if (!whisperText) {
+    return {
+      windowIndex,
+      text: referenceText,
+      basis: 'reference',
+      score: 0,
+      confidence: CONFIDENCE_REFERENCE,
+    };
+  }
+  if (!referenceText) {
+    return {
+      windowIndex,
+      text: whisperText,
+      basis: 'whisper',
+      score: 0,
+      confidence: CONFIDENCE_UNREFEREED,
+    };
+  }
+
+  const score = bigramDice(
+    normalizeForFusionCompare(whisperText),
+    normalizeForFusionCompare(referenceText),
+  );
+  if (score >= FUSION_AGREE_SCORE) {
+    // The bonus is bounded so a perfect overlap still reads as machine output.
+    const confidence = Math.min(0.95, CONFIDENCE_AGREED + 0.35 * score);
+    return { windowIndex, text: whisperText, basis: 'whisper', score, confidence };
+  }
+  return {
+    windowIndex,
+    text: whisperText,
+    basis: 'whisper-unverified',
+    score,
+    confidence: CONFIDENCE_UNVERIFIED,
+  };
+}
+
+/**
+ * The English text a window's cues contribute to one translation request.
+ *
+ * A merged window covers several cues, and translating them separately then
+ * gluing the results back together would produce Japanese that reads as a list of
+ * fragments. The reference is compared against a transcript of the *whole* window,
+ * so it has to be a translation of the whole window.
+ */
+export function windowSourceText(
+  window: AsrWindow,
+  cues: readonly FusionCue[],
+): string {
+  return window.cueIndices
+    .map((index) => cues[index]?.text.trim() ?? '')
+    .filter(Boolean)
+    .join(' ');
+}
+
+/**
+ * Score every window, in window order.
+ *
+ * `references` is indexed by window, and a missing entry is an empty string
+ * rather than an error: the translator is optional (no model installed, a
+ * cancelled batch, a chunk the model declined), and the plan requires the offline
+ * path to degrade rather than fail. With no references at all this returns
+ * exactly what F2 alone produced, every cue marked `whisper`.
+ */
+export function decideFusedWindows(
+  whisperTexts: readonly string[],
+  references: readonly string[],
+): FusedWindowDecision[] {
+  return whisperTexts.map((text, index) =>
+    decideFusedWindow(index, text ?? '', references[index] ?? ''));
+}
+
+/**
+ * Mean confidence over the windows that produced text.
+ *
+ * Dropped windows are excluded rather than counted as zero. They are not lines
+ * the track claims badly; they are lines it does not claim at all, and averaging
+ * them in would make a short episode with a lot of silence look untrustworthy.
+ * Returns 0 when nothing survived, which is the honest reading of an empty track.
+ */
+export function meanFusionConfidence(decisions: readonly FusedWindowDecision[]): number {
+  const kept = decisions.filter((decision) => decision.text.trim().length > 0);
+  if (!kept.length) return 0;
+  const total = kept.reduce((sum, decision) => sum + decision.confidence, 0);
+  return Math.round((total / kept.length) * 1000) / 1000;
+}

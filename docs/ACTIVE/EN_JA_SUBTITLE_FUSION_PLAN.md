@@ -280,3 +280,98 @@ record but not the per-cue confidence sidecar, which has nothing to carry until 
 **Next stage: F3** — the per-cue EN→JA reference translation through `main/translate.ts`'s
 batch API. Note for whoever takes it: the fixture used here has a **human Japanese track
 alongside the English one**, which makes it the first real F7 evaluation candidate.
+
+### F3 + F4 — the reference translation, and the scoring that makes it matter — 2026-08-14, primary
+
+**Why the two stages landed together.** F3 on its own produces a per-cue translation that
+nothing reads. That is precisely the failure mode this repo's Wiktextract importer names in its
+own header — "writing rows no query consults is how a database grows data that is never wrong
+because it is never used" — and the same session had just spent a slice fixing a schema table
+that had sat unread for seven versions. F4 is what turns the reference into a decision, so it is
+what makes F3 observable.
+
+**What landed.**
+
+- `src/shared/subtitleFusionCore.ts` (pure, extended): `normalizeForFusionCompare`,
+  `bigramDice`, `decideFusedWindow`, `decideFusedWindows`, `meanFusionConfidence`,
+  `windowSourceText`, the `FusionBasis` union and `FUSION_AGREE_SCORE`.
+- `src/main/transcriptionJobs.ts`: `translateWindowReferences` plus the F3/F4 steps in
+  `runFusionJob`, and `confidence` on the emitted `SubtitleRecord`.
+- `src/shared/__tests__/subtitleFusionScoring.test.ts` — 18 tests.
+
+**The policy, in one sentence, and where it is enforced.** Whisper's text wins; the reference is
+a referee, not an author. Offline — which is the only path until F5 — a disagreement still yields
+Whisper's words, at `basis: 'whisper-unverified'` and reduced confidence. Mutation-checked:
+changing that one `text: whisperText` to `text: referenceText` turns the policy assertion red
+with `Received: "完全に無関係な文章です"`. The single case where the reference supplies text is
+the one where Whisper supplied none (`basis: 'reference'`), which is also the only user-visible
+behaviour change from F2: a window Whisper returned nothing for now carries the translated
+English line instead of vanishing from the track.
+
+**Decisions taken, and the reasoning.**
+
+1. **One translation per ASR *window*, not per cue.** A merged window's transcript covers several
+   English lines. Scoring it against a per-cue translation would be structurally unfair, and
+   translating cues separately then gluing them yields Japanese that reads as a list of
+   fragments. `windowSourceText` joins a window's cues into one passage.
+2. **The local translator, not a cloud provider.** The reference only has to carry meaning well
+   enough to disagree usefully with a misheard transcript. An episode has hundreds of windows;
+   a cloud call each is not a cost this stage can justify. Cloud is F5, on disputed cues only.
+3. **`FUSION_AGREE_SCORE = 0.34`, and it is provisional — F7 calibrates it.** Set low
+   deliberately: the two strings compared are not two attempts at the same sentence but a
+   transcript and a machine translation *of a translation*, so even a perfect pair shares only
+   content words. A high threshold would mark almost every correct cue as disputed, and a scorer
+   that flags correct lines is worse than no scorer.
+4. **Bigrams, not characters or words.** Japanese has a small alphabet and a high base rate of
+   coincidental single-character overlap (の, に, し appear in unrelated sentences). Words would
+   need a tokenizer, which would drag a dictionary into a pure module. A one-character string has
+   no bigrams and is compared as itself, so every はい and ええ does not score 0 against
+   everything.
+5. **Katakana folds to hiragana; the prolonged sound mark ー is kept.** Whisper writes ジュース
+   where the translator writes じゅーす often enough that not folding would flag correct cues.
+   ー is a mora, not punctuation — dropping it would merge ビル and ビール, which is asserted.
+6. **`meanFusionConfidence` excludes dropped windows rather than counting them as zero.** They
+   are not lines the track claims badly; they are lines it does not claim at all.
+7. **Every translator failure yields empty references, never an exception.** No model installed,
+   a cancelled batch, a declined chunk, or a throw all degrade to exactly the F2 output with
+   every cue marked `whisper`. Asserted directly (`decideFusedWindows([...], [])`). The plan
+   makes offline degradation a hard requirement, so this is the stage's load-bearing property.
+
+**Gates** — run once after the turn's last slice, on the shared working tree.
+`npx vitest run --testTimeout=60000 --hookTimeout=60000`: **601 passed / 1 skipped files, 7,937
+passed / 6 skipped tests**, exit 0. `node tools/i18n-check.cjs`: exit 0 at **9,557** English keys
+translated in ja/zh/ru (this slice adds no user-visible string — the confidence it produces is a
+number on an existing record, and the phase labels are unchanged, which is why F8's
+`'translating'`/`'fusing'` phases still have not landed). `node tools/architecture-audit.cjs`:
+exit 0, **1,834 modules, 18 findings, nothing new**, 2 known pending. `npx eslint` on the 15
+touched paths: clean apart from two pre-existing `adjacent-overload-signatures` errors in
+`src/renderer/window.d.ts`, which were **reproduced at HEAD** (`git show
+HEAD:src/renderer/window.d.ts` lints to the same two identities) and belong to another track.
+
+Honest note on the vitest number, unchanged from the F1/F2 entry: that is the **shared working
+tree**, which carries several other tracks' uncommitted work. Committed HEAD is red with nine
+long-standing failures that predate this slice and belong to other tracks. This slice adds no
+failure identity.
+
+**Live acceptance: not run for this slice, and that is a gap, stated rather than papered over.**
+F1/F2's acceptance was a full end-to-end fusion of a real 305 s episode. Repeating it here needs
+the whole Whisper pass plus a local translator load, and the turn's budget went to the Track 2
+etymology slice's live QA (which did run, in full, on the real install). What *is* verified: the
+pure decision layer is exhaustively unit-tested and mutation-checked, and the job wiring is a
+straight-line substitution — `texts` → `decisions.map(d => d.text)` into the same
+`windowCuesToSubtitleCues` call F2 already proved live.
+
+**What the next session should do first:** a live fusion run on the same podcast fixture, and
+compare its `fused-ja.srt` against F1/F2's. The expected difference is narrow and checkable —
+windows that were dropped for an empty transcript should now carry Japanese, the record should
+carry a non-zero `confidence`, and no window that previously had text should have changed. If a
+line that Whisper produced has changed, the referee has become an author and that is a defect.
+
+**Status against §6 "What done means":** (1) F1–F4 done, F5 and F6's confidence sidecar open.
+(2) done. (3) not started — F7 is now the gating unknown, since `FUSION_AGREE_SCORE` and the
+confidence constants are all provisional until it runs. (4) **not** done for this slice; see
+above. (5) done.
+
+**Next stage: F6's per-cue sidecar**, which is now the cheapest remaining piece — `decisions`
+already carries `{basis, score, confidence}` per window and nothing persists it. F5 needs a cloud
+key and a schema; F7 needs real media and the Whisper runtime.

@@ -34,15 +34,19 @@ import type { MediaItem } from '../shared/types';
 import { parseSubtitles } from '../shared/subtitleCues';
 import { shiftCues } from '../shared/subtitleSync';
 import {
+  decideFusedWindows,
+  meanFusionConfidence,
   planAsrWindows,
   selectDialogueCues,
   windowCuesToSubtitleCues,
+  windowSourceText,
   FUSION_MAX_WINDOW_SEC,
   type CueExclusionReason,
 } from '../shared/subtitleFusionCore';
 import { cuesToSrt } from '../shared/subtitlesExport';
 import { extractAudioPcm } from './media';
 import { estimateSubtitleOffset } from './subtitleSync';
+import { isTranslateAvailable, runTranslationBatch } from './translate';
 
 export interface TranscriptionHost {
   listItems: () => MediaItem[];
@@ -350,6 +354,53 @@ function writeSubtitleFile(mediaId: string, fileName: string, contents: string):
 }
 
 /**
+ * Translate each ASR window's English text, for the reference F4 scores against.
+ *
+ * Returns an array parallel to `sources`, with an empty string wherever no
+ * translation was produced. **Every failure path yields empties rather than
+ * throwing**, and that is the whole contract: the plan makes offline degradation
+ * a hard requirement, and a missing reference costs confidence, never the track.
+ * With no local model installed, a cancelled batch, or a chunk the model declined,
+ * the job still writes exactly the Whisper output F2 produced.
+ *
+ * The local translator is used, not a cloud provider. The reference only has to
+ * carry meaning well enough to disagree usefully with a misheard transcript, and
+ * spending a cloud call per window on an episode with ~500 of them is not a cost
+ * this stage can justify. Cloud arbitration is F5, on the disputed cues only.
+ */
+async function translateWindowReferences(
+  sources: readonly string[],
+  sourceLang: string,
+  targetLang: string,
+  isCancelled: () => boolean,
+): Promise<string[]> {
+  const references = sources.map(() => '');
+  if (!isTranslateAvailable()) return references;
+
+  const items = sources
+    .map((text, index) => ({ id: String(index), text: text.trim(), source: sourceLang, target: targetLang }))
+    .filter((item) => item.text.length > 0);
+  if (!items.length) return references;
+
+  try {
+    const results = await runTranslationBatch(items, { shouldCancel: isCancelled });
+    for (const result of results) {
+      const index = Number(result.id);
+      // `runTranslationBatch` echoes the ids it was given, but a model that
+      // fabricates one must not be able to write outside the array.
+      if (!Number.isInteger(index) || index < 0 || index >= references.length) continue;
+      references[index] = result.text.trim();
+    }
+  } catch {
+    // A translator failure is not a fusion failure. Deliberately silent: the
+    // reduced per-cue confidence in the written record is where this shows up,
+    // and it shows up per line rather than as one banner about the whole run.
+    return sources.map(() => '');
+  }
+  return references;
+}
+
+/**
  * Transcribe the Japanese audio on the English track's cue grid.
  *
  * This is F1+F2 of `docs/ACTIVE/EN_JA_SUBTITLE_FUSION_PLAN.md`, and on its own it
@@ -461,8 +512,25 @@ async function runFusionJob(job: TranscriptionJob): Promise<TranscriptionResult>
       texts.push(reply.text ?? '');
     }
 
+    // F3 — the reference translation, one request per window rather than per cue.
+    // A merged window's transcript covers several English lines, so the reference
+    // it is scored against has to cover the same span or the comparison is
+    // structurally unfair. `runTranslationBatch` already dedupes, chunks and
+    // caches, so identical lines across an episode cost one call.
     emit('aligning', total);
-    const fused = windowCuesToSubtitleCues(windows, cues, texts);
+    const references = await translateWindowReferences(
+      windows.map((window) => windowSourceText(window, cues)),
+      source.lang,
+      job.lang,
+      () => stopped(total),
+    );
+
+    // F4 — agreement scoring. Offline this never overrides Whisper; what it
+    // changes is the confidence carried per line, and that a window Whisper
+    // returned nothing for now carries the translated English instead of
+    // disappearing from the track.
+    const decisions = decideFusedWindows(texts, references);
+    const fused = windowCuesToSubtitleCues(windows, cues, decisions.map((d) => d.text));
     const srt = cuesToSrt(fused);
     if (!srt.trim()) {
       emit('error', total, { error: 'empty' });
@@ -479,6 +547,7 @@ async function runFusionJob(job: TranscriptionJob): Promise<TranscriptionResult>
       label: `${job.lang.toUpperCase()} (fused from ${source.lang.toUpperCase()} + Whisper)`,
       machineGenerated: true,
       derivation: 'en-ja-fusion',
+      confidence: meanFusionConfidence(decisions),
       addedAt: Date.now(),
     };
     // Replaces the previous *fused* track only. A plain Whisper transcript for the
