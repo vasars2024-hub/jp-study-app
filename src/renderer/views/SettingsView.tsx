@@ -26,10 +26,47 @@ import { TELEMETRY_CONSENT_KEY } from '../../shared/stats';
 import { sendTelemetryPingIfNeeded } from '../telemetryPing';
 import { useT } from '../i18n';
 import { LANG_TAGS } from '../../shared/i18n/core';
+import type { DictionaryImportJobSnapshot } from '../../shared/dictionaryImportJob';
 
 /** Study-profile picker and controls — shared by Settings and Anki views. */
 export function ProfileSettingsSection() {
   return <ProfileSwitcher showHeading />;
+}
+
+/**
+ * Queues a dictionary job and answers with the terminal snapshot it reaches.
+ *
+ * The listener is attached *before* `start` runs, and buffers terminal snapshots
+ * it cannot yet attribute: the job id only exists once `start` has answered, and
+ * a small relabel can finish inside that round trip. Attaching afterwards would
+ * wait forever for an event already delivered.
+ *
+ * There is no timeout, deliberately: `importJobs.ts` synthesises a `failed`
+ * terminal when the utility process exits without one, so every queued job ends
+ * in an event rather than in silence.
+ */
+async function queueDictionaryJob<T extends { jobId?: string }>(
+  start: () => Promise<T>,
+): Promise<{ result: T; terminal: DictionaryImportJobSnapshot['terminal'] }> {
+  const buffered = new Map<string, DictionaryImportJobSnapshot>();
+  let wanted: string | null = null;
+  let deliver: ((snapshot: DictionaryImportJobSnapshot) => void) | null = null;
+  const off = window.api.onDictImportChanged((snapshot) => {
+    if (!snapshot.terminal) return;
+    if (wanted === snapshot.jobId) deliver?.(snapshot);
+    else buffered.set(snapshot.jobId, snapshot);
+  });
+  try {
+    const result = await start();
+    if (!result.jobId) return { result, terminal: undefined };
+    wanted = result.jobId;
+    const already = buffered.get(wanted);
+    const snapshot = already
+      ?? (await new Promise<DictionaryImportJobSnapshot>((resolve) => { deliver = resolve; }));
+    return { result, terminal: snapshot.terminal };
+  } finally {
+    off();
+  }
 }
 
 function dictKindLabel(d: YomitanDictInfo, t: (key: string) => string): string {
@@ -55,6 +92,8 @@ export function DictionarySettingsSection() {
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
+  /** The source whose relabel job is running; its select is locked meanwhile. */
+  const [relabeling, setRelabeling] = useState<string | null>(null);
   const [exOffline, setExOffline] = useState<{
     installed: boolean;
     sentenceCount: number;
@@ -220,14 +259,37 @@ export function DictionarySettingsSection() {
   // Not `updateSource`: relabelling headwords changes which pairs exist at all —
   // that is the point of it — so the pair selector and its active pair have to be
   // re-read, not only the source list.
+  //
+  // And not synchronous either: the relabel runs as a job on the import utility
+  // process (7.2 s for 101,843 headwords), so the reply is a job id and the list
+  // must not be re-read until that job reaches a terminal state — reading it
+  // earlier would show the language the source still has and look like a control
+  // that did nothing.
   async function onSetSourceLang(id: string, sourceLang: string) {
     setMsg(null);
-    const next = await window.api.dictSetSourceLang(id, sourceLang);
-    if (!next.ok) {
-      setMsg({ kind: 'err', text: t('settings.study.dict.sources.langFailed') });
-      return;
+    setRelabeling(id);
+    try {
+      const { result, terminal } = await queueDictionaryJob(() =>
+        window.api.dictSetSourceLang(id, sourceLang));
+      if (!result.ok) {
+        setMsg({
+          kind: 'err',
+          text: result.error === 'busy'
+            ? t('settings.study.dict.sources.langBusy')
+            : t('settings.study.dict.sources.langFailed'),
+        });
+        return;
+      }
+      // `unchanged` means the source already had that language: nothing ran, and
+      // nothing on screen is stale.
+      if (result.unchanged) return;
+      if (terminal && terminal.state !== 'committed') {
+        setMsg({ kind: 'err', text: t('settings.study.dict.sources.langFailed') });
+      }
+      await refresh();
+    } finally {
+      setRelabeling(null);
     }
-    await refresh();
   }
 
   async function onRemoveSource(source: DictionarySourceInfo) {
@@ -380,6 +442,9 @@ export function DictionarySettingsSection() {
               <div className="dict-manage-info">
                 <div className="set-row-title">{source.title}</div>
                 <div className="set-row-desc muted">{langNativeLabel(source.sourceLang)} · {source.kind} · {source.entryCount.toLocaleString(LANG_TAGS[lang])}</div>
+                {relabeling === source.id && (
+                  <div className="set-row-desc muted">{t('settings.study.dict.sources.langRunning')}</div>
+                )}
                 {(source.licence || source.attribution) && (
                   <div className="set-row-desc muted">
                     {[source.licence, source.attribution].filter(Boolean).join(' · ')}
@@ -392,6 +457,10 @@ export function DictionarySettingsSection() {
                   title={t('settings.study.dict.sources.langTitle')}
                   aria-label={t('settings.study.dict.sources.langTitle')}
                   value={source.sourceLang}
+                  // One relabel at a time, and never a second one against the
+                  // source a job is already rewriting: the queue would refuse it
+                  // as `busy`, which is a worse answer than a locked control.
+                  disabled={relabeling !== null}
                   onChange={(event) => void onSetSourceLang(source.id, event.target.value)}
                 >
                   {/* An importer may have written a code this table does not carry

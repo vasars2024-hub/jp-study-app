@@ -80,7 +80,7 @@ import {
   type DictionarySourceInfo,
   type DictionarySourceMutationResult,
 } from '../../shared/dictionarySources';
-import { relabelDictionarySourceLang } from './sourceLang';
+import { runSourceLangRelabel } from './sourceLang';
 import {
   buildOfflineInterlinear,
   type LexiconInterlinearOptions,
@@ -244,6 +244,13 @@ export function setDictionarySourceEnabled(
  * and pitch and frequency are read under the headword's language. Changing the
  * `dictionaries` row alone would advertise a pair the headwords cannot answer —
  * the exact shape of the defect this repairs.
+ *
+ * **Synchronous, and therefore not the renderer's path.** Measured at 7.2 s for
+ * JMdict RU's 101,843 headwords; JMdict EN has 524,106 and would freeze the app
+ * for something like half a minute. `dict:setSourceLang` queues a `relabel` job
+ * on the import utility process instead (`importWorker.ts`). This entry point
+ * stays for tests and for any caller that already owns a database handle and a
+ * thread it is allowed to block.
  */
 export function setDictionarySourceLang(
   id: string,
@@ -252,28 +259,8 @@ export function setDictionarySourceLang(
 ): DictionarySourceMutationResult {
   const target = normalizeSourceLang(lang);
   if (!target) return { ok: false, error: 'invalid-lang', sources: listDictionarySources(db) };
-  const row = db.prepare('select source_lang from dictionaries where id = ?').get(id) as
-    | { source_lang: string }
-    | undefined;
-  if (!row) return { ok: false, error: 'not-found', sources: listDictionarySources(db) };
-  const current = (row.source_lang ?? '').trim();
-  // Already there: the requested state holds, so this is success with no write.
-  // Reporting a failure would make a `<select>` that re-sends its own value look
-  // broken, and there is nothing left for the caller to do about it.
-  if (current === target) return { ok: true, sources: listDictionarySources(db) };
-
-  // `chars` is a projection of `char_sources` pinned to `'ja'`, so a character
-  // source moving off `ja` has to be rebuilt out of it — and the characters it
-  // owned can only be read while its rows still carry the old language.
-  const affected = (db
-    .prepare('select char from char_sources where dict_id = ? and lang = ?')
-    .all(id, current) as Array<{ char: string }>).map((entry) => entry.char);
-
-  db.transaction(() => {
-    relabelDictionarySourceLang(db, id, current, target);
-    db.prepare('update char_sources set lang = ? where dict_id = ? and lang = ?').run(target, id, current);
-    if (affected.length) rebuildCharacterProjection(db, affected);
-  })();
+  const outcome = runSourceLangRelabel(db, id, target);
+  if (!outcome.ok) return { ok: false, error: outcome.error, sources: listDictionarySources(db) };
   return { ok: true, sources: listDictionarySources(db) };
 }
 

@@ -1692,6 +1692,8 @@ export const ja: Catalog = {
   'settings.study.dict.sources.pairReset': '既定の並び順に戻す',
   'settings.study.dict.sources.langTitle': 'この辞書の見出し語が書かれている言語 — 取り込み時の判定が違っていれば変更',
   'settings.study.dict.sources.langFailed': 'この辞書の言語を変更できませんでした。',
+  'settings.study.dict.sources.langRunning': 'この辞書の見出し語を書き換えています。大きな辞書では時間がかかります。',
+  'settings.study.dict.sources.langBusy': '別の辞書処理が実行中です。完了してからもう一度お試しください。',
   'settings.study.dict.examples.title': 'オフライン例文',
   'settings.study.dict.examples.intro': 'Tatoeba の例文は既定でオンラインです。オフライン照会用に tatoeba.org/downloads から日本語文 CSV をインポートできます。オンライン検索が成功した例文もキャッシュされます。任意: 同じ文ファイルとリンク CSV でインポート時に英語訳を付けられます。',
   'settings.study.dict.examples.import': 'Tatoeba 文をインポート（CSV）',

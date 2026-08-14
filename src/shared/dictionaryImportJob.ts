@@ -3,7 +3,18 @@
  * The worker/main bridge owns execution; this module only describes the
  * observable state so renderer recovery cannot infer success from progress.
  */
-export type DictionaryImportKind = 'cedict' | 'wiktextract' | 'dsl' | 'jmnedict' | 'kanjidic' | 'stardict' | 'tatoeba' | 'legacy';
+
+import { normalizeSourceLang } from './dictionarySources';
+
+/**
+ * `relabel` is not an import — it writes no new rows. It is here because it is
+ * the same *shape* of work: minutes of synchronous SQLite writes against the
+ * dictionary database, which must not run on Electron's main event loop, and
+ * which two callers must never run at once against one write lock. Reusing this
+ * queue gets the one-at-a-time guarantee, the reload-survivable snapshot and the
+ * process isolation for free; a second mechanism would have to re-earn all three.
+ */
+export type DictionaryImportKind = 'cedict' | 'wiktextract' | 'dsl' | 'jmnedict' | 'kanjidic' | 'stardict' | 'tatoeba' | 'legacy' | 'relabel';
 
 export type DictionaryImportTerminal =
   | { state: 'committed'; counts: Record<string, number> }
@@ -26,7 +37,7 @@ export interface DictionaryImportJobSnapshot {
   terminal?: DictionaryImportTerminal;
 }
 
-const KINDS = new Set<DictionaryImportKind>(['cedict', 'wiktextract', 'dsl', 'jmnedict', 'kanjidic', 'stardict', 'tatoeba', 'legacy']);
+const KINDS = new Set<DictionaryImportKind>(['cedict', 'wiktextract', 'dsl', 'jmnedict', 'kanjidic', 'stardict', 'tatoeba', 'legacy', 'relabel']);
 const PHASES = new Set<DictionaryImportProgress['phase']>(['reading', 'importing', 'committing']);
 const TERMINAL_STATES = new Set<DictionaryImportTerminal['state']>(['committed', 'cancelled', 'failed']);
 const JOB_ID_MAX = 128;
@@ -106,6 +117,8 @@ export interface DictionaryImportRequest {
   linksFilePath?: string;
   /** Overrides the importer's own default dictionary id. Bounded like `jobId`. */
   dictId?: string;
+  /** `relabel` only: the source language every row of `dictId` moves to. */
+  toLang?: string;
 }
 
 const PATH_MAX = 4_096;
@@ -122,7 +135,7 @@ export function normalizeDictionaryImportRequest(value: unknown): DictionaryImpo
   if (!KINDS.has(raw.kind as DictionaryImportKind)) return null;
   const kind = raw.kind as DictionaryImportKind;
   const request: DictionaryImportRequest = { kind };
-  if (kind === 'legacy') {
+  if (kind === 'legacy' || kind === 'relabel') {
     // A path would be ignored; accepting one would imply it was honoured.
     if (raw.filePath !== undefined || raw.linksFilePath !== undefined) return null;
   } else {
@@ -136,6 +149,19 @@ export function normalizeDictionaryImportRequest(value: unknown): DictionaryImpo
   if (raw.dictId !== undefined) {
     if (!boundedText(raw.dictId, JOB_ID_MAX)) return null;
     request.dictId = raw.dictId;
+  }
+  if (kind === 'relabel') {
+    // Both are mandatory here, and neither has a defensible default: without a
+    // `dictId` there is no dictionary to move, and `normalizeSourceLang` refuses
+    // a blank language because a source with no `source_lang` answers no pair at
+    // all. An importer's own id fallback has no equivalent on this side.
+    const toLang = normalizeSourceLang(raw.toLang);
+    if (!request.dictId || !toLang) return null;
+    request.toLang = toLang;
+  } else if (raw.toLang !== undefined) {
+    // Same rule as `filePath` on a legacy request: accepting a field this kind
+    // ignores would imply it was honoured.
+    return null;
   }
   return request;
 }

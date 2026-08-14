@@ -1831,6 +1831,8 @@ export const ru: Catalog = {
   'settings.study.dict.sources.pairReset': 'Вернуть порядок по умолчанию',
   'settings.study.dict.sources.langTitle': 'Язык, на котором написаны заголовочные слова этого источника — измените, если импорт определил его неверно',
   'settings.study.dict.sources.langFailed': 'Не удалось изменить язык этого источника.',
+  'settings.study.dict.sources.langRunning': 'Записи источника переписываются — для большого словаря это займёт время.',
+  'settings.study.dict.sources.langBusy': 'Выполняется другая словарная задача. Повторите попытку после её завершения.',
   'settings.study.dict.examples.title': 'Офлайн-примеры предложений',
   'settings.study.dict.examples.intro': 'Примеры Tatoeba по умолчанию онлайн. Импортируйте CSV японских предложений с tatoeba.org/downloads для офлайн-поиска; удачные онлайн-поиски также кэшируются. По желанию: тот же файл предложений плюс CSV ссылок — чтобы при импорте добавить английские глоссы.',
   'settings.study.dict.examples.import': 'Импортировать предложения Tatoeba (CSV)',

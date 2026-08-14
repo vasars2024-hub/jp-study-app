@@ -1683,6 +1683,8 @@ export const zh: Catalog = {
   'settings.study.dict.sources.pairReset': '恢复默认顺序',
   'settings.study.dict.sources.langTitle': '该词源词头所用的语言 — 若导入时判断有误，请在此更改',
   'settings.study.dict.sources.langFailed': '无法更改该词源的语言。',
+  'settings.study.dict.sources.langRunning': '正在重写该词源的词条，大型词典可能需要一些时间。',
+  'settings.study.dict.sources.langBusy': '另一个词典任务正在运行，请等待其完成后重试。',
   'settings.study.dict.examples.title': '离线例句',
   'settings.study.dict.examples.intro': 'Tatoeba 例句默认在线可用。可从 tatoeba.org/downloads 导入日语句子 CSV 以供离线查阅；成功在线搜索的例句也会被缓存。可选：同一句子文件外加链接 CSV，在导入时附上英语释义。',
   'settings.study.dict.examples.import': '导入 Tatoeba 句子（CSV）',

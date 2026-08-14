@@ -529,7 +529,12 @@ const api = {
     ipcRenderer.invoke('dict:resetPairPriority', pair),
   dictSetSourceEnabled: (id: string, enabled: boolean): Promise<import('./shared/dictionarySources').DictionarySourceMutationResult> =>
     ipcRenderer.invoke('dict:setSourceEnabled', id, enabled),
-  dictSetSourceLang: (id: string, lang: string): Promise<import('./shared/dictionarySources').DictionarySourceMutationResult> =>
+  /**
+   * Queues the relabel; it does not perform it. `jobId` names a job on the
+   * import stream (`onDictImportChanged`) whose terminal snapshot is the real
+   * answer — `sources` here is the list as it stands *before* the move.
+   */
+  dictSetSourceLang: (id: string, lang: string): Promise<import('./shared/dictionarySources').DictionarySourceLangResult> =>
     ipcRenderer.invoke('dict:setSourceLang', id, lang),
   dictMoveSource: (id: string, direction: -1 | 1, pair?: import('./shared/dictionarySources').DictionaryLanguagePair): Promise<import('./shared/dictionarySources').DictionarySourceMutationResult> =>
     ipcRenderer.invoke('dict:moveSource', id, direction, pair),

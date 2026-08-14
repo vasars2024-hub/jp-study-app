@@ -35,6 +35,7 @@ import { importKanjidic } from './importers/kanjidic';
 import { importStarDict } from './importers/stardict';
 import { importTatoeba } from './importers/tatoeba';
 import { migrateLegacyYomitanStores } from './migrate';
+import { runSourceLangRelabel } from './sourceLang';
 import type {
   DictionaryImportKind,
   DictionaryImportRequest,
@@ -193,6 +194,25 @@ export function runDictionaryImport(
       });
       const { cancelled, ...rest } = counts;
       return cancelled ? { state: 'cancelled', counts: {} } : { state: 'committed', counts: numericCounts(rest) };
+    }
+
+    if (request.kind === 'relabel') {
+      // No `shouldCancel` is threaded in, and that is deliberate rather than an
+      // omission. The relabel is five UPDATE statements in one transaction: there
+      // is no row loop to poll between, and SQLite will not abandon a statement
+      // half-way. A cancel button that could only ever fire before the first
+      // statement or after the last would be a lie about what it does. The one
+      // honest check is before the transaction opens.
+      if (deps.shouldCancel()) return { state: 'cancelled', counts: {} };
+      deps.onProgress(0, 'committing');
+      const outcome = runSourceLangRelabel(db, request.dictId as string, request.toLang as string);
+      if (!outcome.ok) {
+        // `not-found` is the only failure this can report, and it is a real one:
+        // the dictionary was removed between the renderer reading the list and
+        // the job reaching the worker.
+        return { state: 'failed', error: `No dictionary with id ${request.dictId}.` };
+      }
+      return { state: 'committed', counts: numericCounts(outcome.counts) };
     }
 
     const result = migrateLegacyYomitanStores(

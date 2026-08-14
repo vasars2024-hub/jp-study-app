@@ -146,6 +146,82 @@ describe('runDictionaryImport', () => {
     expect(terminal).toEqual({ state: 'committed', counts: { stores: 0, skipped: 0, headwords: 0, senses: 0, glosses: 0 } });
   });
 
+  // A relabel writes no new rows, so it is not an import — it is here because it
+  // is the same shape of work: seconds of synchronous SQLite writes that must not
+  // sit on the main event loop, behind the same one-at-a-time queue.
+  describe('the relabel kind', () => {
+    function seedChineseUnderJapanese(): SqliteDb {
+      const db = openDictionaryDb({ dir: dbDir });
+      open.push(db);
+      db.prepare('insert into dictionaries (id, title, source_lang, target_langs, priority) values (?, ?, ?, ?, ?)')
+        .run('user-zh', 'Some Chinese dictionary', 'ja', 'zh', 0);
+      db.prepare('insert into headwords (dict_id, lang, text, norm, reading, reading_norm) values (?, ?, ?, ?, ?, ?)')
+        .run('user-zh', 'ja', '熊貓', '熊貓', '', '');
+      db.prepare('insert into pitch (dict_id, lang, norm, reading, positions) values (?, ?, ?, ?, ?)')
+        .run('user-zh', 'ja', '熊貓', 'ㄒㄩㄥˊ', '0');
+      db.prepare('insert into freq_corpora (lang, norm, corpus, rank) values (?, ?, ?, ?)')
+        .run('ja', '熊貓', 'user-zh', 12);
+      db.close();
+      return db;
+    }
+
+    it('moves every row the dictionary owns and counts what it actually moved', () => {
+      seedChineseUnderJapanese();
+
+      const terminal = runDictionaryImport(
+        { kind: 'relabel', dictId: 'user-zh', toLang: 'zh' },
+        dbDir,
+        tempRoot,
+        deps(),
+      );
+
+      // The counts are `better-sqlite3`'s own numbers, not estimates: a relabel
+      // that claimed rows it did not move would be the same lie as an import
+      // claiming entries it never wrote.
+      expect(terminal).toEqual({
+        state: 'committed',
+        counts: { headwords: 1, pitch: 1, frequencies: 1, pairOverrides: 0, characters: 0 },
+      });
+      const check = openDictionaryDb({ dir: dbDir });
+      open.push(check);
+      expect(check.prepare('select source_lang from dictionaries where id = ?').get('user-zh'))
+        .toEqual({ source_lang: 'zh' });
+      expect(check.prepare('select lang from headwords where dict_id = ?').all('user-zh'))
+        .toEqual([{ lang: 'zh' }]);
+      expect(check.prepare('select lang from pitch where dict_id = ?').all('user-zh'))
+        .toEqual([{ lang: 'zh' }]);
+      expect(check.prepare('select lang from freq_corpora where corpus = ?').all('user-zh'))
+        .toEqual([{ lang: 'zh' }]);
+    });
+
+    it('reports a dictionary that is no longer there as failed rather than as a silent success', () => {
+      seedChineseUnderJapanese();
+      const terminal = runDictionaryImport(
+        { kind: 'relabel', dictId: 'gone', toLang: 'zh' },
+        dbDir,
+        tempRoot,
+        deps(),
+      );
+      expect(terminal.state).toBe('failed');
+      expect(terminal.state === 'failed' ? terminal.error : '').toContain('gone');
+    });
+
+    it('honours a cancel before the transaction, which is the only point it can', () => {
+      seedChineseUnderJapanese();
+      const terminal = runDictionaryImport(
+        { kind: 'relabel', dictId: 'user-zh', toLang: 'zh' },
+        dbDir,
+        tempRoot,
+        deps({ shouldCancel: () => true }),
+      );
+      expect(terminal).toEqual({ state: 'cancelled', counts: {} });
+      const check = openDictionaryDb({ dir: dbDir });
+      open.push(check);
+      expect(check.prepare('select lang from headwords where dict_id = ?').all('user-zh'))
+        .toEqual([{ lang: 'ja' }]);
+    });
+  });
+
   it('closes the database even when the import throws', () => {
     expect(() =>
       runDictionaryImport({ kind: 'cedict', filePath: path.join(tempRoot, 'nope.u8') }, dbDir, tempRoot, deps()),

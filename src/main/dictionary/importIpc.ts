@@ -23,8 +23,12 @@ import {
   startLegacyMigrationIfPending,
   type ImportWorkerHandle,
 } from './importJobs';
+import {
+  normalizeSourceLang,
+  type DictionarySourceLangResult,
+} from '../../shared/dictionarySources';
 import { legacyYomitanRoot } from './migrate';
-import { pendingLegacyStores } from './service';
+import { listDictionarySources, pendingLegacyStores } from './service';
 
 export const DICTIONARY_IMPORT_CHANNELS = {
   start: 'dictImport:start',
@@ -101,6 +105,32 @@ export function dictionaryImportJobs(): DictionaryImportJobs {
 export function startPendingLegacyDictionaryMigration(): void {
   const manager = dictionaryImportJobs();
   startLegacyMigrationIfPending(manager, pendingLegacyStores().length);
+}
+
+/**
+ * Queues a source-language relabel and answers immediately.
+ *
+ * Lives here rather than in `service.ts` because the answer is a job, not a new
+ * state: the caller gets `jobId` and learns the outcome from the same
+ * `dictImport:changed` stream every import uses. The two cheap refusals — an
+ * unusable language code, and a dictionary that is not there — are settled on
+ * the main thread first, because spawning a process to discover them would make
+ * a typo cost a process launch and would report `not-found` as a *failed job*
+ * rather than as a refused request.
+ */
+export function startSourceLangRelabel(id: unknown, lang: unknown): DictionarySourceLangResult {
+  const sources = listDictionarySources();
+  const toLang = normalizeSourceLang(lang);
+  if (!toLang) return { ok: false, error: 'invalid-lang', sources };
+  const source = typeof id === 'string' ? sources.find((entry) => entry.id === id) : undefined;
+  if (!source) return { ok: false, error: 'not-found', sources };
+  // Already there: the requested state holds. A `<select>` that re-sends its own
+  // value must not spend 7 s of utility process on a no-op.
+  if (source.sourceLang.trim() === toLang) return { ok: true, unchanged: true, sources };
+
+  const started = dictionaryImportJobs().start({ kind: 'relabel', dictId: source.id, toLang });
+  if (!started.ok) return { ok: false, error: started.error, sources };
+  return { ok: true, jobId: started.snapshot.jobId, sources };
 }
 
 export function registerDictionaryImportIpc(): void {

@@ -17,6 +17,26 @@ export interface DictionarySourceMutationResult {
 }
 
 /**
+ * What a source-language change answers with, which is *not* the new state.
+ *
+ * Relabelling every row a dictionary owns takes seconds to tens of seconds, so
+ * it runs as a job on the import utility process rather than on the main thread.
+ * The reply therefore says only that the work was accepted; `sources` is the
+ * list as it stands *now*, unchanged, and the caller re-reads it when the job's
+ * terminal snapshot arrives. Returning an optimistically-updated list here would
+ * show a language the database has not moved to yet.
+ */
+export interface DictionarySourceLangResult {
+  ok: boolean;
+  error?: 'not-found' | 'invalid-lang' | 'busy' | 'unsupported';
+  /** The queued job, when one was started. Match it against import snapshots. */
+  jobId?: string;
+  /** The source already had that language: success with nothing to run. */
+  unchanged?: boolean;
+  sources: DictionarySourceInfo[];
+}
+
+/**
  * The language code a source's headwords may be relabelled to, or `undefined`
  * when the caller sent something that is not one.
  *

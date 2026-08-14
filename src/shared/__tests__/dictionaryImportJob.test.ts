@@ -109,6 +109,24 @@ describe('dictionary import request validation', () => {
     expect(normalizeDictionaryImportRequest({ kind: 'legacy', filePath: '/tmp/anything' })).toBeNull();
   });
 
+  it('takes a relabel only with both a dictionary and a usable language', () => {
+    expect(normalizeDictionaryImportRequest({ kind: 'relabel', dictId: 'jmdict-ru', toLang: ' RU ' }))
+      .toEqual({ kind: 'relabel', dictId: 'jmdict-ru', toLang: 'ru' });
+    // Neither half has a defensible default: no dictionary means nothing to
+    // move, and a blank language would leave rows answering no pair at all.
+    expect(normalizeDictionaryImportRequest({ kind: 'relabel', toLang: 'ru' })).toBeNull();
+    expect(normalizeDictionaryImportRequest({ kind: 'relabel', dictId: 'jmdict-ru' })).toBeNull();
+    expect(normalizeDictionaryImportRequest({ kind: 'relabel', dictId: 'jmdict-ru', toLang: '  ' })).toBeNull();
+  });
+
+  it('refuses a relabel carrying a path, and any other kind carrying a language', () => {
+    // Same rule both ways: a field this kind ignores must not be accepted, or
+    // the request implies it was honoured.
+    expect(normalizeDictionaryImportRequest({ kind: 'relabel', dictId: 'd', toLang: 'ru', filePath: '/tmp/x' })).toBeNull();
+    expect(normalizeDictionaryImportRequest({ kind: 'cedict', filePath: '/a', toLang: 'zh' })).toBeNull();
+    expect(normalizeDictionaryImportRequest({ kind: 'legacy', toLang: 'ja' })).toBeNull();
+  });
+
   it('rejects an unknown kind and non-object input', () => {
     expect(normalizeDictionaryImportRequest({ kind: 'jmdict', filePath: '/a' })).toBeNull();
     expect(normalizeDictionaryImportRequest(null)).toBeNull();

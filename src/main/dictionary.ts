@@ -52,7 +52,6 @@ import {
   moveDictionarySourceInPair,
   resetDictionaryPairPriority,
   setDictionarySourceEnabled,
-  setDictionarySourceLang,
   moveDictionarySource,
   removeDictionarySource,
   listUserNotesFromDb,
@@ -92,6 +91,7 @@ import {
 import {
   registerDictionaryImportIpc,
   startPendingLegacyDictionaryMigration,
+  startSourceLangRelabel,
 } from './dictionary/importIpc';
 import { resolveCustomFrequencyRanks } from './mining';
 import { getMainJapaneseTokenizer } from './japaneseTokenizer';
@@ -666,11 +666,17 @@ export function registerDictionaryIpc(): void {
     resetDictionaryPairPriority(readPair(pair) ?? GLOBAL_PAIR));
   ipcMain.handle('dict:setSourceEnabled', (_e, id: string, enabled: boolean) =>
     setDictionarySourceEnabled(id, enabled));
-  // `lang` stays `unknown` all the way into the service, which validates it. The
-  // renderer sends a code from a fixed list, but this channel is reachable from
-  // anything with the preload bridge, and a bad code here would relabel rows.
+  // `lang` stays `unknown` all the way into the validator. The renderer sends a
+  // code from a fixed list, but this channel is reachable from anything with the
+  // preload bridge, and a bad code here would relabel rows.
+  //
+  // The work itself does *not* happen here: relabelling every row a dictionary
+  // owns is 7.2 s for 101,843 headwords and would be ~35 s for JMdict EN, so it
+  // is queued on the import utility process and answered with a job id. The
+  // synchronous `setDictionarySourceLang` stays in `service.ts` for callers that
+  // already hold a database handle and a thread they may block.
   ipcMain.handle('dict:setSourceLang', (_e, id: string, lang: unknown) =>
-    setDictionarySourceLang(id, lang));
+    startSourceLangRelabel(id, lang));
   ipcMain.handle('dict:moveSource', (_e, id: string, direction: -1 | 1, pair?: unknown) => {
     const dir = direction === -1 ? -1 : 1;
     const scoped = readPair(pair);
