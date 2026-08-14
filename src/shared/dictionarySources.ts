@@ -12,8 +12,26 @@ export interface DictionarySourceInfo {
 
 export interface DictionarySourceMutationResult {
   ok: boolean;
-  error?: 'not-found' | 'edge';
+  error?: 'not-found' | 'edge' | 'invalid-lang';
   sources: DictionarySourceInfo[];
+}
+
+/**
+ * The language code a source's headwords may be relabelled to, or `undefined`
+ * when the caller sent something that is not one.
+ *
+ * Two to three letters, because both lengths are already in the database: the
+ * importers write `ja`/`zh`/`en` and StarDict writes the honest `und` when its
+ * archive declares nothing. Blank is *not* accepted — unlike the gloss-language
+ * override there is no "auto" on this side. `dictionaries.source_lang` is one of
+ * the two halves of every language pair, and `listDictionaryPairs` skips a blank
+ * one, so clearing it would delete the source from every pair it can answer
+ * rather than restoring a detection that never existed.
+ */
+export function normalizeSourceLang(raw: unknown): string | undefined {
+  if (typeof raw !== 'string') return undefined;
+  const normalized = raw.trim().toLowerCase();
+  return /^[a-z]{2,3}$/.test(normalized) ? normalized : undefined;
 }
 
 /**

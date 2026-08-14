@@ -523,6 +523,8 @@ const api = {
     ipcRenderer.invoke('dict:resetPairPriority', pair),
   dictSetSourceEnabled: (id: string, enabled: boolean): Promise<import('./shared/dictionarySources').DictionarySourceMutationResult> =>
     ipcRenderer.invoke('dict:setSourceEnabled', id, enabled),
+  dictSetSourceLang: (id: string, lang: string): Promise<import('./shared/dictionarySources').DictionarySourceMutationResult> =>
+    ipcRenderer.invoke('dict:setSourceLang', id, lang),
   dictMoveSource: (id: string, direction: -1 | 1, pair?: import('./shared/dictionarySources').DictionaryLanguagePair): Promise<import('./shared/dictionarySources').DictionarySourceMutationResult> =>
     ipcRenderer.invoke('dict:moveSource', id, direction, pair),
   dictRemoveSource: (id: string): Promise<import('./shared/dictionarySources').DictionarySourceMutationResult> =>

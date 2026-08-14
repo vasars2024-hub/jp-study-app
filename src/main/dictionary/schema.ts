@@ -27,6 +27,7 @@
 
 import type { SqliteDb } from './db';
 import { BUNDLED_GLOSS_LANGS, BUNDLED_SOURCE_LANGS, DEFAULT_SOURCE_LANG } from './glossLang';
+import { relabelDictionarySourceLang } from './sourceLang';
 
 /** Bumped by appending to MIGRATIONS. Never edit a released step. */
 export const DICT_SCHEMA_VERSION = 7;
@@ -530,28 +531,17 @@ export const MIGRATIONS: MigrationStep[] = [
       // The headword UPDATE fires the FTS synchronisation triggers once per row,
       // which retract and re-add identical text. That is real work on a large store
       // and it is correct work; it happens once, inside this step's transaction.
+      // The statements themselves live in `./sourceLang`, because a user
+      // correcting a source's language by hand needs exactly the same five —
+      // the legacy format declares no source language, so a Chinese or Korean
+      // archive a *user* imported still lands under the default.
       const readCurrent = db.prepare('select source_lang from dictionaries where id = ?');
-      const setSource = db.prepare('update dictionaries set source_lang = ? where id = ?');
-      const relabelHeadwords = db.prepare('update headwords set lang = ? where dict_id = ? and lang = ?');
-      const relabelPitch = db.prepare('update pitch set lang = ? where dict_id = ? and lang = ?');
-      const relabelFreq = db.prepare('update freq_corpora set lang = ? where corpus = ? and lang = ?');
-      // `OR REPLACE` because (dict_id, source_lang, target_lang) is the primary key.
-      // A conflicting `zh` override cannot have been set deliberately — no `zh`
-      // headword existed for this dictionary to offer that pair — so the relabelled
-      // row is the one the user actually chose, and it wins.
-      const relabelPairs = db.prepare(
-        'update or replace dict_pair_priority set source_lang = ? where dict_id = ? and source_lang = ?',
-      );
 
       for (const [dictId, lang] of Object.entries(BUNDLED_SOURCE_LANGS)) {
         if (!lang || lang === DEFAULT_SOURCE_LANG) continue;
         const row = readCurrent.get(dictId) as { source_lang?: string } | undefined;
         if (!row || (row.source_lang ?? '').trim() !== DEFAULT_SOURCE_LANG) continue;
-        setSource.run(lang, dictId);
-        relabelHeadwords.run(lang, dictId, DEFAULT_SOURCE_LANG);
-        relabelPitch.run(lang, dictId, DEFAULT_SOURCE_LANG);
-        relabelFreq.run(lang, dictId, DEFAULT_SOURCE_LANG);
-        relabelPairs.run(lang, dictId, DEFAULT_SOURCE_LANG);
+        relabelDictionarySourceLang(db, dictId, DEFAULT_SOURCE_LANG, lang);
       }
     },
   },

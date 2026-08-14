@@ -17,8 +17,9 @@ import {
   removeDictionarySource,
   resetDictionaryPairPriority,
   setDictionarySourceEnabled,
+  setDictionarySourceLang,
 } from '../dictionary/service';
-import { GLOBAL_PAIR } from '../../shared/dictionarySources';
+import { GLOBAL_PAIR, normalizeSourceLang } from '../../shared/dictionarySources';
 
 describe('dictionary source controls', () => {
   let db: SqliteDb;
@@ -42,6 +43,113 @@ describe('dictionary source controls', () => {
     expect(moveDictionarySource('b', -1, db)).toMatchObject({ ok: false, error: 'edge' });
     expect(removeDictionarySource('b', db).sources.map((source) => source.id)).toEqual(['a']);
     expect(removeDictionarySource('missing', db)).toMatchObject({ ok: false, error: 'not-found' });
+  });
+});
+
+describe('correcting the language a source was imported under', () => {
+  let db: SqliteDb;
+
+  beforeEach(() => {
+    tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'jp-dict-source-lang-'));
+    db = openDictionaryDb({ dir: tempRoot });
+    const insert = db.prepare(
+      'insert into dictionaries (id, title, source_lang, target_langs, priority) values (?, ?, ?, ?, ?)',
+    );
+    // A Chinese archive a user imported themselves: the legacy format declares no
+    // source language, so it landed under the Japanese default like every other.
+    insert.run('user-zh', 'Some Chinese dictionary', 'ja', 'zh', 0);
+    insert.run('other', 'A real Japanese dictionary', 'ja', 'en', 1);
+    db.prepare('insert into headwords (dict_id, lang, text, norm, reading, reading_norm) values (?, ?, ?, ?, ?, ?)')
+      .run('user-zh', 'ja', '熊貓', '熊貓', '', '');
+    db.prepare('insert into headwords (dict_id, lang, text, norm, reading, reading_norm) values (?, ?, ?, ?, ?, ?)')
+      .run('other', 'ja', '猫', '猫', 'ねこ', 'ねこ');
+    db.prepare('insert into pitch (dict_id, lang, norm, reading, positions) values (?, ?, ?, ?, ?)')
+      .run('user-zh', 'ja', '熊貓', 'ㄒㄩㄥˊ', '0');
+    db.prepare('insert into freq_corpora (lang, norm, corpus, rank) values (?, ?, ?, ?)')
+      .run('ja', '熊貓', 'user-zh', 12);
+  });
+  afterEach(() => { db.close(); fs.rmSync(tempRoot, { recursive: true, force: true }); });
+
+  const langOf = (table: string, column = 'dict_id', id = 'user-zh'): string[] =>
+    (db.prepare(`select lang from ${table} where ${column} = ?`).all(id) as Array<{ lang: string }>)
+      .map((row) => row.lang);
+
+  it('relabels every row the source owns, and only that source', () => {
+    expect(setDictionarySourceLang('user-zh', 'zh', db)).toMatchObject({ ok: true });
+
+    expect(listDictionarySources(db).find((source) => source.id === 'user-zh')?.sourceLang).toBe('zh');
+    expect(langOf('headwords')).toEqual(['zh']);
+    expect(langOf('pitch')).toEqual(['zh']);
+    expect(langOf('freq_corpora', 'corpus')).toEqual(['zh']);
+    // The untouched Japanese dictionary keeps every one of its own rows.
+    expect(listDictionarySources(db).find((source) => source.id === 'other')?.sourceLang).toBe('ja');
+    expect(langOf('headwords', 'dict_id', 'other')).toEqual(['ja']);
+  });
+
+  it('makes the source answer the pair it can actually answer', () => {
+    expect(listDictionaryPairs(db)).toEqual([
+      { sourceLang: 'ja', targetLang: 'en' },
+      { sourceLang: 'ja', targetLang: 'zh' },
+    ]);
+    setDictionarySourceLang('user-zh', 'zh', db);
+    expect(listDictionaryPairs(db)).toEqual([
+      { sourceLang: 'ja', targetLang: 'en' },
+      { sourceLang: 'zh', targetLang: 'zh' },
+    ]);
+  });
+
+  it('carries a pair order across, and lets the relabelled row win a collision', () => {
+    const upsert = db.prepare(
+      'insert into dict_pair_priority (dict_id, source_lang, target_lang, priority) values (?, ?, ?, ?)',
+    );
+    upsert.run('user-zh', 'ja', 'zh', 3);
+    // A stale row already sitting on the destination pair. It cannot have been
+    // chosen deliberately — no zh headword of this dictionary existed to order.
+    upsert.run('user-zh', 'zh', 'zh', 9);
+    setDictionarySourceLang('user-zh', 'zh', db);
+    const rows = db
+      .prepare('select source_lang, target_lang, priority from dict_pair_priority where dict_id = ?')
+      .all('user-zh');
+    expect(rows).toEqual([{ source_lang: 'zh', target_lang: 'zh', priority: 3 }]);
+  });
+
+  it('moves a character source and rebuilds the projection it fed', () => {
+    db.prepare(`insert into char_sources (dict_id, lang, char, strokes, radical, components, readings, meanings)
+                values (?, 'ja', ?, ?, ?, '[]', '[]', '[]')`).run('user-zh', '熊', 14, '86');
+    db.prepare(`insert into chars (lang, char, strokes, primary_source_id, source_ids)
+                values ('ja', ?, ?, ?, ?)`).run('熊', 14, 'user-zh', '["user-zh"]');
+
+    setDictionarySourceLang('user-zh', 'zh', db);
+
+    expect(langOf('char_sources')).toEqual(['zh']);
+    // `chars` is a Japanese-only projection, so a source that is no longer
+    // Japanese must stop appearing in it rather than linger as a stale row.
+    expect(db.prepare(`select count(*) c from chars where lang = 'ja' and char = ?`).get('熊'))
+      .toEqual({ c: 0 });
+  });
+
+  it('refuses anything that is not a language code, and writes nothing', () => {
+    for (const bad of ['', ' ', 'ja-JP', 'j', 'jpan', 'z h', '中文', 7, null, undefined, ['zh'], {}]) {
+      expect(setDictionarySourceLang('user-zh', bad, db)).toMatchObject({ ok: false, error: 'invalid-lang' });
+    }
+    expect(langOf('headwords')).toEqual(['ja']);
+    expect(listDictionarySources(db).find((source) => source.id === 'user-zh')?.sourceLang).toBe('ja');
+  });
+
+  it('is honest about a source that is not there, and quiet about one already correct', () => {
+    expect(setDictionarySourceLang('missing', 'zh', db)).toMatchObject({ ok: false, error: 'not-found' });
+    // Re-sending the language a source already has is the state the caller asked
+    // for, so it succeeds — a `<select>` re-emitting its own value is not a fault.
+    expect(setDictionarySourceLang('other', 'ja', db)).toMatchObject({ ok: true });
+    expect(langOf('headwords', 'dict_id', 'other')).toEqual(['ja']);
+  });
+
+  it('normalizes case and whitespace, and accepts the three-letter codes already in the database', () => {
+    expect(normalizeSourceLang(' JA ')).toBe('ja');
+    expect(normalizeSourceLang('und')).toBe('und');
+    expect(normalizeSourceLang('yue')).toBe('yue');
+    expect(setDictionarySourceLang('user-zh', ' ZH ', db)).toMatchObject({ ok: true });
+    expect(langOf('headwords')).toEqual(['zh']);
   });
 });
 

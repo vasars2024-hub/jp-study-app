@@ -383,6 +383,7 @@ declare global {
       dictPairHasOverride(pair: import('../shared/dictionarySources').DictionaryLanguagePair): Promise<boolean>;
       dictResetPairPriority(pair: import('../shared/dictionarySources').DictionaryLanguagePair): Promise<import('../shared/dictionarySources').DictionarySourceMutationResult>;
       dictSetSourceEnabled(id: string, enabled: boolean): Promise<import('../shared/dictionarySources').DictionarySourceMutationResult>;
+      dictSetSourceLang(id: string, lang: string): Promise<import('../shared/dictionarySources').DictionarySourceMutationResult>;
       dictMoveSource(id: string, direction: -1 | 1, pair?: import('../shared/dictionarySources').DictionaryLanguagePair): Promise<import('../shared/dictionarySources').DictionarySourceMutationResult>;
       dictRemoveSource(id: string): Promise<import('../shared/dictionarySources').DictionarySourceMutationResult>;
       ankiStatus(): Promise<AnkiStatus>;

@@ -71,11 +71,13 @@ import type { LexiconNeighborResult } from '../../shared/lexiconNeighbors';
 import type { LexiconCompoundResult } from '../../shared/lexiconCompounds';
 import {
   isGlobalPair,
+  normalizeSourceLang,
   pairKey,
   type DictionaryLanguagePair,
   type DictionarySourceInfo,
   type DictionarySourceMutationResult,
 } from '../../shared/dictionarySources';
+import { relabelDictionarySourceLang } from './sourceLang';
 import {
   buildOfflineInterlinear,
   type LexiconInterlinearOptions,
@@ -221,6 +223,55 @@ export function setDictionarySourceEnabled(
     if (result.changes) rebuildCharacterProjection(db, affected);
   })();
   return { ok: result.changes > 0, error: result.changes ? undefined : 'not-found', sources: listDictionarySources(db) };
+}
+
+/**
+ * Correct the language a source's headwords are stored under.
+ *
+ * The legacy Yomitan format declares no source language, so a Chinese or Korean
+ * archive a user imported themselves lands under `'ja'` with nothing in the file
+ * to say otherwise — and the title cannot be trusted for this side, because it
+ * names the *gloss* language ("JMdict (Japanese–Russian)"). Schema step 7 repairs
+ * the dictionaries this app provisions itself, by id; this is how a user repairs
+ * the rest, which is the only evidence that exists for them.
+ *
+ * It is a relabel of every row the source owns, in one transaction, because the
+ * language is what the lookup path filters on: `lookupChineseInDb` pins
+ * `sourceLangs: ['zh']`, `dict_pair_priority` joins `pp.source_lang = h.lang`,
+ * and pitch and frequency are read under the headword's language. Changing the
+ * `dictionaries` row alone would advertise a pair the headwords cannot answer —
+ * the exact shape of the defect this repairs.
+ */
+export function setDictionarySourceLang(
+  id: string,
+  lang: unknown,
+  db: SqliteDb = dictionaryDb(),
+): DictionarySourceMutationResult {
+  const target = normalizeSourceLang(lang);
+  if (!target) return { ok: false, error: 'invalid-lang', sources: listDictionarySources(db) };
+  const row = db.prepare('select source_lang from dictionaries where id = ?').get(id) as
+    | { source_lang: string }
+    | undefined;
+  if (!row) return { ok: false, error: 'not-found', sources: listDictionarySources(db) };
+  const current = (row.source_lang ?? '').trim();
+  // Already there: the requested state holds, so this is success with no write.
+  // Reporting a failure would make a `<select>` that re-sends its own value look
+  // broken, and there is nothing left for the caller to do about it.
+  if (current === target) return { ok: true, sources: listDictionarySources(db) };
+
+  // `chars` is a projection of `char_sources` pinned to `'ja'`, so a character
+  // source moving off `ja` has to be rebuilt out of it — and the characters it
+  // owned can only be read while its rows still carry the old language.
+  const affected = (db
+    .prepare('select char from char_sources where dict_id = ? and lang = ?')
+    .all(id, current) as Array<{ char: string }>).map((entry) => entry.char);
+
+  db.transaction(() => {
+    relabelDictionarySourceLang(db, id, current, target);
+    db.prepare('update char_sources set lang = ? where dict_id = ? and lang = ?').run(target, id, current);
+    if (affected.length) rebuildCharacterProjection(db, affected);
+  })();
+  return { ok: true, sources: listDictionarySources(db) };
 }
 
 export function moveDictionarySource(

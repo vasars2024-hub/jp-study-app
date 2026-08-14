@@ -1681,6 +1681,8 @@ export const zh: Catalog = {
   'settings.study.dict.sources.pairCustom': '该语言对有自己的顺序。',
   'settings.study.dict.sources.pairInherited': '该语言对使用默认顺序。在下方重新排序即可为其单独设置。',
   'settings.study.dict.sources.pairReset': '恢复默认顺序',
+  'settings.study.dict.sources.langTitle': '该词源词头所用的语言 — 若导入时判断有误，请在此更改',
+  'settings.study.dict.sources.langFailed': '无法更改该词源的语言。',
   'settings.study.dict.examples.title': '离线例句',
   'settings.study.dict.examples.intro': 'Tatoeba 例句默认在线可用。可从 tatoeba.org/downloads 导入日语句子 CSV 以供离线查阅；成功在线搜索的例句也会被缓存。可选：同一句子文件外加链接 CSV，在导入时附上英语释义。',
   'settings.study.dict.examples.import': '导入 Tatoeba 句子（CSV）',

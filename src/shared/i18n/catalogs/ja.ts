@@ -1690,6 +1690,8 @@ export const ja: Catalog = {
   'settings.study.dict.sources.pairCustom': 'この言語ペアには専用の並び順があります。',
   'settings.study.dict.sources.pairInherited': 'この言語ペアは既定の並び順に従います。下で並べ替えると専用の並び順になります。',
   'settings.study.dict.sources.pairReset': '既定の並び順に戻す',
+  'settings.study.dict.sources.langTitle': 'この辞書の見出し語が書かれている言語 — 取り込み時の判定が違っていれば変更',
+  'settings.study.dict.sources.langFailed': 'この辞書の言語を変更できませんでした。',
   'settings.study.dict.examples.title': 'オフライン例文',
   'settings.study.dict.examples.intro': 'Tatoeba の例文は既定でオンラインです。オフライン照会用に tatoeba.org/downloads から日本語文 CSV をインポートできます。オンライン検索が成功した例文もキャッシュされます。任意: 同じ文ファイルとリンク CSV でインポート時に英語訳を付けられます。',
   'settings.study.dict.examples.import': 'Tatoeba 文をインポート（CSV）',

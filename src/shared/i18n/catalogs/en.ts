@@ -1806,6 +1806,8 @@ export const en: Catalog = {
   'settings.study.dict.sources.pairCustom': 'This pair has its own order.',
   'settings.study.dict.sources.pairInherited': 'This pair follows the default order. Reordering below gives it one of its own.',
   'settings.study.dict.sources.pairReset': 'Reset to default order',
+  'settings.study.dict.sources.langTitle': 'Language this source’s headwords are written in — change it if an import guessed wrong',
+  'settings.study.dict.sources.langFailed': 'Could not change the language of this source.',
   'settings.study.dict.examples.title': 'Offline example sentences',
   'settings.study.dict.examples.intro': 'Tatoeba examples work online by default. Import the Japanese sentences CSV from tatoeba.org/downloads for offline lookup; the app also caches examples from successful online searches. Optional: re-use the same sentences file plus a links CSV to attach English glosses during import.',
   'settings.study.dict.examples.import': 'Import Tatoeba sentences (CSV)',

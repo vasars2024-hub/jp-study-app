@@ -217,6 +217,19 @@ export function DictionarySettingsSection() {
     if (!next.ok && next.error !== 'edge') setMsg({ kind: 'err', text: t('settings.study.dict.updateFailed') });
   }
 
+  // Not `updateSource`: relabelling headwords changes which pairs exist at all —
+  // that is the point of it — so the pair selector and its active pair have to be
+  // re-read, not only the source list.
+  async function onSetSourceLang(id: string, sourceLang: string) {
+    setMsg(null);
+    const next = await window.api.dictSetSourceLang(id, sourceLang);
+    if (!next.ok) {
+      setMsg({ kind: 'err', text: t('settings.study.dict.sources.langFailed') });
+      return;
+    }
+    await refresh();
+  }
+
   async function onRemoveSource(source: DictionarySourceInfo) {
     const ok = await confirmDialog({ title: t('settings.study.dict.removeTitle'), message: t('settings.study.dict.removeMsg', { title: source.title }), confirmLabel: t('common.remove'), danger: true });
     if (ok) await updateSource(window.api.dictRemoveSource(source.id));
@@ -366,7 +379,7 @@ export function DictionarySettingsSection() {
               </label>
               <div className="dict-manage-info">
                 <div className="set-row-title">{source.title}</div>
-                <div className="set-row-desc muted">{source.sourceLang} · {source.kind} · {source.entryCount.toLocaleString(LANG_TAGS[lang])}</div>
+                <div className="set-row-desc muted">{langNativeLabel(source.sourceLang)} · {source.kind} · {source.entryCount.toLocaleString(LANG_TAGS[lang])}</div>
                 {(source.licence || source.attribution) && (
                   <div className="set-row-desc muted">
                     {[source.licence, source.attribution].filter(Boolean).join(' · ')}
@@ -374,6 +387,25 @@ export function DictionarySettingsSection() {
                 )}
               </div>
               <div className="dict-manage-actions">
+                <select
+                  className="dict-lang-select"
+                  title={t('settings.study.dict.sources.langTitle')}
+                  aria-label={t('settings.study.dict.sources.langTitle')}
+                  value={source.sourceLang}
+                  onChange={(event) => void onSetSourceLang(source.id, event.target.value)}
+                >
+                  {/* An importer may have written a code this table does not carry
+                      — StarDict writes 'und' when its archive declares nothing —
+                      and a select whose value matches no option renders blank. */}
+                  {(KNOWN_LANGS.some((known) => known.code === source.sourceLang)
+                    ? KNOWN_LANGS
+                    : [{ code: source.sourceLang, nativeLabel: langNativeLabel(source.sourceLang) }, ...KNOWN_LANGS]
+                  ).map((known) => (
+                    <option key={known.code} value={known.code}>
+                      {known.nativeLabel}
+                    </option>
+                  ))}
+                </select>
                 <button className="btn small" title={t('settings.study.dict.higherPriority')} disabled={index === 0} onClick={() => void onMoveSource(source.id, -1)}>↑</button>
                 <button className="btn small" title={t('settings.study.dict.lowerPriority')} disabled={index === sources.length - 1} onClick={() => void onMoveSource(source.id, 1)}>↓</button>
                 <button className="btn small" onClick={() => void onRemoveSource(source)}>{t('common.remove')}</button>

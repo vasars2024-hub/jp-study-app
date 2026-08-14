@@ -51,6 +51,7 @@ import {
   moveDictionarySourceInPair,
   resetDictionaryPairPriority,
   setDictionarySourceEnabled,
+  setDictionarySourceLang,
   moveDictionarySource,
   removeDictionarySource,
   listUserNotesFromDb,
@@ -659,6 +660,11 @@ export function registerDictionaryIpc(): void {
     resetDictionaryPairPriority(readPair(pair) ?? GLOBAL_PAIR));
   ipcMain.handle('dict:setSourceEnabled', (_e, id: string, enabled: boolean) =>
     setDictionarySourceEnabled(id, enabled));
+  // `lang` stays `unknown` all the way into the service, which validates it. The
+  // renderer sends a code from a fixed list, but this channel is reachable from
+  // anything with the preload bridge, and a bad code here would relabel rows.
+  ipcMain.handle('dict:setSourceLang', (_e, id: string, lang: unknown) =>
+    setDictionarySourceLang(id, lang));
   ipcMain.handle('dict:moveSource', (_e, id: string, direction: -1 | 1, pair?: unknown) => {
     const dir = direction === -1 ? -1 : 1;
     const scoped = readPair(pair);
