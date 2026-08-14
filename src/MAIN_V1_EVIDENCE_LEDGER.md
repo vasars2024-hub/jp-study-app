@@ -18862,3 +18862,37 @@ Own dev app, `npm start`; bridge pid **30600** on 127.0.0.1:39273. The previous 
   assert "never report a refused or rejected write as saved" are the honest evidence there.
 - **Notes are not exported anywhere yet.** The plan lists `exports` separately, and a note that
   cannot leave the app is a smaller promise than one that can.
+
+### Committed-HEAD verification, run after the checkpoint commit `fa6e177`
+
+Added because the retry-53 finding-1 lesson is specifically about not letting shared-tree green
+stand in for committed evidence. Two disposable detached worktrees, `node_modules` supplied by an
+NTFS junction — one at exact `fa6e177`, one at the parent `57dcf6a` to derive the baseline here
+rather than inherit it from the previous hop's ledger.
+
+- The three test files this slice touches pass in isolation at committed HEAD: **3 files /
+  55 tests**, exit 0.
+- `node tools/i18n-check.cjs` exit 0 at **9,356** keys. That is the *committed* count; the 9,527
+  quoted in the gates section above is the shared tree, which carries other tracks' uncommitted
+  catalog keys. Both are green; they are different trees and are not interchangeable.
+- `node tools/architecture-audit.cjs` exit 0, nothing new — the six new modules all landed with
+  their importers, so no orphan.
+- Full `npx vitest run --testTimeout=60000 --hookTimeout=60000` at `fa6e177`: exit 1, **4 failed /
+  558 passed / 1 skipped files, 9 failed / 7,369 passed / 6 skipped tests** — five
+  `blancAgentStepConfirmGate`, one `localAgentQueueRun`, one `novelReaderProgressGuard`, two
+  `i18n.test.ts` catalog-hygiene. The same four files at the **parent** `57dcf6a` fail with the
+  **identical 9 identities** (9 failed / 43 passed), re-measured rather than quoted, so the set
+  difference introduced by this commit is **empty**. HEAD remains red for reasons owned by other
+  tracks, exactly as retry-53 measured at `bb222ae` and `01a9a25`.
+- One of those nine is `i18n.test.ts > does not let a new component render UI text without adopting
+  i18n`, which is exactly what a new component trips, so it was checked rather than waved through:
+  `tools/i18n-hardcoded-check.cjs` at `fa6e177` names **no** path from this slice. Every string in
+  `EntryNote.tsx` goes through `t()`.
+
+The worktrees were removed and pruned; the shared tree's foreign dirty state is untouched at the
+same **392** paths it carried when this hop started (`preload.ts`, `window.d.ts` and the four
+catalogs still hold their other-track hunks, which is why this commit staged reconstructed
+HEAD-plus-this-edit blobs for those six rather than `git add`ing them). One trap worth the line:
+`preload.ts` at HEAD is **mixed-ending** — CRLF in places, a bare LF on the very line this slice
+inserts after — so the reconstruction reads the EOL off the anchor line, never off the file, and
+asserts the byte delta equals the inserted block before staging.
