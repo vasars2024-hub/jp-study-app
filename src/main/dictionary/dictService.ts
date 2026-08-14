@@ -44,6 +44,12 @@ import {
   type LexiconCompoundCandidate,
   type LexiconCompoundResult,
 } from '../../shared/lexiconCompounds';
+import {
+  MAX_ETYMOLOGY_RESULTS,
+  selectLexiconEtymologies,
+  type LexiconEtymology,
+  type LexiconEtymologyResult,
+} from '../../shared/lexiconEtymology';
 import { pinyinSearchKey } from '../../shared/pinyin';
 import type { SqliteDb } from './db';
 
@@ -963,6 +969,103 @@ export function findLexiconCompounds(db: SqliteDb, query: CompoundQuery): Lexico
     };
   });
   return { query: text, compounds };
+}
+
+export interface EtymologyQuery {
+  text: string;
+  /** Source languages to match headwords in. Every language when omitted. */
+  sourceLangs?: DictLangCode[];
+  limit?: number;
+}
+
+/**
+ * Headword rows probed before their etymologies are read. A word can legitimately
+ * exist in several installed dictionaries; past this it is a normalisation
+ * collision, not a word.
+ */
+const ETYMOLOGY_HEADWORD_ROWS = 24;
+
+/**
+ * The origin paragraphs the installed dictionaries state for a word.
+ *
+ * ## Why an equality probe and not `lookup()`
+ *
+ * The compound expansion runs `lookup()` first because it needs to know whether
+ * the query *is* a word before paying for an index scan. This has no scan to
+ * guard: it is one equality on `idx_hw_norm` and one indexed read of
+ * `idx_etym_head`. Going through `lookup()` would additionally pull in the
+ * de-inflection, prefix and reading passes, so a kana query could resolve to a
+ * homophone and attach that word's origin to this one — an etymology is the one
+ * fact where landing on the wrong headword is indistinguishable from a lie.
+ *
+ * Matching is therefore on `norm` alone. The caller passes a headword the lookup
+ * already resolved, so the written form is what is in hand.
+ *
+ * ## Ordering
+ *
+ * Dictionary priority first, the same precedence every other surface uses, so the
+ * source a user ranked highest speaks first. `selectLexiconEtymologies` then drops
+ * the repeats — Wiktextract emits one record per part of speech and repeats the
+ * paragraph on each.
+ */
+export function findLexiconEtymology(db: SqliteDb, query: EtymologyQuery): LexiconEtymologyResult {
+  const text = query.text.trim();
+  const empty: LexiconEtymologyResult = { query: text, etymologies: [] };
+  if (!text) return empty;
+
+  const langs = query.sourceLangs?.length ? [...new Set(query.sourceLangs)] : [];
+  const langFilter = langs.length ? ` and h.lang in (${langs.map(() => '?').join(',')})` : '';
+  const headwords = db.prepare(`
+    select h.id, h.lang, h.dict_id, d.title as dict_title
+    from headwords h indexed by idx_hw_norm
+    join dictionaries d on d.id = h.dict_id
+    where h.norm = ? and d.enabled = 1${langFilter}
+    order by d.priority desc, h.id asc
+    limit ?
+  `).all(normalizeForLookup(text), ...langs, ETYMOLOGY_HEADWORD_ROWS) as Array<{
+    id: number; lang: string; dict_id: string; dict_title: string;
+  }>;
+  if (!headwords.length) return empty;
+
+  const byId = new Map(headwords.map((row) => [row.id, row]));
+  const etymologyRows = db.prepare(`
+    select headword_id, text, source
+    from etymology
+    where headword_id in (${headwords.map(() => '?').join(',')})
+  `).all(...headwords.map((row) => row.id)) as Array<{
+    headword_id: number; text: string; source: string | null;
+  }>;
+  if (!etymologyRows.length) return empty;
+
+  // The SQL above deliberately has no ORDER BY: `idx_etym_head` is not ordered by
+  // the headword sequence the priority sort produced, so sorting there would ask
+  // SQLite for a sort it cannot serve from the index. The rows are few — bounded
+  // by 24 headwords — so they are reordered here into the headword order instead.
+  const byHeadword = new Map<number, typeof etymologyRows>();
+  for (const row of etymologyRows) {
+    const bucket = byHeadword.get(row.headword_id);
+    if (bucket) bucket.push(row);
+    else byHeadword.set(row.headword_id, [row]);
+  }
+
+  const ordered: LexiconEtymology[] = [];
+  for (const headword of headwords) {
+    for (const row of byHeadword.get(headword.id) ?? []) {
+      const source = row.source?.trim();
+      ordered.push({
+        lang: headword.lang,
+        text: row.text,
+        dictId: headword.dict_id,
+        dictTitle: headword.dict_title,
+        ...(source ? { pos: source } : {}),
+      });
+    }
+  }
+
+  return {
+    query: text,
+    etymologies: selectLexiconEtymologies(ordered, query.limit ?? MAX_ETYMOLOGY_RESULTS),
+  };
 }
 
 function jsonStringArray(value: string): string[] {

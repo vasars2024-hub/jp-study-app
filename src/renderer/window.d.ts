@@ -360,6 +360,10 @@ declare global {
         text: string,
         options?: { sourceLangs?: string[]; glossLangs?: string[] },
       ): Promise<import('../shared/lexiconCompounds').LexiconCompoundResult>;
+      dictEtymology(
+        text: string,
+        options?: { sourceLangs?: string[] },
+      ): Promise<import('../shared/lexiconEtymology').LexiconEtymologyResult>;
       dictConjugation(word: string): Promise<import('../shared/conjugationClass').ConjugationAnalysis>;
       dictNoteGet(
         identity: import('../shared/lexiconNotes').LexiconNoteIdentity,

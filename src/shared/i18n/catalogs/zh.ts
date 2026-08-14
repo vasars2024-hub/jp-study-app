@@ -8431,6 +8431,8 @@ export const zh: Catalog = {
   'lexicon.concordance.empty': '在 {count} 条可读字幕轨道中未找到字面匹配。',
   'lexicon.concordance.summary': '从 {sources} 条可读字幕轨道中找到 {count} 个例句',
   'lexicon.concordance.scope': '仅包含字面匹配，不包含活用形式或由上下文暗示的词。',
+  'lexicon.etymology.title': '词源',
+  'lexicon.etymology.note': '引自你已安装的词典，并非生成内容。',
   'lexicon.compounds.title': '含有该词的词',
   'lexicon.compounds.note': '已安装词典中字面上含有该词的词条，按常用程度排列。匹配部分在每个词中高亮显示。',
   'lexicon.compounds.action': '查找含有该词的词',

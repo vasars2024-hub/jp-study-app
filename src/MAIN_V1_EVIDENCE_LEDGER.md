@@ -20653,3 +20653,141 @@ four new ones were untracked, so a plain `git add` of the named paths was safe a
 HEAD-plus-edit blob reconstruction was needed. `src/MAIN_V1_EVIDENCE_LEDGER.md` and
 `docs/ACTIVE/EN_JA_SUBTITLE_FUSION_PLAN.md` were likewise clean. Nothing else in the ~1,000
 dirty paths was touched, staged, or cleaned.
+
+## Track 2 — where a word came from, from the table that had never had a reader — 2026-08-14 23:35 MSK primary
+
+### Which slice this is, and how it was chosen
+
+The relay ladder puts Main V1 Track 2 (the professional multilingual Lexicon Workbench) ahead
+of everything except the co-priority subtitle-fusion plan, and the last landed slice was a
+fusion one (`4c539fd`), so the alternation calls for a Track 2 slice here. The boss audit's
+last dated section (`docs/audit/RELAY_BOSS_AUDIT.md`, the 2026-08-14 14:40 MSK resolution note)
+records all four retry-53 findings closed, so nothing pre-empted the ladder.
+
+Track 2's own bullet list names **etymology** among the facts the Workbench must show. Three of
+the schema's tables — `collocations`, `etymology`, `audio` — turned out to have **no producer
+and no consumer anywhere in the tree**: a search for each outside `schema.ts` returns only
+prompt text and comments. `etymology` was the one whose writer was already sitting a few lines
+away.
+
+### What landed
+
+A vertical slice, source to surface, for a fact that was previously unreachable:
+
+- **`src/shared/lexiconEtymology.ts`** (new, pure) — the contract plus
+  `selectLexiconEtymologies`, which deduplicates on layout-normalised text and preserves row
+  order.
+- **`src/main/dictionary/importers/wiktextract.ts`** — reads `etymology_text` (falling back to
+  `etymology_texts` only when the joined field is absent, because the latter is a *split* of the
+  former, not extra material) and writes the `etymology` table. `source` carries the record's
+  own part of speech, since the supplying dictionary is already recoverable through
+  `headwords.dict_id` while the part of speech is the only thing distinguishing two genuinely
+  different origins Wiktionary files under one spelling.
+- **`src/main/dictionary/schema.ts`** — `idx_etym_head` in the base DDL, and migration step 8
+  (`CREATE INDEX IF NOT EXISTS`, re-runnable like every step before it) for installed databases.
+  `DICT_SCHEMA_VERSION` 7 → 8.
+- **`src/main/dictionary/dictService.ts`** — `findLexiconEtymology`, two indexed probes.
+- **`src/main/dictionary/service.ts`**, **`src/main/dictionary.ts`**, **`src/preload.ts`**,
+  **`src/renderer/window.d.ts`** — the `dict:etymology` channel end to end.
+- **`src/renderer/components/lexicon/LexiconEtymology.tsx`** + `lexiconEtymology.css`, rendered
+  from `DictionaryResults` above the two opt-in expansions.
+- Four i18n catalogs: `lexicon.etymology.title`, `lexicon.etymology.note`.
+
+The importer's own header had already stated the rule this slice obeys — "writing rows no query
+consults is how a database grows data that is never wrong because it is never used. Those land
+with their readers." The header is updated to say the reader arrived, rather than left asserting
+a restriction that no longer holds.
+
+### Decisions taken under standing auto-approval, and the tradeoff in each
+
+1. **The panel runs unasked, unlike the compound and neighbour expansions beside it.** Those are
+   opt-in because each scans a whole language partition of the headword index (316–673 ms
+   unpinned, 60–87 ms pinned, per the compounds slice's own measurement). This is an equality on
+   `idx_hw_norm` plus an indexed read of `idx_etym_head` — **1 ms measured live** — so there is
+   nothing for a button to protect, and a button that answers "no etymology" is worse than no
+   button.
+2. **It renders `null` rather than an empty state.** On a default install *nothing* writes this
+   table, because only the Wiktextract importer does. An always-visible control advertising a
+   fact the install cannot supply is the failure mode the honesty probes exist to catch. Absence
+   is the honest shape, and it is asserted by two tests.
+3. **A failed read is also absence, not an error row.** There is no user action to retry and no
+   claim being withheld; an alert on every lookup against an un-migrated database would be pure
+   noise. Stated here rather than left implicit, because "silently swallow the error" is
+   normally the wrong call and this is the narrow case where it is not.
+4. **Matching is `norm` equality, not `lookup()`.** Going through `lookup()` would pull in the
+   de-inflection, prefix and reading passes, so a kana query could resolve to a homophone and
+   attach *that* word's origin to this one. An etymology is the one fact where landing on the
+   wrong headword is indistinguishable from a lie.
+5. **A paragraph over `MAX_ETYMOLOGY_CHARS` (4,000) is dropped, not truncated.** A paragraph cut
+   mid-clause reads as a complete claim the source never made, and this surface's entire value
+   is that every sentence in it is verbatim.
+
+### Tests
+
+`src/main/__tests__/dictionaryEtymology.test.ts` (13) and
+`src/renderer/__tests__/lexiconEtymology.test.tsx` (5) — importer writes and rolls back with the
+transaction, `etymology_texts` fallback precedence, the over-long drop, per-POS dedup, source
+filter, disabled dictionary, the foreign-key cascade, priority ordering, and the renderer's
+absent/present/popup behaviour.
+
+**Mutation check.** Removing `seen.has(text)` from `selectLexiconEtymologies` — the dedup that is
+this slice's least obvious claim — turned **4** of the 18 tests red for the intended reason
+(`["From Old Japanese", "From Old Japanese", "from old japanese"]` against the expected two).
+Restored, all 18 green, plus `dictionaryWiktextract`, `dictionaryDb`, `dictionaryMigrate`,
+`dictionarySources` and `lexiconCompounds`: **7 files / 125 tests**, exit 0.
+
+### Live acceptance, through the debug bridge on the real install
+
+Owned dev app started with plain `npm start`; bridge PID **35884** on 127.0.0.1:39273.
+
+- **Before**: `window.api.dictEtymology('犬', { sourceLangs: ['ja'] })` returned
+  `{ query: '犬', etymologies: [] }` against the four bundled sources — the main handler is live,
+  not merely present on `window.api`, and its honest default on a real install is empty.
+- **Import**: a 4-record Wiktextract JSONL went through the *real* job path
+  (`dictImportStart` → utility process → `importWiktextract`), terminal `committed`, counts
+  `entries 4, headwords 4, senses 4, glosses 4, etymologies 3`. Three of four records carry an
+  origin; 水 does not.
+- **Read**: 犬 returned **one** paragraph in **1 ms** despite *two* records carrying it under two
+  parts of speech — the per-POS dedup working on real data through the real path, attributed to
+  `Wiktionary (wiktextract)` with `pos: 'noun'`. 猫 returned its own paragraph, never 犬's.
+- **Adverse inputs**: 水 (in the dictionary, no origin), `sourceLangs: ['ru']`, a non-existent
+  word, whitespace, and a malformed call (`dictEtymology(12345, 'not-an-array')`) all returned
+  `{ etymologies: [] }` without throwing.
+- **Rendered**: Dictionary app, Start menu → Словарь, searched 犬. Panel **772 × 178**,
+  `display: block`, `rgb(216,235,224)` on `rgb(18,28,23)` — computed contrast **14.02:1** — title
+  and note resolved through the Russian catalog, one row, `white-space: pre-wrap`, attribution
+  `Wiktionary (wiktextract) noun`, `overflowX: 0`. Forced to 320 px it reflowed to 320 × 216
+  with `scrollWidth - clientWidth = 0`. Screenshot at `debug/shots/win1-1786738966780.png`.
+- **Absence proved, not assumed**: 水 and 食べる both render **no** `.lexicon-etymology` element
+  at all, while `.lexicon-compounds` and the neighbour panel stay present beside them.
+- **`/logs?level=error` returned 0 entries** across every probe.
+- **Reverse path**: `dictRemoveSource('wikt-etym-probe')` returned the original four sources, the
+  reader went back to `[]`, and a read-only `better-sqlite3` open of the real
+  `%APPDATA%\jp-study-app\dictionary\dict.db` confirms `user_version = 8`, `idx_etym_head`
+  present, **0** etymology rows, **0** probe headwords, 4 dictionaries. `EXPLAIN QUERY PLAN` on
+  the reader's own statement reports `SEARCH etymology USING INDEX idx_etym_head (headword_id=?)`
+  — the migration's purpose is measured, not asserted. The install is back to the four sources it
+  started with; the fixture and the probe script were deleted and owned PID 35884 plus its five
+  children were stopped, nothing else.
+
+### One live result that would have been a false finding
+
+The first rendered probe reported the panel **ABSENT** while the direct IPC call returned a
+paragraph. That was not a defect: reading the sibling expansion's React fibre showed the
+Workbench had mounted with `lang: 'zh'`, because 犬 is a Han character and the lens was on 中文.
+The panel was correctly refusing to answer a Chinese-scoped question with a Japanese-scoped fact.
+Switching the lens to 日本語 produced the render measured above. **Read the props a surface was
+actually mounted with before scoring it against a hand-made IPC call.**
+
+### Deliberately open
+
+- **`collocations` and `audio` are still writer-less and reader-less.** Found in the same sweep
+  and deliberately not touched: each needs its own source (a corpus extraction; an audio provider
+  and a cache policy), which is a slice apiece, not a rider on this one.
+- **Nothing writes `etymology` except the Wiktextract importer**, so the panel is invisible on a
+  default install. That is honest but it is not coverage. JMdict carries no etymology at all;
+  reaching a default install means either bundling a filtered extraction (licence: CC BY-SA 4.0,
+  a distribution decision, not an engineering one) or a KANJIDIC-style character-origin source.
+- **`xrefs` is still unread**, unchanged by this slice, and the importer header still says so.
+- **The nine long-standing full-suite failures at committed HEAD are untouched** and still belong
+  to other tracks.

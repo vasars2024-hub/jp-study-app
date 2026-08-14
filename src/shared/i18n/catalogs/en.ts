@@ -8876,6 +8876,8 @@ export const en: Catalog = {
   'lexicon.concordance.empty': 'No literal matches were found in {count} readable subtitle tracks.',
   'lexicon.concordance.summary': '{count} examples from {sources} readable subtitle tracks',
   'lexicon.concordance.scope': 'Literal matches only. Inflections and words implied by context are not included.',
+  'lexicon.etymology.title': 'Origin',
+  'lexicon.etymology.note': 'Quoted from the dictionaries you have installed, not generated.',
   'lexicon.compounds.title': 'Words containing this one',
   'lexicon.compounds.note': 'Headwords from your installed dictionaries that literally contain this word, most common first. The matching part is highlighted in each.',
   'lexicon.compounds.action': 'Find containing words',

@@ -45,6 +45,7 @@ import {
   resetChineseDictionaryCache,
   findSemanticNeighborsInDb,
   findLexiconCompoundsInDb,
+  findLexiconEtymologyInDb,
   listDictionarySources,
   listDictionaryPairs,
   dictionaryPairHasOverride,
@@ -83,6 +84,11 @@ import {
   MAX_COMPOUND_RESULTS,
   type LexiconCompoundResult,
 } from '../shared/lexiconCompounds';
+import {
+  MAX_ETYMOLOGY_QUERY_CHARS,
+  MAX_ETYMOLOGY_RESULTS,
+  type LexiconEtymologyResult,
+} from '../shared/lexiconEtymology';
 import {
   registerDictionaryImportIpc,
   startPendingLegacyDictionaryMigration,
@@ -758,6 +764,29 @@ export function registerDictionaryIpc(): void {
         // optional on an un-migrated installation, and an expansion the reader
         // asked for degrades to "nothing to show" rather than to a rejected
         // invoke the surface would have to render as a defect.
+        return empty;
+      }
+    },
+  );
+  ipcMain.handle(
+    'dict:etymology',
+    (_e, text: unknown, options?: unknown): LexiconEtymologyResult => {
+      const raw = options && typeof options === 'object' && !Array.isArray(options)
+        ? options as Record<string, unknown>
+        : {};
+      const query = typeof text === 'string' ? text.trim().slice(0, MAX_ETYMOLOGY_QUERY_CHARS) : '';
+      const empty: LexiconEtymologyResult = { query, etymologies: [] };
+      if (!query) return empty;
+      try {
+        return findLexiconEtymologyInDb({
+          text: query,
+          sourceLangs: readLangList(raw.sourceLangs),
+          limit: MAX_ETYMOLOGY_RESULTS,
+        });
+      } catch {
+        // Same contract again, and it matters more here: this read fires with the
+        // lookup rather than on a click, so a throw on an un-migrated installation
+        // would surface as a rejected invoke on every single word.
         return empty;
       }
     },

@@ -36,6 +36,7 @@ import CharacterMetadataPanel from './lexicon/CharacterMetadataPanel';
 import CharacterMetadataUnavailable from './lexicon/CharacterMetadataUnavailable';
 import ConjugationTable from './lexicon/ConjugationTable';
 import LexiconCompounds from './lexicon/LexiconCompounds';
+import LexiconEtymology from './lexicon/LexiconEtymology';
 import EntryNote from './lexicon/EntryNote';
 import SemanticNeighbors from './lexicon/SemanticNeighbors';
 import UsageLabels, { entryUsageTags } from './lexicon/UsageLabels';
@@ -974,6 +975,14 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
           lookup. */}
       {variant !== 'popup' && entries.length > 0 && (
         <ConjugationTable query={entries[0].word} lang={lang} />
+      )}
+
+      {/* Above the opt-in expansions rather than beside them: this one costs two
+          indexed probes, runs unasked, and renders nothing when the installed
+          dictionaries carry no origin for the word — so it never occupies space
+          it cannot fill. */}
+      {variant !== 'popup' && entries.length > 0 && (
+        <LexiconEtymology query={entries[0].word} lang={lang} />
       )}
 
       {variant !== 'popup' && entries.length > 0 && (

@@ -1,0 +1,54 @@
+.lexicon-etymology {
+  margin: 14px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-1);
+  color: var(--text);
+}
+
+.lexicon-etymology > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.lexicon-etymology-note {
+  margin: 8px 0 0;
+  font-size: 0.9em;
+}
+
+.lexicon-etymology-list {
+  display: grid;
+  gap: 10px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lexicon-etymology-list li {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+/* Etymology is prose, and a source routinely writes it as several paragraphs.
+   `pre-wrap` keeps those breaks without turning the block into a code listing —
+   the text still reflows at the container width. */
+.lexicon-etymology-text {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+.lexicon-etymology-attribution {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 0.85em;
+}
+
+.lexicon-etymology-pos {
+  font-style: italic;
+}

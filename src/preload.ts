@@ -459,6 +459,12 @@ const api = {
     options?: { sourceLangs?: string[]; glossLangs?: string[] },
   ): Promise<import('./shared/lexiconCompounds').LexiconCompoundResult> =>
     ipcRenderer.invoke('dict:compounds', text, options),
+  /** What the installed dictionaries say about where this word came from. */
+  dictEtymology: (
+    text: string,
+    options?: { sourceLangs?: string[] },
+  ): Promise<import('./shared/lexiconEtymology').LexiconEtymologyResult> =>
+    ipcRenderer.invoke('dict:etymology', text, options),
   /** Every form of a conjugable Japanese word, from IPADIC's own class table. */
   dictConjugation: (
     word: string,

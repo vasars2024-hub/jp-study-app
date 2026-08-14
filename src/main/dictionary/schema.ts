@@ -30,7 +30,7 @@ import { BUNDLED_GLOSS_LANGS, BUNDLED_SOURCE_LANGS, DEFAULT_SOURCE_LANG } from '
 import { relabelDictionarySourceLang } from './sourceLang';
 
 /** Bumped by appending to MIGRATIONS. Never edit a released step. */
-export const DICT_SCHEMA_VERSION = 7;
+export const DICT_SCHEMA_VERSION = 8;
 
 export interface MigrationStep {
   version: number;
@@ -139,6 +139,7 @@ CREATE TABLE etymology (
   text        TEXT NOT NULL,
   source      TEXT
 );
+CREATE INDEX idx_etym_head ON etymology(headword_id);
 
 CREATE TABLE audio (
   headword_id INTEGER NOT NULL REFERENCES headwords(id) ON DELETE CASCADE,
@@ -543,6 +544,25 @@ export const MIGRATIONS: MigrationStep[] = [
         if (!row || (row.source_lang ?? '').trim() !== DEFAULT_SOURCE_LANG) continue;
         relabelDictionarySourceLang(db, dictId, DEFAULT_SOURCE_LANG, lang);
       }
+    },
+  },
+  {
+    version: 8,
+    name: 'index the etymology table now that something reads it',
+    up(db) {
+      // `etymology` shipped in v1 with no writer and no reader, so it needed no
+      // index and had none. Both landed together (`importWiktextract` writes it,
+      // `findLexiconEtymology` reads it), and the read is `where headword_id in
+      // (…)` — which without this index is a full table scan of every etymology
+      // in every installed dictionary, on the main process, for a panel that
+      // renders on every lookup.
+      //
+      // A plain `CREATE INDEX` on a fresh database is in the base DDL above; this
+      // step exists for the installed ones. `IF NOT EXISTS` because every step in
+      // this ladder must survive being applied twice — a caller that rewinds
+      // `user_version` on a file that already has the index would otherwise
+      // strand the whole ladder.
+      db.exec('CREATE INDEX IF NOT EXISTS idx_etym_head ON etymology(headword_id)');
     },
   },
 ];

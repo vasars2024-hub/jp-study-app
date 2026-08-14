@@ -18,12 +18,13 @@
 //
 // ## What is deliberately not imported
 //
-// Only the four tables that have live readers: `headwords`, `senses`, `glosses`,
-// `inflections`. Wiktextract also carries etymology, synonym/antonym cross
-// references, IPA and translations, and the schema has `etymology`/`xrefs` tables
-// for two of those — but nothing reads either one yet, and writing rows no query
-// consults is how a database grows data that is never wrong because it is never
-// used. Those land with their readers.
+// Only the tables that have live readers: `headwords`, `senses`, `glosses`,
+// `inflections`, and now `etymology` — whose reader landed with it, in
+// `findLexiconEtymology`, exactly as this note originally required. Wiktextract
+// also carries synonym/antonym cross references, IPA and translations, and the
+// schema has an `xrefs` table for the first of those — but nothing reads it yet,
+// and writing rows no query consults is how a database grows data that is never
+// wrong because it is never used. Those land with their readers.
 
 import fs from 'node:fs';
 import type { SqliteDb } from '../db';
@@ -37,6 +38,15 @@ export interface WiktextractRecord {
   pos?: string;
   senses?: { glosses?: string[]; raw_glosses?: string[]; tags?: string[] }[];
   forms?: { form?: string; tags?: string[]; source?: string }[];
+  /** The origin paragraph, plain text. Absent on most entries. */
+  etymology_text?: string;
+  /**
+   * The same paragraph split into sections, on the minority of entries that have
+   * one. Kaikki emits both fields when it emits either, and `etymology_text` is
+   * the joined form — so this is read only when the joined form is missing, never
+   * in addition to it.
+   */
+  etymology_texts?: string[];
 }
 
 export interface WiktextractImportOptions {
@@ -81,8 +91,39 @@ export interface WiktextractImportCounts {
   senses: number;
   glosses: number;
   inflections: number;
+  /** Origin paragraphs written to the `etymology` table. */
+  etymologies: number;
   /** True when `shouldCancel` fired and the transaction was rolled back. */
   cancelled: boolean;
+}
+
+/**
+ * An etymology longer than this is dropped rather than stored.
+ *
+ * Truncating would be worse than omitting: a paragraph cut mid-clause reads as a
+ * complete claim the source never made, and this surface's entire value is that
+ * every sentence in it is verbatim. Wiktionary's real etymologies sit far under
+ * this; anything past it is a transcluded table or a citation dump.
+ */
+export const MAX_ETYMOLOGY_CHARS = 4000;
+
+/**
+ * The origin paragraph a record carries, or an empty string.
+ *
+ * Exported for the same reason `classifyForms` is: the choice of which field to
+ * read, and when, is where this can be wrong. `etymology_texts` is a *split* of
+ * `etymology_text`, not extra material, so reading both would store the same
+ * prose twice — once joined and once per section — and the reader would show a
+ * paragraph followed by its own halves.
+ */
+export function etymologyText(record: WiktextractRecord): string {
+  const joined = typeof record.etymology_text === 'string' ? record.etymology_text.trim() : '';
+  const text = joined || (record.etymology_texts ?? [])
+    .filter((part): part is string => typeof part === 'string')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join('\n\n');
+  return text.length > MAX_ETYMOLOGY_CHARS ? '' : text;
 }
 
 export const WIKTEXTRACT_LICENCE = 'CC BY-SA 4.0';
@@ -211,7 +252,8 @@ export function importWiktextract(
   const langs = new Set(options.langs ?? WIKTEXTRACT_DEFAULT_LANGS);
   const progressEvery = options.progressEvery ?? 20_000;
   const counts: WiktextractImportCounts = {
-    dictId, entries: 0, skipped: 0, headwords: 0, senses: 0, glosses: 0, inflections: 0, cancelled: false,
+    dictId, entries: 0, skipped: 0, headwords: 0, senses: 0, glosses: 0, inflections: 0,
+    etymologies: 0, cancelled: false,
   };
 
   const run = db.transaction(() => {
@@ -241,6 +283,13 @@ export function importWiktextract(
     const insertGloss = db.prepare('insert into glosses (sense_id, lang, text, ord) values (?, ?, ?, ?)');
     const insertInflection = db.prepare(
       'insert into inflections (headword_id, form, name, tags) values (?, ?, null, ?)',
+    );
+    // `source` carries the record's own part of speech, not the dump's name. The
+    // dictionary a row came from is already recoverable through `headwords.dict_id`,
+    // whereas the part of speech is the one thing that distinguishes two genuinely
+    // different origins Wiktionary files under one spelling.
+    const insertEtymology = db.prepare(
+      'insert into etymology (headword_id, lang, text, source) values (?, ?, ?, ?)',
     );
 
     let line = 0;
@@ -303,6 +352,12 @@ export function importWiktextract(
         });
       });
 
+      const etymology = etymologyText(record);
+      if (etymology) {
+        insertEtymology.run(headwordId, lang, etymology, record.pos ?? null);
+        counts.etymologies += 1;
+      }
+
       for (const inflection of inflections) {
         // `name` stays null and the paradigm lives in `tags`. `collectInflectionReasons`
         // concatenates name with the split tags, so a readable name here would
@@ -319,7 +374,10 @@ export function importWiktextract(
     if (err !== CANCELLED) throw err;
     // Every count is zero because every row was rolled back. Reporting the tallies
     // the aborted pass had reached would describe rows that are not in the database.
-    return { dictId, entries: 0, skipped: 0, headwords: 0, senses: 0, glosses: 0, inflections: 0, cancelled: true };
+    return {
+      dictId, entries: 0, skipped: 0, headwords: 0, senses: 0, glosses: 0, inflections: 0,
+      etymologies: 0, cancelled: true,
+    };
   }
   return counts;
 }

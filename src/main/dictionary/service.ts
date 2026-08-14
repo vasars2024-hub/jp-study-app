@@ -46,9 +46,11 @@ import {
 } from './importers/wiktextract';
 import {
   findLexiconCompounds,
+  findLexiconEtymology,
   findSemanticNeighbors,
   lookup,
   type CompoundQuery,
+  type EtymologyQuery,
   type LookupQuery,
   type LookupResult,
   type NeighborQuery,
@@ -69,6 +71,7 @@ import type {
 import type { DictResult } from '../../shared/types';
 import type { LexiconNeighborResult } from '../../shared/lexiconNeighbors';
 import type { LexiconCompoundResult } from '../../shared/lexiconCompounds';
+import type { LexiconEtymologyResult } from '../../shared/lexiconEtymology';
 import {
   isGlobalPair,
   normalizeSourceLang,
@@ -432,6 +435,17 @@ export function findSemanticNeighborsInDb(query: NeighborQuery): LexiconNeighbor
  */
 export function findLexiconCompoundsInDb(query: CompoundQuery): LexiconCompoundResult {
   return findLexiconCompounds(dictionaryDb(), query);
+}
+
+/**
+ * The origin paragraphs the installed dictionaries state for a word.
+ *
+ * Unlike the two reads above this one is cheap enough to run unasked — two
+ * indexed probes, no scan — so the surface fires it with the lookup rather than
+ * behind a button.
+ */
+export function findLexiconEtymologyInDb(query: EtymologyQuery): LexiconEtymologyResult {
+  return findLexiconEtymology(dictionaryDb(), query);
 }
 
 /** The user's own note on a word, from the managed database. */

@@ -8466,6 +8466,8 @@ export const ja: Catalog = {
   'lexicon.concordance.empty': '読み取り可能な字幕{count}本に文字列の一致はありませんでした。',
   'lexicon.concordance.summary': '読み取り可能な字幕{sources}本から{count}件の用例',
   'lexicon.concordance.scope': '文字列が一致した用例だけです。活用形や文脈から推測される語は含みません。',
+  'lexicon.etymology.title': '語源',
+  'lexicon.etymology.note': 'インストール済み辞書からの引用で、生成された文章ではありません。',
   'lexicon.compounds.title': 'この語を含む語',
   'lexicon.compounds.note': 'インストール済み辞書の見出し語のうち、この語を文字どおり含むものを、一般的な順に表示します。一致部分は各語の中で強調されます。',
   'lexicon.compounds.action': 'この語を含む語を検索',
