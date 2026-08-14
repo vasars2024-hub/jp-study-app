@@ -453,6 +453,12 @@ const api = {
     options?: { sourceLangs?: string[]; glossLangs?: string[] },
   ): Promise<import('./shared/lexiconNeighbors').LexiconNeighborResult> =>
     ipcRenderer.invoke('dict:semanticNeighbors', text, options),
+  /** Words whose written form contains this one, from the unified database. */
+  dictCompounds: (
+    text: string,
+    options?: { sourceLangs?: string[]; glossLangs?: string[] },
+  ): Promise<import('./shared/lexiconCompounds').LexiconCompoundResult> =>
+    ipcRenderer.invoke('dict:compounds', text, options),
   /** Every form of a conjugable Japanese word, from IPADIC's own class table. */
   dictConjugation: (
     word: string,

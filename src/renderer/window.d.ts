@@ -356,6 +356,10 @@ declare global {
         text: string,
         options?: { sourceLangs?: string[]; glossLangs?: string[] },
       ): Promise<import('../shared/lexiconNeighbors').LexiconNeighborResult>;
+      dictCompounds(
+        text: string,
+        options?: { sourceLangs?: string[]; glossLangs?: string[] },
+      ): Promise<import('../shared/lexiconCompounds').LexiconCompoundResult>;
       dictConjugation(word: string): Promise<import('../shared/conjugationClass').ConjugationAnalysis>;
       dictNoteGet(
         identity: import('../shared/lexiconNotes').LexiconNoteIdentity,

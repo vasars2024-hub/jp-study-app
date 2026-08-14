@@ -45,8 +45,10 @@ import {
   type WiktextractImportOptions,
 } from './importers/wiktextract';
 import {
+  findLexiconCompounds,
   findSemanticNeighbors,
   lookup,
+  type CompoundQuery,
   type LookupQuery,
   type LookupResult,
   type NeighborQuery,
@@ -66,6 +68,7 @@ import type {
 } from '../../shared/lexiconNotes';
 import type { DictResult } from '../../shared/types';
 import type { LexiconNeighborResult } from '../../shared/lexiconNeighbors';
+import type { LexiconCompoundResult } from '../../shared/lexiconCompounds';
 import {
   isGlobalPair,
   pairKey,
@@ -367,6 +370,17 @@ export function lookupInDictionaryDb(query: LookupQuery): LookupResult {
  */
 export function findSemanticNeighborsInDb(query: NeighborQuery): LexiconNeighborResult {
   return findSemanticNeighbors(dictionaryDb(), query);
+}
+
+/**
+ * Words whose written form contains the queried one, from the managed database.
+ *
+ * Separate from `lookupInDictionaryDb` for the same reason the neighbours read
+ * is: it scans a language partition of the headword index, which is tens of
+ * milliseconds a lookup nobody asked to expand must not spend.
+ */
+export function findLexiconCompoundsInDb(query: CompoundQuery): LexiconCompoundResult {
+  return findLexiconCompounds(dictionaryDb(), query);
 }
 
 /** The user's own note on a word, from the managed database. */

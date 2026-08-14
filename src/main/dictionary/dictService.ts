@@ -36,6 +36,14 @@ import {
   type LexiconNeighborCandidate,
   type LexiconNeighborResult,
 } from '../../shared/lexiconNeighbors';
+import {
+  COMPOUND_SCAN_ROWS,
+  MAX_COMPOUND_RESULTS,
+  selectLexiconCompounds,
+  type LexiconCompound,
+  type LexiconCompoundCandidate,
+  type LexiconCompoundResult,
+} from '../../shared/lexiconCompounds';
 import { pinyinSearchKey } from '../../shared/pinyin';
 import type { SqliteDb } from './db';
 
@@ -823,6 +831,138 @@ export function findSemanticNeighbors(db: SqliteDb, query: NeighborQuery): Lexic
     probedSenses: probes,
     neighbors: rankLexiconNeighbors(text, candidates, query.limit ?? MAX_NEIGHBOR_RESULTS),
   };
+}
+
+export interface CompoundQuery {
+  text: string;
+  /** Source languages to search headwords in. The query's own languages when omitted. */
+  sourceLangs?: DictLangCode[];
+  /** Gloss languages the shown gloss may be written in. All of them when omitted. */
+  glossLangs?: DictLangCode[];
+  limit?: number;
+}
+
+/**
+ * Words whose written form contains the queried one.
+ *
+ * The plan asks for "words containing a character". Until now the only thing
+ * answering that was a filter inside the character panel over entries the lookup
+ * had already returned — so it could only ever show compounds that happened to be
+ * in the same result set, and only for a character the panel could ground. This
+ * asks the headword index directly, for a word of any length.
+ *
+ * ## Why `instr` and not FTS5
+ *
+ * `headwords_fts` cannot answer this, which was measured rather than assumed:
+ * unicode61 treats an unbroken CJK run as **one token**, so a phrase match on 猫
+ * returns 猫 and nothing else — not 子猫, not 猫背. The schema's own note that
+ * "CJK falls through as individual codepoints" is true of matching a whole
+ * headword and does not extend to matching inside one.
+ *
+ * ## Why `INDEXED BY`, which is the load-bearing line here
+ *
+ * Left to itself SQLite plans this through `idx_hw_reading`, whose leading `lang`
+ * column satisfies the equality and whose remaining columns do not contain `norm`
+ * — so every one of the ja partition's 697k rows needs a table seek to evaluate
+ * the filter. Measured on this machine's real database: **316–673 ms**, on the
+ * main process, for a single expansion. Pinned to `idx_hw_norm` the scan is
+ * covering, the filter runs off the index, and the same queries take **60–87 ms**
+ * including the sort. `INDEXED BY` is a hard constraint, so a future schema change
+ * that drops that index fails loudly here instead of silently reintroducing the
+ * half-second.
+ *
+ * ## Why the ORDER BY stays, unlike in `findSemanticNeighbors`
+ *
+ * The neighbour probe drops its ORDER BY because sorting a very common gloss's
+ * matches costs seconds. Here the scan already visits every matching row whatever
+ * happens — that is what `instr` over an index range means — so the sort adds only
+ * ~15 ms and buys a globally correct top of the list. Without it a common
+ * character such as 日 would return the first 200 matches in `norm` order, which
+ * is 〆切日 and 日おおい rather than 祝日 and 日課.
+ */
+export function findLexiconCompounds(db: SqliteDb, query: CompoundQuery): LexiconCompoundResult {
+  const text = query.text.trim();
+  const empty: LexiconCompoundResult = { query: text, compounds: [] };
+  if (!text) return empty;
+
+  // The word has to exist before its compounds are searched for. This is not
+  // politeness: it costs one indexed probe and it is what keeps a typo or a
+  // pasted fragment from paying for the index scan below.
+  //
+  // Deliberately **not** scoped by `glossLangs`. Whether 猫 is a headword is not a
+  // question about Russian, and `lookup` drops an entry whose every sense the
+  // gloss filter removed — so passing the filter through here would answer "this
+  // word has no compounds" to a reader whose only fault was asking for Russian
+  // definitions of a word JMdict happens to define in English.
+  const own = lookup(db, {
+    text,
+    sourceLangs: query.sourceLangs,
+    headwordsOnly: true,
+    limit: 8,
+  });
+  const exact = own.entries.filter((entry) => entry.via === 'exact' || entry.via === 'reading');
+  if (!exact.length) return empty;
+
+  const langs = [...new Set(exact.map((entry) => entry.lang))];
+  const glossLangs = query.glossLangs?.length ? [...new Set(query.glossLangs)] : [];
+  const rows = db.prepare(`
+    select h.id, h.lang, h.text, h.reading, h.dict_id, d.title as dict_title
+    from headwords h indexed by idx_hw_norm
+    join dictionaries d on d.id = h.dict_id
+    where h.lang in (${langs.map(() => '?').join(',')})
+      and d.enabled = 1
+      and instr(h.norm, ?) > 0
+    order by h.score desc, length(h.text) asc, h.id asc
+    limit ?
+  `).all(...langs, normalizeForLookup(text), COMPOUND_SCAN_ROWS) as Array<{
+    id: number; lang: string; text: string; reading: string | null;
+    dict_id: string; dict_title: string;
+  }>;
+
+  const candidates: LexiconCompoundCandidate[] = rows.map((row) => ({
+    headwordId: row.id,
+    lang: row.lang,
+    text: row.text,
+    reading: row.reading ?? '',
+    dictId: row.dict_id,
+    dictTitle: row.dict_title,
+  }));
+  const chosen = selectLexiconCompounds(text, candidates, query.limit ?? MAX_COMPOUND_RESULTS);
+  if (!chosen.length) return { query: text, compounds: [] };
+
+  // One bounded read for the twelve rows that survived, rather than a join that
+  // would have carried every sense of all 200 scanned rows through the sort.
+  const glossLangFilter = glossLangs.length
+    ? ` and g.lang in (${glossLangs.map(() => '?').join(',')})`
+    : '';
+  const glossRows = db.prepare(`
+    select s.headword_id as headword_id, g.text as gloss
+    from senses s
+    join glosses g on g.sense_id = s.id
+    where s.headword_id in (${chosen.map(() => '?').join(',')})${glossLangFilter}
+    order by s.headword_id, s.ord, g.ord
+  `).all(...chosen.map((item) => item.headwordId), ...glossLangs) as Array<{
+    headword_id: number; gloss: string;
+  }>;
+  const firstGloss = new Map<number, string>();
+  for (const row of glossRows) {
+    const gloss = row.gloss.trim();
+    if (!gloss || firstGloss.has(row.headword_id)) continue;
+    firstGloss.set(row.headword_id, gloss);
+  }
+
+  const compounds: LexiconCompound[] = chosen.map((item) => {
+    const gloss = firstGloss.get(item.headwordId);
+    return {
+      lang: item.lang,
+      text: item.text,
+      reading: item.reading,
+      dictId: item.dictId,
+      dictTitle: item.dictTitle,
+      ...(gloss ? { gloss } : {}),
+    };
+  });
+  return { query: text, compounds };
 }
 
 function jsonStringArray(value: string): string[] {

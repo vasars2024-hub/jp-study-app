@@ -44,6 +44,7 @@ import {
   lookupOfflineInterlinearFromStore,
   resetChineseDictionaryCache,
   findSemanticNeighborsInDb,
+  findLexiconCompoundsInDb,
   listDictionarySources,
   listDictionaryPairs,
   dictionaryPairHasOverride,
@@ -76,6 +77,11 @@ import {
   MAX_NEIGHBOR_RESULTS,
   type LexiconNeighborResult,
 } from '../shared/lexiconNeighbors';
+import {
+  MAX_COMPOUND_QUERY_CHARS,
+  MAX_COMPOUND_RESULTS,
+  type LexiconCompoundResult,
+} from '../shared/lexiconCompounds';
 import {
   registerDictionaryImportIpc,
   startPendingLegacyDictionaryMigration,
@@ -721,6 +727,31 @@ export function registerDictionaryIpc(): void {
         // The unified database is still optional on an un-migrated installation.
         // An expansion the reader asked for must degrade to "nothing to show",
         // never to a rejected invoke the surface has to render as a defect.
+        return empty;
+      }
+    },
+  );
+  ipcMain.handle(
+    'dict:compounds',
+    (_e, text: unknown, options?: unknown): LexiconCompoundResult => {
+      const raw = options && typeof options === 'object' && !Array.isArray(options)
+        ? options as Record<string, unknown>
+        : {};
+      const query = typeof text === 'string' ? text.trim().slice(0, MAX_COMPOUND_QUERY_CHARS) : '';
+      const empty: LexiconCompoundResult = { query, compounds: [] };
+      if (!query) return empty;
+      try {
+        return findLexiconCompoundsInDb({
+          text: query,
+          sourceLangs: readLangList(raw.sourceLangs),
+          glossLangs: readLangList(raw.glossLangs),
+          limit: MAX_COMPOUND_RESULTS,
+        });
+      } catch {
+        // Same contract as the neighbour expansion: the unified database is still
+        // optional on an un-migrated installation, and an expansion the reader
+        // asked for degrades to "nothing to show" rather than to a rejected
+        // invoke the surface would have to render as a defect.
         return empty;
       }
     },

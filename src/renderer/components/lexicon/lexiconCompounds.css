@@ -1,0 +1,83 @@
+.lexicon-compounds {
+  margin: 14px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-1);
+  color: var(--text);
+}
+
+.lexicon-compounds > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.lexicon-compounds-note,
+.lexicon-compounds-empty {
+  margin: 8px 0 0;
+  font-size: 0.9em;
+}
+
+.lexicon-compounds-run {
+  margin-top: 10px;
+  min-height: 32px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.lexicon-compounds-run:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.lexicon-compounds-error {
+  margin: 8px 0 0;
+  color: var(--danger, #d14343);
+}
+
+.lexicon-compounds-list {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lexicon-compounds-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.lexicon-compounds-word {
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+/* The queried word is highlighted inside each compound so the containment claim
+   is visible rather than asserted. `mark` is restyled rather than replaced with a
+   span: the default UA yellow is unreadable on this surface, and the element is
+   what carries the "this part matched" meaning to a screen reader. */
+.lexicon-compounds-word mark {
+  background: none;
+  color: var(--accent, #7c5cbf);
+  font-weight: 700;
+}
+
+.lexicon-compounds-reading,
+.lexicon-compounds-source {
+  color: var(--muted);
+  font-size: 0.85em;
+}
+
+.lexicon-compounds-gloss {
+  flex: 1 1 12rem;
+}

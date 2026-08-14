@@ -9254,6 +9254,12 @@ export const ru: Catalog = {
   'lexicon.concordance.empty': 'В {count} доступных дорожках субтитров точных совпадений нет.',
   'lexicon.concordance.summary': '{count} примеров из {sources} доступных дорожек субтитров',
   'lexicon.concordance.scope': 'Только точные совпадения текста. Словоформы и слова, подразумеваемые контекстом, не включены.',
+  'lexicon.compounds.title': 'Слова, содержащие это слово',
+  'lexicon.compounds.note': 'Заголовочные слова из установленных словарей, буквально содержащие это слово, — сначала самые употребительные. Совпавшая часть выделена в каждом из них.',
+  'lexicon.compounds.action': 'Найти слова с этим словом',
+  'lexicon.compounds.running': 'Просмотр словарей…',
+  'lexicon.compounds.failed': 'Не удалось выполнить поиск в базе словарей.',
+  'lexicon.compounds.empty': 'Ни одно другое заголовочное слово в ваших словарях не содержит «{query}».',
   'lexicon.neighbors.title': 'Слова с общим значением',
   'lexicon.neighbors.shares': 'Общее значение: {senses}',
 
