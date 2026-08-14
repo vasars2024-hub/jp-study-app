@@ -19904,3 +19904,202 @@ already dead, left by the interrupted worker's unclean exit.
 - The nine long-standing full-suite failures are untouched and still belong to other tracks.
 
 Commits: `fe6e1a9` (the slice, by the interrupted worker), and this hop's fix.
+
+## Track 2 — the words a dictionary builds out of this one — 2026-08-14 22:35 MSK primary
+
+### What was open, and why this slice rather than another
+
+Track 2's feature list has carried **"words containing a character"** since the plan was
+written. Re-deriving what shipped: the only thing answering it is
+`CharacterMetadataPanel.tsx:19-21`, an `entries.filter((entry) => entry.word.includes(character.char))`
+over rows the lookup had *already returned*. That has two ceilings and both are structural.
+It can only surface a compound that happened to land in the same eight-entry result set, and
+it renders only when `result.character` exists — which needs KANJIDIC2 chars data that **this
+install does not have** (`window.api.lookupTerm` returns `hasCharacter:false` for every word,
+independently reproduced twice in this ledger). So on a default install the feature was
+unreachable, and where reachable it was incidental.
+
+`collocations`, `etymology` and `xrefs` were also considered and deliberately **not** taken.
+All three have tables in the v1 schema and **no writer**: `wiktextract.ts:19-26` states outright
+that it drops etymology and cross-references until they have readers. Landing one of those means
+landing an importer *and* a reader for data no installed source currently supplies, so the live
+half would have been an empty state either way. The headword index is the one rich thing this
+install actually has — 697,837 ja headwords across JMdict EN, JMdict RU and Moedict ZH.
+
+### Two measured decisions that reasoning alone would have got wrong
+
+**1. FTS5 cannot answer a substring query, at all.** `headwords_fts` exists and looked like the
+obvious tool. Probed against the shipped SQLite 3.53.4 with a throwaway in-memory table rather
+than assumed:
+
+```
+"猫"     => 猫
+"ねこ"   => ねこ
+"食べる" => 食べる
+```
+
+`子猫` and `猫背` were in the table and matched **nothing**. unicode61 classifies CJK ideographs
+as token characters, so an unbroken CJK run is **one token** — the schema's own note that "CJK
+falls through it as individual codepoints" is true of matching a whole headword and does not
+extend to matching inside one. Recorded here because that comment reads as a licence to use FTS
+for exactly this, and it is not one.
+
+**2. `INDEXED BY idx_hw_norm` is the feature, not a hint.** Left to itself SQLite plans
+`instr(h.norm, ?)` through `idx_hw_reading` — whose leading `lang` satisfies the equality and
+whose payload does not contain `norm`, so every one of the ja partition's 697k rows needs a
+table seek. Measured read-only against the real 374 MB `dict.db`, warm, two rounds:
+
+| query | SQLite's own plan | pinned to `idx_hw_norm` |
+| --- | --- | --- |
+| 猫 | 316 ms | 55–65 ms |
+| 憂鬱 | 673 ms | 47 ms |
+| ゐ | 533 ms | 60 ms |
+| 齟齬 | 521 ms | 49–56 ms |
+
+Half a second of synchronous main-process time per expansion, versus ~50 ms. `INDEXED BY` is a
+hard constraint rather than a preference, so a later schema change that drops that index fails
+loudly here instead of silently restoring the half-second.
+
+**The `ORDER BY` stays, unlike in `findSemanticNeighbors`.** That function drops its ordering
+because sorting a very common gloss's matches was measured at 2.4 s. This case is the opposite:
+`instr` over an index range visits every matching row whatever happens, so the sort adds ~15 ms
+(60→87 ms worst case) and buys a globally correct top of the list. Without it a query of 日
+returns the first 200 matches in `norm` order — 〆切日, 日おおい, 一日じゅう — instead of 終日,
+祝日, 初日, 当日. `headwords.score` is a real signal on this data and was verified before being
+relied on: 日曜日 999800, 子猫 1999800, 愛猫 −200.
+
+### The slice
+
+`src/shared/lexiconCompounds.ts` (new) holds the containment rule and the selection;
+`findLexiconCompounds` in `dictService.ts` runs one pinned index scan plus one bounded gloss read
+for the twelve rows that survive; `dict:compounds` → `preload` → `window.d.ts` →
+`LexiconCompounds.tsx`, opt-in behind a `<details>` exactly like the neighbours panel beside it.
+The queried word is marked inside each compound with `<mark>`, so containment is *visible* rather
+than asserted.
+
+The surface is named after containment, not word formation, and that is deliberate: 手 legitimately
+returns 手袋 and also 山手, where the character is the second element. Claiming morphology would
+have been a claim the database cannot support.
+
+### Three holes found by mutation, two of which the tests had missed
+
+**The first control passed, and that was the finding.** Deleting `order by h.score desc` from the
+query left all eight main-side tests **green** — the fixture inserted the compounds most-common
+first, so row-id order alone reproduced the expected ranking and the ranking was never under test.
+The fixture now inserts them in the **reverse** of the expected order; the same mutation then fails
+4 tests for the intended reason (`expected [ '愛猫', '猫背', '子猫' ] to deeply equal [ '子猫',
+'猫背', '愛猫' ]`), and passes again restored. This is the frequency-badge lesson from `fe6e1a9`
+repeating in a different shape: a guard that no test can distinguish from its absence.
+
+**The second control passed too, and it was a wrong comment.** Weakening the self-exclusion from a
+folded key to `text === query` changed nothing, because the case the comment credited it with —
+JMdict's separate ネコ headword — never reaches the exclusion at all: ネコ does not *contain* 猫,
+so the containment filter above it drops it first. The kana fold `rankLexiconNeighbors` applies is
+therefore inert here, and worse than inert: 子猫 and 子ネコ are two spellings a list of written
+forms must keep apart. The rule is now NFKC + case fold only, the comment says why it differs from
+the neighbours rule, and the test that binds it is a width/case duplicate (`ＣＡＴ` against `cat`) —
+which the `===` mutation does fail.
+
+**The third control behaved as intended first time.** Passing `glossLangs` into the existence probe
+makes `findLexiconCompounds` return `[]` for a Russian-scoped request, because `lookup` discards a
+headword whose every sense the gloss filter removed (`dictService.ts:478`). The probe deliberately
+does not inherit that filter — whether 猫 is a headword is not a question about Russian — and the
+mutation fails the one test asserting it.
+
+`containsCompoundQuery` is enforced identically by the SQL, so nothing routed through SQLite can
+exercise it. It is tested directly at the unit level instead, and the test says why.
+
+### Gates, at the committed commit rather than the shared tree
+
+Shared tree first: 3 files / 26 tests exit 0, i18n exit 0, architecture-audit exit 0 nothing new,
+`npx eslint` on the eleven touched paths. eslint reports 2 errors and 7 warnings, and **none is
+mine — proved by set difference, not by count**. Both errors (`adjacent-overload-signatures` on
+`subtitleHarvestList`/`subtitleHarvestFetch`) reproduce on an intact copy of `HEAD:window.d.ts` at
+lines 1536/1539; all 7 `no-explicit-any` warnings reproduce on `HEAD:dictionary.ts`, shifted by
+exactly the 6 import lines this slice adds (132→138, 137→143, 165→171, 487→493, 493→499, 507→513,
+513→519). The first attempt at that baseline was junk and is recorded so the next hop does not
+repeat it: `git show … | Set-Content -NoNewline` joins the pipeline's line array with **no**
+separator, producing a one-line file that lints clean and looks like proof.
+
+Then two detached worktrees, `d756f04` and its parent `b549798`, run **sequentially** — the last
+hop's `scraperSources` `ENOTEMPTY` was diagnosed as contention from two concurrent full suites, and
+running them one at a time reproduced no such failure at either commit.
+
+- Focused suites at `d756f04`: 3 files / 26 tests, exit 0.
+- `i18n-check`: **9,382** at `d756f04` against **9,376** at the parent — exactly the six new
+  `lexicon.compounds.*` keys, present in all four catalogs.
+- `architecture-audit` at `d756f04`: exit 0, nothing new, 2 known pending. The new component landed
+  with its importer, so no orphan module.
+- Full `npx vitest run`: `d756f04` **4 failed / 567 passed / 1 skipped files, 9 failed / 7,486
+  passed / 6 skipped tests**; parent **4 failed / 564 passed / 1 skipped files, 9 failed / 7,460
+  passed / 6 skipped tests**. **The set difference is empty** — the same nine long-standing
+  identities (five `blancAgentStepConfirmGate`, one `localAgentQueueRun`, one
+  `novelReaderProgressGuard`, two `i18n.test.ts`), byte-identical on both sides.
+- **The arithmetic reconciles exactly.** Files 572−569 = 3, the slice's three new test files.
+  Tests 7,501−7,475 = 26 and passed 7,486−7,460 = 26, the slice's 26 new tests. No test moved out
+  of the passed column.
+- **The i18n policer was checked rather than assumed**, and this mattered: `i18n.test.ts`'s
+  "does not let a new component render UI text without adopting i18n" is one of the nine
+  pre-existing failures, so a new offender would have hidden inside an already-red test. Its
+  offender list is **identical at both commits — 37 entries, `Compare-Object` empty**.
+  `LexiconCompounds.tsx` is not in it.
+
+### Live acceptance
+
+Own dev app via `npm start`, bridge pid **24872** on 127.0.0.1:39273, window focused throughout.
+The `debug/bridge.json` present at the start of the hop was stale — pid 29068, already dead, left
+by the previous hop's unclean exit.
+
+- **The real main handler, not the preload binding.** `window.api.dictCompounds('猫',
+  {sourceLangs:['ja']})` returned 12 compounds: 子猫 (kitten), 山猫 (wildcat), 猫舌, 猫背 (bent
+  back), 黒猫, 野良猫, 飼い猫, then five Moedict rows. Every one carries a real gloss and a real
+  dictionary title.
+- **Latency, end to end through IPC**, measured in the renderer: 日 124 ms, 手 122 ms, 齟齬 97 ms,
+  a 12-character sentence 39 ms, `ｘｙｚ` 52 ms, empty and whitespace **0 ms** (short-circuited
+  before any query). Adverse inputs — `''`, `'   '`, `'a'`, `'5'`, `ｘｙｚ`, a whole sentence — all
+  returned 0 compounds silently, none threw.
+- **The renderer half against the shipped stylesheet**, which jsdom cannot check. The real
+  Vite-transformed `DictionaryResults` mounted off-screen against live IPC (host count asserted
+  **1**; React discovered at `?v=318a685f`, `createRoot` under `.default`). Closed by default with
+  **0 rows and no IPC call** — the opt-in claim, live. After one click: **12 rows**, section
+  890×830, row 42 px, every row carrying a gloss, and **no row overflowing** (`scrollWidth >
+  clientWidth` false on all 12).
+- **The highlight is real and readable.** `<mark>` renders with `background: transparent` — the UA
+  yellow override — at `font-weight 700` in the theme accent `rgb(16,185,129)`. Marks per row
+  `1,1,1,1,1,1,1,1,1,1,2,1`: the row with two is a word containing 猫 twice, so the multi-occurrence
+  branch is exercised on real data rather than only in the unit test.
+- **Painted contrast, sampled rather than read off tokens**, against the composed row background
+  `rgb(26,41,32)`: mark **5.99:1** at 18.4 px, word 12.21:1, gloss 12.21:1, reading and source
+  **5.30:1** at 11.9 px. All pass WCAG AA for their size. Run button 193×32.
+- **At 320 px** the section reflows to 310×1642 with **no** horizontal overflow on the section or
+  on any row, and all 12 marks survive.
+- **The app's UI language is Russian on this install**, so the live run rendered
+  `lexicon.compounds.title` as «Слова, содержащие это слово» and the button as «Найти слова с этим
+  словом» — the RU catalog entries are wired, not merely present in a key count.
+- `/logs?level=error`: **0 entries** across every probe. Probe host and all four `window.__*`
+  globals removed and asserted gone; `localStorage` still 80 keys; `window.api` intact. Owned pid
+  24872 and its five children stopped, nothing else. No userData backup was taken.
+
+### Deliberately open
+
+- **Moedict's Chinese headwords arrive labelled `lang: "ja"`, and this surface is the first place
+  a user sees it.** The live 猫 result ends with 猫熊, 熊猫, 猫头鹰, 躲猫猫, 夜猫子 — real rows,
+  correctly attributed to "Moedict (Chinese monolingual)", with pinyin readings — but carrying
+  `lang: 'ja'`, which this component puts on the `lang` attribute. The cause is upstream of this
+  slice: `bundled-moedict-zh` is registered with `source_lang='ja'` and its headwords were migrated
+  under that language, so a `sourceLangs: ['ja']` scope legitimately includes them. Not fixed here
+  because relabelling them to `zh` changes what every existing Chinese lookup path finds, which is
+  a migration slice with its own acceptance, not a line in this one. It is the same *shape* as the
+  Russian-gloss defect closed in `9703c1f` and should be sized as one.
+- **Suffix and infix compounds are found; a *reverse* index is not.** Everything here works because
+  `instr` can be evaluated off `idx_hw_norm` in one covering scan. That is fast enough for an
+  opt-in action and would not be fast enough for a live-as-you-type surface. Making it so needs a
+  reversed-`norm` column and index — a v7 migration with a 697k-row backfill — and is not worth it
+  until something needs the speed.
+- **A very common single character truncates at 200 scanned rows**, which is why the SQL and not
+  the JS does the ranking: the window is the *top* 200 by score, not the first 200 found. A
+  thirteenth compound of 日 therefore exists and is not shown. That is a limit, not a defect, and
+  the surface shows twelve by design.
+- The nine long-standing full-suite failures are untouched and still belong to other tracks.
+
+Commit: `d756f04`.
