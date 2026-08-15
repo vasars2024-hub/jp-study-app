@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useElementSize } from '../hooks';
 
 // Fixed-row-height windowed list. However large `items` gets, only the rows
@@ -16,6 +16,15 @@ export interface VirtualListProps<T> {
   getKey: (item: T, index: number) => string | number;
   renderItem: (item: T, index: number) => ReactNode;
   emptyState?: ReactNode;
+  /**
+   * Bring this row into view when it changes — the minimum scroll that does it,
+   * so a keyboard cursor walking the list does not jump the viewport around.
+   *
+   * A windowed list cannot be keyboard-navigated without this: the row the
+   * cursor moves to may not be in the DOM at all, so it can neither be focused
+   * nor referenced by `aria-activedescendant`.
+   */
+  scrollToIndex?: number;
 }
 
 export default function VirtualList<T>({
@@ -27,6 +36,7 @@ export default function VirtualList<T>({
   getKey,
   renderItem,
   emptyState,
+  scrollToIndex,
 }: VirtualListProps<T>) {
   const [containerRef, size] = useElementSize<HTMLDivElement>();
   const [scrollTop, setScrollTop] = useState(0);
@@ -43,6 +53,18 @@ export default function VirtualList<T>({
       setScrollTop(containerRef.current?.scrollTop ?? 0);
     });
   }, [containerRef]);
+
+  useEffect(() => {
+    if (scrollToIndex == null || scrollToIndex < 0) return;
+    const el = containerRef.current;
+    if (!el) return;
+    const top = scrollToIndex * itemHeight;
+    const bottom = top + itemHeight;
+    // Only move if the row is actually outside the viewport, and only as far as
+    // it takes: re-centring on every arrow press makes the list feel unmoored.
+    if (top < el.scrollTop) el.scrollTop = top;
+    else if (bottom > el.scrollTop + el.clientHeight) el.scrollTop = bottom - el.clientHeight;
+  }, [scrollToIndex, itemHeight, containerRef]);
 
   const total = items.length;
   const viewportH = size.height || 0;

@@ -8682,6 +8682,8 @@ export const ja: Catalog = {
     '{total} 件中 {loaded} 件のみ読み込み済みです。検索と並べ替えは読み込み済みのノートが対象です。',
   'ankiWorkbench.browser.empty': 'この検索に一致するノートはありません。',
   'ankiWorkbench.browser.selectRow': 'ノート {id} を選択',
+  'ankiWorkbench.browser.grid':
+    'ノート一覧。矢印キーで移動、スペースで選択、Shift で範囲選択、Ctrl+A ですべて選択。',
   'ankiWorkbench.browser.selected': '{count} 件選択中',
   'ankiWorkbench.browser.selectAll': '{count} 件すべてを選択',
   'ankiWorkbench.browser.selectFound': 'ここで見つかった {count} 件を選択',

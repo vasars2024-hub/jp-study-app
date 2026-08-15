@@ -9487,6 +9487,8 @@ export const ru: Catalog = {
     'Загружено только {loaded} из {total} заметок. Поиск и сортировка работают по загруженным заметкам.',
   'ankiWorkbench.browser.empty': 'Нет заметок, подходящих под этот поиск.',
   'ankiWorkbench.browser.selectRow': 'Выбрать заметку {id}',
+  'ankiWorkbench.browser.grid':
+    'Заметки. Стрелки — переход, пробел — выбор, Shift — диапазон, Ctrl+A — выбрать все.',
   'ankiWorkbench.browser.selected': 'Выбрано: {count}',
   'ankiWorkbench.browser.selectAll': 'Выбрать все: {count}',
   'ankiWorkbench.browser.selectFound': 'Выбрать найденные здесь: {count}',

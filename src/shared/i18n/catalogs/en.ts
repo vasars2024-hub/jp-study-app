@@ -9107,6 +9107,8 @@ export const en: Catalog = {
     'Only {loaded} of {total} notes are loaded. Search and sort cover the loaded notes.',
   'ankiWorkbench.browser.empty': 'No notes match this search.',
   'ankiWorkbench.browser.selectRow': 'Select note {id}',
+  'ankiWorkbench.browser.grid':
+    'Notes. Arrow keys move, Space selects, Shift extends, Ctrl+A selects all.',
   'ankiWorkbench.browser.selected': '{count} selected',
   'ankiWorkbench.browser.selectAll': 'Select all {count}',
   'ankiWorkbench.browser.selectFound': 'Select the {count} found here',

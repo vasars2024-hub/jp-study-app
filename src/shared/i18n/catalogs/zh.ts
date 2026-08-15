@@ -8644,6 +8644,8 @@ export const zh: Catalog = {
     '{total} 条笔记中仅加载了 {loaded} 条。搜索和排序仅覆盖已加载的笔记。',
   'ankiWorkbench.browser.empty': '没有笔记符合此搜索。',
   'ankiWorkbench.browser.selectRow': '选择笔记 {id}',
+  'ankiWorkbench.browser.grid':
+    '笔记列表。方向键移动，空格选择，Shift 连选，Ctrl+A 全选。',
   'ankiWorkbench.browser.selected': '已选 {count} 条',
   'ankiWorkbench.browser.selectAll': '全选 {count} 条',
   'ankiWorkbench.browser.selectFound': '选择这里找到的 {count} 条',

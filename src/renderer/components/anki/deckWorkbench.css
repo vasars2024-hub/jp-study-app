@@ -353,9 +353,17 @@
   min-width: 0;
 }
 
-.wb-browser-split > .wb-browser-rows {
+.wb-browser-split > .wb-browser-grid {
   flex: 1 1 auto;
   min-width: 0;
+}
+
+/* The grid is the single tab stop for the whole row list, so its focus ring is
+   the only signal a keyboard user gets that the cursor keys now do something. */
+.wb-browser-grid:focus-visible {
+  outline: 2px solid var(--focus, var(--accent, #4c8dff));
+  outline-offset: 2px;
+  border-radius: var(--radius-md, 10px);
 }
 
 .wb-inspector {

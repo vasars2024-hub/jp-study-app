@@ -173,6 +173,19 @@ async function click(el: HTMLElement) {
   });
 }
 
+async function key(el: HTMLElement, k: string, init: KeyboardEventInit = {}) {
+  await act(async () => {
+    el.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, ...init }));
+  });
+}
+
+/** The rendered row for a note id — virtualized, so it may not be there. */
+function rowOf(noteId: string): HTMLElement {
+  const el = host.querySelector(`#wb-row-${noteId}`);
+  if (!el) throw new Error(`row ${noteId} is not rendered`);
+  return el as HTMLElement;
+}
+
 beforeAll(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 });
@@ -487,6 +500,68 @@ describe('DeckWorkbench', () => {
     await click(([...host.querySelectorAll('.deck-workbench-step')] as HTMLButtonElement[])[1]!);
     expect(host.textContent).not.toContain('ankiWorkbench.browser.edited');
     expect(buttonBy('ankiWorkbench.edit.undo').disabled).toBe(true);
+  });
+
+  it('drives the whole Browser grid from the keyboard', async () => {
+    await toBrowse(browsable());
+    const grid = host.querySelector('.wb-browser-grid') as HTMLDivElement;
+    expect(grid.getAttribute('role')).toBe('grid');
+    // One tab stop for the list: 100k rows have no tabbable order to walk, so
+    // every row control is out of it and the grid itself is in it.
+    expect(grid.tabIndex).toBe(0);
+    for (const el of host.querySelectorAll('.wb-browser-row input, .wb-browser-row button')) {
+      expect((el as HTMLElement).tabIndex).toBe(-1);
+    }
+
+    // Arrow down from nowhere lands on the first row and opens it.
+    await key(grid, 'ArrowDown');
+    expect(grid.getAttribute('aria-activedescendant')).toBe('wb-row-n1');
+    expect(host.querySelector('.wb-inspector')).not.toBeNull();
+    // Moving the cursor is not selecting: the batch is untouched.
+    expect(host.textContent).toContain('ankiWorkbench.browser.selected:0');
+
+    await key(grid, 'ArrowDown');
+    expect(grid.getAttribute('aria-activedescendant')).toBe('wb-row-n2');
+    await key(grid, ' ');
+    expect(host.textContent).toContain('ankiWorkbench.browser.selected:1');
+    expect(rowOf('n2').getAttribute('aria-selected')).toBe('true');
+
+    // Shift+Arrow extends from the anchor the last plain move set.
+    await key(grid, 'ArrowDown', { shiftKey: true });
+    expect(host.textContent).toContain('ankiWorkbench.browser.selected:2');
+    expect(rowOf('n3').getAttribute('aria-selected')).toBe('true');
+    expect(rowOf('n1').getAttribute('aria-selected')).toBe('false');
+
+    // Home/End are absolute, and neither disturbs the selection.
+    await key(grid, 'Home');
+    expect(grid.getAttribute('aria-activedescendant')).toBe('wb-row-n1');
+    await key(grid, 'End');
+    expect(grid.getAttribute('aria-activedescendant')).toBe('wb-row-n3');
+    expect(host.textContent).toContain('ankiWorkbench.browser.selected:2');
+
+    // Ctrl+A is the footer button, not a second, looser rule.
+    await key(grid, 'a', { ctrlKey: true });
+    expect(host.textContent).toContain('ankiWorkbench.browser.selected:3');
+
+    // Escape closes the inspector without clearing the batch.
+    await key(grid, 'Escape');
+    expect(host.querySelector('.wb-inspector')).toBeNull();
+    expect(host.textContent).toContain('ankiWorkbench.browser.selected:3');
+  });
+
+  it('does not walk the cursor off either end of the grid', async () => {
+    await toBrowse(browsable());
+    const grid = host.querySelector('.wb-browser-grid') as HTMLDivElement;
+    await key(grid, 'ArrowUp');
+    // From nowhere, ArrowUp enters at the last row rather than doing nothing.
+    expect(grid.getAttribute('aria-activedescendant')).toBe('wb-row-n3');
+    for (let i = 0; i < 5; i += 1) await key(grid, 'ArrowDown');
+    expect(grid.getAttribute('aria-activedescendant')).toBe('wb-row-n3');
+    for (let i = 0; i < 5; i += 1) await key(grid, 'ArrowUp');
+    expect(grid.getAttribute('aria-activedescendant')).toBe('wb-row-n1');
+    // PageUp/PageDown clamp the same way rather than throwing on an empty slot.
+    await key(grid, 'PageDown');
+    expect(grid.getAttribute('aria-activedescendant')).toBe('wb-row-n3');
   });
 
   it('survives a session list that throws', async () => {

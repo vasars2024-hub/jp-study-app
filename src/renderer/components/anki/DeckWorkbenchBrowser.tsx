@@ -40,6 +40,10 @@ import DeckWorkbenchInspector from './DeckWorkbenchInspector';
 import DeckWorkbenchSamples from './DeckWorkbenchSamples';
 
 const ROW_HEIGHT = 34;
+/** How far PageUp/PageDown moves the cursor. */
+const PAGE_ROWS = 10;
+/** DOM id of a row, so `aria-activedescendant` has something to point at. */
+const rowDomId = (noteId: string): string => `wb-row-${noteId}`;
 
 /** The plan's Browser modes. `gallery` is the representative sample set. */
 type BrowserView = 'grid' | 'samples';
@@ -107,6 +111,88 @@ export default function DeckWorkbenchBrowser({
       }
     },
     [applySelection, selection, shown],
+  );
+
+  /** Where the keyboard cursor is, or -1 before it has been anywhere. */
+  const cursor = focusedId ? shown.findIndex((r) => r.noteId === focusedId) : -1;
+
+  /**
+   * The grid is one tab stop with a moving cursor, not N tab stops.
+   *
+   * A hundred thousand rows cannot be tabbed through, and only a windowful of
+   * them exists in the DOM at any moment, so the row controls are taken out of
+   * the tab order and every row action is reachable from here instead. The
+   * cursor doubles as what the inspector is showing, which is how Anki's own
+   * browser behaves: arrowing down walks the notes and the editor follows.
+   */
+  const onGridKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (shown.length === 0) return;
+      const last = shown.length - 1;
+      const move = (to: number): void => {
+        e.preventDefault();
+        const clamped = Math.max(0, Math.min(last, to));
+        const target = shown[clamped];
+        if (!target) return;
+        if (e.shiftKey && anchor.current) {
+          applySelection(selectRowRange(selection, shown, anchor.current, target.noteId));
+        } else if (!e.shiftKey) {
+          // Plain movement leaves the batch alone; only the anchor follows, so
+          // a later Shift+Arrow extends from where the user actually is.
+          anchor.current = target.noteId;
+        }
+        setFocusedId(target.noteId);
+      };
+
+      switch (e.key) {
+        case 'ArrowDown':
+          return move(cursor < 0 ? 0 : cursor + 1);
+        case 'ArrowUp':
+          return move(cursor < 0 ? last : cursor - 1);
+        case 'PageDown':
+          return move(cursor < 0 ? 0 : cursor + PAGE_ROWS);
+        case 'PageUp':
+          return move(cursor < 0 ? last : cursor - PAGE_ROWS);
+        case 'Home':
+          return move(0);
+        case 'End':
+          return move(last);
+        case ' ':
+        case 'Spacebar': {
+          if (cursor < 0) return;
+          e.preventDefault();
+          const row = shown[cursor];
+          if (!row) return;
+          if (e.shiftKey && anchor.current) {
+            applySelection(selectRowRange(selection, shown, anchor.current, row.noteId));
+          } else {
+            anchor.current = row.noteId;
+            applySelection(toggleRowSelection(selection, row.noteId));
+          }
+          return;
+        }
+        case 'a':
+        case 'A': {
+          if (!e.ctrlKey && !e.metaKey) return;
+          e.preventDefault();
+          // Exactly what the footer button does, including its honesty rule:
+          // "all matching" is only offered where it is a claim we can keep.
+          applySelection(
+            canSelectWholeSource
+              ? selectAllMatching()
+              : { mode: 'explicit', ids: shown.map((r) => r.noteId) },
+          );
+          return;
+        }
+        case 'Escape':
+          if (!focusedId) return;
+          e.preventDefault();
+          setFocusedId(null);
+          return;
+        default:
+      }
+    },
+    [applySelection, canSelectWholeSource, cursor, focusedId, selection, shown],
   );
 
   const selected = selectionCount(selection, matchedTotal);
@@ -207,45 +293,67 @@ export default function DeckWorkbenchBrowser({
       </div>
 
       <div className="wb-browser-split" hidden={view !== 'grid'}>
-        <VirtualList
-          className="wb-browser-rows"
-          items={shown}
-          itemHeight={ROW_HEIGHT}
-          getKey={(row) => row.noteId}
-          emptyState={<p className="muted">{t('ankiWorkbench.browser.empty')}</p>}
-          renderItem={(row) => {
-            const checked = isRowSelected(selection, row.noteId);
-            return (
-              <div
-                className={`wb-browser-row${checked ? ' selected' : ''}${
-                  focusedId === row.noteId ? ' focused' : ''
-                }${noteIsEdited(journal, row.noteId) ? ' edited' : ''}`}
-                style={{ height: ROW_HEIGHT, gridTemplateColumns: `2.5rem ${gridTemplate}` }}
-              >
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  aria-label={t('ankiWorkbench.browser.selectRow', { id: row.noteId })}
-                  onClick={(e) => onRowClick(row.noteId, e.shiftKey)}
-                  onChange={() => undefined}
-                />
-                {shownCols.map((col) => (
-                  // Opening a note is not selecting it: a user reads one row
-                  // while a batch of others stays ticked.
-                  <button
-                    key={col.id}
-                    type="button"
-                    className="wb-browser-cell"
-                    title={row.cells[col.id]}
-                    onClick={() => setFocusedId(row.noteId)}
-                  >
-                    {row.cells[col.id]}
-                  </button>
-                ))}
-              </div>
-            );
-          }}
-        />
+        <div
+          className="wb-browser-grid"
+          role="grid"
+          tabIndex={0}
+          aria-label={t('ankiWorkbench.browser.grid')}
+          aria-rowcount={shown.length}
+          aria-multiselectable
+          aria-activedescendant={focusedId ? rowDomId(focusedId) : undefined}
+          onKeyDown={onGridKeyDown}
+        >
+          <VirtualList
+            className="wb-browser-rows"
+            items={shown}
+            itemHeight={ROW_HEIGHT}
+            getKey={(row) => row.noteId}
+            scrollToIndex={cursor >= 0 ? cursor : undefined}
+            emptyState={<p className="muted">{t('ankiWorkbench.browser.empty')}</p>}
+            renderItem={(row, index) => {
+              const checked = isRowSelected(selection, row.noteId);
+              return (
+                <div
+                  id={rowDomId(row.noteId)}
+                  role="row"
+                  aria-rowindex={index + 1}
+                  aria-selected={checked}
+                  className={`wb-browser-row${checked ? ' selected' : ''}${
+                    focusedId === row.noteId ? ' focused' : ''
+                  }${noteIsEdited(journal, row.noteId) ? ' edited' : ''}`}
+                  style={{ height: ROW_HEIGHT, gridTemplateColumns: `2.5rem ${gridTemplate}` }}
+                >
+                  {/* Every control here is `tabIndex={-1}`: the grid is one tab
+                      stop with a cursor, because a windowed list of 100k rows
+                      has no tabbable order to walk. */}
+                  <input
+                    type="checkbox"
+                    tabIndex={-1}
+                    checked={checked}
+                    aria-label={t('ankiWorkbench.browser.selectRow', { id: row.noteId })}
+                    onClick={(e) => onRowClick(row.noteId, e.shiftKey)}
+                    onChange={() => undefined}
+                  />
+                  {shownCols.map((col) => (
+                    // Opening a note is not selecting it: a user reads one row
+                    // while a batch of others stays ticked.
+                    <button
+                      key={col.id}
+                      type="button"
+                      tabIndex={-1}
+                      role="gridcell"
+                      className="wb-browser-cell"
+                      title={row.cells[col.id]}
+                      onClick={() => setFocusedId(row.noteId)}
+                    >
+                      {row.cells[col.id]}
+                    </button>
+                  ))}
+                </div>
+              );
+            }}
+          />
+        </div>
         {focused && (
           <DeckWorkbenchInspector
             draft={draft}
