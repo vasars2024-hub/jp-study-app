@@ -32,7 +32,9 @@ import {
   type ApkgDraftRequest,
   type ApkgDraftResult,
 } from '../../shared/ankiDraft';
+import type { CsvDraftRequest } from '../../shared/ankiCsv';
 import { readRawCollection } from './apkgDraftRead';
+import { readCsvDraft } from './csvDraftRead';
 import { decodeMediaManifestNames } from './ankiProtoConfig';
 import { mt } from '../i18n';
 
@@ -417,4 +419,5 @@ export function registerApkgIpc(): void {
   ipcMain.handle('apkg:import', (_e, filePath?: string) => importApkg(filePath));
   ipcMain.handle('apkg:importCards', (_e, filePath?: string) => importApkgCards(filePath));
   ipcMain.handle('apkg:readDraft', (_e, request?: ApkgDraftRequest) => readApkgDraft(request));
+  ipcMain.handle('anki:readCsvDraft', (_e, request?: CsvDraftRequest) => readCsvDraft(request));
 }

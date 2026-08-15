@@ -18,7 +18,12 @@
 // silently dropped, so a file this reader is too old for says so.
 
 import { ANKI_FIELD_SEP } from './ankiDraft';
-import type { RawAnkiCollection, RawAnkiNoteRow, RawAnkiNoteTypeRow } from './ankiDraft';
+import type {
+  AnkiDraft,
+  RawAnkiCollection,
+  RawAnkiNoteRow,
+  RawAnkiNoteTypeRow,
+} from './ankiDraft';
 
 /**
  * The separator names Anki accepts in `#separator:`. A value that is not one of
@@ -430,4 +435,88 @@ function fieldNameAt(meta: AnkiCsvMeta, special: Set<number>, ord: number): stri
     if (seen === ord) return meta.columnNames[c].trim() || undefined;
   }
   return undefined;
+}
+
+// ----- IPC contract ---------------------------------------------------------------
+
+/**
+ * Byte ceiling for `anki:readCsvDraft`.
+ *
+ * The read is synchronous string work on the main process, like its `.apkg`
+ * sibling. The largest real export on this machine is 3.7 MB and parses+drafts
+ * in 368 ms, so this caps the worst case at roughly one and a half seconds
+ * rather than leaving it unbounded. Moving both readers off the main event loop
+ * is Phase 7's large-deck performance work, not this slice's.
+ */
+export const ANKI_CSV_MAX_BYTES = 16 * 1024 * 1024;
+
+export type AnkiCsvEncoding = 'utf-8' | 'utf-16le' | 'utf-16be';
+
+/**
+ * What the reader made of the file, beside the draft itself.
+ *
+ * Every guess it had to make is named here — a sniffed separator, an encoding
+ * inferred from a byte-order mark, a directive it did not understand — so the
+ * workbench can show the user what was assumed rather than presenting a
+ * misparsed file as a clean one.
+ */
+export interface AnkiCsvDraftSummary {
+  separator: string;
+  separatorSource: AnkiCsvMeta['separatorSource'];
+  html: boolean;
+  columnNames: string[];
+  guidColumn?: number;
+  noteTypeColumn?: number;
+  deckColumn?: number;
+  tagsColumn?: number;
+  globalTags: string[];
+  unknownDirectives: string[];
+  /** Delimited rows in the body, and how many of them were blank and skipped. */
+  rowCount: number;
+  blankRows: number;
+  encoding: AnkiCsvEncoding;
+  byteLength: number;
+}
+
+export interface CsvDraftRequest {
+  /**
+   * Required. Unlike `apkg:readDraft` this channel opens no file dialog: the
+   * surface that picks the file is Phase 2's workbench shell, and a dialog here
+   * would need user-visible strings before there is anything to show them in.
+   */
+  filePath?: string;
+  noteOffset?: number;
+  noteLimit?: number;
+}
+
+export interface CsvDraftResult {
+  ok: boolean;
+  /** One page: the full header, `counts` for the whole file, windowed notes. */
+  draft?: AnkiDraft;
+  fileName?: string;
+  noteOffset?: number;
+  totalNotes?: number;
+  csv?: AnkiCsvDraftSummary;
+  error?: string;
+}
+
+/** The `AnkiCsvDraftSummary` half a caller can compute without touching a file. */
+export function summarizeAnkiCsv(
+  collection: AnkiCsvCollection,
+): Omit<AnkiCsvDraftSummary, 'encoding' | 'byteLength'> {
+  const { meta } = collection;
+  return {
+    separator: meta.separator,
+    separatorSource: meta.separatorSource,
+    html: meta.html,
+    columnNames: meta.columnNames,
+    guidColumn: meta.guidColumn,
+    noteTypeColumn: meta.noteTypeColumn,
+    deckColumn: meta.deckColumn,
+    tagsColumn: meta.tagsColumn,
+    globalTags: meta.globalTags,
+    unknownDirectives: meta.unknownDirectives,
+    rowCount: collection.rowCount,
+    blankRows: collection.blankRows,
+  };
 }

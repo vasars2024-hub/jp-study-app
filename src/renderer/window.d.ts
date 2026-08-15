@@ -465,6 +465,9 @@ declare global {
       readApkgDraft(
         request?: import('../shared/ankiDraft').ApkgDraftRequest,
       ): Promise<import('../shared/ankiDraft').ApkgDraftResult>;
+      readAnkiCsvDraft(
+        request?: import('../shared/ankiCsv').CsvDraftRequest,
+      ): Promise<import('../shared/ankiCsv').CsvDraftResult>;
       onAnkiIntervalsChanged(cb: (s: IntervalSnapshot) => void): () => void;
       desktopGetLayout(): Promise<DesktopLayoutSnapshot>;
       desktopCommitLayout(
