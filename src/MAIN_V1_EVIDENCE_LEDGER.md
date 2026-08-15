@@ -22435,3 +22435,58 @@ black-hole listener and `debug/qbit-count-proxy.cjs`. Full table in
 
 **Next: P4 gates 14–17** — a MAL title through `subtitleHarvestList`, a real episode range, cues
 counted per episode, and gate 17 with qBittorrent disabled entirely.
+
+## 2026-08-16 00:15 — `primary` — Track 7 gate 12: a generation is a proposal until someone decides
+
+Boss audit re-derived first, not trusted: the 18:00 section's four findings are all still
+closed. Finding 1's `scheduleDrain` re-arm is at `transcriptionJobs.ts:741`; finding 2 shipped
+as `media-not-rendered` + `ADVISORY_RENDER_PROBLEMS` (`1d21625a`); finding 3's tree caveat is
+now standard in every gate line; finding 4's file is another track's **untracked** work, left
+alone deliberately. Nothing owed.
+
+**`5a71b0d9` — `shared/ankiAiAdditions.ts`, the review model.** Four decisions:
+
+1. **Approval is per-note single-choice, not per-variant multi-select.** One field takes one
+   value; approving a second *moves* the approval rather than leaving a writer to pick.
+2. **A rejection is retained and flagged, never deleted.** Gate 12 asks that rejected data be
+   represented honestly — a vanished variant is one the user cannot see, cannot undo, and
+   cannot tell apart from one the provider never returned.
+3. **`aiRetryTargets` returns `failed` and nothing else.** A rejection is a finished decision
+   and a cancellation is a withdrawn request; re-asking either spends money undoing the user.
+4. **AI provenance has no `none` mode**, unlike `wrapEnrichProvenance`. Unmarked generated
+   prose reads as a dictionary quotation or as the user's own writing — the exact
+   misrepresentation the plan's exclusions forbid. Distinct attribute/class (`data-jp-ai`,
+   `jp-ai-gen`) so a template can style the two differently.
+
+`pending` is a real status: without it a cancelled batch and an unrun one look identical and a
+partial result reports as complete. An answer with no usable variant is `failed`, not an empty
+success.
+
+**`dd2c26a2` — the `apply-ai-additions` tray action.** Blocks on four states rather than
+writing less than it claims: no batch, a `batchId` mismatch (regenerating replaces the batch;
+a stale action would write another run's sentences), any undecided variant, any still-pending
+note. Failed/cancelled/all-rejected are counted **once per action** as three distinct codes.
+Six problem strings in en/ja/zh/ru.
+
+**Mutation controls, both reverted with `cmp` byte-equality.** (1) `aiRetryTargets` widened to
+non-generated → "retries the failed note and not the rejected or cancelled ones" failed
+(`['n2','n3','n4']` vs `['n3']`). (2) Deleting the `summary.undecided` guard → "refuses while
+any suggestion is still undecided" failed (`blocked` **false**, expected true) — the undecided
+text would have been written.
+
+**Trap for the next worker: `severity: 'blocking'` inside `blockingProblems` is decorative.**
+`planChangeTray` returns blocked on *any* problem that function pushes, so flipping a severity
+there is not a valid mutation control — it passed 30/30 and proved nothing. Delete the push.
+
+**Gates**, once after the last slice, shared working tree (HEAD alone still carries the audit's
+foreign failures). `npx vitest run` **658 files passed / 1 skipped of 659, 8,911 passed / 6
+skipped, zero failures**, exit 0 — exactly +1 file and +30 tests against the 23:45 baseline
+(657/8,881), so every new test is this slice's and nothing else moved. `architecture-audit`
+exit 0, **Nothing new**, 2 pending. `i18n-check` exit 0 at **9,896** keys (+6, exactly this
+slice's). `eslint` on all three touched source paths: **0**. The 4 neighbouring tray suites:
+**77 passed**.
+
+**Next: gate 12's generation half** — a review panel (variants, approve/reject, cancel, retry
+failures) and the provider call that fills a batch. Deliberately NOT started here: adding the
+tray form without a way to produce a batch would ship a control that can only ever say
+"generate a batch first". The provider/privacy/cost decision belongs with that slice.
