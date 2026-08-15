@@ -182,8 +182,13 @@ async function resolveApiKey(input: ScraperQbitInput): Promise<string> {
 function apiKeyProblem(key: string): string {
   if (!key) return 'No API key is stored for this connection.';
   if (key !== key.trim()) return 'The stored API key has leading or trailing whitespace.';
-  if (/[\s\x00-\x1f\x7f]/.test(key)) {
-    return 'The stored API key contains a space or control character, so it is not a usable key.';
+  // Scanned by code point rather than by regex: a character class spelling out
+  // the C0 range trips `no-control-regex`, and the codes say the intent anyway.
+  for (const char of key) {
+    const code = char.codePointAt(0) ?? 0;
+    if (code <= 0x20 || code === 0x7f) {
+      return 'The stored API key contains a space or control character, so it is not a usable key.';
+    }
   }
   return '';
 }
