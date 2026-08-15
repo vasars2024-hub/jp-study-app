@@ -155,7 +155,14 @@ the pipeline with the JA track masked out, then score fused output against the h
 track: align cues by time overlap, compute character error rate after the same
 normalization as F4. Ship gate: **fused CER beats both raw-Whisper CER and MT-only CER
 on every test episode.** If it doesn't, the fusion is not adding accuracy and the
-feature must not ship as "highly accurate". This harness lives outside vitest (needs
+feature must not ship as "highly accurate".
+
+**Amended 2026-08-15 — the gate is per-mode; see §6.** The rule above is unpassable on
+the offline path *by construction* (offline never overwrites Whisper text except in an
+empty window, so the two tracks are usually character-identical). It survives verbatim
+as the `arbitrated` mode. `offline` is graded on what the offline path actually does.
+
+This harness lives outside vitest (needs
 real media + the Whisper runtime) — typecheck its fixtures explicitly; an untyped
 harness fixture has faked product bugs in this repo before.
 
@@ -209,6 +216,27 @@ harness fixture has faked product bugs in this repo before.
 2. Fusion core unit tests green (`npx vitest run` on the new test files), plus the four
    stage-1 relay gates (`vitest`, `i18n-check`, `architecture-audit`, scoped `eslint`).
 3. F7 harness run on ≥2 real episodes with the ship gate met, numbers recorded below.
+
+   **The gate, as decided 2026-08-15** (standing auto-approval; the original single rule
+   was unpassable offline — see the 2026-08-15 backup entry in §7). Each episode is
+   scored under a `mode`, defaulting to `offline` because that is the weaker claim and a
+   run must *opt in* to being graded strictly:
+
+   - **`arbitrated`** (F5 cloud arbitration ran): unchanged — fused CER strictly below
+     **both** whisperOnly and mtOnly.
+   - **`offline`**: fused CER **≤** whisperOnly (it may not be *worse* — a bad reference
+     substituted into an empty window fails here), fused CER **<** mtOnly strictly, and
+     fused **misses no more reference cues** than whisperOnly did. Filling a window
+     Whisper returned nothing for is the offline path's entire contribution to the text,
+     so losing coverage is the offline regression that matters.
+
+   A pass emits the strongest sentence it licenses (`ShipGate.claim`): `beats-both` only
+   when **every** episode was arbitrated, otherwise `no-regression`. One offline episode
+   caps the whole run. When fused and whisperOnly are character-identical the gate says
+   so as a **note** — a green offline run can never be quoted as "fusing beat Whisper".
+   Rejected: dropping the whisper comparison entirely (then nothing catches a regression),
+   and gating on `alignedCer` (it punishes the fused track for using the English grid,
+   which is the design).
 4. Live acceptance through the debug bridge: trigger fusion on a real media item with an
    EN track, watch phases progress, see the fused track appear, badge uncertain lines,
    confirm the record survives an app restart.
@@ -673,3 +701,38 @@ one.
 
 **Status against §6:** (1) done. (2) done. (3) **harness run for real at last, and it FAILS** —
 one episode scored, and the gate is unpassable offline as written. (4) partial. (5) done.
+
+### The §6 ship gate, decided: it is per-mode now — 2026-08-15, primary
+
+**Landed:** `16e1603`. Full text of the decision is in §6(3); this is the why and the cost.
+
+**The blocker.** The gate said "fused CER strictly below both baselines, every episode".
+Offline that cannot pass — `decideFusedWindow` keeps Whisper's text verbatim in every branch
+that has any, so `fused-ja.srt` and `fused-ja.whisper-only.srt` came out **byte-identical**
+(5,526 B). A gate no correct implementation can pass is not strict, it is untestable, and it
+was blocking §6(3) permanently rather than measuring anything.
+
+**Chosen: split the gate by mode, default to the weaker claim.** `arbitrated` keeps the
+original rule verbatim. `offline` is graded on the three things the offline path actually
+does — not worse than Whisper, strictly better than MT, and no coverage lost. Rejected:
+(a) drop the Whisper comparison — then nothing catches a fusion that damages the track;
+(b) let a high-confidence reference overwrite Whisper offline so it *can* win — that
+reverses the plan's own "verbatim still matches the audio" rule, on no evidence, to make a
+number move; (c) gate on `alignedCer` — it charges the fused track for using the English
+grid, which is the design.
+
+**The load-bearing part is the claim, not the pass.** `ShipGate.claim` is `beats-both` only
+if **every** episode was arbitrated; one offline episode caps the run at `no-regression`, and
+`fusionClaimSentence()` is the single place those words live so no surface can paraphrase a
+weaker result upward. Character-identical fused/whisper tracks emit a **note** on a *passing*
+run — that is what stops a green offline gate being quoted as "fusing beat Whisper".
+`--mode` typos are an error, never a silent downgrade to the weaker rules.
+
+**Verified.** 28 tests in `subtitleFusionEval.test.ts` (was 21), including the three offline
+failures that must still bite: worse-than-Whisper, coverage lost at equal document CER, and
+losing to mtOnly. CLI on a 2-episode fixture: offline → **PASS, exit 0, claim
+`no-regression`**, both degenerate-comparison notes printed; the same files with
+`--mode arbitrated` → **FAIL, exit 1, claim `none`**, "does not beat whisperOnly 0.2143".
+
+**Where §6(3) now stands.** Still FAIL, but for one honest reason instead of two: only one
+real episode has ever been scored. The structural blocker is gone.
