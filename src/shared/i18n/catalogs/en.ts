@@ -9293,6 +9293,18 @@ export const en: Catalog = {
     'On {count} notes the installed dictionaries disagreed, so those notes were left alone: {detail}',
   'ankiWorkbench.tray.problem.enrich-sources-merged':
     'On {count} notes several dictionaries disagreed and all of their answers were written: {detail}',
+  'ankiWorkbench.tray.problem.no-ai-review':
+    'No generated suggestions are loaded yet, so there is nothing to apply. Generate a batch first.',
+  'ankiWorkbench.tray.problem.ai-batch-mismatch':
+    'This step was set up for an earlier generation ({detail}) that has since been replaced. Remove it and add it again.',
+  'ankiWorkbench.tray.problem.ai-not-reviewed':
+    '{count} notes are still waiting for you to accept or reject a suggestion. Nothing is written until you decide.',
+  'ankiWorkbench.tray.problem.ai-generation-failed':
+    'Generation failed on {count} notes. You can retry just those.',
+  'ankiWorkbench.tray.problem.ai-cancelled':
+    'You cancelled before {count} notes were generated, so they are left unchanged.',
+  'ankiWorkbench.tray.problem.ai-all-rejected':
+    'You rejected every suggestion on {count} notes, so nothing is written to them.',
 
 };
 

@@ -38,6 +38,12 @@ import {
   type AnkiDraftEditOp,
 } from './ankiDraftEdit';
 import {
+  approvedAiAdditions,
+  summarizeAiReview,
+  wrapAiProvenance,
+  type AiBatch,
+} from './ankiAiAdditions';
+import {
   resolveEnrichValue,
   wrapEnrichProvenance,
   type EnrichAspect,
@@ -55,7 +61,8 @@ export type TrayActionKind =
   | 'swap-fields'
   | 'copy-field'
   | 'normalize-text'
-  | 'enrich-dictionary';
+  | 'enrich-dictionary'
+  | 'apply-ai-additions';
 
 /**
  * What a copy does when the destination already holds text — Phase 4's "require
@@ -116,6 +123,23 @@ export type TrayAction =
       senseRule: EnrichSenseRule;
       /** Whether the field records which dictionary produced it. No default. */
       provenance: EnrichProvenanceMode;
+    })
+  | (TrayActionBase & {
+      kind: 'apply-ai-additions';
+      /**
+       * The reviewed batch this action writes. The batch itself arrives through
+       * `planChangeTray`'s options — it holds the user's whole review and is far
+       * too large to sit on a serializable action — so this is the id that
+       * proves the two agree. A tray built for one generation run must not
+       * write a different run's sentences into the deck.
+       */
+      batchId: string;
+      /** Where the approved text goes. */
+      toField: string;
+      /** Same three answers a copy has, for the same reason. No default. */
+      onConflict: FieldCopyConflict;
+      /** Only read for `append`; `DEFAULT_COPY_SEPARATOR` when omitted. */
+      separator?: string;
     });
 
 // ----- the ordered list --------------------------------------------------------
@@ -170,7 +194,22 @@ export type TrayProblemCode =
   /** Installed dictionaries disagreed and the rule is `refuse`. */
   | 'enrich-sense-conflict'
   /** Dictionaries disagreed and `all-sources` wrote the merge. */
-  | 'enrich-sources-merged';
+  | 'enrich-sources-merged'
+  /** An AI addition was queued with no generation batch to read. Blocking. */
+  | 'no-ai-review'
+  /** The queued action names a different batch than the one supplied. Blocking. */
+  | 'ai-batch-mismatch'
+  /**
+   * Variants came back that the user has neither approved nor rejected.
+   * Blocking: applying them would be generation without a reviewed diff.
+   */
+  | 'ai-not-reviewed'
+  /** The provider failed for these notes. Retryable — see `aiRetryTargets`. */
+  | 'ai-generation-failed'
+  /** The batch was cancelled before these notes were generated. */
+  | 'ai-cancelled'
+  /** The user rejected every variant for these notes, so nothing is written. */
+  | 'ai-all-rejected';
 
 export interface TrayProblem {
   code: TrayProblemCode;
@@ -262,6 +301,7 @@ function blockingProblems(
   actions: readonly TrayAction[],
   noteIds: readonly string[],
   hasEnrichData: boolean,
+  aiBatch: AiBatch | undefined,
 ): TrayProblem[] {
   const problems: TrayProblem[] = [];
   const enabled = actions.filter((a) => a.enabled);
@@ -299,6 +339,44 @@ function blockingProblems(
         // not true. Refuse the plan instead, exactly as the `freq:` predicates
         // refuse a query with no vocabulary context.
         problems.push({ code: 'no-enrich-data', severity: 'blocking', actionId: action.id, count: 1 });
+      }
+    } else if (action.kind === 'apply-ai-additions') {
+      if (action.toField === '') {
+        problems.push({ code: 'empty-parameter', severity: 'blocking', actionId: action.id, count: 1 });
+      } else if (!aiBatch) {
+        problems.push({ code: 'no-ai-review', severity: 'blocking', actionId: action.id, count: 1 });
+      } else if (aiBatch.id !== action.batchId) {
+        // Regenerating replaces the batch. A tray still holding the previous
+        // one would write sentences the user reviewed for different notes.
+        problems.push({
+          code: 'ai-batch-mismatch',
+          severity: 'blocking',
+          actionId: action.id,
+          count: 1,
+          detail: action.batchId,
+        });
+      } else {
+        // The rule the whole module exists for: an alternative nobody accepted
+        // or refused is not a value to write. Refuse the plan rather than
+        // silently skipping those notes, so the user sees what is still theirs
+        // to decide instead of an apply that quietly did less than it said.
+        const summary = summarizeAiReview(aiBatch);
+        if (summary.undecided > 0) {
+          problems.push({
+            code: 'ai-not-reviewed',
+            severity: 'blocking',
+            actionId: action.id,
+            count: summary.undecided,
+          });
+        }
+        if (summary.pending > 0) {
+          problems.push({
+            code: 'ai-not-reviewed',
+            severity: 'blocking',
+            actionId: action.id,
+            count: summary.pending,
+          });
+        }
       }
     } else if (action.kind === 'swap-fields' || action.kind === 'copy-field') {
       const [a, b] =
@@ -361,10 +439,16 @@ export function planChangeTray(
      * Browser's `VocabContext` — so neither can live on a serializable action.
      */
     enrich?: { lookup: EnrichLookup; vocab: VocabContext };
+    /**
+     * The reviewed generation an `apply-ai-additions` action writes. Outside for
+     * the same reason `enrich` is: it arrives asynchronously from a provider and
+     * carries the user's whole review, neither of which belongs on an action.
+     */
+    ai?: AiBatch;
   },
 ): TrayPlan {
   const groupId = opts?.groupId ?? `tray-${journal.done.length + 1}`;
-  const problems = blockingProblems(actions, noteIds, opts?.enrich !== undefined);
+  const problems = blockingProblems(actions, noteIds, opts?.enrich !== undefined, opts?.ai);
   if (problems.length > 0) {
     return {
       draft,
@@ -577,6 +661,48 @@ export function planChangeTray(
             });
           }
         }
+      } else if (action.kind === 'apply-ai-additions') {
+        const batch = opts?.ai;
+        // Unreachable: `blockingProblems` refused a missing or mismatched batch.
+        if (!batch) continue;
+        const approved = approvedAiAdditions(batch).find((a) => a.noteId === noteId);
+        // Not every selected note is in the batch, and a note whose variants
+        // were all rejected writes nothing. Both are silent here on purpose —
+        // they are counted once for the whole action below, not per note.
+        if (!approved) continue;
+        const toOrd = soleOrd(start, action.toField);
+        if (toOrd === undefined) {
+          problems.push({
+            code: 'field-absent',
+            severity: 'warning',
+            actionId: action.id,
+            count: 1,
+            detail: action.toField,
+          });
+          continue;
+        }
+        // Unconditional, unlike dictionary provenance: see `wrapAiProvenance`.
+        const written = wrapAiProvenance(approved.text, batch.provider, batch.model);
+        const toRaw = start.fields.find((f) => f.ord === toOrd)?.raw ?? '';
+        const occupied = toRaw.trim() !== '';
+        let next: string | null;
+        if (!occupied) next = written;
+        else if (action.onConflict === 'overwrite') next = written;
+        else if (action.onConflict === 'append')
+          next = `${toRaw}${action.separator ?? DEFAULT_COPY_SEPARATOR}${written}`;
+        else next = null;
+        if (next !== null && applyWrite(at, noteId, toOrd, next)) {
+          touched = true;
+          if (occupied && action.onConflict === 'overwrite') {
+            problems.push({
+              code: 'overwrite-nonempty',
+              severity: 'warning',
+              actionId: action.id,
+              count: 1,
+              detail: action.toField,
+            });
+          }
+        }
       } else if (action.kind === 'copy-field') {
         const fromOrd = soleOrd(start, action.fromField);
         const toOrd = soleOrd(start, action.toField);
@@ -635,6 +761,38 @@ export function planChangeTray(
       }
 
       if (touched) changed += 1;
+    }
+
+    if (action.kind === 'apply-ai-additions' && opts?.ai) {
+      // Once per action, not per note: these are properties of the generation
+      // run, and the counts are the honest account of what the batch did *not*
+      // produce. Reported even though the plan proceeds — an apply that wrote
+      // 40 of 50 notes must say so rather than look complete.
+      const summary = summarizeAiReview(opts.ai);
+      if (summary.failed > 0) {
+        problems.push({
+          code: 'ai-generation-failed',
+          severity: 'warning',
+          actionId: action.id,
+          count: summary.failed,
+        });
+      }
+      if (summary.cancelled > 0) {
+        problems.push({
+          code: 'ai-cancelled',
+          severity: 'warning',
+          actionId: action.id,
+          count: summary.cancelled,
+        });
+      }
+      if (summary.allRejected > 0) {
+        problems.push({
+          code: 'ai-all-rejected',
+          severity: 'info',
+          actionId: action.id,
+          count: summary.allRejected,
+        });
+      }
     }
 
     outcomes.push({

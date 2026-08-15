@@ -8827,6 +8827,18 @@ export const zh: Catalog = {
     '{count} 条笔记上已安装词典不一致，因此未作改动：{detail}',
   'ankiWorkbench.tray.problem.enrich-sources-merged':
     '{count} 条笔记上多本词典不一致，已写入它们的全部答案：{detail}',
+  'ankiWorkbench.tray.problem.no-ai-review':
+    '尚未加载生成的候选内容，因此没有可应用的内容。请先生成一批。',
+  'ankiWorkbench.tray.problem.ai-batch-mismatch':
+    '此步骤是为已被替换的上一次生成（{detail}）设置的。请删除后重新添加。',
+  'ankiWorkbench.tray.problem.ai-not-reviewed':
+    '{count} 条笔记仍等待你采纳或拒绝建议。在你决定之前不会写入任何内容。',
+  'ankiWorkbench.tray.problem.ai-generation-failed':
+    '{count} 条笔记生成失败。你可以只重试这些笔记。',
+  'ankiWorkbench.tray.problem.ai-cancelled':
+    '你在 {count} 条笔记生成之前取消了操作，因此它们保持不变。',
+  'ankiWorkbench.tray.problem.ai-all-rejected':
+    '你拒绝了 {count} 条笔记的全部建议，因此不会向它们写入任何内容。',
 
 };
 

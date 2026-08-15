@@ -25,6 +25,9 @@ import {
   type AiBatch,
 } from '../ankiAiAdditions';
 import { readEnrichProvenance, wrapEnrichProvenance } from '../ankiEnrich';
+import { planChangeTray, type TrayAction } from '../ankiChangeTray';
+import { createEditJournal } from '../ankiDraftEdit';
+import type { AnkiDraft, AnkiDraftNote } from '../ankiDraft';
 
 const batchOf = (...terms: Array<[string, string]>): AiBatch =>
   beginAiBatch(
@@ -255,5 +258,189 @@ describe('generated text says it is generated', () => {
   it('keeps markup inside the generated value intact', () => {
     const wrapped = wrapAiProvenance('<b>猫</b>が寝ている。', 'anthropic', 'm');
     expect(readAiProvenance(wrapped)?.value).toBe('<b>猫</b>が寝ている。');
+  });
+});
+
+// ----- the apply-ai-additions tray action ------------------------------------
+
+function noteOf(id: string, expression: string, sentence: string): AnkiDraftNote {
+  return {
+    id,
+    guid: `g-${id}`,
+    noteTypeId: 'nt1',
+    tags: [],
+    marked: false,
+    fields: [
+      { ord: 0, name: 'Expression', raw: expression, normalized: expression },
+      { ord: 1, name: 'Sentence', raw: sentence, normalized: sentence },
+    ],
+    modifiedAtSec: 0,
+    flags: 0,
+    data: '',
+    cardIds: [],
+    media: [],
+  };
+}
+
+function draftOf(notes: AnkiDraftNote[]): AnkiDraft {
+  return {
+    version: 1,
+    source: { kind: 'apkg', label: 'fixture', fingerprint: 'fp' },
+    decks: [{ id: 'd1', name: 'Core', path: ['Core'], filtered: false }],
+    noteTypes: [
+      {
+        id: 'nt1',
+        name: 'Vocab',
+        kind: 'standard',
+        css: '',
+        fields: [
+          { ord: 0, name: 'Expression', sticky: false, rtl: false },
+          { ord: 1, name: 'Sentence', sticky: false, rtl: false },
+        ],
+        templates: [],
+        sortFieldOrd: 0,
+      },
+    ],
+    notes,
+    cards: [],
+    diagnostics: [],
+    counts: { notes: notes.length, cards: 0, decks: 1, noteTypes: 1, reviews: 0, mediaReferences: 0 },
+  };
+}
+
+const aiAction = (
+  over: Partial<Extract<TrayAction, { kind: 'apply-ai-additions' }>> = {},
+): TrayAction => ({
+  id: 'a1',
+  enabled: true,
+  kind: 'apply-ai-additions',
+  batchId: 'b1',
+  toField: 'Sentence',
+  onConflict: 'keep',
+  ...over,
+});
+
+describe('the apply-ai-additions tray action', () => {
+  const notes = [noteOf('n1', '猫', ''), noteOf('n2', '犬', ''), noteOf('n3', '鳥', '')];
+  const draft = draftOf(notes);
+  const ids = ['n1', 'n2', 'n3'];
+
+  /** One approved note, one the user rejected outright, one the provider failed. */
+  const reviewed = () => {
+    let batch = batchOf(['n1', '猫'], ['n2', '犬'], ['n3', '鳥']);
+    batch = withVariants(batch, 'n1', '猫が寝ている。', '猫を飼っている。');
+    batch = approveAiVariant(batch, 'n1', 'n1v2');
+    batch = withVariants(batch, 'n2', '犬が走る。');
+    batch = rejectAiVariant(batch, 'n2', 'n2v1');
+    batch = recordAiResult(batch, 'n3', { ok: false, error: '503' });
+    return batch;
+  };
+
+  it('refuses the whole plan when no generation was supplied', () => {
+    const plan = planChangeTray(draft, createEditJournal(), ids, [aiAction()]);
+    expect(plan.blocked).toBe(true);
+    expect(plan.problems.map((p) => p.code)).toContain('no-ai-review');
+    expect(plan.draft).toBe(draft);
+  });
+
+  it('refuses to write one generation while another is queued', () => {
+    const plan = planChangeTray(draft, createEditJournal(), ids, [aiAction({ batchId: 'stale' })], {
+      ai: reviewed(),
+    });
+    expect(plan.blocked).toBe(true);
+    expect(plan.problems.map((p) => `${p.code}:${p.detail}`)).toContain('ai-batch-mismatch:stale');
+  });
+
+  it('refuses while any suggestion is still undecided, and writes nothing', () => {
+    let batch = batchOf(['n1', '猫'], ['n2', '犬']);
+    batch = withVariants(batch, 'n1', 'A1');
+    batch = approveAiVariant(batch, 'n1', 'n1v1');
+    batch = withVariants(batch, 'n2', 'B1'); // nobody decided about n2
+
+    const plan = planChangeTray(draft, createEditJournal(), ids, [aiAction()], { ai: batch });
+    expect(plan.blocked).toBe(true);
+    expect(plan.problems.find((p) => p.code === 'ai-not-reviewed')?.count).toBe(1);
+    expect(plan.draft).toBe(draft);
+  });
+
+  it('refuses while the provider is still answering', () => {
+    const plan = planChangeTray(draft, createEditJournal(), ids, [aiAction()], {
+      ai: batchOf(['n1', '猫']),
+    });
+    expect(plan.blocked).toBe(true);
+    expect(plan.problems.map((p) => p.code)).toContain('ai-not-reviewed');
+  });
+
+  it('writes only the approved note, marked as generated, and counts the rest honestly', () => {
+    const plan = planChangeTray(draft, createEditJournal(), ids, [aiAction()], { ai: reviewed() });
+
+    expect(plan.blocked).toBe(false);
+    expect(plan.changedNotes).toBe(1);
+
+    const written = plan.draft.notes.find((n) => n.id === 'n1')?.fields[1].raw ?? '';
+    expect(readAiProvenance(written)).toEqual({
+      provider: 'anthropic',
+      model: 'claude-opus-5',
+      value: '猫を飼っている。',
+    });
+    // The negative control for the honesty rule: a reader must not be able to
+    // mistake the generated sentence for a dictionary quotation.
+    expect(readEnrichProvenance(written)).toBeNull();
+
+    // n2 (every variant rejected) and n3 (provider failed) are untouched, and
+    // are named by two different codes rather than one vague "skipped".
+    expect(plan.draft.notes.find((n) => n.id === 'n2')?.fields[1].raw).toBe('');
+    expect(plan.draft.notes.find((n) => n.id === 'n3')?.fields[1].raw).toBe('');
+    const byCode = new Map(plan.problems.map((p) => [p.code, p.count]));
+    expect(byCode.get('ai-generation-failed')).toBe(1);
+    expect(byCode.get('ai-all-rejected')).toBe(1);
+    expect(plan.outcomes[0]).toMatchObject({ matched: 3, changed: 1, skipped: 2 });
+  });
+
+  it('reports the notes a cancel left ungenerated rather than looking complete', () => {
+    let batch = batchOf(['n1', '猫'], ['n2', '犬']);
+    batch = withVariants(batch, 'n1', 'A1');
+    batch = approveAiVariant(batch, 'n1', 'n1v1');
+    batch = cancelAiBatch(batch);
+
+    const plan = planChangeTray(draft, createEditJournal(), ids, [aiAction()], { ai: batch });
+    expect(plan.blocked).toBe(false);
+    expect(plan.changedNotes).toBe(1);
+    expect(plan.problems.find((p) => p.code === 'ai-cancelled')?.count).toBe(1);
+  });
+
+  it('leaves an occupied field alone under `keep` and replaces it under `overwrite`', () => {
+    const filled = draftOf([noteOf('n1', '猫', 'mine')]);
+    let batch = withVariants(batchOf(['n1', '猫']), 'n1', 'A1');
+    batch = approveAiVariant(batch, 'n1', 'n1v1');
+
+    const kept = planChangeTray(filled, createEditJournal(), ['n1'], [aiAction()], { ai: batch });
+    expect(kept.changedNotes).toBe(0);
+    expect(kept.draft.notes[0].fields[1].raw).toBe('mine');
+
+    const over = planChangeTray(
+      filled,
+      createEditJournal(),
+      ['n1'],
+      [aiAction({ onConflict: 'overwrite' })],
+      { ai: batch },
+    );
+    expect(over.changedNotes).toBe(1);
+    expect(readAiProvenance(over.draft.notes[0].fields[1].raw)?.value).toBe('A1');
+    expect(over.problems.map((p) => p.code)).toContain('overwrite-nonempty');
+  });
+
+  it('names an absent destination field instead of writing somewhere else', () => {
+    let batch = withVariants(batchOf(['n1', '猫']), 'n1', 'A1');
+    batch = approveAiVariant(batch, 'n1', 'n1v1');
+    const plan = planChangeTray(
+      draft,
+      createEditJournal(),
+      ['n1'],
+      [aiAction({ toField: 'Nope' })],
+      { ai: batch },
+    );
+    expect(plan.changedNotes).toBe(0);
+    expect(plan.problems.map((p) => `${p.code}:${p.detail}`)).toContain('field-absent:Nope');
   });
 });

@@ -8868,6 +8868,18 @@ export const ja: Catalog = {
     '{count}件のノートでインストール済み辞書が食い違ったため、変更しませんでした: {detail}',
   'ankiWorkbench.tray.problem.enrich-sources-merged':
     '{count}件のノートで複数の辞書が食い違い、そのすべての回答を書き込みました: {detail}',
+  'ankiWorkbench.tray.problem.no-ai-review':
+    '生成された候補がまだ読み込まれていないため、適用するものがありません。先に生成してください。',
+  'ankiWorkbench.tray.problem.ai-batch-mismatch':
+    'この手順は、すでに置き換えられた以前の生成（{detail}）用に設定されています。削除して追加し直してください。',
+  'ankiWorkbench.tray.problem.ai-not-reviewed':
+    '{count} 件のノートは、候補を採用するか却下するかがまだ決まっていません。決めるまで何も書き込まれません。',
+  'ankiWorkbench.tray.problem.ai-generation-failed':
+    '{count} 件のノートで生成に失敗しました。その分だけ再試行できます。',
+  'ankiWorkbench.tray.problem.ai-cancelled':
+    '{count} 件のノートが生成される前に中止したため、変更されていません。',
+  'ankiWorkbench.tray.problem.ai-all-rejected':
+    '{count} 件のノートではすべての候補を却下したため、何も書き込まれません。',
 
 };
 

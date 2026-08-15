@@ -9673,6 +9673,18 @@ export const ru: Catalog = {
     'В {count} заметках установленные словари разошлись, поэтому они остались без изменений: {detail}',
   'ankiWorkbench.tray.problem.enrich-sources-merged':
     'В {count} заметках несколько словарей разошлись, и записаны все их варианты: {detail}',
+  'ankiWorkbench.tray.problem.no-ai-review':
+    'Сгенерированные варианты ещё не загружены, применять нечего. Сначала запустите генерацию.',
+  'ankiWorkbench.tray.problem.ai-batch-mismatch':
+    'Этот шаг настроен для предыдущей генерации ({detail}), которая уже заменена. Удалите его и добавьте заново.',
+  'ankiWorkbench.tray.problem.ai-not-reviewed':
+    'На {count} заметках вы ещё не приняли и не отклонили вариант. Пока вы не решите, ничего не записывается.',
+  'ankiWorkbench.tray.problem.ai-generation-failed':
+    'Генерация не удалась на {count} заметках. Можно повторить только их.',
+  'ankiWorkbench.tray.problem.ai-cancelled':
+    'Вы отменили до того, как сгенерировались {count} заметок, поэтому они остались без изменений.',
+  'ankiWorkbench.tray.problem.ai-all-rejected':
+    'Вы отклонили все варианты на {count} заметках, поэтому в них ничего не записывается.',
 
 };
 
