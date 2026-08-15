@@ -129,9 +129,6 @@ export interface BrowserQuerySchema {
   fieldNames: string[];
 }
 
-/** Keys that are not field names. `re` is handled where it appears. */
-const RESERVED_KEYS = new Set(['deck', 'tag', 'note', 'is', 'cards', 're']);
-
 // ----- tokenizer ---------------------------------------------------------------
 
 interface Token {
