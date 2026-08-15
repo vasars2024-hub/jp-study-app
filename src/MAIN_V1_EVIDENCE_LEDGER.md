@@ -22318,3 +22318,58 @@ Other gates: `node tools/i18n-check.cjs` exit 0, **9,850** keys, unchanged (no U
 turn). `node tools/architecture-audit.cjs` exit 0, 1,937 modules, 19 findings, **Nothing new**,
 2 pending. `npx eslint src/main/malSync.ts src/main/__tests__/malSync.test.ts
 src/main/__tests__/malRelations.test.ts` — **0 errors, 0 warnings**.
+
+## 2026-08-15 22:45 — `primary` — Track 7 gate 11's UI half, and a detail the summary threw away
+
+Boss audit re-derived first: the 18:00 section's findings 1–4 are all closed (`0bd6e614`
+fixed the stranded queue; `media-not-rendered` ships in `ankiTemplateRender.ts:554`; the
+tree caveat is written; finding 4 is another track's untracked file, deliberately left).
+
+**`879c8c90` — the `enrich-dictionary` form.** Three decisions:
+
+1. **Every select is preselected to the answer that cannot invent one** — `refuse` for a
+   disagreement, `inline` for provenance — the same rule that put `keep` first on a copy.
+2. **The tray builds its own `VocabContext`**, rather than the Browser lifting one through
+   `DeckWorkbench`. Enrichment reads `byNote[…].term` and `terms`, both pure functions of
+   the draft; the Browser's copy also carries ranks and knowledge levels that cost an IPC
+   round trip and mean nothing here. Cost: `collectVocabTerms` runs twice per draft, both
+   memoized. Only a queued, enabled enrichment pays for the lookup at all.
+3. **A host without `dictEnrichTerms` leaves `lookup` undefined** so the plan stays blocked
+   on `no-enrich-data`. Setting an empty map instead would render as "no installed
+   dictionary knows any of your words" — a lie about the user's dictionaries, and the
+   negative control the first of five new tests asserts.
+
+**`1f169b7e` — `summarizeTrayProblems` was discarding measured data.** It summed `count`
+and kept the **first** problem's `detail`, so a plan that recorded one word per conflicting
+note rendered as a number with one arbitrary example — and the enrichment strings did not
+print even that. Details are now deduplicated and capped at `MAX_PROBLEM_DETAILS` (5) with
+an ellipsis; `media-missing` and `field-absent` improve for free. `c1945000` is the eslint
+follow-up (`await act(async () => {})` is `no-empty-function`).
+
+**Live, window 1, real IPC, real installed dictionaries.** `dictEnrichTerms` on 猫/食べる/
+水/日本語 → **4/4 answered, 4 entries each**, multi-source merges visible
+(`JMdict (Japanese–English)|JMdict (Japanese–Russian)`). Then the real component mounted
+off-screen over a 3-note probe deck: before the lookup **Apply disabled, blocking
+`no-enrich-data`**; after, **"2 of 3 words found"**, `n1`/`n2` written with a provenance
+span crediting **3** and **2** dictionaries, `n3` unchanged. Warnings before `1f169b7e`
+named nothing; after, they name **猫** and **zzznotaword**.
+
+**Traps.** (1) Probe selectors must be **positional**, never by label text — the chrome is
+localized and an English match silently finds nothing. (2) The `?v=` React hash rule from
+`mounting-a-real-component-off-screen` applies verbatim: a bare `import('react')` fails
+outright with "Failed to resolve module specifier".
+
+**Gates**, once after the last slice, shared working tree (HEAD alone still carries the
+audit's foreign failures). `npx vitest run` **655 files, 654 passed / 1 skipped, 8,850
+passed / 6 skipped, zero failures** (+43 vs the 21:15 entry's 8,807). `i18n-check` exit 0 at
+**9,871** keys (+21). `architecture-audit` exit 0, 1,937 modules, **Nothing new**, 2 pending.
+`eslint` on all 8 touched paths: **0 errors**, 76 pre-existing `no-non-null-assertion`
+warnings in the two test files.
+
+**Staging note:** the four i18n catalogs carry another track's ~1,300-line conversion. Both
+commits staged reconstructed HEAD+my-block blobs via `hash-object --no-filters`, verified by
+slicing the block back out and asserting byte-equality with `git show HEAD:<path>`; their
+working trees were not touched. Scripts: `debug/stage-enrich-i18n{,2}.cjs`.
+
+**Next: gate 12, reviewed AI additions.** Gate 11's export/reimport half is blocked on
+Phase 6 — `src/main/anki/` has no exporter, so that round trip cannot run yet.
