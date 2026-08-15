@@ -41,7 +41,13 @@ import {
   type AnkiDraftEditResult,
 } from '../../../shared/ankiDraftEdit';
 import type { TrayPlan } from '../../../shared/ankiChangeTray';
-import { countJournalSteps } from '../../../shared/ankiDraftEdit';
+import { countJournalSteps, trailingStep } from '../../../shared/ankiDraftEdit';
+import {
+  invertMasteryWrites,
+  masteryWrites,
+  type MasteryWrite,
+} from '../../../shared/ankiMastery';
+import { setLevel, type WkLevel } from '../../knownWords';
 import { loadDeckAsAnkiDraft } from '../../flashcardDeck';
 import { useT } from '../../i18n';
 import DeckWorkbenchBrowser from './DeckWorkbenchBrowser';
@@ -55,6 +61,31 @@ type SessionRow = Awaited<ReturnType<typeof listSessions>>[number];
 
 function listSessions() {
   return window.api.ankiDraftSessionList();
+}
+
+/** One applied mastery mapping, carrying both directions it can be moved in. */
+interface MasteryStep {
+  /** The tray group it belonged to, so one tray stays one undo. */
+  groupId: string;
+  forward: MasteryWrite[];
+  backward: MasteryWrite[];
+}
+
+interface MasteryHistory {
+  undo: MasteryStep[];
+  redo: MasteryStep[];
+}
+
+const EMPTY_MASTERY_HISTORY: MasteryHistory = { undo: [], redo: [] };
+
+/**
+ * One knowledge write. `level: null` means *remove the entry*, and passing 0
+ * with `manual` is exactly how `knownWords.setLevel` deletes one — so restoring
+ * "never judged" and setting "New" are the same call, which is correct: they are
+ * the same stored state.
+ */
+function writeMasteryLevel(write: MasteryWrite): void {
+  setLevel(write.term, (write.level ?? 0) as WkLevel, true);
 }
 
 /** The worst severity present, which is what decides the step's validation. */
@@ -76,6 +107,13 @@ export default function DeckWorkbench() {
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   /** Every draft edit, oldest first, with its own before-image. */
   const [journal, setJournal] = useState<AnkiDraftEditJournal>(createEditJournal);
+  /**
+   * The mastery half of the edit history. It cannot live in the draft journal:
+   * every op there names a note in the draft, and a mastery entry names a lemma
+   * in a store that outlives the draft entirely. Keyed by the tray's group id so
+   * one tray remains one undo across both.
+   */
+  const [masteryHistory, setMasteryHistory] = useState<MasteryHistory>(EMPTY_MASTERY_HISTORY);
   /** Selected notes the tray can act on now — loaded ones only. */
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   /** What the selection stands for, which on a paged source is the larger number. */
@@ -187,7 +225,23 @@ export default function DeckWorkbench() {
    * batch is not re-run here, so what the user read is exactly what lands.
    */
   const applyTray = useCallback((plan: TrayPlan) => {
-    if (plan.blocked || plan.changedNotes === 0) return;
+    const mastery = plan.mastery;
+    const masteryCount = mastery?.changes.length ?? 0;
+    if (plan.blocked || (plan.changedNotes === 0 && masteryCount === 0)) return;
+    if (mastery && masteryCount > 0) {
+      // Local knowledge is keyed by lemma and lives outside the draft, so it is
+      // written here rather than adopted with `plan.draft`. Its inverse is
+      // stacked under the tray's own group id, which is what lets one tray stay
+      // one undo even when half of it landed in a different store.
+      const forward = masteryWrites(mastery);
+      const backward = invertMasteryWrites(mastery);
+      for (const write of forward) writeMasteryLevel(write);
+      setMasteryHistory((prev) => ({
+        undo: [...prev.undo, { groupId: plan.groupId, forward, backward }],
+        // A fresh apply forks the history, exactly as the draft journal's does.
+        redo: [],
+      }));
+    }
     setDraft(plan.draft);
     setJournal(plan.journal);
   }, []);
@@ -199,6 +253,28 @@ export default function DeckWorkbench() {
    */
   const stepHistory = useCallback(
     (direction: 'undo' | 'redo') => {
+      // The mastery half of the step first, because it is decided by the same
+      // group id the draft ops carry and a mastery-only tray leaves no ops at
+      // all — in which case this *is* the whole step and there is nothing to
+      // run against the draft.
+      const step = trailingStep(direction === 'undo' ? journal.done : journal.undone);
+      const stack = direction === 'undo' ? masteryHistory.undo : masteryHistory.redo;
+      const top = stack[stack.length - 1];
+      const masteryOnly = top !== undefined && step.length === 0;
+      if (top && (masteryOnly || step[0]?.group === top.groupId)) {
+        // The entry carries both directions, captured when it was applied — a
+        // recomputed inverse would read the store *after* the writes it is
+        // supposed to reverse and restore the values it just wrote.
+        for (const write of direction === 'undo' ? top.backward : top.forward) {
+          writeMasteryLevel(write);
+        }
+        setMasteryHistory((prev) =>
+          direction === 'undo'
+            ? { undo: prev.undo.slice(0, -1), redo: [...prev.redo, top] }
+            : { redo: prev.redo.slice(0, -1), undo: [...prev.undo, top] },
+        );
+      }
+      if (masteryOnly) return;
       setDraft((prevDraft) => {
         if (!prevDraft) return prevDraft;
         const normalize = draftFieldNormalizer(prevDraft.source);
@@ -209,7 +285,7 @@ export default function DeckWorkbench() {
         return result.draft;
       });
     },
-    [journal],
+    [journal, masteryHistory],
   );
 
   const discardSession = useCallback(
@@ -385,7 +461,7 @@ export default function DeckWorkbench() {
               <button
                 type="button"
                 className="btn"
-                disabled={journal.done.length === 0}
+                disabled={journal.done.length === 0 && masteryHistory.undo.length === 0}
                 onClick={() => stepHistory('undo')}
               >
                 {/* Steps, not ops: one tray over 3,000 notes is one undo, and a
@@ -395,7 +471,7 @@ export default function DeckWorkbench() {
               <button
                 type="button"
                 className="btn"
-                disabled={journal.undone.length === 0}
+                disabled={journal.undone.length === 0 && masteryHistory.redo.length === 0}
                 onClick={() => stepHistory('redo')}
               >
                 {t('ankiWorkbench.edit.redo', { count: countJournalSteps(journal.undone) })}

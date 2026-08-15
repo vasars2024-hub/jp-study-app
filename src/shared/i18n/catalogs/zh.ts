@@ -8826,6 +8826,34 @@ export const zh: Catalog = {
   'ankiWorkbench.tray.aiTo': '已批准的建议写入到',
   'ankiWorkbench.tray.kind.apply-ai-additions': '应用已审阅的 AI 建议',
   'ankiWorkbench.tray.describe.apply-ai-additions': '把每条已批准的 AI 建议写入 {to}（{conflict}）',
+  'anki.mastery.level.new': '未学',
+  'anki.mastery.level.learning': '学习中',
+  'anki.mastery.level.familiar': '眼熟',
+  'anki.mastery.level.known': '已掌握',
+  'ankiWorkbench.tray.kind.set-mastery': '设置这些词的掌握程度',
+  'ankiWorkbench.tray.describe.set-mastery': '把所选词标记为「{level}」',
+  'ankiWorkbench.tray.masteryLevel': '把这些词标记为',
+  'ankiWorkbench.tray.mastery.effect': '这会改变什么',
+  'ankiWorkbench.tray.mastery.target': '新的掌握程度',
+  'ankiWorkbench.tray.mastery.words': '词语',
+  'ankiWorkbench.tray.mastery.wordsValue':
+    '在所选的 {notes} 条笔记中，{changed} 个词会变动，{unchanged} 个已经处于该状态',
+  'ankiWorkbench.tray.mastery.noWord': '无法处理',
+  'ankiWorkbench.tray.mastery.noWordValue': '所选的 {count} 条笔记没有词语字段',
+  'ankiWorkbench.tray.mastery.phrase': '内容是短语',
+  'ankiWorkbench.tray.mastery.phraseValue':
+    '所选的 {count} 条笔记里是短语而不是单个词语，将保持不变',
+  'ankiWorkbench.tray.mastery.scheduling': 'Anki 排程',
+  'ankiWorkbench.tray.mastery.schedulingValue':
+    '会重新排程 {count} 张卡片。这只改变本应用对这些词的记录，不会改动 Anki 中的到期日、间隔或难度',
+  'ankiWorkbench.tray.problem.no-vocab-context':
+    '尚未读取此选区的词语，因此无法规划这次标记。',
+  'ankiWorkbench.tray.problem.mastery-no-word':
+    '所选的 {count} 条笔记没有词语字段，因此没有可标记的内容。',
+  'ankiWorkbench.tray.problem.mastery-phrase':
+    '所选的 {count} 条笔记里是短语而不是单个词语。这里只能记录词语，因此它们保持不变。',
+  'ankiWorkbench.tray.problem.mastery-local-only':
+    '仅在本应用内改变 {count} 个词。Anki 中不会重新排程任何卡片。',
   'ankiWorkbench.ai.title': 'AI 建议',
   'ankiWorkbench.ai.lead': '为所选词生成候选。在你批准某个候选并添加上面的步骤之前，不会写入任何内容。',
   'ankiWorkbench.ai.kind': '生成',

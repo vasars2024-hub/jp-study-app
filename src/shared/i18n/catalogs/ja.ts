@@ -8866,6 +8866,34 @@ export const ja: Catalog = {
   'ankiWorkbench.tray.aiTo': '承認した候補の書き込み先',
   'ankiWorkbench.tray.kind.apply-ai-additions': '確認済みのAI候補を適用',
   'ankiWorkbench.tray.describe.apply-ai-additions': '承認した各AI候補を{to}に書き込む（{conflict}）',
+  'anki.mastery.level.new': '未学習',
+  'anki.mastery.level.learning': '学習中',
+  'anki.mastery.level.familiar': '見覚えあり',
+  'anki.mastery.level.known': '習得済み',
+  'ankiWorkbench.tray.kind.set-mastery': '単語の習熟度を設定する',
+  'ankiWorkbench.tray.describe.set-mastery': '選択した単語を「{level}」にする',
+  'ankiWorkbench.tray.masteryLevel': 'これらの単語を次にする',
+  'ankiWorkbench.tray.mastery.effect': '変更される内容',
+  'ankiWorkbench.tray.mastery.target': '新しい習熟度',
+  'ankiWorkbench.tray.mastery.words': '単語',
+  'ankiWorkbench.tray.mastery.wordsValue':
+    '選択した{notes}件のノートについて、{changed}語が変わり、{unchanged}語はすでにその状態です',
+  'ankiWorkbench.tray.mastery.noWord': '対象にできないもの',
+  'ankiWorkbench.tray.mastery.noWordValue': '選択した{count}件のノートには単語フィールドがありません',
+  'ankiWorkbench.tray.mastery.phrase': '語句だったもの',
+  'ankiWorkbench.tray.mastery.phraseValue':
+    '選択した{count}件のノートは単語ではなく語句なので、そのままにします',
+  'ankiWorkbench.tray.mastery.scheduling': 'Ankiのスケジュール',
+  'ankiWorkbench.tray.mastery.schedulingValue':
+    'スケジュールが変わるカードは{count}枚です。これはこのアプリが単語について知っている内容を変えるだけで、Ankiの期日・間隔・難易度は変わりません',
+  'ankiWorkbench.tray.problem.no-vocab-context':
+    'この選択範囲の単語がまだ読み込まれていないため、対応付けを計画できません。',
+  'ankiWorkbench.tray.problem.mastery-no-word':
+    '選択した{count}件のノートには単語フィールドがないため、設定できるものがありません。',
+  'ankiWorkbench.tray.problem.mastery-phrase':
+    '選択した{count}件のノートは単語ではなく語句です。ここに記録できるのは単語だけなので、そのままにします。',
+  'ankiWorkbench.tray.problem.mastery-local-only':
+    'このアプリ内でのみ{count}語を変更します。Ankiのスケジュールは一切変わりません。',
   'ankiWorkbench.ai.title': 'AI候補',
   'ankiWorkbench.ai.lead': '選択した語の候補を生成します。候補を承認して上の手順を追加するまで、何も書き込まれません。',
   'ankiWorkbench.ai.kind': '生成するもの',

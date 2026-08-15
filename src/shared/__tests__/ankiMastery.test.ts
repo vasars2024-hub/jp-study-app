@@ -12,6 +12,7 @@ import { planChangeTray, type TrayAction } from '../ankiChangeTray';
 import { createEditJournal } from '../ankiDraftEdit';
 import {
   invertMasteryWrites,
+  isWritableMasteryTerm,
   masteryEffect,
   masteryWrites,
   planMasteryMapping,
@@ -81,6 +82,43 @@ describe('planMasteryMapping', () => {
     ]);
   });
 
+  it('treats mapping an unjudged word to New as no change at all', () => {
+    // No stored entry and level 0 are the same state. Counting this as a move
+    // would report work the store cannot show, since writing 0 deletes nothing
+    // that was there.
+    const plan = planMasteryMapping({
+      noteIds: ['n1', 'n3'],
+      termByNote,
+      levels: new Map([['猫', 2]]),
+      target: 0,
+    });
+    expect(plan.changes.map((c) => c.term)).toEqual(['猫']);
+    expect(plan.unchangedTerms).toBe(1);
+    expect(masteryEffect(plan).termsChanged).toBe(1);
+  });
+
+  it('declines to store a phrase as a word, and says which notes held one', () => {
+    // Measured on the real deck: `extractVocabTerm` splits on whitespace, so a
+    // short Japanese sentence in an Expression field arrives as one "word" and
+    // clears the 16-character lookup cap. Reading it is harmless; writing it
+    // into the lemma-keyed store is not.
+    const plan = planMasteryMapping({
+      noteIds: ['s1', 's2', 'n3'],
+      termByNote: new Map([
+        ['s1', '今日はいい天気です'],
+        ['s2', 'ねこ、いぬ'],
+        ['n3', '猫'],
+      ]),
+      levels: new Map(),
+      target: 3,
+    });
+    expect(plan.changes.map((c) => c.term)).toEqual(['猫']);
+    expect(plan.notesWithPhrase).toEqual(['s1', 's2']);
+    expect(plan.notesWithoutWord).toEqual([]);
+    expect(isWritableMasteryTerm('猫')).toBe(true);
+    expect(isWritableMasteryTerm('今日はいい天気です')).toBe(false);
+  });
+
   it('states zero Anki rescheduling as a value, not an omission', () => {
     const plan = planMasteryMapping({
       noteIds: ['n1', 'n3', 'n4'],
@@ -95,6 +133,7 @@ describe('planMasteryMapping', () => {
       termsUnchanged: 0,
       notesCovered: 2,
       notesWithoutWord: 1,
+      notesWithPhrase: 0,
       ankiSchedulingChanged: false,
       ankiCardsRescheduled: 0,
     });

@@ -36,7 +36,14 @@ import {
 } from '../../../shared/ankiEnrich';
 import type { AiBatch } from '../../../shared/ankiAiAdditions';
 import { TEXT_NORMALIZE_ORDER, type TextNormalizeOp } from '../../../shared/ankiTextNormalize';
+import {
+  MASTERY_LEVELS,
+  MASTERY_LEVEL_KEYS,
+  masteryEffect,
+  type MasteryLevel,
+} from '../../../shared/ankiMastery';
 import { buildVocabContext } from '../../../shared/ankiVocabContext';
+import { listKnownEntries, onKnowledgeChanged } from '../../knownWords';
 import { useT } from '../../i18n';
 import DeckWorkbenchAiPanel, { type AiPanelNote } from './DeckWorkbenchAiPanel';
 
@@ -47,9 +54,18 @@ const ACTION_KINDS: TrayActionKind[] = [
   'copy-field',
   'enrich-dictionary',
   'apply-ai-additions',
+  'set-mastery',
   'add-tags',
   'remove-tags',
 ];
+/**
+ * The rung the level select starts on. Unlike a field name there is no unset
+ * value that could mean anything — every rung is valid — so the form opens on
+ * `Known`, which is the mapping gate 3 demonstrates. Nothing is written by
+ * choosing it: the step is queued, its effect is rendered in full above Apply,
+ * and Apply is a separate deliberate click.
+ */
+const DEFAULT_MASTERY_LEVEL: MasteryLevel = 3;
 const COPY_CONFLICTS: FieldCopyConflict[] = ['keep', 'overwrite', 'append'];
 const ENRICH_ASPECTS: EnrichAspect[] = ['meaning', 'reading', 'partOfSpeech'];
 const ENRICH_SENSE_RULES: EnrichSenseRule[] = ['refuse', 'first-source', 'all-sources'];
@@ -104,6 +120,7 @@ export default function DeckWorkbenchTray({
   // APKG round trip, and a field whose text came from somewhere the user cannot
   // name later is the thing this whole action is meant to avoid.
   const [provenance, setProvenance] = useState<EnrichProvenanceMode>('inline');
+  const [masteryLevel, setMasteryLevel] = useState<MasteryLevel>(DEFAULT_MASTERY_LEVEL);
   const [applied, setApplied] = useState<number | null>(null);
   /**
    * The reviewed generation, owned here because the tray is what writes it. A
@@ -172,14 +189,36 @@ export default function DeckWorkbenchTray({
     };
   }, [wantsEnrich, vocab]);
 
+  /**
+   * Lemma → stored level, for `set-mastery`. Built from `listKnownEntries()`
+   * rather than `getLevel()` per word on purpose: `getLevel` answers 0 for a
+   * word that was never judged, and the whole undo story turns on those two
+   * being different. An absent key here means *never judged*.
+   *
+   * Re-read on every knowledge change, including one made in another window, so
+   * the preview never plans against levels the store has already moved past.
+   */
+  const [knownLevels, setKnownLevels] = useState<ReadonlyMap<string, number>>(
+    () => new Map(listKnownEntries().map((e) => [e.word, e.level])),
+  );
+  useEffect(
+    () => onKnowledgeChanged(() => {
+      setKnownLevels(new Map(listKnownEntries().map((e) => [e.word, e.level])));
+    }),
+    [],
+  );
+
   const plan = useMemo(
     () =>
       planChangeTray(draft, journal, selectedIds, actions, {
         ...(lookup ? { enrich: { lookup, vocab } } : {}),
         ...(aiBatch ? { ai: aiBatch } : {}),
+        mastery: { vocab, levels: knownLevels },
       }),
-    [draft, journal, selectedIds, actions, lookup, vocab, aiBatch],
+    [draft, journal, selectedIds, actions, lookup, vocab, aiBatch, knownLevels],
   );
+  const effect = plan.mastery ? masteryEffect(plan.mastery) : null;
+  const masteryChanges = plan.mastery?.changes.length ?? 0;
 
   /**
    * The selected notes the AI panel may ask about, with the word each declares.
@@ -218,6 +257,8 @@ export default function DeckWorkbenchTray({
         // `no-ai-review`, which is the true statement. Refusing to add the step
         // at all would leave the user with a button that silently did nothing.
         return { id, enabled: true, kind, batchId: aiBatch?.id ?? '', toField: fieldB, onConflict };
+      case 'set-mastery':
+        return { id, enabled: true, kind, level: masteryLevel };
       case 'normalize-text':
         return {
           id,
@@ -276,6 +317,10 @@ export default function DeckWorkbenchTray({
         return t('ankiWorkbench.tray.describe.apply-ai-additions', {
           to: action.toField,
           conflict: t(`ankiWorkbench.tray.conflict.${action.onConflict}`),
+        });
+      case 'set-mastery':
+        return t('ankiWorkbench.tray.describe.set-mastery', {
+          level: t(MASTERY_LEVEL_KEYS[action.level]),
         });
       default:
         return t(`ankiWorkbench.tray.describe.${action.kind}`, { tags: action.tags.join(' ') });
@@ -527,6 +572,20 @@ export default function DeckWorkbenchTray({
             {fieldSelect(t('ankiWorkbench.tray.aiTo'), fieldB, setFieldB)}
             {conflictSelect()}
           </>
+        ) : kind === 'set-mastery' ? (
+          <label>
+            {t('ankiWorkbench.tray.masteryLevel')}
+            <select
+              value={String(masteryLevel)}
+              onChange={(e) => setMasteryLevel(Number(e.target.value) as MasteryLevel)}
+            >
+              {MASTERY_LEVELS.map((level) => (
+                <option key={level} value={String(level)}>
+                  {t(MASTERY_LEVEL_KEYS[level])}
+                </option>
+              ))}
+            </select>
+          </label>
         ) : (
           <label>
             {t('ankiWorkbench.tray.tags')}
@@ -573,6 +632,49 @@ export default function DeckWorkbenchTray({
         </ul>
       )}
 
+      {!plan.blocked && effect && (
+        // Gate 3's "show the exact mastery/scheduling effects before commit",
+        // rendered from the same plan Apply writes. The scheduling line is
+        // printed whether or not it is zero: the plan's exclusions forbid a
+        // mastery label whose scheduling consequence the user has to infer.
+        <dl className="wb-tray-effect" aria-label={t('ankiWorkbench.tray.mastery.effect')}>
+          <div>
+            <dt>{t('ankiWorkbench.tray.mastery.target')}</dt>
+            <dd>{t(MASTERY_LEVEL_KEYS[effect.target])}</dd>
+          </div>
+          <div>
+            <dt>{t('ankiWorkbench.tray.mastery.words')}</dt>
+            <dd>
+              {t('ankiWorkbench.tray.mastery.wordsValue', {
+                changed: effect.termsChanged,
+                unchanged: effect.termsUnchanged,
+                notes: effect.notesCovered,
+              })}
+            </dd>
+          </div>
+          {effect.notesWithoutWord > 0 && (
+            <div>
+              <dt>{t('ankiWorkbench.tray.mastery.noWord')}</dt>
+              <dd>{t('ankiWorkbench.tray.mastery.noWordValue', { count: effect.notesWithoutWord })}</dd>
+            </div>
+          )}
+          {effect.notesWithPhrase > 0 && (
+            <div>
+              <dt>{t('ankiWorkbench.tray.mastery.phrase')}</dt>
+              <dd>{t('ankiWorkbench.tray.mastery.phraseValue', { count: effect.notesWithPhrase })}</dd>
+            </div>
+          )}
+          <div>
+            <dt>{t('ankiWorkbench.tray.mastery.scheduling')}</dt>
+            <dd>
+              {t('ankiWorkbench.tray.mastery.schedulingValue', {
+                count: effect.ankiCardsRescheduled,
+              })}
+            </dd>
+          </div>
+        </dl>
+      )}
+
       {!plan.blocked && (
         <div className="wb-tray-preview">
           <p className={plan.changedNotes > 0 ? 'wb-tray-summary' : 'muted'}>
@@ -614,10 +716,12 @@ export default function DeckWorkbenchTray({
         <button
           type="button"
           className="btn primary"
-          disabled={plan.blocked || plan.changedNotes === 0}
+          // A mastery-only tray changes no note and still has work to do, so
+          // `changedNotes` alone would disable Apply on a plan that is ready.
+          disabled={plan.blocked || (plan.changedNotes === 0 && masteryChanges === 0)}
           onClick={() => {
             onApply(plan);
-            setApplied(plan.changedNotes);
+            setApplied(plan.changedNotes + masteryChanges);
           }}
         >
           {t('ankiWorkbench.tray.apply')}

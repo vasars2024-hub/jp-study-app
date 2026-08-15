@@ -229,6 +229,8 @@ export type TrayProblemCode =
   | 'no-vocab-context'
   /** These notes declare no word, so there is nothing whose mastery could move. */
   | 'mastery-no-word'
+  /** These notes' word field holds a phrase, which is not a lemma to store. */
+  | 'mastery-phrase'
   /**
    * The consequence gate 3 forbids leaving implied: this writes local knowledge
    * and reschedules nothing in Anki. Always reported when the action runs.
@@ -605,6 +607,14 @@ export function planChangeTray(
           severity: 'warning',
           actionId: action.id,
           count: plan.notesWithoutWord.length,
+        });
+      }
+      if (plan.notesWithPhrase.length > 0) {
+        problems.push({
+          code: 'mastery-phrase',
+          severity: 'warning',
+          actionId: action.id,
+          count: plan.notesWithPhrase.length,
         });
       }
       // Reported whenever the action runs, including when it moves nothing, so

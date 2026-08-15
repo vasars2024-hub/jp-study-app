@@ -9291,6 +9291,34 @@ export const en: Catalog = {
   'ankiWorkbench.tray.aiTo': 'Write the approved suggestion to',
   'ankiWorkbench.tray.kind.apply-ai-additions': 'Apply reviewed AI suggestions',
   'ankiWorkbench.tray.describe.apply-ai-additions': 'Write each approved AI suggestion to {to} ({conflict})',
+  'anki.mastery.level.new': 'New',
+  'anki.mastery.level.learning': 'Learning',
+  'anki.mastery.level.familiar': 'Familiar',
+  'anki.mastery.level.known': 'Known',
+  'ankiWorkbench.tray.kind.set-mastery': 'Set how well you know these words',
+  'ankiWorkbench.tray.describe.set-mastery': 'Mark the selected words as {level}',
+  'ankiWorkbench.tray.masteryLevel': 'Mark these words as',
+  'ankiWorkbench.tray.mastery.effect': 'What this changes',
+  'ankiWorkbench.tray.mastery.target': 'New level',
+  'ankiWorkbench.tray.mastery.words': 'Words',
+  'ankiWorkbench.tray.mastery.wordsValue':
+    '{changed} words move, {unchanged} are already there, across {notes} selected notes',
+  'ankiWorkbench.tray.mastery.noWord': 'Cannot be mapped',
+  'ankiWorkbench.tray.mastery.noWordValue': '{count} selected notes declare no word',
+  'ankiWorkbench.tray.mastery.phrase': 'Held a phrase',
+  'ankiWorkbench.tray.mastery.phraseValue':
+    '{count} selected notes hold a phrase rather than a single word, and are left alone',
+  'ankiWorkbench.tray.mastery.scheduling': 'Anki scheduling',
+  'ankiWorkbench.tray.mastery.schedulingValue':
+    '{count} cards rescheduled — this changes what this app knows about the words, not any due date, interval or ease in Anki',
+  'ankiWorkbench.tray.problem.no-vocab-context':
+    'The words for this selection have not been read yet, so the mapping cannot be planned.',
+  'ankiWorkbench.tray.problem.mastery-no-word':
+    '{count} selected notes declare no word, so there is nothing to mark on them.',
+  'ankiWorkbench.tray.problem.mastery-phrase':
+    '{count} selected notes hold a phrase rather than a single word. They are left alone, because what this records has to be a word.',
+  'ankiWorkbench.tray.problem.mastery-local-only':
+    'Moves {count} words in this app only. Nothing in Anki is rescheduled.',
   'ankiWorkbench.ai.title': 'AI suggestions',
   'ankiWorkbench.ai.lead': 'Generate alternatives for the selected words. Nothing is written until you approve one and add the step above.',
   'ankiWorkbench.ai.kind': 'Generate',

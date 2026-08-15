@@ -9671,6 +9671,34 @@ export const ru: Catalog = {
   'ankiWorkbench.tray.aiTo': 'Записать одобренный вариант в',
   'ankiWorkbench.tray.kind.apply-ai-additions': 'Применить проверенные ИИ-варианты',
   'ankiWorkbench.tray.describe.apply-ai-additions': 'Записать каждый одобренный ИИ-вариант в {to} ({conflict})',
+  'anki.mastery.level.new': 'Новое',
+  'anki.mastery.level.learning': 'Учится',
+  'anki.mastery.level.familiar': 'Знакомое',
+  'anki.mastery.level.known': 'Известное',
+  'ankiWorkbench.tray.kind.set-mastery': 'Задать, насколько вы знаете эти слова',
+  'ankiWorkbench.tray.describe.set-mastery': 'Пометить выбранные слова как «{level}»',
+  'ankiWorkbench.tray.masteryLevel': 'Пометить эти слова как',
+  'ankiWorkbench.tray.mastery.effect': 'Что это изменит',
+  'ankiWorkbench.tray.mastery.target': 'Новый уровень',
+  'ankiWorkbench.tray.mastery.words': 'Слова',
+  'ankiWorkbench.tray.mastery.wordsValue':
+    'Изменится слов: {changed}; уже на этом уровне: {unchanged}; выбранных заметок: {notes}',
+  'ankiWorkbench.tray.mastery.noWord': 'Нельзя сопоставить',
+  'ankiWorkbench.tray.mastery.noWordValue': 'В {count} выбранных заметках нет поля со словом',
+  'ankiWorkbench.tray.mastery.phrase': 'Там фраза',
+  'ankiWorkbench.tray.mastery.phraseValue':
+    'В {count} выбранных заметках стоит фраза, а не отдельное слово — они остаются без изменений',
+  'ankiWorkbench.tray.mastery.scheduling': 'Расписание Anki',
+  'ankiWorkbench.tray.mastery.schedulingValue':
+    'Карточек с изменённым расписанием: {count}. Меняется только то, что это приложение знает о словах, — ни срок, ни интервал, ни лёгкость в Anki не затрагиваются',
+  'ankiWorkbench.tray.problem.no-vocab-context':
+    'Слова для этой выборки ещё не прочитаны, поэтому спланировать пометку нельзя.',
+  'ankiWorkbench.tray.problem.mastery-no-word':
+    'В {count} выбранных заметках нет поля со словом, поэтому помечать на них нечего.',
+  'ankiWorkbench.tray.problem.mastery-phrase':
+    'В {count} выбранных заметках стоит фраза, а не отдельное слово. Здесь записывается только слово, поэтому они остаются без изменений.',
+  'ankiWorkbench.tray.problem.mastery-local-only':
+    'Изменит {count} слов только в этом приложении. В Anki ничего не перепланируется.',
   'ankiWorkbench.ai.title': 'Варианты от ИИ',
   'ankiWorkbench.ai.lead': 'Сгенерируйте варианты для выбранных слов. Ничего не записывается, пока вы не одобрите вариант и не добавите шаг выше.',
   'ankiWorkbench.ai.kind': 'Что сгенерировать',

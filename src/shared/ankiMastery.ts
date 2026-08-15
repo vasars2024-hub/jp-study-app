@@ -31,6 +31,36 @@
 // type declares no word field cannot be mapped at all. Dropping those notes
 // silently is how a batch over 200 notes moves 6 words and still reads as done.
 
+/**
+ * The longest string this action will write into the knowledge store as a word.
+ *
+ * Measured on the real 3,221-note deck: `extractVocabTerm` splits on
+ * *whitespace*, and Japanese has none, so a short sentence in an `Expression`
+ * field arrives as one token and passes its 16-character cap — `今日はいい天気
+ * です` was in the first six terms of a 60-note selection.
+ *
+ * That is tolerable for `freq:`/`known:`, which only ever *read*: a sentence
+ * simply fails to rank. It is not tolerable here, because this action *writes*,
+ * and `renderer/knownWords.ts` is keyed by lemma and feeds every mining filter
+ * in the app. The two errors are not symmetric — a word this rule declines is
+ * one the user can still mark by hand, while a sentence written into the store
+ * quietly changes what every other surface considers known. So the cap is
+ * deliberately tighter than the lookup's and errs toward writing less.
+ */
+export const MASTERY_MAX_TERM_CHARS = 8;
+
+/** Punctuation that makes a string a phrase, never a headword. */
+const SENTENCE_PUNCTUATION = /[。．！？!?、，,・…‥]/u;
+
+/**
+ * Whether a term extracted from a field can be stored as a word. A `false` here
+ * is reported to the user as its own outcome, never a silent skip.
+ */
+export function isWritableMasteryTerm(term: string): boolean {
+  if (term.length === 0 || term.length > MASTERY_MAX_TERM_CHARS) return false;
+  return !SENTENCE_PUNCTUATION.test(term);
+}
+
 /** The app's local knowledge scale, shared with `renderer/knownWords.ts`. */
 export type MasteryLevel = 0 | 1 | 2 | 3;
 
@@ -70,8 +100,14 @@ export interface MasteryPlan {
   distinctTerms: number;
   /** Words already at the target, which Apply leaves untouched. */
   unchangedTerms: number;
-  /** Selected notes whose note type declares no word, or whose value is not one. */
+  /** Selected notes whose note type declares no word, or whose value is empty. */
   notesWithoutWord: string[];
+  /**
+   * Selected notes whose field held a phrase rather than a headword. Kept apart
+   * from `notesWithoutWord`: "this note declares no word" and "this note's word
+   * field holds a sentence" are different problems with different fixes.
+   */
+  notesWithPhrase: string[];
   /** Selected notes covered by at least one moving word. */
   notesCovered: number;
 }
@@ -95,6 +131,7 @@ export function planMasteryMapping(input: MasteryPlanInput): MasteryPlan {
   const { noteIds, termByNote, levels, target } = input;
   const byTerm = new Map<string, MasteryTermChange>();
   const notesWithoutWord: string[] = [];
+  const notesWithPhrase: string[] = [];
   const seenTerms = new Set<string>();
   let unchangedTerms = 0;
 
@@ -104,13 +141,22 @@ export function planMasteryMapping(input: MasteryPlanInput): MasteryPlan {
       notesWithoutWord.push(noteId);
       continue;
     }
+    if (!isWritableMasteryTerm(term)) {
+      notesWithPhrase.push(noteId);
+      continue;
+    }
     const stored = levels.get(term);
     const before = isMasteryLevel(stored) ? stored : null;
+    // No entry and level 0 are the *same stored state* — both mean "unjudged" —
+    // so mapping an unjudged word to `New` moves nothing and must not be
+    // counted as a change. `before` still keeps them apart, because undo needs
+    // to restore the one that was actually there.
+    const unchanged = (before ?? 0) === target;
     if (!seenTerms.has(term)) {
       seenTerms.add(term);
-      if (before === target) unchangedTerms += 1;
+      if (unchanged) unchangedTerms += 1;
     }
-    if (before === target) continue;
+    if (unchanged) continue;
     const existing = byTerm.get(term);
     if (existing) existing.noteIds.push(noteId);
     else byTerm.set(term, { term, before, after: target, noteIds: [noteId] });
@@ -126,6 +172,7 @@ export function planMasteryMapping(input: MasteryPlanInput): MasteryPlan {
     distinctTerms: seenTerms.size,
     unchangedTerms,
     notesWithoutWord,
+    notesWithPhrase,
     notesCovered: covered.size,
   };
 }
@@ -147,6 +194,7 @@ export interface MasteryEffect {
   termsUnchanged: number;
   notesCovered: number;
   notesWithoutWord: number;
+  notesWithPhrase: number;
   /** Anki's scheduler is untouched by this action. */
   ankiSchedulingChanged: false;
   /** Cards whose due date, interval or ease this would alter. */
@@ -161,6 +209,7 @@ export function masteryEffect(plan: MasteryPlan): MasteryEffect {
     termsUnchanged: plan.unchangedTerms,
     notesCovered: plan.notesCovered,
     notesWithoutWord: plan.notesWithoutWord.length,
+    notesWithPhrase: plan.notesWithPhrase.length,
     ankiSchedulingChanged: false,
     ankiCardsRescheduled: 0,
   };
