@@ -21920,3 +21920,53 @@ audit's 9 foreign failures). `npx vitest run` **exit 0, 640 passed / 1 skipped o
 **Next: Phase 3's change tray**, which `ankiDraftEdit`'s journal was shaped to become. Gate 10's
 remaining half (contrast, reduced motion, compact/maximized, the four languages end-to-end) is
 still open and is a measurement slice, not a build one.
+
+## 2026-08-15 19:00 primary — Track 7 Phase 3: the change tray, and the quadratic it hid
+
+Three slices, `ede721c6` / `dffbe48a` / `7df8e791`. Fusion was re-derived first and is **closed** —
+`EN_JA_SUBTITLE_FUSION_PLAN.md`'s last section (13:00) records all five §6 gates passing and its
+last open defect fixed — so the turn-by-turn alternation ends and this turn stayed in main-v1.
+
+**`ede721c6` — `shared/ankiChangeTray.ts`, the model.** Ordered actions (`find-replace`,
+`add-tags`, `remove-tags`), each applied to the previous one's output. Four decisions:
+
+1. **The dry run *is* the apply.** `planChangeTray` returns the resulting draft; Apply adopts it.
+   Two code paths — one to preview, one to mutate — is how a preview starts lying, and the drift
+   cannot be tested away once it exists.
+2. **Blocking refuses the whole tray.** A bad regex or empty parameter changes nothing, rather
+   than skipping one rule and leaving an ambiguous partial result.
+3. **Fields by name, never ord.** A selection spans note types; `Back` is ord 1 in one and ord 2
+   in another, and an ord-addressed tray overwrites `Meaning`. Asserted directly.
+4. **One tray = one undo.** `AnkiDraftEditOp` gained an optional `group`; `undoLastEdit` moves a
+   whole group, newest-op-first. **Mutation control:** unwinding forwards leaves `dog` where
+   `cat` belongs.
+
+**`dffbe48a` — the surface.** `DeckWorkbenchTray` under the Browser; `onSelection` now also
+carries the resolved loaded ids. **Two numbers, never one:** what is selected vs what the tray can
+change now — `all-matching` on a paged source names notes never in memory. Undo/redo count
+*steps*, not ops. 42 i18n keys ×4, staged with `debug/wb-tray-keys.cjs` (HEAD+block splice; the
+catalogs carry hundreds of foreign hunks).
+
+**`7df8e791` — the perf defect the first two slices shipped.** The preview recomputes every
+render, so its cost is frame time. It was quadratic twice: a scan per note, and a whole-array
+rebuild + whole-draft media scan per edit; undo of a group had the same shape. `createDraftEditIndex`
+computes the lookups once and `writeNoteField` takes the media set instead of deriving it.
+**8,000 notes, two actions over the whole deck: 3,050 ms → 59 ms; undo 19 ms.** Freezing the media
+set for a batch is also the more correct reading — no draft edit changes what the package holds.
+
+**Live, window 2, local deck, real IPC, keyboard-only selection.** add-tags `3 из 3`, find/replace
+今日→本日 `2 из 3` with Expression/Sentence diffs; a `([` rule blocks the tray with V8's own
+message, drops the preview, disables Apply; removing it restores the same plan; Apply rewrites the
+grid rows and the history reads `Отменить (1)`; one undo restores 今日 and drops the tag. Re-run
+after the perf slice: identical output.
+
+**Trap:** the workbench toggle is a toggle — clicking it when the panel is open collapses it, so a
+probe's second run finds nothing and reads exactly like a component that failed to render.
+
+**Gates**, once after the last slice, on the shared working tree. `npx vitest run` **exit 0, 643
+passed / 1 skipped of 644 files, 8,650 passed / 6 skipped** (+27 = exactly my new tests).
+`i18n-check` exit 0 at **9,802** (+42). `architecture-audit` exit 0, **Nothing new**, 2 pending.
+`eslint` on 12 paths: **0 errors**, 59 pre-existing `no-non-null-assertion` warnings in tests.
+
+**Next: Phase 3's saved views and nested filters**, the tray's other half — the plan pairs them,
+and the Browser's search is still one flat query string.
