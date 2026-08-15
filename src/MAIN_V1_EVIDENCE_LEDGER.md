@@ -20963,3 +20963,67 @@ pure format string, inserted without re-sorting the baseline. architecture 1,848
 - The example scan is unindexed by nature. On a real 200k-sentence corpus a **rare** word still
   pays a full table scan — the 400-row cap only helps common ones. Not measured, because no
   install here has a corpus; measure before widening the surface.
+
+## Track 2 — the third table with no traffic: xrefs — 2026-08-15 04:30 MSK primary
+
+No interrupted slice to recover; tree was where `5e0775f` left it. Handoff named this slice and
+it re-derived: `xrefs` had a schema, `idx_xref_from`, and **0 rows on the real install** — no
+writer, no reader. The Wiktextract importer's header named it and declined to fill it.
+
+**Slice 1 — `af65b80`. Writer and reader together.** `classifyXrefs` maps kaikki's five link
+fields to the four kinds the schema documents. Decisions: (1) `related` **and**
+`coordinate_terms` both collapse to `cf` — a real loss of detail, and the honest option, since
+`cf` claims only "compare" while `syn` would assert a synonymy nobody stated; (2) self
+references dropped — Wiktionary routinely lists a page among its own related terms, so keeping
+them points most entries at the page already open; (3) a target over 32 code points is prose and
+could never resolve, so it would render as permanently dead text under a "synonyms" heading.
+`findLexiconXrefs` reuses the **etymology** equality probe, not `lookup()` — a kana query can
+de-inflect onto a homophone, and attaching that word's synonyms here is indistinguishable from
+inventing them. `resolved` is a batched probe run **after** selection, not a join: resolving all
+400 scanned rows to discard 376 is the mistake the example reader already documents.
+
+**Slice 2 — `2dcc5a8`. Surface.** `dict:xrefs` → preload → `window.d.ts` → `LexiconXrefs`, beside
+the origin panel (indexed probes only, nothing for a button to protect), absent entirely when
+nothing states a relation. Grouped in the schema's kind order, not the reply's. **The decision
+worth keeping:** targets are *not* links. No panel in this column has word-click navigation, so a
+link would need a callback that does not exist or would go nowhere; `resolved` is rendered as
+availability instead, carried in **text as well as styling** so it survives monochrome. 7 keys ×4.
+
+**`abf1641` — a trap that cost real time.** The Write tool emitted the space in
+`` `${row.kind} ${text}` `` as a raw **NUL byte**. Every test passed (NUL is still a unique
+separator) and git silently classified `lexiconXrefs.ts` as *binary*. Sweep new files for byte 0
+before committing; a green suite will not catch it. Staging the six files that carry other
+tracks' hunks also needs `hash-object --no-filters`: `preload.ts`'s HEAD blob is LF throughout
+and ends on a lone CRLF, and the clean filter normalised that tail into a foreign whitespace hunk.
+
+**Live acceptance** (own `npm start`, bridge pid 31472 on 127.0.0.1:39273). Real `dict.db` had
+**0 xrefs**. With a scoped throwaway dictionary (`relay-xref-probe`, 5 relations): live
+`dictXrefs('犬')` returned all five with `resolved` = true/false/true/true/false, matching
+independently counted headword rows elsewhere (13/0/10/13/0). `lookupTerm('犬')` returned
+犬/犬侍/犬顔/犬肉/犬笛 with no relation leakage; `sourceLangs:['ru']` → empty. Rendered panel
+772×338, Russian chrome (`Связанные слова`, `Синонимы`/`Антонимы`/`См. также`/`Сравните`,
+`нет в ваших словарях`), headings in schema order, **0 `a`/`button` elements**, word 12.21:1,
+note and heading 6.08:1, 320 px reflow with no horizontal overflow. Adverse inputs (`null`, `42`,
+non-array langs, array options, a 22-char sentence clamped to 16) all answered `{xrefs: []}` —
+no rejected invoke. Removal cascaded to **exactly** the before-counts (4/697837/697837/0) and the
+live read went empty. `/logs?level=error` = 0 throughout. Owned pids stopped, two foreign node
+pids untouched.
+
+**Mutation controls.** Four, all restored: self-reference guard → `cf:犬` leaks in *and* reports
+`resolved:true`; kind guard → a stored `hypernym` reaches the surface; group ordering → headings
+fall into reply order; `resolved` branch → every availability marker disappears.
+
+**Gates.** `npx vitest run` — **612 passed / 1 skipped files, 8,078 passed / 6 skipped, exit 0**
+(was 610/8,047; the +2 files and +31 tests are mine). i18n 9,582 keys. architecture 18 findings,
+2 pending, nothing new. eslint clean on every new path; `window.d.ts`'s two
+`adjacent-overload-signatures` errors and `dictionary.ts`'s 7 `any` warnings reproduce at HEAD.
+
+### Deliberately open
+
+- `collocations` and `audio` remain writer-less and reader-less. `xrefs` has left that list.
+- **No importer but Wiktextract writes `xrefs`**, and no Wiktextract dump is installed here, so on
+  a default install this panel is absent for every word. JMdict's own `<xref>` elements are the
+  obvious second writer and the legacy Yomitan migration drops them — that is the next slice's
+  shape, and it is what would make this surface non-empty without a manual import.
+- Cross-references are not clickable. That needs a lookup callback threaded through
+  `DictionaryResults`, which no sibling panel has either; it is one shared slice, not four.
