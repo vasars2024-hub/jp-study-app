@@ -473,16 +473,25 @@ async function parseDeepSeekStream(
 function requestBody(request: AiProviderRequest, model: string, maxOutputTokens: number): { url: string; init: RequestInit } {
   const streaming = Boolean(request.onTextChunk);
   if (request.providerId === 'gemini-2.5-flash') {
-    // NOT sent, deliberately: `generationConfig.thinkingConfig.thinkingBudget`.
-    // The 2.5 series thinks by default and charges thoughts against
-    // `maxOutputTokens`, which is the likeliest cause of the MAX_TOKENS
-    // truncations read below — but Gemini rejects an unknown `generationConfig`
-    // field with a 400, and a wrong guess here breaks *every* cloud call in the
-    // app, not just the one that motivated it. It stays out until someone can
-    // put a real request against a real key. The arbiter's split-retry handles
-    // the symptom without betting the whole provider on an unverified field.
+    // The 2.5 series thinks by default and charges its thoughts against
+    // `maxOutputTokens`, which is the cause of the MAX_TOKENS truncations read
+    // below: the answer is cut off before it starts. Left out until 2026-08-15
+    // only because an unknown `generationConfig` field is a 400 and a wrong guess
+    // breaks *every* cloud call in the app; the field is now confirmed against
+    // Google's own REST reference for `v1beta/models/gemini-2.5-flash`, where
+    // `thinkingBudget` is an integer 0..24576 (0 disables, -1 is the dynamic
+    // default).
+    //
+    // A quarter of the budget, floored at 512 so a small request still gets room
+    // to think and ceilinged at the documented maximum. Not 0: disabling thinking
+    // entirely is a quality change to every cloud answer in the app, and the
+    // defect being fixed is thoughts *consuming the reply's* budget, not thinking
+    // itself. Three quarters left for the answer is what the arbiter's split
+    // retry was compensating for.
+    const thinkingBudget = Math.min(24_576, Math.max(512, Math.floor(maxOutputTokens / 4)));
     const generationConfig: Record<string, unknown> = {
       maxOutputTokens,
+      thinkingConfig: { thinkingBudget },
       ...(request.responseMimeType === 'application/json' || request.responseSchema
         ? { responseMimeType: 'application/json' }
         : {}),

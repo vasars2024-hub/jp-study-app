@@ -70,7 +70,37 @@ describe('main-owned AI provider runtime', () => {
       responseSchema: { type: 'object' },
       maxOutputTokens: 321,
       temperature: 0.1,
+      // 2.5 charges thinking against maxOutputTokens, so a request that does not
+      // reserve any is truncated before the answer starts. The floor is what
+      // keeps a small request from reserving a budget too small to think in.
+      thinkingConfig: { thinkingBudget: 512 },
     });
+  });
+
+  it('reserves a quarter of the output budget for thinking, within Gemini bounds', async () => {
+    const budgets: number[] = [];
+    const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(String(init.body)) as {
+        generationConfig: { thinkingConfig: { thinkingBudget: number } };
+      };
+      budgets.push(body.generationConfig.thinkingConfig.thinkingBudget);
+      return jsonResponse({
+        candidates: [{ content: { parts: [{ text: 'ok' }] } }],
+        usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1, totalTokenCount: 2 },
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    for (const maxOutputTokens of [1_000, 8_192, 200_000]) {
+      await runCloudAiRequest({
+        providerId: 'gemini-2.5-flash', apiKey: 'k', prompt: 'p', maxOutputTokens,
+      });
+    }
+    // Floor 512, then a plain quarter. The third case asks for 200,000 and gets
+    // 16,384 because the request's own output budget is clamped to 65,536 first
+    // — so the documented 24,576 ceiling is unreachable through this path and
+    // stays purely as a guard against that clamp ever being raised. Asserting
+    // 24,576 here would be asserting a value no caller can produce.
+    expect(budgets).toEqual([512, 2_048, 16_384]);
   });
 
   it('retries only retriable failures and emits an auditable lifecycle', async () => {
