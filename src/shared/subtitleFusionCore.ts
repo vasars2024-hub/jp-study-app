@@ -553,7 +553,11 @@ export function windowDecisionsToFusedCues(
       end: Math.max(last.end, first.start + 0.001),
       text,
       windowIndex: index,
-      basis: decision?.basis ?? 'whisper',
+      // Narrow — the `!text` guard above already proves `decision` exists — but
+      // the default must still lean the safe way. An unknown provenance is not
+      // a checked one, and `'whisper'` would have this fall back to the single
+      // most-trusted value in the union.
+      basis: decision?.basis ?? 'whisper-unrefereed',
       score: decision?.score ?? 0,
       confidence: decision?.confidence ?? 0,
     });
