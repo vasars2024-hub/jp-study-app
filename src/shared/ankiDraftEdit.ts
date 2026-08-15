@@ -43,6 +43,12 @@ export function draftFieldNormalizer(source: AnkiDraftSource): (raw: string) => 
   return source.plainText ? collapsePlainText : stripFieldHtml;
 }
 
+/**
+ * Ops produced together by one batch (the Phase 3 change tray) share a `group`,
+ * and undo/redo move a whole group at a time. A tray run over 3,000 notes that
+ * needed 3,000 undos would be reversible only in the arithmetic sense.
+ * A single edit has no group and is therefore its own step.
+ */
 export type AnkiDraftEditOp =
   | {
       kind: 'field';
@@ -51,8 +57,9 @@ export type AnkiDraftEditOp =
       /** Verbatim previous value, so undo restores bytes rather than a re-render. */
       before: string;
       after: string;
+      group?: string;
     }
-  | { kind: 'tags'; noteId: string; before: string[]; after: string[] };
+  | { kind: 'tags'; noteId: string; before: string[]; after: string[]; group?: string };
 
 export interface AnkiDraftEditJournal {
   /** Applied ops, oldest first. */
@@ -251,16 +258,46 @@ function applyInverse(
   );
 }
 
+/**
+ * The trailing ops that form one user-visible step: a whole group, or the single
+ * ungrouped op. Returned in the order they were applied, so an inverse pass has
+ * to walk it backwards and a redo pass forwards.
+ */
+export function trailingStep(ops: readonly AnkiDraftEditOp[]): AnkiDraftEditOp[] {
+  const last = ops[ops.length - 1];
+  if (!last) return [];
+  if (!last.group) return [last];
+  let start = ops.length - 1;
+  while (start > 0 && ops[start - 1].group === last.group) start -= 1;
+  return ops.slice(start);
+}
+
+/** Steps a user would count, with each batch counting once. */
+export function countJournalSteps(ops: readonly AnkiDraftEditOp[]): number {
+  let steps = 0;
+  let previous: string | undefined;
+  for (const op of ops) {
+    if (!op.group || op.group !== previous) steps += 1;
+    previous = op.group;
+  }
+  return steps;
+}
+
 export function undoLastEdit(
   draft: AnkiDraft,
   journal: AnkiDraftEditJournal,
   normalize: (raw: string) => string,
 ): AnkiDraftEditResult {
-  const op = journal.done[journal.done.length - 1];
-  if (!op) return { draft, journal, changed: false, reason: 'unchanged' };
+  const step = trailingStep(journal.done);
+  if (step.length === 0) return { draft, journal, changed: false, reason: 'unchanged' };
+  // Newest first: two ops on one field must be unwound in the order they were
+  // written, or the older op's `before` loses to the newer one's.
+  let next = draft;
+  for (let i = step.length - 1; i >= 0; i -= 1) next = applyInverse(next, step[i], 'before', normalize);
   return {
-    draft: applyInverse(draft, op, 'before', normalize),
-    journal: { done: journal.done.slice(0, -1), undone: [...journal.undone, op] },
+    draft: next,
+    // `undone` keeps applied order, so redo can replay the group forwards.
+    journal: { done: journal.done.slice(0, -step.length), undone: [...journal.undone, ...step] },
     changed: true,
   };
 }
@@ -270,11 +307,13 @@ export function redoLastEdit(
   journal: AnkiDraftEditJournal,
   normalize: (raw: string) => string,
 ): AnkiDraftEditResult {
-  const op = journal.undone[journal.undone.length - 1];
-  if (!op) return { draft, journal, changed: false, reason: 'unchanged' };
+  const step = trailingStep(journal.undone);
+  if (step.length === 0) return { draft, journal, changed: false, reason: 'unchanged' };
+  let next = draft;
+  for (const op of step) next = applyInverse(next, op, 'after', normalize);
   return {
-    draft: applyInverse(draft, op, 'after', normalize),
-    journal: { done: [...journal.done, op], undone: journal.undone.slice(0, -1) },
+    draft: next,
+    journal: { done: [...journal.done, ...step], undone: journal.undone.slice(0, -step.length) },
     changed: true,
   };
 }
