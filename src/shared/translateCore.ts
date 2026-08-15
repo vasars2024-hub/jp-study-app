@@ -122,9 +122,20 @@ export function cleanLlmOutput(raw: string): string {
 }
 
 /**
+ * The `<Russian translation>` slot from `buildBatchPrompt`'s worked example.
+ *
+ * A small model sometimes fills the shape and not the content — observed live
+ * against Qwen3-1.7B, which returned every item as `"<Japanese translation>"`.
+ * That is a well-formed reply whose text is the prompt, and without this it
+ * reaches the card as a translation.
+ */
+const TEMPLATE_ECHO = /^<[^<>]*\btranslation>$/;
+
+/**
  * Parse the JSON array a batch prompt asks for. Malformed JSON returns an
  * empty map (the caller treats those items as failed); an item echoing its own
- * id as the "translation" is rejected (the source of stray "t1" card values).
+ * id as the "translation" is rejected (the source of stray "t1" card values), as
+ * is one echoing the example's placeholder.
  */
 export function parseBatchJson(raw: string, expectedIds: Set<string>): Map<string, string> {
   const out = new Map<string, string>();
@@ -138,7 +149,9 @@ export function parseBatchJson(raw: string, expectedIds: Set<string>): Map<strin
       const obj = item as Record<string, unknown>;
       const id = typeof obj.id === 'string' ? obj.id : '';
       const text = typeof obj.text === 'string' ? obj.text.trim() : '';
-      if (id && expectedIds.has(id) && text && text !== id) out.set(id, text);
+      if (id && expectedIds.has(id) && text && text !== id && !TEMPLATE_ECHO.test(text)) {
+        out.set(id, text);
+      }
     }
   } catch {
     /* fall through */
@@ -146,23 +159,34 @@ export function parseBatchJson(raw: string, expectedIds: Set<string>): Map<strin
   return out;
 }
 
+/**
+ * The batch prompt, with its worked example built from the caller's own first id.
+ *
+ * A hardcoded example id is not cosmetic — a 1.7B model copies it literally, and
+ * `parseBatchJson` then drops the whole reply on the `expectedIds` filter. Measured
+ * against Qwen3-1.7B on 2026-08-15: the short form's frozen `"t0"` example made the
+ * model answer `["t0".."t7"]` for items numbered `[0]…[7]`, and `parseBatchJson`
+ * kept **0 of 8** — every short-form batch in the app had been returning nothing.
+ * Deriving the example from `items[0].id` makes that class of drift impossible.
+ */
 export function buildBatchPrompt(items: TranslateBatchItem[]): string {
   const source = langLabel(items[0].source);
   const target = langLabel(items[0].target);
   const lines = items.map((item) => `[${item.id}] ${item.text}`);
+  const example = `[{"id":${JSON.stringify(items[0].id)},"text":"<${target} translation>"}, ...]`;
   const longForm = items.some((item) => item.text.length > 40);
   if (longForm) {
     return (
       `/no_think\nTranslate each numbered ${source} passage into ${target}. ` +
       `Keep meaning and tone; output ${target} only. ` +
-      `Return ONLY a JSON array: [{"id":"0","text":"<${target} translation>"}, ...]\n\n` +
+      `Return ONLY a JSON array: ${example}\n\n` +
       lines.join('\n')
     );
   }
   return (
     `/no_think\nTranslate each numbered ${source} term into ${target}. ` +
     `Give the ${target} meaning only — never romaji, kana, or the original word. ` +
-    `Return ONLY a JSON array: [{"id":"t0","text":"<${target} translation>"}, ...]\n\n` +
+    `Return ONLY a JSON array: ${example}\n\n` +
     lines.join('\n')
   );
 }
