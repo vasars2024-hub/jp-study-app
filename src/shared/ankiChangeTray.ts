@@ -38,7 +38,23 @@ import {
   type AnkiDraftEditOp,
 } from './ankiDraftEdit';
 
-export type TrayActionKind = 'add-tags' | 'remove-tags' | 'find-replace';
+export type TrayActionKind =
+  | 'add-tags'
+  | 'remove-tags'
+  | 'find-replace'
+  | 'swap-fields'
+  | 'copy-field';
+
+/**
+ * What a copy does when the destination already holds text — Phase 4's "require
+ * explicit overwrite choices". There is deliberately no default: a `copy-field`
+ * action that silently meant `overwrite` is how a batch destroys the only copy
+ * of a field, and the type makes the caller say which it meant.
+ */
+export type FieldCopyConflict = 'overwrite' | 'keep' | 'append';
+
+/** What `append` puts between the old value and the copied one when unset. */
+export const DEFAULT_COPY_SEPARATOR = '<br>';
 
 interface TrayActionBase {
   id: string;
@@ -57,6 +73,15 @@ export type TrayAction =
       replace: string;
       regex: boolean;
       matchCase: boolean;
+    })
+  | (TrayActionBase & { kind: 'swap-fields'; fieldA: string; fieldB: string })
+  | (TrayActionBase & {
+      kind: 'copy-field';
+      fromField: string;
+      toField: string;
+      onConflict: FieldCopyConflict;
+      /** Only read for `append`; `DEFAULT_COPY_SEPARATOR` when omitted. */
+      separator?: string;
     });
 
 // ----- the ordered list --------------------------------------------------------
@@ -97,6 +122,8 @@ export type TrayProblemCode =
   | 'invalid-regex'
   | 'empty-parameter'
   | 'field-absent'
+  | 'same-field'
+  | 'overwrite-nonempty'
   | 'cloze-cards-change'
   | 'media-missing'
   | 'media-dropped';
@@ -208,6 +235,25 @@ function blockingProblems(actions: readonly TrayAction[], noteIds: readonly stri
           detail: compiled,
         });
       }
+    } else if (action.kind === 'swap-fields' || action.kind === 'copy-field') {
+      const [a, b] =
+        action.kind === 'swap-fields'
+          ? [action.fieldA, action.fieldB]
+          : [action.fromField, action.toField];
+      if (a === '' || b === '') {
+        problems.push({ code: 'empty-parameter', severity: 'blocking', actionId: action.id, count: 1 });
+      } else if (a === b) {
+        // A swap with itself is a no-op and a copy onto itself is either a no-op
+        // or, with `append`, a silent doubling. Both read as a mis-set form, so
+        // refuse rather than run something the user cannot have meant.
+        problems.push({
+          code: 'same-field',
+          severity: 'blocking',
+          actionId: action.id,
+          count: 1,
+          detail: a,
+        });
+      }
     } else if (normalizeTags(action.tags).length === 0) {
       problems.push({ code: 'empty-parameter', severity: 'blocking', actionId: action.id, count: 1 });
     }
@@ -286,6 +332,40 @@ export function planChangeTray(
     return change;
   };
 
+  /**
+   * Write one field and record every consequence of it. Returns false when the
+   * value is already what was asked for, so a caller can count "changed" without
+   * knowing anything about media, cloze or the journal.
+   *
+   * `next` is computed by the caller *before* calling, which is what makes a
+   * swap correct: both values are read while both are still the originals.
+   */
+  const applyWrite = (at: number, noteId: string, ord: number, next: string): boolean => {
+    const current = notes[at];
+    const value = current?.fields.find((f) => f.ord === ord);
+    if (!current || !value || value.raw === next) return false;
+    const isCloze = index.clozeTypeIds.has(current.noteTypeId);
+    const out = writeNoteField(current, ord, next, normalize, isCloze, index.present);
+    notes[at] = out.note;
+    ops.push({ kind: 'field', noteId, fieldOrd: ord, before: value.raw, after: next, group: groupId });
+    const change = changeFor(noteId);
+    mergeFieldChange(change, { ord, name: value.name, before: value.raw, after: next });
+    pushUnique(change.clozeAdded, out.clozeOrdinalsAdded);
+    pushUnique(change.clozeRemoved, out.clozeOrdinalsRemoved);
+    pushUnique(change.mediaMissing, out.mediaMissing);
+    pushUnique(change.mediaDropped, out.mediaDropped);
+    return true;
+  };
+
+  /**
+   * The single ord a field name resolves to on this note, or `undefined`. A note
+   * type that lacks one half of a swap or copy makes the whole note skip: writing
+   * only the half that exists is the ambiguous partial result the tray forbids,
+   * and for a swap it would destroy the surviving value outright.
+   */
+  const soleOrd = (note: AnkiDraftNote, fieldName: string): number | undefined =>
+    targetOrds(noteTypes, note, fieldName)[0];
+
   for (const action of actions) {
     if (!action.enabled) continue;
     let matched = 0;
@@ -311,28 +391,70 @@ export function planChangeTray(
             detail: action.fieldName ?? '',
           });
         }
-        const isCloze = index.clozeTypeIds.has(start.noteTypeId);
         for (const ord of ords) {
           // Re-read every time: a previous ord's write replaced the note object.
-          const current = notes[at] ?? start;
-          const value = current.fields.find((f) => f.ord === ord);
+          const value = (notes[at] ?? start).fields.find((f) => f.ord === ord);
           if (!value) continue;
           // `lastIndex` survives on a `g` regex between calls, so a fresh one per
           // field is not an optimisation to remove: reusing it silently skips
           // matches at the start of every second field.
           const fresh = compilePattern(action) as RegExp;
-          const next = value.raw.replace(fresh, action.replace);
-          if (next === value.raw) continue;
-          const out = writeNoteField(current, ord, next, normalize, isCloze, index.present);
-          notes[at] = out.note;
-          ops.push({ kind: 'field', noteId, fieldOrd: ord, before: value.raw, after: next, group: groupId });
+          if (applyWrite(at, noteId, ord, value.raw.replace(fresh, action.replace))) touched = true;
+        }
+      } else if (action.kind === 'swap-fields') {
+        const ordA = soleOrd(start, action.fieldA);
+        const ordB = soleOrd(start, action.fieldB);
+        if (ordA === undefined || ordB === undefined) {
+          problems.push({
+            code: 'field-absent',
+            severity: 'warning',
+            actionId: action.id,
+            count: 1,
+            detail: ordA === undefined ? action.fieldA : action.fieldB,
+          });
+          continue;
+        }
+        // Both reads happen here, against the same note object, so the second
+        // write cannot see the first one's output and copy a value onto itself.
+        const rawA = start.fields.find((f) => f.ord === ordA)?.raw ?? '';
+        const rawB = start.fields.find((f) => f.ord === ordB)?.raw ?? '';
+        if (applyWrite(at, noteId, ordA, rawB)) touched = true;
+        if (applyWrite(at, noteId, ordB, rawA)) touched = true;
+      } else if (action.kind === 'copy-field') {
+        const fromOrd = soleOrd(start, action.fromField);
+        const toOrd = soleOrd(start, action.toField);
+        if (fromOrd === undefined || toOrd === undefined) {
+          problems.push({
+            code: 'field-absent',
+            severity: 'warning',
+            actionId: action.id,
+            count: 1,
+            detail: fromOrd === undefined ? action.fromField : action.toField,
+          });
+          continue;
+        }
+        const fromRaw = start.fields.find((f) => f.ord === fromOrd)?.raw ?? '';
+        const toRaw = start.fields.find((f) => f.ord === toOrd)?.raw ?? '';
+        const occupied = toRaw.trim() !== '';
+        let next: string | null;
+        if (!occupied) next = fromRaw;
+        else if (action.onConflict === 'overwrite') next = fromRaw;
+        else if (action.onConflict === 'append')
+          next = `${toRaw}${action.separator ?? DEFAULT_COPY_SEPARATOR}${fromRaw}`;
+        else next = null; // `keep`: an occupied destination is left exactly alone.
+        if (next !== null && applyWrite(at, noteId, toOrd, next)) {
           touched = true;
-          const change = changeFor(noteId);
-          mergeFieldChange(change, { ord, name: value.name, before: value.raw, after: next });
-          pushUnique(change.clozeAdded, out.clozeOrdinalsAdded);
-          pushUnique(change.clozeRemoved, out.clozeOrdinalsRemoved);
-          pushUnique(change.mediaMissing, out.mediaMissing);
-          pushUnique(change.mediaDropped, out.mediaDropped);
+          if (occupied && action.onConflict === 'overwrite') {
+            // The destructive case, counted rather than assumed: the user chose
+            // it, but they should see how many notes lost text before applying.
+            problems.push({
+              code: 'overwrite-nonempty',
+              severity: 'warning',
+              actionId: action.id,
+              count: 1,
+              detail: action.toField,
+            });
+          }
         }
       } else {
         const current = start;

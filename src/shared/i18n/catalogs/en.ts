@@ -9239,6 +9239,21 @@ export const en: Catalog = {
   'ankiWorkbench.tray.problem.cloze-cards-change': 'On {count} notes the cloze numbers change, so Anki would add or drop cards on commit.',
   'ankiWorkbench.tray.problem.media-missing': 'Media this source does not contain: {detail}',
   'ankiWorkbench.tray.problem.media-dropped': 'Last reference removed: {detail}',
+  'ankiWorkbench.tray.kind.swap-fields': 'Swap two fields',
+  'ankiWorkbench.tray.kind.copy-field': 'Copy one field into another',
+  'ankiWorkbench.tray.describe.swap-fields': 'Swap {a} ↔ {b}',
+  'ankiWorkbench.tray.describe.copy-field': 'Copy {from} → {to} ({conflict})',
+  'ankiWorkbench.tray.swapA': 'First field',
+  'ankiWorkbench.tray.swapB': 'Second field',
+  'ankiWorkbench.tray.copyFrom': 'Copy from',
+  'ankiWorkbench.tray.copyTo': 'Copy into',
+  'ankiWorkbench.tray.onConflict': 'If the destination already has text',
+  'ankiWorkbench.tray.conflict.keep': 'keep what is there',
+  'ankiWorkbench.tray.conflict.overwrite': 'overwrite it',
+  'ankiWorkbench.tray.conflict.append': 'append after it',
+  'ankiWorkbench.tray.field.choose': 'choose a field',
+  'ankiWorkbench.tray.problem.same-field': 'A field cannot be swapped or copied onto itself ({detail}).',
+  'ankiWorkbench.tray.problem.overwrite-nonempty': 'On {count} notes {detail} already held text and would be overwritten.',
 };
 
 

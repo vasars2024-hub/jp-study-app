@@ -137,6 +137,24 @@ function addReplace(find: string, replaceWith: string): void {
   });
 }
 
+function addToTray(): void {
+  act(() => {
+    byText('button', 'ankiWorkbench.tray.add')!.dispatchEvent(
+      new MouseEvent('click', { bubbles: true }),
+    );
+  });
+}
+
+/** Pick a value in whichever `<select>` sits under the label with this key. */
+function selectField(labelKey: string, value: string): void {
+  const select = [...host.querySelectorAll('label')]
+    .find((l) => l.textContent?.includes(labelKey))!
+    .querySelector('select')!;
+  setValue(select, value);
+}
+
+const selectKind = (kind: string): void => selectField('ankiWorkbench.tray.kind', kind);
+
 describe('DeckWorkbenchTray', () => {
   it('offers no Apply until an action would actually change something', () => {
     mount(draftOf([note('n1')]), ['n1']);
@@ -217,5 +235,56 @@ describe('DeckWorkbenchTray', () => {
     const up = host.querySelectorAll<HTMLButtonElement>('.wb-tray-action')[1]!.querySelectorAll('button')[0]!;
     act(() => up.dispatchEvent(new MouseEvent('click', { bubbles: true })));
     expect(host.querySelector('.wb-tray-diff ins')!.textContent).toBe('dog');
+  });
+
+  it('swaps two fields from the form and shows both halves of the diff', () => {
+    mount(draftOf([note('n1')]), ['n1']);
+    selectKind('swap-fields');
+    selectField('ankiWorkbench.tray.swapA', 'Front');
+    selectField('ankiWorkbench.tray.swapB', 'Back');
+    addToTray();
+
+    expect(host.textContent).toContain('ankiWorkbench.tray.describe.swap-fields:Front,Back');
+    const rows = [...host.querySelectorAll('.wb-tray-diff-row')];
+    expect(rows.map((r) => r.querySelector('del')!.textContent)).toEqual(['ねこ', 'cat']);
+    expect(rows.map((r) => r.querySelector('ins')!.textContent)).toEqual(['cat', 'ねこ']);
+    expect(applyButton().disabled).toBe(false);
+  });
+
+  it('defaults a copy to the rule that cannot lose text, and warns when it can', () => {
+    mount(draftOf([note('n1')]), ['n1']);
+    selectKind('copy-field');
+    selectField('ankiWorkbench.tray.copyFrom', 'Front');
+    selectField('ankiWorkbench.tray.copyTo', 'Back');
+    // The pre-selected conflict rule is `keep`, so the occupied Back is untouched
+    // and there is nothing to apply.
+    addToTray();
+    expect(host.textContent).toContain('ankiWorkbench.tray.summaryNone');
+    expect(applyButton().disabled).toBe(true);
+
+    // Choosing `overwrite` is what makes it destructive — and it says so, per note.
+    act(() =>
+      host.querySelectorAll<HTMLButtonElement>('.wb-tray-action button')[2]!.dispatchEvent(
+        new MouseEvent('click', { bubbles: true }),
+      ),
+    );
+    selectField('ankiWorkbench.tray.onConflict', 'overwrite');
+    addToTray();
+    expect(host.textContent).toContain('ankiWorkbench.tray.problem.overwrite-nonempty:1,Back');
+    expect(host.querySelector('.wb-tray-warn')).not.toBeNull();
+    expect(applyButton().disabled).toBe(false);
+  });
+
+  it('refuses a swap of one field with itself before anything can run', () => {
+    mount(draftOf([note('n1')]), ['n1']);
+    selectKind('swap-fields');
+    selectField('ankiWorkbench.tray.swapA', 'Back');
+    selectField('ankiWorkbench.tray.swapB', 'Back');
+    addToTray();
+
+    expect(host.textContent).toContain('ankiWorkbench.tray.problem.same-field');
+    expect(host.querySelector('.wb-tray-blocking')).not.toBeNull();
+    expect(host.querySelector('.wb-tray-preview')).toBeNull();
+    expect(applyButton().disabled).toBe(true);
   });
 });

@@ -12,7 +12,7 @@
  * what is selected and what it can change now — and never prints the selection
  * count next to the verb.
  */
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import type { AnkiDraft } from '../../../shared/ankiDraft';
 import {
   addTrayAction,
@@ -21,6 +21,7 @@ import {
   removeTrayAction,
   summarizeTrayProblems,
   toggleTrayAction,
+  type FieldCopyConflict,
   type TrayAction,
   type TrayActionKind,
   type TrayPlan,
@@ -28,7 +29,14 @@ import {
 import type { AnkiDraftEditJournal } from '../../../shared/ankiDraftEdit';
 import { useT } from '../../i18n';
 
-const ACTION_KINDS: TrayActionKind[] = ['find-replace', 'add-tags', 'remove-tags'];
+const ACTION_KINDS: TrayActionKind[] = [
+  'find-replace',
+  'swap-fields',
+  'copy-field',
+  'add-tags',
+  'remove-tags',
+];
+const COPY_CONFLICTS: FieldCopyConflict[] = ['keep', 'overwrite', 'append'];
 /** How many changed notes the diff lists before it summarises the rest. */
 const DIFF_PREVIEW_ROWS = 5;
 const DIFF_CHARS = 120;
@@ -63,6 +71,11 @@ export default function DeckWorkbenchTray({
   const [regex, setRegex] = useState(false);
   const [matchCase, setMatchCase] = useState(false);
   const [tagText, setTagText] = useState('');
+  const [fieldA, setFieldA] = useState('');
+  const [fieldB, setFieldB] = useState('');
+  // `keep` first and pre-selected: the only one of the three that cannot lose
+  // text, so the form's default choice is the non-destructive one.
+  const [onConflict, setOnConflict] = useState<FieldCopyConflict>('keep');
   const [applied, setApplied] = useState<number | null>(null);
 
   /** Every field name in the draft, since a tray targets by name across note types. */
@@ -79,37 +92,85 @@ export default function DeckWorkbenchTray({
     [draft, journal, selectedIds, actions],
   );
 
+  const buildAction = (id: string): TrayAction => {
+    switch (kind) {
+      case 'find-replace':
+        return {
+          id,
+          enabled: true,
+          kind,
+          fieldName: fieldName === '' ? null : fieldName,
+          find,
+          replace: replaceWith,
+          regex,
+          matchCase,
+        };
+      case 'swap-fields':
+        return { id, enabled: true, kind, fieldA, fieldB };
+      case 'copy-field':
+        return { id, enabled: true, kind, fromField: fieldA, toField: fieldB, onConflict };
+      default:
+        return { id, enabled: true, kind, tags: tagText.split(/\s+/).filter(Boolean) };
+    }
+  };
+
   const append = (): void => {
-    const id = `act-${(nextActionSeq += 1)}`;
-    const action: TrayAction =
-      kind === 'find-replace'
-        ? {
-            id,
-            enabled: true,
-            kind,
-            fieldName: fieldName === '' ? null : fieldName,
-            find,
-            replace: replaceWith,
-            regex,
-            matchCase,
-          }
-        : { id, enabled: true, kind, tags: tagText.split(/\s+/).filter(Boolean) };
-    setActions((prev) => addTrayAction(prev, action));
+    setActions((prev) => addTrayAction(prev, buildAction(`act-${(nextActionSeq += 1)}`)));
     setApplied(null);
     if (kind === 'find-replace') {
       setFind('');
       setReplaceWith('');
-    } else setTagText('');
+    } else if (kind === 'add-tags' || kind === 'remove-tags') setTagText('');
   };
 
-  const describe = (action: TrayAction): string =>
-    action.kind === 'find-replace'
-      ? t('ankiWorkbench.tray.describe.find-replace', {
+  const describe = (action: TrayAction): string => {
+    switch (action.kind) {
+      case 'find-replace':
+        return t('ankiWorkbench.tray.describe.find-replace', {
           field: action.fieldName ?? t('ankiWorkbench.tray.field.all'),
           find: action.find,
           replace: action.replace === '' ? t('ankiWorkbench.tray.nothing') : action.replace,
-        })
-      : t(`ankiWorkbench.tray.describe.${action.kind}`, { tags: action.tags.join(' ') });
+        });
+      case 'swap-fields':
+        return t('ankiWorkbench.tray.describe.swap-fields', { a: action.fieldA, b: action.fieldB });
+      case 'copy-field':
+        return t('ankiWorkbench.tray.describe.copy-field', {
+          from: action.fromField,
+          to: action.toField,
+          conflict: t(`ankiWorkbench.tray.conflict.${action.onConflict}`),
+        });
+      default:
+        return t(`ankiWorkbench.tray.describe.${action.kind}`, { tags: action.tags.join(' ') });
+    }
+  };
+
+  /** The two-field form both `swap-fields` and `copy-field` use. */
+  const fieldPair = (labelA: string, labelB: string): ReactNode => (
+    <>
+      <label>
+        {labelA}
+        <select value={fieldA} onChange={(e) => setFieldA(e.target.value)}>
+          <option value="">{t('ankiWorkbench.tray.field.choose')}</option>
+          {fieldNames.map((name) => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        {labelB}
+        <select value={fieldB} onChange={(e) => setFieldB(e.target.value)}>
+          <option value="">{t('ankiWorkbench.tray.field.choose')}</option>
+          {fieldNames.map((name) => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+        </select>
+      </label>
+    </>
+  );
 
   const problems = summarizeTrayProblems(plan.problems);
   // The selection can name notes that are not loaded; the tray must not imply
@@ -227,6 +288,25 @@ export default function DeckWorkbenchTray({
                 onChange={() => setMatchCase((v) => !v)}
               />
               {t('ankiWorkbench.tray.matchCase')}
+            </label>
+          </>
+        ) : kind === 'swap-fields' ? (
+          fieldPair(t('ankiWorkbench.tray.swapA'), t('ankiWorkbench.tray.swapB'))
+        ) : kind === 'copy-field' ? (
+          <>
+            {fieldPair(t('ankiWorkbench.tray.copyFrom'), t('ankiWorkbench.tray.copyTo'))}
+            <label>
+              {t('ankiWorkbench.tray.onConflict')}
+              <select
+                value={onConflict}
+                onChange={(e) => setOnConflict(e.target.value as FieldCopyConflict)}
+              >
+                {COPY_CONFLICTS.map((value) => (
+                  <option key={value} value={value}>
+                    {t(`ankiWorkbench.tray.conflict.${value}`)}
+                  </option>
+                ))}
+              </select>
             </label>
           </>
         ) : (
