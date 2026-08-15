@@ -21570,3 +21570,67 @@ the 2 known `adjacent-overload-signatures` errors at HEAD are not even in scope.
 **Next.** Phase 1's remaining source adapters: CSV/TSV (Anki writes `#separator:`/`#notetype
 column:` header lines its own importer reads) or live AnkiConnect. Both need a preload binding,
 so `debug/stage-apkg-draft.cjs` is the stager to copy.
+
+## Track 7 — the CSV adapter, read from the header Anki writes — 2026-08-15 23:40 MSK primary
+
+Fusion re-derived **closed a 6th time** (§7's last entry: all five §6 gates pass, last defect
+closed), so the whole turn went to Track 7 / `ANKI_DECK_WORKBENCH_PLAN.md` Phase 1, source
+adapter 3. Boss audit's last section is still 2026-08-15 04:24; finding 1 remains fixed
+(`transcriptionJobs.ts` `planNoWindowRetry` + `MAX_NO_WINDOW_ATTEMPTS`). Nothing new actionable.
+
+**Slice 1 — `d107a3b8` — `src/shared/ankiCsv.ts`.** The `#directive:value` block plus RFC 4180
+rows, into the raw shapes `buildAnkiDraft` already eats. **Directives derived from the 8 real Anki
+exports in ~/Downloads, not from memory**: `#separator:`, `#html:`, `#columns:` and `#tags column:`
+appear verbatim there; `#guid/#notetype/#deck column:`, `#notetype:`, `#deck:`, `#tags:` are the
+documented siblings and are read the same way. An unrecognised one lands in `unknownDirectives`
+rather than being dropped. **Two refusals to invent, both load-bearing:** no **cards** (a row is a
+note; how many cards it becomes is the note type's decision and the file has none, so a card would
+fabricate a `due`/`queue`/`ord`) and no **card design** (the placeholder note type is `unassigned`
+→ the new **blocking `note-type-unassigned`**, deliberately not `template-format-unavailable`: the
+formats were not unreadable, the source has none). Contract additions are additive;
+`AnkiDraftNote.targetDeckId` carries a `#deck:` intent that has no card to live on. 32 tests.
+
+**Trap, cost 10 min.** The Write tool put a **raw 0x1f byte** in the source where `ANKI_FIELD_SEP`
+belonged, plus a literal U+FEFF that eslint's `no-irregular-whitespace` then failed on. Neither
+`node -e` replacement landed through the Bash tool's escaping. **PowerShell
+`[IO.File]::ReadAllText` + `.Replace` with `[char]0xFEFF` is what worked.** Run `cat -A` over any
+new file whose content mentions control characters.
+
+**Slice 2 — `50580140` — `anki:readCsvDraft`, end to end.** `src/main/anki/csvDraftRead.ts` →
+handler in `apkgImport.ts` → `readAnkiCsvDraft` on preload → `window.d.ts` (both dirty; staged
+HEAD+insertion via `debug/stage-csv-draft.cjs`, verified as exactly 7 added lines and nothing
+else). **Decision: no file dialog** — the channel requires `filePath` and answers `no-file`
+without one, because the surface that picks a file is Phase 2 and a dialog needs i18n strings with
+nowhere to show them (it also leaves 4 dirty catalogs untouched). **Decision: a 16 MB ceiling, not
+a worker** — main-thread string work like its .apkg sibling, largest real export 3.9 MB at 268 ms,
+so the cap bounds the worst case near 1.5 s; moving both readers off the loop is Phase 7.
+`file-too-large:<actual>:<limit>` names both numbers rather than truncating. Encoding is read off
+the **BOM, not sniffed** (Excel's Unicode text is UTF-16LE; guessing wrong gives mojibake that
+still parses). `#html:false` switches the normalizer to whitespace-collapse — the HTML stripper
+eats a literal `<` and the rest of the field. 12 tests.
+
+**Live, real IPC, main restarted (pid 43964).** `HSK4_deck.txt` 608 notes / 7 fields / tags
+`[HSK4]` / page of 500 / **26 ms**. `N1 Vocab 3t.txt` **3.92 MB, 1,436 notes, 268 ms**, 11 fields,
+tagsColumn 12, and **1,217 media references found with zero falsely accused missing** — a text
+export has no manifest, so the check correctly stays silent. `FORMATME.txt` (`#html:false` padded
+with 9 tabs, the exact trap) → `html:false`, `挙げ句` normalized unstripped. Offset 600 pages 5 of
+608 with `counts.notes` still 608. Absent file → ENOENT returned, not thrown. No `filePath` →
+`no-file`. Every file: `unknownDirectives: []`, uniform row widths, no `field-count-mismatch`.
+
+**Next.** Phase 1's last two adapters: live AnkiConnect (adapter 2 — `client.ts` already has the
+`invoke`/capability plumbing) and the app's own local Flashcards store (adapter 4). Then Phase 2's
+workbench shell, which is where the first user-visible strings and the dialog belong.
+
+### Gates
+
+Once after the last slice, on the shared dirty tree — several hundred foreign paths belong to
+other concurrent tracks, so a failure is attributed before it is claimed.
+
+`npx vitest run`: **exit 0, 627 passed / 1 skipped files, 8,421 passed / 6 skipped tests** — +2
+files and +44 tests against last turn's 625/8,377, which is exactly this turn's 32 + 12 and no
+collateral. `node tools/i18n-check.cjs`: exit 0 at **9,636** keys, unchanged — neither slice adds
+a user-visible string, by Phase 0's own contracts-before-UI sequencing. `node
+tools/architecture-audit.cjs`: exit 0, **Nothing new**, 2 known pending. `npx eslint` on all **8**
+touched paths: clean except the 2 `adjacent-overload-signatures` errors in `window.d.ts`, which
+are **at HEAD** (`git show HEAD:src/renderer/window.d.ts` has `subtitleHarvestList` at both :831
+and :1595) and belong to another track; my insertion is at :468 and is not involved.
