@@ -28,7 +28,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { app } from 'electron';
-import { closeDictionaryDb, dictionaryDb, dictionaryDbPath, type SqliteDb } from './db';
+import {
+  closeDictionaryDb,
+  dictionaryDb,
+  dictionaryDbPath,
+  dictionaryDir,
+  type SqliteDb,
+} from './db';
+import { getHeadwordAudio, type HeadwordAudioQuery } from './audio';
+import type { LexiconAudioResult } from '../../shared/lexiconAudio';
 import { DICT_SCHEMA_VERSION } from './schema';
 import {
   legacyYomitanRoot,
@@ -427,6 +435,26 @@ export function findLexiconEtymologyInDb(query: EtymologyQuery): LexiconEtymolog
  */
 export function findLexiconXrefsInDb(query: XrefQuery): LexiconXrefResult {
   return findLexiconXrefs(dictionaryDb(), query);
+}
+
+/**
+ * A word's native pronunciation, from the disk cache or the provider.
+ *
+ * The database is passed as `null` when it cannot be opened rather than being
+ * allowed to throw: the clip does not come from SQLite, and an un-migrated
+ * installation should still be able to hear a word — it just does not get the
+ * `audio` index row that a later "words I already have audio for" query wants.
+ */
+export function getHeadwordAudioFromDb(
+  query: Omit<HeadwordAudioQuery, 'dir'>,
+): Promise<LexiconAudioResult> {
+  let db: SqliteDb | null = null;
+  try {
+    db = dictionaryDb();
+  } catch {
+    db = null;
+  }
+  return getHeadwordAudio(db, { ...query, dir: dictionaryDir() });
 }
 
 /** The user's own note on a word, from the managed database. */

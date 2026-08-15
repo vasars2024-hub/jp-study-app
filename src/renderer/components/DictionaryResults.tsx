@@ -39,6 +39,7 @@ import LexiconCompounds from './lexicon/LexiconCompounds';
 import LexiconExamples from './lexicon/LexiconExamples';
 import LexiconEtymology from './lexicon/LexiconEtymology';
 import LexiconXrefs from './lexicon/LexiconXrefs';
+import WordAudio from './lexicon/WordAudio';
 import EntryNote from './lexicon/EntryNote';
 import SemanticNeighbors from './lexicon/SemanticNeighbors';
 import UsageLabels, { entryUsageTags } from './lexicon/UsageLabels';
@@ -890,6 +891,11 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
                     {entry.reading}
                   </span>
                 )}
+                {/* Beside the reading rather than in a panel of its own: a
+                    pronunciation belongs to this entry's word, and the result
+                    list shows several. Renders nothing for a language with no
+                    provider, and fetches nothing until it is clicked. */}
+                <WordAudio lang={lang} reading={entry.reading} word={entry.word} />
                 {entry.isCommon && (
                   <span className="dict-badge common">{t('dict.results.common')}</span>
                 )}

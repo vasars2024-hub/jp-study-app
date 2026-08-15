@@ -1,0 +1,62 @@
+/* A control that sits inside a line of words, so it takes the line's own colour
+   and only the pointer, the focus ring and the hover surface mark it as a
+   button. 24px square: the entry head is a dense row and a larger target would
+   push the reading off the baseline, but it stays at the accessible floor. */
+.word-audio {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.word-audio:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.word-audio:focus-visible {
+  outline: 2px solid var(--accent, currentColor);
+  outline-offset: 2px;
+}
+
+.word-audio:disabled {
+  cursor: default;
+}
+
+/* The word has been played at least once. Full-contrast rather than muted, so a
+   glance down a result list shows which words this install can already say
+   without asking the network again. */
+.word-audio.is-ready {
+  color: var(--text);
+}
+
+/* No recording exists. The speaker keeps its cone and loses its waves — the
+   shape carries the meaning, not the opacity, so it survives a high-contrast or
+   monochrome rendering. The accessible name says it in words either way. */
+.word-audio.is-none {
+  opacity: 0.55;
+}
+
+/* The provider could not be reached. Still clickable, because a retry is the
+   correct next action and the label already says so. */
+.word-audio.is-offline {
+  color: var(--warn, var(--muted));
+}
+
+.word-audio.is-loading {
+  opacity: 0.7;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .word-audio {
+    transition: none;
+  }
+}

@@ -13,6 +13,8 @@ import type { DeinflectionInfo, DictEntry, DictResult, DictSense, YomitanDictInf
 import { deinflect } from '../../shared/deinflect';
 import { mt } from '../i18n';
 import { initDictionaryService } from './service';
+import { fetchProviderAudio } from './audio';
+import { normalizeAudioIdentity } from '../../shared/lexiconAudio';
 import { BUNDLED_GLOSS_LANGS, detectLangFromTitle } from './glossLang';
 import { parseTagBankRows, splitSenseTags, splitTagField, type DictTagBank } from '../../shared/dictTagBank';
 
@@ -1036,33 +1038,30 @@ export function initYomitan(): Promise<void> {
   return initPromise;
 }
 
-/** Native audio via JapanesePod101 CDN → Anki media folder. */
+/**
+ * Native audio via JapanesePod101 CDN → Anki media folder.
+ *
+ * The request, the timeout and the placeholder-clip rule moved to
+ * `dictionary/audio.ts` when the Dictionary itself learned to play a word: two
+ * copies of "how do you tell a missing recording from a real one" is exactly the
+ * knowledge that drifts. What stays here is the Anki-shaped half — the media
+ * filename and the `[sound:…]` reference — which the dictionary panel has no use
+ * for. An empty string still means "no audio field", for every reason.
+ */
 export async function fetchJapaneseAudio(
   term: string,
   reading: string,
   storeMedia: (filename: string, dataBase64: string) => Promise<void>,
 ): Promise<string> {
-  const kanji = encodeURIComponent(term);
-  const kana = encodeURIComponent(reading || term);
-  const url = `https://assets.languagepod101.com/dictionary/japanese/audiomp3.php?kanji=${kanji}&kana=${kana}`;
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 8000);
+  const identity = normalizeAudioIdentity({ lang: 'ja', term, reading });
+  if (!identity) return '';
+  const fetched = await fetchProviderAudio(identity);
+  if (fetched.status !== 'ready') return '';
+  const filename = `jsa-${fetched.md5.slice(0, 12)}.mp3`;
   try {
-    const res = await fetch(url, { signal: ctrl.signal });
-    if (!res.ok) return '';
-    const buf = Buffer.from(await res.arrayBuffer());
-    if (buf.length === 0) return '';
-    // JapanesePod101 serves a fixed 52288-byte placeholder clip when it has no
-    // recording for the word. Real audio is small (~1–3 KB), so a size floor
-    // would be wrong — match the known placeholder by size + md5 and skip it.
-    const md5 = crypto.createHash('md5').update(buf).digest('hex');
-    if (buf.length === 52288 || md5 === '7e2c2f954ef6051373ba916f000168dc') return '';
-    const filename = `jsa-${md5.slice(0, 12)}.mp3`;
-    await storeMedia(filename, buf.toString('base64'));
-    return `[sound:${filename}]`;
+    await storeMedia(filename, fetched.buffer.toString('base64'));
   } catch {
     return '';
-  } finally {
-    clearTimeout(timer);
   }
+  return `[sound:${filename}]`;
 }

@@ -372,6 +372,9 @@ declare global {
         text: string,
         options?: { sourceLangs?: string[] },
       ): Promise<import('../shared/lexiconXrefs').LexiconXrefResult>;
+      dictAudio(
+        request: { lang: string; term: string; reading?: string; cacheOnly?: boolean },
+      ): Promise<import('../shared/lexiconAudio').LexiconAudioResult>;
       dictConjugation(word: string): Promise<import('../shared/conjugationClass').ConjugationAnalysis>;
       dictNoteGet(
         identity: import('../shared/lexiconNotes').LexiconNoteIdentity,

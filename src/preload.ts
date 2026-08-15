@@ -477,6 +477,11 @@ const api = {
     options?: { sourceLangs?: string[] },
   ): Promise<import('./shared/lexiconXrefs').LexiconXrefResult> =>
     ipcRenderer.invoke('dict:xrefs', text, options),
+  /** A word's native pronunciation, from the disk cache or, on a click, the provider. */
+  dictAudio: (
+    request: { lang: string; term: string; reading?: string; cacheOnly?: boolean },
+  ): Promise<import('./shared/lexiconAudio').LexiconAudioResult> =>
+    ipcRenderer.invoke('dict:audio', request),
   /** Every form of a conjugable Japanese word, from IPADIC's own class table. */
   dictConjugation: (
     word: string,

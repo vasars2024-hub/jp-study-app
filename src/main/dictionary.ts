@@ -48,6 +48,7 @@ import {
   findExampleSentencesInDb,
   findLexiconEtymologyInDb,
   findLexiconXrefsInDb,
+  getHeadwordAudioFromDb,
   listDictionarySources,
   listDictionaryPairs,
   dictionaryPairHasOverride,
@@ -100,6 +101,10 @@ import {
   MAX_XREF_RESULTS,
   type LexiconXrefResult,
 } from '../shared/lexiconXrefs';
+import {
+  MAX_AUDIO_QUERY_CHARS,
+  type LexiconAudioResult,
+} from '../shared/lexiconAudio';
 import {
   registerDictionaryImportIpc,
   startPendingLegacyDictionaryMigration,
@@ -855,6 +860,36 @@ export function registerDictionaryIpc(): void {
         // throw on an un-migrated installation would reject on every word.
         return empty;
       }
+    },
+  );
+  // A word said out loud. Unlike every read above it this one may touch the
+  // network, so it fires on a click and never with the lookup — see
+  // `shared/lexiconAudio.ts` for what that disclosure is and why it is bounded.
+  ipcMain.handle(
+    'dict:audio',
+    (_e, request: unknown): Promise<LexiconAudioResult> => {
+      const raw = request && typeof request === 'object' && !Array.isArray(request)
+        ? request as Record<string, unknown>
+        : {};
+      const term = typeof raw.term === 'string' ? raw.term.trim().slice(0, MAX_AUDIO_QUERY_CHARS) : '';
+      const lang = typeof raw.lang === 'string' ? raw.lang : '';
+      const reading = typeof raw.reading === 'string'
+        ? raw.reading.trim().slice(0, MAX_AUDIO_QUERY_CHARS)
+        : undefined;
+      if (!term) return Promise.resolve({ query: term, status: 'unsupported' });
+      return getHeadwordAudioFromDb({
+        lang,
+        term,
+        reading,
+        cacheOnly: raw.cacheOnly === true,
+      }).catch(() => ({
+        // The fetch path already turns its own failures into `offline`, so
+        // reaching here means the filesystem or the database threw. Same shape
+        // as a dead connection from the surface's side: retryable, not a claim
+        // that the word has no recording.
+        query: term,
+        status: 'offline' as const,
+      }));
     },
   );
   ipcMain.handle(
