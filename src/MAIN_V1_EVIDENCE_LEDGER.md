@@ -21252,3 +21252,61 @@ back in, keyed `(headword_id, lang, model, prompt_version)`. (2) `inflections`, 
 a data-availability state, not a code gap; `chars` still needs a source nothing bundles.
 (3) The collocation partner shows no gloss, unlike the compound rows: 猫に鰹節 needs a click to
 learn what 鰹節 means. Cheap to add by reusing the compound gloss query.
+
+## Track 2 — the table with no insert statement, and the thing that now fills it — 2026-08-15 12:45 MSK primary
+
+No interrupted slice to recover: the worker that hit the limit at 12:02 wrote no file (nothing
+under `src/`, `docs/`, `tools/` has an mtime past 11:36:33, which is `c960887`). Boss audit's last
+section is still 2026-08-15 04:24, finding 1 closed by `4c7b416`.
+
+**Slice 1 — `c875c03`. `explanations` gets identity columns, a writer and a reader.** It was the
+last v1 table with zero inserts anywhere in source. The blocker was the shipped primary key
+`(headword_id, lang, model, prompt_version)`: notes solved the same re-import id-reuse problem by
+writing `headword_id = 0`, which is unavailable here because that column is *in* the key and every
+word would collide at 0. **Migration 12 rebuilds the table** — SQLite cannot drop a PK in place,
+and the rebuild is honest precisely because no install has a row to lose. Guarded on the `norm`
+sentinel so a rewound `user_version` does not drop rows written since. **Decision (standing
+auto-approval): `lang` keeps migration 6's meaning (the *word's* language) and the prose language
+is a new `gloss_lang` column** — "explain this in Russian" and "explain this in English" are two
+answers, and overloading one column costs a reader the wrong-language explanation with no way to
+tell. Payload carries the word it describes; a row disagreeing with its own key is deleted and
+missed, not rendered. `EXPLANATION_MAX_ROWS` (2,000) evicts oldest-first inside the write txn.
+
+**Slice 2 — `c9120f9`. `dict:explain` is the producer.** Its own channel, not `agentExecution:run`
+— that requires an existing conversation and appends to it (`agentExecutionIpc.ts:458-475`), so a
+side panel would create a visible conversation per explained word. `normalizePolicy` is **exported
+and reused**, not reimplemented; its cloud-without-consent companion check is restated because
+`normalizePolicy` alone does not carry it. **The `model` half of the key is derived from the policy**
+(`explainModelKey`), never sent — a caller that spelled it differently reads a cache that never hits
+and pays every lookup with nothing looking broken. `allowLocalFallback: false` for the mirror
+reason. Nothing is stored on any failure, so a failed refresh leaves the previous answer intact.
+
+**Live, own `npm start` (main changed twice — a Forge rebuild is not a restart).** Slice 1: cold
+get → null; set → read back with text U+732B and reading U+306D/U+3053 intact and an invented
+`vibes` heading dropped; other prose language and other reading both miss; clear → removed 1 → null.
+Slice 2: seeded row → `cached:true` with the derived key and **no** provider call; `allowCloud:false`
+on a cloud target → refused; missing prose language → refused; `refresh:true` **reached the real
+Gemini provider** and returned `provider-failed` / `output-truncated`, and the seeded answer was
+still there afterwards. Both probe rows cleared; the table is empty again, as it was.
+
+**Traps.** (1) **The bridge mangles Japanese in the request body** — `text:'猫'` arrives as `?` and
+silently writes a mojibake row that then "misses". Send `'猫'` escapes and assert on
+`codePointAt`, never on the echoed string. Cost one wasted write here. (2) `providerId` is
+`'gemini-2.5-flash'`, **not** `'gemini'` — `normalizePolicy` returns null for the wrong one and
+every call comes back `invalid-request` with nothing saying which field was wrong. (3) The
+`output-truncated` on the live refresh is the **same 2.5-Flash thinking-budget defect the fusion
+track logged**, now confirmed on a second, much smaller prompt. Any UI for this must show the code.
+
+**Gates**, shared tree (~426 foreign entries): `npx vitest run` **619 files / 8,239 passed, 1 skipped
+file / 6 skipped tests**; the single failure, `scraperSources.test.ts > caps the stored history`,
+**passes in isolation** and sits on another track's dirty scraper paths — a load flake, not mine.
+i18n exit 0 at **9,595**, unchanged, correct because this turn adds no UI string. architecture exit
+0, **Nothing new**, 2 known pending. eslint clean on all 13 touched paths except `window.d.ts`'s 2
+`adjacent-overload-signatures` errors (`subtitleHarvestList`/`Fetch`, same pair the previous entry
+proved pre-existing, now at 1650/1653 because foreign hunks moved them).
+
+**Deliberately open.** (1) **No UI** — `dict:explain` has no caller. That is the next slice: the
+Explain lens in `LexiconWorkbenchResults.tsx` is a hand-off button today, and the panel needs
+cache-hit rendering, the nine section labels in i18n ×4, a refresh and a forget. (2) `inflections`,
+`freq_corpora`, `examples`, `chars` still have writers that have not been run on this install — a
+data state, not a code gap. (3) The collocation partner still shows no gloss.
