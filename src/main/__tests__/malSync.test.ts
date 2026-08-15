@@ -513,6 +513,68 @@ describe('reading the list', () => {
     expect(page.entries).toHaveLength(1);
     expect(page.entries[0].animeId).toBe(21);
   });
+
+  /**
+   * Hands out a fresh cursor every time, so the walk is only ever ended by the
+   * page cap — `fetchAnimeList`'s `seen` set would otherwise cut a repeated URL
+   * short and hide which guard actually fired.
+   */
+  const endlessPages = (pageBody: (offset: number) => string) => {
+    let offset = 0;
+    return () => {
+      offset += 100;
+      return {
+        status: 200,
+        body: pageBody(offset),
+      };
+    };
+  };
+
+  it('pages past the old 20-page cap that was truncating a real list', async () => {
+    // Measured 2026-08-15 against the user's own account: the unfiltered walk
+    // stopped at exactly 2,000 entries / 20 pages while the completed-only walk
+    // finished naturally with 1,414 completed titles, 82 more than the capped
+    // walk had seen. The cap was losing real shows, so it is a backstop now.
+    const store = memoryStore(connectedTokens());
+    const rec = recorder(endlessPages((offset) => listPage({
+      paging: { next: `https://api.myanimelist.net/v2/users/@me/animelist?offset=${offset}` },
+    })));
+    const client = makeClient(rec.transport, store);
+
+    const result = await client.fetchAnimeList();
+
+    expect(result.pagesFetched).toBe(200);
+    expect(result.truncated).toBe(true);
+  });
+
+  it('stops on a cursor that keeps returning no entries', async () => {
+    // A cursor with no rows behind it is making no progress, and at a 200-page
+    // cap that is 200 requests spent on the user's MAL quota for nothing.
+    const store = memoryStore(connectedTokens());
+    const rec = recorder(endlessPages((offset) => JSON.stringify({
+      data: [],
+      paging: { next: `https://api.myanimelist.net/v2/users/@me/animelist?offset=${offset}` },
+    })));
+    const client = makeClient(rec.transport, store);
+
+    const result = await client.fetchAnimeList();
+
+    expect(result.pagesFetched).toBe(1);
+    expect(result.entries).toHaveLength(0);
+    // Still truncated: MAL had a cursor left, we chose not to follow it.
+    expect(result.truncated).toBe(true);
+  });
+
+  it('reports a walk MAL itself ended as complete, not truncated', async () => {
+    const store = memoryStore(connectedTokens());
+    const rec = recorder(() => ({ status: 200, body: listPage() }));
+    const client = makeClient(rec.transport, store);
+
+    const result = await client.fetchAnimeList();
+
+    expect(result.truncated).toBe(false);
+    expect(result.pagesFetched).toBe(1);
+  });
 });
 
 // ---------------------------------------------------------------------------

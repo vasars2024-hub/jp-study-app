@@ -415,8 +415,22 @@ export interface MalSyncDeps {
 const EXPIRY_SKEW_MS = 60_000;
 /** MAL's own cap is 1000; 100 is its default page and a polite request size. */
 const PAGE_SIZE = 100;
-/** A hard stop on paging. `paging.next` is MAL's string, not ours to trust. */
-const MAX_PAGES = 20;
+/**
+ * A hard stop on paging. `paging.next` is MAL's string, not ours to trust.
+ *
+ * Raised from 20 on 2026-08-15 because it was terminating real walks, not
+ * guarding against runaway ones: an unfiltered fetch of the user's own list
+ * stopped at exactly 2,000 entries / 20 pages with `truncated: true`, and the
+ * same account's `completed`-only fetch — which finishes naturally at 15 pages
+ * — returns 1,414 completed titles where the capped walk had seen 1,332. The
+ * cap was silently losing 82 completed shows before anything downstream saw
+ * them (MAL_ANIME_PIPELINE_PLAN.md P2 gate 6).
+ *
+ * 200 pages is 20,000 entries at `PAGE_SIZE`, past any real list. What actually
+ * ends a normal walk is MAL running out of `paging.next`; the loop-detection
+ * below ends a pathological one. This is the backstop behind both.
+ */
+const MAX_PAGES = 200;
 
 export interface MalAuthStatus {
   configured: boolean;
@@ -759,6 +773,11 @@ export class MalSyncClient {
       entries.push(...page.entries);
       pagesFetched += 1;
       url = page.nextPageUrl && isMalApiUrl(page.nextPageUrl) ? page.nextPageUrl : null;
+      // A page that carries a cursor but no entries is making no progress, and
+      // with MAX_PAGES now at 200 that would be 200 requests spent on the user's
+      // quota for nothing. Stop, and report it as truncated — an empty result is
+      // a finding, not an ending.
+      if (page.entries.length === 0) break;
     }
 
     return { entries, truncated: url !== null, pagesFetched };
