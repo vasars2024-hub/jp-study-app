@@ -21850,3 +21850,73 @@ naming the five cases this deck genuinely lacks.
 
 **Next: Phase 2's full keyboard flow** (gate 10) — arrow/space/shift-range in the Browser grid,
 then Phase 3's change tray, which `ankiDraftEdit`'s journal was shaped to become.
+
+> **Correction, 2026-08-15 18:40 (boss-audit finding 3).** The `exit 0, 640 files / 8,616 tests`
+> above is the **shared working tree**. HEAD alone was **616 files / 8,283 tests with 9 failures**,
+> from other tracks' unstaged i18n work; exit 0 is a property of the dirty tree only. Every later
+> entry states which tree it measured.
+
+## 2026-08-15 18:45 primary — boss-audit findings 1–3 closed, and the keyboard-drivable Browser
+
+Three slices, `0bd6e614` / `1d21625a` / `1e5a3e7d`. The 18:00 boss audit landed *after* the
+previous handoff was written, so it was still unread; its findings took priority over the ladder.
+
+**Finding 1 (`0bd6e614`), `main/transcriptionJobs.ts`.** The no-window retire branch shifted the
+head job and `break`s without re-arming the timer, and `drain` is only re-entered from a timer, an
+enqueue or boot — so every job queued behind a retired one was stranded for the session with no
+error of its own. `scheduleDrain(NO_WINDOW_RETRY_MS)` when the queue is non-empty. **Mutation
+control:** reverting the guard fails the new two-job test with `expected 0 to be greater than 0`
+(zero pending timers), which is the defect exactly.
+
+**Finding 2 (`1d21625a`), the preview's media lens.** The frame is an opaque-origin `srcdoc`
+whose CSP allows `data:` only and Anki names media by bare file name, so present media renders
+identically to broken media and produced no problem line — a false clean on every image card.
+Decision (standing auto-approval): **flag, do not render**. Resolving to `data:` would need new
+IPC to pull bytes out of the package and would inline arbitrary media into a srcdoc; loosening
+the CSP is off the table since live evidence shows it is the thing holding. New code
+`media-not-rendered`, one line per side. **The trap it hides:** `problems.length > 0` is what
+picks the gallery's `validation-failing` card, so a bare advisory would have spent that slot on
+the first image card of any media deck — hence `ADVISORY_RENDER_PROBLEMS`, which the chooser
+skips. Gate 13's media lens is now documented in the plan as *flagged, not rendered*.
+
+**A second defect the live probe found, same missing distinction inverted:** `fieldIsEmpty`
+stripped `<img>` outright, so an image-only front reported `empty-question` — "Anki would not
+generate this card" — on a card Anki generates fine. It now mirrors Anki's own
+`strip_html_preserving_media_filenames`. False clean and false failure were one bug.
+
+**Finding 3:** the caveat is written directly above this entry. **Finding 4 deliberately not
+actioned:** `renderer/__tests__/visualNovelI18n.test.tsx` is **untracked** — another track's
+uncommitted work — and editing it would rewrite their file. It did not reproduce in this turn's
+full run. Left for its owner.
+
+**`1e5a3e7d` — gate 10's Browser half.** The grid becomes one tab stop with a cursor (the
+existing `focusedId`, so no second notion of "current row"); arrow/page/home/end move, Space
+toggles, Shift extends from the anchor, Ctrl+A reuses the footer button's honesty rule, Escape
+closes the inspector without touching the batch, and every row control drops to `tabIndex -1`.
+`VirtualList` gains one additive prop, `scrollToIndex` — a windowed list is not keyboard-navigable
+without it, because the cursor's row may not be in the DOM to focus or to point
+`aria-activedescendant` at.
+
+**Live, window 2, local deck through real IPC (3,221 notes), real `KeyboardEvent`s, no mouse.**
+Preview: an image-only note with one present and one absent image reports exactly
+`media-not-rendered/question/cat.png` + `missing-media/answer/gone.png` and **no** empty-side
+problem; all four catalogs resolve live. Grid: `role="grid"`, `tabIndex 0`, 22 rows rendered, all
+row controls at -1; ArrowDown opens the inspector at count **0**, Space **1**, Shift+ArrowDown
+**2**, End scrolls the virtual list to `scrollTop 109176` keeping **2**, Home returns to 0,
+Ctrl+A reads **"Выбрано: 3 221"** (whole source, not the 22 rendered rows), Escape closes the
+inspector with the 3,221 intact.
+
+**Trap:** a bare `import('/src/shared/x.ts')` in a bridge probe returns the module copy already in
+the registry — the **pre-edit** one. It reported the old result twice and looked like a failed
+fix; `?probe=' + Date.now()` is what makes the probe measure your edit.
+
+**Gates**, once after the last slice, on the **shared working tree** (HEAD alone still carries the
+audit's 9 foreign failures). `npx vitest run` **exit 0, 640 passed / 1 skipped of 641 files,
+8,623 passed / 6 skipped** — 8,622 → 8,629 total is exactly my 7 new tests, and the audit's
+`visualNovelI18n` flake did not reproduce. `i18n-check` exit 0 at **9,760** keys (+2).
+`architecture-audit` exit 0, **Nothing new**, 2 known pending. `eslint` on all 8 touched paths:
+**0 errors**, 25 `no-non-null-assertion` warnings all pre-existing in `deckWorkbench.test.tsx`.
+
+**Next: Phase 3's change tray**, which `ankiDraftEdit`'s journal was shaped to become. Gate 10's
+remaining half (contrast, reduced motion, compact/maximized, the four languages end-to-end) is
+still open and is a measurement slice, not a build one.
