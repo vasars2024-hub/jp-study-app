@@ -1,0 +1,318 @@
+# Anki Deck Workbench Plan
+
+**Status:** required Main V1 Track 7 product slice  
+**Goal:** turn the existing import, Flashcards, known-word, frequency, and AnkiConnect pieces into one intuitive, demonstrable, full-fidelity deck editing workspace.
+
+This plan is authoritative for the Anki editing workbench. The generic Anki bullet in the Main V1 plan is not complete until the acceptance gates at the end of this document pass.
+
+## Current source-derived baseline
+
+The repository already has useful foundations, but not a deck editor:
+
+- `.apkg` import currently maps selected note fields into the app's simplified `word`, `reading`, `meaning`, `sentence`, deck, and tag shape. It does not preserve enough of the note/card/template/scheduler model for safe round-trip editing.
+- AnkiConnect currently supports connection checks, deck/model discovery, limited note creation/deletion, searches, note/card reads, and media storage. It does not yet expose the mutation surface required for bulk field, tag, flag, deck, template, or scheduling edits.
+- The local deck model already carries frequency, JLPT, known state, and a small local SRS state. Local ratings are presently only `Again` and `Good`, rather than Anki's `Again`, `Hard`, `Good`, and `Easy` choices.
+- Flashcards already supports basic import/export, folders, search, card editing, review, and known-word integration. The Anki surface is primarily a connection/card-composition flow, not a large-deck workbench.
+
+Do not declare this plan complete by pointing to those foundations. Re-derive each capability from source and live behavior.
+
+## Product contract
+
+The workbench is a reversible staging area between a source deck and a committed result. A user can import a package or inspect live Anki, filter any subset, compose several edits, inspect exact before/after results, and then export or commit the validated change set.
+
+Use Anki terminology accurately while keeping the interface approachable:
+
+- A **note** owns fields such as Expression, Reading, English, and Russian.
+- One or more **card templates** render fronts and backs from those note fields.
+- Swapping two note fields and swapping a card template's rendered front/back are different operations. Offer both, explain the difference in preview, and never silently apply one as the other.
+- Anki review ratings are `Again`, `Hard`, `Good`, and `Easy`. App labels such as `Known`, `Very good`, or `Bad` are named mastery or scheduling presets with a visible mapping; they must not masquerade as Anki review history.
+- A lower frequency rank means a more frequent word. Every frequency condition must spell out its meaning, for example `rank <= 5,000 (top 5,000 / more frequent)`.
+
+“Full-fledged Anki editing” means an explicit compatibility matrix for supported Anki Desktop core operations. It does not mean silently editing Anki's database or pretending to support arbitrary add-ons. Unsupported core operations remain release blockers for this plan unless an honest, tested adapter or package round-trip is supplied.
+
+The capabilities named in this document are a **minimum, not a closed feature list**. Phase 0 must inventory the full supported Anki version across its editor, Browser/search, note types and fields, templates and card generation, deck organization, import/export, media, review state, scheduler, deck-option presets, filtered/custom study, and recovery operations. Each capability is tracked as `supported`, `read-only`, `blocked with reason`, or `add-on/custom behavior`. When Anki adds a relevant core feature, the matrix and plan must be updated rather than treating this numbered document as a ceiling.
+
+## Supported sources and fidelity
+
+### Source adapters
+
+1. `.apkg` package import into an isolated draft.
+2. Live Anki collection through AnkiConnect, with connection/version/capability discovery.
+3. CSV/TSV import with saved field-mapping presets.
+4. The app's local Flashcards and known-word stores.
+5. Export to a new package or a validated live-Anki commit; never overwrite the only source copy by default.
+
+Evaluate `.colpkg` during the capability audit. Add it only if full collection semantics, media, and recovery can be guaranteed.
+
+### Normalized draft model
+
+Preserve, rather than flatten:
+
+- source and stable provenance identifiers;
+- deck hierarchy, note type, all ordered raw fields, tags, flags, and marks;
+- the note-to-card relationship and every card template's front, back, CSS, and browser preview;
+- card IDs, note IDs, ordinals, queue/type, due data, interval, ease, lapses, repetitions, suspension/bury state, and available review history;
+- media references, filenames, checksums, and missing-media diagnostics;
+- original raw values plus normalized searchable values;
+- import warnings and every unsupported source feature.
+
+The draft records a source fingerprint. A live commit must re-read affected notes/cards and refuse or rebase conflicts if Anki changed after the preview was created.
+
+## Interaction design
+
+### Workspace layout
+
+Build a dedicated **Deck Workbench** destination reachable from both Flashcards and Anki:
+
+- **Source rail:** package/live collection, deck tree, saved filters, and change sets.
+- **Stable high-contrast data grid:** virtualized notes/cards with configurable columns, inline edit, multi-select, sorting, grouping, and keyboard range selection.
+- **Context inspector:** rendered front/back, raw fields, note/card relationship, scheduling facts, media, and validation issues.
+- **Change tray:** ordered batch actions, affected count, conflicts, warnings, undo, dry run, export, and commit.
+
+Use Liquid UI selectively for navigation, contextual tools, transitions, and the inspector. The large editing grid must remain a calm, readable anchor surface. Preserve focus order, shortcuts, reduced motion, screen-reader labels, and usable targets at compact, default, and maximized sizes.
+
+### Numbered guided flow
+
+Keep one visible, resumable stepper so a new user always knows where they are:
+
+1. **Choose source** — import a deck, connect live Anki, open a local deck, or use the demonstration deck.
+2. **Browse and select** — search, filter, inspect, and confirm which notes/cards will change.
+3. **Add and enrich** — pull dictionary data, generate reviewed AI additions, or merge another source.
+4. **Fields and design** — add/reorder fields and Browser columns, map content, and customize card templates/layout.
+5. **Learning rules** — choose known/mastery labels, frequency rules, tags, deck options, and scheduling changes.
+6. **Review examples** — inspect representative cards, edge cases, diffs, conflicts, costs, and a complete dry run.
+7. **Apply or export** — commit to live Anki or create a new package, then verify by reading it back.
+
+Each step shows a short outcome sentence, affected count, validation status, and safe Back/Next controls. Back never loses work. Advanced users may jump between completed steps, but the interface must not scatter required decisions across unrelated popups.
+
+### Smart deck Browser
+
+The Browser is both a fast editor and the selection engine for all recipes:
+
+- offer spreadsheet, compact list, and rendered-card gallery modes over the same selection;
+- combine normal text/Anki-query search, faceted filters, saved searches, and optional semantic search;
+- let the user add, hide, reorder, pin, resize, and save Browser columns independently from adding fields to an Anki note type;
+- show expandable note rows with every generated sibling card and its scheduling state;
+- flip cards in place and compare front/back, note fields, source data, and proposed output without leaving the Browser;
+- build representative sample sets from first/random cards plus empty, longest, media-heavy, cloze, sibling, conflicting, and validation-failing cases;
+- preview desktop, compact/mobile, light, dark, and app-theme rendering where the template supports it;
+- keep selection and scroll position stable while switching views or editing filters.
+
+### Two levels of control
+
+- **Quick recipes** cover common tasks with plain-language controls and a live preview.
+- **Advanced rules** expose nested `AND`/`OR`, field and scheduler predicates, regex, ordered transformations, and saved reusable recipes.
+
+Every empty state ships with a local demonstration deck. A user must be able to explore filtering, swapping, translating, and scheduling previews without connecting a real collection. Demonstration mode is clearly labeled and never reports a real export or Anki commit.
+
+## Query and selection engine
+
+Filters must work across:
+
+- deck/subdeck, note type, card template, and any note field;
+- exact, contains, missing, regex, script/language, duplicate, and near-duplicate text;
+- tags, marked state, flags, suspended/buried state, new/learning/review/relearning state, due range, interval, ease, lapses, and leech status;
+- frequency rank/range/source, JLPT level, word type, proper-name status, and missing-frequency policy;
+- local known/mastery level, app review history, Anki interval/rating evidence, and user-selected precedence when the sources disagree;
+- missing audio/image, broken media references, sentence availability, and source provenance.
+
+Selection semantics must distinguish `visible rows`, `selected rows`, and `all matching rows`. Before applying a batch action, show the exact total and keep it stable even when the grid is virtualized.
+
+## Editing and batch actions
+
+### Fields, templates, and language
+
+- Swap rendered front/back for selected card templates.
+- Swap, copy, move, merge, split, add, rename, reorder, or clear note fields with a schema migration preview.
+- Map any source field to Japanese, Russian, English, reading, sentence, hint, or custom fields.
+- Translate a chosen field into Japanese, Russian, English, or another configured language; preserve the original by default and show provider, privacy, cost, and offline/cloud status before work starts.
+- Apply HTML cleanup, whitespace and Unicode normalization, regex replacement, kana/romaji conversion, furigana generation/removal, and reading repair.
+- Edit and preview template HTML/CSS against representative notes and every generated sibling card.
+- Detect empty rendered sides, unresolved template fields, malformed cloze syntax, and script/language mismatches before commit.
+
+### Dictionary and AI enrichment
+
+- Browse all configured app dictionaries through the existing Lexicon/dictionary service and map selected data into new or existing Anki fields.
+- Support headword, alternative spellings, readings, ordered senses, translations, part of speech, usage/register notes, pitch accent, frequency values and sources, JLPT/level metadata, kanji details, example sentences, audio, images, and source attribution whenever the underlying dictionary legally and technically provides them.
+- Let the user choose one dictionary, source priority, or a merged result. Show conflicting values side by side and use explicit `keep`, `replace`, `append`, `fill empty`, `best ranked`, and `manual review` policies.
+- Add dictionary fields/columns to a note type in bulk and update its templates in the same reviewed change set; never dump every available property into an unreadable card by default.
+- Generate optional AI translations, natural example sentences, sentence translations, reading aids, concise definitions, mnemonics, usage notes, grammar explanations, cloze candidates, hints, distractors, and other user-defined fields.
+- Generate several alternatives where useful and let the user approve, edit, regenerate, or reject per card or in batches. Apply language, length, difficulty, politeness, target-word, and duplication constraints.
+- Ground dictionary-derived facts in the selected source and retain per-field provenance. Mark AI-generated content separately; do not present generated examples or definitions as dictionary quotations.
+- Cache/reuse identical enrichment requests, support cancellation and bounded concurrency, and show provider, model, privacy, network, cost estimate, progress, failures, and retry scope before and during generation.
+
+### Card and note-type designer
+
+- Add, remove, rename, clone, and reorder note fields with reserved-name and data-loss validation.
+- Add/remove/clone/reorder card types, including forward, reverse, optional reverse, typed-answer, cloze, and supported image-occlusion designs.
+- Provide an intuitive block/layout designer for common content, conditionals, labels, audio, images, hints, and answer sections, plus a synchronized expert HTML/CSS editor.
+- Customize fonts, sizes, spacing, colors, alignment, front/back structure, browser appearance, night-mode rules, responsive behavior, and per-language typography through reusable style presets.
+- Update the preview continuously against the representative sample set, not just one ideal card. Show exactly which cards would be created, become empty, become duplicates, or change appearance.
+- Make every schema/template change reversible in the draft and warn about its effect on generated sibling cards and existing scheduling.
+
+### Organization and metadata
+
+- Add/remove/replace/normalize tags; map app labels to tags only through an explicit preset.
+- Move or copy notes/cards between decks where Anki semantics allow it.
+- Change note type using an explicit field/template mapping.
+- Set/clear flags and marked state.
+- Suspend/unsuspend, bury/unbury where supported, and identify leeches.
+- Find exact and normalized duplicates, compare them, then merge or delete only through a recoverable reviewed change set.
+
+### Mastery and scheduling
+
+- Expand local review controls to `Again`, `Hard`, `Good`, and `Easy` with tested migration from the existing two-rating state.
+- Let users define named mastery presets such as `Bad`, `Learning`, `Good`, `Very good`, and `Known`; display the precise local and Anki effects of each preset.
+- Batch-set local known/mastery status independently of Anki scheduling.
+- Support core Anki scheduling operations through tested capabilities: review rating where valid, forget/reset, reschedule/set due, new-card position, interval/ease changes, suspend/unsuspend, and deck-option assignment.
+- Manage deck-option presets and overrides, including daily new/review limits, learning and relearning steps, insertion/gather/sort/display order, maximum/minimum intervals, leech handling, sibling burying, audio/timer behavior where supported, and filtered/custom-study settings.
+- Treat legacy scheduling and FSRS as different validated modes. For FSRS, include desired retention, parameters/optimization status, historical retention, ignore-before date, and reschedule-on-change impact; show a workload estimate and a high-impact warning before a bulk reschedule.
+- Validate minimum/maximum values, time units, timezone behavior, learning states, sibling effects, and scheduler-version compatibility.
+- Never fabricate review log entries or write directly to `collection.anki2`. If a desired scheduler mutation is unavailable through the supported adapter, explain it and keep Apply disabled for that action.
+
+## Smart recipe library
+
+Ship at least the following working, tested recipes; they are product features, not placeholder menu entries. This is the initial catalogue, not a cap: users can save new recipes from any supported filter/action pipeline, and later workers may add reusable actions without redesigning the workbench.
+
+1. Swap front and back, with note-field and rendered-template variants.
+2. Translate Back to Japanese, Russian, English, or a configured language while retaining the original.
+3. Exclude words already known locally, in Anki, or in either source using explicit precedence.
+4. Select `rank <= N` or `rank > N` with a plain-language frequency explanation.
+5. Map frequency bands to named mastery/scheduling presets, for example top 5,000 -> `Very good`.
+6. Prioritize high-frequency unknown words without changing known cards.
+7. Fill missing readings or furigana, with confidence and manual-review thresholds.
+8. Detect wrong-language or wrong-script content in a chosen field.
+9. Find exact/normalized/near duplicates and propose a canonical note.
+10. Rescue leeches by adding hints, sentences, or a slower scheduling preset.
+11. Find missing, broken, duplicate, or oversized media.
+12. Normalize inconsistent tags and deck paths.
+13. Split a deck by JLPT level, frequency band, source, or mastery.
+14. Merge glossary data from a secondary deck without overwriting stronger fields.
+15. Identify empty backs, identical front/back renders, and broken templates.
+16. Find sentence cards missing the target expression or reading.
+17. Audit sibling cards and remove unintended duplicate templates.
+18. Find stale cards by last review/due state and preview reset or reschedule options.
+19. Generate cloze candidates from selected sentence fields with a review step.
+20. Restore source context such as sentence, title, timestamp, screenshot, or URL when provenance is available.
+21. Enrich selected notes from one or more dictionaries using visible merge precedence.
+22. Generate and approve level-appropriate AI example sentences and translations.
+23. Generate mnemonics, hints, grammar notes, clozes, and distractors into separate fields.
+24. Create or clone a note type, add dictionary/AI fields, and apply a matching card-design preset.
+25. Audit the representative preview set for clipping, unreadable styling, broken media, and light/dark/mobile differences.
+26. Compare current scheduling with a proposed deck preset or FSRS desired-retention change and estimate workload impact.
+
+The recipe system must be extensible without creating a separate one-off code path for every recipe. Each recipe compiles to the same filter, transform, validation, preview, and change-set primitives.
+
+## Safe batch workflow
+
+Every mutation follows the same pipeline:
+
+1. Select a source and create or resume an isolated draft.
+2. Build a filter and show matching, excluded, missing-data, and conflict counts.
+3. Add one or more ordered actions to the change tray.
+4. Compute a dry run outside Electron's main event loop.
+5. Show representative before/after front and back renders plus a field/schedule diff.
+6. Validate templates, media, values, unsupported actions, and live-source conflicts.
+7. Apply to the draft; allow step-level undo/redo and action reordering.
+8. Export a new artifact or commit a bounded change set to live Anki.
+9. Re-read the target and verify counts, values, renders, and scheduler state.
+10. Store a compact audit journal sufficient to understand and, where the adapter permits, reverse the commit.
+
+Partial failure must identify exactly what committed, what failed, and what can be retried or reversed. Do not display success from optimistic renderer state.
+
+## Architecture and performance
+
+- Put normalized types, validation, filter evaluation, transformations, and deterministic change-set generation in shared pure modules.
+- Keep package parsing, indexing, translation batches, media hashing, large diff generation, and commits in a worker or safely chunked child process. Never run them on Electron's main event loop.
+- Add versioned IPC contracts across shared types, main handlers, preload, renderer consumers, and focused tests.
+- Stream or page large results and virtualize the grid. Avoid sending whole large decks repeatedly over IPC.
+- Target smooth filtering and selection on a 100,000-note fixture, bounded memory, cancellable long operations, and resumable drafts.
+- Use a transaction journal/delta snapshots, not unbounded full copies of every imported package.
+- Persist field mappings, saved filters, recipes, column layouts, and draft metadata with migrations, validation, reset behavior, and round-trip tests.
+- Add all shared chrome and status strings through the existing EN/JA/ZH/RU i18n catalogs.
+
+## Delivery sequence
+
+### Phase 0 — capability and fidelity contract
+
+- Inventory current APKG, local deck, known-word, frequency, SRS, AnkiConnect, media, and export behavior from source and live probes.
+- Publish a tested compatibility matrix for Anki version, AnkiConnect actions, package features, scheduler operations, and unsupported add-on data.
+- Create mixed-language, multi-note-type, multi-template, media, cloze, scheduling, and corrupt-data fixtures.
+- Freeze the normalized draft and reversible change-set contracts before building the UI.
+
+### Phase 1 — loss-aware import and drafts
+
+- Import APKG, CSV/TSV, local decks, and live Anki into the normalized model.
+- Preserve raw fields and provenance, surface unsupported data, autosave resumable drafts, and prove cancellation/recovery.
+
+### Phase 2 — workbench shell and single edits
+
+- Build the seven-step guided flow, smart virtualized Browser, source rail, inspector, real representative template preview, column manager, search, selection, and accessible keyboard flow.
+- Support safe single-note/card field, tag, deck, and local-mastery edits.
+
+### Phase 3 — rules, changes, and recovery
+
+- Build nested filters, saved views, the ordered change tray, deterministic dry runs, validation, diff previews, undo/redo, and audit journal.
+- Prove stable `all matching` selection across paging and virtualization.
+
+### Phase 4 — smart language, frequency, and known-word workflows
+
+- Deliver field/template swap, dictionary enrichment, reviewed AI additions, translation, text normalization, frequency rules, known-word exclusion, mastery mappings, card-design presets, and the first ten smart recipes.
+- Require explicit missing-frequency, conflicting-known-state, provider, privacy, and overwrite choices.
+
+### Phase 5 — Anki core editing parity
+
+- Extend the typed Anki adapter for the tested field, tag, deck, flag, suspend/bury, model/template, media, and scheduler operations.
+- Finish the four-rating local SRS migration and explicit mastery-preset mappings.
+- Complete the compatibility matrix with honest disabled states for capabilities that cannot be performed safely.
+
+### Phase 6 — export, commit, and round-trip proof
+
+- Export a new package and commit bounded changes to live Anki.
+- Add source-fingerprint conflict handling, partial-failure recovery, post-commit rereads, and reversible journals.
+- Prove import -> edit -> export/reimport and live read -> edit -> commit/reread equivalence for all supported data.
+
+### Phase 7 — advanced recipes and release hardening
+
+- Complete all twenty smart recipes, large-deck performance, accessibility, localization, error recovery, and Standard/Liquid/theme visual matrices.
+- Run focused tests, integration tests, a 100,000-note performance fixture, and live Electron acceptance with a disposable Anki profile.
+
+## Demonstrable acceptance gates
+
+This slice is complete only when all of these can be shown with real data and no mock success:
+
+1. Import a representative APKG, inspect every preserved/unsupported feature, swap front/back, export a new package, reimport it, and match the approved diff.
+2. Translate a Back field to Russian or Japanese into a selected destination field, preview individual diffs and provider implications, cancel safely, then apply and verify.
+3. Filter `frequency rank <= 5,000` plus `unknown`, explain that this means the most frequent 5,000 words, map the results to `Very good`, and show the exact mastery/scheduling effects before commit.
+4. Exclude words known locally, known in Anki, or both; resolve a deliberately conflicting item according to the selected precedence.
+5. Batch-edit tags, flags, deck, suspension, due date, interval/ease or a supported scheduling preset, then reread Anki and prove the resulting state.
+6. Safely edit a multi-template and cloze note without confusing fields with generated cards or breaking sibling renders.
+7. Interrupt a large import, translation, dry run, and live commit; recover without a false success state or an ambiguous partial result.
+8. Undo a draft action, reverse a supported committed action, and clearly explain any adapter operation that cannot be reversed.
+9. Filter and preview the 100,000-note fixture without freezing window dragging or Electron's main event loop.
+10. Complete the primary workflows using keyboard only and verify focus, contrast, reduced motion, EN/JA/ZH/RU strings, and compact/default/maximized layouts.
+11. Follow the numbered flow to enrich a mixed deck from configured dictionaries, add new fields, resolve conflicting senses, update the template, and prove field-level provenance after export/reimport.
+12. Generate several AI example sentences and learning aids, approve only selected variants, preview difficult and edge-case cards across layouts, cancel one batch, retry only failures, and verify that rejected/generated data is represented honestly.
+13. Customize Browser columns separately from note fields, create a reverse/optional-reverse card design, and prove that the representative preview catches blank, duplicate, cloze, sibling, media, and dark/mobile rendering failures before Apply.
+14. Exercise every `supported` row in the living Anki parity matrix and prove every `read-only` or `blocked` row has an honest explanation and no active Apply path.
+
+## Explicit exclusions
+
+- No direct mutation of Anki's SQLite collection.
+- No claim of compatibility with arbitrary Anki add-ons or custom scheduler patches.
+- No destructive overwrite of the only imported package or live collection state by default.
+- No AI translation or generation without visible provider/privacy/cost state and a reviewed diff.
+- No “known”, “good”, or “very good” label whose actual scheduling effect is hidden from the user.
+
+## Living upstream references
+
+Recheck these primary references during Phase 0 and before parity sign-off; Anki behavior evolves:
+
+- [Adding and editing notes, fields, tags, flags, cloze, and image occlusion](https://docs.ankiweb.net/editing.html)
+- [Browsing and bulk organization](https://docs.ankiweb.net/browsing.html)
+- [Search grammar and scheduler properties](https://docs.ankiweb.net/searching.html)
+- [Card templates and rendered previews](https://docs.ankiweb.net/templates/intro.html)
+- [Card generation, reverse cards, conditionals, and cloze behavior](https://docs.ankiweb.net/templates/generation.html)
+- [Deck options, legacy scheduling, and FSRS](https://docs.ankiweb.net/deck-options.html)
+- [Package export and scheduling/media options](https://docs.ankiweb.net/exporting.html)
+- [AnkiConnect action surface](https://github.com/FooSoft/anki-connect)

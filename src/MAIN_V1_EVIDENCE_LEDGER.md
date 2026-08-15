@@ -21730,3 +21730,29 @@ a better separator: a filePath may contain a space). **The one-command detector:
 **Phase 1 is now complete** — four source adapters plus autosave/cancel/recovery. Next is Phase 2,
 the workbench shell, which is where Track 7's first user-visible strings and file dialog belong;
 budget for a four-catalog i18n pass there.
+
+### Gates — 2026-08-16 16:10 MSK backup, once after the last slice
+
+**The first full run was RED, and the failure was not mine to ignore.**
+`architectureBaseline.test.ts` reported one new finding:
+`test-only-module:src/shared/ankiLocalDeck.ts`. `f214bdf5` landed source adapter 4 with no
+importer outside its own test and its turn ended before the gates ran, so the suite had been red
+since. **Fixed in this turn: `aa2b660b`** — `loadDeckAsAnkiDraft()` in
+`src/renderer/flashcardDeck.ts`, the real caller (the deck *is* that store; a main-process reader
+would ship the cards out and the draft back for nothing), plus 8 renderer tests covering what the
+shared unit tests structurally cannot — that the *live* store feeds the adapter, including a deck
+in the v1.0-audit-5.1 over-encoded shape reading as 1 card rather than as empty.
+
+`npx vitest run`: **exit 0, 633 passed / 1 skipped files, 8,511 passed / 6 skipped tests.**
+Against the previous turn's 627 / 8,421: **+6 files, +90 tests** = this turn's 74 (22 connect +
+27 session + 17 store + 8 renderer) plus `f214bdf5`'s 16, which no gate run had ever counted.
+`node tools/i18n-check.cjs`: exit 0 at **9,636** keys, unchanged — Track 7 still has no
+user-visible string, by Phase 0's contracts-before-UI sequencing. `node tools/architecture-audit.cjs`:
+exit 0, 1,895 modules, 19 findings, **"Nothing new"**, 2 known pending. `npx eslint` on all **13**
+touched paths: clean but for the 2 `adjacent-overload-signatures` errors in `window.d.ts`, which
+are **another track's and pre-date this turn** — `git show f214bdf5:src/renderer/window.d.ts` has
+`subtitleHarvestList`/`subtitleHarvestFetch` declared twice, at :831 and :1595.
+
+**Lesson worth the line: `f214bdf5` is the second commit in this branch to land a shared module
+ahead of its only importer.** Carve commits by import closure, and if a turn ends without running
+the gates, the next turn inherits a red suite it did not cause.
