@@ -19,24 +19,48 @@
 // ## What is deliberately not imported
 //
 // Only the tables that have live readers: `headwords`, `senses`, `glosses`,
-// `inflections`, and now `etymology` — whose reader landed with it, in
-// `findLexiconEtymology`, exactly as this note originally required. Wiktextract
-// also carries synonym/antonym cross references, IPA and translations, and the
-// schema has an `xrefs` table for the first of those — but nothing reads it yet,
-// and writing rows no query consults is how a database grows data that is never
-// wrong because it is never used. Those land with their readers.
+// `inflections`, `etymology` — whose reader landed with it, in
+// `findLexiconEtymology` — and now `xrefs`, which lands with `findLexiconXrefs`
+// on the same terms this note originally set: writing rows no query consults is
+// how a database grows data that is never wrong because it is never used. IPA
+// and translations are still out for exactly that reason.
 
 import fs from 'node:fs';
 import type { SqliteDb } from '../db';
 import { normalizeForLookup } from '../dictService';
 import { pinyinSearchKey } from '../../../shared/pinyin';
+import { type LexiconXrefKind, normalizeXrefKind, normalizeXrefText } from '../../../shared/lexiconXrefs';
 
 /** One JSONL record, reduced to the fields this importer reads. */
+/**
+ * One cross-reference entry as kaikki writes it.
+ *
+ * The `word` field is the only one this importer reads. Kaikki also emits `sense`
+ * (a gloss fragment disambiguating *which* sense the link belongs to) and
+ * `english`; both are prose about the link rather than the link, and `xrefs` has
+ * one text column.
+ */
+export interface WiktextractXrefEntry {
+  word?: string;
+}
+
+/** One `senses[]` element, reduced to the fields this importer reads. */
+export interface WiktextractSense {
+  glosses?: string[];
+  raw_glosses?: string[];
+  tags?: string[];
+  synonyms?: WiktextractXrefEntry[];
+  antonyms?: WiktextractXrefEntry[];
+  related?: WiktextractXrefEntry[];
+  coordinate_terms?: WiktextractXrefEntry[];
+  see_also?: (WiktextractXrefEntry | string)[];
+}
+
 export interface WiktextractRecord {
   word?: string;
   lang_code?: string;
   pos?: string;
-  senses?: { glosses?: string[]; raw_glosses?: string[]; tags?: string[] }[];
+  senses?: WiktextractSense[];
   forms?: { form?: string; tags?: string[]; source?: string }[];
   /** The origin paragraph, plain text. Absent on most entries. */
   etymology_text?: string;
@@ -93,6 +117,8 @@ export interface WiktextractImportCounts {
   inflections: number;
   /** Origin paragraphs written to the `etymology` table. */
   etymologies: number;
+  /** Cross-reference rows written to the `xrefs` table. */
+  xrefs: number;
   /** True when `shouldCancel` fired and the transaction was rolled back. */
   cancelled: boolean;
 }
@@ -233,6 +259,71 @@ export function classifyForms(
 }
 
 /**
+ * Which kaikki `senses[]` field carries which stored `xrefs.kind`.
+ *
+ * `related` and `coordinate_terms` both collapse to `cf`, which is a real loss of
+ * detail and the honest one available: the schema documents four kinds, and
+ * "coordinate term" is neither a synonym nor a synonym-adjacent enough relation to
+ * file as one. `cf` claims only "compare", which is true of both.
+ */
+const XREF_SOURCE_FIELDS: readonly (keyof WiktextractSense)[] = [
+  'synonyms', 'antonyms', 'see_also', 'related', 'coordinate_terms',
+];
+
+/**
+ * An xref target longer than this is a sentence, not a word.
+ *
+ * Wiktionary's link lists routinely carry a parenthetical or a whole usage note
+ * where a word belongs. Such a row could never resolve against `headwords.norm`,
+ * so it would render as permanently unresolvable text under a "synonyms" heading —
+ * worse than being absent, because the surface would look broken rather than empty.
+ */
+const MAX_XREF_TARGET_CHARS = 32;
+
+/**
+ * The cross references one sense states, as `(kind, target)` pairs.
+ *
+ * Exported for the same reason `classifyForms` is: the SQL is trivial and the
+ * filtering is where this can be wrong. A kaikki link list mixes bare words with
+ * templated prose, and only the shape distinguishes them.
+ *
+ * Self references are dropped. Wiktionary pages list the headword among its own
+ * "related terms" often enough that leaving them in would give most entries a
+ * cross reference pointing at the page the reader is already on.
+ */
+export function classifyXrefs(
+  sense: WiktextractSense,
+  word: string,
+): { kind: LexiconXrefKind; text: string }[] {
+  const out: { kind: LexiconXrefKind; text: string }[] = [];
+  const seen = new Set<string>();
+  const self = normalizeXrefText(word);
+
+  for (const field of XREF_SOURCE_FIELDS) {
+    const kind = normalizeXrefKind(field);
+    if (!kind) continue;
+    const entries = sense[field];
+    if (!Array.isArray(entries)) continue;
+
+    for (const entry of entries) {
+      // `see_also` is the one field kaikki emits as bare strings as well as as
+      // objects, depending on how the source page was templated.
+      const raw = typeof entry === 'string' ? entry : entry?.word;
+      if (typeof raw !== 'string') continue;
+      const text = normalizeXrefText(raw);
+      if (!text || text === self) continue;
+      if ([...text].length > MAX_XREF_TARGET_CHARS) continue;
+      const key = `${kind} ${text}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ kind, text });
+    }
+  }
+
+  return out;
+}
+
+/**
  * Imports Wiktextract JSONL lines, replacing any previous import of the same id.
  *
  * Takes an iterable of lines rather than one string: a language-filtered kaikki
@@ -253,7 +344,7 @@ export function importWiktextract(
   const progressEvery = options.progressEvery ?? 20_000;
   const counts: WiktextractImportCounts = {
     dictId, entries: 0, skipped: 0, headwords: 0, senses: 0, glosses: 0, inflections: 0,
-    etymologies: 0, cancelled: false,
+    etymologies: 0, xrefs: 0, cancelled: false,
   };
 
   const run = db.transaction(() => {
@@ -291,6 +382,7 @@ export function importWiktextract(
     const insertEtymology = db.prepare(
       'insert into etymology (headword_id, lang, text, source) values (?, ?, ?, ?)',
     );
+    const insertXref = db.prepare('insert into xrefs (from_sense, to_text, kind) values (?, ?, ?)');
 
     let line = 0;
     for (const raw of lines) {
@@ -322,6 +414,11 @@ export function importWiktextract(
           tags: (sense.tags ?? []).filter((tag): tag is string => typeof tag === 'string'),
           glosses: (sense.glosses ?? sense.raw_glosses ?? [])
             .filter((gloss): gloss is string => typeof gloss === 'string' && gloss.trim().length > 0),
+          // Cross references hang off the sense that states them, so they are
+          // classified here and written once the sense has an id. A sense the
+          // filter below drops takes its references with it: an xref whose
+          // `from_sense` does not exist is a row no reader can reach.
+          xrefs: classifyXrefs(sense, word),
         }))
         .filter((sense) => sense.glosses.length > 0);
       if (!senses.length) {
@@ -350,6 +447,10 @@ export function importWiktextract(
           insertGloss.run(senseId, glossLang, gloss, glossOrd);
           counts.glosses += 1;
         });
+        for (const xref of sense.xrefs) {
+          insertXref.run(senseId, xref.text, xref.kind);
+          counts.xrefs += 1;
+        }
       });
 
       const etymology = etymologyText(record);
@@ -376,7 +477,7 @@ export function importWiktextract(
     // the aborted pass had reached would describe rows that are not in the database.
     return {
       dictId, entries: 0, skipped: 0, headwords: 0, senses: 0, glosses: 0, inflections: 0,
-      etymologies: 0, cancelled: true,
+      etymologies: 0, xrefs: 0, cancelled: true,
     };
   }
   return counts;

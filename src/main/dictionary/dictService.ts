@@ -58,6 +58,14 @@ import {
   type LexiconExampleResult,
   type LexiconExampleTranslation,
 } from '../../shared/lexiconExamples';
+import {
+  LEXICON_XREF_KINDS,
+  MAX_XREF_RESULTS,
+  selectLexiconXrefs,
+  type LexiconXref,
+  type LexiconXrefKind,
+  type LexiconXrefResult,
+} from '../../shared/lexiconXrefs';
 import { EXAMPLE_DICTIONARY_KIND } from '../../shared/dictionarySources';
 import { pinyinSearchKey } from '../../shared/pinyin';
 import type { SqliteDb } from './db';
@@ -1084,6 +1092,133 @@ export function findLexiconEtymology(db: SqliteDb, query: EtymologyQuery): Lexic
   return {
     query: text,
     etymologies: selectLexiconEtymologies(ordered, query.limit ?? MAX_ETYMOLOGY_RESULTS),
+  };
+}
+
+export interface XrefQuery {
+  text: string;
+  /** Source languages to match headwords in. Every language when omitted. */
+  sourceLangs?: DictLangCode[];
+  limit?: number;
+}
+
+/**
+ * Headword rows probed before their cross references are read. Same bound and
+ * same reasoning as `ETYMOLOGY_HEADWORD_ROWS`.
+ */
+const XREF_HEADWORD_ROWS = 24;
+
+/**
+ * Cross-reference rows read before selection. A single Wiktionary sense can carry
+ * a hundred "related terms", and `selectLexiconXrefs` keeps 24 — so the cap
+ * bounds work that would otherwise be discarded, and it is applied after the
+ * indexed read rather than instead of it.
+ */
+const XREF_SCAN_ROWS = 400;
+
+/**
+ * The words the installed dictionaries point at from this word's senses.
+ *
+ * This is the first reader `xrefs` has ever had. Like `examples` before it, the
+ * table shipped in v1 with an index and no traffic at all in either direction.
+ *
+ * ## Why the same equality probe as the etymology reader
+ *
+ * Not `lookup()`, for the reason recorded there: the de-inflection and reading
+ * passes can resolve a kana query to a homophone, and attaching that word's
+ * synonym list to this one is indistinguishable from inventing it. Matching is on
+ * `norm` alone, and the caller passes a headword the lookup already resolved.
+ *
+ * ## Resolution is a probe, not a join
+ *
+ * `xrefs.to_text` is free text — Wiktionary points at words a given install has
+ * no dictionary for. One batched equality on `idx_hw_norm` over the handful of
+ * targets that survived selection tells the surface which ones are navigable, so
+ * a reference is never rendered as a link that would open an empty result. The
+ * probe deliberately runs *after* selection: resolving all 400 scanned rows to
+ * throw away 376 of them is the same mistake the example reader documents.
+ */
+export function findLexiconXrefs(db: SqliteDb, query: XrefQuery): LexiconXrefResult {
+  const text = query.text.trim();
+  const empty: LexiconXrefResult = { query: text, xrefs: [] };
+  if (!text) return empty;
+
+  const langs = query.sourceLangs?.length ? [...new Set(query.sourceLangs)] : [];
+  const langFilter = langs.length ? ` and h.lang in (${langs.map(() => '?').join(',')})` : '';
+  const headwords = db.prepare(`
+    select h.id, h.lang, h.dict_id, d.title as dict_title
+    from headwords h indexed by idx_hw_norm
+    join dictionaries d on d.id = h.dict_id
+    where h.norm = ? and ${WORD_SOURCE_WHERE}${langFilter}
+    order by d.priority desc, h.id asc
+    limit ?
+  `).all(normalizeForLookup(text), ...langs, XREF_HEADWORD_ROWS) as Array<{
+    id: number; lang: string; dict_id: string; dict_title: string;
+  }>;
+  if (!headwords.length) return empty;
+
+  const rows = db.prepare(`
+    select s.headword_id, s.pos, x.to_text, x.kind
+    from senses s
+    join xrefs x on x.from_sense = s.id
+    where s.headword_id in (${headwords.map(() => '?').join(',')})
+    order by s.headword_id, s.ord, x.rowid
+    limit ?
+  `).all(...headwords.map((row) => row.id), XREF_SCAN_ROWS) as Array<{
+    headword_id: number; pos: string | null; to_text: string; kind: string;
+  }>;
+  if (!rows.length) return empty;
+
+  // Reordered into the priority order the headword probe produced, for the same
+  // reason the etymology reader does it in JavaScript: the SQL above is ordered
+  // by `headword_id` because that is what the index can serve, and that is not
+  // the order `d.priority desc` put the headwords in.
+  const byHeadword = new Map<number, typeof rows>();
+  for (const row of rows) {
+    const bucket = byHeadword.get(row.headword_id);
+    if (bucket) bucket.push(row);
+    else byHeadword.set(row.headword_id, [row]);
+  }
+
+  const kinds = new Set<string>(LEXICON_XREF_KINDS);
+  const ordered: LexiconXref[] = [];
+  for (const headword of headwords) {
+    for (const row of byHeadword.get(headword.id) ?? []) {
+      // A row whose kind is not one of the four the schema documents is dropped
+      // rather than defaulted. The surface groups and labels by kind, so a
+      // fallback would file the reference under a relation nobody claimed.
+      if (!kinds.has(row.kind)) continue;
+      const pos = row.pos?.trim();
+      ordered.push({
+        kind: row.kind as LexiconXrefKind,
+        text: row.to_text,
+        lang: headword.lang,
+        dictId: headword.dict_id,
+        dictTitle: headword.dict_title,
+        resolved: false,
+        ...(pos ? { pos } : {}),
+      });
+    }
+  }
+
+  const chosen = selectLexiconXrefs(ordered, query.limit ?? MAX_XREF_RESULTS);
+  if (!chosen.length) return empty;
+
+  const norms = [...new Set(chosen.map((row) => normalizeForLookup(row.text)))].filter(Boolean);
+  const resolved = new Set<string>();
+  if (norms.length) {
+    const found = db.prepare(`
+      select distinct h.norm
+      from headwords h indexed by idx_hw_norm
+      join dictionaries d on d.id = h.dict_id
+      where h.norm in (${norms.map(() => '?').join(',')}) and ${WORD_SOURCE_WHERE}
+    `).all(...norms) as Array<{ norm: string }>;
+    for (const row of found) resolved.add(row.norm);
+  }
+
+  return {
+    query: text,
+    xrefs: chosen.map((row) => ({ ...row, resolved: resolved.has(normalizeForLookup(row.text)) })),
   };
 }
 
