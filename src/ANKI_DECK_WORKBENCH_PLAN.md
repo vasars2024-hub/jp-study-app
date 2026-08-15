@@ -257,10 +257,12 @@ Partial failure must identify exactly what committed, what failed, and what can 
 - Shipped: `shared/ankiChangeTray.ts` (tray, dry run = apply, one tray = one undo), `shared/ankiBrowserQuery.ts` (nested AND/OR/NOT grammar; an unrecognized key is a refusal that names the token, never a silent match-all), `shared/ankiBrowserViews.ts` (query + sort + columns, never a selection), `shared/ankiEditAudit.ts` (an entry is exactly what one Undo takes back; an undone step stays recorded).
 - Still open in this phase: gate 10's measurement half — contrast, reduced motion, compact/maximized and the four languages end-to-end — which is a measurement slice, not a build one.
 
-### Phase 4 — smart language, frequency, and known-word workflows
+### Phase 4 — smart language, frequency, and known-word workflows — started 2026-08-15
 
 - Deliver field/template swap, dictionary enrichment, reviewed AI additions, translation, text normalization, frequency rules, known-word exclusion, mastery mappings, card-design presets, and the first ten smart recipes.
 - Require explicit missing-frequency, conflicting-known-state, provider, privacy, and overwrite choices.
+- Shipped: field swap and field-to-field copy as tray kinds (`swap-fields`, `copy-field`; the copy has no default conflict rule, and `overwrite` counts every note whose destination already held text), and `shared/ankiTextNormalize.ts` (five individually chosen ops in one canonical running order, never touching cloze markers or `[sound:…]`).
+- Next in this phase: frequency rules and known-word exclusion — the vocabulary data plumbing (rank lookup for a draft, local/Anki known state) before the `freq:`/`known:` predicates, which must refuse rather than match-all when no context is available.
 
 ### Phase 5 — Anki core editing parity
 

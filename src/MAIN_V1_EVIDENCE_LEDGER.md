@@ -22030,3 +22030,60 @@ in tests after `19b8ee9f`).
 rules, known-word exclusion, and the first ten smart recipes. Phase 3's gate 10 measurement half
 (contrast, reduced motion, compact/maximized, four languages end-to-end) is still open and is a
 measurement slice, not a build one.
+
+## 2026-08-15 19:46 primary — Track 7 Phase 4 opens: field ops and text clean-up
+
+Two slices, `82ca603` and `1f7fb5e`. Both extend the Phase 3 tray rather than adding a
+surface: same ordered list, same one-tray-one-undo, same dry-run-is-the-apply.
+
+**`82ca603` — `swap-fields` and `copy-field`.** Phase 4's "field/template swap" and gate 1's
+swap front/back. Three decisions:
+
+1. **A swap reads both values before writing either.** `applyWrite(at, noteId, ord, next)` takes
+   a value the caller already computed, which is what makes that possible; find/replace was
+   refactored onto it, so cloze/media/journal bookkeeping has one implementation.
+2. **A note type missing either half is skipped whole**, warned with `field-absent` naming the
+   missing field. Writing only the half that exists destroys the survivor.
+3. **`copy-field` has no default conflict rule** — the type demands `keep` | `overwrite` |
+   `append` (separator defaults to `<br>`). `overwrite` counts every note whose destination
+   already held text as an `overwrite-nonempty` warning. `keep` protects a value, not a blank:
+   a whitespace-only destination still gets filled. Swap/copy onto the same field is a
+   **blocking** `same-field`, not a no-op.
+
+**`1f7fb5e` — `normalize-text`.** Five ops in `shared/ankiTextNormalize.ts`, none default; an
+action with none ticked is `empty-parameter`, blocking. Deliberately **not** `stripFieldHtml`,
+which builds the *display* string and would drop every cloze marker in the deck. `[sound:…]`
+survives the furigana pass because both live in one alternation and the sound branch wins the
+position it starts at (parking behind a placeholder corrupts fields that already contain the
+placeholder). Width fold is U+FF01–FF5E only — 、。「」 are not full-width ASCII. Ops always run
+in `TEXT_NORMALIZE_ORDER` whatever order they were ticked: the tray already owns ordering, and a
+second finer one inside a single action is unguessable. `<img>` is the honest loss — strip-html
+removes it and `writeNoteField` raises `media-dropped`.
+
+**Live, window 2, local deck, query `猫` → 5 notes, real IPC, draft-only.** Swap
+`Expression ↔ Meaning`: `5 из 5 заметок`, first row `攻撃 | コウゲキ | …` → `コウゲキ | …`
+(Meaning was empty, so Expression empties — correct), Undo restored it exactly. Same field twice
+→ `Поле нельзя поменять местами… (Expression)`, no preview, Apply disabled. Copy
+`Expression → Reading` (Reading occupied) across all three rules: **keep** `0 из 5`, *Ничего не
+изменится*; **append** `コウゲキ` → `コウゲキ<br>攻撃`; **overwrite** `コウゲキ` → `攻撃` **plus**
+`В заметках (5) поле Reading уже содержит текст и будет перезаписано.` Normalize: kind picker
+lists 6 kinds, ops render in running order, nothing ticked → blocking refusal, and ticking
+trim→html→collapse still describes them as `убрать HTML, схлопнуть пробелы, обрезать края`.
+
+**Trap:** a literal ideographic space or full-width bracket in a regex is an eslint
+`no-irregular-whitespace` error and the Write tool turns literal spaces inside a template string
+into **NUL bytes** — write those lines from PowerShell as `！`-style escapes; `node -e`
+silently no-ops on the repair.
+
+**Gates**, once after the last slice, shared tree. `npx vitest run` **649 files, 8,722 passed /
+11 skipped, 1 file failed** — `visualNovelI18n.test.tsx`, the same 10 s `beforeAll` load flake
+the 18:00 boss audit recorded; **passes alone in 5.28 s**, nothing here touches VisualNovel.
+`i18n-check` exit 0 at **9,844** (+22). `architecture-audit` exit 0, **Nothing new**, 2 pending.
+`eslint` on 6 paths: **0 errors**.
+
+**Next: Phase 4's frequency rules and known-word exclusion** (gates 3 and 4). The model shape is
+settled — a `freq:`/`known:` predicate pair in `ankiBrowserQuery.ts` that **refuses** when no
+vocabulary context is supplied, with an explicit missing-frequency policy and an explicit
+local/Anki precedence — but the data plumbing (rank lookup for a whole draft through the lexicon
+DB, and local known-state from `renderer/knownWords.ts`) is its own slice and must land first or
+the predicates can only ever refuse.
