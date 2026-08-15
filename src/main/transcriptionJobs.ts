@@ -603,6 +603,18 @@ async function runFusionJob(job: TranscriptionJob): Promise<TranscriptionResult>
       lang: job.lang,
       offsetSec: estimate.confident ? estimate.offsetSec : 0,
       offsetConfident: estimate.confident,
+      // What F5 did, recorded rather than inferred. Two runs on this install
+      // with the same key applied 22 verdicts and 0, and the sidecars were
+      // indistinguishable from "no provider configured" — both leave every
+      // disputed cue `whisper-unverified`, so counting bases cannot separate a
+      // failed arbiter from an absent one. The F7 harness picks its `--mode`
+      // from exactly this distinction.
+      arbitration: {
+        attempted: arbitration.attempted,
+        applied: arbitration.applied,
+        failedBatches: arbitration.failedBatches,
+        skipped: arbitration.skipped,
+      },
     });
     try {
       writeSubtitleFile(

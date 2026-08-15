@@ -204,6 +204,82 @@ describe('parseFusionTrackMeta', () => {
   });
 });
 
+describe('the arbitration summary', () => {
+  const cues = [cue(0, 1.5, 'hello'), cue(1.5, 3, 'there')];
+  const windows: AsrWindow[] = cues.map((entry, index) => ({
+    startSec: entry.start,
+    endSec: entry.end,
+    cueIndices: [index],
+  }));
+  // References that agree, so every basis is plain `whisper` — a v1-readable
+  // sidecar, which is what the additivity assertion below needs to be about the
+  // new field rather than about an unrefereed cue.
+  const decisions = decideFusedWindows(['テキスト1', 'テキスト2'], ['テキスト1', 'テキスト2']);
+
+  it('separates an arbiter that failed every batch from one that was never configured', () => {
+    // The whole reason this field exists: both of these produce zero arbitration
+    // bases, so the cue list cannot tell them apart. Two real runs on one install
+    // hit exactly this — 22 verdicts applied on one episode and 0 on the next.
+    const failed = buildFusionTrackMeta(windows, cues, decisions, {
+      ...track,
+      arbitration: { attempted: 16, applied: 0, failedBatches: 2, skipped: null },
+    });
+    const noKey = buildFusionTrackMeta(windows, cues, decisions, {
+      ...track,
+      arbitration: { attempted: 0, applied: 0, failedBatches: 0, skipped: 'no-key' },
+    });
+    expect(failed.cues.map((entry) => entry.basis))
+      .toEqual(noKey.cues.map((entry) => entry.basis));
+    expect(failed.arbitration).toEqual({
+      attempted: 16, applied: 0, failedBatches: 2, skipped: null,
+    });
+    expect(noKey.arbitration?.skipped).toBe('no-key');
+  });
+
+  it('is additive: carrying it does not push a v1-readable sidecar to v2', () => {
+    const meta = buildFusionTrackMeta(windows, cues, decisions, {
+      ...track,
+      arbitration: { attempted: 2, applied: 2, failedBatches: 0, skipped: null },
+    });
+    // Nothing here is an arbitration *basis*, so an older reader still reads
+    // every cue correctly and the version must not move.
+    expect(meta.version).toBe(1);
+    expect(FUSION_META_VERSION).toBeGreaterThan(1);
+  });
+
+  it('omits the key entirely when the caller had nothing to report', () => {
+    const meta = buildFusionTrackMeta(windows, cues, decisions, track);
+    expect(meta.arbitration).toBeUndefined();
+    expect(serializeFusionTrackMeta(meta)).not.toContain('arbitration');
+  });
+
+  it('round-trips through the reader', () => {
+    const meta = buildFusionTrackMeta(windows, cues, decisions, {
+      ...track,
+      arbitration: { attempted: 9, applied: 7, failedBatches: 1, skipped: null },
+    });
+    const back = parseFusionTrackMeta(serializeFusionTrackMeta(meta));
+    expect(back?.arbitration).toEqual(meta.arbitration);
+  });
+
+  it('drops a malformed summary rather than the cues it sits beside', () => {
+    const withCues = (arbitration: unknown): string => JSON.stringify({
+      version: 1,
+      arbitration,
+      cues: [{ index: 0, startSec: 0, endSec: 1, basis: 'whisper', score: 0.5, confidence: 0.7 }],
+    });
+    for (const bad of ['nonsense', 42, [], { skipped: 'no-such-reason' }]) {
+      const parsed = parseFusionTrackMeta(withCues(bad));
+      expect(parsed?.cues).toHaveLength(1);
+      expect(parsed?.arbitration).toBeUndefined();
+    }
+    // A summary missing its counters is still a summary; the numbers default.
+    const sparse = parseFusionTrackMeta(withCues({ skipped: 'cancelled' }));
+    expect(sparse?.arbitration)
+      .toEqual({ attempted: 0, applied: 0, failedBatches: 0, skipped: 'cancelled' });
+  });
+});
+
 describe('fusionCueCounts', () => {
   it('counts every non-agreeing basis as uncertain, which is what a badge shows', () => {
     const meta = parseFusionTrackMeta(JSON.stringify({

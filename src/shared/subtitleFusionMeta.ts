@@ -64,6 +64,31 @@ export interface FusedCueMeta {
   confidence: number;
 }
 
+/**
+ * What F5 actually did, as opposed to what its per-cue bases let you guess.
+ *
+ * Two runs on the same install with the same key produced `applied: 22` and
+ * `applied: 0`, and nothing on disk said why — a provider that failed every batch
+ * looked identical to a provider that was never configured, because both leave
+ * every disputed cue `whisper-unverified`. Counting bases cannot tell them apart
+ * either: zero applied verdicts is zero arbitration bases in both cases.
+ *
+ * Optional, and deliberately **not** a version bump: a reader that does not know
+ * this field ignores it and still reads every cue correctly, which is the only
+ * thing `version` exists to protect. Absent means "written before this field",
+ * never "arbitration did not run".
+ */
+export interface FusionArbitrationSummary {
+  /** Windows sent to the provider. */
+  attempted: number;
+  /** Verdicts that survived the parse and the fidelity guard. */
+  applied: number;
+  /** Batches whose request or parse produced nothing. */
+  failedBatches: number;
+  /** Why no verdicts were produced, when none were; `null` when it ran. */
+  skipped: 'no-key' | 'no-candidates' | 'cancelled' | null;
+}
+
 export interface FusionTrackMeta {
   version: number;
   /** Epoch ms the fusion job wrote this track. */
@@ -77,6 +102,8 @@ export interface FusionTrackMeta {
   offsetConfident: boolean;
   /** Mean confidence over emitted cues, 0–1. */
   meanConfidence: number;
+  /** Absent on sidecars written before the field existed. */
+  arbitration?: FusionArbitrationSummary;
   cues: FusedCueMeta[];
 }
 
@@ -104,6 +131,7 @@ export function buildFusionTrackMeta(
     lang: string;
     offsetSec: number;
     offsetConfident: boolean;
+    arbitration?: FusionArbitrationSummary;
   },
 ): FusionTrackMeta {
   const rows = windowDecisionsToFusedCues(windows, cues, decisions);
@@ -120,6 +148,7 @@ export function buildFusionTrackMeta(
     offsetSec: Math.round(track.offsetSec * 1000) / 1000,
     offsetConfident: track.offsetConfident,
     meanConfidence,
+    ...(track.arbitration ? { arbitration: track.arbitration } : {}),
     cues: rows.map((row, index) => ({
       index,
       startSec: Math.round(row.start * 1000) / 1000,
@@ -144,6 +173,32 @@ const FUSION_BASES: readonly FusionBasis[] = [
 
 function readNumber(value: unknown, fallback = 0): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+const ARBITRATION_SKIPS: readonly FusionArbitrationSummary['skipped'][] = [
+  'no-key',
+  'no-candidates',
+  'cancelled',
+  null,
+];
+
+/**
+ * Total, like the rest of this reader: anything that is not a summary reads as
+ * absent. A half-written `arbitration` block must not cost the caller the cues.
+ */
+function readArbitration(value: unknown): FusionArbitrationSummary | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const row = value as Record<string, unknown>;
+  const skipped = row.skipped === undefined || row.skipped === null
+    ? null
+    : ARBITRATION_SKIPS.find((candidate) => candidate === row.skipped);
+  if (skipped === undefined) return undefined;
+  return {
+    attempted: readNumber(row.attempted),
+    applied: readNumber(row.applied),
+    failedBatches: readNumber(row.failedBatches),
+    skipped,
+  };
 }
 
 function readCue(value: unknown, index: number): FusedCueMeta | null {
@@ -180,6 +235,7 @@ export function parseFusionTrackMeta(raw: string): FusionTrackMeta | null {
   const version = readNumber(source.version, 0);
   if (version < 1 || version > FUSION_META_VERSION) return null;
   if (!Array.isArray(source.cues)) return null;
+  const arbitration = readArbitration(source.arbitration);
   return {
     version,
     createdAt: readNumber(source.createdAt),
@@ -189,6 +245,7 @@ export function parseFusionTrackMeta(raw: string): FusionTrackMeta | null {
     offsetSec: readNumber(source.offsetSec),
     offsetConfident: source.offsetConfident === true,
     meanConfidence: readNumber(source.meanConfidence),
+    ...(arbitration ? { arbitration } : {}),
     cues: source.cues
       .map((cue, index) => readCue(cue, index))
       .filter((cue): cue is FusedCueMeta => cue !== null),
