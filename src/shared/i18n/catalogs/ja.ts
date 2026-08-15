@@ -8862,12 +8862,12 @@ export const ja: Catalog = {
   'ankiWorkbench.tray.problem.no-enrich-data':
     '辞書の回答がまだ読み込まれていないため、何も補完できません。この表示が続く場合、インストール済み辞書にここから到達できていません。',
   'ankiWorkbench.tray.problem.enrich-no-entry':
-    '{count}件のノートの語は、どのインストール済み辞書にもありません。',
+    '{count}件のノートの語は、どのインストール済み辞書にもありません: {detail}',
   'ankiWorkbench.tray.problem.enrich-no-word': '{count}件のノートには検索対象の語フィールドがありません。',
   'ankiWorkbench.tray.problem.enrich-sense-conflict':
-    '{count}件のノートでインストール済み辞書が食い違ったため、変更しませんでした。',
+    '{count}件のノートでインストール済み辞書が食い違ったため、変更しませんでした: {detail}',
   'ankiWorkbench.tray.problem.enrich-sources-merged':
-    '{count}件のノートで複数の辞書が食い違い、そのすべての回答を書き込みました。',
+    '{count}件のノートで複数の辞書が食い違い、そのすべての回答を書き込みました: {detail}',
 
 };
 

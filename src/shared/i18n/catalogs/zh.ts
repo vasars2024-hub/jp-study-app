@@ -8821,12 +8821,12 @@ export const zh: Catalog = {
   'ankiWorkbench.tray.enrichReady': '{count} 个词中有 {found} 个在已安装词典中找到。',
   'ankiWorkbench.tray.problem.no-enrich-data':
     '尚未载入任何词典结果，因此无法填充。若一直如此，说明这里无法访问已安装的词典。',
-  'ankiWorkbench.tray.problem.enrich-no-entry': '{count} 条笔记的词不在任何已安装词典中。',
+  'ankiWorkbench.tray.problem.enrich-no-entry': '{count} 条笔记的词不在任何已安装词典中：{detail}',
   'ankiWorkbench.tray.problem.enrich-no-word': '{count} 条笔记没有可供查询的词语字段。',
   'ankiWorkbench.tray.problem.enrich-sense-conflict':
-    '{count} 条笔记上已安装词典不一致，因此未作改动。',
+    '{count} 条笔记上已安装词典不一致，因此未作改动：{detail}',
   'ankiWorkbench.tray.problem.enrich-sources-merged':
-    '{count} 条笔记上多本词典不一致，已写入它们的全部答案。',
+    '{count} 条笔记上多本词典不一致，已写入它们的全部答案：{detail}',
 
 };
 

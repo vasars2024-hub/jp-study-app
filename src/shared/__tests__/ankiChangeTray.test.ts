@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AnkiDraft, AnkiDraftNote } from '../ankiDraft';
 import {
+  MAX_PROBLEM_DETAILS,
   addTrayAction,
   moveTrayAction,
   planChangeTray,
@@ -8,6 +9,8 @@ import {
   summarizeTrayProblems,
   toggleTrayAction,
   type TrayAction,
+  type TrayProblem,
+  type TrayProblemCode,
 } from '../ankiChangeTray';
 import {
   countJournalSteps,
@@ -339,6 +342,44 @@ describe('planChangeTray', () => {
     expect(summarizeTrayProblems(plan.problems).map((p) => `${p.code}:${p.count}`)).toEqual([
       'media-missing:1',
       'media-dropped:1',
+    ]);
+  });
+});
+
+describe('summarizeTrayProblems keeps the details it merges', () => {
+  const problem = (detail: string, code: TrayProblemCode = 'media-missing'): TrayProblem => ({
+    code,
+    severity: 'warning',
+    actionId: 'a1',
+    count: 1,
+    detail,
+  });
+
+  it('names every distinct detail rather than only the first', () => {
+    // The per-note problems each carry one name; summing counts alone kept the
+    // first and threw the rest away, leaving a number nobody could act on.
+    const [merged] = summarizeTrayProblems([problem('a.png'), problem('b.png'), problem('a.png')]);
+    expect(merged!.count).toBe(3);
+    expect(merged!.detail).toBe('a.png, b.png');
+  });
+
+  it('stops at the cap and marks that it did', () => {
+    const many = Array.from({ length: MAX_PROBLEM_DETAILS + 3 }, (_, i) => problem(`f${i}.png`));
+    const [merged] = summarizeTrayProblems(many);
+    expect(merged!.count).toBe(MAX_PROBLEM_DETAILS + 3);
+    expect(merged!.detail).toBe('f0.png, f1.png, f2.png, f3.png, f4.png…');
+  });
+
+  it('keeps details of different codes and actions apart', () => {
+    const summary = summarizeTrayProblems([
+      problem('a.png'),
+      problem('gone.png', 'media-dropped'),
+      { ...problem('b.png'), actionId: 'a2' },
+    ]);
+    expect(summary.map((p) => `${p.code}/${p.actionId}:${p.detail}`)).toEqual([
+      'media-missing/a1:a.png',
+      'media-dropped/a1:gone.png',
+      'media-missing/a2:b.png',
     ]);
   });
 });

@@ -684,12 +684,40 @@ export function planChangeTray(
 }
 
 /** Collapse the problem list to one line per code, for a compact summary. */
+/**
+ * How many distinct details one summarized problem names before it stops. A
+ * whole deck's worth of words in one warning line is unreadable, and the count
+ * is already there to say how many there were.
+ */
+export const MAX_PROBLEM_DETAILS = 5;
+
 export function summarizeTrayProblems(problems: readonly TrayProblem[]): TrayProblem[] {
   const out: TrayProblem[] = [];
+  // Details are collected, not overwritten: the per-note problems carry one
+  // word, file name or field each, and keeping only the first one's — which is
+  // what summing counts alone did — turns "these six words conflicted" into a
+  // number the user cannot act on.
+  const collected = new Map<TrayProblem, string[]>();
   for (const problem of problems) {
     const existing = out.find((p) => p.code === problem.code && p.actionId === problem.actionId);
-    if (existing) existing.count += problem.count;
-    else out.push({ ...problem });
+    if (!existing) {
+      const copy = { ...problem };
+      out.push(copy);
+      collected.set(copy, problem.detail === undefined ? [] : [problem.detail]);
+      continue;
+    }
+    existing.count += problem.count;
+    const seen = collected.get(existing);
+    if (!seen || problem.detail === undefined || seen.includes(problem.detail)) continue;
+    // One past the cap, so the overflow is detectable without a second counter.
+    if (seen.length <= MAX_PROBLEM_DETAILS) seen.push(problem.detail);
+  }
+  for (const [problem, seen] of collected) {
+    if (seen.length === 0) continue;
+    problem.detail =
+      seen.length > MAX_PROBLEM_DETAILS
+        ? `${seen.slice(0, MAX_PROBLEM_DETAILS).join(', ')}…`
+        : seen.join(', ');
   }
   return out;
 }

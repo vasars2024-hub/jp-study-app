@@ -9286,12 +9286,13 @@ export const en: Catalog = {
   'ankiWorkbench.tray.enrichReady': '{found} of {count} words found in the installed dictionaries.',
   'ankiWorkbench.tray.problem.no-enrich-data':
     'No dictionary answers are loaded yet, so nothing can be filled in. If this stays, the installed dictionaries are unreachable from here.',
-  'ankiWorkbench.tray.problem.enrich-no-entry': 'No installed dictionary knows the word on {count} notes.',
+  'ankiWorkbench.tray.problem.enrich-no-entry':
+    'No installed dictionary knows the word on {count} notes: {detail}',
   'ankiWorkbench.tray.problem.enrich-no-word': '{count} notes declare no word field to look up.',
   'ankiWorkbench.tray.problem.enrich-sense-conflict':
-    'On {count} notes the installed dictionaries disagreed, so those notes were left alone.',
+    'On {count} notes the installed dictionaries disagreed, so those notes were left alone: {detail}',
   'ankiWorkbench.tray.problem.enrich-sources-merged':
-    'On {count} notes several dictionaries disagreed and all of their answers were written.',
+    'On {count} notes several dictionaries disagreed and all of their answers were written: {detail}',
 
 };
 

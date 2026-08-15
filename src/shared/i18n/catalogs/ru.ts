@@ -9667,12 +9667,12 @@ export const ru: Catalog = {
   'ankiWorkbench.tray.problem.no-enrich-data':
     'Ответы словарей ещё не загружены, поэтому заполнить нечем. Если так и остаётся, установленные словари отсюда недоступны.',
   'ankiWorkbench.tray.problem.enrich-no-entry':
-    'Слово из {count} заметок не знает ни один установленный словарь.',
+    'Слово из {count} заметок не знает ни один установленный словарь: {detail}',
   'ankiWorkbench.tray.problem.enrich-no-word': 'В {count} заметках нет поля со словом для поиска.',
   'ankiWorkbench.tray.problem.enrich-sense-conflict':
-    'В {count} заметках установленные словари разошлись, поэтому они остались без изменений.',
+    'В {count} заметках установленные словари разошлись, поэтому они остались без изменений: {detail}',
   'ankiWorkbench.tray.problem.enrich-sources-merged':
-    'В {count} заметках несколько словарей разошлись, и записаны все их варианты.',
+    'В {count} заметках несколько словарей разошлись, и записаны все их варианты: {detail}',
 
 };
 

@@ -399,7 +399,8 @@ describe('DeckWorkbenchTray enrichment', () => {
 
     // A disagreement under `refuse` is named and changes nothing — not silently
     // resolved in favour of whichever dictionary happened to be first.
-    expect(host.textContent).toContain('ankiWorkbench.tray.problem.enrich-sense-conflict:1');
+    // The word itself reaches the warning, so a user can go and resolve it.
+    expect(host.textContent).toContain('ankiWorkbench.tray.problem.enrich-sense-conflict:1,ねこ');
     expect(host.textContent).toContain('ankiWorkbench.tray.summaryNone');
     expect(applyButton().disabled).toBe(true);
   });
@@ -414,7 +415,7 @@ describe('DeckWorkbenchTray enrichment', () => {
     addEnrich('all-sources');
     await act(async () => {});
 
-    expect(host.textContent).toContain('ankiWorkbench.tray.problem.enrich-sources-merged:1');
+    expect(host.textContent).toContain('ankiWorkbench.tray.problem.enrich-sources-merged:1,ねこ');
     act(() => applyButton().dispatchEvent(new MouseEvent('click', { bubbles: true })));
     const written = onApply.mock.calls[0]![0].draft.notes[0]!.fields[1]!.raw;
     expect(written).toContain('cat / feline');
