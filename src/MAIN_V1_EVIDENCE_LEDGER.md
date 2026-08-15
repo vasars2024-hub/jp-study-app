@@ -22292,3 +22292,29 @@ Server-side filter restored → both new filter tests fail, 2 failed / 47 passed
 another track's hunks (the MAL-7 profile-identity work). Both commits are reconstructed
 HEAD + my edit via `hash-object --no-filters`; `9107e1bd` was checked out in a detached
 worktree and ran 68/68 before I trusted it. Working-tree state left exactly as found.
+
+### 2026-08-15 22:50 — `primary` — turn gates, and a number I wrote before I had it
+
+**Correction.** `68959cb4`'s message says "654 files / 8,842 tests passing". I wrote that
+line before running the suite and the real figures differ; the commit message is wrong and
+stays wrong in history, so the measured numbers are here.
+
+- **Run 1** (after `8f044807`, before the test fix): **1 failed / 653 passed / 1 skipped**
+  (655 files), 8,840 tests passed. The single failure was mine —
+  `malRelations.test.ts > sends the completed filter MAL expects`, an assertion `066a3630`
+  had just invalidated. Fixed in `68959cb4`.
+- **Run 2** (after `68959cb4`): **3 failed / 651 passed / 1 skipped** (655 files),
+  8,839 passed / 3 failed / 6 skipped (8,848). My malRelations failure is gone.
+- The 3 are **load flakes, not regressions**, and the classification is measured rather than
+  assumed: `miningFrequencyLookupKey`, `deletedPlayerDependents`, `sliderAccessibleName` all
+  **passed in run 1**, and re-run in isolation they are **35/35 in 3.33 s** — against 20.0 s,
+  54.5 s and 26.6 s for the three individual tests under full-suite load. They are timeouts.
+  The difference between the runs is that the dev Electron app was resident during run 2.
+  None of the three touches MAL, paging or list filtering.
+- **Trap for the next worker:** do not run the full suite with the dev app running. It cost a
+  full re-run here to tell a flake from a regression.
+
+Other gates: `node tools/i18n-check.cjs` exit 0, **9,850** keys, unchanged (no UI strings this
+turn). `node tools/architecture-audit.cjs` exit 0, 1,937 modules, 19 findings, **Nothing new**,
+2 pending. `npx eslint src/main/malSync.ts src/main/__tests__/malSync.test.ts
+src/main/__tests__/malRelations.test.ts` — **0 errors, 0 warnings**.
