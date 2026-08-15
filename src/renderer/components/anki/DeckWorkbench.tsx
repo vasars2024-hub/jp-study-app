@@ -46,6 +46,7 @@ import { loadDeckAsAnkiDraft } from '../../flashcardDeck';
 import { useT } from '../../i18n';
 import DeckWorkbenchBrowser from './DeckWorkbenchBrowser';
 import DeckWorkbenchTray from './DeckWorkbenchTray';
+import DeckWorkbenchJournal from './DeckWorkbenchJournal';
 import './deckWorkbench.css';
 
 type SourceKey = 'apkg' | 'connect' | 'localDeck';
@@ -401,6 +402,7 @@ export default function DeckWorkbench() {
               </button>
               <span className="muted">{t('ankiWorkbench.edit.draftOnly')}</span>
             </div>
+            <DeckWorkbenchJournal draft={draft} journal={journal} />
             <DeckWorkbenchBrowser
               draft={draft}
               totalNotes={totalNotes ?? draft.counts.notes}

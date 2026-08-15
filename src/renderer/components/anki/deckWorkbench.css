@@ -269,6 +269,47 @@
   margin: 0;
 }
 
+.wb-journal {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wb-journal-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 12rem;
+  overflow-y: auto;
+}
+
+.wb-journal-entry {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 0.9em;
+}
+
+.wb-journal-index {
+  min-width: 1.5rem;
+  text-align: right;
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+}
+
+.wb-journal-where,
+.wb-journal-flag {
+  opacity: 0.75;
+}
+
+/* A step that was taken back still happened; struck through, never removed. */
+.wb-journal-undone .wb-journal-what {
+  text-decoration: line-through;
+}
+
 .wb-browser-views {
   display: flex;
   align-items: center;

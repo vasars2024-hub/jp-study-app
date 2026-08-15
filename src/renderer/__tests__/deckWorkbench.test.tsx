@@ -428,6 +428,35 @@ describe('DeckWorkbench', () => {
     expect(host.querySelectorAll('.wb-browser-row')).toHaveLength(2);
   });
 
+  it('has no journal before anything is edited, and records a step once there is one', async () => {
+    await toBrowse(browsable());
+    // Nothing happened yet, so there is nothing to consult — an empty history
+    // panel would be a control that does nothing.
+    expect(host.querySelector('.wb-journal')).toBeNull();
+
+    await click(host.querySelectorAll('.wb-browser-cell')[0] as HTMLElement);
+    const field = host.querySelector('.wb-inspector-input') as HTMLTextAreaElement;
+    await type(field, 'ねこ・edited');
+    await blur(field);
+
+    const toggle = host.querySelector('.wb-journal-toggle') as HTMLButtonElement;
+    expect(toggle.textContent).toBe('ankiWorkbench.journal.title:1,1');
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(host.querySelector('.wb-journal-list')).toBeNull();
+
+    await click(toggle);
+    const entries = [...host.querySelectorAll('.wb-journal-entry')];
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.textContent).toContain('ankiWorkbench.journal.single:1');
+    expect(entries[0]?.textContent).toContain('ankiWorkbench.journal.fields:Expression');
+    expect(entries[0]?.className).not.toContain('wb-journal-undone');
+
+    // Undone is recorded, not erased: the step count drops but the entry stays.
+    await click(buttonBy('ankiWorkbench.edit.undo'));
+    expect((host.querySelector('.wb-journal-toggle') as HTMLElement).textContent).toBe('ankiWorkbench.journal.title:0,0');
+    expect(host.querySelector('.wb-journal-entry')?.className).toContain('wb-journal-undone');
+  });
+
   it('saves a view and restores its query, sort and columns — but never a selection', async () => {
     window.localStorage.removeItem('jp-anki-browser-views');
     await toBrowse(browsable());
