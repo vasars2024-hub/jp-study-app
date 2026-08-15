@@ -98,6 +98,14 @@ function legacyDb(): Database {
   return db;
 }
 
+/** `(field << 3) | 2`, a one-byte length, then UTF-8 — a real config blob's shape. */
+function lenField(field: number, value: string): number[] {
+  const utf8 = Array.from(new TextEncoder().encode(value));
+  return [(field << 3) | 2, utf8.length, ...utf8];
+}
+
+const protoBytes = (...parts: number[][]) => Uint8Array.from(parts.flat());
+
 /** Schema 18: normalized tables, and the formats hidden inside protobuf blobs. */
 function normalizedDb(): Database {
   const db = new SQL.Database();
@@ -121,10 +129,25 @@ function normalizedDb(): Database {
     '',
     '',
   ]);
+  // Note type 100 keeps an empty template config: the case where the formats
+  // genuinely cannot be read, which must stay blocking.
   db.run('INSERT INTO notetypes (id, name, config) VALUES (100, ?, ?)', ['Japanese', new Uint8Array([0x08, 0x00])]);
   db.run('INSERT INTO fields (ntid, ord, name, config) VALUES (100, 0, ?, ?)', ['Expression', new Uint8Array()]);
   db.run('INSERT INTO fields (ntid, ord, name, config) VALUES (100, 1, ?, ?)', ['English', new Uint8Array()]);
   db.run('INSERT INTO templates (ntid, ord, name, config) VALUES (100, 0, ?, ?)', ['Card 1', new Uint8Array()]);
+  // Note type 200 carries the real protobuf blobs a modern export writes.
+  db.run('INSERT INTO notetypes (id, name, config) VALUES (200, ?, ?)', [
+    'Cloze+',
+    protoBytes(lenField(3, '.card { color: #111; }'), lenField(5, '\\documentclass'), lenField(6, '\\end{document}')),
+  ]);
+  db.run('INSERT INTO fields (ntid, ord, name, config) VALUES (200, 0, ?, ?)', [
+    'Text',
+    protoBytes(lenField(3, 'Arial'), [0x20, 20]),
+  ]);
+  db.run('INSERT INTO templates (ntid, ord, name, config) VALUES (200, 0, ?, ?)', [
+    'Cloze card',
+    protoBytes(lenField(1, '{{cloze:Text}}'), lenField(2, '{{cloze:Text}}<br>{{Extra}}'), lenField(3, '{{Text}}')),
+  ]);
   // The `kind` oneof: 0x0a keys field 1 (normal), 0x12 keys field 2 (filtered).
   db.run('INSERT INTO decks (id, name, kind) VALUES (1, ?, ?)', ['Japanese', new Uint8Array([0x0a, 0x00])]);
   db.run('INSERT INTO decks (id, name, kind) VALUES (2, ?, ?)', ['Japanese\x1fCore', new Uint8Array([0x12, 0x00])]);
@@ -219,6 +242,39 @@ describe('readRawCollection — schema 18 normalized tables', () => {
     db.close();
   });
 
+  it('decodes CSS, LaTeX, formats and field fonts out of the protobuf blobs', () => {
+    const db = normalizedDb();
+    const nt = readRawCollection(db).noteTypes.find((n) => n.name === 'Cloze+');
+    expect(nt).toMatchObject({
+      css: '.card { color: #111; }',
+      latexPre: '\\documentclass',
+      latexPost: '\\end{document}',
+      // Cloze is read from the template text, not from a guessed enum field.
+      type: 1,
+    });
+    expect(nt?.fields[0]).toMatchObject({ name: 'Text', font: 'Arial', size: 20 });
+    expect(nt?.templates[0]).toMatchObject({
+      qfmt: '{{cloze:Text}}',
+      afmt: '{{cloze:Text}}<br>{{Extra}}',
+      bqfmt: '{{Text}}',
+    });
+    // Its formats are readable, so it raises no blocking diagnostic of its own.
+    expect(nt?.formatsUnavailable).toBeUndefined();
+    db.close();
+  });
+
+  it('keeps the blocking diagnostic per note type, not per collection', () => {
+    const db = normalizedDb();
+    // Give note type 100 a decodable template and the whole draft unblocks.
+    db.run('UPDATE templates SET config = ? WHERE ntid = 100', [
+      protoBytes(lenField(1, '{{Expression}}'), lenField(2, '{{English}}')),
+    ]);
+    const draft = draftOf(db);
+    expect(draft.diagnostics.map((d) => d.code)).not.toContain('template-format-unavailable');
+    expect(draftIsBlocked(draft)).toBe(false);
+    db.close();
+  });
+
   it('reads the filtered flag out of the kind blob oneof tag', () => {
     const db = normalizedDb();
     const decks = draftOf(db).decks;
@@ -262,7 +318,7 @@ describe('readRawCollection — degradation', () => {
   it('degrades a malformed models blob to the normalized tables rather than throwing', () => {
     const db = normalizedDb();
     db.run("UPDATE col SET models = '{not json'");
-    expect(readRawCollection(db).noteTypes.map((n) => n.name)).toEqual(['Japanese']);
+    expect(readRawCollection(db).noteTypes.map((n) => n.name)).toEqual(['Japanese', 'Cloze+']);
     db.close();
   });
 });

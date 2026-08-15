@@ -19,6 +19,12 @@ import type {
   RawAnkiNoteTypeRow,
   RawAnkiRevlogRow,
 } from '../../shared/ankiDraft';
+import {
+  decodeFieldConfig,
+  decodeNotetypeConfig,
+  decodeTemplateConfig,
+  templatesLookCloze,
+} from './ankiProtoConfig';
 
 /** The slice of sql.js's `Database` this module uses. */
 export interface SqlReadable {
@@ -60,9 +66,9 @@ interface LegacyModel {
 /**
  * Note types from the legacy `col.models` JSON blob.
  *
- * This is the only place a collection states a template's question and answer
- * format in plain text. Schema 18 moved both into a protobuf blob, which is why
- * `readNormalizedNoteTypes` below can only report their names.
+ * This states a template's question and answer format in plain text; schema 18
+ * keeps the same values in a protobuf blob that `readNormalizedNoteTypes` below
+ * decodes through `ankiProtoConfig.ts`.
  */
 function readLegacyNoteTypes(db: SqlReadable): RawAnkiNoteTypeRow[] {
   const raw = rows(db, 'SELECT models FROM col LIMIT 1')[0]?.[0];
@@ -111,42 +117,63 @@ function readLegacyNoteTypes(db: SqlReadable): RawAnkiNoteTypeRow[] {
 /**
  * Note types from schema 18's normalized tables.
  *
- * `notetypes.config`, `fields.config` and `templates.config` are protobuf blobs,
- * so a template's `qfmt`/`afmt`, the note type's CSS and its cloze/standard kind
- * are NOT readable here. Rather than default them to empty — which would export
- * a deck whose cards render blank and look like the user's own edit — every note
- * type read this way is marked `formatsUnavailable`, and the draft turns that
- * into a blocking diagnostic. Names, ordinals and the note-to-field mapping are
- * real columns and are read normally.
+ * `notetypes.config`, `fields.config` and `templates.config` are protobuf blobs;
+ * `ankiProtoConfig.ts` decodes the CSS, LaTeX preamble, question/answer formats
+ * and field fonts out of them. A note type keeps `formatsUnavailable` — and the
+ * draft's blocking diagnostic with it — unless EVERY one of its templates
+ * decoded a question format that references a field. A deck whose cards would
+ * render blank must say so rather than export a template that looks like the
+ * user's own edit.
  */
 function readNormalizedNoteTypes(db: SqlReadable): RawAnkiNoteTypeRow[] {
-  const noteTypeRows = rows(db, 'SELECT id, name FROM notetypes');
+  const noteTypeRows = rows(db, 'SELECT id, name, config FROM notetypes');
   if (!noteTypeRows.length) return [];
 
   const fieldsById = new Map<string, RawAnkiNoteTypeRow['fields']>();
-  for (const row of rows(db, 'SELECT ntid, ord, name FROM fields ORDER BY ntid, ord')) {
+  for (const row of rows(db, 'SELECT ntid, ord, name, config FROM fields ORDER BY ntid, ord')) {
     const id = str(row[0]);
     const list = fieldsById.get(id) ?? [];
-    list.push({ ord: num(row[1]), name: str(row[2]) });
+    const config = decodeFieldConfig(row[3]);
+    list.push({ ord: num(row[1]), name: str(row[2]), font: config?.font, size: config?.size });
     fieldsById.set(id, list);
   }
 
+  // A template whose config would not decode is recorded with no `qfmt` at all,
+  // so the all-templates check below fails for its note type instead of the
+  // draft quietly gaining one blank card.
   const templatesById = new Map<string, RawAnkiNoteTypeRow['templates']>();
-  for (const row of rows(db, 'SELECT ntid, ord, name FROM templates ORDER BY ntid, ord')) {
+  const decodedById = new Map<string, number>();
+  for (const row of rows(db, 'SELECT ntid, ord, name, config FROM templates ORDER BY ntid, ord')) {
     const id = str(row[0]);
     const list = templatesById.get(id) ?? [];
-    list.push({ ord: num(row[1]), name: str(row[2]) });
+    const config = decodeTemplateConfig(row[3]);
+    if (config) decodedById.set(id, (decodedById.get(id) ?? 0) + 1);
+    list.push({
+      ord: num(row[1]),
+      name: str(row[2]),
+      qfmt: config?.qfmt,
+      afmt: config?.afmt,
+      bqfmt: config?.bqfmt,
+      bafmt: config?.bafmt,
+    });
     templatesById.set(id, list);
   }
 
   return noteTypeRows.map((row) => {
     const id = str(row[0]);
+    const templates = templatesById.get(id) ?? [];
+    const config = decodeNotetypeConfig(row[2]);
+    const allDecoded = templates.length > 0 && decodedById.get(id) === templates.length;
     return {
       id,
       name: str(row[1]),
+      type: templatesLookCloze(templates) ? 1 : 0,
+      css: config?.css,
+      latexPre: config?.latexPre,
+      latexPost: config?.latexPost,
       fields: fieldsById.get(id) ?? [],
-      templates: templatesById.get(id) ?? [],
-      formatsUnavailable: true,
+      templates,
+      formatsUnavailable: allDecoded ? undefined : true,
     };
   });
 }

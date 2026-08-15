@@ -1,0 +1,200 @@
+// Decode the protobuf `config` blobs schema 18 keeps note-type CSS and card
+// templates in — the last thing standing between a modern .apkg and a
+// full-fidelity draft (ANKI_DECK_WORKBENCH_PLAN.md, Phase 1).
+//
+// Schema 11 states a template's question and answer format as plain JSON in
+// `col.models`. Schema 18 moved it into `notetypes.config` / `templates.config`
+// / `fields.config`, each a serialized protobuf message. Anki ships the schema
+// in its own repository, not in the package, so the field numbers below were
+// derived the only way a reader here can defend: by decoding every blob in 18
+// real schema-18 packages with a generic wire-format reader and matching field
+// numbers to content that can only be one thing (a `.card { ... }` stylesheet, a
+// `\documentclass` preamble, a `{{Front}}` template).
+//
+// Field numbers this file claims, with the evidence:
+//   notetypes.config  3 = css        35/35 blobs, CSS text
+//                     5 = latexPre   35/35, `\documentclass...`
+//                     6 = latexPost  35/35, `\end{document}`
+//   templates.config  1 = qfmt      187/187, contains `{{`
+//                     2 = afmt      187/187, contains `{{FrontSide}}` etc.
+//                     3 = bqfmt       6/187, a bare `{{Kanji}}` browser format
+//   fields.config     3 = font      496/496, `Arial`
+//                     4 = size      496/496, `20`
+//
+// Everything else stays undecoded on purpose. `kind` (field 1) and
+// `sortFieldIdx` (field 2) are absent from all 35 sampled note types because
+// both default to zero, so this reader will not assert a meaning for them from
+// a blob alone: cloze is recognised from the `{{cloze:` marker in a decoded
+// template, which is content evidence and cannot be a misread field number.
+//
+// Nothing here throws. A blob that does not decode returns `null` and the
+// caller keeps its existing "formats unavailable" claim, which is the honest
+// answer and the one already wired into the draft's blocking diagnostics.
+
+/** One field occurrence from the protobuf wire format. */
+interface WireField {
+  field: number;
+  wire: number;
+  varint?: bigint;
+  bytes?: Uint8Array;
+}
+
+const WIRE_VARINT = 0;
+const WIRE_I64 = 1;
+const WIRE_LEN = 2;
+const WIRE_I32 = 5;
+
+/**
+ * Generic protobuf wire-format reader — no schema, no assumptions.
+ *
+ * Returns `null` for anything malformed (a truncated varint, a length that runs
+ * past the end, a group/deprecated wire type) rather than a partial read, so a
+ * caller can never mistake half a message for a whole one.
+ */
+export function decodeWireFields(bytes: Uint8Array): WireField[] | null {
+  const out: WireField[] = [];
+  let i = 0;
+
+  const varint = (): bigint | null => {
+    let shift = 0n;
+    let value = 0n;
+    while (i < bytes.length) {
+      const b = bytes[i++];
+      value |= BigInt(b & 0x7f) << shift;
+      if ((b & 0x80) === 0) return value;
+      shift += 7n;
+      // 10 bytes is the maximum a 64-bit varint can occupy.
+      if (shift > 63n) return null;
+    }
+    return null;
+  };
+
+  while (i < bytes.length) {
+    const key = varint();
+    if (key == null) return null;
+    const field = Number(key >> 3n);
+    const wire = Number(key & 7n);
+    if (field <= 0) return null;
+
+    if (wire === WIRE_VARINT) {
+      const value = varint();
+      if (value == null) return null;
+      out.push({ field, wire, varint: value });
+    } else if (wire === WIRE_LEN) {
+      const len = varint();
+      if (len == null) return null;
+      const size = Number(len);
+      if (!Number.isSafeInteger(size) || size < 0 || i + size > bytes.length) return null;
+      out.push({ field, wire, bytes: bytes.subarray(i, i + size) });
+      i += size;
+    } else if (wire === WIRE_I64) {
+      if (i + 8 > bytes.length) return null;
+      i += 8;
+      out.push({ field, wire });
+    } else if (wire === WIRE_I32) {
+      if (i + 4 > bytes.length) return null;
+      i += 4;
+      out.push({ field, wire });
+    } else {
+      // Wire types 3 and 4 are the deprecated groups; Anki emits neither.
+      return null;
+    }
+  }
+  return out;
+}
+
+const decoder = new TextDecoder('utf-8', { fatal: false });
+
+function text(fields: WireField[], field: number): string | undefined {
+  const hit = fields.find((f) => f.field === field && f.wire === WIRE_LEN);
+  return hit?.bytes ? decoder.decode(hit.bytes) : undefined;
+}
+
+function asBytes(value: unknown): Uint8Array | null {
+  if (value instanceof Uint8Array) return value;
+  // sql.js hands back a Uint8Array; a Buffer (a Uint8Array subclass) also passes
+  // above. Anything else — a string, a null column — is not a blob.
+  if (Array.isArray(value) && value.every((b) => typeof b === 'number')) {
+    return Uint8Array.from(value as number[]);
+  }
+  return null;
+}
+
+// ----- note types ------------------------------------------------------------
+
+export interface AnkiNotetypeConfig {
+  css?: string;
+  latexPre?: string;
+  latexPost?: string;
+}
+
+/** Decode `notetypes.config`. `null` when the column is not a decodable blob. */
+export function decodeNotetypeConfig(value: unknown): AnkiNotetypeConfig | null {
+  const bytes = asBytes(value);
+  if (!bytes) return null;
+  const fields = decodeWireFields(bytes);
+  if (!fields) return null;
+  return {
+    css: text(fields, 3),
+    latexPre: text(fields, 5),
+    latexPost: text(fields, 6),
+  };
+}
+
+// ----- card templates --------------------------------------------------------
+
+export interface AnkiTemplateConfig {
+  qfmt: string;
+  afmt: string;
+  bqfmt?: string;
+  bafmt?: string;
+}
+
+/**
+ * Decode `templates.config`.
+ *
+ * `null` unless the blob yields a question format that actually looks like one.
+ * Anki requires the front of a card to reference at least one field, so a qfmt
+ * with no `{{` is either a misdecode or a template that would render blank —
+ * both cases the caller must report as unavailable rather than export.
+ */
+export function decodeTemplateConfig(value: unknown): AnkiTemplateConfig | null {
+  const bytes = asBytes(value);
+  if (!bytes) return null;
+  const fields = decodeWireFields(bytes);
+  if (!fields) return null;
+  const qfmt = text(fields, 1);
+  if (!qfmt || !qfmt.includes('{{')) return null;
+  return {
+    qfmt,
+    afmt: text(fields, 2) ?? '',
+    bqfmt: text(fields, 3),
+    bafmt: text(fields, 4),
+  };
+}
+
+/** A cloze note type is the one whose template asks for a cloze deletion. */
+export function templatesLookCloze(templates: readonly { qfmt?: string }[]): boolean {
+  return templates.some((t) => (t.qfmt ?? '').includes('{{cloze:'));
+}
+
+// ----- fields ----------------------------------------------------------------
+
+export interface AnkiFieldConfig {
+  font?: string;
+  size?: number;
+}
+
+/** Decode `fields.config`. Only the two members every sampled blob carries. */
+export function decodeFieldConfig(value: unknown): AnkiFieldConfig | null {
+  const bytes = asBytes(value);
+  if (!bytes) return null;
+  const fields = decodeWireFields(bytes);
+  if (!fields) return null;
+  const size = fields.find((f) => f.field === 4 && f.wire === WIRE_VARINT)?.varint;
+  return {
+    font: text(fields, 3),
+    // A font size is a small positive number; anything else is not one.
+    size: size != null && size > 0n && size < 1000n ? Number(size) : undefined,
+  };
+}
