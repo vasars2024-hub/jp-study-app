@@ -471,6 +471,31 @@ declare global {
       readAnkiConnectDraft(
         request?: import('../shared/ankiConnectDraft').ConnectDraftRequest,
       ): Promise<import('../shared/ankiConnectDraft').ConnectDraftResult>;
+      ankiDraftSessionList(): Promise<
+        import('../main/anki/draftSessionStore').DraftSessionSummary[]
+      >;
+      ankiDraftSessionBegin(request: {
+        sourceKind: import('../shared/ankiDraft').AnkiDraftSourceKind;
+        label: string;
+        request: import('../shared/ankiDraftSession').AnkiDraftSessionRequest;
+        fingerprint?: string;
+      }): Promise<import('../shared/ankiDraftSession').AnkiDraftSession>;
+      ankiDraftSessionRecordPage(
+        id: string,
+        page: import('../shared/ankiDraftSession').DraftSessionPageReport,
+      ): Promise<import('../shared/ankiDraftSession').AnkiDraftSession | null>;
+      ankiDraftSessionCancel(
+        id: string,
+      ): Promise<import('../shared/ankiDraftSession').AnkiDraftSession | null>;
+      ankiDraftSessionFail(
+        id: string,
+        error: string,
+      ): Promise<import('../shared/ankiDraftSession').AnkiDraftSession | null>;
+      ankiDraftSessionResume(
+        id: string,
+        fingerprint?: string,
+      ): Promise<import('../main/anki/draftSessionStore').DraftSessionResumeResult>;
+      ankiDraftSessionDelete(id: string): Promise<boolean>;
       onAnkiIntervalsChanged(cb: (s: IntervalSnapshot) => void): () => void;
       desktopGetLayout(): Promise<DesktopLayoutSnapshot>;
       desktopCommitLayout(

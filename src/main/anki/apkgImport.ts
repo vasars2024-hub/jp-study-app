@@ -37,6 +37,17 @@ import type { ConnectDraftRequest } from '../../shared/ankiConnectDraft';
 import { readRawCollection } from './apkgDraftRead';
 import { readCsvDraft } from './csvDraftRead';
 import { readConnectDraft } from './connectDraftRead';
+import {
+  beginDraftSession,
+  cancelDraftSession,
+  deleteDraftSession,
+  failDraftSession,
+  recordDraftSessionPage,
+  resumeDraftSession,
+  summarizeDraftSessions,
+  type BeginDraftSessionRequest,
+} from './draftSessionStore';
+import type { DraftSessionPageReport } from '../../shared/ankiDraftSession';
 import { decodeMediaManifestNames } from './ankiProtoConfig';
 import { mt } from '../i18n';
 
@@ -425,4 +436,23 @@ export function registerApkgIpc(): void {
   ipcMain.handle('anki:readConnectDraft', (_e, request?: ConnectDraftRequest) =>
     readConnectDraft(request),
   );
+
+  // Resumable draft sessions. The renderer drives paging, so it is the only
+  // component that knows a page actually arrived; these channels are how it
+  // tells the store. Nothing here reads a source — see `draftSessionStore.ts`.
+  ipcMain.handle('anki:draftSessionList', () => summarizeDraftSessions());
+  ipcMain.handle('anki:draftSessionBegin', (_e, request: BeginDraftSessionRequest) =>
+    beginDraftSession(request),
+  );
+  ipcMain.handle('anki:draftSessionRecordPage', (_e, id: string, page: DraftSessionPageReport) =>
+    recordDraftSessionPage(id, page) ?? null,
+  );
+  ipcMain.handle('anki:draftSessionCancel', (_e, id: string) => cancelDraftSession(id) ?? null);
+  ipcMain.handle('anki:draftSessionFail', (_e, id: string, error: string) =>
+    failDraftSession(id, String(error ?? 'unknown')) ?? null,
+  );
+  ipcMain.handle('anki:draftSessionResume', (_e, id: string, fingerprint?: string) =>
+    resumeDraftSession(id, fingerprint),
+  );
+  ipcMain.handle('anki:draftSessionDelete', (_e, id: string) => deleteDraftSession(id));
 }

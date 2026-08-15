@@ -67,6 +67,12 @@ import type { ApkgDraftRequest, ApkgDraftResult } from './shared/ankiDraft';
 import type { CsvDraftRequest, CsvDraftResult } from './shared/ankiCsv';
 import type { ConnectDraftRequest, ConnectDraftResult } from './shared/ankiConnectDraft';
 import type {
+  AnkiDraftSession,
+  AnkiDraftSessionRequest,
+  DraftSessionPageReport,
+} from './shared/ankiDraftSession';
+import type { DraftSessionSummary as AnkiDraftSessionSummary } from './main/anki/draftSessionStore';
+import type {
   AiEngineConfig,
   AiEngineKind,
   AiDeckGenerationRequest,
@@ -581,6 +587,32 @@ const api = {
   /** One page of the live Anki collection read as a workbench draft. Read-only. */
   readAnkiConnectDraft: (request?: ConnectDraftRequest): Promise<ConnectDraftResult> =>
     ipcRenderer.invoke('anki:readConnectDraft', request),
+  /** Resumable draft sessions. `complete` is never something a caller may set. */
+  ankiDraftSessionList: (): Promise<AnkiDraftSessionSummary[]> =>
+    ipcRenderer.invoke('anki:draftSessionList'),
+  ankiDraftSessionBegin: (request: {
+    sourceKind: import('./shared/ankiDraft').AnkiDraftSourceKind;
+    label: string;
+    request: AnkiDraftSessionRequest;
+    fingerprint?: string;
+  }): Promise<AnkiDraftSession> => ipcRenderer.invoke('anki:draftSessionBegin', request),
+  ankiDraftSessionRecordPage: (
+    id: string,
+    page: DraftSessionPageReport,
+  ): Promise<AnkiDraftSession | null> =>
+    ipcRenderer.invoke('anki:draftSessionRecordPage', id, page),
+  ankiDraftSessionCancel: (id: string): Promise<AnkiDraftSession | null> =>
+    ipcRenderer.invoke('anki:draftSessionCancel', id),
+  ankiDraftSessionFail: (id: string, error: string): Promise<AnkiDraftSession | null> =>
+    ipcRenderer.invoke('anki:draftSessionFail', id, error),
+  /** Pass the source's live fingerprint; a mismatch answers `source-changed`. */
+  ankiDraftSessionResume: (
+    id: string,
+    fingerprint?: string,
+  ): Promise<import('./main/anki/draftSessionStore').DraftSessionResumeResult> =>
+    ipcRenderer.invoke('anki:draftSessionResume', id, fingerprint),
+  ankiDraftSessionDelete: (id: string): Promise<boolean> =>
+    ipcRenderer.invoke('anki:draftSessionDelete', id),
   dictListYomitan: (): Promise<YomitanDictInfo[]> => ipcRenderer.invoke('dict:listYomitan'),
   dictRemoveYomitan: (id: string): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('dict:removeYomitan', id),
