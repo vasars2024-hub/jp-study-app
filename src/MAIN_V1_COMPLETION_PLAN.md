@@ -371,18 +371,149 @@ The existing popup is a foundation, not completion.
   OCR/model default controls. Alternate OCR candidates and the mixed-panel order model still
   need explicit provider/product decisions and have not been forced.
 
-## Track 6: repair Media shell, then finish Liquid
+## Track 6: repair Media shell, then prove the Liquid Video pilot
 
 - Treat the current workspace screenshot state as a release-blocking regression: no sidebar, search, discovery, or useful library structure and a giant empty canvas.
 - Restore one coherent Media shell with sidebar, global search, Library, Discover, Study, Readiness, Review, Music, Settings, imports, filtering, sorting, queues, details, and player access.
 - Clearly integrate local and Seanime-backed libraries rather than hiding the mature shell behind a stripped overlay.
-- Then complete Liquid video/workspace: real playback, subtitle discovery/versioning, dual subtitles, transcript, dictionary, translation, AI, mining/card editor, layouts, customization, detach/reattach, multi-monitor placement, restored bounds, persistence, errors, and performance.
+- Then complete the first full Liquid Video pilot under `LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md`: real playback, subtitle discovery/versioning, dual subtitles, transcript, dictionary, translation, AI, mining/card editor, layouts, customization, detach/reattach, multi-monitor placement, restored bounds, persistence, errors, and performance.
+- Use `renderer/assets/concepts/liquid-workplace-video-concept-v1.png` for hierarchy, density, and selective-material intent, not as a literal feature or data specification.
+- Keep conventional windows as the default. The same complete Media/Video feature set must work in Standard and explicitly enabled Liquid presentations.
+- Do not call the player a system pattern until it has passed the full visual matrix and the user has approved it.
 
 ## Track 7: remaining main-app completion
 
 - Reconcile and finish all still-open non-Mobile, non-Noctis v1 features after re-deriving their state.
 - Include known architecture, grammar, settings/help, storage-hardening, scraper, subtitles, resources, VN, manga, Anki, multi-monitor, visual, and stale-document discrepancies only when source/live evidence confirms they remain open.
+- Deliver the required full-fidelity Anki Deck Workbench in `ANKI_DECK_WORKBENCH_PLAN.md`. The current APKG importer, local Flashcards editor, and Anki card composer are foundations, not completion; this slice remains open until that plan's demonstrable acceptance gates pass.
 - Do not redo items merely because an old document says pending.
+
+## Track 8: system-wide Liquid Workplace transformation
+
+After the player pilot is visually approved and the remaining app contracts are stable, execute
+`LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md` across every main desktop app and internal suite.
+
+- Apply the concept's clean, smooth, minimal, intelligent hierarchy to every app interior, including normal windows.
+- Keep Liquid window behavior explicit, per-window, reversible, and state preserving.
+- Use stable opaque anchors for reading, editing, forms, tables, logs, calendars, gameplay, review cards, and other dense work. Reserve Liquid treatment for contextual navigation, transport, inspectors, docking, and meaningful transitions.
+- Build and close a feature-parity ledger for Standard and Liquid destinations before accepting any app migration.
+- Preserve the taskbar, desktop grid, normal drag/resize/snap/focus, pop-outs, multi-monitor transfer, persistence, Aero, Wired, Blanc, high contrast, reduced motion, and performance modes.
+- Require fresh rendered baselines and after screenshots at compact/default/maximized sizes; source inspection alone is not visual proof.
+- Finish with the full visual atlas and explicit user visual approval before release hardening.
+
+## Track 9: qBittorrent API surface — credential contract and verification phase
+
+Every part of the app that reaches qBittorrent goes through one client
+(`src/main/scraper/qbittorrent.ts`) and one stored secret. That surface has never been proven
+against a live daemon: the nyaa subtitle provider shipped in `477380be` with 40 unit tests and a
+live IPC check, but **no acquisition has ever completed**, and the client cannot use the
+credential form qBittorrent now issues. This phase closes both gaps and covers *all* qBittorrent
+consumers, not only nyaa.
+
+### The auth contract — measured, not inferred
+
+Taken 2026-08-15 against **qBittorrent v5.2.3** on `127.0.0.1:8080`.
+
+> **Test-validity rule.** With `WebUI\LocalHostAuth=false`, qBittorrent authorises *every*
+> localhost request, so all four rows below return 200 and the run proves nothing. Every auth
+> probe MUST run with `LocalHostAuth=true` and MUST include a no-credential control that returns
+> 403. A probe without a passing negative control is not evidence. This exact false pass was
+> produced once while establishing this table.
+
+| Method | Result |
+|---|---|
+| no credentials (control) | **403** — control passes, run is valid |
+| `X-Api-Key: <key>` | **403** — not a supported header |
+| `Authorization: Bearer <key>` | **200** |
+| `POST /api/v2/auth/login` (username+password) → SID cookie | 204, then 200 |
+
+What follows from it:
+
+- **An API key authenticates on its own.** A user who supplies one must never also be asked for a
+  username and password. Requiring both is a defect, not a safety measure.
+- **`Authorization: Bearer` is the only accepted header form.** `X-Api-Key` is refused by the
+  daemon. Do not ship the header name by analogy with other providers.
+- `qbittorrent.ts` today implements only `login()` → SID cookie, with the password resolved from
+  the vault via `getScraperSecret(config.passwordRef)`. **API-key auth is unimplemented**, so every
+  gate below that names a key is blocked until Phase 9.0 lands.
+- Both modes must keep working. Existing users have username/password in the vault; new users will
+  have only a key. Neither may become mandatory for the other.
+
+### Phase 9.0 — the missing auth path (build, then test)
+
+- Add an API-key mode to `ScraperQbittorrentSettings`: an `apiKeyRef` alongside `passwordRef`,
+  resolved through the same credential vault. The key itself never enters settings JSON, any
+  export, any error string, or any log line.
+- Add the key to the scraper redaction list beside the existing `'x-api-key'` entry in
+  `src/main/scraper/http.ts:72`, and to the token patterns in `src/main/scraper/logBus.ts:217`.
+- Settings offers exactly one auth mode at a time; choosing one visibly disables the other's
+  fields rather than silently ignoring them.
+- `qbitTest()` reports *which* mode authenticated, so a user can tell a working key from a working
+  password.
+- `resetQbitSessions()` must clear key-mode state too, or a changed key keeps working until restart.
+
+### Phase 9.1 — contract gates (no daemon, run in CI)
+
+1. A key-mode request carries `Authorization: Bearer` and **no** `username`/`password` field.
+2. A password-mode request is byte-identical to today's — this phase must not regress the SID path.
+3. The key is absent from every log line, error message, `QbitStatusReport`, and settings export;
+   assert on a fixture key with a recognisable sentinel value.
+4. Switching modes clears the cached cookie/session for that host.
+5. A malformed or empty key is refused before any network call is attempted.
+
+### Phase 9.2 — live daemon gates (real qBittorrent, no torrent traffic)
+
+Run with `LocalHostAuth=true` and the 403 control passing, against a real daemon.
+
+6. `qbitTest()` succeeds in key mode with no password stored anywhere.
+7. `qbitTest()` succeeds in password mode with no key stored anywhere.
+8. A wrong key and a wrong password each produce a *distinct, honest* message — not the same
+   generic failure, and not a false success.
+9. `qbitTransfers()`, `qbitTorrentInfo()`, `qbitFiles()`, `qbitSetFilePriorities()`, `qbitStart()`
+   and `qbitAwaitFiles()` each succeed in **both** modes. Reaching only `app/version` proves
+   nothing about the endpoints acquisition actually uses.
+10. A daemon that is running but has the WebUI disabled must surface the specific "WebUI not
+    enabled" condition, distinct from "wrong credentials" and from "not running". qBittorrent
+    refuses to start the WebUI at all when credentials are unset and logs
+    `WebUI: Credentials are not set` — that state must be reported honestly, not as a timeout.
+
+### Phase 9.3 — real acquisition gates (network side effects — attended runs only)
+
+These download from a public swarm on the user's connection. **Never run unattended, and never as
+part of an automated suite.**
+
+11. Route A: a subtitle-only release under the 50 MB ceiling is taken whole, lands as a
+    `SubtitleRecord`, and its cues render in the player through the same path a Jimaku subtitle
+    takes.
+12. Route B: a batch release fetches only subtitle files by per-file priority, with everything else
+    set to skip; verify against `qbitFiles()` that no video file was ever requested.
+13. A single-file MKV with an interleaved embedded track is refused rather than partially fetched.
+14. The "don't touch a torrent the user already has" rule holds when the target hash is already in
+    the session — verified against a real pre-existing torrent, not a fixture.
+15. Interrupting an in-flight acquisition leaves no half-registered `SubtitleRecord` and no
+    orphaned torrent in the `jp-study-subtitles` category.
+
+### Phase 9.4 — portability gates (the "any user, not just this machine" requirement)
+
+16. A clean profile with no vault entry, no key, and no qBittorrent configured shows an honest
+    disabled state with a specific reason — the four-message availability guard already proven for
+    nyaa must hold for every qBittorrent consumer.
+17. A user who pastes only an API key reaches a working acquisition without ever seeing a
+    username or password field.
+18. A non-default host, port, and `basePath` (reverse-proxy style) work in both auth modes;
+    `qbitBaseUrl()` is exercised with a non-empty base path.
+19. Credentials survive an app restart and are readable only through the vault, never from a
+    settings file on disk.
+20. Every qBittorrent consumer is covered, not just nyaa: `subtitleNyaaSource.ts`,
+    `subtitleDiscovery.ts`, `scraper/downloads.ts`, `scraper/torrents.ts`, `scraper/runtime.ts`,
+    and the `TorrentManagerPage`, `MalDownloadDialog`, `NyaaSubtitleDialog`, and
+    `ScraperSettingsDrawer` surfaces. A consumer left on the old auth path is an open gate.
+
+### Exit condition
+
+Gates 1–10 and 16–20 pass in CI or against a live daemon with the 403 control passing. Gates 11–15
+are attended and signed off once by the user. Until then the nyaa provider stays default-disabled
+and last in priority, as it ships today.
 
 ## Dependency order
 
@@ -392,9 +523,11 @@ The existing popup is a foundation, not completion.
 4. Central AI Agent foundation and main Study OS surface, reusing the Lexicon and existing tool infrastructure.
 5. Unified Reading workspace.
 6. ReadingLens completion using shared Lexicon, Agent, and Reading components.
-7. Media shell repair, then Liquid completion.
-8. Remaining confirmed main-app items.
-9. Fresh v1.0 audit, full regression gates, and complete visual verification matrix.
+7. Media shell repair, then the feature-complete and visually approved Liquid Video pilot.
+8. Remaining confirmed main-app items, including the required Anki Deck Workbench, so the transformation targets stable contracts.
+9. qBittorrent API surface: the credential contract in Track 9 Phase 9.0, then its verification phase. This gates the nyaa subtitle acquisition and every other qBittorrent consumer, and it is the only remaining item whose acceptance needs an attended run with real network side effects.
+10. System-wide Liquid Workplace rollout in the L5–L11 waves defined by its dedicated plan.
+11. Fresh v1.0 audit, parity-ledger closure, full regression gates, and complete Standard/Liquid/theme visual verification matrix.
 
 Independent Media-shell work may run alongside Dictionary/Lexicon after the audit, but live Electron verification must be serialized to avoid misleading evidence.
 
