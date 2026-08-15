@@ -736,3 +736,44 @@ losing to mtOnly. CLI on a 2-episode fixture: offline → **PASS, exit 0, claim
 
 **Where §6(3) now stands.** Still FAIL, but for one honest reason instead of two: only one
 real episode has ever been scored. The structural blocker is gone.
+
+### F3's truncation isolated: it was never the timeout — 2026-08-15, primary
+
+**Landed:** `f090522`.
+
+**Retraction.** The previous entry's suspected mechanism — `BATCH_PROMPT_TIMEOUT_MS` at 90 s
+against a `LlamaChatSession` whose context grows per chunk — is **wrong**. Each prompt finishes
+in ~3.7 s, and `promptWithTimeout`'s `finally` already calls `resetSessionHistory`. Do not
+re-open the timeout theory.
+
+**The real cause, measured against the shipped Qwen3-1.7B, not argued.** `buildBatchPrompt`
+demonstrated a **hardcoded** example id. The model copies it literally and `parseBatchJson`
+filters on `expectedIds`, so the reply was discarded wholesale. Same 8 English sentences,
+three id offsets, long form: ids `0-7` → model returned `["0".."7"]`, **8/8 kept**; ids `8-15`
+→ `["0".."7"]`, **0/8**; ids `16-23` → `["0".."7"]`, **0/8**. `runTranslationBatch` chunks by
+`BATCH_SIZE = 8`, which is exactly why 35 windows yielded a reference for the first 8 only.
+
+**A second, larger defect fell out of the same probe.** The *short-form* prompt's example said
+`{"id":"t0"}` while its lines were `[0]`, so it returned **0/8 on the first chunk too** — every
+short-form batch translation in the app has been returning nothing, for as long as that example
+has been frozen. Nothing measured it because the caller reads an empty string as "the model
+declined this term".
+
+**Fix: derive the example from `items[0].id`.** After it, all five cases keep 8/8, including
+ids `480-487` and `1200-1207` — so the model has no trouble with large ids and a chunk-local
+renumbering layer in `translate.ts` is **not** needed. One was written and then reverted; do not
+re-add it. `parseBatchJson` also now rejects `"<Japanese translation>"`, the placeholder the
+model was seen returning as every item's text.
+
+**Trap for the next worker.** This is not fusion-specific — `runTranslationBatch` serves EPUB,
+manga and gloss paths too, and all of them lost everything past item 8. Any pre-`f090522`
+measurement of local translation coverage is understated and must be re-taken, not reused.
+
+**Gates:** vitest 612 passed / 1 skipped files, 8,123 passed / 6 skipped. i18n exit 0 at 9,584
+keys. architecture exit 0, "Nothing new", 2 known pending. eslint clean on the 4 `src/` paths;
+`tools/fusion-eval.cjs`'s 3 `no-var-requires` errors are **pre-existing** — verified by linting
+the `16e1603~1` blob, which reports the same 3 at the same statements.
+
+**Not re-run this turn:** the F7 harness itself. It needs the app, real media and a fresh fusion;
+the reference stage should now cover all 35 windows instead of 8, and that number is the first
+thing to re-measure.
