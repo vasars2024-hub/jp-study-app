@@ -15,6 +15,7 @@ import {
   fieldsForGroup,
   fieldPatch,
   groupMeta,
+  readField,
   searchScraperFields,
   type ScraperFieldDef,
   type ScraperSettingsGroupId,
@@ -147,7 +148,12 @@ export default function ScraperSettingsDrawer() {
         void testQbit();
         return;
       case 'credential': {
-        const ref = settings.qbittorrent.passwordRef;
+        // The ref comes from the field's own path, not a hardcoded one: there
+        // are two credentials on this panel now (password and API key) and a
+        // fixed path would have opened the password editor for both.
+        const ref = typeof readField(settings, field.path) === 'string'
+          ? (readField(settings, field.path) as string)
+          : '';
         setCredentialEditor({ title: field.label, path: field.path, value: ref, secret: '', stored: false });
         // Whether a secret exists is main's answer, not something the settings
         // document can be trusted to know.

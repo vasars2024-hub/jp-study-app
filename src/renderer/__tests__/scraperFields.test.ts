@@ -146,6 +146,36 @@ describe('searchScraperFields', () => {
     expect(hits.some((p) => p.startsWith('qbittorrent.'))).toBe(true);
   });
 
+  it('finds the API key field by the words a user would type', () => {
+    for (const query of ['api key', 'bearer', 'token']) {
+      expect(searchScraperFields(query, true).map((f) => f.path)).toContain(
+        'qbittorrent.apiKeyRef',
+      );
+    }
+  });
+});
+
+describe('the two qBittorrent credential fields', () => {
+  const credentials = SCRAPER_FIELDS.filter(
+    (f) => f.action === 'qbit-password' || f.action === 'qbit-apikey',
+  );
+
+  it('are two distinct fields on two distinct paths', () => {
+    // The drawer used to read `qbittorrent.passwordRef` for whichever credential
+    // row was clicked, so a second one would have edited the first one's secret.
+    expect(credentials.map((f) => f.path).sort()).toEqual([
+      'qbittorrent.apiKeyRef',
+      'qbittorrent.passwordRef',
+    ]);
+  });
+
+  it('both point at a ref the settings model holds, never at the secret', () => {
+    for (const field of credentials) {
+      expect(readField(DEFAULT_SCRAPER_SETTINGS, field.path)).toBe('');
+      expect(field.path.endsWith('Ref')).toBe(true);
+    }
+  });
+
   it('respects advanced mode', () => {
     const advancedField = SCRAPER_FIELDS.find((f) => f.advanced)!;
     expect(searchScraperFields(advancedField.label, false).map((f) => f.path)).not.toContain(

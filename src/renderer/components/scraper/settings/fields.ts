@@ -27,6 +27,7 @@ import {
 } from '../../../../shared/scraperOutputSettings';
 import {
   SCRAPER_QBIT_ADD_MODES,
+  SCRAPER_QBIT_AUTH_MODES,
   SCRAPER_QBIT_LAYOUTS,
   SCRAPER_SOURCE_MODES,
   SCRAPER_TORRENT_PROTOCOLS,
@@ -267,8 +268,10 @@ export const SCRAPER_FIELDS: ScraperFieldDef[] = [
   { path: 'qbittorrent.host', group: 'qbittorrent', kind: 'text', label: 'Host', placeholder: 'localhost' },
   { path: 'qbittorrent.port', group: 'qbittorrent', kind: 'number', label: 'Port', min: 1, max: 65_535 },
   { path: 'qbittorrent.basePath', group: 'qbittorrent', kind: 'text', label: 'Base Path', placeholder: '/qbt', advanced: true },
+  { path: 'qbittorrent.authMode', group: 'qbittorrent', kind: 'select', label: 'Authentication', options: opts(SCRAPER_QBIT_AUTH_MODES, { password: 'Username and password', apiKey: 'API key' }), keywords: ['api key', 'auth', 'login'], hint: 'The mode not selected here is ignored, not used as a fallback.' },
   { path: 'qbittorrent.username', group: 'qbittorrent', kind: 'text', label: 'Username' },
   { path: 'qbittorrent.passwordRef', group: 'qbittorrent', kind: 'status', label: 'Password', action: 'qbit-password', hint: 'Stored by the operating system, never in this settings file.' },
+  { path: 'qbittorrent.apiKeyRef', group: 'qbittorrent', kind: 'status', label: 'API Key', action: 'qbit-apikey', keywords: ['api key', 'token', 'bearer'], hint: 'Sent as a Bearer token, and enough on its own — no username or password is needed in this mode.' },
   { path: 'qbittorrent.category', group: 'qbittorrent', kind: 'text', label: 'Category', placeholder: 'anime' },
   { path: 'qbittorrent.tags', group: 'qbittorrent', kind: 'tags', label: 'Tags' },
   { path: 'qbittorrent.savePath', group: 'qbittorrent', kind: 'text', label: 'Save Path', placeholder: 'Leave empty to use qBittorrent’s default' },
