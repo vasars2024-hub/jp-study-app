@@ -80,13 +80,11 @@ import type { LexiconEtymologyResult } from '../../shared/lexiconEtymology';
 import type { LexiconXrefResult } from '../../shared/lexiconXrefs';
 import {
   isGlobalPair,
-  normalizeSourceLang,
   pairKey,
   type DictionaryLanguagePair,
   type DictionarySourceInfo,
   type DictionarySourceMutationResult,
 } from '../../shared/dictionarySources';
-import { runSourceLangRelabel } from './sourceLang';
 import {
   buildOfflineInterlinear,
   type LexiconInterlinearOptions,
@@ -234,41 +232,15 @@ export function setDictionarySourceEnabled(
   return { ok: result.changes > 0, error: result.changes ? undefined : 'not-found', sources: listDictionarySources(db) };
 }
 
-/**
- * Correct the language a source's headwords are stored under.
- *
- * The legacy Yomitan format declares no source language, so a Chinese or Korean
- * archive a user imported themselves lands under `'ja'` with nothing in the file
- * to say otherwise — and the title cannot be trusted for this side, because it
- * names the *gloss* language ("JMdict (Japanese–Russian)"). Schema step 7 repairs
- * the dictionaries this app provisions itself, by id; this is how a user repairs
- * the rest, which is the only evidence that exists for them.
- *
- * It is a relabel of every row the source owns, in one transaction, because the
- * language is what the lookup path filters on: `lookupChineseInDb` pins
- * `sourceLangs: ['zh']`, `dict_pair_priority` joins `pp.source_lang = h.lang`,
- * and pitch and frequency are read under the headword's language. Changing the
- * `dictionaries` row alone would advertise a pair the headwords cannot answer —
- * the exact shape of the defect this repairs.
- *
- * **Synchronous, and therefore not the renderer's path.** Measured at 7.2 s for
- * JMdict RU's 101,843 headwords; JMdict EN has 524,106 and would freeze the app
- * for something like half a minute. `dict:setSourceLang` queues a `relabel` job
- * on the import utility process instead (`importWorker.ts`). This entry point
- * stays for tests and for any caller that already owns a database handle and a
- * thread it is allowed to block.
- */
-export function setDictionarySourceLang(
-  id: string,
-  lang: unknown,
-  db: SqliteDb = dictionaryDb(),
-): DictionarySourceMutationResult {
-  const target = normalizeSourceLang(lang);
-  if (!target) return { ok: false, error: 'invalid-lang', sources: listDictionarySources(db) };
-  const outcome = runSourceLangRelabel(db, id, target);
-  if (!outcome.ok) return { ok: false, error: outcome.error, sources: listDictionarySources(db) };
-  return { ok: true, sources: listDictionarySources(db) };
-}
+// Correcting the language a source's headwords are stored under has no entry
+// point here, deliberately. It used to: a synchronous `setDictionarySourceLang`
+// kept "for callers that already own a database handle and a thread they may
+// block". No such caller ever appeared — `dict:setSourceLang` routes to
+// `startSourceLangRelabel`, which queues the work on the import utility process —
+// so all it was was a second, unguarded way onto a 7.2 s write transaction from
+// whatever thread happened to call it. The work itself lives in
+// `dictionary/sourceLang.ts`, which is what the utility process runs and what the
+// tests exercise. Boss audit 2026-08-15 04:24, finding 5.
 
 export function moveDictionarySource(
   id: string,

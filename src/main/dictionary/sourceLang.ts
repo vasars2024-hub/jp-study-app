@@ -70,9 +70,13 @@ export type SourceLangRelabelOutcome =
  * `lang`-keyed headword indexes, not the FTS triggers — so it is exactly the
  * shape of work that must not sit on the main event loop.
  *
- * `counts` are `better-sqlite3`'s own `changes` per statement, not estimates:
- * they are what the caller reports, and a relabel that claims rows it did not
- * move is the same class of lie as an import that claims entries it did not write.
+ * `counts` are "rows this dictionary now owns in that language", read back inside
+ * the same transaction — and that is not the same as "rows this relabel moved".
+ * Only `characters` (`:111`) is `better-sqlite3`'s own `changes`; the other four
+ * are `count(*)` taken *after* the move, so they include any row that already
+ * carried `toLang` beforehand. What the caller reports has to be read that way,
+ * because a relabel that claims rows it did not move is the same class of lie as
+ * an import that claims entries it did not write.
  */
 export function runSourceLangRelabel(
   db: SqliteDb,

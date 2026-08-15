@@ -684,9 +684,9 @@ export function registerDictionaryIpc(): void {
   //
   // The work itself does *not* happen here: relabelling every row a dictionary
   // owns is 7.2 s for 101,843 headwords and would be ~35 s for JMdict EN, so it
-  // is queued on the import utility process and answered with a job id. The
-  // synchronous `setDictionarySourceLang` stays in `service.ts` for callers that
-  // already hold a database handle and a thread they may block.
+  // is queued on the import utility process and answered with a job id. This is
+  // the only entry point: `service.ts` used to carry a synchronous twin for
+  // callers holding their own handle, and no such caller ever existed.
   ipcMain.handle('dict:setSourceLang', (_e, id: string, lang: unknown) =>
     startSourceLangRelabel(id, lang));
   ipcMain.handle('dict:moveSource', (_e, id: string, direction: -1 | 1, pair?: unknown) => {

@@ -17,8 +17,12 @@ import {
   removeDictionarySource,
   resetDictionaryPairPriority,
   setDictionarySourceEnabled,
-  setDictionarySourceLang,
 } from '../dictionary/service';
+// The relabel itself, not a `service.ts` wrapper around it: the only production
+// entry point is `startSourceLangRelabel`, which validates the code and then runs
+// exactly this against the utility process's own handle. Validation is covered
+// where it lives, in `dictionarySourceLangJob.test.ts`.
+import { runSourceLangRelabel } from '../dictionary/sourceLang';
 import { GLOBAL_PAIR, normalizeSourceLang } from '../../shared/dictionarySources';
 
 describe('dictionary source controls', () => {
@@ -75,7 +79,7 @@ describe('correcting the language a source was imported under', () => {
       .map((row) => row.lang);
 
   it('relabels every row the source owns, and only that source', () => {
-    expect(setDictionarySourceLang('user-zh', 'zh', db)).toMatchObject({ ok: true });
+    expect(runSourceLangRelabel(db, 'user-zh', 'zh')).toMatchObject({ ok: true, changed: true });
 
     expect(listDictionarySources(db).find((source) => source.id === 'user-zh')?.sourceLang).toBe('zh');
     expect(langOf('headwords')).toEqual(['zh']);
@@ -91,7 +95,7 @@ describe('correcting the language a source was imported under', () => {
       { sourceLang: 'ja', targetLang: 'en' },
       { sourceLang: 'ja', targetLang: 'zh' },
     ]);
-    setDictionarySourceLang('user-zh', 'zh', db);
+    runSourceLangRelabel(db, 'user-zh', 'zh');
     expect(listDictionaryPairs(db)).toEqual([
       { sourceLang: 'ja', targetLang: 'en' },
       { sourceLang: 'zh', targetLang: 'zh' },
@@ -106,7 +110,7 @@ describe('correcting the language a source was imported under', () => {
     // A stale row already sitting on the destination pair. It cannot have been
     // chosen deliberately — no zh headword of this dictionary existed to order.
     upsert.run('user-zh', 'zh', 'zh', 9);
-    setDictionarySourceLang('user-zh', 'zh', db);
+    runSourceLangRelabel(db, 'user-zh', 'zh');
     const rows = db
       .prepare('select source_lang, target_lang, priority from dict_pair_priority where dict_id = ?')
       .all('user-zh');
@@ -119,7 +123,7 @@ describe('correcting the language a source was imported under', () => {
     db.prepare(`insert into chars (lang, char, strokes, primary_source_id, source_ids)
                 values ('ja', ?, ?, ?, ?)`).run('熊', 14, 'user-zh', '["user-zh"]');
 
-    setDictionarySourceLang('user-zh', 'zh', db);
+    runSourceLangRelabel(db, 'user-zh', 'zh');
 
     expect(langOf('char_sources')).toEqual(['zh']);
     // `chars` is a Japanese-only projection, so a source that is no longer
@@ -128,19 +132,22 @@ describe('correcting the language a source was imported under', () => {
       .toEqual({ c: 0 });
   });
 
-  it('refuses anything that is not a language code, and writes nothing', () => {
+  it('refuses anything that is not a language code before any row is touched', () => {
+    // The gate is the validator, and it runs before a handle is ever reached —
+    // which is the point: `runSourceLangRelabel` takes a code that has already
+    // passed, so nothing that fails here can arrive at a write at all.
     for (const bad of ['', ' ', 'ja-JP', 'j', 'jpan', 'z h', '中文', 7, null, undefined, ['zh'], {}]) {
-      expect(setDictionarySourceLang('user-zh', bad, db)).toMatchObject({ ok: false, error: 'invalid-lang' });
+      expect(normalizeSourceLang(bad)).toBeUndefined();
     }
     expect(langOf('headwords')).toEqual(['ja']);
     expect(listDictionarySources(db).find((source) => source.id === 'user-zh')?.sourceLang).toBe('ja');
   });
 
   it('is honest about a source that is not there, and quiet about one already correct', () => {
-    expect(setDictionarySourceLang('missing', 'zh', db)).toMatchObject({ ok: false, error: 'not-found' });
+    expect(runSourceLangRelabel(db, 'missing', 'zh')).toMatchObject({ ok: false, error: 'not-found' });
     // Re-sending the language a source already has is the state the caller asked
     // for, so it succeeds — a `<select>` re-emitting its own value is not a fault.
-    expect(setDictionarySourceLang('other', 'ja', db)).toMatchObject({ ok: true });
+    expect(runSourceLangRelabel(db, 'other', 'ja')).toMatchObject({ ok: true, changed: false });
     expect(langOf('headwords', 'dict_id', 'other')).toEqual(['ja']);
   });
 
@@ -148,7 +155,10 @@ describe('correcting the language a source was imported under', () => {
     expect(normalizeSourceLang(' JA ')).toBe('ja');
     expect(normalizeSourceLang('und')).toBe('und');
     expect(normalizeSourceLang('yue')).toBe('yue');
-    expect(setDictionarySourceLang('user-zh', ' ZH ', db)).toMatchObject({ ok: true });
+    // The pair the production path composes: normalize, then relabel with what
+    // came out. ` ZH ` reaches the database as `zh` or not at all.
+    const normalized = normalizeSourceLang(' ZH ');
+    expect(runSourceLangRelabel(db, 'user-zh', normalized ?? '')).toMatchObject({ ok: true });
     expect(langOf('headwords')).toEqual(['zh']);
   });
 });
