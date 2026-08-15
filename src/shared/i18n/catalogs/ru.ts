@@ -1119,6 +1119,12 @@ export const ru: Catalog = {
     many: 'исправлено {count} строк',
     other: 'исправлено {count} строки',
   },
+  'media.subtitles.fusion.unrefereed': {
+    one: '{count} строка из {total} — только расшифровка, без опорного перевода',
+    few: '{count} строки из {total} — только расшифровка, без опорного перевода',
+    many: '{count} строк из {total} — только расшифровка, без опорного перевода',
+    other: '{count} строки из {total} — только расшифровка, без опорного перевода',
+  },
   'media.subtitles.searchFailed': 'Поиск субтитров не удался.',
   'media.subtitles.none': 'Субтитры для этой серии не найдены.',
   'media.subtitles.notSearched': 'Для этой серии поиск ещё не выполнялся.',

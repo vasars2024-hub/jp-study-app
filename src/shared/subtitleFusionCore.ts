@@ -299,6 +299,14 @@ export function windowCuesToSubtitleCues(
 export type FusionBasis =
   /** Whisper's transcript, and the reference agrees with it. */
   | 'whisper'
+  /**
+   * Whisper's transcript with **no reference to check it against** — F3 produced
+   * nothing for this window, which offline means the Qwen translator is not
+   * installed at all. Distinct from `whisper` on purpose: the two carry the same
+   * text, but one survived a check and the other never faced one, and collapsing
+   * them lets a whisper-only track report itself as fully verified.
+   */
+  | 'whisper-unrefereed'
   /** Whisper's transcript, kept despite the reference disagreeing. */
   | 'whisper-unverified'
   /** A disputed line the F5 arbiter looked at and kept verbatim anyway. */
@@ -432,7 +440,7 @@ export function decideFusedWindow(
     return {
       windowIndex,
       text: whisperText,
-      basis: 'whisper',
+      basis: 'whisper-unrefereed',
       score: 0,
       confidence: CONFIDENCE_UNREFEREED,
     };

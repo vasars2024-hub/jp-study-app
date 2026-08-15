@@ -993,6 +993,9 @@ export const ja: Catalog = {
   'media.subtitles.fusion.repaired': {
     other: '{count} 行を修正',
   },
+  'media.subtitles.fusion.unrefereed': {
+    other: '{total} 行中 {count} 行は書き起こしのみ — 参照訳なし',
+  },
   'media.subtitles.searchFailed': '字幕の検索に失敗しました。',
   'media.subtitles.none': 'このエピソードの字幕は見つかりませんでした。',
   'media.subtitles.notSearched': 'このエピソードはまだ検索していません。',

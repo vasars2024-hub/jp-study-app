@@ -991,6 +991,9 @@ export const zh: Catalog = {
   'media.subtitles.fusion.repaired': {
     other: '已修正 {count} 行',
   },
+  'media.subtitles.fusion.unrefereed': {
+    other: '{total} 行中有 {count} 行仅有转写 — 没有参考译文',
+  },
   'media.subtitles.searchFailed': '字幕搜索失败。',
   'media.subtitles.none': '未找到这一集的字幕。',
   'media.subtitles.notSearched': '尚未为这一集执行搜索。',

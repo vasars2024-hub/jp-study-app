@@ -118,9 +118,13 @@ describe('buildFusionTrackMeta', () => {
     expect(meta.cues[0].startSec).toBe(1.5);
   });
 
+  // Refereed offline: a reference was produced and agreed, so every cue is
+  // plain `whisper` and the sidecar has nothing a v1 reader cannot read.
+  const refereed = (): FusedWindowDecision[] =>
+    decideFusedWindows(windows.map(() => 'テキスト'), windows.map(() => 'テキスト'));
+
   it('carries the sync gate result so a track fused unshifted says so', () => {
-    const decisions = decideFusedWindows(windows.map(() => 'テキスト'), windows.map(() => ''));
-    const declined = buildFusionTrackMeta(windows, cues, decisions, {
+    const declined = buildFusionTrackMeta(windows, cues, refereed(), {
       ...track,
       offsetSec: 0,
       offsetConfident: false,
@@ -128,18 +132,27 @@ describe('buildFusionTrackMeta', () => {
     expect(declined).toMatchObject({ offsetSec: 0, offsetConfident: false, version: 1 });
   });
 
-  it('declares version 2 only for a track F5 actually arbitrated', () => {
-    const offline = decideFusedWindows(windows.map(() => 'テキスト'), windows.map(() => ''));
-    // An offline-only sidecar contains nothing a v1 reader would misread, so it
-    // stays v1 and older builds keep showing its badges.
-    expect(buildFusionTrackMeta(windows, cues, offline, track).version).toBe(1);
+  it('declares version 2 only for a track a v1 reader would misread', () => {
+    // Offline but refereed: nothing here a v1 reader gets wrong, so it stays v1
+    // and older builds keep showing its badges.
+    expect(buildFusionTrackMeta(windows, cues, refereed(), track).version).toBe(1);
 
-    const arbitrated: FusedWindowDecision[] = offline.map((decision, index) => (index === 1
+    const arbitrated: FusedWindowDecision[] = refereed().map((decision, index) => (index === 1
       ? { ...decision, basis: 'whisper-corrected' as const, confidence: 0.75 }
       : decision));
     expect(buildFusionTrackMeta(windows, cues, arbitrated, track).version)
       .toBe(FUSION_META_VERSION);
     expect(FUSION_META_VERSION).toBe(2);
+  });
+
+  it('declares version 2 for an unrefereed track, so no v1 build can call it checked', () => {
+    // The translator-less run. A v1 reader has no `whisper-unrefereed`, and the
+    // alternative — writing these as plain `whisper` to stay v1 — is exactly the
+    // "all lines cross-checked" lie. Refusing the file beats reading it wrong.
+    const unrefereed = decideFusedWindows(windows.map(() => 'テキスト'), windows.map(() => ''));
+    expect(unrefereed.every((d) => d.basis === 'whisper-unrefereed')).toBe(true);
+    expect(buildFusionTrackMeta(windows, cues, unrefereed, track).version)
+      .toBe(FUSION_META_VERSION);
   });
 
   it('averages confidence over emitted cues only, matching the record', () => {
@@ -207,6 +220,7 @@ describe('fusionCueCounts', () => {
       verified: 2,
       corrected: 0,
       unverified: 1,
+      unrefereed: 0,
       reference: 1,
       uncertain: 2,
     });
@@ -228,10 +242,32 @@ describe('fusionCueCounts', () => {
       verified: 2,
       corrected: 1,
       unverified: 1,
+      unrefereed: 0,
       reference: 0,
       // A repaired line is trusted, so it is deliberately not "uncertain" —
       // it gets its own line in the UI instead of inflating the warning.
       uncertain: 1,
+    });
+  });
+
+  it('never calls an unrefereed line verified — the whisper-only track cannot claim a check', () => {
+    const meta = parseFusionTrackMeta(JSON.stringify({
+      version: 2,
+      cues: [0, 1, 2].map((index) => ({ index, basis: 'whisper-unrefereed' })),
+    }));
+    expect(meta && fusionCueCounts(meta)).toEqual({
+      total: 3,
+      // The regression this test exists for: these read `whisper` before the
+      // split, so `verified` was 3/3 and the UI said "3 lines, all
+      // cross-checked" about a track nothing had cross-checked.
+      verified: 0,
+      corrected: 0,
+      unverified: 0,
+      unrefereed: 3,
+      reference: 0,
+      // Folded into `uncertain` on purpose: a caller that only reads this field
+      // still gets an honest answer without knowing the basis vocabulary.
+      uncertain: 3,
     });
   });
 });

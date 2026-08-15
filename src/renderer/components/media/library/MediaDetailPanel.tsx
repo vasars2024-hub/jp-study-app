@@ -427,13 +427,23 @@ export default function MediaDetailPanel({
                       ? t('media.subtitles.confidence', { percent: Math.round(track.confidence) })
                       : null,
                     track.machineGenerated ? t('media.subtitles.machine') : null,
+                    // Precedence matters, and "all cross-checked" is the claim
+                    // that has to be earned. A track fused with no translator
+                    // installed has nothing to cross-check against, so it takes
+                    // the unrefereed line and says why; only a track where every
+                    // line actually faced a reference reaches `allChecked`.
                     counts
-                      ? (counts.uncertain
-                        ? t('media.subtitles.fusion.uncertain', {
-                          count: counts.uncertain,
+                      ? (counts.unrefereed
+                        ? t('media.subtitles.fusion.unrefereed', {
+                          count: counts.unrefereed,
                           total: counts.total,
                         })
-                        : t('media.subtitles.fusion.allChecked', { count: counts.total }))
+                        : counts.uncertain
+                          ? t('media.subtitles.fusion.uncertain', {
+                            count: counts.uncertain,
+                            total: counts.total,
+                          })
+                          : t('media.subtitles.fusion.allChecked', { count: counts.total }))
                       : null,
                     // Separate from the two above: a repaired line is trusted, but
                     // it is text the arbiter wrote rather than text Whisper heard,

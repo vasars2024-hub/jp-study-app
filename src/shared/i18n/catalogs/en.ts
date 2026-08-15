@@ -1093,6 +1093,10 @@ export const en: Catalog = {
     one: '{count} line repaired',
     other: '{count} lines repaired',
   },
+  'media.subtitles.fusion.unrefereed': {
+    one: '{count} of {total} lines transcript-only — no reference translation',
+    other: '{count} of {total} lines transcript-only — no reference translation',
+  },
   'media.subtitles.searchFailed': 'The subtitle search failed.',
   'media.subtitles.none': 'No subtitles found for this episode.',
   'media.subtitles.notSearched': 'No search has run for this episode yet.',

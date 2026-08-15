@@ -104,9 +104,12 @@ describe('decideFusedWindow — Whisper wins, the reference referees', () => {
   it('keeps Whisper unrefereed, not disputed, when no reference was produced', () => {
     const decision = decideFusedWindow(4, '静かな夜だ', '');
     expect(decision.text).toBe('静かな夜だ');
-    expect(decision.basis).toBe('whisper');
+    // Its own basis, not `whisper`. The text is identical to an agreed line's,
+    // so the basis is the only thing that can carry "nothing checked this" —
+    // and while it read `whisper`, a translator-less run reported itself to the
+    // user as fully cross-checked.
+    expect(decision.basis).toBe('whisper-unrefereed');
     expect(decision.score).toBe(0);
-    // Distinguishable from an agreed line: nothing checked it.
     expect(decision.confidence).toBeLessThan(0.6);
   });
 
@@ -121,7 +124,11 @@ describe('decideFusedWindows', () => {
   it('degrades to exactly the F2 output when no reference exists at all', () => {
     const decisions = decideFusedWindows(['あいう', '', 'かきく'], []);
     expect(decisions.map((d) => d.text)).toEqual(['あいう', '', 'かきく']);
-    expect(decisions.map((d) => d.basis)).toEqual(['whisper', 'empty', 'whisper']);
+    // Exactly the F2 text, and every line says so: this is the whisper-only
+    // baseline wearing a fusion filename, which is the one thing the track must
+    // not be able to hide.
+    expect(decisions.map((d) => d.basis))
+      .toEqual(['whisper-unrefereed', 'empty', 'whisper-unrefereed']);
   });
 
   it('pairs references by window index, tolerating a short or gappy array', () => {

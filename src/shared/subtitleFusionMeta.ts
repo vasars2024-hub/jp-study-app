@@ -36,12 +36,18 @@ import {
 export const FUSION_META_VERSION = 2;
 
 /**
- * The bases a version-1 reader knows. F5's arbitration added two more, and a v1
- * reader drops a cue whose basis it does not recognise — which would under-count
- * a track and hide every repair. So a sidecar declares **2 only when it actually
- * contains an arbitrated cue**: an offline-only track stays readable by older
- * builds, and the files a v1 reader would misread are exactly the ones it now
- * refuses outright.
+ * The bases a version-1 reader knows. F5's arbitration added two, and the
+ * unrefereed split added a third; a v1 reader drops a cue whose basis it does not
+ * recognise — which would under-count a track and hide every repair. So a sidecar
+ * declares **2 only when it actually contains a cue a v1 reader cannot read**: a
+ * fully refereed offline track stays readable by older builds, and the files a v1
+ * reader would misread are exactly the ones it now refuses outright.
+ *
+ * `whisper-unrefereed` is deliberately *not* in this list even though it predates
+ * F5 in spirit. A v1 build reading it as an unknown basis drops the cue, but a v1
+ * build that had been told it was plain `whisper` would count it as verified —
+ * which is the exact false claim the split exists to stop. Refusing the file beats
+ * reading it wrong.
  */
 const V1_BASES: readonly FusionBasis[] = ['whisper', 'whisper-unverified', 'reference', 'empty'];
 
@@ -133,6 +139,7 @@ const FUSION_BASES: readonly FusionBasis[] = [
   ...V1_BASES,
   'whisper-as-is',
   'whisper-corrected',
+  'whisper-unrefereed',
 ];
 
 function readNumber(value: unknown, fallback = 0): number {
@@ -200,6 +207,7 @@ export function fusionCueCounts(meta: FusionTrackMeta): {
   verified: number;
   corrected: number;
   unverified: number;
+  unrefereed: number;
   reference: number;
   uncertain: number;
 } {
@@ -212,14 +220,24 @@ export function fusionCueCounts(meta: FusionTrackMeta): {
   const verified = count('whisper') + count('whisper-as-is');
   const corrected = count('whisper-corrected');
   const unverified = count('whisper-unverified');
+  // Never checked, as opposed to checked and doubted. Reported on its own
+  // because the fix is different: a doubted line needs reading, an unrefereed
+  // one needs the translator installed.
+  const unrefereed = count('whisper-unrefereed');
   const reference = count('reference');
   return {
     total: meta.cues.length,
     verified,
     corrected,
     unverified,
+    unrefereed,
     reference,
-    uncertain: unverified + reference,
+    // Unrefereed lines count here too. `uncertain` is what a caller reaches for
+    // to answer "how much of this needs a second look", and a line nothing ever
+    // compared against anything needs one as much as a disputed line does.
+    // Folding it in keeps every existing consumer honest by default; the
+    // separate field above is for a surface that wants to say *why*.
+    uncertain: unverified + reference + unrefereed,
   };
 }
 
