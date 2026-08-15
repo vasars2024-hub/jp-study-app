@@ -21140,3 +21140,60 @@ paths.
 (2) The sibling panels (etymology, compounds, neighbours, examples) can take `onLookup` now that
 the seam exists; none does yet. (3) Step 11's 3.2 s stays on the main thread at first dictionary
 use after upgrade, for the reason recorded two entries ago.
+
+## Track 2 — the word said out loud, and two panels you can follow — 2026-08-15 08:00 MSK primary
+
+No interrupted slice. Boss audit's last section (2026-08-15 04:24) finding 1 is closed by
+`4c7b416` — re-verified in `transcriptionJobs.ts` (`noWindowAttempts`, `MAX_NO_WINDOW_ATTEMPTS`)
+and in its test. Nothing pending there.
+
+**Slice 1 — `79b4e79`. `audio`, the last v1 table with no writer.** The JPod101 fetcher has
+existed since before that table but was reachable only from Anki export, which fetched a clip,
+gave it to Anki's media folder and forgot it. Now: a 24x24 play control beside each entry's
+reading, a disk cache at `userData/dictionary/<lang>/<sha1 of lang + sep + term + sep + reading>.mp3`,
+and an `audio` row per matching headword. **Decision (standing auto-approval):** the row is an
+*index*, not the cache — bytes stay in files, and a word with no headword still plays and simply
+gets no row, because `audio.headword_id` is NOT NULL and inventing a headword to satisfy it is
+worse than no index entry. **Network only on a click** — every sibling panel is a local indexed
+probe, so firing this with the lookup would mail every searched word to a CDN. A definite `none`
+is cached as an empty `.none` marker; `offline` is not, because that is a fact about the moment.
+The placeholder rule (JPod101 answers a miss with HTTP 200 + a fixed 52,288 B clip) moved to
+`dictionary/audio.ts`; `fetchJapaneseAudio` keeps only the Anki-shaped half.
+**Live, own `npm start`, RU locale:** `dict:audio` for 犬/いぬ gave `ready`, 1,608 B,
+`cached:false`, 2,713 ms; second call `cached:true`; `zh` gave `unsupported` with no request; a
+28-char sentence gave `none` + marker file. Real DB after: **5 `audio` rows** (4 headwords for 犬,
+1 for 犬侍), 2 clips + 1 marker on disk. Search 犬 rendered **8 entries, 8 buttons**, `aria-label`
+"Воспроизвести 犬" (i18n x4 wired, not key-counted); real bridge click gave `word-audio is-ready`.
+
+**Slice 2 — `f9f8df5`. The seam's other two consumers.** `c7803b6` added
+`DictionaryResults.onLookup` and only `LexiconXrefs` used it. Compounds and semantic neighbours
+now take it too. Unlike an xref target there is no `resolved` question: every row came out of the
+headword table. `lexicon.xrefs.lookup` became `lexicon.lookup.word` in all four catalogs (three
+panels share the sentence; net key count unchanged). The compound control keeps its `<mark>` —
+the containment highlight is the row's whole claim. **Live:** search 猫 gave 12 compound links +
+12 neighbour links, tooltip "Найти 子猫", `<mark>猫</mark>` intact inside the BUTTON; bridge click
+left the results leading with 子猫 and the audio button following to "Воспроизвести 子猫".
+`aaa8070` is the follow-up for a `no-empty-function` error slice 1 introduced.
+
+**Traps.** (1) The first `npm start` of this turn produced a window with `url:""` forever and
+`/eval` timing out at 30 s. Cause: `createWindow` does `session.clearCache().finally(loadURL)`
+and the **network service had crashed** at boot (`relay-audio-start.err.log`), so `clearCache()`
+never settled and `loadURL` was never called. A plain restart fixed it — do not read this as a
+code defect. (2) The Write tool emitted three **raw U+0001 bytes** where the two-character
+backslash escape was intended; scan new files for control bytes before committing. (3)
+`click.ps1` correctly refuses a control scrolled out of the `.fwin` viewport — call
+`scrollIntoView({block:'center'})` first, then re-measure.
+
+**Gates**, on the shared tree (~426 foreign status entries, so not a statement about committed
+HEAD alone): `npx vitest run` **613 passed / 1 skipped files, 8,143 passed / 6 skipped**, exit 0.
+i18n exit 0 at **9,588** keys. architecture exit 0, **Nothing new**, 2 known pending. eslint clean
+on all 20 touched paths except `window.d.ts`'s 2 `adjacent-overload-signatures` errors, **proved
+pre-existing** by linting the `79b4e79~1` blob (same 2, at lines 1557/1560).
+
+**Deliberately open.** (1) `collocations` is now the only v1 table with neither writer nor
+reader; no installed source supplies collocation data, so its writer needs a corpus decision
+first. (2) The audio control does no cache-only probe on render, so a word already cached looks
+identical to one never played until it is clicked — `cacheOnly` exists on the handler for
+whoever wants that, but an IPC per entry per lookup was not worth it. (3) `LexiconExamples` and
+`LexiconEtymology` still take no `onLookup`, correctly: their rows are sentences and prose, not
+words. (4) Step 11's 3.2 s stays on the main thread at first dictionary use after upgrade.
