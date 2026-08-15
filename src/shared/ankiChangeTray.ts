@@ -27,13 +27,13 @@
 // note types, and `Back` is ord 1 in one and ord 3 in another; targeting an ord
 // would write into whichever field happened to sit there.
 
-import type { AnkiDraft, AnkiDraftNote } from './ankiDraft';
+import type { AnkiDraft, AnkiDraftNote, AnkiDraftNoteType } from './ankiDraft';
 import {
-  createEditJournal,
+  MARKED_TAG,
+  createDraftEditIndex,
   draftFieldNormalizer,
   normalizeTags,
-  setNoteField,
-  setNoteTags,
+  writeNoteField,
   type AnkiDraftEditJournal,
   type AnkiDraftEditOp,
 } from './ankiDraftEdit';
@@ -173,14 +173,14 @@ function compilePattern(action: Extract<TrayAction, { kind: 'find-replace' }>): 
   }
 }
 
-function noteTypeOf(draft: AnkiDraft, note: AnkiDraftNote) {
-  return draft.noteTypes.find((nt) => nt.id === note.noteTypeId);
-}
-
 /** Ords a find/replace action should visit in this note, in field order. */
-function targetOrds(draft: AnkiDraft, note: AnkiDraftNote, fieldName: string | null): number[] {
+function targetOrds(
+  noteTypes: Map<string, AnkiDraftNoteType>,
+  note: AnkiDraftNote,
+  fieldName: string | null,
+): number[] {
   if (fieldName === null) return note.fields.map((f) => f.ord).sort((a, b) => a - b);
-  const def = noteTypeOf(draft, note)?.fields.find((f) => f.name === fieldName);
+  const def = noteTypes.get(note.noteTypeId)?.fields.find((f) => f.name === fieldName);
   // The note type is authoritative, but a source that could not read one still
   // gives each value a name, so fall back to the value rather than skipping.
   const ord = def?.ord ?? note.fields.find((f) => f.name === fieldName)?.ord;
@@ -262,10 +262,13 @@ export function planChangeTray(
   const normalize = draftFieldNormalizer(draft.source);
   const changesById = new Map<string, TrayNoteChange>();
   const outcomes: TrayActionOutcome[] = [];
-  // A scratch journal keeps `setNoteField`'s ops separable from the caller's
-  // history; they are stamped with the group and appended once, at the end.
-  let working = draft;
-  let scratch = createEditJournal();
+  // One working copy and one set of lookups for the whole tray. Rebuilding the
+  // notes array per edited note, or scanning it to find each note, is quadratic
+  // and this preview is recomputed on every render — see `ankiChangeTrayScale`.
+  const notes = [...draft.notes];
+  const index = createDraftEditIndex(draft);
+  const noteTypes = new Map(draft.noteTypes.map((nt) => [nt.id, nt]));
+  const ops: AnkiDraftEditOp[] = [];
 
   const changeFor = (noteId: string): TrayNoteChange => {
     let change = changesById.get(noteId);
@@ -289,15 +292,16 @@ export function planChangeTray(
     let changed = 0;
 
     for (const noteId of noteIds) {
-      const note = working.notes.find((n) => n.id === noteId);
-      if (!note) continue;
+      const at = index.position.get(noteId);
+      const start = at === undefined ? undefined : notes[at];
+      if (at === undefined || !start) continue;
       matched += 1;
       let touched = false;
 
       if (action.kind === 'find-replace') {
         const pattern = compilePattern(action);
         if (typeof pattern === 'string') continue;
-        const ords = targetOrds(working, note, action.fieldName);
+        const ords = targetOrds(noteTypes, start, action.fieldName);
         if (ords.length === 0) {
           problems.push({
             code: 'field-absent',
@@ -307,39 +311,43 @@ export function planChangeTray(
             detail: action.fieldName ?? '',
           });
         }
+        const isCloze = index.clozeTypeIds.has(start.noteTypeId);
         for (const ord of ords) {
-          const current = working.notes.find((n) => n.id === noteId);
-          const value = current?.fields.find((f) => f.ord === ord);
-          if (!current || !value) continue;
+          // Re-read every time: a previous ord's write replaced the note object.
+          const current = notes[at] ?? start;
+          const value = current.fields.find((f) => f.ord === ord);
+          if (!value) continue;
           // `lastIndex` survives on a `g` regex between calls, so a fresh one per
           // field is not an optimisation to remove: reusing it silently skips
           // matches at the start of every second field.
           const fresh = compilePattern(action) as RegExp;
           const next = value.raw.replace(fresh, action.replace);
           if (next === value.raw) continue;
-          const res = setNoteField(working, scratch, noteId, ord, next, normalize);
-          if (!res.changed) continue;
-          working = res.draft;
-          scratch = res.journal;
+          const out = writeNoteField(current, ord, next, normalize, isCloze, index.present);
+          notes[at] = out.note;
+          ops.push({ kind: 'field', noteId, fieldOrd: ord, before: value.raw, after: next, group: groupId });
           touched = true;
           const change = changeFor(noteId);
           mergeFieldChange(change, { ord, name: value.name, before: value.raw, after: next });
-          pushUnique(change.clozeAdded, res.clozeOrdinalsAdded ?? []);
-          pushUnique(change.clozeRemoved, res.clozeOrdinalsRemoved ?? []);
-          pushUnique(change.mediaMissing, res.mediaMissing ?? []);
-          pushUnique(change.mediaDropped, res.mediaDropped ?? []);
+          pushUnique(change.clozeAdded, out.clozeOrdinalsAdded);
+          pushUnique(change.clozeRemoved, out.clozeOrdinalsRemoved);
+          pushUnique(change.mediaMissing, out.mediaMissing);
+          pushUnique(change.mediaDropped, out.mediaDropped);
         }
       } else {
+        const current = start;
         const wanted = normalizeTags(action.tags);
-        const before = note.tags;
+        const before = current.tags;
         const after =
           action.kind === 'add-tags'
             ? normalizeTags([...before, ...wanted])
             : before.filter((tag) => !wanted.includes(tag));
-        const res = setNoteTags(working, scratch, noteId, after);
-        if (res.changed) {
-          working = res.draft;
-          scratch = res.journal;
+        if (after.length !== before.length || after.some((tag, i) => tag !== before[i])) {
+          // `marked` is a tag in the data and a flag in the model; the same rule
+          // `setNoteTags` enforces, because letting them disagree makes the
+          // Browser's marked column contradict its tag column.
+          notes[at] = { ...current, tags: after, marked: after.includes(MARKED_TAG) };
+          ops.push({ kind: 'tags', noteId, before, after, group: groupId });
           touched = true;
           const change = changeFor(noteId);
           // The net tag change, same rule as fields: keep the earliest `before`.
@@ -377,10 +385,16 @@ export function planChangeTray(
     }
   }
 
-  const grouped: AnkiDraftEditOp[] = scratch.done.map((op) => ({ ...op, group: groupId }));
   return {
-    draft: working,
-    journal: { done: [...journal.done, ...grouped], undone: grouped.length > 0 ? [] : journal.undone },
+    // A tray that changed nothing returns the input objects, so a caller can
+    // compare by identity to see that nothing happened.
+    draft: ops.length > 0 ? { ...draft, notes } : draft,
+    journal:
+      ops.length > 0
+        ? // A fresh batch forks the history, same as a single edit: a redo past
+          // it would reapply ops computed against a draft that no longer exists.
+          { done: [...journal.done, ...ops], undone: [] }
+        : journal,
     groupId,
     outcomes,
     changes,

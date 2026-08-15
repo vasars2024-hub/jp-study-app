@@ -124,7 +124,7 @@ function replaceNote(draft: AnkiDraft, next: AnkiDraftNote): AnkiDraft {
 }
 
 /** Every media file name the source actually holds, from the notes as read. */
-function presentNames(draft: AnkiDraft): Set<string> {
+export function presentMediaNames(draft: AnkiDraft): Set<string> {
   const names = new Set<string>();
   for (const note of draft.notes) {
     for (const ref of note.media) if (ref.present) names.add(ref.fileName);
@@ -132,7 +132,30 @@ function presentNames(draft: AnkiDraft): Set<string> {
   return names;
 }
 
-interface FieldWriteOutcome {
+/**
+ * Lookups a batch computes once and reuses across thousands of edits. Both are
+ * whole-draft scans, and doing either per edit is what makes a tray quadratic:
+ * at 8,000 notes that was 3.0 s of frame time for a preview that is recomputed
+ * on every render.
+ */
+export interface DraftEditIndex {
+  /** Note id to its position in `draft.notes`. */
+  position: Map<string, number>;
+  present: Set<string>;
+  clozeTypeIds: Set<string>;
+}
+
+export function createDraftEditIndex(draft: AnkiDraft): DraftEditIndex {
+  const position = new Map<string, number>();
+  draft.notes.forEach((note, i) => position.set(note.id, i));
+  return {
+    position,
+    present: presentMediaNames(draft),
+    clozeTypeIds: new Set(draft.noteTypes.filter((nt) => nt.kind === 'cloze').map((nt) => nt.id)),
+  };
+}
+
+export interface FieldWriteOutcome {
   note: AnkiDraftNote;
   mediaDropped: string[];
   mediaMissing: string[];
@@ -140,21 +163,25 @@ interface FieldWriteOutcome {
   clozeOrdinalsRemoved: number[];
 }
 
-/** The whole consequence calculation, shared by an edit and by its undo. */
-function writeField(
-  draft: AnkiDraft,
+/**
+ * The whole consequence calculation, shared by a single edit, a batch and every
+ * undo. `present` is injected rather than derived so a batch can compute it once:
+ * the set describes what the *source package* holds, which no draft edit changes,
+ * so freezing it for the duration of a batch is also the more correct reading.
+ */
+export function writeNoteField(
   note: AnkiDraftNote,
   fieldOrd: number,
   raw: string,
   normalize: (raw: string) => string,
   isCloze: boolean,
+  present: Set<string>,
 ): FieldWriteOutcome {
   const before = note.fields.find((f) => f.ord === fieldOrd)?.raw ?? '';
   const fields = note.fields.map((f) =>
     f.ord === fieldOrd ? { ...f, raw, normalized: normalize(raw) } : f,
   );
 
-  const present = presentNames(draft);
   const kept = note.media.filter((m) => m.fieldOrd !== fieldOrd);
   const fresh = mediaRefsInField(raw, fieldOrd, (name) => present.has(name));
   const media: AnkiDraftMediaRef[] = [...kept, ...fresh].sort(
@@ -197,7 +224,7 @@ export function setNoteField(
   if (field.raw === raw) return { draft, journal, changed: false, reason: 'unchanged' };
 
   const isCloze = draft.noteTypes.find((nt) => nt.id === note.noteTypeId)?.kind === 'cloze';
-  const out = writeField(draft, note, fieldOrd, raw, normalize, isCloze);
+  const out = writeNoteField(note, fieldOrd, raw, normalize, isCloze, presentMediaNames(draft));
   return {
     draft: replaceNote(draft, out.note),
     journal: {
@@ -239,23 +266,36 @@ export function setNoteTags(
   };
 }
 
-function applyInverse(
-  draft: AnkiDraft,
+/**
+ * Undo one op into a working array. Mutating `notes` here is safe and is the
+ * point: it is a copy the caller made for this step, and rebuilding the whole
+ * array per op is what made undoing a 3,000-note batch quadratic.
+ */
+function applyInverseInto(
+  notes: AnkiDraftNote[],
+  index: DraftEditIndex,
   op: AnkiDraftEditOp,
   toValue: 'before' | 'after',
   normalize: (raw: string) => string,
-): AnkiDraft {
-  const note = findNote(draft, op.noteId);
-  if (!note) return draft;
+): void {
+  const at = index.position.get(op.noteId);
+  if (at === undefined) return;
+  const note = notes[at];
+  if (!note) return;
   if (op.kind === 'tags') {
     const tags = op[toValue];
-    return replaceNote(draft, { ...note, tags, marked: tags.includes(MARKED_TAG) });
+    notes[at] = { ...note, tags, marked: tags.includes(MARKED_TAG) };
+    return;
   }
-  const isCloze = draft.noteTypes.find((nt) => nt.id === note.noteTypeId)?.kind === 'cloze';
-  return replaceNote(
-    draft,
-    writeField(draft, note, op.fieldOrd, op[toValue], normalize, isCloze).note,
-  );
+  const isCloze = index.clozeTypeIds.has(note.noteTypeId);
+  notes[at] = writeNoteField(
+    note,
+    op.fieldOrd,
+    op[toValue],
+    normalize,
+    isCloze,
+    index.present,
+  ).note;
 }
 
 /**
@@ -292,10 +332,13 @@ export function undoLastEdit(
   if (step.length === 0) return { draft, journal, changed: false, reason: 'unchanged' };
   // Newest first: two ops on one field must be unwound in the order they were
   // written, or the older op's `before` loses to the newer one's.
-  let next = draft;
-  for (let i = step.length - 1; i >= 0; i -= 1) next = applyInverse(next, step[i], 'before', normalize);
+  const notes = [...draft.notes];
+  const index = createDraftEditIndex(draft);
+  for (let i = step.length - 1; i >= 0; i -= 1) {
+    applyInverseInto(notes, index, step[i], 'before', normalize);
+  }
   return {
-    draft: next,
+    draft: { ...draft, notes },
     // `undone` keeps applied order, so redo can replay the group forwards.
     journal: { done: journal.done.slice(0, -step.length), undone: [...journal.undone, ...step] },
     changed: true,
@@ -309,10 +352,11 @@ export function redoLastEdit(
 ): AnkiDraftEditResult {
   const step = trailingStep(journal.undone);
   if (step.length === 0) return { draft, journal, changed: false, reason: 'unchanged' };
-  let next = draft;
-  for (const op of step) next = applyInverse(next, op, 'after', normalize);
+  const notes = [...draft.notes];
+  const index = createDraftEditIndex(draft);
+  for (const op of step) applyInverseInto(notes, index, op, 'after', normalize);
   return {
-    draft: next,
+    draft: { ...draft, notes },
     journal: { done: [...journal.done, ...step], undone: journal.undone.slice(0, -step.length) },
     changed: true,
   };
