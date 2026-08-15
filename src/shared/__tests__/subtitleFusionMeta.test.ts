@@ -278,6 +278,76 @@ describe('the arbitration summary', () => {
     expect(sparse?.arbitration)
       .toEqual({ attempted: 0, applied: 0, failedBatches: 0, skipped: 'cancelled' });
   });
+
+  it('carries the failure breakdown, which is what makes a failed batch chaseable', () => {
+    const meta = buildFusionTrackMeta(windows, cues, decisions, {
+      ...track,
+      arbitration: {
+        attempted: 38,
+        applied: 22,
+        failedBatches: 1,
+        skipped: null,
+        failures: { timeout: 1 },
+        dropped: 3,
+      },
+    });
+    const back = parseFusionTrackMeta(serializeFusionTrackMeta(meta));
+    expect(back?.arbitration?.failures).toEqual({ timeout: 1 });
+    expect(back?.arbitration?.dropped).toBe(3);
+  });
+
+  it('omits both fields on a clean run rather than writing empty ones', () => {
+    const meta = buildFusionTrackMeta(windows, cues, decisions, {
+      ...track,
+      arbitration: { attempted: 4, applied: 4, failedBatches: 0, skipped: null },
+    });
+    const serialized = serializeFusionTrackMeta(meta);
+    expect(serialized).not.toContain('failures');
+    expect(serialized).not.toContain('dropped');
+    expect(parseFusionTrackMeta(serialized)?.arbitration?.failures).toBeUndefined();
+  });
+
+  it('bounds a hostile breakdown instead of handing it to a caller', () => {
+    const withCues = (arbitration: unknown): string => JSON.stringify({
+      version: 1,
+      arbitration,
+      cues: [{ index: 0, startSec: 0, endSec: 1, basis: 'whisper', score: 0.5, confidence: 0.7 }],
+    });
+    const hostile = parseFusionTrackMeta(withCues({
+      skipped: null,
+      failures: {
+        timeout: 2,
+        // Reasons are open-ended (a provider's own error codes), so the reader
+        // validates shape, not vocabulary — but not at unbounded size.
+        [`x`.repeat(200)]: 1,
+        'not-a-number': 'many',
+        negative: -4,
+        zero: 0,
+        ...Object.fromEntries(Array.from({ length: 40 }, (_, i) => [`code${i}`, 1])),
+      },
+      dropped: -7,
+    }));
+    const failures = hostile?.arbitration?.failures ?? {};
+    expect(Object.keys(failures).length).toBeLessThanOrEqual(16);
+    expect(failures.timeout).toBe(2);
+    expect(failures['not-a-number']).toBeUndefined();
+    expect(failures.negative).toBeUndefined();
+    expect(failures.zero).toBeUndefined();
+    expect(Object.keys(failures).every((key) => key.length <= 40)).toBe(true);
+    // A negative count is not a count; it reads as absent, not as a number the
+    // UI would render with a minus sign.
+    expect(hostile?.arbitration?.dropped).toBeUndefined();
+  });
+
+  it('reads an all-invalid breakdown as absent, not as an empty object', () => {
+    const parsed = parseFusionTrackMeta(JSON.stringify({
+      version: 1,
+      arbitration: { skipped: null, failures: { bad: 'x' } },
+      cues: [{ index: 0, startSec: 0, endSec: 1, basis: 'whisper', score: 0.5, confidence: 0.7 }],
+    }));
+    expect(parsed?.arbitration).toBeDefined();
+    expect(parsed?.arbitration?.failures).toBeUndefined();
+  });
 });
 
 describe('fusionCueCounts', () => {

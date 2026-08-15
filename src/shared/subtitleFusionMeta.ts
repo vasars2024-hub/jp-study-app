@@ -87,6 +87,20 @@ export interface FusionArbitrationSummary {
   failedBatches: number;
   /** Why no verdicts were produced, when none were; `null` when it ran. */
   skipped: 'no-key' | 'no-candidates' | 'cancelled' | null;
+  /**
+   * Failed batches counted by reason, e.g. `{ timeout: 1 }` — the provider's own
+   * error code for a request that threw, or `unparsable` / `empty` / `rejected`
+   * for a response that arrived and could not be used. `failedBatches` says how
+   * many; this says which, and the three response-side causes need three
+   * different fixes. Absent when no batch failed.
+   */
+  failures?: Record<string, number>;
+  /**
+   * Verdicts the model returned that the guards discarded, summed over batches
+   * that still yielded something. A batch can half-fail; `failedBatches` cannot
+   * see that, and a model losing a third of every batch is a real defect.
+   */
+  dropped?: number;
 }
 
 export interface FusionTrackMeta {
@@ -183,6 +197,27 @@ const ARBITRATION_SKIPS: readonly FusionArbitrationSummary['skipped'][] = [
 ];
 
 /**
+ * Reasons are open-ended by design — a request-side one is whatever error code
+ * the provider layer produced, and that list grows without this file. So the
+ * reader validates shape, not vocabulary, and bounds both dimensions: a corrupt
+ * or hostile sidecar may not hand a caller an unbounded map or a giant key.
+ */
+const MAX_FAILURE_REASONS = 16;
+const MAX_FAILURE_REASON_LEN = 40;
+
+function readFailures(value: unknown): Record<string, number> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const out: Record<string, number> = {};
+  for (const [reason, count] of Object.entries(value as Record<string, unknown>)) {
+    if (Object.keys(out).length >= MAX_FAILURE_REASONS) break;
+    if (!reason || reason.length > MAX_FAILURE_REASON_LEN) continue;
+    if (typeof count !== 'number' || !Number.isFinite(count) || count <= 0) continue;
+    out[reason] = Math.floor(count);
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+/**
  * Total, like the rest of this reader: anything that is not a summary reads as
  * absent. A half-written `arbitration` block must not cost the caller the cues.
  */
@@ -193,11 +228,15 @@ function readArbitration(value: unknown): FusionArbitrationSummary | undefined {
     ? null
     : ARBITRATION_SKIPS.find((candidate) => candidate === row.skipped);
   if (skipped === undefined) return undefined;
+  const failures = readFailures(row.failures);
+  const dropped = readNumber(row.dropped);
   return {
     attempted: readNumber(row.attempted),
     applied: readNumber(row.applied),
     failedBatches: readNumber(row.failedBatches),
     skipped,
+    ...(failures ? { failures } : {}),
+    ...(dropped > 0 ? { dropped } : {}),
   };
 }
 

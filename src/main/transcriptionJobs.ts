@@ -614,6 +614,9 @@ async function runFusionJob(job: TranscriptionJob): Promise<TranscriptionResult>
         applied: arbitration.applied,
         failedBatches: arbitration.failedBatches,
         skipped: arbitration.skipped,
+        // Omitted when nothing failed, so a clean run's sidecar is unchanged.
+        ...(Object.keys(arbitration.failures).length ? { failures: arbitration.failures } : {}),
+        ...(arbitration.dropped > 0 ? { dropped: arbitration.dropped } : {}),
       },
     });
     try {

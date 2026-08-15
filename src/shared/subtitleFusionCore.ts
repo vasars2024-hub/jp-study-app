@@ -782,6 +782,24 @@ export function buildFusionArbitrationPrompt(batch: readonly ArbitrationCandidat
 }
 
 /**
+ * What a provider response contained, as opposed to what survived it.
+ *
+ * `parseFusionArbitration` answers "which verdicts may I use", which is all the
+ * happy path needs. It cannot answer "why did this batch produce nothing", and
+ * that turned out to be the question: a third of batches on a real provider
+ * yielded zero and the three causes — the response was not JSON at all, the model
+ * returned an empty list, the guards discarded every row — need different fixes
+ * and looked identical on disk.
+ */
+export interface FusionArbitrationParse {
+  verdicts: ArbitrationVerdict[];
+  /** The response was JSON with a `lines` array. False means the model wandered. */
+  parsed: boolean;
+  /** Entries the `lines` array held, before any guard ran. */
+  rows: number;
+}
+
+/**
  * Read a provider response into verdicts, discarding anything unsafe.
  *
  * Total: malformed JSON, a missing `lines`, an unknown id, a fabricated basis, an
@@ -793,14 +811,23 @@ export function parseFusionArbitration(
   raw: string,
   batch: readonly ArbitrationCandidate[],
 ): ArbitrationVerdict[] {
+  return inspectFusionArbitration(raw, batch).verdicts;
+}
+
+/** `parseFusionArbitration` plus the counts a failure diagnosis needs. */
+export function inspectFusionArbitration(
+  raw: string,
+  batch: readonly ArbitrationCandidate[],
+): FusionArbitrationParse {
+  const unparsed: FusionArbitrationParse = { verdicts: [], parsed: false, rows: 0 };
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
-    return [];
+    return unparsed;
   }
   const lines = (parsed as { lines?: unknown } | null)?.lines;
-  if (!Array.isArray(lines)) return [];
+  if (!Array.isArray(lines)) return unparsed;
 
   const byIndex = new Map(batch.map((candidate) => [candidate.windowIndex, candidate]));
   const seen = new Set<number>();
@@ -855,7 +882,7 @@ export function parseFusionArbitration(
       confidence: kept ? CONFIDENCE_ARBITRATED_AS_IS : CONFIDENCE_ARBITRATED_CORRECTED,
     });
   }
-  return out;
+  return { verdicts: out, parsed: true, rows: lines.length };
 }
 
 /**

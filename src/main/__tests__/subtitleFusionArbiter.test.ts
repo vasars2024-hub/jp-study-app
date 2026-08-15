@@ -131,3 +131,95 @@ describe('arbitrateFusionDecisions', () => {
     expect(seen).toEqual([[1, 2], [2, 2]]);
   });
 });
+
+/**
+ * A live run lost roughly a third of its batches on a real provider and the
+ * sidecar could only say "one batch failed". These four causes are what the fix
+ * for that has to tell apart — they are four different bugs, in four different
+ * layers, and three of them used to look like the fourth.
+ */
+describe('arbitrateFusionDecisions failure diagnosis', () => {
+  it('reports the provider error code, not the message, when a request throws', async () => {
+    const before = scored();
+    const outcome = await arbitrateFusionDecisions(before, ENGLISH, REFERENCES, {
+      call: () => Promise.reject(Object.assign(
+        new Error('AI request timed out after 90s. Try fewer items.'),
+        { code: 'timeout' },
+      )),
+    });
+    expect(outcome.failedBatches).toBe(1);
+    expect(outcome.failures).toEqual({ timeout: 1 });
+    expect(outcome.decisions).toEqual(before);
+  });
+
+  it('falls back to "error" for a plain throw rather than putting prose on disk', async () => {
+    const outcome = await arbitrateFusionDecisions(scored(), ENGLISH, REFERENCES, {
+      call: () => Promise.reject(new Error('502 upstream: <html>token=abc</html>')),
+    });
+    expect(outcome.failures).toEqual({ error: 1 });
+    expect(JSON.stringify(outcome.failures)).not.toContain('token');
+  });
+
+  it('separates prose, an empty list, and rows the guard threw out', async () => {
+    const cases: Array<[string, string]> = [
+      ['Sure! Here are the corrected lines:', 'unparsable'],
+      ['{"lines":[]}', 'empty'],
+      // A well-formed row whose text resembles neither the transcript nor the
+      // reference: the fidelity guard drops it, so the batch yields nothing.
+      [JSON.stringify({ lines: [{ id: 1, text: 'まったく別の文章です', basis: 'whisper-corrected' }] }), 'rejected'],
+    ];
+    for (const [raw, reason] of cases) {
+      const before = scored();
+      const outcome = await arbitrateFusionDecisions(before, ENGLISH, REFERENCES, {
+        call: async () => raw,
+      });
+      expect(outcome.failures, `${reason} case`).toEqual({ [reason]: 1 });
+      expect(outcome.failedBatches).toBe(1);
+      expect(outcome.decisions).toEqual(before);
+    }
+  });
+
+  it('counts reasons per batch, so a mixed run says which failure dominated', async () => {
+    const many = decideFusedWindows(
+      Array.from({ length: 40 }, (_, i) => `台詞${i}です`),
+      Array.from({ length: 40 }, () => '全く関係のない参照文がここにあります'),
+    );
+    let batch = 0;
+    const outcome = await arbitrateFusionDecisions(many, many.map((_, i) => `line ${i}`), many.map(() => 'x'), {
+      call: async () => {
+        batch += 1;
+        if (batch === 1) throw Object.assign(new Error('429'), { code: 'rate-limit' });
+        if (batch === 2) return 'not json at all';
+        throw Object.assign(new Error('429 again'), { code: 'rate-limit' });
+      },
+    });
+    expect(outcome.failedBatches).toBe(3);
+    expect(outcome.failures).toEqual({ 'rate-limit': 2, unparsable: 1 });
+  });
+
+  it('counts rows the guard discarded from a batch that still succeeded', async () => {
+    // Two verdicts back for a one-window batch: one usable, one for a window the
+    // model was never shown. `failedBatches` cannot see this — `dropped` can.
+    const before = scored();
+    const outcome = await arbitrateFusionDecisions(before, ENGLISH, REFERENCES, {
+      call: async () => JSON.stringify({
+        lines: [
+          { id: 1, text: '端を渡ります', basis: 'whisper-corrected' },
+          { id: 99, text: 'この窓は存在しません', basis: 'whisper-as-is' },
+        ],
+      }),
+    });
+    expect(outcome).toMatchObject({ applied: 1, failedBatches: 0, dropped: 1 });
+    expect(outcome.failures).toEqual({});
+  });
+
+  it('leaves both fields empty on a clean run', async () => {
+    const outcome = await arbitrateFusionDecisions(scored(), ENGLISH, REFERENCES, {
+      call: async () => JSON.stringify({
+        lines: [{ id: 1, text: '橋を渡ります', basis: 'whisper-as-is' }],
+      }),
+    });
+    expect(outcome).toMatchObject({ applied: 1, failedBatches: 0, dropped: 0 });
+    expect(outcome.failures).toEqual({});
+  });
+});

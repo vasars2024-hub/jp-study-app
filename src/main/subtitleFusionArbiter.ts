@@ -28,7 +28,7 @@ import {
   applyFusionArbitration,
   batchArbitrationCandidates,
   buildFusionArbitrationPrompt,
-  parseFusionArbitration,
+  inspectFusionArbitration,
   selectArbitrationCandidates,
   FUSION_ARBITRATION_SCHEMA,
   type ArbitrationVerdict,
@@ -49,6 +49,25 @@ export interface FusionArbitrationOutcome {
   /** Batches whose request or parse produced nothing. */
   failedBatches: number;
   skipped: FusionArbitrationSkip;
+  /** Failed batches counted by reason; see `failureReason`. Empty when none failed. */
+  failures: Record<string, number>;
+  /** Verdicts discarded by the guards in batches that still yielded something. */
+  dropped: number;
+}
+
+/**
+ * Name a batch failure so the next reader does not have to guess.
+ *
+ * A request that threw reports the provider layer's own `code` — `timeout`,
+ * `rate-limit`, `invalid-response` and the rest — because those are already the
+ * vocabulary the rest of main uses for the same failures, and a code is stable
+ * where a message is prose. Anything unrecognisable is `error` rather than the
+ * message text: an arbitrary provider string ends up in a file on disk, and this
+ * summary is not the place to find out it quoted the user's audio back.
+ */
+function failureReason(error: unknown): string {
+  const code = (error as { code?: unknown } | null)?.code;
+  return typeof code === 'string' && code ? code : 'error';
 }
 
 export interface FusionArbitrationOptions {
@@ -90,6 +109,8 @@ export async function arbitrateFusionDecisions(
     applied: 0,
     failedBatches: 0,
     skipped,
+    failures: {},
+    dropped: 0,
   });
 
   const candidates = selectArbitrationCandidates(decisions, englishTexts, references);
@@ -113,20 +134,38 @@ export async function arbitrateFusionDecisions(
 
   const batches = batchArbitrationCandidates(candidates);
   const verdicts: ArbitrationVerdict[] = [];
+  const failures: Record<string, number> = {};
+  const fail = (reason: string): void => {
+    failures[reason] = (failures[reason] ?? 0) + 1;
+  };
   let failedBatches = 0;
+  let dropped = 0;
   for (let i = 0; i < batches.length; i += 1) {
     if (options.isCancelled?.()) break;
     const batch = batches[i];
     try {
       const raw = await send(buildFusionArbitrationPrompt(batch), batch.length);
-      const parsed = parseFusionArbitration(raw, batch);
-      if (!parsed.length) failedBatches += 1;
-      verdicts.push(...parsed);
-    } catch {
+      const result = inspectFusionArbitration(raw, batch);
+      if (!result.verdicts.length) {
+        failedBatches += 1;
+        // Three different defects, and they were indistinguishable before this:
+        // a model that answered with prose, a model that returned an empty list,
+        // and a model whose every row the fidelity guard threw out.
+        if (!result.parsed) fail('unparsable');
+        else if (!result.rows) fail('empty');
+        else fail('rejected');
+      } else {
+        // A batch that yielded *something* is not failed, but losing half its
+        // rows is still worth seeing — this is the half `failedBatches` is blind to.
+        dropped += Math.max(0, result.rows - result.verdicts.length);
+      }
+      verdicts.push(...result.verdicts);
+    } catch (error) {
       // No retry. A failing provider fails the next batch too, and the whole
       // point of this stage being optional is that losing it costs confidence
       // rather than the track.
       failedBatches += 1;
+      fail(failureReason(error));
     }
     options.onBatch?.(i + 1, batches.length);
   }
@@ -137,5 +176,7 @@ export async function arbitrateFusionDecisions(
     applied: verdicts.length,
     failedBatches,
     skipped: null,
+    failures,
+    dropped,
   };
 }
