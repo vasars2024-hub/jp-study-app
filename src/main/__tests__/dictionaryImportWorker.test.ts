@@ -143,7 +143,10 @@ describe('runDictionaryImport', () => {
 
   it('reports an empty legacy tree as committed with zero stores', () => {
     const terminal = runDictionaryImport({ kind: 'legacy' }, dbDir, path.join(tempRoot, 'yomitan'), deps());
-    expect(terminal).toEqual({ state: 'committed', counts: { stores: 0, skipped: 0, headwords: 0, senses: 0, glosses: 0 } });
+    expect(terminal).toEqual({
+      state: 'committed',
+      counts: { stores: 0, skipped: 0, headwords: 0, senses: 0, glosses: 0, xrefs: 0 },
+    });
   });
 
   // A relabel writes no new rows, so it is not an import — it is here because it
