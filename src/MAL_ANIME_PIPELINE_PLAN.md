@@ -495,3 +495,43 @@ errors on a clean tree; prove "no new errors" by set-difference on file+message.
   what landed with `git log -- <path>` and never `git status`, and **never `git stash`** in this
   repo.
 - MAL writes are irreversible from this side. Reads are free; a write needs the user.
+
+## 2026-08-16 — P7 gate 32, first leg driven live; both catalogues are down
+
+Worker `backup`. Gate 32 is **partially measured and then externally blocked**, and the two
+defects the attempt exposed are fixed and committed.
+
+**External block, measured not assumed.** `curl` direct: Jikan `HTTP 504` *"Jikan failed to
+connect to MyAnimeList. MyAnimeList may be down/unavailable"*; AniList GraphQL `403`
+*"The AniList API has been temporarily disabled due to severe stability issues."* Through the
+app's own handler: `searchDiscovery('One Piece')` → **0 candidates, failures `['jikan','anilist']`,
+servedBy `null`**. So gate 32's "pick a title from a search" leg cannot run today. The **feed**
+leg does: `browseDiscovery('this-season')` → **25 candidates, servedBy `anilist`, failures
+`['jikan']`** (disk cache), and 26 rows render.
+
+**Defect 1 — a total outage reached the user as "Nothing matched." (`5020872`, recovered from
+the interrupted turn).** Both provider clients collapsed a transport failure into `[]`.
+`jikanSearch`/`anilistSearch` now answer `null` for "did not answer"; `searchDiscovery` returns
+the `DiscoveryFeedResult` shape the feed already used. Live: the placeholder now reads
+*"MyAnimeList · AniList did not answer, so this is not a result — nothing was searched."* with
+class `disc-placeholder disc-placeholder-error`. **Control:** same build, same session, one
+provider down and rows served — 26 rows, placeholder `null`, no outage text. The message is
+gated on `loadState==='empty'`, set from the raw count, so a filtered-to-zero list can never be
+blamed on a provider. 5 unit tests, including "both answered with nothing ⇒ zero failures".
+
+**Defect 2 — the download dialog showed the channel name (`d5d1375f`).** Driving
+row → inspector → `Download…` on an AniList-sourced title rendered *"Could not list anything to
+download — Error invoking remote method 'scraper:malUnits': Error: The catalogue has no anilist
+entry 185874."* New `shared/ipcErrorText.ts` strips Electron's wrapper; both discover surfaces
+now share it. Live after a reload: *"— The catalogue has no anilist entry 185874."* 6 tests,
+including the control that it never returns an empty string (an empty status line reads as
+success).
+
+**Traps for the next worker.** (1) The dialog's error is captured in state at fetch time — HMR
+re-renders but does **not** re-run it, and `/key Escape` did not close the modal either. Only
+`/reload` + a rows poll re-drove it; `debug/p7-drive.cjs` is that driver. (2) Discover's own
+filters (level select, hide-owned) cannot empty a non-empty feed, so the filtered-to-zero
+control has no live path — it rests on the `loadState` gate and the unit tests.
+
+**Gate 32 remains OPEN** on the harvest→mine→deck legs: they need a title with jimaku coverage,
+which needs a working search. Re-check the two catalogues at the start of the next MAL turn.
