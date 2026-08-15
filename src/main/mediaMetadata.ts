@@ -170,9 +170,12 @@ async function searchProviders(title: string): Promise<ProviderWork[]> {
   // Jikan first: it is the MyAnimeList data the user asked for, and it carries
   // per-episode titles. AniList only fills in when Jikan returns nothing, so the
   // common path costs one provider, not two.
+  // `null` from either provider means it never answered; here that is the same
+  // as having nothing to offer, because this path only ever patches fields it
+  // actually received.
   const primary = await jikanSearch(title);
-  if (primary.length > 0) return primary;
-  return anilistSearch(title);
+  if (primary && primary.length > 0) return primary;
+  return (await anilistSearch(title)) ?? [];
 }
 
 /** Turns an applied provider answer into the fields persisted on every file. */

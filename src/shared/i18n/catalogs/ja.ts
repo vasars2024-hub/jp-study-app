@@ -7251,6 +7251,7 @@ export const ja: Catalog = {
   'scraper.state.loading': 'カタログを読み込み中...',
   'scraper.state.error': 'カタログから応答がありません。接続を確認して更新してください。',
   'scraper.state.empty': '該当する作品がありません。別のタイトルかフィードをお試しください。',
+  'scraper.state.providersDown': '{providers} から応答がありませんでした。検索自体が行われていないため、これは結果ではありません。数分後にもう一度お試しください。',
   'scraper.state.shortlistEmpty': '候補はまだありません。作品をブックマークすると、ここに保存されます。',
   'scraper.results.label': '検索結果',
   'scraper.count.results': {

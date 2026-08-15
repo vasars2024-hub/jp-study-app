@@ -7216,6 +7216,7 @@ export const zh: Catalog = {
   'scraper.state.loading': '正在加载目录...',
   'scraper.state.error': '目录没有响应。请检查网络后刷新。',
   'scraper.state.empty': '没有匹配的结果。换个标题或列表试试。',
+  'scraper.state.providersDown': '{providers} 没有响应，因此这并不是搜索结果——实际上没有执行任何搜索。请几分钟后重试。',
   'scraper.state.shortlistEmpty': '候选列表为空。收藏作品后会保存在这里。',
   'scraper.results.label': '发现结果',
   'scraper.count.results': {

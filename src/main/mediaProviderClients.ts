@@ -313,7 +313,17 @@ function jikanToWork(anime: JikanAnime): ProviderWork {
   };
 }
 
-export async function jikanSearch(title: string, limit = 8): Promise<ProviderWork[]> {
+/**
+ * Searches MyAnimeList through Jikan.
+ *
+ * `null` means **the provider did not answer** — a 504 (which is what a
+ * MyAnimeList outage looks like from Jikan), a transport error, or unparseable
+ * JSON. An empty array means it answered and had nothing. Collapsing the two,
+ * which this used to do, is what let a total outage reach the user as
+ * "Nothing matched": measured live on 2026-08-16 with Jikan at 504 and AniList
+ * at 403, the Discover console told the user their query had no results.
+ */
+export async function jikanSearch(title: string, limit = 8): Promise<ProviderWork[] | null> {
   const query = title.trim();
   if (!query) return [];
   const key = `jikan:search:${query.toLowerCase()}:${limit}`;
@@ -324,7 +334,7 @@ export async function jikanSearch(title: string, limit = 8): Promise<ProviderWor
       jikanLimiter,
     ))?.data
     ?? null;
-  if (!data) return [];
+  if (!data) return null;
   if (!cached) writeCache(key, data);
   return data.filter((entry) => num(entry?.mal_id) !== undefined).map(jikanToWork);
 }
@@ -548,7 +558,8 @@ function anilistPageCount(data: unknown): number {
   return Array.isArray(media) ? media.length : 0;
 }
 
-export async function anilistSearch(title: string, limit = 8): Promise<ProviderWork[]> {
+/** Same `null` versus `[]` contract as {@link jikanSearch}. */
+export async function anilistSearch(title: string, limit = 8): Promise<ProviderWork[] | null> {
   const query = title.trim();
   if (!query) return [];
   const data = await anilistQuery<{ Page?: { media?: AnilistMedia[] } }>(
@@ -560,7 +571,8 @@ export async function anilistSearch(title: string, limit = 8): Promise<ProviderW
     { q: query, n: limit },
     `anilist:search:${query.toLowerCase()}:${limit}`,
   );
-  return (data?.Page?.media ?? []).filter((media) => num(media?.id) !== undefined).map(anilistToWork);
+  if (!data) return null;
+  return (data.Page?.media ?? []).filter((media) => num(media?.id) !== undefined).map(anilistToWork);
 }
 
 /** Seasons in broadcast order, so "the season before this one" is an index step. */

@@ -1363,7 +1363,7 @@ const api = {
   // ---- discovery (Scraper app: catalogue search + curated feeds) ----
   searchDiscovery: (
     query: string,
-  ): Promise<import('./shared/mediaDiscovery').DiscoveryCandidate[]> =>
+  ): Promise<import('./shared/mediaDiscovery').DiscoveryFeedResult> =>
     ipcRenderer.invoke('discovery:search', query),
   browseDiscovery: (
     feed: import('./shared/mediaDiscovery').DiscoveryFeedId,

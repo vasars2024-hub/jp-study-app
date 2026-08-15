@@ -7919,6 +7919,7 @@ export const ru: Catalog = {
   'scraper.state.loading': 'Загрузка каталога...',
   'scraper.state.error': 'Каталог не ответил. Проверьте подключение и обновите.',
   'scraper.state.empty': 'Ничего не найдено. Попробуйте другое название или подборку.',
+  'scraper.state.providersDown': '{providers} не ответил, поэтому это не результат — поиск не выполнялся. Попробуйте снова через несколько минут.',
   'scraper.state.shortlistEmpty': 'Список пуст. Добавьте тайтл в закладки, и он появится здесь.',
   'scraper.results.label': 'Результаты подбора',
   'scraper.count.results': {

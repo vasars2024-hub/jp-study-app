@@ -918,7 +918,7 @@ declare global {
       clearMediaMetadataCache(): Promise<void>;
       searchDiscovery(
         query: string,
-      ): Promise<import('../shared/mediaDiscovery').DiscoveryCandidate[]>;
+      ): Promise<import('../shared/mediaDiscovery').DiscoveryFeedResult>;
       browseDiscovery(
         feed: import('../shared/mediaDiscovery').DiscoveryFeedId,
         page?: number,

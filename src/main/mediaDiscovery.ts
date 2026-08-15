@@ -67,18 +67,38 @@ function usable(candidate: DiscoveryCandidate): boolean {
 /**
  * Searches both providers and merges the results.
  *
- * Failures are swallowed per provider rather than per call: if AniList is down,
- * a Jikan-only list is a materially better answer than an error, and the
- * console has no way to act on "one of two providers failed" anyway.
+ * One provider failing is still not an error: a Jikan-only list is a materially
+ * better answer than an error page. What changed is that the failure is now
+ * *reported* rather than swallowed. Both clients answer `null` when they never
+ * replied, so "both catalogues are down" and "this title does not exist" stop
+ * being the same empty array — the console can then say which one happened.
+ *
+ * The trigger was live: on 2026-08-16 Jikan answered 504 (MyAnimeList
+ * unreachable) and AniList answered 403 ("temporarily disabled"), and a search
+ * for a show with 1,100 episodes rendered as "Nothing matched."
  */
-export async function searchDiscovery(query: string): Promise<DiscoveryCandidate[]> {
+export async function searchDiscovery(query: string): Promise<DiscoveryFeedResult> {
   const trimmed = typeof query === 'string' ? query.trim() : '';
-  if (!trimmed) return [];
+  const fetchedAt = Date.now();
+  if (!trimmed) return { candidates: [], provenance: { servedBy: null, failures: [], fetchedAt } };
   const [jikan, anilist] = await Promise.all([
-    jikanSearch(trimmed, SEARCH_LIMIT).catch(() => [] as ProviderWork[]),
-    anilistSearch(trimmed, SEARCH_LIMIT).catch(() => [] as ProviderWork[]),
+    jikanSearch(trimmed, SEARCH_LIMIT).catch(() => null),
+    anilistSearch(trimmed, SEARCH_LIMIT).catch(() => null),
   ]);
-  return dedupeDiscoveryCandidates([...jikan, ...anilist].map(toCandidate).filter(usable));
+  const failures: DiscoveryProviderId[] = [];
+  if (jikan === null) failures.push('jikan');
+  if (anilist === null) failures.push('anilist');
+  const works: ProviderWork[] = [...(jikan ?? []), ...(anilist ?? [])];
+  // Whoever contributed a row gets the credit; Jikan first, matching the order
+  // the rows are merged in. `null` here means nothing answered at all, which is
+  // exactly the distinction the empty state is rendered from.
+  const servedBy: DiscoveryProviderId | null = jikan?.length
+    ? 'jikan'
+    : anilist?.length ? 'anilist' : null;
+  return {
+    candidates: dedupeDiscoveryCandidates(works.map(toCandidate).filter(usable)),
+    provenance: { servedBy, failures, fetchedAt },
+  };
 }
 
 /**

@@ -168,7 +168,7 @@ export function useDiscovery(enabled = true): DiscoveryState {
   const [levelPinned, setLevelPinned] = useState(initialPrefs.level !== null);
   const [hideOwned, setHideOwnedState] = useState(initialPrefs.hideOwned);
   const [candidates, setCandidates] = useState<DiscoveryCandidate[]>([]);
-  /** Null while a search is driving the list — provenance is a feed concept. */
+  /** Null only on the manga path, whose provider returns a bare list. */
   const [provenance, setProvenance] = useState<DiscoveryFeedProvenance | null>(null);
   const [loadState, setLoadState] = useState<LoadState>('idle');
   const [loadMessage, setLoadMessage] = useState('');
@@ -212,9 +212,10 @@ export function useDiscovery(enabled = true): DiscoveryState {
     requestToken.current = token;
     setLoadState('loading');
     setLoadMessage('');
-    // Search returns a bare list; a feed returns rows plus the provenance that
-    // says which catalogue actually answered. Both are normalized here so the
-    // rest of the view never has to care which path it came from.
+    // Anime search and anime feeds both return rows plus the provenance that
+    // says which catalogue actually answered; manga search still returns a bare
+    // list. All three are normalized here so the rest of the view never has to
+    // care which path it came from.
     const request: Promise<DiscoveryCandidate[] | DiscoveryFeedResult> | undefined =
       mediaType === 'manga'
         ? window.api?.readingMangaSearch?.({
@@ -548,8 +549,18 @@ export function DiscoveryResults({ state }: { state: DiscoveryState }) {
   const { t } = useT();
   const {
     results, selected, select, loadState, loadMessage, tab, shortlistIds,
-    toggleShortlist, mediaType, downloadFor, openDownload, closeDownload,
+    toggleShortlist, mediaType, downloadFor, openDownload, closeDownload, provenance,
   } = state;
+
+  /**
+   * Which catalogues never replied, as brand names.
+   *
+   * Only meaningful together with `loadState === 'empty'`, which is set from the
+   * *raw* candidate count — so a list emptied by the level filter or by "hide
+   * titles in my library" can never be blamed on a provider outage.
+   */
+  const downProviders = (provenance?.failures ?? [])
+    .map((id) => (id === 'jikan' ? 'MyAnimeList' : 'AniList'));
 
   // The dialog is a portal, and it is mounted here rather than behind the early
   // returns below: a download opened from the inspector must survive the list
@@ -579,9 +590,17 @@ export function DiscoveryResults({ state }: { state: DiscoveryState }) {
     );
   }
   if (results.length === 0) {
+    // "Nothing matched" is a claim about the catalogue's contents, and it is a
+    // lie when nothing was ever asked. Measured 2026-08-16: Jikan at 504 and
+    // AniList at 403 rendered a search for a 1,100-episode series as no results.
+    const outage = tab === 'browse' && loadState === 'empty' && downProviders.length > 0;
     return (
-      <div className="disc-placeholder">
-        {tab === 'shortlist' ? t('scraper.state.shortlistEmpty') : t('scraper.state.empty')}
+      <div className={`disc-placeholder${outage ? ' disc-placeholder-error' : ''}`}>
+        {tab === 'shortlist'
+          ? t('scraper.state.shortlistEmpty')
+          : outage
+            ? t('scraper.state.providersDown', { providers: downProviders.join(' · ') })
+            : t('scraper.state.empty')}
         {dialog}
       </div>
     );

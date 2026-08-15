@@ -7613,6 +7613,7 @@ export const en: Catalog = {
   'scraper.state.loading': 'Loading catalogue...',
   'scraper.state.error': 'The catalogue did not answer. Check your connection and refresh.',
   'scraper.state.empty': 'Nothing matched. Try another title or feed.',
+  'scraper.state.providersDown': '{providers} did not answer, so this is not a result — nothing was searched. Try again in a few minutes.',
   'scraper.state.shortlistEmpty': 'Nothing shortlisted yet. Bookmark a title to keep it here.',
   'scraper.results.label': 'Discovery results',
   'scraper.count.results': {
