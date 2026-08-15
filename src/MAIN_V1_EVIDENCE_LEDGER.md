@@ -21310,3 +21310,50 @@ Explain lens in `LexiconWorkbenchResults.tsx` is a hand-off button today, and th
 cache-hit rendering, the nine section labels in i18n ×4, a refresh and a forget. (2) `inflections`,
 `freq_corpora`, `examples`, `chars` still have writers that have not been run on this install — a
 data state, not a code gap. (3) The collocation partner still shows no gloss.
+
+## Track 2 — the channel with no caller gets two callers — 2026-08-15 13:25 MSK primary
+
+Boss audit's last section is still 2026-08-15 04:24, finding 1 closed by `4c7b416`; nothing pending.
+Handoff verified: `584319cd`/`6ac1aacf`/`69764f63` all exist and touch the paths they name.
+
+**Slice 1 — `0ab150cd`. `EntryExplain`, the Explain UI.** `dict:explain` had no caller; it has one
+below every dictionary-sourced expansion on the entry page (`DictionaryResults`, non-popup only).
+**Opening a word reads the cache and sends nothing** — `dictExplanationGet` under the derived key,
+never `dict:explain`; the request is a button. **Decision (standing auto-approval): the provider is
+the app's own AI engine config (`ai:getConfig`), not a third picker.** A per-panel picker would be
+the third place a model is chosen, and since the model is *in* the cache key, a panel disagreeing
+with the app's configured engine would miss the cache on every lookup and pay for it silently.
+`explainPolicyFromEngine` refuses `cloud-key` / `local-model` before anything is sent, so an empty
+API-key field is reported as an empty API-key field rather than as `invalid-request`.
+`EXPLANATION_SECTION_LABEL_KEYS` is `Record<SectionKind, string>` — a tenth kind without a label is
+a type error, not a raw key at a reader. 24 keys ×4.
+
+**Slice 2 — `bfc7e24c`. The second host.** The interlinear sense panel in
+`LexiconWorkbenchResults.tsx` (which was a passage hand-off button only), grounded on the token's
+matched headword — 見た opens 見る. **`explainSensesFromMatch` is deliberately blind to
+`pinnedSense`**: nothing in the storage key records a pin, so pin-varying grounding would write one
+reader's sense-3 answer into the cell every later sense-1 lookup reads. Deterministic per word.
+
+**Live, running dev app (renderer only — main unchanged, no restart needed).** Dictionary 猫: panel
+renders collapsed, `dictExplain` **not** called on open. Seeded row via `dictExplanationSet` →
+re-lookup renders it **open**, RU headings (`Оттенок значения`/`Пример`), invented kind `zzz`
+dropped, provenance `От cloud:gemini-2.5-flash:default, сохранено 15.08.2026`. Ask → **real Gemini
+call**, real RU explanation, 3 sections; running state disables the button and keeps the old answer
+visible. Forget → panel back to its offer and `dictExplanationGet` → **null**. Same five steps
+through the sense panel on 猫を見た。 (3 pinnable tokens, 9 sense options). **Table left empty.**
+
+**Traps.** (1) The bridge's `/eval` body field is **`js`**, not `expression` — `{"ok":false,"error":
+"missing js"}` is the only signal. `debug/ev.cjs` is a working one-liner client. (2) The
+`output-truncated` the previous entry hit on this prompt **did not recur** after `e3be6cf0`; two
+live Gemini calls both parsed. (3) `lexiconWorkbenchResults.test.tsx`'s `useT` mock returned no
+`lang`; `EntryExplain` reads it as `glossLang`, so the mock now carries `lang: 'en'`.
+
+**Gates**, shared tree (~426 foreign entries). `npx vitest run` exit 0: **620 files passed / 1
+skipped, 8,265 tests passed / 6 skipped** — no failures at all, so the previous entry's
+`scraperSources` load flake did not recur. i18n exit 0 at **9,622** (+24). architecture exit 0,
+**Nothing new**, 2 known pending. eslint clean on all 9 touched paths.
+
+**Deliberately open.** (1) A single-sense interlinear token is not clickable, so it has no Explain;
+extending `canPinSense`'s control rule is its own decision. (2) `inflections`, `freq_corpora`,
+`examples`, `chars` still have writers unrun on this install — a data state. (3) The collocation
+partner still shows no gloss.
