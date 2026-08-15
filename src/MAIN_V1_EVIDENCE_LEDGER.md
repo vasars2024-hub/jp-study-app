@@ -21679,3 +21679,54 @@ pages); `tag:nonexistent-zzz-tag` → `total 0`, **modelsRead 0** (no wasted rou
 
 **Phase 1's four source adapters are now all landed.** Its remaining clause is autosave-resumable
 drafts plus proven cancellation/recovery (acceptance gate 7) — that, not Phase 2, is next.
+
+## Track 7 — Phase 1 closes: an interrupted read cannot come back finished — 2026-08-16 16:05 MSK backup
+
+**Slice 2 — `aa18dd87` — resumable draft sessions.** Phase 1's last clause and the model behind
+demonstrable acceptance gate 7. `shared/ankiDraftSession.ts` (state machine, pure) +
+`main/anki/draftSessionStore.ts` (one atomically-written `userData/anki-draft-sessions.json`) +
+seven `anki:draftSession*` channels → preload → `window.d.ts`. 44 tests (27 shared + 17 main).
+
+**Decision: `complete` is computed from contiguous-coverage-from-zero, never set by a caller.**
+The obvious alternative, `covered >= totalNotes`, is exactly wrong — with a hole in the middle the
+two disagree *precisely* when it matters, and the second is the false success gate 7 forbids.
+Tested directly: 100 + 200 of 300 with a gap → `covered 300`, `sessionCoversEverything false`.
+
+**Decision: interruption is detected by pid, not by a staleness timeout.** Anything the file still
+calls `reading` was written by a process that never came back to change it; unless that pid is
+this process, it loads as `interrupted`. A timeout would have to exceed a legitimate read of a
+155,383-note collection, which makes it useless. **Decision: `interrupted` is a separate status
+from `cancelled`** — the user chose one and not the other, and only the unchosen one is offered
+for resume. Cancelling keeps its pages (stopping is not discarding), and **a page arriving after
+a cancel is dropped rather than reviving the session** — the ambiguous partial result in its
+other form. **Decision: a resume re-checks the source fingerprint** and answers `source-changed`
+rather than splicing two collections into one draft with no diagnostic saying so; that verdict
+does **not** delete the session, so the surface can explain it first.
+
+**Negative control, not just a green suite.** Replacing the one load-bearing line
+(`.map((s) => reconcileSessionOnLoad(s, process.pid, now))` → `.map((s) => s)`) reddened **3/17**
+for the intended reason; restored and re-green at 17/17.
+
+**Live, real IPC, real kill — this is the gate-7 evidence, not a mock.** App restarted for the new
+handlers (pid 38952). Seven channels driven: `begin` → `reading` with `ownerPid` **38952**, the
+actual Electron main pid, so these are real main handlers and not a preload stub. `recordPage`
+merged pages and carried `review-history-absent` through; `resume` with the same fingerprint →
+`{ok, offset 500, limit 500}`, with a moved one → `source-changed`; `cancel` → `cancelled`, and a
+**late page left it `cancelled`**; cancelling a missing id → `null`, no throw. Then a session was
+left at `reading` / 1,500 of 155,383 and the process **killed** (`taskkill /T /F 38952`). On-disk
+state read directly: `status: "reading"`, `ownerPid: 38952`. Restarted (pid **43292**) → the same
+session lists as **`interrupted`**, `ownerPid` gone, `pages [{0,1500}]` intact, `resumable true`,
+`resumeOffset 1500`; the *cancelled* session beside it stayed `cancelled` / `resumable false`
+across the same restart. `resume` → `{ok, offset 1500, limit 500}` and `ownerPid` **43292** on
+disk. Both probe sessions then deleted; the real userData file is back to `{"sessions": []}`.
+
+**Trap, and it is the second turn in a row it has cost time.** The Write tool again emitted a
+**raw 0x00 byte** where a `' '` string literal belonged (`sourceKey`'s `.join`), and `git add`
+staged the file as **`Bin 0 -> 8512 bytes`** — the only visible symptom. Fixed with a Node
+**buffer-level** splice to `String.fromCharCode(31)`, matching `ANKI_FIELD_SEP`'s own idiom (also
+a better separator: a filePath may contain a space). **The one-command detector:
+`tr -d '\11\12\15\40-\176\200-\377' < FILE | wc -c` must print 0** on any new source file.
+
+**Phase 1 is now complete** — four source adapters plus autosave/cancel/recovery. Next is Phase 2,
+the workbench shell, which is where Track 7's first user-visible strings and file dialog belong;
+budget for a four-catalog i18n pass there.
