@@ -19,7 +19,8 @@ vi.mock('electron', () => ({
 
 // vi.mock is hoisted above imports by vitest, so a static import is safe here
 // and avoids top-level await (which this tsconfig's module target rejects).
-const { scoreCandidates, toProvidersDocument, recentlyFailed, hasLanguage, retainedOnForce } = __subtitleDiscoveryTestables;
+const { scoreCandidates, toProvidersDocument, recentlyFailed, hasLanguage, retainedOnForce,
+  hasUnattachedSidecar } = __subtitleDiscoveryTestables;
 
 type Candidate = Parameters<typeof scoreCandidates>[0][number];
 
@@ -262,5 +263,54 @@ describe('retainedOnForce', () => {
   it('handles an item that has no records at all', () => {
     expect(retainedOnForce(undefined)).toEqual([]);
     expect(retainedOnForce([])).toEqual([]);
+  });
+});
+
+describe('hasUnattachedSidecar', () => {
+  // The defect this covers, reproduced live on 2026-08-15: an English `.en.vtt`
+  // sitting beside a video whose Japanese sidecar was already attached could
+  // never be discovered, because `autoDownloadLanguages` is `['ja']` by default
+  // and every wanted language was therefore already present — so the item was
+  // skipped before any scan ran. EN→JA fusion needs exactly that English track,
+  // which is why the plan recorded its blocker as "input, not code". It was code.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'subdisc-sidecar-'));
+  const video = path.join(dir, 'Podcast #13.mp4');
+  fs.writeFileSync(video, '');
+  fs.writeFileSync(path.join(dir, 'Podcast #13.ja.vtt'), 'WEBVTT\n');
+  fs.writeFileSync(path.join(dir, 'Podcast #13.en.vtt'), 'WEBVTT\n');
+
+  const mediaItem = (subtitles: unknown[]) =>
+    ({ id: 'm1', path: video, subtitles } as Parameters<typeof hasUnattachedSidecar>[0]);
+
+  it('finds the English sidecar when only the Japanese one is attached', () => {
+    expect(hasUnattachedSidecar(mediaItem([
+      { id: 'r1', lang: 'ja', source: 'sidecar', format: 'vtt', addedAt: 1,
+        path: path.join(dir, 'Podcast #13.ja.vtt') },
+    ]))).toBe(true);
+  });
+
+  it('is false once both languages are attached', () => {
+    expect(hasUnattachedSidecar(mediaItem([
+      { id: 'r1', lang: 'ja', source: 'sidecar', format: 'vtt', addedAt: 1,
+        path: path.join(dir, 'Podcast #13.ja.vtt') },
+      { id: 'r2', lang: 'en', source: 'sidecar', format: 'vtt', addedAt: 1,
+        path: path.join(dir, 'Podcast #13.en.vtt') },
+    ]))).toBe(false);
+  });
+
+  it('does not re-offer a language another source already holds', () => {
+    // A generated `en` track means the `.en.vtt` would add no language, so the
+    // item must not be re-visited on every sweep for the rest of its life.
+    expect(hasUnattachedSidecar(mediaItem([
+      { id: 'r1', lang: 'ja', source: 'sidecar', format: 'vtt', addedAt: 1,
+        path: path.join(dir, 'Podcast #13.ja.vtt') },
+      { id: 'r2', lang: 'en', source: 'generated', format: 'srt', addedAt: 1, path: 'x/en.srt' },
+    ]))).toBe(false);
+  });
+
+  it('is false for a media file whose directory does not exist', () => {
+    expect(hasUnattachedSidecar({
+      id: 'm2', path: path.join(dir, 'nope', 'gone.mp4'), subtitles: [],
+    } as Parameters<typeof hasUnattachedSidecar>[0])).toBe(false);
   });
 });

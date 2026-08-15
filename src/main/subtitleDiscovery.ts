@@ -380,6 +380,19 @@ function hasLanguage(records: readonly SubtitleRecord[], lang: string): boolean 
   return records.some((record) => record.lang.startsWith(base));
 }
 
+/**
+ * A sidecar next to the media file that names a language the item does not
+ * already carry. Only language-tagged files count: an untagged one is claimed
+ * by guesswork that needs the wanted-language list, which by construction is
+ * fully satisfied wherever this is asked.
+ */
+function hasUnattachedSidecar(item: MediaItem): boolean {
+  const records = item.subtitles ?? [];
+  const known = new Set(records.map((record) => record.path));
+  return findSidecarSubtitles(item.path).some((sidecar) =>
+    !!sidecar.language && !known.has(sidecar.path) && !hasLanguage(records, sidecar.language));
+}
+
 async function discoverForItem(
   item: MediaItem,
   settings: SubtitleDiscoverySettings,
@@ -404,9 +417,13 @@ async function discoverForItem(
   for (const providerId of providers) {
     if (cancelled.has(item.id)) return { records, failures, files };
 
-    // Nothing left to look for.
+    // Nothing left to *fetch*. `autoDownloadLanguages` gates downloads, so it
+    // gates the remote half of the ladder only. A sidecar already sitting next
+    // to the video is content the user provided; skipping it because some other
+    // language is already present is what left EN→JA fusion unable to see an
+    // English track lying beside the Japanese one it was asked to fuse from.
     const missing = languages.filter((lang) => !hasLanguage(records, lang));
-    if (missing.length === 0) break;
+    if (missing.length === 0 && isRemoteSubtitleProvider(providerId)) continue;
 
     if (providerId === 'embedded') {
       emit('probing-embedded');
@@ -440,8 +457,12 @@ async function discoverForItem(
     if (providerId === 'sidecar') {
       emit('scanning-sidecar');
       for (const sidecar of findSidecarSubtitles(item.path)) {
+        // A file that names its own language is taken at face value even when
+        // that language was not asked for — it is already on disk. An *unnamed*
+        // file is still only claimed when exactly one wanted language is missing,
+        // because that is the only case where the guess has a single answer.
         const target = sidecar.language ?? (missing.length === 1 ? missing[0] : null);
-        if (!target || !missing.includes(target) || known.has(sidecar.path)) continue;
+        if (!target || hasLanguage(records, target) || known.has(sidecar.path)) continue;
         known.add(sidecar.path);
         files += 1;
         records.push({
@@ -621,8 +642,11 @@ export async function runSubtitleDiscovery(
     if (only && !only.has(item.id)) return false;
     if (!eligible(item)) return false;
     if (request.force) return true;
-    // Skip anything that already has every wanted language.
-    return !languages.every((lang) => hasLanguage(item.subtitles ?? [], lang));
+    if (!languages.every((lang) => hasLanguage(item.subtitles ?? [], lang))) return true;
+    // Every wanted language is present, but a sidecar the user placed beside the
+    // file can still be unattached, and the language filter alone would never
+    // reach it. One readdir per item, and only for items we would otherwise skip.
+    return hasUnattachedSidecar(item);
   });
 
   if (items.length === 0) return { ok: true, attached: 0, empty: 0, files: 0 };
@@ -872,4 +896,5 @@ export function registerSubtitleDiscoveryIpc(discoveryHost: SubtitleDiscoveryHos
 
 export const __subtitleDiscoveryTestables = {
   scoreCandidates, toProvidersDocument, recentlyFailed, hasLanguage, retainedOnForce,
+  hasUnattachedSidecar,
 };
