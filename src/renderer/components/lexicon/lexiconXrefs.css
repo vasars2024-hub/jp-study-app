@@ -1,0 +1,69 @@
+.lexicon-xrefs {
+  margin: 14px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-1);
+  color: var(--text);
+}
+
+.lexicon-xrefs > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.lexicon-xrefs-note {
+  margin: 8px 0 0;
+  font-size: 0.9em;
+}
+
+.lexicon-xrefs-group {
+  margin-top: 10px;
+}
+
+.lexicon-xrefs-kind {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 0.85em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.lexicon-xrefs-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lexicon-xrefs-word {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  line-height: 1.4;
+}
+
+/* A target no installed dictionary carries. Dimmed, but never below the contrast
+   floor — the word itself is still the content, and the note beside it is what
+   carries the "you cannot look this up" meaning. Colour alone is not the signal,
+   so the distinction survives a monochrome or high-contrast rendering. */
+.lexicon-xrefs-word.is-absent {
+  background: transparent;
+  border: 1px dashed var(--border);
+}
+
+.lexicon-xrefs-absent-note {
+  color: var(--muted);
+  font-size: 0.8em;
+}
+
+.lexicon-xrefs-source {
+  margin: 10px 0 0;
+  font-size: 0.85em;
+}

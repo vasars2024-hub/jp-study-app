@@ -368,6 +368,10 @@ declare global {
         text: string,
         options?: { sourceLangs?: string[] },
       ): Promise<import('../shared/lexiconEtymology').LexiconEtymologyResult>;
+      dictXrefs(
+        text: string,
+        options?: { sourceLangs?: string[] },
+      ): Promise<import('../shared/lexiconXrefs').LexiconXrefResult>;
       dictConjugation(word: string): Promise<import('../shared/conjugationClass').ConjugationAnalysis>;
       dictNoteGet(
         identity: import('../shared/lexiconNotes').LexiconNoteIdentity,

@@ -47,6 +47,7 @@ import {
   findLexiconCompoundsInDb,
   findExampleSentencesInDb,
   findLexiconEtymologyInDb,
+  findLexiconXrefsInDb,
   listDictionarySources,
   listDictionaryPairs,
   dictionaryPairHasOverride,
@@ -94,6 +95,11 @@ import {
   MAX_ETYMOLOGY_RESULTS,
   type LexiconEtymologyResult,
 } from '../shared/lexiconEtymology';
+import {
+  MAX_XREF_QUERY_CHARS,
+  MAX_XREF_RESULTS,
+  type LexiconXrefResult,
+} from '../shared/lexiconXrefs';
 import {
   registerDictionaryImportIpc,
   startPendingLegacyDictionaryMigration,
@@ -824,6 +830,29 @@ export function registerDictionaryIpc(): void {
         // Same contract again, and it matters more here: this read fires with the
         // lookup rather than on a click, so a throw on an un-migrated installation
         // would surface as a rejected invoke on every single word.
+        return empty;
+      }
+    },
+  );
+  ipcMain.handle(
+    'dict:xrefs',
+    (_e, text: unknown, options?: unknown): LexiconXrefResult => {
+      const raw = options && typeof options === 'object' && !Array.isArray(options)
+        ? options as Record<string, unknown>
+        : {};
+      const query = typeof text === 'string' ? text.trim().slice(0, MAX_XREF_QUERY_CHARS) : '';
+      const empty: LexiconXrefResult = { query, xrefs: [] };
+      if (!query) return empty;
+      try {
+        return findLexiconXrefsInDb({
+          text: query,
+          sourceLangs: readLangList(raw.sourceLangs),
+          limit: MAX_XREF_RESULTS,
+        });
+      } catch {
+        // Same contract as the etymology read beside it, and it matters for the
+        // same reason: this fires with the lookup rather than on a click, so a
+        // throw on an un-migrated installation would reject on every word.
         return empty;
       }
     },

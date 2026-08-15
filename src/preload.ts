@@ -471,6 +471,12 @@ const api = {
     options?: { sourceLangs?: string[] },
   ): Promise<import('./shared/lexiconEtymology').LexiconEtymologyResult> =>
     ipcRenderer.invoke('dict:etymology', text, options),
+  /** The words the installed dictionaries point at from this word's senses. */
+  dictXrefs: (
+    text: string,
+    options?: { sourceLangs?: string[] },
+  ): Promise<import('./shared/lexiconXrefs').LexiconXrefResult> =>
+    ipcRenderer.invoke('dict:xrefs', text, options),
   /** Every form of a conjugable Japanese word, from IPADIC's own class table. */
   dictConjugation: (
     word: string,

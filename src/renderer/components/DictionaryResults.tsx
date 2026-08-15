@@ -38,6 +38,7 @@ import ConjugationTable from './lexicon/ConjugationTable';
 import LexiconCompounds from './lexicon/LexiconCompounds';
 import LexiconExamples from './lexicon/LexiconExamples';
 import LexiconEtymology from './lexicon/LexiconEtymology';
+import LexiconXrefs from './lexicon/LexiconXrefs';
 import EntryNote from './lexicon/EntryNote';
 import SemanticNeighbors from './lexicon/SemanticNeighbors';
 import UsageLabels, { entryUsageTags } from './lexicon/UsageLabels';
@@ -984,6 +985,13 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
           it cannot fill. */}
       {variant !== 'popup' && entries.length > 0 && (
         <LexiconEtymology query={entries[0].word} lang={lang} />
+      )}
+
+      {/* Beside the etymology and above the opt-in expansions, for the same
+          reason: indexed probes only, and absent entirely when the installed
+          dictionaries state no relation for the word. */}
+      {variant !== 'popup' && entries.length > 0 && (
+        <LexiconXrefs query={entries[0].word} lang={lang} />
       )}
 
       {variant !== 'popup' && entries.length > 0 && (

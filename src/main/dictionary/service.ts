@@ -48,6 +48,7 @@ import {
   findExampleSentences,
   findLexiconCompounds,
   findLexiconEtymology,
+  findLexiconXrefs,
   findSemanticNeighbors,
   lookup,
   type CompoundQuery,
@@ -56,6 +57,7 @@ import {
   type LookupQuery,
   type LookupResult,
   type NeighborQuery,
+  type XrefQuery,
 } from './dictService';
 import {
   lookupChineseTerm,
@@ -75,6 +77,7 @@ import type { LexiconNeighborResult } from '../../shared/lexiconNeighbors';
 import type { LexiconCompoundResult } from '../../shared/lexiconCompounds';
 import type { LexiconExampleResult } from '../../shared/lexiconExamples';
 import type { LexiconEtymologyResult } from '../../shared/lexiconEtymology';
+import type { LexiconXrefResult } from '../../shared/lexiconXrefs';
 import {
   isGlobalPair,
   normalizeSourceLang,
@@ -441,6 +444,17 @@ export function findExampleSentencesInDb(query: ExampleQuery): LexiconExampleRes
  */
 export function findLexiconEtymologyInDb(query: EtymologyQuery): LexiconEtymologyResult {
   return findLexiconEtymology(dictionaryDb(), query);
+}
+
+/**
+ * The words the installed dictionaries point at from a word's senses.
+ *
+ * Cheap on the same terms as the etymology read: an indexed headword probe, an
+ * indexed join on `idx_xref_from`, and one batched equality to decide which
+ * targets this install can navigate to. No scan, so it runs with the lookup.
+ */
+export function findLexiconXrefsInDb(query: XrefQuery): LexiconXrefResult {
+  return findLexiconXrefs(dictionaryDb(), query);
 }
 
 /** The user's own note on a word, from the managed database. */
