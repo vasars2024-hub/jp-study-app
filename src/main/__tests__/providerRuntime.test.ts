@@ -370,7 +370,7 @@ describe('main-owned AI provider runtime', () => {
       apiKey: 'gemini-key',
       prompt: 'Stream sixteen windows.',
       maxOutputTokens: 4096,
-      onTextChunk: () => {},
+      onTextChunk: () => undefined,
     })).rejects.toMatchObject({ code: 'output-truncated' });
   });
 });
