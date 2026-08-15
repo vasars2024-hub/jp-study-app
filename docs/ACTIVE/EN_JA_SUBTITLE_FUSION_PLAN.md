@@ -777,3 +777,29 @@ the `16e1603~1` blob, which reports the same 3 at the same statements.
 **Not re-run this turn:** the F7 harness itself. It needs the app, real media and a fresh fusion;
 the reference stage should now cover all 35 windows instead of 8, and that number is the first
 thing to re-measure.
+
+### Episode 1 re-scored after `f090522`: the reference stage now covers every window — 2026-08-15, backup
+
+**No code change.** This is the measurement `f090522` was blind-committed on, taken through the
+product path: app started with `JP_FUSION_EVAL=1`, fusion re-run on `a167b9e2` pinned to the
+human EN sidecar `380be605`, 35/35 windows, 0 errors, `queued -> ... -> done` in ~9 min.
+
+**The fix holds end to end.** `fused-ja.mt-only.srt` went **1,087 B / 8 cues -> 5,936 B / 35
+cues**; the sidecar is **v1** again (no `whisper-unrefereed` left), **35/35 cues carry a nonzero
+score** (max 0.641, was 8 and 0.571), meanConfidence **0.507 -> 0.571**, basis `{whisper:19,
+whisper-unverified:16}`. The old "reference for the first chunk only" ceiling is gone.
+
+**F7 on episode 1, `--mode offline`: PASS.** Reference 38 cues / 1490 chars — fused CER
+**11.28%**, whisperOnly **11.28%**, mtOnly **70.54%** (was 91.41% with 30 cues missed; now
+**0 reference cues missed**). The degenerate-comparison note prints, as designed: fused and
+whisperOnly are still character-identical offline, so this episode licenses no "fusion beat
+Whisper" claim — only "fusion did not damage the track, and it beat translation alone".
+
+**Run-level gate still FAIL, for exactly one reason:** `only 1 episode(s) scored; the gate needs
+2`. Claim `nothing`. Episode 2 (`4fbae4af`, Hana #13) is the next slice and is queued.
+
+**Traps.** (1) The baselines only exist when the *main* process saw `JP_FUSION_EVAL=1` at launch
+(`transcriptionJobs.ts:581`) — set it before `npm start`, not in the shell you probe from.
+(2) A pre-fix `fused-ja.meta.json` keeps its old basis counts forever; there is no migration, so
+re-fuse before quoting any sidecar written before `f090522` (Hana #12's 07:05 sidecar is one).
+(3) Pinning `sourceSubtitleId` matters — without it the job may pick the *generated* JA track.
