@@ -332,16 +332,17 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
   }, []);
   useEffect(refreshJitenCovers, []);
 
+  // Everything except the dictionary saves, which have their own two tabs.
+  //
+  // Written as an exclusion rather than the allow-list it used to be, because
+  // the allow-list silently orphaned whole sources: `media` — every card the
+  // subtitle harvest, the visual-novel miner and Study Mode produce — was in
+  // the deck, counted by nothing and listed nowhere, and the sidebar's own
+  // "Media" folder chip read 0 while holding cards. `extension` was orphaned
+  // the same way. A new `FlashcardSource` now appears by default instead of
+  // vanishing until someone remembers this line.
   const epubCards = useMemo(
-    () =>
-      deck.filter(
-        (c) =>
-          c.source === 'epub' ||
-          c.source === 'epub-ai' ||
-          c.source === 'import' ||
-          c.source === 'csv' ||
-          c.source === 'jiten',
-      ),
+    () => deck.filter((c) => c.source !== 'dictionary'),
     [deck],
   );
   const recentStrip = useMemo(() => epubCards.slice(0, 24), [epubCards]);
@@ -1691,6 +1692,15 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
                                 )}
                                 <span className="flash-row-meaning">{card.meaning || card.back || '—'}</span>
                                 {card.sentence && <span className="flash-row-sentence muted">{card.sentence}</span>}
+                                {typeof card.sourceRef?.episode === 'number' && (
+                                  // The deck row already names the show, via the group header it
+                                  // sits under. Which *episode* is the part a season harvest of
+                                  // 90-odd files records and nothing showed — without it the
+                                  // provenance exists only in storage.
+                                  <span className="flash-row-episode muted">
+                                    {t('flash.row.episode', { episode: card.sourceRef.episode })}
+                                  </span>
+                                )}
                                 {card.folder && <span className="flash-row-folder muted">{card.folder}</span>}
                               </div>
                               <div className="flash-row-actions">

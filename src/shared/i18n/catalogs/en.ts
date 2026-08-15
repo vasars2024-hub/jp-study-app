@@ -5735,6 +5735,7 @@ export const en: Catalog = {
   'flash.renameBook': 'Rename',
   'flash.renameBook.prompt': 'New name for this book',
   'flash.file': 'File',
+  'flash.row.episode': 'Ep. {episode}',
   'flash.noSavedWords': 'No saved words yet',
   'flash.noSavedWords.hint':
     'Open the Dictionary (or highlight a word while reading) and tap the star icon on a result to save it here.',

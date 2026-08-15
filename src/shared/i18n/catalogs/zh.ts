@@ -5404,6 +5404,7 @@ export const zh: Catalog = {
   'flash.renameBook': '重命名',
   'flash.renameBook.prompt': '为这本书输入新名称',
   'flash.file': '归类',
+  'flash.row.episode': '第{episode}集',
   'flash.noSavedWords': '还没有保存的单词',
   'flash.noSavedWords.hint': '打开词典（或在阅读时选中单词），点击结果上的星形图标即可保存到这里。',
 

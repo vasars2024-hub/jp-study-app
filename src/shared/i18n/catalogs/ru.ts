@@ -5998,6 +5998,7 @@ export const ru: Catalog = {
   'flash.renameBook': 'Переименовать',
   'flash.renameBook.prompt': 'Новое название для этой книги',
   'flash.file': 'Разложить',
+  'flash.row.episode': 'Сер. {episode}',
   'flash.noSavedWords': 'Сохранённых слов пока нет',
   'flash.noSavedWords.hint':
     'Откройте словарь (или выделите слово во время чтения) и нажмите на значок звезды у результата, чтобы сохранить его здесь.',

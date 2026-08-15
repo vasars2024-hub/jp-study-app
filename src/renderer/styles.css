@@ -6251,6 +6251,17 @@ mark.lookup-mark,
   border-radius: 999px;
 }
 
+/* The episode a harvested card came from. Deliberately the same pill as the
+   folder badge above: a row carrying both should read as two facts about the
+   card, not two competing decorations, so neither gets its own colour. */
+.flash-row-episode {
+  font-size: 11px;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
 .flash-row-actions {
   display: flex;
   align-items: center;

@@ -5430,6 +5430,7 @@ export const ja: Catalog = {
   'flash.renameBook': '名前を変更',
   'flash.renameBook.prompt': 'この本の新しい名前',
   'flash.file': '整理',
+  'flash.row.episode': '第{episode}話',
   'flash.noSavedWords': 'まだ保存された単語がありません',
   'flash.noSavedWords.hint': '辞書を開く（または読書中に単語を選択）と、結果の星アイコンをタップしてここに保存できます。',
 
