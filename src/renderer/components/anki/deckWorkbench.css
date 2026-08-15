@@ -623,3 +623,160 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-sm, 6px);
 }
+
+/* ----- the change tray (Phase 3) -------------------------------------------
+   A stable anchor surface, not glass: this is the panel a user reads a diff on
+   before committing a batch, and the plan keeps dense editing work high
+   contrast. Liquid treatment stays on the shell around it. */
+.wb-tray {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 10px);
+  background: var(--panel, var(--bg));
+}
+
+.wb-tray-head h3 {
+  margin: 0;
+}
+
+.wb-tray-scope {
+  margin: 4px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.wb-tray-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wb-tray-action {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+}
+
+/* Disabled means "still in the order, not running" — dimmed, never hidden, or
+   the numbering the user reasons about would silently renumber. */
+.wb-tray-action.disabled {
+  opacity: 0.55;
+}
+
+.wb-tray-step {
+  min-width: 1.5rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.wb-tray-desc {
+  flex: 1 1 220px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.wb-tray-outcome {
+  font-variant-numeric: tabular-nums;
+}
+
+.wb-tray-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px;
+}
+
+.wb-tray-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wb-tray-form label.wb-tray-flag {
+  flex-direction: row;
+  align-items: center;
+}
+
+.wb-tray-form input,
+.wb-tray-form select {
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.wb-tray-problems {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.wb-tray-warn {
+  color: var(--warn, #c07000);
+}
+
+.wb-tray-blocking {
+  color: var(--danger, #b3261e);
+  font-weight: 600;
+}
+
+.wb-tray-summary {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.wb-tray-diff {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wb-tray-diff-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.wb-tray-diff-field {
+  min-width: 5rem;
+  font-weight: 600;
+}
+
+.wb-tray-diff del {
+  color: var(--danger, #b3261e);
+}
+
+.wb-tray-diff ins {
+  color: var(--ok, #1e7a3c);
+  text-decoration: none;
+}
+
+.wb-tray-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.wb-tray-applied {
+  font-weight: 600;
+}

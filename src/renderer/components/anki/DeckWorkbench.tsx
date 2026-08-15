@@ -40,9 +40,12 @@ import {
   type AnkiDraftEditJournal,
   type AnkiDraftEditResult,
 } from '../../../shared/ankiDraftEdit';
+import type { TrayPlan } from '../../../shared/ankiChangeTray';
+import { countJournalSteps } from '../../../shared/ankiDraftEdit';
 import { loadDeckAsAnkiDraft } from '../../flashcardDeck';
 import { useT } from '../../i18n';
 import DeckWorkbenchBrowser from './DeckWorkbenchBrowser';
+import DeckWorkbenchTray from './DeckWorkbenchTray';
 import './deckWorkbench.css';
 
 type SourceKey = 'apkg' | 'connect' | 'localDeck';
@@ -72,6 +75,10 @@ export default function DeckWorkbench() {
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   /** Every draft edit, oldest first, with its own before-image. */
   const [journal, setJournal] = useState<AnkiDraftEditJournal>(createEditJournal);
+  /** Selected notes the tray can act on now — loaded ones only. */
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  /** What the selection stands for, which on a paged source is the larger number. */
+  const [selectedCount, setSelectedCount] = useState(0);
 
   const refreshSessions = useCallback(async () => {
     try {
@@ -96,6 +103,10 @@ export default function DeckWorkbench() {
     // Carrying them onto a different source would let undo write a previous
     // deck's text into a note that merely shares an id.
     setJournal(createEditJournal());
+    // Same reason: ids from the previous source name nothing here, and a tray
+    // built against them would report a scope it does not have.
+    setSelectedIds([]);
+    setSelectedCount(0);
     setFlow((prev) =>
       recordStep(prev, 'source', {
         satisfied: true,
@@ -148,7 +159,9 @@ export default function DeckWorkbench() {
     });
   }, []);
 
-  const onBrowseSelection = useCallback((count: number, wholeSource: boolean) => {
+  const onBrowseSelection = useCallback((count: number, wholeSource: boolean, ids: string[]) => {
+    setSelectedIds(ids);
+    setSelectedCount(count);
     setFlow((prev) =>
       recordStep(prev, 'browse', {
         // Zero selected is a legitimate state, and it is not a finished step.
@@ -166,6 +179,16 @@ export default function DeckWorkbench() {
     if (!result.changed) return;
     setDraft(result.draft);
     setJournal(result.journal);
+  }, []);
+
+  /**
+   * Applying the tray is adopting the plan the preview was computed from — the
+   * batch is not re-run here, so what the user read is exactly what lands.
+   */
+  const applyTray = useCallback((plan: TrayPlan) => {
+    if (plan.blocked || plan.changedNotes === 0) return;
+    setDraft(plan.draft);
+    setJournal(plan.journal);
   }, []);
 
   /**
@@ -364,7 +387,9 @@ export default function DeckWorkbench() {
                 disabled={journal.done.length === 0}
                 onClick={() => stepHistory('undo')}
               >
-                {t('ankiWorkbench.edit.undo', { count: journal.done.length })}
+                {/* Steps, not ops: one tray over 3,000 notes is one undo, and a
+                    button reading "Undo (3000)" would describe the wrong thing. */}
+                {t('ankiWorkbench.edit.undo', { count: countJournalSteps(journal.done) })}
               </button>
               <button
                 type="button"
@@ -372,7 +397,7 @@ export default function DeckWorkbench() {
                 disabled={journal.undone.length === 0}
                 onClick={() => stepHistory('redo')}
               >
-                {t('ankiWorkbench.edit.redo', { count: journal.undone.length })}
+                {t('ankiWorkbench.edit.redo', { count: countJournalSteps(journal.undone) })}
               </button>
               <span className="muted">{t('ankiWorkbench.edit.draftOnly')}</span>
             </div>
@@ -382,6 +407,13 @@ export default function DeckWorkbench() {
               journal={journal}
               onSelection={onBrowseSelection}
               onEdit={applyEdit}
+            />
+            <DeckWorkbenchTray
+              draft={draft}
+              journal={journal}
+              selectedIds={selectedIds}
+              selectedCount={selectedCount}
+              onApply={applyTray}
             />
           </div>
         ) : (

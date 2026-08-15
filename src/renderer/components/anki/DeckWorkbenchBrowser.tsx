@@ -59,7 +59,11 @@ export default function DeckWorkbenchBrowser({
   /** Notes in the whole source, which may exceed the page in `draft`. */
   totalNotes: number;
   journal: AnkiDraftEditJournal;
-  onSelection: (count: number, wholeSource: boolean) => void;
+  /**
+   * `ids` are the selected notes that are actually loaded. `count` can exceed
+   * them on a paged source, and the tray has to be able to say so.
+   */
+  onSelection: (count: number, wholeSource: boolean, ids: string[]) => void;
   onEdit: (result: AnkiDraftEditResult) => void;
 }) {
   const { t } = useT();
@@ -96,9 +100,15 @@ export default function DeckWorkbenchBrowser({
   const applySelection = useCallback(
     (next: BrowserSelection) => {
       setSelection(next);
-      onSelection(selectionCount(next, matchedTotal), selectionIsWholeSource(next));
+      onSelection(
+        selectionCount(next, matchedTotal),
+        selectionIsWholeSource(next),
+        // Resolved against the rows in memory, which is the only set anything
+        // downstream can actually edit.
+        shown.filter((row) => isRowSelected(next, row.noteId)).map((row) => row.noteId),
+      );
     },
-    [onSelection, matchedTotal],
+    [onSelection, matchedTotal, shown],
   );
 
   const onRowClick = useCallback(
