@@ -145,6 +145,13 @@ export interface AnkiDraftNote {
   /** Anki's "marked" is the `marked` tag, surfaced separately because the UI treats it as a flag. */
   marked: boolean;
   fields: AnkiDraftFieldValue[];
+  /**
+   * The deck a source that carries notes but no cards said this note belongs in
+   * (a CSV `#deck:` / `#deck column:`). A card's deck lives on the card; this is
+   * an intent the file stated and nothing is scheduled into it yet, so it is
+   * deliberately not `deckId`.
+   */
+  targetDeckId?: string;
   modifiedAtSec: number;
   /** `notes.flags` and `notes.data`, preserved verbatim; Anki reserves both. */
   flags: number;
@@ -234,7 +241,8 @@ export type AnkiDraftDiagnosticCode =
   | 'duplicate-guid'
   | 'empty-first-field'
   | 'review-history-absent'
-  | 'template-format-unavailable';
+  | 'template-format-unavailable'
+  | 'note-type-unassigned';
 
 export interface AnkiDraftDiagnostic {
   code: AnkiDraftDiagnosticCode;
@@ -293,6 +301,8 @@ export interface RawAnkiNoteRow {
   flds: string;
   flags?: number;
   data?: string;
+  /** Deck the source named for this note when it carries no cards. See `targetDeckId`. */
+  targetDid?: string | number;
 }
 
 export interface RawAnkiCardRow {
@@ -355,6 +365,14 @@ export interface RawAnkiNoteTypeRow {
    * empty formats look like real ones.
    */
   formatsUnavailable?: boolean;
+  /**
+   * Set by a reader for a placeholder note type it had to invent because the
+   * source carries none at all — a CSV/TSV names columns, never a card design.
+   * The builder raises `note-type-unassigned` as blocking: the draft opens and
+   * can be inspected, and nothing can be exported until a real note type is
+   * chosen.
+   */
+  unassigned?: boolean;
 }
 
 export interface RawAnkiRevlogRow {
@@ -496,6 +514,10 @@ const SEVERITY: Readonly<Record<AnkiDraftDiagnosticCode, AnkiDraftDiagnostic['se
   // Blocking too: a template whose qfmt/afmt could not be read would export as a
   // card that renders blank, and it would look like the user's own edit.
   'template-format-unavailable': 'blocking',
+  // Blocking as well, and for the neighbouring reason: a source with no note
+  // type at all (a CSV) gets a placeholder so its columns have somewhere to
+  // live, and exporting against a placeholder would invent a card design.
+  'note-type-unassigned': 'blocking',
   // Warning: safe to edit, not safe to assume.
   'missing-media': 'warning',
   'orphan-card': 'warning',
@@ -595,6 +617,7 @@ export function buildAnkiDraft(
   // --- note types
   const noteTypes: AnkiDraftNoteType[] = raw.noteTypes.map((row) => {
     if (row.formatsUnavailable) diag.add('template-format-unavailable', String(row.name ?? row.id));
+    if (row.unassigned) diag.add('note-type-unassigned', String(row.name ?? row.id));
     return {
       id: String(row.id),
       name: String(row.name ?? ''),
@@ -719,6 +742,7 @@ export function buildAnkiDraft(
       tags: tags.filter((t) => t.toLowerCase() !== 'marked'),
       marked: tags.some((t) => t.toLowerCase() === 'marked'),
       fields,
+      targetDeckId: row.targetDid != null ? String(row.targetDid) : undefined,
       modifiedAtSec: Number(row.mod ?? 0),
       flags: Number(row.flags ?? 0),
       data: String(row.data ?? ''),
