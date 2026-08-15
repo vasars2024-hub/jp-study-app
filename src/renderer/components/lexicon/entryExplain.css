@@ -1,0 +1,93 @@
+.lexicon-explain-entry {
+  margin: 14px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-1);
+  color: var(--text);
+}
+
+.lexicon-explain-entry > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.lexicon-explain-about,
+.lexicon-explain-blocked,
+.lexicon-explain-empty {
+  margin: 8px 0 0;
+  font-size: 0.9em;
+}
+
+.lexicon-explain-answer {
+  margin-top: 10px;
+}
+
+.lexicon-explain-summary {
+  margin: 0;
+  /* The one line a reader takes away before opening anything below it. */
+  font-size: 1.02em;
+  line-height: 1.5;
+}
+
+.lexicon-explain-section {
+  margin-top: 12px;
+}
+
+.lexicon-explain-section > h4 {
+  margin: 0 0 4px;
+  font-size: 0.82em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+.lexicon-explain-section > p {
+  margin: 0;
+  line-height: 1.5;
+  /* Explanations are prose the model wrote with its own paragraph breaks. */
+  white-space: pre-wrap;
+}
+
+.lexicon-explain-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.lexicon-explain-ask,
+.lexicon-explain-forget {
+  min-height: 32px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.lexicon-explain-ask:disabled,
+.lexicon-explain-forget:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.lexicon-explain-provenance {
+  margin: 8px 0 0;
+  font-size: 0.85em;
+}
+
+.lexicon-explain-error {
+  margin: 8px 0 0;
+  color: var(--danger, #d14343);
+}
+
+.lexicon-explain-code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--surface-2);
+  font-size: 0.9em;
+}

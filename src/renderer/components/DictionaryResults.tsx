@@ -42,6 +42,7 @@ import LexiconEtymology from './lexicon/LexiconEtymology';
 import LexiconXrefs from './lexicon/LexiconXrefs';
 import WordAudio from './lexicon/WordAudio';
 import EntryNote from './lexicon/EntryNote';
+import EntryExplain from './lexicon/EntryExplain';
 import SemanticNeighbors from './lexicon/SemanticNeighbors';
 import UsageLabels, { entryUsageTags } from './lexicon/UsageLabels';
 import WordKnowledge from './lexicon/WordKnowledge';
@@ -1028,6 +1029,19 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
 
       {variant !== 'popup' && entries.length > 0 && (
         <SemanticNeighbors query={entries[0].word} lang={lang} onLookup={onLookup} />
+      )}
+
+      {/* Below every dictionary-sourced expansion, because this is the only one
+          on the page a model wrote. It is grounded on the same matched headword
+          and on the glosses rendered above, so the model explains the entry the
+          reader is looking at rather than its own guess at the word. */}
+      {variant !== 'popup' && entries.length > 0 && (
+        <EntryExplain
+          word={entries[0].word}
+          reading={entries[0].reading ?? ''}
+          lang={lang}
+          senses={entries[0].senses ?? []}
+        />
       )}
 
       {/* Anchored on the same matched headword as the expansions above, so a note
