@@ -428,6 +428,45 @@ describe('DeckWorkbench', () => {
     expect(host.querySelectorAll('.wb-browser-row')).toHaveLength(2);
   });
 
+  it('saves a view and restores its query, sort and columns — but never a selection', async () => {
+    window.localStorage.removeItem('jp-anki-browser-views');
+    await toBrowse(browsable());
+    const search = host.querySelector('.wb-browser-search') as HTMLInputElement;
+    await type(search, 'animal');
+    await click(rowOf('n1').querySelector('input') as HTMLElement);
+    const toggles = [...host.querySelectorAll('.wb-browser-column-toggle input')] as HTMLInputElement[];
+    await click(toggles[1]!); // hide the second field column
+
+    await type(host.querySelector('.wb-browser-view-name') as HTMLInputElement, 'Animals');
+    await click(buttonBy('ankiWorkbench.browser.views.save'));
+
+    const stored = JSON.parse(window.localStorage.getItem('jp-anki-browser-views') ?? '{}');
+    expect(stored.views).toHaveLength(1);
+    expect(stored.views[0].query).toBe('animal');
+    expect(stored.views[0].visibleColumnIds).not.toContain('field:Meaning');
+    // The selected note is not part of the view: a note id means nothing after a
+    // reimport, and restoring one would silently reselect the wrong note.
+    expect(JSON.stringify(stored)).not.toContain('n1');
+
+    // Change everything, then apply the saved view back.
+    await type(search, '');
+    await click(toggles[1]!);
+    expect(host.querySelectorAll('.wb-browser-row')).toHaveLength(3);
+
+    const pick = host.querySelector('.wb-browser-view-pick') as HTMLSelectElement;
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
+      setter?.call(pick, stored.views[0].id);
+      pick.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect((host.querySelector('.wb-browser-search') as HTMLInputElement).value).toBe('animal');
+    expect(host.querySelectorAll('.wb-browser-row')).toHaveLength(2);
+    expect(([...host.querySelectorAll('.wb-browser-column-toggle input')] as HTMLInputElement[])[1]!.checked).toBe(false);
+
+    await click(buttonBy('ankiWorkbench.browser.views.delete'));
+    expect(JSON.parse(window.localStorage.getItem('jp-anki-browser-views') ?? '{}').views).toEqual([]);
+  });
+
   it('will not offer "select all matching" for a filtered page of a larger source', async () => {
     // The honesty rule: with a query active on a paged source, "everything
     // matching" is a claim nobody computed — only the rows found here are real.

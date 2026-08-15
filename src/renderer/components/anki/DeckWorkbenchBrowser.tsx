@@ -33,6 +33,17 @@ import {
   type BrowserSort,
 } from '../../../shared/ankiWorkbenchBrowser';
 import { filterBrowserRows, type BrowserQueryErrorCode } from '../../../shared/ankiBrowserQuery';
+import {
+  EMPTY_SAVED_VIEWS,
+  SAVED_VIEWS_STORAGE_KEY,
+  applyBrowserView,
+  browserViewSort,
+  captureBrowserView,
+  parseSavedBrowserViews,
+  removeBrowserView,
+  saveBrowserView,
+  serializeSavedBrowserViews,
+} from '../../../shared/ankiBrowserViews';
 import type { AnkiDraftEditJournal, AnkiDraftEditResult } from '../../../shared/ankiDraftEdit';
 import { editedNoteIds, noteIsEdited } from '../../../shared/ankiDraftEdit';
 import VirtualList from '../VirtualList';
@@ -87,6 +98,24 @@ export default function DeckWorkbenchBrowser({
   const [view, setView] = useState<BrowserView>('grid');
   const anchor = useRef<string | null>(null);
 
+  /**
+   * Saved views live in renderer localStorage, not in the draft or in settings:
+   * they outlive one package and belong to no deck, and a read that throws must
+   * not cost the workbench its Browser. Read once; every write goes through
+   * `persistViews` so the in-memory list and the store cannot drift.
+   */
+  const [savedViews, setSavedViews] = useState(() => {
+    try {
+      return parseSavedBrowserViews(window.localStorage.getItem(SAVED_VIEWS_STORAGE_KEY));
+    } catch {
+      return EMPTY_SAVED_VIEWS;
+    }
+  });
+  const [viewName, setViewName] = useState('');
+  const [activeViewId, setActiveViewId] = useState('');
+  /** What the last applied view could not restore in this deck. */
+  const [viewGap, setViewGap] = useState<{ missing: number; sortDropped: boolean } | null>(null);
+
   const rows = useMemo(() => buildBrowserRows(draft, columns), [draft, columns]);
   // The draft's own field names, so `Expression:食べる` is a field predicate and
   // `Expresion:食べる` is a refusal instead of a filter that quietly matches all.
@@ -121,6 +150,47 @@ export default function DeckWorkbenchBrowser({
       );
     },
     [onSelection, matchedTotal, shown],
+  );
+
+  const persistViews = useCallback((next: ReturnType<typeof parseSavedBrowserViews>) => {
+    setSavedViews(next);
+    try {
+      window.localStorage.setItem(SAVED_VIEWS_STORAGE_KEY, serializeSavedBrowserViews(next));
+    } catch {
+      // A full or blocked store must not lose the user the view they just made
+      // in this session; it is simply not there next time.
+    }
+  }, []);
+
+  const onSaveView = useCallback(() => {
+    const name = viewName.trim();
+    if (!name) return;
+    const saved = captureBrowserView(name, query, sort, columns, Math.floor(Date.now() / 1000));
+    persistViews(saveBrowserView(savedViews, saved));
+    setActiveViewId(saved.id);
+    setViewName('');
+    setViewGap(null);
+  }, [columns, persistViews, query, savedViews, sort, viewName]);
+
+  const onApplyView = useCallback(
+    (id: string) => {
+      setActiveViewId(id);
+      const found = savedViews.views.find((v) => v.id === id);
+      if (!found) {
+        setViewGap(null);
+        return;
+      }
+      const applied = applyBrowserView(columns, found);
+      setColumns(applied.columns);
+      setQuery(found.query);
+      setSort(browserViewSort(applied.columns, found));
+      setViewGap(
+        applied.missingColumnIds.length || applied.sortDropped
+          ? { missing: applied.missingColumnIds.length, sortDropped: applied.sortDropped }
+          : null,
+      );
+    },
+    [columns, savedViews],
   );
 
   const onRowClick = useCallback(
@@ -257,6 +327,62 @@ export default function DeckWorkbenchBrowser({
           ))}
         </div>
       </div>
+
+      {/* Saved views: the query, the sort and the visible columns, under a name
+          the user chose. Never a selection — see `ankiBrowserViews.ts`. */}
+      <div className="wb-browser-views" role="group" aria-label={t('ankiWorkbench.browser.views')}>
+        <select
+          className="wb-browser-view-pick"
+          aria-label={t('ankiWorkbench.browser.views')}
+          value={activeViewId}
+          onChange={(e) => onApplyView(e.target.value)}
+        >
+          <option value="">
+            {savedViews.views.length === 0
+              ? t('ankiWorkbench.browser.views.none')
+              : t('ankiWorkbench.browser.views.pick')}
+          </option>
+          {savedViews.views.map((v) => (
+            /* The name is the user's own text and is never translated. */
+            <option key={v.id} value={v.id}>
+              {v.name}
+            </option>
+          ))}
+        </select>
+        <input
+          className="wb-browser-view-name"
+          value={viewName}
+          placeholder={t('ankiWorkbench.browser.views.name')}
+          aria-label={t('ankiWorkbench.browser.views.name')}
+          onChange={(e) => setViewName(e.target.value)}
+        />
+        <button type="button" className="btn" disabled={viewName.trim() === ''} onClick={onSaveView}>
+          {t('ankiWorkbench.browser.views.save')}
+        </button>
+        {activeViewId !== '' && (
+          <button
+            type="button"
+            className="btn"
+            onClick={() => {
+              persistViews(removeBrowserView(savedViews, activeViewId));
+              setActiveViewId('');
+              setViewGap(null);
+            }}
+          >
+            {t('ankiWorkbench.browser.views.delete')}
+          </button>
+        )}
+      </div>
+
+      {/* A view saved on another deck restores what it can. Saying so is the
+          point: showing fewer columns than the view promised, silently, is the
+          failure this line exists to prevent. */}
+      {viewGap && (
+        <p className="muted wb-browser-view-gap">
+          {viewGap.missing > 0 && t('ankiWorkbench.browser.views.partial', { count: viewGap.missing })}
+          {viewGap.sortDropped && ` ${t('ankiWorkbench.browser.views.sortDropped')}`}
+        </p>
+      )}
 
       {/* A refused query shows why, next to the box that refused it. Without
           this the grid empties and reads exactly like "nothing matched". */}

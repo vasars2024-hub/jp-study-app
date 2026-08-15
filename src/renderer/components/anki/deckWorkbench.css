@@ -269,6 +269,22 @@
   margin: 0;
 }
 
+.wb-browser-views {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.wb-browser-view-name {
+  min-width: 10rem;
+  flex: 0 1 14rem;
+}
+
+.wb-browser-view-gap {
+  margin: 0;
+}
+
 /* A refused query. Not `muted` — this is the reason the grid is empty, and it
    has to out-read the row count sitting next to the box. */
 .wb-browser-query-error {
