@@ -308,7 +308,7 @@ This slice is complete only when all of these can be shown with real data and no
 12. Generate several AI example sentences and learning aids, approve only selected variants, preview difficult and edge-case cards across layouts, cancel one batch, retry only failures, and verify that rejected/generated data is represented honestly.
 13. Customize Browser columns separately from note fields, create a reverse/optional-reverse card design, and prove that the representative preview catches blank, duplicate, cloze, sibling, media, and dark/mobile rendering failures before Apply. The media lens is *flagged, not rendered*: the preview frame is an opaque-origin `srcdoc` whose CSP allows `data:` images only, and Anki references media by bare file name, so a card that references media the package holds must say so explicitly (`media-not-rendered`) rather than show a blank box that reads as clean. Loosening the CSP does not satisfy this gate.
 
-    **Closed 2026-08-16** (`a99c9f27`, `70c840cf`, `65007161`). Columns: `ankiWorkbenchBrowser.ts` + the
+    **Closed 2026-08-16** (`a99c9f27`, `70c840cf`, `65007162`). Columns: `ankiWorkbenchBrowser.ts` + the
     `wb-browser-columns` group. Design: `shared/ankiCardDesign.ts` + `DeckWorkbenchCardDesign.tsx`. On the
     real 3,221-note deck a reverse design added **3,180** cards and skipped **41** with an empty `Reading`
     (3,180 + 41 = 3,221); apply took cards **3,221 → 6,401** and remove took them back to **3,221** with

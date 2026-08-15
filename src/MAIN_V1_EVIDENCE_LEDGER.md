@@ -22619,7 +22619,7 @@ is not a note with a broken field. Blocking problems styled apart from advisory 
 lives in the same panel, not deferred. The sample renders against a **one-note** draft, never
 `applyCardDesign(draft, plan)` — the latter spreads every note per render.
 
-**`65007161` — the defect the live run found, which no test would have.** The new
+**`65007162` — the defect the live run found, which no test would have.** The new
 `conditional-card-not-generated` code first keyed on "the qfmt has a conditional", which is
 true of a note whose flag is *unset* (by design) **and** one whose flag is set but whose
 question field is blank (a real defect). It called the second intentional. It now renders the
