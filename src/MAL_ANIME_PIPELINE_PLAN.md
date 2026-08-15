@@ -345,6 +345,55 @@ A run that mines everything has a broken filter, and an empty run is a finding, 
 20. Cards land in a real deck, carry their context sentence, and record which title and episode
 they came from. 21. Mining the same episodes twice does not duplicate cards.
 
+**Progress 2026-08-16 02:05 (`primary`). P5 CLOSES — gates 18–21 pass live.** `79e6bba6`,
+`0f432f7a`. One Piece episodes 100–104 through the real Jimaku API, on the user's own
+3,221-card deck, restored byte-identical afterwards (1,320,982 bytes, folders `["Extension"]`).
+
+- **Gate 18.** 2,885 files listed, 5 planned / 0 missing, **1,667 cues** (360/337/391/255/324),
+  22,715 characters, **1,352 unique vocabulary items over 3,514 occurrences**, not truncated.
+  Byte-identical on a second run after a reload, and identical to P4 gate 15's cue counts.
+- **Gate 19.** そう set to level 2 → mineable **1,352 → 1,351**, absent from the mined output,
+  and present in the control run immediately before. **Read this one carefully:** the filter
+  removed **0 of 1,352** on the user's real knowledge state, so a mining run alone proves
+  nothing about it — the negative control is the only evidence it executes at all.
+- **Gate 20.** 30 cards: **30/30 carry an episode, a sentence and the title**, 0 outside
+  100–104, 0 with a cue second past an episode's own length. Histogram 100:23, 101:6, 102:1.
+- **Gate 21.** Mining the same episodes twice → **60 cards, 60 distinct words, 0 repeats**. It
+  does not duplicate; it continues down the frequency list. That is the honest reading of the
+  gate, not a workaround for a broken dedup — `existing` is scoped to `bookId`.
+
+**Two defects, both live, both fixed.**
+
+1. **The combined timeline made provenance meaningless.** `combineSeasonCues` offsets each
+   episode past the last, so `firstSeenAt` on a 94-episode range is measured from the first
+   episode and corresponds to no file on disk. Cards recorded the title and nothing else. New
+   `locateInSeason` undoes the offset; `addMediaStudyFlashcards` writes episode +
+   episode-relative second into `sourceRef`. Study Mode, with no season index, still writes no
+   `sourceRef` rather than inventing an episode. Mutation control: `withinSec: seconds` →
+   `expected { episode: 21, withinSec: 85 } to deeply equal { … withinSec: 10 }`, 2 failures.
+2. **The Flashcards explorer never listed a single mined media card.** `epubCards`
+   (`FlashcardsContent.tsx:335`) was an allow-list of five sources; `'media'` and `'extension'`
+   are not in it. Measured histogram on the real deck: **media 1, dictionary 3, epub 3,218** —
+   and the media card was in no tab, no count, no group, while the sidebar's own "Media" folder
+   chip read `Media 0` holding a Media card. So every card this whole plan produces was
+   invisible in the surface that exists to show the deck. Now "everything except `dictionary`".
+   Control: the surface's own search for the card's word returned **0 matches** before and
+   **1 row** after, same card, same window.
+
+**Traps for whoever is next.**
+
+- **`addDeckCards` auto-creates the card's folder and no removal path drops it again.** A probe
+  that mines and then deletes its cards leaves `,"Media"` — exactly 8 bytes — in
+  `jp-flashcard-deck`, and a byte-identical restore check fails on it. `deleteDeckFolder` is the
+  reverse; it is safe only once 0 cards reference the folder.
+- **The deck has no restore point and localStorage is mirrored to IndexedDB.** Restore by
+  removing the probe's own cards through `removeDeckCards`, not by rewriting the blob.
+- `mineableVocabulary` (`mediaStudyWorkflow.ts`) now owns the `getLevel(w) < 2` filter that was
+  written inline in the VN miner and again in the harvest panel. Do not re-inline it.
+- P5's gates are the last unblocked ones below P6: **gate 29 is half-open and gates 31/33 are
+  attended-only**, so the next unblocked slice is **P7 gate 32**, the whole flow driven through
+  the real UI rather than through the modules as these gates were.
+
 ### P6 — the torrent path and its contingencies
 
 Only now, and only with the acquisition rules already in `NYAA_SUBTITLE_EXTRACTION_PLAN.md`
