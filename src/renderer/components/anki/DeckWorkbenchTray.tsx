@@ -27,10 +27,12 @@ import {
   type TrayPlan,
 } from '../../../shared/ankiChangeTray';
 import type { AnkiDraftEditJournal } from '../../../shared/ankiDraftEdit';
+import { TEXT_NORMALIZE_ORDER, type TextNormalizeOp } from '../../../shared/ankiTextNormalize';
 import { useT } from '../../i18n';
 
 const ACTION_KINDS: TrayActionKind[] = [
   'find-replace',
+  'normalize-text',
   'swap-fields',
   'copy-field',
   'add-tags',
@@ -76,6 +78,7 @@ export default function DeckWorkbenchTray({
   // `keep` first and pre-selected: the only one of the three that cannot lose
   // text, so the form's default choice is the non-destructive one.
   const [onConflict, setOnConflict] = useState<FieldCopyConflict>('keep');
+  const [normalizeOps, setNormalizeOps] = useState<TextNormalizeOp[]>([]);
   const [applied, setApplied] = useState<number | null>(null);
 
   /** Every field name in the draft, since a tray targets by name across note types. */
@@ -109,6 +112,14 @@ export default function DeckWorkbenchTray({
         return { id, enabled: true, kind, fieldA, fieldB };
       case 'copy-field':
         return { id, enabled: true, kind, fromField: fieldA, toField: fieldB, onConflict };
+      case 'normalize-text':
+        return {
+          id,
+          enabled: true,
+          kind,
+          fieldName: fieldName === '' ? null : fieldName,
+          ops: [...normalizeOps],
+        };
       default:
         return { id, enabled: true, kind, tags: tagText.split(/\s+/).filter(Boolean) };
     }
@@ -133,6 +144,14 @@ export default function DeckWorkbenchTray({
         });
       case 'swap-fields':
         return t('ankiWorkbench.tray.describe.swap-fields', { a: action.fieldA, b: action.fieldB });
+      case 'normalize-text':
+        return t('ankiWorkbench.tray.describe.normalize-text', {
+          field: action.fieldName ?? t('ankiWorkbench.tray.field.all'),
+          // In canonical order, so the description matches what will run.
+          ops: TEXT_NORMALIZE_ORDER.filter((op) => action.ops.includes(op))
+            .map((op) => t(`ankiWorkbench.tray.normalize.${op}`))
+            .join(', '),
+        });
       case 'copy-field':
         return t('ankiWorkbench.tray.describe.copy-field', {
           from: action.fromField,
@@ -289,6 +308,36 @@ export default function DeckWorkbenchTray({
               />
               {t('ankiWorkbench.tray.matchCase')}
             </label>
+          </>
+        ) : kind === 'normalize-text' ? (
+          <>
+            <label>
+              {t('ankiWorkbench.tray.field')}
+              <select value={fieldName} onChange={(e) => setFieldName(e.target.value)}>
+                <option value="">{t('ankiWorkbench.tray.field.all')}</option>
+                {fieldNames.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {/* Listed in the order they run, because that order is fixed and
+                the form is the only place it is visible. */}
+            {TEXT_NORMALIZE_ORDER.map((op) => (
+              <label key={op} className="wb-tray-flag">
+                <input
+                  type="checkbox"
+                  checked={normalizeOps.includes(op)}
+                  onChange={() =>
+                    setNormalizeOps((prev) =>
+                      prev.includes(op) ? prev.filter((o) => o !== op) : [...prev, op],
+                    )
+                  }
+                />
+                {t(`ankiWorkbench.tray.normalize.${op}`)}
+              </label>
+            ))}
           </>
         ) : kind === 'swap-fields' ? (
           fieldPair(t('ankiWorkbench.tray.swapA'), t('ankiWorkbench.tray.swapB'))

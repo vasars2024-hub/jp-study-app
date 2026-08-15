@@ -9634,5 +9634,12 @@ export const ru: Catalog = {
   'ankiWorkbench.tray.field.choose': 'выберите поле',
   'ankiWorkbench.tray.problem.same-field': 'Поле нельзя поменять местами или скопировать в само себя ({detail}).',
   'ankiWorkbench.tray.problem.overwrite-nonempty': 'В заметках ({count}) поле {detail} уже содержит текст и будет перезаписано.',
+  'ankiWorkbench.tray.kind.normalize-text': 'Привести текст в порядок',
+  'ankiWorkbench.tray.describe.normalize-text': 'Привести в порядок {field}: {ops}',
+  'ankiWorkbench.tray.normalize.strip-html': 'убрать HTML',
+  'ankiWorkbench.tray.normalize.strip-furigana': 'убрать фуригану в скобках',
+  'ankiWorkbench.tray.normalize.ascii-width': 'полноширинный ASCII в обычный',
+  'ankiWorkbench.tray.normalize.collapse-space': 'схлопнуть пробелы',
+  'ankiWorkbench.tray.normalize.trim': 'обрезать края',
 };
 

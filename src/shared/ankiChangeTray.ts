@@ -37,13 +37,15 @@ import {
   type AnkiDraftEditJournal,
   type AnkiDraftEditOp,
 } from './ankiDraftEdit';
+import { normalizeFieldText, type TextNormalizeOp } from './ankiTextNormalize';
 
 export type TrayActionKind =
   | 'add-tags'
   | 'remove-tags'
   | 'find-replace'
   | 'swap-fields'
-  | 'copy-field';
+  | 'copy-field'
+  | 'normalize-text';
 
 /**
  * What a copy does when the destination already holds text — Phase 4's "require
@@ -82,6 +84,13 @@ export type TrayAction =
       onConflict: FieldCopyConflict;
       /** Only read for `append`; `DEFAULT_COPY_SEPARATOR` when omitted. */
       separator?: string;
+    })
+  | (TrayActionBase & {
+      kind: 'normalize-text';
+      /** `null` means every field, same as find/replace. */
+      fieldName: string | null;
+      /** Order here is ignored; they always run in `TEXT_NORMALIZE_ORDER`. */
+      ops: TextNormalizeOp[];
     });
 
 // ----- the ordered list --------------------------------------------------------
@@ -234,6 +243,12 @@ function blockingProblems(actions: readonly TrayAction[], noteIds: readonly stri
           count: 1,
           detail: compiled,
         });
+      }
+    } else if (action.kind === 'normalize-text') {
+      // No op chosen is not "normalise with defaults": there is no default, and
+      // an action that provably cannot change anything is a mis-set form.
+      if (action.ops.length === 0) {
+        problems.push({ code: 'empty-parameter', severity: 'blocking', actionId: action.id, count: 1 });
       }
     } else if (action.kind === 'swap-fields' || action.kind === 'copy-field') {
       const [a, b] =
@@ -400,6 +415,22 @@ export function planChangeTray(
           // matches at the start of every second field.
           const fresh = compilePattern(action) as RegExp;
           if (applyWrite(at, noteId, ord, value.raw.replace(fresh, action.replace))) touched = true;
+        }
+      } else if (action.kind === 'normalize-text') {
+        const ords = targetOrds(noteTypes, start, action.fieldName);
+        if (ords.length === 0) {
+          problems.push({
+            code: 'field-absent',
+            severity: 'warning',
+            actionId: action.id,
+            count: 1,
+            detail: action.fieldName ?? '',
+          });
+        }
+        for (const ord of ords) {
+          const value = (notes[at] ?? start).fields.find((f) => f.ord === ord);
+          if (!value) continue;
+          if (applyWrite(at, noteId, ord, normalizeFieldText(value.raw, action.ops))) touched = true;
         }
       } else if (action.kind === 'swap-fields') {
         const ordA = soleOrd(start, action.fieldA);

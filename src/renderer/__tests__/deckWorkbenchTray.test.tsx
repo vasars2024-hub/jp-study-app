@@ -275,6 +275,46 @@ describe('DeckWorkbenchTray', () => {
     expect(applyButton().disabled).toBe(false);
   });
 
+  it('offers the clean-up ops in the order they run, and refuses none chosen', () => {
+    mount(draftOf([note('n1', ' <b>cat</b>  ')]), ['n1']);
+    selectKind('normalize-text');
+    const ops = [...host.querySelectorAll('.wb-tray-form .wb-tray-flag')].map((l) => l.textContent);
+    expect(ops).toEqual([
+      'ankiWorkbench.tray.normalize.strip-html',
+      'ankiWorkbench.tray.normalize.strip-furigana',
+      'ankiWorkbench.tray.normalize.ascii-width',
+      'ankiWorkbench.tray.normalize.collapse-space',
+      'ankiWorkbench.tray.normalize.trim',
+    ]);
+
+    // Nothing ticked is a refusal, not "normalise with sensible defaults".
+    addToTray();
+    expect(host.textContent).toContain('ankiWorkbench.tray.problem.empty-parameter');
+    expect(applyButton().disabled).toBe(true);
+
+    act(() =>
+      host.querySelectorAll<HTMLButtonElement>('.wb-tray-action button')[2]!.dispatchEvent(
+        new MouseEvent('click', { bubbles: true }),
+      ),
+    );
+    // Tick them out of order; the description still lists them in running order.
+    for (const key of ['trim', 'strip-html', 'collapse-space']) {
+      const box = [...host.querySelectorAll('.wb-tray-form .wb-tray-flag')]
+        .find((l) => l.textContent?.endsWith(key))!
+        .querySelector('input')!;
+      act(() => box.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    }
+    selectField('ankiWorkbench.tray.field', 'Back');
+    addToTray();
+
+    expect(host.textContent).toContain(
+      'ankiWorkbench.tray.describe.normalize-text:Back,ankiWorkbench.tray.normalize.strip-html, ankiWorkbench.tray.normalize.collapse-space, ankiWorkbench.tray.normalize.trim',
+    );
+    const diff = host.querySelector('.wb-tray-diff')!;
+    expect(diff.querySelector('del')!.textContent).toBe(' <b>cat</b>  ');
+    expect(diff.querySelector('ins')!.textContent).toBe('cat');
+  });
+
   it('refuses a swap of one field with itself before anything can run', () => {
     mount(draftOf([note('n1')]), ['n1']);
     selectKind('swap-fields');

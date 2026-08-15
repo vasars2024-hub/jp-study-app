@@ -253,3 +253,77 @@ describe('tray copy-field', () => {
     expect(plan.problems.map((p) => p.code)).toEqual(['empty-parameter']);
   });
 });
+
+describe('tray normalize-text', () => {
+  const normalizeAction = (
+    over: Partial<Extract<TrayAction, { kind: 'normalize-text' }>> = {},
+  ): TrayAction => ({
+    id: 'a1',
+    enabled: true,
+    kind: 'normalize-text',
+    fieldName: 'Front',
+    ops: ['strip-html', 'collapse-space', 'trim'],
+    ...over,
+  });
+
+  const messy = (id: string): AnkiDraftNote =>
+    note({
+      id,
+      fields: [
+        { ord: 0, name: 'Front', raw: ' <b>ねこ</b>&nbsp;&nbsp;かわいい ', normalized: '' },
+        { ord: 1, name: 'Back', raw: ' <i>cat</i> ', normalized: '' },
+      ],
+    });
+
+  it('normalises one named field and leaves the others untouched', () => {
+    const plan = planChangeTray(draftOf([messy('n1')]), createEditJournal(), ['n1'], [
+      normalizeAction(),
+    ]);
+    expect(raw(plan.draft, 'n1', 'Front')).toBe('ねこ かわいい');
+    expect(raw(plan.draft, 'n1', 'Back')).toBe(' <i>cat</i> ');
+  });
+
+  it('reaches every field when no field is named', () => {
+    const plan = planChangeTray(draftOf([messy('n1')]), createEditJournal(), ['n1'], [
+      normalizeAction({ fieldName: null }),
+    ]);
+    expect(raw(plan.draft, 'n1', 'Back')).toBe('cat');
+    expect(plan.changes[0]!.fields.map((f) => f.name)).toEqual(['Front', 'Back']);
+  });
+
+  it('refuses an action with no op chosen instead of guessing a default', () => {
+    const plan = planChangeTray(draftOf([messy('n1')]), createEditJournal(), ['n1'], [
+      normalizeAction({ ops: [] }),
+    ]);
+    expect(plan.blocked).toBe(true);
+    expect(plan.problems.map((p) => p.code)).toEqual(['empty-parameter']);
+  });
+
+  it('reports the media reference a stripped <img> takes with it', () => {
+    const d = draftOf([
+      note({
+        id: 'n1',
+        fields: [
+          { ord: 0, name: 'Front', raw: 'ねこ<img src="cat.jpg">', normalized: 'ねこ' },
+          { ord: 1, name: 'Back', raw: 'cat', normalized: 'cat' },
+        ],
+        media: [{ fieldOrd: 0, reference: 'cat.jpg', fileName: 'cat.jpg', present: false }],
+      }),
+    ]);
+    const plan = planChangeTray(d, createEditJournal(), ['n1'], [
+      normalizeAction({ ops: ['strip-html'] }),
+    ]);
+    expect(raw(plan.draft, 'n1', 'Front')).toBe('ねこ');
+    expect(plan.problems.map((p) => `${p.code}:${p.detail}`)).toContain('media-dropped:cat.jpg');
+  });
+
+  it('runs after an earlier action, on that action’s output', () => {
+    const plan = planChangeTray(draftOf([note({ id: 'n1' })]), createEditJournal(), ['n1'], [
+      { id: 'a0', enabled: true, kind: 'find-replace', fieldName: 'Front', find: 'ねこ', replace: '<b>ＮＥＫＯ</b>', regex: false, matchCase: true },
+      normalizeAction({ ops: ['strip-html', 'ascii-width'] }),
+    ]);
+    expect(raw(plan.draft, 'n1', 'Front')).toBe('NEKO');
+    // One net diff row: the original value and the final one, never the middle.
+    expect(plan.changes[0]!.fields[0]).toMatchObject({ before: 'ねこ', after: 'NEKO' });
+  });
+});

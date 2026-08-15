@@ -8789,5 +8789,12 @@ export const zh: Catalog = {
   'ankiWorkbench.tray.field.choose': '选择字段',
   'ankiWorkbench.tray.problem.same-field': '字段不能与自身交换或复制（{detail}）。',
   'ankiWorkbench.tray.problem.overwrite-nonempty': '在 {count} 条笔记中，{detail} 已有内容，将被覆盖。',
+  'ankiWorkbench.tray.kind.normalize-text': '整理文本',
+  'ankiWorkbench.tray.describe.normalize-text': '整理 {field}：{ops}',
+  'ankiWorkbench.tray.normalize.strip-html': '移除 HTML',
+  'ankiWorkbench.tray.normalize.strip-furigana': '移除方括号振假名',
+  'ankiWorkbench.tray.normalize.ascii-width': '全角 ASCII 转半角',
+  'ankiWorkbench.tray.normalize.collapse-space': '合并空格',
+  'ankiWorkbench.tray.normalize.trim': '去除首尾空白',
 };
 

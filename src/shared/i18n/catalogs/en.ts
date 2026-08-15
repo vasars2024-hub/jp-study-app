@@ -9254,6 +9254,13 @@ export const en: Catalog = {
   'ankiWorkbench.tray.field.choose': 'choose a field',
   'ankiWorkbench.tray.problem.same-field': 'A field cannot be swapped or copied onto itself ({detail}).',
   'ankiWorkbench.tray.problem.overwrite-nonempty': 'On {count} notes {detail} already held text and would be overwritten.',
+  'ankiWorkbench.tray.kind.normalize-text': 'Clean up text',
+  'ankiWorkbench.tray.describe.normalize-text': 'Clean up {field}: {ops}',
+  'ankiWorkbench.tray.normalize.strip-html': 'remove HTML',
+  'ankiWorkbench.tray.normalize.strip-furigana': 'remove bracket furigana',
+  'ankiWorkbench.tray.normalize.ascii-width': 'full-width ASCII to half-width',
+  'ankiWorkbench.tray.normalize.collapse-space': 'collapse spaces',
+  'ankiWorkbench.tray.normalize.trim': 'trim the ends',
 };
 
 

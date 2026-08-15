@@ -8829,5 +8829,12 @@ export const ja: Catalog = {
   'ankiWorkbench.tray.field.choose': 'フィールドを選択',
   'ankiWorkbench.tray.problem.same-field': 'フィールドを自身と入れ替えたりコピーしたりはできません（{detail}）。',
   'ankiWorkbench.tray.problem.overwrite-nonempty': '{count} 件のノートで {detail} にはすでに文字があり、上書きされます。',
+  'ankiWorkbench.tray.kind.normalize-text': 'テキストを整形',
+  'ankiWorkbench.tray.describe.normalize-text': '{field} を整形: {ops}',
+  'ankiWorkbench.tray.normalize.strip-html': 'HTML を削除',
+  'ankiWorkbench.tray.normalize.strip-furigana': '角括弧のふりがなを削除',
+  'ankiWorkbench.tray.normalize.ascii-width': '全角 ASCII を半角に',
+  'ankiWorkbench.tray.normalize.collapse-space': '空白をまとめる',
+  'ankiWorkbench.tray.normalize.trim': '前後の空白を削除',
 };
 
