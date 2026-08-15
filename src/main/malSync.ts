@@ -37,9 +37,17 @@ import {
   parseMalAnimeListPage,
   parseMalListStatusResponse,
   serialiseMalListStatusUpdate,
+  DEFAULT_MAL_RELATION_MAX_DEPTH,
+  DEFAULT_MAL_RELATION_MAX_REQUESTS,
+  isMalRelationType,
+  nextRelationFrontier,
+  parseMalAnimeRelations,
+  type MalAnimeRelations,
+  type MalDerivative,
   type MalListEntry,
   type MalListStatus,
   type MalListStatusUpdate,
+  type MalRelationWalkOptions,
 } from '../shared/malSync';
 import {
   clearSecret,
@@ -431,6 +439,14 @@ export interface MalListSyncResult {
   pagesFetched: number;
 }
 
+export interface MalDerivativeWalkResult {
+  derivatives: MalDerivative[];
+  /** How many `/anime/{id}` reads it actually cost. */
+  requests: number;
+  /** True when the request budget ran out with frontier still queued. */
+  truncated: boolean;
+}
+
 export class MalSyncClient {
   private readonly transport: MalTransport;
   private readonly store: MalTokenStore;
@@ -748,6 +764,85 @@ export class MalSyncClient {
     return { entries, truncated: url !== null, pagesFetched };
   }
 
+  // -- derivatives ----------------------------------------------------------
+
+  /**
+   * Reads one title's `related_anime`.
+   *
+   * A separate request per title, because MAL does not return `related_anime`
+   * on the list endpoint at all — asking for it in the list `fields` gets it
+   * silently dropped, not an error. That is the whole reason the walk below is
+   * budgeted: a 400-title list would otherwise be 400 requests.
+   */
+  async fetchAnimeRelations(animeId: number): Promise<MalAnimeRelations> {
+    if (!Number.isFinite(animeId) || animeId <= 0) {
+      throw new MalSyncError('request-failed', 'That is not a MyAnimeList entry id.');
+    }
+    const query = new URLSearchParams({ fields: 'id,title,main_picture,related_anime' });
+    const response = await this.authedRequest({
+      url: `${MAL_API_BASE}/anime/${Math.trunc(animeId)}?${query.toString()}`,
+      method: 'GET',
+    });
+    return parseMalAnimeRelations(this.parseJson(response));
+  }
+
+  /**
+   * Walks outward from titles the user has finished to the rest of their
+   * franchises, breadth-first.
+   *
+   * Seeds start in `visited`, so a show already on the user's list is never
+   * reported as its own derivative and the guaranteed sequel/prequel two-cycle
+   * terminates on the first hop back. The request budget is a hard stop rather
+   * than a rate limit: MAL's quota is the user's, and a walk that silently
+   * spends 400 requests on their behalf is worse than one that says it stopped.
+   */
+  async fetchDerivatives(
+    seedIds: readonly number[],
+    options: MalRelationWalkOptions = {},
+  ): Promise<MalDerivativeWalkResult> {
+    const maxDepth = Math.max(1, Math.trunc(options.maxDepth ?? DEFAULT_MAL_RELATION_MAX_DEPTH));
+    const maxRequests = Math.max(
+      1,
+      Math.trunc(options.maxRequests ?? DEFAULT_MAL_RELATION_MAX_REQUESTS),
+    );
+
+    const visited = new Set<number>();
+    const seeds: { animeId: number; depth: number }[] = [];
+    for (const raw of seedIds) {
+      if (!Number.isFinite(raw) || raw <= 0) continue;
+      const animeId = Math.trunc(raw);
+      if (visited.has(animeId)) continue;
+      visited.add(animeId);
+      seeds.push({ animeId, depth: 0 });
+    }
+
+    const derivatives: MalDerivative[] = [];
+    let frontier = seeds;
+    let requests = 0;
+    let truncated = false;
+
+    while (frontier.length > 0 && !truncated) {
+      const next: { animeId: number; depth: number }[] = [];
+      for (const item of frontier) {
+        if (requests >= maxRequests) {
+          truncated = true;
+          break;
+        }
+        requests += 1;
+        const node = await this.fetchAnimeRelations(item.animeId);
+        const depth = item.depth + 1;
+        for (const edge of nextRelationFrontier(node, visited, options)) {
+          visited.add(edge.animeId);
+          derivatives.push({ ...edge, fromAnimeId: item.animeId, depth });
+          if (depth < maxDepth) next.push({ animeId: edge.animeId, depth });
+        }
+      }
+      frontier = next;
+    }
+
+    return { derivatives, requests, truncated };
+  }
+
   // -- list write -----------------------------------------------------------
 
   /**
@@ -864,6 +959,25 @@ export function registerMalSyncIpc(): void {
     guard(() => client().fetchAnimeList(
       isMalListStatus(status) ? { status } : {},
     )));
+
+  // Read-only, like `mal:fetchList` — it never touches the user's list. The
+  // budget arrives from the renderer but is clamped in `fetchDerivatives`, so a
+  // caller cannot ask for an unbounded walk of someone else's API quota.
+  ipcMain.handle('mal:fetchDerivatives', async (_event, seedIds: unknown, options: unknown) =>
+    guard(() => {
+      const ids = Array.isArray(seedIds)
+        ? seedIds.filter((value): value is number => typeof value === 'number')
+        : [];
+      const raw = (options ?? {}) as Record<string, unknown>;
+      const clean: MalRelationWalkOptions = {};
+      if (typeof raw.maxDepth === 'number') clean.maxDepth = raw.maxDepth;
+      if (typeof raw.maxRequests === 'number') clean.maxRequests = raw.maxRequests;
+      if (Array.isArray(raw.relations)) {
+        const relations = raw.relations.filter(isMalRelationType);
+        if (relations.length > 0) clean.relations = relations;
+      }
+      return client().fetchDerivatives(ids, clean);
+    }));
 
   ipcMain.handle('mal:updateEntry', async (_event, animeId: unknown, update: unknown) =>
     guard(() => {

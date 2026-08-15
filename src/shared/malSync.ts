@@ -213,3 +213,160 @@ export function parseMalListStatusResponse(payload: unknown): MalListStatusUpdat
     rewatching: listStatus.is_rewatching === true,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Derivatives (`related_anime`)
+// ---------------------------------------------------------------------------
+
+/**
+ * MAL's relation vocabulary, as it appears in `relation_type`.
+ *
+ * The list endpoint does not carry this — `related_anime` is only returned by
+ * `/anime/{id}`, one request per title, which is why the walk below is bounded
+ * rather than exhaustive.
+ */
+export const MAL_RELATION_TYPES = [
+  'sequel',
+  'prequel',
+  'alternative_setting',
+  'alternative_version',
+  'side_story',
+  'parent_story',
+  'summary',
+  'full_story',
+  'spin_off',
+  'adaptation',
+  'character',
+  'other',
+] as const;
+
+export type MalRelationType = (typeof MAL_RELATION_TYPES)[number];
+
+export function isMalRelationType(value: unknown): value is MalRelationType {
+  return typeof value === 'string' && (MAL_RELATION_TYPES as readonly string[]).includes(value);
+}
+
+/**
+ * Which relations mean "more of the same work", and so more of the same
+ * vocabulary.
+ *
+ * `character` and `other` are excluded because they are the two loose ones: MAL
+ * uses `character` for "shares a cast member", which reaches across unrelated
+ * franchises within two hops, and `other` is its unclassified bucket. Everything
+ * that names a structural link — including `prequel`, which is study material a
+ * user who finished the sequel wants — is in. `adaptation` stays in because on
+ * `related_anime` it points at another *anime*; the cross-medium links live on
+ * `related_manga`, which this walk never reads.
+ */
+export const MAL_DERIVATIVE_RELATIONS: readonly MalRelationType[] = MAL_RELATION_TYPES.filter(
+  (relation) => relation !== 'character' && relation !== 'other',
+);
+
+/** One edge of `related_anime`, normalized. */
+export interface MalRelatedAnime {
+  animeId: number;
+  title: string;
+  posterUrl?: string;
+  relation: MalRelationType;
+  /**
+   * MAL's own `relation_type_formatted` ("Side Story"), kept verbatim.
+   *
+   * The UI shows this rather than a translation of `relation`: MAL is the
+   * authority on what it called the link, and inventing our own label for a
+   * vocabulary that is already prose invites the two to disagree.
+   */
+  relationLabel: string;
+}
+
+/** `/anime/{id}?fields=id,title,related_anime`, normalized. */
+export interface MalAnimeRelations {
+  animeId: number;
+  title: string;
+  related: MalRelatedAnime[];
+}
+
+/**
+ * Projects one `/anime/{id}` response onto the relation model.
+ *
+ * Tolerant in the same way as `parseMalAnimeListPage`: an edge with no usable id
+ * or an unrecognized `relation_type` is dropped rather than thrown over, so one
+ * new relation word MAL adds later costs that edge and not the walk.
+ */
+export function parseMalAnimeRelations(payload: unknown): MalAnimeRelations {
+  const root = asRecord(payload);
+  const animeId = asFiniteNumber(root.id, Number.NaN);
+  const related: MalRelatedAnime[] = [];
+  const rows = Array.isArray(root.related_anime) ? root.related_anime : [];
+
+  for (const row of rows) {
+    const record = asRecord(row);
+    const node = asRecord(record.node);
+    const nodeId = asFiniteNumber(node.id, Number.NaN);
+    if (!Number.isFinite(nodeId)) continue;
+    if (!isMalRelationType(record.relation_type)) continue;
+
+    const picture = asRecord(node.main_picture);
+    const posterUrl = typeof picture.large === 'string' && picture.large
+      ? picture.large
+      : typeof picture.medium === 'string' ? picture.medium : undefined;
+    const label = record.relation_type_formatted;
+
+    related.push({
+      animeId: Math.trunc(nodeId),
+      title: typeof node.title === 'string' ? node.title : '',
+      posterUrl,
+      relation: record.relation_type,
+      relationLabel: typeof label === 'string' && label ? label : record.relation_type,
+    });
+  }
+
+  return {
+    animeId: Number.isFinite(animeId) ? Math.trunc(animeId) : Number.NaN,
+    title: typeof root.title === 'string' ? root.title : '',
+    related,
+  };
+}
+
+/** A title reached by following `related_anime`, with how it was reached. */
+export interface MalDerivative extends MalRelatedAnime {
+  /** The title whose `related_anime` named it. */
+  fromAnimeId: number;
+  /** 1 for a direct relation of a seed, 2 for a relation of that, and so on. */
+  depth: number;
+}
+
+export interface MalRelationWalkOptions {
+  /** Relations worth following. Defaults to `MAL_DERIVATIVE_RELATIONS`. */
+  relations?: readonly MalRelationType[];
+  /** How many hops from a seed. 1 means direct relations only. */
+  maxDepth?: number;
+  /** A hard stop on how many `/anime/{id}` requests the walk may make. */
+  maxRequests?: number;
+}
+
+export const DEFAULT_MAL_RELATION_MAX_DEPTH = 2;
+export const DEFAULT_MAL_RELATION_MAX_REQUESTS = 60;
+
+/**
+ * The edges of one node worth adding to the frontier.
+ *
+ * `visited` carries every id already seen — including the seeds, which is what
+ * makes the guaranteed sequel/prequel two-cycle terminate, and what keeps a
+ * title the user already has on their list out of the derivative set.
+ */
+export function nextRelationFrontier(
+  node: MalAnimeRelations,
+  visited: ReadonlySet<number>,
+  options: MalRelationWalkOptions = {},
+): MalRelatedAnime[] {
+  const allowed = new Set<MalRelationType>(options.relations ?? MAL_DERIVATIVE_RELATIONS);
+  const out: MalRelatedAnime[] = [];
+  const local = new Set<number>();
+  for (const edge of node.related) {
+    if (!allowed.has(edge.relation)) continue;
+    if (visited.has(edge.animeId) || local.has(edge.animeId)) continue;
+    local.add(edge.animeId);
+    out.push(edge);
+  }
+  return out;
+}

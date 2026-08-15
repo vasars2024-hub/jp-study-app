@@ -841,6 +841,19 @@ declare global {
       saveSubtitleDiscoverySettings(
         settings: import('../../shared/subtitleDiscoveryIpc').SubtitleDiscoverySettings,
       ): Promise<import('../../shared/subtitleDiscoveryIpc').SubtitleDiscoverySettings>;
+      /** The user's list, optionally narrowed to one MAL status. Read-only. */
+      malFetchList(
+        status?: import('../shared/malSync').MalListStatus,
+      ): Promise<
+        import('../main/malSync').MalIpcResult<import('../main/malSync').MalListSyncResult>
+      >;
+      /** Franchise derivatives reached through `related_anime`. Read-only. */
+      malFetchDerivatives(
+        seedIds: number[],
+        options?: import('../shared/malSync').MalRelationWalkOptions,
+      ): Promise<
+        import('../main/malSync').MalIpcResult<import('../main/malSync').MalDerivativeWalkResult>
+      >;
       subtitleProviderCredentials(): Promise<import('../../shared/subtitleDiscoveryIpc').SubtitleProviderCredentialState[]>;
       setSubtitleProviderKey(
         id: string,

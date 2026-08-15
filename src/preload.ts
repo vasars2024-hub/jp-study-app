@@ -1376,6 +1376,14 @@ const api = {
     status?: import('./shared/malSync').MalListStatus,
   ): Promise<import('./main/malSync').MalIpcResult<import('./main/malSync').MalListSyncResult>> =>
     ipcRenderer.invoke('mal:fetchList', status),
+  // Read-only franchise discovery: one `/anime/{id}` read per title walked,
+  // bounded in the main process. It never touches the user's list.
+  malFetchDerivatives: (
+    seedIds: number[],
+    options?: import('./shared/malSync').MalRelationWalkOptions,
+  ): Promise<
+    import('./main/malSync').MalIpcResult<import('./main/malSync').MalDerivativeWalkResult>
+  > => ipcRenderer.invoke('mal:fetchDerivatives', seedIds, options),
   malUpdateEntry: (
     animeId: number,
     update: import('./shared/malSync').MalListStatusUpdate,
