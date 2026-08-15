@@ -27,34 +27,12 @@ import {
   type RenderedAnkiCard,
 } from '../../../shared/ankiTemplateRender';
 import { useT } from '../../i18n';
+import { previewFrameDocument, type PreviewTheme } from './ankiPreviewFrame';
 
 type PreviewSide = 'question' | 'answer';
 type PreviewViewport = 'desktop' | 'compact';
-type PreviewTheme = 'light' | 'dark';
 
-/** Anki's own default card colours, so a deck's CSS lands on the background it expects. */
-const THEME_CSS: Record<PreviewTheme, string> = {
-  light: 'background:#ffffff;color:#000000;',
-  dark: 'background:#2f2f31;color:#fbfbfb;',
-};
-
-function frameDocument(html: string, css: string, theme: PreviewTheme): string {
-  return [
-    '<!DOCTYPE html><html><head><meta charset="utf-8">',
-    // A foreign template may reference a remote stylesheet or font; the CSP keeps
-    // the preview offline rather than letting a deck phone home on render.
-    '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; ',
-    "img-src data:; style-src 'unsafe-inline'; font-src data:\">",
-    `<style>html,body{margin:0;padding:12px;${THEME_CSS[theme]}}`,
-    `.card{${THEME_CSS[theme]}}`,
-    css,
-    '</style></head><body><div class="card">',
-    html,
-    '</div></body></html>',
-  ].join('');
-}
-
-function ProblemLine({ problem }: { problem: AnkiRenderProblem }) {
+export function ProblemLine({ problem }: { problem: AnkiRenderProblem }) {
   const { t } = useT();
   const text = t(`ankiWorkbench.preview.problem.${problem.code}`, {
     detail: problem.detail ?? '',
@@ -172,7 +150,7 @@ export default function DeckWorkbenchPreview({
           // No scripts, no origin, no navigation: a foreign deck's template runs
           // nothing. See the file comment.
           sandbox=""
-          srcDoc={frameDocument(html, active.css, theme)}
+          srcDoc={previewFrameDocument(html, active.css, theme)}
         />
       </div>
 

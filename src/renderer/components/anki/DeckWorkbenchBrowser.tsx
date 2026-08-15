@@ -37,8 +37,12 @@ import { editedNoteIds, noteIsEdited } from '../../../shared/ankiDraftEdit';
 import VirtualList from '../VirtualList';
 import { useT } from '../../i18n';
 import DeckWorkbenchInspector from './DeckWorkbenchInspector';
+import DeckWorkbenchSamples from './DeckWorkbenchSamples';
 
 const ROW_HEIGHT = 34;
+
+/** The plan's Browser modes. `gallery` is the representative sample set. */
+type BrowserView = 'grid' | 'samples';
 
 export default function DeckWorkbenchBrowser({
   draft,
@@ -62,6 +66,7 @@ export default function DeckWorkbenchBrowser({
   /** The row the inspector is about. Focus is not selection — a user reads one
    *  note while a batch of others stays selected. */
   const [focusedId, setFocusedId] = useState<string | null>(null);
+  const [view, setView] = useState<BrowserView>('grid');
   const anchor = useRef<string | null>(null);
 
   const rows = useMemo(() => buildBrowserRows(draft, columns), [draft, columns]);
@@ -125,9 +130,40 @@ export default function DeckWorkbenchBrowser({
         <span className="muted">
           {t('ankiWorkbench.browser.rows', { shown: shown.length, loaded: draft.counts.notes })}
         </span>
+        {/* Switching view never touches the selection — the plan requires a
+            batch to survive a look at the sample cards. */}
+        <div role="group" aria-label={t('ankiWorkbench.browser.view')}>
+          {(['grid', 'samples'] as const).map((value) => (
+            <button
+              key={value}
+              type="button"
+              className={`btn${view === value ? ' primary' : ''}`}
+              aria-pressed={view === value}
+              onClick={() => setView(value)}
+            >
+              {t(`ankiWorkbench.browser.view.${value}`)}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="wb-browser-columns" role="group" aria-label={t('ankiWorkbench.browser.columns')}>
+      {view === 'samples' && (
+        <DeckWorkbenchSamples
+          draft={draft}
+          totalNotes={totalNotes}
+          onOpenNote={(noteId) => {
+            setFocusedId(noteId);
+            setView('grid');
+          }}
+        />
+      )}
+
+      <div
+        className="wb-browser-columns"
+        role="group"
+        aria-label={t('ankiWorkbench.browser.columns')}
+        hidden={view !== 'grid'}
+      >
         <span className="muted">{t('ankiWorkbench.browser.columns')}</span>
         {columns.map((col) => (
           <label key={col.id} className="wb-browser-column-toggle">
@@ -147,7 +183,11 @@ export default function DeckWorkbenchBrowser({
         </p>
       )}
 
-      <div className="wb-browser-head" style={{ gridTemplateColumns: `2.5rem ${gridTemplate}` }}>
+      <div
+        className="wb-browser-head"
+        style={{ gridTemplateColumns: `2.5rem ${gridTemplate}` }}
+        hidden={view !== 'grid'}
+      >
         <span />
         {shownCols.map((col) => {
           const dir = sort?.columnId === col.id ? sort.dir : undefined;
@@ -166,7 +206,7 @@ export default function DeckWorkbenchBrowser({
         })}
       </div>
 
-      <div className="wb-browser-split">
+      <div className="wb-browser-split" hidden={view !== 'grid'}>
         <VirtualList
           className="wb-browser-rows"
           items={shown}

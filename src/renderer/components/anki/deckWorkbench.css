@@ -529,3 +529,89 @@
 .wb-preview-hint {
   font-size: 0.75rem;
 }
+
+/* ----- representative sample gallery ----- */
+
+/* `hidden` alone loses to the display rules below, and conditionally
+   unmounting the grid would throw away scroll position on every view switch. */
+.wb-browser [hidden] {
+  display: none;
+}
+
+.wb-samples {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wb-samples-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.wb-samples-head h4,
+.wb-samples-head p {
+  margin: 0;
+}
+
+.wb-sample-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wb-sample {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 10px);
+  background: var(--panel);
+}
+
+.wb-sample-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.wb-sample-reasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.wb-sample-reason {
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* The two reasons that mean "this card is already wrong" carry the warning
+   colour; the rest are neutral descriptions of why the card was picked. */
+.wb-sample-reason.validation-failing,
+.wb-sample-reason.empty-render {
+  border-color: var(--warn, #c07000);
+  color: var(--warn, #c07000);
+  font-weight: 600;
+}
+
+.wb-sample-frame {
+  display: block;
+  width: 100%;
+  height: 140px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+}
