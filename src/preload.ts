@@ -501,6 +501,14 @@ const api = {
     options?: { sourceLangs?: string[] },
   ): Promise<Record<string, number>> =>
     ipcRenderer.invoke('dict:frequencyRanks', texts, options),
+  /**
+   * Offline dictionary hits for a whole deck selection, for the Deck Workbench's
+   * enrichment. A word nothing answered for is absent, never an empty array.
+   */
+  dictEnrichTerms: (
+    terms: string[],
+  ): Promise<Record<string, import('./shared/ankiEnrich').EnrichEntry[]>> =>
+    ipcRenderer.invoke('dict:enrichTerms', terms),
   /** The words the installed dictionaries point at from this word's senses. */
   dictXrefs: (
     text: string,

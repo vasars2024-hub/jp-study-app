@@ -29,6 +29,8 @@ import {
   setYomitanLang,
 } from './dictionary/yomitan';
 import { candidateLookupKey, glossFromEntry } from '../shared/epubEnrichment';
+import type { EnrichEntry } from '../shared/ankiEnrich';
+import { enrichTermsBatch } from './dictionary/enrichService';
 import { hasKana, textMatchesLang } from '../shared/langs';
 import {
   cacheExamples,
@@ -1174,6 +1176,11 @@ export function registerDictionaryIpc(): void {
     'dict:lookupTermsBatch',
     (_e, queries: GlossLookupQuery[], langs: CandidateGlossLang[]) =>
       lookupTermsBatch(queries, langs),
+  );
+  ipcMain.handle(
+    'dict:enrichTerms',
+    (_e, terms: unknown): Promise<Record<string, EnrichEntry[]>> =>
+      enrichTermsBatch(Array.isArray(terms) ? terms : []),
   );
   ipcMain.handle('examples:search', (_e, query: string, limit?: number) => searchExamples(query, limit));
   ipcMain.handle('examples:offlineStatus', () => offlineStatus());

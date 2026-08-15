@@ -381,6 +381,9 @@ declare global {
         texts: string[],
         options?: { sourceLangs?: string[] },
       ): Promise<Record<string, number>>;
+      dictEnrichTerms(
+        terms: string[],
+      ): Promise<Record<string, import('../shared/ankiEnrich').EnrichEntry[]>>;
       dictXrefs(
         text: string,
         options?: { sourceLangs?: string[] },

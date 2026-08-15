@@ -100,6 +100,24 @@ describe('resolveEnrichValue', () => {
     });
   });
 
+  it('credits every dictionary behind a merged entry, primary first', () => {
+    // The unified database merges two dictionaries that agree on headword and
+    // reading into ONE entry with combined senses. That is one voice with two
+    // names, not a disagreement — so `refuse` must not fire, and the field must
+    // still credit both.
+    const merged: EnrichEntry = {
+      source: 'JMdict (EN)',
+      sources: ['JMdict (EN)', 'Wiktionary'],
+      reading: 'ねこ',
+      senses: [{ partsOfSpeech: ['noun'], definitions: ['cat', 'domestic cat'] }],
+    };
+    expect(resolveEnrichValue([merged], 'meaning', 'refuse')).toEqual({
+      value: `cat${ENRICH_DEFINITION_SEPARATOR}domestic cat`,
+      sources: ['JMdict (EN)', 'Wiktionary'],
+      merged: false,
+    });
+  });
+
   it('contributes no source name for an entry that cannot be attributed', () => {
     const anon: EnrichEntry = { source: null, reading: 'ねこ', senses: [{ partsOfSpeech: [], definitions: ['cat'] }] };
     expect(resolveEnrichValue([anon], 'meaning', 'first-source')).toEqual({

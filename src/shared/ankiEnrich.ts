@@ -64,8 +64,23 @@ export const ENRICH_SOURCE_SEPARATOR = ' / ';
  * three lines.
  */
 export interface EnrichEntry {
-  /** The dictionary that produced this entry, or `null` when it cannot be attributed. */
+  /**
+   * The dictionary that produced this entry, or `null` when it cannot be
+   * attributed. Deterministic: for a merged entry it is the primary source, so
+   * a caller that only understands one name still gets a stable one.
+   */
   source: string | null;
+  /**
+   * Every dictionary that contributed this entry, primary first, when the store
+   * merged several. Absent means `[source]`.
+   *
+   * The unified database merges entries that agree on language, headword and
+   * reading — two dictionaries glossing 猫 come back as one entry, not two — so
+   * without this list the enriched field would credit only the first of them.
+   * The senses are genuinely merged, so this is one voice with several names,
+   * not a disagreement.
+   */
+  sources?: readonly string[];
   reading: string;
   senses: ReadonlyArray<{
     partsOfSpeech: readonly string[];
@@ -93,8 +108,22 @@ export interface EnrichResolution {
 
 /** One value per source, in source order, with duplicates of *value* collapsed. */
 interface SourceValue {
+  /** The grouping key: the entry's primary source. */
   source: string | null;
+  /** Everyone to credit for this value, primary first. */
+  credit: string[];
   value: string;
+}
+
+/** Every dictionary behind one entry, primary first, with no empty names. */
+function entryCredit(entry: EnrichEntry): string[] {
+  const names = entry.sources ?? (entry.source ? [entry.source] : []);
+  const out: string[] = [];
+  for (const name of names) {
+    const clean = name.trim();
+    if (clean && !out.includes(clean)) out.push(clean);
+  }
+  return out;
 }
 
 function aspectValue(entry: EnrichEntry, aspect: EnrichAspect): string {
@@ -129,26 +158,30 @@ function aspectValue(entry: EnrichEntry, aspect: EnrichAspect): string {
  */
 function valuesBySource(entries: readonly EnrichEntry[], aspect: EnrichAspect): SourceValue[] {
   const order: Array<string | null> = [];
-  const bySource = new Map<string | null, string[]>();
+  const bySource = new Map<string | null, { values: string[]; credit: string[] }>();
   for (const entry of entries) {
     const value = aspectValue(entry, aspect);
     if (!value) continue;
+    const credit = entryCredit(entry);
     const bucket = bySource.get(entry.source);
     if (bucket) {
-      if (!bucket.includes(value)) bucket.push(value);
+      if (!bucket.values.includes(value)) bucket.values.push(value);
+      for (const name of credit) if (!bucket.credit.includes(name)) bucket.credit.push(name);
     } else {
       order.push(entry.source);
-      bySource.set(entry.source, [value]);
+      bySource.set(entry.source, { values: [value], credit });
     }
   }
   const out: SourceValue[] = [];
   for (const source of order) {
-    const value = (bySource.get(source) ?? []).join(ENRICH_DEFINITION_SEPARATOR);
+    const bucket = bySource.get(source);
+    if (!bucket) continue;
+    const value = bucket.values.join(ENRICH_DEFINITION_SEPARATOR);
     if (!value) continue;
     // Identical text from two dictionaries is agreement, not a conflict; keep
     // the first source's attribution and drop the duplicate value.
     if (out.some((existing) => existing.value === value)) continue;
-    out.push({ source, value });
+    out.push({ source, credit: bucket.credit, value });
   }
   return out;
 }
@@ -170,16 +203,16 @@ export function resolveEnrichValue(
   const values = valuesBySource(entries, aspect);
   if (values.length === 0) return { refused: 'no-value' };
   if (values.length === 1) {
-    const only = values[0];
-    return { value: only.value, sources: only.source ? [only.source] : [], merged: false };
+    return { value: values[0].value, sources: [...values[0].credit], merged: false };
   }
   if (rule === 'refuse') return { refused: 'sense-conflict' };
   if (rule === 'first-source') {
-    const first = values[0];
-    return { value: first.value, sources: first.source ? [first.source] : [], merged: false };
+    return { value: values[0].value, sources: [...values[0].credit], merged: false };
   }
   const sources: string[] = [];
-  for (const { source } of values) if (source && !sources.includes(source)) sources.push(source);
+  for (const { credit } of values) {
+    for (const name of credit) if (!sources.includes(name)) sources.push(name);
+  }
   return {
     value: values.map((v) => v.value).join(ENRICH_SOURCE_SEPARATOR),
     sources,
