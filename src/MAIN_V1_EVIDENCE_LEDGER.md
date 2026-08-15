@@ -21756,3 +21756,53 @@ are **another track's and pre-date this turn** — `git show f214bdf5:src/render
 **Lesson worth the line: `f214bdf5` is the second commit in this branch to land a shared module
 ahead of its only importer.** Carve commits by import closure, and if a turn ends without running
 the gates, the next turn inherits a red suite it did not cause.
+
+## Track 7 — Phase 2's Browser, and a note you can take back — 2026-08-15 17:35 MSK primary
+
+Fusion re-derived closed an **8th** time (§7's last entry, all five §6 gates), so Track 7 got
+the turn.
+
+**Found on re-deriving: `5bbece69` (Phase 2 slice 1) landed and the turn died there.** The
+Browser it referenced — `shared/ankiWorkbenchBrowser.ts`, `DeckWorkbenchBrowser.tsx` and its
+229-line test — was **finished and untracked**, calling **17 i18n keys that did not exist in any
+catalog**, and `deckWorkbench.test.tsx` was red 2/9. Third turn running that a stranded slice hid
+in 400+ dirty paths. `git log -- <path>`, never `git status`, to check a handoff's claim.
+
+`b977b14` — **the Browser closes**. The red tests were a *harness* failure, not a product one:
+jsdom ships no `ResizeObserver`, so `VirtualList` threw the moment step 2 rendered and both
+"later step" tests failed for a reason that reads exactly like a defect. Stub installed; the
+"not built" assertion moved to step 3, where it is now true. 17 keys × 4 catalogs.
+
+`b276a4f` — **single-note edits**. `shared/ankiDraftEdit.ts`: field/tag ops with before-images,
+undo/redo re-running the inverse against the current draft. A no-op never enters the journal; a
+new edit drops the redo branch. Three consequences shown, not hidden: orphaned media, a reference
+the source lacks, and the cloze numbers a change adds/removes (Anki generates a card per cloze,
+a draft cannot — so it says what *would* happen on commit). 14 keys × 4 catalogs.
+
+**Decision (standing auto-approval): `AnkiDraftSource.plainText`, new and optional.** An edit
+must normalize the way the read did; the HTML stripper over a `#html:false` CSV field eats a
+literal `<`. Alternative rejected: always `stripFieldHtml` — one line cheaper, silently wrong for
+plain-text CSV. `collapsePlainText` moved main → shared so reader and editor share one function.
+
+**The live run earned its place: it found a defect no test had.** The footer read
+`Выбрать все: 3 221` under a filter showing four rows, then selected four. `selectAll`'s count is
+`matchedTotal` now — the same number the click acts on. Pinned by a test.
+
+**Live, bridge pid 43292, both paged and whole-source branches.** Local deck 3,221 notes → 22
+rows in the DOM, `scrollHeight` 109,514 = 3221×34 exactly. Live AnkiConnect, 500 of 155,383 read
+→ "select all 155,383" with the not-yet-loaded warning, degrading to "select the 1 found here"
+the moment a query makes the wider claim uncomputable. Edit → row shows stripped text + edited
+marker → undo restores row, inspector and journal together → redo. `/logs?level=error`: **0**.
+
+**Two harness traps, both worth an hour:** React maps `onBlur` onto **`focusout`** (a dispatched
+`blur` does not bubble; the edit looks silently dropped), and React's value-tracker setter is
+**per element class** (the `HTMLInputElement` one on a textarea throws "not a valid instance").
+
+**Gates**, once, after the last slice. `npx vitest run` exit **0**, 637 passed / 1 skipped files,
+**8,580 passed / 6 skipped** (baseline 633 / 8,511; +4 files, +69 tests, all mine).
+`i18n-check` exit 0 at **9,713** (+77). `architecture-audit` exit 0, **Nothing new**, 2 known
+pending. `eslint` on all 9 touched paths: **0 errors** (48 non-null-assertion warnings, the
+repo's existing test style).
+
+**Next: Phase 2's remainder** — representative template preview and full keyboard flow; then
+Phase 3's change tray, which `ankiDraftEdit`'s journal was shaped to become.
