@@ -134,6 +134,33 @@ describe('findLexiconCollocations', () => {
     expect(count()).toBe(first);
   });
 
+  it('stores each row under its own language when the scan spans two', () => {
+    // A Han query resolves in both partitions of the real database, so `langs`
+    // holds two entries and the call is not scoped to one. Every stored row must
+    // carry the language of the headword it came from — keying the whole call on
+    // the first language put Japanese phrases in the Chinese partition, where the
+    // delete that is supposed to own them could no longer find them.
+    // The Chinese entry deliberately outscores the Japanese one so that it sorts
+    // FIRST in the resolved language list. Without that this test passes against
+    // the very bug it exists for — `langs[0]` was 'ja' by luck, which is exactly
+    // how a green test hides a real defect.
+    importLegacyIndex(db, {
+      version: 1,
+      info: INFO({ id: 'cedict', title: 'CC-CEDICT', glossLangs: ['en'] }),
+      terms: { 猫: term('猫', 'māo', ['cat'], 3000000) },
+    });
+    db.prepare("update headwords set lang = 'zh' where dict_id = 'cedict'").run();
+
+    const result = findLexiconCollocations(db, { text: '猫' });
+    expect(result.collocations.length).toBeGreaterThan(0);
+    const rows = db.prepare(
+      "select distinct lang from collocations where head = '猫'",
+    ).all() as Array<{ lang: string }>;
+    // The phrases are all Japanese headwords, so nothing may be filed under zh.
+    expect(rows.map((r) => r.lang)).toEqual(['ja']);
+    expect(result.collocations.every((c) => c.lang === 'ja')).toBe(true);
+  });
+
   it('reads its payload back out of the table, so a wiped table yields nothing', () => {
     findLexiconCollocations(db, { text: '猫', sourceLangs: ['ja'] });
     // A trigger that deletes the rows straight after they are inserted stands in

@@ -1113,7 +1113,15 @@ export function findLexiconCollocations(
   }
 
   const chosen = selectLexiconCollocations(drafts, attested, query.limit ?? MAX_COLLOCATION_RESULTS);
-  const langKey = langs[0];
+
+  // Each row is stored under the language of the headword it came from, not under
+  // one language chosen for the whole call. `langs` genuinely holds more than one
+  // entry: a Han query resolves in both partitions of the shipped database (ja
+  // 625,949 headwords, zh 71,888), and 猫 is a headword in each. Writing them all
+  // under the first would put a Japanese phrase in the Chinese partition of an
+  // index whose leading column is `lang` — and the delete below, keyed the same
+  // way, would then fail to replace the rows it was supposed to own.
+  const scanned = new Set(langs);
 
   // One transaction, so a reader in another connection never sees this head with
   // half its rows replaced. `count` is deliberately re-derived rather than summed
@@ -1121,12 +1129,19 @@ export function findLexiconCollocations(
   // accumulating it across calls would turn it into a tally of how often the word
   // was looked up.
   const replace = db.transaction((items: readonly CollocationDraft[]) => {
-    db.prepare('delete from collocations where lang = ? and head = ?').run(langKey, text);
+    const remove = db.prepare('delete from collocations where lang = ? and head = ?');
+    // Every language this call scanned is cleared, including ones that ended up
+    // contributing no row: a phrase that stops parsing after a dictionary changes
+    // has to disappear rather than survive as the only row left for its language.
+    for (const lang of scanned) remove.run(lang, text);
     const insert = db.prepare(
       'insert into collocations (lang, head, partner, pattern, count) values (?, ?, ?, ?, ?)',
     );
     for (const item of items) {
-      insert.run(langKey, text, item.partner, collocationPattern(item.particle, item.order), item.count);
+      insert.run(
+        item.candidate.lang, text, item.partner,
+        collocationPattern(item.particle, item.order), item.count,
+      );
     }
   });
   try {
@@ -1138,17 +1153,25 @@ export function findLexiconCollocations(
   }
 
   const stored = db.prepare(`
-    select partner, pattern, count from collocations
-    where lang = ? and head = ?
-  `).all(langKey, text) as Array<{ partner: string; pattern: string; count: number }>;
+    select lang, partner, pattern, count from collocations
+    where lang in (${placeholders}) and head = ?
+  `).all(...langs, text) as Array<{
+    lang: string; partner: string; pattern: string; count: number;
+  }>;
 
-  const byPartner = new Map(chosen.map((item) => [`${item.partner}\t${collocationPattern(item.particle, item.order)}`, item]));
+  // Keyed by language too, so two partitions that happen to carry the same phrase
+  // for the same head stay two rows rather than silently collapsing into one.
+  const draftKey = (lang: string, partner: string, pattern: string) => `${lang}\t${partner}\t${pattern}`;
+  const byRow = new Map(chosen.map((item) => [
+    draftKey(item.candidate.lang, item.partner, collocationPattern(item.particle, item.order)),
+    item,
+  ]));
   const collocations: LexiconCollocation[] = [];
   for (const row of stored) {
-    const draft = byPartner.get(`${row.partner}\t${row.pattern}`);
+    const draft = byRow.get(draftKey(row.lang, row.partner, row.pattern));
     if (!draft) continue;
     collocations.push({
-      lang: draft.candidate.lang,
+      lang: row.lang,
       head: draft.head,
       partner: row.partner,
       particle: draft.particle,
@@ -1162,8 +1185,13 @@ export function findLexiconCollocations(
     });
   }
   // The stored read is unordered; restore the commonness order the scan produced.
-  const rank = new Map(chosen.map((item, index) => [`${item.partner}\t${collocationPattern(item.particle, item.order)}`, index]));
-  collocations.sort((a, b) => (rank.get(`${a.partner}\t${a.pattern}`) ?? 0) - (rank.get(`${b.partner}\t${b.pattern}`) ?? 0));
+  const rank = new Map(chosen.map((item, index) => [
+    draftKey(item.candidate.lang, item.partner, collocationPattern(item.particle, item.order)),
+    index,
+  ]));
+  collocations.sort((a, b) =>
+    (rank.get(draftKey(a.lang, a.partner, a.pattern)) ?? 0)
+    - (rank.get(draftKey(b.lang, b.partner, b.pattern)) ?? 0));
 
   return { query: text, collocations };
 }
