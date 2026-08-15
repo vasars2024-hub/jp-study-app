@@ -20,7 +20,11 @@ import NyaaSubtitleDialog from './NyaaSubtitleDialog';
 import { useMediaJobs } from './useMediaJobs';
 import { episodesBySeason, providerEpisodeTitle, type LibraryEntry } from '../../../../shared/mediaLibraryEntries';
 import { mediaSubtitleStatus } from '../../../../shared/mediaSubtitleStatus';
-import { fusionCueCounts, type FusionTrackMeta } from '../../../../shared/subtitleFusionMeta';
+import {
+  fusionArbitrationStatus,
+  fusionCueCounts,
+  type FusionTrackMeta,
+} from '../../../../shared/subtitleFusionMeta';
 import type { MediaItem } from '../../../../shared/types';
 
 export interface MediaDetailPanelProps {
@@ -419,6 +423,22 @@ export default function MediaDetailPanel({
                   // Only ever present for a fused track that has its F6 sidecar.
                   const meta = fusionMeta[track.id];
                   const counts = meta ? fusionCueCounts(meta) : null;
+                  // Why the unverified lines above are unverified. Silent for
+                  // `unknown` (a sidecar that predates the field cannot testify),
+                  // for `ok`, and for a skip that is not a failure — nothing
+                  // disputed, or a cancelled run. The two cases worth a line need
+                  // different actions from the user: configure a model, or retry.
+                  const arbiter = meta ? fusionArbitrationStatus(meta) : { kind: 'unknown' as const };
+                  const arbiterLine = arbiter.kind === 'failed'
+                    ? t('media.subtitles.fusion.arbiterFailed', { count: arbiter.failedBatches })
+                    : arbiter.kind === 'partial'
+                      ? t('media.subtitles.fusion.arbiterPartial', {
+                        applied: arbiter.applied,
+                        attempted: arbiter.attempted,
+                      })
+                      : arbiter.kind === 'off' && arbiter.reason === 'no-key'
+                        ? t('media.subtitles.fusion.arbiterOff')
+                        : null;
                   const detail = [
                     t(`media.subtitles.source.${track.source}`),
                     track.format.toUpperCase(),
@@ -451,6 +471,7 @@ export default function MediaDetailPanel({
                     counts?.corrected ? t('media.subtitles.fusion.repaired', {
                       count: counts.corrected,
                     }) : null,
+                    arbiterLine,
                   ].filter(Boolean).join(' · ');
 
                   const body = (

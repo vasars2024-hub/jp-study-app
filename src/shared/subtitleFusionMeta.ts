@@ -345,6 +345,47 @@ export function fusionCueCounts(meta: FusionTrackMeta): {
   };
 }
 
+/**
+ * Why a track's unverified lines are unverified — the question `fusionCueCounts`
+ * cannot answer.
+ *
+ * "16 of 35 lines unverified" reads identically whether no cloud model was ever
+ * configured or one was configured, asked, and lost every batch, because both
+ * leave the same bases behind. The first is a setting the user can change; the
+ * second is a failure they should be told about. `FusionArbitrationSummary` has
+ * carried the distinction on disk since `c0b8843` with nothing reading it.
+ *
+ * `unknown` is its own case rather than folded into `off`: a sidecar written
+ * before the field cannot testify, and a surface must not turn silence into a
+ * claim in either direction.
+ */
+export type FusionArbitrationStatus =
+  /** No `arbitration` field — the sidecar predates it and says nothing. */
+  | { kind: 'unknown' }
+  /** Never asked, and the reason is not a failure. */
+  | { kind: 'off'; reason: 'no-key' | 'no-candidates' | 'cancelled' }
+  /** Asked, and every batch came back unusable. */
+  | { kind: 'failed'; failedBatches: number }
+  /** Asked, some verdicts landed, some batches did not. */
+  | { kind: 'partial'; applied: number; attempted: number; failedBatches: number }
+  /** Asked, nothing failed. */
+  | { kind: 'ok'; applied: number; attempted: number };
+
+export function fusionArbitrationStatus(meta: FusionTrackMeta): FusionArbitrationStatus {
+  const summary = meta.arbitration;
+  if (!summary) return { kind: 'unknown' };
+  if (summary.skipped) return { kind: 'off', reason: summary.skipped };
+  const { applied, attempted, failedBatches } = summary;
+  if (failedBatches <= 0) return { kind: 'ok', applied, attempted };
+  // A run rescued by the split retry still failed on the first ask, but every
+  // verdict it owed landed in the end — reporting that as a partial failure
+  // would train the user to ignore the line. `recovered` is already folded into
+  // `applied`, so this reads the outcome, not the attempt history.
+  return applied > 0
+    ? { kind: 'partial', applied, attempted, failedBatches }
+    : { kind: 'failed', failedBatches };
+}
+
 /** Track-level `SubtitleRecord.confidence` is a 0–100 match score, not a 0–1 ratio. */
 export function fusionConfidencePercent(meanConfidence: number): number {
   return Math.max(0, Math.min(100, Math.round(meanConfidence * 100)));

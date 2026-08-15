@@ -26,11 +26,13 @@ import {
 import {
   FUSION_META_VERSION,
   buildFusionTrackMeta,
+  fusionArbitrationStatus,
   fusionConfidencePercent,
   fusionCueCounts,
   fusionMetaPathFor,
   parseFusionTrackMeta,
   serializeFusionTrackMeta,
+  type FusionArbitrationStatus,
 } from '../subtitleFusionMeta';
 
 const cue = (start: number, end: number, text: string): FusionCue => ({ start, end, text });
@@ -415,6 +417,57 @@ describe('fusionCueCounts', () => {
       // still gets an honest answer without knowing the basis vocabulary.
       uncertain: 3,
     });
+  });
+});
+
+describe('fusionArbitrationStatus', () => {
+  /** Throws rather than returning null so the assertions below read as one line. */
+  const statusOf = (arbitration: unknown): FusionArbitrationStatus => {
+    const meta = parseFusionTrackMeta(JSON.stringify({
+      version: 2,
+      arbitration,
+      cues: [{ index: 0, basis: 'whisper-unverified' }],
+    }));
+    if (!meta) throw new Error('fixture did not parse');
+    return fusionArbitrationStatus(meta);
+  };
+
+  it('separates "never asked" from "asked and lost every batch" — the two the bases cannot tell apart', () => {
+    // Both of these leave the same single `whisper-unverified` cue behind, which
+    // is the whole reason the sidecar records the summary at all.
+    expect(statusOf({
+      attempted: 0, applied: 0, failedBatches: 0, skipped: 'no-key',
+    })).toEqual({ kind: 'off', reason: 'no-key' });
+    expect(statusOf({
+      attempted: 16, applied: 0, failedBatches: 1, skipped: null,
+    })).toEqual({ kind: 'failed', failedBatches: 1 });
+  });
+
+  it('a sidecar written before the field says nothing rather than "arbitration did not run"', () => {
+    const meta = parseFusionTrackMeta(JSON.stringify({
+      version: 1,
+      cues: [{ index: 0, basis: 'whisper-unverified' }],
+    }));
+    expect(meta && fusionArbitrationStatus(meta)).toEqual({ kind: 'unknown' });
+  });
+
+  it('reports a half-failed run as partial, and a clean one as ok', () => {
+    expect(statusOf({
+      attempted: 38, applied: 22, failedBatches: 1, skipped: null,
+    })).toEqual({ kind: 'partial', applied: 22, attempted: 38, failedBatches: 1 });
+    expect(statusOf({
+      attempted: 16, applied: 16, failedBatches: 0, skipped: null,
+    })).toEqual({ kind: 'ok', applied: 16, attempted: 16 });
+  });
+
+  it('a batch the split retry rescued reads as ok, not as a partial failure', () => {
+    // `recovered` is already folded into `applied` and `failedBatches` only
+    // counts batches nothing was won back from, so a fully rescued run owes the
+    // user no warning — the retry did its job.
+    expect(statusOf({
+      attempted: 16, applied: 16, failedBatches: 0, skipped: null,
+      failures: { 'output-truncated': 1 }, recovered: 16,
+    })).toEqual({ kind: 'ok', applied: 16, attempted: 16 });
   });
 });
 

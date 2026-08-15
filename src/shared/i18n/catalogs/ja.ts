@@ -996,6 +996,11 @@ export const ja: Catalog = {
   'media.subtitles.fusion.unrefereed': {
     other: '{total} 行中 {count} 行は書き起こしのみ — 参照訳なし',
   },
+  'media.subtitles.fusion.arbiterOff': 'クラウド照合なし — AI モデル未設定',
+  'media.subtitles.fusion.arbiterFailed': {
+    other: 'クラウド照合に失敗（{count} 件のリクエスト）',
+  },
+  'media.subtitles.fusion.arbiterPartial': '判定が分かれた {attempted} 行中 {applied} 行をクラウドで照合',
   'media.subtitles.searchFailed': '字幕の検索に失敗しました。',
   'media.subtitles.none': 'このエピソードの字幕は見つかりませんでした。',
   'media.subtitles.notSearched': 'このエピソードはまだ検索していません。',

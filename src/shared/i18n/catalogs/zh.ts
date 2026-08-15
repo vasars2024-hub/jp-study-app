@@ -994,6 +994,11 @@ export const zh: Catalog = {
   'media.subtitles.fusion.unrefereed': {
     other: '{total} 行中有 {count} 行仅有转写 — 没有参考译文',
   },
+  'media.subtitles.fusion.arbiterOff': '未做云端校验 — 尚未配置 AI 模型',
+  'media.subtitles.fusion.arbiterFailed': {
+    other: '云端校验失败（{count} 次请求）',
+  },
+  'media.subtitles.fusion.arbiterPartial': '{attempted} 行存疑行中有 {applied} 行已云端校验',
   'media.subtitles.searchFailed': '字幕搜索失败。',
   'media.subtitles.none': '未找到这一集的字幕。',
   'media.subtitles.notSearched': '尚未为这一集执行搜索。',
