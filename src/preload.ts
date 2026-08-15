@@ -522,6 +522,19 @@ const api = {
     input: import('./shared/lexiconExplanations').LexiconExplanationInput,
   ): Promise<{ ok: boolean; explanation: import('./shared/lexiconExplanations').LexiconExplanation | null }> =>
     ipcRenderer.invoke('dict:explanationSet', key, input),
+  /**
+   * Explain one word: the stored answer, or one model call whose reply is stored.
+   * The `model` half of the cache key is derived from `policy`, not sent.
+   */
+  dictExplain: (
+    request: {
+      key: import('./shared/lexiconExplanations').LexiconExplanationIdentity & { glossLang: string };
+      grounding: import('./shared/lexiconExplainPrompt').LexiconExplainGrounding;
+      policy: import('./shared/agentWorkspace').AgentProviderPolicy;
+      refresh?: boolean;
+    },
+  ): Promise<import('./main/dictionary/explainRun').LexiconExplainResult> =>
+    ipcRenderer.invoke('dict:explain', request),
   /** Forget this word's explanations across every prose language, model and version. */
   dictExplanationClear: (
     identity: import('./shared/lexiconExplanations').LexiconExplanationIdentity,

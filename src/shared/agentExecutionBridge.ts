@@ -360,7 +360,13 @@ function normalizeExecutionAttachments(value: unknown): AgentExecutionAttachment
   return attachments;
 }
 
-function normalizePolicy(value: unknown): AgentProviderPolicy | null {
+/**
+ * Exported because Contextual Explain sends a provider policy over its own IPC
+ * channel and must squeeze it through the identical bounds — including the
+ * `cache: 'persistent'` and cloud-without-consent refusals. A second normalizer
+ * would eventually disagree with this one about what a request is allowed to be.
+ */
+export function normalizePolicy(value: unknown): AgentProviderPolicy | null {
   const raw = record(value);
   const target = record(raw.target);
   let normalizedTarget: AgentProviderPolicy['target'] | null = null;

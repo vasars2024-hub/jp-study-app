@@ -66,11 +66,19 @@ import {
   clearStoredExplanationsInDb,
 } from './dictionary/service';
 import {
+  EXPLANATION_PROMPT_VERSION,
   readExplanationIdentity,
   readExplanationInput,
   readExplanationKey,
   type LexiconExplanation,
 } from '../shared/lexiconExplanations';
+import {
+  explainModelKey,
+  readExplainGrounding,
+  readExplainTarget,
+} from '../shared/lexiconExplainPrompt';
+import { normalizePolicy } from '../shared/agentExecutionBridge';
+import { runLexiconExplain, type LexiconExplainResult } from './dictionary/explainRun';
 import {
   notesToCsv,
   readNoteExportQuery,
@@ -961,6 +969,57 @@ export function registerDictionaryIpc(): void {
         return { ok: true, explanation: writeStoredExplanationToDb(target, readExplanationInput(input)) };
       } catch {
         return { ok: false, explanation: null };
+      }
+    },
+  );
+  // Explain one word: serve the stored answer, or ask the model once and store
+  // what comes back.
+  //
+  // Its own channel rather than `agentExecution:run`, which requires an existing
+  // conversation and appends the exchange to it — a side panel that created a
+  // visible conversation per explained word would bury the user's real ones. The
+  // policy still goes through `normalizePolicy`, so this channel cannot be the
+  // loose one: the same cloud-consent and persistent-cache refusals apply.
+  ipcMain.handle(
+    'dict:explain',
+    async (_e, raw: unknown): Promise<LexiconExplainResult> => {
+      const request = raw && typeof raw === 'object' && !Array.isArray(raw)
+        ? raw as Record<string, unknown>
+        : {};
+      const policy = normalizePolicy(request.policy);
+      const target = readExplainTarget(request.key);
+      // The cloud-consent refusal is `normalizeAgentExecutionRequest`'s, restated
+      // rather than inherited because `normalizePolicy` alone does not carry it —
+      // and a channel that sends a word to a cloud provider the user has not
+      // enabled is exactly the hole that check exists to close.
+      if (!policy || !target || (policy.target.kind === 'cloud' && !policy.allowCloud)) {
+        return { ok: false, cached: false, explanation: null, error: 'invalid-request' };
+      }
+      // The model half of the key is derived from the policy, never taken from
+      // the caller: a surface that spelled it differently would read a cache that
+      // never hits and pay for every lookup without anything looking broken.
+      const key = {
+        ...target,
+        model: explainModelKey(policy),
+        promptVersion: EXPLANATION_PROMPT_VERSION,
+      };
+      const grounding = readExplainGrounding(request.grounding);
+      try {
+        return await runLexiconExplain(
+          {
+            readCached: (target) => readStoredExplanationFromDb(target),
+            store: (target, input) => writeStoredExplanationToDb(target, input),
+            runProvider: async (target, prompt, options) => {
+              const { runAgentProviderPrompt } = await import('./agentProviderRouter');
+              return runAgentProviderPrompt(target, prompt, options);
+            },
+          },
+          { key, grounding, policy, refresh: request.refresh === true },
+        );
+      } catch {
+        // A database that will not open reaches here. It is a failure to explain,
+        // not a rejected invoke: the surface offers a retry either way.
+        return { ok: false, cached: false, explanation: null, error: 'not-stored' };
       }
     },
   );

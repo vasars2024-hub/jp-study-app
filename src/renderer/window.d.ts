@@ -406,6 +406,14 @@ declare global {
       dictExplanationClear(
         identity: import('../shared/lexiconExplanations').LexiconExplanationIdentity,
       ): Promise<{ ok: boolean; removed: number }>;
+      dictExplain(
+        request: {
+          key: import('../shared/lexiconExplanations').LexiconExplanationIdentity & { glossLang: string };
+          grounding: import('../shared/lexiconExplainPrompt').LexiconExplainGrounding;
+          policy: import('../shared/agentWorkspace').AgentProviderPolicy;
+          refresh?: boolean;
+        },
+      ): Promise<import('../main/dictionary/explainRun').LexiconExplainResult>;
       dictListYomitan(): Promise<YomitanDictInfo[]>;
       dictRemoveYomitan(id: string): Promise<{ ok: boolean; error?: string }>;
       dictSetYomitanEnabled(id: string, enabled: boolean): Promise<{ ok: boolean; error?: string }>;
