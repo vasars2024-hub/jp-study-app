@@ -131,6 +131,29 @@ text — verified by walking the panel from a clean profile and reading only wha
 5. New strings exist in all four catalogs (`shared/i18n/catalogs/{en,ja,zh,ru}.ts`) and
 `node tools/i18n-check.cjs` exits 0. Baseline before this plan: **9,636** keys.
 
+**Progress 2026-08-15 23:12 (`primary`). P1 CLOSES — gates 4 and 5 pass.** `6a1be82`.
+
+- **Gate 4 PASSES.** The four walkthrough steps now render **before** the Connect button, and
+  step 2 promises in advance that `http://localhost/oauth/callback` will not load. Every word
+  already existed in `malSync.callbackDesc`, which lives inside `{pendingState && …}` — i.e. it
+  only ever appeared *after* the failure it explains. **The fix was ordering, not text.**
+- **The test asserts document order, not presence** (`renderer/__tests__/malSyncWalkthrough.
+  test.tsx`, 4 tests): a refactor that keeps all four strings and moves them back under the
+  button re-breaks the gate while every presence assertion still passes. **Mutation control:**
+  with the block moved below the button the suite fails (`expected false to be true`); restored,
+  4/4 pass and the panel compared **byte-identical** (`-ceq`) to its pre-mutation copy.
+  The control also caught a defect in the test itself first — searching for the *first* element
+  containing the text finds the card wrapper, because `textContent` is inherited, so index 0 is
+  trivially before everything. It now takes the deepest match and uses `compareDocumentPosition`.
+- **Gate 5 PASSES.** Keys live in `shared/i18n/malSync/{en,ja,ru,zh}.ts` (the module the
+  catalogs aggregate — *not* `catalogs/*.ts`, which carry another track's dirty hunks).
+  `node tools/i18n-check.cjs` **exit 0 at 9,890** English keys, all translated in ja/zh/ru.
+- **Correction to this document.** "What is missing" item **6** (MAL Sync unfindable —
+  `settingsRegistry` pointing at `api-keys`) is **already fixed and covered**:
+  `renderer/__tests__/malSyncSettingsRouting.test.ts` derives the mounting page from
+  `ScraperPage.tsx` source and asserts both the search result and the API-keys Manage button
+  land there, with a negative control against ranking `api-keys` first. Do not re-fix it.
+
 ### P2 — MAL sync completeness
 
 - Request the richer field set including `related_anime` (defect 2).
@@ -216,10 +239,10 @@ account (`Asmilov`), on a dev app restarted for the new handler.** `0438a293`.
   source (`11597 sequel from 5081`, `28025 parent_story from 32268`, …). `byStatus.completed`
   stayed **1,426** — the walk invented no completed rows. Total **1,429**, `derivatives 3`.
 - **Gate 13 PASSES.** Structural first: `main/malLibrary.ts` imports no MAL client and holds no
-  timer, so neither channel can reach MyAnimeList. Observed too: with the panel mounted and no
-  input, `lastSyncAt` read **1786824081331** and total **1,429** at two points **33,944 ms**
-  apart, both identical. The file is real — `%APPDATA%\jp-study-app\mal-library.json`,
-  **641,236 bytes**.
+  timer, so neither channel can reach MyAnimeList. Observed too: `lastSyncAt` still read
+  **1786824081331** and total still **1,429** at 1786824488100 — **406,769 ms (6.8 min)** after
+  the last write, with no user action in between. The file is real —
+  `%APPDATA%\jp-study-app\mal-library.json`, **641,236 bytes**.
 - **Trap for P4:** the panel's status dropdown filters **client-side in main**, deliberately. Do
   not "optimise" it into MAL's `status=` query later; P2 measured that omitting twelve
   rewatched titles.
