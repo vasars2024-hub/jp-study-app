@@ -959,3 +959,35 @@ treats a symptom that should no longer occur — **do not delete it**, it is sti
 behaviour for a genuinely oversized batch, but the next fusion turn should re-run the F5
 arbitration on an episode and read the `failures` map: if `output-truncated` is gone, say so
 with the numbers, and reconsider whether the 3x retry ceiling is still worth its cost.
+
+### The sidecar's arbitration summary finally has a reader — 2026-08-15, primary
+
+**Landed:** `584319cd`. `c0b8843` put `FusionArbitrationSummary` on disk precisely because a
+failed arbiter and an absent one leave identical cue bases; nothing had read it since, so the
+track row still said only "16 of 35 lines unverified" in both cases — one is a setting the
+user can change, the other is a failure they were never told about.
+
+`fusionArbitrationStatus` (pure, in `shared/subtitleFusionMeta.ts`) collapses the summary to
+five outcomes; `MediaDetailPanel` renders the three that owe the user an action — `off/no-key`,
+`failed`, `partial` — and stays silent on `ok` and on **`unknown`**. `unknown` is its own case
+on purpose: a sidecar written before the field cannot testify, and rendering that silence as
+"arbitration did not run" is the exact collapse the field exists to prevent. Rejected:
+reporting `recovered` as a partial failure — it is already folded into `applied` and
+`failedBatches` excludes fully-rescued batches, so a warning there trains the user to ignore
+the line.
+
+3 new keys × 4 catalogs. i18n exit 0 at **9,598** (was 9,595).
+
+**Live**, real IPC, real sidecar — episode 1's `{attempted:16, applied:0, failedBatches:1,
+skipped:null}`. `MediaDetailPanel` mounted off-screen, Субтитры tab clicked, fused row reads
+`… · совпадение 57% · Сгенерировано машиной · 16 строк из 35 не подтверждены · **облачная
+сверка не удалась (1 запрос)**` — Russian `one` plural form correct.
+
+**Two traps, both cost time here.** (1) **Editing any renderer-imported file kills an
+in-flight fusion job**: Vite HMR reloads the renderer, the Whisper worker lives there, and the
+job's chunk request comes back `no-window`. Do all code edits *before* starting a run, or
+between runs. (2) The catalogs carry another track's unstaged hunks (`settings.nav.scraper.desc`
+among them), and the Edit tool rewrites them LF — a plain `git add` stages ~1,300 foreign lines
+per file. `debug/stage-fusion-i18n.cjs` reconstructs HEAD + the insertion with the anchor
+line's own terminator and asserts the round trip; `--cached --stat` then shows 24 insertions,
+0 deletions.
