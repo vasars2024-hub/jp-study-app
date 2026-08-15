@@ -311,6 +311,12 @@ interface RenderContext {
   templateName: string;
   side: 'question' | 'answer';
   report: (problem: AnkiRenderProblem) => void;
+  /**
+   * Keep every conditional section's body regardless of its field, used once to
+   * ask "would this template have rendered anything if the conditional were
+   * true?". Never set on a render the user sees.
+   */
+  forceSections?: boolean;
 }
 
 /** Anki's Japanese support: `漢字[かんじ]` becomes ruby. */
@@ -440,7 +446,7 @@ function renderSections(template: string, ctx: RenderContext): string {
     ctx.report({ code: 'unresolved-field', side: ctx.side, detail: rawName });
   }
   const filled = !fieldIsEmpty(value ?? '');
-  const keep = kind === '#' ? filled : !filled;
+  const keep = ctx.forceSections ? true : kind === '#' ? filled : !filled;
 
   return before + (keep ? renderSections(body, ctx) : '') + renderSections(rest, ctx);
 }
@@ -531,7 +537,26 @@ export function renderAnkiCard(
   // `{{#Add Reverse}}` that renders blank is the optional-reverse design
   // working exactly as asked, and calling that "blank question" would make
   // every unflagged note in the deck read as a failure.
-  const questionIsConditional = SECTION_RE.test(String(template?.qfmt ?? ''));
+  //
+  // "Has a conditional" is not enough to tell them apart: a *flagged* note whose
+  // question field is blank also renders empty, and calling that by-design would
+  // hide a real blank behind the switch. So the test is whether the conditional
+  // is what suppressed the content — render the question once more with every
+  // section forced open, and if it is still empty the blank is the field's, not
+  // the switch's. The extra render only runs on an empty question.
+  const questionIsConditional =
+    fieldIsEmpty(questionHtml) &&
+    SECTION_RE.test(String(template?.qfmt ?? '')) &&
+    !fieldIsEmpty(
+      renderFormat(template?.qfmt ?? '', {
+        ...base,
+        side: 'question',
+        forceSections: true,
+        // This render is a question asked of the template, not a render of the
+        // card, so its findings are already reported by the real one above.
+        report: () => undefined,
+      }),
+    );
   if (fieldIsEmpty(questionHtml)) {
     if (questionIsConditional) {
       report({ code: 'conditional-card-not-generated', side: 'question' });

@@ -324,6 +324,35 @@ describe('the conditional card that Anki never generates', () => {
     expect(codes).not.toContain('empty-answer');
   });
 
+  // Found by driving the real 3,221-note deck: a *flagged* note whose question
+  // field happens to be blank also renders empty, and "has a conditional" alone
+  // would have called that by-design and hidden a real blank behind the switch.
+  it('calls a flagged note with an empty question field blank, not by-design', () => {
+    const flagged: AnkiDraftNoteType = {
+      ...basic,
+      fields: [...basic.fields, { ord: 2, name: DEFAULT_REVERSE_FLAG_FIELD, sticky: false, rtl: false }],
+      templates: [
+        ...basic.templates,
+        {
+          ord: 1,
+          name: 'Card 2',
+          qfmt: `{{#${DEFAULT_REVERSE_FLAG_FIELD}}}{{Back}}{{/${DEFAULT_REVERSE_FLAG_FIELD}}}`,
+          afmt: '{{FrontSide}}<hr id=answer>{{Front}}',
+          bqfmt: '',
+          bafmt: '',
+        },
+      ],
+    };
+    const emptyBack = note({
+      id: 'n1',
+      fields: [field(0, 'Front', 'ねこ'), field(1, 'Back', ''), field(2, DEFAULT_REVERSE_FLAG_FIELD, 'y')],
+    });
+    const rendered = renderAnkiCard(draftOf([emptyBack], [flagged]), emptyBack, 1);
+    const codes = rendered.problems.map((p) => p.code);
+    expect(codes).toContain('empty-question');
+    expect(codes).not.toContain('conditional-card-not-generated');
+  });
+
   it('still calls an unconditional blank question a blank question', () => {
     const blank = note({ id: 'n1', fields: [field(0, 'Front', ''), field(1, 'Back', 'cat')] });
     const rendered = renderAnkiCard(draftOf([blank]), blank, 0);
