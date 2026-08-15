@@ -514,3 +514,53 @@ human JA track. What is still missing is **input, not code**: one media item car
 track and a human JA track, on two episodes. Cheapest route remains the F6/F8 entry's — drop a
 short English `.srt` beside a video and run discovery. Keep the EN track small on the first pass;
 `planAsrWindows` derives windows from cues, so a 3-cue track is a 3-window Whisper pass.
+
+### F7 attempt 1 — the fixture is built, the gate did not run — 2026-08-15, primary
+
+**Landed:** `8f2aab9` (discovery fix + 4 tests). F7 itself is **still not run**; §6 item (3)
+remains open. What changed is that the two things blocking it are now named and one is fixed.
+
+**"Input, not code" was wrong — it was code.** Three previous entries recorded this install as
+having no English subtitle track. It has had one since July: an `.en.vtt` beside the podcast
+`yYNWwH2GlB0`. Discovery could not see it. `autoDownloadLanguages` defaults to `['ja']` and was
+applied to *every* provider, so a local sidecar was gated three times over — the item was skipped
+wholesale (all wanted languages present), the ladder `break`ed before the local scan, and the scan
+required the file's tag to be in the wanted list. Proof, same session: a sweep found `files: 0`;
+temporarily setting `['ja','en']` gave `attached: 3, files: 3`; after `8f2aab9` a forced sweep with
+the setting back at `['ja']` gives `files: 2` and rebuilds both records. Setting captured and
+restored byte-identical. Mutation-checked (dropping the `hasLanguage` guard reddens the
+"does not re-offer a language another source already holds" case).
+
+**The real remaining blocker: this machine can no longer load the only cached Whisper model.**
+Configured tier is `kotoba-whisper`; the sole model in `transformers-cache` is
+`whisper-large-v3-turbo` (fp16 encoder + q4 decoder). Loading it now dies with
+**`RangeError: Array buffer allocation failed`**. F1/F2 ran this exact model successfully on
+2026-08-14, so this is memory pressure, not a regression. Next turn needs either a smaller model
+downloaded (`whisper-small`) or less concurrent load — not more fixture work.
+
+**A severe defect found on the way, NOT fixed — next worker should weigh it.** When the renderer
+dies mid-chunk, Electron reloads it, main re-requests the same chunk, and it loops **forever**:
+observed ~20 s per cycle for 10+ minutes. `attempts` stayed **0**, `/logs?level=error` stayed
+**empty** (WebGPU dies silently; only the CPU path threw), and no phase ever advanced. Cancelling
+the jobs stopped the loop instantly, which is the causal proof. A renderer death is not currently
+a job failure, so the retry cap never applies.
+
+**Gates**, once after the last slice, shared working tree (same caveat as every entry above).
+vitest **610 passed / 1 skipped files, 8,047 passed / 6 skipped tests, exit 0** (+4 = this slice).
+i18n-check exit 0 at **9,575** keys — no new user-visible string. architecture-audit exit 0,
+**nothing new**, 2 known pending. eslint on both touched paths: **0 errors**, 1 pre-existing
+`no-unused-vars` warning on an import line this slice never touched.
+
+**Fixture left in place deliberately** (userData, additive only): three Hana podcast items now in
+the library, each with a human EN *and* human JA sidecar — `yYNWwH2GlB0` (305 s, 38 EN cues,
+independently-authored grids, the harder case), `zaX5aqO5Nm4`, `ltbRQvkcgfY`. All three are
+`Kind: captions`, creator-authored, fetched with `yt-dlp --write-sub` (manual tracks only, never
+`--write-auto-sub`: YouTube's `en-ja` auto-track is machine-translated *from* the JA reference and
+would make the MT-only baseline a round-trip of the thing being scored).
+
+**Trap worth two minutes:** these filenames contain `[videoId]`, which PowerShell treats as a
+wildcard — `Test-Path`/`Get-Item` without `-LiteralPath` report a real file as absent. That cost a
+false "the copy wrote 0 bytes" here.
+
+**Status against §6:** (1) done. (2) done. (3) **not run** — harness and fixture both ready, blocked
+on the model load. (4) partial, unchanged. (5) done.
