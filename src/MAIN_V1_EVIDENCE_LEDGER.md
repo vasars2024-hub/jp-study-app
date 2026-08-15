@@ -21634,3 +21634,48 @@ tools/architecture-audit.cjs`: exit 0, **Nothing new**, 2 known pending. `npx es
 touched paths: clean except the 2 `adjacent-overload-signatures` errors in `window.d.ts`, which
 are **at HEAD** (`git show HEAD:src/renderer/window.d.ts` has `subtitleHarvestList` at both :831
 and :1595) and belong to another track; my insertion is at :468 and is not involved.
+
+## Track 7 — Phase 1's source adapters close, live against 155,383 real notes — 2026-08-16 15:55 MSK backup
+
+Fusion re-derived **closed a 7th time** (§7's last entry, "The failures map, re-read after the
+fix: it is empty" — all five §6 gates pass), so the turn went to Track 7. Boss audit's last
+section is still 2026-08-15 04:24 and its finding 1 is still fixed. Nothing new actionable.
+
+**Recovered, not written by me: `f214bdf5`** (local Flashcards deck → draft, adapter 4). Its turn
+died before writing a ledger entry, and it left **adapter 2 finished on disk but untracked** —
+`ankiConnectDraft.ts`, `connectDraftRead.ts`, both test files, plus hunks in `apkgImport.ts`,
+`preload.ts` and `window.d.ts`. **Trap for the next worker: `git status` on this tree is 400+
+paths, so a stranded slice hides in it. `git log -- <path>` on a file the handoff claims is
+committed is the one-command check.** The handoff itself predated `f214bdf5` and named neither.
+
+**Slice 1 — `2605237d` — `anki:readConnectDraft`, adapter 2, end to end.** Pure/transport split
+like the CSV adapter. **Decision: `findModelsByName`, not `modelFieldNames` + `modelTemplates` +
+`modelStyling`** — one round trip per note type instead of three, and the only one that reports
+`type` (cloze) and `sortf`, which the other three lose outright. **Decision: fetch only the note
+types a page references** — 84 decks sit behind 155,383 notes here, so pulling every model's
+template HTML for 500 notes is most of the payload for none of the value.
+
+**The defect this design exists to prevent:** `notesInfo` returns fields as an **object**, and
+object key order is insertion order, not field order. Joining on key order would silently swap two
+fields' contents on **every** note; `joinConnectFields` sorts on each field's reported `order`.
+
+Refusals to invent, all three tested: `guid` stays **empty** (AnkiConnect exposes none, and a note
+id is exactly what does not survive a reimport); `revlog`/`mediaFiles` stay **undefined**, not
+empty (no action reads either — an empty manifest would accuse every real `[sound:]` of missing);
+an unresolvable model/deck name is carried through **as the name**, so `buildAnkiDraft` reports
+`unknown-note-type`/`missing-deck` instead of the draft quietly losing a note. Filtered decks cost
+one `getDeckConfig` each (no bulk action reports `dyn`), bounded to the page's own decks, with
+`filteredProbeTruncated` when it could not cover them; a probe that throws counts as not-filtered.
+Everything is read-only, which is what made the live run safe. 22 tests (12 shared + 10 main).
+
+**Live, real IPC, against the user's actual Anki** — bridge pid 34824, AnkiConnect **API 6**,
+profile `User 1`. `{noteLimit:5}` → `ok`, **totalNotes 155,383**, 5 notes / 5 cards / 84 decks /
+**modelsRead 1**, `unknownModelNames []`, `unknownDeckNames []`, `revlog` and `mediaFiles` both
+`undefined`, fields in order `Front`/`Back` with `system construction<br>` normalized to
+`system construction`. Four adverse probes: offset **155,380** → exactly **3** notes (the tail
+pages); `tag:nonexistent-zzz-tag` → `total 0`, **modelsRead 0** (no wasted round trip);
+`deck:(((` → `ok:false` carrying **Anki's own** search-syntax error, not a fake success;
+`{noteOffset:-5, noteLimit:0}` → clamped to offset 0 / 1 note, no throw.
+
+**Phase 1's four source adapters are now all landed.** Its remaining clause is autosave-resumable
+drafts plus proven cancellation/recovery (acceptance gate 7) — that, not Phase 2, is next.
