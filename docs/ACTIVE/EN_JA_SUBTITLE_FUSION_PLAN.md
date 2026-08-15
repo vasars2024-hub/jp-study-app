@@ -944,3 +944,18 @@ exit 0, **Nothing new**, 2 known pending. `npx eslint` on all 12 touched paths: 
 
 **§6 status unchanged: all five gates still pass.** This entry closes the defect §6 did not
 cover; it is not a §6 item.
+
+### 2026-08-15 12:50 primary — cross-track: the arbiter's root cause is fixed
+
+Landed from a main-v1 turn, because the same defect hit `dict:explain` on its first live
+call. `e3be6cf0` sends `generationConfig.thinkingConfig.thinkingBudget` (a quarter of
+`maxOutputTokens`, floor 512, ceiling 24,576 — unreachable in practice, the budget is
+clamped to 65,536 upstream so the largest producible value is 16,384). The field was
+confirmed against Google's REST reference for `v1beta/models/gemini-2.5-flash` by the
+interactive session; the `needs-user.md` entry that parked it is deleted.
+
+This removes the *cause* of the failed arbitration batches. `428d6624`'s split retry now
+treats a symptom that should no longer occur — **do not delete it**, it is still the right
+behaviour for a genuinely oversized batch, but the next fusion turn should re-run the F5
+arbitration on an episode and read the `failures` map: if `output-truncated` is gone, say so
+with the numbers, and reconsider whether the 3x retry ceiling is still worth its cost.
