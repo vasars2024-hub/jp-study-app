@@ -178,4 +178,49 @@ describe('a drain that never finds a renderer', () => {
       pcm.bytes = 0;
     }
   });
+
+  it('keeps draining the jobs behind a head job that retires', async () => {
+    // `drain` is only re-entered from a timer, an enqueue or boot. If retiring
+    // the head job breaks the loop without re-arming the timer, everything
+    // queued behind it is stranded with no error of its own — a silently dead
+    // queue entry. One job could never show that; two can.
+    pcm.bytes = 16_000 * 4;
+    vi.useFakeTimers();
+    const errors: string[] = [];
+    const off = onMainTranscriptionProgress((p) => {
+      if (p.phase === 'error') errors.push(`${p.mediaId}:${p.error ?? ''}`);
+    });
+    try {
+      const second = { ...media, id: 'm2', title: 'Episode 2', fileName: 'ep2.mkv' };
+      registerTranscriptionIpc({
+        listItems: () => [media, second],
+        patchItems: () => undefined,
+      } as never);
+      enqueueTranscription({ mediaId: 'm1' });
+      enqueueTranscription({ mediaId: 'm2' });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(transcriptionQueue().map((job) => job.mediaId)).toEqual(['m1', 'm2']);
+
+      // The head job attempts once per retry window, so it retires one window
+      // short of the bound. m2 must not have been touched by any of that.
+      await vi.advanceTimersByTimeAsync(15_000 * (MAX_NO_WINDOW_ATTEMPTS - 1));
+      expect(errors).toEqual(['m1:no-window']);
+      expect(transcriptionQueue().map((job) => job.mediaId)).toEqual(['m2']);
+      // The regression: a retire that does not re-arm leaves zero timers here,
+      // and m2 then waits for the rest of the session.
+      expect(vi.getTimerCount()).toBeGreaterThan(0);
+
+      // And it really does progress, rather than merely holding a timer.
+      await vi.advanceTimersByTimeAsync(15_000);
+      expect(transcriptionQueue()[0]?.noWindowAttempts).toBe(1);
+
+      await vi.advanceTimersByTimeAsync(15_000 * MAX_NO_WINDOW_ATTEMPTS);
+      expect(transcriptionQueue()).toHaveLength(0);
+      expect(errors).toEqual(['m1:no-window', 'm2:no-window']);
+    } finally {
+      off();
+      vi.useRealTimers();
+      pcm.bytes = 0;
+    }
+  });
 });

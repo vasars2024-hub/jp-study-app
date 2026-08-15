@@ -736,6 +736,12 @@ async function drain(): Promise<void> {
             startedAt: Date.now(),
             error: 'no-window',
           });
+          // Retiring the head job must not strand the queue behind it. `drain`
+          // is only ever re-entered from a timer, an enqueue or boot, so
+          // breaking here without re-arming the timer would leave every job
+          // after this one queued forever with no error of its own — the same
+          // stall the retry branch below exists to avoid.
+          if (queue.length > 0) scheduleDrain(NO_WINDOW_RETRY_MS);
         } else {
           if (queue[0]?.mediaId === job.mediaId) queue[0] = plan.job;
           scheduleDrain(NO_WINDOW_RETRY_MS);
