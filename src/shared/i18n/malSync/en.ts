@@ -43,6 +43,20 @@ export const MAL_SYNC_EN: Catalog = {
   'malSync.nonDefaultProfileWarning':
     'This app is running on a non-default profile folder. Approving access on MyAnimeList is permanent and applies to your whole account, but the token is saved only in this folder — if it is temporary or gets deleted, your account stays authorized with no way to use it from here. Revoke access in your MyAnimeList settings if that happens.',
 
+  // P1 gate 4. `callbackDesc` said all of this, but only *after* Connect — by
+  // which time the user has already watched their browser fail to load
+  // localhost and concluded the feature is broken. The user hit exactly that.
+  // Step 2 is the load-bearing line: it promises the failure before it happens.
+  'malSync.walkthroughTitle': 'What happens when you connect',
+  'malSync.walkthroughStep1':
+    'Your normal browser opens on MyAnimeList. Sign in and approve access there — this app never sees your password.',
+  'malSync.walkthroughStep2':
+    'MyAnimeList then sends you to http://localhost/oauth/callback, and that page will not load. That is expected, not a failure: this app runs no local web server to catch it, deliberately.',
+  'malSync.walkthroughStep3':
+    'In the browser’s address bar, copy the long value that comes after “code=”.',
+  'malSync.walkthroughStep4':
+    'Paste it into the box that appears here and press Finish connecting. The code expires after a few minutes, so do it right away.',
+
   'malSync.connect': 'Connect MyAnimeList',
   'malSync.callbackCode': 'Authorization code',
   'malSync.callbackPlaceholder': 'Paste the code from the redirect address',

@@ -25,6 +25,16 @@ export const MAL_SYNC_JA: Catalog = {
   'malSync.nonDefaultProfileWarning':
     'このアプリは既定以外のプロファイルフォルダーで動作しています。MyAnimeList 側の許可はアカウント全体に対して永続的に残りますが、トークンはこのフォルダーにしか保存されません。フォルダーが一時的なものだったり削除されたりすると、アカウントは許可されたまま、ここからは利用できなくなります。その場合は MyAnimeList の設定でアクセスを取り消してください。',
 
+  'malSync.walkthroughTitle': '連携時に起こること',
+  'malSync.walkthroughStep1':
+    'いつものブラウザーで MyAnimeList が開きます。そこでサインインしてアクセスを許可してください。このアプリがパスワードを受け取ることはありません。',
+  'malSync.walkthroughStep2':
+    'その後 MyAnimeList は http://localhost/oauth/callback に転送しますが、このページは読み込めません。これは異常ではなく想定どおりです。受け取るためのローカルサーバーを意図的に動かしていないためです。',
+  'malSync.walkthroughStep3':
+    'ブラウザーのアドレスバーで、「code=」の後ろにある長い値をコピーしてください。',
+  'malSync.walkthroughStep4':
+    'ここに表示される入力欄に貼り付けて「連携を完了」を押します。コードは数分で失効するので、すぐに行ってください。',
+
   'malSync.connect': 'MyAnimeList と連携',
   'malSync.callbackCode': '認証コード',
   'malSync.callbackPlaceholder': 'リダイレクト先のアドレスからコードを貼り付け',

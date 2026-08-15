@@ -25,6 +25,15 @@ export const MAL_SYNC_ZH: Catalog = {
   'malSync.nonDefaultProfileWarning':
     '本应用正运行在非默认的配置文件夹中。你在 MyAnimeList 上的授权是永久且覆盖整个账号的，但令牌只保存在这个文件夹里——如果它是临时的或被删除，你的账号仍处于已授权状态，却无法再从这里使用。若发生这种情况，请到 MyAnimeList 设置中撤销访问权限。',
 
+  'malSync.walkthroughTitle': '连接时会发生什么',
+  'malSync.walkthroughStep1':
+    '会在你平常用的浏览器中打开 MyAnimeList。请在那里登录并授权——本应用不会接触你的密码。',
+  'malSync.walkthroughStep2':
+    '随后 MyAnimeList 会跳转到 http://localhost/oauth/callback，而这个页面打不开。这是预期行为，不是故障：本应用有意不运行本地网页服务器来接收它。',
+  'malSync.walkthroughStep3': '在浏览器地址栏中，复制“code=”后面那串很长的值。',
+  'malSync.walkthroughStep4':
+    '把它粘贴到这里出现的输入框，然后按“完成连接”。验证码只在几分钟内有效，请立即操作。',
+
   'malSync.connect': '连接 MyAnimeList',
   'malSync.callbackCode': '授权码',
   'malSync.callbackPlaceholder': '从跳转后的地址中粘贴授权码',

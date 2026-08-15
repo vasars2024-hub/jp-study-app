@@ -222,6 +222,25 @@ export default function MalSyncPanel() {
           <p role="alert" className="muted">{t('malSync.plaintextWarning')}</p>
         )}
 
+        {/* Before the button, not after it. `callbackDesc` below says most of
+            this, but it only appears once Connect has been pressed — by then the
+            user has already watched their browser fail to load
+            `http://localhost/oauth/callback` and concluded the feature is
+            broken. That is not a hypothetical: it is what happened to the
+            developer of this app. Step 2 promises the failure in advance, which
+            is the only thing that turns it from a bug into a step. */}
+        {!status.connected && (
+          <div className="mal-connect-walkthrough">
+            <p>{t('malSync.walkthroughTitle')}</p>
+            <ol className="muted">
+              <li>{t('malSync.walkthroughStep1')}</li>
+              <li>{t('malSync.walkthroughStep2')}</li>
+              <li>{t('malSync.walkthroughStep3')}</li>
+              <li>{t('malSync.walkthroughStep4')}</li>
+            </ol>
+          </div>
+        )}
+
         {!status.connected && (
           <>
             <button
