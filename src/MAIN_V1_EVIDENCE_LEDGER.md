@@ -20908,3 +20908,58 @@ files, 7,968 passed / 6 skipped tests, exit 0**, fully green: the previous turn'
   were headwords. Latent on a default install, since Tatoeba is not bundled, and deliberately not
   "fixed" by exclusion alone: excluding those rows without first building the sentence reader would
   turn a usable import into dead weight. That reader is the next slice's shape.
+
+## Track 2 — the sentences that were pretending to be words — 2026-08-15 03:20 MSK primary
+
+No interrupted slice to recover; tree was where `3998950` left it. Handoff named this slice and
+it re-derived correctly: `examples`/`example_translations` had FTS5, three triggers, no writer,
+no reader, and `dictService.ts` never read `dictionaries.kind`.
+
+**Slice 1 — `1bf125d`. Storage.** Schema step **10**: `examples` gains `dict_id` (FK, cascade —
+without it an example store could be neither disabled nor deleted), gains `idx_examples_dict`,
+and the rows an old import left in `headwords` are moved across with ids **offset** past
+`max(id)` rather than reused. The importer now writes `examples`/`example_translations`, keeping
+Tatoeba's sentence id in `source` as the row's only durable name (`examples.id` is reassigned by
+every re-import). `WORD_SOURCE_WHERE` (`d.enabled = 1 and d.kind <> 'examples'`) keeps such a
+store out of both lookup probes — belt *and* braces, so the guarantee survives a store the
+migration has not reached. `instr`, not `examples_fts`: unicode61 makes an unbroken CJK run one
+token, so a phrase MATCH on 猫 cannot find it inside a sentence — the same measurement
+`findLexiconCompounds` already records. The scan is capped at 400 rows and **unordered**;
+shortest-first is applied to that sample in `selectLexiconExamples`, because a global
+`order by length` would visit every sentence in the corpus on the main thread before returning
+one row. Recorded as a bounded sample, not the corpus optimum.
+
+**Slice 2 — `ec4549a`. Surface.** `dict:examples` → preload → `window.d.ts` → `LexiconExamples`
+under the compound list, opt-in for the same reason its neighbours are. Row = sentence with the
+query marked, the corpus's translations, corpus + licence. **The trap:** Tatoeba publishes ISO
+639-3, so a Japanese sentence stored as `jpn` is unreachable by every `ja` filter in this app —
+the surface would have been empty on every real install. `canonicalCorpusLang` maps the five
+codes the filters use and keeps everything else verbatim (a guessed mapping is wrong data; an
+unmapped one is merely unreachable). Step 10 repairs already-written rows. `exampleBodyKey`
+strips edge punctuation so Tatoeba's bare-word entries (`猫。`) do not win shortest-first.
+
+**Live acceptance** (own `npm start`, bridge pid 836 on 127.0.0.1:39273). Step 10 ran on the real
+`dict.db`: `user_version` 9→10, `dict_id` + index present, headwords **697,837 before and after**.
+With a scoped throwaway corpus (`relay-example-probe`, 3 sentences) inserted externally: live
+`dictExamples('猫')` returned 2 rows shortest-first with `猫。` dropped, `sourceId`/`licence`
+carried; `glossLangs:['ru']` gave `[[ru]], []`; `lookupTerm('猫')` returned 猫/猫舌/猫背/猫肉 and
+**no sentence**. Rendered panel: 772×362, Russian chrome (`Примеры употребления` / `Найти
+примеры`), `mark` at 5.99:1 on the row, sentence 12.21:1, `lang` = ja / en+ru per line, credit
+`Relay probe corpus · CC BY 2.0 FR`. Deleting the dictionary row cascaded both tables to zero and
+live `dictExamples` went back to 0 — restore asserted `===` on four counts, not by eye.
+`/logs?level=error` = 0 throughout. Owned pids stopped, nothing else.
+
+**Gates.** `npx vitest run --testTimeout=60000 --hookTimeout=60000` — **610 passed / 1 skipped
+files, 8,043 passed / 6 skipped tests, exit 0** (was 607/8,015; the +3 files and +28 tests are
+mine). i18n 9,575 keys; `lexicon.examples.credit` is `{source} · {licence}` and is baselined as a
+pure format string, inserted without re-sorting the baseline. architecture 1,848 modules /
+19 findings / nothing new. eslint clean on every touched path — `window.d.ts`'s two
+`adjacent-overload-signatures` errors reproduce at HEAD and are another track's.
+
+### Deliberately open
+
+- `collocations`, `audio` and `xrefs` are still writer-less and reader-less. `examples` has left
+  that list.
+- The example scan is unindexed by nature. On a real 200k-sentence corpus a **rare** word still
+  pays a full table scan — the 400-row cap only helps common ones. Not measured, because no
+  install here has a corpus; measure before widening the surface.
