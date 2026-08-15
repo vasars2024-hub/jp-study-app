@@ -22545,3 +22545,50 @@ run was competing with a second suite I had started in the background plus a fre
 dev app. The isolated run above is the result.) `architecture-audit` exit 0,
 **Nothing new**, 2 pending. `i18n-check` exit 0 at **9,940** keys (+39, exactly this turn's).
 `eslint` on all 7 touched source paths: **0**.
+
+## 2026-08-16 01:25 — `primary` — Track 7 Phase 4: mastery mappings, and the sentence the store nearly learned
+
+Boss audit: last section still 2026-08-15 18:00, findings 1–2 fixed in the tree. Nothing owed.
+
+**`99ec1012` — the model.** `shared/ankiMastery.ts` + the `set-mastery` tray kind. Four decisions:
+
+1. **The effect is a value, not prose.** `masteryEffect()` returns `ankiSchedulingChanged: false`
+   and `ankiCardsRescheduled: 0` as *literal types*, so an action that ever touches Anki's
+   scheduler breaks every caller instead of quietly lying. The plan's exclusions forbid a
+   mastery label whose scheduling effect is hidden; this makes hiding it a compile error.
+2. **The word is the unit, not the note.** Five notes teaching one lemma are one entry.
+3. **"Never judged" is not level 0** for undo (`before: MasteryLevel | null`), but they are the
+   *same stored state* for the changed-test — mapping an unjudged word to `New` moves nothing.
+4. **The plan rides on `TrayPlan.mastery`, not the draft.** Knowledge is keyed by lemma and lives
+   outside the deck, so a mastery-only tray returns the identical draft object.
+
+**`01b517aa` — the UI, and two defects it exposed.**
+(a) `Apply` was `disabled={plan.changedNotes === 0}` — dead on exactly the plan this slice runs.
+Undo/Redo had the same shape against `journal.done`. All three now read the mastery half too,
+stacked under the tray's group id so one tray stays one undo across two stores. The step carries
+**both directions captured at apply time**; a recomputed inverse reads the store *after* the
+writes it must reverse and restores what it just wrote.
+(b) **`extractVocabTerm` splits on whitespace and Japanese has none**, so `今日はいい天気です`
+(9 chars) clears the 16-char cap and arrives as a "word". Harmless for `freq:`/`known:`, which
+only read; not harmless for a *write* into the lemma-keyed store every mining filter consults.
+`MASTERY_MAX_TERM_CHARS = 8` is deliberately tighter and errs toward writing less; declined notes
+are reported as `mastery-phrase`, never dropped. **This is a pre-existing property of the shared
+extractor — the `freq:`/`known:` predicates still see sentences as terms.**
+
+**Live, real 3,221-note deck, real `jp-word-knowledge-ja` store.** 60 selected produced 59 that
+declare a word, **57 terms move**, 2 held a phrase, 1 declared none. **Negative control: 刑事
+present in the changes before, absent after one write put it at the target — 57 to 56, delta
+exactly 1.** Forward **57/57 verified at level 3**; replanning then moved **0** with 57 already
+there. Inverse restored **0 entries**. Second control: planning with no context gives `blocked`,
+`no-vocab-context`, `plan.mastery === undefined`.
+
+**Trap: the store's raw bytes are not a restore check when the key starts absent.** `getItem`
+returns `null` (0 bytes) but `persist()` writes `{}` (2 bytes), so a byte-compare reports a false
+difference on a store that is genuinely back to zero entries. Compare entry counts, then
+`removeItem` to restore *absent* — which is what left this profile exactly as found.
+
+**Gates**, once after the last slice, shared tree. `vitest` **663 files passed / 1 skipped of 664,
+8,977 passed / 6 skipped, zero failures** — +1 file and +12 tests against the 01:00 baseline
+(662/8,965), which is exactly this turn's test file. `architecture-audit` exit 0, **Nothing new**,
+1,953 modules, 19 findings, 2 pending. `i18n-check` exit 0 at **9,962** keys (+21, exactly this
+turn's, all four languages). `eslint` on all 9 touched paths: **0**.
