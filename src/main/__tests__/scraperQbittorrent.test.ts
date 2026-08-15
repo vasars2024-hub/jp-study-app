@@ -44,11 +44,14 @@ const { flushScraperLogWrites } = await import('../scraper/logBus');
 
 const GOOD_USER = 'admin';
 const GOOD_PASS = 'adminadmin';
+const GOOD_KEY = 'RmDdRLXCTFEBpS2v3Yk6wJn9';
 
 let server: http.Server;
 let config: ScraperQbittorrentSettings;
 let addBodies: string[] = [];
 let sessionValid = true;
+/** Every request the app actually sent, so a header claim is measured not assumed. */
+let seenHeaders: http.IncomingHttpHeaders[] = [];
 
 const TORRENT_INFO = [
   {
@@ -106,7 +109,13 @@ beforeAll(async () => {
 
   server = http.createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://x');
-    const authed = sessionValid && (req.headers.cookie ?? '').includes('SID=session-token');
+    seenHeaders.push(req.headers);
+    // Mirrors the contract measured against a real daemon under
+    // `WebUI\LocalHostAuth=true`: Bearer authorizes, `X-Api-Key` does not. The
+    // second half is enforced by simply never reading that header.
+    const keyed = (req.headers.authorization ?? '') === `Bearer ${GOOD_KEY}`;
+    const authed =
+      keyed || (sessionValid && (req.headers.cookie ?? '').includes('SID=session-token'));
 
     if (url.pathname === '/api/v2/auth/login') {
       let body = '';
@@ -188,6 +197,7 @@ beforeEach(async () => {
   encryptionAvailable = true;
   sessionValid = true;
   addBodies = [];
+  seenHeaders = [];
   resetQbitSessions();
   await flushScraperLogWrites();
   await fsp.rm(path.join(tempRoot, 'scraper'), { recursive: true, force: true });
@@ -407,6 +417,90 @@ describe('qbitTest', () => {
   it('reports "unreachable" when nothing is listening', async () => {
     const report = await qbitTest({ config: { ...config, port: 1 } });
     expect(report.status).toBe('unreachable');
+  });
+});
+
+describe('qbitTest in API-key mode', () => {
+  /** No username and no stored password: the key must carry the call alone. */
+  const keyConfig = (): ScraperQbittorrentSettings => ({
+    ...config,
+    authMode: 'apiKey',
+    username: '',
+    passwordRef: '',
+    apiKeyRef: 'test/qbit-key',
+  });
+
+  beforeEach(async () => {
+    await setScraperSecret('test/qbit-key', GOOD_KEY);
+  });
+
+  afterEach(async () => {
+    await clearScraperSecret('test/qbit-key');
+  });
+
+  it('connects on the key alone, with no username and no password', async () => {
+    const report = await qbitTest({ config: keyConfig() });
+    expect(report.status).toBe('connected');
+    expect(report.version).toBe('4.6.4');
+  });
+
+  it('sends the key as Authorization: Bearer and never as X-Api-Key', async () => {
+    await qbitTest({ config: keyConfig() });
+    expect(seenHeaders.length).toBeGreaterThan(0);
+    for (const headers of seenHeaders) {
+      expect(headers.authorization).toBe(`Bearer ${GOOD_KEY}`);
+      expect(headers['x-api-key']).toBeUndefined();
+    }
+    // No login was attempted: a key authenticates on its own.
+    expect(addBodies).toEqual([]);
+  });
+
+  // Negative control: the daemon must actually refuse a key it does not know.
+  it('reports "unauthorized" when the key is wrong, without retrying', async () => {
+    await setScraperSecret('test/qbit-key', 'a-key-the-daemon-never-issued');
+    const report = await qbitTest({ config: keyConfig() });
+    expect(report.status).toBe('unauthorized');
+    expect(report.message).toMatch(/rejected the API key/i);
+    // One attempt, not a retry loop: a key does not expire mid-call.
+    expect(seenHeaders).toHaveLength(1);
+  });
+
+  it('reports "unauthorized" when no key is stored', async () => {
+    await clearScraperSecret('test/qbit-key');
+    const report = await qbitTest({ config: keyConfig() });
+    expect(report.status).toBe('unauthorized');
+    expect(report.message).toMatch(/no api key/i);
+    expect(seenHeaders).toHaveLength(0);
+  });
+
+  it('refuses an unusable key before making any request', async () => {
+    await setScraperSecret('test/qbit-key', `bad key\nwith a newline`);
+    const report = await qbitTest({ config: keyConfig() });
+    expect(report.status).toBe('unauthorized');
+    expect(report.message).toMatch(/space or control character/i);
+    expect(seenHeaders).toHaveLength(0);
+  });
+
+  it('accepts a key passed in for a test before saving', async () => {
+    await clearScraperSecret('test/qbit-key');
+    const report = await qbitTest({ config: keyConfig(), apiKey: GOOD_KEY });
+    expect(report.status).toBe('connected');
+  });
+
+  it('does not ride a password session after the mode is switched to a bad key', async () => {
+    // A real password session first, so a cached SID exists for this base URL.
+    expect((await qbitTest({ config })).status).toBe('connected');
+    expect((await qbitTransfers({ config })).length).toBeGreaterThan(0);
+
+    await setScraperSecret('test/qbit-key', 'a-key-the-daemon-never-issued');
+    const report = await qbitTest({ config: keyConfig() });
+    expect(report.status).toBe('unauthorized');
+  });
+
+  it('reports "unreachable" rather than connected when the base path is wrong', async () => {
+    const report = await qbitTest({ config: { ...keyConfig(), basePath: '/proxied' } });
+    expect(report.status).toBe('unreachable');
+    expect(report.message).toMatch(/404/);
   });
 });
 

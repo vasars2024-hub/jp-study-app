@@ -196,6 +196,11 @@ export interface ScraperQbitInput {
   config: ScraperQbittorrentSettings;
   /** Plaintext, in-memory only, for this one call. Never persisted by main. */
   password?: string;
+  /**
+   * Plaintext API key for a "test before saving" flow, same lifetime rules as
+   * `password`. Consulted only when `config.authMode` is `apiKey`.
+   */
+  apiKey?: string;
 }
 
 export interface ScraperQbitSendInput extends ScraperQbitInput {

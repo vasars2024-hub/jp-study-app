@@ -476,18 +476,38 @@ export type ScraperQbitAddMode = (typeof SCRAPER_QBIT_ADD_MODES)[number];
 export const SCRAPER_QBIT_LAYOUTS = ['original', 'subfolder', 'nosubfolder'] as const;
 export type ScraperQbitContentLayout = (typeof SCRAPER_QBIT_LAYOUTS)[number];
 
+/**
+ * How the app proves who it is to qBittorrent.
+ *
+ * Measured against a real daemon under `WebUI\LocalHostAuth=true`, with a
+ * no-credential 403 control passing: `Authorization: Bearer <key>` returns 200
+ * and `X-Api-Key` returns 403, so a key authenticates entirely on its own and
+ * the username/password pair is never additionally required. Exactly one mode
+ * is in force at a time; the other's fields are inert, not secretly consulted.
+ */
+export const SCRAPER_QBIT_AUTH_MODES = ['password', 'apiKey'] as const;
+export type ScraperQbitAuthMode = (typeof SCRAPER_QBIT_AUTH_MODES)[number];
+
 export interface ScraperQbittorrentSettings {
   enabled: boolean;
   scheme: 'http' | 'https';
   host: string;
   port: number;
   basePath: string;
+  /** Which credential is actually used. The other mode's fields stay inert. */
+  authMode: ScraperQbitAuthMode;
   username: string;
   /**
    * SECURITY: a handle into OS-protected storage, never the secret itself.
    * validateScraperQbittorrentSettings actively drops a `password` key.
    */
   passwordRef: string;
+  /**
+   * SECURITY: the same kind of handle for an API key. The key itself never
+   * enters this document, an export, an error string, or a log line — a
+   * plaintext `apiKey` key is dropped exactly like `password`.
+   */
+  apiKeyRef: string;
   connectionStatus: ScraperQbitStatus;
   lastCheckedAt: string | null;
 
@@ -516,8 +536,10 @@ export const DEFAULT_SCRAPER_QBITTORRENT_SETTINGS: ScraperQbittorrentSettings = 
   host: 'localhost',
   port: 8080,
   basePath: '',
+  authMode: 'password',
   username: '',
   passwordRef: '',
+  apiKeyRef: '',
   connectionStatus: 'not-configured',
   lastCheckedAt: null,
   category: '',
@@ -565,6 +587,14 @@ export function validateScraperQbittorrentSettings(
       message: 'Removed a plaintext password. Store credentials in the OS keychain.',
     });
   }
+  // An API key is a credential on exactly the same footing, and a hand-written
+  // config is the realistic source of one.
+  if ('apiKey' in source) {
+    issues.push({
+      path: `${prefix}.apiKey`,
+      message: 'Removed a plaintext API key. Store credentials in the OS keychain.',
+    });
+  }
 
   const host = normalizeHost(source.host);
   if (source.host !== undefined && !host) {
@@ -583,12 +613,26 @@ export function validateScraperQbittorrentSettings(
     host: host ?? fallback.host,
     port: boundedNumber(source.port, fallback.port, 1, 65_535, `${prefix}.port`, issues),
     basePath,
+    authMode: enumValue(
+      source.authMode,
+      SCRAPER_QBIT_AUTH_MODES,
+      fallback.authMode,
+      `${prefix}.authMode`,
+      issues,
+    ),
     username: stringValue(source.username, fallback.username, 120, `${prefix}.username`, issues),
     passwordRef: stringValue(
       source.passwordRef,
       fallback.passwordRef,
       256,
       `${prefix}.passwordRef`,
+      issues,
+    ),
+    apiKeyRef: stringValue(
+      source.apiKeyRef,
+      fallback.apiKeyRef,
+      256,
+      `${prefix}.apiKeyRef`,
       issues,
     ),
     connectionStatus: enumValue(

@@ -18,7 +18,10 @@ import type {
   QbitTransferRow,
   TorrentRow,
 } from '../../shared/scraperResults';
-import type { ScraperQbittorrentSettings } from '../../shared/scraperSourceSettings';
+import type {
+  ScraperQbitAuthMode,
+  ScraperQbittorrentSettings,
+} from '../../shared/scraperSourceSettings';
 import type { ScraperQbitInput, ScraperQbitSendInput } from '../../shared/scraperIpc';
 import { getScraperSecret } from './credentials';
 import { scraperRequest } from './http';
@@ -26,8 +29,26 @@ import { scraperLog } from './logBus';
 
 const TIMEOUT_MS = 12_000;
 
-/** Live sessions, keyed by base URL. Cleared when a call comes back 403. */
-const sessions = new Map<string, string>();
+/**
+ * Live sessions, keyed by base URL. Cleared when a call comes back 403.
+ *
+ * The mode is stored beside the cookie because a user who switches from
+ * password to key auth would otherwise keep riding the old SID until the app
+ * restarts — the switch would look like it worked no matter what the new
+ * credential is.
+ */
+const sessions = new Map<string, { mode: ScraperQbitAuthMode; cookie: string }>();
+
+/** The cookie for this base URL, but only if it was minted in `mode`. */
+function sessionCookie(base: string, mode: ScraperQbitAuthMode): string {
+  const held = sessions.get(base);
+  if (!held) return '';
+  if (held.mode !== mode) {
+    sessions.delete(base);
+    return '';
+  }
+  return held.cookie;
+}
 
 export function qbitBaseUrl(config: ScraperQbittorrentSettings): string {
   return `${config.scheme}://${config.host}:${config.port}${config.basePath}`;
@@ -142,6 +163,31 @@ async function resolvePassword(input: ScraperQbitInput): Promise<string> {
   return getScraperSecret(input.config.passwordRef);
 }
 
+/** `password` for anything stored before the key mode existed. */
+function authModeOf(config: ScraperQbittorrentSettings): ScraperQbitAuthMode {
+  return config.authMode === 'apiKey' ? 'apiKey' : 'password';
+}
+
+async function resolveApiKey(input: ScraperQbitInput): Promise<string> {
+  if (input.apiKey) return input.apiKey;
+  return getScraperSecret(input.config.apiKeyRef);
+}
+
+/**
+ * A key is rejected here rather than by the daemon when it cannot possibly be
+ * one: no network call, and the reason names the shape rather than echoing the
+ * value. Header values cannot carry CR/LF or a stray space without either being
+ * refused by the HTTP layer or splitting the header, so those are the checks.
+ */
+function apiKeyProblem(key: string): string {
+  if (!key) return 'No API key is stored for this connection.';
+  if (key !== key.trim()) return 'The stored API key has leading or trailing whitespace.';
+  if (/[\s\x00-\x1f\x7f]/.test(key)) {
+    return 'The stored API key contains a space or control character, so it is not a usable key.';
+  }
+  return '';
+}
+
 interface LoginResult {
   ok: boolean;
   cookie: string;
@@ -210,7 +256,7 @@ async function login(config: ScraperQbittorrentSettings, password: string): Prom
         latencyMs,
       };
     }
-    sessions.set(base, sid);
+    sessions.set(base, { mode: 'password', cookie: sid });
     return { ok: true, cookie: sid, status: 'connected', message: '', latencyMs };
   } catch (error) {
     return {
@@ -223,25 +269,76 @@ async function login(config: ScraperQbittorrentSettings, password: string): Prom
   }
 }
 
-/** A logged-in request, retrying once through a fresh login on a 403. */
+/**
+ * The one accepted key header, measured rather than guessed.
+ *
+ * Against a real daemon under `WebUI\LocalHostAuth=true` with a no-credential
+ * 403 control passing, `Authorization: Bearer <key>` returned 200 and
+ * `X-Api-Key` returned 403. Do not add the second one back "for compatibility".
+ */
+export function apiKeyHeaders(key: string): Record<string, string> {
+  return { authorization: `Bearer ${key}` };
+}
+
+/**
+ * An authorized request, retrying once through a fresh login on a 403.
+ *
+ * The retry belongs to password mode only. A key does not expire and is not
+ * held in a session, so a 403 there means the key itself is wrong — retrying
+ * would turn a definite answer into a slow one and read as a flake.
+ */
 async function authed(
   input: ScraperQbitInput,
   path: string,
   init: { method?: string; body?: string; headers?: Record<string, string> } = {},
 ): Promise<{ status: number; body: string } | { error: LoginResult }> {
   const base = qbitBaseUrl(input.config);
-  const password = await resolvePassword(input);
+  const mode = authModeOf(input.config);
 
-  const send = async (cookie: string) =>
+  const send = async (auth: Record<string, string>) =>
     scraperRequest(`${base}${path}`, {
       method: init.method ?? 'GET',
-      headers: { cookie, referer: base, ...init.headers },
+      headers: { ...auth, referer: base, ...init.headers },
       body: init.body,
       timeoutMs: TIMEOUT_MS,
       correlationId: 'qbit',
     });
 
-  let cookie = sessions.get(base) ?? '';
+  if (mode === 'apiKey') {
+    const key = await resolveApiKey(input);
+    const problem = apiKeyProblem(key);
+    if (problem) {
+      return { error: { ok: false, cookie: '', status: 'unauthorized', message: problem, latencyMs: 0 } };
+    }
+    try {
+      const response = await send(apiKeyHeaders(key));
+      if (response.status === 403) {
+        return {
+          error: {
+            ok: false,
+            cookie: '',
+            status: 'unauthorized',
+            message: 'qBittorrent rejected the API key.',
+            latencyMs: 0,
+          },
+        };
+      }
+      return { status: response.status, body: response.body };
+    } catch (error) {
+      return {
+        error: {
+          ok: false,
+          cookie: '',
+          status: 'unreachable',
+          message: error instanceof Error ? error.message : String(error),
+          latencyMs: 0,
+        },
+      };
+    }
+  }
+
+  const password = await resolvePassword(input);
+  let cookie = sessionCookie(base, 'password');
   if (!cookie) {
     const result = await login(input.config, password);
     if (!result.ok) return { error: result };
@@ -249,13 +346,13 @@ async function authed(
   }
 
   try {
-    let response = await send(cookie);
+    let response = await send({ cookie });
     if (response.status === 403) {
       // The session expired or qBittorrent restarted.
       sessions.delete(base);
       const result = await login(input.config, password);
       if (!result.ok) return { error: result };
-      response = await send(result.cookie);
+      response = await send({ cookie: result.cookie });
     }
     return { status: response.status, body: response.body };
   } catch (error) {
@@ -281,31 +378,34 @@ export async function qbitTest(input: ScraperQbitInput): Promise<QbitStatusRepor
       latencyMs: 0,
     };
   }
-  if (!config.username) {
-    return { status: 'unauthorized', version: '', message: 'No username is set.', latencyMs: 0 };
-  }
-  const password = await resolvePassword(input);
-  if (!password) {
-    return {
-      status: 'unauthorized',
-      version: '',
-      message: 'No password is stored for this account.',
-      latencyMs: 0,
-    };
+  const mode = authModeOf(config);
+
+  // A key authenticates on its own, so a missing username is only a problem in
+  // password mode. Asking for one in key mode was the fastest way to make a
+  // working key look broken.
+  if (mode === 'apiKey') {
+    const problem = apiKeyProblem(await resolveApiKey(input));
+    if (problem) {
+      return { status: 'unauthorized', version: '', message: problem, latencyMs: 0 };
+    }
+  } else {
+    if (!config.username) {
+      return { status: 'unauthorized', version: '', message: 'No username is set.', latencyMs: 0 };
+    }
+    const password = await resolvePassword(input);
+    if (!password) {
+      return {
+        status: 'unauthorized',
+        version: '',
+        message: 'No password is stored for this account.',
+        latencyMs: 0,
+      };
+    }
   }
 
   const started = Date.now();
+  // A test must not pass on a session minted by the previous credential.
   sessions.delete(qbitBaseUrl(config));
-  const session = await login(config, password);
-  if (!session.ok) {
-    scraperLog('warn', 'qbit', `Connection test failed: ${session.message}`);
-    return {
-      status: session.status,
-      version: '',
-      message: session.message,
-      latencyMs: session.latencyMs,
-    };
-  }
 
   const version = await authed(input, '/api/v2/app/version');
   const latencyMs = Date.now() - started;
@@ -314,6 +414,17 @@ export async function qbitTest(input: ScraperQbitInput): Promise<QbitStatusRepor
       status: version.error.status,
       version: '',
       message: version.error.message,
+      latencyMs,
+    };
+  }
+  // In password mode a bad base path or port already failed at the login. Key
+  // mode has no login step, so this is the only place a 404 from a wrong
+  // `basePath` can be caught before it is reported as a connection.
+  if (version.status !== 200) {
+    return {
+      status: version.status === 401 || version.status === 403 ? 'unauthorized' : 'unreachable',
+      version: '',
+      message: `qBittorrent answered ${version.status} to the version request.`,
       latencyMs,
     };
   }
