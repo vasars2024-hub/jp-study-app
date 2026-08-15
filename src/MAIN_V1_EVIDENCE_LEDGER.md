@@ -22490,3 +22490,58 @@ slice's). `eslint` on all three touched source paths: **0**. The 4 neighbouring 
 failures) and the provider call that fills a batch. Deliberately NOT started here: adding the
 tray form without a way to produce a batch would ship a control that can only ever say
 "generate a batch first". The provider/privacy/cost decision belongs with that slice.
+
+## 2026-08-16 01:00 — `primary` — Track 7 gate 12 closes: a live sentence, and a cancel that kept eight of them
+
+Boss audit: last section is still 2026-08-15 18:00, re-derived closed twice already. Nothing owed.
+
+**`4d514c3` — the generation half.** `shared/ankiAiPrompt.ts` (wire format, parse, disclosure)
+and `main/anki/aiAdditions.ts` (`anki:aiGenerateAdditions`, `anki:aiCancelAdditions`,
+`anki:aiAdditionsProgress`). Four decisions:
+
+1. **Chunk-relative index, never a note id.** A note id means nothing to a model, leaks an
+   identifier, and invites the model to invent one. Out-of-range indices are dropped.
+2. **The gloss is opt-in and the *normalizer* enforces it** — a form that forgets to clear the
+   meaning fields still cannot send them. This is the privacy control; the UI is just its form.
+3. **An unpriced provider reports no cost, not `$0.00`.** `estimateAgentProviderCostUsd` already
+   returns `undefined`; the disclosure passes that through instead of formatting a zero.
+4. **Chunk boundary = cancel boundary.** Checked before each call, so a cancel never pays for an
+   answer the user already refused, and everything already answered is kept.
+
+`local-engine-unsupported` refuses rather than silently billing a cloud provider the user did not
+select; no key refuses rather than returning an empty batch.
+
+**`c644b99` — the review panel.** Provider, model, request count, the exact fields leaving the
+machine and the cost, all rendered from *the same normalized request the run sends*, above the
+button that spends. `apply-ai-additions` joins the tray's action list. 39 keys × 4 languages.
+
+**Live acceptance, real provider, negative control first.** Before restarting the dev app the
+bridge returned `No handler registered for 'anki:aiGenerateAdditions'` — the handler genuinely
+did not exist. After: 1 note → `猫がソファで寝ています。` from `gemini-2.5-flash`. **20 notes
+cancelled after the first chunk → `cancelled: true`, 8 of 20 answered, 8 of 8 successful.** Empty
+selection → `error: 'no-request'`, `provider: ''` (nothing sent).
+
+**Mutation controls, both reverted with `cmp` byte-equality.** (1) Dropping the `sendGloss` guard
+in the normalizer fails 2 of 15. (2) Sending the panel's raw notes instead of the normalized ones
+fails 1 of 11.
+
+**Trap for the next worker, cost about 20 minutes: `git commit --only -- <paths>` re-stages from
+the WORKING TREE, discarding the HEAD+edit blobs you just built.** It swallowed another track's
+`studyBlockWindows` hunks into a commit that had passed every reconstruction check. `git reset
+--soft HEAD~1`, re-run the staging script, then plain `git commit` with no path arguments —
+the index is already exactly right. Second trap: a **controlled** `AiBatch` prop is one render
+behind the panel's own state, so the run recorded the provider's answer into the pre-run batch,
+i.e. into nothing. The panel owns the batch; `publish()` is the only write path.
+
+**New scratch tool:** `debug/stage-head-insert.cjs <spec.json>` stages HEAD-plus-insertions for
+any file dirtied by another track — multi-line anchors, no clean filter, and it slices the
+inserted bytes back out and demands `=== HEAD` before staging.
+
+**Gates**, once after the last slice, shared tree. `npx vitest run` **661 files passed / 1 skipped
+of 662, 8,959 passed / 6 skipped, zero failures**, exit 0 — +3 files and +32 tests against the
+00:15 baseline (658/8,927), which is exactly this turn's three test files. (An earlier run of the
+same suite showed 2 failures; both were the known load-dependent `beforeAll` timeouts, and that
+run was competing with a second suite I had started in the background plus a freshly relaunched
+dev app. The isolated run above is the result.) `architecture-audit` exit 0,
+**Nothing new**, 2 pending. `i18n-check` exit 0 at **9,940** keys (+39, exactly this turn's).
+`eslint` on all 7 touched source paths: **0**.
