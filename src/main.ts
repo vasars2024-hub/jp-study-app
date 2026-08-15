@@ -12,6 +12,7 @@ import { registerProfileIpc } from './main/profiles';
 import { registerAnkiIpc } from './main/anki';
 import { registerProfileRulesIpc } from './main/profileRules';
 import { registerApkgIpc } from './main/anki/apkgImport';
+import { registerAnkiAiAdditionsIpc } from './main/anki/aiAdditions';
 import { registerDesktopIpc } from './main/desktop';
 import { registerDisplayIpc } from './main/displays';
 import {
@@ -1596,6 +1597,7 @@ app.whenReady().then(async () => {
   registerAnkiIpc();
   registerProfileRulesIpc();
   registerApkgIpc();
+  registerAnkiAiAdditionsIpc();
   registerDesktopIpc();
   registerDisplayIpc();
   configureDesktopWindows({

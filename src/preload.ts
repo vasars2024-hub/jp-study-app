@@ -65,6 +65,8 @@ import type { ApkgImportResult } from './shared/apkgParse';
 import type { ApkgCardsResult } from './shared/apkgCards';
 import type { ApkgDraftRequest, ApkgDraftResult } from './shared/ankiDraft';
 import type { CsvDraftRequest, CsvDraftResult } from './shared/ankiCsv';
+import type { AiAdditionKind } from './shared/ankiAiAdditions';
+import type { AiAdditionsNoteResult, AiAdditionsRunResult } from './shared/ankiAiPrompt';
 import type { ConnectDraftRequest, ConnectDraftResult } from './shared/ankiConnectDraft';
 import type {
   AnkiDraftSession,
@@ -772,6 +774,31 @@ const api = {
     const handler = (_e: unknown, s: IntervalSnapshot): void => cb(s);
     ipcRenderer.on('anki:intervalsChanged', handler);
     return () => ipcRenderer.removeListener('anki:intervalsChanged', handler);
+  },
+  /**
+   * Deck Workbench AI additions (gate 12). The batch id is the renderer's, so a
+   * cancel and a late progress event can both be matched against the batch the
+   * review is actually showing.
+   */
+  ankiAiGenerateAdditions: (request: {
+    batchId: string;
+    kind: AiAdditionKind;
+    notes: { noteId: string; term: string; gloss?: string }[];
+    variantCount: number;
+    sendGloss: boolean;
+    explainLanguage: string;
+  }): Promise<AiAdditionsRunResult> => ipcRenderer.invoke('anki:aiGenerateAdditions', request),
+  ankiAiCancelAdditions: (batchId: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('anki:aiCancelAdditions', batchId),
+  onAnkiAiAdditionsProgress: (
+    cb: (payload: { batchId: string; results: AiAdditionsNoteResult[] }) => void,
+  ): (() => void) => {
+    const handler = (
+      _e: unknown,
+      payload: { batchId: string; results: AiAdditionsNoteResult[] },
+    ): void => cb(payload);
+    ipcRenderer.on('anki:aiAdditionsProgress', handler);
+    return () => ipcRenderer.removeListener('anki:aiAdditionsProgress', handler);
   },
 
   // Dual-desktop layout

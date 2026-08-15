@@ -24,6 +24,8 @@ import type { AnimeScheduleRequest, AnimeScheduleResponse } from '../shared/anim
 import type { DueForecast } from '../shared/reviewForecast';
 import type { PitchLookup } from '../shared/pitchAccent';
 import type { ApkgImportResult } from '../shared/apkgParse';
+import type { AiAdditionKind } from '../shared/ankiAiAdditions';
+import type { AiAdditionsNoteResult, AiAdditionsRunResult } from '../shared/ankiAiPrompt';
 import type { ApkgCardsResult } from '../shared/apkgCards';
 import type { AssetError, AssetSpec, AssetStatus } from '../shared/assetRegistry';
 import type { ReverifyOutcome, AssetIntegrity } from '../main/downloads';
@@ -466,6 +468,19 @@ declare global {
       ankiGetIntervalsForNotes(noteIds: readonly number[]): Promise<IntervalSnapshot>;
       /** Read-only week-ahead due counts from Anki's own scheduler. */
       ankiDueForecast(): Promise<DueForecast>;
+      /** Deck Workbench AI additions — gate 12. Batch id is the renderer's. */
+      ankiAiGenerateAdditions(request: {
+        batchId: string;
+        kind: AiAdditionKind;
+        notes: { noteId: string; term: string; gloss?: string }[];
+        variantCount: number;
+        sendGloss: boolean;
+        explainLanguage: string;
+      }): Promise<AiAdditionsRunResult>;
+      ankiAiCancelAdditions(batchId: string): Promise<{ ok: boolean }>;
+      onAnkiAiAdditionsProgress(
+        cb: (payload: { batchId: string; results: AiAdditionsNoteResult[] }) => void,
+      ): () => void;
       /** Structured pitch-accent data for a term. */
       dictPitch(term: string, reading?: string): Promise<PitchLookup>;
       importApkg(filePath?: string): Promise<ApkgImportResult>;
