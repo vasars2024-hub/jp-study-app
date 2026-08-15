@@ -178,3 +178,24 @@ export function explainSensesFromMatch(match: {
   }
   return [{ definitions: (match.glosses ?? []).map((gloss) => gloss.text) }];
 }
+
+/**
+ * Whether an entry carries enough for a *grounded* explanation.
+ *
+ * Defined in terms of `explainSensesFromMatch` rather than by reading the same
+ * fields a second time, so the check and the payload can never disagree: if this
+ * says yes, the request that follows has at least one gloss in it.
+ *
+ * A token that matched a headword but yielded no gloss in the reader's target
+ * languages fails here on purpose. The word is real, but the only thing the
+ * request could carry is the word itself, and prose grounded in nothing is the
+ * one output this surface must not present as dictionary-backed.
+ */
+export function hasExplainGrounding(match: {
+  glosses?: readonly { text: string }[];
+  senses?: readonly { glosses: readonly { text: string }[] }[];
+}): boolean {
+  return explainSensesFromMatch(match).some(
+    (sense) => (sense.definitions ?? []).some((definition) => definition.trim().length > 0),
+  );
+}

@@ -34,7 +34,7 @@ import {
   type LexiconRoundTripDiff,
 } from '../../../shared/lexiconRoundTrip';
 import { resolveLexiconInput, type LexiconLensOverride } from '../../../shared/lexiconWorkbench';
-import { explainSensesFromMatch } from '../../../shared/lexiconExplainView';
+import { explainSensesFromMatch, hasExplainGrounding } from '../../../shared/lexiconExplainView';
 import EntryExplain from './EntryExplain';
 import DictionaryResults, { type DictLang } from '../DictionaryResults';
 import { translateTo } from '../../translator';
@@ -513,15 +513,24 @@ export default function LexiconWorkbenchResults({
                     <rt>{glossRt(match)}</rt>
                   </ruby>
                 );
-                // Only a token whose entry offers a real choice becomes a
-                // control; a single-sense token stays plain text so the flow
-                // does not fill up with buttons that do nothing.
-                if (!match || !canPinSense(match)) return <span key={key}>{ruby}</span>;
+                // A token becomes a control when the panel has something to put
+                // in it: a real sense choice, or — since the panel gained
+                // Explain — an entry grounded enough to explain. A token whose
+                // dictionary said nothing in the reader's target languages
+                // stays plain text, so the flow still never fills up with
+                // buttons that open an empty panel.
+                const pinnable = !!match && canPinSense(match);
+                if (!match || !(pinnable || hasExplainGrounding(match))) {
+                  return <span key={key}>{ruby}</span>;
+                }
                 const pinKey = sensePinKey(match);
                 return (
                   <button
                     aria-expanded={openSense === pinKey}
-                    aria-label={t('lexicon.sense.choose', { word: part.text })}
+                    aria-label={t(
+                      pinnable ? 'lexicon.sense.choose' : 'lexicon.sense.openExplain',
+                      { word: part.text },
+                    )}
                     className="lexicon-sense-token"
                     key={key}
                     onClick={() => setOpenSense((prev) => (prev === pinKey ? null : pinKey))}
@@ -536,7 +545,10 @@ export default function LexiconWorkbenchResults({
           )}
           {openMatch && openSense && (
             <div
-              aria-label={t('lexicon.sense.group', { word: openMatch.text })}
+              aria-label={t(
+                canPinSense(openMatch) ? 'lexicon.sense.group' : 'lexicon.sense.groupExplain',
+                { word: openMatch.text },
+              )}
               className="lexicon-sense-panel"
               role="group"
             >
@@ -551,6 +563,10 @@ export default function LexiconWorkbenchResults({
                   {t('lexicon.sense.close')}
                 </button>
               </div>
+              {/* No list at all when the entry offers one sense: "no pinned
+                  sense" against a single option is a choice with one outcome,
+                  and the flat gloss line above already says the same thing. */}
+              {canPinSense(openMatch) ? (
               <ul className="lexicon-sense-list">
                 <li>
                   <button
@@ -581,6 +597,9 @@ export default function LexiconWorkbenchResults({
                   );
                 })}
               </ul>
+              ) : (
+                <p className="muted lexicon-sense-single">{t('lexicon.sense.single')}</p>
+              )}
               {/* The one place on this surface a single word is already the
                   subject. The grounding is the token's own entry rather than the
                   passage, and it deliberately ignores the pin above it — see

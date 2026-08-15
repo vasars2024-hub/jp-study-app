@@ -5,6 +5,7 @@ import {
   explainGroundingFromSenses,
   explainPolicyFromEngine,
   explainSensesFromMatch,
+  hasExplainGrounding,
 } from '../lexiconExplainView';
 import { EXPLANATION_SECTION_KINDS } from '../lexiconExplanations';
 import { EXPLAIN_GLOSS_MAX_CHARS, EXPLAIN_MAX_GLOSSES, explainModelKey } from '../lexiconExplainPrompt';
@@ -143,5 +144,28 @@ describe('explainSensesFromMatch', () => {
     );
     expect(pinned).toEqual(unpinned);
     expect(pinned.glosses).toEqual(['cat', 'shamisen']);
+  });
+});
+
+describe('hasExplainGrounding', () => {
+  const gloss = (text: string) => ({ lang: 'en', text });
+
+  it('accepts an entry that yields at least one gloss, sense list or not', () => {
+    expect(hasExplainGrounding({ glosses: [gloss('cat')] })).toBe(true);
+    expect(hasExplainGrounding({ senses: [{ glosses: [gloss('to see')] }] })).toBe(true);
+  });
+
+  it('refuses an entry whose dictionary said nothing in the reader targets', () => {
+    expect(hasExplainGrounding({})).toBe(false);
+    expect(hasExplainGrounding({ glosses: [] })).toBe(false);
+    expect(hasExplainGrounding({ senses: [{ glosses: [] }] })).toBe(false);
+    // Whitespace is not a gloss: it would pass a length check and ground nothing.
+    expect(hasExplainGrounding({ glosses: [gloss('   ')] })).toBe(false);
+  });
+
+  it('agrees with the payload the request would actually carry', () => {
+    const match = { glosses: [gloss('  ')], senses: [{ glosses: [] }] };
+    expect(explainGroundingFromSenses(explainSensesFromMatch(match)).glosses).toEqual([]);
+    expect(hasExplainGrounding(match)).toBe(false);
   });
 });

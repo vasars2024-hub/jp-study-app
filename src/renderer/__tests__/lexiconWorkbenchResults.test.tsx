@@ -639,7 +639,7 @@ describe('LexiconWorkbenchResults', () => {
     expect(translateRun).not.toHaveBeenCalled();
   });
 
-  it('leaves a single-sense token as plain reading flow rather than a control', async () => {
+  it('opens a single-sense token for its explanation, with no sense list to choose from', async () => {
     const lookup = vi.fn().mockResolvedValue({
       text: '猫', detectedLangs: ['ja'], glossLangs: ['en'], tokenCount: 1, matchedCount: 1,
       truncated: false,
@@ -651,7 +651,14 @@ describe('LexiconWorkbenchResults', () => {
         },
       }],
     });
-    Object.defineProperty(window, 'api', { configurable: true, value: { lookupOfflineInterlinear: lookup } });
+    const aiGetConfig = vi.fn().mockResolvedValue({
+      engine: 'cloud', providerId: 'gemini-2.5-flash', apiKeysSet: { gemini: true, deepseek: false },
+    });
+    const dictExplanationGet = vi.fn().mockResolvedValue(null);
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: { lookupOfflineInterlinear: lookup, aiGetConfig, dictExplanationGet, dictExplain: vi.fn() },
+    });
     const host = document.createElement('div');
     document.body.append(host);
     root = createRoot(host);
@@ -660,8 +667,52 @@ describe('LexiconWorkbenchResults', () => {
       await Promise.resolve();
     });
 
-    expect(host.querySelector('.lexicon-sense-token')).toBeNull();
     expect(host.querySelector('ruby.is-grounded')?.textContent).toContain('cat');
+    const token = host.querySelector<HTMLButtonElement>('.lexicon-sense-token');
+    // Not "choose the sense used here" — there is only one, and the panel it
+    // opens is the explanation.
+    expect(token?.getAttribute('aria-label')).toBe('lexicon.sense.openExplain:猫');
+
+    await act(async () => {
+      token?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    const panel = host.querySelector('.lexicon-sense-panel');
+    expect(panel?.getAttribute('aria-label')).toBe('lexicon.sense.groupExplain:猫');
+    expect(panel?.querySelector('.lexicon-sense-list')).toBeNull();
+    expect(panel?.querySelector('.lexicon-sense-single')?.textContent).toBe('lexicon.sense.single');
+    expect(panel?.querySelector('.lexicon-explain-entry')).not.toBeNull();
+    // The flat gloss line is the grounding when the entry carries no sense list.
+    expect(dictExplanationGet).toHaveBeenCalledWith({
+      lang: 'ja', text: '猫', reading: 'ねこ', glossLang: 'en',
+      model: 'cloud:gemini-2.5-flash:default', promptVersion: 1,
+    });
+  });
+
+  it('leaves a token with no gloss in the target language as plain reading flow', async () => {
+    const lookup = vi.fn().mockResolvedValue({
+      text: '猫', detectedLangs: ['ja'], glossLangs: ['en'], tokenCount: 1, matchedCount: 1,
+      truncated: false,
+      parts: [{
+        kind: 'token', text: '猫', start: 0, end: 1,
+        match: {
+          text: '猫', reading: 'ねこ', dictId: 'jmdict-fr', dictTitle: 'JMdict (French)',
+          headwordId: 7, glosses: [], hasTargetGloss: false,
+        },
+      }],
+    });
+    Object.defineProperty(window, 'api', { configurable: true, value: { lookupOfflineInterlinear: lookup } });
+    const host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root?.render(<LexiconWorkbenchResults query="猫" lang="ja" lookupAttempt={10} lens="translate" />);
+      await Promise.resolve();
+    });
+
+    // Nothing to pin and nothing to ground an explanation on, so no control.
+    expect(host.querySelector('.lexicon-sense-token')).toBeNull();
   });
 
   it('offers the word explanation inside the sense panel, keyed on the token headword', async () => {
@@ -886,7 +937,10 @@ describe('LexiconWorkbenchResults', () => {
     });
 
     await act(async () => {
-      host.querySelector('.lexicon-sense-token')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      // 猫 is a control too — it has an explanation — so the pinnable token is
+      // named rather than taken as the first one in the flow.
+      host.querySelector('.lexicon-sense-token[aria-label^="lexicon.sense.choose"]')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       await Promise.resolve();
     });
     await act(async () => {
