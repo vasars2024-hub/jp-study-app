@@ -22132,3 +22132,12 @@ in `needs-user.md` (2026-08-15 17:20); nothing new to add. Gate 4 passes live.
 binding appears after a window reload and then rejects with `No handler registered`, which reads
 like a wiring bug and is not one. Restart the dev app (`npm start`) before probing a new channel.
 Second: this profile renders the workbench in **English**, not the Russian the 19:46 probes used.
+
+**Gates**, once after the last slice, shared tree. First run: **17 failures, all mine** —
+`deckWorkbench.test.tsx` stubs `window.api`, and the Browser called the new channel
+unconditionally; fixed in `ffebce0e` (an absent binding is now the same case as a deck with no
+words). Re-run: `npx vitest run` **650 files, 649 passed / 1 skipped, 8,767 passed / 6 skipped,
+zero failures** — the `visualNovelI18n.test.tsx` load flake the last three turns saw did not
+recur. `i18n-check` exit 0 at **9,850** (+6). `architecture-audit` exit 0, **Nothing new**, 2
+pending. `eslint` on 9 paths: **0 errors** (7 pre-existing `no-explicit-any` warnings in
+`main/dictionary.ts`, lines 193-574, none in the added code).
