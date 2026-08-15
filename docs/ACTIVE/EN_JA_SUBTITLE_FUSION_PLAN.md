@@ -839,3 +839,50 @@ episode 1 is offline and one offline episode caps the whole run — as designed.
 **§6 status: (1) done. (2) done. (3) DONE — passes, recorded above. (4) partial (the uncertain
 badge still has no live evidence; episode 1's sidecar now has 16 `whisper-unverified` cues, which
 is the fixture that finally makes it provable). (5) done.**
+
+### The arbiter's outcome is recorded, the badge is proven, and §6(4) closes — 2026-08-15, backup
+
+**Landed:** `c0b8843`. The optional `arbitration` summary now rides in the F6 sidecar. Additive
+by design and **no version bump**: a reader that does not know the field ignores it and still
+reads every cue, which is the only thing `version` protects. Absent means "written before the
+field", never "arbitration did not run" — the two must not collapse, which is the whole point.
+Rejected: deriving it from basis counts (zero applied verdicts leaves zero arbitration bases, so
+a failed provider and an absent one are literally the same cue list), and logging it to the main
+log (a log is not attached to the track a month later, and the harness needs it per episode).
+
+**It answered the open question on its first live run, which is the argument for it.** Re-fused
+`a167b9e2` on the restarted build: `{"attempted":16,"applied":0,"failedBatches":1,"skipped":null}`.
+So episode 1 was **not** offline — a key was configured, 16 windows went out as **one batch**, and
+that batch came back unusable. Episode 2's 38 candidates batch into 16/16/6 and applied 22, i.e.
+one of its three batches failed the same way. **The next slice is that batch failure**: F5 loses
+roughly a third of its batches on this provider and nothing retries or reports it. Everything
+needed to chase it is now on disk per track.
+
+**Cross-surface proof, not a grep.** `window.api.fusionTrackMeta('a167b9e2…','942e8312…')` through
+the **real main handler** returned `cues:35` and the arbitration object intact — so the writer,
+`parseFusionTrackMeta`, the IPC and the renderer typing all agree on the new field.
+
+**§6(4)'s missing half is now evidence.** The previous entry could not prove the uncertain badge
+because `window.api` is a frozen contextBridge object and a stubbed sidecar silently no-opped.
+With a genuine 16/35-unverified track it needs no stub: `MediaDetailPanel` mounted off-screen
+against live IPC, Субтитры tab clicked, the fused row reads
+`ja · JA (fused from EN + Whisper) · Сгенерировано · SRT · совпадение 57% · Сгенерировано машиной
+· **16 строк из 35 не подтверждены**` — the count and total match the sidecar exactly. Restart
+survival was demonstrated by the turn itself: the 06:15 record from a previous app instance was
+still in `media.json` and still readable at 08:00.
+
+**Two traps that cost 20 minutes here.** (1) `MediaDetailPanel` is a **default** export;
+`mod.MediaDetailPanel` is `undefined` and React 19 renders it as nothing with **no console error**
+— a silent empty mount that reads exactly like "the panel refused to render". Check
+`Object.keys(mod)` before believing an empty host. (2) The panel is tabbed; the tracks list does
+not exist in the DOM until the Субтитры tab is clicked, so a `querySelector` on first paint is a
+false negative.
+
+**Gates**, once after the last slice, on the shared dirty tree. `npx vitest run
+--testTimeout=60000 --hookTimeout=60000`: **613 passed / 1 skipped files, 8,148 passed / 6
+skipped**, exit 0 (+5 = this slice's tests). `node tools/i18n-check.cjs`: exit 0 at **9,588**
+keys — no new user-visible string, the badge keys already existed in all four catalogs.
+`node tools/architecture-audit.cjs`: exit 0, **Nothing new**, 2 known pending. `npx eslint` on
+the three touched paths: **exit 0, clean**.
+
+**§6 status: (1) done. (2) done. (3) done. (4) DONE. (5) done. All five gates pass.**
