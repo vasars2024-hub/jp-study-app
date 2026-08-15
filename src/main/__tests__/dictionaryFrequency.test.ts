@@ -20,7 +20,11 @@ vi.mock('electron', () => ({
 }));
 
 import { closeDictionaryDb, openDictionaryDb, type SqliteDb } from '../dictionary/db';
-import { findLexiconFrequency, normalizeForLookup } from '../dictionary/dictService';
+import {
+  findLexiconFrequency,
+  findLexiconFrequencyRanks,
+  normalizeForLookup,
+} from '../dictionary/dictService';
 
 let db: SqliteDb;
 
@@ -155,5 +159,57 @@ describe('reading a word out of the frequency corpora', () => {
     const detail = plan.map((row) => row.detail).join(' | ');
     expect(detail).toContain('idx_freq_norm');
     expect(detail).not.toContain('SCAN freq_corpora');
+  });
+});
+
+// The Deck Workbench needs a rank per note before it can filter on one, and one
+// statement per word would be thousands of them on the main thread.
+describe('ranking a whole page of words in one pass', () => {
+  it('returns the best rank per word and omits the words nothing ranks', () => {
+    seedCorpus('bccwj', 'BCCWJ frequency', { priority: 5 });
+    seedCorpus('novels', 'Novel corpus', { priority: 1 });
+    seedRank('bccwj', '猫', 1_204);
+    seedRank('novels', '猫', 880);
+    seedRank('bccwj', '食べる', 312);
+    const ranks = findLexiconFrequencyRanks(db, ['猫', '食べる', '胼胝']);
+    // Best rank, not the highest-priority corpus's: this answers "how common",
+    // and the most confident answer is the one that ranks the word highest.
+    expect(ranks.get('猫')).toBe(880);
+    expect(ranks.get('食べる')).toBe(312);
+    expect(ranks.has('胼胝')).toBe(false);
+  });
+
+  it('does not let a disabled corpus speak, exactly like the single-word read', () => {
+    seedCorpus('off', 'Switched off', { enabled: 0 });
+    seedRank('off', '猫', 5);
+    expect(findLexiconFrequencyRanks(db, ['猫']).size).toBe(0);
+  });
+
+  it('keys the answer by the term the caller asked, not by the normalized form', () => {
+    seedCorpus('bccwj', 'BCCWJ frequency');
+    seedRank('bccwj', 'ネコ', 700);
+    // NFKC folds half-width katakana onto full-width, so both spellings hit the
+    // same row — and each still comes back under the spelling the caller used,
+    // which is the one the note's field actually holds.
+    const ranks = findLexiconFrequencyRanks(db, ['ネコ', 'ﾈｺ']);
+    expect(ranks.get('ネコ')).toBe(700);
+    expect(ranks.get('ﾈｺ')).toBe(700);
+  });
+
+  it('drops blanks and prose rather than probing with them', () => {
+    seedCorpus('bccwj', 'BCCWJ frequency');
+    seedRank('bccwj', '猫', 12);
+    const ranks = findLexiconFrequencyRanks(db, ['', '   ', '猫']);
+    expect([...ranks.keys()]).toEqual(['猫']);
+  });
+
+  it('answers a batch far larger than one SQL variable chunk', () => {
+    seedCorpus('bccwj', 'BCCWJ frequency');
+    const terms = Array.from({ length: 950 }, (_, i) => `w${i}`);
+    for (const term of terms) seedRank('bccwj', term, terms.indexOf(term) + 1);
+    const ranks = findLexiconFrequencyRanks(db, terms);
+    expect(ranks.size).toBe(950);
+    expect(ranks.get('w0')).toBe(1);
+    expect(ranks.get('w949')).toBe(950);
   });
 });

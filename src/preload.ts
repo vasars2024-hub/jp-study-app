@@ -492,6 +492,15 @@ const api = {
     options?: { sourceLangs?: string[] },
   ): Promise<import('./shared/lexiconFrequency').LexiconFrequencyResult> =>
     ipcRenderer.invoke('dict:frequency', text, options),
+  /**
+   * Best rank for many words at once, for a whole page of Deck Workbench notes.
+   * A word no enabled corpus ranks is **absent** from the result rather than 0.
+   */
+  dictFrequencyRanks: (
+    texts: string[],
+    options?: { sourceLangs?: string[] },
+  ): Promise<Record<string, number>> =>
+    ipcRenderer.invoke('dict:frequencyRanks', texts, options),
   /** The words the installed dictionaries point at from this word's senses. */
   dictXrefs: (
     text: string,

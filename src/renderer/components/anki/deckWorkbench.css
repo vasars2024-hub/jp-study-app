@@ -238,6 +238,16 @@
   gap: 8px;
 }
 
+/* The known-word precedence picker sits with the row count, not with the
+   filters: it changes what `known:` *means*, so it has to stay visible while
+   the query is being typed rather than hide behind a disclosure. */
+.wb-browser-precedence {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
 .wb-browser-search {
   flex: 1 1 220px;
   min-width: 0;

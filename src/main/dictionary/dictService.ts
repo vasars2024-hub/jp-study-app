@@ -62,6 +62,8 @@ import {
   type LexiconEtymologyResult,
 } from '../../shared/lexiconEtymology';
 import {
+  MAX_FREQUENCY_BATCH,
+  MAX_FREQUENCY_QUERY_CHARS,
   MAX_FREQUENCY_RESULTS,
   buildLexiconFrequencyResult,
   type LexiconFrequencyEntry,
@@ -1469,6 +1471,67 @@ export function findLexiconFrequency(db: SqliteDb, query: FrequencyQuery): Lexic
   });
 
   return buildLexiconFrequencyResult(text, entries, query.limit ?? MAX_FREQUENCY_RESULTS);
+}
+
+/**
+ * SQLite's default `SQLITE_MAX_VARIABLE_NUMBER` is 999 on older builds. Chunking
+ * at 400 leaves room for the language filter without ever approaching it.
+ */
+const FREQUENCY_BATCH_TERMS = 400;
+
+/**
+ * The best rank each of many words has, in one pass.
+ *
+ * The Deck Workbench needs a rank for every note on a page before it can filter
+ * on one, and `findLexiconFrequency` per word would be thousands of statements
+ * on the main thread. This is the same indexed probe widened to an `IN` over a
+ * chunk of normalized forms, with `min(rank)` per form done by SQLite — the
+ * per-corpus breakdown the single-word reader returns is not what a filter
+ * needs, so none of it crosses the wire.
+ *
+ * A word no enabled corpus ranks is **absent from the result**, never zero and
+ * never a large number: the caller has to be able to tell "nothing ranks this"
+ * from "ranked far down the list".
+ */
+export function findLexiconFrequencyRanks(
+  db: SqliteDb,
+  terms: readonly string[],
+  sourceLangs?: DictLangCode[],
+): Map<string, number> {
+  const out = new Map<string, number>();
+  const langs = sourceLangs?.length ? [...new Set(sourceLangs)] : [];
+  const langFilter = langs.length ? ` and f.lang in (${langs.map(() => '?').join(',')})` : '';
+
+  // Normalized form → the terms that share it, so the answer comes back keyed
+  // by what the caller asked rather than by an internal normalization.
+  const byNorm = new Map<string, string[]>();
+  for (const term of terms.slice(0, MAX_FREQUENCY_BATCH)) {
+    const trimmed = term.trim().slice(0, MAX_FREQUENCY_QUERY_CHARS);
+    if (!trimmed) continue;
+    const norm = normalizeForLookup(trimmed);
+    if (!norm) continue;
+    const list = byNorm.get(norm);
+    if (list) list.push(term);
+    else byNorm.set(norm, [term]);
+  }
+
+  const norms = [...byNorm.keys()];
+  for (let at = 0; at < norms.length; at += FREQUENCY_BATCH_TERMS) {
+    const chunk = norms.slice(at, at + FREQUENCY_BATCH_TERMS);
+    const rows = db.prepare(`
+      select f.norm as norm, min(f.rank) as rank
+      from freq_corpora f
+      join dictionaries d on d.id = f.corpus
+      where f.norm in (${chunk.map(() => '?').join(',')}) and d.enabled = 1${langFilter}
+      group by f.norm
+    `).all(...chunk, ...langs) as Array<{ norm: string; rank: number }>;
+    for (const row of rows) {
+      const rank = Number(row.rank);
+      if (!Number.isFinite(rank) || rank < 1) continue;
+      for (const term of byNorm.get(row.norm) ?? []) out.set(term, rank);
+    }
+  }
+  return out;
 }
 
 export interface XrefQuery {

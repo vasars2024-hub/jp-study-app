@@ -26,6 +26,17 @@ export const MAX_FREQUENCY_RESULTS = 6;
 export const MAX_FREQUENCY_QUERY_CHARS = 16;
 
 /**
+ * How many distinct words one batched rank lookup may ask about.
+ *
+ * A page of a deck, not a corpus. The Deck Workbench needs a rank per note
+ * before it can filter on one, and the batched reader answers that in a handful
+ * of statements — but a caller that hands it a whole 100k-note collection is
+ * asking for a table scan on the main thread, so the bound is enforced rather
+ * than documented.
+ */
+export const MAX_FREQUENCY_BATCH = 4_000;
+
+/**
  * The learner-facing summary of a rank.
  *
  * Bands rather than a bare number because "#4,312" answers nothing on its own —

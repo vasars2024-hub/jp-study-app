@@ -376,6 +376,11 @@ declare global {
         text: string,
         options?: { sourceLangs?: string[] },
       ): Promise<import('../shared/lexiconFrequency').LexiconFrequencyResult>;
+      /** Term → best rank. A word no enabled corpus ranks is absent, not 0. */
+      dictFrequencyRanks(
+        texts: string[],
+        options?: { sourceLangs?: string[] },
+      ): Promise<Record<string, number>>;
       dictXrefs(
         text: string,
         options?: { sourceLangs?: string[] },

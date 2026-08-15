@@ -12,7 +12,7 @@
  * well-defined) or when the whole source is loaded. With a query active on a
  * paged source the user gets the honest alternative: select the rows found here.
  */
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AnkiDraft } from '../../../shared/ankiDraft';
 import {
   EMPTY_SELECTION,
@@ -33,6 +33,13 @@ import {
   type BrowserSort,
 } from '../../../shared/ankiWorkbenchBrowser';
 import { filterBrowserRows, type BrowserQueryErrorCode } from '../../../shared/ankiBrowserQuery';
+import {
+  buildVocabContext,
+  collectVocabTerms,
+  type VocabKnownPrecedence,
+} from '../../../shared/ankiVocabContext';
+import { MAX_FREQUENCY_BATCH } from '../../../shared/lexiconFrequency';
+import { getLevel, onKnowledgeChanged } from '../../knownWords';
 import {
   EMPTY_SAVED_VIEWS,
   SAVED_VIEWS_STORAGE_KEY,
@@ -117,10 +124,86 @@ export default function DeckWorkbenchBrowser({
   /** What the last applied view could not restore in this deck. */
   const [viewGap, setViewGap] = useState<{ missing: number; sortDropped: boolean } | null>(null);
 
+  /**
+   * Which source wins when the local knowledge store and Anki's own scheduling
+   * disagree about the same word (the plan's gate 4). A user setting rather
+   * than a constant, because the honest answer differs per learner: someone who
+   * grades by hand trusts `local`, someone driven by their review history
+   * trusts `anki`.
+   */
+  const [precedence, setPrecedence] = useState<VocabKnownPrecedence>('local');
+  /**
+   * Ranks for this page's words. `undefined` until the lookup answers — the
+   * distinction matters, because with no context at all `freq:`/`known:` are a
+   * refusal, and a refusal is the right thing to show while the answer is
+   * genuinely unknown.
+   */
+  const [ranks, setRanks] = useState<ReadonlyMap<string, number | null> | undefined>(undefined);
+  /** Bumped by the knowledge store so a level changed elsewhere reaches the filter. */
+  const [knowledgeTick, setKnowledgeTick] = useState(0);
+
   const rows = useMemo(() => buildBrowserRows(draft, columns), [draft, columns]);
+  const vocabTerms = useMemo(
+    () => collectVocabTerms(draft.notes, draft.noteTypes).slice(0, MAX_FREQUENCY_BATCH),
+    [draft],
+  );
+
+  useEffect(() => {
+    let live = true;
+    if (!vocabTerms.length) {
+      // No word field anywhere in this deck is still an answered lookup: the
+      // filters must work and report "no word", not sit refusing forever.
+      setRanks(new Map());
+      return () => {
+        live = false;
+      };
+    }
+    setRanks(undefined);
+    void window.api
+      .dictFrequencyRanks(vocabTerms)
+      .then((found) => {
+        if (!live) return;
+        // Every term asked about gets a key: a word the corpora do not rank maps
+        // to `null`, which is a measured absence rather than a missing lookup.
+        setRanks(new Map(vocabTerms.map((term) => [term, found[term] ?? null])));
+      })
+      .catch(() => {
+        if (live) setRanks(new Map(vocabTerms.map((term) => [term, null])));
+      });
+    return () => {
+      live = false;
+    };
+  }, [vocabTerms]);
+
+  useEffect(() => onKnowledgeChanged(() => setKnowledgeTick((n) => n + 1)), []);
+
+  const vocab = useMemo(() => {
+    if (!ranks) return undefined;
+    void knowledgeTick;
+    const localLevels = new Map<string, number>();
+    for (const term of vocabTerms) {
+      // Only words the store actually holds: `getLevel` returns 0 for a word it
+      // has never seen, and recording that would turn "never asked" into "not
+      // known" for the entire deck.
+      const level = getLevel(term);
+      if (level > 0) localLevels.set(term, level);
+    }
+    return buildVocabContext({
+      notes: draft.notes,
+      noteTypes: draft.noteTypes,
+      cards: draft.cards,
+      ranks,
+      localLevels,
+      precedence,
+    });
+  }, [draft, ranks, vocabTerms, precedence, knowledgeTick]);
+
   // The draft's own field names, so `Expression:食べる` is a field predicate and
   // `Expresion:食べる` is a refusal instead of a filter that quietly matches all.
-  const schema = useMemo(() => ({ fieldNames: browserFieldNames(draft) }), [draft]);
+  const schema = useMemo(
+    () => ({ fieldNames: browserFieldNames(draft), ...(vocab ? { vocab } : {}) }),
+    [draft, vocab],
+  );
   const filtered = useMemo(() => filterBrowserRows(rows, query, schema), [rows, query, schema]);
   const shown = useMemo(() => sortBrowserRows(filtered.rows, sort), [filtered, sort]);
   const shownCols = useMemo(() => visibleBrowserColumns(columns), [columns]);
@@ -312,6 +395,24 @@ export default function DeckWorkbenchBrowser({
         <span className="muted">
           {t('ankiWorkbench.browser.rows', { shown: shown.length, loaded: draft.counts.notes })}
         </span>
+        {/* Only shown once a deck actually has words to rank: on a deck whose
+            note types declare no word field, `known:` can never resolve a
+            conflict, and a control that decides nothing is a lie. */}
+        {vocabTerms.length > 0 && (
+          <label className="wb-browser-precedence">
+            <span className="muted">{t('ankiWorkbench.browser.known.precedence')}</span>
+            <select
+              value={precedence}
+              onChange={(e) => setPrecedence(e.target.value as VocabKnownPrecedence)}
+            >
+              {(['local', 'anki', 'either', 'both'] as const).map((value) => (
+                <option key={value} value={value}>
+                  {t(`ankiWorkbench.browser.known.precedence.${value}`)}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         {/* Switching view never touches the selection — the plan requires a
             batch to survive a look at the sample cards. */}
         <div role="group" aria-label={t('ankiWorkbench.browser.view')}>

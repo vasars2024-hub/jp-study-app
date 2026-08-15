@@ -49,6 +49,7 @@ import {
   findExampleSentencesInDb,
   findLexiconEtymologyInDb,
   findLexiconFrequencyInDb,
+  findLexiconFrequencyRanksInDb,
   findLexiconXrefsInDb,
   getHeadwordAudioFromDb,
   listDictionarySources,
@@ -121,6 +122,7 @@ import {
   type LexiconEtymologyResult,
 } from '../shared/lexiconEtymology';
 import {
+  MAX_FREQUENCY_BATCH,
   MAX_FREQUENCY_QUERY_CHARS,
   MAX_FREQUENCY_RESULTS,
   type LexiconFrequencyResult,
@@ -912,6 +914,29 @@ export function registerDictionaryIpc(): void {
         // lookup, so a throw on an un-migrated install would reject on every
         // single word rather than showing nothing.
         return empty;
+      }
+    },
+  );
+  ipcMain.handle(
+    'dict:frequencyRanks',
+    (_e, texts: unknown, options?: unknown): Record<string, number> => {
+      const raw = options && typeof options === 'object' && !Array.isArray(options)
+        ? options as Record<string, unknown>
+        : {};
+      const terms = Array.isArray(texts)
+        ? texts.filter((t): t is string => typeof t === 'string').slice(0, MAX_FREQUENCY_BATCH)
+        : [];
+      if (!terms.length) return {};
+      try {
+        // A plain object, not a Map: structured clone carries a Map fine, but
+        // every other dictionary channel returns JSON-shaped data and a caller
+        // reading `result[term]` cannot be tripped by the difference. A term no
+        // corpus ranks is simply absent — never 0, which would read as rank 0.
+        return Object.fromEntries(findLexiconFrequencyRanksInDb(terms, readLangList(raw.sourceLangs)));
+      } catch {
+        // Same contract as the single-word read above: an un-migrated install
+        // must show no ranks, not reject the Browser's whole filter.
+        return {};
       }
     },
   );

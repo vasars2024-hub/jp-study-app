@@ -58,11 +58,13 @@ import {
   findLexiconCompounds,
   findLexiconEtymology,
   findLexiconFrequency,
+  findLexiconFrequencyRanks,
   findLexiconXrefs,
   findSemanticNeighbors,
   lookup,
   type CollocationQuery,
   type CompoundQuery,
+  type DictLangCode,
   type EtymologyQuery,
   type ExampleQuery,
   type FrequencyQuery,
@@ -475,6 +477,18 @@ export function findLexiconXrefsInDb(query: XrefQuery): LexiconXrefResult {
  */
 export function findLexiconFrequencyInDb(query: FrequencyQuery): LexiconFrequencyResult {
   return findLexiconFrequency(dictionaryDb(), query);
+}
+
+/**
+ * Ranks for a page of Deck Workbench notes in one pass. One statement per 400
+ * words rather than one per word, which is what keeps a whole-deck frequency
+ * filter off the main thread's back.
+ */
+export function findLexiconFrequencyRanksInDb(
+  terms: readonly string[],
+  sourceLangs?: DictLangCode[],
+): Map<string, number> {
+  return findLexiconFrequencyRanks(dictionaryDb(), terms, sourceLangs);
 }
 
 /**
