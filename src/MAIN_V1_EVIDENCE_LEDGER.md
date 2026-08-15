@@ -21513,3 +21513,60 @@ which are **at HEAD** and another track's. `src/preload.ts` and
 
 **Next.** Phase 1 continues: the protobuf decode that would close
 `template-format-unavailable` for schema 18, or the CSV/live-Anki source adapters.
+
+## Track 7 — the formats and the manifest schema 18 hid — 2026-08-15 21:10 MSK primary
+
+Fusion re-derived **closed** a 5th time (§7's last entry: all five §6 gates pass, last defect
+closed), so the whole turn went to Track 7 / `ANKI_DECK_WORKBENCH_PLAN.md` Phase 1. Boss audit
+04:24 re-checked: finding 1 IS fixed in the tree (`transcriptionJobs.ts:714` carries the
+no-window counter that resets on a reached renderer); nothing else actionable.
+
+**Slice 1 — `e26c8e5` — `src/main/anki/ankiProtoConfig.ts`, and schema 18 stops being blocked.**
+Last turn's `template-format-unavailable` was correct but terminal: qfmt/afmt/CSS live in
+protobuf blobs. **Decision: decode them, but claim only field numbers derived from real data.**
+A generic wire reader ran over every blob in **18 real schema-18 packages**; field numbers were
+matched to content that can only be one thing — notetype 3 = css (35/35 blobs, `.card {`), 5/6 =
+latexPre/Post (`\documentclass`, `\end{document}`), template 1/2 = qfmt/afmt (187/187), 3 = bqfmt
+(6/187, a bare `{{Kanji}}`), field 3/4 = font/size (496/496, `Arial`/`20`). Rejected: publishing
+the upstream proto from memory. **`kind` (field 1) and `sortFieldIdx` (2) are NOT claimed** —
+both default to 0, so no sampled deck sets them and the numbers are unverifiable here; cloze is
+read from the `{{cloze:` marker in a decoded template instead, which is content evidence.
+`formatsUnavailable` survives unless **every** template of a note type decoded a qfmt containing
+`{{` — a blank-rendering card must still refuse to export. Decoder is total: malformed → `null`.
+
+**Slice 2 — `93ea48e` — the media manifest, and a count that was 15% too big.** The zstd package
+stores its manifest as compressed protobuf, so `readMediaManifest`'s JSON parse threw and the
+missing-media check silently disabled itself. Shape corroborated by arithmetic on a real package:
+**104 manifest entries = 104 numbered zip files = 104 references**. A nameless entry rejects the
+whole manifest (half a manifest accuses a complete deck). Also fixed in the same slice, because
+this is what made the diagnostic fire at all: missing media was counted **per reference**, so one
+absent clip cited by thirty notes read as thirty missing files. Now per file, like
+`mediaReferences` beside it.
+
+**Live, real IPC, main restarted twice, real decks.** `N1 Vocab-20260102173058.apkg` — the exact
+deck last turn recorded as blocking — now reads `blocking: []`, css **111 chars**, qfmt
+`{{Front}}`, fields `Front/Arial/20`. `Full Japanese Study Deck` (**52,021 notes / 55,571 cards /
+22,208 reviews in 21.8 s**): 5 note types, css 1,738–3,725 chars, bqfmt `{{Kanji}}` decoded,
+font `Noto Sans JP Medium`, **no diagnostics**. `Ginga Eiyuu Densetsu` (schema 11) unchanged
+through the legacy path, css 26,923. Media: `N1 Vocab 3` 104 refs → **0 missing** (no false
+accusation); `book.apkg` 48 refs, manifest decompresses to **0 bytes** → **48 missing**, and
+48 after the per-file fix where the first run said 55.
+
+**Trap, and it cost 15 minutes.** `debugBridge.ts:235` wraps the body as `(${code})`, so /eval
+takes ONE EXPRESSION. A trailing `;` after `})()`, or any `a; b` statement pair, fails with
+"Script failed to execute … check the renderer console" — which reads like the script threw.
+Send `(() => { ... })()` with **no trailing semicolon**.
+
+### Gates
+
+Once after the last slice, on the shared dirty tree (several hundred foreign paths).
+`npx vitest run` **exit 0 — 625 passed / 1 skipped files, 8,377 passed / 6 skipped tests**, no
+failures (+1 file, +20 tests). `node tools/i18n-check.cjs` exit 0 at **9,636** keys, unchanged:
+no UI string this turn, Phase 1 is still contract/reader work by the plan's own sequencing.
+`node tools/architecture-audit.cjs` exit 0, **Nothing new**, 2 known pending. `npx eslint` on all
+**6** touched paths: **clean** — and note none of them is `preload.ts`/`window.d.ts` this turn, so
+the 2 known `adjacent-overload-signatures` errors at HEAD are not even in scope.
+
+**Next.** Phase 1's remaining source adapters: CSV/TSV (Anki writes `#separator:`/`#notetype
+column:` header lines its own importer reads) or live AnkiConnect. Both need a preload binding,
+so `debug/stage-apkg-draft.cjs` is the stager to copy.
