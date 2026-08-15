@@ -611,3 +611,65 @@ baselines or a second episode.
 
 **Trap:** the fused sidecar is `fused-ja.meta.json`, a sibling of `fused-ja.srt` — *not*
 `fused-ja.srt.fusion.json`. Guessing the latter reads as "no provenance was written".
+
+### F3 arrives, and F7 finally returns a number: fusing currently buys nothing — 2026-08-15, backup
+
+**Landed:** `34d4239` (the honesty defect), `f422011` (same class, one layer down).
+
+**The handoff's next slice rested on a false premise: there is no in-app GGUF downloader.**
+`localAgent.ts` only *discovers* models already in `userData/models` or `~/Downloads`
+(`KNOWN_MODEL_FILENAMES`); `LOCAL_AGENT_MODEL_CATALOG` carries no URL. Fetched directly instead:
+`ggml-org/Qwen3-1.7B-GGUF` → `Qwen3-1.7B-Q4_K_M.gguf`, **1,282,439,264 B in 63 s**, saved as the
+exact `USER_MODEL` name. (Official `Qwen/Qwen3-1.7B-GGUF` publishes **only** Q8_0.) Verified
+through the product path: `translateStatus()` → `modelFound:true`, `translateEnsureReady()` → ok,
+`translateRunBatch` → real Japanese.
+
+**The defect fixed.** `decideFusedWindow` returned `basis:'whisper'` both when the reference
+agreed and when *no reference existed*. Offline that is every cue, so `fusionCueCounts` read them
+as `verified` and the row rendered **"35 lines, all cross-checked"** about a track nothing had
+checked. Pre-run sidecar: v1, 35 cues, `{"whisper":35}`, all scores 0, meanConf 0.45 — and 0.45
+*is* `CONFIDENCE_UNREFEREED`, so only the basis had collapsed the distinction. `whisper-unrefereed`
+splits them; F5 selects on `whisper-unverified` only (`:673`), so no new cue reaches the cloud.
+An unrefereed sidecar declares v2 (a v1 reader must refuse it, not miscount it), and `uncertain`
+folds `unrefereed` in so a caller reading one field stays honest.
+
+**Re-run of `a167b9e2` with the translator live.** v2, 35 cues, meanConf 0.507,
+`{"whisper":7,"whisper-unverified":1,"whisper-unrefereed":27}`, 8 nonzero scores (max 0.571).
+So F3 now contributes — **for 8 of 35 windows only**.
+
+**Second defect, which the first fix is what made visible.** The reference stage silently covers
+only the first `BATCH_SIZE` chunk. `fused-ja.mt-only.srt` holds exactly **8** cues, the first 8 in
+time order, covering 0–40 s of a 305 s episode. Not the validator (`textMatchesLang('ja',…)` is
+`hasKana||hasHan`, permissive) and not an id-mapping fault: a live 8-item `translateRunBatch`
+returned **8/8 non-empty**. `translateBatchChunk` cannot throw — it catches and pushes `''` — so a
+short *array* means the worker loop exited early. Mechanism strongly indicated but not isolated:
+`BATCH_PROMPT_TIMEOUT_MS` is **90 s** and `ensureSession()` reuses **one** `LlamaChatSession`
+whose context grows with every chunk, so chunk 1 fits the timeout and chunks 2–5 do not.
+**Next worker: isolate this first** — one live 35-item `translateRunBatch` outside a fusion, and
+`/logs` around it, settles timeout-vs-early-return in minutes.
+
+**F7 ran. First real CER numbers this plan has ever had** (episode 1, human JA reference, 38 cues
+/ 1490 chars): fused **11.28%**, whisperOnly **11.28%**, mtOnly **91.41%** (8 cues, 30 reference
+cues missed). Gate **FAIL**, exit 1, for two honest reasons: one episode, and *fused does not beat
+whisperOnly*.
+
+**The finding that outranks the rest: offline, fused CER can never beat whisper-only — by
+construction.** `fused-ja.srt` and `fused-ja.whisper-only.srt` are **byte-identical** (5,526 B,
+`Buffer.equals` true). Every branch of `decideFusedWindow` holding Whisper text keeps that text
+verbatim; only an `asr-empty` window takes the reference. That is the plan's own deliberate
+offline rule ("the verbatim-but-possibly-misheard line still matches the audio"). So the §6 ship
+gate — *fused must beat both baselines strictly on every episode* — is **unpassable on the offline
+path**, and fixing the chunk truncation above will not change that. This is a plan-level decision,
+not a bug: either the gate is scored with F5 arbitration on (needs a cloud key), or the offline
+path must let a high-confidence reference correct Whisper somewhere, or the gate is restated as
+"fused must beat whisper-only *where a reference exists*". Deliberately **not** decided here —
+it changes what the feature claims, and the next turn should take it as its first slice.
+
+**Traps.** (1) `/eval` takes a single **expression**: a trailing `;` after the IIFE yields
+"Script failed to execute" with no detail. (2) Do not park two probes on one global — the second
+overwrote the first's progress log mid-run. (3) Generated sidecars written before `34d4239` keep
+the old "all cross-checked" claim until re-fused; there is no migration and there should not be
+one.
+
+**Status against §6:** (1) done. (2) done. (3) **harness run for real at last, and it FAILS** —
+one episode scored, and the gate is unpassable offline as written. (4) partial. (5) done.
