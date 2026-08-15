@@ -54,9 +54,19 @@ export default function WordAudio({ word, reading, lang }: Props) {
 
   if (!word || !supportsLexiconAudio(lang)) return null;
 
+  /**
+   * A rejected `play()` is never reported as a network problem: the clip is in
+   * hand and cached, and the only realistic cause is Chromium's user-activation
+   * window having expired while the fetch was in flight. The state stays
+   * `ready`, so the next click replays from the ref under a fresh gesture.
+   */
+  const start = (src: string) => {
+    void new Audio(src).play().catch(() => undefined);
+  };
+
   const play = async () => {
     if (clip.current) {
-      void new Audio(clip.current).play().catch(() => setState('offline'));
+      start(clip.current);
       return;
     }
     const attempt = ++run.current;
@@ -75,12 +85,7 @@ export default function WordAudio({ word, reading, lang }: Props) {
     if (result.status === 'ready' && result.clip) {
       clip.current = `data:${result.clip.mimeType};base64,${result.clip.dataBase64}`;
       setState('ready');
-      // A rejected `play()` here is not a failure to *get* the audio — the clip
-      // is in hand and cached. Chromium's user-activation window can have
-      // expired during the fetch, and the state must stay `ready` so the next
-      // click replays it from the ref under a fresh gesture instead of
-      // reporting a network problem that did not happen.
-      void new Audio(clip.current).play().catch(() => {});
+      start(clip.current);
       return;
     }
     // `unsupported` cannot be reached from here — the control does not render
