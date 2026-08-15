@@ -65,6 +65,7 @@ import type { ApkgImportResult } from './shared/apkgParse';
 import type { ApkgCardsResult } from './shared/apkgCards';
 import type { ApkgDraftRequest, ApkgDraftResult } from './shared/ankiDraft';
 import type { CsvDraftRequest, CsvDraftResult } from './shared/ankiCsv';
+import type { ConnectDraftRequest, ConnectDraftResult } from './shared/ankiConnectDraft';
 import type {
   AiEngineConfig,
   AiEngineKind,
@@ -577,6 +578,9 @@ const api = {
   /** One page of an Anki CSV/TSV text export read as a workbench draft. */
   readAnkiCsvDraft: (request?: CsvDraftRequest): Promise<CsvDraftResult> =>
     ipcRenderer.invoke('anki:readCsvDraft', request),
+  /** One page of the live Anki collection read as a workbench draft. Read-only. */
+  readAnkiConnectDraft: (request?: ConnectDraftRequest): Promise<ConnectDraftResult> =>
+    ipcRenderer.invoke('anki:readConnectDraft', request),
   dictListYomitan: (): Promise<YomitanDictInfo[]> => ipcRenderer.invoke('dict:listYomitan'),
   dictRemoveYomitan: (id: string): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('dict:removeYomitan', id),
