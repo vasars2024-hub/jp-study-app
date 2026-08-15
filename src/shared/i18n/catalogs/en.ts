@@ -9094,6 +9094,24 @@ export const en: Catalog = {
   'ankiWorkbench.sessions.status.cancelled': 'Cancelled',
   'ankiWorkbench.sessions.status.failed': 'Failed',
   'ankiWorkbench.sessions.status.complete': 'Complete',
+  'ankiWorkbench.step.browse.outcome': '{count} notes selected',
+  'ankiWorkbench.step.browse.outcomeAll': 'All {count} matching notes selected',
+  'ankiWorkbench.browser.search': 'Search fields, tags and decks',
+  'ankiWorkbench.browser.rows': '{shown} of {loaded} loaded notes shown',
+  'ankiWorkbench.browser.columns': 'Columns',
+  'ankiWorkbench.browser.column.noteType': 'Note type',
+  'ankiWorkbench.browser.column.decks': 'Decks',
+  'ankiWorkbench.browser.column.tags': 'Tags',
+  'ankiWorkbench.browser.column.cards': 'Cards',
+  'ankiWorkbench.browser.pageOnly':
+    'Only {loaded} of {total} notes are loaded. Search and sort cover the loaded notes.',
+  'ankiWorkbench.browser.empty': 'No notes match this search.',
+  'ankiWorkbench.browser.selectRow': 'Select note {id}',
+  'ankiWorkbench.browser.selected': '{count} selected',
+  'ankiWorkbench.browser.selectAll': 'Select all {count}',
+  'ankiWorkbench.browser.selectFound': 'Select the {count} found here',
+  'ankiWorkbench.browser.clear': 'Clear selection',
+  'ankiWorkbench.browser.wholeSource': 'Covers the whole source, including notes not loaded yet.',
 };
 
 

@@ -8669,5 +8669,23 @@ export const ja: Catalog = {
   'ankiWorkbench.sessions.status.cancelled': 'キャンセル済み',
   'ankiWorkbench.sessions.status.failed': '失敗',
   'ankiWorkbench.sessions.status.complete': '完了',
+  'ankiWorkbench.step.browse.outcome': '{count} 件のノートを選択',
+  'ankiWorkbench.step.browse.outcomeAll': '一致する {count} 件すべてを選択',
+  'ankiWorkbench.browser.search': 'フィールド・タグ・デッキを検索',
+  'ankiWorkbench.browser.rows': '読み込み済み {loaded} 件のうち {shown} 件を表示',
+  'ankiWorkbench.browser.columns': '列',
+  'ankiWorkbench.browser.column.noteType': 'ノートタイプ',
+  'ankiWorkbench.browser.column.decks': 'デッキ',
+  'ankiWorkbench.browser.column.tags': 'タグ',
+  'ankiWorkbench.browser.column.cards': 'カード',
+  'ankiWorkbench.browser.pageOnly':
+    '{total} 件中 {loaded} 件のみ読み込み済みです。検索と並べ替えは読み込み済みのノートが対象です。',
+  'ankiWorkbench.browser.empty': 'この検索に一致するノートはありません。',
+  'ankiWorkbench.browser.selectRow': 'ノート {id} を選択',
+  'ankiWorkbench.browser.selected': '{count} 件選択中',
+  'ankiWorkbench.browser.selectAll': '{count} 件すべてを選択',
+  'ankiWorkbench.browser.selectFound': 'ここで見つかった {count} 件を選択',
+  'ankiWorkbench.browser.clear': '選択を解除',
+  'ankiWorkbench.browser.wholeSource': '未読み込みのノートも含め、ソース全体が対象です。',
 };
 

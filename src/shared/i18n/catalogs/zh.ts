@@ -8631,5 +8631,23 @@ export const zh: Catalog = {
   'ankiWorkbench.sessions.status.cancelled': '已取消',
   'ankiWorkbench.sessions.status.failed': '失败',
   'ankiWorkbench.sessions.status.complete': '已完成',
+  'ankiWorkbench.step.browse.outcome': '已选择 {count} 条笔记',
+  'ankiWorkbench.step.browse.outcomeAll': '已选择全部 {count} 条匹配笔记',
+  'ankiWorkbench.browser.search': '搜索字段、标签和牌组',
+  'ankiWorkbench.browser.rows': '已加载 {loaded} 条，显示 {shown} 条',
+  'ankiWorkbench.browser.columns': '列',
+  'ankiWorkbench.browser.column.noteType': '笔记类型',
+  'ankiWorkbench.browser.column.decks': '牌组',
+  'ankiWorkbench.browser.column.tags': '标签',
+  'ankiWorkbench.browser.column.cards': '卡片',
+  'ankiWorkbench.browser.pageOnly':
+    '{total} 条笔记中仅加载了 {loaded} 条。搜索和排序仅覆盖已加载的笔记。',
+  'ankiWorkbench.browser.empty': '没有笔记符合此搜索。',
+  'ankiWorkbench.browser.selectRow': '选择笔记 {id}',
+  'ankiWorkbench.browser.selected': '已选 {count} 条',
+  'ankiWorkbench.browser.selectAll': '全选 {count} 条',
+  'ankiWorkbench.browser.selectFound': '选择这里找到的 {count} 条',
+  'ankiWorkbench.browser.clear': '清除选择',
+  'ankiWorkbench.browser.wholeSource': '涵盖整个来源，包括尚未加载的笔记。',
 };
 

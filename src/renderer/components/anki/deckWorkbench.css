@@ -215,3 +215,114 @@
   display: flex;
   gap: 8px;
 }
+
+.deck-workbench-body.single {
+  grid-template-columns: 1fr;
+}
+
+/* ----- step 2: the Browser ----------------------------------------------- */
+/* A dense data grid, so it stays a flat opaque anchor surface: no translucency,
+   no blur, no shadow. Liquid treatment belongs on the stepper above it. */
+
+.wb-browser {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.wb-browser-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.wb-browser-search {
+  flex: 1 1 220px;
+  min-width: 0;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 10px);
+  background: var(--input-bg, var(--panel));
+  color: inherit;
+  font: inherit;
+}
+
+.wb-browser-columns {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  font-size: 0.85em;
+}
+
+.wb-browser-column-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.wb-browser-partial {
+  margin: 0;
+}
+
+.wb-browser-head,
+.wb-browser-row {
+  display: grid;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+}
+
+.wb-browser-head {
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85em;
+}
+
+.wb-browser-sort {
+  padding: 6px 2px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wb-browser-sort:focus-visible {
+  outline: 2px solid var(--focus, var(--accent));
+  outline-offset: -2px;
+}
+
+.wb-browser-rows {
+  height: 340px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 10px);
+  /* Opaque: this is the reading surface, and it scrolls. */
+  background: var(--panel);
+}
+
+.wb-browser-row {
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 45%, transparent);
+}
+
+.wb-browser-row.selected {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.wb-browser-cell {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.wb-browser-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
+}

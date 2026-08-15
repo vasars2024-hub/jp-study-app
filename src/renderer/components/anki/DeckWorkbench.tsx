@@ -34,6 +34,7 @@ import {
 } from '../../../shared/ankiWorkbenchFlow';
 import { loadDeckAsAnkiDraft } from '../../flashcardDeck';
 import { useT } from '../../i18n';
+import DeckWorkbenchBrowser from './DeckWorkbenchBrowser';
 import './deckWorkbench.css';
 
 type SourceKey = 'apkg' | 'connect' | 'localDeck';
@@ -133,6 +134,20 @@ export default function DeckWorkbench() {
     });
   }, []);
 
+  const onBrowseSelection = useCallback((count: number, wholeSource: boolean) => {
+    setFlow((prev) =>
+      recordStep(prev, 'browse', {
+        // Zero selected is a legitimate state, and it is not a finished step.
+        satisfied: count > 0,
+        outcomeKey: wholeSource
+          ? 'ankiWorkbench.step.browse.outcomeAll'
+          : 'ankiWorkbench.step.browse.outcome',
+        outcomeParams: { count },
+        affected: count,
+      }),
+    );
+  }, []);
+
   const discardSession = useCallback(
     async (id: string) => {
       await window.api.ankiDraftSessionDelete(id);
@@ -193,7 +208,7 @@ export default function DeckWorkbench() {
         </p>
       )}
 
-      <div className="deck-workbench-body">
+      <div className={`deck-workbench-body${flow.current === 'source' ? '' : ' single'}`}>
         {flow.current === 'source' ? (
           <>
             <div className="deck-workbench-rail">
@@ -299,6 +314,15 @@ export default function DeckWorkbench() {
               )}
             </div>
           </>
+        ) : flow.current === 'browse' && draft ? (
+          <div className="deck-workbench-detail deck-workbench-detail-wide">
+            {currentStep.stale && <p className="muted">{t('ankiWorkbench.step.staleDetail')}</p>}
+            <DeckWorkbenchBrowser
+              draft={draft}
+              totalNotes={totalNotes ?? draft.counts.notes}
+              onSelection={onBrowseSelection}
+            />
+          </div>
         ) : (
           <div className="deck-workbench-detail">
             <p className="deck-workbench-outcome">{t(`ankiWorkbench.step.${flow.current}`)}</p>

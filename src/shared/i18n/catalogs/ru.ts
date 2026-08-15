@@ -9474,5 +9474,23 @@ export const ru: Catalog = {
   'ankiWorkbench.sessions.status.cancelled': 'Отменено',
   'ankiWorkbench.sessions.status.failed': 'Ошибка',
   'ankiWorkbench.sessions.status.complete': 'Завершено',
+  'ankiWorkbench.step.browse.outcome': 'Выбрано заметок: {count}',
+  'ankiWorkbench.step.browse.outcomeAll': 'Выбраны все подходящие заметки: {count}',
+  'ankiWorkbench.browser.search': 'Поиск по полям, меткам и колодам',
+  'ankiWorkbench.browser.rows': 'Показано {shown} из {loaded} загруженных заметок',
+  'ankiWorkbench.browser.columns': 'Столбцы',
+  'ankiWorkbench.browser.column.noteType': 'Тип заметки',
+  'ankiWorkbench.browser.column.decks': 'Колоды',
+  'ankiWorkbench.browser.column.tags': 'Метки',
+  'ankiWorkbench.browser.column.cards': 'Карточки',
+  'ankiWorkbench.browser.pageOnly':
+    'Загружено только {loaded} из {total} заметок. Поиск и сортировка работают по загруженным заметкам.',
+  'ankiWorkbench.browser.empty': 'Нет заметок, подходящих под этот поиск.',
+  'ankiWorkbench.browser.selectRow': 'Выбрать заметку {id}',
+  'ankiWorkbench.browser.selected': 'Выбрано: {count}',
+  'ankiWorkbench.browser.selectAll': 'Выбрать все: {count}',
+  'ankiWorkbench.browser.selectFound': 'Выбрать найденные здесь: {count}',
+  'ankiWorkbench.browser.clear': 'Снять выделение',
+  'ankiWorkbench.browser.wholeSource': 'Охватывает весь источник, включая ещё не загруженные заметки.',
 };
 
