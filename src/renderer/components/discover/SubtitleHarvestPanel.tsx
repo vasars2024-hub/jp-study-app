@@ -42,6 +42,7 @@ import {
 import { getLevel } from '../../knownWords';
 import { showToast } from '../ui/Toast';
 import { acquisitionConfigFrom } from '../../../shared/subtitleNyaa';
+import { ipcErrorText } from '../../../shared/ipcErrorText';
 import { getActiveScraperSettings } from '../../scraperSettingsStore';
 
 interface Props {
@@ -65,9 +66,8 @@ type Phase = 'idle' | 'listing' | 'listed' | 'fetching' | 'analysing' | 'done' |
 /** Only the first N vocabulary rows are rendered; the rest are still mined. */
 const VISIBLE_VOCAB = 60;
 
-function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
+/** Same reason as the download dialog: the channel name is not a sentence. */
+const errorText = ipcErrorText;
 
 export default function SubtitleHarvestPanel({ anilistId, malId, title, episodes, sourceId }: Props) {
   const { t, lang } = useT();

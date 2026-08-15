@@ -39,6 +39,7 @@ import {
   type MalReleasePlan,
   type MalSelectionMode,
 } from '../../../shared/malDownload';
+import { ipcErrorText } from '../../../shared/ipcErrorText';
 import type { DiscoveryCandidate } from '../../../shared/mediaDiscovery';
 import type { ReadingMangaProvider } from '../../../shared/readingIpc';
 import type { TorrentRow } from '../../../shared/scraperResults';
@@ -82,9 +83,9 @@ const FOCUSABLE = 'button, [href], input, select, textarea, summary, [tabindex]'
 /** Nyaa's Literature category — raw and translated manga, not video. */
 const NYAA_LITERATURE = '3_0';
 
-function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
+/** Electron's `Error invoking remote method '<channel>':` wrapper is not a
+ *  sentence a user can act on — see `shared/ipcErrorText`. */
+const errorText = ipcErrorText;
 
 /**
  * Announce a finished run.
