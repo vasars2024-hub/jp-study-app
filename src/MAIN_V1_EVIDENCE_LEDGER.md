@@ -21410,3 +21410,51 @@ passed / 6 skipped** — no failures. i18n exit 0 at **9,625** (+3). architectur
 
 **Deliberately open.** (2) `inflections`, `freq_corpora`, `examples`, `chars` still have
 writers unrun on this install — a data state, not code. Items (1) and (3) are closed.
+
+## Track 2 — two columns with writers and no readers — 2026-08-15 17:15 MSK primary
+
+Boss audit's last section (2026-08-15 04:24) named finding 1 — the unbounded `no-window`
+retry — as the one actionable defect. Re-derived: **already fixed** (`planNoWindowRetry` /
+`noWindowAttempts`, `transcriptionJobs.ts:687-693, 727-742`). Fusion re-derived closed, so main-v1.
+
+**Slice 1 — `c7ed17a1`. `user_notes.starred`: in the schema since v1, no writer, no reader.**
+It rides the note row (same word identity; a second table would duplicate the key, migration
+6's partial index and its orphan handling). **Decision:** a star counts as content in
+`noteIsEmpty` — without that, starring a word nobody wrote about stores a row and deletes it
+in the same transaction, failing on exactly the words the star is for. The entry star writes
+without an explicit save (no typed text to lose) and sends the **stored** body, never the
+draft. `starredOnly` narrows in SQL; CSV gains a locale-free `1`/`0` column. 4 keys ×4.
+
+**Slice 2 — `176967ec`. `freq_corpora`: `idx_freq_norm` built for a probe nobody wrote.**
+Writer in the legacy Yomitan migration, relabeller in `sourceLang.ts`, no reader — and
+`sourceLang.ts:14` *claimed* the rows "are read by the lookup path". Corrected in place.
+**Decision:** the probe does not go through `headwords`. A row is keyed `(lang, norm, corpus)`,
+so routing via headwords silently drops every corpus that ranks a word no installed dictionary
+defines — the case a frequency list is most useful in. Band cutoffs 1.5k/5k/15k live once in
+the shared contract, not per corpus. 7 keys ×4.
+
+**Live, real IPC, main restarted twice.** Star: empty-body write on 胼胝 → row stored
+`starred=1`; unstar → row **gone**, `dictNoteGet` null. 猫 starred+noted → unstar keeps
+`note:"everyday word"`. List mixed `猫:1 食べる:0 胼胝:1`; `starredOnly` → 2 of 2. Live DOM:
+entry star 32×32, `aria-pressed` true→false→true over two real clicks, `<details>` never
+toggled, body preserved, RU `Снять отметку`/`Отметить слово`; browse row `★ Отмечено`,
+`Только отмеченные` → 1 of 1. **Probe rows deleted; the install's notes list is back to 0.**
+Frequency: `dict:frequency` answers `{query,entries:[]}` and the panel is **absent** on a live
+lookup, 0 renderer errors — honest, this install has no frequency corpus (4 sources, none is
+one). The populated branch is proven on the real engine in `dictionaryFrequency.test.ts`,
+including an `explain query plan` assertion that it uses `idx_freq_norm` and does not scan.
+
+**Traps.** (1) The bridge's `/eval` embeds the body as `` (${code}) `` — a probe file ending in
+`;` is a syntax error reported only as "Script failed to execute". Drop it. (2) The Workbench's
+`input[type=search]` is the **notes filter**; the query box is the first `input[type=text]`.
+
+**Gates**, once after the last slice. `npx vitest run` exit 0: **622 files / 1 skipped, 8,311
+tests passed / 6 skipped**, no failures (+2 files, +39 tests). i18n exit 0 at **9,636** (+11).
+architecture exit 0, **Nothing new**, 2 known pending. eslint clean on 11 paths except 2
+`adjacent-overload-signatures` errors in `window.d.ts` — **present at HEAD** (lines 821/824 vs
+1585/1588 in `git show HEAD:`), another track's duplicate block, not my 4 lines.
+
+**Deliberately open.** `inflections`, `chars`, `examples`, `freq_corpora` now all have readers
+*and* writers, and all four importers are reachable from Settings. Only the **source file** is
+missing, and only the user can supply it — logged in `~\.claude-runs\needs-user.md`. Data
+state, not code: complete-except-external.
