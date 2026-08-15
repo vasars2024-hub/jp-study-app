@@ -25,6 +25,15 @@ export interface DictionarySourceInfo {
  * neighbouring label — printing "terms" for a kind this map has not learned yet
  * would be a wrong answer where the untranslated literal is merely an ugly one.
  */
+/**
+ * The `dictionaries.kind` of a store whose rows are whole sentences, not words.
+ *
+ * Word lookups exclude it and the example reader is the only thing that reads it.
+ * A single constant because those two facts have to agree: a store excluded from
+ * lookups by one spelling and read by another is a store nothing can reach.
+ */
+export const EXAMPLE_DICTIONARY_KIND = 'examples';
+
 export const DICTIONARY_KIND_LABEL_KEYS: Readonly<Record<string, string>> = {
   term: 'settings.study.dict.kind.terms',
   pitch: 'settings.study.dict.kind.pitch',

@@ -50,6 +50,15 @@ import {
   type LexiconEtymology,
   type LexiconEtymologyResult,
 } from '../../shared/lexiconEtymology';
+import {
+  EXAMPLE_SCAN_ROWS,
+  MAX_EXAMPLE_QUERY_CHARS,
+  MAX_EXAMPLE_RESULTS,
+  selectLexiconExamples,
+  type LexiconExampleResult,
+  type LexiconExampleTranslation,
+} from '../../shared/lexiconExamples';
+import { EXAMPLE_DICTIONARY_KIND } from '../../shared/dictionarySources';
 import { pinyinSearchKey } from '../../shared/pinyin';
 import type { SqliteDb } from './db';
 
@@ -237,6 +246,17 @@ interface HeadwordRow {
 // Every statement below is prefixed by this text, so the pair parameter is
 // always bound first. `pairTarget()` returns '' when there is no unambiguous
 // pair, which matches no row and leaves `d.priority` in charge.
+/**
+ * A store of whole sentences is not a store of words, and nothing used to say so.
+ *
+ * Tatoeba's importer wrote one sentence per headword, so an imported example
+ * dictionary answered `猫` with every sentence beginning `猫…` and offered them as
+ * definitions. Storage moved to `examples` in schema step 10, and this predicate is
+ * what keeps the guarantee independent of the storage: a store that declares itself
+ * `examples` never contributes to a word lookup, whatever rows it holds.
+ */
+const WORD_SOURCE_WHERE = `d.enabled = 1 and d.kind <> '${EXAMPLE_DICTIONARY_KIND}'`;
+
 const HEADWORD_SELECT = `
   select h.id, h.dict_id, d.title as dict_title, h.lang, h.text, h.norm, h.reading, h.reading_norm,
          h.variant_of, h.score, h.freq_rank,
@@ -245,7 +265,7 @@ const HEADWORD_SELECT = `
   join dictionaries d on d.id = h.dict_id
   left join dict_pair_priority pp
     on pp.dict_id = d.id and pp.source_lang = h.lang and pp.target_lang = ?
-  where d.enabled = 1
+  where ${WORD_SOURCE_WHERE}
 `;
 
 /**
@@ -575,7 +595,7 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
         join dictionaries d on d.id = h.dict_id
         left join dict_pair_priority pp
           on pp.dict_id = d.id and pp.source_lang = h.lang and pp.target_lang = ?
-        where glosses_fts match ? and d.enabled = 1${reverseLangFilter}
+        where glosses_fts match ? and ${WORD_SOURCE_WHERE}${reverseLangFilter}
         order by priority, h.id
         limit ?
       `)
@@ -1064,6 +1084,115 @@ export function findLexiconEtymology(db: SqliteDb, query: EtymologyQuery): Lexic
   return {
     query: text,
     etymologies: selectLexiconEtymologies(ordered, query.limit ?? MAX_ETYMOLOGY_RESULTS),
+  };
+}
+
+export interface ExampleQuery {
+  text: string;
+  /** Sentence languages to search. The query's own detected languages when omitted. */
+  sourceLangs?: DictLangCode[];
+  /** Translation languages worth showing. All of them when omitted. */
+  glossLangs?: DictLangCode[];
+  limit?: number;
+}
+
+/**
+ * Sentences from an imported example corpus that contain the queried word.
+ *
+ * This is the first reader `examples`/`example_translations` have ever had. Both
+ * tables shipped in v1 with FTS5 and its triggers and no writer; the Tatoeba
+ * importer wrote sentences into `headwords` instead, which is why 200k sentences
+ * could be imported and none of them was reachable as an example.
+ *
+ * ## Why `instr` and not `examples_fts`, which is right there
+ *
+ * The same reason `findLexiconCompounds` cannot use `headwords_fts`: unicode61
+ * treats an unbroken CJK run as one token, so a phrase MATCH on 猫 matches a
+ * sentence only if 猫 is delimited in it — which in Japanese it essentially never
+ * is. The FTS table is genuinely useful for a Latin or Cyrillic corpus and
+ * genuinely useless for the Japanese one this feature exists for, so it is left in
+ * step by its triggers and not read here.
+ *
+ * ## Why the scan is capped and unordered
+ *
+ * `instr` over a text column cannot use an index whatever the SQL says, so the
+ * only lever is how much of the table is visited. `limit EXAMPLE_SCAN_ROWS` with
+ * no `ORDER BY` lets SQLite stop at the first few hundred matches — a common word
+ * therefore costs a fraction of the corpus. A global `order by length(e.text)`
+ * would instead force every sentence to be visited before the first row is
+ * returned, on the main process, for every lookup. Shortest-first is applied to
+ * the scanned rows in `selectLexiconExamples` instead, which is a bounded sample
+ * rather than the corpus optimum and is documented as such.
+ */
+export function findExampleSentences(db: SqliteDb, query: ExampleQuery): LexiconExampleResult {
+  const text = query.text.trim();
+  const empty: LexiconExampleResult = { query: text, examples: [] };
+  if (!text || [...text].length > MAX_EXAMPLE_QUERY_CHARS) return empty;
+
+  const langs = query.sourceLangs?.length ? [...new Set(query.sourceLangs)] : detectQueryLangs(text);
+  if (!langs.length) return empty;
+
+  // Only stores that declare themselves example corpora, which is the same
+  // predicate `WORD_SOURCE_WHERE` uses to keep them out of word lookups. The two
+  // halves are complementary on purpose: every enabled store is read by exactly
+  // one of them.
+  const rows = db.prepare(`
+    select e.id, e.lang, e.text, e.source, e.licence, e.dict_id, d.title as dict_title
+    from examples e
+    join dictionaries d on d.id = e.dict_id
+    where d.enabled = 1
+      and d.kind = '${EXAMPLE_DICTIONARY_KIND}'
+      and e.lang in (${langs.map(() => '?').join(',')})
+      and instr(e.text, ?) > 0
+    limit ?
+  `).all(...langs, text, EXAMPLE_SCAN_ROWS) as Array<{
+    id: number; lang: string; text: string; source: string | null; licence: string | null;
+    dict_id: string; dict_title: string;
+  }>;
+
+  const chosen = selectLexiconExamples(text, rows.map((row) => ({
+    exampleId: row.id,
+    lang: row.lang,
+    text: row.text,
+    dictId: row.dict_id,
+    dictTitle: row.dict_title,
+    ...(row.source ? { sourceId: row.source } : {}),
+    ...(row.licence ? { licence: row.licence } : {}),
+  })), query.limit ?? MAX_EXAMPLE_RESULTS);
+  if (!chosen.length) return empty;
+
+  // One bounded read for the handful that survived, rather than a join carrying
+  // every translation of all 400 scanned rows through the selection.
+  const glossLangs = query.glossLangs?.length ? [...new Set(query.glossLangs)] : [];
+  const langFilter = glossLangs.length
+    ? ` and t.lang in (${glossLangs.map(() => '?').join(',')})`
+    : '';
+  const translationRows = db.prepare(`
+    select t.example_id, t.lang, t.text
+    from example_translations t
+    where t.example_id in (${chosen.map(() => '?').join(',')})${langFilter}
+    order by t.example_id, t.rowid
+  `).all(...chosen.map((item) => item.exampleId), ...glossLangs) as Array<{
+    example_id: number; lang: string; text: string;
+  }>;
+  const byExample = new Map<number, LexiconExampleTranslation[]>();
+  for (const row of translationRows) {
+    const list = byExample.get(row.example_id) ?? [];
+    list.push({ lang: row.lang, text: row.text });
+    byExample.set(row.example_id, list);
+  }
+
+  return {
+    query: text,
+    examples: chosen.map((item) => ({
+      lang: item.lang,
+      text: item.text,
+      translations: byExample.get(item.exampleId) ?? [],
+      dictId: item.dictId,
+      dictTitle: item.dictTitle,
+      ...(item.sourceId ? { sourceId: item.sourceId } : {}),
+      ...(item.licence ? { licence: item.licence } : {}),
+    })),
   };
 }
 

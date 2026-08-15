@@ -30,7 +30,7 @@ import { BUNDLED_GLOSS_LANGS, BUNDLED_SOURCE_LANGS, DEFAULT_SOURCE_LANG } from '
 import { relabelDictionarySourceLang } from './sourceLang';
 
 /** Bumped by appending to MIGRATIONS. Never edit a released step. */
-export const DICT_SCHEMA_VERSION = 9;
+export const DICT_SCHEMA_VERSION = 10;
 
 export interface MigrationStep {
   version: number;
@@ -595,6 +595,52 @@ export const MIGRATIONS: MigrationStep[] = [
           (select count(*) from freq_corpora f where f.corpus = dictionaries.id)
         WHERE kind = 'freq' AND entry_count = 0
       `);
+    },
+  },
+  {
+    version: 10,
+    name: 'sentences move out of the headword index and into the examples tables',
+    up(db) {
+      // `examples`/`example_translations` shipped in v1 with FTS5 and its three
+      // triggers and no writer at all. The Tatoeba importer stored its sentences
+      // as `headwords`/`senses`/`glosses` instead, so a whole sentence was a
+      // headword: it answered ordinary word lookups, it fed the compound and
+      // neighbour probes, and `examples_fts` stayed permanently empty.
+      //
+      // `examples` has no owner column, which is why the importer could not have
+      // used it correctly even if it had tried — an example dictionary could
+      // neither be disabled nor deleted without stranding its rows. Adding the
+      // column is what makes the table usable, and SQLite accepts a REFERENCES
+      // clause on ADD COLUMN as long as the new column defaults to NULL.
+      const columns = db.prepare('PRAGMA table_info(examples)').all() as { name: string }[];
+      if (!columns.some((column) => column.name === 'dict_id')) {
+        db.exec('ALTER TABLE examples ADD COLUMN dict_id TEXT REFERENCES dictionaries(id) ON DELETE CASCADE');
+      }
+      db.exec('CREATE INDEX IF NOT EXISTS idx_examples_dict ON examples(dict_id)');
+
+      // Move what the old writer already stored. Ids are offset past the current
+      // maximum rather than reused, so the step is correct on a database that
+      // somehow already holds example rows instead of only on the empty ones every
+      // install actually has. `senses`/`glosses` cascade off `headwords`, and the
+      // FTS triggers retract the deleted terms, so the delete is the whole cleanup.
+      const offset = (db.prepare('select coalesce(max(id), 0) as top from examples').get() as { top: number }).top;
+      db.prepare(`
+        INSERT INTO examples (id, lang, text, source, licence, dict_id)
+        SELECT h.id + ?, h.lang, h.text, null, d.licence, d.id
+        FROM headwords h JOIN dictionaries d ON d.id = h.dict_id
+        WHERE d.kind = 'examples'
+      `).run(offset);
+      db.prepare(`
+        INSERT INTO example_translations (example_id, lang, text)
+        SELECT s.headword_id + ?, g.lang, g.text
+        FROM senses s
+        JOIN glosses g ON g.sense_id = s.id
+        JOIN headwords h ON h.id = s.headword_id
+        JOIN dictionaries d ON d.id = h.dict_id
+        WHERE d.kind = 'examples'
+        ORDER BY s.headword_id, s.ord, g.ord
+      `).run(offset);
+      db.exec(`DELETE FROM headwords WHERE dict_id IN (SELECT id FROM dictionaries WHERE kind = 'examples')`);
     },
   },
 ];
