@@ -752,6 +752,33 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     group: 'Media',
     advanced: true,
   },
+  {
+    // The panel itself lives on the scraper page (`ScraperPage.tsx`), but the
+    // only registry entry carrying `mal`/`myanimelist` used to be `api-keys` —
+    // a page that does not render it. A user searching "mal sync" landed on a
+    // page without the panel and concluded the feature was missing. The id
+    // matches the panel's `SettingsCard id="mal-sync"`, so following the result
+    // scrolls to and highlights the card rather than the top of a long page.
+    id: 'mal-sync',
+    titleKey: 'malSync.title',
+    descKey: 'malSync.desc',
+    keywords: [
+      'mal',
+      'mal sync',
+      'myanimelist',
+      'my anime list',
+      'anime list',
+      'manga list',
+      'account',
+      'oauth',
+      'connect',
+      'completed',
+      'sync',
+    ],
+    pageId: 'scraper',
+    group: 'Media',
+    advanced: true,
+  },
 
   // Media
   {

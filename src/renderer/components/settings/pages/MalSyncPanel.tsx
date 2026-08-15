@@ -24,6 +24,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useT } from '../../../i18n';
 import SettingsCard from '../SettingsCard';
+import { useSettings } from '../SettingsContext';
 import type { MalListStatus } from '../../../../shared/malSync';
 
 const REGISTER_URL = 'https://myanimelist.net/apiconfig';
@@ -48,6 +49,7 @@ const EMPTY_STATUS: Status = { configured: false, connected: false, tokensEncryp
 
 export default function MalSyncPanel() {
   const { t, lang } = useT();
+  const { focusSettingId } = useSettings();
   const [status, setStatus] = useState<Status>(EMPTY_STATUS);
   const [clientIdDraft, setClientIdDraft] = useState('');
   const [codeDraft, setCodeDraft] = useState('');
@@ -130,7 +132,14 @@ export default function MalSyncPanel() {
     );
 
   return (
-    <SettingsCard id="mal-sync" title={t('malSync.title')} description={t('malSync.desc')}>
+    <SettingsCard
+      id="mal-sync"
+      title={t('malSync.title')}
+      description={t('malSync.desc')}
+      // The scraper page renders ten cards; arriving from a settings search for
+      // "mal sync" has to land on this one rather than the top of the page.
+      highlight={focusSettingId === 'mal-sync'}
+    >
       <fieldset className="unified-search-controls">
         <legend>{t('malSync.setup')}</legend>
         <small className="muted">{t('malSync.clientIdDesc')}</small>

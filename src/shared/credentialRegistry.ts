@@ -229,7 +229,10 @@ export const CREDENTIAL_REGISTRY: CredentialSpec[] = [
     usedByKeys: ['credential.use.malSync'],
     store: 'vault',
     refusesWhenUnencrypted: true,
-    managedOnPage: 'study',
+    // `MalSyncPanel` is mounted only by `ScraperPage.tsx`. This said `study`,
+    // so the row's Manage button navigated to a page that does not contain the
+    // panel — the same wrong-page routing the settings search had.
+    managedOnPage: 'scraper',
   },
 ];
 
