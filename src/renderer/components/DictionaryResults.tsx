@@ -35,6 +35,7 @@ import { useT } from '../i18n';
 import CharacterMetadataPanel from './lexicon/CharacterMetadataPanel';
 import CharacterMetadataUnavailable from './lexicon/CharacterMetadataUnavailable';
 import ConjugationTable from './lexicon/ConjugationTable';
+import LexiconCollocations from './lexicon/LexiconCollocations';
 import LexiconCompounds from './lexicon/LexiconCompounds';
 import LexiconExamples from './lexicon/LexiconExamples';
 import LexiconEtymology from './lexicon/LexiconEtymology';
@@ -1012,6 +1013,13 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
 
       {variant !== 'popup' && entries.length > 0 && (
         <LexiconCompounds query={entries[0].word} lang={lang} onLookup={onLookup} />
+      )}
+
+      {/* Directly below the compounds, because the two answer neighbouring
+          questions about the same scan — what this word is written inside, and
+          what it is used with. */}
+      {variant !== 'popup' && entries.length > 0 && (
+        <LexiconCollocations query={entries[0].word} lang={lang} onLookup={onLookup} />
       )}
 
       {variant !== 'popup' && entries.length > 0 && (

@@ -360,6 +360,10 @@ declare global {
         text: string,
         options?: { sourceLangs?: string[]; glossLangs?: string[] },
       ): Promise<import('../shared/lexiconCompounds').LexiconCompoundResult>;
+      dictCollocations(
+        text: string,
+        options?: { sourceLangs?: string[] },
+      ): Promise<import('../shared/lexiconCollocations').LexiconCollocationResult>;
       dictExamples(
         text: string,
         options?: { sourceLangs?: string[]; glossLangs?: string[] },

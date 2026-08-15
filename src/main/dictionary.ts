@@ -45,6 +45,7 @@ import {
   resetChineseDictionaryCache,
   findSemanticNeighborsInDb,
   findLexiconCompoundsInDb,
+  findLexiconCollocationsInDb,
   findExampleSentencesInDb,
   findLexiconEtymologyInDb,
   findLexiconXrefsInDb,
@@ -86,6 +87,11 @@ import {
   MAX_COMPOUND_RESULTS,
   type LexiconCompoundResult,
 } from '../shared/lexiconCompounds';
+import {
+  MAX_COLLOCATION_QUERY_CHARS,
+  MAX_COLLOCATION_RESULTS,
+  type LexiconCollocationResult,
+} from '../shared/lexiconCollocations';
 import {
   MAX_EXAMPLE_QUERY_CHARS,
   MAX_EXAMPLE_RESULTS,
@@ -787,6 +793,29 @@ export function registerDictionaryIpc(): void {
         // optional on an un-migrated installation, and an expansion the reader
         // asked for degrades to "nothing to show" rather than to a rejected
         // invoke the surface would have to render as a defect.
+        return empty;
+      }
+    },
+  );
+  ipcMain.handle(
+    'dict:collocations',
+    (_e, text: unknown, options?: unknown): LexiconCollocationResult => {
+      const raw = options && typeof options === 'object' && !Array.isArray(options)
+        ? options as Record<string, unknown>
+        : {};
+      const query = typeof text === 'string' ? text.trim().slice(0, MAX_COLLOCATION_QUERY_CHARS) : '';
+      const empty: LexiconCollocationResult = { query, collocations: [] };
+      if (!query) return empty;
+      try {
+        return findLexiconCollocationsInDb({
+          text: query,
+          sourceLangs: readLangList(raw.sourceLangs),
+          limit: MAX_COLLOCATION_RESULTS,
+        });
+      } catch {
+        // Same contract as the compound expansion, and one extra failure this one
+        // can have: it writes, so a locked database reaches here too. Neither is
+        // something the surface should render as a defect.
         return empty;
       }
     },

@@ -1,0 +1,114 @@
+.lexicon-collocations {
+  margin: 14px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-1);
+  color: var(--text);
+}
+
+.lexicon-collocations > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.lexicon-collocations-note,
+.lexicon-collocations-empty {
+  margin: 8px 0 0;
+  font-size: 0.9em;
+}
+
+.lexicon-collocations-run {
+  margin-top: 10px;
+  min-height: 32px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.lexicon-collocations-run:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.lexicon-collocations-error {
+  margin: 8px 0 0;
+  color: var(--danger, #d14343);
+}
+
+.lexicon-collocations-list {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lexicon-collocations-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.lexicon-collocations-phrase {
+  display: inline-flex;
+  align-items: baseline;
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+/* The three parts of a phrase are marked differently because the row's whole
+   claim is that they are three parts: the queried word, the particle that joins
+   them, and the other word. Flattening them into one string would leave the
+   reader to take the parse on trust. */
+.lexicon-collocations-head {
+  color: var(--accent, #7c5cbf);
+}
+
+.lexicon-collocations-particle {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+/* Same treatment as the compound and xref links: the row reads as a phrase
+   rather than as a toolbar, so only the pointer, the underline and the focus
+   ring mark the partner as a control. */
+.lexicon-collocations-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--border);
+  text-underline-offset: 3px;
+}
+
+.lexicon-collocations-link:hover {
+  text-decoration-color: currentColor;
+}
+
+.lexicon-collocations-link:focus-visible {
+  outline: 2px solid var(--accent, currentColor);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.lexicon-collocations-count,
+.lexicon-collocations-source {
+  color: var(--muted);
+  font-size: 0.85em;
+}
+
+.lexicon-collocations-source {
+  flex: 1 1 auto;
+  text-align: end;
+}

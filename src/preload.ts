@@ -459,6 +459,12 @@ const api = {
     options?: { sourceLangs?: string[]; glossLangs?: string[] },
   ): Promise<import('./shared/lexiconCompounds').LexiconCompoundResult> =>
     ipcRenderer.invoke('dict:compounds', text, options),
+  /** Phrases where this word is joined to another word by a particle. */
+  dictCollocations: (
+    text: string,
+    options?: { sourceLangs?: string[] },
+  ): Promise<import('./shared/lexiconCollocations').LexiconCollocationResult> =>
+    ipcRenderer.invoke('dict:collocations', text, options),
   /** Sentences from an installed example corpus that contain this word. */
   dictExamples: (
     text: string,

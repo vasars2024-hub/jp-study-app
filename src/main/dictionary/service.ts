@@ -54,11 +54,13 @@ import {
 } from './importers/wiktextract';
 import {
   findExampleSentences,
+  findLexiconCollocations,
   findLexiconCompounds,
   findLexiconEtymology,
   findLexiconXrefs,
   findSemanticNeighbors,
   lookup,
+  type CollocationQuery,
   type CompoundQuery,
   type EtymologyQuery,
   type ExampleQuery,
@@ -82,6 +84,7 @@ import type {
 } from '../../shared/lexiconNotes';
 import type { DictResult } from '../../shared/types';
 import type { LexiconNeighborResult } from '../../shared/lexiconNeighbors';
+import type { LexiconCollocationResult } from '../../shared/lexiconCollocations';
 import type { LexiconCompoundResult } from '../../shared/lexiconCompounds';
 import type { LexiconExampleResult } from '../../shared/lexiconExamples';
 import type { LexiconEtymologyResult } from '../../shared/lexiconEtymology';
@@ -408,6 +411,19 @@ export function findSemanticNeighborsInDb(query: NeighborQuery): LexiconNeighbor
  */
 export function findLexiconCompoundsInDb(query: CompoundQuery): LexiconCompoundResult {
   return findLexiconCompounds(dictionaryDb(), query);
+}
+
+/**
+ * Phrases where the queried word is joined to another word by a particle.
+ *
+ * Opt-in for the same reason as its two siblings above, and with one difference
+ * worth knowing at this seam: unlike them it **writes** — it refreshes this head's
+ * rows in `collocations` before reading the payload back out. That is a bounded
+ * delete-and-insert of at most twelve rows, not an import, so it stays on this
+ * call rather than moving to the import worker.
+ */
+export function findLexiconCollocationsInDb(query: CollocationQuery): LexiconCollocationResult {
+  return findLexiconCollocations(dictionaryDb(), query);
 }
 
 /** Sentences from an installed example corpus that contain a word. */

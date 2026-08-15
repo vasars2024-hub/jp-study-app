@@ -45,6 +45,17 @@ import {
   type LexiconCompoundResult,
 } from '../../shared/lexiconCompounds';
 import {
+  COLLOCATION_SCAN_ROWS,
+  MAX_COLLOCATION_RESULTS,
+  collocationPattern,
+  draftLexiconCollocations,
+  renderCollocationPattern,
+  selectLexiconCollocations,
+  type CollocationDraft,
+  type LexiconCollocation,
+  type LexiconCollocationResult,
+} from '../../shared/lexiconCollocations';
+import {
   MAX_ETYMOLOGY_RESULTS,
   selectLexiconEtymologies,
   type LexiconEtymology,
@@ -997,6 +1008,164 @@ export function findLexiconCompounds(db: SqliteDb, query: CompoundQuery): Lexico
     };
   });
   return { query: text, compounds };
+}
+
+export interface CollocationQuery {
+  text: string;
+  /** Source languages to match headwords in. Every language when omitted. */
+  sourceLangs?: DictLangCode[];
+  limit?: number;
+}
+
+/**
+ * Phrases where this word is joined to another word by a particle.
+ *
+ * ## Why this writes to `collocations` and then reads back from it
+ *
+ * `collocations` was the last v1 table with neither a writer nor a reader, and the
+ * cheapest way to give it one would have been a cache: derive on a miss, serve
+ * stored rows on a hit. That is the version with a bug in it — enabling a
+ * dictionary, disabling one or re-importing changes the correct answer, and a row
+ * written before that change has no way to know. There is no revision column to
+ * compare against, and inventing one to protect a **75 ms** query is the wrong
+ * trade.
+ *
+ * So the derivation is unconditional and the table is written through on every
+ * call: the rows for this head are replaced, and the payload the surface renders is
+ * then read back out of `collocations` rather than assembled from the local
+ * variables. The table therefore has a genuine reader on the hot path — a stored
+ * row that failed to write is a row the reader does not return, which is exactly
+ * the coupling that keeps a write-only table from quietly rotting — and it
+ * self-heals on the next lookup after any dictionary change.
+ *
+ * ## The two indexed passes, and why neither is the obvious query
+ *
+ * The scan is `findLexiconCompounds`' scan and needs its `INDEXED BY idx_hw_norm`
+ * for the same measured reason. The attestation pass is the one worth warning
+ * about: the natural spelling of "is this partner a word" is
+ * `where h.text = ? or h.reading = ?`, and **`headwords.text` carries no index** —
+ * on the real 697,837-row database that is a full scan per partner, measured at
+ * **10.5 s for 猫 and 18.1 s for 腹**. Rewritten as one batched `norm in (...)`
+ * plus one `reading_norm in (...)`, both covered, the whole call is **71–82 ms**.
+ */
+export function findLexiconCollocations(
+  db: SqliteDb,
+  query: CollocationQuery,
+): LexiconCollocationResult {
+  const text = query.text.trim();
+  const empty: LexiconCollocationResult = { query: text, collocations: [] };
+  if (!text) return empty;
+
+  // Same guard, and the same reason, as the compound expansion: one indexed probe
+  // keeps a typo or a pasted fragment from paying for the scan below. Deliberately
+  // not scoped by `glossLangs` — whether 猫 is a headword is not a question about
+  // the language its definitions are wanted in.
+  const own = lookup(db, {
+    text,
+    sourceLangs: query.sourceLangs,
+    headwordsOnly: true,
+    limit: 8,
+  });
+  const exact = own.entries.filter((entry) => entry.via === 'exact' || entry.via === 'reading');
+  if (!exact.length) return empty;
+
+  const langs = [...new Set(exact.map((entry) => entry.lang))];
+  const placeholders = langs.map(() => '?').join(',');
+  const rows = db.prepare(`
+    select h.lang, h.text, h.reading, h.dict_id, d.title as dict_title
+    from headwords h indexed by idx_hw_norm
+    join dictionaries d on d.id = h.dict_id
+    where h.lang in (${placeholders})
+      and d.enabled = 1
+      and instr(h.norm, ?) > 0
+    order by h.score desc, length(h.text) asc, h.id asc
+    limit ?
+  `).all(...langs, normalizeForLookup(text), COLLOCATION_SCAN_ROWS) as Array<{
+    lang: string; text: string; reading: string | null;
+    dict_id: string; dict_title: string;
+  }>;
+
+  const drafts = draftLexiconCollocations(text, rows.map((row) => ({
+    lang: row.lang,
+    text: row.text,
+    reading: row.reading ?? '',
+    dictId: row.dict_id,
+    dictTitle: row.dict_title,
+  })));
+  if (!drafts.length) return empty;
+
+  const partners = [...new Set(drafts.map((draft) => normalizeForLookup(draft.partner)))];
+  const partnerHoles = partners.map(() => '?').join(',');
+  const attested = new Set<string>();
+  for (const row of db.prepare(`
+    select distinct h.norm as key
+    from headwords h indexed by idx_hw_norm
+    join dictionaries d on d.id = h.dict_id
+    where h.lang in (${placeholders}) and d.enabled = 1 and h.norm in (${partnerHoles})
+  `).all(...langs, ...partners) as Array<{ key: string }>) attested.add(row.key);
+  for (const row of db.prepare(`
+    select distinct h.reading_norm as key
+    from headwords h indexed by idx_hw_reading
+    join dictionaries d on d.id = h.dict_id
+    where h.lang in (${placeholders}) and d.enabled = 1 and h.reading_norm in (${partnerHoles})
+  `).all(...langs, ...partners) as Array<{ key: string }>) {
+    if (row.key) attested.add(row.key);
+  }
+
+  const chosen = selectLexiconCollocations(drafts, attested, query.limit ?? MAX_COLLOCATION_RESULTS);
+  const langKey = langs[0];
+
+  // One transaction, so a reader in another connection never sees this head with
+  // half its rows replaced. `count` is deliberately re-derived rather than summed
+  // into the existing row: it counts attesting dictionary entries *now*, and
+  // accumulating it across calls would turn it into a tally of how often the word
+  // was looked up.
+  const replace = db.transaction((items: readonly CollocationDraft[]) => {
+    db.prepare('delete from collocations where lang = ? and head = ?').run(langKey, text);
+    const insert = db.prepare(
+      'insert into collocations (lang, head, partner, pattern, count) values (?, ?, ?, ?, ?)',
+    );
+    for (const item of items) {
+      insert.run(langKey, text, item.partner, collocationPattern(item.particle, item.order), item.count);
+    }
+  });
+  try {
+    replace(chosen);
+  } catch {
+    // A read-only or locked database must not turn an expansion the reader asked
+    // for into a rejected invoke. The rows below then come back empty, which is
+    // the honest answer: nothing was stored, so nothing is reported as stored.
+  }
+
+  const stored = db.prepare(`
+    select partner, pattern, count from collocations
+    where lang = ? and head = ?
+  `).all(langKey, text) as Array<{ partner: string; pattern: string; count: number }>;
+
+  const byPartner = new Map(chosen.map((item) => [`${item.partner}\t${collocationPattern(item.particle, item.order)}`, item]));
+  const collocations: LexiconCollocation[] = [];
+  for (const row of stored) {
+    const draft = byPartner.get(`${row.partner}\t${row.pattern}`);
+    if (!draft) continue;
+    collocations.push({
+      lang: draft.candidate.lang,
+      head: draft.head,
+      partner: row.partner,
+      particle: draft.particle,
+      order: draft.order,
+      phrase: renderCollocationPattern(row.pattern, draft.head, row.partner),
+      pattern: row.pattern,
+      count: row.count,
+      reading: draft.candidate.reading,
+      dictId: draft.candidate.dictId,
+      dictTitle: draft.candidate.dictTitle,
+    });
+  }
+  // The stored read is unordered; restore the commonness order the scan produced.
+  const rank = new Map(chosen.map((item, index) => [`${item.partner}\t${collocationPattern(item.particle, item.order)}`, index]));
+  collocations.sort((a, b) => (rank.get(`${a.partner}\t${a.pattern}`) ?? 0) - (rank.get(`${b.partner}\t${b.pattern}`) ?? 0));
+
+  return { query: text, collocations };
 }
 
 export interface EtymologyQuery {
