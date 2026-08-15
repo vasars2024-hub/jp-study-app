@@ -292,6 +292,21 @@ describe('buildAnkiDraft', () => {
     expect(missing).toMatchObject({ severity: 'warning', count: 1, samples: ['run.mp3'] });
   });
 
+  it('counts one missing file once, however many notes cite it', () => {
+    const raw = fixture();
+    // A second note referencing the same absent clip: one file to go and find.
+    raw.notes.push({
+      id: 1003,
+      guid: 'cccc',
+      mid: 200,
+      mod: 1_690_000_200,
+      tags: '',
+      flds: ['走った', '[sound:run.mp3] [sound:walk.mp3]'].join(SEP),
+    });
+    const missing = build(raw).diagnostics.find((d) => d.code === 'missing-media');
+    expect(missing).toMatchObject({ count: 2, samples: ['run.mp3', 'walk.mp3'] });
+  });
+
   it('does not claim media is missing when the source carries no manifest', () => {
     const raw = fixture();
     delete raw.mediaFiles;

@@ -682,8 +682,11 @@ export function buildAnkiDraft(
         if (!mediaNames.has(ref.fileName)) {
           mediaNames.add(ref.fileName);
           mediaReferences += 1;
+          // Counted per FILE, like `mediaReferences` beside it. One absent
+          // audio clip cited by thirty notes is one file to go and find, and
+          // reporting it as thirty misstates the size of the problem.
+          if (hasMediaManifest && !ref.present) diag.add('missing-media', ref.fileName);
         }
-        if (hasMediaManifest && !ref.present) diag.add('missing-media', ref.fileName);
       }
       return {
         ord: index,

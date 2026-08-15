@@ -33,6 +33,7 @@ import {
   type ApkgDraftResult,
 } from '../../shared/ankiDraft';
 import { readRawCollection } from './apkgDraftRead';
+import { decodeMediaManifestNames } from './ankiProtoConfig';
 import { mt } from '../i18n';
 
 function focusedWindow(): BrowserWindow | undefined {
@@ -330,17 +331,29 @@ async function importApkgCards(filePath?: string): Promise<ApkgCardsResult> {
  *
  * The legacy `media` entry is a JSON map of `{"0": "cat.jpg"}` — the numeric key
  * IS the file's name inside the zip. The newer zstd package stores the same
- * manifest as protobuf, which is not read here; returning `undefined` then is
- * deliberate, because the draft only reports missing media when it has a
- * manifest to check against, and guessing would accuse a complete deck.
+ * manifest as a zstd-compressed protobuf, read here through
+ * `decodeMediaManifestNames`. Only a manifest in neither form returns
+ * `undefined`, because the draft reports missing media only when it has
+ * something to check against and guessing would accuse a complete deck.
  */
 function readMediaManifest(zip: AdmZip): string[] | undefined {
   const entry = zip.getEntry('media');
   if (!entry) return undefined;
+  const raw = entry.getData();
   try {
-    const parsed = JSON.parse(entry.getData().toString('utf8')) as Record<string, unknown>;
-    const names = Object.values(parsed).filter((v): v is string => typeof v === 'string');
-    return names;
+    const parsed = JSON.parse(raw.toString('utf8')) as Record<string, unknown>;
+    return Object.values(parsed).filter((v): v is string => typeof v === 'string');
+  } catch {
+    /* not the legacy JSON manifest — try the protobuf one below */
+  }
+
+  const zstd = (zlib as unknown as { zstdDecompressSync?: (b: Uint8Array) => Buffer })
+    .zstdDecompressSync;
+  if (typeof zstd !== 'function') return undefined;
+  try {
+    // A package with no media at all decompresses to zero bytes, which decodes
+    // to an empty list — the honest "it carries none", not "unknown".
+    return decodeMediaManifestNames(zstd(raw)) ?? undefined;
   } catch {
     return undefined;
   }

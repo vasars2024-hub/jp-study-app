@@ -198,3 +198,43 @@ export function decodeFieldConfig(value: unknown): AnkiFieldConfig | null {
     size: size != null && size > 0n && size < 1000n ? Number(size) : undefined,
   };
 }
+
+// ----- the media manifest ----------------------------------------------------
+
+/**
+ * The file names in a package's `media` manifest, protobuf flavour.
+ *
+ * A legacy .apkg stores the manifest as JSON (`{"0": "cat.jpg"}`); the zstd
+ * package stores the same information as a compressed protobuf, so the JSON
+ * reader gets `undefined` and the draft's missing-media check silently switches
+ * itself off — a deck with no media at all reports nothing missing.
+ *
+ * Shape, read off a real 104-file package: one repeated field 1, each entry
+ * carrying `name` (1, string), `size` (2, varint) and `sha1` (3, exactly 20
+ * bytes). The corroboration is arithmetic — 104 entries, 104 numbered files in
+ * the zip, and 104 media references in the collection.
+ *
+ * `null` when the bytes are not that message. An entry list that decodes but
+ * yields a nameless entry is rejected whole: half a manifest would accuse a
+ * complete deck of missing files, which is worse than not checking.
+ *
+ * The caller passes ALREADY-DECOMPRESSED bytes. Zero bytes is a real answer —
+ * a package that carries no media — and decodes to an empty list.
+ */
+export function decodeMediaManifestNames(value: unknown): string[] | null {
+  const bytes = asBytes(value);
+  if (!bytes) return null;
+  const fields = decodeWireFields(bytes);
+  if (!fields) return null;
+
+  const names: string[] = [];
+  for (const entry of fields) {
+    if (entry.field !== 1 || entry.wire !== WIRE_LEN || !entry.bytes) return null;
+    const inner = decodeWireFields(entry.bytes);
+    if (!inner) return null;
+    const name = text(inner, 1);
+    if (!name) return null;
+    names.push(name);
+  }
+  return names;
+}

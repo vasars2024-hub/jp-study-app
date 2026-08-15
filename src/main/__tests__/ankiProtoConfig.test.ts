@@ -13,6 +13,7 @@ import {
   decodeNotetypeConfig,
   decodeTemplateConfig,
   decodeFieldConfig,
+  decodeMediaManifestNames,
   templatesLookCloze,
 } from '../anki/ankiProtoConfig';
 
@@ -132,6 +133,33 @@ describe('decodeFieldConfig', () => {
   it('drops a size that is not a plausible font size', () => {
     expect(decodeFieldConfig(bytes([0x20, 0x00]))?.size).toBeUndefined();
     expect(decodeFieldConfig(bytes([0x20, 0x80, 0x80, 0x01]))?.size).toBeUndefined();
+  });
+});
+
+describe('decodeMediaManifestNames', () => {
+  /** One `MediaEntry`: name (1), size (2), and the 20-byte sha1 (3). */
+  function entry(name: string, size: number): number[] {
+    const inner = [...lenField(1, name), 0x10, size, 0x1a, 20, ...new Array(20).fill(0)];
+    return [0x0a, inner.length, ...inner];
+  }
+
+  it('reads the file names out of the repeated entries', () => {
+    expect(decodeMediaManifestNames(bytes(entry('cat.jpg', 12), entry('声.mp3', 40)))).toEqual([
+      'cat.jpg',
+      '声.mp3',
+    ]);
+  });
+
+  it('reads zero bytes as a package that carries no media, not as unknown', () => {
+    expect(decodeMediaManifestNames(new Uint8Array())).toEqual([]);
+  });
+
+  it('rejects the whole manifest rather than returning half of one', () => {
+    // A nameless entry: accepting the rest would accuse a complete deck.
+    expect(decodeMediaManifestNames(bytes(entry('cat.jpg', 12), [0x0a, 0x02, 0x10, 0x01]))).toBeNull();
+    // A top-level field that is not the repeated entry list.
+    expect(decodeMediaManifestNames(bytes([0x10, 0x01]))).toBeNull();
+    expect(decodeMediaManifestNames('{"0":"cat.jpg"}')).toBeNull();
   });
 });
 
