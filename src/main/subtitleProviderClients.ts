@@ -17,6 +17,7 @@
 import { net } from 'electron';
 import path from 'node:path';
 import type { SubtitleRecordFormat } from '../shared/subtitleRecord';
+import { chooseJimakuEntry } from '../shared/subtitleHarvest';
 import type { SubtitleProviderExecutionId } from '../shared/subtitleDiscoveryIpc';
 import {
   readSubtitleProviderSecret,
@@ -171,7 +172,23 @@ function episodeFromName(name: string): number | null {
 
 const JIMAKU = 'https://jimaku.cc/api';
 
-interface JimakuEntry { id: number; name?: string; anilist_id?: number; english_name?: string }
+interface JimakuEntry {
+  id: number;
+  name?: string;
+  anilist_id?: number;
+  english_name?: string;
+  japanese_name?: string;
+}
+
+/** Which question actually found the entry, so a caller can be honest about it. */
+export type JimakuMatchBasis = 'anilist' | 'title';
+
+export interface JimakuMatch {
+  candidates: ProviderSubtitleCandidate[];
+  /** The entry the files came from. `null` when the search matched nothing. */
+  entry: { id: number; name: string } | null;
+  basis: JimakuMatchBasis;
+}
 interface JimakuFile { name?: string; url?: string; size?: number }
 
 /**
@@ -186,8 +203,27 @@ export async function jimakuSearch(
   title: string,
   episode: number | null,
 ): Promise<ProviderSubtitleCandidate[]> {
+  return (await jimakuSearchDetailed(anilistId, title, episode)).candidates;
+}
+
+/**
+ * As `jimakuSearch`, and also says *which* entry answered.
+ *
+ * Split out rather than widening `jimakuSearch`, whose other caller
+ * (`subtitleDiscovery.ts`) matches against a local file and has no use for the
+ * entry. The harvest panel does: with the AniList id lookup down, a listing can
+ * be the wrong show, and a user who cannot see which entry was picked has no
+ * way to tell a fuzzy title hit from an exact one.
+ */
+export async function jimakuSearchDetailed(
+  anilistId: number | undefined,
+  title: string,
+  episode: number | null,
+): Promise<JimakuMatch> {
+  const basis: JimakuMatchBasis = anilistId ? 'anilist' : 'title';
+  const empty: JimakuMatch = { candidates: [], entry: null, basis };
   const key = keyFor('jimaku');
-  if (!key) return [];
+  if (!key) return empty;
 
   const query = anilistId
     ? `anilist_id=${encodeURIComponent(String(anilistId))}`
@@ -195,12 +231,12 @@ export async function jimakuSearch(
   const entries = await requestJson<JimakuEntry[]>(`${JIMAKU}/entries/search?${query}`, {
     headers: { Authorization: key },
   });
-  if (!entries?.length) return [];
+  if (!entries?.length) return empty;
 
   const out: ProviderSubtitleCandidate[] = [];
-  // Only the first entry: with an AniList id there is exactly one, and without one
-  // the later entries are progressively worse title guesses.
-  const entry = entries[0];
+  // Not `entries[0]`: the `?query=` search is fuzzy and unordered, and taking
+  // the first answered "Naruto" with BORUTO. See `chooseJimakuEntry`.
+  const entry = chooseJimakuEntry(entries, anilistId ? '' : title) ?? entries[0];
   const suffix = episode !== null ? `?episode=${encodeURIComponent(String(episode))}` : '';
   const files = await requestJson<JimakuFile[]>(`${JIMAKU}/entries/${entry.id}/files${suffix}`, {
     headers: { Authorization: key },
@@ -227,7 +263,11 @@ export async function jimakuSearch(
       fetchToken: url,
     });
   }
-  return out;
+  return {
+    candidates: out,
+    entry: { id: entry.id, name: (entry.name || entry.english_name || entry.japanese_name || '').trim() },
+    basis,
+  };
 }
 
 /** Jimaku serves files from its own CDN; the URL is fetched as-is. */

@@ -29,6 +29,7 @@ import {
   toSrt,
   type CombinedSeasonSegment,
   type HarvestFileCandidate,
+  type SubtitleHarvestListResult,
 } from '../../../shared/subtitleHarvest';
 import { parseSubtitles, type Cue } from '../../subtitles';
 import {
@@ -74,6 +75,16 @@ export default function SubtitleHarvestPanel({ anilistId, malId, title, episodes
   const [combine, setCombine] = useState(true);
   const [segments, setSegments] = useState<CombinedSeasonSegment[]>([]);
   const [cues, setCues] = useState<Cue[]>([]);
+  /**
+   * Which provider entry answered, and how.
+   *
+   * Shown rather than kept internal: a fuzzy title search can list a different
+   * show entirely, and a confident listing of the wrong series is the failure
+   * this panel must not have silently.
+   */
+  const [source, setSource] = useState<Pick<
+    SubtitleHarvestListResult, 'matchedBy' | 'entry' | 'idLookupDown'
+  > | null>(null);
   const [analysis, setAnalysis] = useState<MediaStudyAnalysis | null>(null);
   const [failures, setFailures] = useState<string[]>([]);
 
@@ -96,11 +107,17 @@ export default function SubtitleHarvestPanel({ anilistId, malId, title, episodes
     setNeedsKey(false);
     setAnalysis(null);
     setCues([]);
+    setSource(null);
     try {
       const result = await window.api.subtitleHarvestList({ anilistId, malId, title });
       setFiles(result.files);
       setNeedsKey(result.needsKey);
       setMessage(result.message);
+      setSource({
+        matchedBy: result.matchedBy,
+        entry: result.entry,
+        idLookupDown: result.idLookupDown,
+      });
       setPhase(result.ok ? 'listed' : 'error');
     } catch (error) {
       setMessage(errorText(error));
@@ -265,6 +282,21 @@ export default function SubtitleHarvestPanel({ anilistId, malId, title, episodes
             </span>
           ) : null}
           <span className="scr-muted">{t('subHarvest.plan.filed', { count: files.length })}</span>
+        </p>
+      ) : null}
+
+      {/* Which show the files actually came from. An exact id match is stated
+          quietly; a title guess is stated as a warning, because it is the one
+          that can silently be a different series. */}
+      {source?.entry ? (
+        <p
+          className={`mal-dl-note${source.matchedBy === 'title' ? ' mal-dl-miss' : ' scr-muted'}`}
+          role="status"
+        >
+          {source.matchedBy === 'title'
+            ? t('subHarvest.source.titleGuess', { name: source.entry.name })
+            : t('subHarvest.source.exact', { name: source.entry.name })}
+          {source.idLookupDown ? ` ${t('subHarvest.source.idLookupDown')}` : ''}
         </p>
       ) : null}
 

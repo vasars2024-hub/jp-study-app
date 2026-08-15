@@ -85,6 +85,20 @@ export interface SubtitleHarvestListResult {
   needsKey: boolean;
   files: HarvestFileCandidate[];
   message: string;
+  /**
+   * Which question found the entry. `'title'` means a fuzzy search, which can
+   * land on the wrong show, and the UI says so — a listing that is confidently
+   * BORUTO when the user asked for Naruto is worse than an empty one.
+   */
+  matchedBy: 'anilist' | 'title' | null;
+  /** The provider entry the files came from, named so the user can check it. */
+  entry: { id: number; name: string } | null;
+  /**
+   * The MAL→AniList id lookup could not answer, so the title guess was the only
+   * path left. Distinct from "this title has no AniList mapping": one is an
+   * outage that will pass, the other never will.
+   */
+  idLookupDown: boolean;
 }
 
 export interface SubtitleHarvestFetchResult {
@@ -259,4 +273,113 @@ export function toSrt(cues: readonly HarvestCue[]): string {
  */
 export function toPlainText(cues: readonly HarvestCue[]): string {
   return cues.map((cue) => cue.text.replace(/\s*\n\s*/g, ' ').trim()).filter(Boolean).join('\n');
+}
+
+// ----------------------------------------------------------- entry choice ---
+
+/**
+ * The fields of a Jimaku catalogue entry this module ranks on.
+ *
+ * Structural, not imported: `main/subtitleProviderClients.ts` owns the wire
+ * type, and `shared/` must not depend on `main/`.
+ */
+export interface JimakuEntryLike {
+  id: number;
+  name?: string;
+  english_name?: string;
+  japanese_name?: string;
+}
+
+/**
+ * Punctuation that distinguishes no two shows.
+ *
+ * Colons and dashes are the separators release names and catalogue names
+ * disagree about most (`Boruto: Naruto Next Generations` versus
+ * `Boruto - Naruto Next Generations`), so they become spaces rather than being
+ * deleted — deleting them would glue `Boruto` and `Naruto` into one token.
+ */
+const TITLE_NOISE = /[:!?.,'’"“”\-–—_/\\()[\]~・、。！？：]+/g;
+
+export function normalizeEntryTitle(value: string): string {
+  return value.toLowerCase().replace(TITLE_NOISE, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * How well one candidate name answers a query. Lower is better.
+ *
+ * The ladder is whole-word only. Substring matching would rank
+ * `Naruto Shippuuden` and `Naruto` identically for the query `Naruto`, and the
+ * point of this function is precisely to tell those apart.
+ */
+const NO_MATCH = 9;
+
+function nameScore(name: string, query: string): number {
+  const value = normalizeEntryTitle(name);
+  if (!value) return NO_MATCH;
+  if (value === query) return 0;
+  if (value.startsWith(`${query} `)) return 1;
+  if (query.startsWith(`${value} `)) return 2;
+  if (` ${value} `.includes(` ${query} `)) return 3;
+  if (` ${query} `.includes(` ${value} `)) return 4;
+  return NO_MATCH;
+}
+
+/**
+ * Pick the entry a title search actually meant.
+ *
+ * Jimaku's `?query=` search is fuzzy and returns entries in no useful order, so
+ * taking `entries[0]` is a coin flip — measured live on 2026-08-16, it answered
+ * `Naruto` with **BORUTO** (293 files, the wrong show), `One Piece` with a
+ * single 15th-anniversary special (1 file against the real entry's 2,885), and
+ * `Detective Conan` with a Lupin III crossover movie (3 files against 1,148).
+ * Each of those makes an episode range of, say, 100–200 resolve to nothing at
+ * all while the panel reports a successful listing.
+ *
+ * This is load-bearing right now rather than a nicety: AniList's GraphQL API
+ * answers **403 "temporarily disabled due to severe stability issues"** as of
+ * 2026-08-16, so the MAL→AniList hop that normally keeps a MyAnimeList title
+ * off the fuzzy path fails for every id, and the title search is the only path
+ * left.
+ *
+ * Ties break on the shorter name and then the lower id: between a base series
+ * and a sequel that both match, the base series is the one the plain title
+ * meant, and the ordering must not depend on the provider's response order.
+ */
+export function chooseJimakuEntry<T extends JimakuEntryLike>(
+  entries: readonly T[],
+  title: string,
+): T | null {
+  if (!entries.length) return null;
+  const query = normalizeEntryTitle(title ?? '');
+  // No query to rank against — the caller searched by id, where the provider's
+  // own ordering is the only signal there is.
+  if (!query) return entries[0];
+
+  let best: T | null = null;
+  let bestScore = Infinity;
+  let bestLength = Infinity;
+  for (const entry of entries) {
+    const names = [entry.name, entry.english_name, entry.japanese_name].filter(
+      (name): name is string => typeof name === 'string' && name.trim().length > 0,
+    );
+    if (!names.length) continue;
+    const score = Math.min(...names.map((name) => nameScore(name, query)));
+    // No name answered the query at all. Ranking such an entry against another
+    // one that also did not answer is inventing a preference out of nothing —
+    // shorter is not closer — so they are left to the provider's own order.
+    if (score === NO_MATCH) continue;
+    const length = Math.min(...names.map((name) => normalizeEntryTitle(name).length));
+    if (
+      score < bestScore
+      || (score === bestScore && length < bestLength)
+      || (score === bestScore && length === bestLength && best !== null && entry.id < best.id)
+    ) {
+      best = entry;
+      bestScore = score;
+      bestLength = length;
+    }
+  }
+  // Every entry scored 9 — nothing matched by name. The provider still returned
+  // these for the query, so the first is no worse a guess than giving up.
+  return best ?? entries[0];
 }

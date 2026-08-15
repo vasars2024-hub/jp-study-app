@@ -4092,6 +4092,9 @@ export const en: Catalog = {
   // Subtitle harvest — the words of a show, without downloading the show.
   'subHarvest.intro': 'Fetches the Japanese subtitles for the episodes selected above — no video — joins them into one transcript, and runs the same analysis the player\u2019s Study Mode uses.',
   'subHarvest.needsKey': 'Jimaku needs an API key before it will answer. Add one in Settings \u2192 Scraper \u2192 Subtitle providers.',
+  'subHarvest.source.exact': 'Matched by id: {name}.',
+  'subHarvest.source.titleGuess': 'Matched by title search: {name} \u2014 check this is the right show before harvesting.',
+  'subHarvest.source.idLookupDown': 'The AniList id lookup is unavailable, so a title search was the only option.',
   'subHarvest.combine': 'Combine into one season transcript',
   'subHarvest.action.find': 'Find subtitles',
   'subHarvest.action.finding': 'Searching Jimaku\u2026',

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   SEASON_EPISODE_GAP_SECONDS,
+  chooseJimakuEntry,
   combineSeasonCues,
   episodeAt,
   planSubtitleHarvest,
@@ -142,5 +143,65 @@ describe('exports', () => {
 
   it('flattens a multi-line cue into one plain-text line', () => {
     expect(toPlainText([{ start: 0, end: 1, text: 'first\nsecond' }])).toBe('first second');
+  });
+});
+
+describe('chooseJimakuEntry', () => {
+  // Names as Jimaku actually files them. The three wrong answers below are not
+  // hypothetical: on 2026-08-16 the live listing returned each of them for the
+  // plain title, because the code took `entries[0]`.
+  const naruto = { id: 983, name: 'Naruto', japanese_name: 'NARUTO -ナルト-' };
+  const boruto = { id: 1959, name: 'Boruto: Naruto Next Generations' };
+  const shippuuden = { id: 1000, name: 'Naruto: Shippuuden' };
+  const onePiece = { id: 1563, name: 'One Piece' };
+  const onePieceSpecial = {
+    id: 3425,
+    name: 'One Piece 3D2Y: Ace no Shi wo Koete! Luffy Nakama Tono Chikai',
+  };
+  const conan = { id: 743, name: 'Detective Conan', english_name: 'Case Closed' };
+  const lupinConan = { id: 900, name: 'Lupin III vs. Detective Conan' };
+
+  it('prefers the exact title over a sequel that contains it', () => {
+    // Provider order deliberately puts the wrong answer first — that ordering
+    // is exactly what produced 293 files of BORUTO for a Naruto harvest.
+    expect(chooseJimakuEntry([boruto, naruto, shippuuden], 'Naruto')?.id).toBe(983);
+  });
+
+  it('prefers the series over a special whose name starts with it', () => {
+    expect(chooseJimakuEntry([onePieceSpecial, onePiece], 'One Piece')?.id).toBe(1563);
+  });
+
+  it('prefers the series over a crossover film that contains it', () => {
+    expect(chooseJimakuEntry([lupinConan, conan], 'Detective Conan')?.id).toBe(743);
+  });
+
+  it('matches on the English name when the primary name is not the queried one', () => {
+    expect(chooseJimakuEntry([lupinConan, conan], 'Case Closed')?.id).toBe(743);
+  });
+
+  it('ignores punctuation and case differences between the two spellings', () => {
+    expect(chooseJimakuEntry([boruto, naruto], 'BORUTO - Naruto Next Generations')?.id).toBe(1959);
+  });
+
+  it('keeps the provider ordering when there is no title to rank on', () => {
+    // The id path: the caller asked by anilist_id, where the provider's order
+    // is the only signal and second-guessing it would be invention.
+    expect(chooseJimakuEntry([onePieceSpecial, onePiece], '')?.id).toBe(3425);
+  });
+
+  it('falls back to the first entry when nothing matches by name at all', () => {
+    // Still a guess, but the provider returned these *for this query*, so it is
+    // no worse than refusing — and the caller reports it as a title match.
+    expect(chooseJimakuEntry([boruto, shippuuden], 'Frieren')?.id).toBe(1959);
+  });
+
+  it('returns null for an empty listing rather than inventing an entry', () => {
+    expect(chooseJimakuEntry([], 'Naruto')).toBeNull();
+  });
+
+  it('does not depend on the order equal-scoring entries were returned in', () => {
+    const forward = chooseJimakuEntry([naruto, shippuuden, boruto], 'Naruto')?.id;
+    const reversed = chooseJimakuEntry([boruto, shippuuden, naruto], 'Naruto')?.id;
+    expect(forward).toBe(reversed);
   });
 });

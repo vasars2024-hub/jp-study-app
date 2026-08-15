@@ -26,7 +26,7 @@ import { ipcMain } from 'electron';
 import {
   fetchSubtitleCandidate,
   hasSubtitleProviderKey,
-  jimakuSearch,
+  jimakuSearchDetailed,
   type ProviderSubtitleCandidate,
 } from './subtitleProviderClients';
 import type {
@@ -84,9 +84,21 @@ const sleep = (ms: number) => new Promise<void>((resolve) => { setTimeout(resolv
 const ANILIST_GRAPHQL = 'https://graphql.anilist.co';
 const anilistByMal = new Map<number, number | null>();
 
-async function resolveAnilistId(malId: number): Promise<number | null> {
+/**
+ * `down` separates "AniList could not answer" from "AniList says there is no
+ * mapping". Both leave the caller on the title path, but only the first is
+ * temporary, and telling the user which one they hit is the difference between
+ * "try again later" and "this title is not on AniList".
+ *
+ * Measured 2026-08-16: the endpoint returns **403 "The AniList API has been
+ * temporarily disabled due to severe stability issues"** for every query, so
+ * `down` is the live case, not the rare one.
+ */
+interface AnilistResolution { id: number | null; down: boolean }
+
+async function resolveAnilistId(malId: number): Promise<AnilistResolution> {
   const cached = anilistByMal.get(malId);
-  if (cached !== undefined) return cached;
+  if (cached !== undefined) return { id: cached, down: false };
   try {
     const response = await fetch(ANILIST_GRAPHQL, {
       method: 'POST',
@@ -99,14 +111,20 @@ async function resolveAnilistId(malId: number): Promise<number | null> {
     if (!response.ok) {
       // Not cached: a 429 or a blip is not evidence the mapping does not exist,
       // and caching it would make one bad minute permanent for that title.
-      return null;
+      return { id: null, down: true };
     }
-    const body = await response.json() as { data?: { Media?: { id?: number } } };
+    const body = await response.json() as {
+      data?: { Media?: { id?: number } };
+      errors?: unknown[];
+    };
+    // A 200 carrying `errors` is how GraphQL reports its own failures, and
+    // reading that as "no mapping" would cache an outage as a fact.
+    if (Array.isArray(body?.errors) && body.errors.length) return { id: null, down: true };
     const id = body?.data?.Media?.id ?? null;
     anilistByMal.set(malId, id);
-    return id;
+    return { id, down: false };
   } catch {
-    return null;
+    return { id: null, down: true };
   }
 }
 
@@ -117,9 +135,17 @@ export async function listSubtitleHarvest(
   let anilistId = Number.isInteger(input.anilistId) && (input.anilistId ?? 0) > 0
     ? (input.anilistId as number)
     : undefined;
+  let idLookupDown = false;
+  const blank = { matchedBy: null, entry: null, idLookupDown: false } as const;
 
   if (!anilistId && !title && !input.malId) {
-    return { ok: false, needsKey: false, files: [], message: 'No AniList id and no title to search with.' };
+    return {
+      ok: false,
+      needsKey: false,
+      files: [],
+      message: 'No AniList id and no title to search with.',
+      ...blank,
+    };
   }
   // Distinguished from "no results" on purpose: a missing key is a thing the
   // user can fix, and reporting it as an empty list sends them looking for a
@@ -130,22 +156,25 @@ export async function listSubtitleHarvest(
       needsKey: true,
       files: [],
       message: 'Jimaku needs an API key before it will answer. Add one in Settings → Scraper → Subtitle providers.',
+      ...blank,
     };
   }
 
   // A MAL candidate is put on the id path before the title fallback is
   // considered; failing that, `jimakuSearch` still has the title to try.
   if (!anilistId && input.malId) {
-    anilistId = (await resolveAnilistId(input.malId)) ?? undefined;
+    const resolved = await resolveAnilistId(input.malId);
+    anilistId = resolved.id ?? undefined;
+    idLookupDown = resolved.down;
   }
 
   try {
     // `null` episode asks for the whole entry, which is what lets one request
     // serve both "episodes 20-24" and "the whole season" — the choosing is
     // `planSubtitleHarvest`'s job, not the network's.
-    const candidates = await jimakuSearch(anilistId, title, null);
-    remember(candidates);
-    const files: HarvestFileCandidate[] = candidates.map((candidate) => ({
+    const match = await jimakuSearchDetailed(anilistId, title, null);
+    remember(match.candidates);
+    const files: HarvestFileCandidate[] = match.candidates.map((candidate) => ({
       id: candidate.providerItemId,
       name: candidate.releaseName,
       format: candidate.format,
@@ -155,6 +184,9 @@ export async function listSubtitleHarvest(
       needsKey: false,
       files,
       message: files.length ? '' : 'Jimaku has no Japanese subtitles filed for this title.',
+      matchedBy: match.entry ? match.basis : null,
+      entry: match.entry,
+      idLookupDown,
     };
   } catch (error) {
     return {
@@ -162,6 +194,9 @@ export async function listSubtitleHarvest(
       needsKey: false,
       files: [],
       message: error instanceof Error ? error.message : String(error),
+      matchedBy: null,
+      entry: null,
+      idLookupDown,
     };
   }
 }
