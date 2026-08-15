@@ -21357,3 +21357,56 @@ skipped, 8,265 tests passed / 6 skipped** — no failures at all, so the previou
 extending `canPinSense`'s control rule is its own decision. (2) `inflections`, `freq_corpora`,
 `examples`, `chars` still have writers unrun on this install — a data state. (3) The collocation
 partner still shows no gloss.
+
+## Track 2 — the two open items on the list, closed — 2026-08-15 14:00 MSK primary
+
+Boss audit's last section is still 2026-08-15 04:24, nothing pending. Fusion re-derived
+first per the alternation: `584319cd` exists and touches the paths it names, §6(4) closed
+with live-IPC evidence, no open defect recorded — so this turn is main-v1.
+
+**Slice 1 — `de8488b2`. Open item (1): a single-sense token had no Explain.** It was not a
+control at all. The rule is now "the panel has something to put in it": `canPinSense(match)
+|| hasExplainGrounding(match)`. **Decision (standing auto-approval): the grounding check is
+defined *through* `explainSensesFromMatch`**, not by re-reading the same fields, so the
+check and the request payload cannot disagree — if it says yes, the request carries a gloss.
+A token whose dictionary said nothing in the reader's targets still stays plain text; asking
+a model to explain it would ground prose in the word alone. The panel drops the sense `<ul>`
+when there is one sense — "no pinned sense" against one option is a choice with one outcome
+— and says so instead. 3 keys ×4.
+
+**How much this was worth, measured not assumed.** `senses` is populated only when the entry
+offers **more than one in the requested targets**, so on a *single-dictionary* install it is
+absent for every token: a live lookup of 猫を見た。 with `glossLangs: ['ru']` returned senses
+0/0/0. Before this slice such an install had no Explain anywhere in the interlinear flow.
+
+**Slice 2 — `20ffa0e0`. Open item (3): the collocation partner had no gloss.** The row named
+a partner, made it a link, and said nothing about it — 猫の額 cost a second search.
+`partnerGloss` is optional and **derived per call, never stored**: it belongs to the
+partner's entry, which a dictionary change moves, and `collocations` has no revision column.
+Resolved partner → one best-scoring headword id → the compound expansion's own bounded gloss
+read; the single-join spelling (`h.norm in (...)` straight through to `glosses`) is unbounded,
+dragging hundreds of rows through the sort for one string. `reading_norm` is probed only for
+partners `norm` did not resolve — the set attestation kept on their reading alone.
+`glossLangs` added to the query/handler/preload for parity with `dictCompounds`.
+
+**Live, real IPC, main restarted (main changed — a preload binding proves nothing).**
+`dictCollocations('猫')` → 9/9 rows glossed on the real 697,837-headword database: 額
+"(picture) frame", 小判 "koban", 鰹節 "katsuobushi", and **かぶる "to put on (one's head)"** —
+the reading-only path, live. `glossLangs:['ru']` → 9 rows, **0** glosses: attestation is not
+a question about gloss language. Component mounted, all 9 `.lexicon-collocations-gloss`
+rendered, source still row-end. Slice 1 live: になった (head 胼胝, senses 0) is now a control
+labelled `Объяснить слово になった`, panel `О слове 胼胝`, no sense list, RU single-sense note,
+EntryExplain mounted → **real Gemini call**, 4 RU sections, provenance line; Forget → offer.
+
+**Traps.** (1) `src/preload.ts` has **mixed terminators** — it contains CRLF and the
+`dictCollocations` block is LF, so `head.includes('\r\n')` picks the wrong one and the anchor
+reads as "not in HEAD". `debug/stage-colloc-preload.cjs` discovers it from the anchor itself.
+(2) The Bash tool is Git Bash: a PowerShell `@'…'@` here-string in `git commit -m` lands
+verbatim and the subject becomes `@`. Use `-F <file>`.
+
+**Gates**, shared tree. `npx vitest run` exit 0: **620 files passed / 1 skipped, 8,272 tests
+passed / 6 skipped** — no failures. i18n exit 0 at **9,625** (+3). architecture exit 0,
+**Nothing new**, 2 known pending. eslint clean on all 13 touched paths.
+
+**Deliberately open.** (2) `inflections`, `freq_corpora`, `examples`, `chars` still have
+writers unrun on this install — a data state, not code. Items (1) and (3) are closed.
