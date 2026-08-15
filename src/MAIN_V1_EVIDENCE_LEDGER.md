@@ -21025,5 +21025,66 @@ fall into reply order; `resolved` branch → every availability marker disappear
   a default install this panel is absent for every word. JMdict's own `<xref>` elements are the
   obvious second writer and the legacy Yomitan migration drops them — that is the next slice's
   shape, and it is what would make this surface non-empty without a manual import.
+  **CLOSED 2026-08-15 by `0256ebd`** — and the premise was half wrong. The migration did not drop
+  them; it stored them as `see: …` *glosses*. 53,089 xrefs now exist on the default install. The
+  guess at "a JMdict XML importer" was also wrong: there is none, JMdict arrives via the legacy
+  Yomitan store.
 - Cross-references are not clickable. That needs a lookup callback threaded through
   `DictionaryResults`, which no sibling panel has either; it is one shared slice, not four.
+
+## Track 2 — the cross references that were sitting in the definition list — 2026-08-15 05:55 MSK primary
+
+No interrupted slice. Previous entry named "JMdict's own `<xref>` as the second writer" as the
+next slice's shape, and it re-derived — but not where it expected. There is **no JMdict XML
+importer** in this repo (`jmnedict.ts` is names-only, no `<xref>`); JMdict arrives through the
+legacy Yomitan store. The xrefs were already imported, into the wrong table: the conversion
+renders `<xref>` as definition strings beginning `see: `, and `importLegacyIndex` stored them
+verbatim. Real install: **53,540** of 1,333,201 glosses, all `bundled-jmdict-en`. So 裏表 listed
+"see: 表裏 2. duplicity; double-dealing" among its own meanings and 表裏 was unreachable from it.
+
+**Slice — `0256ebd`. Writer, in-place repair, and the honest remainder.** `parseLegacyXref` splits
+at import; **schema step 11** does the same lift on existing databases, which is the load-bearing
+half: `pendingLegacyStores` only re-reads a store whose id is *not* already in `dictionaries`, so
+without the step every existing install keeps the polluted glosses and an empty panel forever.
+Decisions: (1) target is everything up to the first **ASCII space** — a character class fails on
+`Ｔシャツ`, `３時のおやつ`, `勝てば官軍、負ければ賊軍`, all real (378 of 53,540); (2) a `（かな）`
+annotation is stripped or the target can never match `headwords.norm`; (3) kind is `see`, not `syn`
+— the schema has `see` precisely so JMdict's claim need not be inflated; (4) not restricted to
+`bundled-jmdict-*`, because a user's own JMdict archive is identical and it is the parser's guards,
+not the dict id, that protect a real definition; (5) `MAX_XREF_TARGET_CHARS` moved to the shared
+contract now that two writers share it.
+
+**Measured on the real 378 MB dict.db** (copy first, then live). 53,540 candidates → **53,089**
+xrefs in **3.2 s**; glosses 1,333,201 → 1,280,112; headwords/senses **unchanged** at 697,837;
+**0** senses left glossless; **0** ord holes; idempotent (re-run → 53,089). The **451** that stay
+are, every one, self references by text — JMdict pointing between two readings of one spelling
+(更衣 こうい/ころもがえ). Kept as glosses deliberately: `to_text` has nowhere to put the reading, so
+an xref would point at the entry already open, and deleting it would drop a pointer to a real
+other reading. Classified all 451 mechanically, not by eye — the only rejection reason is
+`self reference`.
+
+**Live acceptance** (own `npm start`, bridge pid **36348**). App start migrated the real database:
+`user_version` 10 → **11**, `xrefs` 0 → **53,089**, `see: ` glosses 53,540 → 451. Live
+`dictXrefs('裏表')` → `{kind:'see', text:'表裏', dictId:'bundled-jmdict-en', resolved:true}`.
+Nothing was backed up and nothing needed to be: the migration never touches
+`yomitan/bundled-jmdict-en/index.json`, so "Rebuild index" reconstructs from source.
+
+**Trap — the NUL byte again, same tool, second slice running.** `/[^\x00-]/u` written through Edit
+landed a **real 0x00** in `migrate.ts` and git classified it binary. Caught by a byte scan before
+commit; all four committed blobs re-verified 0 NUL. Also: `/eval` mangles non-ASCII through the
+shell — `dictXrefs('裏表')` arrived as `query:"??"`. Use `\uXXXX` escapes in bridge JS, always.
+
+**Deliberately open.** (1) **24.7% of the new rows will render "not in your dictionaries" when
+they are in them**: 13,204 of 53,540 targets are bare kana (`see: みっこくしゃ …` for 密告者), and
+`findLexiconXrefs`'s resolution probe (`dictService.ts:1207-1216`) tests `h.norm` only. `idx_hw_reading
+ON headwords(lang, reading_norm)` already exists, so this is a second batch probe unioned into
+`resolved` — no migration, no new index. That is the next slice. (2) Step 11 costs 3.2 s on the
+main thread at first dictionary use after upgrade; left there because a migration must complete
+before any read, so splitting it across processes is a much larger change than this slice.
+(3) `collocations`/`audio` still have no writer. (4) Cross references still are not clickable.
+
+**Gates** (shared tree, which carries ~426 foreign status entries; the branch is known red at
+committed HEAD for reasons owned by other tracks — boss-audit finding 2). i18n **9,582** keys,
+exit 0. architecture exit 0, **Nothing new**, 2 known pending. eslint on all 7 touched paths
+exit **0**. Targeted: 190 passed across the 7 dictionary suites. Full `npx vitest run` recorded
+in the handoff.
