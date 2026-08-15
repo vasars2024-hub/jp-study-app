@@ -8495,6 +8495,7 @@ export const ja: Catalog = {
   'lexicon.xrefs.kind.see': '参照',
   'lexicon.xrefs.kind.cf': '比較',
   'lexicon.xrefs.notInstalled': '辞書に未収録',
+  'lexicon.xrefs.lookup': '{word} を検索',
   'lexicon.compounds.title': 'この語を含む語',
   'lexicon.compounds.note': 'インストール済み辞書の見出し語のうち、この語を文字どおり含むものを、一般的な順に表示します。一致部分は各語の中で強調されます。',
   'lexicon.compounds.action': 'この語を含む語を検索',

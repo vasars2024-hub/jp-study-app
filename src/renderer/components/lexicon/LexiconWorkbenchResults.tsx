@@ -123,6 +123,8 @@ interface Props {
   lookupAttempt: number;
   lens?: LexiconLensOverride;
   glossLang?: GlossLang;
+  /** Passed straight through to `DictionaryResults`; see its own prop doc. */
+  onLookup?: (word: string) => void;
 }
 
 export default function LexiconWorkbenchResults({
@@ -131,6 +133,7 @@ export default function LexiconWorkbenchResults({
   lookupAttempt,
   lens = 'auto',
   glossLang = 'en',
+  onLookup,
 }: Props) {
   const { t } = useT();
   const [selectedLens, setSelectedLens] = useState<LexiconLensOverride>(lens);
@@ -480,7 +483,7 @@ export default function LexiconWorkbenchResults({
         </div>
       )}
       {!interlinear ? (
-        <DictionaryResults key={lookupAttempt} query={query} variant="page" lang={lang} />
+        <DictionaryResults key={lookupAttempt} query={query} variant="page" lang={lang} onLookup={onLookup} />
       ) : (
         <div className="lexicon-interlinear">
           <div className="lexicon-interlinear-meta">

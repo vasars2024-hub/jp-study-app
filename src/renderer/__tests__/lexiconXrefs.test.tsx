@@ -2,8 +2,8 @@
 //
 // The claim under test: the related-words panel shows relations a dictionary
 // actually stated, grouped by the four kinds the schema documents, and marks
-// which targets this install can look up — without rendering any of them as a
-// link, because no panel in this column has word-click navigation. It is
+// which targets this install can look up — turning exactly those into controls
+// when the host passed a lookup callback, and none of them when it did not. It is
 // **absent**, not empty and not an error row, whenever nothing states a relation.
 import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -139,12 +139,44 @@ describe('Related words', () => {
     }
   });
 
-  it('renders no target as a link, because there is nowhere for one to go', async () => {
+  it('renders no target as a control when the host offered no lookup to run', async () => {
     stubApi({ query: '犬', entries: [ENTRY] } as DictResult);
     await render(<DictionaryResults query="犬" variant="page" lang="ja" />);
 
     expect(section()?.querySelectorAll('a')).toHaveLength(0);
     expect(section()?.querySelectorAll('.lexicon-xrefs-word button')).toHaveLength(0);
+  });
+
+  it('makes exactly the resolved targets clickable when the host can run a lookup', async () => {
+    stubApi({ query: '犬', entries: [ENTRY] } as DictResult);
+    const onLookup = vi.fn();
+    await render(<DictionaryResults query="犬" variant="page" lang="ja" onLookup={onLookup} />);
+
+    // 狗, 狼 and 子犬 are unresolved: a control over them would open an empty
+    // result, which is the dead control the honest label exists to avoid.
+    expect([...host.querySelectorAll('.lexicon-xrefs-link')].map((el) => el.textContent))
+      .toEqual(['ワンちゃん', '猫']);
+    for (const el of words().filter((w) => w.classList.contains('is-absent'))) {
+      expect(el.querySelector('button')).toBeNull();
+    }
+  });
+
+  it('runs the lookup for the word that was clicked, not the word being read', async () => {
+    stubApi({ query: '犬', entries: [ENTRY] } as DictResult);
+    const onLookup = vi.fn();
+    await render(<DictionaryResults query="犬" variant="page" lang="ja" onLookup={onLookup} />);
+
+    const link = host.querySelectorAll('.lexicon-xrefs-link')[1] as HTMLButtonElement;
+    await act(async () => { link.click(); });
+    expect(onLookup.mock.calls).toEqual([['猫']]);
+  });
+
+  it('names the target in the control’s own tooltip, through i18n', async () => {
+    stubApi({ query: '犬', entries: [ENTRY] } as DictResult);
+    await render(<DictionaryResults query="犬" variant="page" lang="ja" onLookup={vi.fn()} />);
+
+    expect((host.querySelector('.lexicon-xrefs-link') as HTMLElement).title)
+      .toBe('lexicon.xrefs.lookup:ワンちゃん');
   });
 
   it('tags each word with the language of the sense it came from', async () => {

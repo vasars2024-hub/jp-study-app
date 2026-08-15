@@ -8909,6 +8909,7 @@ export const en: Catalog = {
   'lexicon.xrefs.kind.see': 'See also',
   'lexicon.xrefs.kind.cf': 'Compare',
   'lexicon.xrefs.notInstalled': 'not in your dictionaries',
+  'lexicon.xrefs.lookup': 'Look up {word}',
   'lexicon.compounds.title': 'Words containing this one',
   'lexicon.compounds.note': 'Headwords from your installed dictionaries that literally contain this word, most common first. The matching part is highlighted in each.',
   'lexicon.compounds.action': 'Find containing words',

@@ -98,6 +98,23 @@ export default function DictionaryView() {
     setLookupAttempt((attempt) => attempt + 1);
   }
 
+  /**
+   * Open a word one of the expansion panels points at — today the cross
+   * references, tomorrow whichever sibling takes the same callback.
+   *
+   * Deliberately keeps the current language rather than re-detecting it, unlike
+   * `openNotedWord`: the target was resolved *inside* this language's partition
+   * by the panel that offered it, so switching would look the word up somewhere
+   * it was never claimed to exist. The search box is filled as well as fired, so
+   * the box never disagrees with what is on screen and the reader can edit the
+   * word they just arrived at.
+   */
+  function openRelatedWord(word: string) {
+    setInput(word);
+    setQuery(word);
+    setLookupAttempt((attempt) => attempt + 1);
+  }
+
   const isZh = lang === 'zh';
 
   // View menu (language) + source status — Aero only (AppChrome pass-through in
@@ -189,7 +206,12 @@ export default function DictionaryView() {
             : 'Tip: while reading a book you can highlight any word to look it up instantly. Tap the star icon on a result to save it to Flashcards.'}
         </p>
       ) : (
-        <LexiconWorkbenchResults query={query} lang={lang} lookupAttempt={lookupAttempt} />
+        <LexiconWorkbenchResults
+          query={query}
+          lang={lang}
+          lookupAttempt={lookupAttempt}
+          onLookup={openRelatedWord}
+        />
       )}
     </div>
     </AppChrome>

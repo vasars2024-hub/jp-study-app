@@ -8460,6 +8460,7 @@ export const zh: Catalog = {
   'lexicon.xrefs.kind.see': '参见',
   'lexicon.xrefs.kind.cf': '比较',
   'lexicon.xrefs.notInstalled': '词典中没有',
+  'lexicon.xrefs.lookup': '查询 {word}',
   'lexicon.compounds.title': '含有该词的词',
   'lexicon.compounds.note': '已安装词典中字面上含有该词的词条，按常用程度排列。匹配部分在每个词中高亮显示。',
   'lexicon.compounds.action': '查找含有该词的词',

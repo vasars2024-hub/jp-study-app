@@ -139,6 +139,16 @@ interface Props {
   context?: string;
   /** Which dictionary to use: Japanese (Jisho) or Chinese (CC-CEDICT). */
   lang?: DictLang;
+  /**
+   * Run a fresh lookup for a word one of the expansion panels points at.
+   *
+   * The single navigation seam for this whole column: the panels below own no
+   * query state, and a host that has no search box to answer with simply omits
+   * it, which leaves every target a plain label rather than a control that goes
+   * nowhere. `LexiconXrefs` is the first consumer; its siblings can take the
+   * same callback without a second mechanism.
+   */
+  onLookup?: (word: string) => void;
 }
 
 type AddState = 'idle' | 'translating' | 'adding' | 'added' | 'dup' | 'error';
@@ -247,7 +257,7 @@ function glossFor(entry: DictEntry): string {
     .join(' / ');
 }
 
-export default function DictionaryResults({ query, variant = 'popup', lang = 'ja', context }: Props) {
+export default function DictionaryResults({ query, variant = 'popup', lang = 'ja', context, onLookup }: Props) {
   const { t } = useT();
   const [result, setResult] = useState<DictResult | null>(null);
   const [anki, setAnki] = useState<AnkiStatus | null>(null);
@@ -991,7 +1001,7 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
           reason: indexed probes only, and absent entirely when the installed
           dictionaries state no relation for the word. */}
       {variant !== 'popup' && entries.length > 0 && (
-        <LexiconXrefs query={entries[0].word} lang={lang} />
+        <LexiconXrefs query={entries[0].word} lang={lang} onLookup={onLookup} />
       )}
 
       {variant !== 'popup' && entries.length > 0 && (

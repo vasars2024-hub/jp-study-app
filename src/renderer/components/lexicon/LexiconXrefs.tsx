@@ -12,6 +12,13 @@ interface Props {
   query: string;
   /** Source language of the lookup, so a Han word is not probed in both. */
   lang: string;
+  /**
+   * Run a fresh lookup for a target, when the host owns a search box to run it
+   * in. Omitted by every host that does not: the popup is a glance surface and
+   * Translate's query is the user's own text, so a control there would either
+   * go nowhere or overwrite what they typed.
+   */
+  onLookup?: (text: string) => void;
 }
 
 /**
@@ -38,16 +45,17 @@ const XREF_KIND_KEYS: Record<LexiconXrefKind, string> = {
  * the gloss list at import and by schema step 11, so the panel is populated
  * before a user imports anything.
  *
- * ## Why the targets are not links
+ * ## Which targets are links, and which deliberately are not
  *
- * They are marked available or not, and neither is clickable. No panel in this
- * column has word-click navigation, so a link here would either need a callback
- * that does not exist or would be a control that goes nowhere — and a dead
- * control is a worse answer than an honest label. What the marker does carry is
- * real: a cross reference is free text, and `resolved` is the difference between
- * a word this install can actually look up and one only Wiktionary has.
+ * Only a `resolved` target, and only when the host passed `onLookup`. Both
+ * halves matter. `resolved` is not decoration: a cross reference is free text,
+ * and it is the difference between a word this install can actually look up and
+ * one only the source dictionary has — so a link over an unresolved target would
+ * open an empty result, which is exactly the dead control the honest label
+ * replaced. And a host without a search box has nowhere to run the lookup, so it
+ * passes no callback and every target stays a plain label there.
  */
-export default function LexiconXrefs({ query, lang }: Props) {
+export default function LexiconXrefs({ query, lang, onLookup }: Props) {
   const { t } = useT();
   const [xrefs, setXrefs] = useState<LexiconXref[]>([]);
   const run = useRef(0);
@@ -98,7 +106,18 @@ export default function LexiconXrefs({ query, lang }: Props) {
                 key={`${row.kind}-${row.text}`}
                 lang={row.lang}
               >
-                <span className="lexicon-xrefs-text">{row.text}</span>
+                {onLookup && row.resolved ? (
+                  <button
+                    className="lexicon-xrefs-text lexicon-xrefs-link"
+                    onClick={() => onLookup(row.text)}
+                    title={t('lexicon.xrefs.lookup', { word: row.text })}
+                    type="button"
+                  >
+                    {row.text}
+                  </button>
+                ) : (
+                  <span className="lexicon-xrefs-text">{row.text}</span>
+                )}
                 {!row.resolved && (
                   <span className="lexicon-xrefs-absent-note">
                     {t('lexicon.xrefs.notInstalled')}
