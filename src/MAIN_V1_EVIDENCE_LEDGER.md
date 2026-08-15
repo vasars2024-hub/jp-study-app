@@ -22373,3 +22373,33 @@ working trees were not touched. Scripts: `debug/stage-enrich-i18n{,2}.cjs`.
 
 **Next: gate 12, reviewed AI additions.** Gate 11's export/reimport half is blocked on
 Phase 6 — `src/main/anki/` has no exporter, so that round trip cannot run yet.
+
+## 2026-08-15 23:40 — mal-pipeline P0 gate 1: the qBittorrent API key, proven against the real daemon
+
+The user entered the WebUI API key into the OS keychain themselves at ~22:30; nothing here
+reads it back, and the app has no channel that could.
+
+- **Gate 1 PASSES.** `window.api.scraperQbitTest` on the active profile `relay-probe`
+  (`authMode:'apiKey'`, `apiKeyRef:'qbit/apikey'`, `127.0.0.1:8080`) → `connected`, version
+  **5.2.3**, **30 ms**. Validity control: an unauthenticated `curl` to the same path returns
+  **403** under `WebUI\LocalHostAuth=true`, so "connected" is a real result.
+- **Precondition checked first** because it is the one that silently wastes a turn: a key
+  saved while `authMode` is still `password` fails identically to an absent key
+  (`renderer/components/scraper/settings/fields.ts:271` — the unselected mode is ignored, not
+  a fallback). It was already `apiKey`; no UI defect to file.
+- **Four negative controls, live, on the real main-process client.** Request count and header
+  name are not readable off a real daemon without the secret, so those ran through
+  `debug/qbit-count-proxy.cjs` (127.0.0.1:8099, 403/404/200 by mode file, logs every request)
+  with a decoy key: wrong key → `unauthorized` + **exactly 1 request** (no 403 retry in key
+  mode); control-char key → **0 requests**, `latencyMs 0`; absent ref → **0 requests**,
+  `latencyMs 0`; the header was `authorization: Bearer <decoy>` with `x-api-key` **absent
+  from the received header names**. Non-200 → `unreachable`, "qBittorrent answered 404 to the
+  version request", while the *same* proxy at 200 returns `connected` — the refusal
+  discriminates on status, not on the proxy being fake.
+- **Not re-runnable from a relay turn:** the daemon-side half of control 3 (the real key sent
+  as `X-Api-Key` returning 403) needs the secret in hand. It stands as measured 2026-08-15
+  20:xx. Do not attempt to harvest it from `qBittorrent.ini`.
+- Trap for the next worker: the counting proxy keeps its log **in memory** and rewrites the
+  file every request — deleting the file does not reset the count. Diff, or restart it.
+
+**Next: P6 contingency gates 22–30**, which gate 1 was the blocker for.

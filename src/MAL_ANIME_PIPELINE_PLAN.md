@@ -116,6 +116,32 @@ the panel, and following the result lands on a rendered `MalSyncPanel`.
 - Defect 5 is **CLOSED**: `a9b797aa` gives the client API-key auth, `83cb233f` gives the user
   a way to select it. See the ledger entry of the same date for the measured contract.
 
+**Progress 2026-08-15 23:40 (`primary`). Gate 1 PASSES, live, with all four negative
+controls re-asserted.** The user entered the API key into the OS keychain at ~22:30.
+
+- **Precondition first, because it fails identically to an absent key:** active profile
+  `relay-probe` reads `authMode:'apiKey'`, `apiKeyRef:'qbit/apikey'` — already correct, no
+  UI defect to raise. **Validity control:** an unauthenticated `curl` to
+  `127.0.0.1:8080/api/v2/app/version` returns **403**, so the daemon is genuinely refusing.
+- **Gate 1:** `window.api.scraperQbitTest` on the real daemon → `connected`, version
+  **5.2.3**, **30 ms**, message `Connected to 127.0.0.1:8080.`
+- **Counting the wire.** Two of the four controls are claims about request *count* and header
+  *name*, and neither is readable off a real daemon without the user's secret. So they ran
+  against `debug/qbit-count-proxy.cjs` (127.0.0.1:8099, mode-switchable 403/404/200, logs
+  every request) through the same main-process client, with a **decoy** key I supplied.
+  1. Wrong key → `unauthorized`, "qBittorrent rejected the API key.", **exactly 1 request**.
+  2. Key with a control char → **0 requests**, `latencyMs 0`; absent `apiKeyRef` → **0
+     requests**, `latencyMs 0`. Proxy count unchanged across both.
+  3. The only auth header on the wire was `authorization: Bearer <decoy>`; `x-api-key` was
+     **absent from `Object.keys(req.headers)`**. The daemon-side half (real key as
+     `X-Api-Key` → 403) was measured 2026-08-15 20:xx and **cannot be re-run from a relay
+     turn** without extracting the user's secret — do not try.
+  4. Non-200 version → refused: `unreachable`, "qBittorrent answered 404 to the version
+     request." **Discriminating positive:** the same proxy switched to 200 returns
+     `connected`, version `9.9.9` — so the refusal is about the status, not about the proxy.
+- Trap: the proxy holds its log array **in memory** and rewrites the file per request, so
+  deleting `qbit-proxy-log.json` does not reset the count. Diff counts, or restart it.
+
 ### P1 — the in-app walkthrough (a first-run user must not need a human)
 
 State **before** the Connect button, not after, that the browser **will** fail to load
