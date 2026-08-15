@@ -321,4 +321,56 @@ describe('main-owned AI provider runtime', () => {
     })).rejects.toMatchObject({ code: 'persistent-cache-unavailable' });
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  /**
+   * `MAX_TOKENS` with no `parts` is what a thinking model returns when it spends
+   * the whole output budget reasoning. It used to surface as "Gemini returned an
+   * empty response", which sent every caller looking at the provider instead of
+   * at the size of its own request — including F5, which lost whole arbitration
+   * batches to it and recorded only `invalid-response`.
+   */
+  it('names a truncated Gemini answer as truncation, not as an empty response', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({
+      candidates: [{ finishReason: 'MAX_TOKENS' }],
+      usageMetadata: { promptTokenCount: 900, candidatesTokenCount: 4096, totalTokenCount: 4996 },
+    })));
+
+    await expect(runCloudAiRequest({
+      providerId: 'gemini-2.5-flash',
+      apiKey: 'gemini-key',
+      prompt: 'Arbitrate sixteen windows.',
+      maxOutputTokens: 4096,
+    })).rejects.toMatchObject({ code: 'output-truncated' });
+  });
+
+  it('still calls a genuinely empty Gemini answer empty', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({
+      candidates: [{ content: { parts: [{ text: '   ' }] }, finishReason: 'STOP' }],
+    })));
+
+    await expect(runCloudAiRequest({
+      providerId: 'gemini-2.5-flash',
+      apiKey: 'gemini-key',
+      prompt: 'Say nothing.',
+      maxOutputTokens: 256,
+    })).rejects.toMatchObject({ code: 'invalid-response' });
+  });
+
+  it('fails a stream cut off mid-answer rather than handing back half a JSON object', async () => {
+    // The worse half of the same defect: the text parses far enough to look
+    // like an answer and is missing its tail.
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(sseResponse([
+      { candidates: [{ content: { parts: [{ text: '{"lines":[{"id":0,' }] } }] },
+      { candidates: [{ finishReason: 'MAX_TOKENS' }] },
+      '[DONE]',
+    ])));
+
+    await expect(runCloudAiRequest({
+      providerId: 'gemini-2.5-flash',
+      apiKey: 'gemini-key',
+      prompt: 'Stream sixteen windows.',
+      maxOutputTokens: 4096,
+      onTextChunk: () => {},
+    })).rejects.toMatchObject({ code: 'output-truncated' });
+  });
 });

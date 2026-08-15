@@ -185,16 +185,19 @@ describe('arbitrateFusionDecisions failure diagnosis', () => {
       Array.from({ length: 40 }, () => '全く関係のない参照文がここにあります'),
     );
     let batch = 0;
-    const outcome = await arbitrateFusionDecisions(many, many.map((_, i) => `line ${i}`), many.map(() => 'x'), {
-      call: async () => {
-        batch += 1;
-        if (batch === 1) throw Object.assign(new Error('429'), { code: 'rate-limit' });
-        if (batch === 2) return 'not json at all';
-        throw Object.assign(new Error('429 again'), { code: 'rate-limit' });
-      },
+    const call = vi.fn(async () => {
+      batch += 1;
+      // All three reasons are deliberately non-splittable, so this stays a test
+      // about counting rather than about the split retry below.
+      if (batch === 2) return '{"lines":[]}';
+      throw Object.assign(new Error('429'), { code: 'rate-limit' });
     });
+    const outcome = await arbitrateFusionDecisions(many, many.map((_, i) => `line ${i}`), many.map(() => 'x'), {
+      call,
+    });
+    expect(call).toHaveBeenCalledTimes(3);
     expect(outcome.failedBatches).toBe(3);
-    expect(outcome.failures).toEqual({ 'rate-limit': 2, unparsable: 1 });
+    expect(outcome.failures).toEqual({ 'rate-limit': 2, empty: 1 });
   });
 
   it('counts rows the guard discarded from a batch that still succeeded', async () => {
@@ -213,13 +216,152 @@ describe('arbitrateFusionDecisions failure diagnosis', () => {
     expect(outcome.failures).toEqual({});
   });
 
-  it('leaves both fields empty on a clean run', async () => {
+  it('leaves the fields empty on a clean run', async () => {
     const outcome = await arbitrateFusionDecisions(scored(), ENGLISH, REFERENCES, {
       call: async () => JSON.stringify({
         lines: [{ id: 1, text: '橋を渡ります', basis: 'whisper-as-is' }],
       }),
     });
-    expect(outcome).toMatchObject({ applied: 1, failedBatches: 0, dropped: 0 });
+    expect(outcome).toMatchObject({ applied: 1, failedBatches: 0, dropped: 0, recovered: 0 });
     expect(outcome.failures).toEqual({});
+  });
+});
+
+/**
+ * The defect this whole slice exists for: a 16-window batch failed wholesale and
+ * every verdict in it was lost, while the 6-window batch beside it went through.
+ * A failure whose likelihood scales with how much was asked gets asked again in
+ * halves — once, and only for reasons where a smaller question is a different
+ * question.
+ */
+describe('arbitrateFusionDecisions split retry', () => {
+  /** 20 disputes → two batches of 16 and 4 under FUSION_ARBITRATION_BATCH. */
+  const many = (count: number): {
+    decisions: FusedWindowDecision[];
+    english: string[];
+    references: string[];
+  } => {
+    const decisions = decideFusedWindows(
+      Array.from({ length: count }, (_, i) => `台詞${i}です`),
+      Array.from({ length: count }, () => '全く関係のない参照文がここにあります'),
+    );
+    return {
+      decisions,
+      english: decisions.map((_, i) => `line ${i}`),
+      references: decisions.map(() => '全く関係のない参照文がここにあります'),
+    };
+  };
+
+  /** Answers every window it is shown, but only below `limit` items. */
+  const answersUnder = (limit: number) => async (prompt: string, itemCount: number) => {
+    if (itemCount >= limit) {
+      throw Object.assign(new Error('output limit'), { code: 'output-truncated' });
+    }
+    const ids = [...prompt.matchAll(/"id":(\d+)/g)].map((match) => Number(match[1]));
+    return JSON.stringify({
+      lines: ids.map((id) => ({ id, text: `台詞${id}です`, basis: 'whisper-as-is' })),
+    });
+  };
+
+  it('recovers a batch the provider could not answer whole', async () => {
+    const { decisions, english, references } = many(16);
+    const call = vi.fn(answersUnder(16));
+    const outcome = await arbitrateFusionDecisions(decisions, english, references, { call });
+
+    // One full batch, then its two halves of 8.
+    expect(call.mock.calls.map((args) => args[1])).toEqual([16, 8, 8]);
+    expect(outcome.applied).toBe(16);
+    expect(outcome.recovered).toBe(16);
+    // The failure still happened and is still reported. A run that only ever
+    // succeeds on the second try is a finding, not a clean run.
+    expect(outcome.failures).toEqual({ 'output-truncated': 1 });
+    expect(outcome.failedBatches).toBe(0);
+    expect(outcome.decisions.every((decision) => decision.basis === 'whisper-as-is')).toBe(true);
+  });
+
+  it('splits only once, so a hopeless batch costs two extra calls and no more', async () => {
+    const { decisions, english, references } = many(16);
+    const call = vi.fn(() => Promise.reject(
+      Object.assign(new Error('output limit'), { code: 'output-truncated' }),
+    ));
+    const outcome = await arbitrateFusionDecisions(decisions, english, references, { call });
+
+    expect(call).toHaveBeenCalledTimes(3);
+    expect(outcome.applied).toBe(0);
+    expect(outcome.recovered).toBe(0);
+    expect(outcome.failedBatches).toBe(1);
+    expect(outcome.failures).toEqual({ 'output-truncated': 3 });
+    expect(outcome.decisions).toEqual(decisions);
+  });
+
+  it('does not split a refusal — a smaller question gets the same no at twice the price', async () => {
+    const { decisions, english, references } = many(16);
+    for (const raw of ['{"lines":[]}', JSON.stringify({ lines: [{ id: 0, text: 'まったく別の文章です', basis: 'reference' }] })]) {
+      const call = vi.fn(async () => raw);
+      const outcome = await arbitrateFusionDecisions(decisions, english, references, { call });
+      expect(call).toHaveBeenCalledTimes(1);
+      expect(outcome.failedBatches).toBe(1);
+      expect(outcome.recovered).toBe(0);
+    }
+  });
+
+  it('does not split rate limiting, which more requests can only worsen', async () => {
+    const { decisions, english, references } = many(16);
+    const call = vi.fn(() => Promise.reject(
+      Object.assign(new Error('429'), { code: 'rate-limit' }),
+    ));
+    await arbitrateFusionDecisions(decisions, english, references, { call });
+    expect(call).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not split a single-window batch, which has no smaller half', async () => {
+    const before = scored();
+    const call = vi.fn(() => Promise.reject(
+      Object.assign(new Error('cut off'), { code: 'output-truncated' }),
+    ));
+    const outcome = await arbitrateFusionDecisions(before, ENGLISH, REFERENCES, { call });
+    expect(call).toHaveBeenCalledTimes(1);
+    expect(outcome.failedBatches).toBe(1);
+  });
+
+  it('counts a partial rescue as recovered without hiding the windows still lost', async () => {
+    const { decisions, english, references } = many(16);
+    let seen = 0;
+    const call = vi.fn(async (prompt: string, itemCount: number) => {
+      seen += 1;
+      if (itemCount === 16) throw Object.assign(new Error('cut'), { code: 'output-truncated' });
+      // The first half answers; the second half fails again.
+      if (seen === 3) throw Object.assign(new Error('cut'), { code: 'timeout' });
+      const ids = [...prompt.matchAll(/"id":(\d+)/g)].map((match) => Number(match[1]));
+      return JSON.stringify({
+        lines: ids.map((id) => ({ id, text: `台詞${id}です`, basis: 'whisper-as-is' })),
+      });
+    });
+    const outcome = await arbitrateFusionDecisions(decisions, english, references, { call });
+
+    expect(outcome.recovered).toBe(8);
+    expect(outcome.applied).toBe(8);
+    // Rescued overall, so not a failed batch — but both failures are on record.
+    expect(outcome.failedBatches).toBe(0);
+    expect(outcome.failures).toEqual({ 'output-truncated': 1, timeout: 1 });
+    // The half that never came back is still exactly what F4 decided.
+    expect(outcome.decisions[15]).toEqual(decisions[15]);
+  });
+
+  it('stops mid-split when the job is cancelled rather than paying for the other half', async () => {
+    const { decisions, english, references } = many(16);
+    let calls = 0;
+    const call = vi.fn(async (_prompt: string, itemCount: number) => {
+      calls += 1;
+      if (itemCount === 16) throw Object.assign(new Error('cut'), { code: 'output-truncated' });
+      return '{"lines":[]}';
+    });
+    const outcome = await arbitrateFusionDecisions(decisions, english, references, {
+      call,
+      // Cancelled once the first half has been paid for.
+      isCancelled: () => calls >= 2,
+    });
+    expect(call).toHaveBeenCalledTimes(2);
+    expect(outcome.decisions).toEqual(decisions);
   });
 });

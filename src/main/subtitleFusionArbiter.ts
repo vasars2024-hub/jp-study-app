@@ -14,9 +14,10 @@
  *    error, a timeout, a cancelled job, a model that answers with prose — resolves
  *    to fewer verdicts. Zero verdicts is `applyFusionArbitration`'s identity case,
  *    so the offline output is reached by doing nothing, not by a fallback branch.
- *  - **Bounded cost.** `FUSION_ARBITRATION_MAX_WINDOWS` caps the windows, the batch
- *    size caps the requests, and a batch that fails does not retry. A user pressing
- *    "fuse" is not signing up for an unbounded number of paid calls.
+ *  - **Bounded cost.** `FUSION_ARBITRATION_MAX_WINDOWS` caps the windows and the
+ *    batch size caps the requests. A batch that fails for a size-shaped reason is
+ *    re-asked once in halves and no further, so the ceiling is 3x the batch count.
+ *    A user pressing "fuse" is not signing up for an unbounded number of paid calls.
  *  - **No opinion on the rest of the track.** Only disputed windows are sent, and
  *    only the windows a verdict names are changed.
  *
@@ -31,6 +32,7 @@ import {
   inspectFusionArbitration,
   selectArbitrationCandidates,
   FUSION_ARBITRATION_SCHEMA,
+  type ArbitrationCandidate,
   type ArbitrationVerdict,
   type FusedWindowDecision,
 } from '../shared/subtitleFusionCore';
@@ -53,6 +55,8 @@ export interface FusionArbitrationOutcome {
   failures: Record<string, number>;
   /** Verdicts discarded by the guards in batches that still yielded something. */
   dropped: number;
+  /** Verdicts won back by re-asking a failed batch in halves. */
+  recovered: number;
 }
 
 /**
@@ -68,6 +72,32 @@ export interface FusionArbitrationOutcome {
 function failureReason(error: unknown): string {
   const code = (error as { code?: unknown } | null)?.code;
   return typeof code === 'string' && code ? code : 'error';
+}
+
+/**
+ * Reasons that plausibly scale with how much was asked for in one request, and
+ * are therefore worth asking again in halves.
+ *
+ * Deliberately short. `rejected` and `empty` mean the model answered and the
+ * answer was no — a smaller question gets the same no, at twice the price.
+ * `authentication`, `rate-limit`, `cost-budget` and `cancelled` get *worse*
+ * with more requests. `unparsable` is here because a response cut off mid-JSON
+ * arrives as unparsable text whenever the provider does not label it, which is
+ * every streaming path and some non-streaming ones.
+ */
+const SPLITTABLE_REASONS: ReadonlySet<string> = new Set([
+  'output-truncated',
+  'unparsable',
+  'timeout',
+]);
+
+function splittableBatch(batch: readonly ArbitrationCandidate[], reason: string): boolean {
+  return batch.length > 1 && SPLITTABLE_REASONS.has(reason);
+}
+
+function halve<T>(items: readonly T[]): [T[], T[]] {
+  const mid = Math.ceil(items.length / 2);
+  return [items.slice(0, mid), items.slice(mid)];
 }
 
 export interface FusionArbitrationOptions {
@@ -111,6 +141,7 @@ export async function arbitrateFusionDecisions(
     skipped,
     failures: {},
     dropped: 0,
+    recovered: 0,
   });
 
   const candidates = selectArbitrationCandidates(decisions, englishTexts, references);
@@ -140,33 +171,71 @@ export async function arbitrateFusionDecisions(
   };
   let failedBatches = 0;
   let dropped = 0;
-  for (let i = 0; i < batches.length; i += 1) {
-    if (options.isCancelled?.()) break;
-    const batch = batches[i];
+  let recovered = 0;
+
+  /** One request. `reason` is `null` exactly when the batch yielded verdicts. */
+  const runBatch = async (batch: readonly ArbitrationCandidate[]): Promise<{
+    verdicts: ArbitrationVerdict[];
+    dropped: number;
+    reason: string | null;
+  }> => {
     try {
       const raw = await send(buildFusionArbitrationPrompt(batch), batch.length);
       const result = inspectFusionArbitration(raw, batch);
-      if (!result.verdicts.length) {
-        failedBatches += 1;
-        // Three different defects, and they were indistinguishable before this:
-        // a model that answered with prose, a model that returned an empty list,
-        // and a model whose every row the fidelity guard threw out.
-        if (!result.parsed) fail('unparsable');
-        else if (!result.rows) fail('empty');
-        else fail('rejected');
-      } else {
+      if (result.verdicts.length) {
         // A batch that yielded *something* is not failed, but losing half its
-        // rows is still worth seeing — this is the half `failedBatches` is blind to.
-        dropped += Math.max(0, result.rows - result.verdicts.length);
+        // rows is still worth seeing — the half `failedBatches` is blind to.
+        return {
+          verdicts: result.verdicts,
+          dropped: Math.max(0, result.rows - result.verdicts.length),
+          reason: null,
+        };
       }
-      verdicts.push(...result.verdicts);
+      // Three different defects, indistinguishable before this: a model that
+      // answered with prose, one that returned an empty list, and one whose
+      // every row the fidelity guard threw out.
+      if (!result.parsed) return { verdicts: [], dropped: 0, reason: 'unparsable' };
+      return { verdicts: [], dropped: 0, reason: result.rows ? 'rejected' : 'empty' };
     } catch (error) {
-      // No retry. A failing provider fails the next batch too, and the whole
-      // point of this stage being optional is that losing it costs confidence
-      // rather than the track.
-      failedBatches += 1;
-      fail(failureReason(error));
+      return { verdicts: [], dropped: 0, reason: failureReason(error) };
     }
+  };
+
+  for (let i = 0; i < batches.length; i += 1) {
+    if (options.isCancelled?.()) break;
+    const batch = batches[i];
+    const first = await runBatch(batch);
+    verdicts.push(...first.verdicts);
+    dropped += first.dropped;
+
+    if (first.reason) {
+      // The reason is recorded whether or not the split rescues it: the failure
+      // happened, and a run that only ever succeeds on the second try is a
+      // finding, not a clean run.
+      fail(first.reason);
+      const halves = splittableBatch(batch, first.reason) ? halve(batch) : null;
+      if (!halves || options.isCancelled?.()) {
+        failedBatches += 1;
+      } else {
+        let rescued = 0;
+        for (const half of halves) {
+          if (options.isCancelled?.()) break;
+          // One level only. The halves do not split again, so a failed batch
+          // costs at most two extra requests and the whole stage stays bounded
+          // at 3x its batch count — a user pressing "fuse" is still not signing
+          // up for an unbounded number of paid calls.
+          const retry = await runBatch(half);
+          verdicts.push(...retry.verdicts);
+          dropped += retry.dropped;
+          rescued += retry.verdicts.length;
+          if (retry.reason) fail(retry.reason);
+        }
+        recovered += rescued;
+        if (!rescued) failedBatches += 1;
+      }
+    }
+    // Progress counts the original batches, so a split does not make the bar go
+    // backwards or overshoot its total.
     options.onBatch?.(i + 1, batches.length);
   }
 
@@ -178,5 +247,6 @@ export async function arbitrateFusionDecisions(
     skipped: null,
     failures,
     dropped,
+    recovered,
   };
 }

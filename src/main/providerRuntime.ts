@@ -30,7 +30,13 @@ export type AiProviderErrorCode =
   | 'upstream'
   | 'network'
   | 'vision-unsupported'
-  | 'invalid-response';
+  | 'invalid-response'
+  /**
+   * The model hit `maxOutputTokens` before finishing. Distinct from
+   * `invalid-response` because the fix is different and the caller can act on
+   * it: a truncated answer means ask for less, not that the provider is broken.
+   */
+  | 'output-truncated';
 
 export class AiProviderRuntimeError extends Error {
   constructor(
@@ -276,7 +282,7 @@ function usageWithCost(
 
 async function parseGeminiResponse(response: Response, pricing?: AiProviderPricing): Promise<{ text: string; usage: AiProviderUsage }> {
   let json: {
-    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> }; finishReason?: string }>;
     usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number };
   };
   try {
@@ -285,6 +291,16 @@ async function parseGeminiResponse(response: Response, pricing?: AiProviderPrici
     throw new AiProviderRuntimeError('Gemini returned invalid JSON.', 'invalid-response');
   }
   const text = json.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+  // Checked before the empty test, because a thinking model that spends the
+  // whole budget on thoughts returns MAX_TOKENS *with no parts at all* — which
+  // read as "the provider returned nothing" and sent every caller looking in
+  // the wrong place. A truncated answer is the caller's size problem.
+  if (json.candidates?.[0]?.finishReason === 'MAX_TOKENS') {
+    throw new AiProviderRuntimeError(
+      'Gemini hit its output token limit before finishing. Try fewer items.',
+      'output-truncated',
+    );
+  }
   if (!text) throw new AiProviderRuntimeError('Gemini returned an empty response.', 'invalid-response');
   const usage = json.usageMetadata;
   return {
@@ -383,14 +399,16 @@ async function parseGeminiStream(
 ): Promise<StreamAccumulator> {
   let text = '';
   let usage: AiProviderUsage = {};
+  let truncated = false;
   await consumeSse(response, (payload) => {
     if (typeof payload !== 'object' || payload === null) {
       throw new AiProviderRuntimeError('Gemini returned an invalid stream event.', 'invalid-response');
     }
     const chunk = payload as {
-      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> }; finishReason?: string }>;
       usageMetadata?: { promptTokenCount?: unknown; candidatesTokenCount?: unknown; totalTokenCount?: unknown };
     };
+    if (chunk.candidates?.[0]?.finishReason === 'MAX_TOKENS') truncated = true;
     const delta = chunk.candidates?.[0]?.content?.parts
       ?.map((part) => typeof part.text === 'string' ? part.text : '')
       .join('') ?? '';
@@ -407,6 +425,15 @@ async function parseGeminiStream(
       );
     }
   });
+  // A stream that was cut mid-JSON is worse than one that produced nothing: the
+  // text parses far enough to look like an answer and is missing its tail. It
+  // fails as truncation whether or not any text arrived.
+  if (truncated) {
+    throw new AiProviderRuntimeError(
+      'Gemini hit its output token limit before finishing. Try fewer items.',
+      'output-truncated',
+    );
+  }
   if (!text.trim()) throw new AiProviderRuntimeError('Gemini returned an empty response.', 'invalid-response');
   return { text: text.trim(), usage };
 }
@@ -446,6 +473,14 @@ async function parseDeepSeekStream(
 function requestBody(request: AiProviderRequest, model: string, maxOutputTokens: number): { url: string; init: RequestInit } {
   const streaming = Boolean(request.onTextChunk);
   if (request.providerId === 'gemini-2.5-flash') {
+    // NOT sent, deliberately: `generationConfig.thinkingConfig.thinkingBudget`.
+    // The 2.5 series thinks by default and charges thoughts against
+    // `maxOutputTokens`, which is the likeliest cause of the MAX_TOKENS
+    // truncations read below — but Gemini rejects an unknown `generationConfig`
+    // field with a 400, and a wrong guess here breaks *every* cloud call in the
+    // app, not just the one that motivated it. It stays out until someone can
+    // put a real request against a real key. The arbiter's split-retry handles
+    // the symptom without betting the whole provider on an unverified field.
     const generationConfig: Record<string, unknown> = {
       maxOutputTokens,
       ...(request.responseMimeType === 'application/json' || request.responseSchema

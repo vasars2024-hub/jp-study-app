@@ -73,6 +73,7 @@ const PROVIDER_CODES = new Set<AiProviderErrorCode>([
   'network',
   'vision-unsupported',
   'invalid-response',
+  'output-truncated',
 ]);
 
 /**

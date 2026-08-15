@@ -101,6 +101,12 @@ export interface FusionArbitrationSummary {
    * see that, and a model losing a third of every batch is a real defect.
    */
   dropped?: number;
+  /**
+   * Verdicts won back by re-asking a failed batch in halves. A run with
+   * `failures` but a matching `recovered` was rescued rather than degraded, and
+   * the two must not be read as the same outcome.
+   */
+  recovered?: number;
 }
 
 export interface FusionTrackMeta {
@@ -230,6 +236,7 @@ function readArbitration(value: unknown): FusionArbitrationSummary | undefined {
   if (skipped === undefined) return undefined;
   const failures = readFailures(row.failures);
   const dropped = readNumber(row.dropped);
+  const recovered = readNumber(row.recovered);
   return {
     attempted: readNumber(row.attempted),
     applied: readNumber(row.applied),
@@ -237,6 +244,7 @@ function readArbitration(value: unknown): FusionArbitrationSummary | undefined {
     skipped,
     ...(failures ? { failures } : {}),
     ...(dropped > 0 ? { dropped } : {}),
+    ...(recovered > 0 ? { recovered } : {}),
   };
 }
 
