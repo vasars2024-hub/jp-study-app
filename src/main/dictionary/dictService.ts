@@ -62,6 +62,12 @@ import {
   type LexiconEtymologyResult,
 } from '../../shared/lexiconEtymology';
 import {
+  MAX_FREQUENCY_RESULTS,
+  buildLexiconFrequencyResult,
+  type LexiconFrequencyEntry,
+  type LexiconFrequencyResult,
+} from '../../shared/lexiconFrequency';
+import {
   EXAMPLE_SCAN_ROWS,
   MAX_EXAMPLE_QUERY_CHARS,
   MAX_EXAMPLE_RESULTS,
@@ -1398,6 +1404,71 @@ export function findLexiconEtymology(db: SqliteDb, query: EtymologyQuery): Lexic
     query: text,
     etymologies: selectLexiconEtymologies(ordered, query.limit ?? MAX_ETYMOLOGY_RESULTS),
   };
+}
+
+export interface FrequencyQuery {
+  text: string;
+  /** Corpus languages to match. Every language when omitted. */
+  sourceLangs?: DictLangCode[];
+  limit?: number;
+}
+
+/**
+ * Frequency rows read before selection.
+ *
+ * `freq_corpora` has no unique constraint, so one corpus can legitimately hold
+ * several rows for the same normalised form. The cap bounds the read without
+ * bounding the *answer*: `selectLexiconFrequencies` keeps the best rank per
+ * corpus afterwards, so a source with four spellings of one word still gets one
+ * row and its lowest rank.
+ */
+const FREQUENCY_SCAN_ROWS = 64;
+
+/**
+ * How common a word is, in the corpora this install actually has.
+ *
+ * ## Why this does not go through `headwords`
+ *
+ * Unlike etymology or cross references, a frequency row is not attached to a
+ * headword id — it is keyed on `(lang, norm, corpus)` and `idx_freq_norm` exists
+ * for exactly this probe. Going via `headwords` would silently drop every corpus
+ * that ranks a word no installed dictionary happens to define, which is the case
+ * a frequency list is most useful in.
+ *
+ * The join to `dictionaries` is for the title and the enabled flag only. A corpus
+ * the user switched off must not speak here, for the same reason its definitions
+ * do not.
+ */
+export function findLexiconFrequency(db: SqliteDb, query: FrequencyQuery): LexiconFrequencyResult {
+  const text = query.text.trim();
+  if (!text) return { query: text, entries: [] };
+
+  const langs = query.sourceLangs?.length ? [...new Set(query.sourceLangs)] : [];
+  const langFilter = langs.length ? ` and f.lang in (${langs.map(() => '?').join(',')})` : '';
+  const rows = db.prepare(`
+    select f.corpus, f.rank, f.per_million, d.title as corpus_title
+    from freq_corpora f indexed by idx_freq_norm
+    join dictionaries d on d.id = f.corpus
+    where f.norm = ? and d.enabled = 1${langFilter}
+    order by d.priority desc
+    limit ?
+  `).all(normalizeForLookup(text), ...langs, FREQUENCY_SCAN_ROWS) as Array<{
+    corpus: string; rank: number; per_million: number | null; corpus_title: string | null;
+  }>;
+
+  const entries: LexiconFrequencyEntry[] = rows.map((row) => {
+    const perMillion = row.per_million;
+    return {
+      corpusId: row.corpus,
+      // A corpus with no title is still a corpus; showing its id beats showing
+      // an empty attribution for a number.
+      corpusTitle: row.corpus_title?.trim() || row.corpus,
+      rank: Number(row.rank),
+      ...(typeof perMillion === 'number' && Number.isFinite(perMillion) ? { perMillion } : {}),
+    };
+  });
+
+  return buildLexiconFrequencyResult(text, entries, query.limit ?? MAX_FREQUENCY_RESULTS);
 }
 
 export interface XrefQuery {

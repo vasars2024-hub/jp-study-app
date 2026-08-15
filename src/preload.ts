@@ -477,6 +477,12 @@ const api = {
     options?: { sourceLangs?: string[] },
   ): Promise<import('./shared/lexiconEtymology').LexiconEtymologyResult> =>
     ipcRenderer.invoke('dict:etymology', text, options),
+  /** How common a word is, in the frequency corpora this install has. */
+  dictFrequency: (
+    text: string,
+    options?: { sourceLangs?: string[] },
+  ): Promise<import('./shared/lexiconFrequency').LexiconFrequencyResult> =>
+    ipcRenderer.invoke('dict:frequency', text, options),
   /** The words the installed dictionaries point at from this word's senses. */
   dictXrefs: (
     text: string,

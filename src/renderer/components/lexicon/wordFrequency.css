@@ -1,0 +1,72 @@
+.lexicon-frequency {
+  margin: 12px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-1);
+  color: var(--text);
+}
+
+.lexicon-frequency-band {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+}
+
+.lexicon-frequency-badge {
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.9em;
+  font-weight: 600;
+}
+
+/* The band is named in words inside the badge, so colour is reinforcement and
+   never the only carrier — these read the same in monochrome and high contrast. */
+.lexicon-frequency-badge.is-veryCommon {
+  border-color: var(--accent, #10b981);
+  color: var(--accent, #10b981);
+}
+
+.lexicon-frequency-badge.is-common {
+  border-color: var(--accent, #10b981);
+}
+
+.lexicon-frequency-lead {
+  font-size: 0.9em;
+}
+
+.lexicon-frequency-list {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lexicon-frequency-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 0.9em;
+}
+
+.lexicon-frequency-source {
+  /* The corpus name takes the room it needs and the numbers stay together at the
+     end of the row, which is what a reader scanning several corpora compares. */
+  flex: 1 1 8rem;
+  min-width: 0;
+}
+
+.lexicon-frequency-rank {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.lexicon-frequency-permillion {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}

@@ -372,6 +372,10 @@ declare global {
         text: string,
         options?: { sourceLangs?: string[] },
       ): Promise<import('../shared/lexiconEtymology').LexiconEtymologyResult>;
+      dictFrequency(
+        text: string,
+        options?: { sourceLangs?: string[] },
+      ): Promise<import('../shared/lexiconFrequency').LexiconFrequencyResult>;
       dictXrefs(
         text: string,
         options?: { sourceLangs?: string[] },

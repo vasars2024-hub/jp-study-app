@@ -48,6 +48,7 @@ import {
   findLexiconCollocationsInDb,
   findExampleSentencesInDb,
   findLexiconEtymologyInDb,
+  findLexiconFrequencyInDb,
   findLexiconXrefsInDb,
   getHeadwordAudioFromDb,
   listDictionarySources,
@@ -119,6 +120,11 @@ import {
   MAX_ETYMOLOGY_RESULTS,
   type LexiconEtymologyResult,
 } from '../shared/lexiconEtymology';
+import {
+  MAX_FREQUENCY_QUERY_CHARS,
+  MAX_FREQUENCY_RESULTS,
+  type LexiconFrequencyResult,
+} from '../shared/lexiconFrequency';
 import {
   MAX_XREF_QUERY_CHARS,
   MAX_XREF_RESULTS,
@@ -882,6 +888,29 @@ export function registerDictionaryIpc(): void {
         // Same contract again, and it matters more here: this read fires with the
         // lookup rather than on a click, so a throw on an un-migrated installation
         // would surface as a rejected invoke on every single word.
+        return empty;
+      }
+    },
+  );
+  ipcMain.handle(
+    'dict:frequency',
+    (_e, text: unknown, options?: unknown): LexiconFrequencyResult => {
+      const raw = options && typeof options === 'object' && !Array.isArray(options)
+        ? options as Record<string, unknown>
+        : {};
+      const query = typeof text === 'string' ? text.trim().slice(0, MAX_FREQUENCY_QUERY_CHARS) : '';
+      const empty: LexiconFrequencyResult = { query, entries: [] };
+      if (!query) return empty;
+      try {
+        return findLexiconFrequencyInDb({
+          text: query,
+          sourceLangs: readLangList(raw.sourceLangs),
+          limit: MAX_FREQUENCY_RESULTS,
+        });
+      } catch {
+        // Same contract as the etymology read above: this fires with every
+        // lookup, so a throw on an un-migrated install would reject on every
+        // single word rather than showing nothing.
         return empty;
       }
     },

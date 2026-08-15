@@ -10,10 +10,11 @@
 // The set of tables is not a matter of taste. `dictionaries.source_lang` and
 // `headwords.lang` are joined by `dict_pair_priority` (`pp.source_lang = h.lang`),
 // so a row that disagreed with the headwords it owns would make every pair
-// override for that dictionary stop applying — silently. `pitch` and
-// `freq_corpora` are keyed by the same language and are read by the lookup path
-// under the headword's language, so leaving them behind hides the pitch pattern
-// and the frequency rank of every word in a relabelled dictionary.
+// override for that dictionary stop applying — silently. `pitch` is keyed by the
+// same language and is read by the lookup path under the headword's language;
+// `freq_corpora` is keyed the same way and read by `findLexiconFrequency`, which
+// filters on `f.lang`. Leaving either behind hides the pitch pattern and the
+// frequency rank of every word in a relabelled dictionary.
 //
 // Deliberately *not* in `relabelDictionarySourceLang`: `char_sources`. Its
 // projection into `chars` is pinned to `'ja'` (`importers/kanjidic.ts`), so

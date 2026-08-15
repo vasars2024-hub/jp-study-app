@@ -57,6 +57,7 @@ import {
   findLexiconCollocations,
   findLexiconCompounds,
   findLexiconEtymology,
+  findLexiconFrequency,
   findLexiconXrefs,
   findSemanticNeighbors,
   lookup,
@@ -64,6 +65,7 @@ import {
   type CompoundQuery,
   type EtymologyQuery,
   type ExampleQuery,
+  type FrequencyQuery,
   type LookupQuery,
   type LookupResult,
   type NeighborQuery,
@@ -98,6 +100,7 @@ import type { LexiconCollocationResult } from '../../shared/lexiconCollocations'
 import type { LexiconCompoundResult } from '../../shared/lexiconCompounds';
 import type { LexiconExampleResult } from '../../shared/lexiconExamples';
 import type { LexiconEtymologyResult } from '../../shared/lexiconEtymology';
+import type { LexiconFrequencyResult } from '../../shared/lexiconFrequency';
 import type { LexiconXrefResult } from '../../shared/lexiconXrefs';
 import {
   isGlobalPair,
@@ -461,6 +464,17 @@ export function findLexiconEtymologyInDb(query: EtymologyQuery): LexiconEtymolog
  */
 export function findLexiconXrefsInDb(query: XrefQuery): LexiconXrefResult {
   return findLexiconXrefs(dictionaryDb(), query);
+}
+
+/**
+ * How common a word is in the installed frequency corpora.
+ *
+ * One indexed equality on `idx_freq_norm` and a join on the primary key of a
+ * table with a handful of rows, so it runs with the lookup like the two above
+ * rather than behind a button.
+ */
+export function findLexiconFrequencyInDb(query: FrequencyQuery): LexiconFrequencyResult {
+  return findLexiconFrequency(dictionaryDb(), query);
 }
 
 /**

@@ -39,6 +39,7 @@ import LexiconCollocations from './lexicon/LexiconCollocations';
 import LexiconCompounds from './lexicon/LexiconCompounds';
 import LexiconExamples from './lexicon/LexiconExamples';
 import LexiconEtymology from './lexicon/LexiconEtymology';
+import WordFrequency from './lexicon/WordFrequency';
 import LexiconXrefs from './lexicon/LexiconXrefs';
 import WordAudio from './lexicon/WordAudio';
 import EntryNote from './lexicon/EntryNote';
@@ -988,6 +989,14 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
           );
         })}
       </div>
+
+      {/* First of the unasked panels because it is the shortest fact about the
+          word and the one that changes how the rest is read. One indexed probe,
+          and absent entirely on an install with no frequency corpus — which is
+          every default install. */}
+      {variant !== 'popup' && entries.length > 0 && (
+        <WordFrequency query={entries[0].word} lang={lang} />
+      )}
 
       {/* Anchored on the matched headword rather than the raw query, so an
           inflected search still expands the word it actually found. The popup
