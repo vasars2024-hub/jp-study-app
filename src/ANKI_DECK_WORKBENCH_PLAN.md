@@ -250,10 +250,12 @@ Partial failure must identify exactly what committed, what failed, and what can 
 - Build the seven-step guided flow, smart virtualized Browser, source rail, inspector, real representative template preview, column manager, search, selection, and accessible keyboard flow.
 - Support safe single-note/card field, tag, deck, and local-mastery edits.
 
-### Phase 3 — rules, changes, and recovery
+### Phase 3 — rules, changes, and recovery — built 2026-08-15
 
 - Build nested filters, saved views, the ordered change tray, deterministic dry runs, validation, diff previews, undo/redo, and audit journal.
 - Prove stable `all matching` selection across paging and virtualization.
+- Shipped: `shared/ankiChangeTray.ts` (tray, dry run = apply, one tray = one undo), `shared/ankiBrowserQuery.ts` (nested AND/OR/NOT grammar; an unrecognized key is a refusal that names the token, never a silent match-all), `shared/ankiBrowserViews.ts` (query + sort + columns, never a selection), `shared/ankiEditAudit.ts` (an entry is exactly what one Undo takes back; an undone step stays recorded).
+- Still open in this phase: gate 10's measurement half — contrast, reduced motion, compact/maximized and the four languages end-to-end — which is a measurement slice, not a build one.
 
 ### Phase 4 — smart language, frequency, and known-word workflows
 

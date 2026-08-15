@@ -21970,3 +21970,63 @@ passed / 1 skipped of 644 files, 8,650 passed / 6 skipped** (+27 = exactly my ne
 
 **Next: Phase 3's saved views and nested filters**, the tray's other half — the plan pairs them,
 and the Browser's search is still one flat query string.
+
+## 2026-08-15 19:30 primary — Track 7 Phase 3 closes: filters, views, and the journal
+
+Three slices, `8c44be77` / `5ca39b71` / `be4ad845` (+ `19b8ee9f`, a dead-const lint fix).
+Phase 3's remaining items were nested filters, saved views and the audit journal; all three
+landed, so Phase 3 is complete and Track 7 moves to Phase 4.
+
+**`8c44be77` — `shared/ankiBrowserQuery.ts`.** The flat all-terms search becomes a parsed tree:
+AND/OR/NOT, brackets, `deck:`, `tag:`, `note:`, `is:marked`, `cards:>N`, `re:pat`, `Field:text`,
+`Field:re:pat`. A bare word keeps its Phase 2 meaning, so every old query still means what it
+meant. Four decisions:
+
+1. **An unknown key is a parse error, not a no-op** — the failure Phase 2 avoided by staying
+   simple. `filterBrowserRows` returns rows *and* the error; the surface names the token beside
+   the box, because an empty grid otherwise reads as "nothing matched". A refused query also
+   cannot license the whole-source select-all.
+2. **Predicates read `BrowserRow.fields`, never `cells`** — hiding a column must not change what
+   a query matches. New additive field on the row.
+3. **`*` is a wildcard, `_` is literal.** Anki treats `_` as one-char; underscores are ordinary
+   in deck names and media-derived fields here, and quietly widening on one is the same defect.
+4. **Compile once per query, not per row** — 30,000 rows through two wildcards, asserted.
+
+**`5ca39b71` — saved views.** Query + sort + visible columns under a user name, in renderer
+localStorage. **Never the selection**: note ids mean nothing after a reimport and restoring one
+reselects the wrong notes. Views are deck-independent by design, so mismatch is normal and
+applying one *reports* what it could not restore (absent columns counted, absent sort column
+cleared and said so, all-absent columns leaves the grid alone rather than blanking it).
+
+**`be4ad845` — the audit journal.** **An entry is exactly what one Undo takes back** (grouped as
+`trailingStep` groups), so the list and the button cannot disagree; one entry per op would show
+3,000 lines for one tray run. An undone step stays listed, struck through and flagged, until a
+new edit clears the redo stack — erasing it defeats the point of a journal. Fields named, never
+ord'd. Absent entirely before the first edit rather than an empty control.
+
+**Live, window 2, local deck (3,221 notes), real IPC.** Filters: bare `る` 2,771, its negation
+450 — **2,771 + 450 = 3,221 exactly**; `Expression:る` 490; `cards:>=1` 3,221; `tag:none` 0;
+`(る or tag:none) cards:>=1` 2,771. Refusals render the Russian string, `aria-invalid=true`,
+`rgb(209,52,56)`, and the footer degrades to "Выбрать найденные здесь: 0". Views: saved with
+sort `field:Expression asc` and 6 column ids, cleared, restored identically (490 rows, ▲ intact,
+the hidden column back); delete empties the store; the probe cleans its own localStorage key.
+Journal: absent before any edit, `История: шагов 1 по заметкам: 1` after, entry reads
+`Одиночная правка… в полях: Expression`, and one Undo leaves the entry in place with
+`wb-journal-undone` + `отменено` while the count drops to 0.
+
+**Trap:** the tokenizer has two escape layers. `\*` must survive tokenization or the wildcard
+layer never sees it — only `" ( ) \` and whitespace are consumed there. And a token is literal
+text only when it is *wholly* quoted: `"or"` is a word, `deck:"my deck"` is still a deck search.
+
+**Gates**, once after the last slice, shared tree. `npx vitest run` **647 files, 8,678 passed /
+23 skipped, 1 file failed** — `readingLensI18n.test.tsx`, a 10 s `beforeAll` timeout that
+**passes alone in 4.62 s** and is tracked+clean, so it is the same load-dependent flake the 18:00
+boss audit recorded for `visualNovelI18n`; nothing here touches ReadingLens. `i18n-check` exit 0
+at **9,822** (+20: 6 query, 8 views, 6 journal). `architecture-audit` exit 0, **Nothing new**,
+2 pending. `eslint` on 12 paths: **0 errors** (37 warnings, all pre-existing `no-non-null-assertion`
+in tests after `19b8ee9f`).
+
+**Next: Track 7 Phase 4** — field/template swap, dictionary enrichment, translation, frequency
+rules, known-word exclusion, and the first ten smart recipes. Phase 3's gate 10 measurement half
+(contrast, reduced motion, compact/maximized, four languages end-to-end) is still open and is a
+measurement slice, not a build one.
