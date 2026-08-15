@@ -37,7 +37,16 @@ import {
   type AnkiDraftEditJournal,
   type AnkiDraftEditOp,
 } from './ankiDraftEdit';
+import {
+  resolveEnrichValue,
+  wrapEnrichProvenance,
+  type EnrichAspect,
+  type EnrichLookup,
+  type EnrichProvenanceMode,
+  type EnrichSenseRule,
+} from './ankiEnrich';
 import { normalizeFieldText, type TextNormalizeOp } from './ankiTextNormalize';
+import type { VocabContext } from './ankiVocabContext';
 
 export type TrayActionKind =
   | 'add-tags'
@@ -45,7 +54,8 @@ export type TrayActionKind =
   | 'find-replace'
   | 'swap-fields'
   | 'copy-field'
-  | 'normalize-text';
+  | 'normalize-text'
+  | 'enrich-dictionary';
 
 /**
  * What a copy does when the destination already holds text — Phase 4's "require
@@ -91,6 +101,21 @@ export type TrayAction =
       fieldName: string | null;
       /** Order here is ignored; they always run in `TEXT_NORMALIZE_ORDER`. */
       ops: TextNormalizeOp[];
+    })
+  | (TrayActionBase & {
+      kind: 'enrich-dictionary';
+      /** Which dictionary fact to write. */
+      aspect: EnrichAspect;
+      /** Where to write it. The word itself is found by `ankiVocabContext`. */
+      toField: string;
+      /** Same three answers a copy has, for the same reason. No default. */
+      onConflict: FieldCopyConflict;
+      /** Only read for `append`; `DEFAULT_COPY_SEPARATOR` when omitted. */
+      separator?: string;
+      /** What a disagreement between installed dictionaries means. No default. */
+      senseRule: EnrichSenseRule;
+      /** Whether the field records which dictionary produced it. No default. */
+      provenance: EnrichProvenanceMode;
     });
 
 // ----- the ordered list --------------------------------------------------------
@@ -135,7 +160,17 @@ export type TrayProblemCode =
   | 'overwrite-nonempty'
   | 'cloze-cards-change'
   | 'media-missing'
-  | 'media-dropped';
+  | 'media-dropped'
+  /** An enrichment was queued with no dictionary data to read. Blocking. */
+  | 'no-enrich-data'
+  /** No installed dictionary answered for this note's word. */
+  | 'enrich-no-entry'
+  /** This note declares no word field, so there is nothing to look up. */
+  | 'enrich-no-word'
+  /** Installed dictionaries disagreed and the rule is `refuse`. */
+  | 'enrich-sense-conflict'
+  /** Dictionaries disagreed and `all-sources` wrote the merge. */
+  | 'enrich-sources-merged';
 
 export interface TrayProblem {
   code: TrayProblemCode;
@@ -223,7 +258,11 @@ function targetOrds(
   return ord === undefined ? [] : [ord];
 }
 
-function blockingProblems(actions: readonly TrayAction[], noteIds: readonly string[]): TrayProblem[] {
+function blockingProblems(
+  actions: readonly TrayAction[],
+  noteIds: readonly string[],
+  hasEnrichData: boolean,
+): TrayProblem[] {
   const problems: TrayProblem[] = [];
   const enabled = actions.filter((a) => a.enabled);
   if (noteIds.length === 0) problems.push({ code: 'empty-selection', severity: 'blocking', count: 0 });
@@ -249,6 +288,17 @@ function blockingProblems(actions: readonly TrayAction[], noteIds: readonly stri
       // an action that provably cannot change anything is a mis-set form.
       if (action.ops.length === 0) {
         problems.push({ code: 'empty-parameter', severity: 'blocking', actionId: action.id, count: 1 });
+      }
+    } else if (action.kind === 'enrich-dictionary') {
+      if (action.toField === '') {
+        problems.push({ code: 'empty-parameter', severity: 'blocking', actionId: action.id, count: 1 });
+      } else if (!hasEnrichData) {
+        // The lookup is asynchronous and lives outside this module, so a tray
+        // planned before it resolved would enrich nothing and report every note
+        // as "no entry" — which reads as "your dictionaries are empty" and is
+        // not true. Refuse the plan instead, exactly as the `freq:` predicates
+        // refuse a query with no vocabulary context.
+        problems.push({ code: 'no-enrich-data', severity: 'blocking', actionId: action.id, count: 1 });
       }
     } else if (action.kind === 'swap-fields' || action.kind === 'copy-field') {
       const [a, b] =
@@ -303,10 +353,18 @@ export function planChangeTray(
   journal: AnkiDraftEditJournal,
   noteIds: readonly string[],
   actions: readonly TrayAction[],
-  opts?: { groupId?: string },
+  opts?: {
+    groupId?: string;
+    /**
+     * The dictionary hits an `enrich-dictionary` action reads, and the words to
+     * read them for. Both come from outside — one from IPC, one from the
+     * Browser's `VocabContext` — so neither can live on a serializable action.
+     */
+    enrich?: { lookup: EnrichLookup; vocab: VocabContext };
+  },
 ): TrayPlan {
   const groupId = opts?.groupId ?? `tray-${journal.done.length + 1}`;
-  const problems = blockingProblems(actions, noteIds);
+  const problems = blockingProblems(actions, noteIds, opts?.enrich !== undefined);
   if (problems.length > 0) {
     return {
       draft,
@@ -451,6 +509,74 @@ export function planChangeTray(
         const rawB = start.fields.find((f) => f.ord === ordB)?.raw ?? '';
         if (applyWrite(at, noteId, ordA, rawB)) touched = true;
         if (applyWrite(at, noteId, ordB, rawA)) touched = true;
+      } else if (action.kind === 'enrich-dictionary') {
+        const enrich = opts?.enrich;
+        // Unreachable: `blockingProblems` already refused. Kept because the type
+        // is optional and a future caller must not get a silent no-op.
+        if (!enrich) continue;
+        const toOrd = soleOrd(start, action.toField);
+        if (toOrd === undefined) {
+          problems.push({
+            code: 'field-absent',
+            severity: 'warning',
+            actionId: action.id,
+            count: 1,
+            detail: action.toField,
+          });
+          continue;
+        }
+        const term = enrich.vocab.byNote.get(noteId)?.term ?? null;
+        if (!term) {
+          problems.push({
+            code: 'enrich-no-word',
+            severity: 'warning',
+            actionId: action.id,
+            count: 1,
+            detail: noteId,
+          });
+          continue;
+        }
+        const resolved = resolveEnrichValue(enrich.lookup.get(term), action.aspect, action.senseRule);
+        if ('refused' in resolved) {
+          problems.push({
+            code: resolved.refused === 'sense-conflict' ? 'enrich-sense-conflict' : 'enrich-no-entry',
+            severity: 'warning',
+            actionId: action.id,
+            count: 1,
+            detail: term,
+          });
+          continue;
+        }
+        if (resolved.merged) {
+          problems.push({
+            code: 'enrich-sources-merged',
+            severity: 'info',
+            actionId: action.id,
+            count: 1,
+            detail: term,
+          });
+        }
+        const written = wrapEnrichProvenance(resolved.value, resolved.sources, action.provenance);
+        const toRaw = start.fields.find((f) => f.ord === toOrd)?.raw ?? '';
+        const occupied = toRaw.trim() !== '';
+        let next: string | null;
+        if (!occupied) next = written;
+        else if (action.onConflict === 'overwrite') next = written;
+        else if (action.onConflict === 'append')
+          next = `${toRaw}${action.separator ?? DEFAULT_COPY_SEPARATOR}${written}`;
+        else next = null;
+        if (next !== null && applyWrite(at, noteId, toOrd, next)) {
+          touched = true;
+          if (occupied && action.onConflict === 'overwrite') {
+            problems.push({
+              code: 'overwrite-nonempty',
+              severity: 'warning',
+              actionId: action.id,
+              count: 1,
+              detail: action.toField,
+            });
+          }
+        }
       } else if (action.kind === 'copy-field') {
         const fromOrd = soleOrd(start, action.fromField);
         const toOrd = soleOrd(start, action.toField);
