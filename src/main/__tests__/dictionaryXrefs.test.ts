@@ -57,6 +57,27 @@ const NEKO = { word: '猫', lang_code: 'ja', pos: 'noun', senses: [{ glosses: ['
 /** Carries no cross references at all, which is most of a real dump. */
 const MIZU = { word: '水', lang_code: 'ja', pos: 'noun', senses: [{ glosses: ['water'] }] };
 
+/**
+ * A spelling stored with its kana reading. JMdict writes a quarter of its own
+ * targets this way — `see: みっこくしゃ`, never `see: 密告者` — so the target is a
+ * headword's `reading_norm` and never appears in `norm` at all.
+ */
+const MIKKOKUSHA = {
+  word: '密告者',
+  lang_code: 'ja',
+  pos: 'noun',
+  senses: [{ glosses: ['informer'] }],
+  forms: [{ form: 'みっこくしゃ', tags: ['hiragana'] }],
+};
+
+/** Points at that reading rather than at the spelling. */
+const TSUUHOUSHA = {
+  word: '通報者',
+  lang_code: 'ja',
+  pos: 'noun',
+  senses: [{ glosses: ['reporter'], see_also: ['みっこくしゃ'] }],
+};
+
 const lines = (...records: unknown[]) => records.map((record) => JSON.stringify(record));
 
 const xref = (over: Partial<LexiconXref> = {}): LexiconXref => ({
@@ -251,5 +272,34 @@ describe('findLexiconXrefs', () => {
   it('excludes a disabled dictionary from both the read and the resolution probe', () => {
     db.prepare('update dictionaries set enabled = 0 where id = ?').run('wikt');
     expect(findLexiconXrefs(db, { text: '犬', sourceLangs: ['ja'] }).xrefs).toEqual([]);
+  });
+
+  it('resolves a bare-kana target through the headword whose reading it is', () => {
+    importWiktextract(db, lines(MIKKOKUSHA, TSUUHOUSHA), { dictId: 'kana', title: 'Kana' });
+    const result = findLexiconXrefs(db, { text: '通報者', sourceLangs: ['ja'] });
+    // `みっこくしゃ` is nobody's `norm`; without the reading probe this rendered as
+    // "not in your dictionaries" while `lookup` navigated to it perfectly well.
+    expect(result.xrefs).toMatchObject([{ kind: 'see', text: 'みっこくしゃ', resolved: true }]);
+  });
+
+  it('still marks a kana target no dictionary carries as unavailable', () => {
+    importWiktextract(db, lines(TSUUHOUSHA), { dictId: 'kana', title: 'Kana' });
+    const result = findLexiconXrefs(db, { text: '通報者', sourceLangs: ['ja'] });
+    expect(result.xrefs).toMatchObject([{ text: 'みっこくしゃ', resolved: false }]);
+  });
+
+  it('does not resolve a reading that belongs to another language’s partition', () => {
+    importWiktextract(db, lines(MIKKOKUSHA, TSUUHOUSHA), { dictId: 'kana', title: 'Kana' });
+    db.prepare('update headwords set lang = ? where text = ?').run('zh', '密告者');
+    const result = findLexiconXrefs(db, { text: '通報者', sourceLangs: ['ja'] });
+    expect(result.xrefs).toMatchObject([{ text: 'みっこくしゃ', resolved: false }]);
+  });
+
+  it('excludes a disabled dictionary from the reading probe as well', () => {
+    importWiktextract(db, lines(MIKKOKUSHA), { dictId: 'kana', title: 'Kana' });
+    importWiktextract(db, lines(TSUUHOUSHA), { dictId: 'src', title: 'Src' });
+    db.prepare('update dictionaries set enabled = 0 where id = ?').run('kana');
+    const result = findLexiconXrefs(db, { text: '通報者', sourceLangs: ['ja'] });
+    expect(result.xrefs).toMatchObject([{ text: 'みっこくしゃ', resolved: false }]);
   });
 });

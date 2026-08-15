@@ -1132,11 +1132,13 @@ const XREF_SCAN_ROWS = 400;
  * ## Resolution is a probe, not a join
  *
  * `xrefs.to_text` is free text — Wiktionary points at words a given install has
- * no dictionary for. One batched equality on `idx_hw_norm` over the handful of
- * targets that survived selection tells the surface which ones are navigable, so
- * a reference is never rendered as a link that would open an empty result. The
- * probe deliberately runs *after* selection: resolving all 400 scanned rows to
- * throw away 376 of them is the same mistake the example reader documents.
+ * no dictionary for. Two batched equalities over the handful of targets that
+ * survived selection tell the surface which ones are navigable, so a reference is
+ * never rendered as a link that would open an empty result: one on `idx_hw_norm`,
+ * then one on `idx_hw_reading` for whatever the first did not place, because a
+ * bare-kana target is a headword's *reading* rather than its `norm`. Both probes
+ * deliberately run *after* selection: resolving all 400 scanned rows to throw
+ * away 376 of them is the same mistake the example reader documents.
  */
 export function findLexiconXrefs(db: SqliteDb, query: XrefQuery): LexiconXrefResult {
   const text = query.text.trim();
@@ -1214,6 +1216,30 @@ export function findLexiconXrefs(db: SqliteDb, query: XrefQuery): LexiconXrefRes
       where h.norm in (${norms.map(() => '?').join(',')}) and ${WORD_SOURCE_WHERE}
     `).all(...norms) as Array<{ norm: string }>;
     for (const row of found) resolved.add(row.norm);
+
+    // Second probe, over readings, for the targets `norm` could not place. JMdict
+    // writes a quarter of its references in bare kana (`see: みっこくしゃ` for
+    // 密告者), and those rows are stored as the *reading* of a kanji headword, not
+    // as a `norm` — so a norm-only probe marked 13,204 of 53,540 navigable targets
+    // unavailable. `lookup` resolves them through `byReading` with exactly this
+    // normalization, so the marker was wrong, not the navigation.
+    const unresolved = norms.filter((norm) => !resolved.has(norm));
+    const readingLangs = [...new Set(headwords.map((row) => row.lang))];
+    if (unresolved.length && readingLangs.length) {
+      // Scoped to the languages the headword probe already returned, because
+      // `idx_hw_reading` leads on `lang`: without the equality the index cannot
+      // serve the probe at all and `INDEXED BY` would fail loudly. Those are also
+      // the only languages a reference from this entry could be navigable in.
+      const byReading = db.prepare(`
+        select distinct h.reading_norm as norm
+        from headwords h indexed by idx_hw_reading
+        join dictionaries d on d.id = h.dict_id
+        where h.lang in (${readingLangs.map(() => '?').join(',')})
+          and h.reading_norm in (${unresolved.map(() => '?').join(',')})
+          and ${WORD_SOURCE_WHERE}
+      `).all(...readingLangs, ...unresolved) as Array<{ norm: string }>;
+      for (const row of byReading) resolved.add(row.norm);
+    }
   }
 
   return {

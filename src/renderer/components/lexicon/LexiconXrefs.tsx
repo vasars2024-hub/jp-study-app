@@ -33,8 +33,10 @@ const XREF_KIND_KEYS: Record<LexiconXrefKind, string> = {
  *
  * Runs unasked, on the same terms as the etymology panel above it — an indexed
  * headword probe and an indexed join, with no scan for a button to protect — and
- * renders nothing at all when there is nothing to show. On a default install
- * that is every word, because only the Wiktextract importer writes `xrefs`.
+ * renders nothing at all when there is nothing to show. That is no longer most
+ * words on a default install: bundled JMdict's own `<xref>`s are lifted out of
+ * the gloss list at import and by schema step 11, so the panel is populated
+ * before a user imports anything.
  *
  * ## Why the targets are not links
  *
