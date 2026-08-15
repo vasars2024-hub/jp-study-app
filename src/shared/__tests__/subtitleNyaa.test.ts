@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { TorrentRow } from '../scraperResults';
 import {
+  asNyaaAcquisitionConfig,
   buildSubtitleQuery,
   couldCarrySidecarSubtitles,
   episodeFromFileName,
@@ -293,5 +294,30 @@ describe('buildSubtitleQuery', () => {
 
   it('omits the episode when there is none', () => {
     expect(buildSubtitleQuery({ title: 'Frieren', episode: null }).text).toBe('Frieren');
+  });
+});
+
+describe('asNyaaAcquisitionConfig', () => {
+  const whole = {
+    indexers: [{ id: 'nyaa', kind: 'torrent', enabled: true }],
+    torrents: { maxSizeBytes: 1 },
+    qbittorrent: { enabled: true, savePath: '' },
+  };
+
+  it('accepts a config carrying all three pieces', () => {
+    expect(asNyaaAcquisitionConfig(whole)).toBe(whole);
+  });
+
+  it.each([
+    ['no indexers array', { ...whole, indexers: undefined }],
+    ['indexers not an array', { ...whole, indexers: 'nyaa' }],
+    ['no torrent settings', { ...whole, torrents: null }],
+    ['no qbittorrent settings', { ...whole, qbittorrent: undefined }],
+    ['not an object', 'nyaa'],
+    ['absent', undefined],
+  ])('treats a config with %s as absent rather than half-configuring it', (_label, input) => {
+    // Half-accepting would pass the availability check and then fail at fetch
+    // time — the same failure one step later and much harder to read.
+    expect(asNyaaAcquisitionConfig(input)).toBeUndefined();
   });
 });

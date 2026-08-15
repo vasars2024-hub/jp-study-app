@@ -74,6 +74,33 @@ export interface SubtitleHarvestListInput {
    * question with one answer and asking it to guess from a string.
    */
   malId?: number | null;
+  /**
+   * The active profile's acquisition settings, so main can say honestly whether
+   * the nyaa fallback is usable when Jimaku has nothing filed.
+   *
+   * `unknown` and optional, exactly as `subtitleDiscovery` takes it: the
+   * renderer owns the scraper profile, main validates the shape structurally,
+   * and anything incomplete disables the provider rather than half-configuring
+   * it. Omitting it is not an error — it produces the `not-configured` answer,
+   * which is the truth.
+   */
+  acquisition?: unknown;
+}
+
+/**
+ * Whether the nyaa fallback could run for this title, and why not when it
+ * cannot.
+ *
+ * Reported rather than acted on. nyaa ships default-disabled and last in
+ * priority, and fetching from it means a torrent — so a Jimaku miss offers it
+ * as a next step with an honest reason attached, instead of silently promoting
+ * it or, worse, showing an empty list that looks like "no subtitles exist".
+ */
+export interface HarvestNyaaOffer {
+  available: boolean;
+  /** `null` when available; otherwise `nyaaAvailability`'s own reason. */
+  reason: 'not-configured' | 'no-indexer' | 'qbit-disabled' | 'qbit-remote' | null;
+  detail: string;
 }
 
 export interface SubtitleHarvestListResult {
@@ -99,6 +126,11 @@ export interface SubtitleHarvestListResult {
    * outage that will pass, the other never will.
    */
   idLookupDown: boolean;
+  /**
+   * The nyaa fallback's own answer, computed only when Jimaku listed nothing.
+   * `null` means it was not asked, which is not the same as "unavailable".
+   */
+  nyaa: HarvestNyaaOffer | null;
 }
 
 export interface SubtitleHarvestFetchResult {

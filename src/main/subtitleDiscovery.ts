@@ -70,6 +70,7 @@ import {
   takeRememberedNyaaCandidate,
   type NyaaAcquisitionConfig,
 } from './subtitleNyaaSource';
+import { asNyaaAcquisitionConfig } from '../shared/subtitleNyaa';
 import { osdbHashFile } from './osdbHash';
 import { enqueueTranscription } from './transcriptionJobs';
 
@@ -88,12 +89,10 @@ export interface SubtitleDiscoveryHost {
  * rather than half-configuring it.
  */
 function asAcquisitionConfig(input: unknown): NyaaAcquisitionConfig | undefined {
-  if (!input || typeof input !== 'object') return undefined;
-  const value = input as Partial<NyaaAcquisitionConfig>;
-  if (!Array.isArray(value.indexers)) return undefined;
-  if (!value.torrents || typeof value.torrents !== 'object') return undefined;
-  if (!value.qbittorrent || typeof value.qbittorrent !== 'object') return undefined;
-  return value as NyaaAcquisitionConfig;
+  // One definition, in shared: the harvest listing validates the same payload,
+  // and two copies of this check would drift into disagreeing about what a
+  // usable config is.
+  return asNyaaAcquisitionConfig(input);
 }
 
 let host: SubtitleDiscoveryHost | null = null;

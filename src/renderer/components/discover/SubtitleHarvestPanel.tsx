@@ -40,6 +40,8 @@ import {
 } from '../../mediaStudyWorkflow';
 import { getLevel } from '../../knownWords';
 import { showToast } from '../ui/Toast';
+import { acquisitionConfigFrom } from '../../../shared/subtitleNyaa';
+import { getActiveScraperSettings } from '../../scraperSettingsStore';
 
 interface Props {
   /** Jimaku keys on this. Null for a Jikan/MAL candidate — see `malId`. */
@@ -83,7 +85,7 @@ export default function SubtitleHarvestPanel({ anilistId, malId, title, episodes
    * this panel must not have silently.
    */
   const [source, setSource] = useState<Pick<
-    SubtitleHarvestListResult, 'matchedBy' | 'entry' | 'idLookupDown'
+    SubtitleHarvestListResult, 'matchedBy' | 'entry' | 'idLookupDown' | 'nyaa'
   > | null>(null);
   const [analysis, setAnalysis] = useState<MediaStudyAnalysis | null>(null);
   const [failures, setFailures] = useState<string[]>([]);
@@ -109,7 +111,14 @@ export default function SubtitleHarvestPanel({ anilistId, malId, title, episodes
     setCues([]);
     setSource(null);
     try {
-      const result = await window.api.subtitleHarvestList({ anilistId, malId, title });
+      // The scraper profile lives here, not in main, so the nyaa fallback's
+      // availability is answered against the profile the user is actually on.
+      const result = await window.api.subtitleHarvestList({
+        anilistId,
+        malId,
+        title,
+        acquisition: acquisitionConfigFrom(getActiveScraperSettings()),
+      });
       setFiles(result.files);
       setNeedsKey(result.needsKey);
       setMessage(result.message);
@@ -117,6 +126,7 @@ export default function SubtitleHarvestPanel({ anilistId, malId, title, episodes
         matchedBy: result.matchedBy,
         entry: result.entry,
         idLookupDown: result.idLookupDown,
+        nyaa: result.nyaa,
       });
       setPhase(result.ok ? 'listed' : 'error');
     } catch (error) {
@@ -297,6 +307,20 @@ export default function SubtitleHarvestPanel({ anilistId, malId, title, episodes
             ? t('subHarvest.source.titleGuess', { name: source.entry.name })
             : t('subHarvest.source.exact', { name: source.entry.name })}
           {source.idLookupDown ? ` ${t('subHarvest.source.idLookupDown')}` : ''}
+        </p>
+      ) : null}
+
+      {/* Jimaku had nothing. nyaa is named as the next step rather than run:
+          it is a torrent fetch, it ships default-disabled and last, and it is
+          the Episodes tab that performs it. When it cannot run, its own reason
+          is shown — an empty list that means "your indexer is off" must not
+          read as "this show has no subtitles". */}
+      {source?.nyaa ? (
+        <p className="mal-dl-note mal-dl-subs-nyaa" role="status">
+          <Icon name="info" size={12} />
+          {source.nyaa.available
+            ? t('subHarvest.nyaa.offered')
+            : t('subHarvest.nyaa.unavailable', { detail: source.nyaa.detail })}
         </p>
       ) : null}
 

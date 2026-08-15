@@ -29,7 +29,10 @@ import {
   jimakuSearchDetailed,
   type ProviderSubtitleCandidate,
 } from './subtitleProviderClients';
+import { nyaaAvailability } from './subtitleNyaaSource';
+import { asNyaaAcquisitionConfig } from '../shared/subtitleNyaa';
 import type {
+  HarvestNyaaOffer,
   HarvestFileCandidate,
   SubtitleHarvestFetchResult,
   SubtitleHarvestListInput,
@@ -136,7 +139,7 @@ export async function listSubtitleHarvest(
     ? (input.anilistId as number)
     : undefined;
   let idLookupDown = false;
-  const blank = { matchedBy: null, entry: null, idLookupDown: false } as const;
+  const blank = { matchedBy: null, entry: null, idLookupDown: false, nyaa: null } as const;
 
   if (!anilistId && !title && !input.malId) {
     return {
@@ -187,6 +190,10 @@ export async function listSubtitleHarvest(
       matchedBy: match.entry ? match.basis : null,
       entry: match.entry,
       idLookupDown,
+      // Only when Jimaku covered nothing. Computing it on every listing would
+      // put a torrent provider in front of a user who already has what they
+      // asked for, and nyaa ships default-disabled and last for that reason.
+      nyaa: files.length ? null : await describeNyaaFallback(input.acquisition),
     };
   } catch (error) {
     return {
@@ -197,8 +204,24 @@ export async function listSubtitleHarvest(
       matchedBy: null,
       entry: null,
       idLookupDown,
+      nyaa: await describeNyaaFallback(input.acquisition),
     };
   }
+}
+
+/**
+ * Whether the nyaa fallback could run, in nyaa's own words.
+ *
+ * Reuses `nyaaAvailability` rather than re-deriving the conditions: its four
+ * refusals are measured behaviour that P6 already leans on, and a second
+ * opinion here could tell the user the fallback is available while the fetch
+ * path refuses it.
+ */
+async function describeNyaaFallback(acquisition: unknown): Promise<HarvestNyaaOffer> {
+  const available = await nyaaAvailability(asNyaaAcquisitionConfig(acquisition));
+  return available.ok
+    ? { available: true, reason: null, detail: '' }
+    : { available: false, reason: available.reason, detail: available.detail };
 }
 
 /**
