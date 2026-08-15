@@ -35,8 +35,13 @@ export const WHISPER_MODEL_SPECS: WhisperModelSpec[] = [
     langs: ['any'],
   },
   {
+    // `onnx-community/kotoba-whisper-v2.0` — the id this used to carry — answers
+    // 401 for every file, so the tier that `defaultWhisperTier('ja')` picks could
+    // not be downloaded at all: Japanese transcription failed on a default install
+    // with "Unauthorized access to file". `-v2.2-ONNX` is the published ONNX
+    // conversion and serves the full encoder/decoder set (fp16, q4, quantized).
     id: 'kotoba-whisper',
-    hfId: 'onnx-community/kotoba-whisper-v2.0',
+    hfId: 'onnx-community/kotoba-whisper-v2.2-ONNX',
     sizeBytes: 320_000_000,
     langs: ['ja'],
     preferFor: ['ja'],
