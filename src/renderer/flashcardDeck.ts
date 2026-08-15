@@ -62,6 +62,12 @@ interface FlashcardDeckStore {
   cards: DeckFlashcard[];
 }
 
+import {
+  buildLocalDeckDraft,
+  type BuildLocalDeckOptions,
+  type LocalDeckDraftResult,
+} from '../shared/ankiLocalDeck';
+import { stripFieldHtml } from '../shared/apkgParse';
 import { IDB_KEYS, mirrorToIdb } from './storage/storage';
 import { isOverEncoded, quarantineIfUnrepaired, unwrapOverEncoded } from '../shared/overEncodedJson';
 import { emitCompanionEvent } from './environment/companionEvents';
@@ -129,6 +135,23 @@ export function loadDeck(): DeckFlashcard[] {
 
 export function loadDeckFolders(): string[] {
   return readStore().folders;
+}
+
+/**
+ * This deck, in the Anki workbench's normalized draft shape — source adapter 4
+ * of `src/ANKI_DECK_WORKBENCH_PLAN.md`.
+ *
+ * It lives here rather than in a main-process reader because the deck *is* this
+ * renderer store: an IPC round trip would ship the cards out and the draft back
+ * for no gain. One read of the store serves both cards and folders, so an empty
+ * folder still becomes a subdeck.
+ */
+export function loadDeckAsAnkiDraft(options: BuildLocalDeckOptions = {}): LocalDeckDraftResult {
+  const store = readStore();
+  return buildLocalDeckDraft(store.cards, stripFieldHtml, {
+    folders: store.folders,
+    ...options,
+  });
 }
 
 export function setDeckFolders(folders: string[]): string[] {
