@@ -48,6 +48,16 @@ let calls: string[] = [];
 let files: StoredFile[] = [];
 /** Whether the torrent is already in the client before we add it. */
 let present = false;
+/**
+ * The raw qBittorrent state the stand-in reports. `error` is what a disk that
+ * filled mid-transfer produces, and `missingFiles` is what deleting the data
+ * underneath it produces; neither ever moves progress again.
+ */
+let torrentState = 'downloading';
+/** Torrents that vanish while we are waiting — the user removed it, or the client restarted without it. */
+let disappearAfterAdd = false;
+/** Starting the torrent moves nothing, which is what a stopped-on-error transfer looks like. */
+let stallOnStart = false;
 let addBodies: string[] = [];
 
 function readBody(req: http.IncomingMessage): Promise<string> {
@@ -86,7 +96,7 @@ beforeAll(async () => {
       // already here?" is the whole safety gate and must be answerable.
       const wanted = url.searchParams.get('hashes');
       const rows = present || !wanted
-        ? [{ hash: HASH, name: 'Show Subs', save_path: savePath, progress: 1, size: 1000 }]
+        ? [{ hash: HASH, name: 'Show Subs', save_path: savePath, progress: 1, size: 1000, state: torrentState }]
         : [];
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify(rows));
@@ -100,7 +110,7 @@ beforeAll(async () => {
     if (url.pathname === '/api/v2/torrents/add') {
       void readBody(req).then((body) => {
         addBodies.push(body);
-        present = true;
+        present = !disappearAfterAdd;
         res.writeHead(200, { 'content-type': 'text/plain' });
         res.end('Ok.');
       });
@@ -124,7 +134,7 @@ beforeAll(async () => {
     if (url.pathname === '/api/v2/torrents/resume') {
       void readBody(req).then(() => {
         // Starting completes whatever was left enabled.
-        for (const file of files) if (file.priority > 0) file.progress = 1;
+        if (!stallOnStart) for (const file of files) if (file.priority > 0) file.progress = 1;
         res.writeHead(200);
         res.end('Ok.');
       });
@@ -160,6 +170,9 @@ beforeEach(() => {
   calls = [];
   addBodies = [];
   present = false;
+  torrentState = 'downloading';
+  disappearAfterAdd = false;
+  stallOnStart = false;
   resetQbitSessions();
 });
 
@@ -334,5 +347,61 @@ describe('nyaaFetch — a torrent the user already has', () => {
     expect(result.ok).toBe(true);
     expect(result.ok && result.value.text).toContain('already here');
     expect(calls.some((call) => call.startsWith('prio:'))).toBe(false);
+  });
+});
+
+// P6 contingency gates 28 and 29: a transfer that stops and never resumes.
+//
+// Both used to be indistinguishable from a slow swarm, because the wait polled
+// file progress and nothing else — so the user waited the full five minutes and
+// was then told it "timed out", which is the generic failure this phase exists
+// to eliminate.
+describe('nyaaFetch — a transfer that stops and never comes back', () => {
+  it('gate 28: names the error state instead of waiting out the timeout', async () => {
+    files = [{ name: 'Show - 07.ja.ass', size: 40_000, progress: 0, priority: 1 }];
+    stallOnStart = true;
+    torrentState = 'error';
+
+    const started = Date.now();
+    const result = await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 30_000 });
+    const elapsed = Date.now() - started;
+
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.reason).toMatch(/free space/i);
+    // The negative control: the old code produced this, after 30 seconds.
+    expect(result.ok === false && result.reason).not.toMatch(/timed out/i);
+    // It must give up on the first poll, not near the deadline.
+    expect(elapsed).toBeLessThan(5_000);
+  });
+
+  it('gate 28: `missingFiles` counts too — the data went away underneath it', async () => {
+    files = [{ name: 'Show - 07.ja.ass', size: 40_000, progress: 0, priority: 1 }];
+    stallOnStart = true;
+    torrentState = 'missingFiles';
+
+    const result = await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 30_000 });
+    expect(result.ok === false && result.reason).toMatch(/free space/i);
+  });
+
+  it('gate 29: a torrent that is gone from the client says so', async () => {
+    files = [{ name: 'Show - 07.ja.ass', size: 40_000, progress: 0, priority: 1 }];
+    stallOnStart = true;
+    disappearAfterAdd = true;
+
+    const result = await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 30_000 });
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.reason).toMatch(/no longer in qBittorrent/i);
+  });
+
+  it('a stalled-but-healthy transfer is still allowed to finish waiting', async () => {
+    // The control for both gates above: `stalledDL` is a slow swarm, not a
+    // failure, and bailing on it would turn a working fetch into an error.
+    files = [{ name: 'Show - 07.ja.ass', size: 40_000, progress: 0, priority: 1 }];
+    stallOnStart = true;
+    torrentState = 'stalledDL';
+
+    const result = await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 1_200 });
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.reason).toMatch(/timed out/i);
   });
 });

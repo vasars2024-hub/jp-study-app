@@ -229,6 +229,19 @@ async function login(config: ScraperQbittorrentSettings, password: string): Prom
         latencyMs,
       };
     }
+    // Measured against a real 5.2.3 daemon on 2026-08-15: a wrong password
+    // answers **401**, not the older `200 Ok./Fails.` pair. Without this branch
+    // every wrong password fell through to "unreachable" below and told the user
+    // to check their host and port while the credential was the problem.
+    if (response.status === 401) {
+      return {
+        ok: false,
+        cookie: '',
+        status: 'unauthorized',
+        message: 'The username or password was rejected.',
+        latencyMs,
+      };
+    }
     if (response.status !== 200) {
       return {
         ok: false,
@@ -806,6 +819,27 @@ export async function qbitAwaitFiles(
     const selected = files.value.filter((file) => wanted.has(file.index));
     if (selected.length && selected.every((file) => file.progress >= 1)) {
       return { ok: true, value: selected };
+    }
+
+    // Progress alone cannot tell "still downloading" from "stopped and never
+    // coming". A disk that filled mid-transfer, or files deleted underneath
+    // qBittorrent, leaves progress frozen below 1 — so without this the wait
+    // burned the whole five-minute timeout and then blamed the timeout.
+    const info = await qbitTorrentInfo(input, hash);
+    if (info.ok) {
+      if (!info.value) {
+        return {
+          ok: false,
+          reason: 'This torrent is no longer in qBittorrent, so the subtitle cannot arrive.',
+        };
+      }
+      if (info.value.state === 'error') {
+        return {
+          ok: false,
+          reason:
+            'qBittorrent stopped this torrent with an error, so waiting cannot help — check the free space at its save path.',
+        };
+      }
     }
 
     if (Date.now() >= deadline) {

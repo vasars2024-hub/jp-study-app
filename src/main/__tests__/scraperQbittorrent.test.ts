@@ -50,6 +50,12 @@ let server: http.Server;
 let config: ScraperQbittorrentSettings;
 let addBodies: string[] = [];
 let sessionValid = true;
+/**
+ * How the stand-in refuses a bad login. qBittorrent changed this between
+ * versions: 4.x answered `200 Ok./Fails.`, 5.2.3 answers `401`. Both are
+ * exercised, because the client has to be right on either.
+ */
+let loginRejectStyle: 'fails' | '401' = 'fails';
 /** Every request the app actually sent, so a header claim is measured not assumed. */
 let seenHeaders: http.IncomingHttpHeaders[] = [];
 
@@ -130,6 +136,12 @@ beforeAll(async () => {
             'content-type': 'text/plain',
           });
           res.end('Ok.');
+        } else if (loginRejectStyle === '401') {
+          // What a real 5.2.3 daemon does. The stand-in defaulted to the older
+          // `200 Fails.` for long enough that a live probe, not this suite,
+          // found the client mapping 401 onto "unreachable".
+          res.writeHead(401, { 'content-type': 'text/plain' });
+          res.end('Unauthorized');
         } else {
           res.writeHead(200, { 'content-type': 'text/plain' });
           res.end('Fails.');
@@ -196,6 +208,7 @@ afterAll(async () => {
 beforeEach(async () => {
   encryptionAvailable = true;
   sessionValid = true;
+  loginRejectStyle = 'fails';
   addBodies = [];
   seenHeaders = [];
   resetQbitSessions();
@@ -406,6 +419,19 @@ describe('qbitTest', () => {
     const report = await qbitTest({ config });
     expect(report.status).toBe('unauthorized');
     expect(report.message).toMatch(/rejected/i);
+  });
+
+  // P6 gate 24, brought back from a live probe against the user's real 5.2.3
+  // daemon: it answers 401, and the client used to call that "unreachable" —
+  // sending the user to check a host and port that were both correct.
+  it('reports "unauthorized", not "unreachable", when the daemon refuses with 401', async () => {
+    loginRejectStyle = '401';
+    await setScraperSecret('test/qbit', 'wrong-password');
+    const report = await qbitTest({ config });
+    expect(report.status).toBe('unauthorized');
+    expect(report.message).toMatch(/username or password was rejected/i);
+    // The negative control this test exists for: the old mapping produced this.
+    expect(report.message).not.toMatch(/answered 401/i);
   });
 
   it('accepts a password passed in for a test before saving', async () => {
