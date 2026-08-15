@@ -6,9 +6,12 @@
  * it prints mean what the plan says they mean, because those numbers are the only
  * evidence behind the feature's accuracy claim.
  *
- * The gate is deliberately hostile to its own feature: a tie is a failure, one
- * episode is a failure, and a fused track that merely equals raw Whisper is a
- * failure. A gate that a broken pipeline can pass is decoration.
+ * The gate is deliberately hostile to its own feature: one episode is a failure, and
+ * an arbitrated tie is a failure. A gate that a broken pipeline can pass is
+ * decoration. The offline mode is the one exception and it is not a weakening — the
+ * offline path cannot beat Whisper on CER by construction, so the rules it *is*
+ * graded on are the ones it can actually fail, and the claim a pass licenses shrinks
+ * to match.
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -23,6 +26,7 @@ import {
   editDistance,
   evaluateEpisode,
   evaluateTrack,
+  fusionClaimSentence,
   fusionShipGate,
   overlapSeconds,
   FUSION_GATE_MIN_EPISODES,
@@ -133,19 +137,20 @@ describe('evaluateEpisode', () => {
       fused: [cue(0, 2, '橋を渡ります'), cue(3, 5, '雨が降っています')],
       whisperOnly: [cue(0, 2, '端を渡ります'), cue(3, 5, '飴が降っています')],
       mtOnly: [cue(0, 2, '橋を渡る'), cue(3, 5, '雨が降っている')],
-    });
+    }, 'arbitrated');
     expect(verdict.passed).toBe(true);
     expect(verdict.lostTo).toEqual([]);
     expect(verdict.fused.documentCer).toBe(0);
+    expect(verdict.identicalToWhisper).toBe(false);
   });
 
-  it('fails on a tie, because a tie means fusing bought nothing', () => {
+  it('fails an arbitrated tie, because a tie means arbitration bought nothing', () => {
     const same = [cue(0, 2, '端を渡ります'), cue(3, 5, '飴が降っています')];
     const verdict = evaluateEpisode('ep1', reference, {
       fused: same,
       whisperOnly: same,
       mtOnly: [cue(0, 2, 'まったく違う文'), cue(3, 5, 'これも違う文章')],
-    });
+    }, 'arbitrated');
     expect(verdict.passed).toBe(false);
     expect(verdict.lostTo).toEqual(['whisperOnly']);
   });
@@ -155,8 +160,56 @@ describe('evaluateEpisode', () => {
       fused: [cue(0, 2, '全然関係のない文章'), cue(3, 5, 'これも無関係な話')],
       whisperOnly: [cue(0, 2, '橋を渡ります'), cue(3, 5, '雨が降っています')],
       mtOnly: [cue(0, 2, '橋を渡る'), cue(3, 5, '雨が降っている')],
-    });
+    }, 'arbitrated');
     expect(verdict.lostTo).toEqual(['whisperOnly', 'mtOnly']);
+  });
+
+  it('defaults to offline — the weaker claim — when no mode is given', () => {
+    const same = [cue(0, 2, '端を渡ります'), cue(3, 5, '飴が降っています')];
+    const verdict = evaluateEpisode('ep1', reference, {
+      fused: same,
+      whisperOnly: same,
+      mtOnly: [cue(0, 2, 'まったく違う文'), cue(3, 5, 'これも違う文章')],
+    });
+    expect(verdict.mode).toBe('offline');
+    // The identical case the offline path produces on an episode with no empty
+    // ASR window. It passes, and `identicalToWhisper` is how the report says why.
+    expect(verdict.passed).toBe(true);
+    expect(verdict.identicalToWhisper).toBe(true);
+  });
+
+  it('still fails offline when fusion made the track worse than Whisper', () => {
+    const verdict = evaluateEpisode('ep1', reference, {
+      // As if a bad reference had been substituted into an empty window.
+      fused: [cue(0, 2, '端を渡ります'), cue(3, 5, '全然関係のない話です')],
+      whisperOnly: [cue(0, 2, '端を渡ります'), cue(3, 5, '飴が降っています')],
+      mtOnly: [cue(0, 2, 'まったく違う文'), cue(3, 5, 'これも違う文章')],
+    });
+    expect(verdict.lostTo).toEqual(['whisperOnly']);
+    expect(verdict.identicalToWhisper).toBe(false);
+  });
+
+  it('still fails offline when fusion lost a line Whisper had covered', () => {
+    // Equal CER on the concatenated document, but the fused track dropped the
+    // second cue's timing and no longer covers that reference line at all.
+    const verdict = evaluateEpisode('ep1', reference, {
+      fused: [cue(0, 2, '橋を渡ります雨が降っています')],
+      whisperOnly: [cue(0, 2, '橋を渡ります'), cue(3, 5, '雨が降っています')],
+      mtOnly: [cue(0, 2, 'まったく違う文'), cue(3, 5, 'これも違う文章')],
+    });
+    expect(verdict.fused.documentCer).toBe(verdict.whisperOnly.documentCer);
+    expect(verdict.lostTo).toEqual(['coverage']);
+    expect(verdict.passed).toBe(false);
+  });
+
+  it('never excuses offline from beating translation alone', () => {
+    const same = [cue(0, 2, '端を渡ります'), cue(3, 5, '飴が降っています')];
+    const verdict = evaluateEpisode('ep1', reference, {
+      fused: same,
+      whisperOnly: same,
+      mtOnly: [cue(0, 2, '橋を渡ります'), cue(3, 5, '雨が降っています')],
+    });
+    expect(verdict.lostTo).toEqual(['mtOnly']);
   });
 });
 
@@ -221,6 +274,13 @@ describe('fusionShipGate', () => {
     fused: [cue(0, 2, '猫が好き')],
     whisperOnly: [cue(0, 2, '猫が数奇')],
     mtOnly: [cue(0, 2, '私は猫が大好きです')],
+  }, 'arbitrated');
+
+  /** The shape the offline path actually produces: fused text === whisper text. */
+  const offlinePass = (episode: string): EpisodeVerdict => evaluateEpisode(episode, [cue(0, 2, '猫が好き')], {
+    fused: [cue(0, 2, '猫が数奇')],
+    whisperOnly: [cue(0, 2, '猫が数奇')],
+    mtOnly: [cue(0, 2, '私は猫が大好きです')],
   });
 
   it('needs more than one episode, and says so rather than reading as green', () => {
@@ -229,12 +289,14 @@ describe('fusionShipGate', () => {
     expect(gate.reasons[0]).toContain(`the gate needs ${FUSION_GATE_MIN_EPISODES}`);
     // The single episode itself passed — the gate failed on evidence, not accuracy.
     expect(gate.episodes[0].passed).toBe(true);
+    expect(gate.claim).toBe('none');
   });
 
   it('passes when every episode passes and there are enough of them', () => {
     const gate = fusionShipGate([pass('ep1'), pass('ep2')]);
-    expect(gate).toMatchObject({ passed: true, reasons: [] });
+    expect(gate).toMatchObject({ passed: true, reasons: [], claim: 'beats-both' });
     expect(gate.episodes).toHaveLength(2);
+    expect(gate.notes).toEqual([]);
   });
 
   it('fails the whole gate for one bad episode, and names the numbers', () => {
@@ -242,11 +304,39 @@ describe('fusionShipGate', () => {
       fused: [cue(0, 2, '犬が嫌い')],
       whisperOnly: [cue(0, 2, '猫が好き')],
       mtOnly: [cue(0, 2, '猫が好き')],
-    });
+    }, 'arbitrated');
     const gate = fusionShipGate([pass('ep1'), bad]);
     expect(gate.passed).toBe(false);
     expect(gate.reasons).toHaveLength(2);
     expect(gate.reasons.every((reason) => reason.startsWith('ep2:'))).toBe(true);
     expect(gate.reasons[0]).toMatch(/fused CER \d\.\d{4} does not beat whisperOnly \d\.\d{4}/);
+  });
+
+  it('caps a passing offline run at the weaker claim, and says the comparison was degenerate', () => {
+    const gate = fusionShipGate([offlinePass('ep1'), offlinePass('ep2')]);
+    expect(gate.passed).toBe(true);
+    expect(gate.claim).toBe('no-regression');
+    expect(gate.notes).toHaveLength(2);
+    expect(gate.notes[0]).toContain('character-identical');
+    expect(fusionClaimSentence(gate.claim)).not.toContain('beats both');
+  });
+
+  it('lets one offline episode cap an otherwise arbitrated run', () => {
+    // The claim a run supports is only as strong as its weakest episode.
+    const gate = fusionShipGate([pass('ep1'), offlinePass('ep2')]);
+    expect(gate.passed).toBe(true);
+    expect(gate.claim).toBe('no-regression');
+  });
+
+  it('words an offline regression as "is worse than", not as a missed win', () => {
+    const regressed = evaluateEpisode('ep2', [cue(0, 2, '猫が好き')], {
+      fused: [cue(0, 2, '犬が嫌い')],
+      whisperOnly: [cue(0, 2, '猫が数奇')],
+      mtOnly: [cue(0, 2, '私は猫が大好きです')],
+    });
+    const gate = fusionShipGate([offlinePass('ep1'), regressed]);
+    expect(gate.passed).toBe(false);
+    expect(gate.reasons[0]).toMatch(/ep2: fused CER \d\.\d{4} is worse than whisperOnly \d\.\d{4}/);
+    expect(gate.claim).toBe('none');
   });
 });

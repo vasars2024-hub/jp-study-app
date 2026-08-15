@@ -8,8 +8,16 @@
  *
  * Per episode you supply four subtitle files: the human Japanese track (the
  * reference), the pipeline's fused output, Whisper's transcript alone, and the
- * reference translation alone. The last two are the baselines; the fused track has
- * to beat *both*, on every episode, and there must be at least two episodes.
+ * reference translation alone. The last two are the baselines, and there must be at
+ * least two episodes.
+ *
+ * What the fused track has to do to those baselines depends on the episode's
+ * `mode`, which says whether F5 cloud arbitration ran. `arbitrated` must beat both
+ * strictly; `offline` — the default, because it is the weaker claim — must merely
+ * not be worse than Whisper, must lose no lines to it, and must beat translation
+ * alone. `src/shared/subtitleFusionEval.ts` documents why. The gate prints the
+ * strongest sentence the run licenses; an all-offline run cannot reach the strict
+ * one however green it prints.
  *
  * It lives outside vitest because producing its inputs needs real media and the
  * Whisper runtime. But the scoring it prints is `src/shared/subtitleFusionEval.ts`
@@ -20,11 +28,12 @@
  * Usage:
  *   node tools/fusion-eval.cjs --manifest <path.json> [--json] [--out <path>]
  *   node tools/fusion-eval.cjs --episode <name> --reference a.srt --fused b.srt \
- *        --whisper c.srt --mt d.srt   (repeatable)
+ *        --whisper c.srt --mt d.srt [--mode offline|arbitrated]   (repeatable)
  *
  * Manifest shape:
  *   { "episodes": [ { "name": "...", "reference": "...", "fused": "...",
- *                     "whisperOnly": "...", "mtOnly": "..." } ] }
+ *                     "whisperOnly": "...", "mtOnly": "...",
+ *                     "mode": "offline" | "arbitrated" } ] }
  * Relative paths resolve against the manifest's own directory.
  *
  * Exit code is the gate: 0 when it passes, 1 when it fails or the inputs are
@@ -73,9 +82,24 @@ function parseArgs(argv) {
       if (!pending) throw new Error(`${arg} must follow an --episode`);
       const key = { '--reference': 'reference', '--fused': 'fused', '--whisper': 'whisperOnly', '--mt': 'mtOnly' }[arg];
       pending[key] = next();
+    } else if (arg === '--mode') {
+      if (!pending) throw new Error('--mode must follow an --episode');
+      pending.mode = readMode(next());
     } else throw new Error(`unknown argument ${arg}`);
   }
   return out;
+}
+
+/**
+ * A mode the gate does not know is a silent downgrade to the weaker rules, so a
+ * typo has to be an error rather than a default.
+ */
+function readMode(value) {
+  if (value === undefined) return 'offline';
+  if (value !== 'offline' && value !== 'arbitrated') {
+    throw new Error(`mode must be "offline" or "arbitrated", got "${value}"`);
+  }
+  return value;
 }
 
 function readEpisodes(args) {
@@ -90,6 +114,7 @@ function readEpisodes(args) {
     fused: path.resolve(base, entry.fused),
     whisperOnly: path.resolve(base, entry.whisperOnly),
     mtOnly: path.resolve(base, entry.mtOnly),
+    mode: readMode(entry.mode),
   })).concat(args.episodes);
 }
 
@@ -141,6 +166,7 @@ function main() {
           whisperOnly: loadTrack(episode.whisperOnly, 'whisperOnly'),
           mtOnly: loadTrack(episode.mtOnly, 'mtOnly'),
         },
+        readMode(episode.mode),
       ));
     } catch (error) {
       console.error(`fusion-eval: ${episode.name}: ${error.message}`);
@@ -157,7 +183,7 @@ function main() {
 
   const pct = (value) => `${(value * 100).toFixed(2)}%`;
   for (const verdict of gate.episodes) {
-    console.log(`\n${verdict.episode}`);
+    console.log(`\n${verdict.episode}  [${verdict.mode}]`);
     console.log(`  reference     ${verdict.fused.referenceCues} cues, ${verdict.fused.referenceChars} chars`);
     for (const key of ['fused', 'whisperOnly', 'mtOnly']) {
       const track = verdict[key];
@@ -171,6 +197,10 @@ function main() {
   }
   console.log(`\nship gate: ${gate.passed ? 'PASS' : 'FAIL'}`);
   for (const reason of gate.reasons) console.log(`  - ${reason}`);
+  // Printed on a pass as well as a failure: the notes are how a green run stays
+  // honest about what it did not measure.
+  for (const note of gate.notes) console.log(`  note: ${note}`);
+  console.log(`this run supports: ${evalCore.fusionClaimSentence(gate.claim)}`);
   return gate.passed ? 0 : 1;
 }
 

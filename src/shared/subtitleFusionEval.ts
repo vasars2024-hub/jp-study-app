@@ -4,10 +4,14 @@
  * Every threshold in the fusion pipeline is provisional until something measures
  * whether fusing actually beats not fusing. This module is that measurement: given
  * a human Japanese track and the tracks the pipeline produced, it reports character
- * error rate, and it answers the one question the feature's marketing depends on —
- * **does the fused track beat both raw Whisper and translation alone?** If it does
- * not, the fusion is not adding accuracy and the plan says it must not ship as
- * "highly accurate".
+ * error rate and answers the one question the feature's marketing depends on —
+ * **what may this feature honestly claim?** If the answer is "nothing", the plan
+ * says it must not ship as "highly accurate".
+ *
+ * The rules differ by `FusionEvalMode`, and that split is the point: the offline
+ * path cannot beat raw Whisper on CER *by construction*, so grading it as if it
+ * could would make the gate untestable rather than strict. See `evaluateEpisode`
+ * for what each mode measures and `FusionClaim` for what a pass licenses.
  *
  * Pure, with no Node or Electron imports, for two reasons. The scoring has to be
  * unit-testable without a 24-minute episode and a Whisper runtime, and the CLI in
@@ -176,6 +180,22 @@ export function evaluateTrack(
   };
 }
 
+/**
+ * Which path produced the fused track, because the two make different claims.
+ *
+ * Offline (`F5` skipped — no key, no disputes, or a provider that failed) the
+ * pipeline never overwrites Whisper text with the reference except in a window
+ * Whisper returned nothing for. So on an episode with no empty window the fused
+ * track is *character-identical* to `whisperOnly`, and "fused beats whisperOnly
+ * strictly" is unpassable by construction rather than unmet by measurement.
+ * Grading that run strictly does not test the pipeline, it tests whether the
+ * arbiter ran.
+ */
+export type FusionEvalMode = 'offline' | 'arbitrated';
+
+/** A baseline (or the coverage rule) the fused track failed, named for the report. */
+export type FusionLoss = 'whisperOnly' | 'mtOnly' | 'coverage';
+
 /** The three tracks one episode contributes to the gate. */
 export interface EpisodeCandidates {
   /** The pipeline's output — F1–F6, arbitration on or off. */
@@ -188,73 +208,166 @@ export interface EpisodeCandidates {
 
 export interface EpisodeVerdict {
   episode: string;
+  /** The mode this episode was graded under. Defaults to the stricter-to-claim `offline`. */
+  mode: FusionEvalMode;
   fused: TrackEvaluation;
   whisperOnly: TrackEvaluation;
   mtOnly: TrackEvaluation;
-  /** Fused CER strictly below both baselines. The plan's ship gate, per episode. */
+  /** The mode's rules all satisfied. */
   passed: boolean;
-  /** Baselines the fused track failed to beat, named for the report. */
-  lostTo: Array<'whisperOnly' | 'mtOnly'>;
+  /** Baselines (and the coverage rule) the fused track failed. */
+  lostTo: FusionLoss[];
+  /**
+   * The fused track carries the same characters as `whisperOnly` after
+   * normalization — so the CER comparison between them is degenerate, not close.
+   * Reported so a passing offline run can never be quoted as "fusing beat Whisper".
+   */
+  identicalToWhisper: boolean;
 }
 
 /**
- * Score one episode and decide whether it passes.
+ * Score one episode and decide whether it passes, under its mode's rules.
  *
  * `documentCer` is the number the gate reads. `alignedCer` is reported but does
  * not gate: it punishes the fused track for using the English grid, which is the
  * very design decision the feature rests on, so gating on it would fail the
  * pipeline for working as intended.
  *
- * "Strictly below" is deliberate — a tie means fusing bought nothing, and the
- * claim under test is that it buys accuracy.
+ * **Arbitrated** keeps the plan's original rule — fused strictly below both
+ * baselines. A tie there means arbitration bought nothing, and the claim under
+ * test is that it buys accuracy.
+ *
+ * **Offline** grades the three things the offline path actually does, and only
+ * those. It may not be *worse* than Whisper (a reference substitution in an empty
+ * window that damages the track fails here); it must still beat translation alone
+ * strictly, which is a real measurement because the two tracks genuinely differ;
+ * and it may not cover fewer reference cues than Whisper did, because filling a
+ * window Whisper returned nothing for is the offline path's whole contribution to
+ * the text. What it deliberately does **not** claim is a strict CER win over
+ * Whisper — see `FusionEvalMode`.
  */
 export function evaluateEpisode(
   episode: string,
   reference: readonly EvalCue[],
   candidates: EpisodeCandidates,
+  mode: FusionEvalMode = 'offline',
 ): EpisodeVerdict {
   const fused = evaluateTrack(reference, candidates.fused);
   const whisperOnly = evaluateTrack(reference, candidates.whisperOnly);
   const mtOnly = evaluateTrack(reference, candidates.mtOnly);
-  const lostTo: Array<'whisperOnly' | 'mtOnly'> = [];
-  if (!(fused.documentCer < whisperOnly.documentCer)) lostTo.push('whisperOnly');
+  const lostTo: FusionLoss[] = [];
+  const beatsWhisper = mode === 'arbitrated'
+    ? fused.documentCer < whisperOnly.documentCer
+    : fused.documentCer <= whisperOnly.documentCer;
+  if (!beatsWhisper) lostTo.push('whisperOnly');
   if (!(fused.documentCer < mtOnly.documentCer)) lostTo.push('mtOnly');
-  return { episode, fused, whisperOnly, mtOnly, passed: lostTo.length === 0, lostTo };
+  if (mode === 'offline' && fused.missedCues > whisperOnly.missedCues) lostTo.push('coverage');
+  return {
+    episode,
+    mode,
+    fused,
+    whisperOnly,
+    mtOnly,
+    passed: lostTo.length === 0,
+    lostTo,
+    identicalToWhisper:
+      normalizeForFusionCompare(documentText(candidates.fused))
+      === normalizeForFusionCompare(documentText(candidates.whisperOnly)),
+  };
 }
 
 /** The plan's minimum evidence: the gate is not meaningful on one episode. */
 export const FUSION_GATE_MIN_EPISODES = 2;
+
+/**
+ * The strongest sentence a passing run licenses. `none` when it did not pass.
+ *
+ * This exists so the gate's own output, not a reader's memory of the plan, decides
+ * what the feature may say about itself. An all-offline run can only ever reach
+ * `no-regression`, however green it prints.
+ */
+export type FusionClaim = 'beats-both' | 'no-regression' | 'none';
 
 export interface ShipGate {
   passed: boolean;
   episodes: EpisodeVerdict[];
   /** Why the gate failed, in the words the report prints. */
   reasons: string[];
+  /**
+   * True of the run but not gating — degenerate comparisons, mode mixes, and other
+   * things that limit what the numbers mean without making them wrong.
+   */
+  notes: string[];
+  claim: FusionClaim;
+}
+
+/** The claim's one sentence, so every caller prints the same words. */
+export function fusionClaimSentence(claim: FusionClaim): string {
+  switch (claim) {
+    case 'beats-both':
+      return 'fusing beats both raw Whisper and translation alone on every episode scored';
+    case 'no-regression':
+      return 'fusing is no worse than raw Whisper, loses no lines to it, and beats '
+        + 'translation alone — it does not claim a Whisper accuracy win';
+    default:
+      return 'nothing; this run supports no accuracy claim';
+  }
 }
 
 /**
- * The whole gate: every episode must pass, and there must be enough of them.
+ * The whole gate: every episode must pass its mode's rules, and there must be
+ * enough of them.
  *
- * A single passing episode is not evidence — one lucky recording can beat both
+ * A single passing episode is not evidence — one lucky recording can beat the
  * baselines by accident, and the plan asks for two precisely so that it cannot.
  * Too few episodes is a failure of the *gate*, not of the pipeline, and the reason
  * string says so rather than letting a thin run read as a green one.
+ *
+ * The strict `beats-both` claim needs **every** episode arbitrated. One offline
+ * episode in the set caps the whole run at `no-regression`, because the run's claim
+ * is only as strong as its weakest episode.
  */
 export function fusionShipGate(episodes: readonly EpisodeVerdict[]): ShipGate {
   const reasons: string[] = [];
+  const notes: string[] = [];
   if (episodes.length < FUSION_GATE_MIN_EPISODES) {
     reasons.push(
       `only ${episodes.length} episode(s) scored; the gate needs ${FUSION_GATE_MIN_EPISODES}`,
     );
   }
   for (const verdict of episodes) {
+    const fusedCer = verdict.fused.documentCer.toFixed(4);
     for (const lost of verdict.lostTo) {
-      const baseline = lost === 'whisperOnly' ? verdict.whisperOnly : verdict.mtOnly;
-      reasons.push(
-        `${verdict.episode}: fused CER ${verdict.fused.documentCer.toFixed(4)} `
-        + `does not beat ${lost} ${baseline.documentCer.toFixed(4)}`,
+      if (lost === 'coverage') {
+        reasons.push(
+          `${verdict.episode}: fused misses ${verdict.fused.missedCues} reference cues `
+          + `where whisperOnly misses ${verdict.whisperOnly.missedCues}`,
+        );
+      } else if (lost === 'whisperOnly' && verdict.mode === 'offline') {
+        reasons.push(
+          `${verdict.episode}: fused CER ${fusedCer} is worse than `
+          + `whisperOnly ${verdict.whisperOnly.documentCer.toFixed(4)}`,
+        );
+      } else {
+        const baseline = lost === 'whisperOnly' ? verdict.whisperOnly : verdict.mtOnly;
+        reasons.push(
+          `${verdict.episode}: fused CER ${fusedCer} `
+          + `does not beat ${lost} ${baseline.documentCer.toFixed(4)}`,
+        );
+      }
+    }
+    if (verdict.identicalToWhisper) {
+      notes.push(
+        `${verdict.episode}: fused and whisperOnly are character-identical, so their `
+        + 'CER comparison is degenerate — fusion changed no text on this episode',
       );
     }
   }
-  return { passed: reasons.length === 0, episodes: [...episodes], reasons };
+  const passed = reasons.length === 0;
+  const claim: FusionClaim = !passed
+    ? 'none'
+    : episodes.every((verdict) => verdict.mode === 'arbitrated')
+      ? 'beats-both'
+      : 'no-regression';
+  return { passed, episodes: [...episodes], reasons, notes, claim };
 }
