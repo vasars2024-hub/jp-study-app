@@ -11,6 +11,9 @@ vi.mock('../i18n', () => ({
   useT: () => ({
     t: (key: string, vars?: Record<string, string | number>) =>
       vars ? `${key}:${Object.values(vars).join(',')}` : key,
+    // Read by `EntryExplain` as the language an explanation's prose is written
+    // in, which is part of its storage key — so the mock has to carry one.
+    lang: 'en',
   }),
 }));
 
@@ -659,6 +662,61 @@ describe('LexiconWorkbenchResults', () => {
 
     expect(host.querySelector('.lexicon-sense-token')).toBeNull();
     expect(host.querySelector('ruby.is-grounded')?.textContent).toContain('cat');
+  });
+
+  it('offers the word explanation inside the sense panel, keyed on the token headword', async () => {
+    const senses = [
+      { index: 0, glosses: [{ lang: 'en', text: 'to see' }] },
+      { index: 1, glosses: [{ lang: 'en', text: 'to look after' }] },
+    ];
+    const lookup = vi.fn().mockResolvedValue({
+      text: '猫を見た。', detectedLangs: ['ja'], glossLangs: ['en'], tokenCount: 2, matchedCount: 1,
+      truncated: false,
+      parts: [
+        { kind: 'separator', text: '猫を', start: 0, end: 2 },
+        {
+          kind: 'token', text: '見た', start: 2, end: 4,
+          match: {
+            text: '見る', reading: 'みる', dictId: 'jmdict-en', dictTitle: 'JMdict (English)',
+            headwordId: 3,
+            glosses: [{ lang: 'en', text: 'to see' }, { lang: 'en', text: 'to look after' }],
+            senses,
+          },
+        },
+      ],
+    });
+    const aiGetConfig = vi.fn().mockResolvedValue({
+      engine: 'cloud', providerId: 'gemini-2.5-flash', apiKeysSet: { gemini: true, deepseek: false },
+    });
+    const dictExplanationGet = vi.fn().mockResolvedValue(null);
+    const dictExplain = vi.fn();
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: { lookupOfflineInterlinear: lookup, aiGetConfig, dictExplanationGet, dictExplain },
+    });
+    const host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root?.render(<LexiconWorkbenchResults query="猫を見た。" lang="ja" lookupAttempt={31} />);
+      await Promise.resolve();
+    });
+
+    // Absent until a word is actually the subject; the passage is not one.
+    expect(host.querySelector('.lexicon-explain-entry')).toBeNull();
+
+    await act(async () => {
+      host.querySelector('.lexicon-sense-token')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    expect(host.querySelector('.lexicon-sense-panel .lexicon-explain-entry')).not.toBeNull();
+    // The dictionary form the token matched, not the inflected surface form.
+    expect(dictExplanationGet).toHaveBeenCalledWith({
+      lang: 'ja', text: '見る', reading: 'みる', glossLang: 'en',
+      model: 'cloud:gemini-2.5-flash:default', promptVersion: 1,
+    });
+    expect(dictExplain).not.toHaveBeenCalled();
   });
 
   it('leaves the harvest out entirely when nothing was segmented', async () => {

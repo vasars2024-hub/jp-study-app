@@ -156,3 +156,25 @@ export function explainGroundingFromSenses(
   }
   return partsOfSpeech.length ? { glosses, partsOfSpeech } : { glosses };
 }
+
+/**
+ * One interlinear token's entry, in the shape `explainGroundingFromSenses` reads.
+ *
+ * Deliberately blind to `pinnedSense`, and that is the decision rather than an
+ * oversight. A pinned sense is the reader saying which meaning *this passage*
+ * used, and leading the grounding with it would produce a better explanation —
+ * but the storage key is the word, the prose language, the model and the prompt
+ * version, and nothing in it records which sense was pinned. Grounding that
+ * varied with the pin would write one reader's sense-3 answer into the cell every
+ * later reader's sense-1 lookup reads, with nothing on screen saying so. The
+ * grounding is therefore the entry, in the entry's own order, every time.
+ */
+export function explainSensesFromMatch(match: {
+  glosses?: readonly { text: string }[];
+  senses?: readonly { glosses: readonly { text: string }[] }[];
+}): ExplainSenseLike[] {
+  if (match.senses?.length) {
+    return match.senses.map((sense) => ({ definitions: sense.glosses.map((gloss) => gloss.text) }));
+  }
+  return [{ definitions: (match.glosses ?? []).map((gloss) => gloss.text) }];
+}

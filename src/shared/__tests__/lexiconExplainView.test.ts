@@ -4,6 +4,7 @@ import {
   explainErrorLabelKey,
   explainGroundingFromSenses,
   explainPolicyFromEngine,
+  explainSensesFromMatch,
 } from '../lexiconExplainView';
 import { EXPLANATION_SECTION_KINDS } from '../lexiconExplanations';
 import { EXPLAIN_GLOSS_MAX_CHARS, EXPLAIN_MAX_GLOSSES, explainModelKey } from '../lexiconExplainPrompt';
@@ -112,5 +113,35 @@ describe('explainGroundingFromSenses', () => {
     expect(explainGroundingFromSenses([{ definitions: ['cat'] }]))
       .toEqual({ glosses: ['cat'] });
     expect(explainGroundingFromSenses(undefined)).toEqual({ glosses: [] });
+  });
+});
+
+describe('explainSensesFromMatch', () => {
+  const gloss = (text: string) => ({ lang: 'en', text });
+
+  it('prefers the per-sense breakdown when the token carries one', () => {
+    expect(explainSensesFromMatch({
+      glosses: [gloss('cat')],
+      senses: [{ glosses: [gloss('cat')] }, { glosses: [gloss('shamisen')] }],
+    })).toEqual([{ definitions: ['cat'] }, { definitions: ['shamisen'] }]);
+  });
+
+  it('falls back to the flat glosses for a single-sense token', () => {
+    expect(explainSensesFromMatch({ glosses: [gloss('dog'), gloss('hound')] }))
+      .toEqual([{ definitions: ['dog', 'hound'] }]);
+    expect(explainSensesFromMatch({})).toEqual([{ definitions: [] }]);
+  });
+
+  it('grounds identically whatever the reader pinned, because the key ignores pins', () => {
+    const match = {
+      glosses: [gloss('cat')],
+      senses: [{ glosses: [gloss('cat')] }, { glosses: [gloss('shamisen')] }],
+    };
+    const unpinned = explainGroundingFromSenses(explainSensesFromMatch(match));
+    const pinned = explainGroundingFromSenses(
+      explainSensesFromMatch({ ...match, pinnedSense: 1 } as typeof match),
+    );
+    expect(pinned).toEqual(unpinned);
+    expect(pinned.glosses).toEqual(['cat', 'shamisen']);
   });
 });

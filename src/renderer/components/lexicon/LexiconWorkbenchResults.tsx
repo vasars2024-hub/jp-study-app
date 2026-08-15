@@ -34,6 +34,8 @@ import {
   type LexiconRoundTripDiff,
 } from '../../../shared/lexiconRoundTrip';
 import { resolveLexiconInput, type LexiconLensOverride } from '../../../shared/lexiconWorkbench';
+import { explainSensesFromMatch } from '../../../shared/lexiconExplainView';
+import EntryExplain from './EntryExplain';
 import DictionaryResults, { type DictLang } from '../DictionaryResults';
 import { translateTo } from '../../translator';
 import { useT } from '../../i18n';
@@ -579,6 +581,17 @@ export default function LexiconWorkbenchResults({
                   );
                 })}
               </ul>
+              {/* The one place on this surface a single word is already the
+                  subject. The grounding is the token's own entry rather than the
+                  passage, and it deliberately ignores the pin above it — see
+                  `explainSensesFromMatch` for why a pinned sense must not reach
+                  a cache keyed on the word. */}
+              <EntryExplain
+                word={openMatch.text}
+                reading={openMatch.reading}
+                lang={lang}
+                senses={explainSensesFromMatch(openMatch)}
+              />
             </div>
           )}
           {/* Offered only once the reader has actually pinned something: with no
