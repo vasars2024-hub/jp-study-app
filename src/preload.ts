@@ -1384,6 +1384,19 @@ const api = {
   ): Promise<
     import('./main/malSync').MalIpcResult<import('./main/malSync').MalDerivativeWalkResult>
   > => ipcRenderer.invoke('mal:fetchDerivatives', seedIds, options),
+  // ---- the anime/manga library the sync writes into ----
+  // Local disk only. `malLibrarySync` stores rows the caller already fetched
+  // through `malFetchList`/`malFetchDerivatives`; there is no MAL client behind
+  // it, which is what makes "nothing syncs on a timer" structural rather than a
+  // promise. Neither channel can reach MyAnimeList.
+  malLibrarySync: (
+    payload: import('./main/malLibrary').MalLibrarySyncRequest,
+  ): Promise<import('./main/malLibrary').MalLibrarySyncReport> =>
+    ipcRenderer.invoke('mal:librarySync', payload),
+  malLibraryList: (): Promise<{
+    entries: import('./shared/malLibrary').MalLibraryEntry[];
+    summary: import('./shared/malLibrary').MalLibrarySummary;
+  }> => ipcRenderer.invoke('mal:libraryList'),
   malUpdateEntry: (
     animeId: number,
     update: import('./shared/malSync').MalListStatusUpdate,

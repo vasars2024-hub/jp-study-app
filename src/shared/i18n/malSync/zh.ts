@@ -40,6 +40,22 @@ export const MAL_SYNC_ZH: Catalog = {
   'malSync.listCount': '已拉取 {count} 条。',
   'malSync.truncated': '达到分页上限时 MyAnimeList 仍有后续页面，因此这份列表并不完整。',
 
+  'malSync.library': '库',
+  'malSync.libraryDesc':
+    '保存后，已获取的作品会留在本应用中，供字幕与词汇工具使用。只保存你刚刚获取的内容，不会联网访问 MyAnimeList，也不会改动那边的列表。',
+  'malSync.librarySave': '把已获取的作品保存到库',
+  'malSync.librarySaving': '保存中…',
+  'malSync.libraryResult': '已保存：新增 {added} 条，更新 {updated} 条，未变 {unchanged} 条。',
+  'malSync.libraryRejected': '有 {rejected} 条无法读取，已跳过。',
+  'malSync.libraryStored': '库中共有 {total} 部作品。',
+  'malSync.libraryEmpty': '尚未保存任何内容。',
+  'malSync.libraryDerivatives': '其中 {derivatives} 部是通过相关作品找到的。',
+  'malSync.libraryNothingFetched': '请先获取列表，然后再保存。',
+  'malSync.statusFilter': '显示',
+  'malSync.statusAll': '列表全部',
+  'malSync.statusCompleted': '仅已看完',
+  'malSync.statusWatching': '仅在看',
+
   'malSync.error.not-configured': '尚未配置 MyAnimeList 的 Client ID。',
   'malSync.error.not-authenticated': '尚未连接 MyAnimeList，请先连接账号。',
   'malSync.error.reauth-required': 'MyAnimeList 需要你重新登录，请再连接一次账号。',

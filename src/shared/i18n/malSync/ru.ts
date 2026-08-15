@@ -50,6 +50,22 @@ export const MAL_SYNC_RU: Catalog = {
   'malSync.truncated':
     'При достижении предела страниц у MyAnimeList оставались ещё страницы, поэтому список неполный.',
 
+  'malSync.library': 'Библиотека',
+  'malSync.libraryDesc':
+    'Сохранение оставляет полученные тайтлы внутри приложения, чтобы инструменты субтитров и словаря могли с ними работать. Сохраняется только то, что вы уже получили: обращений к MyAnimeList нет, ваш список там не меняется.',
+  'malSync.librarySave': 'Сохранить полученные тайтлы в библиотеку',
+  'malSync.librarySaving': 'Сохранение…',
+  'malSync.libraryResult': 'Сохранено: {added} новых, {updated} обновлено, {unchanged} без изменений.',
+  'malSync.libraryRejected': '{rejected} записей не удалось прочитать, они пропущены.',
+  'malSync.libraryStored': 'В библиотеке {total} тайтлов.',
+  'malSync.libraryEmpty': 'Пока ничего не сохранено.',
+  'malSync.libraryDerivatives': 'Из них {derivatives} найдены через связанные тайтлы.',
+  'malSync.libraryNothingFetched': 'Сначала получите список, затем сохраните его.',
+  'malSync.statusFilter': 'Показывать',
+  'malSync.statusAll': 'Весь список',
+  'malSync.statusCompleted': 'Только завершённые',
+  'malSync.statusWatching': 'Только смотрю',
+
   'malSync.error.not-configured': 'Client ID для MyAnimeList ещё не настроен.',
   'malSync.error.not-authenticated': 'Нет подключения к MyAnimeList. Сначала подключите аккаунт.',
   'malSync.error.reauth-required': 'MyAnimeList требует войти заново. Подключите аккаунт ещё раз.',

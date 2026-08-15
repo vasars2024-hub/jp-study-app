@@ -854,6 +854,15 @@ declare global {
       ): Promise<
         import('../main/malSync').MalIpcResult<import('../main/malSync').MalDerivativeWalkResult>
       >;
+      /** Stores already-fetched rows in the local library. Never calls MAL. */
+      malLibrarySync(
+        payload: import('../main/malLibrary').MalLibrarySyncRequest,
+      ): Promise<import('../main/malLibrary').MalLibrarySyncReport>;
+      /** Reads the stored library back. Local disk only. */
+      malLibraryList(): Promise<{
+        entries: import('../shared/malLibrary').MalLibraryEntry[];
+        summary: import('../shared/malLibrary').MalLibrarySummary;
+      }>;
       subtitleProviderCredentials(): Promise<import('../../shared/subtitleDiscoveryIpc').SubtitleProviderCredentialState[]>;
       setSubtitleProviderKey(
         id: string,

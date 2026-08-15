@@ -60,6 +60,25 @@ export const MAL_SYNC_EN: Catalog = {
   'malSync.truncated':
     'MyAnimeList still had more pages when the page limit was reached, so this list is incomplete.',
 
+  // The library half. Before this existed the fetch counted its rows and threw
+  // them away, so "connected to MyAnimeList" bought the user a number and
+  // nothing else. Saving is its own click for the same reason fetching is.
+  'malSync.library': 'Library',
+  'malSync.libraryDesc':
+    'Saving keeps the fetched titles in this app so the subtitle and vocabulary tools can work from them. It stores what you just fetched — it never contacts MyAnimeList, and it never changes your list there.',
+  'malSync.librarySave': 'Save fetched titles to library',
+  'malSync.librarySaving': 'Saving…',
+  'malSync.libraryResult': 'Saved: {added} new, {updated} updated, {unchanged} unchanged.',
+  'malSync.libraryRejected': '{rejected} rows could not be read and were skipped.',
+  'malSync.libraryStored': '{total} titles in the library.',
+  'malSync.libraryEmpty': 'Nothing saved yet.',
+  'malSync.libraryDerivatives': '{derivatives} of them reached through related titles.',
+  'malSync.libraryNothingFetched': 'Fetch your list first, then save it.',
+  'malSync.statusFilter': 'Show',
+  'malSync.statusAll': 'Everything on my list',
+  'malSync.statusCompleted': 'Completed only',
+  'malSync.statusWatching': 'Watching only',
+
   'malSync.error.not-configured': 'No MyAnimeList Client ID is configured yet.',
   'malSync.error.not-authenticated': 'Not connected to MyAnimeList. Connect the account first.',
   'malSync.error.reauth-required': 'MyAnimeList needs you to sign in again. Connect the account once more.',

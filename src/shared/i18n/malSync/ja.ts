@@ -42,6 +42,22 @@ export const MAL_SYNC_JA: Catalog = {
   'malSync.truncated':
     'ページ数の上限に達した時点で MyAnimeList にまだ続きがあったため、このリストは不完全です。',
 
+  'malSync.library': 'ライブラリ',
+  'malSync.libraryDesc':
+    '保存すると、取得した作品がこのアプリ内に保持され、字幕・語彙ツールから利用できます。保存対象は直前に取得した内容だけで、MyAnimeList への通信も、あちら側のリストの変更も行いません。',
+  'malSync.librarySave': '取得した作品をライブラリに保存',
+  'malSync.librarySaving': '保存中…',
+  'malSync.libraryResult': '保存しました：新規{added}件、更新{updated}件、変更なし{unchanged}件。',
+  'malSync.libraryRejected': '{rejected}件は読み取れなかったため除外しました。',
+  'malSync.libraryStored': 'ライブラリに{total}件あります。',
+  'malSync.libraryEmpty': 'まだ何も保存されていません。',
+  'malSync.libraryDerivatives': 'うち{derivatives}件は関連作品から辿ったものです。',
+  'malSync.libraryNothingFetched': '先にリストを取得してから保存してください。',
+  'malSync.statusFilter': '表示',
+  'malSync.statusAll': 'リスト全体',
+  'malSync.statusCompleted': '完了済みのみ',
+  'malSync.statusWatching': '視聴中のみ',
+
   'malSync.error.not-configured': 'MyAnimeList の Client ID がまだ設定されていません。',
   'malSync.error.not-authenticated': 'MyAnimeList と未連携です。先にアカウントを連携してください。',
   'malSync.error.reauth-required': 'MyAnimeList で再度のサインインが必要です。もう一度連携してください。',

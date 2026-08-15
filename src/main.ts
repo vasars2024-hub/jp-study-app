@@ -38,6 +38,7 @@ import { registerScraperIpc } from './main/scraper';
 import { registerReadingIpc } from './main/reading';
 import { registerSeanimeIpc, stopSeanime } from './main/seanime';
 import { registerMalSyncIpc } from './main/malSync';
+import { registerMalLibraryIpc } from './main/malLibrary';
 import { registerReleaseIpc } from './main/release';
 import { registerResourcesCatalogIpc } from './main/resourcesCatalog';
 import { registerCollectedToolsIpc } from './main/collectedTools';
@@ -1631,6 +1632,9 @@ app.whenReady().then(async () => {
   // user-initiated action, and answers "not configured" until the user supplies
   // a client id of their own — none is shipped.
   registerMalSyncIpc();
+  // Where a fetched list is kept once the user asks for it to be kept. Local
+  // disk only — this module has no MAL client, so it cannot sync on its own.
+  registerMalLibraryIpc();
   registerReleaseIpc();
   registerResourcesCatalogIpc();
   registerCollectedToolsIpc();
