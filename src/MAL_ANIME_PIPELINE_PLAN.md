@@ -290,6 +290,50 @@ distinct refusal messages still fire honestly rather than returning empty. 17. T
 path completes with **no torrent client configured at all** — prove it by disabling the
 qBittorrent connection for one run.
 
+**Progress 2026-08-16 01:05 (`primary`). P4 CLOSES — gates 14–17 pass live.** `48bfcddb`,
+`3c4c8179`. Every number is from the running app against the real Jimaku API.
+
+- **Gate 14.** One Piece, range **100–200**: 2,885 candidates listed, **94 episodes planned,
+  7 reported missing** (160, 170, 174, 180, 190, 196, 200), **0 outside the range, 0
+  duplicated**. Control: episode 99999 → 0 picks, reported missing rather than silently dropped.
+- **Gate 15.** Episodes 100–104 fetched: **1,667 cues** (360 / 337 / 391 / 255 / 324), 103,185
+  characters, 0 fetch errors, combined timeline monotonic, **0 empty cues**.
+- **Gate 16.** Nyaa is now reachable from the harvest entry point and all four refusals fire
+  distinctly on a nonexistent title — `not-configured` (both an absent and a *malformed* config),
+  `no-indexer` (both an empty list and a present-but-disabled indexer), `qbit-disabled`,
+  `qbit-remote` naming the unreadable path. **Positive control: a valid config returns
+  `available: true`**, so the refusals are not a blanket false. When Jimaku *does* cover the
+  title the fallback is not computed at all (`nyaa: null`).
+- **Gate 17.** Same run with `qbittorrent.enabled: false`: listed 2,885, all 5 planned ids still
+  listed, all 5 fetched, byte-identical to the run above (18492/21143/25669/17323/20558). The
+  harvest path imports no torrent client.
+
+**Two defects, both live, both fixed.**
+
+1. **`jimakuSearch` took `entries[0]`,** and Jimaku's `?query=` search is fuzzy and unordered.
+   Measured before the fix: `Naruto` → **BORUTO, 293 files**; `One Piece` → a 15th-anniversary
+   special, **1 file**; `Detective Conan` → a Lupin III crossover, **3 files**. Each listed
+   *successfully*, and then a 100–200 range resolved to nothing. After `chooseJimakuEntry`:
+   **220 / 2,885 / 1,148**, matching the explicit-AniList-id control exactly.
+2. **AniList's GraphQL API is down** — `403 "The AniList API has been temporarily disabled due
+   to severe stability issues"`, confirmed both by direct curl and by `idLookupDown: true`
+   through the app. So the MAL→AniList hop fails for **every** id and the fuzzy title search is
+   the only path left. This is why (1) was not cosmetic. `resolveAnilistId` now separates an
+   outage from "no mapping" and no longer caches a bad minute as a fact.
+
+**Traps for whoever is next.**
+
+- **A title search can only match the names Jimaku filed.** `Detective Conan` still lands on a
+  movie, because entry 743 is filed as `Meitantei Conan` / `Case Closed`. MAL's own title for
+  that id *is* `Meitantei Conan`, which returns the right 1,148 — so the product path is fine and
+  the hand-typed English one is not. The panel now states `matchedBy: 'title'` for exactly this.
+- **AniList being down is not permanent.** When it returns, the id path takes over silently and
+  these numbers will come from `matchedBy: 'anilist'` instead. Do not read a future
+  `idLookupDown: false` as a regression in the fix.
+- Reusable: `debug/stage-i18n-block.cjs <anchor> <first key> <key after block>` stages catalog
+  additions as HEAD + block, which is mandatory while the four catalogs carry another track's
+  uncommitted conversion.
+
 ### P5 — vocab into the deck
 
 `analyzeMediaStudyCues` → `addMediaStudyFlashcards` (`renderer/mediaStudyWorkflow.ts:208`), with
