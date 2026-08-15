@@ -21806,3 +21806,47 @@ repo's existing test style).
 
 **Next: Phase 2's remainder** — representative template preview and full keyboard flow; then
 Phase 3's change tray, which `ankiDraftEdit`'s journal was shaped to become.
+
+## 2026-08-15 18:00 primary — Track 7 Phase 2: the preview that renders what Anki would generate
+
+Three slices, `fa02dede` / `15b59338` / `544d1b5c`. Fusion re-derived
+**closed a 9th time** (§7's last entry, all five §6 gates), so Track 7 took the whole turn.
+
+**`shared/ankiTemplateRender.ts`** — a card in Anki is generated, not stored, so a workbench
+that shows fields but never renders them cannot report a blank question or a missing field
+until after a commit. It renders the Anki template subset (fields, filters, conditionals,
+`{{FrontSide}}`, cloze) and reports 11 problem codes. **Unimplemented syntax is reported, never
+silently dropped** — a preview that renders less than Anki does is a preview that lies.
+
+**Two defects the unit tests caught, both invisible to eyeballing output:**
+- The cloze hint separator is the first `::` **at depth zero**, not `indexOf('::')`. Nested
+  `{{c1::a {{c2::b}} c}}` split inside the inner marker and rendered `a {{c2` as the answer.
+- The cloze target comes from **the ordinal being rendered**, never `card.ord`. A cloze number
+  an edit just added has no card row, so reading the row rendered every such preview as cloze 1.
+
+**`DeckWorkbenchPreview.tsx`** under the inspector: sibling tabs, front/back flip, a 320px
+compact stage, light/dark. **`DeckWorkbenchSamples.tsx`**: the representative gallery, with a
+`View` toggle in the Browser that never touches the selection.
+
+**Security decision (standing auto-approval): rendered card HTML is a stranger's package.**
+It goes in a `sandbox=""` iframe with a `default-src 'none'` CSP inside, never
+`dangerouslySetInnerHTML`. `ankiPreviewFrame.ts` is the single place that rule lives.
+
+**Trap for the next worker:** `hidden` loses to a `display: flex/grid` rule. The grid is hidden
+rather than unmounted (unmounting VirtualList discards scroll position), so `.wb-browser [hidden]`
+restates it at higher specificity. Live-measured at 0px; without the rule the grid stays visible.
+
+**Live, window 2, local deck through real IPC (3,221 notes).** Preview: `sandbox` reads `""`,
+front renders 今日はいい天気です, back adds the template's `<hr id=answer>` and sentence div; it
+found a real duplicate-first-field on the first note opened. Dark rewrote the document to
+`#2f2f31`; compact measured **320px**, frame painting **318×180**. Gallery: **3** cards, every
+frame sandboxed and painting at **140px**, "Выбрано из всех 3 221 заметок", and an absent list
+naming the five cases this deck genuinely lacks.
+
+**Gates**, once after the last slice. `npx vitest run` **exit 0, 640 files / 8,616 tests** (was
+637 / 8,580 — exactly my 3 files and 36 tests). `i18n-check` exit 0 at **9,758** keys (+45).
+`architecture-audit` exit 0, **Nothing new**, 2 known pending. `eslint` on all 9 touched paths:
+**0 errors** (2 `import/no-duplicates` warnings in the inspector predate this turn).
+
+**Next: Phase 2's full keyboard flow** (gate 10) — arrow/space/shift-range in the Browser grid,
+then Phase 3's change tray, which `ankiDraftEdit`'s journal was shaped to become.
