@@ -150,10 +150,12 @@ export default function DeckWorkbenchBrowser({
 
   useEffect(() => {
     let live = true;
-    if (!vocabTerms.length) {
-      // No word field anywhere in this deck is still an answered lookup: the
-      // filters must work and report "no word", not sit refusing forever.
-      setRanks(new Map());
+    // No word field anywhere in this deck is still an answered lookup: the
+    // filters must work and report "no word", not sit refusing forever. Same
+    // for a host whose bridge predates the channel — `known:` still answers
+    // from card state, and every rank is honestly absent.
+    if (!vocabTerms.length || typeof window.api?.dictFrequencyRanks !== 'function') {
+      setRanks(new Map(vocabTerms.map((term) => [term, null])));
       return () => {
         live = false;
       };
