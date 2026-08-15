@@ -886,3 +886,61 @@ keys — no new user-visible string, the badge keys already existed in all four 
 the three touched paths: **exit 0, clean**.
 
 **§6 status: (1) done. (2) done. (3) done. (4) DONE. (5) done. All five gates pass.**
+
+### The failed batch says why, gets a second chance, and can no longer fool the gate — 2026-08-15, backup
+
+**Landed:** `d5f7b644`, `428d6624`, `e3284530`, `14a9c33f`. §6 was already closed; this is the
+open defect the previous entry named as the next slice — F5 losing ~1/3 of its batches with
+nothing retrying or reporting it.
+
+**`failedBatches: 1` was the whole diagnosis, and it collapsed four defects in four layers:** a
+request that threw, a model that answered with prose, one that returned an empty list, one whose
+every row the fidelity guard threw out. `inspectFusionArbitration` now reports what a response
+*contained* (`parsed`/`rows`) beside what survived it; `parseFusionArbitration` is a one-line
+delegate so no existing caller changed. The arbiter counts reasons into a `failures` map (the
+provider's own error `code` for a throw — a code is stable where a message is prose, and this
+ends up in a file on disk), plus `dropped` for rows discarded in batches that still yielded
+something, which `failedBatches` is structurally blind to.
+
+**Root cause, identified but deliberately NOT fixed.** Gemini 2.5 Flash thinks by default and
+charges thoughts against `maxOutputTokens`; spending the budget on thinking returns
+`finishReason: MAX_TOKENS` with no `parts`. That fits every fact: episode 1's single 16-batch
+lost whole, episode 2 losing one of 16/16/6 while the 6 went through, one 16 succeeding and
+another not, never a partial. The fix is one line —
+`generationConfig.thinkingConfig.thinkingBudget` — but **Gemini 400s an unknown
+`generationConfig` field, so a wrong guess breaks every cloud call in the app**, and this turn
+had no web access and no usable key (vaulted). Left as a commented non-decision in
+`requestBody`, and logged in `needs-user.md`. **Do not send it on a hunch.**
+
+**Treated instead:** `output-truncated` is its own error code on both Gemini paths (the
+streaming half matters more — a stream cut mid-JSON parses far enough to look like an answer),
+and a failed batch is re-asked **once, in halves**. Only for size-shaped reasons
+(`output-truncated`, `unparsable`, `timeout`); never `rejected`/`empty` (the model answered and
+the answer was no — a smaller question gets the same no at twice the price) and never
+`rate-limit`/`authentication`/`cost-budget`. Ceiling is 3x the batch count. `recovered` records
+what the split won back, and the original failure is still reported: a run that only succeeds on
+the second try is a finding, not a clean run.
+
+**The gate was taking the operator's word for the mode, and the word was already wrong.**
+`--mode arbitrated` is an assertion; episode 1 was graded under it having applied **zero**
+verdicts. `--meta <sidecar>` + `fusionModeFromArbitration` (`skipped === null && applied > 0`)
+reads it from the run's own record. Evidence only ever **downgrades** — a missing or field-less
+sidecar leaves `--mode` alone, because "cannot testify" is not "testifies offline". Proven on
+fixtures: identical tracks, `--mode arbitrated` twice, claim `beats-both`; add `--meta` and
+ep2's zero-applied sidecar regrades it to `no-regression`, with a note printed above the table.
+
+**Trap for the next worker:** the pre-existing "counts reasons per batch" test used
+`unparsable`, which the split now retries — its rate-limit count went 2→4, correctly. If a
+reason count doubles unexpectedly, check `SPLITTABLE_REASONS` before suspecting the counter.
+
+**Gates**, once after the last slice, on the shared dirty tree. `npx vitest run
+--testTimeout=60000 --hookTimeout=60000`: **615 passed / 1 skipped files, 8,191 passed / 6
+skipped**, exit 0 — baseline 615/8,166, so exactly this turn's +25 tests and no regression.
+`node tools/i18n-check.cjs`: exit 0 at **9,595** keys, unchanged (no new user-visible string —
+`failures`/`recovered` are on-disk provenance, not UI). `node tools/architecture-audit.cjs`:
+exit 0, **Nothing new**, 2 known pending. `npx eslint` on all 12 touched paths: clean, bar
+`tools/fusion-eval.cjs`'s 3 pre-existing `no-var-requires` (proved identical on the
+`e3284530~1` blob).
+
+**§6 status unchanged: all five gates still pass.** This entry closes the defect §6 did not
+cover; it is not a §6 item.
