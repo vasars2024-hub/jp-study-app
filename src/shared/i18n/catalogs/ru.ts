@@ -9647,5 +9647,32 @@ export const ru: Catalog = {
   'ankiWorkbench.tray.normalize.ascii-width': 'полноширинный ASCII в обычный',
   'ankiWorkbench.tray.normalize.collapse-space': 'схлопнуть пробелы',
   'ankiWorkbench.tray.normalize.trim': 'обрезать края',
+  'ankiWorkbench.tray.kind.enrich-dictionary': 'Заполнить из установленных словарей',
+  'ankiWorkbench.tray.describe.enrich-dictionary':
+    'Записать {aspect} в {to} ({conflict}; {rule}; {provenance})',
+  'ankiWorkbench.tray.enrichTo': 'Записать в',
+  'ankiWorkbench.tray.aspect': 'Что записать',
+  'ankiWorkbench.tray.aspect.reading': 'чтение',
+  'ankiWorkbench.tray.aspect.meaning': 'значение',
+  'ankiWorkbench.tray.aspect.partOfSpeech': 'часть речи',
+  'ankiWorkbench.tray.senseRule': 'Если установленные словари расходятся',
+  'ankiWorkbench.tray.senseRule.first-source': 'взять первый словарь',
+  'ankiWorkbench.tray.senseRule.all-sources': 'записать все варианты',
+  'ankiWorkbench.tray.senseRule.refuse': 'оставить заметку без изменений',
+  'ankiWorkbench.tray.provenance': 'Записывать, из какого словаря взято',
+  'ankiWorkbench.tray.provenance.inline': 'да, прямо в поле',
+  'ankiWorkbench.tray.provenance.none': 'нет',
+  'ankiWorkbench.tray.enrichLoading': 'Ищем {count} слов в установленных словарях…',
+  'ankiWorkbench.tray.enrichReady': 'Найдено {found} из {count} слов в установленных словарях.',
+  'ankiWorkbench.tray.problem.no-enrich-data':
+    'Ответы словарей ещё не загружены, поэтому заполнить нечем. Если так и остаётся, установленные словари отсюда недоступны.',
+  'ankiWorkbench.tray.problem.enrich-no-entry':
+    'Слово из {count} заметок не знает ни один установленный словарь.',
+  'ankiWorkbench.tray.problem.enrich-no-word': 'В {count} заметках нет поля со словом для поиска.',
+  'ankiWorkbench.tray.problem.enrich-sense-conflict':
+    'В {count} заметках установленные словари разошлись, поэтому они остались без изменений.',
+  'ankiWorkbench.tray.problem.enrich-sources-merged':
+    'В {count} заметках несколько словарей разошлись, и записаны все их варианты.',
+
 };
 

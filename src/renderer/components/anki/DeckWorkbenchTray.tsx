@@ -12,7 +12,7 @@
  * what is selected and what it can change now — and never prints the selection
  * count next to the verb.
  */
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { AnkiDraft } from '../../../shared/ankiDraft';
 import {
   addTrayAction,
@@ -27,7 +27,15 @@ import {
   type TrayPlan,
 } from '../../../shared/ankiChangeTray';
 import type { AnkiDraftEditJournal } from '../../../shared/ankiDraftEdit';
+import {
+  type EnrichAspect,
+  type EnrichEntry,
+  type EnrichLookup,
+  type EnrichProvenanceMode,
+  type EnrichSenseRule,
+} from '../../../shared/ankiEnrich';
 import { TEXT_NORMALIZE_ORDER, type TextNormalizeOp } from '../../../shared/ankiTextNormalize';
+import { buildVocabContext } from '../../../shared/ankiVocabContext';
 import { useT } from '../../i18n';
 
 const ACTION_KINDS: TrayActionKind[] = [
@@ -35,10 +43,14 @@ const ACTION_KINDS: TrayActionKind[] = [
   'normalize-text',
   'swap-fields',
   'copy-field',
+  'enrich-dictionary',
   'add-tags',
   'remove-tags',
 ];
 const COPY_CONFLICTS: FieldCopyConflict[] = ['keep', 'overwrite', 'append'];
+const ENRICH_ASPECTS: EnrichAspect[] = ['meaning', 'reading', 'partOfSpeech'];
+const ENRICH_SENSE_RULES: EnrichSenseRule[] = ['refuse', 'first-source', 'all-sources'];
+const ENRICH_PROVENANCE: EnrichProvenanceMode[] = ['inline', 'none'];
 /** How many changed notes the diff lists before it summarises the rest. */
 const DIFF_PREVIEW_ROWS = 5;
 const DIFF_CHARS = 120;
@@ -79,6 +91,16 @@ export default function DeckWorkbenchTray({
   // text, so the form's default choice is the non-destructive one.
   const [onConflict, setOnConflict] = useState<FieldCopyConflict>('keep');
   const [normalizeOps, setNormalizeOps] = useState<TextNormalizeOp[]>([]);
+  const [aspect, setAspect] = useState<EnrichAspect>('meaning');
+  // `refuse` first and pre-selected for the same reason `keep` is: it is the one
+  // answer that cannot invent one. A disagreement between installed
+  // dictionaries then leaves those notes alone and names them, instead of
+  // silently picking a winner the user never chose.
+  const [senseRule, setSenseRule] = useState<EnrichSenseRule>('refuse');
+  // Provenance on by default: the span renders as ordinary text, survives an
+  // APKG round trip, and a field whose text came from somewhere the user cannot
+  // name later is the thing this whole action is meant to avoid.
+  const [provenance, setProvenance] = useState<EnrichProvenanceMode>('inline');
   const [applied, setApplied] = useState<number | null>(null);
 
   /** Every field name in the draft, since a tray targets by name across note types. */
@@ -90,9 +112,67 @@ export default function DeckWorkbenchTray({
     return names;
   }, [draft]);
 
+  /**
+   * The word each note declares, for `enrich-dictionary`. Built here rather than
+   * lifted out of the Browser: enrichment reads only `byNote[…].term` and
+   * `terms`, both of which are pure functions of the draft. The Browser's copy
+   * additionally carries frequency ranks and knowledge levels, which cost an IPC
+   * round trip and mean nothing to an enrichment — so this one asks for neither.
+   */
+  const vocab = useMemo(
+    () => buildVocabContext({ notes: draft.notes, noteTypes: draft.noteTypes, cards: draft.cards }),
+    [draft],
+  );
+  const [lookup, setLookup] = useState<EnrichLookup | undefined>(undefined);
+  const [lookupPending, setLookupPending] = useState(false);
+  // Only a queued enrichment pays for the lookup: it is a database read per
+  // distinct word, and every other action kind has no use for the result.
+  const wantsEnrich = actions.some((a) => a.enabled && a.kind === 'enrich-dictionary');
+
+  useEffect(() => {
+    if (!wantsEnrich) return;
+    let live = true;
+    // A deck with no word field anywhere is still an answered lookup: an empty
+    // map is data, and every note then reports `enrich-no-word`, which is true.
+    // A host whose bridge predates the channel is NOT — leaving `lookup`
+    // undefined keeps the plan blocked on `no-enrich-data` rather than
+    // reporting every note as "no dictionary knows this word", which is a lie
+    // about the user's dictionaries.
+    if (!vocab.terms.length) {
+      setLookup(new Map());
+      return;
+    }
+    if (typeof window.api?.dictEnrichTerms !== 'function') return;
+    setLookupPending(true);
+    void window.api
+      .dictEnrichTerms([...vocab.terms])
+      .then((found: Record<string, EnrichEntry[]>) => {
+        if (!live) return;
+        // Absent means "nothing answered", so only the words that were found go
+        // in; `resolveEnrichValue` reads a missing key as `no-entry`.
+        setLookup(new Map(Object.entries(found)));
+        setLookupPending(false);
+      })
+      .catch(() => {
+        if (!live) return;
+        setLookup(undefined);
+        setLookupPending(false);
+      });
+    return () => {
+      live = false;
+    };
+  }, [wantsEnrich, vocab]);
+
   const plan = useMemo(
-    () => planChangeTray(draft, journal, selectedIds, actions),
-    [draft, journal, selectedIds, actions],
+    () =>
+      planChangeTray(
+        draft,
+        journal,
+        selectedIds,
+        actions,
+        lookup ? { enrich: { lookup, vocab } } : undefined,
+      ),
+    [draft, journal, selectedIds, actions, lookup, vocab],
   );
 
   const buildAction = (id: string): TrayAction => {
@@ -112,6 +192,8 @@ export default function DeckWorkbenchTray({
         return { id, enabled: true, kind, fieldA, fieldB };
       case 'copy-field':
         return { id, enabled: true, kind, fromField: fieldA, toField: fieldB, onConflict };
+      case 'enrich-dictionary':
+        return { id, enabled: true, kind, aspect, toField: fieldB, onConflict, senseRule, provenance };
       case 'normalize-text':
         return {
           id,
@@ -158,37 +240,57 @@ export default function DeckWorkbenchTray({
           to: action.toField,
           conflict: t(`ankiWorkbench.tray.conflict.${action.onConflict}`),
         });
+      case 'enrich-dictionary':
+        return t('ankiWorkbench.tray.describe.enrich-dictionary', {
+          aspect: t(`ankiWorkbench.tray.aspect.${action.aspect}`),
+          to: action.toField,
+          conflict: t(`ankiWorkbench.tray.conflict.${action.onConflict}`),
+          rule: t(`ankiWorkbench.tray.senseRule.${action.senseRule}`),
+          provenance: t(`ankiWorkbench.tray.provenance.${action.provenance}`),
+        });
       default:
         return t(`ankiWorkbench.tray.describe.${action.kind}`, { tags: action.tags.join(' ') });
     }
   };
 
+  /** One "choose a field" select. `''` is the unset value every caller checks. */
+  const fieldSelect = (label: string, value: string, onChange: (next: string) => void): ReactNode => (
+    <label>
+      {label}
+      <select value={value} onChange={(e) => onChange(e.target.value)}>
+        <option value="">{t('ankiWorkbench.tray.field.choose')}</option>
+        {fieldNames.map((name) => (
+          <option key={name} value={name}>
+            {name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+
   /** The two-field form both `swap-fields` and `copy-field` use. */
   const fieldPair = (labelA: string, labelB: string): ReactNode => (
     <>
-      <label>
-        {labelA}
-        <select value={fieldA} onChange={(e) => setFieldA(e.target.value)}>
-          <option value="">{t('ankiWorkbench.tray.field.choose')}</option>
-          {fieldNames.map((name) => (
-            <option key={name} value={name}>
-              {name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        {labelB}
-        <select value={fieldB} onChange={(e) => setFieldB(e.target.value)}>
-          <option value="">{t('ankiWorkbench.tray.field.choose')}</option>
-          {fieldNames.map((name) => (
-            <option key={name} value={name}>
-              {name}
-            </option>
-          ))}
-        </select>
-      </label>
+      {fieldSelect(labelA, fieldA, setFieldA)}
+      {fieldSelect(labelB, fieldB, setFieldB)}
     </>
+  );
+
+  /** The conflict select `copy-field` and `enrich-dictionary` share. */
+  const conflictSelect = (): ReactNode => (
+    <label>
+      {t('ankiWorkbench.tray.onConflict')}
+      <select
+        value={onConflict}
+        onChange={(e) => setOnConflict(e.target.value as FieldCopyConflict)}
+      >
+        {COPY_CONFLICTS.map((value) => (
+          <option key={value} value={value}>
+            {t(`ankiWorkbench.tray.conflict.${value}`)}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 
   const problems = summarizeTrayProblems(plan.problems);
@@ -344,15 +446,46 @@ export default function DeckWorkbenchTray({
         ) : kind === 'copy-field' ? (
           <>
             {fieldPair(t('ankiWorkbench.tray.copyFrom'), t('ankiWorkbench.tray.copyTo'))}
+            {conflictSelect()}
+          </>
+        ) : kind === 'enrich-dictionary' ? (
+          <>
             <label>
-              {t('ankiWorkbench.tray.onConflict')}
-              <select
-                value={onConflict}
-                onChange={(e) => setOnConflict(e.target.value as FieldCopyConflict)}
-              >
-                {COPY_CONFLICTS.map((value) => (
+              {t('ankiWorkbench.tray.aspect')}
+              <select value={aspect} onChange={(e) => setAspect(e.target.value as EnrichAspect)}>
+                {ENRICH_ASPECTS.map((value) => (
                   <option key={value} value={value}>
-                    {t(`ankiWorkbench.tray.conflict.${value}`)}
+                    {t(`ankiWorkbench.tray.aspect.${value}`)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {/* The word itself is read from the note's own vocabulary field, so
+                only the destination is chosen here. */}
+            {fieldSelect(t('ankiWorkbench.tray.enrichTo'), fieldB, setFieldB)}
+            {conflictSelect()}
+            <label>
+              {t('ankiWorkbench.tray.senseRule')}
+              <select
+                value={senseRule}
+                onChange={(e) => setSenseRule(e.target.value as EnrichSenseRule)}
+              >
+                {ENRICH_SENSE_RULES.map((value) => (
+                  <option key={value} value={value}>
+                    {t(`ankiWorkbench.tray.senseRule.${value}`)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              {t('ankiWorkbench.tray.provenance')}
+              <select
+                value={provenance}
+                onChange={(e) => setProvenance(e.target.value as EnrichProvenanceMode)}
+              >
+                {ENRICH_PROVENANCE.map((value) => (
+                  <option key={value} value={value}>
+                    {t(`ankiWorkbench.tray.provenance.${value}`)}
                   </option>
                 ))}
               </select>
@@ -373,6 +506,17 @@ export default function DeckWorkbenchTray({
           {t('ankiWorkbench.tray.add')}
         </button>
       </div>
+
+      {wantsEnrich && (lookupPending || lookup) && (
+        <p className="muted wb-tray-enrich" role="status">
+          {lookupPending
+            ? t('ankiWorkbench.tray.enrichLoading', { count: vocab.terms.length })
+            : t('ankiWorkbench.tray.enrichReady', {
+                found: lookup?.size ?? 0,
+                count: vocab.terms.length,
+              })}
+        </p>
+      )}
 
       {problems.length > 0 && (
         <ul className="wb-tray-problems">

@@ -21,6 +21,7 @@ vi.mock('../i18n', () => ({
 import type { AnkiDraft, AnkiDraftNote } from '../../shared/ankiDraft';
 import { createEditJournal, type AnkiDraftEditJournal } from '../../shared/ankiDraftEdit';
 import type { TrayPlan } from '../../shared/ankiChangeTray';
+import type { EnrichEntry } from '../../shared/ankiEnrich';
 import DeckWorkbenchTray from '../components/anki/DeckWorkbenchTray';
 
 function note(id: string, back = 'cat'): AnkiDraftNote {
@@ -326,5 +327,109 @@ describe('DeckWorkbenchTray', () => {
     expect(host.querySelector('.wb-tray-blocking')).not.toBeNull();
     expect(host.querySelector('.wb-tray-preview')).toBeNull();
     expect(applyButton().disabled).toBe(true);
+  });
+});
+
+// ----- dictionary enrichment, gate 11's surface half ---------------------------
+
+/** One dictionary's answer for ねこ. */
+function entry(source: string, definition: string): EnrichEntry {
+  return {
+    source,
+    reading: 'ねこ',
+    senses: [{ partsOfSpeech: ['noun'], definitions: [definition] }],
+  };
+}
+
+/** Queue an `enrich-dictionary` action writing the meaning into `Back`. */
+function addEnrich(rule = 'refuse'): void {
+  selectKind('enrich-dictionary');
+  selectField('ankiWorkbench.tray.enrichTo', 'Back');
+  selectField('ankiWorkbench.tray.senseRule', rule);
+  addToTray();
+}
+
+describe('DeckWorkbenchTray enrichment', () => {
+  afterEach(() => {
+    delete (window as { api?: unknown }).api;
+  });
+
+  it('blocks rather than reporting a whole deck as unknown when no lookup can run', () => {
+    // The negative control for the whole feature: with no `dictEnrichTerms` on
+    // the host, an empty result would read as "no installed dictionary knows any
+    // of your words". The tray must refuse the plan instead.
+    mount(draftOf([note('n1', '')]), ['n1']);
+    addEnrich();
+
+    expect(host.textContent).toContain('ankiWorkbench.tray.problem.no-enrich-data');
+    expect(host.textContent).not.toContain('ankiWorkbench.tray.problem.enrich-no-entry');
+    expect(host.querySelector('.wb-tray-blocking')).not.toBeNull();
+    expect(applyButton().disabled).toBe(true);
+  });
+
+  it('writes the dictionary value with its provenance once the lookup answers', async () => {
+    const dictEnrichTerms = vi.fn().mockResolvedValue({ ねこ: [entry('JMdict (EN)', 'cat')] });
+    (window as { api?: unknown }).api = { dictEnrichTerms };
+    mount(draftOf([note('n1', '')]), ['n1']);
+    addEnrich();
+    // Blocked while the lookup is in flight, for the same reason as above.
+    expect(applyButton().disabled).toBe(true);
+    await act(async () => {});
+
+    // Asked for the word the note declares, not for the note's other field.
+    expect(dictEnrichTerms).toHaveBeenCalledWith(['ねこ']);
+    expect(host.textContent).toContain('ankiWorkbench.tray.enrichReady:1,1');
+    expect(host.textContent).toContain('ankiWorkbench.tray.summary:1');
+
+    act(() => applyButton().dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    const written = onApply.mock.calls[0]![0].draft.notes[0]!.fields[1]!.raw;
+    expect(written).toContain('cat');
+    expect(written).toContain('data-jp-dict="JMdict (EN)"');
+  });
+
+  it('leaves a note alone when installed dictionaries disagree and the rule says so', async () => {
+    (window as { api?: unknown }).api = {
+      dictEnrichTerms: vi
+        .fn()
+        .mockResolvedValue({ ねこ: [entry('JMdict (EN)', 'cat'), entry('Wiktionary', 'feline')] }),
+    };
+    mount(draftOf([note('n1', '')]), ['n1']);
+    addEnrich();
+    await act(async () => {});
+
+    // A disagreement under `refuse` is named and changes nothing — not silently
+    // resolved in favour of whichever dictionary happened to be first.
+    expect(host.textContent).toContain('ankiWorkbench.tray.problem.enrich-sense-conflict:1');
+    expect(host.textContent).toContain('ankiWorkbench.tray.summaryNone');
+    expect(applyButton().disabled).toBe(true);
+  });
+
+  it('merges both dictionaries under all-sources and says that it did', async () => {
+    (window as { api?: unknown }).api = {
+      dictEnrichTerms: vi
+        .fn()
+        .mockResolvedValue({ ねこ: [entry('JMdict (EN)', 'cat'), entry('Wiktionary', 'feline')] }),
+    };
+    mount(draftOf([note('n1', '')]), ['n1']);
+    addEnrich('all-sources');
+    await act(async () => {});
+
+    expect(host.textContent).toContain('ankiWorkbench.tray.problem.enrich-sources-merged:1');
+    act(() => applyButton().dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    const written = onApply.mock.calls[0]![0].draft.notes[0]!.fields[1]!.raw;
+    expect(written).toContain('cat / feline');
+    // Both dictionaries are credited in the attribute, which is `|`-separated so
+    // a source name containing the value separator stays readable.
+    expect(written).toContain('data-jp-dict="JMdict (EN)|Wiktionary"');
+  });
+
+  it('does not look anything up for a tray with no enrichment in it', () => {
+    const dictEnrichTerms = vi.fn().mockResolvedValue({});
+    (window as { api?: unknown }).api = { dictEnrichTerms };
+    mount(draftOf([note('n1')]), ['n1']);
+    addReplace('cat', 'ねこ');
+
+    expect(dictEnrichTerms).not.toHaveBeenCalled();
+    expect(host.querySelector('.wb-tray-enrich')).toBeNull();
   });
 });

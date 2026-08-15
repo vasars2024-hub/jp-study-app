@@ -8802,5 +8802,31 @@ export const zh: Catalog = {
   'ankiWorkbench.tray.normalize.ascii-width': '全角 ASCII 转半角',
   'ankiWorkbench.tray.normalize.collapse-space': '合并空格',
   'ankiWorkbench.tray.normalize.trim': '去除首尾空白',
+  'ankiWorkbench.tray.kind.enrich-dictionary': '用已安装词典填充',
+  'ankiWorkbench.tray.describe.enrich-dictionary':
+    '把{aspect}写入{to}（{conflict}；{rule}；{provenance}）',
+  'ankiWorkbench.tray.enrichTo': '写入到',
+  'ankiWorkbench.tray.aspect': '写入什么',
+  'ankiWorkbench.tray.aspect.reading': '读音',
+  'ankiWorkbench.tray.aspect.meaning': '词义',
+  'ankiWorkbench.tray.aspect.partOfSpeech': '词性',
+  'ankiWorkbench.tray.senseRule': '已安装词典不一致时',
+  'ankiWorkbench.tray.senseRule.first-source': '使用第一本词典',
+  'ankiWorkbench.tray.senseRule.all-sources': '全部写入',
+  'ankiWorkbench.tray.senseRule.refuse': '不改动该笔记',
+  'ankiWorkbench.tray.provenance': '记录来自哪本词典',
+  'ankiWorkbench.tray.provenance.inline': '是，记在字段里',
+  'ankiWorkbench.tray.provenance.none': '否',
+  'ankiWorkbench.tray.enrichLoading': '正在已安装词典中查询 {count} 个词…',
+  'ankiWorkbench.tray.enrichReady': '{count} 个词中有 {found} 个在已安装词典中找到。',
+  'ankiWorkbench.tray.problem.no-enrich-data':
+    '尚未载入任何词典结果，因此无法填充。若一直如此，说明这里无法访问已安装的词典。',
+  'ankiWorkbench.tray.problem.enrich-no-entry': '{count} 条笔记的词不在任何已安装词典中。',
+  'ankiWorkbench.tray.problem.enrich-no-word': '{count} 条笔记没有可供查询的词语字段。',
+  'ankiWorkbench.tray.problem.enrich-sense-conflict':
+    '{count} 条笔记上已安装词典不一致，因此未作改动。',
+  'ankiWorkbench.tray.problem.enrich-sources-merged':
+    '{count} 条笔记上多本词典不一致，已写入它们的全部答案。',
+
 };
 

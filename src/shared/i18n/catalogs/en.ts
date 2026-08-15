@@ -9267,6 +9267,32 @@ export const en: Catalog = {
   'ankiWorkbench.tray.normalize.ascii-width': 'full-width ASCII to half-width',
   'ankiWorkbench.tray.normalize.collapse-space': 'collapse spaces',
   'ankiWorkbench.tray.normalize.trim': 'trim the ends',
+  'ankiWorkbench.tray.kind.enrich-dictionary': 'Fill from installed dictionaries',
+  'ankiWorkbench.tray.describe.enrich-dictionary':
+    'Write {aspect} into {to} ({conflict}; {rule}; {provenance})',
+  'ankiWorkbench.tray.enrichTo': 'Write into',
+  'ankiWorkbench.tray.aspect': 'What to write',
+  'ankiWorkbench.tray.aspect.reading': 'reading',
+  'ankiWorkbench.tray.aspect.meaning': 'meaning',
+  'ankiWorkbench.tray.aspect.partOfSpeech': 'part of speech',
+  'ankiWorkbench.tray.senseRule': 'If installed dictionaries disagree',
+  'ankiWorkbench.tray.senseRule.first-source': 'use the first dictionary',
+  'ankiWorkbench.tray.senseRule.all-sources': 'write all of them',
+  'ankiWorkbench.tray.senseRule.refuse': 'leave the note alone',
+  'ankiWorkbench.tray.provenance': 'Record which dictionary it came from',
+  'ankiWorkbench.tray.provenance.inline': 'yes, in the field',
+  'ankiWorkbench.tray.provenance.none': 'no',
+  'ankiWorkbench.tray.enrichLoading': 'Reading the installed dictionaries for {count} words…',
+  'ankiWorkbench.tray.enrichReady': '{found} of {count} words found in the installed dictionaries.',
+  'ankiWorkbench.tray.problem.no-enrich-data':
+    'No dictionary answers are loaded yet, so nothing can be filled in. If this stays, the installed dictionaries are unreachable from here.',
+  'ankiWorkbench.tray.problem.enrich-no-entry': 'No installed dictionary knows the word on {count} notes.',
+  'ankiWorkbench.tray.problem.enrich-no-word': '{count} notes declare no word field to look up.',
+  'ankiWorkbench.tray.problem.enrich-sense-conflict':
+    'On {count} notes the installed dictionaries disagreed, so those notes were left alone.',
+  'ankiWorkbench.tray.problem.enrich-sources-merged':
+    'On {count} notes several dictionaries disagreed and all of their answers were written.',
+
 };
 
 

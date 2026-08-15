@@ -8842,5 +8842,32 @@ export const ja: Catalog = {
   'ankiWorkbench.tray.normalize.ascii-width': '全角 ASCII を半角に',
   'ankiWorkbench.tray.normalize.collapse-space': '空白をまとめる',
   'ankiWorkbench.tray.normalize.trim': '前後の空白を削除',
+  'ankiWorkbench.tray.kind.enrich-dictionary': 'インストール済み辞書から補完',
+  'ankiWorkbench.tray.describe.enrich-dictionary':
+    '{aspect}を{to}に書き込む（{conflict}／{rule}／{provenance}）',
+  'ankiWorkbench.tray.enrichTo': '書き込み先',
+  'ankiWorkbench.tray.aspect': '書き込む内容',
+  'ankiWorkbench.tray.aspect.reading': '読み',
+  'ankiWorkbench.tray.aspect.meaning': '意味',
+  'ankiWorkbench.tray.aspect.partOfSpeech': '品詞',
+  'ankiWorkbench.tray.senseRule': 'インストール済み辞書が食い違う場合',
+  'ankiWorkbench.tray.senseRule.first-source': '最初の辞書を使う',
+  'ankiWorkbench.tray.senseRule.all-sources': 'すべて書き込む',
+  'ankiWorkbench.tray.senseRule.refuse': 'そのノートは変更しない',
+  'ankiWorkbench.tray.provenance': '出典の辞書を記録する',
+  'ankiWorkbench.tray.provenance.inline': 'はい、フィールド内に',
+  'ankiWorkbench.tray.provenance.none': 'いいえ',
+  'ankiWorkbench.tray.enrichLoading': '{count}語をインストール済み辞書で検索しています…',
+  'ankiWorkbench.tray.enrichReady': '{count}語のうち{found}語がインストール済み辞書に見つかりました。',
+  'ankiWorkbench.tray.problem.no-enrich-data':
+    '辞書の回答がまだ読み込まれていないため、何も補完できません。この表示が続く場合、インストール済み辞書にここから到達できていません。',
+  'ankiWorkbench.tray.problem.enrich-no-entry':
+    '{count}件のノートの語は、どのインストール済み辞書にもありません。',
+  'ankiWorkbench.tray.problem.enrich-no-word': '{count}件のノートには検索対象の語フィールドがありません。',
+  'ankiWorkbench.tray.problem.enrich-sense-conflict':
+    '{count}件のノートでインストール済み辞書が食い違ったため、変更しませんでした。',
+  'ankiWorkbench.tray.problem.enrich-sources-merged':
+    '{count}件のノートで複数の辞書が食い違い、そのすべての回答を書き込みました。',
+
 };
 
