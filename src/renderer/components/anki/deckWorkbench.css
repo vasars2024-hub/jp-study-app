@@ -859,3 +859,88 @@
 .wb-tray-applied {
   font-weight: 600;
 }
+
+/* ----- card designs ----- */
+
+.wb-design {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 10px);
+  background: var(--panel, var(--bg));
+}
+
+.wb-design-title {
+  margin: 0;
+}
+
+.wb-design-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.wb-design-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8rem;
+}
+
+/* The consequence line is a count the user compares against the deck, so it
+   gets tabular figures like every other number in the workbench. */
+.wb-design-effect {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.wb-design-problems {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.8rem;
+  list-style: disc;
+}
+
+.wb-design-problem {
+  color: var(--muted, #666);
+}
+
+/* A blocking problem is the reason Apply is disabled, so it must not read like
+   the advisory lines above it. */
+.wb-design-problem-blocking {
+  color: var(--warn, #c07000);
+}
+
+.wb-design-formats {
+  margin: 0;
+  padding: 6px 8px;
+  overflow-x: auto;
+  font-size: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--bg);
+}
+
+.wb-design-sample-q {
+  margin: 2px 0;
+  font-size: 0.95rem;
+}
+
+.wb-design-applied {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wb-design-applied-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  font-variant-numeric: tabular-nums;
+}

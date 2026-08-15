@@ -53,6 +53,7 @@ import { useT } from '../../i18n';
 import DeckWorkbenchBrowser from './DeckWorkbenchBrowser';
 import DeckWorkbenchTray from './DeckWorkbenchTray';
 import DeckWorkbenchJournal from './DeckWorkbenchJournal';
+import DeckWorkbenchCardDesign from './DeckWorkbenchCardDesign';
 import './deckWorkbench.css';
 
 type SourceKey = 'apkg' | 'connect' | 'localDeck';
@@ -493,6 +494,10 @@ export default function DeckWorkbench() {
               selectedCount={selectedCount}
               onApply={applyTray}
             />
+            {/* A card design changes the note type, not the selected notes, so
+                it sits beside the tray rather than inside it and does not read
+                the selection at all. */}
+            <DeckWorkbenchCardDesign draft={draft} onDraft={setDraft} />
           </div>
         ) : (
           <div className="deck-workbench-detail">
