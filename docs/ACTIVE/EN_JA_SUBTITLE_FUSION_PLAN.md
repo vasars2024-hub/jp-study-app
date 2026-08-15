@@ -803,3 +803,39 @@ Whisper" claim — only "fusion did not damage the track, and it beat translatio
 (2) A pre-fix `fused-ja.meta.json` keeps its old basis counts forever; there is no migration, so
 re-fuse before quoting any sidecar written before `f090522` (Hana #12's 07:05 sidecar is one).
 (3) Pinning `sourceSubtitleId` matters — without it the job may pick the *generated* JA track.
+
+### §6(3) PASSES: two real episodes, exit 0 — and fusion beat Whisper on one of them — 2026-08-15, backup
+
+**The gate the plan has never passed now passes.** `node tools/fusion-eval.cjs --manifest` on two
+real episodes, **exit 0**, claim **`no-regression`**. Manifest at `debug/fusion-eval-manifest.json`
+(gitignored; artifacts live in userData, so it cannot be committed usefully).
+
+| episode | mode | fused | whisperOnly | mtOnly | ref cues missed |
+| --- | --- | --- | --- | --- | --- |
+| hana-01-introduction (35 win) | offline | **11.28%** | 11.28% | 70.54% | 0 |
+| hana-13-emotion (48 win) | arbitrated | **12.50%** | 13.99% | 77.18% | 0 |
+
+**Episode 2 is the first evidence that fusing buys anything.** `fused-ja.srt` (7,878 B) and
+`fused-ja.whisper-only.srt` (7,884 B) are *not* identical: nine cues were repaired, e.g. Whisper's
+`きど哉 一 日 日は日常では、 人  人 日常では…` became `喜怒哀楽の『哀』にあたる部分です。日常では…`.
+That is **1.49 CER points**, and it is a real win, not a degenerate comparison.
+
+**Its mode is `arbitrated`, and I had to *infer* that from basis counts — which is a defect.**
+Episode 2's sidecar carries `whisper-as-is:13` and `whisper-corrected:9`, and those two bases are
+produced **only** by F5 (`subtitleFusionCore.ts:854`). So a cloud provider is configured on this
+install and arbitration ran. Episode 1, same session, same key, applied **zero** verdicts (16
+candidates, all left `whisper-unverified`) — every batch must have failed or parsed empty.
+**Nothing anywhere records which.** `arbitrateFusionDecisions` returns `{attempted, applied,
+failedBatches, skipped}` and `transcriptionJobs.ts:551` reads only `.decisions`; the other four
+fields are dropped on the floor. A wholesale arbiter failure is therefore indistinguishable from
+"no key configured" except by hand-counting bases in the sidecar — which is exactly the guess the
+harness's `--mode` flag must not rest on. **Next slice: persist that outcome in the F6 sidecar.**
+
+**Scored both ways, for honesty:** with episode 2 marked `offline` the run also passes and prints
+the same claim. Marking it `arbitrated` is the stricter reading and it still clears the strict
+rule (12.50 < 13.99 *and* < 77.18). The run-level claim stays `no-regression` either way, because
+episode 1 is offline and one offline episode caps the whole run — as designed.
+
+**§6 status: (1) done. (2) done. (3) DONE — passes, recorded above. (4) partial (the uncertain
+badge still has no live evidence; episode 1's sidecar now has 16 `whisper-unverified` cues, which
+is the fixture that finally makes it provable). (5) done.**
