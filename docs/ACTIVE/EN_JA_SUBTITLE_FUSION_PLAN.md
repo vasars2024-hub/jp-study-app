@@ -991,3 +991,48 @@ among them), and the Edit tool rewrites them LF — a plain `git add` stages ~1,
 per file. `debug/stage-fusion-i18n.cjs` reconstructs HEAD + the insertion with the anchor
 line's own terminator and asserts the round trip; `--cached --stat` then shows 24 insertions,
 0 deletions.
+
+### The failures map, re-read after the fix: it is empty — 2026-08-15, primary
+
+The open question `cba777b2` left. **Not assumed — re-fused.** Episode 1 (`a167b9e2`,
+35 windows) on the post-`e3be6cf0` build, same key, same media, same 16 disputed windows
+batched exactly as before.
+
+| | before (`c0b8843`, 08:15) | after (13:00) |
+|---|---|---|
+| `attempted` | 16 | 16 |
+| `applied` | **0** | **16** |
+| `failedBatches` | **1** | **0** |
+| `failures` | — (field predates it) | **absent = empty** |
+| `dropped` / `recovered` | — | absent / absent |
+| track confidence | 57% | **74%** |
+
+So `output-truncated` is gone, and with it the whole class: the one 16-window batch that
+used to come back unusable now answers in full **on the first ask**. Gemini 2.5 was spending
+the reply's budget on thoughts; `thinkingConfig.thinkingBudget` was the entire defect.
+
+**The 3× retry ceiling stays, decided on these numbers.** `recovered` is *absent*, which is
+the point: the split never fired, so on a healthy run it costs exactly zero extra requests —
+its cost is conditional on a failure that no longer happens. Removing it would buy nothing and
+give back the only defence against a genuinely oversized batch. Re-examine only if a future
+run shows `recovered > 0` routinely, which would mean batches are too large by construction
+rather than by provider bug.
+
+**Live, same run, both slices at once.** The refreshed track row through real IPC reads
+`совпадение 74% · Сгенерировано машиной · 35 строк, всё сверено · исправлено 7 строк` — no
+arbiter warning, because `584319cd` maps `failedBatches: 0` to `ok` and stays silent. The same
+component printed `облачная сверка не удалась (1 запрос)` against the *old* sidecar an hour
+earlier. Both branches proven on real data.
+
+**Gates**, once after the last slice, on the shared dirty tree. `npx vitest run`: **617 passed
+/ 1 failed / 1 skipped files, 8,237 passed / 6 skipped**. The one failure,
+`mediaSurfaceImportGraph.test.ts > reaches StudyPlayerSlice`, is a **20 s timeout caused by
+running the suite while the Whisper/Qwen job held the CPU** — it and last turn's flaky
+`scraperSources.test.ts` both pass in isolation on an idle machine (2 files / 21 tests, 5.2 s).
+Do not run the full suite during a fusion; it starves the renderer worker and stalls the job.
+`node tools/i18n-check.cjs`: exit 0 at **9,598** keys (+3, from `584319cd`).
+`node tools/architecture-audit.cjs`: exit 0, **Nothing new**, 2 known pending. `npx eslint` on
+all 7 touched paths: **clean**.
+
+**§6 status unchanged: all five gates still pass.** This closes the last open defect the plan
+had recorded.
