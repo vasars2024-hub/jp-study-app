@@ -24,6 +24,7 @@ import {
   type AnkiDraftEditJournal,
 } from '../../../shared/ankiDraftEdit';
 import { useT } from '../../i18n';
+import DeckWorkbenchPreview from './DeckWorkbenchPreview';
 
 export interface InspectorConsequence {
   fieldOrd: number;
@@ -135,6 +136,10 @@ export default function DeckWorkbenchInspector({
         />
         <span className="muted">{t('ankiWorkbench.inspector.tagsHint')}</span>
       </label>
+
+      {/* Below the fields on purpose: the card an edit produces is the thing the
+          edit is *for*, and it re-renders as soon as the field commits. */}
+      <DeckWorkbenchPreview draft={draft} note={note} />
     </aside>
   );
 }
