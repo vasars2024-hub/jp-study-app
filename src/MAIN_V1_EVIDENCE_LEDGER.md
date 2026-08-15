@@ -22592,3 +22592,60 @@ difference on a store that is genuinely back to zero entries. Compare entry coun
 (662/8,965), which is exactly this turn's test file. `architecture-audit` exit 0, **Nothing new**,
 1,953 modules, 19 findings, 2 pending. `i18n-check` exit 0 at **9,962** keys (+21, exactly this
 turn's, all four languages). `eslint` on all 9 touched paths: **0**.
+
+## 2026-08-16 02:15 — `backup` — Track 7 gate 13 closes: a reverse design, and the blank it mis-blamed
+
+Boss audit re-derived, not trusted: 18:00's four findings still closed —
+finding 1's `scheduleDrain` re-arm is at `transcriptionJobs.ts:741`, finding 2 ships as
+`media-not-rendered`, finding 3's tree caveat is standard, finding 4 is another track's
+untracked file. Nothing owed.
+
+**`a99c9f27` — `shared/ankiCardDesign.ts`, the model.** Four decisions:
+
+1. **A design is not a tray action.** The tray's ops are `field`/`tags` keyed by note; this
+   adds a *template* and brings whole cards into existence. They undo separately, so
+   reverting a tag batch cannot take a card design with it.
+2. **Counting is a field test, not a render** — O(1) per note, so the count over the 100k
+   fixture stays honest without the whole-deck HTML render gate 9 forbids on the event loop.
+3. **A design that *adds* the flag field reports zero cards and is allowed; one on an
+   existing flag field no note carries is blocked.** The first is how you set one up, the
+   second is a switch that will never fire.
+4. **`removeCardDesign` deletes by the ids recorded at apply time**, so a card added later
+   survives the reverse transition. A recomputed inverse reads the draft after its own writes.
+
+**`70c840cf` — the panel.** States the consequence as a number before Apply; unflagged and
+empty-question skips counted *separately*, because a note the design deliberately passes over
+is not a note with a broken field. Blocking problems styled apart from advisory ones. Remove
+lives in the same panel, not deferred. The sample renders against a **one-note** draft, never
+`applyCardDesign(draft, plan)` — the latter spreads every note per render.
+
+**`65007161` — the defect the live run found, which no test would have.** The new
+`conditional-card-not-generated` code first keyed on "the qfmt has a conditional", which is
+true of a note whose flag is *unset* (by design) **and** one whose flag is set but whose
+question field is blank (a real defect). It called the second intentional. It now renders the
+question once more with sections forced open; still empty means the blank is the field's.
+
+**Live, real 3,221-note deck, in-memory drafts only — nothing persisted.**
+Reverse on `JP Study Local` (8 fields): **3,180 cards added, 41 notes skipped** with an empty
+`Reading` — 3,180 + 41 = 3,221 exactly. Apply: **3,221 → 6,401** cards. Remove: back to
+**3,221** cards and **1** template.
+Optional-reverse: adds `Add Reverse` to all 3,221, **0 cards**, `flag-field-added:3221`, qfmt
+`{{#Add Reverse}}{{Reading}}{{/Add Reverse}}`. **Negative control** — flagging exactly 3 notes
+that have a Reading replans to **3** cards / **3,218** notesWithoutFlag, and the same template
+on the same draft then reports `["empty-question"]` for a *flagged* note with a blank Reading
+and `conditional-card-not-generated` for an unflagged one. Two different notes, two different
+sentences.
+
+**Trap for the next worker: `/eval` rejects a script ending in `;`** ("Script failed to
+execute"), and a dynamic `import()` through the bridge is **module-cached** — an edited shared
+module keeps returning the old code until you append `?v=`+Date.now(). That cost a false
+"the fix did not land". `debug/evfile.cjs` posts a file's contents and avoids the shell
+quoting that breaks on apostrophes.
+
+**Gates**, once after the last slice, shared working tree (HEAD alone is red from other
+tracks' unstaged i18n work). `vitest` **667 files passed / 1 skipped of 668, 9,015 passed /
+6 skipped, zero failures** — +2 files, +27 tests against the 01:25 baseline (665/8,988), which
+is exactly this turn's two test files. `i18n-check` exit 0 at **9,991** keys (+28, all four
+languages). `architecture-audit` exit 0, **Nothing new**, 1,960 modules, 19 findings, 2 pending.
+`eslint` **0** on all 10 lintable touched paths; the 11th is `deckWorkbench.css`, and eslint
+fails to parse *every* `.css` file in this repo — pre-existing, not a gate.

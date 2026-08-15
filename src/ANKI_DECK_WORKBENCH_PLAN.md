@@ -307,6 +307,15 @@ This slice is complete only when all of these can be shown with real data and no
 11. Follow the numbered flow to enrich a mixed deck from configured dictionaries, add new fields, resolve conflicting senses, update the template, and prove field-level provenance after export/reimport.
 12. Generate several AI example sentences and learning aids, approve only selected variants, preview difficult and edge-case cards across layouts, cancel one batch, retry only failures, and verify that rejected/generated data is represented honestly.
 13. Customize Browser columns separately from note fields, create a reverse/optional-reverse card design, and prove that the representative preview catches blank, duplicate, cloze, sibling, media, and dark/mobile rendering failures before Apply. The media lens is *flagged, not rendered*: the preview frame is an opaque-origin `srcdoc` whose CSP allows `data:` images only, and Anki references media by bare file name, so a card that references media the package holds must say so explicitly (`media-not-rendered`) rather than show a blank box that reads as clean. Loosening the CSP does not satisfy this gate.
+
+    **Closed 2026-08-16** (`a99c9f27`, `70c840cf`, `65007161`). Columns: `ankiWorkbenchBrowser.ts` + the
+    `wb-browser-columns` group. Design: `shared/ankiCardDesign.ts` + `DeckWorkbenchCardDesign.tsx`. On the
+    real 3,221-note deck a reverse design added **3,180** cards and skipped **41** with an empty `Reading`
+    (3,180 + 41 = 3,221); apply took cards **3,221 → 6,401** and remove took them back to **3,221** with
+    **1** template. Optional-reverse added `Add Reverse` to all 3,221 for **0** cards; flagging exactly 3
+    replanned to **3**. Media stays *flagged, not rendered*, as above. The sibling lens gained
+    `conditional-card-not-generated`: a note the design passes over says so, and a **flagged** note with a
+    blank question field still says `empty-question` — proven live as two different sentences.
 14. Exercise every `supported` row in the living Anki parity matrix and prove every `read-only` or `blocked` row has an honest explanation and no active Apply path.
 
 ## Explicit exclusions
