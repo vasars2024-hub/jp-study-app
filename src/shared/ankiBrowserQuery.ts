@@ -18,6 +18,13 @@
 // user's own typing and is never translated.
 
 import type { BrowserRow } from './ankiWorkbenchBrowser';
+import { FREQUENCY_BAND_LIMITS, type LexiconFrequencyBand } from './lexiconFrequency';
+import {
+  isVocabKnownConflict,
+  resolveVocabKnown,
+  type VocabContext,
+  type VocabNoteFacts,
+} from './ankiVocabContext';
 
 // ----- the tree ----------------------------------------------------------------
 
@@ -81,6 +88,52 @@ export interface CardCountPredicate {
   value: number;
 }
 
+/**
+ * `freq:<=5000`, `freq:common`, `freq:none`, `freq:noword` — Phase 4 gate 3.
+ *
+ * Three separate absences, because collapsing them would let a filter claim
+ * something nobody measured. A numeric or band comparison matches only a note
+ * whose word an installed corpus actually ranked; `none` is a word no corpus
+ * knows; `noword` is a note no word could be read from at all (its note type
+ * declares no word field, or the field holds prose). "Unranked" is therefore
+ * never silently sorted in with "rare", which is the whole reason
+ * `lexiconFrequency.ts` keeps the rank nullable.
+ */
+export interface FrequencyPredicate {
+  kind: 'freq';
+  /** A rank comparison. Absent for a band range and for the two absence modes. */
+  op?: NumericOp;
+  value?: number;
+  /**
+   * A closed inclusive rank range, from a band name (`freq:common`). A band is
+   * a range rather than a `<=` so the four bands partition the ranks instead of
+   * nesting — otherwise `freq:common` would also return every very-common word
+   * and "how many are merely common" could not be asked.
+   */
+  range?: { from: number; to: number };
+  /** `none` = ranked by nothing; `noword` = no headword to rank. */
+  absence?: 'none' | 'noword';
+}
+
+/**
+ * `known:yes|no|local|anki|both|conflict|none` — Phase 4 gate 4.
+ *
+ * `yes`/`no` are the verdict after the context's precedence has resolved any
+ * disagreement; `local`/`anki`/`both` name a source directly; `conflict` finds
+ * the items gate 4 asks the user to resolve; `none` is the notes neither source
+ * has an opinion about. A note with no data at all matches **only** `none` —
+ * not `no`, which would report a word the user was never asked about as one
+ * they do not know.
+ *
+ * A scheduled card is always an Anki answer, including a new one: Anki measured
+ * it and it is not mature. Silence is a note with no card at all, or a word
+ * this install's knowledge store has never held an entry for.
+ */
+export interface KnownPredicate {
+  kind: 'known';
+  mode: 'yes' | 'no' | 'local' | 'anki' | 'both' | 'conflict' | 'none';
+}
+
 export type BrowserPredicate =
   | AnyTextPredicate
   | RegexPredicate
@@ -89,7 +142,9 @@ export type BrowserPredicate =
   | DeckPredicate
   | NoteTypePredicate
   | FlagPredicate
-  | CardCountPredicate;
+  | CardCountPredicate
+  | FrequencyPredicate
+  | KnownPredicate;
 
 export interface BrowserFilterGroup {
   kind: 'group';
@@ -111,7 +166,14 @@ export type BrowserQueryErrorCode =
   | 'bad-regex'
   | 'unbalanced-paren'
   | 'empty-group'
-  | 'dangling-operator';
+  | 'dangling-operator'
+  /**
+   * `freq:` or `known:` was used while the surface had no vocabulary context to
+   * read. The refusal names the token, exactly like an unknown key: a
+   * frequency filter that quietly matches every note — or none — is worse than
+   * no filter, and the user cannot tell the two apart from an empty grid.
+   */
+  | 'no-vocab-context';
 
 export interface BrowserQueryError {
   code: BrowserQueryErrorCode;
@@ -127,6 +189,12 @@ export type BrowserQueryResult =
 export interface BrowserQuerySchema {
   /** Every field name in the draft, as `browserFieldNames` returns them. */
   fieldNames: string[];
+  /**
+   * Per-note ranks and known state, from `buildVocabContext`. Absent means the
+   * surface has not resolved any vocabulary facts, and `freq:`/`known:` are a
+   * refusal rather than a filter — see `no-vocab-context`.
+   */
+  vocab?: VocabContext;
 }
 
 // ----- tokenizer ---------------------------------------------------------------
@@ -227,6 +295,47 @@ function parseNumeric(raw: string): { op: NumericOp; value: number } | null {
   return { op: (m[1] as NumericOp | undefined) ?? '=', value: Number(m[2]) };
 }
 
+/** Band name → the rank it ends at, so `freq:common` reads the shared limits. */
+const FREQUENCY_BAND_BY_NAME = new Map<string, LexiconFrequencyBand>(
+  [...FREQUENCY_BAND_LIMITS.map(([band]) => band), 'rare' as const].map((band) => [
+    band.toLowerCase(),
+    band,
+  ]),
+);
+
+function bandRange(band: LexiconFrequencyBand): { from: number; to: number } {
+  let from = 1;
+  for (const [name, limit] of FREQUENCY_BAND_LIMITS) {
+    if (name === band) return { from, to: limit };
+    from = limit + 1;
+  }
+  return { from, to: Number.MAX_SAFE_INTEGER };
+}
+
+function parseFrequencyValue(value: string): BrowserPredicate | null {
+  const v = value.toLowerCase();
+  if (v === 'none' || v === 'noword') return { kind: 'freq', absence: v };
+  const band = FREQUENCY_BAND_BY_NAME.get(v);
+  if (band) return { kind: 'freq', range: bandRange(band) };
+  const num = parseNumeric(value);
+  return num ? { kind: 'freq', op: num.op, value: num.value } : null;
+}
+
+const KNOWN_MODES: ReadonlySet<KnownPredicate['mode']> = new Set([
+  'yes',
+  'no',
+  'local',
+  'anki',
+  'both',
+  'conflict',
+  'none',
+]);
+
+function parseKnownValue(value: string): BrowserPredicate | null {
+  const v = value.toLowerCase() as KnownPredicate['mode'];
+  return KNOWN_MODES.has(v) ? { kind: 'known', mode: v } : null;
+}
+
 function predicateFromTerm(token: Token, schema: BrowserQuerySchema): BrowserPredicate | BrowserQueryError {
   const { text, quoted } = token;
   const colon = quoted ? -1 : text.indexOf(':');
@@ -276,6 +385,14 @@ function predicateFromTerm(token: Token, schema: BrowserQuerySchema): BrowserPre
     const num = parseNumeric(value);
     if (!num) return { code: 'unknown-key', token: text };
     return { kind: 'cards', op: num.op, value: num.value };
+  }
+  if (lowerKey === 'freq' || lowerKey === 'known') {
+    // The refusal comes before the value is even read: with no context, every
+    // spelling of the key is equally unanswerable, and reporting "unknown
+    // value" would send the user off correcting a query that is already right.
+    if (!schema.vocab) return { code: 'no-vocab-context', token: text };
+    const parsed = lowerKey === 'freq' ? parseFrequencyValue(value) : parseKnownValue(value);
+    return parsed ?? { code: 'unknown-key', token: text };
   }
 
   // A field name, matched case-insensitively against the draft's own fields so
@@ -420,16 +537,16 @@ function matchesNeedle(haystack: string, needle: string, wildcard: boolean, re: 
  * build the same RegExp a hundred thousand times, which is the shape of defect
  * the change-tray preview shipped and then had to fix.
  */
-export function compileBrowserFilter(node: BrowserFilterNode): RowTest {
+export function compileBrowserFilter(node: BrowserFilterNode, vocab?: VocabContext): RowTest {
   switch (node.kind) {
     case 'group': {
-      const tests = node.children.map(compileBrowserFilter);
+      const tests = node.children.map((child) => compileBrowserFilter(child, vocab));
       return node.op === 'and'
         ? (row) => tests.every((test) => test(row))
         : (row) => tests.some((test) => test(row));
     }
     case 'not': {
-      const test = compileBrowserFilter(node.child);
+      const test = compileBrowserFilter(node.child, vocab);
       return (row) => !test(row);
     }
     case 'text': {
@@ -483,16 +600,91 @@ export function compileBrowserFilter(node: BrowserFilterNode): RowTest {
       const want = node.marked;
       return (row) => row.marked === want;
     }
-    default: {
+    case 'cards': {
       const { op, value } = node;
       return (row) => compareNumeric(op, row.cardCount, value);
+    }
+    case 'freq': {
+      // Unreachable through `parseBrowserQuery`, which refuses the token when
+      // there is no context. A hand-built tree still must not match everything.
+      if (!vocab) return () => false;
+      const facts = vocab.byNote;
+      if (node.absence === 'noword') return (row) => factsFor(facts, row).term === null;
+      if (node.absence === 'none') {
+        // A note with no word is not a word nothing ranks. It is excluded here
+        // and found by `freq:noword` instead.
+        return (row) => {
+          const f = factsFor(facts, row);
+          return f.term !== null && f.rank === null;
+        };
+      }
+      const { range, op, value } = node;
+      if (range) {
+        return (row) => {
+          const rank = factsFor(facts, row).rank;
+          return rank !== null && rank >= range.from && rank <= range.to;
+        };
+      }
+      if (op === undefined || value === undefined) return () => false;
+      return (row) => {
+        const rank = factsFor(facts, row).rank;
+        return rank !== null && compareNumeric(op, rank, value);
+      };
+    }
+    default: {
+      if (!vocab) return () => false;
+      const facts = vocab.byNote;
+      const precedence = vocab.precedence;
+      const { mode } = node;
+      return (row) => {
+        const known = factsFor(facts, row).known;
+        switch (mode) {
+          case 'local':
+            return known.local === true;
+          case 'anki':
+            return known.anki === true;
+          case 'both':
+            return known.local === true && known.anki === true;
+          case 'conflict':
+            return isVocabKnownConflict(known);
+          case 'none':
+            return known.local === null && known.anki === null;
+          case 'no':
+            // Only a source that spoke can say "no"; a word nobody has an
+            // opinion about is `known:none`, never `known:no`.
+            return resolveVocabKnown(known, precedence) === 'unknown';
+          default:
+            return resolveVocabKnown(known, precedence) === 'known';
+        }
+      };
     }
   }
 }
 
-export function matchBrowserRows(rows: BrowserRow[], filter: BrowserFilterNode | null): BrowserRow[] {
+/**
+ * A row whose note the context never saw. `buildVocabContext` gives every note
+ * an entry, so this is the paged-source case: rows loaded after the context was
+ * built are all-absent rather than throwing or matching.
+ */
+const NO_VOCAB_FACTS: VocabNoteFacts = {
+  noteId: '',
+  field: null,
+  term: null,
+  rank: null,
+  known: { local: null, anki: null },
+};
+
+function factsFor(byNote: ReadonlyMap<string, VocabNoteFacts>, row: BrowserRow): VocabNoteFacts {
+  return byNote.get(row.noteId) ?? NO_VOCAB_FACTS;
+}
+
+export function matchBrowserRows(
+  rows: BrowserRow[],
+  filter: BrowserFilterNode | null,
+  vocab?: VocabContext,
+): BrowserRow[] {
   if (!filter) return rows;
-  const test = compileBrowserFilter(filter);
+  const test = compileBrowserFilter(filter, vocab);
   return rows.filter(test);
 }
 
@@ -508,5 +700,5 @@ export function filterBrowserRows(
 ): { rows: BrowserRow[]; error: BrowserQueryError | null } {
   const parsed = parseBrowserQuery(query, schema);
   if (!parsed.ok) return { rows: [], error: parsed.error };
-  return { rows: matchBrowserRows(rows, parsed.filter), error: null };
+  return { rows: matchBrowserRows(rows, parsed.filter, schema.vocab), error: null };
 }

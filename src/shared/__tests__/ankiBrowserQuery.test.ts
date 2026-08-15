@@ -8,6 +8,7 @@ import {
   parseBrowserQuery,
   tokenizeBrowserQuery,
 } from '../ankiBrowserQuery';
+import { buildVocabContext } from '../ankiVocabContext';
 
 function note(over: Partial<AnkiDraftNote> & { id: string }): AnkiDraftNote {
   return {
@@ -280,5 +281,129 @@ describe('compilation happens once, not per row', () => {
     // every three. Recompiling the two wildcards per row is what this catches.
     expect(out).toHaveLength(20000);
     expect(elapsed).toBeLessThan(300);
+  });
+});
+
+// ----- Phase 4: frequency and known-word predicates ------------------------------
+
+describe('freq: and known: refuse rather than match-all without a context', () => {
+  it('names the offending token, exactly like an unknown key', () => {
+    expect(ids('freq:<=5000')).toBe('no-vocab-context');
+    expect(ids('known:no')).toBe('no-vocab-context');
+    // The refusal is the whole query's, so nothing leaks through the AND.
+    expect(ids('core freq:none')).toBe('no-vocab-context');
+  });
+
+  it('refuses before judging the value, so a right query is not reported as wrong', () => {
+    expect(ids('freq:banana')).toBe('no-vocab-context');
+  });
+
+  it('a hand-built freq/known node with no context matches nothing, and does not throw', () => {
+    const freq = compileBrowserFilter({ kind: 'freq', op: '<=', value: 5000 });
+    const known = compileBrowserFilter({ kind: 'known', mode: 'yes' });
+    expect(rows.filter(freq)).toEqual([]);
+    expect(rows.filter(known)).toEqual([]);
+  });
+});
+
+describe('freq: and known: with a context', () => {
+  const vocabCards = [
+    // n1's two cards are both mature, so Anki calls it known.
+    { ...card('c1', 'n1', 'd1'), type: 'review' as const, interval: 60 },
+    { ...card('c2', 'n1', 'd2'), type: 'review' as const, interval: 40 },
+    card('c3', 'n2', 'd1'),
+    card('c4', 'n3', 'd1'),
+  ];
+  const vocab = buildVocabContext({
+    notes: draft.notes,
+    noteTypes: draft.noteTypes,
+    cards: vocabCards,
+    // 飲む is in no installed corpus; the cloze note has no word field at all.
+    ranks: new Map([['食べる', 812], ['飲む', null]]),
+    localLevels: new Map([['食べる', 1], ['飲む', 3]]),
+  });
+  const vocabSchema = { fieldNames: browserFieldNames(draft), vocab };
+  const vids = (query: string): string[] | string => {
+    const out = filterBrowserRows(rows, query, vocabSchema);
+    return out.error ? out.error.code : out.rows.map((r) => r.noteId);
+  };
+
+  it('compares ranks and never counts an unranked word as rare', () => {
+    expect(vids('freq:<=5000')).toEqual(['n1']);
+    expect(vids('freq:>100000')).toEqual([]);
+    expect(vids('freq:=812')).toEqual(['n1']);
+  });
+
+  it('separates "nothing ranks it" from "there is no word to rank"', () => {
+    expect(vids('freq:none')).toEqual(['n3']);
+    expect(vids('freq:noword')).toEqual(['n2']);
+  });
+
+  it('reads a band as a closed range, so the bands partition instead of nesting', () => {
+    expect(vids('freq:veryCommon')).toEqual(['n1']);
+    expect(vids('freq:common')).toEqual([]);
+    expect(vids('freq:rare')).toEqual([]);
+  });
+
+  it('still refuses a value it cannot read', () => {
+    expect(vids('freq:banana')).toBe('unknown-key');
+    expect(vids('known:maybe')).toBe('unknown-key');
+  });
+
+  it('answers each known source on its own', () => {
+    // 食べる is Learning locally (level 1 < 3) but mature in Anki; 飲む is the
+    // reverse; the cloze note has no word and therefore no local opinion.
+    expect(vids('known:anki')).toEqual(['n1']);
+    expect(vids('known:local')).toEqual(['n3']);
+    expect(vids('known:both')).toEqual([]);
+    expect(vids('known:conflict')).toEqual(['n1', 'n3']);
+  });
+
+  it('resolves the verdict by the context precedence', () => {
+    expect(vids('known:yes')).toEqual(['n3']); // the default precedence is local
+    const ankiFirst = {
+      fieldNames: browserFieldNames(draft),
+      vocab: { ...vocab, precedence: 'anki' as const },
+    };
+    const out = filterBrowserRows(rows, 'known:yes', ankiFirst);
+    expect(out.rows.map((r) => r.noteId)).toEqual(['n1']);
+  });
+
+  it('lets an unscheduled card still be an Anki answer, but never a local one', () => {
+    // n2's only card is new: Anki has genuinely measured it as not mature, so
+    // it answers `known:no`. Its *local* side stays null — the note carries no
+    // word, so no one was ever asked. Every note here has a card, so nothing is
+    // `known:none`.
+    expect(vids('known:none')).toEqual([]);
+    expect(vids('known:no')).toEqual(['n1', 'n2']); // local wins n1; Anki alone answers n2
+  });
+
+  it('is no-data, not "not known", when neither source has anything to say', () => {
+    // The same n2 with nothing scheduled: a CSV import nobody has studied.
+    const unscheduled = buildVocabContext({
+      notes: draft.notes,
+      noteTypes: draft.noteTypes,
+      cards: vocabCards.filter((c) => c.noteId !== 'n2'),
+      ranks: new Map([['食べる', 812], ['飲む', null]]),
+      localLevels: new Map([['食べる', 1], ['飲む', 3]]),
+    });
+    const schemaNow = { fieldNames: browserFieldNames(draft), vocab: unscheduled };
+    expect(filterBrowserRows(rows, 'known:none', schemaNow).rows.map((r) => r.noteId)).toEqual(['n2']);
+    expect(filterBrowserRows(rows, 'known:no', schemaNow).rows.map((r) => r.noteId)).toEqual(['n1']);
+  });
+
+  it('composes with the rest of the grammar, including negation', () => {
+    expect(vids('-known:local')).toEqual(['n1', 'n2']);
+    expect(vids('(freq:<=5000 or freq:none) -known:local')).toEqual(['n1']);
+  });
+
+  it('treats a row the context never saw as all-absent rather than a match', () => {
+    const stranger = { ...(rows[0] as (typeof rows)[number]), noteId: 'paged-in-later' };
+    const parsed = parseBrowserQuery('freq:<=5000', vocabSchema);
+    if (!parsed.ok) throw new Error(parsed.error.code);
+    expect(matchBrowserRows([stranger], parsed.filter, vocab)).toEqual([]);
+    const none = parseBrowserQuery('freq:noword', vocabSchema);
+    if (!none.ok) throw new Error(none.error.code);
+    expect(matchBrowserRows([stranger], none.filter, vocab)).toEqual([stranger]);
   });
 });

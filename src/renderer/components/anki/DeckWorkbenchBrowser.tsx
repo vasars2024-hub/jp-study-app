@@ -67,6 +67,7 @@ const QUERY_ERROR_KEY: Record<BrowserQueryErrorCode, string> = {
   'unbalanced-paren': 'ankiWorkbench.browser.query.unbalancedParen',
   'empty-group': 'ankiWorkbench.browser.query.emptyGroup',
   'dangling-operator': 'ankiWorkbench.browser.query.danglingOperator',
+  'no-vocab-context': 'ankiWorkbench.browser.query.noVocabContext',
 };
 
 export default function DeckWorkbenchBrowser({
