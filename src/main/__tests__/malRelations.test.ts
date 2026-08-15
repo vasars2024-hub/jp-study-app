@@ -243,9 +243,37 @@ describe('the list walk refuses a hijacked paging cursor', () => {
     expect(result.truncated).toBe(false);
   });
 
-  it('sends the completed filter MAL expects when one is asked for', async () => {
+  it('does NOT hand the status filter to MAL, because MALs filter hides rewatches', async () => {
+    // This test asserted the opposite when it was written, and the assertion was
+    // wrong about MAL rather than about the code. Measured live 2026-08-15 on
+    // the user's account: `status=completed` returned 1,414 entries while the
+    // unfiltered walk found 1,426 marked completed, and all 12 of the gap had
+    // `is_rewatching: true`. MAL's filter quietly means "completed and not
+    // currently being rewatched", which drops the shows a user is actively
+    // watching through again — the best study material on the list.
     const h = harness(() => page(null, 1));
-    await h.client.fetchAnimeList({ status: 'completed' });
-    expect(new URL(h.sent[0].url).searchParams.get('status')).toBe('completed');
+
+    const result = await h.client.fetchAnimeList({ status: 'completed' });
+
+    expect(new URL(h.sent[0].url).searchParams.get('status')).toBeNull();
+    // The filter still happens, just here, against the status we parsed.
+    expect(result.entries.map((e) => e.animeId)).toEqual([1]);
+  });
+
+  it('drops a non-matching entry when filtering locally', async () => {
+    const h = harness(() => ({
+      status: 200,
+      body: JSON.stringify({
+        data: [
+          { node: { id: 1, title: 'Title 1' }, list_status: { status: 'completed' } },
+          { node: { id: 2, title: 'Title 2' }, list_status: { status: 'watching' } },
+        ],
+        paging: {},
+      }),
+    }));
+
+    const result = await h.client.fetchAnimeList({ status: 'completed' });
+
+    expect(result.entries.map((e) => e.animeId)).toEqual([1]);
   });
 });
