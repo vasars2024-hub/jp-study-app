@@ -22141,3 +22141,47 @@ zero failures** — the `visualNovelI18n.test.tsx` load flake the last three tur
 recur. `i18n-check` exit 0 at **9,850** (+6). `architecture-audit` exit 0, **Nothing new**, 2
 pending. `eslint` on 9 paths: **0 errors** (7 pre-existing `no-explicit-any` warnings in
 `main/dictionary.ts`, lines 193-574, none in the added code).
+
+## 2026-08-15 21:00 — `backup` — mal-pipeline P0: qBittorrent API-key auth, and a control to pick it
+
+**Recovery first.** `primary` died on a usage limit at 20:38 one minute after writing
+`src/main/scraper/qbittorrent.ts`. What it left did not compile and git reported it as
+**binary**: the `apiKeyProblem` regex had raw `0x00`/`0x1f`/`0x7f` bytes where `\xNN` escapes
+belonged (the Write-tool trap, now seen a third time — `git add` showing `Bin` is still the
+only symptom), and the `sessions` map had been retyped to `{mode, cookie}` while
+`sessions.set(base, sid)` and `sessions.get(base) ?? ''` still passed a bare string. The
+shared half (`scraperSourceSettings.ts`, `scraperIpc.ts`) was complete and carried no foreign
+hunks. Finished rather than reverted; all four files landed together in `a9b797aa`.
+
+**Decision — one key header, no fallback.** `Authorization: Bearer <key>` only. `X-Api-Key`
+returned 403 against the real daemon under `WebUI\LocalHostAuth=true` with a no-credential
+control passing, so shipping it "for compatibility" would send a header the daemon rejects and
+make a wrong key indistinguishable from a wrong header. Tradeoff: a future qBittorrent that
+accepts `X-Api-Key` needs a one-line change, which is cheaper than the ambiguity.
+
+**Decision — key mode does not retry a 403.** The password retry exists because a SID expires;
+a key does not, so a retry there converts a definite answer into a slow one that reads as a
+flake. Measured: a wrong key produces exactly **1** request.
+
+**Trap found and closed.** Removing the login step from key mode opened a hole — `qbitTest`
+would report `connected` on any non-200 body, because in password mode a wrong `basePath` had
+always been caught by the login's own non-200 branch. `qbitTest` now refuses a non-200 version
+response (404 → `unreachable`, 401/403 → `unauthorized`).
+
+**Gates, as numbers.** `scraperQbittorrent.test.ts` **36 pass** (was 28). Mutation check, since
+a green suite is not coverage: swapping the header to `X-Api-Key` fails **4** of them. Negative
+controls: wrong key → `unauthorized` + **1** request; unusable key (whitespace/control char)
+→ **0** requests; absent key → **0** requests; a live password session is dropped, not reused,
+when the mode switches. `scraperFields.test.ts` **24 pass** (was 21).
+
+**Second slice, `83cb233f`.** The auth mode had no control anywhere in the product. Added the
+Authentication select and the API Key row, and de-hardcoded the drawer's `credential` action —
+it read `settings.qbittorrent.passwordRef` for *whichever* row was clicked, so the second
+credential row would have written the API key over the password's ref. The ref now comes from
+the clicked field's own path via `readField`.
+
+**Live.** Profile `relay-probe`, pid 37360. qBittorrent settings measured `enabled:false,
+host:'localhost', username:''` — plan defect 4 confirmed — then configured to
+`enabled:true, 127.0.0.1:8080, admin`; doc 50,755 → 50,825 B. Restore point
+`debug/qbit-settings-restore.json`. **P0 gate 1 is blocked on a user-held secret**
+(`needs-user.md` 20:55); gate 2's dialog observation is open; gate 3 passed in `a110411f`.

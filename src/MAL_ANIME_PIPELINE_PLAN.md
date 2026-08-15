@@ -97,6 +97,25 @@ Each phase ends with its gates demonstrated on real data and a dated ledger entr
 `availableTargets`. 3. Searching "mal sync" in Settings offers the page that actually contains
 the panel, and following the result lands on a rendered `MalSyncPanel`.
 
+**Progress 2026-08-15 21:00 (`backup`).**
+- Gate 3 **PASSES** — `a110411f`, verified live on pid 37360.
+- Gate 2 **precondition satisfied, dialog observation still open.** The guard is exactly
+  `settings.qbittorrent.enabled && settings.qbittorrent.host.trim()`
+  (`MalDownloadDialog.tsx:607`). Measured live before: `enabled:false, host:'localhost',
+  username:'', passwordRef:''` — plan defect 4 confirmed, not assumed. Written through to
+  `enabled:true, host:'127.0.0.1', port:8080, username:'admin', passwordRef:'qbit/webui',
+  category:'jp-study'` on the active profile `relay-probe`; the doc went 50,755 → 50,825 B,
+  +70 being exactly the two new keys plus the changed values. Restore point:
+  `debug/qbit-settings-restore.json` (56,846 B, gitignored). What remains is opening the
+  dialog through the Discover route and reading `availableTargets` off the rendered DOM —
+  the settings store is module-scoped, so there is no console shortcut for it.
+- Gate 1 **BLOCKED on the user**, recorded in `~\.claude-runs\needs-user.md` 20:55. The
+  daemon runs with `WebUI\LocalHostAuth=true`, `Username=admin`, `CSRFProtection=true`, so a
+  real secret is required and only a PBKDF2 hash exists on disk. Do not harvest it from
+  `qBittorrent.ini` — that is the escalation category the standing authorization excludes.
+- Defect 5 is **CLOSED**: `a9b797aa` gives the client API-key auth, `83cb233f` gives the user
+  a way to select it. See the ledger entry of the same date for the measured contract.
+
 ### P1 — the in-app walkthrough (a first-run user must not need a human)
 
 State **before** the Connect button, not after, that the browser **will** fail to load
