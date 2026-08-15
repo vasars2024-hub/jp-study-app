@@ -21197,3 +21197,58 @@ identical to one never played until it is clicked — `cacheOnly` exists on the 
 whoever wants that, but an IPC per entry per lookup was not worth it. (3) `LexiconExamples` and
 `LexiconEtymology` still take no `onLookup`, correctly: their rows are sentences and prose, not
 words. (4) Step 11's 3.2 s stays on the main thread at first dictionary use after upgrade.
+
+## Track 2 — the last table with no writer, and the language it filed rows under — 2026-08-15 11:20 MSK backup
+
+No interrupted slice to recover: the worker that hit the limit at 10:42 changed no file (only
+`docs/ACTIVE/EN_JA_SUBTITLE_FUSION_PLAN.md` at 09:23, already committed). Boss audit's last
+section is still 2026-08-15 04:24, closed by `4c7b416`.
+
+**Slice 1 — `b8303e6`. `collocations` gets a writer and a reader.** It was the last v1 table
+with neither. **Decision (standing auto-approval): the corpus is the headword index, not a
+sentence corpus** — measured, not assumed: on the real 697,837-headword DB `examples` holds
+**0 rows** (offline Tatoeba is a JSON file, not SQLite) and `senses.pos` is the empty string on
+**every** row, so both a corpus counter and a POS extractor would be dead on every install.
+JMdict carries set phrases as ordinary headwords, so 猫に小判 is a row and its particle is in
+the string. A row is parsed at the phrase **edges**, never merely contained — 猫撫で声 contains
+猫 and で and is not a collocation — and the partner must itself be attested. **Write-through,
+not a cache:** a cache goes stale when a dictionary is enabled/disabled/re-imported and there is
+no revision column; rows are replaced each call and the payload is read back **out of the
+table**, which is what gives the table a reader instead of letting it rot write-only.
+Particles: から/まで/より/を/に/が/の/へ/と. は/で/も excluded — they produced 傘はり, 気がかり,
+心がけ. `count` = attesting dictionary entries, labelled "entries", **never a frequency**.
+**Live, own `npm start`, RU locale:** 猫 through the real button gave **9** phrases (猫の目 ×4
+entries, 猫に小判, 猫を被る); the real DB went **0 → 9** rows; clicking 小判 ran a real lookup
+and the results led with 小判. i18n ×4 wired (9,588 → 9,595 keys).
+
+**Slice 2 — `0b4c04f`. The row's language was `langs[0]`, not the row's.** A bare Han query
+resolves in **both** partitions (ja 625,949 / zh 71,888) and 猫 is a headword in each, so a
+Japanese phrase could be filed under zh — and the delete, keyed the same way, would then miss
+the rows it owned and they would accumulate. Fixed to the candidate's own lang; the delete
+clears every scanned lang. **The test took two attempts and that is the lesson:** the first
+version passed against the buggy code because `langs[0]` was 'ja' by luck. Giving the zh entry
+the higher score makes zh sort first, and it then fails against the old code — verified by
+mutating the fix back out (`expected 0 to be greater than 0`), not assumed.
+
+**Traps.** (1) The `url:""` boot flake from the previous entry is **still live** — it cost one
+restart here and presents as `/eval` timing out on `1+1` while the main process is healthy and
+`/health` answers. Check `url` in the `/health` window list before blaming your own code.
+(2) `headwords.text` **carries no index**: the natural `where h.text = ? or h.reading = ?`
+attestation probe is a full scan per partner, **10.5 s for 猫 / 18.1 s for 腹**. Batched onto
+`norm`/`reading_norm` the whole call is **71–82 ms** (228 ms across two languages, still
+`SEARCH ... USING INDEX idx_hw_norm`).
+
+**Gates**, shared tree (~426 foreign entries, so not a statement about HEAD alone): `npx vitest
+run` **615 passed / 1 skipped files, 8,166 passed / 6 skipped**, exit 0 — baseline 613/8,148,
+i.e. exactly this turn's +2 files / +18 tests, nothing new red. i18n exit 0 at **9,595**.
+architecture exit 0, **Nothing new**, 2 known pending. eslint clean on all 10 touched paths
+except `window.d.ts`'s 2 `adjacent-overload-signatures` errors, **proved pre-existing** by
+linting the `b8303e6~1` blob (same 2, same identifiers, at 1560/1563).
+
+**Deliberately open.** (1) `explanations` is now the only v1 table with **zero insert statements
+anywhere in source** — the next writer slice, and it needs the Contextual Explain reply wired
+back in, keyed `(headword_id, lang, model, prompt_version)`. (2) `inflections`, `freq_corpora`,
+`examples`, `chars` all have production writers that simply have not been run on this install —
+a data-availability state, not a code gap; `chars` still needs a source nothing bundles.
+(3) The collocation partner shows no gloss, unlike the compound rows: 猫に鰹節 needs a click to
+learn what 鰹節 means. Cheap to add by reusing the compound gloss query.
