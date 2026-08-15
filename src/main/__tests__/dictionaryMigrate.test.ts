@@ -21,6 +21,7 @@ import {
   LEGACY_KEY_SEP,
   glossLangOf,
   importLegacyIndex,
+  parseLegacyXref,
   sourceLangOf,
   migrateLegacyYomitanStores,
   readMigratedEntries,
@@ -721,5 +722,263 @@ describe('schema 7 — repairing an install whose headwords were written as Japa
     expect(db.prepare('select source_lang, target_lang, priority from dict_pair_priority').all()).toEqual([
       { source_lang: 'zh', target_lang: 'zh', priority: 3 },
     ]);
+  });
+});
+
+// JMdict's `<xref>` elements survive the Yomitan conversion as ordinary definition
+// strings beginning `see: `. On the bundled English store that is 53,540 of
+// 1,065,448 definitions, every one of which the reader was showing as a meaning of
+// the word. These tests pin both halves: which strings are cross references, and
+// that lifting them leaves the surviving gloss list intact.
+describe('legacy JMdict cross references — see: is a reference, not a meaning', () => {
+  function glossesOf(word: string) {
+    return db.prepare(
+      'select g.text as text, g.ord as ord from glosses g'
+      + ' join senses s on s.id = g.sense_id'
+      + ' join headwords h on h.id = s.headword_id'
+      + ' where h.text = ? order by g.ord',
+    ).all(word);
+  }
+
+  it('takes the target up to the first ASCII space and calls it a see', () => {
+    expect(parseLegacyXref('see: 石南花 rhododendron', '石楠花')).toEqual({
+      kind: 'see',
+      text: '石南花',
+    });
+  });
+
+  it('keeps the target when the gloss side carries a sense number', () => {
+    expect(parseLegacyXref('see: ペコペコ 3. denting; buckling; giving (in)', 'へこへこ')?.text)
+      .toBe('ペコペコ');
+  });
+
+  it('strips a fullwidth reading annotation so the target can resolve', () => {
+    // 2,511 bundled rows look like this. `更衣（こうい）` is not a headword; `更衣` is.
+    expect(parseLegacyXref("see: 更衣（こうい） 1. changing one's clothes", '衣更え')?.text)
+      .toBe('更衣');
+  });
+
+  it.each([
+    ['see: Ｔシャツ T-shirt; tee shirt', 'Ｔシャツ'],
+    ['see: ３時のおやつ afternoon refreshment', '３時のおやつ'],
+    ['see: 勝てば官軍、負ければ賊軍 might is right', '勝てば官軍、負ければ賊軍'],
+    ['see: ＮＨＫから国民を守る党 NHK Party', 'ＮＨＫから国民を守る党'],
+  ])('survives the shapes a character class would drop: %s', (definition, expected) => {
+    expect(parseLegacyXref(definition, 'x')?.text).toBe(expected);
+  });
+
+  it.each([
+    ['an ordinary definition', 'to see; to look at', 'x'],
+    ['a definition merely opening with the word see', 'see: below for details', 'x'],
+    ['a self reference', 'see: 表裏 duplicity', '表裏'],
+    ['a target longer than a word can be', 'see: ' + 'あ'.repeat(33) + ' prose', 'x'],
+    ['a bare prefix with no target', 'see: ', 'x'],
+  ])('refuses %s rather than guessing', (_label, definition, word) => {
+    expect(parseLegacyXref(definition, word)).toBeNull();
+  });
+
+  it('writes an xrefs row and drops the reference from the gloss list', () => {
+    importLegacyIndex(db, fixture({
+      terms: {
+        裏表: [entry('裏表', 'うらおもて', [
+          'double-dealing',
+          'two faces',
+          'see: 表裏 2. duplicity; double-dealing; being two-faced',
+        ])],
+      },
+    }));
+
+    expect(glossesOf('裏表')).toEqual([
+      { text: 'double-dealing', ord: 0 },
+      { text: 'two faces', ord: 1 },
+    ]);
+
+    expect(db.prepare(
+      'select x.to_text as toText, x.kind as kind from xrefs x'
+      + ' join senses s on s.id = x.from_sense'
+      + ' join headwords h on h.id = s.headword_id'
+      + " where h.text = '裏表'",
+    ).all()).toEqual([{ toText: '表裏', kind: 'see' }]);
+  });
+
+  it('recounts gloss ord over the survivors, so no hole reorders a sense', () => {
+    importLegacyIndex(db, fixture({
+      terms: {
+        リア充: [entry('リア充', 'リアじゅう', [
+          'see: リアル 4. real world',
+          'normie',
+          'see: 充実 1. fullness',
+          'person satisfied with their offline life',
+        ])],
+      },
+    }));
+
+    // The two survivors must be 0 and 1 — not 1 and 3, which is what leaving the
+    // original indices behind would store, and which orders senses by a stale gap.
+    expect(glossesOf('リア充')).toEqual([
+      { text: 'normie', ord: 0 },
+      { text: 'person satisfied with their offline life', ord: 1 },
+    ]);
+  });
+
+  it('moves the entry HTML onto the first surviving gloss', () => {
+    // The structured HTML rides on gloss ord 0. If a `see:` line was ord 0 before
+    // the lift, the HTML would otherwise vanish with it.
+    importLegacyIndex(db, fixture({
+      terms: {
+        夫: [entry('夫', 'おっと', ['see: 良人（りょうじん） 1. husband', 'husband'], {
+          glossaryHtml: '<div>husband</div>',
+        })],
+      },
+    }));
+
+    expect(db.prepare(
+      'select g.text as text, g.html as html from glosses g'
+      + ' join senses s on s.id = g.sense_id'
+      + ' join headwords h on h.id = s.headword_id'
+      + " where h.text = '夫' order by g.ord",
+    ).all()).toEqual([{ text: 'husband', html: '<div>husband</div>' }]);
+  });
+
+  it('counts what it lifted, so a migration can report it', () => {
+    const counts = importLegacyIndex(db, fixture({
+      terms: {
+        裏表: [entry('裏表', 'うらおもて', ['two faces', 'see: 表裏 2. duplicity'])],
+        リア充: [entry('リア充', 'リアじゅう', ['normie', 'see: リアル 4. real world'])],
+      },
+    }));
+    expect(counts.xrefs).toBe(2);
+    expect(counts.glosses).toBe(2);
+  });
+});
+
+// Splitting at import time fixes nothing on its own: `pendingLegacyStores` only
+// re-reads a store whose id is not already in `dictionaries`, so every existing
+// install would keep the polluted glosses and an empty panel. Step 11 is the lift
+// done in place, and these tests are on the install that has already migrated.
+describe('schema step 11 — repairing an install whose xrefs are still glosses', () => {
+  /**
+   * The shape the pre-step importer produced. Import correctly first — the writer
+   * would now split these — then write the `see:` rows back by hand and rewind
+   * `user_version`, which is the same reconstruction the step 7 tests use.
+   */
+  function importWithXrefsAsGlosses(): void {
+    importLegacyIndex(db, fixture({
+      terms: { 裏表: [entry('裏表', 'うらおもて', ['double-dealing', 'two faces'])] },
+    }));
+    const senseId = (db.prepare(
+      "select s.id as id from senses s join headwords h on h.id = s.headword_id where h.text = '裏表'",
+    ).get() as { id: number }).id;
+    db.prepare('insert into glosses (sense_id, lang, text, html, ord) values (?, ?, ?, null, ?)')
+      .run(senseId, 'en', 'see: 表裏 2. duplicity; double-dealing', 2);
+    db.pragma('user_version = 10');
+  }
+
+  it('moves a see: gloss into xrefs on an install that already migrated', () => {
+    importWithXrefsAsGlosses();
+    expect(db.prepare('select count(*) as c from xrefs').get()).toEqual({ c: 0 });
+
+    migrateDictionaryDb(db);
+
+    expect(db.prepare('select to_text as toText, kind from xrefs').all())
+      .toEqual([{ toText: '表裏', kind: 'see' }]);
+    expect(db.prepare("select count(*) as c from glosses where text like 'see: %'").get())
+      .toEqual({ c: 0 });
+    expect(db.prepare('select text from glosses order by ord').all())
+      .toEqual([{ text: 'double-dealing' }, { text: 'two faces' }]);
+  });
+
+  it('closes the ord hole the delete leaves behind', () => {
+    importLegacyIndex(db, fixture({
+      terms: { リア充: [entry('リア充', 'リアじゅう', ['normie', 'offline life'])] },
+    }));
+    const senseId = (db.prepare(
+      "select s.id as id from senses s join headwords h on h.id = s.headword_id where h.text = 'リア充'",
+    ).get() as { id: number }).id;
+    // Interleaved, so the delete leaves 1 and 3 rather than a trailing gap.
+    db.prepare('update glosses set ord = 1 where sense_id = ? and text = ?').run(senseId, 'normie');
+    db.prepare('update glosses set ord = 3 where sense_id = ? and text = ?').run(senseId, 'offline life');
+    const insert = db.prepare('insert into glosses (sense_id, lang, text, html, ord) values (?, ?, ?, null, ?)');
+    insert.run(senseId, 'en', 'see: リアル 4. real world', 0);
+    insert.run(senseId, 'en', 'see: 充実 1. fullness', 2);
+    db.pragma('user_version = 10');
+
+    migrateDictionaryDb(db);
+
+    expect(db.prepare('select text, ord from glosses order by ord').all()).toEqual([
+      { text: 'normie', ord: 0 },
+      { text: 'offline life', ord: 1 },
+    ]);
+    expect(db.prepare('select count(*) as c from xrefs').get()).toEqual({ c: 2 });
+  });
+
+  it('carries the entry HTML onto the first surviving gloss', () => {
+    importLegacyIndex(db, fixture({
+      terms: { 夫: [entry('夫', 'おっと', ['husband'], { glossaryHtml: '<div>husband</div>' })] },
+    }));
+    const senseId = (db.prepare(
+      "select s.id as id from senses s join headwords h on h.id = s.headword_id where h.text = '夫'",
+    ).get() as { id: number }).id;
+    // The old importer put the HTML on ord 0, which here is the reference — so a
+    // naive delete would take the entry's structured content with it.
+    db.prepare('update glosses set ord = 1, html = null where sense_id = ?').run(senseId);
+    db.prepare('insert into glosses (sense_id, lang, text, html, ord) values (?, ?, ?, ?, ?)')
+      .run(senseId, 'en', 'see: 良人（りょうじん） 1. husband', '<div>husband</div>', 0);
+    db.pragma('user_version = 10');
+
+    migrateDictionaryDb(db);
+
+    expect(db.prepare('select text, html, ord from glosses').all())
+      .toEqual([{ text: 'husband', html: '<div>husband</div>', ord: 0 }]);
+  });
+
+  it('leaves a definition it cannot parse as a gloss', () => {
+    importLegacyIndex(db, fixture({
+      terms: { 見る: [entry('見る', 'みる', ['to see'])] },
+    }));
+    const senseId = (db.prepare(
+      "select s.id as id from senses s join headwords h on h.id = s.headword_id where h.text = '見る'",
+    ).get() as { id: number }).id;
+    db.prepare('insert into glosses (sense_id, lang, text, html, ord) values (?, ?, ?, null, ?)')
+      .run(senseId, 'en', 'see: below for the full conjugation table', 1);
+    db.pragma('user_version = 10');
+
+    migrateDictionaryDb(db);
+
+    expect(db.prepare('select count(*) as c from xrefs').get()).toEqual({ c: 0 });
+    expect(db.prepare('select count(*) as c from glosses').get()).toEqual({ c: 2 });
+  });
+
+  // 451 of the real install's 53,540 candidates are this: JMdict cross-referencing
+  // two readings of one spelling. `to_text` has nowhere to put the reading, so an
+  // xref here would point at the entry already open — and deleting it would drop a
+  // pointer to a real other reading. It stays a gloss, and that is the whole answer.
+  it('leaves a reference to another reading of the same spelling alone', () => {
+    importLegacyIndex(db, fixture({
+      terms: { 更衣: [entry('更衣', 'ころもがえ', ['seasonal change of clothing'])] },
+    }));
+    const senseId = (db.prepare(
+      "select s.id as id from senses s join headwords h on h.id = s.headword_id where h.text = '更衣'",
+    ).get() as { id: number }).id;
+    db.prepare('insert into glosses (sense_id, lang, text, html, ord) values (?, ?, ?, null, ?)')
+      .run(senseId, 'en', "see: 更衣（こうい） 1. changing one's clothes", 1);
+    db.pragma('user_version = 10');
+
+    migrateDictionaryDb(db);
+
+    expect(db.prepare('select count(*) as c from xrefs').get()).toEqual({ c: 0 });
+    expect(db.prepare("select count(*) as c from glosses where text like 'see: %'").get())
+      .toEqual({ c: 1 });
+  });
+
+  it('is a no-op the second time, so re-running the migration is safe', () => {
+    importWithXrefsAsGlosses();
+    migrateDictionaryDb(db);
+    const after = db.prepare('select to_text as toText from xrefs').all();
+
+    db.pragma('user_version = 10');
+    migrateDictionaryDb(db);
+
+    expect(db.prepare('select to_text as toText from xrefs').all()).toEqual(after);
   });
 });

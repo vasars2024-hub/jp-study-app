@@ -230,6 +230,7 @@ export function runDictionaryImport(
       headwords: result.imported.reduce((sum, entry) => sum + entry.headwords, 0),
       senses: result.imported.reduce((sum, entry) => sum + entry.senses, 0),
       glosses: result.imported.reduce((sum, entry) => sum + entry.glosses, 0),
+      xrefs: result.imported.reduce((sum, entry) => sum + entry.xrefs, 0),
     };
     return { state: result.cancelled ? 'cancelled' : 'committed', counts };
   } finally {

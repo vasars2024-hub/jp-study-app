@@ -27,11 +27,12 @@
 
 import type { SqliteDb } from './db';
 import { BUNDLED_GLOSS_LANGS, BUNDLED_SOURCE_LANGS, DEFAULT_SOURCE_LANG } from './glossLang';
+import { parseLegacyXref } from './migrate';
 import { relabelDictionarySourceLang } from './sourceLang';
 import { CORPUS_LANG_ALIAS_PAIRS } from '../../shared/dictionarySources';
 
 /** Bumped by appending to MIGRATIONS. Never edit a released step. */
-export const DICT_SCHEMA_VERSION = 10;
+export const DICT_SCHEMA_VERSION = 11;
 
 export interface MigrationStep {
   version: number;
@@ -658,6 +659,82 @@ export const MIGRATIONS: MigrationStep[] = [
       for (const [alias, canonical] of CORPUS_LANG_ALIAS_PAIRS) {
         canonicalise.run(canonical, alias);
         canonicaliseTranslations.run(canonical, alias);
+      }
+    },
+  },
+  {
+    version: 11,
+    name: 'JMdict cross references move out of the definition list and into xrefs',
+    up(db) {
+      // `xrefs` had exactly one writer, the Wiktextract importer, and no bundled
+      // dictionary uses it — so on a default install the cross-reference panel was
+      // empty for every word. Meanwhile JMdict's own `<xref>` elements were sitting
+      // in `glosses`: the Yomitan conversion renders them as definition strings
+      // beginning `see: `, and the legacy migration stored them verbatim. On this
+      // machine's real store that is 53,540 rows, so 裏表 listed
+      // "see: 表裏 2. duplicity; double-dealing" among its own meanings.
+      //
+      // `./migrate` now splits them at import time. This step does the same lift in
+      // place, because `pendingLegacyStores` only re-reads a store whose id is *not*
+      // already in `dictionaries` — without this, every existing install keeps the
+      // polluted glosses and an empty panel until it deletes and re-imports 97 MB.
+      //
+      // Deliberately not restricted to `bundled-jmdict-*`: a user's own JMdict
+      // Yomitan archive produces identical rows, and it is `parseLegacyXref`'s own
+      // guards — a target with a non-ASCII character, no longer than a word, not the
+      // headword itself — that keep a genuine definition opening with "see" from
+      // being lifted, not the dictionary it came from.
+      //
+      // Measured on the real 378 MB install: 53,540 candidates in, **53,089** xrefs
+      // out in 3.2 s, 26,940 of 27,534 distinct targets resolving to a headword. The
+      // **451** that stay are every one of them a self reference by text — JMdict
+      // cross-referencing two readings of one spelling (更衣 こうい/ころもがえ). They
+      // are kept as glosses on purpose: `to_text` is a bare string with nowhere to
+      // put the reading, so storing one would render as a reference to the entry the
+      // reader is already on, and deleting one would take a pointer to a real other
+      // reading with it. 451 of 1.33 M glosses stay mildly ugly; none is invented.
+      const candidates = db.prepare(`
+        SELECT g.id AS id, g.sense_id AS senseId, g.text AS text, g.html AS html, h.text AS word
+        FROM glosses g
+        JOIN senses s ON s.id = g.sense_id
+        JOIN headwords h ON h.id = s.headword_id
+        WHERE g.text LIKE 'see: %'
+      `).all() as { id: number; senseId: number; text: string; html: string | null; word: string }[];
+      if (candidates.length === 0) return;
+
+      const insertXref = db.prepare('INSERT INTO xrefs (from_sense, to_text, kind) VALUES (?, ?, ?)');
+      const deleteGloss = db.prepare('DELETE FROM glosses WHERE id = ?');
+      const touched = new Set<number>();
+      // The entry's structured HTML rides on gloss ord 0, so when the row being
+      // deleted is the one carrying it, the HTML has to be rescued *before* the
+      // delete — after it there is nothing left to read it off.
+      const rescuedHtml = new Map<number, string>();
+      for (const row of candidates) {
+        const xref = parseLegacyXref(row.text, row.word);
+        // A string this parser will not commit to stays a gloss. Being ugly is
+        // recoverable; deleting a meaning is not.
+        if (!xref) continue;
+        insertXref.run(row.senseId, xref.text, xref.kind);
+        if (row.html !== null && !rescuedHtml.has(row.senseId)) rescuedHtml.set(row.senseId, row.html);
+        deleteGloss.run(row.id);
+        touched.add(row.senseId);
+      }
+      if (touched.size === 0) return;
+
+      // Then the hole in `ord`. Every reader sorts glosses by it and the delete
+      // leaves gaps (0,1,2,3 → 1,3), so renumber the survivors contiguously and
+      // put any rescued HTML on the new first row.
+      const survivors = db.prepare('SELECT id, ord, html FROM glosses WHERE sense_id = ? ORDER BY ord, id');
+      const carryHtml = db.prepare('UPDATE glosses SET html = ? WHERE id = ?');
+      const setOrd = db.prepare('UPDATE glosses SET ord = ? WHERE id = ?');
+      for (const senseId of touched) {
+        const rows = survivors.all(senseId) as { id: number; ord: number; html: string | null }[];
+        if (rows.length === 0) continue;
+        const html = rows.find((row) => row.html !== null)?.html ?? rescuedHtml.get(senseId) ?? null;
+        if (html !== null && rows[0].html === null) carryHtml.run(html, rows[0].id);
+        rows.forEach((row, index) => {
+          if (row.ord !== index) setOrd.run(index, row.id);
+        });
       }
     },
   },

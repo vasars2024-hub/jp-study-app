@@ -29,7 +29,12 @@ import fs from 'node:fs';
 import type { SqliteDb } from '../db';
 import { normalizeForLookup } from '../dictService';
 import { pinyinSearchKey } from '../../../shared/pinyin';
-import { type LexiconXrefKind, normalizeXrefKind, normalizeXrefText } from '../../../shared/lexiconXrefs';
+import {
+  type LexiconXrefKind,
+  MAX_XREF_TARGET_CHARS,
+  normalizeXrefKind,
+  normalizeXrefText,
+} from '../../../shared/lexiconXrefs';
 
 /** One JSONL record, reduced to the fields this importer reads. */
 /**
@@ -269,16 +274,6 @@ export function classifyForms(
 const XREF_SOURCE_FIELDS: readonly (keyof WiktextractSense)[] = [
   'synonyms', 'antonyms', 'see_also', 'related', 'coordinate_terms',
 ];
-
-/**
- * An xref target longer than this is a sentence, not a word.
- *
- * Wiktionary's link lists routinely carry a parenthetical or a whole usage note
- * where a word belongs. Such a row could never resolve against `headwords.norm`,
- * so it would render as permanently unresolvable text under a "synonyms" heading —
- * worse than being absent, because the surface would look broken rather than empty.
- */
-const MAX_XREF_TARGET_CHARS = 32;
 
 /**
  * The cross references one sense states, as `(kind, target)` pairs.

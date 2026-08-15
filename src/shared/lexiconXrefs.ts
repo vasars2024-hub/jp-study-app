@@ -31,6 +31,20 @@ export const MAX_XREF_RESULTS = 24;
  */
 export const MAX_XREF_QUERY_CHARS = 16;
 
+/**
+ * An xref target longer than this is a sentence, not a word.
+ *
+ * Link lists routinely carry a parenthetical or a whole usage note where a word
+ * belongs. Such a row could never resolve against `headwords.norm`, so it would
+ * render as permanently unresolvable text under a "synonyms" heading — worse than
+ * being absent, because the surface would look broken rather than empty.
+ *
+ * Shared rather than per-importer: two writers now produce these rows, and a
+ * target one of them accepts and the other rejects is a difference the reader has
+ * no way to explain.
+ */
+export const MAX_XREF_TARGET_CHARS = 32;
+
 export interface LexiconXref {
   kind: LexiconXrefKind;
   /** The target word, verbatim as the dictionary wrote it. */

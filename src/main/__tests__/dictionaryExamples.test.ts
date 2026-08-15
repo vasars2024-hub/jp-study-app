@@ -125,9 +125,12 @@ describe('word lookups and example corpora', () => {
 });
 
 describe('schema step 10', () => {
-  it('is the current schema version', () => {
+  it('is a shipped schema step, and the version has moved past it', () => {
+    // Step 10 is no longer the last one; step 11 lifts JMdict's `see:` definitions
+    // into `xrefs`. What still matters here is that 10 shipped and was not edited.
     expect(MIGRATIONS.at(-1)?.version).toBe(DICT_SCHEMA_VERSION);
-    expect(DICT_SCHEMA_VERSION).toBe(10);
+    expect(MIGRATIONS.some((step) => step.version === 10)).toBe(true);
+    expect(DICT_SCHEMA_VERSION).toBe(11);
   });
 
   // Reproduces exactly what an install that imported Tatoeba before this slice

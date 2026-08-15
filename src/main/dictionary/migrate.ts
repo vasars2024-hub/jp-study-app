@@ -12,6 +12,10 @@
 //   * **The migration is lossless with respect to what the JSON holds** — terms,
 //     pitch and frequency all land somewhere. That is what makes the parity test
 //     meaningful: anything the old Map could answer, the database can answer.
+//     "Somewhere" is load-bearing, and since `parseLegacyXref` it is no longer
+//     always `glosses`: a `see: …` definition is JMdict's own cross reference and
+//     lands in `xrefs`. So a store carrying those does **not** round-trip through
+//     `readMigratedEntries` verbatim, by design — the row moved table, not away.
 //
 // Everything is synchronous because better-sqlite3 is; the caller is expected to run
 // it off the main thread for a large store (Phase 1's utilityProcess), which is why
@@ -19,6 +23,11 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import {
+  type LexiconXrefKind,
+  MAX_XREF_TARGET_CHARS,
+  normalizeXrefText,
+} from '../../shared/lexiconXrefs';
 import type { DictSense, YomitanDictInfo } from '../../shared/types';
 import type { SqliteDb } from './db';
 import { DEFAULT_SOURCE_LANG, resolveGlossLangs, resolveSourceLang } from './glossLang';
@@ -65,6 +74,68 @@ export interface ImportedCounts {
   glosses: number;
   pitch: number;
   freq: number;
+  /** Cross-reference rows lifted out of the definition list. See `parseLegacyXref`. */
+  xrefs: number;
+}
+
+/**
+ * The prefix the legacy JMdict store uses for a cross reference.
+ *
+ * JMdict's `<xref>` elements survive the Yomitan conversion, but not as structure:
+ * they arrive as ordinary definition strings that happen to begin `see: `. On the
+ * bundled English store that is **53,540** of 1,065,448 definitions — every one of
+ * which the reader has been showing as if it were a meaning of the word, so 裏表
+ * lists "see: 表裏 2. duplicity; double-dealing" among its own definitions.
+ */
+const LEGACY_XREF_PREFIX = 'see: ';
+
+/**
+ * A `（かな）` reading annotation on the target, which 2,511 of the bundled rows carry.
+ *
+ * It has to come off. `xrefs.to_text` is both what the surface prints and what the
+ * resolution probe compares against `headwords.norm`, and no headword is stored with
+ * its reading in fullwidth brackets — so keeping it would mark every one of those
+ * targets unresolved while displaying a form no dictionary actually uses.
+ */
+const LEGACY_XREF_READING = /（[^（）]*）$/u;
+
+/**
+ * One cross reference lifted out of a legacy definition string, or null if the
+ * string is an ordinary definition and must stay one.
+ *
+ * The target is everything up to the first **ASCII space**, because that is the
+ * separator the conversion uses and a Japanese headword never contains one. That
+ * rule survives the shapes a character class does not: fullwidth alphanumerics
+ * (`Ｔシャツ`, `３時のおやつ`), ideographic commas (`勝てば官軍、負ければ賊軍`) and
+ * a trailing sense number on the *gloss* side (`see: ペコペコ 3. denting`).
+ *
+ * Returning null rather than a best guess is the point. A row this parser is unsure
+ * of stays a gloss, where it is merely ugly, instead of becoming a cross reference
+ * pointing at a word nobody named.
+ *
+ * The kind is always `see`: JMdict states "see also" and nothing stronger, and the
+ * schema has a `see` value precisely so that claim need not be inflated to `syn`.
+ */
+export function parseLegacyXref(
+  definition: string,
+  word: string,
+): { kind: LexiconXrefKind; text: string } | null {
+  if (typeof definition !== 'string' || !definition.startsWith(LEGACY_XREF_PREFIX)) return null;
+
+  const body = definition.slice(LEGACY_XREF_PREFIX.length);
+  const space = body.indexOf(' ');
+  const raw = space < 0 ? body : body.slice(0, space);
+  const text = normalizeXrefText(raw.replace(LEGACY_XREF_READING, ''));
+
+  if (!text) return null;
+  // A target with no character outside ASCII is not a Japanese headword — it is a
+  // definition that merely opened with the word "see", and lifting it would delete
+  // a meaning. Every one of the 53,540 real targets clears this test.
+  if (![...text].some((ch) => (ch.codePointAt(0) ?? 0) > 0x7f)) return null;
+  if ([...text].length > MAX_XREF_TARGET_CHARS) return null;
+  if (text === normalizeXrefText(word)) return null;
+
+  return { kind: 'see', text };
 }
 
 export interface MigrationProgress {
@@ -257,7 +328,7 @@ export function importLegacyIndex(
   const sourceLang = sourceLangOf(info);
   const provenance = BUNDLED_LEGACY_PROVENANCE[dictId];
   const kind = legacyKindOf(info);
-  const counts: ImportedCounts = { dictId, headwords: 0, senses: 0, glosses: 0, pitch: 0, freq: 0 };
+  const counts: ImportedCounts = { dictId, headwords: 0, senses: 0, glosses: 0, pitch: 0, freq: 0, xrefs: 0 };
 
   const run = db.transaction(() => {
     deleteLegacySourceRows(db, dictId, shouldCancel);
@@ -287,6 +358,7 @@ export function importLegacyIndex(
     `);
     const insertSense = db.prepare('insert into senses (headword_id, ord, pos, tags) values (?, ?, ?, ?)');
     const insertGloss = db.prepare('insert into glosses (sense_id, lang, text, html, ord) values (?, ?, ?, ?, ?)');
+    const insertXref = db.prepare('insert into xrefs (from_sense, to_text, kind) values (?, ?, ?)');
 
     for (const [norm, entries] of Object.entries(index.terms ?? {})) {
       for (const entry of entries) {
@@ -318,10 +390,26 @@ export function importLegacyIndex(
           // rides on the first gloss of the first sense — the only place a reader
           // can find it again without a second table.
           const html = senseOrd === 0 ? entry.glossaryHtml ?? null : null;
-          (sense.definitions ?? []).forEach((definition, glossOrd) => {
+          // A `see: …` definition is JMdict's own cross reference, not a meaning, so
+          // it becomes an `xrefs` row and leaves the gloss list. `glossOrd` is
+          // recounted over the definitions that stay, because `ord` is what the
+          // reader sorts by and a hole in it would print the senses out of order.
+          //
+          // No sense in the bundled store is made entirely of these (measured: 0 of
+          // 524,106), so lifting them can never leave a sense with no glosses at all
+          // — which `dictService` would then filter out of the entry completely.
+          let glossOrd = 0;
+          for (const definition of sense.definitions ?? []) {
+            const xref = parseLegacyXref(definition, entry.word);
+            if (xref) {
+              insertXref.run(senseId, xref.text, xref.kind);
+              counts.xrefs += 1;
+              continue;
+            }
             insertGloss.run(senseId, glossLang, definition, glossOrd === 0 ? html : null, glossOrd);
             counts.glosses += 1;
-          });
+            glossOrd += 1;
+          }
         });
       }
     }
