@@ -61,7 +61,16 @@ import {
   listUserNotesFromDb,
   readUserNoteFromDb,
   writeUserNoteToDb,
+  readStoredExplanationFromDb,
+  writeStoredExplanationToDb,
+  clearStoredExplanationsInDb,
 } from './dictionary/service';
+import {
+  readExplanationIdentity,
+  readExplanationInput,
+  readExplanationKey,
+  type LexiconExplanation,
+} from '../shared/lexiconExplanations';
 import {
   notesToCsv,
   readNoteExportQuery,
@@ -926,6 +935,47 @@ export function registerDictionaryIpc(): void {
     (_e, word: unknown): Promise<ConjugationAnalysis> =>
       analyzeConjugation(typeof word === 'string' ? word : ''),
   );
+  // The stored explanation of a word. A miss and an un-migrated installation are
+  // the same answer — `null` means "nothing cached, ask the model" and both are
+  // that — so this handler never rejects and the surface never renders a defect
+  // for a word simply not explained yet.
+  ipcMain.handle('dict:explanationGet', (_e, key: unknown): LexiconExplanation | null => {
+    const target = readExplanationKey(key);
+    if (!target) return null;
+    try {
+      return readStoredExplanationFromDb(target);
+    } catch {
+      return null;
+    }
+  });
+  // A failed write returns `{ ok: false }` rather than the explanation, matching
+  // `dict:noteSet`. The caller has just spent a model call, so it needs to know
+  // the answer was not kept — reporting a silent miss as a save means the next
+  // reader pays for the same answer again and nothing says why.
+  ipcMain.handle(
+    'dict:explanationSet',
+    (_e, key: unknown, input: unknown): { ok: boolean; explanation: LexiconExplanation | null } => {
+      const target = readExplanationKey(key);
+      if (!target) return { ok: false, explanation: null };
+      try {
+        return { ok: true, explanation: writeStoredExplanationToDb(target, readExplanationInput(input)) };
+      } catch {
+        return { ok: false, explanation: null };
+      }
+    },
+  );
+  // The reversal: forget this word's explanations across every prose language,
+  // model and prompt version. "This explanation is wrong" is about the word, not
+  // about the one model/language pair that happens to be on screen.
+  ipcMain.handle('dict:explanationClear', (_e, identity: unknown): { ok: boolean; removed: number } => {
+    const target = readExplanationIdentity(identity);
+    if (!target) return { ok: false, removed: 0 };
+    try {
+      return { ok: true, removed: clearStoredExplanationsInDb(target.lang, target.text, target.reading) };
+    } catch {
+      return { ok: false, removed: 0 };
+    }
+  });
   // The user's own note on a word. Both handlers answer `null` rather than
   // rejecting when the database is not there yet: a note surface renders "no note"
   // for a word that has none, and an un-migrated installation is that same state.

@@ -32,7 +32,7 @@ import { relabelDictionarySourceLang } from './sourceLang';
 import { CORPUS_LANG_ALIAS_PAIRS } from '../../shared/dictionarySources';
 
 /** Bumped by appending to MIGRATIONS. Never edit a released step. */
-export const DICT_SCHEMA_VERSION = 11;
+export const DICT_SCHEMA_VERSION = 12;
 
 export interface MigrationStep {
   version: number;
@@ -736,6 +736,65 @@ export const MIGRATIONS: MigrationStep[] = [
           if (row.ord !== index) setOrd.run(index, row.id);
         });
       }
+    },
+  },
+  {
+    version: 12,
+    name: 'explanations key on the word they explain rather than a headword row id',
+    up(db) {
+      // `explanations` shipped in v1 keyed `(headword_id, lang, model,
+      // prompt_version)` and has never had an insert statement anywhere in this
+      // source tree, so on every installation in existence it holds zero rows.
+      // That is what makes a rebuild rather than an ALTER the honest step here:
+      // the primary key is the problem, SQLite cannot drop one in place, and
+      // there is no row to lose.
+      //
+      // The key is wrong for the reason migration 6 gives about notes, only
+      // sharper. A re-import runs `delete from dictionaries`, the cascade takes
+      // every headword, and the next import hands the same autoincrement ids to
+      // different words — so a surviving explanation of 猫 is eventually read
+      // back and rendered under 犬. Following notes and writing `headword_id = 0`
+      // instead is not available: `headword_id` is *in* the primary key, so every
+      // word's explanation would collide with every other word's.
+      //
+      // `lang` keeps the meaning it has in `user_notes` after migration 6 — the
+      // language of the *word*. The prose language is a new column: "explain 猫 in
+      // Russian" and "explain 猫 in English" are two answers, not one answer shown
+      // twice, and the plan lists explanation-language selection as a v1 feature.
+      // Splitting them costs a column; overloading `lang` would cost a reader
+      // being shown the wrong-language explanation with no way to tell.
+      //
+      // Re-runnable like every step before it: a caller that rewinds
+      // `user_version` on a file that already has the new shape must not drop the
+      // rows written since. `norm` is the sentinel because it exists only after
+      // this step.
+      const columns = (db.pragma('table_info(explanations)') as Array<{ name: string }>)
+        .map((column) => column.name);
+      if (!columns.includes('norm')) {
+        db.exec('DROP TABLE IF EXISTS explanations');
+        db.exec(`
+          CREATE TABLE explanations (
+            lang           TEXT NOT NULL,
+            text           TEXT NOT NULL,
+            norm           TEXT NOT NULL,
+            reading        TEXT NOT NULL DEFAULT '',
+            reading_norm   TEXT NOT NULL DEFAULT '',
+            gloss_lang     TEXT NOT NULL,
+            model          TEXT NOT NULL,
+            prompt_version INTEGER NOT NULL,
+            json           TEXT NOT NULL,
+            created_at     INTEGER NOT NULL DEFAULT 0
+          )
+        `);
+      }
+      // Unique on the whole key, so a re-explain replaces its own answer and can
+      // never leave two rows a reader has to choose between. `created_at` carries
+      // the eviction order, and it is the only thing the row cap sorts on.
+      db.exec(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_expl_key
+        ON explanations(lang, norm, reading_norm, gloss_lang, model, prompt_version)
+      `);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_expl_created ON explanations(created_at)');
     },
   },
 ];

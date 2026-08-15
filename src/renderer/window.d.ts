@@ -393,6 +393,19 @@ declare global {
       dictNoteExport(
         query?: Partial<import('../shared/lexiconNotes').LexiconNoteExportQuery>,
       ): Promise<import('../shared/lexiconNotes').LexiconNoteExportResult>;
+      dictExplanationGet(
+        key: import('../shared/lexiconExplanations').LexiconExplanationKey,
+      ): Promise<import('../shared/lexiconExplanations').LexiconExplanation | null>;
+      dictExplanationSet(
+        key: import('../shared/lexiconExplanations').LexiconExplanationKey,
+        input: import('../shared/lexiconExplanations').LexiconExplanationInput,
+      ): Promise<{
+        ok: boolean;
+        explanation: import('../shared/lexiconExplanations').LexiconExplanation | null;
+      }>;
+      dictExplanationClear(
+        identity: import('../shared/lexiconExplanations').LexiconExplanationIdentity,
+      ): Promise<{ ok: boolean; removed: number }>;
       dictListYomitan(): Promise<YomitanDictInfo[]>;
       dictRemoveYomitan(id: string): Promise<{ ok: boolean; error?: string }>;
       dictSetYomitanEnabled(id: string, enabled: boolean): Promise<{ ok: boolean; error?: string }>;

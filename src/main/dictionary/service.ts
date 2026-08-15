@@ -75,6 +75,11 @@ import {
   type ChineseLookupDeps,
 } from './chineseLookup';
 import { listUserNotes, readUserNote, writeUserNote } from './notes';
+import {
+  clearStoredExplanations,
+  readStoredExplanation,
+  writeStoredExplanation,
+} from './explanations';
 import type {
   LexiconNote,
   LexiconNoteIdentity,
@@ -82,6 +87,11 @@ import type {
   LexiconNoteListQuery,
   LexiconNoteListResult,
 } from '../../shared/lexiconNotes';
+import type {
+  LexiconExplanation,
+  LexiconExplanationInput,
+  LexiconExplanationKey,
+} from '../../shared/lexiconExplanations';
 import type { DictResult } from '../../shared/types';
 import type { LexiconNeighborResult } from '../../shared/lexiconNeighbors';
 import type { LexiconCollocationResult } from '../../shared/lexiconCollocations';
@@ -489,6 +499,24 @@ export function writeUserNoteToDb(
   input: LexiconNoteInput,
 ): LexiconNote | null {
   return writeUserNote(dictionaryDb(), identity, input);
+}
+
+/** The stored explanation of a word, from the managed database. */
+export function readStoredExplanationFromDb(key: LexiconExplanationKey): LexiconExplanation | null {
+  return readStoredExplanation(dictionaryDb(), key);
+}
+
+/** Store or clear one model's explanation of a word. Returns it as it now stands. */
+export function writeStoredExplanationToDb(
+  key: LexiconExplanationKey,
+  input: LexiconExplanationInput,
+): LexiconExplanation | null {
+  return writeStoredExplanation(dictionaryDb(), key, input);
+}
+
+/** Forget every stored explanation of one word. Returns the rows removed. */
+export function clearStoredExplanationsInDb(lang: string, text: string, reading: string): number {
+  return clearStoredExplanations(dictionaryDb(), lang, text, reading);
 }
 
 /**

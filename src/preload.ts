@@ -508,6 +508,25 @@ const api = {
     query?: Partial<import('./shared/lexiconNotes').LexiconNoteListQuery>,
   ): Promise<import('./shared/lexiconNotes').LexiconNoteListResult> =>
     ipcRenderer.invoke('dict:noteList', query),
+  /**
+   * The stored explanation of a word, keyed on the word plus the prose language,
+   * the model and the prompt version. `null` means nothing is cached, which is
+   * also what an un-migrated installation answers.
+   */
+  dictExplanationGet: (
+    key: import('./shared/lexiconExplanations').LexiconExplanationKey,
+  ): Promise<import('./shared/lexiconExplanations').LexiconExplanation | null> =>
+    ipcRenderer.invoke('dict:explanationGet', key),
+  dictExplanationSet: (
+    key: import('./shared/lexiconExplanations').LexiconExplanationKey,
+    input: import('./shared/lexiconExplanations').LexiconExplanationInput,
+  ): Promise<{ ok: boolean; explanation: import('./shared/lexiconExplanations').LexiconExplanation | null }> =>
+    ipcRenderer.invoke('dict:explanationSet', key, input),
+  /** Forget this word's explanations across every prose language, model and version. */
+  dictExplanationClear: (
+    identity: import('./shared/lexiconExplanations').LexiconExplanationIdentity,
+  ): Promise<{ ok: boolean; removed: number }> =>
+    ipcRenderer.invoke('dict:explanationClear', identity),
   /** Write every note matching this scope to a CSV file the user picks. */
   dictNoteExport: (
     query?: Partial<import('./shared/lexiconNotes').LexiconNoteExportQuery>,
