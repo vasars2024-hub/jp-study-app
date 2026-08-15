@@ -9,6 +9,7 @@
 // src/shared/apkgParse.ts so it is unit-testable; this file is the I/O shell.
 
 import { ipcMain, dialog, BrowserWindow } from 'electron';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
@@ -20,13 +21,36 @@ import {
   looksLikeUpgradeStub,
   modelsFromNormalizedRows,
   parseModels,
+  stripFieldHtml,
   type ApkgImportResult,
 } from '../../shared/apkgParse';
 import { notesToCards, type ApkgCardsResult, type RawNote } from '../../shared/apkgCards';
+import {
+  ANKI_DRAFT_PAGE_SIZE,
+  buildAnkiDraft,
+  pageAnkiDraft,
+  type ApkgDraftRequest,
+  type ApkgDraftResult,
+} from '../../shared/ankiDraft';
+import { readRawCollection } from './apkgDraftRead';
 import { mt } from '../i18n';
 
 function focusedWindow(): BrowserWindow | undefined {
   return BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
+}
+
+/** The deck file dialog, shared by all three readers so their filters cannot drift. */
+async function pickDeckFile(filePath?: string): Promise<string | null> {
+  if (filePath) return filePath;
+  const win = focusedWindow();
+  const opts = {
+    title: mt('dialog.importAnkiDeck.title'),
+    filters: [{ name: mt('dialog.filter.ankiDeck'), extensions: ['apkg', 'colpkg'] }],
+    properties: ['openFile' as const],
+  };
+  const picked = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts);
+  if (picked.canceled || !picked.filePaths[0]) return null;
+  return picked.filePaths[0];
 }
 
 // ----- sql.js (cached across imports) ----------------------------------------
@@ -249,20 +273,8 @@ function readCards(db: Database): ApkgCardsResult {
 }
 
 async function importApkg(filePath?: string): Promise<ApkgImportResult> {
-  let file = filePath;
-  if (!file) {
-    const win = focusedWindow();
-    const opts = {
-      title: mt('dialog.importAnkiDeck.title'),
-      filters: [{ name: mt('dialog.filter.ankiDeck'), extensions: ['apkg', 'colpkg'] }],
-      properties: ['openFile' as const],
-    };
-    const picked = win
-      ? await dialog.showOpenDialog(win, opts)
-      : await dialog.showOpenDialog(opts);
-    if (picked.canceled || !picked.filePaths[0]) return { ok: false, error: 'cancelled' };
-    file = picked.filePaths[0];
-  }
+  const file = await pickDeckFile(filePath);
+  if (!file) return { ok: false, error: 'cancelled' };
 
   let db: Database | null = null;
   try {
@@ -291,20 +303,8 @@ async function importApkg(filePath?: string): Promise<ApkgImportResult> {
  * database, and that had already been solved and hardened here.
  */
 async function importApkgCards(filePath?: string): Promise<ApkgCardsResult> {
-  let file = filePath;
-  if (!file) {
-    const win = focusedWindow();
-    const opts = {
-      title: mt('dialog.importAnkiDeck.title'),
-      filters: [{ name: mt('dialog.filter.ankiDeck'), extensions: ['apkg', 'colpkg'] }],
-      properties: ['openFile' as const],
-    };
-    const picked = win
-      ? await dialog.showOpenDialog(win, opts)
-      : await dialog.showOpenDialog(opts);
-    if (picked.canceled || !picked.filePaths[0]) return { ok: false, error: 'cancelled' };
-    file = picked.filePaths[0];
-  }
+  const file = await pickDeckFile(filePath);
+  if (!file) return { ok: false, error: 'cancelled' };
 
   let db: Database | null = null;
   try {
@@ -325,7 +325,83 @@ async function importApkgCards(filePath?: string): Promise<ApkgCardsResult> {
   }
 }
 
+/**
+ * Media file names the package carries, or `undefined` when it cannot say.
+ *
+ * The legacy `media` entry is a JSON map of `{"0": "cat.jpg"}` — the numeric key
+ * IS the file's name inside the zip. The newer zstd package stores the same
+ * manifest as protobuf, which is not read here; returning `undefined` then is
+ * deliberate, because the draft only reports missing media when it has a
+ * manifest to check against, and guessing would accuse a complete deck.
+ */
+function readMediaManifest(zip: AdmZip): string[] | undefined {
+  const entry = zip.getEntry('media');
+  if (!entry) return undefined;
+  try {
+    const parsed = JSON.parse(entry.getData().toString('utf8')) as Record<string, unknown>;
+    const names = Object.values(parsed).filter((v): v is string => typeof v === 'string');
+    return names;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Read a deck as a full-fidelity draft — the workbench's reader.
+ *
+ * Sibling of `importApkg`/`importApkgCards`, sharing their zip/zstd/sql.js
+ * ladder. It differs in what it keeps: everything, per `shared/ankiDraft.ts`.
+ * The response is one PAGE of notes, because the whole point of a workbench is
+ * decks too large to hand across IPC in a single message.
+ */
+async function readApkgDraft(request: ApkgDraftRequest = {}): Promise<ApkgDraftResult> {
+  const file = await pickDeckFile(request.filePath);
+  if (!file) return { ok: false, error: 'cancelled' };
+
+  let db: Database | null = null;
+  try {
+    const zip = new AdmZip(file);
+    const bytes = readCollectionBytes(zip);
+    const SQL = await getSql();
+    db = new SQL.Database(bytes);
+
+    const raw = readRawCollection(db, { mediaFiles: readMediaManifest(zip) });
+    const full = buildAnkiDraft(raw, {
+      source: {
+        kind: file.toLowerCase().endsWith('.colpkg') ? 'colpkg' : 'apkg',
+        label: path.basename(file),
+        schemaVersion: raw.col?.ver,
+        createdAtSec: raw.col?.crt,
+        modifiedAtMs: raw.col?.mod,
+        // The collection bytes are what was read, so they are what a later commit
+        // must find unchanged. Hashing the file would also hash its media.
+        fingerprint: `sha1:${crypto.createHash('sha1').update(bytes).digest('hex')}`,
+      },
+      normalize: stripFieldHtml,
+    });
+
+    const offset = Math.max(0, Math.floor(request.noteOffset ?? 0));
+    const limit = request.noteLimit ?? ANKI_DRAFT_PAGE_SIZE;
+    return {
+      ok: true,
+      draft: pageAnkiDraft(full, offset, limit),
+      fileName: path.basename(file),
+      noteOffset: offset,
+      totalNotes: full.counts.notes,
+    };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  } finally {
+    try {
+      db?.close();
+    } catch {
+      /* already closed */
+    }
+  }
+}
+
 export function registerApkgIpc(): void {
   ipcMain.handle('apkg:import', (_e, filePath?: string) => importApkg(filePath));
   ipcMain.handle('apkg:importCards', (_e, filePath?: string) => importApkgCards(filePath));
+  ipcMain.handle('apkg:readDraft', (_e, request?: ApkgDraftRequest) => readApkgDraft(request));
 }

@@ -9,6 +9,7 @@ import {
   decodeCardType,
   deckPath,
   draftIsBlocked,
+  pageAnkiDraft,
   mediaRefsInField,
   type AnkiDraftDiagnosticCode,
   type AnkiDraftSource,
@@ -362,5 +363,49 @@ describe('buildAnkiDraft', () => {
     const draft = build({ notes: [], cards: [], decks: [], noteTypes: [] });
     expect(draft.counts.notes).toBe(0);
     expect(draftIsBlocked(draft)).toBe(false);
+  });
+});
+
+describe('pageAnkiDraft', () => {
+  const many = () => {
+    const raw = fixture();
+    raw.notes = Array.from({ length: 10 }, (_, i) => ({
+      id: 2000 + i,
+      guid: `g${i}`,
+      mid: 200,
+      flds: [`note ${i}`, ''].join(SEP),
+    }));
+    raw.cards = raw.notes.map((n, i) => ({ id: 7000 + i, nid: n.id, did: 2, ord: 0 }));
+    return build(raw);
+  };
+
+  it('windows notes and narrows cards to the notes on the page', () => {
+    const page = pageAnkiDraft(many(), 3, 4);
+    expect(page.notes.map((n) => n.id)).toEqual(['2003', '2004', '2005', '2006']);
+    expect(page.cards.map((c) => c.id)).toEqual(['7003', '7004', '7005', '7006']);
+  });
+
+  it('keeps the header and whole-collection counts, so the deck reports one size', () => {
+    const full = many();
+    const page = pageAnkiDraft(full, 5, 2);
+    expect(page.counts).toEqual(full.counts);
+    expect(page.decks).toEqual(full.decks);
+    expect(page.noteTypes).toEqual(full.noteTypes);
+    expect(page.diagnostics).toEqual(full.diagnostics);
+    expect(page.source).toEqual(full.source);
+  });
+
+  it('empties the review log on a page but keeps absent absent', () => {
+    expect(pageAnkiDraft(many(), 0, 2).reviews).toEqual([]);
+    const raw = fixture();
+    delete raw.revlog;
+    expect(pageAnkiDraft(build(raw), 0, 2).reviews).toBeUndefined();
+  });
+
+  it('clamps a hostile offset and limit rather than allocating on them', () => {
+    expect(pageAnkiDraft(many(), -5, 2).notes.map((n) => n.id)).toEqual(['2000', '2001']);
+    expect(pageAnkiDraft(many(), 0, 0).notes).toHaveLength(1);
+    expect(pageAnkiDraft(many(), 0, 1e9).notes).toHaveLength(10);
+    expect(pageAnkiDraft(many(), 999, 10).notes).toEqual([]);
   });
 });

@@ -462,6 +462,9 @@ declare global {
       dictPitch(term: string, reading?: string): Promise<PitchLookup>;
       importApkg(filePath?: string): Promise<ApkgImportResult>;
       importApkgCards(filePath?: string): Promise<ApkgCardsResult>;
+      readApkgDraft(
+        request?: import('../shared/ankiDraft').ApkgDraftRequest,
+      ): Promise<import('../shared/ankiDraft').ApkgDraftResult>;
       onAnkiIntervalsChanged(cb: (s: IntervalSnapshot) => void): () => void;
       desktopGetLayout(): Promise<DesktopLayoutSnapshot>;
       desktopCommitLayout(

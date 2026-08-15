@@ -233,7 +233,8 @@ export type AnkiDraftDiagnosticCode =
   | 'missing-deck'
   | 'duplicate-guid'
   | 'empty-first-field'
-  | 'review-history-absent';
+  | 'review-history-absent'
+  | 'template-format-unavailable';
 
 export interface AnkiDraftDiagnostic {
   code: AnkiDraftDiagnosticCode;
@@ -347,6 +348,13 @@ export interface RawAnkiNoteTypeRow {
     bafmt?: string;
     did?: string | number | null;
   }>;
+  /**
+   * Set by a reader that could name this note type's templates but could not
+   * read their question/answer formats — schema 18 keeps those in a protobuf
+   * blob. The builder turns it into a blocking diagnostic rather than letting
+   * empty formats look like real ones.
+   */
+  formatsUnavailable?: boolean;
 }
 
 export interface RawAnkiRevlogRow {
@@ -485,6 +493,9 @@ const SEVERITY: Readonly<Record<AnkiDraftDiagnosticCode, AnkiDraftDiagnostic['se
   // Blocking: exporting or committing would write something the source did not say.
   'unknown-note-type': 'blocking',
   'field-count-mismatch': 'blocking',
+  // Blocking too: a template whose qfmt/afmt could not be read would export as a
+  // card that renders blank, and it would look like the user's own edit.
+  'template-format-unavailable': 'blocking',
   // Warning: safe to edit, not safe to assume.
   'missing-media': 'warning',
   'orphan-card': 'warning',
@@ -520,10 +531,16 @@ function diagnostics(): DiagnosticBuilder {
   };
 }
 
-/** Anki's normalized `decks` table stores nesting as 0x1f; the legacy blob uses `::`. */
+/**
+ * Anki's normalized `decks` table separates a deck's ancestors with 0x1f — the
+ * same byte `flds` uses between fields, in an unrelated role — while the legacy
+ * `col.decks` blob writes `::`. A draft can be built from either, so both split.
+ */
+const DECK_PATH_RE = new RegExp(`${String.fromCharCode(0x1f)}|::`);
+
 export function deckPath(name: string): string[] {
   return String(name ?? '')
-    .split(/\x1f|::/)
+    .split(DECK_PATH_RE)
     .map((part) => part.trim())
     .filter(Boolean);
 }
@@ -576,36 +593,39 @@ export function buildAnkiDraft(
   const deckIds = new Set(decks.map((d) => d.id));
 
   // --- note types
-  const noteTypes: AnkiDraftNoteType[] = raw.noteTypes.map((row) => ({
-    id: String(row.id),
-    name: String(row.name ?? ''),
-    kind: Number(row.type ?? 0) === 1 ? 'cloze' : 'standard',
-    css: String(row.css ?? ''),
-    sortFieldOrd: Number(row.sortf ?? 0),
-    latexPre: row.latexPre,
-    latexPost: row.latexPost,
-    fields: [...row.fields]
-      .sort((a, b) => a.ord - b.ord)
-      .map((f) => ({
-        ord: Number(f.ord ?? 0),
-        name: String(f.name ?? ''),
-        sticky: Boolean(f.sticky),
-        rtl: Boolean(f.rtl),
-        font: f.font,
-        fontSize: f.size,
-      })),
-    templates: [...row.templates]
-      .sort((a, b) => a.ord - b.ord)
-      .map((t) => ({
-        ord: Number(t.ord ?? 0),
-        name: String(t.name ?? ''),
-        qfmt: String(t.qfmt ?? ''),
-        afmt: String(t.afmt ?? ''),
-        bqfmt: String(t.bqfmt ?? ''),
-        bafmt: String(t.bafmt ?? ''),
-        deckOverrideId: t.did != null ? String(t.did) : undefined,
-      })),
-  }));
+  const noteTypes: AnkiDraftNoteType[] = raw.noteTypes.map((row) => {
+    if (row.formatsUnavailable) diag.add('template-format-unavailable', String(row.name ?? row.id));
+    return {
+      id: String(row.id),
+      name: String(row.name ?? ''),
+      kind: Number(row.type ?? 0) === 1 ? 'cloze' : 'standard',
+      css: String(row.css ?? ''),
+      sortFieldOrd: Number(row.sortf ?? 0),
+      latexPre: row.latexPre,
+      latexPost: row.latexPost,
+      fields: [...row.fields]
+        .sort((a, b) => a.ord - b.ord)
+        .map((f) => ({
+          ord: Number(f.ord ?? 0),
+          name: String(f.name ?? ''),
+          sticky: Boolean(f.sticky),
+          rtl: Boolean(f.rtl),
+          font: f.font,
+          fontSize: f.size,
+        })),
+      templates: [...row.templates]
+        .sort((a, b) => a.ord - b.ord)
+        .map((t) => ({
+          ord: Number(t.ord ?? 0),
+          name: String(t.name ?? ''),
+          qfmt: String(t.qfmt ?? ''),
+          afmt: String(t.afmt ?? ''),
+          bqfmt: String(t.bqfmt ?? ''),
+          bafmt: String(t.bafmt ?? ''),
+          deckOverrideId: t.did != null ? String(t.did) : undefined,
+        })),
+    };
+  });
   const noteTypeById = new Map(noteTypes.map((nt) => [nt.id, nt]));
 
   // --- cards, grouped by note so a note can list its own
@@ -750,4 +770,53 @@ export function buildAnkiDraft(
 /** True when any diagnostic would stop an export or a live commit. */
 export function draftIsBlocked(draft: AnkiDraft): boolean {
   return draft.diagnostics.some((d) => d.severity === 'blocking');
+}
+
+// ----- paging -------------------------------------------------------------------
+
+/** Notes per page. A 100k-note collection must never cross IPC in one message. */
+export const ANKI_DRAFT_PAGE_SIZE = 500;
+export const ANKI_DRAFT_MAX_PAGE_SIZE = 2000;
+
+/**
+ * One page of notes, with the deck/note-type/diagnostic header intact.
+ *
+ * `counts` keeps describing the WHOLE collection — it is what the header claims
+ * about the source, and recomputing it per page would make the same deck report
+ * a different size depending on which page was open. Only `notes` and `cards`
+ * are windowed, and `cards` is narrowed to the notes on this page so a row can
+ * always render its own cards without a second round trip.
+ */
+export function pageAnkiDraft(draft: AnkiDraft, offset: number, limit: number): AnkiDraft {
+  const start = Math.max(0, Math.floor(offset));
+  const size = Math.min(Math.max(1, Math.floor(limit)), ANKI_DRAFT_MAX_PAGE_SIZE);
+  const notes = draft.notes.slice(start, start + size);
+  const ids = new Set(notes.map((n) => n.id));
+  return {
+    ...draft,
+    notes,
+    cards: draft.cards.filter((c) => ids.has(c.noteId)),
+    // Review history is per-card and unbounded; a page never carries it.
+    reviews: draft.reviews ? [] : undefined,
+  };
+}
+
+// ----- IPC contract ---------------------------------------------------------------
+
+export interface ApkgDraftRequest {
+  /** Skip the OS file dialog when set. */
+  filePath?: string;
+  noteOffset?: number;
+  noteLimit?: number;
+}
+
+export interface ApkgDraftResult {
+  ok: boolean;
+  /** One page: the full header, `counts` for the whole collection, windowed notes/cards. */
+  draft?: AnkiDraft;
+  fileName?: string;
+  /** Where this page starts, and how many notes the collection holds in total. */
+  noteOffset?: number;
+  totalNotes?: number;
+  error?: string;
 }

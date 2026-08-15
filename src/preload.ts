@@ -63,6 +63,7 @@ import type { PitchLookup } from './shared/pitchAccent';
 import type { LexiconInterlinearOptions, LexiconInterlinearResult } from './shared/lexiconInterlinear';
 import type { ApkgImportResult } from './shared/apkgParse';
 import type { ApkgCardsResult } from './shared/apkgCards';
+import type { ApkgDraftRequest, ApkgDraftResult } from './shared/ankiDraft';
 import type {
   AiEngineConfig,
   AiEngineKind,
@@ -569,6 +570,9 @@ const api = {
   /** Parse an Anki .apkg into whole study cards (word/reading/meaning/sentence). */
   importApkgCards: (filePath?: string): Promise<ApkgCardsResult> =>
     ipcRenderer.invoke('apkg:importCards', filePath),
+  /** One page of an .apkg read as a full-fidelity workbench draft. */
+  readApkgDraft: (request?: ApkgDraftRequest): Promise<ApkgDraftResult> =>
+    ipcRenderer.invoke('apkg:readDraft', request),
   dictListYomitan: (): Promise<YomitanDictInfo[]> => ipcRenderer.invoke('dict:listYomitan'),
   dictRemoveYomitan: (id: string): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('dict:removeYomitan', id),
