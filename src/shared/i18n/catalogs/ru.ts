@@ -9543,6 +9543,8 @@ export const ru: Catalog = {
   'ankiWorkbench.preview.problem.missing-media': 'Этого нет в источнике: {detail}.',
   'ankiWorkbench.preview.problem.media-not-rendered':
     'Предпросмотр не загружает медиа: здесь пусто, но в Anki отобразится: {detail}.',
+  'ankiWorkbench.preview.problem.conditional-card-not-generated':
+    'Условие в этом шаблоне ложно для этой заметки, поэтому Anki не создаёт здесь карточку.',
   'ankiWorkbench.preview.problem.empty-first-field': 'Первое поле пусто — Anki определяет по нему дубликаты.',
   'ankiWorkbench.preview.problem.duplicate-first-field': 'У другой заметки такое же первое поле: {detail}.',
   'ankiWorkbench.browser.view': 'Вид',

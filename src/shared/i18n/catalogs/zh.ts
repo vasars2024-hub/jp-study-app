@@ -8698,6 +8698,8 @@ export const zh: Catalog = {
   'ankiWorkbench.preview.problem.missing-media': '此来源不包含：{detail}。',
   'ankiWorkbench.preview.problem.media-not-rendered':
     '预览无法加载媒体，因此这里显示为空白，但在 Anki 中会正常显示：{detail}。',
+  'ankiWorkbench.preview.problem.conditional-card-not-generated':
+    '此模板的条件对该笔记为假，因此 Anki 不会在这里生成卡片。',
   'ankiWorkbench.preview.problem.empty-first-field': '第一个字段为空，Anki 用它检测重复。',
   'ankiWorkbench.preview.problem.duplicate-first-field': '另一条笔记的第一个字段相同：{detail}。',
   'ankiWorkbench.browser.view': '视图',

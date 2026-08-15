@@ -9163,6 +9163,8 @@ export const en: Catalog = {
   'ankiWorkbench.preview.problem.missing-media': 'This source does not contain: {detail}.',
   'ankiWorkbench.preview.problem.media-not-rendered':
     'The preview cannot load media, so this renders blank here but not in Anki: {detail}.',
+  'ankiWorkbench.preview.problem.conditional-card-not-generated':
+    'A conditional in this template is false for this note, so Anki generates no card here.',
   'ankiWorkbench.preview.problem.empty-first-field': 'The first field is empty; Anki uses it to detect duplicates.',
   'ankiWorkbench.preview.problem.duplicate-first-field': 'Another note has the same first field: {detail}.',
   'ankiWorkbench.browser.view': 'View',

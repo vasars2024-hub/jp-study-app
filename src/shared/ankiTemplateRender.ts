@@ -62,6 +62,12 @@ export type AnkiRenderProblemCode =
    * `ADVISORY_RENDER_PROBLEMS`.
    */
   | 'media-not-rendered'
+  /**
+   * The question rendered empty because a conditional in the template is false
+   * for this note, so Anki generates **no card here at all**. Advisory: this is
+   * the design working, not a blank card — see `ADVISORY_RENDER_PROBLEMS`.
+   */
+  | 'conditional-card-not-generated'
   /** The note's first field is empty; Anki treats it as the duplicate key. */
   | 'empty-first-field'
   /** Another note in this deck has the same first field. */
@@ -85,6 +91,7 @@ export interface AnkiRenderProblem {
  */
 export const ADVISORY_RENDER_PROBLEMS: ReadonlySet<AnkiRenderProblemCode> = new Set([
   'media-not-rendered',
+  'conditional-card-not-generated',
 ]);
 
 export interface RenderedAnkiCard {
@@ -518,8 +525,25 @@ export function renderAnkiCard(
   const answerFormat = String(template?.afmt ?? '').replace(/\{\{FrontSide\}\}/g, questionHtml);
   const answerHtml = renderFormat(answerFormat, { ...base, side: 'answer' });
 
-  if (fieldIsEmpty(questionHtml)) report({ code: 'empty-question', side: 'question' });
-  if (fieldIsEmpty(answerHtml)) report({ code: 'empty-answer', side: 'answer' });
+  // An empty question means Anki generates no card — but *why* it is empty is
+  // the difference between a defect and a design. A qfmt with no conditional
+  // that renders blank is a broken card the user must fix; a qfmt gated on
+  // `{{#Add Reverse}}` that renders blank is the optional-reverse design
+  // working exactly as asked, and calling that "blank question" would make
+  // every unflagged note in the deck read as a failure.
+  const questionIsConditional = SECTION_RE.test(String(template?.qfmt ?? ''));
+  if (fieldIsEmpty(questionHtml)) {
+    if (questionIsConditional) {
+      report({ code: 'conditional-card-not-generated', side: 'question' });
+    } else {
+      report({ code: 'empty-question', side: 'question' });
+    }
+  }
+  // A card that is not generated has no answer to be blank. Reporting one
+  // would be a second failure line for a card that does not exist.
+  if (fieldIsEmpty(answerHtml) && !(questionIsConditional && fieldIsEmpty(questionHtml))) {
+    report({ code: 'empty-answer', side: 'answer' });
+  }
 
   if (noteType.kind === 'cloze' && clozeOrdinalsOfNote(note).length === 0) {
     report({ code: 'cloze-without-markers', side: 'note' });
