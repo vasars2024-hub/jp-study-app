@@ -21088,3 +21088,55 @@ committed HEAD for reasons owned by other tracks — boss-audit finding 2). i18n
 exit 0. architecture exit 0, **Nothing new**, 2 known pending. eslint on all 7 touched paths
 exit **0**. Targeted: 190 passed across the 7 dictionary suites. Full `npx vitest run` recorded
 in the handoff.
+
+## Track 2 — the kana cross references, and a reference you can follow — 2026-08-15 07:15 MSK primary
+
+No interrupted slice. Boss audit finding 1 was already closed by `4c7b416`; findings 4 and 5
+were still open and rode with this dictionary work as the audit suggested.
+
+**Slice 1 — `b0c6a13`. The reading probe.** `findLexiconXrefs` resolved targets against `norm`
+only, so `see: やけ` from 自棄糞 — やけ being the *reading* of 自棄 and nobody's `norm` — rendered
+"not in your dictionaries" over a word `lookup` reaches through its own `byReading`. Second
+batched equality over whatever the first did not place, unioned into the same set, scoped to the
+langs the headword probe already returned (`idx_hw_reading` leads on `lang`; without the equality
+`INDEXED BY` has no query solution). No migration, no new index.
+**The previous entry's 24.7% estimate was wrong and is retracted.** It counted targets that *are*
+bare kana, not targets a norm probe cannot place — most kana targets are also kana headwords.
+Real numbers, systematic every-4th sample of the 27,534 distinct (lang,target) pairs behind
+53,089 xref rows: 6,000 sampled → 5,875 already resolved by norm, **125 (2.1%) newly resolved by
+reading, 0 left unresolved**. Smaller share than predicted, larger effect: the false marker is
+now gone entirely on this install. (A full sweep is I/O-bound at minutes — each probe is a random
+seek into a 378 MB B-tree — hence the sample; 1,500 and 6,000 agree to 0.1 pt.)
+
+**Slice 2 — `c7803b6`. The column's one navigation seam.** `DictionaryResults` takes an optional
+`onLookup(word)`; `DictionaryView` answers it by filling the box *and* firing the search, keeping
+the current language (unlike `openNotedWord` — the target was resolved inside this language's
+partition by the panel that offered it). Only a `resolved` target becomes a control, and only
+where a host passed the callback: the popup is a glance surface and Translate's query is the
+user's own text, so both pass nothing and every target stays a plain label there.
+**Live acceptance, own `npm start`, bridge pid 27464-launched:** searching 自棄糞 rendered やけ as
+the single `.lexicon-xrefs-link`, tooltip "Найти やけ" (RU, so the i18n×4 is wired, not just
+key-counted); clicking it set the box to やけ and landed on headword **自棄** — reachable only
+because slice 1 resolves it. Both slices verified in one gesture.
+
+**Slice 3 — `09ed4ca`. Audit findings 4(b) and 5.** `setDictionarySourceLang` deleted: no
+non-test caller ever existed, and it was a second unguarded way onto a 7.2 s write transaction
+from any thread. Suite drives `runSourceLangRelabel` directly and now also asserts `changed`,
+which the wrapper discarded. 4(b): only `counts.characters` is `.changes`; the other four are
+`count(*)` after the move — comment reworded. 4(a) is a commit message and cannot be edited:
+`08714f6`'s "three nearest suites green (47 tests)" needs **four** suites to reach 47.
+
+**Traps.** `/eval` mangles non-ASCII: drive the search box with `\uXXXX` escapes. The four i18n
+catalogs and `DictionaryView.tsx` carry another track's unstaged pass — staged as reconstructed
+HEAD+edit blobs (catalogs show +1/-0), commit re-checked in a detached worktree.
+
+**Gates**, on the shared tree — which carries ~426 foreign status entries, so this is *not* a
+statement about committed HEAD in isolation (boss-audit findings 2 and 3): `npx vitest run`
+**612 passed / 1 skipped files, 8,113 passed / 6 skipped**, exit 0. i18n exit 0 at **9,584**
+keys. architecture exit 0, **Nothing new**, 2 known pending. eslint exit 0 on all 12 touched
+paths.
+
+**Deliberately open.** (1) `collocations` and `audio` are the last v1 tables with no writer.
+(2) The sibling panels (etymology, compounds, neighbours, examples) can take `onLookup` now that
+the seam exists; none does yet. (3) Step 11's 3.2 s stays on the main thread at first dictionary
+use after upgrade, for the reason recorded two entries ago.
