@@ -322,6 +322,42 @@ acquisition from a MAL page, end to end, ending in cues that render in the playe
 same path a jimaku subtitle takes. This downloads from a public swarm on the user's own
 connection. **Never run it unattended, and never inside an automated suite.**
 
+**Progress 2026-08-15 23:35 (`primary`). P6 gates 22–28 and 30 measured; two were failing.**
+`98ee9c6f`. Every number below is from the running app, not a suite.
+
+| # | state | result |
+| --- | --- | --- |
+| 22 | not running (port 8123, nothing listening) | `unreachable`, `connect ECONNREFUSED 127.0.0.1:8123`, **53 ms** |
+| 23 | WebUI disabled | **identical at the wire to 22** — the port is simply closed. Its real requirement holds: not a timeout. Discriminator measured against a listener that accepts and never answers → `Timed out after 12000ms.` at **12,114 ms** |
+| 24 | wrong password | **WAS FAILING** → now `unauthorized`, "The username or password was rejected.", **14 ms** |
+| 25 | wrong API key | `unauthorized`, "qBittorrent rejected the API key.", **189 ms**, real daemon, exactly 1 request |
+| 26 | unreachable host (192.0.2.1) | `unreachable`, `read ECONNRESET`, **11,140 ms** |
+| 27 | savePath unreadable | `nyaaAvailability` → its own `qbit-remote` reason, with the readable path passing as control |
+| 28 | disk full mid-transfer | **WAS FAILING** → now names the error state on the first poll |
+| 29 | quit mid-acquisition | **HALF OPEN** — see below |
+| 30 | same episode twice | the preexisting-torrent branch, proven both ways |
+
+- **Gate 24 was the first defect.** qBittorrent 5.2.3 answers **401** to a bad login; the client
+  knew only the older `200 Ok./Fails.` pair, so 401 fell through to the generic non-200 branch and
+  every wrong password read `unreachable` — telling the user to check a host and port that were
+  both correct. The stand-in server encoded the same stale contract, which is exactly why 37 green
+  tests never saw it. Both are fixed; the new test asserts the message is *not* "answered 401".
+- **Gate 28 was the second.** `qbitAwaitFiles` polled file progress and nothing else, so a disk
+  that filled mid-transfer was indistinguishable from a slow swarm: `FETCH_TIMEOUT_MS` is **5
+  minutes**, and at the end of it the user was told it timed out. It now reads the torrent state
+  each poll. **Mutation control:** with the state check disabled the suite runs **42,146 ms with 2
+  failures**; with it, **3,610 ms, 14 passed**. `stalledDL` still waits — the control that stops a
+  slow swarm being called a failure.
+- **Gate 29 is half open, and is not being called a pass.** "The torrent is gone from the client"
+  now reports itself honestly. The other half — that an app quit mid-acquisition leaves no
+  half-registered `SubtitleRecord` — needs a real acquisition to interrupt, which is **gate 31,
+  attended only**. Do not claim 29 until that runs.
+- **The daemon-side probes had a budget.** qBittorrent bans an IP for an hour after 5 failed
+  logins (no `MaxAuthenticationFailCount` in the ini, so the default applies). Three were spent
+  proving the defect; gate 24's *fix* was therefore verified by replaying the daemon's own 401
+  from `debug/qbit-count-proxy.cjs`, and gate 1 was re-run afterwards — still `connected`, 5.2.3,
+  **4 ms**, so nothing was banned.
+
 ### P7 — the whole flow, once, as a user
 
 **Gate 32.** From a MAL page: pick a title, choose a range, harvest subtitles, mine vocab, land

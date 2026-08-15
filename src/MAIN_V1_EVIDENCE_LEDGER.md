@@ -22403,3 +22403,35 @@ reads it back, and the app has no channel that could.
   file every request — deleting the file does not reset the count. Diff, or restart it.
 
 **Next: P6 contingency gates 22–30**, which gate 1 was the blocker for.
+
+## 2026-08-15 23:40 — mal-pipeline P6: two contingencies that were lying, found by probing not by testing
+
+`98ee9c6f`. Gates 22–28 and 30 measured live against the real daemon, a closed port, a
+black-hole listener and `debug/qbit-count-proxy.cjs`. Full table in
+`src/MAL_ANIME_PIPELINE_PLAN.md` under P6.
+
+- **Gate 24 was failing.** qBittorrent **5.2.3 answers 401** to a bad login. `login()` knew only
+  the 4.x `200 Ok./Fails.` contract, so 401 hit the generic non-200 branch and reported
+  `unreachable` — "check your host and port" for a credential problem. The stand-in server in
+  `scraperQbittorrent.test.ts` encoded the same stale contract, which is why **37 green tests**
+  never caught it. Fixed; the new test also asserts the message is *not* "answered 401".
+- **Gate 28 was failing.** `qbitAwaitFiles` polled file progress only, so a disk that filled
+  mid-transfer looked exactly like a slow swarm: `FETCH_TIMEOUT_MS` is **5 minutes** and the user
+  was then told it "timed out". It now reads the torrent state each poll and names the error, and
+  reports separately when the torrent has left the client. **Mutation control:** state check
+  disabled → **42,146 ms, 2 failed**; restored → **3,610 ms, 14 passed**, source byte-identical
+  (`-ceq`). `stalledDL` still waits, which is the control against calling a slow swarm a failure.
+- **Gate 23 has no distinct wire signature and is not given one.** A disabled WebUI and a stopped
+  qBittorrent both leave the port closed: `ECONNREFUSED` at **53 ms** either way. The gate's real
+  demand — never a timeout — holds, and the discriminator was measured: a listener that accepts
+  and never answers times out at **12,114 ms**.
+- **Gate 29 is half open. Do not mark it passed.** "Torrent gone from the client" reports
+  honestly now; "an app quit leaves no half-registered `SubtitleRecord`" needs a real acquisition
+  to interrupt, i.e. **gate 31, attended only**.
+- **Trap: the daemon-side probe budget is 5.** qBittorrent bans the IP for an hour after five
+  failed logins and the ini sets no override. Three were spent proving gate 24; its *fix* was
+  verified by replaying the daemon's own 401 through the proxy, then gate 1 was re-run — still
+  `connected`, 5.2.3, **4 ms**. Budget your wrong-credential probes the same way.
+
+**Next: P4 gates 14–17** — a MAL title through `subtitleHarvestList`, a real episode range, cues
+counted per episode, and gate 17 with qBittorrent disabled entirely.
