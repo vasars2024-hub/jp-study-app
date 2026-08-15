@@ -27,6 +27,7 @@ import {
   evaluateEpisode,
   evaluateTrack,
   fusionClaimSentence,
+  fusionModeFromArbitration,
   fusionShipGate,
   overlapSeconds,
   FUSION_GATE_MIN_EPISODES,
@@ -338,5 +339,63 @@ describe('fusionShipGate', () => {
     expect(gate.passed).toBe(false);
     expect(gate.reasons[0]).toMatch(/ep2: fused CER \d\.\d{4} is worse than whisperOnly \d\.\d{4}/);
     expect(gate.claim).toBe('none');
+  });
+});
+
+/**
+ * `--mode arbitrated` was an assertion with nothing behind it, and it was wrong on
+ * a real run: episode 1 was graded arbitrated after F5 sent its one batch, got it
+ * back unusable, and applied zero verdicts. Grading that strictly tests whether the
+ * arbiter ran; quoting `beats-both` off it is the false claim the mode split exists
+ * to prevent.
+ */
+describe('fusionModeFromArbitration', () => {
+  it('is arbitrated only when the arbiter ran AND changed something', () => {
+    expect(fusionModeFromArbitration({ applied: 22, skipped: null })).toBe('arbitrated');
+  });
+
+  it('is offline when a configured arbiter applied nothing — the case that fooled the gate', () => {
+    // The exact shape episode 1 wrote: a key was present, one batch went out, and
+    // it came back unusable. No text changed, so this is the offline pipeline.
+    expect(fusionModeFromArbitration({ applied: 0, skipped: null })).toBe('offline');
+  });
+
+  it('is offline for every skip reason', () => {
+    for (const skipped of ['no-key', 'no-candidates', 'cancelled'] as const) {
+      expect(fusionModeFromArbitration({ applied: 0, skipped })).toBe('offline');
+    }
+    // Even a nonzero count cannot license the strong claim against a skip: the two
+    // disagree, and the weaker reading is the safe one.
+    expect(fusionModeFromArbitration({ applied: 5, skipped: 'cancelled' })).toBe('offline');
+  });
+
+  it('is offline when there is no summary to testify', () => {
+    // A sidecar written before the `arbitration` field existed. "Cannot testify"
+    // must not read as "testifies arbitrated".
+    expect(fusionModeFromArbitration(undefined)).toBe('offline');
+    expect(fusionModeFromArbitration(null)).toBe('offline');
+  });
+
+  it('downgrades a would-be beats-both run to no-regression, end to end', () => {
+    // Two episodes a strict grading passes. Reading their sidecars turns one
+    // offline, and the gate's claim shrinks with it rather than the run failing.
+    const reference = [cue(0, 2, 'ねこがすきです'), cue(2, 4, 'はしをわたります')];
+    const candidates = {
+      fused: [cue(0, 2, 'ねこがすきです'), cue(2, 4, 'はしをわたります')],
+      whisperOnly: [cue(0, 2, 'ねこがすきです'), cue(2, 4, 'はしをわたりません')],
+      mtOnly: [cue(0, 2, 'ねこはすきではない'), cue(2, 4, 'かわをわたります')],
+    };
+    const claimed: EpisodeVerdict[] = [
+      evaluateEpisode('ep1', reference, candidates, 'arbitrated'),
+      evaluateEpisode('ep2', reference, candidates, 'arbitrated'),
+    ];
+    expect(fusionShipGate(claimed)).toMatchObject({ passed: true, claim: 'beats-both' });
+
+    const evidenced: EpisodeVerdict[] = [
+      evaluateEpisode('ep1', reference, candidates, fusionModeFromArbitration({ applied: 22, skipped: null })),
+      // The failed-arbiter episode, regraded from its own record.
+      evaluateEpisode('ep2', reference, candidates, fusionModeFromArbitration({ applied: 0, skipped: null })),
+    ];
+    expect(fusionShipGate(evidenced)).toMatchObject({ passed: true, claim: 'no-regression' });
   });
 });

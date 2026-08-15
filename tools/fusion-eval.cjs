@@ -25,15 +25,21 @@
  * esbuild exactly as tools/grammar-audit.cjs does it, not a second implementation
  * that can drift from the one the product uses.
  *
+ * `--mode` alone is an operator's assertion, and it has been wrong: an episode was
+ * graded `arbitrated` after F5 applied zero verdicts. Pass `--meta` with the fused
+ * track's `.meta.json` sidecar and the gate reads the mode out of the run's own
+ * record instead. Evidence only ever downgrades — see `applyMetaMode`.
+ *
  * Usage:
  *   node tools/fusion-eval.cjs --manifest <path.json> [--json] [--out <path>]
  *   node tools/fusion-eval.cjs --episode <name> --reference a.srt --fused b.srt \
- *        --whisper c.srt --mt d.srt [--mode offline|arbitrated]   (repeatable)
+ *        --whisper c.srt --mt d.srt [--mode offline|arbitrated] [--meta e.meta.json]
+ *        (repeatable)
  *
  * Manifest shape:
  *   { "episodes": [ { "name": "...", "reference": "...", "fused": "...",
  *                     "whisperOnly": "...", "mtOnly": "...",
- *                     "mode": "offline" | "arbitrated" } ] }
+ *                     "mode": "offline" | "arbitrated", "meta": "..." } ] }
  * Relative paths resolve against the manifest's own directory.
  *
  * Exit code is the gate: 0 when it passes, 1 when it fails or the inputs are
@@ -85,6 +91,9 @@ function parseArgs(argv) {
     } else if (arg === '--mode') {
       if (!pending) throw new Error('--mode must follow an --episode');
       pending.mode = readMode(next());
+    } else if (arg === '--meta') {
+      if (!pending) throw new Error('--meta must follow an --episode');
+      pending.meta = next();
     } else throw new Error(`unknown argument ${arg}`);
   }
   return out;
@@ -115,7 +124,43 @@ function readEpisodes(args) {
     whisperOnly: path.resolve(base, entry.whisperOnly),
     mtOnly: path.resolve(base, entry.mtOnly),
     mode: readMode(entry.mode),
+    ...(entry.meta ? { meta: path.resolve(base, entry.meta) } : {}),
   })).concat(args.episodes);
+}
+
+/**
+ * Decide the mode from the fused track's own sidecar rather than from what the
+ * operator typed.
+ *
+ * `--mode` was an assertion, and on a real run it was wrong: an episode was
+ * graded `arbitrated` after F5 sent its one batch, got it back unusable and
+ * applied zero verdicts. The sidecar has said which since the `arbitration`
+ * field landed, so the gate reads it.
+ *
+ * Evidence only ever *downgrades*: a missing, unreadable or field-less sidecar
+ * leaves `--mode` alone, because "cannot testify" is not "testifies offline",
+ * and an operator who says `offline` about an arbitrated run is understating,
+ * which the gate is free to accept. Returns the note to print, or null.
+ */
+function applyMetaMode(episode) {
+  if (!episode.meta) return null;
+  let summary;
+  try {
+    summary = JSON.parse(fs.readFileSync(episode.meta, 'utf8')).arbitration;
+  } catch (error) {
+    throw new Error(`could not read --meta ${episode.meta}: ${error.message}`);
+  }
+  if (!summary) return null;
+  const derived = evalCore.fusionModeFromArbitration(summary);
+  const claimed = readMode(episode.mode);
+  episode.mode = derived === 'arbitrated' ? claimed : derived;
+  if (claimed === 'arbitrated' && derived === 'offline') {
+    return `${episode.name}: graded OFFLINE despite --mode arbitrated — the sidecar reports `
+      + `applied=${summary.applied ?? 0}, skipped=${JSON.stringify(summary.skipped ?? null)}`
+      + `${summary.failures ? `, failures=${JSON.stringify(summary.failures)}` : ''}. `
+      + 'Arbitration changed no text, so this run is the offline pipeline.';
+  }
+  return null;
 }
 
 const REQUIRED = ['reference', 'fused', 'whisperOnly', 'mtOnly'];
@@ -151,6 +196,7 @@ function main() {
   }
 
   const verdicts = [];
+  const modeNotes = [];
   for (const episode of episodes) {
     const missing = REQUIRED.filter((key) => !episode[key]);
     if (missing.length) {
@@ -158,6 +204,8 @@ function main() {
       return 1;
     }
     try {
+      const note = applyMetaMode(episode);
+      if (note) modeNotes.push(note);
       verdicts.push(evalCore.evaluateEpisode(
         episode.name,
         loadTrack(episode.reference, 'reference'),
@@ -175,11 +223,21 @@ function main() {
   }
 
   const gate = evalCore.fusionShipGate(verdicts);
-  if (args.out) fs.writeFileSync(args.out, `${JSON.stringify(gate, null, 2)}\n`, 'utf8');
+  if (args.out) {
+    fs.writeFileSync(
+      args.out,
+      `${JSON.stringify(modeNotes.length ? { ...gate, modeNotes } : gate, null, 2)}\n`,
+      'utf8',
+    );
+  }
   if (args.json) {
-    console.log(JSON.stringify(gate, null, 2));
+    console.log(JSON.stringify(modeNotes.length ? { ...gate, modeNotes } : gate, null, 2));
     return gate.passed ? 0 : 1;
   }
+
+  // Before the numbers, not after: a reader who stops at the CER table must not
+  // miss that an episode was regraded out from under the mode they asked for.
+  for (const note of modeNotes) console.log(`fusion-eval: ${note}`);
 
   const pct = (value) => `${(value * 100).toFixed(2)}%`;
   for (const verdict of gate.episodes) {

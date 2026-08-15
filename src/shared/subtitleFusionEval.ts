@@ -25,6 +25,7 @@
  */
 
 import { normalizeForFusionCompare } from './subtitleFusionCore';
+import type { FusionArbitrationSummary } from './subtitleFusionMeta';
 
 /** A timed line from any track — reference or candidate. */
 export interface EvalCue {
@@ -192,6 +193,29 @@ export function evaluateTrack(
  * arbiter ran.
  */
 export type FusionEvalMode = 'offline' | 'arbitrated';
+
+/**
+ * The mode an episode's own sidecar licenses, as opposed to the one the operator
+ * typed on the command line.
+ *
+ * `--mode arbitrated` was an assertion with nothing behind it, and the assertion
+ * was wrong on a real run: episode 1 was graded arbitrated after F5 sent its one
+ * batch, got it back unusable and applied **zero** verdicts. A run where
+ * arbitration contributed no text is the offline pipeline, whatever configuration
+ * it had — grading it strictly tests whether the arbiter ran, and quoting
+ * `beats-both` off it is the exact false claim the mode split exists to stop.
+ *
+ * So: `arbitrated` requires the arbiter to have both run (`skipped === null`) and
+ * changed something (`applied > 0`). Absent summary means a sidecar written
+ * before the field existed, which cannot testify either way and therefore does
+ * not license the stronger claim.
+ */
+export function fusionModeFromArbitration(
+  summary?: Pick<FusionArbitrationSummary, 'applied' | 'skipped'> | null,
+): FusionEvalMode {
+  if (!summary || summary.skipped !== null) return 'offline';
+  return summary.applied > 0 ? 'arbitrated' : 'offline';
+}
 
 /** A baseline (or the coverage rule) the fused track failed, named for the report. */
 export type FusionLoss = 'whisperOnly' | 'mtOnly' | 'coverage';
