@@ -262,7 +262,8 @@ Partial failure must identify exactly what committed, what failed, and what can 
 - Deliver field/template swap, dictionary enrichment, reviewed AI additions, translation, text normalization, frequency rules, known-word exclusion, mastery mappings, card-design presets, and the first ten smart recipes.
 - Require explicit missing-frequency, conflicting-known-state, provider, privacy, and overwrite choices.
 - Shipped: field swap and field-to-field copy as tray kinds (`swap-fields`, `copy-field`; the copy has no default conflict rule, and `overwrite` counts every note whose destination already held text), and `shared/ankiTextNormalize.ts` (five individually chosen ops in one canonical running order, never touching cloze markers or `[sound:…]`).
-- Next in this phase: frequency rules and known-word exclusion — the vocabulary data plumbing (rank lookup for a draft, local/Anki known state) before the `freq:`/`known:` predicates, which must refuse rather than match-all when no context is available.
+- Shipped: frequency rules and known-word exclusion — `shared/ankiVocabContext.ts` (word field, headword, rank, known state; three absences kept distinct), `freq:`/`known:` Browser predicates that **refuse naming the token** when no vocabulary context exists, a batched `dict:frequencyRanks` reader, and a visible local/Anki precedence picker. Gate 4 passes live on the 3,221-note local deck; **gate 3 is blocked on data, not code** — `freq_corpora` is empty until a frequency dictionary is imported (`needs-user.md`, 2026-08-15 17:20).
+- Next in this phase: dictionary enrichment and reviewed AI additions (gates 11 and 12), then mastery mappings and card-design presets.
 
 ### Phase 5 — Anki core editing parity
 

@@ -22087,3 +22087,48 @@ vocabulary context is supplied, with an explicit missing-frequency policy and an
 local/Anki precedence — but the data plumbing (rank lookup for a whole draft through the lexicon
 DB, and local known-state from `renderer/knownWords.ts`) is its own slice and must land first or
 the predicates can only ever refuse.
+
+## 2026-08-15 20:30 primary — Track 7 Phase 4: frequency rules and known-word exclusion
+
+Three slices: `5450031` the vocabulary facts, `68b1e83` the predicates, `cb65c80` the wiring.
+
+**`5450031` — `shared/ankiVocabContext.ts`.** Which field holds the word (an ordered candidate
+list matched exactly, never by substring: `Word Audio` is not the word; no candidate means the
+note type declares none, and falling back to field 0 would rank every sentence deck's *meaning*),
+the headword inside it (first whitespace run, refused past `MAX_FREQUENCY_QUERY_CHARS`), its rank,
+and its known state. Three absences stay distinct. **Anki-known = every card of the note is
+`review`/`relearning` past 21 days** — *every*, because a note whose reverse card is still new is
+one the user is still learning. A source with no data does not vote; precedence resolves a real
+disagreement only.
+
+**`68b1e83` — the predicates.** `freq:<=5000`, `freq:veryCommon|common|uncommon|rare`,
+`freq:none`, `freq:noword`, `known:yes|no|local|anki|both|conflict|none`. With no context the
+token is a **parse** refusal (`no-vocab-context`, i18n in four languages), decided before the
+value is even read — a wrong-value message would send the user to fix a query that is already
+right. A band is a **closed range**, so the four bands partition rather than nest.
+
+**`cb65c80` — the wiring.** `findLexiconFrequencyRanks` (one statement per 400 words, `min(rank)`
+by SQLite, `IN` on `norm` with no `indexed by` so the planner may scan the index once instead of
+seeking 400 times) then `dict:frequencyRanks`, `window.api.dictFrequencyRanks`, and a
+`VocabContext` the Browser rebuilds when the draft, the ranks, the precedence or the knowledge
+store changes. `getLevel` returning 0 for a never-seen word is **dropped, not recorded**, or
+"never asked" would become "not known" for the entire deck.
+
+**Live, restarted dev app (pid 37360 — the old main had no handler; confirmed by invoking it and
+getting `No handler registered`), anki popout, local deck, 3,221 notes.** `freq:none` **3,220**,
+`freq:noword` **1** — an exact partition, and correct: `freq_corpora` holds **0 rows** on this
+install, so nothing can be ranked. `freq:<=5000` and `freq:veryCommon` **0**. `freq:banana` and
+`known:maybe` refuse naming the token. Known state, with one level-3 entry seeded into an empty
+`jp-word-knowledge-ja` and restored to `null` afterwards (verified identical): `known:local` **2**,
+`known:conflict` **2** (local says known, Anki says not mature), `known:yes` **2**, `known:no`
+**3,219** — 2 + 3,219 = 3,221. Flipping the picker to `anki`: `known:yes` **0**, `known:no`
+**3,221**. The precedence picker renders all four options in EN.
+
+**Gate 3 is blocked on data, not code**: with no frequency corpus imported every rank is `null`,
+so "filter rank <= 5,000 and map to Very good" cannot be *shown* with real numbers. Already listed
+in `needs-user.md` (2026-08-15 17:20); nothing new to add. Gate 4 passes live.
+
+**Trap:** the running Electron main does **not** pick up a new `ipcMain.handle` — the preload
+binding appears after a window reload and then rejects with `No handler registered`, which reads
+like a wiring bug and is not one. Restart the dev app (`npm start`) before probing a new channel.
+Second: this profile renders the workbench in **English**, not the Russian the 19:46 probes used.
