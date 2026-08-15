@@ -22245,3 +22245,50 @@ new**, 2 pending. `eslint` on 6 paths: **0 errors** (7 pre-existing `no-explicit
 **Staging note:** `src/preload.ts` and `src/renderer/window.d.ts` carry other tracks' hunks. Both
 were committed as reconstructed HEAD + my insert via `hash-object --no-filters`; their working-
 tree state is untouched.
+
+## 2026-08-15 22:30 — `primary` — mal-pipeline P2 closes: the list was quietly two sizes too small
+
+Picked up `backup`'s interrupted turn. Its `626f2354` (derivatives walk) had landed clean two
+minutes before the usage limit; only the bookkeeping was missing. Verified it live rather than
+trusting it, then measured P2's remaining gates — and two of the four failed.
+
+**Gate 6 failed, `9107e1bd`.** `malFetchList()` returned n=2000, pages=20, `truncated:true`.
+`MAX_PAGES` 20 × `PAGE_SIZE` 100 = exactly 2,000: the cap was ending the walk, not MAL. The
+negative control that made it undeniable was the same account's `completed`-only walk, which
+finishes naturally at 15 pages and reported 1,414 completed where the capped walk had seen
+1,332 — 82 completed shows lost before the library or the miner ever saw them. Cap → 200, plus
+a stop on a cursor that returns zero entries (at 200 pages that would be 200 requests on the
+user's quota buying nothing). Re-measured after a full restart: **2,144 entries, 2,144 unique,
+22 pages, truncated false**.
+
+**Gate 7 passed and was still wrong, `066a3630`.** The filtered walk returned 1,414 entries,
+every one `completed` — the gate as written passes. The set difference against the full walk is
+what caught it: 12 ids only in the full walk, 0 only in the filtered, and **all 12 had
+`is_rewatching:true`**. MAL's `status=completed` silently omits what the user is currently
+rewatching, which is the best study material on the list. `fetchAnimeList` now filters on the
+parsed status client-side. Live after: **1,426 entries, all completed, 12 rewatching**.
+**Tradeoff:** a filtered read costs the whole list, 22 pages vs 15 — seven extra requests to
+stop losing twelve titles. Reversible in one line.
+
+**Gate 8 passed, verified not assumed.** Seed 5081 Bakemonogatari, depth 2, budget 40:
+11 derivatives, 11 unique, 6 requests, truncated false, seed absent from its own output.
+sequel 3 / prequel 3 / summary 2 / side_story 1 / alternative_version 1 / parent_story 1.
+
+**Gate 9 passed** in `626f2354` — a `paging.next` at `evil.invalid` ends the walk after 1 request.
+
+**Findings the next worker must not rediscover.**
+1. A status assertion cannot detect a filter that under-returns. Only the set difference against
+   the unfiltered walk can. Every filter gate in this plan needs the same shape.
+2. MAL's `status=` query is not "the filter, server-side" — it is the filter minus rewatches,
+   and nothing in the response says so. P3 must not reach for it as an optimisation.
+3. A main-process constant change needs a **full app restart**; Forge did not restart main on
+   edit, and the first re-measurement ran against the old cap still resident in pid 37848.
+
+**Negative controls.** MAX_PAGES back to 20 → the new paging test fails, 1 failed / 46 passed.
+Server-side filter restored → both new filter tests fail, 2 failed / 47 passed. As committed,
+49/49.
+
+**Staging note:** `src/main/malSync.ts` and `src/main/__tests__/malSync.test.ts` both carry
+another track's hunks (the MAL-7 profile-identity work). Both commits are reconstructed
+HEAD + my edit via `hash-object --no-filters`; `9107e1bd` was checked out in a detached
+worktree and ran 68/68 before I trusted it. Working-tree state left exactly as found.

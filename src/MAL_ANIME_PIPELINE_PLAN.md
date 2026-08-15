@@ -143,6 +143,37 @@ the user's real MAL profile. 7. A `completed`-filtered fetch returns only comple
 `paging.next` that is not a MAL API URL still ends the walk (`malSync.ts:846-874` — assert the
 guard, do not merely trust it).
 
+**Progress 2026-08-15 22:30 (`primary`). P2 CLOSES — all four gates pass live on the user's
+own account (`Asmilov`, default profile).** Two of them failed first and were fixed here.
+
+- **Gate 6 PASSES** — `9107e1bd`. It **failed** on first measurement: `malFetchList()` returned
+  n=**2000**, pages=**20**, `truncated:true`. `MAX_PAGES` was 20 and `PAGE_SIZE` 100, so the cap
+  was the terminator, not MAL running out of cursor. Cap → 200 (20,000 entries, past any real
+  list); a page carrying a cursor but zero entries now also stops the walk. Re-measured after a
+  full app restart: n=**2144**, uniq=**2144**, pages=**22**, `truncated:false`.
+- **Gate 7 PASSES** — `066a3630`, and it hid a second defect that a status assertion alone would
+  have waved through. The server-filtered walk returned **1,414** entries, every one `completed`
+  — gate 7 as written passed. The **set difference** against the full walk did not: **12** ids
+  only in the full walk, **0** only in the filtered one, and **all 12 had `is_rewatching:true`**
+  (Bakemonogatari, Kiseijuu, Hibike! Euphonium, Byousoku 5 Centimeter …). MAL's own
+  `status=completed` omits what the user is rewatching — i.e. exactly the shows they are
+  actively studying. `fetchAnimeList` now filters on the parsed status client-side; re-measured
+  live: **1,426** entries, all completed, **12** of them rewatching, 22 pages, `truncated:false`.
+  **Tradeoff:** a filtered read now costs the whole list, 22 pages instead of 15. Seven extra
+  requests against the user's MAL quota to stop losing twelve titles silently. One-line revert.
+- **Gate 8 PASSES** — `626f2354` (the previous worker's, verified live here, not trusted).
+  Seed 5081 Bakemonogatari, depth 2, budget 40: **11** derivatives, **11** unique, **6**
+  requests, `truncated:false`, and the seed itself correctly **absent** from its own output.
+  Relations recorded: sequel 3, prequel 3, summary 2, side_story 1, alternative_version 1,
+  parent_story 1 — Nisemonogatari (sequel, d1), Nekomonogatari: Kuro (prequel, d1),
+  Kizumonogatari III (prequel, d2), Owarimonogatari (prequel, d2), Monogatari Second Season
+  (sequel, d2). Real entries, MAL's own `relation_type_formatted` labels.
+- **Gate 9 PASSES** — asserted in `626f2354`: a `paging.next` at `evil.invalid` ends the walk
+  with `sent.length === 1`, so no bearer token reaches that host.
+- Defects **2 and 3 are CLOSED** by the above. Defect **1 remains open and is P3's whole job**.
+- **Trap for P3:** do *not* reach for MAL's `status=` query for speed. It is not a filter, it is
+  a filter minus your rewatches, and nothing in the response says so.
+
 ### P3 — the anime/manga library actually receives the list
 
 Write fetched entries into the anime/manga library rather than counting and discarding them
