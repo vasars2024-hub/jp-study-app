@@ -22185,3 +22185,63 @@ host:'localhost', username:''` — plan defect 4 confirmed — then configured t
 `enabled:true, 127.0.0.1:8080, admin`; doc 50,755 → 50,825 B. Restore point
 `debug/qbit-settings-restore.json`. **P0 gate 1 is blocked on a user-held secret**
 (`needs-user.md` 20:55); gate 2's dialog observation is open; gate 3 passed in `a110411f`.
+
+## 2026-08-15 21:15 — `backup` — Track 7 Phase 4: dictionary enrichment, model and reader
+
+Two slices: `184b24d0` the enrichment model and its tray kind, `0ab5d668` the batched
+reader. Gate 11's build half; its UI half is deliberately not in this turn.
+
+**`184b24d0` — `shared/ankiEnrich.ts` + the `enrich-dictionary` tray kind.** Three decisions:
+
+1. **A disagreement between installed dictionaries is a fact.** `EnrichSenseRule` is
+   `first-source | all-sources | refuse`, with **no default** — same reason `FieldCopyConflict`
+   has none. Several entries from ONE dictionary are not a disagreement (a dictionary does not
+   disagree with itself), and two dictionaries producing identical text is agreement; neither
+   fires `refuse`.
+2. **Provenance is field-level and lives in the field.** Anki has no per-field metadata, so a
+   tag could never say which field came from which dictionary. `wrapEnrichProvenance` writes an
+   ordinary `<span class="jp-dict-src" data-jp-dict="…">`, which an APKG round trip carries back
+   verbatim; `readEnrichProvenance` reads it out. Attribute text is escaped and unescaped, so a
+   source name containing a quote round-trips.
+3. **An enrichment queued with no lookup data blocks the whole plan** (`no-enrich-data`) rather
+   than running and reporting every note as "no entry" — which reads as "your dictionaries are
+   empty" and is false. Four distinct outcomes stay distinct: `enrich-no-word` (the note type
+   declares none), `enrich-no-entry`, `enrich-sense-conflict`, `enrich-sources-merged`.
+
+**`0ab5d668` — `main/dictionary/enrichService.ts` + `dict:enrichTerms`.** Offline only:
+`lookupTerm` falls back to Jisho over HTTP and a 3,000-note enrichment doing that is 3,000
+requests to someone else's server. **Two findings a probe against the real database produced,
+both of which would have made gate 11 pass on paper:**
+
+- **The database MERGES entries agreeing on lang+headword+reading**, so two dictionaries
+  glossing 猫 arrive as ONE `LookupEntry` with combined senses and an ordered primary-first
+  `sources[]`. `lookupResultToDictResult` keeps only `dictTitle` and drops that list — the
+  enriched field would have credited one dictionary for text several wrote. The service now
+  reads `LookupEntry` directly; `EnrichEntry.sources` carries the list, `source` stays the
+  primary. Measured: seeded `d1=JMdict (EN)` + `d2=Wiktionary` on 猫/ねこ → **1 entry**,
+  `sources = ['JMdict (EN)','Wiktionary']`, definitions `['cat','domestic cat']`.
+- **`initYomitan()` provisions the bundled dictionaries** on a profile that never opened one:
+  measured **Kanjium 107,978 + JMdict-EN 305,596 + JMdict-RU 93,385 + Moedict 70,589 entries,
+  ~15 s**, inside what looked like a pure DB test. The legacy fallback is now deferred until the
+  database has actually missed, and separable via `{ legacyFallback: false }`.
+
+**Trap for the next worker:** a `src/main/__tests__` test that reaches the legacy Yomitan store
+pays that 15 s bootstrap and needs network. Pass `legacyFallback: false` unless the legacy path
+is the claim.
+
+**Next: gate 11's UI half** — `DeckWorkbenchTray.tsx` gains the `enrich-dictionary` form
+(aspect / destination / conflict / sense rule / provenance, four new i18n keys × 4 languages),
+and `DeckWorkbenchBrowser.tsx` fetches `dictEnrichTerms(vocab.terms)` and passes
+`{ lookup, vocab }` into `planChangeTray`. It already builds the `VocabContext` for `freq:`/
+`known:`, so the second half is one memo. Then live acceptance on the 3,221-note local deck —
+and note the app must be **restarted** for `dict:enrichTerms` to exist in main.
+
+**Gates**, once after the last slice, shared tree. `npx vitest run` **653 files, 652 passed / 1
+skipped, 8,807 passed / 6 skipped, zero failures** (+40 tests). `i18n-check` exit 0 at **9,850**
+(unchanged — no UI strings landed this turn, correctly). `architecture-audit` exit 0, **Nothing
+new**, 2 pending. `eslint` on 6 paths: **0 errors** (7 pre-existing `no-explicit-any` warnings in
+`main/dictionary.ts`).
+
+**Staging note:** `src/preload.ts` and `src/renderer/window.d.ts` carry other tracks' hunks. Both
+were committed as reconstructed HEAD + my insert via `hash-object --no-filters`; their working-
+tree state is untouched.
