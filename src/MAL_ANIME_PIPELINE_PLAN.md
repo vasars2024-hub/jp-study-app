@@ -184,6 +184,46 @@ sync produces no duplicates. 12. An entry the user updated on MAL reflects the c
 re-sync. 13. Nothing auto-syncs on a timer — every call still hangs off a button, because a
 write to a real MAL list cannot be undone from this side.
 
+**Progress 2026-08-15 23:05 (`primary`). P3 CLOSES — gates 10–13 pass live on the user's own
+account (`Asmilov`), on a dev app restarted for the new handler.** `0438a293`.
+
+- **Decision (standing auto-approval).** There was no existing store to write into — the media
+  library is keyed on files on disk and a MAL title has none, and no module in the tree
+  referenced `malId` as an identity. So: a new `<userData>/mal-library.json`, merge logic in
+  `shared/malLibrary.ts`, file half in `main/malLibrary.ts`. **Identity is `media:malId`**, not
+  a bare id: MAL numbers anime and manga separately and a bare id collides the day a manga list
+  syncs. **Tradeoff:** `mal:librarySync` takes rows the *caller* already fetched rather than
+  fetching them itself. Costs one extra IPC hop for a payload that already crossed once; buys
+  that every MAL request stays on the one audited path that owns the token and the `paging.next`
+  host guard, and makes gate 13 structural — the module has no client, so it *cannot* sync.
+- **Gate 10 PASSES.** Library before: `total 0, lastSyncAt null` (handler invoked live, not
+  grepped). `malFetchList('completed')` → **1,426** entries in 8,532 ms, `truncated:false` —
+  the same number P2 measured. Sync → **added 1,426, updated 0, rejected 0**, stored
+  `total 1,426`, `byStatus.completed 1,426`, `derivatives 0`.
+- **Gate 11 PASSES.** Same list again → **added 0, updated 0, unchanged 1,426**, total still
+  1,426.
+- **Gate 12 PASSES, with the negative control built in.** A real MAL edit is a write the user
+  must authorise, so the change was staged the other way round: the first sync carried anime
+  **8481** with `score 0, episodesWatched 0` while MAL really reports `score 5, watched 3`; the
+  re-sync carried MAL's untouched rows. Result **updated 1, unchanged 1,425** — the count is the
+  control, because a merge that overwrote blindly would have said 1,426. Stored row afterwards:
+  `score 5, episodesWatched 3, origin list`, `addedAt 1786824015225` held from the first sync
+  while `syncedAt` moved to 1786824041607.
+- **The derivative-never-blanks rule, proven on real data.** `malFetchDerivatives([5081])`
+  returned **11**; **8** of them are already on the user's completed list carrying
+  `episodesWatched` 11, 4, 12, 26, 1, 4, 12, 7. Syncing the walk: **added 3, updated 8**, and all
+  eight kept those exact eight numbers, stayed `origin:"list"`, and gained their relation and
+  source (`11597 sequel from 5081`, `28025 parent_story from 32268`, …). `byStatus.completed`
+  stayed **1,426** — the walk invented no completed rows. Total **1,429**, `derivatives 3`.
+- **Gate 13 PASSES.** Structural first: `main/malLibrary.ts` imports no MAL client and holds no
+  timer, so neither channel can reach MyAnimeList. Observed too: with the panel mounted and no
+  input, `lastSyncAt` read **1786824081331** and total **1,429** at two points **33,944 ms**
+  apart, both identical. The file is real — `%APPDATA%\jp-study-app\mal-library.json`,
+  **641,236 bytes**.
+- **Trap for P4:** the panel's status dropdown filters **client-side in main**, deliberately. Do
+  not "optimise" it into MAL's `status=` query later; P2 measured that omitting twelve
+  rewatched titles.
+
 ### P4 — subtitles from the MAL page (nyaa + jimaku), no video download
 
 This is the user's "or just download all japanese vocab from subtitles for all the episodes"
