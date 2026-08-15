@@ -269,6 +269,18 @@
   margin: 0;
 }
 
+/* A refused query. Not `muted` — this is the reason the grid is empty, and it
+   has to out-read the row count sitting next to the box. */
+.wb-browser-query-error {
+  margin: 0;
+  color: var(--danger, #b3261e);
+  font-weight: 600;
+}
+
+.wb-browser-search[aria-invalid='true'] {
+  border-color: var(--danger, #b3261e);
+}
+
 .wb-browser-head,
 .wb-browser-row {
   display: grid;

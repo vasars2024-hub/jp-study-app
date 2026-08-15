@@ -106,6 +106,13 @@ export interface BrowserRow {
   modifiedAtSec: number;
   /** Column id → the text that column shows for this row. */
   cells: Record<string, string>;
+  /**
+   * Field name → normalized text, for every field this note actually has.
+   * Separate from `cells` on purpose: a filter must read the note, not the
+   * column configuration, or hiding a column would silently change what a
+   * query matches. Absent (not empty) when the note type has no such field.
+   */
+  fields: Record<string, string>;
   /** Lower-cased haystack: every field's normalized text plus tags and deck names. */
   search: string;
 }
@@ -162,6 +169,7 @@ export function buildBrowserRows(draft: AnkiDraft, columns: BrowserColumn[]): Br
       cardCount,
       modifiedAtSec: note.modifiedAtSec,
       cells: noteCells(note, columns, type, decks, cardCount),
+      fields: Object.fromEntries(note.fields.map((f) => [f.name, f.normalized])),
       search: [
         ...note.fields.map((f) => f.normalized),
         ...note.tags,
@@ -176,17 +184,11 @@ export function buildBrowserRows(draft: AnkiDraft, columns: BrowserColumn[]): Br
 
 // ----- search and sort ---------------------------------------------------------
 
-/**
- * Plain substring search over every field, tag and deck name, all terms required.
- * Anki's own query syntax (`deck:`, `is:due`, `-tag:`) is Phase 3's nested-filter
- * slice; this deliberately does not pretend to understand it, because a filter
- * that silently ignores `deck:x` and returns everything is worse than no filter.
- */
-export function searchBrowserRows(rows: BrowserRow[], query: string): BrowserRow[] {
-  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
-  if (terms.length === 0) return rows;
-  return rows.filter((row) => terms.every((term) => row.search.includes(term)));
-}
+// Search moved to `ankiBrowserQuery.ts` in Phase 3: the flat all-terms-required
+// substring filter this file used to hold is now the bare-word case of that
+// module's grammar, so every Phase 2 query still means exactly what it meant.
+// One filter path, not two — the same reason the change tray's dry run *is* its
+// apply.
 
 export type BrowserSortDir = 'asc' | 'desc';
 

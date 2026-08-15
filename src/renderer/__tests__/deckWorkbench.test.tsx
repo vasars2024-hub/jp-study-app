@@ -394,6 +394,40 @@ describe('DeckWorkbench', () => {
     expect(host.textContent).toContain('ankiWorkbench.browser.empty');
   });
 
+  it('says why a query was refused instead of showing an empty grid', async () => {
+    // Phase 3's rule: an unrecognized key is a refusal. Without the message the
+    // grid empties and reads exactly like "nothing matched" — the failure mode
+    // the flat search was deliberately left simple to avoid.
+    await toBrowse(browsable());
+    const search = host.querySelector('.wb-browser-search') as HTMLInputElement;
+    await type(search, 'Expresion:ねこ');
+    const alert = host.querySelector('.wb-browser-query-error');
+    expect(alert?.getAttribute('role')).toBe('alert');
+    expect(alert?.textContent).toBe('ankiWorkbench.browser.query.unknownKey:Expresion:ねこ');
+    expect(search.getAttribute('aria-invalid')).toBe('true');
+    expect(search.getAttribute('aria-describedby')).toBe('wb-browser-query-error');
+    expect(host.querySelectorAll('.wb-browser-row')).toHaveLength(0);
+    // A query that does not parse is not a filter, so it cannot license the
+    // whole-source claim either.
+    expect([...host.querySelectorAll('button')].some((b) => b.textContent?.includes('browser.selectAll'))).toBe(false);
+
+    // Fixing the key clears the message and filters for real.
+    await type(search, 'Expression:ねこ');
+    expect(host.querySelector('.wb-browser-query-error')).toBeNull();
+    expect(search.getAttribute('aria-invalid')).toBeNull();
+    expect(host.querySelectorAll('.wb-browser-row')).toHaveLength(1);
+  });
+
+  it('filters on a nested query the flat search could not express', async () => {
+    await toBrowse(browsable());
+    const search = host.querySelector('.wb-browser-search') as HTMLInputElement;
+    // Two rows carry `animal`; one of them is ねこ. `-` excludes it.
+    await type(search, 'animal -Expression:ねこ');
+    expect(host.querySelectorAll('.wb-browser-row')).toHaveLength(1);
+    await type(search, '(animal or nothing-matches-this) cards:1');
+    expect(host.querySelectorAll('.wb-browser-row')).toHaveLength(2);
+  });
+
   it('will not offer "select all matching" for a filtered page of a larger source', async () => {
     // The honesty rule: with a query active on a paged source, "everything
     // matching" is a claim nobody computed — only the rows found here are real.

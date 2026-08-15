@@ -7,7 +7,6 @@ import {
   defaultBrowserColumns,
   isRowSelected,
   nextBrowserSort,
-  searchBrowserRows,
   selectAllMatching,
   selectRowRange,
   selectionCount,
@@ -137,19 +136,15 @@ describe('rows', () => {
   });
 });
 
-describe('search', () => {
-  it('requires every term and searches fields, tags, decks and note type', () => {
-    expect(searchBrowserRows(rows, '').map((r) => r.noteId)).toEqual(['n1', 'n2', 'n3']);
-    expect(searchBrowserRows(rows, 'core').map((r) => r.noteId)).toEqual(['n1', 'n2', 'n3']);
-    expect(searchBrowserRows(rows, 'core verb').map((r) => r.noteId)).toEqual(['n1']);
-    expect(searchBrowserRows(rows, '飲む').map((r) => r.noteId)).toEqual(['n3']);
-    expect(searchBrowserRows(rows, 'cloze').map((r) => r.noteId)).toEqual(['n2']);
-  });
-
-  it('does not pretend to understand Anki query syntax', () => {
-    // `deck:Japanese::Verbs` matches nothing rather than silently returning all
-    // three, which is the failure mode that would look like a working filter.
-    expect(searchBrowserRows(rows, 'deck:Japanese::Verbs')).toHaveLength(0);
+describe('rows carry their own fields', () => {
+  it('exposes every field the note has, independent of the visible columns', () => {
+    // A filter reads this, not `cells` — hiding a column must not change what a
+    // query matches. See `ankiBrowserQuery.ts`, which owns search from Phase 3.
+    const hidden = buildBrowserRows(draft, columns.map((c) => ({ ...c, visible: false })));
+    expect(hidden[0]?.fields).toEqual({ Meaning: 'to eat', Expression: '食べる' });
+    expect(hidden[1]?.fields).toEqual({ Text: 'a {{c1::cloze}} note' });
+    // A note of another note type has no such field at all, rather than ''.
+    expect('Meaning' in (hidden[1]?.fields ?? {})).toBe(false);
   });
 });
 

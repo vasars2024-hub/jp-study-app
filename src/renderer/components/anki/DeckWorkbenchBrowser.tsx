@@ -16,11 +16,11 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import type { AnkiDraft } from '../../../shared/ankiDraft';
 import {
   EMPTY_SELECTION,
+  browserFieldNames,
   buildBrowserRows,
   defaultBrowserColumns,
   isRowSelected,
   nextBrowserSort,
-  searchBrowserRows,
   selectAllMatching,
   selectRowRange,
   selectionCount,
@@ -32,6 +32,7 @@ import {
   type BrowserSelection,
   type BrowserSort,
 } from '../../../shared/ankiWorkbenchBrowser';
+import { filterBrowserRows, type BrowserQueryErrorCode } from '../../../shared/ankiBrowserQuery';
 import type { AnkiDraftEditJournal, AnkiDraftEditResult } from '../../../shared/ankiDraftEdit';
 import { editedNoteIds, noteIsEdited } from '../../../shared/ankiDraftEdit';
 import VirtualList from '../VirtualList';
@@ -47,6 +48,15 @@ const rowDomId = (noteId: string): string => `wb-row-${noteId}`;
 
 /** The plan's Browser modes. `gallery` is the representative sample set. */
 type BrowserView = 'grid' | 'samples';
+
+/** Parse-failure code → i18n key. Kept exhaustive so a new code cannot go mute. */
+const QUERY_ERROR_KEY: Record<BrowserQueryErrorCode, string> = {
+  'unknown-key': 'ankiWorkbench.browser.query.unknownKey',
+  'bad-regex': 'ankiWorkbench.browser.query.badRegex',
+  'unbalanced-paren': 'ankiWorkbench.browser.query.unbalancedParen',
+  'empty-group': 'ankiWorkbench.browser.query.emptyGroup',
+  'dangling-operator': 'ankiWorkbench.browser.query.danglingOperator',
+};
 
 export default function DeckWorkbenchBrowser({
   draft,
@@ -78,16 +88,18 @@ export default function DeckWorkbenchBrowser({
   const anchor = useRef<string | null>(null);
 
   const rows = useMemo(() => buildBrowserRows(draft, columns), [draft, columns]);
-  const shown = useMemo(
-    () => sortBrowserRows(searchBrowserRows(rows, query), sort),
-    [rows, query, sort],
-  );
+  // The draft's own field names, so `Expression:食べる` is a field predicate and
+  // `Expresion:食べる` is a refusal instead of a filter that quietly matches all.
+  const schema = useMemo(() => ({ fieldNames: browserFieldNames(draft) }), [draft]);
+  const filtered = useMemo(() => filterBrowserRows(rows, query, schema), [rows, query, schema]);
+  const shown = useMemo(() => sortBrowserRows(filtered.rows, sort), [filtered, sort]);
   const shownCols = useMemo(() => visibleBrowserColumns(columns), [columns]);
 
   const partial = draft.counts.notes < totalNotes;
   // With a filter on a paged source, "everything matching" is a claim nobody
-  // computed. See the file comment.
-  const canSelectWholeSource = !partial || query.trim() === '';
+  // computed. See the file comment. A query that failed to parse is not a
+  // filter at all, so it cannot license a whole-source claim either.
+  const canSelectWholeSource = !filtered.error && (!partial || query.trim() === '');
   /**
    * How many notes the current filter stands for. With no query that is the
    * whole source; with one it is only what the loaded rows matched. The live
@@ -95,7 +107,7 @@ export default function DeckWorkbenchBrowser({
    * "select all 3,221" under a filter showing four rows, and then selected
    * four. A count in a button is a promise about what the click will do.
    */
-  const matchedTotal = query.trim() === '' ? totalNotes : shown.length;
+  const matchedTotal = query.trim() === '' && !filtered.error ? totalNotes : shown.length;
 
   const applySelection = useCallback(
     (next: BrowserSelection) => {
@@ -221,6 +233,9 @@ export default function DeckWorkbenchBrowser({
           value={query}
           placeholder={t('ankiWorkbench.browser.search')}
           aria-label={t('ankiWorkbench.browser.search')}
+          title={t('ankiWorkbench.browser.query.hint')}
+          aria-invalid={filtered.error ? true : undefined}
+          aria-describedby={filtered.error ? 'wb-browser-query-error' : undefined}
           onChange={(e) => setQuery(e.target.value)}
         />
         <span className="muted">
@@ -242,6 +257,14 @@ export default function DeckWorkbenchBrowser({
           ))}
         </div>
       </div>
+
+      {/* A refused query shows why, next to the box that refused it. Without
+          this the grid empties and reads exactly like "nothing matched". */}
+      {filtered.error && (
+        <p className="wb-browser-query-error" id="wb-browser-query-error" role="alert">
+          {t(QUERY_ERROR_KEY[filtered.error.code], { token: filtered.error.token })}
+        </p>
+      )}
 
       {view === 'samples' && (
         <DeckWorkbenchSamples
