@@ -564,3 +564,50 @@ false "the copy wrote 0 bytes" here.
 
 **Status against §6:** (1) done. (2) done. (3) **not run** — harness and fixture both ready, blocked
 on the model load. (4) partial, unchanged. (5) done.
+
+### F7 attempt 2 — the pipeline ran end to end, and it is not fusing — 2026-08-15, primary
+
+**Landed:** `9273174` (the Whisper model blocker, fixed). The fusion pipeline completed a real
+episode for the first time. §6 item (3) is still **not passed**, but for a new and better reason.
+
+**The model blocker was a dead HuggingFace id, not memory.** The previous entry blamed
+`Array buffer allocation failed` on the 1.6 GB turbo model. The real wall was upstream:
+`kotoba-whisper`'s hfId was `onnx-community/kotoba-whisper-v2.0`, which answers **401**, and
+that tier is what `defaultWhisperTier('ja')` hands every user who never opened the dropdown —
+so JA transcription failed on a **default install**. Already recorded as **KI-7** in
+`docs/ACTIVE/KNOWN_ISSUES.md` and deferred there as "a product decision". Decision taken under
+standing auto-approval, and deliberately the smallest one: `onnx-community/kotoba-whisper-v2.2-ONNX`
+is the published ONNX conversion of the *same* Japanese fine-tune, so accuracy character and
+size class are unchanged — not a swap to a generic Whisper tier. Probed siblings: v2.0,
+v2.0-ONNX, v1.0-ONNX, v2.1-ONNX all **401**; v2.2-ONNX **200** with the full encoder/decoder set.
+Verified through the product path after a window reload, not by curl: `whisperHfId()` returns the
+new id and `prefetchWhisperModel` downloaded **and loaded** it, ok:true in **89.7 s**; Cache
+Storage 9 -> 16 entries, and the app wrote its own record `{"kotoba-whisper":["webgpu"]}`.
+
+**KI-8 does not reproduce on this model.** KI-8 records degenerate Japanese from the default
+WebGPU/q4 path, measured on `Xenova/whisper-base`. On kotoba-v2.2 the same default device
+produced 35 cues of coherent, natural Japanese (self-introduction, hobbies, why the podcast
+exists). Residual ASR noise is ordinary: ポトキャスト/ポッキャスト/ポドキャスト vary across cues.
+KI-8 should be re-scoped to whisper-base rather than treated as a property of the GPU path.
+
+**The finding that matters: the fused track is Whisper-only wearing a fusion label.** Item
+`a167b9e2` (Hana #1, 305 s), 35/35 windows, zero errors, phases queued -> preparing ->
+extracting-audio -> transcribing -> aligning -> done in ~10 min. But `fused-ja.meta.json` is
+uniform: **35/35 cues `basis:"whisper"`, every `score` 0, every `confidence` 0.45**,
+`offsetConfident:false`. F3 contributed nothing, so F4 had nothing to score and F5 nothing to
+arbitrate. Cause is one line: `translateWindowReferences` returns all-empty at
+`transcriptionJobs.ts:389` when `isTranslateAvailable()` is false, and it is false because
+`resolveModelPath()` (`translate.ts:324-334`) finds no Qwen3 GGUF. This is the graceful-degradation
+path working exactly as designed — and it means F7 **cannot** pass today: the output *is* the
+whisper-only baseline, so it can never beat it. A gate run now would fail correctly, not
+informatively.
+
+**Next slice, and it is not human-blocked.** `LOCAL_AGENT_MODEL_CATALOG`'s `qwen3-1.7b` declares
+`fileName: 'Qwen3-1.7B.gguf'`, byte-identical to `translate.ts`'s `USER_MODEL`, and
+`resolveModelPath` checks `userData/models/<USER_MODEL>` first — so the in-app local-agent
+download satisfies the translator with no file juggling. Install it, re-run the same fusion on
+`a167b9e2`, and confirm `basis` stops being uniformly `whisper` **before** spending time on
+baselines or a second episode.
+
+**Trap:** the fused sidecar is `fused-ja.meta.json`, a sibling of `fused-ja.srt` — *not*
+`fused-ja.srt.fusion.json`. Guessing the latter reads as "no provenance was written".
