@@ -9532,6 +9532,8 @@ export const ru: Catalog = {
   'ankiWorkbench.preview.problem.cloze-without-markers': 'Тип заметок с пропусками без единой метки не создаёт карточек.',
   'ankiWorkbench.preview.problem.cloze-filter-outside-cloze-note': 'Фильтр пропуска на обычном типе заметок ничего не делает: {detail}.',
   'ankiWorkbench.preview.problem.missing-media': 'Этого нет в источнике: {detail}.',
+  'ankiWorkbench.preview.problem.media-not-rendered':
+    'Предпросмотр не загружает медиа: здесь пусто, но в Anki отобразится: {detail}.',
   'ankiWorkbench.preview.problem.empty-first-field': 'Первое поле пусто — Anki определяет по нему дубликаты.',
   'ankiWorkbench.preview.problem.duplicate-first-field': 'У другой заметки такое же первое поле: {detail}.',
   'ankiWorkbench.browser.view': 'Вид',

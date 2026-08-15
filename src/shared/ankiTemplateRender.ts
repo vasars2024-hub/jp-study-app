@@ -56,6 +56,12 @@ export type AnkiRenderProblemCode =
   | 'cloze-filter-outside-cloze-note'
   /** The render references a media file the source does not contain. */
   | 'missing-media'
+  /**
+   * The render references media the source *does* contain, but the preview
+   * frame cannot load it. Advisory, not a deck defect — see
+   * `ADVISORY_RENDER_PROBLEMS`.
+   */
+  | 'media-not-rendered'
   /** The note's first field is empty; Anki treats it as the duplicate key. */
   | 'empty-first-field'
   /** Another note in this deck has the same first field. */
@@ -68,6 +74,18 @@ export interface AnkiRenderProblem {
   /** The offending name — a field, a filter, a media file. Absent when not applicable. */
   detail?: string;
 }
+
+/**
+ * Problems that describe a limit of the *preview*, not a defect in the deck.
+ *
+ * They are still shown — a user comparing a card against Anki deserves to know
+ * why a box is blank — but nothing may treat them as evidence that a card is
+ * broken. The representative sample's `validation-failing` slot in particular
+ * would otherwise be spent on the first image card of any media deck.
+ */
+export const ADVISORY_RENDER_PROBLEMS: ReadonlySet<AnkiRenderProblemCode> = new Set([
+  'media-not-rendered',
+]);
 
 export interface RenderedAnkiCard {
   cardId: string;
@@ -88,9 +106,22 @@ export interface RenderedAnkiCard {
 const TAG_RE = /<[^>]*>/g;
 const NBSP_RE = /&nbsp;|&#160;|\u00a0/g;
 
-/** Anki's "is this field empty": strip markup and entities-as-space, then trim. */
+/** A tag carrying a `src`, whose file name Anki counts as content. */
+const SRC_TAG_RE = /<(?:img|audio|video|source|embed|object)\b[^>]*?\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))[^>]*>/gi;
+
+/**
+ * Anki's "is this field empty": strip markup and entities-as-space, then trim —
+ * but keep the file name of anything with a `src` first.
+ *
+ * This mirrors Anki's own `strip_html_preserving_media_filenames`, and the
+ * distinction is load-bearing: a card whose front is nothing but `<img>` is a
+ * perfectly ordinary card that Anki generates and reviews. Stripping the tag
+ * outright would call it empty and claim Anki refuses to generate it, which is
+ * a false failure on every image-only note in a deck.
+ */
 export function fieldIsEmpty(raw: string): boolean {
-  return stripHtml(raw).length === 0;
+  return stripHtml(String(raw ?? '').replace(SRC_TAG_RE, (_m, a, b, c) => ` ${a ?? b ?? c} `))
+    .length === 0;
 }
 
 export function stripHtml(raw: string): string {
@@ -505,14 +536,22 @@ export function renderAnkiCard(
     options.mediaPresent ??
     ((fileName: string) => note.media.some((m) => m.fileName === fileName && m.present));
   for (const side of [questionHtml, answerHtml]) {
+    const sideName = side === questionHtml ? 'question' : 'answer';
+    // Media the source *does* hold still cannot load: the frame is an
+    // opaque-origin srcdoc whose CSP allows `data:` images only, and Anki
+    // references media by bare file name. Saying so is the difference between
+    // "this card is fine" and "this card is fine except for what you cannot
+    // see here" — without it every image card gets a false clean.
+    const unrendered: string[] = [];
     for (const ref of mediaRefsInField(side, 0, present)) {
       if (!ref.present) {
-        report({
-          code: 'missing-media',
-          side: side === questionHtml ? 'question' : 'answer',
-          detail: ref.fileName,
-        });
+        report({ code: 'missing-media', side: sideName, detail: ref.fileName });
+      } else if (!unrendered.includes(ref.fileName)) {
+        unrendered.push(ref.fileName);
       }
+    }
+    if (unrendered.length > 0) {
+      report({ code: 'media-not-rendered', side: sideName, detail: unrendered.join(', ') });
     }
   }
 
@@ -689,7 +728,10 @@ export function buildRepresentativeSample(
         (p) => p.code === 'empty-question' || p.code === 'empty-answer',
       );
       if (blank && empties.length === 0) empties.push(note);
-      if (render.problems.length > 0 && !blank && failing.length === 0) {
+      // Advisory lines say something about the preview, not the deck, so they
+      // must not spend the one slot reserved for a card that really fails.
+      const failed = render.problems.some((p) => !ADVISORY_RENDER_PROBLEMS.has(p.code));
+      if (failed && !blank && failing.length === 0) {
         failing.push({ note, ord });
       }
       if (empties.length > 0 && failing.length > 0) break;

@@ -244,6 +244,96 @@ describe('renderAnkiCard', () => {
       side: 'question',
       detail: 'gone.png',
     });
+    // Absent media is already blank-and-explained; it must not also be reported
+    // as merely unrenderable, which would read as "fine in Anki".
+    expect(rendered.problems.map((p) => p.code)).not.toContain('media-not-rendered');
+  });
+
+  it('says so when media the source does hold cannot be shown in the preview', () => {
+    // The frame's CSP allows `data:` images only and Anki references media by
+    // bare file name, so a present image is still a blank box. Silence there is
+    // a false clean on every image card.
+    const n = note({
+      id: 'n1',
+      fields: [
+        field(0, 'Front', '<img src="cat.png"><img src="cat.png">'),
+        field(1, 'Back', '<img src="dog.png">'),
+      ],
+      media: [
+        { reference: 'cat.png', fileName: 'cat.png', kind: 'image', fieldOrd: 0, present: true },
+        { reference: 'dog.png', fileName: 'dog.png', kind: 'image', fieldOrd: 1, present: true },
+      ],
+    });
+    const type = {
+      ...basic,
+      templates: [{ ...basic.templates[0], qfmt: '{{Front}}', afmt: '{{Back}}' }],
+    };
+    const rendered = renderAnkiCard(draftOf([n], { noteTypes: [type, clozeType] }), n, 0);
+    // One line per side, and the repeated reference is named once.
+    expect(rendered.problems).toContainEqual({
+      code: 'media-not-rendered',
+      side: 'question',
+      detail: 'cat.png',
+    });
+    expect(rendered.problems).toContainEqual({
+      code: 'media-not-rendered',
+      side: 'answer',
+      detail: 'dog.png',
+    });
+    expect(rendered.problems.filter((p) => p.code === 'media-not-rendered')).toHaveLength(2);
+  });
+
+  it('does not call an image-only side empty', () => {
+    // Anki's own emptiness test preserves media file names, so a front that is
+    // nothing but an `<img>` generates a card. Reporting `empty-question` there
+    // claims Anki would refuse it — a false failure on every image-only note.
+    const n = note({
+      id: 'n1',
+      fields: [field(0, 'Front', '<img src="cat.png">'), field(1, 'Back', '<img src="dog.png">')],
+      media: [
+        { reference: 'cat.png', fileName: 'cat.png', kind: 'image', fieldOrd: 0, present: true },
+        { reference: 'dog.png', fileName: 'dog.png', kind: 'image', fieldOrd: 1, present: true },
+      ],
+    });
+    const codes = renderAnkiCard(draftOf([n]), n, 0).problems.map((p) => p.code);
+    expect(codes).not.toContain('empty-question');
+    expect(codes).not.toContain('empty-answer');
+    // A tag with no `src` really is nothing, and still reads as empty.
+    expect(fieldIsEmpty('<br><div></div>')).toBe(true);
+    expect(fieldIsEmpty('<img src="cat.png">')).toBe(false);
+  });
+
+  it('leaves a card with no media references clean', () => {
+    const n = note({ id: 'n1' });
+    expect(renderAnkiCard(draftOf([n]), n, 0).problems).toEqual([]);
+  });
+
+  it('does not let the advisory claim the sample set’s failing slot', () => {
+    // An image card is not a failing card. Before the advisory was classed as
+    // advisory, the first image note in any media deck took the one slot the
+    // gallery reserves for a card that genuinely fails to render.
+    const imaged = note({
+      id: 'n1',
+      fields: [field(0, 'Front', '<img src="cat.png">'), field(1, 'Back', 'cat')],
+      media: [
+        { reference: 'cat.png', fileName: 'cat.png', kind: 'image', fieldOrd: 0, present: true },
+      ],
+    });
+    const broken = note({
+      id: 'n2',
+      fields: [field(0, 'Front', '{{Nope}}'), field(1, 'Back', 'dog')],
+    });
+    const type = {
+      ...basic,
+      templates: [{ ...basic.templates[0], qfmt: '{{Front}}{{Nope}}', afmt: '{{Back}}' }],
+    };
+    const draft = draftOf([imaged, broken], { noteTypes: [type, clozeType] });
+    const sample = buildRepresentativeSample(draft);
+    const failing = sample.cases.filter((c) => c.reasons.includes('validation-failing'));
+    expect(failing).toHaveLength(1);
+    // Both notes render `{{Nope}}`, so the tie is broken by order — what matters
+    // is that the slot went to an unresolved field, not to an image.
+    expect(failing[0].render.problems.map((p) => p.code)).toContain('unresolved-field');
   });
 });
 

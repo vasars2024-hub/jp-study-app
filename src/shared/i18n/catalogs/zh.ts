@@ -8687,6 +8687,8 @@ export const zh: Catalog = {
   'ankiWorkbench.preview.problem.cloze-without-markers': '没有填空标记的填空笔记类型不会生成卡片。',
   'ankiWorkbench.preview.problem.cloze-filter-outside-cloze-note': '在非填空笔记类型上使用填空过滤器没有作用：{detail}。',
   'ankiWorkbench.preview.problem.missing-media': '此来源不包含：{detail}。',
+  'ankiWorkbench.preview.problem.media-not-rendered':
+    '预览无法加载媒体，因此这里显示为空白，但在 Anki 中会正常显示：{detail}。',
   'ankiWorkbench.preview.problem.empty-first-field': '第一个字段为空，Anki 用它检测重复。',
   'ankiWorkbench.preview.problem.duplicate-first-field': '另一条笔记的第一个字段相同：{detail}。',
   'ankiWorkbench.browser.view': '视图',

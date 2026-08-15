@@ -8727,6 +8727,8 @@ export const ja: Catalog = {
   'ankiWorkbench.preview.problem.cloze-without-markers': '穴埋めマーカーのない穴埋めノートタイプはカードを生成しません。',
   'ankiWorkbench.preview.problem.cloze-filter-outside-cloze-note': '穴埋め以外のノートタイプでは穴埋めフィルターは機能しません: {detail}。',
   'ankiWorkbench.preview.problem.missing-media': 'このソースに含まれていません: {detail}。',
+  'ankiWorkbench.preview.problem.media-not-rendered':
+    'プレビューはメディアを読み込めないため、ここでは空白になりますが Anki では表示されます: {detail}。',
   'ankiWorkbench.preview.problem.empty-first-field': '最初のフィールドが空です。Anki は重複判定にこれを使います。',
   'ankiWorkbench.preview.problem.duplicate-first-field': '最初のフィールドが同じノートが他にあります: {detail}。',
   'ankiWorkbench.browser.view': '表示',

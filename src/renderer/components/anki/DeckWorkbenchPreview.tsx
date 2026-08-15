@@ -7,6 +7,10 @@
  * which sibling card, which side, which viewport and which theme — the four axes
  * the plan asks the preview to catch a failure on before Apply.
  *
+ * One lens is deliberately not visual: the frame cannot load a deck's media, so
+ * a card referencing media the package holds reports `media-not-rendered`
+ * instead of showing a blank box that would read as clean.
+ *
  * Two rules this file exists to keep:
  *
  * - **The rendered HTML is untrusted.** It comes out of a foreign package and

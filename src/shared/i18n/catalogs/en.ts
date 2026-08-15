@@ -9152,6 +9152,8 @@ export const en: Catalog = {
   'ankiWorkbench.preview.problem.cloze-without-markers': 'A cloze note type with no cloze marker generates no cards.',
   'ankiWorkbench.preview.problem.cloze-filter-outside-cloze-note': 'A cloze filter on a non-cloze note type does nothing: {detail}.',
   'ankiWorkbench.preview.problem.missing-media': 'This source does not contain: {detail}.',
+  'ankiWorkbench.preview.problem.media-not-rendered':
+    'The preview cannot load media, so this renders blank here but not in Anki: {detail}.',
   'ankiWorkbench.preview.problem.empty-first-field': 'The first field is empty; Anki uses it to detect duplicates.',
   'ankiWorkbench.preview.problem.duplicate-first-field': 'Another note has the same first field: {detail}.',
   'ankiWorkbench.browser.view': 'View',

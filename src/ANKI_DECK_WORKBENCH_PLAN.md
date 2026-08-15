@@ -293,7 +293,7 @@ This slice is complete only when all of these can be shown with real data and no
 10. Complete the primary workflows using keyboard only and verify focus, contrast, reduced motion, EN/JA/ZH/RU strings, and compact/default/maximized layouts.
 11. Follow the numbered flow to enrich a mixed deck from configured dictionaries, add new fields, resolve conflicting senses, update the template, and prove field-level provenance after export/reimport.
 12. Generate several AI example sentences and learning aids, approve only selected variants, preview difficult and edge-case cards across layouts, cancel one batch, retry only failures, and verify that rejected/generated data is represented honestly.
-13. Customize Browser columns separately from note fields, create a reverse/optional-reverse card design, and prove that the representative preview catches blank, duplicate, cloze, sibling, media, and dark/mobile rendering failures before Apply.
+13. Customize Browser columns separately from note fields, create a reverse/optional-reverse card design, and prove that the representative preview catches blank, duplicate, cloze, sibling, media, and dark/mobile rendering failures before Apply. The media lens is *flagged, not rendered*: the preview frame is an opaque-origin `srcdoc` whose CSP allows `data:` images only, and Anki references media by bare file name, so a card that references media the package holds must say so explicitly (`media-not-rendered`) rather than show a blank box that reads as clean. Loosening the CSP does not satisfy this gate.
 14. Exercise every `supported` row in the living Anki parity matrix and prove every `read-only` or `blocked` row has an honest explanation and no active Apply path.
 
 ## Explicit exclusions
