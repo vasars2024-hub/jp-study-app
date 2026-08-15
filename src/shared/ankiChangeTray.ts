@@ -52,6 +52,11 @@ import {
   type EnrichSenseRule,
 } from './ankiEnrich';
 import { normalizeFieldText, type TextNormalizeOp } from './ankiTextNormalize';
+import {
+  planMasteryMapping,
+  type MasteryLevel,
+  type MasteryPlan,
+} from './ankiMastery';
 import type { VocabContext } from './ankiVocabContext';
 
 export type TrayActionKind =
@@ -62,7 +67,8 @@ export type TrayActionKind =
   | 'copy-field'
   | 'normalize-text'
   | 'enrich-dictionary'
-  | 'apply-ai-additions';
+  | 'apply-ai-additions'
+  | 'set-mastery';
 
 /**
  * What a copy does when the destination already holds text — Phase 4's "require
@@ -140,6 +146,15 @@ export type TrayAction =
       onConflict: FieldCopyConflict;
       /** Only read for `append`; `DEFAULT_COPY_SEPARATOR` when omitted. */
       separator?: string;
+    })
+  | (TrayActionBase & {
+      kind: 'set-mastery';
+      /**
+       * The rung to move the selection's words to. No default: the whole point
+       * of gate 3 is that the user names the level and is shown its effect, and
+       * a default would be this module choosing a judgement on their behalf.
+       */
+      level: MasteryLevel;
     });
 
 // ----- the ordered list --------------------------------------------------------
@@ -209,7 +224,16 @@ export type TrayProblemCode =
   /** The batch was cancelled before these notes were generated. */
   | 'ai-cancelled'
   /** The user rejected every variant for these notes, so nothing is written. */
-  | 'ai-all-rejected';
+  | 'ai-all-rejected'
+  /** A mastery mapping was queued with no vocabulary context to read. Blocking. */
+  | 'no-vocab-context'
+  /** These notes declare no word, so there is nothing whose mastery could move. */
+  | 'mastery-no-word'
+  /**
+   * The consequence gate 3 forbids leaving implied: this writes local knowledge
+   * and reschedules nothing in Anki. Always reported when the action runs.
+   */
+  | 'mastery-local-only';
 
 export interface TrayProblem {
   code: TrayProblemCode;
@@ -263,6 +287,14 @@ export interface TrayPlan {
   problems: TrayProblem[];
   /** True when a blocking problem stopped the plan; `draft` is then the input. */
   blocked: boolean;
+  /**
+   * What a `set-mastery` action would write, when the tray holds one. It is not
+   * folded into `draft`: local knowledge is keyed by lemma and lives outside the
+   * deck, so a mastery-only tray returns the *identical* draft object and
+   * `changedNotes: 0` while still having real work to do. A caller that adopts
+   * only `draft` on Apply silently drops it.
+   */
+  mastery?: MasteryPlan;
 }
 
 function escapeLiteral(s: string): string {
@@ -302,6 +334,7 @@ function blockingProblems(
   noteIds: readonly string[],
   hasEnrichData: boolean,
   aiBatch: AiBatch | undefined,
+  hasMasteryContext: boolean,
 ): TrayProblem[] {
   const problems: TrayProblem[] = [];
   const enabled = actions.filter((a) => a.enabled);
@@ -378,6 +411,14 @@ function blockingProblems(
           });
         }
       }
+    } else if (action.kind === 'set-mastery') {
+      // Same refusal as `no-enrich-data`, and for the same reason: the term for
+      // each note comes from a context built outside this module. Planning
+      // without it would resolve every note to "no word" and report a selection
+      // of vocabulary notes as unmappable, which is not true.
+      if (!hasMasteryContext) {
+        problems.push({ code: 'no-vocab-context', severity: 'blocking', actionId: action.id, count: 1 });
+      }
     } else if (action.kind === 'swap-fields' || action.kind === 'copy-field') {
       const [a, b] =
         action.kind === 'swap-fields'
@@ -445,10 +486,23 @@ export function planChangeTray(
      * carries the user's whole review, neither of which belongs on an action.
      */
     ai?: AiBatch;
+    /**
+     * The words a `set-mastery` action maps and their currently stored levels.
+     * Outside for the same reason `enrich` is: the terms come from the Browser's
+     * `VocabContext` and the levels from the renderer's knowledge store, and
+     * neither belongs on a serializable action.
+     */
+    mastery?: { vocab: VocabContext; levels: ReadonlyMap<string, number> };
   },
 ): TrayPlan {
   const groupId = opts?.groupId ?? `tray-${journal.done.length + 1}`;
-  const problems = blockingProblems(actions, noteIds, opts?.enrich !== undefined, opts?.ai);
+  const problems = blockingProblems(
+    actions,
+    noteIds,
+    opts?.enrich !== undefined,
+    opts?.ai,
+    opts?.mastery !== undefined,
+  );
   if (problems.length > 0) {
     return {
       draft,
@@ -472,6 +526,7 @@ export function planChangeTray(
   const index = createDraftEditIndex(draft);
   const noteTypes = new Map(draft.noteTypes.map((nt) => [nt.id, nt]));
   const ops: AnkiDraftEditOp[] = [];
+  let masteryPlan: MasteryPlan | undefined;
 
   const changeFor = (noteId: string): TrayNoteChange => {
     let change = changesById.get(noteId);
@@ -525,6 +580,53 @@ export function planChangeTray(
 
   for (const action of actions) {
     if (!action.enabled) continue;
+
+    if (action.kind === 'set-mastery') {
+      // Whole-selection, not per-note: the unit is the word, and the same lemma
+      // on four notes is one entry. Running this inside the per-note loop would
+      // count it four times and write it four times.
+      const ctx = opts?.mastery;
+      if (!ctx) continue; // unreachable — `blockingProblems` already refused.
+      const termByNote = new Map<string, string | null>();
+      for (const noteId of noteIds) termByNote.set(noteId, ctx.vocab.byNote.get(noteId)?.term ?? null);
+      const plan = planMasteryMapping({
+        noteIds,
+        termByNote,
+        levels: ctx.levels,
+        target: action.level,
+      });
+      // Later actions in the same tray overwrite an earlier mapping's plan
+      // rather than merging: two mastery actions in one tray are the user
+      // changing their mind, and the last one is what Apply must write.
+      masteryPlan = plan;
+      if (plan.notesWithoutWord.length > 0) {
+        problems.push({
+          code: 'mastery-no-word',
+          severity: 'warning',
+          actionId: action.id,
+          count: plan.notesWithoutWord.length,
+        });
+      }
+      // Reported whenever the action runs, including when it moves nothing, so
+      // the scheduling consequence is never a thing the user has to infer from
+      // its absence. The detail is the numeric rung, never a translated label.
+      problems.push({
+        code: 'mastery-local-only',
+        severity: 'info',
+        actionId: action.id,
+        count: plan.changes.length,
+        detail: String(plan.target),
+      });
+      outcomes.push({
+        actionId: action.id,
+        kind: action.kind,
+        matched: noteIds.length,
+        changed: plan.notesCovered,
+        skipped: noteIds.length - plan.notesCovered,
+      });
+      continue;
+    }
+
     let matched = 0;
     let changed = 0;
 
@@ -838,6 +940,7 @@ export function planChangeTray(
     changedNotes: changes.length,
     problems,
     blocked: false,
+    mastery: masteryPlan,
   };
 }
 
