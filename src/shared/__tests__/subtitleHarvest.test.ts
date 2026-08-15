@@ -4,6 +4,7 @@ import {
   chooseJimakuEntry,
   combineSeasonCues,
   episodeAt,
+  locateInSeason,
   planSubtitleHarvest,
   toPlainText,
   toSrt,
@@ -121,6 +122,22 @@ describe('combineSeasonCues', () => {
   it('preserves every cue', () => {
     const { cues } = combineSeasonCues([ep(1, ['a', 'b', 'c']), ep(2, ['d', 'e'])]);
     expect(cues.map((c) => c.text)).toEqual(['a', 'b', 'c', 'd', 'e']);
+  });
+
+  it('undoes the offset so a located moment is episode-relative', () => {
+    // Deck provenance reads this. `t=15s of episode 21` corresponds to a real
+    // moment in a real file; the combined `t=45s` corresponds to nothing.
+    const { segments } = combineSeasonCues([ep(20, ['a', 'b']), ep(21, ['c', 'd'])]);
+    expect(locateInSeason(segments, 0)).toEqual({ episode: 20, withinSec: 0 });
+    expect(locateInSeason(segments, 10)).toEqual({ episode: 20, withinSec: 10 });
+    expect(locateInSeason(segments, segments[1].start + 10))
+      .toEqual({ episode: 21, withinSec: 10 });
+  });
+
+  it('refuses to place a moment that belongs to no episode', () => {
+    const { segments } = combineSeasonCues([ep(20, ['a', 'b']), ep(21, ['c'])]);
+    expect(locateInSeason(segments, segments[0].end + 1)).toBeNull();
+    expect(locateInSeason(segments, segments[1].end + 10_000)).toBeNull();
   });
 });
 

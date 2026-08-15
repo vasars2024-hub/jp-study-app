@@ -272,6 +272,31 @@ export function episodeAt(segments: readonly CombinedSeasonSegment[], seconds: n
   return null;
 }
 
+/**
+ * Where in the *season* a combined-timeline moment sits: which episode, and how
+ * far into that episode.
+ *
+ * `episodeAt` answers only the first half, and the second half is what deck
+ * provenance needs — a card mined from episode 104 should record `t=311s of
+ * episode 104`, not `t=5,120s of a corpus that no file on disk corresponds to`.
+ * The combined timeline is an artefact of `combineSeasonCues` offsetting each
+ * episode past the last; nothing outside this module can undo that offset.
+ *
+ * A moment inside an inter-episode gap belongs to no episode and returns null,
+ * the same as one past the end.
+ */
+export function locateInSeason(
+  segments: readonly CombinedSeasonSegment[],
+  seconds: number,
+): { episode: number; withinSec: number } | null {
+  for (const segment of segments) {
+    if (seconds >= segment.start && seconds <= segment.end) {
+      return { episode: segment.episode, withinSec: Math.max(0, seconds - segment.start) };
+    }
+  }
+  return null;
+}
+
 /** `3661.5` → `01:01:01,500`. SubRip separates milliseconds with a comma. */
 function srtStamp(seconds: number): string {
   const clamped = Math.max(0, seconds);

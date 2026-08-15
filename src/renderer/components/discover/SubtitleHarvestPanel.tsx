@@ -36,6 +36,7 @@ import {
   SEASON_STUDY_LIMITS,
   addMediaStudyFlashcards,
   analyzeMediaStudyCues,
+  mineableVocabulary,
   type MediaStudyAnalysis,
 } from '../../mediaStudyWorkflow';
 import { getLevel } from '../../knownWords';
@@ -188,15 +189,20 @@ export default function SubtitleHarvestPanel({ anilistId, malId, title, episodes
    * know is the fastest way to make a deck useless.
    */
   const mineable = useMemo(
-    () => (analysis ? analysis.vocabulary.filter((entry) => getLevel(entry.word) < 2) : []),
+    () => (analysis ? mineableVocabulary(analysis.vocabulary) : []),
     [analysis],
   );
 
   const mine = useCallback(() => {
     if (!analysis) return;
+    // `segments` and not just the cues: the analysis ran on the *combined*
+    // timeline, so without the segment index every card would record a
+    // timestamp measured from the first episode of the range and no episode at
+    // all — the one piece of provenance a season harvest owes the deck.
     const added = addMediaStudyFlashcards(
       { id: sourceId, title },
       { ...analysis, vocabulary: mineable },
+      { segments },
     );
     showToast({
       kind: added ? 'success' : 'default',
@@ -205,7 +211,7 @@ export default function SubtitleHarvestPanel({ anilistId, malId, title, episodes
         ? t('subHarvest.mined', { count: added })
         : t('subHarvest.minedNone'),
     });
-  }, [analysis, mineable, sourceId, t, title]);
+  }, [analysis, mineable, segments, sourceId, t, title]);
 
   const save = useCallback((kind: 'srt' | 'txt') => {
     const body = kind === 'srt' ? toSrt(cues) : toPlainText(cues);

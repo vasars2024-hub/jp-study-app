@@ -11,6 +11,7 @@ import {
   difficultyBandFromJlpt,
   type MediaLanguageProfile,
 } from '../shared/mediaStudyDatabase';
+import { locateInSeason, type CombinedSeasonSegment } from '../shared/subtitleHarvest';
 import type { MediaItem } from '../shared/types';
 import {
   buildVisualNovelStudyCardDrafts,
@@ -199,16 +200,50 @@ export function createMediaLanguageProfile(
   };
 }
 
+/** Knowledge level at and above which a word is no longer worth a card. */
+export const MINEABLE_BELOW_LEVEL = 2;
+
+/**
+ * Words worth a card: everything the learner is not already at level 2+ on.
+ *
+ * One function rather than the `getLevel(w) < 2` that was written inline in the
+ * visual-novel miner and again in the subtitle-harvest panel. Mining what you
+ * already know is the fastest way to make a deck useless, so this is the filter
+ * that has to be right — and a filter with three copies is one that drifts, and
+ * is only ever tested through whichever copy the test happened to reach.
+ */
+export function mineableVocabulary<T extends { word: string }>(
+  vocabulary: readonly T[],
+): T[] {
+  return vocabulary.filter((entry) => getLevel(entry.word) < MINEABLE_BELOW_LEVEL);
+}
+
 /**
  * `{ id, title }` rather than a full `MediaItem`: those are the only two fields
  * used, and widening the parameter lets the subtitle harvest — which mines a
  * catalogue entry that has no local media file — reuse this instead of forking
  * a second, drifting copy of the same deck write. `MediaItem` still satisfies it.
  */
+export interface MediaStudyFlashcardOptions {
+  limit?: number;
+  /**
+   * Season segments from `combineSeasonCues`, when the analysed corpus is a
+   * multi-episode harvest.
+   *
+   * Without them a card mined from a 94-episode range records the title and
+   * nothing else, so "where did this word come from" has no answer any surface
+   * can show — the combined timestamp is meaningless outside the one run that
+   * produced it. With them each card carries the episode number and the
+   * episode-relative moment, in `sourceRef`, which is the field the player and
+   * Study handoffs already read.
+   */
+  segments?: readonly CombinedSeasonSegment[];
+}
+
 export function addMediaStudyFlashcards(
   item: Pick<MediaItem, 'id' | 'title'>,
   analysis: MediaStudyAnalysis,
-  limit = 30,
+  options: MediaStudyFlashcardOptions = {},
 ): number {
   const existing = new Set(
     loadDeck()
@@ -216,18 +251,39 @@ export function addMediaStudyFlashcards(
       .map((card) => card.word),
   );
   const drafts = buildMediaStudyFlashcardDrafts(analysis.vocabulary, {
-    limit,
+    limit: options.limit ?? 30,
     excludeWords: existing,
   });
   if (!drafts.length) return 0;
-  addDeckCards(drafts.map((draft) => ({
-    ...draft,
-    meaning: '',
-    source: 'media' as const,
-    bookId: item.id,
-    bookTitle: item.title,
-    folder: 'Media',
-  })));
+  // `buildMediaStudyFlashcardDrafts` does not carry `firstSeenAt` through, and
+  // widening the draft would touch every other caller; the word is the key the
+  // ranking already deduplicates on, so this recovers it without that churn.
+  const firstSeen = new Map(analysis.vocabulary.map((entry) => [entry.word, entry.firstSeenAt]));
+  addDeckCards(drafts.map((draft) => {
+    const at = firstSeen.get(draft.word);
+    const located = options.segments && at !== undefined
+      ? locateInSeason(options.segments, at)
+      : null;
+    return {
+      ...draft,
+      meaning: '',
+      source: 'media' as const,
+      bookId: item.id,
+      bookTitle: item.title,
+      folder: 'Media',
+      ...(located
+        ? {
+          sourceRef: {
+            mediaId: item.id,
+            sourceKind: 'media' as const,
+            episode: located.episode,
+            cueStartSec: located.withinSec,
+            sentence: draft.sentence,
+          },
+        }
+        : {}),
+    };
+  }));
   return drafts.length;
 }
 
@@ -252,7 +308,7 @@ export function addVisualNovelStudyFlashcards(
   }
   const miningAnalysis: MediaStudyAnalysis = {
     ...analysis,
-    vocabulary: analysis.vocabulary.filter((entry) => getLevel(entry.word) < 2),
+    vocabulary: mineableVocabulary(analysis.vocabulary),
   };
   const drafts = buildVisualNovelStudyCardDrafts(miningAnalysis, sceneReferences, existing);
   const levels = configuredJlptSets();
