@@ -8460,7 +8460,7 @@ export const zh: Catalog = {
   'lexicon.xrefs.kind.see': '参见',
   'lexicon.xrefs.kind.cf': '比较',
   'lexicon.xrefs.notInstalled': '词典中没有',
-  'lexicon.xrefs.lookup': '查询 {word}',
+  'lexicon.lookup.word': '查询 {word}',
   'lexicon.audio.play': '播放 {word}',
   'lexicon.audio.loading': '正在获取发音',
   'lexicon.audio.none': '该词没有录音',

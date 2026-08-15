@@ -1011,7 +1011,7 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
       )}
 
       {variant !== 'popup' && entries.length > 0 && (
-        <LexiconCompounds query={entries[0].word} lang={lang} />
+        <LexiconCompounds query={entries[0].word} lang={lang} onLookup={onLookup} />
       )}
 
       {variant !== 'popup' && entries.length > 0 && (
@@ -1019,7 +1019,7 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
       )}
 
       {variant !== 'popup' && entries.length > 0 && (
-        <SemanticNeighbors query={entries[0].word} lang={lang} />
+        <SemanticNeighbors query={entries[0].word} lang={lang} onLookup={onLookup} />
       )}
 
       {/* Anchored on the same matched headword as the expansions above, so a note

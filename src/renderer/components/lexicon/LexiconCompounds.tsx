@@ -10,6 +10,12 @@ interface Props {
   query: string;
   /** Source language of the lookup, so a Han query is not searched in both. */
   lang: string;
+  /**
+   * Run a fresh lookup for one of these words, when the host owns a search box.
+   * Omitted by hosts that do not — the same seam `LexiconXrefs` uses, and the
+   * same rule: no callback, no control.
+   */
+  onLookup?: (text: string) => void;
 }
 
 /**
@@ -22,7 +28,7 @@ interface Props {
  * carries, with the queried word marked inside it, so nothing here claims a word
  * was *formed* from another one; it claims only what can be read off the row.
  */
-export default function LexiconCompounds({ query, lang }: Props) {
+export default function LexiconCompounds({ query, lang, onLookup }: Props) {
   const { t } = useT();
   const [state, setState] = useState<State>('idle');
   const [compounds, setCompounds] = useState<LexiconCompound[]>([]);
@@ -74,13 +80,32 @@ export default function LexiconCompounds({ query, lang }: Props) {
         <ul className="lexicon-compounds-list">
           {compounds.map((compound) => (
             <li key={`${compound.lang}-${compound.text}-${compound.reading}`}>
-              <span className="lexicon-compounds-word" lang={compound.lang}>
-                {splitCompoundText(compound.text, query).map((part, index) => (
-                  part.match
-                    ? <mark key={index}>{part.text}</mark>
-                    : <span key={index}>{part.text}</span>
-                ))}
-              </span>
+              {/* Every row here came out of the headword table, so unlike an
+                  xref target there is no "resolved" question to ask: if the
+                  host can run a lookup, the word can be looked up. */}
+              {onLookup ? (
+                <button
+                  className="lexicon-compounds-word lexicon-compounds-link"
+                  lang={compound.lang}
+                  onClick={() => onLookup(compound.text)}
+                  title={t('lexicon.lookup.word', { word: compound.text })}
+                  type="button"
+                >
+                  {splitCompoundText(compound.text, query).map((part, index) => (
+                    part.match
+                      ? <mark key={index}>{part.text}</mark>
+                      : <span key={index}>{part.text}</span>
+                  ))}
+                </button>
+              ) : (
+                <span className="lexicon-compounds-word" lang={compound.lang}>
+                  {splitCompoundText(compound.text, query).map((part, index) => (
+                    part.match
+                      ? <mark key={index}>{part.text}</mark>
+                      : <span key={index}>{part.text}</span>
+                  ))}
+                </span>
+              )}
               {compound.reading && compound.reading !== compound.text && (
                 <span className="lexicon-compounds-reading" lang={compound.lang}>
                   {compound.reading}

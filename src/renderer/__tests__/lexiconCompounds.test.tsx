@@ -176,6 +176,30 @@ describe('Words containing this one', () => {
     expect(rows().map((row) => row.querySelector('mark')?.textContent)).toEqual(['猫', '猫']);
   });
 
+  it('follows a compound when the host owns a search box, keeping the highlight', async () => {
+    stubApi({ query: '猫', entries: [ENTRY] } as DictResult);
+    const onLookup = vi.fn();
+    await render(<DictionaryResults query="猫" variant="page" lang="ja" onLookup={onLookup} />);
+    await click(runButton());
+
+    const link = host.querySelector<HTMLButtonElement>('.lexicon-compounds-link');
+    expect(link?.title).toBe('lexicon.lookup.word:子猫');
+    // The containment highlight is the row's whole claim; turning the word into
+    // a control must not flatten it into plain text.
+    expect(link?.querySelector('mark')?.textContent).toBe('猫');
+    await click(link);
+    expect(onLookup.mock.calls).toEqual([['子猫']]);
+  });
+
+  it('leaves every compound a plain label in a host with nowhere to run a lookup', async () => {
+    stubApi({ query: '猫', entries: [ENTRY] } as DictResult);
+    await render(<DictionaryResults query="猫" variant="page" lang="ja" />);
+    await click(runButton());
+
+    expect(rows()).not.toHaveLength(0);
+    expect(host.querySelector('.lexicon-compounds-link')).toBeNull();
+  });
+
   it('says plainly when nothing contains the word instead of showing an empty list', async () => {
     stubApi({ query: '猫', entries: [ENTRY] } as DictResult);
     compoundReply = async () => ({ query: '猫', compounds: [] });

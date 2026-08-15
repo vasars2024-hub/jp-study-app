@@ -131,6 +131,27 @@ describe('Semantic neighbours', () => {
     expect(row?.textContent).toContain('JMdict (English)');
   });
 
+  it('follows a neighbour when the host owns a search box, and only then', async () => {
+    stubApi({ query: '猫', entries: [ENTRY] } as DictResult);
+    const onLookup = vi.fn();
+    await render(<DictionaryResults query="猫" variant="page" lang="ja" onLookup={onLookup} />);
+    await click(runButton());
+
+    const link = host.querySelector<HTMLButtonElement>('.lexicon-neighbors-link');
+    expect(link?.title).toBe('lexicon.lookup.word:子猫');
+    await click(link);
+    expect(onLookup.mock.calls).toEqual([['子猫']]);
+  });
+
+  it('leaves every neighbour a plain label in a host with nowhere to run a lookup', async () => {
+    stubApi({ query: '猫', entries: [ENTRY] } as DictResult);
+    await render(<DictionaryResults query="猫" variant="page" lang="ja" />);
+    await click(runButton());
+
+    expect(rows()).not.toHaveLength(0);
+    expect(host.querySelector('.lexicon-neighbors-link')).toBeNull();
+  });
+
   it('says plainly when nothing shares a sense instead of showing an empty list', async () => {
     stubApi({ query: '猫', entries: [ENTRY] } as DictResult);
     neighborReply = async () => ({ query: '猫', probedSenses: ['cat'], neighbors: [] });

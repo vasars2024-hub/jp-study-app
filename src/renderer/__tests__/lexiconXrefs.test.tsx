@@ -176,7 +176,7 @@ describe('Related words', () => {
     await render(<DictionaryResults query="犬" variant="page" lang="ja" onLookup={vi.fn()} />);
 
     expect((host.querySelector('.lexicon-xrefs-link') as HTMLElement).title)
-      .toBe('lexicon.xrefs.lookup:ワンちゃん');
+      .toBe('lexicon.lookup.word:ワンちゃん');
   });
 
   it('tags each word with the language of the sense it came from', async () => {

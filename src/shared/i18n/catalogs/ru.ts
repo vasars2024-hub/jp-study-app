@@ -9297,7 +9297,7 @@ export const ru: Catalog = {
   'lexicon.xrefs.kind.see': 'См. также',
   'lexicon.xrefs.kind.cf': 'Сравните',
   'lexicon.xrefs.notInstalled': 'нет в ваших словарях',
-  'lexicon.xrefs.lookup': 'Найти {word}',
+  'lexicon.lookup.word': 'Найти {word}',
   'lexicon.audio.play': 'Воспроизвести {word}',
   'lexicon.audio.loading': 'Загрузка произношения',
   'lexicon.audio.none': 'Для этого слова нет записи',

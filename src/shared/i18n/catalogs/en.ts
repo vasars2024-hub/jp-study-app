@@ -8909,7 +8909,7 @@ export const en: Catalog = {
   'lexicon.xrefs.kind.see': 'See also',
   'lexicon.xrefs.kind.cf': 'Compare',
   'lexicon.xrefs.notInstalled': 'not in your dictionaries',
-  'lexicon.xrefs.lookup': 'Look up {word}',
+  'lexicon.lookup.word': 'Look up {word}',
   'lexicon.audio.play': 'Play {word}',
   'lexicon.audio.loading': 'Fetching pronunciation',
   'lexicon.audio.none': 'No recording for this word',

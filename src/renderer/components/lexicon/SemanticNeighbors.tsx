@@ -10,6 +10,12 @@ interface Props {
   query: string;
   /** Source language of the lookup, so a Han query is not searched in both. */
   lang: string;
+  /**
+   * Run a fresh lookup for one of these words, when the host owns a search box.
+   * Omitted by hosts that do not — the same seam `LexiconXrefs` uses, and the
+   * same rule: no callback, no control.
+   */
+  onLookup?: (text: string) => void;
 }
 
 /**
@@ -20,7 +26,7 @@ interface Props {
  * asks to widen it. Every row states the gloss it shares and the dictionary it
  * came from, so nothing here reads as an AI-suggested relationship.
  */
-export default function SemanticNeighbors({ query, lang }: Props) {
+export default function SemanticNeighbors({ query, lang, onLookup }: Props) {
   const { t } = useT();
   const [state, setState] = useState<State>('idle');
   const [neighbors, setNeighbors] = useState<LexiconNeighbor[]>([]);
@@ -72,7 +78,22 @@ export default function SemanticNeighbors({ query, lang }: Props) {
         <ul className="lexicon-neighbors-list">
           {neighbors.map((neighbor) => (
             <li key={`${neighbor.lang}-${neighbor.text}-${neighbor.reading}`}>
-              <span className="lexicon-neighbors-word" lang={neighbor.lang}>{neighbor.text}</span>
+              {/* A neighbour is a headword by construction — the probe found it
+                  in the headword table — so the control is offered whenever the
+                  host has somewhere to run the lookup. */}
+              {onLookup ? (
+                <button
+                  className="lexicon-neighbors-word lexicon-neighbors-link"
+                  lang={neighbor.lang}
+                  onClick={() => onLookup(neighbor.text)}
+                  title={t('lexicon.lookup.word', { word: neighbor.text })}
+                  type="button"
+                >
+                  {neighbor.text}
+                </button>
+              ) : (
+                <span className="lexicon-neighbors-word" lang={neighbor.lang}>{neighbor.text}</span>
+              )}
               {neighbor.reading && neighbor.reading !== neighbor.text && (
                 <span className="lexicon-neighbors-reading" lang={neighbor.lang}>
                   {neighbor.reading}

@@ -8495,7 +8495,7 @@ export const ja: Catalog = {
   'lexicon.xrefs.kind.see': '参照',
   'lexicon.xrefs.kind.cf': '比較',
   'lexicon.xrefs.notInstalled': '辞書に未収録',
-  'lexicon.xrefs.lookup': '{word} を検索',
+  'lexicon.lookup.word': '{word} を検索',
   'lexicon.audio.play': '{word} を再生',
   'lexicon.audio.loading': '音声を取得中',
   'lexicon.audio.none': 'この語の音声はありません',

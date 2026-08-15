@@ -110,7 +110,7 @@ export default function LexiconXrefs({ query, lang, onLookup }: Props) {
                   <button
                     className="lexicon-xrefs-text lexicon-xrefs-link"
                     onClick={() => onLookup(row.text)}
-                    title={t('lexicon.xrefs.lookup', { word: row.text })}
+                    title={t('lexicon.lookup.word', { word: row.text })}
                     type="button"
                   >
                     {row.text}
