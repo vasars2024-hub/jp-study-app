@@ -20609,7 +20609,10 @@ global deleted. The `.mp4` and both sidecars are untouched on disk — re-addabl
 ### Gates
 
 `npx vitest run --testTimeout=60000 --hookTimeout=60000` — **598 files passed, 1 skipped;
-7,901 passed, 6 skipped**, exit 0. `node tools/i18n-check.cjs` — 9,555 English keys translated
+7,901 passed, 6 skipped**, exit 0 — **measured in this shared dirty tree**, where the full suite
+is known to be green only because other tracks' implementations are unstaged here; at committed
+HEAD the branch is red for reasons owned by those tracks (boss-audit finding 2, 2026-08-15
+04:24). `node tools/i18n-check.cjs` — 9,555 English keys translated
 in ja/zh/ru, exit 0 (this slice adds no user-visible string; the fusion job has no UI yet, by
 F8's own sequencing). `node tools/architecture-audit.cjs` — 1,829 modules, 18 findings,
 **nothing new**, exit 0. `npx eslint` on the eight touched paths — clean, exit 0.
@@ -21458,3 +21461,55 @@ architecture exit 0, **Nothing new**, 2 known pending. eslint clean on 11 paths 
 *and* writers, and all four importers are reachable from Settings. Only the **source file** is
 missing, and only the user can supply it — logged in `~\.claude-runs\needs-user.md`. Data
 state, not code: complete-except-external.
+
+## Track 7 — the deck the importer read and threw most of away — 2026-08-15 18:20 MSK primary
+
+Track 2 is complete-except-external (only a user-supplied dataset fills the four empty
+tables; parked in needs-user.md), so Track 7 opens: `src/ANKI_DECK_WORKBENCH_PLAN.md`
+Phase 0/1. Boss audit 04:24 re-checked: findings 1, 4(b), 5 already fixed in the tree,
+2 is not the ladder's, **3 fixed here** (the bare `### Gates` at :20609 now carries the
+shared-tree caveat its siblings do).
+
+**Slice 1 — `ae02e53`. `src/shared/ankiDraft.ts`, the frozen draft contract.** The .apkg
+importer flattens a collection to word/reading/meaning/sentence; a round-trip through it
+loses note types, templates, all scheduling, flags, marks, media and every unclaimed
+field. `buildAnkiDraft` is pure and **total** — never throws on a malformed collection,
+because refusing to open a deck the user can see in Anki is worse than opening it with the
+damage named. **Decisions:** `due` stays raw (its unit depends on the card's type; a
+conversion needs the rollover hour and lies the moment the type changes).
+`mediaFilenamesFromAnkiMarkup` deliberately NOT reused — it validates markup this app
+wrote, drops any name with a slash and dedupes globally; a foreign deck's subdirectory
+reference is what must be *reported*. 34 tests.
+
+**Slice 2 — `01bdb53`. `apkg:readDraft` + `src/main/anki/apkgDraftRead.ts`.** Reads both
+schemas: legacy `col.models`/`col.decks` JSON, and schema 18's normalized tables.
+**Decision, the load-bearing one:** schema 18 keeps qfmt/afmt, CSS and the cloze kind in
+**protobuf blobs**. Defaulting them to empty would export blank-rendering cards that look
+like the user's own edit, so such a note type is marked `formatsUnavailable` and the draft
+raises `template-format-unavailable` as **blocking**. Rejected: guessing the proto field
+numbers (unverifiable) and silently emitting empty formats. The response is one **page** —
+`counts` describes the whole collection, `notes`/`cards` are windowed, reviews dropped.
+
+**Live, real IPC, main restarted, four real decks in ~/Downloads.** `N1 Vocab`: 3,359
+notes / 3,359 cards / **1,352 reviews in 580 ms**, page of 3, sha1 fingerprint,
+`template-format-unavailable` on "Basic++" with `qfmt` `""` and `cssLen` 0 — it did not
+invent a format. `Ginga Eiyuu Densetsu`: **schema 11**, legacy branch, a **23-field** note
+type with **26,923 chars** of CSS and a real qfmt, no blocking diagnostic — that is the
+deck the simplified importer reduces to four fields. `book.apkg`: **48** media refs
+resolved against the JSON manifest, 0 missing. Both branches proven on real user data.
+
+**Trap.** The bridge `/eval` param is **`js`**, not `code`, and it JSON-stringifies the
+result — a promise serializes to `{}`. Kick the work off into a global and poll it.
+
+**Gates**, once after the last slice, shared dirty tree. `npx vitest run` **625 files /
+8,357 tests, exit 0**, no failures (+3 files, +46 tests). `node tools/i18n-check.cjs`
+exit 0 at **9,636**, unchanged — this slice adds no user-visible string, by Phase 0's own
+sequencing (contracts before UI). `node tools/architecture-audit.cjs` exit 0, **Nothing
+new**, 2 known pending. `npx eslint` on all **7** touched paths: clean except the 2
+`adjacent-overload-signatures` errors in `window.d.ts`'s duplicate `subtitleHarvest*` block,
+which are **at HEAD** and another track's. `src/preload.ts` and
+`src/renderer/window.d.ts` carry other tracks' hunks; staged HEAD+insertion via
+`debug/stage-apkg-draft.cjs`, verified as exactly 7 added lines and nothing else.
+
+**Next.** Phase 1 continues: the protobuf decode that would close
+`template-format-unavailable` for schema 18, or the CSV/live-Anki source adapters.
