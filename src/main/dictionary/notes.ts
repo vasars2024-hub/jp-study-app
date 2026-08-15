@@ -28,8 +28,12 @@ interface NoteRow {
   reading: string | null;
   note: string | null;
   tags: string | null;
+  starred: number | null;
   updated_at: number;
 }
+
+/** Every column a note is rebuilt from, named once so the two readers cannot drift. */
+const NOTE_COLUMNS = 'lang, text, reading, note, tags, starred, updated_at';
 
 interface NoteKey {
   lang: string;
@@ -60,6 +64,9 @@ function toNote(row: NoteRow): LexiconNote {
     reading: row.reading ?? '',
     note: row.note ?? '',
     tags: parseNoteTags(row.tags),
+    // Every row written before this column had a writer holds the schema default
+    // 0, so an old note reads back as unstarred rather than as undefined.
+    starred: Number(row.starred) === 1,
     updatedAt: Number(row.updated_at) || 0,
   };
 }
@@ -70,7 +77,7 @@ export function readUserNote(db: SqliteDb, identity: LexiconNoteIdentity): Lexic
   if (!key) return null;
   const row = db
     .prepare(`
-      select lang, text, reading, note, tags, updated_at from user_notes
+      select ${NOTE_COLUMNS} from user_notes
       where lang = ? and norm = ? and reading_norm = ?
     `)
     .get(key.lang, key.norm, key.readingNorm) as NoteRow | undefined;
@@ -112,6 +119,9 @@ export function listUserNotes(db: SqliteDb, query: LexiconNoteListQuery): Lexico
     where.push('lang = ?');
     params.push(query.lang.trim().toLowerCase());
   }
+  // No parameter: the column is an integer flag this file is the only writer of,
+  // and `= 1` also excludes the nulls a hand-edited database could hold.
+  if (query.starredOnly) where.push('starred = 1');
   const filter = query.filter.trim();
   if (filter) {
     where.push(
@@ -128,7 +138,7 @@ export function listUserNotes(db: SqliteDb, query: LexiconNoteListQuery): Lexico
   );
   const rows = db
     .prepare(`
-      select lang, text, reading, note, tags, updated_at from user_notes
+      select ${NOTE_COLUMNS} from user_notes
       ${clause}
       order by updated_at desc, text asc
       limit ? offset ?
@@ -159,7 +169,7 @@ export function writeUserNote(
   const remove = db.prepare('delete from user_notes where lang = ? and norm = ? and reading_norm = ?');
   const insert = db.prepare(`
     insert into user_notes (headword_id, lang, text, norm, reading, reading_norm, note, tags, starred, updated_at)
-    values (0, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+    values (0, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const empty = noteIsEmpty(input);
   const stored = empty ? null : {
@@ -168,6 +178,7 @@ export function writeUserNote(
     reading: identity.reading.trim(),
     note: input.note,
     tags: [...input.tags],
+    starred: input.starred,
     updatedAt: Math.max(0, Math.floor(now)),
   } satisfies LexiconNote;
 
@@ -182,6 +193,7 @@ export function writeUserNote(
       key.readingNorm,
       stored.note,
       serializeNoteTags(stored.tags),
+      stored.starred ? 1 : 0,
       stored.updatedAt,
     );
   })();

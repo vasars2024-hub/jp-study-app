@@ -47,6 +47,7 @@ export default function NotesBrowser({ lang, onOpen }: Props) {
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState('');
   const [thisLangOnly, setThisLangOnly] = useState(false);
+  const [starredOnly, setStarredOnly] = useState(false);
   const [notes, setNotes] = useState<LexiconNote[]>([]);
   const [total, setTotal] = useState(0);
   const [state, setState] = useState<'idle' | 'loading' | 'error'>('idle');
@@ -62,7 +63,7 @@ export default function NotesBrowser({ lang, onOpen }: Props) {
     if (typeof window.api?.dictNoteList !== 'function') return;
     setState('loading');
     void window.api
-      .dictNoteList({ lang: scope, filter, limit, offset: 0 })
+      .dictNoteList({ lang: scope, filter, starredOnly, limit, offset: 0 })
       .then((result) => {
         // A slow reply for a filter the user has already retyped must not land
         // under the newer one.
@@ -74,7 +75,7 @@ export default function NotesBrowser({ lang, onOpen }: Props) {
       .catch(() => {
         if (attempt === run.current) setState('error');
       });
-  }, [scope, filter, limit]);
+  }, [scope, filter, starredOnly, limit]);
 
   useEffect(() => {
     if (!open) return;
@@ -83,7 +84,7 @@ export default function NotesBrowser({ lang, onOpen }: Props) {
 
   // A result reported against a scope the user has since changed is worse than
   // no result, because the path it names is real and the count is not this list's.
-  useEffect(() => setExportStatus(''), [scope, filter]);
+  useEffect(() => setExportStatus(''), [scope, filter, starredOnly]);
 
   /**
    * Write out everything the current filter and scope match.
@@ -96,7 +97,7 @@ export default function NotesBrowser({ lang, onOpen }: Props) {
     setExporting(true);
     setExportStatus('');
     void window.api
-      .dictNoteExport({ lang: scope, filter })
+      .dictNoteExport({ lang: scope, filter, starredOnly })
       .then((result) => {
         // Dismissing the save dialog is a decision, not a failure, and must not
         // be reported back as one.
@@ -113,7 +114,7 @@ export default function NotesBrowser({ lang, onOpen }: Props) {
       })
       .catch(() => setExportStatus(t('lexicon.notes.exportFailed')))
       .finally(() => setExporting(false));
-  }, [scope, filter, t]);
+  }, [scope, filter, starredOnly, t]);
 
   // A note saved in the entry below has to show up here, or the two disagree.
   useEffect(() => {
@@ -159,13 +160,24 @@ export default function NotesBrowser({ lang, onOpen }: Props) {
           />
           <span>{t('lexicon.notes.thisLanguage')}</span>
         </label>
+        <label className="lexicon-notes-scope">
+          <input
+            type="checkbox"
+            checked={starredOnly}
+            onChange={(e) => {
+              setStarredOnly(e.target.checked);
+              setLimit(NOTE_LIST_DEFAULT_LIMIT);
+            }}
+          />
+          <span>{t('lexicon.notes.starredOnly')}</span>
+        </label>
       </div>
 
       {state === 'error' ? (
         <p className="lexicon-notes-error" role="alert">{t('lexicon.notes.failed')}</p>
       ) : notes.length === 0 ? (
         <p className="muted lexicon-notes-empty">
-          {t(filter || thisLangOnly ? 'lexicon.notes.noMatches' : 'lexicon.notes.empty')}
+          {t(filter || thisLangOnly || starredOnly ? 'lexicon.notes.noMatches' : 'lexicon.notes.empty')}
         </p>
       ) : (
         <>
@@ -177,6 +189,17 @@ export default function NotesBrowser({ lang, onOpen }: Props) {
                   className="lexicon-notes-open"
                   onClick={() => onOpen(note.text, note.lang)}
                 >
+                  {/*
+                    Read out rather than hidden: with "starred only" off the list
+                    mixes both, and a screen reader otherwise hears two identical
+                    rows. The glyph carries the state, so it survives monochrome.
+                  */}
+                  {note.starred && (
+                    <span className="lexicon-notes-star" title={t('lexicon.notes.starredRow')}>
+                      <span aria-hidden="true">★</span>
+                      <span className="sr-only">{t('lexicon.notes.starredRow')}</span>
+                    </span>
+                  )}
                   <span className="lexicon-notes-word" lang={note.lang}>{note.text}</span>
                   {note.reading && (
                     <span className="muted lexicon-notes-reading" lang={note.lang}>{note.reading}</span>

@@ -12,6 +12,42 @@
   font-weight: 600;
 }
 
+/* The label takes the room the marker leaves so the star sits at the end of the
+   row rather than immediately after the words, at any width. */
+.lexicon-note-summary-label {
+  margin-right: 8px;
+}
+
+.lexicon-note-star {
+  /* 32px is the shared minimum hit target; the glyph alone is far below it. */
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  color: var(--muted, #8a8a8a);
+  font-size: 1.15em;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.lexicon-note-star:hover:not(:disabled) {
+  border-color: var(--border);
+  background: var(--surface-2);
+}
+
+.lexicon-note-star.is-starred {
+  /* Colour is not the only signal: the glyph itself changes from ☆ to ★, so a
+     starred word still reads as starred in monochrome and in high contrast. */
+  color: var(--accent, #c99a2e);
+}
+
+.lexicon-note-star:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
 .lexicon-note-about {
   margin: 8px 0 0;
   font-size: 0.9em;

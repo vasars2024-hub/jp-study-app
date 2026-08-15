@@ -28,6 +28,16 @@ export interface LexiconNoteIdentity {
 export interface LexiconNote extends LexiconNoteIdentity {
   note: string;
   tags: string[];
+  /**
+   * The user marked this word to come back to.
+   *
+   * A star is not a note with a special body: it is a one-click judgement about a
+   * word, and it has to be settable without writing prose and readable without
+   * parsing any. It rides on the note row because the two are keyed on the same
+   * word identity and a second table would only duplicate that key, migration 6's
+   * partial index, and the orphan handling that goes with them.
+   */
+  starred: boolean;
   /** Epoch milliseconds of the last write. 0 for a note that has never been written. */
   updatedAt: number;
 }
@@ -35,6 +45,7 @@ export interface LexiconNote extends LexiconNoteIdentity {
 export interface LexiconNoteInput {
   note: string;
   tags: string[];
+  starred: boolean;
 }
 
 /** One page of the user's notes. `total` counts every match, not the page. */
@@ -43,6 +54,11 @@ export interface LexiconNoteListQuery {
   lang: string;
   /** Empty means no text filter. Matched against word, reading, body and tags. */
   filter: string;
+  /**
+   * Keep only starred rows. `false` shows starred and unstarred alike rather than
+   * "unstarred only" — the star narrows a list, it does not partition it.
+   */
+  starredOnly: boolean;
   limit: number;
   offset: number;
 }
@@ -166,6 +182,7 @@ export function readNoteListQuery(raw: unknown): LexiconNoteListQuery {
   return {
     lang: boundedField(record.lang, 16).toLowerCase(),
     filter: boundedField(record.filter, NOTE_FILTER_MAX_CHARS),
+    starredOnly: record.starredOnly === true,
     limit,
     offset,
   };
@@ -175,7 +192,13 @@ export function readNoteInput(raw: unknown): LexiconNoteInput {
   const record = raw && typeof raw === 'object' && !Array.isArray(raw)
     ? raw as Record<string, unknown>
     : {};
-  return { note: normalizeNoteText(record.note), tags: normalizeNoteTags(record.tags) };
+  return {
+    note: normalizeNoteText(record.note),
+    tags: normalizeNoteTags(record.tags),
+    // Strictly `=== true`: an absent field must read as "not starred" and never
+    // as truthy-by-accident, because this value is written, not merely filtered.
+    starred: record.starred === true,
+  };
 }
 
 /**
@@ -184,9 +207,13 @@ export function readNoteInput(raw: unknown): LexiconNoteInput {
  * Clearing the text is how a note is deleted — an empty row would otherwise sit
  * in the table forever, and "the note is gone" and "the note is an empty string"
  * would be two states the reader cannot tell apart.
+ *
+ * A star counts as content. Without that clause, starring a word nobody has
+ * written about would store a row and then immediately delete it, and the star
+ * would silently fail on exactly the words it is most useful for.
  */
 export function noteIsEmpty(input: LexiconNoteInput): boolean {
-  return input.note.length === 0 && input.tags.length === 0;
+  return input.note.length === 0 && input.tags.length === 0 && !input.starred;
 }
 
 /** Tags are stored as one text column; this is the only place that shape is decided. */
@@ -202,6 +229,7 @@ export function parseNoteTags(raw: unknown): string[] {
 export interface LexiconNoteExportQuery {
   lang: string;
   filter: string;
+  starredOnly: boolean;
 }
 
 export interface LexiconNoteExportResult {
@@ -224,11 +252,11 @@ export interface LexiconNoteExportResult {
  * the trimming and case-folding rules would eventually disagree about which.
  */
 export function readNoteExportQuery(raw: unknown): LexiconNoteExportQuery {
-  const { lang, filter } = readNoteListQuery(raw);
-  return { lang, filter };
+  const { lang, filter, starredOnly } = readNoteListQuery(raw);
+  return { lang, filter, starredOnly };
 }
 
-const CSV_COLUMNS = ['language', 'word', 'reading', 'note', 'tags', 'updated'] as const;
+const CSV_COLUMNS = ['language', 'word', 'reading', 'note', 'tags', 'starred', 'updated'] as const;
 
 /**
  * One RFC 4180 field.
@@ -262,6 +290,9 @@ function csvField(value: string): string {
  * shape rather than a second tag serialization invented here. Timestamps are
  * ISO 8601 rather than a localized date: an export outlives the locale that
  * wrote it, and `2026-08-14T…` is unambiguous everywhere `08/14/2026` is not.
+ *
+ * `starred` is `1`/`0` for the same reason: `yes`/`Да` would make the file's
+ * meaning depend on the UI language that happened to be set when it was written.
  */
 export function notesToCsv(notes: readonly LexiconNote[]): string {
   const rows = [CSV_COLUMNS.map(csvField).join(',')];
@@ -272,6 +303,7 @@ export function notesToCsv(notes: readonly LexiconNote[]): string {
       note.reading,
       note.note,
       serializeNoteTags(note.tags),
+      note.starred ? '1' : '0',
       note.updatedAt > 0 ? new Date(note.updatedAt).toISOString() : '',
     ].map(csvField).join(','));
   }

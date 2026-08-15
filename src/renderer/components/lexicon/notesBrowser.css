@@ -93,6 +93,12 @@
   background: var(--surface-2);
 }
 
+.lexicon-notes-star {
+  flex: 0 0 auto;
+  color: var(--accent, #c99a2e);
+  line-height: 1;
+}
+
 .lexicon-notes-word {
   font-size: 1.1em;
   font-weight: 600;

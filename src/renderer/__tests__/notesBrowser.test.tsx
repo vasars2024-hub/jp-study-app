@@ -28,6 +28,7 @@ function note(overrides: Partial<LexiconNote> = {}): LexiconNote {
     reading: 'たべる',
     note: 'ichidan verb',
     tags: ['verbs'],
+    starred: false,
     updatedAt: 1_700_000_000_000,
     ...overrides,
   };
@@ -48,10 +49,12 @@ function stubApi(list: (query: LexiconNoteListQuery) => Promise<LexiconNoteListR
 
 /** The ordinary case: everything seeded, paged by whatever the surface asked for. */
 function stubWith(all: LexiconNote[]): void {
-  stubApi(async (query) => ({
-    notes: all.filter((n) => !query.lang || n.lang === query.lang).slice(0, query.limit),
-    total: all.filter((n) => !query.lang || n.lang === query.lang).length,
-  }));
+  stubApi(async (query) => {
+    const matched = all.filter(
+      (n) => (!query.lang || n.lang === query.lang) && (!query.starredOnly || n.starred),
+    );
+    return { notes: matched.slice(0, query.limit), total: matched.length };
+  });
 }
 
 let root: Root | null = null;
@@ -93,6 +96,11 @@ const filterField = () =>
   need(host.querySelector<HTMLInputElement>('.lexicon-notes-filter'), 'the filter field');
 const scopeToggle = () =>
   need(host.querySelector<HTMLInputElement>('.lexicon-notes-scope input'), 'the language scope toggle');
+const starToggle = () =>
+  need(
+    host.querySelectorAll<HTMLInputElement>('.lexicon-notes-scope input')[1],
+    'the starred-only toggle',
+  );
 
 /** `<details>` does not fire `toggle` in jsdom on its own; the component reads `open` off the event. */
 async function openPanel(): Promise<void> {
@@ -248,6 +256,44 @@ describe('the notes browser', () => {
     expect(panel()).toBeNull();
     expect(host.textContent).toBe('');
   });
+
+  it('narrows to starred rows in the database, not in the page it already has', async () => {
+    const starredTaberu = note({ starred: true });
+    stubWith([starredTaberu, NEKO]);
+    await render(<NotesBrowser lang="ja" onOpen={ignoreOpen} />);
+    await openPanel();
+    expect(dictNoteList).toHaveBeenLastCalledWith(expect.objectContaining({ starredOnly: false }));
+    expect(words()).toEqual(['食べる', '猫']);
+
+    await act(async () => {
+      starToggle().click();
+    });
+    expect(dictNoteList).toHaveBeenLastCalledWith(
+      expect.objectContaining({ starredOnly: true, offset: 0 }),
+    );
+    expect(words()).toEqual(['食べる']);
+  });
+
+  it('marks a starred row so a mixed list is readable, and says so in words', async () => {
+    stubWith([note({ starred: true }), NEKO]);
+    await render(<NotesBrowser lang="ja" onOpen={ignoreOpen} />);
+    await openPanel();
+    const stars = host.querySelectorAll('.lexicon-notes-star');
+    expect(stars).toHaveLength(1);
+    // Not the glyph alone: the row is a button, and a screen reader has to hear
+    // the difference between the two otherwise identical rows.
+    expect(stars[0].textContent).toContain('lexicon.notes.starredRow');
+  });
+
+  it('calls an empty starred filter no matches, not an empty archive', async () => {
+    stubWith([NEKO]);
+    await render(<NotesBrowser lang="ja" onOpen={ignoreOpen} />);
+    await openPanel();
+    await act(async () => {
+      starToggle().click();
+    });
+    expect(host.querySelector('.lexicon-notes-empty')?.textContent).toBe('lexicon.notes.noMatches');
+  });
 });
 
 describe('the notes browser — taking the archive out of the app', () => {
@@ -280,7 +326,7 @@ describe('the notes browser — taking the archive out of the app', () => {
       scopeToggle().click();
     });
     await click(need(exportButton(), 'the export button'));
-    expect(dictNoteExport).toHaveBeenCalledWith({ lang: 'ja', filter: 'ね' });
+    expect(dictNoteExport).toHaveBeenCalledWith({ lang: 'ja', filter: 'ね', starredOnly: false });
     expect(dictNoteExport.mock.calls[0][0]).not.toHaveProperty('limit');
     expect(dictNoteExport.mock.calls[0][0]).not.toHaveProperty('offset');
   });

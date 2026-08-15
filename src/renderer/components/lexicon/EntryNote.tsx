@@ -35,6 +35,13 @@ function parseTagField(value: string): string[] {
  * "saved" cannot be shown for a write that did not land. Clearing both fields and
  * saving deletes the note — the copy says so, because a note that is an empty
  * string and a note that is gone must not look the same.
+ *
+ * The star is the exception to "saving is explicit". It carries no typed text to
+ * lose, it is the one thing here worth doing on a word you have nothing to say
+ * about yet, and an explicit save step would make marking a word cost the same as
+ * writing about one. It therefore writes immediately — and writes the *stored*
+ * note body, never the draft in the box, so a click on the star can never commit
+ * half a sentence someone was still typing.
  */
 export default function EntryNote({ word, reading, lang }: Props) {
   const { t } = useT();
@@ -43,6 +50,8 @@ export default function EntryNote({ word, reading, lang }: Props) {
   const [text, setText] = useState('');
   const [tagField, setTagField] = useState('');
   const [saved, setSaved] = useState<{ note: string; tags: string }>({ note: '', tags: '' });
+  const [starred, setStarred] = useState(false);
+  const [starBusy, setStarBusy] = useState(false);
   const [state, setState] = useState<SaveState>('idle');
   const run = useRef(0);
 
@@ -53,6 +62,8 @@ export default function EntryNote({ word, reading, lang }: Props) {
     setText('');
     setTagField('');
     setSaved({ note: '', tags: '' });
+    setStarred(false);
+    setStarBusy(false);
     setState('idle');
     if (!word || !lang) return;
     // A preload without these bindings cannot read a note and cannot store one
@@ -70,7 +81,11 @@ export default function EntryNote({ word, reading, lang }: Props) {
         setText(note?.note ?? '');
         setTagField(tags);
         setSaved({ note: note?.note ?? '', tags });
-        setOpen(Boolean(note));
+        setStarred(Boolean(note?.starred));
+        // Unfolded for something to read, not merely for a row that exists: a
+        // word that is only starred has an empty editor, and opening it would
+        // spend the space the star was meant to save.
+        setOpen(Boolean(note && (note.note || note.tags.length > 0)));
         setLoaded(true);
       })
       .catch(() => {
@@ -81,6 +96,15 @@ export default function EntryNote({ word, reading, lang }: Props) {
 
   const dirty = text !== saved.note || tagField !== saved.tags;
 
+  /** Only after a write the database confirmed — announcing an attempt would imply it landed. */
+  function announce(): void {
+    try {
+      window.dispatchEvent(new CustomEvent(LEXICON_NOTES_CHANGED_EVENT));
+    } catch {
+      /* jsdom without CustomEvent, and a missed refresh is not worth failing a save over */
+    }
+  }
+
   async function save(): Promise<void> {
     if (state === 'saving' || !dirty) return;
     const attempt = run.current;
@@ -88,7 +112,7 @@ export default function EntryNote({ word, reading, lang }: Props) {
     try {
       const result = await window.api.dictNoteSet(
         { lang, text: word, reading },
-        { note: text, tags: parseTagField(tagField) },
+        { note: text, tags: parseTagField(tagField), starred },
       );
       if (attempt !== run.current) return;
       if (!result.ok) {
@@ -101,17 +125,45 @@ export default function EntryNote({ word, reading, lang }: Props) {
       setText(result.note?.note ?? '');
       setTagField(storedTags);
       setSaved({ note: result.note?.note ?? '', tags: storedTags });
+      setStarred(Boolean(result.note?.starred));
       setState('saved');
-      // Only after a write the database confirmed. Announcing an attempted save
-      // would make the browse list re-read for nothing and, worse, imply the
-      // note landed.
-      try {
-        window.dispatchEvent(new CustomEvent(LEXICON_NOTES_CHANGED_EVENT));
-      } catch {
-        /* jsdom without CustomEvent, and a missed refresh is not worth failing a save over */
-      }
+      announce();
     } catch {
       if (attempt === run.current) setState('error');
+    }
+  }
+
+  /**
+   * Flip the star and store it in the same round trip.
+   *
+   * `saved`, not the draft: the star owns one field of a row whose other fields
+   * belong to the explicit save button, so it re-sends the last confirmed body
+   * rather than whatever is currently in the box.
+   *
+   * Unstarring a word with no note and no tags empties the row, and the main
+   * process deletes it — which is the correct end state, not a lost note.
+   */
+  async function toggleStar(): Promise<void> {
+    if (starBusy || typeof window.api?.dictNoteSet !== 'function') return;
+    const attempt = run.current;
+    const next = !starred;
+    setStarBusy(true);
+    try {
+      const result = await window.api.dictNoteSet(
+        { lang, text: word, reading },
+        { note: saved.note, tags: parseTagField(saved.tags), starred: next },
+      );
+      if (attempt !== run.current) return;
+      // A failed write leaves the star where it was. Showing it filled and then
+      // finding it empty on the next lookup is worse than it never moving.
+      if (result.ok) {
+        setStarred(Boolean(result.note?.starred));
+        announce();
+      }
+    } catch {
+      /* same as a rejected write: the star does not move */
+    } finally {
+      if (attempt === run.current) setStarBusy(false);
     }
   }
 
@@ -123,7 +175,30 @@ export default function EntryNote({ word, reading, lang }: Props) {
       open={open}
       onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)}
     >
-      <summary>{t('lexicon.note.title')}</summary>
+      <summary>
+        <span className="lexicon-note-summary-label">{t('lexicon.note.title')}</span>
+        {/*
+          Inside the summary so the star costs one click on a collapsed note, and
+          `preventDefault` so that click marks the word instead of unfolding the
+          editor. The button is still a button: Enter and Space on it fire the same
+          handler, and the summary keeps its own keyboard toggle.
+        */}
+        <button
+          type="button"
+          className={`lexicon-note-star${starred ? ' is-starred' : ''}`}
+          aria-pressed={starred}
+          disabled={starBusy}
+          title={t(starred ? 'lexicon.note.unstar' : 'lexicon.note.star')}
+          aria-label={t(starred ? 'lexicon.note.unstar' : 'lexicon.note.star')}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            void toggleStar();
+          }}
+        >
+          <span aria-hidden="true">{starred ? '★' : '☆'}</span>
+        </button>
+      </summary>
       <p className="muted lexicon-note-about">{t('lexicon.note.about')}</p>
       <textarea
         className="lexicon-note-text"

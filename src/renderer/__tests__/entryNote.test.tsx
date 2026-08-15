@@ -21,6 +21,7 @@ function note(overrides: Partial<LexiconNote> = {}): LexiconNote {
     reading: 'たべる',
     note: 'transitive pair',
     tags: ['verbs'],
+    starred: false,
     updatedAt: 5,
     ...overrides,
   };
@@ -33,13 +34,15 @@ function stubApi(
   get: (identity: { lang: string; text: string; reading: string }) => Promise<LexiconNote | null>,
   set?: (
     identity: { lang: string; text: string; reading: string },
-    input: { note: string; tags: string[] },
+    input: { note: string; tags: string[]; starred: boolean },
   ) => Promise<{ ok: boolean; note: LexiconNote | null }>,
 ): void {
   dictNoteGet = vi.fn(get);
   dictNoteSet = vi.fn(set ?? (async (_i, input) => ({
     ok: true,
-    note: input.note || input.tags.length ? note({ note: input.note, tags: input.tags }) : null,
+    note: input.note || input.tags.length || input.starred
+      ? note({ note: input.note, tags: input.tags, starred: input.starred })
+      : null,
   })));
   (window as unknown as { api: Record<string, unknown> }).api = { dictNoteGet, dictNoteSet };
 }
@@ -104,7 +107,7 @@ async function type(field: HTMLTextAreaElement | HTMLInputElement, value: string
 
 async function click(button: HTMLButtonElement): Promise<void> {
   await act(async () => {
-    button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
   });
 }
 
@@ -149,7 +152,7 @@ describe('EntryNote', () => {
     await click(saveButton());
     expect(dictNoteSet).toHaveBeenCalledWith(
       { lang: 'ja', text: '食べる', reading: 'たべる' },
-      { note: 'ichidan, not godan', tags: ['verbs', 'JLPT N5'] },
+      { note: 'ichidan, not godan', tags: ['verbs', 'JLPT N5'], starred: false },
     );
   });
 
@@ -193,7 +196,7 @@ describe('EntryNote', () => {
     await type(textarea(), '');
     await type(tagInput(), '');
     await click(saveButton());
-    expect(dictNoteSet).toHaveBeenCalledWith(expect.anything(), { note: '', tags: [] });
+    expect(dictNoteSet).toHaveBeenCalledWith(expect.anything(), { note: '', tags: [], starred: false });
     expect(textarea().value).toBe('');
     expect(tagInput().value).toBe('');
   });
@@ -235,5 +238,80 @@ describe('EntryNote', () => {
     stubApi(() => new Promise<LexiconNote | null>(() => undefined));
     await render(<EntryNote {...TABERU} />);
     expect(box()).toBeNull();
+  });
+});
+
+/*
+ * The star is the one control here that writes without an explicit save, so what
+ * it sends matters more than what it looks like.
+ */
+describe('EntryNote — the star', () => {
+  const star = () =>
+    need(host.querySelector<HTMLButtonElement>('.lexicon-note-star'), 'the star button');
+
+  it('offers a star on a word with no note, and marks it in one click', async () => {
+    stubApi(async () => null);
+    await render(<EntryNote {...TABERU} />);
+    expect(star().getAttribute('aria-pressed')).toBe('false');
+    await click(star());
+    expect(dictNoteSet).toHaveBeenCalledWith(
+      { lang: 'ja', text: '食べる', reading: 'たべる' },
+      { note: '', tags: [], starred: true },
+    );
+    expect(star().getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('shows a stored star as pressed and takes it off again', async () => {
+    stubApi(async () => note({ starred: true }));
+    await render(<EntryNote {...TABERU} />);
+    expect(star().getAttribute('aria-pressed')).toBe('true');
+    await click(star());
+    expect(dictNoteSet.mock.calls[0][1]).toMatchObject({ starred: false });
+    expect(star().getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('sends the stored note, never the half-typed draft in the box', async () => {
+    stubApi(async () => note({ note: 'stored', tags: [] }));
+    await render(<EntryNote {...TABERU} />);
+    await type(textarea(), 'still typing this');
+    await click(star());
+    // The draft must not ride along on a click that was about the star.
+    expect(dictNoteSet).toHaveBeenCalledWith(expect.anything(), {
+      note: 'stored',
+      tags: [],
+      starred: true,
+    });
+    expect(textarea().value).toBe('still typing this');
+  });
+
+  it('marks the word instead of unfolding the editor', async () => {
+    stubApi(async () => null);
+    await render(<EntryNote {...TABERU} />);
+    expect(box()?.open).toBe(false);
+    await click(star());
+    expect(box()?.open).toBe(false);
+  });
+
+  it('opens a word that has a note, but not one that is only starred', async () => {
+    stubApi(async () => note({ note: '', tags: [], starred: true }));
+    await render(<EntryNote {...TABERU} />);
+    expect(star().getAttribute('aria-pressed')).toBe('true');
+    // Nothing to read means nothing to show; the star already said what it had to.
+    expect(box()?.open).toBe(false);
+  });
+
+  it('leaves the star where it was when the write fails', async () => {
+    stubApi(async () => null, async () => ({ ok: false, note: null }));
+    await render(<EntryNote {...TABERU} />);
+    await click(star());
+    expect(star().getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('does not carry a star across to the next word looked up', async () => {
+    stubApi(async (identity) => (identity.text === '食べる' ? note({ starred: true }) : null));
+    await render(<EntryNote {...TABERU} />);
+    expect(star().getAttribute('aria-pressed')).toBe('true');
+    await rerender(<EntryNote word="猫" reading="ねこ" lang="ja" />);
+    expect(star().getAttribute('aria-pressed')).toBe('false');
   });
 });

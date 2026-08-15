@@ -74,13 +74,14 @@ afterEach(() => {
 
 describe('user notes — storing and reading', () => {
   it('reads back the note it stored', () => {
-    writeUserNote(db, TABERU, { note: 'transitive pair is 食べさせる', tags: ['verbs'] }, 1_700_000_000_000);
+    writeUserNote(db, TABERU, { note: 'transitive pair is 食べさせる', tags: ['verbs'], starred: false }, 1_700_000_000_000);
     expect(readUserNote(db, TABERU)).toEqual({
       lang: 'ja',
       text: '食べる',
       reading: 'たべる',
       note: 'transitive pair is 食べさせる',
       tags: ['verbs'],
+      starred: false,
       updatedAt: 1_700_000_000_000,
     });
   });
@@ -90,44 +91,44 @@ describe('user notes — storing and reading', () => {
   });
 
   it('replaces rather than duplicates when the same word is written twice', () => {
-    writeUserNote(db, TABERU, { note: 'first', tags: [] });
-    writeUserNote(db, TABERU, { note: 'second', tags: [] });
+    writeUserNote(db, TABERU, { note: 'first', tags: [], starred: false });
+    writeUserNote(db, TABERU, { note: 'second', tags: [], starred: false });
     expect(db.prepare('select count(*) c from user_notes').get()).toEqual({ c: 1 });
     expect(readUserNote(db, TABERU)?.note).toBe('second');
   });
 
   it('deletes the row when both fields are cleared, so "gone" is not stored as ""', () => {
-    writeUserNote(db, TABERU, { note: 'temporary', tags: ['x'] });
-    expect(writeUserNote(db, TABERU, { note: '', tags: [] })).toBeNull();
+    writeUserNote(db, TABERU, { note: 'temporary', tags: ['x'], starred: false });
+    expect(writeUserNote(db, TABERU, { note: '', tags: [], starred: false })).toBeNull();
     expect(db.prepare('select count(*) c from user_notes').get()).toEqual({ c: 0 });
     expect(readUserNote(db, TABERU)).toBeNull();
   });
 
   it('keeps a tags-only note, because a tag is content too', () => {
-    expect(writeUserNote(db, TABERU, { note: '', tags: ['jlpt-n5'] })?.tags).toEqual(['jlpt-n5']);
+    expect(writeUserNote(db, TABERU, { note: '', tags: ['jlpt-n5'], starred: false })?.tags).toEqual(['jlpt-n5']);
     expect(readUserNote(db, TABERU)?.tags).toEqual(['jlpt-n5']);
   });
 
   it('round-trips several tags through the single stored column', () => {
-    writeUserNote(db, TABERU, { note: 'x', tags: ['verbs', 'JLPT N5', 'ichidan'] });
+    writeUserNote(db, TABERU, { note: 'x', tags: ['verbs', 'JLPT N5', 'ichidan'], starred: false });
     expect(readUserNote(db, TABERU)?.tags).toEqual(['verbs', 'JLPT N5', 'ichidan']);
   });
 
   it('refuses an identity that does not name a word, and writes nothing', () => {
-    expect(writeUserNote(db, { lang: 'ja', text: '   ', reading: '' }, { note: 'x', tags: [] })).toBeNull();
-    expect(writeUserNote(db, { lang: '', text: '食べる', reading: '' }, { note: 'x', tags: [] })).toBeNull();
+    expect(writeUserNote(db, { lang: 'ja', text: '   ', reading: '' }, { note: 'x', tags: [], starred: false })).toBeNull();
+    expect(writeUserNote(db, { lang: '', text: '食べる', reading: '' }, { note: 'x', tags: [], starred: false })).toBeNull();
     expect(db.prepare('select count(*) c from user_notes').get()).toEqual({ c: 0 });
   });
 });
 
 describe('user notes — browsing every note without knowing the word', () => {
   /** The whole page, which is what the browse surface asks for on open. */
-  const ALL = { lang: '', filter: '', limit: NOTE_LIST_DEFAULT_LIMIT, offset: 0 };
+  const ALL = { lang: '', filter: '', starredOnly: false, limit: NOTE_LIST_DEFAULT_LIMIT, offset: 0 };
 
   function seedNotes(): void {
-    writeUserNote(db, TABERU, { note: 'ichidan verb', tags: ['verbs'] }, 3_000);
-    writeUserNote(db, { lang: 'ja', text: '猫', reading: 'ねこ' }, { note: 'everyday word', tags: ['animals'] }, 1_000);
-    writeUserNote(db, { lang: 'zh', text: '生物', reading: '' }, { note: 'shēngwù', tags: [] }, 2_000);
+    writeUserNote(db, TABERU, { note: 'ichidan verb', tags: ['verbs'], starred: false }, 3_000);
+    writeUserNote(db, { lang: 'ja', text: '猫', reading: 'ねこ' }, { note: 'everyday word', tags: ['animals'], starred: false }, 1_000);
+    writeUserNote(db, { lang: 'zh', text: '生物', reading: '' }, { note: 'shēngwù', tags: [], starred: false }, 2_000);
   }
 
   it('lists every note newest first, with the word each one belongs to', () => {
@@ -141,6 +142,7 @@ describe('user notes — browsing every note without knowing the word', () => {
       reading: 'たべる',
       note: 'ichidan verb',
       tags: ['verbs'],
+      starred: false,
       updatedAt: 3_000,
     });
   });
@@ -151,7 +153,7 @@ describe('user notes — browsing every note without knowing the word', () => {
 
   it('drops a note from the list the moment it is cleared', () => {
     seedNotes();
-    writeUserNote(db, TABERU, { note: '', tags: [] });
+    writeUserNote(db, TABERU, { note: '', tags: [], starred: false });
     expect(listUserNotes(db, ALL).notes.map((note) => note.text)).toEqual(['生物', '猫']);
   });
 
@@ -171,13 +173,13 @@ describe('user notes — browsing every note without knowing the word', () => {
   });
 
   it('folds the filter the same way the lookup index does, so ＣＡＴ finds cat', () => {
-    writeUserNote(db, { lang: 'en', text: 'cat', reading: '' }, { note: 'x', tags: [] }, 1);
+    writeUserNote(db, { lang: 'en', text: 'cat', reading: '' }, { note: 'x', tags: [], starred: false }, 1);
     expect(listUserNotes(db, { ...ALL, filter: 'ＣＡＴ' }).notes.map((n) => n.text)).toEqual(['cat']);
   });
 
   it('treats a wildcard the user typed as a character, not as "match everything"', () => {
     seedNotes();
-    writeUserNote(db, { lang: 'ja', text: '％', reading: '' }, { note: 'percent sign', tags: [] }, 4_000);
+    writeUserNote(db, { lang: 'ja', text: '％', reading: '' }, { note: 'percent sign', tags: [], starred: false }, 4_000);
     expect(listUserNotes(db, { ...ALL, filter: '%' }).notes.map((n) => n.text)).toEqual(['％']);
     expect(listUserNotes(db, { ...ALL, filter: '_' }).total).toBe(0);
   });
@@ -201,6 +203,7 @@ describe('user notes — browsing every note without knowing the word', () => {
     expect(readNoteListQuery(undefined)).toEqual({
       lang: '',
       filter: '',
+      starredOnly: false,
       limit: NOTE_LIST_DEFAULT_LIMIT,
       offset: 0,
     });
@@ -213,9 +216,70 @@ describe('user notes — browsing every note without knowing the word', () => {
     expect(readNoteListQuery('nonsense')).toEqual({
       lang: '',
       filter: '',
+      starredOnly: false,
       limit: NOTE_LIST_DEFAULT_LIMIT,
       offset: 0,
     });
+  });
+});
+
+/*
+ * The star. `user_notes.starred` has existed since the first schema and had no
+ * writer and no reader until now — every row carried the default 0. These pin the
+ * two things that were not obvious: that a star alone keeps a row alive, and that
+ * writing a note does not quietly clear one.
+ */
+describe('user notes — the star', () => {
+  const ALL = { lang: '', filter: '', starredOnly: false, limit: NOTE_LIST_DEFAULT_LIMIT, offset: 0 };
+
+  it('stores a star on a word nobody wrote about, because a star is content too', () => {
+    expect(writeUserNote(db, TABERU, { note: '', tags: [], starred: true })?.starred).toBe(true);
+    expect(readUserNote(db, TABERU)?.starred).toBe(true);
+    expect(db.prepare('select starred from user_notes').get()).toEqual({ starred: 1 });
+  });
+
+  it('deletes the row when the last star comes off an otherwise empty note', () => {
+    writeUserNote(db, TABERU, { note: '', tags: [], starred: true });
+    expect(writeUserNote(db, TABERU, { note: '', tags: [], starred: false })).toBeNull();
+    expect(db.prepare('select count(*) c from user_notes').get()).toEqual({ c: 0 });
+  });
+
+  it('keeps the note when the star comes off a word that also has one', () => {
+    writeUserNote(db, TABERU, { note: 'ichidan', tags: [], starred: true });
+    const after = writeUserNote(db, TABERU, { note: 'ichidan', tags: [], starred: false });
+    expect(after).toMatchObject({ note: 'ichidan', starred: false });
+    expect(readUserNote(db, TABERU)?.note).toBe('ichidan');
+  });
+
+  it('reads an unstarred word back as false, not as the raw 0 the column holds', () => {
+    writeUserNote(db, TABERU, { note: 'x', tags: [], starred: false });
+    expect(readUserNote(db, TABERU)?.starred).toBe(false);
+  });
+
+  it('narrows the browse list to starred rows without partitioning it', () => {
+    writeUserNote(db, TABERU, { note: 'ichidan', tags: [], starred: true }, 3_000);
+    writeUserNote(db, { lang: 'ja', text: '猫', reading: 'ねこ' }, { note: 'cat', tags: [], starred: false }, 2_000);
+    expect(listUserNotes(db, ALL).notes.map((note) => note.text)).toEqual(['食べる', '猫']);
+    const starred = listUserNotes(db, { ...ALL, starredOnly: true });
+    expect(starred.notes.map((note) => note.text)).toEqual(['食べる']);
+    // `total` is the starred total, not the unfiltered one, or "showing 1 of 2"
+    // would offer a second page that does not exist.
+    expect(starred.total).toBe(1);
+  });
+
+  it('combines the star with the language and text filters rather than replacing them', () => {
+    writeUserNote(db, TABERU, { note: 'ichidan', tags: [], starred: true }, 3_000);
+    writeUserNote(db, { lang: 'zh', text: '生物', reading: '' }, { note: 'x', tags: [], starred: true }, 2_000);
+    const rows = listUserNotes(db, { ...ALL, lang: 'ja', starredOnly: true }).notes;
+    expect(rows.map((note) => note.text)).toEqual(['食べる']);
+  });
+
+  it('exports the star as a locale-free flag, so the file means the same in any UI language', () => {
+    writeUserNote(db, TABERU, { note: 'ichidan', tags: [], starred: true }, 3_000);
+    const scope = readNoteExportQuery({ starredOnly: true });
+    expect(scope.starredOnly).toBe(true);
+    const csv = notesToCsv(listUserNotes(db, { ...scope, limit: 100, offset: 0 }).notes);
+    expect(csv.split('\r\n')[1]).toContain('"1"');
   });
 });
 
@@ -227,6 +291,7 @@ describe('user notes — writing the archive out as a file the user owns', () =>
       reading: 'たべる',
       note: 'ichidan verb',
       tags: ['verbs'],
+      starred: false,
       updatedAt: 1_700_000_000_000,
       ...overrides,
     };
@@ -239,14 +304,14 @@ describe('user notes — writing the archive out as a file the user owns', () =>
 
   it('names its columns and writes one CRLF-terminated record per note', () => {
     const csv = notesToCsv([exported(), exported({ text: '猫', reading: 'ねこ' })]);
-    expect(csv.split('\r\n')[0]).toBe('"language","word","reading","note","tags","updated"');
+    expect(csv.split('\r\n')[0]).toBe('"language","word","reading","note","tags","starred","updated"');
     expect(csv.endsWith('\r\n')).toBe(true);
     // Header + two records + the trailing terminator's empty tail.
     expect(csv.split('\r\n')).toHaveLength(4);
   });
 
   it('writes a header and nothing else for an empty archive', () => {
-    expect(notesToCsv([])).toBe('"language","word","reading","note","tags","updated"\r\n');
+    expect(notesToCsv([])).toBe('"language","word","reading","note","tags","starred","updated"\r\n');
   });
 
   it('quotes a body containing the delimiter, a quote and a newline without losing any of them', () => {
@@ -280,7 +345,7 @@ describe('user notes — writing the archive out as a file the user owns', () =>
 
   it('exports the whole match, not the page the surface happens to be showing', () => {
     for (let i = 0; i < 5; i += 1) {
-      writeUserNote(db, { lang: 'ja', text: `語${i}`, reading: '' }, { note: 'x', tags: [] }, 1_000 + i);
+      writeUserNote(db, { lang: 'ja', text: `語${i}`, reading: '' }, { note: 'x', tags: [], starred: false }, 1_000 + i);
     }
     const scope = readNoteExportQuery({ lang: '', filter: '', limit: 2 });
     const all = listUserNotes(db, { ...scope, limit: 100, offset: 0 });
@@ -290,18 +355,18 @@ describe('user notes — writing the archive out as a file the user owns', () =>
   });
 
   it('selects by exactly the rules the list does, so the file and the screen agree', () => {
-    writeUserNote(db, TABERU, { note: 'ichidan verb', tags: ['verbs'] }, 3_000);
-    writeUserNote(db, { lang: 'zh', text: '生物', reading: '' }, { note: 'shēngwù', tags: [] }, 2_000);
+    writeUserNote(db, TABERU, { note: 'ichidan verb', tags: ['verbs'], starred: false }, 3_000);
+    writeUserNote(db, { lang: 'zh', text: '生物', reading: '' }, { note: 'shēngwù', tags: [], starred: false }, 2_000);
     const scope = readNoteExportQuery({ lang: ' JA ', filter: ' verbs ' });
-    expect(scope).toEqual({ lang: 'ja', filter: 'verbs' });
+    expect(scope).toEqual({ lang: 'ja', filter: 'verbs', starredOnly: false });
     const rows = listUserNotes(db, { ...scope, limit: 100, offset: 0 }).notes;
     expect(rows.map((note) => note.text)).toEqual(['食べる']);
   });
 
   it('drops the paging a caller supplied rather than letting it truncate the file', () => {
-    expect(readNoteExportQuery({ limit: 1, offset: 900 })).toEqual({ lang: '', filter: '' });
-    expect(readNoteExportQuery(undefined)).toEqual({ lang: '', filter: '' });
-    expect(readNoteExportQuery('nonsense')).toEqual({ lang: '', filter: '' });
+    expect(readNoteExportQuery({ limit: 1, offset: 900 })).toEqual({ lang: '', filter: '', starredOnly: false });
+    expect(readNoteExportQuery(undefined)).toEqual({ lang: '', filter: '', starredOnly: false });
+    expect(readNoteExportQuery('nonsense')).toEqual({ lang: '', filter: '', starredOnly: false });
     expect(readNoteExportQuery({ filter: 'x'.repeat(500) }).filter).toHaveLength(64);
   });
 });
@@ -311,7 +376,7 @@ describe('user notes — the identity a note is keyed on', () => {
   // number, and a re-import destroys every headword and hands its ids out again.
   it('survives the dictionary it was written against being re-imported', () => {
     seedHeadword(db, { text: '食べる', reading: 'たべる' });
-    writeUserNote(db, TABERU, { note: 'mine', tags: [] });
+    writeUserNote(db, TABERU, { note: 'mine', tags: [], starred: false });
 
     db.prepare('delete from dictionaries where id = ?').run('d1');
     expect(db.prepare('select count(*) c from headwords').get()).toEqual({ c: 0 });
@@ -321,30 +386,30 @@ describe('user notes — the identity a note is keyed on', () => {
   });
 
   it('is still readable with no headword at all, which is why the word is stored on the row', () => {
-    writeUserNote(db, TABERU, { note: 'mine', tags: [] });
+    writeUserNote(db, TABERU, { note: 'mine', tags: [], starred: false });
     expect(db.prepare('select count(*) c from headwords').get()).toEqual({ c: 0 });
     expect(readUserNote(db, TABERU)?.text).toBe('食べる');
   });
 
   it('finds the note through the same normalisation the headword index uses', () => {
-    writeUserNote(db, { lang: 'en', text: 'Cat', reading: '' }, { note: 'mine', tags: [] });
+    writeUserNote(db, { lang: 'en', text: 'Cat', reading: '' }, { note: 'mine', tags: [], starred: false });
     expect(readUserNote(db, { lang: 'en', text: 'CAT', reading: '' })?.note).toBe('mine');
     // NFKC: the full-width form is the same headword to the index, so it must be
     // the same note here.
-    writeUserNote(db, { lang: 'ja', text: 'ＡＢＣ', reading: '' }, { note: 'wide', tags: [] });
+    writeUserNote(db, { lang: 'ja', text: 'ＡＢＣ', reading: '' }, { note: 'wide', tags: [], starred: false });
     expect(readUserNote(db, { lang: 'ja', text: 'abc', reading: '' })?.note).toBe('wide');
   });
 
   it('keys on the language, so the same spelling in two languages is two notes', () => {
-    writeUserNote(db, { lang: 'ja', text: '愛', reading: '' }, { note: 'japanese', tags: [] });
-    writeUserNote(db, { lang: 'zh', text: '愛', reading: '' }, { note: 'chinese', tags: [] });
+    writeUserNote(db, { lang: 'ja', text: '愛', reading: '' }, { note: 'japanese', tags: [], starred: false });
+    writeUserNote(db, { lang: 'zh', text: '愛', reading: '' }, { note: 'chinese', tags: [], starred: false });
     expect(readUserNote(db, { lang: 'ja', text: '愛', reading: '' })?.note).toBe('japanese');
     expect(readUserNote(db, { lang: 'zh', text: '愛', reading: '' })?.note).toBe('chinese');
   });
 
   it('keys on the reading, so two homographs do not share one note', () => {
-    writeUserNote(db, { lang: 'ja', text: '生物', reading: 'せいぶつ' }, { note: 'organism', tags: [] });
-    writeUserNote(db, { lang: 'ja', text: '生物', reading: 'なまもの' }, { note: 'raw food', tags: [] });
+    writeUserNote(db, { lang: 'ja', text: '生物', reading: 'せいぶつ' }, { note: 'organism', tags: [], starred: false });
+    writeUserNote(db, { lang: 'ja', text: '生物', reading: 'なまもの' }, { note: 'raw food', tags: [], starred: false });
     expect(readUserNote(db, { lang: 'ja', text: '生物', reading: 'せいぶつ' })?.note).toBe('organism');
     expect(readUserNote(db, { lang: 'ja', text: '生物', reading: 'なまもの' })?.note).toBe('raw food');
   });
@@ -352,7 +417,7 @@ describe('user notes — the identity a note is keyed on', () => {
   it('does not fold katakana into hiragana the way the neighbour list does', () => {
     // A neighbour list must not return ネコ as a neighbour of ねこ; a note is
     // written against the spelling on screen and must not be shown under another.
-    writeUserNote(db, { lang: 'ja', text: 'ネコ', reading: '' }, { note: 'katakana', tags: [] });
+    writeUserNote(db, { lang: 'ja', text: 'ネコ', reading: '' }, { note: 'katakana', tags: [], starred: false });
     expect(readUserNote(db, { lang: 'ja', text: 'ねこ', reading: '' })).toBeNull();
   });
 
@@ -428,6 +493,7 @@ describe('schema 6 — giving existing notes a word to hang off', () => {
       reading: 'たべる',
       note: 'legacy',
       tags: [],
+      starred: false,
       updatedAt: 7,
     });
   });
