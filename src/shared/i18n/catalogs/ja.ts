@@ -8687,5 +8687,21 @@ export const ja: Catalog = {
   'ankiWorkbench.browser.selectFound': 'ここで見つかった {count} 件を選択',
   'ankiWorkbench.browser.clear': '選択を解除',
   'ankiWorkbench.browser.wholeSource': '未読み込みのノートも含め、ソース全体が対象です。',
+  'ankiWorkbench.browser.edited': '編集したノート: {count} 件',
+  'ankiWorkbench.edit.undo': '元に戻す ({count})',
+  'ankiWorkbench.edit.redo': 'やり直す ({count})',
+  'ankiWorkbench.edit.draftOnly': '編集はこの下書き内だけです。Anki にはまだ何も書き込まれません。',
+  'ankiWorkbench.inspector.title': 'ノート',
+  'ankiWorkbench.inspector.noteType': 'ノートタイプ: {name}',
+  'ankiWorkbench.inspector.decks': 'デッキ: {names}',
+  'ankiWorkbench.inspector.cards': 'カード: {count}',
+  'ankiWorkbench.inspector.tags': 'タグ',
+  'ankiWorkbench.inspector.tagsHint': 'スペース区切り。タグ自体にスペースは使えません。',
+  'ankiWorkbench.inspector.clozeAdded':
+    '穴埋め {ords} が追加されます。適用時に Anki が新しいカードを生成します。',
+  'ankiWorkbench.inspector.clozeRemoved':
+    '穴埋め {ords} が削除されます。適用時にそのカードはなくなります。',
+  'ankiWorkbench.inspector.mediaDropped': 'このノートから参照されなくなりました: {names}',
+  'ankiWorkbench.inspector.mediaMissing': 'このソースに含まれていません: {names}',
 };
 

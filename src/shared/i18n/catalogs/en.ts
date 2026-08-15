@@ -9112,6 +9112,22 @@ export const en: Catalog = {
   'ankiWorkbench.browser.selectFound': 'Select the {count} found here',
   'ankiWorkbench.browser.clear': 'Clear selection',
   'ankiWorkbench.browser.wholeSource': 'Covers the whole source, including notes not loaded yet.',
+  'ankiWorkbench.browser.edited': '{count} notes edited',
+  'ankiWorkbench.edit.undo': 'Undo ({count})',
+  'ankiWorkbench.edit.redo': 'Redo ({count})',
+  'ankiWorkbench.edit.draftOnly': 'Edits stay in this draft. Nothing is written to Anki yet.',
+  'ankiWorkbench.inspector.title': 'Note',
+  'ankiWorkbench.inspector.noteType': 'Note type: {name}',
+  'ankiWorkbench.inspector.decks': 'Decks: {names}',
+  'ankiWorkbench.inspector.cards': 'Cards: {count}',
+  'ankiWorkbench.inspector.tags': 'Tags',
+  'ankiWorkbench.inspector.tagsHint': 'Separated by spaces. A tag cannot contain a space.',
+  'ankiWorkbench.inspector.clozeAdded':
+    'This adds cloze {ords}. Anki would generate a new card for it on commit.',
+  'ankiWorkbench.inspector.clozeRemoved':
+    'This removes cloze {ords}. The card it generated would go away on commit.',
+  'ankiWorkbench.inspector.mediaDropped': 'No longer referenced by this note: {names}',
+  'ankiWorkbench.inspector.mediaMissing': 'This source does not contain: {names}',
 };
 
 

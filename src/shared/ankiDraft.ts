@@ -43,6 +43,14 @@ export interface AnkiDraftSource {
    * collection that changed underneath it.
    */
   fingerprint: string;
+  /**
+   * The source stored field text as plain text rather than HTML — a CSV imported
+   * with Anki's `#html:false`. Recorded because an *edit* has to normalize the
+   * way the read did: running the HTML stripper over plain text would silently
+   * eat a literal `<` the user typed. Absent means HTML, which is what Anki's
+   * own editor stores.
+   */
+  plainText?: boolean;
 }
 
 // ----- note types, fields, templates ------------------------------------------

@@ -9492,5 +9492,21 @@ export const ru: Catalog = {
   'ankiWorkbench.browser.selectFound': 'Выбрать найденные здесь: {count}',
   'ankiWorkbench.browser.clear': 'Снять выделение',
   'ankiWorkbench.browser.wholeSource': 'Охватывает весь источник, включая ещё не загруженные заметки.',
+  'ankiWorkbench.browser.edited': 'Отредактировано заметок: {count}',
+  'ankiWorkbench.edit.undo': 'Отменить ({count})',
+  'ankiWorkbench.edit.redo': 'Вернуть ({count})',
+  'ankiWorkbench.edit.draftOnly': 'Правки остаются в этом черновике. В Anki пока ничего не записано.',
+  'ankiWorkbench.inspector.title': 'Заметка',
+  'ankiWorkbench.inspector.noteType': 'Тип заметки: {name}',
+  'ankiWorkbench.inspector.decks': 'Колоды: {names}',
+  'ankiWorkbench.inspector.cards': 'Карточек: {count}',
+  'ankiWorkbench.inspector.tags': 'Метки',
+  'ankiWorkbench.inspector.tagsHint': 'Разделяются пробелами. В самой метке пробела быть не может.',
+  'ankiWorkbench.inspector.clozeAdded':
+    'Добавляется пропуск {ords}. При применении Anki создаст для него новую карточку.',
+  'ankiWorkbench.inspector.clozeRemoved':
+    'Удаляется пропуск {ords}. При применении созданная им карточка исчезнет.',
+  'ankiWorkbench.inspector.mediaDropped': 'Больше не используется этой заметкой: {names}',
+  'ankiWorkbench.inspector.mediaMissing': 'Этого нет в источнике: {names}',
 };
 

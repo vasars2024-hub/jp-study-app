@@ -32,6 +32,14 @@ import {
   type WorkbenchFlowState,
   type WorkbenchStepId,
 } from '../../../shared/ankiWorkbenchFlow';
+import {
+  createEditJournal,
+  draftFieldNormalizer,
+  redoLastEdit,
+  undoLastEdit,
+  type AnkiDraftEditJournal,
+  type AnkiDraftEditResult,
+} from '../../../shared/ankiDraftEdit';
 import { loadDeckAsAnkiDraft } from '../../flashcardDeck';
 import { useT } from '../../i18n';
 import DeckWorkbenchBrowser from './DeckWorkbenchBrowser';
@@ -62,6 +70,8 @@ export default function DeckWorkbench() {
   const [error, setError] = useState<string | null>(null);
   const [locked, setLocked] = useState<WorkbenchStepId | null>(null);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
+  /** Every draft edit, oldest first, with its own before-image. */
+  const [journal, setJournal] = useState<AnkiDraftEditJournal>(createEditJournal);
 
   const refreshSessions = useCallback(async () => {
     try {
@@ -82,6 +92,10 @@ export default function DeckWorkbench() {
     setDraft(next);
     setTotalNotes(whole);
     setError(null);
+    // The journal's ops name notes in the draft they were computed against.
+    // Carrying them onto a different source would let undo write a previous
+    // deck's text into a note that merely shares an id.
+    setJournal(createEditJournal());
     setFlow((prev) =>
       recordStep(prev, 'source', {
         satisfied: true,
@@ -147,6 +161,32 @@ export default function DeckWorkbench() {
       }),
     );
   }, []);
+
+  const applyEdit = useCallback((result: AnkiDraftEditResult) => {
+    if (!result.changed) return;
+    setDraft(result.draft);
+    setJournal(result.journal);
+  }, []);
+
+  /**
+   * Undo and redo re-run the op's inverse against the *current* draft rather
+   * than restoring a snapshot, so the edit that is taken back is the one named
+   * in the journal and nothing else is rolled back with it.
+   */
+  const stepHistory = useCallback(
+    (direction: 'undo' | 'redo') => {
+      setDraft((prevDraft) => {
+        if (!prevDraft) return prevDraft;
+        const normalize = draftFieldNormalizer(prevDraft.source);
+        const run = direction === 'undo' ? undoLastEdit : redoLastEdit;
+        const result = run(prevDraft, journal, normalize);
+        if (!result.changed) return prevDraft;
+        setJournal(result.journal);
+        return result.draft;
+      });
+    },
+    [journal],
+  );
 
   const discardSession = useCallback(
     async (id: string) => {
@@ -317,10 +357,31 @@ export default function DeckWorkbench() {
         ) : flow.current === 'browse' && draft ? (
           <div className="deck-workbench-detail deck-workbench-detail-wide">
             {currentStep.stale && <p className="muted">{t('ankiWorkbench.step.staleDetail')}</p>}
+            <div className="deck-workbench-history">
+              <button
+                type="button"
+                className="btn"
+                disabled={journal.done.length === 0}
+                onClick={() => stepHistory('undo')}
+              >
+                {t('ankiWorkbench.edit.undo', { count: journal.done.length })}
+              </button>
+              <button
+                type="button"
+                className="btn"
+                disabled={journal.undone.length === 0}
+                onClick={() => stepHistory('redo')}
+              >
+                {t('ankiWorkbench.edit.redo', { count: journal.undone.length })}
+              </button>
+              <span className="muted">{t('ankiWorkbench.edit.draftOnly')}</span>
+            </div>
             <DeckWorkbenchBrowser
               draft={draft}
               totalNotes={totalNotes ?? draft.counts.notes}
+              journal={journal}
               onSelection={onBrowseSelection}
+              onEdit={applyEdit}
             />
           </div>
         ) : (

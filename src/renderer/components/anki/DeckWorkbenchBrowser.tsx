@@ -32,26 +32,36 @@ import {
   type BrowserSelection,
   type BrowserSort,
 } from '../../../shared/ankiWorkbenchBrowser';
+import type { AnkiDraftEditJournal, AnkiDraftEditResult } from '../../../shared/ankiDraftEdit';
+import { editedNoteIds, noteIsEdited } from '../../../shared/ankiDraftEdit';
 import VirtualList from '../VirtualList';
 import { useT } from '../../i18n';
+import DeckWorkbenchInspector from './DeckWorkbenchInspector';
 
 const ROW_HEIGHT = 34;
 
 export default function DeckWorkbenchBrowser({
   draft,
   totalNotes,
+  journal,
   onSelection,
+  onEdit,
 }: {
   draft: AnkiDraft;
   /** Notes in the whole source, which may exceed the page in `draft`. */
   totalNotes: number;
+  journal: AnkiDraftEditJournal;
   onSelection: (count: number, wholeSource: boolean) => void;
+  onEdit: (result: AnkiDraftEditResult) => void;
 }) {
   const { t } = useT();
   const [columns, setColumns] = useState(() => defaultBrowserColumns(draft));
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<BrowserSort | null>(null);
   const [selection, setSelection] = useState<BrowserSelection>(EMPTY_SELECTION);
+  /** The row the inspector is about. Focus is not selection — a user reads one
+   *  note while a batch of others stays selected. */
+  const [focusedId, setFocusedId] = useState<string | null>(null);
   const anchor = useRef<string | null>(null);
 
   const rows = useMemo(() => buildBrowserRows(draft, columns), [draft, columns]);
@@ -96,6 +106,10 @@ export default function DeckWorkbenchBrowser({
 
   const selected = selectionCount(selection, matchedTotal);
   const gridTemplate = shownCols.map((c) => `${c.width}fr`).join(' ');
+  // Re-read from the draft every render: an edit replaces the note object, and
+  // a stale copy would show the inspector its own pre-edit text.
+  const focused = focusedId ? draft.notes.find((n) => n.id === focusedId) : undefined;
+  const editedCount = editedNoteIds(journal).length;
 
   return (
     <div className="wb-browser">
@@ -152,35 +166,55 @@ export default function DeckWorkbenchBrowser({
         })}
       </div>
 
-      <VirtualList
-        className="wb-browser-rows"
-        items={shown}
-        itemHeight={ROW_HEIGHT}
-        getKey={(row) => row.noteId}
-        emptyState={<p className="muted">{t('ankiWorkbench.browser.empty')}</p>}
-        renderItem={(row) => {
-          const checked = isRowSelected(selection, row.noteId);
-          return (
-            <div
-              className={`wb-browser-row${checked ? ' selected' : ''}`}
-              style={{ height: ROW_HEIGHT, gridTemplateColumns: `2.5rem ${gridTemplate}` }}
-            >
-              <input
-                type="checkbox"
-                checked={checked}
-                aria-label={t('ankiWorkbench.browser.selectRow', { id: row.noteId })}
-                onClick={(e) => onRowClick(row.noteId, e.shiftKey)}
-                onChange={() => undefined}
-              />
-              {shownCols.map((col) => (
-                <span key={col.id} className="wb-browser-cell" title={row.cells[col.id]}>
-                  {row.cells[col.id]}
-                </span>
-              ))}
-            </div>
-          );
-        }}
-      />
+      <div className="wb-browser-split">
+        <VirtualList
+          className="wb-browser-rows"
+          items={shown}
+          itemHeight={ROW_HEIGHT}
+          getKey={(row) => row.noteId}
+          emptyState={<p className="muted">{t('ankiWorkbench.browser.empty')}</p>}
+          renderItem={(row) => {
+            const checked = isRowSelected(selection, row.noteId);
+            return (
+              <div
+                className={`wb-browser-row${checked ? ' selected' : ''}${
+                  focusedId === row.noteId ? ' focused' : ''
+                }${noteIsEdited(journal, row.noteId) ? ' edited' : ''}`}
+                style={{ height: ROW_HEIGHT, gridTemplateColumns: `2.5rem ${gridTemplate}` }}
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  aria-label={t('ankiWorkbench.browser.selectRow', { id: row.noteId })}
+                  onClick={(e) => onRowClick(row.noteId, e.shiftKey)}
+                  onChange={() => undefined}
+                />
+                {shownCols.map((col) => (
+                  // Opening a note is not selecting it: a user reads one row
+                  // while a batch of others stays ticked.
+                  <button
+                    key={col.id}
+                    type="button"
+                    className="wb-browser-cell"
+                    title={row.cells[col.id]}
+                    onClick={() => setFocusedId(row.noteId)}
+                  >
+                    {row.cells[col.id]}
+                  </button>
+                ))}
+              </div>
+            );
+          }}
+        />
+        {focused && (
+          <DeckWorkbenchInspector
+            draft={draft}
+            journal={journal}
+            note={focused}
+            onEdit={onEdit}
+          />
+        )}
+      </div>
 
       <div className="wb-browser-foot">
         <span>{t('ankiWorkbench.browser.selected', { count: selected })}</span>
@@ -204,6 +238,11 @@ export default function DeckWorkbenchBrowser({
         </button>
         {selectionIsWholeSource(selection) && partial && (
           <span className="muted">{t('ankiWorkbench.browser.wholeSource')}</span>
+        )}
+        {editedCount > 0 && (
+          <span className="wb-browser-edited">
+            {t('ankiWorkbench.browser.edited', { count: editedCount })}
+          </span>
         )}
       </div>
     </div>

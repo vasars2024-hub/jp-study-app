@@ -145,11 +145,25 @@ function buttonBy(text: string): HTMLButtonElement {
  * fires — the search box then looks broken when only the harness is. Write
  * through the prototype setter the tracker watches.
  */
-async function type(el: HTMLInputElement, value: string) {
-  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+async function type(el: HTMLInputElement | HTMLTextAreaElement, value: string) {
+  // The setter is per element class: calling the input one on a textarea throws
+  // "'set value' called on an object that is not a valid instance".
+  const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+  const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
   await act(async () => {
     setter?.call(el, value);
     el.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+
+/**
+ * React maps `onBlur` onto the native `focusout`, not `blur` — `blur` does not
+ * bubble, so React's delegated root listener never sees it and a commit-on-blur
+ * field looks like it silently dropped the edit.
+ */
+async function blur(el: HTMLElement) {
+  await act(async () => {
+    el.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
   });
 }
 
@@ -407,6 +421,72 @@ describe('DeckWorkbench', () => {
     await click(toggles[0]!);
     expect(host.querySelectorAll('.wb-browser-row')[0]!.querySelectorAll('.wb-browser-cell')).toHaveLength(4);
     expect(host.querySelectorAll('.wb-browser-column-toggle input')).toHaveLength(6);
+  });
+
+  it('opens a note in the inspector without changing the selection', async () => {
+    await toBrowse(browsable());
+    expect(host.querySelector('.wb-inspector')).toBeNull();
+
+    await click(host.querySelectorAll('.wb-browser-cell')[0] as HTMLElement);
+    const inspector = host.querySelector('.wb-inspector')!;
+    expect(inspector.textContent).toContain('ankiWorkbench.inspector.noteType:Basic');
+    expect(inspector.textContent).toContain('ankiWorkbench.inspector.cards:1');
+    // Opening is not selecting.
+    expect(host.textContent).toContain('ankiWorkbench.browser.selected:0');
+    expect(host.querySelectorAll('.wb-browser-row.focused')).toHaveLength(1);
+  });
+
+  it('edits a field on blur, updates the row, and undoes it', async () => {
+    await toBrowse(browsable());
+    await click(host.querySelectorAll('.wb-browser-cell')[0] as HTMLElement);
+    const box = host.querySelector('.wb-inspector-input') as HTMLTextAreaElement;
+    await type(box, '<b>とら</b>');
+    await blur(box);
+
+    // The row reads the normalized text, so the HTML must not leak into it.
+    const firstRow = host.querySelectorAll('.wb-browser-row')[0]!;
+    expect(firstRow.textContent).toContain('とら');
+    expect(firstRow.textContent).not.toContain('<b>');
+    expect(firstRow.className).toContain('edited');
+    expect(host.textContent).toContain('ankiWorkbench.browser.edited:1');
+
+    await click(buttonBy('ankiWorkbench.edit.undo'));
+    expect(host.querySelectorAll('.wb-browser-row')[0]!.textContent).toContain('ねこ');
+    expect(host.textContent).not.toContain('ankiWorkbench.browser.edited');
+    expect(buttonBy('ankiWorkbench.edit.undo').disabled).toBe(true);
+    expect(buttonBy('ankiWorkbench.edit.redo').disabled).toBe(false);
+  });
+
+  it('says what a cloze edit would do to the cards instead of doing it silently', async () => {
+    const d = browsable();
+    d.noteTypes[0]!.kind = 'cloze';
+    d.notes[0]!.fields[0] = { ord: 0, name: 'Expression', raw: '{{c1::ねこ}}', normalized: 'ねこ' };
+    await toBrowse(d);
+    await click(host.querySelectorAll('.wb-browser-cell')[0] as HTMLElement);
+
+    const box = host.querySelector('.wb-inspector-input') as HTMLTextAreaElement;
+    await type(box, '{{c1::ねこ}} {{c2::猫}}');
+    await blur(box);
+    expect(host.querySelector('.wb-inspector')!.textContent).toContain(
+      'ankiWorkbench.inspector.clozeAdded:2',
+    );
+  });
+
+  it('drops the edit journal when a different source replaces the draft', async () => {
+    // An op names a note id; replaying it against another deck would write one
+    // deck's text into a note that merely shares an id.
+    await toBrowse(browsable());
+    await click(host.querySelectorAll('.wb-browser-cell')[0] as HTMLElement);
+    const box = host.querySelector('.wb-inspector-input') as HTMLTextAreaElement;
+    await type(box, 'edited');
+    await blur(box);
+    expect(host.textContent).toContain('ankiWorkbench.browser.edited:1');
+
+    await click(([...host.querySelectorAll('.deck-workbench-step')] as HTMLButtonElement[])[0]!);
+    await click(buttonBy('ankiWorkbench.source.apkg'));
+    await click(([...host.querySelectorAll('.deck-workbench-step')] as HTMLButtonElement[])[1]!);
+    expect(host.textContent).not.toContain('ankiWorkbench.browser.edited');
+    expect(buttonBy('ankiWorkbench.edit.undo').disabled).toBe(true);
   });
 
   it('survives a session list that throws', async () => {

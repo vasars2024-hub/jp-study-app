@@ -23,6 +23,7 @@ import {
   pageAnkiDraft,
 } from '../../shared/ankiDraft';
 import { stripFieldHtml } from '../../shared/apkgParse';
+import { collapsePlainText } from '../../shared/ankiDraftEdit';
 
 /**
  * Decode the file's bytes.
@@ -73,6 +74,9 @@ export async function readCsvDraft(request: CsvDraftRequest = {}): Promise<CsvDr
         // The file's bytes are what was read, so they are what a later commit
         // must find unchanged.
         fingerprint: `sha1:${crypto.createHash('sha1').update(bytes).digest('hex')}`,
+        // Recorded on the source so a later *edit* normalizes the same way the
+        // read did, rather than guessing HTML for a plain-text file.
+        plainText: !collection.meta.html,
       },
       // `#html:false` means the fields are plain text. Running the HTML stripper
       // over them would eat a literal `<` and everything after it, so a file
@@ -95,8 +99,3 @@ export async function readCsvDraft(request: CsvDraftRequest = {}): Promise<CsvDr
   }
 }
 
-function collapsePlainText(raw: string): string {
-  return String(raw ?? '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
