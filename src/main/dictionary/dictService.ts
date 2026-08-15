@@ -1014,7 +1014,103 @@ export interface CollocationQuery {
   text: string;
   /** Source languages to match headwords in. Every language when omitted. */
   sourceLangs?: DictLangCode[];
+  /** Languages the partner's gloss may be written in. Any language when omitted. */
+  glossLangs?: DictLangCode[];
   limit?: number;
+}
+
+/**
+ * The first definition of each chosen partner, keyed by the partner as written.
+ *
+ * The partner is a substring of a phrase, not a scanned row, so it has no
+ * headword id yet — which is why this resolves in two steps rather than one
+ * join. Step one turns each partner into **one** headword id (best score wins,
+ * ties by id, so the answer does not depend on SQLite's row order); step two is
+ * then the compound expansion's own bounded gloss read over at most twelve ids.
+ * The single join spelling — `h.norm in (...)` joined straight through to
+ * `glosses` — looks simpler and is not bounded: a common partner carried by four
+ * installed dictionaries with a dozen senses each drags hundreds of rows through
+ * the sort to produce one string.
+ *
+ * `reading_norm` is probed only for the partners `norm` did not resolve, because
+ * that is exactly the set the attestation pass kept on their reading alone
+ * (風邪をうつす's うつす). A partner that resolves both ways keeps its written
+ * form's entry, which is the one the reader is looking at.
+ */
+function readCollocationPartnerGlosses(
+  db: SqliteDb,
+  partners: readonly string[],
+  langs: readonly string[],
+  glossLangs: readonly string[],
+): Map<string, string> {
+  const byPartner = new Map<string, string>();
+  if (!partners.length || !langs.length) return byPartner;
+
+  const norms = new Map<string, string[]>();
+  for (const partner of partners) {
+    const norm = normalizeForLookup(partner);
+    if (!norm) continue;
+    const bucket = norms.get(norm);
+    if (bucket) bucket.push(partner);
+    else norms.set(norm, [partner]);
+  }
+  if (!norms.size) return byPartner;
+
+  const langHoles = langs.map(() => '?').join(',');
+  const keys = [...norms.keys()];
+  const keyHoles = keys.map(() => '?').join(',');
+  const bestId = new Map<string, { id: number; score: number }>();
+  const takeBest = (rows: Array<{ key: string; id: number; score: number }>) => {
+    for (const row of rows) {
+      if (!row.key) continue;
+      const current = bestId.get(row.key);
+      if (current && (current.score > row.score
+        || (current.score === row.score && current.id <= row.id))) continue;
+      bestId.set(row.key, { id: row.id, score: row.score });
+    }
+  };
+  takeBest(db.prepare(`
+    select h.norm as key, h.id as id, h.score as score
+    from headwords h indexed by idx_hw_norm
+    join dictionaries d on d.id = h.dict_id
+    where h.lang in (${langHoles}) and d.enabled = 1 and h.norm in (${keyHoles})
+  `).all(...langs, ...keys) as Array<{ key: string; id: number; score: number }>);
+
+  const unresolved = keys.filter((key) => !bestId.has(key));
+  if (unresolved.length) {
+    takeBest(db.prepare(`
+      select h.reading_norm as key, h.id as id, h.score as score
+      from headwords h indexed by idx_hw_reading
+      join dictionaries d on d.id = h.dict_id
+      where h.lang in (${langHoles}) and d.enabled = 1
+        and h.reading_norm in (${unresolved.map(() => '?').join(',')})
+    `).all(...langs, ...unresolved) as Array<{ key: string; id: number; score: number }>);
+  }
+  if (!bestId.size) return byPartner;
+
+  const ids = [...bestId.values()].map((entry) => entry.id);
+  const glossLangFilter = glossLangs.length
+    ? ` and g.lang in (${glossLangs.map(() => '?').join(',')})`
+    : '';
+  const firstGloss = new Map<number, string>();
+  for (const row of db.prepare(`
+    select s.headword_id as headword_id, g.text as gloss
+    from senses s
+    join glosses g on g.sense_id = s.id
+    where s.headword_id in (${ids.map(() => '?').join(',')})${glossLangFilter}
+    order by s.headword_id, s.ord, g.ord
+  `).all(...ids, ...glossLangs) as Array<{ headword_id: number; gloss: string }>) {
+    const gloss = row.gloss.trim();
+    if (!gloss || firstGloss.has(row.headword_id)) continue;
+    firstGloss.set(row.headword_id, gloss);
+  }
+
+  for (const [key, entry] of bestId) {
+    const gloss = firstGloss.get(entry.id);
+    if (!gloss) continue;
+    for (const partner of norms.get(key) ?? []) byPartner.set(partner, gloss);
+  }
+  return byPartner;
 }
 
 /**
@@ -1114,6 +1210,13 @@ export function findLexiconCollocations(
 
   const chosen = selectLexiconCollocations(drafts, attested, query.limit ?? MAX_COLLOCATION_RESULTS);
 
+  const partnerGloss = readCollocationPartnerGlosses(
+    db,
+    chosen.map((draft) => draft.partner),
+    langs,
+    query.glossLangs?.length ? [...new Set(query.glossLangs)] : [],
+  );
+
   // Each row is stored under the language of the headword it came from, not under
   // one language chosen for the whole call. `langs` genuinely holds more than one
   // entry: a Han query resolves in both partitions of the shipped database (ja
@@ -1170,6 +1273,7 @@ export function findLexiconCollocations(
   for (const row of stored) {
     const draft = byRow.get(draftKey(row.lang, row.partner, row.pattern));
     if (!draft) continue;
+    const gloss = partnerGloss.get(row.partner);
     collocations.push({
       lang: row.lang,
       head: draft.head,
@@ -1182,6 +1286,10 @@ export function findLexiconCollocations(
       reading: draft.candidate.reading,
       dictId: draft.candidate.dictId,
       dictTitle: draft.candidate.dictTitle,
+      // Derived on every call rather than stored beside the row: the gloss
+      // belongs to the partner's entry, which a dictionary change can move, and
+      // `collocations` has no revision column to notice that with.
+      ...(gloss ? { partnerGloss: gloss } : {}),
     });
   }
   // The stored read is unordered; restore the commonness order the scan produced.

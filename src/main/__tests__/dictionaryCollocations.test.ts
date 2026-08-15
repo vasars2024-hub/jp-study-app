@@ -89,6 +89,39 @@ describe('findLexiconCollocations', () => {
     expect(phrases('猫')).not.toContain('猫なで声');
   });
 
+  it('gives the partner its own first definition, so the row says what the phrase joins', () => {
+    const result = findLexiconCollocations(db, { text: '猫', sourceLangs: ['ja'] });
+    expect(result.collocations.find((c) => c.phrase === '猫に小判')?.partnerGloss)
+      .toBe('koban coin');
+    expect(result.collocations.find((c) => c.phrase === '猫の目')?.partnerGloss).toBe('eye');
+    // The head is the word already on screen, so it is never the one glossed.
+    expect(result.collocations.some((c) => c.partnerGloss === 'cat')).toBe(false);
+  });
+
+  it('glosses a partner the dictionaries carry only as a reading', () => {
+    // かぶる is a headword nowhere; it is the reading of 被る. The attestation
+    // pass already keeps such a row, and the gloss has to follow it there.
+    importLegacyIndex(db, {
+      version: 1,
+      info: INFO({ id: 'extra', title: 'Extra' }),
+      terms: { 猫をかぶる: term('猫をかぶる', 'ねこをかぶる', ['to feign innocence'], 500000) },
+    });
+    const row = findLexiconCollocations(db, { text: '猫', sourceLangs: ['ja'] })
+      .collocations.find((c) => c.phrase === '猫をかぶる');
+    expect(row?.partner).toBe('かぶる');
+    expect(row?.partnerGloss).toBe('to wear on the head');
+  });
+
+  it('leaves the gloss off rather than answering in a language that was not asked for', () => {
+    const rows = findLexiconCollocations(db, {
+      text: '猫', sourceLangs: ['ja'], glossLangs: ['ru'],
+    }).collocations;
+    // The rows themselves survive: a partner is attested by being a headword,
+    // which is not a question about the language its definitions are wanted in.
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((c) => c.partnerGloss === undefined)).toBe(true);
+  });
+
   it('drops a phrase whose other element is not a word in the same dictionaries', () => {
     expect(phrases('猫')).not.toContain('猫に蒲鉾');
   });

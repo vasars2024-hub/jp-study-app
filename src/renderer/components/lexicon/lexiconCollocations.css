@@ -108,7 +108,17 @@
   font-size: 0.85em;
 }
 
+/* The partner's definition is content, not metadata, so it keeps the row's own
+   text colour and takes the slack the source used to hold: on a narrow row it
+   is the part worth wrapping onto its own line. */
+.lexicon-collocations-gloss {
+  flex: 1 1 10rem;
+  min-width: 0;
+  font-size: 0.9em;
+}
+
 .lexicon-collocations-source {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
+  margin-inline-start: auto;
   text-align: end;
 }

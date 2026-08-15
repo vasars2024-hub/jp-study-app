@@ -62,6 +62,16 @@ export interface LexiconCollocation {
   head: string;
   /** The other word in the phrase. */
   partner: string;
+  /**
+   * The partner's own first definition, when the dictionaries carry one.
+   *
+   * Optional because attestation and definition are different questions: a
+   * partner is kept when its written form *or its reading* is a headword, and a
+   * kana spelling that only matches a reading may resolve to an entry whose
+   * senses were filtered out. Absent therefore means "no gloss to show", never
+   * "not a word" — the row was already proven attested before it got here.
+   */
+  partnerGloss?: string;
   particle: CollocationParticle;
   order: CollocationOrder;
   /** The whole headword the row came from, e.g. 猫に小判. */

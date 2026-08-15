@@ -827,6 +827,7 @@ export function registerDictionaryIpc(): void {
         return findLexiconCollocationsInDb({
           text: query,
           sourceLangs: readLangList(raw.sourceLangs),
+          glossLangs: readLangList(raw.glossLangs),
           limit: MAX_COLLOCATION_RESULTS,
         });
       } catch {

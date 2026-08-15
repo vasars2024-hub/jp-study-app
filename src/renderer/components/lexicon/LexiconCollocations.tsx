@@ -117,6 +117,14 @@ export default function LexiconCollocations({ query, lang, onLookup }: Props) {
               </span>
               {/* An attestation tally, never a corpus frequency — the label says
                   "entries", which is what was counted. */}
+              {/* The partner is the one word in the row the reader has not
+                  looked up, so a row without its definition asks them to run a
+                  second search to find out what the phrase means. Absent only
+                  when the dictionaries carry the partner without a definition
+                  in a language on this install. */}
+              {item.partnerGloss && (
+                <span className="lexicon-collocations-gloss">{item.partnerGloss}</span>
+              )}
               <span className="lexicon-collocations-count">
                 {t('lexicon.collocations.attested', { count: String(item.count) })}
               </span>

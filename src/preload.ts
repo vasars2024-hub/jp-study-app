@@ -462,7 +462,7 @@ const api = {
   /** Phrases where this word is joined to another word by a particle. */
   dictCollocations: (
     text: string,
-    options?: { sourceLangs?: string[] },
+    options?: { sourceLangs?: string[]; glossLangs?: string[] },
   ): Promise<import('./shared/lexiconCollocations').LexiconCollocationResult> =>
     ipcRenderer.invoke('dict:collocations', text, options),
   /** Sentences from an installed example corpus that contain this word. */
