@@ -565,6 +565,57 @@ describe('reading the list', () => {
     expect(result.truncated).toBe(true);
   });
 
+  /** One list row, so a status filter has something specific to keep or drop. */
+  const row = (id: number, status: string, rewatching = false) => ({
+    node: { id, title: `title ${id}`, num_episodes: 12 },
+    list_status: {
+      status,
+      score: 7,
+      num_episodes_watched: 3,
+      is_rewatching: rewatching,
+      updated_at: '2026-08-15T10:00:00+00:00',
+    },
+  });
+
+  it('filters by status here rather than asking MAL to', async () => {
+    const store = memoryStore(connectedTokens());
+    const rec = recorder(() => ({
+      status: 200,
+      body: JSON.stringify({
+        data: [row(1, 'completed'), row(2, 'watching'), row(3, 'dropped')],
+        paging: {},
+      }),
+    }));
+    const client = makeClient(rec.transport, store);
+
+    const result = await client.fetchAnimeList({ status: 'completed' });
+
+    expect(result.entries.map((e) => e.animeId)).toEqual([1]);
+    // The query must NOT carry the filter — that is the whole point.
+    expect(new URL(rec.apiCalls()[0].url).searchParams.get('status')).toBeNull();
+  });
+
+  it('keeps a completed entry the user is rewatching, which MALs own filter drops', async () => {
+    // Measured 2026-08-15 on the user's account: `status=completed` returned
+    // 1,414 titles against 1,426 marked completed in the full walk, and all 12
+    // of the difference had is_rewatching true. Those are the shows being
+    // actively rewatched — the best study material on the list.
+    const store = memoryStore(connectedTokens());
+    const rec = recorder(() => ({
+      status: 200,
+      body: JSON.stringify({
+        data: [row(5081, 'completed', true), row(2, 'watching', false)],
+        paging: {},
+      }),
+    }));
+    const client = makeClient(rec.transport, store);
+
+    const result = await client.fetchAnimeList({ status: 'completed' });
+
+    expect(result.entries).toHaveLength(1);
+    expect(result.entries[0]).toMatchObject({ animeId: 5081, rewatching: true });
+  });
+
   it('reports a walk MAL itself ended as complete, not truncated', async () => {
     const store = memoryStore(connectedTokens());
     const rec = recorder(() => ({ status: 200, body: listPage() }));

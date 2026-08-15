@@ -751,6 +751,19 @@ export class MalSyncClient {
    * should never see it. So the host is checked before every hop — a redirect
    * of the paging cursor to anywhere but MAL's API ends the walk rather than
    * leaking the credential.
+   *
+   * `options.status` filters **here, not on MAL**, which is deliberate and cost
+   * something. MAL's own `status=completed` query omits every entry the user is
+   * currently rewatching, even though `list_status.status` on those same entries
+   * still reads `completed`. Measured on the user's account 2026-08-15: the
+   * server-side filter returned 1,414 titles, the full walk found 1,426 marked
+   * completed, and all 12 of the difference had `is_rewatching: true` —
+   * Bakemonogatari, Kiseijuu, Hibike! Euphonium among them. Those are shows the
+   * user is actively rewatching, i.e. the best study material on the list, and a
+   * library sync built on MAL's filter would drop exactly them.
+   *
+   * The price is the whole list every time: 22 pages instead of 15 on that same
+   * account. Seven extra requests to stop silently losing twelve titles.
    */
   async fetchAnimeList(options: { status?: MalListStatus } = {}): Promise<MalListSyncResult> {
     const query = new URLSearchParams({
@@ -758,7 +771,6 @@ export class MalSyncClient {
       limit: String(PAGE_SIZE),
       nsfw: 'true',
     });
-    if (options.status) query.set('status', options.status);
 
     let url: string | null = `${MAL_API_BASE}/users/@me/animelist?${query.toString()}`;
     const entries: MalListEntry[] = [];
@@ -780,7 +792,11 @@ export class MalSyncClient {
       if (page.entries.length === 0) break;
     }
 
-    return { entries, truncated: url !== null, pagesFetched };
+    return {
+      entries: options.status ? entries.filter((e) => e.status === options.status) : entries,
+      truncated: url !== null,
+      pagesFetched,
+    };
   }
 
   // -- derivatives ----------------------------------------------------------
