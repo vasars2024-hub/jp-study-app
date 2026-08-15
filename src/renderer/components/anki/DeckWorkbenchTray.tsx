@@ -34,9 +34,11 @@ import {
   type EnrichProvenanceMode,
   type EnrichSenseRule,
 } from '../../../shared/ankiEnrich';
+import type { AiBatch } from '../../../shared/ankiAiAdditions';
 import { TEXT_NORMALIZE_ORDER, type TextNormalizeOp } from '../../../shared/ankiTextNormalize';
 import { buildVocabContext } from '../../../shared/ankiVocabContext';
 import { useT } from '../../i18n';
+import DeckWorkbenchAiPanel, { type AiPanelNote } from './DeckWorkbenchAiPanel';
 
 const ACTION_KINDS: TrayActionKind[] = [
   'find-replace',
@@ -44,6 +46,7 @@ const ACTION_KINDS: TrayActionKind[] = [
   'swap-fields',
   'copy-field',
   'enrich-dictionary',
+  'apply-ai-additions',
   'add-tags',
   'remove-tags',
 ];
@@ -102,6 +105,12 @@ export default function DeckWorkbenchTray({
   // name later is the thing this whole action is meant to avoid.
   const [provenance, setProvenance] = useState<EnrichProvenanceMode>('inline');
   const [applied, setApplied] = useState<number | null>(null);
+  /**
+   * The reviewed generation, owned here because the tray is what writes it. A
+   * regenerate replaces it, and `planChangeTray` refuses any step whose batch id
+   * no longer matches — see `ankiChangeTray`'s `ai-batch-mismatch`.
+   */
+  const [aiBatch, setAiBatch] = useState<AiBatch | undefined>(undefined);
 
   /** Every field name in the draft, since a tray targets by name across note types. */
   const fieldNames = useMemo(() => {
@@ -165,14 +174,24 @@ export default function DeckWorkbenchTray({
 
   const plan = useMemo(
     () =>
-      planChangeTray(
-        draft,
-        journal,
-        selectedIds,
-        actions,
-        lookup ? { enrich: { lookup, vocab } } : undefined,
-      ),
-    [draft, journal, selectedIds, actions, lookup, vocab],
+      planChangeTray(draft, journal, selectedIds, actions, {
+        ...(lookup ? { enrich: { lookup, vocab } } : {}),
+        ...(aiBatch ? { ai: aiBatch } : {}),
+      }),
+    [draft, journal, selectedIds, actions, lookup, vocab, aiBatch],
+  );
+
+  /**
+   * The selected notes the AI panel may ask about, with the word each declares.
+   * `enrich-dictionary`'s vocabulary is reused rather than recomputed: it is the
+   * same question — which word is this note about — and a second answer to it
+   * could disagree with the one the enrichment path uses.
+   */
+  const aiNotes = useMemo<AiPanelNote[]>(
+    () => selectedIds
+      .map((noteId) => ({ noteId, term: vocab.byNote.get(noteId)?.term ?? '' }))
+      .filter((note) => note.term !== ''),
+    [selectedIds, vocab],
   );
 
   const buildAction = (id: string): TrayAction => {
@@ -194,6 +213,11 @@ export default function DeckWorkbenchTray({
         return { id, enabled: true, kind, fromField: fieldA, toField: fieldB, onConflict };
       case 'enrich-dictionary':
         return { id, enabled: true, kind, aspect, toField: fieldB, onConflict, senseRule, provenance };
+      case 'apply-ai-additions':
+        // An empty id when no batch exists: `planChangeTray` then blocks on
+        // `no-ai-review`, which is the true statement. Refusing to add the step
+        // at all would leave the user with a button that silently did nothing.
+        return { id, enabled: true, kind, batchId: aiBatch?.id ?? '', toField: fieldB, onConflict };
       case 'normalize-text':
         return {
           id,
@@ -247,6 +271,11 @@ export default function DeckWorkbenchTray({
           conflict: t(`ankiWorkbench.tray.conflict.${action.onConflict}`),
           rule: t(`ankiWorkbench.tray.senseRule.${action.senseRule}`),
           provenance: t(`ankiWorkbench.tray.provenance.${action.provenance}`),
+        });
+      case 'apply-ai-additions':
+        return t('ankiWorkbench.tray.describe.apply-ai-additions', {
+          to: action.toField,
+          conflict: t(`ankiWorkbench.tray.conflict.${action.onConflict}`),
         });
       default:
         return t(`ankiWorkbench.tray.describe.${action.kind}`, { tags: action.tags.join(' ') });
@@ -491,6 +520,13 @@ export default function DeckWorkbenchTray({
               </select>
             </label>
           </>
+        ) : kind === 'apply-ai-additions' ? (
+          <>
+            {/* Only the destination and the conflict rule: what gets written is
+                whatever the review below approved, not a parameter of the step. */}
+            {fieldSelect(t('ankiWorkbench.tray.aiTo'), fieldB, setFieldB)}
+            {conflictSelect()}
+          </>
         ) : (
           <label>
             {t('ankiWorkbench.tray.tags')}
@@ -517,6 +553,8 @@ export default function DeckWorkbenchTray({
               })}
         </p>
       )}
+
+      <DeckWorkbenchAiPanel notes={aiNotes} onBatch={setAiBatch} />
 
       {problems.length > 0 && (
         <ul className="wb-tray-problems">
