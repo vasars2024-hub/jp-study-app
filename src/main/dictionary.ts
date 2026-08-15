@@ -45,6 +45,7 @@ import {
   resetChineseDictionaryCache,
   findSemanticNeighborsInDb,
   findLexiconCompoundsInDb,
+  findExampleSentencesInDb,
   findLexiconEtymologyInDb,
   listDictionarySources,
   listDictionaryPairs,
@@ -83,6 +84,11 @@ import {
   MAX_COMPOUND_RESULTS,
   type LexiconCompoundResult,
 } from '../shared/lexiconCompounds';
+import {
+  MAX_EXAMPLE_QUERY_CHARS,
+  MAX_EXAMPLE_RESULTS,
+  type LexiconExampleResult,
+} from '../shared/lexiconExamples';
 import {
   MAX_ETYMOLOGY_QUERY_CHARS,
   MAX_ETYMOLOGY_RESULTS,
@@ -770,6 +776,31 @@ export function registerDictionaryIpc(): void {
         // optional on an un-migrated installation, and an expansion the reader
         // asked for degrades to "nothing to show" rather than to a rejected
         // invoke the surface would have to render as a defect.
+        return empty;
+      }
+    },
+  );
+  ipcMain.handle(
+    'dict:examples',
+    (_e, text: unknown, options?: unknown): LexiconExampleResult => {
+      const raw = options && typeof options === 'object' && !Array.isArray(options)
+        ? options as Record<string, unknown>
+        : {};
+      const query = typeof text === 'string' ? text.trim().slice(0, MAX_EXAMPLE_QUERY_CHARS) : '';
+      const empty: LexiconExampleResult = { query, examples: [] };
+      if (!query) return empty;
+      try {
+        return findExampleSentencesInDb({
+          text: query,
+          sourceLangs: readLangList(raw.sourceLangs),
+          glossLangs: readLangList(raw.glossLangs),
+          limit: MAX_EXAMPLE_RESULTS,
+        });
+      } catch {
+        // Same contract as the neighbour and compound expansions. An example
+        // corpus is optional on every install — nobody has one until they import
+        // one — so "no database yet" and "no corpus installed" have to look the
+        // same to the surface: an empty list, never a rejected invoke.
         return empty;
       }
     },

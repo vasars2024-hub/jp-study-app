@@ -28,6 +28,7 @@
 import type { SqliteDb } from './db';
 import { BUNDLED_GLOSS_LANGS, BUNDLED_SOURCE_LANGS, DEFAULT_SOURCE_LANG } from './glossLang';
 import { relabelDictionarySourceLang } from './sourceLang';
+import { CORPUS_LANG_ALIAS_PAIRS } from '../../shared/dictionarySources';
 
 /** Bumped by appending to MIGRATIONS. Never edit a released step. */
 export const DICT_SCHEMA_VERSION = 10;
@@ -641,6 +642,23 @@ export const MIGRATIONS: MigrationStep[] = [
         ORDER BY s.headword_id, s.ord, g.ord
       `).run(offset);
       db.exec(`DELETE FROM headwords WHERE dict_id IN (SELECT id FROM dictionaries WHERE kind = 'examples')`);
+
+      // Tatoeba's own ISO 639-3 codes went straight into `headwords.lang`, so a
+      // Japanese sentence sits under `jpn` where every language filter in this app
+      // says `ja`. Canonicalise here as well as in the importer, or a migrated
+      // corpus stays unreachable by the reader that was just built for it.
+      const canonicalise = db.prepare(`
+        UPDATE examples SET lang = ? WHERE lang = ?
+          AND dict_id IN (SELECT id FROM dictionaries WHERE kind = 'examples')
+      `);
+      const canonicaliseTranslations = db.prepare(`
+        UPDATE example_translations SET lang = ? WHERE lang = ?
+          AND example_id IN (SELECT id FROM examples)
+      `);
+      for (const [alias, canonical] of CORPUS_LANG_ALIAS_PAIRS) {
+        canonicalise.run(canonical, alias);
+        canonicaliseTranslations.run(canonical, alias);
+      }
     },
   },
 ];

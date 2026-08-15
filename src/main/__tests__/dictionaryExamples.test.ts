@@ -51,44 +51,44 @@ afterEach(() => {
 describe('example sentence reader', () => {
   it('returns sentences containing the word, shortest first, with their translations', () => {
     importCorpus();
-    const result = findExampleSentences(db, { text: '猫', sourceLangs: ['jpn'] });
+    const result = findExampleSentences(db, { text: '猫', sourceLangs: ['ja'] });
     expect(result.query).toBe('猫');
     expect(result.examples.map((example) => example.text)).toEqual([
       '猫が好きです。',
       'その大きな黒い猫はとても静かに眠っています。',
     ]);
     expect(result.examples[0]).toMatchObject({
-      lang: 'jpn',
+      lang: 'ja',
       dictId: 'tatoeba',
       dictTitle: 'Tatoeba',
       sourceId: '1',
       licence: 'CC BY 2.0 FR',
     });
     expect(result.examples[0].translations).toEqual([
-      { lang: 'eng', text: 'I like cats.' },
-      { lang: 'rus', text: 'Я люблю кошек.' },
+      { lang: 'en', text: 'I like cats.' },
+      { lang: 'ru', text: 'Я люблю кошек.' },
     ]);
   });
 
   // `猫。` contains 猫 and is not an example of it.
   it('drops a sentence that is only the word itself', () => {
     importCorpus();
-    const texts = findExampleSentences(db, { text: '猫', sourceLangs: ['jpn'] })
+    const texts = findExampleSentences(db, { text: '猫', sourceLangs: ['ja'] })
       .examples.map((example) => example.text);
     expect(texts).not.toContain('猫。');
   });
 
   it('filters translations to the requested languages', () => {
     importCorpus();
-    const result = findExampleSentences(db, { text: '猫', sourceLangs: ['jpn'], glossLangs: ['rus'] });
-    expect(result.examples[0].translations).toEqual([{ lang: 'rus', text: 'Я люблю кошек.' }]);
+    const result = findExampleSentences(db, { text: '猫', sourceLangs: ['ja'], glossLangs: ['ru'] });
+    expect(result.examples[0].translations).toEqual([{ lang: 'ru', text: 'Я люблю кошек.' }]);
     expect(result.examples[1].translations).toEqual([]);
   });
 
   it('reads nothing from a disabled corpus', () => {
     importCorpus();
     db.prepare(`update dictionaries set enabled = 0 where id = 'tatoeba'`).run();
-    expect(findExampleSentences(db, { text: '猫', sourceLangs: ['jpn'] }).examples).toEqual([]);
+    expect(findExampleSentences(db, { text: '猫', sourceLangs: ['ja'] }).examples).toEqual([]);
   });
 
   it('answers empty for a blank query and for a pasted sentence', () => {
@@ -98,7 +98,7 @@ describe('example sentence reader', () => {
   });
 
   it('does not throw on a database that has no example corpus at all', () => {
-    expect(findExampleSentences(db, { text: '猫', sourceLangs: ['jpn'] })).toEqual({
+    expect(findExampleSentences(db, { text: '猫', sourceLangs: ['ja'] })).toEqual({
       query: '猫',
       examples: [],
     });
@@ -119,8 +119,8 @@ describe('word lookups and example corpora', () => {
       values ((select id from headwords where dict_id='tatoeba'),0,'example','')`).run().lastInsertRowid);
     db.prepare(`insert into glosses (sense_id,lang,text,ord) values (?,'eng','I like cats.',0)`).run(senseId);
 
-    expect(lookup(db, { text: '猫', sourceLangs: ['jpn'] }).entries).toEqual([]);
-    expect(lookup(db, { text: 'I like cats.', sourceLangs: ['eng'] }).entries).toEqual([]);
+    expect(lookup(db, { text: '猫', sourceLangs: ['ja'] }).entries).toEqual([]);
+    expect(lookup(db, { text: 'I like cats.', sourceLangs: ['en'] }).entries).toEqual([]);
   });
 });
 
@@ -146,12 +146,14 @@ describe('schema step 10', () => {
     expect(step).toBeDefined();
     step?.up(db);
 
+    // `jpn`/`eng`/`rus` in, `ja`/`en`/`ru` out: the old importer stored Tatoeba's
+    // ISO 639-3 codes verbatim, and every language filter in this app says `ja`.
     expect(db.prepare('select lang,text,licence,dict_id from examples').all()).toEqual([
-      { lang: 'jpn', text: '猫が好きです。', licence: 'CC BY 2.0 FR', dict_id: 'tatoeba' },
+      { lang: 'ja', text: '猫が好きです。', licence: 'CC BY 2.0 FR', dict_id: 'tatoeba' },
     ]);
     expect(db.prepare('select lang,text from example_translations order by rowid').all()).toEqual([
-      { lang: 'eng', text: 'I like cats.' },
-      { lang: 'rus', text: 'Я люблю кошек.' },
+      { lang: 'en', text: 'I like cats.' },
+      { lang: 'ru', text: 'Я люблю кошек.' },
     ]);
     expect(db.prepare('select count(*) as count from headwords').get()).toEqual({ count: 0 });
     expect(db.prepare('select count(*) as count from senses').get()).toEqual({ count: 0 });

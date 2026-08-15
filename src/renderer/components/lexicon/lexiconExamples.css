@@ -1,0 +1,86 @@
+.lexicon-examples {
+  margin: 14px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-1);
+  color: var(--text);
+}
+
+.lexicon-examples > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.lexicon-examples-note,
+.lexicon-examples-empty {
+  margin: 8px 0 0;
+  font-size: 0.9em;
+}
+
+.lexicon-examples-run {
+  margin-top: 10px;
+  min-height: 32px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.lexicon-examples-run:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.lexicon-examples-error {
+  margin: 8px 0 0;
+  color: var(--danger, #d14343);
+}
+
+.lexicon-examples-list {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lexicon-examples-list li {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+/* A sentence is read, not scanned, so it keeps a comfortable measure and a
+   reading line-height rather than the single-line treatment the compound list
+   uses for words. */
+.lexicon-examples-sentence {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.6;
+}
+
+/* The queried word is highlighted inside the sentence so the containment claim is
+   visible rather than asserted. `mark` is restyled rather than replaced with a
+   span: the default UA yellow is unreadable on this surface, and the element is
+   what carries the "this part matched" meaning to a screen reader. */
+.lexicon-examples-sentence mark {
+  background: none;
+  color: var(--accent, #7c5cbf);
+  font-weight: 700;
+}
+
+.lexicon-examples-translation {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.lexicon-examples-source {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 0.85em;
+}

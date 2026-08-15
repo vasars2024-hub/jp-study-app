@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import type { SqliteDb } from '../db';
-import { EXAMPLE_DICTIONARY_KIND } from '../../../shared/dictionarySources';
+import { canonicalCorpusLang, EXAMPLE_DICTIONARY_KIND } from '../../../shared/dictionarySources';
 
 export interface TatoebaImportOptions {
   dictId?: string;
@@ -68,8 +68,10 @@ export function importTatoeba(db: SqliteDb, sentencesPath: string, linksPath: st
       if (!translations.length) continue;
       // `source` keeps Tatoeba's own sentence id, which is the only durable name
       // this row has: `examples.id` is reassigned by every re-import.
-      const exampleId = Number(example.run(source.lang, source.text, String(id), LICENCE, dictId).lastInsertRowid);
-      for (const item of translations) translation.run(exampleId, item.lang, item.text);
+      const exampleId = Number(
+        example.run(canonicalCorpusLang(source.lang), source.text, String(id), LICENCE, dictId).lastInsertRowid,
+      );
+      for (const item of translations) translation.run(exampleId, canonicalCorpusLang(item.lang), item.text);
       counts.entries += 1; counts.translations += translations.length;
     }
     db.prepare('update dictionaries set entry_count=? where id=?').run(counts.entries, dictId);

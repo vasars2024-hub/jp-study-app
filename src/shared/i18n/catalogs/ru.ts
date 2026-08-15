@@ -9290,6 +9290,13 @@ export const ru: Catalog = {
   'lexicon.compounds.running': 'Просмотр словарей…',
   'lexicon.compounds.failed': 'Не удалось выполнить поиск в базе словарей.',
   'lexicon.compounds.empty': 'Ни одно другое заголовочное слово в ваших словарях не содержит «{query}».',
+  'lexicon.examples.title': 'Примеры употребления',
+  'lexicon.examples.note': 'Предложения из установленного корпуса примеров, содержащие это слово, — сначала самые короткие. Слово выделено в каждом из них.',
+  'lexicon.examples.action': 'Найти примеры',
+  'lexicon.examples.running': 'Поиск предложений…',
+  'lexicon.examples.failed': 'Не удалось выполнить поиск в корпусе примеров.',
+  'lexicon.examples.empty': 'Ни одно предложение в установленных корпусах не содержит «{query}». Импортируйте Tatoeba в настройках, чтобы добавить примеры.',
+  'lexicon.examples.credit': '{source} · {licence}',
   'lexicon.neighbors.title': 'Слова с общим значением',
   'lexicon.neighbors.shares': 'Общее значение: {senses}',
 

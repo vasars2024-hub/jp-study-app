@@ -34,6 +34,32 @@ export interface DictionarySourceInfo {
  */
 export const EXAMPLE_DICTIONARY_KIND = 'examples';
 
+/**
+ * Tatoeba publishes ISO 639-3; every other importer and every language filter in
+ * this app speaks the two-letter codes. Stored uncanonicalized, a Japanese
+ * sentence lands as `jpn` and no `ja` lookup can ever reach it.
+ *
+ * Only the languages this app actually filters by are listed. An unmapped code is
+ * kept verbatim, which leaves it honest and merely unreachable by the language
+ * filter — a guessed mapping would instead be wrong data.
+ */
+const CORPUS_LANG_ALIASES: Readonly<Record<string, string>> = {
+  jpn: 'ja',
+  eng: 'en',
+  rus: 'ru',
+  cmn: 'zh',
+  zho: 'zh',
+};
+
+export function canonicalCorpusLang(code: string): string {
+  const key = code.trim().toLowerCase();
+  return CORPUS_LANG_ALIASES[key] ?? key;
+}
+
+/** The alias pairs, for the migration that has to repair rows already written. */
+export const CORPUS_LANG_ALIAS_PAIRS: readonly (readonly [string, string])[] =
+  Object.entries(CORPUS_LANG_ALIASES);
+
 export const DICTIONARY_KIND_LABEL_KEYS: Readonly<Record<string, string>> = {
   term: 'settings.study.dict.kind.terms',
   pitch: 'settings.study.dict.kind.pitch',

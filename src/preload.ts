@@ -459,6 +459,12 @@ const api = {
     options?: { sourceLangs?: string[]; glossLangs?: string[] },
   ): Promise<import('./shared/lexiconCompounds').LexiconCompoundResult> =>
     ipcRenderer.invoke('dict:compounds', text, options),
+  /** Sentences from an installed example corpus that contain this word. */
+  dictExamples: (
+    text: string,
+    options?: { sourceLangs?: string[]; glossLangs?: string[] },
+  ): Promise<import('./shared/lexiconExamples').LexiconExampleResult> =>
+    ipcRenderer.invoke('dict:examples', text, options),
   /** What the installed dictionaries say about where this word came from. */
   dictEtymology: (
     text: string,

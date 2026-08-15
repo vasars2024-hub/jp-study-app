@@ -36,6 +36,7 @@ import CharacterMetadataPanel from './lexicon/CharacterMetadataPanel';
 import CharacterMetadataUnavailable from './lexicon/CharacterMetadataUnavailable';
 import ConjugationTable from './lexicon/ConjugationTable';
 import LexiconCompounds from './lexicon/LexiconCompounds';
+import LexiconExamples from './lexicon/LexiconExamples';
 import LexiconEtymology from './lexicon/LexiconEtymology';
 import EntryNote from './lexicon/EntryNote';
 import SemanticNeighbors from './lexicon/SemanticNeighbors';
@@ -987,6 +988,10 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
 
       {variant !== 'popup' && entries.length > 0 && (
         <LexiconCompounds query={entries[0].word} lang={lang} />
+      )}
+
+      {variant !== 'popup' && entries.length > 0 && (
+        <LexiconExamples query={entries[0].word} lang={lang} />
       )}
 
       {variant !== 'popup' && entries.length > 0 && (

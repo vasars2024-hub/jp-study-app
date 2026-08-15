@@ -16,7 +16,7 @@ describe('Tatoeba importer', () => {
     fs.writeFileSync(links, '1\t2\n1\t3\n');
     expect(importTatoeba(db, sentences, links)).toMatchObject({ entries: 1, translations: 2, cancelled: false });
     expect(db.prepare(`select lang,text from example_translations order by rowid`).all()).toEqual([
-      { lang: 'eng', text: 'It is a cat.' }, { lang: 'rus', text: 'Это кошка.' },
+      { lang: 'en', text: 'It is a cat.' }, { lang: 'ru', text: 'Это кошка.' },
     ]);
     expect(db.prepare(`select licence,attribution from dictionaries where id='tatoeba'`).get()).toEqual({
       licence: 'CC BY 2.0 FR', attribution: 'Tatoeba — https://tatoeba.org/',
@@ -33,7 +33,7 @@ describe('Tatoeba importer', () => {
     importTatoeba(db, sentences, links);
     expect(db.prepare('select count(*) as count from headwords').get()).toEqual({ count: 0 });
     expect(db.prepare('select lang,text,source,licence,dict_id from examples').all()).toEqual([
-      { lang: 'jpn', text: '猫です。', source: '1', licence: 'CC BY 2.0 FR', dict_id: 'tatoeba' },
+      { lang: 'ja', text: '猫です。', source: '1', licence: 'CC BY 2.0 FR', dict_id: 'tatoeba' },
     ]);
   });
 

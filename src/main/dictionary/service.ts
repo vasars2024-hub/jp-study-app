@@ -45,12 +45,14 @@ import {
   type WiktextractImportOptions,
 } from './importers/wiktextract';
 import {
+  findExampleSentences,
   findLexiconCompounds,
   findLexiconEtymology,
   findSemanticNeighbors,
   lookup,
   type CompoundQuery,
   type EtymologyQuery,
+  type ExampleQuery,
   type LookupQuery,
   type LookupResult,
   type NeighborQuery,
@@ -71,6 +73,7 @@ import type {
 import type { DictResult } from '../../shared/types';
 import type { LexiconNeighborResult } from '../../shared/lexiconNeighbors';
 import type { LexiconCompoundResult } from '../../shared/lexiconCompounds';
+import type { LexiconExampleResult } from '../../shared/lexiconExamples';
 import type { LexiconEtymologyResult } from '../../shared/lexiconEtymology';
 import {
   isGlobalPair,
@@ -422,6 +425,11 @@ export function findSemanticNeighborsInDb(query: NeighborQuery): LexiconNeighbor
  */
 export function findLexiconCompoundsInDb(query: CompoundQuery): LexiconCompoundResult {
   return findLexiconCompounds(dictionaryDb(), query);
+}
+
+/** Sentences from an installed example corpus that contain a word. */
+export function findExampleSentencesInDb(query: ExampleQuery): LexiconExampleResult {
+  return findExampleSentences(dictionaryDb(), query);
 }
 
 /**
