@@ -10,6 +10,7 @@ import {
   useAnkiConfig,
 } from '../components/anki/AnkiContent';
 import { ProfileSettingsSection } from './SettingsView';
+import DeckWorkbench from '../components/anki/DeckWorkbench';
 import { useT } from '../i18n';
 
 export default function AnkiView() {
@@ -46,6 +47,17 @@ export default function AnkiView() {
             {loading ? t('anki.checking') : t('anki.recheck')}
           </button>
         </div>
+      </div>
+
+      {/*
+        Outside the connected branch on purpose: two of its three sources (a
+        package file and this app's own local deck) need no Anki at all, so
+        gating the workbench on AnkiConnect would hide working functionality.
+      */}
+      <div className="anki-card anki-card-flush">
+        <CollapsibleSection title={t('ankiWorkbench.title')} summary={t('ankiWorkbench.lead')}>
+          <DeckWorkbench />
+        </CollapsibleSection>
       </div>
 
       {loading && <div className="banner">{t('anki.checkingConnection')}</div>}

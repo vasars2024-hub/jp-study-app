@@ -1,0 +1,217 @@
+/* Deck Workbench — ANKI_DECK_WORKBENCH_PLAN.md Phase 2.
+ *
+ * Its own file rather than another block in styles.css, following
+ * views/mediaCenter.css and views/readingWorkspace.css.
+ *
+ * Liquid UI, selectively: the stepper and the source rail are contextual
+ * navigation and get the translucent treatment; the detail column, which is
+ * where numbers and diagnostics are read, stays a plain opaque anchor surface.
+ * Only shared tokens are used, so Aero/Wired/Blanc remap this for free. */
+
+.deck-workbench {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg, 16px);
+}
+
+.deck-workbench-head h2 {
+  margin: 0 0 4px;
+  font-size: 1.05rem;
+}
+
+.deck-workbench-progress {
+  margin: 4px 0 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+/* ----- the stepper ------------------------------------------------------- */
+
+.deck-workbench-stepper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.deck-workbench-step {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 10px);
+  background: color-mix(in srgb, var(--panel) 78%, transparent);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.deck-workbench-step:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.deck-workbench-step:focus-visible {
+  outline: 2px solid var(--focus, var(--accent));
+  outline-offset: 2px;
+}
+
+.deck-workbench-step.current {
+  border-color: var(--accent);
+  background: var(--panel);
+}
+
+.deck-workbench-step.done .deck-workbench-step-num {
+  background: var(--accent);
+  color: var(--on-accent, #fff);
+}
+
+.deck-workbench-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--border) 70%, transparent);
+  font-variant-numeric: tabular-nums;
+}
+
+.deck-workbench-step-outcome,
+.deck-workbench-step-flag {
+  color: var(--muted);
+  font-size: 0.85em;
+}
+
+.deck-workbench-step.stale {
+  border-style: dashed;
+}
+
+.deck-workbench-step.stale .deck-workbench-step-flag {
+  color: var(--status-warning, var(--muted));
+}
+
+/* ----- body -------------------------------------------------------------- */
+
+.deck-workbench-body {
+  display: grid;
+  grid-template-columns: minmax(200px, 1fr) minmax(0, 2fr);
+  gap: var(--space-lg, 16px);
+  align-items: start;
+}
+
+/* One column below the workbench's own narrow breakpoint, so compact windows
+   and the Blanc panel do not squeeze the detail column to nothing. */
+@media (max-width: 720px) {
+  .deck-workbench-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.deck-workbench-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.deck-workbench-rail h3,
+.deck-workbench-detail h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.deck-workbench-source {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  /* 44px minimum target: two text lines plus this padding clears it. */
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 10px);
+  background: color-mix(in srgb, var(--panel) 78%, transparent);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.deck-workbench-source:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+.deck-workbench-source:focus-visible {
+  outline: 2px solid var(--focus, var(--accent));
+  outline-offset: 2px;
+}
+
+.deck-workbench-source-name {
+  font-weight: 600;
+}
+
+.deck-workbench-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: var(--space-lg, 16px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 10px);
+  /* Opaque on purpose: this is the reading surface. */
+  background: var(--panel);
+}
+
+.deck-workbench-outcome {
+  margin: 0;
+  font-weight: 600;
+}
+
+.deck-workbench-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.deck-workbench-error {
+  margin: 0;
+  color: var(--status-error);
+}
+
+.deck-workbench-warning {
+  margin: 0;
+  color: var(--status-warning, var(--muted));
+}
+
+.deck-workbench-locked {
+  margin: 0;
+  color: var(--status-warning, var(--muted));
+}
+
+.deck-workbench-sessions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.deck-workbench-sessions li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.deck-workbench-nav {
+  display: flex;
+  gap: 8px;
+}
