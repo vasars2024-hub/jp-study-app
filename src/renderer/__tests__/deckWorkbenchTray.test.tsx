@@ -349,6 +349,12 @@ function addEnrich(rule = 'refuse'): void {
   addToTray();
 }
 
+/** Let the enrichment lookup's promise settle inside React's `act`. */
+const flushLookup = (): Promise<void> =>
+  act(async () => {
+    await Promise.resolve();
+  });
+
 describe('DeckWorkbenchTray enrichment', () => {
   afterEach(() => {
     delete (window as { api?: unknown }).api;
@@ -374,7 +380,7 @@ describe('DeckWorkbenchTray enrichment', () => {
     addEnrich();
     // Blocked while the lookup is in flight, for the same reason as above.
     expect(applyButton().disabled).toBe(true);
-    await act(async () => {});
+    await flushLookup();
 
     // Asked for the word the note declares, not for the note's other field.
     expect(dictEnrichTerms).toHaveBeenCalledWith(['ねこ']);
@@ -395,7 +401,7 @@ describe('DeckWorkbenchTray enrichment', () => {
     };
     mount(draftOf([note('n1', '')]), ['n1']);
     addEnrich();
-    await act(async () => {});
+    await flushLookup();
 
     // A disagreement under `refuse` is named and changes nothing — not silently
     // resolved in favour of whichever dictionary happened to be first.
@@ -413,7 +419,7 @@ describe('DeckWorkbenchTray enrichment', () => {
     };
     mount(draftOf([note('n1', '')]), ['n1']);
     addEnrich('all-sources');
-    await act(async () => {});
+    await flushLookup();
 
     expect(host.textContent).toContain('ankiWorkbench.tray.problem.enrich-sources-merged:1,ねこ');
     act(() => applyButton().dispatchEvent(new MouseEvent('click', { bubbles: true })));
