@@ -53,6 +53,16 @@ export interface TranscriptionJob {
   queuedAt: number;
   /** Attempts so far, so a permanently failing file is not retried forever. */
   attempts: number;
+  /**
+   * Consecutive drains that found no renderer to transcribe in.
+   *
+   * Counted separately from `attempts` because "no window" is not the file's
+   * fault: a queue restored at boot legitimately waits for the renderer, and
+   * spending the media's three real attempts on that would break the
+   * resume-after-restart promise. Absent means zero, so an older persisted
+   * queue restores unchanged.
+   */
+  noWindowAttempts?: number;
   kind?: TranscriptionKind;
   /** For `fuse-en-ja`: which subtitle record supplies the cue grid. */
   sourceSubtitleId?: string;
@@ -86,6 +96,15 @@ export interface TranscriptionResult {
 
 /** A job is abandoned after this many failed attempts. */
 export const MAX_TRANSCRIPTION_ATTEMPTS = 3;
+
+/**
+ * Consecutive no-renderer drains before a job is abandoned.
+ *
+ * At the drain loop's 15 s retry spacing this is ten minutes of waiting — far
+ * longer than a cold boot needs, and short enough that a renderer which keeps
+ * dying mid-job cannot pin the queue head for the rest of the session.
+ */
+export const MAX_NO_WINDOW_ATTEMPTS = 40;
 
 /** Phases that mean the job is over. */
 export const TERMINAL_TRANSCRIPTION_PHASES: TranscriptionPhase[] = ['done', 'cancelled', 'error'];

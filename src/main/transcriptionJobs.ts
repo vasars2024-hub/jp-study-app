@@ -21,6 +21,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import {
+  MAX_NO_WINDOW_ATTEMPTS,
   MAX_TRANSCRIPTION_ATTEMPTS,
   estimateEtaMs,
   type TranscriptionJob,
@@ -660,6 +661,21 @@ async function runFusionJob(job: TranscriptionJob): Promise<TranscriptionResult>
   }
 }
 
+/**
+ * What to do with the head job when a drain found no renderer window.
+ *
+ * Pure, so the bound is testable without a queue, a window or a Whisper: the
+ * thing worth asserting is that the counter climbs and that it eventually
+ * stops, not how the loop is written.
+ */
+function planNoWindowRetry(job: TranscriptionJob): { retire: boolean; job: TranscriptionJob } {
+  const noWindowAttempts = (job.noWindowAttempts ?? 0) + 1;
+  return {
+    retire: noWindowAttempts >= MAX_NO_WINDOW_ATTEMPTS,
+    job: { ...job, noWindowAttempts },
+  };
+}
+
 async function drain(): Promise<void> {
   if (draining) return;
   draining = true;
@@ -679,13 +695,35 @@ async function drain(): Promise<void> {
         if (!result.ok && result.error !== 'cancelled') {
           const attempts = job.attempts + 1;
           // A file that fails repeatedly is dropped rather than retried forever.
-          if (attempts < MAX_TRANSCRIPTION_ATTEMPTS) queue.push({ ...job, attempts });
+          // The no-window counter resets: this run did reach a renderer, so the
+          // waiting it did earlier says nothing about the wait ahead of it.
+          if (attempts < MAX_TRANSCRIPTION_ATTEMPTS) {
+            queue.push({ ...job, attempts, noWindowAttempts: 0 });
+          }
         }
       } catch {
         // No window to transcribe in. Keep the job queued and try again shortly:
         // the window usually arrives seconds later, and breaking without a retry
-        // stalls the queue until something else happens to enqueue.
-        scheduleDrain(NO_WINDOW_RETRY_MS);
+        // stalls the queue until something else happens to enqueue. But a
+        // renderer that never arrives — or one that keeps dying mid-job — would
+        // otherwise hold the queue head forever, re-extracting the audio every
+        // 15 s for the rest of the session, so the wait is bounded too.
+        const plan = planNoWindowRetry(job);
+        if (plan.retire) {
+          if (queue[0]?.mediaId === job.mediaId) queue.shift();
+          broadcast({
+            mediaId: job.mediaId,
+            title: job.title,
+            phase: 'error',
+            done: 0,
+            total: 0,
+            startedAt: Date.now(),
+            error: 'no-window',
+          });
+        } else {
+          if (queue[0]?.mediaId === job.mediaId) queue[0] = plan.job;
+          scheduleDrain(NO_WINDOW_RETRY_MS);
+        }
         break;
       } finally {
         active -= 1;
@@ -837,5 +875,6 @@ export const __transcriptionTestables = {
   chunksToSrt,
   timestamp,
   pickEnglishTrack,
+  planNoWindowRetry,
   hasPendingRetry: (): boolean => retryTimer !== null,
 };

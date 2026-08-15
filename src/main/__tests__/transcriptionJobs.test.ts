@@ -3,10 +3,19 @@ import { describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { __transcriptionTestables } from '../transcriptionJobs';
+import {
+  __transcriptionTestables,
+  enqueueTranscription,
+  onMainTranscriptionProgress,
+  registerTranscriptionIpc,
+  transcriptionQueue,
+} from '../transcriptionJobs';
+import { MAX_NO_WINDOW_ATTEMPTS } from '../../shared/transcriptionIpc';
 
 const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'transcribe-test-'));
 
+// No window, ever: every chunk request answers `no-window`, which is the whole
+// point of the drain-bound test below.
 vi.mock('electron', () => ({
   app: { getPath: () => tmpRoot },
   ipcMain: { handle: () => undefined, on: () => undefined },
@@ -14,9 +23,11 @@ vi.mock('electron', () => ({
 }));
 
 // media.ts is imported for extractAudioPcm; stub it so no ffmpeg is spawned.
-vi.mock('../media', () => ({ extractAudioPcm: async () => new ArrayBuffer(0) }));
+// Mutable so a test can hand the job enough audio to be worth a chunk request.
+const pcm = vi.hoisted(() => ({ bytes: 0 }));
+vi.mock('../media', () => ({ extractAudioPcm: async () => new ArrayBuffer(pcm.bytes) }));
 
-const { chunksToSrt, timestamp, pickEnglishTrack } = __transcriptionTestables;
+const { chunksToSrt, timestamp, pickEnglishTrack, planNoWindowRetry } = __transcriptionTestables;
 
 describe('timestamp', () => {
   it('formats SRT timestamps with a comma before the milliseconds', () => {
@@ -102,5 +113,69 @@ describe('pickEnglishTrack', () => {
     const subs = [record({ id: 'a' }), record({ id: 'b' }), record({ id: 'ja', lang: 'ja' })];
     expect(pickEnglishTrack(item(subs), 'b')?.id).toBe('b');
     expect(pickEnglishTrack(item(subs), 'ja')).toBeUndefined();
+  });
+});
+
+describe('planNoWindowRetry', () => {
+  const job = (over: Record<string, unknown> = {}): Parameters<typeof planNoWindowRetry>[0] =>
+    ({ mediaId: 'm', title: 't', lang: 'ja', queuedAt: 1, attempts: 0, ...over }) as
+      Parameters<typeof planNoWindowRetry>[0];
+
+  it('counts an absent counter as zero, so an older persisted queue restores', () => {
+    expect(planNoWindowRetry(job()).job.noWindowAttempts).toBe(1);
+  });
+
+  it('climbs without touching the attempts the media itself is judged on', () => {
+    const next = planNoWindowRetry(job({ noWindowAttempts: 5, attempts: 2 }));
+    expect(next.job.noWindowAttempts).toBe(6);
+    expect(next.job.attempts).toBe(2);
+    expect(next.retire).toBe(false);
+  });
+
+  it('retires exactly at the bound, and keeps the rest of the job intact', () => {
+    expect(planNoWindowRetry(job({ noWindowAttempts: MAX_NO_WINDOW_ATTEMPTS - 2 })).retire).toBe(false);
+    const last = planNoWindowRetry(job({ noWindowAttempts: MAX_NO_WINDOW_ATTEMPTS - 1, kind: 'fuse-en-ja' }));
+    expect(last.retire).toBe(true);
+    expect(last.job.kind).toBe('fuse-en-ja');
+  });
+});
+
+describe('a drain that never finds a renderer', () => {
+  const media = {
+    id: 'm1', title: 'Episode 1', fileName: 'ep1.mkv', path: '/tmp/ep1.mkv', subtitles: [],
+  };
+
+  it('bounds the wait instead of holding the queue head for the whole session', async () => {
+    // One full chunk of audio, so the job actually reaches a chunk request and
+    // the `no-window` throw — an empty buffer would finish as an empty transcript.
+    pcm.bytes = 16_000 * 4;
+    vi.useFakeTimers();
+    const errors: string[] = [];
+    const off = onMainTranscriptionProgress((p) => {
+      if (p.phase === 'error') errors.push(p.error ?? '');
+    });
+    try {
+      registerTranscriptionIpc({ listItems: () => [media], patchItems: () => undefined } as never);
+      enqueueTranscription({ mediaId: 'm1' });
+      await vi.advanceTimersByTimeAsync(0);
+
+      // Still queued — the window usually does arrive — but the wait is counted now.
+      expect(transcriptionQueue()).toHaveLength(1);
+      expect(transcriptionQueue()[0].noWindowAttempts).toBe(1);
+
+      await vi.advanceTimersByTimeAsync(15_000);
+      expect(transcriptionQueue()[0].noWindowAttempts).toBe(2);
+      // The file is blameless: its own attempts are untouched.
+      expect(transcriptionQueue()[0].attempts).toBe(0);
+
+      // Left alone it retires, rather than re-extracting the audio every 15 s forever.
+      await vi.advanceTimersByTimeAsync(15_000 * MAX_NO_WINDOW_ATTEMPTS);
+      expect(transcriptionQueue()).toHaveLength(0);
+      expect(errors).toContain('no-window');
+    } finally {
+      off();
+      vi.useRealTimers();
+      pcm.bytes = 0;
+    }
   });
 });
