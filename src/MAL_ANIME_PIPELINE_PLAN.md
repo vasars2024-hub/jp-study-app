@@ -986,3 +986,46 @@ media item involved; only the *attach* step (`writeSubtitleFile` + `patchItems`,
 needs one, and harvest mining wants the text, not a record. So a title-keyed list handler plus a
 text-returning fetch handler closes it. That is cross-surface (contract, main, preload,
 `window.d.ts`, panel, i18n ×4, tests) and is a turn of its own — do not half-land it.
+
+## 2026-08-17 — P4's nyaa half is real: the offer now has a door behind it
+
+Worker `primary`. Commits `91987dbb`, `b8b30f1b`, `9771641e`, `4d589e98`. This closes the item
+the previous turn scoped and left open ("the harvest panel has no nyaa *fetch* path").
+
+**The gap was structural, not missing wiring.** `subtitleDiscovery`'s nyaa pair refuses anything
+`host.listItems()` does not hold, because its job ends in a `SubtitleRecord` attached to a file on
+disk. A MAL title the user has not downloaded therefore had **no nyaa route at all** — the offer
+sentence has been in front of users for as long as the panel has, and never had a destination.
+
+**Three slices.**
+1. `91987dbb` — `nyaaFetchAll`. `nyaaFetch` already downloads **every** subtitle file a release
+   holds (`selectSubtitleFiles` does not filter when the token names no episode, and
+   `qbitAwaitFiles` waits for all of them) and then returns after the **first** that reads. Correct
+   for discovery, useless for a range. `nyaaFetch` is now the single-file view over it, so the
+   discovery contract did not move. **25 tests** (was 21).
+2. `b8b30f1b` — `subtitleHarvest:nyaaList` / `:nyaaFetch`, title-keyed, no media item. Searched
+   with `episode: null` because a harvest asks for a range and the releases that serve a range
+   carry it whole. Session catalogue is `subtitleNyaaSource`'s own, shared with discovery.
+   **10 tests**; 38 green across both harvest suites.
+3. `9771641e` — the panel. Two clicks, never one: listing must not be able to start a transfer.
+   The range check **refuses rather than filters** — a release whose episodes miss the range names
+   what it holds and studies nothing. **5 renderer tests** + the route test rewritten (4).
+
+**Mutation controls, each landing on exactly one test.** `break` after the first push → "returns
+every episode in the pack". `episode: null` → `1` → "searches the whole title". Deleting the
+unlisted-id guard → "refuses an id it never listed". `if (!inRange.length)` → `if (false)` →
+"refuses a release whose episodes miss the range". All restored byte-identical (`-ceq` by sha256).
+
+**Gate status unchanged.** This is P4 infrastructure, not a new gate pass: nothing here has been
+run against the live index. **Gate 31 remains open** and its two blockers are still the measured
+ones from 2026-08-16 — 1 Route A candidate in 99 titles and it is bitmap-only, 0 of 6 Route B
+batches carry sidecars. What is new is that a *harvest* can now reach nyaa at all, which is a
+third route those surveys never covered. **The next slice is to run it live**: `listNyaaHarvest`
+on a title Jimaku misses, then `fetchNyaaHarvest` on a real candidate, reporting cue counts.
+
+**Traps.** (1) `window.d.ts` declares `subtitleHarvestList/Fetch` **twice** (overload copies at
+HEAD:918 and HEAD:1681) and the file has **mixed line endings** — a single-line anchor names two
+places, and a multi-line anchor joined with the file's "dominant" EOL matches zero. See
+`debug/stage-harvest-nyaa.cjs`. (2) A test asserting `` `ipcMain.handle('${channel}'` `` registers
+*itself* as the handler in `tools/architecture-audit.cjs` and turns dead-ipc 0 → 1; assemble the
+string from parts. (3) Russian plurals need `one/few/many/other`, not three.
