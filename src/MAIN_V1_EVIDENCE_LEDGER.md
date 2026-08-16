@@ -24002,3 +24002,40 @@ same class ("Select a title to see why it was recommended").
 
 **Next:** the enrich tray blocks the bridge past 30 s on 500 notes — measure whether
 main's event loop is the thing blocked, and if so move the lookup off it.
+
+## 2026-08-16 — Track 7 / Phase 4: deck enrichment held Electron's main loop for 37 seconds
+
+**Slice.** `enrichTermsBatch` now yields to the event loop on a time budget.
+`src/main/dictionary/enrichService.ts`, `src/main/__tests__/dictionaryEnrich.test.ts`.
+
+**The finding, found by driving the app rather than reading it.** Two bridge `/eval`
+calls timed out at 30 s while the Deck Workbench tray enriched 500 notes. The cause is
+not the renderer: `lookupInDictionaryDb` is synchronous better-sqlite3 called in a bare
+`for` loop in main, so the whole batch runs as one uninterruptible task. Measured live —
+**~67 ms per word**, linear (1 → 65 ms, 10 → 634, 50 → 3,447, 200 → 13,359, 500 →
+33,682) — and a **`/health` request, which touches main only and never the renderer,
+took 36,910 ms to answer during the run and 1 ms immediately after.** That is CLAUDE.md's
+"never run dictionary processing on Electron's main event loop", and window-dragging
+responsiveness is a stated product invariant.
+
+**Decision.** Chunk-and-yield (`await setImmediate` after each ~50 ms slice), not a
+worker. Tradeoff: the total run is unchanged — this makes it *interruptible*, not faster
+— where a utility process would also cut wall time. Taken because the sync
+better-sqlite3 handle, its migrations and the Yomitan fallback all live in main today, so
+moving them is a Track-9-sized slice, while the invariant being broken is starvation.
+A **time** budget rather than a fixed chunk size: the per-word cost varies with the
+installed dictionaries, so a count tuned here starves another profile.
+
+**Live, after a real app restart** (main does not hot-reload), same 500 words:
+worst `/health` **5,230 ms** on the first probe and **10–443 ms** after. A second, warm
+run isolates that first block as the cold synchronous `openDictionaryDb`, not the loop:
+worst **462 ms**, median ~70 ms, twelve probes, none failed. So **36,910 ms → 462 ms**
+worst-case block, and main answers throughout instead of going silent.
+
+**Test + negative control.** `lets queued macrotasks run while it works` counts ticks of a
+`setImmediate` pump across a 400-word batch — behavioural, not a wall-clock threshold that
+would flake. Deleting the yield takes the suite to **1 failed | 5 passed**, red at
+`expect(ticks).toBeGreaterThan(1)`; restored and re-verified **6 passed**.
+
+**Left open on purpose:** 67 ms for one word is itself slow, and the cold DB open is a
+separate synchronous cost. Both are query/architecture work, not starvation work.

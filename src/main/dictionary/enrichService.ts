@@ -25,6 +25,30 @@ export const MAX_ENRICH_BATCH = 2_000;
 export const MAX_ENRICH_ENTRIES_PER_TERM = 4;
 
 /**
+ * How long the lookup loop may hold Electron's main event loop before letting
+ * it breathe.
+ *
+ * `lookupInDictionaryDb` is synchronous better-sqlite3 and measured **~67 ms
+ * per word** on this installation, so a 500-word selection ran the loop for
+ * **33.7 s** without ever yielding — measured live 2026-08-16, with a `/health`
+ * request that touches only main taking **36,910 ms** to answer during it and
+ * **1 ms** immediately after. Nothing could paint, drag or answer IPC for that
+ * whole window, which is exactly what CLAUDE.md's performance rule forbids.
+ *
+ * A time budget rather than a fixed chunk size, because the per-word cost
+ * varies with the installed dictionaries: a count tuned for one profile starves
+ * another. The total run takes the same time; it is now interruptible.
+ */
+const ENRICH_YIELD_MS = 50;
+
+/** Hand the event loop back — a macrotask, so timers, IPC and paint all run. */
+function yieldToEventLoop(): Promise<void> {
+  return new Promise((resolve) => {
+    setImmediate(resolve);
+  });
+}
+
+/**
  * A legacy Yomitan hit. That store never merges across dictionaries, so one
  * entry is one dictionary and `source` says everything there is to say.
  */
@@ -109,6 +133,7 @@ export async function enrichTermsBatch(
 
   const out: Record<string, EnrichEntry[]> = {};
   const missed: string[] = [];
+  let sliceStart = Date.now();
   for (const term of unique) {
     let entries: LookupEntry[] = [];
     try {
@@ -118,6 +143,10 @@ export async function enrichTermsBatch(
     }
     if (entries.length) out[term] = entries.slice(0, MAX_ENRICH_ENTRIES_PER_TERM).map(fromLookupEntry);
     else missed.push(term);
+    if (Date.now() - sliceStart >= ENRICH_YIELD_MS) {
+      await yieldToEventLoop();
+      sliceStart = Date.now();
+    }
   }
   if (!legacyFallback || !missed.length) return out;
 
@@ -128,12 +157,17 @@ export async function enrichTermsBatch(
   } catch {
     return out;
   }
+  sliceStart = Date.now();
   for (const term of missed) {
     let entries: DictEntry[] = [];
     try {
       entries = lookupOfflineDeinflected(term).entries;
     } catch {
       entries = [];
+    }
+    if (Date.now() - sliceStart >= ENRICH_YIELD_MS) {
+      await yieldToEventLoop();
+      sliceStart = Date.now();
     }
     if (!entries.length) continue;
     out[term] = entries.slice(0, MAX_ENRICH_ENTRIES_PER_TERM).map(fromLegacyEntry);

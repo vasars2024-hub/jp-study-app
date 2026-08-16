@@ -110,3 +110,43 @@ describe('enrichTermsBatch', () => {
     expect(await enrichTermsBatch(['   '], { legacyFallback: false })).toEqual({});
   });
 });
+
+describe('enrichTermsBatch does not starve the main event loop', () => {
+  /**
+   * The defect this pins, measured live 2026-08-16: the lookup loop was fully
+   * synchronous, so a 500-word selection held main for 33.7 s and a `/health`
+   * request that touches only main took 36,910 ms to answer during it (1 ms
+   * after). Nothing could paint, drag or answer IPC.
+   *
+   * The assertion is behavioural rather than timing-based — a wall-clock
+   * threshold would flake on a loaded machine. A `setImmediate` callback queued
+   * before the batch starts can only run before the batch resolves if the loop
+   * actually hands the event loop back, so counting ticks is exact.
+   */
+  it('lets queued macrotasks run while it works', async () => {
+    seedDict('d1', 'JMdict (EN)');
+    const terms: string[] = [];
+    for (let i = 0; i < 400; i += 1) {
+      const term = `語${i}`;
+      seedEntry('d1', term, `gloss ${i}`);
+      terms.push(term);
+    }
+
+    let ticks = 0;
+    let stop = false;
+    const pump = (): void => {
+      if (stop) return;
+      ticks += 1;
+      setImmediate(pump);
+    };
+    setImmediate(pump);
+
+    const out = await enrichTermsBatch(terms, { legacyFallback: false });
+    stop = true;
+
+    expect(Object.keys(out).length).toBe(400);
+    // One tick is the pump's own first run; anything above that only happens
+    // because the batch yielded mid-flight.
+    expect(ticks).toBeGreaterThan(1);
+  });
+});
