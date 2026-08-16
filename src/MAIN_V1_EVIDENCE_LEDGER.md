@@ -24039,3 +24039,53 @@ would flake. Deleting the yield takes the suite to **1 failed | 5 passed**, red 
 
 **Left open on purpose:** 67 ms for one word is itself slow, and the cold DB open is a
 separate synchronous cost. Both are query/architecture work, not starvation work.
+
+## 2026-08-16 — Track 7 / Phase 7: recipe 17, and a clean library that proved nothing
+
+**Slices.** `8c705e02` `shared/ankiSiblingAudit.ts` + the `sibling:` Browser predicate
+(20 + 10 tests, 6 i18n keys ×4) · `d2c53c9c` `DeckWorkbenchSiblings` (5 tests, 8 keys ×4).
+
+**Decision.** Recipe 17 ("audit sibling cards and remove unintended duplicate templates")
+ships its **audit** half as a filter plus a read-only panel, recipes 9/11/15's shape. Five
+verdicts healthiest first: `single / ok / duplicate / ambiguous / orphan`. The subject is
+the note **type**, not the note — recipe 15 judges what one card renders into, and each
+half of a duplicate pair renders perfectly, so no per-card lens can see this fault.
+
+**`ambiguous` is the load-bearing distinction, and it is a refusal to offer a fix.** Two
+templates with the same question and the same answer waste time; one can go and nothing is
+lost. Two with the same question and *different* answers are unanswerable, and removing
+either silently drops content. Collapsing them would put a destructive button in front of
+the case where it is wrong. `orphan` outranks both: a card whose ord names no template
+cannot render at all — Anki's own Empty Cards tool deletes exactly these.
+
+**Compared as rendered text, over a stated sample.** `{{Front}}` and `{{ Front }}` are one
+template written twice, so the render is what is compared (recipe 15's choice). The sample
+is evenly spaced, never a prefix — a mined deck's first 50 notes share one source's
+conditional shape. Every group reports `sampled`, because **the verdict is the sample's**:
+a fixture reads `ambiguous` at 50 notes and `duplicate` at 2, and the test asserts that
+rather than hiding it. Redundant card counts come from the whole draft; the sample decides
+whether a template is redundant, the draft decides what reviewing it costs.
+
+**Live, and the clean result is the finding.** 33 real packages, **38,283 notes on page /
+52,144 cards**, read through the real main process with no dialog (`readApkgDraft
+{filePath}`). Every tally sums to its own note count; worst audit **1,014 ms** (5 templates
+× 2,000 notes). The library is **clean**: 32,422 `single`, 5,861 `ok`, **0** duplicate,
+**0** ambiguous, **0** orphan. That proves nothing on its own, so
+`New_HSK_30…drawing.apkg` — 5 genuinely distinct templates, 2,000 notes, all `ok`, itself
+the negative control — was broken deliberately: cloning `Card 1` gives exactly **1** group,
+`duplicate`, ords [0,99], sampled 50, **2,000** redundant cards, all 2,000 notes; changing
+only the clone's **answer** gives exactly **1** group, `ambiguous`, all 2,000 notes.
+
+**Left open on purpose: the "remove" half.** Removing a template deletes every card it
+generated across the collection and renumbers the surviving ords, and AnkiConnect has **no**
+remove-template action — so the live destination has to refuse by name before write #1, the
+way recipe 13's `deck-rename-unsupported` does. A button now would be a promise the writers
+cannot keep, which is why the panel proposes queries and nothing else.
+
+**Traps.** (1) The Write tool put a **raw NUL byte** into `ankiSiblingAudit.ts` (`const SEP
+= '\u0000'`), which made git stage it as `Bin 0 -> 12655 bytes`. Only PowerShell repaired
+it; Edit could not even match the line, because its `old_string` is re-encoded to the same
+raw byte. Check `git diff --cached --stat` for `Bin` on any new source file. (2)
+`readApkgDraft` returns one **page**: `draft.notes.length` was 2,000 where
+`draft.counts.notes` was 52,021, and a sweep reading the former reports a fifth of a deck
+as the deck.
