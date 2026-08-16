@@ -23527,3 +23527,62 @@ real package carries it anyway. (d) The running app's **main process does not
 hot-reload**: an IPC export probe returned `nothing-to-export` purely because main
 predated the change. Probe kept at `debug/r12-real-apkg.probe.test.ts.txt` — copy it
 into `src/main/__tests__/` to re-run, it reads the user's Downloads.
+
+## 2026-08-16 — Track 7 / Phase 7: recipe 15, and the deck whose own `$'` rewrote the template
+
+**Slices.** `df7eba97` the model, `256669c8` the filter, `90a30fa2` the renderer fix
+the real-data run turned up.
+
+**Decision.** Recipe 15 ("identify empty backs, identical front/back renders, broken
+templates") ships as a **filter, not a tray action** — like recipes 8 and 16 its verb
+is "find". `shared/ankiCardHealth.ts` classifies a rendered card six ways, healthiest
+first: `ok / not-generated / same / empty-back / empty-front / broken`. Tradeoff:
+`same` compares **rendered text**, not fields — fields that differ can render
+identically (a template showing `{{Front}}` on both sides) and identical fields can
+render differently the moment one side wraps in a filter.
+
+**Why `same` had to exist at all.** `renderAnkiCard` substitutes `{{FrontSide}}` into
+the answer *before* rendering it, so `{{FrontSide}}<hr id=answer>{{Back}}` over an
+empty `Back` renders a non-empty answer holding the question. `empty-answer` does not
+fire; every prior check passed the card. `not-generated` is dropped from a note's
+verdict rather than ranked, so an opted-out reverse neither enters the defect queue nor
+inflates the healthy count.
+
+**`render:` is the first predicate a row cannot answer** — the verdict is about the
+note type's templates. It reads `schema.render`, precomputed per draft by
+`buildCardHealthContext` and memoized on `draft` alone (a render is a function of note
++ note type only, so unlike `vocab` it does not move with the knowledge store).
+`no-render-context` is its own error code: vocab context waits on a frequency
+dictionary, render context waits only on the draft, and reusing the vocab message would
+send the user after the wrong thing.
+
+**The finding, which is why real data was used.** First run over 10 real packages:
+`NO_ENGLISHegg_rollsJLPT_N1N5_v3.apkg` reported `unbalanced-conditional` on **10,147 of
+10,147** notes. An independent balance check of its four formats: 26/28/28/26 sections,
+**0** unclosed, **0** orphan closes — the deck was fine. `renderAnkiCard` passed the
+rendered question as `String.replace`'s *replacement string*, where `$&`/`` $` ``/`$'`/
+`$$`/`$n` are patterns. That deck's front side ships inline script holding
+`'$1<b>$2</b>'` and `['$', '^', 'v']`; the `$'` spliced the whole remainder of the
+answer format in again — 55 sections where the template has 28, the body rendered twice,
+one `{{/Alt1}}` with no opener. Fixed by passing a function. Would have handed the user
+a 10,147-note "broken template" queue with zero real entries.
+
+**Measured, 10 packages / 121,737 notes** (Downloads): 7,992 + 300 + 80 + 608 + 52,021 +
+10,147 + 9,979 + 38,089 + 1,921 + 600, **every one 100% `ok`** after the fix, each tally
+summing to its own note count. eggrolls: 10,147 broken → 10,147 ok.
+**Negative control:** on `Advanced.apkg`'s 基本 type (`{{FrontSide}}<hr id=answer>{{裏面}}`)
+blanking 裏面 moves one note ok → `same` and moves **exactly** that one, 0 others.
+**Mutation controls, all three red:** returning `ok` for the `same` verdict fails 3;
+ranking ungenerated siblings instead of dropping them fails 2; restoring the
+replacement-string substitution fails the new regression test alone.
+
+**Traps.** (a) A control that blanks fields on a *rich* note type proves nothing — the
+Lapis type's answer adds static chrome, so it stays `ok` correctly; the control needs a
+plain `{{FrontSide}}…{{Back}}` type. (b) Vitest swallows `console.log` from passing
+tests; the probe writes to `debug/r15-real.log` instead. (c) All-`ok` across a whole deck
+is a finding to chase, not a pass — the 10,147 all-`broken` was the renderer, and four
+100%-clean packages were what made the fifth's uniformity legible.
+
+Probes at `debug/r15-real-apkg.probe.test.ts.txt` and
+`debug/r15-frontside-dollar.probe.test.ts.txt` — copy into `src/main/__tests__/` to
+re-run; they read the user's Downloads and are not suite material.
