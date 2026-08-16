@@ -94,6 +94,12 @@ import {
   type MasteryLevel,
   type MasteryPlan,
 } from './ankiMastery';
+import {
+  decideGlossaryField,
+  matchGlossaryEntry,
+  type GlossaryMergeMode,
+  type GlossarySource,
+} from './ankiGlossaryMerge';
 import type { VocabContext } from './ankiVocabContext';
 
 export type TrayActionKind =
@@ -111,7 +117,8 @@ export type TrayActionKind =
   | 'set-mastery'
   | 'normalize-tags'
   | 'normalize-decks'
-  | 'split-deck';
+  | 'split-deck'
+  | 'merge-glossary';
 
 /**
  * What a copy does when the destination already holds text — Phase 4's "require
@@ -286,6 +293,25 @@ export type TrayAction =
       unmatchedSegment?: string;
       /** Ascending band edges. Required for `frequency`, ignored elsewhere. */
       bands?: number[];
+    })
+  | (TrayActionBase & {
+      /**
+       * Recipe 14. The only action that reads a *second* deck: the glossary it
+       * merges from arrives through `planChangeTray`'s options for the same
+       * reason `apply-ai-additions`' batch does — it is a whole other draft's
+       * worth of rows and cannot sit on a serializable action. See
+       * `ankiGlossaryMerge.ts` for why a stronger destination is kept and why an
+       * ambiguous key is refused instead of resolved.
+       */
+      kind: 'merge-glossary';
+      /** Id of the `GlossarySource` supplied through `opts.glossary`. */
+      sourceId: string;
+      /** The destination field the two decks are matched on. */
+      keyField: string;
+      /** Source field -> destination field. Empty is refused as a mis-set form. */
+      fieldPairs: { fromField: string; toField: string }[];
+      /** No default: the three modes lose, keep and combine text differently. */
+      mode: GlossaryMergeMode;
     })
   | (TrayActionBase & {
       kind: 'set-mastery';
@@ -470,7 +496,38 @@ export type TrayProblemCode =
   /** A selected note that generates no card, so there is nothing to file. */
   | 'split-no-cards'
   /** The split ran and moved nothing. Same reason `deck-normalize-clean` exists. */
-  | 'split-clean';
+  | 'split-clean'
+  /**
+   * Recipe 14 could not run at all: no glossary supplied, a glossary from a
+   * different pick than the tray was built for, or no field pairs. Blocking.
+   * `detail` carries the id the action expected, for the mismatch case.
+   */
+  | 'glossary-missing'
+  | 'glossary-mismatch'
+  /** Selected notes whose key field is blank, so nothing can be matched to them. */
+  | 'glossary-key-empty'
+  /** Selected notes whose key is in no secondary row. Info: a partial glossary is normal. */
+  | 'glossary-unmatched'
+  /**
+   * The secondary deck holds this key twice with disagreeing values, so the
+   * merge refuses it rather than picking one. Warning — it names work the user
+   * has to do in the other deck (recipe 9), not a failure of this run.
+   */
+  | 'glossary-key-ambiguous'
+  /** Fields kept because the destination won the strength order. `detail` is the reason. */
+  | 'glossary-kept-stronger'
+  /** Fields kept because neither value won. See `ankiGlossaryMerge.ts`. */
+  | 'glossary-kept-equal'
+  /** `fill-empty`: fields left alone because the destination already had text. */
+  | 'glossary-kept-occupied'
+  /** Matched rows whose source field was blank. Nothing to carry over. */
+  | 'glossary-source-empty'
+  /** `merge-senses`: every incoming sense was already there. */
+  | 'glossary-nothing-to-add'
+  /** `merge-senses` refused a value carrying markup or an entity. See the module header. */
+  | 'glossary-html-refused'
+  /** The merge ran and wrote nothing. Same reason `split-clean` exists. */
+  | 'glossary-clean';
 
 export interface TrayProblem {
   code: TrayProblemCode;
@@ -650,6 +707,7 @@ function blockingProblems(
   hasPrioritizeContext: boolean,
   decks: readonly AnkiDraftDeck[],
   hasSplitContext: boolean,
+  glossary: GlossarySource | undefined,
 ): TrayProblem[] {
   const problems: TrayProblem[] = [];
   const enabled = actions.filter((a) => a.enabled);
@@ -808,6 +866,40 @@ function blockingProblems(
           count: 1,
         });
       }
+    } else if (action.kind === 'merge-glossary') {
+      const pairs = action.fieldPairs.filter((p) => p.fromField !== '' && p.toField !== '');
+      if (action.keyField === '' || pairs.length === 0) {
+        problems.push({ code: 'empty-parameter', severity: 'blocking', actionId: action.id, count: 1 });
+      } else if (!glossary) {
+        // Same refusal `enrich-dictionary` makes for a missing lookup: planning
+        // without the secondary deck would report every note as unmatched,
+        // which reads as "your glossary is empty" and is not true.
+        problems.push({ code: 'glossary-missing', severity: 'blocking', actionId: action.id, count: 1 });
+      } else if (glossary.id !== action.sourceId) {
+        // Picking a different secondary deck mints a new id. A tray still
+        // holding the old one would merge a file the user is no longer looking
+        // at — `apply-ai-additions`' batch mismatch, one deck up.
+        problems.push({
+          code: 'glossary-mismatch',
+          severity: 'blocking',
+          actionId: action.id,
+          count: 1,
+          detail: action.sourceId,
+        });
+      } else {
+        // A pair writing into the key field would rewrite the very value the
+        // match was made on, so the same tray run twice would match differently.
+        const onKey = pairs.find((p) => p.toField.toLowerCase() === action.keyField.toLowerCase());
+        if (onKey) {
+          problems.push({
+            code: 'same-field',
+            severity: 'blocking',
+            actionId: action.id,
+            count: 1,
+            detail: onKey.toField,
+          });
+        }
+      }
     } else if (action.kind === 'swap-fields' || action.kind === 'copy-field') {
       const [a, b] =
         action.kind === 'swap-fields'
@@ -908,6 +1000,12 @@ export function planChangeTray(
       levels?: ReadonlyMap<string, number>;
       masterySegments?: Readonly<Record<MasteryLevel, string>>;
     };
+    /**
+     * The secondary deck a `merge-glossary` action reads. Outside for the same
+     * reason `ai` is: it is another draft's rows, read from a second file after
+     * the tray was built, and far too large to sit on a serializable action.
+     */
+    glossary?: GlossarySource;
   },
 ): TrayPlan {
   const groupId = opts?.groupId ?? `tray-${journal.done.length + 1}`;
@@ -920,6 +1018,7 @@ export function planChangeTray(
     opts?.prioritize !== undefined,
     draft.decks,
     opts?.split !== undefined,
+    opts?.glossary,
   );
   if (problems.length > 0) {
     return {
@@ -1708,6 +1807,100 @@ export function planChangeTray(
             });
           }
         }
+      } else if (action.kind === 'merge-glossary') {
+        const glossary = opts?.glossary;
+        // Unreachable: `blockingProblems` refused a missing or mismatched
+        // glossary. Kept for the same reason the enrichment branch keeps its.
+        if (!glossary) continue;
+        const keyOrd = soleOrd(start, action.keyField);
+        if (keyOrd === undefined) {
+          problems.push({
+            code: 'field-absent',
+            severity: 'warning',
+            actionId: action.id,
+            count: 1,
+            detail: action.keyField,
+          });
+          continue;
+        }
+        const match = matchGlossaryEntry(
+          glossary,
+          start.fields.find((f) => f.ord === keyOrd)?.raw ?? '',
+        );
+        if (!match.matched) {
+          problems.push({
+            code:
+              match.reason === 'key-empty'
+                ? 'glossary-key-empty'
+                : match.reason === 'key-ambiguous'
+                  ? 'glossary-key-ambiguous'
+                  : 'glossary-unmatched',
+            // A partial glossary is the normal case, so an unmatched note is
+            // info. The other two name work the user has to do.
+            severity: match.reason === 'unmatched' ? 'info' : 'warning',
+            actionId: action.id,
+            count: 1,
+            detail: match.reason === 'unmatched' ? undefined : match.key || action.keyField,
+          });
+          continue;
+        }
+        for (const pair of action.fieldPairs) {
+          if (pair.fromField === '' || pair.toField === '') continue;
+          const toOrd = soleOrd(start, pair.toField);
+          if (toOrd === undefined) {
+            problems.push({
+              code: 'field-absent',
+              severity: 'warning',
+              actionId: action.id,
+              count: 1,
+              detail: pair.toField,
+            });
+            continue;
+          }
+          const incoming = match.entry.values[pair.fromField.toLowerCase()] ?? '';
+          // `notes[at]` and not `start`: two pairs may write the same
+          // destination, and the second must decide against what the first left.
+          const currentRaw = notes[at]?.fields.find((f) => f.ord === toOrd)?.raw ?? '';
+          const decision = decideGlossaryField(currentRaw, incoming, action.mode);
+          if (decision.outcome === 'write') {
+            const occupied = currentRaw.trim() !== '';
+            if (applyWrite(at, noteId, toOrd, decision.value ?? '')) {
+              touched = true;
+              if (occupied && action.mode === 'prefer-stronger') {
+                // The one destructive path in this action, counted rather than
+                // implied: `prefer-stronger` replaced text that was already
+                // there because the incoming value won the order.
+                problems.push({
+                  code: 'overwrite-nonempty',
+                  severity: 'warning',
+                  actionId: action.id,
+                  count: 1,
+                  detail: pair.toField,
+                });
+              }
+            }
+            continue;
+          }
+          const code =
+            decision.outcome === 'kept-stronger'
+              ? 'glossary-kept-stronger'
+              : decision.outcome === 'kept-equal'
+                ? 'glossary-kept-equal'
+                : decision.outcome === 'kept-occupied'
+                  ? 'glossary-kept-occupied'
+                  : decision.outcome === 'source-empty'
+                    ? 'glossary-source-empty'
+                    : decision.outcome === 'nothing-to-add'
+                      ? 'glossary-nothing-to-add'
+                      : 'glossary-html-refused';
+          problems.push({
+            code,
+            severity: decision.outcome === 'html-refused' ? 'warning' : 'info',
+            actionId: action.id,
+            count: 1,
+            detail: decision.strongerBy ?? pair.toField,
+          });
+        }
       } else if (action.kind === 'copy-field') {
         const fromOrd = soleOrd(start, action.fromField);
         const toOrd = soleOrd(start, action.toField);
@@ -1766,6 +1959,20 @@ export function planChangeTray(
       }
 
       if (touched) changed += 1;
+    }
+
+    if (action.kind === 'merge-glossary' && opts?.glossary && changed === 0) {
+      // Once per action: "the glossary had nothing you were missing" and "the
+      // two decks do not line up" both look like `changed: 0`, and the second
+      // is a mis-set key field the user can fix. `detail` is the glossary's own
+      // size, so the row cannot read as clean over an empty file.
+      problems.push({
+        code: 'glossary-clean',
+        severity: 'info',
+        actionId: action.id,
+        count: noteIds.length,
+        detail: String(opts.glossary.entries.size),
+      });
     }
 
     if (action.kind === 'apply-ai-additions' && opts?.ai) {

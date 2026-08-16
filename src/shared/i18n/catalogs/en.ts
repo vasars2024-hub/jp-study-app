@@ -9657,6 +9657,30 @@ export const en: Catalog = {
     '{count} notes are tagged with two JLPT levels at once, so the split will not pick one for you.',
   'ankiWorkbench.tray.problem.split-no-cards':
     '{count} selected notes generate no card, so there is nothing to file.',
+  'ankiWorkbench.tray.problem.glossary-missing':
+    'Pick the deck to merge glossary data from before applying this action.',
+  'ankiWorkbench.tray.problem.glossary-mismatch':
+    'This merge was built for a different deck ({detail}). Rebuild it against the deck you picked.',
+  'ankiWorkbench.tray.problem.glossary-key-empty':
+    '{count} notes have nothing in {detail}, so there is no value to match them on.',
+  'ankiWorkbench.tray.problem.glossary-unmatched':
+    '{count} notes are not in the other deck. Nothing was written to them.',
+  'ankiWorkbench.tray.problem.glossary-key-ambiguous':
+    'The other deck holds {count} of these keys more than once with different content, so the merge will not pick one for you. Find its duplicates first.',
+  'ankiWorkbench.tray.problem.glossary-kept-stronger':
+    '{count} fields were kept because what you already have is stronger ({detail}).',
+  'ankiWorkbench.tray.problem.glossary-kept-equal':
+    '{count} fields were kept because neither version is stronger than the other.',
+  'ankiWorkbench.tray.problem.glossary-kept-occupied':
+    '{count} fields already had content, so this mode left them alone.',
+  'ankiWorkbench.tray.problem.glossary-source-empty':
+    '{count} matched notes have nothing in the field being merged from.',
+  'ankiWorkbench.tray.problem.glossary-nothing-to-add':
+    '{count} fields already contain every meaning the other deck offers.',
+  'ankiWorkbench.tray.problem.glossary-html-refused':
+    '{count} fields contain formatting or an HTML entity, so their meanings cannot be split apart safely. Use a mode that writes the whole field instead.',
+  'ankiWorkbench.tray.problem.glossary-clean':
+    'Nothing to merge into these {count} notes, from a glossary of {detail} entries. Check that the matching field holds the same kind of value in both decks.',
   'ankiWorkbench.review.cardDeckMoves': '{count} card(s) moved to another deck',
   'ankiWorkbench.tray.problem.deck-normalize-renamed':
     '{count} decks change name, for example {detail}. No card changes deck.',

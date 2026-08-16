@@ -9155,6 +9155,29 @@ export const zh: Catalog = {
   'ankiWorkbench.tray.problem.split-ambiguous':
     '{count} 条笔记同时标有两个 JLPT 等级，因此拆分不会替你选择其一。',
   'ankiWorkbench.tray.problem.split-no-cards': '所选的 {count} 条笔记不生成卡片，没有可归档的内容。',
+  'ankiWorkbench.tray.problem.glossary-missing': '应用此操作前，请先选择要合并释义数据的来源牌组。',
+  'ankiWorkbench.tray.problem.glossary-mismatch':
+    '此合并是针对另一个牌组（{detail}）建立的。请按你所选的牌组重新建立。',
+  'ankiWorkbench.tray.problem.glossary-key-empty':
+    '{count} 条笔记的 {detail} 为空，没有可用于匹配的值。',
+  'ankiWorkbench.tray.problem.glossary-unmatched':
+    '{count} 条笔记不在另一个牌组中，未写入任何内容。',
+  'ankiWorkbench.tray.problem.glossary-key-ambiguous':
+    '另一个牌组中有 {count} 个这样的键重复出现且内容不同，合并不会替你选择其一。请先处理那边的重复项。',
+  'ankiWorkbench.tray.problem.glossary-kept-stronger':
+    '{count} 个字段保持不变，因为你已有的内容更完整（{detail}）。',
+  'ankiWorkbench.tray.problem.glossary-kept-equal':
+    '{count} 个字段保持不变，因为两边的内容没有强弱之分。',
+  'ankiWorkbench.tray.problem.glossary-kept-occupied':
+    '{count} 个字段已有内容，此模式不会改动它们。',
+  'ankiWorkbench.tray.problem.glossary-source-empty':
+    '匹配到的 {count} 条笔记，其来源字段为空。',
+  'ankiWorkbench.tray.problem.glossary-nothing-to-add':
+    '{count} 个字段已包含另一个牌组提供的全部释义。',
+  'ankiWorkbench.tray.problem.glossary-html-refused':
+    '{count} 个字段含有格式标记或 HTML 实体，无法安全地拆分释义。请改用整体写入字段的模式。',
+  'ankiWorkbench.tray.problem.glossary-clean':
+    '从包含 {detail} 条释义的数据中，没有可合并进这 {count} 条笔记的内容。请确认匹配字段在两个牌组中存放的是同类值。',
   'ankiWorkbench.review.cardDeckMoves': '{count} 张卡片移至其他牌组',
   'ankiWorkbench.tray.problem.deck-normalize-renamed':
     '{count} 个牌组的名称会改变，例如 {detail}。没有卡片会更换牌组。',

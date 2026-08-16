@@ -10045,6 +10045,30 @@ export const ru: Catalog = {
     'Заметок сразу с двумя уровнями JLPT: {count}. Разделение не станет выбирать за вас.',
   'ankiWorkbench.tray.problem.split-no-cards':
     'Выбранных заметок, не порождающих карточек: {count}. Раскладывать нечего.',
+  'ankiWorkbench.tray.problem.glossary-missing':
+    'Перед применением этого действия выберите колоду, из которой брать данные словаря.',
+  'ankiWorkbench.tray.problem.glossary-mismatch':
+    'Это слияние построено для другой колоды ({detail}). Соберите его заново для выбранной колоды.',
+  'ankiWorkbench.tray.problem.glossary-key-empty':
+    'Заметок с пустым полем {detail}: {count}. Сопоставлять их не по чему.',
+  'ankiWorkbench.tray.problem.glossary-unmatched':
+    'Заметок, которых нет в другой колоде: {count}. В них ничего не записано.',
+  'ankiWorkbench.tray.problem.glossary-key-ambiguous':
+    'В другой колоде {count} таких ключей встречаются несколько раз с разным содержимым, поэтому слияние не выбирает за вас. Сначала разберитесь с дубликатами там.',
+  'ankiWorkbench.tray.problem.glossary-kept-stronger':
+    'Полей сохранено без изменений, потому что имеющееся содержимое полнее ({detail}): {count}.',
+  'ankiWorkbench.tray.problem.glossary-kept-equal':
+    'Полей сохранено без изменений, потому что ни одна из версий не полнее другой: {count}.',
+  'ankiWorkbench.tray.problem.glossary-kept-occupied':
+    'Полей уже с содержимым, которые этот режим не трогает: {count}.',
+  'ankiWorkbench.tray.problem.glossary-source-empty':
+    'Сопоставленных заметок с пустым исходным полем: {count}.',
+  'ankiWorkbench.tray.problem.glossary-nothing-to-add':
+    'Полей, где уже есть все значения из другой колоды: {count}.',
+  'ankiWorkbench.tray.problem.glossary-html-refused':
+    'Полей с разметкой или HTML-сущностью, значения в которых нельзя безопасно разделить: {count}. Используйте режим, записывающий поле целиком.',
+  'ankiWorkbench.tray.problem.glossary-clean':
+    'Из словаря на {detail} записей в эти заметки ({count}) сливать нечего. Проверьте, что поле сопоставления хранит однотипные значения в обеих колодах.',
   'ankiWorkbench.review.cardDeckMoves': 'Карточек перемещено в другую колоду: {count}',
   'ankiWorkbench.tray.problem.deck-normalize-renamed':
     '{count} колод меняют имя, например {detail}. Ни одна карточка не меняет колоду.',

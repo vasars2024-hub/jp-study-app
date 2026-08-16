@@ -9230,6 +9230,30 @@ export const ja: Catalog = {
     '{count} 件のノートは JLPT レベルが2つ付いているため、分割はどちらかを勝手に選びません。',
   'ankiWorkbench.tray.problem.split-no-cards':
     '選択された {count} 件のノートはカードを生成しないため、振り分けるものがありません。',
+  'ankiWorkbench.tray.problem.glossary-missing':
+    'この操作を適用する前に、語義データの取り込み元となるデッキを選んでください。',
+  'ankiWorkbench.tray.problem.glossary-mismatch':
+    'この統合は別のデッキ（{detail}）向けに作成されています。選択したデッキで作り直してください。',
+  'ankiWorkbench.tray.problem.glossary-key-empty':
+    '{count} 件のノートは {detail} が空のため、照合に使える値がありません。',
+  'ankiWorkbench.tray.problem.glossary-unmatched':
+    '{count} 件のノートは相手のデッキに存在しません。何も書き込まれていません。',
+  'ankiWorkbench.tray.problem.glossary-key-ambiguous':
+    '相手のデッキでは、このうち {count} 件のキーが異なる内容で重複しているため、統合はどれか一つを選びません。まず重複を整理してください。',
+  'ankiWorkbench.tray.problem.glossary-kept-stronger':
+    '{count} 件のフィールドは、既存の内容の方が充実しているため維持されました（{detail}）。',
+  'ankiWorkbench.tray.problem.glossary-kept-equal':
+    '{count} 件のフィールドは、どちらの内容も優劣がないため維持されました。',
+  'ankiWorkbench.tray.problem.glossary-kept-occupied':
+    '{count} 件のフィールドには既に内容があるため、このモードでは変更していません。',
+  'ankiWorkbench.tray.problem.glossary-source-empty':
+    '照合できた {count} 件のノートは、取り込み元のフィールドが空です。',
+  'ankiWorkbench.tray.problem.glossary-nothing-to-add':
+    '{count} 件のフィールドには、相手のデッキが持つ語義がすべて含まれています。',
+  'ankiWorkbench.tray.problem.glossary-html-refused':
+    '{count} 件のフィールドには書式や HTML 実体参照が含まれるため、語義を安全に分割できません。フィールド全体を書き込むモードを使ってください。',
+  'ankiWorkbench.tray.problem.glossary-clean':
+    '{detail} 件の語義データから、この {count} 件のノートに統合できるものはありませんでした。照合フィールドが両方のデッキで同じ種類の値かどうか確認してください。',
   'ankiWorkbench.review.cardDeckMoves': '{count} 枚のカードを別のデッキへ移動',
   'ankiWorkbench.tray.problem.deck-normalize-renamed':
     '{count}個のデッキ名が変わります（例: {detail}）。カードのデッキは変わりません。',
