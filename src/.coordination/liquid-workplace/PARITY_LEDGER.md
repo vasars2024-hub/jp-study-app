@@ -122,8 +122,8 @@ that recipe was run on 2026-08-16 and produced the stated number.
 | Pop-outs | Shell/window mgr | Click the pop-out `.fwin-b` and count windows in `/health`. Observed: **1 → 2 windows**, the new one 900×640 at `?popout=dictionary`, in-desk `.fwin` removed | **YES** — plus the state-loss note above |
 | Desktop shortcut grid | Study OS shell | Dispatch the shell's own `desktop:add-shortcut` event, count `.os-desk-icon`, then remove via the icon's own `×` and re-count. Observed **0 → 1 → 0**, the icon carrying its label `L0ParityProbe`. A break = the count does not move, or the removal leaves a residue | **YES** — 0→1→0, layout restored |
 | Display assignments | Shell/window mgr | Move a window to a second display and confirm the assignment survives a restart | no — **one display on this machine**, so the negative control is impossible here |
-| Secret Aero discovery and exit | Aero shell | Perform the discovery gesture, assert the Aero shell mounts, then exit and assert Study OS returns with the same window set | **no — recipe is forbidden as written**, see below |
-| Aero safe mode | Aero shell | Force safe mode and assert the reduced shell renders with its exit route intact | **no — same forbidden entry step** |
+| Secret Aero discovery and exit | Aero shell | **Rewritten 2026-08-17** — do NOT perform the gesture. Run `probes/aero-materials-parity.js`: assert the trigger is present *and hit-testable* (`elementFromPoint` at its centre returns it, a point 200px away does not), then force `data-materials='aero'` and assert the Aero material layer paints, then restore and assert every number returns. Observed: `.fwin` backdrop `none` → `blur(14px) saturate(1.38)` → `none`, radius `20px` → `8px` → `20px`, taskbar background `none` → the Aero blue gradient → `none`; window set `2` (Anki, Scraper) unchanged across all 5 legs | **YES** — control inverted, store byte-intact. **Material layer only**, see scope limit below |
+| Aero safe mode | Aero shell | **Rewritten 2026-08-17** — force `data-aero-safe-mode='on'` on top of `data-materials='aero'` (attribute, never `setAeroSafeMode()`), assert the reduced shell renders and the exit route survives. Observed: living-layer displayed `3 → 0 → 3`, `.fwin` backdrop `blur(14px) saturate(1.38)` → `none` → `blur(14px) saturate(1.38)`, transition-duration `0s` → `1e-06s` → `0s`; exit route intact in all 5 legs (trigger present, restore-theme `study-os`) | **YES** — reversible both ways, store byte-intact |
 | Wired lifecycle | Wired shell | Drive `requestWiredArchiveRestart` and assert the boot sequence completes with open modules and desktop layout in place (`DesktopShell.tsx:2294` states that contract) | no — needs an environment switch first, see below |
 | Blanc cold-open boundary | Blanc renderer | `blancOpen()`, focus the new window, and assert Study OS chrome is absent **in a call whose selectors are proven live in window 1**. Observed: Blanc `blanc.html?blanc=1` mounts **81** blanc-classed nodes / 253 chars of text with `.os-taskbar` **0**, `.fwin` **0**, `.os-desk-icon` **0**; same selectors in window 1 return **1 / 2 / 0-blanc**. A break = Study OS chrome present, or the selectors read 0 in both windows | **YES** — control inverted cleanly |
 
@@ -133,28 +133,49 @@ Present and populated: **all-app baseline (22 surfaces × 3 sizes)**, **Video ba
 **performance baselines incl. the restart leg**, **census**, **this ledger** with 7 driven
 Dictionary rows, and **this matrix** with 9 rows each carrying a runnable recipe.
 
-**The gate does not close yet**, but the unobserved set is now **4 of 9**, not 6 — the desktop
-shortcut grid and the Blanc cold-open boundary were driven live on 2026-08-16 (see their rows).
+**The gate does not close yet**, but the unobserved set is now **2 of 9**, not 4 — the two Aero
+rows were rewritten and driven live on 2026-08-17 (see their rows), after the desktop shortcut
+grid and Blanc cold-open boundary on 2026-08-16.
 
-The four that remain are **not** four more cheap runs, and the earlier "three of those six are
-cheap" estimate was wrong on two of them. Corrected, with the reason each is blocked:
+### The Aero rows — how the forbidden recipe was replaced (2026-08-17)
 
-- **Secret Aero discovery/exit** and **Aero safe mode** — the recipe as written is **forbidden**,
-  not merely unrun. `.claude/skills/jp-bridge/SKILL.md` §2 bars entering Secret Aero to test
-  something: `SecretAeroTrigger.toggle()` calls `armLockscreenOnSecretEntry()`, which can lock the
-  app behind the PIN, and the *return* trip fires `restoreStudyEnvironmentAfterAero()`, which
-  writes environment state — against a profile with no restore point. These rows need a rewritten
-  recipe that observes the Aero shell **without** the live entry gesture (a mounted-component or
-  route-level assertion), not a braver agent. Whoever rewrites them owns that decision.
+The old recipe was **forbidden, not merely unrun**: `SecretAeroTrigger.toggle()` calls
+`armLockscreenOnSecretEntry()` (can lock the app behind the PIN) and the return trip fires
+`restoreStudyEnvironmentAfterAero()`, which writes environment state against a profile with no
+restore point. **That risk is measured, not theoretical** — `jp-aero-environment-v1` holds a real
+populated ~6 KB blob on this machine and `jp-study-environment-backup-v1` another, so the restore
+would genuinely overwrite user state.
+
+**`setTheme(AERO_THEME_ID)` is not the way around it.** `installAeroEnvironmentBridge` subscribes
+to `onThemeChanged` (`aeroEnvironment.ts:165-171`) and fires the same restore on the way back out.
+So does dispatching a synthetic theme-changed event. The theme is not touchable in either direction.
+
+**What the rewritten recipe drives instead:** the DOM presentation attributes the material layer
+is keyed off — `data-materials` and `data-aero-safe-mode` — set directly on `documentElement`,
+never through `setTheme()` or `setAeroSafeMode()`. Both are runtime-only, and `aeroSafeMode.ts`'s
+own header states safe mode "never edits the environment, display, sound, companion, wallpaper, or
+study-data stores". Restoration is unconditional (`finally`) and asserted byte-for-byte.
+
+Result: `storeAllIntact` **true** (4 of 4 keys identical), `attrsRestored` **true**,
+`controlInverted` **true**, 0 errors in `/logs`, window set unchanged at 2. Re-run reproduced it
+from the committed path.
+
+**Scope limit, stated rather than buried.** These two rows now certify the Aero **material/CSS
+layer**. They do **not** cover the React `useAeroMaterials()` branch (`AppChrome.tsx:31`), which
+re-reads only on `onThemeChanged` — reaching it needs exactly the write above. A wave that changes
+Aero's *React* composition is therefore still uncovered by this matrix; a wave that breaks its
+material layer is now caught. Do not read these rows as more than that.
+
+The two that remain:
+
 - **Wired lifecycle** — `requestWiredArchiveRestart()` only means anything once `isWiredTheme()`
   is true (`wiredArchiveLifecycle.ts:412`, `:430`), so the recipe silently no-ops from Study OS.
   Reaching it requires an environment switch, which is a persisted write in the same class as the
-  Aero one. Cheaper than Aero and genuinely reversible, but it is a state change, not a read.
+  Aero one. **The Aero rewrite above is the template**: if Wired's shell is likewise keyed off a
+  `data-materials='wired'` attribute, the same attribute-only, restore-in-`finally` probe applies
+  and no theme write is needed. That is the next thing to try before accepting a state change.
 - **Display assignments** — unchanged hardware blocker: one display on this machine, so the
   negative control cannot exist here at all.
-
-Until these are run, a wave could break a frozen system and nothing here would catch it — which
-is the one job this matrix has.
 
 **Instrumentation limit found while closing the grid row, so the next worker does not re-derive
 it:** the desk icon's `×` is `display:none` until `.os-desk-icon:hover` (`styles.css:13806`,
