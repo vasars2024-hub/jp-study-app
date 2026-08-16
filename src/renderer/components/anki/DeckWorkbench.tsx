@@ -59,7 +59,9 @@ import DeckWorkbenchTray, {
 import DeckWorkbenchJournal from './DeckWorkbenchJournal';
 import DeckWorkbenchCardDesign from './DeckWorkbenchCardDesign';
 import DeckWorkbenchReview from './DeckWorkbenchReview';
+import DeckWorkbenchApply from './DeckWorkbenchApply';
 import { buildWorkbenchReview } from '../../../shared/ankiWorkbenchReview';
+import type { ApkgExportResult } from '../../../shared/ankiApkgExport';
 import './deckWorkbench.css';
 
 type SourceKey = 'apkg' | 'connect' | 'localDeck';
@@ -451,6 +453,22 @@ export default function DeckWorkbench() {
     [journal, masteryHistory, restateClaim],
   );
 
+  /**
+   * Step 7's outcome sentence carries the exporter's own numbers, never a
+   * recount — the exporter verified them against the written file, and this
+   * step's claim must be about that file, not about the draft.
+   */
+  const onExported = useCallback((res: ApkgExportResult) => {
+    setFlow((prev) =>
+      recordStep(prev, 'apply', {
+        satisfied: true,
+        outcomeKey: 'ankiWorkbench.step.apply.outcome',
+        outcomeParams: { file: res.fileName ?? '', notes: res.notesUpdated ?? 0 },
+        affected: (res.notesUpdated ?? 0) + (res.cardsUpdated ?? 0),
+      }),
+    );
+  }, []);
+
   const discardSession = useCallback(
     async (id: string) => {
       await window.api.ankiDraftSessionDelete(id);
@@ -707,6 +725,16 @@ export default function DeckWorkbench() {
               totalNotes={totalNotes ?? draft.counts.notes}
               masteryWrites={masteryApplied}
             />
+          </div>
+        ) : flow.current === 'apply' && draft ? (
+          <div className="deck-workbench-detail deck-workbench-detail-wide">
+            <p className="deck-workbench-outcome">{t('ankiWorkbench.step.apply.lead')}</p>
+            {currentStep.stale && <p className="muted">{t('ankiWorkbench.step.staleDetail')}</p>}
+            {/* Undo stays offered on the last step: what it changes is the net
+                set the export button claims, and the claim recomputes live. */}
+            {history}
+            <DeckWorkbenchJournal draft={draft} journal={journal} />
+            <DeckWorkbenchApply draft={draft} journal={journal} onExported={onExported} />
           </div>
         ) : (
           <div className="deck-workbench-detail">

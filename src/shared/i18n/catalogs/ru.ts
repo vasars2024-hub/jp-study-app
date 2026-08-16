@@ -9540,6 +9540,43 @@ export const ru: Catalog = {
   'ankiWorkbench.review.queueLabel': 'Место в очереди',
   'ankiWorkbench.review.overwrittenFlag': 'Записано более чем одним шагом',
   'ankiWorkbench.review.emptyValue': 'пусто',
+  'ankiWorkbench.step.apply.lead':
+    'Превратите сеанс в настоящий файл: экспортируйте новый пакет со всеми изменениями из обзора.',
+  'ankiWorkbench.step.apply.outcome': 'Экспортирован {file} — заметок: {notes}',
+  'ankiWorkbench.apply.noFile':
+    'Этот источник — не файл пакета, поэтому экспортировать его копию не из чего. Запись изменений в живую коллекцию — следующий этап; когда она появится, она будет здесь.',
+  'ankiWorkbench.apply.blocked':
+    'В этом источнике есть проблемы, блокирующие экспорт. Вернитесь к шагу 1, чтобы их посмотреть.',
+  'ankiWorkbench.apply.empty': 'Итоговых изменений за сеанс нет — экспортировать нечего.',
+  'ankiWorkbench.apply.notes': 'Заметок с новым содержимым: {count}',
+  'ankiWorkbench.apply.cardMoves': 'Карточек переместится в очереди: {count}',
+  'ankiWorkbench.apply.original':
+    'Экспорт записывает новый пакет. Исходный файл никогда не изменяется.',
+  'ankiWorkbench.apply.export': 'Экспортировать новый пакет…',
+  'ankiWorkbench.apply.writing': 'Записываем пакет…',
+  'ankiWorkbench.apply.ok.file': 'Записано в {path}',
+  'ankiWorkbench.apply.ok.counts': 'В новом пакете обновлено заметок: {notes}, карточек: {cards}',
+  'ankiWorkbench.apply.ok.verified':
+    'Проверено: записанный файл перечитан с диска, все изменения найдены.',
+  'ankiWorkbench.apply.error.nothing-to-export':
+    'Изменений для записи не найдено, файл не создан.',
+  'ankiWorkbench.apply.error.no-source':
+    'Исходный пакет не найден — копировать не из чего. Файл не записан.',
+  'ankiWorkbench.apply.error.source-changed':
+    'Исходный файл изменился после чтения. Ничего не записано — перечитайте его на шаге 1 перед экспортом.',
+  'ankiWorkbench.apply.error.overwrite-source':
+    'Это имя перезаписало бы исходный файл, поэтому ничего не записано. Выберите другое имя.',
+  'ankiWorkbench.apply.error.note-missing':
+    'Изменённой заметки больше нет в исходном файле. Ничего не записано — перечитайте источник перед экспортом.',
+  'ankiWorkbench.apply.error.field-count-mismatch':
+    'Поля заметки больше не совпадают со структурой исходного файла. Ничего не записано — перечитайте источник перед экспортом.',
+  'ankiWorkbench.apply.error.card-missing':
+    'Перемещённой карточки больше нет в исходном файле. Ничего не записано — перечитайте источник перед экспортом.',
+  'ankiWorkbench.apply.error.compressed-unsupported':
+    'Пакет использует более новый сжатый формат, запись которого ещё не поддерживается. Ничего не записано.',
+  'ankiWorkbench.apply.error.verify-failed':
+    'Записанный файл не прошёл проверку перечитыванием — ему нельзя доверять. Удалите его и повторите.',
+  'ankiWorkbench.apply.error.io': 'Не удалось записать файл.',
   'ankiWorkbench.browser.search': 'Поиск по полям, меткам и колодам',
   'ankiWorkbench.browser.rows': 'Показано {shown} из {loaded} загруженных заметок',
   'ankiWorkbench.browser.columns': 'Столбцы',

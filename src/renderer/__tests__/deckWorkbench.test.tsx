@@ -54,6 +54,7 @@ const readApkgDraft = vi.fn();
 const readAnkiConnectDraft = vi.fn();
 const ankiDraftSessionList = vi.fn();
 const ankiDraftSessionDelete = vi.fn();
+const exportApkgDraft = vi.fn();
 
 function draft(over: Partial<AnkiDraft> = {}): AnkiDraft {
   return {
@@ -193,12 +194,12 @@ beforeAll(() => {
 
 beforeEach(() => {
   installLayout(900, 400);
-  for (const m of [readApkgDraft, readAnkiConnectDraft, ankiDraftSessionList, ankiDraftSessionDelete, loadDeckAsAnkiDraft]) m.mockReset();
+  for (const m of [readApkgDraft, readAnkiConnectDraft, ankiDraftSessionList, ankiDraftSessionDelete, loadDeckAsAnkiDraft, exportApkgDraft]) m.mockReset();
   ankiDraftSessionList.mockResolvedValue([]);
   ankiDraftSessionDelete.mockResolvedValue(true);
   Object.defineProperty(window, 'api', {
     configurable: true,
-    value: { readApkgDraft, readAnkiConnectDraft, ankiDraftSessionList, ankiDraftSessionDelete },
+    value: { readApkgDraft, readAnkiConnectDraft, ankiDraftSessionList, ankiDraftSessionDelete, exportApkgDraft },
   });
 });
 
@@ -308,21 +309,17 @@ describe('DeckWorkbench', () => {
     expect(([...host.querySelectorAll('.deck-workbench-step')] as HTMLButtonElement[])[1]!.disabled).toBe(false);
   });
 
-  it('says a later step is not built rather than showing a control that does nothing', async () => {
-    // Steps 1 to 6 are built now, so the unbuilt claim has to be tested on
-    // step 7 — reached only by satisfying the selection step and then passing
-    // through the three optional tray steps and the review.
+  it('claims no unbuilt step anywhere in the walked flow', async () => {
+    // Step 7 was the last placeholder; with it built, walking the whole flow
+    // must never show the "not built yet" disclaimer or an empty step body.
     await toBrowse(browsable());
     await click(buttonBy('ankiWorkbench.browser.selectAll'));
-    for (let i = 0; i < 5; i += 1) await click(buttonBy('ankiWorkbench.next'));
-
-    expect(host.textContent).toContain('ankiWorkbench.step.notReady');
-    expect(host.querySelector('.deck-workbench-rail')).toBeNull();
-    expect(host.querySelector('.wb-browser')).toBeNull();
-    expect(host.querySelector('.wb-tray')).toBeNull();
-    // Back, Next and the stepper are the only controls on an unbuilt step.
-    const controls = [...host.querySelectorAll('.deck-workbench-body button')];
-    expect(controls).toHaveLength(0);
+    for (let i = 0; i < 5; i += 1) {
+      await click(buttonBy('ankiWorkbench.next'));
+      expect(host.textContent).not.toContain('ankiWorkbench.step.notReady');
+    }
+    // The last step really is step 7 with its own surface, not a placeholder.
+    expect(host.querySelector('.wb-apply')).not.toBeNull();
   });
 
   it('splits every tray kind across steps 3, 4 and 5 and gives step 2 none of them', async () => {
@@ -820,5 +817,113 @@ describe('DeckWorkbench', () => {
     await mount();
     expect(host.textContent).toContain('ankiWorkbench.sessions.none');
     expect(host.querySelectorAll('.deck-workbench-source')).toHaveLength(3);
+  });
+});
+
+describe('DeckWorkbench step 7 — Apply or export', () => {
+  /** Select everything on step 2, then walk the flow to step 7. */
+  async function toApply() {
+    await click(buttonBy('ankiWorkbench.browser.selectAll'));
+    for (let i = 0; i < 5; i += 1) await click(buttonBy('ankiWorkbench.next'));
+  }
+
+  /** Edit n1's Expression through the inspector, so the net set is non-empty. */
+  async function editOneField() {
+    await click(host.querySelectorAll('.wb-browser-cell')[0] as HTMLElement);
+    const field = host.querySelector('.wb-inspector-input') as HTMLTextAreaElement;
+    await type(field, 'ねこ・edited');
+    await blur(field);
+  }
+
+  it('offers no export for a source that is not a package file', async () => {
+    loadDeckAsAnkiDraft.mockReturnValue({
+      draft: browsable({ source: { kind: 'local-deck', label: 'Local deck', fingerprint: 'fp-local' } }),
+    });
+    await mount();
+    await click(buttonBy('ankiWorkbench.source.localDeck'));
+    await click(buttonBy('ankiWorkbench.next'));
+    await toApply();
+
+    expect(host.textContent).toContain('ankiWorkbench.apply.noFile');
+    expect(host.querySelector('.wb-apply-export')).toBeNull();
+    expect(exportApkgDraft).not.toHaveBeenCalled();
+  });
+
+  it('disables export over an empty net change set and says why', async () => {
+    await toBrowse(browsable());
+    await toApply();
+
+    expect(host.textContent).toContain('ankiWorkbench.apply.empty');
+    const button = host.querySelector('.wb-apply-export') as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    await click(button);
+    expect(exportApkgDraft).not.toHaveBeenCalled();
+  });
+
+  it('exports the net set through the real channel, with no outPath, and records the step', async () => {
+    exportApkgDraft.mockResolvedValue({
+      ok: true,
+      filePath: 'C:\\out\\Core 2k (edited).apkg',
+      fileName: 'Core 2k (edited).apkg',
+      notesUpdated: 1,
+      cardsUpdated: 0,
+      verified: true,
+      fingerprint: 'fp-new',
+    });
+    await toBrowse(browsable());
+    await editOneField();
+    await toApply();
+
+    // The claim is computed from the same builder the exporter receives.
+    expect(host.textContent).toContain('ankiWorkbench.apply.notes:1');
+    await click(buttonBy('ankiWorkbench.apply.export'));
+
+    expect(exportApkgDraft).toHaveBeenCalledTimes(1);
+    const request = exportApkgDraft.mock.calls[0]![0];
+    expect(request.fingerprint).toBe('fp-1');
+    expect(request.changes.notes).toEqual([
+      { noteId: 'n1', fields: ['ねこ・edited', 'ねこ-en'], tags: undefined },
+    ]);
+    expect(request.changes.cardMoves).toEqual([]);
+    // No outPath and no sourcePath: the save dialog and the fingerprint's
+    // remembered path are the production path, and the test proves it is taken.
+    expect(request).not.toHaveProperty('outPath');
+    expect(request).not.toHaveProperty('sourcePath');
+
+    expect(host.textContent).toContain('ankiWorkbench.apply.ok.file:C:\\out\\Core 2k (edited).apkg');
+    expect(host.textContent).toContain('ankiWorkbench.apply.ok.counts:1,0');
+    expect(host.textContent).toContain('ankiWorkbench.apply.ok.verified');
+    expect(host.textContent).toContain('ankiWorkbench.step.apply.outcome:Core 2k (edited).apkg,1');
+    expect(host.textContent).toContain('ankiWorkbench.progress:7,7');
+  });
+
+  it('reports a refusal under its own code and does not satisfy the step', async () => {
+    exportApkgDraft.mockResolvedValue({
+      ok: false,
+      errorCode: 'source-changed',
+      error: 'fingerprint moved',
+    });
+    await toBrowse(browsable());
+    await editOneField();
+    await toApply();
+    await click(buttonBy('ankiWorkbench.apply.export'));
+
+    const alert = host.querySelector('.wb-apply-result [role="alert"]');
+    expect(alert?.textContent).toContain('ankiWorkbench.apply.error.source-changed');
+    // The adapter's own words survive alongside the translated line.
+    expect(host.textContent).toContain('fingerprint moved');
+    expect(host.textContent).toContain('ankiWorkbench.progress:6,7');
+  });
+
+  it('stays silent when the save dialog is cancelled', async () => {
+    exportApkgDraft.mockResolvedValue({ ok: false, errorCode: 'cancelled' });
+    await toBrowse(browsable());
+    await editOneField();
+    await toApply();
+    await click(buttonBy('ankiWorkbench.apply.export'));
+
+    expect(host.querySelector('.wb-apply-result')).toBeNull();
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+    expect(host.textContent).toContain('ankiWorkbench.progress:6,7');
   });
 });

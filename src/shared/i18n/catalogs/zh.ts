@@ -8686,6 +8686,36 @@ export const zh: Catalog = {
   'ankiWorkbench.review.queueLabel': '队列位置',
   'ankiWorkbench.review.overwrittenFlag': '由多个步骤写入',
   'ankiWorkbench.review.emptyValue': '空',
+  'ankiWorkbench.step.apply.lead': '把这次会话变成真正的文件：导出一个包含审阅中所有更改的新牌组包。',
+  'ankiWorkbench.step.apply.outcome': '已导出 {file} — {notes} 条笔记',
+  'ankiWorkbench.apply.noFile':
+    '此来源不是包文件，没有可导出副本的文件。写回正在运行的集合属于后续阶段，实装后会显示在这里。',
+  'ankiWorkbench.apply.blocked': '此来源存在阻止导出的问题。请回到第 1 步查看。',
+  'ankiWorkbench.apply.empty': '本次会话的净更改为空 — 没有可导出的内容。',
+  'ankiWorkbench.apply.notes': '{count} 条笔记将写入新内容',
+  'ankiWorkbench.apply.cardMoves': '{count} 张卡片将在队列中移动',
+  'ankiWorkbench.apply.original': '导出会写入一个新的包文件，原文件永远不会被修改。',
+  'ankiWorkbench.apply.export': '导出新包…',
+  'ankiWorkbench.apply.writing': '正在写入包…',
+  'ankiWorkbench.apply.ok.file': '已写入 {path}',
+  'ankiWorkbench.apply.ok.counts': '在新包中更新了 {notes} 条笔记和 {cards} 张卡片',
+  'ankiWorkbench.apply.ok.verified': '已验证：写入的文件已从磁盘重新读取，所有更改均已确认。',
+  'ankiWorkbench.apply.error.nothing-to-export': '未发现可写入的更改，因此没有创建文件。',
+  'ankiWorkbench.apply.error.no-source': '找不到原始包文件，没有可复制的来源。未写入任何文件。',
+  'ankiWorkbench.apply.error.source-changed':
+    '来源文件在读取后发生了变化。未写入任何内容 — 请先在第 1 步重新读取再导出。',
+  'ankiWorkbench.apply.error.overwrite-source':
+    '该名称会覆盖原文件，因此未写入任何内容。请换一个名称。',
+  'ankiWorkbench.apply.error.note-missing':
+    '有已更改的笔记不再存在于来源文件中。未写入任何内容 — 请先重新读取来源再导出。',
+  'ankiWorkbench.apply.error.field-count-mismatch':
+    '有笔记的字段与来源文件的布局不再一致。未写入任何内容 — 请先重新读取来源再导出。',
+  'ankiWorkbench.apply.error.card-missing':
+    '有已移动的卡片不再存在于来源文件中。未写入任何内容 — 请先重新读取来源再导出。',
+  'ankiWorkbench.apply.error.compressed-unsupported':
+    '此包使用了尚不支持写入的较新压缩格式。未写入任何内容。',
+  'ankiWorkbench.apply.error.verify-failed': '写入的文件未通过回读校验，不可信任。请删除后重试。',
+  'ankiWorkbench.apply.error.io': '无法写入文件。',
   'ankiWorkbench.browser.search': '搜索字段、标签和牌组',
   'ankiWorkbench.browser.rows': '已加载 {loaded} 条，显示 {shown} 条',
   'ankiWorkbench.browser.columns': '列',

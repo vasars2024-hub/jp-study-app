@@ -9155,6 +9155,42 @@ export const en: Catalog = {
   'ankiWorkbench.review.queueLabel': 'Queue position',
   'ankiWorkbench.review.overwrittenFlag': 'Written by more than one step',
   'ankiWorkbench.review.emptyValue': 'empty',
+  'ankiWorkbench.step.apply.lead':
+    'Turn the session into a real file: export a new package holding every change the review described.',
+  'ankiWorkbench.step.apply.outcome': 'Exported {file} — {notes} notes',
+  'ankiWorkbench.apply.noFile':
+    'This source is not a package file, so there is no file to export a copy of. Writing changes back to a live collection is a later phase and will appear here when it is real.',
+  'ankiWorkbench.apply.blocked':
+    'Problems found in this source block an export. Go back to step 1 to see them.',
+  'ankiWorkbench.apply.empty': 'The session adds up to no changes — there is nothing to export.',
+  'ankiWorkbench.apply.notes': '{count} notes will be written with their new content',
+  'ankiWorkbench.apply.cardMoves': '{count} cards will move in the queue',
+  'ankiWorkbench.apply.original': 'Export writes a new package. The original file is never modified.',
+  'ankiWorkbench.apply.export': 'Export a new package…',
+  'ankiWorkbench.apply.writing': 'Writing the package…',
+  'ankiWorkbench.apply.ok.file': 'Written to {path}',
+  'ankiWorkbench.apply.ok.counts': '{notes} notes and {cards} cards updated in the new package',
+  'ankiWorkbench.apply.ok.verified':
+    'Verified: the file was read back from disk and every change was found in it.',
+  'ankiWorkbench.apply.error.nothing-to-export':
+    'The exporter found no changes to write, so no file was created.',
+  'ankiWorkbench.apply.error.no-source':
+    'The original package could not be found, so there was nothing to copy from. No file was written.',
+  'ankiWorkbench.apply.error.source-changed':
+    'The source file changed after it was read. Nothing was written — re-read it on step 1 before exporting.',
+  'ankiWorkbench.apply.error.overwrite-source':
+    'That name would overwrite the original file, so nothing was written. Choose a different name.',
+  'ankiWorkbench.apply.error.note-missing':
+    'A changed note is no longer in the source file. Nothing was written — re-read the source before exporting.',
+  'ankiWorkbench.apply.error.field-count-mismatch':
+    'A note’s fields no longer match the source file’s layout. Nothing was written — re-read the source before exporting.',
+  'ankiWorkbench.apply.error.card-missing':
+    'A moved card is no longer in the source file. Nothing was written — re-read the source before exporting.',
+  'ankiWorkbench.apply.error.compressed-unsupported':
+    'This package uses a newer compressed format that cannot be written yet. Nothing was written.',
+  'ankiWorkbench.apply.error.verify-failed':
+    'The written file failed its read-back check, so it must not be trusted. Delete it and try again.',
+  'ankiWorkbench.apply.error.io': 'The file could not be written.',
   'ankiWorkbench.browser.search': 'Search fields, tags and decks',
   'ankiWorkbench.browser.rows': '{shown} of {loaded} loaded notes shown',
   'ankiWorkbench.browser.columns': 'Columns',

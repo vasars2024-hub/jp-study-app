@@ -8730,6 +8730,42 @@ export const ja: Catalog = {
   'ankiWorkbench.review.queueLabel': '出題順',
   'ankiWorkbench.review.overwrittenFlag': '複数の手順から書き込まれました',
   'ankiWorkbench.review.emptyValue': '空',
+  'ankiWorkbench.step.apply.lead':
+    'セッションを実際のファイルにします。確認した変更をすべて含む新しいパッケージを書き出します。',
+  'ankiWorkbench.step.apply.outcome': '{file} を書き出しました — ノート {notes} 件',
+  'ankiWorkbench.apply.noFile':
+    'このソースにはコピーできるパッケージファイルがありません。稼働中のコレクションへの書き戻しは今後の段階で、実装され次第ここに表示されます。',
+  'ankiWorkbench.apply.blocked':
+    'このソースには書き出しを妨げる問題があります。手順1に戻って確認してください。',
+  'ankiWorkbench.apply.empty': 'このセッションの正味の変更はありません — 書き出すものがありません。',
+  'ankiWorkbench.apply.notes': '{count} 件のノートが新しい内容で書き込まれます',
+  'ankiWorkbench.apply.cardMoves': '{count} 枚のカードがキュー内で移動します',
+  'ankiWorkbench.apply.original': '書き出しは新しいパッケージを作成します。元のファイルは変更されません。',
+  'ankiWorkbench.apply.export': '新しいパッケージを書き出す…',
+  'ankiWorkbench.apply.writing': 'パッケージを書き込んでいます…',
+  'ankiWorkbench.apply.ok.file': '{path} に書き込みました',
+  'ankiWorkbench.apply.ok.counts': '新しいパッケージ内でノート {notes} 件とカード {cards} 枚を更新しました',
+  'ankiWorkbench.apply.ok.verified':
+    '検証済み: 書き込んだファイルをディスクから読み直し、すべての変更を確認しました。',
+  'ankiWorkbench.apply.error.nothing-to-export':
+    '書き込む変更が見つからなかったため、ファイルは作成されませんでした。',
+  'ankiWorkbench.apply.error.no-source':
+    '元のパッケージが見つからず、コピー元がありません。ファイルは書き込まれていません。',
+  'ankiWorkbench.apply.error.source-changed':
+    '読み込み後にソースファイルが変更されました。何も書き込まれていません — 書き出す前に手順1で読み直してください。',
+  'ankiWorkbench.apply.error.overwrite-source':
+    'その名前では元のファイルを上書きしてしまうため、何も書き込まれていません。別の名前を選んでください。',
+  'ankiWorkbench.apply.error.note-missing':
+    '変更したノートがソースファイルに存在しません。何も書き込まれていません — 書き出す前にソースを読み直してください。',
+  'ankiWorkbench.apply.error.field-count-mismatch':
+    'ノートのフィールドがソースファイルの構成と一致しません。何も書き込まれていません — 書き出す前にソースを読み直してください。',
+  'ankiWorkbench.apply.error.card-missing':
+    '移動したカードがソースファイルに存在しません。何も書き込まれていません — 書き出す前にソースを読み直してください。',
+  'ankiWorkbench.apply.error.compressed-unsupported':
+    'このパッケージはまだ書き込みに対応していない新しい圧縮形式を使用しています。何も書き込まれていません。',
+  'ankiWorkbench.apply.error.verify-failed':
+    '書き込んだファイルが読み直し検証に失敗したため、信頼できません。削除してからやり直してください。',
+  'ankiWorkbench.apply.error.io': 'ファイルを書き込めませんでした。',
   'ankiWorkbench.browser.search': 'フィールド・タグ・デッキを検索',
   'ankiWorkbench.browser.rows': '読み込み済み {loaded} 件のうち {shown} 件を表示',
   'ankiWorkbench.browser.columns': '列',
