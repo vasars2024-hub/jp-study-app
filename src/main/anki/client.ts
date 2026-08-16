@@ -3,6 +3,7 @@
 // normalized into an AnkiError before leaving this module.
 
 import { ANKI_UNREACHABLE_MSG, ANKI_COLLECTION_UNAVAILABLE_MSG } from '../../shared/anki';
+import type { AnkiConnectModel } from '../../shared/ankiConnectDraft';
 import { DEFAULT_ANKI_URL } from '../../shared/profiles';
 
 // ----- Wire shapes ---------------------------------------------------------
@@ -21,6 +22,9 @@ export interface AnkiNoteInfo {
   fields: Record<string, { value: string; order: number }>;
   cards: number[];
   tags: string[];
+  /** Epoch seconds. Reported by AnkiConnect 6; the workbench draft preserves it. */
+  mod?: number;
+  profile?: string;
 }
 
 export interface AnkiCardInfo {
@@ -30,6 +34,18 @@ export interface AnkiCardInfo {
   note: number;
   /** Anki scheduler queue. -1 is the authoritative suspended state. */
   queue?: number;
+  /** The rest of the scheduler row, read by the workbench draft and by nothing else. */
+  deckName?: string;
+  modelName?: string;
+  ord?: number;
+  type?: number;
+  due?: number;
+  factor?: number;
+  reps?: number;
+  lapses?: number;
+  left?: number;
+  mod?: number;
+  flags?: number;
 }
 
 export interface CreateModelParams {
@@ -58,6 +74,47 @@ export interface AnkiActionMap {
   findCards: { params: { query: string }; result: number[] };
   notesInfo: { params: { notes: number[] }; result: AnkiNoteInfo[] };
   cardsInfo: { params: { cards: number[] }; result: AnkiCardInfo[] };
+  // ----- workbench draft reads (ANKI_DECK_WORKBENCH_PLAN.md adapter 2) -----
+  /** Deck name to deck id. `deckNames` alone cannot key a card's deck. */
+  deckNamesAndIds: { params: undefined; result: Record<string, number> };
+  /**
+   * Anki's whole model row per name — `type`, `sortf`, `flds`, `tmpls`, `css`,
+   * `latexPre/Post`. `modelFieldNames` + `modelTemplates` + `modelStyling` need
+   * three round trips per note type and still report neither cloze nor sortf.
+   */
+  findModelsByName: { params: { modelNames: string[] }; result: AnkiConnectModel[] };
+  /**
+   * For a normal deck this returns the deck-options preset; for a filtered one it
+   * returns the deck row itself, with `dyn: 1`. That difference is the only way
+   * this API reports a filtered deck, whose cards are on loan and not editable.
+   */
+  getDeckConfig: { params: { deck: string }; result: { id?: number; dyn?: number } };
+  // ----- workbench live commit (ANKI_DECK_WORKBENCH_PLAN.md Phase 6) -----
+  /** Whole-row field replacement, keyed by field NAME. Errors when the note is open in Anki's editor. */
+  updateNoteFields: {
+    params: { note: { id: number; fields: Record<string, string> } };
+    result: null;
+  };
+  /**
+   * Tags are committed as a diff rather than through `updateNoteTags`, which
+   * replaces the whole string: the draft carries `marked` as a flag, so a
+   * replacement would drop it. See `shared/ankiConnectCommit.ts`.
+   */
+  addTags: { params: { notes: number[]; tags: string }; result: null };
+  removeTags: { params: { notes: number[]; tags: string }; result: null };
+  /**
+   * The only AnkiConnect route to a card's raw `due` column — `setDueDate` takes
+   * days-from-now and rewrites `type`/`queue`, which cannot express a new card's
+   * queue position. `warning_check` is the add-on's own acknowledgement that the
+   * caller is writing a scheduler column directly; the workbench refuses cards in
+   * filtered decks before it gets here.
+   */
+  setSpecificValueOfCard: {
+    params: { card: number; keys: string[]; newValues: string[]; warning_check?: boolean };
+    result: boolean[];
+  };
+  /** The profile the write landed in, echoed back into the commit result. */
+  getActiveProfile: { params: undefined; result: string };
 }
 
 // ----- Timeout tiers ---------------------------------------------------------
@@ -85,6 +142,16 @@ const DEFAULT_TIMEOUTS: Record<keyof AnkiActionMap, number> = {
   findCards: BULK_TIMEOUT_MS,
   notesInfo: BULK_TIMEOUT_MS,
   cardsInfo: BULK_TIMEOUT_MS,
+  deckNamesAndIds: FAST_TIMEOUT_MS,
+  getDeckConfig: FAST_TIMEOUT_MS,
+  updateNoteFields: MUTATE_TIMEOUT_MS,
+  addTags: MUTATE_TIMEOUT_MS,
+  removeTags: MUTATE_TIMEOUT_MS,
+  setSpecificValueOfCard: MUTATE_TIMEOUT_MS,
+  getActiveProfile: FAST_TIMEOUT_MS,
+  // BULK: a model row carries every template's full HTML, so a collection with
+  // dozens of note types answers slower than any other read-only action.
+  findModelsByName: BULK_TIMEOUT_MS,
 };
 
 // ----- Error taxonomy --------------------------------------------------------

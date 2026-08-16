@@ -27,6 +27,32 @@ function chunk<T>(items: readonly T[], size: number): T[][] {
 }
 
 /**
+ * Fingerprint → the request that produced it, most recent last.
+ *
+ * The commit path has to re-read the same window to compare fingerprints, and
+ * the renderer deliberately holds no transport detail — the same reason the
+ * .apkg exporter remembers source paths here rather than shipping them to the
+ * renderer. Small on purpose: it exists to survive the minutes between reading
+ * a collection and committing to it.
+ */
+const recentReads = new Map<string, ConnectDraftRequest>();
+const RECENT_READ_LIMIT = 8;
+
+export function rememberConnectRead(fingerprint: string, request: ConnectDraftRequest): void {
+  recentReads.delete(fingerprint);
+  recentReads.set(fingerprint, request);
+  while (recentReads.size > RECENT_READ_LIMIT) {
+    const oldest = recentReads.keys().next().value;
+    if (oldest == null) break;
+    recentReads.delete(oldest);
+  }
+}
+
+export function recallConnectRead(fingerprint: string): ConnectDraftRequest | undefined {
+  return recentReads.get(fingerprint);
+}
+
+/**
  * Which of these deck names are filtered decks.
  *
  * `deckNamesAndIds` does not report `dyn`, and there is no bulk action that
@@ -112,6 +138,14 @@ export async function readConnectDraft(
         fingerprint: `connect:${noteIds.length}:${Math.max(0, ...notes.map((n) => Number(n.mod ?? 0)))}`,
       },
       normalize: stripFieldHtml,
+    });
+
+    // Normalized values, not the caller's: the commit's re-read has to ask the
+    // exact question this answer came from or the fingerprints cannot compare.
+    rememberConnectRead(draft.source.fingerprint, {
+      query,
+      noteOffset: offset,
+      noteLimit: limit,
     });
 
     return {

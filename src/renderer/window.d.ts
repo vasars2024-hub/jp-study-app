@@ -505,6 +505,9 @@ declare global {
       readAnkiConnectDraft(
         request?: import('../shared/ankiConnectDraft').ConnectDraftRequest,
       ): Promise<import('../shared/ankiConnectDraft').ConnectDraftResult>;
+      commitAnkiConnectDraft(
+        request: import('../shared/ankiConnectCommit').ConnectCommitRequest,
+      ): Promise<import('../shared/ankiConnectCommit').ConnectCommitResult>;
       ankiDraftSessionList(): Promise<
         import('../main/anki/draftSessionStore').DraftSessionSummary[]
       >;

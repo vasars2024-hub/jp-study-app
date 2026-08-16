@@ -37,6 +37,8 @@ import type { ConnectDraftRequest } from '../../shared/ankiConnectDraft';
 import { readRawCollection } from './apkgDraftRead';
 import { readCsvDraft } from './csvDraftRead';
 import { readConnectDraft } from './connectDraftRead';
+import { commitConnectDraft } from './connectCommit';
+import type { ConnectCommitRequest } from '../../shared/ankiConnectCommit';
 import {
   beginDraftSession,
   cancelDraftSession,
@@ -448,6 +450,9 @@ export function registerApkgIpc(): void {
   ipcMain.handle('anki:readCsvDraft', (_e, request?: CsvDraftRequest) => readCsvDraft(request));
   ipcMain.handle('anki:readConnectDraft', (_e, request?: ConnectDraftRequest) =>
     readConnectDraft(request),
+  );
+  ipcMain.handle('anki:commitConnectDraft', (_e, request: ConnectCommitRequest) =>
+    commitConnectDraft(request),
   );
 
   // Resumable draft sessions. The renderer drives paging, so it is the only

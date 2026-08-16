@@ -69,6 +69,7 @@ import type { CsvDraftRequest, CsvDraftResult } from './shared/ankiCsv';
 import type { AiAdditionKind } from './shared/ankiAiAdditions';
 import type { AiAdditionsNoteResult, AiAdditionsRunResult } from './shared/ankiAiPrompt';
 import type { ConnectDraftRequest, ConnectDraftResult } from './shared/ankiConnectDraft';
+import type { ConnectCommitRequest, ConnectCommitResult } from './shared/ankiConnectCommit';
 import type {
   AnkiDraftSession,
   AnkiDraftSessionRequest,
@@ -610,6 +611,9 @@ const api = {
   /** One page of the live Anki collection read as a workbench draft. Read-only. */
   readAnkiConnectDraft: (request?: ConnectDraftRequest): Promise<ConnectDraftResult> =>
     ipcRenderer.invoke('anki:readConnectDraft', request),
+  /** Write the workbench's net change set into the live Anki collection. */
+  commitAnkiConnectDraft: (request: ConnectCommitRequest): Promise<ConnectCommitResult> =>
+    ipcRenderer.invoke('anki:commitConnectDraft', request),
   /** Resumable draft sessions. `complete` is never something a caller may set. */
   ankiDraftSessionList: (): Promise<AnkiDraftSessionSummary[]> =>
     ipcRenderer.invoke('anki:draftSessionList'),
