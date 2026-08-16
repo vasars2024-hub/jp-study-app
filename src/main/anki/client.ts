@@ -108,10 +108,22 @@ export interface AnkiActionMap {
    * queue position. `warning_check` is the add-on's own acknowledgement that the
    * caller is writing a scheduler column directly; the workbench refuses cards in
    * filtered decks before it gets here.
+   *
+   * Two measured traps, both of which produced a silent no-op (2026-08-16):
+   * `newValues` are `setattr` straight onto the card, so an integer column needs
+   * a NUMBER — `'7'` answers `[[false, "'str' object cannot be interpreted as an
+   * integer"]]` and moves nothing. And that refusal arrives INSIDE a 200 result
+   * rather than in `body.error`, so `invoke` cannot raise it: every caller must
+   * read the array. `settingsFailure()` below is the one place that decodes it.
    */
   setSpecificValueOfCard: {
-    params: { card: number; keys: string[]; newValues: string[]; warning_check?: boolean };
-    result: boolean[];
+    params: {
+      card: number;
+      keys: string[];
+      newValues: (string | number)[];
+      warning_check?: boolean;
+    };
+    result: (boolean | [boolean, string])[];
   };
   /** The profile the write landed in, echoed back into the commit result. */
   getActiveProfile: { params: undefined; result: string };
@@ -181,6 +193,25 @@ export function isUnreachable(err: unknown): boolean {
 
 export function isCollectionUnavailable(err: unknown): boolean {
   return err instanceof AnkiError && err.kind === 'collection';
+}
+
+/**
+ * Decode `setSpecificValueOfCard`'s in-band refusal.
+ *
+ * It answers HTTP 200 with `body.error: null` whether it wrote or refused; the
+ * verdict is one entry per key, `true` on success and `[false, message]` on
+ * refusal. Returns the message when any key was refused, `null` when all landed.
+ * Anything else this action ever answers is treated as a refusal without a
+ * message rather than as success, because an unrecognized shape is not proof.
+ */
+export function settingsFailure(result: (boolean | [boolean, string])[]): string | null {
+  if (!Array.isArray(result)) return 'AnkiConnect returned no per-key verdict.';
+  for (const entry of result) {
+    if (entry === true) continue;
+    if (Array.isArray(entry)) return String(entry[1] ?? 'refused');
+    return 'AnkiConnect refused the write without saying why.';
+  }
+  return null;
 }
 
 /**

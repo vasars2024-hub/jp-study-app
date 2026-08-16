@@ -26,7 +26,13 @@ import {
 } from '../../shared/ankiConnectCommit';
 import { exportChangesEmpty } from '../../shared/ankiApkgExport';
 import type { ConnectDraftRequest } from '../../shared/ankiConnectDraft';
-import { invoke, isCollectionUnavailable, isUnreachable, toUiError } from './client';
+import {
+  invoke,
+  isCollectionUnavailable,
+  isUnreachable,
+  settingsFailure,
+  toUiError,
+} from './client';
 import { readConnectDraft, recallConnectRead } from './connectDraftRead';
 
 function transportCode(err: unknown): ConnectCommitResult['errorCode'] {
@@ -117,12 +123,21 @@ export async function commitConnectDraft(
   for (const move of plan.cardWrites) {
     const id = String(move.cardId);
     try {
-      await invoke('setSpecificValueOfCard', {
+      const verdict = await invoke('setSpecificValueOfCard', {
         card: move.cardId,
+        // A NUMBER, and the per-key verdict has to be read: this action reports
+        // its refusals inside a 200 body, so `invoke` cannot raise them. Sending
+        // '7' here is what made the first live run report `cardsUpdated 1` while
+        // the card had not moved — see `client.ts`'s note on the action.
         keys: ['due'],
-        newValues: [String(move.due)],
+        newValues: [move.due],
         warning_check: true,
       });
+      const refused = settingsFailure(verdict);
+      if (refused) {
+        failures.push({ kind: 'card', id, reason: refused });
+        continue;
+      }
       cardsUpdated += 1;
     } catch (err) {
       if (isUnreachable(err) || isCollectionUnavailable(err)) {

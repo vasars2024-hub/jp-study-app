@@ -11,12 +11,15 @@ import type { ApkgExportChangeSet } from '../../shared/ankiApkgExport';
 
 const invoke = vi.fn();
 
-vi.mock('../anki/client', () => ({
+// Only the transport is faked. `settingsFailure` comes through untouched: the
+// in-band-refusal case below exists because that decoder is what turns a 200
+// body into a failure, and a stub of it would reproduce the defect it guards.
+vi.mock('../anki/client', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../anki/client')>()),
   invoke: (...args: unknown[]) => invoke(...args),
   toUiError: (err: unknown) => (err instanceof Error ? err.message : String(err)),
   isUnreachable: (err: unknown) => err instanceof Error && err.message === 'UNREACHABLE',
-  isCollectionUnavailable: (err: unknown) =>
-    err instanceof Error && err.message === 'COLLECTION',
+  isCollectionUnavailable: (err: unknown) => err instanceof Error && err.message === 'COLLECTION',
 }));
 
 const { commitConnectDraft } = await import('../anki/connectCommit');
@@ -160,13 +163,19 @@ class FakeCollection {
         const target = this.cards.find((c) => c.id === id);
         if (!target) throw new Error('card was not found');
         const keys = params.keys as string[];
-        const values = params.newValues as string[];
+        const values = params.newValues as unknown[];
+        // Anki's own rule, measured 2026-08-16: the value is `setattr` onto an
+        // integer column, so a string is refused — HTTP 200, `error: null`, and
+        // the verdict inside the result. Writing nothing in that case is what
+        // makes this a real reproduction rather than a friendlier fake.
+        const bad = keys.findIndex((_k, i) => typeof values[i] !== 'number');
+        if (bad >= 0) return [[false, "'str' object cannot be interpreted as an integer"]];
         if (!this.swallowWrites) {
           keys.forEach((key, i) => {
             if (key === 'due') target.due = Number(values[i]);
           });
         }
-        return [true];
+        return keys.map(() => true);
       }
       default:
         throw new Error(`unexpected action ${action}`);
@@ -243,7 +252,7 @@ describe('commitConnectDraft', () => {
     expect(callsTo('setSpecificValueOfCard')[0][1]).toEqual({
       card: CARD_A,
       keys: ['due'],
-      newValues: ['3'],
+      newValues: [3],
       warning_check: true,
     });
     expect(collection.cards.find((c) => c.id === CARD_A)?.due).toBe(3);
@@ -410,6 +419,49 @@ describe('commitConnectDraft', () => {
       id: String(NOTE_B),
       reason: 'UNREACHABLE',
     });
+  });
+
+  it('sends the due as a number, because a string is refused inside a 200 body', async () => {
+    // The first live run against real Anki sent '7' and reported `cardsUpdated
+    // 1` on a card that had not moved: `setSpecificValueOfCard` answers
+    // `[[false, "'str' object cannot be interpreted as an integer"]]` with
+    // `error: null`, so nothing threw. Guarding both halves — what is sent, and
+    // that an in-band refusal is read as a failure.
+    const fingerprint = await currentFingerprint();
+    const result = await commitConnectDraft({
+      fingerprint,
+      read: READ,
+      changes: { notes: [], cardMoves: [{ cardId: String(CARD_A), noteId: String(NOTE_A), due: 7 }] },
+    });
+
+    expect(typeof (callsTo('setSpecificValueOfCard')[0][1] as { newValues: unknown[] }).newValues[0]).toBe(
+      'number',
+    );
+    expect(result.ok).toBe(true);
+    expect(result.cardsUpdated).toBe(1);
+    expect(collection.cards.find((c) => c.id === CARD_A)?.due).toBe(7);
+  });
+
+  it('reads an in-band refusal as a failure rather than as a write', async () => {
+    const fingerprint = await currentFingerprint();
+    // Anki refuses the column without an HTTP error and without moving the card.
+    invoke.mockImplementation(async (action: string, params?: Record<string, unknown>) => {
+      if (action === 'setSpecificValueOfCard') return [[false, 'card is in a filtered deck']];
+      return collection.handle(action, params ?? {});
+    });
+    const result = await commitConnectDraft({
+      fingerprint,
+      read: READ,
+      changes: { notes: [], cardMoves: [{ cardId: String(CARD_A), noteId: String(NOTE_A), due: 7 }] },
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.errorCode).toBe('partial');
+    expect(result.cardsUpdated).toBe(0);
+    expect(result.failures).toEqual([
+      { kind: 'card', id: String(CARD_A), reason: 'card is in a filtered deck' },
+    ]);
+    expect(collection.cards.find((c) => c.id === CARD_A)?.due).toBe(10);
   });
 
   it('does not claim success when the re-read cannot find the change', async () => {
