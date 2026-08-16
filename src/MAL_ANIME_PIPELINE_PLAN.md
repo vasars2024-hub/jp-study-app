@@ -942,3 +942,47 @@ same acquisition adds its own torrent a moment later; assert on the orphan's **h
 **End state, stated rather than left implied:** `247d977772eb` is still in
 `jp-study-subtitles` fetching metadata at 1 seeder (0 bytes down). That is the same residue
 the reaper now exists to clear, and the next acquisition clears it.
+
+## 2026-08-16 — the nyaa offer pointed at a tab that does not carry the button
+
+Worker `backup`. Defect found while scoping the plan's own open item ("wiring the MAL harvest
+entry point to nyaa"). Not that wiring — this is the honesty defect sitting in front of it.
+
+**What was wrong.** When Jimaku files nothing, `SubtitleHarvestPanel` does not run nyaa; it
+names it as the next step in prose (`subHarvest.nyaa.offered`, rendered at
+`SubtitleHarvestPanel.tsx:337`). All four catalogs said *"Nyaa can be searched instead from the
+**Episodes** tab"*. The nyaa button is rendered under `{tab === 'subtitles' && (`
+(`MediaDetailPanel.tsx:357`, button at `:363`); `episodes` is a different tab declared at
+`:170`. The sentence also implied any MAL title works, while `listNyaaCandidates`
+(`subtitleDiscovery.ts:761`) refuses anything `host.listItems()` does not hold — *"That media
+item is no longer in the library."* A title the user has not downloaded has **no route at all**.
+
+This is the settings-search defect's exact shape, which the user hit personally: a pointer to a
+surface that does not hold what it promises. Neither the suite nor `i18n-check` can see it —
+both keys exist, all four locales are present, and only the *relationship* between them is wrong.
+
+**Fixed in all four locales**, naming the Subtitles tab and stating the library precondition.
+i18n-check unmoved at **10,351** keys (an existing key was rewritten, not added).
+
+**The guard, and why a source scan.** `subtitleHarvestNyaaRoute.test.ts` reads
+`MediaDetailPanel.tsx`, finds which `{tab === '…'}` block encloses `media.subtitles.nyaa.open`,
+resolves that tab's own English label, and asserts the offer contains it, contains no other
+tab's label, and states the precondition. The guarded tab is a JSX condition and the label goes
+through `t()` at render, so there is no runtime value to assert on.
+
+**Mutation control: the original sentence put back → 3 of 4 red, each for a different reason** —
+`to contain 'Subtitles'`, `not to contain 'Episodes'`, `to match /librar/i`. The fourth test is
+the parse-sanity guard and correctly stayed green; without it a regex that matched nothing would
+make the other three vacuously pass. `en.ts` restored **byte-identical** (sha256 `270ddb87…`).
+
+**Live**, through the running renderer's own module (`fetch('/src/shared/i18n/catalogs/en.ts')`,
+so it is the app's graph and not the file re-read): `namesSubtitlesTab: true`,
+`namesEpisodesTab: false`, `statesLibraryPrecondition: true`. `debug/nyaa-offer-live.cjs`.
+
+**Still open, unchanged and now scoped:** the harvest panel has no nyaa *fetch* path. The design
+is already derived — `nyaaSearch` takes title/season/episode and uses `mediaId` only to look
+them up (`subtitleDiscovery.ts:769`), and `nyaaFetch` returns `{text, format, fileName}` with no
+media item involved; only the *attach* step (`writeSubtitleFile` + `patchItems`, `:826`/`:848`)
+needs one, and harvest mining wants the text, not a record. So a title-keyed list handler plus a
+text-returning fetch handler closes it. That is cross-surface (contract, main, preload,
+`window.d.ts`, panel, i18n ×4, tests) and is a turn of its own — do not half-land it.
