@@ -21,11 +21,20 @@ import type { BrowserRow } from './ankiWorkbenchBrowser';
 import { FREQUENCY_BAND_LIMITS, type LexiconFrequencyBand } from './lexiconFrequency';
 import { containsScript, hasNoScript, parseTextScript, type TextScript } from './textScripts';
 import {
+  extractVocabTerm,
   isVocabKnownConflict,
+  resolveVocabField,
   resolveVocabKnown,
   type VocabContext,
   type VocabNoteFacts,
 } from './ankiVocabContext';
+import {
+  parseSentenceCover,
+  resolveReadingField,
+  resolveSentenceField,
+  sentenceCover,
+  type SentenceCover,
+} from './ankiSentenceCover';
 
 // ----- the tree ----------------------------------------------------------------
 
@@ -159,6 +168,26 @@ export interface ScriptPredicate {
   absence?: 'none';
 }
 
+/**
+ * `cover:none`, `Example:cover:stem` — smart recipe 16, "find sentence cards
+ * missing the target expression or reading".
+ *
+ * Unscoped it reads the note's *sentence* field, resolved by
+ * `resolveSentenceField` the same way `freq:` resolves the word field — a user
+ * filtering a mined deck should not have to know it calls the field `Example`.
+ * Field-scoped it reads exactly the field named, spelled like `Field:script:`.
+ *
+ * The four modes are spelled out rather than offered as `cover:broken` because
+ * `none` is a candidate to review and not a verdict: the stem rule is a prefix
+ * rule and misses 来る → きた. `ankiSentenceCover.ts` lists what it misses.
+ */
+export interface SentenceCoverPredicate {
+  kind: 'cover';
+  /** Absent = the note's own sentence field. */
+  fieldName?: string;
+  cover: SentenceCover;
+}
+
 export type BrowserPredicate =
   | AnyTextPredicate
   | RegexPredicate
@@ -170,7 +199,8 @@ export type BrowserPredicate =
   | CardCountPredicate
   | FrequencyPredicate
   | KnownPredicate
-  | ScriptPredicate;
+  | ScriptPredicate
+  | SentenceCoverPredicate;
 
 export interface BrowserFilterGroup {
   kind: 'group';
@@ -422,6 +452,10 @@ function predicateFromTerm(token: Token, schema: BrowserQuerySchema): BrowserPre
   if (lowerKey === 'script') {
     return parseScriptValue(value) ?? { code: 'unknown-key', token: text };
   }
+  if (lowerKey === 'cover') {
+    const cover = parseSentenceCover(value);
+    return cover ? { kind: 'cover', cover } : { code: 'unknown-key', token: text };
+  }
   if (lowerKey === 'freq' || lowerKey === 'known') {
     // The refusal comes before the value is even read: with no context, every
     // spelling of the key is equally unanswerable, and reporting "unknown
@@ -449,6 +483,11 @@ function predicateFromTerm(token: Token, schema: BrowserQuerySchema): BrowserPre
   if (value.toLowerCase().startsWith('script:')) {
     const scoped = parseScriptValue(value.slice(7));
     return scoped ? { ...scoped, fieldName: field } : { code: 'unknown-key', token: text };
+  }
+  // `Example:cover:none`, the field-scoped form, spelled like the two above.
+  if (value.toLowerCase().startsWith('cover:')) {
+    const cover = parseSentenceCover(value.slice(6));
+    return cover ? { kind: 'cover', cover, fieldName: field } : { code: 'unknown-key', token: text };
   }
   return {
     kind: 'field',
@@ -693,6 +732,35 @@ export function compileBrowserFilter(node: BrowserFilterNode, vocab?: VocabConte
         return absence === 'none'
           ? values.every(hasNoScript)
           : !!script && values.some((value) => containsScript(value, script));
+      };
+    }
+    case 'cover': {
+      const { fieldName, cover } = node;
+      return (row) => {
+        // Every field name is read off the *row*, not off a draft-wide schema:
+        // a mixed deck holds several note types and each declares its own
+        // sentence, word and reading fields. Resolving once for the draft would
+        // score one note type's notes against another's field names.
+        const names = Object.keys(row.fields);
+        const sentenceField = fieldName ?? resolveSentenceField(names);
+        if (sentenceField === null) return false;
+        const sentence = row.fields[sentenceField];
+        // Absent is not empty, the same rule `field` and `script` both apply: a
+        // note type with no such field has no coverage verdict, and calling that
+        // `none` would report every vocabulary note as a broken sentence card.
+        if (sentence === undefined) return false;
+        const wordField = resolveVocabField(names);
+        if (wordField === null) return false;
+        const term = extractVocabTerm(row.fields[wordField] ?? '');
+        if (term === null) return false;
+        const readingField = resolveReadingField(names);
+        return (
+          sentenceCover({
+            sentence,
+            term,
+            reading: readingField === null ? null : (row.fields[readingField] ?? null),
+          }) === cover
+        );
       };
     }
     default: {

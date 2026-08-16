@@ -9406,6 +9406,24 @@ export const en: Catalog = {
   'ankiWorkbench.browser.explain.script.katakana': 'katakana',
   'ankiWorkbench.browser.explain.script.kana': 'kana',
   'ankiWorkbench.browser.explain.script.hangul': 'Hangul',
+  'ankiWorkbench.browser.explain.cover.exact': 'its sentence contains its word as written',
+  'ankiWorkbench.browser.explain.cover.reading':
+    'its sentence does not contain its word as written, but does contain its reading',
+  'ankiWorkbench.browser.explain.cover.stem':
+    'its sentence contains only the stem of its word, so the word appears in an inflected form',
+  'ankiWorkbench.browser.explain.cover.none':
+    'its sentence contains neither its word, nor its reading, nor the stem of its word',
+  'ankiWorkbench.browser.explain.coverField.exact': '{field} contains its word as written',
+  'ankiWorkbench.browser.explain.coverField.reading':
+    '{field} does not contain its word as written, but does contain its reading',
+  'ankiWorkbench.browser.explain.coverField.stem':
+    '{field} contains only the stem of its word, so the word appears in an inflected form',
+  'ankiWorkbench.browser.explain.coverField.none':
+    '{field} contains neither its word, nor its reading, nor the stem of its word',
+  'ankiWorkbench.browser.explain.cover.unknown':
+    'this module cannot tell whether its sentence contains its word: the word does not inflect in a way it can reduce to a stem',
+  'ankiWorkbench.browser.explain.coverField.unknown':
+    'this module cannot tell whether {field} contains its word: the word does not inflect in a way it can reduce to a stem',
   'ankiWorkbench.journal.title': 'History: {applied} steps over {notes} notes',
   'ankiWorkbench.journal.batch': 'Batch of {ops} changes on {notes} notes',
   'ankiWorkbench.journal.single': 'Single edit on {notes} note',

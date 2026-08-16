@@ -8928,6 +8928,18 @@ export const zh: Catalog = {
   'ankiWorkbench.browser.explain.script.katakana': '片假名',
   'ankiWorkbench.browser.explain.script.kana': '假名',
   'ankiWorkbench.browser.explain.script.hangul': '谚文',
+  'ankiWorkbench.browser.explain.cover.exact': '例句中按原写法包含该词',
+  'ankiWorkbench.browser.explain.cover.reading': '例句中不含该词的写法，但含其读音',
+  'ankiWorkbench.browser.explain.cover.stem': '例句中只含该词的词干，即以活用形出现',
+  'ankiWorkbench.browser.explain.cover.none': '例句中既无该词，也无其读音和词干',
+  'ankiWorkbench.browser.explain.coverField.exact': '{field} 中按原写法包含该词',
+  'ankiWorkbench.browser.explain.coverField.reading': '{field} 中不含该词的写法，但含其读音',
+  'ankiWorkbench.browser.explain.coverField.stem': '{field} 中只含该词的词干，即以活用形出现',
+  'ankiWorkbench.browser.explain.coverField.none': '{field} 中既无该词，也无其读音和词干',
+  'ankiWorkbench.browser.explain.cover.unknown':
+    '无法判断例句是否包含该词：该词无法归约出词干',
+  'ankiWorkbench.browser.explain.coverField.unknown':
+    '无法判断 {field} 是否包含该词：该词无法归约出词干',
   'ankiWorkbench.journal.title': '历史：{notes} 条笔记上的 {applied} 个步骤',
   'ankiWorkbench.journal.batch': '对 {notes} 条笔记的 {ops} 处批量更改',
   'ankiWorkbench.journal.single': '对 {notes} 条笔记的单次编辑',

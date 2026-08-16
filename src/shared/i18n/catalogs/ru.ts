@@ -9792,6 +9792,24 @@ export const ru: Catalog = {
   'ankiWorkbench.browser.explain.script.katakana': 'катакана',
   'ankiWorkbench.browser.explain.script.kana': 'кана',
   'ankiWorkbench.browser.explain.script.hangul': 'хангыль',
+  'ankiWorkbench.browser.explain.cover.exact': 'предложение содержит слово в его записи',
+  'ankiWorkbench.browser.explain.cover.reading':
+    'предложение не содержит слово в его записи, но содержит его чтение',
+  'ankiWorkbench.browser.explain.cover.stem':
+    'предложение содержит только основу слова, то есть слово стоит в изменённой форме',
+  'ankiWorkbench.browser.explain.cover.none':
+    'предложение не содержит ни слова, ни его чтения, ни его основы',
+  'ankiWorkbench.browser.explain.coverField.exact': '{field} содержит слово в его записи',
+  'ankiWorkbench.browser.explain.coverField.reading':
+    '{field} не содержит слово в его записи, но содержит его чтение',
+  'ankiWorkbench.browser.explain.coverField.stem':
+    '{field} содержит только основу слова, то есть слово стоит в изменённой форме',
+  'ankiWorkbench.browser.explain.coverField.none':
+    '{field} не содержит ни слова, ни его чтения, ни его основы',
+  'ankiWorkbench.browser.explain.cover.unknown':
+    'нельзя определить, содержит ли предложение слово: у слова не выделяется основа',
+  'ankiWorkbench.browser.explain.coverField.unknown':
+    'нельзя определить, содержит ли {field} слово: у слова не выделяется основа',
   'ankiWorkbench.journal.title': 'История: шагов {applied} по заметкам: {notes}',
   'ankiWorkbench.journal.batch': 'Партия из {ops} изменений в заметках: {notes}',
   'ankiWorkbench.journal.single': 'Одиночная правка в заметках: {notes}',

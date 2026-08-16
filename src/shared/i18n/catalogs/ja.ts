@@ -8981,6 +8981,22 @@ export const ja: Catalog = {
   'ankiWorkbench.browser.explain.script.katakana': 'カタカナ',
   'ankiWorkbench.browser.explain.script.kana': 'かな',
   'ankiWorkbench.browser.explain.script.hangul': 'ハングル',
+  'ankiWorkbench.browser.explain.cover.exact': '例文に単語がそのままの表記で含まれる',
+  'ankiWorkbench.browser.explain.cover.reading':
+    '例文に単語の表記は含まれないが、読みは含まれる',
+  'ankiWorkbench.browser.explain.cover.stem':
+    '例文に単語の語幹だけが含まれる（活用した形で出ている）',
+  'ankiWorkbench.browser.explain.cover.none': '例文に単語も読みも語幹も含まれない',
+  'ankiWorkbench.browser.explain.coverField.exact': '{field} に単語がそのままの表記で含まれる',
+  'ankiWorkbench.browser.explain.coverField.reading':
+    '{field} に単語の表記は含まれないが、読みは含まれる',
+  'ankiWorkbench.browser.explain.coverField.stem':
+    '{field} に単語の語幹だけが含まれる（活用した形で出ている）',
+  'ankiWorkbench.browser.explain.coverField.none': '{field} に単語も読みも語幹も含まれない',
+  'ankiWorkbench.browser.explain.cover.unknown':
+    '例文に単語が含まれるか判定できない（語幹を取り出せない語）',
+  'ankiWorkbench.browser.explain.coverField.unknown':
+    '{field} に単語が含まれるか判定できない（語幹を取り出せない語）',
   'ankiWorkbench.journal.title': '履歴: {notes} 件のノートに {applied} ステップ',
   'ankiWorkbench.journal.batch': '{notes} 件のノートへの {ops} 件の一括変更',
   'ankiWorkbench.journal.single': '{notes} 件のノートの単独編集',

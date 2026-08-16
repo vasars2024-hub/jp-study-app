@@ -141,6 +141,13 @@ function explainPredicate(node: Exclude<BrowserFilterNode, { kind: 'group' } | {
       return node.fieldName
         ? clause('scriptField', { field: node.fieldName, script: `${QUERY_EXPLAIN_KEY_PREFIX}script.${node.script}` })
         : clause('script', { script: `${QUERY_EXPLAIN_KEY_PREFIX}script.${node.script}` });
+    case 'cover':
+      // Four sentences rather than one with the mode interpolated: "does not
+      // contain its word at all" and "contains only the stem of its word" are
+      // different claims, and a single template would have to say neither.
+      return node.fieldName
+        ? clause(`coverField.${node.cover}`, { field: node.fieldName })
+        : clause(`cover.${node.cover}`);
   }
 }
 
