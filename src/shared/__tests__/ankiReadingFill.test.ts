@@ -282,6 +282,53 @@ describe('the fill-reading tray action', () => {
     expect(plan.draft.notes.find((n) => n.id === 'n3')?.fields[1].raw).toBe('');
   });
 
+  it('tells the user the readings were pinyin, not that nothing answered', () => {
+    // The distinction 3fa55e11 exists to draw, reaching the code the user
+    // actually reads. A deck whose only installed dictionary for 掃 is Chinese
+    // gets sǎo / sào back: "no installed dictionary gives a reading" would be
+    // false, and it hides the one action that fixes it — install a Japanese
+    // dictionary. Guarding the tray mapping, not just proposeReading: the boss
+    // audit of 2026-08-16 flipped this ternary and the whole suite stayed green.
+    const pinyinNotes = [noteOf('p1', '掃', '')];
+    const pinyinDraft = draftOf(pinyinNotes);
+    const plan = planChangeTray(pinyinDraft, createEditJournal(), ['p1'], [fillAction()], {
+      enrich: {
+        lookup: new Map([['掃', [entry('sǎo', 'CC-CEDICT'), entry('sào', 'CC-CEDICT')]]]),
+        vocab: buildVocabContext({
+          notes: pinyinNotes,
+          noteTypes: pinyinDraft.noteTypes,
+          cards: [],
+        }),
+      },
+    });
+    expect(plan.changedNotes).toBe(0);
+    const codes = plan.problems.map((p) => p.code);
+    expect(codes).toContain('reading-not-kana');
+    expect(codes).not.toContain('reading-no-entry');
+    expect(plan.problems.find((p) => p.code === 'reading-not-kana')?.detail).toBe('掃');
+    expect(plan.draft.notes.find((n) => n.id === 'p1')?.fields[1].raw).toBe('');
+  });
+
+  it('keeps "the entries carried no reading at all" as the no-entry code', () => {
+    // The other arm of the same ternary: an entry that exists but is blank is
+    // 'no-reading', and it must not be reported as a pinyin problem.
+    const blankNotes = [noteOf('b1', '燦然', '')];
+    const blankDraft = draftOf(blankNotes);
+    const plan = planChangeTray(blankDraft, createEditJournal(), ['b1'], [fillAction()], {
+      enrich: {
+        lookup: new Map([['燦然', [entry('  ', 'JMdict')]]]),
+        vocab: buildVocabContext({
+          notes: blankNotes,
+          noteTypes: blankDraft.noteTypes,
+          cards: [],
+        }),
+      },
+    });
+    const codes = plan.problems.map((p) => p.code);
+    expect(codes).toContain('reading-no-entry');
+    expect(codes).not.toContain('reading-not-kana');
+  });
+
   it('never overwrites a reading that is already there', () => {
     // 犬 resolves cleanly, so the only thing stopping the write is that the
     // field is occupied — which is what "fill missing" has to mean.
