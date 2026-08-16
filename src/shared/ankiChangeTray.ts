@@ -27,7 +27,7 @@
 // note types, and `Back` is ord 1 in one and ord 3 in another; targeting an ord
 // would write into whichever field happened to sit there.
 
-import type { AnkiDraft, AnkiDraftNote, AnkiDraftNoteType } from './ankiDraft';
+import type { AnkiDraft, AnkiDraftDeck, AnkiDraftNote, AnkiDraftNoteType } from './ankiDraft';
 import {
   MARKED_TAG,
   createDraftEditIndex,
@@ -70,6 +70,14 @@ import {
   type DeckNormalizePlan,
 } from './ankiDeckNormalize';
 import {
+  deckSplitParameterProblem,
+  planDeckSplit,
+  type DeckSplitAxis,
+  type DeckSplitPlan,
+  type DeckSplitRefusalCode,
+  type DeckSplitUnmatched,
+} from './ankiDeckSplit';
+import {
   planPrioritizeNew,
   type PrioritizePlan,
   type PrioritizeRefusal,
@@ -81,6 +89,7 @@ import {
   type LeechRescueRefusal,
 } from './ankiLeechRescue';
 import {
+  isMasteryLevel,
   planMasteryMapping,
   type MasteryLevel,
   type MasteryPlan,
@@ -101,7 +110,8 @@ export type TrayActionKind =
   | 'rescue-leeches'
   | 'set-mastery'
   | 'normalize-tags'
-  | 'normalize-decks';
+  | 'normalize-decks'
+  | 'split-deck';
 
 /**
  * What a copy does when the destination already holds text — Phase 4's "require
@@ -258,6 +268,24 @@ export type TrayAction =
       kind: 'normalize-decks';
       /** Order here is ignored; they always run in `DECK_NORMALIZE_ORDER`. */
       ops: DeckNormalizeOp[];
+    })
+  | (TrayActionBase & {
+      /**
+       * Recipe 13. The only action that moves a card between decks, and the
+       * only one whose scope is a named deck rather than the selection: see
+       * `ankiDeckSplit.ts` for why a selection that reached outside the parent
+       * refuses those cards instead of restructuring the whole collection.
+       */
+      kind: 'split-deck';
+      axis: DeckSplitAxis;
+      /** The deck being split. Its subtree is the scope. */
+      parentDeckId: string;
+      /** What happens to notes with no value on the axis. No default. */
+      unmatched: DeckSplitUnmatched;
+      /** Name of the deck `collect` gathers them into. Read only for `collect`. */
+      unmatchedSegment?: string;
+      /** Ascending band edges. Required for `frequency`, ignored elsewhere. */
+      bands?: number[];
     })
   | (TrayActionBase & {
       kind: 'set-mastery';
@@ -421,7 +449,28 @@ export type TrayProblemCode =
   /** Filtered decks left alone: their cards are on loan and Anki rebuilds them. */
   | 'deck-normalize-filtered'
   /** The action ran and renamed nothing. Same reason `tag-normalize-clean` exists. */
-  | 'deck-normalize-clean';
+  | 'deck-normalize-clean'
+  /**
+   * Recipe 13's split could not run at all: no such parent, a filtered parent,
+   * bands that are not ascending positive integers, or `collect` with no name.
+   * Blocking — `detail` carries the `DeckSplitProblem`, so one code covers every
+   * impossible input without four near-identical rows.
+   */
+  | 'split-refused'
+  /** Cards this split moves. `detail` names the first target deck. */
+  | 'split-moved'
+  /** Notes carrying no value on the axis. Info under `leave`, since nothing moved. */
+  | 'split-unmatched'
+  /** A selected card outside the deck being split. Warning: it was left alone. */
+  | 'split-outside-parent'
+  /** A card on loan to a filtered deck. Moving it would strand it on rebuild. */
+  | 'split-filtered-card'
+  /** Tags name two JLPT levels, so the split refuses to pick one. */
+  | 'split-ambiguous'
+  /** A selected note that generates no card, so there is nothing to file. */
+  | 'split-no-cards'
+  /** The split ran and moved nothing. Same reason `deck-normalize-clean` exists. */
+  | 'split-clean';
 
 export interface TrayProblem {
   code: TrayProblemCode;
@@ -509,12 +558,30 @@ export interface TrayPlan {
    */
   deckNormalize?: DeckNormalizePlan;
   /**
+   * What a `split-deck` action would do. Folded into `draft` — both the card
+   * moves and the decks it creates — and here so the surface can show the
+   * per-bucket counts and the refusals by name rather than one moved total.
+   */
+  deckSplit?: DeckSplitPlan;
+  /**
    * Cards whose `due` this tray moved. Separate from `changedNotes` because a
    * reposition-only tray changes zero notes and is not therefore a no-op; a
    * caller that gated Apply on `changedNotes` alone would disable it.
    */
   changedCards: number;
 }
+
+/**
+ * Recipe 13's refusals mapped to the codes the surface renders. A table for the
+ * reason the recipe-6 one below gives — a chain of ternaries mapping a refusal
+ * to the wrong user-facing code is a bug no test can enumerate.
+ */
+export const SPLIT_REFUSAL_PROBLEMS: Readonly<Record<DeckSplitRefusalCode, TrayProblemCode>> = {
+  'outside-parent': 'split-outside-parent',
+  'filtered-card': 'split-filtered-card',
+  'ambiguous-jlpt': 'split-ambiguous',
+  'note-without-cards': 'split-no-cards',
+};
 
 /**
  * Recipe 6's refusals, in the order the surface should list them. A table
@@ -581,6 +648,8 @@ function blockingProblems(
   aiBatch: AiBatch | undefined,
   hasMasteryContext: boolean,
   hasPrioritizeContext: boolean,
+  decks: readonly AnkiDraftDeck[],
+  hasSplitContext: boolean,
 ): TrayProblem[] {
   const problems: TrayProblem[] = [];
   const enabled = actions.filter((a) => a.enabled);
@@ -689,6 +758,25 @@ function blockingProblems(
         problems.push({ code: 'no-vocab-context', severity: 'blocking', actionId: action.id, count: 1 });
       } else if (!Number.isFinite(action.startPosition) || action.startPosition < 0) {
         problems.push({ code: 'empty-parameter', severity: 'blocking', actionId: action.id, count: 1 });
+      }
+    } else if (action.kind === 'split-deck') {
+      // Checked here rather than from the returned plan, because a split that
+      // cannot run has to stop the *tray* — guarantee 4. `deckSplitParameterProblem`
+      // is the same function `planDeckSplit` calls, so the two cannot drift.
+      const problem = deckSplitParameterProblem(decks, action);
+      if (problem) {
+        problems.push({
+          code: 'split-refused',
+          severity: 'blocking',
+          actionId: action.id,
+          count: 1,
+          detail: problem,
+        });
+      } else if ((action.axis === 'frequency' || action.axis === 'mastery') && !hasSplitContext) {
+        // Same refusal as `set-mastery`: without the context every note ranks
+        // `null` and the split would file a whole deck under "no value on this
+        // axis" while reporting that as the data's fault.
+        problems.push({ code: 'no-vocab-context', severity: 'blocking', actionId: action.id, count: 1 });
       }
     } else if (action.kind === 'rescue-leeches') {
       const measures = new Set(action.measures);
@@ -807,6 +895,19 @@ export function planChangeTray(
      * store, neither of which belongs on a serializable action.
      */
     prioritize?: { vocab: VocabContext };
+    /**
+     * What a `split-deck` action reads for its `frequency` and `mastery` axes.
+     * Its own channel rather than a reuse of `mastery`/`prioritize`: a split
+     * writes no knowledge and moves no queue position, and a tray holding a
+     * split plus one of those would otherwise have to supply the wrong one.
+     * `masterySegments` are deck names, so they are literals in the user's
+     * language rather than translation keys — see `DEFAULT_MASTERY_SEGMENTS`.
+     */
+    split?: {
+      vocab: VocabContext;
+      levels?: ReadonlyMap<string, number>;
+      masterySegments?: Readonly<Record<MasteryLevel, string>>;
+    };
   },
 ): TrayPlan {
   const groupId = opts?.groupId ?? `tray-${journal.done.length + 1}`;
@@ -817,6 +918,8 @@ export function planChangeTray(
     opts?.ai,
     opts?.mastery !== undefined,
     opts?.prioritize !== undefined,
+    draft.decks,
+    opts?.split !== undefined,
   );
   if (problems.length > 0) {
     return {
@@ -849,6 +952,7 @@ export function planChangeTray(
   let leechRescuePlan: LeechRescuePlan | undefined;
   let tagNormalizePlan: TagNormalizePlan | undefined;
   let deckNormalizePlan: DeckNormalizePlan | undefined;
+  let deckSplitPlan: DeckSplitPlan | undefined;
   let changedCards = 0;
 
   const changeFor = (noteId: string): TrayNoteChange => {
@@ -1177,6 +1281,118 @@ export function planChangeTray(
         matched: plan.considered,
         changed: plan.renames.length,
         skipped: plan.considered - plan.renames.length,
+      });
+      continue;
+    }
+
+    if (action.kind === 'split-deck') {
+      // Reads the *working* notes and decks, not the draft's: an earlier
+      // `add-tags` action that wrote `JLPT::N5` has to be visible to the split,
+      // which is guarantee 2 and the only reason order is worth having.
+      const ctx = opts?.split;
+      const rankByNote = new Map<string, number | null>();
+      const masteryByNote = new Map<string, MasteryLevel | null>();
+      for (const noteId of noteIds) {
+        const facts = ctx?.vocab.byNote.get(noteId);
+        rankByNote.set(noteId, facts?.rank ?? null);
+        const stored = facts?.term ? ctx?.levels?.get(facts.term) : undefined;
+        masteryByNote.set(noteId, isMasteryLevel(stored) ? stored : null);
+      }
+      const plan = planDeckSplit({
+        noteIds,
+        notes,
+        cards,
+        decks,
+        noteTypes: draft.noteTypes,
+        axis: action.axis,
+        parentDeckId: action.parentDeckId,
+        unmatched: action.unmatched,
+        unmatchedSegment: action.unmatchedSegment,
+        bands: action.bands,
+        rankByNote,
+        masteryByNote,
+        masterySegments: ctx?.masterySegments,
+      });
+      deckSplitPlan = plan;
+      if (plan.problem) continue; // unreachable — `blockingProblems` already refused.
+
+      const created = plan.targets.filter((t) => t.created);
+      if (created.length > 0) {
+        for (const target of created) {
+          decks.push({
+            id: target.deckId,
+            name: target.name,
+            path: [],
+            filtered: false,
+            // The parent's options preset, so a new subdeck studies the way the
+            // deck it came out of does. Anki's own "create subdeck" inherits
+            // nothing, but a split that silently reset every new card limit to
+            // the default preset would change how much the user sees per day.
+            configId: decks.find((d) => d.id === plan.parentDeckId)?.configId,
+          });
+        }
+        // Once for the batch: `path` and `parentId` above are placeholders, and
+        // relinking is what actually nests the new decks under the parent.
+        decks = relinkDeckParents(decks);
+      }
+      for (const move of plan.moves) {
+        const at = index.cardPosition.get(move.cardId);
+        if (at === undefined) continue;
+        const card = cards[at];
+        if (!card) continue;
+        cards[at] = { ...card, deckId: move.toDeckId };
+        ops.push({
+          kind: 'card-deck',
+          noteId: move.noteId,
+          cardId: move.cardId,
+          before: move.fromDeckId,
+          after: move.toDeckId,
+          group: groupId,
+        });
+      }
+      changedCards += plan.moves.length;
+
+      if (plan.moves.length > 0) {
+        problems.push({
+          code: 'split-moved',
+          severity: 'info',
+          actionId: action.id,
+          count: plan.moves.length,
+          detail: plan.targets[0]?.name,
+        });
+      } else {
+        problems.push({
+          code: 'split-clean',
+          severity: 'info',
+          actionId: action.id,
+          count: plan.considered,
+        });
+      }
+      if (plan.unmatchedNoteIds.length > 0) {
+        problems.push({
+          code: 'split-unmatched',
+          severity: plan.unmatched === 'leave' ? 'info' : 'warning',
+          actionId: action.id,
+          count: plan.unmatchedNoteIds.length,
+        });
+      }
+      for (const refusal of plan.refusals) {
+        problems.push({
+          code: SPLIT_REFUSAL_PROBLEMS[refusal.code],
+          severity: 'warning',
+          actionId: action.id,
+          count: refusal.cardIds.length || refusal.noteIds.length,
+        });
+      }
+      outcomes.push({
+        actionId: action.id,
+        kind: action.kind,
+        matched: plan.considered,
+        // Notes, not cards: every other outcome row counts notes, and a split
+        // that reported 1,200 next to a 600-note selection would read as a bug.
+        changed: plan.targets.reduce((sum, t) => sum + t.noteIds.length, 0),
+        skipped:
+          plan.considered - plan.targets.reduce((sum, t) => sum + t.noteIds.length, 0),
       });
       continue;
     }
@@ -1633,6 +1849,7 @@ export function planChangeTray(
     leechRescue: leechRescuePlan,
     tagNormalize: tagNormalizePlan,
     deckNormalize: deckNormalizePlan,
+    deckSplit: deckSplitPlan,
   };
 }
 

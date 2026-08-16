@@ -9966,6 +9966,12 @@ export const ru: Catalog = {
   'ankiWorkbench.tray.deckNormalize.trim-separators': 'исправить пути ::',
   'ankiWorkbench.tray.deckNormalize.ascii-width': 'полноширинный ASCII в обычный',
   'ankiWorkbench.tray.deckNormalize.unify-case': 'привести к написанию, самому частому в этой коллекции',
+  'ankiWorkbench.tray.describe.split-deck': 'Разделить колоду по: {axis}',
+  'ankiWorkbench.tray.split.axis.jlpt': 'уровень JLPT',
+  'ankiWorkbench.tray.split.axis.frequency': 'диапазон частотности',
+  'ankiWorkbench.tray.split.axis.source': 'тип заметки-источника',
+  'ankiWorkbench.tray.split.axis.mastery': 'уровень освоения',
+  'ankiWorkbench.review.cardDeckMoves': 'Карточек перемещено в другую колоду: {count}',
   'ankiWorkbench.tray.problem.deck-normalize-renamed':
     '{count} колод меняют имя, например {detail}. Ни одна карточка не меняет колоду.',
   'ankiWorkbench.tray.problem.deck-normalize-merge-refused':

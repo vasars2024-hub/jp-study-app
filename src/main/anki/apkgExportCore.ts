@@ -202,6 +202,18 @@ export function applyExportChanges(
     id: number | string;
     due: number;
   }
+  // Recipe 13's split. Writing it means creating deck rows and rewriting
+  // `cards.did`, which this writer does not do yet — so it refuses by name.
+  // Dropping the moves instead would export a package where the split provably
+  // did not happen while every surface said it had.
+  if ((changes.cardDeckMoves ?? []).length > 0) {
+    throw new ExportRefusal(
+      'deck-move-unsupported',
+      `This change set moves ${(changes.cardDeckMoves ?? []).length} card(s) between decks, `
+        + 'which the package writer cannot yet do. Undo the split before exporting.',
+    );
+  }
+
   const cardPlans: CardPlan[] = [];
   for (const move of changes.cardMoves) {
     const row = firstRow(db, 'SELECT id FROM cards WHERE id = ?', [idParam(move.cardId)]);

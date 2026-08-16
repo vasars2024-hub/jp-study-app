@@ -263,6 +263,32 @@ interface Bucketed {
   segment: string;
 }
 
+/** The parameters a caller can validate without a selection. */
+export type DeckSplitParameters = Pick<
+  DeckSplitInput,
+  'axis' | 'parentDeckId' | 'unmatched' | 'unmatchedSegment' | 'bands'
+>;
+
+/**
+ * Why this split cannot run, or `null`. Split out of `planDeckSplit` so the
+ * change tray can refuse the action *before* anything in the tray runs — the
+ * tray's rule that a blocking problem changes nothing cannot be honoured by a
+ * check that only fires once the plan is already computing.
+ */
+export function deckSplitParameterProblem(
+  decks: readonly AnkiDraftDeck[],
+  params: DeckSplitParameters,
+): DeckSplitProblem | null {
+  const parent = decks.find((d) => d.id === params.parentDeckId);
+  if (!parent) return 'no-such-parent';
+  if (parent.filtered) return 'parent-filtered';
+  if (params.axis === 'frequency' && !validBands(params.bands)) return 'invalid-bands';
+  if (params.unmatched === 'collect' && sanitizeDeckSegment(params.unmatchedSegment ?? '') === '') {
+    return 'empty-unmatched-name';
+  }
+  return null;
+}
+
 /**
  * What a split would do, computed once and used for both the preview and the
  * write — the tray's rule that the dry run *is* the apply holds here too.
@@ -270,14 +296,11 @@ interface Bucketed {
 export function planDeckSplit(input: DeckSplitInput): DeckSplitPlan {
   const { axis, decks, parentDeckId, unmatched } = input;
   if (input.noteIds.length === 0) return emptyPlan(input, 'empty-selection');
+  const parameterProblem = deckSplitParameterProblem(decks, input);
+  if (parameterProblem) return emptyPlan(input, parameterProblem);
   const parent = decks.find((d) => d.id === parentDeckId);
   if (!parent) return emptyPlan(input, 'no-such-parent');
-  if (parent.filtered) return emptyPlan(input, 'parent-filtered');
-  if (axis === 'frequency' && !validBands(input.bands)) return emptyPlan(input, 'invalid-bands');
   const collectSegment = sanitizeDeckSegment(input.unmatchedSegment ?? '');
-  if (unmatched === 'collect' && collectSegment === '') {
-    return emptyPlan(input, 'empty-unmatched-name');
-  }
 
   const parentPath = toPathForm(parent.name);
   const filteredDeckIds = new Set(decks.filter((d) => d.filtered).map((d) => d.id));

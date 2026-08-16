@@ -85,6 +85,22 @@ export type AnkiDraftEditOp =
     }
   | {
       /**
+       * The deck a card sits in — recipe 13's split. Reversible by writing the
+       * old id back, because that is the whole of what a move is: Anki stores a
+       * card's deck as one id on the card and nothing else changes. The decks a
+       * split *creates* are not journalled; undoing the moves empties them
+       * rather than deleting them, which is the reversal a user can see and
+       * finish by hand, and is far safer than a delete this op could not undo.
+       */
+      kind: 'card-deck';
+      noteId: string;
+      cardId: string;
+      before: string;
+      after: string;
+      group?: string;
+    }
+  | {
+      /**
        * A deck's name — recipe 12's deck half. The only op in the journal that
        * belongs to no note, because a deck rename touches no note and no card:
        * a card names its deck by id, and Anki derives the tree from the name, so
@@ -410,6 +426,14 @@ function applyInverseInto(
     const card = cards[cardAt];
     if (!card) return;
     cards[cardAt] = { ...card, due: op[toValue] };
+    return;
+  }
+  if (op.kind === 'card-deck') {
+    const cardAt = index.cardPosition.get(op.cardId);
+    if (cardAt === undefined) return;
+    const card = cards[cardAt];
+    if (!card) return;
+    cards[cardAt] = { ...card, deckId: op[toValue] };
     return;
   }
   const at = index.position.get(op.noteId);

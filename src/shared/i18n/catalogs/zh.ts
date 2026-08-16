@@ -9086,6 +9086,12 @@ export const zh: Catalog = {
   'ankiWorkbench.tray.deckNormalize.trim-separators': '修复 :: 路径',
   'ankiWorkbench.tray.deckNormalize.ascii-width': '全角 ASCII 转半角',
   'ankiWorkbench.tray.deckNormalize.unify-case': '统一为此集合中最常用的写法',
+  'ankiWorkbench.tray.describe.split-deck': '按{axis}拆分此牌组',
+  'ankiWorkbench.tray.split.axis.jlpt': 'JLPT 等级',
+  'ankiWorkbench.tray.split.axis.frequency': '词频区间',
+  'ankiWorkbench.tray.split.axis.source': '来源笔记类型',
+  'ankiWorkbench.tray.split.axis.mastery': '掌握程度',
+  'ankiWorkbench.review.cardDeckMoves': '{count} 张卡片移至其他牌组',
   'ankiWorkbench.tray.problem.deck-normalize-renamed':
     '{count} 个牌组的名称会改变，例如 {detail}。没有卡片会更换牌组。',
   'ankiWorkbench.tray.problem.deck-normalize-merge-refused':

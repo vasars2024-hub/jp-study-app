@@ -9151,6 +9151,12 @@ export const ja: Catalog = {
   'ankiWorkbench.tray.deckNormalize.trim-separators': ':: の区切りを修復',
   'ankiWorkbench.tray.deckNormalize.ascii-width': '全角ASCIIを半角に',
   'ankiWorkbench.tray.deckNormalize.unify-case': 'このコレクションで最も多い表記に合わせる',
+  'ankiWorkbench.tray.describe.split-deck': 'このデッキを{axis}で分割',
+  'ankiWorkbench.tray.split.axis.jlpt': 'JLPTレベル',
+  'ankiWorkbench.tray.split.axis.frequency': '頻度帯',
+  'ankiWorkbench.tray.split.axis.source': 'ソースのノートタイプ',
+  'ankiWorkbench.tray.split.axis.mastery': '習熟度',
+  'ankiWorkbench.review.cardDeckMoves': '{count} 枚のカードを別のデッキへ移動',
   'ankiWorkbench.tray.problem.deck-normalize-renamed':
     '{count}個のデッキ名が変わります（例: {detail}）。カードのデッキは変わりません。',
   'ankiWorkbench.tray.problem.deck-normalize-merge-refused':

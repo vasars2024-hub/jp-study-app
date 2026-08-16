@@ -50,10 +50,24 @@ export interface ApkgExportDeckRename {
   to: string;
 }
 
+/**
+ * Recipe 13's split. Named apart from `ApkgExportCardMove`, which is a *queue
+ * position* despite its name: one changes `cards.due`, the other `cards.did`,
+ * and folding them together is how a reposition would silently refile a card.
+ */
+export interface ApkgExportCardDeckMove {
+  cardId: string;
+  noteId: string;
+  /** The draft's deck id, which for a deck the split created is a `split:` id. */
+  deckId: string;
+}
+
 export interface ApkgExportChangeSet {
   notes: ApkgExportNoteChange[];
   cardMoves: ApkgExportCardMove[];
   deckRenames: ApkgExportDeckRename[];
+  /** Absent on a payload written before recipe 13; read tolerantly downstream. */
+  cardDeckMoves?: ApkgExportCardDeckMove[];
 }
 
 // ----- IPC contract -------------------------------------------------------------
@@ -80,6 +94,13 @@ export type ApkgExportErrorCode =
    * and only the deck name refuses.
    */
   | 'deck-collation-unsupported'
+  /**
+   * Recipe 13's split moved cards between decks and this writer cannot yet
+   * create a deck row or rewrite `cards.did`. Refused by name rather than
+   * dropped: a split that previewed, applied to the draft and then exported a
+   * package where nothing moved is the false success the plan forbids.
+   */
+  | 'deck-move-unsupported'
   | 'compressed-unsupported'
   | 'verify-failed'
   | 'io';
@@ -152,18 +173,21 @@ export function buildApkgExportChanges(
       else deckRenames.set(op.deckId, { deckId: op.deckId, before: op.before, after: op.after });
       continue;
     }
+    // The kind is part of the key: `card-due` and `card-deck` both name a card,
+    // and one key for both would let a split swallow a reposition of the same
+    // card — the second op would fold into the first and never export.
     const key =
       op.kind === 'field'
         ? `f:${op.noteId}:${op.fieldOrd}`
         : op.kind === 'tags'
           ? `t:${op.noteId}`
-          : `c:${op.cardId}`;
+          : `c:${op.kind}:${op.cardId}`;
     if (tracked.has(key)) continue;
     tracked.set(key, {
       noteId: op.noteId,
       kind: op.kind,
       fieldOrd: op.kind === 'field' ? op.fieldOrd : undefined,
-      cardId: op.kind === 'card-due' ? op.cardId : undefined,
+      cardId: op.kind === 'card-due' || op.kind === 'card-deck' ? op.cardId : undefined,
       firstBefore: op.before,
     });
   }
@@ -174,6 +198,7 @@ export function buildApkgExportChanges(
   const fieldNotes = new Set<string>();
   const tagNotes = new Set<string>();
   const cardMoves: ApkgExportCardMove[] = [];
+  const cardDeckMoves: ApkgExportCardDeckMove[] = [];
 
   for (const entry of tracked.values()) {
     if (entry.kind === 'field') {
@@ -184,6 +209,11 @@ export function buildApkgExportChanges(
     } else if (entry.kind === 'tags') {
       const note = noteById.get(entry.noteId);
       if (note && !sameTags(entry.firstBefore as string[], note.tags)) tagNotes.add(entry.noteId);
+    } else if (entry.kind === 'card-deck') {
+      const card = entry.cardId ? cardById.get(entry.cardId) : undefined;
+      if (card && card.deckId !== entry.firstBefore) {
+        cardDeckMoves.push({ cardId: card.id, noteId: entry.noteId, deckId: card.deckId });
+      }
     } else {
       const card = entry.cardId ? cardById.get(entry.cardId) : undefined;
       if (card && card.due !== entry.firstBefore) {
@@ -214,7 +244,7 @@ export function buildApkgExportChanges(
     deckRenamed.push({ deckId: rename.deckId, from: rename.before, to: deck.name });
   }
 
-  return { notes, cardMoves, deckRenames: deckRenamed };
+  return { notes, cardMoves, deckRenames: deckRenamed, cardDeckMoves };
 }
 
 /** True when the change set carries nothing to write. */
@@ -225,6 +255,7 @@ export function exportChangesEmpty(changes: ApkgExportChangeSet): boolean {
   return (
     changes.notes.length === 0 &&
     changes.cardMoves.length === 0 &&
-    (changes.deckRenames ?? []).length === 0
+    (changes.deckRenames ?? []).length === 0 &&
+    (changes.cardDeckMoves ?? []).length === 0
   );
 }

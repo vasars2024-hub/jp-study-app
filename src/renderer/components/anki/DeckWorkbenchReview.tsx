@@ -72,6 +72,9 @@ export default function DeckWorkbenchReview({
             {summary.cardMoves > 0 && (
               <li>{t('ankiWorkbench.review.cardMoves', { count: summary.cardMoves })}</li>
             )}
+            {summary.cardDeckMoves > 0 && (
+              <li>{t('ankiWorkbench.review.cardDeckMoves', { count: summary.cardDeckMoves })}</li>
+            )}
             {summary.revertedNotes > 0 && (
               <li>{t('ankiWorkbench.review.reverted', { count: summary.revertedNotes })}</li>
             )}

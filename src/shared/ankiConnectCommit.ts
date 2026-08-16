@@ -51,6 +51,13 @@ export type ConnectCommitErrorCode =
    * promises. Refused by name; exporting a package writes the rename for real.
    */
   | 'deck-rename-unsupported'
+  /**
+   * Recipe 13's split. AnkiConnect *does* have `createDeck` and `changeDeck`,
+   * but committing a split live also has to preserve each card's scheduling and
+   * survive a partial failure across two actions — so it is refused by name
+   * until that path is built rather than half-committed here.
+   */
+  | 'deck-move-unsupported'
   /** Anki or the add-on is not answering. */
   | 'unreachable'
   /** AnkiConnect answered but no collection is loaded. */
@@ -210,6 +217,14 @@ export function planConnectCommit(
     }
     // A change that folds to nothing against the live state is not a write.
     if (write.fields || write.addTags.length || write.removeTags.length) noteWrites.push(write);
+  }
+
+  if ((changes.cardDeckMoves ?? []).length > 0) {
+    throw new ConnectCommitRefusal(
+      'deck-move-unsupported',
+      `This change set moves ${(changes.cardDeckMoves ?? []).length} card(s) between decks, `
+        + 'which a live commit cannot yet do. Undo the split before committing.',
+    );
   }
 
   const cardWrites: ConnectCardWrite[] = [];

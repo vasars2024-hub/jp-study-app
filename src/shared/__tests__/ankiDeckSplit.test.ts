@@ -5,12 +5,22 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_MASTERY_SEGMENTS,
   deckSplitNewDecks,
+  deckSplitParameterProblem,
   jlptLevelsFromTags,
   planDeckSplit,
   sanitizeDeckSegment,
   type DeckSplitInput,
 } from '../ankiDeckSplit';
+import { planChangeTray, type TrayAction } from '../ankiChangeTray';
+import {
+  createEditJournal,
+  redoLastEdit,
+  undoLastEdit,
+  noteIsEdited,
+} from '../ankiDraftEdit';
+import { emptyVocabContext, type VocabContext, type VocabNoteFacts } from '../ankiVocabContext';
 import type {
+  AnkiDraft,
   AnkiDraftCard,
   AnkiDraftDeck,
   AnkiDraftNote,
@@ -473,5 +483,210 @@ describe('planDeckSplit — the source and mastery axes', () => {
       }),
     );
     expect(plan.targets[0].name).toBe('Japanese::既知');
+  });
+});
+
+// ----- the tray action ----------------------------------------------------------
+
+function draftWith(
+  decks: AnkiDraftDeck[],
+  notes: AnkiDraftNote[],
+  cards: AnkiDraftCard[],
+  noteTypes: AnkiDraftNoteType[] = [noteType('nt1', 'Basic')],
+): AnkiDraft {
+  return {
+    source: { kind: 'apkg', label: 'test', plainText: false, createdAtSec: 0 },
+    decks,
+    noteTypes,
+    notes,
+    cards,
+    reviews: [],
+    diagnostics: [],
+    counts: {
+      decks: decks.length,
+      noteTypes: noteTypes.length,
+      notes: notes.length,
+      cards: cards.length,
+      reviews: 0,
+    },
+  } as unknown as AnkiDraft;
+}
+
+function vocabWith(facts: Record<string, Partial<VocabNoteFacts>>): VocabContext {
+  const byNote = new Map<string, VocabNoteFacts>();
+  for (const [noteId, over] of Object.entries(facts)) {
+    byNote.set(noteId, {
+      noteId,
+      field: 'Expression',
+      term: null,
+      rank: null,
+      known: { local: null, anki: null },
+      ...over,
+    });
+  }
+  return { ...emptyVocabContext(), byNote };
+}
+
+const SPLIT: TrayAction = {
+  id: 'a1',
+  enabled: true,
+  kind: 'split-deck',
+  axis: 'jlpt',
+  parentDeckId: '1',
+  unmatched: 'leave',
+};
+
+describe('deckSplitParameterProblem', () => {
+  it('is the same verdict planDeckSplit reaches, so the two cannot drift', () => {
+    const decks = [deck('1', 'Japanese'), deck('f', 'Custom', true)];
+    const params = { axis: 'jlpt' as const, parentDeckId: 'f', unmatched: 'leave' as const };
+    expect(deckSplitParameterProblem(decks, params)).toBe('parent-filtered');
+    expect(planDeckSplit(input({ decks, ...params, noteIds: ['n1'] })).problem).toBe(
+      'parent-filtered',
+    );
+  });
+});
+
+describe('planChangeTray — split-deck', () => {
+  const decks = [deck('1', 'Japanese')];
+  const notes = [note('n1', ['JLPT::N5']), note('n2', ['JLPT::N3']), note('n3', [])];
+  const cards = [card('c1', 'n1', '1'), card('c2', 'n2', '1'), card('c3', 'n3', '1')];
+  const draft = draftWith(decks, notes, cards);
+
+  it('creates the subdecks, moves the cards and nests the new decks under the parent', () => {
+    const plan = planChangeTray(draft, createEditJournal(), ['n1', 'n2', 'n3'], [SPLIT]);
+    expect(plan.blocked).toBe(false);
+    expect(plan.draft.decks.map((d) => d.name)).toEqual([
+      'Japanese',
+      'Japanese::N5',
+      'Japanese::N3',
+    ]);
+    expect(plan.draft.decks[1].parentId).toBe('1');
+    expect(plan.draft.decks[1].path).toEqual(['Japanese', 'N5']);
+    const deckByCard = new Map(plan.draft.cards.map((c) => [c.id, c.deckId]));
+    expect(deckByCard.get('c1')).toBe('split:1:N5');
+    expect(deckByCard.get('c2')).toBe('split:1:N3');
+    // No JLPT tag and `leave`: this card does not move.
+    expect(deckByCard.get('c3')).toBe('1');
+    expect(plan.changedCards).toBe(2);
+    expect(plan.changedNotes).toBe(0);
+    expect(plan.deckSplit?.targets).toHaveLength(2);
+  });
+
+  it('gives a new subdeck the parent’s options preset rather than the default', () => {
+    const withConf = draftWith([{ ...deck('1', 'Japanese'), configId: '7' }], notes, cards);
+    const plan = planChangeTray(withConf, createEditJournal(), ['n1'], [SPLIT]);
+    expect(plan.draft.decks[1].configId).toBe('7');
+  });
+
+  it('reports what moved, what had no level and what it refused, by code', () => {
+    const plan = planChangeTray(
+      draftWith(
+        [deck('1', 'Japanese'), deck('9', 'Other')],
+        [...notes, note('n4', ['JLPT::N5', 'JLPT::N1'])],
+        [...cards, card('c4', 'n4', '1'), card('c9', 'n1', '9', { ord: 1 })],
+      ),
+      createEditJournal(),
+      ['n1', 'n2', 'n3', 'n4'],
+      [SPLIT],
+    );
+    const byCode = new Map(plan.problems.map((p) => [p.code, p]));
+    expect(byCode.get('split-moved')?.count).toBe(2);
+    expect(byCode.get('split-moved')?.detail).toBe('Japanese::N5');
+    expect(byCode.get('split-unmatched')?.count).toBe(1);
+    expect(byCode.get('split-unmatched')?.severity).toBe('info');
+    expect(byCode.get('split-ambiguous')?.count).toBe(1);
+    expect(byCode.get('split-outside-parent')?.count).toBe(1);
+    expect(byCode.get('split-outside-parent')?.severity).toBe('warning');
+  });
+
+  it('says so when it moved nothing, instead of an outcome row of zero', () => {
+    const plan = planChangeTray(
+      draftWith([deck('1', 'Japanese')], [note('n3', [])], [card('c3', 'n3', '1')]),
+      createEditJournal(),
+      ['n3'],
+      [SPLIT],
+    );
+    expect(plan.problems.find((p) => p.code === 'split-clean')?.count).toBe(1);
+    expect(plan.changedCards).toBe(0);
+  });
+
+  it('sees a tag an earlier action in the same tray wrote', () => {
+    const tray: TrayAction[] = [
+      { id: 'a0', enabled: true, kind: 'add-tags', tags: ['JLPT::N4'] },
+      SPLIT,
+    ];
+    const plan = planChangeTray(
+      draftWith([deck('1', 'Japanese')], [note('n3', [])], [card('c3', 'n3', '1')]),
+      createEditJournal(),
+      ['n3'],
+      tray,
+    );
+    expect(plan.draft.decks.map((d) => d.name)).toEqual(['Japanese', 'Japanese::N4']);
+    expect(plan.draft.cards[0].deckId).toBe('split:1:N4');
+  });
+
+  it('undoes every move as one step and redoes it, leaving the empty deck behind', () => {
+    const plan = planChangeTray(draft, createEditJournal(), ['n1', 'n2'], [SPLIT]);
+    expect(noteIsEdited(plan.journal, 'n1')).toBe(true);
+    const undone = undoLastEdit(plan.draft, plan.journal, (s) => s);
+    expect(undone.changed).toBe(true);
+    expect(undone.draft.cards.map((c) => c.deckId)).toEqual(['1', '1', '1']);
+    // The created decks stay; a delete is what this op deliberately cannot undo.
+    expect(undone.draft.decks).toHaveLength(3);
+    expect(undone.journal.done).toHaveLength(0);
+
+    const redone = redoLastEdit(undone.draft, undone.journal, (s) => s);
+    expect(redone.draft.cards.map((c) => c.deckId)).toEqual(['split:1:N5', 'split:1:N3', '1']);
+  });
+
+  it('refuses the whole tray, changing nothing, when the split cannot run', () => {
+    const bad: TrayAction = { ...SPLIT, parentDeckId: 'nope' };
+    const plan = planChangeTray(draft, createEditJournal(), ['n1'], [bad]);
+    expect(plan.blocked).toBe(true);
+    expect(plan.draft).toBe(draft);
+    const refused = plan.problems.find((p) => p.code === 'split-refused');
+    expect(refused?.severity).toBe('blocking');
+    expect(refused?.detail).toBe('no-such-parent');
+  });
+
+  it('refuses a frequency or mastery split with no vocabulary context', () => {
+    const freq: TrayAction = { ...SPLIT, axis: 'frequency', bands: [1000] };
+    const plan = planChangeTray(draft, createEditJournal(), ['n1'], [freq]);
+    expect(plan.blocked).toBe(true);
+    expect(plan.problems.some((p) => p.code === 'no-vocab-context')).toBe(true);
+  });
+
+  it('splits by frequency band from the supplied context', () => {
+    const freq: TrayAction = { ...SPLIT, axis: 'frequency', bands: [1000] };
+    const plan = planChangeTray(draft, createEditJournal(), ['n1', 'n2', 'n3'], [freq], {
+      split: { vocab: vocabWith({ n1: { rank: 5 }, n2: { rank: 9000 } }) },
+    });
+    expect(plan.draft.decks.map((d) => d.name)).toEqual([
+      'Japanese',
+      'Japanese::1-1000',
+      'Japanese::1001+',
+    ]);
+    expect(plan.problems.find((p) => p.code === 'split-unmatched')?.count).toBe(1);
+  });
+
+  it('splits by mastery using the stored level for each note’s own word', () => {
+    const mastery: TrayAction = { ...SPLIT, axis: 'mastery' };
+    const plan = planChangeTray(draft, createEditJournal(), ['n1', 'n2', 'n3'], [mastery], {
+      split: {
+        vocab: vocabWith({ n1: { term: '猫' }, n2: { term: '犬' }, n3: { term: '鳥' } }),
+        levels: new Map([
+          ['猫', 3],
+          ['犬', 1],
+        ]),
+      },
+    });
+    expect(plan.draft.decks.map((d) => d.name)).toEqual([
+      'Japanese',
+      'Japanese::Learning',
+      'Japanese::Known',
+    ]);
+    // 鳥 has never been judged, which is not level 0.
+    expect(plan.deckSplit?.unmatchedNoteIds).toEqual(['n3']);
   });
 });

@@ -9580,6 +9580,12 @@ export const en: Catalog = {
   'ankiWorkbench.tray.deckNormalize.trim-separators': 'repair :: paths',
   'ankiWorkbench.tray.deckNormalize.ascii-width': 'full-width ASCII to half-width',
   'ankiWorkbench.tray.deckNormalize.unify-case': 'match the spelling this collection uses most',
+  'ankiWorkbench.tray.describe.split-deck': 'Split this deck by {axis}',
+  'ankiWorkbench.tray.split.axis.jlpt': 'JLPT level',
+  'ankiWorkbench.tray.split.axis.frequency': 'frequency band',
+  'ankiWorkbench.tray.split.axis.source': 'source note type',
+  'ankiWorkbench.tray.split.axis.mastery': 'mastery',
+  'ankiWorkbench.review.cardDeckMoves': '{count} card(s) moved to another deck',
   'ankiWorkbench.tray.problem.deck-normalize-renamed':
     '{count} decks change name, for example {detail}. No card changes deck.',
   'ankiWorkbench.tray.problem.deck-normalize-merge-refused':

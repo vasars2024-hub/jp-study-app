@@ -521,6 +521,12 @@ export default function DeckWorkbenchTray({
         return { id, enabled: true, kind, ops: [...tagOps] };
       case 'normalize-decks':
         return { id, enabled: true, kind, ops: [...deckOps] };
+      case 'split-deck':
+        // Recipe 13 is queued from its own panel, which owns the axis, the
+        // parent deck and the band edges. It is not in `ACTION_KINDS`, so this
+        // arm exists to keep the switch exhaustive rather than to be reached —
+        // and it builds a *refusable* action rather than a plausible wrong one.
+        return { id, enabled: true, kind, axis: 'jlpt', parentDeckId: '', unmatched: 'leave' };
       case 'normalize-text':
         return {
           id,
@@ -615,6 +621,10 @@ export default function DeckWorkbenchTray({
           ops: TAG_NORMALIZE_ORDER.filter((op) => action.ops.includes(op))
             .map((op) => t(`ankiWorkbench.tray.tagNormalize.${op}`))
             .join(', '),
+        });
+      case 'split-deck':
+        return t('ankiWorkbench.tray.describe.split-deck', {
+          axis: t(`ankiWorkbench.tray.split.axis.${action.axis}`),
         });
       default:
         return t(`ankiWorkbench.tray.describe.${action.kind}`, { tags: action.tags.join(' ') });

@@ -22,7 +22,7 @@ export interface ReviewDiffLine {
   noteId: string;
   /** What the user calls the note: its first non-empty field, normalized. */
   noteLabel: string;
-  kind: 'field' | 'tags' | 'card-due';
+  kind: 'field' | 'tags' | 'card-due' | 'card-deck';
   /** Set for `field` lines. Named, never numbered. */
   fieldName?: string;
   /** Display strings: raw bytes for a field, joined tags, a queue position. */
@@ -43,6 +43,13 @@ export interface WorkbenchReviewSummary {
   tagNotes: number;
   /** New cards whose queue position netted out different. */
   cardMoves: number;
+  /**
+   * Cards recipe 13's split refiled into another deck. Counted apart from
+   * `cardMoves`, which is a *queue position* despite its name: one changes
+   * `cards.due` and the other `cards.did`, and one number for both would let a
+   * split read as a reposition in the only place the user reviews it.
+   */
+  cardDeckMoves: number;
   /**
    * Decks whose name netted out different. Counted apart from `changedNotes`
    * because a rename touches no note: a deck-only session would otherwise
@@ -78,7 +85,7 @@ function sameTags(a: readonly string[], b: readonly string[]): boolean {
 /** One value the journal touched, with the original it started from. */
 interface Tracked {
   noteId: string;
-  kind: 'field' | 'tags' | 'card-due';
+  kind: 'field' | 'tags' | 'card-due' | 'card-deck';
   fieldOrd?: number;
   cardId?: string;
   firstBefore: string | string[] | number;
@@ -108,7 +115,9 @@ export function buildWorkbenchReview(
         ? `f:${op.noteId}:${op.fieldOrd}`
         : op.kind === 'tags'
           ? `t:${op.noteId}`
-          : `c:${op.cardId}`;
+          // The kind is part of the key: a split and a reposition of the same
+          // card are two net changes, not one folding into the other.
+          : `c:${op.kind}:${op.cardId}`;
     // An ungrouped op is its own step, exactly as `trailingStep` counts it.
     const writer = op.group ?? `single:${i}`;
     const entry = tracked.get(key);
@@ -120,7 +129,7 @@ export function buildWorkbenchReview(
       noteId: op.noteId,
       kind: op.kind,
       fieldOrd: op.kind === 'field' ? op.fieldOrd : undefined,
-      cardId: op.kind === 'card-due' ? op.cardId : undefined,
+      cardId: op.kind === 'card-due' || op.kind === 'card-deck' ? op.cardId : undefined,
       firstBefore: op.before,
       writers: new Set([writer]),
     });
@@ -128,6 +137,7 @@ export function buildWorkbenchReview(
 
   const noteById = new Map<string, AnkiDraftNote>(draft.notes.map((n) => [n.id, n]));
   const cardById = new Map<string, AnkiDraftCard>(draft.cards.map((c) => [c.id, c]));
+  const deckNameById = new Map<string, string>(draft.decks.map((d) => [d.id, d.name]));
 
   const changedNoteIds = new Set<string>();
   const touchedNoteIds = new Set<string>();
@@ -135,6 +145,7 @@ export function buildWorkbenchReview(
   const fieldNotes = new Map<string, Set<string>>();
   const diffs: ReviewDiffLine[] = [];
   let cardMoves = 0;
+  let cardDeckMoves = 0;
   let overwrites = 0;
   let totalDiffs = 0;
 
@@ -171,6 +182,19 @@ export function buildWorkbenchReview(
         after: note.tags.join(' '),
         overwritten: entry.writers.size > 1,
       };
+    } else if (entry.kind === 'card-deck') {
+      const card = entry.cardId ? cardById.get(entry.cardId) : undefined;
+      if (!card || card.deckId === entry.firstBefore) continue;
+      cardDeckMoves += 1;
+      line = {
+        noteId: entry.noteId,
+        noteLabel: noteLabel(note, entry.noteId),
+        kind: 'card-deck',
+        // Deck *names*, not ids: an id is not a thing the user can check.
+        before: deckNameById.get(String(entry.firstBefore)) ?? String(entry.firstBefore),
+        after: deckNameById.get(card.deckId) ?? card.deckId,
+        overwritten: entry.writers.size > 1,
+      };
     } else {
       const card = entry.cardId ? cardById.get(entry.cardId) : undefined;
       if (!card || card.due === entry.firstBefore) continue;
@@ -205,6 +229,7 @@ export function buildWorkbenchReview(
     revertedNotes: [...touchedNoteIds].filter((id) => !changedNoteIds.has(id)).length,
     tagNotes: tagNoteIds.size,
     cardMoves,
+    cardDeckMoves,
     deckRenames,
     fieldCounts: [...fieldNotes.entries()].map(([name, ids]) => ({ name, notes: ids.size })),
     overwrites,
