@@ -22649,3 +22649,60 @@ is exactly this turn's two test files. `i18n-check` exit 0 at **9,991** keys (+2
 languages). `architecture-audit` exit 0, **Nothing new**, 1,960 modules, 19 findings, 2 pending.
 `eslint` **0** on all 10 lintable touched paths; the 11th is `deckWorkbench.css`, and eslint
 fails to parse *every* `.css` file in this repo — pre-existing, not a gate.
+
+## 2026-08-16 04:00 — `primary` — Track 7 gate 2: a translation, and the destination that would have eaten its source
+
+Boss audit re-derived, not trusted: 18:00's four findings still closed —
+`scheduleDrain` re-arm at `transcriptionJobs.ts:744`, `media-not-rendered` at
+`ankiTemplateRender.ts:603`, findings 3/4 as recorded. Nothing owed.
+
+**`c30a020` — `shared/ankiTranslate.ts`, the request half.** The decision: a translation
+reuses gate 12's review rather than getting its own. `AiBatch.kind` widens to
+`AiBatchKind`, and a `translate-field` batch flows through `approveAiVariant` into the
+existing `apply-ai-additions` write. Tradeoff: `AiNoteGeneration.term` now means "the
+word" *or* "the source text" — paid deliberately, because a second review module is a
+second place for "a proposal is not a value" to stop being true. Four refusals it
+encodes: a **cloze source is skipped, never sent** (a moved `{{c1::}}` marker silently
+changes which cards Anki generates); `[sound:…]` stripped before sending; **destination
+== source blocks** (`same-field`), because the tray has an `overwrite` rule and recipe 2
+requires retention; an **echo of the source is dropped**, so an untranslated note is a
+retryable failure rather than a generated-content marker over the original.
+
+**`16c8990` — the loop.** `runChunked` extracted; `runAiAdditions` and `runTranslateField`
+both call it. `anki:aiTranslateField` shares gate 12's cancel registry and its
+`anki:aiAdditionsProgress` channel — both are keyed by batch id, so one stop button is
+the honest UI and the renderer needed no new progress plumbing. Chunk 6 vs additions' 8.
+
+**`fb54fff` — the surface.** One panel, two questions: the mode switch changes the form,
+the disclosure's sentences and which IPC call runs. The disclosure names the field **by
+name** and counts the characters exactly (gate 12 could say "term"/"gloss"; a translation
+sends whole fields), and counts the notes it will *not* ask about *before* the run.
+`aiNotes` is now unfiltered — a note with no declared word still has a field worth
+translating.
+
+**Live, real 3,221-note deck, real provider, in-memory drafts only — nothing persisted.**
+Negative control first: before the main restart the bridge returned **`No handler
+registered for 'anki:aiTranslateField'`** while `typeof window.api.ankiAiTranslateField`
+was already `"function"` — preload reloads, main does not. After the restart (pid 34048):
+`Sentence` → `Meaning`, ru. Disclosure on 3 notes: gemini / gemini-2.5-flash, **1 request,
+165 input tokens, cost `not-known`** (no price entered — never `$0.00`).
+Run: **3 requested, 3 answered, 3 ok, 3,461 ms**, summary `undecided: 3` — proposals, none
+written. Approve all 3 → **`blocked:false`, `changedNotes:3`, 0 problems**;
+**source `Sentence` byte-identical on 3 of 3** and `Meaning` `""` →
+`<span class="jp-ai-gen" data-jp-ai="…">Поверят ли детективы…`.
+Cancel: **30 requested → 12 answered / 12 ok / 18 cancelled / 0 failed / 0 pending** —
+the two paid-for chunks survived, the remaining three were never sent.
+
+**Trap: a cancel only lands on a chunk boundary.** At 12 notes (2 chunks) the same probe
+returned `cancelled:true` with **12 of 12 answered** — the cancel round-tripped after the
+last chunk had started. That is honest, not broken; a live cancel demonstration needs
+≥3 chunks. **Trap 2:** `stage-head-insert.cjs` writes only the index, so keys staged that
+way are invisible to vitest, the app and `i18n-check` — the new
+`debug/apply-spec-worktree.cjs` applies the same spec to the working tree.
+
+**Gates**, once after the last slice, shared working tree. `vitest` **669 files passed /
+1 skipped of 672, 9,037 passed / 23 skipped, 1 failed** — the failures are
+`readingLensI18n` (10 s `beforeAll`) and `mediaSurfaceImportGraph` (51 s), the known
+load-dependent flakes; **both pass alone in 5.14 s**, neither imports anything I touched.
+`i18n-check` exit 0 at **10,010** keys (+18 × 4 languages). `architecture-audit` exit 0,
+**Nothing new**, 19 findings, 2 pending. `eslint` **0** on all 8 touched paths.

@@ -271,7 +271,8 @@ Partial failure must identify exactly what committed, what failed, and what can 
 - Shipped: mastery mappings — `shared/ankiMastery.ts` and the `set-mastery` tray kind. Gate 3's exclusion ("no 'known'/'good'/'very good' label whose actual scheduling effect is hidden") is enforced by the *type*: `masteryEffect()` returns `ankiSchedulingChanged: false` and `ankiCardsRescheduled: 0` as literals, so an action that ever reaches Anki's scheduler stops compiling rather than starting to lie, and the effect panel renders that line whether or not it is zero. The word is the unit, not the note; "never judged" stays distinct from level 0 for undo while counting as the same state for the changed-test; the plan rides on `TrayPlan.mastery` rather than the draft, because knowledge is keyed by lemma and outlives the deck. Applying and undoing are stacked under the tray's own group id, so one tray is one undo across both stores.
 - **Gate 3's mastery half live, real 3,221-note deck, real store (2026-08-16):** 60 selected, 59 declare a word, **57 terms move**, 2 held a phrase, 1 declared none. Negative control — 刑事 present in the changes before, absent after one write put it at the target, **57 to 56, delta exactly 1**. Forward **57/57 verified at level 3**, replanning then moved **0**, the inverse restored **0 entries**. Planning with no vocabulary context refuses with `no-vocab-context` and returns no plan. Gate 3's *frequency* half remains blocked on data: `freq_corpora` is still empty.
 - Two defects found by that run and fixed with it: `Apply`/`Undo`/`Redo` were gated on `changedNotes`/`journal.done` alone, so all three were dead on a mastery-only tray; and `extractVocabTerm` splits on whitespace, which Japanese lacks, so `今日はいい天気です` cleared its 16-character cap and arrived as a "word". Harmless for `freq:`/`known:`, which only read — **still true of them today** — but not for a write into the lemma-keyed store every mining filter consults, so `MASTERY_MAX_TERM_CHARS` is tighter and declined notes are reported as `mastery-phrase`.
-- Next in this phase: card-design presets (gate 13's reverse/optional-reverse half). Gate 11's remaining half is **export/reimport provenance**, which is blocked on Phase 6: `src/main/anki/` has `apkgImport.ts` and no exporter, so the round trip cannot be run yet.
+- Shipped: field translation (gate 2) — `shared/ankiTranslate.ts` (request, disclosure, the four refusals), `anki:aiTranslateField` sharing gate 12's cancel registry and progress channel, and a translate mode in `DeckWorkbenchAiPanel`. The review is gate 12's `AiBatch`, widened to `AiBatchKind`; the write is the existing `apply-ai-additions` action.
+- Next in this phase: **the first ten smart recipes** (list at "Smart recipes", items 1–10) — 1, 3, 4, 5 and 14 are already covered by the shipped swap/known/frequency/mastery/enrich actions, so the open ones are 2 (done, gate 2), 6 (prioritize high-frequency unknowns without touching known cards), 7 (fill readings/furigana with a confidence threshold), 8 (wrong-language/script detection), 9 (duplicate detection with a canonical proposal) and 10 (leech rescue). Gate 11's remaining half is **export/reimport provenance**, which is blocked on Phase 6: `src/main/anki/` has `apkgImport.ts` and no exporter, so the round trip cannot be run yet.
 
 ### Phase 5 — Anki core editing parity
 
@@ -296,6 +297,17 @@ This slice is complete only when all of these can be shown with real data and no
 
 1. Import a representative APKG, inspect every preserved/unsupported feature, swap front/back, export a new package, reimport it, and match the approved diff.
 2. Translate a Back field to Russian or Japanese into a selected destination field, preview individual diffs and provider implications, cancel safely, then apply and verify.
+
+    **Closed 2026-08-16** (`c30a020`, `16c8990`, `fb54fff`). `shared/ankiTranslate.ts` is the request
+    half only: the review, the cancel and the write are gate 12's and are reused, so a translation is
+    an `AiBatch` of kind `translate-field` that the existing `apply-ai-additions` action writes.
+    Recipe 2's "while retaining the original" is enforced as a blocking `same-field` problem, not as
+    advice — the tray has an `overwrite` conflict rule. On the real 3,221-note deck, `Sentence` →
+    `Meaning` into Russian: **3 requested, 3 answered, 3 ok in 3,461 ms**, disclosure **1 request /
+    165 input tokens / cost `not-known`**; approving all three gave **`changedNotes: 3`, 0 problems**,
+    the source field **byte-identical on 3 of 3**, and the destination carrying the
+    `jp-ai-gen` marker. Cancel: **30 requested → 12 answered, 18 cancelled, 0 failed**. A cloze
+    source is skipped rather than translated, and an echo of the source is a retryable failure.
 3. Filter `frequency rank <= 5,000` plus `unknown`, explain that this means the most frequent 5,000 words, map the results to `Very good`, and show the exact mastery/scheduling effects before commit.
 4. Exclude words known locally, known in Anki, or both; resolve a deliberately conflicting item according to the selected precedence.
 5. Batch-edit tags, flags, deck, suspension, due date, interval/ease or a supported scheduling preset, then reread Anki and prove the resulting state.
