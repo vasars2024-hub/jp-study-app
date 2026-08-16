@@ -23924,3 +23924,47 @@ gated on it is invisible until the owning process dies. Do not "fix" that — a 
 turns `reading` into `interrupted`, and that is the whole recovery contract.
 
 **Next:** Phase 7's remaining recipes without a tray action kind: **11, 14, 17–20, 26**.
+
+## 2026-08-16 — Track 7 / Phase 7: gate 10 closes, and no human was needed after all
+
+**Slice.** Gate 10's last remainder — step 7's **package-branch** text — measured live.
+No code change; this is the measurement half. Plan updated in the same commit.
+
+**The finding.** The remainder was parked as *attended* for a day on a premise that
+`865f84e2` had already retired: reaching an .apkg draft in the workbench needs the native
+open dialog. It does not. A draft session marked `failed` is `resumable`
+(`ankiDraftSession.ts:355` — `interrupted` OR `failed`), and the Resume button in
+"Unfinished reads" reads the package **by session id, with no path and no dialog**. That
+is the whole walk. `ankiDraftSessionFail` is the shipped channel for a read whose process
+died, so this is a product path, not a test hook.
+
+**Live, `r13-split.apkg` (7,992 notes), through the real UI.** Session
+`apkg-msw0afg9-slef3x` minted at page 1, failed, and the panel rendered
+"Failed — r13-split.apkg / 500 of 7,992 notes read / **Resume from note 500**". Resume
+adopted the package: step 1 "r13-split.apkg — 7,992 notes". Step 7's package branch, empty
+draft: "Export writes a new package. The original file is never modified." + a **disabled**
+"Export a new package…" and "The session adds up to no changes — there is nothing to
+export." With a real change set (enrich → MainDefinition, overwrite, first-source, inline —
+tray planned **495 of 500** notes, applied as **1 step over 495 notes**): "**495 notes will
+be written with their new content**" and the export button **enabled**.
+Measurements: **0** raw i18n keys · contrast **6.08–16.02** at 13–14 px (245,245,247 and
+127,160,142 on 18,28,23) · all controls **35 px** tall, `tabIndex 0` · `reduce-motion`
+transition **0.14s → 1e-06s**, class restored.
+
+**`ja` walk** (persist + reload; `debug/g10-walk-pkg.js`): same branch, **0** raw keys,
+`<html lang>` `ja`, 「書き出しは新しいパッケージを作成します。元のファイルは変更されません。」 and
+「新しいパッケージを書き出す…」, resume label 「ノート 1,000 から再開」. Its enrichment had not
+resolved inside the walk's 20 s budget, so `ja` rendered the *no-changes* sentence rather
+than the count line; the count line is the branch-independent change summary and its
+ja/zh/ru entries are covered by `i18n-check` exit 0. zh/ru were not walked — one non-English
+walk proves the component calls `t()`; catalogue completeness is a gate, not a walk.
+
+**Traps.** (1) The language script threw mid-walk and **never ran its restore**, leaving the
+app in `ja`; the original was recovered as `en` by inference, not from a stored value. Fixed:
+it now writes the pre-run value to `debug/g10-step7-pkg-lang.orig.txt` **before** switching
+and restores in a `finally`. Restored and asserted `=== 'en'`. (2) Enriching 500 notes blocks
+the bridge past its 30 s timeout — twice. A timed-out `/eval` here is not a failure; poll the
+page instead. That block is a real performance finding, measured next.
+
+**Next:** gate 11's UI half — the inspector's "Written from:" line over the reimported
+`gate11-provenance.apkg`, entered the same dialog-free way.
