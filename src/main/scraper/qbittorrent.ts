@@ -21,6 +21,11 @@ import type {
 import type {
   ScraperQbitAuthMode,
   ScraperQbittorrentSettings,
+  ScraperSettingsIssue,
+} from '../../shared/scraperSourceSettings';
+import {
+  DEFAULT_SCRAPER_QBITTORRENT_SETTINGS,
+  validateScraperQbittorrentSettings,
 } from '../../shared/scraperSourceSettings';
 import type { ScraperQbitInput, ScraperQbitSendInput } from '../../shared/scraperIpc';
 import { getScraperSecret } from './credentials';
@@ -48,6 +53,37 @@ function sessionCookie(base: string, mode: ScraperQbitAuthMode): string {
     return '';
   }
   return held.cookie;
+}
+
+/**
+ * The config as it crosses IPC is renderer-supplied and typed, not proven.
+ *
+ * A payload missing fields used to reach `qbitBaseUrl` intact and produce
+ * `undefined://undefined:undefined/undefined` in a user-facing message, and
+ * `buildAddForm` read `.tags.length` off a config without `tags` and rejected
+ * across IPC with a raw TypeError. Both are the same gap, so both are closed at
+ * the same place: every entry point runs the payload through the very validator
+ * persistence already uses, which is total and a fixed point on its own output —
+ * a real saved profile passes through unchanged.
+ */
+export function normalizeQbitInput<T extends ScraperQbitInput>(input: T): T {
+  const source: unknown = input && typeof input === 'object' ? input : {};
+  const issues: ScraperSettingsIssue[] = [];
+  const config = validateScraperQbittorrentSettings(
+    (source as ScraperQbitInput).config,
+    DEFAULT_SCRAPER_QBITTORRENT_SETTINGS,
+    issues,
+    'qbittorrent',
+  );
+  if (issues.length) {
+    scraperLog(
+      'warn',
+      'qbit',
+      `Repaired ${issues.length} bad field(s) in the qBittorrent settings: `
+        + issues.map((issue) => issue.path).join(', '),
+    );
+  }
+  return { ...(source as T), config };
 }
 
 export function qbitBaseUrl(config: ScraperQbittorrentSettings): string {
@@ -386,7 +422,8 @@ async function authed(
   }
 }
 
-export async function qbitTest(input: ScraperQbitInput): Promise<QbitStatusReport> {
+export async function qbitTest(rawInput: ScraperQbitInput): Promise<QbitStatusReport> {
+  const input = normalizeQbitInput(rawInput);
   const { config } = input;
   if (!config.enabled) {
     return {
@@ -456,7 +493,8 @@ export async function qbitTest(input: ScraperQbitInput): Promise<QbitStatusRepor
   };
 }
 
-export async function qbitTransfers(input: ScraperQbitInput): Promise<QbitTransferRow[]> {
+export async function qbitTransfers(rawInput: ScraperQbitInput): Promise<QbitTransferRow[]> {
+  const input = normalizeQbitInput(rawInput);
   if (!input.config.enabled) return [];
   const response = await authed(input, '/api/v2/torrents/info');
   if ('error' in response) {
@@ -623,8 +661,34 @@ async function presentHashes(input: ScraperQbitInput): Promise<Set<string>> {
   return new Set(transfers.map((row) => row.hash.toLowerCase()).filter(Boolean));
 }
 
-export async function qbitSend(input: ScraperQbitSendInput): Promise<QbitSendReport> {
-  const rows: TorrentRow[] = Array.isArray(input.rows) ? input.rows : [];
+/**
+ * The signature promises a report, so an unexpected throw must become one.
+ *
+ * A rejection here crosses IPC as a raw main-process stack the dialog cannot
+ * read, and the user is told nothing about the rows they selected. Failing every
+ * row with the message is the honest answer: nothing was confirmed sent.
+ */
+export async function qbitSend(rawInput: ScraperQbitSendInput): Promise<QbitSendReport> {
+  const input = normalizeQbitInput(rawInput);
+  const rows: TorrentRow[] = Array.isArray(rawInput.rows) ? rawInput.rows : [];
+  try {
+    return await sendToQbit(input, rows);
+  } catch (error) {
+    const reason = `qBittorrent send failed: ${error instanceof Error ? error.message : String(error)}`;
+    scraperLog('error', 'qbit', reason);
+    return {
+      sent: 0,
+      skipped: 0,
+      failed: rows.length,
+      details: rows.map((row) => ({ name: row.name, outcome: 'failed' as const, reason })),
+    };
+  }
+}
+
+async function sendToQbit(
+  input: ScraperQbitSendInput,
+  rows: TorrentRow[],
+): Promise<QbitSendReport> {
   const details: QbitSendReport['details'] = [];
 
   if (!input.config.enabled) {

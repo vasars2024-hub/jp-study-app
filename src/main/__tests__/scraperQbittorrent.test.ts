@@ -32,7 +32,7 @@ vi.mock('electron', () => ({
 
 let encryptionAvailable = true;
 
-const { addFailureReason, buildAddForm, magnetInfoHash, mapQbitState, mapTransfer, parseAddOutcome, qbitBaseUrl, qbitSend, qbitTest, qbitTransfers, resetQbitSessions } =
+const { addFailureReason, buildAddForm, magnetInfoHash, mapQbitState, mapTransfer, normalizeQbitInput, parseAddOutcome, qbitBaseUrl, qbitSend, qbitTest, qbitTransfers, resetQbitSessions } =
   await import('../scraper/qbittorrent');
 
 /** Two real-shaped 40-hex infohashes: one the stand-in holds, one it does not. */
@@ -747,6 +747,92 @@ describe('magnetInfoHash', () => {
     expect(magnetInfoHash('magnet:?xt=urn:btih:MFRGGZDFMZTWQ2LKNNWG23TP')).toBe('');
     expect(magnetInfoHash('magnet:?xt=urn:btih:aa11bb22')).toBe('');
     expect(magnetInfoHash('')).toBe('');
+  });
+});
+
+// ---- a malformed config crossing IPC ------------------------------------
+//
+// The renderer is typed but not trusted: `ScraperQbitInput` arrives over IPC,
+// so a hand-crafted or old payload can be missing any field. Boss audit
+// 2026-08-16 18:20 found two ways that used to surface, and both are here.
+
+describe('a config that is missing fields', () => {
+  it('leaves a real saved profile byte-identical — normalisation is a fixed point', () => {
+    const normalized = normalizeQbitInput({ config });
+    expect(normalized.config).toEqual(config);
+    // and it is idempotent, so the internal re-entry through qbitTransfers cannot drift
+    expect(normalizeQbitInput(normalized).config).toEqual(config);
+  });
+
+  it('carries the rest of the input through untouched', () => {
+    const rows = [row()];
+    const normalized = normalizeQbitInput({ config, rows, password: 'in-memory' });
+    expect(normalized.rows).toBe(rows);
+    expect(normalized.password).toBe('in-memory');
+  });
+
+  it('builds a real base URL from `{}` instead of four undefined tokens', () => {
+    // Finding 1: an unvalidated config reached `qbitBaseUrl` and the failure was
+    // reported to the user as
+    // "Not a usable URL: undefined://undefined:undefinedundefined/api/v2/auth/login".
+    const url = qbitBaseUrl(normalizeQbitInput({ config: {} as ScraperQbittorrentSettings }).config);
+    expect(url).toBe('http://localhost:8080');
+    expect(url).not.toContain('undefined');
+  });
+
+  it('connects with `scheme`, `authMode` and `basePath` all absent', async () => {
+    // The same payload the finding used, minus every field the defaults can
+    // supply — this is the end-to-end half, and it really logs in.
+    const partial = {
+      enabled: true,
+      host: '127.0.0.1',
+      port: config.port,
+      username: GOOD_USER,
+      passwordRef: 'test/qbit',
+    } as ScraperQbittorrentSettings;
+    const report = await qbitTest({ config: partial });
+    expect(report.message).not.toContain('undefined');
+    expect(report.status).toBe('connected');
+  });
+
+  it('answers `not-configured` when the payload is empty', async () => {
+    const report = await qbitTest({ config: {} as ScraperQbittorrentSettings });
+    expect(report.status).toBe('not-configured');
+    expect(report.message).toBe('Sending to qBittorrent is turned off.');
+  });
+
+  it('returns an empty transfer list rather than throwing', async () => {
+    await expect(qbitTransfers({ config: {} as ScraperQbittorrentSettings })).resolves.toEqual([]);
+  });
+
+  it('sends successfully with no `tags` key at all', async () => {
+    // Finding 2: `buildAddForm` read `config.tags.length` and `qbitSend`
+    // rejected across IPC with a raw TypeError instead of a QbitSendReport.
+    const withoutTags = { ...config } as Record<string, unknown>;
+    delete withoutTags.tags;
+    const report = await qbitSend({
+      config: withoutTags as unknown as ScraperQbittorrentSettings,
+      rows: [row()],
+    });
+    expect(report.sent).toBe(1);
+    expect(report.failed).toBe(0);
+    expect(addBodies).toHaveLength(1);
+    expect(addBodies[0]).not.toContain('tags=');
+  });
+
+  it('turns an unexpected throw into a failed report, not a rejection', async () => {
+    // Any throw from below the entry point: the report is what the dialog reads.
+    const exploding = row();
+    Object.defineProperty(exploding, 'magnet', {
+      get() {
+        throw new Error('boom');
+      },
+    });
+    const report = await qbitSend({ config, rows: [exploding] });
+    expect(report.sent).toBe(0);
+    expect(report.failed).toBe(1);
+    expect(report.details[0].outcome).toBe('failed');
+    expect(report.details[0].reason).toBe('qBittorrent send failed: boom');
   });
 });
 
