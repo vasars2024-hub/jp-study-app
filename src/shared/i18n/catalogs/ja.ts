@@ -8801,6 +8801,8 @@ export const ja: Catalog = {
     '名前を変更したデッキの名前がソースファイルでは異なっています。何も書き込まれていません — 書き出す前にソースを読み直してください。',
   'ankiWorkbench.apply.error.deck-name-taken':
     'ソースファイル内の別のデッキが既にその名前を使っており、変更すると2つのデッキが統合されてしまいます。何も書き込まれていません。',
+  'ankiWorkbench.apply.error.deck-collation-unsupported':
+    'このパッケージはデッキ名をこのビルドでは扱えない文字規則で保存しているため、何も書き込まれていません。Ankiで「旧バージョンのAnkiをサポート」にチェックを入れて書き出し、その複製でデッキ名を変更してください。他の編集はこのパッケージから通常どおり書き出せます。',
   'ankiWorkbench.apply.error.compressed-unsupported':
     'このパッケージはまだ書き込みに対応していない新しい圧縮形式を使用しています。何も書き込まれていません。',
   'ankiWorkbench.apply.error.verify-failed':
@@ -9102,6 +9104,21 @@ export const ja: Catalog = {
   'ankiWorkbench.tray.problem.tag-normalize-removed':
     '重複または子タグが含む親タグとして、{count} 件のタグがノートから削除されます。そのノートだけが持つタグが失われることはありません。',
   'ankiWorkbench.tray.problem.tag-normalize-clean':
+  'ankiWorkbench.tray.kind.normalize-decks': 'デッキ名を整理',
+  'ankiWorkbench.tray.describe.normalize-decks': 'デッキ名を整理: {ops}',
+  'ankiWorkbench.tray.deckNormalize.scope':
+    'これは選択したノートではなく、下書き内のすべてのデッキに適用されます。カードのデッキは変わりません。',
+  'ankiWorkbench.tray.deckNormalize.trim-separators': ':: の区切りを修復',
+  'ankiWorkbench.tray.deckNormalize.ascii-width': '全角ASCIIを半角に',
+  'ankiWorkbench.tray.deckNormalize.unify-case': 'このコレクションで最も多い表記に合わせる',
+  'ankiWorkbench.tray.problem.deck-normalize-renamed':
+    '{count}個のデッキ名が変わります（例: {detail}）。カードのデッキは変わりません。',
+  'ankiWorkbench.tray.problem.deck-normalize-merge-refused':
+    '整理後の名前を既に別のデッキが使っているため、{count}個のデッキは名前を変えません（{detail}）。統合するとカードが移動するため、そのままにします。',
+  'ankiWorkbench.tray.problem.deck-normalize-filtered':
+    'フィルタードデッキ{count}個はそのままにします。カードは一時的に借りられており、Ankiが再構築するためです。',
+  'ankiWorkbench.tray.problem.deck-normalize-clean':
+    '整理するものはありません。{count}個のデッキはすべて表記が統一されています。',
     '整えるものはありません。選択した {count} 件のノートのタグはすでに統一されています。',
   'ankiWorkbench.tray.kind.enrich-dictionary': 'インストール済み辞書から補完',
   'ankiWorkbench.tray.describe.enrich-dictionary':

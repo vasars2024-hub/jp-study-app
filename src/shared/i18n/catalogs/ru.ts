@@ -9612,6 +9612,8 @@ export const ru: Catalog = {
     'У переименованной колоды в исходном файле другое имя. Ничего не записано — перечитайте источник перед экспортом.',
   'ankiWorkbench.apply.error.deck-name-taken':
     'Другая колода в исходном файле уже использует это имя, и переименование объединило бы две колоды. Ничего не записано.',
+  'ankiWorkbench.apply.error.deck-collation-unsupported':
+    'В этом пакете имена колод хранятся с текстовым правилом, которое эта сборка не поддерживает, поэтому ничего не записано. Экспортируйте колоду из Anki с галочкой «Поддержка старых версий Anki» и переименуйте колоды в той копии — остальные правки экспортируются из этого пакета как обычно.',
   'ankiWorkbench.apply.error.compressed-unsupported':
     'Пакет использует более новый сжатый формат, запись которого ещё не поддерживается. Ничего не записано.',
   'ankiWorkbench.apply.error.verify-failed':
@@ -9917,6 +9919,21 @@ export const ru: Catalog = {
   'ankiWorkbench.tray.problem.tag-normalize-removed':
     '{count} тегов будут убраны из заметок как дубликаты или подразумеваемые родительские. Ни одна заметка не потеряет тег, который есть только у неё.',
   'ankiWorkbench.tray.problem.tag-normalize-clean':
+  'ankiWorkbench.tray.kind.normalize-decks': 'Привести имена колод в порядок',
+  'ankiWorkbench.tray.describe.normalize-decks': 'Имена колод: {ops}',
+  'ankiWorkbench.tray.deckNormalize.scope':
+    'Это применяется ко всем колодам черновика, а не к выбранным заметкам. Ни одна карточка не меняет колоду.',
+  'ankiWorkbench.tray.deckNormalize.trim-separators': 'исправить пути ::',
+  'ankiWorkbench.tray.deckNormalize.ascii-width': 'полноширинный ASCII в обычный',
+  'ankiWorkbench.tray.deckNormalize.unify-case': 'привести к написанию, самому частому в этой коллекции',
+  'ankiWorkbench.tray.problem.deck-normalize-renamed':
+    '{count} колод меняют имя, например {detail}. Ни одна карточка не меняет колоду.',
+  'ankiWorkbench.tray.problem.deck-normalize-merge-refused':
+    '{count} колод сохраняют имя: приведённое имя уже занято другой колодой ({detail}). Их объединение переместило бы карточки, поэтому они оставлены как есть.',
+  'ankiWorkbench.tray.problem.deck-normalize-filtered':
+    '{count} фильтрованных колод оставлены как есть: их карточки взяты взаймы, и Anki пересобирает такие колоды.',
+  'ankiWorkbench.tray.problem.deck-normalize-clean':
+    'Приводить нечего: все {count} колод уже названы единообразно.',
     'Приводить в порядок нечего: у выбранных заметок ({count}) теги уже единообразны.',
   'ankiWorkbench.tray.kind.enrich-dictionary': 'Заполнить из установленных словарей',
   'ankiWorkbench.tray.describe.enrich-dictionary':

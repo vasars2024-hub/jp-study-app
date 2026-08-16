@@ -8751,6 +8751,8 @@ export const zh: Catalog = {
     '被重命名的牌组在来源文件中的名称不同。未写入任何内容 — 请先重新读取来源再导出。',
   'ankiWorkbench.apply.error.deck-name-taken':
     '来源文件中已有另一个牌组使用该名称，重命名会把两个牌组合并。未写入任何内容。',
+  'ankiWorkbench.apply.error.deck-collation-unsupported':
+    '此软件包用本版本无法处理的文本规则保存牌组名称，因此未写入任何内容。请在 Anki 中勾选“支持旧版 Anki”后导出，并在该副本中重命名牌组 — 其他编辑仍可从此软件包正常导出。',
   'ankiWorkbench.apply.error.compressed-unsupported':
     '此包使用了尚不支持写入的较新压缩格式。未写入任何内容。',
   'ankiWorkbench.apply.error.verify-failed': '写入的文件未通过回读校验，不可信任。请删除后重试。',
@@ -9044,6 +9046,21 @@ export const zh: Catalog = {
   'ankiWorkbench.tray.problem.tag-normalize-removed':
     '{count} 个标签将作为重复项或被隐含的父标签从笔记中移除。不会有笔记失去只属于它的标签。',
   'ankiWorkbench.tray.problem.tag-normalize-clean':
+  'ankiWorkbench.tray.kind.normalize-decks': '整理牌组名称',
+  'ankiWorkbench.tray.describe.normalize-decks': '整理牌组名称：{ops}',
+  'ankiWorkbench.tray.deckNormalize.scope':
+    '这会作用于草稿中的所有牌组，而不是所选笔记。没有卡片会更换牌组。',
+  'ankiWorkbench.tray.deckNormalize.trim-separators': '修复 :: 路径',
+  'ankiWorkbench.tray.deckNormalize.ascii-width': '全角 ASCII 转半角',
+  'ankiWorkbench.tray.deckNormalize.unify-case': '统一为此集合中最常用的写法',
+  'ankiWorkbench.tray.problem.deck-normalize-renamed':
+    '{count} 个牌组的名称会改变，例如 {detail}。没有卡片会更换牌组。',
+  'ankiWorkbench.tray.problem.deck-normalize-merge-refused':
+    '{count} 个牌组保留原名，因为整理后的名称已被另一个牌组使用（{detail}）。合并它们会移动卡片，因此不作改动。',
+  'ankiWorkbench.tray.problem.deck-normalize-filtered':
+    '{count} 个筛选牌组保持不变：其中的卡片是临时借用的，Anki 会重新生成它们。',
+  'ankiWorkbench.tray.problem.deck-normalize-clean':
+    '无需整理：全部 {count} 个牌组的命名已经一致。',
     '无需整理：所选的 {count} 条笔记的标签已经一致。',
   'ankiWorkbench.tray.kind.enrich-dictionary': '用已安装词典填充',
   'ankiWorkbench.tray.describe.enrich-dictionary':

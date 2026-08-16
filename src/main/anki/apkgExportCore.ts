@@ -25,6 +25,10 @@ export interface SqlWritable extends SqlReadable {
   run(sql: string, params?: SqlParam[]): unknown;
 }
 
+/** What the user can actually do about a deck name this build cannot write. */
+const DECK_COLLATION_HELP =
+  'This package stores deck names with a text rule (Anki’s "unicase" collation) that this build cannot apply, so nothing was written. Export the deck from Anki with "Support older Anki versions" checked and rename decks in that copy — every other edit exports from this package normally.';
+
 /** A refusal that names what it refused, so the IPC result can carry a code. */
 export class ExportRefusal extends Error {
   readonly code: ApkgExportErrorCode;
@@ -110,6 +114,24 @@ function readDeckBlob(db: SqlWritable): Record<string, Record<string, unknown>> 
   } catch {
     return undefined;
   }
+}
+
+/**
+ * Anki's schema 18 declares `decks.name` as `text NOT NULL COLLATE unicase` and
+ * puts a UNIQUE index on it. `unicase` is a collation Anki registers in its own
+ * SQLite build; sql.js has neither it nor an API to add one, so *any* write to
+ * that column fails with "no such collation sequence: unicase" while the index
+ * is maintained. Measured on a real package (`N1 Vocab-20260102173058.apkg`,
+ * ver 18): `notes.flds` and `notes.tags` both write fine and `decks.name` is
+ * the only column that fails, which is why this is scoped to deck renames
+ * rather than being a blanket schema refusal.
+ *
+ * Detected from the stored DDL before the first write, so the refusal keeps
+ * this module's all-or-nothing promise instead of failing halfway.
+ */
+function deckNameNeedsMissingCollation(db: SqlWritable): boolean {
+  const row = firstRow(db, "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'decks'", []);
+  return /collate\s+unicase/i.test(String(row?.[0] ?? ''));
 }
 
 /** A deck's stored name in whichever place this collection keeps it. */
@@ -201,6 +223,9 @@ export function applyExportChanges(
       'deck-missing',
       'The source package stores no deck list, so a deck rename cannot be written.',
     );
+  }
+  if (deckRenames.length > 0 && storage === 'table' && deckNameNeedsMissingCollation(db)) {
+    throw new ExportRefusal('deck-collation-unsupported', DECK_COLLATION_HELP);
   }
   // Every name the collection will hold once the whole batch has run, so two
   // renames cannot be individually legal and jointly a merge. Validated in list

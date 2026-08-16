@@ -9226,6 +9226,8 @@ export const en: Catalog = {
     'A renamed deck has a different name in the source file. Nothing was written — re-read the source before exporting.',
   'ankiWorkbench.apply.error.deck-name-taken':
     'Another deck in the source file already uses that name, and renaming onto it would merge the two decks. Nothing was written.',
+  'ankiWorkbench.apply.error.deck-collation-unsupported':
+    'This package stores deck names with a text rule this build cannot apply, so nothing was written. Export the deck from Anki with “Support older Anki versions” checked and rename decks in that copy — every other edit exports from this package normally.',
   'ankiWorkbench.apply.error.compressed-unsupported':
     'This package uses a newer compressed format that cannot be written yet. Nothing was written.',
   'ankiWorkbench.apply.error.verify-failed':
@@ -9531,6 +9533,21 @@ export const en: Catalog = {
     '{count} tags are removed from their notes as duplicates or implied parents. No note loses a tag that only it carried.',
   'ankiWorkbench.tray.problem.tag-normalize-clean':
     'Nothing to tidy: the {count} selected notes already tag consistently.',
+  'ankiWorkbench.tray.kind.normalize-decks': 'Tidy up deck names',
+  'ankiWorkbench.tray.describe.normalize-decks': 'Tidy up deck names: {ops}',
+  'ankiWorkbench.tray.deckNormalize.scope':
+    'This works on every deck in the draft, not on the selected notes. No card changes deck.',
+  'ankiWorkbench.tray.deckNormalize.trim-separators': 'repair :: paths',
+  'ankiWorkbench.tray.deckNormalize.ascii-width': 'full-width ASCII to half-width',
+  'ankiWorkbench.tray.deckNormalize.unify-case': 'match the spelling this collection uses most',
+  'ankiWorkbench.tray.problem.deck-normalize-renamed':
+    '{count} decks change name, for example {detail}. No card changes deck.',
+  'ankiWorkbench.tray.problem.deck-normalize-merge-refused':
+    '{count} decks keep their name because another deck already uses the tidied one ({detail}). Combining them would move cards, so they are left alone.',
+  'ankiWorkbench.tray.problem.deck-normalize-filtered':
+    '{count} filtered decks are left alone: their cards are on loan and Anki rebuilds them.',
+  'ankiWorkbench.tray.problem.deck-normalize-clean':
+    'Nothing to tidy: all {count} decks are already named consistently.',
   'ankiWorkbench.tray.kind.enrich-dictionary': 'Fill from installed dictionaries',
   'ankiWorkbench.tray.describe.enrich-dictionary':
     'Write {aspect} into {to} ({conflict}; {rule}; {provenance})',

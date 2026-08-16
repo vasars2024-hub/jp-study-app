@@ -32,6 +32,7 @@ import {
   MARKED_TAG,
   createDraftEditIndex,
   draftFieldNormalizer,
+  relinkDeckParents,
   normalizeTags,
   writeNoteField,
   type AnkiDraftEditJournal,
@@ -64,6 +65,11 @@ import {
   type TagNormalizePlan,
 } from './ankiTagNormalize';
 import {
+  planDeckNormalize,
+  type DeckNormalizeOp,
+  type DeckNormalizePlan,
+} from './ankiDeckNormalize';
+import {
   planPrioritizeNew,
   type PrioritizePlan,
   type PrioritizeRefusal,
@@ -94,7 +100,8 @@ export type TrayActionKind =
   | 'prioritize-new'
   | 'rescue-leeches'
   | 'set-mastery'
-  | 'normalize-tags';
+  | 'normalize-tags'
+  | 'normalize-decks';
 
 /**
  * What a copy does when the destination already holds text — Phase 4's "require
@@ -240,6 +247,17 @@ export type TrayAction =
       kind: 'normalize-tags';
       /** Order here is ignored; they always run in `TAG_NORMALIZE_ORDER`. */
       ops: TagNormalizeOp[];
+    })
+  | (TrayActionBase & {
+      /**
+       * Recipe 12, deck half. The only action whose unit is the DECK and not the
+       * note: it runs over the whole draft's deck list regardless of what is
+       * selected, because a deck is not part of a selection and renaming only
+       * the decks a filter happened to reach would leave the tree half-tidied.
+       */
+      kind: 'normalize-decks';
+      /** Order here is ignored; they always run in `DECK_NORMALIZE_ORDER`. */
+      ops: DeckNormalizeOp[];
     })
   | (TrayActionBase & {
       kind: 'set-mastery';
@@ -390,7 +408,20 @@ export type TrayProblemCode =
    * "already consistent" and "the ops you chose do not apply here" look
    * identical from an outcome row of `changed: 0`.
    */
-  | 'tag-normalize-clean';
+  | 'tag-normalize-clean'
+  /** Decks that changed name. `detail` is `from -> to` for the first few. */
+  | 'deck-normalize-renamed'
+  /**
+   * A rename refused because another deck already holds the name. Merging two
+   * decks moves cards, which is not what a rename says it does, so the other
+   * renames run and this one is named. A warning, not blocking: the run did
+   * what it could and the user has to know what it did not do.
+   */
+  | 'deck-normalize-merge-refused'
+  /** Filtered decks left alone: their cards are on loan and Anki rebuilds them. */
+  | 'deck-normalize-filtered'
+  /** The action ran and renamed nothing. Same reason `tag-normalize-clean` exists. */
+  | 'deck-normalize-clean';
 
 export interface TrayProblem {
   code: TrayProblemCode;
@@ -472,6 +503,12 @@ export interface TrayPlan {
    */
   tagNormalize?: TagNormalizePlan;
   /**
+   * What a `normalize-decks` action did. Folded into `draft` like `tagNormalize`,
+   * and here for a reason the others do not have: a deck-only tray leaves
+   * `changedNotes` at 0, so this is the only place its work is visible at all.
+   */
+  deckNormalize?: DeckNormalizePlan;
+  /**
    * Cards whose `due` this tray moved. Separate from `changedNotes` because a
    * reposition-only tray changes zero notes and is not therefore a no-op; a
    * caller that gated Apply on `changedNotes` alone would disable it.
@@ -547,7 +584,12 @@ function blockingProblems(
 ): TrayProblem[] {
   const problems: TrayProblem[] = [];
   const enabled = actions.filter((a) => a.enabled);
-  if (noteIds.length === 0) problems.push({ code: 'empty-selection', severity: 'blocking', count: 0 });
+  // `normalize-decks` is the one kind whose unit is not the note, so a tray
+  // holding only that needs no selection. Demanding one would be the surface
+  // lying about what the action reads: it renames the draft's decks either way.
+  if (noteIds.length === 0 && enabled.some((a) => a.kind !== 'normalize-decks')) {
+    problems.push({ code: 'empty-selection', severity: 'blocking', count: 0 });
+  }
   if (enabled.length === 0) problems.push({ code: 'no-actions', severity: 'blocking', count: 0 });
   for (const action of enabled) {
     if (action.kind === 'find-replace') {
@@ -697,7 +739,7 @@ function blockingProblems(
           detail: a,
         });
       }
-    } else if (action.kind === 'normalize-tags') {
+    } else if (action.kind === 'normalize-tags' || action.kind === 'normalize-decks') {
       // Same rule `normalize-text` states: no op chosen is a mis-set form, not
       // "normalise with defaults". There is no default set of ops.
       if (action.ops.length === 0) {
@@ -798,6 +840,7 @@ export function planChangeTray(
   // and this preview is recomputed on every render — see `ankiChangeTrayScale`.
   const notes = [...draft.notes];
   const cards = [...draft.cards];
+  let decks = [...draft.decks];
   const index = createDraftEditIndex(draft);
   const noteTypes = new Map(draft.noteTypes.map((nt) => [nt.id, nt]));
   const ops: AnkiDraftEditOp[] = [];
@@ -805,6 +848,7 @@ export function planChangeTray(
   let prioritizePlan: PrioritizePlan | undefined;
   let leechRescuePlan: LeechRescuePlan | undefined;
   let tagNormalizePlan: TagNormalizePlan | undefined;
+  let deckNormalizePlan: DeckNormalizePlan | undefined;
   let changedCards = 0;
 
   const changeFor = (noteId: string): TrayNoteChange => {
@@ -1067,6 +1111,72 @@ export function planChangeTray(
         matched: noteIds.length,
         changed: written,
         skipped: noteIds.length - written,
+      });
+      continue;
+    }
+
+    if (action.kind === 'normalize-decks') {
+      // Whole-draft, not selection-scoped: see the action's own comment. Nothing
+      // here reads `noteIds`, and the outcome counts decks for the same reason.
+      const plan = planDeckNormalize({ decks, ops: action.ops });
+      deckNormalizePlan = plan;
+      const renamedIds = new Set<string>();
+      for (const rename of plan.renames) {
+        const at = decks.findIndex((d) => d.id === rename.deckId);
+        if (at === -1) continue;
+        decks[at] = { ...decks[at], name: rename.to };
+        renamedIds.add(rename.deckId);
+        ops.push({
+          kind: 'deck-name',
+          deckId: rename.deckId,
+          before: rename.from,
+          after: rename.to,
+          group: groupId,
+        });
+      }
+      // Once for the batch, not per rename: one rename can change another deck's
+      // parentage, so a per-rename relink would be both quadratic and wrong.
+      if (renamedIds.size > 0) decks = relinkDeckParents(decks);
+      if (plan.renames.length > 0) {
+        problems.push({
+          code: 'deck-normalize-renamed',
+          severity: 'info',
+          actionId: action.id,
+          count: plan.renames.length,
+          detail: `${plan.renames[0].from} -> ${plan.renames[0].to}`,
+        });
+      }
+      for (const collision of plan.collisions) {
+        problems.push({
+          code: 'deck-normalize-merge-refused',
+          severity: 'warning',
+          actionId: action.id,
+          count: 1,
+          detail: `${collision.from} -> ${collision.to}`,
+        });
+      }
+      if (plan.filteredSkipped > 0) {
+        problems.push({
+          code: 'deck-normalize-filtered',
+          severity: 'info',
+          actionId: action.id,
+          count: plan.filteredSkipped,
+        });
+      }
+      if (plan.renames.length === 0 && plan.collisions.length === 0) {
+        problems.push({
+          code: 'deck-normalize-clean',
+          severity: 'info',
+          actionId: action.id,
+          count: plan.considered,
+        });
+      }
+      outcomes.push({
+        actionId: action.id,
+        kind: action.kind,
+        matched: plan.considered,
+        changed: plan.renames.length,
+        skipped: plan.considered - plan.renames.length,
       });
       continue;
     }
@@ -1504,7 +1614,7 @@ export function planChangeTray(
   return {
     // A tray that changed nothing returns the input objects, so a caller can
     // compare by identity to see that nothing happened.
-    draft: ops.length > 0 ? { ...draft, notes, cards } : draft,
+    draft: ops.length > 0 ? { ...draft, notes, cards, decks } : draft,
     journal:
       ops.length > 0
         ? // A fresh batch forks the history, same as a single edit: a redo past
@@ -1522,6 +1632,7 @@ export function planChangeTray(
     prioritize: prioritizePlan,
     leechRescue: leechRescuePlan,
     tagNormalize: tagNormalizePlan,
+    deckNormalize: deckNormalizePlan,
   };
 }
 

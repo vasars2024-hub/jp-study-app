@@ -73,6 +73,13 @@ export type ApkgExportErrorCode =
   | 'deck-changed'
   /** Another deck in the source holds the new name — writing it would merge two decks. */
   | 'deck-name-taken'
+  /**
+   * The package stores deck names under Anki's own `unicase` collation, which
+   * this build's SQLite cannot register — so the name column cannot be written
+   * at all. Measured on a real ver-18 package: note fields and tags write fine
+   * and only the deck name refuses.
+   */
+  | 'deck-collation-unsupported'
   | 'compressed-unsupported'
   | 'verify-failed'
   | 'io';

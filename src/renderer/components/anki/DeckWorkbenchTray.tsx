@@ -41,6 +41,7 @@ import type {
 import type { AiBatch } from '../../../shared/ankiAiAdditions';
 import { TEXT_NORMALIZE_ORDER, type TextNormalizeOp } from '../../../shared/ankiTextNormalize';
 import { TAG_NORMALIZE_ORDER, type TagNormalizeOp } from '../../../shared/ankiTagNormalize';
+import { DECK_NORMALIZE_ORDER, type DeckNormalizeOp } from '../../../shared/ankiDeckNormalize';
 import {
   MASTERY_LEVELS,
   MASTERY_LEVEL_KEYS,
@@ -70,6 +71,7 @@ export const ACTION_KINDS: TrayActionKind[] = [
   'add-tags',
   'remove-tags',
   'normalize-tags',
+  'normalize-decks',
 ];
 /**
  * The guided flow's step 3, "Add and enrich": the three kinds that put content
@@ -109,6 +111,7 @@ export const RULE_ACTION_KINDS: TrayActionKind[] = [
   'add-tags',
   'remove-tags',
   'normalize-tags',
+  'normalize-decks',
 ];
 /**
  * The rung the level select starts on. Unlike a field name there is no unset
@@ -207,6 +210,7 @@ export default function DeckWorkbenchTray({
   const [onConflict, setOnConflict] = useState<FieldCopyConflict>('keep');
   const [normalizeOps, setNormalizeOps] = useState<TextNormalizeOp[]>([]);
   const [tagOps, setTagOps] = useState<TagNormalizeOp[]>([]);
+  const [deckOps, setDeckOps] = useState<DeckNormalizeOp[]>([]);
   const [aspect, setAspect] = useState<EnrichAspect>('meaning');
   // `refuse` first and pre-selected for the same reason `keep` is: it is the one
   // answer that cannot invent one. A disagreement between installed
@@ -414,6 +418,9 @@ export default function DeckWorkbenchTray({
   );
   const effect = plan.mastery ? masteryEffect(plan.mastery) : null;
   const masteryChanges = plan.mastery?.changes.length ?? 0;
+  // A deck rename changes no note and no card, so every count that gates Apply
+  // has to know about it or a deck-only tray reads as a plan with nothing in it.
+  const deckRenames = plan.deckNormalize?.renames.length ?? 0;
 
   /**
    * The selected notes the AI panel may ask about, with the word each declares.
@@ -512,6 +519,8 @@ export default function DeckWorkbenchTray({
         return { id, enabled: true, kind, level: masteryLevel };
       case 'normalize-tags':
         return { id, enabled: true, kind, ops: [...tagOps] };
+      case 'normalize-decks':
+        return { id, enabled: true, kind, ops: [...deckOps] };
       case 'normalize-text':
         return {
           id,
@@ -592,6 +601,12 @@ export default function DeckWorkbenchTray({
       case 'set-mastery':
         return t('ankiWorkbench.tray.describe.set-mastery', {
           level: t(MASTERY_LEVEL_KEYS[action.level]),
+        });
+      case 'normalize-decks':
+        return t('ankiWorkbench.tray.describe.normalize-decks', {
+          ops: DECK_NORMALIZE_ORDER.filter((op) => action.ops.includes(op))
+            .map((op) => t(`ankiWorkbench.tray.deckNormalize.${op}`))
+            .join(', '),
         });
       case 'normalize-tags':
         return t('ankiWorkbench.tray.describe.normalize-tags', {
@@ -810,6 +825,26 @@ export default function DeckWorkbenchTray({
                   }
                 />
                 {t(`ankiWorkbench.tray.tagNormalize.${op}`)}
+              </label>
+            ))}
+          </>
+        ) : kind === 'normalize-decks' ? (
+          <>
+            {/* Whole-draft, so there is nothing to scope and nothing to choose
+                but which repairs to make. */}
+            <p className="muted">{t('ankiWorkbench.tray.deckNormalize.scope')}</p>
+            {DECK_NORMALIZE_ORDER.map((op) => (
+              <label key={op} className="wb-tray-flag">
+                <input
+                  type="checkbox"
+                  checked={deckOps.includes(op)}
+                  onChange={() =>
+                    setDeckOps((prev) =>
+                      prev.includes(op) ? prev.filter((o) => o !== op) : [...prev, op],
+                    )
+                  }
+                />
+                {t(`ankiWorkbench.tray.deckNormalize.${op}`)}
               </label>
             ))}
           </>
@@ -1162,16 +1197,19 @@ export default function DeckWorkbenchTray({
         <button
           type="button"
           className="btn primary"
-          // A mastery-only or reposition-only tray changes no note and still
-          // has work to do, so `changedNotes` alone would disable Apply on a
-          // plan that is ready.
+          // A mastery-only, reposition-only or deck-rename-only tray changes no
+          // note and still has work to do, so `changedNotes` alone would disable
+          // Apply on a plan that is ready.
           disabled={
             plan.blocked
-            || (plan.changedNotes === 0 && masteryChanges === 0 && plan.changedCards === 0)
+            || (plan.changedNotes === 0
+              && masteryChanges === 0
+              && plan.changedCards === 0
+              && deckRenames === 0)
           }
           onClick={() => {
             onApply(plan);
-            setApplied(plan.changedNotes + masteryChanges + plan.changedCards);
+            setApplied(plan.changedNotes + masteryChanges + plan.changedCards + deckRenames);
           }}
         >
           {t('ankiWorkbench.tray.apply')}

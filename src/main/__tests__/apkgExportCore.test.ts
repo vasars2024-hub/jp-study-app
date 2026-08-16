@@ -288,6 +288,44 @@ describe('applyExportChanges', () => {
     expect(db.exec('SELECT name FROM decks WHERE id = 2')[0]!.values[0]![0]).toBe('jlpt\x1fn5');
   });
 
+  it('refuses a rename when the package declares the collation this build lacks', () => {
+    // Real ver-18 packages declare `name text NOT NULL COLLATE unicase` and put a
+    // UNIQUE index on it. sql.js cannot register that collation, so the UPDATE
+    // fails with "no such collation sequence" — measured on the user's own
+    // `N1 Vocab-20260102173058.apkg`. Refused before any write instead.
+    // sql.js rejects the collation in a CREATE TABLE, which is why a real
+    // package can only ever arrive with it already in the stored schema — so the
+    // fixture puts it there the same way, through `writable_schema`.
+    const db = normalizedDeckDb();
+    db.run('PRAGMA writable_schema = ON');
+    db.run(
+      "UPDATE sqlite_master SET sql = replace(sql, 'name text', 'name text NOT NULL COLLATE unicase') WHERE type = 'table' AND name = 'decks'",
+    );
+    db.run('PRAGMA writable_schema = OFF');
+    try {
+      applyExportChanges(
+        db,
+        { notes: [], cardMoves: [], deckRenames: [{ deckId: '1', from: 'Japanese', to: 'japanese' }] },
+        { nowMs: NOW_MS, normalize: stripFieldHtml },
+      );
+      expect.unreachable('should have refused');
+    } catch (err) {
+      expect((err as ExportRefusal).code).toBe('deck-collation-unsupported');
+    }
+    expect(db.exec('SELECT name FROM decks WHERE id = 1')[0]!.values[0]![0]).toBe('Japanese');
+
+    // The control: the same collection without the collation writes normally, so
+    // the refusal is keyed on the declaration and not on the schema being 18.
+    const plain = normalizedDeckDb();
+    expect(
+      applyExportChanges(
+        plain,
+        { notes: [], cardMoves: [], deckRenames: [{ deckId: '2', from: 'jlptn5', to: 'JLPTN4' }] },
+        { nowMs: NOW_MS, normalize: stripFieldHtml },
+      ).decksUpdated,
+    ).toBe(1);
+  });
+
   it('refuses a deck that is not in the source package', () => {
     const db = fixtureDb();
     try {

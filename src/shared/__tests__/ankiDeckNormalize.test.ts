@@ -16,6 +16,7 @@ import {
   editedNoteIds,
   noteIsEdited,
 } from '../ankiDraftEdit';
+import { planChangeTray, type TrayAction } from '../ankiChangeTray';
 import type { AnkiDraft, AnkiDraftDeck } from '../ankiDraft';
 import { stripFieldHtml } from '../apkgParse';
 
@@ -208,6 +209,93 @@ describe('renameDraftDeck', () => {
     expect(out.journal.done).toHaveLength(1);
     expect(editedNoteIds(out.journal)).toEqual([]);
     expect(noteIsEdited(out.journal, 'any-note')).toBe(false);
+  });
+});
+
+describe('the normalize-decks tray action', () => {
+  const action: TrayAction = { id: 'a1', enabled: true, kind: 'normalize-decks', ops: ALL };
+
+  function withDecks(decks: AnkiDraftDeck[]): AnkiDraft {
+    const d = draftWith(relinkDeckParents(decks));
+    return {
+      ...d,
+      noteTypes: [
+        {
+          id: 'nt1',
+          name: 'Vocab',
+          kind: 'standard',
+          css: '',
+          fields: [{ ord: 0, name: 'Expression', sticky: false, rtl: false }],
+          templates: [],
+          sortFieldOrd: 0,
+        },
+      ],
+    } as AnkiDraft;
+  }
+
+  it('renames whole-draft on an empty selection, and one undo puts every name back', () => {
+    const draft = withDecks([
+      deck('1', 'JLPT::N5'),
+      deck('2', 'jlpt::N4'),
+      deck('3', 'ＪＬＰＴ::N3'),
+      deck('4', '::Grammar::'),
+    ]);
+    // No notes selected at all: a deck is not part of a selection.
+    const plan = planChangeTray(draft, createEditJournal(), [], [action]);
+    expect(plan.blocked).toBe(false);
+    expect(plan.changedNotes).toBe(0);
+    expect(plan.deckNormalize?.renames).toHaveLength(3);
+    expect(plan.draft.decks.map((d) => d.name)).toEqual([
+      'JLPT::N5',
+      'JLPT::N4',
+      'JLPT::N3',
+      'Grammar',
+    ]);
+    // The tree follows the names: N3/N4 are now under the same parent as N5.
+    expect(plan.draft.decks[1].parentId).toBeUndefined();
+    expect(plan.problems.find((p) => p.code === 'deck-normalize-renamed')?.count).toBe(3);
+
+    const back = undoLastEdit(plan.draft, plan.journal, stripFieldHtml);
+    expect(back.draft.decks.map((d) => d.name)).toEqual([
+      'JLPT::N5',
+      'jlpt::N4',
+      'ＪＬＰＴ::N3',
+      '::Grammar::',
+    ]);
+  });
+
+  it('names a refused merge as a warning and still runs the renames beside it', () => {
+    const draft = withDecks([deck('1', 'JLPT::N5'), deck('2', 'jlpt::n5'), deck('3', 'ｇｒａｍｍａｒ')]);
+    const plan = planChangeTray(draft, createEditJournal(), [], [action]);
+    const refused = plan.problems.find((p) => p.code === 'deck-normalize-merge-refused');
+    expect(refused?.severity).toBe('warning');
+    expect(refused?.detail).toBe('jlpt::n5 -> JLPT::N5');
+    expect(plan.draft.decks.map((d) => d.name)).toEqual(['JLPT::N5', 'jlpt::n5', 'grammar']);
+  });
+
+  it('refuses a run with no op chosen instead of normalising with a default set', () => {
+    const plan = planChangeTray(withDecks([deck('1', 'jlpt')]), createEditJournal(), [], [
+      { ...action, ops: [] },
+    ]);
+    expect(plan.blocked).toBe(true);
+    expect(plan.problems.some((p) => p.code === 'empty-parameter' && p.severity === 'blocking')).toBe(
+      true,
+    );
+  });
+
+  it('says so when there was nothing to tidy, and returns the input draft', () => {
+    const decks = [deck('1', 'JLPT::N5'), deck('2', 'JLPT::N4')];
+    const draft = withDecks(decks);
+    const plan = planChangeTray(draft, createEditJournal(), [], [action]);
+    expect(plan.problems.find((p) => p.code === 'deck-normalize-clean')?.count).toBe(2);
+    expect(plan.draft).toBe(draft);
+  });
+
+  it('reports the filtered decks it left alone rather than dropping them silently', () => {
+    const draft = withDecks([deck('1', 'JLPT::N5'), deck('2', 'jlpt::n4', true)]);
+    const plan = planChangeTray(draft, createEditJournal(), [], [action]);
+    expect(plan.problems.find((p) => p.code === 'deck-normalize-filtered')?.count).toBe(1);
+    expect(plan.draft.decks[1].name).toBe('jlpt::n4');
   });
 });
 

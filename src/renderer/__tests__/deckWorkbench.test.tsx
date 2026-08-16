@@ -357,6 +357,7 @@ describe('DeckWorkbench', () => {
       'add-tags',
       'remove-tags',
       'normalize-tags',
+      'normalize-decks',
     ]);
     expect(host.textContent).toContain('ankiWorkbench.step.rules.lead');
     expect(host.querySelector('.wb-design')).toBeNull();
