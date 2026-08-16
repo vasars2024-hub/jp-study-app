@@ -286,7 +286,7 @@ Partial failure must identify exactly what committed, what failed, and what can 
 - Finish the four-rating local SRS migration and explicit mastery-preset mappings.
 - Complete the compatibility matrix with honest disabled states for capabilities that cannot be performed safely.
 
-### Phase 6 — export, commit, and round-trip proof — package half built 2026-08-16
+### Phase 6 — export, commit, and round-trip proof — both halves built 2026-08-16
 
 - Export a new package and commit bounded changes to live Anki. **The package half landed
   (`ad09b92e`)**: `apkg:export` applies the journal's net change set to a fresh read of the source
@@ -301,8 +301,17 @@ Partial failure must identify exactly what committed, what failed, and what can 
   echoes the exporter's verified numbers on ok and one translated line per refusal code, offers
   no button on a non-package source, and stays silent on a cancelled dialog. Live on the real
   local deck: step 7 current, placeholder gone, honest noFile branch, contrast 6.08–16.02. The
-  package-branch UI walk through the real dialogs is attended-only (needs-user.md). The
-  live-Anki commit half remains open.
+  package-branch UI walk through the real dialogs is attended-only (needs-user.md).
+  **The live-Anki commit half landed (`87e52a5e`, `2978fa35`, `9950f88c`)**:
+  `anki:commitConnectDraft` re-reads the same window and compares fingerprints, plans every
+  write against that fresh read (refusing before write #1), writes collecting per-item failures,
+  then re-reads and verifies. Tags commit as an add/remove diff so the `marked` token survives;
+  a card on loan to a filtered deck is refused rather than repositioned. Live on a disposable
+  deck: notes 2, cards 1, verified true, profile "User 1", fingerprint moved, `marked` preserved,
+  card due 314703→7 with the other two untouched; negative controls `source-changed` and
+  `note-missing` each left a byte-identical collection. The first run exposed a real defect —
+  `setSpecificValueOfCard` refuses a string value inside a 200 body — which the post-commit
+  re-read caught as `verify-failed` rather than reporting as a save.
 - Add source-fingerprint conflict handling, partial-failure recovery, post-commit rereads, and reversible journals.
 - Prove import -> edit -> export/reimport and live read -> edit -> commit/reread equivalence for all supported data.
 

@@ -23214,3 +23214,66 @@ narrower than "every select": step 3 measures **32/32/32** but steps 4/5 still h
 selects (32 where styled) — the one-fix-at-workbench-level item stays open, pre-existing.
 Gate 10's remainder: compact/maximized reflow for steps 3–7, and the apkg-branch texts of step 7
 (attended). Probe pattern: `debug/step7-lang.ps1`'s walk + the step6-a11y ratio recipe.
+
+## 2026-08-16 — Track 7 / Phase 6: the live-Anki commit half, built and proven live
+
+**`87e52a5e` + `2978fa35` + `9950f88c`.** `anki:commitConnectDraft` writes the same net set
+`buildApkgExportChanges` hands the .apkg exporter. Fixed order: re-read the same window and
+compare fingerprints → plan against that fresh read (refusing before write #1) → write,
+collecting per-item failures → re-read and verify. Three deliberate differences from the package
+writer: **tags commit as an add/remove diff**, not `updateNoteTags` (which replaces the whole
+string and would drop the `marked` token the draft models as a flag); a card **on loan to a
+filtered deck is refused**, not repositioned; `setSpecificValueOfCard` is the only route to a new
+card's queue position (`setDueDate` takes days-from-now and rewrites type/queue).
+Main remembers the read window by fingerprint (`rememberConnectRead`, cap 8) exactly as
+`rememberApkgSource` does, so the renderer holds no transport detail — the commit request is
+`{fingerprint, changes}` and the tests assert `read` is absent.
+
+**The defect the live run found, and the step that caught it.** Run 1 reported `cardsUpdated 1`
+on a card that had not moved. `setSpecificValueOfCard` has two traps: `newValues` are `setattr`
+onto the column so an integer field needs a **NUMBER** (`'7'` → `[[false, "'str' object cannot
+be interpreted as an integer"]]`), and that refusal arrives **inside a 200 body with
+`error: null`**, so `invoke` cannot raise it. Nothing shipped broken — the post-commit re-read
+answered `verify-failed / card …: due differs`. Fixed by sending a number and decoding the
+per-key verdict (`settingsFailure`); the fake collection now enforces Anki's typing rule so it
+reproduces in CI.
+
+**Live gate**, disposable deck created and removed by the run (84 decks before, 84 after, 0
+strays): **notes 2, cards 1, verified true, profile "User 1"**, fingerprint
+`connect:3:1786860577` → `connect:3:1786860667`. 犬 → 犬（いぬ） with `marked` still on the note;
+`gate-core` removed from 猫 and nothing else; card due **314703 → 7** while the other two stayed
+**314704 / 314705**; 鳥 untouched. **Negative controls, both with byte-identical snapshots
+after:** stale fingerprint → `source-changed`; a ghost note batched with a valid
+`SHOULD-NOT-LAND` edit → `note-missing`, valid edit not written.
+
+**Step 7's UI** (`9950f88c`): live branch = warning naming the profile *before* the button,
+per-failure lines for `partial`, no success block on `verify-failed`. Live on the real
+155,386-note collection: "1 notes will be written…", warning "(User 1)", enabled button, **no**
+export button, **no** noFile line, 0 raw keys, contrast 6.08 @14 px / 14.02 @13 px. Write was
+never clicked — the fixture deck is not on page 1, so a UI-driven commit would edit real notes;
+the IPC half below it is what the live gate above proves.
+
+**Repaired an orphan.** HEAD's `client.ts` never carried the adapter-2 action map
+(`deckNamesAndIds`, `findModelsByName`, `getDeckConfig`, the scheduler row) that HEAD's own
+`connectDraftRead.ts` calls five times — 67 additions, 0 deletions, now committed.
+
+**Traps.** (1) PowerShell **`ac` is `Add-Content`** and an alias beats a same-named function
+*silently*: three "AnkiConnect calls" wrote three files into the repo root and returned nothing.
+`r` is `Invoke-History` (that one at least errors). Name probe helpers ≥3 letters.
+(2) AnkiConnect rejects `params: null` — "None is not of type 'object'"; send `{}`.
+(3) `preload.ts` / `window.d.ts` / the four catalogs all carry other tracks' hunks **and** mixed
+CRLF/LF blobs — stage HEAD+edit region blobs (`debug/stage-connect-commit.js`,
+`debug/stage-live-apply-i18n.js`), never the worktree copy.
+
+**Measured, for gate 9.** With all **155,386** notes selected, each step transition took
+**30–60 s** (3→4 ~40 s, 4→5 ~60 s, 5→6 ~60 s, 6→7 ~60 s).
+
+**Gates this turn.** vitest **680 passed / 1 failed / 1 skipped of 682, 9,218 passed** — the
+failure is `mediaSurfaceImportGraph` timing out at 20 s under full-suite load and it passes
+alone in **5.18 s** (known flake shape; shared dirty tree, HEAD alone red from other tracks).
+i18n exit 0 at **10,202** (+19). architecture "Nothing new", 2 pending. eslint **0 errors** on
+touched paths.
+
+**Still open.** Gate 11's provenance-after-reimport specifics; gate 10's compact/maximized
+reflow for steps 3–7 and the apkg-branch texts of step 7 (attended); the UI-driven live commit
+(needs a scoped connect query so a walk cannot touch real notes).
