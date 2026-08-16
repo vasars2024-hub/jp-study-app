@@ -9960,6 +9960,7 @@ export const ru: Catalog = {
     '{count} тегов будут убраны из заметок как дубликаты или подразумеваемые родительские. Ни одна заметка не потеряет тег, который есть только у неё.',
   'ankiWorkbench.tray.problem.tag-normalize-clean':
   'ankiWorkbench.tray.kind.normalize-decks': 'Привести имена колод в порядок',
+  'ankiWorkbench.tray.kind.split-deck': 'Разделить колоду на подколоды',
   'ankiWorkbench.tray.describe.normalize-decks': 'Имена колод: {ops}',
   'ankiWorkbench.tray.deckNormalize.scope':
     'Это применяется ко всем колодам черновика, а не к выбранным заметкам. Ни одна карточка не меняет колоду.',
@@ -9971,6 +9972,28 @@ export const ru: Catalog = {
   'ankiWorkbench.tray.split.axis.frequency': 'диапазон частотности',
   'ankiWorkbench.tray.split.axis.source': 'тип заметки-источника',
   'ankiWorkbench.tray.split.axis.mastery': 'уровень освоения',
+  'ankiWorkbench.tray.problem.split-refused': 'Эту колоду нельзя разделить: {detail}',
+  'ankiWorkbench.tray.split.refusal.empty-selection': 'не выбрано ни одной заметки',
+  'ankiWorkbench.tray.split.refusal.no-such-parent': 'такой колоды нет в этом черновике',
+  'ankiWorkbench.tray.split.refusal.parent-filtered':
+    'фильтрованная колода держит карточки взаймы, своих у неё нет',
+  'ankiWorkbench.tray.split.refusal.invalid-bands':
+    'границы частотных диапазонов должны быть возрастающими целыми числами',
+  'ankiWorkbench.tray.split.refusal.empty-unmatched-name':
+    'подколоде для заметок без значения по этой оси нужно имя',
+  'ankiWorkbench.tray.problem.split-moved':
+    'Карточек переедет в другую колоду: {count}, первая — {detail}.',
+  'ankiWorkbench.tray.problem.split-clean':
+    'Раскладывать нечего: все заметки ({count}) уже лежат в той колоде, куда их поместило бы это разделение.',
+  'ankiWorkbench.tray.problem.split-unmatched': 'Заметок без значения по этой оси: {count}.',
+  'ankiWorkbench.tray.problem.split-outside-parent':
+    'Выбранных карточек вне разделяемой колоды: {count}. Они оставлены без изменений.',
+  'ankiWorkbench.tray.problem.split-filtered-card':
+    'Выбранных карточек, отданных взаймы фильтрованной колоде: {count}. Их перемещение потеряло бы их при перестроении, поэтому они оставлены без изменений.',
+  'ankiWorkbench.tray.problem.split-ambiguous':
+    'Заметок сразу с двумя уровнями JLPT: {count}. Разделение не станет выбирать за вас.',
+  'ankiWorkbench.tray.problem.split-no-cards':
+    'Выбранных заметок, не порождающих карточек: {count}. Раскладывать нечего.',
   'ankiWorkbench.review.cardDeckMoves': 'Карточек перемещено в другую колоду: {count}',
   'ankiWorkbench.tray.problem.deck-normalize-renamed':
     '{count} колод меняют имя, например {detail}. Ни одна карточка не меняет колоду.',

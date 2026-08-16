@@ -9080,6 +9080,7 @@ export const zh: Catalog = {
     '{count} 个标签将作为重复项或被隐含的父标签从笔记中移除。不会有笔记失去只属于它的标签。',
   'ankiWorkbench.tray.problem.tag-normalize-clean':
   'ankiWorkbench.tray.kind.normalize-decks': '整理牌组名称',
+  'ankiWorkbench.tray.kind.split-deck': '将牌组拆分为子牌组',
   'ankiWorkbench.tray.describe.normalize-decks': '整理牌组名称：{ops}',
   'ankiWorkbench.tray.deckNormalize.scope':
     '这会作用于草稿中的所有牌组，而不是所选笔记。没有卡片会更换牌组。',
@@ -9091,6 +9092,25 @@ export const zh: Catalog = {
   'ankiWorkbench.tray.split.axis.frequency': '词频区间',
   'ankiWorkbench.tray.split.axis.source': '来源笔记类型',
   'ankiWorkbench.tray.split.axis.mastery': '掌握程度',
+  'ankiWorkbench.tray.problem.split-refused': '此牌组无法拆分：{detail}',
+  'ankiWorkbench.tray.split.refusal.empty-selection': '尚未选择笔记',
+  'ankiWorkbench.tray.split.refusal.no-such-parent': '该牌组不在此草稿中',
+  'ankiWorkbench.tray.split.refusal.parent-filtered':
+    '筛选牌组中的卡片是借来的，它本身没有卡片可归档',
+  'ankiWorkbench.tray.split.refusal.invalid-bands': '频率分段的边界必须是递增的整数',
+  'ankiWorkbench.tray.split.refusal.empty-unmatched-name':
+    '用于收纳该维度上无值笔记的子牌组需要一个名称',
+  'ankiWorkbench.tray.problem.split-moved': '{count} 张卡片将移至其他牌组，首先是 {detail}。',
+  'ankiWorkbench.tray.problem.split-clean':
+    '无需归档：{count} 条笔记已经都在此次拆分会放入的牌组中。',
+  'ankiWorkbench.tray.problem.split-unmatched': '{count} 条笔记在该维度上没有值。',
+  'ankiWorkbench.tray.problem.split-outside-parent':
+    '所选的 {count} 张卡片位于被拆分牌组之外，因此未作改动。',
+  'ankiWorkbench.tray.problem.split-filtered-card':
+    '所选的 {count} 张卡片正借给筛选牌组；移动它们会在重建时使其失落，因此未作改动。',
+  'ankiWorkbench.tray.problem.split-ambiguous':
+    '{count} 条笔记同时标有两个 JLPT 等级，因此拆分不会替你选择其一。',
+  'ankiWorkbench.tray.problem.split-no-cards': '所选的 {count} 条笔记不生成卡片，没有可归档的内容。',
   'ankiWorkbench.review.cardDeckMoves': '{count} 张卡片移至其他牌组',
   'ankiWorkbench.tray.problem.deck-normalize-renamed':
     '{count} 个牌组的名称会改变，例如 {detail}。没有卡片会更换牌组。',

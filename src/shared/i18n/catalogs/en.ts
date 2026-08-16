@@ -9574,6 +9574,7 @@ export const en: Catalog = {
   'ankiWorkbench.tray.problem.tag-normalize-clean':
     'Nothing to tidy: the {count} selected notes already tag consistently.',
   'ankiWorkbench.tray.kind.normalize-decks': 'Tidy up deck names',
+  'ankiWorkbench.tray.kind.split-deck': 'Split a deck into subdecks',
   'ankiWorkbench.tray.describe.normalize-decks': 'Tidy up deck names: {ops}',
   'ankiWorkbench.tray.deckNormalize.scope':
     'This works on every deck in the draft, not on the selected notes. No card changes deck.',
@@ -9585,6 +9586,29 @@ export const en: Catalog = {
   'ankiWorkbench.tray.split.axis.frequency': 'frequency band',
   'ankiWorkbench.tray.split.axis.source': 'source note type',
   'ankiWorkbench.tray.split.axis.mastery': 'mastery',
+  'ankiWorkbench.tray.problem.split-refused': 'This deck cannot be split: {detail}',
+  'ankiWorkbench.tray.split.refusal.empty-selection': 'no notes are selected',
+  'ankiWorkbench.tray.split.refusal.no-such-parent': 'that deck is not in this draft',
+  'ankiWorkbench.tray.split.refusal.parent-filtered':
+    'a filtered deck holds its cards on loan, so it has none of its own to file',
+  'ankiWorkbench.tray.split.refusal.invalid-bands':
+    'the frequency band edges have to be whole numbers that increase',
+  'ankiWorkbench.tray.split.refusal.empty-unmatched-name':
+    'the subdeck that gathers notes with no value on this axis needs a name',
+  'ankiWorkbench.tray.problem.split-moved':
+    '{count} cards move to another deck, starting with {detail}.',
+  'ankiWorkbench.tray.problem.split-clean':
+    'Nothing to file: all {count} notes are already in the deck this split would put them in.',
+  'ankiWorkbench.tray.problem.split-unmatched':
+    '{count} notes carry no value on this axis.',
+  'ankiWorkbench.tray.problem.split-outside-parent':
+    '{count} selected cards sit outside the deck being split, so they were left alone.',
+  'ankiWorkbench.tray.problem.split-filtered-card':
+    '{count} selected cards are on loan to a filtered deck; moving them would strand them when Anki rebuilds it, so they were left alone.',
+  'ankiWorkbench.tray.problem.split-ambiguous':
+    '{count} notes are tagged with two JLPT levels at once, so the split will not pick one for you.',
+  'ankiWorkbench.tray.problem.split-no-cards':
+    '{count} selected notes generate no card, so there is nothing to file.',
   'ankiWorkbench.review.cardDeckMoves': '{count} card(s) moved to another deck',
   'ankiWorkbench.tray.problem.deck-normalize-renamed':
     '{count} decks change name, for example {detail}. No card changes deck.',

@@ -9145,6 +9145,7 @@ export const ja: Catalog = {
     '重複または子タグが含む親タグとして、{count} 件のタグがノートから削除されます。そのノートだけが持つタグが失われることはありません。',
   'ankiWorkbench.tray.problem.tag-normalize-clean':
   'ankiWorkbench.tray.kind.normalize-decks': 'デッキ名を整理',
+  'ankiWorkbench.tray.kind.split-deck': 'デッキをサブデッキに分割',
   'ankiWorkbench.tray.describe.normalize-decks': 'デッキ名を整理: {ops}',
   'ankiWorkbench.tray.deckNormalize.scope':
     'これは選択したノートではなく、下書き内のすべてのデッキに適用されます。カードのデッキは変わりません。',
@@ -9156,6 +9157,29 @@ export const ja: Catalog = {
   'ankiWorkbench.tray.split.axis.frequency': '頻度帯',
   'ankiWorkbench.tray.split.axis.source': 'ソースのノートタイプ',
   'ankiWorkbench.tray.split.axis.mastery': '習熟度',
+  'ankiWorkbench.tray.problem.split-refused': 'このデッキは分割できません：{detail}',
+  'ankiWorkbench.tray.split.refusal.empty-selection': 'ノートが選択されていません',
+  'ankiWorkbench.tray.split.refusal.no-such-parent': 'そのデッキはこのドラフトにありません',
+  'ankiWorkbench.tray.split.refusal.parent-filtered':
+    'フィルタードデッキはカードを借りているだけで、自分のカードを持たないため',
+  'ankiWorkbench.tray.split.refusal.invalid-bands':
+    '頻度帯の区切りは昇順の整数である必要があります',
+  'ankiWorkbench.tray.split.refusal.empty-unmatched-name':
+    'この軸に値がないノートをまとめるサブデッキには名前が必要です',
+  'ankiWorkbench.tray.problem.split-moved':
+    '{count} 枚のカードが別のデッキへ移動します（最初は {detail}）。',
+  'ankiWorkbench.tray.problem.split-clean':
+    '移動するものはありません：{count} 件のノートはすべて、この分割が入れるデッキに既にあります。',
+  'ankiWorkbench.tray.problem.split-unmatched':
+    '{count} 件のノートはこの軸に値を持ちません。',
+  'ankiWorkbench.tray.problem.split-outside-parent':
+    '選択された {count} 枚のカードは分割対象のデッキの外にあるため、変更していません。',
+  'ankiWorkbench.tray.problem.split-filtered-card':
+    '選択された {count} 枚のカードはフィルタードデッキに貸し出し中です。移動すると再構築時に取り残されるため、変更していません。',
+  'ankiWorkbench.tray.problem.split-ambiguous':
+    '{count} 件のノートは JLPT レベルが2つ付いているため、分割はどちらかを勝手に選びません。',
+  'ankiWorkbench.tray.problem.split-no-cards':
+    '選択された {count} 件のノートはカードを生成しないため、振り分けるものがありません。',
   'ankiWorkbench.review.cardDeckMoves': '{count} 枚のカードを別のデッキへ移動',
   'ankiWorkbench.tray.problem.deck-normalize-renamed':
     '{count}個のデッキ名が変わります（例: {detail}）。カードのデッキは変わりません。',

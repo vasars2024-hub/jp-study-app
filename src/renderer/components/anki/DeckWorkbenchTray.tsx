@@ -1088,7 +1088,14 @@ export default function DeckWorkbenchTray({
             >
               {t(`ankiWorkbench.tray.problem.${problem.code}`, {
                 count: problem.count,
-                detail: problem.detail ?? '',
+                // Every other code's `detail` is the deck's own text — a field
+                // name, a word, a regex error — and passes through untouched.
+                // `split-refused` alone carries a `DeckSplitProblem` enum, and
+                // the pure module cannot translate it, so the renderer does.
+                detail:
+                  problem.code === 'split-refused' && problem.detail
+                    ? t(`ankiWorkbench.tray.split.refusal.${problem.detail}`)
+                    : (problem.detail ?? ''),
               })}
             </li>
           ))}
