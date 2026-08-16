@@ -19,7 +19,7 @@
  * refusals, Apply and Undo are all the tray's, unchanged.
  */
 import { useCallback, useMemo, useState } from 'react';
-import type { AnkiDraft } from '../../../shared/ankiDraft';
+import { ANKI_DRAFT_MAX_PAGE_SIZE, type AnkiDraft } from '../../../shared/ankiDraft';
 import {
   buildGlossarySource,
   type GlossaryMergeMode,
@@ -73,7 +73,11 @@ export default function DeckWorkbenchGlossary({
       // No path: this is the one place the user names the second file, so the
       // OS dialog is the control. A cancelled dialog is a decision, not a
       // failure, and leaves whatever was already loaded alone.
-      const res = await window.api.readApkgDraft({});
+      //
+      // The largest page main will return, because a glossary is read once and
+      // every row past the page is a word this merge silently cannot fill. The
+      // shortfall is reported rather than hidden — see `partial` below.
+      const res = await window.api.readApkgDraft({ noteLimit: ANKI_DRAFT_MAX_PAGE_SIZE });
       if (!res.ok || !res.draft) {
         if (res.error && res.error !== 'cancelled') setError(res.error);
         return;
@@ -152,11 +156,24 @@ export default function DeckWorkbenchGlossary({
 
       {secondary && (
         <p className="muted">
-          {/* The file's own numbers, before any merge: a glossary that read 0
-              rows must not look the same as one the key field simply missed. */}
+          {/* The rows this glossary actually holds, before any merge: a
+              glossary that read 0 rows must not look the same as one the key
+              field simply missed. `notes.length` and NOT `counts.notes` —
+              `counts` describes the whole collection, and main returns one page
+              of at most `ANKI_DRAFT_MAX_PAGE_SIZE`, so a 3,359-note deck read
+              as 2,000 rows would otherwise claim all 3,359 were in the merge. */}
           {t('ankiWorkbench.tray.glossary.loaded', {
             label: secondary.source.label,
-            count: secondary.counts.notes,
+            count: secondary.notes.length,
+          })}
+        </p>
+      )}
+
+      {secondary && secondary.notes.length < secondary.counts.notes && (
+        <p className="wb-tray-warn">
+          {t('ankiWorkbench.tray.glossary.partial', {
+            count: secondary.notes.length,
+            total: secondary.counts.notes,
           })}
         </p>
       )}

@@ -9193,6 +9193,8 @@ export const ja: Catalog = {
   'ankiWorkbench.tray.glossary.pick': '統合元のデッキを選ぶ…',
   'ankiWorkbench.tray.glossary.repick': '別のデッキを選ぶ…',
   'ankiWorkbench.tray.glossary.loaded': '{label} から統合します。読み込んだノート: {count} 件。',
+  'ankiWorkbench.tray.glossary.partial':
+    'このデッキの {total} 件のうち、一度に読み込めたのは先頭 {count} 件のみです。それ以降は統合に含まれません。デッキを分割するか、残りを別途統合してください。',
   'ankiWorkbench.tray.glossary.keyField': '照合フィールド',
   'ankiWorkbench.tray.glossary.keyField.none': '両方のデッキにあるフィールドを選択',
   'ankiWorkbench.tray.glossary.mode': 'フィールドに既に内容がある場合',

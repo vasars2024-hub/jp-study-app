@@ -18,7 +18,7 @@ vi.mock('../i18n', () => ({
   }),
 }));
 
-import type { AnkiDraft, AnkiDraftNote } from '../../shared/ankiDraft';
+import { ANKI_DRAFT_MAX_PAGE_SIZE, type AnkiDraft, type AnkiDraftNote } from '../../shared/ankiDraft';
 import type { GlossarySource } from '../../shared/ankiGlossaryMerge';
 import DeckWorkbenchGlossary, {
   draftFieldNames,
@@ -153,9 +153,26 @@ describe('DeckWorkbenchGlossary', () => {
     mount();
     await pickDeck();
     expect(readApkgDraft).toHaveBeenCalledTimes(1);
-    // No path: the OS dialog is the control the user names the file with.
-    expect(readApkgDraft.mock.calls[0]![0]).toEqual({});
+    // No path: the OS dialog is the control the user names the file with. The
+    // limit is the largest page main will return, because a glossary is read
+    // once and every row past the page is a word this merge cannot fill.
+    expect(readApkgDraft.mock.calls[0]![0]).toEqual({ noteLimit: ANKI_DRAFT_MAX_PAGE_SIZE });
     expect(host.textContent).toContain('ankiWorkbench.tray.glossary.loaded:glossary.apkg,1');
+    expect(host.textContent).not.toContain('ankiWorkbench.tray.glossary.partial');
+  });
+
+  it('counts the page it holds, not the collection, and says so when they differ', async () => {
+    // Measured live: `N1 Vocab-20260102173058.apkg` is 3,359 notes and one read
+    // returns 2,000, so `counts.notes` would have claimed 1,359 words were in a
+    // merge that could never reach them.
+    readApkgDraft.mockResolvedValue({
+      ok: true,
+      draft: { ...THEIRS, counts: { ...THEIRS.counts, notes: 3359 } },
+    });
+    mount();
+    await pickDeck();
+    expect(host.textContent).toContain('ankiWorkbench.tray.glossary.loaded:glossary.apkg,1');
+    expect(host.textContent).toContain('ankiWorkbench.tray.glossary.partial:1,3359');
   });
 
   it('offers only the fields both decks declare as the matching field', async () => {

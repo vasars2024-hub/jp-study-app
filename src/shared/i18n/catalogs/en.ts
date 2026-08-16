@@ -9620,6 +9620,8 @@ export const en: Catalog = {
   'ankiWorkbench.tray.glossary.pick': 'Choose a deck to merge from…',
   'ankiWorkbench.tray.glossary.repick': 'Choose a different deck…',
   'ankiWorkbench.tray.glossary.loaded': 'Merging from {label}: {count} notes read.',
+  'ankiWorkbench.tray.glossary.partial':
+    'Only the first {count} of this deck’s {total} notes could be read at once, so anything after that is not in the merge. Split the deck or merge the rest separately.',
   'ankiWorkbench.tray.glossary.keyField': 'Match on',
   'ankiWorkbench.tray.glossary.keyField.none': 'Choose a field both decks have',
   'ankiWorkbench.tray.glossary.mode': 'When the field already has content',

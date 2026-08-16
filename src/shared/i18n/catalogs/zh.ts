@@ -9123,6 +9123,8 @@ export const zh: Catalog = {
   'ankiWorkbench.tray.glossary.pick': '选择要合并的牌组…',
   'ankiWorkbench.tray.glossary.repick': '换一个牌组…',
   'ankiWorkbench.tray.glossary.loaded': '从 {label} 合并：已读取 {count} 条笔记。',
+  'ankiWorkbench.tray.glossary.partial':
+    '该牌组共 {total} 条笔记，一次只读取了前 {count} 条，其余不在本次合并中。请拆分牌组或另行合并剩余部分。',
   'ankiWorkbench.tray.glossary.keyField': '匹配字段',
   'ankiWorkbench.tray.glossary.keyField.none': '选择两个牌组都有的字段',
   'ankiWorkbench.tray.glossary.mode': '当字段已有内容时',

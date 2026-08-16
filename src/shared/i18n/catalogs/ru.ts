@@ -10009,6 +10009,8 @@ export const ru: Catalog = {
   'ankiWorkbench.tray.glossary.pick': 'Выбрать колоду для слияния…',
   'ankiWorkbench.tray.glossary.repick': 'Выбрать другую колоду…',
   'ankiWorkbench.tray.glossary.loaded': 'Слияние из {label}: прочитано заметок — {count}.',
+  'ankiWorkbench.tray.glossary.partial':
+    'Из {total} заметок этой колоды за раз прочитаны только первые {count}; остальные в слияние не вошли. Разделите колоду или слейте остаток отдельно.',
   'ankiWorkbench.tray.glossary.keyField': 'Сопоставлять по',
   'ankiWorkbench.tray.glossary.keyField.none': 'Выберите поле, которое есть в обеих колодах',
   'ankiWorkbench.tray.glossary.mode': 'Если в поле уже есть содержимое',
