@@ -24136,3 +24136,26 @@ Remove" takes the *first* row and leaves the offending one. (3) The i18n catalog
 HEAD despite git's "LF will be replaced by CRLF" warning — that is checkout, not storage,
 and rejoining a reconstructed blob with CRLF rewrites all 9,874 lines. `debug/stage-i18n-block.cjs`
 does the HEAD+edit staging and fails loudly on a numstat that is not exactly the insertion.
+
+## 2026-08-16 — MAL pipeline P6 gate 29 closes on its live leg (`backup`)
+
+No product code. The reaper landed in `81526f18` with 4 tests and 2 mutation controls but had
+never run against the real daemon; this is that run. Driver `debug/g29-live.cjs`.
+
+- **Restart first** — main does not hot-reload. `target built src/main.ts` 22:32:23, pid 40416.
+- **Baseline 6 torrents**: 5 category `""` (the user's own), 1 `jp-study`, **0** in
+  `jp-study-subtitles`.
+- **Interrupted**: `acceptNyaaSubtitle` on `The Big O - 01` → `e953e84b…` appeared in the
+  category `downloading`; electron main killed `-Force`, 6 processes → 0.
+- **Orphan survived**: after restart, 7 torrents, 1 in `jp-study-subtitles`, paused, 0 %.
+- **Swept**: a second acquisition on a *different* candidate ran the head-of-`nyaaFetch` reaper.
+  `ORPHAN_CLEARED: true`; **`missingFromBaseline: []`** — all 6 baseline torrents present with
+  category unchanged. That second number is the negative control: a sweep ignoring its category
+  query would have deleted the user's five with `deleteFiles=true`.
+- **Trap 1**: candidate ids are **session-scoped in main**. A saved `nyaa:<hash>` refuses with
+  "no longer in this session's listing" from the discovery layer, *before* `nyaaFetch` — so it
+  does not even reap. Re-`listNyaaSubtitles` after every restart.
+- **Trap 2**: do not score this gate by `inCategory === 0`. The sweep runs at the head of the
+  acquisition that clears it, which then adds its own torrent. Assert on the orphan's hash.
+- **End state**: `247d977772eb` left in the category at 1 seeder, 0 bytes — the residue the
+  reaper exists to clear, cleared by the next acquisition.

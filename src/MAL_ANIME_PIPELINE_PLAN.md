@@ -894,3 +894,51 @@ controls behind it and no live measurement. Next turn: restart the app, start a 
 kill the app once the torrent appears in `jp-study-subtitles`, restart, run a second acquisition
 and read that the orphan is gone while the 5 uncategorised user torrents and `jp-study` are
 untouched — that last clause is the live negative control and is the point of the whole slice.
+
+## 2026-08-16 — GATE 29 CLOSES: the live leg, and the five torrents that stayed put
+
+Worker `backup`. No product code changed — this is the live measurement the previous turn
+named as the only thing standing between `qbitReapSubtitleOrphans` (`81526f18`) and a real
+pass. Driver `debug/g29-live.cjs` (gitignored, like every gate driver here).
+
+**The app was restarted first, because main does not hot-reload** — the previous turn's app
+predated nothing, but the rebuild is what makes the measurement mean anything: Forge reported
+`target built src/main.ts` at 22:32:23, new pid 40416.
+
+**Baseline, real daemon, profile `Relay Probe MOUSE`: 6 torrents — 5 category `""` (the user's
+own, added 2025-12-25 → 2026-07-27), 1 `jp-study` (gate 33's, now 100 %), 0 in
+`jp-study-subtitles`.**
+
+**The interruption.** `acceptNyaaSubtitle` on `The Big O - 01` → the NanaOne batch
+(`e953e84b…`, 3 seeders). The torrent appeared in `jp-study-subtitles` within the first poll —
+**7 torrents, `state: downloading`**. Electron main (pid 29848) was then killed with
+`Stop-Process -Force`: 6 electron processes → **0**. That is the crash, taken mid-acquisition.
+
+**The orphan outlived the process, measured not assumed.** After the restart, before any sweep
+could run: **7 torrents, 1 in `jp-study-subtitles`**, `e953e84bf2ef`, paused, 0 %. No
+`SubtitleRecord` points at it and — before `81526f18` — nothing in the app would ever have
+named it again.
+
+**The sweep, and its negative control.** A second acquisition on the *other* candidate
+(`247d9777…`, SFEO-Raws) ran the reaper at the head of `nyaaFetch`:
+
+| assertion | result |
+| --- | --- |
+| `e953e84bf2ef` still present | **gone** — `ORPHAN_CLEARED: true` |
+| all 6 baseline torrents present, category unchanged | **true**, `missingFromBaseline: []` |
+| added since baseline | exactly 1 — the second acquisition's own `247d977772eb` |
+| final categories | `(none): 5, jp-study: 1, jp-study-subtitles: 1` |
+
+The second row is the control and is the whole point: a sweep that ignored its category query
+would have deleted the user's five, `deleteFiles=true` and all. It did not touch one of them.
+
+**Two traps for the next worker.** (1) **Candidate ids are session-scoped in main.** A
+`nyaa:<hash>` id read back from a saved JSON refuses with *"That release is no longer in this
+session's listing."* — from the discovery layer, **before** `nyaaFetch`, so it does not even
+reap. Re-run `listNyaaSubtitles` after every restart. (2) **Do not score this gate by
+`inCategory === 0`.** The sweep runs at the head of the acquisition that clears it, so that
+same acquisition adds its own torrent a moment later; assert on the orphan's **hash**.
+
+**End state, stated rather than left implied:** `247d977772eb` is still in
+`jp-study-subtitles` fetching metadata at 1 seeder (0 bytes down). That is the same residue
+the reaper now exists to clear, and the next acquisition clears it.
