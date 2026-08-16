@@ -30,8 +30,36 @@ keyboard route | data/state owner | automated proof | visual proof | status
 
 ## Status of this ledger
 
-**Row set: census DONE, ledger rows NOT YET WRITTEN. The L0 gate is OPEN — no Liquid
-product code may land.**
+**Machine-readable ledger: `parity-ledger.json` (§5.3 asks for machine-readable; this file is
+its narrative). Row set: census DONE. Rows written and DRIVEN: Dictionary, 7 rows. Rows
+deferred to their own wave per §5.3's "before an app is redesigned": everything else.**
+
+**The L0 gate is still OPEN, on one thing only — 6 of 9 protected-system rows are unobserved.
+See "Gate status" at the end. No Liquid product code may land.**
+
+### Dictionary — 7 rows, each closed by a measured side effect
+
+Driven live through the debug bridge on 2026-08-16; the full rows with their verbatim
+observations are in `parity-ledger.json`. Summary of what was actually observed:
+
+| Feature | Observed side effect | Driven |
+| --- | --- | --- |
+| Look up a word | typed 食べる + `Search`: **38 → 340 DOM nodes, 251 → 2,926 chars**, JMdict entry with pitch, EN + RU glosses | yes |
+| Language/source toggle | attribution **`powered by Jisho (JMdict)` ↔ `powered by CC-CEDICT`**, 2,926 ↔ 514 chars, returns to 2,926 exactly | yes |
+| Presentation mode | Interlinear **2,926 → 1,428 chars**, adds `Detected scale: word` + an AI-provenance line; returns to 2,926 exactly | yes |
+| Per-result actions | the save control is **stateful**: 2 results read `Saved to Flashcards`, 1 reads `Save to Flashcards` | state only — these write user collections |
+| Saved searches | `Save search` is **absent** at empty state and **present** after a query | presence only — it persists |
+| Notes pane + filter | both render at empty state; list empty on this profile, so filtering has nothing to measure | presence only |
+| Window lifecycle | pop out → a **second real BrowserWindow 900×640** (`/health` 1 → 2, url `?popout=dictionary`), in-desk window removed, **the active search did not carry**, and closing the popped window left **neither** window | yes |
+
+Two of these are the kind of thing a button-counting ledger cannot see: the save control
+carries real stored state, and pop-out is not state-preserving. The second is L3's problem.
+
+**Trap for anyone driving a controlled input here:** setting `input.value` through the native
+`HTMLInputElement` setter and dispatching `new Event('input')` — the usual React workaround —
+**silently did not stick**. The field read back empty and `Search` produced zero DOM change,
+which looks exactly like a broken search. The bridge's own `POST /type` (real input synthesis
+into the focused element) worked first try. Focus the field through the product, then `/type`.
 
 `CENSUS.md` (milestone L0-baseline-1, `da154966`) supplies the row set: **25 Study OS
 sections served by 21 distinct root components**, 778 owned files, 255,153 LOC, **4,709
@@ -84,14 +112,32 @@ against the live baseline — never from this table alone.
 §8: these must survive every wave unchanged unless a wave explicitly owns them. A row here
 is a **freeze**, not a feature — breaking one is a release blocker, not a parity gap.
 
+"How a break is observed" is a **recipe someone can run**, not a description. `Verified` means
+that recipe was run on 2026-08-16 and produced the stated number.
+
 | Protected system | Owner | How a break is observed | Verified |
 | --- | --- | --- | --- |
-| Secret Aero discovery and exit | Aero shell | | |
-| Aero safe mode | Aero shell | | |
-| Wired lifecycle | Wired shell | | |
-| Taskbar shell | Study OS shell | | |
-| Desktop shortcut grid | Study OS shell | | |
-| Display assignments | Shell/window mgr | | |
-| Window dragging | Shell/window mgr | | |
-| Pop-outs | Shell/window mgr | | |
-| Blanc cold-open boundary | Blanc renderer | | |
+| Taskbar shell | Study OS shell | `.os-taskbar` exists and carries **one entry per open window**. Observed: 3 entries for Scraper, Anki, Dictionary. A break = missing bar, or entry count ≠ `.fwin` count | **YES** — 3 of 3 |
+| Window dragging | Shell/window mgr | Pointer-drag the `.fwin-bar` by a known delta and read back **committed** `style.left/top` (state, not a transform). Observed: `128px,84px` → `168px,114px` for a +40/+30 drag — exact | **YES** |
+| Pop-outs | Shell/window mgr | Click the pop-out `.fwin-b` and count windows in `/health`. Observed: **1 → 2 windows**, the new one 900×640 at `?popout=dictionary`, in-desk `.fwin` removed | **YES** — plus the state-loss note above |
+| Desktop shortcut grid | Study OS shell | Count `.os-desk-icon`. **Observed 0 on this profile** — the grid renders empty, so a count cannot distinguish "intact and empty" from "broken". Recipe must first add an icon, then re-count | no — needs an icon placed first |
+| Display assignments | Shell/window mgr | Move a window to a second display and confirm the assignment survives a restart | no — **one display on this machine**, so the negative control is impossible here |
+| Secret Aero discovery and exit | Aero shell | Perform the discovery gesture, assert the Aero shell mounts, then exit and assert Study OS returns with the same window set | no |
+| Aero safe mode | Aero shell | Force safe mode and assert the reduced shell renders with its exit route intact | no |
+| Wired lifecycle | Wired shell | Drive `requestWiredArchiveRestart` and assert the boot sequence completes with open modules and desktop layout in place (`DesktopShell.tsx:2294` states that contract) | no |
+| Blanc cold-open boundary | Blanc renderer | Cold-open Blanc and assert it mounts without loading Study OS chrome | no |
+
+## Gate status — L0
+
+Present and populated: **all-app baseline (22 surfaces × 3 sizes)**, **Video baseline**,
+**performance baselines incl. the restart leg**, **census**, **this ledger** with 7 driven
+Dictionary rows, and **this matrix** with 9 rows each carrying a runnable recipe.
+
+**The gate does not close yet.** Its wording is that every row traces to an observed side
+effect, and **6 of the 9 protected-system rows have never been observed**. Three of those six
+are cheap (Wired restart, Blanc cold-open, a desk icon placed then counted); one needs a second
+display and is a hardware blocker; two need the Aero shells. Until they are run, a wave could
+break a frozen system and nothing here would catch it — which is the one job this matrix has.
+
+Also still outstanding for §10.1: `note`, `visualizer` and `musicwidget` have no baseline
+(`ALL_APPS_BASELINE.md`, "Not captured"), and MediaCenter's rows need a real clip.

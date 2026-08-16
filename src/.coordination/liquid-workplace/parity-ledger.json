@@ -1,0 +1,113 @@
+{
+  "schema": "app | feature | currentRoute | standardDestination | liquidDestination | keyboardRoute | dataStateOwner | automatedProof | visualProof | status",
+  "authority": "src/LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md §5.3",
+  "milestone": "L0-baseline-1",
+  "rule": "A row closes on an observed side effect, never on a control's presence. `observed` carries the literal before/after measurement; a row with no `observed` is explicitly not proven.",
+  "statusVocabulary": {
+    "pending": "no Liquid destination yet",
+    "standard-only": "deliberately never going Liquid; reason required inline",
+    "both": "verified in standard and Liquid, each by side effect",
+    "REGRESSION": "reachable in one and not the other; blocks the wave"
+  },
+  "rows": [
+    {
+      "app": "dictionary",
+      "feature": "Look up a word against the active dictionary source",
+      "currentRoute": "Dictionary window > search input + `Search` (button.btn.primary)",
+      "standardDestination": "DictionaryView result list, in-window",
+      "liquidDestination": "",
+      "keyboardRoute": "input is focusable and accepts real keystrokes; a synthetic Enter keydown did NOT trigger a search, so the keyboard route is UNPROVEN, not absent",
+      "dataStateOwner": "local JMdict via the main-process dictionary DB",
+      "automatedProof": "baselines/L0-baseline-1/dictionary-default.json",
+      "visualProof": "live bridge drive, 2026-08-16",
+      "observed": "typed 食べる, clicked Search: window went 38 -> 340 DOM nodes and 251 -> 2,926 chars; rendered 食べる/たべる, COMMON, #16403, PITCH, EN + RU glosses, 'JMdict (Japanese–English)'",
+      "status": "pending"
+    },
+    {
+      "app": "dictionary",
+      "feature": "Switch dictionary source by language (JA / ZH)",
+      "currentRoute": "Dictionary window > `日本語` / `中文` (button.gram-level-btn)",
+      "standardDestination": "same result list, re-sourced",
+      "liquidDestination": "",
+      "keyboardRoute": "both are real buttons, focusable",
+      "dataStateOwner": "JMdict (JA) / CC-CEDICT (ZH)",
+      "automatedProof": "",
+      "visualProof": "live bridge drive, 2026-08-16",
+      "observed": "attribution text changed 'powered by Jisho (JMdict)' -> 'powered by CC-CEDICT'; content 2,926 -> 514 chars, rendering 食 shí and 食 sì; toggling back returned to 2,926 chars and the JMdict attribution EXACTLY — a verified reversible round trip",
+      "status": "pending"
+    },
+    {
+      "app": "dictionary",
+      "feature": "Result presentation mode (Automatic / Dictionary / Interlinear)",
+      "currentRoute": "Dictionary window > `Automatic` | `Dictionary` | `Interlinear`",
+      "standardDestination": "same query, different rendering",
+      "liquidDestination": "",
+      "keyboardRoute": "three real buttons, focusable",
+      "dataStateOwner": "view state, local to DictionaryView",
+      "automatedProof": "",
+      "visualProof": "live bridge drive, 2026-08-16",
+      "observed": "Interlinear: 2,926 -> 1,428 chars, adds 'Detected scale: word', 'Explain in Agent', and the provenance line 'The interlinear above is sourced from your dictionaries. The Agent explanation is AI-generated and uses its current provider, privacy, language…'. Returning to Dictionary mode restored 2,926 chars exactly",
+      "status": "pending"
+    },
+    {
+      "app": "dictionary",
+      "feature": "Per-result actions: play audio, copy to clipboard history, save to Flashcards, mark New, add to Anki",
+      "currentRoute": "Dictionary window > per-result controls (`Play 食べる`, `Copy to clipboard history`, `Save to Flashcards`, `食べる: New. Click to mark…`, `+ Add to Anki`)",
+      "standardDestination": "Flashcards store / Anki collection / clipboard history",
+      "liquidDestination": "",
+      "keyboardRoute": "all rendered as buttons",
+      "dataStateOwner": "flashcards store, AnkiConnect, clipboard history",
+      "automatedProof": "",
+      "visualProof": "state observed, action NOT driven",
+      "observed": "the save control is stateful and reflects real stored state: two of three results render 'Saved to Flashcards' and the third renders 'Save to Flashcards'. NOT DRIVEN — these write to the user's collections; the wave that owns Dictionary must drive them with a reversible target",
+      "status": "pending"
+    },
+    {
+      "app": "dictionary",
+      "feature": "Saved searches",
+      "currentRoute": "Dictionary window > `Save search` (appears in the Saved searches header)",
+      "standardDestination": "saved-search list in the same window",
+      "liquidDestination": "",
+      "keyboardRoute": "button",
+      "dataStateOwner": "persisted search list",
+      "automatedProof": "",
+      "visualProof": "presence/absence observed, action NOT driven",
+      "observed": "`Save search` is ABSENT from the empty surface and PRESENT after a query completes — the control is query-conditional, not static chrome. Not driven: it persists user state",
+      "status": "pending"
+    },
+    {
+      "app": "dictionary",
+      "feature": "Notes pane and its filter",
+      "currentRoute": "Dictionary window > `Your notes` + `Filter notes` (input.lexicon-notes-filter)",
+      "standardDestination": "notes list in the same window",
+      "liquidDestination": "",
+      "keyboardRoute": "text input",
+      "dataStateOwner": "lexicon notes store",
+      "automatedProof": "baselines/L0-baseline-1/dictionary-default.json (input present at empty state)",
+      "visualProof": "presence observed, filtering NOT driven",
+      "observed": "pane and filter render on the empty surface; the list was empty on this profile so filtering has no observable effect to measure here",
+      "status": "pending"
+    },
+    {
+      "app": "dictionary",
+      "feature": "Window lifecycle: pop out, minimize, maximize, close",
+      "currentRoute": "Dictionary window > `.fwin-b` title-bar controls",
+      "standardDestination": "in-desk floating window, or a real OS window when popped out",
+      "liquidDestination": "",
+      "keyboardRoute": "four real buttons",
+      "dataStateOwner": "DesktopShell window state + main-process popOut",
+      "automatedProof": "/health window list",
+      "visualProof": "live bridge drive, 2026-08-16",
+      "observed": "pop out created a SECOND real BrowserWindow at 900×640 (`/health` went 1 -> 2 windows, url `?popout=dictionary`) and removed the in-desk `.fwin`. The popped window rendered the app's INITIAL state — the active 食べる search did not carry across. Closing the popped window left NEITHER window: the desk returned to Scraper+Anki with no Dictionary. L3's reversibility requirement has to decide whether that last part is intended",
+      "status": "pending"
+    }
+  ],
+  "notWritten": {
+    "reason": "§5.3 says the ledger is created per app BEFORE that app is redesigned. Dictionary is written here because it is one of L1's two representative apps and because a ledger no one has driven is a template, not a ledger.",
+    "apps": [
+      "MediaCenterView (video/player/music) — rows need a real clip loaded; the surface currently renders the honest degraded state 'Video playback needs the media server' (VIDEO_BASELINE.md finding 2)",
+      "the other 19 root components — written in their own waves, against ALL_APPS_BASELINE.md",
+      "note / visualizer / musicwidget — no baseline yet, see ALL_APPS_BASELINE.md 'Not captured'"
+    ]
+  }
+}
