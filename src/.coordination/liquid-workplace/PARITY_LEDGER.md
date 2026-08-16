@@ -30,16 +30,54 @@ keyboard route | data/state owner | automated proof | visual proof | status
 
 ## Status of this ledger
 
-**Row set: census in progress.** The per-app census is what produces this file's rows; it
-is recorded in `CENSUS.md` in this directory and each census row becomes one or more ledger
-rows. Until every app in §7's table has a census section, the L0 gate is **OPEN** and no
-Liquid product code may land.
+**Row set: census DONE, ledger rows NOT YET WRITTEN. The L0 gate is OPEN — no Liquid
+product code may land.**
 
-Counts are stated per app, as numbers, never as adjectives.
+`CENSUS.md` (milestone L0-baseline-1, `da154966`) supplies the row set: **25 Study OS
+sections served by 21 distinct root components**, 778 owned files, 255,153 LOC, **4,709
+controls**, 464 command references, 5,715 i18n keys. Regenerate with
+`node tools/liquid-census.cjs`.
 
-| App/section | Census done | Ledger rows | Closed by side effect | Status |
-| --- | --- | --- | --- | --- |
-| *(populated by the census)* | | | | |
+Two census findings change the shape of this ledger and are not optional detail:
+
+- **`note` has no route through `AppSection.tsx`** (24 of 25 sections do). A Liquid
+  presentation applied at that seam misses Note entirely, so Note needs its own row set and
+  its own entry point — see census finding 1.
+- **A row is per component-with-route-variant, not per §7 app.** `player`/`video`/`music`
+  are one `MediaCenterView` differing only by `initialTab`; `novels`/`reading` are one
+  `ReadingWorkspaceView` differing only by `initialSection`. One change lands on three §7
+  rows at once — see census finding 2.
+
+| Component (sections served) | Controls | Commands | Census | Ledger rows | Closed by side effect |
+| --- | --- | --- | --- | --- | --- |
+| SettingsApp (settings) | 1307 | 83 | done | 0 | 0 |
+| MediaCenterView (player, video, music) | 816 | 100 | done | 0 | 0 |
+| FlashcardsView (flashcards) | 471 | 33 | done | 0 | 0 |
+| AnkiView (anki) | 389 | 36 | done | 0 | 0 |
+| ScraperView (scraper) | 367 | 24 | done | 0 | 0 |
+| ImmersionView (immersion) | 359 | 49 | done | 0 | 0 |
+| AgentWorkspaceShell (agent) | 173 | 24 | done | 0 | 0 |
+| LibraryView (library) | 134 | 24 | done | 0 | 0 |
+| GrammarView (grammar) | 130 | 2 | done | 0 | 0 |
+| ReadingWorkspaceView (novels, reading) | 110 | 18 | done | 0 | 0 |
+| DictionaryView (dictionary) | 97 | 24 | done | 0 | 0 |
+| YouTubePlaylistsView (youtube) | 70 | 16 | done | 0 | 0 |
+| CalendarView (calendar) | 68 | 0 | done | 0 | 0 |
+| GameArenaView (games) | 53 | 9 | done | 0 | 0 |
+| ResourcesView (resources) | 49 | 9 | done | 0 | 0 |
+| TranslateView (translate) | 40 | 5 | done | 0 | 0 |
+| StatisticsView (stats) | 26 | 4 | done | 0 | 0 |
+| NotebookView (notebook) | 22 | 1 | done | 0 | 0 |
+| MusicWidget (musicwidget) | 18 | 3 | done | 0 | 0 |
+| ReadingGarden (city) | 10 | 0 | done | 0 | 0 |
+| VisualizerWidget (visualizer) | 0 | 0 | done | 0 | 0 |
+| **Note (note)** | — | — | **NO SHARED ROUTE** | 0 | 0 |
+
+The `Controls` column is a **ceiling on the row count, not the row count**. §5.3 counts
+behavior, not buttons: several controls collapse into one row ("Mine sentence" includes
+fields, media preview, destination deck, error states and undo/retry), while one control
+that branches on state may become several. Rows are written per app during its own wave,
+against the live baseline — never from this table alone.
 
 ## Protected-system matrix
 
