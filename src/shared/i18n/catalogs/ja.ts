@@ -9067,6 +9067,18 @@ export const ja: Catalog = {
   'ankiWorkbench.tray.normalize.ascii-width': '全角 ASCII を半角に',
   'ankiWorkbench.tray.normalize.collapse-space': '空白をまとめる',
   'ankiWorkbench.tray.normalize.trim': '前後の空白を削除',
+  'ankiWorkbench.tray.kind.normalize-tags': 'タグを整える',
+  'ankiWorkbench.tray.describe.normalize-tags': 'タグを整える：{ops}',
+  'ankiWorkbench.tray.tagNormalize.trim-separators': ':: の区切りを修復',
+  'ankiWorkbench.tray.tagNormalize.ascii-width': '全角 ASCII を半角に',
+  'ankiWorkbench.tray.tagNormalize.unify-case': 'このデッキで最も多い表記に合わせる',
+  'ankiWorkbench.tray.tagNormalize.drop-redundant-parents': '子タグが含む親タグを削除',
+  'ankiWorkbench.tray.problem.tag-normalize-renamed':
+    '{count} 件のタグの表記が変わります（例：{detail}）。',
+  'ankiWorkbench.tray.problem.tag-normalize-removed':
+    '重複または子タグが含む親タグとして、{count} 件のタグがノートから削除されます。そのノートだけが持つタグが失われることはありません。',
+  'ankiWorkbench.tray.problem.tag-normalize-clean':
+    '整えるものはありません。選択した {count} 件のノートのタグはすでに統一されています。',
   'ankiWorkbench.tray.kind.enrich-dictionary': 'インストール済み辞書から補完',
   'ankiWorkbench.tray.describe.enrich-dictionary':
     '{aspect}を{to}に書き込む（{conflict}／{rule}／{provenance}）',

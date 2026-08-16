@@ -9878,6 +9878,20 @@ export const ru: Catalog = {
   'ankiWorkbench.tray.normalize.ascii-width': 'полноширинный ASCII в обычный',
   'ankiWorkbench.tray.normalize.collapse-space': 'схлопнуть пробелы',
   'ankiWorkbench.tray.normalize.trim': 'обрезать края',
+  'ankiWorkbench.tray.kind.normalize-tags': 'Привести теги в порядок',
+  'ankiWorkbench.tray.describe.normalize-tags': 'Привести теги в порядок: {ops}',
+  'ankiWorkbench.tray.tagNormalize.trim-separators': 'исправить пути с ::',
+  'ankiWorkbench.tray.tagNormalize.ascii-width': 'полноширинный ASCII в обычный',
+  'ankiWorkbench.tray.tagNormalize.unify-case':
+    'привести к написанию, которое в этой колоде встречается чаще',
+  'ankiWorkbench.tray.tagNormalize.drop-redundant-parents':
+    'убрать родительский тег, который уже подразумевает дочерний',
+  'ankiWorkbench.tray.problem.tag-normalize-renamed':
+    'У {count} тегов изменится написание, например {detail}.',
+  'ankiWorkbench.tray.problem.tag-normalize-removed':
+    '{count} тегов будут убраны из заметок как дубликаты или подразумеваемые родительские. Ни одна заметка не потеряет тег, который есть только у неё.',
+  'ankiWorkbench.tray.problem.tag-normalize-clean':
+    'Приводить в порядок нечего: у выбранных заметок ({count}) теги уже единообразны.',
   'ankiWorkbench.tray.kind.enrich-dictionary': 'Заполнить из установленных словарей',
   'ankiWorkbench.tray.describe.enrich-dictionary':
     'Записать {aspect} в {to} ({conflict}; {rule}; {provenance})',

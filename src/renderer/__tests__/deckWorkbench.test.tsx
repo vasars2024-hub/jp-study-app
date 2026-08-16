@@ -356,6 +356,7 @@ describe('DeckWorkbench', () => {
       'set-mastery',
       'add-tags',
       'remove-tags',
+      'normalize-tags',
     ]);
     expect(host.textContent).toContain('ankiWorkbench.step.rules.lead');
     expect(host.querySelector('.wb-design')).toBeNull();

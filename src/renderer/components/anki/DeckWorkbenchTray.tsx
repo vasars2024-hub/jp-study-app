@@ -40,6 +40,7 @@ import type {
 } from '../../../shared/ankiReadingFill';
 import type { AiBatch } from '../../../shared/ankiAiAdditions';
 import { TEXT_NORMALIZE_ORDER, type TextNormalizeOp } from '../../../shared/ankiTextNormalize';
+import { TAG_NORMALIZE_ORDER, type TagNormalizeOp } from '../../../shared/ankiTagNormalize';
 import {
   MASTERY_LEVELS,
   MASTERY_LEVEL_KEYS,
@@ -68,6 +69,7 @@ export const ACTION_KINDS: TrayActionKind[] = [
   'set-mastery',
   'add-tags',
   'remove-tags',
+  'normalize-tags',
 ];
 /**
  * The guided flow's step 3, "Add and enrich": the three kinds that put content
@@ -106,6 +108,7 @@ export const RULE_ACTION_KINDS: TrayActionKind[] = [
   'set-mastery',
   'add-tags',
   'remove-tags',
+  'normalize-tags',
 ];
 /**
  * The rung the level select starts on. Unlike a field name there is no unset
@@ -203,6 +206,7 @@ export default function DeckWorkbenchTray({
   // text, so the form's default choice is the non-destructive one.
   const [onConflict, setOnConflict] = useState<FieldCopyConflict>('keep');
   const [normalizeOps, setNormalizeOps] = useState<TextNormalizeOp[]>([]);
+  const [tagOps, setTagOps] = useState<TagNormalizeOp[]>([]);
   const [aspect, setAspect] = useState<EnrichAspect>('meaning');
   // `refuse` first and pre-selected for the same reason `keep` is: it is the one
   // answer that cannot invent one. A disagreement between installed
@@ -506,6 +510,8 @@ export default function DeckWorkbenchTray({
         };
       case 'set-mastery':
         return { id, enabled: true, kind, level: masteryLevel };
+      case 'normalize-tags':
+        return { id, enabled: true, kind, ops: [...tagOps] };
       case 'normalize-text':
         return {
           id,
@@ -586,6 +592,14 @@ export default function DeckWorkbenchTray({
       case 'set-mastery':
         return t('ankiWorkbench.tray.describe.set-mastery', {
           level: t(MASTERY_LEVEL_KEYS[action.level]),
+        });
+      case 'normalize-tags':
+        return t('ankiWorkbench.tray.describe.normalize-tags', {
+          // Canonical order, same reason `normalize-text` gives: the sentence
+          // has to match the order that will actually run.
+          ops: TAG_NORMALIZE_ORDER.filter((op) => action.ops.includes(op))
+            .map((op) => t(`ankiWorkbench.tray.tagNormalize.${op}`))
+            .join(', '),
         });
       default:
         return t(`ankiWorkbench.tray.describe.${action.kind}`, { tags: action.tags.join(' ') });
@@ -777,6 +791,25 @@ export default function DeckWorkbenchTray({
                   }
                 />
                 {t(`ankiWorkbench.tray.normalize.${op}`)}
+              </label>
+            ))}
+          </>
+        ) : kind === 'normalize-tags' ? (
+          <>
+            {/* No field select: tags are not a field, and the ops are listed in
+                the order they run for the same reason `normalize-text` does. */}
+            {TAG_NORMALIZE_ORDER.map((op) => (
+              <label key={op} className="wb-tray-flag">
+                <input
+                  type="checkbox"
+                  checked={tagOps.includes(op)}
+                  onChange={() =>
+                    setTagOps((prev) =>
+                      prev.includes(op) ? prev.filter((o) => o !== op) : [...prev, op],
+                    )
+                  }
+                />
+                {t(`ankiWorkbench.tray.tagNormalize.${op}`)}
               </label>
             ))}
           </>

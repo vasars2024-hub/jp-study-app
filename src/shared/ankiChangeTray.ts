@@ -59,6 +59,11 @@ import {
 } from './ankiReadingFill';
 import { normalizeFieldText, type TextNormalizeOp } from './ankiTextNormalize';
 import {
+  planTagNormalize,
+  type TagNormalizeOp,
+  type TagNormalizePlan,
+} from './ankiTagNormalize';
+import {
   planPrioritizeNew,
   type PrioritizePlan,
   type PrioritizeRefusal,
@@ -88,7 +93,8 @@ export type TrayActionKind =
   | 'apply-ai-additions'
   | 'prioritize-new'
   | 'rescue-leeches'
-  | 'set-mastery';
+  | 'set-mastery'
+  | 'normalize-tags';
 
 /**
  * What a copy does when the destination already holds text — Phase 4's "require
@@ -226,6 +232,16 @@ export type TrayAction =
       hintReveal?: number;
     })
   | (TrayActionBase & {
+      /**
+       * Recipe 12, tag half. Repairs `::` paths and unifies case-variant tags
+       * against the spelling the draft already uses most. See
+       * `ankiTagNormalize.ts` for why the casing is not this module's choice.
+       */
+      kind: 'normalize-tags';
+      /** Order here is ignored; they always run in `TAG_NORMALIZE_ORDER`. */
+      ops: TagNormalizeOp[];
+    })
+  | (TrayActionBase & {
       kind: 'set-mastery';
       /**
        * The rung to move the selection's words to. No default: the whole point
@@ -360,7 +376,21 @@ export type TrayProblemCode =
    * The consequence gate 3 forbids leaving implied: this writes local knowledge
    * and reschedules nothing in Anki. Always reported when the action runs.
    */
-  | 'mastery-local-only';
+  | 'mastery-local-only'
+  /** Tags that changed spelling. `detail` is `from -> to` for the first few. */
+  | 'tag-normalize-renamed'
+  /**
+   * Tags a note lost: a redundant parent, a separator-only tag, or a variant
+   * that collapsed onto a spelling the note already carried. Never a concept the
+   * note was the only holder of — but it is a removal, so it is a warning.
+   */
+  | 'tag-normalize-removed'
+  /**
+   * The action ran and moved nothing. Reported rather than left silent, because
+   * "already consistent" and "the ops you chose do not apply here" look
+   * identical from an outcome row of `changed: 0`.
+   */
+  | 'tag-normalize-clean';
 
 export interface TrayProblem {
   code: TrayProblemCode;
@@ -435,6 +465,12 @@ export interface TrayPlan {
    * and how many qualified only through Anki's tag, instead of a bare count.
    */
   leechRescue?: LeechRescuePlan;
+  /**
+   * What a `normalize-tags` action did. Folded into `draft` like `prioritize`;
+   * it is here so the surface can show the distinct-tag count before and after,
+   * which is the number that says whether the sidebar actually got shorter.
+   */
+  tagNormalize?: TagNormalizePlan;
   /**
    * Cards whose `due` this tray moved. Separate from `changedNotes` because a
    * reposition-only tray changes zero notes and is not therefore a no-op; a
@@ -661,6 +697,12 @@ function blockingProblems(
           detail: a,
         });
       }
+    } else if (action.kind === 'normalize-tags') {
+      // Same rule `normalize-text` states: no op chosen is a mis-set form, not
+      // "normalise with defaults". There is no default set of ops.
+      if (action.ops.length === 0) {
+        problems.push({ code: 'empty-parameter', severity: 'blocking', actionId: action.id, count: 1 });
+      }
     } else if (normalizeTags(action.tags).length === 0) {
       problems.push({ code: 'empty-parameter', severity: 'blocking', actionId: action.id, count: 1 });
     }
@@ -762,6 +804,7 @@ export function planChangeTray(
   let masteryPlan: MasteryPlan | undefined;
   let prioritizePlan: PrioritizePlan | undefined;
   let leechRescuePlan: LeechRescuePlan | undefined;
+  let tagNormalizePlan: TagNormalizePlan | undefined;
   let changedCards = 0;
 
   const changeFor = (noteId: string): TrayNoteChange => {
@@ -952,6 +995,78 @@ export function planChangeTray(
         matched: noteIds.length,
         changed: rescued.size,
         skipped: noteIds.length - rescued.size,
+      });
+      continue;
+    }
+
+    if (action.kind === 'normalize-tags') {
+      // Whole-selection so the case census is built once, and — the point of
+      // rule 2 in `ankiTagNormalize.ts` — built over the *whole draft* while the
+      // write stays inside the selection. Per-note it would be rebuilt 3,000
+      // times and would still have to read every note anyway.
+      const selected: Array<{ id: string; tags: readonly string[] }> = [];
+      for (const noteId of noteIds) {
+        const at = index.position.get(noteId);
+        const note = at === undefined ? undefined : notes[at];
+        if (note) selected.push({ id: note.id, tags: note.tags });
+      }
+      const plan = planTagNormalize({
+        notes: selected,
+        // `notes` and not `draft.notes`: earlier actions in the same tray may
+        // already have rewritten tags, and censusing the input draft would
+        // canonicalise against spellings that no longer exist.
+        censusTags: notes.map((n) => n.tags),
+        ops: action.ops,
+      });
+      tagNormalizePlan = plan;
+      let written = 0;
+      for (const change of plan.changes) {
+        const at = index.position.get(change.noteId);
+        if (at === undefined) continue;
+        const current = notes[at];
+        const before = current.tags;
+        // `marked` is a tag in the data and a flag in the model — same rule the
+        // add/remove branch enforces, and it matters here because `unify-case`
+        // can rewrite the casing of `marked` itself.
+        notes[at] = { ...current, tags: change.after, marked: change.after.includes(MARKED_TAG) };
+        ops.push({ kind: 'tags', noteId: change.noteId, before, after: change.after, group: groupId });
+        const noteChange = changeFor(change.noteId);
+        noteChange.tags = { before: noteChange.tags?.before ?? before, after: change.after };
+        written += 1;
+      }
+      if (plan.renamedTags > 0) {
+        problems.push({
+          code: 'tag-normalize-renamed',
+          severity: 'info',
+          actionId: action.id,
+          count: plan.renamedTags,
+          // The first rename, so the user can see the shape of the change
+          // without the surface having to render every pair.
+          detail: `${plan.changes[0]?.renamed[0]?.from ?? ''} -> ${plan.changes[0]?.renamed[0]?.to ?? ''}`,
+        });
+      }
+      if (plan.removedTags > 0) {
+        problems.push({
+          code: 'tag-normalize-removed',
+          severity: 'warning',
+          actionId: action.id,
+          count: plan.removedTags,
+        });
+      }
+      if (written === 0) {
+        problems.push({
+          code: 'tag-normalize-clean',
+          severity: 'info',
+          actionId: action.id,
+          count: plan.unchanged,
+        });
+      }
+      outcomes.push({
+        actionId: action.id,
+        kind: action.kind,
+        matched: noteIds.length,
+        changed: written,
+        skipped: noteIds.length - written,
       });
       continue;
     }
@@ -1406,6 +1521,7 @@ export function planChangeTray(
     mastery: masteryPlan,
     prioritize: prioritizePlan,
     leechRescue: leechRescuePlan,
+    tagNormalize: tagNormalizePlan,
   };
 }
 

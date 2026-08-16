@@ -9492,6 +9492,19 @@ export const en: Catalog = {
   'ankiWorkbench.tray.normalize.ascii-width': 'full-width ASCII to half-width',
   'ankiWorkbench.tray.normalize.collapse-space': 'collapse spaces',
   'ankiWorkbench.tray.normalize.trim': 'trim the ends',
+  'ankiWorkbench.tray.kind.normalize-tags': 'Tidy up tags',
+  'ankiWorkbench.tray.describe.normalize-tags': 'Tidy up tags: {ops}',
+  'ankiWorkbench.tray.tagNormalize.trim-separators': 'repair :: paths',
+  'ankiWorkbench.tray.tagNormalize.ascii-width': 'full-width ASCII to half-width',
+  'ankiWorkbench.tray.tagNormalize.unify-case': 'match the spelling this deck uses most',
+  'ankiWorkbench.tray.tagNormalize.drop-redundant-parents':
+    'drop a parent tag a child already implies',
+  'ankiWorkbench.tray.problem.tag-normalize-renamed':
+    '{count} tags change spelling, for example {detail}.',
+  'ankiWorkbench.tray.problem.tag-normalize-removed':
+    '{count} tags are removed from their notes as duplicates or implied parents. No note loses a tag that only it carried.',
+  'ankiWorkbench.tray.problem.tag-normalize-clean':
+    'Nothing to tidy: the {count} selected notes already tag consistently.',
   'ankiWorkbench.tray.kind.enrich-dictionary': 'Fill from installed dictionaries',
   'ankiWorkbench.tray.describe.enrich-dictionary':
     'Write {aspect} into {to} ({conflict}; {rule}; {provenance})',

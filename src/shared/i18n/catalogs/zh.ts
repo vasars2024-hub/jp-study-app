@@ -9014,6 +9014,17 @@ export const zh: Catalog = {
   'ankiWorkbench.tray.normalize.ascii-width': '全角 ASCII 转半角',
   'ankiWorkbench.tray.normalize.collapse-space': '合并空格',
   'ankiWorkbench.tray.normalize.trim': '去除首尾空白',
+  'ankiWorkbench.tray.kind.normalize-tags': '整理标签',
+  'ankiWorkbench.tray.describe.normalize-tags': '整理标签：{ops}',
+  'ankiWorkbench.tray.tagNormalize.trim-separators': '修复 :: 层级',
+  'ankiWorkbench.tray.tagNormalize.ascii-width': '全角 ASCII 转半角',
+  'ankiWorkbench.tray.tagNormalize.unify-case': '统一为本牌组最常用的写法',
+  'ankiWorkbench.tray.tagNormalize.drop-redundant-parents': '删除子标签已隐含的父标签',
+  'ankiWorkbench.tray.problem.tag-normalize-renamed': '{count} 个标签的写法会改变，例如 {detail}。',
+  'ankiWorkbench.tray.problem.tag-normalize-removed':
+    '{count} 个标签将作为重复项或被隐含的父标签从笔记中移除。不会有笔记失去只属于它的标签。',
+  'ankiWorkbench.tray.problem.tag-normalize-clean':
+    '无需整理：所选的 {count} 条笔记的标签已经一致。',
   'ankiWorkbench.tray.kind.enrich-dictionary': '用已安装词典填充',
   'ankiWorkbench.tray.describe.enrich-dictionary':
     '把{aspect}写入{to}（{conflict}；{rule}；{provenance}）',
