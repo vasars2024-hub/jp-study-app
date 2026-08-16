@@ -22896,3 +22896,53 @@ now advances to the line ending in `,` before inserting. (2) The Browser has no 
 Ctrl+A on `.wb-browser-grid` is the selection, and the tray's Add button reads `Add to tray`.
 (3) Selecting all 3,221 notes leaves the renderer unresponsive to `/eval` for over a minute while
 the lookup runs — that is the enrichment lookup, not a hang; the probe needs ~6 s waits per queue.
+
+## 2026-08-16 06:30 — Track 7 / ANKI Phase 4: recipe 6, and the boss audit's two open findings
+
+**Boss audit 2026-08-16 05:34, findings 1 and 3 closed.** Finding 1 (`5c55dcd1`): the
+`no-kana-reading → reading-not-kana` ternary in `ankiChangeTray.ts:869` had no test; the audit
+flipped it and all 8,797 tests stayed green. Two `planChangeTray` cases, one per arm; re-running the
+same flip now fails **1 of 28** (was 0 of 26). Finding 3 (`b1ec5171`): `ScraperQbitInput.apiKey`
+documented a "test before saving" flow with **no renderer producer** anywhere. Reworded rather than
+wired — `password?` has carried the same unused shape since before key mode, so honesty is the
+smaller change and the wiring path is named in the comment. Finding 2 is not this branch's to fix
+(foreign unstaged hunks); finding 4 stays P3.
+
+**Recipe 6 (`74bcb69c` model, `b0c2396b` surface).** Decision: "prioritize" is read as the new
+card's queue position (`due` while `type` is `new`) and nothing else — a tag or a flag would look
+like the feature without changing what the user studies next. Tradeoff: it needed the edit journal's
+**first card-level op**, `card-due`, so a reposition is one undoable step. Kept deliberately narrow:
+a queue or type change would have to reconstruct `left`, `originalDue` and a review history the
+draft never held. `TrayPlan.changedCards` exists because a reposition-only tray changes zero notes.
+The refusal→code mapping is a **table**, not a ternary chain — that is the exact shape finding 1
+caught, and a table is enumerable by a test.
+
+**Live, real 3,221-note local deck, English UI.** Partition exact: moved **3,079** + no-rank **141**
++ no-word **1** = **3,221**. Order is real Japanese frequency: 帰る #0, 出来る #1, 入れる #2, 置く #3,
+気 #4. Apply enabled (`disabled=false`) — which is the point of `changedCards`; before this turn the
+gate read `changedNotes === 0 && masteryChanges === 0` and the button was **dead** on exactly the
+tray this recipe produces.
+
+**Negative control, live and the right way round.** Marked 帰る known through the app's own store
+(`jp-word-knowledge-ja`, capture-patch-restore): moved **3,079 → 3,078**, known count **0 → 1**
+detail `帰る`, and the queue head became 出来る #0 — the word left the plan entirely. Restored: the
+raw string was `null` before and `null` after (`===`), and the plan returned to 3,079 with 帰る #0.
+Unit mutation control: deleting the known guard fails **7 of 13**.
+
+**Two more defects the mounted test found, both fixed in `b0c2396b`:** the preview said "nothing
+would change" over real moves (a reposition writes no field, so the field diff is empty by
+construction — it now names the words and positions); and a host with no `dictFrequencyRanks` would
+have printed "no installed frequency list ranks this word" across a ranked deck, blaming the words
+for a missing capability, so the plan now stays blocked on `no-vocab-context`.
+
+**Traps.** (1) `ankiKnownFromCards` calls a note known when *every* card is mature, so a fixture
+review card with the default 30-day interval is `known`, not `not-new` — use an interval under 21 to
+test the queue refusal. (2) The bridge `/eval` body key is **`js`**, not `expression`; `expression`
+returns `{"ok":false,"error":"missing js"}`. (3) The four i18n catalogs carry another track's
+~1,300-line unstaged rewrite; `debug/stage-recipe6-i18n.js` builds HEAD+edit blobs, and
+`git hash-object` rejects `--path` together with `--no-filters`.
+
+**Gates (shared working tree; HEAD alone is red from other tracks — boss-audit finding 2).** vitest
+**676 passed / 1 skipped of 677, 9,149 passed / 6 skipped, exit 0** (+1 file, +19 tests, all mine).
+`i18n-check` exit 0 at **10,104** English keys (+10). `architecture-audit` exit 0, **Nothing new**,
+2 known pending. eslint **0 errors** on all 8 touched TS/TSX paths.
