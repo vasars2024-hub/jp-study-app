@@ -22706,3 +22706,60 @@ way are invisible to vitest, the app and `i18n-check` — the new
 load-dependent flakes; **both pass alone in 5.14 s**, neither imports anything I touched.
 `i18n-check` exit 0 at **10,010** keys (+18 × 4 languages). `architecture-audit` exit 0,
 **Nothing new**, 19 findings, 2 pending. `eslint` **0** on all 8 touched paths.
+
+## 2026-08-16 05:00 — `primary` — Track 7 Phase 4: two recipes, and the frequency table finally has rows
+
+Ladder note: **mal-pipeline re-derived as complete-except-external** before starting here —
+gates 1–28, 30 and 32 pass in `MAL_ANIME_PIPELINE_PLAN.md`; 29 is half-open *on* gate 31, and
+31/33 are attended-only. The alternation collapses to main-v1 until the user runs 31/33.
+
+**`2c4a05c` — smart recipe 8, wrong writing system.** New `shared/textScripts.ts` answers
+*containment*, never a language verdict: a sentence card legitimately holds kanji, kana and a
+loanword at once. `script:latin`, `Expression:script:kana` (the `Field:re:` spelling), `script:none`.
+The kanji range is `furigana.ts`'s, imported not re-spelled. **Live, real 3,221-note deck:**
+`script:latin` **225**, `script:han` **3,220**, `script:kana` **3,220**, `script:cyrillic` **17**,
+`script:none` **1**, `script:klingon` → `unknown-key`. **Negative control that decided the design:**
+every row's `search` haystack carries a Latin deck and note-type name, so a haystack-based
+`script:latin` returns **3,221 of 3,221** — the predicate reads `row.fields` instead. All 17
+Cyrillic hits are in `Back` (Russian glosses; 9 also hold Latin), and the one letter-free note is a
+real `?????` placeholder. 9 + 8 tests; the hint key gains `script:` in all four languages. The
+absent-field rule has no live path here — this deck is one note type — so it rests on the tests.
+
+**`4e513c3` — smart recipe 9, duplicates.** `shared/ankiDuplicates.ts` groups by one field in
+exact / normalized / near and proposes the survivor by a readable rule — most non-empty fields,
+then most text, then first seen — with `tied: true` when the pick was arbitrary. Decision: it
+**proposes and never deletes**, and returns a *selection* rather than a new tray kind, because the
+tray's reversible ops are tags and field text and the existing actions already consume a selection.
+Two blank values are two missing values, not a group. Near has **no default threshold** and refuses
+without one. **Live, same deck:** `Expression` exact **40 groups / 40 duplicates / 1 tied / 5 ms**,
+normalized identical, `Sentence` normalized **681 groups / 2,085 duplicates / 172 tied / 19 ms**
+(top group is 43 notes sharing one Wikipedia blob). Near at **0.9 / 0.7 / 0.5 → 40 / 74 / 239
+groups**, **8,784 comparisons** each (not 5.19 M — bigram index), 15–17 ms; at 0.9 it reproduces the
+exact scan's 40 exactly. 20 tests.
+
+**`8578134` — the audit caught a second `bigramDice`.** Moved to `shared/bigramSimilarity.ts`;
+`subtitleFusionCore` and `ankiDuplicates` both import it, keeping fusion's code-point-aware version.
+`ankiDuplicates` is classified **pending**, not accepted: it is the scan half, proven and unwired.
+
+**GATE 3's frequency half is unblocked — `freq_corpora` has rows.** `Freq.JPDB.zip` imported via
+`dict:importYomitan` (9,103 ms → legacy store `30b716411cce`, `hasFreq: true`), then
+`dictImportStart({kind:'legacy'})` migrated it into SQLite. **Before: `dictFrequencyRanks` returned
+`{}` for 5 words. After: `の 1, 言う 104, 人 1,526, 食べる 16,403, 猫 17,797, 日本 49,151,
+燦然 112,650`**, bands veryCommon→rare. The mid-range values look wrong for JPDB but are
+**byte-faithful to the source**: the legacy store's 478,044 freq keys were read directly and say
+`食べるたべる => 16403`. Not a parser defect — do not re-open it as one.
+
+**Traps.** (1) `dict:importYomitan` on a **backslash** path dies as `ADM-ZIP: Invalid filename` —
+the bridge's JSON layer eats the escapes; pass forward slashes. (2) The legacy→SQLite migration was
+**still running after 75 minutes** (utility pid 23540, CPU climbing, WAL 109 MB) on the *second*
+pending store; JPDB itself committed early, which is why the reader answers. Do not restart the app
+mid-migration. (3) New `debug/stage-head-replace.cjs` is the *replacement* sibling of
+`stage-head-insert.cjs` for a dirty catalog line, with the same undo-and-compare-to-HEAD proof.
+(4) `debug/ev.cjs` on a file needs the trailing `;` stripped or `/eval` throws.
+
+**Gates**, once after the last slice. `vitest` full run **671 files passed / 1 skipped of 674,
+9,089 passed**, 2 files failed — `architectureBaseline` (mine, fixed by `8578134`) and
+`scraperLogBus` (20 s, load-dependent); **`src/shared/__tests__/` + `scraperLogBus` re-run together:
+303 files, 4,673 tests, 0 failures in 12.8 s**. `i18n-check` exit 0 at **10,010** keys — no new keys,
+an existing hint value changed. `architecture-audit` exit 0, **Nothing new**, 3 pending. `eslint`
+**0** on all 9 touched paths.
