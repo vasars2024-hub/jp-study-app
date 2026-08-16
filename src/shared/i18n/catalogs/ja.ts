@@ -8773,7 +8773,7 @@ export const ja: Catalog = {
   'ankiWorkbench.browser.view': '表示',
   'ankiWorkbench.browser.view.grid': '表形式',
   'ankiWorkbench.browser.view.samples': '代表的なカード',
-  'ankiWorkbench.browser.query.hint': '語を並べると AND になります。ほかに deck:、tag:、note:、is:marked、cards:>1、re:パターン、フィールド名:文字、freq:<=5000、freq:none、known:no、known:conflict、除外の -、or、括弧が使えます。空白や括弧を含む値は引用符で囲んでください。',
+  'ankiWorkbench.browser.query.hint': '語を並べると AND になります。ほかに deck:、tag:、note:、is:marked、cards:>1、re:パターン、フィールド名:文字、freq:<=5000、freq:none、known:no、known:conflict、script:latin、script:none、フィールド名:script:kana、除外の -、or、括弧が使えます。空白や括弧を含む値は引用符で囲んでください。',
   'ankiWorkbench.browser.query.unknownKey': '「{token}」はこのデッキのフィールドでも、ブラウザーが知るフィルターでもありません。',
   'ankiWorkbench.browser.query.badRegex': 'この正規表現は解釈できません: {token}',
   'ankiWorkbench.browser.query.unbalancedParen': '括弧が対応していません。「{token}」付近です。',

@@ -407,3 +407,66 @@ describe('freq: and known: with a context', () => {
     expect(matchBrowserRows([stranger], none.filter, vocab)).toEqual([stranger]);
   });
 });
+
+// ----- Phase 4: smart recipe 8, wrong-language / wrong-script content -------------
+
+describe('script: finds content in the wrong writing system', () => {
+  it('needs no vocabulary context, unlike freq: and known:', () => {
+    // The same bare `schema` every test above uses — there is no `vocab` on it.
+    expect(ids('script:latin')).toEqual(['n1', 'n2']);
+    expect(ids('script:han')).toEqual(['n1', 'n3']);
+    expect(ids('script:cyrillic')).toEqual([]);
+  });
+
+  it('reads the note’s fields and not the haystack, so deck names cannot match it', () => {
+    // Every row’s `search` carries `japanese::core` and the note type name, so a
+    // `script:latin` over the haystack would return all three rows.
+    expect(rows.every((r) => /japanese/.test(r.search))).toBe(true);
+    expect(ids('script:latin')).not.toContain('n3');
+  });
+
+  it('scopes to one field with the same `Field:` spelling `re:` uses', () => {
+    expect(ids('Meaning:script:latin')).toEqual(['n1']);
+    expect(ids('Expression:script:latin')).toEqual([]);
+    expect(ids('Expression:script:kana')).toEqual(['n1', 'n3']);
+    // Case-insensitive on the field name, like every other field predicate.
+    expect(ids('expression:script:han')).toEqual(['n1', 'n3']);
+  });
+
+  it('a note type without the field never matches, and so is kept by the negation', () => {
+    // n2 is a Cloze note: it has no Expression field at all. Reporting it as
+    // "this Expression holds no Japanese" would drag every other note type into
+    // one note type’s wrong-script audit.
+    expect(ids('Expression:script:none')).toEqual([]);
+    expect(ids('-Expression:script:kana')).toEqual(['n2']);
+  });
+
+  it('distinguishes an empty field from an absent one', () => {
+    // n3’s Meaning is present and empty; n2 has no Meaning field at all.
+    expect(ids('Meaning:script:none')).toEqual(['n3']);
+  });
+
+  it('unscoped `script:none` means every field is letter-free, not some field', () => {
+    // n3 has an empty Meaning but a kanji Expression, so it is not letter-free.
+    expect(ids('script:none')).toEqual([]);
+  });
+
+  it('composes with groups and negation', () => {
+    expect(ids('script:han -script:latin')).toEqual(['n3']);
+    expect(ids('(script:latin or script:han) core')).toEqual(['n1', 'n2', 'n3']);
+  });
+
+  it('refuses an unknown script by naming the whole token, never matching all', () => {
+    expect(ids('script:klingon')).toBe('unknown-key');
+    expect(ids('Expression:script:klingon')).toBe('unknown-key');
+    expect(ids('script:')).toBe('unknown-key');
+    const refused = filterBrowserRows(rows, 'Expression:script:klingon', schema);
+    expect(refused.error).toEqual({ code: 'unknown-key', token: 'Expression:script:klingon' });
+    expect(refused.rows).toEqual([]);
+  });
+
+  it('a hand-built node with neither script nor absence matches nothing, and does not throw', () => {
+    expect(rows.filter(compileBrowserFilter({ kind: 'script' }))).toEqual([]);
+    expect(rows.filter(compileBrowserFilter({ kind: 'script', fieldName: 'Meaning' }))).toEqual([]);
+  });
+});

@@ -9581,7 +9581,7 @@ export const ru: Catalog = {
   'ankiWorkbench.browser.view': 'Вид',
   'ankiWorkbench.browser.view.grid': 'Таблица',
   'ankiWorkbench.browser.view.samples': 'Показательные карточки',
-  'ankiWorkbench.browser.query.hint': 'Слова объединяются через И. Ещё есть deck:, tag:, note:, is:marked, cards:>1, re:шаблон, Поле:текст, freq:<=5000, freq:none, known:no, known:conflict, - для исключения, or и скобки. Значение с пробелами или скобками берите в кавычки.',
+  'ankiWorkbench.browser.query.hint': 'Слова объединяются через И. Ещё есть deck:, tag:, note:, is:marked, cards:>1, re:шаблон, Поле:текст, freq:<=5000, freq:none, known:no, known:conflict, script:latin, script:none, Поле:script:kana, - для исключения, or и скобки. Значение с пробелами или скобками берите в кавычки.',
   'ankiWorkbench.browser.query.unknownKey': '«{token}» — ни поле этой колоды, ни известный браузеру фильтр.',
   'ankiWorkbench.browser.query.badRegex': 'Это регулярное выражение не разбирается: {token}',
   'ankiWorkbench.browser.query.unbalancedParen': 'Непарная скобка рядом с «{token}».',

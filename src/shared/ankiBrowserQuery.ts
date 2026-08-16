@@ -19,6 +19,7 @@
 
 import type { BrowserRow } from './ankiWorkbenchBrowser';
 import { FREQUENCY_BAND_LIMITS, type LexiconFrequencyBand } from './lexiconFrequency';
+import { containsScript, hasNoScript, parseTextScript, type TextScript } from './textScripts';
 import {
   isVocabKnownConflict,
   resolveVocabKnown,
@@ -134,6 +135,30 @@ export interface KnownPredicate {
   mode: 'yes' | 'no' | 'local' | 'anki' | 'both' | 'conflict' | 'none';
 }
 
+/**
+ * `script:latin`, `Expression:script:kana`, `script:none` — smart recipe 8,
+ * "detect wrong-language or wrong-script content in a chosen field".
+ *
+ * Containment, never a language verdict: `textScripts.ts` explains why. The
+ * useful audit query is a composition — `Expression:script:latin` finds English
+ * where Japanese belongs, and `-Expression:script:han -Expression:script:kana`
+ * finds an expression field with no Japanese at all, using the negation the
+ * grammar already has rather than a `not-` spelling of every mode.
+ *
+ * **Unscoped, this reads the note's fields and not `row.search`.** The haystack
+ * also carries tags and deck names, which are Latin in nearly every real deck,
+ * so `script:latin` over it would match everything and read as a broken filter.
+ */
+export interface ScriptPredicate {
+  kind: 'script';
+  /** Absent = any field of the note. */
+  fieldName?: string;
+  /** Absent when `absence` is set. */
+  script?: TextScript;
+  /** `script:none` — no letter of any known script. */
+  absence?: 'none';
+}
+
 export type BrowserPredicate =
   | AnyTextPredicate
   | RegexPredicate
@@ -144,7 +169,8 @@ export type BrowserPredicate =
   | FlagPredicate
   | CardCountPredicate
   | FrequencyPredicate
-  | KnownPredicate;
+  | KnownPredicate
+  | ScriptPredicate;
 
 export interface BrowserFilterGroup {
   kind: 'group';
@@ -336,6 +362,13 @@ function parseKnownValue(value: string): BrowserPredicate | null {
   return KNOWN_MODES.has(v) ? { kind: 'known', mode: v } : null;
 }
 
+/** `none` or one `TextScript`. Unlike `freq:`, this needs no context to answer. */
+function parseScriptValue(value: string): ScriptPredicate | null {
+  if (value.toLowerCase() === 'none') return { kind: 'script', absence: 'none' };
+  const script = parseTextScript(value);
+  return script ? { kind: 'script', script } : null;
+}
+
 function predicateFromTerm(token: Token, schema: BrowserQuerySchema): BrowserPredicate | BrowserQueryError {
   const { text, quoted } = token;
   const colon = quoted ? -1 : text.indexOf(':');
@@ -386,6 +419,9 @@ function predicateFromTerm(token: Token, schema: BrowserQuerySchema): BrowserPre
     if (!num) return { code: 'unknown-key', token: text };
     return { kind: 'cards', op: num.op, value: num.value };
   }
+  if (lowerKey === 'script') {
+    return parseScriptValue(value) ?? { code: 'unknown-key', token: text };
+  }
   if (lowerKey === 'freq' || lowerKey === 'known') {
     // The refusal comes before the value is even read: with no context, every
     // spelling of the key is equally unanswerable, and reporting "unknown
@@ -407,6 +443,12 @@ function predicateFromTerm(token: Token, schema: BrowserQuerySchema): BrowserPre
       return { code: 'bad-regex', token: source };
     }
     return { kind: 'regex', source, fieldName: field };
+  }
+  // `Expression:script:kana`, the field-scoped form, spelled exactly like
+  // `Field:re:` above so a user who knows one already knows the other.
+  if (value.toLowerCase().startsWith('script:')) {
+    const scoped = parseScriptValue(value.slice(7));
+    return scoped ? { ...scoped, fieldName: field } : { code: 'unknown-key', token: text };
   }
   return {
     kind: 'field',
@@ -629,6 +671,28 @@ export function compileBrowserFilter(node: BrowserFilterNode, vocab?: VocabConte
       return (row) => {
         const rank = factsFor(facts, row).rank;
         return rank !== null && compareNumeric(op, rank, value);
+      };
+    }
+    case 'script': {
+      const { fieldName, script, absence } = node;
+      if (fieldName !== undefined) {
+        // Absent is not empty, exactly as `field` decides it: a note of another
+        // note type genuinely has no such field, and reporting it as "holds no
+        // Japanese" would put every other note type into a wrong-script audit.
+        return (row) => {
+          const value = row.fields[fieldName];
+          if (value === undefined) return false;
+          return absence === 'none' ? hasNoScript(value) : !!script && containsScript(value, script);
+        };
+      }
+      // Unscoped reads the fields, never `row.search` — see `ScriptPredicate`.
+      // `script:none` is "every field is letter-free", not "some field is":
+      // otherwise a normal note with one empty field would answer yes.
+      return (row) => {
+        const values = Object.values(row.fields);
+        return absence === 'none'
+          ? values.every(hasNoScript)
+          : !!script && values.some((value) => containsScript(value, script));
       };
     }
     default: {

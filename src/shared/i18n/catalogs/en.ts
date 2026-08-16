@@ -9200,7 +9200,7 @@ export const en: Catalog = {
   'ankiWorkbench.browser.view': 'View',
   'ankiWorkbench.browser.view.grid': 'Spreadsheet',
   'ankiWorkbench.browser.view.samples': 'Representative cards',
-  'ankiWorkbench.browser.query.hint': 'Words are combined with AND. Also: deck:, tag:, note:, is:marked, cards:>1, re:pattern, Field:text, freq:<=5000, freq:none, known:no, known:conflict, - to exclude, or, and brackets. Quote a value containing spaces or brackets.',
+  'ankiWorkbench.browser.query.hint': 'Words are combined with AND. Also: deck:, tag:, note:, is:marked, cards:>1, re:pattern, Field:text, freq:<=5000, freq:none, known:no, known:conflict, script:latin, script:none, Field:script:kana, - to exclude, or, and brackets. Quote a value containing spaces or brackets.',
   'ankiWorkbench.browser.query.unknownKey': '“{token}” is not a field of this deck or a filter this Browser knows.',
   'ankiWorkbench.browser.query.badRegex': 'This regular expression will not compile: {token}',
   'ankiWorkbench.browser.query.unbalancedParen': 'A bracket is unmatched, near “{token}”.',

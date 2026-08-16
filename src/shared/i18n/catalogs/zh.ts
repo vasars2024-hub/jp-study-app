@@ -8733,7 +8733,7 @@ export const zh: Catalog = {
   'ankiWorkbench.browser.view': '视图',
   'ankiWorkbench.browser.view.grid': '表格',
   'ankiWorkbench.browser.view.samples': '代表性卡片',
-  'ankiWorkbench.browser.query.hint': '多个词之间为“且”关系。还可使用 deck:、tag:、note:、is:marked、cards:>1、re:正则、字段名:文本、freq:<=5000、freq:none、known:no、known:conflict、- 排除、or 以及括号。含空格或括号的值请加引号。',
+  'ankiWorkbench.browser.query.hint': '多个词之间为“且”关系。还可使用 deck:、tag:、note:、is:marked、cards:>1、re:正则、字段名:文本、freq:<=5000、freq:none、known:no、known:conflict、script:latin、script:none、字段名:script:kana、- 排除、or 以及括号。含空格或括号的值请加引号。',
   'ankiWorkbench.browser.query.unknownKey': '“{token}”既不是本牌组的字段，也不是浏览器认识的过滤条件。',
   'ankiWorkbench.browser.query.badRegex': '该正则表达式无法解析：{token}',
   'ankiWorkbench.browser.query.unbalancedParen': '括号不匹配，位于“{token}”附近。',
