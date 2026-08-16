@@ -1,0 +1,85 @@
+{
+  "title": "Sticky note",
+  "rect": {
+    "x": 320,
+    "y": 116,
+    "w": 260,
+    "h": 220
+  },
+  "maximized": false,
+  "viewport": {
+    "w": 1264,
+    "h": 821,
+    "dpr": 1
+  },
+  "theme": {
+    "dataTheme": "forest-night",
+    "materials": null,
+    "reducedMotion": false,
+    "forcedColors": false
+  },
+  "controls": {
+    "focusable": 2,
+    "byRole": {
+      "button": 1,
+      "textarea": 1
+    },
+    "under24": 0,
+    "under24list": [],
+    "under44": 1
+  },
+  "focusOrder": {
+    "count": 2,
+    "inversions": 0,
+    "firstInversionAt": -1,
+    "domOrder": [
+      {
+        "i": 0,
+        "n": "Delete note",
+        "top": 5,
+        "left": 225
+      },
+      {
+        "i": 1,
+        "n": "Write a note… (closing deletes it)",
+        "top": 34,
+        "left": 1
+      }
+    ]
+  },
+  "overflow": {
+    "clippedX": 0,
+    "clippedXList": [],
+    "scrollersY": 0,
+    "pastWindowFrame": 0,
+    "pastList": [],
+    "unreachable": 0,
+    "unreachableList": []
+  },
+  "routes": {
+    "count": 0,
+    "list": []
+  },
+  "states": {
+    "empty": false,
+    "loading": false,
+    "error": false,
+    "offline": false,
+    "keywordFormIsAHint": true
+  },
+  "stateBlocks": [],
+  "textChars": 13,
+  "domNodes": 12,
+  "sizeMode": "default",
+  "settle": {
+    "samples": [
+      "12/2",
+      "12/2",
+      "12/2"
+    ],
+    "waitedMs": 1200,
+    "settled": true,
+    "final": "12/2"
+  },
+  "capturedAt": "2026-08-16T21:44:24.0515642+03:00"
+}

@@ -120,19 +120,51 @@ that none exists.
 Regression check on 2 and 3: Dictionary re-run after the refactor reproduced its earlier record
 exactly (10 / 0 / 2 / 0 at all three sizes).
 
+## The entry point none of the app lists has: the desktop context menu
+
+Right-clicking the desk (`.os-desktop`, `contextmenu`) opens a 6-item menu that is not in the
+Start menu, not a desk icon, and not in `CENSUS.md`'s 25 sections: **`New sticky note`,
+`New app shortcut…`, `Widgets…`, `Close all apps`, `Personalize…`, `Desktop & display
+settings`**. Two of the three previously-unreachable surfaces are behind it.
+
+**`note` is now captured** — `Sticky note`, **260×220, 2 focusables, 0 unreachable at default
+and at minimum, no maximize control** (`baselines/L0-baseline-1/sticky note-{default,min}.json`).
+The frameless guard fired here for the second time and correctly refused to record a `max`.
+That makes **23 surfaces** in this milestone.
+
+`Widgets…` opens a **widget gallery of 27 cards** across tabs All/Favorites/Recent/Productivity/
+Study/Music/Statistics — Digital Clock, Analog Clock, Calendar, Pomodoro, Stopwatch, World
+Clock, Daily Goals, Habit Tracker, Countdown, To-do, Study Streak, Today's Study Time, Reading
+Progress, Vocabulary Progress, JLPT/HSK Progress, Word of the Day, Continue Watching, Music
+Player, Learning Heatmap, Learner Map, Calculator, Recent Lookups, Clipboard, CPU, Memory,
+Battery, Network. **That is a whole surface class absent from the census's section list**, and
+the parity ledger will need rows for it.
+
 ## Not captured, and exactly what it would take
 
-Three of the 25 `WinSection`s have no Start-menu row and are **absent from this baseline rather
-than assumed fine**:
-
-- **`note`** — `openNote()` (`DesktopShell.tsx:1451`), reached from a desk icon or the desktop
-  context menu; the desk had **0 icons** at capture. It is also the census's finding 1 (no route
-  through `AppSection.tsx`), so it needs its own entry point either way.
 - **`visualizer`**, **`musicwidget`** — `open()` via `DesktopSettings`' `onOpenVisualizer` /
   `onOpenMusicWidget` (`DesktopShell.tsx:2488`). The Settings window was opened live and its
-  Media·Visualizer tab searched; no button matching `/visual|widget|open/i` was found in the
-  rendered DOM, so the live entry point is not where the prop suggests. Finding that control is
-  its own small task.
+  Media·Visualizer tab searched; **no button matching `/visual|widget|open/i`** was rendered, so
+  the live entry point is not where the prop suggests. The widget gallery has a `Music Player`
+  card but no Visualizer card.
+- **Unresolved, stated as unresolved:** clicking `Add` on the gallery's `Music Player` card
+  produced **0 `.widget-frame`** elements, and afterwards that card was **indistinguishable from
+  an untouched card** (both read `Add`). So either the add did not take, or widgets mount under
+  a selector this probe does not know. One click is not enough to call a control dead — it is
+  recorded as an open question for whichever wave owns widgets, not as a finding.
+
+Also still open, unchanged from `VIDEO_BASELINE.md`: loading/offline states not on screen during
+capture, and playing-clip measurements including frame stability, which need a real clip.
+
+## Harness incident, recorded because it nearly corrupted the boot layout
+
+Hunting for the gallery's close control, a probe clicked the first button matching
+`/close/i` **anywhere in the document** and closed the **Scraper** window — part of the persisted
+boot layout, not scratch. Restored by reopening it from Start (which places at 94,54, not its
+boot 60,24) and dragging it back through the product's own commit path; verified against
+`scraper-default.json`'s recorded rect: **60,24 820×580, and Anki 94,54 820×580** — both exact.
+The lesson is the sweep's own rule, which this ad-hoc probe had stepped outside of: **scope every
+click to the element you are operating on**. `.widget-gallery .widget-b` was the right selector.
 
 Also still open, unchanged from `VIDEO_BASELINE.md`: loading/offline states not on screen during
 capture, and playing-clip measurements including frame stability, which need a real clip.
