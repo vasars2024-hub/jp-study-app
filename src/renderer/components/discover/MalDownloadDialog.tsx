@@ -1276,6 +1276,20 @@ export default function MalDownloadDialog({ candidate, onClose }: Props) {
               </label>
             ) : null}
 
+            {/*
+              One reachable target used to render nothing at all: no picker,
+              and — for qBittorrent specifically — no destination field either,
+              so "Send 7 torrents" named no destination anywhere on the surface.
+              A choice of one is still worth stating; the user has to be able to
+              read where their downloads are about to go without asking someone.
+            */}
+            {(plan || pickingReleases) && availableTargets.length === 1 ? (
+              <p className="disc-field mal-dl-target-only">
+                <span>{t('malDownload.sendTo')}</span>
+                <strong>{t(`malDownload.target.${availableTargets[0]}`)}</strong>
+              </p>
+            ) : null}
+
             {(plan || (pickingReleases && releases.length > 0)) && sendTarget !== 'qbittorrent' ? (
               <input
                 className="scr-input mal-dl-destination"

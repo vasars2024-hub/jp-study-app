@@ -24724,6 +24724,10 @@ html[data-display-focus='strong'] .reading-source-search:focus-within {
 }
 .mal-dl-summary span { color: var(--muted); font-size: var(--font-size-2xs, 11px); }
 .mal-dl-actions { display: flex; align-items: center; gap: 10px; }
+/* Reads as the picker's one-option twin, so a single target still names itself. */
+.mal-dl-target-only { display: flex; align-items: baseline; gap: 6px; margin: 0; }
+.mal-dl-target-only span { color: var(--muted); font-size: var(--font-size-2xs, 11px); }
+.mal-dl-target-only strong { font-weight: 600; font-size: var(--font-size-xs, 12px); color: var(--text); }
 .mal-dl-destination { min-width: 200px; }
 .mal-dl-message {
   margin: 0;

@@ -795,3 +795,47 @@ so that was the swarm, not the timeout.
 (2) The profile's `minSeeders` is **3**, which alone hides every 1-seeder candidate; pass an
 override to see them. (3) The dev app does **not** hot-restart main — every main-process change
 needs a full `npm start` before a live check means anything.
+
+## 2026-08-16 — GATE 2 CLOSES, and the dialog that named no destination
+
+Worker `primary`. Gate 2 ("`MalDownloadDialog` lists `qbittorrent` in `availableTargets`") was
+the last P0 remainder — the settings precondition was written through on 2026-08-15 but nobody had
+read the rendered dialog. Driven live on bridge pid 25856, Discover → row download button →
+*Saga of Tanya the Evil Season 2* (12 episodes) → **Find releases** → a real plan, **"Send 7
+torrents"**.
+
+**Gate 2 PASSES, by deduction with the controls built in** — `availableTargets` is module-scoped
+state with no console reach, so it is read off four independent DOM facts:
+
+| observation | what it forces |
+| --- | --- |
+| `scraperGetAcquisitionSnapshot()` → `torrentClient 'offline'`, `debrid 'offline'` | neither of those two was pushed |
+| Send button **enabled** (`disabled={… \|\| !availableTargets.length}`) | length ≥ 1 |
+| **no `<select>`** (renders at `length > 1`) | length ≤ 1 → exactly **1** |
+| **no `.mal-dl-destination`** (renders when `sendTarget !== 'qbittorrent'`) | `sendTarget === 'qbittorrent'`, set by `setSendTarget(targets[0])` |
+
+The last row is the discriminator, not decoration: an empty `targets` leaves `sendTarget` at its
+initial `'torrent-client'`, which renders the input **and** disables the button — a state distinct
+from the observed one in both fields. So `availableTargets === ['qbittorrent']`.
+
+**The observation found a defect, which is the point of observing.** Those same two guards mean
+that with **one** reachable target the dialog names its destination **nowhere**: the picker needs
+`> 1`, and the destination input is hidden precisely when the target is qBittorrent. The user was
+shown "Send 7 torrents" with no answer to "send where?" — the plan's "a new user must not need a
+human" constraint, in miniature. Fixed: a `length === 1` line reusing the picker's **existing**
+keys (`malDownload.sendTo` + `malDownload.target.*`, all four locales already present, so
+i18n-check is unmoved). Live after HMR: **"Send to qBittorrent"**, 103×16 px, contrast **5.93**
+(label, 11 px) and **13.68** (value, 12 px), 0 raw i18n keys.
+
+**3 tests, both mutations caught by the right test and only that test.** `=== 1` → `false`: only
+"names the destination…" fails. `=== 1` → `>= 1`: only "keeps the picker…" fails. File restored
+**byte-identical** (sha256 `d3e0ca47…`) and 36/36 green after. Third test holds the zero-target
+state so the new line cannot leak into it.
+
+**Trap for the next worker.** `/click` on this bridge takes `{x, y}`, **not** a selector, and a
+coordinate click on the Discover row button did nothing (window offset). `el.click()` through
+`/eval` drives React's synthetic handler correctly — use that. `/eval`'s body key is **`js`**,
+not `expression`.
+
+Commit `<PENDING>` — `MalDownloadDialog.tsx`, `styles.css` (spliced HEAD+4 lines; that file
+carries another track's hunks), `malDownloadDialog.test.ts`.

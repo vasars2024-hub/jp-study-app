@@ -305,6 +305,53 @@ describe('MalDownloadDialog — anime', () => {
     expect(text()).toContain('No release matched');
   });
 
+  // Measured live on gate 2: with qBittorrent the only reachable target, the
+  // picker is suppressed (it needs >1) *and* the destination input is hidden
+  // (it renders only when the target is not qBittorrent), so "Send 7 torrents"
+  // named no destination anywhere on the dialog.
+  it('names the destination when exactly one target is reachable', async () => {
+    qbitSettings = { enabled: true, host: '127.0.0.1', savePath: '' };
+    stubApi({ scraperSearchTorrents: vi.fn(async () => [frierenRelease()]) });
+    await open(anime);
+    await act(async () => button('Find releases').click());
+    const only = must(document.querySelector('.mal-dl-target-only'), 'the single-target line');
+    expect(only.textContent).toContain('Send to');
+    expect(only.textContent).toContain('qBittorrent');
+    // The discriminator: this is the branch with no picker, so the line is the
+    // only thing carrying the destination.
+    expect(document.querySelector('.mal-dl select')).toBeNull();
+    expect(document.querySelector('.mal-dl-destination')).toBeNull();
+  });
+
+  // The other half of the same guard: two targets must still get the picker,
+  // and must not get a static line contradicting whatever is selected.
+  it('keeps the picker and drops the static line when two targets are reachable', async () => {
+    qbitSettings = { enabled: true, host: '127.0.0.1', savePath: '' };
+    stubApi({
+      scraperSearchTorrents: vi.fn(async () => [frierenRelease()]),
+      scraperGetAcquisitionSnapshot: vi.fn(async () => ({
+        torrentClient: { state: 'ready' },
+        debrid: { state: 'offline' },
+      })),
+    });
+    await open(anime);
+    await act(async () => button('Find releases').click());
+    const picker = must(document.querySelector<HTMLSelectElement>('.mal-dl select'), 'the picker');
+    expect([...picker.options].map((option) => option.value))
+      .toEqual(['torrent-client', 'qbittorrent']);
+    expect(document.querySelector('.mal-dl-target-only')).toBeNull();
+  });
+
+  // No target at all is a third state, and it must not borrow either of the
+  // above: nothing to pick, nothing to name, and the send refused.
+  it('names no destination when nothing is reachable', async () => {
+    stubApi({ scraperSearchTorrents: vi.fn(async () => [frierenRelease()]) });
+    await open(anime);
+    await act(async () => button('Find releases').click());
+    expect(document.querySelector('.mal-dl-target-only')).toBeNull();
+    expect(text()).toContain('No torrent client is reachable');
+  });
+
   // A live send came back "0 accepted, 1 rejected" and that counts line was the
   // whole of what the user was told; qBittorrent's reason was in
   // `report.details` and never left this component.
