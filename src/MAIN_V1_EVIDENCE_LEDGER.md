@@ -23362,3 +23362,37 @@ panel too, or a real regression reads as a no-op.
 **Still owed on gate 10:** keyboard-only completion + focus order for steps 3–7, and step 7's
 apkg-branch texts (attended, already in `needs-user.md`). Probes: `debug/g10-reflow.js`,
 `debug/g10-compact-mutation.js`.
+
+## 2026-08-16 — Track 7 / gate 10: keyboard-only completion of steps 3–7, measured
+
+**No product change — this half already held, and here is the number that says so.** Tab is sent
+as a real input event through `/key`; `.focus()` alone never sets `:focus-visible` and has already
+produced one false "no ring" reading on this surface.
+
+**Reachability.** Per step, focus parked on stepper button 1 and Tab pressed until focus left the
+workbench: **21 / 26 / 17 / 12 / 7** stops for steps 3, 4, 5, 6, 7. Every visible, non-disabled
+`button/select/input/textarea` in the step was stamped by the walk — **0 unreached** in all five
+(the one element each run reports is the walk's own start button, focused before the first Tab).
+**0** stops without a focus ring: every stop matched `:focus-visible` with a real
+`outline-style/width`. **0** zero-box stops.
+
+**Operation, which reachability does not prove.** Steps 3→4→5→6→7 advanced using nothing but Tab
+and Enter: **21, 26, 17, 12** Tabs to reach Next, Enter each time, and the flow's own
+`.deck-workbench-step.current` read back 4 *Fields and design*, 5 *Learning rules*, 6 *Review
+examples*, 7 *Apply or export*. **Negative control:** on step 7 Next is disabled — Tab did **not**
+land on it in 70 presses and Enter left the step at 7.
+
+**TRAP that cost a false finding and must not be rediscovered.** `/key` with `Return` sends
+keyDown+keyUp and **no char event**, and Blink activates a focused `<button>` on the *keypress* —
+so `/key Return` moves nothing and reads exactly like a dead Next button. It is not. Activation
+goes through **`/type` with a carriage return**. Two controls settled it: `.click()` on the same
+button advanced the flow, and `/key Return` on a plain stepper button also moved nothing, so the
+fault was the harness, not the surface. Space is different again (Blink activates it on keyup,
+which a char event does not produce). Probes: `debug/g10-keyboard.ps1`,
+`debug/g10-keyboard-advance.ps1`.
+
+**Gate 10 is now complete-except-external.** Everything unattended has passed: four languages,
+contrast + reduced motion for steps 3–6, compact/default/maximized (`0d96de79`), the 32 px control
+floor (`8d1f7ac9`), and keyboard/focus above. The only remainder is step 7's **package-branch**
+texts, which render only over an .apkg draft behind a native dialog — appended to the existing
+attended entry in `needs-user.md` (2026-08-16 08:55) rather than filed as a second blocker.
