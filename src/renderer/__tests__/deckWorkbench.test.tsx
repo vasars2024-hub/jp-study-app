@@ -55,6 +55,7 @@ const readAnkiConnectDraft = vi.fn();
 const ankiDraftSessionList = vi.fn();
 const ankiDraftSessionDelete = vi.fn();
 const exportApkgDraft = vi.fn();
+const commitAnkiConnectDraft = vi.fn();
 
 function draft(over: Partial<AnkiDraft> = {}): AnkiDraft {
   return {
@@ -194,12 +195,12 @@ beforeAll(() => {
 
 beforeEach(() => {
   installLayout(900, 400);
-  for (const m of [readApkgDraft, readAnkiConnectDraft, ankiDraftSessionList, ankiDraftSessionDelete, loadDeckAsAnkiDraft, exportApkgDraft]) m.mockReset();
+  for (const m of [readApkgDraft, readAnkiConnectDraft, ankiDraftSessionList, ankiDraftSessionDelete, loadDeckAsAnkiDraft, exportApkgDraft, commitAnkiConnectDraft]) m.mockReset();
   ankiDraftSessionList.mockResolvedValue([]);
   ankiDraftSessionDelete.mockResolvedValue(true);
   Object.defineProperty(window, 'api', {
     configurable: true,
-    value: { readApkgDraft, readAnkiConnectDraft, ankiDraftSessionList, ankiDraftSessionDelete, exportApkgDraft },
+    value: { readApkgDraft, readAnkiConnectDraft, ankiDraftSessionList, ankiDraftSessionDelete, exportApkgDraft, commitAnkiConnectDraft },
   });
 });
 
@@ -925,5 +926,117 @@ describe('DeckWorkbench step 7 — Apply or export', () => {
     expect(host.querySelector('.wb-apply-result')).toBeNull();
     expect(host.querySelector('[role="alert"]')).toBeNull();
     expect(host.textContent).toContain('ankiWorkbench.progress:6,7');
+  });
+
+  // ----- the live-Anki branch: a different destination, not a variant of export
+
+  /** Walk to step 7 over a draft read from the live collection. */
+  async function toLiveApply() {
+    readAnkiConnectDraft.mockResolvedValue({
+      ok: true,
+      draft: browsable({
+        source: { kind: 'ankiconnect', label: 'User 1', fingerprint: 'connect:3:1786860577' },
+      }),
+      totalNotes: 3,
+    });
+    await mount();
+    await click(buttonBy('ankiWorkbench.source.connect'));
+    await click(buttonBy('ankiWorkbench.next'));
+    await editOneField();
+    await toApply();
+  }
+
+  it('offers a commit rather than an export over a live collection, and warns first', async () => {
+    await toLiveApply();
+
+    // The export button must not be here: there is no file to copy.
+    expect(host.querySelector('.wb-apply-export')).toBeNull();
+    expect(host.textContent).not.toContain('ankiWorkbench.apply.noFile');
+    // The warning names the profile and precedes the button in the DOM.
+    const warning = host.querySelector('.wb-apply-live-warning');
+    expect(warning?.textContent).toContain('ankiWorkbench.apply.live.warning:User 1');
+    const button = host.querySelector('.wb-apply-commit') as HTMLButtonElement;
+    expect(button).not.toBeNull();
+    expect(warning!.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(host.textContent).toContain('ankiWorkbench.apply.notes:1');
+  });
+
+  it('commits the net set through the real channel and echoes the profile it landed in', async () => {
+    commitAnkiConnectDraft.mockResolvedValue({
+      ok: true,
+      notesUpdated: 1,
+      cardsUpdated: 0,
+      verified: true,
+      fingerprint: 'connect:3:1786860667',
+      profile: 'User 1',
+    });
+    await toLiveApply();
+    await click(buttonBy('ankiWorkbench.apply.live.commit'));
+
+    expect(commitAnkiConnectDraft).toHaveBeenCalledTimes(1);
+    const request = commitAnkiConnectDraft.mock.calls[0]![0];
+    expect(request.fingerprint).toBe('connect:3:1786860577');
+    expect(request.changes.notes).toEqual([
+      { noteId: 'n1', fields: ['ねこ・edited', 'ねこ-en'], tags: undefined },
+    ]);
+    // The read window is the main process's memory, not the renderer's.
+    expect(request).not.toHaveProperty('read');
+    expect(host.textContent).toContain('ankiWorkbench.apply.live.ok.counts:1,0,User 1');
+    expect(host.textContent).toContain('ankiWorkbench.apply.live.ok.verified');
+  });
+
+  it('names every change that did not commit instead of one total', async () => {
+    commitAnkiConnectDraft.mockResolvedValue({
+      ok: false,
+      errorCode: 'partial',
+      error: '1 of 2 changes did not commit.',
+      notesUpdated: 1,
+      cardsUpdated: 0,
+      failures: [{ kind: 'card', id: '1786860577371', reason: 'card is in a filtered deck' }],
+    });
+    await toLiveApply();
+    await click(buttonBy('ankiWorkbench.apply.live.commit'));
+
+    const alert = host.querySelector('.wb-apply-result [role="alert"]');
+    expect(alert?.textContent).toContain('ankiWorkbench.apply.liveError.partial');
+    expect(host.querySelector('.wb-apply-failures')?.textContent).toContain(
+      'ankiWorkbench.apply.live.failed.card:1786860577371,card is in a filtered deck',
+    );
+    // A partial commit is not a finished step.
+    expect(host.textContent).toContain('ankiWorkbench.progress:6,7');
+  });
+
+  it('does not present an unverified write as a success', async () => {
+    commitAnkiConnectDraft.mockResolvedValue({
+      ok: false,
+      errorCode: 'verify-failed',
+      error: 'Anki reported success but the re-read disagrees: card 1: due differs',
+      notesUpdated: 1,
+      cardsUpdated: 1,
+      verified: false,
+    });
+    await toLiveApply();
+    await click(buttonBy('ankiWorkbench.apply.live.commit'));
+
+    expect(host.querySelector('[role="status"].wb-apply-result')).toBeNull();
+    expect(host.querySelector('.wb-apply-result [role="alert"]')?.textContent).toContain(
+      'ankiWorkbench.apply.liveError.verify-failed',
+    );
+    expect(host.textContent).toContain('due differs');
+    expect(host.textContent).not.toContain('ankiWorkbench.apply.live.ok.verified');
+  });
+
+  it('still offers nothing at all for a local deck', async () => {
+    loadDeckAsAnkiDraft.mockReturnValue({
+      draft: browsable({ source: { kind: 'local-deck', label: 'Local deck', fingerprint: 'fp-local' } }),
+    });
+    await mount();
+    await click(buttonBy('ankiWorkbench.source.localDeck'));
+    await click(buttonBy('ankiWorkbench.next'));
+    await toApply();
+
+    expect(host.textContent).toContain('ankiWorkbench.apply.noFile');
+    expect(host.querySelector('.wb-apply-commit')).toBeNull();
+    expect(commitAnkiConnectDraft).not.toHaveBeenCalled();
   });
 });

@@ -9541,10 +9541,42 @@ export const ru: Catalog = {
   'ankiWorkbench.review.overwrittenFlag': 'Записано более чем одним шагом',
   'ankiWorkbench.review.emptyValue': 'пусто',
   'ankiWorkbench.step.apply.lead':
-    'Превратите сеанс в настоящий файл: экспортируйте новый пакет со всеми изменениями из обзора.',
+    'Пора вынести черновик наружу: отправьте каждое изменение из обзора по назначению — в новый пакет для файла или в открытую коллекцию для живого Anki.',
   'ankiWorkbench.step.apply.outcome': 'Экспортирован {file} — заметок: {notes}',
   'ankiWorkbench.apply.noFile':
-    'Этот источник — не файл пакета, поэтому экспортировать его копию не из чего. Запись изменений в живую коллекцию — следующий этап; когда она появится, она будет здесь.',
+    'Этот источник — не файл пакета и не живая коллекция Anki, поэтому записывать изменения некуда. Экспортируйте колоду из Anki пакетом и правьте эту копию.',
+  'ankiWorkbench.apply.live.warning':
+    'Эти изменения попадут прямо в коллекцию, открытую в Anki ({profile}). Вернуть их можно только собственной отменой Anki, поэтому сначала проверьте цифры выше.',
+  'ankiWorkbench.apply.live.commit': 'Записать эти изменения в Anki',
+  'ankiWorkbench.apply.live.writing': 'Записываем в Anki…',
+  'ankiWorkbench.apply.live.ok.counts': 'Обновлено заметок: {notes}, карточек: {cards} — в профиле {profile}',
+  'ankiWorkbench.apply.live.ok.verified':
+    'Проверено: коллекция перечитана из Anki, и каждое изменение в ней найдено.',
+  'ankiWorkbench.apply.live.failed.note': 'Заметка {id} не записана — {reason}',
+  'ankiWorkbench.apply.live.failed.card': 'Карточка {id} не перемещена — {reason}',
+  'ankiWorkbench.apply.liveError.nothing-to-commit':
+    'Итоговых изменений в сессии нет, поэтому в Anki ничего не отправлено.',
+  'ankiWorkbench.apply.liveError.no-source':
+    'Сессия больше не знает, какую часть коллекции она прочитала, поэтому ничего не записано. Перечитайте коллекцию на шаге 1.',
+  'ankiWorkbench.apply.liveError.source-changed':
+    'После чтения коллекция изменилась в Anki. Ничего не записано — перечитайте её на шаге 1 и повторите.',
+  'ankiWorkbench.apply.liveError.note-missing':
+    'Изменённой заметки больше нет в коллекции. Ничего не записано — перечитайте её на шаге 1 и повторите.',
+  'ankiWorkbench.apply.liveError.field-count-mismatch':
+    'Поля заметки больше не совпадают с её типом в Anki. Ничего не записано — перечитайте коллекцию на шаге 1.',
+  'ankiWorkbench.apply.liveError.card-filtered':
+    'Перемещаемая карточка находится в фильтрованной колоде, где её позицией распоряжается сама колода. Ничего не записано — сначала опустошите фильтрованную колоду.',
+  'ankiWorkbench.apply.liveError.card-missing':
+    'Перемещаемой карточки больше нет в коллекции. Ничего не записано — перечитайте её на шаге 1 и повторите.',
+  'ankiWorkbench.apply.liveError.unreachable':
+    'Anki перестал отвечать на середине. Всё, что перечислено ниже, до коллекции не дошло.',
+  'ankiWorkbench.apply.liveError.collection-unavailable':
+    'Anki запущен, но коллекция не открыта, поэтому записать ничего не удалось.',
+  'ankiWorkbench.apply.liveError.partial':
+    'Часть изменений записана, часть — нет. Неудавшиеся перечислены ниже; остальные уже в вашей коллекции.',
+  'ankiWorkbench.apply.liveError.verify-failed':
+    'Anki принял изменения, но при повторном чтении коллекции их не нашлось, поэтому считать их сохранёнными нельзя. Проверьте Anki, прежде чем править дальше.',
+  'ankiWorkbench.apply.liveError.io': 'Не удалось записать изменения в Anki.',
   'ankiWorkbench.apply.blocked':
     'В этом источнике есть проблемы, блокирующие экспорт. Вернитесь к шагу 1, чтобы их посмотреть.',
   'ankiWorkbench.apply.empty': 'Итоговых изменений за сеанс нет — экспортировать нечего.',

@@ -8731,10 +8731,42 @@ export const ja: Catalog = {
   'ankiWorkbench.review.overwrittenFlag': '複数の手順から書き込まれました',
   'ankiWorkbench.review.emptyValue': '空',
   'ankiWorkbench.step.apply.lead':
-    'セッションを実際のファイルにします。確認した変更をすべて含む新しいパッケージを書き出します。',
+    '下書きをここで確定します。確認した変更をすべて送り先へ — ファイル由来なら新しいパッケージへ、稼働中の Anki なら開いているコレクションへ。',
   'ankiWorkbench.step.apply.outcome': '{file} を書き出しました — ノート {notes} 件',
   'ankiWorkbench.apply.noFile':
-    'このソースにはコピーできるパッケージファイルがありません。稼働中のコレクションへの書き戻しは今後の段階で、実装され次第ここに表示されます。',
+    'このソースはパッケージファイルでも稼働中の Anki コレクションでもないため、書き戻す先がありません。Anki からパッケージとして書き出し、その複製を編集してください。',
+  'ankiWorkbench.apply.live.warning':
+    'これらの変更は Anki が開いているコレクション（{profile}）に直接書き込まれます。取り消せるのは Anki 自身の「元に戻す」だけなので、まず上の数値を確認してください。',
+  'ankiWorkbench.apply.live.commit': 'これらの変更を Anki に書き込む',
+  'ankiWorkbench.apply.live.writing': 'Anki に書き込み中…',
+  'ankiWorkbench.apply.live.ok.counts': '{profile} でノート {notes} 件、カード {cards} 枚を更新しました',
+  'ankiWorkbench.apply.live.ok.verified':
+    '検証済み：Anki からコレクションを読み直し、すべての変更を確認しました。',
+  'ankiWorkbench.apply.live.failed.note': 'ノート {id} は書き込まれませんでした — {reason}',
+  'ankiWorkbench.apply.live.failed.card': 'カード {id} は移動しませんでした — {reason}',
+  'ankiWorkbench.apply.liveError.nothing-to-commit':
+    'このセッションの net 変更は空のため、Anki には何も送信していません。',
+  'ankiWorkbench.apply.liveError.no-source':
+    'このセッションはコレクションのどの範囲を読み込んだか把握できなくなったため、何も書き込んでいません。手順1で読み直してください。',
+  'ankiWorkbench.apply.liveError.source-changed':
+    '読み込み後に Anki 側でコレクションが変更されました。何も書き込んでいません。手順1で読み直してから書き込んでください。',
+  'ankiWorkbench.apply.liveError.note-missing':
+    '変更対象のノートがコレクションに存在しません。何も書き込んでいません。手順1で読み直してから書き込んでください。',
+  'ankiWorkbench.apply.liveError.field-count-mismatch':
+    'ノートのフィールド構成が Anki のノートタイプと一致しません。何も書き込んでいません。手順1でコレクションを読み直してください。',
+  'ankiWorkbench.apply.liveError.card-filtered':
+    '移動対象のカードはフィルタードデッキにあり、その位置はデッキ側が管理しています。何も書き込んでいません。先にフィルタードデッキを空にしてください。',
+  'ankiWorkbench.apply.liveError.card-missing':
+    '移動対象のカードがコレクションに存在しません。何も書き込んでいません。手順1で読み直してから書き込んでください。',
+  'ankiWorkbench.apply.liveError.unreachable':
+    '途中で Anki が応答しなくなりました。以下に挙げた項目はコレクションに届いていません。',
+  'ankiWorkbench.apply.liveError.collection-unavailable':
+    'Anki は起動していますがコレクションが開かれていないため、何も書き込めませんでした。',
+  'ankiWorkbench.apply.liveError.partial':
+    '一部の変更は書き込まれ、一部は書き込まれませんでした。失敗したものを以下に挙げます。それ以外はすでにコレクションに反映されています。',
+  'ankiWorkbench.apply.liveError.verify-failed':
+    'Anki は変更を受け入れましたが、読み直しでは見つかりませんでした。保存済みとして扱わないでください。続けて編集する前に Anki を確認してください。',
+  'ankiWorkbench.apply.liveError.io': 'Anki に変更を書き込めませんでした。',
   'ankiWorkbench.apply.blocked':
     'このソースには書き出しを妨げる問題があります。手順1に戻って確認してください。',
   'ankiWorkbench.apply.empty': 'このセッションの正味の変更はありません — 書き出すものがありません。',

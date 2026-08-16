@@ -9156,10 +9156,42 @@ export const en: Catalog = {
   'ankiWorkbench.review.overwrittenFlag': 'Written by more than one step',
   'ankiWorkbench.review.emptyValue': 'empty',
   'ankiWorkbench.step.apply.lead':
-    'Turn the session into a real file: export a new package holding every change the review described.',
+    'Leave the draft behind: send every change the review described to its destination — a new package for a file source, the open collection for live Anki.',
   'ankiWorkbench.step.apply.outcome': 'Exported {file} — {notes} notes',
   'ankiWorkbench.apply.noFile':
-    'This source is not a package file, so there is no file to export a copy of. Writing changes back to a live collection is a later phase and will appear here when it is real.',
+    'This source is not a package file and not a live Anki collection, so there is nothing to write back to. Export the deck from Anki as a package and edit that copy instead.',
+  'ankiWorkbench.apply.live.warning':
+    'These changes go straight into the collection Anki has open ({profile}). Anki’s own Undo is the only way back, so review the numbers above first.',
+  'ankiWorkbench.apply.live.commit': 'Write these changes to Anki',
+  'ankiWorkbench.apply.live.writing': 'Writing to Anki…',
+  'ankiWorkbench.apply.live.ok.counts': '{notes} notes and {cards} cards updated in {profile}',
+  'ankiWorkbench.apply.live.ok.verified':
+    'Verified: the collection was read back from Anki and every change was found in it.',
+  'ankiWorkbench.apply.live.failed.note': 'Note {id} was not written — {reason}',
+  'ankiWorkbench.apply.live.failed.card': 'Card {id} did not move — {reason}',
+  'ankiWorkbench.apply.liveError.nothing-to-commit':
+    'The session adds up to no changes, so nothing was sent to Anki.',
+  'ankiWorkbench.apply.liveError.no-source':
+    'This session no longer knows which part of the collection it read, so nothing was written. Re-read the collection on step 1.',
+  'ankiWorkbench.apply.liveError.source-changed':
+    'The collection changed in Anki after it was read. Nothing was written — re-read it on step 1 before writing.',
+  'ankiWorkbench.apply.liveError.note-missing':
+    'A changed note is no longer in the collection. Nothing was written — re-read it on step 1 before writing.',
+  'ankiWorkbench.apply.liveError.field-count-mismatch':
+    'A note’s fields no longer match its note type in Anki. Nothing was written — re-read the collection on step 1.',
+  'ankiWorkbench.apply.liveError.card-filtered':
+    'A moved card is in a filtered deck, where its position belongs to that deck rather than to you. Nothing was written — empty the filtered deck first.',
+  'ankiWorkbench.apply.liveError.card-missing':
+    'A moved card is no longer in the collection. Nothing was written — re-read it on step 1 before writing.',
+  'ankiWorkbench.apply.liveError.unreachable':
+    'Anki stopped answering partway through. Anything listed below did not reach the collection.',
+  'ankiWorkbench.apply.liveError.collection-unavailable':
+    'Anki is running but its collection is not open, so nothing could be written.',
+  'ankiWorkbench.apply.liveError.partial':
+    'Some changes were written and some were not. The ones that failed are listed below; everything else is already in your collection.',
+  'ankiWorkbench.apply.liveError.verify-failed':
+    'Anki accepted the changes but reading the collection back did not find them, so they must not be treated as saved. Check Anki before editing further.',
+  'ankiWorkbench.apply.liveError.io': 'The changes could not be written to Anki.',
   'ankiWorkbench.apply.blocked':
     'Problems found in this source block an export. Go back to step 1 to see them.',
   'ankiWorkbench.apply.empty': 'The session adds up to no changes — there is nothing to export.',

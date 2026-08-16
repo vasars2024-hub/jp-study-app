@@ -10,9 +10,12 @@
  * dialog, and the main process resolves the source from the fingerprint it
  * remembers, so the renderer never holds a path.
  *
- * Only a package source can be exported. The local deck has no file to copy,
- * and writing back to live Anki is a later phase — both say so instead of
- * offering a button that would refuse.
+ * There are two destinations and they are not interchangeable. A package source
+ * exports a NEW file and never touches the original. A live Anki source has no
+ * file to copy: it writes into the collection the user has open, so that branch
+ * says so before the button, reports the profile it landed in, and names every
+ * change that did not commit rather than a single total. A local deck is
+ * neither and offers no button at all.
  */
 import { useMemo, useState } from 'react';
 import type { AnkiDraft } from '../../../shared/ankiDraft';
@@ -22,6 +25,7 @@ import {
   exportChangesEmpty,
   type ApkgExportResult,
 } from '../../../shared/ankiApkgExport';
+import type { ConnectCommitResult } from '../../../shared/ankiConnectCommit';
 import { useT } from '../../i18n';
 
 export default function DeckWorkbenchApply({
@@ -37,6 +41,7 @@ export default function DeckWorkbenchApply({
   const { t } = useT();
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<ApkgExportResult | null>(null);
+  const [commit, setCommit] = useState<ConnectCommitResult | null>(null);
 
   // Recomputed on every edit or undo, exactly as the review's numbers are: an
   // undo run from this step must change what the button claims it will write.
@@ -44,6 +49,23 @@ export default function DeckWorkbenchApply({
   const empty = exportChangesEmpty(changes);
   const blocked = draft.diagnostics.some((d) => d.severity === 'blocking');
   const isPackage = draft.source.kind === 'apkg' || draft.source.kind === 'colpkg';
+  const isLive = draft.source.kind === 'ankiconnect';
+
+  const runCommit = async () => {
+    setBusy(true);
+    setCommit(null);
+    try {
+      const res = await window.api.commitAnkiConnectDraft({
+        fingerprint: draft.source.fingerprint,
+        changes,
+      });
+      setCommit(res);
+    } catch (err) {
+      setCommit({ ok: false, errorCode: 'io', error: err instanceof Error ? err.message : String(err) });
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const runExport = async () => {
     setBusy(true);
@@ -63,6 +85,96 @@ export default function DeckWorkbenchApply({
       setBusy(false);
     }
   };
+
+  if (isLive) {
+    return (
+      <div className="wb-apply">
+        <section aria-label={t('ankiWorkbench.step.apply')}>
+          {blocked ? (
+            <p className="deck-workbench-error" role="alert">
+              {t('ankiWorkbench.apply.blocked')}
+            </p>
+          ) : (
+            <>
+              {empty ? (
+                <p className="muted wb-apply-empty">{t('ankiWorkbench.apply.empty')}</p>
+              ) : (
+                <ul className="deck-workbench-facts">
+                  {changes.notes.length > 0 && (
+                    <li>{t('ankiWorkbench.apply.notes', { count: changes.notes.length })}</li>
+                  )}
+                  {changes.cardMoves.length > 0 && (
+                    <li>{t('ankiWorkbench.apply.cardMoves', { count: changes.cardMoves.length })}</li>
+                  )}
+                </ul>
+              )}
+              {/* Said before the button, not after it: this one has no undo on
+                  our side, and the collection it edits is the one Anki has open. */}
+              <p className="muted wb-apply-live-warning">
+                {t('ankiWorkbench.apply.live.warning', { profile: draft.source.label })}
+              </p>
+              <button
+                type="button"
+                className="btn primary wb-apply-commit"
+                disabled={empty || busy}
+                onClick={() => void runCommit()}
+              >
+                {t('ankiWorkbench.apply.live.commit')}
+              </button>
+              {busy && (
+                <p className="muted" role="status">
+                  {t('ankiWorkbench.apply.live.writing')}
+                </p>
+              )}
+            </>
+          )}
+        </section>
+
+        {commit && commit.ok && (
+          <section
+            className="wb-apply-result"
+            aria-label={t('ankiWorkbench.apply.live.commit')}
+            role="status"
+          >
+            <ul className="deck-workbench-facts">
+              <li>
+                {t('ankiWorkbench.apply.live.ok.counts', {
+                  notes: commit.notesUpdated ?? 0,
+                  cards: commit.cardsUpdated ?? 0,
+                  profile: commit.profile ?? draft.source.label,
+                })}
+              </li>
+              {commit.verified && <li>{t('ankiWorkbench.apply.live.ok.verified')}</li>}
+            </ul>
+          </section>
+        )}
+
+        {commit && !commit.ok && (
+          <div className="wb-apply-result">
+            <p className="deck-workbench-error" role="alert">
+              {t(`ankiWorkbench.apply.liveError.${commit.errorCode ?? 'io'}`)}
+            </p>
+            {/* A partial commit is the one state a total would hide: some
+                changes are in the user's collection and some are not, so each
+                one that failed is named with Anki's own words. */}
+            {commit.failures && commit.failures.length > 0 && (
+              <ul className="deck-workbench-facts wb-apply-failures">
+                {commit.failures.map((failure) => (
+                  <li key={`${failure.kind}-${failure.id}`}>
+                    {t(`ankiWorkbench.apply.live.failed.${failure.kind}`, {
+                      id: failure.id,
+                      reason: failure.reason,
+                    })}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {commit.error && <p className="muted wb-apply-error-detail">{commit.error}</p>}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   if (!isPackage) {
     return <p className="muted wb-apply-nofile">{t('ankiWorkbench.apply.noFile')}</p>;

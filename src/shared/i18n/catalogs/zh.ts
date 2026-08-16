@@ -8686,10 +8686,41 @@ export const zh: Catalog = {
   'ankiWorkbench.review.queueLabel': '队列位置',
   'ankiWorkbench.review.overwrittenFlag': '由多个步骤写入',
   'ankiWorkbench.review.emptyValue': '空',
-  'ankiWorkbench.step.apply.lead': '把这次会话变成真正的文件：导出一个包含审阅中所有更改的新牌组包。',
+  'ankiWorkbench.step.apply.lead':
+    '让草稿落地：把审阅中的每一处更改送到目的地 — 文件来源写入新的牌组包，实时 Anki 写入当前打开的集合。',
   'ankiWorkbench.step.apply.outcome': '已导出 {file} — {notes} 条笔记',
   'ankiWorkbench.apply.noFile':
-    '此来源不是包文件，没有可导出副本的文件。写回正在运行的集合属于后续阶段，实装后会显示在这里。',
+    '此来源既不是包文件，也不是正在运行的 Anki 集合，因此无处写回。请从 Anki 导出为包，再编辑那份副本。',
+  'ankiWorkbench.apply.live.warning':
+    '这些更改会直接写入 Anki 当前打开的集合（{profile}）。只有 Anki 自身的“撤销”能退回，请先核对上面的数字。',
+  'ankiWorkbench.apply.live.commit': '把这些更改写入 Anki',
+  'ankiWorkbench.apply.live.writing': '正在写入 Anki…',
+  'ankiWorkbench.apply.live.ok.counts': '已在 {profile} 中更新 {notes} 条笔记和 {cards} 张卡片',
+  'ankiWorkbench.apply.live.ok.verified': '已验证：从 Anki 重新读取集合，每一处更改都已找到。',
+  'ankiWorkbench.apply.live.failed.note': '笔记 {id} 未写入 — {reason}',
+  'ankiWorkbench.apply.live.failed.card': '卡片 {id} 未移动 — {reason}',
+  'ankiWorkbench.apply.liveError.nothing-to-commit': '本次会话的净更改为空，因此没有向 Anki 发送任何内容。',
+  'ankiWorkbench.apply.liveError.no-source':
+    '本次会话已无法确定当初读取了集合的哪一部分，因此什么也没有写入。请在第 1 步重新读取集合。',
+  'ankiWorkbench.apply.liveError.source-changed':
+    '读取之后集合在 Anki 中发生了变化。什么也没有写入 — 请先在第 1 步重新读取再写入。',
+  'ankiWorkbench.apply.liveError.note-missing':
+    '某条被修改的笔记已不在集合中。什么也没有写入 — 请先在第 1 步重新读取再写入。',
+  'ankiWorkbench.apply.liveError.field-count-mismatch':
+    '某条笔记的字段已与 Anki 中的笔记类型不符。什么也没有写入 — 请在第 1 步重新读取集合。',
+  'ankiWorkbench.apply.liveError.card-filtered':
+    '某张要移动的卡片位于筛选牌组中，其位置由该牌组决定而非由你决定。什么也没有写入 — 请先清空筛选牌组。',
+  'ankiWorkbench.apply.liveError.card-missing':
+    '某张要移动的卡片已不在集合中。什么也没有写入 — 请先在第 1 步重新读取再写入。',
+  'ankiWorkbench.apply.liveError.unreachable':
+    'Anki 中途停止响应。下面列出的内容都没有写进集合。',
+  'ankiWorkbench.apply.liveError.collection-unavailable':
+    'Anki 正在运行，但集合未打开，因此无法写入任何内容。',
+  'ankiWorkbench.apply.liveError.partial':
+    '部分更改已写入，部分没有。失败的列在下面；其余的已经在你的集合里了。',
+  'ankiWorkbench.apply.liveError.verify-failed':
+    'Anki 接受了这些更改，但重新读取集合时并未找到，因此不能当作已保存。继续编辑前请先检查 Anki。',
+  'ankiWorkbench.apply.liveError.io': '无法把更改写入 Anki。',
   'ankiWorkbench.apply.blocked': '此来源存在阻止导出的问题。请回到第 1 步查看。',
   'ankiWorkbench.apply.empty': '本次会话的净更改为空 — 没有可导出的内容。',
   'ankiWorkbench.apply.notes': '{count} 条笔记将写入新内容',
