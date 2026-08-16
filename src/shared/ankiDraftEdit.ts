@@ -25,11 +25,12 @@
 import type {
   AnkiDraft,
   AnkiDraftCard,
+  AnkiDraftDeck,
   AnkiDraftMediaRef,
   AnkiDraftNote,
   AnkiDraftSource,
 } from './ankiDraft';
-import { mediaRefsInField } from './ankiDraft';
+import { deckPath, mediaRefsInField } from './ankiDraft';
 import { stripFieldHtml } from './apkgParse';
 
 /** Anki's "marked" flag is a tag; the model surfaces it separately. */
@@ -81,6 +82,21 @@ export type AnkiDraftEditOp =
       before: number;
       after: number;
       group?: string;
+    }
+  | {
+      /**
+       * A deck's name — recipe 12's deck half. The only op in the journal that
+       * belongs to no note, because a deck rename touches no note and no card:
+       * a card names its deck by id, and Anki derives the tree from the name, so
+       * writing the old string back is a complete inverse. Ops with no `noteId`
+       * are skipped by `editedNoteIds`, which is why the Browser's edited badge
+       * does not light up for a deck the user renamed.
+       */
+      kind: 'deck-name';
+      deckId: string;
+      before: string;
+      after: string;
+      group?: string;
     };
 
 export interface AnkiDraftEditJournal {
@@ -99,8 +115,16 @@ export interface AnkiDraftEditResult {
   journal: AnkiDraftEditJournal;
   /** False when the edit was a no-op or the target did not exist. */
   changed: boolean;
-  /** Set when the note could not be found, so a caller never sees a silent no-op. */
-  reason?: 'no-such-note' | 'no-such-field' | 'unchanged';
+  /** Set when the edit could not run, so a caller never sees a silent no-op. */
+  reason?:
+    | 'no-such-note'
+    | 'no-such-field'
+    | 'unchanged'
+    | 'no-such-deck'
+    /** Another deck already holds that name. Renaming onto it would be a merge. */
+    | 'duplicate-deck-name'
+    /** A deck cannot be nameless, and a blank name would vanish from the tree. */
+    | 'empty-deck-name';
   /** Media file names the edit removed the last reference to, within this note. */
   mediaDropped?: string[];
   /** Media references the edit introduced that the source does not contain. */
@@ -167,6 +191,8 @@ export interface DraftEditIndex {
   clozeTypeIds: Set<string>;
   /** Card id to its position in `draft.cards`, for the `card-due` op. */
   cardPosition: Map<string, number>;
+  /** Deck id to its position in `draft.decks`, for the `deck-name` op. */
+  deckPosition: Map<string, number>;
 }
 
 export function createDraftEditIndex(draft: AnkiDraft): DraftEditIndex {
@@ -174,11 +200,71 @@ export function createDraftEditIndex(draft: AnkiDraft): DraftEditIndex {
   draft.notes.forEach((note, i) => position.set(note.id, i));
   const cardPosition = new Map<string, number>();
   draft.cards.forEach((card, i) => cardPosition.set(card.id, i));
+  const deckPosition = new Map<string, number>();
+  draft.decks.forEach((deck, i) => deckPosition.set(deck.id, i));
   return {
     position,
     present: presentMediaNames(draft),
     clozeTypeIds: new Set(draft.noteTypes.filter((nt) => nt.kind === 'cloze').map((nt) => nt.id)),
     cardPosition,
+    deckPosition,
+  };
+}
+
+/**
+ * Rewrite every deck's `path` and `parentId` from its current name. Anki stores
+ * the tree in the names alone, so a rename can create a parent link (`JLPT ::N5`
+ * trimmed to `JLPT::N5` now has a parent) or break one, and leaving the old
+ * links in place would show the user a tree that disagrees with the names beside
+ * it. Whole-array because one rename can change another deck's parentage.
+ */
+export function relinkDeckParents(decks: readonly AnkiDraftDeck[]): AnkiDraftDeck[] {
+  const byName = new Map<string, string>();
+  for (const deck of decks) byName.set(deck.name, deck.id);
+  return decks.map((deck) => {
+    const path = deckPath(deck.name);
+    const parentPath = path.slice(0, -1);
+    // Both separators, exactly as `buildAnkiDraft` looks a parent up: the two
+    // Anki schemas disagree and a draft may have been built from either, so a
+    // relink that knew only `::` would drop links the read had found.
+    const parentId = parentPath.length
+      ? byName.get(parentPath.join('::')) ?? byName.get(parentPath.join('\x1f'))
+      : undefined;
+    return { ...deck, path, parentId };
+  });
+}
+
+/**
+ * Rename one deck. Reversible by writing the old name back, and that is the
+ * whole operation: no card moves, because a card names its deck by id.
+ *
+ * Refused rather than merged when another deck already holds the name —
+ * combining two decks means moving cards and rewriting their scheduling, which
+ * is not what a rename says it does.
+ */
+export function renameDraftDeck(
+  draft: AnkiDraft,
+  journal: AnkiDraftEditJournal,
+  deckId: string,
+  name: string,
+): AnkiDraftEditResult {
+  const deck = draft.decks.find((d) => d.id === deckId);
+  if (!deck) return { draft, journal, changed: false, reason: 'no-such-deck' };
+  if (name.trim() === '') return { draft, journal, changed: false, reason: 'empty-deck-name' };
+  if (name === deck.name) return { draft, journal, changed: false, reason: 'unchanged' };
+  if (draft.decks.some((d) => d.id !== deckId && d.name === name)) {
+    return { draft, journal, changed: false, reason: 'duplicate-deck-name' };
+  }
+  const decks = relinkDeckParents(
+    draft.decks.map((d) => (d.id === deckId ? { ...d, name } : d)),
+  );
+  return {
+    draft: { ...draft, decks },
+    journal: {
+      done: [...journal.done, { kind: 'deck-name', deckId, before: deck.name, after: name }],
+      undone: [],
+    },
+    changed: true,
   };
 }
 
@@ -301,11 +387,23 @@ export function setNoteTags(
 function applyInverseInto(
   notes: AnkiDraftNote[],
   cards: AnkiDraftCard[],
+  decks: AnkiDraftDeck[],
   index: DraftEditIndex,
   op: AnkiDraftEditOp,
   toValue: 'before' | 'after',
   normalize: (raw: string) => string,
 ): void {
+  if (op.kind === 'deck-name') {
+    const deckAt = index.deckPosition.get(op.deckId);
+    if (deckAt === undefined) return;
+    const deck = decks[deckAt];
+    if (!deck) return;
+    // `path`/`parentId` are relinked once for the whole step by the caller: one
+    // undo of a 40-deck group would otherwise rebuild the tree 40 times, and an
+    // intermediate relink can see a name collision the finished step does not.
+    decks[deckAt] = { ...deck, name: op[toValue] };
+    return;
+  }
   if (op.kind === 'card-due') {
     const cardAt = index.cardPosition.get(op.cardId);
     if (cardAt === undefined) return;
@@ -370,12 +468,14 @@ export function undoLastEdit(
   // written, or the older op's `before` loses to the newer one's.
   const notes = [...draft.notes];
   const cards = [...draft.cards];
+  let decks = [...draft.decks];
   const index = createDraftEditIndex(draft);
   for (let i = step.length - 1; i >= 0; i -= 1) {
-    applyInverseInto(notes, cards, index, step[i], 'before', normalize);
+    applyInverseInto(notes, cards, decks, index, step[i], 'before', normalize);
   }
+  if (step.some((op) => op.kind === 'deck-name')) decks = relinkDeckParents(decks);
   return {
-    draft: { ...draft, notes, cards },
+    draft: { ...draft, notes, cards, decks },
     // `undone` keeps applied order, so redo can replay the group forwards.
     journal: { done: journal.done.slice(0, -step.length), undone: [...journal.undone, ...step] },
     changed: true,
@@ -391,10 +491,12 @@ export function redoLastEdit(
   if (step.length === 0) return { draft, journal, changed: false, reason: 'unchanged' };
   const notes = [...draft.notes];
   const cards = [...draft.cards];
+  let decks = [...draft.decks];
   const index = createDraftEditIndex(draft);
-  for (const op of step) applyInverseInto(notes, cards, index, op, 'after', normalize);
+  for (const op of step) applyInverseInto(notes, cards, decks, index, op, 'after', normalize);
+  if (step.some((op) => op.kind === 'deck-name')) decks = relinkDeckParents(decks);
   return {
-    draft: { ...draft, notes, cards },
+    draft: { ...draft, notes, cards, decks },
     journal: { done: [...journal.done, ...step], undone: journal.undone.slice(0, -step.length) },
     changed: true,
   };
@@ -403,10 +505,15 @@ export function redoLastEdit(
 /** Notes the journal has touched, for the step's affected count. */
 export function editedNoteIds(journal: AnkiDraftEditJournal): string[] {
   const out: string[] = [];
-  for (const op of journal.done) if (!out.includes(op.noteId)) out.push(op.noteId);
+  // A `deck-name` op belongs to no note; counting it against one would mark a
+  // note as edited that nothing wrote to.
+  for (const op of journal.done) {
+    if (op.kind === 'deck-name') continue;
+    if (!out.includes(op.noteId)) out.push(op.noteId);
+  }
   return out;
 }
 
 export function noteIsEdited(journal: AnkiDraftEditJournal, noteId: string): boolean {
-  return journal.done.some((op) => op.noteId === noteId);
+  return journal.done.some((op) => op.kind !== 'deck-name' && op.noteId === noteId);
 }

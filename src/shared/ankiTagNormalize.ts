@@ -87,7 +87,8 @@ function splitPath(tag: string): string[] {
 /**
  * The canonical spelling of every path prefix present in the draft, keyed by the
  * prefix lowercased. Built once per plan and reused for every note, which is
- * what makes rule 2 above true.
+ * what makes rule 2 above true. Path-generic despite the name: `ankiDeckNormalize`
+ * censuses deck names through it, because Anki nests both on `::`.
  *
  * Keyed by *prefix*, not by segment: `Anime::Core` and `Grammar::core` are two
  * different `core`s and unifying them would be this module deciding that two
@@ -128,15 +129,28 @@ export function buildTagCaseCensus(allTags: Iterable<readonly string[]>): Map<st
   return canonical;
 }
 
-function applyOpsToTag(
-  tag: string,
-  ops: ReadonlySet<TagNormalizeOp>,
+/**
+ * The three ops that are pure path work, as flags rather than as a set of
+ * `TagNormalizeOp`. Decks share this grammar but not the tag-only fourth op, and
+ * a shared function keyed on the tag union would have to accept members the deck
+ * caller can never pass.
+ */
+export interface PathNormalizeOps {
+  trimSeparators: boolean;
+  asciiWidth: boolean;
+  unifyCase: boolean;
+}
+
+/** Apply the path ops to one `::` path. Shared by the tag half and the deck half. */
+export function applyPathOps(
+  path: string,
+  ops: PathNormalizeOps,
   census: Map<string, string>,
 ): string {
-  let segs = tag.split(TAG_PATH_SEPARATOR);
-  if (ops.has('trim-separators')) segs = splitPath(tag);
-  if (ops.has('ascii-width')) segs = segs.map(foldAsciiWidth);
-  if (ops.has('unify-case')) {
+  let segs = path.split(TAG_PATH_SEPARATOR);
+  if (ops.trimSeparators) segs = splitPath(path);
+  if (ops.asciiWidth) segs = segs.map(foldAsciiWidth);
+  if (ops.unifyCase) {
     const prefix: string[] = [];
     segs = segs.map((seg) => {
       prefix.push(seg);
@@ -190,6 +204,11 @@ export interface PlanTagNormalizeInput {
 
 export function planTagNormalize(input: PlanTagNormalizeInput): TagNormalizePlan {
   const ops = new Set(TAG_NORMALIZE_ORDER.filter((op) => input.ops.includes(op)));
+  const pathOps: PathNormalizeOps = {
+    trimSeparators: ops.has('trim-separators'),
+    asciiWidth: ops.has('ascii-width'),
+    unifyCase: ops.has('unify-case'),
+  };
   const census = ops.has('unify-case') ? buildTagCaseCensus(input.censusTags) : new Map<string, string>();
   const changes: TagNormalizeChange[] = [];
   const distinctBefore = new Set<string>();
@@ -207,7 +226,7 @@ export function planTagNormalize(input: PlanTagNormalizeInput): TagNormalizePlan
     const mapped: string[] = [];
 
     for (const tag of before) {
-      const next = applyOpsToTag(tag, ops, census);
+      const next = applyPathOps(tag, pathOps, census);
       mapped.push(next);
       if (next === '') {
         // A tag that was nothing but separators. It named no concept, so this is

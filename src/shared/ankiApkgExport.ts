@@ -39,9 +39,21 @@ export interface ApkgExportCardMove {
   due: number;
 }
 
+/**
+ * Recipe 12's deck half. A rename is the whole change: a card names its deck by
+ * id, so nothing moves and the writer only rewrites the name Anki stores.
+ */
+export interface ApkgExportDeckRename {
+  deckId: string;
+  /** The source's name, so the writer can refuse a deck that moved underneath it. */
+  from: string;
+  to: string;
+}
+
 export interface ApkgExportChangeSet {
   notes: ApkgExportNoteChange[];
   cardMoves: ApkgExportCardMove[];
+  deckRenames: ApkgExportDeckRename[];
 }
 
 // ----- IPC contract -------------------------------------------------------------
@@ -115,7 +127,16 @@ export function buildApkgExportChanges(
   journal: AnkiDraftEditJournal,
 ): ApkgExportChangeSet {
   const tracked = new Map<string, Tracked>();
+  const deckRenames = new Map<string, { deckId: string; before: string; after: string }>();
   for (const op of journal.done) {
+    if (op.kind === 'deck-name') {
+      // Folded like every other op: a deck renamed twice exports once, and one
+      // renamed back to its source name exports not at all.
+      const first = deckRenames.get(op.deckId);
+      if (first) first.after = op.after;
+      else deckRenames.set(op.deckId, { deckId: op.deckId, before: op.before, after: op.after });
+      continue;
+    }
     const key =
       op.kind === 'field'
         ? `f:${op.noteId}:${op.fieldOrd}`
@@ -169,10 +190,26 @@ export function buildApkgExportChanges(
     });
   }
 
-  return { notes, cardMoves };
+  const deckRenamed: ApkgExportDeckRename[] = [];
+  for (const rename of deckRenames.values()) {
+    // The deck's *current* draft name, not the op's, for the same reason a field
+    // is re-read above: an undone rename must not export.
+    const deck = draft.decks.find((d) => d.id === rename.deckId);
+    if (!deck || deck.name === rename.before) continue;
+    deckRenamed.push({ deckId: rename.deckId, from: rename.before, to: deck.name });
+  }
+
+  return { notes, cardMoves, deckRenames: deckRenamed };
 }
 
 /** True when the change set carries nothing to write. */
 export function exportChangesEmpty(changes: ApkgExportChangeSet): boolean {
-  return changes.notes.length === 0 && changes.cardMoves.length === 0;
+  // `deckRenames` is read tolerantly: this runs on a payload that crossed IPC,
+  // and a request written before the field existed must read as "no renames"
+  // rather than throw on the way to the writer.
+  return (
+    changes.notes.length === 0 &&
+    changes.cardMoves.length === 0 &&
+    (changes.deckRenames ?? []).length === 0
+  );
 }

@@ -151,4 +151,39 @@ describe('buildApkgExportChanges', () => {
     };
     expect(exportChangesEmpty(buildApkgExportChanges(d, j))).toBe(true);
   });
+
+  it('exports a deck rename as the net of the draft, not the ops', () => {
+    const d = draftOf([note({ id: 'n1' })]);
+    const renamed: AnkiDraft = {
+      ...d,
+      decks: [{ id: 'd1', name: 'Japanese::Core', path: ['Japanese', 'Core'], filtered: false }],
+    };
+    const j: AnkiDraftEditJournal = {
+      done: [
+        { kind: 'deck-name', deckId: 'd1', before: 'Core', after: 'core', group: 'g1' },
+        { kind: 'deck-name', deckId: 'd1', before: 'core', after: 'Japanese::Core', group: 'g2' },
+      ],
+      undone: [],
+    };
+    const changes = buildApkgExportChanges(renamed, j);
+    expect(changes.deckRenames).toEqual([
+      { deckId: 'd1', from: 'Core', to: 'Japanese::Core' },
+    ]);
+    expect(exportChangesEmpty(changes)).toBe(false);
+    // A rename alone is not a note change: nothing else may ride along.
+    expect(changes.notes).toHaveLength(0);
+    expect(changes.cardMoves).toHaveLength(0);
+  });
+
+  it('exports nothing for a deck renamed back to the name the source holds', () => {
+    const d = draftOf([note({ id: 'n1' })]);
+    const j: AnkiDraftEditJournal = {
+      done: [
+        { kind: 'deck-name', deckId: 'd1', before: 'Core', after: 'core' },
+        { kind: 'deck-name', deckId: 'd1', before: 'core', after: 'Core' },
+      ],
+      undone: [],
+    };
+    expect(exportChangesEmpty(buildApkgExportChanges(d, j))).toBe(true);
+  });
 });

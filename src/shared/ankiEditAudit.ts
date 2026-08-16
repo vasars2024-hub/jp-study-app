@@ -37,6 +37,12 @@ export interface JournalEntry {
   fieldNames: string[];
   /** The step changed tags on at least one note. */
   tagsChanged: boolean;
+  /**
+   * Decks the step renamed. Separate from `noteCount` because a deck rename
+   * belongs to no note: a step that renamed 12 decks touches 0 notes, and
+   * reporting it as an empty step would hide the largest change in the journal.
+   */
+  decksRenamed: number;
   /** Ops in the step — what the batch actually cost, not what a user counts. */
   opCount: number;
   /** In the redo stack: it happened, and it has since been taken back. */
@@ -78,7 +84,12 @@ function entryFor(
   const notes = new Set<string>();
   const fieldNames: string[] = [];
   let tagsChanged = false;
+  let decksRenamed = 0;
   for (const op of step) {
+    if (op.kind === 'deck-name') {
+      decksRenamed += 1;
+      continue;
+    }
     notes.add(op.noteId);
     if (op.kind === 'tags') {
       tagsChanged = true;
@@ -91,13 +102,16 @@ function entryFor(
     if (name && !fieldNames.includes(name)) fieldNames.push(name);
   }
   const first = step[0];
+  // A `deck-name` op has no note, so the fallback id names the deck instead.
+  const firstTarget = first === undefined ? '' : first.kind === 'deck-name' ? first.deckId : first.noteId;
   return {
     index,
-    id: first?.group ?? `${first?.kind ?? 'op'}:${first?.noteId ?? ''}:${index}`,
+    id: first?.group ?? `${first?.kind ?? 'op'}:${firstTarget}:${index}`,
     batch: Boolean(first?.group),
     noteCount: notes.size,
     fieldNames,
     tagsChanged,
+    decksRenamed,
     opCount: step.length,
     undone,
   };
@@ -126,5 +140,7 @@ export function appliedStepCount(entries: readonly JournalEntry[]): number {
 
 /** Distinct notes the applied steps touched. A note edited twice counts once. */
 export function auditedNoteCount(journal: AnkiDraftEditJournal): number {
-  return new Set(journal.done.map((op) => op.noteId)).size;
+  const notes = new Set<string>();
+  for (const op of journal.done) if (op.kind !== 'deck-name') notes.add(op.noteId);
+  return notes.size;
 }

@@ -43,6 +43,12 @@ export interface WorkbenchReviewSummary {
   tagNotes: number;
   /** New cards whose queue position netted out different. */
   cardMoves: number;
+  /**
+   * Decks whose name netted out different. Counted apart from `changedNotes`
+   * because a rename touches no note: a deck-only session would otherwise
+   * review as an empty one, and step 6 would tell the user nothing happened.
+   */
+  deckRenames: number;
   /** Field name → notes with a net change on it, in first-touched order. */
   fieldCounts: { name: string; notes: number }[];
   /** Net changes that two or more steps wrote to the same value. */
@@ -90,7 +96,13 @@ export function buildWorkbenchReview(
   // First pass: fold the applied ops into one entry per value, keeping the
   // *first* before-image — that is the state the source actually held.
   const tracked = new Map<string, Tracked>();
+  // Deck id → the name it held before the session's first rename of it.
+  const deckFirstBefore = new Map<string, string>();
   journal.done.forEach((op, i) => {
+    if (op.kind === 'deck-name') {
+      if (!deckFirstBefore.has(op.deckId)) deckFirstBefore.set(op.deckId, op.before);
+      return;
+    }
     const key =
       op.kind === 'field'
         ? `f:${op.noteId}:${op.fieldOrd}`
@@ -179,12 +191,21 @@ export function buildWorkbenchReview(
     if (diffs.length < diffLimit) diffs.push(line);
   }
 
+  // Net, like every other count here: a deck renamed and renamed back is not a
+  // change, and one whose deck has since left the draft is not counted at all.
+  let deckRenames = 0;
+  for (const [deckId, before] of deckFirstBefore) {
+    const deck = draft.decks.find((d) => d.id === deckId);
+    if (deck && deck.name !== before) deckRenames += 1;
+  }
+
   return {
     appliedSteps: countJournalSteps(journal.done),
     changedNotes: changedNoteIds.size,
     revertedNotes: [...touchedNoteIds].filter((id) => !changedNoteIds.has(id)).length,
     tagNotes: tagNoteIds.size,
     cardMoves,
+    deckRenames,
     fieldCounts: [...fieldNotes.entries()].map(([name, ids]) => ({ name, notes: ids.size })),
     overwrites,
     diffs,
