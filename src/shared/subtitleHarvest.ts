@@ -141,6 +141,13 @@ export interface SubtitleHarvestListResult {
    */
   jimakuDown: boolean;
   /**
+   * Jimaku answered, and none of what it returned is this title — the closest
+   * name it offered, so the user can recognise an alternate romanisation. This
+   * is a *refusal*, not a match: listing the closest entry anyway produced 33
+   * files of Madoka Magica for a `Shinreigari` harvest.
+   */
+  rejectedEntry: string | null;
+  /**
    * The nyaa fallback's own answer, computed only when Jimaku listed nothing.
    * `null` means it was not asked, which is not the same as "unavailable".
    */
@@ -507,7 +514,14 @@ export function chooseJimakuEntry<T extends JimakuEntryLike>(
       bestLength = length;
     }
   }
-  // Every entry scored 9 — nothing matched by name. The provider still returned
-  // these for the query, so the first is no worse a guess than giving up.
-  return best ?? entries[0];
+  // Every entry scored 9 — nothing matched by name. This used to return
+  // `entries[0]` on the reasoning that the provider returned these *for this
+  // query*, so a guess was no worse than giving up. Measured 2026-08-17, it is
+  // much worse: `Shinreigari` (Ghost Hound) resolved to `Mahou Shoujo
+  // Madoka☆Magica: Hajimari no Monogatari` and listed **33 files**, which a
+  // harvest then mines into the user's deck stamped with the requested title.
+  // A guess that cannot be told apart from a hit is not a guess, it is a false
+  // success, and the nyaa fallback next door only runs when this returns
+  // nothing. Refusing is what makes the alternative reachable.
+  return best;
 }

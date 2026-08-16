@@ -149,7 +149,8 @@ export async function listSubtitleHarvest(
     : undefined;
   let idLookupDown = false;
   const blank = {
-    matchedBy: null, entry: null, idLookupDown: false, jimakuDown: false, nyaa: null,
+    matchedBy: null, entry: null, idLookupDown: false, jimakuDown: false,
+    rejectedEntry: null, nyaa: null,
   } as const;
 
   if (!anilistId && !title && !input.malId) {
@@ -198,7 +199,9 @@ export async function listSubtitleHarvest(
     // — but the sentence above it no longer claims Jimaku filed nothing.
     const emptyMessage = match.down
       ? `Jimaku did not answer${match.downStatus ? ` (HTTP ${match.downStatus})` : ''}, so this is not an answer about the title. Try again in a moment.`
-      : 'Jimaku has no Japanese subtitles filed for this title.';
+      : match.rejectedEntry
+        ? `Jimaku has entries, but none of them is this title — the closest was "${match.rejectedEntry}". It may be filed under another name.`
+        : 'Jimaku has no Japanese subtitles filed for this title.';
     return {
       ok: true,
       needsKey: false,
@@ -208,6 +211,7 @@ export async function listSubtitleHarvest(
       entry: match.entry,
       idLookupDown,
       jimakuDown: match.down,
+      rejectedEntry: match.rejectedEntry,
       // Only when Jimaku covered nothing. Computing it on every listing would
       // put a torrent provider in front of a user who already has what they
       // asked for, and nyaa ships default-disabled and last for that reason.
@@ -225,6 +229,7 @@ export async function listSubtitleHarvest(
       // A throw out of the client is the same class of thing as a bad status:
       // nothing here is a statement about the catalogue.
       jimakuDown: true,
+      rejectedEntry: null,
       nyaa: await describeNyaaFallback(input.acquisition),
     };
   }

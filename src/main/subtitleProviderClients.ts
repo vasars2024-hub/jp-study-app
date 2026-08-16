@@ -231,6 +231,14 @@ export interface JimakuMatch {
   down: boolean;
   /** The status that made `down` true, for the log. 0 when nothing answered. */
   downStatus: number;
+  /**
+   * Jimaku answered, but nothing it returned is this title.
+   *
+   * Named rather than merely dropped: the name it *did* offer is the one useful
+   * thing to show, because it is usually the show filed under a different
+   * romanisation, and a user who sees it can search again with that spelling.
+   */
+  rejectedEntry: string | null;
 }
 interface JimakuFile { name?: string; url?: string; size?: number }
 
@@ -264,7 +272,9 @@ export async function jimakuSearchDetailed(
   episode: number | null,
 ): Promise<JimakuMatch> {
   const basis: JimakuMatchBasis = anilistId ? 'anilist' : 'title';
-  const empty: JimakuMatch = { candidates: [], entry: null, basis, down: false, downStatus: 0 };
+  const empty: JimakuMatch = {
+    candidates: [], entry: null, basis, down: false, downStatus: 0, rejectedEntry: null,
+  };
   const key = keyFor('jimaku');
   if (!key) return empty;
 
@@ -284,7 +294,17 @@ export async function jimakuSearchDetailed(
   const out: ProviderSubtitleCandidate[] = [];
   // Not `entries[0]`: the `?query=` search is fuzzy and unordered, and taking
   // the first answered "Naruto" with BORUTO. See `chooseJimakuEntry`.
-  const entry = chooseJimakuEntry(entries, anilistId ? '' : title) ?? entries[0];
+  const entry = chooseJimakuEntry(entries, anilistId ? '' : title);
+  // Nothing Jimaku returned is this show. Fetching the files anyway is how
+  // `Shinreigari` came back as 33 files of Madoka Magica — a listing that is
+  // confidently the wrong series, which then gets mined under the right one.
+  if (!entry) {
+    const closest = entries[0];
+    return {
+      ...empty,
+      rejectedEntry: (closest?.name || closest?.english_name || closest?.japanese_name || '').trim() || null,
+    };
+  }
   const suffix = episode !== null ? `?episode=${encodeURIComponent(String(episode))}` : '';
   const filesReply = await requestJsonReply<JimakuFile[]>(`${JIMAKU}/entries/${entry.id}/files${suffix}`, {
     headers: { Authorization: key },
@@ -324,6 +344,7 @@ export async function jimakuSearchDetailed(
     basis,
     down: false,
     downStatus: 0,
+    rejectedEntry: null,
   };
 }
 

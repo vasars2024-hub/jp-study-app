@@ -206,10 +206,25 @@ describe('chooseJimakuEntry', () => {
     expect(chooseJimakuEntry([onePieceSpecial, onePiece], '')?.id).toBe(3425);
   });
 
-  it('falls back to the first entry when nothing matches by name at all', () => {
-    // Still a guess, but the provider returned these *for this query*, so it is
-    // no worse than refusing — and the caller reports it as a title match.
-    expect(chooseJimakuEntry([boruto, shippuuden], 'Frieren')?.id).toBe(1959);
+  it('refuses when nothing matches by name at all, rather than guessing', () => {
+    // This asserted the opposite until 2026-08-17, on the reasoning that the
+    // provider returned these *for this query* so a guess was no worse than
+    // refusing. Measured live, it is much worse: `Shinreigari` (Ghost Hound)
+    // resolved to `Mahou Shoujo Madoka☆Magica: Hajimari no Monogatari` and
+    // listed 33 files, which a harvest then mines under the requested title.
+    expect(chooseJimakuEntry([boruto, shippuuden], 'Frieren')).toBeNull();
+  });
+
+  it('still refuses when only one entry came back — a single wrong answer is wrong', () => {
+    // The one-entry case is where a fallback feels most defensible and is least
+    // so: there is no ranking left, only "the provider said something".
+    expect(chooseJimakuEntry([boruto], 'Shinreigari')).toBeNull();
+  });
+
+  it('does not refuse a genuine match that merely ranks poorly', () => {
+    // The discriminating positive for the refusal above: a rule that returned
+    // null more eagerly would pass both tests above and break every harvest.
+    expect(chooseJimakuEntry([boruto, shippuuden], 'Naruto: Shippuuden')?.id).toBe(1000);
   });
 
   it('returns null for an empty listing rather than inventing an entry', () => {

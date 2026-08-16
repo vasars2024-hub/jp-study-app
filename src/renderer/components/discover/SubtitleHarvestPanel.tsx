@@ -100,7 +100,8 @@ export default function SubtitleHarvestPanel({ anilistId, malId, title, episodes
    * this panel must not have silently.
    */
   const [source, setSource] = useState<Pick<
-    SubtitleHarvestListResult, 'matchedBy' | 'entry' | 'idLookupDown' | 'jimakuDown' | 'nyaa'
+    SubtitleHarvestListResult,
+    'matchedBy' | 'entry' | 'idLookupDown' | 'jimakuDown' | 'rejectedEntry' | 'nyaa'
   > | null>(null);
   const [analysis, setAnalysis] = useState<MediaStudyAnalysis | null>(null);
   const [failures, setFailures] = useState<string[]>([]);
@@ -148,12 +149,19 @@ export default function SubtitleHarvestPanel({ anilistId, malId, title, episodes
       setNeedsKey(result.needsKey);
       // An outage gets the translated sentence, not main's English one: it is
       // the only empty result whose cause the user can act on by waiting.
-      setMessage(result.jimakuDown ? t('subHarvest.jimakuDown') : result.message);
+      setMessage(
+        result.jimakuDown
+          ? t('subHarvest.jimakuDown')
+          : result.rejectedEntry
+            ? t('subHarvest.source.noMatch', { name: result.rejectedEntry })
+            : result.message,
+      );
       setSource({
         matchedBy: result.matchedBy,
         entry: result.entry,
         idLookupDown: result.idLookupDown,
         jimakuDown: result.jimakuDown,
+        rejectedEntry: result.rejectedEntry,
         nyaa: result.nyaa,
       });
       setPhase(result.ok ? 'listed' : 'error');

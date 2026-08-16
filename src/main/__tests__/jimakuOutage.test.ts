@@ -129,6 +129,33 @@ describe('jimakuSearchDetailed — down is set by who actually knows', () => {
     expect(match.candidates[0].format).toBe('srt');
   });
 
+  it('refuses an entry that is not this title, and never asks for its files', async () => {
+    // The live case: `Shinreigari` came back as Madoka Magica with 33 files.
+    // The second request not happening is the load-bearing half — it is what
+    // makes the refusal free rather than a wasted call against a rate limit.
+    replies = [{ status: 200, body: JSON.stringify([{ id: 7, name: 'Mahou Shoujo Madoka☆Magica' }]) }];
+
+    const match = await jimakuSearchDetailed(undefined, 'Shinreigari', null);
+    expect(urls).toHaveLength(1);
+    expect(match.candidates).toEqual([]);
+    expect(match.entry).toBeNull();
+    expect(match.rejectedEntry).toBe('Mahou Shoujo Madoka☆Magica');
+    // Not an outage: Jimaku answered perfectly well. Conflating the two would
+    // tell the user to wait for something waiting cannot fix.
+    expect(match.down).toBe(false);
+  });
+
+  it('does not report a rejection when the entry really is the title', async () => {
+    replies = [
+      { status: 200, body: ENTRY },
+      { status: 200, body: JSON.stringify([{ name: 'Bakuman - 01.ja.srt', url: 'https://x/1.srt' }]) },
+    ];
+
+    const match = await jimakuSearchDetailed(undefined, 'Bakuman.', null);
+    expect(match.rejectedEntry).toBeNull();
+    expect(match.candidates).toHaveLength(1);
+  });
+
   it('treats a 200 carrying non-JSON as the provider misbehaving, not as empty', async () => {
     // A captive portal or an HTML error page served with a 200 is the case a
     // status check alone misses.
