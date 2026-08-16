@@ -689,3 +689,40 @@ started by this relay, so it was left alone. Next worker: restart the app, then
 client is empty" — it was not; five real torrents were there. (2) Probe torrents land in
 the user's real client; `debug/qbit409b.cjs clean <hash…>` removes them, and two were
 removed this turn.
+
+## 2026-08-16 — GATE 33 CLOSES: the 409 was chunked encoding, not a duplicate
+
+Worker `backup`. Commit `5127c0a6`. **The duplicate explanation in the section above is
+FALSIFIED** — the infohash `944969c7…` was not in the transfer list before the send, after the
+send, or at any point I looked. Do not spend another turn on it.
+
+**The real cause, measured on a tap in front of the real daemon.** `scraperRequest` wrote its
+POST body with `request.write()` and no `content-length`, so Node framed it as
+`transfer-encoding: chunked`. qBittorrent 5.2.3's WebUI parses **no** form field out of a
+chunked request: `torrents/add` saw an empty `urls` and answered its empty-`urls` 409. Bisecting
+the *form* found nothing — all 16 variants (full app form, urls-only, each field alone, each
+field removed) returned **200** with a fake magnet, and the real 342-char magnet returned 200
+too. The tap settled it: same handler, same magnet, same form, only the framing changed →
+`sent 1`. `resolveRequestOptions` now sets `content-length` from `Buffer.byteLength` for any
+non-GET/HEAD body a caller did not already declare. 18 tests; mutation control (the guard made
+unreachable) fails **1**.
+
+**GATE 33 IS CLOSED — a real acquisition, through the real UI, on the authorised title.** Named
+before the transfer, as promised: **Date A Live II: Kurumi Star Festival**,
+`[project-gxs] … OVA [10bit BD 720p] [5ACBBFF2].mkv`, **109,890,765 B (104.8 MB), 5 seeders**.
+Legs: search → **3 rows** · pick → `OVA · 2014 · AIC Plus+` · Download… → Episodes shelf ·
+**1 episode selected** · Find releases → **2 releases found**, `1 of 1 covered · 1 torrent` ·
+Send → **`qBittorrent accepted 1, skipped 0, rejected 0.`** and the infohash appears in the
+user's own client under category `jp-study`.
+
+**GATE 30 has its live negative control in the same run.** Pressing Send a second time with the
+torrent now present: **`accepted 0, skipped 0, rejected 1`** and the row reads
+**`Already in qBittorrent.`** — the distinct honest state, not a generic 409.
+
+**Traps.** (1) A tap that forwards with Node `fetch` must strip `transfer-encoding` and
+`content-length` from the forwarded headers, or undici throws `invalid transfer-encoding header`
+and the app reports `read ECONNRESET` — which reads exactly like the daemon being down.
+(2) After a full restart the shell restores **no** windows; open Scraper from Start (`.os-start-btn`
+then the `Scraper` item) before any `debug/g33.cjs` step, or every step answers `no Scraper window`.
+(3) `debug/g33.cjs all` answers `no All mode` on a one-episode title; the single unit is already
+ticked, so that refusal is not a defect.
