@@ -127,8 +127,20 @@ const SRC_TAG_RE = /<(?:img|audio|video|source|embed|object)\b[^>]*?\bsrc\s*=\s*
  * a false failure on every image-only note in a deck.
  */
 export function fieldIsEmpty(raw: string): boolean {
-  return stripHtml(String(raw ?? '').replace(SRC_TAG_RE, (_m, a, b, c) => ` ${a ?? b ?? c} `))
-    .length === 0;
+  return contentText(raw).length === 0;
+}
+
+/**
+ * The text Anki counts as this value's content: markup stripped, entities as
+ * space, whitespace collapsed — but the file name of anything with a `src` kept
+ * first, for the reason `fieldIsEmpty` gives above.
+ *
+ * `fieldIsEmpty` is this compared against `''`. It is exported separately
+ * because "is the answer the same as the question" needs the text itself and
+ * not the emptiness verdict — see `ankiCardHealth.ts`.
+ */
+export function contentText(raw: string): string {
+  return stripHtml(String(raw ?? '').replace(SRC_TAG_RE, (_m, a, b, c) => ` ${a ?? b ?? c} `));
 }
 
 export function stripHtml(raw: string): string {
