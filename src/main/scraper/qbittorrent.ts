@@ -508,6 +508,26 @@ export function buildAddForm(
   return form;
 }
 
+/**
+ * What to tell the user when `torrents/add` refuses.
+ *
+ * qBittorrent explains itself in the response body and the status alone does
+ * not: a 409 is "Torrent is already in the transfer list" *and* "Save path is
+ * not writable" *and* several others. Measured live — a real send returned
+ * `409` with the body naming the cause, and the report said only "qBittorrent
+ * answered 409.", which is the generic failure the contingency gates exist to
+ * forbid.
+ *
+ * The body is short and already user-facing; it is trimmed and length-capped
+ * rather than mapped, so a message this build has never seen still reaches the
+ * user instead of being flattened to a number.
+ */
+export function addFailureReason(status: number, body: string): string {
+  const detail = (body ?? '').trim().replace(/\s+/g, ' ').slice(0, 200);
+  if (!detail) return `qBittorrent answered ${status}.`;
+  return `qBittorrent answered ${status}: ${detail}`;
+}
+
 export async function qbitSend(input: ScraperQbitSendInput): Promise<QbitSendReport> {
   const rows: TorrentRow[] = Array.isArray(input.rows) ? input.rows : [];
   const details: QbitSendReport['details'] = [];
@@ -550,7 +570,7 @@ export async function qbitSend(input: ScraperQbitSendInput): Promise<QbitSendRep
     if ('error' in response || response.status !== 200) {
       const reason = 'error' in response
         ? response.error.message
-        : `qBittorrent answered ${response.status}.`;
+        : addFailureReason(response.status, response.body);
       for (const row of sendable) details.push({ name: row.name, outcome: 'failed', reason });
       scraperLog('error', 'qbit', `Send failed: ${reason}`);
     } else {

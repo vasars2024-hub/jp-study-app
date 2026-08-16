@@ -32,7 +32,7 @@ vi.mock('electron', () => ({
 
 let encryptionAvailable = true;
 
-const { buildAddForm, mapQbitState, mapTransfer, qbitBaseUrl, qbitSend, qbitTest, qbitTransfers, resetQbitSessions } =
+const { addFailureReason, buildAddForm, mapQbitState, mapTransfer, qbitBaseUrl, qbitSend, qbitTest, qbitTransfers, resetQbitSessions } =
   await import('../scraper/qbittorrent');
 const { getScraperSecret, hasScraperSecret, setScraperSecret, clearScraperSecret } =
   await import('../scraper/credentials');
@@ -49,6 +49,15 @@ const GOOD_KEY = 'RmDdRLXCTFEBpS2v3Yk6wJn9';
 let server: http.Server;
 let config: ScraperQbittorrentSettings;
 let addBodies: string[] = [];
+/**
+ * What `torrents/add` answers next.
+ *
+ * The real daemon refuses with a status *and a body naming the cause* — a live
+ * send measured `409` with the reason in the body. A stub that only ever
+ * answers `200 Ok.` encodes a contract the daemon does not have, which is how
+ * the last two qBittorrent defects survived a green suite.
+ */
+let addResponse: { status: number; body: string } = { status: 200, body: 'Ok.' };
 let sessionValid = true;
 /**
  * How the stand-in refuses a bad login. qBittorrent changed this between
@@ -173,8 +182,8 @@ beforeAll(async () => {
       });
       req.on('end', () => {
         addBodies.push(body);
-        res.writeHead(200, { 'content-type': 'text/plain' });
-        res.end('Ok.');
+        res.writeHead(addResponse.status, { 'content-type': 'text/plain' });
+        res.end(addResponse.body);
       });
       return;
     }
@@ -210,6 +219,7 @@ beforeEach(async () => {
   sessionValid = true;
   loginRejectStyle = 'fails';
   addBodies = [];
+  addResponse = { status: 200, body: 'Ok.' };
   seenHeaders = [];
   resetQbitSessions();
   await flushScraperLogWrites();
@@ -589,5 +599,39 @@ describe('qbitSend', () => {
     const report = await qbitSend({ config: { ...config, enabled: false }, rows: [row()] });
     expect(report.failed).toBe(1);
     expect(report.details[0].reason).toMatch(/not enabled/i);
+  });
+
+  // A live send returned 409 and the user was told only "qBittorrent answered
+  // 409." The daemon had said why in the body, and the report threw it away.
+  it('carries qBittorrent’s own explanation of a refusal', async () => {
+    addResponse = { status: 409, body: 'Torrent is already in the transfer list.' };
+    const report = await qbitSend({ config, rows: [row()] });
+    expect(report.sent).toBe(0);
+    expect(report.failed).toBe(1);
+    expect(report.details[0].reason).toBe(
+      'qBittorrent answered 409: Torrent is already in the transfer list.',
+    );
+  });
+
+  it('falls back to the bare status when the refusal carries no body', async () => {
+    addResponse = { status: 500, body: '   ' };
+    const report = await qbitSend({ config, rows: [row()] });
+    expect(report.details[0].reason).toBe('qBittorrent answered 500.');
+  });
+});
+
+describe('addFailureReason', () => {
+  it('never returns an empty string', () => {
+    expect(addFailureReason(409, '')).toBe('qBittorrent answered 409.');
+    expect(addFailureReason(409, '\n\t ')).toBe('qBittorrent answered 409.');
+  });
+
+  it('collapses whitespace and caps a long body', () => {
+    expect(addFailureReason(415, 'Torrent file\n  is not valid')).toBe(
+      'qBittorrent answered 415: Torrent file is not valid',
+    );
+    const long = 'x'.repeat(500);
+    const reason = addFailureReason(409, long);
+    expect(reason.length).toBeLessThanOrEqual('qBittorrent answered 409: '.length + 200);
   });
 });
