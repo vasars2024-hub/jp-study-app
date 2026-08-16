@@ -586,3 +586,56 @@ one step per invocation and is the cheapest way back to any leg.
 
 **P7 gate 32 is CLOSED.** Remaining in this plan: gate 29 (half-open) and the attended-only
 gates 31/33, which need the user in the moment.
+
+## 2026-08-16 — gate 33 driven live on the user's authorised title; two defects fixed, send still refused
+
+Worker `primary`. Gates 31/33 authorised in chat (`needs-user.md`, "1. go"), so this turn ran
+them. Commits `1e757977`, `2804e7d3`.
+
+**The title, named before any transfer, as promised.** From `malFetchList('completed')` — 1,426
+rows, 321 with `totalEpisodes === 1`. Surveyed 110 of those 321 through the app's own
+`scraperSearchTorrents`: **Date A Live II: Kurumi Star Festival** (MAL 22961), release
+`[project-gxs] Date a Live II - Kurumi Star Festival OVA [10bit BD 720p] [5ACBBFF2].mkv`,
+**104.8 MB, 5 seeders** — smallest exact-title match with a live swarm in the sample.
+
+**Gate 33, leg by leg through the real UI.** Search "Date A Live II" → **3 rows**; inspector
+`OVA · 2014 · AIC Plus+`; Download… → Episodes shelf active; Everything → **1 episode selected,
+1 unit**; Find releases → **2 releases found**.
+
+| | before | after |
+| --- | --- | --- |
+| plan summary | `0 of 1 covered · 0 torrents` | `1 of 1 covered · 1 torrent` |
+| send button | `Send 0 torrents` **disabled** | `Send 1 torrent` **enabled** |
+
+**Defect 1 — no one-episode title could ever be downloaded (`1e757977`).** `planMalReleases`
+bound a release only via `releaseCoversEpisode`. An OVA/movie/special numbers nothing because
+there is nothing to number, so all 321 planned to zero. New `namesAnyEpisode` separates
+"unnumbered" from "names a *different* episode", which is still refused; gated on a new
+`singleUnitTitle` option, not `units.length === 1`, because hand-picking episode 7 of 26 also
+selects one unit and there an unnumbered release is a season pack. **Trap:** `namesAnyEpisode`
+needs `(?![\dA-Za-z])` on the trailing edge or the CRC32 tag `[E9ED99BE]` reads as "episode 9"
+and every checksummed release looks numbered. 55 tests; mutation control (widened match made
+unconditional) fails **4**.
+
+**Defect 2 — a refusal said only "answered 409" (`2804e7d3`).** The send reached qBittorrent and
+came back `accepted 0, skipped 0, rejected 1`; the per-row reason was `qBittorrent answered 409.`
+`qbitSend` had `response.body` in hand and dropped it. `addFailureReason` now appends the
+daemon's own text, capped at 200 chars, unmapped. The stand-in server only ever answered
+`200 Ok.` — the same stale-stub shape that hid gates 24 and 28 — and now answers a configurable
+status *and body*. 41 tests; mutation control fails **2**.
+
+**GATE 33 IS NOT CLOSED.** Every leg up to and including the send works; the daemon refuses the
+add. Most likely cause, from the live config: `autoTmm: true` + `category: 'jp-study'` +
+`savePath: ''`, and **nothing in the app ever creates that category**, so automatic management
+has no path to resolve. Next slice: read the real 409 body (needs a full app restart — `2804e7d3`
+is a main-process change and the running app predates it), then create the category via
+`/api/v2/torrents/createCategory` before adding, or fall back. Gate 31 (Route A/B) is untouched.
+
+**Traps.** (1) The dialog's send result renders in `.mal-dl-message`, which carries **no**
+`role=alert|status` — a poll on those selectors reads empty and looks like a silent failure.
+(2) `listNyaaSubtitles` on The Big O returns **0 candidates** honestly: nyaa has only single-file
+MKVs for it and both routes correctly refuse those. Not a defect. (3) Sub-pack (Route A)
+releases with ≥3 seeders are genuinely rare on nyaa today — `Koe no Katachi subtitle pack`,
+the Grendizer U `.ass` files and the Kitsunekko archives all sit at **0 seeders**.
+(4) `debug/g33.cjs` drives this flow one step per invocation; the Scraper window must be opened
+from Start first or every step returns `no Scraper window`.
