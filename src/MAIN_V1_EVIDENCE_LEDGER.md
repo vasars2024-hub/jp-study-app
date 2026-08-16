@@ -24159,3 +24159,52 @@ never run against the real daemon; this is that run. Driver `debug/g29-live.cjs`
   acquisition that clears it, which then adds its own torrent. Assert on the orphan's hash.
 - **End state**: `247d977772eb` left in the category at 1 seeder, 0 bytes — the residue the
   reaper exists to clear, cleared by the next acquisition.
+
+## 2026-08-16 — Track 7 / Phase 7: recipe 18, and the empty revlog that was never empty
+
+**Slices.** `0a5a2e17` recovered `shared/ankiStaleCards.ts` + the `stale:` predicate and
+wired `schema.stale` (3 renderer tests) · `0446c4c0` `DeckWorkbenchStale`, the preview panel
+(7 tests, 16 keys ×4) · `7eeccd5` the live run's finding, `dropped` vs `empty` (1 key ×4).
+
+**Recovery, not a fresh slice.** `ankiStaleCards.ts` (451 lines), its 26 tests and the
+`stale:` parse were written at **23:15:07** and the worker hit its usage limit **28 seconds
+later**. The whole recipe sat untracked with **zero** consumers: `DeckWorkbenchBrowser` never
+built `schema.stale`, so every `stale:` query in the product parsed to `no-stale-context` and
+rendered a tidy refusal. **A refusal reads exactly like a deliberate design** — that is why
+it is the wiring test's negative control and not its assertion. Mutation control: deleting
+the one `...(stale ? { stale } : {})` line fails 2 of 3 tests; the refusal test still passes.
+
+**Decision.** Two axes, never summed: `overdue` is `today - due`, a day Anki *planned*;
+`dormant` is days since the revlog's newest entry, a day the user actually studied. A deck
+abandoned mid-way is deep in both; one rescheduled by a preset change is deep in `overdue`
+only. `withheld` outranks both — rescheduling a suspended card writes a number Anki will
+never read. `reset` is refused whole by name and shown **disabled with its reason**, not
+hidden: the journal carries field/tags/card-due/card-deck/deck-name, and a reset must write
+type, queue, reps, lapses, interval, ease and drop the revlog.
+
+**Live, on the user's 33 real packages, no dialog** (`readApkgDraft {filePath}`, real main
+process, the real module imported from the dev server — `debug/r18-live.cjs`): **52,144
+cards, 0 read errors**, every tally partitions exactly (`sum === cards`, 33 of 33), worst
+scan **4 ms**, worst read 3,473 ms. `reset` → `reset-unsupported` on all 33. The round-robin
+spread is provably even — max−min = **1** on every deck with moves: 67–68/day over 14 days
+on 実験 (946 moves), 52–53 (729), 47–48 (661), 18–19 (263), 11–12 (161), 6–7 (88).
+
+**The finding, and it is why the run happened.** All 33 packages returned `reviewHistory:
+'present'` with **0** revlog rows. Probed for the contradiction: `N1 Vocab 3333….apkg` has
+**748** cards with `reps > 0`, max **41** reps; 実験 **959**, max 35; `XXXX….apkg` **676**,
+max 40 — each beside a log with no rows. A card reviewed 41 times and a log saying nobody
+ever reviewed anything cannot both be true: the export dropped the history, and `dormant: 0`
+there was a **false claim**, the exact silence the panel's notice existed to prevent and
+never fired for. `StaleReviewHistory` now splits the empty log by whether the cards agree —
+`empty` (no card claims a review; the zero is true) vs `dropped` — behind one predicate,
+`staleHistoryIsReadable`, that both the notice and the disabled input read so they cannot
+drift. Re-measured after the fix, same 33: **17 dropped, 16 empty, 0 present, 0 absent**.
+Negative control is the user's own `N1 Vocab 3XXX….apkg` — 1,437 cards, 0 reps, 0 rows,
+panel silent. This corrected recipe 18's own test, which required `present` for an empty log.
+
+**Traps.** (1) `debug/stage-i18n-block.cjs` anchors on a *key* line and treats the next HEAD
+line as the block terminator — it throws on any entry wrapped key-on-one-line/value-on-the-next,
+which is most of `en`. `debug/stage-i18n-after-line.cjs` anchors on the line *before* the
+insertion instead, which is language-independent. (2) A panel fixture defaulting
+`createdAtSec` to `undefined` put 6 of 7 cases silently on the refusal branch while claiming
+to measure the preview — assert the branch you think you are in.
