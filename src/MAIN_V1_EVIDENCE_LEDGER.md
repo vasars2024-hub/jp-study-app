@@ -23181,3 +23181,25 @@ pins `source-changed`.
 
 **Still open.** The live-Anki commit half of Phase 6, gate 11's provenance-after-reimport
 specifics, gate 10's owed four-language/compact measurements for steps 3–7.
+
+## 2026-08-16 — Track 7 / gate 10: the four-language render of steps 3–7, measured
+
+**Method.** The 08:00 "language probe that lies" is now explained and beaten: the in-page
+`import('/src/renderer/i18n.ts')` is a SECOND module instance (the Vite `?v=` duplication), so its
+`setUiLang` notifies its own empty subscriber list — but it shares localStorage. The working
+recipe: `localStorage.setItem('ui-lang', L)` → `location.reload()` → `wait-ready` → structural
+re-walk (`debug/step7-lang.ps1` + `debug/g10-walk.js`; no English labels — `.os-start-btn`,
+`.deck-workbench-source[2]`, `.wb-browser-foot button`, `.deck-workbench-nav button.primary`).
+~60 s per language against the real 3,221-note local deck, select-all applied, trays rendered.
+
+**Numbers.** ja, zh, ru: steps 3, 4, 5, 6, 7 body text and the full stepper each carry **0** raw
+`ankiWorkbench.*` keys. `<html lang>` stamps **ja / zh-Hans / ru** (the zh-Hans distinction is the
+glyph-shape rule the i18n header documents). Step 7's new strings render translated in all three
+(適用または書き出し / 应用或导出 / Применение или экспорт; lead + noFile line confirmed in body).
+User data correctly stays untranslated: deck label `Local flashcards`, note type `JP Study Local`,
+field names. Restore: `ui-lang` back to `en`, `-cne` verified byte-exact, app reloaded on it.
+Full harvest: `debug/step7-lang-results.json`.
+
+**Still owed on gate 10.** Steps 3–5 + 7 contrast/compact/maximized and reduced-motion (step 6
+has its half; step 7 has EN contrast 6.08–16.02 on the two local-deck-visible texts only — the
+package branch's facts/button/error lines render only over an apkg draft, attended).
