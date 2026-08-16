@@ -23708,3 +23708,64 @@ known `scraperScheduler` ENOTEMPTY teardown flake did not fire this run. i18n ex
 **Not built yet, deliberately:** the commit half (create the deck row, write `cards.did`,
 verify) and the workbench panel that queues the action — `split-deck` is not in
 `ACTION_KINDS`. Both are the next two slices.
+
+## 2026-08-16 — Track 7 / Phase 7: recipe 13's panel, and the branch that did not build
+
+**Slices.** `606329ba` the 8 missing tray problem strings + a guard test · `11cce700`
+and `accbb961` the committed catalogs' parse error · `e9d72fa6` the split panel.
+
+**Recipe 13 was speaking to the user in raw key names.** All eight `split-*` codes
+shipped with no string in any catalog. `DeckWorkbenchTray` builds that key at runtime,
+`translate()` returns the key itself when English lacks it (`i18n/core.ts:94`), and the
+tray tests stub `t` to echo keys — so nothing could see it. Measured live through the
+real `translate`: a code with no string returns the literal
+`ankiWorkbench.tray.problem.split-nonexistent`, against
+`"4 cards move to another deck, starting with Core::N5."` for the fixed one.
+`split-refused` alone carries a `DeckSplitProblem` enum rather than deck text, so the
+renderer translates the detail; the pure module cannot.
+New `ankiTrayProblemStrings.test.ts` scans both unions against the English catalog. It
+found the missing `tray.kind.split-deck` on its first run. Mutation control: renaming
+`split-moved` fails it naming exactly that code.
+
+**The committed branch has not built in ja/zh/ru since `b8a7f24c`.** That commit did not
+drop `tag-normalize-clean`'s wrapped value line — it *displaced* it ~47 lines down, where
+it parses as a second value for `deck-normalize-clean`. Both halves fixed. Nothing local
+could see this: the shared dirty tree holds the repaired file, so every worker's
+`i18n-check` and vitest read it and pass while a clean checkout of the branch does not
+compile. Found only by running the gates in a detached worktree at the commit.
+**Correction to `11cce700`'s message, measured after the fact:** this is *not* part of
+the 9 test failures in the 2026-08-16 05:34 boss audit's finding 2. Isolated HEAD was
+4 files / 9 tests red before this fix and **4 files / 9 tests red after**
+(662 passed / 667 files, 9,064 passed / 9,079) — still `i18n.test.ts` on the uncommitted
+`Lockscreen.tsx` locale args, exactly as that audit attributed. What it did fix is
+`node tools/i18n-check.cjs`, which **crashed** on a clean checkout and now exits 0.
+
+**The panel.** `split-deck` stays out of `ACTION_KINDS` — its scope is a named deck, not
+the selection — so it gets `DeckWorkbenchSplit.tsx`, rendered where `kinds` include
+`normalize-decks` (step 5 and the standalone tray). Add and the tray refuse identically
+because both call `deckSplitParameterProblem`; verified live — `no-such-parent`,
+`parent-filtered`, `null`. A filtered deck is listed **disabled** with the count and
+reason, not hidden. Also wired the `split` context into `planChangeTray`: without it the
+`frequency` and `mastery` axes block on `no-vocab-context`.
+
+**Traps.** (a) `tools/i18n-untranslated-baseline.json` is sorted by `localeCompare`, not
+default sort — a `.sort()` reorders `aiStudio.dirPreset`/`direction` and fakes a foreign
+hunk. Insert at the collated index; the diff must be `+n/-0`. (b) The catalogs carry
+~700 lines of another track's unstaged work, so every commit here needed a HEAD+edit
+blob. (c) Union-parsing a doc-commented type must strip comments first: one doc sentence
+ends `"...left the new queue;"` and slicing to the first `;` silently returns 34 of 60.
+
+Gates: `npx vitest run` **693 files (691 passed / 1 failed / 1 skipped), 9,427 tests
+(9,420 passed / 1 failed / 6 skipped)**. Baseline 691 files / 9,410 passed, so +2 files
+and +11 tests — exactly the 2 (guard) + 6 (panel) + 3 (tray wiring) added here. The one
+failure is `mediaSurfaceImportGraph.test.ts`, the documented full-suite load flake
+(ledger 12289, 14124, 22705, 23272); re-run alone it is **8/8 green**, and it touches the
+media import graph, none of these paths. i18n exit 0 at **10,297** (+15, one numeric
+placeholder baselined) · architecture "Nothing new", 2 pending · eslint on the 5 touched
+**JS/TS** paths **0 errors** (46 non-null warnings, the existing test files' own style);
+`deckWorkbench.css` is not lintable by this config and is excluded, not silently passed.
+Shared working tree; HEAD alone is red from other tracks — but for the first time since
+`b8a7f24c` it at least *compiles*.
+
+**Next:** the commit half — create the deck row and write `cards.did` — which both
+writers still refuse by name (`deck-move-unsupported`).
