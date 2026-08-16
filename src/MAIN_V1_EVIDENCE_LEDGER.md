@@ -23769,3 +23769,55 @@ Shared working tree; HEAD alone is red from other tracks — but for the first t
 
 **Next:** the commit half — create the deck row and write `cards.did` — which both
 writers still refuse by name (`deck-move-unsupported`).
+
+## 2026-08-16 — Track 7 / Phase 7: recipe 13's package writer actually moves the card
+
+**Recovered slice.** Worker `primary` was cut off by a usage limit at 16:57 with this
+written but uncommitted (mtimes 16:47–16:55). Re-derived from the diff, mutation-tested
+and landed as `a668ed4d`; nothing was rewritten.
+
+**The defect.** The split previewed, applied to the draft, and exported a package where
+nothing had moved: `applyExportChanges` refused every `cardDeckMoves` batch by name
+because it could create no deck row and rewrite no `cards.did`. Both are written now.
+
+**Decisions.** (1) A minted deck id is `split:<parent>:<segment>` — deliberately
+non-numeric, since a real Anki id is epoch ms and an id that could pass for one would
+file cards into a row that never existed. `deckCreates` on the change set carries the
+name/`conf`; the *writer* allocates the real id from `nowMs` upward, skipping taken ids,
+because only it knows what the source holds. (2) `deck-move-unsupported` leaves
+`ApkgExportErrorCode` and is replaced by `card-filtered`: a card on loan to a filtered
+deck keeps its real deck in `odid`, so writing `did` would strand it on the next rebuild.
+`ankiConnectCommit.ts` keeps the old name — the LIVE path still refuses, and that is the
+next slice. (3) Deck rows are written before `cards.did`, so no card ever points at a
+deck the package does not hold. (4) `cardsUpdated` counts distinct card ROWS: a card both
+repositioned and refiled is one card in Anki, not two change-list entries.
+
+**Schema 18's `decks.kind`** is a protobuf oneof — field 1 `Normal`, field 2 `Filtered`,
+both length-delimited, so the leading byte is exactly what `apkgDraftRead`'s
+`kindBlobIsFiltered` tests. Only `config_id` is written inside `Normal`; every other field
+is a protobuf default, whereas omitting `config_id` points the subdeck at preset 0, which
+no collection has. Schema 11 gets a legacy `col.decks` entry with the per-day counters
+zeroed (a missing counter makes older Anki builds throw on open).
+
+**Verification resolves a minted id back through the deck NAME** in the written file, not
+through whatever id the writer chose — so it confirms the row exists *and* the card points
+at it, independently of the writer.
+
+**`deck-move-unsupported` had shipped with no `liveError` string at all.** The extended
+guard test in `ankiTrayProblemStrings.test.ts` — now scanning `ApkgExportErrorCode` and
+`ConnectCommitErrorCode` against the English catalog — caught it. That plus
+`apply.error.card-filtered`, both in all four languages.
+
+**Trap for whoever stages catalogs next:** a wrapped value line also starts with a quote,
+so a "next entry" regex of `/^\s*'/` silently drops it and stages a catalog that does not
+parse. It must be `/^\s*'[^']*':/`. This is `b8a7f24c`'s defect exactly, and I reproduced
+it on the first attempt; caught before commit by reading the staged diff.
+
+Gates: `apkgExportCore.test.ts` **26/26** (12 new), 58/58 across the four nearest files.
+**Mutation controls:** writing the `Filtered` oneof tag (0x12) instead of `Normal` (0x0a)
+fails the kind-blob test by name; writing the minted id straight into `cards.did` fails
+**5** tests including the name-resolved verify. Isolated at the commit in a detached
+worktree: i18n exit 0 at **10,128**, the four files **58/58** — no dirty-tree dependency.
+
+**Next:** the live half — `createDeck` + `changeDeck` through AnkiConnect, which is the
+last thing between recipe 13 and closed.
