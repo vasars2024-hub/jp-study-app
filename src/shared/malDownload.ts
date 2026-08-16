@@ -296,6 +296,34 @@ export function releaseCoversEpisode(name: string, number: number): boolean {
   return patterns.some((pattern) => new RegExp(pattern, 'i').test(name ?? ''));
 }
 
+/**
+ * Whether a release name numbers an episode at all.
+ *
+ * The same shapes `releaseCoversEpisode` reads, asked without a target number.
+ * A one-episode title has nothing to number, so its releases say things like
+ * `Kurumi Star Festival OVA [10bit BD 720p]` — and a planner that insists on an
+ * episode match can never cover it. This is how that case is told apart from a
+ * release that names *some other* episode, which must still not be offered.
+ *
+ * Deliberately not written as "no digits anywhere": resolutions, bit depths,
+ * years and CRC32 tags are all digits, and every real release carries several.
+ */
+export function namesAnyEpisode(name: string): boolean {
+  // Stricter on the trailing edge than `releaseCoversEpisode`, which may end a
+  // number against a letter. Without that, the CRC32 tag `[E9ED99BE]` reads as
+  // "episode 9" — `[` opens, `E` is the `e` marker, `9` is the number — and
+  // every release carrying a checksum would look numbered.
+  const digits = String.raw`\d{1,3}(?:v\d+)?(?![\dA-Za-z])(?!\.\d)`;
+  const patterns = [
+    String.raw`s\d{1,2}[\s._-]*e${digits}`,
+    String.raw`(?:^|[\s._\-[(])(?:e|ep|episode)[\s._-]*${digits}`,
+    String.raw`[-–—][\s._]*${digits}`,
+    String.raw`\[${digits}\]`,
+    String.raw`_${digits}_`,
+  ];
+  return patterns.some((pattern) => new RegExp(pattern, 'i').test(name ?? ''));
+}
+
 /** A release, as far as the planner cares. `TorrentRow` satisfies this. */
 export type MalRelease = AcquisitionTorrentCandidate;
 
@@ -325,6 +353,21 @@ export interface MalReleasePlanOptions {
    * selection, so it is a choice rather than a default.
    */
   preferBatches?: boolean;
+  /**
+   * The catalogue lists exactly one unit for this title — an OVA, a movie, a
+   * special.
+   *
+   * Such a release has no episode number to carry, so requiring one made every
+   * one of them uncoverable: measured live on `Date A Live II: Kurumi Star
+   * Festival`, where the index returned 2 releases and the plan reported
+   * "0 of 1 covered · 0 torrents" with the send button disabled.
+   *
+   * It is an option rather than `units.length === 1` because those are
+   * different facts. Hand-picking episode 7 of a 26-episode show also selects
+   * one unit, and there an unnumbered release is a season pack or the wrong
+   * thing — never episode 7. Only the caller knows which case it is in.
+   */
+  singleUnitTitle?: boolean;
 }
 
 /**
@@ -410,11 +453,22 @@ export function planMalReleases(
 
   const useBatch = Boolean(options.preferBatches && wholeBatch);
 
+  // A one-episode title's release numbers nothing, because there is nothing to
+  // number. Accepted only for the title's own single unit, and only when the
+  // name numbers no episode at all — a release calling itself `- 05` is still
+  // refused, so this widens the match without loosening it.
+  const soleUnit = Boolean(options.singleUnitTitle) && ordered.length === 1;
+  const unnumbered = (release: MalRelease): boolean => soleUnit && !namesAnyEpisode(release.name);
+
   const matches = ordered.map((unit): MalReleaseMatch => {
     if (useBatch && wholeBatch) return { unit, release: wholeBatch, viaBatch: true };
-    const single = singles.find((release) => releaseCoversEpisode(release.name, unit.number));
+    // A release that names the episode outright wins over an unnumbered one
+    // even when the unnumbered one ranks higher, so the widened match is a
+    // fallback rather than a reordering of the list the user would expect.
+    const single = singles.find((release) => releaseCoversEpisode(release.name, unit.number))
+      ?? singles.find(unnumbered);
     if (single) return { unit, release: single, viaBatch: false };
-    const batch = batches.find((release) => coversUnit(release, unit));
+    const batch = batches.find((release) => coversUnit(release, unit)) ?? batches.find(unnumbered);
     return { unit, release: batch ?? null, viaBatch: Boolean(batch) };
   });
 

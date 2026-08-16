@@ -5,6 +5,7 @@ import {
   coveredByBatchRange,
   episodeLabel,
   filterMalReleases,
+  namesAnyEpisode,
   parseUnitNumber,
   planMalReleases,
   rankMalReleases,
@@ -415,5 +416,72 @@ describe('unit labelling', () => {
     expect(parseUnitNumber('Chapter 12', 0)).toBe(12);
     expect(parseUnitNumber('10-11', 0)).toBe(10);
     expect(parseUnitNumber('Extra', 7)).toBe(7);
+  });
+});
+
+// A one-episode title — OVA, movie, special — is 321 of the 1,426 entries on
+// the measured MAL list, and every one of them planned to nothing before this:
+// the release has no episode number because there is no episode to number.
+describe('single-unit titles', () => {
+  const sole = [unit(1)];
+  const KURUMI = '[project-gxs] Date a Live II - Kurumi Star Festival OVA [10bit BD 720p] [5ACBBFF2].mkv';
+
+  it('leaves the title uncovered when the flag is not set', () => {
+    const plan = planMalReleases(sole, [release(KURUMI)]);
+    expect(plan.covered).toBe(0);
+    expect(plan.releases).toEqual([]);
+  });
+
+  it('covers it from a release that numbers no episode', () => {
+    const plan = planMalReleases(sole, [release(KURUMI)], { singleUnitTitle: true });
+    expect(plan.covered).toBe(1);
+    expect(plan.matches[0].release?.name).toBe(KURUMI);
+    expect(plan.matches[0].viaBatch).toBe(false);
+  });
+
+  // The control that keeps this from being "match anything". A release that
+  // names a different episode is still the wrong thing for the sole unit.
+  it('still refuses a release that names another episode', () => {
+    const plan = planMalReleases(sole, [release('[G] Show - 05 [1080p]')], { singleUnitTitle: true });
+    expect(plan.covered).toBe(0);
+    expect(plan.missing.map((u) => u.number)).toEqual([1]);
+  });
+
+  it('prefers the release that names episode 1 over an unnumbered one', () => {
+    const plan = planMalReleases(sole, [
+      release('[G] Show OVA [1080p]', { seeders: 900 }),
+      release('[G] Show - 01 [1080p]', { seeders: 1 }),
+    ], { singleUnitTitle: true });
+    expect(plan.matches[0].release?.name).toBe('[G] Show - 01 [1080p]');
+  });
+
+  // Hand-picking episode 7 of a 26-episode show also selects one unit. The
+  // caller does not set the flag there, so an unnumbered season pack cannot be
+  // offered as episode 7.
+  it('does not widen a one-unit selection out of a many-unit title', () => {
+    const plan = planMalReleases([unit(7)], [release('[G] Show Complete [1080p]')]);
+    expect(plan.covered).toBe(0);
+  });
+
+  it('ignores the flag when more than one unit is selected', () => {
+    const plan = planMalReleases([unit(1), unit(2)], [release('[G] Show OVA [1080p]')], { singleUnitTitle: true });
+    expect(plan.covered).toBe(0);
+  });
+});
+
+describe('namesAnyEpisode', () => {
+  it('reads the shapes a release actually numbers an episode with', () => {
+    expect(namesAnyEpisode('[G] Show - 05 [1080p]')).toBe(true);
+    expect(namesAnyEpisode('[G] Show S01E07')).toBe(true);
+    expect(namesAnyEpisode('[G] Show ep12 [720p]')).toBe(true);
+    expect(namesAnyEpisode('[G] Show [03]')).toBe(true);
+  });
+
+  // Every real release is full of digits that are not episode numbers. If any
+  // of these read as one, the single-unit path would stop covering anything.
+  it('does not read a resolution, bit depth, year or CRC as an episode', () => {
+    expect(namesAnyEpisode('[project-gxs] Date a Live II - Kurumi Star Festival OVA [10bit BD 720p] [5ACBBFF2].mkv')).toBe(false);
+    expect(namesAnyEpisode('[Commie] Dareka no Manazashi [1080p] [E9ED99BE].mkv')).toBe(false);
+    expect(namesAnyEpisode('[G] Akira (2019) [BD 1920x1080 FLAC]')).toBe(false);
   });
 });

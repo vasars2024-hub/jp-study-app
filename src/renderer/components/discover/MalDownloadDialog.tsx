@@ -583,6 +583,9 @@ export default function MalDownloadDialog({ candidate, onClose }: Props) {
         : planMalReleases(selected, rows, {
           preferredResolution: resolution ? `${resolution}p` : '',
           preferBatches,
+          // `units`, not `selected`: the question is whether the title has one
+          // episode, not whether one is ticked right now.
+          singleUnitTitle: units.length === 1,
         });
       setReleases(pickingReleases
         ? rankMalReleases(rows, { preferredResolution: resolution ? `${resolution}p` : '' })
@@ -621,7 +624,7 @@ export default function MalDownloadDialog({ candidate, onClose }: Props) {
       setSendMessage(errorText(error));
       setSendState('error');
     }
-  }, [pickingReleases, preferBatches, query, selected, t, target]);
+  }, [pickingReleases, preferBatches, query, selected, t, target, units.length]);
 
   /**
    * What the send button will actually hand over.
