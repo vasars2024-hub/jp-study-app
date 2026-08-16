@@ -9818,6 +9818,26 @@ export const en: Catalog = {
     '{count} sentences do not contain the word they teach.',
   'ankiWorkbench.tray.problem.cloze-undecidable':
     '{count} words change shape in a way this cannot follow, so they were left for you rather than guessed at.',
+  'ankiWorkbench.tray.kind.restore-source': 'Restore where each card came from',
+  'ankiWorkbench.tray.describe.restore-source': 'Write {facets} into {to}, where the note records it',
+  'ankiWorkbench.tray.source.to': 'Write the source context to',
+  'ankiWorkbench.tray.source.facets': 'What to restore, when the note records it',
+  'ankiWorkbench.tray.source.facet.timestamp': 'the moment in the video',
+  'ankiWorkbench.tray.source.facet.cue': 'the subtitle track and line',
+  'ankiWorkbench.tray.source.facet.origin': 'which tool made the card',
+  'ankiWorkbench.tray.source.facet.deck': 'the deck the card is in',
+  'ankiWorkbench.tray.source.noUrl':
+    'Only what your cards already record can be restored. This app stores no page address or screenshot alongside a mined card, so neither can be brought back.',
+  'ankiWorkbench.tray.problem.source-field-absent':
+    '{count} notes have no {detail} field, so there is nowhere to put their source context.',
+  'ankiWorkbench.tray.problem.source-occupied':
+    '{count} notes already have something in {detail}, so nothing was written over it.',
+  'ankiWorkbench.tray.problem.source-none':
+    '{count} notes record nothing about where they came from, so nothing was invented for them.',
+  'ankiWorkbench.tray.problem.source-unreadable-clip':
+    'The clip attached to {count} notes has been renamed ({detail}), so the moment it came from can no longer be read from it.',
+  'ankiWorkbench.tray.problem.source-clean':
+    'Nothing was restored. At most {detail} of the {count} selected notes record anything about where they came from.',
   'ankiWorkbench.tray.kind.reschedule-stale': 'Bring stale cards back on schedule',
   'ankiWorkbench.tray.describe.reschedule-stale':
     '{mode} cards overdue by {overdue}+ days or unreviewed for {dormant}+ days, spread over {spread} days',

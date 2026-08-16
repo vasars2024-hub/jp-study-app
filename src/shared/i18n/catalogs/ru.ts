@@ -10207,6 +10207,26 @@ export const ru: Catalog = {
     'В {count} примерах нет слова, которому они учат.',
   'ankiWorkbench.tray.problem.cloze-undecidable':
     'Форму {count} слов не удалось разобрать, поэтому они оставлены вам, а не угаданы.',
+  'ankiWorkbench.tray.kind.restore-source': 'Восстановить, откуда взялась каждая карточка',
+  'ankiWorkbench.tray.describe.restore-source': 'Записать {facets} в {to} там, где заметка это помнит',
+  'ankiWorkbench.tray.source.to': 'Записать сведения об источнике в',
+  'ankiWorkbench.tray.source.facets': 'Что восстановить там, где заметка это помнит',
+  'ankiWorkbench.tray.source.facet.timestamp': 'момент в видео',
+  'ankiWorkbench.tray.source.facet.cue': 'дорожку субтитров и строку',
+  'ankiWorkbench.tray.source.facet.origin': 'каким инструментом сделана карточка',
+  'ankiWorkbench.tray.source.facet.deck': 'колоду, в которой лежит карточка',
+  'ankiWorkbench.tray.source.noUrl':
+    'Восстановить можно только то, что карточки уже помнят. Приложение не сохраняет рядом с добытой карточкой ни адрес страницы, ни снимок экрана, поэтому вернуть их нельзя.',
+  'ankiWorkbench.tray.problem.source-field-absent':
+    'У {count} заметок нет поля {detail}, поэтому сведения об источнике некуда записать.',
+  'ankiWorkbench.tray.problem.source-occupied':
+    'У {count} заметок в поле {detail} уже что-то есть, поэтому оно не перезаписано.',
+  'ankiWorkbench.tray.problem.source-none':
+    '{count} заметок не помнят о своём происхождении ничего, поэтому для них ничего не выдумано.',
+  'ankiWorkbench.tray.problem.source-unreadable-clip':
+    'Клип, приложенный к {count} заметкам, был переименован ({detail}), поэтому момент, из которого он взят, больше не прочитать.',
+  'ankiWorkbench.tray.problem.source-clean':
+    'Ничего не восстановлено. Из {count} выбранных заметок сведения об источнике помнят самое большее {detail}.',
   'ankiWorkbench.tray.kind.reschedule-stale': 'Вернуть застоявшиеся карточки в расписание',
   'ankiWorkbench.tray.describe.reschedule-stale':
     '{mode} карточки, просроченные на {overdue}+ дней или не повторявшиеся {dormant}+ дней, распределив их на {spread} дней',

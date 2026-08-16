@@ -9386,6 +9386,26 @@ export const ja: Catalog = {
     '{count} 件の例文に、その例文が教える単語が含まれていません。',
   'ankiWorkbench.tray.problem.cloze-undecidable':
     '{count} 件の単語は形の変化を追えないため、推測せずそのまま残しました。',
+  'ankiWorkbench.tray.kind.restore-source': 'カードの出典を復元する',
+  'ankiWorkbench.tray.describe.restore-source': 'ノートが記録している場合に{facets}を{to}へ書き込む',
+  'ankiWorkbench.tray.source.to': '出典情報の書き込み先',
+  'ankiWorkbench.tray.source.facets': 'ノートが記録している場合に復元する項目',
+  'ankiWorkbench.tray.source.facet.timestamp': '動画内の時刻',
+  'ankiWorkbench.tray.source.facet.cue': '字幕のトラックと行',
+  'ankiWorkbench.tray.source.facet.origin': 'カードを作成したツール',
+  'ankiWorkbench.tray.source.facet.deck': 'カードのあるデッキ',
+  'ankiWorkbench.tray.source.noUrl':
+    '復元できるのはカードが既に記録している内容だけです。このアプリは採取したカードにページのURLやスクリーンショットを保存しないため、どちらも復元できません。',
+  'ankiWorkbench.tray.problem.source-field-absent':
+    '{count}件のノートには{detail}フィールドがないため、出典情報を書き込む場所がありません。',
+  'ankiWorkbench.tray.problem.source-occupied':
+    '{count}件のノートは{detail}に既に内容があるため、上書きしていません。',
+  'ankiWorkbench.tray.problem.source-none':
+    '{count}件のノートは出典を一切記録していないため、推測で補うことはしていません。',
+  'ankiWorkbench.tray.problem.source-unreadable-clip':
+    '{count}件のノートに添付されたクリップは名前が変更されており（{detail}）、そこから時刻を読み取れません。',
+  'ankiWorkbench.tray.problem.source-clean':
+    '復元できたものはありません。選択した{count}件のうち、出典を記録しているのは最大{detail}件です。',
   'ankiWorkbench.tray.kind.reschedule-stale': '滞ったカードを予定に戻す',
   'ankiWorkbench.tray.describe.reschedule-stale':
     '期限を{overdue}日以上過ぎたカード、または{dormant}日以上復習していないカードを{spread}日に分散して{mode}',

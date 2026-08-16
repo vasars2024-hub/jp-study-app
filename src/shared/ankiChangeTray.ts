@@ -106,6 +106,12 @@ import {
   type ClozeMatchMode,
 } from './ankiClozeCandidates';
 import {
+  planSourceContext,
+  type SourceContextPlan,
+  type SourceContextRefusal,
+  type SourceFacet,
+} from './ankiSourceContext';
+import {
   MIN_STALE_THRESHOLD_DAYS,
   planStaleRemedy,
   scanStaleCards,
@@ -160,7 +166,8 @@ export type TrayActionKind =
   | 'split-deck'
   | 'merge-glossary'
   | 'add-cloze'
-  | 'reschedule-stale';
+  | 'reschedule-stale'
+  | 'restore-source';
 
 /**
  * What a copy does when the destination already holds text — Phase 4's "require
@@ -418,6 +425,25 @@ export type TrayAction =
        * when the action is queued, which is also the moment the panel scanned.
        */
       nowMs: number;
+    })
+  | (TrayActionBase & {
+      /**
+       * Recipe 20. Writes the source facts a note already carries but does not
+       * display — decoded, never invented. See `ankiSourceContext.ts` for what
+       * this app's own mining actually leaves behind and what it does not.
+       *
+       * No `onConflict`, for `fill-reading`'s reason: the recipe *restores*
+       * missing context, so a destination that already holds text is skipped and
+       * counted. A hand-written source note is exactly the value a batch must
+       * not be able to replace.
+       */
+      kind: 'restore-source';
+      /** Where the restored text goes. */
+      toField: string;
+      /** Which facts to restore, in the order they will be joined. No default. */
+      facets: SourceFacet[];
+      /** What separates two facts. `DEFAULT_SOURCE_SEPARATOR` when omitted. */
+      separator?: string;
     });
 
 // ----- the ordered list --------------------------------------------------------
@@ -671,7 +697,25 @@ export type TrayProblemCode =
    */
   | 'stale-history-unreadable'
   /** The action ran and moved no card. Same reason `tag-normalize-clean` exists. */
-  | 'stale-clean';
+  | 'stale-clean'
+  /** Recipe 20. This note type has no field by the destination name. */
+  | 'source-field-absent'
+  /** The destination already holds text; recipe 20 never overwrites one. */
+  | 'source-occupied'
+  /**
+   * The note carries none of the requested facts. Info, not warning: a hand-made
+   * deck records no provenance and that is not a defect in the deck — but it is
+   * reported, because a silent zero here reads as the recipe having failed.
+   */
+  | 'source-none'
+  /**
+   * A `jp-clip-…` media name that claims a timestamp and carries none, so
+   * something rewrote the file name. A warning: the clip is still playable and
+   * the moment it came from is now unrecoverable.
+   */
+  | 'source-unreadable-clip'
+  /** The action ran and restored nothing. Same reason `stale-clean` exists. */
+  | 'source-clean';
 
 export interface TrayProblem {
   code: TrayProblemCode;
@@ -771,6 +815,13 @@ export interface TrayPlan {
    */
   stale?: StaleRemedyPlan;
   /**
+   * What a `restore-source` action decoded. Folded into `draft` like
+   * `prioritize`, and here so the surface can show the per-facet counts and the
+   * evidence string beside each restored value — the field that makes recipe 20
+   * auditable instead of merely plausible.
+   */
+  sourceContext?: SourceContextPlan;
+  /**
    * Cards whose `due` this tray moved. Separate from `changedNotes` because a
    * reposition-only tray changes zero notes and is not therefore a no-op; a
    * caller that gated Apply on `changedNotes` alone would disable it.
@@ -797,6 +848,21 @@ export const STALE_REFUSAL_PROBLEMS: Readonly<
   withheld: { code: 'stale-withheld', severity: 'warning' },
   'not-review': { code: 'stale-not-review', severity: 'info' },
   'not-stale': { code: 'stale-not-stale', severity: 'info' },
+};
+
+/**
+ * Recipe 20's refusals as tray problems. A total `Record` for the same reason
+ * `STALE_REFUSAL_PROBLEMS` is one. None is blocking: every one of them is a
+ * property of an individual note, and a selection where some notes carry
+ * provenance and some do not is the normal case, not a mis-set form.
+ */
+export const SOURCE_REFUSAL_PROBLEMS: Readonly<
+  Record<SourceContextRefusal, { code: TrayProblemCode; severity: 'warning' | 'info' }>
+> = {
+  'field-absent': { code: 'source-field-absent', severity: 'warning' },
+  occupied: { code: 'source-occupied', severity: 'info' },
+  'no-provenance': { code: 'source-none', severity: 'info' },
+  'unreadable-clip': { code: 'source-unreadable-clip', severity: 'warning' },
 };
 
 /**
@@ -938,6 +1004,14 @@ function blockingProblems(
       // deck with no candidates, so it is refused rather than run to a zero the
       // user would read as "none of my notes can be clozed".
       if (action.modes.length === 0) {
+        problems.push({ code: 'empty-parameter', severity: 'blocking', actionId: action.id, count: 1 });
+      }
+    } else if (action.kind === 'restore-source') {
+      // No facet chosen restores nothing at all, and no destination has nowhere
+      // to put it. Both are mis-set forms, not decks without provenance, so they
+      // are refused rather than run to a zero the user would read as "none of my
+      // notes remember where they came from".
+      if (action.toField === '' || action.facets.length === 0) {
         problems.push({ code: 'empty-parameter', severity: 'blocking', actionId: action.id, count: 1 });
       }
     } else if (action.kind === 'reschedule-stale') {
@@ -1266,6 +1340,7 @@ export function planChangeTray(
   let deckNormalizePlan: DeckNormalizePlan | undefined;
   let deckSplitPlan: DeckSplitPlan | undefined;
   let stalePlan: StaleRemedyPlan | undefined;
+  let sourceContextPlan: SourceContextPlan | undefined;
   let changedCards = 0;
 
   const changeFor = (noteId: string): TrayNoteChange => {
@@ -1379,6 +1454,77 @@ export function planChangeTray(
         matched: noteIds.length,
         changed: movedNotes.size,
         skipped: noteIds.length - movedNotes.size,
+      });
+      continue;
+    }
+
+    if (action.kind === 'restore-source') {
+      // Whole-selection because the deck facet is resolved from the card table
+      // and the note type from the type table — building both indexes per note
+      // would walk the whole draft once per row.
+      const selected: AnkiDraftNote[] = [];
+      for (const noteId of noteIds) {
+        const at = index.position.get(noteId);
+        const note = at === undefined ? undefined : notes[at];
+        if (note) selected.push(note);
+      }
+      const plan = planSourceContext({
+        notes: selected,
+        cards,
+        decks,
+        noteTypes: draft.noteTypes,
+        toField: action.toField,
+        facets: action.facets,
+        ...(action.separator === undefined ? {} : { separator: action.separator }),
+      });
+      // Later actions replace an earlier plan, the rule `prioritize-new` states.
+      sourceContextPlan = plan;
+
+      let written = 0;
+      for (const proposal of plan.proposals) {
+        const at = index.position.get(proposal.noteId);
+        if (at === undefined) continue;
+        if (applyWrite(at, proposal.noteId, proposal.toOrd, proposal.after)) written += 1;
+      }
+
+      // Counted per refusal, not pushed per note: `source-none` over a 3,000-note
+      // hand-made deck would otherwise be 3,000 identical rows.
+      const bySkip = new Map<SourceContextRefusal, { count: number; detail?: string }>();
+      for (const skip of plan.skips) {
+        const seen = bySkip.get(skip.refusal);
+        if (seen) seen.count += 1;
+        // The first detail, so the row can name one file or field without the
+        // surface having to render every one.
+        else bySkip.set(skip.refusal, { count: 1, ...(skip.detail ? { detail: skip.detail } : {}) });
+      }
+      for (const [refusal, seen] of bySkip) {
+        const { code, severity } = SOURCE_REFUSAL_PROBLEMS[refusal];
+        problems.push({
+          code,
+          severity,
+          actionId: action.id,
+          count: seen.count,
+          ...(seen.detail === undefined ? {} : { detail: seen.detail }),
+        });
+      }
+      if (written === 0) {
+        // `detail` is how many notes carried *anything*, so a clean run cannot
+        // read as "your deck has no provenance" when the truth is that every
+        // destination was already filled.
+        problems.push({
+          code: 'source-clean',
+          severity: 'info',
+          actionId: action.id,
+          count: noteIds.length,
+          detail: String(Object.values(plan.byFacet).reduce((a, b) => Math.max(a, b), 0)),
+        });
+      }
+      outcomes.push({
+        actionId: action.id,
+        kind: action.kind,
+        matched: noteIds.length,
+        changed: written,
+        skipped: noteIds.length - written,
       });
       continue;
     }
@@ -2396,6 +2542,7 @@ export function planChangeTray(
     deckNormalize: deckNormalizePlan,
     deckSplit: deckSplitPlan,
     stale: stalePlan,
+    sourceContext: sourceContextPlan,
   };
 }
 

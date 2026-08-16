@@ -353,6 +353,9 @@ describe('DeckWorkbench', () => {
       'swap-fields',
       'copy-field',
       'add-cloze',
+      // Recipe 20 is a field edit for the same reason: it writes facts the note
+      // already carries, decoded from the deck's own data.
+      'restore-source',
     ]);
     expect(host.textContent).toContain('ankiWorkbench.step.fields.lead');
     // The card designer reshapes the note type the field edits are written into.

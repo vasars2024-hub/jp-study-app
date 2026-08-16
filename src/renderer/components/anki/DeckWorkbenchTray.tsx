@@ -50,6 +50,7 @@ import {
   DEFAULT_STALE_SPREAD_DAYS,
   type StaleRemedyMode,
 } from '../../../shared/ankiStaleCards';
+import { SOURCE_FACETS, type SourceFacet } from '../../../shared/ankiSourceContext';
 import {
   MASTERY_LEVELS,
   MASTERY_LEVEL_KEYS,
@@ -73,6 +74,7 @@ export const ACTION_KINDS: TrayActionKind[] = [
   'swap-fields',
   'copy-field',
   'add-cloze',
+  'restore-source',
   'enrich-dictionary',
   'fill-reading',
   'apply-ai-additions',
@@ -114,6 +116,10 @@ export const FIELD_ACTION_KINDS: TrayActionKind[] = [
   // reading or generation — so it belongs here and not in step 3's "Add and
   // enrich", even though it is the one field edit that changes the card count.
   'add-cloze',
+  // Recipe 20 for the same reason: it writes facts the note already carries but
+  // does not display. Nothing arrives from a dictionary, a reading or a model —
+  // the whole recipe is a decode of the deck's own data.
+  'restore-source',
 ];
 /**
  * Step 5, "Learning rules": the kinds that decide what a note *means* for study
@@ -164,6 +170,13 @@ const LEECH_MEASURES: LeechRescueMeasure[] = ['tag', 'hint', 'reschedule'];
  * to a capability the journal cannot carry.
  */
 const STALE_MODES: StaleRemedyMode[] = ['reschedule', 'reset'];
+/**
+ * Recipe 20's facets, all on by default. Unlike recipe 19's `stem` there is no
+ * facet here that could be wrong: every one is decoded from evidence the note
+ * already carries, and a note lacking that evidence contributes nothing rather
+ * than a guess. Turning one off narrows what is written, never its accuracy.
+ */
+const DEFAULT_SOURCE_FACETS: SourceFacet[] = [...SOURCE_FACETS];
 /**
  * The rescue tag the form opens on. A namespaced tag rather than `leech`: Anki
  * owns that one and writing it back would make the app's own marks
@@ -299,6 +312,7 @@ export default function DeckWorkbenchTray({
    * own title names.
    */
   const [staleMode, setStaleMode] = useState<StaleRemedyMode>('reschedule');
+  const [sourceFacets, setSourceFacets] = useState<SourceFacet[]>(DEFAULT_SOURCE_FACETS);
   const [applied, setApplied] = useState<number | null>(null);
   /**
    * The reviewed generation, owned here because the tray is what writes it. A
@@ -579,6 +593,19 @@ export default function DeckWorkbenchTray({
           hintFromField: fieldA,
           hintToField: fieldB,
         };
+      case 'restore-source':
+        // `fieldB` is the destination select every writing kind reuses. No
+        // conflict rule, for `fill-reading`'s reason: recipe 20 restores what is
+        // missing, so a filled destination is skipped rather than overwritten.
+        // Facets stay in `SOURCE_FACETS` order regardless of click order, so the
+        // written value's shape does not depend on which box was ticked first.
+        return {
+          id,
+          enabled: true,
+          kind,
+          toField: fieldB,
+          facets: SOURCE_FACETS.filter((f) => sourceFacets.includes(f)),
+        };
       case 'reschedule-stale':
         // `nowMs` is stamped here, at Add, and never re-read. The queued action
         // and the days it plans are then the same "today" no matter how long the
@@ -730,6 +757,13 @@ export default function DeckWorkbenchTray({
           // The modes, not a count: which ways of finding the word are allowed
           // is the whole decision, and "2 modes" hides that `stem` is on.
           modes: action.modes.map((m) => t(`ankiWorkbench.tray.cloze.mode.${m}`)).join(', '),
+        });
+      case 'restore-source':
+        // The facts, not a count: which of them lands in the field is the whole
+        // decision, and "3 facts" hides that the deck path is one of them.
+        return t('ankiWorkbench.tray.describe.restore-source', {
+          to: action.toField,
+          facets: action.facets.map((f) => t(`ankiWorkbench.tray.source.facet.${f}`)).join(', '),
         });
       case 'reschedule-stale':
         // All three numbers, because each one changes which cards move and
@@ -1113,6 +1147,29 @@ export default function DeckWorkbenchTray({
               />
             </label>
             <span className="muted">{t('ankiWorkbench.tray.prioritize.protects')}</span>
+          </>
+        ) : kind === 'restore-source' ? (
+          <>
+            {fieldSelect(t('ankiWorkbench.tray.source.to'), fieldB, setFieldB)}
+            <span className="muted">{t('ankiWorkbench.tray.source.facets')}</span>
+            {SOURCE_FACETS.map((facet) => (
+              <label key={facet} className="wb-tray-flag">
+                <input
+                  type="checkbox"
+                  checked={sourceFacets.includes(facet)}
+                  onChange={() =>
+                    setSourceFacets((prev) =>
+                      prev.includes(facet) ? prev.filter((f) => f !== facet) : [...prev, facet],
+                    )
+                  }
+                />
+                {t(`ankiWorkbench.tray.source.facet.${facet}`)}
+              </label>
+            ))}
+            {/* Said before Add: the recipe's title names a URL and a screenshot,
+                and this app records neither, so the user learns the limit here
+                rather than from a run that restores less than they expected. */}
+            <span className="muted">{t('ankiWorkbench.tray.source.noUrl')}</span>
           </>
         ) : kind === 'reschedule-stale' ? (
           <>

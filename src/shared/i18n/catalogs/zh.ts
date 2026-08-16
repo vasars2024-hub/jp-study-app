@@ -9304,6 +9304,26 @@ export const zh: Catalog = {
   'ankiWorkbench.tray.problem.cloze-not-found': '{count} 个例句并不包含它所教的词。',
   'ankiWorkbench.tray.problem.cloze-undecidable':
     '{count} 个词的变形方式无法追踪，因此留给你处理而不是猜测。',
+  'ankiWorkbench.tray.kind.restore-source': '还原每张卡片的来源',
+  'ankiWorkbench.tray.describe.restore-source': '在笔记有记录时把{facets}写入 {to}',
+  'ankiWorkbench.tray.source.to': '把来源信息写入到',
+  'ankiWorkbench.tray.source.facets': '在笔记有记录时还原哪些内容',
+  'ankiWorkbench.tray.source.facet.timestamp': '视频中的时刻',
+  'ankiWorkbench.tray.source.facet.cue': '字幕轨道与行号',
+  'ankiWorkbench.tray.source.facet.origin': '制作这张卡片的工具',
+  'ankiWorkbench.tray.source.facet.deck': '卡片所在的牌组',
+  'ankiWorkbench.tray.source.noUrl':
+    '只能还原卡片本身已经记录的内容。本应用不会在采集卡片时保存网页地址或截图，因此这两项都无法找回。',
+  'ankiWorkbench.tray.problem.source-field-absent':
+    '{count} 条笔记没有 {detail} 字段，无处写入来源信息。',
+  'ankiWorkbench.tray.problem.source-occupied':
+    '{count} 条笔记的 {detail} 中已有内容，因此没有覆盖。',
+  'ankiWorkbench.tray.problem.source-none':
+    '{count} 条笔记没有记录任何来源信息，因此没有为它们编造内容。',
+  'ankiWorkbench.tray.problem.source-unreadable-clip':
+    '{count} 条笔记附带的片段已被改名（{detail}），无法再从中读出它来自哪个时刻。',
+  'ankiWorkbench.tray.problem.source-clean':
+    '没有还原任何内容。所选的 {count} 条笔记中，最多只有 {detail} 条记录了来源。',
   'ankiWorkbench.tray.kind.reschedule-stale': '让停滞的卡片回到计划中',
   'ankiWorkbench.tray.describe.reschedule-stale':
     '对逾期 {overdue} 天以上或 {dormant} 天未复习的卡片{mode}，分摊到 {spread} 天',
