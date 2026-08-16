@@ -25,6 +25,29 @@
   color: var(--muted);
 }
 
+/* ----- field controls: one hit-target floor for the whole workbench ------- */
+
+/* Measured live for gate 10: every control no panel had styled rendered at
+ * 19 px (select) or 21 px (text input) — under a usable target, and next to
+ * the 32 px the tray and the browser search already set. The floor belongs at
+ * the root rather than in each panel, so a panel added later inherits a usable
+ * size instead of having to remember. Wrapped in `:where()`, which contributes
+ * **zero** specificity: every existing panel rule still wins on padding,
+ * radius or background without an `!important`, and this only fills the gaps.
+ * Checkboxes and radios are excluded — their box is not the hit target, their
+ * label is. */
+:where(.deck-workbench) :where(select),
+:where(.deck-workbench) :where(input:not([type='checkbox']):not([type='radio'])) {
+  min-height: 32px;
+  box-sizing: border-box;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--input-bg, var(--bg));
+  color: var(--fg);
+  font: inherit;
+}
+
 /* ----- the stepper ------------------------------------------------------- */
 
 .deck-workbench-stepper {
@@ -851,15 +874,9 @@
   align-items: center;
 }
 
-.wb-tray-form input,
-.wb-tray-form select {
-  min-height: 32px;
-  padding: 4px 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm, 6px);
-  background: var(--bg);
-  color: var(--fg);
-}
+/* The tray's own copy of these declarations is gone: the workbench-level floor
+ * above is identical, so keeping it here would be the per-panel duplication
+ * the floor exists to end. */
 
 .wb-tray-problems {
   display: flex;
