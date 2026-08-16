@@ -22,7 +22,13 @@
 //     disappear on commit. Refusing the edit would be worse: the text change is
 //     legitimate and it is the *card* consequence that is out of scope here.
 
-import type { AnkiDraft, AnkiDraftMediaRef, AnkiDraftNote, AnkiDraftSource } from './ankiDraft';
+import type {
+  AnkiDraft,
+  AnkiDraftCard,
+  AnkiDraftMediaRef,
+  AnkiDraftNote,
+  AnkiDraftSource,
+} from './ankiDraft';
 import { mediaRefsInField } from './ankiDraft';
 import { stripFieldHtml } from './apkgParse';
 
@@ -59,7 +65,23 @@ export type AnkiDraftEditOp =
       after: string;
       group?: string;
     }
-  | { kind: 'tags'; noteId: string; before: string[]; after: string[]; group?: string };
+  | { kind: 'tags'; noteId: string; before: string[]; after: string[]; group?: string }
+  | {
+      /**
+       * A **new** card's queue position (Anki's `due` for `type: 'new'`). The
+       * only card-level op the journal carries, and deliberately the narrowest
+       * one: repositioning is reversible by writing a number back, whereas a
+       * queue or type change would have to reconstruct `left`, `originalDue` and
+       * a review history the draft never held. `noteId` rides along so
+       * `editedNoteIds` and the Browser's edited badge keep working unchanged.
+       */
+      kind: 'card-due';
+      noteId: string;
+      cardId: string;
+      before: number;
+      after: number;
+      group?: string;
+    };
 
 export interface AnkiDraftEditJournal {
   /** Applied ops, oldest first. */
@@ -143,15 +165,20 @@ export interface DraftEditIndex {
   position: Map<string, number>;
   present: Set<string>;
   clozeTypeIds: Set<string>;
+  /** Card id to its position in `draft.cards`, for the `card-due` op. */
+  cardPosition: Map<string, number>;
 }
 
 export function createDraftEditIndex(draft: AnkiDraft): DraftEditIndex {
   const position = new Map<string, number>();
   draft.notes.forEach((note, i) => position.set(note.id, i));
+  const cardPosition = new Map<string, number>();
+  draft.cards.forEach((card, i) => cardPosition.set(card.id, i));
   return {
     position,
     present: presentMediaNames(draft),
     clozeTypeIds: new Set(draft.noteTypes.filter((nt) => nt.kind === 'cloze').map((nt) => nt.id)),
+    cardPosition,
   };
 }
 
@@ -273,11 +300,20 @@ export function setNoteTags(
  */
 function applyInverseInto(
   notes: AnkiDraftNote[],
+  cards: AnkiDraftCard[],
   index: DraftEditIndex,
   op: AnkiDraftEditOp,
   toValue: 'before' | 'after',
   normalize: (raw: string) => string,
 ): void {
+  if (op.kind === 'card-due') {
+    const cardAt = index.cardPosition.get(op.cardId);
+    if (cardAt === undefined) return;
+    const card = cards[cardAt];
+    if (!card) return;
+    cards[cardAt] = { ...card, due: op[toValue] };
+    return;
+  }
   const at = index.position.get(op.noteId);
   if (at === undefined) return;
   const note = notes[at];
@@ -333,12 +369,13 @@ export function undoLastEdit(
   // Newest first: two ops on one field must be unwound in the order they were
   // written, or the older op's `before` loses to the newer one's.
   const notes = [...draft.notes];
+  const cards = [...draft.cards];
   const index = createDraftEditIndex(draft);
   for (let i = step.length - 1; i >= 0; i -= 1) {
-    applyInverseInto(notes, index, step[i], 'before', normalize);
+    applyInverseInto(notes, cards, index, step[i], 'before', normalize);
   }
   return {
-    draft: { ...draft, notes },
+    draft: { ...draft, notes, cards },
     // `undone` keeps applied order, so redo can replay the group forwards.
     journal: { done: journal.done.slice(0, -step.length), undone: [...journal.undone, ...step] },
     changed: true,
@@ -353,10 +390,11 @@ export function redoLastEdit(
   const step = trailingStep(journal.undone);
   if (step.length === 0) return { draft, journal, changed: false, reason: 'unchanged' };
   const notes = [...draft.notes];
+  const cards = [...draft.cards];
   const index = createDraftEditIndex(draft);
-  for (const op of step) applyInverseInto(notes, index, op, 'after', normalize);
+  for (const op of step) applyInverseInto(notes, cards, index, op, 'after', normalize);
   return {
-    draft: { ...draft, notes },
+    draft: { ...draft, notes, cards },
     journal: { done: [...journal.done, ...step], undone: journal.undone.slice(0, -step.length) },
     changed: true,
   };

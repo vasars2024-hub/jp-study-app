@@ -59,6 +59,11 @@ import {
 } from './ankiReadingFill';
 import { normalizeFieldText, type TextNormalizeOp } from './ankiTextNormalize';
 import {
+  planPrioritizeNew,
+  type PrioritizePlan,
+  type PrioritizeRefusal,
+} from './ankiPrioritize';
+import {
   planMasteryMapping,
   type MasteryLevel,
   type MasteryPlan,
@@ -75,6 +80,7 @@ export type TrayActionKind =
   | 'enrich-dictionary'
   | 'fill-reading'
   | 'apply-ai-additions'
+  | 'prioritize-new'
   | 'set-mastery';
 
 /**
@@ -172,6 +178,21 @@ export type TrayAction =
       separator?: string;
     })
   | (TrayActionBase & {
+      /**
+       * Recipe 6. Renumbers the *new*-queue positions of the selection's
+       * unknown, ranked words so the most frequent come first, and refuses every
+       * known or already-started card by name. See `ankiPrioritize.ts` for why
+       * this is the only honest reading of "prioritize".
+       */
+      kind: 'prioritize-new';
+      /**
+       * The first position handed out. No default here on purpose: `0` puts the
+       * batch ahead of the whole existing new queue and a large number puts it
+       * behind, and which of those the user meant is not this module's guess.
+       */
+      startPosition: number;
+    })
+  | (TrayActionBase & {
       kind: 'set-mastery';
       /**
        * The rung to move the selection's words to. No default: the whole point
@@ -266,8 +287,18 @@ export type TrayProblemCode =
   | 'ai-cancelled'
   /** The user rejected every variant for these notes, so nothing is written. */
   | 'ai-all-rejected'
-  /** A mastery mapping was queued with no vocabulary context to read. Blocking. */
+  /** A mastery mapping or a reposition was queued with no vocabulary context. Blocking. */
   | 'no-vocab-context'
+  /** Left alone because the user already knows the word — recipe 6's guarantee. */
+  | 'prioritize-known'
+  /** No installed corpus ranks this word, so there is no frequency to order by. */
+  | 'prioritize-no-rank'
+  /** This note declares no word, so it has no frequency either. */
+  | 'prioritize-no-word'
+  /** The note's cards have all left the new queue; a position would not apply. */
+  | 'prioritize-not-new'
+  /** The note generates no card in this draft, so there is nothing to position. */
+  | 'prioritize-no-cards'
   /** These notes declare no word, so there is nothing whose mastery could move. */
   | 'mastery-no-word'
   /** These notes' word field holds a phrase, which is not a lemma to store. */
@@ -338,7 +369,34 @@ export interface TrayPlan {
    * only `draft` on Apply silently drops it.
    */
   mastery?: MasteryPlan;
+  /**
+   * What a `prioritize-new` action moved. Unlike `mastery` this **is** folded
+   * into `draft` (a queue position is deck data), so the field is reporting
+   * rather than a second thing to adopt — it exists so the surface can name the
+   * words and positions instead of showing a bare count.
+   */
+  prioritize?: PrioritizePlan;
+  /**
+   * Cards whose `due` this tray moved. Separate from `changedNotes` because a
+   * reposition-only tray changes zero notes and is not therefore a no-op; a
+   * caller that gated Apply on `changedNotes` alone would disable it.
+   */
+  changedCards: number;
 }
+
+/**
+ * Recipe 6's refusals, in the order the surface should list them. A table
+ * rather than a ternary chain: the boss audit of 2026-08-16 found exactly that
+ * shape in `fill-reading` mapping a refusal to the wrong user-facing code with
+ * no test able to see it, and a table is enumerable by a test.
+ */
+export const PRIORITIZE_PROBLEM_CODES: ReadonlyArray<[PrioritizeRefusal, TrayProblemCode]> = [
+  ['known', 'prioritize-known'],
+  ['no-rank', 'prioritize-no-rank'],
+  ['no-word', 'prioritize-no-word'],
+  ['not-new', 'prioritize-not-new'],
+  ['no-cards', 'prioritize-no-cards'],
+];
 
 function escapeLiteral(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -378,6 +436,7 @@ function blockingProblems(
   hasEnrichData: boolean,
   aiBatch: AiBatch | undefined,
   hasMasteryContext: boolean,
+  hasPrioritizeContext: boolean,
 ): TrayProblem[] {
   const problems: TrayProblem[] = [];
   const enabled = actions.filter((a) => a.enabled);
@@ -471,6 +530,17 @@ function blockingProblems(
       if (!hasMasteryContext) {
         problems.push({ code: 'no-vocab-context', severity: 'blocking', actionId: action.id, count: 1 });
       }
+    } else if (action.kind === 'prioritize-new') {
+      // Same refusal for the same reason: without the context every note is
+      // "no word" and the recipe would report a whole vocabulary deck as
+      // unrankable. Refusing also protects guarantee 1 — a missing context
+      // makes every note look unknown, which is precisely when a reposition
+      // would trample the cards the user already knows.
+      if (!hasPrioritizeContext) {
+        problems.push({ code: 'no-vocab-context', severity: 'blocking', actionId: action.id, count: 1 });
+      } else if (!Number.isFinite(action.startPosition) || action.startPosition < 0) {
+        problems.push({ code: 'empty-parameter', severity: 'blocking', actionId: action.id, count: 1 });
+      }
     } else if (action.kind === 'swap-fields' || action.kind === 'copy-field') {
       const [a, b] =
         action.kind === 'swap-fields'
@@ -545,6 +615,13 @@ export function planChangeTray(
      * neither belongs on a serializable action.
      */
     mastery?: { vocab: VocabContext; levels: ReadonlyMap<string, number> };
+    /**
+     * The ranks and known-verdicts a `prioritize-new` action orders by. Outside
+     * for the same reason `enrich` is: they come from the Browser's
+     * `VocabContext`, which resolves a corpus lookup and the local knowledge
+     * store, neither of which belongs on a serializable action.
+     */
+    prioritize?: { vocab: VocabContext };
   },
 ): TrayPlan {
   const groupId = opts?.groupId ?? `tray-${journal.done.length + 1}`;
@@ -554,6 +631,7 @@ export function planChangeTray(
     opts?.enrich !== undefined,
     opts?.ai,
     opts?.mastery !== undefined,
+    opts?.prioritize !== undefined,
   );
   if (problems.length > 0) {
     return {
@@ -563,6 +641,7 @@ export function planChangeTray(
       outcomes: [],
       changes: [],
       changedNotes: 0,
+      changedCards: 0,
       problems,
       blocked: true,
     };
@@ -575,10 +654,13 @@ export function planChangeTray(
   // notes array per edited note, or scanning it to find each note, is quadratic
   // and this preview is recomputed on every render — see `ankiChangeTrayScale`.
   const notes = [...draft.notes];
+  const cards = [...draft.cards];
   const index = createDraftEditIndex(draft);
   const noteTypes = new Map(draft.noteTypes.map((nt) => [nt.id, nt]));
   const ops: AnkiDraftEditOp[] = [];
   let masteryPlan: MasteryPlan | undefined;
+  let prioritizePlan: PrioritizePlan | undefined;
+  let changedCards = 0;
 
   const changeFor = (noteId: string): TrayNoteChange => {
     let change = changesById.get(noteId);
@@ -632,6 +714,68 @@ export function planChangeTray(
 
   for (const action of actions) {
     if (!action.enabled) continue;
+
+    if (action.kind === 'prioritize-new') {
+      // Whole-selection like `set-mastery`, and for a stronger reason: the
+      // positions are handed out in one global frequency order, so computing
+      // them note by note would be arithmetic on a partial ordering.
+      const ctx = opts?.prioritize;
+      if (!ctx) continue; // unreachable — `blockingProblems` already refused.
+      const selected: AnkiDraftNote[] = [];
+      for (const noteId of noteIds) {
+        const at = index.position.get(noteId);
+        const note = at === undefined ? undefined : notes[at];
+        if (note) selected.push(note);
+      }
+      const plan = planPrioritizeNew({
+        notes: selected,
+        cards,
+        vocab: ctx.vocab,
+        startPosition: action.startPosition,
+      });
+      // Later actions replace an earlier plan for the same reason mastery does:
+      // two repositions in one tray are the user changing their mind, and only
+      // the ops are cumulative.
+      prioritizePlan = plan;
+      const movedNotes = new Set<string>();
+      for (const move of plan.moves) {
+        if (move.after === move.before) continue;
+        const cardAt = index.cardPosition.get(move.cardId);
+        if (cardAt === undefined) continue;
+        cards[cardAt] = { ...cards[cardAt], due: move.after };
+        ops.push({
+          kind: 'card-due',
+          noteId: move.noteId,
+          cardId: move.cardId,
+          before: move.before,
+          after: move.after,
+          group: groupId,
+        });
+        movedNotes.add(move.noteId);
+        changedCards += 1;
+      }
+      for (const [refusal, code] of PRIORITIZE_PROBLEM_CODES) {
+        for (const skip of plan.skips) {
+          if (skip.refusal !== refusal) continue;
+          problems.push({
+            code,
+            // "You already know it" is the recipe working, not a warning.
+            severity: refusal === 'known' ? 'info' : 'warning',
+            actionId: action.id,
+            count: 1,
+            detail: skip.term ?? skip.noteId,
+          });
+        }
+      }
+      outcomes.push({
+        actionId: action.id,
+        kind: action.kind,
+        matched: noteIds.length,
+        changed: movedNotes.size,
+        skipped: noteIds.length - movedNotes.size,
+      });
+      continue;
+    }
 
     if (action.kind === 'set-mastery') {
       // Whole-selection, not per-note: the unit is the word, and the same lemma
@@ -1066,7 +1210,7 @@ export function planChangeTray(
   return {
     // A tray that changed nothing returns the input objects, so a caller can
     // compare by identity to see that nothing happened.
-    draft: ops.length > 0 ? { ...draft, notes } : draft,
+    draft: ops.length > 0 ? { ...draft, notes, cards } : draft,
     journal:
       ops.length > 0
         ? // A fresh batch forks the history, same as a single edit: a redo past
@@ -1077,9 +1221,11 @@ export function planChangeTray(
     outcomes,
     changes,
     changedNotes: changes.length,
+    changedCards,
     problems,
     blocked: false,
     mastery: masteryPlan,
+    prioritize: prioritizePlan,
   };
 }
 
