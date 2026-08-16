@@ -15,6 +15,7 @@
 
 import type { AnkiDraft } from './ankiDraft';
 import type { AnkiDraftEditJournal } from './ankiDraftEdit';
+import { isMintedDeckId } from './ankiDeckSplit';
 
 export interface ApkgExportNoteChange {
   noteId: string;
@@ -62,12 +63,34 @@ export interface ApkgExportCardDeckMove {
   deckId: string;
 }
 
+/**
+ * A subdeck recipe 13's split invented, which the writer has to bring into
+ * existence before any `cardDeckMoves` targeting it can land. The id here is the
+ * planner's minted one; the real Anki id (epoch milliseconds) is allocated by
+ * whichever writer creates the row, because only it knows which ids are free.
+ *
+ * `sanitizeDeckSegment` strips `::` and control characters from every segment a
+ * split appends, and a split's parent always exists in the source — so a created
+ * deck is always a direct child of a deck that is already there, and no writer
+ * has to invent intermediate levels.
+ */
+export interface ApkgExportDeckCreate {
+  /** The planner's minted id, e.g. `split:1:N5`. Never a real Anki id. */
+  deckId: string;
+  /** Full name in the SOURCE's own separator, exactly as the draft holds it. */
+  name: string;
+  /** Options preset (`conf`) the split chose — the parent's, so study limits carry. */
+  configId?: string;
+}
+
 export interface ApkgExportChangeSet {
   notes: ApkgExportNoteChange[];
   cardMoves: ApkgExportCardMove[];
   deckRenames: ApkgExportDeckRename[];
   /** Absent on a payload written before recipe 13; read tolerantly downstream. */
   cardDeckMoves?: ApkgExportCardDeckMove[];
+  /** Decks a `cardDeckMoves` entry targets that the source does not have yet. */
+  deckCreates?: ApkgExportDeckCreate[];
 }
 
 // ----- IPC contract -------------------------------------------------------------
@@ -95,12 +118,17 @@ export type ApkgExportErrorCode =
    */
   | 'deck-collation-unsupported'
   /**
-   * Recipe 13's split moved cards between decks and this writer cannot yet
-   * create a deck row or rewrite `cards.did`. Refused by name rather than
-   * dropped: a split that previewed, applied to the draft and then exported a
-   * package where nothing moved is the false success the plan forbids.
+   * Recipe 13's split moved a card that is on loan to a filtered deck: its `did`
+   * is the filtered deck and its real one lives in `odid`. Writing `did` there
+   * would strand it on the next rebuild. `planDeckSplit` refuses these while
+   * planning (`filtered-card`), so this is the writer's own backstop against a
+   * change set assembled some other way.
+   *
+   * There is deliberately no `deck-move-unsupported` here: the package writer
+   * creates the deck rows and rewrites `cards.did` for real. The live
+   * AnkiConnect commit still refuses by that name — see `ankiConnectCommit.ts`.
    */
-  | 'deck-move-unsupported'
+  | 'card-filtered'
   | 'compressed-unsupported'
   | 'verify-failed'
   | 'io';
@@ -126,7 +154,7 @@ export interface ApkgExportResult {
   fileName?: string;
   notesUpdated?: number;
   cardsUpdated?: number;
-  /** Decks renamed in the written package. Reported apart: it touches no note. */
+  /** Deck rows written — renamed, or created by a split. Reported apart: no note moves. */
   decksUpdated?: number;
   /** The written file was re-read FROM DISK and every change was found in it. */
   verified?: boolean;
@@ -244,7 +272,20 @@ export function buildApkgExportChanges(
     deckRenamed.push({ deckId: rename.deckId, from: rename.before, to: deck.name });
   }
 
-  return { notes, cardMoves, deckRenames: deckRenamed, cardDeckMoves };
+  // Only the decks the surviving moves actually target: a split whose moves were
+  // all undone folds to nothing above, and shipping its invented decks anyway
+  // would write empty subdecks into the package for an edit the user took back.
+  const deckCreates: ApkgExportDeckCreate[] = [];
+  const creating = new Set<string>();
+  for (const move of cardDeckMoves) {
+    if (!isMintedDeckId(move.deckId) || creating.has(move.deckId)) continue;
+    const deck = draft.decks.find((d) => d.id === move.deckId);
+    if (!deck) continue; // The writer refuses the move by name; do not invent one here.
+    creating.add(move.deckId);
+    deckCreates.push({ deckId: deck.id, name: deck.name, configId: deck.configId });
+  }
+
+  return { notes, cardMoves, deckRenames: deckRenamed, cardDeckMoves, deckCreates };
 }
 
 /** True when the change set carries nothing to write. */

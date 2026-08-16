@@ -144,6 +144,64 @@ function readDeckName(db: SqlWritable, storage: 'table' | 'blob', deckId: string
   return entry ? String(entry.name ?? '') : undefined;
 }
 
+/** A protobuf varint, which is all the deck `kind` blob below needs. */
+function varint(value: number): number[] {
+  const out: number[] = [];
+  let rest = Math.max(0, Math.floor(value));
+  do {
+    const byte = rest & 0x7f;
+    rest = Math.floor(rest / 128);
+    out.push(rest > 0 ? byte | 0x80 : byte);
+  } while (rest > 0);
+  return out;
+}
+
+/**
+ * A schema-18 `decks.kind` blob for a NORMAL deck carrying its options preset.
+ *
+ * The column is a protobuf oneof: field 1 is `Normal`, field 2 `Filtered`, both
+ * length-delimited — so the leading byte is 0x0a, which is exactly the byte
+ * `apkgDraftRead`'s `kindBlobIsFiltered` tests. Inside `Normal`, field 1 is
+ * `config_id`. Only that field is written: every other one (`extend_new`,
+ * `description`, …) is a protobuf default in Anki's own reader, whereas omitting
+ * `config_id` would leave the new subdeck pointing at preset 0, which no
+ * collection has.
+ */
+function normalDeckKindBlob(configId: number): Uint8Array {
+  const normal = [0x08, ...varint(configId)];
+  return new Uint8Array([0x0a, ...varint(normal.length), ...normal]);
+}
+
+/**
+ * A legacy `col.decks` entry for a deck this export creates. The keys Anki's own
+ * schema-11 writer emits, with the per-day counters zeroed — a brand-new deck has
+ * studied nothing, and a missing counter makes older Anki builds throw on open.
+ */
+function legacyDeckEntry(
+  id: number,
+  name: string,
+  configId: number,
+  modSec: number,
+): Record<string, unknown> {
+  return {
+    id,
+    name,
+    mod: modSec,
+    usn: -1,
+    lrnToday: [0, 0],
+    revToday: [0, 0],
+    newToday: [0, 0],
+    timeToday: [0, 0],
+    collapsed: false,
+    browserCollapsed: false,
+    desc: '',
+    dyn: 0,
+    conf: configId,
+    extendNew: 0,
+    extendRev: 0,
+  };
+}
+
 /**
  * Apply the change set. Throws `ExportRefusal` — before any write — when a
  * named note or card is absent or a field count disagrees with the database.
@@ -202,18 +260,6 @@ export function applyExportChanges(
     id: number | string;
     due: number;
   }
-  // Recipe 13's split. Writing it means creating deck rows and rewriting
-  // `cards.did`, which this writer does not do yet — so it refuses by name.
-  // Dropping the moves instead would export a package where the split provably
-  // did not happen while every surface said it had.
-  if ((changes.cardDeckMoves ?? []).length > 0) {
-    throw new ExportRefusal(
-      'deck-move-unsupported',
-      `This change set moves ${(changes.cardDeckMoves ?? []).length} card(s) between decks, `
-        + 'which the package writer cannot yet do. Undo the split before exporting.',
-    );
-  }
-
   const cardPlans: CardPlan[] = [];
   for (const move of changes.cardMoves) {
     const row = firstRow(db, 'SELECT id FROM cards WHERE id = ?', [idParam(move.cardId)]);
@@ -227,17 +273,18 @@ export function applyExportChanges(
   }
 
   // Recipe 12's deck half. A rename touches no card: a card names its deck by
-  // id, so this is only ever the name Anki stores.
+  // id, so this is only ever the name Anki stores. Recipe 13's split is the
+  // mirror image — it writes no name on an existing deck and only `cards.did`,
+  // plus a row for each subdeck it invented.
   const deckRenames = changes.deckRenames ?? [];
-  const storage = deckRenames.length > 0 ? deckStorage(db) : 'none';
-  if (deckRenames.length > 0 && storage === 'none') {
+  const deckMoves = changes.cardDeckMoves ?? [];
+  const touchesDecks = deckRenames.length > 0 || deckMoves.length > 0;
+  const storage = touchesDecks ? deckStorage(db) : 'none';
+  if (touchesDecks && storage === 'none') {
     throw new ExportRefusal(
       'deck-missing',
-      'The source package stores no deck list, so a deck rename cannot be written.',
+      'The source package stores no deck list, so a deck change cannot be written.',
     );
-  }
-  if (deckRenames.length > 0 && storage === 'table' && deckNameNeedsMissingCollation(db)) {
-    throw new ExportRefusal('deck-collation-unsupported', DECK_COLLATION_HELP);
   }
   // Every name the collection will hold once the whole batch has run, so two
   // renames cannot be individually legal and jointly a merge. Validated in list
@@ -246,15 +293,37 @@ export function applyExportChanges(
   // never emits one — it refuses a collision while planning — and guessing an
   // order that makes a merge legal is exactly the surprise this code refuses.
   const namesAfter = new Map<string, string>();
+  const deckIdsPresent = new Set<string>();
   if (storage === 'table') {
     for (const row of db.exec('SELECT id, name FROM decks')[0]?.values ?? []) {
       namesAfter.set(String(row[1] ?? ''), String(row[0]));
+      deckIdsPresent.add(String(row[0]));
     }
   } else if (storage === 'blob') {
     for (const [id, entry] of Object.entries(readDeckBlob(db) ?? {})) {
       namesAfter.set(String(entry?.name ?? ''), String(entry?.id ?? id));
+      deckIdsPresent.add(String(entry?.id ?? id));
     }
   }
+
+  // Which move targets the source does not have. Keyed on presence rather than on
+  // the `split:` prefix so a stale numeric id refuses too, instead of being
+  // written into `cards.did` as a deck that is not in the package.
+  const createNeeded = new Set<string>();
+  for (const move of deckMoves) {
+    if (!deckIdsPresent.has(move.deckId)) createNeeded.add(move.deckId);
+  }
+  // Both a rename and a create write `decks.name`, so both are impossible in a
+  // package that declares Anki's own `unicase` collation. A split that only
+  // refiles into decks the source already has writes no name and is allowed.
+  if (
+    (deckRenames.length > 0 || createNeeded.size > 0) &&
+    storage === 'table' &&
+    deckNameNeedsMissingCollation(db)
+  ) {
+    throw new ExportRefusal('deck-collation-unsupported', DECK_COLLATION_HELP);
+  }
+
   for (const rename of deckRenames) {
     const stored = storage === 'none' ? undefined : readDeckName(db, storage, rename.deckId);
     if (stored === undefined) {
@@ -278,6 +347,87 @@ export function applyExportChanges(
     }
     namesAfter.delete(rename.from);
     namesAfter.set(rename.to, rename.deckId);
+  }
+
+  // Recipe 13's split, validated after the renames so a create can legally take a
+  // name a rename in the same batch just freed.
+  interface DeckCreatePlan {
+    mintedId: string;
+    /** The real Anki id this run allocates — epoch milliseconds, like Anki's own. */
+    realId: number;
+    name: string;
+    configId: number;
+  }
+  const creates: DeckCreatePlan[] = [];
+  const realDeckId = new Map<string, string>();
+  if (createNeeded.size > 0) {
+    const byMintedId = new Map(
+      (changes.deckCreates ?? []).map((create) => [create.deckId, create]),
+    );
+    // Allocated from `nowMs` upward, skipping anything the source or this batch
+    // already holds. Anki's own ids are creation timestamps, so this is the same
+    // shape a real Anki would have written.
+    const takenIds = new Set(deckIdsPresent);
+    let nextId = Math.max(1, Math.floor(options.nowMs));
+    for (const mintedId of createNeeded) {
+      const create = byMintedId.get(mintedId);
+      if (!create) {
+        throw new ExportRefusal(
+          'deck-missing',
+          `Deck ${mintedId} is not in the source package and the change set carries no name for it, `
+            + 'so the cards moved into it have nowhere to go.',
+        );
+      }
+      if (create.name.trim() === '') {
+        throw new ExportRefusal('deck-missing', `Deck ${mintedId} carries no name.`);
+      }
+      const holder = namesAfter.get(create.name);
+      if (holder !== undefined) {
+        throw new ExportRefusal(
+          'deck-name-taken',
+          `The source already holds a deck called "${create.name}", so the split cannot create a `
+            + 'second one. Re-read the source and run the split again.',
+        );
+      }
+      while (takenIds.has(String(nextId))) nextId += 1;
+      const realId = nextId;
+      takenIds.add(String(realId));
+      nextId += 1;
+      namesAfter.set(create.name, String(realId));
+      realDeckId.set(mintedId, String(realId));
+      creates.push({
+        mintedId,
+        realId,
+        name: create.name,
+        // Anki's default preset is 1 and every collection has it. A created
+        // subdeck with `conf: 0` would point at a preset that does not exist.
+        configId: Number(create.configId ?? 1) || 1,
+      });
+    }
+  }
+
+  interface DeckMovePlan {
+    id: number | string;
+    did: number | string;
+  }
+  const movePlans: DeckMovePlan[] = [];
+  for (const move of deckMoves) {
+    const row = firstRow(db, 'SELECT odid FROM cards WHERE id = ?', [idParam(move.cardId)]);
+    if (!row) {
+      throw new ExportRefusal(
+        'card-missing',
+        `Card ${move.cardId} (note ${move.noteId}) is not in the source package.`,
+      );
+    }
+    if (Number(row[0] ?? 0) !== 0) {
+      throw new ExportRefusal(
+        'card-filtered',
+        `Card ${move.cardId} (note ${move.noteId}) is on loan to a filtered deck, so its deck is `
+          + 'not this export’s to change. Empty the filtered deck in Anki first.',
+      );
+    }
+    const target = realDeckId.get(move.deckId) ?? move.deckId;
+    movePlans.push({ id: idParam(move.cardId), did: idParam(target) });
   }
 
   // --- write
@@ -317,7 +467,13 @@ export function applyExportChanges(
         idParam(rename.deckId),
       ]);
     }
-  } else if (storage === 'blob' && deckRenames.length > 0) {
+    for (const create of creates) {
+      db.run(
+        'INSERT INTO decks (id, name, mtime_secs, usn, common, kind) VALUES (?, ?, ?, -1, ?, ?)',
+        [create.realId, create.name, modSec, new Uint8Array(0), normalDeckKindBlob(create.configId)],
+      );
+    }
+  } else if (storage === 'blob' && (deckRenames.length > 0 || creates.length > 0)) {
     // One parse and one write for the whole batch: the blob is the entire deck
     // list, so writing it per rename would re-serialize it n times.
     const blob = readDeckBlob(db) ?? {};
@@ -325,15 +481,33 @@ export function applyExportChanges(
       const entry = blob[rename.deckId];
       if (entry) blob[rename.deckId] = { ...entry, name: rename.to, mod: modSec, usn: -1 };
     }
+    for (const create of creates) {
+      blob[String(create.realId)] = legacyDeckEntry(create.realId, create.name, create.configId, modSec);
+    }
     db.run('UPDATE col SET decks = ?', [JSON.stringify(blob)]);
+  }
+  // After the deck rows exist, so a card never points at a deck that is not there
+  // yet — the order matters for a package Anki opens without a "missing deck" fix-up.
+  for (const plan of movePlans) {
+    db.run('UPDATE cards SET did = ?, mod = ?, usn = -1 WHERE id = ?', [
+      plan.did,
+      modSec,
+      plan.id,
+    ]);
   }
   // `col.mod` is epoch milliseconds in both schemas.
   db.run('UPDATE col SET mod = ?', [options.nowMs]);
 
   return {
     notesUpdated: notePlans.length,
-    cardsUpdated: cardPlans.length,
-    decksUpdated: deckRenames.length,
+    // Distinct card ROWS written. A card both repositioned and refiled counts
+    // once: the number is what the user would count in Anki, not a total of two
+    // change lists that may name the same card.
+    cardsUpdated: new Set([
+      ...cardPlans.map((p) => String(p.id)),
+      ...movePlans.map((p) => String(p.id)),
+    ]).size,
+    decksUpdated: deckRenames.length + creates.length,
   };
 }
 
@@ -377,12 +551,41 @@ export function verifyExportChanges(
     else if (Number(row[0]) !== move.due) mismatches.push(`card ${move.cardId}: due differs`);
   }
   const renames = changes.deckRenames ?? [];
-  if (renames.length > 0) {
+  const deckMoves = changes.cardDeckMoves ?? [];
+  if (renames.length > 0 || deckMoves.length > 0) {
     const storage = deckStorage(db);
     for (const rename of renames) {
       const stored = storage === 'none' ? undefined : readDeckName(db, storage, rename.deckId);
       if (stored === undefined) mismatches.push(`deck ${rename.deckId}: missing`);
       else if (stored !== rename.to) mismatches.push(`deck ${rename.deckId}: name differs`);
+    }
+    // A minted id is resolved by NAME out of the written file rather than from
+    // whatever `applyExportChanges` allocated. That makes this check independent
+    // of the writer: it confirms the deck row exists under the name the split
+    // promised AND that the card points at that row, which is the whole claim.
+    const idByName = new Map<string, string>();
+    if (storage === 'table') {
+      for (const row of db.exec('SELECT id, name FROM decks')[0]?.values ?? []) {
+        idByName.set(String(row[1] ?? ''), String(row[0]));
+      }
+    } else if (storage === 'blob') {
+      for (const [id, entry] of Object.entries(readDeckBlob(db) ?? {})) {
+        idByName.set(String(entry?.name ?? ''), String(entry?.id ?? id));
+      }
+    }
+    const createdName = new Map(
+      (changes.deckCreates ?? []).map((create) => [create.deckId, create.name]),
+    );
+    for (const move of deckMoves) {
+      const name = createdName.get(move.deckId);
+      const expected = name === undefined ? move.deckId : idByName.get(name);
+      if (expected === undefined) {
+        mismatches.push(`deck ${move.deckId}: missing`);
+        continue;
+      }
+      const row = firstRow(db, 'SELECT did FROM cards WHERE id = ?', [idParam(move.cardId)]);
+      if (!row) mismatches.push(`card ${move.cardId}: missing`);
+      else if (String(row[0]) !== expected) mismatches.push(`card ${move.cardId}: deck differs`);
     }
   }
   return { ok: mismatches.length === 0, mismatches };

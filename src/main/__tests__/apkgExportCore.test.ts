@@ -341,6 +341,296 @@ describe('applyExportChanges', () => {
   });
 });
 
+// ----- recipe 13's split: create the deck row, then write cards.did ---------------
+
+describe('applyExportChanges — recipe 13 deck moves', () => {
+  const splitChanges = {
+    notes: [],
+    cardMoves: [],
+    deckRenames: [],
+    cardDeckMoves: [{ cardId: '5001', noteId: '1001', deckId: 'split:1:N5' }],
+    deckCreates: [{ deckId: 'split:1:N5', name: 'Default::N5', configId: '1' }],
+  };
+
+  it('creates the legacy blob entry and refiles the card into its real id', () => {
+    const db = fixtureDb();
+    const result = applyExportChanges(db, splitChanges, {
+      nowMs: NOW_MS,
+      normalize: stripFieldHtml,
+    });
+    expect(result).toEqual({ notesUpdated: 0, cardsUpdated: 1, decksUpdated: 1 });
+
+    // Read back through the reader an import would use, not through the INSERT.
+    const decks = readRawCollection(db).decks;
+    expect(decks.map((d) => d.name).sort()).toEqual(['Default', 'Default::N5']);
+    const created = decks.find((d) => d.name === 'Default::N5')!;
+    // Allocated from nowMs, like Anki's own creation-timestamp ids — and never 0.
+    expect(created.id).toBe(String(NOW_MS));
+    expect(created.dyn).toBe(0);
+    expect(created.conf).toBe('1');
+
+    const card = db.exec('SELECT did, usn, mod FROM cards WHERE id = 5001')[0]!.values[0]!;
+    expect(card).toEqual([NOW_MS, -1, Math.floor(NOW_MS / 1000)]);
+    // The counters a brand-new deck must carry, or older Anki throws on open.
+    const blob = JSON.parse(
+      String(db.exec('SELECT decks FROM col')[0]!.values[0]![0]),
+    ) as Record<string, Record<string, unknown>>;
+    expect(blob[String(NOW_MS)].newToday).toEqual([0, 0]);
+    expect(blob[String(NOW_MS)].desc).toBe('');
+  });
+
+  it('creates a schema-18 decks row whose kind blob reads back as a normal deck', () => {
+    const db = normalizedDeckDb();
+    db.run('INSERT INTO notes (id, guid, mid, mod, usn, tags, flds, sfld, csum, flags, data) VALUES (?,?,?,?,?,?,?,?,?,?,?)', [
+      1001, 'guid-a', 100, 1_500_000_100, 0, '', ['食べる', 'たべる'].join(SEP), 'たべる', 0, 0, '',
+    ]);
+    db.run('INSERT INTO cards (id, nid, did, ord, mod, usn, type, queue, due, ivl, factor, reps, lapses, left, odue, odid, flags) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [
+      5001, 1001, 1, 0, 1_500_000_100, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0,
+    ]);
+    const changes = {
+      notes: [],
+      cardMoves: [],
+      deckRenames: [],
+      cardDeckMoves: [{ cardId: '5001', noteId: '1001', deckId: 'split:1:N5' }],
+      // Schema 18 nests on 0x1f, and the planner hands the name over in the
+      // source's own separator — so this is what a real split would send.
+      deckCreates: [{ deckId: 'split:1:N5', name: 'Japanese\x1fN5', configId: '1' }],
+    };
+    expect(applyExportChanges(db, changes, { nowMs: NOW_MS, normalize: stripFieldHtml })).toEqual({
+      notesUpdated: 0,
+      cardsUpdated: 1,
+      decksUpdated: 1,
+    });
+    // `dyn: 0` here is the reader deciding from the kind blob's first byte, so it
+    // is a real assertion about the bytes written and not about the column.
+    const created = readRawCollection(db).decks.find((d) => d.name === 'Japanese\x1fN5')!;
+    expect(created).toEqual({ id: String(NOW_MS), name: 'Japanese\x1fN5', dyn: 0 });
+    // Normal(config_id = 1), length-delimited under field 1.
+    const kind = db.exec('SELECT kind FROM decks WHERE id = ?', [NOW_MS])[0]!.values[0]![0];
+    expect(Array.from(kind as Uint8Array)).toEqual([0x0a, 0x02, 0x08, 0x01]);
+    expect(db.exec('SELECT did FROM cards WHERE id = 5001')[0]!.values[0]![0]).toBe(NOW_MS);
+  });
+
+  it('allocates distinct ids for several new decks and skips ones the source holds', () => {
+    const db = fixtureDb();
+    db.run('INSERT INTO cards (id, nid, did, ord, mod, usn, type, queue, due, ivl, factor, reps, lapses, left, odue, odid, flags) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [
+      5002, 1002, 1, 0, 1_500_000_100, 0, 0, 0, 11, 0, 0, 0, 0, 0, 0, 0, 0,
+    ]);
+    // A deck already sitting on the first id this run would allocate.
+    const blob0 = JSON.parse(String(db.exec('SELECT decks FROM col')[0]!.values[0]![0])) as Record<
+      string,
+      unknown
+    >;
+    blob0[String(NOW_MS)] = { id: NOW_MS, name: 'Occupied', dyn: 0, conf: 1 };
+    db.run('UPDATE col SET decks = ?', [JSON.stringify(blob0)]);
+
+    const result = applyExportChanges(
+      db,
+      {
+        notes: [],
+        cardMoves: [],
+        deckRenames: [],
+        cardDeckMoves: [
+          { cardId: '5001', noteId: '1001', deckId: 'split:1:N5' },
+          { cardId: '5002', noteId: '1002', deckId: 'split:1:N4' },
+        ],
+        deckCreates: [
+          { deckId: 'split:1:N5', name: 'Default::N5', configId: '1' },
+          { deckId: 'split:1:N4', name: 'Default::N4', configId: '1' },
+        ],
+      },
+      { nowMs: NOW_MS, normalize: stripFieldHtml },
+    );
+    expect(result).toEqual({ notesUpdated: 0, cardsUpdated: 2, decksUpdated: 2 });
+    const decks = readRawCollection(db).decks;
+    const n5 = decks.find((d) => d.name === 'Default::N5')!;
+    const n4 = decks.find((d) => d.name === 'Default::N4')!;
+    expect(n5.id).toBe(String(NOW_MS + 1));
+    expect(n4.id).toBe(String(NOW_MS + 2));
+    expect(db.exec('SELECT did FROM cards WHERE id = 5001')[0]!.values[0]![0]).toBe(NOW_MS + 1);
+    expect(db.exec('SELECT did FROM cards WHERE id = 5002')[0]!.values[0]![0]).toBe(NOW_MS + 2);
+    // The occupied deck kept its id and name.
+    expect(decks.find((d) => d.id === String(NOW_MS))!.name).toBe('Occupied');
+  });
+
+  it('refiles into a deck the source already has without creating anything', () => {
+    const db = normalizedDeckDb();
+    db.run('INSERT INTO cards (id, nid, did, ord, mod, usn, type, queue, due, ivl, factor, reps, lapses, left, odue, odid, flags) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [
+      5001, 1001, 1, 0, 1_500_000_100, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0,
+    ]);
+    const before = db.exec('SELECT count(*) FROM decks')[0]!.values[0]![0];
+    const result = applyExportChanges(
+      db,
+      {
+        notes: [],
+        cardMoves: [],
+        deckRenames: [],
+        cardDeckMoves: [{ cardId: '5001', noteId: '1001', deckId: '3' }],
+      },
+      { nowMs: NOW_MS, normalize: stripFieldHtml },
+    );
+    expect(result).toEqual({ notesUpdated: 0, cardsUpdated: 1, decksUpdated: 0 });
+    expect(db.exec('SELECT count(*) FROM decks')[0]!.values[0]![0]).toBe(before);
+    expect(db.exec('SELECT did FROM cards WHERE id = 5001')[0]!.values[0]![0]).toBe(3);
+  });
+
+  it('refuses a target deck the source lacks and the change set does not describe', () => {
+    const db = fixtureDb();
+    try {
+      applyExportChanges(
+        db,
+        {
+          notes: [],
+          cardMoves: [],
+          deckRenames: [],
+          cardDeckMoves: [{ cardId: '5001', noteId: '1001', deckId: 'split:1:N5' }],
+        },
+        { nowMs: NOW_MS, normalize: stripFieldHtml },
+      );
+      expect.unreachable('should have refused');
+    } catch (err) {
+      expect((err as ExportRefusal).code).toBe('deck-missing');
+    }
+    // All-or-nothing: no deck appeared and the card did not move.
+    expect(readRawCollection(db).decks).toHaveLength(1);
+    expect(db.exec('SELECT did FROM cards WHERE id = 5001')[0]!.values[0]![0]).toBe(1);
+  });
+
+  it('refuses creating a deck whose name the source already holds', () => {
+    const db = fixtureDb();
+    try {
+      applyExportChanges(
+        db,
+        {
+          notes: [],
+          cardMoves: [],
+          deckRenames: [],
+          cardDeckMoves: [{ cardId: '5001', noteId: '1001', deckId: 'split:1:x' }],
+          deckCreates: [{ deckId: 'split:1:x', name: 'Default', configId: '1' }],
+        },
+        { nowMs: NOW_MS, normalize: stripFieldHtml },
+      );
+      expect.unreachable('should have refused');
+    } catch (err) {
+      expect((err as ExportRefusal).code).toBe('deck-name-taken');
+    }
+    expect(readRawCollection(db).decks).toHaveLength(1);
+  });
+
+  it('lets a create take a name a rename in the same batch just freed', () => {
+    const db = fixtureDb();
+    const result = applyExportChanges(
+      db,
+      {
+        notes: [],
+        cardMoves: [],
+        deckRenames: [{ deckId: '1', from: 'Default', to: 'Archive' }],
+        cardDeckMoves: [{ cardId: '5001', noteId: '1001', deckId: 'split:1:x' }],
+        deckCreates: [{ deckId: 'split:1:x', name: 'Default', configId: '1' }],
+      },
+      { nowMs: NOW_MS, normalize: stripFieldHtml },
+    );
+    expect(result.decksUpdated).toBe(2);
+    const names = readRawCollection(db).decks.map((d) => d.name).sort();
+    expect(names).toEqual(['Archive', 'Default']);
+  });
+
+  it('refuses a card on loan to a filtered deck by name', () => {
+    const db = fixtureDb();
+    db.run('UPDATE cards SET odid = 9, odue = 4 WHERE id = 5001');
+    try {
+      applyExportChanges(db, splitChanges, { nowMs: NOW_MS, normalize: stripFieldHtml });
+      expect.unreachable('should have refused');
+    } catch (err) {
+      expect((err as ExportRefusal).code).toBe('card-filtered');
+    }
+    expect(db.exec('SELECT did FROM cards WHERE id = 5001')[0]!.values[0]![0]).toBe(1);
+    expect(readRawCollection(db).decks).toHaveLength(1);
+  });
+
+  it('refuses a missing card before creating the deck it would have moved to', () => {
+    const db = fixtureDb();
+    try {
+      applyExportChanges(
+        db,
+        {
+          notes: [],
+          cardMoves: [],
+          deckRenames: [],
+          cardDeckMoves: [{ cardId: '4444', noteId: '1001', deckId: 'split:1:N5' }],
+          deckCreates: [{ deckId: 'split:1:N5', name: 'Default::N5', configId: '1' }],
+        },
+        { nowMs: NOW_MS, normalize: stripFieldHtml },
+      );
+      expect.unreachable('should have refused');
+    } catch (err) {
+      expect((err as ExportRefusal).code).toBe('card-missing');
+    }
+    expect(readRawCollection(db).decks).toHaveLength(1);
+  });
+
+  it('counts a card that is both repositioned and refiled once', () => {
+    const db = fixtureDb();
+    const result = applyExportChanges(
+      db,
+      {
+        notes: [],
+        cardMoves: [{ cardId: '5001', noteId: '1001', due: 42 }],
+        deckRenames: [],
+        cardDeckMoves: [{ cardId: '5001', noteId: '1001', deckId: 'split:1:N5' }],
+        deckCreates: [{ deckId: 'split:1:N5', name: 'Default::N5', configId: '1' }],
+      },
+      { nowMs: NOW_MS, normalize: stripFieldHtml },
+    );
+    expect(result.cardsUpdated).toBe(1);
+    const row = db.exec('SELECT due, did FROM cards WHERE id = 5001')[0]!.values[0]!;
+    expect(row).toEqual([42, NOW_MS]);
+  });
+
+  it('refuses a split into a package that declares the collation this build lacks', () => {
+    const db = normalizedDeckDb();
+    db.run('INSERT INTO cards (id, nid, did, ord, mod, usn, type, queue, due, ivl, factor, reps, lapses, left, odue, odid, flags) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [
+      5001, 1001, 1, 0, 1_500_000_100, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0,
+    ]);
+    db.run('PRAGMA writable_schema = ON');
+    db.run(
+      "UPDATE sqlite_master SET sql = replace(sql, 'name text', 'name text NOT NULL COLLATE unicase') WHERE type = 'table' AND name = 'decks'",
+    );
+    db.run('PRAGMA writable_schema = OFF');
+    try {
+      applyExportChanges(
+        db,
+        {
+          notes: [],
+          cardMoves: [],
+          deckRenames: [],
+          cardDeckMoves: [{ cardId: '5001', noteId: '1001', deckId: 'split:1:N5' }],
+          deckCreates: [{ deckId: 'split:1:N5', name: 'Japanese\x1fN5', configId: '1' }],
+        },
+        { nowMs: NOW_MS, normalize: stripFieldHtml },
+      );
+      expect.unreachable('should have refused');
+    } catch (err) {
+      expect((err as ExportRefusal).code).toBe('deck-collation-unsupported');
+    }
+    // The control that keeps this refusal scoped: the SAME package refiles into a
+    // deck it already has, because that write never touches `decks.name`.
+    expect(
+      applyExportChanges(
+        db,
+        {
+          notes: [],
+          cardMoves: [],
+          deckRenames: [],
+          cardDeckMoves: [{ cardId: '5001', noteId: '1001', deckId: '3' }],
+        },
+        { nowMs: NOW_MS, normalize: stripFieldHtml },
+      ),
+    ).toEqual({ notesUpdated: 0, cardsUpdated: 1, decksUpdated: 0 });
+    expect(db.exec('SELECT did FROM cards WHERE id = 5001')[0]!.values[0]![0]).toBe(3);
+  });
+});
+
 describe('verifyExportChanges', () => {
   it('confirms applied changes and catches a tampered one', () => {
     const db = fixtureDb();
@@ -356,6 +646,41 @@ describe('verifyExportChanges', () => {
     const verdict = verifyExportChanges(db, changes);
     expect(verdict.ok).toBe(false);
     expect(verdict.mismatches).toEqual(['note 1001: fields differ']);
+  });
+
+  it('confirms a split by resolving the minted deck id back through its NAME', () => {
+    const db = fixtureDb();
+    const changes = {
+      notes: [],
+      cardMoves: [],
+      deckRenames: [],
+      cardDeckMoves: [{ cardId: '5001', noteId: '1001', deckId: 'split:1:N5' }],
+      deckCreates: [{ deckId: 'split:1:N5', name: 'Default::N5', configId: '1' }],
+    };
+    applyExportChanges(db, changes, { nowMs: NOW_MS, normalize: stripFieldHtml });
+    expect(verifyExportChanges(db, changes)).toEqual({ ok: true, mismatches: [] });
+
+    // Negative control 1: the card silently stayed where it was.
+    db.run('UPDATE cards SET did = 1 WHERE id = 5001');
+    expect(verifyExportChanges(db, changes)).toEqual({
+      ok: false,
+      mismatches: ['card 5001: deck differs'],
+    });
+
+    // Negative control 2: the deck row itself never landed, so there is no id to
+    // compare against at all — a different mismatch from the one above.
+    const db2 = fixtureDb();
+    applyExportChanges(db2, changes, { nowMs: NOW_MS, normalize: stripFieldHtml });
+    const blob = JSON.parse(String(db2.exec('SELECT decks FROM col')[0]!.values[0]![0])) as Record<
+      string,
+      unknown
+    >;
+    delete blob[String(NOW_MS)];
+    db2.run('UPDATE col SET decks = ?', [JSON.stringify(blob)]);
+    expect(verifyExportChanges(db2, changes)).toEqual({
+      ok: false,
+      mismatches: ['deck split:1:N5: missing'],
+    });
   });
 
   it('confirms a deck rename and catches one that did not land', () => {

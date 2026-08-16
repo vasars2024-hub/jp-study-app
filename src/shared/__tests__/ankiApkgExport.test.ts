@@ -186,4 +186,120 @@ describe('buildApkgExportChanges', () => {
     };
     expect(exportChangesEmpty(buildApkgExportChanges(d, j))).toBe(true);
   });
+
+  // ----- recipe 13's split ------------------------------------------------------
+
+  /** A draft after a split filed `c-n1` and `c-n2` into two decks it invented. */
+  function splitDraft(): AnkiDraft {
+    const d = draftOf(
+      [note({ id: 'n1' }), note({ id: 'n2' })],
+      [card({ id: 'c-n1', noteId: 'n1', deckId: 'split:d1:N5' }), card({ id: 'c-n2', noteId: 'n2', deckId: 'split:d1:N4' })],
+    );
+    return {
+      ...d,
+      decks: [
+        ...d.decks,
+        { id: 'split:d1:N5', name: 'Core::N5', path: ['Core', 'N5'], parentId: 'd1', filtered: false, configId: '7' },
+        { id: 'split:d1:N4', name: 'Core::N4', path: ['Core', 'N4'], parentId: 'd1', filtered: false, configId: '7' },
+      ],
+    };
+  }
+
+  it('describes each invented deck once, with the name and preset the split chose', () => {
+    const j: AnkiDraftEditJournal = {
+      done: [
+        { kind: 'card-deck', noteId: 'n1', cardId: 'c-n1', before: 'd1', after: 'split:d1:N5', group: 'g1' },
+        { kind: 'card-deck', noteId: 'n2', cardId: 'c-n2', before: 'd1', after: 'split:d1:N4', group: 'g1' },
+      ],
+      undone: [],
+    };
+    const changes = buildApkgExportChanges(splitDraft(), j);
+    expect(changes.cardDeckMoves).toEqual([
+      { cardId: 'c-n1', noteId: 'n1', deckId: 'split:d1:N5' },
+      { cardId: 'c-n2', noteId: 'n2', deckId: 'split:d1:N4' },
+    ]);
+    expect(changes.deckCreates).toEqual([
+      { deckId: 'split:d1:N5', name: 'Core::N5', configId: '7' },
+      { deckId: 'split:d1:N4', name: 'Core::N4', configId: '7' },
+    ]);
+    // A refile is not a note change and not a reposition.
+    expect(changes.notes).toHaveLength(0);
+    expect(changes.cardMoves).toHaveLength(0);
+  });
+
+  it('describes a deck once when two cards land in it, not once per card', () => {
+    const base = splitDraft();
+    const d: AnkiDraft = {
+      ...base,
+      cards: base.cards.map((c) => ({ ...c, deckId: 'split:d1:N5' })),
+    };
+    const j: AnkiDraftEditJournal = {
+      done: [
+        { kind: 'card-deck', noteId: 'n1', cardId: 'c-n1', before: 'd1', after: 'split:d1:N5', group: 'g1' },
+        { kind: 'card-deck', noteId: 'n2', cardId: 'c-n2', before: 'd1', after: 'split:d1:N5', group: 'g1' },
+      ],
+      undone: [],
+    };
+    const changes = buildApkgExportChanges(d, j);
+    expect(changes.cardDeckMoves).toHaveLength(2);
+    expect(changes.deckCreates).toEqual([
+      { deckId: 'split:d1:N5', name: 'Core::N5', configId: '7' },
+    ]);
+  });
+
+  it('names no invented deck when the split was refiled into an existing one', () => {
+    const d = draftOf(
+      [note({ id: 'n1' })],
+      [card({ id: 'c-n1', noteId: 'n1', deckId: 'd2' })],
+    );
+    const withTarget: AnkiDraft = {
+      ...d,
+      decks: [...d.decks, { id: 'd2', name: 'Core::N5', path: ['Core', 'N5'], filtered: false }],
+    };
+    const j: AnkiDraftEditJournal = {
+      done: [{ kind: 'card-deck', noteId: 'n1', cardId: 'c-n1', before: 'd1', after: 'd2' }],
+      undone: [],
+    };
+    const changes = buildApkgExportChanges(withTarget, j);
+    expect(changes.cardDeckMoves).toHaveLength(1);
+    expect(changes.deckCreates).toEqual([]);
+  });
+
+  it('describes no deck for a split whose moves were all undone', () => {
+    // The card is back in `d1`, so the move folds to nothing — and the deck the
+    // split invented must not be written into the package either.
+    const base = splitDraft();
+    const d: AnkiDraft = { ...base, cards: base.cards.map((c) => ({ ...c, deckId: 'd1' })) };
+    const j: AnkiDraftEditJournal = {
+      done: [
+        { kind: 'card-deck', noteId: 'n1', cardId: 'c-n1', before: 'd1', after: 'split:d1:N5', group: 'g1' },
+        { kind: 'card-deck', noteId: 'n2', cardId: 'c-n2', before: 'd1', after: 'split:d1:N4', group: 'g1' },
+      ],
+      undone: [],
+    };
+    const changes = buildApkgExportChanges(d, j);
+    expect(changes.cardDeckMoves).toEqual([]);
+    expect(changes.deckCreates).toEqual([]);
+    expect(exportChangesEmpty(changes)).toBe(true);
+  });
+
+  it('keeps a reposition and a refile of the SAME card apart', () => {
+    const base = splitDraft();
+    const d: AnkiDraft = {
+      ...base,
+      cards: base.cards.map((c) => (c.id === 'c-n1' ? { ...c, due: 99 } : c)),
+    };
+    const j: AnkiDraftEditJournal = {
+      done: [
+        { kind: 'card-deck', noteId: 'n1', cardId: 'c-n1', before: 'd1', after: 'split:d1:N5' },
+        { kind: 'card-due', noteId: 'n1', cardId: 'c-n1', before: 10, after: 99 },
+      ],
+      undone: [],
+    };
+    const changes = buildApkgExportChanges(d, j);
+    expect(changes.cardMoves).toEqual([{ cardId: 'c-n1', noteId: 'n1', due: 99 }]);
+    expect(changes.cardDeckMoves).toEqual([
+      { cardId: 'c-n1', noteId: 'n1', deckId: 'split:d1:N5' },
+    ]);
+  });
 });

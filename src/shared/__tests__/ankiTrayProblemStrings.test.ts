@@ -74,3 +74,36 @@ describe('anki tray strings', () => {
     expect(missing, 'no action kind renders as a raw key at the user').toEqual([]);
   });
 });
+
+/**
+ * Step 7's two error codes, built into a key the same runtime way
+ * (`DeckWorkbenchApply.tsx:242` and `:155`). Same class of defect and the same
+ * blind spot: recipe 13's `deck-move-unsupported` shipped with no
+ * `liveError` string, so refusing a live split showed the user the literal key.
+ */
+describe('anki apply error strings', () => {
+  /** `cancelled` is filtered out before the panel renders (`DeckWorkbenchApply.tsx:80`). */
+  const NEVER_RENDERED = new Set(['cancelled']);
+
+  it('gives every ApkgExportErrorCode an English string', () => {
+    const codes = unionMembers(
+      readFileSync(join(SHARED, 'ankiApkgExport.ts'), 'utf8'),
+      'ApkgExportErrorCode',
+    ).filter((code) => !NEVER_RENDERED.has(code));
+    const keys = englishKeys();
+    expect(codes.length, 'the union was parsed').toBeGreaterThan(10);
+    const missing = codes.filter((code) => !keys.has(`ankiWorkbench.apply.error.${code}`));
+    expect(missing, 'no export refusal renders as a raw key at the user').toEqual([]);
+  });
+
+  it('gives every ConnectCommitErrorCode an English string', () => {
+    const codes = unionMembers(
+      readFileSync(join(SHARED, 'ankiConnectCommit.ts'), 'utf8'),
+      'ConnectCommitErrorCode',
+    ).filter((code) => !NEVER_RENDERED.has(code));
+    const keys = englishKeys();
+    expect(codes.length, 'the union was parsed').toBeGreaterThan(10);
+    const missing = codes.filter((code) => !keys.has(`ankiWorkbench.apply.liveError.${code}`));
+    expect(missing, 'no live-commit refusal renders as a raw key at the user').toEqual([]);
+  });
+});

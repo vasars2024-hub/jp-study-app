@@ -8760,6 +8760,8 @@ export const ja: Catalog = {
     '移動対象のカードがコレクションに存在しません。何も書き込んでいません。手順1で読み直してから書き込んでください。',
   'ankiWorkbench.apply.liveError.deck-rename-unsupported':
     'この接続では実行中のコレクションのデッキ名を変更できないため、何も書き込んでいません。代わりにパッケージを書き出してください。そちらには変更が反映されます。',
+  'ankiWorkbench.apply.liveError.deck-move-unsupported':
+    '分割はカードを別のデッキへ移動しますが、この接続では実行中のコレクションに書き込めないため、何も書き込んでいません。代わりにパッケージを書き出してください。そちらには分割が反映されます。',
   'ankiWorkbench.apply.liveError.unreachable':
     '途中で Anki が応答しなくなりました。以下に挙げた項目はコレクションに届いていません。',
   'ankiWorkbench.apply.liveError.collection-unavailable':
@@ -8795,6 +8797,8 @@ export const ja: Catalog = {
     'ノートのフィールドがソースファイルの構成と一致しません。何も書き込まれていません — 書き出す前にソースを読み直してください。',
   'ankiWorkbench.apply.error.card-missing':
     '移動したカードがソースファイルに存在しません。何も書き込まれていません — 書き出す前にソースを読み直してください。',
+  'ankiWorkbench.apply.error.card-filtered':
+    '分割で移動するカードがフィルタデッキにあり、そのデッキの所有物です。何も書き込まれていません — 先に Anki でフィルタデッキを空にしてください。',
   'ankiWorkbench.apply.error.deck-missing':
     '名前を変更したデッキがソースファイルに存在しません。何も書き込まれていません — 書き出す前にソースを読み直してください。',
   'ankiWorkbench.apply.error.deck-changed':

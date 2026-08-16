@@ -43,6 +43,19 @@ export const DECK_SPLIT_AXES: readonly DeckSplitAxis[] = ['jlpt', 'frequency', '
 export type DeckSplitUnmatched = 'leave' | 'collect';
 
 /**
+ * The prefix on a deck id this planner mints for a subdeck that does not exist
+ * yet. Deliberately non-numeric — Anki ids are epoch milliseconds, so an id that
+ * could pass for real would let a writer file cards into a deck row that never
+ * existed. A writer resolves one through the change set's `deckCreates`.
+ */
+export const MINTED_DECK_ID_PREFIX = 'split:';
+
+/** True for an id this planner minted rather than read out of a collection. */
+export function isMintedDeckId(deckId: string): boolean {
+  return deckId.startsWith(MINTED_DECK_ID_PREFIX);
+}
+
+/**
  * Anki nests on `::` and on nothing else, so a segment carrying one would create
  * a level the user did not ask for. `A:B` is a legal flat name and is left
  * alone; only a run of two or more colons collapses.
@@ -391,7 +404,7 @@ export function planDeckSplit(input: DeckSplitInput): DeckSplitPlan {
       bucket,
       segment,
       name: toStoredForm(path, parent.name),
-      deckId: deckId ?? `split:${parentDeckId}:${segment}`,
+      deckId: deckId ?? `${MINTED_DECK_ID_PREFIX}${parentDeckId}:${segment}`,
       created: deckId === undefined,
       unmatchedBucket: isUnmatched,
       noteIds: [],
