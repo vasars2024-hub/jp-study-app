@@ -27,6 +27,13 @@
  */
 
 import { releaseCoversEpisode } from './malDownload';
+// The row shape the discovery flow already offers nyaa releases in. Reused
+// rather than redeclared: both are built from the same `NyaaProviderCandidate`,
+// and a second view type would be one more place for the two surfaces to start
+// disagreeing about what a release is.
+import type { NyaaSubtitleCandidateView } from './subtitleDiscoveryIpc';
+
+export type { NyaaSubtitleCandidateView };
 
 /** Structurally identical to `renderer/subtitles.ts`'s `Cue`. See the note above. */
 export interface HarvestCue {
@@ -127,6 +134,13 @@ export interface SubtitleHarvestListResult {
    */
   idLookupDown: boolean;
   /**
+   * Jimaku itself did not answer — a rate limit, a 5xx, a timeout. The empty
+   * list that comes back is then a fact about the request, not about the show,
+   * and the UI must not say "Jimaku has no Japanese subtitles filed for this
+   * title" or the user goes to a torrent index for subtitles that exist.
+   */
+  jimakuDown: boolean;
+  /**
    * The nyaa fallback's own answer, computed only when Jimaku listed nothing.
    * `null` means it was not asked, which is not the same as "unavailable".
    */
@@ -135,6 +149,53 @@ export interface SubtitleHarvestListResult {
 
 export interface SubtitleHarvestFetchResult {
   files: { id: string; text: string | null; error: string }[];
+}
+
+/**
+ * Asking the index for a title, with no local media item anywhere.
+ *
+ * The discovery flow next door keys on a `mediaId` and refuses anything the
+ * library does not hold — which means a title the user has not downloaded has
+ * no nyaa route at all, and the harvest panel could only ever *name* the
+ * fallback it was offering. This input is what the panel actually has: a title.
+ */
+export interface HarvestNyaaListInput {
+  title: string;
+  /** Narrows the query for a multi-season show. Null asks about the title. */
+  season?: number | null;
+  /** The active profile's acquisition settings — see `SubtitleHarvestListInput`. */
+  acquisition?: unknown;
+}
+
+export interface HarvestNyaaListResult {
+  ok: boolean;
+  candidates: NyaaSubtitleCandidateView[];
+  /** Why the list is empty when it is, in nyaa's own words. Never "no results". */
+  message: string;
+}
+
+/** One subtitle file out of an acquired release. */
+export interface HarvestNyaaEpisodeText {
+  /** `null` when the file name states no episode — a movie, or a single file. */
+  episode: number | null;
+  text: string;
+  format: string;
+  fileName: string;
+}
+
+/**
+ * Every subtitle a release turned out to carry.
+ *
+ * A list rather than one file because the unit of acquisition and the unit of
+ * study differ here: one torrent is one sub-pack is a whole season, and the
+ * range the user asked for is a subset of it. Which episodes actually arrived
+ * is the caller's to report — a harvest that quietly returns four of a hundred
+ * is the failure this whole panel exists to not have.
+ */
+export interface HarvestNyaaFetchResult {
+  ok: boolean;
+  files: HarvestNyaaEpisodeText[];
+  message: string;
 }
 
 export interface HarvestPlan {
@@ -368,7 +429,17 @@ export function normalizeEntryTitle(value: string): string {
  * `Naruto Shippuuden` and `Naruto` identically for the query `Naruto`, and the
  * point of this function is precisely to tell those apart.
  */
-const NO_MATCH = 9;
+export const JIMAKU_NAME_NO_MATCH = 9;
+const NO_MATCH = JIMAKU_NAME_NO_MATCH;
+
+/**
+ * Exported so a caller can ask "did anything answer this query at all?" with
+ * the same ladder the chooser ranks by. A second, hand-written copy of this
+ * rule is how a refusal and a selection start disagreeing.
+ */
+export function jimakuEntryNameScore(name: string, query: string): number {
+  return nameScore(name, query);
+}
 
 function nameScore(name: string, query: string): number {
   const value = normalizeEntryTitle(name);

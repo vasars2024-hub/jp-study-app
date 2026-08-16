@@ -4098,6 +4098,8 @@ export const en: Catalog = {
   'subHarvest.source.titleGuess': 'Matched by title search: {name} \u2014 check this is the right show before harvesting.',
   'subHarvest.source.idLookupDown': 'The AniList id lookup is unavailable, so a title search was the only option.',
   'subHarvest.nyaa.offered': 'Jimaku has nothing filed for this title. Nyaa can be searched instead \u2014 it fetches subtitle-only releases through your torrent client, and nothing is downloaded until you pick a release below.',
+  'subHarvest.jimakuDown': 'Jimaku did not answer, so this is not an answer about the title — usually a rate limit. Wait a moment and search again.',
+  'subHarvest.nyaa.offeredDown': 'Jimaku did not answer, so whether it has this title is unknown. Nyaa can be searched anyway — it fetches subtitle-only releases through your torrent client, and nothing is downloaded until you pick a release below.',
   'subHarvest.nyaa.unavailable': 'The Nyaa fallback cannot run either: {detail}',
   'subHarvest.nyaa.search': 'Search Nyaa for this title',
   'subHarvest.nyaa.searching': 'Searching the index\u2026',

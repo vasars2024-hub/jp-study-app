@@ -100,7 +100,7 @@ export default function SubtitleHarvestPanel({ anilistId, malId, title, episodes
    * this panel must not have silently.
    */
   const [source, setSource] = useState<Pick<
-    SubtitleHarvestListResult, 'matchedBy' | 'entry' | 'idLookupDown' | 'nyaa'
+    SubtitleHarvestListResult, 'matchedBy' | 'entry' | 'idLookupDown' | 'jimakuDown' | 'nyaa'
   > | null>(null);
   const [analysis, setAnalysis] = useState<MediaStudyAnalysis | null>(null);
   const [failures, setFailures] = useState<string[]>([]);
@@ -146,11 +146,14 @@ export default function SubtitleHarvestPanel({ anilistId, malId, title, episodes
       });
       setFiles(result.files);
       setNeedsKey(result.needsKey);
-      setMessage(result.message);
+      // An outage gets the translated sentence, not main's English one: it is
+      // the only empty result whose cause the user can act on by waiting.
+      setMessage(result.jimakuDown ? t('subHarvest.jimakuDown') : result.message);
       setSource({
         matchedBy: result.matchedBy,
         entry: result.entry,
         idLookupDown: result.idLookupDown,
+        jimakuDown: result.jimakuDown,
         nyaa: result.nyaa,
       });
       setPhase(result.ok ? 'listed' : 'error');
@@ -158,7 +161,7 @@ export default function SubtitleHarvestPanel({ anilistId, malId, title, episodes
       setMessage(errorText(error));
       setPhase('error');
     }
-  }, [anilistId, malId, title]);
+  }, [anilistId, malId, title, t]);
 
   /**
    * The half both providers share: cues in, corpus out.
@@ -444,8 +447,11 @@ export default function SubtitleHarvestPanel({ anilistId, malId, title, episodes
         <div className="mal-dl-note mal-dl-subs-nyaa" role="status">
           <p>
             <Icon name="info" size={12} />
+            {/* The offer is still made during an outage — waiting is the user's
+                call — but it is not allowed to rest on "Jimaku has nothing",
+                which during a rate limit is a claim nobody measured. */}
             {source.nyaa.available
-              ? t('subHarvest.nyaa.offered')
+              ? (source.jimakuDown ? t('subHarvest.nyaa.offeredDown') : t('subHarvest.nyaa.offered'))
               : t('subHarvest.nyaa.unavailable', { detail: source.nyaa.detail })}
           </p>
           {source.nyaa.available && !nyaaCandidates.length ? (

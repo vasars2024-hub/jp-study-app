@@ -29,9 +29,18 @@ import {
   jimakuSearchDetailed,
   type ProviderSubtitleCandidate,
 } from './subtitleProviderClients';
-import { nyaaAvailability } from './subtitleNyaaSource';
+import {
+  nyaaAvailability,
+  nyaaFetchAll,
+  nyaaSearch,
+  rememberNyaaCandidates,
+  takeRememberedNyaaCandidate,
+} from './subtitleNyaaSource';
 import { asNyaaAcquisitionConfig } from '../shared/subtitleNyaa';
 import type {
+  HarvestNyaaFetchResult,
+  HarvestNyaaListInput,
+  HarvestNyaaListResult,
   HarvestNyaaOffer,
   HarvestFileCandidate,
   SubtitleHarvestFetchResult,
@@ -139,7 +148,9 @@ export async function listSubtitleHarvest(
     ? (input.anilistId as number)
     : undefined;
   let idLookupDown = false;
-  const blank = { matchedBy: null, entry: null, idLookupDown: false, nyaa: null } as const;
+  const blank = {
+    matchedBy: null, entry: null, idLookupDown: false, jimakuDown: false, nyaa: null,
+  } as const;
 
   if (!anilistId && !title && !input.malId) {
     return {
@@ -182,14 +193,21 @@ export async function listSubtitleHarvest(
       name: candidate.releaseName,
       format: candidate.format,
     }));
+    // An outage is reported as an outage. The nyaa fallback is still offered —
+    // a user who wants to go that way should not have to wait out a rate limit
+    // — but the sentence above it no longer claims Jimaku filed nothing.
+    const emptyMessage = match.down
+      ? `Jimaku did not answer${match.downStatus ? ` (HTTP ${match.downStatus})` : ''}, so this is not an answer about the title. Try again in a moment.`
+      : 'Jimaku has no Japanese subtitles filed for this title.';
     return {
       ok: true,
       needsKey: false,
       files,
-      message: files.length ? '' : 'Jimaku has no Japanese subtitles filed for this title.',
+      message: files.length ? '' : emptyMessage,
       matchedBy: match.entry ? match.basis : null,
       entry: match.entry,
       idLookupDown,
+      jimakuDown: match.down,
       // Only when Jimaku covered nothing. Computing it on every listing would
       // put a torrent provider in front of a user who already has what they
       // asked for, and nyaa ships default-disabled and last for that reason.
@@ -204,6 +222,9 @@ export async function listSubtitleHarvest(
       matchedBy: null,
       entry: null,
       idLookupDown,
+      // A throw out of the client is the same class of thing as a bad status:
+      // nothing here is a statement about the catalogue.
+      jimakuDown: true,
       nyaa: await describeNyaaFallback(input.acquisition),
     };
   }
@@ -254,6 +275,107 @@ export async function fetchSubtitleHarvest(ids: readonly string[]): Promise<Subt
   return { files };
 }
 
+// ---------------------------------------------------------------- nyaa ---
+//
+// The fallback the panel could previously only name. `describeNyaaFallback`
+// above answers "could this run"; these two answer "run it".
+//
+// Deliberately not routed through `subtitleDiscovery.ts`'s pair, even though
+// the acquisition underneath is the same: those refuse anything
+// `host.listItems()` does not hold, because their job ends in a
+// `SubtitleRecord` attached to a file on disk. A harvest has no file and wants
+// no record — it wants the text — so the media item is the one thing it cannot
+// supply. `nyaaSearch` only ever used `mediaId` to look a title up, and
+// `nyaaFetchAll` never sees one.
+
+/**
+ * Ranked nyaa releases for a title.
+ *
+ * Searched with `episode: null` on purpose: a harvest asks for a range, and the
+ * releases that can serve a range are the ones that carry it whole. Pinning an
+ * episode at search time is what would make a 100-episode request resolve to a
+ * single-episode release.
+ */
+export async function listNyaaHarvest(
+  input: HarvestNyaaListInput,
+): Promise<HarvestNyaaListResult> {
+  const title = (input?.title ?? '').trim();
+  if (!title) return { ok: false, candidates: [], message: 'No title to search the index with.' };
+
+  const config = asNyaaAcquisitionConfig(input?.acquisition);
+  const available = await nyaaAvailability(config);
+  // Its own four refusals, not a shrug: "your indexer is off" and "this show has
+  // no subtitle releases" are different problems and only one is actionable.
+  if (!available.ok || !config) {
+    return { ok: false, candidates: [], message: available.ok ? '' : available.detail };
+  }
+
+  const season = Number.isFinite(input?.season) ? Number(input?.season) : null;
+  try {
+    const candidates = await nyaaSearch({ config, title, season, episode: null, languages: ['ja'] });
+    // The one session catalogue in `subtitleNyaaSource`, shared with discovery,
+    // so an id listed by either surface is fetchable by either — and the
+    // "candidate ids do not survive a restart" trap lives in exactly one place.
+    rememberNyaaCandidates(candidates);
+    return {
+      ok: true,
+      candidates: candidates.map((candidate) => ({
+        id: candidate.providerItemId,
+        releaseName: candidate.releaseName,
+        route: candidate.route,
+        sizeBytes: candidate.sizeBytes,
+        seeders: candidate.seeders,
+        languages: candidate.language ? [candidate.language] : [],
+        score: candidate.score,
+        reasons: candidate.reasons,
+      })),
+      message: candidates.length
+        ? ''
+        : 'No release on the index looks like it carries subtitles for this title.',
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      candidates: [],
+      message: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+/**
+ * Acquires one release and returns every subtitle in it, as text.
+ *
+ * Nothing is written to the library and no `SubtitleRecord` is created: the
+ * caller is mining words, and a record would claim a media item this flow does
+ * not have. The transfer itself is real and lands in the user's own
+ * qBittorrent under `jp-study-subtitles`, exactly as the discovery path's does.
+ */
+export async function fetchNyaaHarvest(
+  candidateId: string,
+  acquisition: unknown,
+): Promise<HarvestNyaaFetchResult> {
+  const config = asNyaaAcquisitionConfig(acquisition);
+  if (!config) return { ok: false, files: [], message: 'No scraper configuration was supplied.' };
+
+  const candidate = takeRememberedNyaaCandidate(typeof candidateId === 'string' ? candidateId : '');
+  if (!candidate) {
+    return { ok: false, files: [], message: 'That release is no longer in this session’s listing. Search again.' };
+  }
+
+  const outcome = await nyaaFetchAll(candidate, config);
+  if (!outcome.ok) return { ok: false, files: [], message: outcome.reason };
+  return {
+    ok: true,
+    files: outcome.files.map((file) => ({
+      episode: file.episode,
+      text: file.text,
+      format: file.format,
+      fileName: file.fileName,
+    })),
+    message: '',
+  };
+}
+
 /** Test seam — drops the session listing. */
 export function resetSubtitleHarvest(): void {
   catalogue.clear();
@@ -264,4 +386,8 @@ export function registerSubtitleHarvestIpc(): void {
     listSubtitleHarvest(input ?? { anilistId: null, title: '' }));
   ipcMain.handle('subtitleHarvest:fetch', (_event, ids: string[]) =>
     fetchSubtitleHarvest(Array.isArray(ids) ? ids.slice(0, 200) : []));
+  ipcMain.handle('subtitleHarvest:nyaaList', (_event, input: HarvestNyaaListInput) =>
+    listNyaaHarvest(input ?? { title: '' }));
+  ipcMain.handle('subtitleHarvest:nyaaFetch', (_event, candidateId: string, acquisition: unknown) =>
+    fetchNyaaHarvest(candidateId, acquisition));
 }

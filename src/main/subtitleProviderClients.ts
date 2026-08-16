@@ -99,20 +99,54 @@ function request(
   });
 }
 
+/**
+ * A JSON reply that still knows how it failed.
+ *
+ * `requestJson` collapses a 429, a 500, a timeout and a genuine empty result
+ * into one `null`, and a caller that reads `null` as "the catalogue has
+ * nothing" then states an outage as a fact about the show. Measured
+ * 2026-08-17: eight titles reported "Jimaku has no Japanese subtitles filed for
+ * this title" back-to-back and returned 125/57/168/36/95/48/60/47 files when
+ * the same requests were spaced 6 s apart.
+ */
+interface JsonReply<T> {
+  value: T | null;
+  /** 0 when the request never got an answer at all. */
+  status: number;
+  /** Set when the request threw rather than answering. */
+  error: string | null;
+}
+
+async function requestJsonReply<T>(
+  url: string,
+  options: { method?: string; headers?: Record<string, string>; body?: string } = {},
+): Promise<JsonReply<T>> {
+  let response;
+  try {
+    response = await request(url, {
+      ...options,
+      headers: { Accept: 'application/json', ...options.headers },
+    });
+  } catch (error) {
+    return { value: null, status: 0, error: error instanceof Error ? error.message : String(error) };
+  }
+  if (response.status < 200 || response.status >= 300) {
+    return { value: null, status: response.status, error: null };
+  }
+  try {
+    return { value: JSON.parse(response.body.toString('utf-8')) as T, status: response.status, error: null };
+  } catch (error) {
+    // A 200 carrying something that is not JSON is the provider misbehaving,
+    // not an empty catalogue, so it keeps its status rather than reading as one.
+    return { value: null, status: response.status, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
 async function requestJson<T>(
   url: string,
   options: { method?: string; headers?: Record<string, string>; body?: string } = {},
 ): Promise<T | null> {
-  try {
-    const response = await request(url, {
-      ...options,
-      headers: { Accept: 'application/json', ...options.headers },
-    });
-    if (response.status < 200 || response.status >= 300) return null;
-    return JSON.parse(response.body.toString('utf-8')) as T;
-  } catch {
-    return null;
-  }
+  return (await requestJsonReply<T>(url, options)).value;
 }
 
 // ---------------------------------------------------------------------------
@@ -188,6 +222,15 @@ export interface JimakuMatch {
   /** The entry the files came from. `null` when the search matched nothing. */
   entry: { id: number; name: string } | null;
   basis: JimakuMatchBasis;
+  /**
+   * The search request itself did not answer — a rate limit, a 5xx, a timeout.
+   * Distinct from a 200 carrying `[]`, the same way `resolveAnilistId`'s `down`
+   * is distinct from "this title has no AniList mapping": one passes, the other
+   * never will, and only one of them should send a user to a torrent index.
+   */
+  down: boolean;
+  /** The status that made `down` true, for the log. 0 when nothing answered. */
+  downStatus: number;
 }
 interface JimakuFile { name?: string; url?: string; size?: number }
 
@@ -221,28 +264,40 @@ export async function jimakuSearchDetailed(
   episode: number | null,
 ): Promise<JimakuMatch> {
   const basis: JimakuMatchBasis = anilistId ? 'anilist' : 'title';
-  const empty: JimakuMatch = { candidates: [], entry: null, basis };
+  const empty: JimakuMatch = { candidates: [], entry: null, basis, down: false, downStatus: 0 };
   const key = keyFor('jimaku');
   if (!key) return empty;
 
   const query = anilistId
     ? `anilist_id=${encodeURIComponent(String(anilistId))}`
     : `query=${encodeURIComponent(title)}`;
-  const entries = await requestJson<JimakuEntry[]>(`${JIMAKU}/entries/search?${query}`, {
+  const reply = await requestJsonReply<JimakuEntry[]>(`${JIMAKU}/entries/search?${query}`, {
     headers: { Authorization: key },
   });
-  if (!entries?.length) return empty;
+  // A reply that never arrived is an outage, not an answer about this show.
+  if (reply.value === null) {
+    return { ...empty, down: true, downStatus: reply.status };
+  }
+  const entries = reply.value;
+  if (!entries.length) return empty;
 
   const out: ProviderSubtitleCandidate[] = [];
   // Not `entries[0]`: the `?query=` search is fuzzy and unordered, and taking
   // the first answered "Naruto" with BORUTO. See `chooseJimakuEntry`.
   const entry = chooseJimakuEntry(entries, anilistId ? '' : title) ?? entries[0];
   const suffix = episode !== null ? `?episode=${encodeURIComponent(String(episode))}` : '';
-  const files = await requestJson<JimakuFile[]>(`${JIMAKU}/entries/${entry.id}/files${suffix}`, {
+  const filesReply = await requestJsonReply<JimakuFile[]>(`${JIMAKU}/entries/${entry.id}/files${suffix}`, {
     headers: { Authorization: key },
   });
+  // The second request rate-limits exactly like the first, and an entry with a
+  // failed file listing reads as "this entry has no files" — worse than the
+  // search case, because the panel then names a matched entry to vouch for it.
+  if (filesReply.value === null) {
+    return { ...empty, down: true, downStatus: filesReply.status };
+  }
+  const files = filesReply.value;
 
-  for (const file of files ?? []) {
+  for (const file of files) {
     const name = file.name?.trim();
     const url = file.url?.trim();
     if (!name || !url) continue;
@@ -267,6 +322,8 @@ export async function jimakuSearchDetailed(
     candidates: out,
     entry: { id: entry.id, name: (entry.name || entry.english_name || entry.japanese_name || '').trim() },
     basis,
+    down: false,
+    downStatus: 0,
   };
 }
 
