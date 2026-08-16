@@ -29,6 +29,7 @@ import {
   toSrt,
   type CombinedSeasonSegment,
   type HarvestFileCandidate,
+  type NyaaSubtitleCandidateView,
   type SubtitleHarvestListResult,
 } from '../../../shared/subtitleHarvest';
 import { parseSubtitles, type Cue } from '../../subtitles';
@@ -103,6 +104,16 @@ export default function SubtitleHarvestPanel({ anilistId, malId, title, episodes
   > | null>(null);
   const [analysis, setAnalysis] = useState<MediaStudyAnalysis | null>(null);
   const [failures, setFailures] = useState<string[]>([]);
+  /**
+   * The nyaa fallback, once the user asks for it.
+   *
+   * Never populated by `find` — Jimaku missing is not consent to search a
+   * torrent index, and the fetch below puts a real transfer into the user's own
+   * qBittorrent.
+   */
+  const [nyaaCandidates, setNyaaCandidates] = useState<NyaaSubtitleCandidateView[]>([]);
+  /** What the acquired release actually held, against what the range asked for. */
+  const [nyaaTaken, setNyaaTaken] = useState<{ files: number; used: number } | null>(null);
 
   const busy = phase === 'listing' || phase === 'fetching' || phase === 'analysing';
 
@@ -149,11 +160,46 @@ export default function SubtitleHarvestPanel({ anilistId, malId, title, episodes
     }
   }, [anilistId, malId, title]);
 
+  /**
+   * The half both providers share: cues in, corpus out.
+   *
+   * Factored out when nyaa arrived rather than duplicated, because everything
+   * downstream of "we have per-episode cues" — the offsetting, the season
+   * limits, the segment index the deck reads provenance from — must be
+   * identical whichever provider produced the text. A second copy is how one
+   * path quietly loses the `SEASON_STUDY_LIMITS` argument and starts building a
+   * frequency table from an eighth of the dialogue.
+   */
+  const analyse = useCallback(async (perEpisode: { episode: number; cues: Cue[] }[]) => {
+    // Combining is always run: one episode is just a season of one, and the
+    // offsetting is a no-op there. What `combine` decides is only whether the
+    // user is *offered* the whole thing as a single corpus below.
+    const combined = combineSeasonCues(perEpisode);
+    setCues(combined.cues as Cue[]);
+    setSegments(combined.segments);
+
+    if (!combined.cues.length) {
+      setMessage(t('subHarvest.error.noCues'));
+      setPhase('error');
+      return;
+    }
+
+    setPhase('analysing');
+    // Season limits, not the per-episode defaults. `buildMediaStudyCorpus`
+    // stops at 800 cues unless told otherwise, which is about episode three
+    // of a season — and a frequency table built from an eighth of the
+    // dialogue is wrong rather than short.
+    const value = await analyzeMediaStudyCues(combined.cues as Cue[], SEASON_STUDY_LIMITS);
+    setAnalysis(value);
+    setPhase('done');
+  }, [t]);
+
   const harvest = useCallback(async () => {
     if (!plan?.picks.length) return;
     setPhase('fetching');
     setMessage('');
     setFailures([]);
+    setNyaaTaken(null);
     try {
       const reply = await window.api.subtitleHarvestFetch(plan.picks.map((pick) => pick.file.id));
       const byId = new Map(reply.files.map((file) => [file.id, file]));
@@ -167,33 +213,93 @@ export default function SubtitleHarvestPanel({ anilistId, malId, title, episodes
         return { episode: pick.episode, cues: parseSubtitles(fetched.text) };
       });
       setFailures(problems);
-
-      // Combining is always run: one episode is just a season of one, and the
-      // offsetting is a no-op there. What `combine` decides is only whether the
-      // user is *offered* the whole thing as a single corpus below.
-      const combined = combineSeasonCues(perEpisode);
-      setCues(combined.cues as Cue[]);
-      setSegments(combined.segments);
-
-      if (!combined.cues.length) {
-        setMessage(t('subHarvest.error.noCues'));
-        setPhase('error');
-        return;
-      }
-
-      setPhase('analysing');
-      // Season limits, not the per-episode defaults. `buildMediaStudyCorpus`
-      // stops at 800 cues unless told otherwise, which is about episode three
-      // of a season — and a frequency table built from an eighth of the
-      // dialogue is wrong rather than short.
-      const value = await analyzeMediaStudyCues(combined.cues as Cue[], SEASON_STUDY_LIMITS);
-      setAnalysis(value);
-      setPhase('done');
+      await analyse(perEpisode);
     } catch (error) {
       setMessage(errorText(error));
       setPhase('error');
     }
-  }, [plan, t]);
+  }, [analyse, plan, t]);
+
+  /**
+   * Ask the index what it has for this title.
+   *
+   * Only offered when Jimaku filed nothing and `nyaaAvailability` says the
+   * fallback could actually run — the alternative is a button that starts a
+   * torrent transfer and then reports a misconfiguration.
+   */
+  const findNyaa = useCallback(async () => {
+    setPhase('listing');
+    setMessage('');
+    setNyaaCandidates([]);
+    setNyaaTaken(null);
+    setAnalysis(null);
+    setCues([]);
+    try {
+      const result = await window.api.subtitleHarvestNyaaList({
+        title,
+        acquisition: acquisitionConfigFrom(getActiveScraperSettings()),
+      });
+      setNyaaCandidates(result.candidates);
+      setMessage(result.message);
+      setPhase(result.ok ? 'listed' : 'error');
+    } catch (error) {
+      setMessage(errorText(error));
+      setPhase('error');
+    }
+  }, [title]);
+
+  /**
+   * Acquire one release and study whatever of the requested range it holds.
+   *
+   * The range check is not a filter that can quietly empty the run: a release
+   * whose episodes miss the range entirely stops here and says which episodes
+   * it *does* carry. Substituting them would hand back a frequency table for
+   * episodes the user did not ask about, which is worse than nothing because
+   * nothing downstream can tell.
+   */
+  const takeNyaa = useCallback(async (candidateId: string) => {
+    setPhase('fetching');
+    setMessage('');
+    setFailures([]);
+    setNyaaTaken(null);
+    try {
+      const reply = await window.api.subtitleHarvestNyaaFetch(
+        candidateId,
+        acquisitionConfigFrom(getActiveScraperSettings()),
+      );
+      if (!reply.ok) {
+        setMessage(reply.message);
+        setPhase('error');
+        return;
+      }
+      const wanted = new Set(episodes);
+      // No selection upstream means "whatever this release has".
+      const inRange = wanted.size
+        ? reply.files.filter((file) => file.episode !== null && wanted.has(file.episode))
+        : reply.files;
+      if (!inRange.length) {
+        const held = reply.files
+          .map((file) => file.episode)
+          .filter((episode): episode is number => episode !== null)
+          .sort((a, b) => a - b);
+        setMessage(held.length
+          ? t('subHarvest.nyaa.outOfRange', { held: `${held[0]}–${held[held.length - 1]}` })
+          : t('subHarvest.nyaa.noEpisodes'));
+        setPhase('error');
+        return;
+      }
+      setNyaaTaken({ files: reply.files.length, used: inRange.length });
+      await analyse(inRange.map((file) => ({
+        // A release that numbers nothing — a film, a single file — is still one
+        // corpus, and 0 is the episode the segment index then reports.
+        episode: file.episode ?? 0,
+        cues: parseSubtitles(file.text),
+      })));
+    } catch (error) {
+      setMessage(errorText(error));
+      setPhase('error');
+    }
+  }, [analyse, episodes, t]);
 
   /**
    * Words worth a card: everything the learner is not already at level 2+ on.
@@ -329,17 +435,70 @@ export default function SubtitleHarvestPanel({ anilistId, malId, title, episodes
         </p>
       ) : null}
 
-      {/* Jimaku had nothing. nyaa is named as the next step rather than run:
-          it is a torrent fetch, it ships default-disabled and last, and it is
-          the Episodes tab that performs it. When it cannot run, its own reason
-          is shown — an empty list that means "your indexer is off" must not
-          read as "this show has no subtitles". */}
+      {/* Jimaku had nothing. nyaa runs from here now, but only on a second
+          deliberate click: it is a torrent fetch into the user's own client,
+          and it ships default-disabled and last for that reason. When it cannot
+          run, its own reason is shown — an empty list that means "your indexer
+          is off" must not read as "this show has no subtitles". */}
       {source?.nyaa ? (
-        <p className="mal-dl-note mal-dl-subs-nyaa" role="status">
-          <Icon name="info" size={12} />
-          {source.nyaa.available
-            ? t('subHarvest.nyaa.offered')
-            : t('subHarvest.nyaa.unavailable', { detail: source.nyaa.detail })}
+        <div className="mal-dl-note mal-dl-subs-nyaa" role="status">
+          <p>
+            <Icon name="info" size={12} />
+            {source.nyaa.available
+              ? t('subHarvest.nyaa.offered')
+              : t('subHarvest.nyaa.unavailable', { detail: source.nyaa.detail })}
+          </p>
+          {source.nyaa.available && !nyaaCandidates.length ? (
+            <button type="button" className="scr-btn" onClick={findNyaa} disabled={busy}>
+              {phase === 'listing' ? t('subHarvest.nyaa.searching') : t('subHarvest.nyaa.search')}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* Size and swarm health before the click, for the same reason the
+          discovery chooser shows them: accepting one of these starts a real
+          transfer, and those are the two numbers that decide whether it will
+          ever finish. */}
+      {nyaaCandidates.length ? (
+        <div className="mal-dl-subs-nyaa-list">
+          <p className="scr-muted">{t('subHarvest.nyaa.found', { count: nyaaCandidates.length })}</p>
+          <ul>
+            {nyaaCandidates.map((candidate) => (
+              <li key={candidate.id}>
+                <span className="mal-dl-subs-nyaa-name" title={candidate.reasons.join(', ')}>
+                  {candidate.releaseName}
+                </span>
+                <span className="scr-muted">
+                  {t('subHarvest.nyaa.meta', {
+                    size: Math.max(1, Math.round(candidate.sizeBytes / 1_048_576))
+                      .toLocaleString(LANG_TAGS[lang]),
+                    seeders: candidate.seeders.toLocaleString(LANG_TAGS[lang]),
+                  })}
+                </span>
+                <button
+                  type="button"
+                  className="scr-btn"
+                  onClick={() => { void takeNyaa(candidate.id); }}
+                  disabled={busy}
+                >
+                  {t('subHarvest.nyaa.take')}
+                </button>
+              </li>
+            ))}
+          </ul>
+          <p className="scr-muted">{t('subHarvest.nyaa.transferNote')}</p>
+        </div>
+      ) : null}
+
+      {/* What the release turned out to hold, against what was asked for. A
+          release that carries a hundred episodes and matches four of them is a
+          usable result and a surprising one; both numbers are stated. */}
+      {nyaaTaken ? (
+        <p className="mal-dl-subs-plan" role="status">
+          <span className="mal-dl-hit">
+            {t('subHarvest.nyaa.took', { used: nyaaTaken.used, files: nyaaTaken.files })}
+          </span>
         </p>
       ) : null}
 
