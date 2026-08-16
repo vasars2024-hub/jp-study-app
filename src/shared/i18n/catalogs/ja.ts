@@ -2721,6 +2721,8 @@ export const ja: Catalog = {
   'dialog.filter.tatoeba': 'Tatoeba文TSV',
   'dialog.filter.tatoebaLinks': 'TatoebaリンクTSV',
   'dialog.importAnkiDeck.title': 'Ankiデッキ（.apkg）をインポート',
+  'dialog.exportAnkiDeck.title': '編集したAnkiデッキを書き出す',
+  'dialog.exportAnkiDeck.pickSource': '元のデッキファイルを選択',
   'dialog.filter.ankiDeck': 'Ankiデッキ',
 
   'search.theme': 'テーマ',

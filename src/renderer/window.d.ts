@@ -496,6 +496,9 @@ declare global {
       readApkgDraft(
         request?: import('../shared/ankiDraft').ApkgDraftRequest,
       ): Promise<import('../shared/ankiDraft').ApkgDraftResult>;
+      exportApkgDraft(
+        request: import('../shared/ankiApkgExport').ApkgExportRequest,
+      ): Promise<import('../shared/ankiApkgExport').ApkgExportResult>;
       readAnkiCsvDraft(
         request?: import('../shared/ankiCsv').CsvDraftRequest,
       ): Promise<import('../shared/ankiCsv').CsvDraftResult>;

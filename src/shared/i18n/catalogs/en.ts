@@ -2879,6 +2879,8 @@ export const en: Catalog = {
   'dialog.filter.tatoeba': 'Tatoeba sentences TSV',
   'dialog.filter.tatoebaLinks': 'Tatoeba links TSV',
   'dialog.importAnkiDeck.title': 'Import an Anki deck (.apkg)',
+  'dialog.exportAnkiDeck.title': 'Export the edited Anki deck',
+  'dialog.exportAnkiDeck.pickSource': 'Locate the original deck file',
   'dialog.filter.ankiDeck': 'Anki deck',
 
   // Settings search index (settingsRegistry.ts SETTINGS_REGISTRY). Keywords

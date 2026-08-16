@@ -64,6 +64,7 @@ import type { LexiconInterlinearOptions, LexiconInterlinearResult } from './shar
 import type { ApkgImportResult } from './shared/apkgParse';
 import type { ApkgCardsResult } from './shared/apkgCards';
 import type { ApkgDraftRequest, ApkgDraftResult } from './shared/ankiDraft';
+import type { ApkgExportRequest, ApkgExportResult } from './shared/ankiApkgExport';
 import type { CsvDraftRequest, CsvDraftResult } from './shared/ankiCsv';
 import type { AiAdditionKind } from './shared/ankiAiAdditions';
 import type { AiAdditionsNoteResult, AiAdditionsRunResult } from './shared/ankiAiPrompt';
@@ -600,6 +601,9 @@ const api = {
   /** One page of an .apkg read as a full-fidelity workbench draft. */
   readApkgDraft: (request?: ApkgDraftRequest): Promise<ApkgDraftResult> =>
     ipcRenderer.invoke('apkg:readDraft', request),
+  /** Write the workbench's net change set into a NEW .apkg beside the source. */
+  exportApkgDraft: (request: ApkgExportRequest): Promise<ApkgExportResult> =>
+    ipcRenderer.invoke('apkg:export', request),
   /** One page of an Anki CSV/TSV text export read as a workbench draft. */
   readAnkiCsvDraft: (request?: CsvDraftRequest): Promise<CsvDraftResult> =>
     ipcRenderer.invoke('anki:readCsvDraft', request),

@@ -2711,6 +2711,8 @@ export const zh: Catalog = {
   'dialog.filter.tatoeba': 'Tatoeba 句子 TSV',
   'dialog.filter.tatoebaLinks': 'Tatoeba 链接 TSV',
   'dialog.importAnkiDeck.title': '导入 Anki 卡组（.apkg）',
+  'dialog.exportAnkiDeck.title': '导出编辑后的 Anki 卡组',
+  'dialog.exportAnkiDeck.pickSource': '找到原始卡组文件',
   'dialog.filter.ankiDeck': 'Anki 卡组',
 
   'search.theme': '主题',

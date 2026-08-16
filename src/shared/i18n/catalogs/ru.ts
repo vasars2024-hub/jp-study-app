@@ -2916,6 +2916,8 @@ export const ru: Catalog = {
   'dialog.filter.tatoeba': 'Предложения Tatoeba TSV',
   'dialog.filter.tatoebaLinks': 'Связи Tatoeba TSV',
   'dialog.importAnkiDeck.title': 'Импорт колоды Anki (.apkg)',
+  'dialog.exportAnkiDeck.title': 'Экспорт изменённой колоды Anki',
+  'dialog.exportAnkiDeck.pickSource': 'Укажите исходный файл колоды',
   'dialog.filter.ankiDeck': 'Колода Anki',
 
   'search.theme': 'Тема',

@@ -49,6 +49,8 @@ import {
 } from './draftSessionStore';
 import type { DraftSessionPageReport } from '../../shared/ankiDraftSession';
 import { decodeMediaManifestNames } from './ankiProtoConfig';
+import { exportApkg, rememberApkgSource } from './apkgExport';
+import type { ApkgExportRequest } from '../../shared/ankiApkgExport';
 import { mt } from '../i18n';
 
 function focusedWindow(): BrowserWindow | undefined {
@@ -89,7 +91,7 @@ function sqlWasmBinary(): Buffer {
   return fs.readFileSync(wasmPath);
 }
 
-function getSql(): Promise<SqlJsStatic> {
+export function getSql(): Promise<SqlJsStatic> {
   if (!sqlPromise) {
     const initSqlJs = nodeRequire('sql.js') as (config?: {
       wasmBinary?: Uint8Array;
@@ -117,7 +119,7 @@ const COMPRESSED_HELP =
  * crashing. Reading the decoy first "succeeds" and imports exactly one word,
  * which is what "1 cards → 1 words" was. Always try newest → oldest.
  */
-function readCollectionBytes(zip: AdmZip): Uint8Array {
+export function readCollection(zip: AdmZip): { bytes: Uint8Array; entryName: string } {
   const get = (name: string): Buffer | null => zip.getEntry(name)?.getData() ?? null;
 
   const compressed = get('collection.anki21b');
@@ -128,16 +130,22 @@ function readCollectionBytes(zip: AdmZip): Uint8Array {
       .zstdDecompressSync;
     if (typeof zstd !== 'function') throw new Error(COMPRESSED_HELP);
     try {
-      return zstd(compressed);
+      return { bytes: zstd(compressed), entryName: 'collection.anki21b' };
     } catch {
       throw new Error(COMPRESSED_HELP);
     }
   }
 
-  const plain = get('collection.anki21') ?? get('collection.anki2');
-  if (plain) return plain;
+  for (const entryName of ['collection.anki21', 'collection.anki2']) {
+    const plain = get(entryName);
+    if (plain) return { bytes: plain, entryName };
+  }
 
   throw new Error('That file is not an Anki deck (no collection database inside).');
+}
+
+function readCollectionBytes(zip: AdmZip): Uint8Array {
+  return readCollection(zip).bytes;
 }
 
 /**
@@ -393,6 +401,10 @@ async function readApkgDraft(request: ApkgDraftRequest = {}): Promise<ApkgDraftR
     const SQL = await getSql();
     db = new SQL.Database(bytes);
 
+    const fingerprint = `sha1:${crypto.createHash('sha1').update(bytes).digest('hex')}`;
+    // The renderer only ever sees the label; the exporter finds its way back to
+    // the file through this fingerprint-keyed memory in the main process.
+    rememberApkgSource(fingerprint, file);
     const raw = readRawCollection(db, { mediaFiles: readMediaManifest(zip) });
     const full = buildAnkiDraft(raw, {
       source: {
@@ -403,7 +415,7 @@ async function readApkgDraft(request: ApkgDraftRequest = {}): Promise<ApkgDraftR
         modifiedAtMs: raw.col?.mod,
         // The collection bytes are what was read, so they are what a later commit
         // must find unchanged. Hashing the file would also hash its media.
-        fingerprint: `sha1:${crypto.createHash('sha1').update(bytes).digest('hex')}`,
+        fingerprint,
       },
       normalize: stripFieldHtml,
     });
@@ -432,6 +444,7 @@ export function registerApkgIpc(): void {
   ipcMain.handle('apkg:import', (_e, filePath?: string) => importApkg(filePath));
   ipcMain.handle('apkg:importCards', (_e, filePath?: string) => importApkgCards(filePath));
   ipcMain.handle('apkg:readDraft', (_e, request?: ApkgDraftRequest) => readApkgDraft(request));
+  ipcMain.handle('apkg:export', (_e, request: ApkgExportRequest) => exportApkg(request));
   ipcMain.handle('anki:readCsvDraft', (_e, request?: CsvDraftRequest) => readCsvDraft(request));
   ipcMain.handle('anki:readConnectDraft', (_e, request?: ConnectDraftRequest) =>
     readConnectDraft(request),
