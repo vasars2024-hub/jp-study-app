@@ -27,7 +27,7 @@ import {
 import type {
   AnkiDraft,
   AnkiDraftCard,
-  AnkiDraftCardType,
+  AnkiCardType,
   AnkiDraftNote,
 } from '../ankiDraft';
 
@@ -54,7 +54,7 @@ function cardOf(
   id: string,
   noteId: string,
   due: number,
-  type: AnkiDraftCardType = 'new',
+  type: AnkiCardType = 'new',
   ord = 0,
 ): AnkiDraftCard {
   return {
