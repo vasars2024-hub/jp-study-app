@@ -23476,3 +23476,54 @@ Mutation: dropping the stem floor from 3 characters to 2 turns 1 of 12 unit test
 error}` — a single `error`, **not** a `problems` array. Two of my tests asserted
 `parsed.problems` and passed `undefined` into `toEqual([])`-shaped checks before that
 was caught. Read the discriminated union, not the older shape.
+
+## 2026-08-16 — Track 7 / Phase 7: recipe 12's deck half, and the collation a real package refused
+
+`4a3afce6` plan + journal op · `0d205467` the writer · `841f37a2` the tray action and
+surface. Recipe 12 is now closed on both halves.
+
+**Decisions, each a refusal rather than a convenience.** Decks reuse the tag half's
+`::` path ops (`applyPathOps`, extracted) but *not* `drop-redundant-parents`: `JLPT`
+beside `JLPT::N5` is a redundant tag and a real deck holding cards. Two decks
+normalising onto one name is a **merge**, which moves cards — refused by name, the
+one rename skipped and listed, the others still run. A filtered deck is neither
+renamed nor allowed to vote in the census: its cards are on loan and Anki rebuilds it.
+`deck-name` is the first journal op belonging to no note, so `editedNoteIds`,
+`summarizeJournal` (`decksRenamed`), `buildApkgExportChanges` (`deckRenames`) and
+`buildWorkbenchReview` (`deckRenames`) each had to learn it — a 12-deck step touches
+0 notes and would otherwise have read as an empty step.
+
+**The live run found what fixtures could not.** Driving the real writer at the user's
+own `N1 Vocab-20260102173058.apkg` (ver 18): `no such collation sequence: unicase`.
+Schema 18 declares `decks.name` as `text NOT NULL COLLATE unicase` with a UNIQUE index;
+sql.js has neither that collation nor an API to register one. **Scoped by measurement,
+not by guess**: on that same database `notes.flds` and `notes.tags` both write fine and
+`decks.name` is the only column that fails. So the refusal is
+`deck-collation-unsupported`, read from the stored DDL before the first write, and it
+names the one thing that works — re-export from Anki with "Support older Anki versions".
+
+**Numbers, all on the user's own files.**
+- ver 11 `Ginga Eiyuu Densetsu.apkg`: `銀河英雄伝説` → `Anime::銀河英雄伝説` written into
+  a new **1,057,028**-byte package and re-read FROM DISK. **7,992** notes before,
+  **7,992** after; **7,992** cards still in that deck id — no card moved. Verify ok, 0
+  mismatches.
+- ver 18 N1 package: refusal fires, deck still `N1 Vocab`, note write on the same db
+  still succeeds.
+- Live renderer (`debug/r12-decks.js`): mined local deck **2** decks and the N1 page
+  **2** decks both report `deck-normalize-clean` — an honest nothing-to-do. Damaged
+  control from those same names: **5** considered, **2** renamed
+  (`default::ｎ１ -> Default::n1`), **1** merge refused (`DEFAULT -> Default`),
+  changedNotes **0**, export set **2**, undo restored **5 of 5**.
+- AnkiConnect has no rename action, so a live commit refuses `deck-rename-unsupported`
+  before any write (control: 0 mutating calls with a note edit in the same batch).
+
+**Traps.** (a) Schema-18 deck names separate on **0x1f**, not `::` — the first version
+read one as a single flat segment; the ops run on the `::` form and each rename is
+returned in its own deck's separator. (b) `blockingProblems` refused an *empty
+selection* for every kind and Apply was gated on notes+mastery+cards — a deck-only
+tray hit both and looked broken. (c) sql.js rejects `COLLATE unicase` in a CREATE
+TABLE, so the fixture can only carry it via `PRAGMA writable_schema`, which is how a
+real package carries it anyway. (d) The running app's **main process does not
+hot-reload**: an IPC export probe returned `nothing-to-export` purely because main
+predated the change. Probe kept at `debug/r12-real-apkg.probe.test.ts.txt` — copy it
+into `src/main/__tests__/` to re-run, it reads the user's Downloads.
