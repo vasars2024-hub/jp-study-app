@@ -446,7 +446,11 @@
 
 /* Recipe 11's media audit — the same contextual-tool treatment as the scan
    above, so the two read as one family rather than two card designs. */
-.wb-media {
+/* Recipe 17's sibling audit shares recipe 11's treatment outright rather than
+   restating it: the two are the same contextual tool over different subjects,
+   and a second set of values would drift from this one on the first edit. */
+.wb-media,
+.wb-siblings {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
@@ -455,11 +459,13 @@
   background: var(--surface-2, rgba(127, 127, 127, 0.08));
 }
 
-.wb-media p {
+.wb-media p,
+.wb-siblings p {
   margin: 0;
 }
 
-.wb-media-list {
+.wb-media-list,
+.wb-siblings-list {
   margin: 0;
   padding: 0;
   list-style: none;
@@ -469,7 +475,8 @@
   font-size: 0.85rem;
 }
 
-.wb-media-row {
+.wb-media-row,
+.wb-siblings-row {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -479,16 +486,20 @@
 /* The verdict is the row's subject, so it leads and it is the only weighted
    thing on the line — the file name is already a <code> and does not need to
    compete with it. */
-.wb-media-verdict {
+.wb-media-verdict,
+.wb-siblings-verdict {
   font-weight: 600;
 }
 
 .wb-media-missing,
-.wb-media-broken {
+.wb-media-broken,
+.wb-siblings-ambiguous,
+.wb-siblings-orphan {
   color: var(--danger, #b3261e);
 }
 
-.wb-media-filters {
+.wb-media-filters,
+.wb-siblings-filters {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;

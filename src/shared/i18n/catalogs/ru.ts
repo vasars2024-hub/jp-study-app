@@ -9882,6 +9882,17 @@ export const ru: Catalog = {
   'ankiWorkbench.media.duplicateOf': 'те же байты, что и у {name}',
   'ankiWorkbench.media.more': 'и ещё {count}',
   'ankiWorkbench.media.filter': 'Показать эти заметки',
+  'ankiWorkbench.siblings.title': 'Парные карточки',
+  'ankiWorkbench.siblings.summary':
+    'Совпадают {groups} пар шаблонов, это затрагивает {notes} заметок.',
+  'ankiWorkbench.siblings.clean':
+    'Ни один шаблон не повторяет вопрос другого. Проверено заметок: {notes}.',
+  'ankiWorkbench.siblings.orphans':
+    'У {notes} заметок есть карточка, которую не создаёт ни один их шаблон.',
+  'ankiWorkbench.siblings.templates': 'шаблоны: {names}',
+  'ankiWorkbench.siblings.sampled': 'сравнение по {sampled} заметкам',
+  'ankiWorkbench.siblings.cards': 'лишний даёт карточек: {cards}',
+  'ankiWorkbench.siblings.more': 'и ещё {count}',
   'ankiWorkbench.journal.title': 'История: шагов {applied} по заметкам: {notes}',
   'ankiWorkbench.journal.batch': 'Партия из {ops} изменений в заметках: {notes}',
   'ankiWorkbench.journal.single': 'Одиночная правка в заметках: {notes}',

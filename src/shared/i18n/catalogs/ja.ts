@@ -9069,6 +9069,16 @@ export const ja: Catalog = {
   'ankiWorkbench.media.duplicateOf': '{name} と同一の内容',
   'ankiWorkbench.media.more': 'ほか {count} 件',
   'ankiWorkbench.media.filter': '該当ノートを表示',
+  'ankiWorkbench.siblings.title': '兄弟カード',
+  'ankiWorkbench.siblings.summary': '{groups} 組のテンプレートが重複し、{notes} 件のノートに及びます。',
+  'ankiWorkbench.siblings.clean':
+    '他のテンプレートと同じ問いを出すものはありません。{notes} 件のノートを確認しました。',
+  'ankiWorkbench.siblings.orphans':
+    '{notes} 件のノートに、どのテンプレートも作らないカードがあります。',
+  'ankiWorkbench.siblings.templates': 'テンプレート: {names}',
+  'ankiWorkbench.siblings.sampled': '{sampled} 件のノートで比較',
+  'ankiWorkbench.siblings.cards': '余分な方から {cards} 枚のカードが生成されています',
+  'ankiWorkbench.siblings.more': '他 {count} 件',
   'ankiWorkbench.journal.title': '履歴: {notes} 件のノートに {applied} ステップ',
   'ankiWorkbench.journal.batch': '{notes} 件のノートへの {ops} 件の一括変更',
   'ankiWorkbench.journal.single': '{notes} 件のノートの単独編集',

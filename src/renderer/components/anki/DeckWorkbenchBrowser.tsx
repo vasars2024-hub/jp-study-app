@@ -67,6 +67,7 @@ import DeckWorkbenchInspector from './DeckWorkbenchInspector';
 import DeckWorkbenchSamples from './DeckWorkbenchSamples';
 import DeckWorkbenchDuplicates from './DeckWorkbenchDuplicates';
 import DeckWorkbenchMedia from './DeckWorkbenchMedia';
+import DeckWorkbenchSiblings from './DeckWorkbenchSiblings';
 
 const ROW_HEIGHT = 34;
 /** How far PageUp/PageDown moves the cursor. */
@@ -159,6 +160,7 @@ export default function DeckWorkbenchBrowser({
   const [dupesOpen, setDupesOpen] = useState(false);
   /** Recipe 11's media audit, same rule. */
   const [mediaOpen, setMediaOpen] = useState(false);
+  const [siblingsOpen, setSiblingsOpen] = useState(false);
   const anchor = useRef<string | null>(null);
 
   /**
@@ -523,6 +525,15 @@ export default function DeckWorkbenchBrowser({
         >
           {t('ankiWorkbench.media.title')}
         </button>
+        <button
+          type="button"
+          className={`btn${siblingsOpen ? ' primary' : ''}`}
+          aria-pressed={siblingsOpen}
+          aria-expanded={siblingsOpen}
+          onClick={() => setSiblingsOpen((open) => !open)}
+        >
+          {t('ankiWorkbench.siblings.title')}
+        </button>
         {/* Switching view never touches the selection — the plan requires a
             batch to survive a look at the sample cards. */}
         <div role="group" aria-label={t('ankiWorkbench.browser.view')}>
@@ -634,6 +645,12 @@ export default function DeckWorkbenchBrowser({
           property of the package, and scoping it to a filter would report
           "1 file missing" as though the other 22,167 had been checked. */}
       {mediaOpen && <DeckWorkbenchMedia draft={draft} onQuery={setQuery} />}
+
+      {/* Recipe 17's consumer. Whole-draft like recipe 11's and for the same
+          reason, one step stronger: a template is redundant because of how it
+          renders across its note type's notes, so a version scoped to the
+          filtered rows would answer a different question than the one asked. */}
+      {siblingsOpen && <DeckWorkbenchSiblings draft={draft} onQuery={setQuery} />}
 
       {view === 'samples' && (
         <DeckWorkbenchSamples
