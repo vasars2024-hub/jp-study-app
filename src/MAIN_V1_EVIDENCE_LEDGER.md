@@ -23968,3 +23968,37 @@ page instead. That block is a real performance finding, measured next.
 
 **Next:** gate 11's UI half — the inspector's "Written from:" line over the reimported
 `gate11-provenance.apkg`, entered the same dialog-free way.
+
+## 2026-08-16 — Track 7 / Phase 7: gate 11's UI half, and a package that proves its own line
+
+**Slice.** Gate 11's last remainder — the inspector's "Written from:" line over a
+**reimported** package, in the live UI — measured. No code change; plan updated with it.
+
+**Route.** Same dialog-free entry as gate 10: read one page of
+`gate11-provenance.apkg`, mark the session `failed`, take Resume. The resume offset is
+what selects the note, so the page is chosen by where the interrupted read stopped:
+`noteLimit 1` → Resume from note 1 → the attributed note alone; `noteLimit 2` → Resume
+from note 2 → the unattributed one alone. That is also why the negative control is a
+second session rather than a second click.
+
+**Positive.** Note 2002 (猫), Browser row → cell click → inspector:
+"**Written from: JMdict (EN), Jitendex**" under `Reading`, **1 of 3** field slots
+(`Expression` and `Tags` show nothing). Contrast **16.02** at 12.8 px,
+`rgb(245,245,247)` on `rgb(18,28,23)`.
+
+**Negative control.** Note 2003 (犬) — same package, same inspector, **0 of 3** slots.
+
+**The line is the file's, not the panel's.** Read straight back out of the package:
+`2002.Reading.raw` = `<span class="jp-dict-src" data-jp-dict="JMdict (EN)|Jitendex">cat;
+feline</span>`, `normalized` = `cat; feline`; `2001.Reading.raw` = `たべる` and
+`2003.Reading.raw` = `いぬ`, no wrapper. So the panel is rendering provenance that
+survived this app's own export→reimport (`a8df8857` + `9f46261a`), not decorating a note.
+
+**Trap.** The inspector opens from `.wb-browser-cell`, not from the row: the row element
+carries the selection checkbox and clicking it selects rather than opens. A probe that
+clicks the row and finds no `.wb-inspector-provenance` will report a false absence —
+and `.wb-inspector` alone is ambiguous, because the Discover surface has a panel of the
+same class ("Select a title to see why it was recommended").
+
+**Next:** the enrich tray blocks the bridge past 30 s on 500 notes — measure whether
+main's event loop is the thing blocked, and if so move the lookup off it.
