@@ -9389,6 +9389,27 @@ export const en: Catalog = {
   'ankiWorkbench.tray.provenance': 'Record which dictionary it came from',
   'ankiWorkbench.tray.provenance.inline': 'yes, in the field',
   'ankiWorkbench.tray.provenance.none': 'no',
+  'ankiWorkbench.tray.kind.fill-reading': 'Fill in missing readings',
+  'ankiWorkbench.tray.describe.fill-reading':
+    'Fill missing {form} into {to} ({threshold}; {provenance})',
+  'ankiWorkbench.tray.reading.form': 'What to write',
+  'ankiWorkbench.tray.reading.form.kana': 'the whole word in kana',
+  'ankiWorkbench.tray.reading.form.furigana': 'furigana over the kanji',
+  'ankiWorkbench.tray.reading.to': 'Write into',
+  'ankiWorkbench.tray.reading.threshold': 'Fill in without asking when',
+  'ankiWorkbench.tray.reading.threshold.certain': 'two dictionaries agree',
+  'ankiWorkbench.tray.reading.threshold.likely': 'one dictionary answers',
+  'ankiWorkbench.tray.problem.reading-no-word': '{count} notes declare no word field to look up.',
+  'ankiWorkbench.tray.problem.reading-no-entry':
+    'No installed dictionary gives a reading for the word on {count} notes: {detail}',
+  'ankiWorkbench.tray.problem.reading-ambiguous':
+    '{count} words have more than one reading, so they were left for you to choose: {detail}',
+  'ankiWorkbench.tray.problem.reading-below-threshold':
+    '{count} readings were less certain than you allowed, so they were left alone: {detail}',
+  'ankiWorkbench.tray.problem.reading-occupied':
+    '{count} notes already have a reading in {detail}, so nothing was written over it.',
+  'ankiWorkbench.tray.problem.reading-no-kanji':
+    '{count} words have no kanji, so there is nothing to put furigana over: {detail}',
   'ankiWorkbench.tray.aiTo': 'Write the approved suggestion to',
   'ankiWorkbench.tray.kind.apply-ai-additions': 'Apply reviewed AI suggestions',
   'ankiWorkbench.tray.describe.apply-ai-additions': 'Write each approved AI suggestion to {to} ({conflict})',

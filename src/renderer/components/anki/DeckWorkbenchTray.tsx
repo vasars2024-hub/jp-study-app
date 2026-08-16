@@ -34,6 +34,10 @@ import {
   type EnrichProvenanceMode,
   type EnrichSenseRule,
 } from '../../../shared/ankiEnrich';
+import type {
+  ReadingFillForm,
+  ReadingFillThreshold,
+} from '../../../shared/ankiReadingFill';
 import type { AiBatch } from '../../../shared/ankiAiAdditions';
 import { TEXT_NORMALIZE_ORDER, type TextNormalizeOp } from '../../../shared/ankiTextNormalize';
 import {
@@ -53,6 +57,7 @@ const ACTION_KINDS: TrayActionKind[] = [
   'swap-fields',
   'copy-field',
   'enrich-dictionary',
+  'fill-reading',
   'apply-ai-additions',
   'set-mastery',
   'add-tags',
@@ -70,6 +75,11 @@ const COPY_CONFLICTS: FieldCopyConflict[] = ['keep', 'overwrite', 'append'];
 const ENRICH_ASPECTS: EnrichAspect[] = ['meaning', 'reading', 'partOfSpeech'];
 const ENRICH_SENSE_RULES: EnrichSenseRule[] = ['refuse', 'first-source', 'all-sources'];
 const ENRICH_PROVENANCE: EnrichProvenanceMode[] = ['inline', 'none'];
+const READING_FORMS: ReadingFillForm[] = ['kana', 'furigana'];
+// Strictest first and pre-selected, the same rule `refuse` and `keep` follow:
+// `certain` writes only where two dictionaries agreed. `likely` is a widening
+// the user chooses, and neither admits an ambiguous word.
+const READING_THRESHOLDS: ReadingFillThreshold[] = ['certain', 'likely'];
 /** How many changed notes the diff lists before it summarises the rest. */
 const DIFF_PREVIEW_ROWS = 5;
 const DIFF_CHARS = 120;
@@ -120,6 +130,8 @@ export default function DeckWorkbenchTray({
   // APKG round trip, and a field whose text came from somewhere the user cannot
   // name later is the thing this whole action is meant to avoid.
   const [provenance, setProvenance] = useState<EnrichProvenanceMode>('inline');
+  const [readingForm, setReadingForm] = useState<ReadingFillForm>('kana');
+  const [readingThreshold, setReadingThreshold] = useState<ReadingFillThreshold>('certain');
   const [masteryLevel, setMasteryLevel] = useState<MasteryLevel>(DEFAULT_MASTERY_LEVEL);
   const [applied, setApplied] = useState<number | null>(null);
   /**
@@ -153,7 +165,9 @@ export default function DeckWorkbenchTray({
   const [lookupPending, setLookupPending] = useState(false);
   // Only a queued enrichment pays for the lookup: it is a database read per
   // distinct word, and every other action kind has no use for the result.
-  const wantsEnrich = actions.some((a) => a.enabled && a.kind === 'enrich-dictionary');
+  const wantsEnrich = actions.some(
+    (a) => a.enabled && (a.kind === 'enrich-dictionary' || a.kind === 'fill-reading'),
+  );
 
   useEffect(() => {
     if (!wantsEnrich) return;
@@ -280,6 +294,18 @@ export default function DeckWorkbenchTray({
         return { id, enabled: true, kind, fromField: fieldA, toField: fieldB, onConflict };
       case 'enrich-dictionary':
         return { id, enabled: true, kind, aspect, toField: fieldB, onConflict, senseRule, provenance };
+      case 'fill-reading':
+        // No conflict rule: the step only fills an empty destination, so there
+        // is nothing for the user to choose between. See `ankiReadingFill`.
+        return {
+          id,
+          enabled: true,
+          kind,
+          form: readingForm,
+          toField: fieldB,
+          threshold: readingThreshold,
+          provenance,
+        };
       case 'apply-ai-additions':
         // An empty id when no batch exists: `planChangeTray` then blocks on
         // `no-ai-review`, which is the true statement. Refusing to add the step
@@ -339,6 +365,13 @@ export default function DeckWorkbenchTray({
           to: action.toField,
           conflict: t(`ankiWorkbench.tray.conflict.${action.onConflict}`),
           rule: t(`ankiWorkbench.tray.senseRule.${action.senseRule}`),
+          provenance: t(`ankiWorkbench.tray.provenance.${action.provenance}`),
+        });
+      case 'fill-reading':
+        return t('ankiWorkbench.tray.describe.fill-reading', {
+          form: t(`ankiWorkbench.tray.reading.form.${action.form}`),
+          to: action.toField,
+          threshold: t(`ankiWorkbench.tray.reading.threshold.${action.threshold}`),
           provenance: t(`ankiWorkbench.tray.provenance.${action.provenance}`),
         });
       case 'apply-ai-additions':
@@ -575,6 +608,51 @@ export default function DeckWorkbenchTray({
                 {ENRICH_SENSE_RULES.map((value) => (
                   <option key={value} value={value}>
                     {t(`ankiWorkbench.tray.senseRule.${value}`)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              {t('ankiWorkbench.tray.provenance')}
+              <select
+                value={provenance}
+                onChange={(e) => setProvenance(e.target.value as EnrichProvenanceMode)}
+              >
+                {ENRICH_PROVENANCE.map((value) => (
+                  <option key={value} value={value}>
+                    {t(`ankiWorkbench.tray.provenance.${value}`)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </>
+        ) : kind === 'fill-reading' ? (
+          <>
+            <label>
+              {t('ankiWorkbench.tray.reading.form')}
+              <select
+                value={readingForm}
+                onChange={(e) => setReadingForm(e.target.value as ReadingFillForm)}
+              >
+                {READING_FORMS.map((value) => (
+                  <option key={value} value={value}>
+                    {t(`ankiWorkbench.tray.reading.form.${value}`)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {/* The word comes from the note's own vocabulary field, as it does
+                for enrichment, so only the destination is chosen here. */}
+            {fieldSelect(t('ankiWorkbench.tray.reading.to'), fieldB, setFieldB)}
+            <label>
+              {t('ankiWorkbench.tray.reading.threshold')}
+              <select
+                value={readingThreshold}
+                onChange={(e) => setReadingThreshold(e.target.value as ReadingFillThreshold)}
+              >
+                {READING_THRESHOLDS.map((value) => (
+                  <option key={value} value={value}>
+                    {t(`ankiWorkbench.tray.reading.threshold.${value}`)}
                   </option>
                 ))}
               </select>

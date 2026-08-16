@@ -9770,6 +9770,28 @@ export const ru: Catalog = {
   'ankiWorkbench.tray.provenance': 'Записывать, из какого словаря взято',
   'ankiWorkbench.tray.provenance.inline': 'да, прямо в поле',
   'ankiWorkbench.tray.provenance.none': 'нет',
+  'ankiWorkbench.tray.kind.fill-reading': 'Заполнить недостающие чтения',
+  'ankiWorkbench.tray.describe.fill-reading':
+    'Записать недостающее ({form}) в {to} ({threshold}; {provenance})',
+  'ankiWorkbench.tray.reading.form': 'Что записывать',
+  'ankiWorkbench.tray.reading.form.kana': 'слово целиком каной',
+  'ankiWorkbench.tray.reading.form.furigana': 'фуригану над иероглифами',
+  'ankiWorkbench.tray.reading.to': 'Записать в',
+  'ankiWorkbench.tray.reading.threshold': 'Заполнять без вопросов, когда',
+  'ankiWorkbench.tray.reading.threshold.certain': 'два словаря согласны',
+  'ankiWorkbench.tray.reading.threshold.likely': 'ответил хотя бы один словарь',
+  'ankiWorkbench.tray.problem.reading-no-word':
+    'В {count} заметках нет поля со словом, которое можно найти.',
+  'ankiWorkbench.tray.problem.reading-no-entry':
+    'Ни один установленный словарь не даёт чтения для слова в {count} заметках: {detail}',
+  'ankiWorkbench.tray.problem.reading-ambiguous':
+    'У {count} слов несколько чтений, поэтому выбор оставлен вам: {detail}',
+  'ankiWorkbench.tray.problem.reading-below-threshold':
+    '{count} чтений оказались менее надёжными, чем вы разрешили, и остались без изменений: {detail}',
+  'ankiWorkbench.tray.problem.reading-occupied':
+    'В {count} заметках поле {detail} уже содержит чтение — оно не перезаписано.',
+  'ankiWorkbench.tray.problem.reading-no-kanji':
+    'У {count} слов нет иероглифов, поэтому фуригану ставить не над чем: {detail}',
   'ankiWorkbench.tray.aiTo': 'Записать одобренный вариант в',
   'ankiWorkbench.tray.kind.apply-ai-additions': 'Применить проверенные ИИ-варианты',
   'ankiWorkbench.tray.describe.apply-ai-additions': 'Записать каждый одобренный ИИ-вариант в {to} ({conflict})',
