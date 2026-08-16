@@ -90,7 +90,10 @@ describe('the nyaa offer names a route that exists', () => {
     // with the window and main does not. Both ends are asserted.
     for (const channel of ['subtitleHarvest:nyaaList', 'subtitleHarvest:nyaaFetch']) {
       expect(preload).toContain(channel);
-      expect(main).toContain(`ipcMain.handle('${channel}'`);
+      // Assembled rather than written out: `tools/architecture-audit.cjs` scans
+      // every file for the literal registration prefix, so spelling it here
+      // registers this test file as the handler and reports the real one dead.
+      expect(main).toContain(['ipcMain', '.handle(', `'${channel}'`].join(''));
     }
   });
 });
