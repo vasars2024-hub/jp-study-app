@@ -69,6 +69,7 @@ import DeckWorkbenchSamples from './DeckWorkbenchSamples';
 import DeckWorkbenchDuplicates from './DeckWorkbenchDuplicates';
 import DeckWorkbenchMedia from './DeckWorkbenchMedia';
 import DeckWorkbenchSiblings from './DeckWorkbenchSiblings';
+import DeckWorkbenchStale from './DeckWorkbenchStale';
 
 const ROW_HEIGHT = 34;
 /** How far PageUp/PageDown moves the cursor. */
@@ -163,6 +164,8 @@ export default function DeckWorkbenchBrowser({
   /** Recipe 11's media audit, same rule. */
   const [mediaOpen, setMediaOpen] = useState(false);
   const [siblingsOpen, setSiblingsOpen] = useState(false);
+  /** Recipe 18's schedule scan, same rule. */
+  const [staleOpen, setStaleOpen] = useState(false);
   const anchor = useRef<string | null>(null);
 
   /**
@@ -546,6 +549,15 @@ export default function DeckWorkbenchBrowser({
         >
           {t('ankiWorkbench.siblings.title')}
         </button>
+        <button
+          type="button"
+          className={`btn${staleOpen ? ' primary' : ''}`}
+          aria-pressed={staleOpen}
+          aria-expanded={staleOpen}
+          onClick={() => setStaleOpen((open) => !open)}
+        >
+          {t('ankiWorkbench.stale.title')}
+        </button>
         {/* Switching view never touches the selection — the plan requires a
             batch to survive a look at the sample cards. */}
         <div role="group" aria-label={t('ankiWorkbench.browser.view')}>
@@ -663,6 +675,12 @@ export default function DeckWorkbenchBrowser({
           renders across its note type's notes, so a version scoped to the
           filtered rows would answer a different question than the one asked. */}
       {siblingsOpen && <DeckWorkbenchSiblings draft={draft} onQuery={setQuery} />}
+
+      {/* Recipe 18's consumer. Whole-draft, and here it has to be: a card's due
+          day is a property of the schedule, not of whichever rows a text filter
+          is currently showing, and scoping the scan would report a backlog the
+          user could not act on because most of it was never counted. */}
+      {staleOpen && <DeckWorkbenchStale draft={draft} onQuery={setQuery} />}
 
       {view === 'samples' && (
         <DeckWorkbenchSamples

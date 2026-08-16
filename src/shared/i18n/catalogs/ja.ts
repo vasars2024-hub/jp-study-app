@@ -9091,6 +9091,27 @@ export const ja: Catalog = {
   'ankiWorkbench.siblings.sampled': '{sampled} 件のノートで比較',
   'ankiWorkbench.siblings.cards': '余分な方から {cards} 枚のカードが生成されています',
   'ankiWorkbench.siblings.more': '他 {count} 件',
+  'ankiWorkbench.stale.title': 'スケジュール',
+  'ankiWorkbench.stale.summary':
+    '{cards} 枚が停滞しています。期日を {overdue} 日以上過ぎたもの、または {dormant} 日以上復習していないものです。',
+  'ankiWorkbench.stale.clean': '停滞しているカードはありません。{cards} 枚は新規または予定どおりです。',
+  'ankiWorkbench.stale.noHistory':
+    'このソースには復習履歴がないため、「最近復習していない」はここでは判定できません。判定できるのは期日超過のみです。',
+  'ankiWorkbench.stale.overdueDays': '期日超過とみなす日数',
+  'ankiWorkbench.stale.dormantDays': '休眠とみなす日数',
+  'ankiWorkbench.stale.spreadDays': '分散させる日数',
+  'ankiWorkbench.stale.previewTitle': '再スケジュールすると {cards} 枚を {days} 日に分けて移動します。',
+  'ankiWorkbench.stale.spreadRow': '{day} 日目: {cards} 枚',
+  'ankiWorkbench.stale.spreadMore': '他 {days} 日分',
+  'ankiWorkbench.stale.withheldSkipped': '休止中または延期中の {cards} 枚は移動せずスキップします。',
+  'ankiWorkbench.stale.previewOnly': 'これはプレビューです。まだ何もスケジュールしていません。',
+  'ankiWorkbench.stale.reset': '新規に戻す…',
+  'ankiWorkbench.stale.refusal.reset-unsupported':
+    'カードを新規に戻すには、種類・キュー・復習回数・失敗回数・間隔・易しさをすべて消去し、復習履歴も削除する必要があります。このワークベンチは期日の移動しかできないため、中途半端なリセットは行いません。',
+  'ankiWorkbench.stale.refusal.no-collection-origin':
+    'このソースはコレクションの作成日を報告していません。カードの期日は不明な起点から数えられるため、期日超過の値はすべて同じ分だけ誤ります。',
+  'ankiWorkbench.stale.refusal.threshold-too-small':
+    '停滞のしきい値は最低 1 日必要です。',
   'ankiWorkbench.journal.title': '履歴: {notes} 件のノートに {applied} ステップ',
   'ankiWorkbench.journal.batch': '{notes} 件のノートへの {ops} 件の一括変更',
   'ankiWorkbench.journal.single': '{notes} 件のノートの単独編集',

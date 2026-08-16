@@ -9517,6 +9517,27 @@ export const en: Catalog = {
   'ankiWorkbench.siblings.sampled': 'compared over {sampled} notes',
   'ankiWorkbench.siblings.cards': '{cards} cards come from the extra one',
   'ankiWorkbench.siblings.more': 'and {count} more',
+  'ankiWorkbench.stale.title': 'Schedule',
+  'ankiWorkbench.stale.summary':
+    '{cards} cards are stale: overdue by {overdue}+ days, or unreviewed for {dormant}+ days.',
+  'ankiWorkbench.stale.clean': 'Nothing is stale. {cards} cards are new or on schedule.',
+  'ankiWorkbench.stale.noHistory':
+    'This source carries no review log, so “not reviewed lately” cannot be answered here — only overdue days can.',
+  'ankiWorkbench.stale.overdueDays': 'Overdue after (days)',
+  'ankiWorkbench.stale.dormantDays': 'Dormant after (days)',
+  'ankiWorkbench.stale.spreadDays': 'Spread over (days)',
+  'ankiWorkbench.stale.previewTitle': 'A reschedule would move {cards} cards across {days} days.',
+  'ankiWorkbench.stale.spreadRow': 'day {day}: {cards} cards',
+  'ankiWorkbench.stale.spreadMore': 'and {days} more days',
+  'ankiWorkbench.stale.withheldSkipped': '{cards} suspended or buried cards are skipped, not moved.',
+  'ankiWorkbench.stale.previewOnly': 'This is a preview. Nothing has been scheduled.',
+  'ankiWorkbench.stale.reset': 'Reset to new…',
+  'ankiWorkbench.stale.refusal.reset-unsupported':
+    'Resetting a card has to clear its type, queue, reps, lapses, interval and ease and drop its review log. This workbench can only move a due day, so it will not half-perform a reset.',
+  'ankiWorkbench.stale.refusal.no-collection-origin':
+    'This source reports no collection creation date, so a card’s due day counts from an unknown origin and every overdue reading would be wrong by the same unknown amount.',
+  'ankiWorkbench.stale.refusal.threshold-too-small':
+    'A staleness threshold has to be at least one day.',
   'ankiWorkbench.journal.title': 'History: {applied} steps over {notes} notes',
   'ankiWorkbench.journal.batch': 'Batch of {ops} changes on {notes} notes',
   'ankiWorkbench.journal.single': 'Single edit on {notes} note',

@@ -9022,6 +9022,27 @@ export const zh: Catalog = {
   'ankiWorkbench.siblings.sampled': '基于 {sampled} 条笔记比较',
   'ankiWorkbench.siblings.cards': '多余的那个生成了 {cards} 张卡片',
   'ankiWorkbench.siblings.more': '另有 {count} 组',
+  'ankiWorkbench.stale.title': '排程',
+  'ankiWorkbench.stale.summary':
+    '{cards} 张卡片已停滞：逾期 {overdue} 天以上，或 {dormant} 天以上未复习。',
+  'ankiWorkbench.stale.clean': '没有停滞的卡片。{cards} 张是新卡或按期进行。',
+  'ankiWorkbench.stale.noHistory':
+    '此来源不含复习记录，因此这里无法判断“最近未复习”，只能判断逾期天数。',
+  'ankiWorkbench.stale.overdueDays': '逾期判定（天）',
+  'ankiWorkbench.stale.dormantDays': '休眠判定（天）',
+  'ankiWorkbench.stale.spreadDays': '分散天数',
+  'ankiWorkbench.stale.previewTitle': '重新排程会把 {cards} 张卡片分散到 {days} 天。',
+  'ankiWorkbench.stale.spreadRow': '第 {day} 天：{cards} 张',
+  'ankiWorkbench.stale.spreadMore': '另有 {days} 天',
+  'ankiWorkbench.stale.withheldSkipped': '{cards} 张暂停或搁置的卡片会被跳过，不会移动。',
+  'ankiWorkbench.stale.previewOnly': '这是预览，尚未排程任何内容。',
+  'ankiWorkbench.stale.reset': '重置为新卡…',
+  'ankiWorkbench.stale.refusal.reset-unsupported':
+    '重置一张卡片需要清除它的类型、队列、复习次数、失误次数、间隔和难度系数，并删除其复习记录。本工作台只能移动到期日，因此不会执行一半的重置。',
+  'ankiWorkbench.stale.refusal.no-collection-origin':
+    '此来源未报告收藏集的创建日期，卡片的到期日便是从未知起点计算的，所有逾期读数都会偏差同样的未知量。',
+  'ankiWorkbench.stale.refusal.threshold-too-small':
+    '停滞阈值至少为 1 天。',
   'ankiWorkbench.journal.title': '历史：{notes} 条笔记上的 {applied} 个步骤',
   'ankiWorkbench.journal.batch': '对 {notes} 条笔记的 {ops} 处批量更改',
   'ankiWorkbench.journal.single': '对 {notes} 条笔记的单次编辑',

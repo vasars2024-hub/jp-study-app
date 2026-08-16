@@ -450,7 +450,8 @@
    restating it: the two are the same contextual tool over different subjects,
    and a second set of values would drift from this one on the first edit. */
 .wb-media,
-.wb-siblings {
+.wb-siblings,
+.wb-stale {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
@@ -460,11 +461,41 @@
 }
 
 .wb-media p,
-.wb-siblings p {
+.wb-siblings p,
+.wb-stale p {
   margin: 0;
 }
 
+/* The thresholds and the spread are numeric inputs the user reads a result
+   against, so they stay on the anchor surface and inline with their labels
+   rather than becoming a form. */
+.wb-stale-thresholds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.wb-stale-thresholds label,
+.wb-stale-preview label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.wb-stale-thresholds input,
+.wb-stale-preview input {
+  width: 5rem;
+}
+
+.wb-stale-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
 .wb-media-list,
+.wb-stale-spread,
 .wb-siblings-list {
   margin: 0;
   padding: 0;
@@ -499,7 +530,8 @@
 }
 
 .wb-media-filters,
-.wb-siblings-filters {
+.wb-siblings-filters,
+.wb-stale-filters {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;

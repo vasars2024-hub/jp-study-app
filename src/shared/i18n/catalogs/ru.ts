@@ -9905,6 +9905,27 @@ export const ru: Catalog = {
   'ankiWorkbench.siblings.sampled': 'сравнение по {sampled} заметкам',
   'ankiWorkbench.siblings.cards': 'лишний даёт карточек: {cards}',
   'ankiWorkbench.siblings.more': 'и ещё {count}',
+  'ankiWorkbench.stale.title': 'Расписание',
+  'ankiWorkbench.stale.summary':
+    'Застоявшихся карточек: {cards} — просрочены на {overdue}+ дней или не повторялись {dormant}+ дней.',
+  'ankiWorkbench.stale.clean': 'Застоя нет. {cards} карточек новые или идут по расписанию.',
+  'ankiWorkbench.stale.noHistory':
+    'В этом источнике нет журнала повторений, поэтому «давно не повторялось» здесь определить нельзя — только просрочку.',
+  'ankiWorkbench.stale.overdueDays': 'Просрочка от (дней)',
+  'ankiWorkbench.stale.dormantDays': 'Застой от (дней)',
+  'ankiWorkbench.stale.spreadDays': 'Распределить на (дней)',
+  'ankiWorkbench.stale.previewTitle': 'Перепланировка перенесёт {cards} карточек на {days} дней.',
+  'ankiWorkbench.stale.spreadRow': 'день {day}: {cards} карточек',
+  'ankiWorkbench.stale.spreadMore': 'и ещё {days} дней',
+  'ankiWorkbench.stale.withheldSkipped': '{cards} приостановленных или отложенных карточек пропускаются, а не переносятся.',
+  'ankiWorkbench.stale.previewOnly': 'Это предпросмотр. Ничего ещё не запланировано.',
+  'ankiWorkbench.stale.reset': 'Сбросить в новые…',
+  'ankiWorkbench.stale.refusal.reset-unsupported':
+    'Сброс карточки требует очистить её тип, очередь, число повторений, число провалов, интервал и лёгкость и удалить журнал повторений. Этот верстак умеет только переносить дату — поэтому он не выполнит сброс наполовину.',
+  'ankiWorkbench.stale.refusal.no-collection-origin':
+    'Этот источник не сообщает дату создания коллекции, поэтому день повторения карточки отсчитывается от неизвестной точки, и все значения просрочки будут смещены на одну и ту же неизвестную величину.',
+  'ankiWorkbench.stale.refusal.threshold-too-small':
+    'Порог застоя должен быть не меньше одного дня.',
   'ankiWorkbench.journal.title': 'История: шагов {applied} по заметкам: {notes}',
   'ankiWorkbench.journal.batch': 'Партия из {ops} изменений в заметках: {notes}',
   'ankiWorkbench.journal.single': 'Одиночная правка в заметках: {notes}',

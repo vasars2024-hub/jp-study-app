@@ -172,8 +172,8 @@ function mount(draft: AnkiDraft): void {
         draft={draft}
         totalNotes={draft.notes.length}
         journal={createEditJournal()}
-        onSelection={() => {}}
-        onEdit={() => {}}
+        onSelection={vi.fn()}
+        onEdit={vi.fn()}
       />,
     );
   });
