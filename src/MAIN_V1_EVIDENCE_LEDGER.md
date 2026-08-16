@@ -23439,3 +23439,40 @@ measuring one broken note. Use `loadDeckAsAnkiDraft` for tag work.
 **Deck-path renaming is deliberately NOT in this slice.** It is collection-level, needs a
 new `deck-name` journal op, and a tray action that moved cards between near-duplicate
 decks would have a far larger blast radius than "tidy up tags" suggests.
+
+## 2026-08-16 — Track 7 / Phase 7: recipe 16, and the fifth mode a measurement forced
+
+**Commit `07f8704a`.** `shared/ankiSentenceCover.ts` + a `cover:` Browser predicate,
+unscoped (`cover:none`, resolving the note's sentence field) or field-scoped
+(`Example:cover:stem`), spelled exactly like the `script:` and `re:` forms already
+there. Five modes rather than a yes/no, because inflection is the whole problem:
+食べる **is** in 食べました and a plain `includes` says it is not.
+
+**The decision, and it came from a number rather than taste.** The four-mode version
+put **234** notes of the user's real 3,221-note mined deck in `none`. Broken down,
+**233** of those were words whose stem this module refuses — two-character verbs 訊く,
+出す, 帰る, 殺す, whose sentences hold 訊いた, 出した, 帰って, 殺される — and exactly
+**1** was a computed stem the sentence genuinely lacked. Shipping four modes would
+have handed the user a 234-card "broken sentence" queue with one real entry in it.
+`unknown` is the module saying it cannot decide. **The stem floor stays anyway**: 訊
+really does only occur in 訊く, but 見 occurs in 意見, 見せる and 見物, so a
+one-character stem would report `stem` for sentences that do not contain the word —
+a false `stem` *hides* a broken card, a false `unknown` only leaves it undecided, and
+a review queue must fail in the second direction.
+
+**Live, on both real decks.** Mined deck (`loadDeckAsAnkiDraft`, 3,221 rows through
+the Browser's own `buildBrowserRows`): exact **2,479** / reading **0** / stem **507**
+/ none **1** / unknown **233** = **3,220**, with **1** note not applicable — and
+`-cover:exact -cover:stem -cover:reading -cover:none -cover:unknown` matches exactly
+that 1, so the partition closes with no row counted twice or lost. N1 apkg page 1:
+its note type declares only `Front`/`Back`, so `resolveSentenceField` returns null and
+all **2,000** rows are not applicable with every bucket at **0** — absent is not
+empty, the rule `field` and `script` already follow. Probe: `debug/r16-cover.js`.
+
+**Controls.** `cover:broken` is refused as `unknown-key`, never a silent zero.
+Mutation: dropping the stem floor from 3 characters to 2 turns 1 of 12 unit tests red.
+
+**Trap for the next worker.** `parseBrowserQuery` returns `{ok, filter} | {ok:false,
+error}` — a single `error`, **not** a `problems` array. Two of my tests asserted
+`parsed.problems` and passed `undefined` into `toEqual([])`-shaped checks before that
+was caught. Read the discriminated union, not the older shape.
