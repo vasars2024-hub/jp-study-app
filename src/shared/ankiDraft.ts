@@ -142,6 +142,38 @@ export interface AnkiDraftMediaRef {
   fieldOrd: number;
   /** True when the package's media manifest lists this name. */
   present: boolean;
+  /**
+   * Bytes this file occupies **in the package**, when the source reported sizes.
+   * Absent means "not reported", never zero — a zero-byte file is recipe 11's
+   * `broken` and has to stay distinguishable from an unmeasured one.
+   */
+  bytes?: number;
+  /**
+   * The name of the byte-identical file this one duplicates, when the package
+   * stores the same bytes under more than one name. Set only on the copies: the
+   * first name in manifest order is the canonical one and carries nothing.
+   */
+  duplicateOf?: string;
+}
+
+/**
+ * What the package carries in its media folder, as opposed to what its notes
+ * cite. Absent when the source reported no manifest at all — which is not the
+ * same as an empty one, and is why `present: false` alone can never be read as
+ * "missing".
+ */
+export interface AnkiDraftMediaSummary {
+  /** Files the package actually carries. */
+  files: number;
+  /** Their total size, when the source reported sizes. */
+  bytes?: number;
+  /** Carried files no note references. */
+  unreferenced: number;
+  /**
+   * True when per-file sizes were read, so `oversized`/`broken` are answerable.
+   * A manifest without sizes (AnkiConnect) still answers `missing`.
+   */
+  sized: boolean;
 }
 
 export interface AnkiDraftNote {
@@ -283,6 +315,8 @@ export interface AnkiDraft {
   cards: AnkiDraftCard[];
   /** Absent when the source carries no `revlog`; an empty array means "read, and empty". */
   reviews?: AnkiDraftReview[];
+  /** Absent when the source reported no media manifest. Package-level, so a page keeps it. */
+  media?: AnkiDraftMediaSummary;
   diagnostics: AnkiDraftDiagnostic[];
   counts: AnkiDraftCounts;
 }
@@ -404,6 +438,25 @@ export interface RawAnkiCollection {
   revlog?: readonly RawAnkiRevlogRow[];
   /** Media file names the package actually contains, for the missing-media check. */
   mediaFiles?: readonly string[];
+  /**
+   * The same files with their stored size and content checksum, when the reader
+   * could get them. Supersedes `mediaFiles` for presence when both are given —
+   * a reader that can size the files knows their names too.
+   */
+  mediaEntries?: readonly RawAnkiMediaEntry[];
+}
+
+/** One file in the package's media folder, as the reader found it. */
+export interface RawAnkiMediaEntry {
+  /** The name notes cite, not the numeric zip entry it is stored under. */
+  name: string;
+  /** Bytes as stored in the package. 0 is a real, reportable value. */
+  bytes: number;
+  /**
+   * A content checksum for duplicate detection — the zip CRC-32 in practice.
+   * Absent means duplicates cannot be found; size alone is far too weak a key.
+   */
+  crc32?: number;
 }
 
 // ----- enum decoding -----------------------------------------------------------
@@ -508,6 +561,78 @@ export function mediaRefsInField(
   return out;
 }
 
+interface MediaCatalogue {
+  hasManifest: boolean;
+  /** The reader reported per-file sizes, so `oversized`/`broken` are answerable. */
+  sized: boolean;
+  /** Leaf names the package carries. */
+  present: ReadonlySet<string>;
+  /** Only populated when the reader reported sizes. */
+  bytesByName: ReadonlyMap<string, number>;
+  /** Copy name -> the canonical name holding the same bytes. Copies only. */
+  duplicateOf: ReadonlyMap<string, string>;
+  totalBytes?: number;
+}
+
+/**
+ * Index the package's media folder once, so the per-note loop is a map lookup.
+ *
+ * Duplicates are keyed on `bytes:crc32` and never on size alone — a deck of
+ * 22,000 short audio clips has thousands of size collisions between files that
+ * share nothing. The first name in manifest order is canonical and is the one
+ * name in its group left unflagged, because it is the copy Anki would keep.
+ */
+function mediaCatalogue(raw: RawAnkiCollection): MediaCatalogue {
+  const present = new Set<string>();
+  const bytesByName = new Map<string, number>();
+  const duplicateOf = new Map<string, string>();
+  const hasManifest = raw.mediaEntries != null || raw.mediaFiles != null;
+
+  if (raw.mediaEntries) {
+    const canonicalByContent = new Map<string, string>();
+    let totalBytes = 0;
+    for (const entry of raw.mediaEntries) {
+      const name = leafName(entry.name);
+      present.add(name);
+      const bytes = Number.isFinite(entry.bytes) ? Math.max(0, Math.floor(entry.bytes)) : 0;
+      totalBytes += bytes;
+      // A name repeated in the manifest keeps its first size; the alternative
+      // is reporting the last one, which is no more true and is order-dependent.
+      if (!bytesByName.has(name)) bytesByName.set(name, bytes);
+      if (entry.crc32 == null) continue;
+      const key = `${bytes}:${entry.crc32}`;
+      const canonical = canonicalByContent.get(key);
+      if (canonical == null) canonicalByContent.set(key, name);
+      else if (canonical !== name) duplicateOf.set(name, canonical);
+    }
+    return { hasManifest, sized: true, present, bytesByName, duplicateOf, totalBytes };
+  }
+
+  for (const name of raw.mediaFiles ?? []) present.add(leafName(name));
+  return { hasManifest, sized: false, present, bytesByName, duplicateOf };
+}
+
+/**
+ * Carried files no note cites. A cited name the folder lacks is not carried.
+ *
+ * Names starting with `_` are excluded, because Anki reserves that prefix for
+ * files a *note type* references — a template's `<img>`, a stylesheet's font —
+ * and its own Check Media never lists them as unused. Measured on
+ * `New_HSK_30…practice_with_drawing.apkg`: all 7 of its uncited files are
+ * `_youdao.png`-style template assets, so without this the surface would offer
+ * a user seven card-type images to go and delete.
+ */
+function countUnreferenced(
+  present: ReadonlySet<string>,
+  referenced: ReadonlySet<string>,
+): number {
+  let count = 0;
+  for (const name of present) {
+    if (!name.startsWith('_') && !referenced.has(name)) count += 1;
+  }
+  return count;
+}
+
 // ----- the builder --------------------------------------------------------------
 
 interface DiagnosticBuilder {
@@ -594,8 +719,9 @@ export function buildAnkiDraft(
   options: BuildAnkiDraftOptions,
 ): AnkiDraft {
   const diag = diagnostics();
-  const mediaPresent = new Set((raw.mediaFiles ?? []).map((name) => leafName(name)));
-  const hasMediaManifest = raw.mediaFiles != null;
+  const catalogue = mediaCatalogue(raw);
+  const { present: mediaPresent, bytesByName, duplicateOf } = catalogue;
+  const hasMediaManifest = catalogue.hasManifest;
 
   // --- decks
   const byName = new Map<string, string>();
@@ -709,6 +835,10 @@ export function buildAnkiDraft(
     const media: AnkiDraftMediaRef[] = [];
     const fields: AnkiDraftFieldValue[] = parts.map((rawValue, index) => {
       for (const ref of mediaRefsInField(rawValue, index, (name) => mediaPresent.has(name))) {
+        const bytes = bytesByName.get(ref.fileName);
+        if (bytes != null) ref.bytes = bytes;
+        const canonical = duplicateOf.get(ref.fileName);
+        if (canonical != null) ref.duplicateOf = canonical;
         media.push(ref);
         if (!mediaNames.has(ref.fileName)) {
           mediaNames.add(ref.fileName);
@@ -790,6 +920,16 @@ export function buildAnkiDraft(
     notes,
     cards,
     reviews,
+    media: hasMediaManifest
+      ? {
+          files: mediaPresent.size,
+          bytes: catalogue.totalBytes,
+          // Names cited by a note but absent from the folder are not carried
+          // files, so they can never make this number smaller.
+          unreferenced: countUnreferenced(mediaPresent, mediaNames),
+          sized: catalogue.sized,
+        }
+      : undefined,
     diagnostics: diag.drain(),
     counts: {
       notes: notes.length,

@@ -31,6 +31,7 @@ import {
   pageAnkiDraft,
   type ApkgDraftRequest,
   type ApkgDraftResult,
+  type RawAnkiMediaEntry,
 } from '../../shared/ankiDraft';
 import type { CsvDraftRequest } from '../../shared/ankiCsv';
 import type { ConnectDraftRequest } from '../../shared/ankiConnectDraft';
@@ -352,22 +353,30 @@ async function importApkgCards(filePath?: string): Promise<ApkgCardsResult> {
 }
 
 /**
- * Media file names the package carries, or `undefined` when it cannot say.
+ * The manifest as a zip-entry-name -> media-file-name map, or `undefined` when
+ * the package cannot say.
  *
  * The legacy `media` entry is a JSON map of `{"0": "cat.jpg"}` — the numeric key
  * IS the file's name inside the zip. The newer zstd package stores the same
  * manifest as a zstd-compressed protobuf, read here through
- * `decodeMediaManifestNames`. Only a manifest in neither form returns
- * `undefined`, because the draft reports missing media only when it has
- * something to check against and guessing would accuse a complete deck.
+ * `decodeMediaManifestNames`, where position `i` is the entry named `i`. Only a
+ * manifest in neither form returns `undefined`, because the draft reports
+ * missing media only when it has something to check against and guessing would
+ * accuse a complete deck.
  */
-function readMediaManifest(zip: AdmZip): string[] | undefined {
+function readMediaManifest(zip: AdmZip): Map<string, string> | undefined {
   const entry = zip.getEntry('media');
   if (!entry) return undefined;
   const raw = entry.getData();
   try {
     const parsed = JSON.parse(raw.toString('utf8')) as Record<string, unknown>;
-    return Object.values(parsed).filter((v): v is string => typeof v === 'string');
+    const map = new Map<string, string>();
+    // Integer-like keys iterate ascending, so this is manifest order — which is
+    // what makes the canonical copy of a duplicate group deterministic.
+    for (const [key, value] of Object.entries(parsed)) {
+      if (typeof value === 'string') map.set(key, value);
+    }
+    return map;
   } catch {
     /* not the legacy JSON manifest — try the protobuf one below */
   }
@@ -378,10 +387,36 @@ function readMediaManifest(zip: AdmZip): string[] | undefined {
   try {
     // A package with no media at all decompresses to zero bytes, which decodes
     // to an empty list — the honest "it carries none", not "unknown".
-    return decodeMediaManifestNames(zstd(raw)) ?? undefined;
+    const names = decodeMediaManifestNames(zstd(raw));
+    return names ? new Map(names.map((name, i) => [String(i), name])) : undefined;
   } catch {
     return undefined;
   }
+}
+
+/**
+ * The manifest joined to what the archive actually holds — recipe 11's input.
+ *
+ * Sizes and checksums come from the zip's **central directory**, so this reads
+ * no media bytes at all: the largest package on this machine is 22,168 files /
+ * 223.5 MB and decompressing it to size it would be indefensible for a filter.
+ * `bytes` is therefore what the file occupies *in the package*, which is also
+ * the number a user asking "why is this deck 200 MB" wants.
+ *
+ * A manifest entry the archive does not hold is dropped rather than reported as
+ * an empty file: the package does not carry it, so a note citing it reads
+ * `missing`, which is the truth about an archive assembled wrong.
+ */
+function readMediaEntries(zip: AdmZip): RawAnkiMediaEntry[] | undefined {
+  const manifest = readMediaManifest(zip);
+  if (!manifest) return undefined;
+  const out: RawAnkiMediaEntry[] = [];
+  for (const [key, name] of manifest) {
+    const stored = zip.getEntry(key);
+    if (!stored) continue;
+    out.push({ name, bytes: stored.header.size, crc32: stored.header.crc });
+  }
+  return out;
 }
 
 /**
@@ -407,7 +442,11 @@ async function readApkgDraft(request: ApkgDraftRequest = {}): Promise<ApkgDraftR
     // The renderer only ever sees the label; the exporter finds its way back to
     // the file through this fingerprint-keyed memory in the main process.
     rememberApkgSource(fingerprint, file);
-    const raw = readRawCollection(db, { mediaFiles: readMediaManifest(zip) });
+    const mediaEntries = readMediaEntries(zip);
+    const raw = readRawCollection(db, {
+      mediaEntries,
+      mediaFiles: mediaEntries?.map((e) => e.name),
+    });
     const full = buildAnkiDraft(raw, {
       source: {
         kind: file.toLowerCase().endsWith('.colpkg') ? 'colpkg' : 'apkg',

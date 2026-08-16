@@ -15,6 +15,7 @@ import type {
   RawAnkiCardRow,
   RawAnkiCollection,
   RawAnkiDeckRow,
+  RawAnkiMediaEntry,
   RawAnkiNoteRow,
   RawAnkiNoteTypeRow,
   RawAnkiRevlogRow,
@@ -223,6 +224,8 @@ function readDecks(db: SqlReadable): RawAnkiDeckRow[] {
 export interface ReadRawCollectionOptions {
   /** Media file names the package carries, for the missing-media check. */
   mediaFiles?: readonly string[];
+  /** The same files with size and checksum, for recipe 11's media health. */
+  mediaEntries?: readonly RawAnkiMediaEntry[];
 }
 
 /**
@@ -314,5 +317,6 @@ export function readRawCollection(
     noteTypes,
     revlog,
     mediaFiles: options.mediaFiles,
+    mediaEntries: options.mediaEntries,
   };
 }
