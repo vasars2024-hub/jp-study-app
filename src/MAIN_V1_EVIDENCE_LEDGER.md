@@ -22946,3 +22946,49 @@ returns `{"ok":false,"error":"missing js"}`. (3) The four i18n catalogs carry an
 **676 passed / 1 skipped of 677, 9,149 passed / 6 skipped, exit 0** (+1 file, +19 tests, all mine).
 `i18n-check` exit 0 at **10,104** English keys (+10). `architecture-audit` exit 0, **Nothing new**,
 2 known pending. eslint **0 errors** on all 8 touched TS/TSX paths.
+
+## 2026-08-16 07:00 — Track 7 / ANKI Phase 4: recipe 10, the last of the first ten
+
+**Recipe 10 (`7f1be362` model, `b2605eb3` surface).** Decision: a leech is read from the data —
+Anki's own rule, `lapses >= threshold`, plus notes Anki has already tagged `leech` — and only the
+measures the edit journal can undo are made. Tradeoff: the catalogue names three measures and the
+workbench can make two, so `reschedule` is **offered as a checkbox and refuses by name** rather than
+being hidden. The journal carries `field`, `tags` and `card-due` only; an ease or interval change
+would have to reconstruct `left`, `originalDue` and a review history the draft never held, so it
+could not be undone. A reschedule-only tray is therefore **blocking** — an Apply that ran and changed
+nothing reads as the reschedule having happened. Alongside a measure that works it is a warning.
+
+The hint is a **partial reveal of an existing field**: one character, then an ellipsis, sliced by
+code point so a surrogate pair is never split. Nothing is invented — a generated mnemonic would be a
+model's output sitting in the user's deck under their own handwriting. It never overwrites, because a
+leech is precisely the note a user has already annotated. Refusals carry the note's **sort-field
+text**, not its id; recipe 6's version listed ids, which a user cannot act on.
+
+**Live, real 3,221-note local deck, English UI. The finding first:** the deck carries **0 cards with
+any SRS state** (`jp-flashcard-deck`, 3,221 entries, `withSrs: 0`, max lapses **0**), so nothing in
+it is a leech by lapse count and the recipe says exactly that — "22 notes are under the lapse
+threshold and carry no leech tag: 今日はいい天気です, ?????, 刑事, 話, 訊く…". Not a quiet success.
+
+**Positive control, composed from two tray steps** (which also proves the tray's own claim that each
+action runs on the previous one's result): `add-tags leech`, then rescue with `includeTagged`.
+Result **22 leeches found, 22 rescued, 22 of them counted only because Anki had already tagged
+them** — the tagged-only count is right, since lapses are 0. Diff: `Image` ← `今…` (the first
+character of 今日はいい天気です), `Tags` `src::dictionary` → `src::dictionary leech leech::rescued`.
+0 problems.
+
+**Three negative controls, all live on the same data.** (1) Destination occupied: hint into
+`Sentence` refused **22** — "already have a hint, which was kept exactly as you wrote it". (2) Source
+empty: hint from `Meaning` refused **22**. (3) Reschedule-only: `wb-tray-blocking` rendered and
+`Apply to draft` came back **disabled=true**.
+
+**Traps.** (1) The local-deck source populates `lapses` from `srs.lapses` and this user has never
+reviewed in-app, so **no leech recipe can be positively demonstrated on it by lapse count** — use the
+tag path or an APKG. (2) `undoLastEdit` takes a **third** argument, the normalizer; omitting it
+throws `normalize is not a function` from inside `writeNoteField`. (3) Writing markdown through
+`node -e` in the Bash tool: backticks are expanded by the shell before node sees them and the
+identifiers silently vanish. Use a file (`debug/plan-recipe10.js`), never `-e`.
+
+**Gates (shared working tree).** vitest **677 passed / 1 skipped of 678, 9,171 passed / 6 skipped,
+exit 0** (+1 file, +22 tests, all mine; baseline was 676/677 and 9,149). `i18n-check` exit 0 at
+**10,125** English keys (+21). `architecture-audit` exit 0, **Nothing new**, 2 known pending.
+eslint **0 errors** on all 8 touched paths.
