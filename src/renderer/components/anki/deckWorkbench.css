@@ -135,6 +135,26 @@
   }
 }
 
+/* The media query above measures the viewport, but the workbench is hosted
+   inside an in-page window: narrowing the Anki window to 420px leaves the
+   viewport at 1264px, so the query never fires and `.fwin-body`'s
+   overflow-x:hidden silently eats whatever spills. These three rules make the
+   steps reflow off their real container instead of a box they cannot see.
+   A grid item defaults to min-width:auto, so its min-content width wins over
+   the 1fr track; a control that cannot shrink is what sets that min-content. */
+.deck-workbench-body > * {
+  min-width: 0;
+}
+
+.deck-workbench :where(select, input, textarea) {
+  max-width: 100%;
+}
+
+.wb-tray-form label,
+.wb-design-field {
+  min-width: 0;
+}
+
 .deck-workbench-rail {
   display: flex;
   flex-direction: column;

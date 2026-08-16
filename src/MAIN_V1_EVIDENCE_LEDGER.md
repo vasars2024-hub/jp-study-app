@@ -23323,3 +23323,42 @@ failure is `i18nSplit` timing out at 20 s under full-suite load, passing alone i
 a file). i18n exit 0 at **10,203** (+1). architecture "Nothing new", 2 pending. eslint **0
 errors** on touched paths — note every `.css` file in this repo errors under eslint (no CSS
 parser configured), which is pre-existing and not a signal.
+
+## 2026-08-16 — Track 7 / gate 10: compact/default/maximized reflow for steps 3–7
+
+**Recovered first: `8d1f7ac9`** (the 32 px control floor) landed at 10:00 and its author hit a
+usage limit at 10:02 before writing this entry. Its evidence stands as committed: 27 controls on
+the real 3,221-note deck, **minimum 32 px** from **15** that were 19/21 px, and a live-CSSOM
+mutation putting dupes back to 19/19 while `.wb-browser-search` stayed 33 px — the floor fills
+gaps, it does not override panels.
+
+**The defect this slice fixes.** The workbench is hosted inside an in-page `.fwin`, so its
+`@media (max-width: 720px)` rule measures the wrong box: with the Anki window narrowed to **420 px**
+the viewport is still **1264 px**, the query never fires, and `.fwin-body`'s `overflow-x: hidden`
+eats what spills. Measured before, at 420 px on the real local deck: step 4 *fields* clipped
+**14 px**, step 5 *rules* clipped **24 px** — `.deck-workbench-detail` sized **308/318 px** inside a
+**294 px** track, because a grid item defaults to `min-width: auto` and its min-content wins.
+
+**Fix (standing auto-approval), three rules, no new breakpoint.** `min-width: 0` on the body's grid
+items; `max-width: 100%` on the workbench's `select/input/textarea` inside `:where()` so it carries
+zero specificity; `min-width: 0` on `.wb-tray-form label` / `.wb-design-field`. Tradeoff: a
+container query would be the modern instrument, but the surface has exactly one two-column
+arrangement and it already reflows correctly once the item may narrow — a `@container` context on
+`.deck-workbench` would be a larger, riskier change for the same pixels.
+
+**Gate, 3 widths × 5 steps = 15 measurements, all zero clipped pixels.** 420 px (compact), 820 px
+(default), **1264 px** (maximized via the shell's own button). Resize drives the shell's real
+`resizeStart` handler through synthetic pointer events with `setPointerCapture` stubbed and
+restored; window left at 820 px as found.
+
+**Mutation control, both halves red, and they fail at DIFFERENT levels — the trap.** Cancelling
+`min-width: 0` on the grid items returns exactly **14 / 24** clipped px at the workbench.
+Cancelling the control rules returns **0** at the workbench and looked like a dead rule; measured
+at the panel it is `.wb-tray-form` scrollWidth **258** in a **234 px** box (24 over) and
+`.wb-design-controls` **248** in **234** (14 over), clipped by `.wb-tray` / `.wb-design`. A tray
+form cut off inside an opaque panel is invisible to `.deck-workbench.scrollWidth` — measure the
+panel too, or a real regression reads as a no-op.
+
+**Still owed on gate 10:** keyboard-only completion + focus order for steps 3–7, and step 7's
+apkg-branch texts (attended, already in `needs-user.md`). Probes: `debug/g10-reflow.js`,
+`debug/g10-compact-mutation.js`.
