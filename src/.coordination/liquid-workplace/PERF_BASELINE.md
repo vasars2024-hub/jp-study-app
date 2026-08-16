@@ -99,3 +99,7 @@ These are the rest of L0's perf list. They are listed as gaps rather than quietl
 
 The next turn should take the restart-dependent rows in one pass, because they all need the
 same fresh process and a restart mid-sequence invalidates whatever came before it.
+
+> **Done — see `PERF_BASELINE_RESTART.md`** (same milestone, restart leg, 2026-08-16). Five of
+> these six rows are measured there off one cold start; player frame stability is still open.
+> **No number above was modified by that pass** — this is a pointer, not a correction.
