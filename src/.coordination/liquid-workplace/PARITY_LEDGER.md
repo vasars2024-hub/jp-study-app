@@ -120,12 +120,12 @@ that recipe was run on 2026-08-16 and produced the stated number.
 | Taskbar shell | Study OS shell | `.os-taskbar` exists and carries **one entry per open window**. Observed: 3 entries for Scraper, Anki, Dictionary. A break = missing bar, or entry count ≠ `.fwin` count | **YES** — 3 of 3 |
 | Window dragging | Shell/window mgr | Pointer-drag the `.fwin-bar` by a known delta and read back **committed** `style.left/top` (state, not a transform). Observed: `128px,84px` → `168px,114px` for a +40/+30 drag — exact | **YES** |
 | Pop-outs | Shell/window mgr | Click the pop-out `.fwin-b` and count windows in `/health`. Observed: **1 → 2 windows**, the new one 900×640 at `?popout=dictionary`, in-desk `.fwin` removed | **YES** — plus the state-loss note above |
-| Desktop shortcut grid | Study OS shell | Count `.os-desk-icon`. **Observed 0 on this profile** — the grid renders empty, so a count cannot distinguish "intact and empty" from "broken". Recipe must first add an icon, then re-count | no — needs an icon placed first |
+| Desktop shortcut grid | Study OS shell | Dispatch the shell's own `desktop:add-shortcut` event, count `.os-desk-icon`, then remove via the icon's own `×` and re-count. Observed **0 → 1 → 0**, the icon carrying its label `L0ParityProbe`. A break = the count does not move, or the removal leaves a residue | **YES** — 0→1→0, layout restored |
 | Display assignments | Shell/window mgr | Move a window to a second display and confirm the assignment survives a restart | no — **one display on this machine**, so the negative control is impossible here |
-| Secret Aero discovery and exit | Aero shell | Perform the discovery gesture, assert the Aero shell mounts, then exit and assert Study OS returns with the same window set | no |
-| Aero safe mode | Aero shell | Force safe mode and assert the reduced shell renders with its exit route intact | no |
-| Wired lifecycle | Wired shell | Drive `requestWiredArchiveRestart` and assert the boot sequence completes with open modules and desktop layout in place (`DesktopShell.tsx:2294` states that contract) | no |
-| Blanc cold-open boundary | Blanc renderer | Cold-open Blanc and assert it mounts without loading Study OS chrome | no |
+| Secret Aero discovery and exit | Aero shell | Perform the discovery gesture, assert the Aero shell mounts, then exit and assert Study OS returns with the same window set | **no — recipe is forbidden as written**, see below |
+| Aero safe mode | Aero shell | Force safe mode and assert the reduced shell renders with its exit route intact | **no — same forbidden entry step** |
+| Wired lifecycle | Wired shell | Drive `requestWiredArchiveRestart` and assert the boot sequence completes with open modules and desktop layout in place (`DesktopShell.tsx:2294` states that contract) | no — needs an environment switch first, see below |
+| Blanc cold-open boundary | Blanc renderer | `blancOpen()`, focus the new window, and assert Study OS chrome is absent **in a call whose selectors are proven live in window 1**. Observed: Blanc `blanc.html?blanc=1` mounts **81** blanc-classed nodes / 253 chars of text with `.os-taskbar` **0**, `.fwin` **0**, `.os-desk-icon` **0**; same selectors in window 1 return **1 / 2 / 0-blanc**. A break = Study OS chrome present, or the selectors read 0 in both windows | **YES** — control inverted cleanly |
 
 ## Gate status — L0
 
@@ -133,11 +133,44 @@ Present and populated: **all-app baseline (22 surfaces × 3 sizes)**, **Video ba
 **performance baselines incl. the restart leg**, **census**, **this ledger** with 7 driven
 Dictionary rows, and **this matrix** with 9 rows each carrying a runnable recipe.
 
-**The gate does not close yet.** Its wording is that every row traces to an observed side
-effect, and **6 of the 9 protected-system rows have never been observed**. Three of those six
-are cheap (Wired restart, Blanc cold-open, a desk icon placed then counted); one needs a second
-display and is a hardware blocker; two need the Aero shells. Until they are run, a wave could
-break a frozen system and nothing here would catch it — which is the one job this matrix has.
+**The gate does not close yet**, but the unobserved set is now **4 of 9**, not 6 — the desktop
+shortcut grid and the Blanc cold-open boundary were driven live on 2026-08-16 (see their rows).
+
+The four that remain are **not** four more cheap runs, and the earlier "three of those six are
+cheap" estimate was wrong on two of them. Corrected, with the reason each is blocked:
+
+- **Secret Aero discovery/exit** and **Aero safe mode** — the recipe as written is **forbidden**,
+  not merely unrun. `.claude/skills/jp-bridge/SKILL.md` §2 bars entering Secret Aero to test
+  something: `SecretAeroTrigger.toggle()` calls `armLockscreenOnSecretEntry()`, which can lock the
+  app behind the PIN, and the *return* trip fires `restoreStudyEnvironmentAfterAero()`, which
+  writes environment state — against a profile with no restore point. These rows need a rewritten
+  recipe that observes the Aero shell **without** the live entry gesture (a mounted-component or
+  route-level assertion), not a braver agent. Whoever rewrites them owns that decision.
+- **Wired lifecycle** — `requestWiredArchiveRestart()` only means anything once `isWiredTheme()`
+  is true (`wiredArchiveLifecycle.ts:412`, `:430`), so the recipe silently no-ops from Study OS.
+  Reaching it requires an environment switch, which is a persisted write in the same class as the
+  Aero one. Cheaper than Aero and genuinely reversible, but it is a state change, not a read.
+- **Display assignments** — unchanged hardware blocker: one display on this machine, so the
+  negative control cannot exist here at all.
+
+Until these are run, a wave could break a frozen system and nothing here would catch it — which
+is the one job this matrix has.
+
+**Instrumentation limit found while closing the grid row, so the next worker does not re-derive
+it:** the desk icon's `×` is `display:none` until `.os-desk-icon:hover` (`styles.css:13806`,
+`:13822`), and CSS `:hover` responds only to real input. The bridge's `/click` emits
+mouseDown/mouseUp with **no mouse-move**, so hover is never established and the control measures
+`0×0` — the §8 zero-size guard correctly refuses it rather than scoring a zero. The removal leg
+was therefore driven by a programmatic `.click()` on the real `×` element, which still runs the
+real React `onClick` → `removeIcon(id)`. This is an instrumentation limit, **not a product bug**;
+do not file it as one.
+
+**Restore discipline on the grid row.** The persisted layout was captured before
+(`desktopGetLayout()`, 1,829 chars) and compared after: **not** byte-identical, and the single
+delta was fully accounted for — window `scraper` `z: 412 → 414`, bumped by the probe's own
+coordinate click, not by the add/remove. Normalising `z` to 0 makes the two blobs **exactly
+equal**, icon set included. A same-length blob that differs is precisely the case an eyeball
+comparison passes, so compare the string and then explain the delta.
 
 Also still outstanding for §10.1: `note`, `visualizer` and `musicwidget` have no baseline
 (`ALL_APPS_BASELINE.md`, "Not captured"), and MediaCenter's rows need a real clip.
