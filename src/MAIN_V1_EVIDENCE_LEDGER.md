@@ -22796,5 +22796,32 @@ Nesting survives: `-tag:none (is:marked or cards:>1)` renders 3 nested lists.
 store is empty, so every verdict comes from Anki card state and every card is new. The 57 terms a
 previous turn wrote were undone by that same turn.
 
-`c0mmit` — `shared/ankiQueryExplain.ts` (+ 12 tests), `DeckWorkbenchBrowser` renders it under the
+`76df0f27` — `shared/ankiQueryExplain.ts` (+ 12 tests), `DeckWorkbenchBrowser` renders it under the
 search box, `deckWorkbench.css`, 48 keys × 4 catalogs.
+
+## 2026-08-16 — Track 7: recipe 9 gets a consumer, and it still cannot delete anything
+
+**Decision.** `DeckWorkbenchDuplicates.tsx` in the Browser, folded away behind a `Find duplicates`
+toggle. Every outcome is a **selection** — no delete button, no tray kind — so "find them" and
+"clear selection" are the same reversible pair every other batch here uses, and the tray's existing
+`add-tags` / `set-mastery` actions consume the result. It scans **the rows the filter is showing**,
+not the whole draft: the Browser can only hand downstream the notes it holds, so a finding outside
+the active filter would be counted and then not selected, and a count in a button is a promise
+about what the click will do. Scoping to the filter also composes —
+`Expression:script:latin` + a duplicate scan is a real audit query.
+
+**Live, real 3,221-note local deck.** `Expression` exact → **40 groups / 40 duplicates / 80 notes
+in groups**, 1 tied. `Sentence` exact → **681 groups / 2,085 duplicates / 2,766 in groups**, 172
+tied. Both reproduce the module-level numbers of `4e513c3` exactly, now through the UI.
+`near 0.9` on `Expression` → **40 groups at 8,784 pairs compared** — the bigram index, not 5.19 M.
+Selecting: `Select the duplicates (40)` → the foot reads **40 selected**; `Clear selection` → **0**.
+**Negative control:** `near` with no threshold leaves `Scan` **disabled** and renders the refusal —
+a click returns `disabled`, not an empty scan that would read as "no duplicates".
+**Scope control:** the same `Sentence` exact scan under `freq:<=5000` says "Scans the notes shown
+(348)" and finds **57 groups / 85 duplicates**, genuinely different from 681.
+
+`ankiDuplicates.ts` leaves `architecture-baseline.json` — it was the one `test-only-module` entry
+the audit reported as no-longer-occurring; audit is exit 0, **Nothing new**, 2 pending (was 3).
+English strings are written number-last (`Groups: 6 · …`, `Select the duplicates (6)`) because
+`translate()` only pluralizes an entry that is a plural-forms object, and `1 groups` shipped in the
+first draft.

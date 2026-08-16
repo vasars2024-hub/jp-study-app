@@ -62,6 +62,7 @@ import VirtualList from '../VirtualList';
 import { useT } from '../../i18n';
 import DeckWorkbenchInspector from './DeckWorkbenchInspector';
 import DeckWorkbenchSamples from './DeckWorkbenchSamples';
+import DeckWorkbenchDuplicates from './DeckWorkbenchDuplicates';
 
 const ROW_HEIGHT = 34;
 /** How far PageUp/PageDown moves the cursor. */
@@ -147,6 +148,8 @@ export default function DeckWorkbenchBrowser({
    *  note while a batch of others stays selected. */
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [view, setView] = useState<BrowserView>('grid');
+  /** Recipe 9's scan is a tool, not part of the grid: off until asked for. */
+  const [dupesOpen, setDupesOpen] = useState(false);
   const anchor = useRef<string | null>(null);
 
   /**
@@ -255,6 +258,9 @@ export default function DeckWorkbenchBrowser({
   // of `filterBrowserRows`, which returns rows and an error and not the tree —
   // and the parse is cheap next to the filter it already runs on every row.
   const explain = useMemo(() => explainBrowserQuery(query, schema), [query, schema]);
+  const fieldNames = schema.fieldNames;
+  /** The scan's universe: what the filter is showing, and nothing else. */
+  const shownIds = useMemo(() => shown.map((row) => row.noteId), [shown]);
   const shownCols = useMemo(() => visibleBrowserColumns(columns), [columns]);
 
   const partial = draft.counts.notes < totalNotes;
@@ -462,6 +468,15 @@ export default function DeckWorkbenchBrowser({
             </select>
           </label>
         )}
+        <button
+          type="button"
+          className={`btn${dupesOpen ? ' primary' : ''}`}
+          aria-pressed={dupesOpen}
+          aria-expanded={dupesOpen}
+          onClick={() => setDupesOpen((open) => !open)}
+        >
+          {t('ankiWorkbench.browser.dupes.title')}
+        </button>
         {/* Switching view never touches the selection — the plan requires a
             batch to survive a look at the sample cards. */}
         <div role="group" aria-label={t('ankiWorkbench.browser.view')}>
@@ -554,6 +569,18 @@ export default function DeckWorkbenchBrowser({
             <ExplainItem node={explain} t={t} />
           </ul>
         </div>
+      )}
+
+      {/* Recipe 9's consumer. It scans what the filter is showing and hands back
+          an explicit selection, so "find the duplicates" and "clear selection"
+          are the same reversible pair every other batch here uses. */}
+      {dupesOpen && (
+        <DeckWorkbenchDuplicates
+          draft={draft}
+          scopeNoteIds={shownIds}
+          fieldNames={fieldNames}
+          onSelect={(ids) => applySelection({ mode: 'explicit', ids })}
+        />
       )}
 
       {view === 'samples' && (

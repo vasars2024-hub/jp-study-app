@@ -362,6 +362,45 @@
   padding-inline-start: 1.4rem;
 }
 
+/* Recipe 9's scan. A contextual tool, not a card: one continuous surface under
+   the search row, folded away until asked for. */
+.wb-browser-dupes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 0.5rem;
+  background: var(--surface-2, rgba(127, 127, 127, 0.08));
+}
+
+.wb-browser-dupes-controls,
+.wb-browser-dupes-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.wb-browser-dupes-controls label {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.wb-browser-dupes-threshold {
+  width: 5rem;
+}
+
+.wb-browser-dupes-result p {
+  margin: 0 0 0.3rem;
+}
+
+.wb-browser-dupes-notes {
+  margin: 0;
+  padding-inline-start: 1.2rem;
+  font-size: 0.85rem;
+}
+
 .wb-browser-search[aria-invalid='true'] {
   border-color: var(--danger, #b3261e);
 }

@@ -71,10 +71,6 @@
    "status": "accepted",
    "note": "The typed mirror of tokens.css and the source THEME_TOKEN_REFERENCE.md is generated from; PHASE_1_IMPLEMENTATION_PLAN.md and UI_UX_CORE_SHELL_EXECUTION_PLAN.md §12 both say to keep it in sync. It was an orphan — nothing read it, so nothing noticed drift. renderer/__tests__/themeTokenMirror.test.ts now checks every mirrored token against the CSS, which is why it reads as test-only: the test is the consumer, deliberately."
   },
-  "test-only-module:src/shared/ankiDuplicates.ts": {
-   "status": "pending",
-   "note": "ANKI_DECK_WORKBENCH_PLAN.md smart recipe 9, landed as the scan half only. It proposes a canonical note and returns a selection; the consumer is the Deck Workbench Browser's recipe surface, which is the next slice. Deliberately not a new tray kind — the selection it returns feeds the existing add-tags/set-mastery actions, so there is nothing to write until a surface calls it. Measured live on the real 3,221-note deck (40 exact groups on Expression, 681 on Sentence) before this entry was written, so it is proven-but-unwired rather than untried."
-  },
   "test-only-module:src/shared/episodeProcessing.ts": {
    "status": "pending",
    "note": "§1 episode processing: built and tested, no consumer. The settings UI edits the rules; nothing applies them, because no connector exists to apply them to. Matches the boundary §1/§2 state honestly."
