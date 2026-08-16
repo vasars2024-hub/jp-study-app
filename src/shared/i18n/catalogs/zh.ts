@@ -9121,7 +9121,6 @@ export const zh: Catalog = {
     '{count} 个筛选牌组保持不变：其中的卡片是临时借用的，Anki 会重新生成它们。',
   'ankiWorkbench.tray.problem.deck-normalize-clean':
     '无需整理：全部 {count} 个牌组的命名已经一致。',
-    '无需整理：所选的 {count} 条笔记的标签已经一致。',
   'ankiWorkbench.tray.kind.enrich-dictionary': '用已安装词典填充',
   'ankiWorkbench.tray.describe.enrich-dictionary':
     '把{aspect}写入{to}（{conflict}；{rule}；{provenance}）',

@@ -10004,7 +10004,6 @@ export const ru: Catalog = {
     '{count} фильтрованных колод оставлены как есть: их карточки взяты взаймы, и Anki пересобирает такие колоды.',
   'ankiWorkbench.tray.problem.deck-normalize-clean':
     'Приводить нечего: все {count} колод уже названы единообразно.',
-    'Приводить в порядок нечего: у выбранных заметок ({count}) теги уже единообразны.',
   'ankiWorkbench.tray.kind.enrich-dictionary': 'Заполнить из установленных словарей',
   'ankiWorkbench.tray.describe.enrich-dictionary':
     'Записать {aspect} в {to} ({conflict}; {rule}; {provenance})',

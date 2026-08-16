@@ -9190,7 +9190,6 @@ export const ja: Catalog = {
     'フィルタードデッキ{count}個はそのままにします。カードは一時的に借りられており、Ankiが再構築するためです。',
   'ankiWorkbench.tray.problem.deck-normalize-clean':
     '整理するものはありません。{count}個のデッキはすべて表記が統一されています。',
-    '整えるものはありません。選択した {count} 件のノートのタグはすでに統一されています。',
   'ankiWorkbench.tray.kind.enrich-dictionary': 'インストール済み辞書から補完',
   'ankiWorkbench.tray.describe.enrich-dictionary':
     '{aspect}を{to}に書き込む（{conflict}／{rule}／{provenance}）',
