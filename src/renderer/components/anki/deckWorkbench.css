@@ -988,6 +988,57 @@
   margin: 0;
 }
 
+/* Recipe 14's panel is recipe 13's shape — a titled block beside the tray's
+ * kind select — so it borrows the same rules rather than restating them. Only
+ * the pair list is new: two selects and an arrow per row, wrapping on a narrow
+ * window instead of pushing the Remove button out of the panel. */
+.wb-tray-glossary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 0.5rem;
+  background: var(--surface-2, rgba(127, 127, 127, 0.08));
+}
+
+.wb-tray-glossary h4 {
+  margin: 0;
+  font-size: 0.95em;
+}
+
+.wb-tray-glossary p {
+  margin: 0;
+}
+
+.wb-tray-glossary-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px;
+}
+
+.wb-tray-glossary-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wb-tray-glossary-pairs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wb-tray-glossary-pairs li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
 /* The tray's own copy of these declarations is gone: the workbench-level floor
  * above is identical, so keeping it here would be the per-panel duplication
  * the floor exists to end. */

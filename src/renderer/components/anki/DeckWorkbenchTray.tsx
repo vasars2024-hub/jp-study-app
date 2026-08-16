@@ -39,6 +39,7 @@ import type {
   ReadingFillThreshold,
 } from '../../../shared/ankiReadingFill';
 import type { AiBatch } from '../../../shared/ankiAiAdditions';
+import type { GlossarySource } from '../../../shared/ankiGlossaryMerge';
 import { TEXT_NORMALIZE_ORDER, type TextNormalizeOp } from '../../../shared/ankiTextNormalize';
 import { TAG_NORMALIZE_ORDER, type TagNormalizeOp } from '../../../shared/ankiTagNormalize';
 import { DECK_NORMALIZE_ORDER, type DeckNormalizeOp } from '../../../shared/ankiDeckNormalize';
@@ -57,6 +58,7 @@ import { listKnownEntries, onKnowledgeChanged } from '../../knownWords';
 import { useT } from '../../i18n';
 import DeckWorkbenchAiPanel, { type AiPanelNote } from './DeckWorkbenchAiPanel';
 import DeckWorkbenchSplit from './DeckWorkbenchSplit';
+import DeckWorkbenchGlossary from './DeckWorkbenchGlossary';
 
 export const ACTION_KINDS: TrayActionKind[] = [
   'find-replace',
@@ -258,6 +260,12 @@ export default function DeckWorkbenchTray({
    * no longer matches — see `ankiChangeTray`'s `ai-batch-mismatch`.
    */
   const [aiBatch, setAiBatch] = useState<AiBatch | undefined>(undefined);
+  /**
+   * The secondary deck a queued `merge-glossary` plans against. One per tray:
+   * a second Add replaces it, and the action it replaced then refuses by name
+   * rather than merging a file the user is no longer looking at.
+   */
+  const [glossary, setGlossary] = useState<GlossarySource | undefined>(undefined);
 
   /** Every field name in the draft, since a tray targets by name across note types. */
   const fieldNames = useMemo(() => {
@@ -422,8 +430,9 @@ export default function DeckWorkbenchTray({
         // passed with an empty one — a `split` that is present but knows
         // nothing reads to `blockingProblems` as context that exists.
         ...(rankedVocab ? { split: { vocab: rankedVocab, levels: knownLevels } } : {}),
+        ...(glossary ? { glossary } : {}),
       }),
-    [draft, journal, selectedIds, actions, lookup, vocab, aiBatch, knownLevels, rankedVocab],
+    [draft, journal, selectedIds, actions, lookup, vocab, aiBatch, knownLevels, rankedVocab, glossary],
   );
   const effect = plan.mastery ? masteryEffect(plan.mastery) : null;
   const masteryChanges = plan.mastery?.changes.length ?? 0;
@@ -536,6 +545,12 @@ export default function DeckWorkbenchTray({
         // arm exists to keep the switch exhaustive rather than to be reached —
         // and it builds a *refusable* action rather than a plausible wrong one.
         return { id, enabled: true, kind, axis: 'jlpt', parentDeckId: '', unmatched: 'leave' };
+      case 'merge-glossary':
+        // Recipe 14, same arrangement recipe 13 has: queued from its own panel,
+        // which owns the second package. Absent from `ACTION_KINDS`, so this
+        // arm keeps the switch exhaustive and builds a refusable action — no
+        // source id and no pairs is exactly what `blockingProblems` blocks.
+        return { id, enabled: true, kind, sourceId: '', keyField: '', fieldPairs: [], mode: 'fill-empty' };
       case 'normalize-text':
         return {
           id,
@@ -634,6 +649,13 @@ export default function DeckWorkbenchTray({
       case 'split-deck':
         return t('ankiWorkbench.tray.describe.split-deck', {
           axis: t(`ankiWorkbench.tray.split.axis.${action.axis}`),
+        });
+      case 'merge-glossary':
+        return t('ankiWorkbench.tray.describe.merge-glossary', {
+          // The field pairs, not a count: "2 fields" does not tell the user
+          // which of their fields this action is about to write into.
+          fields: action.fieldPairs.map((p) => `${p.fromField} → ${p.toField}`).join(', '),
+          mode: t(`ankiWorkbench.tray.glossary.mode.${action.mode}`),
         });
       default:
         return t(`ankiWorkbench.tray.describe.${action.kind}`, { tags: action.tags.join(' ') });
@@ -1101,6 +1123,27 @@ export default function DeckWorkbenchTray({
                 id: `act-${(nextActionSeq += 1)}`,
                 enabled: true,
                 kind: 'split-deck',
+                ...params,
+              }),
+            );
+            setApplied(null);
+          }}
+        />
+      )}
+
+      {/* Recipe 14 belongs to step 3, "Add and enrich" — it puts content into a
+          note that was not in it before, from a second deck rather than from a
+          dictionary. `enrich-dictionary` is the marker for that step. */}
+      {kinds.includes('enrich-dictionary') && (
+        <DeckWorkbenchGlossary
+          draft={draft}
+          onQueue={(source, params) => {
+            setGlossary(source);
+            setActions((prev) =>
+              addTrayAction(prev, {
+                id: `act-${(nextActionSeq += 1)}`,
+                enabled: true,
+                kind: 'merge-glossary',
                 ...params,
               }),
             );
