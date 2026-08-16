@@ -22858,3 +22858,41 @@ pickers all measure **19 px**; two selects measure 32 px, so a styled variant ex
 35 px. 19 px is below any usable-target guideline and it is a workbench-wide trait, so the new panel
 matching it is correct-for-its-surface and wrong-for-the-user. Whoever finishes gate 10 should fix
 it once at the workbench level rather than per panel.
+
+## 2026-08-16 — Track 7: recipe 7, where two readings is a question and pinyin is not a reading
+
+`d135be88` `shared/ankiReadingFill.ts` + a `fill-reading` tray kind. `355aa7ca` its form
+(15 keys x 4). `3fa55e11` the pinyin fix the live run found.
+
+**Decisions, both reversible, both recorded rather than asked.** (1) Confidence is derived, not
+asserted: two credited sources agreeing on one reading is `certain`, a single source is `likely`,
+several distinct readings is `ambiguous`. `readingMeetsThreshold` refuses `ambiguous` at every
+threshold, so the safety property lives in one function and a new caller cannot forget it — 上手 has
+two readings with different meanings, and a batch that took the first would drill the wrong one for
+months. (2) **No `onConflict`.** Recipe 7 fills *missing* readings, so an occupied destination is
+counted and never overwritten; a hand-checked reading is exactly what a dictionary batch must not be
+able to replace. A furigana alignment that fell back to annotating the whole token is capped at
+`likely` even when both sources agreed; `isAllKanji` in `furigana.ts` tells that fallback apart from
+a correct 猫[ねこ].
+
+**Live, real 3,221-note local deck, English UI, `debug/recipe7-probe.cjs`.** The partition is exact:
+occupied **3,180** + no-entry **21** + no-word **1** + ambiguous **18** + below-threshold **1** =
+**3,221**. The lookup answered **1,992 of 3,180** words. Negative control in the right direction: at
+`certain` **0 of 3,221** changed; widening to `likely` changed **1** and the below-threshold line
+disappeared — more, never fewer. None of the 18 ambiguous words was written.
+
+**FINDING, found live and fixed the same turn (`3fa55e11`).** The unified dictionary is
+multi-language, so `dict:enrichTerms` answers a kanji with the **Chinese** entries too, and their
+`reading` is pinyin: 掃 → `sǎo / sào / そうかい / そうじ`, 潰 → `kuì / …`, 嘆 → `たん / tàn / …`. A
+kanji whose only installed entry is Chinese would have had `jù` written into a Japanese reading
+field at `likely`, silently. `isKanaReading` drops non-kana candidates and `no-kana-reading` is its
+own refusal. Re-run on the same deck: every pinyin gone from the review lists, all five counts
+unchanged. **The same hazard applies to `enrich-dictionary`'s `reading` aspect, which still has no
+language filter** — `resolveEnrichValue` is untouched here and is the next worker's to consider.
+
+**Traps.** (1) The catalogs' long entries wrap onto two lines, so an insert anchored on a key line
+lands *between* a key and its value and the catalog stops parsing — `debug/reading-fill-i18n.cjs`
+now advances to the line ending in `,` before inserting. (2) The Browser has no "Select all" button;
+Ctrl+A on `.wb-browser-grid` is the selection, and the tray's Add button reads `Add to tray`.
+(3) Selecting all 3,221 notes leaves the renderer unresponsive to `/eval` for over a minute while
+the lookup runs — that is the enrichment lookup, not a hang; the probe needs ~6 s waits per queue.
