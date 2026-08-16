@@ -899,6 +899,67 @@ export async function qbitAddStopped(
 }
 
 /**
+ * Removes the subtitle fetches an earlier run abandoned.
+ *
+ * The app quitting mid-acquisition used to be unrecoverable in one direction:
+ * `qbitAddStopped` puts a torrent in `jp-study-subtitles` and, until this
+ * function existed, that category was **written in three places and read in
+ * none**. Nothing reaped it, resumed it or reported it, so a torrent added a
+ * moment before the process died kept downloading on the user's connection
+ * for a subtitle no record would ever point at.
+ *
+ * Deleting is right *here* and stays consistent with "the app does not delete
+ * from someone else's torrent client", because this category is the app's own:
+ * only `qbitAddStopped` ever writes it. `deleteFiles` goes with it — a
+ * part-fetched sub-pack is worth nothing and its bytes are the actual leak.
+ *
+ * `keep` is the hashes this process is working on right now, so a concurrent
+ * acquisition is never swept out from under itself. Two app instances sharing
+ * one client is the case this cannot see; it is not a case the product
+ * supports.
+ */
+export async function qbitReapSubtitleOrphans(
+  input: ScraperQbitInput,
+  keep: ReadonlySet<string> = new Set(),
+): Promise<QbitOutcome<string[]>> {
+  if (!input.config.enabled) return { ok: false, reason: 'qBittorrent is not enabled.' };
+  const listed = await authed(
+    input,
+    `/api/v2/torrents/info?category=${encodeURIComponent(QBIT_SUBTITLE_CATEGORY)}`,
+  );
+  if ('error' in listed || listed.status !== 200) {
+    return { ok: false, reason: failureReason(listed) };
+  }
+  let rows: QbitTorrentInfo[];
+  try {
+    const parsed = JSON.parse(listed.body) as QbitTorrentInfo[];
+    rows = Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return { ok: false, reason: 'The torrent list was not valid JSON.' };
+  }
+  // Filtering on the category again rather than trusting the query parameter:
+  // a build that ignores it would answer with the whole transfer list, and
+  // this function deletes what it is handed.
+  const orphans = rows
+    .map((row) => (row.hash ?? '').toLowerCase())
+    .filter((hash, index) => Boolean(hash)
+      && rows[index].category === QBIT_SUBTITLE_CATEGORY
+      && !keep.has(hash));
+  if (!orphans.length) return { ok: true, value: [] };
+
+  const response = await authed(input, '/api/v2/torrents/delete', {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ hashes: orphans.join('|'), deleteFiles: 'true' }).toString(),
+  });
+  if ('error' in response || response.status !== 200) {
+    return { ok: false, reason: failureReason(response) };
+  }
+  scraperLog('info', 'qbit', `Cleared ${orphans.length} abandoned subtitle fetch(es).`);
+  return { ok: true, value: orphans };
+}
+
+/**
  * Stops a running torrent.
  *
  * Mirror of `qbitStart`: `pause` is the endpoint every 4.x build has and 5.x

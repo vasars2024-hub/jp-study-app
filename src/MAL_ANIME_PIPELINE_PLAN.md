@@ -837,5 +837,60 @@ coordinate click on the Discover row button did nothing (window offset). `el.cli
 `/eval` drives React's synthetic handler correctly — use that. `/eval`'s body key is **`js`**,
 not `expression`.
 
-Commit `<PENDING>` — `MalDownloadDialog.tsx`, `styles.css` (spliced HEAD+4 lines; that file
+Commit `70d48c47` — `MalDownloadDialog.tsx`, `styles.css` (spliced HEAD+4 lines; that file
 carries another track's hunks), `malDownloadDialog.test.ts`.
+
+## 2026-08-16 — gate 29's other half: the category written three times and read never
+
+Worker `primary`. Gate 29 ("the app quits mid-acquisition and restarts: no half-registered
+`SubtitleRecord`, no orphaned torrent in `jp-study-subtitles`") was left HALF OPEN on 2026-08-15
+with the note that its remainder "needs a real acquisition to interrupt, which is gate 31,
+attended only". **That was wrong, and it cost this gate a day.** The half that was open is not a
+*successful* acquisition, it is an *interrupted* one — and the interruption is the cheap part.
+
+**Half (a), `SubtitleRecord`: PASSES, structurally, and needed no live run.**
+`subtitleDiscovery.ts:818` awaits `nyaaFetch` and only then calls `writeSubtitleFile` (`:824`) and
+`patchItems` (`:848`). Both are strictly after the `if (!outcome.ok) return`. A process death
+anywhere in the acquisition therefore writes no file and no record. There is no window to be
+half-registered in.
+
+**Half (b): FAILED, and the proof needed no swarm at all.** `QBIT_SUBTITLE_CATEGORY` occurred in
+**exactly 3 places, all inside `qbitAddStopped`** — `:786` declaring it, `:881` `category=`,
+`:882` `tags=`. **Written three times, read zero times.** Nothing reaped it, resumed it, listed
+it or mentioned it. A torrent added a moment before the process died kept downloading on the
+user's connection, forever, for a subtitle no record could ever point at.
+
+**Live baseline, measured before writing anything** (`scraperQbitTransfers` on the real daemon,
+profile `Relay Probe MOUSE`): **6 torrents — 5 category `""`, 1 `jp-study`, 0 in
+`jp-study-subtitles`.** The five uncategorised ones are the user's own (added 2025-12-25 through
+2026-07-27, long before this relay); the `jp-study` one is gate 33's transfer at **79.4 %**. So
+there is no pre-existing orphan to clean — earlier probes deleted theirs by hand — but nothing
+would have cleaned one either.
+
+**Fix: `qbitReapSubtitleOrphans`, swept at the head of `nyaaFetch`, not at app startup.** The
+tradeoff, recorded because it is not obvious: this provider is *told* its qBittorrent config per
+request (renderer-owned, per profile — the file header says so), so main holds no config at
+launch and a startup hook would have nothing to authenticate with; sweeping at acquisition also
+keeps the app from phoning someone's torrent client on every boot, which the same header calls
+out as deliberately not-unattended. Deleting is consistent with "the app does not delete from
+someone else's torrent client" precisely because **only `qbitAddStopped` ever writes this
+category** — it is the app's own. `deleteFiles=true` goes with it: a part-fetched sub-pack is
+worth nothing and its bytes are the leak. A module `inFlight` set holds back hashes this process
+is acquiring, so a concurrent fetch is never swept from under itself; it is empty on a fresh
+start, which is exactly right, because after a crash everything in that category *is* abandoned.
+
+**4 tests, 2 mutation controls, each caught by exactly one test.** The stand-in answers the
+category query with the **whole** transfer list — the way a build ignoring the parameter would —
+so only the sweep's own re-filter keeps it off the user's torrents. Drop
+`category === QBIT_SUBTITLE_CATEGORY`: only "does not touch a torrent outside its own category"
+fails. Drop `!keep.has(hash)`: only "holds back the hash it is about to acquire" fails.
+`qbittorrent.ts` restored **byte-identical** (sha256 `ac011651…`); **79/79** green across
+`subtitleNyaaFetch` + `scraperQbittorrent`.
+
+**NOT DONE, stated rather than implied: the live leg.** The reaper is main-process code and the
+dev app is running the old main, so it has *not* been exercised against the real daemon. Gate 29
+is therefore **still not a pass** — half (a) is proven, half (b) has a fix with a stand-in and
+controls behind it and no live measurement. Next turn: restart the app, start a nyaa acquisition,
+kill the app once the torrent appears in `jp-study-subtitles`, restart, run a second acquisition
+and read that the orphan is gone while the 5 uncategorised user torrents and `jp-study` are
+untouched — that last clause is the live negative control and is the point of the whole slice.

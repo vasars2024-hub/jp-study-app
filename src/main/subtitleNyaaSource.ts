@@ -52,6 +52,7 @@ import {
   qbitAddStopped,
   qbitAwaitFiles,
   qbitAwaitMetadata,
+  qbitReapSubtitleOrphans,
   qbitSetFilePriorities,
   qbitStart,
   qbitTorrentInfo,
@@ -76,6 +77,16 @@ const METADATA_TIMEOUT_MS = 60_000;
 
 /** Cap on how much text is read back, so a mislabelled `.ass` cannot blow up main. */
 const MAX_SUBTITLE_BYTES = 8 * 1024 * 1024;
+
+/**
+ * Info hashes this process is acquiring right now.
+ *
+ * Read only by the orphan sweep, which cannot otherwise tell a torrent an
+ * earlier run abandoned from one a concurrent fetch is halfway through — both
+ * sit in `jp-study-subtitles` looking identical. Empty on a fresh start, which
+ * is exactly right: after a crash, everything in that category is abandoned.
+ */
+const inFlight = new Set<string>();
 
 const SEARCH_TIMEOUT_MS = 20_000;
 
@@ -373,6 +384,37 @@ export async function nyaaFetch(
   const qbit = { config: config.qbittorrent };
   const hash = token.infoHash.toLowerCase();
 
+  // Before adding, not after: an acquisition is the only moment this provider
+  // holds a qBittorrent config at all (see the header — settings live in the
+  // renderer and arrive per request), so there is no app-startup hook that
+  // could sweep instead, and sweeping here keeps the app from phoning someone's
+  // torrent client on every launch. `hash` is held out because the sweep runs
+  // inside the acquisition that is about to use it.
+  inFlight.add(hash);
+  try {
+    const reaped = await qbitReapSubtitleOrphans(qbit, inFlight);
+    if (reaped.ok && reaped.value.length) {
+      scraperLog(
+        'info',
+        'torrents',
+        `Cleared ${reaped.value.length} subtitle fetch(es) an earlier run left behind.`,
+      );
+    }
+    return await acquire(candidate, config, options, qbit, token, hash);
+  } finally {
+    inFlight.delete(hash);
+  }
+}
+
+/** The body of `nyaaFetch`, so the in-flight bookkeeping has one exit. */
+async function acquire(
+  candidate: ProviderSubtitleCandidate,
+  config: NyaaAcquisitionConfig,
+  options: { isCancelled?: () => boolean; timeoutMs?: number },
+  qbit: { config: NyaaAcquisitionConfig['qbittorrent'] },
+  token: NyaaFetchToken,
+  hash: string,
+): Promise<NyaaFetchOutcome> {
   const added = await qbitAddStopped(qbit, token.magnet, hash);
   if (!added.ok) return { ok: false, reason: added.reason };
   const preexisting = added.value === 'already-present';

@@ -69,6 +69,17 @@ let addBodies: string[] = [];
  */
 let metadataAfterPolls = 0;
 let filesReads = 0;
+/**
+ * The whole transfer list, for the orphan sweep.
+ *
+ * Deliberately holds torrents outside `jp-study-subtitles` too: the sweep
+ * deletes what it is handed, so the control that matters is a client which
+ * answers a category query with everything — some builds ignore the parameter —
+ * and the sweep still touching only its own.
+ */
+let clientTorrents: Array<{ hash: string; category: string }> = [];
+/** Bodies posted to `torrents/delete`, so the control can assert nothing went. */
+let deleteBodies: string[] = [];
 
 function readBody(req: http.IncomingMessage): Promise<string> {
   return new Promise((resolve) => {
@@ -101,6 +112,23 @@ beforeAll(async () => {
       return;
     }
 
+    if (url.pathname === '/api/v2/torrents/info' && url.searchParams.has('category')) {
+      // The sweep's query. Answers with the *whole* list on purpose, ignoring
+      // the parameter the way a build that does not support it would.
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(clientTorrents));
+      return;
+    }
+    if (url.pathname === '/api/v2/torrents/delete') {
+      void readBody(req).then((body) => {
+        deleteBodies.push(body);
+        const gone = new Set((new URLSearchParams(body).get('hashes') ?? '').split('|'));
+        clientTorrents = clientTorrents.filter((row) => !gone.has(row.hash));
+        res.writeHead(200);
+        res.end('Ok.');
+      });
+      return;
+    }
     if (url.pathname === '/api/v2/torrents/info') {
       // Honours `hashes`, unlike the fixture next door — "is this torrent
       // already here?" is the whole safety gate and must be answerable.
@@ -194,6 +222,8 @@ beforeEach(() => {
   stallOnStart = false;
   metadataAfterPolls = 0;
   filesReads = 0;
+  clientTorrents = [];
+  deleteBodies = [];
   resetQbitSessions();
 });
 
@@ -261,6 +291,65 @@ describe('nyaaAvailability', () => {
   it('refuses with no configuration at all, which is what the auto sweep passes', async () => {
     const result = await nyaaAvailability(undefined);
     expect(result.ok === false && result.reason).toBe('not-configured');
+  });
+});
+
+// Gate 29's second half. `jp-study-subtitles` used to be written in three
+// places and read in none, so a process that died between the add and the read
+// left a torrent nothing would ever reap, resume or mention — still downloading
+// on the user's connection for a subtitle no record could point at.
+describe('nyaaFetch — what an interrupted run left in the client', () => {
+  it('clears a subtitle fetch an earlier run abandoned, with its data', async () => {
+    clientTorrents = [{ hash: 'a'.repeat(40), category: 'jp-study-subtitles' }];
+    files = [{ name: 'Show - 07.ja.ass', size: 40_000, progress: 0, priority: 1 }];
+    await writeOnDisk('Show - 07.ja.ass', '[Script Info]\nDialogue: hello');
+
+    const result = await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 5_000 });
+    expect(result.ok).toBe(true);
+    expect(deleteBodies).toHaveLength(1);
+    expect(new URLSearchParams(deleteBodies[0]).get('hashes')).toBe('a'.repeat(40));
+    // The bytes are the actual leak; a part-fetched sub-pack is worth nothing.
+    expect(new URLSearchParams(deleteBodies[0]).get('deleteFiles')).toBe('true');
+  });
+
+  // The control, and the one that would make this dangerous if it failed: the
+  // stand-in answers the category query with the whole transfer list, so only
+  // the sweep's own filter keeps it off the user's torrents.
+  it('does not touch a torrent outside its own category', async () => {
+    clientTorrents = [
+      { hash: 'c'.repeat(40), category: '' },
+      { hash: 'd'.repeat(40), category: 'jp-study' },
+    ];
+    files = [{ name: 'Show - 07.ja.ass', size: 40_000, progress: 0, priority: 1 }];
+    await writeOnDisk('Show - 07.ja.ass', '[Script Info]\nDialogue: hello');
+
+    const result = await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 5_000 });
+    expect(result.ok).toBe(true);
+    expect(deleteBodies).toEqual([]);
+    expect(clientTorrents).toHaveLength(2);
+  });
+
+  // A fetch does not sweep itself out from under its own feet.
+  it('holds back the hash it is about to acquire', async () => {
+    clientTorrents = [
+      { hash: HASH, category: 'jp-study-subtitles' },
+      { hash: 'e'.repeat(40), category: 'jp-study-subtitles' },
+    ];
+    files = [{ name: 'Show - 07.ja.ass', size: 40_000, progress: 0, priority: 1 }];
+    await writeOnDisk('Show - 07.ja.ass', '[Script Info]\nDialogue: hello');
+
+    const result = await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 5_000 });
+    expect(result.ok).toBe(true);
+    expect(new URLSearchParams(deleteBodies[0]).get('hashes')).toBe('e'.repeat(40));
+    expect(clientTorrents.map((row) => row.hash)).toEqual([HASH]);
+  });
+
+  it('sends no delete at all when the category is empty', async () => {
+    files = [{ name: 'Show - 07.ja.ass', size: 40_000, progress: 0, priority: 1 }];
+    await writeOnDisk('Show - 07.ja.ass', '[Script Info]\nDialogue: hello');
+
+    expect((await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 5_000 })).ok).toBe(true);
+    expect(calls).not.toContain('/api/v2/torrents/delete');
   });
 });
 
