@@ -22825,3 +22825,36 @@ the audit reported as no-longer-occurring; audit is exit 0, **Nothing new**, 2 p
 English strings are written number-last (`Groups: 6 · …`, `Select the duplicates (6)`) because
 `translate()` only pluralizes an entry that is a plural-forms object, and `1 groups` shipped in the
 first draft.
+
+## 2026-08-16 — Track 7: gate 10 measured on Browser step 2 (the two surfaces this turn added)
+
+Phase 3 left gate 10's measurement half open. Measured, not eyeballed — `debug/gate10-*.cjs`.
+Scope is honest: **step 2 only**. Steps 3–7 are unmeasured and gate 10 stays open.
+
+**Four languages, end to end.** `ui-lang` set + reload, then re-navigated per language.
+`html lang` = `ja` / `zh-Hans` / `ru` / `en`. Both new surfaces render fully translated with
+**zero raw dotted keys** (regex over every rendered line). RU proves the vars go through
+`Intl.NumberFormat`: *«входит в 5 000 самых частотных слов»* — a narrow no-break space, not `5,000`.
+JA: *「頻度上位 5,000 語に入っている」*. ZH: *"最常用的 5,000 个词"*.
+
+**Contrast, painted colours, nearest opaque ancestor.** Explain title 6.08, explain clause **16.02**,
+dupes scope 5.30, dupes result **13.96**, `neverDeletes` 5.30 — all ≥ 4.5:1 at 13.6–14 px / 400.
+
+**Focus and keyboard.** Real `Tab` key events through `/key`, not `.focus()` — the first reading
+said `outline: 3px none` and that was the artifact, `.focus()` after a click does not set
+`:focus-visible`. With real Tab: every control reports `:focus-visible` true and
+**`outline: 2px solid rgb(16,185,129)`**. `Find duplicates` is tab stop 3, in visual order, and
+carries both `aria-pressed` and `aria-expanded`.
+
+**Reduced motion, actually toggled.** `html.reduce-motion` added live: the new nodes' transitions go
+**0.14s → 1e-06s** on 12 elements, and back to 0.14s when the class is removed.
+
+**Compact.** The dupes controls reflow **3 rows → 4** between 647 px and 372 px with
+`scrollWidth - clientWidth = 0` on both the panel and the explanation. No horizontal overflow.
+
+**FINDING, pre-existing and not this turn's — `<select>` is 19 px tall across the workbench.**
+`wb-browser-precedence`, `wb-browser-view-pick`, `wb-design-field` and the tray's action/field
+pickers all measure **19 px**; two selects measure 32 px, so a styled variant exists. Buttons are
+35 px. 19 px is below any usable-target guideline and it is a workbench-wide trait, so the new panel
+matching it is correct-for-its-surface and wrong-for-the-user. Whoever finishes gate 10 should fix
+it once at the workbench level rather than per panel.
