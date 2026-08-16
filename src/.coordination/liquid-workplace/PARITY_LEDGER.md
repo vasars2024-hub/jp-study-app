@@ -124,7 +124,7 @@ that recipe was run on 2026-08-16 and produced the stated number.
 | Display assignments | Shell/window mgr | Move a window to a second display and confirm the assignment survives a restart | no — **one display on this machine**, so the negative control is impossible here |
 | Secret Aero discovery and exit | Aero shell | **Rewritten 2026-08-17** — do NOT perform the gesture. Run `probes/aero-materials-parity.js`: assert the trigger is present *and hit-testable* (`elementFromPoint` at its centre returns it, a point 200px away does not), then force `data-materials='aero'` and assert the Aero material layer paints, then restore and assert every number returns. Observed: `.fwin` backdrop `none` → `blur(14px) saturate(1.38)` → `none`, radius `20px` → `8px` → `20px`, taskbar background `none` → the Aero blue gradient → `none`; window set `2` (Anki, Scraper) unchanged across all 5 legs | **YES** — control inverted, store byte-intact. **Material layer only**, see scope limit below |
 | Aero safe mode | Aero shell | **Rewritten 2026-08-17** — force `data-aero-safe-mode='on'` on top of `data-materials='aero'` (attribute, never `setAeroSafeMode()`), assert the reduced shell renders and the exit route survives. Observed: living-layer displayed `3 → 0 → 3`, `.fwin` backdrop `blur(14px) saturate(1.38)` → `none` → `blur(14px) saturate(1.38)`, transition-duration `0s` → `1e-06s` → `0s`; exit route intact in all 5 legs (trigger present, restore-theme `study-os`) | **YES** — reversible both ways, store byte-intact |
-| Wired lifecycle | Wired shell | Drive `requestWiredArchiveRestart` and assert the boot sequence completes with open modules and desktop layout in place (`DesktopShell.tsx:2294` states that contract) | no — needs an environment switch first, see below |
+| Wired lifecycle | Wired shell | **Rewritten 2026-08-17** — no environment switch needed. Run `probes/wired-lifecycle-parity.js` then `probes/wired-lifecycle-release.js`: set `data-materials='wired'` (which alone satisfies `isWiredTheme()`), dispatch the product's own `shell:wiredRestart`, record every published phase, then restore. Observed: all five phases in order — `preboot → boot → warning → reveal → active` — with `.fwin` **2 → 2** (Anki, Scraper, same titles) and taskbar entries **2 → 2** across the restart | **YES** — desktopSurvived true, 7 of 7 restore assertions true |
 | Blanc cold-open boundary | Blanc renderer | `blancOpen()`, focus the new window, and assert Study OS chrome is absent **in a call whose selectors are proven live in window 1**. Observed: Blanc `blanc.html?blanc=1` mounts **81** blanc-classed nodes / 253 chars of text with `.os-taskbar` **0**, `.fwin` **0**, `.os-desk-icon` **0**; same selectors in window 1 return **1 / 2 / 0-blanc**. A break = Study OS chrome present, or the selectors read 0 in both windows | **YES** — control inverted cleanly |
 
 ## Gate status — L0
@@ -133,9 +133,29 @@ Present and populated: **all-app baseline (22 surfaces × 3 sizes)**, **Video ba
 **performance baselines incl. the restart leg**, **census**, **this ledger** with 7 driven
 Dictionary rows, and **this matrix** with 9 rows each carrying a runnable recipe.
 
-**The gate does not close yet**, but the unobserved set is now **2 of 9**, not 4 — the two Aero
-rows were rewritten and driven live on 2026-08-17 (see their rows), after the desktop shortcut
-grid and Blanc cold-open boundary on 2026-08-16.
+**The unobserved set is now 1 of 9** — the two Aero rows and the Wired lifecycle row were
+rewritten and driven live on 2026-08-17 (see their rows), after the desktop shortcut grid and
+Blanc cold-open boundary on 2026-08-16. The single remaining row is **display assignments**, and
+it is blocked on hardware this machine does not have, not on effort.
+
+**All three of 2026-08-17's rows came unblocked the same way**, and the pattern is worth carrying
+forward: each was recorded as needing a persisted write, and in each case the shell's material
+layer turned out to be keyed off a **DOM attribute** that a probe may set and restore. Before
+accepting that a protected-system recipe needs a state change, check whether the gate it trips is
+an attribute check.
+
+### Verdict: L0's gate is CLOSED as of 2026-08-17
+
+The gate's own wording is *"no Liquid product code until the baseline and parity ledger exist."*
+Both exist and are committed, and the matrix that guards them now stands at **8 of 9 rows
+observed**, the ninth blocked on a second display this machine does not have. **L1 may begin.**
+
+Read this as what it is. The gate says the freeze map exists and has been driven — it does **not**
+say every frozen system is fully covered. Three coverage holes are recorded above and each is
+carried into L1 rather than closed here: the Aero rows certify the **material/CSS layer but not
+the React `useAeroMaterials()` branch**; the Wired row's **timings are throttled** and are not a
+category-7 input; and its **desk-icon half ran on an empty set**. A wave that trusts this matrix
+beyond those three limits is trusting something it does not say.
 
 ### The Aero rows — how the forbidden recipe was replaced (2026-08-17)
 
@@ -166,14 +186,38 @@ re-reads only on `onThemeChanged` — reaching it needs exactly the write above.
 Aero's *React* composition is therefore still uncovered by this matrix; a wave that breaks its
 material layer is now caught. Do not read these rows as more than that.
 
-The two that remain:
+### The Wired row — the environment switch was never needed (2026-08-17)
 
-- **Wired lifecycle** — `requestWiredArchiveRestart()` only means anything once `isWiredTheme()`
-  is true (`wiredArchiveLifecycle.ts:412`, `:430`), so the recipe silently no-ops from Study OS.
-  Reaching it requires an environment switch, which is a persisted write in the same class as the
-  Aero one. **The Aero rewrite above is the template**: if Wired's shell is likewise keyed off a
-  `data-materials='wired'` attribute, the same attribute-only, restore-in-`finally` probe applies
-  and no theme write is needed. That is the next thing to try before accepting a state change.
+The ledger recorded this row as requiring "an environment switch, a persisted write". **That was
+wrong, and re-deriving it cost one grep.** `isWiredTheme()` (`wiredArchiveLifecycle.ts:72-78`) is
+satisfied by `data-materials === 'wired'` **OR** the theme id, so the Aero template applied
+unchanged. The restart path was then read end to end — `shell:wiredRestart` → `beginEntry
+('restart', true)` → `publish()` → `syncDocumentLifecycle()` — and carries **no `setTheme` call**;
+`setTheme` lives only on the `shell:wiredEntry` path, which the probe never dispatches.
+
+Three real side effects, each neutralised or captured rather than ignored: `markWiredArchiveBootSeen()`
+writes `jp-wired-archive-boot-seen-v1` (captured, restored, asserted `===`); `syncAmbient()` would
+start an audio loop, pre-gated off through the `data-wired-ambient='off'` check it already honours;
+one transient startup sound, not suppressed and carrying no state.
+
+Result: phases `preboot → boot → warning → reveal → active`, `reachedActive` true,
+`desktopSurvived` true, and **7 of 7** restore assertions true including both localStorage keys.
+
+**Two limits, stated because each is a way this row could read as a false pass:**
+
+- **The timings are NOT a performance measurement.** Observed 2 / 1379 / 1501 / 1501 / 1501 ms
+  against reduced-motion budgets of 60 / 420 / 760 / 960 — three phases landing in one tick is
+  Chromium catching up throttled timers in a backgrounded window, not the boot sequence's real
+  cadence. The **order** is the evidence here; the durations are not. Anything scoring rubric
+  category 7 off this row must re-run it under `/focus` with the window foregrounded.
+- **The desk-icon half is measured on an empty set.** `deskIcons` was **0 → 0** because this
+  desktop currently holds no shortcuts, and 0 === 0 passes trivially. Per the rubric's
+  empty-harness guard that half is **not evidence**. The `.fwin` (2) and taskbar-entry (2) halves
+  are real. Re-run with at least one desk icon present to close it — the desktop-shortcut-grid row
+  above already shows how to add and remove one.
+
+The one that remains:
+
 - **Display assignments** — unchanged hardware blocker: one display on this machine, so the
   negative control cannot exist here at all.
 
