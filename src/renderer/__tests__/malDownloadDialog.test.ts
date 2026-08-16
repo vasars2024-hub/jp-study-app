@@ -24,6 +24,9 @@ import MalDownloadDialog from '../components/discover/MalDownloadDialog';
 
 vi.mock('../views/MangaReader', () => ({ default: () => null }));
 
+/** Mutable so a test can switch the qBittorrent target on; reset in `beforeEach`. */
+let qbitSettings = { enabled: false, host: '', savePath: '' };
+
 vi.mock('../scraperSettingsStore', () => ({
   getActiveScraperSettings: () => ({
     sources: {
@@ -31,7 +34,7 @@ vi.mock('../scraperSettingsStore', () => ({
       perSourceTimeoutMs: 8_000,
     },
     torrents: { indexerIds: [], minSeeders: 1, resolutionPriority: [1080] },
-    qbittorrent: { enabled: false, host: '', savePath: '' },
+    qbittorrent: qbitSettings,
   }),
 }));
 
@@ -146,6 +149,25 @@ function focusableIn(selector = 'button, input, select, textarea'): HTMLElement[
     .filter((element) => !element.hasAttribute('disabled'));
 }
 
+/** A release the planner will actually bind to episode 1, so a send is possible. */
+function frierenRelease(patch: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id: 't1',
+    name: '[G] Sousou no Frieren - 01 [1080p]',
+    magnet: 'magnet:?xt=urn:btih:aaa',
+    infoHash: 'aaa',
+    sizeBytes: 1,
+    seeders: 5,
+    leechers: 0,
+    resolution: '1080p',
+    releaseGroup: 'G',
+    isBatch: false,
+    tracker: 'nyaa',
+    subtitleLanguages: [],
+    ...patch,
+  };
+}
+
 function button(label: string): HTMLButtonElement {
   const match = [...document.querySelectorAll('button')]
     .find((element) => (element.textContent ?? '').includes(label));
@@ -173,6 +195,7 @@ beforeEach(() => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
+  qbitSettings = { enabled: false, host: '', savePath: '' };
   stubApi();
 });
 
@@ -280,6 +303,62 @@ describe('MalDownloadDialog — anime', () => {
     expect(text()).toContain('1 release found');
     expect(text()).toContain('0 of 3 covered');
     expect(text()).toContain('No release matched');
+  });
+
+  // A live send came back "0 accepted, 1 rejected" and that counts line was the
+  // whole of what the user was told; qBittorrent's reason was in
+  // `report.details` and never left this component.
+  it('shows why qBittorrent refused a row, not just that it did', async () => {
+    qbitSettings = { enabled: true, host: '127.0.0.1', savePath: '' };
+    stubApi({
+      scraperSearchTorrents: vi.fn(async () => [frierenRelease()]),
+      scraperQbitSend: vi.fn(async () => ({
+        sent: 0,
+        skipped: 0,
+        failed: 1,
+        details: [{
+          name: '[G] Sousou no Frieren - 01 [1080p]',
+          outcome: 'failed',
+          reason: 'Already in qBittorrent.',
+        }],
+      })),
+    });
+    await open(anime);
+    await act(async () => button('Find releases').click());
+    await act(async () => button('Send').click());
+    expect(text()).toContain('Already in qBittorrent.');
+    expect(text()).toContain('[G] Sousou no Frieren - 01 [1080p]');
+  });
+
+  // The counts line reads as success here — one of two went — so the reason for
+  // the other is the only thing that says an episode was lost.
+  it('keeps the refusal visible when only part of the batch was accepted', async () => {
+    qbitSettings = { enabled: true, host: '127.0.0.1', savePath: '' };
+    stubApi({
+      scraperSearchTorrents: vi.fn(async () => [
+        frierenRelease(),
+        frierenRelease({ id: 't2', name: '[G] Sousou no Frieren - 02 [1080p]', infoHash: 'bbb' }),
+      ]),
+      scraperQbitSend: vi.fn(async () => ({
+        sent: 1,
+        skipped: 0,
+        failed: 1,
+        details: [
+          { name: '[G] Sousou no Frieren - 01 [1080p]', outcome: 'sent', reason: '' },
+          {
+            name: '[G] Sousou no Frieren - 02 [1080p]',
+            outcome: 'failed',
+            reason: 'qBittorrent did not accept this link.',
+          },
+        ],
+      })),
+    });
+    await open(anime);
+    await act(async () => button('Find releases').click());
+    await act(async () => button('Send').click());
+    expect(text()).toContain('qBittorrent did not accept this link.');
+    // The row that went is not listed as a problem.
+    expect(text()).not.toContain('[G] Sousou no Frieren - 01 [1080p] —');
   });
 
   it('searches the index by the romaji title the catalogue supplied', async () => {

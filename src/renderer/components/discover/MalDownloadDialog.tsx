@@ -167,6 +167,15 @@ export default function MalDownloadDialog({ candidate, onClose }: Props) {
 
   const [sendState, setSendState] = useState<SendState>('idle');
   const [sendMessage, setSendMessage] = useState('');
+  /**
+   * Why individual rows did not go, straight from the send report.
+   *
+   * The counts line alone is the generic failure the acquisition contingencies
+   * exist to forbid: a live send came back "0 accepted, 1 rejected" and the
+   * reason qBittorrent gave — the torrent was already in the transfer list —
+   * was in `report.details` and thrown away here.
+   */
+  const [sendFailures, setSendFailures] = useState<string[]>([]);
   const [releases, setReleases] = useState<TorrentRow[]>([]);
   /** How many rows the index returned, regardless of how many matched. */
   const [releasesFound, setReleasesFound] = useState<number | null>(null);
@@ -646,6 +655,7 @@ export default function MalDownloadDialog({ candidate, onClose }: Props) {
     if (!sendable.length) return;
     setSendState('sending');
     setSendMessage('');
+    setSendFailures([]);
     try {
       const ids = sendable.map((release) => release.id);
       if (sendTarget === 'qbittorrent') {
@@ -661,6 +671,12 @@ export default function MalDownloadDialog({ candidate, onClose }: Props) {
           failed: report.failed,
         });
         setSendMessage(message);
+        // Every row the client did not take, with the reason it gave. Kept even
+        // when some rows succeeded: a partly-refused batch is exactly the case
+        // the counts line reads as success.
+        setSendFailures(report.details
+          .filter((detail) => detail.outcome !== 'sent' && detail.reason)
+          .map((detail) => `${detail.name} — ${detail.reason}`));
         setSendState(report.failed > 0 && report.sent === 0 ? 'error' : 'done');
         announce(
           report.sent > 0 ? 'success' : 'error',
@@ -771,6 +787,13 @@ export default function MalDownloadDialog({ candidate, onClose }: Props) {
   const footnote = sendMessage
     || (plan && plan.covered === 0 ? t('malDownload.hint.noMatches') : '')
     || (plan && !availableTargets.length ? t('malDownload.error.noClient') : '');
+
+  /**
+   * The per-row reasons under the counts line. Both producers land here: the
+   * batch acquisition's own failures, and the qBittorrent send report, which
+   * until now carried its reasons no further than this component.
+   */
+  const failureLines = progress?.failures.length ? progress.failures : sendFailures;
 
   return createPortal(
     <div
@@ -1355,11 +1378,11 @@ export default function MalDownloadDialog({ candidate, onClose }: Props) {
         >
           {footnote}
         </p>
-        {progress?.failures.length ? (
+        {failureLines.length ? (
           <details className="mal-dl-failures">
-            <summary>{t('malDownload.failures', { count: progress.failures.length })}</summary>
+            <summary>{t('malDownload.failures', { count: failureLines.length })}</summary>
             <ul>
-              {progress.failures.map((failure) => <li key={failure}>{failure}</li>)}
+              {failureLines.map((failure) => <li key={failure}>{failure}</li>)}
             </ul>
           </details>
         ) : null}
