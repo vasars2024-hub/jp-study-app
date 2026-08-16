@@ -726,3 +726,26 @@ and the app reports `read ECONNRESET` — which reads exactly like the daemon be
 then the `Scraper` item) before any `debug/g33.cjs` step, or every step answers `no Scraper window`.
 (3) `debug/g33.cjs all` answers `no All mode` on a one-episode title; the single unit is already
 ticked, so that refusal is not a defect.
+
+## 2026-08-16 — gate 31 Route A: one candidate exists in 99 titles, and it has 1 seeder
+
+Worker `backup`, same turn as `5127c0a6`. Not a slice — a measurement, so the next turn does not
+re-survey. `debug/g31-routes.cjs` (now takes a **minSeeders** 5th arg) applied the app's own
+`looksLikeSubtitleOnly` / batch predicates to the app's own nyaa results across the user's
+completed list, indices **0–98** of the ≥2-episode pool, at **minSeeders 1**:
+
+- **Route A (subs-only ≤ 50 MB): exactly 1 hit in 99 titles.** `Cyber City Oedo 808` (MAL 1352) →
+  `[GB] Cyber City Oedo 808 Bluray 1080p x264 TriAudio (2021) SUBS ONLY-By request`,
+  **36,175,872 B, 1 seeder**. Everything else: **0**.
+- **Route B (batch that could carry sidecars): 60 of 99 titles have at least one**, so Route B is
+  not swarm-blocked; the open question there is whether a chosen batch really contains separate
+  `.ass`/`.srt` files, which only the file list after metadata answers.
+
+So the earlier "sub-packs are rare" trap is now a number: rare means **1 %**, at one seeder. That
+is the Route A the gate has to use unless the user's library grows.
+
+**Gate 33's transfer, since the send is not the whole story.** The accepted torrent is really
+acquiring: `downloading`, **2.5 % (2,719,744 / 109,855,988 B)** at **14 KB/s from 1 connected
+seed**, writing to `C:\Users\Arseniy\Downloads\jp-study\[project-gxs] … [5ACBBFF2].mkv`. At that
+rate it needs about two hours; the *product* path is proven either way, and a later worker can
+read completion straight off `torrents/info`.
