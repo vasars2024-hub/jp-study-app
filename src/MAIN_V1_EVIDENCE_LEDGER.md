@@ -23873,3 +23873,54 @@ detached worktree: i18n exit 0 at **10,129**, **70/70** — no dirty-tree depend
 **Next:** recipe 13 is written, planned, panelled and committed on both destinations —
 close it in `ANKI_DECK_WORKBENCH_PLAN.md` Phase 7 and move to the next recipe without a
 tray action kind (11, 14, 17–20, 26).
+
+## 2026-08-16 — Track 8: the resumable draft session that was never once created
+
+**Slices.** `6c34d6f6` — boss audit 2026-08-16 18:20 findings 1+2 closed (below).
+`865f84e2` — draft sessions are recorded by the reader and a package reopens by session id.
+
+**The finding.** `DeckWorkbench.tsx:4` has claimed "resumable draft sessions" since Phase 1.
+The store, the channels, `planResume`, `nextResumeOffset` and the fingerprint guard all
+exist. **No caller ever used them** — `ankiDraftSessionBegin`/`RecordPage` appear **zero**
+times across `src/renderer` and `src/media`. So "Unfinished reads" could only ever discard
+sessions that nothing created, and no draft has ever been resumable. Same defect class as
+the nyaa one: built, unit-tested, never completed once.
+
+**Decisions.** (1) `readApkgDraft` records its own page, reversing the comment above the
+channels. Tradeoff: it moves paging bookkeeping into the reader, against the original
+"the renderer drives paging" note — taken because a reader that served a page cannot forget
+to say so, and main is the only side holding the path, the fingerprint and the true total.
+The channels stay for a caller main does not read for. (2) Resume is **by session id, never
+by path**: the renderer has never been told where a package lives (main keeps a
+fingerprint-keyed memory precisely so it is not), and the session has persisted
+`request.filePath` all along. Hence `ApkgDraftRequest.sessionId`. (3) An unknown session is
+refused `session-source-unknown` rather than falling through to the file dialog — a resume
+that quietly asks for a different file is not a resume. This is also the **dialog-free
+package entry** the attended workbench walk needs, so gates 10/11 no longer need a human.
+
+**Live acceptance, real 7,992-note package (`r13-split.apkg`), through `window.api`.**
+Page 1 → **500 notes of 7,992**, session `apkg-msvynkb3-t74qcr` minted — the first session
+this app has ever recorded. List: covered **500**, resumeOffset **500**, `resumable: false`
+while `reading` (correct — a live read is not resumed). Resume → `ok, offset 500, limit
+500`; page 2 read **by id with no dialog**, 500 notes at offset 500; pages merged to
+`[0,1000)`, covered **1,000**. **After a full app restart** the session survives, reclassifies
+`reading → interrupted`, and reads **resumable: true, covered 1,000/7,992, resumeOffset
+1,000** — this is the state the Resume button renders from. Resumed again: page 3, 500 notes
+at offset 1,000, covered **1,500**. **Negative control:** `readApkgDraft({sessionId:
+'no-such-session-xyz'})` returned `session-source-unknown` — it did not open a file dialog,
+which would have hung the call forever and been its own measurement.
+
+**Boss audit findings 1+2 (`6c34d6f6`).** One gap: an unvalidated `ScraperQbitInput.config`
+reached `qbitBaseUrl` and told the user `undefined://undefined:undefinedundefined/...`, and
+`buildAddForm` read `.tags.length` off a config with no `tags` so `qbitSend` rejected across
+IPC. `normalizeQbitInput` runs the payload through the validator persistence already uses —
+total, and a fixed point on its own output, so a real profile passes unchanged (asserted).
+Applied at the three functions, not the three IPC handlers: guards internal callers too and
+is testable without stubbing ipcMain. **Mutation controls both red at the finding's own
+message:** dropping it gives back `undefined://127.0.0.1:62146undefined` and the TypeError.
+
+**Trap:** `progress.resumable` is false for a `reading` session by design, so a Resume button
+gated on it is invisible until the owning process dies. Do not "fix" that — a restart is what
+turns `reading` into `interrupted`, and that is the whole recovery contract.
+
+**Next:** Phase 7's remaining recipes without a tray action kind: **11, 14, 17–20, 26**.
