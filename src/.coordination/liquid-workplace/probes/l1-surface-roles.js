@@ -1,0 +1,197 @@
+/**
+ * L1 instrument — surface-role classification and rubric category 3 (Liquid utilization).
+ *
+ * WHAT IT ANSWERS. `src/LIQUID_UI_RUBRIC.md` category 3 asks for two numbers:
+ *   (a) dense-work regions rendered on a translucent material — must be 0;
+ *   (b) navigation/transport/inspector regions given Liquid treatment, vs. total.
+ * `LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md` L1 asks to "confirm the four surface roles"
+ * against Video and Dictionary. Both need the same walk, so it is one probe.
+ *
+ * WHY THE BACKING WALK. A region that paints no background of its own is NOT automatically
+ * "not on glass" — it sits on whatever its nearest painting ancestor is. Scoring the element's
+ * own `background-color` alone reports 0 dense-work-on-glass for a fully translucent window,
+ * which is the exact false pass this category exists to catch. So `backingOf()` walks up until
+ * it meets an opaque paint (alpha >= 0.95) and reports translucent if ANY link in that chain
+ * blurs the backdrop or paints at partial alpha.
+ *
+ * ALPHA PARSING. Chrome resolves this app's `color-mix()` to `color(srgb r g b / a)` and can
+ * emit `rgb(r g b / a)` / `oklab(... / a)`. A parser matching only `rgba(...)` reads every mixed
+ * colour as opaque and silently under-reports — see `.claude/skills/css-measure` §1, where the
+ * same class of miss scored 23 real failures as ABSENT. `alphaOf()` handles all four forms and
+ * returns null (not 1) on an unrecognised string, so an unknown paint is visible as `?`.
+ *
+ * REFUSALS, NOT ZEROS. A missing or 0x0 window returns `refuse:` rather than a clean score
+ * (css-measure §3: a minimised window measures as perfect).
+ *
+ * Run: `node debug/evfile.cjs src/.coordination/liquid-workplace/probes/l1-surface-roles.js`
+ * Argument is edited in at ARG below (the bridge's /eval takes one expression, no params).
+ */
+(() => {
+  const ARG = { titles: ['Dictionary', 'Media'], maxDepth: 3, minAreaPct: 1.0 };
+
+  const alphaOf = (s) => {
+    const v = String(s || '').trim();
+    if (!v || v === 'transparent' || v === 'none') return 0;
+    let m = v.match(/^rgba?\(([^)]+)\)$/);
+    if (m) {
+      const parts = m[1].split(/[\s,/]+/).filter(Boolean);
+      return parts.length >= 4 ? Number(parts[3]) : 1;
+    }
+    // color(srgb r g b / a) and color(display-p3 …) — the colourspace token carries a digit,
+    // so it is dropped by name before the numbers are read.
+    m = v.match(/^color\(\s*[a-z0-9-]+\s+([^)]+)\)$/i);
+    if (m) {
+      const parts = m[1].split(/[\s/]+/).filter(Boolean);
+      return parts.length >= 4 ? Number(parts[3]) : 1;
+    }
+    m = v.match(/^(?:oklab|oklch|lab|lch|hsla?|hwb)\(([^)]+)\)$/i);
+    if (m) {
+      const slash = m[1].split('/');
+      return slash.length > 1 ? Number(slash[1].trim()) : 1;
+    }
+    return null;
+  };
+
+  const TRANSLUCENT_MAX = 0.95;
+
+  const paintOf = (el) => {
+    const cs = getComputedStyle(el);
+    const a = alphaOf(cs.backgroundColor);
+    return {
+      alpha: a,
+      backdrop: cs.backdropFilter && cs.backdropFilter !== 'none' ? cs.backdropFilter : null,
+      image: cs.backgroundImage && cs.backgroundImage !== 'none' ? cs.backgroundImage.slice(0, 40) : null,
+      opacity: Number(cs.opacity),
+    };
+  };
+
+  /** Walks up to the first opaque paint. Translucent if anything on the way blurs or part-paints. */
+  const backingOf = (el, stopAt) => {
+    const chain = [];
+    let node = el;
+    let translucent = false;
+    let reason = null;
+    while (node && node !== stopAt.parentElement) {
+      const p = paintOf(node);
+      chain.push(`${node.tagName.toLowerCase()}.${String(node.className || '').split(' ')[0]}=${p.alpha}${p.backdrop ? '+blur' : ''}`);
+      if (p.backdrop) { translucent = true; reason = `backdrop-filter on ${chain[chain.length - 1]}`; break; }
+      if (p.opacity < 1) { translucent = true; reason = `opacity ${p.opacity} on ${chain[chain.length - 1]}`; break; }
+      if (p.alpha === null) { reason = `unparsed paint on ${chain[chain.length - 1]}`; break; }
+      if (p.alpha >= TRANSLUCENT_MAX) { reason = `opaque at ${chain[chain.length - 1]}`; break; }
+      if (p.alpha > 0) { translucent = true; reason = `alpha ${p.alpha} on ${chain[chain.length - 1]}`; break; }
+      node = node.parentElement;
+    }
+    return { translucent, reason, chain: chain.slice(-4) };
+  };
+
+  const FOCUSABLE = 'a[href],button,input,select,textarea,[tabindex]:not([tabindex="-1"]),summary,details';
+
+  // A single control is not a region. Counting one is how the first run of this probe
+  // reported `label.mc-global-search` (a 290x30 search field) as a dense-work region on
+  // glass. Controls are category 1's business; category 3 scores regions.
+  const CONTROL_SEL = 'input,textarea,select,button,label,summary,a';
+  // Navigation / transport / inspector landmarks. §2.3 makes these the regions Liquid is
+  // FOR, so they are never "dense work" however many buttons or list rows they contain —
+  // the first run scored `aside.mc-sidebar` and `header.mc-topbar` as dense work on that
+  // basis alone, which would have been two false findings.
+  const NAV_SEL =
+    'nav,header,footer,aside,[role="tablist"],[role="toolbar"],[role="navigation"],[role="banner"],[role="menubar"]';
+
+  const classify = (el) => {
+    const text = (el.textContent || '').trim().length;
+    const forms = el.querySelectorAll('input,textarea,select,[contenteditable="true"]').length;
+    const rows = el.querySelectorAll('table,tr,.dict-entry,.card,article').length;
+    const items = el.querySelectorAll('li').length;
+    const focusables = [...el.querySelectorAll(FOCUSABLE)].filter((n) => {
+      const b = n.getBoundingClientRect();
+      return b.width > 0 && b.height > 0 && !n.disabled;
+    }).length;
+    const isNav = el.matches(NAV_SEL);
+    const dense = !isNav && (text >= 200 || forms >= 1 || rows >= 1 || items >= 3);
+    let role;
+    if (dense) role = 'Work';
+    else if (isNav || focusables >= 1) role = 'Liquid-eligible';
+    else if (text === 0) role = 'Ambient';
+    else role = 'Anchor';
+    return { role, text, forms, rows, items, focusables, isNav };
+  };
+
+  const measureWindow = (title) => {
+    const win = [...document.querySelectorAll('.fwin')].find(
+      (w) => (w.querySelector('.fwin-title-text')?.textContent || '').includes(title),
+    );
+    if (!win) return { title, refuse: 'no .fwin with that title — is it open?' };
+    const wr = win.getBoundingClientRect();
+    if (!wr.width || !wr.height) return { title, refuse: 'window is 0x0 — measurement invalid' };
+    const body = win.querySelector('.fwin-body') || win;
+    const winArea = wr.width * wr.height;
+    const regions = [];
+    let controlsSkipped = 0;
+    const walk = (el, d) => {
+      if (d > ARG.maxDepth) return;
+      for (const c of el.children) {
+        const b = c.getBoundingClientRect();
+        if (b.width < 8 || b.height < 8) continue;
+        if (c.matches(CONTROL_SEL)) { controlsSkipped += 1; walk(c, d + 1); continue; }
+        const areaPct = ((b.width * Math.min(b.height, wr.height)) / winArea) * 100;
+        if (areaPct >= ARG.minAreaPct) {
+          const cls = classify(c);
+          const back = backingOf(c, win);
+          const own = paintOf(c);
+          regions.push({
+            sel: `${c.tagName.toLowerCase()}.${String(c.className || '').split(' ').filter(Boolean).slice(0, 2).join('.')}`,
+            box: `${Math.round(b.width)}x${Math.round(b.height)}`,
+            areaPct: Number(areaPct.toFixed(1)),
+            el: c,
+            role: cls.role,
+            evidence: `text=${cls.text} forms=${cls.forms} rows=${cls.rows} li=${cls.items} foc=${cls.focusables} nav=${cls.isNav}`,
+            ownAlpha: own.alpha,
+            ownBackdrop: own.backdrop,
+            translucentBacking: back.translucent,
+            backingReason: back.reason,
+          });
+        }
+        walk(c, d + 1);
+      }
+    };
+    walk(body, 0);
+
+    // Leaf-most only: a container whose descendant is also Work is an Anchor holding work,
+    // not a dense-work region in its own right. Without this a single table flags its four
+    // ancestors too, and the "must be 0" number becomes a depth count.
+    const allWork = regions.filter((r) => r.role === 'Work');
+    for (const r of allWork) {
+      if (allWork.some((o) => o !== r && r.el.contains(o.el))) r.role = 'Anchor(holds work)';
+    }
+    const work = regions.filter((r) => r.role === 'Work');
+    const eligible = regions.filter((r) => r.role === 'Liquid-eligible');
+    const denseOnGlass = work.filter((r) => r.translucentBacking);
+    for (const r of regions) delete r.el;
+    return {
+      title,
+      box: `${Math.round(wr.width)}x${Math.round(wr.height)}`,
+      windowOwnPaint: paintOf(win),
+      regions: regions.length,
+      controlsSkipped,
+      byRole: {
+        Work: work.length,
+        'Liquid-eligible': eligible.length,
+        Anchor: regions.filter((r) => r.role === 'Anchor').length,
+        'Anchor(holds work)': regions.filter((r) => r.role === 'Anchor(holds work)').length,
+        Ambient: regions.filter((r) => r.role === 'Ambient').length,
+      },
+      denseWorkOnTranslucent: denseOnGlass.length,
+      denseWorkOnTranslucentList: denseOnGlass.map((r) => `${r.sel} (${r.backingReason})`),
+      liquidTreatedEligible: eligible.filter((r) => r.translucentBacking || r.ownBackdrop).length,
+      eligibleTotal: eligible.length,
+      detail: regions,
+    };
+  };
+
+  return JSON.stringify({
+    theme: document.documentElement.getAttribute('data-theme'),
+    materials: document.documentElement.getAttribute('data-materials'),
+    viewport: `${window.innerWidth}x${window.innerHeight}`,
+    windows: ARG.titles.map(measureWindow),
+  });
+})()
