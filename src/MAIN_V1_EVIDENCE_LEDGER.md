@@ -22992,3 +22992,56 @@ identifiers silently vanish. Use a file (`debug/plan-recipe10.js`), never `-e`.
 exit 0** (+1 file, +22 tests, all mine; baseline was 676/677 and 9,149). `i18n-check` exit 0 at
 **10,125** English keys (+21). `architecture-audit` exit 0, **Nothing new**, 2 known pending.
 eslint **0 errors** on all 8 touched paths.
+
+## 2026-08-16 07:30 — Track 7 / ANKI gate 10: steps 3, 4 and 5 stop being placeholders
+
+**What was wrong.** Steps 3-7 of the numbered flow rendered "This step is not built yet" while
+steps 3-5's tools had *all* shipped — into step 2's tray, which offered all 12 action kinds. The
+flow described a shape the surface did not have, and gate 10's steps 3-7 measurement and gate 11's
+"follow the numbered flow" both depend on that shape being real.
+
+**Decision (standing auto-approval; reversible).** The tray keeps one catalogue and each step owns a
+disjoint slice of it, rather than each step growing its own panel: 3 = `enrich-dictionary`,
+`fill-reading`, `apply-ai-additions`; 4 = `find-replace`, `normalize-text`, `swap-fields`,
+`copy-field` + `DeckWorkbenchCardDesign`; 5 = `prioritize-new`, `rescue-leeches`, `set-mastery`,
+`add-tags`, `remove-tags`. Step 2 is left with **no tray**, which is what the plan asks of it.
+Tradeoff: three surfaces to keep consistent instead of one, bought back by the queue being shared —
+one tray is still one Apply and one Undo across steps. The alternative (duplicating the tray per
+step) would have made "which step queued this" unanswerable.
+
+**Consequence the split forces.** The queue had to leave `DeckWorkbenchTray`, because Back and Next
+unmount it and "Back never loses work" is the flow's own rule. The tray now takes an *optional*
+controlled `actions`/`onActionsChange` pair; left undefined it keeps its own queue, so every
+existing tray test and standalone host is untouched. Steps 3-5 are satisfied by being **visited**,
+not by queueing: each of their tools is an "or" in the plan, so a mandatory skip button would be a
+required decision about nothing. A stale step is re-recorded to zero.
+
+**Two defects the live run found, both fixed in `30d704ba`.** (1) The tray does not remount between
+steps, so `kind` survived: standing on step 4 after step 3 rendered an `enrich-dictionary` form
+under a select whose value was absent from its own options. A kind the host no longer offers now
+falls back to the first it does. (2) Undo runs from whichever step the user stands on, so undoing
+step 4's batch from step 5 left the stepper reading "3,023 notes edited" about notes that were not.
+Each tray step now stores the group + count its sentence claims; undo empties it, redo restores it.
+
+**Live, real 3,221-note local deck.** Step 2 tray **absent**, Browser present. Step 3 offers exactly
+`[enrich-dictionary, fill-reading, apply-ai-additions]`, step 4 exactly the four field kinds **plus**
+`.wb-design`, step 5 exactly the five rule kinds **without** it — 3+4+5 = **12** = the whole
+catalogue, no kind twice. Arriving on step 4 from step 3 the kind reads `find-replace`.
+Queue carry: a `find-replace` for `ZZQQ-not-in-deck` queued on step 2 (pre-split) planned
+**0 of 3,221** — the negative control — and survived Next into step 3 alongside a `fill-reading`
+into `Reading` at `likely` planning **1 of 3,221**, which is recipe 7's own recorded number; Apply
+recorded "1 notes enriched" with Undo (1) live, and Back returned to step 2 with both still queued.
+Steps 4/5: `Sentence` の → ノ planned and applied **3,023 of 3,221**, step 4 read "3,023 notes
+edited", stepping to 5 and undoing **there** took the draft back and step 4 to "No field changes
+yet", and redo returned both.
+
+**Mutation controls (4, all red then green).** Un-splitting the kinds; making step 3's tray own its
+own queue; `const kind = chosenKind` without the fallback; deleting the `restateClaim` call.
+
+**Trap.** The dev app's Deck Workbench closes on an HMR of `DeckWorkbench.tsx` and reopens on step 1
+— re-drive the source/select/Next chain rather than assuming the surface survived. A `fill-reading`
+over 3,221 notes blocks the renderer past the bridge's fixed **30 s** HttpClient timeout; that is
+not a hang, retry `1+1` until it answers.
+
+**Commits.** `617a96ac` step 3 + the controlled queue · `30d704ba` steps 4/5, the kind fallback and
+the claim restatement.
