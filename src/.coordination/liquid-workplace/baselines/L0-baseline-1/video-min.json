@@ -1,0 +1,363 @@
+{
+  "title": "Video",
+  "rect": {
+    "x": 128,
+    "y": 84,
+    "w": 260,
+    "h": 170
+  },
+  "maximized": false,
+  "viewport": {
+    "w": 1264,
+    "h": 821,
+    "dpr": 1
+  },
+  "theme": {
+    "dataTheme": "forest-night",
+    "materials": null,
+    "reducedMotion": false,
+    "forcedColors": false
+  },
+  "controls": {
+    "focusable": 26,
+    "byRole": {
+      "button": 22,
+      "input": 2,
+      "select": 2
+    },
+    "under24": 1,
+    "under24list": [
+      {
+        "n": "Search your media library…",
+        "w": 151,
+        "h": 19
+      }
+    ],
+    "under44": 23
+  },
+  "focusOrder": {
+    "count": 26,
+    "inversions": 13,
+    "firstInversionAt": 4,
+    "domOrder": [
+      {
+        "i": 0,
+        "n": "Pop out into its own window",
+        "top": 5,
+        "left": 129
+      },
+      {
+        "i": 1,
+        "n": "Minimize",
+        "top": 5,
+        "left": 161
+      },
+      {
+        "i": 2,
+        "n": "Maximize",
+        "top": 5,
+        "left": 193
+      },
+      {
+        "i": 3,
+        "n": "Close",
+        "top": 5,
+        "left": 225
+      },
+      {
+        "i": 4,
+        "n": "Your media at a glance (Ctrl+1)",
+        "top": 121,
+        "left": 26
+      },
+      {
+        "i": 5,
+        "n": "All local media (Ctrl+2)",
+        "top": 164,
+        "left": 26
+      },
+      {
+        "i": 6,
+        "n": "Immersion player (Ctrl+3)",
+        "top": 207,
+        "left": 26
+      },
+      {
+        "i": 7,
+        "n": "Listening room (Ctrl+4)",
+        "top": 250,
+        "left": 26
+      },
+      {
+        "i": 8,
+        "n": "Mine and review (Ctrl+5)",
+        "top": 293,
+        "left": 26
+      },
+      {
+        "i": 9,
+        "n": "MAL + AniList (Ctrl+6)",
+        "top": 336,
+        "left": 26
+      },
+      {
+        "i": 10,
+        "n": "Media workspaceLibrary",
+        "top": 385,
+        "left": 26
+      },
+      {
+        "i": 11,
+        "n": "Media SettingsPlayback and sources",
+        "top": 435,
+        "left": 26
+      },
+      {
+        "i": 12,
+        "n": "Search your media library…",
+        "top": 62,
+        "left": 189
+      },
+      {
+        "i": 13,
+        "n": "Open video",
+        "top": 167,
+        "left": 91
+      },
+      {
+        "i": 14,
+        "n": "Media workspace",
+        "top": 203,
+        "left": 91
+      },
+      {
+        "i": 15,
+        "n": "Select a video",
+        "top": 365,
+        "left": 122
+      },
+      {
+        "i": 16,
+        "n": "Browse folder",
+        "top": 365,
+        "left": 220
+      },
+      {
+        "i": 17,
+        "n": "Whisper model",
+        "top": 665,
+        "left": 104
+      },
+      {
+        "i": 18,
+        "n": "Transcribe speech as Japanese",
+        "top": 698,
+        "left": 105
+      },
+      {
+        "i": 19,
+        "n": "Transcribe speech as Chinese",
+        "top": 698,
+        "left": 169
+      },
+      {
+        "i": 20,
+        "n": "Auto-add folder…",
+        "top": 731,
+        "left": 104
+      },
+      {
+        "i": 21,
+        "n": "Paste a video link to download + auto-transc",
+        "top": 814,
+        "left": 104
+      },
+      {
+        "i": 22,
+        "n": "Existing subtitle language",
+        "top": 817,
+        "left": 184
+      },
+      {
+        "i": 23,
+        "n": "Open The Big O - 01",
+        "top": 1022,
+        "left": 91
+      },
+      {
+        "i": 24,
+        "n": "Open 「パラッ」と「パラリ」はどう違う？オノマトペを部品で分析する【オノマトペ1】#",
+        "top": 1022,
+        "left": 177
+      },
+      {
+        "i": 25,
+        "n": "Open The Big O - 02",
+        "top": 1022,
+        "left": 264
+      }
+    ]
+  },
+  "overflow": {
+    "clippedX": 6,
+    "clippedXList": [
+      {
+        "n": "Media Center日本語 immersionBrowseHomeYour medi",
+        "c": "mc-root",
+        "over": 124
+      },
+      {
+        "n": "The Big O - 01",
+        "c": "",
+        "over": 3
+      },
+      {
+        "n": "The Big O · 1999",
+        "c": "",
+        "over": 3
+      },
+      {
+        "n": "「パラッ」と「パラリ」はどう違う？オノマトペを部品で分析する【オノマトペ1】#284",
+        "c": "",
+        "over": 402
+      },
+      {
+        "n": "The Big O - 02",
+        "c": "",
+        "over": 3
+      },
+      {
+        "n": "The Big O · 1999",
+        "c": "",
+        "over": 3
+      }
+    ],
+    "scrollersY": 1,
+    "pastWindowFrame": 153,
+    "pastList": [
+      {
+        "n": "Media Center",
+        "c": "mc-nav"
+      },
+      {
+        "n": "All local media (Ctrl+2)",
+        "c": ""
+      },
+      {
+        "n": "svg",
+        "c": "[object SVGAnimatedString]"
+      },
+      {
+        "n": "path",
+        "c": "[object SVGAnimatedString]"
+      },
+      {
+        "n": "Immersion player (Ctrl+3)",
+        "c": "is-active"
+      },
+      {
+        "n": "svg",
+        "c": "[object SVGAnimatedString]"
+      },
+      {
+        "n": "path",
+        "c": "[object SVGAnimatedString]"
+      },
+      {
+        "n": "Listening room (Ctrl+4)",
+        "c": ""
+      }
+    ],
+    "unreachable": 27,
+    "unreachableList": [
+      {
+        "n": "Media Center",
+        "c": "mc-nav"
+      },
+      {
+        "n": "All local media (Ctrl+2)",
+        "c": ""
+      },
+      {
+        "n": "svg",
+        "c": "[object SVGAnimatedString]"
+      },
+      {
+        "n": "path",
+        "c": "[object SVGAnimatedString]"
+      },
+      {
+        "n": "Immersion player (Ctrl+3)",
+        "c": "is-active"
+      },
+      {
+        "n": "svg",
+        "c": "[object SVGAnimatedString]"
+      },
+      {
+        "n": "path",
+        "c": "[object SVGAnimatedString]"
+      },
+      {
+        "n": "Listening room (Ctrl+4)",
+        "c": ""
+      }
+    ]
+  },
+  "routes": {
+    "count": 6,
+    "list": [
+      {
+        "n": "Your media at a glance (Ctrl+1)",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "All local media (Ctrl+2)",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Immersion player (Ctrl+3)",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Listening room (Ctrl+4)",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Mine and review (Ctrl+5)",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "MAL + AniList (Ctrl+6)",
+        "role": "button",
+        "sel": null
+      }
+    ]
+  },
+  "states": {
+    "empty": true,
+    "loading": false,
+    "error": true,
+    "offline": false,
+    "keywordFormIsAHint": true
+  },
+  "stateBlocks": [
+    {
+      "c": "mc-video-empty",
+      "t": "Video playback needs the media server The built-in player was removed. Enable the media server to watch and study video."
+    },
+    {
+      "c": "mc-video-empty",
+      "t": "Choose what to watch Open a local video, browse a folder, or choose a title from your library. Select a video Browse folder"
+    }
+  ],
+  "textChars": 990,
+  "domNodes": 295,
+  "sizeMode": "min",
+  "capturedAt": "2026-08-16T21:17:44.2100058+03:00"
+}
