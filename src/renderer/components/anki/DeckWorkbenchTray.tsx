@@ -227,10 +227,38 @@ export default function DeckWorkbenchTray({
    * could disagree with the one the enrichment path uses.
    */
   const aiNotes = useMemo<AiPanelNote[]>(
-    () => selectedIds
-      .map((noteId) => ({ noteId, term: vocab.byNote.get(noteId)?.term ?? '' }))
-      .filter((note) => note.term !== ''),
+    // Deliberately unfiltered: gate 2's translation reads a field, and a note
+    // that declares no word still has a Back worth translating.
+    // `normalizeAiAdditionsRequest` drops the wordless ones for gate 12 itself,
+    // so filtering here would only remove them from the question that wants them.
+    () => selectedIds.map((noteId) => ({ noteId, term: vocab.byNote.get(noteId)?.term ?? '' })),
     [selectedIds, vocab],
+  );
+
+  /**
+   * One note's raw field value, for the translation panel. The note type is
+   * authoritative for a field's ordinal, but a source that could not read one
+   * still names each value, so the value's own name is the fallback — the same
+   * rule `targetOrds` uses in the tray planner.
+   */
+  const notesById = useMemo(
+    () => new Map(draft.notes.map((note) => [note.id, note])),
+    [draft],
+  );
+  const readField = useMemo(
+    () => (noteId: string, fieldName: string): string => {
+      const note = notesById.get(noteId);
+      if (!note) return '';
+      const def = draft.noteTypes
+        .find((nt) => nt.id === note.noteTypeId)?.fields
+        .find((f) => f.name === fieldName);
+      const ord = def?.ord;
+      const value = ord === undefined
+        ? note.fields.find((f) => f.name === fieldName)
+        : note.fields.find((f) => f.ord === ord);
+      return value?.raw ?? '';
+    },
+    [notesById, draft],
   );
 
   const buildAction = (id: string): TrayAction => {
@@ -613,7 +641,13 @@ export default function DeckWorkbenchTray({
         </p>
       )}
 
-      <DeckWorkbenchAiPanel notes={aiNotes} onBatch={setAiBatch} />
+      <DeckWorkbenchAiPanel
+        notes={aiNotes}
+        fieldNames={fieldNames}
+        readField={readField}
+        destinationField={fieldB}
+        onBatch={setAiBatch}
+      />
 
       {problems.length > 0 && (
         <ul className="wb-tray-problems">
