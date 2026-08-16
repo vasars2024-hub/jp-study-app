@@ -114,31 +114,35 @@ describe('clozeCandidate', () => {
   });
 
   it('allocates the next free ordinal note-wide, not per field', () => {
-    const nt = noteType('cloze', ['Expression', 'Reading', 'Sentence', 'Notes']);
     const names = ['Expression', 'Reading', 'Sentence', 'Notes'];
+    const nt = noteType('cloze', names);
     const n = note(
       { Expression: '猫', Reading: 'ねこ', Sentence: '猫が好きです。', Notes: '{{c4::補足}}' },
       names,
     );
+    // The marker lives in another field entirely, so a per-field scan says 1.
     expect(nextClozeOrdinal(n)).toBe(5);
-    expect(clozeCandidate(n, noteType('cloze', names), { modes: ALL_MODES }).ordinal).toBe(5);
+    expect(clozeCandidate(n, nt, { modes: ALL_MODES }).ordinal).toBe(5);
   });
 
   // `normalized` sees the word, `raw` cannot be wrapped without editing markup.
   it('reports html-split rather than not-found when markup runs through the match', () => {
     const nt = noteType('cloze', FIELDS);
-    const n = note({ Expression: '猫', Reading: 'ねこ', Sentence: '<b>猫</b>が好き' }, FIELDS);
-    // The fixture's own premise: normalized contains the term, raw does not.
-    expect(n.fields[2].normalized).toContain('猫');
-    expect(n.fields[2].raw.includes('猫')).toBe(true);
     const split = note(
       { Expression: '食べる', Reading: 'たべる', Sentence: '食<b>べ</b>ました' },
       FIELDS,
     );
+    // The fixture's own premise, asserted rather than assumed: the stripped text
+    // holds the stem and the stored text does not, which is the whole gap.
+    expect(split.fields[2].normalized).toContain('食べ');
+    expect(split.fields[2].raw.includes('食べ')).toBe(false);
     const c = clozeCandidate(split, nt, { modes: ALL_MODES });
     expect(c.outcome).toBe('html-split');
     expect(c.raw).toBeUndefined();
-    void n;
+
+    // Negative control: markup that does NOT run through the match is wrapped.
+    const around = note({ Expression: '猫', Reading: 'ねこ', Sentence: '<b>猫</b>が好き' }, FIELDS);
+    expect(clozeCandidate(around, nt, { modes: ALL_MODES }).raw).toBe('<b>{{c1::猫}}</b>が好き');
   });
 
   it('separates a genuinely absent word from an undecidable one', () => {

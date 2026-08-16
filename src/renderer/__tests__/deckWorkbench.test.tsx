@@ -344,7 +344,16 @@ describe('DeckWorkbench', () => {
 
     await click(buttonBy('ankiWorkbench.next'));
     const fields = kindsOn();
-    expect(fields).toEqual(['find-replace', 'normalize-text', 'swap-fields', 'copy-field']);
+    // `add-cloze` is a field edit, not an enrichment: recipe 19 rewrites the
+    // sentence the deck already holds and brings in no dictionary, reading or
+    // generation. It is the only kind here that changes the card count.
+    expect(fields).toEqual([
+      'find-replace',
+      'normalize-text',
+      'swap-fields',
+      'copy-field',
+      'add-cloze',
+    ]);
     expect(host.textContent).toContain('ankiWorkbench.step.fields.lead');
     // The card designer reshapes the note type the field edits are written into.
     expect(host.querySelector('.wb-design')).not.toBeNull();
