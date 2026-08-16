@@ -9487,6 +9487,13 @@ export const ru: Catalog = {
   'ankiWorkbench.sessions.status.complete': 'Завершено',
   'ankiWorkbench.step.browse.outcome': 'Выбрано заметок: {count}',
   'ankiWorkbench.step.browse.outcomeAll': 'Выбраны все подходящие заметки: {count}',
+  'ankiWorkbench.step.enrich.lead':
+    'Добавьте к выбранным заметкам данные словаря, чтения или проверенные дополнения ИИ.',
+  'ankiWorkbench.step.enrich.noSelection':
+    'Ничего не выбрано. Вернитесь к шагу «Просмотр и выбор» и укажите заметки.',
+  'ankiWorkbench.step.enrich.outcome': 'Дополнено заметок: {count}',
+  'ankiWorkbench.step.enrich.outcomeNone':
+    'Пока ничего не добавлено — этот шаг необязателен',
   'ankiWorkbench.browser.search': 'Поиск по полям, меткам и колодам',
   'ankiWorkbench.browser.rows': 'Показано {shown} из {loaded} загруженных заметок',
   'ankiWorkbench.browser.columns': 'Столбцы',

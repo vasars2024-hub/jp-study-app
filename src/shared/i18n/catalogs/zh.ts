@@ -8641,6 +8641,13 @@ export const zh: Catalog = {
   'ankiWorkbench.sessions.status.complete': '已完成',
   'ankiWorkbench.step.browse.outcome': '已选择 {count} 条笔记',
   'ankiWorkbench.step.browse.outcomeAll': '已选择全部 {count} 条匹配笔记',
+  'ankiWorkbench.step.enrich.lead':
+    '为所选笔记添加词典数据、读音或已审核的 AI 内容。',
+  'ankiWorkbench.step.enrich.noSelection':
+    '尚未选择任何内容。请返回“浏览并选择”，选取要处理的笔记。',
+  'ankiWorkbench.step.enrich.outcome': '已为 {count} 条笔记添加内容',
+  'ankiWorkbench.step.enrich.outcomeNone':
+    '尚未添加任何内容 — 此步骤为可选',
   'ankiWorkbench.browser.search': '搜索字段、标签和牌组',
   'ankiWorkbench.browser.rows': '已加载 {loaded} 条，显示 {shown} 条',
   'ankiWorkbench.browser.columns': '列',

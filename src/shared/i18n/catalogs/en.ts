@@ -9106,6 +9106,12 @@ export const en: Catalog = {
   'ankiWorkbench.sessions.status.complete': 'Complete',
   'ankiWorkbench.step.browse.outcome': '{count} notes selected',
   'ankiWorkbench.step.browse.outcomeAll': 'All {count} matching notes selected',
+  'ankiWorkbench.step.enrich.lead':
+    'Add dictionary data, readings or reviewed AI additions to the notes you selected.',
+  'ankiWorkbench.step.enrich.noSelection':
+    'Nothing is selected. Go back to “Browse and select” and choose the notes to enrich.',
+  'ankiWorkbench.step.enrich.outcome': '{count} notes enriched',
+  'ankiWorkbench.step.enrich.outcomeNone': 'Nothing added yet — this step is optional',
   'ankiWorkbench.browser.search': 'Search fields, tags and decks',
   'ankiWorkbench.browser.rows': '{shown} of {loaded} loaded notes shown',
   'ankiWorkbench.browser.columns': 'Columns',

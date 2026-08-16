@@ -8679,6 +8679,13 @@ export const ja: Catalog = {
   'ankiWorkbench.sessions.status.complete': '完了',
   'ankiWorkbench.step.browse.outcome': '{count} 件のノートを選択',
   'ankiWorkbench.step.browse.outcomeAll': '一致する {count} 件すべてを選択',
+  'ankiWorkbench.step.enrich.lead':
+    '選択したノートに、辞書の情報・読み・確認済みのAI追加を加えます。',
+  'ankiWorkbench.step.enrich.noSelection':
+    '何も選択されていません。「閲覧と選択」に戻って、追加するノートを選んでください。',
+  'ankiWorkbench.step.enrich.outcome': '{count} 件のノートに追加しました',
+  'ankiWorkbench.step.enrich.outcomeNone':
+    'まだ何も追加していません — この手順は任意です',
   'ankiWorkbench.browser.search': 'フィールド・タグ・デッキを検索',
   'ankiWorkbench.browser.rows': '読み込み済み {loaded} 件のうち {shown} 件を表示',
   'ankiWorkbench.browser.columns': '列',

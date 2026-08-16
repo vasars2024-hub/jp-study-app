@@ -70,6 +70,25 @@ const ACTION_KINDS: TrayActionKind[] = [
   'remove-tags',
 ];
 /**
+ * The guided flow's step 3, "Add and enrich": the three kinds that put content
+ * into a note that was not in it before — from a dictionary, from a reading, or
+ * from a reviewed generation. Every other kind rearranges or labels text the
+ * deck already had, which is a different step's decision.
+ *
+ * The split is the whole point of the numbered flow, so it is exclusive: a kind
+ * lives in exactly one step, and the queue itself is shared, because one tray is
+ * still one Apply and one Undo no matter which step queued a given action.
+ */
+export const ENRICH_ACTION_KINDS: TrayActionKind[] = [
+  'enrich-dictionary',
+  'fill-reading',
+  'apply-ai-additions',
+];
+/** Step 2's remainder, in the same order the full list gives them. */
+export const BROWSE_ACTION_KINDS: TrayActionKind[] = ACTION_KINDS.filter(
+  (kind) => !ENRICH_ACTION_KINDS.includes(kind),
+);
+/**
  * The rung the level select starts on. Unlike a field name there is no unset
  * value that could mean anything — every rung is valid — so the form opens on
  * `Known`, which is the mapping gate 3 demonstrates. Nothing is written by
@@ -115,6 +134,9 @@ export default function DeckWorkbenchTray({
   selectedIds,
   selectedCount,
   onApply,
+  kinds = ACTION_KINDS,
+  actions: controlledActions,
+  onActionsChange,
 }: {
   draft: AnkiDraft;
   journal: AnkiDraftEditJournal;
@@ -123,10 +145,25 @@ export default function DeckWorkbenchTray({
   /** What the selection stands for, which on a paged source can be larger. */
   selectedCount: number;
   onApply: (plan: TrayPlan) => void;
+  /** The kinds this host offers. Defaults to all, which is the standalone tray. */
+  kinds?: TrayActionKind[];
+  /**
+   * The queue, when the host owns it. The guided flow does, because a queue that
+   * lived here would be destroyed by the unmount that Back and Next cause — and
+   * "Back never loses work" is the flow's own rule. Left undefined the tray keeps
+   * its own queue, which is what every test and any single-surface host wants.
+   */
+  actions?: TrayAction[];
+  onActionsChange?: (next: TrayAction[]) => void;
 }) {
   const { t } = useT();
-  const [actions, setActions] = useState<TrayAction[]>([]);
-  const [kind, setKind] = useState<TrayActionKind>('find-replace');
+  const [ownActions, setOwnActions] = useState<TrayAction[]>([]);
+  const actions = controlledActions ?? ownActions;
+  const setActions = (update: (prev: TrayAction[]) => TrayAction[]) => {
+    if (onActionsChange) onActionsChange(update(actions));
+    else setOwnActions(update);
+  };
+  const [kind, setKind] = useState<TrayActionKind>(kinds[0] ?? 'find-replace');
   const [fieldName, setFieldName] = useState<string>('');
   const [find, setFind] = useState('');
   const [replaceWith, setReplaceWith] = useState('');
@@ -644,7 +681,7 @@ export default function DeckWorkbenchTray({
         <label>
           {t('ankiWorkbench.tray.kind')}
           <select value={kind} onChange={(e) => setKind(e.target.value as TrayActionKind)}>
-            {ACTION_KINDS.map((value) => (
+            {kinds.map((value) => (
               <option key={value} value={value}>
                 {t(`ankiWorkbench.tray.kind.${value}`)}
               </option>
