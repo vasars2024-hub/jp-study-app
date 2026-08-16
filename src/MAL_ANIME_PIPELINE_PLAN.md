@@ -749,3 +749,49 @@ acquiring: `downloading`, **2.5 % (2,719,744 / 109,855,988 B)** at **14 KB/s fro
 seed**, writing to `C:\Users\Arseniy\Downloads\jp-study\[project-gxs] … [5ACBBFF2].mkv`. At that
 rate it needs about two hours; the *product* path is proven either way, and a later worker can
 read completion straight off `torrents/info`.
+
+## 2026-08-16 — gate 31: the nyaa fetch could never have worked, and now the routes are measurable
+
+Worker `primary`. Commits `279edba1`, `84ac73d7`. **Gate 31 does not pass and is not being
+called a pass** — but its two blockers are now numbers rather than guesses, and the mechanism
+underneath it works for the first time.
+
+**Defect 1 — the whole provider was a false negative (`279edba1`).** `qbitAddStopped` sent
+`paused=true&stopped=true`. A stopped magnet never contacts the swarm, so its metadata never
+arrives and `/api/v2/torrents/files` answers `200 []` forever; `nyaaFetch` read that list one
+request later and returned **"This release contains no subtitle files."** Measured on the real
+daemon with `[NanaOne-Yamayurikai] The Big O 01-26`, 6,442,450,944 B, 3 seeders: added stopped →
+`total_size: -1`, **0 files**, 1 s. Re-added with `stopCondition=MetadataReceived` → **26 files
+in 4 s**, back to `stoppedDL` by itself, `downloaded: 0`. New `qbitAwaitMetadata` polls for the
+list then stops the torrent (`stopWhenReady` is false for a torrent the user already had — never
+pause theirs). A silent swarm gets its own sentence. 4 tests; mutation control fails both new
+ones, the timeout case at the defect's own string.
+
+**Defect 2 — the listing offered other people's shows (`84ac73d7`).** The live listing for
+*The Big O* returned 4 rows at minSeeders 1 and **two were "[HYSUB]The Legend of Heroes - Sen no
+Kiseki - Northern War"** (3.97 GB, 1.83 GB), ranked usable. `looksLikeSameTitle` now needs half a
+title's significant words as whole words in the release name; "the/a/an/of/and/or" are stopwords
+and Japanese particles are not. Live control after the fix: **4 → 2**, both genuinely The Big O.
+
+**Route B's open question is answered: 0 of 6.** `debug/g31b.cjs` added each batch candidate with
+`stopCondition=MetadataReceived`, read the real file list, and deleted it (`downloaded: 0` every
+time). Across The Big O, Kishibe Rohan and Nanatsu no Taizai: **0 of 6 batch releases carry a
+single sidecar subtitle file** — every `[Multiple Subtitle]`/`[Erai-raws]` release is muxed MKVs
+(4 files, 0 subs). 2 of the 6 never sent metadata within 60 s at 1 seeder.
+
+**Route A's one candidate is bitmap English.** The `[GB] Cyber City Oedo 808 … SUBS ONLY` release
+— the *only* Route A hit in the 99-title survey — holds **9 files, all `.sup`, all `[eng]`**.
+PGS bitmaps, not text. The product's `bitmap-only` refusal is correct for it, so there is no
+acquirable Route A in this library today.
+
+**Live acceptance through the fixed app**, `The Big O - 01` → the NanaOne batch: **59 s**, state
+`metaDL`, 4 seeds listed / 0 connected, message *"qBittorrent could not read what is inside this
+release: no peer sent its file list in time."* — a distinct honest state where the old code said
+"contains no subtitle files" in 1 s from an empty list. Still 0 files after 2.5 further minutes,
+so that was the swarm, not the timeout.
+
+**Traps.** (1) `acquisitionConfigFrom` reads indexers from `sources.entries`, **not**
+`torrents.indexers` — the latter does not exist and a probe that uses it gets `no-indexer`.
+(2) The profile's `minSeeders` is **3**, which alone hides every 1-seeder candidate; pass an
+override to see them. (3) The dev app does **not** hot-restart main — every main-process change
+needs a full `npm start` before a live check means anything.
