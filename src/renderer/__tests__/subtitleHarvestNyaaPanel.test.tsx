@@ -109,13 +109,14 @@ async function click(label: string): Promise<void> {
   await act(async () => { target.click(); });
 }
 
-async function mount(episodes: number[]): Promise<void> {
+async function mount(episodes: number[], altTitles?: string[]): Promise<void> {
   await act(async () => {
     root.render(
       <SubtitleHarvestPanel
         anilistId={null}
         malId={1352}
         title="Cyber City Oedo 808"
+        altTitles={altTitles}
         episodes={episodes}
         sourceId="mal:1352"
       />,
@@ -140,6 +141,43 @@ describe('SubtitleHarvestPanel — the nyaa fallback', () => {
     expect(nyaaFetch).not.toHaveBeenCalled();
     // Size and swarm health are on screen before the click that costs something.
     expect(host.textContent).toContain('subHarvest.nyaa.meta:35,4');
+  });
+
+  // Measured live 2026-08-17: MAL 2596 is filed `Shinreigari` and nyaa has the
+  // show only as `Ghost Hound` — the primary title alone returned 0 candidates
+  // for a release with 4 seeders sitting on the index. The panel therefore has
+  // to hand the aliases down; a handler that can walk them is no use if the one
+  // surface that has the other names keeps them.
+  it('hands the catalogue’s other names down to the index search', async () => {
+    nyaaList.mockResolvedValue({ ok: true, candidates: [candidate()], message: '', searchedAs: null });
+    await mount([1], ['Ghost Hound', '心霊狩り']);
+
+    await click('subHarvest.nyaa.search');
+
+    expect(nyaaList.mock.calls[0][0]).toMatchObject({
+      title: 'Cyber City Oedo 808',
+      titles: ['Ghost Hound', '心霊狩り'],
+    });
+  });
+
+  it('says which name found the releases, when it is not the one on screen', async () => {
+    nyaaList.mockResolvedValue({
+      ok: true, candidates: [candidate()], message: '', searchedAs: 'Ghost Hound',
+    });
+    await mount([1], ['Ghost Hound']);
+    await click('subHarvest.nyaa.search');
+
+    expect(host.textContent).toContain('subHarvest.nyaa.searchedAs:Ghost Hound');
+  });
+
+  it('stays quiet about the name when the title itself found them', async () => {
+    // The negative control: a line that always appears cannot tell the user
+    // that this particular list came from somewhere other than the heading.
+    nyaaList.mockResolvedValue({ ok: true, candidates: [candidate()], message: '', searchedAs: null });
+    await mount([1], ['Ghost Hound']);
+    await click('subHarvest.nyaa.search');
+
+    expect(host.textContent).not.toContain('subHarvest.nyaa.searchedAs');
   });
 
   it('refuses a release whose episodes miss the range, and names what it holds', async () => {

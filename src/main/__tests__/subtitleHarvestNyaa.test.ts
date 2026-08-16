@@ -19,6 +19,10 @@ let availability: { ok: true } | { ok: false; reason: string; detail: string } =
 let searchResult: unknown[] = [];
 let searchInput: Record<string, unknown> | null = null;
 let searchThrows: Error | null = null;
+/** Every search this listing made, in order — the alias walk needs the sequence. */
+const searchCalls: Record<string, unknown>[] = [];
+/** Per-title results, for the alias cases. Falls back to `searchResult`. */
+const searchByTitle = new Map<string, unknown[]>();
 let fetchOutcome: unknown = { ok: true, files: [] };
 let fetchedWith: { candidate: unknown; config: unknown } | null = null;
 const remembered = new Map<string, unknown>();
@@ -27,8 +31,10 @@ vi.mock('../subtitleNyaaSource', () => ({
   nyaaAvailability: async () => availability,
   nyaaSearch: async (input: Record<string, unknown>) => {
     searchInput = input;
+    searchCalls.push(input);
     if (searchThrows) throw searchThrows;
-    return searchResult;
+    const byTitle = searchByTitle.get(String(input.title));
+    return byTitle ?? (searchByTitle.size ? [] : searchResult);
   },
   nyaaFetchAll: async (candidate: unknown, config: unknown) => {
     fetchedWith = { candidate, config };
@@ -92,6 +98,8 @@ beforeEach(() => {
   searchResult = [];
   searchInput = null;
   searchThrows = null;
+  searchCalls.length = 0;
+  searchByTitle.clear();
   fetchOutcome = { ok: true, files: [] };
   fetchedWith = null;
   remembered.clear();
@@ -147,6 +155,70 @@ describe('listNyaaHarvest', () => {
     const result = await listNyaaHarvest({ title: '   ', acquisition: acquisition() });
     expect(result.ok).toBe(false);
     expect(searchInput).toBeNull();
+  });
+
+  // The Shinreigari case, measured live 2026-08-17: MAL files the show as
+  // `Shinreigari` and nyaa has it only as `Ghost Hound`. One title string
+  // returned "no release looks like it carries subtitles for this title" for a
+  // show with a 4-seeder batch on the index.
+  it('falls through to an alias when the primary title finds nothing', async () => {
+    searchByTitle.set('Ghost Hound', [candidateRow('nyaa:ghost')]);
+
+    const result = await listNyaaHarvest({
+      title: 'Shinreigari',
+      titles: ['Ghost Hound', '心霊狩り'],
+      acquisition: acquisition(),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.candidates.map((row) => row.id)).toEqual(['nyaa:ghost']);
+    // Primary first, alias second — and it stopped, rather than asking the
+    // third name it did not need.
+    expect(searchCalls.map((call) => call.title)).toEqual(['Shinreigari', 'Ghost Hound']);
+  });
+
+  it('names the alias it found them under, so the list is checkable', async () => {
+    searchByTitle.set('Ghost Hound', [candidateRow('nyaa:ghost')]);
+    const result = await listNyaaHarvest({
+      title: 'Shinreigari', titles: ['Ghost Hound'], acquisition: acquisition(),
+    });
+    expect(result.searchedAs).toBe('Ghost Hound');
+  });
+
+  it('reports no alias when the title itself found them', async () => {
+    // The negative control for the field above: a `searchedAs` that is always
+    // populated tells the user nothing, and would read as if every listing came
+    // from a different show.
+    searchByTitle.set('The Big O', [candidateRow('nyaa:bigo')]);
+    const result = await listNyaaHarvest({
+      title: 'The Big O', titles: ['Big O'], acquisition: acquisition(),
+    });
+    expect(result.searchedAs).toBeNull();
+    expect(searchCalls).toHaveLength(1);
+  });
+
+  it('does not spend a request on an alias that is the title again', async () => {
+    searchByTitle.set('Ghost Hound', [candidateRow('nyaa:ghost')]);
+    const result = await listNyaaHarvest({
+      title: 'Ghost Hound',
+      titles: ['ghost  hound', 'Ghost Hound', '  '],
+      acquisition: acquisition(),
+    });
+    expect(result.ok).toBe(true);
+    expect(searchCalls).toHaveLength(1);
+  });
+
+  it('still refuses when no alias finds anything, in the index’s own words', async () => {
+    // The alias walk must not turn an empty index into an error, nor an error
+    // into an empty index.
+    const result = await listNyaaHarvest({
+      title: 'Shinreigari', titles: ['Ghost Hound'], acquisition: acquisition(),
+    });
+    expect(result.ok).toBe(true);
+    expect(result.candidates).toHaveLength(0);
+    expect(result.searchedAs).toBeNull();
+    expect(result.message).toMatch(/looks like it carries subtitles/i);
+    expect(searchCalls).toHaveLength(2);
   });
 
   it('reports a thrown search rather than rejecting across IPC', async () => {

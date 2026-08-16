@@ -4105,6 +4105,7 @@ export const en: Catalog = {
   'subHarvest.nyaa.search': 'Search Nyaa for this title',
   'subHarvest.nyaa.searching': 'Searching the index\u2026',
   'subHarvest.nyaa.found': { one: '{count} release on the index', other: '{count} releases on the index' },
+  'subHarvest.nyaa.searchedAs': 'Found on the index under the name {name}.',
   'subHarvest.nyaa.meta': '{size} MB \u00b7 {seeders} seeders',
   'subHarvest.nyaa.take': 'Fetch subtitles',
   'subHarvest.nyaa.transferNote': 'Fetching adds a transfer to your qBittorrent and waits for it. Only the subtitle files are downloaded; the video is skipped.',

@@ -168,6 +168,17 @@ export interface SubtitleHarvestFetchResult {
  */
 export interface HarvestNyaaListInput {
   title: string;
+  /**
+   * Every other name the catalogue publishes for this same work.
+   *
+   * One title string is not enough, and the failure is silent. MAL 2596 is
+   * filed as `Shinreigari`, which is what the panel searches with; nyaa has the
+   * show only as `Ghost Hound`. Measured live: `Shinreigari` → 0 candidates and
+   * "no release looks like it carries subtitles for this title", `Ghost Hound`
+   * → 1 at 4 seeders. Same show, same index, same minute. So the aliases are
+   * searched too, and the release filter runs against whichever name found it.
+   */
+  titles?: readonly string[];
   /** Narrows the query for a multi-season show. Null asks about the title. */
   season?: number | null;
   /** The active profile's acquisition settings — see `SubtitleHarvestListInput`. */
@@ -179,6 +190,39 @@ export interface HarvestNyaaListResult {
   candidates: NyaaSubtitleCandidateView[];
   /** Why the list is empty when it is, in nyaa's own words. Never "no results". */
   message: string;
+  /**
+   * The name the listed releases were actually found under, when it is not the
+   * title the user is looking at. Null when the primary title found them.
+   *
+   * Surfaced rather than swallowed: "1 release" under a panel headed
+   * *Shinreigari* is unverifiable by the user unless they are told it was
+   * matched as *Ghost Hound*.
+   */
+  searchedAs: string | null;
+}
+
+/**
+ * The distinct names to search an index with, primary first.
+ *
+ * Case- and space-insensitive dedup, because a catalogue that publishes
+ * `titleEn` and `titleRomaji` identically would otherwise spend a second
+ * request to ask the same question.
+ */
+export function harvestSearchAliases(
+  title: string,
+  aliases: readonly string[] | undefined,
+): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const candidate of [title, ...(aliases ?? [])]) {
+    const trimmed = (candidate ?? '').trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase().replace(/\s+/g, ' ');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(trimmed);
+  }
+  return out;
 }
 
 /** One subtitle file out of an acquired release. */

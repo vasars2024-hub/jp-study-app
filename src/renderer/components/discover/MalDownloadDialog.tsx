@@ -1207,6 +1207,11 @@ export default function MalDownloadDialog({ candidate, onClose }: Props) {
                 anilistId={candidate.provider === 'anilist' ? candidate.id : null}
                 malId={candidate.provider === 'jikan' ? candidate.id : null}
                 title={target?.romajiTitle || target?.title || candidate.title}
+                // Every other name the catalogue publishes, because the release
+                // index does not always file the show under the romaji one.
+                // `harvestSearchAliases` dedups, so the overlap costs nothing.
+                altTitles={[target?.title, target?.nativeTitle, candidate.title]
+                  .filter((name): name is string => !!name)}
                 episodes={selectedEpisodes}
                 sourceId={`harvest:${candidate.provider}:${candidate.id}`}
               />

@@ -3867,6 +3867,7 @@ export const zh: Catalog = {
   'subHarvest.nyaa.search': '\u5728 Nyaa \u4e0a\u641c\u7d22\u8be5\u4f5c\u54c1',
   'subHarvest.nyaa.searching': '\u6b63\u5728\u641c\u7d22\u7d22\u5f15\u2026',
   'subHarvest.nyaa.found': { other: '\u7d22\u5f15\u4e2d\u6709 {count} \u4e2a\u53d1\u5e03' },
+  'subHarvest.nyaa.searchedAs': '\u5728\u7d22\u5f15\u4e2d\u4ee5\u540d\u79f0\u300c{name}\u300d\u627e\u5230\u3002',
   'subHarvest.nyaa.meta': '{size} MB \u00b7 \u505a\u79cd {seeders}',
   'subHarvest.nyaa.take': '\u83b7\u53d6\u5b57\u5e55',
   'subHarvest.nyaa.transferNote': '\u83b7\u53d6\u4f1a\u5411\u4f60\u7684 qBittorrent \u6dfb\u52a0\u4e00\u4e2a\u4f20\u8f93\u5e76\u7b49\u5f85\u5b8c\u6210\u3002\u53ea\u4f1a\u4e0b\u8f7d\u5b57\u5e55\u6587\u4ef6\uff0c\u89c6\u9891\u4f1a\u88ab\u8df3\u8fc7\u3002',

@@ -56,6 +56,15 @@ interface Props {
    */
   malId?: number | null;
   title: string;
+  /**
+   * The catalogue's other names for this same work.
+   *
+   * The index does not file every show under the name MAL does — MAL 2596 is
+   * `Shinreigari` and nyaa has it only as `Ghost Hound`, so one title string
+   * returned an honest-sounding "no release carries subtitles for this title"
+   * for a show with a 4-seeder batch sitting on the index.
+   */
+  altTitles?: string[];
   /** Episode numbers the user selected upstream. Honours range/latest/custom. */
   episodes: number[];
   /** A stable id for deck provenance, so mined cards say where they came from. */
@@ -83,7 +92,14 @@ const MINE_BATCH = 30;
 /** Same reason as the download dialog: the channel name is not a sentence. */
 const errorText = ipcErrorText;
 
-export default function SubtitleHarvestPanel({ anilistId, malId, title, episodes, sourceId }: Props) {
+export default function SubtitleHarvestPanel({
+  anilistId,
+  malId,
+  title,
+  altTitles,
+  episodes,
+  sourceId,
+}: Props) {
   const { t, lang } = useT();
   const [phase, setPhase] = useState<Phase>('idle');
   const [message, setMessage] = useState('');
@@ -113,6 +129,12 @@ export default function SubtitleHarvestPanel({ anilistId, malId, title, episodes
    * qBittorrent.
    */
   const [nyaaCandidates, setNyaaCandidates] = useState<NyaaSubtitleCandidateView[]>([]);
+  /**
+   * The alias the listed releases were found under, when it is not this panel's
+   * own title. Shown, because a release list under a heading that names a
+   * different show is exactly the kind of thing a user cannot check.
+   */
+  const [nyaaSearchedAs, setNyaaSearchedAs] = useState<string | null>(null);
   /** What the acquired release actually held, against what the range asked for. */
   const [nyaaTaken, setNyaaTaken] = useState<{ files: number; used: number } | null>(null);
 
@@ -242,22 +264,25 @@ export default function SubtitleHarvestPanel({ anilistId, malId, title, episodes
     setPhase('listing');
     setMessage('');
     setNyaaCandidates([]);
+    setNyaaSearchedAs(null);
     setNyaaTaken(null);
     setAnalysis(null);
     setCues([]);
     try {
       const result = await window.api.subtitleHarvestNyaaList({
         title,
+        titles: altTitles ?? [],
         acquisition: acquisitionConfigFrom(getActiveScraperSettings()),
       });
       setNyaaCandidates(result.candidates);
+      setNyaaSearchedAs(result.searchedAs);
       setMessage(result.message);
       setPhase(result.ok ? 'listed' : 'error');
     } catch (error) {
       setMessage(errorText(error));
       setPhase('error');
     }
-  }, [title]);
+  }, [title, altTitles]);
 
   /**
    * Acquire one release and study whatever of the requested range it holds.
@@ -477,6 +502,9 @@ export default function SubtitleHarvestPanel({ anilistId, malId, title, episodes
       {nyaaCandidates.length ? (
         <div className="mal-dl-subs-nyaa-list">
           <p className="scr-muted">{t('subHarvest.nyaa.found', { count: nyaaCandidates.length })}</p>
+          {nyaaSearchedAs ? (
+            <p className="scr-muted">{t('subHarvest.nyaa.searchedAs', { name: nyaaSearchedAs })}</p>
+          ) : null}
           <ul>
             {nyaaCandidates.map((candidate) => (
               <li key={candidate.id}>

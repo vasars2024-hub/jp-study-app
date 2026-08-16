@@ -37,6 +37,7 @@ import {
   takeRememberedNyaaCandidate,
 } from './subtitleNyaaSource';
 import { asNyaaAcquisitionConfig } from '../shared/subtitleNyaa';
+import { harvestSearchAliases } from '../shared/subtitleHarvest';
 import type {
   HarvestNyaaFetchResult,
   HarvestNyaaListInput,
@@ -304,27 +305,44 @@ export async function fetchSubtitleHarvest(ids: readonly string[]): Promise<Subt
 export async function listNyaaHarvest(
   input: HarvestNyaaListInput,
 ): Promise<HarvestNyaaListResult> {
-  const title = (input?.title ?? '').trim();
-  if (!title) return { ok: false, candidates: [], message: 'No title to search the index with.' };
+  const aliases = harvestSearchAliases(input?.title ?? '', input?.titles);
+  if (!aliases.length) {
+    return { ok: false, candidates: [], message: 'No title to search the index with.', searchedAs: null };
+  }
 
   const config = asNyaaAcquisitionConfig(input?.acquisition);
   const available = await nyaaAvailability(config);
   // Its own four refusals, not a shrug: "your indexer is off" and "this show has
   // no subtitle releases" are different problems and only one is actionable.
   if (!available.ok || !config) {
-    return { ok: false, candidates: [], message: available.ok ? '' : available.detail };
+    return { ok: false, candidates: [], message: available.ok ? '' : available.detail, searchedAs: null };
   }
 
   const season = Number.isFinite(input?.season) ? Number(input?.season) : null;
   try {
-    const candidates = await nyaaSearch({ config, title, season, episode: null, languages: ['ja'] });
+    // First alias that finds anything wins, rather than a union of all of them.
+    // `nyaaSearch` filters each result against the name it was asked about, so a
+    // union would rank releases scored under different titles against each
+    // other — and the aliases are names for one work, so the first hit is the
+    // same show by construction. It also stops at one request in the common
+    // case, which is what keeps a listing off the index's rate limiter.
+    let found: Awaited<ReturnType<typeof nyaaSearch>> = [];
+    let searchedAs: string | null = null;
+    for (const [index, title] of aliases.entries()) {
+      if (index) await sleep(FETCH_PACING_MS);
+      const candidates = await nyaaSearch({ config, title, season, episode: null, languages: ['ja'] });
+      if (!candidates.length) continue;
+      found = candidates;
+      searchedAs = index ? title : null;
+      break;
+    }
     // The one session catalogue in `subtitleNyaaSource`, shared with discovery,
     // so an id listed by either surface is fetchable by either — and the
     // "candidate ids do not survive a restart" trap lives in exactly one place.
-    rememberNyaaCandidates(candidates);
+    rememberNyaaCandidates(found);
     return {
       ok: true,
-      candidates: candidates.map((candidate) => ({
+      candidates: found.map((candidate) => ({
         id: candidate.providerItemId,
         releaseName: candidate.releaseName,
         route: candidate.route,
@@ -334,15 +352,17 @@ export async function listNyaaHarvest(
         score: candidate.score,
         reasons: candidate.reasons,
       })),
-      message: candidates.length
+      message: found.length
         ? ''
         : 'No release on the index looks like it carries subtitles for this title.',
+      searchedAs,
     };
   } catch (error) {
     return {
       ok: false,
       candidates: [],
       message: error instanceof Error ? error.message : String(error),
+      searchedAs: null,
     };
   }
 }
