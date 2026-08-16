@@ -147,11 +147,41 @@ the parity ledger will need rows for it.
   Media·Visualizer tab searched; **no button matching `/visual|widget|open/i`** was rendered, so
   the live entry point is not where the prop suggests. The widget gallery has a `Music Player`
   card but no Visualizer card.
-- **Unresolved, stated as unresolved:** clicking `Add` on the gallery's `Music Player` card
-  produced **0 `.widget-frame`** elements, and afterwards that card was **indistinguishable from
-  an untouched card** (both read `Add`). So either the add did not take, or widgets mount under
-  a selector this probe does not know. One click is not enough to call a control dead — it is
-  recorded as an open question for whichever wave owns widgets, not as a finding.
+
+  **Correction, 2026-08-16 — these are two different things and the entry above conflated them.**
+  The `musicwidget`/`visualizer` **window sections** reached by `open('musicwidget')` are not the
+  same objects as the gallery's **desktop widgets**. The gallery's `Music Player` card adds the
+  `mini-player` *widget* (`registry.tsx:67`), which is now captured: **300×200, 4 controls, 51
+  chars**, driven live and reverted (see the resolved entry below). That does **not** stand in
+  for a `musicwidget` *section* baseline, which is still uncaptured, and the gallery still
+  carries **no Visualizer card** — 27 cards, counted live via `.widget-card-add`. So the
+  remaining gap is narrower than it was but real: the two window sections still need the entry
+  point the props imply and the live Settings surface does not render.
+- ~~**Unresolved, stated as unresolved:** clicking `Add` on the gallery's `Music Player` card
+  produced **0 `.widget-frame`** elements…~~ **RESOLVED 2026-08-16 — the control is fine, the
+  probe was.** The `Music Player` card's `Add` button sits at viewport **y = 989 in an 821-tall
+  viewport**, i.e. scrolled below the fold, and `document.elementFromPoint(276, 989)` returns
+  **`null`**. The earlier coordinate click therefore never landed on anything, which is also why
+  the card still read `Add` afterwards — nothing had been clicked. `scrollIntoView({block:
+  'center'})` moved it to y = 460, the hit-test then returned the button itself, and one real
+  bridge click produced, in the same observation: label `Add` → **`Add another`**,
+  `.widget-card-badge` **0 → 1**, `.widget-frame` **0 → 1**, and the persisted layout's widget
+  array **0 → 1** carrying type **`mini-player`**. The frame measured **300×200**, exactly the
+  registry's `defaultSize` for `mini-player` (`widgets/registry.tsx:67`), with 4 controls
+  (`Widget options`, `Previous`, `Play`, `Next`) and 51 chars of text. Restored to **0** through
+  the widget menu's own `Remove`; `fwin` stayed **2** and `.os-taskbar` **1** across the whole
+  sequence.
+
+  **The lesson is the instrument, so record it once:** an off-screen control is not a dead
+  control, and a coordinate click that lands on `null` is indistinguishable from a click that
+  did nothing — both leave the UI unchanged. **Hit-test and assert `elementFromPoint` returns
+  your actual target before every click**, and scroll first when it does not.
+
+  **Near-miss worth keeping.** Removing the widget by searching the document for a button
+  reading `Remove` finds **two**: the widget menu's (`.widget-menu button.danger`) and a
+  **Scraper Discover** action (`.scr-discover-featured-actions button.is-planned`). Clicking the
+  first match would have hit the Scraper one — the identical failure to the harness incident
+  below. Scope every menu click with `closest('.widget-frame')` or the menu's own container.
 
 Also still open, unchanged from `VIDEO_BASELINE.md`: loading/offline states not on screen during
 capture, and playing-clip measurements including frame stability, which need a real clip.
