@@ -16,7 +16,7 @@
  * limit. So the outcome sentence carries the total and a separate line says how
  * much has actually been read; either number alone is a lie for a paged source.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { AnkiDraft } from '../../../shared/ankiDraft';
 import { ANKI_DRAFT_PAGE_SIZE } from '../../../shared/ankiDraft';
 import {
@@ -58,6 +58,8 @@ import DeckWorkbenchTray, {
 } from './DeckWorkbenchTray';
 import DeckWorkbenchJournal from './DeckWorkbenchJournal';
 import DeckWorkbenchCardDesign from './DeckWorkbenchCardDesign';
+import DeckWorkbenchReview from './DeckWorkbenchReview';
+import { buildWorkbenchReview } from '../../../shared/ankiWorkbenchReview';
 import './deckWorkbench.css';
 
 type SourceKey = 'apkg' | 'connect' | 'localDeck';
@@ -364,6 +366,47 @@ export default function DeckWorkbench() {
   }, [flow.current]);
 
   /**
+   * Step 6's numbers: the net of the whole session, measured from the
+   * journal's before-images against the draft's current bytes. Recomputed on
+   * every edit or undo by design — the review must never describe a draft
+   * other than the one on screen.
+   */
+  const reviewSummary = useMemo(
+    () => (draft ? buildWorkbenchReview(draft, journal) : null),
+    [draft, journal],
+  );
+  /** Knowledge writes that already landed live when their tray was applied. */
+  const masteryApplied = masteryHistory.undo.reduce((n, s) => n + s.forward.length, 0);
+
+  /**
+   * Review re-records whenever its numbers move while the user stands on it —
+   * an undo run *from* step 6 must restate the sentence it just falsified.
+   * Unlike steps 3–5 this cannot record only when unsatisfied: the numbers
+   * are the point of the step, not a side effect of visiting it.
+   */
+  useEffect(() => {
+    if (flow.current !== 'review' || !reviewSummary) return;
+    const count = reviewSummary.changedNotes;
+    // Three honest sentences: notes change; only already-live knowledge levels
+    // changed; nothing changed at all. "0 notes would change" over a session
+    // that did write mastery levels would be the wrong kind of true.
+    const [key, params] =
+      count > 0
+        ? (['ankiWorkbench.step.review.outcome', { count }] as const)
+        : masteryApplied > 0
+          ? (['ankiWorkbench.step.review.outcomeMastery', { count: masteryApplied }] as const)
+          : (['ankiWorkbench.step.review.outcomeNone', {}] as const);
+    setFlow((prev) =>
+      recordStep(prev, 'review', {
+        satisfied: true,
+        outcomeKey: key,
+        outcomeParams: params,
+        affected: count,
+      }),
+    );
+  }, [flow.current, reviewSummary, masteryApplied]);
+
+  /**
    * Undo and redo re-run the op's inverse against the *current* draft rather
    * than restoring a snapshot, so the edit that is taken back is the one named
    * in the journal and nothing else is rolled back with it.
@@ -649,6 +692,21 @@ export default function DeckWorkbench() {
                 />
               </>
             )}
+          </div>
+        ) : flow.current === 'review' && draft && reviewSummary ? (
+          <div className="deck-workbench-detail deck-workbench-detail-wide">
+            <p className="deck-workbench-outcome">{t('ankiWorkbench.step.review.lead')}</p>
+            {currentStep.stale && <p className="muted">{t('ankiWorkbench.step.staleDetail')}</p>}
+            {/* The history strip stays offered here: reading the dry run is
+                exactly when a user decides to take a step back. */}
+            {history}
+            <DeckWorkbenchJournal draft={draft} journal={journal} />
+            <DeckWorkbenchReview
+              draft={draft}
+              summary={reviewSummary}
+              totalNotes={totalNotes ?? draft.counts.notes}
+              masteryWrites={masteryApplied}
+            />
           </div>
         ) : (
           <div className="deck-workbench-detail">

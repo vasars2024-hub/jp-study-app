@@ -8699,6 +8699,35 @@ export const ja: Catalog = {
     '何も選択されていません。「閲覧と選択」に戻って、ルールを設定するノートを選んでください。',
   'ankiWorkbench.step.rules.outcome': '{count} 件のノートに学習ルールを設定しました',
   'ankiWorkbench.step.rules.outcomeNone': '学習ルールはまだありません — この手順は任意です',
+  'ankiWorkbench.step.review.lead':
+    '適用する前に、この作業全体が何になるのかを確認します。',
+  'ankiWorkbench.step.review.outcome': '{count} 件のノートが変更されます',
+  'ankiWorkbench.step.review.outcomeMastery':
+    '習得度だけが変わりました — すでに {count} 件を書き込み済み',
+  'ankiWorkbench.step.review.outcomeNone': '実質的な変更なし — 下書きは取り込み元と同じです',
+  'ankiWorkbench.review.title': '完全なドライラン',
+  'ankiWorkbench.review.dryRun':
+    '現在の下書きで計測した結果です。Anki にもファイルにも、まだ何も書き込んでいません。',
+  'ankiWorkbench.review.empty':
+    'この下書きには何も変更がありません。編集が不要なデッキならそのまま進み、そうでなければ手順 3〜5 に戻ってください。',
+  'ankiWorkbench.review.changed': '{total} 件中 {count} 件のノートが変更されます',
+  'ankiWorkbench.review.field': '{name} — {count} 件のノート',
+  'ankiWorkbench.review.tags': '{count} 件のノートでタグが変わります',
+  'ankiWorkbench.review.cardMoves': '{count} 枚の新規カードの出題順が変わります',
+  'ankiWorkbench.review.reverted':
+    '{count} 件のノートは編集されましたが、元の値に戻っています',
+  'ankiWorkbench.review.overwrites':
+    '{count} 件の値は複数の手順から書き込まれました — 後の手順の値が反映されます',
+  'ankiWorkbench.review.mastery':
+    '{count} 件の習得度はこのアプリにすでに書き込み済みです — 適用を待たず、いま有効です',
+  'ankiWorkbench.review.cost':
+    '適用時に外部プロバイダへは接続せず、費用もかかりません。ここでの変更はすべて計算済みです。',
+  'ankiWorkbench.review.diffs': 'すべての変更（{count}）',
+  'ankiWorkbench.review.diffsShown': '{total} 件の変更のうち先頭 {shown} 件を表示',
+  'ankiWorkbench.review.tagsLabel': 'タグ',
+  'ankiWorkbench.review.queueLabel': '出題順',
+  'ankiWorkbench.review.overwrittenFlag': '複数の手順から書き込まれました',
+  'ankiWorkbench.review.emptyValue': '空',
   'ankiWorkbench.browser.search': 'フィールド・タグ・デッキを検索',
   'ankiWorkbench.browser.rows': '読み込み済み {loaded} 件のうち {shown} 件を表示',
   'ankiWorkbench.browser.columns': '列',

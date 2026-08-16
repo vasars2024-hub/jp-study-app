@@ -9124,6 +9124,35 @@ export const en: Catalog = {
     'Nothing is selected. Go back to “Browse and select” and choose the notes to set rules for.',
   'ankiWorkbench.step.rules.outcome': '{count} notes given learning rules',
   'ankiWorkbench.step.rules.outcomeNone': 'No learning rules yet — this step is optional',
+  'ankiWorkbench.step.review.lead':
+    'Look at what the whole session adds up to before anything is applied.',
+  'ankiWorkbench.step.review.outcome': '{count} notes would change',
+  'ankiWorkbench.step.review.outcomeMastery':
+    'Only knowledge levels changed — {count} already written',
+  'ankiWorkbench.step.review.outcomeNone': 'No net changes — the draft matches its source',
+  'ankiWorkbench.review.title': 'The complete dry run',
+  'ankiWorkbench.review.dryRun':
+    'Measured on the draft as it stands. Nothing has been written to Anki or to a file yet.',
+  'ankiWorkbench.review.empty':
+    'Nothing in this draft has changed. If this deck needs no edits, continue — otherwise go back to steps 3–5.',
+  'ankiWorkbench.review.changed': '{count} of {total} notes would change',
+  'ankiWorkbench.review.field': '{name} — {count} notes',
+  'ankiWorkbench.review.tags': 'Tags change on {count} notes',
+  'ankiWorkbench.review.cardMoves': '{count} new cards move in the queue',
+  'ankiWorkbench.review.reverted':
+    '{count} notes were edited and are back to their original values',
+  'ankiWorkbench.review.overwrites':
+    '{count} values were written by more than one step — the later step’s value is what lands',
+  'ankiWorkbench.review.mastery':
+    '{count} knowledge levels are already written to this app — live now, not waiting for Apply',
+  'ankiWorkbench.review.cost':
+    'Applying contacts no provider and costs nothing; every change here is already computed.',
+  'ankiWorkbench.review.diffs': 'Every change ({count})',
+  'ankiWorkbench.review.diffsShown': 'Showing the first {shown} of {total} changes',
+  'ankiWorkbench.review.tagsLabel': 'Tags',
+  'ankiWorkbench.review.queueLabel': 'Queue position',
+  'ankiWorkbench.review.overwrittenFlag': 'Written by more than one step',
+  'ankiWorkbench.review.emptyValue': 'empty',
   'ankiWorkbench.browser.search': 'Search fields, tags and decks',
   'ankiWorkbench.browser.rows': '{shown} of {loaded} loaded notes shown',
   'ankiWorkbench.browser.columns': 'Columns',

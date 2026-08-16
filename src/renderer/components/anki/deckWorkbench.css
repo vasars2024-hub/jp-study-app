@@ -1001,3 +1001,76 @@
   justify-content: space-between;
   font-variant-numeric: tabular-nums;
 }
+
+/* Step 6 — the dry run. The numbers are the surface, so they get an anchor
+   surface, not glass: this is dense read-and-decide work. */
+.wb-review {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.wb-review h4 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.wb-review section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* A value two steps disagreed about is the one fact here that can surprise. */
+.wb-review-overwrites {
+  color: var(--status-warning, var(--muted));
+}
+
+.wb-review-diffs-toggle {
+  align-self: flex-start;
+}
+
+.wb-review-diff-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 16rem;
+  overflow-y: auto;
+}
+
+.wb-review-diff {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 0.9em;
+}
+
+.wb-review-diff-note {
+  min-width: 8rem;
+  font-weight: 600;
+}
+
+.wb-review-diff-where,
+.wb-review-diff-flag {
+  opacity: 0.75;
+}
+
+.wb-review-diff-change {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.wb-review-value {
+  font-variant-numeric: tabular-nums;
+}
+
+/* An empty field is a value, and reads as one word rather than as nothing. */
+.wb-review-empty-value {
+  opacity: 0.7;
+}

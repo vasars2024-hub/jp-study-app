@@ -9508,6 +9508,36 @@ export const ru: Catalog = {
   'ankiWorkbench.step.rules.outcome': 'Правила заданы для заметок: {count}',
   'ankiWorkbench.step.rules.outcomeNone':
     'Правил обучения пока нет — этот шаг необязателен',
+  'ankiWorkbench.step.review.lead':
+    'Посмотрите, во что складывается вся эта работа, прежде чем что-либо применять.',
+  'ankiWorkbench.step.review.outcome': 'Изменится заметок: {count}',
+  'ankiWorkbench.step.review.outcomeMastery':
+    'Изменились только уровни знания — уже записано: {count}',
+  'ankiWorkbench.step.review.outcomeNone':
+    'Итоговых изменений нет — черновик совпадает с источником',
+  'ankiWorkbench.review.title': 'Полный пробный прогон',
+  'ankiWorkbench.review.dryRun':
+    'Измерено по черновику в его нынешнем виде. Ни в Anki, ни в файл ещё ничего не записано.',
+  'ankiWorkbench.review.empty':
+    'В этом черновике ничего не изменилось. Если колоде правки не нужны — продолжайте, иначе вернитесь к шагам 3–5.',
+  'ankiWorkbench.review.changed': 'Изменится заметок: {count} из {total}',
+  'ankiWorkbench.review.field': '{name} — заметок: {count}',
+  'ankiWorkbench.review.tags': 'Метки изменятся у заметок: {count}',
+  'ankiWorkbench.review.cardMoves': 'Новых карточек сменят место в очереди: {count}',
+  'ankiWorkbench.review.reverted':
+    'Заметок отредактировали и вернули к исходным значениям: {count}',
+  'ankiWorkbench.review.overwrites':
+    'Значений записано более чем одним шагом: {count} — в итоге останется значение более позднего шага',
+  'ankiWorkbench.review.mastery':
+    'Уровней знания уже записано в это приложение: {count} — они действуют сейчас, а не ждут применения',
+  'ankiWorkbench.review.cost':
+    'Применение не обращается ни к какому провайдеру и ничего не стоит; все изменения здесь уже вычислены.',
+  'ankiWorkbench.review.diffs': 'Все изменения ({count})',
+  'ankiWorkbench.review.diffsShown': 'Показаны первые {shown} из {total} изменений',
+  'ankiWorkbench.review.tagsLabel': 'Метки',
+  'ankiWorkbench.review.queueLabel': 'Место в очереди',
+  'ankiWorkbench.review.overwrittenFlag': 'Записано более чем одним шагом',
+  'ankiWorkbench.review.emptyValue': 'пусто',
   'ankiWorkbench.browser.search': 'Поиск по полям, меткам и колодам',
   'ankiWorkbench.browser.rows': 'Показано {shown} из {loaded} загруженных заметок',
   'ankiWorkbench.browser.columns': 'Столбцы',

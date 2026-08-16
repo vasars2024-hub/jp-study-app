@@ -30,7 +30,7 @@ function SampleCard({
   sample: SampleCase;
   side: 'question' | 'answer';
   theme: PreviewTheme;
-  onOpen: () => void;
+  onOpen?: () => void;
 }) {
   const { t } = useT();
   const { render } = sample;
@@ -69,9 +69,11 @@ function SampleCard({
         </ul>
       )}
 
-      <button type="button" className="btn" onClick={onOpen}>
-        {t('ankiWorkbench.samples.open')}
-      </button>
+      {onOpen && (
+        <button type="button" className="btn" onClick={onOpen}>
+          {t('ankiWorkbench.samples.open')}
+        </button>
+      )}
     </li>
   );
 }
@@ -84,7 +86,9 @@ export default function DeckWorkbenchSamples({
   draft: AnkiDraft;
   /** Notes in the whole source, which may exceed the page held in `draft`. */
   totalNotes: number;
-  onOpenNote: (noteId: string) => void;
+  /** Absent on step 6, where there is no Browser to open the note into —
+   *  offering a button that navigates nowhere would be a dead control. */
+  onOpenNote?: (noteId: string) => void;
 }) {
   const { t } = useT();
   const [side, setSide] = useState<'question' | 'answer'>('question');
@@ -166,7 +170,7 @@ export default function DeckWorkbenchSamples({
             sample={item}
             side={side}
             theme={theme}
-            onOpen={() => onOpenNote(item.noteId)}
+            onOpen={onOpenNote && (() => onOpenNote(item.noteId))}
           />
         ))}
       </ul>

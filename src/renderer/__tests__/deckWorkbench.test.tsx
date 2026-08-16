@@ -309,12 +309,12 @@ describe('DeckWorkbench', () => {
   });
 
   it('says a later step is not built rather than showing a control that does nothing', async () => {
-    // Steps 1 to 5 are built now, so the unbuilt claim has to be tested on
-    // step 6 — reached only by satisfying the selection step and then passing
-    // through the three optional tray steps.
+    // Steps 1 to 6 are built now, so the unbuilt claim has to be tested on
+    // step 7 — reached only by satisfying the selection step and then passing
+    // through the three optional tray steps and the review.
     await toBrowse(browsable());
     await click(buttonBy('ankiWorkbench.browser.selectAll'));
-    for (let i = 0; i < 4; i += 1) await click(buttonBy('ankiWorkbench.next'));
+    for (let i = 0; i < 5; i += 1) await click(buttonBy('ankiWorkbench.next'));
 
     expect(host.textContent).toContain('ankiWorkbench.step.notReady');
     expect(host.querySelector('.deck-workbench-rail')).toBeNull();
@@ -413,6 +413,44 @@ describe('DeckWorkbench', () => {
 
     await click(buttonBy('ankiWorkbench.edit.redo'));
     expect(stepFour().textContent).toContain('ankiWorkbench.step.fields.outcome:1');
+  });
+
+  it('reviews the net of the session on step 6 and restates it when an undo runs from there', async () => {
+    await toBrowse(browsable());
+    await click(buttonBy('ankiWorkbench.browser.selectAll'));
+    await click(buttonBy('ankiWorkbench.next'));
+    await click(buttonBy('ankiWorkbench.next'));
+    await type(host.querySelector('.wb-tray-form input') as HTMLInputElement, 'ねこ');
+    await type([...host.querySelectorAll('.wb-tray-form input')][1] as HTMLInputElement, 'イヌ');
+    await click(buttonBy('ankiWorkbench.tray.add'));
+    await click(buttonBy('ankiWorkbench.tray.apply'));
+
+    await click(buttonBy('ankiWorkbench.next'));
+    await click(buttonBy('ankiWorkbench.next'));
+    const stepSix = () =>
+      ([...host.querySelectorAll('.deck-workbench-step')] as HTMLButtonElement[])[5]!;
+
+    // The dry run is real: it names the field, counts the notes, and says out
+    // loud that nothing has been written anywhere yet.
+    expect(host.querySelector('.wb-review')).not.toBeNull();
+    expect(host.textContent).toContain('ankiWorkbench.review.dryRun');
+    // One note, two fields: the step-4 sentence counts notes and the review
+    // counts values, and both numbers are true of the same batch.
+    expect(host.textContent).toContain('ankiWorkbench.review.changed:1,3');
+    expect(host.textContent).toContain('ankiWorkbench.review.field:Expression,1');
+    expect(host.textContent).toContain('ankiWorkbench.review.field:Meaning,1');
+    expect(stepSix().textContent).toContain('ankiWorkbench.step.review.outcome:1');
+
+    // The diff list carries the source's value on the left, not step 4's.
+    await click(buttonBy('ankiWorkbench.review.diffs:2'));
+    expect(host.querySelectorAll('.wb-review-diff')).toHaveLength(2);
+    expect(host.querySelector('.wb-review-diff')!.textContent).toContain('ねこ');
+
+    // Undo from step 6 itself: the sentence that was just falsified is restated.
+    await click(buttonBy('ankiWorkbench.edit.undo'));
+    expect(host.textContent).toContain('ankiWorkbench.review.empty');
+    expect(host.querySelector('.wb-review-diff')).toBeNull();
+    expect(stepSix().textContent).toContain('ankiWorkbench.step.review.outcomeNone');
   });
 
   it('records each optional step as visited-and-empty rather than passing it silently', async () => {
