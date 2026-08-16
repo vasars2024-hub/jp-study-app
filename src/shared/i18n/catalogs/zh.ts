@@ -9079,6 +9079,7 @@ export const zh: Catalog = {
   'ankiWorkbench.tray.problem.tag-normalize-removed':
     '{count} 个标签将作为重复项或被隐含的父标签从笔记中移除。不会有笔记失去只属于它的标签。',
   'ankiWorkbench.tray.problem.tag-normalize-clean':
+    '无需整理：所选的 {count} 条笔记的标签已经一致。',
   'ankiWorkbench.tray.kind.normalize-decks': '整理牌组名称',
   'ankiWorkbench.tray.kind.split-deck': '将牌组拆分为子牌组',
   'ankiWorkbench.tray.describe.normalize-decks': '整理牌组名称：{ops}',

@@ -9959,6 +9959,7 @@ export const ru: Catalog = {
   'ankiWorkbench.tray.problem.tag-normalize-removed':
     '{count} тегов будут убраны из заметок как дубликаты или подразумеваемые родительские. Ни одна заметка не потеряет тег, который есть только у неё.',
   'ankiWorkbench.tray.problem.tag-normalize-clean':
+    'Приводить в порядок нечего: у выбранных заметок ({count}) теги уже единообразны.',
   'ankiWorkbench.tray.kind.normalize-decks': 'Привести имена колод в порядок',
   'ankiWorkbench.tray.kind.split-deck': 'Разделить колоду на подколоды',
   'ankiWorkbench.tray.describe.normalize-decks': 'Имена колод: {ops}',

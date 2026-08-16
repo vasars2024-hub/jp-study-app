@@ -9144,6 +9144,7 @@ export const ja: Catalog = {
   'ankiWorkbench.tray.problem.tag-normalize-removed':
     '重複または子タグが含む親タグとして、{count} 件のタグがノートから削除されます。そのノートだけが持つタグが失われることはありません。',
   'ankiWorkbench.tray.problem.tag-normalize-clean':
+    '整えるものはありません。選択した {count} 件のノートのタグはすでに統一されています。',
   'ankiWorkbench.tray.kind.normalize-decks': 'デッキ名を整理',
   'ankiWorkbench.tray.kind.split-deck': 'デッキをサブデッキに分割',
   'ankiWorkbench.tray.describe.normalize-decks': 'デッキ名を整理: {ops}',
