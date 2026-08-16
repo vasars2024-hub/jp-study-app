@@ -23277,3 +23277,49 @@ touched paths.
 **Still open.** Gate 11's provenance-after-reimport specifics; gate 10's compact/maximized
 reflow for steps 3–7 and the apkg-branch texts of step 7 (attended); the UI-driven live commit
 (needs a scoped connect query so a walk cannot touch real notes).
+
+## 2026-08-16 — Track 7 / gate 11: provenance after export+reimport, closed live
+
+**`a8df8857` + `9f46261a`.** Gate 11's remaining half was not a missing round trip — it was a
+missing *reader*. `readEnrichProvenance` had **no production consumer at all**: every call site
+in `src/` was a test. Enrichment wrote the wrapper into the field and nothing ever turned it
+back into an answer, so "field-level provenance" was true of the bytes and false of the product.
+
+**Decision (standing auto-approval).** The reader belongs in the note inspector, not a new
+panel: it is the one surface already showing `field.raw` per field, so attribution lands next to
+the value it describes. Rendered from `field.raw` on **every render**, deliberately uncached —
+editing the wrapper away must drop the line rather than leave a stale source. Tradeoff: one
+regex per field per render, which is cheap against the textarea already there, and the
+alternative (caching on the draft) would have to be invalidated on every field edit.
+
+**Live gate, through the real main process, no dialogs** (`readApkgDraft`/`exportApkgDraft`
+take explicit paths). Fixture `%TEMP%\jp-apkg-export-test\source.apkg`, 3 notes, fingerprint
+`sha1:25f98e61…`: read → **0 of 3 notes carried provenance**; export note 2002 with
+`data-jp-dict="JMdict (EN)|Jitendex"` → `ok true, verified true, notesUpdated 1`; reimport the
+written package → note 2002's raw came back **byte-identical**, `normalized` the bare
+`cat; feline`, and notes 2001/2003 **still unattributed**. That last clause is the negative
+control: a pass is not "everything looks enriched".
+
+**Mutation controls, both real.** Replacing the inspector's read with `[]` → **4 of 5** new
+mounted tests red. Making `applyExportChanges` write `change.fields.map(options.normalize)` into
+`flds` → **4 of 4** round-trip tests red. Both reverted; `apkgExportCore.ts` verified clean.
+
+**What the round trip actually has to survive**, each a place markup could be normalized away:
+the enriched field; the field that is **also** sortf (sfld comes back `猫` while flds keeps the
+wrapper — the write path strips only its own copy); a **second** export carrying the first's
+provenance through as untouched source data; and source names containing `"` and `&`.
+
+**Trap.** The attribute is `data-jp-dict` / class `jp-dict-src` — not the `data-enrich-src` the
+function names suggest. Assert against `ENRICH_PROVENANCE_ATTR`, never a guessed literal.
+
+**Not closed live: the inspector on a reimported deck.** The workbench's source picker is a
+native dialog and `window.api` is frozen, so the UI half rides on the attended walk already
+listed in `needs-user.md` (2026-08-16 08:55). The rendering itself is covered by the 5 mounted
+tests + mutation control; what is unproven is only those two halves in one window.
+
+**Gates this turn.** vitest **682 passed / 1 failed / 1 skipped of 684, 9,227 passed** — the
+failure is `i18nSplit` timing out at 20 s under full-suite load, passing alone in **999 ms**
+(a whole-tree file scan; a *different* suite from last turn's flake, so the cause is load, not
+a file). i18n exit 0 at **10,203** (+1). architecture "Nothing new", 2 pending. eslint **0
+errors** on touched paths — note every `.css` file in this repo errors under eslint (no CSS
+parser configured), which is pre-existing and not a signal.
