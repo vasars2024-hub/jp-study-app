@@ -36,7 +36,13 @@ beforeAll(async () => {
         });
         req.on('end', () => {
           res.writeHead(200, { 'content-type': 'application/json' });
-          res.end(JSON.stringify({ method: req.method, body, ua: req.headers['user-agent'] }));
+          res.end(JSON.stringify({
+            method: req.method,
+            body,
+            ua: req.headers['user-agent'],
+            contentLength: req.headers['content-length'] ?? null,
+            transferEncoding: req.headers['transfer-encoding'] ?? null,
+          }));
         });
         return;
       }
@@ -136,6 +142,32 @@ describe('scraperRequest', () => {
     expect(parsed.method).toBe('POST');
     expect(parsed.body).toBe('name=one-piece');
     expect(parsed.ua).toContain('Mozilla/5.0');
+  });
+
+  // qBittorrent's WebUI reads no form field at all out of a chunked request:
+  // `torrents/add` saw an empty `urls` and answered 409 Conflict on every real
+  // send until the length was declared. Measured live 2026-08-16.
+  it('declares a content length rather than sending the body chunked', async () => {
+    const res = await scraperRequest(`${base}/echo`, {
+      method: 'POST',
+      // Multibyte on purpose: a character count would be short here.
+      body: 'urls=magnet%3A&name=日本',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    });
+    const parsed = JSON.parse(res.body);
+    expect(parsed.transferEncoding).toBe(null);
+    expect(parsed.contentLength).toBe(String(Buffer.byteLength('urls=magnet%3A&name=日本')));
+  });
+
+  it('leaves a caller-declared content length alone, and never adds one to a GET', async () => {
+    const declared = await scraperRequest(`${base}/echo`, {
+      method: 'POST',
+      body: 'ab',
+      headers: { 'Content-Length': '2' },
+    });
+    expect(JSON.parse(declared.body).contentLength).toBe('2');
+    const read = await scraperRequest(`${base}/echo`);
+    expect(JSON.parse(read.body).contentLength).toBe(null);
   });
 
   it('follows a redirect and reports the final URL', async () => {

@@ -302,8 +302,18 @@ export function resolveRequestOptions(
     options.headers,
   );
   const timeout = options.timeoutMs ?? policy?.requestTimeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const method = (options.method ?? 'GET').toUpperCase();
+  // Node sends a written body with no `content-length` as `transfer-encoding:
+  // chunked`, and qBittorrent's WebUI parses no form fields at all out of a
+  // chunked request: `torrents/add` then sees an empty `urls` and answers 409
+  // Conflict. Measured live 2026-08-16 — the same magnet with an explicit
+  // length answered 200. Declaring the length is also simply correct for a
+  // body we already hold whole in memory.
+  if (options.body !== undefined && method !== 'GET' && method !== 'HEAD' && !base['content-length']) {
+    base['content-length'] = String(Buffer.byteLength(options.body));
+  }
   return {
-    method: (options.method ?? 'GET').toUpperCase(),
+    method,
     headers: base,
     body: options.body,
     timeoutMs: Math.min(MAX_TIMEOUT_MS, Math.max(1_000, timeout)),
