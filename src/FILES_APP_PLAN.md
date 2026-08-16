@@ -156,6 +156,86 @@ a first-class requirement, not a nicety — the user named time-created and size
 Where a store cannot support an operation (a SQLite dictionary row cannot be "renamed" on disk),
 the action is absent rather than present-and-failing.
 
+## Feature inventory
+
+The user asked for as much of a real file manager as makes sense here, and asked that the list
+itself be brainstormed rather than dictated. Tiers are implementation order, not importance:
+**T1** is the app being usable at all, **T2** is it feeling like Explorer, **T3** is where it
+beats Explorer because it knows what the files *are*.
+
+### The one real conflict: derived folders vs. folders you make
+
+"Automatically sorted" and "let me create folders" pull against each other — a tree computed
+from provenance has nowhere to put a folder the user invented. Resolved with **two container
+kinds, visibly distinct**:
+
+- **Derived folders** — computed from what an item is (Sources/Video, Reference/Dictionaries).
+  Membership is automatic and cannot be edited; new items self-file. These cannot be deleted or
+  renamed, and that refusal is honest rather than hidden.
+- **Collections** — user-made, arbitrary membership, an item may belong to many, and belonging
+  to one never moves or copies the underlying file. Nest freely, rename, delete (deleting a
+  collection never deletes its contents — stated in the confirm).
+
+Anything else — a user folder that silently competes with the derived tree — produces two
+answers to "where is this file", which is the failure this whole design is trying to avoid.
+
+### T1 — the spine
+
+- Tree pane with expand/collapse; item list pane; resizable split.
+- **Sorting** by name, kind, **size**, **date created**, date modified, and date last used,
+  ascending/descending, sort persisted per folder.
+- Columns: choose which show, reorder, resize.
+- Details view + list view; item count and total size of selection in a status bar.
+- Multi-select: Ctrl+click, Shift+range, Ctrl+A, marquee drag, invert selection.
+- Open (routed via `planForPath`), Open with (the ranked candidates), Reveal in Explorer.
+- Search within the current folder and across everything.
+- Back / Forward / Up with history, breadcrumbs, and an editable path bar.
+- **New folder** (creates a Collection), rename, delete-collection.
+- **Favorites**: pin items *and* locations; a Favorites node at the top of the tree.
+  The user's earlier ambiguous "60 stars" is read as this same feature — starring an item
+  surfaces it in Favorites — which makes the two requests one thing.
+- Refresh, and a live-updating list (a new transcript appears without a manual refresh).
+
+### T2 — the Explorer feel
+
+- View modes: details, list, tiles, large/extra-large icons with **thumbnails** (covers,
+  video posters, epub art).
+- **Preview pane** (selected item rendered: cue list, page, cover, waveform) and a **details
+  pane** (metadata, provenance, study stats).
+- **Group by** kind / date / size / provenance, with collapsible groups.
+- Drag and drop: into Collections, out to Explorer, in from Explorer (import via the router).
+- Cut / copy / paste semantics where they are meaningful, with **Undo (Ctrl+Z)** for
+  operations that can be reversed and an explicit "cannot be undone" where they cannot.
+- Context menus per type; a Properties view per item.
+- Filter bar: kind, provenance, date range, size range.
+- Keyboard throughout: F2 rename, Delete, F5 refresh, Alt+←/→, Enter, type-ahead find.
+- **Tabs** — several locations open at once (Windows 11 parity), and optionally a dual pane,
+  which is genuinely useful when moving items between Collections.
+- Progress with cancel for long operations (import, transcribe, bulk mine), and errors that
+  name the item that failed rather than failing the batch silently.
+- Per-folder view settings remembered.
+
+### T3 — what Explorer cannot do, because it does not know what these files are
+
+- **Smart folders** (saved searches that stay live): *Untranscribed videos*, *Never mined*,
+  *Mined this week*, *Has human Japanese subtitles*, *Transcript-only*, *Largest downloads*.
+  This is the honest home for "automatically sorted" beyond the fixed tree.
+- **State columns**: transcribed · mined · exported · enabled (dictionaries) · has notes.
+- **Provenance column** as a first-class citizen: human subs / auto-captions / Whisper
+  transcript / book text — with transcript-derived material visibly marked everywhere.
+- **Study statistics per item**: cards mined from this source, known-word coverage, last
+  studied — the statistics moved out of Settings become per-item facts here, not just totals.
+- **Bulk study actions**: mine all selected, transcribe all selected, export selection.
+- **Duplicate detection** (the same episode acquired twice) and **broken-link detection**
+  (a record pointing at a file that is gone) — both are real conditions in this app today.
+- Notes attached to any item (absorbed from Notebook), searchable.
+- Sort by "most useful to study next" using coverage and frequency data the app already has.
+
+### Explicitly out of scope
+
+Browsing arbitrary disk, file compression, network locations, sharing/permissions, and
+anything that duplicates the OS for its own sake. Import and reveal are the only crossings.
+
 ## Deletion, and why it gets its own section
 
 There is no userData restore point. `downloads`, `models`, `wallpapers`, `library` and
@@ -167,6 +247,18 @@ Rules: deletion states what will be removed and its size before acting; media de
 guarded separately from index deletion; removing a *derived* item (a transcript, a CSV export)
 is distinguished in the UI from removing an *irreplaceable* one (a downloaded video); and
 nothing cascades silently.
+
+**And the mitigation that changes the risk entirely: file-backed deletions go to the Windows
+Recycle Bin, not to `unlink`.** Electron's `shell.trashItem` does exactly this. It restores the
+undo that this app has been missing since backups were switched off, it costs no extra storage
+(the Recycle Bin is the OS's problem), and it means a mis-click on a 2 GB download is
+recoverable by the user without any involvement from us. Adding a file manager to an app with
+no restore point is the risk; routing its deletes through the Recycle Bin is what makes the
+feature responsible rather than reckless — so it is a requirement, not an enhancement.
+
+Index-only rows (a dictionary, a Collection, a note) have no Recycle Bin equivalent, so they get
+a soft delete with an undo window instead. Wherever neither is possible, the confirm says so in
+plain words rather than using the same wording as a recoverable delete.
 
 ## Gates
 
@@ -209,7 +301,24 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
    must sort predictably rather than landing arbitrarily.
 15. **Music is untouched.** A track opens the existing music app, and that app's behaviour is
    unchanged before and after.
-16. Full gates: `npx vitest run`, `node tools/i18n-check.cjs`,
+16. **Collections are real folders.** Create a folder, add items of two different kinds to it,
+   nest it, reopen the app and it survives. Deleting the collection leaves every item in place —
+   proven by re-finding one of them afterwards.
+17. **Derived folders refuse honestly.** Renaming or deleting a derived folder is refused with a
+   named message; it does not silently no-op. Adding an item to one by hand is not offered.
+18. **Favorites.** Pin an item and a location; both appear under Favorites and survive a
+   restart. Unpinning removes them and deletes nothing.
+19. **Smart folders stay live.** A saved search such as *Untranscribed videos* changes its
+   membership after a video is transcribed, with the count before and after both reported.
+20. **Bulk actions.** Select several items and mine them in one action; the result names the
+   per-item outcome, and one failure does not silently abort the rest.
+21. **Deletion is recoverable.** Deleting a file-backed item places it in the Windows Recycle
+   Bin (`shell.trashItem`) and it is restorable from there — verified by actually restoring one.
+   An index-only row is soft-deleted with a working undo. Where neither applies, the confirm
+   says so in different words from a recoverable delete.
+22. **View state persists.** Sort column, direction and view mode are remembered per folder
+   across a restart.
+23. Full gates: `npx vitest run`, `node tools/i18n-check.cjs`,
     `node tools/architecture-audit.cjs`, `npx eslint <touched paths>`. `tsc --noEmit` is NOT a
     gate — 327 pre-existing errors; prove "no new" by set-difference.
 
