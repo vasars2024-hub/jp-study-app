@@ -9185,8 +9185,10 @@ export const en: Catalog = {
     'A moved card is no longer in the collection. Nothing was written — re-read it on step 1 before writing.',
   'ankiWorkbench.apply.liveError.deck-rename-unsupported':
     'A live collection cannot be renamed through this connection, so nothing was written. Export a package instead — the rename is written there.',
-  'ankiWorkbench.apply.liveError.deck-move-unsupported':
-    'A split moves cards between decks, which cannot be written to a live collection through this connection, so nothing was written. Export a package instead — the split is written there.',
+  'ankiWorkbench.apply.liveError.deck-missing':
+    'The split names a deck the collection does not have and the change set does not describe, so the cards have nowhere to go. Nothing was written — re-read the collection before committing.',
+  'ankiWorkbench.apply.liveError.deck-filtered':
+    'The split would file cards into a filtered deck, which rebuilds its own contents, so they would be evicted on the next rebuild. Nothing was written.',
   'ankiWorkbench.apply.liveError.unreachable':
     'Anki stopped answering partway through. Anything listed below did not reach the collection.',
   'ankiWorkbench.apply.liveError.collection-unavailable':

@@ -8714,8 +8714,10 @@ export const zh: Catalog = {
     '某张要移动的卡片已不在集合中。什么也没有写入 — 请先在第 1 步重新读取再写入。',
   'ankiWorkbench.apply.liveError.deck-rename-unsupported':
     '此连接无法重命名正在使用的集合中的牌组，因此什么也没有写入。请改为导出软件包 — 重命名会写入其中。',
-  'ankiWorkbench.apply.liveError.deck-move-unsupported':
-    '拆分会将卡片移至其他牌组，此连接无法写入正在使用的集合，因此什么也没有写入。请改为导出软件包 — 拆分会写入其中。',
+  'ankiWorkbench.apply.liveError.deck-missing':
+    '拆分指定的牌组不在集合中，变更集也没有描述它，因此卡片无处可去。未写入任何内容 — 请先重新读取集合再提交。',
+  'ankiWorkbench.apply.liveError.deck-filtered':
+    '拆分会将卡片放入筛选牌组，而筛选牌组会重建自身内容，下次重建时卡片会被移出。未写入任何内容。',
   'ankiWorkbench.apply.liveError.unreachable':
     'Anki 中途停止响应。下面列出的内容都没有写进集合。',
   'ankiWorkbench.apply.liveError.collection-unavailable':

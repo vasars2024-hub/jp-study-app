@@ -52,12 +52,16 @@ export type ConnectCommitErrorCode =
    */
   | 'deck-rename-unsupported'
   /**
-   * Recipe 13's split. AnkiConnect *does* have `createDeck` and `changeDeck`,
-   * but committing a split live also has to preserve each card's scheduling and
-   * survive a partial failure across two actions — so it is refused by name
-   * until that path is built rather than half-committed here.
+   * Recipe 13's split names a target deck the live collection does not have and
+   * the change set does not describe, so the cards have nowhere to go.
    */
-  | 'deck-move-unsupported'
+  | 'deck-missing'
+  /**
+   * The split's target is a filtered deck. Cards in one are on loan and Anki
+   * rebuilds its contents from a search, so a card filed there by hand would be
+   * evicted on the next rebuild — a move that silently undoes itself.
+   */
+  | 'deck-filtered'
   /** Anki or the add-on is not answering. */
   | 'unreachable'
   /** AnkiConnect answered but no collection is loaded. */
@@ -129,9 +133,26 @@ export interface ConnectCardWrite {
   due: number;
 }
 
+/**
+ * Recipe 13's split, as one call per target deck rather than one per card:
+ * `changeDeck` takes a card array, and a split of a large deck is thousands of
+ * cards across a handful of subdecks.
+ */
+export interface ConnectDeckWrite {
+  /** Full `::` name. AnkiConnect addresses decks by name here, never by id. */
+  deck: string;
+  /** No live deck holds this name yet, so the commit creates it first. */
+  create: boolean;
+  /** Preset to apply after creating — the parent's, so study limits carry. */
+  configId?: number;
+  cardIds: number[];
+}
+
 export interface ConnectCommitPlan {
   noteWrites: ConnectNoteWrite[];
   cardWrites: ConnectCardWrite[];
+  /** Absent-as-empty on a plan carrying no split. */
+  deckWrites: ConnectDeckWrite[];
 }
 
 /** Anki ids are integers; AnkiConnect rejects them as strings. */
@@ -219,12 +240,79 @@ export function planConnectCommit(
     if (write.fields || write.addTags.length || write.removeTags.length) noteWrites.push(write);
   }
 
-  if ((changes.cardDeckMoves ?? []).length > 0) {
-    throw new ConnectCommitRefusal(
-      'deck-move-unsupported',
-      `This change set moves ${(changes.cardDeckMoves ?? []).length} card(s) between decks, `
-        + 'which a live commit cannot yet do. Undo the split before committing.',
+  // Recipe 13's split. Resolved to deck NAMES against this fresh read, because
+  // that is how AnkiConnect addresses a deck — and because a name is stable
+  // across the create, whereas the new deck's id does not exist until Anki
+  // allocates it.
+  const deckWrites: ConnectDeckWrite[] = [];
+  const deckMoves = changes.cardDeckMoves ?? [];
+  if (deckMoves.length > 0) {
+    const deckById = new Map(live.decks.map((deck) => [deck.id, deck]));
+    const deckByName = new Map(live.decks.map((deck) => [deck.name, deck]));
+    const described = new Map(
+      (changes.deckCreates ?? []).map((create) => [create.deckId, create]),
     );
+    const byName = new Map<string, ConnectDeckWrite>();
+    for (const move of deckMoves) {
+      const card = cardById.get(move.cardId);
+      if (!card) {
+        throw new ConnectCommitRefusal(
+          'card-missing',
+          `Card ${move.cardId} (note ${move.noteId}) is no longer in the collection.`,
+        );
+      }
+      // On loan to a filtered deck: its real deck lives in `originalDeckId`, so
+      // `changeDeck` would rewrite the loan rather than the card's actual home.
+      if (card.originalDeckId !== undefined || filteredDeckIds.has(card.deckId)) {
+        throw new ConnectCommitRefusal(
+          'card-filtered',
+          `Card ${move.cardId} is on loan to a filtered deck, so its deck is not this commit's to `
+            + 'change. Empty the filtered deck in Anki first.',
+        );
+      }
+
+      const liveDeck = deckById.get(move.deckId);
+      const spec = described.get(move.deckId);
+      // A deck the split invented may already exist live — created in Anki since
+      // the draft was read. Refiling into it is what the user asked for, so this
+      // is a create that turns into a plain move, not a refusal.
+      const existing = liveDeck ?? (spec ? deckByName.get(spec.name) : undefined);
+      if (!existing && !spec) {
+        throw new ConnectCommitRefusal(
+          'deck-missing',
+          `Deck ${move.deckId} is not in the collection and the change set carries no name for it, `
+            + 'so the cards moved into it have nowhere to go.',
+        );
+      }
+      // Measured hole, deliberately left: `probeFilteredDecks` only probes deck
+      // names the cards reference, so an EMPTY filtered deck reads as normal and
+      // this check cannot see it. Closing it needs a per-target probe in the
+      // transport; `planDeckSplit` already refuses a filtered parent, so the only
+      // way through is a minted name colliding with an empty filtered deck.
+      if (existing?.filtered) {
+        throw new ConnectCommitRefusal(
+          'deck-filtered',
+          `"${existing.name}" is a filtered deck, which rebuilds its own contents — a card filed `
+            + 'there would be evicted on the next rebuild.',
+        );
+      }
+      const name = existing ? existing.name : (spec as { name: string }).name;
+      // Already there against the LIVE state: not a write, same rule the note
+      // half follows.
+      if (existing && card.deckId === existing.id) continue;
+
+      let write = byName.get(name);
+      if (!write) {
+        write = { deck: name, create: !existing, cardIds: [] };
+        if (!existing && spec?.configId !== undefined) {
+          const preset = Number(spec.configId);
+          if (Number.isSafeInteger(preset) && preset > 0) write.configId = preset;
+        }
+        byName.set(name, write);
+        deckWrites.push(write);
+      }
+      write.cardIds.push(numericId(move.cardId, 'card'));
+    }
   }
 
   const cardWrites: ConnectCardWrite[] = [];
@@ -258,7 +346,7 @@ export function planConnectCommit(
     );
   }
 
-  return { noteWrites, cardWrites };
+  return { noteWrites, cardWrites, deckWrites };
 }
 
 /**
@@ -303,6 +391,29 @@ export function verifyConnectCommit(
     const card = cardById.get(move.cardId);
     if (!card) mismatches.push(`card ${move.cardId}: missing`);
     else if (card.due !== move.due) mismatches.push(`card ${move.cardId}: due differs`);
+  }
+
+  // The split. A deck the commit created is resolved by NAME out of the re-read
+  // collection, never from the id the commit happened to receive, so this
+  // confirms both that the deck exists and that the card is in it.
+  const deckMoves = changes.cardDeckMoves ?? [];
+  if (deckMoves.length > 0) {
+    const deckById = new Map(after.decks.map((deck) => [deck.id, deck]));
+    const idByName = new Map(after.decks.map((deck) => [deck.name, deck.id]));
+    const describedName = new Map(
+      (changes.deckCreates ?? []).map((create) => [create.deckId, create.name]),
+    );
+    for (const move of deckMoves) {
+      const name = deckById.get(move.deckId)?.name ?? describedName.get(move.deckId);
+      const expected = name === undefined ? undefined : idByName.get(name);
+      if (expected === undefined) {
+        mismatches.push(`deck ${move.deckId}: missing`);
+        continue;
+      }
+      const card = cardById.get(move.cardId);
+      if (!card) mismatches.push(`card ${move.cardId}: missing`);
+      else if (card.deckId !== expected) mismatches.push(`card ${move.cardId}: deck differs`);
+    }
   }
 
   return { ok: mismatches.length === 0, mismatches };

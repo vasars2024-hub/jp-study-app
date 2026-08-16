@@ -78,8 +78,10 @@ describe('anki tray strings', () => {
 /**
  * Step 7's two error codes, built into a key the same runtime way
  * (`DeckWorkbenchApply.tsx:242` and `:155`). Same class of defect and the same
- * blind spot: recipe 13's `deck-move-unsupported` shipped with no
- * `liveError` string, so refusing a live split showed the user the literal key.
+ * blind spot: recipe 13's live refusal shipped with no `liveError` string, so a
+ * refused split showed the user the literal key. That code has since been
+ * replaced by a real write path, which is exactly why this guard runs against
+ * the union rather than against a list — the members keep changing.
  */
 describe('anki apply error strings', () => {
   /** `cancelled` is filtered out before the panel renders (`DeckWorkbenchApply.tsx:80`). */

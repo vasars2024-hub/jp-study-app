@@ -125,6 +125,21 @@ export interface AnkiActionMap {
     };
     result: (boolean | [boolean, string])[];
   };
+  /**
+   * Recipe 13's split, live half. AnkiConnect addresses a deck by NAME here, not
+   * by id, and creates the deck when the name is unknown — which is why the
+   * commit calls `createDeck` first anyway: only an explicit create can be
+   * followed by `setDeckConfigId`, and only an explicit create fails *before*
+   * any card has moved. A card already in `deck` is left alone by Anki.
+   */
+  changeDeck: { params: { cards: number[]; deck: string }; result: null };
+  /**
+   * Applies an options preset to whole decks by name. The split's new subdeck
+   * inherits its parent's preset, so study limits carry — a freshly created deck
+   * otherwise lands on preset 1 (Default), which is a different daily limit than
+   * the parent the user split.
+   */
+  setDeckConfigId: { params: { decks: string[]; configId: number }; result: boolean };
   /** The profile the write landed in, echoed back into the commit result. */
   getActiveProfile: { params: undefined; result: string };
 }
@@ -160,6 +175,10 @@ const DEFAULT_TIMEOUTS: Record<keyof AnkiActionMap, number> = {
   addTags: MUTATE_TIMEOUT_MS,
   removeTags: MUTATE_TIMEOUT_MS,
   setSpecificValueOfCard: MUTATE_TIMEOUT_MS,
+  // BULK: one call carries every card moving into a deck, so a split of a large
+  // deck sends thousands of ids in a single request.
+  changeDeck: BULK_TIMEOUT_MS,
+  setDeckConfigId: MUTATE_TIMEOUT_MS,
   getActiveProfile: FAST_TIMEOUT_MS,
   // BULK: a model row carries every template's full HTML, so a collection with
   // dozens of note types answers slower than any other read-only action.

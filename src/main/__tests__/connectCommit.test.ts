@@ -68,6 +68,9 @@ class FakeCollection {
     { id: CARD_B, note: NOTE_B, due: 20, deck: 'JP' },
   ];
   decks: Record<string, number> = { JP: 1782214589474 };
+  /** Preset per deck name, written by `setDeckConfigId`. */
+  deckConfig: Record<string, number> = {};
+  deckSeq = 1;
   filteredDecks = new Set<string>();
   /** Actions that must throw, by `${action}:${id}`. */
   failures = new Map<string, Error>();
@@ -177,6 +180,39 @@ class FakeCollection {
         }
         return keys.map(() => true);
       }
+      case 'createDeck': {
+        const name = String(params.deck);
+        const fail = this.failures.get(`createDeck:${name}`);
+        if (fail) throw fail;
+        // Anki's own behaviour: an existing name is not an error, it just
+        // answers the id it already has.
+        if (!(name in this.decks)) this.decks[name] = 1782300000000 + this.deckSeq++;
+        return this.decks[name];
+      }
+      case 'setDeckConfigId': {
+        const names = params.decks as string[];
+        const fail = this.failures.get(`setDeckConfigId:${names.join(',')}`);
+        if (fail) throw fail;
+        for (const name of names) this.deckConfig[name] = Number(params.configId);
+        return true;
+      }
+      case 'changeDeck': {
+        const name = String(params.deck);
+        const fail = this.failures.get(`changeDeck:${name}`);
+        if (fail) throw fail;
+        // `changeDeck` creates the deck when the name is unknown — the real
+        // add-on does, and a fake that refused would hide the fact that the
+        // explicit `createDeck` above is there for the preset, not the deck.
+        if (!(name in this.decks)) this.decks[name] = 1782300000000 + this.deckSeq++;
+        for (const id of params.cards as number[]) {
+          const target = this.cards.find((c) => c.id === id);
+          if (!target || this.swallowWrites) continue;
+          target.deck = name;
+          const note = this.note(target.note);
+          if (note) note.mod += 1;
+        }
+        return null;
+      }
       default:
         throw new Error(`unexpected action ${action}`);
     }
@@ -209,9 +245,15 @@ function callsTo(action: string) {
 /** Every action that can change the collection. Zero of these is the control. */
 function mutatingCalls() {
   return invoke.mock.calls.filter((call) =>
-    ['updateNoteFields', 'addTags', 'removeTags', 'setSpecificValueOfCard'].includes(
-      String(call[0]),
-    ),
+    [
+      'updateNoteFields',
+      'addTags',
+      'removeTags',
+      'setSpecificValueOfCard',
+      'createDeck',
+      'setDeckConfigId',
+      'changeDeck',
+    ].includes(String(call[0])),
   );
 }
 
@@ -492,5 +534,260 @@ describe('commitConnectDraft', () => {
     expect(result.errorCode).toBe('verify-failed');
     expect(result.verified).toBe(false);
     expect(result.error).toContain(`note ${NOTE_A}: fields differ`);
+  });
+});
+
+/**
+ * Recipe 13's split, live half. The package writer allocates its own deck ids;
+ * this side cannot — AnkiConnect addresses a deck by NAME and Anki allocates the
+ * id — so every assertion here is about the name and about what the RE-READ
+ * finds, never about an id the commit chose.
+ */
+describe('commitConnectDraft — recipe 13 split', () => {
+  beforeEach(() => {
+    invoke.mockReset();
+    wire();
+  });
+
+  /** One card into a subdeck the split invented, which Anki does not have yet. */
+  const MINTED = 'split:1782214589474:N5';
+  function splitOneCard(deckId = MINTED, name = 'JP::N5'): ApkgExportChangeSet {
+    return {
+      notes: [],
+      cardMoves: [],
+      cardDeckMoves: [{ cardId: String(CARD_A), noteId: String(NOTE_A), deckId }],
+      deckCreates: [{ deckId, name, configId: '1782214589999' }],
+    };
+  }
+
+  it('creates the subdeck, applies the parent preset, and refiles the card', async () => {
+    const fingerprint = await currentFingerprint();
+    const result = await commitConnectDraft({
+      fingerprint,
+      read: READ,
+      changes: splitOneCard(),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.verified).toBe(true);
+    expect(result.cardsUpdated).toBe(1);
+    expect(callsTo('createDeck').map((c) => c[1])).toEqual([{ deck: 'JP::N5' }]);
+    expect(callsTo('setDeckConfigId').map((c) => c[1])).toEqual([
+      { decks: ['JP::N5'], configId: 1782214589999 },
+    ]);
+    expect(callsTo('changeDeck').map((c) => c[1])).toEqual([
+      { cards: [CARD_A], deck: 'JP::N5' },
+    ]);
+    // The claim, read out of the collection rather than off the result.
+    expect(collection.cards.find((c) => c.id === CARD_A)?.deck).toBe('JP::N5');
+    expect(collection.deckConfig['JP::N5']).toBe(1782214589999);
+    // The card that was not in the split stayed exactly where it was.
+    expect(collection.cards.find((c) => c.id === CARD_B)?.deck).toBe('JP');
+  });
+
+  it('sends one changeDeck call for every card going to the same deck', async () => {
+    const fingerprint = await currentFingerprint();
+    const result = await commitConnectDraft({
+      fingerprint,
+      read: READ,
+      changes: {
+        notes: [],
+        cardMoves: [],
+        cardDeckMoves: [
+          { cardId: String(CARD_A), noteId: String(NOTE_A), deckId: MINTED },
+          { cardId: String(CARD_B), noteId: String(NOTE_B), deckId: MINTED },
+        ],
+        deckCreates: [{ deckId: MINTED, name: 'JP::N5' }],
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.cardsUpdated).toBe(2);
+    expect(callsTo('changeDeck')).toHaveLength(1);
+    expect(callsTo('changeDeck')[0][1]).toEqual({ cards: [CARD_A, CARD_B], deck: 'JP::N5' });
+    // No preset was described, so none is forced onto the new deck.
+    expect(callsTo('setDeckConfigId')).toHaveLength(0);
+  });
+
+  it('refiles into a deck the collection already has without creating one', async () => {
+    collection.decks['JP::N4'] = 1782214589500;
+    const fingerprint = await currentFingerprint();
+    const result = await commitConnectDraft({
+      fingerprint,
+      read: READ,
+      changes: {
+        notes: [],
+        cardMoves: [],
+        cardDeckMoves: [
+          { cardId: String(CARD_A), noteId: String(NOTE_A), deckId: '1782214589500' },
+        ],
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(callsTo('createDeck')).toHaveLength(0);
+    expect(collection.cards.find((c) => c.id === CARD_A)?.deck).toBe('JP::N4');
+  });
+
+  it('treats a minted deck Anki already holds as a move, not a create', async () => {
+    // The user made the deck in Anki between the read and the commit.
+    collection.decks['JP::N5'] = 1782214589600;
+    const fingerprint = await currentFingerprint();
+    const result = await commitConnectDraft({ fingerprint, read: READ, changes: splitOneCard() });
+
+    expect(result.ok).toBe(true);
+    expect(callsTo('createDeck')).toHaveLength(0);
+    // Nor is the existing deck's own preset overwritten by the split's guess.
+    expect(callsTo('setDeckConfigId')).toHaveLength(0);
+    expect(collection.cards.find((c) => c.id === CARD_A)?.deck).toBe('JP::N5');
+  });
+
+  it('is not a write when the card is already in the target deck', async () => {
+    collection.decks['JP::N5'] = 1782214589600;
+    const card = collection.cards.find((c) => c.id === CARD_A);
+    if (card) card.deck = 'JP::N5';
+    const fingerprint = await currentFingerprint();
+    const result = await commitConnectDraft({ fingerprint, read: READ, changes: splitOneCard() });
+
+    expect(result.ok).toBe(true);
+    expect(result.cardsUpdated).toBe(0);
+    expect(mutatingCalls()).toHaveLength(0);
+  });
+
+  it('counts a card that is both refiled and repositioned once', async () => {
+    const fingerprint = await currentFingerprint();
+    const result = await commitConnectDraft({
+      fingerprint,
+      read: READ,
+      changes: {
+        notes: [],
+        cardMoves: [{ cardId: String(CARD_A), noteId: String(NOTE_A), due: 7 }],
+        cardDeckMoves: [{ cardId: String(CARD_A), noteId: String(NOTE_A), deckId: MINTED }],
+        deckCreates: [{ deckId: MINTED, name: 'JP::N5' }],
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    // Two change-list entries, one card row in Anki.
+    expect(result.cardsUpdated).toBe(1);
+    const card = collection.cards.find((c) => c.id === CARD_A);
+    expect(card?.deck).toBe('JP::N5');
+    expect(card?.due).toBe(7);
+  });
+
+  it('refuses a target the collection lacks and the change set does not describe', async () => {
+    const fingerprint = await currentFingerprint();
+    const result = await commitConnectDraft({
+      fingerprint,
+      read: READ,
+      changes: {
+        notes: [],
+        cardMoves: [],
+        cardDeckMoves: [{ cardId: String(CARD_A), noteId: String(NOTE_A), deckId: MINTED }],
+      },
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.errorCode).toBe('deck-missing');
+    expect(mutatingCalls()).toHaveLength(0);
+  });
+
+  it('refuses filing cards into a filtered deck', async () => {
+    collection.decks['Custom Study'] = 1782214589700;
+    collection.filteredDecks.add('Custom Study');
+    // The deck has to hold a card to be *seen* as filtered: `probeFilteredDecks`
+    // only probes deck names the cards reference, so an EMPTY filtered deck
+    // reads as normal. That residual hole is recorded in the ledger; putting a
+    // card here is what makes this test measure the refusal rather than it.
+    const other = collection.cards.find((c) => c.id === CARD_B);
+    if (other) other.deck = 'Custom Study';
+    const fingerprint = await currentFingerprint();
+    const result = await commitConnectDraft({
+      fingerprint,
+      read: READ,
+      changes: {
+        notes: [],
+        cardMoves: [],
+        cardDeckMoves: [
+          { cardId: String(CARD_A), noteId: String(NOTE_A), deckId: '1782214589700' },
+        ],
+      },
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.errorCode).toBe('deck-filtered');
+    expect(result.error).toContain('Custom Study');
+    expect(mutatingCalls()).toHaveLength(0);
+  });
+
+  it('refuses moving a card that is on loan to a filtered deck', async () => {
+    collection.decks['Custom Study'] = 1782214589700;
+    collection.filteredDecks.add('Custom Study');
+    const card = collection.cards.find((c) => c.id === CARD_A);
+    if (card) card.deck = 'Custom Study';
+    const fingerprint = await currentFingerprint();
+    const result = await commitConnectDraft({ fingerprint, read: READ, changes: splitOneCard() });
+
+    expect(result.ok).toBe(false);
+    expect(result.errorCode).toBe('card-filtered');
+    expect(mutatingCalls()).toHaveLength(0);
+  });
+
+  it('names every card in a batched changeDeck that failed, and totals honestly', async () => {
+    collection.failures.set('changeDeck:JP::N5', new Error('deck was not found'));
+    const fingerprint = await currentFingerprint();
+    const result = await commitConnectDraft({
+      fingerprint,
+      read: READ,
+      changes: {
+        notes: [],
+        cardMoves: [],
+        cardDeckMoves: [
+          { cardId: String(CARD_A), noteId: String(NOTE_A), deckId: MINTED },
+          { cardId: String(CARD_B), noteId: String(NOTE_B), deckId: MINTED },
+        ],
+        deckCreates: [{ deckId: MINTED, name: 'JP::N5' }],
+      },
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.errorCode).toBe('partial');
+    expect(result.cardsUpdated).toBe(0);
+    // Both cards named individually — and the denominator counts them the same
+    // way, so it can never read "2 of 1 changes did not commit".
+    expect(result.failures).toEqual([
+      { kind: 'card', id: String(CARD_A), reason: 'deck was not found' },
+      { kind: 'card', id: String(CARD_B), reason: 'deck was not found' },
+    ]);
+    expect(result.error).toBe('2 of 2 changes did not commit.');
+    expect(collection.cards.find((c) => c.id === CARD_A)?.deck).toBe('JP');
+  });
+
+  it('stops at the first move when Anki goes away, and says how far it got', async () => {
+    collection.failures.set('changeDeck:JP::N5', new Error('UNREACHABLE'));
+    const fingerprint = await currentFingerprint();
+    const result = await commitConnectDraft({
+      fingerprint,
+      read: READ,
+      changes: splitOneCard(),
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.errorCode).toBe('unreachable');
+    expect(result.cardsUpdated).toBe(0);
+    expect(result.failures).toEqual([
+      { kind: 'card', id: String(CARD_A), reason: 'UNREACHABLE' },
+    ]);
+  });
+
+  it('does not claim a split landed when the re-read disagrees', async () => {
+    const fingerprint = await currentFingerprint();
+    collection.swallowWrites = true;
+    const result = await commitConnectDraft({ fingerprint, read: READ, changes: splitOneCard() });
+
+    expect(result.ok).toBe(false);
+    expect(result.errorCode).toBe('verify-failed');
+    expect(result.verified).toBe(false);
+    expect(result.error).toContain(`card ${CARD_A}: deck differs`);
   });
 });

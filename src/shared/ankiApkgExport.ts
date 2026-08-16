@@ -124,9 +124,10 @@ export type ApkgExportErrorCode =
    * planning (`filtered-card`), so this is the writer's own backstop against a
    * change set assembled some other way.
    *
-   * There is deliberately no `deck-move-unsupported` here: the package writer
-   * creates the deck rows and rewrites `cards.did` for real. The live
-   * AnkiConnect commit still refuses by that name — see `ankiConnectCommit.ts`.
+   * There is deliberately no `deck-move-unsupported` on either destination any
+   * more: the package writer creates the deck rows and rewrites `cards.did`, and
+   * the live commit does the same through `createDeck`/`changeDeck`. Both refuse
+   * only the cases they genuinely cannot write — see `ankiConnectCommit.ts`.
    */
   | 'card-filtered'
   | 'compressed-unsupported'
