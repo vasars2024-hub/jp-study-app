@@ -535,3 +535,54 @@ control has no live path — it rests on the `loadState` gate and the unit tests
 
 **Gate 32 remains OPEN** on the harvest→mine→deck legs: they need a title with jimaku coverage,
 which needs a working search. Re-check the two catalogues at the start of the next MAL turn.
+
+## 2026-08-16 — P7 gate 32 CLOSES: the whole flow driven through the real UI
+
+Worker `primary`. AniList recovered (`HTTP 200`, One Piece id 21); **Jikan is still `504`**, so
+the app ran one provider down throughout — which is also the honest control for the outage
+message: rows served, no outage text. Commits `a0a0010`, `69b5084`.
+
+**Gate 32, every leg through the real UI**, One Piece 100–104 on the user's own 3,221-card deck,
+restored to **3,221 cards / 1,320,982 bytes / folders `["Extension"]`** afterwards.
+
+| Leg | Measured |
+| --- | --- |
+| Search "One Piece" | **12 rows** (AniList; Jikan down) |
+| Pick → inspector | `ONE PIECE · TV · 1999 · Toei Animation`, buttons Download…/Shortlist/Open source page |
+| Download… | **301 units listed, 1,147 total** — the `no anilist entry` defect is gone |
+| Subtitles only → Range 100–104 | **"5 episodes selected"**, 5 checkboxes checked |
+| Find subtitles | **5 of 5 covered, 2,885 files filed** |
+| Harvest | **1,667 lines, 22,715 chars, 1,352 unique words, 675 kanji, 0 failures** |
+| Mine | **30 cards**, toast visible, histogram **100:23 101:6 102:1** |
+| Verify | 30/30 carry episode + sentence + title, `bookId harvest:anilist:21` |
+
+Cue and vocabulary counts are byte-identical to P4 gate 15 and P5 gate 18 across two independent
+runs plus a reload. Mining twice → **60 cards, 60 distinct, 0 repeats** (P5 gate 21 through the UI).
+
+**Two defects found by driving it, both fixed.**
+
+1. **`showToast` had no viewport mounted anywhere (`a0a0010`).** `components/ui/Toast.tsx` says
+   "mount `<ToastViewport/>` once"; nothing did — not `App.tsx`'s 10 shell branches, not
+   `blancMain.tsx`. So the harvest's "mined N words" and the download dialog's finished/failed
+   announcement both dispatched into no listener: **clicking Mine added 30 cards and produced
+   zero `.ui-toast-host` nodes.** `ToastHost` — the one component already mounted once per shell
+   — now mounts it, and no longer early-returns `null` on an empty `os:toast` list, which would
+   unmount the `ui:toast` listener whenever no `os:toast` is on screen. **Negative control:**
+   remove the `<ToastViewport />` and 3 of the 4 new tests fail, the `os:toast` one still passes.
+   Live after: 0 hosts before dispatch, **1** after, correct `ui-toast--success` class.
+2. **The Mine button promised 1,352 words and added 30 (`69b5084`).**
+   `addMediaStudyFlashcards` defaults to `limit: 30` — right for `MediaStudyMode`, where one
+   video is one sitting — and the panel passed no limit, silently inheriting it while its label
+   read *"Mine 1,352 words"*. `VISIBLE_VOCAB`'s comment claimed "the rest are still mined",
+   false for the same reason. The batch is now an explicit `MINE_BATCH` the panel owns and the
+   label names both numbers: live it reads **"Mine 30 of 1,352 words"** and adds 30. New key
+   `subHarvest.action.mineBatch` ×4; i18n exit 0 at **9,992** (+1).
+
+**Traps.** (1) The `0% you know` / `mineable 1,352 of 1,352` reading is **not** a broken filter —
+P5 gate 19 already proved it with そう→level 2 giving 1,351. Do not re-open it as a finding.
+(2) The four catalogs carry ~1,200 lines of another track's work: stage them with
+`debug/stage-head-insert.cjs`, never `git add`. (3) `debug/g32.cjs <step>` drives the whole flow
+one step per invocation and is the cheapest way back to any leg.
+
+**P7 gate 32 is CLOSED.** Remaining in this plan: gate 29 (half-open) and the attended-only
+gates 31/33, which need the user in the moment.

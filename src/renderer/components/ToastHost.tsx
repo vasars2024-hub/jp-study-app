@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import ToastViewport from './ui/Toast';
+import { ToastViewport } from './ui/Toast';
 
 /**
  * Renders transient `os:toast` messages. Extracted from App.tsx when Blanc got
