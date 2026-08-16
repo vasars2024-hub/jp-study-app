@@ -11,6 +11,7 @@ import {
 import { buildVocabContext } from '../ankiVocabContext';
 import { buildCardHealthContext } from '../ankiCardHealth';
 import { buildMediaHealthContext } from '../ankiMediaHealth';
+import { buildSiblingAuditContext } from '../ankiSiblingAudit';
 import { explainBrowserQuery } from '../ankiQueryExplain';
 
 function note(over: Partial<AnkiDraftNote> & { id: string }): AnkiDraftNote {
@@ -654,6 +655,135 @@ describe('media: (smart recipe 11)', () => {
     expect(explainBrowserQuery('media:missing', mSchema)).toEqual({
       kind: 'clause',
       key: 'ankiWorkbench.browser.explain.media.missing',
+    });
+  });
+});
+
+describe('sibling: (smart recipe 17)', () => {
+  // Its own draft again, and a card at a chosen ord: this predicate's verdict is
+  // about which templates gave a note a card, so `card()`'s fixed `ord: 0`
+  // cannot express any of it.
+  const at = (id: string, noteId: string, ord: number): AnkiDraftCard => ({
+    ...card(id, noteId, 'd1'),
+    ord,
+  });
+  const tpl = (ord: number, name: string, qfmt: string, afmt: string) => ({
+    ord, name, qfmt, afmt, bqfmt: '', bafmt: '',
+  });
+  const fields = [
+    { ord: 0, name: 'Front', sticky: false, rtl: false },
+    { ord: 1, name: 'Back', sticky: false, rtl: false },
+  ];
+  const twinned: AnkiDraft['noteTypes'][number] = {
+    id: 'twinned', name: 'Twinned', kind: 'standard', css: '', fields,
+    templates: [
+      tpl(0, 'Card 1', '{{Front}}', '{{FrontSide}}<hr id=answer>{{Back}}'),
+      // Same render, different spelling — compared as text, not as source.
+      tpl(1, 'Card 1 copy', '{{ Front }}', '{{FrontSide}}<hr id=answer>{{ Back }}'),
+    ],
+    sortFieldOrd: 0, latexPre: '', latexPost: '',
+  };
+  const reversible: AnkiDraft['noteTypes'][number] = {
+    ...twinned,
+    id: 'reversible', name: 'Reversible',
+    templates: [
+      tpl(0, 'Card 1', '{{Front}}', '{{FrontSide}}<hr id=answer>{{Back}}'),
+      tpl(1, 'Card 2', '{{Back}}', '{{FrontSide}}<hr id=answer>{{Front}}'),
+    ],
+  };
+  const disagreeing: AnkiDraft['noteTypes'][number] = {
+    ...twinned,
+    id: 'disagreeing', name: 'Disagreeing',
+    templates: [
+      tpl(0, 'Card 1', '{{Front}}', '{{FrontSide}}<hr id=answer>{{Back}}'),
+      tpl(1, 'Card 2', '{{Front}}', '{{FrontSide}}<hr id=answer>{{Front}}'),
+    ],
+  };
+  const notes = [
+    note({ id: 'twin', noteTypeId: 'twinned', cardIds: ['t1', 't2'],
+      fields: [f(0, 'Front', 'ねこ'), f(1, 'Back', 'cat')] }),
+    note({ id: 'fine', noteTypeId: 'reversible', cardIds: ['r1', 'r2'],
+      fields: [f(0, 'Front', 'いぬ'), f(1, 'Back', 'dog')] }),
+    note({ id: 'alone', noteTypeId: 'reversible', cardIds: ['s1'],
+      fields: [f(0, 'Front', 'とり'), f(1, 'Back', 'bird')] }),
+    note({ id: 'unclear', noteTypeId: 'disagreeing', cardIds: ['a1', 'a2'],
+      fields: [f(0, 'Front', 'うま'), f(1, 'Back', 'horse')] }),
+    note({ id: 'stray', noteTypeId: 'reversible', cardIds: ['o1', 'o2', 'o3'],
+      fields: [f(0, 'Front', 'さる'), f(1, 'Back', 'monkey')] }),
+  ];
+  const sDraft: AnkiDraft = {
+    ...draft,
+    noteTypes: [twinned, reversible, disagreeing],
+    notes,
+    cards: [
+      at('t1', 'twin', 0), at('t2', 'twin', 1),
+      at('r1', 'fine', 0), at('r2', 'fine', 1),
+      at('s1', 'alone', 0),
+      at('a1', 'unclear', 0), at('a2', 'unclear', 1),
+      at('o1', 'stray', 0), at('o2', 'stray', 1), at('o3', 'stray', 9),
+    ],
+    counts: { ...draft.counts, notes: notes.length, cards: 10, noteTypes: 3 },
+  };
+  const sRows = buildBrowserRows(sDraft, defaultBrowserColumns(sDraft));
+  const sSchema = {
+    fieldNames: browserFieldNames(sDraft),
+    sibling: buildSiblingAuditContext(sDraft),
+  };
+  const sIds = (query: string): string[] | string => {
+    const out = filterBrowserRows(sRows, query, sSchema);
+    return out.error ? out.error.code : out.rows.map((r) => r.noteId);
+  };
+
+  it('finds the note reviewing the same prompt twice', () => {
+    expect(sIds('sibling:duplicate')).toEqual(['twin']);
+  });
+
+  it('keeps "same prompt, two answers" separate from a plain duplicate', () => {
+    expect(sIds('sibling:ambiguous')).toEqual(['unclear']);
+  });
+
+  it('finds a card whose ord names no template', () => {
+    expect(sIds('sibling:orphan')).toEqual(['stray']);
+  });
+
+  it('drops a one-card note as single, and the verdicts partition the deck', () => {
+    expect(sIds('sibling:single')).toEqual(['alone']);
+    expect(sIds('sibling:ok')).toEqual(['fine']);
+    const partition = ['single', 'ok', 'duplicate', 'ambiguous', 'orphan']
+      .flatMap((v) => sIds(`sibling:${v}`) as string[]);
+    expect(partition.sort()).toEqual(['alone', 'fine', 'stray', 'twin', 'unclear']);
+  });
+
+  it('composes with negation and groups like any other predicate', () => {
+    expect((sIds('-sibling:single') as string[]).sort())
+      .toEqual(['fine', 'stray', 'twin', 'unclear']);
+    expect((sIds('(sibling:duplicate or sibling:ambiguous)') as string[]).sort())
+      .toEqual(['twin', 'unclear']);
+  });
+
+  it('refuses the key outright when no template comparison has run', () => {
+    const bare = { fieldNames: browserFieldNames(sDraft) };
+    const refused = filterBrowserRows(sRows, 'sibling:duplicate', bare);
+    expect(refused.error).toEqual({ code: 'no-sibling-context', token: 'sibling:duplicate' });
+    expect(refused.rows).toEqual([]);
+    expect(filterBrowserRows(sRows, 'sibling:banana', bare).error?.code).toBe('no-sibling-context');
+  });
+
+  it('refuses an unknown verdict by naming the token, never matching all', () => {
+    expect(sIds('sibling:banana')).toBe('unknown-key');
+    expect(sIds('sibling:')).toBe('unknown-key');
+  });
+
+  it('a compiled node with no context matches nothing rather than everything', () => {
+    expect(sRows.filter(compileBrowserFilter({ kind: 'sibling', verdict: 'ok' }))).toEqual([]);
+  });
+
+  it('explains itself in words, one sentence per verdict', () => {
+    const parsed = parseBrowserQuery('sibling:ambiguous', sSchema);
+    expect(parsed.ok && parsed.filter).toEqual({ kind: 'sibling', verdict: 'ambiguous' });
+    expect(explainBrowserQuery('sibling:ambiguous', sSchema)).toEqual({
+      kind: 'clause',
+      key: 'ankiWorkbench.browser.explain.sibling.ambiguous',
     });
   });
 });

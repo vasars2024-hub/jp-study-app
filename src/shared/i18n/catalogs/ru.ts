@@ -9861,6 +9861,16 @@ export const ru: Catalog = {
     'она ссылается на файл, которого в пакете нет, поэтому ничего не прозвучит и не покажется',
   'ankiWorkbench.browser.query.noMediaContext':
     'Эта колода получена из источника без медиафайлов, поэтому «{token}» нечего проверять.',
+  'ankiWorkbench.browser.explain.sibling.single': 'она даёт одну карточку, поэтому парных к ней нет',
+  'ankiWorkbench.browser.explain.sibling.ok': 'каждая её карточка спрашивает своё',
+  'ankiWorkbench.browser.explain.sibling.duplicate':
+    'две её карточки задают один вопрос и дают один ответ',
+  'ankiWorkbench.browser.explain.sibling.ambiguous':
+    'две её карточки задают один вопрос, но ждут разные ответы',
+  'ankiWorkbench.browser.explain.sibling.orphan':
+    'у неё есть карточка, которую не создаёт ни один шаблон её типа заметки, и отрисовать её нечем',
+  'ankiWorkbench.browser.query.noSiblingContext':
+    'Шаблоны этой колоды ещё не сравнивались, поэтому «{token}» нечего прочитать.',
   'ankiWorkbench.media.title': 'Медиа',
   'ankiWorkbench.media.summary':
     'Файлов: {files}, {size}. Требуют внимания: {defects} — в заметках: {notes}.',

@@ -157,6 +157,11 @@ function explainPredicate(node: Exclude<BrowserFilterNode, { kind: 'group' } | {
       // Same again: "cites a file the package does not carry" and "cites a file
       // stored twice under two names" share no sentence shape at all.
       return clause(`media.${node.health}`);
+    case 'sibling':
+      // And again. `duplicate` and `ambiguous` in particular must not share a
+      // sentence: one says a card is redundant, the other says two cards
+      // disagree, and the second is not fixed by deleting either.
+      return clause(`sibling.${node.verdict}`);
   }
 }
 

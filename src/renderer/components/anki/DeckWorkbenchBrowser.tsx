@@ -35,6 +35,7 @@ import {
 import { filterBrowserRows, type BrowserQueryErrorCode } from '../../../shared/ankiBrowserQuery';
 import { buildCardHealthContext } from '../../../shared/ankiCardHealth';
 import { buildMediaHealthContext } from '../../../shared/ankiMediaHealth';
+import { buildSiblingAuditContext } from '../../../shared/ankiSiblingAudit';
 import {
   QUERY_EXPLAIN_KEY_PREFIX,
   explainBrowserQuery,
@@ -86,6 +87,7 @@ const QUERY_ERROR_KEY: Record<BrowserQueryErrorCode, string> = {
   'no-vocab-context': 'ankiWorkbench.browser.query.noVocabContext',
   'no-render-context': 'ankiWorkbench.browser.query.noRenderContext',
   'no-media-context': 'ankiWorkbench.browser.query.noMediaContext',
+  'no-sibling-context': 'ankiWorkbench.browser.query.noSiblingContext',
 };
 
 type Translate = (key: string, vars?: Record<string, string | number>) => string;
@@ -268,16 +270,24 @@ export default function DeckWorkbenchBrowser({
     [draft],
   );
 
+  // `sibling:` verdicts. Same key again, and the heaviest of the three: it
+  // renders a bounded sample of every note type before it can judge one row, so
+  // it must never move with the query. Always present, unlike `media` — every
+  // draft has note types, and a source whose templates cannot be read reports
+  // that as its own diagnostic rather than as a missing filter.
+  const sibling = useMemo(() => buildSiblingAuditContext(draft), [draft]);
+
   // The draft's own field names, so `Expression:食べる` is a field predicate and
   // `Expresion:食べる` is a refusal instead of a filter that quietly matches all.
   const schema = useMemo(
     () => ({
       fieldNames: browserFieldNames(draft),
       render,
+      sibling,
       ...(media ? { media } : {}),
       ...(vocab ? { vocab } : {}),
     }),
-    [draft, vocab, render, media],
+    [draft, vocab, render, media, sibling],
   );
   const filtered = useMemo(() => filterBrowserRows(rows, query, schema), [rows, query, schema]);
   const shown = useMemo(() => sortBrowserRows(filtered.rows, sort), [filtered, sort]);

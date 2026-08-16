@@ -24,6 +24,11 @@ import {
   type MediaHealth,
   type MediaHealthContext,
 } from './ankiMediaHealth';
+import {
+  parseSiblingVerdict,
+  type SiblingAuditContext,
+  type SiblingVerdict,
+} from './ankiSiblingAudit';
 import { FREQUENCY_BAND_LIMITS, type LexiconFrequencyBand } from './lexiconFrequency';
 import { containsScript, hasNoScript, parseTextScript, type TextScript } from './textScripts';
 import {
@@ -223,6 +228,21 @@ export interface MediaHealthPredicate {
   health: MediaHealth;
 }
 
+/**
+ * `sibling:duplicate`, `sibling:orphan` — smart recipe 17, "audit sibling cards
+ * and remove unintended duplicate templates".
+ *
+ * The only predicate whose verdict is decided by notes *other than* this one:
+ * two templates are duplicates because they render alike across a sample of the
+ * note type, and this row is then judged by which of those templates gave it a
+ * card. So it must read a precomputed context and can never be answered from
+ * the row, exactly like `render:`.
+ */
+export interface SiblingAuditPredicate {
+  kind: 'sibling';
+  verdict: SiblingVerdict;
+}
+
 export type BrowserPredicate =
   | AnyTextPredicate
   | RegexPredicate
@@ -237,7 +257,8 @@ export type BrowserPredicate =
   | ScriptPredicate
   | SentenceCoverPredicate
   | CardHealthPredicate
-  | MediaHealthPredicate;
+  | MediaHealthPredicate
+  | SiblingAuditPredicate;
 
 export interface BrowserFilterGroup {
   kind: 'group';
@@ -281,7 +302,14 @@ export type BrowserQueryErrorCode =
    * live AnkiConnect deck has no package to inspect — so the message has to say
    * that rather than suggest a wait.
    */
-  | 'no-media-context';
+  | 'no-media-context'
+  /**
+   * `sibling:` was used while the surface had no sibling audit to read. Its own
+   * code once more: unlike `render:`, this context needs the note type's other
+   * notes rendered as well, so a surface can legitimately hold one and not the
+   * other — and a message naming the wrong one sends the user nowhere.
+   */
+  | 'no-sibling-context';
 
 export interface BrowserQueryError {
   code: BrowserQueryErrorCode;
@@ -315,6 +343,12 @@ export interface BrowserQuerySchema {
    * rather than a filter — see `no-media-context`.
    */
   media?: MediaHealthContext;
+  /**
+   * Per-note sibling verdicts, from `buildSiblingAuditContext`. Absent means no
+   * template comparison has run, and `sibling:` is a refusal rather than a
+   * filter — see `no-sibling-context`.
+   */
+  sibling?: SiblingAuditContext;
 }
 
 // ----- tokenizer ---------------------------------------------------------------
@@ -531,6 +565,11 @@ function predicateFromTerm(token: Token, schema: BrowserQuerySchema): BrowserPre
     const health = parseMediaHealth(value);
     return health ? { kind: 'media', health } : { code: 'unknown-key', token: text };
   }
+  if (lowerKey === 'sibling') {
+    if (!schema.sibling) return { code: 'no-sibling-context', token: text };
+    const verdict = parseSiblingVerdict(value);
+    return verdict ? { kind: 'sibling', verdict } : { code: 'unknown-key', token: text };
+  }
   if (lowerKey === 'freq' || lowerKey === 'known') {
     // The refusal comes before the value is even read: with no context, every
     // spelling of the key is equally unanswerable, and reporting "unknown
@@ -698,18 +737,19 @@ export function compileBrowserFilter(
   vocab?: VocabContext,
   render?: CardHealthContext,
   media?: MediaHealthContext,
+  sibling?: SiblingAuditContext,
 ): RowTest {
   switch (node.kind) {
     case 'group': {
       const tests = node.children.map((child) =>
-        compileBrowserFilter(child, vocab, render, media),
+        compileBrowserFilter(child, vocab, render, media, sibling),
       );
       return node.op === 'and'
         ? (row) => tests.every((test) => test(row))
         : (row) => tests.some((test) => test(row));
     }
     case 'not': {
-      const test = compileBrowserFilter(node.child, vocab, render, media);
+      const test = compileBrowserFilter(node.child, vocab, render, media, sibling);
       return (row) => !test(row);
     }
     case 'text': {
@@ -861,6 +901,12 @@ export function compileBrowserFilter(
       const { health } = node;
       return (row) => media.get(row.noteId) === health;
     }
+    case 'sibling': {
+      // Same guard again: the parser refuses `sibling:` without a context.
+      if (!sibling) return () => false;
+      const { verdict } = node;
+      return (row) => sibling.get(row.noteId) === verdict;
+    }
     default: {
       if (!vocab) return () => false;
       const facts = vocab.byNote;
@@ -914,9 +960,10 @@ export function matchBrowserRows(
   vocab?: VocabContext,
   render?: CardHealthContext,
   media?: MediaHealthContext,
+  sibling?: SiblingAuditContext,
 ): BrowserRow[] {
   if (!filter) return rows;
-  const test = compileBrowserFilter(filter, vocab, render, media);
+  const test = compileBrowserFilter(filter, vocab, render, media, sibling);
   return rows.filter(test);
 }
 
@@ -933,7 +980,14 @@ export function filterBrowserRows(
   const parsed = parseBrowserQuery(query, schema);
   if (!parsed.ok) return { rows: [], error: parsed.error };
   return {
-    rows: matchBrowserRows(rows, parsed.filter, schema.vocab, schema.render, schema.media),
+    rows: matchBrowserRows(
+      rows,
+      parsed.filter,
+      schema.vocab,
+      schema.render,
+      schema.media,
+      schema.sibling,
+    ),
     error: null,
   };
 }

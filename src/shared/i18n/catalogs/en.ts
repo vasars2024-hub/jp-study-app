@@ -9475,6 +9475,16 @@ export const en: Catalog = {
     'it refers to a file the package does not carry, so nothing will play or show',
   'ankiWorkbench.browser.query.noMediaContext':
     'This deck came from a source that carries no media, so "{token}" has nothing to check.',
+  'ankiWorkbench.browser.explain.sibling.single': 'it makes one card, so it has no sibling',
+  'ankiWorkbench.browser.explain.sibling.ok': 'each of its cards asks something different',
+  'ankiWorkbench.browser.explain.sibling.duplicate':
+    'two of its cards ask the same question and give the same answer',
+  'ankiWorkbench.browser.explain.sibling.ambiguous':
+    'two of its cards ask the same question and expect different answers',
+  'ankiWorkbench.browser.explain.sibling.orphan':
+    'it has a card no template of its note type makes, so nothing can render it',
+  'ankiWorkbench.browser.query.noSiblingContext':
+    'Nothing has compared this deck’s templates yet, so "{token}" has no verdict to read.',
   'ankiWorkbench.media.title': 'Media',
   'ankiWorkbench.media.summary':
     '{files} files, {size}. {defects} need attention across {notes} notes.',

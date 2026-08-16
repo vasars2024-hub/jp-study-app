@@ -8984,6 +8984,14 @@ export const zh: Catalog = {
   'ankiWorkbench.browser.explain.media.broken': '它引用的文件包内虽有，却不含任何数据',
   'ankiWorkbench.browser.explain.media.missing': '它引用的文件不在包内，因此无法播放或显示',
   'ankiWorkbench.browser.query.noMediaContext': '该牌组的来源不携带媒体，因此“{token}”无从检查。',
+  'ankiWorkbench.browser.explain.sibling.single': '它只生成一张卡片，没有同源卡片',
+  'ankiWorkbench.browser.explain.sibling.ok': '它的每张卡片提出的问题各不相同',
+  'ankiWorkbench.browser.explain.sibling.duplicate': '它有两张卡片提出相同的问题并给出相同的答案',
+  'ankiWorkbench.browser.explain.sibling.ambiguous': '它有两张卡片提出相同的问题却期待不同的答案',
+  'ankiWorkbench.browser.explain.sibling.orphan':
+    '它有一张卡片不属于其笔记类型的任何模板，因此无法渲染',
+  'ankiWorkbench.browser.query.noSiblingContext':
+    '尚未比较该牌组的模板，因此“{token}”没有可读取的判定。',
   'ankiWorkbench.media.title': '媒体',
   'ankiWorkbench.media.summary': '{files} 个文件，{size}。{notes} 条笔记涉及 {defects} 处需要处理。',
   'ankiWorkbench.media.clean': '{files} 个文件，{size}。没有需要修复的地方。',

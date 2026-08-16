@@ -9048,6 +9048,16 @@ export const ja: Catalog = {
     'パッケージに含まれていないファイルを参照しているため、再生も表示もされない',
   'ankiWorkbench.browser.query.noMediaContext':
     'このデッキのソースはメディアを持たないため、「{token}」には確認する対象がありません。',
+  'ankiWorkbench.browser.explain.sibling.single': 'カードが1枚だけで、兄弟カードがない',
+  'ankiWorkbench.browser.explain.sibling.ok': 'どのカードもそれぞれ異なる問いを出す',
+  'ankiWorkbench.browser.explain.sibling.duplicate':
+    '2枚のカードが同じ問いを出し、同じ答えを示す',
+  'ankiWorkbench.browser.explain.sibling.ambiguous':
+    '2枚のカードが同じ問いを出しながら、異なる答えを求める',
+  'ankiWorkbench.browser.explain.sibling.orphan':
+    'ノートタイプのどのテンプレートも作らないカードがあり、表示できない',
+  'ankiWorkbench.browser.query.noSiblingContext':
+    'このデッキのテンプレートはまだ比較されていないため、「{token}」に読み取れる判定がありません。',
   'ankiWorkbench.media.title': 'メディア',
   'ankiWorkbench.media.summary':
     '{files} 件 / {size}。{notes} 件のノートにまたがる {defects} 件に対応が必要です。',
