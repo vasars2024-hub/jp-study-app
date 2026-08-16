@@ -23203,3 +23203,14 @@ Full harvest: `debug/step7-lang-results.json`.
 **Still owed on gate 10.** Steps 3–5 + 7 contrast/compact/maximized and reduced-motion (step 6
 has its half; step 7 has EN contrast 6.08–16.02 on the two local-deck-visible texts only — the
 package branch's facts/button/error lines render only over an apkg draft, attended).
+
+## 2026-08-16 — Track 7 / gate 10: contrast + reduced motion for steps 3–5
+
+Live EN walk on the real 3,221-note deck, painted values (ancestor-walk bg, zero-size refused).
+Steps 3, 4, 5 each: lead **16.02** @14 px, muted **6.08** @14 px, tray label **16.02** @14 px,
+tray select **17.17** @13.3 px, tray button **14.02** @13 px — all past AA. `reduce-motion`
+class: transitionDuration **0.14s → 1e-06s** and back, live. The known select-height defect is
+narrower than "every select": step 3 measures **32/32/32** but steps 4/5 still hold **19 px**
+selects (32 where styled) — the one-fix-at-workbench-level item stays open, pre-existing.
+Gate 10's remainder: compact/maximized reflow for steps 3–7, and the apkg-branch texts of step 7
+(attended). Probe pattern: `debug/step7-lang.ps1`'s walk + the step6-a11y ratio recipe.
