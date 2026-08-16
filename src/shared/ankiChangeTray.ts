@@ -64,6 +64,12 @@ import {
   type PrioritizeRefusal,
 } from './ankiPrioritize';
 import {
+  planLeechRescue,
+  type LeechRescueMeasure,
+  type LeechRescuePlan,
+  type LeechRescueRefusal,
+} from './ankiLeechRescue';
+import {
   planMasteryMapping,
   type MasteryLevel,
   type MasteryPlan,
@@ -81,6 +87,7 @@ export type TrayActionKind =
   | 'fill-reading'
   | 'apply-ai-additions'
   | 'prioritize-new'
+  | 'rescue-leeches'
   | 'set-mastery';
 
 /**
@@ -193,6 +200,32 @@ export type TrayAction =
       startPosition: number;
     })
   | (TrayActionBase & {
+      /**
+       * Recipe 10. Finds the selection's leeches by lapse count and Anki's own
+       * `leech` tag, then applies the measures the journal can undo. See
+       * `ankiLeechRescue.ts` for why `reschedule` is refused rather than faked.
+       */
+      kind: 'rescue-leeches';
+      /**
+       * Lapses at or above which a card is a leech. No default here: Anki's 8 is
+       * a *deck option*, and a user whose deck runs at 4 would silently rescue
+       * nothing if this module assumed the shipped value.
+       */
+      threshold: number;
+      /** Whether Anki's `leech` tag qualifies a note below the threshold. */
+      includeTagged: boolean;
+      /** Which measures to apply. Empty is refused as an empty parameter. */
+      measures: LeechRescueMeasure[];
+      /** The tag the `tag` measure writes. Only read when `tag` is selected. */
+      rescueTag: string;
+      /** The field a hint is derived from. Only read when `hint` is selected. */
+      hintFromField: string;
+      /** The field a hint is written into. Only read when `hint` is selected. */
+      hintToField: string;
+      /** Characters revealed; `DEFAULT_LEECH_HINT_REVEAL` when omitted. */
+      hintReveal?: number;
+    })
+  | (TrayActionBase & {
       kind: 'set-mastery';
       /**
        * The rung to move the selection's words to. No default: the whole point
@@ -299,6 +332,26 @@ export type TrayProblemCode =
   | 'prioritize-not-new'
   /** The note generates no card in this draft, so there is nothing to position. */
   | 'prioritize-no-cards'
+  /** Selected, but neither over the leech threshold nor carrying Anki's tag. */
+  | 'leech-not-leech'
+  /** The note generates no card in this draft, so it has no lapse count. */
+  | 'leech-no-cards'
+  /** The rescue tag is already on this note. */
+  | 'leech-already-tagged'
+  /** This note type has no field by one of the two hint names. */
+  | 'leech-hint-field-absent'
+  /** The hint source field is empty on this note. */
+  | 'leech-hint-source-empty'
+  /** The source is no longer than the reveal, so a hint would be the answer. */
+  | 'leech-hint-source-too-short'
+  /** The hint field already holds text; recipe 10 never overwrites one. */
+  | 'leech-hint-occupied'
+  /**
+   * A slower scheduling preset was asked for and the workbench cannot write
+   * one. Blocking when it is the only measure — an Apply that ran and changed
+   * nothing would read as the reschedule having happened.
+   */
+  | 'leech-reschedule-unsupported'
   /** These notes declare no word, so there is nothing whose mastery could move. */
   | 'mastery-no-word'
   /** These notes' word field holds a phrase, which is not a lemma to store. */
@@ -377,6 +430,12 @@ export interface TrayPlan {
    */
   prioritize?: PrioritizePlan;
   /**
+   * What a `rescue-leeches` action found and wrote. Folded into `draft` like
+   * `prioritize`; it is here so the surface can show which notes were leeches
+   * and how many qualified only through Anki's tag, instead of a bare count.
+   */
+  leechRescue?: LeechRescuePlan;
+  /**
    * Cards whose `due` this tray moved. Separate from `changedNotes` because a
    * reposition-only tray changes zero notes and is not therefore a no-op; a
    * caller that gated Apply on `changedNotes` alone would disable it.
@@ -396,6 +455,18 @@ export const PRIORITIZE_PROBLEM_CODES: ReadonlyArray<[PrioritizeRefusal, TrayPro
   ['no-word', 'prioritize-no-word'],
   ['not-new', 'prioritize-not-new'],
   ['no-cards', 'prioritize-no-cards'],
+];
+
+/** Recipe 10's refusals, in the order the surface should list them. Same reason. */
+export const LEECH_RESCUE_PROBLEM_CODES:
+ReadonlyArray<[LeechRescueRefusal, TrayProblemCode]> = [
+  ['not-leech', 'leech-not-leech'],
+  ['no-cards', 'leech-no-cards'],
+  ['already-tagged', 'leech-already-tagged'],
+  ['hint-field-absent', 'leech-hint-field-absent'],
+  ['hint-source-empty', 'leech-hint-source-empty'],
+  ['hint-source-too-short', 'leech-hint-source-too-short'],
+  ['hint-occupied', 'leech-hint-occupied'],
 ];
 
 function escapeLiteral(s: string): string {
@@ -541,6 +612,36 @@ function blockingProblems(
       } else if (!Number.isFinite(action.startPosition) || action.startPosition < 0) {
         problems.push({ code: 'empty-parameter', severity: 'blocking', actionId: action.id, count: 1 });
       }
+    } else if (action.kind === 'rescue-leeches') {
+      const measures = new Set(action.measures);
+      const writes = measures.has('tag') || measures.has('hint');
+      if (measures.size === 0 || !Number.isFinite(action.threshold) || action.threshold < 1) {
+        problems.push({ code: 'empty-parameter', severity: 'blocking', actionId: action.id, count: 1 });
+      } else if (measures.has('tag') && action.rescueTag.trim() === '') {
+        problems.push({ code: 'empty-parameter', severity: 'blocking', actionId: action.id, count: 1 });
+      } else if (measures.has('hint') && (action.hintFromField === '' || action.hintToField === '')) {
+        problems.push({ code: 'empty-parameter', severity: 'blocking', actionId: action.id, count: 1 });
+      } else if (measures.has('hint') && action.hintFromField === action.hintToField) {
+        // A hint derived from the field it is written into is the field
+        // truncating itself, which destroys the value it was drawn from.
+        problems.push({
+          code: 'same-field',
+          severity: 'blocking',
+          actionId: action.id,
+          count: 1,
+          detail: action.hintToField,
+        });
+      }
+      // Refused here rather than at run time so the *only* measure being an
+      // unsupported one disables Apply instead of applying nothing silently.
+      if (measures.has('reschedule') && !writes) {
+        problems.push({
+          code: 'leech-reschedule-unsupported',
+          severity: 'blocking',
+          actionId: action.id,
+          count: 1,
+        });
+      }
     } else if (action.kind === 'swap-fields' || action.kind === 'copy-field') {
       const [a, b] =
         action.kind === 'swap-fields'
@@ -660,6 +761,7 @@ export function planChangeTray(
   const ops: AnkiDraftEditOp[] = [];
   let masteryPlan: MasteryPlan | undefined;
   let prioritizePlan: PrioritizePlan | undefined;
+  let leechRescuePlan: LeechRescuePlan | undefined;
   let changedCards = 0;
 
   const changeFor = (noteId: string): TrayNoteChange => {
@@ -773,6 +875,83 @@ export function planChangeTray(
         matched: noteIds.length,
         changed: movedNotes.size,
         skipped: noteIds.length - movedNotes.size,
+      });
+      continue;
+    }
+
+    if (action.kind === 'rescue-leeches') {
+      // Whole-selection so the counts ("14 leeches, 9 rescued") come from one
+      // pass. Per-note it could still be computed, but the leech/tagged-only
+      // totals a surface reports would then have to be summed by the caller.
+      const selected: AnkiDraftNote[] = [];
+      for (const noteId of noteIds) {
+        const at = index.position.get(noteId);
+        const note = at === undefined ? undefined : notes[at];
+        if (note) selected.push(note);
+      }
+      const plan = planLeechRescue({
+        notes: selected,
+        cards,
+        noteTypes: draft.noteTypes,
+        measures: action.measures,
+        threshold: action.threshold,
+        includeTagged: action.includeTagged,
+        rescueTag: action.rescueTag,
+        hintFromField: action.hintFromField,
+        hintToField: action.hintToField,
+        ...(action.hintReveal === undefined ? {} : { hintReveal: action.hintReveal }),
+      });
+      leechRescuePlan = plan;
+      const rescued = new Set<string>();
+      for (const target of plan.targets) {
+        const at = index.position.get(target.noteId);
+        if (at === undefined) continue;
+        if (target.hint && applyWrite(at, target.noteId, target.hint.toOrd, target.hint.after)) {
+          rescued.add(target.noteId);
+        }
+        if (!target.tag) continue;
+        // Re-read after the write: `applyWrite` replaced the array slot, and
+        // tagging the pre-write object would drop the hint that just landed.
+        const current = notes[at];
+        const before = current.tags;
+        const after = normalizeTags([...before, target.tag]);
+        if (after.length === before.length) continue;
+        notes[at] = { ...current, tags: after, marked: after.includes(MARKED_TAG) };
+        ops.push({ kind: 'tags', noteId: target.noteId, before, after, group: groupId });
+        const change = changeFor(target.noteId);
+        change.tags = { before: change.tags?.before ?? before, after };
+        rescued.add(target.noteId);
+      }
+      for (const [refusal, code] of LEECH_RESCUE_PROBLEM_CODES) {
+        for (const skip of plan.skips) {
+          if (skip.refusal !== refusal) continue;
+          problems.push({
+            code,
+            // "Not a leech" is the filter working, not a fault in the note.
+            severity: refusal === 'not-leech' ? 'info' : 'warning',
+            actionId: action.id,
+            count: 1,
+            detail: skip.noteId,
+          });
+        }
+      }
+      if (plan.rescheduleRefused) {
+        // Not blocking here: `blockingProblems` already refused a reschedule-only
+        // run, so reaching this line means real measures ran alongside it and the
+        // user must still be told the scheduling half did not happen.
+        problems.push({
+          code: 'leech-reschedule-unsupported',
+          severity: 'warning',
+          actionId: action.id,
+          count: 1,
+        });
+      }
+      outcomes.push({
+        actionId: action.id,
+        kind: action.kind,
+        matched: noteIds.length,
+        changed: rescued.size,
+        skipped: noteIds.length - rescued.size,
       });
       continue;
     }
@@ -1226,6 +1405,7 @@ export function planChangeTray(
     blocked: false,
     mastery: masteryPlan,
     prioritize: prioritizePlan,
+    leechRescue: leechRescuePlan,
   };
 }
 
