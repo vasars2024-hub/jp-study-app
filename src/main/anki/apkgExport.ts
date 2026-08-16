@@ -190,6 +190,7 @@ export async function exportApkg(request: ApkgExportRequest): Promise<ApkgExport
       fileName: path.basename(outPath),
       notesUpdated: applied.notesUpdated,
       cardsUpdated: applied.cardsUpdated,
+      decksUpdated: applied.decksUpdated,
       verified: true,
       fingerprint: newFingerprint,
     };

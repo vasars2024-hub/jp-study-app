@@ -67,6 +67,12 @@ export type ApkgExportErrorCode =
   | 'note-missing'
   | 'field-count-mismatch'
   | 'card-missing'
+  /** A renamed deck is not in the source package, or it stores no deck list. */
+  | 'deck-missing'
+  /** The source's deck name is not the one the rename was computed against. */
+  | 'deck-changed'
+  /** Another deck in the source holds the new name — writing it would merge two decks. */
+  | 'deck-name-taken'
   | 'compressed-unsupported'
   | 'verify-failed'
   | 'io';
@@ -92,6 +98,8 @@ export interface ApkgExportResult {
   fileName?: string;
   notesUpdated?: number;
   cardsUpdated?: number;
+  /** Decks renamed in the written package. Reported apart: it touches no note. */
+  decksUpdated?: number;
   /** The written file was re-read FROM DISK and every change was found in it. */
   verified?: boolean;
   /** Fingerprint of the new package's collection, for a later commit against it. */

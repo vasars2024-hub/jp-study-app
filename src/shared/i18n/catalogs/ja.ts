@@ -8758,6 +8758,8 @@ export const ja: Catalog = {
     '移動対象のカードはフィルタードデッキにあり、その位置はデッキ側が管理しています。何も書き込んでいません。先にフィルタードデッキを空にしてください。',
   'ankiWorkbench.apply.liveError.card-missing':
     '移動対象のカードがコレクションに存在しません。何も書き込んでいません。手順1で読み直してから書き込んでください。',
+  'ankiWorkbench.apply.liveError.deck-rename-unsupported':
+    'この接続では実行中のコレクションのデッキ名を変更できないため、何も書き込んでいません。代わりにパッケージを書き出してください。そちらには変更が反映されます。',
   'ankiWorkbench.apply.liveError.unreachable':
     '途中で Anki が応答しなくなりました。以下に挙げた項目はコレクションに届いていません。',
   'ankiWorkbench.apply.liveError.collection-unavailable':
@@ -8793,6 +8795,12 @@ export const ja: Catalog = {
     'ノートのフィールドがソースファイルの構成と一致しません。何も書き込まれていません — 書き出す前にソースを読み直してください。',
   'ankiWorkbench.apply.error.card-missing':
     '移動したカードがソースファイルに存在しません。何も書き込まれていません — 書き出す前にソースを読み直してください。',
+  'ankiWorkbench.apply.error.deck-missing':
+    '名前を変更したデッキがソースファイルに存在しません。何も書き込まれていません — 書き出す前にソースを読み直してください。',
+  'ankiWorkbench.apply.error.deck-changed':
+    '名前を変更したデッキの名前がソースファイルでは異なっています。何も書き込まれていません — 書き出す前にソースを読み直してください。',
+  'ankiWorkbench.apply.error.deck-name-taken':
+    'ソースファイル内の別のデッキが既にその名前を使っており、変更すると2つのデッキが統合されてしまいます。何も書き込まれていません。',
   'ankiWorkbench.apply.error.compressed-unsupported':
     'このパッケージはまだ書き込みに対応していない新しい圧縮形式を使用しています。何も書き込まれていません。',
   'ankiWorkbench.apply.error.verify-failed':

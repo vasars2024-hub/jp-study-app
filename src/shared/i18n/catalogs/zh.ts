@@ -8712,6 +8712,8 @@ export const zh: Catalog = {
     '某张要移动的卡片位于筛选牌组中，其位置由该牌组决定而非由你决定。什么也没有写入 — 请先清空筛选牌组。',
   'ankiWorkbench.apply.liveError.card-missing':
     '某张要移动的卡片已不在集合中。什么也没有写入 — 请先在第 1 步重新读取再写入。',
+  'ankiWorkbench.apply.liveError.deck-rename-unsupported':
+    '此连接无法重命名正在使用的集合中的牌组，因此什么也没有写入。请改为导出软件包 — 重命名会写入其中。',
   'ankiWorkbench.apply.liveError.unreachable':
     'Anki 中途停止响应。下面列出的内容都没有写进集合。',
   'ankiWorkbench.apply.liveError.collection-unavailable':
@@ -8743,6 +8745,12 @@ export const zh: Catalog = {
     '有笔记的字段与来源文件的布局不再一致。未写入任何内容 — 请先重新读取来源再导出。',
   'ankiWorkbench.apply.error.card-missing':
     '有已移动的卡片不再存在于来源文件中。未写入任何内容 — 请先重新读取来源再导出。',
+  'ankiWorkbench.apply.error.deck-missing':
+    '被重命名的牌组不再存在于来源文件中。未写入任何内容 — 请先重新读取来源再导出。',
+  'ankiWorkbench.apply.error.deck-changed':
+    '被重命名的牌组在来源文件中的名称不同。未写入任何内容 — 请先重新读取来源再导出。',
+  'ankiWorkbench.apply.error.deck-name-taken':
+    '来源文件中已有另一个牌组使用该名称，重命名会把两个牌组合并。未写入任何内容。',
   'ankiWorkbench.apply.error.compressed-unsupported':
     '此包使用了尚不支持写入的较新压缩格式。未写入任何内容。',
   'ankiWorkbench.apply.error.verify-failed': '写入的文件未通过回读校验，不可信任。请删除后重试。',

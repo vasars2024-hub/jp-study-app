@@ -125,6 +125,27 @@ describe('planDeckNormalize', () => {
     expect(plan.unchanged).toBe(1);
   });
 
+  it('reads a schema-18 0x1f name as a path and writes it back the same way', () => {
+    const plan = planDeckNormalize({
+      decks: [deck('1', 'JLPT\x1fN5'), deck('2', 'jlpt\x1fＮ４')],
+      ops: ALL,
+    });
+    // `jlpt` loses the census to `JLPT`, and the fullwidth Ｎ４ folds — both of
+    // which need the 0x1f to have been understood as a separator.
+    expect(plan.renames).toEqual([{ deckId: '2', from: 'jlpt\x1fＮ４', to: 'JLPT\x1fN4' }]);
+  });
+
+  it('judges a collision on the deck path, not on the byte that separates it', () => {
+    const plan = planDeckNormalize({
+      decks: [deck('1', 'JLPT::N5'), deck('2', 'jlpt\x1fn5')],
+      ops: ALL,
+    });
+    expect(plan.renames).toEqual([]);
+    expect(plan.collisions).toEqual([
+      { deckId: '2', from: 'jlpt\x1fn5', to: 'JLPT\x1fN5', heldByDeckId: '1' },
+    ]);
+  });
+
   it('runs the ops in the forced order whatever order they arrive in', () => {
     const reversed = planDeckNormalize({
       decks: [deck('1', '::ＪＬＰＴ::'), deck('2', 'JLPT')],

@@ -43,6 +43,14 @@ export type ConnectCommitErrorCode =
   /** A changed card is on loan to a filtered deck; its scheduling is not ours. */
   | 'card-filtered'
   | 'card-missing'
+  /**
+   * The change set carries a deck rename and AnkiConnect has no rename action.
+   * It could be *emulated* as createDeck + changeDeck + deleteDecks, but that
+   * moves every card to a new deck id and drops the old deck's options preset —
+   * a different operation with a much larger blast radius than the word rename
+   * promises. Refused by name; exporting a package writes the rename for real.
+   */
+  | 'deck-rename-unsupported'
   /** Anki or the add-on is not answering. */
   | 'unreachable'
   /** AnkiConnect answered but no collection is loaded. */
@@ -220,6 +228,19 @@ export function planConnectCommit(
       );
     }
     cardWrites.push({ cardId: numericId(move.cardId, 'card'), noteId: move.noteId, due: move.due });
+  }
+
+  // Refused before the first write, like every other refusal here: committing
+  // the note half and dropping the deck half would be a partial success the
+  // user was never told about.
+  const renames = changes.deckRenames ?? [];
+  if (renames.length > 0) {
+    throw new ConnectCommitRefusal(
+      'deck-rename-unsupported',
+      renames.length === 1
+        ? `Renaming "${renames[0].from}" to "${renames[0].to}" cannot be committed to a live collection.`
+        : `${renames.length} deck renames cannot be committed to a live collection.`,
+    );
   }
 
   return { noteWrites, cardWrites };

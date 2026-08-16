@@ -69,6 +69,26 @@ export interface DeckNormalizeInput {
   ops: readonly DeckNormalizeOp[];
 }
 
+/**
+ * Anki's normalized `decks` table separates ancestors with 0x1f while the legacy
+ * `col.decks` blob writes `::`, and a draft may have been read from either. The
+ * ops and the census run on the `::` form so a schema-18 name is not mistaken
+ * for one flat segment, and each rename is handed back in the separator its own
+ * deck is stored with — writing `::` into a schema-18 collection would create a
+ * deck literally named `Japanese::Core` beside the tree, not inside it.
+ */
+const DECK_UNIT_SEPARATOR = '\x1f';
+
+function toPathForm(name: string): string {
+  return name.split(DECK_UNIT_SEPARATOR).join('::');
+}
+
+function toStoredForm(pathForm: string, storedLike: string): string {
+  return storedLike.includes(DECK_UNIT_SEPARATOR)
+    ? pathForm.split('::').join(DECK_UNIT_SEPARATOR)
+    : pathForm;
+}
+
 export function planDeckNormalize(input: DeckNormalizeInput): DeckNormalizePlan {
   const chosen = new Set(DECK_NORMALIZE_ORDER.filter((op) => input.ops.includes(op)));
   const ops = {
@@ -81,43 +101,49 @@ export function planDeckNormalize(input: DeckNormalizeInput): DeckNormalizePlan 
     ? // One iterable holding every renameable deck name: the census is keyed by
       // path prefix, so it does not care whether the names arrived as one list
       // or as one list per note the way tags do.
-      buildTagCaseCensus([renameable.map((d) => d.name)])
+      buildTagCaseCensus([renameable.map((d) => toPathForm(d.name))])
     : new Map<string, string>();
 
   const renames: DeckRename[] = [];
   const collisions: DeckNormalizeCollision[] = [];
   let unchanged = 0;
 
-  // Seeded with every name that is *not* moving — filtered decks and, further
-  // down, each deck that turns out to be already canonical. A rename may only
-  // claim a name nothing else ends up holding.
+  // Keyed on the `::` form so a collision is judged on the deck path Anki means,
+  // not on the byte encoding the row happens to use. Seeded with every name that
+  // is *not* moving — filtered decks and, further down, each deck that turns out
+  // to be already canonical. A rename may only claim a name nothing else holds.
   const heldBy = new Map<string, string>();
   for (const deck of input.decks) {
-    if (deck.filtered) heldBy.set(deck.name, deck.id);
+    if (deck.filtered) heldBy.set(toPathForm(deck.name), deck.id);
   }
-  const targets = renameable.map((deck) => ({ deck, to: applyPathOps(deck.name, ops, census) }));
-  for (const { deck, to } of targets) {
-    if (to === deck.name || to === '') heldBy.set(deck.name, deck.id);
+  const targets = renameable.map((deck) => {
+    const from = toPathForm(deck.name);
+    return { deck, from, to: applyPathOps(from, ops, census) };
+  });
+  for (const { deck, from, to } of targets) {
+    if (to === from || to === '') heldBy.set(from, deck.id);
   }
 
-  for (const { deck, to } of targets) {
-    if (to === '') {
-      // Nothing but separators. A deck cannot be nameless, so this is left alone
-      // rather than renamed to the empty string — and it is not a collision.
-      unchanged += 1;
-      continue;
-    }
-    if (to === deck.name) {
+  for (const { deck, from, to } of targets) {
+    if (to === '' || to === from) {
+      // `''` is a name that was nothing but separators. A deck cannot be
+      // nameless, so it is left alone rather than renamed to the empty string —
+      // and it is not a collision.
       unchanged += 1;
       continue;
     }
     const holder = heldBy.get(to);
     if (holder !== undefined && holder !== deck.id) {
-      collisions.push({ deckId: deck.id, from: deck.name, to, heldByDeckId: holder });
+      collisions.push({
+        deckId: deck.id,
+        from: deck.name,
+        to: toStoredForm(to, deck.name),
+        heldByDeckId: holder,
+      });
       continue;
     }
     heldBy.set(to, deck.id);
-    renames.push({ deckId: deck.id, from: deck.name, to });
+    renames.push({ deckId: deck.id, from: deck.name, to: toStoredForm(to, deck.name) });
   }
 
   return {

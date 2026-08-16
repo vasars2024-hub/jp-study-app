@@ -81,6 +81,45 @@ export interface ApplyExportOptions {
 export interface ApplyExportResult {
   notesUpdated: number;
   cardsUpdated: number;
+  decksUpdated: number;
+}
+
+/**
+ * Where a deck's name lives, decided by the same table test the reader uses:
+ * schema 18 keeps `decks` normalized, everything older keeps a JSON blob in
+ * `col.decks`. `undefined` means the collection has neither, which is a refusal
+ * rather than a silent skip — a rename the user asked for must not evaporate.
+ */
+function deckStorage(db: SqlWritable): 'table' | 'blob' | 'none' {
+  try {
+    if (db.exec('SELECT id FROM decks LIMIT 1')[0]?.values?.length) return 'table';
+  } catch {
+    // A missing table is how the older schema announces itself.
+  }
+  const raw = firstRow(db, 'SELECT decks FROM col LIMIT 1', []);
+  return typeof raw?.[0] === 'string' && raw[0].trim() !== '' ? 'blob' : 'none';
+}
+
+/** The legacy blob, parsed, or `undefined` when it is not the JSON Anki writes. */
+function readDeckBlob(db: SqlWritable): Record<string, Record<string, unknown>> | undefined {
+  const raw = firstRow(db, 'SELECT decks FROM col LIMIT 1', [])?.[0];
+  if (typeof raw !== 'string' || !raw.trim()) return undefined;
+  try {
+    const parsed = JSON.parse(raw) as Record<string, Record<string, unknown>>;
+    return parsed && typeof parsed === 'object' ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** A deck's stored name in whichever place this collection keeps it. */
+function readDeckName(db: SqlWritable, storage: 'table' | 'blob', deckId: string): string | undefined {
+  if (storage === 'table') {
+    const row = firstRow(db, 'SELECT name FROM decks WHERE id = ?', [idParam(deckId)]);
+    return row ? String(row[0] ?? '') : undefined;
+  }
+  const entry = readDeckBlob(db)?.[deckId];
+  return entry ? String(entry.name ?? '') : undefined;
 }
 
 /**
@@ -153,6 +192,57 @@ export function applyExportChanges(
     cardPlans.push({ id: idParam(move.cardId), due: move.due });
   }
 
+  // Recipe 12's deck half. A rename touches no card: a card names its deck by
+  // id, so this is only ever the name Anki stores.
+  const deckRenames = changes.deckRenames ?? [];
+  const storage = deckRenames.length > 0 ? deckStorage(db) : 'none';
+  if (deckRenames.length > 0 && storage === 'none') {
+    throw new ExportRefusal(
+      'deck-missing',
+      'The source package stores no deck list, so a deck rename cannot be written.',
+    );
+  }
+  // Every name the collection will hold once the whole batch has run, so two
+  // renames cannot be individually legal and jointly a merge. Validated in list
+  // order and never reordered: a batch where a later rename would have freed the
+  // name an earlier one wants is refused rather than resequenced. `ankiDeckNormalize`
+  // never emits one — it refuses a collision while planning — and guessing an
+  // order that makes a merge legal is exactly the surprise this code refuses.
+  const namesAfter = new Map<string, string>();
+  if (storage === 'table') {
+    for (const row of db.exec('SELECT id, name FROM decks')[0]?.values ?? []) {
+      namesAfter.set(String(row[1] ?? ''), String(row[0]));
+    }
+  } else if (storage === 'blob') {
+    for (const [id, entry] of Object.entries(readDeckBlob(db) ?? {})) {
+      namesAfter.set(String(entry?.name ?? ''), String(entry?.id ?? id));
+    }
+  }
+  for (const rename of deckRenames) {
+    const stored = storage === 'none' ? undefined : readDeckName(db, storage, rename.deckId);
+    if (stored === undefined) {
+      throw new ExportRefusal(
+        'deck-missing',
+        `Deck ${rename.deckId} is not in the source package.`,
+      );
+    }
+    if (stored !== rename.from) {
+      throw new ExportRefusal(
+        'deck-changed',
+        `Deck ${rename.deckId} is named "${stored}" in the source, not "${rename.from}".`,
+      );
+    }
+    const holder = namesAfter.get(rename.to);
+    if (holder !== undefined && holder !== rename.deckId) {
+      throw new ExportRefusal(
+        'deck-name-taken',
+        `Another deck already holds the name "${rename.to}". Renaming onto it would merge two decks.`,
+      );
+    }
+    namesAfter.delete(rename.from);
+    namesAfter.set(rename.to, rename.deckId);
+  }
+
   // --- write
   const modSec = Math.floor(options.nowMs / 1000);
   for (const plan of notePlans) {
@@ -180,10 +270,34 @@ export function applyExportChanges(
       plan.id,
     ]);
   }
+  if (storage === 'table') {
+    for (const rename of deckRenames) {
+      // `mtime_secs`/`usn` alongside the name, the same freshness the note and
+      // card writes record. Both columns exist in every schema-18 collection.
+      db.run('UPDATE decks SET name = ?, mtime_secs = ?, usn = -1 WHERE id = ?', [
+        rename.to,
+        modSec,
+        idParam(rename.deckId),
+      ]);
+    }
+  } else if (storage === 'blob' && deckRenames.length > 0) {
+    // One parse and one write for the whole batch: the blob is the entire deck
+    // list, so writing it per rename would re-serialize it n times.
+    const blob = readDeckBlob(db) ?? {};
+    for (const rename of deckRenames) {
+      const entry = blob[rename.deckId];
+      if (entry) blob[rename.deckId] = { ...entry, name: rename.to, mod: modSec, usn: -1 };
+    }
+    db.run('UPDATE col SET decks = ?', [JSON.stringify(blob)]);
+  }
   // `col.mod` is epoch milliseconds in both schemas.
   db.run('UPDATE col SET mod = ?', [options.nowMs]);
 
-  return { notesUpdated: notePlans.length, cardsUpdated: cardPlans.length };
+  return {
+    notesUpdated: notePlans.length,
+    cardsUpdated: cardPlans.length,
+    decksUpdated: deckRenames.length,
+  };
 }
 
 /**
@@ -224,6 +338,15 @@ export function verifyExportChanges(
     const row = firstRow(db, 'SELECT due FROM cards WHERE id = ?', [idParam(move.cardId)]);
     if (!row) mismatches.push(`card ${move.cardId}: missing`);
     else if (Number(row[0]) !== move.due) mismatches.push(`card ${move.cardId}: due differs`);
+  }
+  const renames = changes.deckRenames ?? [];
+  if (renames.length > 0) {
+    const storage = deckStorage(db);
+    for (const rename of renames) {
+      const stored = storage === 'none' ? undefined : readDeckName(db, storage, rename.deckId);
+      if (stored === undefined) mismatches.push(`deck ${rename.deckId}: missing`);
+      else if (stored !== rename.to) mismatches.push(`deck ${rename.deckId}: name differs`);
+    }
   }
   return { ok: mismatches.length === 0, mismatches };
 }

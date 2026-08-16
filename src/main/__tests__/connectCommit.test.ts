@@ -288,6 +288,24 @@ describe('commitConnectDraft', () => {
     expect(collection.note(NOTE_A)?.tags).toEqual(['marked']);
   });
 
+  it('refuses a deck rename by name, and commits none of the batch beside it', async () => {
+    const fingerprint = await currentFingerprint();
+    const result = await commitConnectDraft({
+      fingerprint,
+      read: READ,
+      changes: {
+        notes: [{ noteId: String(NOTE_A), fields: ['犬（いぬ）', 'dog'] }],
+        cardMoves: [],
+        deckRenames: [{ deckId: '1', from: 'Default', to: 'Japanese::Core' }],
+      },
+    });
+    expect(result.ok).toBe(false);
+    expect(result.errorCode).toBe('deck-rename-unsupported');
+    // The negative control the whole refusal exists for: the note edit beside
+    // the rename must NOT have been written.
+    expect(mutatingCalls()).toHaveLength(0);
+  });
+
   it('refuses an empty change set without touching Anki', async () => {
     const result = await commitConnectDraft({
       fingerprint: 'connect:2:1782214626',
