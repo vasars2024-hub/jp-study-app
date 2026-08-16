@@ -4104,6 +4104,9 @@ export const en: Catalog = {
   'subHarvest.action.fetching': 'Downloading subtitles\u2026',
   'subHarvest.action.analysing': 'Analysing\u2026',
   'subHarvest.action.mine': { one: 'Mine {count} word', other: 'Mine {count} words' },
+  'subHarvest.action.mineBatch': {
+    one: 'Mine {count} of {total} words', other: 'Mine {count} of {total} words',
+  },
   'subHarvest.action.saveSrt': 'Save combined .srt',
   'subHarvest.action.saveText': 'Save plain text',
   'subHarvest.plan.covered': '{covered} of {total} selected episodes covered',

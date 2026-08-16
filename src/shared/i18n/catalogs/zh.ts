@@ -3866,6 +3866,7 @@ export const zh: Catalog = {
   'subHarvest.action.fetching': '\u6b63\u5728\u4e0b\u8f7d\u5b57\u5e55\u2026',
   'subHarvest.action.analysing': '\u5206\u6790\u4e2d\u2026',
   'subHarvest.action.mine': { other: '\u63d0\u53d6 {count} \u4e2a\u8bcd' },
+  'subHarvest.action.mineBatch': { other: '\u63d0\u53d6 {count} \u4e2a\u8bcd\uff08\u5171 {total} \u4e2a\uff09' },
   'subHarvest.action.saveSrt': '\u4fdd\u5b58\u5408\u5e76\u540e\u7684 .srt',
   'subHarvest.action.saveText': '\u4fdd\u5b58\u7eaf\u6587\u672c',
   'subHarvest.plan.covered': '\u5df2\u8986\u76d6\u6240\u9009 {total} \u96c6\u4e2d\u7684 {covered} \u96c6',

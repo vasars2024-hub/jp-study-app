@@ -3882,6 +3882,7 @@ export const ja: Catalog = {
   'subHarvest.action.fetching': '\u5b57\u5e55\u3092\u30c0\u30a6\u30f3\u30ed\u30fc\u30c9\u4e2d\u2026',
   'subHarvest.action.analysing': '\u89e3\u6790\u4e2d\u2026',
   'subHarvest.action.mine': { other: '{count} \u8a9e\u3092\u62bd\u51fa' },
+  'subHarvest.action.mineBatch': { other: '{count} \u8a9e\u3092\u62bd\u51fa\uff08\u5168 {total} \u8a9e\uff09' },
   'subHarvest.action.saveSrt': '\u7d50\u5408\u3057\u305f .srt \u3092\u4fdd\u5b58',
   'subHarvest.action.saveText': '\u30d7\u30ec\u30fc\u30f3\u30c6\u30ad\u30b9\u30c8\u3092\u4fdd\u5b58',
   'subHarvest.plan.covered': '\u9078\u629e\u3057\u305f {total} \u8a71\u4e2d {covered} \u8a71\u5206\u3092\u30ab\u30d0\u30fc',

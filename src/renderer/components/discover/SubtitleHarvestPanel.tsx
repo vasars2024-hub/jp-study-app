@@ -63,8 +63,21 @@ interface Props {
 
 type Phase = 'idle' | 'listing' | 'listed' | 'fetching' | 'analysing' | 'done' | 'error';
 
-/** Only the first N vocabulary rows are rendered; the rest are still mined. */
+/** Only the first N vocabulary rows are rendered; mining is not limited to them. */
 const VISIBLE_VOCAB = 60;
+
+/**
+ * How many cards one click of Mine adds, most frequent first.
+ *
+ * Passed explicitly rather than inherited: `addMediaStudyFlashcards` defaults to
+ * 30 for `MediaStudyMode`, where one video is one sitting. A season harvest of a
+ * 100-episode range silently took that same 30 while its button read "Mine 1,352
+ * words" — measured live on One Piece 100–104, which added exactly 30. The count
+ * is now the batch, and the label says both numbers, so the button cannot
+ * promise more than the click delivers. Clicking again continues down the
+ * frequency list without repeating a word (P5 gate 21).
+ */
+const MINE_BATCH = 30;
 
 /** Same reason as the download dialog: the channel name is not a sentence. */
 const errorText = ipcErrorText;
@@ -202,7 +215,7 @@ export default function SubtitleHarvestPanel({ anilistId, malId, title, episodes
     const added = addMediaStudyFlashcards(
       { id: sourceId, title },
       { ...analysis, vocabulary: mineable },
-      { segments },
+      { segments, limit: MINE_BATCH },
     );
     showToast({
       kind: added ? 'success' : 'default',
@@ -405,7 +418,12 @@ export default function SubtitleHarvestPanel({ anilistId, malId, title, episodes
           <div className="mal-dl-subs-actions">
             <button type="button" className="disc-btn disc-btn-primary" onClick={mine}>
               <Icon name="plus" size={12} />
-              {t('subHarvest.action.mine', { count: mineable.length })}
+              {mineable.length > MINE_BATCH
+                ? t('subHarvest.action.mineBatch', {
+                  count: MINE_BATCH,
+                  total: mineable.length,
+                })
+                : t('subHarvest.action.mine', { count: mineable.length })}
             </button>
             <button type="button" className="disc-btn" onClick={() => save('srt')}>
               <Icon name="download" size={12} />
