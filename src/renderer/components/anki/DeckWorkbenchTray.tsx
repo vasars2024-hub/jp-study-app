@@ -56,6 +56,7 @@ import { buildVocabContext } from '../../../shared/ankiVocabContext';
 import { listKnownEntries, onKnowledgeChanged } from '../../knownWords';
 import { useT } from '../../i18n';
 import DeckWorkbenchAiPanel, { type AiPanelNote } from './DeckWorkbenchAiPanel';
+import DeckWorkbenchSplit from './DeckWorkbenchSplit';
 
 export const ACTION_KINDS: TrayActionKind[] = [
   'find-replace',
@@ -413,6 +414,14 @@ export default function DeckWorkbenchTray({
         ...(aiBatch ? { ai: aiBatch } : {}),
         mastery: { vocab, levels: knownLevels },
         ...(rankedVocab ? { prioritize: { vocab: rankedVocab } } : {}),
+        // Recipe 13's `frequency` and `mastery` axes refuse outright without
+        // this, the same way `set-mastery` does: absent it every note ranks
+        // `null` and the split would file the whole deck under "no value on
+        // this axis" while blaming the deck. `rankedVocab` is undefined until
+        // the frequency corpus resolves, so the channel is omitted rather than
+        // passed with an empty one — a `split` that is present but knows
+        // nothing reads to `blockingProblems` as context that exists.
+        ...(rankedVocab ? { split: { vocab: rankedVocab, levels: knownLevels } } : {}),
       }),
     [draft, journal, selectedIds, actions, lookup, vocab, aiBatch, knownLevels, rankedVocab],
   );
@@ -1077,6 +1086,28 @@ export default function DeckWorkbenchTray({
         destinationField={fieldB}
         onBatch={setAiBatch}
       />
+
+      {/* Recipe 13 belongs to step 5, "Learning rules" — it decides what a note
+          means for study rather than what it says. `normalize-decks` is the
+          marker for that step because it is the other deck-shaped rule kind, so
+          this appears in the rules step and in the standalone tray and not in
+          the enrich or fields steps, which own neither decks nor scope. */}
+      {kinds.includes('normalize-decks') && (
+        <DeckWorkbenchSplit
+          decks={draft.decks}
+          onQueue={(params) => {
+            setActions((prev) =>
+              addTrayAction(prev, {
+                id: `act-${(nextActionSeq += 1)}`,
+                enabled: true,
+                kind: 'split-deck',
+                ...params,
+              }),
+            );
+            setApplied(null);
+          }}
+        />
+      )}
 
       {problems.length > 0 && (
         <ul className="wb-tray-problems">

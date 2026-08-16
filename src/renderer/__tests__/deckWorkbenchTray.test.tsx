@@ -20,9 +20,9 @@ vi.mock('../i18n', () => ({
 
 import type { AnkiDraft, AnkiDraftNote } from '../../shared/ankiDraft';
 import { createEditJournal, type AnkiDraftEditJournal } from '../../shared/ankiDraftEdit';
-import type { TrayPlan } from '../../shared/ankiChangeTray';
+import type { TrayActionKind, TrayPlan } from '../../shared/ankiChangeTray';
 import type { EnrichEntry } from '../../shared/ankiEnrich';
-import DeckWorkbenchTray from '../components/anki/DeckWorkbenchTray';
+import DeckWorkbenchTray, { FIELD_ACTION_KINDS } from '../components/anki/DeckWorkbenchTray';
 
 function note(id: string, back = 'cat'): AnkiDraftNote {
   return {
@@ -537,5 +537,51 @@ describe('DeckWorkbenchTray prioritize', () => {
 
     expect(host.textContent).toContain('ankiWorkbench.tray.problem.empty-parameter');
     expect(applyButton().disabled).toBe(true);
+  });
+});
+
+describe('the split panel inside the tray', () => {
+  function mountWithKinds(kinds?: TrayActionKind[]): void {
+    act(() => {
+      root = createRoot(host);
+      root.render(
+        <DeckWorkbenchTray
+          draft={draftOf([note('n1')])}
+          journal={createEditJournal()}
+          selectedIds={['n1']}
+          selectedCount={1}
+          onApply={onApply}
+          {...(kinds ? { kinds } : {})}
+        />,
+      );
+    });
+  }
+
+  it('is offered by the rules step and the standalone tray', () => {
+    mountWithKinds();
+    expect(host.textContent).toContain('ankiWorkbench.tray.split.title');
+  });
+
+  it('is not offered by a step that owns neither decks nor scope', () => {
+    mountWithKinds(FIELD_ACTION_KINDS);
+    expect(host.textContent).not.toContain('ankiWorkbench.tray.split.title');
+  });
+
+  it('queues a split-deck action the tray then describes', () => {
+    mountWithKinds();
+    const deckSelect = [...host.querySelectorAll('label')]
+      .find((l) => l.textContent?.includes('ankiWorkbench.tray.split.parent'))!
+      .querySelector('select')!;
+    setValue(deckSelect, 'd1');
+    act(() => {
+      [...host.querySelectorAll('button')]
+        .find((b) => b.textContent?.includes('ankiWorkbench.tray.split.add'))!
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    // `split-deck` is absent from `ACTION_KINDS`, so reaching the queue at all
+    // proves the panel is wired to the same tray the Add button below feeds.
+    expect(host.textContent).toContain('ankiWorkbench.tray.describe.split-deck');
+    expect(host.textContent).not.toContain('ankiWorkbench.tray.problem.split-refused');
   });
 });

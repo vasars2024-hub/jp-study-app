@@ -944,6 +944,39 @@
   align-items: center;
 }
 
+/* Recipe 13's parameters. Same contextual-tool surface as the recipe 9 scan
+   rather than a card: it sits under the tray's own form and belongs to it. */
+.wb-tray-split {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 0.5rem;
+  background: var(--surface-2, rgba(127, 127, 127, 0.08));
+}
+
+.wb-tray-split h4 {
+  margin: 0;
+  font-size: 0.95em;
+}
+
+.wb-tray-split-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px;
+}
+
+.wb-tray-split-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wb-tray-split p {
+  margin: 0;
+}
+
 /* The tray's own copy of these declarations is gone: the workbench-level floor
  * above is identical, so keeping it here would be the per-panel duplication
  * the floor exists to end. */
