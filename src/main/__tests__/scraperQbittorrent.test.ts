@@ -507,7 +507,7 @@ describe('qbitTest in API-key mode', () => {
     expect(seenHeaders).toHaveLength(0);
   });
 
-  it('accepts a key passed in for a test before saving', async () => {
+  it('accepts a key passed in on the call, ahead of the keychain (no renderer sends one)', async () => {
     await clearScraperSecret('test/qbit-key');
     const report = await qbitTest({ config: keyConfig(), apiKey: GOOD_KEY });
     expect(report.status).toBe('connected');

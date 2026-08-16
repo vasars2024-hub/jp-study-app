@@ -194,12 +194,17 @@ export interface ScraperPluginInfo {
 /** A qBittorrent call carries its own connection settings; main stores none. */
 export interface ScraperQbitInput {
   config: ScraperQbittorrentSettings;
-  /** Plaintext, in-memory only, for this one call. Never persisted by main. */
-  password?: string;
   /**
-   * Plaintext API key for a "test before saving" flow, same lifetime rules as
-   * `password`. Consulted only when `config.authMode` is `apiKey`.
+   * Plaintext, in-memory only, for this one call. Never persisted by main.
+   *
+   * No renderer produces this: the drawer saves the secret to the keychain and
+   * main reads it back by ref, so this is a main-process/test affordance only.
+   * Wiring a real "test before saving" flow means threading the drawer's
+   * in-progress secret through `ipcScraperPort.qbitTest`, which nothing does
+   * today — do not read the field's existence as evidence that it happens.
    */
+  password?: string;
+  /** Same lifetime rules and same absent producer as `password`. Consulted only when `config.authMode` is `apiKey`. */
   apiKey?: string;
 }
 
