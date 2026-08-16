@@ -788,6 +788,18 @@ const api = {
     sendGloss: boolean;
     explainLanguage: string;
   }): Promise<AiAdditionsRunResult> => ipcRenderer.invoke('anki:aiGenerateAdditions', request),
+  /**
+   * Deck Workbench field translation (gate 2). A different question with the
+   * same batch id space, so `ankiAiCancelAdditions` and the progress event below
+   * cover it too.
+   */
+  ankiAiTranslateField: (request: {
+    batchId: string;
+    fromField: string;
+    targetLanguage: string;
+    notes: { noteId: string; text: string }[];
+    variantCount: number;
+  }): Promise<AiAdditionsRunResult> => ipcRenderer.invoke('anki:aiTranslateField', request),
   ankiAiCancelAdditions: (batchId: string): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('anki:aiCancelAdditions', batchId),
   onAnkiAiAdditionsProgress: (

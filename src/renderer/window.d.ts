@@ -477,6 +477,14 @@ declare global {
         sendGloss: boolean;
         explainLanguage: string;
       }): Promise<AiAdditionsRunResult>;
+      /** Deck Workbench field translation — gate 2. Same batch id space as above. */
+      ankiAiTranslateField(request: {
+        batchId: string;
+        fromField: string;
+        targetLanguage: string;
+        notes: { noteId: string; text: string }[];
+        variantCount: number;
+      }): Promise<AiAdditionsRunResult>;
       ankiAiCancelAdditions(batchId: string): Promise<{ ok: boolean }>;
       onAnkiAiAdditionsProgress(
         cb: (payload: { batchId: string; results: AiAdditionsNoteResult[] }) => void,
