@@ -23396,3 +23396,46 @@ contrast + reduced motion for steps 3–6, compact/default/maximized (`0d96de79`
 floor (`8d1f7ac9`), and keyboard/focus above. The only remainder is step 7's **package-branch**
 texts, which render only over an .apkg draft behind a native dialog — appended to the existing
 attended entry in `needs-user.md` (2026-08-16 08:55) rather than filed as a second blocker.
+
+## 2026-08-16 — Track 7 / Phase 7: recipe 12's tag half, live on the real mined deck
+
+**Commit `b8a7f24c`.** `shared/ankiTagNormalize.ts` + a `normalize-tags` tray action.
+Four ops in `TAG_NORMALIZE_ORDER`: repair `::` paths, fold full-width ASCII, unify
+case-variant segments, drop a parent a child on the same note already implies.
+
+**The decision and its tradeoff.** There is no `toLowerCase()` in the module. Lowercasing
+is a taste, and a recipe that imposed one would rewrite a deck the user had already made
+consistent. The canonical spelling of each path segment is the spelling that segment
+already has most often — **censused draft-wide while the write stays selection-scoped**,
+or the same tag normalises differently depending on which notes were filtered. Ties break
+toward first-seen, so a given draft always gives the same answer. Cost: the census reads
+every note even for a one-note selection. Keyed by lowercased *path prefix*, not by bare
+segment, so `Anime::Core` and `Grammar::core` keep their own spellings.
+
+**Live, on the user's own 3,221-note mined deck** (`loadDeckAsAnkiDraft`, read-only — the
+plan is computed and never adopted): 3,221 of 3,221 notes tagged, **4** distinct tags,
+**3,074 notes / 3,074 tags renamed, 0 removed**. Every one is the same real fold —
+`book::容疑者Ｘの献身 -> book::容疑者Xの献身`, a full-width Latin X inside a Japanese
+title. Undo restored **3,221 of 3,221** byte-identical as one group. That fold is also
+exactly why `ascii-width` is a checkbox and nothing is on by default: the fullwidth Ｘ is
+arguably the book's real title, so the user sees the literal rename in the tray and
+decides. Probes: `debug/r12-localdeck.js`, `debug/r12-tagnormalize.js`.
+
+**Controls.** No op chosen → `empty-parameter` blocking, `changedNotes: 0`, and the input
+draft returned **by identity**. A `drop-redundant-parents`-only run over the same deck →
+0 changed, journal still at 0 ops, `tag-normalize-clean` count **3,221** rather than a
+silent zero. Mutation control: replacing the census lookup with a lowercase-last-segment
+fallback turns **6 of 12** unit tests red; restored, 12/12 green.
+
+**FINDING, and the next worker should not rediscover it.** The imported N1 apkg is not a
+tag fixture. Read in full (two pages — `ANKI_DRAFT_MAX_PAGE_SIZE` is **2000**, so a
+3,359-note deck needs `noteOffset: 2000` for the rest, and a single call silently returns
+2,000): **1 note of 3,359 carries any tag**, and its 30 "tags" are an English gloss split
+on spaces (`to`, `hold`, `Buddhist`, `いとなむGodan`, …) — Anki tags are whitespace-
+separated, so a gloss written into the tags column shatters. The recipe handled it
+correctly (3 duplicate `to` removed) but any recipe measured on that deck's tags is
+measuring one broken note. Use `loadDeckAsAnkiDraft` for tag work.
+
+**Deck-path renaming is deliberately NOT in this slice.** It is collection-level, needs a
+new `deck-name` journal op, and a tray action that moved cards between near-duplicate
+decks would have a far larger blast radius than "tidy up tags" suggests.

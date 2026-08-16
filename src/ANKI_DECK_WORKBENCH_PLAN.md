@@ -319,6 +319,7 @@ Partial failure must identify exactly what committed, what failed, and what can 
 
 - Complete all twenty smart recipes, large-deck performance, accessibility, localization, error recovery, and Standard/Liquid/theme visual matrices.
 - Run focused tests, integration tests, a 100,000-note performance fixture, and live Electron acceptance with a disposable Anki profile.
+- Shipped 2026-08-16: **recipe 12's tag half** (`b8a7f24c`) — `shared/ankiTagNormalize.ts` + a `normalize-tags` tray action, four ops in a fixed order, casing decided by a draft-wide census rather than by `toLowerCase()`. Live on the real 3,221-note mined deck: 3,074 notes / 3,074 tags renamed (`book::容疑者Ｘの献身 -> book::容疑者Xの献身`), undo restored 3,221 of 3,221 byte-identical; a clean run reports `tag-normalize-clean` for 3,221 instead of a silent zero. **Recipe 12's deck-path half is still open** and needs a new `deck-name` journal op — see the ledger entry for why it is not folded in. Recipes still without a tray action kind: **11, 13–20, 26**.
 
 ## Demonstrable acceptance gates
 
