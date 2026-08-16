@@ -1,0 +1,200 @@
+{
+  "title": "Statistics",
+  "rect": {
+    "x": 128,
+    "y": 84,
+    "w": 260,
+    "h": 170
+  },
+  "maximized": false,
+  "viewport": {
+    "w": 1264,
+    "h": 821,
+    "dpr": 1
+  },
+  "theme": {
+    "dataTheme": "forest-night",
+    "materials": null,
+    "reducedMotion": false,
+    "forcedColors": false
+  },
+  "controls": {
+    "focusable": 9,
+    "byRole": {
+      "button": 9
+    },
+    "under24": 0,
+    "under24list": [],
+    "under44": 9
+  },
+  "focusOrder": {
+    "count": 9,
+    "inversions": 0,
+    "firstInversionAt": -1,
+    "domOrder": [
+      {
+        "i": 0,
+        "n": "Pop out into its own window",
+        "top": 5,
+        "left": 129
+      },
+      {
+        "i": 1,
+        "n": "Minimize",
+        "top": 5,
+        "left": 161
+      },
+      {
+        "i": 2,
+        "n": "Maximize",
+        "top": 5,
+        "left": 193
+      },
+      {
+        "i": 3,
+        "n": "Close",
+        "top": 5,
+        "left": 225
+      },
+      {
+        "i": 4,
+        "n": "Reset",
+        "top": 50,
+        "left": 168
+      },
+      {
+        "i": 5,
+        "n": "Sync from Anki",
+        "top": 172,
+        "left": 124
+      },
+      {
+        "i": 6,
+        "n": "Resume THE Big O — 1",
+        "top": 1696,
+        "left": 19
+      },
+      {
+        "i": 7,
+        "n": "Resume THE Big O — 13",
+        "top": 1739,
+        "left": 19
+      },
+      {
+        "i": 8,
+        "n": "Resume Sousou no Frieren — 1",
+        "top": 1782,
+        "left": 19
+      }
+    ]
+  },
+  "overflow": {
+    "clippedX": 7,
+    "clippedXList": [
+      {
+        "n": "Your reading time and characters read, track",
+        "c": "fwin-body   ",
+        "over": 109
+      },
+      {
+        "n": "悪の教典 02",
+        "c": "stats-book-title",
+        "over": 6
+      },
+      {
+        "n": "クビシメロマンチスト 人間失格・零崎人識 戯言 (講談社文庫)",
+        "c": "stats-book-title",
+        "over": 282
+      },
+      {
+        "n": "クビシメロマンチスト 人間失格・零崎人識 戯言 (講談社文庫)",
+        "c": "stats-book-title",
+        "over": 302
+      },
+      {
+        "n": "THE Big O — 1",
+        "c": "stats-book-title",
+        "over": 21
+      },
+      {
+        "n": "THE Big O — 13",
+        "c": "stats-book-title",
+        "over": 29
+      },
+      {
+        "n": "Sousou no Frieren — 1",
+        "c": "stats-book-title",
+        "over": 66
+      }
+    ],
+    "scrollersY": 1,
+    "pastWindowFrame": 167,
+    "pastList": [
+      {
+        "n": "Your reading time and characters read, track",
+        "c": "stats-view"
+      },
+      {
+        "n": "Word knowledgeSync from AnkiBeginnerEstimate",
+        "c": "stats-section"
+      },
+      {
+        "n": "Word knowledgeSync from Anki",
+        "c": "wk-head"
+      },
+      {
+        "n": "Word knowledge",
+        "c": ""
+      },
+      {
+        "n": "Sync from Anki",
+        "c": "btn small"
+      },
+      {
+        "n": "svg",
+        "c": "[object SVGAnimatedString]"
+      },
+      {
+        "n": "path",
+        "c": "[object SVGAnimatedString]"
+      },
+      {
+        "n": "Estimated level Beginner",
+        "c": "stats-level-estimate"
+      }
+    ],
+    "unreachable": 0,
+    "unreachableList": []
+  },
+  "routes": {
+    "count": 0,
+    "list": []
+  },
+  "states": {
+    "empty": false,
+    "loading": false,
+    "error": false,
+    "offline": false,
+    "keywordFormIsAHint": true
+  },
+  "stateBlocks": [
+    {
+      "c": "stats-level-estimate",
+      "t": "Beginner Estimated level From Familiar-or-better coverage of your JLPT / HSK word lists."
+    }
+  ],
+  "textChars": 895,
+  "domNodes": 185,
+  "sizeMode": "min",
+  "settle": {
+    "final": "185/9",
+    "samples": [
+      "185/9",
+      "185/9",
+      "185/9"
+    ],
+    "settled": true,
+    "waitedMs": 1200
+  },
+  "capturedAt": "2026-08-16T21:31:53.9584573+03:00"
+}

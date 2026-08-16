@@ -1,0 +1,453 @@
+{
+  "title": "Immersion",
+  "rect": {
+    "x": 128,
+    "y": 84,
+    "w": 820,
+    "h": 580
+  },
+  "maximized": false,
+  "viewport": {
+    "w": 1264,
+    "h": 821,
+    "dpr": 1
+  },
+  "theme": {
+    "dataTheme": "forest-night",
+    "materials": null,
+    "reducedMotion": false,
+    "forcedColors": false
+  },
+  "controls": {
+    "focusable": 1046,
+    "byRole": {
+      "button": 1045,
+      "input": 1
+    },
+    "under24": 512,
+    "under24list": [
+      {
+        "n": "Remove",
+        "w": 20,
+        "h": 49
+      },
+      {
+        "n": "Remove",
+        "w": 20,
+        "h": 49
+      },
+      {
+        "n": "Remove",
+        "w": 20,
+        "h": 49
+      },
+      {
+        "n": "Remove",
+        "w": 20,
+        "h": 49
+      },
+      {
+        "n": "Remove",
+        "w": 20,
+        "h": 49
+      },
+      {
+        "n": "Remove",
+        "w": 20,
+        "h": 49
+      },
+      {
+        "n": "Remove",
+        "w": 20,
+        "h": 49
+      },
+      {
+        "n": "Remove",
+        "w": 20,
+        "h": 49
+      },
+      {
+        "n": "Remove",
+        "w": 20,
+        "h": 49
+      },
+      {
+        "n": "Remove",
+        "w": 20,
+        "h": 49
+      },
+      {
+        "n": "Remove",
+        "w": 20,
+        "h": 49
+      },
+      {
+        "n": "Remove",
+        "w": 20,
+        "h": 50
+      }
+    ],
+    "under44": 534
+  },
+  "focusOrder": {
+    "count": 1046,
+    "inversions": 13,
+    "firstInversionAt": 17,
+    "domOrder": [
+      {
+        "i": 0,
+        "n": "Pop out into its own window",
+        "top": 5,
+        "left": 689
+      },
+      {
+        "i": 1,
+        "n": "Minimize",
+        "top": 5,
+        "left": 721
+      },
+      {
+        "i": 2,
+        "n": "Maximize",
+        "top": 5,
+        "left": 753
+      },
+      {
+        "i": 3,
+        "n": "Close",
+        "top": 5,
+        "left": 785
+      },
+      {
+        "i": 4,
+        "n": "Reload",
+        "top": 60,
+        "left": 95
+      },
+      {
+        "i": 5,
+        "n": "Enter URL or search…",
+        "top": 57,
+        "left": 129
+      },
+      {
+        "i": 6,
+        "n": "Live — browse",
+        "top": 59,
+        "left": 392
+      },
+      {
+        "i": 7,
+        "n": "Live·Reader — read + highlight",
+        "top": 59,
+        "left": 431
+      },
+      {
+        "i": 8,
+        "n": "Focus (F6) — distraction-free",
+        "top": 59,
+        "left": 506
+      },
+      {
+        "i": 9,
+        "n": "Live page lookup on — select or Shift-hover ",
+        "top": 60,
+        "left": 561
+      },
+      {
+        "i": 10,
+        "n": "Save site (Ctrl+D)",
+        "top": 60,
+        "left": 595
+      },
+      {
+        "i": 11,
+        "n": "Save as tool",
+        "top": 60,
+        "left": 629
+      },
+      {
+        "i": 12,
+        "n": "Export to Library",
+        "top": 60,
+        "left": 663
+      },
+      {
+        "i": 13,
+        "n": "Capture video to Media",
+        "top": 60,
+        "left": 697
+      },
+      {
+        "i": 14,
+        "n": "Open in system browser",
+        "top": 60,
+        "left": 731
+      },
+      {
+        "i": 15,
+        "n": "Hide library",
+        "top": 60,
+        "left": 765
+      },
+      {
+        "i": 16,
+        "n": "Visual Novel Library",
+        "top": 96,
+        "left": 653
+      },
+      {
+        "i": 17,
+        "n": "NHK Easy",
+        "top": 302,
+        "left": 92
+      },
+      {
+        "i": 18,
+        "n": "Wikipedia JP",
+        "top": 302,
+        "left": 176
+      },
+      {
+        "i": 19,
+        "n": "Hacker News",
+        "top": 302,
+        "left": 278
+      },
+      {
+        "i": 20,
+        "n": "Chinese Wikipedia",
+        "top": 302,
+        "left": 382
+      },
+      {
+        "i": 21,
+        "n": "Russian Wikipedia",
+        "top": 336,
+        "left": 238
+      },
+      {
+        "i": 22,
+        "n": "https://www.youtube.com/watch?v=qKAyZYGBk3Q",
+        "top": 129,
+        "left": 588
+      },
+      {
+        "i": 23,
+        "n": "Remove",
+        "top": 129,
+        "left": 765
+      },
+      {
+        "i": 24,
+        "n": "https://www.google.com/search?q=kaiju&sca_es",
+        "top": 182,
+        "left": 588
+      },
+      {
+        "i": 25,
+        "n": "Remove",
+        "top": 182,
+        "left": 765
+      },
+      {
+        "i": 26,
+        "n": "https://www.youtube.com/",
+        "top": 235,
+        "left": 588
+      },
+      {
+        "i": 27,
+        "n": "Remove",
+        "top": 235,
+        "left": 765
+      },
+      {
+        "i": 28,
+        "n": "https://www.youtube.com/shorts/07q9VmuCq30",
+        "top": 288,
+        "left": 588
+      },
+      {
+        "i": 29,
+        "n": "Remove",
+        "top": 288,
+        "left": 765
+      },
+      {
+        "i": 30,
+        "n": "https://www.youtube.com/shorts/2jRmEd6XQr0",
+        "top": 341,
+        "left": 588
+      },
+      {
+        "i": 31,
+        "n": "Remove",
+        "top": 341,
+        "left": 765
+      },
+      {
+        "i": 32,
+        "n": "https://www.youtube.com/shorts/vtGz2YpslqU",
+        "top": 394,
+        "left": 588
+      },
+      {
+        "i": 33,
+        "n": "Remove",
+        "top": 394,
+        "left": 765
+      },
+      {
+        "i": 34,
+        "n": "https://www.youtube.com/shorts/P5u7u61uLgY",
+        "top": 447,
+        "left": 588
+      },
+      {
+        "i": 35,
+        "n": "Remove",
+        "top": 447,
+        "left": 765
+      },
+      {
+        "i": 36,
+        "n": "https://www.youtube.com/shorts/vNVHQpC8RRw",
+        "top": 500,
+        "left": 588
+      },
+      {
+        "i": 37,
+        "n": "Remove",
+        "top": 500,
+        "left": 765
+      },
+      {
+        "i": 38,
+        "n": "https://www.youtube.com/shorts/Tnw6JwXPWXg",
+        "top": 553,
+        "left": 588
+      },
+      {
+        "i": 39,
+        "n": "Remove",
+        "top": 553,
+        "left": 765
+      }
+    ]
+  },
+  "overflow": {
+    "clippedX": 376,
+    "clippedXList": [
+      {
+        "n": "(466) The New Epstein. - YouTube",
+        "c": "immersion-site-title",
+        "over": 21
+      },
+      {
+        "n": "whjee is the holy chabad site - Google Searc",
+        "c": "immersion-site-title",
+        "over": 84
+      },
+      {
+        "n": "(465) INSANE MEGALOPHOBIA Drawing in Gartic ",
+        "c": "immersion-site-title",
+        "over": 196
+      },
+      {
+        "n": "(465) w Joe 🤦‍♂️🤦‍♂️🤦‍♂️ #streamergames #",
+        "c": "immersion-site-title",
+        "over": 346
+      },
+      {
+        "n": "(465) bro has no durability #viral #jjk #juj",
+        "c": "immersion-site-title",
+        "over": 243
+      },
+      {
+        "n": "(465) The Power of German Tank Stabilization",
+        "c": "immersion-site-title",
+        "over": 139
+      },
+      {
+        "n": "(465) Old ishowspeed wouldn't have hesitated",
+        "c": "immersion-site-title",
+        "over": 161
+      },
+      {
+        "n": "(465) Never forget when an eagle landed on h",
+        "c": "immersion-site-title",
+        "over": 328
+      }
+    ],
+    "scrollersY": 1,
+    "pastWindowFrame": 3526,
+    "pastList": [
+      {
+        "n": "(465) Never forget when an eagle landed on h",
+        "c": ""
+      },
+      {
+        "n": "https://www.youtube.com/shorts/Tnw6JwXPWXg",
+        "c": "immersion-site-card"
+      },
+      {
+        "n": "1 visit · 1d",
+        "c": "immersion-site-meta muted"
+      },
+      {
+        "n": "Remove",
+        "c": "immersion-site-remove"
+      },
+      {
+        "n": "svg",
+        "c": "[object SVGAnimatedString]"
+      },
+      {
+        "n": "(465) Nothing CEO reacts tho hard critic to ",
+        "c": ""
+      },
+      {
+        "n": "https://www.youtube.com/shorts/Px32-DukQLQ",
+        "c": "immersion-site-card"
+      },
+      {
+        "n": "(465) Nothing CEO reacts tho hard critic to ",
+        "c": "immersion-site-title"
+      }
+    ],
+    "unreachable": 0,
+    "unreachableList": []
+  },
+  "routes": {
+    "count": 0,
+    "list": []
+  },
+  "states": {
+    "empty": false,
+    "loading": false,
+    "error": true,
+    "offline": false,
+    "keywordFormIsAHint": true
+  },
+  "stateBlocks": [
+    {
+      "c": "immersion-empty",
+      "t": "Open a page to begin immersion reading. NHK Easy Wikipedia JP Hacker News Chinese Wikipedia Russian Wikipedia Search opens Live · F8 cycles modes · F6 Focus · Ctrl+L URL bar"
+    }
+  ],
+  "textChars": 41325,
+  "domNodes": 3652,
+  "sizeMode": "default",
+  "settle": {
+    "settled": true,
+    "waitedMs": 1200,
+    "samples": [
+      "3652/1048",
+      "3652/1048",
+      "3652/1048"
+    ],
+    "final": "3652/1048"
+  },
+  "capturedAt": "2026-08-16T21:29:02.8431299+03:00"
+}

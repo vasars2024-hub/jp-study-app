@@ -1,0 +1,387 @@
+{
+  "title": "Library",
+  "rect": {
+    "x": 128,
+    "y": 84,
+    "w": 260,
+    "h": 170
+  },
+  "maximized": false,
+  "viewport": {
+    "w": 1264,
+    "h": 821,
+    "dpr": 1
+  },
+  "theme": {
+    "dataTheme": "forest-night",
+    "materials": null,
+    "reducedMotion": false,
+    "forcedColors": false
+  },
+  "controls": {
+    "focusable": 40,
+    "byRole": {
+      "button": 38,
+      "select": 2
+    },
+    "under24": 0,
+    "under24list": [],
+    "under44": 40
+  },
+  "focusOrder": {
+    "count": 40,
+    "inversions": 0,
+    "firstInversionAt": -1,
+    "domOrder": [
+      {
+        "i": 0,
+        "n": "Pop out into its own window",
+        "top": 5,
+        "left": 129
+      },
+      {
+        "i": 1,
+        "n": "Minimize",
+        "top": 5,
+        "left": 161
+      },
+      {
+        "i": 2,
+        "n": "Maximize",
+        "top": 5,
+        "left": 193
+      },
+      {
+        "i": 3,
+        "n": "Close",
+        "top": 5,
+        "left": 225
+      },
+      {
+        "i": 4,
+        "n": "+ Import file(s)",
+        "top": 50,
+        "left": 85
+      },
+      {
+        "i": 5,
+        "n": "Import image folder",
+        "top": 50,
+        "left": 219
+      },
+      {
+        "i": 6,
+        "n": "Web / paste",
+        "top": 50,
+        "left": 411
+      },
+      {
+        "i": 7,
+        "n": "Random Wikipedia",
+        "top": 50,
+        "left": 553
+      },
+      {
+        "i": 8,
+        "n": "Sync now",
+        "top": 330,
+        "left": 32
+      },
+      {
+        "i": 9,
+        "n": "Change",
+        "top": 330,
+        "left": 117
+      },
+      {
+        "i": 10,
+        "n": "Stop",
+        "top": 366,
+        "left": 32
+      },
+      {
+        "i": 11,
+        "n": "Everything (drop a book here to take it out ",
+        "top": 419,
+        "left": 19
+      },
+      {
+        "i": 12,
+        "n": "Manga — drop books here to file them; drag t",
+        "top": 419,
+        "left": 86
+      },
+      {
+        "i": 13,
+        "n": "Inbox — drop books here to file them; drag t",
+        "top": 458,
+        "left": 19
+      },
+      {
+        "i": 14,
+        "n": "Unfiled 21",
+        "top": 458,
+        "left": 119
+      },
+      {
+        "i": 15,
+        "n": "+ New folder",
+        "top": 497,
+        "left": 19
+      },
+      {
+        "i": 16,
+        "n": "Sort",
+        "top": 544,
+        "left": 49
+      },
+      {
+        "i": 17,
+        "n": "Group",
+        "top": 584,
+        "left": 19
+      },
+      {
+        "i": 18,
+        "n": "Covers",
+        "top": 624,
+        "left": 19
+      },
+      {
+        "i": 19,
+        "n": "List",
+        "top": 624,
+        "left": 106
+      },
+      {
+        "i": 20,
+        "n": "Inbox",
+        "top": 663,
+        "left": 19
+      },
+      {
+        "i": 21,
+        "n": "Chrome extension",
+        "top": 663,
+        "left": 81
+      },
+      {
+        "i": 22,
+        "n": "YouTube",
+        "top": 697,
+        "left": 19
+      },
+      {
+        "i": 23,
+        "n": "All",
+        "top": 731,
+        "left": 19
+      },
+      {
+        "i": 24,
+        "n": "Japanese",
+        "top": 731,
+        "left": 66
+      },
+      {
+        "i": 25,
+        "n": "Chinese",
+        "top": 731,
+        "left": 150
+      },
+      {
+        "i": 26,
+        "n": "English",
+        "top": 768,
+        "left": 19
+      },
+      {
+        "i": 27,
+        "n": "Unknown",
+        "top": 768,
+        "left": 92
+      },
+      {
+        "i": 28,
+        "n": "All",
+        "top": 805,
+        "left": 19
+      },
+      {
+        "i": 29,
+        "n": "L1",
+        "top": 805,
+        "left": 66
+      },
+      {
+        "i": 30,
+        "n": "L2",
+        "top": 805,
+        "left": 111
+      },
+      {
+        "i": 31,
+        "n": "L3",
+        "top": 805,
+        "left": 156
+      },
+      {
+        "i": 32,
+        "n": "L4",
+        "top": 842,
+        "left": 19
+      },
+      {
+        "i": 33,
+        "n": "L5",
+        "top": 842,
+        "left": 64
+      },
+      {
+        "i": 34,
+        "n": "L6",
+        "top": 842,
+        "left": 109
+      },
+      {
+        "i": 35,
+        "n": "L7",
+        "top": 842,
+        "left": 154
+      },
+      {
+        "i": 36,
+        "n": "Convert to text",
+        "top": 1560,
+        "left": 19
+      },
+      {
+        "i": 37,
+        "n": "Convert to text",
+        "top": 1937,
+        "left": 19
+      },
+      {
+        "i": 38,
+        "n": "Convert to text",
+        "top": 2314,
+        "left": 19
+      },
+      {
+        "i": 39,
+        "n": "Convert to text",
+        "top": 2690,
+        "left": 19
+      }
+    ]
+  },
+  "overflow": {
+    "clippedX": 20,
+    "clippedXList": [
+      {
+        "n": "Your books and manga. Import files to start ",
+        "c": "fwin-body   ",
+        "over": 478
+      },
+      {
+        "n": "One Punch-Man : The Koi Pond | Chapter 229 |",
+        "c": "card-title",
+        "over": 95
+      },
+      {
+        "n": "One Punch-Man : The Koi Pond | Chapter 229 |",
+        "c": "card-title",
+        "over": 95
+      },
+      {
+        "n": "One Punch-Man : The Koi Pond | Chapter 229 |",
+        "c": "card-title",
+        "over": 95
+      },
+      {
+        "n": "ハサミ男 (殊能将之) (z-library.sk, 1lib.sk, z-lib.sk",
+        "c": "card-title",
+        "over": 65
+      },
+      {
+        "n": "10 キドナプキディング 青色サヴァンと戯言遣いの娘",
+        "c": "card-title",
+        "over": 94
+      },
+      {
+        "n": "06 ヒトクイマジカル 殺戮奇術の匂宮兄妹",
+        "c": "card-title",
+        "over": 30
+      },
+      {
+        "n": "05 サイコロジカ (下) 曳かれ者の小唄",
+        "c": "card-title",
+        "over": 3
+      }
+    ],
+    "scrollersY": 1,
+    "pastWindowFrame": 311,
+    "pastList": [
+      {
+        "n": "Your books and manga. Import files to start ",
+        "c": "library"
+      },
+      {
+        "n": "Your books and manga. Import files to start ",
+        "c": "view-head"
+      },
+      {
+        "n": "Your books and manga. Import files to start ",
+        "c": "muted"
+      },
+      {
+        "n": "+ Import file(s)Import image folderWeb / pas",
+        "c": "actions"
+      },
+      {
+        "n": "Import image folder",
+        "c": "btn"
+      },
+      {
+        "n": "Web / paste",
+        "c": "btn"
+      },
+      {
+        "n": "svg",
+        "c": "[object SVGAnimatedString]"
+      },
+      {
+        "n": "path",
+        "c": "[object SVGAnimatedString]"
+      }
+    ],
+    "unreachable": 0,
+    "unreachableList": []
+  },
+  "routes": {
+    "count": 0,
+    "list": []
+  },
+  "states": {
+    "empty": false,
+    "loading": false,
+    "error": false,
+    "offline": false,
+    "keywordFormIsAHint": true
+  },
+  "stateBlocks": [],
+  "textChars": 2607,
+  "domNodes": 447,
+  "sizeMode": "min",
+  "settle": {
+    "settled": true,
+    "waitedMs": 1200,
+    "samples": [
+      "447/92",
+      "447/92",
+      "447/92"
+    ],
+    "final": "447/92"
+  },
+  "capturedAt": "2026-08-16T21:29:15.2802309+03:00"
+}

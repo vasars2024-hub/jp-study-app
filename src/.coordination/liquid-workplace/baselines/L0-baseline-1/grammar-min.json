@@ -1,0 +1,449 @@
+{
+  "title": "Grammar",
+  "rect": {
+    "x": 128,
+    "y": 84,
+    "w": 260,
+    "h": 170
+  },
+  "maximized": false,
+  "viewport": {
+    "w": 1264,
+    "h": 821,
+    "dpr": 1
+  },
+  "theme": {
+    "dataTheme": "forest-night",
+    "materials": null,
+    "reducedMotion": false,
+    "forcedColors": false
+  },
+  "controls": {
+    "focusable": 4839,
+    "byRole": {
+      "button": 2426,
+      "input": 2412,
+      "select": 1
+    },
+    "under24": 2416,
+    "under24list": [
+      {
+        "n": "Saved filters…",
+        "w": 109,
+        "h": 19
+      },
+      {
+        "n": "Name this filter…",
+        "w": 177,
+        "h": 21
+      },
+      {
+        "n": "Select this point",
+        "w": 13,
+        "h": 13
+      },
+      {
+        "n": "Select this point",
+        "w": 13,
+        "h": 13
+      },
+      {
+        "n": "Select this point",
+        "w": 13,
+        "h": 13
+      },
+      {
+        "n": "Select this point",
+        "w": 13,
+        "h": 13
+      },
+      {
+        "n": "Select this point",
+        "w": 13,
+        "h": 13
+      },
+      {
+        "n": "Select this point",
+        "w": 13,
+        "h": 13
+      },
+      {
+        "n": "Select this point",
+        "w": 13,
+        "h": 13
+      },
+      {
+        "n": "Select this point",
+        "w": 13,
+        "h": 13
+      },
+      {
+        "n": "Select this point",
+        "w": 13,
+        "h": 13
+      },
+      {
+        "n": "Select this point",
+        "w": 13,
+        "h": 13
+      }
+    ],
+    "under44": 4816
+  },
+  "focusOrder": {
+    "count": 4839,
+    "inversions": 4827,
+    "firstInversionAt": 12,
+    "domOrder": [
+      {
+        "i": 0,
+        "n": "Pop out into its own window",
+        "top": 5,
+        "left": 129
+      },
+      {
+        "i": 1,
+        "n": "Minimize",
+        "top": 5,
+        "left": 161
+      },
+      {
+        "i": 2,
+        "n": "Maximize",
+        "top": 5,
+        "left": 193
+      },
+      {
+        "i": 3,
+        "n": "Close",
+        "top": 5,
+        "left": 225
+      },
+      {
+        "i": 4,
+        "n": "Grammar points",
+        "top": 55,
+        "left": 99
+      },
+      {
+        "i": 5,
+        "n": "Practice",
+        "top": 55,
+        "left": 187
+      },
+      {
+        "i": 6,
+        "n": "Guides & hacks",
+        "top": 55,
+        "left": 265
+      },
+      {
+        "i": 7,
+        "n": "Review",
+        "top": 55,
+        "left": 338
+      },
+      {
+        "i": 8,
+        "n": "Search grammar or meaning…",
+        "top": 299,
+        "left": 19
+      },
+      {
+        "i": 9,
+        "n": "Filters",
+        "top": 341,
+        "left": 19
+      },
+      {
+        "i": 10,
+        "n": "Saved filters…",
+        "top": 375,
+        "left": 19
+      },
+      {
+        "i": 11,
+        "n": "Name this filter…",
+        "top": 400,
+        "left": 19
+      },
+      {
+        "i": 12,
+        "n": "Select this point",
+        "top": 492,
+        "left": 29
+      },
+      {
+        "i": 13,
+        "n": "〜あとでN5after ~",
+        "top": 489,
+        "left": 51
+      },
+      {
+        "i": 14,
+        "n": "Select this point",
+        "top": 550,
+        "left": 29
+      },
+      {
+        "i": 15,
+        "n": "〜か (question marker)N5turns a sentence into ",
+        "top": 547,
+        "left": 51
+      },
+      {
+        "i": 16,
+        "n": "Select this point",
+        "top": 608,
+        "left": 29
+      },
+      {
+        "i": 17,
+        "n": "〜が (subject particle)N5marks the subject / n",
+        "top": 605,
+        "left": 51
+      },
+      {
+        "i": 18,
+        "n": "Select this point",
+        "top": 666,
+        "left": 29
+      },
+      {
+        "i": 19,
+        "n": "〜が / 〜けど (but)N5but / however",
+        "top": 663,
+        "left": 51
+      },
+      {
+        "i": 20,
+        "n": "Select this point",
+        "top": 724,
+        "left": 29
+      },
+      {
+        "i": 21,
+        "n": "〜がほしいN5want (a thing)",
+        "top": 721,
+        "left": 51
+      },
+      {
+        "i": 22,
+        "n": "Select this point",
+        "top": 782,
+        "left": 29
+      },
+      {
+        "i": 23,
+        "n": "〜から (because)N5because ~ / so ~",
+        "top": 779,
+        "left": 51
+      },
+      {
+        "i": 24,
+        "n": "Select this point",
+        "top": 840,
+        "left": 29
+      },
+      {
+        "i": 25,
+        "n": "〜から〜までN5from ~ to ~ (time / place)",
+        "top": 837,
+        "left": 51
+      },
+      {
+        "i": 26,
+        "n": "Select this point",
+        "top": 898,
+        "left": 29
+      },
+      {
+        "i": 27,
+        "n": "〜が好き / 上手 / 下手N5like / good at / bad at",
+        "top": 895,
+        "left": 51
+      },
+      {
+        "i": 28,
+        "n": "Select this point",
+        "top": 956,
+        "left": 29
+      },
+      {
+        "i": 29,
+        "n": "〜くなる / 〜になるN5become ~",
+        "top": 953,
+        "left": 51
+      },
+      {
+        "i": 30,
+        "n": "Select this point",
+        "top": 1014,
+        "left": 29
+      },
+      {
+        "i": 31,
+        "n": "〜たいN5want to do ~",
+        "top": 1011,
+        "left": 51
+      },
+      {
+        "i": 32,
+        "n": "Select this point",
+        "top": 1072,
+        "left": 29
+      },
+      {
+        "i": 33,
+        "n": "〜たり〜たりするN5do things like A and B (examples)",
+        "top": 1069,
+        "left": 51
+      },
+      {
+        "i": 34,
+        "n": "Select this point",
+        "top": 1130,
+        "left": 29
+      },
+      {
+        "i": 35,
+        "n": "〜で (place of action / means)N5at/in (action ",
+        "top": 1127,
+        "left": 51
+      },
+      {
+        "i": 36,
+        "n": "Select this point",
+        "top": 1188,
+        "left": 29
+      },
+      {
+        "i": 37,
+        "n": "〜ているN5is doing / is in a state",
+        "top": 1185,
+        "left": 51
+      },
+      {
+        "i": 38,
+        "n": "Select this point",
+        "top": 1246,
+        "left": 29
+      },
+      {
+        "i": 39,
+        "n": "〜てからN5after doing ~",
+        "top": 1243,
+        "left": 51
+      }
+    ]
+  },
+  "overflow": {
+    "clippedX": 93,
+    "clippedXList": [
+      {
+        "n": "JLPT N5–N1 and HSK 1–10 grammar, plus Practi",
+        "c": "fwin-body   ",
+        "over": 163
+      },
+      {
+        "n": "get / make / induce (someone) to do (somethi",
+        "c": "gram-x-meaning",
+        "over": 95
+      },
+      {
+        "n": "to make somebody do something. to let somebo",
+        "c": "gram-x-meaning",
+        "over": 38
+      },
+      {
+        "n": "Once you have experienced something, it cann",
+        "c": "gram-x-meaning",
+        "over": 65
+      },
+      {
+        "n": "to make something ~, to decide on, to try to",
+        "c": "gram-x-meaning",
+        "over": 35
+      },
+      {
+        "n": "for; in order to; for the benefit of; becaus",
+        "c": "gram-x-meaning",
+        "over": 12
+      },
+      {
+        "n": "don't have to; it's OK to not do. Indicates ",
+        "c": "gram-x-meaning",
+        "over": 31
+      },
+      {
+        "n": "if; in the case that ~ (limit the range of t",
+        "c": "gram-x-meaning",
+        "over": 164
+      }
+    ],
+    "scrollersY": 1,
+    "pastWindowFrame": 19318,
+    "pastList": [
+      {
+        "n": "JLPT N5–N1 and HSK 1–10 grammar, plus Practi",
+        "c": "gram-view"
+      },
+      {
+        "n": "JLPT N5–N1 and HSK 1–10 grammar, plus Practi",
+        "c": "view-head"
+      },
+      {
+        "n": "JLPT N5–N1 and HSK 1–10 grammar, plus Practi",
+        "c": "muted"
+      },
+      {
+        "n": "Grammar pointsPracticeGuides & hacksReview",
+        "c": "gram-mode-toggle"
+      },
+      {
+        "n": "Practice",
+        "c": "gram-mode-btn "
+      },
+      {
+        "n": "Guides & hacks",
+        "c": "gram-mode-btn "
+      },
+      {
+        "n": "Review",
+        "c": "gram-mode-btn "
+      },
+      {
+        "n": "BackForwardFiltersSelection (0)Saved filters",
+        "c": "gram-x "
+      }
+    ],
+    "unreachable": 0,
+    "unreachableList": []
+  },
+  "routes": {
+    "count": 0,
+    "list": []
+  },
+  "states": {
+    "empty": false,
+    "loading": false,
+    "error": true,
+    "offline": false,
+    "keywordFormIsAHint": true
+  },
+  "stateBlocks": [],
+  "textChars": 91550,
+  "domNodes": 19350,
+  "sizeMode": "min",
+  "settle": {
+    "settled": true,
+    "waitedMs": 1200,
+    "samples": [
+      "19350/4843",
+      "19350/4843",
+      "19350/4843"
+    ],
+    "final": "19350/4843"
+  },
+  "capturedAt": "2026-08-16T21:29:26.4688885+03:00"
+}

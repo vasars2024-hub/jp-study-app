@@ -36,6 +36,10 @@
 #>
 param(
   [Parameter(Mandatory = $true)][string]$Title,
+  # A frameless window (the Mooncap Garden) renders no `.fwin-title-text` at all, so the
+  # title-only finder resolves to '' and cannot address it. `-Selector` targets the window
+  # element directly; `-Title` then names the record rather than finding it.
+  [string]$Selector = '',
   [string[]]$Sizes = @('default', 'min', 'max'),
   [string]$Milestone = 'L0-baseline-1'
 )
@@ -55,12 +59,39 @@ function Invoke-Eval([string]$js) {
   return $r.result
 }
 
+# A fixed sleep is not a settle. Immersion measured 4 focusables at 700 ms and 1,046 a few
+# seconds later -- the first record was a loading skeleton filed under the name `default`,
+# which is a false baseline every later scorecard would be compared against. So: sample the
+# node/control count until two consecutive samples agree, and record whether it settled.
+function Wait-Settle([string]$winExpr, [int]$maxMs = 12000) {
+  $probe = @"
+(() => { const w = ($winExpr);
+  if (!w) return '0/0'; return w.querySelectorAll('*').length + '/' + w.querySelectorAll('a[href],button,input,select,textarea,[tabindex]:not([tabindex=\"-1\"]),[role=button],[role=tab]').length; })()
+"@
+  $prev = ''; $stable = 0; $waited = 0; $samples = @()
+  while ($waited -lt $maxMs) {
+    Start-Sleep -Milliseconds 400
+    $waited += 400
+    $now = Invoke-Eval $probe
+    $samples += $now
+    if ($now -eq $prev) { $stable += 1 } else { $stable = 0 }
+    $prev = $now
+    if ($stable -ge 2) { return @{ settled = $true; waitedMs = $waited; final = $now; samples = $samples } }
+  }
+  return @{ settled = $false; waitedMs = $waited; final = $prev; samples = $samples }
+}
+
+# How every eval in this script resolves its target window. One expression, defined once, so a
+# selector-addressed window and a title-addressed one go through identical measurement code.
+$W = if ($Selector) { "document.querySelector('$Selector')" }
+     else { "[...document.querySelectorAll('.fwin')].find((x) => ((x.querySelector('.fwin-title-text') || {}).textContent || '') === '$Title')" }
+
 # rAF and layout settle differently in a background window; focus first (jp-bridge section 4).
 $null = Invoke-RestMethod -Uri "$base/focus" -Method Post -Headers $headers -Body '{}' -ContentType 'application/json'
 Start-Sleep -Milliseconds 250
 
 $find = @"
-(() => { const w = [...document.querySelectorAll('.fwin')].find((x) => ((x.querySelector('.fwin-title-text') || {}).textContent || '') === '$Title');
+(() => { const w = ($W);
   return w ? { found: true, x: w.style.left, y: w.style.top, w: w.style.width, h: w.style.height, max: w.classList.contains('fwin-max') } : { found: false }; })()
 "@
 $entry = Invoke-Eval $find
@@ -71,8 +102,8 @@ Write-Host "entry geometry: $($entry.w) x $($entry.h) at ($($entry.x),$($entry.y
 $harvest = @"
 (() => {
   const T = '$Title';
-  const win = [...document.querySelectorAll('.fwin')].find((x) => ((x.querySelector('.fwin-title-text') || {}).textContent || '') === T);
-  if (!win) return { refuse: 'no .fwin titled ' + T };
+  const win = ($W);
+  if (!win) return { refuse: 'no window resolved for ' + T };
   if (getComputedStyle(win).display === 'none') return { refuse: 'window not displayed -- measurement invalid' };
   const R = win.getBoundingClientRect();
   if (R.width === 0 || R.height === 0) return { refuse: 'zero-size box -- refusing to record zeros' };
@@ -158,23 +189,30 @@ $outDir = Join-Path $repo "src\.coordination\liquid-workplace\baselines\$Milesto
 if (-not (Test-Path $outDir)) { New-Item -ItemType Directory -Path $outDir -Force | Out-Null }
 
 $results = @()
+$skipped = @()
 foreach ($size in $Sizes) {
+  $skipThisSize = $null
   switch ($size) {
     'default' { }
     'max' {
-      $null = Invoke-Eval @"
-(() => { const w = [...document.querySelectorAll('.fwin')].find((x) => ((x.querySelector('.fwin-title-text') || {}).textContent || '') === '$Title');
+      $r = Invoke-Eval @"
+(() => { const w = ($W);
   if (w.classList.contains('fwin-max')) return 'already max';
   const btn = [...w.querySelectorAll('.fwin-b')].find((e) => /maxim/i.test(e.getAttribute('title') || ''));
   if (!btn) return 'no maximize control'; btn.click(); return 'maximized'; })()
 "@
+      # A frameless window (the Garden) has no maximize control. Recording the unchanged
+      # default box under the name `max` would put a duplicate record in the baseline that
+      # reads as a third size -- exactly the false-pass shape the rubric forbids. Refuse it
+      # by name instead, and carry the reason into the sweep summary.
+      if ($r -eq 'no maximize control') { $skipThisSize = 'no maximize control (frameless window)' }
     }
     'min' {
       # Drive the product's own resizeStart to MIN_W x MIN_H rather than writing style, so the
       # committed state is what a user's smallest window actually is.
       $null = Invoke-Eval @"
 (() => {
-  const w = [...document.querySelectorAll('.fwin')].find((x) => ((x.querySelector('.fwin-title-text') || {}).textContent || '') === '$Title');
+  const w = ($W);
   const grip = w.querySelector('.fwin-resize'); const g = grip.getBoundingClientRect();
   const sx = Math.round(g.left + g.width / 2), sy = Math.round(g.top + g.height / 2);
   const oSet = Element.prototype.setPointerCapture, oRel = Element.prototype.releasePointerCapture;
@@ -187,20 +225,27 @@ foreach ($size in $Sizes) {
 "@
     }
   }
-  Start-Sleep -Milliseconds 700
+  if ($skipThisSize) {
+    Write-Warning "size '$size' NOT RECORDED for '$Title': $skipThisSize"
+    $skipped += [pscustomobject]@{ sizeMode = $size; reason = $skipThisSize }
+    continue
+  }
+  $settle = Wait-Settle $W
+  if (-not $settle.settled) { Write-Warning "size '$size' did NOT settle in $($settle.waitedMs) ms (last $($settle.final)) -- record is labelled unsettled." }
   $rec = Invoke-Eval $harvest
   if ($rec.refuse) { Write-Error "REFUSED at size '$size': $($rec.refuse)" }
   $rec | Add-Member -NotePropertyName sizeMode -NotePropertyValue $size -Force
+  $rec | Add-Member -NotePropertyName settle -NotePropertyValue ([pscustomobject]$settle) -Force
   $rec | Add-Member -NotePropertyName capturedAt -NotePropertyValue (Get-Date).ToString('o') -Force
   $path = Join-Path $outDir ("$($Title.ToLower())-$size.json")
   $rec | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $path -Encoding utf8
-  Write-Host "$size -> $($rec.rect.w)x$($rec.rect.h)  focusable $($rec.controls.focusable)  inversions $($rec.focusOrder.inversions)  under24 $($rec.controls.under24)  pastFrame $($rec.overflow.pastWindowFrame) (unreachable $($rec.overflow.unreachable))  -> $path"
+  Write-Host "$size -> $($rec.rect.w)x$($rec.rect.h)  focusable $($rec.controls.focusable)  inversions $($rec.focusOrder.inversions)  under24 $($rec.controls.under24)  pastFrame $($rec.overflow.pastWindowFrame) (unreachable $($rec.overflow.unreachable))  settled $($settle.settled) in $($settle.waitedMs)ms  -> $path"
   $results += $rec
 
   # Restore before the next size, so each capture starts from the entry geometry.
   if ($size -eq 'max') {
     $null = Invoke-Eval @"
-(() => { const w = [...document.querySelectorAll('.fwin')].find((x) => ((x.querySelector('.fwin-title-text') || {}).textContent || '') === '$Title');
+(() => { const w = ($W);
   if (!w.classList.contains('fwin-max')) return 'not max';
   const btn = [...w.querySelectorAll('.fwin-b')].find((e) => /restore|maxim/i.test(e.getAttribute('title') || '')); btn.click(); return 'restored'; })()
 "@
@@ -217,7 +262,7 @@ foreach ($size in $Sizes) {
 # identical "sizes". Restoring has to go through `resizeStart`/`onPatch` like a user's drag.
 $restore = @"
 (() => {
-  const w = [...document.querySelectorAll('.fwin')].find((x) => ((x.querySelector('.fwin-title-text') || {}).textContent || '') === '$Title');
+  const w = ($W);
   if (w.classList.contains('fwin-max')) { const btn = [...w.querySelectorAll('.fwin-b')].find((e) => /restore|maxim/i.test(e.getAttribute('title') || '')); if (btn) btn.click(); }
   const targetW = parseFloat('$($entry.w)'), targetH = parseFloat('$($entry.h)');
   const r = w.getBoundingClientRect();
@@ -237,12 +282,12 @@ Start-Sleep -Milliseconds 400
 # Verification that actually distinguishes DOM from state: maximize and restore forces React to
 # rewrite width/height from `win.w`/`win.h`, so whatever the box reads afterwards IS the state.
 $null = Invoke-Eval @"
-(() => { const w = [...document.querySelectorAll('.fwin')].find((x) => ((x.querySelector('.fwin-title-text') || {}).textContent || '') === '$Title');
+(() => { const w = ($W);
   const btn = [...w.querySelectorAll('.fwin-b')].find((e) => /maxim/i.test(e.getAttribute('title') || '')); btn.click(); return 'max'; })()
 "@
 Start-Sleep -Milliseconds 400
 $null = Invoke-Eval @"
-(() => { const w = [...document.querySelectorAll('.fwin')].find((x) => ((x.querySelector('.fwin-title-text') || {}).textContent || '') === '$Title');
+(() => { const w = ($W);
   const btn = [...w.querySelectorAll('.fwin-b')].find((e) => /restore|maxim/i.test(e.getAttribute('title') || '')); btn.click(); return 'restored'; })()
 "@
 Start-Sleep -Milliseconds 500

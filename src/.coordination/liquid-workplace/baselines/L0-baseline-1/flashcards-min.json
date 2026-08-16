@@ -1,0 +1,466 @@
+{
+  "title": "Flashcards",
+  "rect": {
+    "x": 128,
+    "y": 84,
+    "w": 260,
+    "h": 170
+  },
+  "maximized": false,
+  "viewport": {
+    "w": 1264,
+    "h": 821,
+    "dpr": 1
+  },
+  "theme": {
+    "dataTheme": "forest-night",
+    "materials": null,
+    "reducedMotion": false,
+    "forcedColors": false
+  },
+  "controls": {
+    "focusable": 96,
+    "byRole": {
+      "button": 91,
+      "input": 3,
+      "textarea": 1,
+      "select": 1
+    },
+    "under24": 35,
+    "under24list": [
+      {
+        "n": "Search flashcards by word, reading, meaning,",
+        "w": 177,
+        "h": 21
+      },
+      {
+        "n": "input",
+        "w": 13,
+        "h": 13
+      },
+      {
+        "n": "Delete folder",
+        "w": 15,
+        "h": 17
+      },
+      {
+        "n": "Remove",
+        "w": 22,
+        "h": 20
+      },
+      {
+        "n": "Remove",
+        "w": 22,
+        "h": 20
+      },
+      {
+        "n": "Remove",
+        "w": 22,
+        "h": 20
+      },
+      {
+        "n": "Remove",
+        "w": 22,
+        "h": 20
+      },
+      {
+        "n": "Remove",
+        "w": 22,
+        "h": 20
+      },
+      {
+        "n": "Remove",
+        "w": 22,
+        "h": 20
+      },
+      {
+        "n": "Remove",
+        "w": 22,
+        "h": 20
+      },
+      {
+        "n": "Remove",
+        "w": 22,
+        "h": 20
+      },
+      {
+        "n": "Remove",
+        "w": 22,
+        "h": 20
+      }
+    ],
+    "under44": 91
+  },
+  "focusOrder": {
+    "count": 96,
+    "inversions": 52,
+    "firstInversionAt": 18,
+    "domOrder": [
+      {
+        "i": 0,
+        "n": "Pop out into its own window",
+        "top": 5,
+        "left": 129
+      },
+      {
+        "i": 1,
+        "n": "Minimize",
+        "top": 5,
+        "left": 161
+      },
+      {
+        "i": 2,
+        "n": "Maximize",
+        "top": 5,
+        "left": 193
+      },
+      {
+        "i": 3,
+        "n": "Close",
+        "top": 5,
+        "left": 225
+      },
+      {
+        "i": 4,
+        "n": "Simple EPUB mining",
+        "top": 50,
+        "left": 98
+      },
+      {
+        "i": 5,
+        "n": "Advanced EPUB",
+        "top": 50,
+        "left": 262
+      },
+      {
+        "i": 6,
+        "n": "Jiten vocab",
+        "top": 50,
+        "left": 399
+      },
+      {
+        "i": 7,
+        "n": "CSV tool",
+        "top": 50,
+        "left": 508
+      },
+      {
+        "i": 8,
+        "n": "AI card studio",
+        "top": 50,
+        "left": 601
+      },
+      {
+        "i": 9,
+        "n": "Ask the Agent",
+        "top": 50,
+        "left": 726
+      },
+      {
+        "i": 10,
+        "n": "Review dictionary (2)",
+        "top": 50,
+        "left": 853
+      },
+      {
+        "i": 11,
+        "n": "EPUB decks (3,218)",
+        "top": 229,
+        "left": 19
+      },
+      {
+        "i": 12,
+        "n": "Dictionary (2)",
+        "top": 229,
+        "left": 141
+      },
+      {
+        "i": 13,
+        "n": "Search flashcards by word, reading, meaning,",
+        "top": 297,
+        "left": 33
+      },
+      {
+        "i": 14,
+        "n": "my-deck",
+        "top": 435,
+        "left": 43
+      },
+      {
+        "i": 15,
+        "n": "Open file",
+        "top": 480,
+        "left": 43
+      },
+      {
+        "i": 16,
+        "n": "Paste vocabulary list, CSV, or TSV here…",
+        "top": 525,
+        "left": 43
+      },
+      {
+        "i": 17,
+        "n": "Open Simple EPUB mining",
+        "top": 932,
+        "left": 43
+      },
+      {
+        "i": 18,
+        "n": "All in current folder (3,218)メインページ (144)容疑者",
+        "top": 1154,
+        "left": 43
+      },
+      {
+        "i": 19,
+        "n": "input",
+        "top": 1167,
+        "left": 260
+      },
+      {
+        "i": 20,
+        "n": "Start review (3,218)",
+        "top": 1122,
+        "left": 386
+      },
+      {
+        "i": 21,
+        "n": "All3218",
+        "top": 1594,
+        "left": 37
+      },
+      {
+        "i": 22,
+        "n": "Unfiled3218",
+        "top": 1594,
+        "left": 115
+      },
+      {
+        "i": 23,
+        "n": "Extension0×",
+        "top": 1633,
+        "left": 37
+      },
+      {
+        "i": 24,
+        "n": "Delete folder",
+        "top": 1640,
+        "left": 125
+      },
+      {
+        "i": 25,
+        "n": "+ New folder",
+        "top": 1672,
+        "left": 37
+      },
+      {
+        "i": 26,
+        "n": "N1メインページ144 cards0 known",
+        "top": 1720,
+        "left": 38
+      },
+      {
+        "i": 27,
+        "n": "Options",
+        "top": 1736,
+        "left": 72
+      },
+      {
+        "i": 28,
+        "n": "Delete deck",
+        "top": 1736,
+        "left": 145
+      },
+      {
+        "i": 29,
+        "n": "File",
+        "top": 1881,
+        "left": 108
+      },
+      {
+        "i": 30,
+        "n": "Remove",
+        "top": 1884,
+        "left": 155
+      },
+      {
+        "i": 31,
+        "n": "File",
+        "top": 1983,
+        "left": 108
+      },
+      {
+        "i": 32,
+        "n": "Remove",
+        "top": 1986,
+        "left": 155
+      },
+      {
+        "i": 33,
+        "n": "File",
+        "top": 2091,
+        "left": 108
+      },
+      {
+        "i": 34,
+        "n": "Remove",
+        "top": 2094,
+        "left": 155
+      },
+      {
+        "i": 35,
+        "n": "File",
+        "top": 2180,
+        "left": 108
+      },
+      {
+        "i": 36,
+        "n": "Remove",
+        "top": 2183,
+        "left": 155
+      },
+      {
+        "i": 37,
+        "n": "File",
+        "top": 2326,
+        "left": 108
+      },
+      {
+        "i": 38,
+        "n": "Remove",
+        "top": 2329,
+        "left": 155
+      },
+      {
+        "i": 39,
+        "n": "File",
+        "top": 2415,
+        "left": 108
+      }
+    ]
+  },
+  "overflow": {
+    "clippedX": 11,
+    "clippedXList": [
+      {
+        "n": "Dictionary saves, EPUB deck strip, and folde",
+        "c": "fwin-body   ",
+        "over": 763
+      },
+      {
+        "n": "N1メインページ144 cards0 knownOptionsDelete deck記事",
+        "c": "flash-group",
+        "over": 29
+      },
+      {
+        "n": "メインページ メインページ 出典: フリー百科事典『ウィキペディア（Wikipedia）",
+        "c": "flash-row-sentence muted",
+        "over": 49
+      },
+      {
+        "n": "メインページ メインページ 出典: フリー百科事典『ウィキペディア（Wikipedia）",
+        "c": "flash-row-sentence muted",
+        "over": 49
+      },
+      {
+        "n": "1992年 より BirdLife International のブルガリア・パートナー",
+        "c": "flash-row-sentence muted",
+        "over": 34
+      },
+      {
+        "n": "メインページ メインページ 出典: フリー百科事典『ウィキペディア（Wikipedia）",
+        "c": "flash-row-sentence muted",
+        "over": 49
+      },
+      {
+        "n": "1992年 より BirdLife International のブルガリア・パートナー",
+        "c": "flash-row-sentence muted",
+        "over": 34
+      },
+      {
+        "n": "1992年 より BirdLife International のブルガリア・パートナー",
+        "c": "flash-row-sentence muted",
+        "over": 34
+      }
+    ],
+    "scrollersY": 3,
+    "pastWindowFrame": 530,
+    "pastList": [
+      {
+        "n": "Dictionary saves, EPUB deck strip, and folde",
+        "c": "flash-view flash-view-decks"
+      },
+      {
+        "n": "Dictionary saves, EPUB deck strip, and folde",
+        "c": "view-head"
+      },
+      {
+        "n": "Dictionary saves, EPUB deck strip, and folde",
+        "c": "muted"
+      },
+      {
+        "n": "Simple EPUB miningAdvanced EPUBJiten vocabCS",
+        "c": "actions"
+      },
+      {
+        "n": "Advanced EPUB",
+        "c": "btn"
+      },
+      {
+        "n": "Jiten vocab",
+        "c": "btn"
+      },
+      {
+        "n": "CSV tool",
+        "c": "btn"
+      },
+      {
+        "n": "AI card studio",
+        "c": "btn"
+      }
+    ],
+    "unreachable": 0,
+    "unreachableList": []
+  },
+  "routes": {
+    "count": 3,
+    "list": [
+      {
+        "n": "EPUB decks (3,218)Dictionary (2)",
+        "role": "div",
+        "sel": null
+      },
+      {
+        "n": "EPUB decks (3,218)",
+        "role": "button",
+        "sel": true
+      },
+      {
+        "n": "Dictionary (2)",
+        "role": "button",
+        "sel": null
+      }
+    ]
+  },
+  "states": {
+    "empty": false,
+    "loading": false,
+    "error": false,
+    "offline": false,
+    "keywordFormIsAHint": true
+  },
+  "stateBlocks": [],
+  "textChars": 9864,
+  "domNodes": 551,
+  "sizeMode": "min",
+  "settle": {
+    "settled": true,
+    "waitedMs": 1200,
+    "samples": [
+      "551/99",
+      "551/99",
+      "551/99"
+    ],
+    "final": "551/99"
+  },
+  "capturedAt": "2026-08-16T21:29:37.0992831+03:00"
+}

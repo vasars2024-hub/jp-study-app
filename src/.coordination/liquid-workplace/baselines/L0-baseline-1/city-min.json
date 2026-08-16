@@ -1,0 +1,198 @@
+{
+  "title": "city",
+  "rect": {
+    "x": 128,
+    "y": 84,
+    "w": 260,
+    "h": 170
+  },
+  "maximized": false,
+  "viewport": {
+    "w": 1264,
+    "h": 821,
+    "dpr": 1
+  },
+  "theme": {
+    "dataTheme": "forest-night",
+    "materials": null,
+    "reducedMotion": false,
+    "forcedColors": false
+  },
+  "controls": {
+    "focusable": 8,
+    "byRole": {
+      "button": 8
+    },
+    "under24": 1,
+    "under24list": [
+      {
+        "n": "Sky sim",
+        "w": 62,
+        "h": 22
+      }
+    ],
+    "under44": 7
+  },
+  "focusOrder": {
+    "count": 8,
+    "inversions": 2,
+    "firstInversionAt": 3,
+    "domOrder": [
+      {
+        "i": 0,
+        "n": "Pop out into its own window",
+        "top": 9,
+        "left": 157
+      },
+      {
+        "i": 1,
+        "n": "Minimize",
+        "top": 9,
+        "left": 189
+      },
+      {
+        "i": 2,
+        "n": "Close",
+        "top": 9,
+        "left": 221
+      },
+      {
+        "i": 3,
+        "n": "Show Mooncap dossier",
+        "top": 263,
+        "left": 78
+      },
+      {
+        "i": 4,
+        "n": "Sky sim",
+        "top": 230,
+        "left": 13
+      },
+      {
+        "i": 5,
+        "n": "Star",
+        "top": 286,
+        "left": 24
+      },
+      {
+        "i": 6,
+        "n": "Asteroid",
+        "top": 319,
+        "left": 24
+      },
+      {
+        "i": 7,
+        "n": "Ice barrage",
+        "top": 352,
+        "left": 24
+      }
+    ]
+  },
+  "overflow": {
+    "clippedX": 1,
+    "clippedXList": [
+      {
+        "n": "Mooncap reading garden. Mushroom stage 01 of",
+        "c": "reading-garden stage-band-1",
+        "over": 154
+      }
+    ],
+    "scrollersY": 0,
+    "pastWindowFrame": 81,
+    "pastList": [
+      {
+        "n": "Mooncap reading garden. Mushroom stage 01 of",
+        "c": "reading-garden stage-band-1"
+      },
+      {
+        "n": "div",
+        "c": "reading-garden-sky"
+      },
+      {
+        "n": "div",
+        "c": "reading-garden-world world-back"
+      },
+      {
+        "n": "img",
+        "c": "reading-garden-background-master"
+      },
+      {
+        "n": "div",
+        "c": "reading-garden-world world-sky-events"
+      },
+      {
+        "n": "canvas",
+        "c": "reading-garden-sky-events"
+      },
+      {
+        "n": "div",
+        "c": "reading-garden-stars"
+      },
+      {
+        "n": "i",
+        "c": ""
+      }
+    ],
+    "unreachable": 81,
+    "unreachableList": [
+      {
+        "n": "Mooncap reading garden. Mushroom stage 01 of",
+        "c": "reading-garden stage-band-1"
+      },
+      {
+        "n": "div",
+        "c": "reading-garden-sky"
+      },
+      {
+        "n": "div",
+        "c": "reading-garden-world world-back"
+      },
+      {
+        "n": "img",
+        "c": "reading-garden-background-master"
+      },
+      {
+        "n": "div",
+        "c": "reading-garden-world world-sky-events"
+      },
+      {
+        "n": "canvas",
+        "c": "reading-garden-sky-events"
+      },
+      {
+        "n": "div",
+        "c": "reading-garden-stars"
+      },
+      {
+        "n": "i",
+        "c": ""
+      }
+    ]
+  },
+  "routes": {
+    "count": 0,
+    "list": []
+  },
+  "states": {
+    "empty": false,
+    "loading": false,
+    "error": false,
+    "offline": false,
+    "keywordFormIsAHint": true
+  },
+  "stateBlocks": [],
+  "textChars": 69,
+  "domNodes": 130,
+  "sizeMode": "min",
+  "settle": {
+    "settled": true,
+    "samples": [
+      "130/8",
+      "130/8",
+      "130/8"
+    ],
+    "final": "130/8",
+    "waitedMs": 1200
+  },
+  "capturedAt": "2026-08-16T21:33:54.9320086+03:00"
+}

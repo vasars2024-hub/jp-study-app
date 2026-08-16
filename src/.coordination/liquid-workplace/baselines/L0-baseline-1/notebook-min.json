@@ -1,0 +1,479 @@
+{
+  "title": "Notebook",
+  "rect": {
+    "x": 128,
+    "y": 84,
+    "w": 260,
+    "h": 170
+  },
+  "maximized": false,
+  "viewport": {
+    "w": 1264,
+    "h": 821,
+    "dpr": 1
+  },
+  "theme": {
+    "dataTheme": "forest-night",
+    "materials": null,
+    "reducedMotion": false,
+    "forcedColors": false
+  },
+  "controls": {
+    "focusable": 480,
+    "byRole": {
+      "button": 474,
+      "tab": 6
+    },
+    "under24": 400,
+    "under24list": [
+      {
+        "n": "猫LookupsLookups8/15/2026, 2:07:15 PM",
+        "w": 20,
+        "h": 84
+      },
+      {
+        "n": "犬LookupsLookups8/15/2026, 1:14:40 PM",
+        "w": 20,
+        "h": 84
+      },
+      {
+        "n": "気分屋ClipboardClipboard8/15/2026, 11:49:01 AM",
+        "w": 20,
+        "h": 122
+      },
+      {
+        "n": "嵌めるClipboardClipboard8/15/2026, 11:42:39 AM",
+        "w": 20,
+        "h": 122
+      },
+      {
+        "n": "小判LookupsLookups8/15/2026, 11:05:30 AM",
+        "w": 20,
+        "h": 103
+      },
+      {
+        "n": "子猫LookupsLookups8/15/2026, 7:52:58 AM",
+        "w": 20,
+        "h": 103
+      },
+      {
+        "n": "やけLookupsLookups8/15/2026, 7:04:42 AM",
+        "w": 20,
+        "h": 103
+      },
+      {
+        "n": "自棄糞LookupsLookups8/15/2026, 7:04:28 AM",
+        "w": 20,
+        "h": 122
+      },
+      {
+        "n": "食べるLookupsLookups8/14/2026, 11:22:09 PM",
+        "w": 20,
+        "h": 122
+      },
+      {
+        "n": "水LookupsLookups8/14/2026, 11:22:05 PM",
+        "w": 20,
+        "h": 84
+      },
+      {
+        "n": "犬LookupsLookups8/14/2026, 11:20:35 PM",
+        "w": 20,
+        "h": 84
+      },
+      {
+        "n": "本LookupsLookups8/14/2026, 9:11:51 PM",
+        "w": 20,
+        "h": 84
+      }
+    ],
+    "under44": 461
+  },
+  "focusOrder": {
+    "count": 480,
+    "inversions": 5,
+    "firstInversionAt": 33,
+    "domOrder": [
+      {
+        "i": 0,
+        "n": "Pop out into its own window",
+        "top": 5,
+        "left": 129
+      },
+      {
+        "i": 1,
+        "n": "Minimize",
+        "top": 5,
+        "left": 161
+      },
+      {
+        "i": 2,
+        "n": "Maximize",
+        "top": 5,
+        "left": 193
+      },
+      {
+        "i": 3,
+        "n": "Close",
+        "top": 5,
+        "left": 225
+      },
+      {
+        "i": 4,
+        "n": "Overview",
+        "top": 50,
+        "left": 19
+      },
+      {
+        "i": 5,
+        "n": "Library",
+        "top": 50,
+        "left": 100
+      },
+      {
+        "i": 6,
+        "n": "Words",
+        "top": 83,
+        "left": 19
+      },
+      {
+        "i": 7,
+        "n": "Translations",
+        "top": 83,
+        "left": 84
+      },
+      {
+        "i": 8,
+        "n": "Highlights",
+        "top": 116,
+        "left": 19
+      },
+      {
+        "i": 9,
+        "n": "Captures",
+        "top": 116,
+        "left": 105
+      },
+      {
+        "i": 10,
+        "n": "2Saved words",
+        "top": 160,
+        "left": 19
+      },
+      {
+        "i": 11,
+        "n": "21Lookups",
+        "top": 229,
+        "left": 19
+      },
+      {
+        "i": 12,
+        "n": "0Flashcards",
+        "top": 298,
+        "left": 19
+      },
+      {
+        "i": 13,
+        "n": "0Anki",
+        "top": 367,
+        "left": 19
+      },
+      {
+        "i": 14,
+        "n": "3218Mining",
+        "top": 436,
+        "left": 19
+      },
+      {
+        "i": 15,
+        "n": "0Known levels",
+        "top": 505,
+        "left": 19
+      },
+      {
+        "i": 16,
+        "n": "0Translations",
+        "top": 574,
+        "left": 19
+      },
+      {
+        "i": 17,
+        "n": "6Plan to read",
+        "top": 643,
+        "left": 19
+      },
+      {
+        "i": 18,
+        "n": "15Highlights",
+        "top": 712,
+        "left": 19
+      },
+      {
+        "i": 19,
+        "n": "3OCR",
+        "top": 781,
+        "left": 19
+      },
+      {
+        "i": 20,
+        "n": "0Audio",
+        "top": 850,
+        "left": 19
+      },
+      {
+        "i": 21,
+        "n": "5Clipboard",
+        "top": 919,
+        "left": 19
+      },
+      {
+        "i": 22,
+        "n": "3Extension",
+        "top": 988,
+        "left": 19
+      },
+      {
+        "i": 23,
+        "n": "0Live captions",
+        "top": 1057,
+        "left": 19
+      },
+      {
+        "i": 24,
+        "n": "Review Notebook",
+        "top": 1128,
+        "left": 19
+      },
+      {
+        "i": 25,
+        "n": "Refresh",
+        "top": 1128,
+        "left": 155
+      },
+      {
+        "i": 26,
+        "n": "All (3273)",
+        "top": 1192,
+        "left": 19
+      },
+      {
+        "i": 27,
+        "n": "Flashcards (3218)",
+        "top": 1224,
+        "left": 19
+      },
+      {
+        "i": 28,
+        "n": "Lookups (21)",
+        "top": 1256,
+        "left": 19
+      },
+      {
+        "i": 29,
+        "n": "Highlights/ハサミ男 (殊能将之) (z-library.sk, 1lib.s",
+        "top": 1288,
+        "left": 19
+      },
+      {
+        "i": 30,
+        "n": "Plan to read (6)",
+        "top": 1354,
+        "left": 19
+      },
+      {
+        "i": 31,
+        "n": "Clipboard (5)",
+        "top": 1386,
+        "left": 19
+      },
+      {
+        "i": 32,
+        "n": "OCR (3)",
+        "top": 1418,
+        "left": 19
+      },
+      {
+        "i": 33,
+        "n": "Extension (3)",
+        "top": 1450,
+        "left": 19
+      },
+      {
+        "i": 34,
+        "n": "Mined (2)",
+        "top": 1482,
+        "left": 19
+      },
+      {
+        "i": 35,
+        "n": "Highlights/10 キドナプキディング 青色サヴァンと戯言遣いの娘 (2)",
+        "top": 1514,
+        "left": 19
+      },
+      {
+        "i": 36,
+        "n": "Highlights/Unknown book (55da75a7) (1)",
+        "top": 1581,
+        "left": 19
+      },
+      {
+        "i": 37,
+        "n": "Start capture",
+        "top": 1431,
+        "left": 338
+      },
+      {
+        "i": 38,
+        "n": "猫LookupsLookups8/15/2026, 2:07:15 PM",
+        "top": 1660,
+        "left": 231
+      },
+      {
+        "i": 39,
+        "n": "犬LookupsLookups8/15/2026, 1:14:40 PM",
+        "top": 1750,
+        "left": 231
+      }
+    ]
+  },
+  "overflow": {
+    "clippedX": 16,
+    "clippedXList": [
+      {
+        "n": "One Punch-Man : The Koi Pond | Chapter 229 |",
+        "c": "gx-notebook-lineage-label",
+        "over": 100
+      },
+      {
+        "n": "One Punch-Man : The Koi Pond | Chapter 229 |",
+        "c": "gx-notebook-lineage-label",
+        "over": 100
+      },
+      {
+        "n": "ハサミ男 (殊能将之) (z-library.sk, 1lib.sk, z-lib.sk",
+        "c": "gx-notebook-lineage-label",
+        "over": 74
+      },
+      {
+        "n": "ハサミ男 (殊能将之) (z-library.sk, 1lib.sk, z-lib.sk",
+        "c": "gx-notebook-lineage-label",
+        "over": 74
+      },
+      {
+        "n": "ハサミ男 (殊能将之) (z-library.sk, 1lib.sk, z-lib.sk",
+        "c": "gx-notebook-lineage-label",
+        "over": 74
+      },
+      {
+        "n": "ハサミ男 (殊能将之) (z-library.sk, 1lib.sk, z-lib.sk",
+        "c": "gx-notebook-lineage-label",
+        "over": 74
+      },
+      {
+        "n": "ハサミ男 (殊能将之) (z-library.sk, 1lib.sk, z-lib.sk",
+        "c": "gx-notebook-lineage-label",
+        "over": 74
+      },
+      {
+        "n": "ハサミ男 (殊能将之) (z-library.sk, 1lib.sk, z-lib.sk",
+        "c": "gx-notebook-lineage-label",
+        "over": 74
+      }
+    ],
+    "scrollersY": 1,
+    "pastWindowFrame": 2252,
+    "pastList": [
+      {
+        "n": "2Saved words21Lookups0Flashcards0Anki3218Min",
+        "c": "gx-notebook-overview"
+      },
+      {
+        "n": "2Saved words21Lookups0Flashcards0Anki3218Min",
+        "c": "gx-notebook-counts"
+      },
+      {
+        "n": "2Saved words",
+        "c": "gx-notebook-count "
+      },
+      {
+        "n": "2",
+        "c": "gx-notebook-count-n"
+      },
+      {
+        "n": "Saved words",
+        "c": "gx-notebook-count-l"
+      },
+      {
+        "n": "21Lookups",
+        "c": "gx-notebook-count "
+      },
+      {
+        "n": "21",
+        "c": "gx-notebook-count-n"
+      },
+      {
+        "n": "Lookups",
+        "c": "gx-notebook-count-l"
+      }
+    ],
+    "unreachable": 0,
+    "unreachableList": []
+  },
+  "routes": {
+    "count": 6,
+    "list": [
+      {
+        "n": "Overview",
+        "role": "tab",
+        "sel": "true"
+      },
+      {
+        "n": "Library",
+        "role": "tab",
+        "sel": "false"
+      },
+      {
+        "n": "Words",
+        "role": "tab",
+        "sel": "false"
+      },
+      {
+        "n": "Translations",
+        "role": "tab",
+        "sel": "false"
+      },
+      {
+        "n": "Highlights",
+        "role": "tab",
+        "sel": "false"
+      },
+      {
+        "n": "Captures",
+        "role": "tab",
+        "sel": "false"
+      }
+    ]
+  },
+  "states": {
+    "empty": false,
+    "loading": false,
+    "error": false,
+    "offline": false,
+    "keywordFormIsAHint": true
+  },
+  "stateBlocks": [],
+  "textChars": 22872,
+  "domNodes": 3854,
+  "sizeMode": "min",
+  "settle": {
+    "final": "3854/481",
+    "samples": [
+      "3854/481",
+      "3854/481",
+      "3854/481"
+    ],
+    "settled": true,
+    "waitedMs": 1200
+  },
+  "capturedAt": "2026-08-16T21:31:35.2232155+03:00"
+}

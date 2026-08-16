@@ -1,0 +1,183 @@
+{
+  "title": "Dictionary",
+  "rect": {
+    "x": 128,
+    "y": 84,
+    "w": 260,
+    "h": 170
+  },
+  "maximized": false,
+  "viewport": {
+    "w": 1264,
+    "h": 821,
+    "dpr": 1
+  },
+  "theme": {
+    "dataTheme": "forest-night",
+    "materials": null,
+    "reducedMotion": false,
+    "forcedColors": false
+  },
+  "controls": {
+    "focusable": 10,
+    "byRole": {
+      "button": 6,
+      "input": 4
+    },
+    "under24": 2,
+    "under24list": [
+      {
+        "n": "input",
+        "w": 13,
+        "h": 13
+      },
+      {
+        "n": "input",
+        "w": 13,
+        "h": 13
+      }
+    ],
+    "under44": 10
+  },
+  "focusOrder": {
+    "count": 10,
+    "inversions": 0,
+    "firstInversionAt": -1,
+    "domOrder": [
+      {
+        "i": 0,
+        "n": "Pop out into its own window",
+        "top": 5,
+        "left": 129
+      },
+      {
+        "i": 1,
+        "n": "Minimize",
+        "top": 5,
+        "left": 161
+      },
+      {
+        "i": 2,
+        "n": "Maximize",
+        "top": 5,
+        "left": 193
+      },
+      {
+        "i": 3,
+        "n": "Close",
+        "top": 5,
+        "left": 225
+      },
+      {
+        "i": 4,
+        "n": "日本語",
+        "top": 50,
+        "left": 100
+      },
+      {
+        "i": 5,
+        "n": "中文",
+        "top": 50,
+        "left": 175
+      },
+      {
+        "i": 6,
+        "n": "Type a word, e.g. 食べる or “eat”…",
+        "top": 229,
+        "left": 19
+      },
+      {
+        "i": 7,
+        "n": "Filter notes",
+        "top": 364,
+        "left": 34
+      },
+      {
+        "i": 8,
+        "n": "input",
+        "top": 417,
+        "left": 38
+      },
+      {
+        "i": 9,
+        "n": "input",
+        "top": 459,
+        "left": 38
+      }
+    ]
+  },
+  "overflow": {
+    "clippedX": 1,
+    "clippedXList": [
+      {
+        "n": "Search Japanese or English — powered by Jish",
+        "c": "fwin-body   ",
+        "over": 76
+      }
+    ],
+    "scrollersY": 1,
+    "pastWindowFrame": 21,
+    "pastList": [
+      {
+        "n": "Search Japanese or English — powered by Jish",
+        "c": "dict-view"
+      },
+      {
+        "n": "Search Japanese or English — powered by Jish",
+        "c": "view-head"
+      },
+      {
+        "n": "Search Japanese or English — powered by Jish",
+        "c": "muted"
+      },
+      {
+        "n": "Search",
+        "c": "dict-search"
+      },
+      {
+        "n": "Type a word, e.g. 食べる or “eat”…",
+        "c": ""
+      },
+      {
+        "n": "Search",
+        "c": "btn primary"
+      },
+      {
+        "n": "Saved searches",
+        "c": "dict-saved-searches"
+      },
+      {
+        "n": "Saved searches",
+        "c": "dict-saved-searches-head"
+      }
+    ],
+    "unreachable": 0,
+    "unreachableList": []
+  },
+  "routes": {
+    "count": 0,
+    "list": []
+  },
+  "states": {
+    "empty": false,
+    "loading": false,
+    "error": false,
+    "offline": false,
+    "keywordFormIsAHint": true
+  },
+  "stateBlocks": [],
+  "textChars": 251,
+  "domNodes": 38,
+  "sizeMode": "min",
+  "settle": {
+    "settled": true,
+    "samples": [
+      "38/11",
+      "38/11",
+      "38/11"
+    ],
+    "final": "38/11",
+    "waitedMs": 1200
+  },
+  "capturedAt": "2026-08-16T21:34:02.4033306+03:00"
+}

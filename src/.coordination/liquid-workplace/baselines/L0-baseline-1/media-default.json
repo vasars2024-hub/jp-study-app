@@ -1,0 +1,329 @@
+{
+  "title": "Media",
+  "rect": {
+    "x": 128,
+    "y": 84,
+    "w": 1080,
+    "h": 700
+  },
+  "maximized": false,
+  "viewport": {
+    "w": 1264,
+    "h": 821,
+    "dpr": 1
+  },
+  "theme": {
+    "dataTheme": "forest-night",
+    "materials": null,
+    "reducedMotion": false,
+    "forcedColors": false
+  },
+  "controls": {
+    "focusable": 28,
+    "byRole": {
+      "button": 26,
+      "input": 1,
+      "select": 1
+    },
+    "under24": 1,
+    "under24list": [
+      {
+        "n": "Search your media library…",
+        "w": 248,
+        "h": 19
+      }
+    ],
+    "under44": 19
+  },
+  "focusOrder": {
+    "count": 28,
+    "inversions": 23,
+    "firstInversionAt": 4,
+    "domOrder": [
+      {
+        "i": 0,
+        "n": "Pop out into its own window",
+        "top": 5,
+        "left": 949
+      },
+      {
+        "i": 1,
+        "n": "Minimize",
+        "top": 5,
+        "left": 981
+      },
+      {
+        "i": 2,
+        "n": "Maximize",
+        "top": 5,
+        "left": 1013
+      },
+      {
+        "i": 3,
+        "n": "Close",
+        "top": 5,
+        "left": 1045
+      },
+      {
+        "i": 4,
+        "n": "Your media at a glance (Ctrl+1)",
+        "top": 150,
+        "left": 29
+      },
+      {
+        "i": 5,
+        "n": "All local media (Ctrl+2)",
+        "top": 199,
+        "left": 29
+      },
+      {
+        "i": 6,
+        "n": "Immersion player (Ctrl+3)",
+        "top": 247,
+        "left": 29
+      },
+      {
+        "i": 7,
+        "n": "Listening room (Ctrl+4)",
+        "top": 296,
+        "left": 29
+      },
+      {
+        "i": 8,
+        "n": "Mine and review (Ctrl+5)",
+        "top": 345,
+        "left": 29
+      },
+      {
+        "i": 9,
+        "n": "MAL + AniList (Ctrl+6)",
+        "top": 393,
+        "left": 29
+      },
+      {
+        "i": 10,
+        "n": "Media workspaceLibrary",
+        "top": 448,
+        "left": 29
+      },
+      {
+        "i": 11,
+        "n": "Media SettingsPlayback and sources",
+        "top": 625,
+        "left": 29
+      },
+      {
+        "i": 12,
+        "n": "Search your media library…",
+        "top": 64,
+        "left": 716
+      },
+      {
+        "i": 13,
+        "n": "Open media",
+        "top": 60,
+        "left": 983
+      },
+      {
+        "i": 14,
+        "n": "Media Settings",
+        "top": 60,
+        "left": 1019
+      },
+      {
+        "i": 15,
+        "n": "Home",
+        "top": 110,
+        "left": 247
+      },
+      {
+        "i": 16,
+        "n": "Recently added33",
+        "top": 142,
+        "left": 247
+      },
+      {
+        "i": 17,
+        "n": "Continue watching2",
+        "top": 174,
+        "left": 247
+      },
+      {
+        "i": 18,
+        "n": "Study queue",
+        "top": 206,
+        "left": 247
+      },
+      {
+        "i": 19,
+        "n": "Favorites",
+        "top": 238,
+        "left": 247
+      },
+      {
+        "i": 20,
+        "n": "Tracking",
+        "top": 270,
+        "left": 247
+      },
+      {
+        "i": 21,
+        "n": "TV shows29",
+        "top": 317,
+        "left": 247
+      },
+      {
+        "i": 22,
+        "n": "Unsorted4",
+        "top": 349,
+        "left": 247
+      },
+      {
+        "i": 23,
+        "n": "Sort by",
+        "top": 114,
+        "left": 735
+      },
+      {
+        "i": 24,
+        "n": "Grid view",
+        "top": 121,
+        "left": 902
+      },
+      {
+        "i": 25,
+        "n": "List view",
+        "top": 121,
+        "left": 932
+      },
+      {
+        "i": 26,
+        "n": "Add",
+        "top": 115,
+        "left": 971
+      },
+      {
+        "i": 27,
+        "n": "The Big O",
+        "top": 162,
+        "left": 461
+      }
+    ]
+  },
+  "overflow": {
+    "clippedX": 0,
+    "clippedXList": [],
+    "scrollersY": 0,
+    "pastWindowFrame": 0,
+    "pastList": [],
+    "unreachable": 0,
+    "unreachableList": []
+  },
+  "routes": {
+    "count": 16,
+    "list": [
+      {
+        "n": "Browse",
+        "role": "span",
+        "sel": null
+      },
+      {
+        "n": "Your media at a glance (Ctrl+1)",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "All local media (Ctrl+2)",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Immersion player (Ctrl+3)",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Listening room (Ctrl+4)",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Mine and review (Ctrl+5)",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "MAL + AniList (Ctrl+6)",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Library status",
+        "role": "span",
+        "sel": null
+      },
+      {
+        "n": "Home",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Recently added33",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Continue watching2",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Study queue",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Favorites",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Tracking",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "TV shows29",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Unsorted4",
+        "role": "button",
+        "sel": null
+      }
+    ]
+  },
+  "states": {
+    "empty": false,
+    "loading": false,
+    "error": false,
+    "offline": false,
+    "keywordFormIsAHint": true
+  },
+  "stateBlocks": [],
+  "textChars": 501,
+  "domNodes": 203,
+  "sizeMode": "default",
+  "settle": {
+    "waitedMs": 1200,
+    "settled": true,
+    "samples": [
+      "203/31",
+      "203/31",
+      "203/31"
+    ],
+    "final": "203/31"
+  },
+  "capturedAt": "2026-08-16T21:30:23.7746067+03:00"
+}

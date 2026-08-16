@@ -1,0 +1,331 @@
+{
+  "title": "Music",
+  "rect": {
+    "x": 128,
+    "y": 84,
+    "w": 1080,
+    "h": 700
+  },
+  "maximized": false,
+  "viewport": {
+    "w": 1264,
+    "h": 821,
+    "dpr": 1
+  },
+  "theme": {
+    "dataTheme": "forest-night",
+    "materials": null,
+    "reducedMotion": false,
+    "forcedColors": false
+  },
+  "controls": {
+    "focusable": 31,
+    "byRole": {
+      "button": 25,
+      "input": 5,
+      "select": 1
+    },
+    "under24": 4,
+    "under24list": [
+      {
+        "n": "Search songs, artists, albums…",
+        "w": 248,
+        "h": 19
+      },
+      {
+        "n": "Search songs",
+        "w": 163,
+        "h": 21
+      },
+      {
+        "n": "Volume",
+        "w": 80,
+        "h": 16
+      },
+      {
+        "n": "Volume",
+        "w": 86,
+        "h": 3
+      }
+    ],
+    "under44": 23
+  },
+  "focusOrder": {
+    "count": 31,
+    "inversions": 23,
+    "firstInversionAt": 4,
+    "domOrder": [
+      {
+        "i": 0,
+        "n": "Pop out into its own window",
+        "top": 5,
+        "left": 949
+      },
+      {
+        "i": 1,
+        "n": "Minimize",
+        "top": 5,
+        "left": 981
+      },
+      {
+        "i": 2,
+        "n": "Maximize",
+        "top": 5,
+        "left": 1013
+      },
+      {
+        "i": 3,
+        "n": "Close",
+        "top": 5,
+        "left": 1045
+      },
+      {
+        "i": 4,
+        "n": "Your media at a glance (Ctrl+1)",
+        "top": 134,
+        "left": 11
+      },
+      {
+        "i": 5,
+        "n": "All local media (Ctrl+2)",
+        "top": 183,
+        "left": 11
+      },
+      {
+        "i": 6,
+        "n": "Immersion player (Ctrl+3)",
+        "top": 231,
+        "left": 11
+      },
+      {
+        "i": 7,
+        "n": "Listening room (Ctrl+4)",
+        "top": 280,
+        "left": 11
+      },
+      {
+        "i": 8,
+        "n": "Mine and review (Ctrl+5)",
+        "top": 329,
+        "left": 11
+      },
+      {
+        "i": 9,
+        "n": "MAL + AniList (Ctrl+6)",
+        "top": 377,
+        "left": 11
+      },
+      {
+        "i": 10,
+        "n": "Media workspaceLibrary",
+        "top": 432,
+        "left": 11
+      },
+      {
+        "i": 11,
+        "n": "Media SettingsPlayback and sources",
+        "top": 641,
+        "left": 11
+      },
+      {
+        "i": 12,
+        "n": "Search songs, artists, albums…",
+        "top": 48,
+        "left": 734
+      },
+      {
+        "i": 13,
+        "n": "Open media",
+        "top": 44,
+        "left": 1001
+      },
+      {
+        "i": 14,
+        "n": "Media Settings",
+        "top": 44,
+        "left": 1037
+      },
+      {
+        "i": 15,
+        "n": "Detach player",
+        "top": 118,
+        "left": 765
+      },
+      {
+        "i": 16,
+        "n": "Detach mini-player",
+        "top": 118,
+        "left": 899
+      },
+      {
+        "i": 17,
+        "n": "Album names included in search",
+        "top": 195,
+        "left": 380
+      },
+      {
+        "i": 18,
+        "n": "Show liked only",
+        "top": 195,
+        "left": 410
+      },
+      {
+        "i": 19,
+        "n": "Search songs",
+        "top": 252,
+        "left": 265
+      },
+      {
+        "i": 20,
+        "n": "Recently playedTitleArtistFolder",
+        "top": 289,
+        "left": 266
+      },
+      {
+        "i": 21,
+        "n": "Video or audio link → download…",
+        "top": 583,
+        "left": 236
+      },
+      {
+        "i": 22,
+        "n": "Shuffle",
+        "top": 553,
+        "left": 468
+      },
+      {
+        "i": 23,
+        "n": "Repeat: off",
+        "top": 553,
+        "left": 665
+      },
+      {
+        "i": 24,
+        "n": "Volume",
+        "top": 595,
+        "left": 689
+      },
+      {
+        "i": 25,
+        "n": "Open the mini-player widget",
+        "top": 590,
+        "left": 781
+      },
+      {
+        "i": 26,
+        "n": "Nothing playingChoose music from your librar",
+        "top": 652,
+        "left": 219
+      },
+      {
+        "i": 27,
+        "n": "Shuffle",
+        "top": 658,
+        "left": 451
+      },
+      {
+        "i": 28,
+        "n": "Repeat: off",
+        "top": 658,
+        "left": 576
+      },
+      {
+        "i": 29,
+        "n": "Volume",
+        "top": 669,
+        "left": 950
+      },
+      {
+        "i": 30,
+        "n": "Detach mini-player",
+        "top": 658,
+        "left": 1041
+      }
+    ]
+  },
+  "overflow": {
+    "clippedX": 0,
+    "clippedXList": [],
+    "scrollersY": 1,
+    "pastWindowFrame": 0,
+    "pastList": [],
+    "unreachable": 0,
+    "unreachableList": []
+  },
+  "routes": {
+    "count": 8,
+    "list": [
+      {
+        "n": "Browse",
+        "role": "span",
+        "sel": null
+      },
+      {
+        "n": "Your media at a glance (Ctrl+1)",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "All local media (Ctrl+2)",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Immersion player (Ctrl+3)",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Listening room (Ctrl+4)",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Mine and review (Ctrl+5)",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "MAL + AniList (Ctrl+6)",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Library status",
+        "role": "span",
+        "sel": null
+      }
+    ]
+  },
+  "states": {
+    "empty": false,
+    "loading": false,
+    "error": false,
+    "offline": false,
+    "keywordFormIsAHint": true
+  },
+  "stateBlocks": [
+    {
+      "c": "muted music-empty",
+      "t": "No audio in your media library yet. Drop songs (mp3, flac…) into your media watch folder — they'll show up here. You can set that folder in Media settings."
+    },
+    {
+      "c": "mc-aside-empty",
+      "t": "Audio from the Media Library appears here automatically."
+    }
+  ],
+  "textChars": 939,
+  "domNodes": 248,
+  "sizeMode": "default",
+  "settle": {
+    "waitedMs": 1200,
+    "settled": true,
+    "samples": [
+      "248/43",
+      "248/43",
+      "248/43"
+    ],
+    "final": "248/43"
+  },
+  "capturedAt": "2026-08-16T21:30:41.2832669+03:00"
+}

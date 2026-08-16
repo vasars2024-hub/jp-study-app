@@ -1,0 +1,344 @@
+{
+  "title": "Agent",
+  "rect": {
+    "x": 0,
+    "y": 0,
+    "w": 1264,
+    "h": 765
+  },
+  "maximized": true,
+  "viewport": {
+    "w": 1264,
+    "h": 821,
+    "dpr": 1
+  },
+  "theme": {
+    "dataTheme": "forest-night",
+    "materials": null,
+    "reducedMotion": false,
+    "forcedColors": false
+  },
+  "controls": {
+    "focusable": 29,
+    "byRole": {
+      "button": 25,
+      "input": 1,
+      "select": 2,
+      "textarea": 1
+    },
+    "under24": 0,
+    "under24list": [],
+    "under44": 25
+  },
+  "focusOrder": {
+    "count": 29,
+    "inversions": 25,
+    "firstInversionAt": 4,
+    "domOrder": [
+      {
+        "i": 0,
+        "n": "Pop out into its own window",
+        "top": 5,
+        "left": 1133
+      },
+      {
+        "i": 1,
+        "n": "Minimize",
+        "top": 5,
+        "left": 1165
+      },
+      {
+        "i": 2,
+        "n": "Maximize",
+        "top": 5,
+        "left": 1197
+      },
+      {
+        "i": 3,
+        "n": "Close",
+        "top": 5,
+        "left": 1229
+      },
+      {
+        "i": 4,
+        "n": "New conversation",
+        "top": 90,
+        "left": 31
+      },
+      {
+        "i": 5,
+        "n": "Search conversations",
+        "top": 132,
+        "left": 58
+      },
+      {
+        "i": 6,
+        "n": "What does this word mean?Ask4 messages",
+        "top": 169,
+        "left": 31
+      },
+      {
+        "i": 7,
+        "n": "Pin conversation",
+        "top": 185,
+        "left": 240
+      },
+      {
+        "i": 8,
+        "n": "New conversationAsk0 messages",
+        "top": 234,
+        "left": 31
+      },
+      {
+        "i": 9,
+        "n": "Pin conversation",
+        "top": 250,
+        "left": 240
+      },
+      {
+        "i": 10,
+        "n": "New conversationAsk0 messages",
+        "top": 298,
+        "left": 31
+      },
+      {
+        "i": 11,
+        "n": "Pin conversation",
+        "top": 314,
+        "left": 240
+      },
+      {
+        "i": 12,
+        "n": "Clear history",
+        "top": 703,
+        "left": 31
+      },
+      {
+        "i": 13,
+        "n": "Plain conversation. The prompt is sent exact",
+        "top": 67,
+        "left": 501
+      },
+      {
+        "i": 14,
+        "n": "Simple",
+        "top": 66,
+        "left": 805
+      },
+      {
+        "i": 15,
+        "n": "Full",
+        "top": 66,
+        "left": 861
+      },
+      {
+        "i": 16,
+        "n": "Delete",
+        "top": 62,
+        "left": 1139
+      },
+      {
+        "i": 17,
+        "n": "From dictionary",
+        "top": 321,
+        "left": 659
+      },
+      {
+        "i": 18,
+        "n": "From dictionary",
+        "top": 575,
+        "left": 659
+      },
+      {
+        "i": 19,
+        "n": "Review destination",
+        "top": 619,
+        "left": 546
+      },
+      {
+        "i": 20,
+        "n": "Attach files",
+        "top": 712,
+        "left": 308
+      },
+      {
+        "i": 21,
+        "n": "English日本語中文Русский",
+        "top": 765,
+        "left": 822
+      },
+      {
+        "i": 22,
+        "n": "Explain these settings — Control Center",
+        "top": 801,
+        "left": 321
+      },
+      {
+        "i": 23,
+        "n": "Explain nuance — 食べる",
+        "top": 801,
+        "left": 533
+      },
+      {
+        "i": 24,
+        "n": "Ask about your study context",
+        "top": 850,
+        "left": 308
+      },
+      {
+        "i": 25,
+        "n": "Hide context and activity",
+        "top": 118,
+        "left": 924
+      },
+      {
+        "i": 26,
+        "n": "Remove Control Center from context",
+        "top": 257,
+        "left": 1165
+      },
+      {
+        "i": 27,
+        "n": "Remove Dictionary from context",
+        "top": 344,
+        "left": 1165
+      },
+      {
+        "i": 28,
+        "n": "Remove 食べる from context",
+        "top": 432,
+        "left": 1165
+      }
+    ]
+  },
+  "overflow": {
+    "clippedX": 3,
+    "clippedXList": [
+      {
+        "n": "Search history",
+        "c": "agent-visually-hidden",
+        "over": 86
+      },
+      {
+        "n": "Conversation mode",
+        "c": "agent-visually-hidden",
+        "over": 120
+      },
+      {
+        "n": "Prompt",
+        "c": "sr-only",
+        "over": 45
+      }
+    ],
+    "scrollersY": 1,
+    "pastWindowFrame": 29,
+    "pastList": [
+      {
+        "n": "YouCompleteWhat does this word mean?AgentCom",
+        "c": "agent-conversation-workspace is-inspecto"
+      },
+      {
+        "n": "YouCompleteWhat does this word mean?AgentCom",
+        "c": "agent-conversation-main"
+      },
+      {
+        "n": "ProviderLocal QwenGemini 2.5 FlashDeepSeek V",
+        "c": "agent-composer"
+      },
+      {
+        "n": "Suggestions from your contextExplanation lan",
+        "c": "agent-context-suggestions"
+      },
+      {
+        "n": "Suggestions from your contextExplanation lan",
+        "c": "agent-context-suggestions-heading"
+      },
+      {
+        "n": "Suggestions from your context",
+        "c": ""
+      },
+      {
+        "n": "Explanation languageEnglish日本語中文Русский",
+        "c": "agent-context-suggestion-language"
+      },
+      {
+        "n": "Explanation language",
+        "c": ""
+      }
+    ],
+    "unreachable": 0,
+    "unreachableList": []
+  },
+  "routes": {
+    "count": 8,
+    "list": [
+      {
+        "n": "New conversation",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "What does this word mean?Ask4 messages",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Pin conversation",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "New conversationAsk0 messages",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Pin conversation",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "New conversationAsk0 messages",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Pin conversation",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Clear history",
+        "role": "button",
+        "sel": null
+      }
+    ]
+  },
+  "states": {
+    "empty": false,
+    "loading": false,
+    "error": false,
+    "offline": false,
+    "keywordFormIsAHint": true
+  },
+  "stateBlocks": [
+    {
+      "c": "agent-cloud-notice",
+      "t": "This prompt stays on this device."
+    }
+  ],
+  "textChars": 2006,
+  "domNodes": 278,
+  "sizeMode": "max",
+  "settle": {
+    "waitedMs": 1200,
+    "settled": true,
+    "samples": [
+      "278/39",
+      "278/39",
+      "278/39"
+    ],
+    "final": "278/39"
+  },
+  "capturedAt": "2026-08-16T21:30:35.2507951+03:00"
+}

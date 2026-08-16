@@ -1,0 +1,389 @@
+{
+  "title": "Media",
+  "rect": {
+    "x": 128,
+    "y": 84,
+    "w": 260,
+    "h": 170
+  },
+  "maximized": false,
+  "viewport": {
+    "w": 1264,
+    "h": 821,
+    "dpr": 1
+  },
+  "theme": {
+    "dataTheme": "forest-night",
+    "materials": null,
+    "reducedMotion": false,
+    "forcedColors": false
+  },
+  "controls": {
+    "focusable": 26,
+    "byRole": {
+      "button": 24,
+      "input": 1,
+      "select": 1
+    },
+    "under24": 1,
+    "under24list": [
+      {
+        "n": "Search your media library…",
+        "w": 151,
+        "h": 19
+      }
+    ],
+    "under44": 25
+  },
+  "focusOrder": {
+    "count": 26,
+    "inversions": 21,
+    "firstInversionAt": 4,
+    "domOrder": [
+      {
+        "i": 0,
+        "n": "Pop out into its own window",
+        "top": 5,
+        "left": 129
+      },
+      {
+        "i": 1,
+        "n": "Minimize",
+        "top": 5,
+        "left": 161
+      },
+      {
+        "i": 2,
+        "n": "Maximize",
+        "top": 5,
+        "left": 193
+      },
+      {
+        "i": 3,
+        "n": "Close",
+        "top": 5,
+        "left": 225
+      },
+      {
+        "i": 4,
+        "n": "Your media at a glance (Ctrl+1)",
+        "top": 121,
+        "left": 26
+      },
+      {
+        "i": 5,
+        "n": "All local media (Ctrl+2)",
+        "top": 164,
+        "left": 26
+      },
+      {
+        "i": 6,
+        "n": "Immersion player (Ctrl+3)",
+        "top": 207,
+        "left": 26
+      },
+      {
+        "i": 7,
+        "n": "Listening room (Ctrl+4)",
+        "top": 250,
+        "left": 26
+      },
+      {
+        "i": 8,
+        "n": "Mine and review (Ctrl+5)",
+        "top": 293,
+        "left": 26
+      },
+      {
+        "i": 9,
+        "n": "MAL + AniList (Ctrl+6)",
+        "top": 336,
+        "left": 26
+      },
+      {
+        "i": 10,
+        "n": "Media workspaceLibrary",
+        "top": 385,
+        "left": 26
+      },
+      {
+        "i": 11,
+        "n": "Media SettingsPlayback and sources",
+        "top": 435,
+        "left": 26
+      },
+      {
+        "i": 12,
+        "n": "Search your media library…",
+        "top": 62,
+        "left": 189
+      },
+      {
+        "i": 13,
+        "n": "Home",
+        "top": 106,
+        "left": 108
+      },
+      {
+        "i": 14,
+        "n": "Recently added33",
+        "top": 138,
+        "left": 108
+      },
+      {
+        "i": 15,
+        "n": "Continue watching2",
+        "top": 170,
+        "left": 108
+      },
+      {
+        "i": 16,
+        "n": "Study queue",
+        "top": 202,
+        "left": 108
+      },
+      {
+        "i": 17,
+        "n": "Favorites",
+        "top": 234,
+        "left": 108
+      },
+      {
+        "i": 18,
+        "n": "Tracking",
+        "top": 266,
+        "left": 108
+      },
+      {
+        "i": 19,
+        "n": "TV shows29",
+        "top": 313,
+        "left": 108
+      },
+      {
+        "i": 20,
+        "n": "Unsorted4",
+        "top": 345,
+        "left": 108
+      },
+      {
+        "i": 21,
+        "n": "Sort by",
+        "top": 230,
+        "left": 327
+      },
+      {
+        "i": 22,
+        "n": "Grid view",
+        "top": 237,
+        "left": 362
+      },
+      {
+        "i": 23,
+        "n": "List view",
+        "top": 237,
+        "left": 392
+      },
+      {
+        "i": 24,
+        "n": "Add",
+        "top": 231,
+        "left": 431
+      },
+      {
+        "i": 25,
+        "n": "The Big O",
+        "top": 277,
+        "left": 327
+      }
+    ]
+  },
+  "overflow": {
+    "clippedX": 3,
+    "clippedXList": [
+      {
+        "n": "Media Center日本語 immersionBrowseHomeYour medi",
+        "c": "mc-root",
+        "over": 124
+      },
+      {
+        "n": "LibraryHomeRecently added33Continue watching",
+        "c": "mc-page mc-library-page",
+        "over": 144
+      },
+      {
+        "n": "Continue watching",
+        "c": "medialib-browser__title",
+        "over": 172
+      }
+    ],
+    "scrollersY": 1,
+    "pastWindowFrame": 88,
+    "pastList": [
+      {
+        "n": "Media Center",
+        "c": "mc-nav"
+      },
+      {
+        "n": "All local media (Ctrl+2)",
+        "c": "is-active"
+      },
+      {
+        "n": "svg",
+        "c": "[object SVGAnimatedString]"
+      },
+      {
+        "n": "path",
+        "c": "[object SVGAnimatedString]"
+      },
+      {
+        "n": "Immersion player (Ctrl+3)",
+        "c": ""
+      },
+      {
+        "n": "svg",
+        "c": "[object SVGAnimatedString]"
+      },
+      {
+        "n": "path",
+        "c": "[object SVGAnimatedString]"
+      },
+      {
+        "n": "Listening room (Ctrl+4)",
+        "c": ""
+      }
+    ],
+    "unreachable": 49,
+    "unreachableList": [
+      {
+        "n": "Media Center",
+        "c": "mc-nav"
+      },
+      {
+        "n": "All local media (Ctrl+2)",
+        "c": "is-active"
+      },
+      {
+        "n": "svg",
+        "c": "[object SVGAnimatedString]"
+      },
+      {
+        "n": "path",
+        "c": "[object SVGAnimatedString]"
+      },
+      {
+        "n": "Immersion player (Ctrl+3)",
+        "c": ""
+      },
+      {
+        "n": "svg",
+        "c": "[object SVGAnimatedString]"
+      },
+      {
+        "n": "path",
+        "c": "[object SVGAnimatedString]"
+      },
+      {
+        "n": "Listening room (Ctrl+4)",
+        "c": ""
+      }
+    ]
+  },
+  "routes": {
+    "count": 14,
+    "list": [
+      {
+        "n": "Your media at a glance (Ctrl+1)",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "All local media (Ctrl+2)",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Immersion player (Ctrl+3)",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Listening room (Ctrl+4)",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Mine and review (Ctrl+5)",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "MAL + AniList (Ctrl+6)",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Home",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Recently added33",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Continue watching2",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Study queue",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Favorites",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Tracking",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "TV shows29",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Unsorted4",
+        "role": "button",
+        "sel": null
+      }
+    ]
+  },
+  "states": {
+    "empty": false,
+    "loading": false,
+    "error": false,
+    "offline": false,
+    "keywordFormIsAHint": true
+  },
+  "stateBlocks": [],
+  "textChars": 193,
+  "domNodes": 203,
+  "sizeMode": "min",
+  "settle": {
+    "waitedMs": 1200,
+    "settled": true,
+    "samples": [
+      "203/31",
+      "203/31",
+      "203/31"
+    ],
+    "final": "203/31"
+  },
+  "capturedAt": "2026-08-16T21:30:25.1448770+03:00"
+}

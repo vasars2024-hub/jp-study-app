@@ -1,0 +1,202 @@
+{
+  "title": "Translate",
+  "rect": {
+    "x": 128,
+    "y": 84,
+    "w": 260,
+    "h": 170
+  },
+  "maximized": false,
+  "viewport": {
+    "w": 1264,
+    "h": 821,
+    "dpr": 1
+  },
+  "theme": {
+    "dataTheme": "forest-night",
+    "materials": null,
+    "reducedMotion": false,
+    "forcedColors": false
+  },
+  "controls": {
+    "focusable": 14,
+    "byRole": {
+      "button": 13,
+      "textarea": 1
+    },
+    "under24": 0,
+    "under24list": [],
+    "under44": 13
+  },
+  "focusOrder": {
+    "count": 14,
+    "inversions": 5,
+    "firstInversionAt": 4,
+    "domOrder": [
+      {
+        "i": 0,
+        "n": "Pop out into its own window",
+        "top": 5,
+        "left": 129
+      },
+      {
+        "i": 1,
+        "n": "Minimize",
+        "top": 5,
+        "left": 161
+      },
+      {
+        "i": 2,
+        "n": "Maximize",
+        "top": 5,
+        "left": 193
+      },
+      {
+        "i": 3,
+        "n": "Close",
+        "top": 5,
+        "left": 225
+      },
+      {
+        "i": 4,
+        "n": "Translate",
+        "top": 63,
+        "left": 105
+      },
+      {
+        "i": 5,
+        "n": "History",
+        "top": 63,
+        "left": 190
+      },
+      {
+        "i": 6,
+        "n": "日本語",
+        "top": 50,
+        "left": 282
+      },
+      {
+        "i": 7,
+        "n": "中文",
+        "top": 50,
+        "left": 357
+      },
+      {
+        "i": 8,
+        "n": "Русский",
+        "top": 50,
+        "left": 419
+      },
+      {
+        "i": 9,
+        "n": "Swap languages",
+        "top": 95,
+        "left": 282
+      },
+      {
+        "i": 10,
+        "n": "中文",
+        "top": 135,
+        "left": 282
+      },
+      {
+        "i": 11,
+        "n": "English",
+        "top": 135,
+        "left": 344
+      },
+      {
+        "i": 12,
+        "n": "Русский",
+        "top": 135,
+        "left": 422
+      },
+      {
+        "i": 13,
+        "n": "日本語を貼り付け / 入力してください… (Ctrl+Enter)",
+        "top": 308,
+        "left": 19
+      }
+    ]
+  },
+  "overflow": {
+    "clippedX": 1,
+    "clippedXList": [
+      {
+        "n": "Offline translation via Qwen3 on your machin",
+        "c": "fwin-body   ",
+        "over": 252
+      }
+    ],
+    "scrollersY": 1,
+    "pastWindowFrame": 28,
+    "pastList": [
+      {
+        "n": "Offline translation via Qwen3 on your machin",
+        "c": "tr-view"
+      },
+      {
+        "n": "Offline translation via Qwen3 on your machin",
+        "c": "view-head"
+      },
+      {
+        "n": "Offline translation via Qwen3 on your machin",
+        "c": "muted"
+      },
+      {
+        "n": "TranslateHistory",
+        "c": "gram-mode-toggle tr-tabs"
+      },
+      {
+        "n": "日本語中文Русский中文EnglishРусский",
+        "c": "tr-dir"
+      },
+      {
+        "n": "日本語中文Русский",
+        "c": "dict-lang-toggle"
+      },
+      {
+        "n": "日本語",
+        "c": "gram-level-btn active"
+      },
+      {
+        "n": "中文",
+        "c": "gram-level-btn "
+      }
+    ],
+    "unreachable": 0,
+    "unreachableList": []
+  },
+  "routes": {
+    "count": 1,
+    "list": [
+      {
+        "n": "TranslateHistory",
+        "role": "div",
+        "sel": null
+      }
+    ]
+  },
+  "states": {
+    "empty": false,
+    "loading": false,
+    "error": false,
+    "offline": true,
+    "keywordFormIsAHint": true
+  },
+  "stateBlocks": [],
+  "textChars": 204,
+  "domNodes": 44,
+  "sizeMode": "min",
+  "settle": {
+    "final": "44/15",
+    "samples": [
+      "44/15",
+      "44/15",
+      "44/15"
+    ],
+    "settled": true,
+    "waitedMs": 1200
+  },
+  "capturedAt": "2026-08-16T21:31:26.3972617+03:00"
+}

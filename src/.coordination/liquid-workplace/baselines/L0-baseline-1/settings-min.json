@@ -1,0 +1,532 @@
+{
+  "title": "Settings",
+  "rect": {
+    "x": 128,
+    "y": 84,
+    "w": 260,
+    "h": 170
+  },
+  "maximized": false,
+  "viewport": {
+    "w": 1264,
+    "h": 821,
+    "dpr": 1
+  },
+  "theme": {
+    "dataTheme": "forest-night",
+    "materials": null,
+    "reducedMotion": false,
+    "forcedColors": false
+  },
+  "controls": {
+    "focusable": 44,
+    "byRole": {
+      "button": 43,
+      "input": 1
+    },
+    "under24": 0,
+    "under24list": [],
+    "under44": 31
+  },
+  "focusOrder": {
+    "count": 44,
+    "inversions": 22,
+    "firstInversionAt": 7,
+    "domOrder": [
+      {
+        "i": 0,
+        "n": "Pop out into its own window",
+        "top": 5,
+        "left": 129
+      },
+      {
+        "i": 1,
+        "n": "Minimize",
+        "top": 5,
+        "left": 161
+      },
+      {
+        "i": 2,
+        "n": "Maximize",
+        "top": 5,
+        "left": 193
+      },
+      {
+        "i": 3,
+        "n": "Close",
+        "top": 5,
+        "left": 225
+      },
+      {
+        "i": 4,
+        "n": "Search settings",
+        "top": 50,
+        "left": 19
+      },
+      {
+        "i": 5,
+        "n": "Ask the Agent",
+        "top": 90,
+        "left": 19
+      },
+      {
+        "i": 6,
+        "n": "Home",
+        "top": 141,
+        "left": 19
+      },
+      {
+        "i": 7,
+        "n": "Themes, colors, fonts",
+        "top": 212,
+        "left": 19
+      },
+      {
+        "i": 8,
+        "n": "Desktop background",
+        "top": 247,
+        "left": 19
+      },
+      {
+        "i": 9,
+        "n": "Desktop pets",
+        "top": 282,
+        "left": 19
+      },
+      {
+        "i": 10,
+        "n": "Icons, taskbar, session",
+        "top": 353,
+        "left": 19
+      },
+      {
+        "i": 11,
+        "n": "Keyboard and mouse bindings",
+        "top": 388,
+        "left": 19
+      },
+      {
+        "i": 12,
+        "n": "Reduced launcher with pop-out apps",
+        "top": 423,
+        "left": 19
+      },
+      {
+        "i": 13,
+        "n": "PIN gate on app launch",
+        "top": 458,
+        "left": 19
+      },
+      {
+        "i": 14,
+        "n": "Profiles and dictionaries",
+        "top": 529,
+        "left": 19
+      },
+      {
+        "i": 15,
+        "n": "Route mines to Anki profiles",
+        "top": 564,
+        "left": 19
+      },
+      {
+        "i": 16,
+        "n": "Reader typography",
+        "top": 599,
+        "left": 19
+      },
+      {
+        "i": 17,
+        "n": "Desktops across your screens",
+        "top": 670,
+        "left": 19
+      },
+      {
+        "i": 18,
+        "n": "Where dropped files go",
+        "top": 705,
+        "left": 19
+      },
+      {
+        "i": 19,
+        "n": "Every key the app can hold, in one place.",
+        "top": 740,
+        "left": 19
+      },
+      {
+        "i": 20,
+        "n": "Zoom and motion",
+        "top": 775,
+        "left": 19
+      },
+      {
+        "i": 21,
+        "n": "Animation speed and effects",
+        "top": 810,
+        "left": 19
+      },
+      {
+        "i": 22,
+        "n": "Download, update, and remove models",
+        "top": 845,
+        "left": 19
+      },
+      {
+        "i": 23,
+        "n": "Usage, inventory, backups, and clear tools",
+        "top": 880,
+        "left": 19
+      },
+      {
+        "i": 24,
+        "n": "Guided tour and keyboard shortcuts",
+        "top": 915,
+        "left": 19
+      },
+      {
+        "i": 25,
+        "n": "Advanced mode off — extra settings hidden (s",
+        "top": 156,
+        "left": 25
+      },
+      {
+        "i": 26,
+        "n": "Customize theme",
+        "top": 621,
+        "left": 245
+      },
+      {
+        "i": 27,
+        "n": "Change language",
+        "top": 727,
+        "left": 245
+      },
+      {
+        "i": 28,
+        "n": "Chrome extension",
+        "top": 833,
+        "left": 245
+      },
+      {
+        "i": 29,
+        "n": "Blanc Mode",
+        "top": 939,
+        "left": 245
+      },
+      {
+        "i": 30,
+        "n": "Change wallpaper",
+        "top": 1045,
+        "left": 245
+      },
+      {
+        "i": 31,
+        "n": "Companion settings",
+        "top": 1151,
+        "left": 245
+      },
+      {
+        "i": 32,
+        "n": "Particles & atmosphere",
+        "top": 1257,
+        "left": 245
+      },
+      {
+        "i": 33,
+        "n": "Manage shortcuts",
+        "top": 1363,
+        "left": 245
+      },
+      {
+        "i": 34,
+        "n": "Lockscreen & PIN",
+        "top": 1469,
+        "left": 245
+      },
+      {
+        "i": 35,
+        "n": "Memory & storage",
+        "top": 1575,
+        "left": 245
+      },
+      {
+        "i": 36,
+        "n": "Personalization · Appearance",
+        "top": 1715,
+        "left": 245
+      },
+      {
+        "i": 37,
+        "n": "System · API keys",
+        "top": 1771,
+        "left": 245
+      },
+      {
+        "i": 38,
+        "n": "System · Models & dictionaries",
+        "top": 1810,
+        "left": 245
+      },
+      {
+        "i": 39,
+        "n": "System · Display",
+        "top": 1866,
+        "left": 245
+      }
+    ]
+  },
+  "overflow": {
+    "clippedX": 1,
+    "clippedXList": [
+      {
+        "n": "Ask the AgentHomePersonalizationAppearanceWa",
+        "c": "fwin-body   ",
+        "over": 182
+      }
+    ],
+    "scrollersY": 2,
+    "pastWindowFrame": 218,
+    "pastList": [
+      {
+        "n": "HomePersonalizationAppearanceWallpaperCompan",
+        "c": "os-set-body"
+      },
+      {
+        "n": "Home",
+        "c": "os-set-nav-item active"
+      },
+      {
+        "n": "PersonalizationAppearanceWallpaperCompanions",
+        "c": "os-set-nav-group"
+      },
+      {
+        "n": "Personalization",
+        "c": "os-set-nav-group-label"
+      },
+      {
+        "n": "AppearanceWallpaperCompanions",
+        "c": "os-set-nav-list"
+      },
+      {
+        "n": "Appearance",
+        "c": ""
+      },
+      {
+        "n": "Themes, colors, fonts",
+        "c": "os-set-nav-item "
+      },
+      {
+        "n": "svg",
+        "c": "[object SVGAnimatedString]"
+      }
+    ],
+    "unreachable": 2,
+    "unreachableList": [
+      {
+        "n": "HomePersonalizationAppearanceWallpaperCompan",
+        "c": "os-set-body"
+      },
+      {
+        "n": "Home",
+        "c": "os-set-pane-v2 os-set-pane-anim"
+      }
+    ]
+  },
+  "routes": {
+    "count": 34,
+    "list": [
+      {
+        "n": "Settings categories",
+        "role": "nav",
+        "sel": null
+      },
+      {
+        "n": "Home",
+        "role": "button",
+        "sel": true
+      },
+      {
+        "n": "PersonalizationAppearanceWallpaperCompanions",
+        "role": "div",
+        "sel": null
+      },
+      {
+        "n": "Personalization",
+        "role": "div",
+        "sel": null
+      },
+      {
+        "n": "AppearanceWallpaperCompanions",
+        "role": "ul",
+        "sel": null
+      },
+      {
+        "n": "Themes, colors, fonts",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Desktop background",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Desktop pets",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "DesktopDesktop layoutShortcutsMini ViewLocks",
+        "role": "div",
+        "sel": null
+      },
+      {
+        "n": "Desktop",
+        "role": "div",
+        "sel": null
+      },
+      {
+        "n": "Desktop layoutShortcutsMini ViewLockscreen",
+        "role": "ul",
+        "sel": null
+      },
+      {
+        "n": "Icons, taskbar, session",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Keyboard and mouse bindings",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Reduced launcher with pop-out apps",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "PIN gate on app launch",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "StudyProfile & dictionaryMining rulesReading",
+        "role": "div",
+        "sel": null
+      },
+      {
+        "n": "Study",
+        "role": "div",
+        "sel": null
+      },
+      {
+        "n": "Profile & dictionaryMining rulesReading",
+        "role": "ul",
+        "sel": null
+      },
+      {
+        "n": "Profiles and dictionaries",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Route mines to Anki profiles",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Reader typography",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "SystemMonitorsFile dropsAPI keysDisplayMotio",
+        "role": "div",
+        "sel": null
+      },
+      {
+        "n": "System",
+        "role": "div",
+        "sel": null
+      },
+      {
+        "n": "MonitorsFile dropsAPI keysDisplayMotionModel",
+        "role": "ul",
+        "sel": null
+      },
+      {
+        "n": "Desktops across your screens",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Where dropped files go",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Every key the app can hold, in one place.",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Zoom and motion",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Animation speed and effects",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Download, update, and remove models",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Usage, inventory, backups, and clear tools",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Guided tour and keyboard shortcuts",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "AdvancedTap to unlock expert options",
+        "role": "div",
+        "sel": null
+      },
+      {
+        "n": "Advanced mode off — extra settings hidden (s",
+        "role": "button",
+        "sel": null
+      }
+    ]
+  },
+  "states": {
+    "empty": false,
+    "loading": false,
+    "error": false,
+    "offline": false,
+    "keywordFormIsAHint": true
+  },
+  "stateBlocks": [],
+  "textChars": 882,
+  "domNodes": 245,
+  "sizeMode": "min",
+  "settle": {
+    "final": "245/44",
+    "samples": [
+      "245/44",
+      "245/44",
+      "245/44"
+    ],
+    "settled": true,
+    "waitedMs": 1200
+  },
+  "capturedAt": "2026-08-16T21:32:21.4180128+03:00"
+}

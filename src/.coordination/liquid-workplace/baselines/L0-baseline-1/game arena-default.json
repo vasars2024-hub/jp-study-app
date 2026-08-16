@@ -1,0 +1,231 @@
+{
+  "title": "Game Arena",
+  "rect": {
+    "x": 128,
+    "y": 84,
+    "w": 980,
+    "h": 660
+  },
+  "maximized": false,
+  "viewport": {
+    "w": 1264,
+    "h": 821,
+    "dpr": 1
+  },
+  "theme": {
+    "dataTheme": "forest-night",
+    "materials": null,
+    "reducedMotion": false,
+    "forcedColors": false
+  },
+  "controls": {
+    "focusable": 21,
+    "byRole": {
+      "button": 21
+    },
+    "under24": 0,
+    "under24list": [],
+    "under44": 6
+  },
+  "focusOrder": {
+    "count": 21,
+    "inversions": 13,
+    "firstInversionAt": 8,
+    "domOrder": [
+      {
+        "i": 0,
+        "n": "Pop out into its own window",
+        "top": 5,
+        "left": 849
+      },
+      {
+        "i": 1,
+        "n": "Minimize",
+        "top": 5,
+        "left": 881
+      },
+      {
+        "i": 2,
+        "n": "Maximize",
+        "top": 5,
+        "left": 913
+      },
+      {
+        "i": 3,
+        "n": "Close",
+        "top": 5,
+        "left": 945
+      },
+      {
+        "i": 4,
+        "n": "Settings",
+        "top": 88,
+        "left": 855
+      },
+      {
+        "i": 5,
+        "n": "Sentence BuilderRebuild the Japanese sentenc",
+        "top": 169,
+        "left": 44
+      },
+      {
+        "i": 6,
+        "n": "Speed TypeType the Japanese answer with kana",
+        "top": 236,
+        "left": 44
+      },
+      {
+        "i": 7,
+        "n": "Word Match RushPair Japanese words with thei",
+        "top": 303,
+        "left": 44
+      },
+      {
+        "i": 8,
+        "n": "Kana SprintPick the romaji for kana prompts.",
+        "top": 369,
+        "left": 44
+      },
+      {
+        "i": 9,
+        "n": "Kanji Reading AttackChoose the reading of a ",
+        "top": 425,
+        "left": 44
+      },
+      {
+        "i": 10,
+        "n": "Cloze BlitzFill the blank in a Japanese sent",
+        "top": 492,
+        "left": 44
+      },
+      {
+        "i": 11,
+        "n": "Listening FlashHear Japanese, then pick the ",
+        "top": 559,
+        "left": 44
+      },
+      {
+        "i": 12,
+        "n": "Particle PanicChoose the particle that makes",
+        "top": 626,
+        "left": 44
+      },
+      {
+        "i": 13,
+        "n": "Counter QuizPick the correct counter for the",
+        "top": 692,
+        "left": 44
+      },
+      {
+        "i": 14,
+        "n": "Reverse RecallRead Japanese and type the mea",
+        "top": 759,
+        "left": 44
+      },
+      {
+        "i": 15,
+        "n": "Space InvadersOpen-source pygame Space Invad",
+        "top": 826,
+        "left": 44
+      },
+      {
+        "i": 16,
+        "n": "LanderSimA compact Lunar Lander physics sim ",
+        "top": 893,
+        "left": 44
+      },
+      {
+        "i": 17,
+        "n": "Dr. CapsuleA capsule-matching bottle puzzle ",
+        "top": 960,
+        "left": 44
+      },
+      {
+        "i": 18,
+        "n": "MinesweeperRecursive Minesweeper board logic",
+        "top": 1026,
+        "left": 44
+      },
+      {
+        "i": 19,
+        "n": "Mirror WritingWrite from an idea map and sub",
+        "top": 1093,
+        "left": 44
+      },
+      {
+        "i": 20,
+        "n": "Start round",
+        "top": 342,
+        "left": 322
+      }
+    ]
+  },
+  "overflow": {
+    "clippedX": 0,
+    "clippedXList": [],
+    "scrollersY": 1,
+    "pastWindowFrame": 45,
+    "pastList": [
+      {
+        "n": "Particle PanicChoose the particle that makes",
+        "c": "game-list-item "
+      },
+      {
+        "n": "Particle PanicChoose the particle that makes",
+        "c": ""
+      },
+      {
+        "n": "Choose the particle that makes the sentence ",
+        "c": ""
+      },
+      {
+        "n": "Counter QuizPick the correct counter for the",
+        "c": "game-list-item "
+      },
+      {
+        "n": "svg",
+        "c": "[object SVGAnimatedString]"
+      },
+      {
+        "n": "path",
+        "c": "[object SVGAnimatedString]"
+      },
+      {
+        "n": "Counter QuizPick the correct counter for the",
+        "c": ""
+      },
+      {
+        "n": "Counter Quiz",
+        "c": ""
+      }
+    ],
+    "unreachable": 0,
+    "unreachableList": []
+  },
+  "routes": {
+    "count": 0,
+    "list": []
+  },
+  "states": {
+    "empty": false,
+    "loading": false,
+    "error": false,
+    "offline": false,
+    "keywordFormIsAHint": true
+  },
+  "stateBlocks": [],
+  "textChars": 1416,
+  "domNodes": 142,
+  "sizeMode": "default",
+  "settle": {
+    "final": "142/21",
+    "samples": [
+      "142/21",
+      "142/21",
+      "142/21"
+    ],
+    "settled": true,
+    "waitedMs": 1200
+  },
+  "capturedAt": "2026-08-16T21:31:43.0432263+03:00"
+}

@@ -1,0 +1,164 @@
+{
+  "title": "Statistics",
+  "rect": {
+    "x": 0,
+    "y": 0,
+    "w": 1264,
+    "h": 765
+  },
+  "maximized": true,
+  "viewport": {
+    "w": 1264,
+    "h": 821,
+    "dpr": 1
+  },
+  "theme": {
+    "dataTheme": "forest-night",
+    "materials": null,
+    "reducedMotion": false,
+    "forcedColors": false
+  },
+  "controls": {
+    "focusable": 9,
+    "byRole": {
+      "button": 9
+    },
+    "under24": 0,
+    "under24list": [],
+    "under44": 9
+  },
+  "focusOrder": {
+    "count": 9,
+    "inversions": 0,
+    "firstInversionAt": -1,
+    "domOrder": [
+      {
+        "i": 0,
+        "n": "Pop out into its own window",
+        "top": 5,
+        "left": 1133
+      },
+      {
+        "i": 1,
+        "n": "Minimize",
+        "top": 5,
+        "left": 1165
+      },
+      {
+        "i": 2,
+        "n": "Maximize",
+        "top": 5,
+        "left": 1197
+      },
+      {
+        "i": 3,
+        "n": "Close",
+        "top": 5,
+        "left": 1229
+      },
+      {
+        "i": 4,
+        "n": "Reset",
+        "top": 50,
+        "left": 1172
+      },
+      {
+        "i": 5,
+        "n": "Sync from Anki",
+        "top": 115,
+        "left": 1102
+      },
+      {
+        "i": 6,
+        "n": "Resume THE Big O — 1",
+        "top": 1280,
+        "left": 19
+      },
+      {
+        "i": 7,
+        "n": "Resume THE Big O — 13",
+        "top": 1323,
+        "left": 19
+      },
+      {
+        "i": 8,
+        "n": "Resume Sousou no Frieren — 1",
+        "top": 1366,
+        "left": 19
+      }
+    ]
+  },
+  "overflow": {
+    "clippedX": 0,
+    "clippedXList": [],
+    "scrollersY": 1,
+    "pastWindowFrame": 110,
+    "pastList": [
+      {
+        "n": "Your reading time and characters read, track",
+        "c": "stats-view"
+      },
+      {
+        "n": "0day streak0sread today0characters today1h 3",
+        "c": "stats-cards"
+      },
+      {
+        "n": "0swatched today",
+        "c": "stats-card"
+      },
+      {
+        "n": "0s",
+        "c": "stats-card-val"
+      },
+      {
+        "n": "watched today",
+        "c": "stats-card-lbl"
+      },
+      {
+        "n": "26mtotal watched",
+        "c": "stats-card"
+      },
+      {
+        "n": "26m",
+        "c": "stats-card-val"
+      },
+      {
+        "n": "total watched",
+        "c": "stats-card-lbl"
+      }
+    ],
+    "unreachable": 0,
+    "unreachableList": []
+  },
+  "routes": {
+    "count": 0,
+    "list": []
+  },
+  "states": {
+    "empty": false,
+    "loading": false,
+    "error": false,
+    "offline": false,
+    "keywordFormIsAHint": true
+  },
+  "stateBlocks": [
+    {
+      "c": "stats-level-estimate",
+      "t": "Beginner Estimated level From Familiar-or-better coverage of your JLPT / HSK word lists."
+    }
+  ],
+  "textChars": 895,
+  "domNodes": 182,
+  "sizeMode": "max",
+  "settle": {
+    "final": "182/9",
+    "samples": [
+      "182/9",
+      "182/9",
+      "182/9"
+    ],
+    "settled": true,
+    "waitedMs": 1200
+  },
+  "capturedAt": "2026-08-16T21:31:55.4602971+03:00"
+}

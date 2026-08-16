@@ -1,0 +1,423 @@
+{
+  "title": "Notebook",
+  "rect": {
+    "x": 0,
+    "y": 0,
+    "w": 1264,
+    "h": 765
+  },
+  "maximized": true,
+  "viewport": {
+    "w": 1264,
+    "h": 821,
+    "dpr": 1
+  },
+  "theme": {
+    "dataTheme": "forest-night",
+    "materials": null,
+    "reducedMotion": false,
+    "forcedColors": false
+  },
+  "controls": {
+    "focusable": 480,
+    "byRole": {
+      "button": 474,
+      "tab": 6
+    },
+    "under24": 0,
+    "under24list": [],
+    "under44": 63
+  },
+  "focusOrder": {
+    "count": 480,
+    "inversions": 16,
+    "firstInversionAt": 27,
+    "domOrder": [
+      {
+        "i": 0,
+        "n": "Pop out into its own window",
+        "top": 5,
+        "left": 1133
+      },
+      {
+        "i": 1,
+        "n": "Minimize",
+        "top": 5,
+        "left": 1165
+      },
+      {
+        "i": 2,
+        "n": "Maximize",
+        "top": 5,
+        "left": 1197
+      },
+      {
+        "i": 3,
+        "n": "Close",
+        "top": 5,
+        "left": 1229
+      },
+      {
+        "i": 4,
+        "n": "Overview",
+        "top": 50,
+        "left": 19
+      },
+      {
+        "i": 5,
+        "n": "Library",
+        "top": 50,
+        "left": 100
+      },
+      {
+        "i": 6,
+        "n": "Words",
+        "top": 50,
+        "left": 168
+      },
+      {
+        "i": 7,
+        "n": "Translations",
+        "top": 50,
+        "left": 233
+      },
+      {
+        "i": 8,
+        "n": "Highlights",
+        "top": 50,
+        "left": 328
+      },
+      {
+        "i": 9,
+        "n": "Captures",
+        "top": 50,
+        "left": 414
+      },
+      {
+        "i": 10,
+        "n": "2Saved words",
+        "top": 94,
+        "left": 19
+      },
+      {
+        "i": 11,
+        "n": "21Lookups",
+        "top": 94,
+        "left": 142
+      },
+      {
+        "i": 12,
+        "n": "0Flashcards",
+        "top": 94,
+        "left": 266
+      },
+      {
+        "i": 13,
+        "n": "0Anki",
+        "top": 94,
+        "left": 389
+      },
+      {
+        "i": 14,
+        "n": "3218Mining",
+        "top": 94,
+        "left": 513
+      },
+      {
+        "i": 15,
+        "n": "0Known levels",
+        "top": 94,
+        "left": 636
+      },
+      {
+        "i": 16,
+        "n": "0Translations",
+        "top": 94,
+        "left": 759
+      },
+      {
+        "i": 17,
+        "n": "6Plan to read",
+        "top": 94,
+        "left": 883
+      },
+      {
+        "i": 18,
+        "n": "15Highlights",
+        "top": 94,
+        "left": 1006
+      },
+      {
+        "i": 19,
+        "n": "3OCR",
+        "top": 94,
+        "left": 1130
+      },
+      {
+        "i": 20,
+        "n": "0Audio",
+        "top": 163,
+        "left": 19
+      },
+      {
+        "i": 21,
+        "n": "5Clipboard",
+        "top": 163,
+        "left": 142
+      },
+      {
+        "i": 22,
+        "n": "3Extension",
+        "top": 163,
+        "left": 266
+      },
+      {
+        "i": 23,
+        "n": "0Live captions",
+        "top": 163,
+        "left": 389
+      },
+      {
+        "i": 24,
+        "n": "Review Notebook",
+        "top": 234,
+        "left": 19
+      },
+      {
+        "i": 25,
+        "n": "Refresh",
+        "top": 234,
+        "left": 165
+      },
+      {
+        "i": 26,
+        "n": "All (3273)",
+        "top": 281,
+        "left": 19
+      },
+      {
+        "i": 27,
+        "n": "Flashcards (3218)",
+        "top": 313,
+        "left": 19
+      },
+      {
+        "i": 28,
+        "n": "Lookups (21)",
+        "top": 345,
+        "left": 19
+      },
+      {
+        "i": 29,
+        "n": "Highlights/ハサミ男 (殊能将之) (z-library.sk, 1lib.s",
+        "top": 377,
+        "left": 19
+      },
+      {
+        "i": 30,
+        "n": "Plan to read (6)",
+        "top": 426,
+        "left": 19
+      },
+      {
+        "i": 31,
+        "n": "Clipboard (5)",
+        "top": 458,
+        "left": 19
+      },
+      {
+        "i": 32,
+        "n": "OCR (3)",
+        "top": 490,
+        "left": 19
+      },
+      {
+        "i": 33,
+        "n": "Extension (3)",
+        "top": 522,
+        "left": 19
+      },
+      {
+        "i": 34,
+        "n": "Mined (2)",
+        "top": 554,
+        "left": 19
+      },
+      {
+        "i": 35,
+        "n": "Highlights/10 キドナプキディング 青色サヴァンと戯言遣いの娘 (2)",
+        "top": 586,
+        "left": 19
+      },
+      {
+        "i": 36,
+        "n": "Highlights/Unknown book (55da75a7) (1)",
+        "top": 652,
+        "left": 19
+      },
+      {
+        "i": 37,
+        "n": "Start capture",
+        "top": 292,
+        "left": 1043
+      },
+      {
+        "i": 38,
+        "n": "猫LookupsLookups8/15/2026, 2:07:15 PM",
+        "top": 371,
+        "left": 231
+      },
+      {
+        "i": 39,
+        "n": "犬LookupsLookups8/15/2026, 1:14:40 PM",
+        "top": 431,
+        "left": 231
+      }
+    ]
+  },
+  "overflow": {
+    "clippedX": 16,
+    "clippedXList": [
+      {
+        "n": "One Punch-Man : The Koi Pond | Chapter 229 |",
+        "c": "gx-notebook-lineage-label",
+        "over": 100
+      },
+      {
+        "n": "One Punch-Man : The Koi Pond | Chapter 229 |",
+        "c": "gx-notebook-lineage-label",
+        "over": 100
+      },
+      {
+        "n": "ハサミ男 (殊能将之) (z-library.sk, 1lib.sk, z-lib.sk",
+        "c": "gx-notebook-lineage-label",
+        "over": 74
+      },
+      {
+        "n": "ハサミ男 (殊能将之) (z-library.sk, 1lib.sk, z-lib.sk",
+        "c": "gx-notebook-lineage-label",
+        "over": 74
+      },
+      {
+        "n": "ハサミ男 (殊能将之) (z-library.sk, 1lib.sk, z-lib.sk",
+        "c": "gx-notebook-lineage-label",
+        "over": 74
+      },
+      {
+        "n": "ハサミ男 (殊能将之) (z-library.sk, 1lib.sk, z-lib.sk",
+        "c": "gx-notebook-lineage-label",
+        "over": 74
+      },
+      {
+        "n": "ハサミ男 (殊能将之) (z-library.sk, 1lib.sk, z-lib.sk",
+        "c": "gx-notebook-lineage-label",
+        "over": 74
+      },
+      {
+        "n": "ハサミ男 (殊能将之) (z-library.sk, 1lib.sk, z-lib.sk",
+        "c": "gx-notebook-lineage-label",
+        "over": 74
+      }
+    ],
+    "scrollersY": 1,
+    "pastWindowFrame": 3704,
+    "pastList": [
+      {
+        "n": "猫LookupsLookups8/15/2026, 2:07:15 PM犬Lookups",
+        "c": "gx-notebook-list"
+      },
+      {
+        "n": "やけLookupsLookups8/15/2026, 7:04:42 AM",
+        "c": "gx-notebook-item"
+      },
+      {
+        "n": "やけLookupsLookups8/15/2026, 7:04:42 AM",
+        "c": "gx-notebook-item-btn"
+      },
+      {
+        "n": "Lookups8/15/2026, 7:04:42 AM",
+        "c": "gx-notebook-item-meta muted"
+      },
+      {
+        "n": "Lookups",
+        "c": ""
+      },
+      {
+        "n": "8/15/2026, 7:04:42 AM",
+        "c": ""
+      },
+      {
+        "n": "自棄糞LookupsLookups8/15/2026, 7:04:28 AM",
+        "c": "gx-notebook-item"
+      },
+      {
+        "n": "自棄糞LookupsLookups8/15/2026, 7:04:28 AM",
+        "c": "gx-notebook-item-btn"
+      }
+    ],
+    "unreachable": 0,
+    "unreachableList": []
+  },
+  "routes": {
+    "count": 6,
+    "list": [
+      {
+        "n": "Overview",
+        "role": "tab",
+        "sel": "true"
+      },
+      {
+        "n": "Library",
+        "role": "tab",
+        "sel": "false"
+      },
+      {
+        "n": "Words",
+        "role": "tab",
+        "sel": "false"
+      },
+      {
+        "n": "Translations",
+        "role": "tab",
+        "sel": "false"
+      },
+      {
+        "n": "Highlights",
+        "role": "tab",
+        "sel": "false"
+      },
+      {
+        "n": "Captures",
+        "role": "tab",
+        "sel": "false"
+      }
+    ]
+  },
+  "states": {
+    "empty": false,
+    "loading": false,
+    "error": false,
+    "offline": false,
+    "keywordFormIsAHint": true
+  },
+  "stateBlocks": [
+    {
+      "c": "muted gx-lc-empty",
+      "t": "No scripts yet. Captions are only recorded while capture is on."
+    }
+  ],
+  "textChars": 22872,
+  "domNodes": 3851,
+  "sizeMode": "max",
+  "settle": {
+    "final": "3851/481",
+    "samples": [
+      "3851/481",
+      "3851/481",
+      "3851/481"
+    ],
+    "settled": true,
+    "waitedMs": 1200
+  },
+  "capturedAt": "2026-08-16T21:31:36.8296332+03:00"
+}

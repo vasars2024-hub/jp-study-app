@@ -1,0 +1,381 @@
+{
+  "title": "Reading Finder",
+  "rect": {
+    "x": 128,
+    "y": 84,
+    "w": 260,
+    "h": 170
+  },
+  "maximized": false,
+  "viewport": {
+    "w": 1264,
+    "h": 821,
+    "dpr": 1
+  },
+  "theme": {
+    "dataTheme": "forest-night",
+    "materials": null,
+    "reducedMotion": false,
+    "forcedColors": false
+  },
+  "controls": {
+    "focusable": 33,
+    "byRole": {
+      "button": 22,
+      "tab": 7,
+      "input": 1,
+      "select": 3
+    },
+    "under24": 0,
+    "under24list": [],
+    "under44": 25
+  },
+  "focusOrder": {
+    "count": 33,
+    "inversions": 0,
+    "firstInversionAt": -1,
+    "domOrder": [
+      {
+        "i": 0,
+        "n": "Pop out into its own window",
+        "top": 5,
+        "left": 129
+      },
+      {
+        "i": 1,
+        "n": "Minimize",
+        "top": 5,
+        "left": 161
+      },
+      {
+        "i": 2,
+        "n": "Maximize",
+        "top": 5,
+        "left": 193
+      },
+      {
+        "i": 3,
+        "n": "Close",
+        "top": 5,
+        "left": 225
+      },
+      {
+        "i": 4,
+        "n": "Home",
+        "top": 55,
+        "left": 27
+      },
+      {
+        "i": 5,
+        "n": "Reading Finder",
+        "top": 55,
+        "left": 107
+      },
+      {
+        "i": 6,
+        "n": "Library",
+        "top": 55,
+        "left": 235
+      },
+      {
+        "i": 7,
+        "n": "Continue reading",
+        "top": 55,
+        "left": 318
+      },
+      {
+        "i": 8,
+        "n": "Plan",
+        "top": 55,
+        "left": 458
+      },
+      {
+        "i": 9,
+        "n": "Import",
+        "top": 55,
+        "left": 529
+      },
+      {
+        "i": 10,
+        "n": "Sources",
+        "top": 55,
+        "left": 613
+      },
+      {
+        "i": 11,
+        "n": "Beginner",
+        "top": 225,
+        "left": 62
+      },
+      {
+        "i": 12,
+        "n": "N5",
+        "top": 225,
+        "left": 151
+      },
+      {
+        "i": 13,
+        "n": "N4",
+        "top": 264,
+        "left": 19
+      },
+      {
+        "i": 14,
+        "n": "N3",
+        "top": 264,
+        "left": 72
+      },
+      {
+        "i": 15,
+        "n": "N2",
+        "top": 264,
+        "left": 126
+      },
+      {
+        "i": 16,
+        "n": "N1",
+        "top": 264,
+        "left": 179
+      },
+      {
+        "i": 17,
+        "n": "Advanced",
+        "top": 303,
+        "left": 19
+      },
+      {
+        "i": 18,
+        "n": "Surprise me",
+        "top": 303,
+        "left": 123
+      },
+      {
+        "i": 19,
+        "n": "Find a site…",
+        "top": 346,
+        "left": 19
+      },
+      {
+        "i": 20,
+        "n": "All genresAudioClassicsCultureEssayFanficFol",
+        "top": 411,
+        "left": 19
+      },
+      {
+        "i": 21,
+        "n": "Any lengthShort storySerialFull novel",
+        "top": 473,
+        "left": 19
+      },
+      {
+        "i": 22,
+        "n": "Any priceFreeFreemiumPaid",
+        "top": 473,
+        "left": 132
+      },
+      {
+        "i": 23,
+        "n": "Furigana only",
+        "top": 516,
+        "left": 19
+      },
+      {
+        "i": 24,
+        "n": "Show 18+ sites",
+        "top": 516,
+        "left": 139
+      },
+      {
+        "i": 25,
+        "n": "Tadoku (多読)FreeFree graded readers made spec",
+        "top": 612,
+        "left": 19
+      },
+      {
+        "i": 26,
+        "n": "日本語多読道場FreeGraded readers with narrated audi",
+        "top": 769,
+        "left": 19
+      },
+      {
+        "i": 27,
+        "n": "NHK News Web EasyFreeReal news simplified fo",
+        "top": 906,
+        "left": 19
+      },
+      {
+        "i": 28,
+        "n": "絵本ひろばFreeFree picture books — the gentlest p",
+        "top": 1043,
+        "left": 19
+      },
+      {
+        "i": 29,
+        "n": "福娘童話集FreeA huge archive of Japanese folk tal",
+        "top": 1180,
+        "left": 19
+      },
+      {
+        "i": 30,
+        "n": "Matcha (Easy Japanese)FreemiumA travel and c",
+        "top": 1317,
+        "left": 19
+      },
+      {
+        "i": 31,
+        "n": "Todaii / Easy JapaneseFreeGraded news articl",
+        "top": 1454,
+        "left": 19
+      },
+      {
+        "i": 32,
+        "n": "Satori ReaderFreemiumGraded serial stories w",
+        "top": 1591,
+        "left": 19
+      }
+    ]
+  },
+  "overflow": {
+    "clippedX": 1,
+    "clippedXList": [
+      {
+        "n": "Reading FinderFind Japanese reading matched ",
+        "c": "reading-workspace-panel",
+        "over": 58
+      }
+    ],
+    "scrollersY": 0,
+    "pastWindowFrame": 127,
+    "pastList": [
+      {
+        "n": "Library",
+        "c": "reading-workspace-tab"
+      },
+      {
+        "n": "svg",
+        "c": "[object SVGAnimatedString]"
+      },
+      {
+        "n": "Library",
+        "c": ""
+      },
+      {
+        "n": "Continue reading",
+        "c": "reading-workspace-tab"
+      },
+      {
+        "n": "svg",
+        "c": "[object SVGAnimatedString]"
+      },
+      {
+        "n": "path",
+        "c": "[object SVGAnimatedString]"
+      },
+      {
+        "n": "Continue reading",
+        "c": ""
+      },
+      {
+        "n": "Plan",
+        "c": "reading-workspace-tab"
+      }
+    ],
+    "unreachable": 108,
+    "unreachableList": [
+      {
+        "n": "Reading FinderFind Japanese reading matched ",
+        "c": "view-head"
+      },
+      {
+        "n": "Find Japanese reading matched to your level ",
+        "c": "muted"
+      },
+      {
+        "n": "LevelBeginnerN5N4N3N2N1AdvancedSurprise meGe",
+        "c": "rf-controls"
+      },
+      {
+        "n": "LevelBeginnerN5N4N3N2N1AdvancedSurprise me",
+        "c": "rf-level-row"
+      },
+      {
+        "n": "Level",
+        "c": "rf-level-label"
+      },
+      {
+        "n": "Beginner",
+        "c": "gram-level-btn active"
+      },
+      {
+        "n": "N5",
+        "c": "gram-level-btn active"
+      },
+      {
+        "n": "N4",
+        "c": "gram-level-btn "
+      }
+    ]
+  },
+  "routes": {
+    "count": 7,
+    "list": [
+      {
+        "n": "Home",
+        "role": "tab",
+        "sel": "false"
+      },
+      {
+        "n": "Reading Finder",
+        "role": "tab",
+        "sel": "true"
+      },
+      {
+        "n": "Library",
+        "role": "tab",
+        "sel": "false"
+      },
+      {
+        "n": "Continue reading",
+        "role": "tab",
+        "sel": "false"
+      },
+      {
+        "n": "Plan",
+        "role": "tab",
+        "sel": "false"
+      },
+      {
+        "n": "Import",
+        "role": "tab",
+        "sel": "false"
+      },
+      {
+        "n": "Sources",
+        "role": "tab",
+        "sel": "false"
+      }
+    ]
+  },
+  "states": {
+    "empty": false,
+    "loading": false,
+    "error": false,
+    "offline": false,
+    "keywordFormIsAHint": true
+  },
+  "stateBlocks": [],
+  "textChars": 1345,
+  "domNodes": 175,
+  "sizeMode": "min",
+  "settle": {
+    "waitedMs": 1200,
+    "settled": true,
+    "samples": [
+      "175/33",
+      "175/33",
+      "175/33"
+    ],
+    "final": "175/33"
+  },
+  "capturedAt": "2026-08-16T21:31:08.9785161+03:00"
+}

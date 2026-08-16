@@ -1,0 +1,239 @@
+{
+  "title": "Anki",
+  "rect": {
+    "x": 94,
+    "y": 54,
+    "w": 820,
+    "h": 580
+  },
+  "maximized": false,
+  "viewport": {
+    "w": 1264,
+    "h": 821,
+    "dpr": 1
+  },
+  "theme": {
+    "dataTheme": "forest-night",
+    "materials": null,
+    "reducedMotion": false,
+    "forcedColors": false
+  },
+  "controls": {
+    "focusable": 21,
+    "byRole": {
+      "button": 15,
+      "select": 2,
+      "input": 4
+    },
+    "under24": 1,
+    "under24list": [
+      {
+        "n": "input",
+        "w": 13,
+        "h": 13
+      }
+    ],
+    "under44": 16
+  },
+  "focusOrder": {
+    "count": 21,
+    "inversions": 12,
+    "firstInversionAt": 9,
+    "domOrder": [
+      {
+        "i": 0,
+        "n": "Pop out into its own window",
+        "top": 5,
+        "left": 689
+      },
+      {
+        "i": 1,
+        "n": "Minimize",
+        "top": 5,
+        "left": 721
+      },
+      {
+        "i": 2,
+        "n": "Maximize",
+        "top": 5,
+        "left": 753
+      },
+      {
+        "i": 3,
+        "n": "Close",
+        "top": 5,
+        "left": 785
+      },
+      {
+        "i": 4,
+        "n": "Study profile",
+        "top": 208,
+        "left": 149
+      },
+      {
+        "i": 5,
+        "n": "Create New Profile",
+        "top": 263,
+        "left": 40
+      },
+      {
+        "i": 6,
+        "n": "Reset this built-in profile to its defaults",
+        "top": 263,
+        "left": 193
+      },
+      {
+        "i": 7,
+        "n": "Recheck",
+        "top": 317,
+        "left": 711
+      },
+      {
+        "i": 8,
+        "n": "Deck WorkbenchRead a deck without losing any",
+        "top": 397,
+        "left": 44
+      },
+      {
+        "i": 9,
+        "n": "JP Study::ZH to JP5y56454w54bookChineseCusto",
+        "top": 752,
+        "left": 43
+      },
+      {
+        "i": 10,
+        "n": "Create in Anki",
+        "top": 824,
+        "left": 120
+      },
+      {
+        "i": 11,
+        "n": "Field templates",
+        "top": 1052,
+        "left": 44
+      },
+      {
+        "i": 12,
+        "n": "Leave blank for automatic mapping",
+        "top": 1178,
+        "left": 160
+      },
+      {
+        "i": 13,
+        "n": "Leave blank for automatic mapping",
+        "top": 1221,
+        "left": 160
+      },
+      {
+        "i": 14,
+        "n": "Leave blank for automatic mapping",
+        "top": 1264,
+        "left": 160
+      },
+      {
+        "i": 15,
+        "n": "Reset to automatic",
+        "top": 1313,
+        "left": 134
+      },
+      {
+        "i": 16,
+        "n": "Variable paletteInsert {placeholders} into f",
+        "top": 1382,
+        "left": 44
+      },
+      {
+        "i": 17,
+        "n": "Examples & fallbackAuto-fetch Tatoeba + expr",
+        "top": 1461,
+        "left": 44
+      },
+      {
+        "i": 18,
+        "n": "Card styling (CSS)Customize how mined cards ",
+        "top": 1592,
+        "left": 44
+      },
+      {
+        "i": 19,
+        "n": "Add a card by handManual test without mining",
+        "top": 1713,
+        "left": 44
+      },
+      {
+        "i": 20,
+        "n": "input",
+        "top": 525,
+        "left": 650
+      }
+    ]
+  },
+  "overflow": {
+    "clippedX": 0,
+    "clippedXList": [],
+    "scrollersY": 1,
+    "pastWindowFrame": 82,
+    "pastList": [
+      {
+        "n": "Study profileActive profileChinese gloss on ",
+        "c": "anki-view"
+      },
+      {
+        "n": "Connected — 84 decks, 35 note types.Deck & n",
+        "c": "anki-workspace"
+      },
+      {
+        "n": "Connected — 84 decks, 35 note types.Deck & n",
+        "c": "anki-workspace-main"
+      },
+      {
+        "n": "Deck & note typeBound to Chinese → Japanese ",
+        "c": "anki-card"
+      },
+      {
+        "n": "Deck & note type",
+        "c": ""
+      },
+      {
+        "n": "Bound to Chinese → Japanese — Chinese gloss ",
+        "c": "muted anki-sub"
+      },
+      {
+        "n": "Chinese → Japanese",
+        "c": ""
+      },
+      {
+        "n": "DeckJP Study::ZH to JP5y56454w54bookChineseC",
+        "c": "anki-selects"
+      }
+    ],
+    "unreachable": 0,
+    "unreachableList": []
+  },
+  "routes": {
+    "count": 0,
+    "list": []
+  },
+  "states": {
+    "empty": false,
+    "loading": false,
+    "error": false,
+    "offline": false,
+    "keywordFormIsAHint": true
+  },
+  "stateBlocks": [],
+  "textChars": 7940,
+  "domNodes": 248,
+  "sizeMode": "default",
+  "settle": {
+    "waitedMs": 1200,
+    "settled": true,
+    "samples": [
+      "248/22",
+      "248/22",
+      "248/22"
+    ],
+    "final": "248/22"
+  },
+  "capturedAt": "2026-08-16T21:30:06.7543350+03:00"
+}

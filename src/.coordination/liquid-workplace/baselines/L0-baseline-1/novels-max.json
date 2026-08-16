@@ -1,0 +1,383 @@
+{
+  "title": "Novels",
+  "rect": {
+    "x": 0,
+    "y": 0,
+    "w": 1264,
+    "h": 765
+  },
+  "maximized": true,
+  "viewport": {
+    "w": 1264,
+    "h": 821,
+    "dpr": 1
+  },
+  "theme": {
+    "dataTheme": "forest-night",
+    "materials": null,
+    "reducedMotion": false,
+    "forcedColors": false
+  },
+  "controls": {
+    "focusable": 37,
+    "byRole": {
+      "button": 20,
+      "tab": 7,
+      "input": 2,
+      "select": 7,
+      "textarea": 1
+    },
+    "under24": 1,
+    "under24list": [
+      {
+        "n": "Search title, author, genre, or tag",
+        "w": 366,
+        "h": 19
+      }
+    ],
+    "under44": 30
+  },
+  "focusOrder": {
+    "count": 37,
+    "inversions": 15,
+    "firstInversionAt": 11,
+    "domOrder": [
+      {
+        "i": 0,
+        "n": "Pop out into its own window",
+        "top": 5,
+        "left": 1133
+      },
+      {
+        "i": 1,
+        "n": "Minimize",
+        "top": 5,
+        "left": 1165
+      },
+      {
+        "i": 2,
+        "n": "Maximize",
+        "top": 5,
+        "left": 1197
+      },
+      {
+        "i": 3,
+        "n": "Close",
+        "top": 5,
+        "left": 1229
+      },
+      {
+        "i": 4,
+        "n": "Home",
+        "top": 55,
+        "left": 27
+      },
+      {
+        "i": 5,
+        "n": "Reading Finder",
+        "top": 55,
+        "left": 107
+      },
+      {
+        "i": 6,
+        "n": "Library",
+        "top": 55,
+        "left": 235
+      },
+      {
+        "i": 7,
+        "n": "Continue reading",
+        "top": 55,
+        "left": 318
+      },
+      {
+        "i": 8,
+        "n": "Plan",
+        "top": 55,
+        "left": 458
+      },
+      {
+        "i": 9,
+        "n": "Import",
+        "top": 55,
+        "left": 529
+      },
+      {
+        "i": 10,
+        "n": "Sources",
+        "top": 55,
+        "left": 613
+      },
+      {
+        "i": 11,
+        "n": "Search title, author, genre, or tag",
+        "top": 106,
+        "left": 62
+      },
+      {
+        "i": 12,
+        "n": "Search Jiten",
+        "top": 99,
+        "left": 448
+      },
+      {
+        "i": 13,
+        "n": "Local",
+        "top": 99,
+        "left": 560
+      },
+      {
+        "i": 14,
+        "n": "Plan (6)",
+        "top": 99,
+        "left": 1034
+      },
+      {
+        "i": 15,
+        "n": "Sources",
+        "top": 99,
+        "left": 1106
+      },
+      {
+        "i": 16,
+        "n": "AllJiten novelsJiten web novelsLocal catalog",
+        "top": 181,
+        "left": 32
+      },
+      {
+        "i": 17,
+        "n": "AllBeginnerEasyModerateHardVery HardUnknown",
+        "top": 243,
+        "left": 32
+      },
+      {
+        "i": 18,
+        "n": "AllActionAdult OnlyAdventureChildren'sComedy",
+        "top": 305,
+        "left": 32
+      },
+      {
+        "i": 19,
+        "n": "AnyHas linkDirect EPUB link",
+        "top": 367,
+        "left": 32
+      },
+      {
+        "i": 20,
+        "n": "AnyImportedNot imported",
+        "top": 429,
+        "left": 32
+      },
+      {
+        "i": 21,
+        "n": "AnyAnalyzed or minedNot analyzed",
+        "top": 491,
+        "left": 32
+      },
+      {
+        "i": 22,
+        "n": "DifficultyTitleAuthorSourcePlan status",
+        "top": 553,
+        "left": 32
+      },
+      {
+        "i": 23,
+        "n": "時をかける少女The Girl Who Leapt Through TimeLocalE",
+        "top": 183,
+        "left": 250
+      },
+      {
+        "i": 24,
+        "n": "世界から猫が消えたならIf Cats Disappeared from the Worl",
+        "top": 235,
+        "left": 250
+      },
+      {
+        "i": 25,
+        "n": "GOSICKGosickLocalModeratelinked4",
+        "top": 287,
+        "left": 250
+      },
+      {
+        "i": 26,
+        "n": "遠野物語The Legends of TōnoLocalVery Hardanalyze",
+        "top": 339,
+        "left": 250
+      },
+      {
+        "i": 27,
+        "n": "Remove",
+        "top": 689,
+        "left": 912
+      },
+      {
+        "i": 28,
+        "n": "Open source",
+        "top": 689,
+        "left": 1020
+      },
+      {
+        "i": 29,
+        "n": "Import file",
+        "top": 731,
+        "left": 912
+      },
+      {
+        "i": 30,
+        "n": "Analyze EPUB",
+        "top": 790,
+        "left": 912
+      },
+      {
+        "i": 31,
+        "n": "Find the book · BookWalker",
+        "top": 892,
+        "left": 912
+      },
+      {
+        "i": 32,
+        "n": "Details · Wikipedia",
+        "top": 925,
+        "left": 912
+      },
+      {
+        "i": 33,
+        "n": "Google Books",
+        "top": 925,
+        "left": 1025
+      },
+      {
+        "i": 34,
+        "n": "Aozora search",
+        "top": 958,
+        "left": 912
+      },
+      {
+        "i": 35,
+        "n": "https://example.com/book.epub",
+        "top": 1013,
+        "left": 912
+      },
+      {
+        "i": 36,
+        "n": "Reading plan, edition notes, source reminder",
+        "top": 1073,
+        "left": 912
+      }
+    ]
+  },
+  "overflow": {
+    "clippedX": 0,
+    "clippedXList": [],
+    "scrollersY": 1,
+    "pastWindowFrame": 20,
+    "pastList": [
+      {
+        "n": "RemoveOpen sourceImport fileDownload/import ",
+        "c": "jiten-actions"
+      },
+      {
+        "n": "Import file",
+        "c": "btn"
+      },
+      {
+        "n": "Download/import EPUB",
+        "c": "btn"
+      },
+      {
+        "n": "Analyze EPUB",
+        "c": "btn primary"
+      },
+      {
+        "n": "svg",
+        "c": "[object SVGAnimatedString]"
+      },
+      {
+        "n": "path",
+        "c": "[object SVGAnimatedString]"
+      },
+      {
+        "n": "Jiten vocab mine",
+        "c": "btn"
+      },
+      {
+        "n": "svg",
+        "c": "[object SVGAnimatedString]"
+      }
+    ],
+    "unreachable": 0,
+    "unreachableList": []
+  },
+  "routes": {
+    "count": 9,
+    "list": [
+      {
+        "n": "Home",
+        "role": "tab",
+        "sel": "false"
+      },
+      {
+        "n": "Reading Finder",
+        "role": "tab",
+        "sel": "false"
+      },
+      {
+        "n": "Library",
+        "role": "tab",
+        "sel": "false"
+      },
+      {
+        "n": "Continue reading",
+        "role": "tab",
+        "sel": "false"
+      },
+      {
+        "n": "Plan",
+        "role": "tab",
+        "sel": "true"
+      },
+      {
+        "n": "Import",
+        "role": "tab",
+        "sel": "false"
+      },
+      {
+        "n": "Sources",
+        "role": "tab",
+        "sel": "false"
+      },
+      {
+        "n": "Plan to Read titles",
+        "role": "main",
+        "sel": null
+      },
+      {
+        "n": "TitleSourceDifficultyStatusLinks",
+        "role": "div",
+        "sel": null
+      }
+    ]
+  },
+  "states": {
+    "empty": false,
+    "loading": false,
+    "error": false,
+    "offline": false,
+    "keywordFormIsAHint": true
+  },
+  "stateBlocks": [],
+  "textChars": 1327,
+  "domNodes": 225,
+  "sizeMode": "max",
+  "settle": {
+    "waitedMs": 1200,
+    "settled": true,
+    "samples": [
+      "225/39",
+      "225/39",
+      "225/39"
+    ],
+    "final": "225/39"
+  },
+  "capturedAt": "2026-08-16T21:31:00.7340191+03:00"
+}

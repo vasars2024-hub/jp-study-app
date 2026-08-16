@@ -1,0 +1,20 @@
+[
+  {
+    "section": "city",
+    "title": "city",
+    "openedBySweep": true,
+    "status": "ok",
+    "default": "680x705 foc=8 inv=0 u24=1 u44=7 routes=0 clipX=1 unreach=19 dom=130 settled=True",
+    "min": "260x170 foc=8 inv=2 u24=1 u44=7 routes=0 clipX=1 unreach=81 dom=130 settled=True",
+    "max": "NOT RECORDED"
+  },
+  {
+    "section": "dictionary",
+    "title": "Dictionary",
+    "openedBySweep": true,
+    "status": "ok",
+    "default": "820x580 foc=10 inv=0 u24=2 u44=10 routes=0 clipX=0 unreach=0 dom=38 settled=True",
+    "min": "260x170 foc=10 inv=0 u24=2 u44=10 routes=0 clipX=1 unreach=0 dom=38 settled=True",
+    "max": "1264x765 foc=10 inv=0 u24=2 u44=10 routes=0 clipX=0 unreach=0 dom=35 settled=True"
+  }
+]

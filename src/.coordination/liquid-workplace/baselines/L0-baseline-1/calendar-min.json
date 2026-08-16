@@ -1,0 +1,184 @@
+{
+  "title": "Calendar",
+  "rect": {
+    "x": 128,
+    "y": 84,
+    "w": 260,
+    "h": 170
+  },
+  "maximized": false,
+  "viewport": {
+    "w": 1264,
+    "h": 821,
+    "dpr": 1
+  },
+  "theme": {
+    "dataTheme": "forest-night",
+    "materials": null,
+    "reducedMotion": false,
+    "forcedColors": false
+  },
+  "controls": {
+    "focusable": 13,
+    "byRole": {
+      "button": 12,
+      "input": 1
+    },
+    "under24": 0,
+    "under24list": [],
+    "under44": 12
+  },
+  "focusOrder": {
+    "count": 13,
+    "inversions": 0,
+    "firstInversionAt": -1,
+    "domOrder": [
+      {
+        "i": 0,
+        "n": "Pop out into its own window",
+        "top": 5,
+        "left": 129
+      },
+      {
+        "i": 1,
+        "n": "Minimize",
+        "top": 5,
+        "left": 161
+      },
+      {
+        "i": 2,
+        "n": "Maximize",
+        "top": 5,
+        "left": 193
+      },
+      {
+        "i": 3,
+        "n": "Close",
+        "top": 5,
+        "left": 225
+      },
+      {
+        "i": 4,
+        "n": "New event",
+        "top": 68,
+        "left": 157
+      },
+      {
+        "i": 5,
+        "n": "Month",
+        "top": 244,
+        "left": 44
+      },
+      {
+        "i": 6,
+        "n": "Week",
+        "top": 244,
+        "left": 107
+      },
+      {
+        "i": 7,
+        "n": "Day",
+        "top": 244,
+        "left": 165
+      },
+      {
+        "i": 8,
+        "n": "Agenda",
+        "top": 244,
+        "left": 213
+      },
+      {
+        "i": 9,
+        "n": "Previous",
+        "top": 283,
+        "left": 41
+      },
+      {
+        "i": 10,
+        "n": "Today",
+        "top": 284,
+        "left": 77
+      },
+      {
+        "i": 11,
+        "n": "Next",
+        "top": 283,
+        "left": 140
+      },
+      {
+        "i": 12,
+        "n": "Jump to date",
+        "top": 285,
+        "left": 344
+      }
+    ]
+  },
+  "overflow": {
+    "clippedX": 0,
+    "clippedXList": [],
+    "scrollersY": 1,
+    "pastWindowFrame": 107,
+    "pastList": [
+      {
+        "n": "CalendarStudy sessions, exams, assignments, ",
+        "c": "view-head"
+      },
+      {
+        "n": "CalendarStudy sessions, exams, assignments, ",
+        "c": ""
+      },
+      {
+        "n": "Study sessions, exams, assignments, and remi",
+        "c": "muted"
+      },
+      {
+        "n": "MonthWeekDayAgenda‹Today›August 2026",
+        "c": "cal-toolbar"
+      },
+      {
+        "n": "MonthWeekDayAgenda",
+        "c": "cal-modes"
+      },
+      {
+        "n": "Month",
+        "c": "cal-mode-btn active"
+      },
+      {
+        "n": "Week",
+        "c": "cal-mode-btn "
+      },
+      {
+        "n": "Day",
+        "c": "cal-mode-btn "
+      }
+    ],
+    "unreachable": 0,
+    "unreachableList": []
+  },
+  "routes": {
+    "count": 0,
+    "list": []
+  },
+  "states": {
+    "empty": false,
+    "loading": false,
+    "error": false,
+    "offline": false,
+    "keywordFormIsAHint": true
+  },
+  "stateBlocks": [],
+  "textChars": 271,
+  "domNodes": 168,
+  "sizeMode": "min",
+  "settle": {
+    "final": "168/13",
+    "samples": [
+      "168/13",
+      "168/13",
+      "168/13"
+    ],
+    "settled": true,
+    "waitedMs": 1200
+  },
+  "capturedAt": "2026-08-16T21:32:03.2346750+03:00"
+}

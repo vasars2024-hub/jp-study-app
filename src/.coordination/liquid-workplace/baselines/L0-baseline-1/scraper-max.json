@@ -1,0 +1,573 @@
+{
+  "title": "Scraper",
+  "rect": {
+    "x": 0,
+    "y": 0,
+    "w": 1264,
+    "h": 765
+  },
+  "maximized": true,
+  "viewport": {
+    "w": 1264,
+    "h": 821,
+    "dpr": 1
+  },
+  "theme": {
+    "dataTheme": "forest-night",
+    "materials": null,
+    "reducedMotion": false,
+    "forcedColors": false
+  },
+  "controls": {
+    "focusable": 126,
+    "byRole": {
+      "button": 93,
+      "combobox": 1,
+      "input": 3,
+      "select": 1,
+      "tab": 3,
+      "row": 25
+    },
+    "under24": 57,
+    "under24list": [
+      {
+        "n": "input",
+        "w": 13,
+        "h": 13
+      },
+      {
+        "n": "1 planned",
+        "w": 75,
+        "h": 20
+      },
+      {
+        "n": "Search the catalogue",
+        "w": 923,
+        "h": 18
+      },
+      {
+        "n": "input",
+        "w": 13,
+        "h": 13
+      },
+      {
+        "n": "Download BLEACH: Thousand-Year Blood War - T",
+        "w": 18,
+        "h": 18
+      },
+      {
+        "n": "Shortlist BLEACH: Thousand-Year Blood War - ",
+        "w": 18,
+        "h": 18
+      },
+      {
+        "n": "Download Saga of Tanya the Evil Season 2",
+        "w": 18,
+        "h": 18
+      },
+      {
+        "n": "Shortlist Saga of Tanya the Evil Season 2",
+        "w": 18,
+        "h": 18
+      },
+      {
+        "n": "Download Trapped in a Dating Sim: The World ",
+        "w": 18,
+        "h": 18
+      },
+      {
+        "n": "Shortlist Trapped in a Dating Sim: The World",
+        "w": 18,
+        "h": 18
+      },
+      {
+        "n": "Download From Old Country Bumpkin to Master ",
+        "w": 18,
+        "h": 18
+      },
+      {
+        "n": "Shortlist From Old Country Bumpkin to Master",
+        "w": 18,
+        "h": 18
+      }
+    ],
+    "under44": 101
+  },
+  "focusOrder": {
+    "count": 126,
+    "inversions": 101,
+    "firstInversionAt": 16,
+    "domOrder": [
+      {
+        "i": 0,
+        "n": "Pop out into its own window",
+        "top": 5,
+        "left": 1133
+      },
+      {
+        "i": 1,
+        "n": "Minimize",
+        "top": 5,
+        "left": 1165
+      },
+      {
+        "i": 2,
+        "n": "Maximize",
+        "top": 5,
+        "left": 1197
+      },
+      {
+        "i": 3,
+        "n": "Close",
+        "top": 5,
+        "left": 1229
+      },
+      {
+        "i": 4,
+        "n": "Toggle navigation",
+        "top": 59,
+        "left": 159
+      },
+      {
+        "i": 5,
+        "n": "Search the scraper",
+        "top": 58,
+        "left": 193
+      },
+      {
+        "i": 6,
+        "n": "New Scrape",
+        "top": 59,
+        "left": 914
+      },
+      {
+        "i": 7,
+        "n": "Profiles",
+        "top": 59,
+        "left": 1029
+      },
+      {
+        "i": 8,
+        "n": "Scrape history",
+        "top": 59,
+        "left": 1117
+      },
+      {
+        "i": 9,
+        "n": "Advanced settings",
+        "top": 59,
+        "left": 1147
+      },
+      {
+        "i": 10,
+        "n": "Advanced controls shown",
+        "top": 59,
+        "left": 1177
+      },
+      {
+        "i": 11,
+        "n": "Switch to compact window",
+        "top": 59,
+        "left": 1207
+      },
+      {
+        "i": 12,
+        "n": "Dashboard",
+        "top": 106,
+        "left": 27
+      },
+      {
+        "i": 13,
+        "n": "New Scrape",
+        "top": 132,
+        "left": 27
+      },
+      {
+        "i": 14,
+        "n": "Discover",
+        "top": 158,
+        "left": 27
+      },
+      {
+        "i": 15,
+        "n": "History",
+        "top": 184,
+        "left": 27
+      },
+      {
+        "i": 16,
+        "n": "Source Manager",
+        "top": 210,
+        "left": 27
+      },
+      {
+        "i": 17,
+        "n": "Torrent Manager",
+        "top": 236,
+        "left": 27
+      },
+      {
+        "i": 18,
+        "n": "Profiles",
+        "top": 262,
+        "left": 27
+      },
+      {
+        "i": 19,
+        "n": "Scheduled Tasks",
+        "top": 288,
+        "left": 27
+      },
+      {
+        "i": 20,
+        "n": "Site Rules",
+        "top": 314,
+        "left": 27
+      },
+      {
+        "i": 21,
+        "n": "Plugins",
+        "top": 340,
+        "left": 27
+      },
+      {
+        "i": 22,
+        "n": "Results",
+        "top": 380,
+        "left": 27
+      },
+      {
+        "i": 23,
+        "n": "Downloads",
+        "top": 406,
+        "left": 27
+      },
+      {
+        "i": 24,
+        "n": "Exports",
+        "top": 432,
+        "left": 27
+      },
+      {
+        "i": 25,
+        "n": "Selector Tester",
+        "top": 472,
+        "left": 27
+      },
+      {
+        "i": 26,
+        "n": "Regex Tester",
+        "top": 498,
+        "left": 27
+      },
+      {
+        "i": 27,
+        "n": "HTTP Inspector",
+        "top": 524,
+        "left": 27
+      },
+      {
+        "i": 28,
+        "n": "Script Console",
+        "top": 550,
+        "left": 27
+      },
+      {
+        "i": 29,
+        "n": "input",
+        "top": 186,
+        "left": 859
+      },
+      {
+        "i": 30,
+        "n": "Next 24 hours",
+        "top": 182,
+        "left": 988
+      },
+      {
+        "i": 31,
+        "n": "Load schedule",
+        "top": 182,
+        "left": 1094
+      },
+      {
+        "i": 32,
+        "n": "1 planned",
+        "top": 243,
+        "left": 1144
+      },
+      {
+        "i": 33,
+        "n": "Scrape",
+        "top": 284,
+        "left": 299
+      },
+      {
+        "i": 34,
+        "n": "Remove",
+        "top": 284,
+        "left": 372
+      },
+      {
+        "i": 35,
+        "n": "Search the catalogue",
+        "top": 488,
+        "left": 118
+      },
+      {
+        "i": 36,
+        "n": "Refresh",
+        "top": 481,
+        "left": 1133
+      },
+      {
+        "i": 37,
+        "n": "Anime",
+        "top": 522,
+        "left": 88
+      },
+      {
+        "i": 38,
+        "n": "Manga",
+        "top": 522,
+        "left": 147
+      },
+      {
+        "i": 39,
+        "n": "This season",
+        "top": 522,
+        "left": 222
+      }
+    ]
+  },
+  "overflow": {
+    "clippedX": 15,
+    "clippedXList": [
+      {
+        "n": "Scraper sections",
+        "c": "scr-rail is-collapsed",
+        "over": 19
+      },
+      {
+        "n": "BLEACH: Thousand-Year Blood War - The Calami",
+        "c": "",
+        "over": 18
+      },
+      {
+        "n": "Trapped in a Dating Sim: The World of Otome ",
+        "c": "",
+        "over": 201
+      },
+      {
+        "n": "From Old Country Bumpkin to Master Swordsman",
+        "c": "",
+        "over": 28
+      },
+      {
+        "n": "I Became a Legend After My 10 Year-Long Last",
+        "c": "",
+        "over": 31
+      },
+      {
+        "n": "ここは俺に任せて先に行けと言ってから１０年がたったら伝説になっていた。",
+        "c": "",
+        "over": 106
+      },
+      {
+        "n": "Mushoku Tensei: Jobless Reincarnation Season",
+        "c": "",
+        "over": 7
+      },
+      {
+        "n": "The 100 Girlfriends Who Really, Really, Real",
+        "c": "",
+        "over": 186
+      }
+    ],
+    "scrollersY": 1,
+    "pastWindowFrame": 472,
+    "pastList": [
+      {
+        "n": "DiscoverFind anime worth studying, then hand",
+        "c": "scr-page scr-page--discover"
+      },
+      {
+        "n": "SearchRefreshAnimeMangaThis seasonAiring now",
+        "c": "disc-view scr-discover-host"
+      },
+      {
+        "n": "#TitleMatchLevelFormatEpisodesRating1BLEACH:",
+        "c": "disc-body"
+      },
+      {
+        "n": "#TitleMatchLevelFormatEpisodesRating1BLEACH:",
+        "c": "disc-main"
+      },
+      {
+        "n": "Discovery results",
+        "c": "disc-table"
+      },
+      {
+        "n": "3Trapped in a Dating Sim: The World of Otome",
+        "c": "disc-row "
+      },
+      {
+        "n": "Trapped in a Dating Sim: The World of Otome ",
+        "c": "disc-cell-title"
+      },
+      {
+        "n": "乙女ゲー世界はモブに厳しい世界です2",
+        "c": ""
+      }
+    ],
+    "unreachable": 0,
+    "unreachableList": []
+  },
+  "routes": {
+    "count": 23,
+    "list": [
+      {
+        "n": "Dashboard",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "New Scrape",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Discover",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "History",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Source Manager",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Torrent Manager",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Profiles",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Scheduled Tasks",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Site Rules",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Plugins",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Results",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Downloads",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Exports",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Selector Tester",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Regex Tester",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "HTTP Inspector",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Script Console",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "DiscoverYouTubeShortlist1",
+        "role": "tablist",
+        "sel": null
+      },
+      {
+        "n": "Discover",
+        "role": "tab",
+        "sel": "true"
+      },
+      {
+        "n": "YouTube",
+        "role": "tab",
+        "sel": "false"
+      },
+      {
+        "n": "Shortlist1",
+        "role": "tab",
+        "sel": "false"
+      },
+      {
+        "n": "1",
+        "role": "span",
+        "sel": null
+      },
+      {
+        "n": "Discovery results",
+        "role": "table",
+        "sel": null
+      }
+    ]
+  },
+  "states": {
+    "empty": false,
+    "loading": false,
+    "error": false,
+    "offline": false,
+    "keywordFormIsAHint": true
+  },
+  "stateBlocks": [
+    {
+      "c": "disc-inspector disc-inspector-empty",
+      "t": "Select a title to see why it was recommended."
+    }
+  ],
+  "textChars": 2812,
+  "domNodes": 822,
+  "sizeMode": "max",
+  "settle": {
+    "waitedMs": 1200,
+    "settled": true,
+    "samples": [
+      "822/130",
+      "822/130",
+      "822/130"
+    ],
+    "final": "822/130"
+  },
+  "capturedAt": "2026-08-16T21:30:52.6621069+03:00"
+}

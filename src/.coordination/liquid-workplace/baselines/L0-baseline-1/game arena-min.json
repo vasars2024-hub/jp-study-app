@@ -1,0 +1,242 @@
+{
+  "title": "Game Arena",
+  "rect": {
+    "x": 128,
+    "y": 84,
+    "w": 260,
+    "h": 170
+  },
+  "maximized": false,
+  "viewport": {
+    "w": 1264,
+    "h": 821,
+    "dpr": 1
+  },
+  "theme": {
+    "dataTheme": "forest-night",
+    "materials": null,
+    "reducedMotion": false,
+    "forcedColors": false
+  },
+  "controls": {
+    "focusable": 21,
+    "byRole": {
+      "button": 21
+    },
+    "under24": 0,
+    "under24list": [],
+    "under44": 5
+  },
+  "focusOrder": {
+    "count": 21,
+    "inversions": 7,
+    "firstInversionAt": 14,
+    "domOrder": [
+      {
+        "i": 0,
+        "n": "Pop out into its own window",
+        "top": 5,
+        "left": 129
+      },
+      {
+        "i": 1,
+        "n": "Minimize",
+        "top": 5,
+        "left": 161
+      },
+      {
+        "i": 2,
+        "n": "Maximize",
+        "top": 5,
+        "left": 193
+      },
+      {
+        "i": 3,
+        "n": "Close",
+        "top": 5,
+        "left": 225
+      },
+      {
+        "i": 4,
+        "n": "Settings",
+        "top": 222,
+        "left": 118
+      },
+      {
+        "i": 5,
+        "n": "Sentence BuilderRebuild the Japanese sentenc",
+        "top": 283,
+        "left": 44
+      },
+      {
+        "i": 6,
+        "n": "Speed TypeType the Japanese answer with kana",
+        "top": 350,
+        "left": 44
+      },
+      {
+        "i": 7,
+        "n": "Word Match RushPair Japanese words with thei",
+        "top": 417,
+        "left": 44
+      },
+      {
+        "i": 8,
+        "n": "Kana SprintPick the romaji for kana prompts.",
+        "top": 483,
+        "left": 44
+      },
+      {
+        "i": 9,
+        "n": "Kanji Reading AttackChoose the reading of a ",
+        "top": 550,
+        "left": 44
+      },
+      {
+        "i": 10,
+        "n": "Cloze BlitzFill the blank in a Japanese sent",
+        "top": 617,
+        "left": 44
+      },
+      {
+        "i": 11,
+        "n": "Listening FlashHear Japanese, then pick the ",
+        "top": 684,
+        "left": 44
+      },
+      {
+        "i": 12,
+        "n": "Particle PanicChoose the particle that makes",
+        "top": 750,
+        "left": 44
+      },
+      {
+        "i": 13,
+        "n": "Counter QuizPick the correct counter for the",
+        "top": 817,
+        "left": 44
+      },
+      {
+        "i": 14,
+        "n": "Reverse RecallRead Japanese and type the mea",
+        "top": 884,
+        "left": 44
+      },
+      {
+        "i": 15,
+        "n": "Space InvadersOpen-source pygame Space Invad",
+        "top": 951,
+        "left": 44
+      },
+      {
+        "i": 16,
+        "n": "LanderSimA compact Lunar Lander physics sim ",
+        "top": 1018,
+        "left": 44
+      },
+      {
+        "i": 17,
+        "n": "Dr. CapsuleA capsule-matching bottle puzzle ",
+        "top": 1084,
+        "left": 44
+      },
+      {
+        "i": 18,
+        "n": "MinesweeperRecursive Minesweeper board logic",
+        "top": 1151,
+        "left": 44
+      },
+      {
+        "i": 19,
+        "n": "Mirror WritingWrite from an idea map and sub",
+        "top": 1218,
+        "left": 44
+      },
+      {
+        "i": 20,
+        "n": "Start round",
+        "top": 876,
+        "left": 272
+      }
+    ]
+  },
+  "overflow": {
+    "clippedX": 2,
+    "clippedXList": [
+      {
+        "n": "PracticeGame ArenaFast local drills plus Mir",
+        "c": "fwin-body   ",
+        "over": 38
+      },
+      {
+        "n": "Kanji Reading Attack",
+        "c": "",
+        "over": 2
+      }
+    ],
+    "scrollersY": 3,
+    "pastWindowFrame": 116,
+    "pastList": [
+      {
+        "n": "PracticeGame ArenaFast local drills plus Mir",
+        "c": "game-arena-top"
+      },
+      {
+        "n": "PracticeGame ArenaFast local drills plus Mir",
+        "c": ""
+      },
+      {
+        "n": "Fast local drills plus Mirror Writing evalua",
+        "c": "muted"
+      },
+      {
+        "n": "Game progress",
+        "c": "game-arena-progress"
+      },
+      {
+        "n": "0 XP",
+        "c": ""
+      },
+      {
+        "n": "0 streak",
+        "c": ""
+      },
+      {
+        "n": "0 badges",
+        "c": ""
+      },
+      {
+        "n": "Settings",
+        "c": "btn small"
+      }
+    ],
+    "unreachable": 0,
+    "unreachableList": []
+  },
+  "routes": {
+    "count": 0,
+    "list": []
+  },
+  "states": {
+    "empty": false,
+    "loading": false,
+    "error": false,
+    "offline": false,
+    "keywordFormIsAHint": true
+  },
+  "stateBlocks": [],
+  "textChars": 1416,
+  "domNodes": 142,
+  "sizeMode": "min",
+  "settle": {
+    "final": "142/21",
+    "samples": [
+      "142/21",
+      "142/21",
+      "142/21"
+    ],
+    "settled": true,
+    "waitedMs": 1200
+  },
+  "capturedAt": "2026-08-16T21:31:44.8194358+03:00"
+}

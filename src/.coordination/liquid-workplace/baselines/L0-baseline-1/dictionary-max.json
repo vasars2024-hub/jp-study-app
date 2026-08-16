@@ -1,0 +1,144 @@
+{
+  "title": "Dictionary",
+  "rect": {
+    "x": 0,
+    "y": 0,
+    "w": 1264,
+    "h": 765
+  },
+  "maximized": true,
+  "viewport": {
+    "w": 1264,
+    "h": 821,
+    "dpr": 1
+  },
+  "theme": {
+    "dataTheme": "forest-night",
+    "materials": null,
+    "reducedMotion": false,
+    "forcedColors": false
+  },
+  "controls": {
+    "focusable": 10,
+    "byRole": {
+      "button": 6,
+      "input": 4
+    },
+    "under24": 2,
+    "under24list": [
+      {
+        "n": "input",
+        "w": 13,
+        "h": 13
+      },
+      {
+        "n": "input",
+        "w": 13,
+        "h": 13
+      }
+    ],
+    "under44": 10
+  },
+  "focusOrder": {
+    "count": 10,
+    "inversions": 0,
+    "firstInversionAt": -1,
+    "domOrder": [
+      {
+        "i": 0,
+        "n": "Pop out into its own window",
+        "top": 5,
+        "left": 1133
+      },
+      {
+        "i": 1,
+        "n": "Minimize",
+        "top": 5,
+        "left": 1165
+      },
+      {
+        "i": 2,
+        "n": "Maximize",
+        "top": 5,
+        "left": 1197
+      },
+      {
+        "i": 3,
+        "n": "Close",
+        "top": 5,
+        "left": 1229
+      },
+      {
+        "i": 4,
+        "n": "日本語",
+        "top": 50,
+        "left": 1114
+      },
+      {
+        "i": 5,
+        "n": "中文",
+        "top": 50,
+        "left": 1189
+      },
+      {
+        "i": 6,
+        "n": "Type a word, e.g. 食べる or “eat”…",
+        "top": 115,
+        "left": 19
+      },
+      {
+        "i": 7,
+        "n": "Filter notes",
+        "top": 250,
+        "left": 34
+      },
+      {
+        "i": 8,
+        "n": "input",
+        "top": 260,
+        "left": 982
+      },
+      {
+        "i": 9,
+        "n": "input",
+        "top": 260,
+        "left": 1134
+      }
+    ]
+  },
+  "overflow": {
+    "clippedX": 0,
+    "clippedXList": [],
+    "scrollersY": 0,
+    "pastWindowFrame": 0,
+    "pastList": [],
+    "unreachable": 0,
+    "unreachableList": []
+  },
+  "routes": {
+    "count": 0,
+    "list": []
+  },
+  "states": {
+    "empty": false,
+    "loading": false,
+    "error": false,
+    "offline": false,
+    "keywordFormIsAHint": true
+  },
+  "stateBlocks": [],
+  "textChars": 251,
+  "domNodes": 35,
+  "sizeMode": "max",
+  "settle": {
+    "settled": true,
+    "samples": [
+      "35/11",
+      "35/11",
+      "35/11"
+    ],
+    "final": "35/11",
+    "waitedMs": 1200
+  },
+  "capturedAt": "2026-08-16T21:34:03.7557695+03:00"
+}

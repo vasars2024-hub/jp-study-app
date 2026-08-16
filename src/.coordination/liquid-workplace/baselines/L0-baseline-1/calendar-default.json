@@ -1,0 +1,184 @@
+{
+  "title": "Calendar",
+  "rect": {
+    "x": 128,
+    "y": 84,
+    "w": 820,
+    "h": 580
+  },
+  "maximized": false,
+  "viewport": {
+    "w": 1264,
+    "h": 821,
+    "dpr": 1
+  },
+  "theme": {
+    "dataTheme": "forest-night",
+    "materials": null,
+    "reducedMotion": false,
+    "forcedColors": false
+  },
+  "controls": {
+    "focusable": 13,
+    "byRole": {
+      "button": 12,
+      "input": 1
+    },
+    "under24": 0,
+    "under24list": [],
+    "under44": 13
+  },
+  "focusOrder": {
+    "count": 13,
+    "inversions": 7,
+    "firstInversionAt": 5,
+    "domOrder": [
+      {
+        "i": 0,
+        "n": "Pop out into its own window",
+        "top": 5,
+        "left": 689
+      },
+      {
+        "i": 1,
+        "n": "Minimize",
+        "top": 5,
+        "left": 721
+      },
+      {
+        "i": 2,
+        "n": "Maximize",
+        "top": 5,
+        "left": 753
+      },
+      {
+        "i": 3,
+        "n": "Close",
+        "top": 5,
+        "left": 785
+      },
+      {
+        "i": 4,
+        "n": "New event",
+        "top": 68,
+        "left": 652
+      },
+      {
+        "i": 5,
+        "n": "Month",
+        "top": 168,
+        "left": 44
+      },
+      {
+        "i": 6,
+        "n": "Week",
+        "top": 168,
+        "left": 107
+      },
+      {
+        "i": 7,
+        "n": "Day",
+        "top": 168,
+        "left": 165
+      },
+      {
+        "i": 8,
+        "n": "Agenda",
+        "top": 168,
+        "left": 213
+      },
+      {
+        "i": 9,
+        "n": "Previous",
+        "top": 167,
+        "left": 350
+      },
+      {
+        "i": 10,
+        "n": "Today",
+        "top": 168,
+        "left": 386
+      },
+      {
+        "i": 11,
+        "n": "Next",
+        "top": 167,
+        "left": 449
+      },
+      {
+        "i": 12,
+        "n": "Jump to date",
+        "top": 169,
+        "left": 653
+      }
+    ]
+  },
+  "overflow": {
+    "clippedX": 0,
+    "clippedXList": [],
+    "scrollersY": 1,
+    "pastWindowFrame": 36,
+    "pastList": [
+      {
+        "n": "SMTWTFS2627282930311234567891011121314151617",
+        "c": "cal-month-grid"
+      },
+      {
+        "n": "16",
+        "c": "cal-month-cell  today"
+      },
+      {
+        "n": "17",
+        "c": "cal-month-cell  "
+      },
+      {
+        "n": "18",
+        "c": "cal-month-cell  "
+      },
+      {
+        "n": "19",
+        "c": "cal-month-cell  "
+      },
+      {
+        "n": "20",
+        "c": "cal-month-cell  "
+      },
+      {
+        "n": "21",
+        "c": "cal-month-cell  "
+      },
+      {
+        "n": "22",
+        "c": "cal-month-cell  "
+      }
+    ],
+    "unreachable": 0,
+    "unreachableList": []
+  },
+  "routes": {
+    "count": 0,
+    "list": []
+  },
+  "states": {
+    "empty": false,
+    "loading": false,
+    "error": false,
+    "offline": false,
+    "keywordFormIsAHint": true
+  },
+  "stateBlocks": [],
+  "textChars": 271,
+  "domNodes": 168,
+  "sizeMode": "default",
+  "settle": {
+    "final": "168/13",
+    "samples": [
+      "168/13",
+      "168/13",
+      "168/13"
+    ],
+    "settled": true,
+    "waitedMs": 1200
+  },
+  "capturedAt": "2026-08-16T21:32:01.4826061+03:00"
+}

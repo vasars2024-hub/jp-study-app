@@ -1,0 +1,358 @@
+{
+  "title": "Resources",
+  "rect": {
+    "x": 128,
+    "y": 84,
+    "w": 820,
+    "h": 580
+  },
+  "maximized": false,
+  "viewport": {
+    "w": 1264,
+    "h": 821,
+    "dpr": 1
+  },
+  "theme": {
+    "dataTheme": "forest-night",
+    "materials": null,
+    "reducedMotion": false,
+    "forcedColors": false
+  },
+  "controls": {
+    "focusable": 77,
+    "byRole": {
+      "button": 76,
+      "input": 1
+    },
+    "under24": 2,
+    "under24list": [
+      {
+        "n": "https://github.com/Artikash/Textractor/relea",
+        "w": 154,
+        "h": 20
+      },
+      {
+        "n": "Remove",
+        "w": 22,
+        "h": 22
+      }
+    ],
+    "under44": 17
+  },
+  "focusOrder": {
+    "count": 77,
+    "inversions": 2,
+    "firstInversionAt": 12,
+    "domOrder": [
+      {
+        "i": 0,
+        "n": "Pop out into its own window",
+        "top": 5,
+        "left": 689
+      },
+      {
+        "i": 1,
+        "n": "Minimize",
+        "top": 5,
+        "left": 721
+      },
+      {
+        "i": 2,
+        "n": "Maximize",
+        "top": 5,
+        "left": 753
+      },
+      {
+        "i": 3,
+        "n": "Close",
+        "top": 5,
+        "left": 785
+      },
+      {
+        "i": 4,
+        "n": "All",
+        "top": 115,
+        "left": 19
+      },
+      {
+        "i": 5,
+        "n": "Dictionaries & lookup",
+        "top": 115,
+        "left": 71
+      },
+      {
+        "i": 6,
+        "n": "Kanji & vocab (SRS)",
+        "top": 115,
+        "left": 234
+      },
+      {
+        "i": 7,
+        "n": "Grammar references",
+        "top": 115,
+        "left": 385
+      },
+      {
+        "i": 8,
+        "n": "Reading practice",
+        "top": 115,
+        "left": 541
+      },
+      {
+        "i": 9,
+        "n": "Listening & video",
+        "top": 154,
+        "left": 19
+      },
+      {
+        "i": 10,
+        "n": "Immersion tools",
+        "top": 154,
+        "left": 157
+      },
+      {
+        "i": 11,
+        "n": "Practice & community",
+        "top": 154,
+        "left": 289
+      },
+      {
+        "i": 12,
+        "n": "Fetch the latest catalogue",
+        "top": 201,
+        "left": 60
+      },
+      {
+        "i": 13,
+        "n": "Search resources…",
+        "top": 199,
+        "left": 159
+      },
+      {
+        "i": 14,
+        "n": "Sapphire — Flashcards & SRS",
+        "top": 893,
+        "left": 19
+      },
+      {
+        "i": 15,
+        "n": "Ruby — Kanji & writing",
+        "top": 893,
+        "left": 280
+      },
+      {
+        "i": 16,
+        "n": "Emerald — Grammar",
+        "top": 893,
+        "left": 542
+      },
+      {
+        "i": 17,
+        "n": "Amber — Listening & audio",
+        "top": 1079,
+        "left": 19
+      },
+      {
+        "i": 18,
+        "n": "Opal — Reading & immersion",
+        "top": 1079,
+        "left": 280
+      },
+      {
+        "i": 19,
+        "n": "Jade — Chinese",
+        "top": 1079,
+        "left": 542
+      },
+      {
+        "i": 20,
+        "n": "Amethyst — Russian",
+        "top": 1265,
+        "left": 19
+      },
+      {
+        "i": 21,
+        "n": "Pearl — Absolute beginner path",
+        "top": 1265,
+        "left": 280
+      },
+      {
+        "i": 22,
+        "n": "Topaz — Output & speaking",
+        "top": 1265,
+        "left": 542
+      },
+      {
+        "i": 23,
+        "n": "Obsidian — Tools & tech",
+        "top": 1451,
+        "left": 19
+      },
+      {
+        "i": 24,
+        "n": "https://github.com/Artikash/Textractor/relea",
+        "top": 1719,
+        "left": 35
+      },
+      {
+        "i": 25,
+        "n": "Remove",
+        "top": 1718,
+        "left": 361
+      },
+      {
+        "i": 26,
+        "n": "Added from the Obsidian bundle setup: Downlo",
+        "top": 1748,
+        "left": 35
+      },
+      {
+        "i": 27,
+        "n": "JimakuFreeCommunity-run archive of Japanese ",
+        "top": 1902,
+        "left": 19
+      },
+      {
+        "i": 28,
+        "n": "YomitanFreeActively maintained pop-up dictio",
+        "top": 1902,
+        "left": 411
+      },
+      {
+        "i": 29,
+        "n": "JLFreeFast Windows pop-up dictionary for VNs",
+        "top": 2034,
+        "left": 19
+      },
+      {
+        "i": 30,
+        "n": "JP Mining Note (JPMN)FreeA polished, feature",
+        "top": 2034,
+        "left": 411
+      },
+      {
+        "i": 31,
+        "n": "ッツ Ebook ReaderFreeBrowser EPUB reader tuned",
+        "top": 2166,
+        "left": 19
+      },
+      {
+        "i": 32,
+        "n": "asbplayerFreeSubtitle-synced immersion + sen",
+        "top": 2166,
+        "left": 411
+      },
+      {
+        "i": 33,
+        "n": "owocrFreeOn-demand OCR pipeline for reading ",
+        "top": 2298,
+        "left": 19
+      },
+      {
+        "i": 34,
+        "n": "Lute v3FreeSelf-hosted \"learning using texts",
+        "top": 2298,
+        "left": 411
+      },
+      {
+        "i": 35,
+        "n": "MementoFreeA video player with a built-in po",
+        "top": 2430,
+        "left": 19
+      },
+      {
+        "i": 36,
+        "n": "MokuroFreeOCR manga into hoverable text you ",
+        "top": 2430,
+        "left": 411
+      },
+      {
+        "i": 37,
+        "n": "exSTATicFreeTrack immersion stats (character",
+        "top": 2562,
+        "left": 19
+      },
+      {
+        "i": 38,
+        "n": "Heavenly PathFreeThe community-favorite road",
+        "top": 2562,
+        "left": 411
+      },
+      {
+        "i": 39,
+        "n": "MigakuPaidAll-in-one paid immersion suite (b",
+        "top": 2694,
+        "left": 19
+      }
+    ]
+  },
+  "overflow": {
+    "clippedX": 0,
+    "clippedXList": [],
+    "scrollersY": 1,
+    "pastWindowFrame": 832,
+    "pastList": [
+      {
+        "n": "A hand-picked directory of the best places t",
+        "c": "res-view"
+      },
+      {
+        "n": "Learners by country",
+        "c": "heatmap-section"
+      },
+      {
+        "n": "div",
+        "c": "heatmap-svg-wrap"
+      },
+      {
+        "n": "Learners in 2 countries · 22 total",
+        "c": "[object SVGAnimatedString]"
+      },
+      {
+        "n": "path",
+        "c": "[object SVGAnimatedString]"
+      },
+      {
+        "n": "path",
+        "c": "[object SVGAnimatedString]"
+      },
+      {
+        "n": "path",
+        "c": "[object SVGAnimatedString]"
+      },
+      {
+        "n": "path",
+        "c": "[object SVGAnimatedString]"
+      }
+    ],
+    "unreachable": 0,
+    "unreachableList": []
+  },
+  "routes": {
+    "count": 0,
+    "list": []
+  },
+  "states": {
+    "empty": false,
+    "loading": false,
+    "error": false,
+    "offline": true,
+    "keywordFormIsAHint": true
+  },
+  "stateBlocks": [],
+  "textChars": 9455,
+  "domNodes": 935,
+  "sizeMode": "default",
+  "settle": {
+    "final": "935/77",
+    "samples": [
+      "677/77",
+      "935/77",
+      "935/77",
+      "935/77"
+    ],
+    "settled": true,
+    "waitedMs": 1600
+  },
+  "capturedAt": "2026-08-16T21:32:11.1343239+03:00"
+}

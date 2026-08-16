@@ -1,0 +1,375 @@
+{
+  "title": "Music",
+  "rect": {
+    "x": 128,
+    "y": 84,
+    "w": 260,
+    "h": 170
+  },
+  "maximized": false,
+  "viewport": {
+    "w": 1264,
+    "h": 821,
+    "dpr": 1
+  },
+  "theme": {
+    "dataTheme": "forest-night",
+    "materials": null,
+    "reducedMotion": false,
+    "forcedColors": false
+  },
+  "controls": {
+    "focusable": 27,
+    "byRole": {
+      "button": 22,
+      "input": 4,
+      "select": 1
+    },
+    "under24": 3,
+    "under24list": [
+      {
+        "n": "Search songs, artists, albums…",
+        "w": 151,
+        "h": 19
+      },
+      {
+        "n": "Search songs",
+        "w": 193,
+        "h": 21
+      },
+      {
+        "n": "Volume",
+        "w": 80,
+        "h": 16
+      }
+    ],
+    "under44": 27
+  },
+  "focusOrder": {
+    "count": 27,
+    "inversions": 21,
+    "firstInversionAt": 4,
+    "domOrder": [
+      {
+        "i": 0,
+        "n": "Pop out into its own window",
+        "top": 5,
+        "left": 129
+      },
+      {
+        "i": 1,
+        "n": "Minimize",
+        "top": 5,
+        "left": 161
+      },
+      {
+        "i": 2,
+        "n": "Maximize",
+        "top": 5,
+        "left": 193
+      },
+      {
+        "i": 3,
+        "n": "Close",
+        "top": 5,
+        "left": 225
+      },
+      {
+        "i": 4,
+        "n": "Your media at a glance (Ctrl+1)",
+        "top": 105,
+        "left": 8
+      },
+      {
+        "i": 5,
+        "n": "All local media (Ctrl+2)",
+        "top": 148,
+        "left": 8
+      },
+      {
+        "i": 6,
+        "n": "Immersion player (Ctrl+3)",
+        "top": 191,
+        "left": 8
+      },
+      {
+        "i": 7,
+        "n": "Listening room (Ctrl+4)",
+        "top": 234,
+        "left": 8
+      },
+      {
+        "i": 8,
+        "n": "Mine and review (Ctrl+5)",
+        "top": 277,
+        "left": 8
+      },
+      {
+        "i": 9,
+        "n": "MAL + AniList (Ctrl+6)",
+        "top": 320,
+        "left": 8
+      },
+      {
+        "i": 10,
+        "n": "Media workspaceLibrary",
+        "top": 369,
+        "left": 8
+      },
+      {
+        "i": 11,
+        "n": "Media SettingsPlayback and sources",
+        "top": 419,
+        "left": 8
+      },
+      {
+        "i": 12,
+        "n": "Search songs, artists, albums…",
+        "top": 46,
+        "left": 171
+      },
+      {
+        "i": 13,
+        "n": "Detach player",
+        "top": 179,
+        "left": 73
+      },
+      {
+        "i": 14,
+        "n": "Detach mini-player",
+        "top": 215,
+        "left": 73
+      },
+      {
+        "i": 15,
+        "n": "Album names included in search",
+        "top": 273,
+        "left": 256
+      },
+      {
+        "i": 16,
+        "n": "Show liked only",
+        "top": 273,
+        "left": 286
+      },
+      {
+        "i": 17,
+        "n": "Search songs",
+        "top": 330,
+        "left": 111
+      },
+      {
+        "i": 18,
+        "n": "Recently playedTitleArtistFolder",
+        "top": 367,
+        "left": 112
+      },
+      {
+        "i": 19,
+        "n": "Video or audio link → download…",
+        "top": 516,
+        "left": 82
+      },
+      {
+        "i": 20,
+        "n": "Shuffle",
+        "top": 892,
+        "left": 84
+      },
+      {
+        "i": 21,
+        "n": "Repeat: off",
+        "top": 930,
+        "left": 84
+      },
+      {
+        "i": 22,
+        "n": "Volume",
+        "top": 967,
+        "left": 111
+      },
+      {
+        "i": 23,
+        "n": "Open the mini-player widget",
+        "top": 963,
+        "left": 203
+      },
+      {
+        "i": 24,
+        "n": "Nothing playingChoose music from your librar",
+        "top": 124,
+        "left": 71
+      },
+      {
+        "i": 25,
+        "n": "Shuffle",
+        "top": 130,
+        "left": 201
+      },
+      {
+        "i": 26,
+        "n": "Repeat: off",
+        "top": 130,
+        "left": 326
+      }
+    ]
+  },
+  "overflow": {
+    "clippedX": 4,
+    "clippedXList": [
+      {
+        "n": "Media Center日本語 immersionBrowseHomeYour medi",
+        "c": "mc-root",
+        "over": 93
+      },
+      {
+        "n": "Your synced lyrics will appear here",
+        "c": "",
+        "over": 63
+      },
+      {
+        "n": "Nothing playing",
+        "c": "",
+        "over": 26
+      },
+      {
+        "n": "Choose music from your library",
+        "c": "",
+        "over": 78
+      }
+    ],
+    "scrollersY": 3,
+    "pastWindowFrame": 119,
+    "pastList": [
+      {
+        "n": "Media Center",
+        "c": "mc-nav"
+      },
+      {
+        "n": "All local media (Ctrl+2)",
+        "c": ""
+      },
+      {
+        "n": "svg",
+        "c": "[object SVGAnimatedString]"
+      },
+      {
+        "n": "path",
+        "c": "[object SVGAnimatedString]"
+      },
+      {
+        "n": "Immersion player (Ctrl+3)",
+        "c": ""
+      },
+      {
+        "n": "svg",
+        "c": "[object SVGAnimatedString]"
+      },
+      {
+        "n": "path",
+        "c": "[object SVGAnimatedString]"
+      },
+      {
+        "n": "Listening room (Ctrl+4)",
+        "c": "is-active"
+      }
+    ],
+    "unreachable": 39,
+    "unreachableList": [
+      {
+        "n": "Media Center",
+        "c": "mc-nav"
+      },
+      {
+        "n": "All local media (Ctrl+2)",
+        "c": ""
+      },
+      {
+        "n": "svg",
+        "c": "[object SVGAnimatedString]"
+      },
+      {
+        "n": "path",
+        "c": "[object SVGAnimatedString]"
+      },
+      {
+        "n": "Immersion player (Ctrl+3)",
+        "c": ""
+      },
+      {
+        "n": "svg",
+        "c": "[object SVGAnimatedString]"
+      },
+      {
+        "n": "path",
+        "c": "[object SVGAnimatedString]"
+      },
+      {
+        "n": "Listening room (Ctrl+4)",
+        "c": "is-active"
+      }
+    ]
+  },
+  "routes": {
+    "count": 6,
+    "list": [
+      {
+        "n": "Your media at a glance (Ctrl+1)",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "All local media (Ctrl+2)",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Immersion player (Ctrl+3)",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Listening room (Ctrl+4)",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "Mine and review (Ctrl+5)",
+        "role": "button",
+        "sel": null
+      },
+      {
+        "n": "MAL + AniList (Ctrl+6)",
+        "role": "button",
+        "sel": null
+      }
+    ]
+  },
+  "states": {
+    "empty": false,
+    "loading": false,
+    "error": false,
+    "offline": false,
+    "keywordFormIsAHint": true
+  },
+  "stateBlocks": [
+    {
+      "c": "muted music-empty",
+      "t": "No audio in your media library yet. Drop songs (mp3, flac…) into your media watch folder — they'll show up here. You can set that folder in Media settings."
+    }
+  ],
+  "textChars": 524,
+  "domNodes": 248,
+  "sizeMode": "min",
+  "settle": {
+    "waitedMs": 1200,
+    "settled": true,
+    "samples": [
+      "248/43",
+      "248/43",
+      "248/43"
+    ],
+    "final": "248/43"
+  },
+  "capturedAt": "2026-08-16T21:30:42.6486126+03:00"
+}
