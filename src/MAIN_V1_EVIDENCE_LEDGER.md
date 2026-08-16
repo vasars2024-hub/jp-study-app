@@ -23147,3 +23147,37 @@ type them as the `SqlValue` union or every call site goes red under tsc while vi
 
 **Still open.** Step 7's UI (this exporter has no surface yet), the live-Anki commit half of
 Phase 6, gate 11's provenance-after-reimport specifics, gate 10's owed measurements.
+
+## 2026-08-16 — Track 7 / step 7 "Apply or export" UI (`4dfaf53`)
+
+**Decision.** One component, `DeckWorkbenchApply.tsx`: net counts from the same
+`buildApkgExportChanges` the exporter receives (recomputed per edit/undo, so undoing from step 7
+changes what the button claims), export request = `{fingerprint, changes}` with NO outPath and NO
+sourcePath — the save dialog and the fingerprint-remembered path are the production route and the
+tests assert both fields are absent. Non-package sources (local-deck / ankiconnect / csv) get an
+honest noFile line and no button; live-Anki commit stays a later phase and the line says so.
+
+**Numbers.** 35/35 in `deckWorkbench.test.tsx` (5 new: noFile, empty-disabled, ok path with
+request-shape assertion, refusal under its own code, cancelled-silent; 1 rewritten: the
+"unbuilt step" test now asserts NO step shows the placeholder). i18n exit 0 at **10,183** (+23:
+lead, outcome, noFile, blocked, empty, 2 counts, original, export, writing, 3 ok lines, 10 error
+codes). Live on the real 3,221-note local deck: source → select all 3,221 → Next×5 → step 7
+current, "not built yet" ABSENT, noFile line rendered, export button ABSENT, undo strip present.
+Contrast lead **16.02**, muted noFile **6.08**, both at 14 px.
+
+**Deliberately not proven live:** the package-branch UI (counts/button/result) — the open dialog
+is native and unattended runs cannot dismiss it; `window.api` is frozen (writable:false measured),
+so the UI's own `readApkgDraft({noteLimit})` cannot be fed a fixture path in-page. The renderer
+half is covered by the 5 unit tests; the IPC half below it was proven live at `ad09b92e`. The
+2-minute attended walk (open fixture → edit → export via real save dialog) is in needs-user.md.
+
+**Traps.** (1) A cancelled save dialog must not `setResult` — the source step's cancelled-open
+rule, or every dismissed dialog renders as a failure. (2) The step-6 drive script clicked
+"Select all" right after choosing the source — that only worked because that session's workbench
+was already on step 2; a fresh walk needs a Next between source and Select all. (3) The error
+lines are dynamic keys (`ankiWorkbench.apply.error.${code}`) — i18n-check cannot see the usage,
+so a renamed ApkgExportErrorCode member silently falls back to the raw key; the refusal test
+pins `source-changed`.
+
+**Still open.** The live-Anki commit half of Phase 6, gate 11's provenance-after-reimport
+specifics, gate 10's owed four-language/compact measurements for steps 3–7.
