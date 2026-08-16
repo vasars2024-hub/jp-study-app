@@ -23821,3 +23821,55 @@ worktree: i18n exit 0 at **10,128**, the four files **58/58** — no dirty-tree 
 
 **Next:** the live half — `createDeck` + `changeDeck` through AnkiConnect, which is the
 last thing between recipe 13 and closed.
+
+## 2026-08-16 — Track 7 / Phase 7: recipe 13's live half, and the real-package proof
+
+**Slice.** `8106d0ed` — `createDeck` + `changeDeck` through AnkiConnect. Recipe 13 now
+reaches **both** workbench destinations; `deck-move-unsupported` is gone from both unions.
+
+**Decisions.** (1) Targets resolve to deck **NAMES** against the fresh pre-commit read —
+that is how AnkiConnect addresses a deck, and a name is stable across the create while the
+new id does not exist until Anki allocates it. Verification resolves the same name out of
+the **re-read**, so it never trusts an id. (2) **One `changeDeck` per target deck**, not
+per card: a large split is thousands of cards across a few subdecks. A failed group names
+every card in it rather than guessing a subset, and the `n of m` denominator counts the
+split's cards individually so it can never read "2 of 1". (3) `createDeck` is called even
+though `changeDeck` would create the deck: only an explicit create can be followed by
+`setDeckConfigId`, and only an explicit create fails **before** any card moves. The preset
+is the parent's, applied best-effort — a deck on default limits beats a refused move. (4)
+A minted deck Anki already holds is a plain move, and does **not** get the split's guessed
+preset forced onto it. (5) Two codes replace the old refusal, both before write #1:
+`deck-missing` and `deck-filtered`. Strings for both in all four languages.
+
+**Measured hole, left deliberately and commented at the check:** an EMPTY filtered deck
+reads as **normal**, because `probeFilteredDecks` only probes deck names the *cards*
+reference. Found by a test that failed for that reason, not by inspection.
+`planDeckSplit` already refuses a filtered parent, so the only route through is a minted
+name colliding with an empty filtered deck. Closing it needs a per-target probe.
+
+**Real-package acceptance — the first time recipe 13 has moved a card in a real file.**
+`Ginga Eiyuu Densetsu.apkg` through the surface's own path (`planChangeTray` with a
+`split-deck` action), then the real writer, then a re-read **from disk**:
+`7,992` notes / `7,992` cards / `2` decks in · axis `source` → **1** subdeck created
+(`銀河英雄伝説::Lapis (Jiten)`), **7,992** moves · writer `cardsUpdated 7992,
+decksUpdated 1` · written package **1,087,549** bytes (source 1,055,328) · `verifyExport
+Changes` **true, 0 mismatches** · re-read: **7,992 notes / 7,992 cards preserved, 3 decks**
+(2 + 1), parent `銀河英雄伝説` **0** cards, the new subdeck **7,992**, `conf=1` — the
+parent's preset carried. **Negative controls in the same run:** axis `jlpt` moved **0** and
+said so (`split-clean` + `split-unmatched`, both 7,992) rather than inventing a partition,
+and axis `frequency` refused `invalid-bands` with no bands supplied. Probe was temporary
+(it reads `~/Downloads`); output kept at `debug/r13-real.out.txt`.
+
+**Trap:** `readRawCollection` takes the **database**, not the zip — passing the zip returns
+a draft of `0 notes / 0 cards / 0 decks` and throws two steps later, not at the call. And a
+`TrayAction` needs `enabled: true`; without it `planChangeTray` answers `no-actions` and
+every axis reads as "did not partition".
+
+Gates: `connectCommit.test.ts` **27/27** (12 new), **70/70** across the four nearest files.
+**Mutation controls:** dropping the `changeDeck` call fails **7** tests; making verification
+ignore deck moves fails the swallowed-write test by name. Isolated at the commit in a
+detached worktree: i18n exit 0 at **10,129**, **70/70** — no dirty-tree dependency.
+
+**Next:** recipe 13 is written, planned, panelled and committed on both destinations —
+close it in `ANKI_DECK_WORKBENCH_PLAN.md` Phase 7 and move to the next recipe without a
+tray action kind (11, 14, 17–20, 26).
