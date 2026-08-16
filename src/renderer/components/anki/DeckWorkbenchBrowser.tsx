@@ -34,6 +34,11 @@ import {
 } from '../../../shared/ankiWorkbenchBrowser';
 import { filterBrowserRows, type BrowserQueryErrorCode } from '../../../shared/ankiBrowserQuery';
 import {
+  QUERY_EXPLAIN_KEY_PREFIX,
+  explainBrowserQuery,
+  type QueryExplainNode,
+} from '../../../shared/ankiQueryExplain';
+import {
   buildVocabContext,
   collectVocabTerms,
   type VocabKnownPrecedence,
@@ -76,6 +81,44 @@ const QUERY_ERROR_KEY: Record<BrowserQueryErrorCode, string> = {
   'dangling-operator': 'ankiWorkbench.browser.query.danglingOperator',
   'no-vocab-context': 'ankiWorkbench.browser.query.noVocabContext',
 };
+
+type Translate = (key: string, vars?: Record<string, string | number>) => string;
+
+/**
+ * One explanation node as a list item, recursing into groups.
+ *
+ * A `vars` value that is itself an explain key (the script names) is translated
+ * before it is interpolated — "Latin" is a proper noun in English and is not one
+ * in Japanese, so it cannot travel through `shared/` as literal text.
+ */
+function ExplainItem({ node, t }: { node: QueryExplainNode; t: Translate }): JSX.Element {
+  if (node.kind === 'clause') {
+    const vars = node.vars
+      ? Object.fromEntries(
+          Object.entries(node.vars).map(([name, value]) => [
+            name,
+            typeof value === 'string' && value.startsWith(QUERY_EXPLAIN_KEY_PREFIX) ? t(value) : value,
+          ]),
+        )
+      : undefined;
+    return <li>{t(node.key, vars)}</li>;
+  }
+  const label = node.kind === 'not' ? `${QUERY_EXPLAIN_KEY_PREFIX}not` : `${QUERY_EXPLAIN_KEY_PREFIX}group.${node.op}`;
+  const children = node.kind === 'not' ? [node.child] : node.children;
+  return (
+    <li>
+      {t(label)}
+      <ul>
+        {children.map((child, i) => (
+          // The tree has no ids and is rebuilt from the query text on every
+          // keystroke, so position is the only key there is — and it is stable
+          // for a given query, which is all this list needs.
+          <ExplainItem key={i} node={child} t={t} />
+        ))}
+      </ul>
+    </li>
+  );
+}
 
 export default function DeckWorkbenchBrowser({
   draft,
@@ -208,6 +251,10 @@ export default function DeckWorkbenchBrowser({
   );
   const filtered = useMemo(() => filterBrowserRows(rows, query, schema), [rows, query, schema]);
   const shown = useMemo(() => sortBrowserRows(filtered.rows, sort), [filtered, sort]);
+  // What the query means in words. Parsed a second time rather than lifted out
+  // of `filterBrowserRows`, which returns rows and an error and not the tree —
+  // and the parse is cheap next to the filter it already runs on every row.
+  const explain = useMemo(() => explainBrowserQuery(query, schema), [query, schema]);
   const shownCols = useMemo(() => visibleBrowserColumns(columns), [columns]);
 
   const partial = draft.counts.notes < totalNotes;
@@ -494,6 +541,19 @@ export default function DeckWorkbenchBrowser({
         <p className="wb-browser-query-error" id="wb-browser-query-error" role="alert">
           {t(QUERY_ERROR_KEY[filtered.error.code], { token: filtered.error.token })}
         </p>
+      )}
+
+      {/* Gate 3: `freq:<=5000` is a corpus rank, not a card count and not a
+          score, and nothing on this surface said so. The explanation is built
+          from the parsed tree, so it cannot describe a filter other than the one
+          that ran; a query that failed to parse explains nothing at all. */}
+      {explain && (
+        <div className="wb-browser-explain">
+          <p className="muted">{t(`${QUERY_EXPLAIN_KEY_PREFIX}title`)}</p>
+          <ul>
+            <ExplainItem node={explain} t={t} />
+          </ul>
+        </div>
       )}
 
       {view === 'samples' && (

@@ -22763,3 +22763,38 @@ mid-migration. (3) New `debug/stage-head-replace.cjs` is the *replacement* sibli
 303 files, 4,673 tests, 0 failures in 12.8 s**. `i18n-check` exit 0 at **10,010** keys — no new keys,
 an existing hint value changed. `architecture-audit` exit 0, **Nothing new**, 3 pending. `eslint`
 **0** on all 9 touched paths.
+
+## 2026-08-16 — Track 7 / ANKI Phase 4: gate 3 closes, and the rank stops being a bare number
+
+**Decision.** `freq:<=5000` filtered correctly and explained nothing: 5000 is a corpus rank, not a
+card count, not a score, not a threshold the user set. New `shared/ankiQueryExplain.ts` turns the
+**parsed tree** into i18n keys + vars (never prose, never the typed text), so the explanation cannot
+describe a filter other than the one that ran, and a refused query explains nothing at all.
+Tradeoff: the query is parsed a second time rather than lifted out of `filterBrowserRows`, which
+returns rows and an error and not the tree — the parse is nothing next to the per-row filter beside
+it. Comparisons are normalized to the inclusive rank they stand for: `freq:<5000` reads as *the most
+frequent **4,999** words*, because that is the set it returns. `freq:<1` says no word can match
+rather than claiming "the most frequent 0".
+
+**"Very good" is spelled `Known` here, deliberately.** The gate's label is Anki's ease-button
+vocabulary; this app's top rung is `anki.mastery.level.known`, and the plan's own exclusion forbids
+any such label whose scheduling effect is hidden. The effect panel is what satisfies the gate.
+
+**GATE 3 CLOSED — live, real 3,221-note local deck, real `freq_corpora`.**
+`freq:<=5000 known:no` → **348 of 3,221**, explained as *"All of these: / its word is among the
+5,000 most frequent words in the installed frequency list / you do not know its word yet"*.
+Mapped to `Known` and added to the tray: **342 words move, 0 already there, across 348 selected
+notes; 0 cards rescheduled — this changes what this app knows about the words, not any due date,
+interval or ease in Anki.** Removed again; nothing was applied.
+**Negative controls.** The partition is exact: `<=5000` 348 + `>5000` 2,731 + `none` 141 + `noword`
+1 = **3,221**, and `veryCommon` 75 + `common` 273 = 348, `uncommon` 530 + `rare` 2,201 = 2,731.
+`freq:<=5000 nope:1` renders **no explanation at all** and the refusal instead. Empty query → none.
+Nesting survives: `-tag:none (is:marked or cards:>1)` renders 3 nested lists.
+
+**Not a defect, measured rather than assumed:** `known:no` is **3,221 / 3,221** and `known:none`
+**0** because `jp-word-knowledge-ja` does not exist in this profile's localStorage — the local
+store is empty, so every verdict comes from Anki card state and every card is new. The 57 terms a
+previous turn wrote were undone by that same turn.
+
+`c0mmit` — `shared/ankiQueryExplain.ts` (+ 12 tests), `DeckWorkbenchBrowser` renders it under the
+search box, `deckWorkbench.css`, 48 keys × 4 catalogs.

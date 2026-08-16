@@ -275,6 +275,7 @@ Partial failure must identify exactly what committed, what failed, and what can 
 - Shipped: recipe 8, wrong-language/wrong-script detection — `shared/textScripts.ts` (containment, never a language verdict, reusing `furigana.ts`'s kanji range) and a `script:` Browser predicate with the same `Field:` scoping `re:` uses. It reads `row.fields` and **not** the search haystack: on the real 3,221-note deck a haystack-based `script:latin` matches 3,221 of 3,221 because every row carries a Latin deck and note-type name, while the field-based one matches 225. Live: cyrillic **17** (all in `Back`), letter-free **1**, unknown script refused by name.
 - Shipped: recipe 9, duplicates — `shared/ankiDuplicates.ts`. Three modes (exact / normalized / near) over one field, and a canonical proposal by a rule the user can read: most non-empty fields, then most text, then first seen, with `tied` set when the pick was arbitrary. It **proposes and never deletes**, and returns a selection rather than a new tray kind, because the tray's reversible ops are tags and field text and the existing actions already consume a selection. Near mode has no default threshold and refuses without one; it indexes character bigrams, so the real deck costs **8,784** comparisons rather than 5.19 million. Live: `Expression` **40 groups**, `Sentence` **681 groups / 2,085 duplicates**. Its consumer surface is the next slice — it is `pending` in `architecture-baseline.json`, not silently accepted.
 - **Gate 3's frequency half is now unblocked**: `Freq.JPDB.zip` is imported and migrated, `freq_corpora` has rows, and `dictFrequencyRanks` answered `{}` before and `の 1 / 言う 104 / 人 1,526 / 燦然 112,650` after. Gate 3 itself is a measurement slice now, not a build one.
+- Shipped: the query explanation — `shared/ankiQueryExplain.ts` and a quiet nested list under the search box. It closes gate 3's last open half: a corpus rank is not a card count and nothing on the surface said so. It explains the **parsed tree**, so it cannot drift from the filter that ran, and it emits i18n keys rather than prose, so the four catalogs decide word order. See gate 3 for the live numbers.
 - Next in this phase: **the first ten smart recipes** (list at "Smart recipes", items 1–10) — 1, 3, 4, 5 and 14 are covered by the shipped swap/known/frequency/mastery/enrich actions, 2 by gate 2, 8 and 9 as above; the open ones are 6 (prioritize high-frequency unknowns without touching known cards), 7 (fill readings/furigana with a confidence threshold) and 10 (leech rescue), plus a surface that calls the duplicate scan. Gate 11's remaining half is **export/reimport provenance**, which is blocked on Phase 6: `src/main/anki/` has `apkgImport.ts` and no exporter, so the round trip cannot be run yet.
 
 ### Phase 5 — Anki core editing parity
@@ -312,6 +313,19 @@ This slice is complete only when all of these can be shown with real data and no
     `jp-ai-gen` marker. Cancel: **30 requested → 12 answered, 18 cancelled, 0 failed**. A cloze
     source is skipped rather than translated, and an echo of the source is a retryable failure.
 3. Filter `frequency rank <= 5,000` plus `unknown`, explain that this means the most frequent 5,000 words, map the results to `Very good`, and show the exact mastery/scheduling effects before commit.
+
+    **Closed 2026-08-16.** `shared/ankiQueryExplain.ts` explains the **parsed tree** as i18n keys and
+    vars, so the sentence cannot describe a filter other than the one that ran and a refused query
+    explains nothing. Comparisons normalize to the inclusive rank: `freq:<5000` reads as the most
+    frequent **4,999** words. The gate's `Very good` is this app's top rung `Known` — Anki's ease
+    vocabulary is exactly what the plan's exclusion list forbids using as a label with a hidden
+    scheduling effect, and the effect panel is what closes the gate instead. Live on the real
+    3,221-note deck: `freq:<=5000 known:no` → **348**, explained as "its word is among the 5,000 most
+    frequent words in the installed frequency list" + "you do not know its word yet"; mapped to
+    `Known` the tray shows **342 words move, 0 already there, across 348 notes, 0 cards
+    rescheduled** before any commit. Negative controls: the partition `<=5000` 348 + `>5000` 2,731 +
+    `none` 141 + `noword` 1 = **3,221** exactly, and `freq:<=5000 nope:1` renders the refusal and no
+    explanation.
 4. Exclude words known locally, known in Anki, or both; resolve a deliberately conflicting item according to the selected precedence.
 5. Batch-edit tags, flags, deck, suspension, due date, interval/ease or a supported scheduling preset, then reread Anki and prove the resulting state.
 6. Safely edit a multi-template and cloze note without confusing fields with generated cards or breaking sibling renders.

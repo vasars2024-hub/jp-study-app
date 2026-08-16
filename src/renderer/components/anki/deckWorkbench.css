@@ -344,6 +344,24 @@
   font-weight: 600;
 }
 
+/* What the query means, in words. Deliberately quiet — it explains the filter
+   the user already typed, so it must not compete with the grid or with a
+   refusal. The nested lists carry the AND/OR structure, so they keep their
+   markers and their indent. */
+.wb-browser-explain {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.wb-browser-explain p {
+  margin: 0;
+}
+
+.wb-browser-explain ul {
+  margin: 0.15rem 0 0;
+  padding-inline-start: 1.4rem;
+}
+
 .wb-browser-search[aria-invalid='true'] {
   border-color: var(--danger, #b3261e);
 }
