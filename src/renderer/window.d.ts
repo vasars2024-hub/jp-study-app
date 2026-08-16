@@ -1685,6 +1685,14 @@ declare global {
       subtitleHarvestFetch(
         ids: string[],
       ): Promise<import('../shared/subtitleHarvest').SubtitleHarvestFetchResult>;
+      /** The nyaa fallback for a title Jimaku has nothing filed for. */
+      subtitleHarvestNyaaList(
+        input: import('../shared/subtitleHarvest').HarvestNyaaListInput,
+      ): Promise<import('../shared/subtitleHarvest').HarvestNyaaListResult>;
+      subtitleHarvestNyaaFetch(
+        candidateId: string,
+        acquisition: unknown,
+      ): Promise<import('../shared/subtitleHarvest').HarvestNyaaFetchResult>;
       scraperListExports(): Promise<import('../shared/scraperResults').ExportRecord[]>;
       scraperListPlugins(
         enabledIds: string[],

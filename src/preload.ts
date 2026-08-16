@@ -2712,6 +2712,17 @@ const api = {
     ids: string[],
   ): Promise<import('./shared/subtitleHarvest').SubtitleHarvestFetchResult> =>
     ipcRenderer.invoke('subtitleHarvest:fetch', ids),
+  // The nyaa fallback, for a title with no local media item. Same id-exchange
+  // rule as above: main holds the magnet its own listing produced.
+  subtitleHarvestNyaaList: (
+    input: import('./shared/subtitleHarvest').HarvestNyaaListInput,
+  ): Promise<import('./shared/subtitleHarvest').HarvestNyaaListResult> =>
+    ipcRenderer.invoke('subtitleHarvest:nyaaList', input),
+  subtitleHarvestNyaaFetch: (
+    candidateId: string,
+    acquisition: unknown,
+  ): Promise<import('./shared/subtitleHarvest').HarvestNyaaFetchResult> =>
+    ipcRenderer.invoke('subtitleHarvest:nyaaFetch', candidateId, acquisition),
   scraperListExports: (): Promise<import('./shared/scraperResults').ExportRecord[]> =>
     ipcRenderer.invoke(SCRAPER_CHANNELS.listExports),
   scraperListPlugins: (
