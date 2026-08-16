@@ -8937,6 +8937,7 @@ export const zh: Catalog = {
   'ankiWorkbench.tray.problem.reading-below-threshold': '{count} 个读音低于你设定的把握程度，已保持原样：{detail}',
   'ankiWorkbench.tray.problem.reading-occupied': '{count} 条笔记的 {detail} 已有读音，未覆盖。',
   'ankiWorkbench.tray.problem.reading-no-kanji': '{count} 个词没有汉字，无法添加注音：{detail}',
+  'ankiWorkbench.tray.problem.reading-not-kana': '{count} 个词找到的读音不是假名，应来自非日语词典，因此未写入：{detail}',
   'ankiWorkbench.tray.aiTo': '已批准的建议写入到',
   'ankiWorkbench.tray.kind.apply-ai-additions': '应用已审阅的 AI 建议',
   'ankiWorkbench.tray.describe.apply-ai-additions': '把每条已批准的 AI 建议写入 {to}（{conflict}）',

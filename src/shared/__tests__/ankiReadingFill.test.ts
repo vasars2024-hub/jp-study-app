@@ -9,6 +9,7 @@
 // load-bearing ones here, not the happy path.
 import { describe, expect, it } from 'vitest';
 import {
+  isKanaReading,
   proposeReading,
   readingCandidates,
   readingMeetsThreshold,
@@ -47,6 +48,27 @@ describe('readingCandidates', () => {
   it('drops entries with no reading rather than inventing an empty candidate', () => {
     expect(readingCandidates([entry('  ', 'JMdict')])).toEqual([]);
   });
+
+  it('drops pinyin, which the multi-language store returns for the same kanji', () => {
+    // Measured on the real deck: 掃 comes back as sǎo / sào / そうかい / そうじ
+    // because the installed dictionaries include Chinese ones. Pinyin in a
+    // Japanese reading field is the corruption this recipe must not cause.
+    const out = readingCandidates([
+      entry('sǎo', 'CC-CEDICT'),
+      entry('sào', 'CC-CEDICT'),
+      entry('そうじ', 'JMdict'),
+    ]);
+    expect(out.map((c) => c.reading)).toEqual(['そうじ']);
+  });
+
+  it('keeps the marks that legitimately appear inside a kana reading', () => {
+    expect(isKanaReading('コーヒー')).toBe(true);
+    expect(isKanaReading('ばか・あほ')).toBe(true);
+    expect(isKanaReading('jù')).toBe(false);
+    expect(isKanaReading('ねko')).toBe(false);
+    expect(isKanaReading('ー')).toBe(false);
+    expect(isKanaReading('')).toBe(false);
+  });
 });
 
 describe('proposeReading', () => {
@@ -54,6 +76,20 @@ describe('proposeReading', () => {
     expect(proposeReading('猫', undefined, 'kana')).toEqual({ refused: 'no-entry' });
     expect(proposeReading('猫', [], 'kana')).toEqual({ refused: 'no-entry' });
     expect(proposeReading('猫', [entry('', 'JMdict')], 'kana')).toEqual({ refused: 'no-reading' });
+  });
+
+  it('NEGATIVE CONTROL: a kanji only a Chinese dictionary knows writes nothing', () => {
+    // Two Chinese sources agreeing would otherwise read as `certain` and put
+    // `sǎo` into the deck. The refusal is its own code because "your Japanese
+    // dictionary is missing" is a different thing to tell the user than
+    // "nobody knows this word".
+    expect(proposeReading('掃', [entry('sǎo', 'CC-CEDICT'), entry('sào', 'CEDICT2')], 'kana'))
+      .toEqual({ refused: 'no-kana-reading' });
+  });
+
+  it('is not made ambiguous by a Chinese entry sitting beside a Japanese one', () => {
+    const out = proposeReading('潰', [entry('kuì', 'CC-CEDICT'), entry('つぶす', 'JMdict')], 'kana');
+    expect(out).toMatchObject({ confidence: 'likely', reading: 'つぶす', value: 'つぶす' });
   });
 
   it('refuses furigana on a term with no kanji, and still fills its kana reading', () => {

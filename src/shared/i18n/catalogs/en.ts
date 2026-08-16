@@ -9410,6 +9410,8 @@ export const en: Catalog = {
     '{count} notes already have a reading in {detail}, so nothing was written over it.',
   'ankiWorkbench.tray.problem.reading-no-kanji':
     '{count} words have no kanji, so there is nothing to put furigana over: {detail}',
+  'ankiWorkbench.tray.problem.reading-not-kana':
+    'The only readings found for {count} words are not kana, so they came from a non-Japanese dictionary and nothing was written: {detail}',
   'ankiWorkbench.tray.aiTo': 'Write the approved suggestion to',
   'ankiWorkbench.tray.kind.apply-ai-additions': 'Apply reviewed AI suggestions',
   'ankiWorkbench.tray.describe.apply-ai-additions': 'Write each approved AI suggestion to {to} ({conflict})',

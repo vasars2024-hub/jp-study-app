@@ -8978,6 +8978,8 @@ export const ja: Catalog = {
     '{count} 件の読みは指定した確度に届かなかったため、そのままにしました: {detail}',
   'ankiWorkbench.tray.problem.reading-occupied': '{count} 件のノートの {detail} には既に読みがあるため、上書きしていません。',
   'ankiWorkbench.tray.problem.reading-no-kanji': '{count} 件の単語には漢字がないため、ふりがなを付ける対象がありません: {detail}',
+  'ankiWorkbench.tray.problem.reading-not-kana':
+    '{count} 件の単語で見つかった読みはかなではないため、日本語以外の辞書によるものと判断して書き込みませんでした: {detail}',
   'ankiWorkbench.tray.aiTo': '承認した候補の書き込み先',
   'ankiWorkbench.tray.kind.apply-ai-additions': '確認済みのAI候補を適用',
   'ankiWorkbench.tray.describe.apply-ai-additions': '承認した各AI候補を{to}に書き込む（{conflict}）',

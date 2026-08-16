@@ -9792,6 +9792,8 @@ export const ru: Catalog = {
     'В {count} заметках поле {detail} уже содержит чтение — оно не перезаписано.',
   'ankiWorkbench.tray.problem.reading-no-kanji':
     'У {count} слов нет иероглифов, поэтому фуригану ставить не над чем: {detail}',
+  'ankiWorkbench.tray.problem.reading-not-kana':
+    'Для {count} слов найдены только чтения не каной — они пришли из неяпонского словаря, поэтому ничего не записано: {detail}',
   'ankiWorkbench.tray.aiTo': 'Записать одобренный вариант в',
   'ankiWorkbench.tray.kind.apply-ai-additions': 'Применить проверенные ИИ-варианты',
   'ankiWorkbench.tray.describe.apply-ai-additions': 'Записать каждый одобренный ИИ-вариант в {to} ({conflict})',

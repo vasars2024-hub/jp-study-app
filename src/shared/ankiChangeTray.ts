@@ -238,6 +238,11 @@ export type TrayProblemCode =
   | 'reading-no-word'
   /** No installed dictionary answered with a reading for this note's word. */
   | 'reading-no-entry'
+  /**
+   * Readings came back but none was kana — on this machine that is a Chinese
+   * entry answering a kanji with pinyin. Nothing is written.
+   */
+  | 'reading-not-kana'
   /** Several distinct readings. Review only — never written at any threshold. */
   | 'reading-ambiguous'
   /** One reading, but less certain than the threshold allows. Left for review. */
@@ -861,9 +866,15 @@ export function planChangeTray(
         }
         const proposal = proposeReading(term, enrich.lookup.get(term), action.form);
         if ('refused' in proposal) {
+          const code =
+            proposal.refused === 'no-kanji'
+              ? 'reading-no-kanji'
+              : proposal.refused === 'no-kana-reading'
+                ? 'reading-not-kana'
+                : 'reading-no-entry';
           problems.push({
-            code: proposal.refused === 'no-kanji' ? 'reading-no-kanji' : 'reading-no-entry',
-            severity: proposal.refused === 'no-kanji' ? 'info' : 'warning',
+            code,
+            severity: code === 'reading-no-kanji' ? 'info' : 'warning',
             actionId: action.id,
             count: 1,
             detail: term,

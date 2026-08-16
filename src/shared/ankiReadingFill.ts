@@ -63,6 +63,11 @@ export type ReadingFillRefusal =
   | 'no-entry'
   /** The entries carry no reading at all. */
   | 'no-reading'
+  /**
+   * Readings came back, but none of them was kana — so none of them was a
+   * Japanese reading. See `isKanaReading` for why this is its own outcome.
+   */
+  | 'no-kana-reading'
   /** Furigana form on a term with no kanji: there is nothing to annotate. */
   | 'no-kanji';
 
@@ -109,7 +114,27 @@ function entrySources(entry: EnrichEntry): string[] {
 }
 
 /**
- * Collapse the entries to one candidate per distinct reading, in source order.
+ * Kana, and nothing but kana (plus the marks that appear inside one).
+ *
+ * Measured on the real deck, 2026-08-16: the unified dictionary is
+ * multi-language, so `dict:enrichTerms` answers a kanji with the **Chinese**
+ * entries too, and their `reading` is pinyin — 掃 came back as
+ * `sǎo / sào / そうかい / そうじ` and 潰 as `kuì / かいよう / …`. Two things follow
+ * and both are bugs if this filter is missing: a kanji whose only installed
+ * entry is Chinese would have `jù` written into a Japanese reading field at
+ * `likely`, silently; and every word with both a Chinese and a Japanese entry
+ * would be reported ambiguous for a reason that is not a real disagreement.
+ *
+ * A Japanese reading is kana. Anything else did not come from a Japanese
+ * dictionary, whatever the entry claims, so it is not a candidate here.
+ */
+export function isKanaReading(text: string): boolean {
+  return /^[ぁ-ゖァ-ヺー・゛゜\s]+$/u.test(text) && /[ぁ-ゖァ-ヺ]/u.test(text);
+}
+
+/**
+ * Collapse the entries to one candidate per distinct kana reading, in source
+ * order.
  *
  * Normalising to hiragana first is what stops ネコ and ねこ counting as two
  * readings and turning an unambiguous word into a review item.
@@ -117,8 +142,9 @@ function entrySources(entry: EnrichEntry): string[] {
 export function readingCandidates(entries: readonly EnrichEntry[]): ReadingCandidate[] {
   const out: ReadingCandidate[] = [];
   for (const entry of entries) {
-    const reading = toHiragana(entry.reading.trim());
-    if (!reading) continue;
+    const trimmed = entry.reading.trim();
+    if (!trimmed || !isKanaReading(trimmed)) continue;
+    const reading = toHiragana(trimmed);
     const existing = out.find((c) => c.reading === reading);
     const sources = entrySources(entry);
     if (existing) {
@@ -147,7 +173,13 @@ export function proposeReading(
   if (form === 'furigana' && !hasKanji(surface)) return { refused: 'no-kanji' };
   if (!entries || entries.length === 0) return { refused: 'no-entry' };
   const candidates = readingCandidates(entries);
-  if (candidates.length === 0) return { refused: 'no-reading' };
+  if (candidates.length === 0) {
+    // "The entries had no reading" and "every reading they had was pinyin" are
+    // different facts about the user's installed dictionaries, and the second
+    // one is actionable — it means the Japanese dictionary is the one missing.
+    const anyReading = entries.some((e) => e.reading.trim() !== '');
+    return { refused: anyReading ? 'no-kana-reading' : 'no-reading' };
+  }
 
   const chosen = candidates[0];
   const segments = alignFurigana(surface, chosen.reading);
