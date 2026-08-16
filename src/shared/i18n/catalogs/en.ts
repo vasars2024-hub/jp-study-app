@@ -9606,6 +9606,7 @@ export const en: Catalog = {
     'Nothing to tidy: the {count} selected notes already tag consistently.',
   'ankiWorkbench.tray.kind.normalize-decks': 'Tidy up deck names',
   'ankiWorkbench.tray.kind.split-deck': 'Split a deck into subdecks',
+  'ankiWorkbench.tray.kind.merge-glossary': 'Merge glossary data from another deck',
   'ankiWorkbench.tray.describe.normalize-decks': 'Tidy up deck names: {ops}',
   'ankiWorkbench.tray.deckNormalize.scope':
     'This works on every deck in the draft, not on the selected notes. No card changes deck.',

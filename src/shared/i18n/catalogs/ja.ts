@@ -9179,6 +9179,7 @@ export const ja: Catalog = {
     '整えるものはありません。選択した {count} 件のノートのタグはすでに統一されています。',
   'ankiWorkbench.tray.kind.normalize-decks': 'デッキ名を整理',
   'ankiWorkbench.tray.kind.split-deck': 'デッキをサブデッキに分割',
+  'ankiWorkbench.tray.kind.merge-glossary': '別のデッキから語義データを統合',
   'ankiWorkbench.tray.describe.normalize-decks': 'デッキ名を整理: {ops}',
   'ankiWorkbench.tray.deckNormalize.scope':
     'これは選択したノートではなく、下書き内のすべてのデッキに適用されます。カードのデッキは変わりません。',

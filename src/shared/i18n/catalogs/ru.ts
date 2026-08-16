@@ -9995,6 +9995,7 @@ export const ru: Catalog = {
     'Приводить в порядок нечего: у выбранных заметок ({count}) теги уже единообразны.',
   'ankiWorkbench.tray.kind.normalize-decks': 'Привести имена колод в порядок',
   'ankiWorkbench.tray.kind.split-deck': 'Разделить колоду на подколоды',
+  'ankiWorkbench.tray.kind.merge-glossary': 'Слить данные словаря из другой колоды',
   'ankiWorkbench.tray.describe.normalize-decks': 'Имена колод: {ops}',
   'ankiWorkbench.tray.deckNormalize.scope':
     'Это применяется ко всем колодам черновика, а не к выбранным заметкам. Ни одна карточка не меняет колоду.',

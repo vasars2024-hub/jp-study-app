@@ -9109,6 +9109,7 @@ export const zh: Catalog = {
     '无需整理：所选的 {count} 条笔记的标签已经一致。',
   'ankiWorkbench.tray.kind.normalize-decks': '整理牌组名称',
   'ankiWorkbench.tray.kind.split-deck': '将牌组拆分为子牌组',
+  'ankiWorkbench.tray.kind.merge-glossary': '从另一个牌组合并释义数据',
   'ankiWorkbench.tray.describe.normalize-decks': '整理牌组名称：{ops}',
   'ankiWorkbench.tray.deckNormalize.scope':
     '这会作用于草稿中的所有牌组，而不是所选笔记。没有卡片会更换牌组。',

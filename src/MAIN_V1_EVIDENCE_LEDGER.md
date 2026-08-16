@@ -24089,3 +24089,50 @@ raw byte. Check `git diff --cached --stat` for `Bin` on any new source file. (2)
 `readApkgDraft` returns one **page**: `draft.notes.length` was 2,000 where
 `draft.counts.notes` was 52,021, and a sweep reading the former reports a fifth of a deck
 as the deck.
+
+## 2026-08-16 — Track 7 / Phase 7: recipe 14, and the glossary that only ever holds one page
+
+**Slices.** `63f5bfdb` `shared/ankiGlossaryMerge.ts` + the `merge-glossary` tray action
+(30 tests, 12 i18n keys ×4) · `046c33cb` `DeckWorkbenchGlossary` (9 tests, 20 keys ×4) ·
+`0aa50b55` the page-count honesty fix the live run found (1 test, 1 key ×4).
+
+**Decision.** "Without overwriting stronger fields" is the whole recipe, so strength is a
+**stated order, not a score**: attributed beats unattributed, then more senses, then more
+text, first difference wins, and the deciding component comes back as `strongerBy`. A tie
+**keeps the destination** — rewriting 3,000 fields to equally strong text costs an export
+and a sync and buys nothing. Three modes, no default: `fill-empty` cannot lose text,
+`prefer-stronger` may and counts every note that did, `merge-senses` appends what is missing.
+
+**Two refusals carry it.** A key the glossary holds twice with *disagreeing* values is
+dropped from the source entirely (recipe 9 is how that deck gets cleaned); rows that agree
+collapse, keeping the attributed copy. `merge-senses` refuses a value carrying `<` or `&`
+rather than splitting it — the `;` in `&nbsp;` is not a sense boundary.
+
+**Live, on two of the user's real N1 packages, no dialog.** Destination `N1 Vocab 3.apkg`
+(158 notes, 2 note types), glossary `N1 Vocab-20260102173058.apkg`. Source build **70 ms**:
+2,000 rows → **1,784 entries, 57 ambiguous keys** (real duplicates in the user's own deck —
+動機/簡潔な/従事する first), 2 keyless. The partition is exact and the same in all three
+modes: **147 unmatched + 10 matched + 1 `field-absent` = 158**, plans 2–7 ms. All three wrote
+**0**, and each said *why* differently: `kept-occupied` 10, `kept-stronger` 10,
+`html-refused` 10 — the last is the `&`/`<` refusal firing on real HTML-heavy fields, not a
+fixture. **Positive control:** blanking those same 10 Backs gives **10 written** (定着 ←
+6,499 chars), and undo restores all 10 to blank. **Negative controls, three:** 読む is in no
+glossary row → offered, **0 changed, still blank**; a planted twin for 定着 with a different
+answer takes entries 1,784 → 1,783 and ambiguous 57 → 58, **0 changed**,
+`glossary-key-ambiguous`; and the tray still holding the first source id against the second
+payload is **blocked** with `glossary-mismatch`.
+
+**The live run's finding, fixed in its own commit.** `readApkgDraft` clamps every read to
+`ANKI_DRAFT_MAX_PAGE_SIZE` (2,000, `ankiDraft.ts:954`) — `noteLimit: 6000` still returned
+2,000 of 3,359. The panel was rendering `counts.notes`, which describes the **whole
+collection**, so it would have claimed 3,359 rows were in a merge that could never reach
+1,359 of them. It now reports `notes.length` and raises `glossary.partial` naming both
+numbers.
+
+**Traps.** (1) `…glossary.add` is a prefix of `…glossary.addPair`: a substring button lookup
+in a renderer test clicks the wrong control and the "queues at Add" assertion passes for the
+wrong reason. Match `textContent` exactly. (2) Every pair row owns a Remove, so "click
+Remove" takes the *first* row and leaves the offending one. (3) The i18n catalogs are LF at
+HEAD despite git's "LF will be replaced by CRLF" warning — that is checkout, not storage,
+and rejoining a reconstructed blob with CRLF rewrites all 9,874 lines. `debug/stage-i18n-block.cjs`
+does the HEAD+edit staging and fails loudly on a numstat that is not exactly the insertion.
