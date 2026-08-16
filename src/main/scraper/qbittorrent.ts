@@ -843,14 +843,22 @@ export async function qbitTorrentInfo(
 }
 
 /**
- * Adds a magnet stopped, so nothing transfers until file priorities are set.
+ * Adds a magnet so it fetches its own metadata and then stops itself.
  *
  * Deliberately does **not** use `buildAddForm`: that applies the profile's own
  * add mode, which may be `forced`, and starting a 12 GB batch at full tilt is
  * the exact outcome this provider exists to prevent. The form here is fixed.
  *
- * `paused` was renamed `stopped` in qBittorrent 5; both are sent because
- * unknown form fields are ignored and guessing the version is worse.
+ * **`paused`/`stopped` is exactly what this must not send.** A magnet added
+ * stopped never contacts the swarm, so its metadata never arrives and
+ * `torrents/files` answers `200 []` for as long as it exists — measured against
+ * the real daemon on a 26-file release, which reported **0 files**. Every nyaa
+ * fetch then read that empty list and told the user the release contained no
+ * subtitles. `stopCondition=MetadataReceived` (qBittorrent 4.5+) is the
+ * primitive that actually fits: the torrent runs only until the file list
+ * arrives — measured at **4 s, 26 files, `downloaded: 0`** — and puts itself
+ * back to `stoppedDL` before any content byte is chosen. `qbitAwaitMetadata`
+ * stops it a second time for builds that do not know the parameter.
  */
 export async function qbitAddStopped(
   input: ScraperQbitInput,
@@ -869,8 +877,7 @@ export async function qbitAddStopped(
 
   const form = new URLSearchParams();
   form.set('urls', magnet);
-  form.set('paused', 'true');
-  form.set('stopped', 'true');
+  form.set('stopCondition', 'MetadataReceived');
   form.set('category', QBIT_SUBTITLE_CATEGORY);
   form.set('tags', QBIT_SUBTITLE_CATEGORY);
   // Original layout keeps the paths the torrent declares, which is what the
@@ -889,6 +896,28 @@ export async function qbitAddStopped(
   }
   scraperLog('info', 'qbit', `Added a subtitle fetch stopped (${hash.slice(0, 8)}).`);
   return { ok: true, value: 'added' };
+}
+
+/**
+ * Stops a running torrent.
+ *
+ * Mirror of `qbitStart`: `pause` is the endpoint every 4.x build has and 5.x
+ * still honours, `stop` is 5.x's replacement.
+ */
+export async function qbitStop(
+  input: ScraperQbitInput,
+  hash: string,
+): Promise<QbitOutcome<true>> {
+  const body = new URLSearchParams({ hashes: hash.trim().toLowerCase() }).toString();
+  const headers = { 'content-type': 'application/x-www-form-urlencoded' };
+  let response = await authed(input, '/api/v2/torrents/pause', { method: 'POST', headers, body });
+  if (!('error' in response) && (response.status === 404 || response.status === 405)) {
+    response = await authed(input, '/api/v2/torrents/stop', { method: 'POST', headers, body });
+  }
+  if ('error' in response || response.status !== 200) {
+    return { ok: false, reason: failureReason(response) };
+  }
+  return { ok: true, value: true };
 }
 
 /**
@@ -983,6 +1012,52 @@ export interface QbitAwaitOptions {
 }
 
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => { setTimeout(resolve, ms); });
+
+/**
+ * Waits until a magnet's file list exists, then makes sure it is not running.
+ *
+ * A magnet names no files. Until the metadata arrives from the swarm,
+ * `torrents/files` answers `200` with an empty array — indistinguishable, to a
+ * caller that reads it once, from a release that genuinely holds no subtitles.
+ * That single read is what made the nyaa provider a total false negative, so
+ * this wait is not a refinement of the fetch; it is the step without which no
+ * fetch of either route can ever succeed.
+ *
+ * `stopWhenReady` belongs to the caller because ownership does: a torrent this
+ * process added is ours to stop, and one the user already had is not — pausing
+ * theirs would silently halt a transfer they started.
+ */
+export async function qbitAwaitMetadata(
+  input: ScraperQbitInput,
+  hash: string,
+  options: QbitAwaitOptions & { stopWhenReady?: boolean },
+): Promise<QbitOutcome<QbitFileEntry[]>> {
+  const pollMs = options.pollMs ?? 1_000;
+  const sleep = options.sleep ?? defaultSleep;
+  const deadline = Date.now() + Math.max(0, options.timeoutMs);
+
+  for (;;) {
+    if (options.isCancelled?.()) return { ok: false, reason: 'Cancelled.' };
+
+    const files = await qbitFiles(input, hash);
+    if (!files.ok) return files;
+    if (files.value.length) {
+      // `stopCondition=MetadataReceived` has normally done this already; a build
+      // that ignores the parameter has not, and the exposure is then one poll
+      // interval rather than a whole unbounded download.
+      if (options.stopWhenReady) await qbitStop(input, hash);
+      return { ok: true, value: files.value };
+    }
+
+    if (Date.now() >= deadline) {
+      return {
+        ok: false,
+        reason: 'qBittorrent could not read what is inside this release: no peer sent its file list in time.',
+      };
+    }
+    await sleep(pollMs);
+  }
+}
 
 /**
  * Waits for a set of files to finish, or gives up.

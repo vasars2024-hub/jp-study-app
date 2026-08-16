@@ -51,7 +51,7 @@ import { searchTorrents } from './scraper/torrents';
 import {
   qbitAddStopped,
   qbitAwaitFiles,
-  qbitFiles,
+  qbitAwaitMetadata,
   qbitSetFilePriorities,
   qbitStart,
   qbitTorrentInfo,
@@ -63,6 +63,16 @@ import type { ProviderSubtitleCandidate } from './subtitleProviderClients';
 
 /** How long to wait for a subtitle fetch before giving up on the swarm. */
 const FETCH_TIMEOUT_MS = 5 * 60 * 1000;
+
+/**
+ * How long to wait for a magnet's file list.
+ *
+ * Much shorter than the fetch timeout because it is a different question: this
+ * is "does anyone in this swarm answer at all", and a swarm that answers takes
+ * seconds — the real 3-seeder release used to develop this returned 26 files in
+ * 4 s. A minute is generous; a swarm silent for a minute has nothing to send.
+ */
+const METADATA_TIMEOUT_MS = 60_000;
 
 /** Cap on how much text is read back, so a mislabelled `.ass` cannot blow up main. */
 const MAX_SUBTITLE_BYTES = 8 * 1024 * 1024;
@@ -364,7 +374,15 @@ export async function nyaaFetch(
   if (!added.ok) return { ok: false, reason: added.reason };
   const preexisting = added.value === 'already-present';
 
-  const files = await qbitFiles(qbit, hash);
+  // Not `qbitFiles`: a magnet has no file list yet at this point, and reading it
+  // once returned an empty array that every route then read as "no subtitles".
+  const files = await qbitAwaitMetadata(qbit, hash, {
+    // A phase cannot outlast the whole: a caller that hands this fetch a tighter
+    // budget than a minute means the metadata wait too, not just the download.
+    timeoutMs: Math.min(METADATA_TIMEOUT_MS, options.timeoutMs ?? METADATA_TIMEOUT_MS),
+    isCancelled: options.isCancelled,
+    stopWhenReady: !preexisting,
+  });
   if (!files.ok) return { ok: false, reason: files.reason };
 
   const selection = selectSubtitleFiles(files.value, {

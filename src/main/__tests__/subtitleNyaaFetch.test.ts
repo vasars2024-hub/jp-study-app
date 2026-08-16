@@ -59,6 +59,16 @@ let disappearAfterAdd = false;
 /** Starting the torrent moves nothing, which is what a stopped-on-error transfer looks like. */
 let stallOnStart = false;
 let addBodies: string[] = [];
+/**
+ * How many `torrents/files` reads answer `[]` before the metadata "arrives".
+ *
+ * This is the real daemon's behaviour for a magnet, not an invented one: a
+ * magnet names no files, so the WebUI answers `200 []` until a peer sends the
+ * torrent's info dictionary. Measured on the live client at 0 files for as long
+ * as the torrent stayed stopped, then 26 files 4 s after it was allowed to run.
+ */
+let metadataAfterPolls = 0;
+let filesReads = 0;
 
 function readBody(req: http.IncomingMessage): Promise<string> {
   return new Promise((resolve) => {
@@ -103,8 +113,17 @@ beforeAll(async () => {
       return;
     }
     if (url.pathname === '/api/v2/torrents/files') {
+      filesReads += 1;
+      const known = filesReads > metadataAfterPolls ? files : [];
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify(files.map((file, index) => ({ index, ...file }))));
+      res.end(JSON.stringify(known.map((file, index) => ({ index, ...file }))));
+      return;
+    }
+    if (url.pathname === '/api/v2/torrents/pause') {
+      void readBody(req).then(() => {
+        res.writeHead(200);
+        res.end('Ok.');
+      });
       return;
     }
     if (url.pathname === '/api/v2/torrents/add') {
@@ -173,6 +192,8 @@ beforeEach(() => {
   torrentState = 'downloading';
   disappearAfterAdd = false;
   stallOnStart = false;
+  metadataAfterPolls = 0;
+  filesReads = 0;
   resetQbitSessions();
 });
 
@@ -253,11 +274,58 @@ describe('nyaaFetch — route A, a subtitle-only pack', () => {
     expect(result.ok && result.value.text).toContain('Dialogue: hello');
     expect(result.ok && result.value.fileName).toBe('Show - 07.ja.ass');
 
-    // Added stopped, never running: an add that starts immediately has already
-    // begun pulling video by the time the file list is known.
-    expect(addBodies[0]).toContain('paused=true');
-    expect(addBodies[0]).toContain('stopped=true');
+    // Stopped by condition, not by flag. `paused`/`stopped` was the old form
+    // and it is the one thing that must never come back: a magnet added stopped
+    // never asks the swarm for its metadata, so the file list stays empty and
+    // every release looks like it has no subtitles in it.
+    expect(addBodies[0]).toContain('stopCondition=MetadataReceived');
+    expect(addBodies[0]).not.toContain('paused=true');
+    expect(addBodies[0]).not.toContain('stopped=true');
     expect(addBodies[0]).toContain('category=jp-study-subtitles');
+  });
+
+  it('waits for a magnet’s file list instead of reading an empty one', async () => {
+    // Three empty reads, then the real list — the shape a magnet actually has.
+    metadataAfterPolls = 3;
+    files = [{ name: 'Show - 07.ja.ass', size: 40_000, progress: 0, priority: 1 }];
+    await writeOnDisk('Show - 07.ja.ass', '[Script Info]\nDialogue: after metadata');
+
+    const result = await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 5_000 });
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.value.text).toContain('after metadata');
+    // It really did have to wait, rather than the stand-in answering at once.
+    expect(filesReads).toBeGreaterThan(3);
+    // And the torrent we added was put back to stopped before any file was
+    // chosen — a build that ignores `stopCondition` must not be left running.
+    expect(calls).toContain('/api/v2/torrents/pause');
+  });
+
+  it('names a swarm that never sends a file list, and does not call it empty', async () => {
+    // 500 polls at the 1 s floor is far beyond the metadata timeout, so this is
+    // the "nobody answered" case rather than a slow one.
+    metadataAfterPolls = 500;
+    files = [{ name: 'Show - 07.ja.ass', size: 40_000, progress: 0, priority: 1 }];
+
+    const result = await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 5_000 });
+    expect(result.ok).toBe(false);
+    // The distinction this whole wait exists for: "we could not see inside it"
+    // is not "there is nothing inside it".
+    expect(result.ok === false && result.reason).toMatch(/no peer sent its file list/i);
+    expect(result.ok === false && result.reason).not.toMatch(/no subtitle files/i);
+    expect(calls.some((call) => call.startsWith('prio:'))).toBe(false);
+  });
+
+  it('never pauses a torrent the user already had', async () => {
+    // The negative control for `stopWhenReady`: this transfer is the user's, and
+    // silently pausing it would stop a download they started.
+    present = true;
+    files = [{ name: 'Show - 07.ja.ass', size: 40_000, progress: 1, priority: 1 }];
+    await writeOnDisk('Show - 07.ja.ass', 'Dialogue: theirs');
+
+    const result = await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 5_000 });
+    expect(result.ok).toBe(true);
+    expect(addBodies).toHaveLength(0);
+    expect(calls).not.toContain('/api/v2/torrents/pause');
   });
 
   it('corrects the format from the file that actually arrived', async () => {
