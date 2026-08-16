@@ -23650,3 +23650,61 @@ from other tracks).
 
 Probe at `debug/r11-real-apkg.probe.test.ts` — copy into `src/main/__tests__/` to re-run;
 it reads the user's Downloads and is not suite material.
+
+## 2026-08-16 — Track 7 / Phase 7: recipe 13, the first action that moves a card
+
+**Slices.** `f4fda08b` `shared/ankiDeckSplit.ts` + 29 tests · `fad826df` the `split-deck`
+tray action, the `card-deck` journal op, the two writers' refusals, 6 i18n keys x4.
+
+**Decision.** Recipe 13 ("split a deck by JLPT level, frequency band, source, or
+mastery") is an **action**, not a filter — every earlier Phase 7 recipe was a find. Four
+axes: JLPT from tags, frequency bands from `VocabContext.rank`, **source = note type
+name** (the only per-note origin an .apkg carries — there is no `Source` field
+convention in this repo; checked), mastery from the local knowledge store. Tradeoff:
+note type is a proxy for origin and gets a merged deck wrong when two sources share one
+note type; the alternative needed a field the data does not have.
+
+**The rules, each protecting a card that must not move.** Scope is one named deck's
+subtree — a selection routinely spans the collection and splitting on it would
+restructure decks the user never opened. A note tagged both `JLPT::N5` and `JLPT::N1` is
+refused (`ambiguous-jlpt`), never resolved by taking the lower; and a refusal outranks
+`collect`, which a test caught doing the opposite. A card on loan to a filtered deck is
+refused. Siblings file together (the note votes, the card moves). A card already in its
+target is `unchanged`, so a second run moves nothing.
+
+**Undo is honest about its limit.** `card-deck` reverses by writing the old deck id back;
+the decks the split *created* stay behind, empty. A delete this op could not undo would
+be the dishonest half.
+
+**The refusals the writers now carry.** Neither `apkgExportCore` nor `ankiConnectCommit`
+can create a deck row or rewrite `cards.did`, so both throw `deck-move-unsupported` by
+name. Silently dropping the moves would have exported a package where the split provably
+did not happen while every surface said it had. Also found and fixed: `card-due` and
+`card-deck` folded to the **same key** in both `buildApkgExportChanges` and
+`buildWorkbenchReview`, so a split would have swallowed a reposition of the same card.
+`WorkbenchReviewSummary.cardDeckMoves` is counted apart from `cardMoves` — despite the
+name, that one is a queue position (`due`), not a deck (`did`).
+
+**Live, through the running renderer** (modules `import()`ed, draft built in page):
+7 notes / 8 cards, **4 moved**, 2 subdecks created, both nested under the parent and both
+inheriting its `conf=7` options preset. n1's two cards both landed in N5.
+**Negative control, all four still put:** the untagged note, the ambiguous note, the
+filtered-deck card, and the card in `Other` outside the parent. Undo restored all 8 deck
+ids and left 6 decks standing. Problems: `split-moved=4`, `split-unmatched=1`,
+`split-ambiguous=1`, `split-outside-parent=1`, `split-filtered-card=1`.
+
+**Traps.** (a) The Write tool turned `[\x00-\x1f\x7f]` into **raw control bytes** in the
+new module; only PowerShell repaired it — use `\p{Cc}` and never a `\xNN` escape here.
+(b) `DeckWorkbenchTray.tsx` has two `switch (kind)` blocks whose `default` arm silently
+absorbs any new `TrayActionKind`; both needed an explicit `split-deck` case or the panel
+would have built an `add-tags` action from it.
+
+Gates: `npx vitest run` **exit 0 — 690 passed / 1 skipped of 691, 9,398 passed / 6
+skipped**. Baseline 688 passed + 1 failed of 690 and 9,358: +1 file, +40 tests, and the
+known `scraperScheduler` ENOTEMPTY teardown flake did not fire this run. i18n exit 0 at
+**10,268** (+6) · architecture "Nothing new", 2 pending · eslint on 10 touched paths:
+**0 errors, 0 warnings**. Shared working tree (HEAD alone is red from other tracks).
+
+**Not built yet, deliberately:** the commit half (create the deck row, write `cards.did`,
+verify) and the workbench panel that queues the action — `split-deck` is not in
+`ACTION_KINDS`. Both are the next two slices.
