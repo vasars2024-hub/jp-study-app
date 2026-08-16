@@ -9481,6 +9481,12 @@ export const ru: Catalog = {
   'ankiWorkbench.sessions.none': 'Незавершённых чтений нет.',
   'ankiWorkbench.sessions.covered': 'Прочитано заметок: {covered} из {total}',
   'ankiWorkbench.sessions.discard': 'Отбросить',
+  'ankiWorkbench.sessions.resume': 'Продолжить с заметки {offset}',
+  'ankiWorkbench.sessions.resumeRefused.nothing-to-resume': 'В этом чтении не осталось ничего для продолжения.',
+  'ankiWorkbench.sessions.resumeRefused.source-changed':
+    'Файл изменился после начала этого чтения. Откройте его заново, чтобы начать сначала.',
+  'ankiWorkbench.sessions.resumeRefused.cancelled-by-user': 'Это чтение было отменено.',
+  'ankiWorkbench.sessions.resumeRefused.already-complete': 'Это чтение уже охватило все заметки.',
   'ankiWorkbench.sessions.status.reading': 'Чтение',
   'ankiWorkbench.sessions.status.paused': 'Пауза',
   'ankiWorkbench.sessions.status.interrupted': 'Прервано',

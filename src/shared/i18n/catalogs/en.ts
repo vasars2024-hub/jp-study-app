@@ -9100,6 +9100,12 @@ export const en: Catalog = {
   'ankiWorkbench.sessions.none': 'No unfinished reads.',
   'ankiWorkbench.sessions.covered': '{covered} of {total} notes read',
   'ankiWorkbench.sessions.discard': 'Discard',
+  'ankiWorkbench.sessions.resume': 'Resume from note {offset}',
+  'ankiWorkbench.sessions.resumeRefused.nothing-to-resume': 'This read has nothing left to continue.',
+  'ankiWorkbench.sessions.resumeRefused.source-changed':
+    'The file has changed since this read started. Open it again to start fresh.',
+  'ankiWorkbench.sessions.resumeRefused.cancelled-by-user': 'This read was cancelled.',
+  'ankiWorkbench.sessions.resumeRefused.already-complete': 'This read already covered every note.',
   'ankiWorkbench.sessions.status.reading': 'Reading',
   'ankiWorkbench.sessions.status.paused': 'Paused',
   'ankiWorkbench.sessions.status.interrupted': 'Interrupted',

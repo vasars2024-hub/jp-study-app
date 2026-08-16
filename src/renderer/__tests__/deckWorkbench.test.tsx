@@ -53,6 +53,7 @@ let host: HTMLDivElement;
 const readApkgDraft = vi.fn();
 const readAnkiConnectDraft = vi.fn();
 const ankiDraftSessionList = vi.fn();
+const ankiDraftSessionResume = vi.fn();
 const ankiDraftSessionDelete = vi.fn();
 const exportApkgDraft = vi.fn();
 const commitAnkiConnectDraft = vi.fn();
@@ -195,12 +196,12 @@ beforeAll(() => {
 
 beforeEach(() => {
   installLayout(900, 400);
-  for (const m of [readApkgDraft, readAnkiConnectDraft, ankiDraftSessionList, ankiDraftSessionDelete, loadDeckAsAnkiDraft, exportApkgDraft, commitAnkiConnectDraft]) m.mockReset();
+  for (const m of [readApkgDraft, readAnkiConnectDraft, ankiDraftSessionList, ankiDraftSessionResume, ankiDraftSessionDelete, loadDeckAsAnkiDraft, exportApkgDraft, commitAnkiConnectDraft]) m.mockReset();
   ankiDraftSessionList.mockResolvedValue([]);
   ankiDraftSessionDelete.mockResolvedValue(true);
   Object.defineProperty(window, 'api', {
     configurable: true,
-    value: { readApkgDraft, readAnkiConnectDraft, ankiDraftSessionList, ankiDraftSessionDelete, exportApkgDraft, commitAnkiConnectDraft },
+    value: { readApkgDraft, readAnkiConnectDraft, ankiDraftSessionList, ankiDraftSessionResume, ankiDraftSessionDelete, exportApkgDraft, commitAnkiConnectDraft },
   });
 });
 
@@ -512,6 +513,56 @@ describe('DeckWorkbench', () => {
     await click(buttonBy('ankiWorkbench.sessions.discard'));
     expect(ankiDraftSessionDelete).toHaveBeenCalledWith('s1');
     expect(host.textContent).toContain('ankiWorkbench.sessions.none');
+  });
+
+  it('resumes a session by id, never by path, and picks up at the uncovered offset', async () => {
+    ankiDraftSessionList.mockResolvedValue([
+      {
+        session: { id: 's1', label: 'Ginga Eiyuu Densetsu.apkg', status: 'interrupted' },
+        progress: { status: 'interrupted', covered: 1500, totalNotes: 7992, resumable: true, resumeOffset: 1500 },
+      },
+    ]);
+    ankiDraftSessionResume.mockResolvedValue({ plan: { verdict: 'ok', offset: 1500, limit: 500 } });
+    readApkgDraft.mockResolvedValue({ ok: true, draft: browsable(), totalNotes: 7992, sessionId: 's1' });
+    await mount();
+
+    await click(buttonBy('ankiWorkbench.sessions.resume:1500'));
+    expect(ankiDraftSessionResume).toHaveBeenCalledWith('s1');
+    // The renderer has never been told where the file is; the session names it.
+    expect(readApkgDraft).toHaveBeenCalledWith({ sessionId: 's1', noteOffset: 1500, noteLimit: 500 });
+    expect(readApkgDraft).not.toHaveBeenCalledWith(
+      expect.objectContaining({ filePath: expect.anything() }),
+    );
+    expect(host.textContent).toContain('ankiWorkbench.step.source.outcome');
+  });
+
+  it('says why a changed file cannot be resumed and reads nothing', async () => {
+    // The negative control: a resume that silently re-read would splice two
+    // collections into one draft with nothing recording that it happened.
+    ankiDraftSessionList.mockResolvedValue([
+      {
+        session: { id: 's1', label: 'Ginga Eiyuu Densetsu.apkg', status: 'interrupted' },
+        progress: { status: 'interrupted', covered: 1500, totalNotes: 7992, resumable: true, resumeOffset: 1500 },
+      },
+    ]);
+    ankiDraftSessionResume.mockResolvedValue({ plan: { verdict: 'source-changed' } });
+    await mount();
+
+    await click(buttonBy('ankiWorkbench.sessions.resume:1500'));
+    expect(readApkgDraft).not.toHaveBeenCalled();
+    expect(host.textContent).toContain('ankiWorkbench.sessions.resumeRefused.source-changed');
+  });
+
+  it('offers no resume for a session that cannot be continued', async () => {
+    ankiDraftSessionList.mockResolvedValue([
+      {
+        session: { id: 's1', label: 'Live collection', status: 'complete' },
+        progress: { status: 'complete', covered: 7992, totalNotes: 7992, resumable: false, resumeOffset: null },
+      },
+    ]);
+    await mount();
+    expect(host.textContent).toContain('ankiWorkbench.sessions.status.complete');
+    expect(host.textContent).not.toContain('ankiWorkbench.sessions.resume');
   });
 
   it('shows the draft as Browser rows and records the selection on step 2', async () => {

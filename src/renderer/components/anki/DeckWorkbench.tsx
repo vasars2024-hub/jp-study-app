@@ -477,6 +477,43 @@ export default function DeckWorkbench() {
     [refreshSessions],
   );
 
+  /**
+   * Pick a package back up where the last read stopped.
+   *
+   * The verdict decides, and every verdict other than `ok` is said out loud
+   * rather than turned into a fresh read: `source-changed` in particular means
+   * the file on disk is not the one these pages came from, and continuing would
+   * splice two collections into one draft with nothing recording that it
+   * happened. No path is involved — the session names its own source to main.
+   */
+  const resumeSession = useCallback(
+    async (id: string) => {
+      setBusy('apkg');
+      setError(null);
+      try {
+        const { plan } = await window.api.ankiDraftSessionResume(id);
+        if (plan.verdict !== 'ok') {
+          setError(t(`ankiWorkbench.sessions.resumeRefused.${plan.verdict}`));
+          return;
+        }
+        const res = await window.api.readApkgDraft({
+          sessionId: id,
+          noteOffset: plan.offset,
+          noteLimit: plan.limit ?? ANKI_DRAFT_PAGE_SIZE,
+        });
+        if (!res.ok || !res.draft) {
+          if (res.error && res.error !== 'cancelled') setError(res.error);
+        } else adoptDraft(res.draft, res.totalNotes);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setBusy(null);
+        void refreshSessions();
+      }
+    },
+    [adoptDraft, refreshSessions, t],
+  );
+
   const progress = workbenchFlowProgress(flow);
   const currentStep = findStep(flow, flow.current);
   const blocking = draft?.diagnostics.filter((d) => d.severity === 'blocking') ?? [];
@@ -652,6 +689,18 @@ export default function DeckWorkbench() {
                           total: p.totalNotes ?? '?',
                         })}
                       </span>
+                      {p.resumable && (
+                        <button
+                          type="button"
+                          className="btn"
+                          disabled={busy !== null}
+                          onClick={() => void resumeSession(session.id)}
+                        >
+                          {t('ankiWorkbench.sessions.resume', {
+                            offset: p.resumeOffset ?? 0,
+                          })}
+                        </button>
+                      )}
                       <button
                         type="button"
                         className="btn"

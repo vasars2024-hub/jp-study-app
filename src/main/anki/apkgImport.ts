@@ -45,6 +45,7 @@ import {
   cancelDraftSession,
   deleteDraftSession,
   failDraftSession,
+  getDraftSession,
   recordDraftSessionPage,
   resumeDraftSession,
   summarizeDraftSessions,
@@ -428,7 +429,16 @@ function readMediaEntries(zip: AdmZip): RawAnkiMediaEntry[] | undefined {
  * decks too large to hand across IPC in a single message.
  */
 async function readApkgDraft(request: ApkgDraftRequest = {}): Promise<ApkgDraftResult> {
-  const file = await pickDeckFile(request.filePath);
+  // A resume names its session, never a path: the renderer has never been told
+  // where the file is (only its label), and the session store is where the path
+  // has been kept all along. Falling through to the dialog when the session is
+  // gone would silently ask for a different file, so it is an explicit refusal.
+  let requested = request.filePath;
+  if (!requested && request.sessionId) {
+    requested = getDraftSession(request.sessionId)?.request.filePath;
+    if (!requested) return { ok: false, error: 'session-source-unknown' };
+  }
+  const file = await pickDeckFile(requested);
   if (!file) return { ok: false, error: 'cancelled' };
 
   let db: Database | null = null;
@@ -463,12 +473,36 @@ async function readApkgDraft(request: ApkgDraftRequest = {}): Promise<ApkgDraftR
 
     const offset = Math.max(0, Math.floor(request.noteOffset ?? 0));
     const limit = request.noteLimit ?? ANKI_DRAFT_PAGE_SIZE;
+    const page = pageAnkiDraft(full, offset, limit);
+
+    // The session is recorded here rather than by the caller. The channels for
+    // doing it from the renderer have existed since Phase 1 and no caller has
+    // ever used them, so every session list has been empty and no draft has
+    // ever been resumable. Main is also the only side that can record one
+    // honestly: it holds the path, the fingerprint and the true total, and a
+    // page it served cannot go unrecorded because a caller forgot to say so.
+    const sourceKind = full.source.kind === 'colpkg' ? 'colpkg' : 'apkg';
+    const session = beginDraftSession({
+      sourceKind,
+      label: path.basename(file),
+      request: { kind: sourceKind, filePath: file, noteLimit: limit },
+      fingerprint,
+    });
+    recordDraftSessionPage(session.id, {
+      offset,
+      count: page.notes.length,
+      totalNotes: full.counts.notes,
+      fingerprint,
+      diagnosticCodes: page.diagnostics.map((d) => d.code),
+    });
+
     return {
       ok: true,
-      draft: pageAnkiDraft(full, offset, limit),
+      draft: page,
       fileName: path.basename(file),
       noteOffset: offset,
       totalNotes: full.counts.notes,
+      sessionId: session.id,
     };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
@@ -494,9 +528,10 @@ export function registerApkgIpc(): void {
     commitConnectDraft(request),
   );
 
-  // Resumable draft sessions. The renderer drives paging, so it is the only
-  // component that knows a page actually arrived; these channels are how it
-  // tells the store. Nothing here reads a source — see `draftSessionStore.ts`.
+  // Resumable draft sessions. `readApkgDraft` records its own pages — a reader
+  // that served a page is the one component that cannot forget to say so. These
+  // channels remain for a caller driving paging itself (a source main does not
+  // read, or a cancel/fail the reader cannot observe).
   ipcMain.handle('anki:draftSessionList', () => summarizeDraftSessions());
   ipcMain.handle('anki:draftSessionBegin', (_e, request: BeginDraftSessionRequest) =>
     beginDraftSession(request),

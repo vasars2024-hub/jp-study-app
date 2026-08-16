@@ -981,6 +981,13 @@ export function pageAnkiDraft(draft: AnkiDraft, offset: number, limit: number): 
 export interface ApkgDraftRequest {
   /** Skip the OS file dialog when set. */
   filePath?: string;
+  /**
+   * Resume this session's source. The path comes from the session store, so a
+   * surface can reopen a package it was never told the location of. Refused as
+   * `session-source-unknown` rather than falling back to the dialog: a resume
+   * that quietly asks for a different file is not a resume.
+   */
+  sessionId?: string;
   noteOffset?: number;
   noteLimit?: number;
 }
@@ -993,5 +1000,7 @@ export interface ApkgDraftResult {
   /** Where this page starts, and how many notes the collection holds in total. */
   noteOffset?: number;
   totalNotes?: number;
+  /** The session this page was folded into, so a surface can resume it later. */
+  sessionId?: string;
   error?: string;
 }

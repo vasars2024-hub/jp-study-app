@@ -8673,6 +8673,12 @@ export const ja: Catalog = {
   'ankiWorkbench.sessions.none': '未完了の読み込みはありません。',
   'ankiWorkbench.sessions.covered': '{total} 件中 {covered} 件を読み込み済み',
   'ankiWorkbench.sessions.discard': '破棄',
+  'ankiWorkbench.sessions.resume': 'ノート {offset} から再開',
+  'ankiWorkbench.sessions.resumeRefused.nothing-to-resume': 'この読み込みに続きはありません。',
+  'ankiWorkbench.sessions.resumeRefused.source-changed':
+    'この読み込みの開始後にファイルが変更されました。もう一度開いて最初からやり直してください。',
+  'ankiWorkbench.sessions.resumeRefused.cancelled-by-user': 'この読み込みはキャンセルされました。',
+  'ankiWorkbench.sessions.resumeRefused.already-complete': 'この読み込みはすでに全ノートを読み終えています。',
   'ankiWorkbench.sessions.status.reading': '読み込み中',
   'ankiWorkbench.sessions.status.paused': '一時停止',
   'ankiWorkbench.sessions.status.interrupted': '中断',
