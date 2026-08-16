@@ -8966,6 +8966,42 @@ export const zh: Catalog = {
     '{count} 个词已经开始学习，新卡队列位置对它们不适用：{detail}',
   'ankiWorkbench.tray.problem.prioritize-no-cards':
     '{count} 条笔记在本牌组中不生成卡片，没有可排序的对象：{detail}',
+  'ankiWorkbench.tray.kind.rescue-leeches':
+    '挽救反复遗忘的词',
+  'ankiWorkbench.tray.describe.rescue-leeches':
+    '挽救遗忘次数达到 {threshold} 次及以上的笔记：{measures}',
+  'ankiWorkbench.tray.leech.threshold':
+    '达到多少次遗忘算作顽固卡',
+  'ankiWorkbench.tray.leech.includeTagged':
+    '同时包含 Anki 已标记 leech 的笔记',
+  'ankiWorkbench.tray.leech.measure.tag': '添加挽救标签',
+  'ankiWorkbench.tray.leech.measure.hint': '从现有字段生成提示',
+  'ankiWorkbench.tray.leech.measure.reschedule': '应用更宽松的排程预设',
+  'ankiWorkbench.tray.leech.tag': '挽救标签',
+  'ankiWorkbench.tray.leech.hintFrom': '提示取自',
+  'ankiWorkbench.tray.leech.hintTo': '提示写入',
+  'ankiWorkbench.tray.leech.noReschedule':
+    '此编辑器无法更改排程，因此不会重新排程。请在 Anki 的牌组选项中更改顽固卡设置。',
+  'ankiWorkbench.tray.leech.keepsHints':
+    '已有内容的提示字段会原样保留，提示也只显示第一个字符。',
+  'ankiWorkbench.tray.leech.found':
+    '找到 {count} 张顽固卡，已挽救 {rescued} 张；其中 {tagged} 张仅因 Anki 已加标签而计入',
+  'ankiWorkbench.tray.problem.leech-not-leech':
+    '{count} 条笔记的遗忘次数低于阈值且没有 leech 标签，未作改动：{detail}',
+  'ankiWorkbench.tray.problem.leech-no-cards':
+    '{count} 条笔记在此牌组中没有卡片，因而没有遗忘次数：{detail}',
+  'ankiWorkbench.tray.problem.leech-already-tagged':
+    '{count} 条笔记已带有挽救标签：{detail}',
+  'ankiWorkbench.tray.problem.leech-hint-field-absent':
+    '{count} 条笔记缺少提示所需的两个字段，因此未写入提示：{detail}',
+  'ankiWorkbench.tray.problem.leech-hint-source-empty':
+    '{count} 条笔记的提示来源字段为空：{detail}',
+  'ankiWorkbench.tray.problem.leech-hint-source-too-short':
+    '{count} 条笔记太短，提示会暴露整个答案，因此未写入任何内容：{detail}',
+  'ankiWorkbench.tray.problem.leech-hint-occupied':
+    '{count} 条笔记已有提示，已按你写的原样保留：{detail}',
+  'ankiWorkbench.tray.problem.leech-reschedule-unsupported':
+    '这里无法应用更宽松的排程预设：此编辑器只能更改笔记和新卡顺序。请在 Anki 的牌组选项中更改顽固卡设置。',
   'ankiWorkbench.tray.describe.set-mastery': '把所选词标记为「{level}」',
   'ankiWorkbench.tray.masteryLevel': '把这些词标记为',
   'ankiWorkbench.tray.mastery.effect': '这会改变什么',

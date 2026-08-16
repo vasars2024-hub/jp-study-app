@@ -95,6 +95,12 @@ export interface LeechRescueTarget {
 export interface LeechRescueSkip {
   noteId: string;
   refusal: LeechRescueRefusal;
+  /**
+   * The note's sort field, stripped and trimmed — what the user calls this note.
+   * A refusal list of raw ids is a list the user cannot act on. Falls back to
+   * the id when every field is empty, so it is never blank.
+   */
+  label: string;
 }
 
 export interface LeechRescuePlan {
@@ -149,6 +155,20 @@ export function leechHintText(source: string, reveal: number): string | null {
   return `${chars.slice(0, reveal).join('')}${LEECH_HINT_ELLIPSIS}`;
 }
 
+/** What the user calls this note: its sort field, or the first field with text. */
+function noteLabel(types: Map<string, AnkiDraftNoteType>, note: AnkiDraftNote): string {
+  const sortOrd = types.get(note.noteTypeId)?.sortFieldOrd ?? 0;
+  const ordered = [
+    ...note.fields.filter((f) => f.ord === sortOrd),
+    ...note.fields.filter((f) => f.ord !== sortOrd),
+  ];
+  for (const field of ordered) {
+    const text = stripFieldHtml(field.raw).trim();
+    if (text !== '') return text;
+  }
+  return note.id;
+}
+
 function fieldOrd(
   types: Map<string, AnkiDraftNoteType>,
   note: AnkiDraftNote,
@@ -192,16 +212,17 @@ export function planLeechRescue(input: LeechRescueInput): LeechRescuePlan {
   let taggedOnlyNotes = 0;
 
   for (const note of input.notes) {
+    const label = noteLabel(types, note);
     const own = cardsByNote.get(note.id) ?? [];
     if (own.length === 0) {
-      skips.push({ noteId: note.id, refusal: 'no-cards' });
+      skips.push({ noteId: note.id, refusal: 'no-cards', label });
       continue;
     }
     const lapses = own.reduce((most, card) => Math.max(most, card.lapses), 0);
     const tagged = note.tags.includes(ANKI_LEECH_TAG);
     const overThreshold = lapses >= threshold;
     if (!overThreshold && !(tagged && input.includeTagged)) {
-      skips.push({ noteId: note.id, refusal: 'not-leech' });
+      skips.push({ noteId: note.id, refusal: 'not-leech', label });
       continue;
     }
     leechNotes += 1;
@@ -210,7 +231,7 @@ export function planLeechRescue(input: LeechRescueInput): LeechRescuePlan {
     let tag: string | null = null;
     if (measures.has('tag') && rescueTag) {
       if (note.tags.includes(rescueTag)) {
-        skips.push({ noteId: note.id, refusal: 'already-tagged' });
+        skips.push({ noteId: note.id, refusal: 'already-tagged', label });
       } else {
         tag = rescueTag;
       }
@@ -221,17 +242,17 @@ export function planLeechRescue(input: LeechRescueInput): LeechRescuePlan {
       const fromOrd = fieldOrd(types, note, input.hintFromField);
       const toOrd = fieldOrd(types, note, input.hintToField);
       if (fromOrd === undefined || toOrd === undefined) {
-        skips.push({ noteId: note.id, refusal: 'hint-field-absent' });
+        skips.push({ noteId: note.id, refusal: 'hint-field-absent', label });
       } else {
         const before = note.fields.find((f) => f.ord === toOrd)?.raw ?? '';
         const source = stripFieldHtml(note.fields.find((f) => f.ord === fromOrd)?.raw ?? '').trim();
         const text = source === '' ? null : leechHintText(source, reveal);
         if (before.trim() !== '') {
-          skips.push({ noteId: note.id, refusal: 'hint-occupied' });
+          skips.push({ noteId: note.id, refusal: 'hint-occupied', label });
         } else if (source === '') {
-          skips.push({ noteId: note.id, refusal: 'hint-source-empty' });
+          skips.push({ noteId: note.id, refusal: 'hint-source-empty', label });
         } else if (text === null) {
-          skips.push({ noteId: note.id, refusal: 'hint-source-too-short' });
+          skips.push({ noteId: note.id, refusal: 'hint-source-too-short', label });
         } else {
           hint = {
             fromField: input.hintFromField,

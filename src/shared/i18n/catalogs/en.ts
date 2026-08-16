@@ -9440,6 +9440,42 @@ export const en: Catalog = {
     '{count} words have already been started, so a new-queue position would not apply to them: {detail}',
   'ankiWorkbench.tray.problem.prioritize-no-cards':
     '{count} notes generate no card in this deck, so there is nothing to position: {detail}',
+  'ankiWorkbench.tray.kind.rescue-leeches':
+    'Rescue words you keep forgetting',
+  'ankiWorkbench.tray.describe.rescue-leeches':
+    'Rescue notes with {threshold} or more lapses: {measures}',
+  'ankiWorkbench.tray.leech.threshold':
+    'Count as a leech at this many lapses',
+  'ankiWorkbench.tray.leech.includeTagged':
+    'Also include notes Anki has already tagged leech',
+  'ankiWorkbench.tray.leech.measure.tag': 'Add a rescue tag',
+  'ankiWorkbench.tray.leech.measure.hint': 'Add a hint from an existing field',
+  'ankiWorkbench.tray.leech.measure.reschedule': 'Apply a slower scheduling preset',
+  'ankiWorkbench.tray.leech.tag': 'Rescue tag',
+  'ankiWorkbench.tray.leech.hintFrom': 'Take the hint from',
+  'ankiWorkbench.tray.leech.hintTo': 'Write the hint to',
+  'ankiWorkbench.tray.leech.noReschedule':
+    'This editor cannot change scheduling, so nothing will be rescheduled. Change the leech settings in the deck options in Anki instead.',
+  'ankiWorkbench.tray.leech.keepsHints':
+    'A hint field that already holds text is left exactly as it is, and the hint only ever reveals the first character.',
+  'ankiWorkbench.tray.leech.found':
+    '{count} leeches found, {rescued} rescued; {tagged} of them counted only because Anki had already tagged them',
+  'ankiWorkbench.tray.problem.leech-not-leech':
+    '{count} notes are under the lapse threshold and carry no leech tag, so they were left alone: {detail}',
+  'ankiWorkbench.tray.problem.leech-no-cards':
+    '{count} notes generate no card in this deck, so they have no lapse count: {detail}',
+  'ankiWorkbench.tray.problem.leech-already-tagged':
+    '{count} notes already carry the rescue tag: {detail}',
+  'ankiWorkbench.tray.problem.leech-hint-field-absent':
+    '{count} notes do not have both hint fields, so no hint was written: {detail}',
+  'ankiWorkbench.tray.problem.leech-hint-source-empty':
+    '{count} notes have nothing in the field the hint would come from: {detail}',
+  'ankiWorkbench.tray.problem.leech-hint-source-too-short':
+    '{count} notes are so short that a hint would show the whole answer, so nothing was written: {detail}',
+  'ankiWorkbench.tray.problem.leech-hint-occupied':
+    '{count} notes already have a hint, which was kept exactly as you wrote it: {detail}',
+  'ankiWorkbench.tray.problem.leech-reschedule-unsupported':
+    'A slower scheduling preset cannot be applied here: this editor changes notes and new-card order only. Change the leech settings in the deck options in Anki.',
   'ankiWorkbench.tray.describe.set-mastery': 'Mark the selected words as {level}',
   'ankiWorkbench.tray.masteryLevel': 'Mark these words as',
   'ankiWorkbench.tray.mastery.effect': 'What this changes',

@@ -931,7 +931,7 @@ export function planChangeTray(
             severity: refusal === 'not-leech' ? 'info' : 'warning',
             actionId: action.id,
             count: 1,
-            detail: skip.noteId,
+            detail: skip.label,
           });
         }
       }

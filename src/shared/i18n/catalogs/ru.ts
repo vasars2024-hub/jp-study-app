@@ -9822,6 +9822,42 @@ export const ru: Catalog = {
     '{count} слов уже начаты, поэтому позиция в очереди новых карточек к ним не применяется: {detail}',
   'ankiWorkbench.tray.problem.prioritize-no-cards':
     '{count} заметок не порождают карточек в этой колоде, позиционировать нечего: {detail}',
+  'ankiWorkbench.tray.kind.rescue-leeches':
+    'Вытащить слова, которые постоянно забываются',
+  'ankiWorkbench.tray.describe.rescue-leeches':
+    'Вытащить заметки с {threshold} и более провалами: {measures}',
+  'ankiWorkbench.tray.leech.threshold':
+    'Считать пиявкой начиная с такого числа провалов',
+  'ankiWorkbench.tray.leech.includeTagged':
+    'Включить и заметки, которым Anki уже поставил метку leech',
+  'ankiWorkbench.tray.leech.measure.tag': 'Добавить метку спасения',
+  'ankiWorkbench.tray.leech.measure.hint': 'Сделать подсказку из существующего поля',
+  'ankiWorkbench.tray.leech.measure.reschedule': 'Применить более щадящий режим повторений',
+  'ankiWorkbench.tray.leech.tag': 'Метка спасения',
+  'ankiWorkbench.tray.leech.hintFrom': 'Взять подсказку из',
+  'ankiWorkbench.tray.leech.hintTo': 'Записать подсказку в',
+  'ankiWorkbench.tray.leech.noReschedule':
+    'Этот редактор не меняет расписание, поэтому ничего перенесено не будет. Измените настройки пиявок в параметрах колоды в Anki.',
+  'ankiWorkbench.tray.leech.keepsHints':
+    'Поле подсказки, в котором уже есть текст, остаётся нетронутым, а сама подсказка показывает только первый символ.',
+  'ankiWorkbench.tray.leech.found':
+    'Найдено пиявок: {count}, вытащено: {rescued}; из них {tagged} попали сюда только из-за метки Anki',
+  'ankiWorkbench.tray.problem.leech-not-leech':
+    'У {count} заметок провалов меньше порога и нет метки leech, поэтому их не тронули: {detail}',
+  'ankiWorkbench.tray.problem.leech-no-cards':
+    'У {count} заметок нет карточек в этой колоде, значит нет и счётчика провалов: {detail}',
+  'ankiWorkbench.tray.problem.leech-already-tagged':
+    'У {count} заметок метка спасения уже стоит: {detail}',
+  'ankiWorkbench.tray.problem.leech-hint-field-absent':
+    'У {count} заметок нет обоих полей для подсказки, поэтому подсказка не записана: {detail}',
+  'ankiWorkbench.tray.problem.leech-hint-source-empty':
+    'У {count} заметок пусто в поле, из которого берётся подсказка: {detail}',
+  'ankiWorkbench.tray.problem.leech-hint-source-too-short':
+    '{count} заметок настолько коротки, что подсказка показала бы весь ответ, поэтому ничего не записано: {detail}',
+  'ankiWorkbench.tray.problem.leech-hint-occupied':
+    'У {count} заметок подсказка уже есть, и она сохранена ровно так, как вы её написали: {detail}',
+  'ankiWorkbench.tray.problem.leech-reschedule-unsupported':
+    'Более щадящий режим повторений здесь применить нельзя: этот редактор меняет только заметки и порядок новых карточек. Измените настройки пиявок в параметрах колоды в Anki.',
   'ankiWorkbench.tray.describe.set-mastery': 'Пометить выбранные слова как «{level}»',
   'ankiWorkbench.tray.masteryLevel': 'Пометить эти слова как',
   'ankiWorkbench.tray.mastery.effect': 'Что это изменит',

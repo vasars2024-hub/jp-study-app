@@ -46,6 +46,10 @@ import {
   masteryEffect,
   type MasteryLevel,
 } from '../../../shared/ankiMastery';
+import {
+  DEFAULT_LEECH_THRESHOLD,
+  type LeechRescueMeasure,
+} from '../../../shared/ankiLeechRescue';
 import { buildVocabContext } from '../../../shared/ankiVocabContext';
 import { listKnownEntries, onKnowledgeChanged } from '../../knownWords';
 import { useT } from '../../i18n';
@@ -60,6 +64,7 @@ const ACTION_KINDS: TrayActionKind[] = [
   'fill-reading',
   'apply-ai-additions',
   'prioritize-new',
+  'rescue-leeches',
   'set-mastery',
   'add-tags',
   'remove-tags',
@@ -81,6 +86,19 @@ const READING_FORMS: ReadingFillForm[] = ['kana', 'furigana'];
 // `certain` writes only where two dictionaries agreed. `likely` is a widening
 // the user chooses, and neither admits an ambiguous word.
 const READING_THRESHOLDS: ReadingFillThreshold[] = ['certain', 'likely'];
+/**
+ * Recipe 10's measures, in the order the form lists them. `reschedule` is last
+ * and deliberately still offered: the catalogue names it, and a checkbox that
+ * refuses out loud is the honest answer to a capability the adapter lacks —
+ * hiding it would leave the user assuming the workbench had done it.
+ */
+const LEECH_MEASURES: LeechRescueMeasure[] = ['tag', 'hint', 'reschedule'];
+/**
+ * The rescue tag the form opens on. A namespaced tag rather than `leech`: Anki
+ * owns that one and writing it back would make the app's own marks
+ * indistinguishable from the scheduler's.
+ */
+const DEFAULT_RESCUE_TAG = 'leech::rescued';
 /** How many changed notes the diff lists before it summarises the rest. */
 const DIFF_PREVIEW_ROWS = 5;
 const DIFF_CHARS = 120;
@@ -145,6 +163,21 @@ export default function DeckWorkbenchTray({
   const prioritizeStart = /^\d+$/.test(prioritizeStartText.trim())
     ? Number(prioritizeStartText.trim())
     : -1;
+  /**
+   * Recipe 10's leech threshold, as text for the same reason the reposition
+   * start is: the field must be allowed to be empty mid-typing. An unparseable
+   * value becomes 0, which `planChangeTray` blocks — a threshold below one would
+   * call every card in the deck a leech.
+   */
+  const [leechThresholdText, setLeechThresholdText] = useState(String(DEFAULT_LEECH_THRESHOLD));
+  const leechThreshold = /^\d+$/.test(leechThresholdText.trim())
+    ? Number(leechThresholdText.trim())
+    : 0;
+  // On by default: Anki tagged those notes when the *deck's* threshold tripped,
+  // which need not be the number typed above, and they are leeches either way.
+  const [leechIncludeTagged, setLeechIncludeTagged] = useState(true);
+  const [leechMeasures, setLeechMeasures] = useState<LeechRescueMeasure[]>(['tag']);
+  const [leechTag, setLeechTag] = useState(DEFAULT_RESCUE_TAG);
   const [applied, setApplied] = useState<number | null>(null);
   /**
    * The reviewed generation, owned here because the tray is what writes it. A
@@ -393,6 +426,20 @@ export default function DeckWorkbenchTray({
         return { id, enabled: true, kind, batchId: aiBatch?.id ?? '', toField: fieldB, onConflict };
       case 'prioritize-new':
         return { id, enabled: true, kind, startPosition: prioritizeStart };
+      case 'rescue-leeches':
+        // The hint reuses the same two field selects a copy does, and in the
+        // same direction: `fieldA` is read, `fieldB` is written.
+        return {
+          id,
+          enabled: true,
+          kind,
+          threshold: leechThreshold,
+          includeTagged: leechIncludeTagged,
+          measures: [...leechMeasures],
+          rescueTag: leechTag,
+          hintFromField: fieldA,
+          hintToField: fieldB,
+        };
       case 'set-mastery':
         return { id, enabled: true, kind, level: masteryLevel };
       case 'normalize-text':
@@ -464,6 +511,13 @@ export default function DeckWorkbenchTray({
       case 'prioritize-new':
         return t('ankiWorkbench.tray.describe.prioritize-new', {
           start: String(action.startPosition),
+        });
+      case 'rescue-leeches':
+        return t('ankiWorkbench.tray.describe.rescue-leeches', {
+          threshold: String(action.threshold),
+          measures: LEECH_MEASURES.filter((m) => action.measures.includes(m))
+            .map((m) => t(`ankiWorkbench.tray.leech.measure.${m}`))
+            .join(', '),
         });
       case 'set-mastery':
         return t('ankiWorkbench.tray.describe.set-mastery', {
@@ -782,6 +836,57 @@ export default function DeckWorkbenchTray({
             </label>
             <span className="muted">{t('ankiWorkbench.tray.prioritize.protects')}</span>
           </>
+        ) : kind === 'rescue-leeches' ? (
+          <>
+            <label>
+              {t('ankiWorkbench.tray.leech.threshold')}
+              <input
+                type="text"
+                inputMode="numeric"
+                value={leechThresholdText}
+                onChange={(e) => setLeechThresholdText(e.target.value)}
+              />
+            </label>
+            <label className="wb-tray-flag">
+              <input
+                type="checkbox"
+                checked={leechIncludeTagged}
+                onChange={() => setLeechIncludeTagged((prev) => !prev)}
+              />
+              {t('ankiWorkbench.tray.leech.includeTagged')}
+            </label>
+            {LEECH_MEASURES.map((measure) => (
+              <label key={measure} className="wb-tray-flag">
+                <input
+                  type="checkbox"
+                  checked={leechMeasures.includes(measure)}
+                  onChange={() =>
+                    setLeechMeasures((prev) =>
+                      prev.includes(measure)
+                        ? prev.filter((m) => m !== measure)
+                        : [...prev, measure],
+                    )
+                  }
+                />
+                {t(`ankiWorkbench.tray.leech.measure.${measure}`)}
+              </label>
+            ))}
+            {leechMeasures.includes('tag') && (
+              <label>
+                {t('ankiWorkbench.tray.leech.tag')}
+                <input value={leechTag} onChange={(e) => setLeechTag(e.target.value)} />
+              </label>
+            )}
+            {leechMeasures.includes('hint')
+              && fieldPair(t('ankiWorkbench.tray.leech.hintFrom'), t('ankiWorkbench.tray.leech.hintTo'))}
+            {leechMeasures.includes('reschedule') && (
+              /* Said before Apply, not after: the checkbox is offered because
+                 the catalogue names the measure, and the user has to learn here
+                 that nothing will reschedule rather than from a silent result. */
+              <span className="wb-tray-warn">{t('ankiWorkbench.tray.leech.noReschedule')}</span>
+            )}
+            <span className="muted">{t('ankiWorkbench.tray.leech.keepsHints')}</span>
+          </>
         ) : kind === 'set-mastery' ? (
           <label>
             {t('ankiWorkbench.tray.masteryLevel')}
@@ -930,6 +1035,19 @@ export default function DeckWorkbenchTray({
                   .slice(0, DIFF_PREVIEW_ROWS)
                   .map((m) => `${m.term} #${m.after}`)
                   .join(', '),
+              })}
+            </p>
+          )}
+          {plan.leechRescue && (
+            /* The field diff shows the writes but not what made those notes
+               leeches. Reporting how many were found, and how many arrived only
+               through Anki's tag, is what keeps the threshold honest — a run
+               that found 0 must read as 0 and not as a quiet success. */
+            <p className="wb-tray-summary">
+              {t('ankiWorkbench.tray.leech.found', {
+                count: plan.leechRescue.leechNotes,
+                rescued: plan.leechRescue.targets.length,
+                tagged: plan.leechRescue.taggedOnlyNotes,
               })}
             </p>
           )}

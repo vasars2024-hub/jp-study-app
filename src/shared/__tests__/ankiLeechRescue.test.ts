@@ -165,6 +165,11 @@ const rescueAction = (
 const refusalsFor = (skips: ReadonlyArray<{ noteId: string; refusal: LeechRescueRefusal }>) =>
   new Map(skips.map((s) => [`${s.noteId}:${s.refusal}`, true]));
 
+const labelOf = (
+  skips: ReadonlyArray<{ noteId: string; label: string }>,
+  noteId: string,
+): string | undefined => skips.find((s) => s.noteId === noteId)?.label;
+
 describe('leechHintText', () => {
   it('reveals the leading characters and withholds the rest', () => {
     expect(leechHintText('to eat', 1)).toBe('t…');
@@ -202,6 +207,8 @@ describe('planLeechRescue', () => {
     const plan = planLeechRescue({ ...baseInput, measures: ['tag'], threshold: 8 });
     expect(plan.targets.some((t) => t.noteId === 'n-neko')).toBe(false);
     expect(refusalsFor(plan.skips).has('n-neko:not-leech')).toBe(true);
+    // Named by its own text, not its id: a refusal list of ids is unactionable.
+    expect(labelOf(plan.skips, 'n-neko')).toBe('猫');
   });
 
   it('drops the tag-only note when includeTagged is off', () => {

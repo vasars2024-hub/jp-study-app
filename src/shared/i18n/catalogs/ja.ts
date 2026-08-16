@@ -9008,6 +9008,42 @@ export const ja: Catalog = {
     'すでに学習を始めているため、{count} 語には新規キューの位置が適用されません：{detail}',
   'ankiWorkbench.tray.problem.prioritize-no-cards':
     'このデッキでカードを生成しないため、{count} 件のノートには並べ替える対象がありません：{detail}',
+  'ankiWorkbench.tray.kind.rescue-leeches':
+    '何度も忘れる単語を立て直す',
+  'ankiWorkbench.tray.describe.rescue-leeches':
+    '忘却回数が {threshold} 回以上のノートを立て直す：{measures}',
+  'ankiWorkbench.tray.leech.threshold':
+    'この忘却回数からリーチとみなす',
+  'ankiWorkbench.tray.leech.includeTagged':
+    'Anki が既に leech タグを付けたノートも含める',
+  'ankiWorkbench.tray.leech.measure.tag': '立て直し用のタグを付ける',
+  'ankiWorkbench.tray.leech.measure.hint': '既存のフィールドからヒントを作る',
+  'ankiWorkbench.tray.leech.measure.reschedule': 'ゆるやかなスケジュール設定を適用する',
+  'ankiWorkbench.tray.leech.tag': '立て直しタグ',
+  'ankiWorkbench.tray.leech.hintFrom': 'ヒントの取得元',
+  'ankiWorkbench.tray.leech.hintTo': 'ヒントの書き込み先',
+  'ankiWorkbench.tray.leech.noReschedule':
+    'このエディタはスケジュールを変更できないため、再スケジュールは行われません。Anki のデッキオプションでリーチ設定を変更してください。',
+  'ankiWorkbench.tray.leech.keepsHints':
+    'すでに文字が入っているヒントフィールドはそのまま残ります。ヒントは先頭の 1 文字だけを表示します。',
+  'ankiWorkbench.tray.leech.found':
+    'リーチ {count} 件を検出し、{rescued} 件を立て直しました。うち {tagged} 件は Anki のタグのみによる該当です',
+  'ankiWorkbench.tray.problem.leech-not-leech':
+    '{count} 件のノートは忘却回数がしきい値未満で leech タグもないため、変更していません：{detail}',
+  'ankiWorkbench.tray.problem.leech-no-cards':
+    '{count} 件のノートはこのデッキにカードがないため、忘却回数がありません：{detail}',
+  'ankiWorkbench.tray.problem.leech-already-tagged':
+    '{count} 件のノートには既に立て直しタグが付いています：{detail}',
+  'ankiWorkbench.tray.problem.leech-hint-field-absent':
+    '{count} 件のノートにはヒント用の 2 つのフィールドが揃っていないため、ヒントを書き込んでいません：{detail}',
+  'ankiWorkbench.tray.problem.leech-hint-source-empty':
+    '{count} 件のノートはヒントの取得元フィールドが空です：{detail}',
+  'ankiWorkbench.tray.problem.leech-hint-source-too-short':
+    '{count} 件のノートは短すぎてヒントが答えそのものになるため、何も書き込んでいません：{detail}',
+  'ankiWorkbench.tray.problem.leech-hint-occupied':
+    '{count} 件のノートには既にヒントがあり、書かれたとおりに残しました：{detail}',
+  'ankiWorkbench.tray.problem.leech-reschedule-unsupported':
+    'ここではゆるやかなスケジュール設定を適用できません。このエディタが変更できるのはノートと新規カードの順序だけです。Anki のデッキオプションでリーチ設定を変更してください。',
   'ankiWorkbench.tray.describe.set-mastery': '選択した単語を「{level}」にする',
   'ankiWorkbench.tray.masteryLevel': 'これらの単語を次にする',
   'ankiWorkbench.tray.mastery.effect': '変更される内容',
