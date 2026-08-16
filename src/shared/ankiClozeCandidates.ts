@@ -60,6 +60,9 @@ import { resolveVocabField } from './ankiVocabContext';
 /** How the sentence held the word — the confidence the review step ranks by. */
 export type ClozeMatchMode = 'exact' | 'reading' | 'stem';
 
+/** The modes, most-certain first — the order a surface should list them in. */
+export const CLOZE_MATCH_MODES: readonly ClozeMatchMode[] = ['exact', 'reading', 'stem'];
+
 export type ClozeCandidateOutcome =
   /** A span was located and a marker can be written. */
   | 'ready'

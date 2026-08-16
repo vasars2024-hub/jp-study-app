@@ -10184,6 +10184,26 @@ export const ru: Catalog = {
     'У {count} слов нет иероглифов, поэтому фуригану ставить не над чем: {detail}',
   'ankiWorkbench.tray.problem.reading-not-kana':
     'Для {count} слов найдены только чтения не каной — они пришли из неяпонского словаря, поэтому ничего не записано: {detail}',
+  'ankiWorkbench.tray.kind.add-cloze': 'Скрыть слово в его же примере',
+  'ankiWorkbench.tray.describe.add-cloze': 'Скрыть слово внутри примера ({modes})',
+  'ankiWorkbench.tray.cloze.modes': 'Как искать слово в примере',
+  'ankiWorkbench.tray.cloze.mode.exact': 'ровно так, как записано в поле слова',
+  'ankiWorkbench.tray.cloze.mode.reading': 'записанным каной',
+  'ankiWorkbench.tray.cloze.mode.stem': 'в изменённой форме, скрывая только неизменную часть',
+  'ankiWorkbench.tray.problem.cloze-wrong-note-type':
+    'Заметок с типом {detail}: {count}. Этот тип не делает карточки из скрытых слов — фигурные скобки просто появятся на карточке, поэтому ничего не записано.',
+  'ankiWorkbench.tray.problem.cloze-already':
+    'В {count} заметках это слово уже скрыто, поэтому они оставлены как есть.',
+  'ankiWorkbench.tray.problem.cloze-no-sentence':
+    'В {count} заметках нет примера, в котором можно скрыть слово.',
+  'ankiWorkbench.tray.problem.cloze-no-word':
+    'В {count} заметках не указано, какому слову они учат, поэтому скрывать нечего.',
+  'ankiWorkbench.tray.problem.cloze-html-split':
+    'В {count} заметках слово разорвано форматированием внутри примера, и скрыть его без переписывания вашего форматирования нельзя.',
+  'ankiWorkbench.tray.problem.cloze-not-found':
+    'В {count} примерах нет слова, которому они учат.',
+  'ankiWorkbench.tray.problem.cloze-undecidable':
+    'Форму {count} слов не удалось разобрать, поэтому они оставлены вам, а не угаданы.',
   'ankiWorkbench.tray.aiTo': 'Записать одобренный вариант в',
   'ankiWorkbench.tray.kind.apply-ai-additions': 'Применить проверенные ИИ-варианты',
   'ankiWorkbench.tray.describe.apply-ai-additions': 'Записать каждый одобренный ИИ-вариант в {to} ({conflict})',

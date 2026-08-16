@@ -100,7 +100,38 @@ import {
   type GlossaryMergeMode,
   type GlossarySource,
 } from './ankiGlossaryMerge';
+import {
+  clozeCandidate,
+  type ClozeCandidateOutcome,
+  type ClozeMatchMode,
+} from './ankiClozeCandidates';
 import type { VocabContext } from './ankiVocabContext';
+
+/**
+ * Recipe 19's outcomes as tray problems. A table rather than a chain of
+ * ternaries because `fill-reading` mapping a refusal to the wrong user-facing
+ * code is a shape this file has already been bitten by (see line ~646), and a
+ * total `Record` cannot silently lose an outcome when one is added.
+ *
+ * `ready` maps to nothing: it is the write, not a problem.
+ *
+ * Two are `info` rather than `warning`. `cloze-already` is the correct end
+ * state — the note is done — and `cloze-undecidable` is recipe 16's rule, where
+ * no stem was computable so the module never asked the question. Ranking either
+ * as a warning would put a queue of non-defects in front of the real ones.
+ */
+const CLOZE_OUTCOME_PROBLEMS: Record<
+  Exclude<ClozeCandidateOutcome, 'ready'>,
+  { code: TrayProblemCode; severity: 'warning' | 'info' }
+> = {
+  already: { code: 'cloze-already', severity: 'info' },
+  'not-cloze': { code: 'cloze-wrong-note-type', severity: 'warning' },
+  'no-sentence': { code: 'cloze-no-sentence', severity: 'warning' },
+  'no-term': { code: 'cloze-no-word', severity: 'warning' },
+  'html-split': { code: 'cloze-html-split', severity: 'warning' },
+  'not-found': { code: 'cloze-not-found', severity: 'warning' },
+  unknown: { code: 'cloze-undecidable', severity: 'info' },
+};
 
 export type TrayActionKind =
   | 'add-tags'
@@ -118,7 +149,8 @@ export type TrayActionKind =
   | 'normalize-tags'
   | 'normalize-decks'
   | 'split-deck'
-  | 'merge-glossary';
+  | 'merge-glossary'
+  | 'add-cloze';
 
 /**
  * What a copy does when the destination already holds text — Phase 4's "require
@@ -321,6 +353,27 @@ export type TrayAction =
        * a default would be this module choosing a judgement on their behalf.
        */
       level: MasteryLevel;
+    })
+  | (TrayActionBase & {
+      /**
+       * Recipe 19. Wraps a note's own word, where it occurs in the note's own
+       * sentence field, in the next free `{{cN::…}}` marker. There is no
+       * `toField`: the destination is the sentence itself, resolved per note
+       * type by `resolveSentenceField`, because a cloze deletion that lived in
+       * a different field from the sentence would not be a deletion at all.
+       *
+       * The action carries no `onConflict` either. It never overwrites: a span
+       * already inside a marker is `cloze-already` and writes nothing, which is
+       * what makes a second run over the same selection a no-op rather than a
+       * marker nested inside a marker.
+       */
+      kind: 'add-cloze';
+      /**
+       * Match modes to accept, no default. `stem` proposes a partial span
+       * (食べ out of 食べました) and whether that is wanted is the user's call —
+       * see `ankiClozeCandidates.ts` for why it is not extended.
+       */
+      modes: ClozeMatchMode[];
     });
 
 // ----- the ordered list --------------------------------------------------------
@@ -393,6 +446,23 @@ export type TrayProblemCode =
   | 'reading-occupied'
   /** Furigana was asked for on a word with no kanji: nothing to annotate. */
   | 'reading-no-kanji'
+  /**
+   * Recipe 19. A standard note type: `{{cN::…}}` would render as literal braces
+   * on the card rather than generating one. Nothing is written.
+   */
+  | 'cloze-wrong-note-type'
+  /** The span is already inside a marker, so the note is already done. */
+  | 'cloze-already'
+  /** This note type declares no sentence field, or this note's is empty. */
+  | 'cloze-no-sentence'
+  /** This note type declares no word field, so there is nothing to delete. */
+  | 'cloze-no-word'
+  /** The sentence holds the word but markup runs through the match. */
+  | 'cloze-html-split'
+  /** The sentence does not contain the word under any requested mode. */
+  | 'cloze-not-found'
+  /** No stem was computable, so containment was never an answerable question. */
+  | 'cloze-undecidable'
   /** An AI addition was queued with no generation batch to read. Blocking. */
   | 'no-ai-review'
   /** The queued action names a different batch than the one supplied. Blocking. */
@@ -759,6 +829,13 @@ function blockingProblems(
         problems.push({ code: 'empty-parameter', severity: 'blocking', actionId: action.id, count: 1 });
       } else if (!hasEnrichData) {
         problems.push({ code: 'no-enrich-data', severity: 'blocking', actionId: action.id, count: 1 });
+      }
+    } else if (action.kind === 'add-cloze') {
+      // No mode selected proposes nothing at all. That is a mis-set form, not a
+      // deck with no candidates, so it is refused rather than run to a zero the
+      // user would read as "none of my notes can be clozed".
+      if (action.modes.length === 0) {
+        problems.push({ code: 'empty-parameter', severity: 'blocking', actionId: action.id, count: 1 });
       }
     } else if (action.kind === 'apply-ai-additions') {
       if (action.toField === '') {
@@ -1765,6 +1842,37 @@ export function planChangeTray(
           action.provenance,
         );
         if (applyWrite(at, noteId, toOrd, written)) touched = true;
+      } else if (action.kind === 'add-cloze') {
+        const noteType = draft.noteTypes.find((nt) => nt.id === start.noteTypeId);
+        // A note whose type is not in the draft cannot be judged cloze or
+        // standard, and `cloze` is the guess that writes. Same refusal the
+        // model makes, for the same reason.
+        if (!noteType) {
+          problems.push({
+            code: 'cloze-wrong-note-type',
+            severity: 'warning',
+            actionId: action.id,
+            count: 1,
+            detail: noteId,
+          });
+          continue;
+        }
+        const candidate = clozeCandidate(start, noteType, { modes: action.modes });
+        if (candidate.outcome !== 'ready') {
+          problems.push({
+            code: CLOZE_OUTCOME_PROBLEMS[candidate.outcome].code,
+            severity: CLOZE_OUTCOME_PROBLEMS[candidate.outcome].severity,
+            actionId: action.id,
+            count: 1,
+            detail: candidate.outcome === 'not-cloze' ? noteType.name : noteId,
+          });
+          continue;
+        }
+        // `applyWrite` runs the field through `writeNoteField`, which reports
+        // the added ordinal and raises `cloze-cards-change` — this action's
+        // whole point is that a card appears, so the tray says so rather than
+        // this branch restating it.
+        if (applyWrite(at, noteId, candidate.fieldOrd, candidate.raw ?? '')) touched = true;
       } else if (action.kind === 'apply-ai-additions') {
         const batch = opts?.ai;
         // Unreachable: `blockingProblems` refused a missing or mismatched batch.

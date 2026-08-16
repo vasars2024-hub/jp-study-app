@@ -9285,6 +9285,22 @@ export const zh: Catalog = {
   'ankiWorkbench.tray.problem.reading-occupied': '{count} 条笔记的 {detail} 已有读音，未覆盖。',
   'ankiWorkbench.tray.problem.reading-no-kanji': '{count} 个词没有汉字，无法添加注音：{detail}',
   'ankiWorkbench.tray.problem.reading-not-kana': '{count} 个词找到的读音不是假名，应来自非日语词典，因此未写入：{detail}',
+  'ankiWorkbench.tray.kind.add-cloze': '在例句中隐藏该词',
+  'ankiWorkbench.tray.describe.add-cloze': '隐藏例句中的词（{modes}）',
+  'ankiWorkbench.tray.cloze.modes': '如何在例句中查找该词',
+  'ankiWorkbench.tray.cloze.mode.exact': '与词语字段写法完全一致',
+  'ankiWorkbench.tray.cloze.mode.reading': '以假名拼写',
+  'ankiWorkbench.tray.cloze.mode.stem': '变形后的形式，只隐藏不变的部分',
+  'ankiWorkbench.tray.problem.cloze-wrong-note-type':
+    '{count} 条笔记使用 {detail} 笔记类型，它不会根据隐藏的词生成卡片——花括号会直接显示在卡片上，因此未写入。',
+  'ankiWorkbench.tray.problem.cloze-already': '{count} 条笔记已经隐藏了该词，因此保持原样。',
+  'ankiWorkbench.tray.problem.cloze-no-sentence': '{count} 条笔记没有可用来隐藏该词的例句。',
+  'ankiWorkbench.tray.problem.cloze-no-word': '{count} 条笔记没有说明所教的词，因此没有可隐藏的内容。',
+  'ankiWorkbench.tray.problem.cloze-html-split':
+    '{count} 条笔记中，该词被例句里的格式拆开，不重写你的格式就无法隐藏。',
+  'ankiWorkbench.tray.problem.cloze-not-found': '{count} 个例句并不包含它所教的词。',
+  'ankiWorkbench.tray.problem.cloze-undecidable':
+    '{count} 个词的变形方式无法追踪，因此留给你处理而不是猜测。',
   'ankiWorkbench.tray.aiTo': '已批准的建议写入到',
   'ankiWorkbench.tray.kind.apply-ai-additions': '应用已审阅的 AI 建议',
   'ankiWorkbench.tray.describe.apply-ai-additions': '把每条已批准的 AI 建议写入 {to}（{conflict}）',

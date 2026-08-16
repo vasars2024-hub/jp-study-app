@@ -9795,6 +9795,26 @@ export const en: Catalog = {
     '{count} words have no kanji, so there is nothing to put furigana over: {detail}',
   'ankiWorkbench.tray.problem.reading-not-kana':
     'The only readings found for {count} words are not kana, so they came from a non-Japanese dictionary and nothing was written: {detail}',
+  'ankiWorkbench.tray.kind.add-cloze': 'Hide the word in its own sentence',
+  'ankiWorkbench.tray.describe.add-cloze': 'Hide the word inside the sentence ({modes})',
+  'ankiWorkbench.tray.cloze.modes': 'How the word may be found in the sentence',
+  'ankiWorkbench.tray.cloze.mode.exact': 'written exactly as the word field has it',
+  'ankiWorkbench.tray.cloze.mode.reading': 'spelled out in kana',
+  'ankiWorkbench.tray.cloze.mode.stem': 'in a changed form, hiding only the unchanging part',
+  'ankiWorkbench.tray.problem.cloze-wrong-note-type':
+    '{count} notes use the {detail} note type, which does not make cards from hidden words — the braces would show up on the card, so nothing was written.',
+  'ankiWorkbench.tray.problem.cloze-already':
+    '{count} notes already have that word hidden, so they were left as they are.',
+  'ankiWorkbench.tray.problem.cloze-no-sentence':
+    '{count} notes have no sentence to hide the word in.',
+  'ankiWorkbench.tray.problem.cloze-no-word':
+    '{count} notes do not say which word they teach, so there is nothing to hide.',
+  'ankiWorkbench.tray.problem.cloze-html-split':
+    'In {count} notes the word is split by formatting inside the sentence, so it cannot be hidden without rewriting your formatting.',
+  'ankiWorkbench.tray.problem.cloze-not-found':
+    '{count} sentences do not contain the word they teach.',
+  'ankiWorkbench.tray.problem.cloze-undecidable':
+    '{count} words change shape in a way this cannot follow, so they were left for you rather than guessed at.',
   'ankiWorkbench.tray.aiTo': 'Write the approved suggestion to',
   'ankiWorkbench.tray.kind.apply-ai-additions': 'Apply reviewed AI suggestions',
   'ankiWorkbench.tray.describe.apply-ai-additions': 'Write each approved AI suggestion to {to} ({conflict})',

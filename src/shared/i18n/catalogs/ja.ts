@@ -9363,6 +9363,26 @@ export const ja: Catalog = {
   'ankiWorkbench.tray.problem.reading-no-kanji': '{count} 件の単語には漢字がないため、ふりがなを付ける対象がありません: {detail}',
   'ankiWorkbench.tray.problem.reading-not-kana':
     '{count} 件の単語で見つかった読みはかなではないため、日本語以外の辞書によるものと判断して書き込みませんでした: {detail}',
+  'ankiWorkbench.tray.kind.add-cloze': '例文の中で単語を隠す',
+  'ankiWorkbench.tray.describe.add-cloze': '例文の中の単語を隠す（{modes}）',
+  'ankiWorkbench.tray.cloze.modes': '例文の中で単語をどう探すか',
+  'ankiWorkbench.tray.cloze.mode.exact': '単語フィールドと同じ表記',
+  'ankiWorkbench.tray.cloze.mode.reading': 'かな表記',
+  'ankiWorkbench.tray.cloze.mode.stem': '活用形。変わらない部分だけを隠す',
+  'ankiWorkbench.tray.problem.cloze-wrong-note-type':
+    '{count} 件のノートは {detail} ノートタイプで、隠した単語からカードを作りません。波かっこがそのままカードに表示されるため、書き込みませんでした。',
+  'ankiWorkbench.tray.problem.cloze-already':
+    '{count} 件のノートではすでにその単語が隠されているため、そのままにしました。',
+  'ankiWorkbench.tray.problem.cloze-no-sentence':
+    '{count} 件のノートには単語を隠す例文がありません。',
+  'ankiWorkbench.tray.problem.cloze-no-word':
+    '{count} 件のノートは学習する単語を示していないため、隠すものがありません。',
+  'ankiWorkbench.tray.problem.cloze-html-split':
+    '{count} 件のノートでは例文内の書式で単語が分断されており、書式を書き換えずに隠すことができません。',
+  'ankiWorkbench.tray.problem.cloze-not-found':
+    '{count} 件の例文に、その例文が教える単語が含まれていません。',
+  'ankiWorkbench.tray.problem.cloze-undecidable':
+    '{count} 件の単語は形の変化を追えないため、推測せずそのまま残しました。',
   'ankiWorkbench.tray.aiTo': '承認した候補の書き込み先',
   'ankiWorkbench.tray.kind.apply-ai-additions': '確認済みのAI候補を適用',
   'ankiWorkbench.tray.describe.apply-ai-additions': '承認した各AI候補を{to}に書き込む（{conflict}）',

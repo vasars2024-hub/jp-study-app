@@ -43,6 +43,7 @@ import type { GlossarySource } from '../../../shared/ankiGlossaryMerge';
 import { TEXT_NORMALIZE_ORDER, type TextNormalizeOp } from '../../../shared/ankiTextNormalize';
 import { TAG_NORMALIZE_ORDER, type TagNormalizeOp } from '../../../shared/ankiTagNormalize';
 import { DECK_NORMALIZE_ORDER, type DeckNormalizeOp } from '../../../shared/ankiDeckNormalize';
+import { CLOZE_MATCH_MODES, type ClozeMatchMode } from '../../../shared/ankiClozeCandidates';
 import {
   MASTERY_LEVELS,
   MASTERY_LEVEL_KEYS,
@@ -65,6 +66,7 @@ export const ACTION_KINDS: TrayActionKind[] = [
   'normalize-text',
   'swap-fields',
   'copy-field',
+  'add-cloze',
   'enrich-dictionary',
   'fill-reading',
   'apply-ai-additions',
@@ -101,6 +103,10 @@ export const FIELD_ACTION_KINDS: TrayActionKind[] = [
   'normalize-text',
   'swap-fields',
   'copy-field',
+  // Recipe 19 rewrites the sentence field in place, bringing in no dictionary,
+  // reading or generation — so it belongs here and not in step 3's "Add and
+  // enrich", even though it is the one field edit that changes the card count.
+  'add-cloze',
 ];
 /**
  * Step 5, "Learning rules": the kinds that decide what a note *means* for study
@@ -214,6 +220,10 @@ export default function DeckWorkbenchTray({
   const [normalizeOps, setNormalizeOps] = useState<TextNormalizeOp[]>([]);
   const [tagOps, setTagOps] = useState<TagNormalizeOp[]>([]);
   const [deckOps, setDeckOps] = useState<DeckNormalizeOp[]>([]);
+  // `stem` is off by default: it hides only the unchanging part of an inflected
+  // word (食べ out of 食べました), which is a partial deletion worth opting into
+  // rather than finding on a card later. See `ankiClozeCandidates.ts`.
+  const [clozeModes, setClozeModes] = useState<ClozeMatchMode[]>(['exact', 'reading']);
   const [aspect, setAspect] = useState<EnrichAspect>('meaning');
   // `refuse` first and pre-selected for the same reason `keep` is: it is the one
   // answer that cannot invent one. A disagreement between installed
@@ -551,6 +561,13 @@ export default function DeckWorkbenchTray({
         // arm keeps the switch exhaustive and builds a refusable action — no
         // source id and no pairs is exactly what `blockingProblems` blocks.
         return { id, enabled: true, kind, sourceId: '', keyField: '', fieldPairs: [], mode: 'fill-empty' };
+      case 'add-cloze':
+        // Recipe 19. Unlike 13 and 14 this one IS in `ACTION_KINDS`, so this arm
+        // is reached: the form is the mode checkboxes below. The default is
+        // `exact` and `reading` but not `stem` — a stem match hides only the
+        // unchanging part of an inflected word, which is a partial deletion the
+        // user should opt into rather than discover on their cards.
+        return { id, enabled: true, kind, modes: [...clozeModes] };
       case 'normalize-text':
         return {
           id,
@@ -656,6 +673,12 @@ export default function DeckWorkbenchTray({
           // which of their fields this action is about to write into.
           fields: action.fieldPairs.map((p) => `${p.fromField} → ${p.toField}`).join(', '),
           mode: t(`ankiWorkbench.tray.glossary.mode.${action.mode}`),
+        });
+      case 'add-cloze':
+        return t('ankiWorkbench.tray.describe.add-cloze', {
+          // The modes, not a count: which ways of finding the word are allowed
+          // is the whole decision, and "2 modes" hides that `stem` is on.
+          modes: action.modes.map((m) => t(`ankiWorkbench.tray.cloze.mode.${m}`)).join(', '),
         });
       default:
         return t(`ankiWorkbench.tray.describe.${action.kind}`, { tags: action.tags.join(' ') });
@@ -886,6 +909,27 @@ export default function DeckWorkbenchTray({
                   }
                 />
                 {t(`ankiWorkbench.tray.deckNormalize.${op}`)}
+              </label>
+            ))}
+          </>
+        ) : kind === 'add-cloze' ? (
+          <>
+            {/* No field pickers: recipe 19 writes into the sentence field the
+                note type declares, so there is nothing to point at. The only
+                decision is which ways of finding the word count as a match. */}
+            <p className="muted">{t('ankiWorkbench.tray.cloze.modes')}</p>
+            {CLOZE_MATCH_MODES.map((mode) => (
+              <label key={mode} className="wb-tray-flag">
+                <input
+                  type="checkbox"
+                  checked={clozeModes.includes(mode)}
+                  onChange={() =>
+                    setClozeModes((prev) =>
+                      prev.includes(mode) ? prev.filter((m) => m !== mode) : [...prev, mode],
+                    )
+                  }
+                />
+                {t(`ankiWorkbench.tray.cloze.mode.${mode}`)}
               </label>
             ))}
           </>
