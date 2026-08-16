@@ -151,11 +151,13 @@ Both exist and are committed, and the matrix that guards them now stands at **8 
 observed**, the ninth blocked on a second display this machine does not have. **L1 may begin.**
 
 Read this as what it is. The gate says the freeze map exists and has been driven — it does **not**
-say every frozen system is fully covered. Three coverage holes are recorded above and each is
-carried into L1 rather than closed here: the Aero rows certify the **material/CSS layer but not
-the React `useAeroMaterials()` branch**; the Wired row's **timings are throttled** and are not a
-category-7 input; and its **desk-icon half ran on an empty set**. A wave that trusts this matrix
-beyond those three limits is trusting something it does not say.
+say every frozen system is fully covered. Of the three coverage holes first recorded here, **two
+were closed in the same turn** (the Wired row's empty desk-icon set and its throttled timings, both
+re-run and re-measured above). **One is carried into L1:** the Aero rows certify the
+**material/CSS layer but not the React `useAeroMaterials()` branch**, which re-reads only on
+`onThemeChanged` — and reaching that needs the write the whole rewrite exists to avoid. A wave that
+changes Aero's React composition is still uncovered by this matrix. Anything else it is trusted for
+is trusting something it does not say.
 
 ### The Aero rows — how the forbidden recipe was replaced (2026-08-17)
 
@@ -203,18 +205,29 @@ one transient startup sound, not suppressed and carrying no state.
 Result: phases `preboot → boot → warning → reveal → active`, `reachedActive` true,
 `desktopSurvived` true, and **7 of 7** restore assertions true including both localStorage keys.
 
-**Two limits, stated because each is a way this row could read as a false pass:**
+**Both limits this row was first recorded with are now CLOSED — re-run 2026-08-17, same turn.**
+They are kept here because the corrections are the reusable part.
 
-- **The timings are NOT a performance measurement.** Observed 2 / 1379 / 1501 / 1501 / 1501 ms
-  against reduced-motion budgets of 60 / 420 / 760 / 960 — three phases landing in one tick is
-  Chromium catching up throttled timers in a backgrounded window, not the boot sequence's real
-  cadence. The **order** is the evidence here; the durations are not. Anything scoring rubric
-  category 7 off this row must re-run it under `/focus` with the window foregrounded.
-- **The desk-icon half is measured on an empty set.** `deskIcons` was **0 → 0** because this
-  desktop currently holds no shortcuts, and 0 === 0 passes trivially. Per the rubric's
-  empty-harness guard that half is **not evidence**. The `.fwin` (2) and taskbar-entry (2) halves
-  are real. Re-run with at least one desk icon present to close it — the desktop-shortcut-grid row
-  above already shows how to add and remove one.
+- **The empty-harness hole is closed.** The first run scored `deskIcons` **0 → 0** on a desktop
+  holding no shortcuts, which passes trivially and is not evidence. Re-run with a real icon added
+  through the shell's own `desktop:add-shortcut` event: DOM icons **0 → 1** (label
+  `L0WiredIconProbe`, its `×` control present), then the full restart with the icon present —
+  `deskIcons` **1 → 1 → 1** across `preboot → boot → warning → reveal → active`, `.fwin` 2 and
+  taskbar 2 unchanged. Icon then removed via its own `×`, DOM back to **0**, and the persisted
+  layout re-read through `desktopGetLayout()`: **0 icons, blob 1,829 chars — identical to the
+  captured baseline.** Trap confirmed still live: the `×` is `display:none` until `:hover` and the
+  bridge `/click` sends no mouse-move, so it must be driven with a programmatic `.click()`.
+- **The throttling diagnosis was right, and the timings are now real.** The first run's
+  2 / 1379 / 1501 / 1501 / 1501 ms was Chromium catching up throttled timers in a backgrounded
+  window. Re-run after `/focus`: **0 / 783 / 858 / 858 / 961 ms** against reduced-motion budgets of
+  60 / 420 / 760 / 960 — `active` at **961 ms against a 960 ms budget**. Standing rule this
+  produced: **`/focus` before any timing measurement, or the number is the throttler's, not the
+  product's.** A backgrounded window does not fail loudly; it reports plausible-looking numbers
+  roughly 1.5× too large and bunches phases into one tick.
+- **An intermediate run reached only `preboot → boot`** because the release leg fired before the
+  sequence finished. It is recorded rather than discarded: `reachedActive` false is the correct
+  result for that run, and reporting it as a pass on the strength of `desktopSurvived: true` would
+  have been exactly the false pass this matrix exists to prevent.
 
 The one that remains:
 
