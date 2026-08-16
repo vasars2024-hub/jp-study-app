@@ -23586,3 +23586,67 @@ is a finding to chase, not a pass — the 10,147 all-`broken` was the renderer, 
 Probes at `debug/r15-real-apkg.probe.test.ts.txt` and
 `debug/r15-frontside-dollar.probe.test.ts.txt` — copy into `src/main/__tests__/` to
 re-run; they read the user's Downloads and are not suite material.
+
+## 2026-08-16 — Track 7 / Phase 7: recipe 11, and the deck where one file breaks 11,084 notes
+
+**Slices.** `685f487d` the model + package plumbing, `2b8db431` the `media:` filter and
+the panel.
+
+**Decision.** Recipe 11 ("find missing, broken, duplicate, or oversized media") ships as
+a **filter plus a read-only panel**, like recipes 9 and 15 — its verb is "find".
+`shared/ankiMediaHealth.ts` gives seven verdicts, healthiest first:
+`none / ok / unverified / duplicate / oversized / broken / missing`. `none` is dropped
+rather than ranked (recipe 15's `not-generated` rule): 42,021 of one real deck's 52,021
+notes cite no media at all and would otherwise make "97% ok" mean nothing.
+
+**Sizes without reading a byte.** `bytes`/`crc32` come from the zip's **central
+directory** — the largest package here is 22,168 files / 223.5 MB, and decompressing that
+to size it is not a trade a filter can make. Tradeoff: `bytes` is what the file occupies
+*in the package*, and `broken` is zero-byte only. Magic-number sniffing for a truncated
+mp3 was rejected on that same cost. Duplicates key on `bytes:crc32`, never size alone —
+22k short clips collide on size constantly.
+
+**The catalogue never crosses IPC.** Facts ride on the per-note `AnkiDraftMediaRef`s,
+which page; only a 4-number `AnkiDraft.media` summary is package-level. That is why
+`unverified` had to exist: a manifest-less draft (AnkiConnect, local deck) has
+`present:false` on every reference while nothing is known to be absent, and reading that
+as `missing` queues up the user's whole deck.
+
+**Both axes, always.** `HSK_30_Vocabulary…Simplified_Characters.apkg` reports **11,084 of
+11,086** notes `missing`. Chased as a suspected name-mismatch bug; it is not — the names
+match exactly and **one** file is absent (`1sec_silence.mp3`). So `mediaFileDefects`
+exists and the panel states files *and* notes. Neither number alone is honest.
+
+**The false positive real data did find.** `unreferenced` counted 14 files across the 30
+packages that no note cites — every one an Anki `_`-prefixed template asset
+(`_SourceHanSerifJP-Medium.otf`, `_youdao.png`). Excluded: all 30 now report 0, and the
+surface no longer offers a user their own card type's fonts to delete.
+
+**Measured, 30 packages / ~179,000 notes**, every tally summing to its own note count.
+**Live** through the running renderer on a 504-note draft: the seven verdicts partition
+it exactly (500 + 1 + 1 + 1 + 1), from **4 defect files**. Negative control: the
+media-less note is in neither `media:missing` nor `media:ok`. Refusals: no context ->
+`no-media-context`, `media:banana` -> `unknown-key` — never an empty grid.
+**Mutation controls, all four red:** duplicates keyed on size alone (2), dropping the `_`
+exclusion (1), `missing` on a manifest-less draft (2), and the panel reporting defect
+files where it claims notes (1).
+
+**Traps.** (a) The workbench cannot be opened by an agent (native file dialog), so live
+acceptance ran by `import()`ing the modules into the running renderer and building a
+draft in-page — `/eval` is synchronous, so kick the promise, stash on `window`, read in a
+second call. (b) The four i18n catalogs carry other tracks' unstaged work; staged with
+`debug/stage-media-i18n.cjs` (HEAD blob + one spliced block). Do **not** reuse
+`stage-render-i18n.cjs` — its `keys * 2` assertion rejects a block that mixes one- and
+two-line entries, which recipe 11's English does. Committed blobs re-checked: +18 keys,
+0 removals, all four catalogs still key-identical.
+
+Gates: `npx vitest run` **688 passed / 1 failed suite / 1 skipped of 690, 9,358 passed /
+6 skipped**; the failure is `scraperScheduler.test.ts` ENOTEMPTY in *teardown* (all 37 of
+its tests pass) and it passes 37/37 alone — the known full-run flake, not this change.
+Baseline 687/688 and 9,310; +2 files, +48 tests. i18n exit 0 at **10,262**. architecture
+"Nothing new", 2 pending. eslint on 11 touched paths: **0 errors**, 7 non-null-assertion
+warnings in tests, matching the surrounding style. Shared working tree (HEAD alone is red
+from other tracks).
+
+Probe at `debug/r11-real-apkg.probe.test.ts` — copy into `src/main/__tests__/` to re-run;
+it reads the user's Downloads and is not suite material.
