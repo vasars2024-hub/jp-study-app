@@ -152,6 +152,17 @@ export interface StaleCardFacts {
    * yet due", so it is clamped to `null` — a card due tomorrow is not -1 stale.
    */
   overdueDays: number | null;
+  /**
+   * The card's `due` as a day number, or `null` when `due` is not one.
+   *
+   * Separate from `overdueDays` because that one is clamped, and the two
+   * therefore answer different questions: `overdueDays` is null for a review
+   * card due tomorrow, `dueDay` is not. A remedy that read the clamped value to
+   * decide whether a card *has* a day would refuse every dormant card whose due
+   * is still in the future — which is the recipe's headline case, a deck the
+   * user stopped studying long before its cards came due.
+   */
+  dueDay: number | null;
   /** Days since the newest revlog entry, or `null` with no history for this card. */
   sinceReviewDays: number | null;
   /** Lapses, carried through so a surface can rank a rescue queue without re-reading cards. */
@@ -303,13 +314,15 @@ function classifyCard(card: AnkiDraftCard, ctx: ClassifyContext): StaleCardFacts
   // second and a new card's is a queue position, so subtracting `todayDay` from
   // either produces a number in the millions or a plausible-looking lie.
   const isDayNumber = card.type === 'review' || card.type === 'relearning';
-  const rawOverdue = isDayNumber ? ctx.todayDay - card.due : null;
+  const dueDay = isDayNumber ? card.due : null;
+  const rawOverdue = dueDay === null ? null : ctx.todayDay - dueDay;
   const overdueDays = rawOverdue !== null && rawOverdue > 0 ? rawOverdue : null;
 
   const facts = {
     cardId: card.id,
     noteId: card.noteId,
     overdueDays,
+    dueDay,
     sinceReviewDays,
     lapses: card.lapses,
   };
@@ -441,9 +454,12 @@ export function planStaleRemedy(input: StaleRemedyInput): StaleRemedyResult {
       skips.push({ ...seat, refusal: 'withheld' });
       continue;
     }
-    // `overdueDays === null` is exactly "its `due` is not a day number", so this
-    // covers new and learning cards without re-reading the card row.
-    if (facts.overdueDays === null) {
+    // `dueDay` and not `overdueDays`: the latter is clamped at zero, so reading
+    // it here would call a review card due tomorrow "not a review card" and
+    // refuse every dormant card whose due has not arrived yet — the recipe's
+    // headline case. `dueDay === null` is exactly "its `due` is not a day
+    // number", which is new and learning cards and nothing else.
+    if (facts.dueDay === null) {
       skips.push({ ...seat, refusal: 'not-review' });
       continue;
     }
@@ -470,7 +486,10 @@ export function planStaleRemedy(input: StaleRemedyInput): StaleRemedyResult {
     // worst cards should not all land together, and an even split keeps each
     // day's load within one card of every other day's.
     const after = todayDay + (index % spread);
-    const before = todayDay - (facts.overdueDays ?? 0);
+    // The card's real day, not `todayDay - overdueDays`. Those agree on an
+    // overdue card by construction and disagree on a dormant one whose due is
+    // still ahead, where the derived form would report a `before` in the past.
+    const before = facts.dueDay ?? todayDay;
     moves.push({
       noteId: facts.noteId,
       cardId: facts.cardId,

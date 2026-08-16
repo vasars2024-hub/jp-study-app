@@ -45,6 +45,12 @@ import { TAG_NORMALIZE_ORDER, type TagNormalizeOp } from '../../../shared/ankiTa
 import { DECK_NORMALIZE_ORDER, type DeckNormalizeOp } from '../../../shared/ankiDeckNormalize';
 import { CLOZE_MATCH_MODES, type ClozeMatchMode } from '../../../shared/ankiClozeCandidates';
 import {
+  DEFAULT_DORMANT_DAYS,
+  DEFAULT_OVERDUE_DAYS,
+  DEFAULT_STALE_SPREAD_DAYS,
+  type StaleRemedyMode,
+} from '../../../shared/ankiStaleCards';
+import {
   MASTERY_LEVELS,
   MASTERY_LEVEL_KEYS,
   masteryEffect,
@@ -71,6 +77,7 @@ export const ACTION_KINDS: TrayActionKind[] = [
   'fill-reading',
   'apply-ai-additions',
   'prioritize-new',
+  'reschedule-stale',
   'rescue-leeches',
   'set-mastery',
   'add-tags',
@@ -115,6 +122,10 @@ export const FIELD_ACTION_KINDS: TrayActionKind[] = [
  */
 export const RULE_ACTION_KINDS: TrayActionKind[] = [
   'prioritize-new',
+  // Recipe 18. Same step and the same reason `prioritize-new` is here: it moves
+  // when a card is seen, which is what a note means for study rather than what
+  // it says. It is also the other kind that writes `card-due` and no field.
+  'reschedule-stale',
   'rescue-leeches',
   'set-mastery',
   'add-tags',
@@ -146,6 +157,13 @@ const READING_THRESHOLDS: ReadingFillThreshold[] = ['certain', 'likely'];
  * hiding it would leave the user assuming the workbench had done it.
  */
 const LEECH_MEASURES: LeechRescueMeasure[] = ['tag', 'hint', 'reschedule'];
+/**
+ * Recipe 18's two modes, in the order the select lists them. `reset` is last and
+ * deliberately still offered for the reason `reschedule` is above: the recipe's
+ * own title names it, and an option that refuses out loud is the honest answer
+ * to a capability the journal cannot carry.
+ */
+const STALE_MODES: StaleRemedyMode[] = ['reschedule', 'reset'];
 /**
  * The rescue tag the form opens on. A namespaced tag rather than `leech`: Anki
  * owns that one and writing it back would make the app's own marks
@@ -263,6 +281,24 @@ export default function DeckWorkbenchTray({
   const [leechIncludeTagged, setLeechIncludeTagged] = useState(true);
   const [leechMeasures, setLeechMeasures] = useState<LeechRescueMeasure[]>(['tag']);
   const [leechTag, setLeechTag] = useState(DEFAULT_RESCUE_TAG);
+  /**
+   * Recipe 18's three numbers, as text for the reason the two above are: each
+   * must be allowed to be empty mid-typing. An unparseable value becomes 0,
+   * which is below `MIN_STALE_THRESHOLD_DAYS` and blocks — the defaults are not
+   * substituted silently, because a threshold the user meant to change and
+   * mistyped would otherwise run against a number they never chose.
+   */
+  const [staleOverdueText, setStaleOverdueText] = useState(String(DEFAULT_OVERDUE_DAYS));
+  const [staleDormantText, setStaleDormantText] = useState(String(DEFAULT_DORMANT_DAYS));
+  const [staleSpreadText, setStaleSpreadText] = useState(String(DEFAULT_STALE_SPREAD_DAYS));
+  const staleDays = (text: string): number => (/^\d+$/.test(text.trim()) ? Number(text.trim()) : 0);
+  /**
+   * `reschedule` and never `reset` as the opening value. `reset` is in the select
+   * and refuses out loud, the same arrangement recipe 10's `reschedule` measure
+   * has — hiding it would leave the user hunting for a capability the recipe's
+   * own title names.
+   */
+  const [staleMode, setStaleMode] = useState<StaleRemedyMode>('reschedule');
   const [applied, setApplied] = useState<number | null>(null);
   /**
    * The reviewed generation, owned here because the tray is what writes it. A
@@ -543,6 +579,21 @@ export default function DeckWorkbenchTray({
           hintFromField: fieldA,
           hintToField: fieldB,
         };
+      case 'reschedule-stale':
+        // `nowMs` is stamped here, at Add, and never re-read. The queued action
+        // and the days it plans are then the same "today" no matter how long the
+        // tray sits before Apply — recipe 14's rule, that the payload is built
+        // when the step is queued rather than while the form is edited.
+        return {
+          id,
+          enabled: true,
+          kind,
+          mode: staleMode,
+          overdueDays: staleDays(staleOverdueText),
+          dormantDays: staleDays(staleDormantText),
+          spreadDays: staleDays(staleSpreadText),
+          nowMs: Date.now(),
+        };
       case 'set-mastery':
         return { id, enabled: true, kind, level: masteryLevel };
       case 'normalize-tags':
@@ -679,6 +730,16 @@ export default function DeckWorkbenchTray({
           // The modes, not a count: which ways of finding the word are allowed
           // is the whole decision, and "2 modes" hides that `stem` is on.
           modes: action.modes.map((m) => t(`ankiWorkbench.tray.cloze.mode.${m}`)).join(', '),
+        });
+      case 'reschedule-stale':
+        // All three numbers, because each one changes which cards move and
+        // where: "reschedule stale cards" would not tell the user whether their
+        // 90-day threshold or their 14-day window is the one they mistyped.
+        return t('ankiWorkbench.tray.describe.reschedule-stale', {
+          mode: t(`ankiWorkbench.tray.stale.mode.${action.mode}`),
+          overdue: String(action.overdueDays),
+          dormant: String(action.dormantDays),
+          spread: String(action.spreadDays),
         });
       default:
         return t(`ankiWorkbench.tray.describe.${action.kind}`, { tags: action.tags.join(' ') });
@@ -1052,6 +1113,62 @@ export default function DeckWorkbenchTray({
               />
             </label>
             <span className="muted">{t('ankiWorkbench.tray.prioritize.protects')}</span>
+          </>
+        ) : kind === 'reschedule-stale' ? (
+          <>
+            {/* The two thresholds are separate inputs because the two axes are
+                separate verdicts — `overdue` counts days past a day Anki
+                planned, `dormant` counts days since a review that happened.
+                One combined "staleness" number would call a deck abandoned
+                mid-way and a deck rescheduled by a preset change the same. */}
+            <label>
+              {t('ankiWorkbench.tray.stale.overdue')}
+              <input
+                type="text"
+                inputMode="numeric"
+                value={staleOverdueText}
+                onChange={(e) => setStaleOverdueText(e.target.value)}
+              />
+            </label>
+            <label>
+              {t('ankiWorkbench.tray.stale.dormant')}
+              <input
+                type="text"
+                inputMode="numeric"
+                value={staleDormantText}
+                onChange={(e) => setStaleDormantText(e.target.value)}
+              />
+            </label>
+            <label>
+              {t('ankiWorkbench.tray.stale.spread')}
+              <input
+                type="text"
+                inputMode="numeric"
+                value={staleSpreadText}
+                onChange={(e) => setStaleSpreadText(e.target.value)}
+              />
+            </label>
+            <label>
+              {t('ankiWorkbench.tray.stale.mode')}
+              <select
+                value={staleMode}
+                onChange={(e) => setStaleMode(e.target.value as StaleRemedyMode)}
+              >
+                {STALE_MODES.map((mode) => (
+                  <option key={mode} value={mode}>
+                    {t(`ankiWorkbench.tray.stale.mode.${mode}`)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {staleMode === 'reset' ? (
+              /* Said before Add, not after Apply: the option is offered because
+                 the recipe names it, and the user has to learn here that the
+                 workbench cannot perform one. */
+              <span className="wb-tray-warn">{t('ankiWorkbench.tray.stale.noReset')}</span>
+            ) : (
+              <span className="muted">{t('ankiWorkbench.tray.stale.spreadsEvenly')}</span>
+            )}
           </>
         ) : kind === 'rescue-leeches' ? (
           <>

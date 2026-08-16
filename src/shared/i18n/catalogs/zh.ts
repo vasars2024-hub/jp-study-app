@@ -9304,6 +9304,33 @@ export const zh: Catalog = {
   'ankiWorkbench.tray.problem.cloze-not-found': '{count} 个例句并不包含它所教的词。',
   'ankiWorkbench.tray.problem.cloze-undecidable':
     '{count} 个词的变形方式无法追踪，因此留给你处理而不是猜测。',
+  'ankiWorkbench.tray.kind.reschedule-stale': '让停滞的卡片回到计划中',
+  'ankiWorkbench.tray.describe.reschedule-stale':
+    '对逾期 {overdue} 天以上或 {dormant} 天未复习的卡片{mode}，分摊到 {spread} 天',
+  'ankiWorkbench.tray.stale.overdue': '逾期天数阈值',
+  'ankiWorkbench.tray.stale.dormant': '停滞天数阈值',
+  'ankiWorkbench.tray.stale.spread': '分摊天数',
+  'ankiWorkbench.tray.stale.modes': '如何处理这些卡片',
+  'ankiWorkbench.tray.stale.mode.reschedule': '移动到期日',
+  'ankiWorkbench.tray.stale.mode.reset': '重置为新卡片',
+  'ankiWorkbench.tray.stale.noReset':
+    '重置一张卡片需要清除它的类型、队列、复习次数、失误次数、间隔和难度系数，并删除它的复习记录。本工作台只能移动到期日，因此不会执行一半的重置。',
+  'ankiWorkbench.tray.stale.spreadsEvenly':
+    '逾期最久的卡片最先回来，每一天的数量与其他各天相差不超过一张。',
+  'ankiWorkbench.tray.problem.stale-reset-unsupported':
+    '这里无法执行重置，因此没有做任何更改。请改选“移动到期日”。',
+  'ankiWorkbench.tray.problem.stale-no-origin':
+    '此来源没有集合创建日期，卡片的到期日起点未知，写入的每一个日期都会偏差同样一个未知的量。',
+  'ankiWorkbench.tray.problem.stale-withheld':
+    '{count} 张暂停或搁置的卡片保持原样：换一个到期日不会改变它们显示的内容。',
+  'ankiWorkbench.tray.problem.stale-not-review':
+    '{count} 张卡片是新卡片或仍在学习中，没有可移动的到期日。',
+  'ankiWorkbench.tray.problem.stale-not-stale':
+    '{count} 张卡片在两个阈值之内，因此保持原位。',
+  'ankiWorkbench.tray.problem.stale-history-unreadable':
+    '此来源的复习记录无法读取（{detail}），因此完全无法回答“最近没有复习”。移动的 {count} 张卡片仅按逾期天数选出。',
+  'ankiWorkbench.tray.problem.stale-clean':
+    '在这些阈值下没有停滞的卡片，因此没有移动任何到期日。',
   'ankiWorkbench.tray.aiTo': '已批准的建议写入到',
   'ankiWorkbench.tray.kind.apply-ai-additions': '应用已审阅的 AI 建议',
   'ankiWorkbench.tray.describe.apply-ai-additions': '把每条已批准的 AI 建议写入 {to}（{conflict}）',

@@ -362,6 +362,9 @@ describe('DeckWorkbench', () => {
     const rules = kindsOn();
     expect(rules).toEqual([
       'prioritize-new',
+      // Recipe 18. Here rather than in `fields` for the same reason
+      // `prioritize-new` is: it moves when a card is seen, not what it says.
+      'reschedule-stale',
       'rescue-leeches',
       'set-mastery',
       'add-tags',

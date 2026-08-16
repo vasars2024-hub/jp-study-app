@@ -9818,6 +9818,33 @@ export const en: Catalog = {
     '{count} sentences do not contain the word they teach.',
   'ankiWorkbench.tray.problem.cloze-undecidable':
     '{count} words change shape in a way this cannot follow, so they were left for you rather than guessed at.',
+  'ankiWorkbench.tray.kind.reschedule-stale': 'Bring stale cards back on schedule',
+  'ankiWorkbench.tray.describe.reschedule-stale':
+    '{mode} cards overdue by {overdue}+ days or unreviewed for {dormant}+ days, spread over {spread} days',
+  'ankiWorkbench.tray.stale.overdue': 'Overdue after (days)',
+  'ankiWorkbench.tray.stale.dormant': 'Dormant after (days)',
+  'ankiWorkbench.tray.stale.spread': 'Spread over (days)',
+  'ankiWorkbench.tray.stale.modes': 'What to do with them',
+  'ankiWorkbench.tray.stale.mode.reschedule': 'Move their due days',
+  'ankiWorkbench.tray.stale.mode.reset': 'Reset them to new',
+  'ankiWorkbench.tray.stale.noReset':
+    'Resetting a card has to clear its type, queue, reps, lapses, interval and ease and drop its review log. This workbench can only move a due day, so it will not half-perform a reset.',
+  'ankiWorkbench.tray.stale.spreadsEvenly':
+    'The longest-overdue cards come back first, and each day of the window gets within one card of every other day.',
+  'ankiWorkbench.tray.problem.stale-reset-unsupported':
+    'A reset cannot be performed here, so nothing was changed. Choose “Move their due days” instead.',
+  'ankiWorkbench.tray.problem.stale-no-origin':
+    'This source reports no collection creation date, so a card’s due day counts from an unknown origin and every day this would write would be wrong by the same unknown amount.',
+  'ankiWorkbench.tray.problem.stale-withheld':
+    '{count} suspended or buried cards were left alone: a new due day changes nothing they show.',
+  'ankiWorkbench.tray.problem.stale-not-review':
+    '{count} cards are new or still being learned, so they have no due day to move.',
+  'ankiWorkbench.tray.problem.stale-not-stale':
+    '{count} cards are inside both thresholds, so they were left where they are.',
+  'ankiWorkbench.tray.problem.stale-history-unreadable':
+    'This source’s review log cannot be read ({detail}), so “not reviewed lately” could not be answered at all — the {count} cards moved were chosen on overdue days alone.',
+  'ankiWorkbench.tray.problem.stale-clean':
+    'Nothing was stale under these thresholds, so no due day moved.',
   'ankiWorkbench.tray.aiTo': 'Write the approved suggestion to',
   'ankiWorkbench.tray.kind.apply-ai-additions': 'Apply reviewed AI suggestions',
   'ankiWorkbench.tray.describe.apply-ai-additions': 'Write each approved AI suggestion to {to} ({conflict})',

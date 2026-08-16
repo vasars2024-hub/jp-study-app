@@ -10207,6 +10207,33 @@ export const ru: Catalog = {
     'В {count} примерах нет слова, которому они учат.',
   'ankiWorkbench.tray.problem.cloze-undecidable':
     'Форму {count} слов не удалось разобрать, поэтому они оставлены вам, а не угаданы.',
+  'ankiWorkbench.tray.kind.reschedule-stale': 'Вернуть застоявшиеся карточки в расписание',
+  'ankiWorkbench.tray.describe.reschedule-stale':
+    '{mode} карточки, просроченные на {overdue}+ дней или не повторявшиеся {dormant}+ дней, распределив их на {spread} дней',
+  'ankiWorkbench.tray.stale.overdue': 'Просрочено после (дней)',
+  'ankiWorkbench.tray.stale.dormant': 'Без повторений (дней)',
+  'ankiWorkbench.tray.stale.spread': 'Распределить на (дней)',
+  'ankiWorkbench.tray.stale.modes': 'Что с ними сделать',
+  'ankiWorkbench.tray.stale.mode.reschedule': 'Перенести даты повторения',
+  'ankiWorkbench.tray.stale.mode.reset': 'Сбросить в новые',
+  'ankiWorkbench.tray.stale.noReset':
+    'Сброс карточки требует очистить её тип, очередь, число повторений, число ошибок, интервал и лёгкость и удалить журнал повторений. Этот верстак умеет только переносить дату, поэтому не станет выполнять сброс наполовину.',
+  'ankiWorkbench.tray.stale.spreadsEvenly':
+    'Первыми возвращаются самые давно просроченные карточки, и нагрузка каждого дня окна отличается от других не более чем на одну карточку.',
+  'ankiWorkbench.tray.problem.stale-reset-unsupported':
+    'Сброс здесь выполнить нельзя, поэтому ничего не изменено. Выберите «Перенести даты повторения».',
+  'ankiWorkbench.tray.problem.stale-no-origin':
+    'Источник не сообщает дату создания коллекции, поэтому день повторения карточки отсчитывается от неизвестного начала, и каждая записанная дата была бы смещена на одну и ту же неизвестную величину.',
+  'ankiWorkbench.tray.problem.stale-withheld':
+    '{count} приостановленных или отложенных карточек оставлены как есть: новая дата ничего не меняет в том, что они показывают.',
+  'ankiWorkbench.tray.problem.stale-not-review':
+    '{count} карточек новые или ещё изучаются, поэтому переносить у них нечего.',
+  'ankiWorkbench.tray.problem.stale-not-stale':
+    '{count} карточек укладываются в оба порога, поэтому остались на своих местах.',
+  'ankiWorkbench.tray.problem.stale-history-unreadable':
+    'Журнал повторений этого источника прочитать нельзя ({detail}), поэтому вопрос «давно не повторялось» остался без ответа — перенесённые {count} карточек выбраны только по числу дней просрочки.',
+  'ankiWorkbench.tray.problem.stale-clean':
+    'При этих порогах застоявшихся карточек не нашлось, поэтому ни одна дата не сдвинулась.',
   'ankiWorkbench.tray.aiTo': 'Записать одобренный вариант в',
   'ankiWorkbench.tray.kind.apply-ai-additions': 'Применить проверенные ИИ-варианты',
   'ankiWorkbench.tray.describe.apply-ai-additions': 'Записать каждый одобренный ИИ-вариант в {to} ({conflict})',

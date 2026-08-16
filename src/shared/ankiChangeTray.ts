@@ -105,6 +105,15 @@ import {
   type ClozeCandidateOutcome,
   type ClozeMatchMode,
 } from './ankiClozeCandidates';
+import {
+  MIN_STALE_THRESHOLD_DAYS,
+  planStaleRemedy,
+  scanStaleCards,
+  staleHistoryIsReadable,
+  type StaleRefusal,
+  type StaleRemedyMode,
+  type StaleRemedyPlan,
+} from './ankiStaleCards';
 import type { VocabContext } from './ankiVocabContext';
 
 /**
@@ -150,7 +159,8 @@ export type TrayActionKind =
   | 'normalize-decks'
   | 'split-deck'
   | 'merge-glossary'
-  | 'add-cloze';
+  | 'add-cloze'
+  | 'reschedule-stale';
 
 /**
  * What a copy does when the destination already holds text — Phase 4's "require
@@ -374,6 +384,40 @@ export type TrayAction =
        * see `ankiClozeCandidates.ts` for why it is not extended.
        */
       modes: ClozeMatchMode[];
+    })
+  | (TrayActionBase & {
+      /**
+       * Recipe 18's write half. `DeckWorkbenchStale` previews the spread; this is
+       * the action that lands it, as `card-due` ops — the same op kind recipe 6
+       * emits, so both writers already carry it to a package and to live Anki.
+       *
+       * It reads nothing from outside: `scanStaleCards` needs only the draft, so
+       * unlike `prioritize-new` there is no context channel and no
+       * `no-vocab-context` refusal to make.
+       */
+      kind: 'reschedule-stale';
+      /**
+       * `reset` is offered and refused by name rather than hidden. The journal
+       * carries field/tags/card-due/card-deck/deck-name; a real reset has to
+       * write type, queue, reps, lapses, interval and ease and drop the revlog,
+       * and writing only `due` would leave a review card claiming it had been
+       * forgotten while keeping a review card's interval.
+       */
+      mode: StaleRemedyMode;
+      /** Days past due before a review card counts as stale. */
+      overdueDays: number;
+      /** Days without a review before a card counts as stale. */
+      dormantDays: number;
+      /** Days to spread the backlog over, starting today. */
+      spreadDays: number;
+      /**
+       * The "today" the days are counted from, carried on the action rather than
+       * read here. A dry run and its apply are two `planChangeTray` calls, and a
+       * `Date.now()` inside would let them cross a day boundary between the two —
+       * the user would then approve one set of days and receive another. Set once
+       * when the action is queued, which is also the moment the panel scanned.
+       */
+      nowMs: number;
     });
 
 // ----- the ordered list --------------------------------------------------------
@@ -597,7 +641,37 @@ export type TrayProblemCode =
   /** `merge-senses` refused a value carrying markup or an entity. See the module header. */
   | 'glossary-html-refused'
   /** The merge ran and wrote nothing. Same reason `split-clean` exists. */
-  | 'glossary-clean';
+  | 'glossary-clean'
+  /**
+   * Recipe 18. A reset was queued and the workbench cannot perform one. Always
+   * blocking, unlike `leech-reschedule-unsupported`, which blocks only when it
+   * is the sole measure: `reset` is this action's whole mode, so there is no
+   * other half of the run that could still be honest.
+   */
+  | 'stale-reset-unsupported'
+  /**
+   * The source reported no collection origin, so a review card's `due` day
+   * counts from an unknown zero and every day this would write would be wrong
+   * by that same unknown offset. Blocking.
+   */
+  | 'stale-no-origin'
+  /**
+   * Suspended or buried cards left alone: a new due day changes nothing they
+   * show, and writing one would be a number Anki never reads.
+   */
+  | 'stale-withheld'
+  /** New or learning cards: their `due` is a queue position, not a day. */
+  | 'stale-not-review'
+  /** Inside both thresholds. The filter working, so info rather than warning. */
+  | 'stale-not-stale'
+  /**
+   * The source's review history is unreadable, so the `dormant` axis cannot fire
+   * at all and only overdue cards were moved. A warning and never silent: a run
+   * that quietly answered half the question reads as having answered all of it.
+   */
+  | 'stale-history-unreadable'
+  /** The action ran and moved no card. Same reason `tag-normalize-clean` exists. */
+  | 'stale-clean';
 
 export interface TrayProblem {
   code: TrayProblemCode;
@@ -691,12 +765,39 @@ export interface TrayPlan {
    */
   deckSplit?: DeckSplitPlan;
   /**
+   * What a `reschedule-stale` action moved. Folded into `draft` like
+   * `prioritize`, and here for the same reason: the surface needs the per-day
+   * spread and the refusals by name, not one moved total.
+   */
+  stale?: StaleRemedyPlan;
+  /**
    * Cards whose `due` this tray moved. Separate from `changedNotes` because a
    * reposition-only tray changes zero notes and is not therefore a no-op; a
    * caller that gated Apply on `changedNotes` alone would disable it.
    */
   changedCards: number;
 }
+
+/**
+ * Recipe 18's refusals as tray problems. A total `Record` for the reason
+ * `CLOZE_OUTCOME_PROBLEMS` is one: a refusal added to `StaleRefusal` fails to
+ * compile here rather than silently losing its user-facing row.
+ *
+ * The three that come back from the *scan* are blocking — they say the whole
+ * action cannot run — and the three that come back per card are consequences of
+ * a run that did happen. `threshold-too-small` reuses `empty-parameter` because
+ * it is exactly that: a form field holding a number no scan can use.
+ */
+export const STALE_REFUSAL_PROBLEMS: Readonly<
+  Record<StaleRefusal, { code: TrayProblemCode; severity: 'blocking' | 'warning' | 'info' }>
+> = {
+  'no-collection-origin': { code: 'stale-no-origin', severity: 'blocking' },
+  'threshold-too-small': { code: 'empty-parameter', severity: 'blocking' },
+  'reset-unsupported': { code: 'stale-reset-unsupported', severity: 'blocking' },
+  withheld: { code: 'stale-withheld', severity: 'warning' },
+  'not-review': { code: 'stale-not-review', severity: 'info' },
+  'not-stale': { code: 'stale-not-stale', severity: 'info' },
+};
 
 /**
  * Recipe 13's refusals mapped to the codes the surface renders. A table for the
@@ -778,6 +879,8 @@ function blockingProblems(
   decks: readonly AnkiDraftDeck[],
   hasSplitContext: boolean,
   glossary: GlossarySource | undefined,
+  /** The draft's collection origin, for recipe 18. `undefined` is `stale-no-origin`. */
+  createdAtSec: number | undefined,
 ): TrayProblem[] {
   const problems: TrayProblem[] = [];
   const enabled = actions.filter((a) => a.enabled);
@@ -836,6 +939,38 @@ function blockingProblems(
       // user would read as "none of my notes can be clozed".
       if (action.modes.length === 0) {
         problems.push({ code: 'empty-parameter', severity: 'blocking', actionId: action.id, count: 1 });
+      }
+    } else if (action.kind === 'reschedule-stale') {
+      // Refused here and not from the returned plan, because a mode the
+      // workbench cannot perform has to stop the *tray* — guarantee 4. An Apply
+      // that ran and wrote nothing would read as the reset having happened.
+      if (action.mode === 'reset') {
+        problems.push({
+          code: STALE_REFUSAL_PROBLEMS['reset-unsupported'].code,
+          severity: 'blocking',
+          actionId: action.id,
+          count: 1,
+        });
+      } else if (
+        !Number.isFinite(action.overdueDays) ||
+        action.overdueDays < MIN_STALE_THRESHOLD_DAYS ||
+        !Number.isFinite(action.dormantDays) ||
+        action.dormantDays < MIN_STALE_THRESHOLD_DAYS ||
+        !Number.isFinite(action.spreadDays) ||
+        action.spreadDays < 1 ||
+        !Number.isFinite(action.nowMs)
+      ) {
+        problems.push({ code: 'empty-parameter', severity: 'blocking', actionId: action.id, count: 1 });
+      } else if (typeof createdAtSec !== 'number' || !Number.isFinite(createdAtSec)) {
+        // Every `due` day this could write counts from the collection's creation
+        // day. With no origin they would all be wrong by the same unknown
+        // offset, which is worse than not moving them at all.
+        problems.push({
+          code: STALE_REFUSAL_PROBLEMS['no-collection-origin'].code,
+          severity: 'blocking',
+          actionId: action.id,
+          count: 1,
+        });
       }
     } else if (action.kind === 'apply-ai-additions') {
       if (action.toField === '') {
@@ -1096,6 +1231,7 @@ export function planChangeTray(
     draft.decks,
     opts?.split !== undefined,
     opts?.glossary,
+    draft.source.createdAtSec,
   );
   if (problems.length > 0) {
     return {
@@ -1129,6 +1265,7 @@ export function planChangeTray(
   let tagNormalizePlan: TagNormalizePlan | undefined;
   let deckNormalizePlan: DeckNormalizePlan | undefined;
   let deckSplitPlan: DeckSplitPlan | undefined;
+  let stalePlan: StaleRemedyPlan | undefined;
   let changedCards = 0;
 
   const changeFor = (noteId: string): TrayNoteChange => {
@@ -1235,6 +1372,99 @@ export function planChangeTray(
             detail: skip.term ?? skip.noteId,
           });
         }
+      }
+      outcomes.push({
+        actionId: action.id,
+        kind: action.kind,
+        matched: noteIds.length,
+        changed: movedNotes.size,
+        skipped: noteIds.length - movedNotes.size,
+      });
+      continue;
+    }
+
+    if (action.kind === 'reschedule-stale') {
+      // Whole-selection like `prioritize-new`, and for the same reason: the days
+      // are handed out round-robin over one global ordering, so computing them
+      // note by note would be arithmetic on a partial ordering.
+      //
+      // Scanned against `cards`, not `draft.cards`: an earlier action in the same
+      // tray may already have moved a `due`, and classifying against the input
+      // draft would call a card overdue that this very tray just rescheduled.
+      const scan = scanStaleCards({
+        draft: { ...draft, cards },
+        nowMs: action.nowMs,
+        overdueDays: action.overdueDays,
+        dormantDays: action.dormantDays,
+      });
+      if (!scan.ok) continue; // unreachable — `blockingProblems` already refused.
+
+      // The selection scopes the run the way it scopes every other action. A
+      // card whose note is not selected is not skipped-with-a-reason, it was
+      // never offered: reporting it as `not-stale` would put thousands of rows
+      // in front of the user about notes they did not select.
+      const wanted = new Set(noteIds);
+      const cardIds = scan.cards.filter((f) => wanted.has(f.noteId)).map((f) => f.cardId);
+
+      const result = planStaleRemedy({
+        scan,
+        mode: action.mode,
+        spreadDays: action.spreadDays,
+        cardIds,
+      });
+      if (!result.ok) continue; // unreachable — `reset` is blocked above.
+      const plan = result.plan;
+      // Later actions replace an earlier plan for the reason `prioritize-new`
+      // gives: two reschedules in one tray are the user changing their mind, and
+      // only the ops are cumulative.
+      stalePlan = plan;
+
+      const movedNotes = new Set<string>();
+      for (const move of plan.moves) {
+        if (move.after === move.before) continue;
+        const cardAt = index.cardPosition.get(move.cardId);
+        if (cardAt === undefined) continue;
+        cards[cardAt] = { ...cards[cardAt], due: move.after };
+        ops.push({
+          kind: 'card-due',
+          noteId: move.noteId,
+          cardId: move.cardId,
+          before: move.before,
+          after: move.after,
+          group: groupId,
+        });
+        movedNotes.add(move.noteId);
+        changedCards += 1;
+      }
+
+      // Counted per refusal rather than pushed per card: a 3,000-card selection
+      // would otherwise produce 3,000 identical `not-stale` rows.
+      const bySkip = new Map<StaleRefusal, number>();
+      for (const skip of plan.skips) bySkip.set(skip.refusal, (bySkip.get(skip.refusal) ?? 0) + 1);
+      for (const [refusal, count] of bySkip) {
+        const { code, severity } = STALE_REFUSAL_PROBLEMS[refusal];
+        // The three blocking refusals cannot reach here — the scan succeeded and
+        // `reset` was refused above — so nothing downgrades a blocking severity.
+        if (severity === 'blocking') continue;
+        problems.push({ code, severity, actionId: action.id, count });
+      }
+      if (!staleHistoryIsReadable(scan.reviewHistory)) {
+        // Said whenever it is true, not only when nothing moved. The overdue
+        // half is fully answerable and did run; the dormant half could not, and
+        // a run that silently answered one of two axes reads as having answered
+        // both. `detail` names which of the two causes it was.
+        problems.push({
+          code: 'stale-history-unreadable',
+          severity: 'warning',
+          actionId: action.id,
+          count: plan.moves.length,
+          detail: scan.reviewHistory,
+        });
+      }
+      if (plan.changedCards === 0) {
+        // "Nothing is stale" and "your thresholds match nothing here" look
+        // identical from an outcome row of `changed: 0`, so say which.
+        problems.push({ code: 'stale-clean', severity: 'info', actionId: action.id, count: 0 });
       }
       outcomes.push({
         actionId: action.id,
@@ -2165,6 +2395,7 @@ export function planChangeTray(
     tagNormalize: tagNormalizePlan,
     deckNormalize: deckNormalizePlan,
     deckSplit: deckSplitPlan,
+    stale: stalePlan,
   };
 }
 

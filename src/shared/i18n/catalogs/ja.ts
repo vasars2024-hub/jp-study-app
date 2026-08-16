@@ -9386,6 +9386,33 @@ export const ja: Catalog = {
     '{count} 件の例文に、その例文が教える単語が含まれていません。',
   'ankiWorkbench.tray.problem.cloze-undecidable':
     '{count} 件の単語は形の変化を追えないため、推測せずそのまま残しました。',
+  'ankiWorkbench.tray.kind.reschedule-stale': '滞ったカードを予定に戻す',
+  'ankiWorkbench.tray.describe.reschedule-stale':
+    '期限を{overdue}日以上過ぎたカード、または{dormant}日以上復習していないカードを{spread}日に分散して{mode}',
+  'ankiWorkbench.tray.stale.overdue': '期限超過とみなす日数',
+  'ankiWorkbench.tray.stale.dormant': '休眠とみなす日数',
+  'ankiWorkbench.tray.stale.spread': '分散させる日数',
+  'ankiWorkbench.tray.stale.modes': '対象カードの扱い',
+  'ankiWorkbench.tray.stale.mode.reschedule': '期日を移動する',
+  'ankiWorkbench.tray.stale.mode.reset': '新規に戻す',
+  'ankiWorkbench.tray.stale.noReset':
+    'リセットにはカードの種類・キュー・回数・失敗数・間隔・易しさの消去と復習ログの削除が必要です。このワークベンチは期日の移動しかできないため、中途半端なリセットは行いません。',
+  'ankiWorkbench.tray.stale.spreadsEvenly':
+    '期限超過が最も長いカードから先に戻り、各日の枚数の差は最大1枚に収まります。',
+  'ankiWorkbench.tray.problem.stale-reset-unsupported':
+    'ここではリセットを実行できないため、何も変更していません。「期日を移動する」を選んでください。',
+  'ankiWorkbench.tray.problem.stale-no-origin':
+    'このソースにはコレクションの作成日がないため、カードの期日の起点が不明で、書き込む日付はすべて同じ不明な量だけずれてしまいます。',
+  'ankiWorkbench.tray.problem.stale-withheld':
+    '停止中または保留中の{count}枚はそのままにしました。期日を変えても表示は変わりません。',
+  'ankiWorkbench.tray.problem.stale-not-review':
+    '{count}枚は新規または学習中のため、移動できる期日がありません。',
+  'ankiWorkbench.tray.problem.stale-not-stale':
+    '{count}枚はどちらのしきい値にも達していないため、そのままにしました。',
+  'ankiWorkbench.tray.problem.stale-history-unreadable':
+    'このソースの復習ログを読み取れないため（{detail}）、「最近復習していない」は判定できませんでした。移動した{count}枚は期限超過の日数だけで選ばれています。',
+  'ankiWorkbench.tray.problem.stale-clean':
+    'このしきい値では滞ったカードがなかったため、期日は1件も移動していません。',
   'ankiWorkbench.tray.aiTo': '承認した候補の書き込み先',
   'ankiWorkbench.tray.kind.apply-ai-additions': '確認済みのAI候補を適用',
   'ankiWorkbench.tray.describe.apply-ai-additions': '承認した各AI候補を{to}に書き込む（{conflict}）',
