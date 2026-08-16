@@ -9448,6 +9448,32 @@ export const en: Catalog = {
     'one of its cards has a template that cannot render: an unknown field, an unsupported filter, an unclosed conditional, or a broken cloze',
   'ankiWorkbench.browser.explain.render.not-generated':
     'none of its cards are generated, because a conditional in the template is off for this note',
+  'ankiWorkbench.browser.explain.media.none': 'it refers to no image or audio at all',
+  'ankiWorkbench.browser.explain.media.ok':
+    'every image and sound it refers to is in the package, at a sensible size',
+  'ankiWorkbench.browser.explain.media.unverified':
+    'this source does not say what media it carries, so nothing about its files could be checked',
+  'ankiWorkbench.browser.explain.media.duplicate':
+    'it refers to a file the package also stores under a second name, byte for byte',
+  'ankiWorkbench.browser.explain.media.oversized':
+    'it refers to a file far larger than its kind normally is',
+  'ankiWorkbench.browser.explain.media.broken':
+    'it refers to a file the package carries but which holds no data at all',
+  'ankiWorkbench.browser.explain.media.missing':
+    'it refers to a file the package does not carry, so nothing will play or show',
+  'ankiWorkbench.browser.query.noMediaContext':
+    'This deck came from a source that carries no media, so "{token}" has nothing to check.',
+  'ankiWorkbench.media.title': 'Media',
+  'ankiWorkbench.media.summary':
+    '{files} files, {size}. {defects} need attention across {notes} notes.',
+  'ankiWorkbench.media.clean': '{files} files, {size}. Nothing to fix.',
+  'ankiWorkbench.media.absent': 'This source carries no media folder to check.',
+  'ankiWorkbench.media.unreferenced': '{count} carried by the package and used by no note',
+  'ankiWorkbench.media.reclaimable': '{size} of it is a second copy of a file already here',
+  'ankiWorkbench.media.affects': 'used by {notes} notes',
+  'ankiWorkbench.media.duplicateOf': 'same bytes as {name}',
+  'ankiWorkbench.media.more': 'and {count} more',
+  'ankiWorkbench.media.filter': 'Show these notes',
   'ankiWorkbench.journal.title': 'History: {applied} steps over {notes} notes',
   'ankiWorkbench.journal.batch': 'Batch of {ops} changes on {notes} notes',
   'ankiWorkbench.journal.single': 'Single edit on {notes} note',

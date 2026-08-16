@@ -10,6 +10,8 @@ import {
 } from '../ankiBrowserQuery';
 import { buildVocabContext } from '../ankiVocabContext';
 import { buildCardHealthContext } from '../ankiCardHealth';
+import { buildMediaHealthContext } from '../ankiMediaHealth';
+import { explainBrowserQuery } from '../ankiQueryExplain';
 
 function note(over: Partial<AnkiDraftNote> & { id: string }): AnkiDraftNote {
   return {
@@ -563,5 +565,95 @@ describe('render: (smart recipe 15)', () => {
 
   it('a compiled node with no context matches nothing rather than everything', () => {
     expect(rRows.filter(compileBrowserFilter({ kind: 'render', health: 'ok' }))).toEqual([]);
+  });
+});
+
+describe('media: (smart recipe 11)', () => {
+  const mRef = (over: Partial<AnkiDraftNote['media'][number]> = {}) => ({
+    reference: 'a.mp3',
+    fileName: 'a.mp3',
+    kind: 'audio' as const,
+    fieldOrd: 0,
+    present: true,
+    bytes: 4096,
+    ...over,
+  });
+  const notes = [
+    note({ id: 'fine', cardIds: ['c1'], fields: [f(0, 'Front', 'ねこ')], media: [mRef()] }),
+    note({
+      id: 'gone', cardIds: ['c2'], fields: [f(0, 'Front', 'いぬ')],
+      media: [mRef({ fileName: 'gone.mp3', present: false })],
+    }),
+    note({
+      id: 'copy', cardIds: ['c3'], fields: [f(0, 'Front', 'とり')],
+      media: [mRef({ fileName: 'copy.mp3', duplicateOf: 'a.mp3' })],
+    }),
+    note({ id: 'silent', cardIds: ['c4'], fields: [f(0, 'Front', 'うま')] }),
+  ];
+  const mDraft: AnkiDraft = {
+    ...draft,
+    notes,
+    cards: notes.map((n) => card(n.cardIds[0]!, n.id, 'd1')),
+    media: { files: 2, bytes: 8192, unreferenced: 0, sized: true },
+    counts: { ...draft.counts, notes: notes.length, cards: notes.length },
+  };
+  const mRows = buildBrowserRows(mDraft, defaultBrowserColumns(mDraft));
+  const mSchema = {
+    fieldNames: browserFieldNames(mDraft),
+    media: buildMediaHealthContext(mDraft),
+  };
+  const mIds = (query: string): string[] | string => {
+    const out = filterBrowserRows(mRows, query, mSchema);
+    return out.error ? out.error.code : out.rows.map((r) => r.noteId);
+  };
+
+  it('finds the note citing a file the package does not carry', () => {
+    expect(mIds('media:missing')).toEqual(['gone']);
+  });
+
+  it('finds the second copy and not the file it copies', () => {
+    expect(mIds('media:duplicate')).toEqual(['copy']);
+  });
+
+  it('separates "no media" from "media is fine", and the verdicts partition the deck', () => {
+    expect(mIds('media:none')).toEqual(['silent']);
+    expect(mIds('media:ok')).toEqual(['fine']);
+    const partition = ['none', 'ok', 'unverified', 'duplicate', 'oversized', 'broken', 'missing']
+      .flatMap((h) => mIds(`media:${h}`) as string[]);
+    expect(partition.sort()).toEqual(['copy', 'fine', 'gone', 'silent']);
+  });
+
+  it('composes with negation and groups like any other predicate', () => {
+    expect((mIds('-media:none') as string[]).sort()).toEqual(['copy', 'fine', 'gone']);
+    expect((mIds('(media:missing or media:duplicate)') as string[]).sort())
+      .toEqual(['copy', 'gone']);
+  });
+
+  it('refuses the key outright on a source that carries no media at all', () => {
+    // Its own code: unlike `no-render-context` there is nothing to wait for —
+    // a CSV or a live AnkiConnect deck will never have a package to inspect.
+    const bare = { fieldNames: browserFieldNames(mDraft) };
+    const refused = filterBrowserRows(mRows, 'media:missing', bare);
+    expect(refused.error).toEqual({ code: 'no-media-context', token: 'media:missing' });
+    expect(refused.rows).toEqual([]);
+    expect(filterBrowserRows(mRows, 'media:banana', bare).error?.code).toBe('no-media-context');
+  });
+
+  it('refuses an unknown verdict by naming the token, never matching all', () => {
+    expect(mIds('media:banana')).toBe('unknown-key');
+    expect(mIds('media:')).toBe('unknown-key');
+  });
+
+  it('a compiled node with no context matches nothing rather than everything', () => {
+    expect(mRows.filter(compileBrowserFilter({ kind: 'media', health: 'ok' }))).toEqual([]);
+  });
+
+  it('explains itself in words, one sentence per verdict', () => {
+    const parsed = parseBrowserQuery('media:missing', mSchema);
+    expect(parsed.ok && parsed.filter).toEqual({ kind: 'media', health: 'missing' });
+    expect(explainBrowserQuery('media:missing', mSchema)).toEqual({
+      kind: 'clause',
+      key: 'ankiWorkbench.browser.explain.media.missing',
+    });
   });
 });

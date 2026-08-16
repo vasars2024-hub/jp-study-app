@@ -9021,6 +9021,32 @@ export const ja: Catalog = {
     'いずれかのカードのテンプレートが描画できない（未知のフィールド、未対応のフィルタ、閉じていない条件、壊れた穴埋め）',
   'ankiWorkbench.browser.explain.render.not-generated':
     'テンプレートの条件がこのノートで無効なため、カードが 1 枚も生成されない',
+  'ankiWorkbench.browser.explain.media.none': '画像も音声もまったく参照していない',
+  'ankiWorkbench.browser.explain.media.ok':
+    '参照している画像と音声はすべてパッケージ内にあり、サイズも妥当',
+  'ankiWorkbench.browser.explain.media.unverified':
+    'このソースは収録メディアを申告しないため、ファイルについて何も確認できなかった',
+  'ankiWorkbench.browser.explain.media.duplicate':
+    'パッケージが同じ内容を別名でもう 1 つ保持しているファイルを参照している',
+  'ankiWorkbench.browser.explain.media.oversized':
+    '同種のファイルとしては極端に大きいファイルを参照している',
+  'ankiWorkbench.browser.explain.media.broken':
+    'パッケージ内に存在するがデータが空のファイルを参照している',
+  'ankiWorkbench.browser.explain.media.missing':
+    'パッケージに含まれていないファイルを参照しているため、再生も表示もされない',
+  'ankiWorkbench.browser.query.noMediaContext':
+    'このデッキのソースはメディアを持たないため、「{token}」には確認する対象がありません。',
+  'ankiWorkbench.media.title': 'メディア',
+  'ankiWorkbench.media.summary':
+    '{files} 件 / {size}。{notes} 件のノートにまたがる {defects} 件に対応が必要です。',
+  'ankiWorkbench.media.clean': '{files} 件 / {size}。修正すべき点はありません。',
+  'ankiWorkbench.media.absent': 'このソースには確認できるメディアフォルダーがありません。',
+  'ankiWorkbench.media.unreferenced': 'パッケージ内にあり、どのノートも使っていないファイル {count} 件',
+  'ankiWorkbench.media.reclaimable': 'うち {size} は既存ファイルの複製',
+  'ankiWorkbench.media.affects': '{notes} 件のノートが使用',
+  'ankiWorkbench.media.duplicateOf': '{name} と同一の内容',
+  'ankiWorkbench.media.more': 'ほか {count} 件',
+  'ankiWorkbench.media.filter': '該当ノートを表示',
   'ankiWorkbench.journal.title': '履歴: {notes} 件のノートに {applied} ステップ',
   'ankiWorkbench.journal.batch': '{notes} 件のノートへの {ops} 件の一括変更',
   'ankiWorkbench.journal.single': '{notes} 件のノートの単独編集',

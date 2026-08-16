@@ -19,6 +19,11 @@
 
 import type { BrowserRow } from './ankiWorkbenchBrowser';
 import { parseCardHealth, type CardHealth, type CardHealthContext } from './ankiCardHealth';
+import {
+  parseMediaHealth,
+  type MediaHealth,
+  type MediaHealthContext,
+} from './ankiMediaHealth';
 import { FREQUENCY_BAND_LIMITS, type LexiconFrequencyBand } from './lexiconFrequency';
 import { containsScript, hasNoScript, parseTextScript, type TextScript } from './textScripts';
 import {
@@ -204,6 +209,20 @@ export interface CardHealthPredicate {
   health: CardHealth;
 }
 
+/**
+ * `media:missing`, `media:duplicate` — smart recipe 11, "find missing, broken,
+ * duplicate, or oversized media".
+ *
+ * Answerable from the note's own references, unlike `render:` — but still read
+ * from a precomputed context, because the *verdict* depends on package-level
+ * facts (was a manifest read at all, were sizes read) that a row does not
+ * carry, and because a filter must not recompute per keystroke.
+ */
+export interface MediaHealthPredicate {
+  kind: 'media';
+  health: MediaHealth;
+}
+
 export type BrowserPredicate =
   | AnyTextPredicate
   | RegexPredicate
@@ -217,7 +236,8 @@ export type BrowserPredicate =
   | KnownPredicate
   | ScriptPredicate
   | SentenceCoverPredicate
-  | CardHealthPredicate;
+  | CardHealthPredicate
+  | MediaHealthPredicate;
 
 export interface BrowserFilterGroup {
   kind: 'group';
@@ -254,7 +274,14 @@ export type BrowserQueryErrorCode =
    * render context waits only on the draft itself. Telling a user to load a
    * dictionary would send them after the wrong thing entirely.
    */
-  | 'no-render-context';
+  | 'no-render-context'
+  /**
+   * `media:` was used on a draft whose source reported no media at all. Its own
+   * code again: this one is cleared by nothing the user can do — a CSV or a
+   * live AnkiConnect deck has no package to inspect — so the message has to say
+   * that rather than suggest a wait.
+   */
+  | 'no-media-context';
 
 export interface BrowserQueryError {
   code: BrowserQueryErrorCode;
@@ -282,6 +309,12 @@ export interface BrowserQuerySchema {
    * rather than a filter — see `no-render-context`.
    */
   render?: CardHealthContext;
+  /**
+   * Per-note media verdicts, from `buildMediaHealthContext`. Absent means the
+   * draft's source carries no media facts at all, and `media:` is a refusal
+   * rather than a filter — see `no-media-context`.
+   */
+  media?: MediaHealthContext;
 }
 
 // ----- tokenizer ---------------------------------------------------------------
@@ -493,6 +526,11 @@ function predicateFromTerm(token: Token, schema: BrowserQuerySchema): BrowserPre
     const health = parseCardHealth(value);
     return health ? { kind: 'render', health } : { code: 'unknown-key', token: text };
   }
+  if (lowerKey === 'media') {
+    if (!schema.media) return { code: 'no-media-context', token: text };
+    const health = parseMediaHealth(value);
+    return health ? { kind: 'media', health } : { code: 'unknown-key', token: text };
+  }
   if (lowerKey === 'freq' || lowerKey === 'known') {
     // The refusal comes before the value is even read: with no context, every
     // spelling of the key is equally unanswerable, and reporting "unknown
@@ -659,16 +697,19 @@ export function compileBrowserFilter(
   node: BrowserFilterNode,
   vocab?: VocabContext,
   render?: CardHealthContext,
+  media?: MediaHealthContext,
 ): RowTest {
   switch (node.kind) {
     case 'group': {
-      const tests = node.children.map((child) => compileBrowserFilter(child, vocab, render));
+      const tests = node.children.map((child) =>
+        compileBrowserFilter(child, vocab, render, media),
+      );
       return node.op === 'and'
         ? (row) => tests.every((test) => test(row))
         : (row) => tests.some((test) => test(row));
     }
     case 'not': {
-      const test = compileBrowserFilter(node.child, vocab, render);
+      const test = compileBrowserFilter(node.child, vocab, render, media);
       return (row) => !test(row);
     }
     case 'text': {
@@ -814,6 +855,12 @@ export function compileBrowserFilter(
       // `ok`, the same rule `cover:` applies to a missing sentence field.
       return (row) => render.get(row.noteId) === health;
     }
+    case 'media': {
+      // Same guard, same reason: the parser refuses `media:` without a context.
+      if (!media) return () => false;
+      const { health } = node;
+      return (row) => media.get(row.noteId) === health;
+    }
     default: {
       if (!vocab) return () => false;
       const facts = vocab.byNote;
@@ -866,9 +913,10 @@ export function matchBrowserRows(
   filter: BrowserFilterNode | null,
   vocab?: VocabContext,
   render?: CardHealthContext,
+  media?: MediaHealthContext,
 ): BrowserRow[] {
   if (!filter) return rows;
-  const test = compileBrowserFilter(filter, vocab, render);
+  const test = compileBrowserFilter(filter, vocab, render, media);
   return rows.filter(test);
 }
 
@@ -885,7 +933,7 @@ export function filterBrowserRows(
   const parsed = parseBrowserQuery(query, schema);
   if (!parsed.ok) return { rows: [], error: parsed.error };
   return {
-    rows: matchBrowserRows(rows, parsed.filter, schema.vocab, schema.render),
+    rows: matchBrowserRows(rows, parsed.filter, schema.vocab, schema.render, schema.media),
     error: null,
   };
 }

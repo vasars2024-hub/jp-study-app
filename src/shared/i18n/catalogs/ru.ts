@@ -9834,6 +9834,32 @@ export const ru: Catalog = {
     'шаблон одной из карточек не отрисовывается: неизвестное поле, неподдерживаемый фильтр, незакрытое условие или сломанный пропуск',
   'ankiWorkbench.browser.explain.render.not-generated':
     'ни одна карточка не создаётся: условие в шаблоне выключено для этой заметки',
+  'ankiWorkbench.browser.explain.media.none': 'она не ссылается ни на изображения, ни на звук',
+  'ankiWorkbench.browser.explain.media.ok':
+    'все изображения и звуки, на которые она ссылается, есть в пакете и разумного размера',
+  'ankiWorkbench.browser.explain.media.unverified':
+    'источник не сообщает, какие файлы он несёт, поэтому проверить их не удалось',
+  'ankiWorkbench.browser.explain.media.duplicate':
+    'она ссылается на файл, который пакет хранит ещё раз под другим именем, байт в байт',
+  'ankiWorkbench.browser.explain.media.oversized':
+    'она ссылается на файл, который намного больше обычного для своего типа',
+  'ankiWorkbench.browser.explain.media.broken':
+    'она ссылается на файл, который есть в пакете, но не содержит данных',
+  'ankiWorkbench.browser.explain.media.missing':
+    'она ссылается на файл, которого в пакете нет, поэтому ничего не прозвучит и не покажется',
+  'ankiWorkbench.browser.query.noMediaContext':
+    'Эта колода получена из источника без медиафайлов, поэтому «{token}» нечего проверять.',
+  'ankiWorkbench.media.title': 'Медиа',
+  'ankiWorkbench.media.summary':
+    'Файлов: {files}, {size}. Требуют внимания: {defects} — в заметках: {notes}.',
+  'ankiWorkbench.media.clean': 'Файлов: {files}, {size}. Исправлять нечего.',
+  'ankiWorkbench.media.absent': 'У этого источника нет папки медиафайлов для проверки.',
+  'ankiWorkbench.media.unreferenced': 'файлов в пакете, не используемых ни одной заметкой: {count}',
+  'ankiWorkbench.media.reclaimable': 'из них {size} — вторая копия уже имеющегося файла',
+  'ankiWorkbench.media.affects': 'используют заметок: {notes}',
+  'ankiWorkbench.media.duplicateOf': 'те же байты, что и у {name}',
+  'ankiWorkbench.media.more': 'и ещё {count}',
+  'ankiWorkbench.media.filter': 'Показать эти заметки',
   'ankiWorkbench.journal.title': 'История: шагов {applied} по заметкам: {notes}',
   'ankiWorkbench.journal.batch': 'Партия из {ops} изменений в заметках: {notes}',
   'ankiWorkbench.journal.single': 'Одиночная правка в заметках: {notes}',

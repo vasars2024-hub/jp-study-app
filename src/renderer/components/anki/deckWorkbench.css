@@ -444,6 +444,56 @@
   font-size: 0.85rem;
 }
 
+/* Recipe 11's media audit — the same contextual-tool treatment as the scan
+   above, so the two read as one family rather than two card designs. */
+.wb-media {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 0.5rem;
+  background: var(--surface-2, rgba(127, 127, 127, 0.08));
+}
+
+.wb-media p {
+  margin: 0;
+}
+
+.wb-media-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+}
+
+.wb-media-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+/* The verdict is the row's subject, so it leads and it is the only weighted
+   thing on the line — the file name is already a <code> and does not need to
+   compete with it. */
+.wb-media-verdict {
+  font-weight: 600;
+}
+
+.wb-media-missing,
+.wb-media-broken {
+  color: var(--danger, #b3261e);
+}
+
+.wb-media-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
 .wb-browser-search[aria-invalid='true'] {
   border-color: var(--danger, #b3261e);
 }

@@ -153,6 +153,10 @@ function explainPredicate(node: Exclude<BrowserFilterNode, { kind: 'group' } | {
       // front did not" and "has a template that cannot render" are unrelated
       // claims that no single interpolated template can make.
       return clause(`render.${node.health}`);
+    case 'media':
+      // Same again: "cites a file the package does not carry" and "cites a file
+      // stored twice under two names" share no sentence shape at all.
+      return clause(`media.${node.health}`);
   }
 }
 

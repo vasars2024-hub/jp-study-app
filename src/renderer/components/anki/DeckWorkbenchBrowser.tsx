@@ -34,6 +34,7 @@ import {
 } from '../../../shared/ankiWorkbenchBrowser';
 import { filterBrowserRows, type BrowserQueryErrorCode } from '../../../shared/ankiBrowserQuery';
 import { buildCardHealthContext } from '../../../shared/ankiCardHealth';
+import { buildMediaHealthContext } from '../../../shared/ankiMediaHealth';
 import {
   QUERY_EXPLAIN_KEY_PREFIX,
   explainBrowserQuery,
@@ -64,6 +65,7 @@ import { useT } from '../../i18n';
 import DeckWorkbenchInspector from './DeckWorkbenchInspector';
 import DeckWorkbenchSamples from './DeckWorkbenchSamples';
 import DeckWorkbenchDuplicates from './DeckWorkbenchDuplicates';
+import DeckWorkbenchMedia from './DeckWorkbenchMedia';
 
 const ROW_HEIGHT = 34;
 /** How far PageUp/PageDown moves the cursor. */
@@ -83,6 +85,7 @@ const QUERY_ERROR_KEY: Record<BrowserQueryErrorCode, string> = {
   'dangling-operator': 'ankiWorkbench.browser.query.danglingOperator',
   'no-vocab-context': 'ankiWorkbench.browser.query.noVocabContext',
   'no-render-context': 'ankiWorkbench.browser.query.noRenderContext',
+  'no-media-context': 'ankiWorkbench.browser.query.noMediaContext',
 };
 
 type Translate = (key: string, vars?: Record<string, string | number>) => string;
@@ -152,6 +155,8 @@ export default function DeckWorkbenchBrowser({
   const [view, setView] = useState<BrowserView>('grid');
   /** Recipe 9's scan is a tool, not part of the grid: off until asked for. */
   const [dupesOpen, setDupesOpen] = useState(false);
+  /** Recipe 11's media audit, same rule. */
+  const [mediaOpen, setMediaOpen] = useState(false);
   const anchor = useRef<string | null>(null);
 
   /**
@@ -255,11 +260,24 @@ export default function DeckWorkbenchBrowser({
   // `vocab` it does not move when the knowledge store does.
   const render = useMemo(() => buildCardHealthContext(draft), [draft]);
 
+  // `media:` verdicts, same reasoning and the same key. Absent — not an empty
+  // map — when the source reported no media at all, so the parser can refuse
+  // `media:` rather than hand back a filter that matches nothing.
+  const media = useMemo(
+    () => (draft.media ? buildMediaHealthContext(draft) : undefined),
+    [draft],
+  );
+
   // The draft's own field names, so `Expression:食べる` is a field predicate and
   // `Expresion:食べる` is a refusal instead of a filter that quietly matches all.
   const schema = useMemo(
-    () => ({ fieldNames: browserFieldNames(draft), render, ...(vocab ? { vocab } : {}) }),
-    [draft, vocab, render],
+    () => ({
+      fieldNames: browserFieldNames(draft),
+      render,
+      ...(media ? { media } : {}),
+      ...(vocab ? { vocab } : {}),
+    }),
+    [draft, vocab, render, media],
   );
   const filtered = useMemo(() => filterBrowserRows(rows, query, schema), [rows, query, schema]);
   const shown = useMemo(() => sortBrowserRows(filtered.rows, sort), [filtered, sort]);
@@ -486,6 +504,15 @@ export default function DeckWorkbenchBrowser({
         >
           {t('ankiWorkbench.browser.dupes.title')}
         </button>
+        <button
+          type="button"
+          className={`btn${mediaOpen ? ' primary' : ''}`}
+          aria-pressed={mediaOpen}
+          aria-expanded={mediaOpen}
+          onClick={() => setMediaOpen((open) => !open)}
+        >
+          {t('ankiWorkbench.media.title')}
+        </button>
         {/* Switching view never touches the selection — the plan requires a
             batch to survive a look at the sample cards. */}
         <div role="group" aria-label={t('ankiWorkbench.browser.view')}>
@@ -591,6 +618,12 @@ export default function DeckWorkbenchBrowser({
           onSelect={(ids) => applySelection({ mode: 'explicit', ids })}
         />
       )}
+
+      {/* Recipe 11's consumer. Unlike the duplicate scan it audits the whole
+          draft and not the filtered rows: a package's media folder is a
+          property of the package, and scoping it to a filter would report
+          "1 file missing" as though the other 22,167 had been checked. */}
+      {mediaOpen && <DeckWorkbenchMedia draft={draft} onQuery={setQuery} />}
 
       {view === 'samples' && (
         <DeckWorkbenchSamples
