@@ -461,6 +461,16 @@ Gate: no Liquid product code until the baseline and parity ledger exist.
 Gate: the layout studies score 80/80 on `src/LIQUID_UI_RUBRIC.md` against Video and Dictionary
 before shared primitives are built. (Was "user approves"; amended 2026-08-16, see §10.4.)
 
+**Progress (2026-08-17, L0's gate having closed the same day).** Two of the eight rubric
+categories are now driven live on both reference apps, each with a control that failed:
+`.coordination/liquid-workplace/L1_SURFACE_ROLES.md` (category 3 — the four roles are
+mechanically decidable; Video 3 of 3 eligible regions Liquid-treated, Dictionary 0 of 9, dense
+work on translucent material **0** on both) and `.coordination/liquid-workplace/L1_USE_OF_SPACE.md`
+(category 4 — clean at default; **Video clips 49 boxes at 260×170**, reproducing
+`ALL_APPS_BASELINE.md`'s figure through a second instrument, so its category 4 is not a 10).
+Still open for L1: maximized geometry, categories 1, 2, 5–8, and the layout studies themselves.
+`LIQUID_SCORECARD.md` is deliberately still empty — two categories are not a score.
+
 ### L2 — Semantic tokens and shared primitives
 
 - Add Liquid semantic tokens without changing existing app output.
