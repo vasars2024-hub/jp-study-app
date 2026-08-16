@@ -9058,6 +9058,18 @@ export const ja: Catalog = {
     'ノートタイプのどのテンプレートも作らないカードがあり、表示できない',
   'ankiWorkbench.browser.query.noSiblingContext':
     'このデッキのテンプレートはまだ比較されていないため、「{token}」に読み取れる判定がありません。',
+  'ankiWorkbench.browser.explain.stale.new':
+    '一度も学習されていないため、古くなるスケジュールがありません',
+  'ankiWorkbench.browser.explain.stale.active':
+    'スケジュール済みで、両方のしきい値内にあります',
+  'ankiWorkbench.browser.explain.stale.overdue':
+    '期日からの経過日数がしきい値を超えています',
+  'ankiWorkbench.browser.explain.stale.dormant':
+    '休眠のしきい値の間、一度も復習されていません',
+  'ankiWorkbench.browser.explain.stale.withheld':
+    '保留または埋設されており、期日に関わらず Anki は表示しません',
+  'ankiWorkbench.browser.query.noStaleContext':
+    'このデッキのスケジュールが読み取られていません（スキャン未実行、または期日を数える作成日がソースにありません）。そのため「{token}」に読み取れる判定がありません。',
   'ankiWorkbench.media.title': 'メディア',
   'ankiWorkbench.media.summary':
     '{files} 件 / {size}。{notes} 件のノートにまたがる {defects} 件に対応が必要です。',

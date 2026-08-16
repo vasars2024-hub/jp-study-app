@@ -9485,6 +9485,18 @@ export const en: Catalog = {
     'it has a card no template of its note type makes, so nothing can render it',
   'ankiWorkbench.browser.query.noSiblingContext':
     'Nothing has compared this deck’s templates yet, so "{token}" has no verdict to read.',
+  'ankiWorkbench.browser.explain.stale.new':
+    'it has never been studied, so no schedule has gone stale',
+  'ankiWorkbench.browser.explain.stale.active':
+    'it is scheduled and inside both staleness thresholds',
+  'ankiWorkbench.browser.explain.stale.overdue':
+    'its due day passed longer ago than the overdue threshold',
+  'ankiWorkbench.browser.explain.stale.dormant':
+    'it has not been reviewed within the dormant threshold',
+  'ankiWorkbench.browser.explain.stale.withheld':
+    'it is suspended or buried, so Anki will not show it whatever its due day says',
+  'ankiWorkbench.browser.query.noStaleContext':
+    'Nothing has read this deck’s schedule — no scan has run, or the source reports no creation date to count due days from — so "{token}" has no verdict to read.',
   'ankiWorkbench.media.title': 'Media',
   'ankiWorkbench.media.summary':
     '{files} files, {size}. {defects} need attention across {notes} notes.',

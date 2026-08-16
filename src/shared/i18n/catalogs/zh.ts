@@ -8992,6 +8992,18 @@ export const zh: Catalog = {
     '它有一张卡片不属于其笔记类型的任何模板，因此无法渲染',
   'ankiWorkbench.browser.query.noSiblingContext':
     '尚未比较该牌组的模板，因此“{token}”没有可读取的判定。',
+  'ankiWorkbench.browser.explain.stale.new':
+    '从未学习过，因此没有变陈旧的日程',
+  'ankiWorkbench.browser.explain.stale.active':
+    '已排程，且处于两个阈值之内',
+  'ankiWorkbench.browser.explain.stale.overdue':
+    '超过到期日的天数已超出逾期阈值',
+  'ankiWorkbench.browser.explain.stale.dormant':
+    '在休眠阈值内从未被复习',
+  'ankiWorkbench.browser.explain.stale.withheld':
+    '已暂停或被掩埋，无论到期日如何 Anki 都不会显示',
+  'ankiWorkbench.browser.query.noStaleContext':
+    '尚未读取该牌组的日程——扫描未运行，或来源没有可用于计算到期日的创建日期——因此“{token}”没有可读取的判定。',
   'ankiWorkbench.media.title': '媒体',
   'ankiWorkbench.media.summary': '{files} 个文件，{size}。{notes} 条笔记涉及 {defects} 处需要处理。',
   'ankiWorkbench.media.clean': '{files} 个文件，{size}。没有需要修复的地方。',

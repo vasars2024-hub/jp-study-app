@@ -162,6 +162,12 @@ function explainPredicate(node: Exclude<BrowserFilterNode, { kind: 'group' } | {
       // sentence: one says a card is redundant, the other says two cards
       // disagree, and the second is not fixed by deleting either.
       return clause(`sibling.${node.verdict}`);
+    case 'stale':
+      // Once more, and here the two stale verdicts are the pair that must not
+      // share a sentence: `overdue` is about a day Anki planned and `dormant`
+      // about a day the user actually studied, and a deck can be deep in one
+      // and clear of the other.
+      return clause(`stale.${node.verdict}`);
   }
 }
 

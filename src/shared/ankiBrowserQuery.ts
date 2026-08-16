@@ -29,6 +29,11 @@ import {
   type SiblingAuditContext,
   type SiblingVerdict,
 } from './ankiSiblingAudit';
+import {
+  parseStaleVerdict,
+  type StaleContext,
+  type StaleVerdict,
+} from './ankiStaleCards';
 import { FREQUENCY_BAND_LIMITS, type LexiconFrequencyBand } from './lexiconFrequency';
 import { containsScript, hasNoScript, parseTextScript, type TextScript } from './textScripts';
 import {
@@ -243,6 +248,20 @@ export interface SiblingAuditPredicate {
   verdict: SiblingVerdict;
 }
 
+/**
+ * `stale:overdue`, `stale:dormant`, `stale:withheld` — smart recipe 18, "find
+ * stale cards by last review/due state".
+ *
+ * A verdict belongs to a *card* and a row is a *note*, so the context holds each
+ * note's worst card. Precomputed for the reason `sibling:` is: the verdict needs
+ * the whole revlog folded to a newest-review-per-card map, which is a per-draft
+ * pass and not a per-row one.
+ */
+export interface StalePredicate {
+  kind: 'stale';
+  verdict: StaleVerdict;
+}
+
 export type BrowserPredicate =
   | AnyTextPredicate
   | RegexPredicate
@@ -258,7 +277,8 @@ export type BrowserPredicate =
   | SentenceCoverPredicate
   | CardHealthPredicate
   | MediaHealthPredicate
-  | SiblingAuditPredicate;
+  | SiblingAuditPredicate
+  | StalePredicate;
 
 export interface BrowserFilterGroup {
   kind: 'group';
@@ -309,7 +329,15 @@ export type BrowserQueryErrorCode =
    * notes rendered as well, so a surface can legitimately hold one and not the
    * other — and a message naming the wrong one sends the user nowhere.
    */
-  | 'no-sibling-context';
+  | 'no-sibling-context'
+  /**
+   * `stale:` was used while the surface held no schedule scan. Its own code, and
+   * unlike every context above it this one has two distinct causes the message
+   * has to cover: nothing has scanned yet, or the scan itself refused because
+   * the source reported no `col.crt` and every overdue reading would be wrong by
+   * an unknown offset (`no-collection-origin`).
+   */
+  | 'no-stale-context';
 
 export interface BrowserQueryError {
   code: BrowserQueryErrorCode;
@@ -349,6 +377,12 @@ export interface BrowserQuerySchema {
    * filter — see `no-sibling-context`.
    */
   sibling?: SiblingAuditContext;
+  /**
+   * Each note's worst card verdict, from `buildStaleContext`. Absent means no
+   * schedule scan has run *or* the scan refused, and `stale:` is a refusal
+   * rather than a filter — see `no-stale-context`.
+   */
+  stale?: StaleContext;
 }
 
 // ----- tokenizer ---------------------------------------------------------------
@@ -570,6 +604,11 @@ function predicateFromTerm(token: Token, schema: BrowserQuerySchema): BrowserPre
     const verdict = parseSiblingVerdict(value);
     return verdict ? { kind: 'sibling', verdict } : { code: 'unknown-key', token: text };
   }
+  if (lowerKey === 'stale') {
+    if (!schema.stale) return { code: 'no-stale-context', token: text };
+    const verdict = parseStaleVerdict(value);
+    return verdict ? { kind: 'stale', verdict } : { code: 'unknown-key', token: text };
+  }
   if (lowerKey === 'freq' || lowerKey === 'known') {
     // The refusal comes before the value is even read: with no context, every
     // spelling of the key is equally unanswerable, and reporting "unknown
@@ -738,18 +777,19 @@ export function compileBrowserFilter(
   render?: CardHealthContext,
   media?: MediaHealthContext,
   sibling?: SiblingAuditContext,
+  stale?: StaleContext,
 ): RowTest {
   switch (node.kind) {
     case 'group': {
       const tests = node.children.map((child) =>
-        compileBrowserFilter(child, vocab, render, media, sibling),
+        compileBrowserFilter(child, vocab, render, media, sibling, stale),
       );
       return node.op === 'and'
         ? (row) => tests.every((test) => test(row))
         : (row) => tests.some((test) => test(row));
     }
     case 'not': {
-      const test = compileBrowserFilter(node.child, vocab, render, media, sibling);
+      const test = compileBrowserFilter(node.child, vocab, render, media, sibling, stale);
       return (row) => !test(row);
     }
     case 'text': {
@@ -907,6 +947,14 @@ export function compileBrowserFilter(
       const { verdict } = node;
       return (row) => sibling.get(row.noteId) === verdict;
     }
+    case 'stale': {
+      // Same guard once more: the parser refuses `stale:` without a context.
+      if (!stale) return () => false;
+      const { verdict } = node;
+      // A note absent from the map has no cards at all, so it answers no
+      // `stale:` verdict rather than defaulting into the healthy one.
+      return (row) => stale.get(row.noteId) === verdict;
+    }
     default: {
       if (!vocab) return () => false;
       const facts = vocab.byNote;
@@ -961,9 +1009,10 @@ export function matchBrowserRows(
   render?: CardHealthContext,
   media?: MediaHealthContext,
   sibling?: SiblingAuditContext,
+  stale?: StaleContext,
 ): BrowserRow[] {
   if (!filter) return rows;
-  const test = compileBrowserFilter(filter, vocab, render, media, sibling);
+  const test = compileBrowserFilter(filter, vocab, render, media, sibling, stale);
   return rows.filter(test);
 }
 
@@ -987,6 +1036,7 @@ export function filterBrowserRows(
       schema.render,
       schema.media,
       schema.sibling,
+      schema.stale,
     ),
     error: null,
   };

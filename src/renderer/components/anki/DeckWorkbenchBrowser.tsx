@@ -36,6 +36,7 @@ import { filterBrowserRows, type BrowserQueryErrorCode } from '../../../shared/a
 import { buildCardHealthContext } from '../../../shared/ankiCardHealth';
 import { buildMediaHealthContext } from '../../../shared/ankiMediaHealth';
 import { buildSiblingAuditContext } from '../../../shared/ankiSiblingAudit';
+import { buildStaleContext } from '../../../shared/ankiStaleCards';
 import {
   QUERY_EXPLAIN_KEY_PREFIX,
   explainBrowserQuery,
@@ -89,6 +90,7 @@ const QUERY_ERROR_KEY: Record<BrowserQueryErrorCode, string> = {
   'no-render-context': 'ankiWorkbench.browser.query.noRenderContext',
   'no-media-context': 'ankiWorkbench.browser.query.noMediaContext',
   'no-sibling-context': 'ankiWorkbench.browser.query.noSiblingContext',
+  'no-stale-context': 'ankiWorkbench.browser.query.noStaleContext',
 };
 
 type Translate = (key: string, vars?: Record<string, string | number>) => string;
@@ -279,6 +281,15 @@ export default function DeckWorkbenchBrowser({
   // that as its own diagnostic rather than as a missing filter.
   const sibling = useMemo(() => buildSiblingAuditContext(draft), [draft]);
 
+  // `stale:` verdicts, and the only context whose clock matters. `Date.now()` is
+  // read once per draft and not per render, so the whole filter session judges
+  // every row against one "today" — a scan that re-read the clock could put two
+  // rows of the same query on opposite sides of a day boundary. Absent, like
+  // `media`, when the scan refuses: a source with no `col.crt` cannot answer
+  // "how overdue" at all, and `stale:` is then a named refusal rather than a
+  // filter that quietly matches nothing.
+  const stale = useMemo(() => buildStaleContext(draft, Date.now()) ?? undefined, [draft]);
+
   // The draft's own field names, so `Expression:食べる` is a field predicate and
   // `Expresion:食べる` is a refusal instead of a filter that quietly matches all.
   const schema = useMemo(
@@ -287,9 +298,10 @@ export default function DeckWorkbenchBrowser({
       render,
       sibling,
       ...(media ? { media } : {}),
+      ...(stale ? { stale } : {}),
       ...(vocab ? { vocab } : {}),
     }),
-    [draft, vocab, render, media, sibling],
+    [draft, vocab, render, media, sibling, stale],
   );
   const filtered = useMemo(() => filterBrowserRows(rows, query, schema), [rows, query, schema]);
   const shown = useMemo(() => sortBrowserRows(filtered.rows, sort), [filtered, sort]);

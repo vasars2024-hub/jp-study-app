@@ -9871,6 +9871,18 @@ export const ru: Catalog = {
     'у неё есть карточка, которую не создаёт ни один шаблон её типа заметки, и отрисовать её нечем',
   'ankiWorkbench.browser.query.noSiblingContext':
     'Шаблоны этой колоды ещё не сравнивались, поэтому «{token}» нечего прочитать.',
+  'ankiWorkbench.browser.explain.stale.new':
+    'её ни разу не учили, поэтому устаревать нечему',
+  'ankiWorkbench.browser.explain.stale.active':
+    'она запланирована и укладывается в оба порога',
+  'ankiWorkbench.browser.explain.stale.overdue':
+    'срок прошёл раньше, чем допускает порог просрочки',
+  'ankiWorkbench.browser.explain.stale.dormant':
+    'её не повторяли в пределах порога бездействия',
+  'ankiWorkbench.browser.explain.stale.withheld':
+    'она приостановлена или отложена, так что Anki не покажет её независимо от срока',
+  'ankiWorkbench.browser.query.noStaleContext':
+    'Расписание этой колоды не прочитано — сканирование не запускалось или источник не сообщает дату создания для отсчёта сроков, — поэтому «{token}» нечего прочитать.',
   'ankiWorkbench.media.title': 'Медиа',
   'ankiWorkbench.media.summary':
     'Файлов: {files}, {size}. Требуют внимания: {defects} — в заметках: {notes}.',
