@@ -39,6 +39,7 @@ import path from 'node:path';
 import type { SubtitleRecordFormat } from '../shared/subtitleRecord';
 import {
   buildSubtitleQuery,
+  episodeFromFileName,
   rankSubtitleCandidates,
   selectSubtitleFiles,
   type NyaaAcquisitionConfig,
@@ -333,6 +334,36 @@ export type NyaaFetchOutcome =
   | { ok: true; value: NyaaFetchResult }
   | { ok: false; reason: string };
 
+/**
+ * One subtitle file out of a release, with the episode its name states.
+ *
+ * The episode is parsed here rather than by the caller because the file names
+ * are the only place a sub-pack says which episode is which, and
+ * `episodeFromFileName` is already the one parser for that — a second one would
+ * drift from it the first time a release group changed its naming.
+ */
+export interface NyaaFetchedFile extends NyaaFetchResult {
+  /** `null` when the name states no episode, e.g. a movie or a single file. */
+  episode: number | null;
+}
+
+/**
+ * Every readable subtitle file the release turned out to hold.
+ *
+ * Exists because the two callers want different amounts of the same
+ * acquisition. Discovery matches one local video file, so one subtitle is the
+ * whole answer; a catalogue harvest asks for an episode *range*, and a sub-pack
+ * carries that range in one torrent. Fetching per episode would mean re-adding
+ * the same torrent once per episode — so the acquisition runs once and both
+ * callers read from its result.
+ */
+export type NyaaFetchAllOutcome =
+  | { ok: true; files: NyaaFetchedFile[] }
+  | { ok: false; reason: string };
+
+/** Shared by both fetch shapes, so they cannot drift into two wordings. */
+const NOTHING_READABLE = 'The subtitle files finished downloading but could not be read from disk.';
+
 const SELECTION_MESSAGES: Record<NyaaSelectionReason, string> = {
   'ok': '',
   'bitmap-only': 'This release only has image-based subtitles, which cannot be read as text.',
@@ -365,16 +396,41 @@ async function readSubtitleFile(savePath: string, torrentName: string, fileName:
 /**
  * Acquires one candidate and returns its text.
  *
- * The sequence is the same for both routes and only the priority step differs:
- * add stopped, learn what is inside, choose, start, wait, read. Adding stopped
- * first is what makes the choice possible at all — a torrent added running has
- * already begun fetching video by the time its file list is known.
+ * The single-file view of `nyaaFetchAll`, for the discovery path: one local
+ * video file takes one subtitle record, and a record has one path and one
+ * format. Kept as its own export rather than making every caller index `[0]`,
+ * because "the first readable file" is a decision — the selection is already
+ * ordered largest-first within the dominant format — and it belongs here next
+ * to the ordering rather than at each call site.
  */
 export async function nyaaFetch(
   candidate: ProviderSubtitleCandidate,
   config: NyaaAcquisitionConfig,
   options: { isCancelled?: () => boolean; timeoutMs?: number } = {},
 ): Promise<NyaaFetchOutcome> {
+  const outcome = await nyaaFetchAll(candidate, config, options);
+  if (!outcome.ok) return outcome;
+  const [first] = outcome.files;
+  // Unreachable through `acquireAll`, which refuses rather than returning an
+  // empty list — asserted here so a later change there cannot turn a silent
+  // empty into a candidate that claims success with no text.
+  if (!first) return { ok: false, reason: NOTHING_READABLE };
+  return { ok: true, value: { text: first.text, format: first.format, fileName: first.fileName } };
+}
+
+/**
+ * Acquires one candidate and returns every subtitle file it holds.
+ *
+ * The sequence is the same for both routes and only the priority step differs:
+ * add stopped, learn what is inside, choose, start, wait, read. Adding stopped
+ * first is what makes the choice possible at all — a torrent added running has
+ * already begun fetching video by the time its file list is known.
+ */
+export async function nyaaFetchAll(
+  candidate: ProviderSubtitleCandidate,
+  config: NyaaAcquisitionConfig,
+  options: { isCancelled?: () => boolean; timeoutMs?: number } = {},
+): Promise<NyaaFetchAllOutcome> {
   const available = await nyaaAvailability(config);
   if (!available.ok) return { ok: false, reason: available.detail };
 
@@ -400,21 +456,21 @@ export async function nyaaFetch(
         `Cleared ${reaped.value.length} subtitle fetch(es) an earlier run left behind.`,
       );
     }
-    return await acquire(candidate, config, options, qbit, token, hash);
+    return await acquireAll(candidate, config, options, qbit, token, hash);
   } finally {
     inFlight.delete(hash);
   }
 }
 
-/** The body of `nyaaFetch`, so the in-flight bookkeeping has one exit. */
-async function acquire(
+/** The body of `nyaaFetchAll`, so the in-flight bookkeeping has one exit. */
+async function acquireAll(
   candidate: ProviderSubtitleCandidate,
   config: NyaaAcquisitionConfig,
   options: { isCancelled?: () => boolean; timeoutMs?: number },
   qbit: { config: NyaaAcquisitionConfig['qbittorrent'] },
   token: NyaaFetchToken,
   hash: string,
-): Promise<NyaaFetchOutcome> {
+): Promise<NyaaFetchAllOutcome> {
   const added = await qbitAddStopped(qbit, token.magnet, hash);
   if (!added.ok) return { ok: false, reason: added.reason };
   const preexisting = added.value === 'already-present';
@@ -476,19 +532,27 @@ async function acquire(
   if (!info.ok) return { ok: false, reason: info.reason };
   if (!info.value?.savePath) return { ok: false, reason: 'qBittorrent reported no save path.' };
 
+  const read: NyaaFetchedFile[] = [];
   for (const file of selection.files) {
     const text = await readSubtitleFile(info.value.savePath, info.value.name, file.name);
+    // An unreadable file is skipped rather than failing the release: a pack
+    // where one of twenty-six episodes is truncated still carries twenty-five,
+    // and the caller reports which episodes it got.
     if (text && text.trim()) {
-      scraperLog('info', 'torrents', `Fetched a subtitle from ${candidate.releaseName}.`);
-      return {
-        ok: true,
-        value: { text, format: selection.format, fileName: path.basename(file.name) },
-      };
+      read.push({
+        text,
+        format: selection.format,
+        fileName: path.basename(file.name),
+        episode: episodeFromFileName(file.name),
+      });
     }
   }
 
-  return {
-    ok: false,
-    reason: 'The subtitle files finished downloading but could not be read from disk.',
-  };
+  if (!read.length) return { ok: false, reason: NOTHING_READABLE };
+  scraperLog(
+    'info',
+    'torrents',
+    `Fetched ${read.length} subtitle file(s) from ${candidate.releaseName}.`,
+  );
+  return { ok: true, files: read };
 }

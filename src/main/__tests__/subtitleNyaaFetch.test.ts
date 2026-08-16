@@ -31,7 +31,7 @@ vi.mock('electron', () => ({
   },
 }));
 
-const { nyaaAvailability, nyaaFetch } = await import('../subtitleNyaaSource');
+const { nyaaAvailability, nyaaFetch, nyaaFetchAll } = await import('../subtitleNyaaSource');
 const { resetQbitSessions } = await import('../scraper/qbittorrent');
 const { setScraperStoreRoot } = await import('../scraper/store');
 
@@ -560,5 +560,78 @@ describe('nyaaFetch — a transfer that stops and never comes back', () => {
     const result = await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 1_200 });
     expect(result.ok).toBe(false);
     expect(result.ok === false && result.reason).toMatch(/timed out/i);
+  });
+});
+
+describe('nyaaFetchAll — a sub-pack is a season, not one file', () => {
+  it('returns every episode in the pack, each keyed to its own episode number', async () => {
+    // The whole reason this function exists: a harvest asks for a *range*, and
+    // `nyaaFetch` answers with one file no matter how many the release holds.
+    files = [
+      { name: 'Show - 07.ja.ass', size: 40_000, progress: 0, priority: 1 },
+      { name: 'Show - 08.ja.ass', size: 41_000, progress: 0, priority: 1 },
+      { name: 'Show - 09.ja.ass', size: 42_000, progress: 0, priority: 1 },
+    ];
+    await writeOnDisk('Show - 07.ja.ass', 'Dialogue: seven');
+    await writeOnDisk('Show - 08.ja.ass', 'Dialogue: eight');
+    await writeOnDisk('Show - 09.ja.ass', 'Dialogue: nine');
+
+    // `episode: null` is what a range listing searches with — the pack covers
+    // the range, so pinning one episode at search time would discard the rest.
+    const all = await nyaaFetchAll(candidate('sub-pack', null), config(), { timeoutMs: 5_000 });
+    expect(all.ok).toBe(true);
+    expect(all.ok && all.files.map((file) => file.episode).sort((a, b) => Number(a) - Number(b)))
+      .toEqual([7, 8, 9]);
+    expect(all.ok && all.files.map((file) => file.text).join('|')).toContain('Dialogue: eight');
+
+    // The single-file view over the same acquisition still answers one file,
+    // which is the discovery contract and must not have moved.
+    const one = await nyaaFetch(candidate('sub-pack', null), config(), { timeoutMs: 5_000 });
+    expect(one.ok).toBe(true);
+    expect(one.ok && one.value.fileName).toBe('Show - 09.ja.ass');
+  });
+
+  it('skips a file that is on disk but empty, and keeps the rest', async () => {
+    // The negative control for the per-file skip: without it, one truncated
+    // episode out of three would either fail the release or land as an empty
+    // cue list that mines to nothing while reporting success.
+    files = [
+      { name: 'Show - 07.ja.ass', size: 40_000, progress: 0, priority: 1 },
+      { name: 'Show - 08.ja.ass', size: 41_000, progress: 0, priority: 1 },
+    ];
+    await writeOnDisk('Show - 07.ja.ass', '   \n  ');
+    await writeOnDisk('Show - 08.ja.ass', 'Dialogue: eight');
+
+    const all = await nyaaFetchAll(candidate('sub-pack', null), config(), { timeoutMs: 5_000 });
+    expect(all.ok).toBe(true);
+    expect(all.ok && all.files).toHaveLength(1);
+    expect(all.ok && all.files[0].episode).toBe(8);
+  });
+
+  it('refuses rather than returning an empty list when nothing reads', async () => {
+    files = [{ name: 'Show - 07.ja.ass', size: 40_000, progress: 0, priority: 1 }];
+    // Listed by the client, never written to disk.
+
+    const all = await nyaaFetchAll(candidate('sub-pack'), config(), { timeoutMs: 5_000 });
+    expect(all.ok).toBe(false);
+    expect(all.ok === false && all.reason).toMatch(/could not be read from disk/i);
+  });
+
+  it('still honours the episode filter when the token names one', async () => {
+    // Control for the test above it: the same three-file pack, fetched by a
+    // token that pins episode 8, must narrow to 8 — otherwise the discovery
+    // path would start attaching whole seasons to one video file.
+    files = [
+      { name: 'Show - 07.ja.ass', size: 40_000, progress: 0, priority: 1 },
+      { name: 'Show - 08.ja.ass', size: 41_000, progress: 0, priority: 1 },
+      { name: 'Show - 09.ja.ass', size: 42_000, progress: 0, priority: 1 },
+    ];
+    await writeOnDisk('Show - 07.ja.ass', 'Dialogue: seven');
+    await writeOnDisk('Show - 08.ja.ass', 'Dialogue: eight');
+    await writeOnDisk('Show - 09.ja.ass', 'Dialogue: nine');
+
+    const all = await nyaaFetchAll(candidate('sub-pack', 8), config(), { timeoutMs: 5_000 });
+    expect(all.ok).toBe(true);
+    expect(all.ok && all.files.map((file) => file.episode)).toEqual([8]);
   });
 });
