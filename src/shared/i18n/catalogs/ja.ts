@@ -8832,6 +8832,7 @@ export const ja: Catalog = {
     '穴埋め {ords} が削除されます。適用時にそのカードはなくなります。',
   'ankiWorkbench.inspector.mediaDropped': 'このノートから参照されなくなりました: {names}',
   'ankiWorkbench.inspector.mediaMissing': 'このソースに含まれていません: {names}',
+  'ankiWorkbench.inspector.provenance': '出典: {sources}',
   'ankiWorkbench.preview.title': 'カードのプレビュー',
   'ankiWorkbench.preview.siblings': 'このノートが生成するカード',
   'ankiWorkbench.preview.sideGroup': '面',

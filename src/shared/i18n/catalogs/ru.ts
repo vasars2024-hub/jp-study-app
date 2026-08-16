@@ -9643,6 +9643,7 @@ export const ru: Catalog = {
     'Удаляется пропуск {ords}. При применении созданная им карточка исчезнет.',
   'ankiWorkbench.inspector.mediaDropped': 'Больше не используется этой заметкой: {names}',
   'ankiWorkbench.inspector.mediaMissing': 'Этого нет в источнике: {names}',
+  'ankiWorkbench.inspector.provenance': 'Источник: {sources}',
   'ankiWorkbench.preview.title': 'Предпросмотр карточки',
   'ankiWorkbench.preview.siblings': 'Карточки, которые создаёт эта заметка',
   'ankiWorkbench.preview.sideGroup': 'Сторона',

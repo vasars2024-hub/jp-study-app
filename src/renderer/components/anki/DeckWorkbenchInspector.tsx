@@ -12,6 +12,13 @@
  * A field commits on blur, not on every keystroke: one journal entry per visit
  * to a field is what makes undo mean "take back that edit" instead of "take back
  * one character".
+ *
+ * It is also where written provenance is *read back* (plan gate 11). Enrichment
+ * wraps a value it wrote in a span naming the dictionaries behind it; that
+ * wrapper survives an export and a reimport as ordinary field markup, so this
+ * panel is what turns it from bytes in a field into an answer to "where did
+ * this come from?". Deliberately derived from `field.raw` on every render
+ * rather than cached: editing the wrapper away must make the line disappear.
  */
 import { useEffect, useState } from 'react';
 import type { AnkiDraft, AnkiDraftNote } from '../../../shared/ankiDraft';
@@ -23,6 +30,7 @@ import {
   setNoteTags,
   type AnkiDraftEditJournal,
 } from '../../../shared/ankiDraftEdit';
+import { readEnrichProvenance } from '../../../shared/ankiEnrich';
 import { useT } from '../../i18n';
 import DeckWorkbenchPreview from './DeckWorkbenchPreview';
 
@@ -91,7 +99,9 @@ export default function DeckWorkbenchInspector({
         <li>{t('ankiWorkbench.inspector.cards', { count: note.cardIds.length })}</li>
       </ul>
 
-      {note.fields.map((field) => (
+      {note.fields.map((field) => {
+        const wrote = readEnrichProvenance(field.raw)?.sources ?? [];
+        return (
         <label key={field.ord} className="wb-inspector-field">
           <span className="wb-inspector-field-name">{field.name}</span>
           <textarea
@@ -103,6 +113,11 @@ export default function DeckWorkbenchInspector({
             rows={2}
             onBlur={(e) => commitField(field.ord, e.target.value)}
           />
+          {wrote.length > 0 && (
+            <span className="wb-inspector-provenance" data-field-ord={field.ord}>
+              {t('ankiWorkbench.inspector.provenance', { sources: wrote.join(', ') })}
+            </span>
+          )}
           {last?.fieldOrd === field.ord && last.clozeAdded.length > 0 && (
             <span className="wb-inspector-note" role="status">
               {t('ankiWorkbench.inspector.clozeAdded', { ords: last.clozeAdded.join(', ') })}
@@ -124,7 +139,8 @@ export default function DeckWorkbenchInspector({
             </span>
           )}
         </label>
-      ))}
+        );
+      })}
 
       <label className="wb-inspector-field">
         <span className="wb-inspector-field-name">{t('ankiWorkbench.inspector.tags')}</span>

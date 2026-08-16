@@ -561,6 +561,14 @@
   color: var(--warn, #c07000);
 }
 
+/* Provenance is an attribution, not a problem: it sits at the same weight as a
+   consequence note rather than borrowing the warning colour. */
+.wb-inspector-provenance {
+  font-size: 0.8rem;
+  opacity: 0.85;
+  font-style: italic;
+}
+
 .deck-workbench-history {
   display: flex;
   flex-wrap: wrap;

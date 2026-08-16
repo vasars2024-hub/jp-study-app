@@ -9257,6 +9257,7 @@ export const en: Catalog = {
     'This removes cloze {ords}. The card it generated would go away on commit.',
   'ankiWorkbench.inspector.mediaDropped': 'No longer referenced by this note: {names}',
   'ankiWorkbench.inspector.mediaMissing': 'This source does not contain: {names}',
+  'ankiWorkbench.inspector.provenance': 'Written from: {sources}',
   'ankiWorkbench.preview.title': 'Card preview',
   'ankiWorkbench.preview.siblings': 'Cards this note generates',
   'ankiWorkbench.preview.sideGroup': 'Side',

@@ -8779,6 +8779,7 @@ export const zh: Catalog = {
   'ankiWorkbench.inspector.clozeRemoved': '这会删除填空 {ords}。应用时它生成的卡片会消失。',
   'ankiWorkbench.inspector.mediaDropped': '此笔记不再引用：{names}',
   'ankiWorkbench.inspector.mediaMissing': '此来源不包含：{names}',
+  'ankiWorkbench.inspector.provenance': '来源：{sources}',
   'ankiWorkbench.preview.title': '卡片预览',
   'ankiWorkbench.preview.siblings': '此笔记生成的卡片',
   'ankiWorkbench.preview.sideGroup': '面',
