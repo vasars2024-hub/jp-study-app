@@ -8686,6 +8686,19 @@ export const ja: Catalog = {
   'ankiWorkbench.step.enrich.outcome': '{count} 件のノートに追加しました',
   'ankiWorkbench.step.enrich.outcomeNone':
     'まだ何も追加していません — この手順は任意です',
+  'ankiWorkbench.step.fields.lead':
+    'ノートがすでに持っているテキストを移動・整形・書き換えし、カードの表示方法を変更します。',
+  'ankiWorkbench.step.fields.noSelection':
+    '何も選択されていません。「閲覧と選択」に戻って、編集するノートを選んでください。',
+  'ankiWorkbench.step.fields.outcome': '{count} 件のノートを編集しました',
+  'ankiWorkbench.step.fields.outcomeNone':
+    'フィールドの変更はまだありません — この手順は任意です',
+  'ankiWorkbench.step.rules.lead':
+    'これらのノートの扱いを決めます。タグ、習得済みとみなす範囲、出題の順番です。',
+  'ankiWorkbench.step.rules.noSelection':
+    '何も選択されていません。「閲覧と選択」に戻って、ルールを設定するノートを選んでください。',
+  'ankiWorkbench.step.rules.outcome': '{count} 件のノートに学習ルールを設定しました',
+  'ankiWorkbench.step.rules.outcomeNone': '学習ルールはまだありません — この手順は任意です',
   'ankiWorkbench.browser.search': 'フィールド・タグ・デッキを検索',
   'ankiWorkbench.browser.rows': '読み込み済み {loaded} 件のうち {shown} 件を表示',
   'ankiWorkbench.browser.columns': '列',

@@ -8648,6 +8648,18 @@ export const zh: Catalog = {
   'ankiWorkbench.step.enrich.outcome': '已为 {count} 条笔记添加内容',
   'ankiWorkbench.step.enrich.outcomeNone':
     '尚未添加任何内容 — 此步骤为可选',
+  'ankiWorkbench.step.fields.lead':
+    '移动、整理或改写这些笔记已有的文本，并调整卡片的排版方式。',
+  'ankiWorkbench.step.fields.noSelection':
+    '尚未选择任何内容。请返回“浏览并选择”，选取要编辑的笔记。',
+  'ankiWorkbench.step.fields.outcome': '已编辑 {count} 条笔记',
+  'ankiWorkbench.step.fields.outcomeNone': '尚未修改字段 — 此步骤为可选',
+  'ankiWorkbench.step.rules.lead':
+    '决定这些笔记的定位：如何标记、算作已掌握到什么程度，以及何时出现。',
+  'ankiWorkbench.step.rules.noSelection':
+    '尚未选择任何内容。请返回“浏览并选择”，选取要设定规则的笔记。',
+  'ankiWorkbench.step.rules.outcome': '已为 {count} 条笔记设定学习规则',
+  'ankiWorkbench.step.rules.outcomeNone': '尚未设定学习规则 — 此步骤为可选',
   'ankiWorkbench.browser.search': '搜索字段、标签和牌组',
   'ankiWorkbench.browser.rows': '已加载 {loaded} 条，显示 {shown} 条',
   'ankiWorkbench.browser.columns': '列',

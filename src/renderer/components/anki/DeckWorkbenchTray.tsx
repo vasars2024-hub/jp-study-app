@@ -55,7 +55,7 @@ import { listKnownEntries, onKnowledgeChanged } from '../../knownWords';
 import { useT } from '../../i18n';
 import DeckWorkbenchAiPanel, { type AiPanelNote } from './DeckWorkbenchAiPanel';
 
-const ACTION_KINDS: TrayActionKind[] = [
+export const ACTION_KINDS: TrayActionKind[] = [
   'find-replace',
   'normalize-text',
   'swap-fields',
@@ -84,10 +84,29 @@ export const ENRICH_ACTION_KINDS: TrayActionKind[] = [
   'fill-reading',
   'apply-ai-additions',
 ];
-/** Step 2's remainder, in the same order the full list gives them. */
-export const BROWSE_ACTION_KINDS: TrayActionKind[] = ACTION_KINDS.filter(
-  (kind) => !ENRICH_ACTION_KINDS.includes(kind),
-);
+/**
+ * Step 4, "Fields and design": the kinds that move or rewrite text the deck
+ * already holds. They travel with the card designer, which reshapes the note
+ * type the same edits are written into.
+ */
+export const FIELD_ACTION_KINDS: TrayActionKind[] = [
+  'find-replace',
+  'normalize-text',
+  'swap-fields',
+  'copy-field',
+];
+/**
+ * Step 5, "Learning rules": the kinds that decide what a note *means* for study
+ * — what it is labelled, what the user is held to know, and when it is seen —
+ * rather than what it says.
+ */
+export const RULE_ACTION_KINDS: TrayActionKind[] = [
+  'prioritize-new',
+  'rescue-leeches',
+  'set-mastery',
+  'add-tags',
+  'remove-tags',
+];
 /**
  * The rung the level select starts on. Unlike a field name there is no unset
  * value that could mean anything — every rung is valid — so the form opens on
@@ -163,7 +182,15 @@ export default function DeckWorkbenchTray({
     if (onActionsChange) onActionsChange(update(actions));
     else setOwnActions(update);
   };
-  const [kind, setKind] = useState<TrayActionKind>(kinds[0] ?? 'find-replace');
+  const [chosenKind, setKind] = useState<TrayActionKind>(kinds[0] ?? 'find-replace');
+  /**
+   * A host may change the kinds it offers without remounting — the guided flow
+   * does, on every step. A `kind` the current step does not own would render a
+   * select whose value is absent from its own options (so the form below it
+   * belongs to another step) and an Add button that queues an action this step
+   * cannot describe. It falls back to the first kind offered instead.
+   */
+  const kind = kinds.includes(chosenKind) ? chosenKind : (kinds[0] ?? 'find-replace');
   const [fieldName, setFieldName] = useState<string>('');
   const [find, setFind] = useState('');
   const [replaceWith, setReplaceWith] = useState('');

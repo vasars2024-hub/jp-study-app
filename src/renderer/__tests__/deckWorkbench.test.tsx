@@ -20,6 +20,7 @@ vi.mock('../components/anki/deckWorkbench.css', () => ({}));
 
 import type { AnkiDraft, AnkiDraftDiagnostic, AnkiDraftNote } from '../../shared/ankiDraft';
 import DeckWorkbench from '../components/anki/DeckWorkbench';
+import { ACTION_KINDS } from '../components/anki/DeckWorkbenchTray';
 
 /**
  * Step 2 mounts `VirtualList`, and jsdom ships no `ResizeObserver` and reports
@@ -308,13 +309,12 @@ describe('DeckWorkbench', () => {
   });
 
   it('says a later step is not built rather than showing a control that does nothing', async () => {
-    // Steps 1, 2 and 3 are built now, so the unbuilt claim has to be tested on
-    // step 4 — reached only by actually satisfying the selection step and then
-    // passing through the (optional) enrich step.
+    // Steps 1 to 5 are built now, so the unbuilt claim has to be tested on
+    // step 6 — reached only by satisfying the selection step and then passing
+    // through the three optional tray steps.
     await toBrowse(browsable());
     await click(buttonBy('ankiWorkbench.browser.selectAll'));
-    await click(buttonBy('ankiWorkbench.next'));
-    await click(buttonBy('ankiWorkbench.next'));
+    for (let i = 0; i < 4; i += 1) await click(buttonBy('ankiWorkbench.next'));
 
     expect(host.textContent).toContain('ankiWorkbench.step.notReady');
     expect(host.querySelector('.deck-workbench-rail')).toBeNull();
@@ -325,50 +325,112 @@ describe('DeckWorkbench', () => {
     expect(controls).toHaveLength(0);
   });
 
-  it('gives step 3 the enrichment kinds and step 2 every other one, never both', async () => {
+  it('splits every tray kind across steps 3, 4 and 5 and gives step 2 none of them', async () => {
     await toBrowse(browsable());
     await click(buttonBy('ankiWorkbench.browser.selectAll'));
     const kindsOn = () => {
       const select = [...host.querySelectorAll('.wb-tray-form select')][0] as HTMLSelectElement;
       return [...select.options].map((o) => o.value);
     };
-    const browseKinds = kindsOn();
-    expect(browseKinds).toContain('find-replace');
-    expect(browseKinds).not.toContain('enrich-dictionary');
-    expect(browseKinds).not.toContain('fill-reading');
-    expect(browseKinds).not.toContain('apply-ai-additions');
+    // Step 2 confirms a selection; it queues nothing.
+    expect(host.querySelector('.wb-browser')).not.toBeNull();
+    expect(host.querySelector('.wb-tray')).toBeNull();
 
     await click(buttonBy('ankiWorkbench.next'));
-    expect(kindsOn()).toEqual(['enrich-dictionary', 'fill-reading', 'apply-ai-additions']);
-    // The Browser is step 2's; step 3 acts on the selection it recorded.
-    expect(host.querySelector('.wb-browser')).toBeNull();
+    const enrich = kindsOn();
+    expect(enrich).toEqual(['enrich-dictionary', 'fill-reading', 'apply-ai-additions']);
     expect(host.textContent).toContain('ankiWorkbench.step.enrich.lead');
+    // The Browser is step 2's; a tray step acts on the selection it recorded.
+    expect(host.querySelector('.wb-browser')).toBeNull();
+
+    await click(buttonBy('ankiWorkbench.next'));
+    const fields = kindsOn();
+    expect(fields).toEqual(['find-replace', 'normalize-text', 'swap-fields', 'copy-field']);
+    expect(host.textContent).toContain('ankiWorkbench.step.fields.lead');
+    // The card designer reshapes the note type the field edits are written into.
+    expect(host.querySelector('.wb-design')).not.toBeNull();
+
+    await click(buttonBy('ankiWorkbench.next'));
+    const rules = kindsOn();
+    expect(rules).toEqual([
+      'prioritize-new',
+      'rescue-leeches',
+      'set-mastery',
+      'add-tags',
+      'remove-tags',
+    ]);
+    expect(host.textContent).toContain('ankiWorkbench.step.rules.lead');
+    expect(host.querySelector('.wb-design')).toBeNull();
+
+    // The partition: every kind the tray offers belongs to exactly one step.
+    const split = [...enrich, ...fields, ...rules];
+    expect([...split].sort()).toEqual([...ACTION_KINDS].sort());
+    expect(new Set(split).size).toBe(split.length);
   });
 
   it('carries a queued action across Next and Back, because the tray unmounts and the queue must not', async () => {
     await toBrowse(browsable());
     await click(buttonBy('ankiWorkbench.browser.selectAll'));
+    await click(buttonBy('ankiWorkbench.next'));
+    await click(buttonBy('ankiWorkbench.next'));
+    // The tray does not remount between steps, so its `kind` must fall back to
+    // one this step owns — otherwise this is an enrich form on step 4.
+    const kindSelect = host.querySelector('.wb-tray-form select') as HTMLSelectElement;
+    expect(kindSelect.value).toBe('find-replace');
     await type(host.querySelector('.wb-tray-form input') as HTMLInputElement, 'ねこ');
     await click(buttonBy('ankiWorkbench.tray.add'));
     expect(host.querySelectorAll('.wb-tray-action')).toHaveLength(1);
 
     await click(buttonBy('ankiWorkbench.next'));
-    // Step 3 cannot *build* a find-replace, but it shows the one queue there is.
+    // Step 5 cannot *build* a find-replace, but it shows the one queue there is.
+    expect(host.querySelectorAll('.wb-tray-action')).toHaveLength(1);
+    await click(buttonBy('ankiWorkbench.back'));
     expect(host.querySelectorAll('.wb-tray-action')).toHaveLength(1);
     await click(buttonBy('ankiWorkbench.back'));
     expect(host.querySelectorAll('.wb-tray-action')).toHaveLength(1);
   });
 
-  it('records step 3 as visited-and-empty rather than passing it silently', async () => {
+  it('takes back a step’s outcome sentence when its batch is undone from another step', async () => {
     await toBrowse(browsable());
     await click(buttonBy('ankiWorkbench.browser.selectAll'));
-    const stepThree = () =>
-      ([...host.querySelectorAll('.deck-workbench-step')] as HTMLButtonElement[])[2]!;
-    expect(stepThree().className).not.toContain('done');
-
     await click(buttonBy('ankiWorkbench.next'));
-    expect(stepThree().className).toContain('done');
-    expect(stepThree().textContent).toContain('ankiWorkbench.step.enrich.outcomeNone');
+    await click(buttonBy('ankiWorkbench.next'));
+    const stepFour = () =>
+      ([...host.querySelectorAll('.deck-workbench-step')] as HTMLButtonElement[])[3]!;
+
+    await type(host.querySelector('.wb-tray-form input') as HTMLInputElement, 'ねこ');
+    await type([...host.querySelectorAll('.wb-tray-form input')][1] as HTMLInputElement, 'イヌ');
+    await click(buttonBy('ankiWorkbench.tray.add'));
+    await click(buttonBy('ankiWorkbench.tray.apply'));
+    expect(stepFour().textContent).toContain('ankiWorkbench.step.fields.outcome:1');
+
+    // Undo from step 5, where the batch was not queued — the journal is the
+    // draft's, not any one step's, and the claim has to move with it.
+    await click(buttonBy('ankiWorkbench.next'));
+    await click(buttonBy('ankiWorkbench.edit.undo'));
+    expect(stepFour().textContent).toContain('ankiWorkbench.step.fields.outcomeNone');
+    expect(stepFour().textContent).not.toContain('ankiWorkbench.step.fields.outcome:');
+
+    await click(buttonBy('ankiWorkbench.edit.redo'));
+    expect(stepFour().textContent).toContain('ankiWorkbench.step.fields.outcome:1');
+  });
+
+  it('records each optional step as visited-and-empty rather than passing it silently', async () => {
+    await toBrowse(browsable());
+    await click(buttonBy('ankiWorkbench.browser.selectAll'));
+    const stepAt = (i: number) =>
+      ([...host.querySelectorAll('.deck-workbench-step')] as HTMLButtonElement[])[i]!;
+    for (const i of [2, 3, 4]) expect(stepAt(i).className).not.toContain('done');
+
+    for (const [i, key] of [
+      [2, 'enrich'],
+      [3, 'fields'],
+      [4, 'rules'],
+    ] as const) {
+      await click(buttonBy('ankiWorkbench.next'));
+      expect(stepAt(i).className).toContain('done');
+      expect(stepAt(i).textContent).toContain(`ankiWorkbench.step.${key}.outcomeNone`);
+    }
   });
 
   it('marks later steps stale when a second source replaces the first', async () => {

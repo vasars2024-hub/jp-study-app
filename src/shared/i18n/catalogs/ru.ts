@@ -9494,6 +9494,20 @@ export const ru: Catalog = {
   'ankiWorkbench.step.enrich.outcome': 'Дополнено заметок: {count}',
   'ankiWorkbench.step.enrich.outcomeNone':
     'Пока ничего не добавлено — этот шаг необязателен',
+  'ankiWorkbench.step.fields.lead':
+    'Переместите, очистите или перепишите текст, который уже есть в этих заметках, и измените вид их карточек.',
+  'ankiWorkbench.step.fields.noSelection':
+    'Ничего не выбрано. Вернитесь к шагу «Просмотр и выбор» и укажите заметки для правки.',
+  'ankiWorkbench.step.fields.outcome': 'Изменено заметок: {count}',
+  'ankiWorkbench.step.fields.outcomeNone':
+    'Поля пока не менялись — этот шаг необязателен',
+  'ankiWorkbench.step.rules.lead':
+    'Решите, чем считать эти заметки: какие метки, что засчитывается как выученное и когда они появятся.',
+  'ankiWorkbench.step.rules.noSelection':
+    'Ничего не выбрано. Вернитесь к шагу «Просмотр и выбор» и укажите заметки для правил.',
+  'ankiWorkbench.step.rules.outcome': 'Правила заданы для заметок: {count}',
+  'ankiWorkbench.step.rules.outcomeNone':
+    'Правил обучения пока нет — этот шаг необязателен',
   'ankiWorkbench.browser.search': 'Поиск по полям, меткам и колодам',
   'ankiWorkbench.browser.rows': 'Показано {shown} из {loaded} загруженных заметок',
   'ankiWorkbench.browser.columns': 'Столбцы',

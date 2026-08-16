@@ -52,14 +52,41 @@ import { loadDeckAsAnkiDraft } from '../../flashcardDeck';
 import { useT } from '../../i18n';
 import DeckWorkbenchBrowser from './DeckWorkbenchBrowser';
 import DeckWorkbenchTray, {
-  BROWSE_ACTION_KINDS,
   ENRICH_ACTION_KINDS,
+  FIELD_ACTION_KINDS,
+  RULE_ACTION_KINDS,
 } from './DeckWorkbenchTray';
 import DeckWorkbenchJournal from './DeckWorkbenchJournal';
 import DeckWorkbenchCardDesign from './DeckWorkbenchCardDesign';
 import './deckWorkbench.css';
 
 type SourceKey = 'apkg' | 'connect' | 'localDeck';
+
+/**
+ * Which of the numbered steps owns which tray action kinds. The three sets
+ * partition the tray's whole catalogue and no kind appears twice — that
+ * exclusivity is what makes the flow a flow rather than a decoration over one
+ * big panel, and `deckWorkbench.test.tsx` asserts it against the tray's own
+ * list so a kind added later cannot quietly belong to no step.
+ *
+ * Step 2 is deliberately absent: the plan gives it "search, filter, inspect,
+ * and confirm which notes/cards will change", which is a selection, not an
+ * edit. Its inline field editing stays, because that is editing one note the
+ * user is looking at rather than queueing a batch.
+ */
+const STEP_TRAY_KINDS = {
+  enrich: ENRICH_ACTION_KINDS,
+  fields: FIELD_ACTION_KINDS,
+  rules: RULE_ACTION_KINDS,
+} as const;
+
+type TrayStepId = keyof typeof STEP_TRAY_KINDS;
+
+const TRAY_STEP_IDS = Object.keys(STEP_TRAY_KINDS) as TrayStepId[];
+
+function isTrayStep(id: WorkbenchStepId): id is TrayStepId {
+  return (TRAY_STEP_IDS as WorkbenchStepId[]).includes(id);
+}
 
 type SessionRow = Awaited<ReturnType<typeof listSessions>>[number];
 
@@ -129,6 +156,15 @@ export default function DeckWorkbench() {
    * navigation, which is the one thing the flow promises never happens.
    */
   const [trayActions, setTrayActions] = useState<TrayAction[]>([]);
+  /**
+   * What each tray step's outcome sentence is a claim *about*: the tray group it
+   * recorded, and the count it recorded. Undo runs from whichever step the user
+   * is standing on, so without this the stepper keeps reading "3,023 notes
+   * edited" over a batch that has just been taken back.
+   */
+  const [stepClaims, setStepClaims] = useState<
+    Partial<Record<TrayStepId, { groupId: string; count: number }>>
+  >({});
 
   const refreshSessions = useCallback(async () => {
     try {
@@ -161,6 +197,7 @@ export default function DeckWorkbench() {
     // Carrying it over would let Apply run a plan the user built against a deck
     // that is no longer open.
     setTrayActions([]);
+    setStepClaims({});
     setFlow((prev) =>
       recordStep(prev, 'source', {
         satisfied: true,
@@ -260,37 +297,66 @@ export default function DeckWorkbench() {
     setDraft(plan.draft);
     setJournal(plan.journal);
     // The step the tray was applied on owns the outcome sentence, so the count
-    // is read from the plan rather than recomputed. Only `enrich` records here:
-    // `browse` records a selection, which an apply does not change.
+    // is read from the plan rather than recomputed. `browse` never records
+    // here: it records a selection, which an apply does not change.
+    const at = flow.current;
+    if (!isTrayStep(at)) return;
+    setStepClaims((prev) => ({ ...prev, [at]: { groupId: plan.groupId, count: plan.changedNotes } }));
     setFlow((prev) =>
-      prev.current === 'enrich'
-        ? recordStep(prev, 'enrich', {
-            satisfied: true,
-            outcomeKey: 'ankiWorkbench.step.enrich.outcome',
-            outcomeParams: { count: plan.changedNotes },
-            affected: plan.changedNotes,
-          })
-        : prev,
+      recordStep(prev, at, {
+        satisfied: true,
+        outcomeKey: `ankiWorkbench.step.${at}.outcome`,
+        outcomeParams: { count: plan.changedNotes },
+        affected: plan.changedNotes,
+      }),
     );
-  }, []);
+  }, [flow.current]);
 
   /**
-   * Step 3 is satisfied by being visited, not by enriching: the plan offers
-   * dictionary data, AI additions *or* another source, so a deck that needs
-   * none of them is a finished step, and a mandatory "skip" button would be a
-   * required decision about nothing. It records "nothing added" out loud rather
-   * than passing silently, and an apply above replaces that with the real count.
+   * Move a step's outcome sentence with the batch it describes. An undo of the
+   * group a step recorded leaves that step honestly empty again; a redo puts the
+   * number back. Doing only the first half would be a lie in the other
+   * direction, so both run off the same stored claim.
+   */
+  const restateClaim = useCallback(
+    (groupId: string | undefined, undone: boolean) => {
+      if (!groupId) return;
+      const at = TRAY_STEP_IDS.find((id) => stepClaims[id]?.groupId === groupId);
+      if (!at) return;
+      const count = stepClaims[at]?.count ?? 0;
+      setFlow((prev) =>
+        recordStep(prev, at, {
+          satisfied: true,
+          outcomeKey: undone
+            ? `ankiWorkbench.step.${at}.outcomeNone`
+            : `ankiWorkbench.step.${at}.outcome`,
+          outcomeParams: undone ? {} : { count },
+          affected: undone ? 0 : count,
+        }),
+      );
+    },
+    [stepClaims],
+  );
+
+  /**
+   * Steps 3, 4 and 5 are satisfied by being visited, not by queueing anything:
+   * the plan offers each of their tools as an "or", so a deck that needs none of
+   * them is a finished step and a mandatory "skip" button would be a required
+   * decision about nothing. Each records its own "nothing yet" sentence out loud
+   * rather than passing silently, and an apply above replaces that with the real
+   * count.
    */
   useEffect(() => {
-    if (flow.current !== 'enrich') return;
+    const at = flow.current;
+    if (!isTrayStep(at)) return;
     setFlow((prev) => {
-      const step = findStep(prev, 'enrich');
+      const step = findStep(prev, at);
       // A stale step is re-recorded: its old count was measured against the
       // source that has since been replaced, so it must not survive as a claim.
       if (step.satisfied && !step.stale) return prev;
-      return recordStep(prev, 'enrich', {
+      return recordStep(prev, at, {
         satisfied: true,
-        outcomeKey: 'ankiWorkbench.step.enrich.outcomeNone',
+        outcomeKey: `ankiWorkbench.step.${at}.outcomeNone`,
         outcomeParams: {},
         affected: 0,
       });
@@ -312,6 +378,9 @@ export default function DeckWorkbench() {
       const stack = direction === 'undo' ? masteryHistory.undo : masteryHistory.redo;
       const top = stack[stack.length - 1];
       const masteryOnly = top !== undefined && step.length === 0;
+      // The group is the same identifier on both halves, so one call covers a
+      // draft-only tray, a mastery-only tray and one that was both.
+      restateClaim(step[0]?.group ?? top?.groupId, direction === 'undo');
       if (top && (masteryOnly || step[0]?.group === top.groupId)) {
         // The entry carries both directions, captured when it was applied — a
         // recomputed inverse would read the store *after* the writes it is
@@ -336,7 +405,7 @@ export default function DeckWorkbench() {
         return result.draft;
       });
     },
-    [journal, masteryHistory],
+    [journal, masteryHistory, restateClaim],
   );
 
   const discardSession = useCallback(
@@ -351,6 +420,36 @@ export default function DeckWorkbench() {
   const currentStep = findStep(flow, flow.current);
   const blocking = draft?.diagnostics.filter((d) => d.severity === 'blocking') ?? [];
   const warnings = draft?.diagnostics.filter((d) => d.severity === 'warning') ?? [];
+
+  /**
+   * One history strip, shared by every step that can edit the draft. It is the
+   * same two buttons over the same journal wherever it is rendered, because the
+   * journal is the draft's and not any one step's — an undo on step 5 takes back
+   * whatever the last tray was, including one queued on step 3.
+   */
+  const history = (
+    <div className="deck-workbench-history">
+      <button
+        type="button"
+        className="btn"
+        disabled={journal.done.length === 0 && masteryHistory.undo.length === 0}
+        onClick={() => stepHistory('undo')}
+      >
+        {/* Steps, not ops: one tray over 3,000 notes is one undo, and a button
+            reading "Undo (3000)" would describe the wrong thing. */}
+        {t('ankiWorkbench.edit.undo', { count: countJournalSteps(journal.done) })}
+      </button>
+      <button
+        type="button"
+        className="btn"
+        disabled={journal.undone.length === 0 && masteryHistory.redo.length === 0}
+        onClick={() => stepHistory('redo')}
+      >
+        {t('ankiWorkbench.edit.redo', { count: countJournalSteps(journal.undone) })}
+      </button>
+      <span className="muted">{t('ankiWorkbench.edit.draftOnly')}</span>
+    </div>
+  );
 
   return (
     <div className="deck-workbench">
@@ -508,27 +607,7 @@ export default function DeckWorkbench() {
         ) : flow.current === 'browse' && draft ? (
           <div className="deck-workbench-detail deck-workbench-detail-wide">
             {currentStep.stale && <p className="muted">{t('ankiWorkbench.step.staleDetail')}</p>}
-            <div className="deck-workbench-history">
-              <button
-                type="button"
-                className="btn"
-                disabled={journal.done.length === 0 && masteryHistory.undo.length === 0}
-                onClick={() => stepHistory('undo')}
-              >
-                {/* Steps, not ops: one tray over 3,000 notes is one undo, and a
-                    button reading "Undo (3000)" would describe the wrong thing. */}
-                {t('ankiWorkbench.edit.undo', { count: countJournalSteps(journal.done) })}
-              </button>
-              <button
-                type="button"
-                className="btn"
-                disabled={journal.undone.length === 0 && masteryHistory.redo.length === 0}
-                onClick={() => stepHistory('redo')}
-              >
-                {t('ankiWorkbench.edit.redo', { count: countJournalSteps(journal.undone) })}
-              </button>
-              <span className="muted">{t('ankiWorkbench.edit.draftOnly')}</span>
-            </div>
+            {history}
             <DeckWorkbenchJournal draft={draft} journal={journal} />
             <DeckWorkbenchBrowser
               draft={draft}
@@ -537,52 +616,26 @@ export default function DeckWorkbench() {
               onSelection={onBrowseSelection}
               onEdit={applyEdit}
             />
-            <DeckWorkbenchTray
-              draft={draft}
-              journal={journal}
-              selectedIds={selectedIds}
-              selectedCount={selectedCount}
-              onApply={applyTray}
-              kinds={BROWSE_ACTION_KINDS}
-              actions={trayActions}
-              onActionsChange={setTrayActions}
-            />
-            {/* A card design changes the note type, not the selected notes, so
-                it sits beside the tray rather than inside it and does not read
-                the selection at all. */}
-            <DeckWorkbenchCardDesign draft={draft} onDraft={setDraft} />
           </div>
-        ) : flow.current === 'enrich' && draft ? (
+        ) : isTrayStep(flow.current) && draft ? (
           <div className="deck-workbench-detail deck-workbench-detail-wide">
-            <p className="deck-workbench-outcome">{t('ankiWorkbench.step.enrich.lead')}</p>
+            <p className="deck-workbench-outcome">
+              {t(`ankiWorkbench.step.${flow.current}.lead`)}
+            </p>
             {currentStep.stale && <p className="muted">{t('ankiWorkbench.step.staleDetail')}</p>}
+            {/* A card design changes the note type, not the selected notes, so
+                it sits beside the tray rather than inside it, reads no selection
+                and is offered even when the tray cannot be. */}
+            {flow.current === 'fields' && <DeckWorkbenchCardDesign draft={draft} onDraft={setDraft} />}
             {selectedIds.length === 0 ? (
               // Step 2 will not pass on an empty selection, so this is the paged
               // case: a selection that stands for notes none of which are
               // loaded. The tray could only refuse every note, for a reason
               // invisible from here, so it is not offered at all.
-              <p className="muted">{t('ankiWorkbench.step.enrich.noSelection')}</p>
+              <p className="muted">{t(`ankiWorkbench.step.${flow.current}.noSelection`)}</p>
             ) : (
               <>
-                <div className="deck-workbench-history">
-                  <button
-                    type="button"
-                    className="btn"
-                    disabled={journal.done.length === 0 && masteryHistory.undo.length === 0}
-                    onClick={() => stepHistory('undo')}
-                  >
-                    {t('ankiWorkbench.edit.undo', { count: countJournalSteps(journal.done) })}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn"
-                    disabled={journal.undone.length === 0 && masteryHistory.redo.length === 0}
-                    onClick={() => stepHistory('redo')}
-                  >
-                    {t('ankiWorkbench.edit.redo', { count: countJournalSteps(journal.undone) })}
-                  </button>
-                  <span className="muted">{t('ankiWorkbench.edit.draftOnly')}</span>
-                </div>
+                {history}
                 <DeckWorkbenchJournal draft={draft} journal={journal} />
                 <DeckWorkbenchTray
                   draft={draft}
@@ -590,7 +643,7 @@ export default function DeckWorkbench() {
                   selectedIds={selectedIds}
                   selectedCount={selectedCount}
                   onApply={applyTray}
-                  kinds={ENRICH_ACTION_KINDS}
+                  kinds={STEP_TRAY_KINDS[flow.current]}
                   actions={trayActions}
                   onActionsChange={setTrayActions}
                 />

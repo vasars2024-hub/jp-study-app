@@ -9112,6 +9112,18 @@ export const en: Catalog = {
     'Nothing is selected. Go back to “Browse and select” and choose the notes to enrich.',
   'ankiWorkbench.step.enrich.outcome': '{count} notes enriched',
   'ankiWorkbench.step.enrich.outcomeNone': 'Nothing added yet — this step is optional',
+  'ankiWorkbench.step.fields.lead':
+    'Move, clean up or rewrite the text these notes already hold, and change how their cards are laid out.',
+  'ankiWorkbench.step.fields.noSelection':
+    'Nothing is selected. Go back to “Browse and select” and choose the notes to edit.',
+  'ankiWorkbench.step.fields.outcome': '{count} notes edited',
+  'ankiWorkbench.step.fields.outcomeNone': 'No field changes yet — this step is optional',
+  'ankiWorkbench.step.rules.lead':
+    'Decide what these notes count as: what they are tagged, what you are held to know, and when they come up.',
+  'ankiWorkbench.step.rules.noSelection':
+    'Nothing is selected. Go back to “Browse and select” and choose the notes to set rules for.',
+  'ankiWorkbench.step.rules.outcome': '{count} notes given learning rules',
+  'ankiWorkbench.step.rules.outcomeNone': 'No learning rules yet — this step is optional',
   'ankiWorkbench.browser.search': 'Search fields, tags and decks',
   'ankiWorkbench.browser.rows': '{shown} of {loaded} loaded notes shown',
   'ankiWorkbench.browser.columns': 'Columns',
