@@ -24208,3 +24208,48 @@ which is most of `en`. `debug/stage-i18n-after-line.cjs` anchors on the line *be
 insertion instead, which is language-independent. (2) A panel fixture defaulting
 `createdAtSec` to `undefined` put 6 of 7 cases silently on the refusal branch while claiming
 to measure the preview — assert the branch you think you are in.
+
+## 2026-08-17 — Track 7 / Phase 7: recipe 19, and a library with no cloze note type in it
+
+**Slices.** `814e83e3` `shared/ankiClozeCandidates.ts` + 12 tests · `6af0f023` the `add-cloze`
+tray action, its 7 problem codes, the step-4 form and 13 keys ×4 (7 tray tests).
+
+**Decision.** A `stem` match wraps the stem and nothing more. The fluent cloze over
+昨日ケーキを食べました covers 食べました, and extending across the trailing kana run is
+derivable — but it swallows the particle in 食べましたが and the result reads as fluent
+Japanese while testing the wrong span. Recipe 16's rule applied to the write side: an
+under-covering candidate is visible to the reviewer, an over-covering one is not. So `stem`
+also ships **off by default** in the tray form. Two texts, deliberately: cover is answered on
+`normalized` so this cannot disagree with recipe 16, the write lands in `raw`, and the gap
+between them is its own refusal (`html-split`) rather than a false `not-found`.
+
+**The load-bearing refusal is `not-cloze`.** `{{cN::…}}` generates cards on a cloze note type
+and renders as literal braces on a standard one — no error, no empty card, the user's card
+just reads `{{c1::食べ}}ました` forever. Checked per note before any candidate is proposed.
+
+**Live on the user's 33 real packages, no dialog** (`readApkgDraft {filePath}`, real main
+process, shipped module imported from the dev server — `debug/r19-live.cjs`): **38,283 of
+38,283 notes `not-cloze`, 0 of 33 packages hold a cloze note type.** That is the guard firing
+on 100% of real data and it measures nothing else — **a clean sweep, exactly recipe 17's
+shape**, so it is reported as a FINDING and not as a pass.
+
+**The positive control, on real text** (`debug/r19-positive.cjs`, note-type `kind` flipped to
+cloze **in memory only** — nothing written, no package touched). 14 of 33 packages declare
+both a sentence and a word field; 19 declare neither and are skipped by name rather than
+counted as zeros. `Re_Zero kara Hajimeru Isekai S.apkg`, 2,000 notes, `Lapis (Jiten)`
+[Expression / Sentence]: **ready 1,862 = exact 1,586 + stem 276**, not-found 19, unknown 119,
+sum **2,000 of 2,000**. Real spans, wrapped through real HTML:
+`無論、三十を<b>{{c1::超える}}</b>魔手の猛攻は…`. The stated under-coverage is visible in the
+output rather than asserted — `<b>{{c1::命を落と}}した</b>`, `<b>{{c1::突き出}}し</b>`.
+
+**Controls, all three.** Ladder monotonic on every package, 0 violations: exact-only 1,586 ≤
+no-stem 1,586 ≤ all 1,862. Idempotence: a second pass over the written text is **ready 0,
+already 1,862** — the marker is never nested. No mode selected writes 0 and *blocks* rather
+than running to a zero the user would read as "none of my notes can be clozed". Worst scan
+**29 ms** for 2,000 notes.
+
+**Traps.** (1) `html-split` fired **0** times across 13,878 real notes — it is proven by
+fixture only, so do not cite it as field-measured. (2) `not-cloze` is checked first and masks
+every other outcome, which is why the positive control reports resolvable field pairs
+separately; the 38,283 above says nothing about how many notes have sentences. (3) The 11,866
+`no-sentence` are real: DaKanji2 declares an `Example` field its notes leave empty.
