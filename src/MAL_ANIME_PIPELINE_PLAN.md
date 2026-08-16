@@ -1029,3 +1029,53 @@ places, and a multi-line anchor joined with the file's "dominant" EOL matches ze
 `debug/stage-harvest-nyaa.cjs`. (2) A test asserting `` `ipcMain.handle('${channel}'` `` registers
 *itself* as the handler in `tools/architecture-audit.cjs` and turns dead-ipc 0 → 1; assemble the
 string from parts. (3) Russian plurals need `one/few/many/other`, not three.
+
+## 2026-08-17 — P4: Jimaku's silence was being reported as its answer
+
+Worker `primary`. Commits `49ca928c`, `10f216a8`. Not a new gate pass — this is P4 gate 16's
+honesty property failing in the field, found while surveying the harvest→nyaa route the previous
+turn built. **Both defects sent users to a torrent index for subtitles Jimaku already had.**
+
+**Defect 1 — a rate limit read as an empty catalogue (`49ca928c`).** `requestJson`
+(`subtitleProviderClients.ts:102` at HEAD) collapsed a 429, a 5xx, a timeout and a genuine `[]`
+into one `null`, and `listSubtitleHarvest` turned that into the sentence *"Jimaku has no Japanese
+subtitles filed for this title"* plus the nyaa offer. **Live control, the decisive one:** 8 titles
+that reported 0 files back-to-back returned **125 / 57 / 168 / 36 / 95 / 48 / 60 / 47 files** when
+the identical requests were spaced 6 s apart — 636 files that "did not exist". Now on
+`requestJsonReply`, which keeps the status; `JimakuMatch` carries `down`/`downStatus` for **both**
+requests. The file listing is the worse half: there the panel has a matched entry name vouching
+for the emptiness. **Live after:** of 23 titles, 9 empty → **9 of 9** carry `jimakuDown` and
+*"Jimaku did not answer (HTTP 429)…"*, and the **14** that answered carry `jimakuDown: false`
+with no message. So the cause is measured, not inferred: **429**.
+
+**Defect 2 — the fuzzy chooser guessed a different show (`10f216a8`).** `chooseJimakuEntry` ended
+in `best ?? entries[0]`. Query `Shinreigari` (Ghost Hound) scored every entry NO_MATCH and fell
+through to *Mahou Shoujo Madoka☆Magica: Hajimari no Monogatari*, listing **33 files** — mined into
+the deck stamped with the requested title. And because `files.length` was non-zero, `nyaa: null`:
+the wrong show also **suppressed** the right route. Now refuses and names the closest entry
+(usually the same show under another romanisation). **Live after:** Shinreigari 33 → **0**,
+`matchedBy: null`, `jimakuDown: false`, nyaa **offered**. Control same run: Dororo still **101**,
+`rejectedEntry: null`, nyaa not offered.
+
+**`b8b30f1b` did not contain what this plan says it does.** It committed `preload.ts` and
+`window.d.ts` **only** — `src/main/subtitleHarvest.ts`'s nyaa handlers and its 10-test file were
+never committed, so HEAD shipped a *Search Nyaa* button invoking `subtitleHarvest:nyaaList` with
+**no handler registered**. Landed in `49ca928c`. The 2026-08-17 entry above overstates that slice.
+
+**Mutation controls, each on its own suite.** `reply.value === null` → `false`: invisible to
+`subtitleHarvestNyaa.test.ts` (19/19 green — the client is mocked there), **3 failures** in the
+new `jimakuOutage.test.ts`, which drives the real client over a stubbed `electron.net`. That gap
+is why the file exists. `match.down` → `false`: 1 failure. `return best` → `best ?? entries[0]`:
+**3 failures**. All restored byte-identical (`sha256sum -c`).
+
+**Gate 31 stays open**, unchanged. **New number for it:** Jimaku's coverage of this library is far
+better than the fast scan suggested — 14 of 23 sampled titles are covered, and the 9 "misses" were
+all 429s. Do **not** reuse the "26 of 40 have no Jimaku entry" figure from the first sweep; it was
+the rate limit, and the spaced re-run refuted it.
+
+**Traps.** (1) A back-to-back sweep over Jimaku 429s within ~10 requests — space probes ≥6 s or
+every number is about the limiter. (2) `debug/g31c-harvest.cjs` (`config|jscan|jslow|scan|list|
+fetch`) needs `import('/src/…?probe=' + Date.now())` for any module you just edited; the plain
+specifier resolves to the renderer graph's pre-edit copy and reads as "not a function".
+(3) `subtitleHarvestNyaa.test.ts` mocks `jimakuSearchDetailed`, so nothing in it can ever catch a
+defect inside the Jimaku client.
