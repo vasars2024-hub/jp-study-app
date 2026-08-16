@@ -11,8 +11,8 @@
  * that flags correct lines is worse than no scorer at all.
  */
 import { describe, expect, it } from 'vitest';
+import { bigramDice } from '../bigramSimilarity';
 import {
-  bigramDice,
   decideFusedWindow,
   decideFusedWindows,
   meanFusionConfidence,

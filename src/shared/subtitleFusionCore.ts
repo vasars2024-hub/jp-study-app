@@ -14,6 +14,11 @@
  * function of its arguments so it can be tested without a media file.
  */
 
+// `bigramDice` used to live here. It moved to its own module when the Deck
+// Workbench's near-duplicate scan needed the same measure — one owner, so the
+// two surfaces can never drift into disagreeing about what "the same" means.
+import { bigramDice } from './bigramSimilarity';
+
 /** A parsed subtitle cue, in seconds. Structurally the `Cue` of `subtitleCues.ts`. */
 export interface FusionCue {
   start: number;
@@ -369,45 +374,6 @@ export function normalizeForFusionCompare(text: string): string {
     .normalize('NFKC')
     .replace(/[ァ-ヶ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0x60))
     .replace(/[^\p{Letter}\p{Number}ー]/gu, '');
-}
-
-/**
- * Sørensen–Dice coefficient over character bigrams.
- *
- * Bigrams rather than characters because Japanese has a small alphabet and a high
- * base rate of coincidental character overlap — two unrelated sentences routinely
- * share の, に and し. Bigrams rather than words because there is no whitespace to
- * split on and running a tokenizer here would drag a dictionary into a pure module.
- *
- * A one-character string has no bigrams, so it is compared as itself; without that
- * every single-character cue would score 0 against everything.
- */
-export function bigramDice(a: string, b: string): number {
-  if (!a || !b) return 0;
-  if (a === b) return 1;
-  const grams = (s: string): Map<string, number> => {
-    const out = new Map<string, number>();
-    const units = [...s];
-    if (units.length === 1) return new Map([[units[0], 1]]);
-    for (let i = 0; i < units.length - 1; i += 1) {
-      const key = units[i] + units[i + 1];
-      out.set(key, (out.get(key) ?? 0) + 1);
-    }
-    return out;
-  };
-  const left = grams(a);
-  const right = grams(b);
-  let shared = 0;
-  let leftTotal = 0;
-  let rightTotal = 0;
-  for (const count of left.values()) leftTotal += count;
-  for (const [key, count] of right) {
-    rightTotal += count;
-    const other = left.get(key);
-    if (other) shared += Math.min(other, count);
-  }
-  if (!leftTotal || !rightTotal) return 0;
-  return (2 * shared) / (leftTotal + rightTotal);
 }
 
 /**

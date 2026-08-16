@@ -26,6 +26,7 @@
 // no scan, for the same reason a filter that quietly matches everything is.
 
 import type { AnkiDraftNote, AnkiDraftNoteType } from './ankiDraft';
+import { bigramDice, bigramSet } from './bigramSimilarity';
 
 /**
  * `exact` compares the field as stored, HTML and all — two notes pasted from the
@@ -184,32 +185,6 @@ function groupOf(
 
 // ----- near mode ----------------------------------------------------------------
 
-function bigrams(text: string): string[] {
-  if (text.length < 2) return text === '' ? [] : [text];
-  const out: string[] = [];
-  for (let i = 0; i + 1 < text.length; i += 1) out.push(text.slice(i, i + 2));
-  return out;
-}
-
-/** Sørensen–Dice over character bigrams — no word boundaries, so it reads Japanese. */
-export function bigramDice(a: string, b: string): number {
-  if (a === b) return 1;
-  const left = bigrams(a);
-  const right = bigrams(b);
-  if (left.length === 0 || right.length === 0) return 0;
-  const counts = new Map<string, number>();
-  for (const g of left) counts.set(g, (counts.get(g) ?? 0) + 1);
-  let shared = 0;
-  for (const g of right) {
-    const have = counts.get(g) ?? 0;
-    if (have > 0) {
-      counts.set(g, have - 1);
-      shared += 1;
-    }
-  }
-  return (2 * shared) / (left.length + right.length);
-}
-
 /**
  * Union-find over the candidate pairs, so `a≈b` and `b≈c` land in one group even
  * when `a` and `c` fall under the threshold. Transitivity is the behaviour a
@@ -222,7 +197,7 @@ function nearGroups(
 ): { groups: DuplicateGroup[]; comparisons: number; capped: boolean } {
   const index = new Map<string, number[]>();
   entries.forEach((entry, i) => {
-    for (const g of new Set(bigrams(entry.key))) {
+    for (const g of bigramSet(entry.key)) {
       const bucket = index.get(g);
       if (bucket) bucket.push(i);
       else index.set(g, [i]);
@@ -244,7 +219,7 @@ function nearGroups(
   let comparisons = 0;
   for (let i = 0; i < entries.length; i += 1) {
     const seen = new Set<number>();
-    for (const g of new Set(bigrams(entries[i].key))) {
+    for (const g of bigramSet(entries[i].key)) {
       for (const j of index.get(g) ?? []) {
         if (j <= i || seen.has(j)) continue;
         seen.add(j);

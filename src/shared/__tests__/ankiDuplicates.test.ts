@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { AnkiDraftNote, AnkiDraftNoteType } from '../ankiDraft';
+import { bigramDice } from '../bigramSimilarity';
 import {
   NEAR_MAX_COMPARISONS,
-  bigramDice,
   duplicateNoteIds,
   findDuplicateNotes,
   normalizeDuplicateKey,
