@@ -23086,3 +23086,29 @@ Two more: `btn('Back')` matches the preview **side toggle** before the nav butto
 **Still open in Track 7.** Step 7 "Apply or export" is blocked on Phase 6 — `src/main/anki/` has
 `apkgImport.ts` and no exporter — which also blocks gate 11's round-trip half. Gate 10 owes steps
 3–6 contrast/reduced-motion/4-language measurement.
+
+## 2026-08-16 — Track 7 / gate 10 measurement for step 6 (partial)
+
+**Measured live on the review surface** (3,221-note local deck, `Sentence` の → ノ applied, diff list
+open, EN): contrast **16.02** on the section title at 15.2 px/700, **6.08** on the dry-run and
+outcome lines at 14 px/400, **16.02** on a diff's note label at 12.6 px/600, **6.08** on its field
+label, **16.02** on its before/after values, **14.02** on the disclosure button at 13 px/600. Every
+one clears 4.5:1 at its own size. `html.reduce-motion` takes the button's transition from
+**0.14s → 1e-06s** live and back. The diff list renders **50** of **3,023** lines with the
+"Showing the first 50" sentence present, so the cap is visible rather than silent.
+
+**Reversibility, live.** Undo from step 6 → 3,023 → **0** and the toggle disappears; Redo → **3,023**
+and it returns. Step 4's own claim moves with it in both directions.
+
+**NOT measured, still owed on this step.** The four-language *render* of the review surface. Only EN
+was measured on screen. JA/ZH/RU are proven at the catalog level (i18n-check parity, and
+`t('ankiWorkbench.review.title')` resolves to 完全なドライラン with the module in `ja`), which is not
+the same claim. Steps 3–5 still owe the whole measurement.
+
+**Trap that cost this measurement.** An in-page `import('/src/renderer/i18n.ts')` + `setUiLang(lang)`
+sets `current`, writes `ui-lang` and updates `documentElement.lang` — and **re-renders nothing**: the
+app's components are subscribed to a different module instance, so the surface stays English while
+every module-level reading says it switched. Measuring a language costs a reload:
+`localStorage.setItem('ui-lang', 'ja')` then `location.reload()` — which boots the whole app in JA
+(スタート / デスクトップ 1 observed) but **closes the Anki window**, so the workbench must be re-driven
+from the desktop. Restore `ui-lang` afterwards; this run left it back at `en`.
