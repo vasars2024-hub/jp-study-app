@@ -51,6 +51,12 @@ import {
   type EnrichProvenanceMode,
   type EnrichSenseRule,
 } from './ankiEnrich';
+import {
+  proposeReading,
+  readingMeetsThreshold,
+  type ReadingFillForm,
+  type ReadingFillThreshold,
+} from './ankiReadingFill';
 import { normalizeFieldText, type TextNormalizeOp } from './ankiTextNormalize';
 import {
   planMasteryMapping,
@@ -67,6 +73,7 @@ export type TrayActionKind =
   | 'copy-field'
   | 'normalize-text'
   | 'enrich-dictionary'
+  | 'fill-reading'
   | 'apply-ai-additions'
   | 'set-mastery';
 
@@ -127,6 +134,23 @@ export type TrayAction =
       separator?: string;
       /** What a disagreement between installed dictionaries means. No default. */
       senseRule: EnrichSenseRule;
+      /** Whether the field records which dictionary produced it. No default. */
+      provenance: EnrichProvenanceMode;
+    })
+  | (TrayActionBase & {
+      kind: 'fill-reading';
+      /** Plain kana or bracket ruby. No default: they are different fields. */
+      form: ReadingFillForm;
+      /** Where the reading goes. The word itself is found by `ankiVocabContext`. */
+      toField: string;
+      /**
+       * The lowest confidence written without a human. There is deliberately no
+       * `onConflict` alongside it: recipe 7 fills *missing* readings, so a
+       * destination that already holds text is skipped and counted, never
+       * overwritten. A hand-checked reading is exactly the value a dictionary
+       * batch must not be able to replace.
+       */
+      threshold: ReadingFillThreshold;
       /** Whether the field records which dictionary produced it. No default. */
       provenance: EnrichProvenanceMode;
     })
@@ -210,6 +234,18 @@ export type TrayProblemCode =
   | 'enrich-sense-conflict'
   /** Dictionaries disagreed and `all-sources` wrote the merge. */
   | 'enrich-sources-merged'
+  /** This note declares no word field, so there is no reading to look up. */
+  | 'reading-no-word'
+  /** No installed dictionary answered with a reading for this note's word. */
+  | 'reading-no-entry'
+  /** Several distinct readings. Review only — never written at any threshold. */
+  | 'reading-ambiguous'
+  /** One reading, but less certain than the threshold allows. Left for review. */
+  | 'reading-below-threshold'
+  /** The destination already holds text, so the reading is not missing. */
+  | 'reading-occupied'
+  /** Furigana was asked for on a word with no kanji: nothing to annotate. */
+  | 'reading-no-kanji'
   /** An AI addition was queued with no generation batch to read. Blocking. */
   | 'no-ai-review'
   /** The queued action names a different batch than the one supplied. Blocking. */
@@ -373,6 +409,15 @@ function blockingProblems(
         // as "no entry" — which reads as "your dictionaries are empty" and is
         // not true. Refuse the plan instead, exactly as the `freq:` predicates
         // refuse a query with no vocabulary context.
+        problems.push({ code: 'no-enrich-data', severity: 'blocking', actionId: action.id, count: 1 });
+      }
+    } else if (action.kind === 'fill-reading') {
+      // Same two refusals `enrich-dictionary` has, and for the same reasons: the
+      // lookup arrives asynchronously from outside this module, and planning
+      // without it would report every note as "no dictionary knows this word".
+      if (action.toField === '') {
+        problems.push({ code: 'empty-parameter', severity: 'blocking', actionId: action.id, count: 1 });
+      } else if (!hasEnrichData) {
         problems.push({ code: 'no-enrich-data', severity: 'blocking', actionId: action.id, count: 1 });
       }
     } else if (action.kind === 'apply-ai-additions') {
@@ -773,6 +818,79 @@ export function planChangeTray(
             });
           }
         }
+      } else if (action.kind === 'fill-reading') {
+        const enrich = opts?.enrich;
+        // Unreachable: `blockingProblems` already refused. Kept for the same
+        // reason the enrichment branch keeps its guard.
+        if (!enrich) continue;
+        const toOrd = soleOrd(start, action.toField);
+        if (toOrd === undefined) {
+          problems.push({
+            code: 'field-absent',
+            severity: 'warning',
+            actionId: action.id,
+            count: 1,
+            detail: action.toField,
+          });
+          continue;
+        }
+        const term = enrich.vocab.byNote.get(noteId)?.term ?? null;
+        if (!term) {
+          problems.push({
+            code: 'reading-no-word',
+            severity: 'warning',
+            actionId: action.id,
+            count: 1,
+            detail: noteId,
+          });
+          continue;
+        }
+        // "Missing" is tested before the lookup is consulted: a note that already
+        // has a reading is not a candidate at all, and reporting it as one would
+        // bury the notes the user can actually act on.
+        const toRaw = start.fields.find((f) => f.ord === toOrd)?.raw ?? '';
+        if (toRaw.trim() !== '') {
+          problems.push({
+            code: 'reading-occupied',
+            severity: 'info',
+            actionId: action.id,
+            count: 1,
+            detail: action.toField,
+          });
+          continue;
+        }
+        const proposal = proposeReading(term, enrich.lookup.get(term), action.form);
+        if ('refused' in proposal) {
+          problems.push({
+            code: proposal.refused === 'no-kanji' ? 'reading-no-kanji' : 'reading-no-entry',
+            severity: proposal.refused === 'no-kanji' ? 'info' : 'warning',
+            actionId: action.id,
+            count: 1,
+            detail: term,
+          });
+          continue;
+        }
+        if (!readingMeetsThreshold(proposal.confidence, action.threshold)) {
+          // Ambiguity is its own code, not a threshold miss: no setting admits
+          // it, and telling the user to lower the threshold would be a lie.
+          problems.push({
+            code: proposal.confidence === 'ambiguous' ? 'reading-ambiguous' : 'reading-below-threshold',
+            severity: 'warning',
+            actionId: action.id,
+            count: 1,
+            detail:
+              proposal.confidence === 'ambiguous'
+                ? `${term}: ${proposal.candidates.map((c) => c.reading).join(' / ')}`
+                : term,
+          });
+          continue;
+        }
+        const written = wrapEnrichProvenance(
+          proposal.value,
+          proposal.candidates[0].sources,
+          action.provenance,
+        );
+        if (applyWrite(at, noteId, toOrd, written)) touched = true;
       } else if (action.kind === 'apply-ai-additions') {
         const batch = opts?.ai;
         // Unreachable: `blockingProblems` refused a missing or mismatched batch.

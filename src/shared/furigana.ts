@@ -38,6 +38,15 @@ export function hasKanji(text: string): boolean {
   return KANJI_RE.test(text);
 }
 
+/**
+ * True when every character is a kanji (or the 々 repeater), i.e. the surface
+ * offers no kana anchor to align against. Callers use it to tell a correct
+ * whole-token annotation (猫[ねこ]) from `alignFurigana`'s coarse fallback.
+ */
+export function isAllKanji(text: string): boolean {
+  return text.length > 0 && [...text].every((ch) => KANJI_RUN_RE.test(ch));
+}
+
 /** Katakana → hiragana, leaving the long-vowel mark and everything else alone. */
 export function toHiragana(s: string): string {
   return s.replace(/[ァ-ヶ]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60));
