@@ -116,6 +116,56 @@ disagree six months later, so the Files app **calls this one**.
 Where a file has more than one plausible handler the router already ranks candidates; the Files
 app should offer the ranked list as an "Open with" rather than silently taking the top one.
 
+### Ingest — the app finds your files, you don't feed it one at a time
+
+Clarified by the user 2026-08-16: they do **not** want a disk browser. They want the app to
+**scan storage, recognise what it can use, and bring it in in bulk** — including live, while
+things are still downloading, and including "here is a folder, sort all of it".
+
+This is the same classification problem the drop router already solves, applied to many files
+at once: `planForPath` classifies, ingest supplies the volume. Three entry points:
+
+**1. Scan.** Point it at roots (offer sensible defaults — Downloads, Videos, Documents — never
+the whole drive by default), walk them, classify every candidate, and present a **review list
+grouped by destination**: *14 subtitles → Sources/Text, 3 epubs → Sources/Books, 1 dictionary
+zip → Reference*. The user confirms or deselects; nothing is imported silently on the first
+run. Scanning is strictly **read-only** on the user's files.
+
+**2. Watch — live, while downloading.** Chosen folders stay monitored, so a file finishing in
+the browser's or a torrent client's download directory is recognised as it lands. This also
+connects the MAL pipeline for free: the qBittorrent save path is just another watched folder.
+
+  Two traps that decide whether this works or is maddening:
+  - **Never touch a file still being written.** `.crdownload`, `.part`, `.tmp`, `.!qB` and
+    friends are ignored, *and* a file is only considered once its size has been stable for a
+    few seconds. Importing a half-written video is the obvious way to produce a corrupt
+    library entry that looks like an app bug.
+  - **Confidence tiers.** High-confidence matches (an `.epub`, an `.apkg`, a subtitle beside a
+    known video) may auto-import; anything the router settled by guessing goes to a review
+    queue. Silent auto-import of a guess is how a library fills with junk nobody can trace.
+
+**3. Paste a folder.** Paste a path or drag a folder in; it is walked recursively, archives are
+expanded far enough to see what they contain (the router already sniffs zips), and every item is
+placed in its proper category. The result is a report: placed, skipped, ambiguous, and why —
+never a bare "done".
+
+**Copy or reference? Reference in place, by default.** `downloads` is already ~5.3 GB; copying
+discovered media into userData would duplicate tens of gigabytes for no benefit and is
+irreversible from the user's point of view once they tidy the original. So an imported item
+records a **path to where it already lives**, and copying is opt-in (and the sane default only
+for small derived files — subtitles, `.apkg`, dictionaries). Two consequences that must be
+designed for, not discovered: the app now has **broken links** when a user moves or deletes an
+original (already a T3 feature — detect and report, never crash), and **removal semantics
+differ** — removing a referenced item from the library must never delete the user's file.
+
+**Never modify what it did not create.** Ingest reads, indexes and references. It does not move,
+rename, reorganise or delete anything in the user's own folders. If the user asks for tidying
+later, that is a separate feature with its own confirmations.
+
+Re-scanning is incremental and idempotent: known files are recognised by path, size and mtime
+(hash where it matters), so a second scan imports nothing twice and reports honestly that it
+found nothing new.
+
 ### Real-filesystem bridge — browsing what the app owns, importing from anywhere
 
 Scope decision (user): the tree is **what the app owns**. But the user also asked to be able to
@@ -233,8 +283,11 @@ answers to "where is this file", which is the failure this whole design is tryin
 
 ### Explicitly out of scope
 
-Browsing arbitrary disk, file compression, network locations, sharing/permissions, and
-anything that duplicates the OS for its own sake. Import and reveal are the only crossings.
+Browsing arbitrary disk as a navigation surface, file compression, network locations,
+sharing/permissions, and anything that duplicates the OS for its own sake. The crossings to the
+real filesystem are **ingest** (scan, watch, paste-a-folder — see above) and **reveal**. The
+distinction the user drew is worth keeping sharp: the app *finds and indexes* your files, it is
+not a second Explorer for navigating them.
 
 ## Deletion, and why it gets its own section
 
@@ -318,7 +371,29 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
    says so in different words from a recoverable delete.
 22. **View state persists.** Sort column, direction and view mode are remembered per folder
    across a restart.
-23. Full gates: `npx vitest run`, `node tools/i18n-check.cjs`,
+23. **Scan finds things in bulk.** Point it at a folder holding a mixed set — subtitles, an
+   epub, a dictionary zip, a video — and it reports a count per destination. Report the number
+   found, the number placed and the number left ambiguous; "scanned successfully" with no
+   numbers is not a pass.
+24. **Scan is read-only.** After a scan and an import, every original file is byte-identical and
+   still in its original path — verified, not assumed.
+25. **Watch picks up a live download.** A file appearing in a watched folder is recognised
+   without a manual refresh, and the elapsed time is reported.
+26. **A partial download is never ingested.** A `.crdownload`/`.part`/`.!qB` file, and a file
+   still growing, are both ignored until complete — proven by watching one arrive mid-write,
+   not by asserting the extension list exists.
+27. **Ambiguity goes to review, not into the library.** A file the router settles only by
+   guessing lands in the review queue; a high-confidence match may auto-import. Both paths
+   demonstrated with a real file each.
+28. **Paste a folder sorts all of it.** A pasted folder is walked recursively, archives are
+   expanded far enough to classify their contents, and the report names placed / skipped /
+   ambiguous with reasons.
+29. **Re-scan is idempotent.** Running the same scan twice imports nothing the second time and
+   says so — a duplicate library entry is a FAIL.
+30. **Referenced items behave.** Removing a referenced item from the library leaves the user's
+   original file on disk; moving the original produces a reported broken link rather than a
+   crash or a silent disappearance.
+31. Full gates: `npx vitest run`, `node tools/i18n-check.cjs`,
     `node tools/architecture-audit.cjs`, `npx eslint <touched paths>`. `tsc --noEmit` is NOT a
     gate — 327 pre-existing errors; prove "no new" by set-difference.
 
