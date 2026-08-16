@@ -639,3 +639,53 @@ releases with ≥3 seeders are genuinely rare on nyaa today — `Koe no Katachi 
 the Grendizer U `.ass` files and the Kitsunekko archives all sit at **0 seeders**.
 (4) `debug/g33.cjs` drives this flow one step per invocation; the Scraper window must be opened
 from Start first or every step returns `no Scraper window`.
+
+## 2026-08-16 — the 409 is a duplicate, and the reason never reached the user
+
+Worker `primary`. Commits `4df53cbc`, `5b8cbb24`. **The category theory in the section
+above is FALSIFIED — do not spend another turn on it.** Measured against the user's own
+daemon (**v5.2.3**, `categories.json` is `{}`): a fresh magnet sent with that same
+nonexistent `jp-study` category and `autoTMM=true` returns **200**. The category is not
+the cause and `createCategory` is not needed.
+
+**The real `torrents/add` contract, measured, five probes.** Empty `urls` → **409
+`Conflict`**. New magnet → **200** `{"added_torrent_ids":["…"],"failure_count":0,
+"pending_count":0,"success_count":1}`. The *same* magnet again → **409 `Conflict`**.
+Malformed magnet → **409 `Conflict`**. One duplicate + one new in a single batch →
+**200 with `failure_count:1, success_count:1`**.
+
+Two defects follow, and neither is error handling.
+
+**Defect 1 — a 200 was read as "every row sent" (`4df53cbc`).** On the mixed batch above
+the app reported the refused episode as delivered. `parseAddOutcome` reads the 5.2 JSON
+and returns `null` for 4.x's plain `Ok.` (that contract genuinely has no per-row
+information, so whole-batch behaviour is kept there). Rows are attributed by infohash;
+when they cannot be, the **whole batch is failed rather than guessed** — a false failure
+is visible in qBittorrent, a false success silently loses an episode. 50 tests; mutation
+control (`settleAddedRows` made unconditional) fails **2**, disabling the duplicate
+lookup fails **1**.
+
+**Defect 2 — the reason never left the main process (`5b8cbb24`).** `report.details`
+already carried a per-row reason; `MalDownloadDialog` read only the three counts, so a
+refused send showed `0 accepted, 0 skipped, 1 rejected` and nothing else. The
+`.mal-dl-failures` disclosure existed but was fed only by the batch-acquisition path.
+Both producers feed it now. 33 tests; mutation control fails **2**.
+
+**GATE 33's 409 IS EXPLAINED: the torrent was already in the transfer list.** The magnet
+is sound — read live out of the running app, `magnet:?xt=urn:btih:944969c7…`, 342 chars,
+**4 seeders, 104.8 MB**, `[project-gxs] Date a Live II - Kurumi Star Festival OVA`. Since
+409 means *nothing in the batch was added* and the link is well formed, a duplicate is
+the only remaining cause. **Gate 30 ("same episode twice") now has its distinct honest
+state**: `Already in qBittorrent.`, established by consulting the transfer list, because
+v5.2.3's 409 body is the literal word `Conflict` and names no cause at all.
+
+**Still open, and it needs an app restart the relay did not take.** The live re-run of
+gate 33 requires the running Electron (pid 41504, started 09:10, predates both commits)
+to be restarted — main-process changes do not hot-reload, and that process was not
+started by this relay, so it was left alone. Next worker: restart the app, then
+`node debug/g33.cjs` through `send`.
+
+**Traps.** (1) `torrents/info` truncated at 500 chars parses as `[]` and reads as "the
+client is empty" — it was not; five real torrents were there. (2) Probe torrents land in
+the user's real client; `debug/qbit409b.cjs clean <hash…>` removes them, and two were
+removed this turn.
