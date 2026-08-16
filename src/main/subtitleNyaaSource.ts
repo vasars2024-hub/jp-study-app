@@ -244,6 +244,9 @@ export async function nyaaSearch(input: NyaaSearchInput): Promise<NyaaProviderCa
     languages: input.languages,
     preferredGroups: input.config.torrents.preferredReleaseGroups,
     minSeeders: input.config.torrents.minSeeders,
+    // The index matched this query, not this title. Without the title here the
+    // listing offers releases of other shows entirely.
+    title: input.title,
   });
 
   return ranked.map((candidate) => ({

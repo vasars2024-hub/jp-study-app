@@ -7,6 +7,7 @@ import {
   episodeFromFileName,
   isBitmapSubtitleFile,
   languageFromFileName,
+  looksLikeSameTitle,
   looksLikeSubtitleOnly,
   rankSubtitleCandidates,
   selectSubtitleFiles,
@@ -163,6 +164,43 @@ describe('rankSubtitleCandidates', () => {
     expect(ranked.map((c) => c.row.id)).toEqual(['pack', 'batch']);
     expect(ranked[0].route).toBe('sub-pack');
     expect(ranked[1].route).toBe('batch-sidecar');
+  });
+
+  it('drops a release of a different show, using the two the index really returned', () => {
+    // Both names are verbatim from a live nyaa search for "The Big O 01", which
+    // returned them alongside the real ones. Before the title guard they were
+    // ranked as usable subtitle sources for The Big O, so accepting one added
+    // ~4 GB of an unrelated series to the user's torrent client.
+    const wrong = row({
+      id: 'wrong',
+      name: '[HYSUB]The Legend of Heroes - Sen no Kiseki - Northern War -[01~12][BIG5_MP4][1920X1080]',
+      sizeBytes: 3_972_844_749,
+      isBatch: true,
+      seeders: 2,
+    });
+    const right = row({
+      id: 'right',
+      name: '[NanaOne-Yamayurikai] The Big O 01-26 (GerSub Hi10P BD 576p) [v2]',
+      sizeBytes: 6_442_450_944,
+      isBatch: true,
+      seeders: 3,
+    });
+    const ranked = rankSubtitleCandidates([wrong, right], { languages: ['ja'], title: 'The Big O' });
+    expect(ranked.map((c) => c.row.id)).toEqual(['right']);
+    // Without a title nothing is dropped — the older callers' behaviour.
+    expect(rankSubtitleCandidates([wrong, right], { languages: ['ja'] })).toHaveLength(2);
+  });
+
+  it('keeps a release whose name only half covers the title', () => {
+    // Half, not all: releases abbreviate and re-order, and demanding a full
+    // cover would throw away good rows to catch bad ones.
+    expect(looksLikeSameTitle('[Erai-raws] Nanatsu no Taizai - Seisen no Shirushi - 01 ~ 04', 'Nanatsu no Taizai: Seisen no Shirushi')).toBe(true);
+    expect(looksLikeSameTitle('【悠哈璃羽字幕社】[Kishibe Rohan wa Ugokanai][01-04][BDRIP]', 'Kishibe Rohan wa Ugokanai')).toBe(true);
+    expect(looksLikeSameTitle('[GB] Cyber City Oedo 808 Bluray 1080p SUBS ONLY', 'Cyber City Oedo 808')).toBe(true);
+    // "the" is a stopword, so this shares nothing that counts.
+    expect(looksLikeSameTitle('The Legend of Heroes - Sen no Kiseki - Northern War', 'The Big O')).toBe(false);
+    // A particle is not a stopword: dropping "no" would make these look alike.
+    expect(looksLikeSameTitle('Nanatsu no Taizai 01-24', 'Sen no Kiseki')).toBe(false);
   });
 
   it('drops rows advertising only unwanted languages', () => {

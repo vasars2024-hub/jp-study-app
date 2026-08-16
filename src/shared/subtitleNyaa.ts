@@ -228,6 +228,52 @@ export interface NyaaSubtitleWant {
   preferredGroups?: string[];
   /** Rows below this are not worth queueing — a dead swarm never completes. */
   minSeeders?: number;
+  /**
+   * The title the search was for. Rows that do not plausibly belong to it are
+   * dropped; omitting it keeps every row, which is what the older callers did.
+   */
+  title?: string;
+}
+
+/**
+ * Title words worth matching on.
+ *
+ * Articles and connectives are dropped because they are what makes an index's
+ * fuzzy match wander: searching "The Big O" on nyaa returns "The Legend of
+ * Heroes - Sen no Kiseki - Northern War", which shares only "the". Japanese
+ * particles are deliberately **not** in this list — `no`, `wa` and `ga` carry
+ * real weight inside a romaji title ("Nanatsu no Taizai").
+ */
+const TITLE_STOPWORDS = new Set(['the', 'a', 'an', 'of', 'and', 'or']);
+
+function titleTokens(title: string): string[] {
+  return String(title ?? '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .split(' ')
+    .filter((token) => token && !TITLE_STOPWORDS.has(token));
+}
+
+/**
+ * Whether a release name plausibly belongs to the title that was searched for.
+ *
+ * The index decides what a query matches and it matches generously; nothing
+ * downstream used to check, so a listing for one show could offer a 4 GB batch
+ * of a completely different one — measured live, "The Big O" returned two
+ * releases of "The Legend of Heroes - Sen no Kiseki - Northern War" and both
+ * were ranked as usable subtitle sources. Accepting one adds someone else's
+ * show to the user's torrent client.
+ *
+ * Half the significant words, not all of them: releases routinely carry an
+ * alternate or abbreviated title, and demanding an exact cover would throw away
+ * good rows to catch bad ones.
+ */
+export function looksLikeSameTitle(rowName: string, title: string): boolean {
+  const tokens = titleTokens(title);
+  if (!tokens.length) return true;
+  const haystack = ` ${String(rowName ?? '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ')} `;
+  const hits = tokens.filter((token) => haystack.includes(` ${token} `)).length;
+  return hits * 2 >= tokens.length;
 }
 
 export interface NyaaSubtitleCandidate {
@@ -265,6 +311,7 @@ export function rankSubtitleCandidates(
   for (const row of rows ?? []) {
     if (!row) continue;
     if (row.seeders < minSeeders) continue;
+    if (want.title && !looksLikeSameTitle(row.name, want.title)) continue;
 
     const isPack = looksLikeSubtitleOnly(row);
     const isBatch = !isPack && couldCarrySidecarSubtitles(row);
