@@ -8857,6 +8857,8 @@ export const zh: Catalog = {
   'ankiWorkbench.browser.query.emptyGroup': '该查询包含空分组。',
   'ankiWorkbench.browser.query.danglingOperator': '“{token}”的两侧都需要过滤条件。',
   'ankiWorkbench.browser.query.noVocabContext': '此牌组尚未获取词汇数据，因此无法回答“{token}”。这里不进行任何筛选，而不是匹配全部。',
+  'ankiWorkbench.browser.query.noRenderContext':
+    '此牌组的卡片尚未渲染，因此无法回答“{token}”。这里不进行任何筛选，而不是匹配全部。',
   'ankiWorkbench.browser.known.precedence': '两者不一致时',
   'ankiWorkbench.browser.known.precedence.local': '以本应用为准',
   'ankiWorkbench.browser.known.precedence.anki': '以 Anki 为准',
@@ -8950,6 +8952,18 @@ export const zh: Catalog = {
     '无法判断例句是否包含该词：该词无法归约出词干',
   'ankiWorkbench.browser.explain.coverField.unknown':
     '无法判断 {field} 是否包含该词：该词无法归约出词干',
+  'ankiWorkbench.browser.explain.render.ok':
+    '其卡片的答案面会显示正面没有出现过的内容',
+  'ankiWorkbench.browser.explain.render.same':
+    '其中某张卡片的答案面只显示正面已有的内容',
+  'ankiWorkbench.browser.explain.render.empty-back':
+    '其中某张卡片的答案面渲染为空',
+  'ankiWorkbench.browser.explain.render.empty-front':
+    '其中某张卡片的问题面渲染为空，Anki 不会为它生成卡片',
+  'ankiWorkbench.browser.explain.render.broken':
+    '其中某张卡片的模板无法渲染：未知字段、不支持的过滤器、未闭合的条件，或损坏的填空',
+  'ankiWorkbench.browser.explain.render.not-generated':
+    '模板中的条件对该笔记为关，因此它不会生成任何卡片',
   'ankiWorkbench.journal.title': '历史：{notes} 条笔记上的 {applied} 个步骤',
   'ankiWorkbench.journal.batch': '对 {notes} 条笔记的 {ops} 处批量更改',
   'ankiWorkbench.journal.single': '对 {notes} 条笔记的单次编辑',

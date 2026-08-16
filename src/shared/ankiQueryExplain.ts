@@ -148,6 +148,11 @@ function explainPredicate(node: Exclude<BrowserFilterNode, { kind: 'group' } | {
       return node.fieldName
         ? clause(`coverField.${node.cover}`, { field: node.fieldName })
         : clause(`cover.${node.cover}`);
+    case 'render':
+      // One sentence per verdict, for `cover:`'s reason: "shows nothing the
+      // front did not" and "has a template that cannot render" are unrelated
+      // claims that no single interpolated template can make.
+      return clause(`render.${node.health}`);
   }
 }
 

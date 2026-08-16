@@ -9,6 +9,7 @@ import {
   tokenizeBrowserQuery,
 } from '../ankiBrowserQuery';
 import { buildVocabContext } from '../ankiVocabContext';
+import { buildCardHealthContext } from '../ankiCardHealth';
 
 function note(over: Partial<AnkiDraftNote> & { id: string }): AnkiDraftNote {
   return {
@@ -468,5 +469,99 @@ describe('script: finds content in the wrong writing system', () => {
   it('a hand-built node with neither script nor absence matches nothing, and does not throw', () => {
     expect(rows.filter(compileBrowserFilter({ kind: 'script' }))).toEqual([]);
     expect(rows.filter(compileBrowserFilter({ kind: 'script', fieldName: 'Meaning' }))).toEqual([]);
+  });
+});
+
+describe('render: (smart recipe 15)', () => {
+  // Its own draft, because the fixture above declares `templates: []` on every
+  // note type — which renders no card at all and is `broken` for every note.
+  const basic: AnkiDraft['noteTypes'][number] = {
+    id: 'basic', name: 'Basic', kind: 'standard', css: '',
+    fields: [
+      { ord: 0, name: 'Front', sticky: false, rtl: false },
+      { ord: 1, name: 'Back', sticky: false, rtl: false },
+    ],
+    templates: [
+      {
+        ord: 0, name: 'Card 1',
+        qfmt: '{{Front}}', afmt: '{{FrontSide}}<hr id=answer>{{Back}}',
+        bqfmt: '', bafmt: '',
+      },
+    ],
+    sortFieldOrd: 0, latexPre: '', latexPost: '',
+  };
+  const typo: AnkiDraft['noteTypes'][number] = {
+    ...basic,
+    id: 'typo', name: 'Typo',
+    templates: [{ ...basic.templates[0], qfmt: '{{Frnt}}' }],
+  };
+  const notes = [
+    note({ id: 'good', noteTypeId: 'basic', cardIds: ['g1'],
+      fields: [f(0, 'Front', 'ねこ'), f(1, 'Back', 'cat')] }),
+    note({ id: 'blank-back', noteTypeId: 'basic', cardIds: ['b1'],
+      fields: [f(0, 'Front', 'いぬ'), f(1, 'Back', '')] }),
+    note({ id: 'blank-front', noteTypeId: 'basic', cardIds: ['f1'],
+      fields: [f(0, 'Front', ''), f(1, 'Back', 'dog')] }),
+    note({ id: 'bad-template', noteTypeId: 'typo', cardIds: ['t1'],
+      fields: [f(0, 'Front', 'とり'), f(1, 'Back', 'bird')] }),
+  ];
+  const rDraft: AnkiDraft = {
+    ...draft,
+    noteTypes: [basic, typo],
+    notes,
+    cards: notes.map((n) => card(n.cardIds[0], n.id, 'd1')),
+    counts: { ...draft.counts, notes: notes.length, cards: notes.length, noteTypes: 2 },
+  };
+  const rRows = buildBrowserRows(rDraft, defaultBrowserColumns(rDraft));
+  const rSchema = {
+    fieldNames: browserFieldNames(rDraft),
+    render: buildCardHealthContext(rDraft),
+  };
+  const rIds = (query: string): string[] | string => {
+    const out = filterBrowserRows(rRows, query, rSchema);
+    return out.error ? out.error.code : out.rows.map((r) => r.noteId);
+  };
+
+  it('finds the card whose answer shows the front again', () => {
+    expect(rIds('render:same')).toEqual(['blank-back']);
+  });
+
+  it('finds a blank question and a template that cannot render', () => {
+    expect(rIds('render:empty-front')).toEqual(['blank-front']);
+    expect(rIds('render:broken')).toEqual(['bad-template']);
+  });
+
+  it('reports only the healthy note as ok, and the verdicts partition the deck', () => {
+    expect(rIds('render:ok')).toEqual(['good']);
+    const partition = ['ok', 'same', 'empty-back', 'empty-front', 'broken', 'not-generated']
+      .flatMap((h) => rIds(`render:${h}`) as string[]);
+    expect(partition.sort()).toEqual(['bad-template', 'blank-back', 'blank-front', 'good']);
+  });
+
+  it('composes with negation and groups like any other predicate', () => {
+    expect((rIds('-render:ok') as string[]).sort())
+      .toEqual(['bad-template', 'blank-back', 'blank-front']);
+    expect((rIds('(render:same or render:broken)') as string[]).sort())
+      .toEqual(['bad-template', 'blank-back']);
+  });
+
+  it('refuses the key outright when the surface resolved no render context', () => {
+    // Not "unknown value" and not an empty grid: with no context every spelling
+    // is equally unanswerable, and `no-vocab-context` would send the user off
+    // loading a frequency dictionary that has nothing to do with it.
+    const bare = { fieldNames: browserFieldNames(rDraft) };
+    const refused = filterBrowserRows(rRows, 'render:same', bare);
+    expect(refused.error).toEqual({ code: 'no-render-context', token: 'render:same' });
+    expect(refused.rows).toEqual([]);
+    expect(filterBrowserRows(rRows, 'render:banana', bare).error?.code).toBe('no-render-context');
+  });
+
+  it('refuses an unknown verdict by naming the token, never matching all', () => {
+    expect(rIds('render:banana')).toBe('unknown-key');
+    expect(rIds('render:')).toBe('unknown-key');
+  });
+
+  it('a compiled node with no context matches nothing rather than everything', () => {
+    expect(rRows.filter(compileBrowserFilter({ kind: 'render', health: 'ok' }))).toEqual([]);
   });
 });

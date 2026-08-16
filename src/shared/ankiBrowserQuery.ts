@@ -18,6 +18,7 @@
 // user's own typing and is never translated.
 
 import type { BrowserRow } from './ankiWorkbenchBrowser';
+import { parseCardHealth, type CardHealth, type CardHealthContext } from './ankiCardHealth';
 import { FREQUENCY_BAND_LIMITS, type LexiconFrequencyBand } from './lexiconFrequency';
 import { containsScript, hasNoScript, parseTextScript, type TextScript } from './textScripts';
 import {
@@ -188,6 +189,21 @@ export interface SentenceCoverPredicate {
   cover: SentenceCover;
 }
 
+/**
+ * `render:same`, `render:broken` — smart recipe 15, "identify empty backs,
+ * identical front/back renders, and broken templates".
+ *
+ * Unlike every other predicate this one cannot be answered from the row: the
+ * verdict is about the note type's *templates*, and a row carries only field
+ * values. So it reads `schema.render`, precomputed once per draft by
+ * `buildCardHealthContext`, exactly the way `freq:`/`known:` read
+ * `schema.vocab` — and refuses the same way when that context is absent.
+ */
+export interface CardHealthPredicate {
+  kind: 'render';
+  health: CardHealth;
+}
+
 export type BrowserPredicate =
   | AnyTextPredicate
   | RegexPredicate
@@ -200,7 +216,8 @@ export type BrowserPredicate =
   | FrequencyPredicate
   | KnownPredicate
   | ScriptPredicate
-  | SentenceCoverPredicate;
+  | SentenceCoverPredicate
+  | CardHealthPredicate;
 
 export interface BrowserFilterGroup {
   kind: 'group';
@@ -229,7 +246,15 @@ export type BrowserQueryErrorCode =
    * frequency filter that quietly matches every note — or none — is worse than
    * no filter, and the user cannot tell the two apart from an empty grid.
    */
-  | 'no-vocab-context';
+  | 'no-vocab-context'
+  /**
+   * `render:` was used while the surface had no rendered-card verdicts to read.
+   * Its own code and not `no-vocab-context`, because the two are cleared by
+   * different things: vocabulary context waits on a frequency dictionary, and
+   * render context waits only on the draft itself. Telling a user to load a
+   * dictionary would send them after the wrong thing entirely.
+   */
+  | 'no-render-context';
 
 export interface BrowserQueryError {
   code: BrowserQueryErrorCode;
@@ -251,6 +276,12 @@ export interface BrowserQuerySchema {
    * refusal rather than a filter — see `no-vocab-context`.
    */
   vocab?: VocabContext;
+  /**
+   * Per-note rendered-card verdicts, from `buildCardHealthContext`. Absent
+   * means nothing has rendered this draft's cards, and `render:` is a refusal
+   * rather than a filter — see `no-render-context`.
+   */
+  render?: CardHealthContext;
 }
 
 // ----- tokenizer ---------------------------------------------------------------
@@ -456,6 +487,12 @@ function predicateFromTerm(token: Token, schema: BrowserQuerySchema): BrowserPre
     const cover = parseSentenceCover(value);
     return cover ? { kind: 'cover', cover } : { code: 'unknown-key', token: text };
   }
+  if (lowerKey === 'render') {
+    // Refused before the value is read, for the reason `freq:`/`known:` give.
+    if (!schema.render) return { code: 'no-render-context', token: text };
+    const health = parseCardHealth(value);
+    return health ? { kind: 'render', health } : { code: 'unknown-key', token: text };
+  }
   if (lowerKey === 'freq' || lowerKey === 'known') {
     // The refusal comes before the value is even read: with no context, every
     // spelling of the key is equally unanswerable, and reporting "unknown
@@ -618,16 +655,20 @@ function matchesNeedle(haystack: string, needle: string, wildcard: boolean, re: 
  * build the same RegExp a hundred thousand times, which is the shape of defect
  * the change-tray preview shipped and then had to fix.
  */
-export function compileBrowserFilter(node: BrowserFilterNode, vocab?: VocabContext): RowTest {
+export function compileBrowserFilter(
+  node: BrowserFilterNode,
+  vocab?: VocabContext,
+  render?: CardHealthContext,
+): RowTest {
   switch (node.kind) {
     case 'group': {
-      const tests = node.children.map((child) => compileBrowserFilter(child, vocab));
+      const tests = node.children.map((child) => compileBrowserFilter(child, vocab, render));
       return node.op === 'and'
         ? (row) => tests.every((test) => test(row))
         : (row) => tests.some((test) => test(row));
     }
     case 'not': {
-      const test = compileBrowserFilter(node.child, vocab);
+      const test = compileBrowserFilter(node.child, vocab, render);
       return (row) => !test(row);
     }
     case 'text': {
@@ -763,6 +804,16 @@ export function compileBrowserFilter(node: BrowserFilterNode, vocab?: VocabConte
         );
       };
     }
+    case 'render': {
+      // No context is a filter that matches nothing, which is why the parser
+      // refuses `render:` outright before ever reaching here. This guard is for
+      // a caller that compiled a tree it did not parse against the same schema.
+      if (!render) return () => false;
+      const { health } = node;
+      // A row whose note the context never saw is not a match: absent is not
+      // `ok`, the same rule `cover:` applies to a missing sentence field.
+      return (row) => render.get(row.noteId) === health;
+    }
     default: {
       if (!vocab) return () => false;
       const facts = vocab.byNote;
@@ -814,9 +865,10 @@ export function matchBrowserRows(
   rows: BrowserRow[],
   filter: BrowserFilterNode | null,
   vocab?: VocabContext,
+  render?: CardHealthContext,
 ): BrowserRow[] {
   if (!filter) return rows;
-  const test = compileBrowserFilter(filter, vocab);
+  const test = compileBrowserFilter(filter, vocab, render);
   return rows.filter(test);
 }
 
@@ -832,5 +884,8 @@ export function filterBrowserRows(
 ): { rows: BrowserRow[]; error: BrowserQueryError | null } {
   const parsed = parseBrowserQuery(query, schema);
   if (!parsed.ok) return { rows: [], error: parsed.error };
-  return { rows: matchBrowserRows(rows, parsed.filter, schema.vocab), error: null };
+  return {
+    rows: matchBrowserRows(rows, parsed.filter, schema.vocab, schema.render),
+    error: null,
+  };
 }

@@ -33,6 +33,7 @@ import {
   type BrowserSort,
 } from '../../../shared/ankiWorkbenchBrowser';
 import { filterBrowserRows, type BrowserQueryErrorCode } from '../../../shared/ankiBrowserQuery';
+import { buildCardHealthContext } from '../../../shared/ankiCardHealth';
 import {
   QUERY_EXPLAIN_KEY_PREFIX,
   explainBrowserQuery,
@@ -81,6 +82,7 @@ const QUERY_ERROR_KEY: Record<BrowserQueryErrorCode, string> = {
   'empty-group': 'ankiWorkbench.browser.query.emptyGroup',
   'dangling-operator': 'ankiWorkbench.browser.query.danglingOperator',
   'no-vocab-context': 'ankiWorkbench.browser.query.noVocabContext',
+  'no-render-context': 'ankiWorkbench.browser.query.noRenderContext',
 };
 
 type Translate = (key: string, vars?: Record<string, string | number>) => string;
@@ -246,11 +248,18 @@ export default function DeckWorkbenchBrowser({
     });
   }, [draft, ranks, vocabTerms, precedence, knowledgeTick]);
 
+  // `render:` verdicts, computed once per draft rather than per row: the filter
+  // re-runs on every keystroke and rendering the deck's cards inside it would
+  // re-render every note each time. Keyed on `draft` alone — a card's render is
+  // a function of its note and its note type and of nothing else, so unlike
+  // `vocab` it does not move when the knowledge store does.
+  const render = useMemo(() => buildCardHealthContext(draft), [draft]);
+
   // The draft's own field names, so `Expression:食べる` is a field predicate and
   // `Expresion:食べる` is a refusal instead of a filter that quietly matches all.
   const schema = useMemo(
-    () => ({ fieldNames: browserFieldNames(draft), ...(vocab ? { vocab } : {}) }),
-    [draft, vocab],
+    () => ({ fieldNames: browserFieldNames(draft), render, ...(vocab ? { vocab } : {}) }),
+    [draft, vocab, render],
   );
   const filtered = useMemo(() => filterBrowserRows(rows, query, schema), [rows, query, schema]);
   const shown = useMemo(() => sortBrowserRows(filtered.rows, sort), [filtered, sort]);

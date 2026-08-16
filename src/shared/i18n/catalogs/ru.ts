@@ -9721,6 +9721,8 @@ export const ru: Catalog = {
   'ankiWorkbench.browser.query.emptyGroup': 'В запросе есть пустая группа.',
   'ankiWorkbench.browser.query.danglingOperator': 'С обеих сторон от «{token}» нужен фильтр.',
   'ankiWorkbench.browser.query.noVocabContext': 'Для этой колоды ещё не получены данные о словах, поэтому на «{token}» ответить нельзя. Ничего не отфильтровано — но и не показано всё подряд.',
+  'ankiWorkbench.browser.query.noRenderContext':
+    'Карточки этой колоды ещё не отрисованы, поэтому на «{token}» ответить нельзя. Ничего не отфильтровано — но и не показано всё подряд.',
   'ankiWorkbench.browser.known.precedence': 'Если данные расходятся',
   'ankiWorkbench.browser.known.precedence.local': 'доверять этому приложению',
   'ankiWorkbench.browser.known.precedence.anki': 'доверять Anki',
@@ -9820,6 +9822,18 @@ export const ru: Catalog = {
     'нельзя определить, содержит ли предложение слово: у слова не выделяется основа',
   'ankiWorkbench.browser.explain.coverField.unknown':
     'нельзя определить, содержит ли {field} слово: у слова не выделяется основа',
+  'ankiWorkbench.browser.explain.render.ok':
+    'на обороте карточек показано то, чего не было на лицевой стороне',
+  'ankiWorkbench.browser.explain.render.same':
+    'на обороте одной из карточек нет ничего, чего не было бы на лицевой стороне',
+  'ankiWorkbench.browser.explain.render.empty-back':
+    'оборот одной из карточек отрисовывается пустым',
+  'ankiWorkbench.browser.explain.render.empty-front':
+    'лицевая сторона одной из карточек пуста, поэтому Anki не создаёт для неё карточку',
+  'ankiWorkbench.browser.explain.render.broken':
+    'шаблон одной из карточек не отрисовывается: неизвестное поле, неподдерживаемый фильтр, незакрытое условие или сломанный пропуск',
+  'ankiWorkbench.browser.explain.render.not-generated':
+    'ни одна карточка не создаётся: условие в шаблоне выключено для этой заметки',
   'ankiWorkbench.journal.title': 'История: шагов {applied} по заметкам: {notes}',
   'ankiWorkbench.journal.batch': 'Партия из {ops} изменений в заметках: {notes}',
   'ankiWorkbench.journal.single': 'Одиночная правка в заметках: {notes}',

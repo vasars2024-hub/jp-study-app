@@ -8910,6 +8910,8 @@ export const ja: Catalog = {
   'ankiWorkbench.browser.query.emptyGroup': 'このクエリには空のグループがあります。',
   'ankiWorkbench.browser.query.danglingOperator': '「{token}」の両側にフィルターが必要です。',
   'ankiWorkbench.browser.query.noVocabContext': 'このデッキの語彙データがまだ取得されていないため、「{token}」には答えられません。すべてを表示するのではなく、何も絞り込みません。',
+  'ankiWorkbench.browser.query.noRenderContext':
+    'このデッキのカードがまだ描画されていないため、「{token}」には答えられません。すべてを表示するのではなく、何も絞り込みません。',
   'ankiWorkbench.browser.known.precedence': '食い違うとき',
   'ankiWorkbench.browser.known.precedence.local': 'このアプリを優先',
   'ankiWorkbench.browser.known.precedence.anki': 'Anki を優先',
@@ -9007,6 +9009,18 @@ export const ja: Catalog = {
     '例文に単語が含まれるか判定できない（語幹を取り出せない語）',
   'ankiWorkbench.browser.explain.coverField.unknown':
     '{field} に単語が含まれるか判定できない（語幹を取り出せない語）',
+  'ankiWorkbench.browser.explain.render.ok':
+    '解答面に表面にはなかった内容が表示される',
+  'ankiWorkbench.browser.explain.render.same':
+    'いずれかのカードで、解答面に表面と同じ内容しか表示されない',
+  'ankiWorkbench.browser.explain.render.empty-back':
+    'いずれかのカードの解答面が空になる',
+  'ankiWorkbench.browser.explain.render.empty-front':
+    'いずれかのカードの問題面が空になり、Anki はそのカードを生成しない',
+  'ankiWorkbench.browser.explain.render.broken':
+    'いずれかのカードのテンプレートが描画できない（未知のフィールド、未対応のフィルタ、閉じていない条件、壊れた穴埋め）',
+  'ankiWorkbench.browser.explain.render.not-generated':
+    'テンプレートの条件がこのノートで無効なため、カードが 1 枚も生成されない',
   'ankiWorkbench.journal.title': '履歴: {notes} 件のノートに {applied} ステップ',
   'ankiWorkbench.journal.batch': '{notes} 件のノートへの {ops} 件の一括変更',
   'ankiWorkbench.journal.single': '{notes} 件のノートの単独編集',

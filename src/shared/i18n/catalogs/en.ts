@@ -9335,6 +9335,8 @@ export const en: Catalog = {
   'ankiWorkbench.browser.query.emptyGroup': 'This query contains an empty group.',
   'ankiWorkbench.browser.query.danglingOperator': '“{token}” needs a filter on both sides.',
   'ankiWorkbench.browser.query.noVocabContext': 'This deck has no word data resolved yet, so “{token}” cannot be answered. Nothing is filtered rather than everything.',
+  'ankiWorkbench.browser.query.noRenderContext':
+    'This deck’s cards have not been rendered yet, so “{token}” cannot be answered. Nothing is filtered rather than everything.',
   'ankiWorkbench.browser.known.precedence': 'When they disagree',
   'ankiWorkbench.browser.known.precedence.local': 'trust this app',
   'ankiWorkbench.browser.known.precedence.anki': 'trust Anki',
@@ -9434,6 +9436,18 @@ export const en: Catalog = {
     'this module cannot tell whether its sentence contains its word: the word does not inflect in a way it can reduce to a stem',
   'ankiWorkbench.browser.explain.coverField.unknown':
     'this module cannot tell whether {field} contains its word: the word does not inflect in a way it can reduce to a stem',
+  'ankiWorkbench.browser.explain.render.ok':
+    'its cards render an answer that shows something the question did not',
+  'ankiWorkbench.browser.explain.render.same':
+    'one of its cards shows nothing on the answer that the question had not already shown',
+  'ankiWorkbench.browser.explain.render.empty-back':
+    'one of its cards renders a blank answer',
+  'ankiWorkbench.browser.explain.render.empty-front':
+    'one of its cards renders a blank question, so Anki generates no card for it',
+  'ankiWorkbench.browser.explain.render.broken':
+    'one of its cards has a template that cannot render: an unknown field, an unsupported filter, an unclosed conditional, or a broken cloze',
+  'ankiWorkbench.browser.explain.render.not-generated':
+    'none of its cards are generated, because a conditional in the template is off for this note',
   'ankiWorkbench.journal.title': 'History: {applied} steps over {notes} notes',
   'ankiWorkbench.journal.batch': 'Batch of {ops} changes on {notes} notes',
   'ankiWorkbench.journal.single': 'Single edit on {notes} note',
