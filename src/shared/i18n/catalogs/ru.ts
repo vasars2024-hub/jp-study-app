@@ -9802,6 +9802,26 @@ export const ru: Catalog = {
   'anki.mastery.level.familiar': 'Знакомое',
   'anki.mastery.level.known': 'Известное',
   'ankiWorkbench.tray.kind.set-mastery': 'Задать, насколько вы знаете эти слова',
+  'ankiWorkbench.tray.kind.prioritize-new':
+    'Учить самые частотные слова первыми',
+  'ankiWorkbench.tray.describe.prioritize-new':
+    'Переупорядочить очередь новых карточек по частотности, начиная с позиции {start}, не трогая известные слова',
+  'ankiWorkbench.tray.prioritize.start':
+    'Начальная позиция новой карточки',
+  'ankiWorkbench.tray.prioritize.moved':
+    '{count} карточек переместятся в начало очереди новых: {detail}',
+  'ankiWorkbench.tray.prioritize.protects':
+    'Уже известные слова не перемещаются, а у начатых карточек сохраняется их расписание.',
+  'ankiWorkbench.tray.problem.prioritize-known':
+    '{count} слов оставлены на месте, потому что вы их уже знаете: {detail}',
+  'ankiWorkbench.tray.problem.prioritize-no-rank':
+    '{count} слов нет ни в одном установленном частотном списке, поэтому упорядочить их по частотности нечем: {detail}',
+  'ankiWorkbench.tray.problem.prioritize-no-word':
+    'В {count} заметках не указано слово, поэтому и частотности у них нет: {detail}',
+  'ankiWorkbench.tray.problem.prioritize-not-new':
+    '{count} слов уже начаты, поэтому позиция в очереди новых карточек к ним не применяется: {detail}',
+  'ankiWorkbench.tray.problem.prioritize-no-cards':
+    '{count} заметок не порождают карточек в этой колоде, позиционировать нечего: {detail}',
   'ankiWorkbench.tray.describe.set-mastery': 'Пометить выбранные слова как «{level}»',
   'ankiWorkbench.tray.masteryLevel': 'Пометить эти слова как',
   'ankiWorkbench.tray.mastery.effect': 'Что это изменит',

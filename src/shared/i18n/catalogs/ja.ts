@@ -8988,6 +8988,26 @@ export const ja: Catalog = {
   'anki.mastery.level.familiar': '見覚えあり',
   'anki.mastery.level.known': '習得済み',
   'ankiWorkbench.tray.kind.set-mastery': '単語の習熟度を設定する',
+  'ankiWorkbench.tray.kind.prioritize-new':
+    '頻出語から先に学習する',
+  'ankiWorkbench.tray.describe.prioritize-new':
+    '新規キューを頻度順に並べ替える（開始位置 {start}、既知の語はそのまま）',
+  'ankiWorkbench.tray.prioritize.start':
+    '新規カードの開始位置',
+  'ankiWorkbench.tray.prioritize.moved':
+    '{count} 枚のカードを新規キューの前方へ移動します：{detail}',
+  'ankiWorkbench.tray.prioritize.protects':
+    'すでに知っている語は動かしません。学習を始めたカードのスケジュールもそのままです。',
+  'ankiWorkbench.tray.problem.prioritize-known':
+    'すでに知っている語のため、{count} 語はそのままにしました：{detail}',
+  'ankiWorkbench.tray.problem.prioritize-no-rank':
+    'インストール済みの頻度リストに載っていないため、{count} 語は頻度で並べられません：{detail}',
+  'ankiWorkbench.tray.problem.prioritize-no-word':
+    '{count} 件のノートに単語がないため、頻度もありません：{detail}',
+  'ankiWorkbench.tray.problem.prioritize-not-new':
+    'すでに学習を始めているため、{count} 語には新規キューの位置が適用されません：{detail}',
+  'ankiWorkbench.tray.problem.prioritize-no-cards':
+    'このデッキでカードを生成しないため、{count} 件のノートには並べ替える対象がありません：{detail}',
   'ankiWorkbench.tray.describe.set-mastery': '選択した単語を「{level}」にする',
   'ankiWorkbench.tray.masteryLevel': 'これらの単語を次にする',
   'ankiWorkbench.tray.mastery.effect': '変更される内容',

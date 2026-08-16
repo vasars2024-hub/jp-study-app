@@ -59,6 +59,7 @@ const ACTION_KINDS: TrayActionKind[] = [
   'enrich-dictionary',
   'fill-reading',
   'apply-ai-additions',
+  'prioritize-new',
   'set-mastery',
   'add-tags',
   'remove-tags',
@@ -133,6 +134,17 @@ export default function DeckWorkbenchTray({
   const [readingForm, setReadingForm] = useState<ReadingFillForm>('kana');
   const [readingThreshold, setReadingThreshold] = useState<ReadingFillThreshold>('certain');
   const [masteryLevel, setMasteryLevel] = useState<MasteryLevel>(DEFAULT_MASTERY_LEVEL);
+  /**
+   * Where recipe 6 starts renumbering. `0` by default, which puts the batch
+   * ahead of the whole existing new queue — the reading of "prioritize" the
+   * recipe is named for. Kept as text so the field can be empty while the user
+   * is typing; an unparseable value becomes -1 and the plan blocks rather than
+   * silently repositioning to 0.
+   */
+  const [prioritizeStartText, setPrioritizeStartText] = useState('0');
+  const prioritizeStart = /^\d+$/.test(prioritizeStartText.trim())
+    ? Number(prioritizeStartText.trim())
+    : -1;
   const [applied, setApplied] = useState<number | null>(null);
   /**
    * The reviewed generation, owned here because the tray is what writes it. A
@@ -163,11 +175,59 @@ export default function DeckWorkbenchTray({
   );
   const [lookup, setLookup] = useState<EnrichLookup | undefined>(undefined);
   const [lookupPending, setLookupPending] = useState(false);
+  /**
+   * Frequency ranks, for `prioritize-new` only. The same measured-absence rule
+   * the Browser uses: every term asked about gets a key, and a word no corpus
+   * ranks maps to `null`. `undefined` means the lookup has not answered, which
+   * keeps the recipe's context absent and the plan honestly blocked rather than
+   * reporting a whole ranked deck as unrankable.
+   */
+  const [ranks, setRanks] = useState<ReadonlyMap<string, number | null> | undefined>(undefined);
   // Only a queued enrichment pays for the lookup: it is a database read per
   // distinct word, and every other action kind has no use for the result.
   const wantsEnrich = actions.some(
     (a) => a.enabled && (a.kind === 'enrich-dictionary' || a.kind === 'fill-reading'),
   );
+  // Ranks cost their own IPC round trip and only recipe 6 reads them, so the
+  // same rule the enrich lookup follows applies: nothing is fetched until a
+  // queued action actually needs it.
+  const wantsRanks = actions.some((a) => a.enabled && a.kind === 'prioritize-new');
+
+  useEffect(() => {
+    if (!wantsRanks) return;
+    let live = true;
+    const terms = vocab.terms;
+    if (typeof window.api?.dictFrequencyRanks !== 'function') {
+      // A host whose bridge predates the channel is NOT an answered lookup. The
+      // Browser may treat it as one — `known:` still works there and every rank
+      // is honestly absent in a filter. Here it would print "no installed
+      // frequency list ranks this word" over an entire ranked deck, blaming the
+      // words for a missing capability, so the plan stays blocked instead.
+      return () => {
+        live = false;
+      };
+    }
+    if (terms.length === 0) {
+      // A deck with no word field anywhere IS an answered lookup: every note
+      // then reports `prioritize-no-word`, which is true.
+      setRanks(new Map());
+      return () => {
+        live = false;
+      };
+    }
+    setRanks(undefined);
+    void window.api
+      .dictFrequencyRanks([...terms])
+      .then((found) => {
+        if (live) setRanks(new Map(terms.map((term) => [term, found[term] ?? null])));
+      })
+      .catch(() => {
+        if (live) setRanks(new Map(terms.map((term) => [term, null])));
+      });
+    return () => {
+      live = false;
+    };
+  }, [wantsRanks, vocab]);
 
   useEffect(() => {
     if (!wantsEnrich) return;
@@ -222,14 +282,34 @@ export default function DeckWorkbenchTray({
     [],
   );
 
+  /**
+   * The ranked, knowledge-aware context recipe 6 orders by. Separate from
+   * `vocab` because that one deliberately asks for neither — enrichment reads
+   * only the term — and merging them would put an IPC round trip and a
+   * knowledge-store read behind every find/replace preview.
+   */
+  const rankedVocab = useMemo(() => {
+    if (!ranks) return undefined;
+    return buildVocabContext({
+      notes: draft.notes,
+      noteTypes: draft.noteTypes,
+      cards: draft.cards,
+      ranks,
+      // Only words the store holds: level 0 is "never asked", and recording it
+      // would turn the whole deck into "not known" — see `DeckWorkbenchBrowser`.
+      localLevels: new Map([...knownLevels].filter(([, level]) => level > 0)),
+    });
+  }, [draft, ranks, knownLevels]);
+
   const plan = useMemo(
     () =>
       planChangeTray(draft, journal, selectedIds, actions, {
         ...(lookup ? { enrich: { lookup, vocab } } : {}),
         ...(aiBatch ? { ai: aiBatch } : {}),
         mastery: { vocab, levels: knownLevels },
+        ...(rankedVocab ? { prioritize: { vocab: rankedVocab } } : {}),
       }),
-    [draft, journal, selectedIds, actions, lookup, vocab, aiBatch, knownLevels],
+    [draft, journal, selectedIds, actions, lookup, vocab, aiBatch, knownLevels, rankedVocab],
   );
   const effect = plan.mastery ? masteryEffect(plan.mastery) : null;
   const masteryChanges = plan.mastery?.changes.length ?? 0;
@@ -311,6 +391,8 @@ export default function DeckWorkbenchTray({
         // `no-ai-review`, which is the true statement. Refusing to add the step
         // at all would leave the user with a button that silently did nothing.
         return { id, enabled: true, kind, batchId: aiBatch?.id ?? '', toField: fieldB, onConflict };
+      case 'prioritize-new':
+        return { id, enabled: true, kind, startPosition: prioritizeStart };
       case 'set-mastery':
         return { id, enabled: true, kind, level: masteryLevel };
       case 'normalize-text':
@@ -378,6 +460,10 @@ export default function DeckWorkbenchTray({
         return t('ankiWorkbench.tray.describe.apply-ai-additions', {
           to: action.toField,
           conflict: t(`ankiWorkbench.tray.conflict.${action.onConflict}`),
+        });
+      case 'prioritize-new':
+        return t('ankiWorkbench.tray.describe.prioritize-new', {
+          start: String(action.startPosition),
         });
       case 'set-mastery':
         return t('ankiWorkbench.tray.describe.set-mastery', {
@@ -678,6 +764,24 @@ export default function DeckWorkbenchTray({
             {fieldSelect(t('ankiWorkbench.tray.aiTo'), fieldB, setFieldB)}
             {conflictSelect()}
           </>
+        ) : kind === 'prioritize-new' ? (
+          <>
+            {/* The word and its rank come from the note itself, as they do for
+                enrichment, so the only parameter is where the renumbering
+                starts. Known words are excluded by the recipe, not by a
+                checkbox: making that optional would make the guarantee
+                optional. */}
+            <label>
+              {t('ankiWorkbench.tray.prioritize.start')}
+              <input
+                type="text"
+                inputMode="numeric"
+                value={prioritizeStartText}
+                onChange={(e) => setPrioritizeStartText(e.target.value)}
+              />
+            </label>
+            <span className="muted">{t('ankiWorkbench.tray.prioritize.protects')}</span>
+          </>
         ) : kind === 'set-mastery' ? (
           <label>
             {t('ankiWorkbench.tray.masteryLevel')}
@@ -814,6 +918,21 @@ export default function DeckWorkbenchTray({
               </li>
             ))}
           </ul>
+          {plan.changedCards > 0 && (
+            /* A reposition writes no field, so the field diff above shows
+               nothing for it. Naming the words and their new positions is what
+               keeps the preview the whole truth about what Apply will do. */
+            <p className="wb-tray-summary">
+              {t('ankiWorkbench.tray.prioritize.moved', {
+                count: plan.changedCards,
+                detail: (plan.prioritize?.moves ?? [])
+                  .filter((m) => m.after !== m.before)
+                  .slice(0, DIFF_PREVIEW_ROWS)
+                  .map((m) => `${m.term} #${m.after}`)
+                  .join(', '),
+              })}
+            </p>
+          )}
           {plan.changes.length > DIFF_PREVIEW_ROWS && (
             <p className="muted">
               {t('ankiWorkbench.tray.diffMore', {
@@ -828,12 +947,16 @@ export default function DeckWorkbenchTray({
         <button
           type="button"
           className="btn primary"
-          // A mastery-only tray changes no note and still has work to do, so
-          // `changedNotes` alone would disable Apply on a plan that is ready.
-          disabled={plan.blocked || (plan.changedNotes === 0 && masteryChanges === 0)}
+          // A mastery-only or reposition-only tray changes no note and still
+          // has work to do, so `changedNotes` alone would disable Apply on a
+          // plan that is ready.
+          disabled={
+            plan.blocked
+            || (plan.changedNotes === 0 && masteryChanges === 0 && plan.changedCards === 0)
+          }
           onClick={() => {
             onApply(plan);
-            setApplied(plan.changedNotes + masteryChanges);
+            setApplied(plan.changedNotes + masteryChanges + plan.changedCards);
           }}
         >
           {t('ankiWorkbench.tray.apply')}

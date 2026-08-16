@@ -8946,6 +8946,26 @@ export const zh: Catalog = {
   'anki.mastery.level.familiar': '眼熟',
   'anki.mastery.level.known': '已掌握',
   'ankiWorkbench.tray.kind.set-mastery': '设置这些词的掌握程度',
+  'ankiWorkbench.tray.kind.prioritize-new':
+    '优先学习高频词',
+  'ankiWorkbench.tray.describe.prioritize-new':
+    '按词频重排新卡队列，从位置 {start} 开始，已掌握的词保持不动',
+  'ankiWorkbench.tray.prioritize.start':
+    '新卡起始位置',
+  'ankiWorkbench.tray.prioritize.moved':
+    '{count} 张卡片将移到新卡队列前面：{detail}',
+  'ankiWorkbench.tray.prioritize.protects':
+    '已经掌握的词不会被移动，已经开始学习的卡片也会保留原有安排。',
+  'ankiWorkbench.tray.problem.prioritize-known':
+    '{count} 个词你已经掌握，因此保持原位：{detail}',
+  'ankiWorkbench.tray.problem.prioritize-no-rank':
+    '{count} 个词不在任何已安装的词频表中，无法按词频排序：{detail}',
+  'ankiWorkbench.tray.problem.prioritize-no-word':
+    '{count} 条笔记没有词条，因此也没有词频：{detail}',
+  'ankiWorkbench.tray.problem.prioritize-not-new':
+    '{count} 个词已经开始学习，新卡队列位置对它们不适用：{detail}',
+  'ankiWorkbench.tray.problem.prioritize-no-cards':
+    '{count} 条笔记在本牌组中不生成卡片，没有可排序的对象：{detail}',
   'ankiWorkbench.tray.describe.set-mastery': '把所选词标记为「{level}」',
   'ankiWorkbench.tray.masteryLevel': '把这些词标记为',
   'ankiWorkbench.tray.mastery.effect': '这会改变什么',

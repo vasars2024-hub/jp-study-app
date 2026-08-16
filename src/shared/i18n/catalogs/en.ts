@@ -9420,6 +9420,26 @@ export const en: Catalog = {
   'anki.mastery.level.familiar': 'Familiar',
   'anki.mastery.level.known': 'Known',
   'ankiWorkbench.tray.kind.set-mastery': 'Set how well you know these words',
+  'ankiWorkbench.tray.kind.prioritize-new':
+    'Study the most frequent words first',
+  'ankiWorkbench.tray.describe.prioritize-new':
+    'Reorder the new queue by frequency, starting at position {start}, leaving known words alone',
+  'ankiWorkbench.tray.prioritize.start':
+    'Start at new-card position',
+  'ankiWorkbench.tray.prioritize.moved':
+    '{count} cards move to the front of the new queue: {detail}',
+  'ankiWorkbench.tray.prioritize.protects':
+    'Words you already know are never moved, and cards you have already started keep their schedule.',
+  'ankiWorkbench.tray.problem.prioritize-known':
+    '{count} words were left where they were because you already know them: {detail}',
+  'ankiWorkbench.tray.problem.prioritize-no-rank':
+    '{count} words are not ranked by any installed frequency list, so there is no frequency to order them by: {detail}',
+  'ankiWorkbench.tray.problem.prioritize-no-word':
+    '{count} notes declare no word, so they have no frequency either: {detail}',
+  'ankiWorkbench.tray.problem.prioritize-not-new':
+    '{count} words have already been started, so a new-queue position would not apply to them: {detail}',
+  'ankiWorkbench.tray.problem.prioritize-no-cards':
+    '{count} notes generate no card in this deck, so there is nothing to position: {detail}',
   'ankiWorkbench.tray.describe.set-mastery': 'Mark the selected words as {level}',
   'ankiWorkbench.tray.masteryLevel': 'Mark these words as',
   'ankiWorkbench.tray.mastery.effect': 'What this changes',

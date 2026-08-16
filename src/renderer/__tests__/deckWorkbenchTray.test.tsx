@@ -440,3 +440,102 @@ describe('DeckWorkbenchTray enrichment', () => {
     expect(host.querySelector('.wb-tray-enrich')).toBeNull();
   });
 });
+
+describe('DeckWorkbenchTray prioritize', () => {
+  afterEach(() => {
+    delete (window as { api?: unknown }).api;
+  });
+
+  /** A draft whose notes have real new cards, which the shared fixture lacks. */
+  function withCards(dues: number[]): AnkiDraft {
+    const notes = dues.map((_, i) => note(`n${i + 1}`));
+    notes.forEach((n, i) => {
+      n.fields[0] = { ord: 0, name: 'Front', raw: `語${i + 1}`, normalized: `語${i + 1}` };
+    });
+    const base = draftOf(notes);
+    return {
+      ...base,
+      cards: dues.map((due, i) => ({
+        id: `c${i + 1}`,
+        noteId: `n${i + 1}`,
+        deckId: 'd1',
+        ord: 0,
+        type: 'new' as const,
+        queue: 'new' as const,
+        due,
+        interval: 0,
+        easeFactor: 0,
+        reps: 0,
+        lapses: 0,
+        left: 0,
+        flag: 'none' as const,
+        modifiedAtSec: 0,
+      })),
+    };
+  }
+
+  const addPrioritize = (): void => {
+    selectKind('prioritize-new');
+    addToTray();
+  };
+
+  it('blocks rather than calling a ranked deck unrankable while the lookup is out', () => {
+    // Same negative control the enrichment has, and the stakes are higher: a
+    // context that never arrived makes every word look unknown, which is
+    // exactly when a reposition would trample cards the user already knows.
+    mount(withCards([700, 701]), ['n1', 'n2']);
+    addPrioritize();
+
+    expect(host.textContent).toContain('ankiWorkbench.tray.problem.no-vocab-context');
+    expect(host.textContent).not.toContain('ankiWorkbench.tray.problem.prioritize-no-rank');
+    expect(applyButton().disabled).toBe(true);
+  });
+
+  it('reorders by frequency once the ranks answer, and applies what it previewed', async () => {
+    const dictFrequencyRanks = vi.fn().mockResolvedValue({ 語1: 900, 語2: 12 });
+    (window as { api?: unknown }).api = { dictFrequencyRanks };
+    mount(withCards([700, 701]), ['n1', 'n2']);
+    addPrioritize();
+    expect(applyButton().disabled).toBe(true);
+    await flushLookup();
+
+    expect(dictFrequencyRanks).toHaveBeenCalledWith(['語1', '語2']);
+    act(() => applyButton().dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    const plan = onApply.mock.calls[0][0];
+    // 語2 is rank 12, so it takes position 0 ahead of 語1's 900.
+    expect(plan.draft.cards.map((c) => [c.id, c.due])).toEqual([
+      ['c1', 1],
+      ['c2', 0],
+    ]);
+    expect(plan.changedCards).toBe(2);
+  });
+
+  it('names the unranked words instead of quietly dropping them', async () => {
+    (window as { api?: unknown }).api = {
+      dictFrequencyRanks: vi.fn().mockResolvedValue({ 語1: 12 }),
+    };
+    mount(withCards([700, 701]), ['n1', 'n2']);
+    addPrioritize();
+    await flushLookup();
+
+    expect(host.textContent).toContain('ankiWorkbench.tray.problem.prioritize-no-rank');
+    expect(host.textContent).toContain('語2');
+  });
+
+  it('refuses a start position that is not a whole number', async () => {
+    (window as { api?: unknown }).api = {
+      dictFrequencyRanks: vi.fn().mockResolvedValue({ 語1: 12 }),
+    };
+    mount(withCards([700]), ['n1']);
+    selectKind('prioritize-new');
+    const startInput = [...host.querySelectorAll('label')]
+      .find((l) => l.textContent?.includes('ankiWorkbench.tray.prioritize.start'))
+      .querySelector('input');
+    setValue(startInput, 'soon');
+    addToTray();
+    await flushLookup();
+
+    expect(host.textContent).toContain('ankiWorkbench.tray.problem.empty-parameter');
+    expect(applyButton().disabled).toBe(true);
+  });
+});
