@@ -24253,3 +24253,53 @@ fixture only, so do not cite it as field-measured. (2) `not-cloze` is checked fi
 every other outcome, which is why the positive control reports resolvable field pairs
 separately; the 38,283 above says nothing about how many notes have sentences. (3) The 11,866
 `no-sentence` are real: DaKanji2 declares an `Example` field its notes leave empty.
+
+## 2026-08-17 — Track 7 / Phase 7: recipe 18 closes, recipe 20 lands, and a planner that refused its own headline case
+
+**Slices.** `788ad0a2` `reschedule-stale` — recipe 18's writer half, 12 tests, 17 keys ×4 ·
+`2724d947` `shared/ankiSourceContext.ts` + the `restore-source` tray action — recipe 20,
+16 model + 6 tray tests, 14 keys ×4.
+
+**Recipe 18 is now CLOSED** (model `0a5a2e17`, filter, preview `0446c4c0`, writer `788ad0a2`).
+`nowMs` is stamped at Add and never re-read: a dry run and its apply are two `planChangeTray`
+calls, and a `Date.now()` inside would let them cross a day boundary — the user approves one
+set of days and receives another. `reset` sits in the select and blocks by name; unlike
+`leech-reschedule-unsupported` it is always blocking, because it is this action's whole mode
+and there is no other half of the run that could still be honest.
+
+**The defect this half found, and it was in the shipped model.** `overdueDays` is clamped at
+zero, so a review card due today or later reads `null` — and `planStaleRemedy` tested exactly
+that value to decide whether a card *has* a due day. A **dormant card whose due is still
+ahead** was therefore refused `not-review`, a false statement about a review card, and that
+card is the recipe's headline case: a deck abandoned long before its cards came due.
+`ankiStaleCards.test.ts:177` had been constructing one since the model shipped and asserted
+only its verdict. `StaleCardFacts.dueDay` is the unclamped answer and `before` now reads it,
+so a future-due move reports its real day instead of a `before` in the past. **Mutation
+control:** restoring the one line fails 3 of 12 tests including the new guard.
+
+**Recipe 20's facet list was decided by measurement, not by its own title.**
+`videoClipFilename` (`videoClip.ts:89`) builds `jp-clip-<seed>-<ms>.mp4` and
+`VideoCoreMiningPanel.tsx:329` passes `<trackNumber>-<cueIndex>`, so timestamp and cue are
+exactly recoverable. **The title is not** — it is not in the name at all, and the seed is run
+through `[^a-zA-Z0-9]+ -> '-'`, which turns a Japanese title into the literal `clip`
+(`videoClip.test.ts:90`). So `title` is read from the card's **deck path** and nowhere else.
+**There is no `url` facet**: `extensionServer.ts:763` tags a mined note and stores no page
+address, so the form states that limit out loud rather than offering a facet with nothing
+behind it. Every restored value carries `evidence`, the exact string it was decoded from.
+
+**Traps for the next worker.** (1) `undoLastEdit(draft, journal, normalize)` takes a
+normalizer as its **third argument** — omit it and the failure is `normalize is not a
+function` from deep inside `writeNoteField`, not a type error at the call site.
+(2) `countJournalSteps` takes `journal.done`, not the journal. (3) Adding a tray kind breaks
+`deckWorkbench.test.tsx`'s step-partition assertion by design — that test is the guard that a
+kind lives in exactly one step, so update it deliberately rather than treating it as noise.
+(4) A tray action needing the draft's `createdAtSec` means extending `blockingProblems`'
+positional signature; it now takes 10 parameters.
+
+**Gates, once, after the last slice.** `npx vitest run` **709 files / 9,701 tests passed, 0
+failed** (the known `visualNovelI18n` dynamic-import flake did not fire) · i18n **10,430**
+keys, exit 0 · architecture **"Nothing new"**, 2 pending · eslint on all 8 touched paths **0
+errors**, 38 warnings (all the pre-existing `no-non-null-assertion` class).
+
+**Recipes still without a tray action kind: 26** (17's *remove* half is also still open, and
+must refuse by name at the live destination — AnkiConnect has no remove-template action).
