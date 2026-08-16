@@ -142,6 +142,33 @@ describe('renderAnkiCard', () => {
     expect(rendered.problems).toEqual([]);
   });
 
+  it('inserts the question into the answer literally, `$` sequences and all', () => {
+    // A real deck's front side can carry inline script, and `$&`/`` $` ``/`$'`/
+    // `$1` are replacement patterns to `String.replace`. Measured on the
+    // eggrolls JLPT deck: its `$'` spliced the whole remainder of the answer
+    // format in again, duplicating the body and leaving a `{{/Alt1}}` with no
+    // opener, so all 10,147 of its notes reported `unbalanced-conditional`.
+    const type = {
+      ...basic,
+      templates: [
+        {
+          ...basic.templates[0],
+          afmt: '{{FrontSide}}<hr id=answer>{{#Back}}{{Back}}{{/Back}}',
+        },
+      ],
+    };
+    const n = note({
+      id: 'n1',
+      fields: [field(0, 'Front', `x.replace(/(a)(b)/g, '$1<b>$2</b>') $& $\` $' $$`), field(1, 'Back', 'cat')],
+    });
+    const rendered = renderAnkiCard(draftOf([n], { noteTypes: [type, clozeType] }), n, 0);
+    expect(rendered.answerHtml).toBe(`${rendered.questionHtml}<hr id=answer>cat`);
+    // The tell of the old behaviour: the answer body appearing twice, and a
+    // close marker whose opener the splice left behind.
+    expect(rendered.answerHtml).not.toContain('{{/Back}}');
+    expect(rendered.problems).toEqual([]);
+  });
+
   it('reports a field the note type does not have instead of printing the marker', () => {
     const type = {
       ...basic,

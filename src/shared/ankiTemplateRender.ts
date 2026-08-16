@@ -540,7 +540,16 @@ export function renderAnkiCard(
   };
 
   const questionHtml = renderFormat(template?.qfmt ?? '', { ...base, side: 'question' });
-  const answerFormat = String(template?.afmt ?? '').replace(/\{\{FrontSide\}\}/g, questionHtml);
+  // The replacement is a *function* so the rendered question is inserted
+  // literally. As a replacement string, `$&`, `` $` ``, `$'`, `$$` and `$1`
+  // inside it would be expanded by `String.replace` — and they occur in real
+  // decks, because a card template may carry inline script. Measured: the
+  // eggrolls JLPT deck's front side ships a markdown-ish rewriter holding
+  // `'$1<b>$2</b>'` and `['$', '^', 'v']`, whose `$'` spliced the entire
+  // remainder of the answer format in a second time. That duplicated the answer
+  // body and left a `{{/Alt1}}` with no opener, so every one of its 10,147
+  // notes reported `unbalanced-conditional` against a template that balances.
+  const answerFormat = String(template?.afmt ?? '').replace(/\{\{FrontSide\}\}/g, () => questionHtml);
   const answerHtml = renderFormat(answerFormat, { ...base, side: 'answer' });
 
   // An empty question means Anki generates no card — but *why* it is empty is
