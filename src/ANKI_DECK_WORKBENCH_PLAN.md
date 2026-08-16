@@ -286,9 +286,17 @@ Partial failure must identify exactly what committed, what failed, and what can 
 - Finish the four-rating local SRS migration and explicit mastery-preset mappings.
 - Complete the compatibility matrix with honest disabled states for capabilities that cannot be performed safely.
 
-### Phase 6 — export, commit, and round-trip proof
+### Phase 6 — export, commit, and round-trip proof — package half built 2026-08-16
 
-- Export a new package and commit bounded changes to live Anki.
+- Export a new package and commit bounded changes to live Anki. **The package half landed
+  (`ad09b92e`)**: `apkg:export` applies the journal's net change set to a fresh read of the source
+  package and writes a NEW .apkg, copying every non-collection zip entry verbatim so media and
+  unpaged notes survive untouched. Fingerprint mismatch, overwrite-of-source, empty set and
+  unknown note/card each refuse with their own code before any file is written, and "ok" is only
+  claimed after the written file is re-read from disk and every change found in it. Proven live on
+  the real IPC path: 2 note edits + 1 card move exported, reimported, byte-exact, with the
+  `Marked` tag token preserved and due 10→3 moved while due 20 stayed. The live-Anki commit half
+  and step 7's UI remain open.
 - Add source-fingerprint conflict handling, partial-failure recovery, post-commit rereads, and reversible journals.
 - Prove import -> edit -> export/reimport and live read -> edit -> commit/reread equivalence for all supported data.
 

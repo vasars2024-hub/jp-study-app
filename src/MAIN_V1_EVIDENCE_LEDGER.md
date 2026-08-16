@@ -23112,3 +23112,38 @@ every module-level reading says it switched. Measuring a language costs a reload
 `localStorage.setItem('ui-lang', 'ja')` then `location.reload()` — which boots the whole app in JA
 (スタート / デスクトップ 1 observed) but **closes the Anki window**, so the workbench must be re-driven
 from the desktop. Restore `ui-lang` afterwards; this run left it back at `en`.
+
+## 2026-08-16 — Track 7 / Phase 6: the .apkg exporter, built and proven live
+
+**`ad09b92e`.** `apkg:export` writes the workbench's **net** change set into a NEW package.
+Decision: main re-reads the SOURCE file and UPDATEs its collection SQLite, copying every other zip
+entry verbatim — media, `meta`, the legacy decoy — rather than synthesizing a collection from the
+draft. Tradeoff: fidelity by construction (unpaged notes, revlog, deck configs all survive
+untouched) at the cost of holding the package in memory once. The renderer never holds the source
+path (draft `label` is basename-only, deliberate); main remembers path-by-fingerprint from
+`readApkgDraft` (`rememberApkgSource`, cap 8) with a locate-dialog fallback the fingerprint still
+guards. `sfld`/`csum` recomputed on any field write; `usn=-1`, `mod` bumped; the `Marked` tag token
+is preserved verbatim because the draft strips it into a flag and no journal op changes it.
+
+**Shared builder** `buildApkgExportChanges` folds the journal exactly as step 6's review does, so
+what the review showed IS what exports. Unit: **6 tests** (`ankiApkgExport.test.ts`) — A→B→A ships
+nothing, full field row not a patch, draft-space tags, net card move, ghost note skipped. **Core**
+`applyExportChanges`/`verifyExportChanges` against a real sql.js collection: **7 tests**
+(`apkgExportCore.test.ts`) — round trip via `readRawCollection`, sortf=1 vs csum-field-0
+distinguished, refusal-before-any-write proven, tamper caught by the verifier's negative control.
+
+**Live on the real IPC path** (app restarted at pid 47636, synthesized 3-note legacy .apkg with a
+media file): export of 2 note edits + 1 card move → `ok, notesUpdated 2, cardsUpdated 1,
+verified true` where verified means the written file was RE-READ FROM DISK. Reimport of
+`edited.apkg` through `readApkgDraft`: edited field byte-exact, `marked` still true with tags
+`core`, second note's tags `animals`, untouched note intact, due 10→**3** moved and due **20** not,
+`mediaReferences 1` with **no** missing-media diagnostic, fingerprint moved. **Negative controls,
+all four refusing with their own codes and writing NO file:** wrong fingerprint → `source-changed`,
+outPath = source → `overwrite-source`, empty set → `nothing-to-export`, ghost note →
+`note-missing`. Temp dir held exactly source.apkg + edited.apkg after.
+
+**Trap.** sql.js's `Database` is not assignable to an interface whose params are `unknown[]` —
+type them as the `SqlValue` union or every call site goes red under tsc while vitest stays green.
+
+**Still open.** Step 7's UI (this exporter has no surface yet), the live-Anki commit half of
+Phase 6, gate 11's provenance-after-reimport specifics, gate 10's owed measurements.
