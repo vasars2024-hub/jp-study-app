@@ -289,6 +289,95 @@ real filesystem are **ingest** (scan, watch, paste-a-folder — see above) and *
 distinction the user drew is worth keeping sharp: the app *finds and indexes* your files, it is
 not a second Explorer for navigating them.
 
+## Folder settings
+
+The user's framing: the ingest traps are handled by junk/clean options plus general folder
+settings, and those settings should be in-depth. Agreed with one correction that shapes the
+design — **cleanup is a remedy, not a substitute for prevention**. If a half-written file is
+ingested, the entry is built from a partial read (wrong duration, wrong cue count, wrong hash)
+and once the file finishes nothing looks broken enough for a cleaner to notice. So the stability
+check stays; settings make it *tunable*, and cleanup handles what still slips through.
+
+### What must never become a setting
+
+Stated first, because the value of a settings surface is partly in what it refuses to offer:
+
+- Ingest never moves, renames, reorganises or deletes anything in the user's own folders. There
+  is no toggle for this. A setting that could turn a library indexer into a file mover is a
+  footgun with no legitimate use.
+- Deletion of irreplaceable media always confirms. Not a preference.
+- Auto-clean may never target irreplaceable material, whatever its age — only derived and cache
+  data. "Delete old videos automatically" is not offered.
+
+### A. Ingest and scanning
+
+- **Watched folders** — list, add/remove, enable per folder, and per-folder rules (auto-import
+  vs review).
+- **Scan roots** and **exclusions** (glob patterns), max depth, skip hidden/system, symlink
+  policy.
+- **Stability window** — how long a file's size must be unchanged before it is considered
+  complete. Default a few seconds; raise it on slow external drives. This is the partial-download
+  trap, made adjustable rather than hidden.
+- **Ignored extensions** — `.crdownload`, `.part`, `.tmp`, `.!qB` and friends, user-editable,
+  because every download tool invents another.
+- **Auto-import confidence** — always review · auto-import high confidence only · auto-import
+  everything (with an honest warning on the last).
+- **Per-category overrides** — e.g. auto-import subtitles and epubs, always review video.
+- **Size thresholds** — ignore files under/over a size, per category.
+- **Archive handling** — expand archives to classify, max archive size, nesting depth.
+- **Duplicate policy** — skip · import anyway · ask.
+- **Reference vs copy**, globally and per category (default: reference; copy small derived files).
+- **Schedule** — on launch · periodically · manual only; plus a background-priority cap so a
+  scan never competes with playback or transcription.
+
+### B. Junk and cleaning
+
+Junk is *defined* here, and the definition is the feature — a cleaner that guesses is worse than
+none. Candidate classes, each individually toggleable:
+
+- Zero-byte and truncated files; abandoned `.part`/`.tmp` beyond an age threshold.
+- **Orphaned index rows** — a record pointing at a file that no longer exists (broken links).
+- **Orphaned derivatives** — a transcript whose video is gone, a cover for a deleted book.
+- Duplicate media (same content, two paths), with a rule for which copy is kept.
+- Stale caches: thumbnails, previews, extracted archive temporaries.
+- Failed or aborted downloads and empty folders the app itself created.
+- Old exports (CSV, `.apkg`) past an age threshold.
+
+Controls: **dry run first, always** — a report with counts and reclaimable size before anything
+happens; per-class enable; age thresholds; **destination** (Recycle Bin by default, quarantine,
+or permanent with an explicit warning); optional schedule that is **report-only by default**.
+A cleanup run writes a log of exactly what it removed, so a surprise is traceable afterwards.
+
+### C. Library, display and organisation
+
+- Default view mode, sort column and direction; per-folder overrides remembered.
+- Default visible columns and their order; date format; show extensions; show hidden items.
+- Thumbnails: on/off, cache size cap, regenerate.
+- Default grouping; Favorites pinned to top; whether Collections may nest.
+- Provenance display: how prominently transcript-derived material is marked (it may be made
+  *more* prominent, never hidden).
+
+### D. Storage and maintenance
+
+- Storage usage per store, with the memory/statistics content that moved out of Settings.
+- Cache caps and a clear-cache action with sizes shown.
+- **Index rebuild / re-verify** — re-check every record against the disk and report drift.
+- **Broken-link policy** — mark only · prompt · attempt automatic relocation by name/size/hash.
+- Library location, and what happens to references if it moves.
+
+### E. Safety
+
+- Confirmation thresholds (confirm above N items or X GB).
+- Undo window length for soft deletes.
+- Whether permanent delete is offered at all — default **no**, Recycle Bin only.
+
+### F. Rules (advanced, later)
+
+A small rules engine — *if a file matches this pattern, route it here, tag it, auto-mine it* —
+plus episode/series naming patterns for anime filenames. Powerful and easy to get wrong, so it
+ships after the fixed behaviour is proven, and every rule shows what it would have matched
+before it is saved.
+
 ## Deletion, and why it gets its own section
 
 There is no userData restore point. `downloads`, `models`, `wallpapers`, `library` and
@@ -393,7 +482,23 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
 30. **Referenced items behave.** Removing a referenced item from the library leaves the user's
    original file on disk; moving the original produces a reported broken link rather than a
    crash or a silent disappearance.
-31. Full gates: `npx vitest run`, `node tools/i18n-check.cjs`,
+31. **The stability window is honoured and adjustable.** Setting it higher delays ingest of a
+   file still growing by that amount; setting it lower does not bypass the completeness check
+   entirely. Proven against a file arriving mid-write at two different settings.
+32. **Cleanup dry-runs before it acts.** Every cleanup class reports its count and reclaimable
+   size first, and the report matches exactly what is removed when confirmed — item for item,
+   not just in total.
+33. **Cleanup never touches irreplaceable material.** Point it at a library containing a
+   downloaded video and every junk class; the video survives every class, including a scheduled
+   run. A cleanup that can reach it is a FAIL regardless of settings.
+34. **Orphan detection is real.** Delete a video's file behind the app's back; the broken-link
+   class finds exactly that record, names it, and the chosen policy (mark / prompt / relocate)
+   does what it says.
+35. **Cleanup is logged.** After a run, a log names each removed item and its destination, and
+   Recycle-Bin-destined items are actually restorable from there.
+36. **Per-category ingest overrides work.** With subtitles set to auto-import and video set to
+   review, a folder containing both routes each one differently in a single scan.
+37. Full gates: `npx vitest run`, `node tools/i18n-check.cjs`,
     `node tools/architecture-audit.cjs`, `npx eslint <touched paths>`. `tsc --noEmit` is NOT a
     gate — 327 pre-existing errors; prove "no new" by set-difference.
 
