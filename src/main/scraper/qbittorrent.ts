@@ -528,6 +528,101 @@ export function addFailureReason(status: number, body: string): string {
   return `qBittorrent answered ${status}: ${detail}`;
 }
 
+/**
+ * What qBittorrent 5.2 reports from `torrents/add`.
+ *
+ * Measured live against v5.2.3, because the 4.x contract this client was written
+ * for no longer holds: a successful add answers **JSON**, not `Ok.`, and a batch
+ * can come back `200` with `failure_count` above zero. Treating any 200 as "every
+ * row sent" therefore reports links the daemon refused as delivered — the false
+ * success the acquisition gates exist to forbid.
+ */
+export interface QbitAddOutcome {
+  addedIds: string[];
+  successCount: number;
+  failureCount: number;
+  pendingCount: number;
+}
+
+/**
+ * Parse the 5.2 add result, or `null` when the daemon did not send one.
+ *
+ * `null` is the 4.x path (`Ok.`), which is a plain-text body and still supported:
+ * the caller keeps its old whole-batch behaviour there, because that contract
+ * genuinely carries no per-row information.
+ */
+export function parseAddOutcome(body: string): QbitAddOutcome | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  const record = parsed as Record<string, unknown>;
+  const counts = ['success_count', 'failure_count', 'pending_count'];
+  if (!counts.some((key) => typeof record[key] === 'number')) return null;
+  const ids = Array.isArray(record.added_torrent_ids) ? record.added_torrent_ids : [];
+  const num = (key: string) => (typeof record[key] === 'number' ? (record[key] as number) : 0);
+  return {
+    addedIds: ids.filter((id): id is string => typeof id === 'string').map((id) => id.toLowerCase()),
+    successCount: num('success_count'),
+    failureCount: num('failure_count'),
+    pendingCount: num('pending_count'),
+  };
+}
+
+/**
+ * The v1 infohash a magnet names, lowercased, or `''` when it cannot be read.
+ *
+ * Only hex is decoded — 40 hex characters for `btih`, 64 for a v2 `btmh`. A
+ * base32 `btih` returns `''` and the caller falls back to a whole-batch verdict
+ * rather than guessing which row the daemon refused.
+ */
+export function magnetInfoHash(magnet: string): string {
+  const match = /\bxt=urn:bt(?:ih|mh):([0-9a-fA-F]{40}|[0-9a-fA-F]{64})\b/.exec(magnet ?? '');
+  return match ? match[1].toLowerCase() : '';
+}
+
+/**
+ * Turn a `200` add response into a per-row outcome.
+ *
+ * The asymmetry here is deliberate. When the daemon refuses part of a batch and
+ * the rows cannot be matched to it by infohash, every row is reported failed
+ * rather than sent: a false failure is visible and the user can look in
+ * qBittorrent, whereas a false success silently loses an episode.
+ */
+export function settleAddedRows(
+  rows: readonly TorrentRow[],
+  outcome: QbitAddOutcome | null,
+): QbitSendReport['details'] {
+  const sent = (row: TorrentRow) => ({ name: row.name, outcome: 'sent' as const, reason: '' });
+  // No JSON body is the 4.x contract, which reports a whole-batch result only.
+  if (!outcome || outcome.failureCount <= 0) return rows.map(sent);
+
+  const added = new Set(outcome.addedIds);
+  const unmatched = rows.filter((row) => {
+    const hash = magnetInfoHash(row.magnet);
+    return !hash || !added.has(hash);
+  });
+  if (unmatched.length !== outcome.failureCount) {
+    const reason =
+      `qBittorrent accepted ${outcome.successCount} of ${rows.length} links and refused `
+      + `${outcome.failureCount}, without naming which.`;
+    return rows.map((row) => ({ name: row.name, outcome: 'failed' as const, reason }));
+  }
+  const refused = new Set(unmatched);
+  return rows.map((row) => (refused.has(row)
+    ? { name: row.name, outcome: 'failed' as const, reason: 'qBittorrent did not accept this link.' }
+    : sent(row)));
+}
+
+/** Lowercased infohashes qBittorrent is already holding, for the 409 branch. */
+async function presentHashes(input: ScraperQbitInput): Promise<Set<string>> {
+  const transfers = await qbitTransfers(input);
+  return new Set(transfers.map((row) => row.hash.toLowerCase()).filter(Boolean));
+}
+
 export async function qbitSend(input: ScraperQbitSendInput): Promise<QbitSendReport> {
   const rows: TorrentRow[] = Array.isArray(input.rows) ? input.rows : [];
   const details: QbitSendReport['details'] = [];
@@ -567,15 +662,29 @@ export async function qbitSend(input: ScraperQbitSendInput): Promise<QbitSendRep
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: form.toString(),
     });
-    if ('error' in response || response.status !== 200) {
-      const reason = 'error' in response
-        ? response.error.message
-        : addFailureReason(response.status, response.body);
+    if ('error' in response) {
+      const reason = response.error.message;
       for (const row of sendable) details.push({ name: row.name, outcome: 'failed', reason });
       scraperLog('error', 'qbit', `Send failed: ${reason}`);
+    } else if (response.status === 200) {
+      details.push(...settleAddedRows(sendable, parseAddOutcome(response.body)));
+      const sentNow = details.filter((d) => d.outcome === 'sent').length;
+      scraperLog('info', 'qbit', `Sent ${sentNow} of ${sendable.length} torrent(s) to qBittorrent.`);
     } else {
-      for (const row of sendable) details.push({ name: row.name, outcome: 'sent', reason: '' });
-      scraperLog('info', 'qbit', `Sent ${sendable.length} torrent(s) to qBittorrent.`);
+      // A 409 means the daemon added *nothing* from this batch, and v5.2.3's body
+      // is the literal word "Conflict" — no cause, so `addFailureReason` alone
+      // leaves the user with a number. The one cause the app can establish itself
+      // is the common one: the torrent is already in the transfer list.
+      const already = response.status === 409 ? await presentHashes(input) : new Set<string>();
+      const generic = addFailureReason(response.status, response.body);
+      for (const row of sendable) {
+        const hash = magnetInfoHash(row.magnet);
+        const reason = hash && already.has(hash)
+          ? 'Already in qBittorrent.'
+          : generic;
+        details.push({ name: row.name, outcome: 'failed', reason });
+      }
+      scraperLog('error', 'qbit', `Send failed: ${generic}`);
     }
   }
 

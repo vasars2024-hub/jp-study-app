@@ -32,8 +32,12 @@ vi.mock('electron', () => ({
 
 let encryptionAvailable = true;
 
-const { addFailureReason, buildAddForm, mapQbitState, mapTransfer, qbitBaseUrl, qbitSend, qbitTest, qbitTransfers, resetQbitSessions } =
+const { addFailureReason, buildAddForm, magnetInfoHash, mapQbitState, mapTransfer, parseAddOutcome, qbitBaseUrl, qbitSend, qbitTest, qbitTransfers, resetQbitSessions } =
   await import('../scraper/qbittorrent');
+
+/** Two real-shaped 40-hex infohashes: one the stand-in holds, one it does not. */
+const HASH_PRESENT = '0123456789abcdef0123456789abcdef01234567';
+const HASH_NEW = '89abcdef0123456789abcdef0123456789abcdef';
 const { getScraperSecret, hasScraperSecret, setScraperSecret, clearScraperSecret } =
   await import('../scraper/credentials');
 const { readSecret, setCredentialVaultRoot } = await import('../credentials/vault');
@@ -67,6 +71,14 @@ let sessionValid = true;
 let loginRejectStyle: 'fails' | '401' = 'fails';
 /** Every request the app actually sent, so a header claim is measured not assumed. */
 let seenHeaders: http.IncomingHttpHeaders[] = [];
+/**
+ * Torrents the stand-in is already holding, on top of the two fixtures.
+ *
+ * Empty by default so the `qbitTransfers` counts stay as they were; the 409
+ * branch needs a real 40-hex infohash to recognise, which the fixtures' short
+ * `aa11`/`bb22` deliberately are not.
+ */
+let torrentInfoExtra: unknown[] = [];
 
 const TORRENT_INFO = [
   {
@@ -172,7 +184,7 @@ beforeAll(async () => {
     }
     if (url.pathname === '/api/v2/torrents/info') {
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify(TORRENT_INFO));
+      res.end(JSON.stringify([...TORRENT_INFO, ...torrentInfoExtra]));
       return;
     }
     if (url.pathname === '/api/v2/torrents/add') {
@@ -221,6 +233,7 @@ beforeEach(async () => {
   addBodies = [];
   addResponse = { status: 200, body: 'Ok.' };
   seenHeaders = [];
+  torrentInfoExtra = [];
   resetQbitSessions();
   await flushScraperLogWrites();
   await fsp.rm(path.join(tempRoot, 'scraper'), { recursive: true, force: true });
@@ -617,6 +630,123 @@ describe('qbitSend', () => {
     addResponse = { status: 500, body: '   ' };
     const report = await qbitSend({ config, rows: [row()] });
     expect(report.details[0].reason).toBe('qBittorrent answered 500.');
+  });
+
+  // Measured against a live qBittorrent v5.2.3: a batch holding one duplicate and
+  // one new magnet answers **200** with `failure_count: 1`. Reporting every row of
+  // a 200 as sent therefore tells the user an episode was delivered that the
+  // daemon threw away.
+  it('does not report a refused link as sent when the batch partly failed', async () => {
+    addResponse = {
+      status: 200,
+      body: JSON.stringify({
+        added_torrent_ids: [HASH_NEW],
+        failure_count: 1,
+        pending_count: 0,
+        success_count: 1,
+      }),
+    };
+    const report = await qbitSend({
+      config,
+      rows: [
+        row({ id: 'ok', name: 'accepted', magnet: `magnet:?xt=urn:btih:${HASH_NEW}` }),
+        row({ id: 'no', name: 'refused', magnet: `magnet:?xt=urn:btih:${HASH_PRESENT}` }),
+      ],
+    });
+    expect(report.sent).toBe(1);
+    expect(report.failed).toBe(1);
+    expect(report.details.find((d) => d.name === 'accepted')?.outcome).toBe('sent');
+    expect(report.details.find((d) => d.name === 'refused')).toMatchObject({
+      outcome: 'failed',
+      reason: 'qBittorrent did not accept this link.',
+    });
+  });
+
+  it('refuses the whole batch rather than guessing when the refusal cannot be attributed', async () => {
+    addResponse = {
+      status: 200,
+      body: JSON.stringify({
+        added_torrent_ids: [],
+        failure_count: 1,
+        pending_count: 0,
+        success_count: 1,
+      }),
+    };
+    // Neither magnet is 40-hex, so no row can be matched to `added_torrent_ids`.
+    const report = await qbitSend({
+      config,
+      rows: [row({ id: 'a' }), row({ id: 'b', magnet: 'magnet:?xt=urn:btih:cc' })],
+    });
+    expect(report.sent).toBe(0);
+    expect(report.failed).toBe(2);
+    expect(report.details[0].reason).toBe(
+      'qBittorrent accepted 1 of 2 links and refused 1, without naming which.',
+    );
+  });
+
+  it('still reports a whole-batch success on qBittorrent 4.x’s plain-text body', async () => {
+    addResponse = { status: 200, body: 'Ok.' };
+    const report = await qbitSend({ config, rows: [row(), row({ id: 'row-2' })] });
+    expect(report.sent).toBe(2);
+    expect(report.failed).toBe(0);
+  });
+
+  // v5.2.3 answers a duplicate add with the literal body "Conflict", which names
+  // no cause at all — so the app establishes the common one itself.
+  it('names the duplicate instead of the status when the torrent is already there', async () => {
+    torrentInfoExtra = [{ hash: HASH_PRESENT.toUpperCase(), name: 'already here', state: 'downloading' }];
+    addResponse = { status: 409, body: 'Conflict' };
+    const report = await qbitSend({
+      config,
+      rows: [row({ id: 'dup', magnet: `magnet:?xt=urn:btih:${HASH_PRESENT}` })],
+    });
+    expect(report.failed).toBe(1);
+    expect(report.details[0].reason).toBe('Already in qBittorrent.');
+  });
+
+  it('keeps the bare 409 for a row qBittorrent is not already holding', async () => {
+    addResponse = { status: 409, body: 'Conflict' };
+    const report = await qbitSend({
+      config,
+      rows: [row({ id: 'fresh', magnet: `magnet:?xt=urn:btih:${HASH_NEW}` })],
+    });
+    expect(report.details[0].reason).toBe('qBittorrent answered 409: Conflict');
+  });
+});
+
+describe('parseAddOutcome', () => {
+  it('reads the v5.2 JSON result', () => {
+    expect(parseAddOutcome(JSON.stringify({
+      added_torrent_ids: ['AABB'],
+      failure_count: 2,
+      pending_count: 1,
+      success_count: 3,
+    }))).toEqual({
+      addedIds: ['aabb'],
+      failureCount: 2,
+      pendingCount: 1,
+      successCount: 3,
+    });
+  });
+
+  it('returns null for the 4.x text body and for anything without counts', () => {
+    expect(parseAddOutcome('Ok.')).toBeNull();
+    expect(parseAddOutcome('Fails.')).toBeNull();
+    expect(parseAddOutcome('[]')).toBeNull();
+    expect(parseAddOutcome(JSON.stringify({ added_torrent_ids: ['aa'] }))).toBeNull();
+  });
+});
+
+describe('magnetInfoHash', () => {
+  it('reads a v1 and a v2 hex infohash, lowercased', () => {
+    expect(magnetInfoHash(`magnet:?xt=urn:btih:${HASH_NEW.toUpperCase()}&dn=x`)).toBe(HASH_NEW);
+    expect(magnetInfoHash(`magnet:?xt=urn:btmh:${'a'.repeat(64)}`)).toBe('a'.repeat(64));
+  });
+
+  it('returns empty for a base32 or truncated hash rather than a wrong one', () => {
+    expect(magnetInfoHash('magnet:?xt=urn:btih:MFRGGZDFMZTWQ2LKNNWG23TP')).toBe('');
+    expect(magnetInfoHash('magnet:?xt=urn:btih:aa11bb22')).toBe('');
+    expect(magnetInfoHash('')).toBe('');
   });
 });
 
