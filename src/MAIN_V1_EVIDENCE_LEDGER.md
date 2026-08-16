@@ -23045,3 +23045,44 @@ not a hang, retry `1+1` until it answers.
 
 **Commits.** `617a96ac` step 3 + the controlled queue · `30d704ba` steps 4/5, the kind fallback and
 the claim restatement.
+
+## 2026-08-16 — Track 7 / Anki workbench step 6 "Review examples" (`5fc4657a`)
+
+**Recovered work.** Worker `primary` died on a usage limit at 07:31 having built
+`shared/ankiWorkbenchReview.ts`, `DeckWorkbenchReview.tsx`, the DeckWorkbench wiring and the EN
+catalog keys, with no JA/ZH/RU, no CSS, no tests and no live run. All of it is re-derived and
+finished here; nothing of it was discarded.
+
+**Decision (standing auto-approval; reversible).** Step 6 reports the **net against the journal's
+first before-images**, not the sum of the step outcomes. Tradeoff: a second measurement path beside
+the per-step counts, bought back by the two being honest about different things — a step says what
+its tray did at the time, review says what Apply would write. Summing the steps would double-count a
+field two trays wrote and would keep counting a field that was later undone.
+
+**Two honesty rules the module enforces.** A → B → A is not a change; it is counted as *reverted*,
+never as changed. A value written by two steps is a conflict the user resolved by ordering, possibly
+without noticing, so it is flagged, not hidden. Local knowledge levels are reported **separately**,
+because unlike everything else on this surface they already landed live when their tray applied.
+
+**Live, real 3,221-note local deck.** Clean draft → "No net changes — the draft matches its source",
+no facts, no diff toggle, and the samples show **no Open button** (step 6 has no Browser to open a
+note into; `onOpenNote` is now optional and absent here). `Sentence` の → ノ applied on step 4:
+step 6 read **3,023 notes would change**, facts "**3,023 of 3,221** notes would change" and
+"Sentence — **3,023** notes", toggle "Every change (**3,023**)", **50** lines rendered with
+"Showing the first 50 of 3,023 changes", first line a real before → after pair. Undo run **from
+step 6** restated it to "No net changes", **0** diff lines, toggle gone, and retracted step 4's own
+claim; Redo (1) live.
+
+**Gates.** `ankiWorkbenchReview.test.ts` 6 new tests (net-not-sum, overwrite flag, undo, field
+grouping, diff cap, empty draft) + 1 new `deckWorkbench.test.tsx` case; the pre-existing "not built"
+test moved from step 6 to step 7, which is the only step left unbuilt.
+
+**Trap.** The bridge's `/eval` evaluates in **expression position**: a trailing `;` (or a file ending
+in `;\n`) fails with "Script failed to execute" and no console line. Strip it — `.TrimEnd("\`r","\`n"," ",";")`.
+Two more: `btn('Back')` matches the preview **side toggle** before the nav button, so navigate with
+`.deck-workbench-step` buttons; and the tray's text inputs carry **no `type` attribute**, so
+`input[type=text]` selects nothing — filter on `i.type === 'text'`.
+
+**Still open in Track 7.** Step 7 "Apply or export" is blocked on Phase 6 — `src/main/anki/` has
+`apkgImport.ts` and no exporter — which also blocks gate 11's round-trip half. Gate 10 owes steps
+3–6 contrast/reduced-motion/4-language measurement.
