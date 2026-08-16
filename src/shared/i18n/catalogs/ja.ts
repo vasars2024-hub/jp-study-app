@@ -9097,6 +9097,8 @@ export const ja: Catalog = {
   'ankiWorkbench.stale.clean': '停滞しているカードはありません。{cards} 枚は新規または予定どおりです。',
   'ankiWorkbench.stale.noHistory':
     'このソースには復習履歴がないため、「最近復習していない」はここでは判定できません。判定できるのは期日超過のみです。',
+  'ankiWorkbench.stale.historyDropped':
+    'この書き出しには復習履歴が含まれていません。カードは復習済みなのに履歴が空です。「最近復習していない」は判定できません。スケジュール情報を含めて書き出し直すと復元できます。',
   'ankiWorkbench.stale.overdueDays': '期日超過とみなす日数',
   'ankiWorkbench.stale.dormantDays': '休眠とみなす日数',
   'ankiWorkbench.stale.spreadDays': '分散させる日数',

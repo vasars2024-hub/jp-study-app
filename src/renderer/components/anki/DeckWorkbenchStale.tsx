@@ -12,9 +12,12 @@
  * a preset change is deep in `overdue` with a clean `dormant` — one number would
  * call those the same deck.
  *
- * When the source carried no revlog, `dormant` cannot fire at all. That is said
- * out loud (`reviewHistory: 'absent'`), because a silent zero there reads as
- * "you have reviewed everything recently" and means the opposite.
+ * When the source's review history is unreadable, `dormant` cannot fire at all.
+ * That is said out loud, because a silent zero there reads as "you have reviewed
+ * everything recently" and means the opposite. Two causes, two sentences: no
+ * `revlog` table (`absent`), or a table with no rows next to cards claiming up
+ * to 41 reps (`dropped`) — which is what all 33 of the user's real packages
+ * turn out to be.
  *
  * `reset` is on screen and disabled with its reason, not hidden. The journal
  * carries field/tags/card-due/card-deck/deck-name; a real reset writes type,
@@ -30,6 +33,7 @@ import {
   MIN_STALE_THRESHOLD_DAYS,
   planStaleRemedy,
   scanStaleCards,
+  staleHistoryIsReadable,
   type StaleVerdict,
 } from '../../../shared/ankiStaleCards';
 import { useT } from '../../i18n';
@@ -112,10 +116,17 @@ export default function DeckWorkbenchStale({
       </p>
 
       {/* Said whenever it is true, not only when the count is zero: a deck with
-          real overdue cards and no revlog still has an unanswerable half. */}
-      {reviewHistory === 'absent' && (
+          real overdue cards and no readable history still has an unanswerable
+          half. `dropped` gets its own sentence because its cause is different
+          and so is its fix — the export left the history behind, and re-exporting
+          with scheduling included brings it back. */}
+      {!staleHistoryIsReadable(reviewHistory) && (
         <p className="muted" role="note">
-          {t('ankiWorkbench.stale.noHistory')}
+          {t(
+            reviewHistory === 'dropped'
+              ? 'ankiWorkbench.stale.historyDropped'
+              : 'ankiWorkbench.stale.noHistory',
+          )}
         </p>
       )}
 
@@ -136,7 +147,7 @@ export default function DeckWorkbenchStale({
             min={MIN_STALE_THRESHOLD_DAYS}
             value={dormantText}
             onChange={(e) => setDormantText(e.target.value)}
-            disabled={reviewHistory === 'absent'}
+            disabled={!staleHistoryIsReadable(reviewHistory)}
           />
         </label>
       </div>

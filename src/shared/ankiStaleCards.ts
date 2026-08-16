@@ -110,12 +110,37 @@ export type StaleRefusal =
   /** The card is inside both thresholds; there is nothing to reschedule. */
   | 'not-stale';
 
-/** Whether the draft could answer the "last review" axis at all. */
+/**
+ * Whether the draft could answer the "last review" axis at all.
+ *
+ * `present` and `absent` are the two the reader can see. The other two split
+ * what the reader reports as an empty log, and the split was forced by real
+ * data: all 33 of the user's packages carry the `revlog` table with **zero**
+ * rows, and in three of them 676–959 cards hold `reps` up to 41. A card reviewed
+ * 41 times and a log saying nobody ever reviewed anything cannot both be true —
+ * the history was dropped at export, and `dormant: 0` there is a false claim
+ * rather than a clean bill of health.
+ */
 export type StaleReviewHistory =
-  /** The source carried a `revlog` and it was read. */
+  /** The source carried a `revlog` with rows, and they were read. */
   | 'present'
-  /** The source carried no `revlog`, so `dormant` can never fire. */
-  | 'absent';
+  /** The source carried no `revlog` table at all, so `dormant` can never fire. */
+  | 'absent'
+  /**
+   * The table is there and empty, and no card claims a review either. The deck
+   * genuinely has not been studied, so `dormant: 0` is the true answer.
+   */
+  | 'empty'
+  /**
+   * The table is there and empty, but cards carry `reps > 0`. The export dropped
+   * the history; `dormant` is unanswerable and must not be reported as zero.
+   */
+  | 'dropped';
+
+/** True when the "last review" axis can produce a verdict at all. */
+export function staleHistoryIsReadable(history: StaleReviewHistory): boolean {
+  return history === 'present' || history === 'empty';
+}
 
 export interface StaleCardFacts {
   cardId: string;
@@ -229,16 +254,26 @@ export function scanStaleCards(input: StaleScanInput): StaleScanResult {
   }
 
   const todayDay = todayDueDay(createdAtSec, nowMs);
-  // `undefined` is "the source carried no revlog"; `[]` is "read, and empty" —
-  // `AnkiDraft.reviews` documents that distinction and it is the whole of the
-  // `reviewHistory` answer.
-  const reviewHistory: StaleReviewHistory = draft.reviews === undefined ? 'absent' : 'present';
   const newest = newestReviewByCard(draft.reviews ?? []);
 
   const cards: StaleCardFacts[] = [];
+  let anyReps = false;
   for (const card of draft.cards) {
+    if (card.reps > 0) anyReps = true;
     cards.push(classifyCard(card, { todayDay, nowMs, newest, overdueDays, dormantDays }));
   }
+
+  // `undefined` is "no revlog table"; `[]` is "table present, no rows". The
+  // second is only good news when the cards agree with it — see
+  // `StaleReviewHistory`.
+  const reviewHistory: StaleReviewHistory =
+    draft.reviews === undefined
+      ? 'absent'
+      : draft.reviews.length > 0
+        ? 'present'
+        : anyReps
+          ? 'dropped'
+          : 'empty';
 
   return {
     ok: true,

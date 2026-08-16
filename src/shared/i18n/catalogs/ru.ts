@@ -9911,6 +9911,8 @@ export const ru: Catalog = {
   'ankiWorkbench.stale.clean': 'Застоя нет. {cards} карточек новые или идут по расписанию.',
   'ankiWorkbench.stale.noHistory':
     'В этом источнике нет журнала повторений, поэтому «давно не повторялось» здесь определить нельзя — только просрочку.',
+  'ankiWorkbench.stale.historyDropped':
+    'При экспорте журнал повторений остался позади: карточки здесь повторялись, но журнал пуст. «Давно не повторялось» определить нельзя — экспортируйте заново вместе с расписанием, чтобы вернуть его.',
   'ankiWorkbench.stale.overdueDays': 'Просрочка от (дней)',
   'ankiWorkbench.stale.dormantDays': 'Застой от (дней)',
   'ankiWorkbench.stale.spreadDays': 'Распределить на (дней)',

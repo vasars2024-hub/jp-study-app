@@ -47,7 +47,12 @@ function note(id: string): AnkiDraftNote {
   };
 }
 
-function card(noteId: string, due: number, queue: AnkiDraftCard['queue'] = 'review'): AnkiDraftCard {
+function card(
+  noteId: string,
+  due: number,
+  queue: AnkiDraftCard['queue'] = 'review',
+  reps = 4,
+): AnkiDraftCard {
   return {
     id: `${noteId}:0`,
     noteId,
@@ -58,7 +63,7 @@ function card(noteId: string, due: number, queue: AnkiDraftCard['queue'] = 'revi
     due,
     interval: 10,
     easeFactor: 2500,
-    reps: 4,
+    reps,
     lapses: 0,
     left: 0,
     flag: 'none',
@@ -77,6 +82,8 @@ interface Shape {
   reviews: AnkiDraft['reviews'];
   /** Drop `col.crt`, which is the whole-scan refusal. Default: the source has one. */
   noOrigin?: boolean;
+  /** Every card `reps: 0`, so an empty log is `empty` and not `dropped`. */
+  neverStudied?: boolean;
 }
 
 function draftOf(shape: Shape): AnkiDraft {
@@ -84,7 +91,7 @@ function draftOf(shape: Shape): AnkiDraft {
   const cards: AnkiDraftCard[] = [];
   const push = (id: string, due: number, queue?: AnkiDraftCard['queue']): void => {
     notes.push(note(id));
-    cards.push(card(id, due, queue));
+    cards.push(card(id, due, queue, shape.neverStudied ? 0 : 4));
   };
   for (let i = 0; i < shape.overdue; i += 1) push(`late-${i}`, 600);
   for (let i = 0; i < shape.fresh; i += 1) push(`fresh-${i}`, 1001);
@@ -195,19 +202,54 @@ describe('DeckWorkbenchStale', () => {
   });
 
   it('says the review log is absent rather than reporting a dormant zero', () => {
-    // Negative control for the summary above: identical cards, one difference —
-    // `reviews` is undefined instead of `[]`.
+    // Identical cards, one difference: `reviews` is undefined instead of `[]`.
     mount(draftOf({ overdue: 30, fresh: 5, withheld: 0, reviews: undefined }));
 
     expect(host.textContent).toContain('ankiWorkbench.stale.noHistory');
     const dormantInput = host.querySelectorAll<HTMLInputElement>('.wb-stale-thresholds input')[1];
     expect(dormantInput.disabled).toBe(true);
+  });
 
-    // And the control case: with a revlog, the notice is gone and the input is live.
+  // The live run's finding. All 33 of the user's real packages carry the revlog
+  // TABLE with zero rows, and three of them hold 676-959 cards with `reps` up to
+  // 41. An empty log next to a card reviewed 41 times is not "you are up to
+  // date" -- the export dropped the history. Before this, every one of those
+  // decks reported `dormant: 0` in silence.
+  it('distinguishes a dropped review history from a genuinely unstudied deck', () => {
+    // `reps: 4` on every card in the fixture, so an empty log contradicts them.
+    mount(draftOf({ overdue: 30, fresh: 5, withheld: 0, reviews: [] }));
+
+    expect(host.textContent).toContain('ankiWorkbench.stale.historyDropped');
+    expect(host.textContent).not.toContain('ankiWorkbench.stale.noHistory');
+    expect(
+      host.querySelectorAll<HTMLInputElement>('.wb-stale-thresholds input')[1].disabled,
+    ).toBe(true);
+
+    // The negative control, and it is the other half of the user's own library:
+    // `N1 Vocab 3XXX….apkg` has 0 reps and 0 revlog rows, so its `dormant: 0` is
+    // the true answer and the panel must say nothing at all.
     act(() => root?.unmount());
     root = null;
     host.innerHTML = '';
-    mount(draftOf({ overdue: 30, fresh: 5, withheld: 0, reviews: [] }));
+    mount(draftOf({ overdue: 0, fresh: 6, withheld: 0, reviews: [], neverStudied: true }));
+    expect(host.textContent).not.toContain('ankiWorkbench.stale.historyDropped');
+    expect(host.textContent).not.toContain('ankiWorkbench.stale.noHistory');
+    expect(
+      host.querySelectorAll<HTMLInputElement>('.wb-stale-thresholds input')[1].disabled,
+    ).toBe(false);
+  });
+
+  it('reads a real log as present and leaves both axes live', () => {
+    mount(
+      draftOf({
+        overdue: 30,
+        fresh: 5,
+        withheld: 0,
+        reviews: [{ cardId: 'late-0:0', reviewedAtMs: NOW_MS - 5 * 86_400_000, ease: 3, interval: 10, lastInterval: 5, easeFactor: 2500, tookMs: 900, kind: 1 }],
+      }),
+    );
+
+    expect(host.textContent).not.toContain('ankiWorkbench.stale.historyDropped');
     expect(host.textContent).not.toContain('ankiWorkbench.stale.noHistory');
     expect(
       host.querySelectorAll<HTMLInputElement>('.wb-stale-thresholds input')[1].disabled,

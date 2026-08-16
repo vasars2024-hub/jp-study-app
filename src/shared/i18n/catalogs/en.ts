@@ -9523,6 +9523,8 @@ export const en: Catalog = {
   'ankiWorkbench.stale.clean': 'Nothing is stale. {cards} cards are new or on schedule.',
   'ankiWorkbench.stale.noHistory':
     'This source carries no review log, so “not reviewed lately” cannot be answered here — only overdue days can.',
+  'ankiWorkbench.stale.historyDropped':
+    'This export left its review history behind: cards here have been reviewed, but the log is empty. “Not reviewed lately” cannot be answered — re-export with scheduling included to get it back.',
   'ankiWorkbench.stale.overdueDays': 'Overdue after (days)',
   'ankiWorkbench.stale.dormantDays': 'Dormant after (days)',
   'ankiWorkbench.stale.spreadDays': 'Spread over (days)',

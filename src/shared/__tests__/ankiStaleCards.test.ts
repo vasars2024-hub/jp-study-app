@@ -13,6 +13,7 @@ import {
   parseStaleVerdict,
   planStaleRemedy,
   scanStaleCards,
+  staleHistoryIsReadable,
   tallyStaleVerdicts,
   todayDueDay,
   type StaleScanResult,
@@ -208,13 +209,34 @@ describe('scanStaleCards verdicts', () => {
   });
 
   it('reports whether the source could answer the review axis at all', () => {
-    const withLog = draftOf([reviewCard('1', 400)], { revlog: [] });
+    // Four states, and the middle two were forced by the live run: every one of
+    // the user's 33 real packages carries the revlog TABLE with zero rows, and
+    // three of them hold 676-959 cards with `reps` up to 41. An empty log beside
+    // a card reviewed 41 times is a dropped export, not a clean bill of health,
+    // and `present` for it -- what this test asserted before -- was a false claim.
+    const withRows = draftOf([reviewCard('1', 400)], {
+      revlog: [{ id: String(NOW - 3 * 86_400_000), cid: '1', ease: 3, ivl: 30, lastIvl: 10, factor: 2500, time: 900, type: 1 }],
+    });
+    const droppedLog = draftOf([reviewCard('1', 400)], { revlog: [] });
+    const neverStudied = draftOf([{ id: '1', nid: 'n1', type: 0, queue: 0, due: 1, reps: 0 }], { revlog: [] });
     const withoutLog = draftOf([reviewCard('1', 400)], { revlog: undefined });
-    expect(ok(scanStaleCards({ draft: withLog, nowMs: NOW })).reviewHistory).toBe('present');
+
+    expect(ok(scanStaleCards({ draft: withRows, nowMs: NOW })).reviewHistory).toBe('present');
+    expect(ok(scanStaleCards({ draft: droppedLog, nowMs: NOW })).reviewHistory).toBe('dropped');
+    expect(ok(scanStaleCards({ draft: neverStudied, nowMs: NOW })).reviewHistory).toBe('empty');
     expect(ok(scanStaleCards({ draft: withoutLog, nowMs: NOW })).reviewHistory).toBe('absent');
-    // Negative control for the whole axis: with no log nothing can read dormant,
-    // and the scan says so by name rather than calling every card fresh.
+
+    // `empty` and `dropped` differ by one card field and by nothing else, which
+    // is the whole claim: the log is identical in both.
+    expect(staleHistoryIsReadable('empty')).toBe(true);
+    expect(staleHistoryIsReadable('dropped')).toBe(false);
+    expect(staleHistoryIsReadable('present')).toBe(true);
+    expect(staleHistoryIsReadable('absent')).toBe(false);
+
+    // Negative control for the whole axis: with no readable log nothing can read
+    // dormant, and the scan says so by name rather than calling every card fresh.
     expect(ok(scanStaleCards({ draft: withoutLog, nowMs: NOW })).tally.dormant).toBe(0);
+    expect(ok(scanStaleCards({ draft: droppedLog, nowMs: NOW })).tally.dormant).toBe(0);
   });
 
   it('partitions every card exactly once', () => {

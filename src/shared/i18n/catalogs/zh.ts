@@ -9028,6 +9028,8 @@ export const zh: Catalog = {
   'ankiWorkbench.stale.clean': '没有停滞的卡片。{cards} 张是新卡或按期进行。',
   'ankiWorkbench.stale.noHistory':
     '此来源不含复习记录，因此这里无法判断“最近未复习”，只能判断逾期天数。',
+  'ankiWorkbench.stale.historyDropped':
+    '这次导出未包含复习记录：这里的卡片确实复习过，但日志是空的。因此无法判断“最近未复习”——重新导出并包含排程信息即可找回。',
   'ankiWorkbench.stale.overdueDays': '逾期判定（天）',
   'ankiWorkbench.stale.dormantDays': '休眠判定（天）',
   'ankiWorkbench.stale.spreadDays': '分散天数',
