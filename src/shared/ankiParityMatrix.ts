@@ -6,8 +6,8 @@
  * only checkable if the table is derived from the code rather than written
  * beside it, so both axes are anchored to real vocabularies:
  *
- * - the **rows** are keyed to `AnkiDraftEditOp['kind']`, the edit journal's six
- *   op kinds. The journal is the *only* thing that reaches a destination —
+ * - the **rows** are keyed to `AnkiDraftEditOp['kind']`, the edit journal's op
+ *   kinds. The journal is the *only* thing that reaches a destination —
  *   `buildApkgExportChanges` folds `journal.done` and nothing else — so a
  *   capability with no op kind cannot be written **by construction**. That is
  *   what makes a `read-only` row provable instead of merely asserted, and it is
@@ -17,7 +17,7 @@
  *   and the error banner cannot drift apart: they read the same literal.
  *
  * Two guards keep it living rather than a snapshot. `JOURNAL_OP_COVERAGE` is a
- * total `Record` over the op-kind union, so a seventh op kind stops this file
+ * total `Record` over the op-kind union, so a further op kind stops this file
  * compiling until it is classified; `CHANGE_SET_COVERAGE` does the same for
  * `ApkgExportChangeSet`'s fields. The test then re-derives both at runtime,
  * because `tsc` is not a gate in this repo and a compile-time-only guard here
@@ -84,7 +84,7 @@ const READ_ONLY: AnkiParityCell = { support: 'read-only', refusal: null };
 /**
  * Every capability the workbench presents, writable or not.
  *
- * Order is deliberate: the six journal-backed rows first, in the order a user
+ * Order is deliberate: the journal-backed rows first, in the order a user
  * meets them, then the preserved-but-unwritable ones. A surface may group them
  * by support level, but the source order is the one the gate reads.
  */
@@ -118,6 +118,43 @@ export const ANKI_PARITY_ROWS: readonly AnkiParityRow[] = [
     connect: WRITES,
   },
   {
+    // Gate 5's suspend third. `suspend`/`unsuspend` are first-class AnkiConnect
+    // actions, so this is the one card-state capability both destinations write
+    // — and the two do it differently on purpose: the package restores the exact
+    // queue the draft holds, while live the restored queue is Anki's own to
+    // recompute, so the commit verifies suspension rather than a queue number.
+    id: 'card-queue',
+    journalOp: 'card-queue',
+    changeSetField: 'cardQueues',
+    package: WRITES,
+    connect: WRITES,
+  },
+  {
+    // Gate 5's interval/ease third. Live it rides the same
+    // `setSpecificValueOfCard` route `card-due` already uses; `ivl` and `factor`
+    // are plain integer columns the draft holds exactly, so unlike `flags` below
+    // there is nothing unread that a whole-column write could clear.
+    id: 'card-scheduling',
+    journalOp: 'card-scheduling',
+    changeSetField: 'cardScheduling',
+    package: WRITES,
+    connect: WRITES,
+  },
+  {
+    // Gate 5's flag third, and the one cell that differs by destination.
+    // AnkiConnect exposes no flag action; the only route is
+    // `setSpecificValueOfCard` on `flags`, which assigns the WHOLE column —
+    // whose upper bits are reserved and are not in the draft. Writing it live
+    // could clear state the workbench never read, so it refuses by name. The
+    // package writer has the stored value in front of it and rewrites the low
+    // three bits alone, which is why the same capability is supported there.
+    id: 'card-flag',
+    journalOp: 'card-flag',
+    changeSetField: 'cardFlags',
+    package: WRITES,
+    connect: { support: 'blocked', refusal: 'card-flag-unsupported' },
+  },
+  {
     // Recipe 12's deck half. The package rewrites the stored name; AnkiConnect
     // has no rename action and the create+move+delete emulation is a different
     // operation with a much larger blast radius, so it refuses by name.
@@ -148,12 +185,13 @@ export const ANKI_PARITY_ROWS: readonly AnkiParityRow[] = [
     connect: READ_ONLY,
   },
   { id: 'note-marked', journalOp: null, changeSetField: null, package: READ_ONLY, connect: READ_ONLY },
-  { id: 'card-flag', journalOp: null, changeSetField: null, package: READ_ONLY, connect: READ_ONLY },
-  { id: 'card-queue', journalOp: null, changeSetField: null, package: READ_ONLY, connect: READ_ONLY },
   {
-    // Interval, ease, reps, lapses and `left`. `card-due` moves a queue
-    // position and nothing else; the rest of a card's scheduling is Anki's.
-    id: 'card-scheduling',
+    // `reps`, `lapses` and `left` — what is LEFT of the old `card-scheduling`
+    // row once gate 5 made interval and ease writable. They stay read-only for a
+    // reason interval and ease do not share: the revlog still holds a row per
+    // review, so writing a counter would put a card's summary and its own
+    // history into disagreement. That is a falsified log, not an edit.
+    id: 'card-review-counters',
     journalOp: null,
     changeSetField: null,
     package: READ_ONLY,
@@ -178,6 +216,9 @@ export const JOURNAL_OP_COVERAGE: Record<AnkiDraftEditOp['kind'], string> = {
   tags: 'note-tags',
   'card-due': 'card-due',
   'card-deck': 'card-deck',
+  'card-queue': 'card-queue',
+  'card-scheduling': 'card-scheduling',
+  'card-flag': 'card-flag',
   'deck-name': 'deck-name',
   'template-remove': 'template-remove',
 };
@@ -198,6 +239,9 @@ export const CHANGE_SET_COVERAGE: Record<keyof Required<ApkgExportChangeSet>, st
   cardDeckMoves: 'card-deck',
   deckCreates: 'card-deck',
   templateRemovals: 'template-remove',
+  cardFlags: 'card-flag',
+  cardQueues: 'card-queue',
+  cardScheduling: 'card-scheduling',
 };
 
 /** The row for a capability id, or undefined. */

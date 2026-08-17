@@ -140,6 +140,18 @@ export interface AnkiActionMap {
    * the parent the user split.
    */
   setDeckConfigId: { params: { decks: string[]; configId: number }; result: boolean };
+  /**
+   * Acceptance gate 5's suspend third. First-class actions, unlike the flag and
+   * the interval — which is why suspension is the one card-state capability the
+   * live commit writes without `warning_check`. Both take a card array, so a
+   * batch suspension is one request.
+   *
+   * `unsuspend` restores a queue **Anki** recomputes from the card's type; the
+   * commit therefore verifies suspendedness rather than a queue number. See
+   * `shared/ankiConnectCommit.ts`.
+   */
+  suspend: { params: { cards: number[] }; result: boolean };
+  unsuspend: { params: { cards: number[] }; result: boolean };
   /** The profile the write landed in, echoed back into the commit result. */
   getActiveProfile: { params: undefined; result: string };
 }
@@ -179,6 +191,9 @@ const DEFAULT_TIMEOUTS: Record<keyof AnkiActionMap, number> = {
   // deck sends thousands of ids in a single request.
   changeDeck: BULK_TIMEOUT_MS,
   setDeckConfigId: MUTATE_TIMEOUT_MS,
+  // BULK for `changeDeck`'s reason: one call carries every card in the batch.
+  suspend: BULK_TIMEOUT_MS,
+  unsuspend: BULK_TIMEOUT_MS,
   getActiveProfile: FAST_TIMEOUT_MS,
   // BULK: a model row carries every template's full HTML, so a collection with
   // dozens of note types answers slower than any other read-only action.

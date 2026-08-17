@@ -916,3 +916,135 @@ describe('applyExportChanges — recipe 17 template removal (schema 18 tables)',
     expect(db.exec('SELECT COUNT(*) FROM templates')[0]?.values[0][0]).toBe(3);
   });
 });
+
+/**
+ * Acceptance gate 5's flags, suspension and interval/ease, written into a real
+ * collection and read back out of it. The round trip is the claim here as
+ * everywhere in this file — the `UPDATE` is never trusted, only the re-read.
+ */
+describe('applyExportChanges — gate 5 card state', () => {
+  const NONE = { notes: [], cardMoves: [], deckRenames: [] };
+
+  /** A second card on the fixture, in a state each capability can be tested on. */
+  function withReviewCard(db: Database): void {
+    db.run(
+      'INSERT INTO cards (id, nid, did, ord, mod, usn, type, queue, due, ivl, factor, reps, lapses, left, odue, odid, flags) '
+        + 'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      [5002, 1002, 1, 0, 1_500_000_100, 0, 2, 2, 300, 10, 2300, 4, 1, 0, 0, 0, 0b1011_0000],
+    );
+  }
+
+  it('sets a flag without touching the reserved bits of the column', () => {
+    // `cards.flags` packs the colour into its low three bits. The fixture card
+    // carries 0b1011_0000, so a writer that assigned a bare 0-7 would clear
+    // four bits nothing in this app has ever read.
+    const db = fixtureDb();
+    withReviewCard(db);
+    const result = applyExportChanges(
+      db,
+      { ...NONE, cardFlags: [{ cardId: '5002', noteId: '1002', flag: 'purple' }] },
+      { nowMs: NOW_MS, normalize: stripFieldHtml },
+    );
+    expect(result.cardsUpdated).toBe(1);
+    const stored = Number(db.exec('SELECT flags FROM cards WHERE id = 5002')[0]!.values[0][0]);
+    expect(stored & 0b111).toBe(7); // purple
+    expect(stored & ~0b111).toBe(0b1011_0000);
+  });
+
+  it('suspends and unsuspends by writing the queue the change set names', () => {
+    const db = fixtureDb();
+    withReviewCard(db);
+    applyExportChanges(
+      db,
+      { ...NONE, cardQueues: [{ cardId: '5002', noteId: '1002', queue: 'suspended' }] },
+      { nowMs: NOW_MS, normalize: stripFieldHtml },
+    );
+    expect(Number(db.exec('SELECT queue FROM cards WHERE id = 5002')[0]!.values[0][0])).toBe(-1);
+    applyExportChanges(
+      db,
+      { ...NONE, cardQueues: [{ cardId: '5002', noteId: '1002', queue: 'review' }] },
+      { nowMs: NOW_MS, normalize: stripFieldHtml },
+    );
+    expect(Number(db.exec('SELECT queue FROM cards WHERE id = 5002')[0]!.values[0][0])).toBe(2);
+    // …and the card's own type is untouched: suspension is a queue state, and
+    // rewriting `type` alongside it would be a scheduling change in disguise.
+    expect(Number(db.exec('SELECT type FROM cards WHERE id = 5002')[0]!.values[0][0])).toBe(2);
+  });
+
+  it('writes interval and ease together and leaves the counters alone', () => {
+    const db = fixtureDb();
+    withReviewCard(db);
+    applyExportChanges(
+      db,
+      {
+        ...NONE,
+        cardScheduling: [{ cardId: '5002', noteId: '1002', interval: 45, easeFactor: 2600 }],
+      },
+      { nowMs: NOW_MS, normalize: stripFieldHtml },
+    );
+    const row = db.exec('SELECT ivl, factor, reps, lapses FROM cards WHERE id = 5002')[0]!.values[0];
+    expect([Number(row[0]), Number(row[1])]).toEqual([45, 2600]);
+    // The read-only half of the old scheduling row, unchanged — the revlog still
+    // holds a row per review and a rewritten counter would contradict it.
+    expect([Number(row[2]), Number(row[3])]).toEqual([4, 1]);
+  });
+
+  it('counts one card once when two capabilities name it', () => {
+    const db = fixtureDb();
+    withReviewCard(db);
+    const result = applyExportChanges(
+      db,
+      {
+        ...NONE,
+        cardFlags: [{ cardId: '5002', noteId: '1002', flag: 'red' }],
+        cardQueues: [{ cardId: '5002', noteId: '1002', queue: 'suspended' }],
+        cardScheduling: [{ cardId: '5002', noteId: '1002', interval: 45, easeFactor: 2600 }],
+      },
+      { nowMs: NOW_MS, normalize: stripFieldHtml },
+    );
+    expect(result.cardsUpdated).toBe(1);
+  });
+
+  it('refuses a card the package does not hold, before writing anything', () => {
+    const db = fixtureDb();
+    withReviewCard(db);
+    let seen = '';
+    try {
+      applyExportChanges(
+        db,
+        {
+          ...NONE,
+          cardFlags: [{ cardId: '5002', noteId: '1002', flag: 'red' }],
+          cardQueues: [{ cardId: '9999', noteId: '1002', queue: 'suspended' }],
+        },
+        { nowMs: NOW_MS, normalize: stripFieldHtml },
+      );
+    } catch (err) {
+      seen = (err as ExportRefusal).code;
+    }
+    expect(seen).toBe('card-missing');
+    // The flag that rode beside it must not have landed: all-or-nothing is the
+    // whole contract of validating before the first UPDATE.
+    expect(Number(db.exec('SELECT flags FROM cards WHERE id = 5002')[0]!.values[0][0])).toBe(0b1011_0000);
+  });
+
+  it('verifies all three out of the written collection, and fails when one did not land', () => {
+    const db = fixtureDb();
+    withReviewCard(db);
+    const changes = {
+      ...NONE,
+      cardFlags: [{ cardId: '5002', noteId: '1002', flag: 'green' as const }],
+      cardQueues: [{ cardId: '5002', noteId: '1002', queue: 'suspended' as const }],
+      cardScheduling: [{ cardId: '5002', noteId: '1002', interval: 45, easeFactor: 2600 }],
+    };
+    applyExportChanges(db, changes, { nowMs: NOW_MS, normalize: stripFieldHtml });
+    expect(verifyExportChanges(db, changes)).toEqual({ ok: true, mismatches: [] });
+
+    // NEGATIVE CONTROL: undo one column behind the verifier's back. A verifier
+    // that only re-stated the change set would still say ok.
+    db.run('UPDATE cards SET factor = 2300 WHERE id = 5002');
+    const verdict = verifyExportChanges(db, changes);
+    expect(verdict.ok).toBe(false);
+    expect(verdict.mismatches).toEqual(['card 5002: ease differs']);
+  });
+});

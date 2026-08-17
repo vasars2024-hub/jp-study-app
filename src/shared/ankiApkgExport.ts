@@ -13,8 +13,8 @@
 // Notes the renderer never loaded ride through the export untouched, so the
 // change set being journal-bounded is a correctness property, not a limit.
 
-import type { AnkiDraft } from './ankiDraft';
-import type { AnkiDraftEditJournal } from './ankiDraftEdit';
+import type { AnkiCardFlag, AnkiCardQueue, AnkiDraft } from './ankiDraft';
+import type { AnkiCardScheduling, AnkiDraftEditJournal } from './ankiDraftEdit';
 import { isMintedDeckId } from './ankiDeckSplit';
 
 export interface ApkgExportNoteChange {
@@ -101,6 +101,37 @@ export interface ApkgExportTemplateRemoval {
   removedOrds: number[];
 }
 
+/**
+ * Gate 5's flag third. The DECODED colour, never the raw `cards.flags` column:
+ * its upper bits are reserved and are not in the draft, so a writer that took a
+ * whole number from here could clear state nothing ever read. The package writer
+ * rewrites the low three bits of the stored value and leaves the rest alone.
+ */
+export interface ApkgExportCardFlag {
+  cardId: string;
+  /** For labelling refusals; the write keys on cardId, as every card change does. */
+  noteId: string;
+  flag: AnkiCardFlag;
+}
+
+/**
+ * Gate 5's suspend third. The full target queue, so a package writer restores
+ * exactly what the draft holds; the live commit derives `queue === 'suspended'`
+ * from it and lets Anki's own `unsuspend` choose the restored queue, because
+ * live that decision is the scheduler's and not this workbench's.
+ */
+export interface ApkgExportCardQueue {
+  cardId: string;
+  noteId: string;
+  queue: AnkiCardQueue;
+}
+
+/** Gate 5's interval/ease third — both columns, because they are one decision. */
+export interface ApkgExportCardScheduling extends AnkiCardScheduling {
+  cardId: string;
+  noteId: string;
+}
+
 export interface ApkgExportChangeSet {
   notes: ApkgExportNoteChange[];
   cardMoves: ApkgExportCardMove[];
@@ -111,6 +142,16 @@ export interface ApkgExportChangeSet {
   deckCreates?: ApkgExportDeckCreate[];
   /** Absent on a payload written before recipe 17's remove half. */
   templateRemovals?: ApkgExportTemplateRemoval[];
+  /**
+   * The three gate-5 card-state lists, each absent on a payload written before
+   * gate 5. Three fields rather than one `cardState` row per card, because the
+   * destinations answer them differently — the package writes all three and the
+   * live commit refuses flags by name — and a single row would have to be
+   * refused or accepted whole.
+   */
+  cardFlags?: ApkgExportCardFlag[];
+  cardQueues?: ApkgExportCardQueue[];
+  cardScheduling?: ApkgExportCardScheduling[];
 }
 
 // ----- IPC contract -------------------------------------------------------------
@@ -216,10 +257,14 @@ export interface ApkgExportResult {
 /** One journal-touched value, with the first before-image — the source's state. */
 interface Tracked {
   noteId: string;
-  kind: 'field' | 'tags' | 'card-due';
+  kind: 'field' | 'tags' | 'card-due' | 'card-deck' | 'card-flag' | 'card-queue' | 'card-scheduling';
   fieldOrd?: number;
   cardId?: string;
-  firstBefore: string | string[] | number;
+  firstBefore: string | string[] | number | AnkiCardScheduling;
+}
+
+function sameScheduling(a: AnkiCardScheduling, b: AnkiCardScheduling): boolean {
+  return a.interval === b.interval && a.easeFactor === b.easeFactor;
 }
 
 function sameTags(a: readonly string[], b: readonly string[]): boolean {
@@ -297,7 +342,7 @@ export function buildApkgExportChanges(
       noteId: op.noteId,
       kind: op.kind,
       fieldOrd: op.kind === 'field' ? op.fieldOrd : undefined,
-      cardId: op.kind === 'card-due' || op.kind === 'card-deck' ? op.cardId : undefined,
+      cardId: op.kind === 'field' || op.kind === 'tags' ? undefined : op.cardId,
       firstBefore: op.before,
     });
   }
@@ -309,6 +354,9 @@ export function buildApkgExportChanges(
   const tagNotes = new Set<string>();
   const cardMoves: ApkgExportCardMove[] = [];
   const cardDeckMoves: ApkgExportCardDeckMove[] = [];
+  const cardFlags: ApkgExportCardFlag[] = [];
+  const cardQueues: ApkgExportCardQueue[] = [];
+  const cardScheduling: ApkgExportCardScheduling[] = [];
 
   for (const entry of tracked.values()) {
     if (entry.kind === 'field') {
@@ -323,6 +371,29 @@ export function buildApkgExportChanges(
       const card = entry.cardId ? cardById.get(entry.cardId) : undefined;
       if (card && card.deckId !== entry.firstBefore) {
         cardDeckMoves.push({ cardId: card.id, noteId: entry.noteId, deckId: card.deckId });
+      }
+    } else if (entry.kind === 'card-flag') {
+      // Re-read against the draft exactly as a field is: a flag set and cleared
+      // again in one session is not a change and must not export.
+      const card = entry.cardId ? cardById.get(entry.cardId) : undefined;
+      if (card && card.flag !== entry.firstBefore) {
+        cardFlags.push({ cardId: card.id, noteId: entry.noteId, flag: card.flag });
+      }
+    } else if (entry.kind === 'card-queue') {
+      const card = entry.cardId ? cardById.get(entry.cardId) : undefined;
+      if (card && card.queue !== entry.firstBefore) {
+        cardQueues.push({ cardId: card.id, noteId: entry.noteId, queue: card.queue });
+      }
+    } else if (entry.kind === 'card-scheduling') {
+      const card = entry.cardId ? cardById.get(entry.cardId) : undefined;
+      const before = entry.firstBefore as AnkiCardScheduling;
+      if (card && !sameScheduling(before, { interval: card.interval, easeFactor: card.easeFactor })) {
+        cardScheduling.push({
+          cardId: card.id,
+          noteId: entry.noteId,
+          interval: card.interval,
+          easeFactor: card.easeFactor,
+        });
       }
     } else {
       const card = entry.cardId ? cardById.get(entry.cardId) : undefined;
@@ -385,6 +456,9 @@ export function buildApkgExportChanges(
     cardDeckMoves,
     deckCreates,
     templateRemovals,
+    cardFlags,
+    cardQueues,
+    cardScheduling,
   };
 }
 
@@ -401,6 +475,11 @@ export function exportChangesEmpty(changes: ApkgExportChangeSet): boolean {
     // A removal-only change set touches no note and no card row the other four
     // fields describe, so leaving it out here would report `nothing-to-export`
     // about a package that has a template to drop.
-    (changes.templateRemovals ?? []).length === 0
+    (changes.templateRemovals ?? []).length === 0 &&
+    // Gate 5's three, for the same reason: a session that only suspended cards
+    // writes no note and no `due`, and would otherwise export as nothing.
+    (changes.cardFlags ?? []).length === 0 &&
+    (changes.cardQueues ?? []).length === 0 &&
+    (changes.cardScheduling ?? []).length === 0
   );
 }

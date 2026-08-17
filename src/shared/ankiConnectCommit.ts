@@ -73,6 +73,16 @@ export type ConnectCommitErrorCode =
    * by name; exporting a package removes it for real.
    */
   | 'template-remove-unsupported'
+  /**
+   * Gate 5's flag third, live. AnkiConnect has no flag action; the only route is
+   * `setSpecificValueOfCard` on `flags`, and that assigns the WHOLE column while
+   * Anki keeps the colour in its low three bits and reserves the rest. The draft
+   * carries the decoded colour and nothing else, so a live write would have to
+   * send a bare 0-7 and clear whatever the upper bits held — state this
+   * workbench never read. Refused by name; exporting a package sets the flag for
+   * real, because the writer has the stored column in front of it.
+   */
+  | 'card-flag-unsupported'
   /** Anki or the add-on is not answering. */
   | 'unreachable'
   /** AnkiConnect answered but no collection is loaded. */
@@ -145,6 +155,28 @@ export interface ConnectCardWrite {
 }
 
 /**
+ * Gate 5's suspend third, as two id lists rather than one call per card:
+ * `suspend`/`unsuspend` both take a card array, and a batch suspension is
+ * thousands of cards.
+ */
+export interface ConnectSuspendWrite {
+  suspend: number[];
+  unsuspend: number[];
+}
+
+/**
+ * Gate 5's interval/ease third. One entry per card, because
+ * `setSpecificValueOfCard` addresses a single card — the same shape and the same
+ * route `card-due` already commits through.
+ */
+export interface ConnectSchedulingWrite {
+  cardId: number;
+  noteId: string;
+  interval: number;
+  easeFactor: number;
+}
+
+/**
  * Recipe 13's split, as one call per target deck rather than one per card:
  * `changeDeck` takes a card array, and a split of a large deck is thousands of
  * cards across a handful of subdecks.
@@ -164,6 +196,10 @@ export interface ConnectCommitPlan {
   cardWrites: ConnectCardWrite[];
   /** Absent-as-empty on a plan carrying no split. */
   deckWrites: ConnectDeckWrite[];
+  /** Gate 5's suspend third. Both lists empty on a plan that suspends nothing. */
+  suspendWrites: ConnectSuspendWrite;
+  /** Gate 5's interval/ease third. */
+  schedulingWrites: ConnectSchedulingWrite[];
 }
 
 /** Anki ids are integers; AnkiConnect rejects them as strings. */
@@ -344,6 +380,62 @@ export function planConnectCommit(
     cardWrites.push({ cardId: numericId(move.cardId, 'card'), noteId: move.noteId, due: move.due });
   }
 
+  // Gate 5's suspend third. Cards on loan to a filtered deck are refused for the
+  // reposition's reason and then some: `unsuspend` restores a queue Anki derives
+  // from the card's type, which for a card whose real state lives in `odid`/`odue`
+  // is not the state it would return to once the filtered deck is emptied.
+  const suspendWrites: ConnectSuspendWrite = { suspend: [], unsuspend: [] };
+  for (const change of changes.cardQueues ?? []) {
+    const card = cardById.get(change.cardId);
+    if (!card) {
+      throw new ConnectCommitRefusal(
+        'card-missing',
+        `Card ${change.cardId} (note ${change.noteId}) is no longer in the collection.`,
+      );
+    }
+    if (card.originalDeckId !== undefined || filteredDeckIds.has(card.deckId)) {
+      throw new ConnectCommitRefusal(
+        'card-filtered',
+        `Card ${change.cardId} is on loan to a filtered deck, so its suspension is not this `
+          + "commit's to change. Empty the filtered deck in Anki first.",
+      );
+    }
+    const wantSuspended = change.queue === 'suspended';
+    // Already in that state live: not a write, the rule every other change here
+    // follows against the fresh read.
+    if ((card.queue === 'suspended') === wantSuspended) continue;
+    const id = numericId(change.cardId, 'card');
+    if (wantSuspended) suspendWrites.suspend.push(id);
+    else suspendWrites.unsuspend.push(id);
+  }
+
+  // Gate 5's interval/ease third, through the same `setSpecificValueOfCard`
+  // route `card-due` uses. Both are plain integer columns, so unlike `flags`
+  // there is nothing packed alongside them that a whole-column write would lose.
+  const schedulingWrites: ConnectSchedulingWrite[] = [];
+  for (const change of changes.cardScheduling ?? []) {
+    const card = cardById.get(change.cardId);
+    if (!card) {
+      throw new ConnectCommitRefusal(
+        'card-missing',
+        `Card ${change.cardId} (note ${change.noteId}) is no longer in the collection.`,
+      );
+    }
+    if (filteredDeckIds.has(card.deckId) || card.originalDeckId !== undefined) {
+      throw new ConnectCommitRefusal(
+        'card-filtered',
+        `Card ${change.cardId} is in a filtered deck, where its schedule belongs to that deck's build.`,
+      );
+    }
+    if (card.interval === change.interval && card.easeFactor === change.easeFactor) continue;
+    schedulingWrites.push({
+      cardId: numericId(change.cardId, 'card'),
+      noteId: change.noteId,
+      interval: change.interval,
+      easeFactor: change.easeFactor,
+    });
+  }
+
   // Refused before the first write, like every other refusal here: committing
   // the note half and dropping the deck half would be a partial success the
   // user was never told about.
@@ -371,7 +463,21 @@ export function planConnectCommit(
     );
   }
 
-  return { noteWrites, cardWrites, deckWrites };
+  // Gate 5's flag third, refused in the same place and for the same structural
+  // reason as the two above: before write #1, so a batch that also suspends
+  // cards cannot land the suspension and report the flags as done.
+  const flags = changes.cardFlags ?? [];
+  if (flags.length > 0) {
+    throw new ConnectCommitRefusal(
+      'card-flag-unsupported',
+      flags.length === 1
+        ? `Setting card ${flags[0].cardId}'s flag cannot be committed to a live collection. `
+          + 'Export a package instead.'
+        : `${flags.length} card flags cannot be committed to a live collection. Export a package instead.`,
+    );
+  }
+
+  return { noteWrites, cardWrites, deckWrites, suspendWrites, schedulingWrites };
 }
 
 /**
@@ -416,6 +522,34 @@ export function verifyConnectCommit(
     const card = cardById.get(move.cardId);
     if (!card) mismatches.push(`card ${move.cardId}: missing`);
     else if (card.due !== move.due) mismatches.push(`card ${move.cardId}: due differs`);
+  }
+
+  // Gate 5's suspend third, verified as SUSPENDEDNESS rather than as the exact
+  // queue number. That is not a weaker check, it is the correct one: live,
+  // `unsuspend` restores a queue Anki recomputes from the card's type, so
+  // demanding the draft's own restored value would fail a commit that did
+  // exactly what it said. The package writer, which chooses the number itself,
+  // is verified against the number (`verifyExportChanges`).
+  for (const change of changes.cardQueues ?? []) {
+    const card = cardById.get(change.cardId);
+    if (!card) {
+      mismatches.push(`card ${change.cardId}: missing`);
+      continue;
+    }
+    const want = change.queue === 'suspended';
+    if ((card.queue === 'suspended') !== want) {
+      mismatches.push(`card ${change.cardId}: ${want ? 'not suspended' : 'still suspended'}`);
+    }
+  }
+
+  for (const change of changes.cardScheduling ?? []) {
+    const card = cardById.get(change.cardId);
+    if (!card) {
+      mismatches.push(`card ${change.cardId}: missing`);
+      continue;
+    }
+    if (card.interval !== change.interval) mismatches.push(`card ${change.cardId}: interval differs`);
+    if (card.easeFactor !== change.easeFactor) mismatches.push(`card ${change.cardId}: ease differs`);
   }
 
   // The split. A deck the commit created is resolved by NAME out of the re-read

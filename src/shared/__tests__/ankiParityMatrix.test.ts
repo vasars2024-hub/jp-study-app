@@ -80,7 +80,7 @@ describe('the parity matrix covers every way a change can reach Anki', () => {
     const kinds = objectUnionKinds(read('ankiDraftEdit.ts'), 'AnkiDraftEditOp');
     // Threshold first: a scan that silently returned 1 member would pass a
     // subset comparison. The tray-strings test was written after exactly that.
-    expect(kinds.length).toBeGreaterThanOrEqual(6);
+    expect(kinds.length).toBeGreaterThanOrEqual(9);
     expect([...kinds].sort()).toEqual(Object.keys(JOURNAL_OP_COVERAGE).sort());
 
     // And the coverage map agrees with the rows themselves, both directions.
@@ -97,7 +97,7 @@ describe('the parity matrix covers every way a change can reach Anki', () => {
     expect(start).toBeGreaterThan(-1);
     const body = source.slice(start, source.indexOf('}', start));
     const fields = [...body.matchAll(/^\s+(\w+)\??:/gm)].map((m) => m[1]);
-    expect(fields.length).toBeGreaterThanOrEqual(6);
+    expect(fields.length).toBeGreaterThanOrEqual(9);
     expect([...fields].sort()).toEqual(Object.keys(CHANGE_SET_COVERAGE).sort());
     for (const [field, rowId] of Object.entries(CHANGE_SET_COVERAGE)) {
       expect(parityRow(rowId), `${field} names a row that exists`).toBeTruthy();
@@ -107,7 +107,31 @@ describe('the parity matrix covers every way a change can reach Anki', () => {
   it('gives every row a distinct id', () => {
     const ids = ANKI_PARITY_ROWS.map((r) => r.id);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(ids.length).toBeGreaterThanOrEqual(16);
+    expect(ids.length).toBeGreaterThanOrEqual(17);
+  });
+
+  it('acceptance gate 5 names six capabilities, and every one of them has a write path', () => {
+    // The gate's own wording: "batch-edit tags, flags, deck, suspension, due
+    // date, interval/ease … then reread Anki and prove the resulting state".
+    // Three of the six were `journalOp: null` until gate 5 was built; this
+    // asserts the SIX, so narrowing the gate to the writable thirds fails here.
+    const GATE_5 = [
+      'note-tags',
+      'card-flag',
+      'card-deck',
+      'card-queue',
+      'card-due',
+      'card-scheduling',
+    ];
+    for (const id of GATE_5) {
+      const row = parityRow(id);
+      expect(row, `gate 5 names ${id}`).toBeTruthy();
+      expect(row?.journalOp, `${id} must have a journal op`).toBeTruthy();
+      expect(row?.changeSetField, `${id} must export through a change-set field`).toBeTruthy();
+      // The package is the destination the gate is proved on, so `blocked`
+      // there would mean the capability is still unwritable anywhere.
+      expect(parityCell(row!, 'package').support, `${id} on package`).toBe('supported');
+    }
   });
 });
 
@@ -116,7 +140,10 @@ describe('a read-only row has no write path, and that is proved not asserted', (
     const readOnly = ANKI_PARITY_ROWS.filter(
       (row) => row.package.support === 'read-only' && row.connect.support === 'read-only',
     );
-    expect(readOnly.length).toBeGreaterThanOrEqual(10);
+    // Eight since gate 5 moved flags, suspension and interval/ease out of this
+    // set; `card-review-counters` is what stayed behind of the old scheduling row.
+    expect(readOnly.length).toBe(8);
+    expect(readOnly.map((row) => row.id)).toContain('card-review-counters');
     for (const row of readOnly) {
       // This is the whole argument: `buildApkgExportChanges` folds the journal
       // and nothing else, so a capability with no op cannot be exported.
@@ -198,8 +225,9 @@ describe('every row a destination will not write has an honest explanation', () 
         explained += 1;
       }
     }
-    // Both destinations refuse the ten read-only rows; connect also blocks two.
-    expect(explained).toBe(22);
+    // Both destinations refuse the eight read-only rows; connect also blocks
+    // three — the deck rename, the template removal, and gate 5's card flag.
+    expect(explained).toBe(19);
   });
 
   it('offers no explanation it does not need — a supported cell has no why key', () => {
@@ -328,6 +356,41 @@ describe('the blocked cells refuse for real, before any write', () => {
     } catch (error) {
       expect((error as ConnectCommitRefusal).code).toBe(row.connect.refusal);
     }
+  });
+
+  it('refuses a card flag with the code the matrix names, and only live', () => {
+    const row = parityRow('card-flag')!;
+    expect(row.package.support).toBe('supported');
+    try {
+      planConnectCommit({ ...EMPTY, cardFlags: [{ cardId: '2001', noteId: '1001', flag: 'red' }] }, LIVE);
+      expect.unreachable('a flag must not plan live');
+    } catch (error) {
+      expect((error as ConnectCommitRefusal).code).toBe(row.connect.refusal);
+    }
+  });
+
+  it('NEGATIVE CONTROL: the two card-state capabilities it does support DO plan', () => {
+    // Without this, the flag refusal above is also satisfied by a planner that
+    // refuses every card-state change — which is what the matrix used to say.
+    const plan = planConnectCommit(
+      {
+        ...EMPTY,
+        cardQueues: [{ cardId: '2001', noteId: '1001', queue: 'suspended' }],
+        cardScheduling: [{ cardId: '2002', noteId: '1001', interval: 21, easeFactor: 2500 }],
+      },
+      {
+        ...LIVE,
+        cards: [
+          card({ id: '2001', noteId: '1001' }),
+          card({ id: '2002', noteId: '1001', type: 'review', queue: 'review', interval: 10, easeFactor: 2300 }),
+        ],
+      } as unknown as AnkiDraft,
+    );
+    expect(plan.suspendWrites.suspend).toEqual([2001]);
+    expect(plan.suspendWrites.unsuspend).toEqual([]);
+    expect(plan.schedulingWrites).toEqual([
+      { cardId: 2002, noteId: '1001', interval: 21, easeFactor: 2500 },
+    ]);
   });
 
   it('throws instead of returning a partial plan, so a refusal has written nothing', () => {

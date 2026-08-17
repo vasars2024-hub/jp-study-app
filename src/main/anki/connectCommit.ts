@@ -199,6 +199,68 @@ export async function commitConnectDraft(
     }
   }
 
+  // Gate 5's suspend third. Two batched calls, so a failure cannot distinguish
+  // the cards inside one — every id in the group is reported, exactly as the
+  // split's `changeDeck` does, and the re-read below settles which really moved.
+  for (const [action, ids] of [
+    ['suspend', plan.suspendWrites.suspend],
+    ['unsuspend', plan.suspendWrites.unsuspend],
+  ] as const) {
+    if (ids.length === 0) continue;
+    try {
+      await invoke(action, { cards: ids });
+      for (const id of ids) movedCardIds.add(String(id));
+    } catch (err) {
+      if (isUnreachable(err) || isCollectionUnavailable(err)) {
+        return {
+          ok: false,
+          errorCode: transportCode(err),
+          error: toUiError(err),
+          notesUpdated,
+          cardsUpdated: movedCardIds.size,
+          failures: [
+            ...failures,
+            ...ids.map((id) => ({ kind: 'card' as const, id: String(id), reason: toUiError(err) })),
+          ],
+        };
+      }
+      for (const id of ids) failures.push({ kind: 'card', id: String(id), reason: toUiError(err) });
+    }
+  }
+
+  // Gate 5's interval/ease third, through `card-due`'s own route — including its
+  // two measured traps: numbers not strings, and a refusal that arrives inside a
+  // 200 body where `invoke` cannot raise it.
+  for (const write of plan.schedulingWrites) {
+    const id = String(write.cardId);
+    try {
+      const verdict = await invoke('setSpecificValueOfCard', {
+        card: write.cardId,
+        keys: ['ivl', 'factor'],
+        newValues: [write.interval, write.easeFactor],
+        warning_check: true,
+      });
+      const refused = settingsFailure(verdict);
+      if (refused) {
+        failures.push({ kind: 'card', id, reason: refused });
+        continue;
+      }
+      movedCardIds.add(id);
+    } catch (err) {
+      if (isUnreachable(err) || isCollectionUnavailable(err)) {
+        return {
+          ok: false,
+          errorCode: transportCode(err),
+          error: toUiError(err),
+          notesUpdated,
+          cardsUpdated: movedCardIds.size,
+          failures: [...failures, { kind: 'card', id, reason: toUiError(err) }],
+        };
+      }
+      failures.push({ kind: 'card', id, reason: toUiError(err) });
+    }
+  }
+
   // --- 4. re-read and verify what actually landed
   const after = await readConnectDraft(read);
   if (!after.ok || !after.draft) {
@@ -231,6 +293,9 @@ export async function commitConnectDraft(
       error: `${failures.length} of ${
         plan.noteWrites.length
         + plan.cardWrites.length
+        + plan.schedulingWrites.length
+        + plan.suspendWrites.suspend.length
+        + plan.suspendWrites.unsuspend.length
         + plan.deckWrites.reduce((total, write) => total + write.cardIds.length, 0)
       } changes did not commit.`,
       notesUpdated,

@@ -16,13 +16,24 @@
 // user knows it happened.
 
 import type { AnkiDraft, AnkiDraftCard, AnkiDraftNote } from './ankiDraft';
-import { countJournalSteps, type AnkiDraftEditJournal } from './ankiDraftEdit';
+import {
+  countJournalSteps,
+  type AnkiCardScheduling,
+  type AnkiDraftEditJournal,
+} from './ankiDraftEdit';
 
 export interface ReviewDiffLine {
   noteId: string;
   /** What the user calls the note: its first non-empty field, normalized. */
   noteLabel: string;
-  kind: 'field' | 'tags' | 'card-due' | 'card-deck';
+  kind:
+    | 'field'
+    | 'tags'
+    | 'card-due'
+    | 'card-deck'
+    | 'card-flag'
+    | 'card-queue'
+    | 'card-scheduling';
   /** Set for `field` lines. Named, never numbered. */
   fieldName?: string;
   /** Display strings: raw bytes for a field, joined tags, a queue position. */
@@ -50,6 +61,17 @@ export interface WorkbenchReviewSummary {
    * split read as a reposition in the only place the user reviews it.
    */
   cardDeckMoves: number;
+  /**
+   * Gate 5's three card-state capabilities, counted apart from each other and
+   * from `cardMoves` for that count's own reason: they write three different
+   * columns, and one number covering them would let a suspension read as a
+   * reposition in the only place the user reviews it before committing.
+   */
+  cardFlags: number;
+  /** Cards whose suspension netted out different, either direction. */
+  cardSuspensions: number;
+  /** Cards whose interval or ease netted out different. */
+  cardScheduling: number;
   /**
    * Decks whose name netted out different. Counted apart from `changedNotes`
    * because a rename touches no note: a deck-only session would otherwise
@@ -100,10 +122,17 @@ function sameTags(a: readonly string[], b: readonly string[]): boolean {
 /** One value the journal touched, with the original it started from. */
 interface Tracked {
   noteId: string;
-  kind: 'field' | 'tags' | 'card-due' | 'card-deck';
+  kind:
+    | 'field'
+    | 'tags'
+    | 'card-due'
+    | 'card-deck'
+    | 'card-flag'
+    | 'card-queue'
+    | 'card-scheduling';
   fieldOrd?: number;
   cardId?: string;
-  firstBefore: string | string[] | number;
+  firstBefore: string | string[] | number | AnkiCardScheduling;
   /** Distinct steps that wrote this value. */
   writers: Set<string>;
 }
@@ -155,7 +184,7 @@ export function buildWorkbenchReview(
       noteId: op.noteId,
       kind: op.kind,
       fieldOrd: op.kind === 'field' ? op.fieldOrd : undefined,
-      cardId: op.kind === 'card-due' || op.kind === 'card-deck' ? op.cardId : undefined,
+      cardId: op.kind === 'field' || op.kind === 'tags' ? undefined : op.cardId,
       firstBefore: op.before,
       writers: new Set([writer]),
     });
@@ -172,6 +201,9 @@ export function buildWorkbenchReview(
   const diffs: ReviewDiffLine[] = [];
   let cardMoves = 0;
   let cardDeckMoves = 0;
+  let cardFlags = 0;
+  let cardSuspensions = 0;
+  let cardScheduling = 0;
   let overwrites = 0;
   let totalDiffs = 0;
 
@@ -221,6 +253,46 @@ export function buildWorkbenchReview(
         after: deckNameById.get(card.deckId) ?? card.deckId,
         overwritten: entry.writers.size > 1,
       };
+    } else if (entry.kind === 'card-flag') {
+      const card = entry.cardId ? cardById.get(entry.cardId) : undefined;
+      if (!card || card.flag === entry.firstBefore) continue;
+      cardFlags += 1;
+      line = {
+        noteId: entry.noteId,
+        noteLabel: noteLabel(note, entry.noteId),
+        kind: 'card-flag',
+        // The colour names, which are what Anki's own browser calls them.
+        before: String(entry.firstBefore),
+        after: card.flag,
+        overwritten: entry.writers.size > 1,
+      };
+    } else if (entry.kind === 'card-queue') {
+      const card = entry.cardId ? cardById.get(entry.cardId) : undefined;
+      if (!card || card.queue === entry.firstBefore) continue;
+      cardSuspensions += 1;
+      line = {
+        noteId: entry.noteId,
+        noteLabel: noteLabel(note, entry.noteId),
+        kind: 'card-queue',
+        before: String(entry.firstBefore),
+        after: card.queue,
+        overwritten: entry.writers.size > 1,
+      };
+    } else if (entry.kind === 'card-scheduling') {
+      const card = entry.cardId ? cardById.get(entry.cardId) : undefined;
+      const was = entry.firstBefore as AnkiCardScheduling;
+      if (!card || (card.interval === was.interval && card.easeFactor === was.easeFactor)) continue;
+      cardScheduling += 1;
+      line = {
+        noteId: entry.noteId,
+        noteLabel: noteLabel(note, entry.noteId),
+        kind: 'card-scheduling',
+        // `interval` in days and `easeFactor` in permille, exactly as stored —
+        // the plan forbids relabelling Anki's own units in this workbench.
+        before: `${was.interval}/${was.easeFactor}`,
+        after: `${card.interval}/${card.easeFactor}`,
+        overwritten: entry.writers.size > 1,
+      };
     } else {
       const card = entry.cardId ? cardById.get(entry.cardId) : undefined;
       if (!card || card.due === entry.firstBefore) continue;
@@ -256,6 +328,9 @@ export function buildWorkbenchReview(
     tagNotes: tagNoteIds.size,
     cardMoves,
     cardDeckMoves,
+    cardFlags,
+    cardSuspensions,
+    cardScheduling,
     deckRenames,
     templatesRemoved,
     cardsDeleted,

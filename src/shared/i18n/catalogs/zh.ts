@@ -8739,6 +8739,8 @@ export const zh: Catalog = {
     '此连接无法重命名正在使用的集合中的牌组，因此什么也没有写入。请改为导出软件包 — 重命名会写入其中。',
   'ankiWorkbench.apply.liveError.template-remove-unsupported':
     '无法通过此连接删除卡片模板，因此未写入任何内容。请改为导出牌组包 — 模板会在那里被真正删除。',
+  'ankiWorkbench.apply.liveError.card-flag-unsupported':
+    '无法通过此连接设置卡片旗标，因此未写入任何内容。请改为导出牌组包 — 旗标会在那里被真正设置。',
   'ankiWorkbench.apply.liveError.deck-missing':
     '拆分指定的牌组不在集合中，变更集也没有描述它，因此卡片无处可去。未写入任何内容 — 请先重新读取集合再提交。',
   'ankiWorkbench.apply.liveError.deck-filtered':
@@ -9613,8 +9615,9 @@ export const zh: Catalog = {
   'ankiWorkbench.parity.row.template-add': '添加卡片模板',
   'ankiWorkbench.parity.row.note-marked': '已标记的笔记',
   'ankiWorkbench.parity.row.card-flag': '卡片旗标',
-  'ankiWorkbench.parity.row.card-queue': '暂停和搁置的卡片',
-  'ankiWorkbench.parity.row.card-scheduling': '间隔、简易度、复习次数和遗忘次数',
+  'ankiWorkbench.parity.row.card-queue': '卡片是否处于暂停状态',
+  'ankiWorkbench.parity.row.card-scheduling': '间隔和简易度',
+  'ankiWorkbench.parity.row.card-review-counters': '复习次数和遗忘次数',
   'ankiWorkbench.parity.row.review-history': '复习历史',
   'ankiWorkbench.parity.row.media': '媒体文件',
   'ankiWorkbench.parity.row.note-type-fields': '笔记类型的字段',
@@ -9625,12 +9628,8 @@ export const zh: Catalog = {
     '设计会修改当前草稿，让你查看它将生成哪些卡片。导出发送的是你的编辑历史，其中没有“添加模板”这一步，因此新软件包中的笔记类型与源文件完全一致。',
   'ankiWorkbench.parity.why.package.note-marked':
     '每条笔记是否被标记，都会按源文件原样写入新软件包。这里的编辑不会改变它。',
-  'ankiWorkbench.parity.why.package.card-flag':
-    '旗标会原样写入新软件包。工作台没有设置旗标的编辑操作。',
-  'ankiWorkbench.parity.why.package.card-queue':
-    '暂停和搁置的卡片会在新软件包中保持该状态。工作台没有暂停或恢复卡片的编辑操作。',
-  'ankiWorkbench.parity.why.package.card-scheduling':
-    '间隔、简易度、复习次数和遗忘次数会按现状写入新软件包。对于卡片，这里只能修改它的队列位置。',
+  'ankiWorkbench.parity.why.package.card-review-counters':
+    '复习次数和遗忘次数会按现状写入新软件包。Anki 为每次复习都保留一条记录，若只改次数而不动这些记录，卡片就会与自己的历史互相矛盾。',
   'ankiWorkbench.parity.why.package.review-history':
     '每一条复习记录都会原封不动地复制到新软件包。改写它会让牌组报告出从未发生过的学习。',
   'ankiWorkbench.parity.why.package.media':
@@ -9651,11 +9650,9 @@ export const zh: Catalog = {
   'ankiWorkbench.parity.why.connect.note-marked':
     '每条笔记是否被标记由 Anki 保留。这里的编辑不会改变它。',
   'ankiWorkbench.parity.why.connect.card-flag':
-    '每张卡片的旗标由 Anki 保留。工作台没有设置旗标的编辑操作。',
-  'ankiWorkbench.parity.why.connect.card-queue':
-    '暂停和搁置的卡片保持 Anki 中的状态。工作台没有暂停或恢复卡片的编辑操作。',
-  'ankiWorkbench.parity.why.connect.card-scheduling':
-    '间隔、简易度、复习次数和遗忘次数保持 Anki 中的数值。对于卡片，只会写入它的队列位置。',
+    'Anki 插件没有设置旗标的操作，唯一的替代途径会覆盖整个存储值，其中包含工作台从未读取的部分。导出软件包则会真正设置旗标。',
+  'ankiWorkbench.parity.why.connect.card-review-counters':
+    '复习次数和遗忘次数保持 Anki 中的数值。Anki 为每次复习都保留一条记录，若只改次数而不动这些记录，卡片就会与自己的历史互相矛盾。',
   'ankiWorkbench.parity.why.connect.review-history':
     '绝不会写入你的复习历史。改写它会让 Anki 报告出从未发生过的学习。',
   'ankiWorkbench.parity.why.connect.media':

@@ -23,6 +23,8 @@
 //     legitimate and it is the *card* consequence that is out of scope here.
 
 import type {
+  AnkiCardFlag,
+  AnkiCardQueue,
   AnkiDraft,
   AnkiDraftCard,
   AnkiDraftDeck,
@@ -57,6 +59,24 @@ export function draftFieldNormalizer(source: AnkiDraftSource): (raw: string) => 
  * needed 3,000 undos would be reversible only in the arithmetic sense.
  * A single edit has no group and is therefore its own step.
  */
+/**
+ * The two scheduling columns gate 5 names, carried as one value.
+ *
+ * A pair rather than two ops: Anki answers a review by writing both, and a
+ * journal that could hold one without the other would let an undo restore half
+ * a card's schedule.
+ */
+export interface AnkiCardScheduling {
+  /** Days, in `AnkiDraftCard.interval`'s own units — negatives preserved. */
+  interval: number;
+  /** Permille, as `AnkiDraftCard.easeFactor`: 2500 is 250%. */
+  easeFactor: number;
+}
+
+/** Anki's own floor and a sane ceiling; below 1300 the scheduler clamps anyway. */
+export const MIN_EASE_FACTOR = 1300;
+export const MAX_EASE_FACTOR = 10_000;
+
 export type AnkiDraftEditOp =
   | {
       kind: 'field';
@@ -113,6 +133,67 @@ export type AnkiDraftEditOp =
       deckId: string;
       before: string;
       after: string;
+      group?: string;
+    }
+  | {
+      /**
+       * A card's browser flag — acceptance gate 5's flag third.
+       *
+       * The narrowest of the three card-state ops added for that gate, and the
+       * only one with no derived state at all: Anki keeps the colour in the low
+       * three bits of `cards.flags`, nothing is computed from it, so writing the
+       * old colour back is a complete inverse. The op carries the DECODED colour
+       * rather than the raw column, because the reserved upper bits are not the
+       * workbench's to model — the package writer preserves them by rewriting
+       * only the low three, which is also why this capability is refused live
+       * (`ankiConnectCommit.ts`).
+       */
+      kind: 'card-flag';
+      noteId: string;
+      cardId: string;
+      before: AnkiCardFlag;
+      after: AnkiCardFlag;
+      group?: string;
+    }
+  | {
+      /**
+       * Suspension — gate 5's suspend third, and **only** suspension even though
+       * the column it writes is the whole queue. Burying is Anki's own
+       * until-tomorrow state, unburied by its scheduler at the next day rollover;
+       * a workbench that wrote `buried-user` would be staging a change Anki
+       * undoes by itself. So `after` is either `suspended` or the queue the card
+       * returns to, and never `buried-sibling`/`buried-user`.
+       *
+       * Unsuspending a card the SOURCE already held suspended has no recorded
+       * queue to return to. Anki stores none either — it recomputes from `type`
+       * — so `restoredQueue` mirrors that computation, and a card whose type did
+       * not decode is refused (`unknown-card-state`) rather than guessed into a
+       * queue its scheduler would then misread.
+       */
+      kind: 'card-queue';
+      noteId: string;
+      cardId: string;
+      before: AnkiCardQueue;
+      after: AnkiCardQueue;
+      group?: string;
+    }
+  | {
+      /**
+       * Interval and ease — gate 5's interval/ease third. The two columns move
+       * together because they are one decision: an interval written without the
+       * ease that produced it is a card whose next answer jumps back.
+       *
+       * `reps`, `lapses` and `left` are deliberately NOT here and stay read-only
+       * (`card-review-counters` in the parity matrix). They are counters the
+       * revlog still holds the rows for, so writing one would put the card's
+       * summary and its own review history into disagreement — a falsified log,
+       * not an edit. Interval and ease carry no such second copy.
+       */
+      kind: 'card-scheduling';
+      noteId: string;
+      cardId: string;
+      before: AnkiCardScheduling;
+      after: AnkiCardScheduling;
       group?: string;
     }
   | {
@@ -189,7 +270,24 @@ export interface AnkiDraftEditResult {
     /** Another deck already holds that name. Renaming onto it would be a merge. */
     | 'duplicate-deck-name'
     /** A deck cannot be nameless, and a blank name would vanish from the tree. */
-    | 'empty-deck-name';
+    | 'empty-deck-name'
+    /** The draft holds no card with that id. */
+    | 'no-such-card'
+    /**
+     * Unsuspending a card whose `type` did not decode. Anki recomputes the
+     * restored queue from the type, so there is nothing to restore it to and a
+     * guess would file the card into a queue its scheduler reads differently.
+     */
+    | 'unknown-card-state'
+    /**
+     * Interval/ease on a card that has never graduated. A new card's schedule is
+     * `ivl 0, factor 0` by definition, and writing days onto one without also
+     * moving `type`/`queue` — which this journal deliberately does not do — makes
+     * a card Anki shows as new and schedules as a review.
+     */
+    | 'card-not-scheduled'
+    /** An interval or ease outside what Anki's own scheduler can store. */
+    | 'invalid-scheduling';
   /** Media file names the edit removed the last reference to, within this note. */
   mediaDropped?: string[];
   /** Media references the edit introduced that the source does not contain. */
@@ -327,6 +425,140 @@ export function renameDraftDeck(
     draft: { ...draft, decks },
     journal: {
       done: [...journal.done, { kind: 'deck-name', deckId, before: deck.name, after: name }],
+      undone: [],
+    },
+    changed: true,
+  };
+}
+
+// ----- card state: gate 5's flag, suspension and interval/ease -------------------
+
+function findCard(draft: AnkiDraft, cardId: string): AnkiDraftCard | undefined {
+  return draft.cards.find((c) => c.id === cardId);
+}
+
+function replaceCard(draft: AnkiDraft, next: AnkiDraftCard): AnkiDraft {
+  return { ...draft, cards: draft.cards.map((c) => (c.id === next.id ? next : c)) };
+}
+
+/**
+ * The queue an unsuspended card returns to, or `null` when it cannot be known.
+ *
+ * Anki stores no "queue before suspension" either — it recomputes from `type` —
+ * so this mirrors that computation rather than inventing a memory the collection
+ * does not have. The learning split is on `due`, which for an intraday learning
+ * card is an epoch second and for a day-learn card a day number: the boundary is
+ * not arbitrary, because a day number reaching 10^9 would be a collection 2.7
+ * million years old and an epoch second has not been below it since 2001.
+ */
+export function restoredQueue(card: AnkiDraftCard): AnkiCardQueue | null {
+  switch (card.type) {
+    case 'new':
+      return 'new';
+    case 'review':
+      return 'review';
+    case 'learning':
+    case 'relearning':
+      return card.due >= 1_000_000_000 ? 'learning' : 'day-learn';
+    default:
+      return null;
+  }
+}
+
+/** Set (or clear) a card's browser flag. */
+export function setCardFlag(
+  draft: AnkiDraft,
+  journal: AnkiDraftEditJournal,
+  cardId: string,
+  flag: AnkiCardFlag,
+): AnkiDraftEditResult {
+  const card = findCard(draft, cardId);
+  if (!card) return { draft, journal, changed: false, reason: 'no-such-card' };
+  if (card.flag === flag) return { draft, journal, changed: false, reason: 'unchanged' };
+  return {
+    draft: replaceCard(draft, { ...card, flag }),
+    journal: {
+      done: [
+        ...journal.done,
+        { kind: 'card-flag', noteId: card.noteId, cardId, before: card.flag, after: flag },
+      ],
+      undone: [],
+    },
+    changed: true,
+  };
+}
+
+/**
+ * Suspend or unsuspend one card.
+ *
+ * A card already buried is left alone rather than "unsuspended" into its normal
+ * queue: burying is the scheduler's own until-tomorrow state and lifting it here
+ * would undo something the user did in Anki, which is not what this asks for.
+ */
+export function setCardSuspended(
+  draft: AnkiDraft,
+  journal: AnkiDraftEditJournal,
+  cardId: string,
+  suspended: boolean,
+): AnkiDraftEditResult {
+  const card = findCard(draft, cardId);
+  if (!card) return { draft, journal, changed: false, reason: 'no-such-card' };
+  // Suspending a buried card is legitimate — suspension outranks a bury — so
+  // only the suspended state itself, not any "not normal" state, is the no-op.
+  if ((card.queue === 'suspended') === suspended) {
+    return { draft, journal, changed: false, reason: 'unchanged' };
+  }
+  const after = suspended ? 'suspended' : restoredQueue(card);
+  if (after === null) return { draft, journal, changed: false, reason: 'unknown-card-state' };
+  return {
+    draft: replaceCard(draft, { ...card, queue: after }),
+    journal: {
+      done: [
+        ...journal.done,
+        { kind: 'card-queue', noteId: card.noteId, cardId, before: card.queue, after },
+      ],
+      undone: [],
+    },
+    changed: true,
+  };
+}
+
+/** Write a card's interval and ease together. */
+export function setCardScheduling(
+  draft: AnkiDraft,
+  journal: AnkiDraftEditJournal,
+  cardId: string,
+  next: AnkiCardScheduling,
+): AnkiDraftEditResult {
+  const card = findCard(draft, cardId);
+  if (!card) return { draft, journal, changed: false, reason: 'no-such-card' };
+  if (card.type === 'new' || card.type === 'unknown') {
+    return { draft, journal, changed: false, reason: 'card-not-scheduled' };
+  }
+  if (
+    !Number.isSafeInteger(next.interval) ||
+    !Number.isSafeInteger(next.easeFactor) ||
+    next.easeFactor < MIN_EASE_FACTOR ||
+    next.easeFactor > MAX_EASE_FACTOR
+  ) {
+    return { draft, journal, changed: false, reason: 'invalid-scheduling' };
+  }
+  if (card.interval === next.interval && card.easeFactor === next.easeFactor) {
+    return { draft, journal, changed: false, reason: 'unchanged' };
+  }
+  return {
+    draft: replaceCard(draft, { ...card, interval: next.interval, easeFactor: next.easeFactor }),
+    journal: {
+      done: [
+        ...journal.done,
+        {
+          kind: 'card-scheduling',
+          noteId: card.noteId,
+          cardId,
+          before: { interval: card.interval, easeFactor: card.easeFactor },
+          after: { ...next },
+        },
+      ],
       undone: [],
     },
     changed: true,
@@ -483,6 +715,35 @@ function applyInverseInto(
     const card = cards[cardAt];
     if (!card) return;
     cards[cardAt] = { ...card, deckId: op[toValue] };
+    return;
+  }
+  // Gate 5's three card-state ops. Each restores a stored value verbatim, so
+  // none of them re-derives anything on the way back — an unsuspend that
+  // recomputed `restoredQueue` here would put the card in a queue the op's own
+  // `before` says it was not in.
+  if (op.kind === 'card-flag') {
+    const cardAt = index.cardPosition.get(op.cardId);
+    if (cardAt === undefined) return;
+    const card = cards[cardAt];
+    if (!card) return;
+    cards[cardAt] = { ...card, flag: op[toValue] };
+    return;
+  }
+  if (op.kind === 'card-queue') {
+    const cardAt = index.cardPosition.get(op.cardId);
+    if (cardAt === undefined) return;
+    const card = cards[cardAt];
+    if (!card) return;
+    cards[cardAt] = { ...card, queue: op[toValue] };
+    return;
+  }
+  if (op.kind === 'card-scheduling') {
+    const cardAt = index.cardPosition.get(op.cardId);
+    if (cardAt === undefined) return;
+    const card = cards[cardAt];
+    if (!card) return;
+    const state = op[toValue];
+    cards[cardAt] = { ...card, interval: state.interval, easeFactor: state.easeFactor };
     return;
   }
   // Already handled by `applyTemplateRemovalOps`, whose work cannot be expressed

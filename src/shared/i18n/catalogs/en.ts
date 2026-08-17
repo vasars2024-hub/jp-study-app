@@ -9211,6 +9211,8 @@ export const en: Catalog = {
     'A live collection cannot be renamed through this connection, so nothing was written. Export a package instead — the rename is written there.',
   'ankiWorkbench.apply.liveError.template-remove-unsupported':
     'A card template cannot be removed through this connection, so nothing was written. Export a package instead — the template is removed there.',
+  'ankiWorkbench.apply.liveError.card-flag-unsupported':
+    'A card flag cannot be set through this connection, so nothing was written. Export a package instead — the flag is set there.',
   'ankiWorkbench.apply.liveError.deck-missing':
     'The split names a deck the collection does not have and the change set does not describe, so the cards have nowhere to go. Nothing was written — re-read the collection before committing.',
   'ankiWorkbench.apply.liveError.deck-filtered':
@@ -10133,8 +10135,9 @@ export const en: Catalog = {
   'ankiWorkbench.parity.row.template-add': 'Adding a card template',
   'ankiWorkbench.parity.row.note-marked': 'Marked notes',
   'ankiWorkbench.parity.row.card-flag': 'Card flags',
-  'ankiWorkbench.parity.row.card-queue': 'Suspended and buried cards',
-  'ankiWorkbench.parity.row.card-scheduling': 'Interval, ease, reviews and lapses',
+  'ankiWorkbench.parity.row.card-queue': 'Whether a card is suspended',
+  'ankiWorkbench.parity.row.card-scheduling': 'Interval and ease',
+  'ankiWorkbench.parity.row.card-review-counters': 'Review count and lapses',
   'ankiWorkbench.parity.row.review-history': 'Review history',
   'ankiWorkbench.parity.row.media': 'Media files',
   'ankiWorkbench.parity.row.note-type-fields': 'Note type fields',
@@ -10145,12 +10148,8 @@ export const en: Catalog = {
     'A design changes this draft so you can check the cards it would generate. The export ships your edit history, which has no add-template step, so a new package carries the note type exactly as the source had it.',
   'ankiWorkbench.parity.why.package.note-marked':
     'The new package carries each note as marked or unmarked exactly as the source had it. No edit here changes that.',
-  'ankiWorkbench.parity.why.package.card-flag':
-    'Flags are written to the new package unchanged. The workbench has no edit that sets one.',
-  'ankiWorkbench.parity.why.package.card-queue':
-    'Suspended and buried cards keep that state in the new package. The workbench has no edit that suspends or restores a card.',
-  'ankiWorkbench.parity.why.package.card-scheduling':
-    'Interval, ease, review count and lapses are written to the new package as they stand. Of a card, only its queue position can be changed here.',
+  'ankiWorkbench.parity.why.package.card-review-counters':
+    'How many times a card has been reviewed, and how often it lapsed, are written to the new package as they stand. Anki keeps a row per review, and changing a count without those rows would leave the card disagreeing with its own history.',
   'ankiWorkbench.parity.why.package.review-history':
     'Every review is copied to the new package untouched. Rewriting one would make the deck report study that never happened.',
   'ankiWorkbench.parity.why.package.media':
@@ -10171,11 +10170,9 @@ export const en: Catalog = {
   'ankiWorkbench.parity.why.connect.note-marked':
     'Anki keeps each note as marked or unmarked. No edit here changes that.',
   'ankiWorkbench.parity.why.connect.card-flag':
-    'Anki keeps the flag on each card. The workbench has no edit that sets one.',
-  'ankiWorkbench.parity.why.connect.card-queue':
-    'Suspended and buried cards are left as Anki has them. The workbench has no edit that suspends or restores a card.',
-  'ankiWorkbench.parity.why.connect.card-scheduling':
-    'Interval, ease, review count and lapses stay as Anki has them. Of a card, only its queue position is written.',
+    'Anki’s add-on has no action that sets a flag, and the one way in would overwrite the whole stored value — including parts of it this workbench never read. Exporting a package sets the flag for real.',
+  'ankiWorkbench.parity.why.connect.card-review-counters':
+    'How many times a card has been reviewed, and how often it lapsed, stay as Anki has them. Anki keeps a row per review, and changing a count without those rows would leave the card disagreeing with its own history.',
   'ankiWorkbench.parity.why.connect.review-history':
     'Your review history is never written to. Rewriting one would make Anki report study that never happened.',
   'ankiWorkbench.parity.why.connect.media':

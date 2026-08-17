@@ -12,7 +12,13 @@
 // module returned from cleanly.
 
 import crypto from 'node:crypto';
-import { ANKI_FIELD_SEP, splitNoteFields } from '../../shared/ankiDraft';
+import {
+  ANKI_FIELD_SEP,
+  decodeCardFlag,
+  encodeCardFlag,
+  encodeCardQueue,
+  splitNoteFields,
+} from '../../shared/ankiDraft';
 import type { ApkgExportChangeSet, ApkgExportErrorCode } from '../../shared/ankiApkgExport';
 import { readRawCollection, type SqlReadable } from './apkgDraftRead';
 
@@ -329,6 +335,73 @@ export function applyExportChanges(
     cardPlans.push({ id: idParam(move.cardId), due: move.due });
   }
 
+  // Gate 5's three card-state lists. Each is validated here, before write #1,
+  // for the same all-or-nothing reason as everything above it.
+  //
+  // The flag plan reads the STORED column and rewrites only its low three bits.
+  // That is the whole difference between this destination and the live one,
+  // which has no way to read it back and therefore refuses the capability.
+  interface CardColumnPlan {
+    id: number | string;
+    column: 'flags' | 'queue';
+    value: number;
+  }
+  const columnPlans: CardColumnPlan[] = [];
+  for (const change of changes.cardFlags ?? []) {
+    const row = firstRow(db, 'SELECT flags FROM cards WHERE id = ?', [idParam(change.cardId)]);
+    if (!row) {
+      throw new ExportRefusal(
+        'card-missing',
+        `Card ${change.cardId} (note ${change.noteId}) is not in the source package.`,
+      );
+    }
+    columnPlans.push({
+      id: idParam(change.cardId),
+      column: 'flags',
+      value: encodeCardFlag(change.flag, Number(row[0] ?? 0)),
+    });
+  }
+  for (const change of changes.cardQueues ?? []) {
+    const row = firstRow(db, 'SELECT id FROM cards WHERE id = ?', [idParam(change.cardId)]);
+    if (!row) {
+      throw new ExportRefusal(
+        'card-missing',
+        `Card ${change.cardId} (note ${change.noteId}) is not in the source package.`,
+      );
+    }
+    const queue = encodeCardQueue(change.queue);
+    // `unknown` is the reader's word for a queue number this build does not
+    // recognise. Writing one back would need a number there is none of, so it is
+    // refused rather than defaulted to 0 — which would un-suspend the card.
+    if (queue === null) {
+      throw new ExportRefusal(
+        'card-missing',
+        `Card ${change.cardId} names a queue ("${change.queue}") Anki has no number for.`,
+      );
+    }
+    columnPlans.push({ id: idParam(change.cardId), column: 'queue', value: queue });
+  }
+  interface CardSchedulingPlan {
+    id: number | string;
+    interval: number;
+    easeFactor: number;
+  }
+  const schedulingPlans: CardSchedulingPlan[] = [];
+  for (const change of changes.cardScheduling ?? []) {
+    const row = firstRow(db, 'SELECT id FROM cards WHERE id = ?', [idParam(change.cardId)]);
+    if (!row) {
+      throw new ExportRefusal(
+        'card-missing',
+        `Card ${change.cardId} (note ${change.noteId}) is not in the source package.`,
+      );
+    }
+    schedulingPlans.push({
+      id: idParam(change.cardId),
+      interval: change.interval,
+      easeFactor: change.easeFactor,
+    });
+  }
+
   // Recipe 12's deck half. A rename touches no card: a card names its deck by
   // id, so this is only ever the name Anki stores. Recipe 13's split is the
   // mirror image — it writes no name on an existing deck and only `cards.did`,
@@ -568,6 +641,26 @@ export function applyExportChanges(
       plan.id,
     ]);
   }
+  // Gate 5's flag and suspension writes. The column name is a closed literal
+  // union rather than an interpolated string on purpose: sql.js cannot bind an
+  // identifier, so the only safe way to share one statement shape is a value
+  // that could never have come from user input.
+  for (const plan of columnPlans) {
+    db.run(
+      plan.column === 'flags'
+        ? 'UPDATE cards SET flags = ?, mod = ?, usn = -1 WHERE id = ?'
+        : 'UPDATE cards SET queue = ?, mod = ?, usn = -1 WHERE id = ?',
+      [plan.value, modSec, plan.id],
+    );
+  }
+  for (const plan of schedulingPlans) {
+    db.run('UPDATE cards SET ivl = ?, factor = ?, mod = ?, usn = -1 WHERE id = ?', [
+      plan.interval,
+      plan.easeFactor,
+      modSec,
+      plan.id,
+    ]);
+  }
   if (storage === 'table') {
     for (const rename of deckRenames) {
       // `mtime_secs`/`usn` alongside the name, the same freshness the note and
@@ -692,6 +785,8 @@ export function applyExportChanges(
     cardsUpdated: new Set([
       ...cardPlans.map((p) => String(p.id)),
       ...movePlans.map((p) => String(p.id)),
+      ...columnPlans.map((p) => String(p.id)),
+      ...schedulingPlans.map((p) => String(p.id)),
     ]).size,
     decksUpdated: deckRenames.length + creates.length,
   };
@@ -735,6 +830,38 @@ export function verifyExportChanges(
     const row = firstRow(db, 'SELECT due FROM cards WHERE id = ?', [idParam(move.cardId)]);
     if (!row) mismatches.push(`card ${move.cardId}: missing`);
     else if (Number(row[0]) !== move.due) mismatches.push(`card ${move.cardId}: due differs`);
+  }
+  // Gate 5's three, read back out of the written file. The flag is compared on
+  // the DECODED colour, not the whole column — comparing the raw number would
+  // fail a correct write whenever the source had reserved bits set, which is
+  // precisely the state this writer preserves on purpose.
+  for (const change of changes.cardFlags ?? []) {
+    const row = firstRow(db, 'SELECT flags FROM cards WHERE id = ?', [idParam(change.cardId)]);
+    if (!row) mismatches.push(`card ${change.cardId}: missing`);
+    else if (decodeCardFlag(Number(row[0] ?? 0)) !== change.flag) {
+      mismatches.push(`card ${change.cardId}: flag differs`);
+    }
+  }
+  for (const change of changes.cardQueues ?? []) {
+    const row = firstRow(db, 'SELECT queue FROM cards WHERE id = ?', [idParam(change.cardId)]);
+    if (!row) mismatches.push(`card ${change.cardId}: missing`);
+    else if (Number(row[0]) !== encodeCardQueue(change.queue)) {
+      mismatches.push(`card ${change.cardId}: queue differs`);
+    }
+  }
+  for (const change of changes.cardScheduling ?? []) {
+    const row = firstRow(db, 'SELECT ivl, factor FROM cards WHERE id = ?', [
+      idParam(change.cardId),
+    ]);
+    if (!row) mismatches.push(`card ${change.cardId}: missing`);
+    else {
+      if (Number(row[0]) !== change.interval) {
+        mismatches.push(`card ${change.cardId}: interval differs`);
+      }
+      if (Number(row[1]) !== change.easeFactor) {
+        mismatches.push(`card ${change.cardId}: ease differs`);
+      }
+    }
   }
   const renames = changes.deckRenames ?? [];
   const deckMoves = changes.cardDeckMoves ?? [];

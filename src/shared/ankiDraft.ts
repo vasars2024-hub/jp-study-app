@@ -504,6 +504,26 @@ export function decodeCardFlag(value: number | undefined): AnkiCardFlag {
   return FLAGS[(value ?? 0) & 0b111] ?? 'none';
 }
 
+/**
+ * The stored `cards.flags` value for a colour, **preserving the rest of the
+ * column**. The upper bits are reserved and nothing in the draft models them, so
+ * a writer that assigned a bare 0-7 would clear whatever they held — which is
+ * exactly why the live commit refuses this capability rather than guessing at a
+ * value it cannot re-read (`shared/ankiConnectCommit.ts`).
+ */
+export function encodeCardFlag(flag: AnkiCardFlag, stored: number | undefined): number {
+  const colour = Math.max(FLAGS.indexOf(flag), 0);
+  return ((stored ?? 0) & ~0b111) | colour;
+}
+
+/** The stored `cards.queue` number, or `null` for a queue Anki has no number for. */
+export function encodeCardQueue(queue: AnkiCardQueue): number | null {
+  for (const [value, name] of Object.entries(QUEUES)) {
+    if (name === queue) return Number(value);
+  }
+  return null;
+}
+
 // ----- field and media extraction ----------------------------------------------
 
 /**

@@ -8786,6 +8786,8 @@ export const ja: Catalog = {
     'この接続では実行中のコレクションのデッキ名を変更できないため、何も書き込んでいません。代わりにパッケージを書き出してください。そちらには変更が反映されます。',
   'ankiWorkbench.apply.liveError.template-remove-unsupported':
     'この接続ではカードテンプレートを削除できないため、何も書き込まれませんでした。代わりにパッケージを書き出してください — そちらではテンプレートが削除されます。',
+  'ankiWorkbench.apply.liveError.card-flag-unsupported':
+    'この接続ではカードのフラグを設定できないため、何も書き込まれませんでした。代わりにパッケージを書き出してください — そちらではフラグが設定されます。',
   'ankiWorkbench.apply.liveError.deck-missing':
     '分割が指定するデッキはコレクションに存在せず、変更セットにも記述がないため、カードの移動先がありません。何も書き込まれていません — 反映する前にコレクションを読み直してください。',
   'ankiWorkbench.apply.liveError.deck-filtered':
@@ -9697,8 +9699,9 @@ export const ja: Catalog = {
   'ankiWorkbench.parity.row.template-add': 'カードテンプレートの追加',
   'ankiWorkbench.parity.row.note-marked': 'マーク付きノート',
   'ankiWorkbench.parity.row.card-flag': 'カードのフラグ',
-  'ankiWorkbench.parity.row.card-queue': '停止中・保留中のカード',
-  'ankiWorkbench.parity.row.card-scheduling': '間隔・易しさ・復習回数・失敗回数',
+  'ankiWorkbench.parity.row.card-queue': 'カードを停止しているかどうか',
+  'ankiWorkbench.parity.row.card-scheduling': '間隔と易しさ',
+  'ankiWorkbench.parity.row.card-review-counters': '復習回数と失敗回数',
   'ankiWorkbench.parity.row.review-history': '復習履歴',
   'ankiWorkbench.parity.row.media': 'メディアファイル',
   'ankiWorkbench.parity.row.note-type-fields': 'ノートタイプのフィールド',
@@ -9709,12 +9712,8 @@ export const ja: Catalog = {
     'デザインはこのドラフトを変更し、生成されるカードを確認できるようにします。書き出しには編集履歴が反映されますが、テンプレートを追加する操作は履歴にないため、新しいパッケージには元のノートタイプがそのまま入ります。',
   'ankiWorkbench.parity.why.package.note-marked':
     '各ノートのマークの有無は、元のまま新しいパッケージに書き込まれます。ここでの編集では変わりません。',
-  'ankiWorkbench.parity.why.package.card-flag':
-    'フラグはそのまま新しいパッケージに書き込まれます。ワークベンチにフラグを設定する編集はありません。',
-  'ankiWorkbench.parity.why.package.card-queue':
-    '停止中・保留中のカードはその状態のまま新しいパッケージに入ります。ワークベンチにカードを停止・再開する編集はありません。',
-  'ankiWorkbench.parity.why.package.card-scheduling':
-    '間隔・易しさ・復習回数・失敗回数は現状のまま新しいパッケージに書き込まれます。カードについて変更できるのは並び位置だけです。',
+  'ankiWorkbench.parity.why.package.card-review-counters':
+    '復習回数と失敗回数は現状のまま新しいパッケージに書き込まれます。Anki は復習ごとに記録を残しているため、その記録なしに回数だけを変えるとカードが自身の履歴と食い違います。',
   'ankiWorkbench.parity.why.package.review-history':
     '復習履歴はそのまま新しいパッケージにコピーされます。書き換えると、実際には行っていない学習をデッキが報告することになります。',
   'ankiWorkbench.parity.why.package.media':
@@ -9735,11 +9734,9 @@ export const ja: Catalog = {
   'ankiWorkbench.parity.why.connect.note-marked':
     '各ノートのマークの有無は Anki が保持します。ここでの編集では変わりません。',
   'ankiWorkbench.parity.why.connect.card-flag':
-    '各カードのフラグは Anki が保持します。ワークベンチにフラグを設定する編集はありません。',
-  'ankiWorkbench.parity.why.connect.card-queue':
-    '停止中・保留中のカードは Anki のまま残ります。ワークベンチにカードを停止・再開する編集はありません。',
-  'ankiWorkbench.parity.why.connect.card-scheduling':
-    '間隔・易しさ・復習回数・失敗回数は Anki のままです。カードについて書き込まれるのは並び位置だけです。',
+    'Anki のアドオンにはフラグを設定する操作がなく、唯一の代替手段は保存値そのものを上書きします。そこにはワークベンチが読み取っていない部分も含まれます。パッケージを書き出せばフラグは実際に設定されます。',
+  'ankiWorkbench.parity.why.connect.card-review-counters':
+    '復習回数と失敗回数は Anki のままです。Anki は復習ごとに記録を残しているため、その記録なしに回数だけを変えるとカードが自身の履歴と食い違います。',
   'ankiWorkbench.parity.why.connect.review-history':
     '復習履歴に書き込むことはありません。書き換えると、実際には行っていない学習を Anki が報告することになります。',
   'ankiWorkbench.parity.why.connect.media':
