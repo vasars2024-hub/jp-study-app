@@ -231,6 +231,37 @@ describe('rankSubtitleCandidates', () => {
     expect(looksLikeSameTitle('[GB] Cyber City Oedo 808 Bluray 1080p SUBS ONLY', 'Cyber City Oedo 808')).toBe(true);
   });
 
+  it('refuses a sequel for its predecessor, and in both directions', () => {
+    // Measured live 2026-08-17: a search for MAL 2402 `Ashita no Joe` (79
+    // episodes) accepted this release of `Ashita no Joe 2` (47 episodes, a
+    // different work). Every token of the shorter title is inside the longer
+    // one, so the half-the-words rule scores it a perfect match. It was
+    // harmless only by luck — the release was refused for language a step later.
+    expect(looksLikeSameTitle("Ashita no Joe 2 (Tomorrow's Joe 2) [CR] (Subtitles only)", 'Ashita no Joe')).toBe(false);
+    // The same mistake mirrored, which a one-directional rule would miss.
+    expect(looksLikeSameTitle('[Group] Ashita no Joe 01-79 [BD]', 'Ashita no Joe 2')).toBe(false);
+    // The match that has to survive: the sequel found by its own name.
+    expect(looksLikeSameTitle("Ashita no Joe 2 (Tomorrow's Joe 2) [CR]", 'Ashita no Joe 2')).toBe(true);
+    // Written forms of the same claim.
+    expect(looksLikeSameTitle('[Group] Some Show S2 01-12', 'Some Show')).toBe(false);
+    expect(looksLikeSameTitle('[Group] Some Show 2nd Season 01-12', 'Some Show')).toBe(false);
+    expect(looksLikeSameTitle('[Group] Some Show II [BD]', 'Some Show')).toBe(false);
+  });
+
+  it('does not mistake an episode number for a sequel', () => {
+    // The false-negative controls, and the reason the rule is this narrow: the
+    // pool this filter guards is small enough that throwing away a good release
+    // costs a candidate. Each of these is a real numbering form from the
+    // fixtures already in this file.
+    expect(looksLikeSameTitle('[Group] Ashita no Joe - 07 [1080p]', 'Ashita no Joe')).toBe(true);
+    expect(looksLikeSameTitle('[F-R] Les Miserables Shoujo Cosette 01-52 BATCH (WEB 1080p)', 'Les Miserables: Shoujo Cosette')).toBe(true);
+    expect(looksLikeSameTitle('[Group] Ashita no Joe - 7', 'Ashita no Joe')).toBe(true);
+    // A year is not a sequel, and neither is a first season.
+    expect(looksLikeSameTitle('[Group] Some Show (2010) [BDRip 1080p]', 'Some Show')).toBe(true);
+    expect(looksLikeSameTitle('[Group] Some Show S1 01-25', 'Some Show')).toBe(true);
+    expect(looksLikeSameTitle('[Group] Some Show 1st Season', 'Some Show')).toBe(true);
+  });
+
   it('drops rows advertising only unwanted languages', () => {
     const ru = row({ id: 'ru', name: 'Show Subtitles', sizeBytes: MB, subtitleLanguages: ['ru'] });
     expect(rankSubtitleCandidates([ru], { languages: ['ja'] })).toEqual([]);

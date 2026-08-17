@@ -390,6 +390,51 @@ function untaggedPart(rowName: string): string {
     .replace(/\([^)]*\)/g, ' ');
 }
 
+/** Roman numerals a sequel actually uses; past IX nobody numbers this way. */
+const ROMAN_SEQUEL: Record<string, number> = { ii: 2, iii: 3, iv: 4, v: 5, vi: 6, vii: 7, viii: 8, ix: 9 };
+
+/**
+ * Which sequel a name claims to be, or 0 for the original.
+ *
+ * A sequel shares every word of its predecessor, so the half-the-tokens rule
+ * cannot see the difference and scores it a perfect match in both directions.
+ * Measured 2026-08-17: a search for `Ashita no Joe` (MAL 2402, 79 episodes)
+ * accepted `Ashita no Joe 2 (Tomorrow's Joe 2) [CR]`, a different 47-episode
+ * work. It was harmless only by luck — that release was refused a step later
+ * for being English — and the next numbered sequel would have been downloaded.
+ *
+ * The hard part is that release names are full of numbers that are not sequels.
+ * Three rules keep them out, each one measured against the names already in
+ * this repo's fixtures: a zero-padded number is an episode (`Show - 07`), a
+ * number inside a range is an episode (`01-52 BATCH`), and a number following
+ * a separator rather than a word is an episode (`Cosette - 7`). What is left —
+ * a bare 2 to 9 sitting directly after the title's own words — is the form a
+ * sequel actually takes.
+ */
+export function sequelOrdinal(name: string): number {
+  const claim = untaggedPart(name);
+  let best = 0;
+  const note = (value: number) => { if (value >= 2 && value <= 9) best = Math.max(best, value); };
+
+  // The explicit forms need none of the reasoning below: they say the word.
+  // `S1` and `1st Season` are deliberately in range and score 1, i.e. no
+  // sequel, so `Gundam 00 S1` still matches a search for `Gundam 00`.
+  for (const match of claim.matchAll(/\b(?:s|season)\s?(\d{1,2})\b/giu)) note(Number(match[1]));
+  for (const match of claim.matchAll(/\b(\d{1,2})(?:st|nd|rd|th)\s+season\b/giu)) note(Number(match[1]));
+  for (const match of claim.matchAll(/\b([ivx]{2,4})\b/giu)) {
+    note(ROMAN_SEQUEL[match[1].toLowerCase()] ?? 0);
+  }
+  // A bare number, admitted only when a word precedes it: after a dash, tilde
+  // or hash it is an episode, and every episode-numbering fixture in this file
+  // uses one of those or a zero pad.
+  for (const match of claim.matchAll(/(\S+)\s+(\d{1,2})(?=\s|$)/gu)) {
+    if (match[2].startsWith('0')) continue;
+    if (!/\p{L}/u.test(match[1])) continue;
+    note(Number(match[2]));
+  }
+  return best;
+}
+
 /**
  * Whether the only place this number appears is an episode range.
  *
@@ -421,6 +466,11 @@ function onlyInEpisodeRange(rowName: string, token: string): boolean {
 export function looksLikeSameTitle(rowName: string, title: string): boolean {
   const tokens = titleTokens(title);
   if (!tokens.length) return true;
+  // Asked in both directions, because the failure is symmetric: a search for
+  // the original matches the sequel, and a search for the sequel matches the
+  // original just as well. See `sequelOrdinal` for why a bare number is only
+  // sometimes a sequel.
+  if (sequelOrdinal(rowName) !== sequelOrdinal(title)) return false;
   // A title that is only digits — "001" is one, in the user's own list — has no
   // word the index can be held to, so every batch that numbers its episodes
   // matched it: measured live, "001" listed 23 releases, among them Bleach
