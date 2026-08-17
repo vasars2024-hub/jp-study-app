@@ -9,6 +9,7 @@ vi.mock('../anki/client', () => ({
 
 const { readConnectDraft } = await import('../anki/connectDraftRead');
 const { CONNECT_FILTERED_PROBE_LIMIT, CONNECT_READ_CHUNK } = await import('../../shared/ankiConnectDraft');
+const { ANKI_DRAFT_MAX_PAGE_SIZE } = await import('../../shared/ankiDraft');
 
 const MODEL = {
   id: 1767397623232,
@@ -103,6 +104,38 @@ describe('readConnectDraft', () => {
     expect(result.draft!.counts.notes).toBe(5);
     expect(result.draft!.notes.map((n) => n.id)).toEqual(['110', '111', '112', '113', '114']);
     expect(result.connect).toMatchObject({ matchedNotes: 37, apiVersion: 6, profile: 'User 1' });
+  });
+
+  // Gate 9. The .apkg and CSV readers get their upper bound from `pageAnkiDraft`;
+  // this one assembles its own page from `findNotes` and so never went through
+  // it. Measured live before the fix: `noteLimit: 20000` against the real
+  // 155,384-note collection came back with 20,000 notes and 20,223 cards in one
+  // IPC message, in 29,067 ms, while the same request to the .apkg reader came
+  // back at 2,000. The cost is not the read — the renderer builds a browser row
+  // per note and re-plans the tray on every render.
+  it('clamps an over-cap page to the maximum, as every other reader does', async () => {
+    wire({ noteIds: Array.from({ length: ANKI_DRAFT_MAX_PAGE_SIZE + 500 }, (_v, i) => 100 + i) });
+    const result = await readConnectDraft({ noteLimit: 20_000 });
+
+    expect(result.ok).toBe(true);
+    // The page is bounded ...
+    expect(result.draft!.counts.notes).toBe(ANKI_DRAFT_MAX_PAGE_SIZE);
+    // ... and the true total is still reported, so the surface can say the page
+    // is partial rather than quietly claiming the deck is 2,000 notes long.
+    expect(result.totalNotes).toBe(ANKI_DRAFT_MAX_PAGE_SIZE + 500);
+    // Nothing beyond the cap was even fetched: an unbounded read is expensive on
+    // the wire too, not only in the renderer.
+    const asked = callsTo('notesInfo').reduce(
+      (sum, call) => sum + (call[1] as { notes: number[] }).notes.length,
+      0,
+    );
+    expect(asked).toBe(ANKI_DRAFT_MAX_PAGE_SIZE);
+  });
+
+  it('still honours a page smaller than the cap', async () => {
+    wire({ noteIds: Array.from({ length: 4000 }, (_v, i) => 100 + i) });
+    const result = await readConnectDraft({ noteLimit: 7 });
+    expect(result.draft!.counts.notes).toBe(7);
   });
 
   it('sends deck:* for an empty query, because AnkiConnect rejects a blank one', async () => {

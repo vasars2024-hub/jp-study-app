@@ -16,7 +16,11 @@ import {
   type ConnectDraftRequest,
   type ConnectDraftResult,
 } from '../../shared/ankiConnectDraft';
-import { ANKI_DRAFT_PAGE_SIZE, buildAnkiDraft } from '../../shared/ankiDraft';
+import {
+  ANKI_DRAFT_MAX_PAGE_SIZE,
+  ANKI_DRAFT_PAGE_SIZE,
+  buildAnkiDraft,
+} from '../../shared/ankiDraft';
 import { stripFieldHtml } from '../../shared/apkgParse';
 import { invoke, toUiError } from './client';
 
@@ -86,7 +90,19 @@ export async function readConnectDraft(
   // everything.
   const query = request.query?.trim() || 'deck:*';
   const offset = Math.max(0, Math.floor(request.noteOffset ?? 0));
-  const limit = Math.max(1, Math.floor(request.noteLimit ?? ANKI_DRAFT_PAGE_SIZE));
+  // Clamped at BOTH ends, which for a long time it was not. The .apkg and CSV
+  // readers get their upper bound from `pageAnkiDraft`; this reader assembles its
+  // page from `findNotes` itself and so never went through it, and clamped only
+  // the lower bound. Measured live before the fix: `noteLimit: 20000` against the
+  // real 155,384-note collection returned 20,000 notes and 20,223 cards in
+  // 29,067 ms, in one IPC message, while the same request to the .apkg reader
+  // came back at 2,000. The renderer then builds a browser row per note and
+  // re-plans the tray on every render, so an unbounded page is not a slow read —
+  // it is the 30–60 s step transitions recorded against this collection.
+  const limit = Math.min(
+    Math.max(1, Math.floor(request.noteLimit ?? ANKI_DRAFT_PAGE_SIZE)),
+    ANKI_DRAFT_MAX_PAGE_SIZE,
+  );
 
   try {
     const apiVersion = await invoke('version', undefined);
