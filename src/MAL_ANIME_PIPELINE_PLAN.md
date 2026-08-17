@@ -1487,3 +1487,52 @@ external catalogue changed; nothing here did. Do not read the 337/380 difference
 
 **Next slice:** run `debug/g19n-nyaa-mine.cjs` against Les Misérables, then Ashita no Joe, for a
 Route A pack that survives the language guard.
+
+## 2026-08-17 — the second Route A candidate declared `[Eng]` in all 47 names and was taken anyway
+
+Worker `primary`. Commit `dacf22c1`. Found by pointing the previous entry's own next slice at the
+next candidate, which is what that slice was for.
+
+**Named before the transfer, as required, and the smaller of the two taken:** MAL 2402
+`Ashita no Joe` → `Ashita no Joe 2 (Tomorrow's Joe 2) [CR] (Subtitles only)`, **1,468,006 B =
+1.40 MB, 3 seeders**. The alternative was Les Misérables: Shoujo Cosette at **18.10 MB, 4 seeders**,
+left untouched.
+
+**THE DEFECT. 47 files, every name `[CR] Tomorrow's Joe 2 - E19 [Eng].ass`, every header
+`Title: English (US)`, 0 kana — fetched whole for a `ja` harvest.** `selectSubtitleFiles` excluded
+all 47 correctly, found the pool empty, and then restored **every one of them**, including the ones
+it had just excluded: the fallback was written `pool = text`. It exists because single-language
+packs routinely label nothing, which is most of nyaa — but as written it also undid a correct
+exclusion, so the one kind of release that *answers* the language question was the one kind
+guaranteed to be accepted.
+
+Now the fallback restores only files that stated nothing, and an all-wrong-language release gets
+its own reason, **`wrong-language`** → *"This release only has subtitles in another language."*
+This is **upstream of `2627e201`** and catches exactly the case that one skips by design: Gundam X
+stated nothing and needed its text read after downloading; this one stated `[Eng]` and never needed
+downloading at all. Selection runs after metadata and **before** `qbitSetFilePriorities`/`qbitStart`,
+so the refusal now costs metadata only, not the 1.40 MB.
+
+**Gates.** Three nyaa suites **123/123** (121 before). **Mutation control:** fallback restored to
+`pool = text` → 1 failure, `expected 'ok' to be 'wrong-language'`. **LIVE after a restart**, both
+guards firing on their own case and neither on the other's: Ashita no Joe → *"only has subtitles in
+another language"*; Gundam X, same session → *"not Japanese — 47 file(s) downloaded"*. That pair is
+the inverse control — a single over-broad refusal would have produced one message for both.
+
+**One existing test asserted the defect** and is replaced, not deleted: it fed an `eng` file to a
+`ja` request and expected `ok`. Now the refusal, plus a control that a release labelling *both*
+languages still yields the Japanese file.
+
+**Recorded, not fixed — two separate things this run exposed.**
+1. **A sequel matched its predecessor.** `looksLikeSameTitle` accepted *Ashita no Joe **2*** for a
+   search for *Ashita no Joe* (MAL 2402, 79 eps; Joe 2 is 47 eps and a different work). Every token
+   of the shorter title is in the longer one. Harmless here because the release was refused for
+   language, but the next numbered sequel may not be.
+2. **The 404 is intermittent, not gone.** The first Ashita no Joe attempt returned
+   `qBittorrent answered 404 to torrents/files.`; an immediate retry with no change reached the
+   files. Ordering was checked and is not the cause — `inFlight.add(hash)` precedes
+   `qbitReapSubtitleOrphans`, so the sweep cannot take the torrent it is fetching.
+
+**Gate 31 Route A: still open, and now 2 of the 3 seed-healthy candidates are eliminated on
+language.** Remaining: **Les Misérables: Shoujo Cosette, 18.10 MB, 4 seeders** — the last one.
+**Next slice:** `node debug/g19n-nyaa-mine.cjs run "Les Misérables: Shoujo Cosette" 1695`.
