@@ -10265,6 +10265,27 @@ export const ru: Catalog = {
     'Журнал повторений этого источника прочитать нельзя ({detail}), поэтому вопрос «давно не повторялось» остался без ответа — перенесённые {count} карточек выбраны только по числу дней просрочки.',
   'ankiWorkbench.tray.problem.stale-clean':
     'При этих порогах застоявшихся карточек не нашлось, поэтому ни одна дата не сдвинулась.',
+  'ankiWorkbench.tray.kind.remove-template': 'Удалить дублирующий шаблон карточки',
+  'ankiWorkbench.tray.describe.remove-template':
+    'Удалить шаблонов из {noteType}: {count}, вместе со всеми созданными ими карточками',
+  'ankiWorkbench.tray.problem.template-no-audit':
+    'Шаблоны карточек ещё не сравнивались, поэтому нельзя сказать, лишняя это копия или единственное место, где задаётся вопрос. Сначала выполните проверку шаблонов.',
+  'ankiWorkbench.tray.problem.template-note-type-missing':
+    'В этом источнике больше нет типа заметки {detail}, поэтому удалять нечего.',
+  'ankiWorkbench.tray.problem.template-missing':
+    'Выбранных шаблонов, которые больше не входят в {detail}: {count}. Они оставлены без изменений.',
+  'ankiWorkbench.tray.problem.template-cloze':
+    'Карточки с пропусками создаются метками в тексте, а не шаблоном, поэтому у {detail} нет шаблона для удаления. Отредактируйте метки пропусков в заметке.',
+  'ankiWorkbench.tray.problem.template-not-duplicate':
+    'Выбранных шаблонов, задающих вопрос, на который ни один другой шаблон не отвечает так же: {count}. Их удаление стёрло бы содержимое, а не дубликат, поэтому они оставлены без изменений.',
+  'ankiWorkbench.tray.problem.template-is-keeper':
+    'Выбранных шаблонов, которые являются сохраняемой копией: {count}. Удалите вместо этого его дубликат.',
+  'ankiWorkbench.tray.problem.template-last':
+    'Тогда у {detail} не осталось бы ни одного шаблона карточки, поэтому ничего не удалено. Типу заметки нужен хотя бы один.',
+  'ankiWorkbench.tray.problem.template-removed':
+    'Удаление {detail} убирает вместе с ним карточек: {count} — вместе с их историей повторений. Отмена вернёт их.',
+  'ankiWorkbench.tray.problem.template-clean':
+    'Ни один шаблон не удалён. Среди выбранного не оказалось удаляемых дубликатов.',
   'ankiWorkbench.tray.aiTo': 'Записать одобренный вариант в',
   'ankiWorkbench.tray.kind.apply-ai-additions': 'Применить проверенные ИИ-варианты',
   'ankiWorkbench.tray.describe.apply-ai-additions': 'Записать каждый одобренный ИИ-вариант в {to} ({conflict})',

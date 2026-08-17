@@ -120,6 +120,13 @@ import {
   type StaleRemedyMode,
   type StaleRemedyPlan,
 } from './ankiStaleCards';
+import {
+  applyTemplateRemoval,
+  templateRemovalOps,
+  type TemplateRemovalPlan,
+  type TemplateRemovalRefusal,
+} from './ankiTemplateRemoval';
+import type { TemplateGroup } from './ankiSiblingAudit';
 import type { VocabContext } from './ankiVocabContext';
 
 /**
@@ -167,7 +174,8 @@ export type TrayActionKind =
   | 'merge-glossary'
   | 'add-cloze'
   | 'reschedule-stale'
-  | 'restore-source';
+  | 'restore-source'
+  | 'remove-template';
 
 /**
  * What a copy does when the destination already holds text — Phase 4's "require
@@ -444,6 +452,29 @@ export type TrayAction =
       facets: SourceFacet[];
       /** What separates two facts. `DEFAULT_SOURCE_SEPARATOR` when omitted. */
       separator?: string;
+    })
+  | (TrayActionBase & {
+      /**
+       * Recipe 17's remove half. Drops a redundant card template and every card
+       * it generated — the only action in the tray that DELETES rows rather than
+       * rewriting them, which is why it reports its cost as a warning and why
+       * `ankiTemplateRemoval` refuses five distinct ways by name.
+       *
+       * Selection-independent, like `normalize-decks`: a template belongs to a
+       * note type, not to the notes a user happened to filter to, so removing it
+       * affects every note of that type whether or not they are on the page.
+       * `noteIds` is deliberately not read by this branch.
+       *
+       * The audit that justifies the removal arrives through
+       * `opts.templateGroups` rather than on the action, for `enrich`'s reason
+       * and one of its own: `draftTemplateGroups` renders templates over a
+       * sample and was measured at 1,014 ms on a real 5-template / 2,000-note
+       * package, and this planner is recomputed on every render.
+       */
+      kind: 'remove-template';
+      noteTypeId: string;
+      /** Ords to remove, in the note type's CURRENT numbering. */
+      ords: number[];
     });
 
 // ----- the ordered list --------------------------------------------------------
@@ -715,7 +746,40 @@ export type TrayProblemCode =
    */
   | 'source-unreadable-clip'
   /** The action ran and restored nothing. Same reason `stale-clean` exists. */
-  | 'source-clean';
+  | 'source-clean'
+  /**
+   * Recipe 17's remove half. The sibling audit has not run, so nothing can say
+   * whether the chosen template is a redundant duplicate or the only copy of a
+   * question. Blocking for `no-enrich-data`'s reason and a stronger one: without
+   * the audit every request would be refused `not-duplicate`, which reads as
+   * "your deck has no duplicates" — the opposite of what an unrun audit means.
+   */
+  | 'template-no-audit'
+  /** The named note type is not in the draft. */
+  | 'template-note-type-missing'
+  /** That ord is not a template of that note type. */
+  | 'template-missing'
+  /** Cloze cards come from field markers, so there is no per-card template. */
+  | 'template-cloze'
+  /**
+   * No `duplicate` group lists that ord as a non-keeper — including the case
+   * where the audit called it `ambiguous`, i.e. the same question with a
+   * DIFFERENT answer. Refused by name rather than left out of the offer, because
+   * removing it would silently drop content the user is still graded on.
+   */
+  | 'template-not-duplicate'
+  /** That ord is the one the audit chose to KEEP — a different fix than above. */
+  | 'template-is-keeper'
+  /** Removing it would leave the note type with no templates and no cards. */
+  | 'template-last'
+  /**
+   * The removal ran. A warning rather than info, and the only tray outcome that
+   * is: it is the one action here that destroys card rows, and its own count is
+   * the number of them.
+   */
+  | 'template-removed'
+  /** The action ran and removed nothing. Same reason `stale-clean` exists. */
+  | 'template-clean';
 
 export interface TrayProblem {
   code: TrayProblemCode;
@@ -822,6 +886,13 @@ export interface TrayPlan {
    */
   sourceContext?: SourceContextPlan;
   /**
+   * What a `remove-template` action dropped. Folded into `draft` — the note
+   * types AND the card table — and here because it is the only tray result that
+   * reports destruction: `removedCards` is a count of rows that will cease to
+   * exist, which no other field in this plan describes.
+   */
+  templateRemoval?: TemplateRemovalPlan;
+  /**
    * Cards whose `due` this tray moved. Separate from `changedNotes` because a
    * reposition-only tray changes zero notes and is not therefore a no-op; a
    * caller that gated Apply on `changedNotes` alone would disable it.
@@ -863,6 +934,27 @@ export const SOURCE_REFUSAL_PROBLEMS: Readonly<
   occupied: { code: 'source-occupied', severity: 'info' },
   'no-provenance': { code: 'source-none', severity: 'info' },
   'unreadable-clip': { code: 'source-unreadable-clip', severity: 'warning' },
+};
+
+/**
+ * Recipe 17's refusals as tray problems. A total `Record` for the reason
+ * `STALE_REFUSAL_PROBLEMS` is one: a refusal added to `TemplateRemovalRefusal`
+ * fails to compile here rather than silently losing its user-facing row.
+ *
+ * None is blocking. Every one is a property of one requested ord, and a request
+ * naming three templates of which two are removable is a partial answer, not a
+ * mis-set form. `not-duplicate` and `is-keeper` are warnings rather than info
+ * because both mean a template the user asked to delete is still there.
+ */
+export const TEMPLATE_REFUSAL_PROBLEMS: Readonly<
+  Record<TemplateRemovalRefusal, { code: TrayProblemCode; severity: 'warning' | 'info' }>
+> = {
+  'note-type-missing': { code: 'template-note-type-missing', severity: 'warning' },
+  'template-missing': { code: 'template-missing', severity: 'warning' },
+  cloze: { code: 'template-cloze', severity: 'warning' },
+  'not-duplicate': { code: 'template-not-duplicate', severity: 'warning' },
+  'is-keeper': { code: 'template-is-keeper', severity: 'warning' },
+  'last-template': { code: 'template-last', severity: 'warning' },
 };
 
 /**
@@ -947,13 +1039,18 @@ function blockingProblems(
   glossary: GlossarySource | undefined,
   /** The draft's collection origin, for recipe 18. `undefined` is `stale-no-origin`. */
   createdAtSec: number | undefined,
+  /** The sibling audit, for recipe 17. `undefined` is `template-no-audit`. */
+  templateGroups: readonly TemplateGroup[] | undefined,
 ): TrayProblem[] {
   const problems: TrayProblem[] = [];
   const enabled = actions.filter((a) => a.enabled);
-  // `normalize-decks` is the one kind whose unit is not the note, so a tray
-  // holding only that needs no selection. Demanding one would be the surface
-  // lying about what the action reads: it renames the draft's decks either way.
-  if (noteIds.length === 0 && enabled.some((a) => a.kind !== 'normalize-decks')) {
+  // Two kinds have a unit that is not the note, so a tray holding only those
+  // needs no selection. Demanding one would be the surface lying about what the
+  // action reads: `normalize-decks` renames the draft's decks either way, and
+  // `remove-template` drops a template from a note TYPE — it affects every note
+  // of that type whether or not the user filtered them onto the page.
+  const SELECTION_FREE = new Set<TrayActionKind>(['normalize-decks', 'remove-template']);
+  if (noteIds.length === 0 && enabled.some((a) => !SELECTION_FREE.has(a.kind))) {
     problems.push({ code: 'empty-selection', severity: 'blocking', count: 0 });
   }
   if (enabled.length === 0) problems.push({ code: 'no-actions', severity: 'blocking', count: 0 });
@@ -1013,6 +1110,18 @@ function blockingProblems(
       // notes remember where they came from".
       if (action.toField === '' || action.facets.length === 0) {
         problems.push({ code: 'empty-parameter', severity: 'blocking', actionId: action.id, count: 1 });
+      }
+    } else if (action.kind === 'remove-template') {
+      // No ord chosen removes nothing at all — a mis-set form, not a deck
+      // without duplicates, so it is refused rather than run to a zero.
+      if (action.ords.length === 0 || action.noteTypeId === '') {
+        problems.push({ code: 'empty-parameter', severity: 'blocking', actionId: action.id, count: 1 });
+      } else if (!templateGroups) {
+        // Blocking, and this one matters more than `no-enrich-data`: with no
+        // audit every ord would come back `not-duplicate`, which the user reads
+        // as "there are no duplicates here" — the exact opposite of what an
+        // audit that has not run actually means.
+        problems.push({ code: 'template-no-audit', severity: 'blocking', actionId: action.id, count: 1 });
       }
     } else if (action.kind === 'reschedule-stale') {
       // Refused here and not from the returned plan, because a mode the
@@ -1287,6 +1396,18 @@ export function planChangeTray(
       masterySegments?: Readonly<Record<MasteryLevel, string>>;
     };
     /**
+     * The sibling audit a `remove-template` action is justified by. Outside the
+     * action for `enrich`'s reason — it is derived state, not a user choice —
+     * and for a cost reason the others do not have: `draftTemplateGroups`
+     * renders every template over a sample and was measured at 1,014 ms on a
+     * real 5-template / 2,000-note package. Recomputing that inside a planner
+     * the surface re-runs on every render would drop frames outright.
+     *
+     * The planner never re-decides these verdicts, exactly as
+     * `ankiTemplateRemoval` never does; it consumes them.
+     */
+    templateGroups?: readonly TemplateGroup[];
+    /**
      * The secondary deck a `merge-glossary` action reads. Outside for the same
      * reason `ai` is: it is another draft's rows, read from a second file after
      * the tray was built, and far too large to sit on a serializable action.
@@ -1306,6 +1427,7 @@ export function planChangeTray(
     opts?.split !== undefined,
     opts?.glossary,
     draft.source.createdAtSec,
+    opts?.templateGroups,
   );
   if (problems.length > 0) {
     return {
@@ -1341,6 +1463,11 @@ export function planChangeTray(
   let deckSplitPlan: DeckSplitPlan | undefined;
   let stalePlan: StaleRemedyPlan | undefined;
   let sourceContextPlan: SourceContextPlan | undefined;
+  // The note-type list as the tray is rewriting it. Only `remove-template`
+  // touches it, but it has to reach the returned draft or the removal would be
+  // folded into the cards and lost on the templates.
+  let draftNoteTypes = draft.noteTypes;
+  let templateRemovalPlan: TemplateRemovalPlan | undefined;
   let changedCards = 0;
 
   const changeFor = (noteId: string): TrayNoteChange => {
@@ -1767,6 +1894,75 @@ export function planChangeTray(
         matched: noteIds.length,
         changed: written,
         skipped: noteIds.length - written,
+      });
+      continue;
+    }
+
+    if (action.kind === 'remove-template') {
+      // Selection-independent, like `normalize-decks`: a template belongs to a
+      // note type, so `noteIds` is deliberately not read here.
+      const plan = applyTemplateRemoval(
+        { ...draft, notes, cards, decks, noteTypes: draftNoteTypes },
+        opts?.templateGroups ?? [],
+        [{ noteTypeId: action.noteTypeId, removeOrds: action.ords }],
+      );
+      templateRemovalPlan = plan;
+
+      if (plan.removals.length > 0) {
+        // Ops built from the BEFORE state — `templateRemovalOps` reads the card
+        // rows and their positions out of the draft the removal ran against,
+        // which is the only place they still exist.
+        ops.push(
+          ...templateRemovalOps(
+            { ...draft, notes, cards, decks, noteTypes: draftNoteTypes },
+            plan,
+            groupId,
+          ),
+        );
+        draftNoteTypes = plan.draft.noteTypes;
+        // The working array is rewritten IN PLACE so every closure above keeps
+        // the same object, then `cardPosition` is rebuilt — a delete shifts
+        // every position after it, and `index` is what the later card-writing
+        // actions address rows through. Only on a real removal, so a tray
+        // without one pays nothing for this.
+        cards.length = 0;
+        cards.push(...plan.draft.cards);
+        index.cardPosition.clear();
+        cards.forEach((card, at) => index.cardPosition.set(card.id, at));
+
+        problems.push({
+          code: 'template-removed',
+          severity: 'warning',
+          actionId: action.id,
+          count: plan.removedCards,
+          detail: plan.removals.map((r) => r.name).join(', '),
+        });
+      } else if (plan.skips.length === 0) {
+        problems.push({ code: 'template-clean', severity: 'info', actionId: action.id, count: 1 });
+      }
+
+      for (const skip of plan.skips) {
+        const mapped = TEMPLATE_REFUSAL_PROBLEMS[skip.refusal];
+        problems.push({
+          code: mapped.code,
+          severity: mapped.severity,
+          actionId: action.id,
+          count: 1,
+          detail: skip.detail ?? skip.noteTypeId,
+        });
+      }
+
+      outcomes.push({
+        actionId: action.id,
+        kind: action.kind,
+        // Templates asked for, templates removed, templates refused — the unit
+        // is the template here, not the note. `removedCards` is reported by the
+        // problem row above, because it is the destructive number and belongs
+        // where the user reads consequences rather than in a matched/changed
+        // triple that every other action fills with note counts.
+        matched: plan.removals.length + plan.skips.length,
+        changed: plan.removals.length,
+        skipped: plan.skips.length,
       });
       continue;
     }
@@ -2521,7 +2717,7 @@ export function planChangeTray(
   return {
     // A tray that changed nothing returns the input objects, so a caller can
     // compare by identity to see that nothing happened.
-    draft: ops.length > 0 ? { ...draft, notes, cards, decks } : draft,
+    draft: ops.length > 0 ? { ...draft, notes, cards, decks, noteTypes: draftNoteTypes } : draft,
     journal:
       ops.length > 0
         ? // A fresh batch forks the history, same as a single edit: a redo past
@@ -2543,6 +2739,7 @@ export function planChangeTray(
     deckSplit: deckSplitPlan,
     stale: stalePlan,
     sourceContext: sourceContextPlan,
+    templateRemoval: templateRemovalPlan,
   };
 }
 

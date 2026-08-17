@@ -9876,6 +9876,27 @@ export const en: Catalog = {
     'This source’s review log cannot be read ({detail}), so “not reviewed lately” could not be answered at all — the {count} cards moved were chosen on overdue days alone.',
   'ankiWorkbench.tray.problem.stale-clean':
     'Nothing was stale under these thresholds, so no due day moved.',
+  'ankiWorkbench.tray.kind.remove-template': 'Remove a duplicate card template',
+  'ankiWorkbench.tray.describe.remove-template':
+    'Remove {count} template(s) from {noteType}, deleting every card they made',
+  'ankiWorkbench.tray.problem.template-no-audit':
+    'The card templates have not been compared yet, so nothing can say whether this one is a redundant copy or the only place a question is asked. Run the template check first.',
+  'ankiWorkbench.tray.problem.template-note-type-missing':
+    'This source no longer has the note type {detail}, so it has no template to remove.',
+  'ankiWorkbench.tray.problem.template-missing':
+    '{count} of the chosen templates are not part of {detail} any more, so they were left alone.',
+  'ankiWorkbench.tray.problem.template-cloze':
+    'Cloze cards come from the markers in the text, not from a card template, so {detail} has no template to remove. Edit the note’s cloze markers instead.',
+  'ankiWorkbench.tray.problem.template-not-duplicate':
+    '{count} of the chosen templates ask a question no other template answers the same way, so removing them would delete content rather than a duplicate. They were left alone.',
+  'ankiWorkbench.tray.problem.template-is-keeper':
+    '{count} of the chosen templates are the copy being kept. Remove one of its duplicates instead.',
+  'ankiWorkbench.tray.problem.template-last':
+    'That would leave {detail} with no card template at all, so nothing was removed. A note type needs at least one.',
+  'ankiWorkbench.tray.problem.template-removed':
+    'Removing {detail} deletes {count} cards along with it, including their review history. Undo puts them back.',
+  'ankiWorkbench.tray.problem.template-clean':
+    'No template was removed. Nothing chosen was a removable duplicate.',
   'ankiWorkbench.tray.aiTo': 'Write the approved suggestion to',
   'ankiWorkbench.tray.kind.apply-ai-additions': 'Apply reviewed AI suggestions',
   'ankiWorkbench.tray.describe.apply-ai-additions': 'Write each approved AI suggestion to {to} ({conflict})',

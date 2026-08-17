@@ -90,10 +90,6 @@
     "test-only-module:src/shared/subtitleFusionEval.ts": {
       "status": "accepted",
       "note": "The EN→JA fusion plan's F7 ship gate. Its real consumer is tools/fusion-eval.cjs, which esbuild-bundles this file at run time by path — the same kind of runtime reference the static import graph cannot follow as importWorker.ts, and the same pattern tools/grammar-audit.cjs and tools/i18n-check.cjs already use. It is deliberately not imported by the app: the harness scores the pipeline from outside it, needs real media and the Whisper runtime, and must not become something product code can call. If tools/fusion-eval.cjs is ever deleted, this becomes a genuine orphan and should be deleted with it."
-    },
-    "test-only-module:src/shared/ankiTemplateRemoval.ts": {
-      "status": "pending",
-      "note": "Recipe 17's remove half, planner layer. Built and tested, no consumer YET, and deliberately so: both destinations were landed first (2ea9e8f6 — the package writer removes for real, the live commit refuses by name) so that no tray control could ship before something could answer it. Stops being test-only when the 'remove-template' tray action kind lands."
     }
   }
 }

@@ -9362,6 +9362,27 @@ export const zh: Catalog = {
     '此来源的复习记录无法读取（{detail}），因此完全无法回答“最近没有复习”。移动的 {count} 张卡片仅按逾期天数选出。',
   'ankiWorkbench.tray.problem.stale-clean':
     '在这些阈值下没有停滞的卡片，因此没有移动任何到期日。',
+  'ankiWorkbench.tray.kind.remove-template': '删除重复的卡片模板',
+  'ankiWorkbench.tray.describe.remove-template':
+    '从 {noteType} 中删除 {count} 个模板，并删除它们生成的所有卡片',
+  'ankiWorkbench.tray.problem.template-no-audit':
+    '尚未比较卡片模板，因此无法判断这是多余的副本，还是唯一提出该问题的模板。请先运行模板检查。',
+  'ankiWorkbench.tray.problem.template-note-type-missing':
+    '此来源已不再包含笔记类型 {detail}，因此没有可删除的模板。',
+  'ankiWorkbench.tray.problem.template-missing':
+    '所选模板中有 {count} 个已不属于 {detail}，因此未作改动。',
+  'ankiWorkbench.tray.problem.template-cloze':
+    '填空卡片由文本中的标记生成，而非卡片模板，因此 {detail} 没有可删除的模板。请改为编辑笔记的填空标记。',
+  'ankiWorkbench.tray.problem.template-not-duplicate':
+    '所选模板中有 {count} 个提出的问题没有其他模板以相同方式作答，删除它们将丢失内容而非重复项，因此未作改动。',
+  'ankiWorkbench.tray.problem.template-is-keeper':
+    '所选模板中有 {count} 个是要保留的那一份。请改为删除它的重复项。',
+  'ankiWorkbench.tray.problem.template-last':
+    '这会使 {detail} 一个卡片模板都不剩，因此未删除任何内容。笔记类型至少需要一个模板。',
+  'ankiWorkbench.tray.problem.template-removed':
+    '删除 {detail} 会连同它生成的 {count} 张卡片及其复习历史一并删除。撤销可以恢复。',
+  'ankiWorkbench.tray.problem.template-clean':
+    '未删除任何模板。所选内容中没有可删除的重复项。',
   'ankiWorkbench.tray.aiTo': '已批准的建议写入到',
   'ankiWorkbench.tray.kind.apply-ai-additions': '应用已审阅的 AI 建议',
   'ankiWorkbench.tray.describe.apply-ai-additions': '把每条已批准的 AI 建议写入 {to}（{conflict}）',

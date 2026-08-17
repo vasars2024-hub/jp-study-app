@@ -9444,6 +9444,27 @@ export const ja: Catalog = {
     'このソースの復習ログを読み取れないため（{detail}）、「最近復習していない」は判定できませんでした。移動した{count}枚は期限超過の日数だけで選ばれています。',
   'ankiWorkbench.tray.problem.stale-clean':
     'このしきい値では滞ったカードがなかったため、期日は1件も移動していません。',
+  'ankiWorkbench.tray.kind.remove-template': '重複したカードテンプレートを削除',
+  'ankiWorkbench.tray.describe.remove-template':
+    '{noteType} からテンプレートを{count}件削除し、それが生成したカードもすべて削除します',
+  'ankiWorkbench.tray.problem.template-no-audit':
+    'カードテンプレートがまだ比較されていないため、これが重複した写しなのか、その質問を尋ねる唯一のテンプレートなのか判断できません。先にテンプレート点検を実行してください。',
+  'ankiWorkbench.tray.problem.template-note-type-missing':
+    'このソースにはノートタイプ {detail} がすでに存在しないため、削除できるテンプレートもありません。',
+  'ankiWorkbench.tray.problem.template-missing':
+    '選択したテンプレートのうち{count}件はすでに {detail} の一部ではないため、そのままにしました。',
+  'ankiWorkbench.tray.problem.template-cloze':
+    '穴埋めカードはテンプレートではなく本文中のマーカーから生成されるため、{detail} に削除できるテンプレートはありません。代わりにノートの穴埋めマーカーを編集してください。',
+  'ankiWorkbench.tray.problem.template-not-duplicate':
+    '選択したテンプレートのうち{count}件は、他のどのテンプレートとも同じ答え方をしない質問を尋ねています。削除すると重複ではなく内容そのものが失われるため、そのままにしました。',
+  'ankiWorkbench.tray.problem.template-is-keeper':
+    '選択したテンプレートのうち{count}件は残す側の写しです。代わりにその重複を削除してください。',
+  'ankiWorkbench.tray.problem.template-last':
+    'それでは {detail} にカードテンプレートが1件も残らないため、何も削除していません。ノートタイプには最低1件必要です。',
+  'ankiWorkbench.tray.problem.template-removed':
+    '{detail} を削除すると、それが生成したカード{count}枚も復習履歴ごと削除されます。元に戻すと復元されます。',
+  'ankiWorkbench.tray.problem.template-clean':
+    'テンプレートは削除されていません。選択したものに削除可能な重複はありませんでした。',
   'ankiWorkbench.tray.aiTo': '承認した候補の書き込み先',
   'ankiWorkbench.tray.kind.apply-ai-additions': '確認済みのAI候補を適用',
   'ankiWorkbench.tray.describe.apply-ai-additions': '承認した各AI候補を{to}に書き込む（{conflict}）',
