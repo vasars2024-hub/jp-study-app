@@ -1,0 +1,198 @@
+/**
+ * Liquid Workplace L3.3 — presentation must survive every snapshot rebuild.
+ *
+ * L3.2 shipped after `main/desktop.ts`'s allowlist deleted `presentation` on its
+ * way to disk, which reverted the user's own command 604ms after they gave it.
+ * That is a CLASS of defect, not one site: `DesktopShell` rebuilds a
+ * `WindowSnapshot` in four more places, each an object literal that keeps only
+ * what it names or spreads.
+ *
+ *   `winToSnapshot`            the persistence path                (L3.2, fixed)
+ *   `{...winToSnapshot(top)}`  move-window-to-another-desktop      (:1165)
+ *   `{...winToSnapshot(w)}`    tear a window off onto its own desk (:2296)
+ *   `winToSnapshot(win)`       cross-monitor drag payload          (:3234)
+ *   `{...winFromSnapshot()}`   the adopt on the receiving monitor  (:1244)
+ *
+ * All four spread, so today they carry the field. This file is what makes that
+ * a guarantee rather than an accident: each case is the exact shape of the
+ * literal at that call site, so a future edit that switches a spread for an
+ * explicit field list fails here instead of in the user's hands.
+ *
+ * These are the REVERSE transitions the plan's §2.1 asks for — a window that
+ * cannot come back from a drag, a tear-off or a desktop move is not reversible,
+ * however clean its toggle is.
+ */
+
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
+
+import { parsePresentation, type LiquidPresentationState } from '../../shared/liquidWindowState';
+import { presentationToSnapshot, toggleWinPresentation } from '../liquidWindowPresentation';
+
+const SHELL = readFileSync(resolve(__dirname, '..', 'components', 'DesktopShell.tsx'), 'utf8');
+
+/** `DesktopShell`'s `Win`, as the shell actually holds one. */
+const WIN = {
+  id: 'dictionary',
+  section: 'dictionary' as const,
+  x: 120,
+  y: 80,
+  w: 820,
+  h: 580,
+  z: 11,
+  min: false,
+  max: false,
+  pin: false,
+  rect: undefined as { x: number; y: number; w: number; h: number } | undefined,
+};
+
+type Win = typeof WIN & { presentation?: LiquidPresentationState };
+
+/** A local mirror of `DesktopShell.winToSnapshot`, including the L3 half. */
+function winToSnapshot(win: Win) {
+  return {
+    id: win.id,
+    section: win.section,
+    x: win.x,
+    y: win.y,
+    w: win.w,
+    h: win.h,
+    z: win.z,
+    visible: !win.min,
+    maximized: !!win.max,
+    pinned: !!win.pin,
+    restoreRect: win.rect,
+    ...presentationToSnapshot(win),
+  };
+}
+
+/** A local mirror of `DesktopShell.winFromSnapshot`. */
+function winFromSnapshot(snap: ReturnType<typeof winToSnapshot>): Win {
+  return {
+    id: snap.id,
+    section: snap.section,
+    x: snap.x,
+    y: snap.y,
+    w: snap.w,
+    h: snap.h,
+    z: snap.z,
+    min: !snap.visible,
+    max: snap.maximized,
+    pin: snap.pinned,
+    rect: snap.restoreRect,
+    ...presentationToSnapshot({ presentation: parsePresentation(snap.presentation) }),
+  } as Win;
+}
+
+const liquid = () => toggleWinPresentation(WIN as Win);
+
+describe('presentation survives every snapshot rebuild', () => {
+  it('the persistence path round-trips it', () => {
+    const w = liquid();
+    const back = winFromSnapshot(winToSnapshot(w));
+    expect(back.presentation).toEqual(w.presentation);
+  });
+
+  it('survives move-to-another-desktop, which repositions the window', () => {
+    // `{ ...winToSnapshot(top), x: 40, y: 40 }` — DesktopShell.tsx:1165.
+    const moved = { ...winToSnapshot(liquid()), x: 40, y: 40 };
+    expect(moved.presentation?.mode).toBe('liquid');
+    // The window lands at 40,40 but still knows where it came FROM, so
+    // Return to standard does not strand it at the drop point.
+    expect(moved.presentation?.standardRect).toEqual({ x: 120, y: 80, w: 820, h: 580 });
+  });
+
+  it('survives a taskbar tear-off onto its own desktop', () => {
+    // `{ ...winToSnapshot(w), x: 40, y: 40, visible: true }` — DesktopShell.tsx:2296.
+    const torn = { ...winToSnapshot(liquid()), x: 40, y: 40, visible: true };
+    expect(torn.presentation?.mode).toBe('liquid');
+    expect(torn.visible).toBe(true);
+  });
+
+  it('survives a cross-monitor drag, payload through adopt', () => {
+    // `winToSnapshot(win)` into the drag payload (:3234), `winFromSnapshot(snap)`
+    // out of it on the receiving monitor (:1244). Serialised through JSON,
+    // because that payload crosses a process boundary.
+    const payload = JSON.parse(JSON.stringify(winToSnapshot(liquid())));
+    const adopted = { ...winFromSnapshot(payload), x: 300, y: 200, z: 99, min: false };
+    expect(adopted.presentation?.mode).toBe('liquid');
+    expect(toggleWinPresentation(adopted)).toMatchObject({ x: 120, y: 80, w: 820, h: 580 });
+  });
+
+  it('a conventional window adds no key at any of those sites', () => {
+    // The other half: pre-L3 layouts must not grow a field they never had.
+    for (const snap of [
+      winToSnapshot(WIN as Win),
+      { ...winToSnapshot(WIN as Win), x: 40, y: 40 },
+      { ...winToSnapshot(WIN as Win), x: 40, y: 40, visible: true },
+    ]) {
+      expect(Object.keys(snap)).not.toContain('presentation');
+    }
+  });
+});
+
+/**
+ * The mirrors above are fixtures, not the shell — a mutation inside
+ * `DesktopShell.tsx` would not move a single one of them. These read the real
+ * file, so the binding between this suite and the code it claims to cover is
+ * itself asserted. A source assertion is a weak instrument in general; here it
+ * is the RIGHT one, because the defect being guarded is literally the shape of
+ * an object literal, and importing a 3,400-line shell to check it would test
+ * the renderer instead.
+ */
+describe('DesktopShell actually routes every rebuild through the converters', () => {
+  it('both converters carry the presentation half', () => {
+    expect(SHELL).toMatch(/function winToSnapshot[\s\S]{0,700}?\.\.\.presentationToSnapshot\(win\)/);
+    expect(SHELL).toMatch(/function winFromSnapshot[\s\S]{0,700}?presentationFromSnapshot\(win\.presentation\)/);
+  });
+
+  it('no rebuild site hand-builds a snapshot around the converter', () => {
+    // Every `winToSnapshot(...)` outside its own definition must be spread or
+    // passed whole. `{ id: w.id, section: w.section, ... }` written out by hand
+    // beside a converter call is the exact shape that dropped `pinned` once and
+    // `presentation` in main this turn.
+    const uses = [...SHELL.matchAll(/winToSnapshot\((\w+)\)/g)];
+    // Three called with an argument (desktop move, tear-off, drag payload) and
+    // three passed bare to `.map` (the two commit paths and hydrate).
+    expect(uses.length).toBe(3);
+    expect(SHELL.match(/map\(winToSnapshot\)/g) ?? []).toHaveLength(3);
+    for (const use of uses) {
+      const before = SHELL.slice(Math.max(0, use.index - 12), use.index);
+      expect(before, `winToSnapshot(${use[1]}) at ${use.index}`).toMatch(/\.\.\.$|[=(,:]\s*$|\bfunction /);
+    }
+  });
+
+  it('the toggle command is the only writer of window.presentation in the shell', () => {
+    // A second writer is a second way to capture the wrong `standardRect` —
+    // which is decision (2) of `shared/liquidWindowState.ts`, the one that
+    // loses the way home permanently and silently.
+    expect(SHELL).not.toMatch(/presentation\s*:\s*\{/);
+    expect(SHELL.match(/toggleWinPresentation\(/g) ?? []).toHaveLength(1);
+    // The shell must go through the seam, not reach past it into the schema's
+    // own commands. (Matched as calls: `desktop.returnToStandard` is an i18n
+    // key and appears in this file legitimately.)
+    expect(SHELL).not.toMatch(/\b(makeLiquid|returnToStandard)\s*\(/);
+  });
+});
+
+describe('liquid and maximize are independent, and both reverse', () => {
+  it('maximizing while liquid keeps the pre-liquid geometry as the way home', () => {
+    const w = liquid();
+    // `toggleMax`'s own literal (DesktopShell.tsx:1802), spread verbatim.
+    const maxed = { ...w, max: true, rect: { x: w.x, y: w.y, w: w.w, h: w.h }, x: 0, y: 0, w: 1920, h: 1040 };
+    expect(maxed.presentation?.standardRect).toEqual({ x: 120, y: 80, w: 820, h: 580 });
+    const back = toggleWinPresentation(maxed);
+    expect(back).toMatchObject({ x: 120, y: 80, w: 820, h: 580, max: false });
+    expect('presentation' in back).toBe(false);
+  });
+
+  it('a window made liquid WHILE maximized comes back maximized', () => {
+    const w = toggleWinPresentation({ ...WIN, max: true, x: 0, y: 0, w: 1920, h: 1040 } as Win);
+    expect(w.presentation?.standardMaximized).toBe(true);
+    // Un-maximize while liquid, then return: the presentation it left was
+    // maximized, so that is the presentation it comes back to.
+    const unmaxed = { ...w, max: false, x: 120, y: 80, w: 820, h: 580 };
+    expect(toggleWinPresentation(unmaxed)).toMatchObject({ max: true, x: 0, y: 0, w: 1920, h: 1040 });
+  });
+});
