@@ -552,9 +552,34 @@ only by the run-count dropping 2,248 → 1,205. Windows are now addressed by **D
 `refusedWindows`/`dictEntriesLive` sit at the top level of every result. Generally: *a probe keyed
 on any user-visible English string cannot be used in a sweep that changes the language.*
 
-Still open for L1: categories 5–7, category 8's **offline** half (a timeout, distinct from the
+**Category 5 (UI clarity) driven 2026-08-17 and is NOT SCORED — structurally, not for a defect.**
+`.coordination/liquid-workplace/L1_UI_CLARITY.md`. **Q7 and Q8 are `NO-SUBJECT` on all five
+windows**, measured rather than assumed: **0 Liquid-presentation toggles** anywhere, so there is no
+Liquid mode to leave and nothing to turn off; **Q6 is `NO-SUBJECT` on Anki and Dictionary too**
+(**0** `backdrop-filter` regions). Scoring those "yes" would credit the ABSENCE of the feature as
+the presence of its quality, so category 5 is capped at **7 answerable questions of 10 until L3/L4
+exists** — the same shape as category 2's missing Standard-vs-Liquid term. Driven results
+(YES/NO/NO-SUBJECT): Anki 4/1/3, Scraper 5/1/2, Dictionary 4/1/3, Media 5/1/2, Settings 6/0/2.
+The one real cross-surface finding is **Q4**: Scraper **31**, Media **25**, Dictionary **18**
+chrome controls against a 12 bar, and **Media offers 0 collapsed disclosures at all**. Anki fails
+**Q3** — its primary action sits outside the body viewport at `scrollTop 0`. Q5 inherited from
+`l1-accessibility.js` re-driven today (min **5.30:1**, **0** of **141** failing); Q9 inherited from
+`parity-ledger.json` (**0 of 7** rows `both`, all `pending`).
+Control fired in three directions — blanked title → Q2 NO, displaced primary → Q3 NO, and an
+injected 6-card **heterogeneous** dashboard → Q10 NO while `div.os-theme-grid`'s 13 **homogeneous**
+swatches at the same 1.00 uniformity stay YES, proving the gallery discriminator is a real
+distinction and not a blanket exemption. Restored to 0 markers, all verdicts back to baseline.
+**Four probe defects were killed before any score was recorded**, each a recurring shape: the
+window body computes to `rgba(0,0,0,0)` so "is it accent?" was comparing against black; Anki
+scored `entryPoints: 0` because a `<select>` was not counted as an entry point; Q3 answered YES
+about the **wrong element** (Dictionary's grammar toggle, Media's nav row); and Q10 called four
+surfaces a card dashboard when the hosts were nav lists and a conjugation table. Plus
+`identityMarkers.desktopLayer` queried `.desktop`, which does not exist here — the same
+match-nothing selector failure as `l1-use-of-space.js`'s `.fwin-titlebar`.
+
+Still open for L1: categories 6–7, category 8's **offline** half (a timeout, distinct from the
 refusal already driven), its dead-control and fabricated-value counts, and the layout studies.
-`LIQUID_SCORECARD.md` is deliberately still empty — five driven categories, none scoring 10.
+`LIQUID_SCORECARD.md` is deliberately still empty — six driven categories, none scoring 10.
 
 ### L2 — Semantic tokens and shared primitives
 
