@@ -24564,3 +24564,46 @@ Gates this turn: `npx vitest run` **709 files passed / 1 skipped, 9,717 passed, 
 - Also this turn, before the ladder slot: `727f70e2` — boss-audit Finding 2's self-contained half.
   All 17 `mediaCalendar.*` keys were committed at HEAD in four languages and the only module that
   reads them never was, so HEAD rendered a bare-English calendar with an OS-locale date.
+
+## 2026-08-17 — Track 7 / gate 5: the three capabilities that were unwritable by construction (`primary`)
+
+- `67512897` the model + both writers + 17 tests; `8901e775` the batch tray + 8 tests.
+  DECISION 1 of the session directive, taken as written: **add the ops, do not narrow the gate.**
+- **What was actually wrong.** `card-flag`, `card-queue` and `card-scheduling` were
+  `journalOp: null` in `shared/ankiParityMatrix.ts`. That is not a missing button — the journal
+  is the only thing that reaches a destination, so those three could not be written by any path.
+  Three new `AnkiDraftEditOp` kinds, three change-set fields, `JOURNAL_OP_COVERAGE` and
+  `CHANGE_SET_COVERAGE` extended (both are total `Record`s, so they had to be).
+- **The cells differ per destination, and that is the finding.** Suspension is live-writable
+  through AnkiConnect's own `suspend`/`unsuspend`; interval/ease through
+  `setSpecificValueOfCard` on `ivl`/`factor`, the route `card-due` already proved.
+  **`card-flag` is `blocked` on connect** (`card-flag-unsupported`): the only route assigns the
+  WHOLE `flags` column, whose upper bits are reserved and are **not in the draft** — a live write
+  would clear state this app never read. The package writer has the stored column in front of it
+  and rewrites the low three bits (`encodeCardFlag`), which is why the same capability is
+  `supported` there. Proven both ways in `apkgExportCore.test.ts`: reserved bits `0b1011_0000`
+  survive a colour change.
+- **Scope split, recorded.** `reps`/`lapses`/`left` did NOT become writable. They are now a
+  separate read-only row `card-review-counters`, because the revlog still holds a row per review
+  and a rewritten counter puts a card in disagreement with its own history. Interval and ease
+  carry no such second copy. The matrix is now **17 rows / 9 journal-backed / 8 read-only /
+  3 blocked live**.
+- **Unsuspend cannot be defaulted.** Anki stores no pre-suspension queue either; it recomputes
+  from `type`. `restoredQueue()` mirrors that (learning splits on `due >= 1e9`, an epoch second
+  vs a day number) and returns `null` for a type that did not decode — refused as
+  `unknown-card-state` / `card-state-unknown` rather than filed into queue 0, which would turn an
+  unsuspend into a reset.
+- **Verify asymmetry, deliberate.** The package verifies the exact queue number it chose; the live
+  commit verifies SUSPENDEDNESS, because `unsuspend` restores a queue Anki recomputes and
+  demanding the draft's number would fail a commit that did exactly what it said.
+- **GATE 5 IS NOT CLOSED and must not be reported as closed.** Missing: the tray's builder control
+  for `set-card-state`, and the load-bearing half — batch it on the real 3,221-note deck, export,
+  re-read through the real path, prove the resulting state.
+- **GATES this turn:** `npx vitest run` **727 files / 9,999 tests / 0 failed** / 6 skipped.
+  i18n exit 0 at 10,542 keys · architecture exit 0 "Nothing new", 6 pending · eslint **0 errors**
+  on all 16 touched paths (75 warnings, all pre-existing `no-non-null-assertion` in tests).
+- **TRAP.** The four catalogs carry another track's live localization campaign (1,200+ lines in
+  ja/zh/ru). `git add` on one lands it. Slice 1 needed a bespoke swap-based stager
+  (`debug/stage-gate5-catalogs.cjs`, reverse-swap === HEAD as the guard); slice 2 was one
+  contiguous block and `debug/stage-catalog-insert.cjs` handled it. Both commits re-verified in a
+  detached worktree at their own HEAD.

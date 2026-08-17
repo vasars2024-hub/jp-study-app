@@ -362,6 +362,23 @@ This slice is complete only when all of these can be shown with real data and no
     explanation.
 4. Exclude words known locally, known in Anki, or both; resolve a deliberately conflicting item according to the selected precedence.
 5. Batch-edit tags, flags, deck, suspension, due date, interval/ease or a supported scheduling preset, then reread Anki and prove the resulting state.
+
+    **NOT CLOSED — half built 2026-08-17** (`67512897` model + both writers,
+    `8901e775` the batch). Three of the six were unwritable BY CONSTRUCTION:
+    `card-flag`, `card-queue` and `card-scheduling` carried `journalOp: null`, and
+    `buildApkgExportChanges` folds `journal.done` and nothing else. They now have op
+    kinds, change-set fields, a package writer, a live commit and a `set-card-state`
+    tray action. Per destination they differ and that is the honest answer:
+    suspension goes live through AnkiConnect's own `suspend`/`unsuspend`,
+    interval/ease through `setSpecificValueOfCard` on `ivl`/`factor` (the route
+    `card-due` already uses), and **`card-flag` is `blocked` live** with
+    `card-flag-unsupported` — the only route assigns the whole `flags` column, whose
+    upper bits are reserved and are not in the draft. `reps`/`lapses`/`left` stayed
+    read-only as a new `card-review-counters` row: the revlog holds a row per review,
+    so a rewritten counter would contradict the card's own history.
+    **What the gate still weighs is untouched: the tray has no builder control for
+    the action, and nothing has been re-read from the real 3,221-note deck.** Do not
+    report this gate as passing on the tags/deck/due thirds, nor on these tests.
 6. Safely edit a multi-template and cloze note without confusing fields with generated cards or breaking sibling renders.
 7. Interrupt a large import, translation, dry run, and live commit; recover without a false success state or an ambiguous partial result.
 8. Undo a draft action, reverse a supported committed action, and clearly explain any adapter operation that cannot be reversed.
