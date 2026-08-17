@@ -32,7 +32,7 @@ vi.mock('electron', () => ({
 
 let encryptionAvailable = true;
 
-const { addFailureReason, awaitFilesStallReason, buildAddForm, magnetInfoHash, mapQbitState, mapTransfer, normalizeQbitInput, parseAddOutcome, qbitAwaitFiles, qbitBaseUrl, qbitSend, qbitTest, qbitTransfers, resetQbitSessions, swarmKnownCount } =
+const { addFailureReason, awaitFilesStallReason, buildAddForm, magnetInfoHash, mapQbitState, mapTransfer, normalizeQbitInput, parseAddOutcome, qbitAwaitFiles, qbitBaseUrl, qbitSend, qbitAwaitMetadata, qbitTest, qbitTransfers, resetQbitSessions, swarmCount, swarmSampleOf, unreachedSwarmReason } =
   await import('../scraper/qbittorrent');
 type StallInput = Parameters<typeof awaitFilesStallReason>[0];
 
@@ -959,7 +959,7 @@ function stall(overrides: Partial<StallInput> = {}): StallInput {
     done: 3,
     total: 39,
     waitedMs: 307_916,
-    last: { connected: 6, known: 40, speedBps: 120_000 },
+    last: { connected: 6, seedsKnown: 12, peersKnown: 28, speedBps: 120_000 },
     peakConnected: 6,
     clientOffline: false,
     ...overrides,
@@ -970,7 +970,7 @@ describe('awaitFilesStallReason', () => {
   it('calls a swarm nobody is in dead, not slow', () => {
     const reason = awaitFilesStallReason(stall({
       done: 0,
-      last: { connected: 0, known: 0, speedBps: 0 },
+      last: { connected: 0, seedsKnown: 0, peersKnown: 0, speedBps: 0 },
       peakConnected: 0,
     }));
     expect(reason).toContain('dead, not slow');
@@ -983,18 +983,21 @@ describe('awaitFilesStallReason', () => {
   it('blames the connection, not the release, when the swarm is populated but unreached', () => {
     const reason = awaitFilesStallReason(stall({
       done: 0,
-      last: { connected: 0, known: 8, speedBps: 0 },
+      last: { connected: 0, seedsKnown: 8, peersKnown: 4, speedBps: 0 },
       peakConnected: 0,
     }));
-    expect(reason).toContain('the swarm lists 8');
+    expect(reason).toContain('lists 8 seed(s)');
     expect(reason).toContain('connection problem');
     // The distinction is the whole point: this one is not the release's fault.
-    expect(reason).not.toContain('dead');
+    // The sentence ends "not a dead release", so the word is present on purpose
+    // — what must be absent is the verdict.
+    expect(reason).not.toContain('dead, not slow');
+    expect(reason).not.toContain('Pick another release');
   });
 
   it('says the swarm went silent when peers were there earlier and are not now', () => {
     const reason = awaitFilesStallReason(stall({
-      last: { connected: 0, known: 40, speedBps: 0 },
+      last: { connected: 0, seedsKnown: 12, peersKnown: 28, speedBps: 0 },
       peakConnected: 6,
     }));
     expect(reason).toContain('Timed out with 3/39 subtitle file(s) complete.');
@@ -1014,7 +1017,7 @@ describe('awaitFilesStallReason', () => {
     // as different problems. Every other input is the dead-swarm shape.
     const reason = awaitFilesStallReason(stall({
       clientOffline: true,
-      last: { connected: 0, known: 0, speedBps: 0 },
+      last: { connected: 0, seedsKnown: 0, peersKnown: 0, speedBps: 0 },
       peakConnected: 0,
     }));
     expect(reason).toBe(
@@ -1028,7 +1031,7 @@ describe('awaitFilesStallReason', () => {
     // seconds ago reports. Reading it as zero would convict a live release.
     const reason = awaitFilesStallReason(stall({
       done: 0,
-      last: { connected: 0, known: null, speedBps: 0 },
+      last: { connected: 0, seedsKnown: null, peersKnown: null, speedBps: 0 },
       peakConnected: 0,
     }));
     expect(reason).toContain('never learned how many');
@@ -1044,31 +1047,72 @@ describe('awaitFilesStallReason', () => {
   it('never reports a zero-minute wait', () => {
     const reason = awaitFilesStallReason(stall({
       waitedMs: 900,
-      last: { connected: 0, known: 0, speedBps: 0 },
+      last: { connected: 0, seedsKnown: 0, peersKnown: 0, speedBps: 0 },
       peakConnected: 0,
     }));
-    expect(reason).toContain('1 minute,');
+    expect(reason).toContain('in 1 minute.');
     expect(reason).not.toContain('0 minute');
   });
 });
 
-describe('swarmKnownCount', () => {
+describe('swarmCount and the swarm sample', () => {
   it('reads a tracker that has not answered as unknown, not as empty', () => {
-    // qBittorrent's own value for an unscraped tracker. Summing it raw is how
-    // a message ends up claiming "the swarm lists -2".
-    expect(swarmKnownCount(-1, -1)).toBeNull();
-  });
-
-  it('keeps the half that did answer', () => {
-    expect(swarmKnownCount(-1, 61)).toBe(61);
-    expect(swarmKnownCount(9, -1)).toBe(9);
+    // qBittorrent's own value for an unscraped tracker. Reading it raw is how a
+    // message ends up claiming "the swarm lists -1".
+    expect(swarmCount(-1)).toBeNull();
   });
 
   it('reads a real zero as a real zero', () => {
     // Measured live on qBittorrent 5.2.3, on a torrent added seconds earlier:
     // `num_complete` 0 and `num_incomplete` 61. Zero here is a fact, not a gap.
-    expect(swarmKnownCount(0, 0)).toBe(0);
-    expect(swarmKnownCount(0, 61)).toBe(61);
+    expect(swarmCount(0)).toBe(0);
+    expect(swarmCount(61)).toBe(61);
+  });
+
+  it('keeps the two halves apart, which is what decides the advice', () => {
+    // The exact live shape of gate 31's Route B candidate on 2026-08-18.
+    const sample = swarmSampleOf(mapTransfer({
+      num_seeds: 0, num_leechs: 0, num_complete: 0, num_incomplete: 1, dlspeed: 0,
+    }));
+    expect(sample).toEqual({ connected: 0, seedsKnown: 0, peersKnown: 1, speedBps: 0 });
+    // Summed it would be 1, and "we reached none of 1" reads as the user's
+    // firewall. Split, it is "no complete copy is being shared".
+    expect(unreachedSwarmReason(sample)).toContain('no seed');
+    expect(unreachedSwarmReason(sample)).not.toContain('connection problem');
+  });
+
+  it('drops only the half the tracker withheld', () => {
+    const sample = swarmSampleOf(mapTransfer({ num_complete: -1, num_incomplete: 61 }));
+    expect(sample.seedsKnown).toBeNull();
+    expect(sample.peersKnown).toBe(61);
+  });
+});
+
+describe('unreachedSwarmReason', () => {
+  const s = (seedsKnown: number | null, peersKnown: number | null) =>
+    unreachedSwarmReason({ connected: 0, seedsKnown, peersKnown, speedBps: 0 });
+
+  it('blames the connection only when a seed actually exists', () => {
+    expect(s(8, 4)).toContain('connection problem');
+    expect(s(8, 4)).toContain('lists 8 seed(s)');
+  });
+
+  it('blames the release when peers exist but no seed does', () => {
+    expect(s(0, 1)).toContain('1 peer(s) and no seed');
+    expect(s(0, 1)).toContain('complete copy');
+    expect(s(0, 1)).not.toContain('connection problem');
+  });
+
+  it('calls an empty swarm dead', () => {
+    expect(s(0, 0)).toContain('dead, not slow');
+  });
+
+  it('convicts nobody when the tracker never answered', () => {
+    expect(s(null, null)).toContain('never learned how many');
+    // It says "nothing says it is dead either" — a refusal to convict, which is
+    // the opposite of the verdict, so the verdict is what is asserted absent.
+    expect(s(null, null)).not.toContain('dead, not slow');
+    expect(s(null, null)).not.toContain('Pick another release');
   });
 });
 
@@ -1114,7 +1158,9 @@ describe('qbitAwaitFiles reads the swarm off the live torrent', () => {
     fileListResponse = SUBS;
     torrentInfoExtra = [torrent({ num_complete: 7, num_incomplete: 1 })];
     const out = await qbitAwaitFiles({ config }, HASH_AWAIT, [0, 1], options);
-    expect(out.ok === false && out.reason).toContain('the swarm lists 8');
+    // 7 seeds, not the 8 a sum would report: the leecher is not a complete copy
+    // and naming it here is what made the advice wrong.
+    expect(out.ok === false && out.reason).toContain('lists 7 seed(s)');
     expect(out.ok === false && out.reason).toContain('connection problem');
   });
 
@@ -1131,9 +1177,19 @@ describe('qbitAwaitFiles reads the swarm off the live torrent', () => {
     torrentInfoExtra = [torrent({ num_complete: -1, num_incomplete: -1 })];
     const out = await qbitAwaitFiles({ config }, HASH_AWAIT, [0, 1], options);
     expect(out.ok === false && out.reason).toContain('never learned how many');
-    // NEGATIVE CONTROL: the sentence a raw sum would have produced.
-    expect(out.ok === false && out.reason).not.toContain('-2');
+    // NEGATIVE CONTROL: the sentence a raw read would have produced.
+    expect(out.ok === false && out.reason).not.toContain('-1');
     expect(out.ok === false && out.reason).not.toContain('dead, not slow');
+  });
+
+  it('blames the release, not the firewall, for a swarm with peers and no seed', async () => {
+    // The live shape, end to end through the wait rather than through the pure
+    // function: `num_complete 0, num_incomplete 1` for the whole wait.
+    fileListResponse = SUBS;
+    torrentInfoExtra = [torrent({ num_complete: 0, num_incomplete: 1 })];
+    const out = await qbitAwaitFiles({ config }, HASH_AWAIT, [0, 1], options);
+    expect(out.ok === false && out.reason).toContain('1 peer(s) and no seed');
+    expect(out.ok === false && out.reason).not.toContain('connection problem');
   });
 
   it('notices a swarm that dies under it, which one final sample could not', async () => {
@@ -1158,5 +1214,76 @@ describe('qbitAwaitFiles reads the swarm off the live torrent', () => {
     const out = await qbitAwaitFiles({ config }, HASH_AWAIT, [0, 1], options);
     expect(out.ok).toBe(true);
     expect(out.ok === true && out.value.map((f) => f.index)).toEqual([0, 1]);
+  });
+});
+
+// ---- the metadata wait had the identical blind spot -----------------------
+//
+// Measured live 2026-08-18: gate 31's own Route B candidate spent 8 minutes at
+// `seedsConnected 0, peersConnected 0, seedsTotal 0, peersTotal 1` and was
+// reported as "no peer sent its file list within 8 minutes" — true, and silent
+// about the fact that no complete copy of it is being shared at all. The fetch
+// never reached `qbitAwaitFiles`; it died one function earlier, saying nothing.
+
+describe('qbitAwaitMetadata names the swarm too', () => {
+  const options = { timeoutMs: 300, pollMs: 15 };
+
+  function torrent(overrides: Record<string, unknown> = {}) {
+    return {
+      hash: HASH_AWAIT,
+      name: 'Show',
+      state: 'metaDL',
+      progress: 0,
+      save_path: 'D:\Subs',
+      num_leechs: 0,
+      num_incomplete: 0,
+      num_seeds: 0,
+      num_complete: 0,
+      ...overrides,
+    };
+  }
+
+  it('reports the live shape as a release nobody has a complete copy of', async () => {
+    fileListResponse = [];
+    torrentInfoExtra = [torrent({ num_incomplete: 1 })];
+    const out = await qbitAwaitMetadata({ config }, HASH_AWAIT, options);
+    expect(out.ok).toBe(false);
+    expect(out.ok === false && out.reason).toContain('1 peer(s) and no seed');
+    // NEGATIVE CONTROL: the sentence the live run actually produced, which
+    // named the symptom and stopped there.
+    expect(out.ok === false && out.reason).not.toBe(
+      'qBittorrent could not read what is inside this release: no peer sent its file list within 1 minute.',
+    );
+  });
+
+  it('calls an empty swarm dead here too', async () => {
+    fileListResponse = [];
+    torrentInfoExtra = [torrent()];
+    const out = await qbitAwaitMetadata({ config }, HASH_AWAIT, options);
+    expect(out.ok === false && out.reason).toContain('dead, not slow');
+  });
+
+  it('keeps blaming the connection when seeds are there and unreached', async () => {
+    fileListResponse = [];
+    torrentInfoExtra = [torrent({ num_complete: 6, num_incomplete: 2 })];
+    const out = await qbitAwaitMetadata({ config }, HASH_AWAIT, options);
+    expect(out.ok === false && out.reason).toContain('connection problem');
+  });
+
+  it('says peers connected and stayed mute when they did', async () => {
+    // The one case that is genuinely about the release rather than the swarm:
+    // somebody is on the wire and still nobody sends the file list.
+    fileListResponse = [];
+    torrentInfoExtra = [torrent({ num_seeds: 3, num_complete: 9 })];
+    const out = await qbitAwaitMetadata({ config }, HASH_AWAIT, options);
+    expect(out.ok === false && out.reason).toContain('peers connected but none sent');
+  });
+
+  it('still returns the file list the moment one arrives', async () => {
+    fileListResponse = [{ index: 0, name: 'Show/ep01.ass', size: 30_000, progress: 0, priority: 1 }];
+    torrentInfoExtra = [torrent()];
+    const out = await qbitAwaitMetadata({ config }, HASH_AWAIT, options);
+    expect(out.ok).toBe(true);
+    expect(out.ok === true && out.value.length).toBe(1);
   });
 });

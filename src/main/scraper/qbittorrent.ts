@@ -1243,6 +1243,10 @@ export async function qbitAwaitMetadata(
   // is the swarm's fault and a declined list is the client's, and one message
   // for both is the generic failure this plan's contingency gates forbid.
   let declined = 0;
+  // The same pair `qbitAwaitFiles` carries, for the same reason: "no peer sent
+  // its file list" names the symptom, and the swarm counts name the cause.
+  let peakConnected = 0;
+  let lastSwarm: QbitSwarmSample | null = null;
 
   for (;;) {
     if (options.isCancelled?.()) return { ok: false, reason: 'Cancelled.' };
@@ -1259,6 +1263,14 @@ export async function qbitAwaitMetadata(
       // interval rather than a whole unbounded download.
       if (options.stopWhenReady) await qbitStop(input, hash);
       return { ok: true, value: files.value };
+    }
+
+    // Sampled every poll, not once at the end, so a swarm that was there and
+    // left is not reported as one that never existed.
+    const sampled = await qbitTorrentInfo(input, hash);
+    if (sampled.ok && sampled.value) {
+      lastSwarm = swarmSampleOf(sampled.value);
+      peakConnected = Math.max(peakConnected, lastSwarm.connected);
     }
 
     if (Date.now() >= deadline) {
@@ -1286,10 +1298,21 @@ export async function qbitAwaitMetadata(
       // one who can judge which: the batch that provoked this reported its
       // 8.15 GB at t+6.1 min, six samples after it looked silent.
       const waitedMin = Math.max(1, Math.round(options.timeoutMs / 60_000));
+      const waited = `within ${waitedMin} minute${waitedMin === 1 ? '' : 's'}`;
+      // Measured live 2026-08-18 on gate 31's own Route B candidate: 8 minutes
+      // at `seedsConnected 0, peersConnected 0, seedsTotal 0, peersTotal 1`,
+      // reported as "no peer sent its file list" — true, and silent about the
+      // fact that no complete copy of that release is being shared at all.
+      if (peakConnected === 0) {
+        return {
+          ok: false,
+          reason: `No peer sent this release's file list ${waited}. ${unreachedSwarmReason(lastSwarm)}`,
+        };
+      }
       return {
         ok: false,
-        reason: 'qBittorrent could not read what is inside this release: no peer sent its file list '
-          + `within ${waitedMin} minute${waitedMin === 1 ? '' : 's'}.`,
+        reason: 'qBittorrent could not read what is inside this release: peers connected but none '
+          + `sent its file list ${waited}.`,
       };
     }
     await sleep(pollMs);
@@ -1301,32 +1324,45 @@ export interface QbitSwarmSample {
   /** Seeds + peers qBittorrent is actually connected to right now. */
   connected: number;
   /**
-   * Seeds + peers the tracker says exist, or **null** when it has not said.
+   * Seeds the tracker says exist, or **null** when it has not said.
    *
    * Null is not zero and the difference decides whether a release gets called
    * dead. `num_complete` / `num_incomplete` are the tracker *scrape*, and
    * qBittorrent answers `-1` for a tracker it has not scraped yet — which is
    * precisely the state a torrent added seconds ago is in, and precisely when
-   * this wait runs. `mapTransfer`'s `?? 0` only defends against the field being
-   * absent, so a raw sum would read "-1 + -1 = -2 peers exist" as a confident
-   * fact and the sentence built from it would be visibly nonsense.
+   * these waits run. `mapTransfer`'s `?? 0` only defends against the field
+   * being absent, so a raw sum would read "-1 + -1 = -2 peers exist" as a
+   * confident fact and the sentence built from it would be visibly nonsense.
    */
-  known: number | null;
+  seedsKnown: number | null;
+  /** Peers (partial copies) the tracker says exist, same null contract. */
+  peersKnown: number | null;
   /** Bytes per second arriving right now. */
   speedBps: number;
 }
 
 /**
- * The tracker's swarm size, with "it has not answered" kept distinct from zero.
+ * One tracker count, with "it has not answered" kept distinct from zero.
  *
- * Each half is dropped independently: a scrape can return the seed count and
- * not the leecher count, and discarding the half that did arrive would throw
- * away the only real number on offer.
+ * Read per half rather than summed, because the halves answer different
+ * questions and the sum answers neither. Measured live 2026-08-18 on gate 31's
+ * Route B candidate: `seedsTotal 0, peersTotal 1` held for a full 8 minutes.
+ * Summed, that is "1 peer exists, and we reached none of it" — which reads as
+ * the user's firewall. Split, it is "nobody is sharing a complete copy", which
+ * is the truth and points at the release instead.
  */
-export function swarmKnownCount(seedsTotal: number, peersTotal: number): number | null {
-  const answered = [seedsTotal, peersTotal].filter((n) => Number.isFinite(n) && n >= 0);
-  if (!answered.length) return null;
-  return answered.reduce((sum, n) => sum + n, 0);
+export function swarmCount(raw: number): number | null {
+  return Number.isFinite(raw) && raw >= 0 ? raw : null;
+}
+
+/** The swarm half of a transfer row, so both waits read it identically. */
+export function swarmSampleOf(row: QbitTransferRow): QbitSwarmSample {
+  return {
+    connected: row.seedsConnected + row.peersConnected,
+    seedsKnown: swarmCount(row.seedsTotal),
+    peersKnown: swarmCount(row.peersTotal),
+    speedBps: row.downloadSpeedBps,
+  };
 }
 
 /** Everything the give-up message is allowed to be derived from. */
@@ -1343,6 +1379,40 @@ export interface QbitStallInput {
   peakConnected: number;
   /** True when qBittorrent itself reports it is on no swarm at all. */
   clientOffline: boolean;
+}
+
+/**
+ * What a swarm nothing connected to actually is, in one sentence.
+ *
+ * Shared by both waits because they hit the identical wall for identical
+ * reasons — the metadata wait was still saying only "no peer sent its file
+ * list", which is a symptom, not a cause — and because two functions wording
+ * the same state differently is how a user concludes they are two problems.
+ *
+ * The four cases are separated by what the *tracker* said, not by what arrived:
+ * nothing arrives in all four, and the advice differs in all four.
+ */
+export function unreachedSwarmReason(last: QbitSwarmSample | null): string {
+  const seeds = last ? last.seedsKnown : null;
+  const peers = last ? last.peersKnown : null;
+
+  // Two ways to land here — `torrents/info` unreadable all wait, or the tracker
+  // never scraped — and neither licenses calling a release dead.
+  if (seeds === null && peers === null) {
+    return 'qBittorrent never learned how many exist: no tracker answered its scrape. Nothing '
+      + 'here says the release is alive, and nothing says it is dead either.';
+  }
+  if ((seeds ?? 0) > 0) {
+    return `The swarm lists ${seeds} seed(s) and qBittorrent reached none of them, so this is a `
+      + 'connection problem — check its VPN, firewall and listening port — not a dead release.';
+  }
+  if ((peers ?? 0) > 0) {
+    // The live case, and the one a summed count gets exactly backwards.
+    return `The tracker lists ${peers} peer(s) and no seed, so nobody is sharing a complete copy `
+      + 'of this release. Pick another release rather than waiting.';
+  }
+  return 'qBittorrent found nobody at all in this swarm: this release is dead, not slow. Pick '
+    + 'another release.';
 }
 
 /**
@@ -1369,21 +1439,7 @@ export function awaitFilesStallReason(input: QbitStallInput): string {
   if (input.peakConnected === 0) {
     // Never reached anyone, so `done` is whatever arrived before this wait
     // began and saying "timed out" about it would be the misleading half.
-    const known = input.last ? input.last.known : null;
-    if (known === null) {
-      // Two ways to land here — `torrents/info` unreadable all wait, or the
-      // tracker never scraped — and neither licenses calling a release dead.
-      return `No seed or peer answered in ${forMinutes}, and qBittorrent never learned how many `
-        + 'exist: no tracker answered its scrape. Nothing here says the release is alive, and '
-        + 'nothing says it is dead either.';
-    }
-    if (known === 0) {
-      return `No seed or peer answered in ${forMinutes}, and qBittorrent found nobody at all in this `
-        + 'swarm: this release is dead, not slow. Pick another release.';
-    }
-    return `No seed or peer answered in ${forMinutes}, though the swarm lists ${known}. qBittorrent `
-      + 'reached none of them, so this is a connection problem — check its VPN, firewall and '
-      + 'listening port — not a slow release.';
+    return `No seed or peer answered in ${forMinutes}. ${unreachedSwarmReason(input.last)}`;
   }
 
   if (input.last && input.last.connected === 0) {
@@ -1462,11 +1518,7 @@ export async function qbitAwaitFiles(
       // Sampled every poll rather than once at the end: a swarm that dies
       // halfway looks identical to one that was never alive if you only ever
       // look after the timeout, and those two deserve different sentences.
-      lastSwarm = {
-        connected: info.value.seedsConnected + info.value.peersConnected,
-        known: swarmKnownCount(info.value.seedsTotal, info.value.peersTotal),
-        speedBps: info.value.downloadSpeedBps,
-      };
+      lastSwarm = swarmSampleOf(info.value);
       peakConnected = Math.max(peakConnected, lastSwarm.connected);
     }
 

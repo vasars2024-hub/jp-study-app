@@ -485,7 +485,7 @@ describe('nyaaFetch — route A, a subtitle-only pack', () => {
     expect(result.ok).toBe(false);
     // The distinction this whole wait exists for: "we could not see inside it"
     // is not "there is nothing inside it".
-    expect(result.ok === false && result.reason).toMatch(/no peer sent its file list/i);
+    expect(result.ok === false && result.reason).toMatch(/sent its file list/i);
     expect(result.ok === false && result.reason).not.toMatch(/no subtitle files/i);
     // How long it waited, because "dead release" and "you gave up too early"
     // are the two readings and only the user can pick between them.
@@ -513,7 +513,7 @@ describe('nyaaFetch — route A, a subtitle-only pack', () => {
     const result = await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 5_000 });
     expect(result.ok).toBe(false);
     expect(result.ok === false && result.reason).toMatch(/not connected to any swarm/i);
-    expect(result.ok === false && result.reason).not.toMatch(/no peer sent its file list/i);
+    expect(result.ok === false && result.reason).not.toMatch(/sent its file list/i);
     expect(calls.some((call) => call.startsWith('prio:'))).toBe(false);
   });
 
@@ -528,7 +528,7 @@ describe('nyaaFetch — route A, a subtitle-only pack', () => {
     files = [{ name: 'Show - 07.ja.ass', size: 40_000, progress: 0, priority: 1 }];
 
     const result = await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 5_000 });
-    expect(result.ok === false && result.reason).toMatch(/no peer sent its file list/i);
+    expect(result.ok === false && result.reason).toMatch(/sent its file list/i);
     expect(result.ok === false && result.reason).not.toMatch(/not connected to any swarm/i);
   });
 
@@ -540,7 +540,7 @@ describe('nyaaFetch — route A, a subtitle-only pack', () => {
     files = [{ name: 'Show - 07.ja.ass', size: 40_000, progress: 0, priority: 1 }];
 
     const result = await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 5_000 });
-    expect(result.ok === false && result.reason).toMatch(/no peer sent its file list/i);
+    expect(result.ok === false && result.reason).toMatch(/sent its file list/i);
   });
 
   it('does not ask about the connection when the metadata arrives', async () => {
@@ -657,7 +657,7 @@ describe('nyaaFetch — route B, selected files out of a batch', () => {
     files = [];
     const result = await nyaaFetch(candidate('batch-sidecar'), config(), { timeoutMs: 5_000 });
     expect(result.ok).toBe(false);
-    expect(result.ok === false && result.reason).toMatch(/no peer sent its file list/i);
+    expect(result.ok === false && result.reason).toMatch(/sent its file list/i);
     expect(result.ok === false && result.reason).not.toMatch(/no subtitle files/i);
   });
 
@@ -834,8 +834,10 @@ describe('nyaaFetch — a transfer that stops and never comes back', () => {
 
     const result = await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 1_200 });
     expect(result.ok === false && result.reason).toMatch(/connection problem/i);
-    expect(result.ok === false && result.reason).toMatch(/the swarm lists 12/i);
-    expect(result.ok === false && result.reason).not.toMatch(/dead/i);
+    // 8, not the 12 a summed count reports: only a seed is a complete copy, and
+    // counting the 4 leechers in is what made the advice wrong live.
+    expect(result.ok === false && result.reason).toMatch(/lists 8 seed\(s\)/i);
+    expect(result.ok === false && result.reason).not.toMatch(/dead, not slow/i);
   });
 });
 
@@ -1009,7 +1011,7 @@ describe('a 404 from torrents/files is not proof the torrent is gone', () => {
     expect(reason).toContain('still has this torrent but would not open its file list');
     // The count is the evidence the message is entitled to make that claim.
     expect(reason).toMatch(/across \d+ attempts/);
-    expect(reason).not.toContain('no peer sent its file list');
+    expect(reason).not.toContain('sent its file list');
   });
 });
 
