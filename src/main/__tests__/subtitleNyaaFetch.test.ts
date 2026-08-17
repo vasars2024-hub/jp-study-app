@@ -58,6 +58,14 @@ let torrentState = 'downloading';
 let disappearAfterAdd = false;
 /** Starting the torrent moves nothing, which is what a stopped-on-error transfer looks like. */
 let stallOnStart = false;
+/**
+ * Endpoints this stand-in refuses with a 404, whatever it would otherwise do.
+ *
+ * A real build does this: qBittorrent 5.x renamed `pause`/`resume` to
+ * `stop`/`start`, so "the endpoint is gone" is an ordinary state and not a
+ * broken server.
+ */
+let notFound = new Set<string>();
 let addBodies: string[] = [];
 /**
  * How many `torrents/files` reads answer `[]` before the metadata "arrives".
@@ -109,6 +117,11 @@ beforeAll(async () => {
     if (!(req.headers.cookie ?? '').includes('SID=tok')) {
       res.writeHead(403);
       res.end('Forbidden');
+      return;
+    }
+    if (notFound.has(url.pathname)) {
+      res.writeHead(404);
+      res.end('missing');
       return;
     }
 
@@ -224,6 +237,7 @@ beforeEach(() => {
   filesReads = 0;
   clientTorrents = [];
   deleteBodies = [];
+  notFound = new Set<string>();
   resetQbitSessions();
 });
 
@@ -633,5 +647,46 @@ describe('nyaaFetchAll — a sub-pack is a season, not one file', () => {
     const all = await nyaaFetchAll(candidate('sub-pack', 8), config(), { timeoutMs: 5_000 });
     expect(all.ok).toBe(true);
     expect(all.ok && all.files.map((file) => file.episode)).toEqual([8]);
+  });
+});
+
+// Measured live, 2026-08-17: the first Route A acquisition this pipeline ever
+// listed correctly — `After War Gundam X`, 20.10 MB, 7 seeders — failed with the
+// whole user-facing reason being "qBittorrent answered 404.". The client speaks
+// eight endpoints and that string names none of them, so the failure could not
+// be diagnosed from the report at all. This plan's own constraint is that a
+// qBittorrent contingency is a distinct honest state, never a generic failure.
+describe('a refused WebUI call names the endpoint that refused', () => {
+  it('names torrents/files when the file list 404s', async () => {
+    notFound.add('/api/v2/torrents/files');
+
+    const result = await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 5_000 });
+
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.reason).toBe(
+      'qBittorrent answered 404 to torrents/files.',
+    );
+  });
+
+  // The one that actually needs the bookkeeping. `qbitStart` tries `resume`
+  // and falls back to 5.x's `start`; if both are gone, reporting `resume` would
+  // send the reader hunting a 4.x compatibility bug that is not there.
+  it('names the fallback endpoint, not the one that was tried first', async () => {
+    // Episode 7 because `candidate()` pins 7 by default; a mismatched file
+    // would fail on the episode filter and never reach the start call.
+    files = [{ name: 'Show - 07.ja.srt', size: 40_000, progress: 0, priority: 1 }];
+    await writeOnDisk('Show - 07.ja.srt', '1\n00:00:01,000 --> 00:00:02,000\nセリフ\n');
+    notFound.add('/api/v2/torrents/resume');
+    notFound.add('/api/v2/torrents/start');
+
+    const result = await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 5_000 });
+
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.reason).toBe(
+      'qBittorrent answered 404 to torrents/start.',
+    );
+    // The fallback really was reached, rather than the name being cosmetic.
+    expect(calls).toContain('/api/v2/torrents/resume');
+    expect(calls).toContain('/api/v2/torrents/start');
   });
 });

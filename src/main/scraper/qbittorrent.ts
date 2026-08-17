@@ -810,10 +810,29 @@ interface QbitRawFile {
 
 export type QbitOutcome<T> = { ok: true; value: T } | { ok: false; reason: string };
 
-function failureReason(response: { error: LoginResult } | { status: number; body: string }): string {
+/**
+ * What to tell the user when a WebUI call refuses.
+ *
+ * The endpoint is named because the status alone is not a diagnosis and this
+ * client speaks eight of them. Measured 2026-08-17: the first live Route A
+ * acquisition — `After War Gundam X`, 20.10 MB, 7 seeders, listed correctly —
+ * failed with the whole reason being *"qBittorrent answered 404."*, and nothing
+ * about that string says which of `add`, `info`, `files`, `filePrio`, `delete`,
+ * `pause`/`stop` or `resume`/`start` produced it. That is the generic failure
+ * this plan's contingency gates exist to forbid, and it cost a turn.
+ *
+ * It matters more than a usual diagnostic because qBittorrent 5.x renamed
+ * endpoints: `pause`/`resume` became `stop`/`start`, and a 404 from one of those
+ * means "your build dropped the alias" while a 404 from `files` means "the
+ * torrent is gone" — opposite problems, one string.
+ */
+function failureReason(
+  response: { error: LoginResult } | { status: number; body: string },
+  endpoint: string,
+): string {
   return 'error' in response
     ? response.error.message
-    : `qBittorrent answered ${response.status}.`;
+    : `qBittorrent answered ${response.status} to ${endpoint}.`;
 }
 
 /**
@@ -831,7 +850,7 @@ export async function qbitTorrentInfo(
   if (!wanted) return { ok: false, reason: 'No info hash.' };
   const response = await authed(input, `/api/v2/torrents/info?hashes=${encodeURIComponent(wanted)}`);
   if ('error' in response || response.status !== 200) {
-    return { ok: false, reason: failureReason(response) };
+    return { ok: false, reason: failureReason(response, 'torrents/info') };
   }
   try {
     const parsed = JSON.parse(response.body) as QbitTorrentInfo[];
@@ -892,7 +911,7 @@ export async function qbitAddStopped(
     body: form.toString(),
   });
   if ('error' in response || response.status !== 200) {
-    return { ok: false, reason: failureReason(response) };
+    return { ok: false, reason: failureReason(response, 'torrents/add') };
   }
   scraperLog('info', 'qbit', `Added a subtitle fetch stopped (${hash.slice(0, 8)}).`);
   return { ok: true, value: 'added' };
@@ -928,7 +947,7 @@ export async function qbitReapSubtitleOrphans(
     `/api/v2/torrents/info?category=${encodeURIComponent(QBIT_SUBTITLE_CATEGORY)}`,
   );
   if ('error' in listed || listed.status !== 200) {
-    return { ok: false, reason: failureReason(listed) };
+    return { ok: false, reason: failureReason(listed, 'torrents/info') };
   }
   let rows: QbitTorrentInfo[];
   try {
@@ -953,7 +972,7 @@ export async function qbitReapSubtitleOrphans(
     body: new URLSearchParams({ hashes: orphans.join('|'), deleteFiles: 'true' }).toString(),
   });
   if ('error' in response || response.status !== 200) {
-    return { ok: false, reason: failureReason(response) };
+    return { ok: false, reason: failureReason(response, 'torrents/delete') };
   }
   scraperLog('info', 'qbit', `Cleared ${orphans.length} abandoned subtitle fetch(es).`);
   return { ok: true, value: orphans };
@@ -971,12 +990,17 @@ export async function qbitStop(
 ): Promise<QbitOutcome<true>> {
   const body = new URLSearchParams({ hashes: hash.trim().toLowerCase() }).toString();
   const headers = { 'content-type': 'application/x-www-form-urlencoded' };
+  // Tracked so the refusal names the endpoint that actually answered: a 404
+  // reported against `pause` after the fallback already ran would send the next
+  // reader looking for a 4.x compatibility bug that is not there.
+  let endpoint = 'torrents/pause';
   let response = await authed(input, '/api/v2/torrents/pause', { method: 'POST', headers, body });
   if (!('error' in response) && (response.status === 404 || response.status === 405)) {
+    endpoint = 'torrents/stop';
     response = await authed(input, '/api/v2/torrents/stop', { method: 'POST', headers, body });
   }
   if ('error' in response || response.status !== 200) {
-    return { ok: false, reason: failureReason(response) };
+    return { ok: false, reason: failureReason(response, endpoint) };
   }
   return { ok: true, value: true };
 }
@@ -997,7 +1021,7 @@ export async function qbitFiles(
   if (!wanted) return { ok: false, reason: 'No info hash.' };
   const response = await authed(input, `/api/v2/torrents/files?hash=${encodeURIComponent(wanted)}`);
   if ('error' in response || response.status !== 200) {
-    return { ok: false, reason: failureReason(response) };
+    return { ok: false, reason: failureReason(response, 'torrents/files') };
   }
   try {
     const parsed = JSON.parse(response.body) as QbitRawFile[];
@@ -1035,7 +1059,7 @@ export async function qbitSetFilePriorities(
     body: form.toString(),
   });
   if ('error' in response || response.status !== 200) {
-    return { ok: false, reason: failureReason(response) };
+    return { ok: false, reason: failureReason(response, 'torrents/filePrio') };
   }
   return { ok: true, value: indexes.length };
 }
@@ -1053,12 +1077,14 @@ export async function qbitStart(
 ): Promise<QbitOutcome<true>> {
   const body = new URLSearchParams({ hashes: hash.trim().toLowerCase() }).toString();
   const headers = { 'content-type': 'application/x-www-form-urlencoded' };
+  let endpoint = 'torrents/resume';
   let response = await authed(input, '/api/v2/torrents/resume', { method: 'POST', headers, body });
   if (!('error' in response) && (response.status === 404 || response.status === 405)) {
+    endpoint = 'torrents/start';
     response = await authed(input, '/api/v2/torrents/start', { method: 'POST', headers, body });
   }
   if ('error' in response || response.status !== 200) {
-    return { ok: false, reason: failureReason(response) };
+    return { ok: false, reason: failureReason(response, endpoint) };
   }
   return { ok: true, value: true };
 }
