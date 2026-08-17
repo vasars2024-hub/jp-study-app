@@ -56,9 +56,16 @@ Foreign:  src/media/** (S4), src/renderer/styles.css (S2 holds it this wave)
 - **Commit when your work is complete, and again at any point it is at risk** — before a long
   gate run, before anything destructive, whenever you are close to a usage limit. Explicit paths.
 
-## 3. The dev app belongs to the user
+## 3. Running the dev app
 
-**Do not start, restart, or kill the app.** If something is listening on 5173, it is the user's.
+**You may start, restart and stop the dev app as the work requires** (`npm start`). The user
+granted this standing permission on 2026-08-07, replacing an earlier rule that forbade it — that
+rule blocked live verification outright whenever the app happened to be down.
+
+Two practical cautions remain. Check whether an instance is already up before starting another:
+a second `electron-forge start` fights the first for port 5173 and the Chromium profile lock. And
+`src/main*` / `src/preload*` changes are baked at launch rather than hot-reloaded, so a live run
+observing them must follow a fresh start.
 
 Most facts about this repo are verifiable by reading source — you rarely need a running app. When
 a task genuinely requires driving the live app, **use the `jp-bridge` skill**; it covers profile
@@ -87,19 +94,35 @@ exact paths.
 fix them and do not treat them as your failure. If you want to show you added none, measure the
 total before and after — never quote the raw number as if it were yours.
 
-### Known-failing suites — THERE ARE NONE. The suite is green.
+### Known-failing suites — depends which tree you are on. Label every number.
 
-> **CORRECTED 2026-08-04, and this entry is why the hedge below it existed.** An earlier
-> version named `architectureBaseline.test.ts` and `flashcardSearch.test.ts` as known-failing,
-> carried from a stale note. **Measured on this tree: `npx vitest run` → 375 files, 4,833
-> tests, 0 failed.** Both named suites run and pass (12 named tests between them).
+**A vitest total is meaningless without the tree it was measured on.** The shared working tree
+and `HEAD` give different answers, because ~420 dirty paths belong to other tracks and some of
+their code is imported but not yet committed.
 
-**Any red suite is a real signal.** Do not assume a failure is pre-existing, and do not skip a
-suite because a document told you it fails. If something is red, either your change caused it
-or the tree moved — establish which before reporting.
+| Tree | Measured 2026-08-17 07:04 | Failing |
+| --- | --- | --- |
+| **SHARED** (the dirty working tree you actually inherit) | 717 files, 9,814 tests, 9,808 passed, 6 skipped | **0** |
+| **HEAD** (clean checkout / verification worktree) | fewer files — another track's modules are uncommitted | **2**, in `i18n.test.ts` |
+
+The two HEAD failures are `i18n.test.ts` catalog-hygiene assertions. **They are not yours to
+fix.** Their baseline outran ~34 files of another track's in-flight i18n conversion; re-recording
+it would widen a ratchet over work still in progress. Leave them and say which tree you measured.
+
+Everything else is green on both trees.
+
+> **This entry has been wrong twice, in opposite directions.** Before 2026-08-04 it named
+> `architectureBaseline.test.ts` and `flashcardSearch.test.ts` as known-failing from a stale note
+> — both ran and passed. The correction then overshot to "THERE ARE NONE. The suite is green,"
+> an unlabelled shared-tree number that sent workers on clean checkouts chasing inherited
+> failures. Hence the rule above the table: **always label the tree.**
+
+**Any OTHER red suite is a real signal.** Do not assume a failure is pre-existing, and do not
+skip a suite because a document told you it fails. If something is red, either your change
+caused it or the tree moved — establish which before reporting.
 
 The general rule stands regardless of this entry's contents: **check a "known-failing" claim
-against your own first run before relying on it.** This one did not survive that check.
+against your own first run before relying on it.** This entry has not survived that check twice.
 
 ## 5. Report measured totals, never an uncaused delta
 
