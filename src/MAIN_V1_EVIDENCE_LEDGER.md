@@ -24813,7 +24813,7 @@ tested only `apkg|colpkg` and `ankiconnect`, so a `csv` draft fell through to `a
 import your `.txt`, edit all of it, and there is nowhere to put the result. Same shape as the
 `local-deck` finding under gate 5.
 
-- `067cd735` — **workbench gate 27 (new) CLOSES.** `shared/ankiCsvExport.ts` (pure) +
+- `067cd735` — **workbench gate 15 (new) CLOSES.** `shared/ankiCsvExport.ts` (pure) +
   `main/anki/csvExport.ts` (I/O) + `csvSourceMemory.ts` + IPC `anki:exportCsvDraft` + preload +
   a third `DeckWorkbenchApply` branch + 22 keys ×4. On the user's own **3,209-row** export:
   read 3,209 rows / 3,209 notes / 0 blank, 10 field columns on all 3,209, separator tab from
@@ -24822,7 +24822,7 @@ import your `.txt`, edit all of it, and there is nowhere to put the result. Same
   row-order`, both verified **50/50** after re-reading the exported file through the same
   reader. **Controls: 3,159/3,159 unselected notes byte-identical**, file grew by exactly
   **350 B = 50 × 7 chars**; a card reposition returns `unsupported-change`.
-  Full decision list in `src/ANKI_DECK_WORKBENCH_PLAN.md` gate 27.
+  Full decision list in `src/ANKI_DECK_WORKBENCH_PLAN.md` gate 15.
 
 **Directive part A — what the translate path does with HTML, answered from source, not run.**
 `ankiTranslate.ts:120` calls `normalizeFieldText(raw.replace(SOUND_TAG,' '), ['strip-html',

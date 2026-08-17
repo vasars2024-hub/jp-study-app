@@ -44,7 +44,7 @@ The capabilities named in this document are a **minimum, not a closed feature li
 
     Amended 2026-08-17: this line said "a new package or a validated live-Anki commit" until the text
     destination shipped (`067cd735`), which made it wrong — adapter 3 could read a `.txt` and had
-    nowhere to write it. The CSV/TSV destination has its own gate (**gate 27**) rather than folding
+    nowhere to write it. The CSV/TSV destination has its own gate (**gate 15**) rather than folding
     into gate 1: it is a different fidelity contract, not a second file format for the same one.
 
 Evaluate `.colpkg` during the capability audit. Add it only if full collection semantics, media, and recovery can be guaranteed.
