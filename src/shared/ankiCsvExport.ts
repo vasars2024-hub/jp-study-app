@@ -280,20 +280,21 @@ export function applyCsvExportChanges(
     }
     const cells = rows[index];
 
-    if (change.fields) {
+    const fields = change.fields;
+    if (fields) {
       // Positions of this row's field columns, in the order the reader read them.
       const fieldPositions: number[] = [];
       for (let c = 0; c < cells.length; c += 1) {
         if (!special.has(c)) fieldPositions.push(c);
       }
-      if (fieldPositions.length !== change.fields.length) {
+      if (fieldPositions.length !== fields.length) {
         throw new CsvExportRefusal(
           'field-count-mismatch',
-          `${change.noteId} has ${fieldPositions.length} field columns but the edit carries ${change.fields.length}.`,
+          `${change.noteId} has ${fieldPositions.length} field columns but the edit carries ${fields.length}.`,
         );
       }
       fieldPositions.forEach((position, ord) => {
-        cells[position] = change.fields![ord];
+        cells[position] = fields[ord];
       });
       notesUpdated += 1;
     }
@@ -308,7 +309,7 @@ export function applyCsvExportChanges(
       // `#tags:` applies to every note in the file and the reader prepends it to
       // each note's tags. Writing the full list back into the column would
       // duplicate those on the next read, so the global prefix is removed again.
-      let tags = [...change.tags];
+      const tags = [...change.tags];
       for (const global of meta.globalTags) {
         const at = tags.indexOf(global);
         if (at >= 0) tags.splice(at, 1);
