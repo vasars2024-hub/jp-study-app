@@ -1,0 +1,188 @@
+/* =============================================================================
+   Liquid Workplace — L2 semantic tokens
+   -----------------------------------------------------------------------------
+   `src/LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md` §5.2 / L2. This sheet declares
+   the vocabulary the Liquid primitives are built in. It declares CUSTOM
+   PROPERTIES AND NOTHING ELSE — every selector here is `:root` (optionally with
+   an attribute qualifier), so importing it cannot change one pixel of existing
+   app output. `liquidTokens.test.ts` asserts exactly that, mechanically, and it
+   is the reason L2 can land before any surface migrates.
+
+   FOUR ROLES, not one material. Plan §2.3: "Liquid is selective ... universal
+   glass is a failure rather than a maximum."
+
+     anchor   Reading, editing, forms, tables, logs, calendars, review cards.
+              OPAQUE AND HIGH CONTRAST IN EVERY VARIANT. `--lq-anchor-blur` is
+              `0px` in the base and is never overridden below — that is the
+              invariant the test pins, because an anchor that picks up glass in
+              one theme is the exact failure §2.3 names.
+     work     The app's primary canvas: the scrollable body it fills. Opaque,
+              calmer than anchor, carries the large regions.
+     liquid   Navigation, transport, contextual tools, temporary inspectors,
+              transitions. The only role that is translucent.
+     ambient  Atmosphere behind everything. Decorative; never the sole carrier
+              of text, so it deliberately has no `--lq-ambient-text`.
+
+   EVERY VALUE DERIVES FROM AN EXISTING BASE TOKEN (`theme/tokens.css`, or a
+   shell-owned semantic var like `--panel`). Nothing here hardcodes a colour.
+   Plan §8: "Liquid is a composition language, not one palette" — Study OS,
+   Aero, Wired and Blanc remap the base vars and these follow for free.
+
+   Load order: after `tokens.css` (whose values these read) and after
+   `perf.css` is irrelevant — the perf/contrast blocks below re-declare their
+   own `--lq-*` names, they do not depend on cascade position against other
+   sheets.
+   ============================================================================= */
+
+:root {
+  /* ---- anchor — opaque, high contrast, stable -------------------------- */
+  --lq-anchor-bg: var(--panel);
+  --lq-anchor-bg-raised: var(--panel-2);
+  --lq-anchor-border: var(--border);
+  --lq-anchor-text: var(--text);
+  --lq-anchor-text-muted: color-mix(in srgb, var(--text) 62%, transparent);
+  --lq-anchor-radius: var(--radius-lg);
+  --lq-anchor-shadow: var(--elevation-1);
+  --lq-anchor-blur: 0px;
+  --lq-anchor-saturate: 1;
+
+  /* ---- work — the primary canvas --------------------------------------- */
+  --lq-work-bg: var(--bg);
+  --lq-work-bg-raised: var(--panel);
+  --lq-work-border: color-mix(in srgb, var(--border) 70%, transparent);
+  --lq-work-text: var(--text);
+  --lq-work-text-muted: color-mix(in srgb, var(--text) 58%, transparent);
+  --lq-work-radius: var(--radius-lg);
+  --lq-work-shadow: var(--elevation-0);
+  --lq-work-blur: 0px;
+  --lq-work-saturate: 1;
+
+  /* ---- liquid — the only translucent role ------------------------------ */
+  --lq-liquid-bg: var(--glass-tint);
+  --lq-liquid-bg-raised: var(--glass-tint-strong);
+  --lq-liquid-border: var(--glass-border);
+  --lq-liquid-highlight: var(--glass-highlight);
+  --lq-liquid-text: var(--text);
+  --lq-liquid-text-muted: color-mix(in srgb, var(--text) 66%, transparent);
+  --lq-liquid-radius: var(--radius-xl);
+  --lq-liquid-shadow: var(--elevation-3);
+  --lq-liquid-blur: var(--glass-blur);
+  --lq-liquid-saturate: 1.25;
+
+  /* ---- ambient — atmosphere, decorative only --------------------------- */
+  --lq-ambient-bg: color-mix(in srgb, var(--bg) 70%, transparent);
+  --lq-ambient-border: transparent;
+  --lq-ambient-radius: var(--radius-2xl);
+  --lq-ambient-shadow: var(--elevation-0);
+  --lq-ambient-blur: var(--blur-md);
+  --lq-ambient-saturate: 1.1;
+
+  /* ---- scaffold geometry ------------------------------------------------
+     One spine of numbers so a rail, a dock and an inspector agree without
+     each app re-deciding. `--lq-measure` is the reading measure an anchor
+     caps its text column at; §4.1 wants content-first hierarchy, and an
+     unbounded line length is the commonest way that is lost. */
+  --lq-space-1: var(--space-2xs);
+  --lq-space-2: 4px;
+  --lq-space-3: 8px;
+  --lq-space-4: 12px;
+  --lq-space-5: 16px;
+  --lq-space-6: var(--space-2xl);
+  --lq-gutter: var(--lq-space-5);
+  --lq-rail-width: 232px;
+  --lq-rail-width-collapsed: 52px;
+  --lq-dock-height: 56px;
+  --lq-inspector-width: 320px;
+  --lq-toolbar-height: 40px;
+  --lq-measure: 68ch;
+  /* Hit target floor. `a11y.css` and the rubric's category 1 both score this;
+     naming it here stops each primitive inventing its own. */
+  --lq-hit-target: 32px;
+
+  /* ---- motion -----------------------------------------------------------
+     §4.3: motion explains a relationship or it does not happen. */
+  --lq-motion-enter: var(--dur-normal);
+  --lq-motion-exit: var(--dur-fast);
+  --lq-motion-move: var(--dur-fast);
+  --lq-ease-enter: var(--ease-glass);
+  --lq-ease-exit: var(--ease-accelerate);
+  --lq-ease-move: var(--ease-standard);
+  /* Multiplier on any transform distance/scale a primitive animates. Set to 0
+     under reduced motion so a single token disables displacement everywhere. */
+  --lq-motion-scale: 1;
+}
+
+/* ---------- Aero — brighter glass, same geometry -------------------------
+   Matches what `materials.css` already does for `.mat-glass` under
+   `[data-materials='aero']`, expressed as tokens so a primitive inherits it
+   without an Aero-specific selector of its own. */
+:root[data-materials='aero'] {
+  --lq-liquid-saturate: 1.4;
+  --lq-ambient-saturate: 1.25;
+  --lq-liquid-shadow: var(--elevation-4);
+  --lq-liquid-radius: var(--radius-2xl);
+}
+
+/* ---------- Wired — flatter, sharper, less depth ------------------------
+   Geometry and depth only. No colour: Wired remaps `--panel`/`--text`/
+   `--glass-*` itself in `wired-shell.css`, and these follow. */
+:root[data-materials='wired'] {
+  --lq-anchor-radius: var(--radius-xs);
+  --lq-work-radius: var(--radius-xs);
+  --lq-liquid-radius: var(--radius-sm);
+  --lq-ambient-radius: var(--radius-xs);
+  --lq-liquid-blur: var(--blur-sm);
+  --lq-liquid-saturate: 1;
+  --lq-liquid-shadow: var(--elevation-1);
+  --lq-anchor-shadow: var(--elevation-0);
+}
+
+/* ---------- High contrast — the liquid role stops being liquid ----------
+   `a11y.css` already strips `backdrop-filter` from the material classes under
+   this theme. The same decision at token level, so a primitive that never
+   touches `.mat-glass` is covered too. */
+:root[data-theme='high-contrast'] {
+  --lq-liquid-bg: var(--panel);
+  --lq-liquid-bg-raised: var(--panel-2);
+  --lq-liquid-border: var(--text);
+  --lq-liquid-highlight: transparent;
+  --lq-liquid-blur: 0px;
+  --lq-liquid-saturate: 1;
+  --lq-liquid-text-muted: var(--text);
+  --lq-anchor-text-muted: var(--text);
+  --lq-work-text-muted: var(--text);
+  --lq-anchor-border: var(--text);
+  --lq-work-border: var(--text);
+  --lq-ambient-bg: var(--bg);
+  --lq-ambient-blur: 0px;
+}
+
+/* ---------- Performance tiers — mirrors perf.css's own ladder ----------- */
+:root[data-perf='atmosphere'] {
+  --lq-liquid-saturate: 1.35;
+}
+:root[data-perf='performance'],
+:root[data-perf='balanced'] {
+  --lq-ambient-blur: var(--blur-sm);
+}
+:root[data-perf='battery'] {
+  --lq-liquid-bg: color-mix(in srgb, var(--panel) 92%, transparent);
+  --lq-liquid-bg-raised: var(--panel);
+  --lq-liquid-blur: 0px;
+  --lq-liquid-saturate: 1;
+  --lq-ambient-blur: 0px;
+  --lq-motion-enter: 0.001ms;
+  --lq-motion-exit: 0.001ms;
+  --lq-motion-move: 0.001ms;
+  --lq-motion-scale: 0;
+}
+
+/* ---------- Reduced motion — displacement off, not just faster ---------- */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --lq-motion-enter: 0.001ms;
+    --lq-motion-exit: 0.001ms;
+    --lq-motion-move: 0.001ms;
+    --lq-motion-scale: 0;
+  }
+}
