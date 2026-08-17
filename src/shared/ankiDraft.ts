@@ -1030,3 +1030,35 @@ export interface ApkgDraftResult {
   sessionId?: string;
   error?: string;
 }
+
+/**
+ * What the main process asks the .apkg read utility process for.
+ *
+ * A path, never a dialog and never a session id: a utility process has no
+ * `dialog` and no session store, so everything it could refuse for is settled by
+ * main before the process is spawned. See `main/anki/apkgReadWorker.ts`.
+ */
+export interface ApkgReadWorkerIn {
+  filePath: string;
+  noteOffset?: number;
+  noteLimit?: number;
+}
+
+/**
+ * What comes back. Deliberately one page and a few scalars rather than the whole
+ * collection: the parse builds the full draft to resolve note types and decks
+ * across the file, but only the page crosses the process boundary, so the message
+ * is bounded by `noteLimit` however large the deck is.
+ */
+export type ApkgReadWorkerOut =
+  | {
+      ok: true;
+      page: AnkiDraft;
+      fingerprint: string;
+      totalNotes: number;
+      sourceKind: 'apkg' | 'colpkg';
+      label: string;
+      noteOffset: number;
+      noteLimit: number;
+    }
+  | { ok: false; error: string };

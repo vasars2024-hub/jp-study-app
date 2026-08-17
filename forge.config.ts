@@ -184,6 +184,18 @@ const config: ForgeConfig = {
           config: 'vite.main.config.ts',
           target: 'main',
         },
+        {
+          // The .apkg draft-read utility process. ANKI_DECK_WORKBENCH_PLAN.md
+          // gate 9 requires the 100,000-note fixture to be read without freezing
+          // the main event loop, and measurement showed main answering 3 IPC
+          // heartbeats during a 6,217 ms read. Same shape as the dictionary
+          // worker above: `target: 'main'` for the Node/Electron child, and Vite
+          // names the output after the entry, so `apkgReadHost.ts` resolves it as
+          // `<.vite/build>/apkgReadWorker.js` beside `main.js`.
+          entry: 'src/main/anki/apkgReadWorker.ts',
+          config: 'vite.main.config.ts',
+          target: 'main',
+        },
       ],
       renderer: [
         {

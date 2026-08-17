@@ -26,7 +26,7 @@ import type { ApkgExportRequest, ApkgExportResult } from '../../shared/ankiApkgE
 import { exportChangesEmpty } from '../../shared/ankiApkgExport';
 import { stripFieldHtml } from '../../shared/apkgParse';
 import { applyExportChanges, verifyExportChanges, ExportRefusal } from './apkgExportCore';
-import { getSql, readCollection } from './apkgImport';
+import { getSql, readCollection } from './apkgCollection';
 import { mt } from '../i18n';
 
 /** Fingerprint → source path, most recent last. Small on purpose: it exists to
