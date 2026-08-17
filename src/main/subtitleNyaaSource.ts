@@ -42,13 +42,19 @@ import {
   episodeFromFileName,
   languageFromFileName,
   looksJapaneseSubtitle,
-  rankSubtitleCandidates,
+  rankSubtitleCandidatesDetailed,
   selectSubtitleFiles,
   type NyaaAcquisitionConfig,
   type NyaaArchiveFile,
+  type NyaaRankDrops,
   type NyaaSelectionReason,
   type NyaaSubtitleCandidate,
 } from '../shared/subtitleNyaa';
+
+/** A search that never reached the ranker discarded nothing, and says so. */
+export function emptyRankDrops(): NyaaRankDrops {
+  return { titleMatched: 0, seeders: 0, title: 0, muxed: 0, shape: 0, language: 0 };
+}
 import { VIDEO_EXT } from '../shared/mediaKind';
 
 export type { NyaaAcquisitionConfig };
@@ -254,10 +260,22 @@ export interface NyaaProviderCandidate extends ProviderSubtitleCandidate {
  * that exists and cannot be parsed.
  */
 export async function nyaaSearch(input: NyaaSearchInput): Promise<NyaaProviderCandidate[]> {
+  return (await nyaaSearchDetailed(input)).candidates;
+}
+
+/**
+ * As `nyaaSearch`, and also carries what the ranker discarded.
+ *
+ * An empty list has several distinct causes and the surfaces that report one
+ * are obliged to say which: see `describeEmptyNyaaListing`.
+ */
+export async function nyaaSearchDetailed(
+  input: NyaaSearchInput,
+): Promise<{ candidates: NyaaProviderCandidate[]; dropped: NyaaRankDrops }> {
   const available = await nyaaAvailability(input.config);
   if (!available.ok) {
     scraperLog('info', 'torrents', `Subtitle search skipped: ${available.detail}`);
-    return [];
+    return { candidates: [], dropped: emptyRankDrops() };
   }
 
   await paceSearch();
@@ -277,7 +295,7 @@ export async function nyaaSearch(input: NyaaSearchInput): Promise<NyaaProviderCa
     timeoutMs: SEARCH_TIMEOUT_MS,
   });
 
-  const ranked = rankSubtitleCandidates(rows, {
+  const { candidates: ranked, dropped } = rankSubtitleCandidatesDetailed(rows, {
     languages: input.languages,
     preferredGroups: input.config.torrents.preferredReleaseGroups,
     minSeeders: input.config.torrents.minSeeders,
@@ -289,7 +307,7 @@ export async function nyaaSearch(input: NyaaSearchInput): Promise<NyaaProviderCa
     episodeCount: input.episodeCount,
   });
 
-  return ranked.map((candidate) => ({
+  const candidates = ranked.map((candidate) => ({
     providerId: 'nyaa' as const,
     // The info hash is the one stable id a release has across indexes.
     providerItemId: `nyaa:${candidate.row.infoHash || candidate.row.id}`,
@@ -319,6 +337,7 @@ export async function nyaaSearch(input: NyaaSearchInput): Promise<NyaaProviderCa
     score: candidate.score,
     reasons: candidate.reasons,
   }));
+  return { candidates, dropped };
 }
 
 // ---------------------------------------------------------------- catalogue ---

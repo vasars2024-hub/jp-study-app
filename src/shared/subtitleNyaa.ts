@@ -251,6 +251,35 @@ function withoutReleaseGroup(name: string): string {
  */
 const VIDEO_WITH_SUBS_RE = /\b(multi(?:ple)?[- ]?sub(?:title)?s?|soft[- ]?subs?|hard[- ]?subs?|dual[- ]?audio|eng(?:lish)?[- ]?sub(?:bed|s)?|sub(?:bed|s)?[- ]?and[- ]?dub(?:bed|s)?)\b/i;
 
+/**
+ * The subset of those phrasings that state *where* the subtitles are, rather
+ * than merely that they exist: inside the container, or burned into the
+ * picture. Either way there is no separate file to ask the client for.
+ *
+ * Deliberately narrower than `VIDEO_WITH_SUBS_RE`. `dual audio` is a claim
+ * about audio; `English subbed` says a release is subtitled without saying
+ * how. Neither is evidence, so neither is here.
+ */
+const MUXED_SUBS_RE = /\b(multi(?:ple)?[- ]?sub(?:title)?s?|soft[- ]?subs?|hard[- ]?subs?)\b/i;
+
+/**
+ * Whether a release's own name says its subtitles are muxed or burned in.
+ *
+ * Measured, not assumed. Across 4 titles and 10 distinct batch candidates the
+ * sidecar route reached a subtitle verdict and found none: 79 files across the
+ * 7 `Kaguya-sama … First Kiss` releases were **79 video, 0 subtitle**, and
+ * candidate 4 — `[Erai-raws] … [Multiple Subtitle]`, 2,662.40 MB — was 4 files
+ * and 4 video. `[Multiple Subtitle]` is Erai-raws' way of saying "several
+ * subtitle *tracks*", and softsub/hardsub say the same by definition.
+ *
+ * Scored against the 33 real sidecar names in the 2026-08-17 survey
+ * (`debug/g31n-routeb-54.json`): **14 of 33** declare it, every one an mkv-era
+ * muxing group (`[Erai-raws]`, `[Judas]`, `[Trix]`, `[DKB]`, `[Anime Time]`).
+ */
+export function declaresMuxedSubtitles(name: string): boolean {
+  return MUXED_SUBS_RE.test(withoutReleaseGroup(name ?? ''));
+}
+
 /** A container extension in the name means the payload is video. */
 const VIDEO_CONTAINER_RE = /\.(mkv|mp4|avi|m2ts|ts|webm|mov)\b/i;
 
@@ -312,10 +341,16 @@ export function looksLikeSubtitleOnly(row: TorrentRow): boolean {
  * `fileCount` is 0 for a batch (the feed does not publish a count and
  * `parseTorrentFeed` records the honest unknown) and 1 for a single release,
  * so a batch is the only shape that qualifies.
+ *
+ * Being a batch is necessary and was, until 2026-08-17, the whole test — which
+ * is why this route went 0 for 10 on real data. A batch whose name declares
+ * muxed or burned-in subtitles is refused here, so no path can spend a 6–47 s
+ * metadata handshake proving what the name already said.
  */
 export function couldCarrySidecarSubtitles(row: TorrentRow): boolean {
   if (!row) return false;
   if (looksLikeSubtitleOnly(row)) return false;
+  if (declaresMuxedSubtitles(row.name ?? '')) return false;
   return row.isBatch === true;
 }
 
@@ -566,6 +601,34 @@ function seederScore(seeders: number): number {
 }
 
 /**
+ * What the ranker saw and threw away.
+ *
+ * An empty candidate list is the same shape whether the index returned nothing
+ * or returned eleven releases of this exact work that cannot serve subtitles.
+ * Those are different answers and the user is owed the difference: eleven
+ * consecutive Route B refusals reported no number, so nothing could audit them.
+ */
+export interface NyaaRankDrops {
+  /** Rows that survived the title gate — the denominator for the rest. */
+  titleMatched: number;
+  /** Below the profile's `minSeeders`. */
+  seeders: number;
+  /** Not this work. */
+  title: number;
+  /** Declares its subtitles muxed into the video or burned in. */
+  muxed: number;
+  /** Neither a small enough pack nor a batch with addressable files. */
+  shape: number;
+  /** Advertises subtitle languages, none of them wanted. */
+  language: number;
+}
+
+export interface NyaaRankResult {
+  candidates: NyaaSubtitleCandidate[];
+  dropped: NyaaRankDrops;
+}
+
+/**
  * Ranks releases as subtitle sources, best first.
  *
  * Rows that cannot be used by either route are dropped rather than scored
@@ -575,16 +638,39 @@ export function rankSubtitleCandidates(
   rows: readonly TorrentRow[],
   want: NyaaSubtitleWant,
 ): NyaaSubtitleCandidate[] {
+  return rankSubtitleCandidatesDetailed(rows, want).candidates;
+}
+
+/** As `rankSubtitleCandidates`, and also says what it discarded and why. */
+export function rankSubtitleCandidatesDetailed(
+  rows: readonly TorrentRow[],
+  want: NyaaSubtitleWant,
+): NyaaRankResult {
   const wanted = (want.languages ?? []).map((lang) => lang.trim().toLowerCase()).filter(Boolean);
   const preferred = new Set((want.preferredGroups ?? []).map((group) => group.toLowerCase()));
   const minSeeders = want.minSeeders ?? 0;
 
   const candidates: NyaaSubtitleCandidate[] = [];
+  const dropped: NyaaRankDrops = {
+    titleMatched: 0,
+    seeders: 0,
+    title: 0,
+    muxed: 0,
+    shape: 0,
+    language: 0,
+  };
 
   for (const row of rows ?? []) {
     if (!row) continue;
-    if (row.seeders < minSeeders) continue;
-    if (want.title && !looksLikeSameTitle(row.name, want.title)) continue;
+    if (row.seeders < minSeeders) {
+      dropped.seeders += 1;
+      continue;
+    }
+    if (want.title && !looksLikeSameTitle(row.name, want.title)) {
+      dropped.title += 1;
+      continue;
+    }
+    dropped.titleMatched += 1;
 
     // A subtitle-only release too small to hold the requested range is dropped
     // outright rather than demoted: `couldCarrySidecarSubtitles` refuses
@@ -593,7 +679,21 @@ export function rankSubtitleCandidates(
     const isPack =
       looksLikeSubtitleOnly(row) && packCoversEpisodeCount(row.sizeBytes, want.episodeCount);
     const isBatch = !isPack && couldCarrySidecarSubtitles(row);
-    if (!isPack && !isBatch) continue;
+    if (!isPack && !isBatch) {
+      // Attributed separately from `shape`, because "this release states its
+      // subtitles are inside the video" is a verdict the listing can explain
+      // and "nothing here is fetchable" is not. A pack can never reach this
+      // branch: `looksLikeSubtitleOnly` already refuses every muxing phrase.
+      //
+      // Only a batch is counted here, so the figure the listing quotes means
+      // "withheld *because* of that declaration". A single-file release has no
+      // addressable subset whatever its name claims, and counting it inflated
+      // the real number nearly threefold live: `Fate/strange Fake` read 11 of
+      // 38 when 4 of its matches were batches at all.
+      if (row.isBatch === true && declaresMuxedSubtitles(row.name ?? '')) dropped.muxed += 1;
+      else dropped.shape += 1;
+      continue;
+    }
 
     // A release advertising no language at all is still usable — plenty of sub
     // packs simply do not say. It scores lower than a declared match and is
@@ -602,7 +702,10 @@ export function rankSubtitleCandidates(
     const matched = wanted.length
       ? advertised.filter((lang) => wanted.some((target) => lang.startsWith(target.slice(0, 2))))
       : [...advertised];
-    if (wanted.length && advertised.length && matched.length === 0) continue;
+    if (wanted.length && advertised.length && matched.length === 0) {
+      dropped.language += 1;
+      continue;
+    }
 
     const reasons: string[] = [];
     let score = 0;
@@ -644,13 +747,37 @@ export function rankSubtitleCandidates(
     candidates.push({ row, route: isPack ? 'sub-pack' : 'batch-sidecar', score, languages: matched, reasons });
   }
 
-  return candidates.sort((a, b) => {
+  candidates.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
     // Same score: take the smaller download. Both routes benefit and it is a
     // stable, meaningful tiebreak.
     if (a.row.sizeBytes !== b.row.sizeBytes) return a.row.sizeBytes - b.row.sizeBytes;
     return a.row.id.localeCompare(b.row.id);
   });
+  return { candidates, dropped };
+}
+
+/**
+ * The listing's message when it has nothing to offer.
+ *
+ * `''` when there are candidates. Otherwise it names what the ranker saw, so a
+ * refusal can be checked rather than believed.
+ */
+export function describeEmptyNyaaListing(dropped: NyaaRankDrops): string {
+  const base = 'No release on the index looks like it carries subtitles for this title.';
+  if (dropped.muxed > 0) {
+    // Two counts, two agreements. `N of M matching release…` cannot be made to
+    // read correctly for both at once — live it produced "1 of 38 matching
+    // release declares" — so each number is given its own noun phrase.
+    const matched = `${dropped.titleMatched} release${dropped.titleMatched === 1 ? '' : 's'}`;
+    const [verb, its] = dropped.muxed === 1 ? ['declares', 'its'] : ['declare', 'their'];
+    return (
+      'No release on the index carries subtitle files for this title. ' +
+      `Of ${matched} matching it, ${dropped.muxed} ${verb} ${its} subtitles muxed into the ` +
+      'video, which cannot be fetched separately.'
+    );
+  }
+  return base;
 }
 
 // ------------------------------------------------------------ file selection ---

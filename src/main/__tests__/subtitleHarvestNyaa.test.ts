@@ -36,8 +36,12 @@ let fetchOutcome: unknown = { ok: true, files: [] };
 let fetchedWith: { candidate: unknown; config: unknown } | null = null;
 const remembered = new Map<string, unknown>();
 
+/** What the ranker discarded, per title, for the refusal-message cases. */
+const dropsByTitle = new Map<string, Record<string, number>>();
+const noDrops = () => ({ titleMatched: 0, seeders: 0, title: 0, muxed: 0, shape: 0, language: 0 });
+
 vi.mock('../subtitleNyaaSource', () => ({
-  nyaaAvailability: async () => availability,
+  emptyRankDrops: () => noDrops(),
   nyaaSearch: async (input: Record<string, unknown>) => {
     searchInput = input;
     searchCalls.push(input);
@@ -45,6 +49,17 @@ vi.mock('../subtitleNyaaSource', () => ({
     const byTitle = searchByTitle.get(String(input.title));
     return byTitle ?? (searchByTitle.size ? [] : searchResult);
   },
+  nyaaSearchDetailed: async (input: Record<string, unknown>) => {
+    searchInput = input;
+    searchCalls.push(input);
+    if (searchThrows) throw searchThrows;
+    const byTitle = searchByTitle.get(String(input.title));
+    return {
+      candidates: byTitle ?? (searchByTitle.size ? [] : searchResult),
+      dropped: { ...noDrops(), ...(dropsByTitle.get(String(input.title)) ?? {}) },
+    };
+  },
+  nyaaAvailability: async () => availability,
   nyaaFetchAll: async (candidate: unknown, config: unknown) => {
     fetchedWith = { candidate, config };
     return fetchOutcome;
@@ -154,6 +169,7 @@ beforeEach(() => {
   searchThrows = null;
   searchCalls.length = 0;
   searchByTitle.clear();
+  dropsByTitle.clear();
   fetchOutcome = { ok: true, files: [] };
   fetchedWith = null;
   remembered.clear();
@@ -204,6 +220,37 @@ describe('listNyaaHarvest', () => {
     const result = await listNyaaHarvest({ title: 'The Big O', acquisition: acquisition() });
     expect(result.ok).toBe(true);
     expect(result.message).toMatch(/looks like it carries subtitles/i);
+  });
+
+  // Eleven consecutive Route B refusals reported no number and so could not be
+  // audited. An empty listing over releases of this exact work is a different
+  // answer from an index that had nothing, and now says so.
+  it('reports why an empty listing is empty when the matches declared muxing', async () => {
+    searchResult = [];
+    dropsByTitle.set('The Big O', { titleMatched: 7, muxed: 4 });
+    const result = await listNyaaHarvest({ title: 'The Big O', acquisition: acquisition() });
+    expect(result.ok).toBe(true);
+    expect(result.message).toContain('Of 7 releases matching it, 4 declare their subtitles');
+    expect(result.message).toContain('muxed into the video');
+  });
+
+  it('keeps the alias that saw the most of the work, not the last one searched', async () => {
+    // The walk's last alias is routinely a Japanese title the index does not
+    // carry; letting it overwrite the refusal would throw away the only alias
+    // that found the show at all.
+    searchByTitle.set('Shinreigari', []);
+    searchByTitle.set('Ghost Hound', []);
+    dropsByTitle.set('Ghost Hound', { titleMatched: 3, muxed: 3 });
+    dropsByTitle.set('心霊狩り', { titleMatched: 0 });
+
+    const result = await listNyaaHarvest({
+      title: 'Shinreigari',
+      titles: ['Ghost Hound', '心霊狩り'],
+      acquisition: acquisition(),
+    });
+
+    expect(result.candidates).toEqual([]);
+    expect(result.message).toContain('Of 3 releases matching it, 3 declare their subtitles');
   });
 
   it('refuses a blank title before touching the network', async () => {

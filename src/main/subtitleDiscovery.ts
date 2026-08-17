@@ -66,11 +66,12 @@ import {
   nyaaAvailability,
   nyaaFetch,
   nyaaSearch,
+  nyaaSearchDetailed,
   rememberNyaaCandidates,
   takeRememberedNyaaCandidate,
   type NyaaAcquisitionConfig,
 } from './subtitleNyaaSource';
-import { asNyaaAcquisitionConfig } from '../shared/subtitleNyaa';
+import { asNyaaAcquisitionConfig, describeEmptyNyaaListing } from '../shared/subtitleNyaa';
 import { osdbHashFile } from './osdbHash';
 import { enqueueTranscription } from './transcriptionJobs';
 
@@ -767,7 +768,7 @@ async function listNyaaCandidates(
 
   const wanted = languages?.length ? languages : loadDiscoverySettings().autoDownloadLanguages;
   try {
-    const candidates = await nyaaSearch({
+    const { candidates, dropped } = await nyaaSearchDetailed({
       config: config as NyaaAcquisitionConfig,
       title: item.seriesTitle ?? item.title,
       season: item.season ?? null,
@@ -787,7 +788,7 @@ async function listNyaaCandidates(
         score: candidate.score,
         reasons: candidate.reasons,
       })),
-      message: candidates.length ? '' : 'No release on the index looks like it carries subtitles for this title.',
+      message: candidates.length ? '' : describeEmptyNyaaListing(dropped),
     };
   } catch (error) {
     return {

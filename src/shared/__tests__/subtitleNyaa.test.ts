@@ -4,6 +4,8 @@ import {
   asNyaaAcquisitionConfig,
   buildSubtitleQuery,
   couldCarrySidecarSubtitles,
+  declaresMuxedSubtitles,
+  describeEmptyNyaaListing,
   episodeFromFileName,
   isBitmapSubtitleFile,
   JAPANESE_KANA_FLOOR,
@@ -13,6 +15,7 @@ import {
   looksLikeSubtitleOnly,
   packCoversEpisodeCount,
   rankSubtitleCandidates,
+  rankSubtitleCandidatesDetailed,
   SUBTITLE_PACK_BYTES_PER_EPISODE,
   selectSubtitleFiles,
   subtitleFormatFor,
@@ -143,6 +146,52 @@ describe('couldCarrySidecarSubtitles', () => {
       isBatch: false,
       sizeBytes: 1_400 * MB,
     }))).toBe(false);
+  });
+
+  it('refuses a batch that declares its subtitles muxed', () => {
+    // The real one, verbatim: 2,662.40 MB, walked live, 4 files and 4 video.
+    expect(couldCarrySidecarSubtitles(row({
+      name: '[Erai-raws] Kaguya-sama wa Kokurasetai - First Kiss wa Owaranai - 01 ~ 04 '
+        + '[1080p][HEVC][BATCH][Multiple Subtitle] [ENG][SPA][ARA][FRE][GER][ITA][RUS]',
+      isBatch: true,
+      sizeBytes: 2_662 * MB,
+    }))).toBe(false);
+  });
+
+  it('still accepts a batch that says nothing about where its subtitles are', () => {
+    // The control the gate must not swallow: these are the rows that genuinely
+    // need the file list before anyone can say. `[SubsPlease]` muxes too, but
+    // its name does not claim to, and a name gate may only act on the name.
+    expect(couldCarrySidecarSubtitles(row({
+      name: '[SubsPlease] Kaguya-sama wa Kokurasetai - First Kiss wa Owaranai (01-04) (1080p) [Batch]',
+      isBatch: true,
+      sizeBytes: 5_939 * MB,
+    }))).toBe(true);
+  });
+});
+
+describe('declaresMuxedSubtitles', () => {
+  it('reads the three phrasings that state where the subtitles are', () => {
+    // Each is a claim about the container, not about existence.
+    expect(declaresMuxedSubtitles('[Erai-raws] Heya Camp - 01 ~ 12 [1080p][Multiple Subtitle]')).toBe(true);
+    expect(declaresMuxedSubtitles('[Judas] Jujutsu Kaisen (Season 03) [1080p][Dual-Audio][Multi-Subs] (Batch)')).toBe(true);
+    expect(declaresMuxedSubtitles('Show S01 [Softsub]')).toBe(true);
+    expect(declaresMuxedSubtitles('Show S01 [Hardsub]')).toBe(true);
+  });
+
+  it('does not read a claim about audio, or an unqualified "subbed", as one', () => {
+    // The negative controls that keep this narrower than `VIDEO_WITH_SUBS_RE`:
+    // neither says whether there is a file to fetch, so neither may retire a
+    // candidate before its file list is read.
+    expect(declaresMuxedSubtitles('[DB] Yuru Camp△ (Season 1-3+Specials) [Dual Audio 10bit BD1080p] (Batch)')).toBe(false);
+    expect(declaresMuxedSubtitles('Show - 05 [English Subbed]')).toBe(false);
+    expect(declaresMuxedSubtitles('[SubsPlease] Show (00-17) (1080p) [Batch]')).toBe(false);
+  });
+
+  it('does not fire on a release group whose own name contains the phrase', () => {
+    // `withoutReleaseGroup` exists for exactly this, and it is why the leading
+    // tag is stripped before the test rather than after.
+    expect(declaresMuxedSubtitles('[Multi-Subs] Show - 01 (1080p) [Batch]')).toBe(false);
   });
 });
 
@@ -344,6 +393,86 @@ describe('rankSubtitleCandidates', () => {
   it('never returns a row that fails both routes', () => {
     const single = row({ name: '[Group] Show - 01 [1080p].mkv', sizeBytes: 1_400 * MB, subtitleLanguages: ['ja'] });
     expect(rankSubtitleCandidates([single], { languages: ['ja'] })).toEqual([]);
+  });
+});
+
+describe('rankSubtitleCandidatesDetailed drops / describeEmptyNyaaListing', () => {
+  // Every row below is a real name from the 2026-08-17 survey.
+  const muxed = row({
+    id: 'erai',
+    name: '[Erai-raws] Kaguya-sama wa Kokurasetai - First Kiss wa Owaranai - 01 ~ 04 '
+      + '[1080p][HEVC][BATCH][Multiple Subtitle] [ENG][SPA][ARA][FRE][GER][ITA][RUS]',
+    isBatch: true,
+    sizeBytes: 2_662 * MB,
+    seeders: 7,
+  });
+  const plain = row({
+    id: 'subsplease',
+    name: '[SubsPlease] Kaguya-sama wa Kokurasetai - First Kiss wa Owaranai (01-04) (1080p) [Batch]',
+    isBatch: true,
+    sizeBytes: 5_939 * MB,
+    seeders: 61,
+  });
+  const want = { languages: ['ja'], title: 'Kaguya-sama wa Kokurasetai - First Kiss wa Owaranai' };
+
+  it('attributes a muxing declaration separately from an unusable shape', () => {
+    const { candidates, dropped } = rankSubtitleCandidatesDetailed([muxed, plain], want);
+    expect(candidates.map((c) => c.row.id)).toEqual(['subsplease']);
+    expect(dropped.titleMatched).toBe(2);
+    expect(dropped.muxed).toBe(1);
+    expect(dropped.shape).toBe(0);
+  });
+
+  it('counts a row that is neither muxed nor fetchable as shape, not muxed', () => {
+    // A single-file release: refused for having no addressable subset, and the
+    // listing must not tell the user it was refused for muxing.
+    const single = row({ id: 'one', name: 'Kaguya-sama wa Kokurasetai - First Kiss wa Owaranai - 01 [1080p].mkv' });
+    const { dropped } = rankSubtitleCandidatesDetailed([single], want);
+    expect(dropped.shape).toBe(1);
+    expect(dropped.muxed).toBe(0);
+  });
+
+  it('does not credit muxing for a row that was unusable anyway', () => {
+    // The number the listing quotes has to mean "withheld because of this".
+    // A single-file release is refused for its shape whatever its name says,
+    // and counting it read 11 of 38 live where only 4 matches were batches.
+    const singleMuxed = row({
+      id: 'single-muxed',
+      name: 'Kaguya-sama wa Kokurasetai - First Kiss wa Owaranai - 01 [1080p][Multi-Subs].mkv',
+      isBatch: false,
+    });
+    const { dropped } = rankSubtitleCandidatesDetailed([singleMuxed], want);
+    expect(declaresMuxedSubtitles(singleMuxed.name)).toBe(true);
+    expect(dropped.muxed).toBe(0);
+    expect(dropped.shape).toBe(1);
+  });
+
+  it('names the number when every match declared muxing, and stays quiet otherwise', () => {
+    const { candidates, dropped } = rankSubtitleCandidatesDetailed([muxed], want);
+    expect(candidates).toEqual([]);
+    // The whole point of the counter: this refusal can be checked. Both counts
+    // agree independently — live, one shared noun phrase produced "1 of 1
+    // matching release declare their subtitles", then "1 of 38 matching
+    // release declares".
+    expect(describeEmptyNyaaListing(dropped)).toContain('Of 1 release matching it, 1 declares its subtitles');
+    expect(describeEmptyNyaaListing(dropped)).toContain('muxed into the video');
+    expect(describeEmptyNyaaListing({ ...dropped, muxed: 1, titleMatched: 38 }))
+      .toContain('Of 38 releases matching it, 1 declares its subtitles');
+    expect(describeEmptyNyaaListing({ ...dropped, muxed: 4, titleMatched: 7 }))
+      .toContain('Of 7 releases matching it, 4 declare their subtitles');
+
+    // Negative control: nothing muxed, so no muxing claim is made up.
+    const { dropped: none } = rankSubtitleCandidatesDetailed([], want);
+    expect(describeEmptyNyaaListing(none)).toBe(
+      'No release on the index looks like it carries subtitles for this title.',
+    );
+  });
+
+  it('separates a title miss from a match it could not use', () => {
+    const other = row({ id: 'other', name: '[Trix] Agents of the Four Seasons S01 (Batch)', isBatch: true });
+    const { dropped } = rankSubtitleCandidatesDetailed([other, muxed], want);
+    expect(dropped.title).toBe(1);
+    expect(dropped.titleMatched).toBe(1);
   });
 });
 

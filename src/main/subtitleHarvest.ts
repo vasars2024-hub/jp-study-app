@@ -30,13 +30,15 @@ import {
   type ProviderSubtitleCandidate,
 } from './subtitleProviderClients';
 import {
+  emptyRankDrops,
   nyaaAvailability,
   nyaaFetchAll,
   nyaaSearch,
+  nyaaSearchDetailed,
   rememberNyaaCandidates,
   takeRememberedNyaaCandidate,
 } from './subtitleNyaaSource';
-import { asNyaaAcquisitionConfig } from '../shared/subtitleNyaa';
+import { asNyaaAcquisitionConfig, describeEmptyNyaaListing } from '../shared/subtitleNyaa';
 import { harvestSearchAliases } from '../shared/subtitleHarvest';
 import { readMalLibrary } from './malLibrary';
 import { malLibraryKey } from '../shared/malLibrary';
@@ -400,9 +402,12 @@ export async function listNyaaHarvest(
     // and a title with no aliases cannot walk at all.
     let found: Awaited<ReturnType<typeof nyaaSearch>> = [];
     let searchedAs: string | null = null;
+    // The alias that saw the most of this work, so an empty result reports the
+    // richest refusal the walk found rather than the last alias's silence.
+    let drops = emptyRankDrops();
     for (const [index, title] of aliases.entries()) {
       if (index) await sleep(FETCH_PACING_MS);
-      const candidates = await nyaaSearch({
+      const { candidates, dropped } = await nyaaSearchDetailed({
         config,
         title,
         season,
@@ -412,6 +417,7 @@ export async function listNyaaHarvest(
         // only hold one episode is not an answer to it.
         episodeCount: stored.totalEpisodes,
       });
+      if (dropped.titleMatched > drops.titleMatched) drops = dropped;
       if (!candidates.length) continue;
       const carriesPack = candidates.some((candidate) => candidate.route === 'sub-pack');
       // Earliest name still wins among equals: a later sidecar-only hit never
@@ -439,9 +445,7 @@ export async function listNyaaHarvest(
         score: candidate.score,
         reasons: candidate.reasons,
       })),
-      message: found.length
-        ? ''
-        : 'No release on the index looks like it carries subtitles for this title.',
+      message: found.length ? '' : describeEmptyNyaaListing(drops),
       searchedAs,
     };
   } catch (error) {

@@ -1753,3 +1753,51 @@ A candidate retired in 49 ms has not been asked the question. Re-run it first ne
 name signal that does not predict sidecars. Either find the name signal that does (survey indices
 134+ for releases whose names state a subs folder) or make the route's own listing honest about
 its hit rate — do not walk more Kaguya-shaped batches expecting a different answer.
+
+## 2026-08-17 — the sidecar route had no name signal at all, and its refusal now counts
+
+Worker `primary`. Commit pending. App restarted 4× (final main pid **17628**); every number below
+is post-restart, because `shared/subtitleNyaa.ts` is consumed by main and main does not hot-reload.
+
+**The finding.** `couldCarrySidecarSubtitles` was `row.isBatch === true` — the route the last entry
+called "0 for 10 on real data" was not ranking on a weak signal, it was ranking on **no** signal.
+Every batch on the index qualified, which is why 10 distinct candidates each spent a 6–47 s metadata
+handshake to be told what their own names already said.
+
+**`declaresMuxedSubtitles`** reads the three phrasings that state *where* the subtitles are —
+`multi(ple) sub(title)s`, `softsub`, `hardsub` — and refuses the sidecar route on them. Deliberately
+**narrower** than the neighbouring `VIDEO_WITH_SUBS_RE`: `dual audio` is a claim about audio and
+`English subbed` says a release is subtitled without saying how, so neither may retire a candidate.
+Scored against the 33 real sidecar names in `debug/g31n-routeb-54.json`: **14 of 33** declare it,
+every one an mkv-era muxing group (`[Erai-raws]`, `[Judas]`, `[Trix]`, `[DKB]`, `[Anime Time]`).
+
+**LIVE, and it is an inverse control pair.** `Kaguya-sama … First Kiss` **7 → 3 rows**: the 4 that
+went all declare `[Multiple Subtitle]`/`[Multi Sub]`/`[Multi Subs]`; the 3 that stayed
+(`[SubsPlease]` ×2, `[DB]`) say nothing about placement and still need their file list. **Control
+that must not move, and did not: `Ghost Hound` still lists its 1 row** — `[DeadFish] … Batch [BD]
+[1080p][MP4][AAC]`, 7,782.40 MB, 6 seeders. `Fate/strange Fake: Whispers of Dawn` — the 1,002.10 MB
+`[Anime Time] … [Multi Sub]` the last entry queued as the next walk — is now retired **by name in
+1,005 ms** instead of a metadata handshake.
+
+**The refusal counts, because eleven in a row that reported no number could not be audited.**
+`rankSubtitleCandidatesDetailed` returns `NyaaRankDrops` (`titleMatched`/`seeders`/`title`/`muxed`/
+`shape`/`language`) and `describeEmptyNyaaListing` speaks it; `nyaaSearchDetailed` carries it to
+both listing surfaces. The alias walk keeps the drops of the alias that **saw the most of the work**,
+so a Japanese title the index does not carry cannot overwrite the one alias that found the show.
+
+**Two defects the live pass found in my own fix, both fixed and re-measured, not reported.**
+(1) `Fate/strange Fake` first read **"11 of 38"** — the counter credited muxing for single-file rows
+that were unusable regardless. Narrowed to batches: **1 of 39**, a threefold overstatement removed.
+(2) `Heya Camp` read *"1 of 1 matching release **declare their** subtitles"*, then after a naive fix
+*"1 of 38 matching **release** declares"* — one noun phrase cannot agree with two counts. Restructured
+to `Of N releases matching it, M declare(s)`; both live strings now read correctly.
+
+Tests: 12 new across the two suites, 3 of them negative controls (`dual audio` and `English subbed`
+are not muxing claims; a group tag named `[Multi-Subs]` is not one either). Mutation control: gate
+disabled → **3 failures, the 3 intended**. Suites: shared+harvest+fetch+panel **159/159**.
+
+**Gate 31 stays 32 of 34** — this makes the route honest and cheap, it does not find a sidecar.
+
+**Next slice:** survey MAL completed indices **134+** for names that state a subs folder (`+ Subs`,
+`Subs/`, a separate `[Subs]` bracket) — the positive signal is still unfound, and the pool above 133
+has never been walked. `debug/mux-live.cjs <json>` lists any title live in ~1–5 s.
