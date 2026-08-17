@@ -1253,3 +1253,59 @@ episodes**, and long-running shows are where sub-packs actually live. Do not con
 unavailable in this library; conclude it is unmeasured above 8 episodes.
 **Next: run `node debug/g31h-alias-routes.cjs 99 100 2 1` and upward**, or sort the pool
 descending, before treating gate 31's Route A as data-blocked.
+
+## 2026-08-17 — gate 31 Route A produces its first usable candidate, live, and the floor that was missing
+
+Worker `primary`. The previous entry's correction was right and it changes the gate. Both earlier
+surveys drew the **99 smallest** multi-episode titles (2–8 eps, 9 % of a 1,105 pool, sorted to OVAs
+and shorts). `debug/g31h-alias-routes.cjs` gained an `[asc|desc]` 6th arg — default `asc`, so every
+earlier invocation still means what it meant — and the **descending** run of the 60 longest
+(`0 60 2 1 desc`, ep range **500–28**) reports **60 titles, 207 searches, 0 errors**:
+
+**Route A: 8 titles of 60, against 1 of 99 ascending.** 4 of the 8 are reachable **only** by a MAL
+alias. Sizes/seeders: Gundam X 20.10 MB/7s, Eureka Seven 39.20 MB/1s, Les Misérables 18.10 MB/4s,
+Romeo no Aoi Sora 16.60 MB/2s, Ashita no Joe 1.40 MB/3s, Utena 1.40 MB/1s, Dragon Ball Z + Dragon
+Ball 0.51 MB/2s. **Route A is not rare in this library — it was measured on the wrong end of the
+pool.** Route B: 53 of 60 carry ≥1 batch; 0 zero-row titles.
+
+**GATE 31 ROUTE A HAS A LIVE, USABLE CANDIDATE — the first ever in this library.** Through the real
+app, not the survey port: `subtitleHarvestNyaaList({title:'Kidou Shinseiki Gundam X', malId:92})` →
+`ok true`, **n 1**, `searchedAs "After War Gundam X"`, route **`sub-pack`**, **20.10 MB, 7 seeders**,
+`After War Gundam X / Kidou Shin Seiki Gundam X Official Subtitles`, **2,306 ms**. Text subs, above
+the profile's `minSeeders`, and the primary title returns **0 rows** — so the alias did the work.
+**Negative control, same title/index/minute:** `malId 99999999` (no library row) → **n 0**,
+`searchedAs null`, *"No release on the index looks like it carries subtitles for this title."*
+Instrument `debug/g31k-floor.cjs`. Gate 31 is still **OPEN** — nothing has been *acquired* yet —
+but its Route A blocker is data, not absence.
+
+**The floor that did not exist, now `8cfff0d8`.** `looksLikeSubtitleOnly` had a 50 MB ceiling and no
+floor, so a one-episode cue file answered a whole-series request — the survey nominated
+`[IsThisYuri] Black Rock Shooter - Dawn Fall 08 subtitles`, **26,726 B**, for an 8-episode show, and
+a different work at that. `packCoversEpisodeCount` is **per episode asked for** (6 KB), never
+absolute: a small file *is* one episode's subtitles, and count 0/1/unknown imposes nothing — MAL
+writes 0 for "still airing", which is unknown, not none. `episodeCount` rides in on the library row
+the alias read already opens, so a listing still parses the 806 KB file once. Scored on the survey's
+own 9 nominations: **2 refused, 7 kept**; both refusals are the same wrong release (`Dragon Ball Z
+Movies 01-13 French subtitles`, 0.51 MB, offered for a 291- and a 153-episode series).
+
+**TRAP — the survey port is WIDER than the product; do not read a survey hit as a listing.**
+`debug/g31h-*.cjs` searches at `minSeeders 0` with no title filter; the app applies
+`looksLikeSameTitle` **and** the profile's `minSeeders`, which is **3** on this machine. Of the 8
+Route A titles, **only 3 survive that** (Gundam X 7s, Les Misérables 4s, Ashita no Joe 3s). Both
+26 KB/0.51 MB false positives were already invisible live — probed at HEAD, Black★Rock Shooter and
+Dragon Ball Z each returned **only** `batch-sidecar` rows. The floor is defence in depth, not a
+repair of an observed listing.
+
+**SECOND DEFECT, measured and NOT fixed — the alias walk breaks on the first name that finds
+*anything*, not the first that finds a *pack*.** `src/main/subtitleHarvest.ts` ("First alias that
+finds anything wins"). Eureka Seven: primary returns **21 rows** — two *Hi-Evolution movie* batches,
+21 GB and 43 GB, not even the TV series — so the walk stops and never reaches `Psalms of Planets
+Eureka Seven`, the only name carrying the **39.20 MB 50-episode subs-only pack**. Same shape on
+Utena (primary 49 rows; `Revolutionary Girl Utena` holds the pack). A Route A pack is categorically
+better than a Route B multi-GB batch, so "any candidate" is the wrong break condition. Both lost
+packs sit at 1 seeder here, so no *usable* pack is lost in this 60-title sample — which is why it is
+recorded rather than rushed. **Next slice: continue the walk while only `batch-sidecar` has been
+seen, and prefer a later alias's `sub-pack`.**
+
+**Still unsurveyed: 946 titles** (1,105 pool − 99 asc − 60 desc). Continue with
+`node debug/g31h-alias-routes.cjs 60 60 2 1 desc`.
