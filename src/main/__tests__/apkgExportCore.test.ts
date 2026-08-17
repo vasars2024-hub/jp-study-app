@@ -117,7 +117,7 @@ describe('applyExportChanges', () => {
       { notes: [{ noteId: '1001', fields: ['<b>食べた</b>', 'たべた'] }], cardMoves: [] },
       { nowMs: NOW_MS, normalize: stripFieldHtml },
     );
-    expect(result).toEqual({ notesUpdated: 1, cardsUpdated: 0, decksUpdated: 0 });
+    expect(result).toEqual({ notesUpdated: 1, cardsUpdated: 0, decksUpdated: 0, templatesRemoved: 0, cardsDeleted: 0 });
 
     const raw = readRawCollection(db);
     const noteRow = raw.notes.find((n) => String(n.id) === '1001')!;
@@ -156,7 +156,7 @@ describe('applyExportChanges', () => {
       { notes: [], cardMoves: [{ cardId: '5001', noteId: '1001', due: 3 }] },
       { nowMs: NOW_MS, normalize: stripFieldHtml },
     );
-    expect(result).toEqual({ notesUpdated: 0, cardsUpdated: 1, decksUpdated: 0 });
+    expect(result).toEqual({ notesUpdated: 0, cardsUpdated: 1, decksUpdated: 0, templatesRemoved: 0, cardsDeleted: 0 });
     const row = db.exec('SELECT due, usn, mod FROM cards WHERE id = 5001')[0]!.values[0]!;
     expect(row).toEqual([3, -1, Math.floor(NOW_MS / 1000)]);
   });
@@ -221,7 +221,7 @@ describe('applyExportChanges', () => {
       },
       { nowMs: NOW_MS, normalize: stripFieldHtml },
     );
-    expect(result).toEqual({ notesUpdated: 0, cardsUpdated: 0, decksUpdated: 1 });
+    expect(result).toEqual({ notesUpdated: 0, cardsUpdated: 0, decksUpdated: 1, templatesRemoved: 0, cardsDeleted: 0 });
     // Read back through the reader an import would use, not through the UPDATE.
     const decks = readRawCollection(db).decks;
     expect(decks).toEqual([{ id: '1', name: 'Japanese::Core', dyn: 0, conf: '1' }]);
@@ -358,7 +358,7 @@ describe('applyExportChanges — recipe 13 deck moves', () => {
       nowMs: NOW_MS,
       normalize: stripFieldHtml,
     });
-    expect(result).toEqual({ notesUpdated: 0, cardsUpdated: 1, decksUpdated: 1 });
+    expect(result).toEqual({ notesUpdated: 0, cardsUpdated: 1, decksUpdated: 1, templatesRemoved: 0, cardsDeleted: 0 });
 
     // Read back through the reader an import would use, not through the INSERT.
     const decks = readRawCollection(db).decks;
@@ -400,6 +400,8 @@ describe('applyExportChanges — recipe 13 deck moves', () => {
       notesUpdated: 0,
       cardsUpdated: 1,
       decksUpdated: 1,
+      templatesRemoved: 0,
+      cardsDeleted: 0,
     });
     // `dyn: 0` here is the reader deciding from the kind blob's first byte, so it
     // is a real assertion about the bytes written and not about the column.
@@ -441,7 +443,7 @@ describe('applyExportChanges — recipe 13 deck moves', () => {
       },
       { nowMs: NOW_MS, normalize: stripFieldHtml },
     );
-    expect(result).toEqual({ notesUpdated: 0, cardsUpdated: 2, decksUpdated: 2 });
+    expect(result).toEqual({ notesUpdated: 0, cardsUpdated: 2, decksUpdated: 2, templatesRemoved: 0, cardsDeleted: 0 });
     const decks = readRawCollection(db).decks;
     const n5 = decks.find((d) => d.name === 'Default::N5')!;
     const n4 = decks.find((d) => d.name === 'Default::N4')!;
@@ -469,7 +471,7 @@ describe('applyExportChanges — recipe 13 deck moves', () => {
       },
       { nowMs: NOW_MS, normalize: stripFieldHtml },
     );
-    expect(result).toEqual({ notesUpdated: 0, cardsUpdated: 1, decksUpdated: 0 });
+    expect(result).toEqual({ notesUpdated: 0, cardsUpdated: 1, decksUpdated: 0, templatesRemoved: 0, cardsDeleted: 0 });
     expect(db.exec('SELECT count(*) FROM decks')[0]!.values[0]![0]).toBe(before);
     expect(db.exec('SELECT did FROM cards WHERE id = 5001')[0]!.values[0]![0]).toBe(3);
   });
@@ -626,7 +628,7 @@ describe('applyExportChanges — recipe 13 deck moves', () => {
         },
         { nowMs: NOW_MS, normalize: stripFieldHtml },
       ),
-    ).toEqual({ notesUpdated: 0, cardsUpdated: 1, decksUpdated: 0 });
+    ).toEqual({ notesUpdated: 0, cardsUpdated: 1, decksUpdated: 0, templatesRemoved: 0, cardsDeleted: 0 });
     expect(db.exec('SELECT did FROM cards WHERE id = 5001')[0]!.values[0]![0]).toBe(3);
   });
 });
@@ -698,5 +700,219 @@ describe('verifyExportChanges', () => {
     const verdict = verifyExportChanges(db, changes);
     expect(verdict.ok).toBe(false);
     expect(verdict.mismatches).toEqual(['deck 2: name differs']);
+  });
+});
+
+// ----- recipe 17's remove half -------------------------------------------------
+
+/** Legacy `col.models`, one note type with THREE templates and cards at 0/1/2. */
+function threeTemplateDb(): Database {
+  const db = fixtureDb();
+  const models = {
+    '100': {
+      id: 100,
+      name: 'Japanese',
+      type: 0,
+      css: '',
+      sortf: 1,
+      flds: [
+        { name: 'Expression', ord: 0 },
+        { name: 'Reading', ord: 1 },
+      ],
+      tmpls: [
+        { name: 'Card 1', ord: 0, qfmt: '{{Expression}}', afmt: '{{Reading}}' },
+        { name: 'Card 1 copy', ord: 1, qfmt: '{{Expression}}', afmt: '{{Reading}}' },
+        { name: 'Card 2', ord: 2, qfmt: '{{Reading}}', afmt: '{{Expression}}' },
+      ],
+    },
+  };
+  db.run('UPDATE col SET models = ?', [JSON.stringify(models)]);
+  db.run('DELETE FROM cards');
+  let cardId = 5001;
+  for (const nid of [1001, 1002]) {
+    for (const ord of [0, 1, 2]) {
+      db.run(
+        'INSERT INTO cards (id, nid, did, ord, mod, usn, type, queue, due, ivl, factor, reps, lapses, left, odue, odid, flags) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+        [cardId++, nid, 1, ord, 1_500_000_100, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0],
+      );
+    }
+  }
+  return db;
+}
+
+/** Schema 18: the template list is its own table, so `ord` is a plain column. */
+function normalizedTemplateDb(): Database {
+  const db = normalizedDeckDb();
+  db.run(`
+    CREATE TABLE notetypes (id integer primary key, name text, mtime_secs integer,
+      usn integer, config blob);
+    CREATE TABLE templates (ntid integer, ord integer, name text, mtime_secs integer,
+      usn integer, config blob);
+  `);
+  db.run('INSERT INTO notetypes (id, name, mtime_secs, usn, config) VALUES (100, ?, 0, 0, ?)', [
+    'Japanese',
+    new Uint8Array(0),
+  ]);
+  const rows: Array<[number, string]> = [
+    [0, 'Card 1'],
+    [1, 'Card 1 copy'],
+    [2, 'Card 2'],
+  ];
+  for (const [ord, name] of rows) {
+    db.run(
+      'INSERT INTO templates (ntid, ord, name, mtime_secs, usn, config) VALUES (100, ?, ?, 0, 0, ?)',
+      [ord, name, new Uint8Array(0)],
+    );
+  }
+  db.run(
+    'INSERT INTO notes (id, guid, mid, mod, usn, tags, flds, sfld, csum, flags, data) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+    [1001, 'guid-a', 100, 1_500_000_100, 0, '', ['食べる', 'たべる'].join(SEP), 'たべる', 0, 0, ''],
+  );
+  let cardId = 5001;
+  for (const ord of [0, 1, 2]) {
+    db.run(
+      'INSERT INTO cards (id, nid, did, ord, mod, usn, type, queue, due, ivl, factor, reps, lapses, left, odue, odid, flags) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      [cardId++, 1001, 1, ord, 1_500_000_100, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0],
+    );
+  }
+  return db;
+}
+
+function removeOnly(removedOrds: number[], noteTypeId = '100') {
+  return { notes: [], cardMoves: [], deckRenames: [], templateRemovals: [{ noteTypeId, removedOrds }] };
+}
+
+/** Card ords still in the collection, ascending — the number every claim here cites. */
+function cardOrds(db: Database): number[] {
+  const values = db.exec('SELECT ord FROM cards ORDER BY nid, ord')[0]?.values ?? [];
+  return values.map((row) => Number(row[0]));
+}
+
+function cardCount(db: Database): number {
+  return Number(db.exec('SELECT COUNT(*) FROM cards')[0]?.values?.[0]?.[0] ?? -1);
+}
+
+describe('applyExportChanges — recipe 17 template removal (legacy col.models)', () => {
+  it('drops the template, deletes its cards and renumbers both halves', () => {
+    const db = threeTemplateDb();
+    const result = applyExportChanges(db, removeOnly([1]), {
+      nowMs: NOW_MS,
+      normalize: stripFieldHtml,
+    });
+    expect(result.templatesRemoved).toBe(1);
+    expect(result.cardsDeleted).toBe(2);
+
+    // Read back through the importer's own reader, never the UPDATE.
+    const model = readRawCollection(db).noteTypes.find((nt) => String(nt.id) === '100');
+    expect(model?.templates.map((t) => [t.ord, t.name])).toEqual([
+      [0, 'Card 1'],
+      [1, 'Card 2'],
+    ]);
+    // Card 2's cards followed their template from ord 2 down to ord 1.
+    expect(cardOrds(db)).toEqual([0, 1, 0, 1]);
+    expect(cardCount(db)).toBe(4);
+  });
+
+  it('NEGATIVE CONTROL: undoing the card renumbering is what produces orphans', () => {
+    const db = threeTemplateDb();
+    applyExportChanges(db, removeOnly([1]), { nowMs: NOW_MS, normalize: stripFieldHtml });
+    const model = readRawCollection(db).noteTypes.find((nt) => String(nt.id) === '100');
+    const present = new Set((model?.templates ?? []).map((t) => t.ord));
+    expect(cardOrds(db).filter((ord) => !present.has(ord))).toEqual([]);
+
+    // The same collection with the card renumbering undone — what a removal that
+    // only rewrote `col.models` would leave behind.
+    db.run('UPDATE cards SET ord = 2 WHERE ord = 1');
+    expect(cardOrds(db).filter((ord) => !present.has(ord))).toHaveLength(2);
+  });
+
+  it('removes two templates in one pass without colliding their ords', () => {
+    const db = threeTemplateDb();
+    const result = applyExportChanges(db, removeOnly([0, 1]), {
+      nowMs: NOW_MS,
+      normalize: stripFieldHtml,
+    });
+    expect(result.templatesRemoved).toBe(2);
+    expect(result.cardsDeleted).toBe(4);
+    const model = readRawCollection(db).noteTypes.find((nt) => String(nt.id) === '100');
+    expect(model?.templates.map((t) => [t.ord, t.name])).toEqual([[0, 'Card 2']]);
+    expect(cardOrds(db)).toEqual([0, 0]);
+  });
+
+  it('refuses a missing note type, a missing ord, and emptying a note type', () => {
+    const cases: Array<[ReturnType<typeof removeOnly>, string]> = [
+      [removeOnly([0], '999'), 'note-type-missing'],
+      [removeOnly([7]), 'template-missing'],
+      [removeOnly([0, 1, 2]), 'last-template'],
+    ];
+    for (const [changes, code] of cases) {
+      const db = threeTemplateDb();
+      const before = cardCount(db);
+      let seen = '';
+      try {
+        applyExportChanges(db, changes, { nowMs: NOW_MS, normalize: stripFieldHtml });
+      } catch (err) {
+        expect(err).toBeInstanceOf(ExportRefusal);
+        seen = (err as ExportRefusal).code;
+      }
+      expect(seen).toBe(code);
+      // Refused before write #1: nothing was deleted on the way to the refusal.
+      expect(cardCount(db)).toBe(before);
+    }
+  });
+
+  it('refuses a package that stores no note-type list at all', () => {
+    const db = threeTemplateDb();
+    db.run('UPDATE col SET models = ?', ['']);
+    let seen = '';
+    try {
+      applyExportChanges(db, removeOnly([1]), { nowMs: NOW_MS, normalize: stripFieldHtml });
+    } catch (err) {
+      seen = (err as ExportRefusal).code;
+    }
+    expect(seen).toBe('template-storage-unsupported');
+    expect(cardCount(db)).toBe(6);
+  });
+});
+
+describe('applyExportChanges — recipe 17 template removal (schema 18 tables)', () => {
+  it('writes through the templates table without touching the notetype protobuf', () => {
+    const db = normalizedTemplateDb();
+    const configBefore = db.exec('SELECT config FROM notetypes WHERE id = 100')[0]?.values[0][0];
+    const result = applyExportChanges(db, removeOnly([1]), {
+      nowMs: NOW_MS,
+      normalize: stripFieldHtml,
+    });
+    expect(result.templatesRemoved).toBe(1);
+    expect(result.cardsDeleted).toBe(1);
+
+    expect(
+      db.exec('SELECT ord, name FROM templates WHERE ntid = 100 ORDER BY ord')[0]?.values,
+    ).toEqual([
+      [0, 'Card 1'],
+      [1, 'Card 2'],
+    ]);
+    expect(cardOrds(db)).toEqual([0, 1]);
+    // The blob is byte-identical: schema 18 keeps the list out of the protobuf.
+    expect(db.exec('SELECT config FROM notetypes WHERE id = 100')[0]?.values[0][0]).toEqual(
+      configBefore,
+    );
+    // Freshness did move, so Anki re-syncs the note type.
+    expect(db.exec('SELECT mtime_secs, usn FROM notetypes WHERE id = 100')[0]?.values[0]).toEqual([
+      Math.floor(NOW_MS / 1000),
+      -1,
+    ]);
+  });
+
+  it('refuses to empty the note type here too', () => {
+    const db = normalizedTemplateDb();
+    let seen = '';
+    try {
+      applyExportChanges(db, removeOnly([0, 1, 2]), { nowMs: NOW_MS, normalize: stripFieldHtml });
+    } catch (err) {
+      seen = (err as ExportRefusal).code;
+    }
+    expect(seen).toBe('last-template');
+    expect(db.exec('SELECT COUNT(*) FROM templates')[0]?.values[0][0]).toBe(3);
   });
 });

@@ -86,6 +86,14 @@ export interface ApplyExportResult {
   notesUpdated: number;
   cardsUpdated: number;
   decksUpdated: number;
+  /** Recipe 17's remove half: card templates dropped from their note types. */
+  templatesRemoved: number;
+  /**
+   * Cards those removals DELETED. Reported separately from `cardsUpdated`
+   * because it is the only number in this result that describes destruction, and
+   * folding it into an "updated" total would hide it.
+   */
+  cardsDeleted: number;
 }
 
 /**
@@ -102,6 +110,55 @@ function deckStorage(db: SqlWritable): 'table' | 'blob' | 'none' {
   }
   const raw = firstRow(db, 'SELECT decks FROM col LIMIT 1', []);
   return typeof raw?.[0] === 'string' && raw[0].trim() !== '' ? 'blob' : 'none';
+}
+
+/**
+ * Where a note type's TEMPLATE LIST lives — the same two-schema ladder as
+ * `deckStorage`, decided independently because a collection can normalize one
+ * and not the other.
+ *
+ * `table` is schema 18's `templates` row per template, whose `ord` is a plain
+ * integer column: removing one is a DELETE and a renumbering UPDATE, and the
+ * `config` protobuf beside it never has to be decoded, let alone re-encoded.
+ * `models` is the older `col.models` JSON. `none` is a refusal.
+ */
+function templateStorage(db: SqlWritable): 'table' | 'models' | 'none' {
+  try {
+    if (db.exec('SELECT ntid FROM templates LIMIT 1')[0]?.values?.length) return 'table';
+  } catch {
+    // A missing table is how the older schema announces itself.
+  }
+  const raw = firstRow(db, 'SELECT models FROM col LIMIT 1', [])?.[0];
+  if (typeof raw !== 'string' || !raw.trim()) return 'none';
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? 'models' : 'none';
+  } catch {
+    return 'none';
+  }
+}
+
+/** Ords a note type currently has a template at, ascending. */
+function templateOrdsOf(
+  db: SqlWritable,
+  storage: 'table' | 'models',
+  noteTypeId: string,
+): number[] | undefined {
+  if (storage === 'table') {
+    const values = db.exec('SELECT ord FROM templates WHERE ntid = ? ORDER BY ord', [
+      idParam(noteTypeId),
+    ])[0]?.values;
+    if (!values?.length) return undefined;
+    return values.map((row) => Number(row[0]));
+  }
+  const raw = firstRow(db, 'SELECT models FROM col LIMIT 1', [])?.[0];
+  if (typeof raw !== 'string') return undefined;
+  const parsed = JSON.parse(raw) as Record<string, { tmpls?: Array<{ ord?: number }> }>;
+  const model = parsed[noteTypeId];
+  if (!model) return undefined;
+  // `ord` is written by Anki but read positionally as a fallback, exactly as
+  // `apkgDraftRead.ts` reads it — the two must agree about what ord 2 is.
+  return (model.tmpls ?? []).map((t, index) => (t.ord == null ? index : Number(t.ord)));
 }
 
 /** The legacy blob, parsed, or `undefined` when it is not the JSON Anki writes. */
@@ -430,6 +487,60 @@ export function applyExportChanges(
     movePlans.push({ id: idParam(move.cardId), did: idParam(target) });
   }
 
+  // Recipe 17's remove half. The change set carries only the ords; the ord map
+  // and the doomed card rows are derived HERE, from the collection about to be
+  // written, so a draft read minutes ago cannot disagree with the package.
+  interface TemplateRemovalPlan {
+    noteTypeId: string;
+    removedOrds: number[];
+    /** Surviving source ord to its ord afterwards; only the ones that move. */
+    renumber: Array<{ from: number; to: number }>;
+  }
+  const templateRemovals = changes.templateRemovals ?? [];
+  const removalPlans: TemplateRemovalPlan[] = [];
+  const templates = templateRemovals.length > 0 ? templateStorage(db) : 'none';
+  if (templateRemovals.length > 0 && templates === 'none') {
+    throw new ExportRefusal(
+      'template-storage-unsupported',
+      'This package stores no readable note-type list, so a card template cannot be removed from it.',
+    );
+  }
+  for (const removal of templateRemovals) {
+    if (templates === 'none') break; // unreachable — refused above
+    const present = templateOrdsOf(db, templates, removal.noteTypeId);
+    if (!present) {
+      throw new ExportRefusal(
+        'note-type-missing',
+        `Note type ${removal.noteTypeId} is not in the source package.`,
+      );
+    }
+    const removed = [...new Set(removal.removedOrds)].sort((a, b) => a - b);
+    for (const ord of removed) {
+      if (!present.includes(ord)) {
+        throw new ExportRefusal(
+          'template-missing',
+          `Note type ${removal.noteTypeId} has no card template at position ${ord + 1}.`,
+        );
+      }
+    }
+    const survivors = present.filter((ord) => !removed.includes(ord));
+    if (survivors.length === 0) {
+      throw new ExportRefusal(
+        'last-template',
+        `Removing every card template of note type ${removal.noteTypeId} would leave its notes `
+          + 'generating no cards at all.',
+      );
+    }
+    // Ranked among the survivors, never "subtract the removals below me" applied
+    // one at a time — see `shared/ankiTemplateRemoval.ts` for why that is only
+    // the same arithmetic in descending order.
+    const renumber: Array<{ from: number; to: number }> = [];
+    survivors.forEach((ord, index) => {
+      if (ord !== index) renumber.push({ from: ord, to: index });
+    });
+    removalPlans.push({ noteTypeId: removal.noteTypeId, removedOrds: removed, renumber });
+  }
+
   // --- write
   const modSec = Math.floor(options.nowMs / 1000);
   for (const plan of notePlans) {
@@ -495,10 +606,85 @@ export function applyExportChanges(
       plan.id,
     ]);
   }
+  // Recipe 17's removal, last: it DELETEs card rows, so running it before the
+  // updates above would let a `due` write target a card this removal is about to
+  // drop and report it as written.
+  //
+  // Both renumbering loops run ASCENDING by source ord, and that is load-bearing
+  // rather than tidy: every survivor's new ord is <= its old one, so ascending
+  // order guarantees the destination has already been vacated. Descending would
+  // collide two templates on one ord.
+  let templatesRemoved = 0;
+  let cardsDeleted = 0;
+  for (const plan of removalPlans) {
+    const mid = idParam(plan.noteTypeId);
+    for (const ord of plan.removedOrds) {
+      const count = firstRow(
+        db,
+        'SELECT COUNT(*) FROM cards WHERE ord = ? AND nid IN (SELECT id FROM notes WHERE mid = ?)',
+        [ord, mid],
+      );
+      cardsDeleted += Number(count?.[0] ?? 0);
+      db.run('DELETE FROM cards WHERE ord = ? AND nid IN (SELECT id FROM notes WHERE mid = ?)', [
+        ord,
+        mid,
+      ]);
+    }
+    for (const move of plan.renumber) {
+      db.run(
+        'UPDATE cards SET ord = ?, mod = ?, usn = -1 WHERE ord = ? AND nid IN '
+          + '(SELECT id FROM notes WHERE mid = ?)',
+        [move.to, modSec, move.from, mid],
+      );
+    }
+    if (templates === 'table') {
+      for (const ord of plan.removedOrds) {
+        db.run('DELETE FROM templates WHERE ntid = ? AND ord = ?', [mid, ord]);
+      }
+      for (const move of plan.renumber) {
+        db.run('UPDATE templates SET ord = ?, mtime_secs = ?, usn = -1 WHERE ntid = ? AND ord = ?', [
+          move.to,
+          modSec,
+          mid,
+          move.from,
+        ]);
+      }
+      // The note type itself is untouched apart from freshness: schema 18 keeps
+      // the template list in its own table, so `notetypes.config` never has to
+      // be decoded or re-encoded to remove one.
+      db.run('UPDATE notetypes SET mtime_secs = ?, usn = -1 WHERE id = ?', [modSec, mid]);
+    }
+    templatesRemoved += plan.removedOrds.length;
+  }
+  if (templates === 'models' && removalPlans.length > 0) {
+    // One parse and one write for the whole batch, like the deck blob above.
+    const raw = firstRow(db, 'SELECT models FROM col LIMIT 1', [])?.[0];
+    const parsed = JSON.parse(String(raw)) as Record<
+      string,
+      { tmpls?: Array<Record<string, unknown>>; mod?: number; usn?: number }
+    >;
+    for (const plan of removalPlans) {
+      const model = parsed[plan.noteTypeId];
+      if (!model) continue; // unreachable — validated above
+      const kept = (model.tmpls ?? []).filter(
+        (t, index) => !plan.removedOrds.includes(t.ord == null ? index : Number(t.ord)),
+      );
+      parsed[plan.noteTypeId] = {
+        ...model,
+        tmpls: kept.map((t, index) => ({ ...t, ord: index })),
+        mod: modSec,
+        usn: -1,
+      };
+    }
+    db.run('UPDATE col SET models = ?', [JSON.stringify(parsed)]);
+  }
+
   // `col.mod` is epoch milliseconds in both schemas.
   db.run('UPDATE col SET mod = ?', [options.nowMs]);
 
   return {
+    templatesRemoved,
+    cardsDeleted,
     notesUpdated: notePlans.length,
     // Distinct card ROWS written. A card both repositioned and refiled counts
     // once: the number is what the user would count in Anki, not a total of two

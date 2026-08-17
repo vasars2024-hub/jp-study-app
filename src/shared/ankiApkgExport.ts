@@ -83,6 +83,24 @@ export interface ApkgExportDeckCreate {
   configId?: string;
 }
 
+/**
+ * Recipe 17's remove half: a redundant card template and everything it generated.
+ *
+ * **It deliberately carries only the ords.** The renumbering of the survivors
+ * and the list of cards to delete are both derivable from the package itself,
+ * and a change set that shipped them would be a second opinion that can go stale
+ * — a draft read minutes ago naming card ids the package no longer has, or an
+ * ord map computed against a template list that has since changed. The writer
+ * derives both from the collection it is about to write, so the two cannot
+ * disagree.
+ */
+export interface ApkgExportTemplateRemoval {
+  /** The note type's id in the SOURCE package (Anki's `mid` / `notetypes.id`). */
+  noteTypeId: string;
+  /** Ords to remove, in the SOURCE numbering. Ascending, no duplicates. */
+  removedOrds: number[];
+}
+
 export interface ApkgExportChangeSet {
   notes: ApkgExportNoteChange[];
   cardMoves: ApkgExportCardMove[];
@@ -91,6 +109,8 @@ export interface ApkgExportChangeSet {
   cardDeckMoves?: ApkgExportCardDeckMove[];
   /** Decks a `cardDeckMoves` entry targets that the source does not have yet. */
   deckCreates?: ApkgExportDeckCreate[];
+  /** Absent on a payload written before recipe 17's remove half. */
+  templateRemovals?: ApkgExportTemplateRemoval[];
 }
 
 // ----- IPC contract -------------------------------------------------------------
@@ -130,6 +150,24 @@ export type ApkgExportErrorCode =
    * only the cases they genuinely cannot write — see `ankiConnectCommit.ts`.
    */
   | 'card-filtered'
+  /** A template removal names a note type the source package does not hold. */
+  | 'note-type-missing'
+  /** A template removal names an ord that note type has no template at. */
+  | 'template-missing'
+  /**
+   * A template removal would leave a note type with no templates at all, which
+   * generates no cards for any of its notes — the notes would survive as text
+   * the user can never be shown again. Refused; `ankiTemplateRemoval.ts` refuses
+   * the same case while planning, and this is the writer's own backstop.
+   */
+  | 'last-template'
+  /**
+   * The package stores its note types only as protobuf blobs this build cannot
+   * re-encode, so a template cannot be removed from it. Distinct from
+   * `deck-collation-unsupported` but the same shape of answer: nothing was
+   * written, and the user is told which package feature is the obstacle.
+   */
+  | 'template-storage-unsupported'
   | 'compressed-unsupported'
   | 'verify-failed'
   | 'io';
@@ -157,6 +195,14 @@ export interface ApkgExportResult {
   cardsUpdated?: number;
   /** Deck rows written — renamed, or created by a split. Reported apart: no note moves. */
   decksUpdated?: number;
+  /** Recipe 17: card templates removed from their note types. */
+  templatesRemoved?: number;
+  /**
+   * Cards those removals deleted. Never folded into `cardsUpdated` — it is the
+   * only count here that describes destruction, and a surface that summed the
+   * two would report a deletion as an edit.
+   */
+  cardsDeleted?: number;
   /** The written file was re-read FROM DISK and every change was found in it. */
   verified?: boolean;
   /** Fingerprint of the new package's collection, for a later commit against it. */
@@ -298,6 +344,10 @@ export function exportChangesEmpty(changes: ApkgExportChangeSet): boolean {
     changes.notes.length === 0 &&
     changes.cardMoves.length === 0 &&
     (changes.deckRenames ?? []).length === 0 &&
-    (changes.cardDeckMoves ?? []).length === 0
+    (changes.cardDeckMoves ?? []).length === 0 &&
+    // A removal-only change set touches no note and no card row the other four
+    // fields describe, so leaving it out here would report `nothing-to-export`
+    // about a package that has a template to drop.
+    (changes.templateRemovals ?? []).length === 0
   );
 }

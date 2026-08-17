@@ -8779,6 +8779,8 @@ export const ja: Catalog = {
     '移動対象のカードがコレクションに存在しません。何も書き込んでいません。手順1で読み直してから書き込んでください。',
   'ankiWorkbench.apply.liveError.deck-rename-unsupported':
     'この接続では実行中のコレクションのデッキ名を変更できないため、何も書き込んでいません。代わりにパッケージを書き出してください。そちらには変更が反映されます。',
+  'ankiWorkbench.apply.liveError.template-remove-unsupported':
+    'この接続ではカードテンプレートを削除できないため、何も書き込まれませんでした。代わりにパッケージを書き出してください — そちらではテンプレートが削除されます。',
   'ankiWorkbench.apply.liveError.deck-missing':
     '分割が指定するデッキはコレクションに存在せず、変更セットにも記述がないため、カードの移動先がありません。何も書き込まれていません — 反映する前にコレクションを読み直してください。',
   'ankiWorkbench.apply.liveError.deck-filtered':
@@ -8828,6 +8830,14 @@ export const ja: Catalog = {
     'ソースファイル内の別のデッキが既にその名前を使っており、変更すると2つのデッキが統合されてしまいます。何も書き込まれていません。',
   'ankiWorkbench.apply.error.deck-collation-unsupported':
     'このパッケージはデッキ名をこのビルドでは扱えない文字規則で保存しているため、何も書き込まれていません。Ankiで「旧バージョンのAnkiをサポート」にチェックを入れて書き出し、その複製でデッキ名を変更してください。他の編集はこのパッケージから通常どおり書き出せます。',
+  'ankiWorkbench.apply.error.note-type-missing':
+    'カードテンプレートの削除が、ソースファイルに存在しないノートタイプを指しています。何も書き込まれませんでした — 書き出す前にソースを読み直してください。',
+  'ankiWorkbench.apply.error.template-missing':
+    'カードテンプレートの削除が、そのノートタイプに存在しないテンプレート位置を指しています。何も書き込まれませんでした — 書き出す前にソースを読み直してください。',
+  'ankiWorkbench.apply.error.last-template':
+    'ノートタイプのカードテンプレートをすべて削除することになり、そのノートからカードが一枚も生成されなくなります。何も書き込まれませんでした — テンプレートを少なくとも一つ残してください。',
+  'ankiWorkbench.apply.error.template-storage-unsupported':
+    'このパッケージには読み取れるノートタイプ一覧が保存されていないため、カードテンプレートを削除できません。何も書き込まれませんでした — 他の編集はこのパッケージから通常どおり書き出せます。',
   'ankiWorkbench.apply.error.compressed-unsupported':
     'このパッケージはまだ書き込みに対応していない新しい圧縮形式を使用しています。何も書き込まれていません。',
   'ankiWorkbench.apply.error.verify-failed':

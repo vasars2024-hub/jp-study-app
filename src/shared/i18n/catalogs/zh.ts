@@ -8732,6 +8732,8 @@ export const zh: Catalog = {
     '某张要移动的卡片已不在集合中。什么也没有写入 — 请先在第 1 步重新读取再写入。',
   'ankiWorkbench.apply.liveError.deck-rename-unsupported':
     '此连接无法重命名正在使用的集合中的牌组，因此什么也没有写入。请改为导出软件包 — 重命名会写入其中。',
+  'ankiWorkbench.apply.liveError.template-remove-unsupported':
+    '无法通过此连接删除卡片模板，因此未写入任何内容。请改为导出牌组包 — 模板会在那里被真正删除。',
   'ankiWorkbench.apply.liveError.deck-missing':
     '拆分指定的牌组不在集合中，变更集也没有描述它，因此卡片无处可去。未写入任何内容 — 请先重新读取集合再提交。',
   'ankiWorkbench.apply.liveError.deck-filtered':
@@ -8777,6 +8779,14 @@ export const zh: Catalog = {
     '来源文件中已有另一个牌组使用该名称，重命名会把两个牌组合并。未写入任何内容。',
   'ankiWorkbench.apply.error.deck-collation-unsupported':
     '此软件包用本版本无法处理的文本规则保存牌组名称，因此未写入任何内容。请在 Anki 中勾选“支持旧版 Anki”后导出，并在该副本中重命名牌组 — 其他编辑仍可从此软件包正常导出。',
+  'ankiWorkbench.apply.error.note-type-missing':
+    '删除卡片模板时指向了源文件中不存在的笔记类型。未写入任何内容 — 请在导出前重新读取源文件。',
+  'ankiWorkbench.apply.error.template-missing':
+    '删除卡片模板时指向了该笔记类型中不存在的模板位置。未写入任何内容 — 请在导出前重新读取源文件。',
+  'ankiWorkbench.apply.error.last-template':
+    '这会删除某个笔记类型的全部卡片模板，使其笔记再也无法生成任何卡片。未写入任何内容 — 请至少保留一个模板。',
+  'ankiWorkbench.apply.error.template-storage-unsupported':
+    '此牌组包没有保存可读取的笔记类型列表，因此无法从中删除卡片模板。未写入任何内容 — 其他编辑仍可从此包正常导出。',
   'ankiWorkbench.apply.error.compressed-unsupported':
     '此包使用了尚不支持写入的较新压缩格式。未写入任何内容。',
   'ankiWorkbench.apply.error.verify-failed': '写入的文件未通过回读校验，不可信任。请删除后重试。',

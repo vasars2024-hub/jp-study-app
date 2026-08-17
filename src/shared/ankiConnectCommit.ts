@@ -62,6 +62,17 @@ export type ConnectCommitErrorCode =
    * evicted on the next rebuild — a move that silently undoes itself.
    */
   | 'deck-filtered'
+  /**
+   * Recipe 17's remove half. AnkiConnect exposes no action that removes a card
+   * template, and the emulation is far worse than the deck-rename one: the only
+   * route is `updateModelTemplates`, which rewrites formats and cannot drop a
+   * template, so the template would have to be blanked instead — leaving every
+   * card it generated in the collection, rendering empty, which is precisely the
+   * `orphan` state recipe 17 exists to clear. Deleting the cards without
+   * removing the template does not work either: Anki regenerates them. Refused
+   * by name; exporting a package removes it for real.
+   */
+  | 'template-remove-unsupported'
   /** Anki or the add-on is not answering. */
   | 'unreachable'
   /** AnkiConnect answered but no collection is loaded. */
@@ -343,6 +354,20 @@ export function planConnectCommit(
       renames.length === 1
         ? `Renaming "${renames[0].from}" to "${renames[0].to}" cannot be committed to a live collection.`
         : `${renames.length} deck renames cannot be committed to a live collection.`,
+    );
+  }
+
+  // Same position and same reason as the rename above: before write #1, so a
+  // tray that also edits fields cannot land the field half and report the
+  // template removal as done.
+  const removals = changes.templateRemovals ?? [];
+  const removedOrds = removals.reduce((sum, r) => sum + r.removedOrds.length, 0);
+  if (removedOrds > 0) {
+    throw new ConnectCommitRefusal(
+      'template-remove-unsupported',
+      removedOrds === 1
+        ? 'Removing a card template cannot be committed to a live collection. Export a package instead.'
+        : `Removing ${removedOrds} card templates cannot be committed to a live collection. Export a package instead.`,
     );
   }
 

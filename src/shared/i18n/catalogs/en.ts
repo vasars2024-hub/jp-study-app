@@ -9204,6 +9204,8 @@ export const en: Catalog = {
     'A moved card is no longer in the collection. Nothing was written — re-read it on step 1 before writing.',
   'ankiWorkbench.apply.liveError.deck-rename-unsupported':
     'A live collection cannot be renamed through this connection, so nothing was written. Export a package instead — the rename is written there.',
+  'ankiWorkbench.apply.liveError.template-remove-unsupported':
+    'A card template cannot be removed through this connection, so nothing was written. Export a package instead — the template is removed there.',
   'ankiWorkbench.apply.liveError.deck-missing':
     'The split names a deck the collection does not have and the change set does not describe, so the cards have nowhere to go. Nothing was written — re-read the collection before committing.',
   'ankiWorkbench.apply.liveError.deck-filtered':
@@ -9253,6 +9255,14 @@ export const en: Catalog = {
     'Another deck in the source file already uses that name, and renaming onto it would merge the two decks. Nothing was written.',
   'ankiWorkbench.apply.error.deck-collation-unsupported':
     'This package stores deck names with a text rule this build cannot apply, so nothing was written. Export the deck from Anki with “Support older Anki versions” checked and rename decks in that copy — every other edit exports from this package normally.',
+  'ankiWorkbench.apply.error.note-type-missing':
+    'A card template removal names a note type the source file does not have. Nothing was written — re-read the source before exporting.',
+  'ankiWorkbench.apply.error.template-missing':
+    'A card template removal names a template position that note type does not have. Nothing was written — re-read the source before exporting.',
+  'ankiWorkbench.apply.error.last-template':
+    'That would remove every card template of a note type, leaving its notes generating no cards at all. Nothing was written — keep at least one template.',
+  'ankiWorkbench.apply.error.template-storage-unsupported':
+    'This package stores no readable note-type list, so a card template cannot be removed from it. Nothing was written — every other edit exports from this package normally.',
   'ankiWorkbench.apply.error.compressed-unsupported':
     'This package uses a newer compressed format that cannot be written yet. Nothing was written.',
   'ankiWorkbench.apply.error.verify-failed':

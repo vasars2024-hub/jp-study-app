@@ -348,6 +348,40 @@ describe('commitConnectDraft', () => {
     expect(mutatingCalls()).toHaveLength(0);
   });
 
+  it('refuses recipe 17 template removal by name, and commits none of the batch beside it', async () => {
+    const fingerprint = await currentFingerprint();
+    const result = await commitConnectDraft({
+      fingerprint,
+      read: READ,
+      changes: {
+        notes: [{ noteId: String(NOTE_A), fields: ['犬（いぬ）', 'dog'] }],
+        cardMoves: [],
+        deckRenames: [],
+        templateRemovals: [{ noteTypeId: '1', removedOrds: [1] }],
+      },
+    });
+    expect(result.ok).toBe(false);
+    expect(result.errorCode).toBe('template-remove-unsupported');
+    // Same control as the rename above: AnkiConnect has no remove-template
+    // action, so the field edit sharing the batch must not land either.
+    expect(mutatingCalls()).toHaveLength(0);
+  });
+
+  it('an empty removal list is not a removal, so the batch beside it commits', async () => {
+    const fingerprint = await currentFingerprint();
+    const result = await commitConnectDraft({
+      fingerprint,
+      read: READ,
+      changes: {
+        notes: [{ noteId: String(NOTE_A), fields: ['犬（いぬ）', 'dog'] }],
+        cardMoves: [],
+        deckRenames: [],
+        templateRemovals: [{ noteTypeId: '1', removedOrds: [] }],
+      },
+    });
+    expect(result.ok).toBe(true);
+  });
+
   it('refuses an empty change set without touching Anki', async () => {
     const result = await commitConnectDraft({
       fingerprint: 'connect:2:1782214626',
