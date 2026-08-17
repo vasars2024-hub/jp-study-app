@@ -49,6 +49,13 @@ let files: StoredFile[] = [];
 /** Whether the torrent is already in the client before we add it. */
 let present = false;
 /**
+ * The category that torrent carries, which decides whose it is.
+ *
+ * Empty is the user's own — hands off. `jp-study-subtitles` is one this app
+ * added and never finished with, and only `qbitAddStopped` ever writes it.
+ */
+let presentCategory = '';
+/**
  * The raw qBittorrent state the stand-in reports. `error` is what a disk that
  * filled mid-transfer produces, and `missingFiles` is what deleting the data
  * underneath it produces; neither ever moves progress again.
@@ -147,7 +154,15 @@ beforeAll(async () => {
       // already here?" is the whole safety gate and must be answerable.
       const wanted = url.searchParams.get('hashes');
       const rows = present || !wanted
-        ? [{ hash: HASH, name: 'Show Subs', save_path: savePath, progress: 1, size: 1000, state: torrentState }]
+        ? [{
+          hash: HASH,
+          name: 'Show Subs',
+          save_path: savePath,
+          progress: 1,
+          size: 1000,
+          state: torrentState,
+          category: presentCategory,
+        }]
         : [];
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify(rows));
@@ -171,6 +186,9 @@ beforeAll(async () => {
       void readBody(req).then((body) => {
         addBodies.push(body);
         present = !disappearAfterAdd;
+        // A real client keeps the category the add form asked for, and the next
+        // run reads it back to work out whose torrent this is.
+        presentCategory = new URLSearchParams(body).get('category') ?? '';
         res.writeHead(200, { 'content-type': 'text/plain' });
         res.end('Ok.');
       });
@@ -230,6 +248,7 @@ beforeEach(() => {
   calls = [];
   addBodies = [];
   present = false;
+  presentCategory = '';
   torrentState = 'downloading';
   disappearAfterAdd = false;
   stallOnStart = false;
@@ -518,6 +537,51 @@ describe('nyaaFetch — a torrent the user already has', () => {
     expect(result.ok).toBe(true);
     expect(result.ok && result.value.text).toContain('already here');
     expect(calls.some((call) => call.startsWith('prio:'))).toBe(false);
+  });
+});
+
+// Measured live on gate 31, and it is why that gate could not be retried: a
+// fetch failed after the add, left its own torrent behind, and the sweep that
+// exists to clear such leftovers deliberately holds out the hash the current
+// acquisition is using. Every retry of the same candidate then met the
+// hands-off branch above and stopped, with the subtitles 20 MB away.
+describe('nyaaFetch — a torrent an earlier run of this app left behind', () => {
+  it('adopts it and finishes the fetch instead of refusing forever', async () => {
+    present = true;
+    presentCategory = 'jp-study-subtitles';
+    files = [
+      { name: 'Show/Show - 07.mkv', size: 1_400_000_000, progress: 0, priority: 1 },
+      { name: 'Show/Subs/Show - 07.ja.ass', size: 40_000, progress: 0, priority: 1 },
+    ];
+    await writeOnDisk('Show/Subs/Show - 07.ja.ass', 'Dialogue: adopted');
+
+    const result = await nyaaFetch(candidate('batch-sidecar'), config(), { timeoutMs: 5_000 });
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.value.text).toContain('adopted');
+    // Driven like a fresh add: the video is skipped, the subtitle enabled.
+    expect(calls).toContain('prio:0=0');
+    expect(calls).toContain('prio:1=1');
+    expect(files[0].priority).toBe(0);
+    // It must not re-add a torrent that is already there.
+    expect(addBodies).toHaveLength(0);
+  });
+
+  it('control: the same incomplete torrent with no category is still refused', async () => {
+    // The half that must keep failing. Identical state, one field different —
+    // if this ever passes, the fix has stopped distinguishing whose torrent it
+    // is and is setting priorities on the user's transfers.
+    present = true;
+    presentCategory = '';
+    files = [
+      { name: 'Show/Show - 07.mkv', size: 1_400_000_000, progress: 0, priority: 1 },
+      { name: 'Show/Subs/Show - 07.ja.ass', size: 40_000, progress: 0, priority: 1 },
+    ];
+
+    const result = await nyaaFetch(candidate('batch-sidecar'), config(), { timeoutMs: 5_000 });
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.reason).toMatch(/already in qBittorrent/i);
+    expect(calls.some((call) => call.startsWith('prio:'))).toBe(false);
+    expect(files[0].priority).toBe(1);
   });
 });
 

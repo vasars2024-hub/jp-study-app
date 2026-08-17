@@ -483,6 +483,9 @@ async function acquireAll(
 ): Promise<NyaaFetchAllOutcome> {
   const added = await qbitAddStopped(qbit, token.magnet, hash);
   if (!added.ok) return { ok: false, reason: added.reason };
+  // Only a torrent that is *someone else's* is hands-off. `adopted` is one this
+  // app added and abandoned, so it is driven exactly like a fresh add — that is
+  // what makes a failed fetch retryable at all.
   const preexisting = added.value === 'already-present';
 
   // Not `qbitFiles`: a magnet has no file list yet at this point, and reading it

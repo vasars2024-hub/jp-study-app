@@ -878,18 +878,37 @@ export async function qbitTorrentInfo(
  * arrives — measured at **4 s, 26 files, `downloaded: 0`** — and puts itself
  * back to `stoppedDL` before any content byte is chosen. `qbitAwaitMetadata`
  * stops it a second time for builds that do not know the parameter.
+ *
+ * **Three answers, not two, and the third is the difference between a retry and
+ * a dead end.** A torrent already in the client is only untouchable if it is
+ * the *user's*. One in `jp-study-subtitles` is this app's own — only this
+ * function ever writes that category — so it is a leftover from a fetch that
+ * died or failed after the add, and there are no user-chosen file priorities to
+ * clobber. Measured live on gate 31: a fetch failed late, left its own torrent
+ * behind, and every retry of the same candidate then answered "already in
+ * qBittorrent", forever, because the in-flight hash is deliberately held out of
+ * the orphan sweep. `adopted` is that case; `already-present` stays exactly as
+ * strict for anything else.
  */
 export async function qbitAddStopped(
   input: ScraperQbitInput,
   magnet: string,
   hash: string,
-): Promise<QbitOutcome<'added' | 'already-present'>> {
+): Promise<QbitOutcome<'added' | 'adopted' | 'already-present'>> {
   if (!input.config.enabled) return { ok: false, reason: 'qBittorrent is not enabled.' };
   if (!magnet) return { ok: false, reason: 'No magnet link.' };
 
   const existing = await qbitTorrentInfo(input, hash);
   if (!existing.ok) return { ok: false, reason: existing.reason };
   if (existing.value) {
+    if (existing.value.category === QBIT_SUBTITLE_CATEGORY) {
+      scraperLog(
+        'info',
+        'qbit',
+        `Reusing a subtitle fetch an earlier run left behind (${hash.slice(0, 8)}).`,
+      );
+      return { ok: true, value: 'adopted' };
+    }
     // Rule 1. The caller decides whether it can use the transfer as it stands.
     return { ok: true, value: 'already-present' };
   }
