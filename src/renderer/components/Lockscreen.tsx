@@ -3,6 +3,8 @@
  * or Windows XP welcome screen (Secret Aero).
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useT } from '../i18n';
+import { LANG_TAGS } from '../../shared/i18n/core';
 import {
   loadLockscreen,
   markLockscreenUnlocked,
@@ -38,6 +40,7 @@ export default function Lockscreen({
   onUnlocked: () => void;
   widgetMode?: boolean;
 }) {
+  const { t, lang } = useT();
   const xpMode = !widgetMode && isAeroLockscreen();
   const wiredMode = !widgetMode && isWiredLockscreen();
   const [cfg] = useState<LockscreenSettings>(() => loadLockscreen());
@@ -168,8 +171,12 @@ export default function Lockscreen({
     tryUnlock(password.replace(/\D/g, '').slice(0, 4));
   };
 
-  const time = clock.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const date = clock.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+  // Formatted in the *UI* language, not the OS locale. `[]` fell back to the
+  // system locale, so every skin printed `Wed, Aug 5` under a Russian or
+  // Japanese UI — the clock is the largest text on the default lockscreen.
+  const locale = LANG_TAGS[lang];
+  const time = clock.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+  const date = clock.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' });
 
   if (wiredMode) {
     return (
@@ -177,11 +184,13 @@ export default function Lockscreen({
         className={`lockscreen lockscreen-wired${unlocking ? ' is-unlocking' : ''}${shake ? ' is-shake' : ''}${error ? ' is-error' : ''}${error && failCount >= 3 ? ' is-error-hard' : ''}`}
         role="dialog"
         aria-modal="true"
-        aria-label="WIRED ARCHIVE access clearance"
+        aria-label={t('lockscreen.aria.wired')}
       >
         <div className="lockscreen-wired-map" aria-hidden="true" />
         <div className="lockscreen-wired-noise" aria-hidden="true" />
         <section className="lockscreen-wired-panel">
+          {/* Fixed terminal/node identifiers — set dressing, English by design.
+              See the lockscreen block in catalogs/en.ts. */}
           <header className="lockscreen-wired-head">
             <span>TERMINAL ID: WIRED ARCHIVE</span>
             <span>NODE STATUS: PASSIVE</span>
@@ -196,7 +205,7 @@ export default function Lockscreen({
             ))}
           </div>
           <form className="lockscreen-wired-form" onSubmit={submitPassword}>
-            <label htmlFor="wired-access-code">INPUT ACCESS CODE</label>
+            <label htmlFor="wired-access-code">{t('lockscreen.wired.inputCode')}</label>
             <div className="lockscreen-wired-command">
               <span aria-hidden="true">&gt;</span>
               <input
@@ -208,18 +217,18 @@ export default function Lockscreen({
                 inputMode="numeric"
                 autoComplete="off"
                 disabled={unlocking}
-                aria-label="Access code"
+                aria-label={t('lockscreen.aria.accessCode')}
                 onChange={(e) => {
                   setPassword(e.target.value.replace(/\D/g, '').slice(0, 4));
                   setError(false);
                 }}
               />
               <button type="submit" disabled={unlocking}>
-                AUTH
+                {t('lockscreen.wired.auth')}
               </button>
             </div>
             <p className="lockscreen-wired-status">
-              {error ? 'ACCESS DENIED / TEMPORARY CLEARANCE REJECTED' : 'CLEARANCE: STUDY OPERATOR / ARCHIVE SEALED'}
+              {error ? t('lockscreen.wired.denied') : t('lockscreen.wired.clearance')}
             </p>
           </form>
         </section>
@@ -233,7 +242,7 @@ export default function Lockscreen({
         className={`lockscreen lockscreen-xp${unlocking ? ' is-unlocking' : ''}${shake ? ' is-shake' : ''}`}
         role="dialog"
         aria-modal="true"
-        aria-label="Welcome — enter your password"
+        aria-label={t('lockscreen.aria.xp')}
       >
         <div className="lockscreen-xp-left">
           <div className="lockscreen-xp-logo" aria-hidden="true">
@@ -245,15 +254,15 @@ export default function Lockscreen({
               </span>
             </span>
           </div>
-          <p className="lockscreen-xp-hint">To begin, click your user name</p>
+          <p className="lockscreen-xp-hint">{t('lockscreen.xp.hint')}</p>
         </div>
         <div className="lockscreen-xp-right">
           <div className={`lockscreen-xp-user${shake ? ' is-shake' : ''}${error ? ' is-error' : ''}`}>
             <div className="lockscreen-xp-avatar" aria-hidden="true" />
             <div className="lockscreen-xp-user-body">
-              <div className="lockscreen-xp-user-name">User</div>
+              <div className="lockscreen-xp-user-name">{t('lockscreen.user')}</div>
               <div className="lockscreen-xp-user-prompt">
-                {error ? 'Incorrect password' : 'Type your password'}
+                {error ? t('lockscreen.xp.incorrect') : t('lockscreen.xp.type')}
               </div>
               <form className="lockscreen-xp-pass-row" onSubmit={submitPassword}>
                 <input
@@ -265,13 +274,13 @@ export default function Lockscreen({
                   inputMode="numeric"
                   autoComplete="off"
                   disabled={unlocking}
-                  aria-label="Password"
+                  aria-label={t('lockscreen.aria.password')}
                   onChange={(e) => {
                     setPassword(e.target.value.replace(/\D/g, '').slice(0, 4));
                     setError(false);
                   }}
                 />
-                <button type="submit" className="lockscreen-xp-go" disabled={unlocking} aria-label="Sign in">
+                <button type="submit" className="lockscreen-xp-go" disabled={unlocking} aria-label={t('lockscreen.aria.signIn')}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                     <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
@@ -293,19 +302,19 @@ export default function Lockscreen({
         className={`lockscreen lock-tint-${cfg.tint} is-widget${unlocking ? ' is-unlocking' : ''}${shake ? ' is-shake' : ''}`}
         role="dialog"
         aria-modal="true"
-        aria-label="Enter passcode"
+        aria-label={t('lockscreen.aria.widget')}
       >
         <div ref={widgetRef} className="lockscreen-widget">
           <header className="lockscreen-bar">
             <span className="lockscreen-brand">
               <span className="lockscreen-brand-mark" aria-hidden />
-              Lock
+              {t('lockscreen.widget.brand')}
             </span>
             <span className="lockscreen-clock-inline">{time}</span>
           </header>
           <div className="lockscreen-date muted">{date}</div>
           <p className={`lockscreen-prompt${error ? ' is-error' : ''}`}>
-            {error ? 'Wrong passcode' : 'Enter passcode'}
+            {error ? t('lockscreen.widget.wrong') : t('lockscreen.widget.enter')}
           </p>
           <div className="lockscreen-dots" aria-hidden>
             {[0, 1, 2, 3].map((i) => (
@@ -323,11 +332,11 @@ export default function Lockscreen({
                     key="del"
                     type="button"
                     className="lockscreen-key is-action"
-                    title="Delete"
+                    title={t('lockscreen.delete')}
                     disabled={unlocking}
                     onClick={() => press('del')}
                   >
-                    Del
+                    {t('lockscreen.del')}
                   </button>
                 );
               }
@@ -354,7 +363,7 @@ export default function Lockscreen({
       className={`lockscreen lockscreen-win11 lock-tint-${cfg.tint}${unlocking ? ' is-unlocking' : ''}${shake ? ' is-shake' : ''}`}
       role="dialog"
       aria-modal="true"
-      aria-label="Sign in to GrammarX"
+      aria-label={t('lockscreen.aria.win11')}
     >
       <div className="lockscreen-win11-bg" aria-hidden="true">
         <div className="lockscreen-win11-bg-clouds" />
@@ -376,9 +385,9 @@ export default function Lockscreen({
             />
           </svg>
         </div>
-        <div className="lockscreen-win11-name">User</div>
+        <div className="lockscreen-win11-name">{t('lockscreen.user')}</div>
         <p className={`lockscreen-win11-prompt${error ? ' is-error' : ''}`}>
-          {error ? 'Incorrect passcode. Try again.' : 'Enter your passcode'}
+          {error ? t('lockscreen.win11.incorrect') : t('lockscreen.win11.enter')}
         </p>
         <div className="lockscreen-win11-dots" aria-hidden>
           {[0, 1, 2, 3].map((i) => (
@@ -396,11 +405,11 @@ export default function Lockscreen({
                   key="del"
                   type="button"
                   className="lockscreen-win11-key is-action"
-                  title="Delete"
+                  title={t('lockscreen.delete')}
                   disabled={unlocking}
                   onClick={() => press('del')}
                 >
-                  Del
+                  {t('lockscreen.del')}
                 </button>
               );
             }

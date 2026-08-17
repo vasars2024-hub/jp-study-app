@@ -68,7 +68,6 @@ import {
   saveLocalAgentTaskQueue,
 } from '../../localAgentTaskQueueStore';
 import {
-  applyAgentRunToQueue,
   pendingAgentTaskStep,
   runAgentTaskStep,
   selectAgentQueueRun,
@@ -401,6 +400,7 @@ export function LocalAgentPanel() {
     return onLocalAgentTaskQueueChanged(setTaskQueue);
   }, []);
 
+
   useEffect(() => window.api.onLocalAgentTrigger((entry) => {
     if (!settings.enabled) {
       setStatus(t('blanc.agent.status.scheduledReady', { name: entry.name }));
@@ -486,24 +486,61 @@ export function LocalAgentPanel() {
    * exactly one place and they cannot drift apart. That drift is the defect slice 47e fixed
    * between the plan and execution boundaries; a third verb was not going to reopen it.
    */
-  const runStep = async (source: AgentTask, step: AgentTaskStep, confirmed: boolean): Promise<void> => {
+  const readExecutionAuthority = (): {
+    permission: LocalAgentSettings['permission'];
+    allowedOperations: typeof executableOperations;
+  } => {
+    // Read at the click, not from the render that made the button. Settings and
+    // profiles are shared across windows and may have narrowed meanwhile.
+    const liveSettings = loadLocalAgentSettings();
+    const liveProfile = getActiveAgentProfile(loadLocalAgentProfiles());
+    const enabled = new Set(liveProfile?.enabledOperations ?? []);
+    return {
+      permission: effectiveAgentPermission(liveSettings.permission, liveProfile),
+      allowedOperations: liveProfile
+        ? availableOperations.filter((operation) => enabled.has(operation))
+        : availableOperations,
+    };
+  };
+
+  const runStep = async (
+    liveQueue: AgentTaskQueue,
+    source: AgentTask,
+    step: AgentTaskStep,
+    confirmed: boolean,
+    activateQueuedTask = false,
+  ): Promise<void> => {
     setBusy(true);
     setStatus(confirmed ? t('blanc.agent.status.runningConfirmed') : t('blanc.agent.status.runningNext'));
     try {
-      const result = await runAgentTaskStep(taskQueue, source, step, {
-        permission: effectiveAgentPermission(settings.permission, activeProfile),
+      const authority = readExecutionAuthority();
+      const result = await runAgentTaskStep(liveQueue, source, step, {
+        permission: authority.permission,
         // Re-checked at EXECUTION, not only when the plan was built: a queued task outlives
         // the profile that authorized it, so narrowing a profile must take effect on work
         // already sitting in the queue.
-        allowedOperations: executableOperations,
+        allowedOperations: authority.allowedOperations,
         handlers,
         ...(confirmed ? { confirmedCallIds: new Set([step.request.callId]) } : {}),
       });
+      if (result.leaseRefusal || result.leaseCommitFailure) {
+        setStatus(t('blanc.agent.status.stepFailed'));
+        return;
+      }
+      if (result.refusal) {
+        setStatus(t(APPROVAL_REFUSAL_KEYS[result.refusal.code]));
+        return;
+      }
+      if (activateQueuedTask) {
+        setSummary(source.objective);
+        setEvents(result.events);
+      } else {
+        setEvents((previous) => [...previous, ...result.events]);
+      }
       setTask(result.task);
-      // Folded into the freshest queue, not the one captured before the await: Pause and Cancel
-      // stay clickable while a step is in flight and must not be reverted by its write-back.
-      setTaskQueue((previous) => saveLocalAgentTaskQueue(applyAgentRunToQueue(previous, result.task)));
-      setEvents((previous) => [...previous, ...result.events]);
+      // Main committed the outcome against the freshest leased row and kept a
+      // Pause/Cancel made while the handler was awaiting.
+      setTaskQueue(result.queue);
       const latest = result.task.steps.find((candidate) => candidate.id === step.id);
       if (latest?.status === 'waiting-confirmation') setStatus(t('blanc.agent.status.confirmationRequired'));
       else if (latest?.status === 'failed') setStatus(latest.error ?? t('blanc.agent.status.stepFailed'));
@@ -516,8 +553,13 @@ export function LocalAgentPanel() {
 
   const runNext = async (): Promise<void> => {
     if (!task) return;
-    const step = pendingAgentTaskStep(task, 'next');
-    if (step) await runStep(task, step, false);
+    const live = loadLocalAgentTaskQueue();
+    const selection = selectAgentQueueRun(live, task.id);
+    if (!selection.ok) {
+      setStatus(t(QUEUE_REFUSAL_KEYS[selection.reason]));
+      return;
+    }
+    await runStep(live, selection.item.task, selection.step, false);
   };
 
   /**
@@ -550,12 +592,13 @@ export function LocalAgentPanel() {
     // runs against the queue as it is at the moment of the grant, and a pause or
     // a cancel from another window lands in the store before it lands in state.
     const live = loadLocalAgentTaskQueue();
+    const authority = readExecutionAuthority();
     const resolution = resolveAgentQueuedStepApproval(
       live,
       task.id,
       candidate.id,
-      effectiveAgentPermission(settings.permission, activeProfile),
-      executableOperations,
+      authority.permission,
+      authority.allowedOperations,
     );
     if (!resolution.ok) {
       setStatus(t(APPROVAL_REFUSAL_KEYS[resolution.code]));
@@ -570,7 +613,7 @@ export function LocalAgentPanel() {
       setStatus(t(APPROVAL_REFUSAL_KEYS['step-not-found']));
       return;
     }
-    await runStep(item.task, step, true);
+    await runStep(live, item.task, step, true);
   };
 
   /**
@@ -580,15 +623,13 @@ export function LocalAgentPanel() {
    * `waiting-confirmation` here — the user confirms it afterwards on the now-live task.
    */
   const runQueued = async (id?: string): Promise<void> => {
-    const selection = selectAgentQueueRun(taskQueue, id);
+    const live = loadLocalAgentTaskQueue();
+    const selection = selectAgentQueueRun(live, id);
     if (!selection.ok) {
       setStatus(t(QUEUE_REFUSAL_KEYS[selection.reason]));
       return;
     }
-    setSummary(selection.item.task.objective);
-    setEvents([]);
-    setTask(selection.item.task);
-    await runStep(selection.item.task, selection.step, false);
+    await runStep(live, selection.item.task, selection.step, false, true);
   };
 
   return (
@@ -760,7 +801,7 @@ export function LocalAgentPanel() {
               <tr key={item.id}><td>{item.task.objective.slice(0, 80)}</td><td>{t(`blanc.agent.queueStatus.${item.status}`)}</td><td>{item.priority}</td><td><div className="blanc-row-actions">
                 {item.status === 'queued' && <button type="button" disabled={busy} onClick={() => void runQueued(item.id)}>{t('blanc.agent.action.run')}</button>}
                 {item.status === 'queued' && <button type="button" onClick={() => setTaskQueue(saveLocalAgentTaskQueue(pauseAgentQueueItem(taskQueue, item.id)))}>{t('common.pause')}</button>}
-                {item.status === 'paused' && <button type="button" onClick={() => setTaskQueue(saveLocalAgentTaskQueue(resumeAgentQueueItem(taskQueue, item.id)))}>{t('common.resume')}</button>}
+                {item.status === 'paused' && !item.execution && <button type="button" onClick={() => setTaskQueue(saveLocalAgentTaskQueue(resumeAgentQueueItem(taskQueue, item.id)))}>{t('common.resume')}</button>}
                 {(item.status === 'queued' || item.status === 'paused') && <button type="button" onClick={() => setTaskQueue(saveLocalAgentTaskQueue(cancelAgentQueueItem(taskQueue, item.id)))}>{t('common.cancel')}</button>}
                 {item.status === 'queued' && <button type="button" onClick={() => setTaskQueue(saveLocalAgentTaskQueue(prioritizeAgentQueueItem(taskQueue, item.id)))}>{t('blanc.agent.action.prioritize')}</button>}
               </div></td></tr>
