@@ -1401,3 +1401,34 @@ Controls assert what must NOT parse — the specials, `[1440x1080]`, a `[2011]` 
 
 **Next slice: P5 on this real pack.** 39 episodes of real `.ass` cues are now on disk and parsed;
 gate 19 (a word the user already knows must NOT appear in the mined output) finally has real input.
+
+## 2026-08-17 — recovery: the two digit-title guards `backup` landed and could not record
+
+Worker `primary`, recording commits it did not author. `backup` committed `a5f47f9c` (10:19:21) and
+`b14ccb3b` (10:23:48) and hit its usage limit **five seconds** after the second, so neither reached
+this plan. Both re-derived here from their diffs and re-run, not trusted from their messages:
+`subtitleNyaa` + `subtitleNyaaFetch` + `subtitleHarvestNyaa` = **107/107 green** at this HEAD, and
+the running app (pid 34264, started 10:22:53) postdates the source edit at 10:21:56, so the live
+numbers below were measured on this code and not on a predecessor.
+
+**`a5f47f9c` — a title made only of digits matched every batch that numbers an episode.** The user's
+completed list carries a one-episode title literally named **`001`**; through the product's own call
+it returned **23 releases** — Bleach 001-063, Fairy Tail 001-175, Naruto Shippuuden 001~079, a 59 GB
+Saint Seiya batch — because `looksLikeSameTitle` wants half the title's tokens and the only token was
+a number every batch prints. Two narrowing rules in `shared/subtitleNyaa.ts`: `titleTokens` drops
+digit-only tokens **while any word remains** (so `Gundam 00` can no longer be satisfied by a
+`Naruto 00 - 12` batch on the digits alone), and an all-digit title refuses any release naming
+another work outside its brackets (`untaggedPart`). Mutation control: guard removed → the 2 new
+cases fail, the other 48 pass both ways.
+
+**`b14ccb3b` — its own follow-up, because a release name can be nothing *but* tags.** 23 → 1 live,
+and the survivor was `[GM-Team][国漫][神印王座][Throne of Seal][2022][001-208 Fin][AVC][GB][1080P]`:
+every word inside a bracket, so `untaggedPart` saw no letters and the row passed. `onlyInEpisodeRange`
+answers from the number's shape instead — for an all-digit title, a token appearing only as a range
+endpoint is not evidence. **Live, at the profile's own `minSeeders`: 23 → 1 → 0.** Inverse control in
+the same session: Alice to Therese still lists its 1 batch-sidecar row and Gundam X still lists its
+20.10 MB / 6-seeder Route A pack, so the guard narrowed the match rather than breaking the listing.
+
+**Gate status is unchanged by these two — they are a P4 listing-precision fix, not a gate.** 32 of 34
+closed; open are **31** (Route A's acquisition leg passed 2026-08-17; Route B and cues-in-the-player
+remain) and **34**.
