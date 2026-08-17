@@ -24727,3 +24727,34 @@ Gates this turn: `npx vitest run` **709 files passed / 1 skipped, 9,717 passed, 
 - **TRAP.** Restoring a mutated `src/shared/*.ts` with `cp` was refused **Permission denied**
   while the dev app held it; `git checkout -- <path>` from PowerShell restored it. Verify with
   `git status --short -- <path>`, not by re-reading the file.
+
+## 2026-08-17 — Track 7 / gate 14: the connect half of gate 5's rows, live on real Anki (`primary`)
+
+- No product change — a live verification slice. `debug/g14-connect-live.cjs`.
+- **Why it was worth running.** Gate 14 lists `card-queue` and `card-scheduling` as `supported`
+  on AnkiConnect and `card-flag` as `blocked`; all three arrived with gate 5 and none had ever
+  touched a real collection. `card-flag`'s refusal existed only as a unit test.
+- **DECISION: a deck the probe CREATES and DELETES, not capture-patch-restore on a real card.**
+  AnkiConnect is live (v6, profile `User 1`) and the user's collection is 155k notes. A restore
+  half that fails leaves a real study card suspended with a wrong interval; creating what you
+  destroy has no such failure mode. `deleteDecks {cardsToo:true}` then verified: **0** cards
+  match the query and the deck is no longer in `deckNames`.
+- **NEGATIVE CONTROL FIRST, and it is the load-bearing half.** A batch carrying `cardFlags`
+  **and** `cardQueues` together: refused `card-flag-unsupported` with the translated sentence
+  ("…cannot be committed to a live collection. Export a package instead."), and the card read
+  back **byte-identical** to before on queue/type/ivl/factor/flags. The queue op that rode
+  beside it did not land — all-or-nothing proven live, not in a fixture.
+- **Then the legal batch.** `cardQueues` + `cardScheduling` alone: `ok`, `cardsUpdated` **1**,
+  `verified: true`, profile `User 1`. Raw AnkiConnect: `queue -1, ivl 42, factor 1900`. The
+  claim is the app's own re-read: `readAnkiConnectDraft` returns **suspended / interval 42 /
+  ease 1900**.
+- **HONEST LIMIT, stated because the setup failed and the numbers still hold.** The probe meant
+  to start from a graduated review card and did not: its raw `setSpecificValueOfCard` calls
+  left `type/queue/ivl/factor` at 0, so the card was **`new`** when the batch ran. Cause is a
+  probe defect, not a product one — that action refuses **in band** (a `false` result, no
+  `error` field) without `warning_check: true`, which the product already passes and decodes
+  (`main/anki/client.ts:233`, `connectCommit.ts:179`/`:239`). A helper that only throws on
+  `j.error` reads an in-band refusal as success.
+- **Gate 14's connect `supported` set is 6 rows: 3 live-proven here, 3 still cited** (note-fields
+  recipe 2, note-tags recipe 12, card-due recipe 6). Package side: 9 supported, of which
+  card-flag/card-queue/card-scheduling were proven by gate 5's own run at `7c66293d`.

@@ -478,6 +478,21 @@ This slice is complete only when all of these can be shown with real data and no
     counter that cannot fire. A canary in `ankiParityMatrix.test.ts` now hardcodes both
     partitions — deliberately the only hardcoded numbers there, since every other test
     re-derives from `ANKI_PARITY_ROWS` and is blind to it changing.
+
+    **The connect half of the three new rows is now exercised LIVE, not cited**
+    (`debug/g14-connect-live.cjs`, real Anki, AnkiConnect v6, profile `User 1`). On a deck the
+    probe creates and deletes, so no existing card is touched: `card-flag` refuses live by
+    name — `card-flag-unsupported`, with its translated sentence — and the `card-queue` op
+    riding beside it in the same batch **wrote nothing**, the card byte-identical to before,
+    which is the all-or-nothing contract proven live rather than in a fixture. The same two
+    ops without the flag commit: `cardsUpdated` **1**, `verified: true`, and re-read through
+    the app's own `readAnkiConnectDraft` as **suspended / interval 42 / ease 1900** (raw
+    AnkiConnect agrees: `queue -1`). Cleanup verified — **0** cards left, deck no longer
+    listed. Honest limit: the probe's own setup to a graduated review state did **not** take,
+    so the card was `new` when the batch ran; `setSpecificValueOfCard` refuses **in band**
+    without `warning_check: true`, which the product already passes and decodes
+    (`main/anki/client.ts:233`, `connectCommit.ts:179`). Gate 14's connect `supported` set is
+    therefore 6 rows of which 3 are now live-proven here and 3 remain cited.
     **Its finding:** `template-add` is read-only on *both* destinations — `applyCardDesign`
     returns a draft and never touches the journal, so gate 13's 3,180 added cards were never
     exportable. The designer now says so between its card count and Apply.
