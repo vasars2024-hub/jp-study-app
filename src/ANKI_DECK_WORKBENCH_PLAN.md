@@ -439,11 +439,25 @@ This slice is complete only when all of these can be shown with real data and no
     makes it a finding rather than a code reading. After: **2,000 / 2,223**,
     17,530 ms, `totalNotes` still 155,384. This is the unexplained 30–60 s step
     transitions recorded against that collection.
-    **Still open, and the gate stays open for it:** the *window-dragging* half, and
-    an in-UI filter/preview walk over the fixture. Note when picking it up that the
-    renderer is now structurally bounded at `ANKI_DRAFT_MAX_PAGE_SIZE` (2,000) rows
-    on every reader, so "filter 100,000" means filtering a page of a 100,000-note
-    deck — the honest reading, not a shortcut.
+    **The window-dragging half PASSES 2026-08-18** (`debug/gate9-drag.cjs`, on a restarted
+    main). A real drag on a real `.fwin-bar` — `pointerdown`, 90 `pointermove`s one per
+    animation frame, `pointerup` — on the same window in both conditions. Idle: median
+    **10.0 ms**, p95 **10.6 ms**, 1 frame over 33 ms, 0 over 100. During the read: median
+    **10.0 ms**, p95 **12.3 ms**, 2 over 33, 0 over 100, main heartbeat max gap **12 ms**
+    and **0** gaps over 250 ms. The read itself: **100,000 totalNotes**, 2,000 on the page,
+    4,737 ms. So the utility-process read costs **+1.7 ms of p95 frame time and nothing
+    else**. Three controls: the read was asserted still in flight *before* the first
+    `pointerdown` (or the table would be two idle drags); `movedPx` **90** per condition,
+    60px→150px→240px, so the events reached the shell's real handler rather than nothing;
+    and the geometry was restored by a **reverse drag through the same handler**, read back
+    as exactly 60px, 24px.
+
+    **Still open, and the gate stays open for it:** an in-UI filter/preview walk over the
+    fixture. Note when picking it up that the renderer is now structurally bounded at
+    `ANKI_DRAFT_MAX_PAGE_SIZE` (2,000) rows on every reader, so "filter 100,000" means
+    filtering a page of a 100,000-note deck — the honest reading, not a shortcut. The
+    dialog-free entry exists: the fixture read above recorded a draft session, so
+    `reopenSession` reaches it from the UI with no OS dialog.
 10. Complete the primary workflows using keyboard only and verify focus, contrast, reduced motion, EN/JA/ZH/RU strings, and compact/default/maximized layouts.
 
     **Closed 2026-08-17** (`cd7472b6`). Everything unattended passed on 2026-08-16; the one

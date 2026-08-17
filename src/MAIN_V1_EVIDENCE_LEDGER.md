@@ -24957,3 +24957,35 @@ Tests: 3 renderer (entry, cancel silent, MB sentence with the raw code asserted 
 
 **Trap.** The bridge's `/eval` payload key is **`js`**, not `expression` — a wrong key answers
 `missing js`, which reads like a syntax error in your own expression.
+
+## 2026-08-18 — Track 7 / gate 9: the dragging half, measured under the 100k read (`primary`)
+
+The main-event-loop half closed at `c538ae6f`/`75ea1f6d`; the plan records the **window-dragging**
+half and an in-UI filter walk as the reason gate 9 stays open. This is the dragging half.
+
+Instrument (`debug/gate9-drag.cjs`): a **real** drag on a real `.fwin-bar` — `pointerdown`, 90
+`pointermove`s one per animation frame, `pointerup` — driven through the debug bridge, with the
+frame interval recorded per move and the shell's own main-side heartbeat
+(`window.api.ankiLinkState()` every 20 ms) running through both conditions. Two conditions on the
+**same window**, idle first, so a number under load is compared to this machine's jitter and not
+to zero. Restart first: main does not hot-reload (main **40208**).
+
+| condition | frames | median | p95 | max | >33 ms | >100 ms | moved | main max gap |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| idle control | 90 | **10.0 ms** | 10.6 ms | 95.8 ms | 1 | 0 | 90 px | 12 ms / 48 beats |
+| during the 100k read | 90 | **10.0 ms** | 12.3 ms | 83.4 ms | 2 | 0 | 90 px | 12 ms / 55 beats, **0** over 250 ms |
+
+Read under it: `gate9-100k.apkg` 13,487,098 B → **100,000 totalNotes**, 2,000 on the page,
+**4,737 ms**, ok. **The read was still in flight when the drag started** (asserted `true` before
+the first `pointerdown`, not assumed) — without that check the whole table could have been two
+idle drags.
+
+**Controls.** (1) `movedPx` **90** and `left` 60px→150px→240px in each condition: the 90 events
+landed on the shell's real drag handler rather than on nothing, which is what a frame-timing
+number alone cannot tell you. (2) The main heartbeat separates a smooth drag over a stalled main
+from a genuinely idle main — 0 gaps over 250 ms says it is the latter. (3) Geometry **restored by
+a reverse drag** through the same handler, not by writing `style`, and read back as exactly
+**60px, 24px** — the value the 2026-08-17 audit recorded for this window.
+
+Verdict: the utility-process read costs **+1.7 ms of p95 frame time and nothing else**. Dragging
+half PASSES. Gate 9's remaining item is the in-UI filter/preview walk.
