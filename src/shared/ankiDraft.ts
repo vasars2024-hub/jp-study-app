@@ -479,7 +479,13 @@ const QUEUES: Readonly<Record<number, AnkiCardQueue>> = {
   4: 'preview',
 };
 
-const FLAGS: readonly AnkiCardFlag[] = [
+/**
+ * Anki's own flag order, index-aligned with the stored column's low three bits,
+ * so `ANKI_CARD_FLAGS[n]` is the flag `n` decodes to. Exported because gate 5's
+ * tray form offers the same list: a second hand-written copy in the UI would be
+ * free to drift from the decoder and label a colour the file does not hold.
+ */
+export const ANKI_CARD_FLAGS: readonly AnkiCardFlag[] = [
   'none',
   'red',
   'orange',
@@ -501,7 +507,7 @@ export function decodeCardQueue(value: number | undefined): AnkiCardQueue {
 
 /** `cards.flags` packs the flag colour into its low three bits; the rest is reserved. */
 export function decodeCardFlag(value: number | undefined): AnkiCardFlag {
-  return FLAGS[(value ?? 0) & 0b111] ?? 'none';
+  return ANKI_CARD_FLAGS[(value ?? 0) & 0b111] ?? 'none';
 }
 
 /**
@@ -512,7 +518,7 @@ export function decodeCardFlag(value: number | undefined): AnkiCardFlag {
  * value it cannot re-read (`shared/ankiConnectCommit.ts`).
  */
 export function encodeCardFlag(flag: AnkiCardFlag, stored: number | undefined): number {
-  const colour = Math.max(FLAGS.indexOf(flag), 0);
+  const colour = Math.max(ANKI_CARD_FLAGS.indexOf(flag), 0);
   return ((stored ?? 0) & ~0b111) | colour;
 }
 

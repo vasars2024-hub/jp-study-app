@@ -9537,6 +9537,26 @@ export const ja: Catalog = {
     'ターコイズ',
   'ankiWorkbench.tray.cardState.flag.purple':
     '紫',
+  'ankiWorkbench.tray.cardState.flagLabel':
+    'フラグ',
+  'ankiWorkbench.tray.cardState.suspendLabel':
+    '休止',
+  'ankiWorkbench.tray.cardState.schedulingLabel':
+    '間隔と易しさを設定する',
+  'ankiWorkbench.tray.cardState.unchanged':
+    '変更しない',
+  'ankiWorkbench.tray.cardState.suspend':
+    'これらのカードを休止する',
+  'ankiWorkbench.tray.cardState.unsuspend':
+    'これらのカードの休止を解除する',
+  'ankiWorkbench.tray.cardState.interval':
+    '間隔（日数）',
+  'ankiWorkbench.tray.cardState.ease':
+    '易しさ（パーミル。2500 は 250%）',
+  'ankiWorkbench.tray.cardState.flagLiveBlocked':
+    'フラグは書き出したパッケージに書き込まれます。実行中の Anki では受け取れません。唯一の経路がフラグ列全体を書き換えてしまい、そこにはこのアプリが読み取っていないビットも含まれるためです。',
+  'ankiWorkbench.tray.cardState.unsuspendRefuses':
+    'Anki は戻すべきキューを保存していないため再計算されます。状態を読み戻せないカードはリセットせずに拒否します。',
   'ankiWorkbench.tray.problem.card-state-empty':
     'このカード変更は何も設定していません — フラグも停止も間隔もありません。適用する前に少なくとも一つ選んでください。',
   'ankiWorkbench.tray.problem.card-state-invalid':

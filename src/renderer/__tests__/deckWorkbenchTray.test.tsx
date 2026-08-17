@@ -18,7 +18,7 @@ vi.mock('../i18n', () => ({
   }),
 }));
 
-import type { AnkiDraft, AnkiDraftNote } from '../../shared/ankiDraft';
+import { ANKI_CARD_FLAGS, type AnkiDraft, type AnkiDraftNote } from '../../shared/ankiDraft';
 import { createEditJournal, type AnkiDraftEditJournal } from '../../shared/ankiDraftEdit';
 import type { TrayActionKind, TrayPlan } from '../../shared/ankiChangeTray';
 import type { EnrichEntry } from '../../shared/ankiEnrich';
@@ -583,5 +583,121 @@ describe('the split panel inside the tray', () => {
     // proves the panel is wired to the same tray the Add button below feeds.
     expect(host.textContent).toContain('ankiWorkbench.tray.describe.split-deck');
     expect(host.textContent).not.toContain('ankiWorkbench.tray.problem.split-refused');
+  });
+});
+
+/**
+ * Gate 5's builder half. The model and both writers landed in `67512897` /
+ * `8901e775`, but with no control in the tray the action was unreachable from
+ * the product — the gate weighs "batch-edit … then reread Anki", and a kind
+ * nothing can queue never reaches either destination.
+ */
+describe('set-card-state — gate 5\'s builder control', () => {
+  const selectFor = (label: string): HTMLSelectElement =>
+    [...host.querySelectorAll('label')]
+      .find((l) => l.textContent?.includes(label))!
+      .querySelector('select')!;
+  const inputFor = (label: string): HTMLInputElement =>
+    [...host.querySelectorAll('label')]
+      .find((l) => l.textContent?.includes(label))!
+      .querySelector('input')!;
+  const add = (): void => {
+    act(() => {
+      byText('button', 'ankiWorkbench.tray.add')!.dispatchEvent(
+        new MouseEvent('click', { bubbles: true }),
+      );
+    });
+  };
+  const chooseKind = (): void => {
+    mount(draftOf([note('n1')]), ['n1']);
+    setValue(selectFor('ankiWorkbench.tray.kind'), 'set-card-state');
+  };
+
+  it('is reachable from the tray at all', () => {
+    mount(draftOf([note('n1')]), ['n1']);
+    const options = [...selectFor('ankiWorkbench.tray.kind').options].map((o) => o.value);
+    expect(options).toContain('set-card-state');
+  });
+
+  it('opens with all three parts unchanged, and says so rather than queueing a guess', () => {
+    chooseKind();
+    expect(selectFor('ankiWorkbench.tray.cardState.flagLabel').value).toBe('');
+    expect(selectFor('ankiWorkbench.tray.cardState.suspendLabel').value).toBe('');
+    // The interval inputs are behind their checkbox, so an untouched form has
+    // no scheduling half to send at all.
+    expect(host.textContent).not.toContain('ankiWorkbench.tray.cardState.interval');
+
+    // NEGATIVE CONTROL: Add is still allowed from the empty form, and the tray
+    // refuses out loud. A disabled button would be a control that does nothing
+    // with no sentence explaining why.
+    add();
+    expect(host.textContent).toContain('ankiWorkbench.tray.problem.card-state-empty');
+    expect(applyButton().disabled).toBe(true);
+  });
+
+  it('queues only the parts that were set', () => {
+    chooseKind();
+    setValue(selectFor('ankiWorkbench.tray.cardState.suspendLabel'), 'suspend');
+    add();
+    expect(host.textContent).toContain('ankiWorkbench.tray.describe.set-card-state');
+    expect(host.textContent).toContain('ankiWorkbench.tray.cardState.partSuspend');
+    // Not flagged and not rescheduled: the two untouched parts are absent from
+    // the description because they are absent from the action.
+    expect(host.textContent).not.toContain('ankiWorkbench.tray.cardState.partFlag');
+    expect(host.textContent).not.toContain('ankiWorkbench.tray.cardState.partScheduling');
+    expect(host.textContent).not.toContain('ankiWorkbench.tray.problem.card-state-empty');
+  });
+
+  it('carries all three at once when all three are set', () => {
+    chooseKind();
+    setValue(selectFor('ankiWorkbench.tray.cardState.flagLabel'), 'red');
+    setValue(selectFor('ankiWorkbench.tray.cardState.suspendLabel'), 'unsuspend');
+    act(() => {
+      inputFor('ankiWorkbench.tray.cardState.schedulingLabel').dispatchEvent(
+        new MouseEvent('click', { bubbles: true }),
+      );
+    });
+    setValue(inputFor('ankiWorkbench.tray.cardState.interval'), '45');
+    setValue(inputFor('ankiWorkbench.tray.cardState.ease'), '2100');
+    add();
+    expect(host.textContent).toContain('ankiWorkbench.tray.cardState.partFlag');
+    expect(host.textContent).toContain('ankiWorkbench.tray.cardState.partUnsuspend');
+    expect(host.textContent).toContain('ankiWorkbench.tray.cardState.partScheduling:45,2100');
+  });
+
+  it('refuses an ease Anki cannot store instead of clamping it', () => {
+    chooseKind();
+    act(() => {
+      inputFor('ankiWorkbench.tray.cardState.schedulingLabel').dispatchEvent(
+        new MouseEvent('click', { bubbles: true }),
+      );
+    });
+    setValue(inputFor('ankiWorkbench.tray.cardState.ease'), '900');
+    add();
+    expect(host.textContent).toContain('ankiWorkbench.tray.problem.card-state-invalid');
+    expect(applyButton().disabled).toBe(true);
+  });
+
+  it('warns that a running Anki cannot take the flag, before Add and not after', () => {
+    chooseKind();
+    expect(host.textContent).not.toContain('ankiWorkbench.tray.cardState.flagLiveBlocked');
+    setValue(selectFor('ankiWorkbench.tray.cardState.flagLabel'), 'blue');
+    expect(host.textContent).toContain('ankiWorkbench.tray.cardState.flagLiveBlocked');
+  });
+
+  it('says what an unsuspend can refuse, before Add', () => {
+    chooseKind();
+    setValue(selectFor('ankiWorkbench.tray.cardState.suspendLabel'), 'suspend');
+    expect(host.textContent).not.toContain('ankiWorkbench.tray.cardState.unsuspendRefuses');
+    setValue(selectFor('ankiWorkbench.tray.cardState.suspendLabel'), 'unsuspend');
+    expect(host.textContent).toContain('ankiWorkbench.tray.cardState.unsuspendRefuses');
+  });
+
+  it('offers the flags the decoder knows, in the stored column order', () => {
+    chooseKind();
+    const options = [...selectFor('ankiWorkbench.tray.cardState.flagLabel').options].map((o) => o.value);
+    // The first option is "leave unchanged"; the rest are `ANKI_CARD_FLAGS`
+    // itself, so the form cannot label a colour `decodeCardFlag` never returns.
+    expect(options).toEqual(['', ...ANKI_CARD_FLAGS]);
   });
 });

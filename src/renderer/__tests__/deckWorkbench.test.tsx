@@ -370,6 +370,9 @@ describe('DeckWorkbench', () => {
       'reschedule-stale',
       'rescue-leeches',
       'set-mastery',
+      // Gate 5's card-level batch, here for the same reason: suspension, flag
+      // and interval/ease all decide when and whether a card is seen.
+      'set-card-state',
       'add-tags',
       'remove-tags',
       'normalize-tags',

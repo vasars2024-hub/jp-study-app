@@ -9455,6 +9455,26 @@ export const zh: Catalog = {
     '青绿色',
   'ankiWorkbench.tray.cardState.flag.purple':
     '紫色',
+  'ankiWorkbench.tray.cardState.flagLabel':
+    '标记',
+  'ankiWorkbench.tray.cardState.suspendLabel':
+    '暂停',
+  'ankiWorkbench.tray.cardState.schedulingLabel':
+    '设置间隔和简易度',
+  'ankiWorkbench.tray.cardState.unchanged':
+    '保持不变',
+  'ankiWorkbench.tray.cardState.suspend':
+    '暂停这些卡片',
+  'ankiWorkbench.tray.cardState.unsuspend':
+    '取消暂停这些卡片',
+  'ankiWorkbench.tray.cardState.interval':
+    '间隔（天）',
+  'ankiWorkbench.tray.cardState.ease':
+    '简易度（千分比，2500 即 250%）',
+  'ankiWorkbench.tray.cardState.flagLiveBlocked':
+    '标记会写入导出的包。正在运行的 Anki 无法接收：唯一的通道会重写整个标记列，其中包含本应用从未读取的位。',
+  'ankiWorkbench.tray.cardState.unsuspendRefuses':
+    'Anki 没有保存可供恢复的队列，只能重新计算。无法读回状态的卡片会被拒绝，而不是被重置。',
   'ankiWorkbench.tray.problem.card-state-empty':
     '这项卡片修改什么也没设置 — 没有旗标、没有暂停、也没有间隔。应用前请至少选择一项。',
   'ankiWorkbench.tray.problem.card-state-invalid':

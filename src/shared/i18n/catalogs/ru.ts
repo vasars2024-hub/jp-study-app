@@ -10361,6 +10361,26 @@ export const ru: Catalog = {
     'бирюзовый',
   'ankiWorkbench.tray.cardState.flag.purple':
     'фиолетовый',
+  'ankiWorkbench.tray.cardState.flagLabel':
+    'Метка',
+  'ankiWorkbench.tray.cardState.suspendLabel':
+    'Приостановка',
+  'ankiWorkbench.tray.cardState.schedulingLabel':
+    'Задать интервал и лёгкость',
+  'ankiWorkbench.tray.cardState.unchanged':
+    'Оставить без изменений',
+  'ankiWorkbench.tray.cardState.suspend':
+    'Приостановить эти карточки',
+  'ankiWorkbench.tray.cardState.unsuspend':
+    'Возобновить эти карточки',
+  'ankiWorkbench.tray.cardState.interval':
+    'Интервал, в днях',
+  'ankiWorkbench.tray.cardState.ease':
+    'Лёгкость, в промилле (2500 — это 250%)',
+  'ankiWorkbench.tray.cardState.flagLiveBlocked':
+    'Метки записываются в экспортированный пакет. Запущенная Anki их не примет: единственный путь переписывает весь столбец меток, включая биты, которые это приложение никогда не читало.',
+  'ankiWorkbench.tray.cardState.unsuspendRefuses':
+    'Anki не хранит очередь, в которую можно вернуть карточку, поэтому она вычисляется заново. Карточка, состояние которой не удалось прочитать, отклоняется, а не сбрасывается.',
   'ankiWorkbench.tray.problem.card-state-empty':
     'Это изменение карточек ничего не задаёт — ни флажка, ни приостановки, ни интервала. Выберите хотя бы одно перед применением.',
   'ankiWorkbench.tray.problem.card-state-invalid':

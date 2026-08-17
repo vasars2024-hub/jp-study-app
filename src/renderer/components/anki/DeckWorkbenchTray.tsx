@@ -13,7 +13,7 @@
  * count next to the verb.
  */
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { AnkiDraft } from '../../../shared/ankiDraft';
+import { ANKI_CARD_FLAGS, type AnkiCardFlag, type AnkiDraft } from '../../../shared/ankiDraft';
 import {
   addTrayAction,
   moveTrayAction,
@@ -82,6 +82,7 @@ export const ACTION_KINDS: TrayActionKind[] = [
   'reschedule-stale',
   'rescue-leeches',
   'set-mastery',
+  'set-card-state',
   'add-tags',
   'remove-tags',
   'normalize-tags',
@@ -134,6 +135,11 @@ export const RULE_ACTION_KINDS: TrayActionKind[] = [
   'reschedule-stale',
   'rescue-leeches',
   'set-mastery',
+  // Gate 5's card-level batch. Suspension, flag and interval/ease all decide
+  // when and whether a card is seen, which is the same question this step's
+  // other kinds answer — and it is the third kind that writes cards rather than
+  // fields, alongside `prioritize-new` and `reschedule-stale`.
+  'set-card-state',
   'add-tags',
   'remove-tags',
   'normalize-tags',
@@ -313,6 +319,31 @@ export default function DeckWorkbenchTray({
    */
   const [staleMode, setStaleMode] = useState<StaleRemedyMode>('reschedule');
   const [sourceFacets, setSourceFacets] = useState<SourceFacet[]>(DEFAULT_SOURCE_FACETS);
+  /**
+   * Gate 5's three parts, each opening on "leave unchanged" rather than on a
+   * value. Every other kind in this tray has one subject; this one has three,
+   * and a form that pre-selected any of them would queue a step that flags every
+   * card of the selection because the user only came for the interval.
+   *
+   * Nothing set is therefore the *starting* state, and Add is still allowed from
+   * it: `planChangeTray` blocks on `card-state-empty`, which says out loud that
+   * the step sets nothing. Disabling Add instead would leave the user holding a
+   * button that does nothing and no sentence explaining why.
+   */
+  const [cardFlag, setCardFlag] = useState<AnkiCardFlag | ''>('');
+  const [cardSuspend, setCardSuspend] = useState<'' | 'suspend' | 'unsuspend'>('');
+  const [cardScheduleOn, setCardScheduleOn] = useState(false);
+  /**
+   * Text, for the reason recipe 18's three numbers are: each must be allowed to
+   * be empty mid-typing. An unparseable interval or ease becomes `NaN` and is
+   * refused by `card-state-invalid` rather than silently substituting a default
+   * the user never chose. A negative interval parses — `AnkiCardScheduling`
+   * preserves them, because Anki stores second-based intervals as negatives.
+   */
+  const [cardIntervalText, setCardIntervalText] = useState('21');
+  const [cardEaseText, setCardEaseText] = useState('2500');
+  const cardNumber = (text: string): number =>
+    /^-?\d+$/.test(text.trim()) ? Number(text.trim()) : Number.NaN;
   const [applied, setApplied] = useState<number | null>(null);
   /**
    * The reviewed generation, owned here because the tray is what writes it. A
@@ -623,6 +654,27 @@ export default function DeckWorkbenchTray({
         };
       case 'set-mastery':
         return { id, enabled: true, kind, level: masteryLevel };
+      case 'set-card-state':
+        // Each part is omitted rather than sent as a no-op value: `undefined`
+        // means "do not touch this column", and a `flag: 'none'` would be a
+        // deliberate un-flagging of every selected card. The three are
+        // independent, so an action may carry one, two or all three — and the
+        // all-absent case is queued and blocked rather than refused silently.
+        return {
+          id,
+          enabled: true,
+          kind,
+          ...(cardFlag === '' ? {} : { flag: cardFlag }),
+          ...(cardSuspend === '' ? {} : { suspended: cardSuspend === 'suspend' }),
+          ...(cardScheduleOn
+            ? {
+                scheduling: {
+                  interval: cardNumber(cardIntervalText),
+                  easeFactor: cardNumber(cardEaseText),
+                },
+              }
+            : {}),
+        };
       case 'normalize-tags':
         return { id, enabled: true, kind, ops: [...tagOps] };
       case 'normalize-decks':
@@ -1320,6 +1372,77 @@ export default function DeckWorkbenchTray({
               ))}
             </select>
           </label>
+        ) : kind === 'set-card-state' ? (
+          <>
+            <label>
+              {t('ankiWorkbench.tray.cardState.flagLabel')}
+              <select value={cardFlag} onChange={(e) => setCardFlag(e.target.value as AnkiCardFlag | '')}>
+                <option value="">{t('ankiWorkbench.tray.cardState.unchanged')}</option>
+                {ANKI_CARD_FLAGS.map((flag) => (
+                  <option key={flag} value={flag}>
+                    {t(`ankiWorkbench.tray.cardState.flag.${flag}`)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              {t('ankiWorkbench.tray.cardState.suspendLabel')}
+              <select
+                value={cardSuspend}
+                onChange={(e) => setCardSuspend(e.target.value as '' | 'suspend' | 'unsuspend')}
+              >
+                <option value="">{t('ankiWorkbench.tray.cardState.unchanged')}</option>
+                <option value="suspend">{t('ankiWorkbench.tray.cardState.suspend')}</option>
+                <option value="unsuspend">{t('ankiWorkbench.tray.cardState.unsuspend')}</option>
+              </select>
+            </label>
+            <label className="wb-tray-flag">
+              <input
+                type="checkbox"
+                checked={cardScheduleOn}
+                onChange={() => setCardScheduleOn((prev) => !prev)}
+              />
+              {t('ankiWorkbench.tray.cardState.schedulingLabel')}
+            </label>
+            {cardScheduleOn && (
+              <>
+                <label>
+                  {t('ankiWorkbench.tray.cardState.interval')}
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={cardIntervalText}
+                    onChange={(e) => setCardIntervalText(e.target.value)}
+                  />
+                </label>
+                <label>
+                  {t('ankiWorkbench.tray.cardState.ease')}
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={cardEaseText}
+                    onChange={(e) => setCardEaseText(e.target.value)}
+                  />
+                </label>
+              </>
+            )}
+            {/* Said before Add, the same place recipe 10's "nothing will
+                reschedule" is said. The capability matrix has `card-flag` as
+                `blocked` on a running Anki: the only route assigns the whole
+                `flags` column, whose reserved upper bits are not in the draft.
+                The package writer has the stored column in front of it, so the
+                same colour lands there. The user learns which destination
+                honours their choice here, not from a commit that skipped it. */}
+            {cardFlag !== '' && (
+              <span className="wb-tray-warn">{t('ankiWorkbench.tray.cardState.flagLiveBlocked')}</span>
+            )}
+            {cardSuspend === 'unsuspend' && (
+              /* Anki stores no pre-suspension queue; it recomputes from `type`.
+                 A card whose type did not decode is refused per card rather than
+                 filed into queue 0, which would turn an unsuspend into a reset. */
+              <span className="muted">{t('ankiWorkbench.tray.cardState.unsuspendRefuses')}</span>
+            )}
+          </>
         ) : (
           <label>
             {t('ankiWorkbench.tray.tags')}

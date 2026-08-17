@@ -9972,6 +9972,26 @@ export const en: Catalog = {
     'turquoise',
   'ankiWorkbench.tray.cardState.flag.purple':
     'purple',
+  'ankiWorkbench.tray.cardState.flagLabel':
+    'Flag',
+  'ankiWorkbench.tray.cardState.suspendLabel':
+    'Suspension',
+  'ankiWorkbench.tray.cardState.schedulingLabel':
+    'Set the interval and ease',
+  'ankiWorkbench.tray.cardState.unchanged':
+    'Leave unchanged',
+  'ankiWorkbench.tray.cardState.suspend':
+    'Suspend these cards',
+  'ankiWorkbench.tray.cardState.unsuspend':
+    'Unsuspend these cards',
+  'ankiWorkbench.tray.cardState.interval':
+    'Interval, in days',
+  'ankiWorkbench.tray.cardState.ease':
+    'Ease, in permille (2500 is 250%)',
+  'ankiWorkbench.tray.cardState.flagLiveBlocked':
+    'Flags are written into an exported package. A running Anki cannot take them: the only route rewrites the whole flag column, including bits this app never read.',
+  'ankiWorkbench.tray.cardState.unsuspendRefuses':
+    'Anki stores no queue to return to, so it is recomputed. A card whose state cannot be read back is refused rather than reset.',
   'ankiWorkbench.tray.problem.card-state-empty':
     'This card change sets nothing — no flag, no suspension and no interval. Choose at least one before applying it.',
   'ankiWorkbench.tray.problem.card-state-invalid':
