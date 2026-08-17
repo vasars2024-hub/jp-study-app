@@ -9425,6 +9425,46 @@ export const zh: Catalog = {
     '删除 {detail} 会连同它生成的 {count} 张卡片及其复习历史一并删除。撤销可以恢复。',
   'ankiWorkbench.tray.problem.template-clean':
     '未删除任何模板。所选内容中没有可删除的重复项。',
+  'ankiWorkbench.tray.kind.set-card-state':
+    '修改卡片状态',
+  'ankiWorkbench.tray.describe.set-card-state':
+    '对所选笔记的每张卡片：{parts}',
+  'ankiWorkbench.tray.cardState.partFlag':
+    '把旗标设为{flag}',
+  'ankiWorkbench.tray.cardState.partSuspend':
+    '暂停它们',
+  'ankiWorkbench.tray.cardState.partUnsuspend':
+    '恢复它们',
+  'ankiWorkbench.tray.cardState.partScheduling':
+    '把间隔设为 {days} 天、简易度设为 {ease}‰',
+  'ankiWorkbench.tray.cardState.flag.none':
+    '无',
+  'ankiWorkbench.tray.cardState.flag.red':
+    '红色',
+  'ankiWorkbench.tray.cardState.flag.orange':
+    '橙色',
+  'ankiWorkbench.tray.cardState.flag.green':
+    '绿色',
+  'ankiWorkbench.tray.cardState.flag.blue':
+    '蓝色',
+  'ankiWorkbench.tray.cardState.flag.pink':
+    '粉色',
+  'ankiWorkbench.tray.cardState.flag.turquoise':
+    '青绿色',
+  'ankiWorkbench.tray.cardState.flag.purple':
+    '紫色',
+  'ankiWorkbench.tray.problem.card-state-empty':
+    '这项卡片修改什么也没设置 — 没有旗标、没有暂停、也没有间隔。应用前请至少选择一项。',
+  'ankiWorkbench.tray.problem.card-state-invalid':
+    '该间隔或简易度不是 Anki 能保存的数值。间隔必须是整数天数，简易度须在 1300‰ 到 10000‰ 之间。',
+  'ankiWorkbench.tray.problem.card-state-no-cards':
+    '所选笔记中有 {count} 条在此来源里不生成卡片，因此没有可修改的卡片状态。',
+  'ankiWorkbench.tray.problem.card-state-not-scheduled':
+    '有 {count} 张卡片尚未学习过，因此还没有间隔和简易度。它们的旗标与暂停状态仍已修改。',
+  'ankiWorkbench.tray.problem.card-state-unknown':
+    '有 {count} 张卡片处于此来源无法描述的状态，没有可以退回的队列，因此保持暂停。',
+  'ankiWorkbench.tray.problem.card-state-already':
+    '有 {count} 条笔记的每张卡片都已是该状态，因此没有任何改变。',
   'ankiWorkbench.tray.aiTo': '已批准的建议写入到',
   'ankiWorkbench.tray.kind.apply-ai-additions': '应用已审阅的 AI 建议',
   'ankiWorkbench.tray.describe.apply-ai-additions': '把每条已批准的 AI 建议写入 {to}（{conflict}）',

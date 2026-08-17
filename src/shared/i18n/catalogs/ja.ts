@@ -9507,6 +9507,46 @@ export const ja: Catalog = {
     '{detail} を削除すると、それが生成したカード{count}枚も復習履歴ごと削除されます。元に戻すと復元されます。',
   'ankiWorkbench.tray.problem.template-clean':
     'テンプレートは削除されていません。選択したものに削除可能な重複はありませんでした。',
+  'ankiWorkbench.tray.kind.set-card-state':
+    'カードの状態を変更',
+  'ankiWorkbench.tray.describe.set-card-state':
+    '選択したノートのすべてのカードに対して: {parts}',
+  'ankiWorkbench.tray.cardState.partFlag':
+    'フラグを{flag}にする',
+  'ankiWorkbench.tray.cardState.partSuspend':
+    '停止する',
+  'ankiWorkbench.tray.cardState.partUnsuspend':
+    '停止を解除する',
+  'ankiWorkbench.tray.cardState.partScheduling':
+    '間隔を {days} 日、易しさを {ease}‰ にする',
+  'ankiWorkbench.tray.cardState.flag.none':
+    'なし',
+  'ankiWorkbench.tray.cardState.flag.red':
+    '赤',
+  'ankiWorkbench.tray.cardState.flag.orange':
+    'オレンジ',
+  'ankiWorkbench.tray.cardState.flag.green':
+    '緑',
+  'ankiWorkbench.tray.cardState.flag.blue':
+    '青',
+  'ankiWorkbench.tray.cardState.flag.pink':
+    'ピンク',
+  'ankiWorkbench.tray.cardState.flag.turquoise':
+    'ターコイズ',
+  'ankiWorkbench.tray.cardState.flag.purple':
+    '紫',
+  'ankiWorkbench.tray.problem.card-state-empty':
+    'このカード変更は何も設定していません — フラグも停止も間隔もありません。適用する前に少なくとも一つ選んでください。',
+  'ankiWorkbench.tray.problem.card-state-invalid':
+    'その間隔または易しさは Anki が保存できる値ではありません。間隔は整数の日数、易しさは 1300‰ から 10000‰ の範囲です。',
+  'ankiWorkbench.tray.problem.card-state-no-cards':
+    '選択したノートのうち {count} 件はこのソースでカードを生成しないため、変更できるカード状態がありません。',
+  'ankiWorkbench.tray.problem.card-state-not-scheduled':
+    '{count} 枚のカードはまだ学習されていないため、間隔と易しさがありません。フラグと停止状態は変更されました。',
+  'ankiWorkbench.tray.problem.card-state-unknown':
+    '{count} 枚のカードはこのソースが説明できない状態にあり、戻すべきキューがありません。停止したままにしました。',
+  'ankiWorkbench.tray.problem.card-state-already':
+    '{count} 件のノートはすべてのカードが既にその状態だったため、何も変わりませんでした。',
   'ankiWorkbench.tray.aiTo': '承認した候補の書き込み先',
   'ankiWorkbench.tray.kind.apply-ai-additions': '確認済みのAI候補を適用',
   'ankiWorkbench.tray.describe.apply-ai-additions': '承認した各AI候補を{to}に書き込む（{conflict}）',

@@ -775,6 +775,34 @@ export default function DeckWorkbenchTray({
           dormant: String(action.dormantDays),
           spread: String(action.spreadDays),
         });
+      case 'set-card-state':
+        // Every part that is set, joined — not a count and not the action's
+        // name. "Change card state" would not tell the user that this queued row
+        // suspends their cards as well as flagging them.
+        return t('ankiWorkbench.tray.describe.set-card-state', {
+          parts: [
+            action.flag === undefined
+              ? null
+              : t('ankiWorkbench.tray.cardState.partFlag', {
+                  flag: t(`ankiWorkbench.tray.cardState.flag.${action.flag}`),
+                }),
+            action.suspended === undefined
+              ? null
+              : t(
+                  action.suspended
+                    ? 'ankiWorkbench.tray.cardState.partSuspend'
+                    : 'ankiWorkbench.tray.cardState.partUnsuspend',
+                ),
+            action.scheduling
+              ? t('ankiWorkbench.tray.cardState.partScheduling', {
+                  days: String(action.scheduling.interval),
+                  ease: String(action.scheduling.easeFactor),
+                })
+              : null,
+          ]
+            .filter((part): part is string => part !== null)
+            .join(', '),
+        });
       default:
         return t(`ankiWorkbench.tray.describe.${action.kind}`, { tags: action.tags.join(' ') });
     }

@@ -9942,6 +9942,46 @@ export const en: Catalog = {
     'Removing {detail} deletes {count} cards along with it, including their review history. Undo puts them back.',
   'ankiWorkbench.tray.problem.template-clean':
     'No template was removed. Nothing chosen was a removable duplicate.',
+  'ankiWorkbench.tray.kind.set-card-state':
+    'Change card state',
+  'ankiWorkbench.tray.describe.set-card-state':
+    'For every card of the selected notes: {parts}',
+  'ankiWorkbench.tray.cardState.partFlag':
+    'flag them {flag}',
+  'ankiWorkbench.tray.cardState.partSuspend':
+    'suspend them',
+  'ankiWorkbench.tray.cardState.partUnsuspend':
+    'unsuspend them',
+  'ankiWorkbench.tray.cardState.partScheduling':
+    'set the interval to {days} days at {ease}‰ ease',
+  'ankiWorkbench.tray.cardState.flag.none':
+    'with no flag',
+  'ankiWorkbench.tray.cardState.flag.red':
+    'red',
+  'ankiWorkbench.tray.cardState.flag.orange':
+    'orange',
+  'ankiWorkbench.tray.cardState.flag.green':
+    'green',
+  'ankiWorkbench.tray.cardState.flag.blue':
+    'blue',
+  'ankiWorkbench.tray.cardState.flag.pink':
+    'pink',
+  'ankiWorkbench.tray.cardState.flag.turquoise':
+    'turquoise',
+  'ankiWorkbench.tray.cardState.flag.purple':
+    'purple',
+  'ankiWorkbench.tray.problem.card-state-empty':
+    'This card change sets nothing — no flag, no suspension and no interval. Choose at least one before applying it.',
+  'ankiWorkbench.tray.problem.card-state-invalid':
+    'That interval or ease is not a value Anki can store. The interval must be a whole number of days and the ease between 1300‰ and 10000‰.',
+  'ankiWorkbench.tray.problem.card-state-no-cards':
+    '{count} of the selected notes make no card in this source, so they have no card state to change.',
+  'ankiWorkbench.tray.problem.card-state-not-scheduled':
+    '{count} cards have never been studied, so they have no interval or ease yet. Their flag and suspension still changed.',
+  'ankiWorkbench.tray.problem.card-state-unknown':
+    '{count} cards are in a state this source does not describe, so there is no queue to return them to. They were left suspended.',
+  'ankiWorkbench.tray.problem.card-state-already':
+    '{count} notes already held that state on every card, so nothing about them changed.',
   'ankiWorkbench.tray.aiTo': 'Write the approved suggestion to',
   'ankiWorkbench.tray.kind.apply-ai-additions': 'Apply reviewed AI suggestions',
   'ankiWorkbench.tray.describe.apply-ai-additions': 'Write each approved AI suggestion to {to} ({conflict})',

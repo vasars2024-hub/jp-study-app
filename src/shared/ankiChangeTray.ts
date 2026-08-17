@@ -27,14 +27,24 @@
 // note types, and `Back` is ord 1 in one and ord 3 in another; targeting an ord
 // would write into whichever field happened to sit there.
 
-import type { AnkiDraft, AnkiDraftDeck, AnkiDraftNote, AnkiDraftNoteType } from './ankiDraft';
+import type {
+  AnkiCardFlag,
+  AnkiDraft,
+  AnkiDraftDeck,
+  AnkiDraftNote,
+  AnkiDraftNoteType,
+} from './ankiDraft';
 import {
   MARKED_TAG,
+  MAX_EASE_FACTOR,
+  MIN_EASE_FACTOR,
   createDraftEditIndex,
   draftFieldNormalizer,
   relinkDeckParents,
   normalizeTags,
+  restoredQueue,
   writeNoteField,
+  type AnkiCardScheduling,
   type AnkiDraftEditJournal,
   type AnkiDraftEditOp,
 } from './ankiDraftEdit';
@@ -175,7 +185,8 @@ export type TrayActionKind =
   | 'add-cloze'
   | 'reschedule-stale'
   | 'restore-source'
-  | 'remove-template';
+  | 'remove-template'
+  | 'set-card-state';
 
 /**
  * What a copy does when the destination already holds text — Phase 4's "require
@@ -475,6 +486,27 @@ export type TrayAction =
       noteTypeId: string;
       /** Ords to remove, in the note type's CURRENT numbering. */
       ords: number[];
+    })
+  | (TrayActionBase & {
+      /**
+       * Acceptance gate 5's batch half — the flag, suspension and interval/ease
+       * of every card of the selected notes.
+       *
+       * One action for all three rather than three, because they are one
+       * decision at the surface ("do this to these cards") and because a tray
+       * holding three separate card-state actions would apply them in queue
+       * order with no way to see the combined result. Each field is optional and
+       * at least one must be set; an action that changes nothing is refused by
+       * `blockingProblems` rather than counted as a no-op run.
+       *
+       * `suspended: false` is an unsuspend and can be refused per card — a card
+       * whose `type` did not decode has no queue to return to. That refusal is a
+       * `card-state-unknown` problem, not a silent skip.
+       */
+      kind: 'set-card-state';
+      flag?: AnkiCardFlag;
+      suspended?: boolean;
+      scheduling?: AnkiCardScheduling;
     });
 
 // ----- the ordered list --------------------------------------------------------
@@ -779,7 +811,19 @@ export type TrayProblemCode =
    */
   | 'template-removed'
   /** The action ran and removed nothing. Same reason `stale-clean` exists. */
-  | 'template-clean';
+  | 'template-clean'
+  /** Gate 5's batch was queued with no flag, no suspension and no schedule. Blocking. */
+  | 'card-state-empty'
+  /** An ease outside what Anki's own scheduler stores, or a fractional interval. Blocking. */
+  | 'card-state-invalid'
+  /** The note generates no card in this draft, so it has no card state. */
+  | 'card-state-no-cards'
+  /** Interval/ease on a card that never graduated: a new card has no schedule to edit. */
+  | 'card-state-not-scheduled'
+  /** Unsuspending a card whose type did not decode — there is no queue to return it to. */
+  | 'card-state-unknown'
+  /** Every card of this note already held the state the batch asked for. */
+  | 'card-state-already';
 
 export interface TrayProblem {
   code: TrayProblemCode;
@@ -1122,6 +1166,21 @@ function blockingProblems(
         // as "there are no duplicates here" — the exact opposite of what an
         // audit that has not run actually means.
         problems.push({ code: 'template-no-audit', severity: 'blocking', actionId: action.id, count: 1 });
+      }
+    } else if (action.kind === 'set-card-state') {
+      // Refused at the tray, not counted as a zero-change run: an Apply that did
+      // nothing would read as the batch having been applied and found nothing to
+      // do, which is a different and much more reassuring answer than the truth.
+      if (action.flag === undefined && action.suspended === undefined && !action.scheduling) {
+        problems.push({ code: 'card-state-empty', severity: 'blocking', actionId: action.id, count: 1 });
+      } else if (
+        action.scheduling &&
+        (!Number.isSafeInteger(action.scheduling.interval) ||
+          !Number.isSafeInteger(action.scheduling.easeFactor) ||
+          action.scheduling.easeFactor < MIN_EASE_FACTOR ||
+          action.scheduling.easeFactor > MAX_EASE_FACTOR)
+      ) {
+        problems.push({ code: 'card-state-invalid', severity: 'blocking', actionId: action.id, count: 1 });
       }
     } else if (action.kind === 'reschedule-stale') {
       // Refused here and not from the returned plan, because a mode the
@@ -1581,6 +1640,121 @@ export function planChangeTray(
         matched: noteIds.length,
         changed: movedNotes.size,
         skipped: noteIds.length - movedNotes.size,
+      });
+      continue;
+    }
+
+    if (action.kind === 'set-card-state') {
+      // Gate 5's batch. Per card, not per note: the gate is about card state and
+      // a note with a reverse template has two cards whose flags and schedules
+      // are independent. `note.cardIds` is the reader's own index, so this needs
+      // no second pass over `draft.cards`.
+      const changedNotes = new Set<string>();
+      let noCards = 0;
+      let notScheduled = 0;
+      let unknownState = 0;
+      let already = 0;
+      for (const noteId of noteIds) {
+        const at = index.position.get(noteId);
+        const note = at === undefined ? undefined : notes[at];
+        if (!note) continue;
+        if (note.cardIds.length === 0) {
+          noCards += 1;
+          continue;
+        }
+        let touchedThisNote = false;
+        for (const cardId of note.cardIds) {
+          const cardAt = index.cardPosition.get(cardId);
+          if (cardAt === undefined) continue;
+          let card = cards[cardAt];
+          if (!card) continue;
+
+          if (action.flag !== undefined && card.flag !== action.flag) {
+            ops.push({
+              kind: 'card-flag',
+              noteId,
+              cardId,
+              before: card.flag,
+              after: action.flag,
+              group: groupId,
+            });
+            card = { ...card, flag: action.flag };
+            touchedThisNote = true;
+          }
+
+          if (action.suspended !== undefined && (card.queue === 'suspended') !== action.suspended) {
+            // The restore is derived from the card, exactly as `setCardSuspended`
+            // does it, and a card it cannot answer for is REFUSED rather than
+            // filed into queue 0 — that would turn an unsuspend into a reset.
+            const after = action.suspended ? 'suspended' : restoredQueue(card);
+            if (after === null) {
+              unknownState += 1;
+            } else {
+              ops.push({
+                kind: 'card-queue',
+                noteId,
+                cardId,
+                before: card.queue,
+                after,
+                group: groupId,
+              });
+              card = { ...card, queue: after };
+              touchedThisNote = true;
+            }
+          }
+
+          if (action.scheduling) {
+            if (card.type === 'new' || card.type === 'unknown') {
+              notScheduled += 1;
+            } else if (
+              card.interval !== action.scheduling.interval ||
+              card.easeFactor !== action.scheduling.easeFactor
+            ) {
+              ops.push({
+                kind: 'card-scheduling',
+                noteId,
+                cardId,
+                before: { interval: card.interval, easeFactor: card.easeFactor },
+                after: { ...action.scheduling },
+                group: groupId,
+              });
+              card = {
+                ...card,
+                interval: action.scheduling.interval,
+                easeFactor: action.scheduling.easeFactor,
+              };
+              touchedThisNote = true;
+            }
+          }
+
+          if (card !== cards[cardAt]) {
+            cards[cardAt] = card;
+            changedCards += 1;
+          }
+        }
+        if (touchedThisNote) changedNotes.add(noteId);
+        else if (note.cardIds.length > 0) already += 1;
+      }
+      for (const [code, count] of [
+        ['card-state-no-cards', noCards],
+        ['card-state-not-scheduled', notScheduled],
+        ['card-state-unknown', unknownState],
+      ] as const) {
+        if (count > 0) {
+          problems.push({ code, severity: 'warning', actionId: action.id, count });
+        }
+      }
+      if (already > 0) {
+        // Info, not a warning: "they were already like that" is the batch being
+        // idempotent, which is the behaviour a user re-running one wants.
+        problems.push({ code: 'card-state-already', severity: 'info', actionId: action.id, count: already });
+      }
+      outcomes.push({
+        actionId: action.id,
+        kind: action.kind,
+        matched: noteIds.length,
+        changed: changedNotes.size,
+        skipped: noteIds.length - changedNotes.size,
       });
       continue;
     }

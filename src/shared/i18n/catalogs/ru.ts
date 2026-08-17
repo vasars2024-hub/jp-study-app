@@ -10331,6 +10331,46 @@ export const ru: Catalog = {
     'Удаление {detail} убирает вместе с ним карточек: {count} — вместе с их историей повторений. Отмена вернёт их.',
   'ankiWorkbench.tray.problem.template-clean':
     'Ни один шаблон не удалён. Среди выбранного не оказалось удаляемых дубликатов.',
+  'ankiWorkbench.tray.kind.set-card-state':
+    'Изменить состояние карточек',
+  'ankiWorkbench.tray.describe.set-card-state':
+    'Для каждой карточки выбранных заметок: {parts}',
+  'ankiWorkbench.tray.cardState.partFlag':
+    'поставить флажок {flag}',
+  'ankiWorkbench.tray.cardState.partSuspend':
+    'приостановить их',
+  'ankiWorkbench.tray.cardState.partUnsuspend':
+    'вернуть их в работу',
+  'ankiWorkbench.tray.cardState.partScheduling':
+    'задать интервал {days} дн. и лёгкость {ease}‰',
+  'ankiWorkbench.tray.cardState.flag.none':
+    'снять',
+  'ankiWorkbench.tray.cardState.flag.red':
+    'красный',
+  'ankiWorkbench.tray.cardState.flag.orange':
+    'оранжевый',
+  'ankiWorkbench.tray.cardState.flag.green':
+    'зелёный',
+  'ankiWorkbench.tray.cardState.flag.blue':
+    'синий',
+  'ankiWorkbench.tray.cardState.flag.pink':
+    'розовый',
+  'ankiWorkbench.tray.cardState.flag.turquoise':
+    'бирюзовый',
+  'ankiWorkbench.tray.cardState.flag.purple':
+    'фиолетовый',
+  'ankiWorkbench.tray.problem.card-state-empty':
+    'Это изменение карточек ничего не задаёт — ни флажка, ни приостановки, ни интервала. Выберите хотя бы одно перед применением.',
+  'ankiWorkbench.tray.problem.card-state-invalid':
+    'Такой интервал или лёгкость Anki хранить не может. Интервал — целое число дней, лёгкость — от 1300‰ до 10000‰.',
+  'ankiWorkbench.tray.problem.card-state-no-cards':
+    '{count} из выбранных заметок не порождают карточек в этом источнике, поэтому у них нет состояния карточки.',
+  'ankiWorkbench.tray.problem.card-state-not-scheduled':
+    '{count} карточек ещё не изучались, поэтому у них нет интервала и лёгкости. Флажок и приостановка всё же изменены.',
+  'ankiWorkbench.tray.problem.card-state-unknown':
+    '{count} карточек в состоянии, которое этот источник не описывает, и возвращать их некуда. Они остались приостановленными.',
+  'ankiWorkbench.tray.problem.card-state-already':
+    '{count} заметок уже имели это состояние на всех карточках, поэтому ничего не изменилось.',
   'ankiWorkbench.tray.aiTo': 'Записать одобренный вариант в',
   'ankiWorkbench.tray.kind.apply-ai-additions': 'Применить проверенные ИИ-варианты',
   'ankiWorkbench.tray.describe.apply-ai-additions': 'Записать каждый одобренный ИИ-вариант в {to} ({conflict})',

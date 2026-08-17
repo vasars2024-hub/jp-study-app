@@ -58,12 +58,14 @@ describe('the parity panel reads the matrix rather than restating it', () => {
     const asConnect = texts('.wb-parity-support');
     expect(asPackage).not.toEqual(asConnect);
 
-    // The difference is exactly the two capabilities a package writes and the
-    // live commit refuses — not a general "live does less" vibe.
+    // The difference is exactly the three capabilities a package writes and the
+    // live commit refuses — not a general "live does less" vibe. `card-flag`
+    // joined the list with gate 5: the package rewrites the low three bits of a
+    // column it can read, and AnkiConnect has no way to read it back.
     const differing = asPackage
       .map((support, i) => (support === asConnect[i] ? null : ANKI_PARITY_ROWS[i].id))
       .filter(Boolean);
-    expect(differing).toEqual(['deck-name', 'template-remove']);
+    expect(differing).toEqual(['card-flag', 'deck-name', 'template-remove']);
   });
 
   it('explains a cell only when it will not write', () => {
@@ -83,9 +85,10 @@ describe('the parity panel reads the matrix rather than restating it', () => {
   it('prints the refusal code the error banner would use, verbatim', () => {
     render('connect');
     const codes = texts('.wb-parity-code');
-    expect(codes).toHaveLength(2);
+    expect(codes).toHaveLength(3);
     expect(codes.join(' ')).toContain('deck-rename-unsupported');
     expect(codes.join(' ')).toContain('template-remove-unsupported');
+    expect(codes.join(' ')).toContain('card-flag-unsupported');
   });
 
   it('carries the package-only conditionals without downgrading their rows', () => {
@@ -109,6 +112,6 @@ describe('the parity panel reads the matrix rather than restating it', () => {
     // The stub renders `key:v1,v2,v3`, so the counts are readable as numbers.
     const [supported, readOnly, blocked] = summary.split(':')[1].split(',').map(Number);
     expect(supported + readOnly + blocked).toBe(ANKI_PARITY_ROWS.length);
-    expect(blocked).toBe(2);
+    expect(blocked).toBe(3);
   });
 });
