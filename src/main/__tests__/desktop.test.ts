@@ -51,4 +51,37 @@ describe('sanitizeWindow', () => {
     expect(sanitizeWindow({ ...base, section: 42 })).toBeNull();
     expect(sanitizeWindow(null)).toBeNull();
   });
+
+  // Liquid presentation (L3.2) is the field the comment above predicted. Live:
+  // the window went liquid at t+26ms and reverted to standard at t+630ms,
+  // because this allowlist dropped `presentation` and main echoed the stripped
+  // layout back. Every assertion below is one half of that measured defect.
+  describe('liquid presentation', () => {
+    const liquid = { v: 1, mode: 'liquid', standardRect: { x: 1, y: 2, w: 3, h: 4 }, standardMaximized: false };
+
+    it('keeps a liquid window liquid', () => {
+      const out = sanitizeWindow({ ...base, presentation: liquid });
+      expect(out?.presentation?.mode).toBe('liquid');
+      expect(out?.presentation?.standardRect).toEqual({ x: 1, y: 2, w: 3, h: 4 });
+    });
+
+    it('omits the key entirely for a conventional window', () => {
+      // Not `toBeUndefined()`: that passes for a present key with an undefined
+      // value, which would grow every pre-L3 layout blob by a field it never had.
+      expect(Object.keys(sanitizeWindow(base) ?? {})).not.toContain('presentation');
+    });
+
+    it.each([
+      ['liquid with nowhere to return to', { v: 1, mode: 'liquid' }],
+      ['a stored standard, which is the absence of the field', { v: 1, mode: 'standard' }],
+      ['a version this build cannot read', { v: 99, mode: 'liquid', standardRect: { x: 1, y: 2, w: 3, h: 4 } }],
+      ['a zero-size rect', { v: 1, mode: 'liquid', standardRect: { x: 0, y: 0, w: 0, h: 4 } }],
+      ['a string', 'liquid'],
+    ])('drops %s rather than shipping it to every window', (_label, presentation) => {
+      const out = sanitizeWindow({ ...base, presentation });
+      expect(Object.keys(out ?? {})).not.toContain('presentation');
+      // Corruption in one field must not cost the window its geometry.
+      expect(out).toMatchObject({ id: 'w1', x: 10, y: 20, w: 300, h: 400 });
+    });
+  });
 });

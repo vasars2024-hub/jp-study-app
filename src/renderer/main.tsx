@@ -52,6 +52,9 @@ import './theme/liquid-tokens.css';
 import './theme/liquid-surfaces.css';
 import './theme/liquid-scaffold.css';
 import './theme/liquid-controls.css';
+// Liquid Workplace per-window presentation (L3). Paints only under
+// `.fwin-liquid`, which no window carries unless the user opts it in.
+import './theme/liquid-window.css';
 // Shell panel base styles (Phase 2) — Notification Center, Quick Settings.
 import './components/shell/shell.css';
 // Multi-monitor desktops, cross-monitor drag ghost, drop router, and the two

@@ -23,6 +23,13 @@ import type {
 import { DESKTOP_STUDY } from '../../shared/desktop';
 import { clampLayoutToViewport, layoutGeometrySignature, resolveAuthoredViewport } from '../desktopLayoutFit';
 import { collectForeignWindows } from '../foreignWindows';
+import {
+  isWinLiquid,
+  presentationFromSnapshot,
+  presentationToSnapshot,
+  toggleWinPresentation,
+} from '../liquidWindowPresentation';
+import type { LiquidPresentationState } from '../../shared/liquidWindowState';
 import { loadDisplayPrefs } from '../displayPrefs';
 import DropRouter from './DropRouter';
 import {
@@ -123,6 +130,12 @@ interface Win {
   /** Always-on-top: rendered in a z band above every unpinned window. */
   pin?: boolean;
   rect?: { x: number; y: number; w: number; h: number };
+  /**
+   * Liquid Workplace presentation (L3). ABSENT is the conventional window and
+   * conventional stays the default — this is opt-in per window and reversible.
+   * Commands live in `../liquidWindowPresentation`.
+   */
+  presentation?: LiquidPresentationState;
 }
 
 /**
@@ -452,6 +465,9 @@ function winFromSnapshot(win: WindowSnapshot): Win {
     max: win.maximized,
     pin: win.pinned,
     rect: win.restoreRect,
+    // Validated, not trusted: a corrupt or future-versioned blob loads as a
+    // conventional window rather than as a Liquid one with no way back.
+    ...presentationToSnapshot({ presentation: presentationFromSnapshot(win.presentation) }),
   };
 }
 
@@ -468,6 +484,7 @@ function winToSnapshot(win: Win): WindowSnapshot {
     maximized: !!win.max,
     pinned: !!win.pin,
     restoreRect: win.rect,
+    ...presentationToSnapshot(win),
   };
 }
 
@@ -1804,6 +1821,17 @@ export default function DesktopShell({
     );
   };
 
+  /**
+   * Make Liquid / Return to standard. Presentation only — the window is not
+   * moved on the way in, so the trip home is the captured rect and nothing
+   * else. Focus is raised because the user just acted on this window.
+   */
+  const toggleLiquid = (id: string) => {
+    setWins((ws) =>
+      ws.map((w) => (w.id === id ? { ...toggleWinPresentation(w), z: ++zTop.current } : w)),
+    );
+  };
+
   const taskClick = (w: Win) => {
     const isTop = w.z === Math.max(...wins.map((x) => x.z));
     if (w.min) focus(w.id);
@@ -2453,6 +2481,7 @@ export default function DesktopShell({
           onClose={() => close(w.id)}
           onMinimize={() => minimize(w.id)}
           onMaximize={() => toggleMax(w.id)}
+          onToggleLiquid={() => toggleLiquid(w.id)}
           onPopOut={() => {
             void window.api.popOut(w.section);
             close(w.id);
@@ -3127,7 +3156,7 @@ type ResizeMode = 'corner' | 'right' | 'bottom';
 
 const FloatingWindow = memo(function FloatingWindow({
   win, animPhase, focused, hidden, deskRef, noteColor,
-  onFocus, onClose, onMinimize, onMaximize, onPopOut, onPatch, children,
+  onFocus, onClose, onMinimize, onMaximize, onToggleLiquid, onPopOut, onPatch, children,
 }: {
   win: Win;
   animPhase: WinAnimPhase | null;
@@ -3139,6 +3168,7 @@ const FloatingWindow = memo(function FloatingWindow({
   onClose: () => void;
   onMinimize: () => void;
   onMaximize: () => void;
+  onToggleLiquid: () => void;
   onPopOut: () => void;
   onPatch: (p: Partial<Win>) => void;
   children: ReactNode;
@@ -3152,6 +3182,11 @@ const FloatingWindow = memo(function FloatingWindow({
   const isMusicWidget = win.section === 'musicwidget';
   const isGarden = win.section === 'city';
   const isMaximized = Boolean(win.max) && !isGarden;
+  // Liquid presentation is opt-in per window and reversible. Notes and the
+  // frameless garden have no conventional chrome to swap, so they do not offer
+  // it — their absence of the control is not a disabled feature.
+  const liquid = isWinLiquid(win) && !isNote && !isGarden;
+  const canGoLiquid = !isNote && !isGarden && !isVisualizer;
   // Real apps (including Mooncap Garden and the music widget) can detach into their own OS window;
   // desktop-only trinkets (notes, the viz widget) cannot.
   const canPopOut = !isNote && !isVisualizer;
@@ -3294,7 +3329,8 @@ const FloatingWindow = memo(function FloatingWindow({
   return (
     <section
       ref={winRef}
-      className={`fwin ${focused ? 'focused' : ''} ${isNote ? 'fwin-note' : ''} ${isVisualizer ? 'fwin-viz' : ''} ${isGarden ? 'fwin-frameless' : ''} ${isMaximized ? 'fwin-max' : ''} ${animPhase ? `fwin-anim-${animPhase}` : ''}`}
+      className={`fwin ${focused ? 'focused' : ''} ${isNote ? 'fwin-note' : ''} ${isVisualizer ? 'fwin-viz' : ''} ${isGarden ? 'fwin-frameless' : ''} ${isMaximized ? 'fwin-max' : ''} ${liquid ? 'fwin-liquid' : ''} ${animPhase ? `fwin-anim-${animPhase}` : ''}`}
+      data-presentation={liquid ? 'liquid' : 'standard'}
       style={{ left: win.x, top: win.y, width: win.w, height: win.h, zIndex: win.pin ? PIN_Z_BASE + win.z : win.z, display: hidden ? 'none' : undefined }}
       onPointerDown={onFocus}
     >
@@ -3313,6 +3349,17 @@ const FloatingWindow = memo(function FloatingWindow({
             {canPopOut && (
               <button className="fwin-b" title={t('desktop.popOut')} onClick={onPopOut}>
                 ⧉
+              </button>
+            )}
+            {canGoLiquid && (
+              <button
+                className={`fwin-b fwin-b-liquid ${liquid ? 'is-liquid' : ''}`}
+                title={liquid ? t('desktop.returnToStandard') : t('desktop.makeLiquid')}
+                aria-label={liquid ? t('desktop.returnToStandard') : t('desktop.makeLiquid')}
+                aria-pressed={liquid}
+                onClick={onToggleLiquid}
+              >
+                {liquid ? '◆' : '◇'}
               </button>
             )}
             {!isNote && (

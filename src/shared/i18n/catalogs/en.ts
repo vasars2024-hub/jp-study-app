@@ -3612,6 +3612,8 @@ export const en: Catalog = {
   'desktop.minimize': 'Minimize',
   'desktop.maximize': 'Maximize',
   'desktop.resize': 'Resize',
+  'desktop.makeLiquid': 'Make Liquid',
+  'desktop.returnToStandard': 'Return to standard window',
 
   // Grammar view
   'grammar.intro':

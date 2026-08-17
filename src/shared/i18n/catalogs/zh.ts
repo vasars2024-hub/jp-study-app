@@ -3410,6 +3410,8 @@ export const zh: Catalog = {
   'desktop.minimize': '最小化',
   'desktop.maximize': '最大化',
   'desktop.resize': '调整大小',
+  'desktop.makeLiquid': '切换为液态窗口',
+  'desktop.returnToStandard': '返回标准窗口',
 
   // Grammar view
   'grammar.intro': 'JLPT N5–N1 与 HSK 1–10 语法，含练习构建器、测试与指南。',

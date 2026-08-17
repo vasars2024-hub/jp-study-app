@@ -3425,6 +3425,8 @@ export const ja: Catalog = {
   'desktop.minimize': '最小化',
   'desktop.maximize': '最大化',
   'desktop.resize': 'サイズ変更',
+  'desktop.makeLiquid': 'リキッド表示にする',
+  'desktop.returnToStandard': '通常のウィンドウに戻す',
 
   // Grammar view
   'grammar.intro': 'JLPT N5〜N1 と HSK 1〜10 の文法、練習ビルダー、テスト、ガイド。',

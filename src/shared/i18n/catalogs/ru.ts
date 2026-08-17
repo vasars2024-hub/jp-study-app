@@ -3680,6 +3680,8 @@ export const ru: Catalog = {
   'desktop.minimize': 'Свернуть',
   'desktop.maximize': 'Развернуть',
   'desktop.resize': 'Изменить размер',
+  'desktop.makeLiquid': 'Жидкое окно',
+  'desktop.returnToStandard': 'Вернуть обычное окно',
 
   // Grammar view
   'grammar.intro': 'Грамматика JLPT N5–N1 и HSK 1–10, конструктор практики, тесты и гайды.',

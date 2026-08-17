@@ -14,6 +14,7 @@ import type {
   WidgetSnapshot,
   WindowSnapshot,
 } from '../shared/desktop';
+import { parsePresentation } from '../shared/liquidWindowState';
 import {
   DEFAULT_ASSIGNMENT,
   DESKTOP_CITY,
@@ -150,6 +151,12 @@ export function sanitizeWindow(value: unknown): WindowSnapshot | null {
   if (!isObject(value)) return null;
   if (typeof value.id !== 'string' || typeof value.section !== 'string') return null;
   const num = (k: string): number => (typeof value[k] === 'number' ? value[k] : 0);
+  // Liquid presentation (L3). This function is an ALLOWLIST — a field it does
+  // not name is silently deleted on the way to disk, which is how the renderer
+  // could go liquid, commit, and be reverted 600ms later by its own re-hydration.
+  // Validated here with the same total parser the renderer uses, so a corrupt
+  // blob on disk is dropped in main rather than shipped to every window.
+  const presentation = parsePresentation(value.presentation);
   const restoreRect =
     isObject(value.rect) || isObject(value.restoreRect)
       ? (value.restoreRect ?? value.rect) as Record<string, unknown>
@@ -173,6 +180,9 @@ export function sanitizeWindow(value: unknown): WindowSnapshot | null {
           h: typeof restoreRect.h === 'number' ? restoreRect.h : 0,
         }
       : undefined,
+    // Omitted, not `undefined`: conventional IS the absence of the key, and a
+    // conditional spread keeps every layout saved before L3 byte-identical.
+    ...(presentation ? { presentation } : {}),
   };
 }
 
