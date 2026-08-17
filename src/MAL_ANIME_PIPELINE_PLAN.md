@@ -1354,3 +1354,50 @@ reproduces the old message. **Next slice: restart the app, then
 `node debug/g31m-acquire.cjs "Kidou Shinseiki Gundam X" 92`.** The 21.7 s before the 404 says the add
 and the metadata wait likely succeeded and it failed later — `files`, `filePrio` or `start` — but
 that is an inference from a duration, not a measurement, and must not be recorded as one.
+
+## 2026-08-17 — ROUTE A ACQUIRES, for the first time: 47 files, 21,079,165 chars, and 39 episodes
+
+Worker `backup`. Two commits. The previous entry's named next slice ran, and the 404 it was chasing
+turned out to be gone — but a worse defect was standing behind it.
+
+**The 404 is closed and was never re-observed.** Restarted the app onto `ac649de8` (main does not
+hot-reload; the previous run's app predated it) and re-ran `debug/g31m-acquire.cjs`. The endpoint-
+naming commit did its job: no 404 appeared at any of the eight endpoints. The inference the last
+entry refused to record — "`files`, `filePrio` or `start`" — is left unrecorded, because the run
+that would have named it never failed again. Do not chase it.
+
+**`60ab76d3` — a fetch that failed once could never be retried, and the torrent it left was its own.**
+What the retry actually met: `ok false`, **0 files, 1,160 ms**, "This torrent is already in
+qBittorrent; its file priorities were left alone." Permanent, not transient. The hands-off rule was
+protecting the wrong torrent: the previous run *added* this one, failed late, and left it behind —
+and `qbitReapSubtitleOrphans` deliberately holds out the hash the current acquisition is using, so
+the one leftover it can never sweep is exactly the one blocking the retry. Every retry of any
+candidate that ever failed after its add was a dead end. `qbitAddStopped` now answers **three**
+states: `adopted` when the existing transfer carries `jp-study-subtitles` — a category only that
+function ever writes, so no user priorities exist to clobber — and `already-present`, unchanged, for
+anything else. Adopted is driven like a fresh add. Gate: `subtitleNyaaFetch` **29/29** (27 before).
+**Negative control** with the adopt branch disabled: the adoption test fails, the refusal control
+still passes, so the test measures the category and not the state around it.
+
+**GATE 31, ROUTE A LEG: ACQUIRED. LIVE.** MAL 92 `Kidou Shinseiki Gundam X`, release *After War
+Gundam X / Kidou Shin Seiki Gundam X Official Subtitles*, **20.10 MB, 6 seeders**, route `sub-pack`,
+searched as `After War Gundam X`. LIST `ok true`, n **1**, **2,059 ms**. FETCH `ok true`, **47 files,
+21,079,165 chars, 78,775 ms** at the profile's own `minSeeders` with nothing relaxed. This pipeline
+had listed candidates for three days and never once acquired one; it has now.
+**Gate 31 is NOT closed** — as written it wants Route B as well, and cues rendering in the player.
+Only the Route A acquisition leg passes.
+
+**`dda019f4` — and every one of those 47 files came back `episode: null`.** The names are
+`[Kidou Shin Seiki Gundam X][21][BDRIP][1440x1080][H264_FLAC].ass`; all four existing patterns want a
+separator or the end of the string, and this convention gives the number a bracket of its own. An
+episode **range** is the thing the user asked this pipeline for, so 20 MB of subtitles arrived
+unusable. One pattern added, for a bracket that is nothing but 1–3 digits. On the 47 real names:
+**OLD 0 parsed / 47 null → NEW 39 parsed, 8 null, 39 distinct, 1..39, 0 duplicates.** Re-measured
+**live through the IPC path after a restart**: `files 47, parsed 39, nulls 8, distinct 39, min 1,
+max 39, missing []`. The 8 nulls are exactly the pack's creditless specials (`[Vol.07][SP02][NCOP2]`)
+— `Vol.07`/`SP02`/`NCOP2` are not pure-digit brackets, so they cannot collide with episodes 1–8.
+Cross-check independent of the parser: each file's own header reads `Title: Gundam X Episode 21`.
+Controls assert what must NOT parse — the specials, `[1440x1080]`, a `[2011]` year, an 8-digit CRC.
+
+**Next slice: P5 on this real pack.** 39 episodes of real `.ass` cues are now on disk and parsed;
+gate 19 (a word the user already knows must NOT appear in the mined output) finally has real input.
