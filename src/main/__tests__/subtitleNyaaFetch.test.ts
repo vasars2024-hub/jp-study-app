@@ -31,7 +31,7 @@ vi.mock('electron', () => ({
   },
 }));
 
-const { nyaaAvailability, nyaaFetch, nyaaFetchAll } = await import('../subtitleNyaaSource');
+const { nyaaAvailability, nyaaFetch, nyaaFetchAll, METADATA_TIMEOUT_MS } = await import('../subtitleNyaaSource');
 const { resetQbitSessions } = await import('../scraper/qbittorrent');
 const { setScraperStoreRoot } = await import('../scraper/store');
 
@@ -452,7 +452,18 @@ describe('nyaaFetch — route A, a subtitle-only pack', () => {
     // is not "there is nothing inside it".
     expect(result.ok === false && result.reason).toMatch(/no peer sent its file list/i);
     expect(result.ok === false && result.reason).not.toMatch(/no subtitle files/i);
+    // How long it waited, because "dead release" and "you gave up too early"
+    // are the two readings and only the user can pick between them.
+    expect(result.ok === false && result.reason).toMatch(/within 1 minute\./);
     expect(calls.some((call) => call.startsWith('prio:'))).toBe(false);
+  });
+
+  it('waits minutes, not one minute, for a file list by default', async () => {
+    // Pinned as a number because the old 60 s was justified by a premise this
+    // repo measured false: `[DeadFish] Ghost Hound - Batch` reported nothing for
+    // six consecutive 30 s samples and then 8,153,820,936 bytes at t+6.1 min.
+    // Anything back under ~6 min re-creates the defect, so this fails loudly.
+    expect(METADATA_TIMEOUT_MS).toBeGreaterThanOrEqual(420_000);
   });
 
   it('blames the client, not the release, when the client reaches no swarm at all', async () => {

@@ -1218,9 +1218,15 @@ export async function qbitAwaitMetadata(
       if (swarm.ok && swarm.value === 'disconnected') {
         return { ok: false, reason: NOT_CONNECTED_REASON };
       }
+      // The waited time is named because it is the difference between "this
+      // release is dead" and "you gave up too early", and the user is the only
+      // one who can judge which: the batch that provoked this reported its
+      // 8.15 GB at t+6.1 min, six samples after it looked silent.
+      const waitedMin = Math.max(1, Math.round(options.timeoutMs / 60_000));
       return {
         ok: false,
-        reason: 'qBittorrent could not read what is inside this release: no peer sent its file list in time.',
+        reason: 'qBittorrent could not read what is inside this release: no peer sent its file list '
+          + `within ${waitedMin} minute${waitedMin === 1 ? '' : 's'}.`,
       };
     }
     await sleep(pollMs);

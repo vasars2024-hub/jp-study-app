@@ -71,12 +71,26 @@ const FETCH_TIMEOUT_MS = 5 * 60 * 1000;
 /**
  * How long to wait for a magnet's file list.
  *
- * Much shorter than the fetch timeout because it is a different question: this
- * is "does anyone in this swarm answer at all", and a swarm that answers takes
- * seconds — the real 3-seeder release used to develop this returned 26 files in
- * 4 s. A minute is generous; a swarm silent for a minute has nothing to send.
+ * **"A swarm silent for a minute has nothing to send" was this constant's stated
+ * premise and it is measured false.** The 60 s it justified refused four
+ * releases in a row on 2026-08-17, one of them a pack that had delivered 47
+ * files the day before, while `connection_status` read `connected` throughout.
+ * Polled directly: `[DeadFish] Ghost Hound - Batch` sat at `size: 0` for six
+ * consecutive 30 s samples and then reported **8,153,820,936 bytes at t+6.1
+ * min** — the swarm was never silent, the wait was ~6x too short. The old
+ * number came from one release on one day, and 4 s and 6 min are both ordinary.
+ *
+ * Eight minutes rather than six because the measurement is a sample, not a
+ * ceiling, and being wrong in this direction costs a longer wait while being
+ * wrong in the other costs a false "there is nothing inside it".
+ *
+ * It costs no content bytes to wait: `stopCondition=MetadataReceived` puts the
+ * torrent back to stopped the moment the file list lands, measured at `paused`
+ * with `progress: 0` on that same 8.15 GB batch. A caller's own tighter budget
+ * still wins — `Math.min` at the call site — so nothing that asks for seconds
+ * suddenly waits minutes.
  */
-const METADATA_TIMEOUT_MS = 60_000;
+export const METADATA_TIMEOUT_MS = 480_000;
 
 /** Cap on how much text is read back, so a mislabelled `.ass` cannot blow up main. */
 const MAX_SUBTITLE_BYTES = 8 * 1024 * 1024;
