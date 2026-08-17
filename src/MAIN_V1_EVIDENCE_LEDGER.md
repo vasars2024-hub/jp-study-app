@@ -24989,3 +24989,50 @@ a reverse drag** through the same handler, not by writing `style`, and read back
 
 Verdict: the utility-process read costs **+1.7 ms of p95 frame time and nothing else**. Dragging
 half PASSES. Gate 9's remaining item is the in-UI filter/preview walk.
+
+## 2026-08-18 — Track 7 / gate 9 CLOSES: the in-UI walk, and a page notice that never fired (`primary`)
+
+Gate 9's last open item was an in-UI filter/preview walk over the 100k fixture. Run through the
+real `.wb-browser-search` in the real running component (`debug/gate9-ui-walk.cjs`), entered by the
+UI's own **Open again** button — no OS dialog. Honest scope, stated because the plan requires it:
+the reopen asks for `ANKI_DRAFT_PAGE_SIZE` (**500**), so this filters a page of a 100,000-note deck.
+
+| condition | median | p95 | max | >16 ms | >100 ms |
+| --- | --- | --- | --- | --- | --- |
+| keystroke, plain text (4 keys) | 42 ms | 56.1 | 56.1 | 4 | 0 |
+| keystroke, `tag:*` (5 keys) | 47.3 ms | 64.6 | 64.6 | 5 | 0 |
+| keystroke, refused `nope:1` (6) | 34.9 ms | 64.1 | 64.1 | 6 | 0 |
+| scroll, **0 px/frame control** | 10.0 ms | 10.6 | 10.6 | — | 0 over 33 |
+| scroll, 60 px/frame | 22.1 ms | 26.8 | 35.6 | — | 1 over 33 |
+| scroll, 400 px/frame (stress) | 26.2 ms | 30.6 | 35.7 | — | 1 over 33 |
+
+Preview opens in **3.7 ms**: inspector 1, `.wb-preview` 1, frame 1, 24 fields, 0 problems. Main
+heartbeat over the whole walk **158 beats / max 411 ms / 1 over 250** against this run's OWN idle
+control **189 / 401 / 1** — indistinguishable from idle, which is the only comparison that means
+anything. Re-windowing costs 10.0 → 26.2 ms and mounts a constant 22 rows at every step.
+
+**Controls, all firing.** Cross-check: each typed query's final rowcount equals a one-shot set of
+the same query, 3 of 3 AGREE — a walk that ended elsewhere was measuring a stale commit. Partitions
+sum exactly: `tag:*` 0 + `-tag:*` 500 = 500, and `cards:>=1` 500 + `cards:<1` 0 = 500. Negative
+control: `zzzzznotathing` → 0 rows and the empty state. Refusal control: `nope:1` renders its
+sentence AND 0 rows. **Gate 9 CLOSES.**
+
+**The walk's finding, fixed in `a6a66729`.** `partial` was `draft.counts.notes < totalNotes`.
+`counts` describes the whole COLLECTION and `draft.notes` is the window (`ankiDraft.ts:1023` says
+so), so on every paged source it compared 100,000 against 100,000 and was **false** — the one
+condition it exists to detect. The page notice never rendered; the row line read *"1 of 100,000
+loaded notes shown"* with 500 loaded; and `canSelectWholeSource` stayed true under an active
+filter, so a **one-row** result offered a button selecting all **100,000** — the exact claim this
+file's own header comment says the guard prevents. After, same window and query: *"Only 500 of
+100,000 notes are loaded."*, *"1 of 500 loaded notes shown"*, *"Select the 1 found here"*. No i18n
+change — both strings were already right, only the value passed was wrong.
+
+**Three instrument traps, each of which produced a false reading first.** (1) React does NOT commit
+inside `dispatchEvent` here, so a DOM read on the next line measures the PREVIOUS query — the first
+run scored the preview ABSENT when it renders fine. Settle on `requestAnimationFrame`. (2)
+`[class*=inspector]` matches a **Discover** window's `.disc-inspector` live in the same renderer;
+that false positive is what made the missing preview look real. (3) The 20 ms main heartbeat is
+throttled to ~1 Hz when the window is unfocused — 21 beats/1 ms unfocused vs **357**/47 ms after
+`POST /focus`. A gap number without that control cannot tell a stalled main from a throttled timer.
+Fourth, cheaper: a probe helper written as an IIFE rather than a function literal throws inside a
+rAF callback where nothing is watching, and the run reports a *timeout*, not an error.

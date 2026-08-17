@@ -452,12 +452,33 @@ This slice is complete only when all of these can be shown with real data and no
     and the geometry was restored by a **reverse drag through the same handler**, read back
     as exactly 60px, 24px.
 
-    **Still open, and the gate stays open for it:** an in-UI filter/preview walk over the
-    fixture. Note when picking it up that the renderer is now structurally bounded at
-    `ANKI_DRAFT_MAX_PAGE_SIZE` (2,000) rows on every reader, so "filter 100,000" means
-    filtering a page of a 100,000-note deck — the honest reading, not a shortcut. The
-    dialog-free entry exists: the fixture read above recorded a draft session, so
-    `reopenSession` reaches it from the UI with no OS dialog.
+    **The in-UI filter/preview walk CLOSES 2026-08-18, and gate 9 with it**
+    (`debug/gate9-ui-walk.cjs`, `a6a66729`). Driven through the real
+    `.wb-browser-search` in the real running component, entered by the UI's own
+    **Open again** button with no OS dialog. Honest scope: reopen asks for
+    `ANKI_DRAFT_PAGE_SIZE` (**500**), so this filters a page of a 100,000-note deck —
+    the honest reading, not a shortcut. Keystroke commit-to-paint, three queries:
+    median **42 / 47.3 / 34.9 ms**, p95 **56.1 / 64.6 / 64.1**, **0** keystrokes over
+    100 ms. Scroll, one step per frame, against its own **0 px/frame control** at
+    median 10.0 ms: 60 px/f **22.1 ms**, 400 px/f **26.2 ms**, 1 frame over 33 in each,
+    re-windowed with a constant 22 rows mounted. Preview opens in **3.7 ms** — inspector,
+    `.wb-preview`, frame, 24 fields, 0 problems. Main heartbeat across the walk
+    **158 beats / max 411 ms / 1 over 250** vs the same run's idle control **189 / 401 /
+    1**: indistinguishable from idle. Controls: 3 of 3 typed queries AGREE with a
+    one-shot set of the same query; `tag:*` 0 + `-tag:*` 500 = 500 and `cards:>=1` 500 +
+    `cards:<1` 0 = 500 exactly; `zzzzznotathing` → 0 rows and the empty state; `nope:1`
+    renders its refusal AND 0 rows.
+
+    **The walk's finding, fixed in the same slice:** `partial` was
+    `draft.counts.notes < totalNotes`, and `counts` is the whole COLLECTION while
+    `draft.notes` is the window (`ankiDraft.ts:1023`), so on every paged source it
+    compared 100,000 against 100,000 and was false. The page notice never rendered, the
+    row line claimed *"1 of 100,000 loaded notes shown"* with 500 loaded, and
+    `canSelectWholeSource` stayed true under a filter — a one-row result offering a
+    button that selects all 100,000, the exact claim the file's header comment says the
+    guard prevents. Traps for the next probe author are in the ledger entry: React does
+    not commit inside `dispatchEvent`, `[class*=inspector]` matches a Discover window,
+    and the main heartbeat is throttled to ~1 Hz unless the window is focused.
 10. Complete the primary workflows using keyboard only and verify focus, contrast, reduced motion, EN/JA/ZH/RU strings, and compact/default/maximized layouts.
 
     **Closed 2026-08-17** (`cd7472b6`). Everything unattended passed on 2026-08-16; the one
