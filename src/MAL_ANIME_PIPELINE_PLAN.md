@@ -1174,3 +1174,39 @@ hygiene, a ratchet whose baseline outran ~34 files of uncommitted foreign i18n c
 **shared tree = 710 files / 0 failed**. And a worktree with a junctioned `node_modules` fails
 `novelReaderProgressGuard.test.ts` on `Denied ID …/pdf.worker.min.mjs?url` — an artifact, not a
 defect; that is why the audit counted 9 failures where there are 8.
+
+## 2026-08-17 — the stored-alias seam proven live, and the husk that answered `/health` for an hour
+
+Worker `backup`. No product change — `449a49d5` was committed on unit tests plus a shared-tree
+read, and its load-bearing claim (main reads the library off disk) had never been exercised by the
+running app. Instrument: `debug/g31g-malid.cjs`, which passes **`malId` and no `titles` at all**,
+so a hit cannot come from the caller.
+
+**The seam is real.** `subtitleHarvestNyaaList({title:'Shinreigari', malId:2596})`, minSeeders 1 →
+`ok true`, **n 1**, `searchedAs "Ghost Hound"`, **1,300 ms**, `[DeadFish] Ghost Hound - Batch
+[BD][1080p][MP4][AAC]`, 7,782 MB, **4 seeders**, route `batch-sidecar`.
+**Negative control, same title, same index, same minute:** `malId 99999999` (no library row) →
+**n 0**, `searchedAs null`, **459 ms**, *"No release on the index looks like it carries subtitles
+for this title."* Same primary title both ways, so the single candidate above came from the
+library read and from nothing else. This is what `449a49d5` claimed and could not show.
+
+**Gate 31 is unchanged and is not being called a pass.** The alias re-survey it is waiting on
+(`debug/g31h-alias-routes.cjs`, every name rather than first-hit, capped at `HARVEST_ALIAS_LIMIT`
+= 4, `via` recorded per hit so a wrong alias is visible) is in flight; first 10 titles: **A 0,
+B 2**. See the next entry for its total.
+
+**The trap, and it cost this turn 20 minutes — read this before you believe any live number.**
+The app that was running (main pid 50272) was a **husk of the second shape**: `/health` answered
+`ok:true` with `visible:true`, `/logs` answered `total 0`, and Vite was **up and serving 200 on
+5173** — every check the skill tells you to run passed. The tells were `url: ""` on the window and
+`/logs` holding **exactly one** entry (`debug bridge up`); every `/eval`, down to `1+1`, timed out
+at the client. A husk does not fail a probe, it *hangs* one, so it reads as a slow query rather
+than a dead renderer. Fix was `Stop-Process` on the electron main **and** the three forge/npm
+wrappers, then `npm start`; the replacement (pid 48256) came up with `url:
+"http://localhost:5173/"`, `title: "日本語 Study"`, `typeof window.api === 'object'`.
+**Before trusting a live number here, eval `1+1` and read `url` — not `/health`'s `ok`.**
+
+**Gate count, re-derived from this plan's own gate tables rather than a keyword sweep: 32 of 34
+closed.** 1–3 (P0), 4–5 (P1), 6–9 (P2), 10–13 (P3), 14–17 (P4), 18–21 (P5), 22–30 (P6, table at
+this file's P6 section plus gate 29's own later closing entry), 32–33 (P7). **Open: 31** (the two
+route blockers) and **34** (the end-of-plan full gates).
