@@ -4,6 +4,7 @@ import {
   asNyaaAcquisitionConfig,
   buildSubtitleQuery,
   couldCarrySidecarSubtitles,
+  declaresExternalSubtitles,
   declaresMuxedSubtitles,
   describeEmptyNyaaListing,
   episodeFromFileName,
@@ -82,8 +83,19 @@ describe('subtitlePackSignals', () => {
     expect(subtitlePackSignals('[Kitsunekko] Frieren Japanese Subtitles')).toContain('subtitles');
     expect(subtitlePackSignals('Show - Subtitle Pack (01-24)')).toContain('sub-pack');
     expect(subtitlePackSignals('Show 01-12 [ASS]')).toContain('format-tag');
-    expect(subtitlePackSignals('進撃の巨人 字幕')).toContain('jp-subtitles');
+    expect(subtitlePackSignals('進撃の巨人 字幕')).toContain('cjk-subtitles');
     expect(subtitlePackSignals('Show - subs only')).toContain('subs-only');
+  });
+
+  it('NEGATIVE CONTROL: a Chinese fansub group name is not a payload claim', () => {
+    // `字幕社`/`字幕組` name the releaser. Before this the group bracket alone
+    // made a multi-GB BDRip look like a subtitle pack; only the 50 MB ceiling
+    // was stopping it, which is one guard for two independent mistakes.
+    expect(subtitlePackSignals(
+      '【悠哈璃羽字幕社＆諸神字幕組】[岸邊露伴一動不動][01-04][BDRIP x264_1080p][繁日雙語]',
+    )).not.toContain('cjk-subtitles');
+    // The same name with a real payload claim still fires.
+    expect(subtitlePackSignals('【悠哈璃羽字幕社】[Show][01-04] 外挂字幕')).toContain('cjk-subtitles');
   });
 
   it('does not treat a word merely containing a format name as a tag', () => {
@@ -205,6 +217,57 @@ describe('declaresMuxedSubtitles', () => {
     // tag is stripped before the test rather than after.
     expect(declaresMuxedSubtitles('[Multi-Subs] Show - 01 (1080p) [Batch]')).toBe(false);
   });
+
+  it('reads the Chinese statements of the same two facts', () => {
+    // Real corpus names. `内封` is the container, `内嵌` is the picture.
+    expect(declaresMuxedSubtitles(
+      '[SweetSub&LoliHouse] 章鱼噼的原罪 / Takopii no Genzai [01-06][WebRip 1080p][简繁日内封字幕][Fin]',
+    )).toBe(true);
+    expect(declaresMuxedSubtitles(
+      '[❀拨雪寻春❀] 送葬者芙莉莲 / 葬送のフリーレン [01-28 Fin][BDRip][HEVC-10bit 1080p][简繁日内封]',
+    )).toBe(true);
+    expect(declaresMuxedSubtitles('[Group] Show 01-12 [1080p][简繁内嵌]')).toBe(true);
+  });
+
+  it('NEGATIVE CONTROL: an external declaration is not a muxing one', () => {
+    // The pair that must not collapse. Both names are Chinese, both name the
+    // same three languages, and they differ only in where the files are — so a
+    // rule that fired on script or on `字幕` would return true for both.
+    expect(declaresMuxedSubtitles(
+      '【喵萌奶茶屋】[无能的奈奈/無能なナナ/Munou na Nana][01-13][BDRip][1080p][简繁日外挂][招募翻译]',
+    )).toBe(false);
+    expect(declaresExternalSubtitles(
+      '【喵萌奶茶屋】[无能的奈奈/無能なナナ/Munou na Nana][01-13][BDRip][1080p][简繁日外挂][招募翻译]',
+    )).toBe(true);
+  });
+
+  it('lets an external declaration win when a name states both', () => {
+    // Synthetic, and said so: 0 of the 1,748 corpus names declare both. Pinned
+    // anyway because the precedence is a real branch, and an unpinned branch is
+    // one a later edit can silently invert. A release shipping muxed tracks
+    // *and* a sidecar folder still has a file to fetch.
+    expect(declaresMuxedSubtitles('[Group] Show 01-12 [1080p][简繁内封][日文外挂]')).toBe(false);
+  });
+});
+
+describe('declaresExternalSubtitles', () => {
+  it('reads both the simplified and traditional forms', () => {
+    expect(declaresExternalSubtitles(
+      '[DBD-Raws][龙珠Z 剧场版/Dragon Ball Z The Movies][01-17合集][1080P][BDRip][简繁日双语外挂][MKV]',
+    )).toBe(true);
+    expect(declaresExternalSubtitles(
+      '[漫游字幕组] Mobile Suit Gundam Unicorn 1-7 BDrip HEVC 1080p 简繁外挂',
+    )).toBe(true);
+  });
+
+  it('NEGATIVE CONTROL: says nothing about a release that states no placement', () => {
+    // If this fired on a silent batch the ranking bonus would be noise: 53 of
+    // the 60 surveyed titles carry at least one batch and almost none say where
+    // their subtitles are.
+    expect(declaresExternalSubtitles('[SubsPlease] Show (00-17) (1080p) [Batch]')).toBe(false);
+    expect(declaresExternalSubtitles('[Erai-raws] Heya Camp - 01 ~ 12 [1080p][Multiple Subtitle]')).toBe(false);
+    expect(declaresExternalSubtitles('[Group] Show [简繁日内封字幕]')).toBe(false);
+  });
 });
 
 describe('rankSubtitleCandidates', () => {
@@ -230,6 +293,40 @@ describe('rankSubtitleCandidates', () => {
     expect(ranked.map((c) => c.row.id)).toEqual(['pack', 'batch']);
     expect(ranked[0].route).toBe('sub-pack');
     expect(ranked[1].route).toBe('batch-sidecar');
+  });
+
+  it('ranks a batch that states it ships sidecars above one that says nothing', () => {
+    // The one thing separating two batches before the metadata handshake, which
+    // costs 6-47 s each and has come back empty 10 times out of 10. The silent
+    // row is given 900 seeders and the declared one 4, so seeders cannot be what
+    // orders them.
+    const declared = row({
+      id: 'declared',
+      name: '【喵萌奶茶屋】[无能的奈奈/無能なナナ/Munou na Nana][01-13][BDRip][1080p][简繁日外挂][招募翻译]',
+      sizeBytes: 9_000 * MB,
+      subtitleLanguages: ['ja'],
+      isBatch: true,
+      seeders: 4,
+    });
+    const ranked = rankSubtitleCandidates([batch, declared], { languages: ['ja'] });
+    expect(ranked.map((c) => c.row.id)).toEqual(['declared', 'batch']);
+    expect(ranked[0].reasons).toContain('signal:external-subs');
+    expect(ranked[1].reasons).not.toContain('signal:external-subs');
+  });
+
+  it('NEGATIVE CONTROL: the sidecar bonus never lifts a batch over a pack', () => {
+    // A 12 GB download must not outrank 500 KB of text on the strength of one
+    // name token. The pack here is given the worse seeder count of the two.
+    const declared = row({
+      id: 'declared',
+      name: '[DBD-Raws][Show][01-17合集][1080P][BDRip][简繁日双语外挂][MKV]',
+      sizeBytes: 12_000 * MB,
+      subtitleLanguages: ['ja'],
+      isBatch: true,
+      seeders: 900,
+    });
+    const ranked = rankSubtitleCandidates([declared, pack], { languages: ['ja'] });
+    expect(ranked.map((c) => c.row.id)).toEqual(['pack', 'declared']);
   });
 
   it('drops a release of a different show, using the two the index really returned', () => {

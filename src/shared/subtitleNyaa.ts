@@ -263,6 +263,48 @@ const VIDEO_WITH_SUBS_RE = /\b(multi(?:ple)?[- ]?sub(?:title)?s?|soft[- ]?subs?|
 const MUXED_SUBS_RE = /\b(multi(?:ple)?[- ]?sub(?:title)?s?|soft[- ]?subs?|hard[- ]?subs?)\b/i;
 
 /**
+ * The same two facts, stated in Chinese. `内封` is "sealed inside" — the
+ * container — and `内嵌` is "embedded", i.e. burned into the picture. Both are
+ * exact synonyms of the softsub/hardsub half of `MUXED_SUBS_RE` and neither
+ * shares a character with the external form below.
+ *
+ * A separate constant because `\b` does not exist between CJK characters: these
+ * terms are anchored by their own script, and adding them to `MUXED_SUBS_RE`
+ * would have silently dropped its word boundaries for the Latin phrasings too.
+ * Traditional variants included — the index carries both.
+ */
+const MUXED_SUBS_CJK_RE = /内封|內封|内嵌|內嵌/;
+
+/**
+ * "External" subtitles, in Chinese: a separate file shipped beside the video.
+ *
+ * The one positive placement signal this corpus actually contains. The
+ * 2026-08-17 hunt scored six *English* phrasings across 2,685 names and found
+ * 1, and concluded "there is no positive signal to rank on" — but it was
+ * measuring our own vocabulary, not the pool, which is the same mistake the
+ * `銀魂`/`gintama` matcher made in the other direction. Re-scored over the same
+ * corpus: **11 of 1,748 names declare `外挂`/`外掛`, and 4 of those also declare
+ * Japanese** (`简繁日外挂` — simplified, traditional *and* Japanese, external).
+ *
+ * Deliberately not merged with `subtitlePackSignals`: this says a video release
+ * carries sidecar files, which is the batch route, not the pack route.
+ */
+const EXTERNAL_SUBS_CJK_RE = /外挂|外掛/;
+
+/**
+ * Whether a release's name states its subtitles ship as separate files.
+ *
+ * Unlike every other signal here this one *promotes* rather than refuses, so it
+ * is checked before the muxing test: a release that states both would have a
+ * file to fetch regardless. Measured over the corpus above: **0 names declare
+ * both**, so the ordering is a guard against a shape that has not appeared yet
+ * rather than a rule anything currently depends on.
+ */
+export function declaresExternalSubtitles(name: string): boolean {
+  return EXTERNAL_SUBS_CJK_RE.test(withoutReleaseGroup(name ?? ''));
+}
+
+/**
  * Whether a release's own name says its subtitles are muxed or burned in.
  *
  * Measured, not assumed. Across 4 titles and 10 distinct batch candidates the
@@ -275,9 +317,15 @@ const MUXED_SUBS_RE = /\b(multi(?:ple)?[- ]?sub(?:title)?s?|soft[- ]?subs?|hard[
  * Scored against the 33 real sidecar names in the 2026-08-17 survey
  * (`debug/g31n-routeb-54.json`): **14 of 33** declare it, every one an mkv-era
  * muxing group (`[Erai-raws]`, `[Judas]`, `[Trix]`, `[DKB]`, `[Anime Time]`).
+ *
+ * The Chinese half was blind until 2026-08-18: **24 of 1,748** corpus names say
+ * `内封`/`内嵌` and every one of them was taking the sidecar route and paying a
+ * 6–47 s metadata handshake to be told what its own name already said.
  */
 export function declaresMuxedSubtitles(name: string): boolean {
-  return MUXED_SUBS_RE.test(withoutReleaseGroup(name ?? ''));
+  const text = withoutReleaseGroup(name ?? '');
+  if (declaresExternalSubtitles(name)) return false;
+  return MUXED_SUBS_RE.test(text) || MUXED_SUBS_CJK_RE.test(text);
 }
 
 /** A container extension in the name means the payload is video. */
@@ -299,7 +347,12 @@ export function subtitlePackSignals(name: string): string[] {
   // Bare "subtitles" survives only because the video-release phrasings above
   // were already excluded.
   if (/\bsubtitles?\b/i.test(text)) found.push('subtitles');
-  if (/字幕/.test(text)) found.push('jp-subtitles');
+  // `字幕` is "subtitles" in Chinese and Japanese alike, so this signal never
+  // meant `jp-`. Worse, 11 of the 32 corpus names carrying it carry it inside a
+  // Chinese fansub *group* name — `字幕社`, `字幕組`, `字幕组` — which is a claim
+  // about who released it, not about what is in it. Those are removed first, so
+  // `【悠哈璃羽字幕社＆諸神字幕組】…` no longer reads as a subtitle pack.
+  if (/字幕/.test(text.replace(/字幕(?:社|組|组)/g, ' '))) found.push('cjk-subtitles');
   // A standalone format tag: `[ASS]`, `(SRT)`, `- ASS`. Anchored to a token
   // boundary so `Cassiopeia` and `Subaru` cannot match.
   if (/(?:^|[\s[(_.-])(ass|srt|ssa|vtt)(?:$|[\s\])_.-])/i.test(text)) found.push('format-tag');
@@ -781,6 +834,16 @@ export function rankSubtitleCandidatesDetailed(
     } else {
       score += 10;
       reasons.push('route:batch-sidecar');
+      // The only thing that distinguishes one batch from another before the
+      // metadata handshake. 10 batch candidates across 4 titles have reached a
+      // subtitle verdict and none carried sidecars, so a batch that actually
+      // states it ships them is the only lead this route has ever had — but it
+      // stays below a `sub-pack` (+50) on purpose, because a pack is still a few
+      // hundred KB against a few GB.
+      if (declaresExternalSubtitles(row.name ?? '')) {
+        score += 20;
+        reasons.push('signal:external-subs');
+      }
     }
 
     const seeds = seederScore(row.seeders);
