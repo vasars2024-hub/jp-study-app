@@ -205,6 +205,26 @@ describe('rankSubtitleCandidates', () => {
     expect(looksLikeSameTitle('Nanatsu no Taizai 01-24', 'Sen no Kiseki')).toBe(false);
   });
 
+  it('refuses a batch of another show for a title that is only digits', () => {
+    // Measured live on the user's own MAL list: the 1-episode title "001"
+    // listed 23 releases, because every batch numbers an episode 001. Each was
+    // one click from adding someone else's show to their torrent client.
+    expect(looksLikeSameTitle('[Naruto-Kun.Hu] Bleach 001-063 [1080p]', '001')).toBe(false);
+    expect(looksLikeSameTitle('[Erai-raws] Naruto Shippuuden - 001 ~ 079 [480p][MultiSub] [BATCH]', '001')).toBe(false);
+    expect(looksLikeSameTitle('Saint Seiya (1986) 001-114 [WEB 720p] [Multi-Subs]', '001')).toBe(false);
+    // The control: a release that names no other work outside its tags is still
+    // accepted, or a numerically titled show could never be found at all.
+    expect(looksLikeSameTitle('[SomeGroup] 001 (2010) [BDRip 1080p]', '001')).toBe(true);
+  });
+
+  it('does not let a bare number stand in for the words of a title', () => {
+    // "Gundam 00" against a Naruto batch: the digits were the whole match.
+    expect(looksLikeSameTitle('[Group] Naruto 00 - 12 [1080p]', 'Gundam 00')).toBe(false);
+    // And the digits are not *required* either — the words still carry it.
+    expect(looksLikeSameTitle('[Group] Gundam 00 S1 01-25', 'Gundam 00')).toBe(true);
+    expect(looksLikeSameTitle('[GB] Cyber City Oedo 808 Bluray 1080p SUBS ONLY', 'Cyber City Oedo 808')).toBe(true);
+  });
+
   it('drops rows advertising only unwanted languages', () => {
     const ru = row({ id: 'ru', name: 'Show Subtitles', sizeBytes: MB, subtitleLanguages: ['ru'] });
     expect(rankSubtitleCandidates([ru], { languages: ['ja'] })).toEqual([]);

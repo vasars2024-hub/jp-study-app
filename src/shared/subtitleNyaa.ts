@@ -297,11 +297,32 @@ export interface NyaaSubtitleWant {
 const TITLE_STOPWORDS = new Set(['the', 'a', 'an', 'of', 'and', 'or']);
 
 function titleTokens(title: string): string[] {
-  return String(title ?? '')
+  const tokens = String(title ?? '')
     .toLowerCase()
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .split(' ')
     .filter((token) => token && !TITLE_STOPWORDS.has(token));
+  // A bare number in a release name is an episode, a volume, a year or a
+  // resolution far more often than it is part of a title, so a digit-only token
+  // is not evidence while any word is available to carry the match. Measured:
+  // "Gundam 00" matched a "Naruto 00 - 12" batch on the `00` alone.
+  const words = tokens.filter((token) => !DIGITS_ONLY.test(token));
+  return words.length ? words : tokens;
+}
+
+/** A token that is nothing but digits. */
+const DIGITS_ONLY = /^\d+$/;
+
+/**
+ * The part of a release name that is not a bracketed or parenthesised tag.
+ *
+ * Group, resolution, codec, source and CRC all live inside brackets, so what is
+ * left is roughly the release's own claim about which work it carries.
+ */
+function untaggedPart(rowName: string): string {
+  return String(rowName ?? '')
+    .replace(/\[[^\]]*\]/g, ' ')
+    .replace(/\([^)]*\)/g, ' ');
 }
 
 /**
@@ -321,6 +342,15 @@ function titleTokens(title: string): string[] {
 export function looksLikeSameTitle(rowName: string, title: string): boolean {
   const tokens = titleTokens(title);
   if (!tokens.length) return true;
+  // A title that is only digits — "001" is one, in the user's own list — has no
+  // word the index can be held to, so every batch that numbers its episodes
+  // matched it: measured live, "001" listed 23 releases, among them Bleach
+  // 001-063, Fairy Tail 001-175 and a 59 GB Saint Seiya batch, each of them one
+  // click from being added to the user's torrent client. A release that names
+  // some other work outside its tags is not that title, whatever its numbering.
+  if (tokens.every((token) => DIGITS_ONLY.test(token)) && /\p{L}/u.test(untaggedPart(rowName))) {
+    return false;
+  }
   const haystack = ` ${String(rowName ?? '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ')} `;
   const hits = tokens.filter((token) => haystack.includes(` ${token} `)).length;
   return hits * 2 >= tokens.length;
