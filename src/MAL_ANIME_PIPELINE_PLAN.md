@@ -1210,3 +1210,46 @@ wrappers, then `npm start`; the replacement (pid 48256) came up with `url:
 closed.** 1–3 (P0), 4–5 (P1), 6–9 (P2), 10–13 (P3), 14–17 (P4), 18–21 (P5), 22–30 (P6, table at
 this file's P6 section plus gate 29's own later closing entry), 32–33 (P7). **Open: 31** (the two
 route blockers) and **34** (the end-of-plan full gates).
+
+## 2026-08-17 — gate 31: the alias re-survey is DONE and does not unblock it, and the pool was the 99 smallest titles
+
+Worker `backup`. The action 2026-08-17's entry named as next ("re-run the 99-title Route A/B
+survey with aliases") has run. `debug/g31h-alias-routes.cjs`: **99 titles, 320 searches, 0
+errors**, 96 of 99 searched more than one name, every name rather than first-hit because the
+question is what *exists*. Gate 31 stays **OPEN** and is not being called a pass.
+
+**Route A: still one real candidate, and aliases did not find it.** Two nominal hits.
+(1) index 32 `Cyber City Oedo 808`, 34.50 MB, 1 seeder — the same `[GB] … SUBS ONLY` release from
+2026-08-16, already measured as **9 files, all `.sup`, all `[eng]`** and correctly refused as
+bitmap-only. It was returned by the primary title *and* by the alias `Cyber City`, so the alias
+added nothing. (2) index 97 `Black★Rock Shooter (TV)` is a **false positive and worth the space**:
+`[IsThisYuri] Black Rock Shooter - Dawn Fall 08 subtitles (DROPPED: This is yuri!)`, **26,726 B,
+1 seeder**, found only via alias `Black Rock Shooter` (75 rows, against the primary's 3). *Dawn
+Fall* is the 2022 series, not the 2012 one, and it is **one episode**. Every Route A heuristic
+passes it — under the 50 MB ceiling, no video container, a `subtitles` signal — so the alias walk
+widened the net onto the wrong work exactly as `HARVEST_ALIAS_LIMIT`'s comment predicts. The size
+floor that would catch a 26 KB "batch" does not exist.
+
+**Route B: materially wider, and still empty.** Titles with ≥1 batch candidate **57 → 73 of 99**,
+**16 gained by aliases alone** — `Fafner The Beyond` (+4), `Night World` (+4), `Bari Bari
+Densetsu` (+5), `ROD OVA`, `機動戦士ガンダム サンダーボルト`, `Golden Courtyard: New Year Wishes in
+Winter`, `Saint☆Onii-san`, `Alien Nine`, `xxxHOLiC OVA`. Baseline zero-row titles **9 → 6**.
+Then the only question that matters, through `debug/g31b.cjs` on the daemon: 11 of the newly
+visible batches added with `stopCondition=MetadataReceived`, file list read, all deleted,
+**`downloaded: 0` on every one**. **0 of 11 carry a sidecar.** Read it honestly — **7 returned a
+file list** (12/12/12/12/50/4/2 files, zero subs) and **4 returned none within 60 s** at low seed
+counts, which is inconclusive rather than negative. With 2026-08-16's 0 of 6 (2 of which also
+never sent metadata), the cumulative conclusive figure is **0 of 11 batches, 17 attempted**.
+Client left as found: `debug/g31i-clientcheck.cjs` → **0** torrents in `jp-study-probe`, the
+user's own 7 untouched.
+
+**The finding that should change what the next turn does, and it corrects this plan.** Both
+surveys — 2026-08-16's and this one — drew from `pool.sort((a, b) => a.totalEpisodes -
+b.totalEpisodes).slice(0, 99)`. That is the **99 SMALLEST** multi-episode titles: **episode range
+2–8**, out of a ≥2-episode pool of **1,105**. So "1 Route A hit in 99 titles, rare means 1 %" was
+measured on **9 %** of the library, deliberately sorted to OVAs, specials and shorts — the
+category least likely to have a fansub pack. **1,006 titles were never searched, 920 of them ≥12
+episodes**, and long-running shows are where sub-packs actually live. Do not conclude Route A is
+unavailable in this library; conclude it is unmeasured above 8 episodes.
+**Next: run `node debug/g31h-alias-routes.cjs 99 100 2 1` and upward**, or sort the pool
+descending, before treating gate 31's Route A as data-blocked.
