@@ -707,6 +707,51 @@ describe('selectSubtitleFiles', () => {
     expect(selectSubtitleFiles(files, { episode: 99 }).reason).toBe('no-episode-match');
   });
 
+  it('takes each episode once when a bilingual release ships it twice', () => {
+    // Verbatim from the first Route B candidate ever found to carry sidecars:
+    // 78 files for 39 episodes, every one paired `sc_jp` / `tc_jp`. Both read as
+    // `ja` — correctly, they are Chinese/Japanese bilingual — so nothing before
+    // this dropped either, and the fetch timed out at 16 of 78.
+    const files = [
+      file(0, '[DBD-Raws][JOJO][06][1080P][BDRip][HEVC-10bit][FLAC].sc_jp.ass', 90_000),
+      file(1, '[DBD-Raws][JOJO][06][1080P][BDRip][HEVC-10bit][FLAC].tc_jp.ass', 89_000),
+      file(2, '[DBD-Raws][JOJO][09][1080P][BDRip][HEVC-10bit][FLAC].sc_jp.ass', 95_000),
+      file(3, '[DBD-Raws][JOJO][09][1080P][BDRip][HEVC-10bit][FLAC].tc_jp.ass', 94_000),
+    ];
+    const chosen = selectSubtitleFiles(files, { languages: ['ja'] });
+    expect(chosen.reason).toBe('ok');
+    // One per episode, and the larger of each pair — `ordered` is largest-first.
+    expect(chosen.files.map((f) => f.index)).toEqual([2, 0]);
+  });
+
+  it('NEGATIVE CONTROL: distinct episodes are never collapsed, and unnumbered files are all kept', () => {
+    // The failure this dedupe could cause is silent cue loss, so both shapes it
+    // could eat are pinned. A 3-episode pack must stay 3 files, and two files
+    // whose episode cannot be read are not known to be duplicates of each other.
+    const distinct = selectSubtitleFiles([
+      file(0, 'Subs/Show - 06.ja.ass'),
+      file(1, 'Subs/Show - 07.ja.ass'),
+      file(2, 'Subs/Show - 08.ja.ass'),
+    ], { languages: ['ja'] });
+    expect(distinct.files).toHaveLength(3);
+
+    const unnumbered = selectSubtitleFiles([
+      file(0, 'Subs/Show - OP.ja.ass'),
+      file(1, 'Subs/Show - ED.ja.ass'),
+    ], { languages: ['ja'] });
+    expect(unnumbered.files).toHaveLength(2);
+  });
+
+  it('leaves a single-episode request alone, where the caller still picks', () => {
+    // The dedupe is scoped to the range path on purpose: narrowing here would
+    // change what the per-episode discovery flow is handed.
+    const chosen = selectSubtitleFiles([
+      file(0, 'Subs/Show - 07.sc_jp.ass', 90_000),
+      file(1, 'Subs/Show - 07.tc_jp.ass', 89_000),
+    ], { episode: 7, languages: ['ja'] });
+    expect(chosen.files).toHaveLength(2);
+  });
+
   it('excludes a stated unwanted language but keeps unlabelled files', () => {
     const files = [
       file(0, 'Subs/eng/Show - 07.ass'),

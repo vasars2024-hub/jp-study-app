@@ -1014,7 +1014,8 @@ export function selectSubtitleFiles(
   if (pool.length === 0) pool = unlabelled;
   if (pool.length === 0) return { files: [], format: null, reason: 'wrong-language' };
 
-  if (typeof want.episode === 'number' && Number.isFinite(want.episode)) {
+  const hasEpisode = typeof want.episode === 'number' && Number.isFinite(want.episode);
+  if (hasEpisode) {
     const matching = pool.filter((file) => episodeFromFileName(file.name) === want.episode);
     if (matching.length === 0) {
       return { files: [], format: null, reason: 'no-episode-match' };
@@ -1035,11 +1036,49 @@ export function selectSubtitleFiles(
     return a[0].localeCompare(b[0]);
   })[0];
 
+  const ordered = [...chosen].sort((a, b) => b.sizeBytes - a.sizeBytes || a.name.localeCompare(b.name));
+
   return {
-    files: [...chosen].sort((a, b) => b.sizeBytes - a.sizeBytes || a.name.localeCompare(b.name)),
+    // A range harvest wants each episode's cues once. A bilingual release ships
+    // each episode twice — measured on the first Route B candidate ever to carry
+    // sidecars, `[DBD-Raws] … 简繁外挂字幕`: **78 subtitle files for 39 episodes**,
+    // `…[06]….sc_jp.ass` and `…[06]….tc_jp.ass`, simplified- and
+    // traditional-Chinese pairings of the *same* Japanese. Both read as `ja` and
+    // both were downloaded; the two files of episode 06 carry **3,387 kana
+    // each**. Half that transfer bought nothing, and the fetch timed out at
+    // 16 of 78 with an 8-minute budget.
+    //
+    // Only the range path dedupes. When a specific episode was requested the
+    // pool is already one episode and the caller picks, so narrowing there would
+    // change the per-episode discovery contract for no gain.
+    files: hasEpisode ? ordered : oneFilePerEpisode(ordered),
     format,
     reason: 'ok',
   };
+}
+
+/**
+ * One file per episode, keeping the order it was given.
+ *
+ * `ordered` arrives largest-first, so the first file seen for an episode is the
+ * fullest one. Files whose episode cannot be read are all kept: two of them are
+ * not known to be duplicates, and dropping on an unparsed name would silently
+ * lose cues.
+ */
+function oneFilePerEpisode(ordered: readonly NyaaArchiveFile[]): NyaaArchiveFile[] {
+  const seen = new Set<number>();
+  const out: NyaaArchiveFile[] = [];
+  for (const file of ordered) {
+    const episode = episodeFromFileName(file.name);
+    if (episode == null) {
+      out.push(file);
+      continue;
+    }
+    if (seen.has(episode)) continue;
+    seen.add(episode);
+    out.push(file);
+  }
+  return out;
 }
 
 // ------------------------------------------------------------------- queries ---
