@@ -1,0 +1,458 @@
+// @vitest-environment jsdom
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { act, type ReactNode } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { AdaptiveRail, railItemName, type RailItem } from '../components/liquid/AdaptiveRail';
+import { ContextToolbar, fitCount, type ToolbarAction } from '../components/liquid/ContextToolbar';
+import { LiquidAppScaffold } from '../components/liquid/LiquidAppScaffold';
+
+/**
+ * L2's fourth gate: the rail and the toolbar that fill the scaffold's two chrome
+ * slots. What each block guards, in the plan's own terms:
+ *
+ *   - §2.2 no feature is removed because the window got small — an action that
+ *     does not fit MOVES to the overflow menu, and the collapsed rail keeps
+ *     every item;
+ *   - rubric category 1 — collapsing hides the label, never the accessible name;
+ *   - rubric category 8 honest states — a dead control says why, and an
+ *     icon-only action with no icon still renders a glyph;
+ *   - §8 a composition language — no colour or dimension in the sheet is a
+ *     literal, so a shell that remaps its vars gets these for free.
+ *
+ * TRAP, and why `fitCount` is exported as a pure function: jsdom reports
+ * `getBoundingClientRect().width === 0` for everything, so a test that only
+ * mounted the toolbar and asserted "3 visible" would pass while measuring
+ * nothing at all. Overflow behaviour is proven against `fitCount` directly and
+ * against the explicit `overflowAfter`; the measured binding is proven live.
+ */
+
+const CSS = readFileSync(resolve(__dirname, '..', 'theme', 'liquid-controls.css'), 'utf8').replace(
+  /\/\*[\s\S]*?\*\//g,
+  '',
+);
+
+let host: HTMLDivElement | null = null;
+let root: Root | null = null;
+function render(node: ReactNode): HTMLDivElement {
+  host = document.createElement('div');
+  document.body.appendChild(host);
+  root = createRoot(host);
+  act(() => {
+    root!.render(node);
+  });
+  return host;
+}
+afterEach(() => {
+  if (root) act(() => root!.unmount());
+  host?.remove();
+  root = null;
+  host = null;
+});
+
+const ITEMS: RailItem[] = [
+  { id: 'library', label: 'Library' },
+  { id: 'decks', label: 'Decks', badge: 12 },
+  { id: 'stats', label: 'Statistics' },
+  { id: 'sync', label: 'Sync', disabled: true, disabledReason: 'Not connected' },
+];
+
+const ACTIONS: ToolbarAction[] = [
+  { id: 'play', label: 'Play' },
+  { id: 'loop', label: 'Loop', pressed: false },
+  { id: 'mine', label: 'Mine sentence' },
+  { id: 'export', label: 'Export', disabled: true, disabledReason: 'No deck selected' },
+  { id: 'settings', label: 'Settings' },
+];
+
+describe('fitCount — overflow arithmetic', () => {
+  it('shows everything when everything fits, with no room reserved for a menu', () => {
+    // 3x100 + 2x8 gap = 316. At exactly 316 the overflow control is not needed
+    // and therefore costs nothing.
+    expect(fitCount([100, 100, 100], 316, 8, 40)).toBe(3);
+    expect(fitCount([100, 100, 100], 1000, 8, 40)).toBe(3);
+  });
+
+  it('reserves the overflow control the moment anything overflows', () => {
+    // 315 is one px short of all three. Budget becomes 315 - 40 - 8 = 267, which
+    // takes two (100 + 8 + 100 = 208) but not three.
+    expect(fitCount([100, 100, 100], 315, 8, 40)).toBe(2);
+    // Tight enough that reserving the control costs the second action too.
+    expect(fitCount([100, 100, 100], 150, 8, 40)).toBe(1);
+    expect(fitCount([100, 100, 100], 60, 8, 40)).toBe(0);
+
+    // THE DISCRIMINATING CASE. Equal-width actions hide this bug: dropping the
+    // reservation entirely still returns the same count for [100,100,100],
+    // because the loose budget overshoots by a whole action either way. With a
+    // small tail action the reservation is exactly what costs it its place —
+    // 100 + 8 + 20 = 128 fits in 150 but not in 150 - 40 - 8. Without this line
+    // `budget = available` passes the whole suite, and the overflow control
+    // then paints over the last action in the running app.
+    expect(fitCount([100, 20, 20], 150, 8, 40)).toBe(1);
+    expect(fitCount([100, 20, 20], 200, 8, 40)).toBe(3);
+  });
+
+  it('takes overflow from the tail, so the caller orders by priority', () => {
+    const widths = [50, 50, 50, 50];
+    for (let available = 60; available < 400; available += 7) {
+      const fit = fitCount(widths, available, 8, 40);
+      expect(fit).toBeGreaterThanOrEqual(0);
+      expect(fit).toBeLessThanOrEqual(4);
+    }
+  });
+
+  it('shows everything rather than nothing when the container cannot be measured', () => {
+    // jsdom, a display:none ancestor, the frame before first layout. Collapsing
+    // a real toolbar into a menu on that frame is the visible failure.
+    expect(fitCount([100, 100], 0, 8, 40)).toBe(2);
+    expect(fitCount([], 500, 8, 40)).toBe(0);
+  });
+});
+
+describe('AdaptiveRail — the name survives the collapse', () => {
+  it('renders every item at both widths; collapsing removes the label span only', () => {
+    for (const collapsed of [false, true]) {
+      const container = render(<AdaptiveRail items={ITEMS} activeId="decks" collapsed={collapsed} />);
+      const buttons = container.querySelectorAll('.lq-rail-item');
+      expect(buttons.length, String(collapsed)).toBe(4);
+      for (const button of Array.from(buttons)) {
+        // The accessible name is present at BOTH widths — collapsing must not be
+        // the thing that introduces it, or an expanded rail has none.
+        expect(button.getAttribute('aria-label')).toBeTruthy();
+        expect(button.querySelector('.lq-rail-icon')).not.toBeNull();
+        // The label span is never removed from the DOM; CSS hides it, so the
+        // component has one output and the breakpoint owns the presentation.
+        expect(button.querySelector('.lq-rail-label')?.textContent).toBeTruthy();
+      }
+      act(() => root!.unmount());
+      host!.remove();
+      root = null;
+    }
+  });
+
+  it('folds the badge and the disabled reason into the accessible name', () => {
+    // aria-label REPLACES the element's text, so anything not in this string is
+    // invisible to a screen reader in collapsed mode.
+    expect(railItemName({ id: 'a', label: 'Decks', badge: 12 })).toBe('Decks (12)');
+    expect(railItemName({ id: 'a', label: 'Library' })).toBe('Library');
+    expect(railItemName({ id: 'a', label: 'Decks', badge: '' })).toBe('Decks');
+    expect(
+      railItemName({ id: 'a', label: 'Sync', disabled: true, disabledReason: 'Not connected' }),
+    ).toBe('Sync — Not connected');
+
+    const container = render(<AdaptiveRail items={ITEMS} />);
+    const sync = container.querySelector('[data-item-id="sync"]')!;
+    expect(sync.getAttribute('aria-label')).toBe('Sync — Not connected');
+    expect(sync.getAttribute('title')).toBe('Not connected');
+  });
+
+  it('gives an icon-less item a real glyph, taken by grapheme not by code unit', () => {
+    const container = render(
+      <AdaptiveRail items={[{ id: 'jp', label: '辞書' }, { id: 'emoji', label: '𝒜nalysis' }]} collapsed />,
+    );
+    const glyphs = Array.from(container.querySelectorAll('.lq-rail-icon'), (el) => el.textContent);
+    // '𝒜' is a surrogate pair: `label[0]` would render half of it.
+    expect(glyphs).toEqual(['辞', '𝒜']);
+  });
+
+  it('keeps a disabled item focusable and refuses to fire it', () => {
+    const onSelect = vi.fn();
+    const container = render(<AdaptiveRail items={ITEMS} onSelect={onSelect} />);
+    const sync = container.querySelector<HTMLButtonElement>('[data-item-id="sync"]')!;
+    // `disabled` would drop it from the tab ring and take its explanation with it.
+    expect(sync.hasAttribute('disabled')).toBe(false);
+    expect(sync.getAttribute('aria-disabled')).toBe('true');
+    act(() => sync.click());
+    expect(onSelect).not.toHaveBeenCalled();
+
+    act(() => container.querySelector<HTMLButtonElement>('[data-item-id="stats"]')!.click());
+    expect(onSelect).toHaveBeenCalledWith('stats');
+  });
+
+  it('marks the active item with aria-current, and only one of them', () => {
+    const container = render(<AdaptiveRail items={ITEMS} activeId="stats" />);
+    const current = container.querySelectorAll('[aria-current="page"]');
+    expect(current.length).toBe(1);
+    expect(current[0].getAttribute('data-item-id')).toBe('stats');
+  });
+
+  it('moves focus with the arrow keys without touching the tab ring', () => {
+    const container = render(<AdaptiveRail items={ITEMS} />);
+    const buttons = Array.from(container.querySelectorAll<HTMLButtonElement>('.lq-rail-item'));
+    // No roving tabindex: every item is its own tab stop, in DOM order (§2.4).
+    expect(buttons.some((b) => b.hasAttribute('tabindex'))).toBe(false);
+
+    buttons[0].focus();
+    const press = (key: string) => {
+      act(() => {
+        buttons[0].dispatchEvent(
+          Object.assign(new KeyboardEvent('keydown', { key, bubbles: true }), {}),
+        );
+      });
+    };
+    press('ArrowDown');
+    expect(document.activeElement).toBe(buttons[1]);
+    buttons[1].focus();
+    act(() => {
+      buttons[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+    });
+    expect(document.activeElement).toBe(buttons[3]);
+  });
+
+  it('labels a group once, on the group, not twice', () => {
+    const container = render(
+      <AdaptiveRail
+        groups={[
+          { id: 'study', label: 'Study', items: [ITEMS[0], ITEMS[1]] },
+          { id: 'tools', items: [ITEMS[2]] },
+        ]}
+      />,
+    );
+    const groups = container.querySelectorAll('.lq-rail-group');
+    expect(groups.length).toBe(2);
+    expect(groups[0].getAttribute('role')).toBe('group');
+    expect(groups[0].getAttribute('aria-label')).toBe('Study');
+    // The visible heading repeats the group's name, so it is hidden from AT.
+    expect(groups[0].querySelector('.lq-rail-group-label')?.getAttribute('aria-hidden')).toBe('true');
+    // An unlabelled group is a visual separator, not an anonymous landmark.
+    expect(groups[1].getAttribute('role')).toBeNull();
+  });
+});
+
+describe('ContextToolbar — overflow moves, never deletes', () => {
+  it('renders every action when they all fit and shows no overflow control', () => {
+    const container = render(
+      <ContextToolbar actions={ACTIONS} label="Video tools" overflowLabel="More" overflowAfter={5} />,
+    );
+    expect(container.querySelectorAll('.lq-toolbar-action').length).toBe(5);
+    expect(container.querySelector('.lq-toolbar-more')).toBeNull();
+    expect(container.querySelector('[role="toolbar"]')?.getAttribute('aria-label')).toBe(
+      'Video tools',
+    );
+  });
+
+  it('moves the tail into the menu and loses nothing on the way', () => {
+    const container = render(
+      <ContextToolbar actions={ACTIONS} label="Video tools" overflowLabel="More" overflowAfter={2} />,
+    );
+    const visible = Array.from(
+      container.querySelectorAll('.lq-toolbar-strip [data-action-id]'),
+      (el) => el.getAttribute('data-action-id'),
+    );
+    expect(visible).toEqual(['play', 'loop']);
+
+    const more = container.querySelector<HTMLButtonElement>('.lq-toolbar-more')!;
+    expect(more.getAttribute('data-count')).toBe('3');
+    expect(more.getAttribute('aria-expanded')).toBe('false');
+    act(() => more.click());
+
+    const menuItems = Array.from(
+      container.querySelectorAll('[role="menuitem"]'),
+      (el) => el.getAttribute('data-action-id'),
+    );
+    expect(menuItems).toEqual(['mine', 'export', 'settings']);
+    // Every action is reachable at this width: 2 + 3 = 5, the full set.
+    expect(visible.length + menuItems.length).toBe(ACTIONS.length);
+    expect(more.getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('runs an overflowed action, closes, and returns focus to the control', () => {
+    const onSelect = vi.fn();
+    const actions = ACTIONS.map((a) => (a.id === 'mine' ? { ...a, onSelect } : a));
+    const container = render(
+      <ContextToolbar actions={actions} label="Video tools" overflowLabel="More" overflowAfter={2} />,
+    );
+    const more = container.querySelector<HTMLButtonElement>('.lq-toolbar-more')!;
+    act(() => more.click());
+    act(() => container.querySelector<HTMLButtonElement>('[data-action-id="mine"]')!.click());
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(container.querySelector('[role="menu"]')).toBeNull();
+    expect(document.activeElement).toBe(more);
+  });
+
+  it('refuses a disabled action in the menu and keeps the menu open', () => {
+    const onSelect = vi.fn();
+    const actions = ACTIONS.map((a) => (a.id === 'export' ? { ...a, onSelect } : a));
+    const container = render(
+      <ContextToolbar actions={actions} label="Video tools" overflowLabel="More" overflowAfter={2} />,
+    );
+    act(() => container.querySelector<HTMLButtonElement>('.lq-toolbar-more')!.click());
+    const exportItem = container.querySelector<HTMLButtonElement>('[data-action-id="export"]')!;
+    expect(exportItem.getAttribute('aria-disabled')).toBe('true');
+    expect(exportItem.getAttribute('title')).toBe('No deck selected');
+    act(() => exportItem.click());
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(container.querySelector('[role="menu"]')).not.toBeNull();
+  });
+
+  it('closes on Escape and returns focus, and walks the menu with arrows', () => {
+    const container = render(
+      <ContextToolbar actions={ACTIONS} label="Video tools" overflowLabel="More" overflowAfter={2} />,
+    );
+    const more = container.querySelector<HTMLButtonElement>('.lq-toolbar-more')!;
+    act(() => more.click());
+    const items = Array.from(container.querySelectorAll<HTMLElement>('[role="menuitem"]'));
+    // Opening moves focus into the menu, so Enter on the control is enough.
+    expect(document.activeElement).toBe(items[0]);
+
+    act(() => {
+      items[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    });
+    expect(document.activeElement).toBe(items[1]);
+    act(() => {
+      items[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+    });
+    expect(document.activeElement).toBe(items[0]);
+    act(() => {
+      items[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    expect(container.querySelector('[role="menu"]')).toBeNull();
+    expect(document.activeElement).toBe(more);
+  });
+
+  it('gives an icon-only action with no icon a glyph rather than an empty box', () => {
+    const container = render(
+      <ContextToolbar
+        actions={[{ id: 'mine', label: 'Mine sentence' }]}
+        label="Tools"
+        overflowLabel="More"
+        overflowAfter={1}
+      />,
+    );
+    const button = container.querySelector<HTMLButtonElement>('[data-action-id="mine"]')!;
+    expect(button.getAttribute('aria-label')).toBe('Mine sentence');
+    expect(button.querySelector('.lq-toolbar-glyph')?.textContent).toBe('M');
+
+    // With labels on there is no glyph and no aria-label — the text IS the name.
+    act(() => {
+      root!.render(
+        <ContextToolbar
+          actions={[{ id: 'mine', label: 'Mine sentence' }]}
+          label="Tools"
+          overflowLabel="More"
+          overflowAfter={1}
+          showLabels
+        />,
+      );
+    });
+    const labelled = container.querySelector<HTMLButtonElement>('[data-action-id="mine"]')!;
+    expect(labelled.getAttribute('aria-label')).toBeNull();
+    expect(labelled.querySelector('.lq-toolbar-glyph')).toBeNull();
+    expect(labelled.querySelector('.lq-toolbar-label')?.textContent).toBe('Mine sentence');
+  });
+
+  it('renders aria-pressed only for toggles', () => {
+    const container = render(
+      <ContextToolbar
+        actions={[
+          { id: 'play', label: 'Play' },
+          { id: 'loop', label: 'Loop', pressed: true },
+        ]}
+        label="Tools"
+        overflowLabel="More"
+        overflowAfter={2}
+      />,
+    );
+    expect(container.querySelector('[data-action-id="play"]')!.hasAttribute('aria-pressed')).toBe(
+      false,
+    );
+    expect(container.querySelector('[data-action-id="loop"]')!.getAttribute('aria-pressed')).toBe(
+      'true',
+    );
+  });
+});
+
+describe('the two primitives inside the scaffold', () => {
+  it('does not nest a second nav, and inherits the scaffold collapse', () => {
+    const container = render(
+      <LiquidAppScaffold
+        widthClass="medium"
+        railLabel="Sections"
+        rail={<AdaptiveRail items={ITEMS} activeId="decks" />}
+        toolbar={<ContextToolbar actions={ACTIONS} label="Tools" overflowLabel="More" overflowAfter={2} />}
+      >
+        body
+      </LiquidAppScaffold>,
+    );
+    // One navigation landmark, owned by the scaffold.
+    expect(container.querySelectorAll('nav').length).toBe(1);
+    expect(container.querySelector('nav')!.getAttribute('aria-label')).toBe('Sections');
+    // The rail declares no collapse of its own — the scaffold owns the breakpoint.
+    expect(container.querySelector('.lq-rail')!.hasAttribute('data-collapsed')).toBe(false);
+    expect(container.querySelector('.lq-scaffold')!.getAttribute('data-rail-collapsed')).toBe('true');
+    // Which is why the CSS has to match on the ancestor as well as on the rail.
+    expect(CSS).toContain(".lq-scaffold[data-rail-collapsed='true'] .lq-rail .lq-rail-label");
+
+    // Keyboard order is toolbar, then rail, then canvas — DOM order, unchanged.
+    const focusable = Array.from(
+      container.querySelectorAll<HTMLElement>('button, [tabindex]:not([tabindex="-1"])'),
+    );
+    expect(focusable[0].closest('.lq-toolbar')).not.toBeNull();
+    expect(focusable.find((el) => el.closest('.lq-rail'))).toBeTruthy();
+    const firstRail = focusable.findIndex((el) => el.closest('.lq-rail'));
+    const lastToolbar = focusable.map((el) => Boolean(el.closest('.lq-toolbar'))).lastIndexOf(true);
+    expect(lastToolbar).toBeLessThan(firstRail);
+  });
+});
+
+describe('the sheet stays a composition language, not a palette', () => {
+  it('hardcodes no colour', () => {
+    const colours = CSS.match(/#[0-9a-f]{3,8}\b|\brgba?\(|\bhsla?\(/gi) ?? [];
+    expect(colours).toEqual([]);
+  });
+
+  it('takes every size and spacing value from a token', () => {
+    // The trap L2.3 recorded: asserting a token appears SOMEWHERE in the sheet
+    // passes while a sibling rule still uses it. Every declaration is checked.
+    const sized = CSS.match(
+      /(?:^|[;{])\s*(?:min-height|min-width|max-height|width|height|padding|margin|gap|border-radius|top|right|bottom|left)\s*:\s*([^;}]+)/gm,
+    )!;
+    const offenders = sized
+      .map((decl) => decl.replace(/^[;{]\s*/, '').trim())
+      .filter((decl) => {
+        const value = decl.slice(decl.indexOf(':') + 1);
+        // A raw px/rem/em number is the failure. 0, 100%, 50%, vh and `auto`
+        // are geometry, not spacing, and carry no palette or scale decision.
+        return /\b\d+(?:\.\d+)?(?:px|rem|em)\b/.test(value);
+      });
+    expect(offenders).toEqual([]);
+  });
+
+  it('keeps every hit target at the shared floor', () => {
+    for (const cls of ['.lq-rail-item', '.lq-toolbar-action', '.lq-toolbar-menu-item']) {
+      const block = CSS.slice(CSS.indexOf(`${cls} {`));
+      const rule = block.slice(0, block.indexOf('}'));
+      expect(rule, cls).toContain('min-height: var(--lq-hit-target)');
+    }
+  });
+
+  it('floors the collapsed rail target, and tightens the inset that ate it', () => {
+    // Found live, not here: the scaffold's rail slot carries `.lq-liquid`, whose
+    // 12px padding and 1px border take 26px of the 52px collapsed track, so the
+    // item measured 18px wide. jsdom has no layout, so no mounted test could
+    // ever have caught it — these two rules are what keep the fix from being
+    // deleted by someone tidying the sheet.
+    const collapsedSlot = CSS.slice(
+      CSS.indexOf(".lq-scaffold[data-rail-collapsed='true'] .lq-scaffold-rail {"),
+    );
+    expect(collapsedSlot.slice(0, collapsedSlot.indexOf('}'))).toContain(
+      'padding: var(--lq-space-2)',
+    );
+    const collapsedItem = CSS.slice(
+      CSS.indexOf(".lq-scaffold[data-rail-collapsed='true'] .lq-rail .lq-rail-item {"),
+    );
+    expect(collapsedItem.slice(0, collapsedItem.indexOf('}'))).toContain(
+      'min-width: var(--lq-hit-target)',
+    );
+  });
+
+  it('scales its one animation by --lq-motion-scale so reduced motion means no displacement', () => {
+    const frames = CSS.slice(CSS.indexOf('@keyframes lq-toolbar-menu-in'));
+    expect(frames).toContain('var(--lq-motion-scale)');
+    // The scale must be inside the DISPLACEMENT, not merely present in the
+    // block — a keyframe that names the token in an unrelated property still
+    // moves the menu under reduced motion.
+    expect(frames).toMatch(/transform:\s*translateY\(calc\([^;]*--lq-motion-scale[^;]*\);/);
+  });
+});

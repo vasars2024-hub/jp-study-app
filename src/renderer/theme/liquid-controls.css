@@ -1,0 +1,335 @@
+/* =============================================================================
+   Liquid Workplace — L2 control primitives (AdaptiveRail, ContextToolbar)
+   -----------------------------------------------------------------------------
+   Same rules as the other three L2 sheets: everything under the `lq-` class
+   namespace nothing else uses, every dimension a `--lq-*` token, every colour a
+   `--lq-*` or an existing shell-owned semantic var. No shell's palette is baked
+   in, so Study OS, Aero, Wired and Blanc get these by remapping their own vars
+   (§8: "a composition language, not one palette").
+
+   The collapsed rail is written twice on purpose: `.lq-rail[data-collapsed]` for
+   a rail used on its own, and `.lq-scaffold[data-rail-collapsed] .lq-rail` for
+   one inside the scaffold, which owns the breakpoint. Neither hides a label with
+   `display: none` on the button — only the label SPAN goes, and the accessible
+   name moves to `aria-label` in the component.
+   ============================================================================= */
+
+/* ---------------------------------------------------------------- rail ---- */
+.lq-rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lq-space-1);
+  padding: var(--lq-space-2);
+  min-width: 0;
+  color: var(--lq-liquid-text);
+}
+
+.lq-rail-heading {
+  padding: var(--lq-space-2) var(--lq-space-3);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--lq-liquid-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lq-rail-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lq-space-1);
+  min-width: 0;
+}
+
+.lq-rail-group + .lq-rail-group {
+  margin-top: var(--lq-space-3);
+  padding-top: var(--lq-space-3);
+  border-top: 1px solid var(--lq-liquid-border);
+}
+
+.lq-rail-group-label {
+  padding: var(--lq-space-1) var(--lq-space-3);
+  font-size: var(--font-size-xs);
+  color: var(--lq-liquid-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lq-rail-item {
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-3);
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: var(--lq-hit-target);
+  padding: var(--lq-space-2) var(--lq-space-3);
+  border: 1px solid transparent;
+  border-radius: var(--lq-liquid-radius);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--lq-motion-move) var(--lq-ease-move),
+    border-color var(--lq-motion-move) var(--lq-ease-move);
+}
+
+.lq-rail-item:hover:not([aria-disabled='true']) {
+  background: var(--lq-liquid-bg);
+  border-color: var(--lq-liquid-border);
+}
+
+.lq-rail-item[data-active='true'] {
+  background: var(--lq-liquid-bg-raised);
+  border-color: var(--lq-liquid-border);
+  color: var(--lq-liquid-text);
+  font-weight: 600;
+}
+
+.lq-rail-item[aria-disabled='true'] {
+  cursor: not-allowed;
+  color: var(--lq-liquid-text-muted);
+}
+
+.lq-rail-item:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.lq-rail-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--lq-space-5);
+  height: var(--lq-space-5);
+  font-size: var(--font-size-sm);
+  line-height: 1;
+}
+
+.lq-rail-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.lq-rail-badge {
+  flex: none;
+  padding: 0 var(--lq-space-2);
+  border-radius: var(--lq-liquid-radius);
+  background: var(--lq-liquid-bg-raised);
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- collapsed: the label span goes, the button and its name stay -------- */
+.lq-rail[data-collapsed='true'] .lq-rail-label,
+.lq-scaffold[data-rail-collapsed='true'] .lq-rail .lq-rail-label,
+.lq-rail[data-collapsed='true'] .lq-rail-group-label,
+.lq-scaffold[data-rail-collapsed='true'] .lq-rail .lq-rail-group-label,
+.lq-rail[data-collapsed='true'] .lq-rail-heading,
+.lq-scaffold[data-rail-collapsed='true'] .lq-rail .lq-rail-heading {
+  display: none;
+}
+
+/* THE COLLAPSED TRACK IS NOT ALL RAIL. The scaffold's rail slot carries
+   `.lq-liquid`, whose `--lq-space-4` padding and 1px border take 26px of the
+   52px `--lq-rail-width-collapsed` track. Measured in the running app before
+   this rule: the item came out 198px wide expanded and **18px** collapsed,
+   against a 32px `--lq-hit-target` floor — a target barely wider than the icon
+   inside it, and the unit tests could not see it because jsdom has no layout.
+   Collapsed, the slot and the rail both drop to the tight inset: 52 − 10 − 4 =
+   38px. */
+.lq-scaffold[data-rail-collapsed='true'] .lq-scaffold-rail {
+  padding: var(--lq-space-2);
+}
+
+.lq-rail[data-collapsed='true'],
+.lq-scaffold[data-rail-collapsed='true'] .lq-rail {
+  padding: var(--lq-space-1);
+}
+
+.lq-rail[data-collapsed='true'] .lq-rail-item,
+.lq-scaffold[data-rail-collapsed='true'] .lq-rail .lq-rail-item {
+  position: relative;
+  justify-content: center;
+  gap: 0;
+  padding: var(--lq-space-2);
+  /* Floored, so a future change to either inset overflows the track visibly
+     instead of shrinking the target below the floor in silence. */
+  min-width: var(--lq-hit-target);
+}
+
+/* The badge becomes a dot: the number is already in the accessible name, and a
+   two-digit count does not fit a 52px rail without pushing the icon off. */
+.lq-rail[data-collapsed='true'] .lq-rail-badge,
+.lq-scaffold[data-rail-collapsed='true'] .lq-rail .lq-rail-badge {
+  position: absolute;
+  width: var(--lq-space-2);
+  height: var(--lq-space-2);
+  padding: 0;
+  border-radius: 50%;
+  background: var(--focus-ring-color);
+  color: transparent;
+  overflow: hidden;
+  transform: translate(var(--lq-space-4), calc(-1 * var(--lq-space-3)));
+}
+
+/* ------------------------------------------------------------- toolbar ---- */
+.lq-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-3);
+  min-width: 0;
+  width: 100%;
+  min-height: var(--lq-toolbar-height);
+  padding: 0 var(--lq-space-2);
+  box-sizing: border-box;
+  color: var(--lq-liquid-text);
+}
+
+.lq-toolbar-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-2);
+  flex: 1 1 auto;
+  min-width: 0;
+  /* The strip never scrolls or wraps: an action that does not fit is moved into
+     the overflow menu by `fitCount`, not pushed out of sight. */
+  overflow: hidden;
+}
+
+.lq-toolbar-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--lq-space-2);
+  flex: none;
+  min-height: var(--lq-hit-target);
+  min-width: var(--lq-hit-target);
+  padding: 0 var(--lq-space-3);
+  border: 1px solid transparent;
+  border-radius: var(--lq-liquid-radius);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background-color var(--lq-motion-move) var(--lq-ease-move),
+    border-color var(--lq-motion-move) var(--lq-ease-move);
+}
+
+.lq-toolbar-action:hover:not([aria-disabled='true']) {
+  background: var(--lq-liquid-bg);
+  border-color: var(--lq-liquid-border);
+}
+
+.lq-toolbar-action[aria-pressed='true'] {
+  background: var(--lq-liquid-bg-raised);
+  border-color: var(--lq-liquid-border);
+}
+
+.lq-toolbar-action[aria-disabled='true'] {
+  cursor: not-allowed;
+  color: var(--lq-liquid-text-muted);
+}
+
+.lq-toolbar-action:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.lq-toolbar-icon,
+.lq-toolbar-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.lq-toolbar-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lq-toolbar-trailing {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-2);
+  min-width: 0;
+}
+
+/* ---- overflow menu ------------------------------------------------------- */
+.lq-toolbar-overflow {
+  position: relative;
+  flex: none;
+}
+
+.lq-toolbar-menu {
+  position: absolute;
+  top: calc(100% + var(--lq-space-2));
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lq-space-1);
+  min-width: var(--lq-rail-width);
+  max-height: 60vh;
+  overflow: hidden auto;
+  padding: var(--lq-space-2);
+  animation: lq-toolbar-menu-in var(--lq-motion-enter) var(--lq-ease-enter);
+}
+
+.lq-toolbar-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-3);
+  min-height: var(--lq-hit-target);
+  padding: var(--lq-space-2) var(--lq-space-3);
+  border: 1px solid transparent;
+  border-radius: var(--lq-liquid-radius);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.lq-toolbar-menu-item:hover:not([aria-disabled='true']) {
+  background: var(--lq-liquid-bg);
+}
+
+.lq-toolbar-menu-item[aria-disabled='true'] {
+  cursor: not-allowed;
+  color: var(--lq-liquid-text-muted);
+}
+
+.lq-toolbar-menu-item:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: calc(-1 * var(--focus-ring-width));
+}
+
+/* Displacement rides on `--lq-motion-scale`, which is 0 under reduced motion and
+   on the battery perf tier — so the menu fades without moving rather than being
+   merely faster. */
+@keyframes lq-toolbar-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--lq-space-2) * var(--lq-motion-scale)));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

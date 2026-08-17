@@ -51,6 +51,7 @@ import './theme/liquid-tokens.css';
 // class namespace nothing else uses; liquidSurfaces.test.ts enforces that.
 import './theme/liquid-surfaces.css';
 import './theme/liquid-scaffold.css';
+import './theme/liquid-controls.css';
 // Shell panel base styles (Phase 2) — Notification Center, Quick Settings.
 import './components/shell/shell.css';
 // Multi-monitor desktops, cross-monitor drag ghost, drop router, and the two
