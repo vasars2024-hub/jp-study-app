@@ -37,6 +37,29 @@ export function mediaWorkspaceIsAvailable(): Promise<boolean> {
 }
 
 /**
+ * What the Media Center's Video stage says, derived from the same tri-state rather than
+ * from a second opinion about it.
+ *
+ * The stage used to render one text for all three: "Enable the media server to watch and
+ * study video". That sentence was written for `SEANIME_SIDECAR=0` back when the Video tab
+ * was hidden whenever the workspace existed — and `f258ef77` deliberately un-hid it, so on
+ * every normal machine the shell's own "Immersion player" destination told the user to
+ * enable something the same window reports as present, with no route to the player it
+ * named. One mapping, here, so the copy and the availability cannot drift apart again.
+ *
+ * `workspace` deliberately does not promise the server is *running*: `available` only means
+ * the sidecar is not `disabled`, and the workspace host renders `stopped` / `starting` /
+ * `offline` / `failed` itself once opened.
+ */
+export type MediaVideoStage = 'workspace' | 'connecting' | 'needs-server';
+
+export function videoStageFor(availability: MediaWorkspaceAvailability): MediaVideoStage {
+  if (availability === 'available') return 'workspace';
+  if (availability === 'pending') return 'connecting';
+  return 'needs-server';
+}
+
+/**
  * `pending` is a real state and callers must handle it. Guessing `available` flashes the
  * workspace chrome on a machine that has none; guessing `unavailable` flashes the very
  * player this migration exists to retire.

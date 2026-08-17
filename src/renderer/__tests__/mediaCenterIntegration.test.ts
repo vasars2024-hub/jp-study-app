@@ -174,3 +174,65 @@ describe('Media Center integration contract', () => {
     expect(sources).not.toContain('https:');
   });
 });
+
+/*
+ * L4.1 — the Video stage says three different things, because there are three states.
+ *
+ * `f258ef77` restored the Video tab on machines where the workspace exists, but the stage
+ * kept the one sentence written for `SEANIME_SIDECAR=0`: "Enable the media server to watch
+ * and study video". Measured live 2026-08-17 with `seanimeStatus().kind === 'stopped'` —
+ * so availability `available`, sidebar launcher `data-sidecar="available"` and enabled —
+ * the stage still rendered that sentence and offered no route to the player it named.
+ */
+describe('Media Center video stage', () => {
+  it('maps each availability to its own stage, rollback included', async () => {
+    const { videoStageFor } = await import('../mediaWorkspaceAvailability');
+    expect(videoStageFor('available')).toBe('workspace');
+    expect(videoStageFor('pending')).toBe('connecting');
+    // The negative control: `unavailable` is the SEANIME_SIDECAR=0 rollback and must keep
+    // the original "needs the media server" copy. A fix that made every state say
+    // "open the workspace" would be the same defect pointing the other way.
+    expect(videoStageFor('unavailable')).toBe('needs-server');
+  });
+
+  it('renders each stage from that one mapping, each copy exactly once', () => {
+    const source = read('renderer/views/MediaCenterView.tsx');
+    expect(source, 'the stage must consume the shared mapping, not re-derive it')
+      .toContain('const stage = videoStageFor(workspace);');
+    for (const key of [
+      'mediaCenter.video.workspacePlayerTitle',
+      'mediaCenter.video.workspacePlayerDetail',
+      'mediaCenter.video.openInWorkspace',
+      'mediaCenter.video.needsServerTitle',
+      'mediaCenter.video.needsServerDetail',
+    ]) {
+      // Matched as the whole `t('…')` call, not as a bare substring. A substring match
+      // counts `t('…openInWorkspaceX')` — a key no catalogue has — as the real thing;
+      // that mutation passed this test green before the regex was tightened.
+      const call = new RegExp(`t\\('${key.replace(/\./g, '\\.')}'\\)`, 'g');
+      expect(source.match(call)?.length ?? 0, key).toBe(1);
+    }
+    // The available branch is only honest if it actually goes somewhere.
+    expect(source).toMatch(
+      /stage === 'workspace' \?[\s\S]{0,900}onOpenSeanime\(current \? \{ localFilePath: current\.path \} : undefined\)/,
+    );
+    // `needs-server` must be the fallback branch, not something reachable while available.
+    expect(source).toMatch(/stage === 'connecting' \?[\s\S]{0,400}needsServerTitle/);
+  });
+
+  it('translates the three new stage keys in all four catalogues', () => {
+    for (const key of [
+      'mediaCenter.video.workspacePlayerTitle',
+      'mediaCenter.video.workspacePlayerDetail',
+      'mediaCenter.video.openInWorkspace',
+    ]) {
+      expect(en[key], `missing en key ${key}`).toBeTruthy();
+      expect(ja[key], `missing ja key ${key}`).toBeTruthy();
+      expect(ru[key], `missing ru key ${key}`).toBeTruthy();
+      expect(zh[key], `missing zh key ${key}`).toBeTruthy();
+    }
+    // The available copy must not promise a *running* server: `available` only means the
+    // sidecar is not `disabled`.
+    expect(en['mediaCenter.video.workspacePlayerDetail']).not.toMatch(/is running|is ready/);
+  });
+});

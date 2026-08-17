@@ -52,7 +52,11 @@ import {
 } from '../components/music/MusicContent';
 import { useT } from '../i18n';
 import { openMediaWorkspace } from '../mediaWorkspaceBridge';
-import { useMediaWorkspaceAvailability } from '../mediaWorkspaceAvailability';
+import {
+  useMediaWorkspaceAvailability,
+  videoStageFor,
+  type MediaWorkspaceAvailability,
+} from '../mediaWorkspaceAvailability';
 import {
   mediaWorkspaceHostExists,
   type MediaWorkspaceOpenRequest,
@@ -642,18 +646,20 @@ function VideoPanel({
   state,
   onStudy,
   onOpenSeanime,
-  seanimeAvailable,
+  workspace,
   seanimeActionTitle,
 }: {
   state: MediaState;
   onStudy: () => void;
   onOpenSeanime: OpenSeanimeWorkspace;
-  seanimeAvailable: boolean;
+  workspace: MediaWorkspaceAvailability;
   seanimeActionTitle?: string;
 }) {
   const { t } = useT();
   const videos = useMemo(() => orderUpNext(state.items), [state.items]);
   const current = state.current;
+  const stage = videoStageFor(workspace);
+  const seanimeAvailable = stage === 'workspace';
   return (
     <div className="mc-page mc-video-page">
       <div className="mc-video-topbar">
@@ -693,20 +699,52 @@ function VideoPanel({
       <div className="mc-video-layout">
         <div className="mc-video-stage">
           {/*
-            Slice 16 deleted `MediaPlayerStage`. This tab is only ever reachable when the
-            sidecar is `disabled` (`SEANIME_SIDECAR=0`) — with the workspace present it is
-            filtered out of the nav entirely — so the honest thing here is to say that
-            video playback needs the media server, not to leave a stage-shaped hole.
+            Slice 16 deleted `MediaPlayerStage`, and the note here used to say this tab was
+            "only ever reachable when the sidecar is disabled — with the workspace present it
+            is filtered out of the nav entirely". That stopped being true at `f258ef77`, which
+            deliberately restored the Video and Library tabs so the shell keeps one surface.
+            The message did not follow, so the *available* machine — the normal one — was told
+            to enable a media server this same window reports as present, with no route to the
+            player it names. L4's first job is a coherent Media shell; this is that seam.
 
-            This is the documented cost of the deletion: the rollback keeps the library,
-            transcription and study surfaces, and loses playback. It is stated rather than
-            discovered.
+            Three states, each said in its own words rather than one text for all of them:
+            `available` names the workspace as the destination and hands off to it (carrying
+            the current file when there is one); `pending` says the status is still resolving;
+            `unavailable` keeps the original rollback text verbatim, because that is exactly
+            the `SEANIME_SIDECAR=0` case it was written for — the rollback keeps the library,
+            transcription and study surfaces and loses playback, stated rather than discovered.
+
+            The available copy does NOT claim the server is running: `available` only means the
+            sidecar is not `disabled` (`mediaWorkspaceAvailability.ts`), and the workspace host
+            renders `stopped`/`starting`/`offline`/`failed` itself once it opens.
           */}
-          <div className="mc-video-empty" role="status">
-            <span><Icon name="video" size={30} /></span>
-            <strong>{t('mediaCenter.video.needsServerTitle')}</strong>
-            <p>{t('mediaCenter.video.needsServerDetail')}</p>
-          </div>
+          {stage === 'workspace' ? (
+            <div className="mc-video-empty" role="status">
+              <span><Icon name="player" size={30} /></span>
+              <strong>{t('mediaCenter.video.workspacePlayerTitle')}</strong>
+              <p>{t('mediaCenter.video.workspacePlayerDetail')}</p>
+              <div>
+                <button
+                  type="button"
+                  className="mc-button mc-button-primary"
+                  onClick={() => onOpenSeanime(current ? { localFilePath: current.path } : undefined)}
+                >
+                  <Icon name="player" size={13} /> {t('mediaCenter.video.openInWorkspace')}
+                </button>
+              </div>
+            </div>
+          ) : stage === 'connecting' ? (
+            <div className="mc-video-empty" role="status">
+              <span><Icon name="video" size={30} /></span>
+              <strong>{t('mediaWorkspace.connectingServer')}</strong>
+            </div>
+          ) : (
+            <div className="mc-video-empty" role="status">
+              <span><Icon name="video" size={30} /></span>
+              <strong>{t('mediaCenter.video.needsServerTitle')}</strong>
+              <p>{t('mediaCenter.video.needsServerDetail')}</p>
+            </div>
+          )}
           {!state.src && (
             <div className="mc-video-empty">
               <span><Icon name="video" size={30} /></span>
@@ -1516,7 +1554,7 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
         state={media}
         onStudy={() => setTab('study')}
         onOpenSeanime={openSeanime}
-        seanimeAvailable={seanimeAvailable}
+        workspace={workspace}
         seanimeActionTitle={seanimeActionTitle}
       />
     );
