@@ -144,6 +144,43 @@ something — conflating them made every control wider than 52px a false theft r
 **Still not a 10, and only one thing is left:** the one-palette limit below. Contrast is
 measured on `forest-night` alone. Hit targets, keyboard and reduced motion now pass.
 
+## 2026-08-18 — the second palette, run validly, and what it found
+
+**The valid path, since the one below is not it.** `import('/src/renderer/theme/engine.ts')` from
+the bridge returns the LIVE module — `listThemes()` gives 13, so it is not a duplicate Vite copy
+with an empty registry that would silently fall back to the default theme. Then
+`applyTheme(id, { persist: false })`, the engine's own single choke point (`engine.ts:145`),
+which stamps `data-theme`, runs `applyThemeAttributes`, and dispatches the event React listens
+to. `persist: false` means no capture-patch-restore is needed at all: `jp-os-theme` read
+`forest-night` before every switch and after the last one.
+
+| palette | min ratio | failing text runs | owner of the minimum |
+| --- | --- | --- | --- |
+| forest-night | 4.67:1 | **0** | `button.fwin-b "◆"` 13px |
+| high-contrast | 8.88:1 | **0** | `span.dict-badge "#"` 10px |
+| **classic-light** | **1.05:1** | **43** | `button.active "Automatic"` 13.3px |
+
+**43 failures on a light theme, and the control says they are NOT Liquid's.** Same palette, same
+window, presentation toggled to Standard: **46** failing runs, the same worst offenders at the
+same ratios, and only **3** of them sit inside a Liquid region — those three read 1.05/1.09 in
+BOTH presentations. Liquid contributes exactly **5**, all `fwin-b` window chrome on the
+translucent frame. So this is a pre-existing app defect that L1's one-palette limit was hiding,
+not a defect in the material.
+
+**And it is not the half-applied artefact recorded below — that was checked before it was
+called a finding.** On `classic-light` the tokens DO move: `--text` `#1e1e1e`, `--panel`
+`#ffffff`, `--bg` `#ffffff`, `--border` `#e0e0e0`, and of the 50 inline properties on `<html>`
+only `--accent` is a colour. Yet `span.dict-word` still paints `rgb(245, 245, 247)` and `body`
+stays `rgb(28, 28, 30)`. The palette is applied; these elements never read it. That is the
+defect: hardcoded dark-theme colours in the Dictionary's own rules, 46 runs of them —
+`dict-word` x8, `li` x14, `dict-badge.freq` x6, `dict-reading` x3, `sr-only` x4.
+
+**Category 1 is still not a 10, and the reason has changed.** It is no longer "the second
+palette was never run"; it is a measured, reproducible failure on every light palette. Next
+slice: tokenize those rules and re-measure all three palettes in the fixing commit. Do not
+"fix" `body` — the desktop background behind windows is a different question from a window's
+own content, and only the second one is white-on-white.
+
 ## Category 1 verdict: neither surface is a 10
 
 Contrast, keyboard and reduced motion pass on both. **The 32 px hit-target bar fails on both** —
