@@ -1,3 +1,5 @@
+import type { LiquidPresentationState } from './liquidWindowState';
+
 /**
  * Schema v3 widened this from `0 | 1` to a plain number: desktops are now a
  * list sized to the user's monitors, not a fixed pair. The two named indices
@@ -53,6 +55,13 @@ export interface WindowSnapshot {
   /** Always-on-top. Optional so pre-existing saved layouts still parse. */
   pinned?: boolean;
   restoreRect?: { x: number; y: number; w: number; h: number };
+  /**
+   * Liquid Workplace presentation (L3). Optional for the same reason `pinned`
+   * is: every layout saved before it existed parses unchanged. Its ABSENCE is
+   * the conventional window, which stays the default — see
+   * `shared/liquidWindowState.ts` for the commands and the validation.
+   */
+  presentation?: LiquidPresentationState;
 }
 
 export interface IconSnapshot {
