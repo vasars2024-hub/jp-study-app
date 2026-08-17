@@ -84,7 +84,18 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
     const bringForward = (detail?: MediaWorkspaceOpenRequest): void => {
       setOpen(true);
       const request = normalizeMediaWorkspaceOpenRequest(detail);
-      if (request) setPlaybackRequest(request);
+      if (!request) return;
+      setPlaybackRequest(request);
+      // The player lives in the library pane, and that pane is hidden — never unmounted —
+      // whenever another segment shows. So a request arriving while the user sits on
+      // Readiness or Review started a real directstream behind `hidden`: measured
+      // 2026-08-17 as a 437 s clip playing unmuted at volume 1.0 inside a `display:none`
+      // pane, box 0x0, while the Readiness tab stayed selected. Audible, invisible, and
+      // with no transport to stop it. Same repair as `onReviewFocus` below, pointed the
+      // other way — carry the view to where the handoff actually lands. Reversible: the
+      // segment buttons still work and the pane was never unmounted, so moving loses
+      // nothing. A bare open (no file) returns above and leaves the segment alone.
+      setView('library');
     };
     const onWorkspaceOpen = (event: Event): void => {
       bringForward((event as CustomEvent<MediaWorkspaceOpenRequest>).detail);
@@ -241,6 +252,9 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
     setPlaybackRequest(
       normalizeMediaWorkspaceOpenRequest({ localFilePath: opened.item.path }),
     );
+    // `Open local video` sits in the header of every segment, so it reaches the hidden
+    // pane from Readiness and Review exactly as the rows above did.
+    setView('library');
   };
 
   if (!status || status.kind === 'disabled') return null;

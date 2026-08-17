@@ -213,3 +213,75 @@ describe('MediaWorkspaceHost — a review focus raised from outside opens the ho
     expect(el.querySelector('.seanime-host-launcher')).not.toBeNull();
   });
 });
+
+/**
+ * The mirror of the block above, and the defect it pins was live rather than theoretical.
+ *
+ * A readiness row's `Open` dispatches `MEDIA_WORKSPACE_OPEN_EVENT` and nothing else, but the
+ * player lives in the **library** pane — which is `hidden`, never unmounted, whenever another
+ * segment shows (see the docblock's watchdog note for why it cannot simply be unmounted).
+ * Driven live 2026-08-17: opening the one Ready file from the Readiness segment started a real
+ * 437 s directstream at volume 1.0, unmuted, inside a `display:none` pane measuring 0x0, while
+ * the Readiness tab stayed selected — audible, invisible, and with no transport to reach.
+ *
+ * The library pane is identified by the workspace stub it contains rather than by
+ * `data-active`, because both panes carry that attribute and only one of them holds the player.
+ */
+describe('MediaWorkspaceHost — a playback request lands on the view that holds the player', () => {
+  function libraryPane(el: HTMLElement): HTMLElement | null {
+    return el.querySelector<HTMLElement>('[data-stub-workspace]')?.closest('.seanime-host-pane')
+      ?? null;
+  }
+
+  async function dispatchOpen(detail: unknown): Promise<void> {
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('seanime:media-workspace-open', { detail }));
+    });
+    await flush();
+  }
+
+  it('hides the library pane while Readiness shows — the state the defect played into', async () => {
+    stubApi(READY);
+    const el = await openOn('readiness');
+    expect(libraryPane(el)?.hasAttribute('hidden')).toBe(true);
+  });
+
+  it('switches to Library when a file is opened from Readiness', async () => {
+    stubApi(READY);
+    const el = await openOn('readiness');
+    expect(libraryPane(el)?.hasAttribute('hidden')).toBe(true);
+
+    await dispatchOpen({ localFilePath: 'c:/media/ep1.mkv' });
+
+    const pane = libraryPane(el);
+    expect(pane?.hasAttribute('hidden')).toBe(false);
+    expect(pane?.getAttribute('data-active')).toBe('true');
+  });
+
+  it('switches to Library when a file is opened from Review', async () => {
+    stubApi(READY);
+    const el = await openOn('review');
+    expect(libraryPane(el)?.hasAttribute('hidden')).toBe(true);
+
+    await dispatchOpen({ localFilePath: 'c:/media/ep1.mkv' });
+
+    expect(libraryPane(el)?.hasAttribute('hidden')).toBe(false);
+    // Review's panel is gone precisely because the segment moved, not merely hidden.
+    expect(el.querySelector('.study-loop')).toBeNull();
+  });
+
+  /**
+   * The negative control. `os:open` and a bare `bringForward()` carry no file, and
+   * `normalizeMediaWorkspaceOpenRequest` returns null for them — those must NOT move the
+   * user off the segment they chose. Without this case the fix above would pass just as
+   * happily if it switched the view unconditionally, which is a different defect.
+   */
+  it('does NOT move the segment for an open request carrying no file', async () => {
+    stubApi(READY);
+    const el = await openOn('readiness');
+
+    await dispatchOpen({ localFilePath: '   ' });
+
+    expect(libraryPane(el)?.hasAttribute('hidden')).toBe(true);
+  });
+});
