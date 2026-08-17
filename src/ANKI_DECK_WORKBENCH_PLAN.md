@@ -367,9 +367,13 @@ This slice is complete only when all of these can be shown with real data and no
     explanation.
 4. Exclude words known locally, known in Anki, or both; resolve a deliberately conflicting item according to the selected precedence.
 
-    **Closed 2026-08-18** (`debug/gate4-known-precedence.cjs`), live through the Browser's
-    own search box and precedence `<select>`. The machinery was fully built and had
-    never been demonstrated. Load-bearing fact for anyone re-running it: the "Anki"
+    **Already closed 2026-08-15** — Phase 4's shipped list states "Gate 4 passes live on
+    the 3,221-note local deck". That claim carries **no numbers**, which is why the run
+    below was worth doing; it does not re-close the gate and this annotation is not a
+    closure. What 2026-08-18 adds is the **measured precedence arbitration** the gate's
+    own wording asks for and the 2026-08-15 line never showed
+    (`debug/gate4-known-precedence.cjs`), live through the Browser's own search box and
+    precedence `<select>`. Load-bearing fact for anyone re-running it: the "Anki"
     side is **not** AnkiConnect — `buildVocabContext` derives it from the draft's own
     card intervals against `matureIntervalDays`, which is what makes this gate runnable
     offline.

@@ -25037,11 +25037,19 @@ throttled to ~1 Hz when the window is unfocused — 21 beats/1 ms unfocused vs *
 Fourth, cheaper: a probe helper written as an IIFE rather than a function literal throws inside a
 rAF callback where nothing is watching, and the run reports a *timeout*, not an error.
 
-## 2026-08-18 — Track 7 / gate 4 CLOSES: the conflict that had to be built to be resolved (`primary`)
+## 2026-08-18 — Track 7 / gate 4's precedence table, and a closure I nearly re-claimed (`primary`)
 
-Re-derived first: gates **4, 6, 7, 8** have zero Track 7 mentions anywhere in this ledger, so they
-are genuinely unstarted rather than closed-and-unannotated. Gate 4 turned out to be fully BUILT and
-merely never demonstrated — `known:local|anki|both|conflict|none|no` plus `resolveVocabKnown`
+**CORRECTION, and the reason this entry is not a closure.** I read gates 4, 6, 7 and 8 as unstarted
+because they have zero Track 7 mentions in this ledger, and that inference was wrong for gate 4:
+Phase 4's *shipped* list in the plan already says "Gate 4 passes live on the 3,221-note local deck"
+(2026-08-15). The relay state file said so too and I checked it only after committing `b9c898f1`,
+whose message claims a closure it should not. Gates **6, 7, 8** remain genuinely unstarted; a
+ledger-mention sweep is not sufficient evidence on its own, and the plan's per-phase shipped lists
+have to be read as well as its gate list.
+
+What the run below is worth keeping for: the 2026-08-15 claim carries **no numbers at all**, and the
+gate's own wording is about *resolving a conflict by precedence* — so the arbitration table here is
+the first evidence that half works. Gate 4 was fully BUILT and its precedence half never measured — `known:local|anki|both|conflict|none|no` plus `resolveVocabKnown`
 arbitrating on a `local|anki|either|both` precedence, all reachable from the Browser's own search
 box and its precedence `<select>`. No code change was needed and none was made.
 
