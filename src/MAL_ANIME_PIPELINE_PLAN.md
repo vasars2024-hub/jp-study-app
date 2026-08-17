@@ -1931,3 +1931,51 @@ held a `[DB] Kaguya-sama …` row from an earlier turn at the start of this sequ
 gone by the next poll; I deleted only the Gintama hash, twice, by hash. Not chased, recorded.
 **Trap:** a `bash` heredoc in this environment eats backslashes — `/^WebUI\APIKey=/` reached disk as
 `/^WebUI\APIKey=/` and then as a syntax error. Write instruments with the Write tool.
+
+## 2026-08-18 — Route B carries sidecars for the first time, found in the half of the index we could not read
+
+Worker `primary`. Commits `862ec8eb` (signal), `7d3f6f4c` (dedupe). App restarted twice for the
+shared change (final main pid **39740**); every live number is post-restart.
+
+**THE FINDING, and it retracts this plan's own conclusion.** 2026-08-17 scanned 2,685 corpus names
+for six *English* phrasings of "external subtitles", found 1, and concluded "there is no positive
+signal to rank on". It was measuring our vocabulary, not the pool — the same mistake the `銀魂`
+matcher made. Chinese releases state placement **and** language exactly, and never in English:
+`外挂`/`外掛` external (**11 of 1,748**, 4 also Japanese), `内封` muxed (**23**), `内嵌` hardsub (**1**).
+So `declaresMuxedSubtitles` was blind to 24 names paying a 6–47 s handshake to learn what their own
+name said, and `declaresExternalSubtitles` is the first signal this route has had pointing *toward*
+a candidate. Third defect found on the way: `字幕` was pushed as signal `jp-subtitles`, but it is
+Chinese too and **11 of its 32 hits sit inside a fansub GROUP name** (`字幕社`, `字幕組`) — a multi-GB
+BDRip read as a subtitle pack with only the 50 MB ceiling stopping it. Now `cjk-subtitles`.
+
+**LIVE, and the ordering control is built in.** JoJo Part 5 (MAL 37991), 3 rows: the
+`[DBD-Raws] … 外挂` row ranks **#0 at 8 seeders, above `[Some-Stuffs]` at 49** — seeders cannot be
+what ordered them. Cardcaptor Sakura: 1 row, flagged. **Negative control on live data: Dragon Ball Z
+returns 4 rows and none carries the flag**, so it is not sprayed on everything; the 1-episode control
+title returns 0 rows with its honest refusal.
+
+**ROUTE B REACHES SIDECARS — the first time in this plan's history.** Ten previous candidates across
+4 titles: **0** subtitle files. This one: **78 subtitle files for 39 episodes**, `…[06]….sc_jp.ass`
+and `…[06]….tc_jp.ass` — simplified- and traditional-Chinese pairings of the *same* Japanese.
+Measured on the 16 that landed: **61,758 kana**, episode 06's two files **3,387 kana each**. Both
+correctly read `ja`, so nothing dropped either and the fetch timed out at 16/78. `7d3f6f4c` keeps one
+file per episode on the range path only. **Live after restart: 78 → 39**, and on disk only `tc_jp`
+exists per episode — `sc_jp` is ENOENT at priority 0. 3 episodes landed, **10,405 kana**.
+
+**A fix I did not make, recorded because it looked right for ten minutes.** The name declares `简繁`
+and no `日`, so a name-level "no Japanese → refuse" rule reads as obviously correct. It would have
+discarded the only Route B candidate that has ever carried Japanese cues. **The name understates the
+payload; only the file names say `_jp`.** Measure the files before writing a name rule.
+
+**GATE 31 STAYS 32 OF 34, and Route B is now swarm-blocked rather than data-blocked** — a real
+distinction, and the third one this leg has had. Second run: **3 of 39 in 307,916 ms**, and at that
+moment `num_seeds=0, num_leechs=0, dlspeed 0.0 KB/s`. Piece size **4.00 MB** × 39 files = up to
+**156 MB** on the wire for 87.80 MB of text, `pieces_have 3/11720`. The listing advertised 7–8
+seeders; the client connected to none.
+
+**Next slice.** The message read *"Timed out with 3/39 subtitle file(s) complete."* while 0 peers
+were connected — gate 28's exact lesson (a full disk was once indistinguishable from a slow swarm)
+recurring one field over. Make a **dead** swarm say so, distinctly from a slow one, in
+`qbitAwaitFiles`; it already re-reads torrent state each poll, so `num_seeds`/`num_leechs` are there.
+Then re-run this candidate — it is a known-good Route B fixture.
+Cleanup: category back to **0 rows**, torrent deleted with its files, both times, by hash.
