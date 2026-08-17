@@ -24439,3 +24439,48 @@ Gates this turn: `npx vitest run` **709 files passed / 1 skipped, 9,717 passed, 
 - **TRAP for anyone running the suite in a worktree:** a junctioned `node_modules` makes Vite deny
   `pdfjs-dist/build/pdf.worker.min.mjs?url` by `fs.allow`, failing `novelReaderProgressGuard` for
   reasons that have nothing to do with the tree. Not a HEAD defect.
+
+## 2026-08-17 — Track 7 / Phase 7: recipe 26 CLOSES, and the smart-recipe catalogue is complete (`primary`)
+
+- `9e758f5e` model + 21 tests, `9d053c08` the Workload panel + 24 keys ×4, `eb2ea915` the live
+  run's own finding. **All 26 catalogue recipes now exist; none is left without a surface.**
+- **Report, not a tray action — forced, not chosen.** The deck-options preset is not in an
+  `.apkg`: `RawAnkiCardRow` has no `data`, no `dconf`/`deck_config` reader exists in
+  `ankiDraft.ts`. So the workbench cannot carry this change and an Add button could only be
+  inactive. The panel states provenance on screen instead: intervals `read`, both ends `stated`.
+- **Stability cancels, which is why this is answerable at all.**
+  `t(r) = (S/FACTOR)·(r^(1/DECAY) − 1)` is linear in S, so a retention change is a pure interval
+  multiplier independent of per-card FSRS memory state — asserted across S = 1…4,000. Workload
+  is `Σ 1/interval`. Decay is the fixed −0.5 and the result says so; a modifier proposal must
+  NOT claim a decay, asserted both ways.
+- **THE TRAP, and the slice's point: a proposal moves NO already-scheduled card.** Anki
+  reschedules at the card's next answer, so the horizon built from `card.due` is identical
+  before and after. A chart that responded to the input would look *more* useful than the honest
+  one. Mutation control: scaling the rows by `1/intervalRatio` fails exactly the test that flips
+  85→95 and asserts the rows survive while the estimate reverses direction.
+- **LIVE, 8 real packages: 3 project, 5 refuse — the refusals are the honest majority.**
+  `N1 Vocab 3.apkg` **92 scheduled / 66 unscheduled**, load **53.641 → 32.760** at 0.90→0.85 and
+  **→ 116.468** at 0.90→0.95, mean interval 4.2 → 6.9 d, backlog 88, horizon(30) 0, read 85 ms /
+  project 0 ms. `Default-20260129112153.apkg` 10 scheduled, **46 filtered** — the on-loan
+  exclusion firing on real data. `5y56454w54.apkg` 54 of 608. Refused `no-scheduled-cards`:
+  `Advanced.apkg`, `book.apkg`, `JLPT-N5-N1_…_Extended_Notes.apkg` (9,979 notes), `1W21WW1W1.apkg`.
+- **Controls on that live data, not only in fixtures:** the exclusion tally partitioned the card
+  list exactly on all 3 (`sums: true`); `intervalRatio` was **1.6374** / **0.4606** identically on
+  every deck, as the cancellation requires; opposite proposals left the horizon **byte-identical**
+  on all 3 while the deltas moved oppositely; `0.90→0.90` gave exactly `ratio 1, delta 0`.
+- **TRAP THE NEXT WORKER MUST NOT REDISCOVER — a real `crt` of 0, and it was already shipped.**
+  `apkgImport.ts:465` passes `col.crt` straight through; `Ginga Eiyuu Densetsu.apkg` reports
+  **crt 0**, which is *finite*, so `Number.isFinite` alone admitted it and `todayDueDay` returned
+  ~20,700. Recipe 18 (shipped) therefore called every review card `overdue` by twenty thousand
+  days — a number, with nothing on the surface to doubt it. Both modules now refuse
+  `no-collection-origin` on `<= 0`. Recipe 18's test was titled *"instead of counting from zero"*
+  and supplied an **absent** origin, so the literal zero walked past it: an absent field and a
+  zero field are different inputs, and only one of them is what real packages carry.
+- **Second trap: `adm-zip` refuses a path containing `[` `]`.** `readApkgDraft` on the user's
+  `Full Japanese Study Deck [JLPT N5~N1 …].apkg` returns `{ok:false, error:'ADM-ZIP: Invalid
+  filename'}` — not a draft defect, and not the PowerShell `-LiteralPath` issue either. Pick a
+  bracket-free package for any live apkg run.
+- **Gates, SHARED TREE.** eslint **0 errors 0 warnings** on all 9 touched paths. i18n-check exit 0
+  at **10,471** (+24). The 4 catalogs were foreign-dirty and were staged as reconstructed HEAD+edit
+  blobs, each verified mechanically — inserted bytes sliced back out leave a remainder
+  byte-identical to HEAD, byte delta matches, diffstat **146 insertions / 0 deletions**.

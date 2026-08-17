@@ -43,9 +43,19 @@ const REFUSAL_KEY: Record<SchedulingImpactRefusal, string> = {
 /**
  * Reviews per day, to one decimal below ten and whole above it. A 3,000-card
  * deck moves in fractions of a review and a 4-card deck's `0` would be wrong.
+ *
+ * Returns a **number**, not a formatted string: `t()` runs a numeric var through
+ * `Intl.NumberFormat(LANG_TAGS[lang])` itself (`shared/i18n/core.ts:62`), so
+ * grouping and the decimal separator follow the UI language. A `toLocaleString()`
+ * here would take the host locale instead, which is what the i18n gate catches.
  */
-function formatLoad(value: number): string {
-  return value < 10 ? value.toFixed(1) : Math.round(value).toLocaleString();
+function roundLoad(value: number): number {
+  return value < 10 ? Math.round(value * 10) / 10 : Math.round(value);
+}
+
+/** One decimal, as a number, for the same reason. */
+function round1(value: number): number {
+  return Math.round(value * 10) / 10;
 }
 
 /** The retention inputs are percentages, because Anki's own field is one. */
@@ -165,8 +175,8 @@ export default function DeckWorkbenchWorkload({
           <p>
             {t('ankiWorkbench.workload.summary', {
               cards: result.scheduledCards,
-              current: formatLoad(result.current.reviewsPerDay),
-              proposed: formatLoad(result.proposed.reviewsPerDay),
+              current: roundLoad(result.current.reviewsPerDay),
+              proposed: roundLoad(result.proposed.reviewsPerDay),
             })}
           </p>
           <p className={result.reviewsPerDayDelta > 0 ? 'wb-workload-up' : 'wb-workload-down'}>
@@ -177,16 +187,16 @@ export default function DeckWorkbenchWorkload({
                   ? 'ankiWorkbench.workload.deltaUp'
                   : 'ankiWorkbench.workload.deltaDown',
               {
-                delta: formatLoad(Math.abs(result.reviewsPerDayDelta)),
+                delta: roundLoad(Math.abs(result.reviewsPerDayDelta)),
                 percent: Math.abs(Math.round((1 / result.intervalRatio - 1) * 100)),
-                ratio: result.intervalRatio.toFixed(2),
+                ratio: Math.round(result.intervalRatio * 100) / 100,
               },
             )}
           </p>
           <p className="muted">
             {t('ankiWorkbench.workload.intervals', {
-              current: result.current.meanIntervalDays.toFixed(1),
-              proposed: result.proposed.meanIntervalDays.toFixed(1),
+              current: round1(result.current.meanIntervalDays),
+              proposed: round1(result.proposed.meanIntervalDays),
             })}
           </p>
 
