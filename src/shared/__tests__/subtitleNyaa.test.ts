@@ -373,11 +373,35 @@ describe('selectSubtitleFiles', () => {
     expect(chosen.files.map((f) => f.index).sort()).toEqual([1, 2]);
   });
 
-  it('falls back to every subtitle when the language filter empties the pool', () => {
-    const files = [file(0, 'Subs/eng/Show - 07.srt')];
+  it('falls back to the files that stated nothing when the language filter empties the pool', () => {
+    // The legitimate half of the fallback: single-language packs routinely
+    // label nothing, and refusing them would refuse most of nyaa.
+    const files = [file(0, 'Subs/Show - 07.srt')];
     const chosen = selectSubtitleFiles(files, { languages: ['ja'] });
     expect(chosen.reason).toBe('ok');
     expect(chosen.files).toHaveLength(1);
+  });
+
+  it('refuses a release whose files all state a language we did not ask for', () => {
+    // This assertion used to read the other way — `ok`, 1 file — and that was
+    // the defect, not a preference. Measured on a real release:
+    // `Ashita no Joe 2 … [CR] (Subtitles only)` ships 47 files each named
+    // `[CR] Tomorrow's Joe 2 - E19 [Eng].ass`, so a `ja` harvest filtered all 47
+    // out, found the pool empty, restored all 47 and downloaded them. A release
+    // that declares its language is the one case that must not be overridden.
+    const files = [file(0, 'Subs/eng/Show - 07.srt'), file(1, "Show - 08 [Eng].ass")];
+    const chosen = selectSubtitleFiles(files, { languages: ['ja'] });
+    expect(chosen.reason).toBe('wrong-language');
+    expect(chosen.files).toHaveLength(0);
+  });
+
+  it('still takes the wanted-language files when the release labels both', () => {
+    // The control for the refusal above: the filter must be selecting, not
+    // simply failing whenever a language is stated anywhere.
+    const files = [file(0, 'Subs/eng/Show - 07.srt'), file(1, 'Subs/jpn/Show - 07.srt')];
+    const chosen = selectSubtitleFiles(files, { languages: ['ja'] });
+    expect(chosen.reason).toBe('ok');
+    expect(chosen.files.map((entry) => entry.name)).toEqual(['Subs/jpn/Show - 07.srt']);
   });
 
   it('prefers the format the pack mostly uses, and returns one format only', () => {

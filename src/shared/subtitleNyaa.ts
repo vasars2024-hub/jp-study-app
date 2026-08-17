@@ -558,7 +558,9 @@ export type NyaaSelectionReason =
   /** Nothing in the release is a subtitle at all. */
   | 'no-subtitles'
   /** Subtitles exist, but none for the episode asked for. */
-  | 'no-episode-match';
+  | 'no-episode-match'
+  /** Every subtitle states a language, and none of them is one we asked for. */
+  | 'wrong-language';
 
 export interface NyaaFileSelection {
   files: NyaaArchiveFile[];
@@ -642,13 +644,22 @@ export function selectSubtitleFiles(
   const wanted = (want.languages ?? []).map((lang) => lang.slice(0, 2).toLowerCase()).filter(Boolean);
   // A file whose path states a language we did not ask for is excluded. One
   // that states nothing is kept: single-language packs routinely label nothing.
+  const unlabelled = text.filter((file) => languageFromFileName(file.name) === null);
   let pool = wanted.length
     ? text.filter((file) => {
       const lang = languageFromFileName(file.name);
       return lang === null || wanted.includes(lang);
     })
     : text;
-  if (pool.length === 0) pool = text;
+  // The empty-pool fallback restores the files that stated *nothing*, never the
+  // ones that stated the wrong language. Restoring everything was measured on a
+  // real release: `Ashita no Joe 2 … [CR] (Subtitles only)` ships 47 files all
+  // named `… [Eng].ass`, so a `ja` harvest filtered every one of them out,
+  // found the pool empty, put all 47 back, and downloaded the English pack the
+  // release had correctly declared. A release that answers the question is the
+  // one case that must not be overridden.
+  if (pool.length === 0) pool = unlabelled;
+  if (pool.length === 0) return { files: [], format: null, reason: 'wrong-language' };
 
   if (typeof want.episode === 'number' && Number.isFinite(want.episode)) {
     const matching = pool.filter((file) => episodeFromFileName(file.name) === want.episode);

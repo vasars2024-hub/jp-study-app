@@ -391,6 +391,7 @@ const SELECTION_MESSAGES: Record<NyaaSelectionReason, string> = {
   'bitmap-only': 'This release only has image-based subtitles, which cannot be read as text.',
   'no-subtitles': 'This release contains no subtitle files.',
   'no-episode-match': 'This release has subtitles, but none for the episode requested.',
+  'wrong-language': 'This release only has subtitles in another language.',
 };
 
 async function readSubtitleFile(savePath: string, torrentName: string, fileName: string): Promise<string | null> {
