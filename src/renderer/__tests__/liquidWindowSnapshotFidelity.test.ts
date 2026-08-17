@@ -190,6 +190,24 @@ describe('DesktopShell actually routes every rebuild through the converters', ()
       /function winFromSnapshot[\s\S]{0,900}?presentationToSnapshot\(\{\s*section: win\.section,/,
     );
   });
+
+  it('the toggle changes presentation and nothing else — not even z', () => {
+    // L6 category-6 drive, 2026-08-17. Standard -> Liquid -> Standard came back
+    // identical in geometry, focus, relative z-order and all 66 controls, and
+    // differed ONLY in `style.zIndex`: 15 -> 19. `toggleLiquid` carried its own
+    // `z: ++zTop.current` on top of the `onPointerDown={onFocus}` raise the same
+    // interaction already performs, and `++` inside a state updater runs twice
+    // under React's development double-invoke, so one command advanced the
+    // persisted counter by 2. Byte-for-byte is what §5.3 asks of the round trip.
+    const body = SHELL.match(/const toggleLiquid = \(id: string\) => \{[\s\S]*?\n {2}\};/)?.[0];
+    expect(body).toBeTruthy();
+    expect(body).not.toMatch(/zTop/);
+    // And the mapped window is the command's return value alone — no spread that
+    // could re-admit a sibling field later.
+    expect(body).toMatch(/w\.id === id \? toggleWinPresentation\(w\) : w/);
+    // The raise it relies on instead must still be there.
+    expect(SHELL).toMatch(/onPointerDown=\{onFocus\}/);
+  });
 });
 
 describe('liquid and maximize are independent, and both reverse', () => {

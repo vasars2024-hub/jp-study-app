@@ -1828,14 +1828,23 @@ export default function DesktopShell({
   };
 
   /**
-   * Make Liquid / Return to standard. Presentation only — the window is not
-   * moved on the way in, so the trip home is the captured rect and nothing
-   * else. Focus is raised because the user just acted on this window.
+   * Make Liquid / Return to standard. PRESENTATION ONLY — nothing else on the
+   * window is touched, so the trip home is the captured rect and nothing else.
+   *
+   * It deliberately does NOT raise `z`. The `<section className="fwin">` root
+   * carries `onPointerDown={onFocus}`, so the very interaction that reaches this
+   * button has already raised the window; doing it again here raised it twice per
+   * command, and because `++zTop.current` is a side effect inside a state updater
+   * React invokes twice in development, the counter actually advanced by 2 per
+   * click. Measured live (L6 category-6 drive, 2026-08-17): Standard → Liquid →
+   * Standard came back identical in geometry, focus, relative z-order and every
+   * rendered value, and differed ONLY in `style.zIndex`, 15 → 19. That is the one
+   * thing that stopped the round trip being byte-for-byte, which §5.3 requires.
+   * Removing it loses nothing: pointer focus still raises, and a raise the user
+   * did not ask for is not part of "change how this window is presented".
    */
   const toggleLiquid = (id: string) => {
-    setWins((ws) =>
-      ws.map((w) => (w.id === id ? { ...toggleWinPresentation(w), z: ++zTop.current } : w)),
-    );
+    setWins((ws) => ws.map((w) => (w.id === id ? toggleWinPresentation(w) : w)));
   };
 
   const taskClick = (w: Win) => {
