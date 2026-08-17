@@ -93,3 +93,57 @@ it settles at L0's 373–379 MB the cap lifts and the burst is named as the owne
   `gesture.title`; **read it, every run.** All five runs above say `title=Dictionary`.
 - **`closedLoop` is `True` for every drag and `False` for every resize.** That is the L0 finding,
   not a harness fault — do not re-derive it as new.
+
+## 2026-08-17 · primary — the re-measurement ran, and it retracts its own premise
+
+The pass above capped category 7 at 9 on "settled 731.1 MB at 3.8 min against L0's
+373–379 MB", and named one experiment: a cold boot, gestures only, no lookup burst,
+RSS at 3.0 / 3.4 / 3.8 min. That ran. Cold start proven — 6 electron pids → **0**, one
+`npm start`, readiness polled on `5173` in the health url; main pid **37416**. Real
+functional state: Dictionary Liquid, 食べる, **3,834 chars / 341 nodes / 66 controls**.
+
+| uptime | main RSS | main private | all 6 | what had happened |
+| --- | --- | --- | --- | --- |
+| 1.17 min | **2,979.1** | 3,133.2 | 3,980.5 | window restore only — **no search yet** |
+| 2.01 | **3,221.1** | 3,543.3 | 4,231.9 | one search |
+| 3.00 | 2,877.8 | 3,136.0 | 3,786.2 | drag+resize+theme+jank gestures |
+| 3.41 | 658.5 | 662.3 | 1,338.2 | — the release |
+| 3.81 | **617.2** | 661.4 | 1,305.3 | the prescribed sample |
+| 8.01 | **436.6** | 581.9 | 1,035.1 | idle |
+| 12.01 | **2,278.1** | 2,824.9 | 3,136.3 | after a renderer **reload** + probes |
+
+**Three findings, and the third retracts the cap's premise.**
+
+1. **The burst is not the owner.** 617.2 MB at 3.8 min with no burst vs 731.1 MB with
+   one. Removing the 126 cold lookups moved it 114 MB, not 240.
+2. **Searching is a bounded cache, not a leak.** `debug/l7b-search-bisect.cjs`, five
+   distinct words each returning real results (2,518–3,262 chars): RSS **618.2 → 663.1**,
+   private **662.4 → 672.6**, and it **plateaus after the second** (662.3, 662.3, 663.1,
+   663.1). +45 MB total, +10.2 MB private. Handles 1,067 → 1,067.
+3. **3.8 min is not settled, so the 9 was scored on a number still falling.** The same
+   process read **436.6 MB at 8.01 min**, within 58–64 MB of L0's 373–379. The gap the
+   cap was built on is mostly the sampling instant.
+
+**The transient is NOT boot-only, which is the sharper bisect target.** 2,979.1 MB at
+1.17 min was measured *before the first search* — nothing dictionary-shaped had run. And
+after the window settled to 436.6 MB, a renderer **reload** plus probe work put it back
+to **2,278.1 MB** at 12.01 min. L0 saw one peak and called it a boot cost; it recurs when
+a renderer re-attaches. Handles are flat throughout (1,067–1,073), so it is allocation,
+not OS-object leakage.
+
+**Category 7 stays 9/10 and the cap is re-stated, not lifted.** What earns the 10 now is
+narrower: sample RSS at 3, 8, 16 and 24 min on a boot with **no reload**, and separately
+reload once at a settled point and sample either side. If the no-reload leg holds ~375–437
+MB the memory objection is closed and the reload path owns the re-spike; if it re-spikes
+unprompted there is a periodic allocation to bisect. **Do not score 10 off the 436.6
+figure alone** — this run's 12-min sample is confounded by work I drove.
+
+Instruments, both re-runnable: `debug/l7b-rss-sampler.ps1 -MainPid <pid> -Marks @(...)`
+and `debug/l7b-search-bisect.cjs <pid> <words...>`.
+
+**Trap.** The four gesture runs above are the healthy ones and they were taken while main
+sat at ~3 GB: drag p50 **10.0** / p95 **10.1** / 0 frames >100 ms, resize p95 10.2,
+theme apply **15.1** / restore **19.5**, `restoredTo=forest-night`, `title=Dictionary` on
+every run. **Frame health does not fall out of main RSS** — reporting one as evidence for
+the other is how a 3 GB process reads as fine. The jank control fired: p95 **10.1 → 110.0**,
+frames >100 ms **0 → 10**.

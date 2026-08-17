@@ -105,3 +105,66 @@ existing one, and a surface score needs a surface.
 
 **Next slice:** L3 — per-window presentation state (`liquidWindowState.ts`: schema, migration,
 validation, round trip), then the Make Liquid / Return to standard commands. Still do NOT widen L1.
+
+## 2026-08-17 · primary · L5 opens — the fifth role, because migration is not construction
+
+| Slice | Commit | What landed |
+| --- | --- | --- |
+| L5.1 contextual role | `7bc4cc57` | `ContextualSurface` + `.lq-contextual` + the `.fwin-liquid` paint gate; lens picker adopts it; 48/48 |
+
+**The measurement that forced it.** On the Liquid Dictionary window, category 3 read
+`denseWorkOnTranslucent` **0** (rule 1 holding) and `liquidTreatedEligible` **0 of 9**.
+L3.2 made the frame Liquid and pinned `.fwin-body` opaque — that is half of §2.3. The
+nine navigation/contextual regions inside it had nothing.
+
+**The decision, standing auto-approval, reversible.** `LiquidSurface` paints
+unconditionally. Correct for a NEW surface; wrong for migrating an existing one, because
+marking a region `lq-liquid` makes it glass in every **conventional** window and §2's
+first non-negotiable is that conventional is the default. Rejected alternative: gate the
+tokens per presentation — that moves the branch into the token sheet, where every shell
+remap inherits it. So the role splits: the region declares, the window decides.
+`.lq-contextual` carries layout, hit floor and focus only; `theme/liquid-window.css` is
+the sole painter and only under `.fwin-liquid`.
+
+**No `backdrop-filter` on that rule, and it is not an omission.** `.fwin` carries
+`transform: translateZ(0)`, making it a backdrop root for its descendants — a
+backdrop-filter there samples the window's own opaque body and paints nothing. Inert
+glass that measures as translucent is the failure mode; the frame supplies the blur.
+
+**Live, after a renderer reload, on 食べる results:**
+
+| | liquid | standard |
+| --- | --- | --- |
+| picker box | **772x50** | **772x32** |
+| background | `color(srgb … / 0.72)` | `rgba(0, 0, 0, 0)` |
+| border / radius / padding | 1px @ .14 / 16px / 8px | 0px / 0px / 0px |
+| its 3 buttons | 32 / 32 / 32 px | — |
+
+Dense work unchanged in both: `.dict-entries` transparent over `.fwin-body`
+`rgb(18,28,23)`. Category 3: **0 of 9 → 1 of 9** treated, `denseWorkOnTranslucent` **0**,
+24 regions. Conventional height is 32px, the same as the pre-migration probe recorded, so
+adoption cost the conventional window nothing.
+
+**3 mutation controls, each red for its own named case, each file restored
+byte-identical:** paint the contextual base → *"no paint property anywhere in this
+sheet"*; drop the `.fwin-liquid` prefix → *"only under an opted-in window"* (2 red — the
+older namespace guard catches it too); give the component `lq-liquid` → *"is NOT the
+liquid class"*.
+
+**Traps.**
+1. **The dev server holds these files open.** A restore write failed `UNKNOWN` /
+   `errno -4094` and left a mutation on disk. `debug/l5-mutate-contextual.cjs` now retries
+   for 10 s and **exits non-zero rather than continuing** if a restore fails. A mutation
+   harness that cannot guarantee its own restore is worse than none.
+2. **Adding a role to `LIQUID_SURFACE_ROLES` breaks a test that looks unrelated.**
+   `renders each role with its class and role marker` iterates that array against a fixed
+   render block — the new role reads as a missing element, not as a list change.
+3. **`DictionaryView.tsx` owns 3 of the remaining 8 eligible regions and is ` M`** with
+   the i18n track's live hunks *on the adjacent lines* (`view-head` at :143). Not touched.
+   The 4 `details.lexicon-*` are a deliberate exclusion, not an oversight: they hold dense
+   reading content when open, so §2.3 keeps them opaque.
+
+**Next slice:** the remaining eligible regions once the i18n track lands
+`DictionaryView.tsx`, then categories 1, 2, 4, 5, 8 re-scored on the Liquid window —
+L1 measured all five pre-Liquid and they are stale by the rubric's own rule.
+`LIQUID_SCORECARD.md` stays empty until all eight sit on one surface.
