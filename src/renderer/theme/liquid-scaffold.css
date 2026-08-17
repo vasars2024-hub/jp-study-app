@@ -1,0 +1,215 @@
+/* =============================================================================
+   Liquid Workplace — L2 scaffold geometry
+   -----------------------------------------------------------------------------
+   The grid `LiquidAppScaffold` fills. Same rules as `liquid-surfaces.css`:
+   everything under the `lq-` namespace, every value a `--lq-*` token, so no
+   existing pixel can move and no shell's palette is baked in.
+
+   The grid is defined per width class rather than with `auto` tracks, because
+   an absent slot must occupy NO track — `data-has-*` is what switches the
+   template, so a scaffold with no inspector has no inspector column, not a 0px
+   one that still shows a border. Honest states start at the geometry.
+
+   Placement is `grid-template-areas` only. DOM order stays toolbar, rail,
+   canvas, inspector, dock at every width, so a reflow never reorders the tab
+   ring (§2.4).
+   ============================================================================= */
+
+.lq-scaffold {
+  box-sizing: border-box;
+  display: grid;
+  gap: var(--lq-space-3);
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+  /* Baseline: canvas only. Every other track is added by a `data-has-*` rule. */
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-areas: 'canvas';
+}
+
+.lq-scaffold-toolbar {
+  grid-area: toolbar;
+  min-height: var(--lq-toolbar-height);
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-3);
+  min-width: 0;
+}
+
+.lq-scaffold-rail {
+  grid-area: rail;
+  overflow: hidden auto;
+  min-width: 0;
+}
+
+.lq-scaffold-canvas {
+  grid-area: canvas;
+  overflow: auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+.lq-scaffold-inspector {
+  grid-area: inspector;
+  overflow: hidden auto;
+  min-width: 0;
+}
+
+.lq-scaffold-dock {
+  grid-area: dock;
+  min-height: var(--lq-dock-height);
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-3);
+  min-width: 0;
+}
+
+/* ---- columns: rail and inspector claim a track only when present --------- */
+.lq-scaffold[data-has-rail='true'] {
+  grid-template-columns: var(--lq-rail-width) minmax(0, 1fr);
+  grid-template-areas: 'rail canvas';
+}
+
+.lq-scaffold[data-has-rail='true'][data-rail-collapsed='true'] {
+  grid-template-columns: var(--lq-rail-width-collapsed) minmax(0, 1fr);
+}
+
+.lq-scaffold[data-has-inspector='true'] {
+  grid-template-columns: minmax(0, 1fr) var(--lq-inspector-width);
+  grid-template-areas: 'canvas inspector';
+}
+
+.lq-scaffold[data-has-rail='true'][data-has-inspector='true'] {
+  grid-template-columns: var(--lq-rail-width) minmax(0, 1fr) var(--lq-inspector-width);
+  grid-template-areas: 'rail canvas inspector';
+}
+
+.lq-scaffold[data-has-rail='true'][data-has-inspector='true'][data-rail-collapsed='true'] {
+  grid-template-columns: var(--lq-rail-width-collapsed) minmax(0, 1fr) var(--lq-inspector-width);
+}
+
+/* ---- rows: toolbar above, dock below ------------------------------------- */
+.lq-scaffold[data-has-toolbar='true'] {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+.lq-scaffold[data-has-dock='true'] {
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+.lq-scaffold[data-has-toolbar='true'][data-has-dock='true'] {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+/* The toolbar and dock span the full spine. Written per column arrangement
+   because `grid-template-areas` has to name every cell of a row. */
+.lq-scaffold[data-has-toolbar='true'] {
+  grid-template-areas:
+    'toolbar'
+    'canvas';
+}
+.lq-scaffold[data-has-toolbar='true'][data-has-rail='true'] {
+  grid-template-areas:
+    'toolbar toolbar'
+    'rail canvas';
+}
+.lq-scaffold[data-has-toolbar='true'][data-has-inspector='true'] {
+  grid-template-areas:
+    'toolbar toolbar'
+    'canvas inspector';
+}
+.lq-scaffold[data-has-toolbar='true'][data-has-rail='true'][data-has-inspector='true'] {
+  grid-template-areas:
+    'toolbar toolbar toolbar'
+    'rail canvas inspector';
+}
+.lq-scaffold[data-has-dock='true'] {
+  grid-template-areas:
+    'canvas'
+    'dock';
+}
+.lq-scaffold[data-has-dock='true'][data-has-rail='true'] {
+  grid-template-areas:
+    'rail canvas'
+    'dock dock';
+}
+.lq-scaffold[data-has-dock='true'][data-has-inspector='true'] {
+  grid-template-areas:
+    'canvas inspector'
+    'dock dock';
+}
+.lq-scaffold[data-has-dock='true'][data-has-rail='true'][data-has-inspector='true'] {
+  grid-template-areas:
+    'rail canvas inspector'
+    'dock dock dock';
+}
+.lq-scaffold[data-has-toolbar='true'][data-has-dock='true'] {
+  grid-template-areas:
+    'toolbar'
+    'canvas'
+    'dock';
+}
+.lq-scaffold[data-has-toolbar='true'][data-has-dock='true'][data-has-rail='true'] {
+  grid-template-areas:
+    'toolbar toolbar'
+    'rail canvas'
+    'dock dock';
+}
+.lq-scaffold[data-has-toolbar='true'][data-has-dock='true'][data-has-inspector='true'] {
+  grid-template-areas:
+    'toolbar toolbar'
+    'canvas inspector'
+    'dock dock';
+}
+.lq-scaffold[data-has-toolbar='true'][data-has-dock='true'][data-has-rail='true'][data-has-inspector='true'] {
+  grid-template-areas:
+    'toolbar toolbar toolbar'
+    'rail canvas inspector'
+    'dock dock dock';
+}
+
+/* ---- compact: the inspector stops being a column -------------------------
+   At this width a 320px inspector leaves the canvas unusable, so it goes under
+   the canvas instead of beside it. It is NOT hidden: §2.2 — no feature is
+   removed because the window got small.
+
+   The cap is on the ROW TRACK, not the item. `max-height: 40%` on the item
+   resolves against its own row, which measured 8px tall in the running app —
+   the inspector was capped to 40% of itself. A percentage row resolves against
+   the scaffold's height, which is what "at most 40% of the panel" means. */
+.lq-scaffold[data-width='compact'] {
+  gap: var(--lq-space-2);
+}
+.lq-scaffold[data-width='compact'][data-has-inspector='true'] {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) minmax(0, 40%);
+  grid-template-areas:
+    'canvas'
+    'inspector';
+}
+.lq-scaffold[data-width='compact'][data-has-toolbar='true'][data-has-inspector='true'] {
+  grid-template-rows: auto minmax(0, 1fr) minmax(0, 40%);
+  grid-template-areas:
+    'toolbar'
+    'canvas'
+    'inspector';
+}
+.lq-scaffold[data-width='compact'][data-has-dock='true'][data-has-inspector='true'] {
+  grid-template-rows: minmax(0, 1fr) minmax(0, 40%) auto;
+  grid-template-areas:
+    'canvas'
+    'inspector'
+    'dock';
+}
+.lq-scaffold[data-width='compact'][data-has-toolbar='true'][data-has-dock='true'][data-has-inspector='true'] {
+  grid-template-rows: auto minmax(0, 1fr) minmax(0, 40%) auto;
+  grid-template-areas:
+    'toolbar'
+    'canvas'
+    'inspector'
+    'dock';
+}
+/* ---- wide: more air, and the canvas keeps its reading measure ------------ */
+.lq-scaffold[data-width='wide'] {
+  gap: var(--lq-gutter);
+}

@@ -50,6 +50,7 @@ import './theme/liquid-tokens.css';
 // Liquid Workplace surface primitives (L2). Paints, but only inside the `lq-`
 // class namespace nothing else uses; liquidSurfaces.test.ts enforces that.
 import './theme/liquid-surfaces.css';
+import './theme/liquid-scaffold.css';
 // Shell panel base styles (Phase 2) — Notification Center, Quick Settings.
 import './components/shell/shell.css';
 // Multi-monitor desktops, cross-monitor drag ghost, drop router, and the two
