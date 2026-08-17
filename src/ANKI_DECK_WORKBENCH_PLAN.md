@@ -412,6 +412,33 @@ This slice is complete only when all of these can be shown with real data and no
 7. Interrupt a large import, translation, dry run, and live commit; recover without a false success state or an ambiguous partial result.
 8. Undo a draft action, reverse a supported committed action, and clearly explain any adapter operation that cannot be reversed.
 9. Filter and preview the 100,000-note fixture without freezing window dragging or Electron's main event loop.
+
+    **The fixture EXISTS as of 2026-08-17**, and the main-event-loop half is CLOSED
+    (`c538ae6f`, `75ea1f6d`). Built by scaling a real ver-11 package rather than
+    hand-writing a schema — `debug/gate9-make-fixture.cjs`, 100,000 notes /
+    100,000 cards / 63.6 MB collection / 13.5 MB zip. Instrument: a 20 ms main-side
+    IPC heartbeat driven from the renderer through the debug bridge; main is single
+    threaded, so a long round trip IS main unable to answer.
+    **Before:** read 6,217 ms, main answered **3** heartbeats, longest unbroken
+    stall **3,293 ms**. Idle control, same machine, same session: 141 beats,
+    **14 ms** max, 1 ms p95. **After** (utility process, verified again on a clean
+    boot): 5,556 ms, **231** beats, longest stall **246 ms**, **0** gaps over
+    250 ms, same page (2,000) and same total (100,000).
+    **Instrument control, run after the fix so a clean number cannot be the probe
+    going blind:** `apkg:import` still parses on main by design, and the same
+    heartbeat on the same fixture through it stalls main **4,414 ms**.
+    Second defect the fixture found: `readConnectDraft` was the one reader with no
+    upper page bound. Asked for 20,000 against the real 155,384-note collection it
+    returned **20,000 notes / 20,223 cards** in one IPC message (29,067 ms) while
+    the .apkg reader answered the same request at **2,000** — that control is what
+    makes it a finding rather than a code reading. After: **2,000 / 2,223**,
+    17,530 ms, `totalNotes` still 155,384. This is the unexplained 30–60 s step
+    transitions recorded against that collection.
+    **Still open, and the gate stays open for it:** the *window-dragging* half, and
+    an in-UI filter/preview walk over the fixture. Note when picking it up that the
+    renderer is now structurally bounded at `ANKI_DRAFT_MAX_PAGE_SIZE` (2,000) rows
+    on every reader, so "filter 100,000" means filtering a page of a 100,000-note
+    deck — the honest reading, not a shortcut.
 10. Complete the primary workflows using keyboard only and verify focus, contrast, reduced motion, EN/JA/ZH/RU strings, and compact/default/maximized layouts.
 
     **Closed 2026-08-17** (`cd7472b6`). Everything unattended passed on 2026-08-16; the one

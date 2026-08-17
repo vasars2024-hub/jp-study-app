@@ -24758,3 +24758,48 @@ Gates this turn: `npx vitest run` **709 files passed / 1 skipped, 9,717 passed, 
 - **Gate 14's connect `supported` set is 6 rows: 3 live-proven here, 3 still cited** (note-fields
   recipe 2, note-tags recipe 12, card-due recipe 6). Package side: 9 supported, of which
   card-flag/card-queue/card-scheduling were proven by gate 5's own run at `7c66293d`.
+
+## 2026-08-17 — Track 7 / gate 9: the deck read owned the main event loop (`primary`)
+
+- `c538ae6f` (worker) + `75ea1f6d` (page clamp). Gate 9's fixture did not exist; it does now.
+- **The fixture.** `debug/gate9-make-fixture.cjs` scales a REAL ver-11 package (Ginga Eiyuu
+  Densetsu, 7,992 notes) to **100,000 notes / 100,000 cards**, 63.6 MB collection, 13.5 MB zip.
+  Deliberately not hand-written: a hand-built schema can be accepted or rejected for reasons a
+  real one is not, which would make the measurement a measurement of my fixture.
+- **Instrument.** A 20 ms main-side IPC heartbeat (`anki:linkState`, answered from cache) driven
+  from the renderer over the debug bridge. Main is single threaded, so a long round trip IS main
+  unable to answer — measured from outside, no product change to instrument it.
+- **BEFORE:** read **6,217 ms**, main answered **3** heartbeats, longest unbroken stall
+  **3,293 ms**, 2 gaps over 1 s. Idle control same machine/session: **141** beats, **14 ms** max,
+  **1 ms** p95. **AFTER**, re-verified on a clean boot: **5,556 ms**, **231** beats, longest stall
+  **246 ms**, **0** over 250 ms. Same page (2,000), same total (100,000), `ok:true`.
+- **DECISION (standing auto-approval): utilityProcess, not worker_threads.** The parse ladder was
+  split into `apkgCollection.ts`, which imports no electron — `apkgImport.ts` never could host a
+  worker because it imports `ipcMain`/`dialog`/`BrowserWindow`. `apkgReadHost.ts` forks one process
+  per read (a pool would hold a sql.js WASM heap sized for the last deck for the whole session) and
+  **falls back to the same function in-process** if the fork fails, so a packaging fault degrades to
+  a slow read, never a refused deck. One forge entry, the fourth, same shape as `importWorker.ts`.
+- **Instrument control, run AFTER the fix — this is the load-bearing half.** A clean number is
+  worthless if the probe went blind. `apkg:import` still parses on main by design; the same
+  heartbeat on the same fixture through it stalls main **4,414 ms**. The probe can still see a
+  freeze, so 246 ms is a real result.
+- **Second defect, found only because the fixture existed.** `readConnectDraft` clamped the LOWER
+  bound only and never called `pageAnkiDraft`. Asked for 20,000 against the real 155,384-note
+  collection: **20,000 notes / 20,223 cards** in ONE IPC message, 29,067 ms. Control in the same
+  run: the .apkg reader, same request, **2,000**. After: **2,000 / 2,223**, 17,530 ms, `totalNotes`
+  still 155,384. **This is the unexplained "30–60 s per step transition on 155,386 notes" this
+  ledger recorded on 2026-08-16** — not a slow read, a renderer building 155k browser rows and
+  re-planning the tray every render. Latent, not live: both DeckWorkbench call sites pass 500.
+- **Mutation controls, 5 of 5 red for their own reason, restores verified `-ceq`.** Drop the forge
+  entry -> `builds the worker` (the ONLY thing that catches a silently unbuilt worker: the deck
+  still opens, the counts are right, only the freeze returns). Import electron into the ladder ->
+  `keeps apkgCollection free of electron`. Parse inline again -> `no longer parses inline`. Report
+  page length as the total -> 2 red. Restore the one-sided clamp -> `clamps an over-cap page`.
+- **Gate 9 is NOT closed.** Main-event-loop half closed with numbers; the **window-dragging** half
+  and an in-UI filter/preview walk over the fixture are still owed. Note for whoever takes it:
+  every reader is now bounded at 2,000 rows, so "filter 100,000" means filtering a page of a
+  100,000-note deck. That is the honest reading of the gate, not a shortcut around it.
+- **Traps.** (1) A bash quoted heredoc still collapses `\` to `\` — `'C:\Users\...'` became
+  `\U\A` escapes and adm-zip answered "Invalid filename". Use forward slashes in generated JS/PS.
+  (2) The Bash tool's overlay says a real Downloads file does not exist; `node` under PowerShell
+  says it does. (3) The bridge's `/eval` field is **`js`**, not `expression`.

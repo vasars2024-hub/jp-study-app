@@ -59,6 +59,10 @@
       "status": "accepted",
       "note": "Barrel for the motion framework; consumers import the leaf modules directly. It costs nothing and is the documented public face of that folder."
     },
+    "orphan-module:src/main/anki/apkgReadWorker.ts": {
+      "status": "accepted",
+      "note": "A process entry point, not a library — the same case as src/main/dictionary/importWorker.ts below, one classification weaker because no test imports it either. Its real caller is utilityProcess.fork() in apkgReadHost.ts, which names it by built path ('.vite/build/apkgReadWorker.js' via apkgReadWorkerPath), a runtime string the static import graph cannot follow. forge.config.ts builds it as a fourth Vite target, so a broken entry fails the build. Its logic is deliberately not here: everything testable lives in apkgCollection.ts, which src/main/__tests__/apkgReadOffMainLoop.test.ts imports directly, and that suite asserts the forge entry still exists — without it the worker is never built and every deck read silently falls back to parsing on the main event loop, which is the ANKI_DECK_WORKBENCH_PLAN.md gate 9 freeze this module exists to prevent."
+    },
     "test-only-module:src/renderer/data/mediaTrackingFixtures.ts": {
       "status": "accepted",
       "note": "Named 'fixtures'. Test data is meant to be test-only."
