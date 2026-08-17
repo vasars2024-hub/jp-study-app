@@ -816,7 +816,14 @@ interface QbitRawFile {
   priority?: number;
 }
 
-export type QbitOutcome<T> = { ok: true; value: T } | { ok: false; reason: string };
+export type QbitOutcome<T> =
+  | { ok: true; value: T }
+  /**
+   * `notFound` marks a 404 specifically, because on one endpoint a 404 is not a
+   * verdict: see `qbitFiles`. Optional, so every existing failure site is
+   * unchanged and only the callers that can act on it look.
+   */
+  | { ok: false; reason: string; notFound?: true };
 
 /**
  * What to tell the user when a WebUI call refuses.
@@ -831,8 +838,8 @@ export type QbitOutcome<T> = { ok: true; value: T } | { ok: false; reason: strin
  *
  * It matters more than a usual diagnostic because qBittorrent 5.x renamed
  * endpoints: `pause`/`resume` became `stop`/`start`, and a 404 from one of those
- * means "your build dropped the alias" while a 404 from `files` means "the
- * torrent is gone" — opposite problems, one string.
+ * means "your build dropped the alias" while a 404 from `files` means the client
+ * would not open this torrent's file list — opposite problems, one string.
  */
 function failureReason(
   response: { error: LoginResult } | { status: number; body: string },
@@ -1083,6 +1090,16 @@ export async function qbitStop(
  * so position is the fallback rather than an error. Getting this wrong sets
  * priorities on the wrong files, which is silent and would be very hard to
  * spot from the outside.
+ *
+ * A 404 here is reported as `notFound` rather than folded into the other
+ * failures, because it does **not** mean the torrent is gone. Measured
+ * 2026-08-17 on `[DeadFish] Ghost Hound - Batch`: the client listed it, with
+ * 8,153,820,936 B of metadata already learned, `qbitAddStopped` found it and
+ * adopted it — and the very next `torrents/files` answered 404 in 84 ms. The
+ * identical call minutes later, on an unchanged torrent, answered 200 and the
+ * fetch reached selection in 14 ms. So the client can decline to open a file
+ * list it will open shortly afterwards, and only `torrents/info` can say
+ * whether the torrent is actually still there.
  */
 export async function qbitFiles(
   input: ScraperQbitInput,
@@ -1092,7 +1109,9 @@ export async function qbitFiles(
   if (!wanted) return { ok: false, reason: 'No info hash.' };
   const response = await authed(input, `/api/v2/torrents/files?hash=${encodeURIComponent(wanted)}`);
   if ('error' in response || response.status !== 200) {
-    return { ok: false, reason: failureReason(response, 'torrents/files') };
+    const reason = failureReason(response, 'torrents/files');
+    if (!('error' in response) && response.status === 404) return { ok: false, reason, notFound: true };
+    return { ok: false, reason };
   }
   try {
     const parsed = JSON.parse(response.body) as QbitRawFile[];
@@ -1172,6 +1191,32 @@ export interface QbitAwaitOptions {
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => { setTimeout(resolve, ms); });
 
 /**
+ * The one wording for "the client no longer has this torrent", shared by both
+ * waits so the state gate 29 depends on cannot drift into two sentences.
+ */
+const TORRENT_GONE_REASON = 'This torrent is no longer in qBittorrent, so the subtitle cannot arrive.';
+
+/**
+ * What a 404 from `torrents/files` means, asked of the only endpoint that knows.
+ *
+ * `torrents/info?hashes=` answers `200 []` for a hash the client does not have,
+ * so it can tell "deleted underneath us" from "declined to open the list this
+ * time" — which a 404 alone cannot, and which the waits used to guess wrong in
+ * the expensive direction: a single 404 ended the whole acquisition in 84 ms.
+ *
+ * `ok: true` means keep waiting; a failure is the reason to stop with.
+ */
+async function fileListDeclined(
+  input: ScraperQbitInput,
+  hash: string,
+): Promise<QbitOutcome<'retry'>> {
+  const info = await qbitTorrentInfo(input, hash);
+  if (!info.ok) return { ok: false, reason: info.reason };
+  if (!info.value) return { ok: false, reason: TORRENT_GONE_REASON };
+  return { ok: true, value: 'retry' };
+}
+
+/**
  * Waits until a magnet's file list exists, then makes sure it is not running.
  *
  * A magnet names no files. Until the metadata arrives from the swarm,
@@ -1193,13 +1238,22 @@ export async function qbitAwaitMetadata(
   const pollMs = options.pollMs ?? 1_000;
   const sleep = options.sleep ?? defaultSleep;
   const deadline = Date.now() + Math.max(0, options.timeoutMs);
+  // How many polls the client answered 404 to while still listing the torrent.
+  // Kept so the timeout can say which silence it waited through: an empty list
+  // is the swarm's fault and a declined list is the client's, and one message
+  // for both is the generic failure this plan's contingency gates forbid.
+  let declined = 0;
 
   for (;;) {
     if (options.isCancelled?.()) return { ok: false, reason: 'Cancelled.' };
 
     const files = await qbitFiles(input, hash);
-    if (!files.ok) return files;
-    if (files.value.length) {
+    if (!files.ok) {
+      if (!files.notFound) return files;
+      const again = await fileListDeclined(input, hash);
+      if (!again.ok) return again;
+      declined += 1;
+    } else if (files.value.length) {
       // `stopCondition=MetadataReceived` has normally done this already; a build
       // that ignores the parameter has not, and the exposure is then one poll
       // interval rather than a whole unbounded download.
@@ -1208,6 +1262,15 @@ export async function qbitAwaitMetadata(
     }
 
     if (Date.now() >= deadline) {
+      if (declined) {
+        const waitedMin = Math.max(1, Math.round(options.timeoutMs / 60_000));
+        return {
+          ok: false,
+          reason: 'qBittorrent still has this torrent but would not open its file list, '
+            + `across ${declined} attempt${declined === 1 ? '' : 's'} over ${waitedMin} `
+            + `minute${waitedMin === 1 ? '' : 's'}.`,
+        };
+      }
       // Whose fault the silence is, asked once and only on the way out. A
       // client with no swarm connection at all cannot learn any release's file
       // list, so blaming the release is a false finding — measured 2026-08-17,
@@ -1256,7 +1319,19 @@ export async function qbitAwaitFiles(
     if (options.isCancelled?.()) return { ok: false, reason: 'Cancelled.' };
 
     const files = await qbitFiles(input, hash);
-    if (!files.ok) return files;
+    // Same tolerance as the metadata wait, and it protects more here: this loop
+    // runs while the subtitles are actually transferring, so a 404 the client
+    // would have answered on the next poll used to throw away a live download.
+    if (!files.ok) {
+      if (!files.notFound) return files;
+      const again = await fileListDeclined(input, hash);
+      if (!again.ok) return again;
+      if (Date.now() >= deadline) {
+        return { ok: false, reason: 'qBittorrent still has this torrent but would not open its file list.' };
+      }
+      await sleep(pollMs);
+      continue;
+    }
 
     const selected = files.value.filter((file) => wanted.has(file.index));
     if (selected.length && selected.every((file) => file.progress >= 1)) {
@@ -1269,12 +1344,7 @@ export async function qbitAwaitFiles(
     // burned the whole five-minute timeout and then blamed the timeout.
     const info = await qbitTorrentInfo(input, hash);
     if (info.ok) {
-      if (!info.value) {
-        return {
-          ok: false,
-          reason: 'This torrent is no longer in qBittorrent, so the subtitle cannot arrive.',
-        };
-      }
+      if (!info.value) return { ok: false, reason: TORRENT_GONE_REASON };
       if (info.value.state === 'error') {
         return {
           ok: false,

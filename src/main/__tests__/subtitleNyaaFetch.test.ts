@@ -85,6 +85,17 @@ let addBodies: string[] = [];
 let metadataAfterPolls = 0;
 let filesReads = 0;
 /**
+ * How many `torrents/files` reads answer 404 before the client opens the list.
+ *
+ * Also the real daemon's behaviour, and separately measured: on 2026-08-17 the
+ * client answered 404 for `[DeadFish] Ghost Hound - Batch` while `torrents/info`
+ * was listing that same torrent with 8,153,820,936 B of metadata, then answered
+ * 200 for it minutes later with nothing changed in between.
+ */
+let filesDeclineFirstReads = 0;
+/** A non-404 refusal from `torrents/files`, which must stay a verdict. */
+let filesRefuseStatus = 0;
+/**
  * The whole transfer list, for the orphan sweep.
  *
  * Deliberately holds torrents outside `jp-study-subtitles` too: the sweep
@@ -187,6 +198,16 @@ beforeAll(async () => {
     }
     if (url.pathname === '/api/v2/torrents/files') {
       filesReads += 1;
+      if (filesRefuseStatus) {
+        res.writeHead(filesRefuseStatus);
+        res.end('nope');
+        return;
+      }
+      if (filesReads <= filesDeclineFirstReads) {
+        res.writeHead(404);
+        res.end('missing');
+        return;
+      }
       const known = filesReads > metadataAfterPolls ? files : [];
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify(known.map((file, index) => ({ index, ...file }))));
@@ -271,6 +292,8 @@ beforeEach(() => {
   stallOnStart = false;
   metadataAfterPolls = 0;
   filesReads = 0;
+  filesDeclineFirstReads = 0;
+  filesRefuseStatus = 0;
   clientTorrents = [];
   deleteBodies = [];
   connectionStatus = 'connected';
@@ -813,15 +836,20 @@ describe('nyaaFetchAll — a sub-pack is a season, not one file', () => {
 // be diagnosed from the report at all. This plan's own constraint is that a
 // qBittorrent contingency is a distinct honest state, never a generic failure.
 describe('a refused WebUI call names the endpoint that refused', () => {
-  it('names torrents/files when the file list 404s', async () => {
-    notFound.add('/api/v2/torrents/files');
+  // `torrents/files` is the one endpoint whose 404 is no longer a verdict, so
+  // the endpoint-naming contract is asserted on a status that still is one.
+  it('names torrents/files when the file list refuses', async () => {
+    filesRefuseStatus = 500;
 
     const result = await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 5_000 });
 
     expect(result.ok).toBe(false);
     expect(result.ok === false && result.reason).toBe(
-      'qBittorrent answered 404 to torrents/files.',
+      'qBittorrent answered 500 to torrents/files.',
     );
+    // Scope control for the 404 tolerance below: anything else is still fatal
+    // on the first read, so the wait cannot swallow a real client failure.
+    expect(filesReads).toBe(1);
   });
 
   // The one that actually needs the bookkeeping. `qbitStart` tries `resume`
@@ -844,6 +872,61 @@ describe('a refused WebUI call names the endpoint that refused', () => {
     // The fallback really was reached, rather than the name being cosmetic.
     expect(calls).toContain('/api/v2/torrents/resume');
     expect(calls).toContain('/api/v2/torrents/start');
+  });
+});
+
+// Measured live 2026-08-17, and it cost this plan two Route B walks. qBittorrent
+// listed `[DeadFish] Ghost Hound - Batch` with 8,153,820,936 B of metadata
+// already learned, `qbitAddStopped` found and adopted it — and the very next
+// `torrents/files` answered 404, ending the whole fetch in 84 ms. The identical
+// call minutes later, nothing changed, answered 200 and the fetch reached its
+// selection verdict in 14 ms. So a 404 from that one endpoint does not mean the
+// torrent is gone, and only `torrents/info` can say whether it actually is.
+describe('a 404 from torrents/files is not proof the torrent is gone', () => {
+  it('waits, and succeeds once the client opens the list it just refused', async () => {
+    filesDeclineFirstReads = 2;
+    files = [{ name: 'Show - 07.ja.ass', size: 40_000, progress: 1, priority: 1 }];
+    await writeOnDisk('Show - 07.ja.ass', '[Script Info]\nDialogue: hello');
+
+    const result = await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 5_000 });
+
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.value.fileName).toBe('Show - 07.ja.ass');
+    // It really did read through the refusals rather than getting lucky on one.
+    expect(filesReads).toBeGreaterThan(filesDeclineFirstReads);
+  });
+
+  // The negative control, and the state gate 29 depends on: when the torrent is
+  // genuinely gone the 404 must still end the fetch, and say so in the client's
+  // terms rather than the endpoint's. Without this the tolerance would turn a
+  // deleted torrent into a full-length wait ending in the wrong diagnosis.
+  it('stops at once, naming the client, when torrents/info agrees it is gone', async () => {
+    filesDeclineFirstReads = 99;
+    disappearAfterAdd = true;
+
+    const result = await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 5_000 });
+
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.reason).toBe(
+      'This torrent is no longer in qBittorrent, so the subtitle cannot arrive.',
+    );
+    expect(filesReads).toBe(1);
+  });
+
+  // A client that never opens the list is a distinct honest state from a swarm
+  // that never answers: the torrent is right there, so blaming the release or
+  // the peers would be a false finding.
+  it('gives up on its own deadline, blaming the client and not the swarm', async () => {
+    filesDeclineFirstReads = 99;
+
+    const result = await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 2_000 });
+
+    expect(result.ok).toBe(false);
+    const reason = result.ok === false ? result.reason : '';
+    expect(reason).toContain('still has this torrent but would not open its file list');
+    // The count is the evidence the message is entitled to make that claim.
+    expect(reason).toMatch(/across \d+ attempts/);
+    expect(reason).not.toContain('no peer sent its file list');
   });
 });
 
