@@ -143,6 +143,39 @@ describe('SubtitleHarvestPanel — the nyaa fallback', () => {
     expect(host.textContent).toContain('subHarvest.nyaa.meta:35,4');
   });
 
+  // This panel offered a 34 MB subtitle pack and a 7,782 MB video batch whose
+  // subtitles are unconfirmed with nothing on screen to tell them apart — the
+  // route was on the contract and never rendered. Measured across 4 titles, 10
+  // batch candidates reached a subtitle verdict and none carried sidecars.
+  it('names the route, and warns only when a batch is actually offered', async () => {
+    nyaaList.mockResolvedValue({ ok: true, candidates: [candidate()], message: '' });
+    await mount([1]);
+    await click('subHarvest.nyaa.search');
+
+    expect(host.textContent).toContain('subHarvest.nyaa.route.sub-pack');
+    // The negative control: a listing of packs alone must not warn about a
+    // batch it is not offering.
+    expect(host.textContent).not.toContain('subHarvest.nyaa.sidecarNote');
+  });
+
+  it('marks a video batch as unconfirmed and explains what picking it does', async () => {
+    nyaaList.mockResolvedValue({
+      ok: true,
+      candidates: [{
+        ...candidate('nyaa:batch'),
+        releaseName: '[DeadFish] Ghost Hound - Batch [BD][1080p][MP4][AAC]',
+        route: 'batch-sidecar' as const,
+        sizeBytes: 8_160_437_862,
+      }],
+      message: '',
+    });
+    await mount([1]);
+    await click('subHarvest.nyaa.search');
+
+    expect(host.textContent).toContain('subHarvest.nyaa.route.batch-sidecar');
+    expect(host.textContent).toContain('subHarvest.nyaa.sidecarNote');
+  });
+
   // Measured live 2026-08-17: MAL 2596 is filed `Shinreigari` and nyaa has the
   // show only as `Ghost Hound` — the primary title alone returned 0 candidates
   // for a release with 4 seeders sitting on the index. The panel therefore has

@@ -1121,7 +1121,7 @@ export const en: Catalog = {
   'media.subtitles.nyaa.fetching': 'Fetching...',
   'media.subtitles.nyaa.attached': 'Attached a {lang} subtitle.',
   'media.subtitles.nyaa.route.sub-pack': 'Subtitles only',
-  'media.subtitles.nyaa.route.batch-sidecar': 'Subtitle files from a batch',
+  'media.subtitles.nyaa.route.batch-sidecar': 'Video batch · subtitles unconfirmed',
   'media.subtitles.nyaa.seeders': {
     one: '{count} seeder',
     other: '{count} seeders',
@@ -4109,6 +4109,9 @@ export const en: Catalog = {
   'subHarvest.nyaa.found': { one: '{count} release on the index', other: '{count} releases on the index' },
   'subHarvest.nyaa.searchedAs': 'Found on the index under the name {name}.',
   'subHarvest.nyaa.meta': '{size} MB \u00b7 {seeders} seeders',
+  'subHarvest.nyaa.route.sub-pack': 'Subtitles only',
+  'subHarvest.nyaa.route.batch-sidecar': 'Video batch · subtitles unconfirmed',
+  'subHarvest.nyaa.sidecarNote': 'A video batch does not say in its name whether it carries separate subtitle files. Its file list is read before anything downloads, and if it carries none you are told so and nothing is fetched.',
   'subHarvest.nyaa.take': 'Fetch subtitles',
   'subHarvest.nyaa.transferNote': 'Fetching adds a transfer to your qBittorrent and waits for it. Only the subtitle files are downloaded; the video is skipped.',
   'subHarvest.nyaa.took': 'Studied {used} of the {files} subtitle files this release carries.',

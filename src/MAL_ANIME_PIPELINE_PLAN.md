@@ -1801,3 +1801,48 @@ disabled → **3 failures, the 3 intended**. Suites: shared+harvest+fetch+panel 
 **Next slice:** survey MAL completed indices **134+** for names that state a subs folder (`+ Subs`,
 `Subs/`, a separate `[Subs]` bracket) — the positive signal is still unfound, and the pool above 133
 has never been walked. `debug/mux-live.cjs <json>` lists any title live in ~1–5 s.
+
+## 2026-08-17 — addendum: the positive signal is 1 in 2,685, and the panel said nothing about route
+
+Worker `primary`. Commit pending, same turn as the entry above.
+
+**The signal hunt, answered with a number.** Every release name this repo has ever recorded across
+all `debug/g31*.json` corpora — **2,685 distinct strings** — scanned for the six ways a release
+could advertise external subtitles (`+ Subs`, a `Subs/` path, a standalone `[Subs]` bracket,
+`w/ subs`, "external/sidecar/separate subtitle", a bare `ASS`/`SRT` token in a batch). **Exactly 1
+name matched**, `[Yousei-raws] Gintama 銀魂 (2006-2010) ep001-201 … + Subs`. Every other form scored
+**0**. So the fork the last entry set — find the positive name signal, or make the listing honest —
+resolves to the second: there is no positive signal to rank on, and a route that cannot be predicted
+from a name must say so instead of pretending.
+
+**The dishonest states, both fixed.** (1) `media.subtitles.nyaa.route.batch-sidecar` read
+**"Subtitle files from a batch"** — a flat assertion of the one thing the app cannot know until it
+reads the file list, and which has been false 10 times out of 10. Now "Video batch · subtitles
+unconfirmed", in all four languages. (2) Worse, and on this plan's own primary surface:
+`SubtitleHarvestPanel` **never rendered the route at all**. `route` has been on the contract at
+`subtitleDiscoveryIpc.ts:197` throughout, and the panel showed name + size + seeders — so a 34 MB
+subtitle pack and a 7,782 MB video batch were offered identically, with nothing on screen to tell a
+user which one costs a metadata handshake and may carry nothing. The route now leads the meta line,
+and a `sidecarNote` appears **only when a batch is actually in the list**.
+
+**LIVE, after the panel change, through the renderer's own module graph** (`debug/route-keys-live.cjs`
+imports the catalogs Vite is serving, not the files on disk): all 4 new/changed keys resolve in
+**en/ja/zh/ru**, 16 of 16 non-MISSING, and the old asserting label is gone from the served copy.
+`node tools/i18n-check.cjs` exit 0 at **10,560** keys (+3).
+
+**NOT driven in-UI, stated rather than implied.** The Start-menu → Scraper → Discover walk reached
+the catalogue (`scr-page--discover`, 44 rows) but the MAL download dialog opens from a per-row
+control this probe did not find, so the panel's rendered DOM was not read live this turn. What was
+verified live is the served i18n and the `route` values the IPC returns (`Ghost Hound` → 1
+`batch-sidecar` row). The render itself is covered by 2 panel tests including a negative control
+(a pack-only listing must NOT show the batch note); mutation control → **1 failure, the intended one**.
+
+**Trap for the next worker: the four i18n catalogs carry another track's uncommitted work** —
+`ja`/`zh` are **+728/-560** against HEAD, `en` +176/-10. A plain `git add` on any of them commits
+theirs. `debug/stage-route-keys.cjs` rebuilds HEAD + exactly two edits per file and writes the blob
+with `hash-object -w --no-filters` (note: `--path` and `--no-filters` are mutually exclusive).
+Staged result read back: **+4/-1 per catalog, nothing foreign**.
+
+**Gate 31 stays 32 of 34.** A survey of MAL completed indices 134–213 was running as this turn
+closed (`debug/g31n-survey4.log`, `g31n-routeb-134.json`); through index 171 it had found **0**
+sub-packs. An earlier attempt died at 156 because a `&`-backgrounded job does not outlive the shell.

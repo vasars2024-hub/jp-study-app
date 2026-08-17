@@ -516,6 +516,11 @@ export default function SubtitleHarvestPanel({
                   {candidate.releaseName}
                 </span>
                 <span className="scr-muted">
+                  {/* The route, first: a 400 KB subtitle pack and a 7.8 GB video
+                      batch whose subtitles are unconfirmed were offered here
+                      identically, with nothing to tell them apart. */}
+                  {t(`subHarvest.nyaa.route.${candidate.route}`)}
+                  {' · '}
                   {t('subHarvest.nyaa.meta', {
                     size: Math.max(1, Math.round(candidate.sizeBytes / 1_048_576))
                       .toLocaleString(LANG_TAGS[lang]),
@@ -533,6 +538,9 @@ export default function SubtitleHarvestPanel({
               </li>
             ))}
           </ul>
+          {nyaaCandidates.some((candidate) => candidate.route === 'batch-sidecar') ? (
+            <p className="scr-muted">{t('subHarvest.nyaa.sidecarNote')}</p>
+          ) : null}
           <p className="scr-muted">{t('subHarvest.nyaa.transferNote')}</p>
         </div>
       ) : null}

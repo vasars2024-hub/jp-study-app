@@ -1151,7 +1151,7 @@ export const ru: Catalog = {
   'media.subtitles.nyaa.fetching': 'Загрузка...',
   'media.subtitles.nyaa.attached': 'Добавлены субтитры ({lang}).',
   'media.subtitles.nyaa.route.sub-pack': 'Только субтитры',
-  'media.subtitles.nyaa.route.batch-sidecar': 'Файлы субтитров из сборника',
+  'media.subtitles.nyaa.route.batch-sidecar': 'Сборник видео · субтитры не подтверждены',
   'media.subtitles.nyaa.seeders': {
     one: '{count} сид',
     few: '{count} сида',
@@ -4241,6 +4241,9 @@ export const ru: Catalog = {
   'subHarvest.nyaa.found': { one: '{count} \u0440\u0435\u043b\u0438\u0437 \u0432 \u0438\u043d\u0434\u0435\u043a\u0441\u0435', few: '{count} \u0440\u0435\u043b\u0438\u0437\u0430 \u0432 \u0438\u043d\u0434\u0435\u043a\u0441\u0435', many: '{count} \u0440\u0435\u043b\u0438\u0437\u043e\u0432 \u0432 \u0438\u043d\u0434\u0435\u043a\u0441\u0435', other: '{count} \u0440\u0435\u043b\u0438\u0437\u0430 \u0432 \u0438\u043d\u0434\u0435\u043a\u0441\u0435' },
   'subHarvest.nyaa.searchedAs': '\u041d\u0430\u0439\u0434\u0435\u043d\u043e \u0432 \u0438\u043d\u0434\u0435\u043a\u0441\u0435 \u043f\u043e\u0434 \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u0435\u043c \u00ab{name}\u00bb.',
   'subHarvest.nyaa.meta': '{size} \u041c\u0411 \u00b7 \u0441\u0438\u0434\u043e\u0432: {seeders}',
+  'subHarvest.nyaa.route.sub-pack': 'Только субтитры',
+  'subHarvest.nyaa.route.batch-sidecar': 'Сборник видео · субтитры не подтверждены',
+  'subHarvest.nyaa.sidecarNote': 'Название сборника видео не сообщает, есть ли в нём отдельные файлы субтитров. Список файлов читается до начала загрузки, и если субтитров нет, вам об этом сообщат и ничего не скачается.',
   'subHarvest.nyaa.take': '\u041f\u043e\u043b\u0443\u0447\u0438\u0442\u044c \u0441\u0443\u0431\u0442\u0438\u0442\u0440\u044b',
   'subHarvest.nyaa.transferNote': '\u041f\u043e\u043b\u0443\u0447\u0435\u043d\u0438\u0435 \u0434\u043e\u0431\u0430\u0432\u043b\u044f\u0435\u0442 \u043f\u0435\u0440\u0435\u0434\u0430\u0447\u0443 \u0432 \u0432\u0430\u0448 qBittorrent \u0438 \u0436\u0434\u0451\u0442 \u0435\u0451. \u0421\u043a\u0430\u0447\u0438\u0432\u0430\u044e\u0442\u0441\u044f \u0442\u043e\u043b\u044c\u043a\u043e \u0444\u0430\u0439\u043b\u044b \u0441\u0443\u0431\u0442\u0438\u0442\u0440\u043e\u0432, \u0432\u0438\u0434\u0435\u043e \u043f\u0440\u043e\u043f\u0443\u0441\u043a\u0430\u0435\u0442\u0441\u044f.',
   'subHarvest.nyaa.took': '\u0420\u0430\u0437\u043e\u0431\u0440\u0430\u043d\u043e {used} \u0438\u0437 {files} \u0444\u0430\u0439\u043b\u043e\u0432 \u0441\u0443\u0431\u0442\u0438\u0442\u0440\u043e\u0432 \u0432 \u044d\u0442\u043e\u043c \u0440\u0435\u043b\u0438\u0437\u0435.',

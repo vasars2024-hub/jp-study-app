@@ -1019,7 +1019,7 @@ export const ja: Catalog = {
   'media.subtitles.nyaa.fetching': '取得中...',
   'media.subtitles.nyaa.attached': '{lang} の字幕を追加しました。',
   'media.subtitles.nyaa.route.sub-pack': '字幕のみ',
-  'media.subtitles.nyaa.route.batch-sidecar': 'バッチ内の字幕ファイル',
+  'media.subtitles.nyaa.route.batch-sidecar': '動画バッチ・字幕は未確認',
   'media.subtitles.nyaa.seeders': {
     other: 'シード {count}',
   },
@@ -3887,6 +3887,9 @@ export const ja: Catalog = {
   'subHarvest.nyaa.found': { other: '\u30a4\u30f3\u30c7\u30c3\u30af\u30b9\u306b {count} \u4ef6\u306e\u30ea\u30ea\u30fc\u30b9' },
   'subHarvest.nyaa.searchedAs': '\u30a4\u30f3\u30c7\u30c3\u30af\u30b9\u3067\u306f\u300c{name}\u300d\u3068\u3044\u3046\u540d\u524d\u3067\u898b\u3064\u304b\u308a\u307e\u3057\u305f\u3002',
   'subHarvest.nyaa.meta': '{size} MB \u00b7 \u30b7\u30fc\u30c9 {seeders}',
+  'subHarvest.nyaa.route.sub-pack': '字幕のみ',
+  'subHarvest.nyaa.route.batch-sidecar': '動画バッチ・字幕は未確認',
+  'subHarvest.nyaa.sidecarNote': '動画バッチは、別ファイルの字幕を含むかどうかを名前では示しません。ダウンロード前にファイル一覧を読み取り、字幕がない場合はその旨を表示して何も取得しません。',
   'subHarvest.nyaa.take': '\u5b57\u5e55\u3092\u53d6\u5f97',
   'subHarvest.nyaa.transferNote': '\u53d6\u5f97\u3059\u308b\u3068 qBittorrent \u306b\u8ee2\u9001\u304c\u8ffd\u52a0\u3055\u308c\u3001\u5b8c\u4e86\u3092\u5f85\u3061\u307e\u3059\u3002\u30c0\u30a6\u30f3\u30ed\u30fc\u30c9\u3055\u308c\u308b\u306e\u306f\u5b57\u5e55\u30d5\u30a1\u30a4\u30eb\u306e\u307f\u3067\u3001\u52d5\u753b\u306f\u30b9\u30ad\u30c3\u30d7\u3055\u308c\u307e\u3059\u3002',
   'subHarvest.nyaa.took': '\u3053\u306e\u30ea\u30ea\u30fc\u30b9\u304c\u6301\u3064 {files} \u4ef6\u306e\u5b57\u5e55\u30d5\u30a1\u30a4\u30eb\u306e\u3046\u3061 {used} \u4ef6\u3092\u89e3\u6790\u3057\u307e\u3057\u305f\u3002',

@@ -1017,7 +1017,7 @@ export const zh: Catalog = {
   'media.subtitles.nyaa.fetching': '正在获取...',
   'media.subtitles.nyaa.attached': '已附加 {lang} 字幕。',
   'media.subtitles.nyaa.route.sub-pack': '仅字幕',
-  'media.subtitles.nyaa.route.batch-sidecar': '合集中的字幕文件',
+  'media.subtitles.nyaa.route.batch-sidecar': '视频合集 · 字幕未确认',
   'media.subtitles.nyaa.seeders': {
     other: '{count} 个做种',
   },
@@ -3871,6 +3871,9 @@ export const zh: Catalog = {
   'subHarvest.nyaa.found': { other: '\u7d22\u5f15\u4e2d\u6709 {count} \u4e2a\u53d1\u5e03' },
   'subHarvest.nyaa.searchedAs': '\u5728\u7d22\u5f15\u4e2d\u4ee5\u540d\u79f0\u300c{name}\u300d\u627e\u5230\u3002',
   'subHarvest.nyaa.meta': '{size} MB \u00b7 \u505a\u79cd {seeders}',
+  'subHarvest.nyaa.route.sub-pack': '仅字幕',
+  'subHarvest.nyaa.route.batch-sidecar': '视频合集 · 字幕未确认',
+  'subHarvest.nyaa.sidecarNote': '视频合集的名称不会说明它是否附带独立的字幕文件。下载前会先读取其文件列表；如果不含字幕，会告知你并且不下载任何内容。',
   'subHarvest.nyaa.take': '\u83b7\u53d6\u5b57\u5e55',
   'subHarvest.nyaa.transferNote': '\u83b7\u53d6\u4f1a\u5411\u4f60\u7684 qBittorrent \u6dfb\u52a0\u4e00\u4e2a\u4f20\u8f93\u5e76\u7b49\u5f85\u5b8c\u6210\u3002\u53ea\u4f1a\u4e0b\u8f7d\u5b57\u5e55\u6587\u4ef6\uff0c\u89c6\u9891\u4f1a\u88ab\u8df3\u8fc7\u3002',
   'subHarvest.nyaa.took': '\u5df2\u5206\u6790\u8be5\u53d1\u5e03\u6240\u542b {files} \u4e2a\u5b57\u5e55\u6587\u4ef6\u4e2d\u7684 {used} \u4e2a\u3002',
