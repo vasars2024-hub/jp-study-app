@@ -42,6 +42,17 @@ export function widthClassFor(width: number): LiquidWidthClass {
   return 'compact';
 }
 
+/**
+ * Whether the rail still has a place in the spine at this width. Exported
+ * because the app that hands its routes to `LiquidDock` as the compact fallback
+ * has to know when to stop — measured live, a caller that passes them at every
+ * width renders TWO navigation landmarks for one set of routes. This predicate
+ * and the scaffold's own reflow read the same line, so they cannot drift.
+ */
+export function railInSpine(widthClass: LiquidWidthClass): boolean {
+  return widthClass !== 'compact';
+}
+
 type ScaffoldProps = Omit<HTMLAttributes<HTMLElement>, 'children'> & {
   as?: ElementType;
   /** Persistent navigation. Rendered in a `nav` landmark. */
@@ -118,7 +129,7 @@ export function LiquidAppScaffold({
   // A rail that is collapsed by the caller, or squeezed out by the breakpoint.
   // Below `medium` the spine has no room for one at all, and the app is
   // expected to surface the same routes from its dock or toolbar.
-  const railHidden = effective === 'compact';
+  const railHidden = !railInSpine(effective);
   const collapsed = Boolean(railCollapsed) || effective === 'medium';
 
   return (

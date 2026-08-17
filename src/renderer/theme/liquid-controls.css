@@ -333,3 +333,177 @@
     transform: translateY(0);
   }
 }
+
+/* ---------------------------------------------------------------- dock ---- */
+/* The dock is the compact-width home for the rail's routes, so its route
+   buttons carry the same hit-target floor the rail's do. `overflow-x: auto`
+   rather than a second overflow menu: scrolling keeps every route reachable by
+   pointer and by keyboard, and a menu inside a dock is a menu inside a menu. */
+.lq-dock {
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-3);
+  width: 100%;
+  min-width: 0;
+  min-height: var(--lq-dock-height);
+  color: var(--lq-liquid-text);
+}
+
+.lq-dock-routes {
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-2);
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.lq-dock-route {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lq-space-2);
+  flex: none;
+  min-height: var(--lq-hit-target);
+  min-width: var(--lq-hit-target);
+  padding: 0 var(--lq-space-3);
+  border: 1px solid transparent;
+  border-radius: var(--lq-liquid-radius);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background-color var(--lq-motion-move) var(--lq-ease-move),
+    border-color var(--lq-motion-move) var(--lq-ease-move);
+}
+
+.lq-dock-route:hover:not([aria-disabled='true']) {
+  background: var(--lq-liquid-bg);
+  border-color: var(--lq-liquid-border);
+}
+
+.lq-dock-route[data-active='true'] {
+  background: var(--lq-liquid-bg-raised);
+  border-color: var(--lq-liquid-border);
+  font-weight: 600;
+}
+
+.lq-dock-route[aria-disabled='true'] {
+  cursor: not-allowed;
+  color: var(--lq-liquid-text-muted);
+}
+
+.lq-dock-route:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.lq-dock-route-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+/* The nested toolbar must not claim the dock's whole width the way it does when
+   it owns the toolbar slot. */
+.lq-dock .lq-dock-actions {
+  flex: none;
+  width: auto;
+  min-height: 0;
+  padding: 0;
+}
+
+.lq-dock-status {
+  flex: none;
+  margin-left: auto;
+  padding: 0 var(--lq-space-2);
+  font-size: var(--font-size-xs);
+  color: var(--lq-liquid-text-muted);
+  white-space: nowrap;
+}
+
+/* ----------------------------------------------------------- inspector ---- */
+.lq-inspector {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lq-space-3);
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  color: var(--lq-liquid-text);
+}
+
+.lq-inspector-head {
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-3);
+  flex: none;
+  min-width: 0;
+}
+
+.lq-inspector-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* The heading takes focus when the inspector opens, so it needs a visible ring
+   even though it is not an interactive control. */
+.lq-inspector-title:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.lq-inspector-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  min-height: var(--lq-hit-target);
+  min-width: var(--lq-hit-target);
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--lq-liquid-radius);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.lq-inspector-close:hover {
+  background: var(--lq-liquid-bg);
+  border-color: var(--lq-liquid-border);
+}
+
+.lq-inspector-close:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* The only scrolling region. The head and the foot stay put so the way out of
+   the inspector never scrolls off the top of it. */
+.lq-inspector-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+}
+
+.lq-inspector-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-2);
+  flex: none;
+  min-width: 0;
+  padding-top: var(--lq-space-2);
+  border-top: 1px solid var(--lq-liquid-border);
+}
