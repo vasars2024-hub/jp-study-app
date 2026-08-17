@@ -24912,3 +24912,48 @@ does not leave `bytes` reusable — a second Database over the same buffer opens
 control on `catalogs/en.ts` **wrote the patch and then failed to restore it** (`UNKNOWN`,
 errno −4094) — the shared file sat damaged until it was checked. Do controls against HEAD's
 blobs, not by mutating a shared catalog.
+
+## 2026-08-18 — Track 7 / gate 15: the destination that nothing could reach (`primary`)
+
+Entry state re-derived: the handoff was written 2 min after its last commit, so nothing was
+stranded by the 23:08 limit. Boss audit's last section (16:15) has no open finding.
+
+- `85b48439` — **the text destination had no door.** `067cd735` built
+  `anki:exportCsvDraft` and a third `DeckWorkbenchApply` branch keyed on
+  `draft.source.kind === 'csv'` — and `readAnkiCsvDraft` had **zero renderer call sites**.
+  `DeckWorkbench` offered `apkg | connect | localDeck`, so a `csv` draft was a state the UI
+  could not produce and the whole destination was unreachable **by construction**, the same
+  shape as gate 5's `local-deck` finding and gate 14's `template-add`. Fourth source card
+  added. The open dialog goes in the IPC registration, **not** in `csvDraftRead.ts`: that
+  module's stated property is that it imports no Electron, which is what keeps its encoding
+  and size-ceiling paths testable against a real temp file. `filePath` short-circuits it as
+  `pickDeckFile` does, so the flow stays drivable with no OS dialog. `file-too-large:<bytes>:
+  <ceiling>` now renders as both numbers in MB instead of the raw code.
+
+**Gate 15's stated remainder — the LIVE IPC round trip — is CLOSED** (`debug/g15-live-ipc.cjs`,
+through `window.api.*` in the running renderer, no module import). On the user's own
+`love-japanese.txt`: read **3,209 rows / 3,209 notes / 0 blank**, separator tab from the
+**header**, `#html:false`, tags column 11, encoding utf-8, page **2,000** of 3,209. Edited the
+last field of 25 notes → `notesUpdated` **25**, `rowsWritten` **3,209**, `noteIdentity`
+**row-order**, `verified: true`. **Arithmetic control: 280,218 → 280,343 bytes, grew exactly
+125 = 25 × 5 chars**, so provably nothing else moved. Re-read the written file through the same
+channel: 3,209 notes, **25** marked, **25/25** edits verified by id and field. Source
+**byte-identical** after every probe.
+
+**The live run's finding, fixed in the same commit.** A `{ notes: [] }` change set came back as
+`TypeError: Cannot read properties of undefined (reading 'length')` instead of
+`nothing-to-export`. `exportChangesEmpty` read `notes` and `cardMoves` strictly while reading
+the other seven fields tolerantly — its own comment says it runs on a payload that crossed IPC
+and must not throw. **All three destinations share that guard** (`apkgExport.ts:83`,
+`connectCommit.ts:52`, `csvExport.ts:73`), so this was never CSV-only.
+
+Refusal controls, all live: stale fingerprint → `source-changed`; `outPath === sourcePath` →
+`overwrite-source`; **no stray file written by either refusal**.
+
+Tests: 3 renderer (entry, cancel silent, MB sentence with the raw code asserted absent), 3 main
+(`ankiTextSourceIpc.test.ts` — dialog filters `txt|csv|tsv`, cancel does not call the reader,
+`filePath` skips the dialog), 1 shared (partial payload empty, with a non-vacuous inverse).
+123 green across the 4 affected suites. i18n **10,590** keys, exit 0 (4 new ×4).
+
+**Trap.** The bridge's `/eval` payload key is **`js`**, not `expression` — a wrong key answers
+`missing js`, which reads like a syntax error in your own expression.

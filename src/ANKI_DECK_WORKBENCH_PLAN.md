@@ -601,6 +601,29 @@ This slice is complete only when all of these can be shown with real data and no
     **A first-column value starting with `#` is quoted**, or `parseAnkiCsvMeta` eats it as a
     directive on re-import — the one round-trip hazard the format creates for itself.
 
+    **The live IPC round trip closes 2026-08-18** (`85b48439`), and closing it found the
+    gate's real hole: the destination had **no door**. `readAnkiCsvDraft` had **zero
+    renderer call sites**, so a `csv` draft was a state the UI could not produce and the
+    third `DeckWorkbenchApply` branch was unreachable by construction — the same shape as
+    gate 5's `local-deck` and gate 14's `template-add`. A fourth source card opens it; the
+    dialog lives in the IPC registration, not in `csvDraftRead.ts`, because that module's
+    Electron-free property is what makes its encoding and size-ceiling paths testable, and
+    `filePath` short-circuits it so the flow stays drivable without an OS dialog.
+    Live through `window.api.*` in the running renderer on the user's own 3,209-row export:
+    read 3,209 / 0 blank, separator tab from the header, `#html:false`, page 2,000 of 3,209;
+    25 edits → `notesUpdated` **25**, `rowsWritten` **3,209**, `noteIdentity` **row-order**,
+    `verified: true`; the file grew **280,218 → 280,343 = exactly 25 × 5 chars**; re-read
+    through the same channel **25/25** verified and the source byte-identical. Four refusals
+    live, no stray file from any: `source-changed`, `overwrite-source`, `nothing-to-export`,
+    and the door showing **4** source cards with **0** raw i18n keys.
+
+    **The live run's own finding:** `{ notes: [] }` returned
+    `TypeError: Cannot read properties of undefined (reading 'length')` across IPC instead of
+    `nothing-to-export`. `exportChangesEmpty` read `notes` and `cardMoves` strictly while
+    reading its other seven fields tolerantly, against its own stated contract — and all
+    three destinations share that guard, so it was never a CSV-only defect. Fixed in the same
+    commit and re-run green on a restarted main.
+
     **Still open on this gate:** the translate half. See the ledger entry for `067cd735`.
 
 ## Explicit exclusions

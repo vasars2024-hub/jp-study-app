@@ -50,9 +50,10 @@ export default function AnkiView() {
       </div>
 
       {/*
-        Outside the connected branch on purpose: two of its three sources (a
-        package file and this app's own local deck) need no Anki at all, so
-        gating the workbench on AnkiConnect would hide working functionality.
+        Outside the connected branch on purpose: three of its four sources (a
+        package file, an Anki text export, and this app's own local deck) need
+        no Anki running at all, so gating the workbench on AnkiConnect would
+        hide working functionality.
       */}
       <div className="anki-card anki-card-flush">
         <CollapsibleSection title={t('ankiWorkbench.title')} summary={t('ankiWorkbench.lead')}>
