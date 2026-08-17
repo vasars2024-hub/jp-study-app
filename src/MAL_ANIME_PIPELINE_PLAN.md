@@ -1689,8 +1689,9 @@ Mai`, and `Juubee Ninpuuchou` a `NINJA SCROLL (1993-2003) - Complete Movie and A
 Both are short titles reached through the **alias** walk, so the false match is in alias selection
 rather than in `looksLikeSameTitle` — `searchedAs` is the field to read when chasing it.
 
-**GATES, SHARED TREE, once after the last slice.** `npx vitest run` **729 files / 10,064 passed /
-0 failed / 6 skipped**. The first run showed 2 failed suites (`mediaSurfaceImportGraph`, a
+**GATES, SHARED TREE, re-run at final HEAD after the last slice.** `npx vitest run` **729 files /
+10,065 passed / 0 failed / 6 skipped** at `0acdfe11`. (An earlier green run at `99c20548` read
+10,064; the season fix adds one test. The gate is the later run, not the earlier one.) The first run showed 2 failed suites (`mediaSurfaceImportGraph`, a
 dictionary suite) — both timeouts, neither touched by this turn, both green on a clean re-run with
 no live survey competing for CPU. That is the recorded full-run flake, verified twice before being
 called anything. i18n exit 0 at **10,554** (no new strings this turn). architecture exit 0,
