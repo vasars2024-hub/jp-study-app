@@ -9951,6 +9951,44 @@ export const ru: Catalog = {
     'Этот источник не сообщает дату создания коллекции, поэтому день повторения карточки отсчитывается от неизвестной точки, и все значения просрочки будут смещены на одну и ту же неизвестную величину.',
   'ankiWorkbench.stale.refusal.threshold-too-small':
     'Порог застоя должен быть не меньше одного дня.',
+  'ankiWorkbench.workload.title': 'Нагрузка',
+  'ankiWorkbench.workload.kind.retention': 'Желаемое удержание',
+  'ankiWorkbench.workload.kind.interval-modifier': 'Модификатор интервала',
+  'ankiWorkbench.workload.retentionFrom': 'Сейчас (%)',
+  'ankiWorkbench.workload.retentionTo': 'Предлагается (%)',
+  'ankiWorkbench.workload.modifierFrom': 'Сейчас (%)',
+  'ankiWorkbench.workload.modifierTo': 'Предлагается (%)',
+  'ankiWorkbench.workload.summary':
+    'Запланированных карточек: {cards}. Сейчас {current} повторений в день, после изменения — {proposed}.',
+  'ankiWorkbench.workload.deltaNone': 'Ничего не меняется: это предложение совпадает с текущей настройкой.',
+  'ankiWorkbench.workload.deltaUp':
+    'На {delta} повторений в день больше, примерно на {percent}% больше работы. Интервалы станут в {ratio} раза от нынешних.',
+  'ankiWorkbench.workload.deltaDown':
+    'На {delta} повторений в день меньше, примерно на {percent}% меньше работы. Интервалы станут в {ratio} раза от нынешних.',
+  'ankiWorkbench.workload.intervals':
+    'Средний интервал сейчас {current} дней, после изменения — {proposed} дней.',
+  'ankiWorkbench.workload.horizonUnchanged':
+    'Дни ниже это предложение не меняет. Anki перепланирует карточку при следующем ответе на неё, поэтому ни одна уже запланированная карточка не сдвинется.',
+  'ankiWorkbench.workload.horizonRow': 'через {offset} дней: карточек {cards}',
+  'ankiWorkbench.workload.horizonMore': 'и ещё {cards} карточек за {days} дней',
+  'ankiWorkbench.workload.backlog':
+    'Карточек с уже прошедшим сроком: {cards}. В дни выше они не входят.',
+  'ankiWorkbench.workload.excluded':
+    'Не учтены: новых или изучаемых {unscheduled}, приостановленных или отложенных {withheld}, переданных в фильтрованную колоду {filtered}, без интервала {noInterval}.',
+  'ankiWorkbench.workload.provenanceRetention':
+    'Прочитано из этой колоды: интервал каждой карточки. Указано вами: оба значения удержания — в пакете нет настроек колоды. Кривая использует фиксированное затухание {decay}, а не ваши параметры FSRS.',
+  'ankiWorkbench.workload.provenanceModifier':
+    'Прочитано из этой колоды: интервал каждой карточки. Указано вами: оба значения модификатора — в пакете нет настроек колоды.',
+  'ankiWorkbench.workload.previewOnly':
+    'Это оценка. Настройки колоды не входят в пакет, поэтому применить их отсюда нельзя — измените пресет в Anki.',
+  'ankiWorkbench.workload.refusal.no-scheduled-cards':
+    'Ни у одной карточки в этой колоде ещё нет интервала повторения, поэтому сравнивать нагрузку не с чем. Колоде, которую ни разу не изучали, нечего прогнозировать.',
+  'ankiWorkbench.workload.refusal.retention-out-of-range':
+    'Желаемое удержание должно быть между 70% и 99% — это диапазон, который принимает сам Anki.',
+  'ankiWorkbench.workload.refusal.modifier-out-of-range':
+    'Модификатор интервала должен быть больше нуля.',
+  'ankiWorkbench.workload.refusal.no-collection-origin':
+    'Этот источник не сообщает дату создания коллекции, поэтому срок карточки отсчитывается от неизвестной точки и весь прогноз сместится на неизвестное число дней.',
   'ankiWorkbench.journal.title': 'История: шагов {applied} по заметкам: {notes}',
   'ankiWorkbench.journal.batch': 'Партия из {ops} изменений в заметках: {notes}',
   'ankiWorkbench.journal.single': 'Одиночная правка в заметках: {notes}',

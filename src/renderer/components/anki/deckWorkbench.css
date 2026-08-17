@@ -537,6 +537,57 @@
   gap: 0.4rem;
 }
 
+/* Recipe 26's estimate. Same anchor surface as its neighbours: it is a table of
+   numbers the user reads against, which the shared guidance keeps opaque and
+   high-contrast rather than giving it a Liquid treatment. */
+.wb-workload {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 0.5rem;
+  background: var(--surface-2, rgba(127, 127, 127, 0.08));
+}
+
+.wb-workload p {
+  margin: 0;
+}
+
+.wb-workload-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.wb-workload-controls label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.wb-workload-controls input {
+  width: 5rem;
+}
+
+.wb-workload-horizon {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.8rem;
+  font-size: 0.85rem;
+}
+
+/* More work is the direction worth flagging; less work needs no colour, so the
+   pair is not a red/green judgement about which setting is correct. */
+.wb-workload-up,
+.wb-workload-refusal {
+  color: var(--danger, #b3261e);
+}
+
 .wb-browser-search[aria-invalid='true'] {
   border-color: var(--danger, #b3261e);
 }

@@ -9563,6 +9563,44 @@ export const en: Catalog = {
     'This source reports no collection creation date, so a card’s due day counts from an unknown origin and every overdue reading would be wrong by the same unknown amount.',
   'ankiWorkbench.stale.refusal.threshold-too-small':
     'A staleness threshold has to be at least one day.',
+  'ankiWorkbench.workload.title': 'Workload',
+  'ankiWorkbench.workload.kind.retention': 'Desired retention',
+  'ankiWorkbench.workload.kind.interval-modifier': 'Interval modifier',
+  'ankiWorkbench.workload.retentionFrom': 'Now (%)',
+  'ankiWorkbench.workload.retentionTo': 'Proposed (%)',
+  'ankiWorkbench.workload.modifierFrom': 'Now (%)',
+  'ankiWorkbench.workload.modifierTo': 'Proposed (%)',
+  'ankiWorkbench.workload.summary':
+    '{cards} scheduled cards: {current} reviews a day now, {proposed} after the change.',
+  'ankiWorkbench.workload.deltaNone': 'Nothing changes: this proposal is the current setting.',
+  'ankiWorkbench.workload.deltaUp':
+    '{delta} more reviews a day, about {percent}% more work. Intervals become {ratio}× their current length.',
+  'ankiWorkbench.workload.deltaDown':
+    '{delta} fewer reviews a day, about {percent}% less work. Intervals become {ratio}× their current length.',
+  'ankiWorkbench.workload.intervals':
+    'Mean interval {current} days now, {proposed} days after the change.',
+  'ankiWorkbench.workload.horizonUnchanged':
+    'The days below are unchanged by this proposal. Anki reschedules a card when it is next answered, so no card that is already scheduled moves.',
+  'ankiWorkbench.workload.horizonRow': 'in {offset} days: {cards} cards',
+  'ankiWorkbench.workload.horizonMore': 'and {cards} cards over {days} more days',
+  'ankiWorkbench.workload.backlog':
+    '{cards} cards are already past due and are not in the days above.',
+  'ankiWorkbench.workload.excluded':
+    'Not counted: {unscheduled} new or learning, {withheld} suspended or buried, {filtered} on loan to a filtered deck, {noInterval} with no interval.',
+  'ankiWorkbench.workload.provenanceRetention':
+    'Read from this deck: every card’s interval. Stated by you: both retention values, because a package carries no deck options. The curve uses a fixed decay of {decay} rather than your own FSRS parameters.',
+  'ankiWorkbench.workload.provenanceModifier':
+    'Read from this deck: every card’s interval. Stated by you: both modifier values, because a package carries no deck options.',
+  'ankiWorkbench.workload.previewOnly':
+    'This is an estimate. Deck options are not part of a package, so nothing here can be applied from the workbench — change the preset in Anki.',
+  'ankiWorkbench.workload.refusal.no-scheduled-cards':
+    'No card in this deck has a review interval yet, so there is no workload to compare. A deck that has never been studied has nothing to project.',
+  'ankiWorkbench.workload.refusal.retention-out-of-range':
+    'Desired retention has to be between 70% and 99%, the band Anki itself accepts.',
+  'ankiWorkbench.workload.refusal.modifier-out-of-range':
+    'An interval modifier has to be above zero.',
+  'ankiWorkbench.workload.refusal.no-collection-origin':
+    'This source reports no collection creation date, so a card’s due day counts from an unknown origin and the forecast would be shifted by an unknown number of days.',
   'ankiWorkbench.journal.title': 'History: {applied} steps over {notes} notes',
   'ankiWorkbench.journal.batch': 'Batch of {ops} changes on {notes} notes',
   'ankiWorkbench.journal.single': 'Single edit on {notes} note',

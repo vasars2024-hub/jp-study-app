@@ -9137,6 +9137,41 @@ export const ja: Catalog = {
     'このソースはコレクションの作成日を報告していません。カードの期日は不明な起点から数えられるため、期日超過の値はすべて同じ分だけ誤ります。',
   'ankiWorkbench.stale.refusal.threshold-too-small':
     '停滞のしきい値は最低 1 日必要です。',
+  'ankiWorkbench.workload.title': '学習量',
+  'ankiWorkbench.workload.kind.retention': '目標保持率',
+  'ankiWorkbench.workload.kind.interval-modifier': '間隔補正',
+  'ankiWorkbench.workload.retentionFrom': '現在 (%)',
+  'ankiWorkbench.workload.retentionTo': '変更後 (%)',
+  'ankiWorkbench.workload.modifierFrom': '現在 (%)',
+  'ankiWorkbench.workload.modifierTo': '変更後 (%)',
+  'ankiWorkbench.workload.summary':
+    'スケジュール済み {cards} 枚: 現在は 1 日 {current} 回、変更後は {proposed} 回。',
+  'ankiWorkbench.workload.deltaNone': '変化なし: この案は現在の設定と同じです。',
+  'ankiWorkbench.workload.deltaUp':
+    '1 日あたり {delta} 回増え、約 {percent}% 多くなります。間隔は現在の {ratio} 倍になります。',
+  'ankiWorkbench.workload.deltaDown':
+    '1 日あたり {delta} 回減り、約 {percent}% 少なくなります。間隔は現在の {ratio} 倍になります。',
+  'ankiWorkbench.workload.intervals': '平均間隔は現在 {current} 日、変更後は {proposed} 日。',
+  'ankiWorkbench.workload.horizonUnchanged':
+    '下の日数はこの案では変わりません。Anki は次の解答時にカードを再スケジュールするため、すでに予定されたカードは動きません。',
+  'ankiWorkbench.workload.horizonRow': '{offset} 日後: {cards} 枚',
+  'ankiWorkbench.workload.horizonMore': 'さらに {days} 日間で {cards} 枚',
+  'ankiWorkbench.workload.backlog': '{cards} 枚はすでに期限切れで、上の日数には含まれていません。',
+  'ankiWorkbench.workload.excluded':
+    '対象外: 新規・学習中 {unscheduled} 枚、休止・埋没 {withheld} 枚、フィルタードデッキに貸出中 {filtered} 枚、間隔なし {noInterval} 枚。',
+  'ankiWorkbench.workload.provenanceRetention':
+    'このデッキから読み取った値: 各カードの間隔。あなたが入力した値: 保持率の両方。パッケージにはデッキオプションが含まれないためです。曲線には固有の FSRS パラメータではなく固定の減衰 {decay} を使用します。',
+  'ankiWorkbench.workload.provenanceModifier':
+    'このデッキから読み取った値: 各カードの間隔。あなたが入力した値: 補正値の両方。パッケージにはデッキオプションが含まれないためです。',
+  'ankiWorkbench.workload.previewOnly':
+    'これは推定値です。デッキオプションはパッケージに含まれないため、ここから適用することはできません。プリセットは Anki 側で変更してください。',
+  'ankiWorkbench.workload.refusal.no-scheduled-cards':
+    'このデッキにはまだ復習間隔を持つカードがないため、比較できる学習量がありません。一度も学習していないデッキには予測するものがありません。',
+  'ankiWorkbench.workload.refusal.retention-out-of-range':
+    '目標保持率は Anki が受け付ける 70%〜99% の範囲である必要があります。',
+  'ankiWorkbench.workload.refusal.modifier-out-of-range': '間隔補正は 0 より大きい必要があります。',
+  'ankiWorkbench.workload.refusal.no-collection-origin':
+    'このソースはコレクション作成日を報告しないため、カードの期日が不明な起点から数えられ、予測全体が不明な日数だけずれてしまいます。',
   'ankiWorkbench.journal.title': '履歴: {notes} 件のノートに {applied} ステップ',
   'ankiWorkbench.journal.batch': '{notes} 件のノートへの {ops} 件の一括変更',
   'ankiWorkbench.journal.single': '{notes} 件のノートの単独編集',

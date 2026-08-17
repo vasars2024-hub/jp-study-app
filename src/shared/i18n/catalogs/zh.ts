@@ -9068,6 +9068,41 @@ export const zh: Catalog = {
     '此来源未报告收藏集的创建日期，卡片的到期日便是从未知起点计算的，所有逾期读数都会偏差同样的未知量。',
   'ankiWorkbench.stale.refusal.threshold-too-small':
     '停滞阈值至少为 1 天。',
+  'ankiWorkbench.workload.title': '复习负荷',
+  'ankiWorkbench.workload.kind.retention': '目标记忆保持率',
+  'ankiWorkbench.workload.kind.interval-modifier': '间隔修正',
+  'ankiWorkbench.workload.retentionFrom': '当前 (%)',
+  'ankiWorkbench.workload.retentionTo': '拟改为 (%)',
+  'ankiWorkbench.workload.modifierFrom': '当前 (%)',
+  'ankiWorkbench.workload.modifierTo': '拟改为 (%)',
+  'ankiWorkbench.workload.summary':
+    '已排程 {cards} 张卡片：当前每天 {current} 次复习，更改后为 {proposed} 次。',
+  'ankiWorkbench.workload.deltaNone': '没有变化：该方案与当前设置相同。',
+  'ankiWorkbench.workload.deltaUp':
+    '每天多 {delta} 次复习，约多 {percent}% 的工作量。间隔将变为当前的 {ratio} 倍。',
+  'ankiWorkbench.workload.deltaDown':
+    '每天少 {delta} 次复习，约少 {percent}% 的工作量。间隔将变为当前的 {ratio} 倍。',
+  'ankiWorkbench.workload.intervals': '平均间隔当前为 {current} 天，更改后为 {proposed} 天。',
+  'ankiWorkbench.workload.horizonUnchanged':
+    '下面的天数不会因该方案而改变。Anki 在卡片下次作答时才重新排程，因此已排程的卡片不会移动。',
+  'ankiWorkbench.workload.horizonRow': '{offset} 天后：{cards} 张',
+  'ankiWorkbench.workload.horizonMore': '之后 {days} 天还有 {cards} 张',
+  'ankiWorkbench.workload.backlog': '{cards} 张卡片已过期，未计入上面的天数。',
+  'ankiWorkbench.workload.excluded':
+    '未计入：新卡或学习中 {unscheduled} 张、暂停或搁置 {withheld} 张、借出到筛选牌组 {filtered} 张、无间隔 {noInterval} 张。',
+  'ankiWorkbench.workload.provenanceRetention':
+    '从本牌组读取：每张卡片的间隔。由你填写：两个保持率数值，因为软件包不包含牌组选项。曲线使用固定衰减 {decay}，而非你自己的 FSRS 参数。',
+  'ankiWorkbench.workload.provenanceModifier':
+    '从本牌组读取：每张卡片的间隔。由你填写：两个修正数值，因为软件包不包含牌组选项。',
+  'ankiWorkbench.workload.previewOnly':
+    '这是估算值。牌组选项不属于软件包的一部分，因此无法从工作台应用——请在 Anki 中更改预设。',
+  'ankiWorkbench.workload.refusal.no-scheduled-cards':
+    '本牌组还没有任何卡片具有复习间隔，因此没有可比较的复习负荷。从未学习过的牌组无从预测。',
+  'ankiWorkbench.workload.refusal.retention-out-of-range':
+    '目标记忆保持率必须在 Anki 自身接受的 70% 至 99% 之间。',
+  'ankiWorkbench.workload.refusal.modifier-out-of-range': '间隔修正必须大于零。',
+  'ankiWorkbench.workload.refusal.no-collection-origin':
+    '该来源未报告收藏创建日期，因此卡片的到期日从未知起点计算，整个预测都会偏移未知的天数。',
   'ankiWorkbench.journal.title': '历史：{notes} 条笔记上的 {applied} 个步骤',
   'ankiWorkbench.journal.batch': '对 {notes} 条笔记的 {ops} 处批量更改',
   'ankiWorkbench.journal.single': '对 {notes} 条笔记的单次编辑',

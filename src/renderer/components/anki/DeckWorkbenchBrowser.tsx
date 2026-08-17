@@ -70,6 +70,7 @@ import DeckWorkbenchDuplicates from './DeckWorkbenchDuplicates';
 import DeckWorkbenchMedia from './DeckWorkbenchMedia';
 import DeckWorkbenchSiblings from './DeckWorkbenchSiblings';
 import DeckWorkbenchStale from './DeckWorkbenchStale';
+import DeckWorkbenchWorkload from './DeckWorkbenchWorkload';
 
 const ROW_HEIGHT = 34;
 /** How far PageUp/PageDown moves the cursor. */
@@ -166,6 +167,8 @@ export default function DeckWorkbenchBrowser({
   const [siblingsOpen, setSiblingsOpen] = useState(false);
   /** Recipe 18's schedule scan, same rule. */
   const [staleOpen, setStaleOpen] = useState(false);
+  /** Recipe 26's workload estimate. Reports only — see the panel's own note. */
+  const [workloadOpen, setWorkloadOpen] = useState(false);
   const anchor = useRef<string | null>(null);
 
   /**
@@ -558,6 +561,15 @@ export default function DeckWorkbenchBrowser({
         >
           {t('ankiWorkbench.stale.title')}
         </button>
+        <button
+          type="button"
+          className={`btn${workloadOpen ? ' primary' : ''}`}
+          aria-pressed={workloadOpen}
+          aria-expanded={workloadOpen}
+          onClick={() => setWorkloadOpen((open) => !open)}
+        >
+          {t('ankiWorkbench.workload.title')}
+        </button>
         {/* Switching view never touches the selection — the plan requires a
             batch to survive a look at the sample cards. */}
         <div role="group" aria-label={t('ankiWorkbench.browser.view')}>
@@ -681,6 +693,14 @@ export default function DeckWorkbenchBrowser({
           is currently showing, and scoping the scan would report a backlog the
           user could not act on because most of it was never counted. */}
       {staleOpen && <DeckWorkbenchStale draft={draft} onQuery={setQuery} />}
+
+      {/* Recipe 26's consumer. Whole-draft for the strongest version of the
+          reason above: workload is a property of the schedule, and a version
+          scoped to the filtered rows would answer "how much of my daily
+          reviewing happens to be on screen", which nobody asked. It hands
+          nothing back to the search box because it proposes no query — the
+          thing it estimates is not a card property. */}
+      {workloadOpen && <DeckWorkbenchWorkload draft={draft} />}
 
       {view === 'samples' && (
         <DeckWorkbenchSamples
