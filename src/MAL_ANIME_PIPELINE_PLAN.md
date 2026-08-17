@@ -1536,3 +1536,50 @@ languages still yields the Japanese file.
 **Gate 31 Route A: still open, and now 2 of the 3 seed-healthy candidates are eliminated on
 language.** Remaining: **Les Misérables: Shoujo Cosette, 18.10 MB, 4 seeders** — the last one.
 **Next slice:** `node debug/g19n-nyaa-mine.cjs run "Les Misérables: Shoujo Cosette" 1695`.
+
+## 2026-08-17 — the pool was not exhausted: a 60 s cap was calling live swarms dead
+
+Worker `primary`. Commits `815542f5`, `430c99b6`. The previous entry's named next slice ran —
+`node debug/g19n-nyaa-mine.cjs run "Les Misérables: Shoujo Cosette" 1695` — and what it exposed was
+upstream of the candidate it was pointed at.
+
+**Les Misérables never reached vocabulary: 3 x 60 s, all `no peer sent its file list in time`,**
+with the torrent left resident in the client for 12 minutes between attempts. Read as a dead swarm
+it would have retired Route A's last seed-healthy candidate.
+
+**The control killed that reading.** Re-fetched **Gundam X (MAL 92)**, the pack that delivered 47
+files on 2026-08-17 — **it timed out too**. So the failures were not properties of those releases.
+Also measured in the same session: `[DeadFish] Ghost Hound - Batch` (7,782.40 MB, 6 seeders, the
+Route B leg's first-ever attempt) — timed out at 61,293 ms.
+
+**`815542f5` — `connected` was answering a different question.** `scraperQbitTest` read
+`connected, 1 ms, v5.2.3` throughout, because it proves the **WebUI** is reachable. `transfer/info`
+carries qBittorrent's own `connection_status`; `qbitTest` now reports it as
+`QbitStatusReport.connection`, and the metadata timeout consults it once on the way out and blames
+the client rather than the release when it reads `disconnected`. Scoped with three tests:
+`firewalled` is **not** an outage (this machine logs `no router found` and reaches swarms fine), a
+build that 404s the route keeps the old wording, and a successful fetch never issues the request.
+qbit suites **98/98** (91 before); mutation control, branch disabled → 1 failure, the intended one.
+**LIVE after restart: `connection: "connected"`** — so it did not explain today. Said plainly.
+
+**`430c99b6` — the actual defect, found by polling instead of inferring.** `debug/qbit-meta-window.cjs`
+watched the transfer list: Ghost Hound sat at `size: 0` for **six consecutive 30 s samples**, then
+**8,153,820,936 bytes at t+6.1 min**, then `paused` at `progress: 0`. The swarm was never silent.
+`METADATA_TIMEOUT_MS` was **60 s** on the stated premise "a swarm silent for a minute has nothing to
+send", generalised from one release that answered in 4 s. Now **480 s**. Waiting is free —
+`stopCondition=MetadataReceived` stopped that 8.15 GB batch itself at zero progress — and the
+existing `Math.min` means the suite's 5 s budgets are untouched (file still 25 s). The refusal now
+names the minutes waited.
+
+**Gate 31 Route A is NOT exhausted, and the previous entry's closing line is retracted.** Gundam X
+and Ashita no Joe stay eliminated — those were **language**, measured on file text, and unaffected.
+Les Misérables is **untested**, not dead: it was only ever refused by the 60 s cap. Gate count
+unchanged at **32 of 34** (open: 31, 34), counted from this file's own gate tables.
+
+**Trap: `require()` caches `debug/bridge.json`.** A poll loop that re-`require`s it to wait for a
+restart reads the dead bridge forever. Use `JSON.parse(readFileSync(...))`.
+
+**Next slice: re-run Les Misérables and Ghost Hound on the 8-minute wait** —
+`node debug/g19n-nyaa-mine.cjs run "Les Misérables: Shoujo Cosette" 1695`, then
+`node debug/g31b-routeb.cjs fetch "Shinreigari" 2596`. Both need a restart first (main does not
+hot-reload) and both were refused only by the old cap.
