@@ -376,9 +376,18 @@ This slice is complete only when all of these can be shown with real data and no
     upper bits are reserved and are not in the draft. `reps`/`lapses`/`left` stayed
     read-only as a new `card-review-counters` row: the revlog holds a row per review,
     so a rewritten counter would contradict the card's own history.
-    **What the gate still weighs is untouched: the tray has no builder control for
-    the action, and nothing has been re-read from the real 3,221-note deck.** Do not
-    report this gate as passing on the tags/deck/due thirds, nor on these tests.
+    **The builder control landed 2026-08-17** (`12a02f69`): `set-card-state` joins
+    `ACTION_KINDS` and step 5's "Learning rules", with all three parts opening on
+    "leave unchanged" and Add still enabled from the empty form so
+    `card-state-empty` refuses out loud instead of a disabled button explaining
+    nothing. `ANKI_CARD_FLAGS` is exported from the decoder so the form cannot
+    label a colour `decodeCardFlag` never returns, and both honest limits are said
+    before Add. 8 renderer tests; 140 green across the five affected suites.
+    **What the gate still weighs is one thing: nothing has been re-read from the
+    real 3,221-note deck.** That deck is the **local** source, not an `.apkg`.
+    Batch flag + suspension + interval/ease on it, export, re-read through the real
+    path, prove the resulting flag/queue/`ivl`/`factor`. Do not report this gate as
+    passing on the tags/deck/due thirds, nor on these tests.
 6. Safely edit a multi-template and cloze note without confusing fields with generated cards or breaking sibling renders.
 7. Interrupt a large import, translation, dry run, and live commit; recover without a false success state or an ambiguous partial result.
 8. Undo a draft action, reverse a supported committed action, and clearly explain any adapter operation that cannot be reversed.

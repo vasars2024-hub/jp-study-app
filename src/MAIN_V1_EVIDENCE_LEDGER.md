@@ -24607,3 +24607,43 @@ Gates this turn: `npx vitest run` **709 files passed / 1 skipped, 9,717 passed, 
   (`debug/stage-gate5-catalogs.cjs`, reverse-swap === HEAD as the guard); slice 2 was one
   contiguous block and `debug/stage-catalog-insert.cjs` handled it. Both commits re-verified in a
   detached worktree at their own HEAD.
+
+## 2026-08-17 — Track 7 / gate 5: the builder control the batch had no door to (`primary`)
+
+- `12a02f69`. `set-card-state` had a model, two writers, a describe arm and 25 tests since
+  `67512897`/`8901e775` — and was **absent from `ACTION_KINDS`**, so nothing in the product
+  could queue it. A capability reachable only from a test is not a capability; gate 5 weighs
+  "batch-edit … then reread", and neither destination was reachable from the UI.
+- **Step 5, "Learning rules"**, with `prioritize-new` and `reschedule-stale`: the three parts
+  all decide *when and whether* a card is seen. It is also the third kind that writes cards
+  rather than fields. `deckWorkbench.test.tsx`'s partition assertion is the guard.
+- **DECISION: all three parts open on "leave unchanged", and Add stays enabled from the empty
+  form.** Every other kind in this tray has one subject; this one has three, and a form that
+  pre-selected any of them would flag every card of a selection the user came to reschedule.
+  `planChangeTray` then blocks on `card-state-empty` — a disabled Add would be a control that
+  does nothing with no sentence saying why. Tradeoff: one extra click to reach a real action.
+- `ANKI_CARD_FLAGS` is now **exported** from `shared/ankiDraft.ts` (was module-private `FLAGS`,
+  index-aligned with the stored column's low three bits). A second hand-written list in the form
+  would be free to label a colour `decodeCardFlag` never returns; the test asserts the select's
+  options are `['', ...ANKI_CARD_FLAGS]` exactly.
+- **Both honest limits are said BEFORE Add**, the placement recipe 10's "nothing will reschedule"
+  uses: a running Anki cannot take a flag (`card-flag` is `blocked` on connect — the only route
+  assigns the whole `flags` column, whose reserved bits are not in the draft), and an unsuspend
+  can refuse per card because Anki stores no queue to return to.
+- **Tests: 8 renderer cases**, including the negative control that Add from the untouched form
+  queues and blocks with `card-state-empty` and a disabled Apply, and that an ease of 900 is
+  refused as `card-state-invalid` rather than clamped to `MIN_EASE_FACTOR`. 140 green across
+  `deckWorkbenchTray`, `deckWorkbench`, `ankiCardStateTray`, `ankiCardState`, `apkgExportCore`.
+- **GATE 5 IS STILL NOT CLOSED.** What remains is exactly one thing and it is the load-bearing
+  half: **batch it on the real 3,221-note LOCAL deck** (not an `.apkg` — the ledger's "3,221"
+  is the local source, `:21791`), export, re-read through the real path, and prove the resulting
+  flag/queue/`ivl`/`factor`. Do not report the gate on these tests.
+- **TRAP, unchanged and still live:** the four catalogs carry another track's localization
+  campaign (en +192/-9, ja and zh +744/-559, ru +703/-518 against HEAD). `git add` on one lands
+  it. `debug/stage-catalog-insert.cjs "<blockFirstLine>" "<anchor>"` handled all four in one
+  call — 10 keys each, `remainder===HEAD true` on every one.
+- **TURN GATES, shared tree:** `npx vitest run` **728 files / 10,059 tests / 0 failed** / 6
+  skipped, 72 s · `node tools/i18n-check.cjs` exit 0 at **10,554** English keys (+10, mine) ·
+  `node tools/architecture-audit.cjs` exit 0, "Nothing new", 6 pending · `npx eslint` on all 8
+  touched paths **0 errors** (81 warnings, all pre-existing `no-non-null-assertion` in the test
+  files, the idiom those files already use throughout).
