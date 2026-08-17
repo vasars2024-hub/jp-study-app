@@ -296,32 +296,53 @@ export async function fetchSubtitleHarvest(ids: readonly string[]): Promise<Subt
 // supply. `nyaaSearch` only ever used `mediaId` to look a title up, and
 // `nyaaFetchAll` never sees one.
 
+/** What one synced MAL row tells a harvest about the work it is searching for. */
+interface StoredMalFacts {
+  /** Every other name the catalogue publishes, or none. */
+  aliases: string[];
+  /** Episodes the work has, or null when unknown or still airing. */
+  totalEpisodes: number | null;
+}
+
+const NO_MAL_FACTS: StoredMalFacts = { aliases: [], totalEpisodes: null };
+
 /**
- * The names a synced MAL row carries, or none.
+ * What a synced MAL row says about this work, or nothing.
  *
  * The sync writes `altTitles` for 1,373 of the user's 1,429 rows and, until
  * this call existed, nothing read them back — 41 % of `mal-library.json` was a
  * field with no reader, and the case it was added for still failed from the UI:
  * MAL 2596's `Ghost Hound` reached disk and stopped there.
  *
+ * `totalEpisodes` rides along from the same row on purpose. It is the size floor
+ * a range listing is judged against, and reading it separately would mean
+ * parsing an 806 KB file twice to answer one listing.
+ *
  * Anime only, because a nyaa subtitle harvest is about episodes and the library
  * keys manga separately under the same numbers.
  *
- * Never throws: an absent, corrupt or newer-versioned library is an empty alias
- * list, and a listing that searches one name is still a listing.
+ * Never throws: an absent, corrupt or newer-versioned library is no facts at
+ * all, and a listing that searches one name is still a listing.
  */
-function storedMalAliases(malId: number | null | undefined): string[] {
-  if (typeof malId !== 'number' || !Number.isFinite(malId) || malId <= 0) return [];
+function storedMalFacts(malId: number | null | undefined): StoredMalFacts {
+  if (typeof malId !== 'number' || !Number.isFinite(malId) || malId <= 0) return NO_MAL_FACTS;
   try {
     const wanted = malLibraryKey('anime', malId);
     for (const entry of readMalLibrary().entries) {
       if (malLibraryKey(entry.media, entry.malId) !== wanted) continue;
-      return (entry.altTitles ?? []).filter((name) => typeof name === 'string' && !!name.trim());
+      // MAL means "still airing" by 0, so it is an unknown count rather than a
+      // zero-episode work — and an unknown count must not impose a floor.
+      const episodes = entry.totalEpisodes;
+      return {
+        aliases: (entry.altTitles ?? []).filter((name) => typeof name === 'string' && !!name.trim()),
+        totalEpisodes:
+          typeof episodes === 'number' && Number.isFinite(episodes) && episodes > 0 ? episodes : null,
+      };
     }
   } catch {
-    return [];
+    return NO_MAL_FACTS;
   }
-  return [];
+  return NO_MAL_FACTS;
 }
 
 /**
@@ -335,9 +356,10 @@ function storedMalAliases(malId: number | null | undefined): string[] {
 export async function listNyaaHarvest(
   input: HarvestNyaaListInput,
 ): Promise<HarvestNyaaListResult> {
+  const stored = storedMalFacts(input?.malId);
   const aliases = harvestSearchAliases(input?.title ?? '', [
     ...(input?.titles ?? []),
-    ...storedMalAliases(input?.malId),
+    ...stored.aliases,
   ]);
   if (!aliases.length) {
     return { ok: false, candidates: [], message: 'No title to search the index with.', searchedAs: null };
@@ -363,7 +385,16 @@ export async function listNyaaHarvest(
     let searchedAs: string | null = null;
     for (const [index, title] of aliases.entries()) {
       if (index) await sleep(FETCH_PACING_MS);
-      const candidates = await nyaaSearch({ config, title, season, episode: null, languages: ['ja'] });
+      const candidates = await nyaaSearch({
+        config,
+        title,
+        season,
+        episode: null,
+        languages: ['ja'],
+        // The listing asks for the whole work at once, so a release that can
+        // only hold one episode is not an answer to it.
+        episodeCount: stored.totalEpisodes,
+      });
       if (!candidates.length) continue;
       found = candidates;
       searchedAs = index ? title : null;

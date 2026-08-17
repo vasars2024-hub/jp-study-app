@@ -82,6 +82,47 @@ export function acquisitionConfigFrom(settings: {
  */
 export const SUBTITLE_SIZE_CEILING_BYTES = 50 * 1024 * 1024;
 
+/**
+ * The least a subtitle-only release may weigh for each episode it is offered
+ * as an answer to.
+ *
+ * The ceiling above stops a video release pretending to be subtitles. Nothing
+ * stopped the opposite, and it was measured rather than imagined: surveying the
+ * user's library for whole-series packs nominated
+ * `[IsThisYuri] Black Rock Shooter - Dawn Fall 08 subtitles (DROPPED: ...)`,
+ * **26,726 bytes**, as a pack for an 8-episode show. It passes every existing
+ * gate — non-zero, under 50 MB, no container extension, a `subtitles` signal —
+ * because it *is* honestly a subtitle release. It is one episode of one, and of
+ * a different work besides.
+ *
+ * 6 KB is deliberately well under a real episode of cues (a styled `.ass` runs
+ * 15-80 KB, a bare `.srt` 10-40 KB), because this gate exists to catch an
+ * order-of-magnitude mismatch and not to referee a plausible pack. At 8
+ * episodes it refuses the 26 KB release above with room to spare; at 500 it
+ * asks a Naruto-sized pack for 3 MB, which 500 episodes of text exceed several
+ * times over.
+ */
+export const SUBTITLE_PACK_BYTES_PER_EPISODE = 6 * 1024;
+
+/**
+ * Whether a subtitle-only release is big enough to hold `episodeCount`
+ * episodes of cues.
+ *
+ * True when the count is unknown or 1: a small file is exactly what a single
+ * episode's subtitles look like, and refusing it there would break the OVAs,
+ * specials and shorts that make up the short end of a real library. The floor
+ * is a statement about a *range* request, not about small files.
+ */
+export function packCoversEpisodeCount(
+  sizeBytes: number,
+  episodeCount: number | null | undefined,
+): boolean {
+  if (typeof episodeCount !== 'number' || !Number.isFinite(episodeCount) || episodeCount <= 1) {
+    return true;
+  }
+  return sizeBytes >= episodeCount * SUBTITLE_PACK_BYTES_PER_EPISODE;
+}
+
 /** Text cue formats the record layer can store, keyed by extension. */
 const TEXT_SUBTITLE_FORMATS: Record<string, SubtitleRecordFormat> = {
   ass: 'ass',
@@ -233,6 +274,15 @@ export interface NyaaSubtitleWant {
    * dropped; omitting it keeps every row, which is what the older callers did.
    */
   title?: string;
+  /**
+   * How many episodes the caller is asking to be answered at once.
+   *
+   * Set by a range harvest, which searches with `episode: null` and therefore
+   * cannot tell a season pack from one episode's sidecar by the query alone.
+   * Omitted by the per-episode discovery path, where a single small file is the
+   * correct answer — see `packCoversEpisodeCount`.
+   */
+  episodeCount?: number | null;
 }
 
 /**
@@ -313,7 +363,12 @@ export function rankSubtitleCandidates(
     if (row.seeders < minSeeders) continue;
     if (want.title && !looksLikeSameTitle(row.name, want.title)) continue;
 
-    const isPack = looksLikeSubtitleOnly(row);
+    // A subtitle-only release too small to hold the requested range is dropped
+    // outright rather than demoted: `couldCarrySidecarSubtitles` refuses
+    // anything `looksLikeSubtitleOnly` accepts, so it cannot fall through to
+    // the batch route and be offered as a multi-gigabyte download instead.
+    const isPack =
+      looksLikeSubtitleOnly(row) && packCoversEpisodeCount(row.sizeBytes, want.episodeCount);
     const isBatch = !isPack && couldCarrySidecarSubtitles(row);
     if (!isPack && !isBatch) continue;
 

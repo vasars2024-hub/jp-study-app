@@ -9,7 +9,9 @@ import {
   languageFromFileName,
   looksLikeSameTitle,
   looksLikeSubtitleOnly,
+  packCoversEpisodeCount,
   rankSubtitleCandidates,
+  SUBTITLE_PACK_BYTES_PER_EPISODE,
   selectSubtitleFiles,
   subtitleFormatFor,
   subtitlePackSignals,
@@ -239,6 +241,73 @@ describe('rankSubtitleCandidates', () => {
   it('never returns a row that fails both routes', () => {
     const single = row({ name: '[Group] Show - 01 [1080p].mkv', sizeBytes: 1_400 * MB, subtitleLanguages: ['ja'] });
     expect(rankSubtitleCandidates([single], { languages: ['ja'] })).toEqual([]);
+  });
+});
+
+describe('packCoversEpisodeCount', () => {
+  // Both halves matter. The floor exists to refuse a one-episode file offered
+  // for a season; it must not refuse a one-episode file offered for one episode,
+  // which is what the short end of a real library is made of.
+  it('imposes no floor when the episode count is unknown, zero or one', () => {
+    expect(packCoversEpisodeCount(26_726, undefined)).toBe(true);
+    expect(packCoversEpisodeCount(26_726, null)).toBe(true);
+    // MAL writes 0 for "still airing", which is an unknown count, not none.
+    expect(packCoversEpisodeCount(26_726, 0)).toBe(true);
+    expect(packCoversEpisodeCount(26_726, 1)).toBe(true);
+    expect(packCoversEpisodeCount(26_726, Number.NaN)).toBe(true);
+  });
+
+  it('scales with the episodes asked for', () => {
+    expect(packCoversEpisodeCount(8 * SUBTITLE_PACK_BYTES_PER_EPISODE, 8)).toBe(true);
+    expect(packCoversEpisodeCount(8 * SUBTITLE_PACK_BYTES_PER_EPISODE - 1, 8)).toBe(false);
+  });
+});
+
+describe('rankSubtitleCandidates episode floor', () => {
+  // Measured, not invented: this exact release was nominated as a whole-series
+  // pack for the 8-episode Black★Rock Shooter (TV) by the 2026-08-17 library
+  // survey. It is one episode of Dawn Fall, a different work.
+  const tooSmall = row({
+    id: 'yuri',
+    name: '[IsThisYuri] Black Rock Shooter - Dawn Fall 08 subtitles (DROPPED: This is yuri!)',
+    sizeBytes: 26_726,
+    subtitleLanguages: ['ja'],
+    seeders: 1,
+  });
+
+  it('drops a one-episode subtitle file offered as a pack for a whole show', () => {
+    expect(rankSubtitleCandidates([tooSmall], { languages: ['ja'], episodeCount: 8 })).toEqual([]);
+  });
+
+  it('keeps the very same release when only one episode is asked for', () => {
+    // The negative control for the gate above: if this also came back empty the
+    // floor would be refusing small files rather than refusing bad answers.
+    const ranked = rankSubtitleCandidates([tooSmall], { languages: ['ja'] });
+    expect(ranked).toHaveLength(1);
+    expect(ranked[0].route).toBe('sub-pack');
+  });
+
+  it('keeps a genuine season pack, measured against a real one', () => {
+    // `Eureka Seven - Psalms of Planets - subs only`, 39.20 MB, 50 episodes —
+    // found live by the same survey, and the case the floor must not break.
+    const real = row({
+      id: 'eureka',
+      name: 'Eureka Seven - Psalms of Planets - subs only (for the 50 episode TV series)',
+      sizeBytes: Math.round(39.2 * MB),
+      subtitleLanguages: ['ja'],
+      seeders: 1,
+      isBatch: true,
+    });
+    const ranked = rankSubtitleCandidates([real], { languages: ['ja'], episodeCount: 50 });
+    expect(ranked).toHaveLength(1);
+    expect(ranked[0].route).toBe('sub-pack');
+  });
+
+  it('drops the undersized pack rather than demoting it to a batch download', () => {
+    // The failure this guards: falling through to `batch-sidecar` would answer
+    // "this 26 KB file is too small" by offering a multi-gigabyte video torrent.
+    const flagged = row({ ...tooSmall, id: 'flagged', isBatch: true, fileCount: 0 });
+    expect(rankSubtitleCandidates([flagged], { languages: ['ja'], episodeCount: 8 })).toEqual([]);
   });
 });
 

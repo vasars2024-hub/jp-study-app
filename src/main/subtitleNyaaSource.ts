@@ -198,6 +198,13 @@ export interface NyaaSearchInput {
   episode: number | null;
   /** Languages discovery still needs. */
   languages: string[];
+  /**
+   * How many episodes this search is meant to answer at once.
+   *
+   * Only a range harvest sets it. Discovery asks per episode and leaves it
+   * unset, which is what keeps a single episode's sidecar a valid answer there.
+   */
+  episodeCount?: number | null;
 }
 
 /**
@@ -259,6 +266,9 @@ export async function nyaaSearch(input: NyaaSearchInput): Promise<NyaaProviderCa
     // The index matched this query, not this title. Without the title here the
     // listing offers releases of other shows entirely.
     title: input.title,
+    // A range request cannot be answered by one episode's cue file, and with
+    // `episode: null` the query itself cannot tell the two apart.
+    episodeCount: input.episodeCount,
   });
 
   return ranked.map((candidate) => ({
