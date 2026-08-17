@@ -26,6 +26,7 @@ import {
   type ApkgExportResult,
 } from '../../../shared/ankiApkgExport';
 import type { ConnectCommitResult } from '../../../shared/ankiConnectCommit';
+import DeckWorkbenchParity from './DeckWorkbenchParity';
 import { useT } from '../../i18n';
 
 export default function DeckWorkbenchApply({
@@ -128,6 +129,12 @@ export default function DeckWorkbenchApply({
               )}
             </>
           )}
+          {/* Scoped to `connect`: this branch writes the collection Anki has
+              open, where a deck rename and a template removal are refused. It
+              is rendered even when the change set is empty, because "what will
+              this never write" is a question asked before there is anything to
+              write. */}
+          <DeckWorkbenchParity destination="connect" />
         </section>
 
         {commit && commit.ok && (
@@ -217,6 +224,9 @@ export default function DeckWorkbenchApply({
             )}
           </>
         )}
+        {/* Scoped to `package`: this branch writes a NEW file, so both of the
+            capabilities the live commit refuses are written here for real. */}
+        <DeckWorkbenchParity destination="package" />
       </section>
 
       {result && result.ok && (

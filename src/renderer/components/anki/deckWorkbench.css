@@ -1347,3 +1347,100 @@
 .wb-review-empty-value {
   opacity: 0.7;
 }
+
+/* ----- the Anki parity matrix (acceptance gate 14) --------------------------- */
+
+/* A disclosure, because step 7's job is the button and this is the reference
+   beside it. Closed by default; the counts in the summary are what a user
+   scanning the step needs, and the sixteen rows are what they open it for. */
+.wb-parity {
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.wb-parity-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: baseline;
+  padding: 8px 10px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.wb-parity-counts {
+  font-weight: 400;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.wb-parity-intro,
+.wb-parity-destination {
+  margin: 0;
+  padding: 0 10px;
+  font-size: 0.8rem;
+}
+
+.wb-parity-destination {
+  padding-bottom: 6px;
+  font-weight: 600;
+}
+
+.wb-parity-rows {
+  margin: 0;
+  padding: 0 10px 10px;
+  list-style: none;
+}
+
+/* Each row is a block rather than a table row: the explanations are sentences,
+   and at a compact width a three-column table would either clip them or force a
+   horizontal scroll — both of which hide the honest part. */
+.wb-parity-row {
+  display: grid;
+  gap: 2px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+  min-width: 0;
+}
+
+.wb-parity-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.wb-parity-support {
+  font-size: 0.8rem;
+}
+
+/* The three levels are distinguished by a leading marker as well as by colour,
+   so the distinction survives high contrast and monochrome. */
+.wb-parity-support::before {
+  margin-right: 6px;
+}
+
+.wb-parity-supported .wb-parity-support::before {
+  content: '+';
+  color: var(--accent);
+}
+
+.wb-parity-read-only .wb-parity-support::before {
+  content: '=';
+}
+
+.wb-parity-blocked .wb-parity-support::before {
+  content: '!';
+  color: var(--status-error);
+}
+
+.wb-parity-why,
+.wb-parity-conditional {
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+.wb-parity-code {
+  font-size: 0.75rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
