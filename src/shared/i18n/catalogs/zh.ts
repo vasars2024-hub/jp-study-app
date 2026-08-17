@@ -8749,6 +8749,8 @@ export const zh: Catalog = {
     '此连接无法重命名正在使用的集合中的牌组，因此什么也没有写入。请改为导出软件包 — 重命名会写入其中。',
   'ankiWorkbench.apply.liveError.template-remove-unsupported':
     '无法通过此连接删除卡片模板，因此未写入任何内容。请改为导出牌组包 — 模板会在那里被真正删除。',
+  'ankiWorkbench.apply.liveError.template-add-unsupported':
+    '无法通过此连接提交卡片设计，因此未写入任何内容。哪些笔记会生成新卡片将由 Anki 自行决定，此设计向你显示的数量便不再是承诺。请改为导出牌组包 — 它会添加模板以及你所看到的那些卡片。',
   'ankiWorkbench.apply.liveError.card-flag-unsupported':
     '无法通过此连接设置卡片旗标，因此未写入任何内容。请改为导出牌组包 — 旗标会在那里被真正设置。',
   'ankiWorkbench.apply.liveError.deck-missing':

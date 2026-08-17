@@ -58,14 +58,18 @@ describe('the parity panel reads the matrix rather than restating it', () => {
     const asConnect = texts('.wb-parity-support');
     expect(asPackage).not.toEqual(asConnect);
 
-    // The difference is exactly the three capabilities a package writes and the
+    // The difference is exactly the four capabilities a package writes and the
     // live commit refuses — not a general "live does less" vibe. `card-flag`
     // joined the list with gate 5: the package rewrites the low three bits of a
     // column it can read, and AnkiConnect has no way to read it back.
+    // `template-add` joined when the card designer gained a destination, and it
+    // is the odd one out: AnkiConnect *has* `modelTemplateAdd`, but Anki would
+    // generate the cards itself, so the count the panel showed would stop being
+    // this workbench's to guarantee.
     const differing = asPackage
       .map((support, i) => (support === asConnect[i] ? null : ANKI_PARITY_ROWS[i].id))
       .filter(Boolean);
-    expect(differing).toEqual(['card-flag', 'deck-name', 'template-remove']);
+    expect(differing).toEqual(['card-flag', 'deck-name', 'template-remove', 'template-add']);
   });
 
   it('explains a cell only when it will not write', () => {
@@ -85,16 +89,20 @@ describe('the parity panel reads the matrix rather than restating it', () => {
   it('prints the refusal code the error banner would use, verbatim', () => {
     render('connect');
     const codes = texts('.wb-parity-code');
-    expect(codes).toHaveLength(3);
+    expect(codes).toHaveLength(4);
     expect(codes.join(' ')).toContain('deck-rename-unsupported');
     expect(codes.join(' ')).toContain('template-remove-unsupported');
+    expect(codes.join(' ')).toContain('template-add-unsupported');
     expect(codes.join(' ')).toContain('card-flag-unsupported');
   });
 
   it('carries the package-only conditionals without downgrading their rows', () => {
     render('package');
     const conditionals = texts('.wb-parity-conditional');
-    expect(conditionals).toHaveLength(2);
+    // Three: `template-storage-unsupported` rides on both template rows, since
+    // a package with no readable note-type list can neither gain a template nor
+    // lose one.
+    expect(conditionals).toHaveLength(3);
     expect(conditionals.join(' ')).toContain('deck-collation-unsupported');
     expect(conditionals.join(' ')).toContain('template-storage-unsupported');
     // Still supported: a conditional is a property of the source file, so the
@@ -112,6 +120,6 @@ describe('the parity panel reads the matrix rather than restating it', () => {
     // The stub renders `key:v1,v2,v3`, so the counts are readable as numbers.
     const [supported, readOnly, blocked] = summary.split(':')[1].split(',').map(Number);
     expect(supported + readOnly + blocked).toBe(ANKI_PARITY_ROWS.length);
-    expect(blocked).toBe(3);
+    expect(blocked).toBe(4);
   });
 });

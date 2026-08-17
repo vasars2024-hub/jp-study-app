@@ -9221,6 +9221,8 @@ export const en: Catalog = {
     'A live collection cannot be renamed through this connection, so nothing was written. Export a package instead — the rename is written there.',
   'ankiWorkbench.apply.liveError.template-remove-unsupported':
     'A card template cannot be removed through this connection, so nothing was written. Export a package instead — the template is removed there.',
+  'ankiWorkbench.apply.liveError.template-add-unsupported':
+    'A card design cannot be committed through this connection, so nothing was written. Anki would decide for itself which notes get the new card, so the number this design showed you would stop being a promise. Export a package instead — it adds the template and exactly the cards you were shown.',
   'ankiWorkbench.apply.liveError.card-flag-unsupported':
     'A card flag cannot be set through this connection, so nothing was written. Export a package instead — the flag is set there.',
   'ankiWorkbench.apply.liveError.deck-missing':

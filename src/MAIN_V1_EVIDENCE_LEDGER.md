@@ -24863,3 +24863,52 @@ the file. Splice into the raw bytes and take each insert's EOL from the insertio
 (2) `git hash-object` refuses `--path` together with `--no-filters`; use `--no-filters` alone
 and match HEAD's endings yourself. (3) A multi-line anchor in such a file must be matched with
 `\r?\n`, or it silently fails to find text that is plainly there.
+
+## 2026-08-17 — Track 7 / gate 14: the designer's destination, and Anki's own collation (`primary`)
+
+Interrupted-work recovery. Worker `backup` hit a usage limit at 22:02:48 with 848 lines of
+`template-add` on disk, tested and unstaged, one second after writing its catalog staging
+script. Re-derived from the diff rather than from any summary, finished, and gated live.
+
+- `4052d840` — **the card designer reaches a destination.** `template-add` is the 7th journal
+  op, carrying the template, the added field and every card row verbatim (`template-remove`'s
+  reason: the inverse must undo what THIS design made). It appends, so nothing renumbers and
+  undo is a filter. Package writes both schemas — 18 through a new `encodeTemplateConfig`
+  (fields 1–4 only, round-tripped against the decoder), legacy through `col.models`; card ids
+  minted from `MAX(id)`, not the clock; read-back is writer-independent (found by `nid`+`ord`,
+  `count !== 1` fails, so a doubled write cannot verify clean). Live refuses
+  `template-add-unsupported`: `modelTemplateAdd` exists and *would* work, which is the
+  problem — Anki generates the cards, so the panel's count stops being ours to guarantee.
+  Parity row moves read-only/read-only → supported/blocked.
+- `50366c26` — **the live run's two findings, fixed.** `INSERT INTO templates` threw
+  `no such collation sequence: unicase` on the user's real ver-18 package: schema 18 declares
+  `templates.name COLLATE unicase` **and** a UNIQUE index over `(name, ntid)` the insert must
+  maintain — and the index is what makes the collation load-bearing, so a fixture with the
+  column alone inserts happily. `withoutMissingCollation` swaps that DDL to BINARY for the one
+  statement and restores it **verbatim in a `finally`**; the uniqueness the index can no longer
+  enforce becomes `template-name-taken`, case-insensitive on both storages, and
+  `planCardDesign` now matches case-insensitively too so the user hears it before Apply.
+  Second finding: `template-ord-taken`, `template-field-unsupported` and
+  `template-add-unsupported` had **no** `ankiWorkbench.apply.{error,liveError}.*` key, so
+  `DeckWorkbenchApply.tsx:379` rendered them as raw keys. 4 keys ×4 and
+  `template-storage-unsupported` widened to name adding as well as removing. **The gate for
+  this already existed** — `ankiTrayProblemStrings.test.ts` reads both unions from source — and
+  it was simply never run: the interrupted worker died before the suite. So the lesson is not a
+  missing gate, it is that targeted tests are not the suite.
+
+**Gate, live on `jlpt-n1-vocab.apkg` (`debug/design-live.cjs`, no dialog, app's own modules).**
+2,991 notes / 2,991 cards → `Card 2` at ord 1, **2,991 cards created in 157 ms**; re-read from
+the written bytes: **5,982 cards, 2,991 at ord 1**, qfmt/afmt identical, verify ok / **0**
+mismatches. **Controls:** 2,991/2,991 pre-existing cards identical in id, due, deck and queue;
+replay onto its own output → `template-ord-taken`; a design adding a field →
+`template-field-unsupported`; the i18n scan finds exactly **3** missing against HEAD and **0**
+against the worktree. `PRAGMA integrity_check` throws `no such collation sequence` on the
+**untouched** source too — not a check this write could have broken.
+
+**Traps.** (1) A `COLLATE unicase` column with no index over it inserts fine; the fixture must
+create `idx_templates_name_ntid` or the test is measuring nothing. (2) `new SQL.Database(bytes)`
+does not leave `bytes` reusable — a second Database over the same buffer opens
+`database disk image is malformed`. Re-read the zip per probe. (3) A capture-patch-restore
+control on `catalogs/en.ts` **wrote the patch and then failed to restore it** (`UNKNOWN`,
+errno −4094) — the shared file sat damaged until it was checked. Do controls against HEAD's
+blobs, not by mutating a shared catalog.

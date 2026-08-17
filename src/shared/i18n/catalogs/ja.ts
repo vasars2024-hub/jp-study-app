@@ -8796,6 +8796,8 @@ export const ja: Catalog = {
     'この接続では実行中のコレクションのデッキ名を変更できないため、何も書き込んでいません。代わりにパッケージを書き出してください。そちらには変更が反映されます。',
   'ankiWorkbench.apply.liveError.template-remove-unsupported':
     'この接続ではカードテンプレートを削除できないため、何も書き込まれませんでした。代わりにパッケージを書き出してください — そちらではテンプレートが削除されます。',
+  'ankiWorkbench.apply.liveError.template-add-unsupported':
+    'この接続ではカードデザインを反映できないため、何も書き込まれませんでした。どのノートに新しいカードを作るかはAnki自身が決めるため、このデザインが示した枚数が保証できなくなります。代わりにパッケージを書き出してください — そちらではテンプレートと、表示されたとおりの枚数のカードが追加されます。',
   'ankiWorkbench.apply.liveError.card-flag-unsupported':
     'この接続ではカードのフラグを設定できないため、何も書き込まれませんでした。代わりにパッケージを書き出してください — そちらではフラグが設定されます。',
   'ankiWorkbench.apply.liveError.deck-missing':

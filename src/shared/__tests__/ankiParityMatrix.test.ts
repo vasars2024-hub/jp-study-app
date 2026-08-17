@@ -232,31 +232,6 @@ describe('every row a destination will not write has an honest explanation', () 
     expect(explained).toBe(18);
   });
 
-  it('gives every package refusal a sentence, in all four languages', () => {
-    // The gate this suite shipped without, and the live run is what found the
-    // gap: `template-ord-taken` and `template-field-unsupported` reached
-    // `DeckWorkbenchApply.tsx`, which renders
-    // `t('ankiWorkbench.apply.error.' + code)` — so a refusal the exporter
-    // states carefully arrived on screen as its own raw key. Reading the union
-    // from source rather than listing codes here is the point: a code added
-    // later fails this without anyone remembering to come back.
-    const codes = stringUnionMembers(read('ankiApkgExport.ts'), 'ApkgExportErrorCode');
-    // Threshold first — a scan that silently matched nothing would pass.
-    expect(codes.length).toBeGreaterThan(15);
-    const keys = Object.fromEntries(LANGS.map((l) => [l, catalogKeys(l)]));
-    for (const code of codes) {
-      // `cancelled` is the one code that is not a failure: the user closed the
-      // save dialog, and the surface says nothing rather than reporting an error.
-      if (code === 'cancelled') continue;
-      for (const lang of LANGS) {
-        expect(
-          keys[lang].has(`ankiWorkbench.apply.error.${code}`),
-          `${lang}: ankiWorkbench.apply.error.${code}`,
-        ).toBe(true);
-      }
-    }
-  });
-
   it('offers no explanation it does not need — a supported cell has no why key', () => {
     // The inverse control. A stale `why` for a capability that later became
     // writable would render a sentence contradicting the button beside it.

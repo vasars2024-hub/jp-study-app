@@ -531,6 +531,43 @@ This slice is complete only when all of these can be shown with real data and no
     The `supported` half is **cited, not re-run**: each of the 6 journal-backed rows has its
     own dated live entry in the evidence ledger (recipes 2, 12, 6, 13, 12-deck, 17).
 
+    **That finding is FIXED 2026-08-17** (`4052d840`, `50366c26`). `template-add` is the 7th
+    journal op and moves to **package `supported` / connect `blocked`**; the matrix is now 17
+    rows / 10 changeable on the package. Live on the user's own `jlpt-n1-vocab.apkg`, through
+    the app's own reader, builder, writer and verifier: **2,991 notes / 2,991 cards → template
+    `Card 2` at ord 1 + 2,991 cards created in 157 ms**, re-read from the written bytes as
+    **5,982 cards, 2,991 at ord 1**, qfmt and afmt identical, `verifyExportChanges` ok / **0**
+    mismatches. Four controls, all firing: **2,991/2,991** pre-existing cards identical in id,
+    due, deck and queue; replaying the design onto its own output → `template-ord-taken`; a
+    design that adds a field → `template-field-unsupported`; and `PRAGMA integrity_check`
+    throws `no such collation sequence` on the **untouched** source too, so it is not a check
+    this write could have broken. Live is refused `template-add-unsupported` — not for want of
+    an AnkiConnect action (`modelTemplateAdd` exists) but because Anki generates the cards
+    itself, so the count the panel already showed would stop being this workbench's to
+    guarantee.
+
+    **The defect the live run found, and why fixtures could not:** `INSERT INTO templates`
+    threw `no such collation sequence: unicase`. Schema 18 declares
+    `templates.name COLLATE unicase` **and** puts a UNIQUE index over `(name, ntid)` that the
+    insert must maintain — and the collation is only load-bearing because of that index, so a
+    fixture with the column and no index inserts happily. Every package current Anki writes is
+    shaped this way, so the destination worked on fixtures and on nothing the user owns.
+    A deck *rename* could only be refused, because the name is the thing being changed; an
+    insert needs the collation only to prove uniqueness, which is answerable in JS first. So
+    `withoutMissingCollation` swaps the stored DDL to BINARY for that one statement and
+    restores it **verbatim in a `finally`**, and the dropped uniqueness becomes
+    `template-name-taken`, compared without case on both storages. Measured one statement at a
+    time: the INSERT fails, the `notetypes` mtime update and the card INSERT succeed.
+
+    **Second finding, same run:** `DeckWorkbenchApply.tsx` renders
+    `t('ankiWorkbench.apply.{error,liveError}.' + code)`, and `template-ord-taken`,
+    `template-field-unsupported` and `template-add-unsupported` had **no key** — three
+    carefully worded refusals arriving on screen as their own raw key. 4 keys ×4 added and
+    `template-storage-unsupported` widened to name adding as well as removing. The gate for
+    exactly this **already existed** (`ankiTrayProblemStrings.test.ts`, both unions read from
+    source) and was simply never run — so the lesson is that targeted tests are not the suite,
+    not that a gate was missing.
+
 15. **CSV/TSV text destination.** Open an Anki text export, edit it, export a NEW text file,
     re-read the exported file through the reader that opened it, and match: the directive
     block round-trips (separator, `#html:false`, `#columns:`, the special-column numbers),

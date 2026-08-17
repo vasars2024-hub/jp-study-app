@@ -16,6 +16,7 @@ vi.mock('../i18n', () => ({
 }));
 
 import type { AnkiDraft, AnkiDraftNote, AnkiDraftNoteType } from '../../shared/ankiDraft';
+import type { AnkiDraftEditOp } from '../../shared/ankiDraftEdit';
 import { DEFAULT_REVERSE_FLAG_FIELD } from '../../shared/ankiCardDesign';
 import DeckWorkbenchCardDesign from '../components/anki/DeckWorkbenchCardDesign';
 
@@ -98,9 +99,17 @@ afterEach(() => {
   host.remove();
 });
 
-/** Mount with a live draft the panel can actually replace, as the workbench does. */
-function mount(initial: AnkiDraft): { current: () => AnkiDraft } {
+/** Mount with a live draft the panel can actually replace, as the workbench does.
+ *  The journal is kept the same way `DeckWorkbench` keeps it — appended on
+ *  Apply, filtered on Remove — because the op is what reaches a destination:
+ *  gate 14 found a design that changed the draft and journalled nothing, so the
+ *  panel's card count was a promise no export could keep. */
+function mount(initial: AnkiDraft): {
+  current: () => AnkiDraft;
+  journal: () => AnkiDraftEditOp[];
+} {
   let draft = initial;
+  let journal: AnkiDraftEditOp[] = [];
   const render = () => {
     root?.render(
       <DeckWorkbenchCardDesign
@@ -109,6 +118,17 @@ function mount(initial: AnkiDraft): { current: () => AnkiDraft } {
           draft = next;
           act(() => render());
         }}
+        onDesignApplied={(op) => {
+          journal = [...journal, op];
+        }}
+        onDesignRemoved={(noteTypeId, templateOrd) => {
+          journal = journal.filter(
+            (op) =>
+              op.kind !== 'template-add'
+              || op.noteTypeId !== noteTypeId
+              || op.template.ord !== templateOrd,
+          );
+        }}
       />,
     );
   };
@@ -116,7 +136,7 @@ function mount(initial: AnkiDraft): { current: () => AnkiDraft } {
     root = createRoot(host);
     render();
   });
-  return { current: () => draft };
+  return { current: () => draft, journal: () => journal };
 }
 
 function select(label: string): HTMLSelectElement {
@@ -170,12 +190,27 @@ describe('DeckWorkbenchCardDesign', () => {
     const live = mount(draftOf([note({ id: 'n1' }), note({ id: 'n2' })]));
     act(() => button('ankiWorkbench.design.apply').click());
     expect(live.current().cards).toHaveLength(2);
+    // The op, not just the draft: `buildApkgExportChanges` folds the journal and
+    // nothing else, so a design missing from here is one no export can carry.
+    // It holds the cards verbatim because the inverse must take back what THIS
+    // design made and not what a later edit added at the same ord.
+    expect(live.journal()).toHaveLength(1);
+    const op = live.journal()[0]!;
+    expect(op.kind).toBe('template-add');
+    if (op.kind === 'template-add') {
+      expect(op.template.ord).toBe(1);
+      expect(op.cards.map((c) => c.noteId)).toEqual(['n1', 'n2']);
+    }
 
     act(() => button('ankiWorkbench.design.remove').click());
 
     expect(live.current().cards).toHaveLength(0);
     expect(live.current().noteTypes[0].templates).toHaveLength(1);
     expect(host.querySelector('.wb-design-applied-row')).toBeNull();
+    // Taken back out rather than inverted: there is no removal op for a template
+    // the source package never had, and a journal still carrying the add would
+    // claim an edit the user can see is gone.
+    expect(live.journal()).toHaveLength(0);
   });
 
   it('disables Apply and marks the reason when the card would ask its own answer', () => {
