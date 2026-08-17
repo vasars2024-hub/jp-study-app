@@ -1884,3 +1884,50 @@ one relaunch loaded in 20 s.
 
 **Gate 31 stays 32 of 34.** Route A has no new candidate in 160 titles and Route B has no sidecar in
 50; the pool is measured thin, not unlucky.
+
+## 2026-08-17 — the corpus's one subs-advertising release was refused by our own matcher
+
+Worker `primary`. Commits `60d04278` (fix) and this entry. App restarted for the shared change
+(main pid **10696**, `5173` in the health URL, 42 s).
+
+**The matcher was hiding the single Route B candidate this plan has ever found.**
+`[Yousei-raws] Gintama 銀魂 (2006-2010) ep001-201 [DVDrip …] + Subs` — the 1 name in 2,685 that
+advertises external subtitles, per the corpus scan two entries above — was refused by
+`looksLikeSameTitle` in **both** directions. Searching the romaji title, `銀魂` read as another
+work's word; searching the native alias, `gintama` did. `ep001` was a second, independent refusal
+on the same row: `ep001-201` splits into a bare `201`, dropped as digits, and an `ep001` that
+`RELEASE_MARKER` never covered. So the survey's "0 sub-packs in 160 titles" was measuring the pool
+*and* our own filter, and could not tell them apart.
+
+**Decision:** a claim word in a script the searched title does not use is *unreadable* evidence, not
+counter-evidence — romaji and native names are one work spelled two ways and no set membership can
+see that. The half-the-tokens ratio is untouched and still judges a genuinely different work first.
+Tradeoff: a release naming a different work **only** in the other script now passes the short-title
+rule; the ratio still has to accept it, which is why the negative control below is the sharp one.
+Same commit: `SHORT_TITLE_MAX_TOKENS` counts **distinct** tokens, so `Mirai no Mirai` (three tokens,
+two words) stops escaping the rule that was written for it.
+
+**LIVE, one variable — the restart.** Same call, `malId 918`, `subtitleHarvest:nyaaList`:
+before **0 rows** ("No release on the index looks like it carries subtitles for this title"), after
+**1 row**, `searchedAs="銀魂"` — the native-alias direction the fix restored — route `batch-sidecar`,
+**109,670.40 MB, 4 seeders**. Mutation controls on the two halves, 1 failure each and the intended
+one. Suites: `subtitleNyaa` 80/80, four matcher suites **119/119**.
+
+**And the answer it unblocked is a refusal, stated as a number.** Metadata handshake
+(`stopCondition=MetadataReceived`, 0 bytes of content, 11 s): **290 files, 114,997,054,438 bytes,
+269 `.mkv`, 20 `.jpg`, and 1 `.rar` — `eng_subs.rar`, 2.20 MB.** **0 text subtitle files, 0 bitmap.**
+The `+ Subs` is an English archive; the Japanese track is muxed into the 269 containers. Driven then
+through the app's own handler, `subtitleHarvestNyaaFetch` refused in **5 s**:
+*"This release contains no subtitle files. 290 file(s), 269 of them video — any subtitles it carries
+are inside the video."* Nothing downloaded, no false success. That is `noSubtitlesReason` earning
+its counts on the one release they were written for.
+
+**Gate 31 stays 32 of 34, and Route B is now genuinely data-blocked rather than filter-blocked** —
+which it was not, before this. The corpus holds no release that both advertises and carries
+Japanese sidecars; the next Route B lead has to come from a widened survey, not from this pool.
+
+**Cleanup, and one thing I did not do.** The `jp-study-subtitles` category is back to **0 rows**. It
+held a `[DB] Kaguya-sama …` row from an earlier turn at the start of this sequence and that row was
+gone by the next poll; I deleted only the Gintama hash, twice, by hash. Not chased, recorded.
+**Trap:** a `bash` heredoc in this environment eats backslashes — `/^WebUI\APIKey=/` reached disk as
+`/^WebUI\APIKey=/` and then as a syntax error. Write instruments with the Write tool.
