@@ -1432,3 +1432,58 @@ the same session: Alice to Therese still lists its 1 batch-sidecar row and Gunda
 **Gate status is unchanged by these two — they are a P4 listing-precision fix, not a gate.** 32 of 34
 closed; open are **31** (Route A's acquisition leg passed 2026-08-17; Route B and cues-in-the-player
 remain) and **34**.
+
+## 2026-08-17 — the pack Route A acquired was ENGLISH, and every gate above called it a success
+
+Worker `primary`. Commit `2627e201`, instrument `debug/g19n-nyaa-mine.cjs`. The previous entry's
+named next slice — "P5 on this real pack" — ran, and the pack did not survive it.
+
+**THE FINDING. 11,136 cues in, 0 words out.** The nyaa arm through its own modules, live: LIST
+`ok`, searched as `After War Gundam X`, the same 20.10 MB / 6-seeder `sub-pack`; FETCH **47 files,
+39 parsed, 8 nulls, episodes 1..39, 0 empty**; `combineSeasonCues` → **11,136 cues**; then
+`analyzeMediaStudyCues` → **0 chars, 0 unique vocabulary, 0 occurrences, 0 mineable**. Measured on
+the files on disk, independent of the app: **47 files, 11,285 dialogue lines, 0 kana, 292,568 Latin
+letters.** `After War Gundam X … Official Subtitles` is the official **English** subtitles. The
+entry above recorded "47 files, 21,079,165 chars, 39 episodes" and was true in every number it
+reported — none of them was the language.
+
+**CONTROL, because 0 words is either the miner or the data.** Same session, same
+`combineSeasonCues` → `analyzeMediaStudyCues`, Japanese input from the jimaku arm: One Piece
+100–101, **740 cues → 11,849 chars, 650 unique vocabulary over 1,528 occurrences, 7,330 kana**.
+Fifteen times fewer cues, 650 words. The pipeline is sound; the pack was English.
+
+**`2627e201` — the fix, at the only place that can answer.** `selectSubtitleFiles` filters on the
+file *name*, and its documented policy is that a name stating nothing is kept. All 47 names state
+only an episode number, so the hole was the entire release. `looksJapaneseSubtitle` reads the text
+in `acquireAll`'s read loop. **Kana, not kanji** — kanji is the script Japanese and Chinese releases
+share and nyaa is full of the latter, so counting it would accept `[GM-Team][国漫]` packs. **Dialogue
+lines only, override blocks stripped** — a real file here is 501,684 bytes with 262 dialogue lines,
+the rest styles and embedded fonts, and the style block is exactly where an English release
+legitimately carries a Japanese *font name*. Floor 20 kana; the tests pin that a single 18-kana cue
+does not clear it. Refusal is its own state: *"This release's subtitles are not Japanese — 47
+file(s) downloaded and none carry Japanese text."*
+**Scoped deliberately:** only unlabelled names are read, because `selectSubtitleFiles` already
+trusts a stated label to *exclude* and two functions disagreeing about a name is worse than the
+hole. Discovery is untouched — it downloads whatever `autoDownloadLanguages` says.
+
+**Gates.** Three nyaa suites **121/121** (107 before). **Mutation control:** guard disabled → 2
+failures, the intended ones (`expected true to be false` on the English pack; `[1,2]` vs `[1]` on
+the mixed pack). Two of the four new tests pass both ways **by design** and are said so here: the
+`languages: ['en']` inverse control and the stated-label case exist to prove the guard is *scoped*.
+**LIVE after a restart** (main does not hot-reload; the app that measured the finding predated the
+commit): the identical call now returns the refusal above instead of 47 English files.
+**Gate 19 re-run on the control's real data:** 海賊 (28 occurrences) → level 2, mineable **650 →
+649**, present before, absent after; restored to 0. Deck untouched, **3,221 cards / 1,320,982 bytes
+before and after**, `knownAtLeast2` 0 both times.
+
+**Gate 31's Route A leg REOPENS. It acquired, and what it acquired was unusable.** The leg needs a
+pack that is actually Japanese. Of the 3 Route A titles that survive the profile's `minSeeders` 3,
+Gundam X is now known-English; **Les Misérables (4 seeders) and Ashita no Joe (3) are untested** and
+are the next candidates.
+
+**Observation, not a finding: jimaku's One Piece listing moved from 2,885 files to 1,802**, and
+episode 101 came back 380 cues where P5 gate 18 recorded 337. Episode 100 is unchanged at 360. An
+external catalogue changed; nothing here did. Do not read the 337/380 difference as a regression.
+
+**Next slice:** run `debug/g19n-nyaa-mine.cjs` against Les Misérables, then Ashita no Joe, for a
+Route A pack that survives the language guard.
