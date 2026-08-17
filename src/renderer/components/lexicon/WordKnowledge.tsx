@@ -46,7 +46,7 @@ export default function WordKnowledge({ word, level, onCycle }: Props) {
   return (
     <button
       type="button"
-      className={`lexicon-knowledge wk-g-${level}${level > 0 ? ' active' : ''}`}
+      className={`lexicon-knowledge lq-hit wk-g-${level}${level > 0 ? ' active' : ''}`}
       title={description}
       aria-label={description}
       onClick={() => onCycle(word)}

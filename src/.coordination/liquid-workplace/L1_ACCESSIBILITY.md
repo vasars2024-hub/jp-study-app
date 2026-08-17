@@ -97,6 +97,53 @@ A true two-palette run must go through the product's own theme control, which pe
 so needs capture-patch-restore. **Category 1 is therefore measured on one palette only**, and
 that is a stated limit, not a pass.
 
+## 2026-08-18 — the 32px bar is met, and it was never a size problem
+
+The deferred item above is done: the hit AREA reaches 32px, the rendered box does not move.
+`.lq-hit` (`theme/liquid-controls.css:31`) is a transparent centred `::after` sized
+`max(100%, var(--lq-hit-target))`, adopted on the six control families L1 measured short —
+`dict-star`, `dict-add`, `dict-ex-btn`, `word-audio`, `lexicon-knowledge`, `fwin-b`.
+
+**The instrument is new and it is the point.** `probes/l1-hit-area.js` walks outward from each
+control's centre in 0.5px steps until `elementFromPoint` stops resolving to it. Reading
+`getBoundingClientRect()` — what `l1-accessibility.js` does, correctly, for layout — cannot see
+an overlay, which is why this category read as unfixable without inflating chrome that
+`css-measure` §2 says must not be inflated.
+
+**Live, Dictionary in Liquid presentation, 8 `dict-entry` results for 食べる, 66 controls:**
+
+| | before | after |
+| --- | --- | --- |
+| below 32px **by rect** | 46 | **46** (unchanged, by design) |
+| below 32px **by pointer** | 46 | **0** |
+| smallest hit region | 18.5x20.5 `dict-star` | **32x32.5** `fwin-b` |
+| controls whose region shrank (theft) | — | **0** |
+| contrast min / failing | 5.30:1 / 0 | **4.67:1** `fwin-b "◆"` 13px / **0** |
+| keyboard unreachable | 0 | **0** |
+| reduced motion over 0.01s | 8 -> 0 | **10 -> 0** (longest 0.24s `div.lq-contextual`) |
+
+11 of 66 are `occluded` and NOT scored: 5 `lexicon-*-run` stay off-viewport after
+`scrollIntoView`, 3 sit under the lens picker. An unscored control is not a passing one.
+
+**Two controls, both red for their own case, both restored and re-measured to the numbers
+above.** They mutate the live CSSOM rule, not the file — the L2 harness left a mutation on disk
+when the dev server held the file open. (a) overlay `width/height: auto` -> below-by-pointer
+**0 -> 46**, landing exactly on the by-rect count, which is what proves the probe reads the
+overlay and not something else. (b) `--lq-hit-target: 96px` so overlays overlap -> theft guard
+**0 -> 2** (`gram-level-btn` cut to 20px tall by the title bar's buttons reaching down) and the
+`fwin-b` pair occluding each other. A guard that has never caught a thief is unproven.
+
+**Traps.** (1) The first version hit-tested the required area's four CORNERS and reported 30 of
+66 failing — an abspos overlay's containing block is the PADDING box, so on a bordered control
+the corner lands in the 1px border gutter outside both. Artefact, not defect. (2) Measured cold
+it scored ONE control: the results region is 3,194px tall in an 820x580 window and two sibling
+windows were stacked on top. Raise the window and scroll each control into view, or the probe
+reports a clean sweep of nothing. (3) A walk that runs out of REACH is not a walk that hit
+something — conflating them made every control wider than 52px a false theft row.
+
+**Still not a 10, and only one thing is left:** the one-palette limit below. Contrast is
+measured on `forest-night` alone. Hit targets, keyboard and reduced motion now pass.
+
 ## Category 1 verdict: neither surface is a 10
 
 Contrast, keyboard and reduced motion pass on both. **The 32 px hit-target bar fails on both** —

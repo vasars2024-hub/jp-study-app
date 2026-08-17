@@ -14,6 +14,37 @@
    name moves to `aria-label` in the component.
    ============================================================================= */
 
+/* ------------------------------------------------------- hit-area floor ---- */
+/* L1 measured 46 of 66 controls in the Dictionary window under the rubric's
+   32px bar, and recorded the fix as "hit-area expansion, not visual growth" —
+   because `css-measure` §2 has already shown that inflating compact desktop
+   chrome is damage, not repair, and category 4's dead-region number is the one
+   that pays for it.
+
+   So the floor is a transparent centred overlay, not a bigger box. The element
+   keeps its rendered rect; the POINTER gets 32px. `max()` means a control
+   already at or above the floor is untouched in that axis, so this is safe to
+   apply to a whole family whose members differ in size.
+
+   Measure it with `elementFromPoint`, never `getBoundingClientRect()` — the
+   rect is not what a pointer hits, and reading the rect is exactly what made
+   this category look unfixable without growing chrome. The same hit test is
+   also the guard: an expander that reaches over a neighbour shows up as that
+   neighbour's corner returning the wrong element. */
+.lq-hit {
+  position: relative;
+}
+
+.lq-hit::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100%, var(--lq-hit-target));
+  height: max(100%, var(--lq-hit-target));
+  transform: translate(-50%, -50%);
+}
+
 /* ---------------------------------------------------------------- rail ---- */
 .lq-rail {
   display: flex;

@@ -105,7 +105,7 @@ export default function WordAudio({ word, reading, lang }: Props) {
   return (
     <button
       aria-label={label}
-      className={`word-audio is-${state}`}
+      className={`word-audio lq-hit is-${state}`}
       disabled={state === 'loading' || state === 'none'}
       onClick={() => void play()}
       title={label}

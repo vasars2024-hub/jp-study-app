@@ -447,6 +447,43 @@ describe('the sheet stays a composition language, not a palette', () => {
     );
   });
 
+  it('expands the hit floor with an overlay, and never with a bigger box', () => {
+    // The whole point of `.lq-hit`: the rendered rect is untouched and the POINTER gets 32px.
+    // A future edit that reaches the floor by growing the control instead would pass a naive
+    // "contains --lq-hit-target" check, so the assertions are on the shape.
+    const block = CSS.slice(CSS.indexOf('.lq-hit::after {'));
+    const rule = block.slice(0, block.indexOf('}'));
+    expect(rule).toContain('position: absolute');
+    expect(rule).toMatch(/width:\s*max\(100%,\s*var\(--lq-hit-target\)\)/);
+    expect(rule).toMatch(/height:\s*max\(100%,\s*var\(--lq-hit-target\)\)/);
+    // Centred on the control, or the overlay grows off one side and steals a neighbour.
+    expect(rule).toContain('transform: translate(-50%, -50%)');
+    // The overlay is the containing block's own child, so the control must be positioned.
+    const base = CSS.slice(CSS.indexOf('.lq-hit {'));
+    expect(base.slice(0, base.indexOf('}'))).toContain('position: relative');
+    // No paint: an overlay that renders is a visual change, and `min-width`/`min-height` on
+    // `.lq-hit` itself would be the box growth this primitive exists to avoid.
+    expect(rule).not.toMatch(/background|border|box-shadow|outline/);
+    expect(base.slice(0, base.indexOf('}'))).not.toMatch(/min-width|min-height|padding/);
+  });
+
+  it('is wired to the controls it was written for, not merely defined', () => {
+    // A primitive nothing imports is invisible, and a CSS-only test cannot tell the difference.
+    // These five are the Dictionary surface's controls that L1 measured under the 32px bar.
+    const adopters: [string, RegExp][] = [
+      ['components/DictionaryResults.tsx', /className="dict-star lq-hit"/],
+      ['components/DictionaryResults.tsx', /dict-add lq-hit/],
+      ['components/DictionaryResults.tsx', /className="dict-ex-btn lq-hit"/],
+      ['components/lexicon/WordAudio.tsx', /word-audio lq-hit/],
+      ['components/lexicon/WordKnowledge.tsx', /lexicon-knowledge lq-hit/],
+      ['components/DesktopShell.tsx', /className="fwin-b lq-hit"/],
+    ];
+    for (const [file, pattern] of adopters) {
+      const src = readFileSync(resolve(__dirname, '..', file), 'utf8');
+      expect(src, `${file} ${pattern}`).toMatch(pattern);
+    }
+  });
+
   it('scales its one animation by --lq-motion-scale so reduced motion means no displacement', () => {
     const frames = CSS.slice(CSS.indexOf('@keyframes lq-toolbar-menu-in'));
     expect(frames).toContain('var(--lq-motion-scale)');

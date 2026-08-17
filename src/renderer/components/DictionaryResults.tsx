@@ -929,14 +929,14 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
                   </span>
                 )}
                 <button
-                  className="dict-star"
+                  className="dict-star lq-hit"
                   title={t('dict.results.copyClipboard')}
                   onClick={() => copyDictionaryEntry(entry)}
                 >
                   <Icon name="clipboard" size={14} />
                 </button>
                 <button
-                  className={`dict-star ${saved ? 'on' : ''}`}
+                  className={`dict-star lq-hit ${saved ? 'on' : ''}`}
                   title={saved ? t('dict.results.savedFlashcards') : t('dict.results.saveFlashcards')}
                   onClick={() => toggleSave(entry)}
                 >
@@ -986,7 +986,7 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
               )}
               {entry.source && <div className="dict-source muted">{entry.source}</div>}
               <button
-                className={`dict-add ${addState[i] === 'added' || addState[i] === 'dup' ? 'done' : ''}`}
+                className={`dict-add lq-hit ${addState[i] === 'added' || addState[i] === 'dup' ? 'done' : ''}`}
                 disabled={addState[i] === 'adding' || addState[i] === 'translating'}
                 onClick={() => addToAnki(entry, i)}
               >
@@ -1073,7 +1073,7 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
       {lang === 'ja' && entries.length > 0 && (
         <div className="dict-examples">
           {exState === 'idle' && (
-            <button className="dict-ex-btn" onClick={loadExamples}>
+            <button className="dict-ex-btn lq-hit" onClick={loadExamples}>
               {t('dict.results.examples')}
             </button>
           )}

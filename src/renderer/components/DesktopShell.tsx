@@ -3364,13 +3364,13 @@ const FloatingWindow = memo(function FloatingWindow({
           </span>
           <span className="fwin-btns">
             {canPopOut && (
-              <button className="fwin-b" title={t('desktop.popOut')} onClick={onPopOut}>
+              <button className="fwin-b lq-hit" title={t('desktop.popOut')} onClick={onPopOut}>
                 ⧉
               </button>
             )}
             {canGoLiquid && (
               <button
-                className={`fwin-b fwin-b-liquid ${liquid ? 'is-liquid' : ''}`}
+                className={`fwin-b lq-hit fwin-b-liquid ${liquid ? 'is-liquid' : ''}`}
                 title={liquid ? t('desktop.returnToStandard') : t('desktop.makeLiquid')}
                 aria-label={liquid ? t('desktop.returnToStandard') : t('desktop.makeLiquid')}
                 aria-pressed={liquid}
@@ -3381,16 +3381,24 @@ const FloatingWindow = memo(function FloatingWindow({
             )}
             {!isNote && (
               <>
-                <button className="fwin-b" title={t('desktop.minimize')} onClick={onMinimize}>
+                <button
+                  className="fwin-b lq-hit"
+                  title={t('desktop.minimize')}
+                  onClick={onMinimize}
+                >
                   ─
                 </button>
-                <button className="fwin-b" title={t('desktop.maximize')} onClick={onMaximize}>
+                <button
+                  className="fwin-b lq-hit"
+                  title={t('desktop.maximize')}
+                  onClick={onMaximize}
+                >
                   ▢
                 </button>
               </>
             )}
             <button
-              className="fwin-b fwin-close"
+              className="fwin-b lq-hit fwin-close"
               style={isNote ? { color: '#3a3320' } : undefined}
               title={isNote ? t('desktop.deleteNote') : t('common.close')}
               onClick={onClose}
