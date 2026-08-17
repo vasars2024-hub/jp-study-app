@@ -172,13 +172,6 @@ function asFiniteNumber(value: unknown, fallback: number): number {
 }
 
 /**
- * Projects one page of `/users/@me/animelist` onto the domain model.
- *
- * Tolerant by construction: a row without a usable numeric id is dropped rather
- * than thrown over, because one malformed entry in a 400-title list should cost
- * the user that row, not the sync.
- */
-/**
  * MAL's `alternative_titles` object, flattened to the names worth searching by.
  *
  * `{ en, ja, synonyms[] }`. The primary title is dropped because it is already
@@ -207,6 +200,13 @@ function parseAlternativeTitles(value: unknown, primary: string): string[] {
   return out;
 }
 
+/**
+ * Projects one page of `/users/@me/animelist` onto the domain model.
+ *
+ * Tolerant by construction: a row without a usable numeric id is dropped rather
+ * than thrown over, because one malformed entry in a 400-title list should cost
+ * the user that row, not the sync.
+ */
 export function parseMalAnimeListPage(payload: unknown): MalListPage {
   const root = asRecord(payload);
   const data = Array.isArray(root.data) ? root.data : [];

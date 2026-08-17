@@ -1131,3 +1131,46 @@ aliases** — it could not see alias-only titles, and 1,373 rows now carry them.
 ("Jikan failed to connect to MyAnimeList") all turn while MAL's own API was up (403 to an
 unauthenticated read) — so `scraperMalUnits` could not be checked and the *dialog*-level
 end-to-end for this title is unverified; the handler-level one is not.
+
+## 2026-08-17 — boss-audit cleanup: the ledger entry `449a49d5` never got, and findings 5 + 6
+
+Worker `backup`. Commits `449a49d5` (by `primary`, undocumented — it hit a usage limit four
+minutes after committing), `c4fc0d23`, and this one. Not a gate pass; audit debt.
+
+**`449a49d5`, recorded here because its author could not.** Boss audit 2026-08-17 03:28
+findings 1 and 3, one edit at one seam. `altTitles` was written by the whole MAL pipeline and
+read by nothing: **1,373 of 1,429** library rows carry aliases and **328,747 of 806,606 bytes
+(41 %)** of `mal-library.json` was a field with no reader, while the motivating case still
+failed from the UI because MAL 2596's `Ghost Hound` lives only in the library and the panel
+cannot see disk. Wired in **main**, not the renderer: `HarvestNyaaListInput` gains `malId` and
+`listNyaaHarvest` reads the row on the side that already holds the file — the renderer's only
+path to the library is `mal:libraryList`, which returns all 806 KB to read one row. Finding 3
+rides along at the same seam: `harvestSearchAliases` caps at `HARVEST_ALIAS_LIMIT = 4`, caller
+order first, because the walk is sequential at 400 ms pacing and breaks only on a hit — the
+**miss** is the expensive case, 374 rows exceed the cap, and one carries ten synonyms that are
+the titles of ten different works. Suite 19 → 24 tests.
+
+**Finding 5 SETTLED — `462e1c37`'s `{added 0, updated 638, unchanged 788}` is not the run it
+claims to be; `4a221dbf`'s `{added 0, updated 1376, unchanged 50}` is.** Re-derived from the
+user's own file rather than from either message: **1,429 rows, 1,373 carry aliases, 56 do not.**
+A first sync that adds `alternative_titles` under the fixed element-wise `sameFieldValue` marks
+exactly the rows whose fields changed, so 1,373 + 3 = **1,376 updated** and 1,426 − 1,376 = **50
+unchanged** falls straight out of the data. `638/788` corresponds to nothing in it. Treat
+`462e1c37`'s figure as superseded.
+
+**Finding 6 fixed.** `462e1c37` inserted `parseAlternativeTitles` between
+`parseMalAnimeListPage` and its JSDoc, so the block ending "*one malformed entry in a 400-title
+list should cost the user that row, not the sync*" documented the alias parser. Moved back.
+
+**Finding 4 is BLOCKED, not skipped.** `.claude/skills/jp-dispatch/SKILL.md:97` still claims
+"Known-failing suites — THERE ARE NONE"; that is false against committed HEAD and the same file
+tells workers to trust any red suite. Two write attempts were refused by the permission
+classifier. Text is drafted in this turn's handoff; a worker with write access to `.claude/`
+should land it.
+
+**Trap for the next worker, and it is the audit's finding 2.** A full-suite number is meaningless
+without its tree. At `c4fc0d23`: **HEAD = 685 files / 2 failed** (both `i18n.test.ts` catalog
+hygiene, a ratchet whose baseline outran ~34 files of uncommitted foreign i18n conversion);
+**shared tree = 710 files / 0 failed**. And a worktree with a junctioned `node_modules` fails
+`novelReaderProgressGuard.test.ts` on `Denied ID …/pdf.worker.min.mjs?url` — an artifact, not a
+defect; that is why the audit counted 9 failures where there are 8.
