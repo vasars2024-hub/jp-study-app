@@ -326,6 +326,20 @@ function untaggedPart(rowName: string): string {
 }
 
 /**
+ * Whether the only place this number appears is an episode range.
+ *
+ * The companion to `untaggedPart`, and it exists because a release name can be
+ * nothing *but* tags: `[GM-Team][国漫][神印王座][Throne of Seal][2022][001-208
+ * Fin][AVC][GB][1080P]` survived the untagged rule with no claim to read, and a
+ * 100 GB Chinese release is not a one-episode short film called "001".
+ */
+function onlyInEpisodeRange(rowName: string, token: string): boolean {
+  const name = String(rowName ?? '');
+  const ranged = new RegExp(`\\d+\\s*[-~–]\\s*0*${token}\\b|\\b0*${token}\\s*[-~–]\\s*\\d+`);
+  return ranged.test(name);
+}
+
+/**
  * Whether a release name plausibly belongs to the title that was searched for.
  *
  * The index decides what a query matches and it matches generously; nothing
@@ -348,8 +362,9 @@ export function looksLikeSameTitle(rowName: string, title: string): boolean {
   // 001-063, Fairy Tail 001-175 and a 59 GB Saint Seiya batch, each of them one
   // click from being added to the user's torrent client. A release that names
   // some other work outside its tags is not that title, whatever its numbering.
-  if (tokens.every((token) => DIGITS_ONLY.test(token)) && /\p{L}/u.test(untaggedPart(rowName))) {
-    return false;
+  if (tokens.every((token) => DIGITS_ONLY.test(token))) {
+    if (/\p{L}/u.test(untaggedPart(rowName))) return false;
+    if (tokens.every((token) => onlyInEpisodeRange(rowName, token))) return false;
   }
   const haystack = ` ${String(rowName ?? '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ')} `;
   const hits = tokens.filter((token) => haystack.includes(` ${token} `)).length;

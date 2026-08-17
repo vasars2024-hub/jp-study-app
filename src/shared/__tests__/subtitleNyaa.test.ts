@@ -212,6 +212,9 @@ describe('rankSubtitleCandidates', () => {
     expect(looksLikeSameTitle('[Naruto-Kun.Hu] Bleach 001-063 [1080p]', '001')).toBe(false);
     expect(looksLikeSameTitle('[Erai-raws] Naruto Shippuuden - 001 ~ 079 [480p][MultiSub] [BATCH]', '001')).toBe(false);
     expect(looksLikeSameTitle('Saint Seiya (1986) 001-114 [WEB 720p] [Multi-Subs]', '001')).toBe(false);
+    // A name that is nothing but tags leaves no claim to read, so the number's
+    // own shape has to answer: 001-208 is a range, not a title.
+    expect(looksLikeSameTitle('[GM-Team][国漫][神印王座][Throne of Seal][2022][001-208 Fin][AVC][GB][1080P]', '001')).toBe(false);
     // The control: a release that names no other work outside its tags is still
     // accepted, or a numerically titled show could never be found at all.
     expect(looksLikeSameTitle('[SomeGroup] 001 (2010) [BDRip 1080p]', '001')).toBe(true);
