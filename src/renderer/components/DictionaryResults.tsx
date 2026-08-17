@@ -808,22 +808,6 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
     }
   }
 
-  if (showSetup) {
-    return (
-      <div className={`dict-results ${variant}`}>
-        <AnkiSetup
-          status={anki}
-          waitingCollection={ankiLink?.waitingCollection}
-          onBack={variant === 'popup' ? () => setShowSetup(false) : undefined}
-          onRetry={async () => {
-            setShowSetup(false);
-            await ensureAnki();
-          }}
-        />
-      </div>
-    );
-  }
-
   const entries = result?.entries ?? [];
 
   /**
@@ -839,6 +823,16 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
    */
   const gradable = variant !== 'popup' && lang === studyLang;
 
+  /**
+   * This hook and the two consts above it must stay ABOVE the `showSetup` early
+   * return. `ensureAnki` sets `showSetup` whenever `ankiStatus()` comes back
+   * disconnected, so the very first render after Anki becomes unreachable took
+   * the early return and ran one hook fewer than the render before it. React
+   * raised "Rendered fewer hooks than expected" inside `<DictionaryResults>`,
+   * `AppErrorBoundary` caught it and recreated the tree from scratch, and every
+   * floating window on the desk disappeared — measured live against a refused
+   * AnkiConnect port, one click on "+ Add to Anki".
+   */
   const knowledge = useMemo(() => {
     const levels = new Map<string, WkLevel>();
     if (gradable) for (const entry of entries) levels.set(entry.word, getLevel(entry.word));
@@ -846,6 +840,22 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
     // `knowledgeTick` is the subscription, not a value: it is what re-reads the
     // store after somebody else writes to it.
   }, [entries, gradable, knowledgeTick]);
+
+  if (showSetup) {
+    return (
+      <div className={`dict-results ${variant}`}>
+        <AnkiSetup
+          status={anki}
+          waitingCollection={ankiLink?.waitingCollection}
+          onBack={variant === 'popup' ? () => setShowSetup(false) : undefined}
+          onRetry={async () => {
+            setShowSetup(false);
+            await ensureAnki();
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className={`dict-results ${variant}`}>

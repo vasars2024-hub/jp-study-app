@@ -516,8 +516,28 @@ penalised for being accessible; and a sweep that resolved all element references
 nodes. Also banked: 18 controls that write real user data are skipped by name, after the first run
 moved study state on eight words before the `mark it Learning` rule existed.
 
-Still open for L1: categories 5–7, category 8's real control, and the layout studies.
-`LIQUID_SCORECARD.md` is deliberately still empty — four driven categories, none scoring 10.
+**Category 8's control fired 2026-08-17 and found a crash, not a missing message.**
+`.coordination/liquid-workplace/L1_HONEST_STATES_CONTROL.md`. The genuine unreachable dependency is
+`userData/profiles.json` → `ankiUrl: http://127.0.0.1:1`, a closed loopback port (refuses rather
+than hangs), with the app stopped for the edit and restarted around it, because `getAnkiUrl()` reads
+a schema loaded once in the store constructor and main does not hot-reload. Control verified at the
+IPC layer first: `ankiStatus()` → `connected:false` with a named error in **1 ms**.
+**One click on "+ Add to Anki" then took the desk from 4 `.fwin` windows to 0** —
+`DictionaryResults`'s `showSetup` early return sat above the `knowledge` `useMemo`, so the first
+render after Anki went unreachable ran one hook fewer and `AppErrorBoundary` recreated the tree.
+Invisible on the success path, which is why the earlier pass never saw it. Fixed by hoisting the
+hook; guarded by `dictionaryUnreachableAnkiHooks.test.tsx`, which asserts the connected→disconnected
+**transition** (the end state alone passes against the broken code) and fails with the identical
+React error when the hoist is inverted. Re-measured after the fix: error state **LIVE** and named
+with a four-step remediation walkthrough, **4 of 4** windows survive, **0** raw i18n keys,
+`/logs?level=error` **total 0**. `profiles.json` restored byte-identical, SHA256 re-checked `-ceq`.
+Category 8 is still not a 10: the **offline** state (a timeout, distinct from a refusal) is undriven,
+raw-key counting is `lang=en` only where the rubric wants all four, and dead-control/fabricated-value
+counts remain unclaimed.
+
+Still open for L1: categories 5–7, category 8's offline half and its ja/zh/ru raw-key sweep, and the
+layout studies. `LIQUID_SCORECARD.md` is deliberately still empty — five driven categories, none
+scoring 10.
 
 ### L2 — Semantic tokens and shared primitives
 
