@@ -1664,3 +1664,39 @@ drive qBittorrent through the app's own IPC instead.
 **Next slice:** `debug/g31n-routeb.cjs survey 80 54` was running as this turn closed (`debug/
 g31n-survey3.log`, `g31n-routeb-54.json`). Indices 54–117 produced **zero** `sub-pack` rows and a
 handful of sidecars. Read that file, then `walk` the smallest sidecar candidates it names.
+
+## 2026-08-17 — addendum, same turn: the survey the fix enabled, and what it found in the fix
+
+Commit `0acdfe11`. `debug/g31n-routeb.cjs survey 80 54` completed over MAL completed-list indices
+**54–133** (`debug/g31n-survey3.log`, `debug/g31n-routeb-54.json`).
+
+**The number: 33 batch-sidecar candidates, and ZERO `sub-pack` rows in 80 titles.** Route A has no
+new candidate anywhere in this tranche — its pool is genuinely thin, not merely unlucky. Smallest
+sidecars: `Fate/strange Fake: Whispers of Dawn` 1,002.10 MB / 3 seeders, then four
+`Kaguya-sama … First Kiss wa Owaranai` rows from 1,331.20 MB.
+
+**The survey found a defect in the gate that had just shipped.** `Jujutsu Kaisen 0 Movie`, a
+1-episode movie, was offered `[Judas] Jujutsu Kaisen (Season 03)` — 4,300.80 MB, 392 seeders.
+`sequelOrdinal` read only `untaggedPart`, which strips parenthesised tags along with the codec
+ones, so a release stating its season plainly was left claiming nothing. Explicit season forms now
+read the **whole** name; bare numbers and roman numerals stay on the untagged claim, where
+brackets full of resolutions and years cannot reach them. Two controls (`(Batch) S01` still
+matches; `[SubsPlease]` is not a season marker). Mutation control: scope reverted → 1 failure.
+
+**Not fixed, recorded with its evidence.** The same survey shows title matches that are not sequel
+errors: `Hal` was offered `[Trix] Agents of the Four Seasons S01 … Shunkashuutou Daikousha: Haru no
+Mai`, and `Juubee Ninpuuchou` a `NINJA SCROLL (1993-2003) - Complete Movie and Anime TV Series`.
+Both are short titles reached through the **alias** walk, so the false match is in alias selection
+rather than in `looksLikeSameTitle` — `searchedAs` is the field to read when chasing it.
+
+**GATES, SHARED TREE, once after the last slice.** `npx vitest run` **729 files / 10,064 passed /
+0 failed / 6 skipped**. The first run showed 2 failed suites (`mediaSurfaceImportGraph`, a
+dictionary suite) — both timeouts, neither touched by this turn, both green on a clean re-run with
+no live survey competing for CPU. That is the recorded full-run flake, verified twice before being
+called anything. i18n exit 0 at **10,554** (no new strings this turn). architecture exit 0,
+"Nothing new", 6 pending. eslint **0 errors** on all 4 touched paths.
+
+**Next slice:** `walk` the smallest sidecars the survey named, in size order, starting with
+`Fate/strange Fake: Whispers of Dawn` (1,002.10 MB, 3 seeders) — a Route B miss costs only the
+metadata handshake, so the pool is walkable. The first release that carries real `.ass`/`.srt`
+sidecars is gate 31's Route B leg. Gate 31 remains **32 of 34**.
