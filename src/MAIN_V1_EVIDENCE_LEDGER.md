@@ -24650,7 +24650,7 @@ Gates this turn: `npx vitest run` **709 files passed / 1 skipped, 9,717 passed, 
 
 ## 2026-08-17 — Track 7 / gate 5 CLOSES, and the local deck it could never have run on (`primary`)
 
-- `1e35e5b7`. The remaining half was the live round trip. It ran, on a package, and passed.
+- `7c66293d`. The remaining half was the live round trip. It ran, on a package, and passed.
 - **The instruction to "batch it on the real 3,221-note LOCAL deck" was impossible by
   construction, and that is the finding.** A `local-deck` draft is neither `isPackage` nor
   `isLive`, so step 7 falls through to `ankiWorkbench.apply.noFile`

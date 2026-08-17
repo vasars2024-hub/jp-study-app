@@ -383,7 +383,7 @@ This slice is complete only when all of these can be shown with real data and no
     nothing. `ANKI_CARD_FLAGS` is exported from the decoder so the form cannot
     label a colour `decodeCardFlag` never returns, and both honest limits are said
     before Add. 8 renderer tests; 140 green across the five affected suites.
-    **Closed 2026-08-17** (`1e35e5b7`) — but **not on the local deck**, and the
+    **Closed 2026-08-17** (`7c66293d`) — but **not on the local deck**, and the
     earlier instruction to run it there was impossible by construction: a
     `local-deck` draft is neither `isPackage` nor `isLive`, so step 7 renders
     `ankiWorkbench.apply.noFile` and offers no destination at all
