@@ -2713,6 +2713,8 @@ export const zh: Catalog = {
   'dialog.importAnkiDeck.title': '导入 Anki 卡组（.apkg）',
   'dialog.exportAnkiDeck.title': '导出编辑后的 Anki 卡组',
   'dialog.exportAnkiDeck.pickSource': '找到原始卡组文件',
+  'dialog.exportAnkiText.title': '将编辑后的卡组导出为文本文件',
+  'dialog.exportAnkiText.pickSource': '找到原始文本文件',
   'dialog.filter.ankiDeck': 'Anki 卡组',
 
   'search.theme': '主题',
@@ -8806,6 +8808,36 @@ export const zh: Catalog = {
     '此包使用了尚不支持写入的较新压缩格式。未写入任何内容。',
   'ankiWorkbench.apply.error.verify-failed': '写入的文件未通过回读校验，不可信任。请删除后重试。',
   'ankiWorkbench.apply.error.io': '无法写入文件。',
+  'ankiWorkbench.apply.text.original': '导出会写入一个新的文本文件，原始文件不会被修改。',
+  'ankiWorkbench.apply.text.identity.rowOrder':
+    '此文件没有 guid 列，因此笔记按其在本文件中的行号匹配。导出的文件在 Anki 中会作为新笔记导入，无法并入你已有的笔记。',
+  'ankiWorkbench.apply.text.identity.guid':
+    '此文件带有 guid 列，因此导出的文件在 Anki 中会作为同一批笔记的更新导入。',
+  'ankiWorkbench.apply.text.export': '导出新的文本文件…',
+  'ankiWorkbench.apply.text.writing': '正在写入文本文件…',
+  'ankiWorkbench.apply.text.ok.file': '已写入 {path}',
+  'ankiWorkbench.apply.text.ok.counts': '在 {rows} 行中重写了 {notes} 条笔记',
+  'ankiWorkbench.apply.text.ok.tags': '{count} 条笔记的标签列已重写',
+  'ankiWorkbench.apply.text.ok.verified': '已从磁盘重新读取写入的文件，并核对到全部更改。',
+  'ankiWorkbench.apply.textError.nothing-to-export': '本次会话的更改相互抵消，未写入任何文件。',
+  'ankiWorkbench.apply.textError.cancelled': '未写入任何内容。',
+  'ankiWorkbench.apply.textError.no-source':
+    '找不到原始文本文件，无法写入。请在工作台中重新打开该文件。',
+  'ankiWorkbench.apply.textError.source-changed':
+    '读取之后原始文本文件已发生变化，未写入任何内容。请重新打开并重做编辑。',
+  'ankiWorkbench.apply.textError.overwrite-source':
+    '导出会写入新文件，绝不会覆盖原始文件。请另选一个名称。',
+  'ankiWorkbench.apply.textError.note-missing':
+    '某项编辑指向原始文件中不存在的行。未写入任何内容 — 请在导出前重新打开该文件。',
+  'ankiWorkbench.apply.textError.field-count-mismatch':
+    '某项编辑携带的字段数与该行的列数不一致。未写入任何内容。',
+  'ankiWorkbench.apply.textError.no-tags-column':
+    '此文件未声明标签列，标签无处可写。未写入任何内容 — 请改为导出为卡组包。',
+  'ankiWorkbench.apply.textError.unsupported-change':
+    '文本文件只保存笔记：没有卡片、没有排程、也没有卡片模板。未写入任何内容 — 请撤销下列编辑，或改为导出为卡组包。',
+  'ankiWorkbench.apply.textError.verify-failed':
+    '写入的文件未通过回读校验，已将其删除，以免留下看似可导入的文件。',
+  'ankiWorkbench.apply.textError.io': '无法写入文本文件。',
   'ankiWorkbench.browser.search': '搜索字段、标签和牌组',
   'ankiWorkbench.browser.rows': '已加载 {loaded} 条，显示 {shown} 条',
   'ankiWorkbench.browser.columns': '列',

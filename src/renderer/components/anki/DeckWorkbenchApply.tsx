@@ -10,12 +10,17 @@
  * dialog, and the main process resolves the source from the fingerprint it
  * remembers, so the renderer never holds a path.
  *
- * There are two destinations and they are not interchangeable. A package source
- * exports a NEW file and never touches the original. A live Anki source has no
- * file to copy: it writes into the collection the user has open, so that branch
- * says so before the button, reports the profile it landed in, and names every
- * change that did not commit rather than a single total. A local deck is
- * neither and offers no button at all.
+ * There are three destinations and they are not interchangeable. A package
+ * source exports a NEW file and never touches the original. A live Anki source
+ * has no file to copy: it writes into the collection the user has open, so that
+ * branch says so before the button, reports the profile it landed in, and names
+ * every change that did not commit rather than a single total. A CSV/TSV source
+ * writes a new TEXT file — the same "never the original" rule as a package, but
+ * with two things a package never has to say: a text file stores notes only, so
+ * a card-level edit is refused by name rather than silently dropped, and without
+ * a guid column the round trip is positional, which is stated before the button
+ * because it decides whether the result merges in Anki or arrives as new notes.
+ * A local deck is none of the three and offers no button at all.
  */
 import { useMemo, useState } from 'react';
 import type { AnkiDraft } from '../../../shared/ankiDraft';
@@ -25,6 +30,7 @@ import {
   exportChangesEmpty,
   type ApkgExportResult,
 } from '../../../shared/ankiApkgExport';
+import type { AnkiCsvExportResult } from '../../../shared/ankiCsvExport';
 import type { ConnectCommitResult } from '../../../shared/ankiConnectCommit';
 import DeckWorkbenchParity from './DeckWorkbenchParity';
 import { useT } from '../../i18n';
@@ -43,6 +49,7 @@ export default function DeckWorkbenchApply({
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<ApkgExportResult | null>(null);
   const [commit, setCommit] = useState<ConnectCommitResult | null>(null);
+  const [textResult, setTextResult] = useState<AnkiCsvExportResult | null>(null);
 
   // Recomputed on every edit or undo, exactly as the review's numbers are: an
   // undo run from this step must change what the button claims it will write.
@@ -51,6 +58,7 @@ export default function DeckWorkbenchApply({
   const blocked = draft.diagnostics.some((d) => d.severity === 'blocking');
   const isPackage = draft.source.kind === 'apkg' || draft.source.kind === 'colpkg';
   const isLive = draft.source.kind === 'ankiconnect';
+  const isText = draft.source.kind === 'csv';
 
   const runCommit = async () => {
     setBusy(true);
@@ -63,6 +71,28 @@ export default function DeckWorkbenchApply({
       setCommit(res);
     } catch (err) {
       setCommit({ ok: false, errorCode: 'io', error: err instanceof Error ? err.message : String(err) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const runTextExport = async () => {
+    setBusy(true);
+    setTextResult(null);
+    try {
+      const res = await window.api.exportAnkiCsvDraft({
+        fingerprint: draft.source.fingerprint,
+        changes,
+      });
+      // A cancelled save dialog is a decision, not a failure — same rule the
+      // package branch follows.
+      if (res.errorCode !== 'cancelled') setTextResult(res);
+    } catch (err) {
+      setTextResult({
+        ok: false,
+        errorCode: 'io',
+        error: err instanceof Error ? err.message : String(err),
+      });
     } finally {
       setBusy(false);
     }
@@ -177,6 +207,103 @@ export default function DeckWorkbenchApply({
               </ul>
             )}
             {commit.error && <p className="muted wb-apply-error-detail">{commit.error}</p>}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (isText) {
+    // One non-empty guid proves the file declares a `#guid column:` — it is a
+    // file-level directive, so a single row settles it for the whole file. All
+    // empty means either no such column or an empty one, and both are equally
+    // unusable as identity, which is what the warning actually says.
+    const hasGuid = draft.notes.some((note) => note.guid !== '');
+    return (
+      <div className="wb-apply">
+        <section aria-label={t('ankiWorkbench.step.apply')}>
+          {blocked ? (
+            <p className="deck-workbench-error" role="alert">
+              {t('ankiWorkbench.apply.blocked')}
+            </p>
+          ) : (
+            <>
+              {empty ? (
+                <p className="muted wb-apply-empty">{t('ankiWorkbench.apply.empty')}</p>
+              ) : (
+                <ul className="deck-workbench-facts">
+                  {changes.notes.length > 0 && (
+                    <li>{t('ankiWorkbench.apply.notes', { count: changes.notes.length })}</li>
+                  )}
+                </ul>
+              )}
+              <p className="muted">{t('ankiWorkbench.apply.text.original')}</p>
+              {/* Before the button: it decides whether the exported file merges
+                  in Anki or arrives as a second copy of every note, and that is
+                  not something to discover after the write. */}
+              <p className="muted wb-apply-text-identity">
+                {t(
+                  hasGuid
+                    ? 'ankiWorkbench.apply.text.identity.guid'
+                    : 'ankiWorkbench.apply.text.identity.rowOrder',
+                )}
+              </p>
+              <button
+                type="button"
+                className="btn primary wb-apply-text-export"
+                disabled={empty || busy}
+                onClick={() => void runTextExport()}
+              >
+                {t('ankiWorkbench.apply.text.export')}
+              </button>
+              {busy && (
+                <p className="muted" role="status">
+                  {t('ankiWorkbench.apply.text.writing')}
+                </p>
+              )}
+            </>
+          )}
+        </section>
+
+        {textResult && textResult.ok && (
+          <section
+            className="wb-apply-result"
+            aria-label={t('ankiWorkbench.apply.text.export')}
+            role="status"
+          >
+            <ul className="deck-workbench-facts">
+              <li>{t('ankiWorkbench.apply.text.ok.file', { path: textResult.filePath ?? '' })}</li>
+              <li>
+                {t('ankiWorkbench.apply.text.ok.counts', {
+                  notes: textResult.notesUpdated ?? 0,
+                  rows: textResult.rowsWritten ?? 0,
+                })}
+              </li>
+              {(textResult.tagsUpdated ?? 0) > 0 && (
+                <li>
+                  {t('ankiWorkbench.apply.text.ok.tags', { count: textResult.tagsUpdated ?? 0 })}
+                </li>
+              )}
+              {textResult.verified && <li>{t('ankiWorkbench.apply.text.ok.verified')}</li>}
+            </ul>
+          </section>
+        )}
+
+        {textResult && !textResult.ok && (
+          <div className="wb-apply-result">
+            <p className="deck-workbench-error" role="alert">
+              {t(`ankiWorkbench.apply.textError.${textResult.errorCode ?? 'io'}`)}
+            </p>
+            {/* The refused kinds by their contract names, so "undo them" names
+                something the user can actually find rather than a total. */}
+            {textResult.unsupported && textResult.unsupported.length > 0 && (
+              <ul className="deck-workbench-facts wb-apply-unsupported">
+                {textResult.unsupported.map((kind) => (
+                  <li key={kind}>{kind}</li>
+                ))}
+              </ul>
+            )}
+            {textResult.error && <p className="muted wb-apply-error-detail">{textResult.error}</p>}
           </div>
         )}
       </div>

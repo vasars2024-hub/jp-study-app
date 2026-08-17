@@ -27,6 +27,8 @@ import type { ConnectDraftRequest } from '../../shared/ankiConnectDraft';
 import { getSql, readCollectionBytes } from './apkgCollection';
 import { parseApkgDraftPageOffMainLoop } from './apkgReadHost';
 import { readCsvDraft } from './csvDraftRead';
+import { exportAnkiCsv } from './csvExport';
+import type { AnkiCsvExportRequest } from '../../shared/ankiCsvExport';
 import { readConnectDraft } from './connectDraftRead';
 import { commitConnectDraft } from './connectCommit';
 import type { ConnectCommitRequest } from '../../shared/ankiConnectCommit';
@@ -354,6 +356,9 @@ export function registerApkgIpc(): void {
   ipcMain.handle('apkg:readDraft', (_e, request?: ApkgDraftRequest) => readApkgDraft(request));
   ipcMain.handle('apkg:export', (_e, request: ApkgExportRequest) => exportApkg(request));
   ipcMain.handle('anki:readCsvDraft', (_e, request?: CsvDraftRequest) => readCsvDraft(request));
+  ipcMain.handle('anki:exportCsvDraft', (_e, request: AnkiCsvExportRequest) =>
+    exportAnkiCsv(request),
+  );
   ipcMain.handle('anki:readConnectDraft', (_e, request?: ConnectDraftRequest) =>
     readConnectDraft(request),
   );

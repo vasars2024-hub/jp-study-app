@@ -2723,6 +2723,8 @@ export const ja: Catalog = {
   'dialog.importAnkiDeck.title': 'Ankiデッキ（.apkg）をインポート',
   'dialog.exportAnkiDeck.title': '編集したAnkiデッキを書き出す',
   'dialog.exportAnkiDeck.pickSource': '元のデッキファイルを選択',
+  'dialog.exportAnkiText.title': '編集したデッキをテキストファイルとして書き出す',
+  'dialog.exportAnkiText.pickSource': '元のテキストファイルを選択',
   'dialog.filter.ankiDeck': 'Ankiデッキ',
 
   'search.theme': 'テーマ',
@@ -8858,6 +8860,39 @@ export const ja: Catalog = {
   'ankiWorkbench.apply.error.verify-failed':
     '書き込んだファイルが読み直し検証に失敗したため、信頼できません。削除してからやり直してください。',
   'ankiWorkbench.apply.error.io': 'ファイルを書き込めませんでした。',
+  'ankiWorkbench.apply.text.original':
+    '書き出しでは新しいテキストファイルを作成します。元のファイルは変更されません。',
+  'ankiWorkbench.apply.text.identity.rowOrder':
+    'このファイルには guid 列がないため、ノートはこのファイル内の行番号で対応付けられます。書き出したファイルは Anki に新しいノートとして取り込まれ、既存のノートには統合されません。',
+  'ankiWorkbench.apply.text.identity.guid':
+    'このファイルには guid 列があるため、書き出したファイルは Anki で同じノートの更新として取り込まれます。',
+  'ankiWorkbench.apply.text.export': '新しいテキストファイルを書き出す…',
+  'ankiWorkbench.apply.text.writing': 'テキストファイルを書き込み中…',
+  'ankiWorkbench.apply.text.ok.file': '{path} に書き込みました',
+  'ankiWorkbench.apply.text.ok.counts': '{rows} 行のうち {notes} 件のノートを書き換えました',
+  'ankiWorkbench.apply.text.ok.tags': '{count} 件のノートのタグ列を書き換えました',
+  'ankiWorkbench.apply.text.ok.verified':
+    '書き込んだファイルをディスクから読み直し、すべての変更を確認しました。',
+  'ankiWorkbench.apply.textError.nothing-to-export':
+    'セッションの変更は差し引きゼロのため、ファイルは書き込まれませんでした。',
+  'ankiWorkbench.apply.textError.cancelled': '何も書き込まれませんでした。',
+  'ankiWorkbench.apply.textError.no-source':
+    '元のテキストファイルが見つからないため、何も書き込めませんでした。ワークベンチでファイルを開き直してください。',
+  'ankiWorkbench.apply.textError.source-changed':
+    '読み込み後に元のテキストファイルが変更されたため、何も書き込まれませんでした。開き直して編集をやり直してください。',
+  'ankiWorkbench.apply.textError.overwrite-source':
+    '書き出しは新しいファイルを作成し、元のファイルを上書きしません。別の名前を選んでください。',
+  'ankiWorkbench.apply.textError.note-missing':
+    '編集が元のファイルに存在しない行を指しています。何も書き込まれていません — 書き出す前にファイルを開き直してください。',
+  'ankiWorkbench.apply.textError.field-count-mismatch':
+    '編集のフィールド数が行の列数と一致しません。何も書き込まれていません。',
+  'ankiWorkbench.apply.textError.no-tags-column':
+    'このファイルにはタグ列が宣言されていないため、タグの書き込み先がありません。何も書き込まれていません — 代わりにパッケージとして書き出してください。',
+  'ankiWorkbench.apply.textError.unsupported-change':
+    'テキストファイルはノートのみを保存します。カード、スケジュール、カードテンプレートはありません。何も書き込まれていません — 下記の編集を取り消すか、パッケージとして書き出してください。',
+  'ankiWorkbench.apply.textError.verify-failed':
+    '書き込んだファイルが読み直し検査に失敗したため、取り込み可能に見える状態で残さず削除しました。',
+  'ankiWorkbench.apply.textError.io': 'テキストファイルを書き込めませんでした。',
   'ankiWorkbench.browser.search': 'フィールド・タグ・デッキを検索',
   'ankiWorkbench.browser.rows': '読み込み済み {loaded} 件のうち {shown} 件を表示',
   'ankiWorkbench.browser.columns': '列',

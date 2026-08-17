@@ -2918,6 +2918,8 @@ export const ru: Catalog = {
   'dialog.importAnkiDeck.title': 'Импорт колоды Anki (.apkg)',
   'dialog.exportAnkiDeck.title': 'Экспорт изменённой колоды Anki',
   'dialog.exportAnkiDeck.pickSource': 'Укажите исходный файл колоды',
+  'dialog.exportAnkiText.title': 'Экспорт изменённой колоды в текстовый файл',
+  'dialog.exportAnkiText.pickSource': 'Укажите исходный текстовый файл',
   'dialog.filter.ankiDeck': 'Колода Anki',
 
   'search.theme': 'Тема',
@@ -9669,6 +9671,39 @@ export const ru: Catalog = {
   'ankiWorkbench.apply.error.verify-failed':
     'Записанный файл не прошёл проверку перечитыванием — ему нельзя доверять. Удалите его и повторите.',
   'ankiWorkbench.apply.error.io': 'Не удалось записать файл.',
+  'ankiWorkbench.apply.text.original':
+    'Экспорт записывает новый текстовый файл. Исходный файл не изменяется.',
+  'ankiWorkbench.apply.text.identity.rowOrder':
+    'В этом файле нет столбца guid, поэтому заметки сопоставляются по номеру строки именно в этом файле. Экспортированный файл импортируется в Anki как новые заметки и не сольётся с уже имеющимися.',
+  'ankiWorkbench.apply.text.identity.guid':
+    'В этом файле есть столбец guid, поэтому экспортированный файл импортируется в Anki как обновление тех же заметок.',
+  'ankiWorkbench.apply.text.export': 'Экспортировать новый текстовый файл…',
+  'ankiWorkbench.apply.text.writing': 'Запись текстового файла…',
+  'ankiWorkbench.apply.text.ok.file': 'Записано в {path}',
+  'ankiWorkbench.apply.text.ok.counts': 'Переписано заметок: {notes} в {rows} строках',
+  'ankiWorkbench.apply.text.ok.tags': 'Столбец тегов переписан у {count} заметок',
+  'ankiWorkbench.apply.text.ok.verified':
+    'Записанный файл перечитан с диска, и в нём найдены все изменения.',
+  'ankiWorkbench.apply.textError.nothing-to-export':
+    'Изменения сеанса взаимно погасились, файл не записан.',
+  'ankiWorkbench.apply.textError.cancelled': 'Ничего не записано.',
+  'ankiWorkbench.apply.textError.no-source':
+    'Исходный текстовый файл отсутствует, записать нечего. Откройте файл в верстаке заново.',
+  'ankiWorkbench.apply.textError.source-changed':
+    'Исходный текстовый файл изменился после чтения, поэтому ничего не записано. Откройте его заново и повторите правки.',
+  'ankiWorkbench.apply.textError.overwrite-source':
+    'Экспорт записывает новый файл и никогда не перезаписывает исходный. Выберите другое имя.',
+  'ankiWorkbench.apply.textError.note-missing':
+    'Правка указывает на строку, которой нет в исходном файле. Ничего не записано — откройте файл заново перед экспортом.',
+  'ankiWorkbench.apply.textError.field-count-mismatch':
+    'Число полей в правке не совпадает с числом столбцов строки. Ничего не записано.',
+  'ankiWorkbench.apply.textError.no-tags-column':
+    'В этом файле не объявлен столбец тегов, записывать теги некуда. Ничего не записано — экспортируйте как пакет.',
+  'ankiWorkbench.apply.textError.unsupported-change':
+    'Текстовый файл хранит только заметки: в нём нет карточек, расписания и шаблонов карточек. Ничего не записано — отмените перечисленные ниже правки или экспортируйте как пакет.',
+  'ankiWorkbench.apply.textError.verify-failed':
+    'Записанный файл не прошёл проверку перечитыванием и был удалён, чтобы не выглядеть пригодным для импорта.',
+  'ankiWorkbench.apply.textError.io': 'Не удалось записать текстовый файл.',
   'ankiWorkbench.browser.search': 'Поиск по полям, меткам и колодам',
   'ankiWorkbench.browser.rows': 'Показано {shown} из {loaded} загруженных заметок',
   'ankiWorkbench.browser.columns': 'Столбцы',

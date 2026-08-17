@@ -502,6 +502,9 @@ declare global {
       readAnkiCsvDraft(
         request?: import('../shared/ankiCsv').CsvDraftRequest,
       ): Promise<import('../shared/ankiCsv').CsvDraftResult>;
+      exportAnkiCsvDraft(
+        request: import('../shared/ankiCsvExport').AnkiCsvExportRequest,
+      ): Promise<import('../shared/ankiCsvExport').AnkiCsvExportResult>;
       readAnkiConnectDraft(
         request?: import('../shared/ankiConnectDraft').ConnectDraftRequest,
       ): Promise<import('../shared/ankiConnectDraft').ConnectDraftResult>;

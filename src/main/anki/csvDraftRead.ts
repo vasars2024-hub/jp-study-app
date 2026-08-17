@@ -24,6 +24,7 @@ import {
 } from '../../shared/ankiDraft';
 import { stripFieldHtml } from '../../shared/apkgParse';
 import { collapsePlainText } from '../../shared/ankiDraftEdit';
+import { rememberCsvSource } from './csvSourceMemory';
 
 /**
  * Decode the file's bytes.
@@ -65,6 +66,10 @@ export async function readCsvDraft(request: CsvDraftRequest = {}): Promise<CsvDr
     const { text, encoding } = decodeTextBuffer(bytes);
     const fileName = path.basename(file);
     const collection = buildAnkiCsvCollection(text, { defaultNoteTypeName: fileName });
+    const fingerprint = `sha1:${crypto.createHash('sha1').update(bytes).digest('hex')}`;
+    // So step 7 can find this file again without the renderer ever holding a
+    // path — the same trade `readApkgDraft` makes for the package exporter.
+    rememberCsvSource(fingerprint, file);
 
     const full = buildAnkiDraft(collection.raw, {
       source: {
@@ -73,7 +78,7 @@ export async function readCsvDraft(request: CsvDraftRequest = {}): Promise<CsvDr
         modifiedAtMs: stat.mtimeMs,
         // The file's bytes are what was read, so they are what a later commit
         // must find unchanged.
-        fingerprint: `sha1:${crypto.createHash('sha1').update(bytes).digest('hex')}`,
+        fingerprint,
         // Recorded on the source so a later *edit* normalizes the same way the
         // read did, rather than guessing HTML for a plain-text file.
         plainText: !collection.meta.html,

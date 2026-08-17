@@ -2881,6 +2881,8 @@ export const en: Catalog = {
   'dialog.importAnkiDeck.title': 'Import an Anki deck (.apkg)',
   'dialog.exportAnkiDeck.title': 'Export the edited Anki deck',
   'dialog.exportAnkiDeck.pickSource': 'Locate the original deck file',
+  'dialog.exportAnkiText.title': 'Export the edited deck as a text file',
+  'dialog.exportAnkiText.pickSource': 'Locate the original text file',
   'dialog.filter.ankiDeck': 'Anki deck',
 
   // Settings search index (settingsRegistry.ts SETTINGS_REGISTRY). Keywords
@@ -9283,6 +9285,39 @@ export const en: Catalog = {
   'ankiWorkbench.apply.error.verify-failed':
     'The written file failed its read-back check, so it must not be trusted. Delete it and try again.',
   'ankiWorkbench.apply.error.io': 'The file could not be written.',
+  'ankiWorkbench.apply.text.original':
+    'Export writes a new text file. The original file is never modified.',
+  'ankiWorkbench.apply.text.identity.rowOrder':
+    'This file carries no guid column, so notes are matched by their row number in this exact file. The exported file re-imports into Anki as new notes; it cannot merge into notes you already have.',
+  'ankiWorkbench.apply.text.identity.guid':
+    'This file carries a guid column, so the exported file re-imports into Anki as updates to the same notes.',
+  'ankiWorkbench.apply.text.export': 'Export a new text file…',
+  'ankiWorkbench.apply.text.writing': 'Writing the text file…',
+  'ankiWorkbench.apply.text.ok.file': 'Written to {path}',
+  'ankiWorkbench.apply.text.ok.counts': '{notes} notes rewritten across {rows} rows',
+  'ankiWorkbench.apply.text.ok.tags': '{count} notes had their tags column rewritten',
+  'ankiWorkbench.apply.text.ok.verified':
+    'The written file was read back from disk and every change was found in it.',
+  'ankiWorkbench.apply.textError.nothing-to-export':
+    'The session adds up to no changes, so no file was written.',
+  'ankiWorkbench.apply.textError.cancelled': 'Nothing was written.',
+  'ankiWorkbench.apply.textError.no-source':
+    'The source text file is gone, so nothing could be written. Reopen the file in the workbench.',
+  'ankiWorkbench.apply.textError.source-changed':
+    'The source text file changed since it was read, so nothing was written. Reopen it and redo the edits.',
+  'ankiWorkbench.apply.textError.overwrite-source':
+    'Export writes a new file and never overwrites the original. Choose a different name.',
+  'ankiWorkbench.apply.textError.note-missing':
+    'An edit names a row the source file does not have. Nothing was written — reopen the file before exporting.',
+  'ankiWorkbench.apply.textError.field-count-mismatch':
+    'An edit carries a different number of fields than the row has columns. Nothing was written.',
+  'ankiWorkbench.apply.textError.no-tags-column':
+    'This file declares no tags column, so tags have nowhere to go. Nothing was written — export as a package instead.',
+  'ankiWorkbench.apply.textError.unsupported-change':
+    'A text file stores notes only: it has no cards, no scheduling and no card templates. Nothing was written — undo the edits listed below, or export as a package instead.',
+  'ankiWorkbench.apply.textError.verify-failed':
+    'The written file failed its read-back check, so it was removed rather than left looking importable.',
+  'ankiWorkbench.apply.textError.io': 'The text file could not be written.',
   'ankiWorkbench.browser.search': 'Search fields, tags and decks',
   'ankiWorkbench.browser.rows': '{shown} of {loaded} loaded notes shown',
   'ankiWorkbench.browser.columns': 'Columns',
