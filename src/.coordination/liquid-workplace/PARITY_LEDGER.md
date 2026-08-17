@@ -263,8 +263,19 @@ change.** The live store carries **three** assignments for **two** panels: `vdd-
 **resolution is in the key**, so changing it does. The user's per-monitor configuration is
 silently reset to the `enabled: false` default and the dead row keeps holding a desktop index.
 Not hypothetical: it happened on this machine, inside one session, when the new display was set
-from 800×600 to 1920×1080. Tracked and fixed separately; the orphan row is **left in place**
-because `resolveDisplayKey`'s contract is that an absent display *keeps* its assignment.
+from 800×600 to 1920×1080. **Fixed in `be731d7e`** — `syncAssignments` now *adopts* the panel's
+previous row (rekeying it) instead of pushing a fresh default, but only on an unambiguous 1:1
+label match. The orphan row is **left in place** on this machine: `resolveDisplayKey`'s contract
+is that an absent display *keeps* its assignment, and the probe's restore discipline is to leave
+the store as found.
+
+**Limit of that fix, stated rather than discovered later.** Because this store *already* carries
+two stale-or-live rows labelled `vdd-by-mtt`, the very next resolution change on this machine is
+ambiguous by the fix's own rule and will create a fresh row rather than adopt. The fix prevents
+accumulation going forward; it does not repair a store that already accumulated. The user-facing
+remedy exists and needs no code — Settings ▸ Monitors' reset control (`MonitorsPage.tsx:242`)
+calls `desktopResetAssignments()` then `deskwinSync()`, which rebuilds every row from the
+displays actually present. Not exercised here: it is a persisted write to real user state.
 
 **Instrumentation limit found while closing the grid row, so the next worker does not re-derive
 it:** the desk icon's `×` is `display:none` until `.os-desk-icon:hover` (`styles.css:13806`,
