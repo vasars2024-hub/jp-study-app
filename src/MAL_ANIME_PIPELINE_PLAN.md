@@ -1979,3 +1979,48 @@ recurring one field over. Make a **dead** swarm say so, distinctly from a slow o
 `qbitAwaitFiles`; it already re-reads torrent state each poll, so `num_seeds`/`num_leechs` are there.
 Then re-run this candidate — it is a known-good Route B fixture.
 Cleanup: category back to **0 rows**, torrent deleted with its files, both times, by hash.
+
+## 2026-08-18 — the swarm gets named, and the same 3/39 means two opposite things
+
+Worker `primary`. Commits `52c49ef6` (file wait), `414df42e` (the `-1`), `fe258d1c` (metadata wait
++ the split), `3059f33b` (lint). App restarted three times; every live number is post-restart.
+
+**THE HEADLINE, and it is a comparison, not a claim.** The same candidate, the same count, opposite
+advice — which is the whole point:
+- 2026-08-17: `"Timed out with 3/39 subtitle file(s) complete."` while `num_seeds=0, num_leechs=0`.
+- 2026-08-18, live: `"Timed out with 3/39 subtitle file(s) complete. Still connected to 16 peer(s)
+  at 121 KB/s — this swarm is slow, not dead, so a longer wait may finish it."`
+
+**Found only because the re-run was live.** The fetch never reached `qbitAwaitFiles` on the first
+attempt — it died one function earlier in `qbitAwaitMetadata`, which had the identical blind spot
+and is the wait that actually fails in practice: 8 minutes at `seedsTotal 0, peersTotal 1`, reported
+as "no peer sent its file list". A unit-test-only slice would have shipped the fix into the wrong
+function and called it done.
+
+**The summed count was backwards, and the split is the fix.** 0 seeds + 1 peer sums to 1, so the
+first cut read "the swarm lists 1 and we reached none of it" → *check your VPN*. Split per half,
+those same numbers say **nobody is sharing a complete copy** — the release's fault. `swarmCount`
+also keeps `-1` (qBittorrent for "tracker not scraped") distinct from zero. **`-1` was NOT
+reproduced on this daemon** — 5.2.3 answered 0/61 fresh and 0/28 aged — so that half is guarded on
+the documented contract, not on an observation. Say so; do not upgrade it to "measured".
+
+**Gate 31 STAYS 32 OF 34** (open: 31, 34), counted from this file's gate tables. Route B did not
+acquire. But the blocker moved again and this is the actionable part: **it is no longer swarm-blocked,
+it is timeout-blocked.** The swarm revived to 16 peers / 9 seeds / 121 KB/s; `FETCH_TIMEOUT_MS` is
+**5 minutes** (`subtitleNyaaSource.ts:77`) and 39 sidecars behind 4 MB piece alignment need ~20+ min
+at that rate. The product now literally says "a longer wait may finish it" and offers no way to wait
+longer. **That is the next slice.**
+
+**Cleanup, through the product's own path and not the user's API key.** `qbitReapSubtitleOrphans`
+runs before each acquisition, so a fetch aimed at another candidate swept the 46 GB transfer this
+turn left running — deleted with its files, none of the user's 6 touched, verified by listing.
+Watched work twice today. `debug/g31a-qbit.cjs` reads the key out of `qBittorrent.ini`; do not.
+
+**Traps.** (1) `debug/g31n-routeb.cjs acquire` **re-sorts candidates by size** and so discards the
+product's own ranking — it picked a muxed release while the `外挂` row the signal promoted sat at #0.
+Take row 0. (2) A refused release stays in the client by design; the *next* acquisition reaps it.
+(3) `scraperQbitTransfers` returns the array directly, not `{ok, rows}`.
+
+Gates: vitest **733 files / 10,191 passed / 0 failed** / 6 skipped (baseline 10,172; **+19 = exactly
+my new cases**); i18n exit 0 (10,590); architecture exit 0 "Nothing new", 5 pending; eslint **0
+errors** on all three touched paths. Mutations: 5 red, 1 red, 4 red, 3 red — each restored green.
