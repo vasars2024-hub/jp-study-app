@@ -1611,3 +1611,56 @@ is **not** passed — it needs a batch that actually carries sidecars.
 **Next slice:** walk Route B candidates for sidecars with `debug/g31b-routeb.cjs fetch <title> <malId>`,
 starting with `Shinreigari` 2596 (7,782.40 MB, 6 seeders, refused only by the old 60 s cap). Each
 miss is free; the first hit is gate 31's Route B leg.
+
+## 2026-08-17 — the 404 that retired candidates was never a verdict, and a sequel is a different work
+
+Worker `primary`. Commits `6cdd874d`, `99c20548`. The previous entry's named next slice ran and
+died on its first candidate; the cause was upstream of Route B entirely.
+
+**`6cdd874d` — the intermittent 404, diagnosed and closed.** `walk "Shinreigari" 2596` refused in
+**84 ms**: *"qBittorrent answered 404 to torrents/files."* The transfer list, read straight after
+through `scraperQbitTransfers`, showed that exact release resident — `50b34db5`, category
+`jp-study-subtitles`, **8,153,820,936 B** of metadata already learned. So `qbitAddStopped` had
+found and adopted it and the very next `torrents/files` 404'd on a torrent the client was listing.
+**The control that settled it: the identical walk minutes later, nothing changed, read the file
+list and reached its selection verdict in 14 ms.** `qbitFiles` now marks a 404 as `notFound`, and
+both waits ask `torrents/info` what it means — still listed means keep waiting, actually absent
+means the client-facing "no longer in qBittorrent" that gate 29 depends on, now one shared
+constant. The metadata timeout gained its own state: a client that will not open the list is not
+a swarm that never answers. 3 tests + a scope control that a **non**-404 stays fatal on the first
+read; the pre-existing test asserting the old behaviour was rewritten onto a 500, not deleted.
+Mutation control: tolerance disabled → 3 failures, the 3 intended. Suites **218/218**.
+
+**`99c20548` — the sequel defect the last entry recorded and left open.** `looksLikeSameTitle`
+scored *Ashita no Joe 2* a perfect match for *Ashita no Joe*: every token of the shorter title is
+inside the longer one and the rule only wants half. `sequelOrdinal` reads the ordinal a name
+claims and the gate compares **both sides**, because the failure is symmetric. The hard part is
+that release names are full of numbers that are not sequels, so three rules keep them out, each
+measured against fixtures already in the file: zero-padded is an episode, inside a range is an
+episode, after a separator rather than a word is an episode. `S1`/`1st Season` score 1.
+**All 62 pre-existing cases unchanged**; 2 new, one of them six false-negative controls.
+Mutation control: gate disabled → 1 failure.
+
+**LIVE after restart (pid 40236), and it is an inverse control pair.** `Ashita no Joe` (2402) now
+lists **3** candidates, all genuine — two `01 ~ 79` Erai-raws batches and a 4K remux `(1-79)` —
+and the 1.40 MB `Ashita no Joe 2 (Tomorrow's Joe 2) [CR] (Subtitles only)` is **gone**. Searching
+`Ashita no Joe 2` still returns that same pack, plus two `01-47` Joe 2 batches. Same release,
+offered for its own title and refused for its predecessor's.
+
+**Route B walk, live, 3 candidates across 2 titles, all honest misses at zero content bytes.**
+`debug/g31b-routeb.cjs` gained a `walk` step because `fetch` took only the FIRST batch-sidecar, so
+one refusal retired a whole title. Ghost Hound (7,782.40 MB, 6 seeders) → *"contains no subtitle
+files"*; Les Misérables `[Aoi-WSRN-Licca]` 12,083.20 MB / 4 seeders → same, metadata **10,128 ms**;
+`[F-R] … 01-52 BATCH` 33,894.40 MB / 14 seeders → same, **6,051 ms**. Both Les Misérables rows are
+new — the 18.10 MB sub-pack this plan chased is below `minSeeders` now. **Gate 31 stays open at
+32 of 34**, counted from this file's gate tables; Route B needs a batch that carries sidecars and
+3 of 3 muxed batches do not.
+
+**Trap: a probe that reads `qbittorrent.apiKey` off the renderer profile gets 403 on every route,
+control included** — the key is resolved main-side from the encrypted store, so `cfg.apiKey` is
+empty and the probe sends no `Authorization` at all. `debug/qbit-files-404.cjs` records this;
+drive qBittorrent through the app's own IPC instead.
+
+**Next slice:** `debug/g31n-routeb.cjs survey 80 54` was running as this turn closed (`debug/
+g31n-survey3.log`, `g31n-routeb-54.json`). Indices 54–117 produced **zero** `sub-pack` rows and a
+handful of sidecars. Read that file, then `walk` the smallest sidecar candidates it names.
