@@ -1583,3 +1583,31 @@ restart reads the dead bridge forever. Use `JSON.parse(readFileSync(...))`.
 `node debug/g19n-nyaa-mine.cjs run "Les Misérables: Shoujo Cosette" 1695`, then
 `node debug/g31b-routeb.cjs fetch "Shinreigari" 2596`. Both need a restart first (main does not
 hot-reload) and both were refused only by the old cap.
+
+## 2026-08-17 — addendum, same turn: Route B gets past metadata for the first time
+
+Both re-runs on the 480 s wait, after a restart (main pid 29960). No product change; evidence only.
+
+**Route A on Les Misérables did not run, and the reason is itself a finding: the candidate pool is
+LIVE, not static.** The 18.10 MB / 4-seeder `sub-pack` this plan named — the one three fetches
+chased this morning — is **no longer above the profile's `minSeeders` 3**. The title now lists
+**2 candidates, both `batch-sidecar`**: `[F-R] Les Miserables Shoujo Cosette 01-52 BATCH (WEB 1080p)`
+33,894.40 MB / 13 seeders, and `[Aoi-WSRN-Licca]…(Batch)_[HD]` 12,083.20 MB / 5 seeders. So a
+survey's Route A hit expires; re-list before treating one as a candidate.
+
+**ROUTE B REACHED SELECTION FOR THE FIRST TIME.** Named before the transfer and the smaller of the
+two taken, per the standing condition: `[Aoi-WSRN-Licca]Les_Miserables_Shoujo_Cosette_(Batch)_[HD]`,
+**12,083.20 MB, 5 seeders**. **Metadata in 11,542 ms** — on the same machine that timed out at 60 s
+four times this morning, which is the swarm variance the 480 s wait exists for. Refusal:
+**"This release contains no subtitle files."** Correct and honest — a muxed/hardsubbed batch has no
+`.ass`/`.srt` sidecars — and it cost **zero content bytes**, because selection runs after metadata
+and before `qbitSetFilePriorities`/`qbitStart`.
+
+**That is the Route B survey method, now proven rather than assumed: a Route B miss is free.** A
+batch is classified `batch-sidecar` from its NAME, and only metadata can say whether real sidecars
+exist, so candidates can be walked at the cost of a metadata handshake each. Gate 31's Route B leg
+is **not** passed — it needs a batch that actually carries sidecars.
+
+**Next slice:** walk Route B candidates for sidecars with `debug/g31b-routeb.cjs fetch <title> <malId>`,
+starting with `Shinreigari` 2596 (7,782.40 MB, 6 seeders, refused only by the old 60 s cap). Each
+miss is free; the first hit is gate 31's Route B leg.
