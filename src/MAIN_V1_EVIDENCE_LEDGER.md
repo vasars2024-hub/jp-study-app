@@ -25036,3 +25036,44 @@ throttled to ~1 Hz when the window is unfocused — 21 beats/1 ms unfocused vs *
 `POST /focus`. A gap number without that control cannot tell a stalled main from a throttled timer.
 Fourth, cheaper: a probe helper written as an IIFE rather than a function literal throws inside a
 rAF callback where nothing is watching, and the run reports a *timeout*, not an error.
+
+## 2026-08-18 — Track 7 / gate 4 CLOSES: the conflict that had to be built to be resolved (`primary`)
+
+Re-derived first: gates **4, 6, 7, 8** have zero Track 7 mentions anywhere in this ledger, so they
+are genuinely unstarted rather than closed-and-unannotated. Gate 4 turned out to be fully BUILT and
+merely never demonstrated — `known:local|anki|both|conflict|none|no` plus `resolveVocabKnown`
+arbitrating on a `local|anki|either|both` precedence, all reachable from the Browser's own search
+box and its precedence `<select>`. No code change was needed and none was made.
+
+**The fact that makes it runnable at all:** the "Anki" side is **not** AnkiConnect.
+`buildVocabContext` derives it from the DRAFT's own card intervals against `matureIntervalDays`, so
+a conflict can be staged entirely offline. An agent that assumes it needs a live collection parks
+this gate for no reason.
+
+Staging, on the 100k fixture's page of 500: every note has cards, none is mature, no word is known
+locally — Anki votes "not known" 500 times, local abstains 500 times. Baseline `known:conflict`
+**0**, `known:yes` **0**, `known:no` **500**. Marking exactly one term (`たまらん`) known locally
+creates exactly one disagreement.
+
+| precedence | `known:conflict` | `known:yes` | `known:no` |
+| --- | --- | --- | --- |
+| `local` | 1 | **1** | 499 |
+| `anki` | 1 | **0** | 500 |
+| `both` | 1 | **0** | 500 |
+| `either` | 1 | **1** | 499 |
+
+The same note flips on the arbiter alone — the gate's actual ask. `conflict` is 1 under all four
+**by design**: disagreement is a fact, not an arbitration. Source modes vote separately:
+`known:local` 1, `known:anki` 0, `known:both` 0.
+
+**Controls.** The before-row 0/0/500 makes the 1 an effect of the mark rather than an always-on
+match. `both`=0 against `either`=1 is a truth table, not a single reading. yes+no = **500 exactly**
+in all four modes. And the counts moving at all proves `import('/src/renderer/knownWords.ts')`
+reached the module instance the Browser subscribes to — a second Vite copy would have left them flat,
+which is why that check is worth having rather than assuming.
+
+**Persisted state.** Local knowledge is renderer `localStorage`, key `jp-word-knowledge-ja`, and it
+was **`{}` (2 chars)** before this run. Captured, patched, restored, and verified `identical: true`
+by string comparison rather than by eye; the renderer was then reloaded so the in-memory cache could
+not keep a level the store no longer holds. Note for the next turn: that reload drops the adopted
+draft, so the workbench needs the fixture reopened again.

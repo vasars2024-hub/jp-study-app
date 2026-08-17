@@ -366,6 +366,33 @@ This slice is complete only when all of these can be shown with real data and no
     `none` 141 + `noword` 1 = **3,221** exactly, and `freq:<=5000 nope:1` renders the refusal and no
     explanation.
 4. Exclude words known locally, known in Anki, or both; resolve a deliberately conflicting item according to the selected precedence.
+
+    **Closed 2026-08-18** (`debug/gate4-known-precedence.cjs`), live through the Browser's
+    own search box and precedence `<select>`. The machinery was fully built and had
+    never been demonstrated. Load-bearing fact for anyone re-running it: the "Anki"
+    side is **not** AnkiConnect — `buildVocabContext` derives it from the draft's own
+    card intervals against `matureIntervalDays`, which is what makes this gate runnable
+    offline.
+    Staging: on the 100k fixture's page of 500, every note has cards, none is mature, and
+    no word is known locally — so Anki votes "not known" 500 times and local abstains 500
+    times (`known:conflict` **0**, `known:yes` **0**, `known:no` **500**). Marking exactly
+    ONE term (`たまらん`) known locally creates exactly one disagreement.
+
+    | precedence | `known:conflict` | `known:yes` | `known:no` |
+    | --- | --- | --- | --- |
+    | `local` | 1 | **1** | 499 |
+    | `anki` | 1 | **0** | 500 |
+    | `both` | 1 | **0** | 500 |
+    | `either` | 1 | **1** | 499 |
+
+    The same note flips on the arbiter alone, which is the gate's actual ask. `conflict`
+    is 1 under all four by design — disagreement is a fact, not an arbitration. Source
+    modes report each vote separately: `known:local` **1**, `known:anki` **0**,
+    `known:both` **0**. Controls: the before-row is 0/0/500, so the 1 is caused by the
+    mark rather than always on; `both`=0 against `either`=1 is a truth table rather than
+    one reading; and yes+no = **500 exactly** in all four modes. Persisted state was
+    captured and restored **byte-identical** (`identical: true`), and the renderer was
+    reloaded to drop the patched in-memory cache.
 5. Batch-edit tags, flags, deck, suspension, due date, interval/ease or a supported scheduling preset, then reread Anki and prove the resulting state.
 
     **NOT CLOSED — half built 2026-08-17** (`67512897` model + both writers,
