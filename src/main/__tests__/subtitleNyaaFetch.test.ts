@@ -61,6 +61,16 @@ let presentCategory = '';
  * underneath it produces; neither ever moves progress again.
  */
 let torrentState = 'downloading';
+/**
+ * Who is on the other end of the swarm, which the row used to omit entirely.
+ *
+ * Omitting it meant every fixture torrent read as zero seeds and zero peers,
+ * and `stalledDL` was the only thing separating "healthy but slow" from "there
+ * is nobody there" — which is the pair the live 2026-08-18 Route B run could
+ * not tell apart either. Healthy by default; a test that wants a dead swarm
+ * zeroes it deliberately.
+ */
+let swarm = { num_seeds: 5, num_leechs: 2, num_complete: 9, num_incomplete: 3 };
 /** Torrents that vanish while we are waiting — the user removed it, or the client restarted without it. */
 let disappearAfterAdd = false;
 /** Starting the torrent moves nothing, which is what a stopped-on-error transfer looks like. */
@@ -190,6 +200,7 @@ beforeAll(async () => {
           size: 1000,
           state: torrentState,
           category: presentCategory,
+          ...swarm,
         }]
         : [];
       res.writeHead(200, { 'content-type': 'application/json' });
@@ -288,6 +299,7 @@ beforeEach(() => {
   present = false;
   presentCategory = '';
   torrentState = 'downloading';
+  swarm = { num_seeds: 5, num_leechs: 2, num_complete: 9, num_incomplete: 3 };
   disappearAfterAdd = false;
   stallOnStart = false;
   metadataAfterPolls = 0;
@@ -779,15 +791,51 @@ describe('nyaaFetch — a transfer that stops and never comes back', () => {
   });
 
   it('a stalled-but-healthy transfer is still allowed to finish waiting', async () => {
-    // The control for both gates above: `stalledDL` is a slow swarm, not a
-    // failure, and bailing on it would turn a working fetch into an error.
+    // The control for both gates above: `stalledDL` with peers on the other end
+    // is a slow swarm, not a failure, and bailing on it would turn a working
+    // fetch into an error. It is the only branch that may invite a longer wait.
     files = [{ name: 'Show - 07.ja.ass', size: 40_000, progress: 0, priority: 1 }];
     stallOnStart = true;
     torrentState = 'stalledDL';
 
+    const started = Date.now();
     const result = await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 1_200 });
     expect(result.ok).toBe(false);
     expect(result.ok === false && result.reason).toMatch(/timed out/i);
+    expect(result.ok === false && result.reason).toMatch(/slow, not dead/i);
+    // It must reach the deadline rather than give up early — the invariant this
+    // case has always been the control for.
+    expect(Date.now() - started).toBeGreaterThanOrEqual(1_000);
+  });
+
+  it('the same stall with nobody in the swarm is reported as dead, not as a timeout', async () => {
+    // The pair the live Route B run could not tell apart: identical state,
+    // identical frozen progress, opposite advice. `stalledDL` alone cannot
+    // distinguish them, which is why the swarm counts are read.
+    files = [{ name: 'Show - 07.ja.ass', size: 40_000, progress: 0, priority: 1 }];
+    stallOnStart = true;
+    torrentState = 'stalledDL';
+    swarm = { num_seeds: 0, num_leechs: 0, num_complete: 0, num_incomplete: 0 };
+
+    const result = await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 1_200 });
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.reason).toMatch(/dead, not slow/i);
+    // NEGATIVE CONTROL: the sentence the user got live, which told them to wait.
+    expect(result.ok === false && result.reason).not.toMatch(/timed out/i);
+  });
+
+  it('a swarm the client reaches none of blames the connection, not the release', async () => {
+    files = [{ name: 'Show - 07.ja.ass', size: 40_000, progress: 0, priority: 1 }];
+    stallOnStart = true;
+    torrentState = 'stalledDL';
+    // What the live run actually saw: the listing advertised seeders and the
+    // client was connected to zero of them.
+    swarm = { num_seeds: 0, num_leechs: 0, num_complete: 8, num_incomplete: 4 };
+
+    const result = await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 1_200 });
+    expect(result.ok === false && result.reason).toMatch(/connection problem/i);
+    expect(result.ok === false && result.reason).toMatch(/the swarm lists 12/i);
+    expect(result.ok === false && result.reason).not.toMatch(/dead/i);
   });
 });
 

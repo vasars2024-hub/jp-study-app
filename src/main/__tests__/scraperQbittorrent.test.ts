@@ -32,8 +32,9 @@ vi.mock('electron', () => ({
 
 let encryptionAvailable = true;
 
-const { addFailureReason, buildAddForm, magnetInfoHash, mapQbitState, mapTransfer, normalizeQbitInput, parseAddOutcome, qbitBaseUrl, qbitSend, qbitTest, qbitTransfers, resetQbitSessions } =
+const { addFailureReason, awaitFilesStallReason, buildAddForm, magnetInfoHash, mapQbitState, mapTransfer, normalizeQbitInput, parseAddOutcome, qbitAwaitFiles, qbitBaseUrl, qbitSend, qbitTest, qbitTransfers, resetQbitSessions } =
   await import('../scraper/qbittorrent');
+type StallInput = Parameters<typeof awaitFilesStallReason>[0];
 
 /** Two real-shaped 40-hex infohashes: one the stand-in holds, one it does not. */
 const HASH_PRESENT = '0123456789abcdef0123456789abcdef01234567';
@@ -86,6 +87,16 @@ let torrentInfoExtra: unknown[] = [];
  * leave the report exactly as it was rather than inventing an outage.
  */
 let connectionStatus = 'connected';
+/** What `torrents/files` answers next. `null` makes the stand-in 404 the route. */
+let fileListResponse: unknown[] | null = null;
+/**
+ * Run on every `torrents/info` request, before it answers.
+ *
+ * The point of it is the one thing a fixed fixture cannot express: a swarm that
+ * is alive on one poll and dead on the next. A test mutates `torrentInfoExtra`
+ * from here and the wait sees it change under itself, exactly as it would live.
+ */
+let torrentInfoHook: (() => void) | null = null;
 
 const TORRENT_INFO = [
   {
@@ -200,8 +211,28 @@ beforeAll(async () => {
       return;
     }
     if (url.pathname === '/api/v2/torrents/info') {
+      torrentInfoHook?.();
+      const all = [...TORRENT_INFO, ...torrentInfoExtra];
+      // The real daemon filters on `hashes` and answers `[]` for one it does not
+      // hold; a stand-in that ignores the parameter reports the first fixture
+      // for every hash, which is how "already present" would test green for a
+      // torrent the client has never seen.
+      const hashes = url.searchParams.get('hashes');
+      const rows = hashes
+        ? all.filter((t) => hashes.toLowerCase().split('|').includes(String((t as { hash?: string }).hash ?? '').toLowerCase()))
+        : all;
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify([...TORRENT_INFO, ...torrentInfoExtra]));
+      res.end(JSON.stringify(rows));
+      return;
+    }
+    if (url.pathname === '/api/v2/torrents/files') {
+      if (!fileListResponse) {
+        res.writeHead(404);
+        res.end('Torrent hash was not found');
+        return;
+      }
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(fileListResponse));
       return;
     }
     if (url.pathname === '/api/v2/torrents/add') {
@@ -252,6 +283,8 @@ beforeEach(async () => {
   seenHeaders = [];
   torrentInfoExtra = [];
   connectionStatus = 'connected';
+  fileListResponse = null;
+  torrentInfoHook = null;
   resetQbitSessions();
   await flushScraperLogWrites();
   await fsp.rm(path.join(tempRoot, 'scraper'), { recursive: true, force: true });
@@ -908,5 +941,174 @@ describe('addFailureReason', () => {
     const long = 'x'.repeat(500);
     const reason = addFailureReason(409, long);
     expect(reason.length).toBeLessThanOrEqual('qBittorrent answered 409: '.length + 200);
+  });
+});
+
+// ---- why a subtitle wait gave up ----------------------------------------
+//
+// The defect these cover, measured live 2026-08-18: a Route B fetch reported
+// "Timed out with 3/39 subtitle file(s) complete" while the same torrent read
+// `num_seeds=0, num_leechs=0, dlspeed 0.0 KB/s`. That sentence tells a user to
+// wait longer, and there was nobody on the other end to wait for.
+
+/** A 40-hex hash the fixtures deliberately do not hold. */
+const HASH_AWAIT = 'cafebabe0123456789abcdef0123456789abcdef';
+
+function stall(overrides: Partial<StallInput> = {}): StallInput {
+  return {
+    done: 3,
+    total: 39,
+    waitedMs: 307_916,
+    last: { connected: 6, known: 40, speedBps: 120_000 },
+    peakConnected: 6,
+    clientOffline: false,
+    ...overrides,
+  };
+}
+
+describe('awaitFilesStallReason', () => {
+  it('calls a swarm nobody is in dead, not slow', () => {
+    const reason = awaitFilesStallReason(stall({
+      done: 0,
+      last: { connected: 0, known: 0, speedBps: 0 },
+      peakConnected: 0,
+    }));
+    expect(reason).toContain('dead, not slow');
+    expect(reason).toContain('5 minutes');
+    // NEGATIVE CONTROL: the exact sentence the defect produced must be gone.
+    // Without the branch this whole block adds, this is what came back.
+    expect(reason).not.toContain('Timed out with');
+  });
+
+  it('blames the connection, not the release, when the swarm is populated but unreached', () => {
+    const reason = awaitFilesStallReason(stall({
+      done: 0,
+      last: { connected: 0, known: 8, speedBps: 0 },
+      peakConnected: 0,
+    }));
+    expect(reason).toContain('the swarm lists 8');
+    expect(reason).toContain('connection problem');
+    // The distinction is the whole point: this one is not the release's fault.
+    expect(reason).not.toContain('dead');
+  });
+
+  it('says the swarm went silent when peers were there earlier and are not now', () => {
+    const reason = awaitFilesStallReason(stall({
+      last: { connected: 0, known: 40, speedBps: 0 },
+      peakConnected: 6,
+    }));
+    expect(reason).toContain('Timed out with 3/39 subtitle file(s) complete.');
+    expect(reason).toContain('went silent');
+    expect(reason).toContain('waiting longer is unlikely to help');
+  });
+
+  it('says a slow swarm is slow, and only then invites a longer wait', () => {
+    const reason = awaitFilesStallReason(stall());
+    expect(reason).toContain('Timed out with 3/39 subtitle file(s) complete.');
+    expect(reason).toContain('Still connected to 6 peer(s) at 120 KB/s');
+    expect(reason).toContain('slow, not dead');
+  });
+
+  it('blames the client itself in the client\'s own words when it is offline', () => {
+    // Word-for-word the status check's sentence, so a user cannot read the two
+    // as different problems. Every other input is the dead-swarm shape.
+    const reason = awaitFilesStallReason(stall({
+      clientOffline: true,
+      last: { connected: 0, known: 0, speedBps: 0 },
+      peakConnected: 0,
+    }));
+    expect(reason).toBe(
+      'qBittorrent is running but not connected to any swarm, so no release can report its contents. '
+      + 'Check its network connection, VPN or firewall.',
+    );
+  });
+
+  it('never reports a zero-minute wait', () => {
+    const reason = awaitFilesStallReason(stall({
+      waitedMs: 900,
+      last: { connected: 0, known: 0, speedBps: 0 },
+      peakConnected: 0,
+    }));
+    expect(reason).toContain('1 minute,');
+    expect(reason).not.toContain('0 minute');
+  });
+});
+
+describe('qbitAwaitFiles reads the swarm off the live torrent', () => {
+  const SUBS = [
+    { index: 0, name: 'Show/Subs/ep01.ass', size: 30_000, progress: 0.4, priority: 1 },
+    { index: 1, name: 'Show/Subs/ep02.ass', size: 30_000, progress: 1, priority: 1 },
+  ];
+
+  function torrent(overrides: Record<string, unknown> = {}) {
+    return {
+      hash: HASH_AWAIT,
+      name: 'Show',
+      state: 'downloading',
+      progress: 0.5,
+      dlspeed: 0,
+      save_path: 'D:\Subs',
+      num_leechs: 0,
+      num_incomplete: 0,
+      num_seeds: 0,
+      num_complete: 0,
+      ...overrides,
+    };
+  }
+
+  /**
+   * A real but tiny budget. The deadline is real wall-clock inside the wait, so
+   * a no-op `sleep` does not skip it — it spins the loop against a live HTTP
+   * stand-in for the whole timeout instead. 300 ms at a 15 ms poll leaves room
+   * for the several polls the "swarm dies under it" case needs.
+   */
+  const options = { timeoutMs: 300, pollMs: 15 };
+
+  it('reports a dead swarm as dead', async () => {
+    fileListResponse = SUBS;
+    torrentInfoExtra = [torrent()];
+    const out = await qbitAwaitFiles({ config }, HASH_AWAIT, [0, 1], options);
+    expect(out.ok).toBe(false);
+    expect(out.ok === false && out.reason).toContain('dead, not slow');
+  });
+
+  it('reports a populated swarm it cannot reach as a connection problem', async () => {
+    fileListResponse = SUBS;
+    torrentInfoExtra = [torrent({ num_complete: 7, num_incomplete: 1 })];
+    const out = await qbitAwaitFiles({ config }, HASH_AWAIT, [0, 1], options);
+    expect(out.ok === false && out.reason).toContain('the swarm lists 8');
+    expect(out.ok === false && out.reason).toContain('connection problem');
+  });
+
+  it('reports a slow swarm with the count and the speed it measured', async () => {
+    fileListResponse = SUBS;
+    torrentInfoExtra = [torrent({ num_seeds: 4, num_leechs: 2, num_complete: 9, dlspeed: 51_200 })];
+    const out = await qbitAwaitFiles({ config }, HASH_AWAIT, [0, 1], options);
+    expect(out.ok === false && out.reason).toContain('Timed out with 1/2 subtitle file(s) complete.');
+    expect(out.ok === false && out.reason).toContain('Still connected to 6 peer(s) at 51 KB/s');
+  });
+
+  it('notices a swarm that dies under it, which one final sample could not', async () => {
+    fileListResponse = SUBS;
+    torrentInfoExtra = [torrent({ num_seeds: 5, num_complete: 9 })];
+    let polls = 0;
+    torrentInfoHook = () => {
+      polls += 1;
+      // Alive for the first two polls, then everyone leaves. A wait that only
+      // looked at the end would call this "never reached anyone".
+      if (polls >= 2) torrentInfoExtra = [torrent({ num_seeds: 0, num_complete: 9 })];
+    };
+    const out = await qbitAwaitFiles({ config }, HASH_AWAIT, [0, 1], options);
+    expect(polls).toBeGreaterThan(2);
+    expect(out.ok === false && out.reason).toContain('went silent');
+    expect(out.ok === false && out.reason).not.toContain('No seed or peer answered');
+  });
+
+  it('still succeeds, and asks the swarm nothing, when every file is complete', async () => {
+    fileListResponse = SUBS.map((f) => ({ ...f, progress: 1 }));
+    torrentInfoExtra = [torrent()];
+    const out = await qbitAwaitFiles({ config }, HASH_AWAIT, [0, 1], options);
+    expect(out.ok).toBe(true);
+    expect(out.ok === true && out.value.map((f) => f.index)).toEqual([0, 1]);
   });
 });

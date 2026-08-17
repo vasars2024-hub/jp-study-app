@@ -1296,6 +1296,77 @@ export async function qbitAwaitMetadata(
   }
 }
 
+/** What the last poll of `torrents/info` said about who is on the other end. */
+export interface QbitSwarmSample {
+  /** Seeds + peers qBittorrent is actually connected to right now. */
+  connected: number;
+  /** Seeds + peers the tracker/DHT says exist, connected or not. */
+  known: number;
+  /** Bytes per second arriving right now. */
+  speedBps: number;
+}
+
+/** Everything the give-up message is allowed to be derived from. */
+export interface QbitStallInput {
+  /** Files of the selection that reached progress 1. */
+  done: number;
+  /** Files the selection asked for. */
+  total: number;
+  /** How long the wait actually ran, not the budget it was given. */
+  waitedMs: number;
+  /** The final sample, or null when `torrents/info` could not be read at all. */
+  last: QbitSwarmSample | null;
+  /** The most peers connected at any single moment of the whole wait. */
+  peakConnected: number;
+  /** True when qBittorrent itself reports it is on no swarm at all. */
+  clientOffline: boolean;
+}
+
+/**
+ * Why a wait ended empty: the client's fault, the swarm's, or nobody's.
+ *
+ * Gate 28's lesson recurring one field over. A full disk was once
+ * indistinguishable from a slow swarm; on 2026-08-18 a Route B fetch reported
+ * *"Timed out with 3/39 subtitle file(s) complete"* while the same torrent read
+ * `num_seeds=0, num_leechs=0, dlspeed 0.0 KB/s`. That sentence reads as "be
+ * patient", and no amount of patience reaches a swarm you are connected to
+ * nobody in. Four outcomes, and only the last one is worth waiting longer on.
+ *
+ * Pure so the four branches are testable without a five-minute wait.
+ */
+export function awaitFilesStallReason(input: QbitStallInput): string {
+  // Asked first because it is not this release's fault at all, and worded
+  // identically to the status check for the reason that constant documents.
+  if (input.clientOffline) return NOT_CONNECTED_REASON;
+
+  const waitedMin = Math.max(1, Math.round(input.waitedMs / 60_000));
+  const forMinutes = `${waitedMin} minute${waitedMin === 1 ? '' : 's'}`;
+  const progress = `Timed out with ${input.done}/${input.total} subtitle file(s) complete.`;
+
+  if (input.peakConnected === 0) {
+    // Never reached anyone, so `done` is whatever arrived before this wait
+    // began and saying "timed out" about it would be the misleading half.
+    const known = input.last?.known ?? 0;
+    if (known === 0) {
+      return `No seed or peer answered in ${forMinutes}, and qBittorrent found nobody at all in this `
+        + 'swarm: this release is dead, not slow. Pick another release.';
+    }
+    return `No seed or peer answered in ${forMinutes}, though the swarm lists ${known}. qBittorrent `
+      + 'reached none of them, so this is a connection problem — check its VPN, firewall and '
+      + 'listening port — not a slow release.';
+  }
+
+  if (input.last && input.last.connected === 0) {
+    return `${progress} The swarm went silent: qBittorrent was connected to peers earlier in this `
+      + 'wait and to none of them by the end, so waiting longer is unlikely to help.';
+  }
+
+  const connected = input.last?.connected ?? input.peakConnected;
+  const kbps = Math.round((input.last?.speedBps ?? 0) / 1_000);
+  return `${progress} Still connected to ${connected} peer(s) at ${kbps} KB/s — this swarm is slow, `
+    + 'not dead, so a longer wait may finish it.';
+}
+
 /**
  * Waits for a set of files to finish, or gives up.
  *
@@ -1313,7 +1384,13 @@ export async function qbitAwaitFiles(
   if (!wanted.size) return { ok: false, reason: 'No files were selected.' };
   const pollMs = options.pollMs ?? 1_000;
   const sleep = options.sleep ?? defaultSleep;
-  const deadline = Date.now() + Math.max(0, options.timeoutMs);
+  const startedAt = Date.now();
+  const deadline = startedAt + Math.max(0, options.timeoutMs);
+  // Carried across polls because the give-up message needs both: the peak
+  // separates "never reached anyone" from "the swarm went silent", and only
+  // the final sample can say which of those is true right now.
+  let peakConnected = 0;
+  let lastSwarm: QbitSwarmSample | null = null;
 
   for (;;) {
     if (options.isCancelled?.()) return { ok: false, reason: 'Cancelled.' };
@@ -1352,13 +1429,33 @@ export async function qbitAwaitFiles(
             'qBittorrent stopped this torrent with an error, so waiting cannot help — check the free space at its save path.',
         };
       }
+      // Sampled every poll rather than once at the end: a swarm that dies
+      // halfway looks identical to one that was never alive if you only ever
+      // look after the timeout, and those two deserve different sentences.
+      lastSwarm = {
+        connected: info.value.seedsConnected + info.value.peersConnected,
+        known: info.value.seedsTotal + info.value.peersTotal,
+        speedBps: info.value.downloadSpeedBps,
+      };
+      peakConnected = Math.max(peakConnected, lastSwarm.connected);
     }
 
     if (Date.now() >= deadline) {
       const done = selected.filter((file) => file.progress >= 1).length;
+      // Asked only on the way out, like the metadata wait: one `transfer/info`
+      // per poll would triple this loop's request count to answer a question
+      // that only matters once.
+      const status = await qbitConnectionStatus(input);
       return {
         ok: false,
-        reason: `Timed out with ${done}/${selected.length} subtitle file(s) complete.`,
+        reason: awaitFilesStallReason({
+          done,
+          total: selected.length,
+          waitedMs: Date.now() - startedAt,
+          last: lastSwarm,
+          peakConnected,
+          clientOffline: status.ok && status.value === 'disconnected',
+        }),
       };
     }
     await sleep(pollMs);
