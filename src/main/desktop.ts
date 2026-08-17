@@ -25,7 +25,11 @@ import {
   SEED_WALLPAPER,
   SLIDE_DURATION_MS,
 } from '../shared/desktop';
-import { isSimulatedDisplayKey } from '../shared/displayIdentity';
+import {
+  PRIMARY_DISPLAY_KEY,
+  displayLabelOfKey,
+  isSimulatedDisplayKey,
+} from '../shared/displayIdentity';
 
 interface CommitLayoutPayload {
   desktopIndex: DesktopIndex;
@@ -471,8 +475,81 @@ class DesktopStore {
     let dirty = false;
     const claimed = new Set(this.schema.assignments.map((a) => a.desktopIndex));
 
+    /*
+     * A stored key nothing currently answers to.
+     *
+     * Mirrors `resolveDisplayKey`'s first two tiers — exact key, then base key
+     * ignoring the `#n` positional suffix — so "stale" here means exactly what
+     * "absent" means everywhere else. `primary` and simulated keys are never
+     * stale: the first always resolves, the second is stripped on load.
+     */
+    const presentKeys = new Set(present.map((d) => d.key));
+    const presentBases = new Set(present.map((d) => d.key.split('#')[0]));
+    const isStaleKey = (key: string): boolean =>
+      key !== PRIMARY_DISPLAY_KEY &&
+      !isSimulatedDisplayKey(key) &&
+      !presentKeys.has(key) &&
+      !presentBases.has(key.split('#')[0]);
+
+    const unmatched = present.filter(
+      (d) => !this.schema.assignments.some((a) => a.displayKey === d.key),
+    );
+    const adoptedKeys = new Set<string>();
+
     for (const display of present) {
       if (this.schema.assignments.some((a) => a.displayKey === display.key)) continue;
+
+      /*
+       * Adopt this panel's previous assignment when its key changed underneath
+       * it, rather than handing it a fresh default row.
+       *
+       * `baseDisplayKey` is `label|WxH|scale`. It deliberately excludes
+       * `bounds.x/y` so rearranging monitors keeps their settings — but the
+       * resolution IS in the key, so *changing a monitor's resolution* silently
+       * orphans everything the user configured for it and leaves a dead row
+       * holding a desktop index. Observed live 2026-08-17: one physical panel
+       * held two assignments, `vdd-by-mtt|800x600|1` and
+       * `vdd-by-mtt|1920x1080|1`, inside a single session.
+       *
+       * A label is weaker than a key — two identical panels share one — so this
+       * only fires on an unambiguous 1:1 match: exactly one unmatched display
+       * with this label, and exactly one stale stored row with it. Anything
+       * less specific falls through to a fresh row, which is the safe default.
+       * The old key is not kept: rekeying is what stops the orphan accumulating.
+       */
+      const label = displayLabelOfKey(display.key);
+      const peers = unmatched.filter((d) => displayLabelOfKey(d.key) === label);
+      const stale = this.schema.assignments.filter(
+        (a) =>
+          isStaleKey(a.displayKey) &&
+          !adoptedKeys.has(a.displayKey) &&
+          displayLabelOfKey(a.displayKey) === label,
+      );
+      if (label && peers.length === 1 && stale.length === 1) {
+        const row = stale[0];
+        adoptedKeys.add(row.displayKey);
+        row.displayKey = display.key;
+        // The user's own index for this panel is kept — unless it is the one the
+        // main window is showing, which is the two-shells-one-desktop break the
+        // fresh-row path below guards against at length. Re-home rather than
+        // refuse, so the rest of their configuration still survives.
+        const isMain = this.mainDisplayKey != null && display.key === this.mainDisplayKey;
+        if (!isMain && row.desktopIndex === this.schema.activeDesktopIndex) {
+          claimed.delete(row.desktopIndex);
+          let free = 0;
+          while (
+            (claimed.has(free) || free === this.schema.activeDesktopIndex) &&
+            free < MAX_DESKTOPS - 1
+          ) {
+            free += 1;
+          }
+          row.desktopIndex = free;
+        }
+        claimed.add(row.desktopIndex);
+        this.ensureDesktop(row.desktopIndex);
+        dirty = true;
+        continue;
+      }
 
       /*
        * A secondary display must never be handed the desktop the MAIN window is

@@ -72,6 +72,20 @@ export function baseDisplayKey(display: DisplayLike): string {
 }
 
 /**
+ * The label half of a display key — `dell|1920x1080|1#2` becomes `dell`.
+ *
+ * This is the part of the fingerprint that identifies the *panel* rather than
+ * the mode it is currently running in, and it is what lets a caller recognise
+ * that `vdd-by-mtt|800x600|1` and `vdd-by-mtt|1920x1080|1` are one monitor the
+ * user changed the resolution of, not two monitors. It is deliberately weaker
+ * than a key: two identical panels share a label, so a caller must handle that
+ * ambiguity itself rather than treating a label match as identity.
+ */
+export function displayLabelOfKey(key: string): string {
+  return key.split('|')[0] ?? '';
+}
+
+/**
  * Keys for a whole display set, collision-resolved.
  *
  * Returns a parallel array — index i is the key for displays[i]. When two or

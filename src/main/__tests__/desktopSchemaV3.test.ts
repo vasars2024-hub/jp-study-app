@@ -267,6 +267,132 @@ describe('desktop store schema v3', () => {
       expect(store.snapshot().assignments).toHaveLength(1);
     });
 
+    /*
+     * Found live 2026-08-17 with a real second display attached: the store held
+     * THREE assignments for TWO panels, because `baseDisplayKey` is
+     * `label|WxH|scale` and the new monitor came up at 800x600 before being set
+     * to 1920x1080. The user's per-monitor configuration is silently reset to
+     * the disabled default, and the dead row keeps holding a desktop index.
+     */
+    describe('a resolution change does not orphan a panel', () => {
+      it('adopts the old assignment instead of creating a second one', async () => {
+        const store = await freshStore();
+        store.setMainDisplayKey('a|1920x1080|1');
+        store.syncAssignments([
+          { key: 'a|1920x1080|1', primary: true },
+          { key: 'vdd-by-mtt|800x600|1', primary: false },
+        ]);
+        // The user configures the panel: on, with no taskbar.
+        store.setAssignment({ displayKey: 'vdd-by-mtt|800x600|1', enabled: true, taskbar: 'none' });
+        const before = (store.snapshot().assignments ?? []).find(
+          (a) => a.displayKey === 'vdd-by-mtt|800x600|1',
+        );
+
+        // Same panel, new resolution — a different key for the same monitor.
+        store.syncAssignments([
+          { key: 'a|1920x1080|1', primary: true },
+          { key: 'vdd-by-mtt|1920x1080|1', primary: false },
+        ]);
+
+        const after = store.snapshot().assignments ?? [];
+        expect(after).toHaveLength(2);
+        expect(after.some((a) => a.displayKey === 'vdd-by-mtt|800x600|1')).toBe(false);
+        const adopted = after.find((a) => a.displayKey === 'vdd-by-mtt|1920x1080|1');
+        expect(adopted?.enabled).toBe(true);
+        expect(adopted?.taskbar).toBe('none');
+        expect(adopted?.desktopIndex).toBe(before?.desktopIndex);
+      });
+
+      it('refuses to adopt when two panels share a label — the ambiguous case', async () => {
+        // Two identical monitors slug to one label, so a label match is not
+        // identity. Guessing here would hand one panel the other's settings.
+        const store = await freshStore();
+        store.setMainDisplayKey('a|1920x1080|1');
+        store.syncAssignments([
+          { key: 'a|1920x1080|1', primary: true },
+          { key: 'dell|1920x1080|1', primary: false },
+        ]);
+        store.setAssignment({ displayKey: 'dell|1920x1080|1', enabled: true });
+
+        store.syncAssignments([
+          { key: 'a|1920x1080|1', primary: true },
+          { key: 'dell|2560x1440|1', primary: false },
+          { key: 'dell|1280x1024|1', primary: false },
+        ]);
+
+        const after = store.snapshot().assignments ?? [];
+        // Stale row kept (an absent display keeps its assignment) and both new
+        // panels got their own fresh, disabled rows — nothing was adopted.
+        expect(after).toHaveLength(4);
+        expect(after.find((a) => a.displayKey === 'dell|1920x1080|1')?.enabled).toBe(true);
+        expect(after.find((a) => a.displayKey === 'dell|2560x1440|1')?.enabled).toBe(false);
+        expect(after.find((a) => a.displayKey === 'dell|1280x1024|1')?.enabled).toBe(false);
+      });
+
+      it('never adopts a row whose display is still attached', async () => {
+        // A second identical panel appearing must not steal the first one's
+        // settings — the first is present, so its row is not stale at all.
+        const store = await freshStore();
+        store.setMainDisplayKey('a|1920x1080|1');
+        store.syncAssignments([
+          { key: 'a|1920x1080|1', primary: true },
+          { key: 'dell|1920x1080|1', primary: false },
+        ]);
+        store.setAssignment({ displayKey: 'dell|1920x1080|1', enabled: true });
+
+        store.syncAssignments([
+          { key: 'a|1920x1080|1', primary: true },
+          { key: 'dell|1920x1080|1', primary: false },
+          { key: 'dell|2560x1440|1', primary: false },
+        ]);
+
+        const after = store.snapshot().assignments ?? [];
+        expect(after).toHaveLength(3);
+        expect(after.find((a) => a.displayKey === 'dell|1920x1080|1')?.enabled).toBe(true);
+        expect(after.find((a) => a.displayKey === 'dell|2560x1440|1')?.enabled).toBe(false);
+      });
+
+      it('re-homes an adopted secondary off the desktop the main window shows', async () => {
+        // The fixture's activeDesktopIndex is 1. Adoption must not smuggle the
+        // secondary onto main's desktop — that is the same two-shells-one-desktop
+        // break the fresh-row path guards against.
+        const store = await freshStore();
+        expect(store.snapshot().activeDesktopIndex).toBe(1);
+        store.setMainDisplayKey('a|1920x1080|1');
+        store.syncAssignments([
+          { key: 'a|1920x1080|1', primary: true },
+          { key: 'b|960x1080|1', primary: false },
+        ]);
+        store.setAssignment({ displayKey: 'b|960x1080|1', desktopIndex: 1, enabled: true });
+
+        store.syncAssignments([
+          { key: 'a|1920x1080|1', primary: true },
+          { key: 'b|1920x1080|1', primary: false },
+        ]);
+
+        const after = store.snapshot().assignments ?? [];
+        const adopted = after.find((a) => a.displayKey === 'b|1920x1080|1');
+        expect(adopted?.enabled).toBe(true);
+        expect(adopted?.desktopIndex).not.toBe(1);
+        const indices = after.map((a) => a.desktopIndex);
+        expect(new Set(indices).size).toBe(indices.length);
+      });
+
+      it('leaves a genuinely unplugged monitor alone', async () => {
+        // Adoption must not fire just because a display went away; there has to
+        // be an unmatched display with the same label for it to move onto.
+        const store = await freshStore();
+        store.syncAssignments([
+          { key: 'a|1920x1080|1', primary: true },
+          { key: 'b|2560x1440|1', primary: false },
+        ]);
+        store.syncAssignments([{ key: 'a|1920x1080|1', primary: true }]);
+        const keys = (store.snapshot().assignments ?? []).map((a) => a.displayKey);
+        expect(keys).toContain('b|2560x1440|1');
+        expect(keys).toHaveLength(2);
+      });
+    });
+
     it('resetAssignments clears the mapping but keeps the desktops', async () => {
       const store = await freshStore();
       store.syncAssignments([{ key: 'a|1920x1080|1', primary: true }]);
