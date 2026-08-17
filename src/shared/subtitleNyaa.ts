@@ -346,11 +346,20 @@ export function looksLikeSubtitleOnly(row: TorrentRow): boolean {
  * is why this route went 0 for 10 on real data. A batch whose name declares
  * muxed or burned-in subtitles is refused here, so no path can spend a 6–47 s
  * metadata handshake proving what the name already said.
+ *
+ * `isBatch` alone is not enough to establish the shape either, because the feed
+ * infers it from an episode *range*. The 2026-08-17 survey of MAL indices
+ * 134–213 offered `[Vivid] Mushishi Zoku Shou - 23-24 - Suzu no Shizuku
+ * [BD 720p AAC].mkv` — a two-episode special in **one** file, flagged a batch on
+ * its `23-24`, at 620 MB / 2,048 MB / 2,867 MB across three releases. A name
+ * that states a container is one file, whatever the range says, and this is the
+ * function whose own contract is that nothing reaches "just download the file".
  */
 export function couldCarrySidecarSubtitles(row: TorrentRow): boolean {
   if (!row) return false;
   if (looksLikeSubtitleOnly(row)) return false;
   if (declaresMuxedSubtitles(row.name ?? '')) return false;
+  if (VIDEO_CONTAINER_RE.test(row.name ?? '')) return false;
   return row.isBatch === true;
 }
 

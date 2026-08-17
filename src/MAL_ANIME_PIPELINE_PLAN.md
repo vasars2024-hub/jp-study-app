@@ -1846,3 +1846,41 @@ Staged result read back: **+4/-1 per catalog, nothing foreign**.
 **Gate 31 stays 32 of 34.** A survey of MAL completed indices 134–213 was running as this turn
 closed (`debug/g31n-survey4.log`, `g31n-routeb-134.json`); through index 171 it had found **0**
 sub-packs. An earlier attempt died at 156 because a `&`-backgrounded job does not outlive the shell.
+
+## 2026-08-17 — addendum 2: the survey finished, and it found a single .mkv offered as a batch
+
+Worker `primary`. Commit pending. App restarted (main pid **33184**, then a clean boot after the
+one below).
+
+**The survey, complete.** MAL completed indices **134–213, 80 titles: 17 batch-sidecar candidates,
+0 sub-packs.** With the 54–133 tranche that is **160 titles, 50 sidecar candidates, 0 sub-packs**.
+**0 of the 17 names state an external subs signal**, consistent with the 1-in-2,685 corpus scan.
+
+**A third defect, found by reading the survey's own output rather than its totals.** Three of the 17
+were `[Vivid] / [Vivid-RMX] Mushishi Zoku Shou - 23-24 - Suzu no Shizuku … .mkv` at 620 / 2,048 /
+2,867 MB — a two-episode special in **one container**, flagged `isBatch` because the feed infers a
+batch from the `23-24` **range**. Offered on this route, picking one downloads the whole file, which
+is the single outcome `couldCarrySidecarSubtitles`'s own contract says nothing may reach.
+`VIDEO_CONTAINER_RE` already existed for `looksLikeSubtitleOnly`; the sidecar gate now consults it.
+
+**LIVE, and the control is the sharp one.** `Mushishi Zoku Shou: Suzu no Shizuku` **3 → 0 rows**
+(base refusal, not the muxed one — correctly attributed to `shape`). **`Ghost Hound` still lists its
+1 row: `[DeadFish] Ghost Hound - Batch [BD][1080p][MP4][AAC]`, 7,782.40 MB, 6 seeders.** That name
+contains `[MP4]` and passes, because the regex is anchored on a literal `.` — *mentioning* a
+container is not *being* one. Mutation control: gate removed → 1 failure, the intended one.
+
+**Open, recorded with evidence, not chased.** The same 17 carry title-matcher false positives of a
+new shape: `Mirai no Mirai` (2018 film) was offered `[EMBER] Miru: Watashi no Mirai (2025)` and
+`[SubsPlease] Miru - Watashi no Mirai`; `Koukaku Kidoutai` got `The Ghost in the Shell 2026`;
+`One Punch Man: Road to Hero` got `[AnimeRG] One-Punch Man (OAD and OVAs 01-06)`. These are
+**different works sharing a word**, not sequels, so `sequelOrdinal` cannot see them — the year in
+the release name is the unused discriminator, and `searchedAs` is the field to read.
+
+**Trap: a stop/start cycle at speed can leave Electron with a live `/health` and no page.** Boot 5
+logged *"Network service crashed or was terminated"*; `/health` answered `{"ok":true}` with
+`title:"jp-study-app"`, `url:""` and every `/eval` timed out on `UND_ERR_HEADERS_TIMEOUT`. **Poll
+for `5173` in the health URL, not for `ok:true`.** A full `Stop-Process` of every electron pid then
+one relaunch loaded in 20 s.
+
+**Gate 31 stays 32 of 34.** Route A has no new candidate in 160 titles and Route B has no sidecar in
+50; the pool is measured thin, not unlucky.

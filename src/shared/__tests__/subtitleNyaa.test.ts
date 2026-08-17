@@ -158,6 +158,18 @@ describe('couldCarrySidecarSubtitles', () => {
     }))).toBe(false);
   });
 
+  it('refuses a single file the feed flagged a batch on its episode range', () => {
+    // Real, from the 2026-08-17 survey of MAL indices 134-213: a two-episode
+    // special in one container, `isBatch` inferred from the `23-24`. Offered on
+    // this route it means downloading the whole file, which is the one outcome
+    // this function's contract says nothing may reach.
+    expect(couldCarrySidecarSubtitles(row({
+      name: '[Vivid] Mushishi Zoku Shou - 23-24 - Suzu no Shizuku [BD 720p AAC] [8BDF3E31].mkv',
+      isBatch: true,
+      sizeBytes: 620 * MB,
+    }))).toBe(false);
+  });
+
   it('still accepts a batch that says nothing about where its subtitles are', () => {
     // The control the gate must not swallow: these are the rows that genuinely
     // need the file list before anyone can say. `[SubsPlease]` muxes too, but
