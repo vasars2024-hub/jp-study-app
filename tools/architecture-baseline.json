@@ -1,95 +1,99 @@
 {
- "_readme": [
-  "Classification for tools/architecture-audit.cjs (MASTER_PLAN.md §21).",
-  "status 'accepted' = verified as intentional; it stays out of the way.",
-  "status 'pending'  = real debt, still open. Also quiet — the gate is on NEW findings.",
-  "A finding missing from this file fails the run, so growth is loud while the backlog is not.",
-  "Remove an entry once the finding stops occurring; the checker reports stale entries too.",
-  "",
-  "The 2026-07-25 pass took this from 58 findings to 18. Everything structural is gone:",
-  "0 import cycles in src/shared, 0 layer violations, 0 dead IPC channels, 0 orphaned",
-  "modules that were not deliberate, and every storage key and duplicated export that",
-  "had two owners now has one. What remains is 14 accepted entries and 3 pending ones,",
-  "and all 3 are the same honest shape: a pure layer that is built and tested but has",
-  "no consumer yet, which its own phase report already records as its boundary."
- ],
- "moduleCount": 963,
- "entries": {
-  "duplicate-export:canUndo": {
-   "status": "accepted",
-   "note": "Two unrelated undo stacks (renderer action history, CSV editor). Same verb, different domain — not shared logic."
-  },
-  "duplicate-export:clearAll": {
-   "status": "accepted",
-   "note": "Generic store verb on two unrelated stores (clipboard history, notifications)."
-  },
-  "duplicate-export:LANG_LABELS": {
-   "status": "accepted",
-   "note": "TranslateContent's list is translation *target* languages; i18n/core's is UI languages. Deliberately independent — CLAUDE.md keeps those two selectors separate."
-  },
-  "duplicate-export:pushHistory": {
-   "status": "accepted",
-   "note": "Two unrelated history stacks, same verb — as canUndo."
-  },
-  "duplicate-export:THEMES": {
-   "status": "accepted",
-   "note": "readerSettings' THEMES is reader typography themes; theme.ts's is app colour themes. Different things, similarly named."
-  },
-  "duplicate-export:qbitTransfers": {
-   "status": "accepted",
-   "note": "main/scraper/qbittorrent.ts is the real WebUI call; scraper/data/fixtures.ts is the sample-data generator the mock port still uses for profiles with no client configured. Same noun, opposite sides of the port boundary — main may not import the renderer."
-  },
-  "duplicate-export:translate": {
-   "status": "accepted",
-   "note": "renderer/translator.ts translates study text; i18n/core.ts translates UI chrome. Unrelated by design."
-  },
-  "duplicate-storage:jp-booted": {
-   "status": "accepted",
-   "note": "One writer (App.tsx), one reader (BootScreen). Handoff, not co-ownership."
-  },
-  "duplicate-storage:jp-os-personalization-v1": {
-   "status": "accepted",
-   "note": "customCss.ts reads osPersonalization's blob only to honour the customCssEnabled gate at boot; documented inside bootCustomCss()."
-  },
-  "duplicate-storage:jp-user-css": {
-   "status": "accepted",
-   "note": "This is the <style> element id, shared by the module that creates it and the one that removes it on reset. Not a storage key — it matches the jp- convention by coincidence."
-  },
-  "orphan-module:src/renderer/motion/index.ts": {
-   "status": "accepted",
-   "note": "Barrel for the motion framework; consumers import the leaf modules directly. It costs nothing and is the documented public face of that folder."
-  },
-  "test-only-module:src/renderer/data/mediaTrackingFixtures.ts": {
-   "status": "accepted",
-   "note": "Named 'fixtures'. Test data is meant to be test-only."
-  },
-  "test-only-module:src/shared/i18n/catalogs/all.ts": {
-   "status": "accepted",
-   "note": "CLAUDE.md says so explicitly: 'for tooling and tests only; importing it from app code puts every language back in the bundle'."
-  },
-  "test-only-module:src/renderer/theme/tokens.ts": {
-   "status": "accepted",
-   "note": "The typed mirror of tokens.css and the source THEME_TOKEN_REFERENCE.md is generated from; PHASE_1_IMPLEMENTATION_PLAN.md and UI_UX_CORE_SHELL_EXECUTION_PLAN.md §12 both say to keep it in sync. It was an orphan — nothing read it, so nothing noticed drift. renderer/__tests__/themeTokenMirror.test.ts now checks every mirrored token against the CSS, which is why it reads as test-only: the test is the consumer, deliberately."
-  },
-  "test-only-module:src/shared/episodeProcessing.ts": {
-   "status": "pending",
-   "note": "§1 episode processing: built and tested, no consumer. The settings UI edits the rules; nothing applies them, because no connector exists to apply them to. Matches the boundary §1/§2 state honestly."
-  },
-  "test-only-module:src/shared/mediaProviderSyncJournal.ts": {
-   "status": "pending",
-   "note": "§7 sync journal, built and tested, no consumer. The original note blamed 'provider execution is out of scope', but provider execution now exists (Jikan/AniList metadata, Jimaku/OpenSubtitles subtitles). The real reason is different: this is a cross-device sync-envelope subsystem, and the app has no cross-device sync at all — no deviceId, no sync surface, no consumer for mediaProviderSyncPersistence or Resolution either. Wiring it would mean inventing that feature and adding a write path nothing reads. Left intact as designed, unfinished work."
-  },
-  "test-only-module:src/shared/mediaWorkspaceI18n.ts": {
-   "status": "accepted",
-   "note": "ADR-003's exit gate. The allowlist must be empty and the adopted-surface list is what mediaWorkspaceI18n.test.ts parses — a gate whose only consumer is its own test is the point, not an accident."
-  },
-  "test-only-module:src/main/dictionary/importWorker.ts": {
-   "status": "accepted",
-   "note": "A process entry point, not a library. Its real caller is utilityProcess.fork() in importIpc.ts, which names it by built path ('.vite/build/importWorker.js' via importJobs.dictionaryImportWorkerPath) — a runtime string the static import graph cannot follow, exactly like src/main.ts and src/preload.ts. forge.config.ts builds it as a third Vite target, so a broken entry fails the build rather than going unnoticed. The test import is of runDictionaryImport/attachDictionaryImportWorker, the two halves that are testable without a child process."
-  },
-  "test-only-module:src/shared/subtitleFusionEval.ts": {
-   "status": "accepted",
-   "note": "The EN→JA fusion plan's F7 ship gate. Its real consumer is tools/fusion-eval.cjs, which esbuild-bundles this file at run time by path — the same kind of runtime reference the static import graph cannot follow as importWorker.ts, and the same pattern tools/grammar-audit.cjs and tools/i18n-check.cjs already use. It is deliberately not imported by the app: the harness scores the pipeline from outside it, needs real media and the Whisper runtime, and must not become something product code can call. If tools/fusion-eval.cjs is ever deleted, this becomes a genuine orphan and should be deleted with it."
+  "_readme": [
+    "Classification for tools/architecture-audit.cjs (MASTER_PLAN.md §21).",
+    "status 'accepted' = verified as intentional; it stays out of the way.",
+    "status 'pending'  = real debt, still open. Also quiet — the gate is on NEW findings.",
+    "A finding missing from this file fails the run, so growth is loud while the backlog is not.",
+    "Remove an entry once the finding stops occurring; the checker reports stale entries too.",
+    "",
+    "The 2026-07-25 pass took this from 58 findings to 18. Everything structural is gone:",
+    "0 import cycles in src/shared, 0 layer violations, 0 dead IPC channels, 0 orphaned",
+    "modules that were not deliberate, and every storage key and duplicated export that",
+    "had two owners now has one. What remains is 14 accepted entries and 3 pending ones,",
+    "and all 3 are the same honest shape: a pure layer that is built and tested but has",
+    "no consumer yet, which its own phase report already records as its boundary."
+  ],
+  "moduleCount": 963,
+  "entries": {
+    "duplicate-export:canUndo": {
+      "status": "accepted",
+      "note": "Two unrelated undo stacks (renderer action history, CSV editor). Same verb, different domain — not shared logic."
+    },
+    "duplicate-export:clearAll": {
+      "status": "accepted",
+      "note": "Generic store verb on two unrelated stores (clipboard history, notifications)."
+    },
+    "duplicate-export:LANG_LABELS": {
+      "status": "accepted",
+      "note": "TranslateContent's list is translation *target* languages; i18n/core's is UI languages. Deliberately independent — CLAUDE.md keeps those two selectors separate."
+    },
+    "duplicate-export:pushHistory": {
+      "status": "accepted",
+      "note": "Two unrelated history stacks, same verb — as canUndo."
+    },
+    "duplicate-export:THEMES": {
+      "status": "accepted",
+      "note": "readerSettings' THEMES is reader typography themes; theme.ts's is app colour themes. Different things, similarly named."
+    },
+    "duplicate-export:qbitTransfers": {
+      "status": "accepted",
+      "note": "main/scraper/qbittorrent.ts is the real WebUI call; scraper/data/fixtures.ts is the sample-data generator the mock port still uses for profiles with no client configured. Same noun, opposite sides of the port boundary — main may not import the renderer."
+    },
+    "duplicate-export:translate": {
+      "status": "accepted",
+      "note": "renderer/translator.ts translates study text; i18n/core.ts translates UI chrome. Unrelated by design."
+    },
+    "duplicate-storage:jp-booted": {
+      "status": "accepted",
+      "note": "One writer (App.tsx), one reader (BootScreen). Handoff, not co-ownership."
+    },
+    "duplicate-storage:jp-os-personalization-v1": {
+      "status": "accepted",
+      "note": "customCss.ts reads osPersonalization's blob only to honour the customCssEnabled gate at boot; documented inside bootCustomCss()."
+    },
+    "duplicate-storage:jp-user-css": {
+      "status": "accepted",
+      "note": "This is the <style> element id, shared by the module that creates it and the one that removes it on reset. Not a storage key — it matches the jp- convention by coincidence."
+    },
+    "orphan-module:src/renderer/motion/index.ts": {
+      "status": "accepted",
+      "note": "Barrel for the motion framework; consumers import the leaf modules directly. It costs nothing and is the documented public face of that folder."
+    },
+    "test-only-module:src/renderer/data/mediaTrackingFixtures.ts": {
+      "status": "accepted",
+      "note": "Named 'fixtures'. Test data is meant to be test-only."
+    },
+    "test-only-module:src/shared/i18n/catalogs/all.ts": {
+      "status": "accepted",
+      "note": "CLAUDE.md says so explicitly: 'for tooling and tests only; importing it from app code puts every language back in the bundle'."
+    },
+    "test-only-module:src/renderer/theme/tokens.ts": {
+      "status": "accepted",
+      "note": "The typed mirror of tokens.css and the source THEME_TOKEN_REFERENCE.md is generated from; PHASE_1_IMPLEMENTATION_PLAN.md and UI_UX_CORE_SHELL_EXECUTION_PLAN.md §12 both say to keep it in sync. It was an orphan — nothing read it, so nothing noticed drift. renderer/__tests__/themeTokenMirror.test.ts now checks every mirrored token against the CSS, which is why it reads as test-only: the test is the consumer, deliberately."
+    },
+    "test-only-module:src/shared/episodeProcessing.ts": {
+      "status": "pending",
+      "note": "§1 episode processing: built and tested, no consumer. The settings UI edits the rules; nothing applies them, because no connector exists to apply them to. Matches the boundary §1/§2 state honestly."
+    },
+    "test-only-module:src/shared/mediaProviderSyncJournal.ts": {
+      "status": "pending",
+      "note": "§7 sync journal, built and tested, no consumer. The original note blamed 'provider execution is out of scope', but provider execution now exists (Jikan/AniList metadata, Jimaku/OpenSubtitles subtitles). The real reason is different: this is a cross-device sync-envelope subsystem, and the app has no cross-device sync at all — no deviceId, no sync surface, no consumer for mediaProviderSyncPersistence or Resolution either. Wiring it would mean inventing that feature and adding a write path nothing reads. Left intact as designed, unfinished work."
+    },
+    "test-only-module:src/shared/mediaWorkspaceI18n.ts": {
+      "status": "accepted",
+      "note": "ADR-003's exit gate. The allowlist must be empty and the adopted-surface list is what mediaWorkspaceI18n.test.ts parses — a gate whose only consumer is its own test is the point, not an accident."
+    },
+    "test-only-module:src/main/dictionary/importWorker.ts": {
+      "status": "accepted",
+      "note": "A process entry point, not a library. Its real caller is utilityProcess.fork() in importIpc.ts, which names it by built path ('.vite/build/importWorker.js' via importJobs.dictionaryImportWorkerPath) — a runtime string the static import graph cannot follow, exactly like src/main.ts and src/preload.ts. forge.config.ts builds it as a third Vite target, so a broken entry fails the build rather than going unnoticed. The test import is of runDictionaryImport/attachDictionaryImportWorker, the two halves that are testable without a child process."
+    },
+    "test-only-module:src/shared/subtitleFusionEval.ts": {
+      "status": "accepted",
+      "note": "The EN→JA fusion plan's F7 ship gate. Its real consumer is tools/fusion-eval.cjs, which esbuild-bundles this file at run time by path — the same kind of runtime reference the static import graph cannot follow as importWorker.ts, and the same pattern tools/grammar-audit.cjs and tools/i18n-check.cjs already use. It is deliberately not imported by the app: the harness scores the pipeline from outside it, needs real media and the Whisper runtime, and must not become something product code can call. If tools/fusion-eval.cjs is ever deleted, this becomes a genuine orphan and should be deleted with it."
+    },
+    "test-only-module:src/shared/ankiTemplateRemoval.ts": {
+      "status": "pending",
+      "note": "Recipe 17's remove half, planner layer. Built and tested, no consumer YET, and deliberately so: both destinations were landed first (2ea9e8f6 — the package writer removes for real, the live commit refuses by name) so that no tray control could ship before something could answer it. Stops being test-only when the 'remove-template' tray action kind lands."
+    }
   }
-}
 }

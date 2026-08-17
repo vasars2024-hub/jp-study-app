@@ -24341,3 +24341,53 @@ Gates this turn: `npx vitest run` **709 files passed / 1 skipped, 9,717 passed, 
 0 failed** — baseline 9,701 plus exactly my 16; `node tools/i18n-check.cjs` **exit 0 at 10,431**
 (+1, the new `subHarvest.nyaa.searchedAs`); `node tools/architecture-audit.cjs` **"Nothing new"**,
 2 pending; `npx eslint` on all **13** touched paths — **0 errors, 0 warnings**.
+
+## 2026-08-17 — Track 7 / Phase 7: recipe 17's remove half, writer-first (`primary`)
+
+- `084a052b` **the model**, `2ea9e8f6` **both destinations**. Recipe 17 was the last recipe whose
+  audit half shipped without its writer; only **26** now lacks a tray action kind.
+- **Decision, and it set the whole order: land the destinations BEFORE the tray action.** A
+  `remove-template` kind added first would be a control that no destination could answer, which is
+  the "inactive control presented as working" this repo forbids. Cost: the planner is `pending
+  test-only-module` in `tools/architecture-baseline.json` until the tray kind lands — recorded
+  there in those words rather than hidden by wiring a premature consumer.
+- **Only `duplicate` is removable, and `ambiguous` is refused BY NAME** (`not-duplicate`), not
+  merely left out of the offer — a request assembled some other way must hit the same wall. Six
+  refusals, all reachable from a test: note-type-missing, template-missing, cloze, not-duplicate,
+  **is-keeper** (distinct from not-duplicate: "that is the one being kept" and "no group covers it"
+  send the user to different fixes), last-template.
+- **Renumbering is the load-bearing half.** Anki binds a card to its template by `ord` alone, so
+  dropping ord 1 of [0,1,2] without moving the rest turns every ord-2 card into a card whose ord
+  names no template — the `orphan` verdict this recipe exists to clear. **Negative control fails as
+  required, twice:** `templateRemovalOrphans` is 0 after a mid-list removal and **2** on the same
+  after-draft with the card half undone; in SQL, 0 cards name a missing template after a removal and
+  **2** do with `UPDATE cards SET ord = 2 WHERE ord = 1` applied.
+- **All removals on one note type renumber TOGETHER** (survivors ranked), never one after another —
+  that is only the same arithmetic in descending order. Both SQL loops run **ascending** by source
+  ord, so each destination ord is already vacated; descending collides two templates on one ord.
+- **PACKAGE writes for real, in both schemas.** `templateStorage()` is its own ladder, decided
+  separately from `deckStorage` because a collection can normalize one and not the other. Schema 18
+  keeps the template list in its own table with a plain integer `ord`, so `notetypes.config` is
+  never decoded — **asserted byte-identical** across a removal. Legacy rewrites `col.models` in one
+  parse/write.
+- **LIVE refuses by name**, `template-remove-unsupported`, thrown before write #1 exactly where
+  `deck-rename-unsupported` is. Re-derived, not inherited: the emulation is *worse* than the
+  rename's — `updateModelTemplates` cannot drop a template, only blank it, leaving every card it
+  generated rendering empty, and deleting the cards alone fails because Anki regenerates them.
+- The change set carries **only** `{noteTypeId, removedOrds}`; the ord map and the doomed rows are
+  derived from the collection about to be written, so a draft read minutes ago cannot disagree with
+  the package. `cardsDeleted` is reported apart from `cardsUpdated` — the only count here that
+  describes destruction.
+- **Gates, SHARED TREE.** `npx vitest run` **711 files / 9,742 passed / 1 failed**, the one failure
+  `architectureBaseline.test.ts` racing a classification added mid-run; green on re-run, 6/6.
+  Baseline was 710 / 9,722 / 0. `i18n-check` **exit 0 at 10,436** (+5). `architecture-audit`
+  **"Nothing new"**, 3 pending. `eslint` on 8 touched paths — 0 errors; the 60 warnings are all
+  pre-existing `no-non-null-assertion` in `apkgExportCore.test.ts` below line 700, none in new code.
+- **TRAP for the next slice.** A `template-remove` journal op cannot be added naively: the journal's
+  own rule is that every op is a complete inverse (see its `card-due` comment refusing a queue
+  change). Undoing a removal must restore the template AND every deleted card row. Decided: the op
+  carries both verbatim — legitimate here because the draft *does* hold them, unlike a review
+  history it never had. Bounded by cards-per-template (2,000 on the user's largest real package).
+- The four i18n catalogs carry another track's in-flight conversion; my keys were staged as
+  reconstructed HEAD+edit blobs, **+10 lines each**, verified mechanically. Their foreign hunks are
+  left in the working tree untouched.
