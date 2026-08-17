@@ -24391,3 +24391,51 @@ Gates this turn: `npx vitest run` **709 files passed / 1 skipped, 9,717 passed, 
 - The four i18n catalogs carry another track's in-flight conversion; my keys were staged as
   reconstructed HEAD+edit blobs, **+10 lines each**, verified mechanically. Their foreign hunks are
   left in the working tree untouched.
+
+## 2026-08-17 — Track 7 / Phase 7: recipe 17 CLOSES, journal-first then the control (`primary`)
+
+- `ea8fbbd5` **the journal op + export fold**, `e2635c6c` **the tray action kind + 11 keys ×4**.
+  Recipe 17 is done end to end; recipes still without a tray action kind: **26** alone.
+- **The op carries what it destroys, verbatim** — template, every deleted card row, the survivor
+  renumbering. Legitimate here, unlike the review history `card-due` refuses to reconstruct,
+  because the draft *does* hold these rows when the removal runs. Bounded at 2,000 cards/template.
+- **It also carries `cardIndexes`, and that is not fussiness.** First op in the journal that changes
+  an array's LENGTH, so the first that can reorder it; the Browser renders `draft.cards` in order.
+  **Negative control proves the distinction:** with `cardIndexes` stubbed the restored card SET is
+  still exactly right and only the order is wrong — a membership assertion passes against the
+  broken code. Assert order, not membership.
+- **TRAP, and the slice's real finding: a second removal on one note type names an ord the FIRST
+  one renumbered.** Source [0,1,2], drop ord 1, survivors renumber to [0,1] — a later "ord 1" is
+  source ord 2. Exporting the op's own number deletes the template the user KEPT. Each note type
+  carries a current→source map rebuilt from each op's own `renumbered` pairs. Mutation control:
+  `sourceOrd(op.template.ord)` → `op.template.ord` fails exactly one test.
+- **Second control corrected mid-slice rather than reported.** Dropping `renumbered` does NOT
+  orphan anything: it collides two templates on one ord, [0,1,1], and `templateRemovalOrphans`
+  reads **0** — every card still names *a* template, just the wrong one. A collision is not an
+  orphan. The round trip asserts the template list itself.
+- **Structural ops run as a whole-step pass, never through `applyInverseInto`.** That function
+  writes through `DraftEditIndex`, which maps an id to a FIXED array position built once per step;
+  re-inserting rows invalidates every position after the insert. Gated by `step.some(...)` the way
+  `relinkDeckParents` already is, so a step with no removal pays nothing. Same reason the tray
+  rewrites its `cards` array **in place** and rebuilds `index.cardPosition` right after.
+- **The audit rides in through `opts.templateGroups`, and its absence BLOCKS.** `draftTemplateGroups`
+  was measured at 1,014 ms on a real 5-template/2,000-note package and this planner re-runs every
+  render. Blocking matters more here than for `no-enrich-data`: with no audit every ord returns
+  `not-duplicate`, which reads as "this deck has no duplicates" — the opposite of the truth.
+- **The action is selection-independent** (a template belongs to a note TYPE), which required
+  widening the empty-selection guard that previously exempted `normalize-decks` alone.
+- Two findings that were the model being right: asking for EVERY ord refuses all of them
+  `last-template` (the guard is per note type, not per request), and a note type is cloze by
+  `type: 1`, not by name. Both now have their own test.
+- `editedNoteIds`/`noteIsEdited`/`auditedNoteCount` skip it beside `deck-name` — a removal spans
+  every note of its type, so any single attribution is false about the rest and badging thousands
+  would be worse than badging none. Review counts `templatesRemoved`/`cardsDeleted` apart instead.
+- `test-only-module:ankiTemplateRemoval.ts` deleted from `architecture-baseline.json`; its own note
+  said it stops being test-only when this kind lands, and the baseline test failed on it as stale.
+- **Gates, SHARED TREE.** eslint on 8 touched paths **0 errors, 0 warnings**. i18n-check **exit 0 at
+  10,447** (+11). architecture-audit **"Nothing new"**, **2** pending (was 3). **Commit verified
+  standalone** in a detached worktree — the 4 catalogs were reconstructed HEAD+edit blobs (+21/-0
+  each), and at committed HEAD i18n-check is exit 0 at **10,276** with 54/54 on the 5 nearest suites.
+- **TRAP for anyone running the suite in a worktree:** a junctioned `node_modules` makes Vite deny
+  `pdfjs-dist/build/pdf.worker.min.mjs?url` by `fs.allow`, failing `novelReaderProgressGuard` for
+  reasons that have nothing to do with the tree. Not a HEAD defect.
