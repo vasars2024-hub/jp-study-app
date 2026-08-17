@@ -80,9 +80,56 @@ Clipping keeps L0's `unreach` definition — past the frame *and* no scrollable 
 purpose. Dictionary's 3,194 px of results inside a 580 px window is the product working, and a
 definition that called it clipping would make L1's numbers incomparable with L0's.
 
-## Not measured here
+## Maximized — the third size, 2026-08-17
 
-**Maximized.** Both surfaces still need the third size, and it has to go through the real
-maximize control rather than an inline width, because `.fwin-max` changes the applied CSS. Next
-slice. Category 4 is **not scored** until it exists — and one category is not a scorecard;
-`LIQUID_SCORECARD.md` stays empty.
+Driven through the real `.fwin-b[title="Maximize"]` button, never an inline width, because
+`.fwin-max` (`styles.css:13849`) changes the applied CSS. `toggleMax` is a React `setWins`
+update, so click and measure are **separate bridge calls** — one eval would read the box a
+render early. Instrument: `probes/l1-maximize-drive.js` then the same `l1-use-of-space.js`.
+Both maximize to the same **1264×765**. One window at a time, as a user would.
+
+| At 1264×765 | Dictionary | Media |
+| --- | --- | --- |
+| Regions | 21 | 9 |
+| **Clipped** | **0** | **0** |
+| **Overlapping** | **0** | **0** |
+| **Horizontal scrollers** | **0** | **0** |
+| Largest dead region | 23.6% of window (379×602), **22.0% of viewport** | 37.3% of window (599×602), **34.8% of viewport** |
+| Dominant canvas / chrome | 55.1% / 4.3% | 62.4% / 44.5% |
+
+**The finding: maximizing makes the dead region worse on both, and this is what fails them.**
+The rubric's bar is no dead region over 15% of the viewport. Dictionary passes at default
+(8.9%) and **fails maximized at 22.0%** — new, and it moves Dictionary off the clean sheet the
+default-size table gave it. Media goes 22.1% → **34.8%**, its worst number at any size.
+
+The ratio numbers move the *right* way and are worth separating from that: canvas grows
+(41.1 → 55.1, 58.3 → **62.4**) while chrome shrinks (5.7 → 4.3, 48.1 → 44.5), so §4.1's "content
+grows into extra space rather than the chrome growing" holds, and Media only reaches §4.1's
+60–75% canvas band **when maximized**. Both facts are true at once: the layout spends new width
+on the canvas, and the canvas then fails to put content in it.
+
+## The control, which failed as required
+
+`clipped: 0` at maximized is the claim most likely to be a blind probe, and the compact control
+does not cover it — that one fires at 260×170 on Media, a different CSS path. So
+`probes/l1-max-clip-control.js` injected one `position:fixed` box into maximized Media's body,
+300 px wide starting 20 px inside the right frame edge (right edge 1544 vs. frame 1264, no
+scrollable ancestor). Re-measure: **Media clipped 0 → 1, Dictionary unchanged at 0** — it fires,
+and it fires only on the target. Removed and verified absent before the restore.
+
+**Round trip.** Both windows returned to their entry box byte-identical on
+`left/top/width/height` — Dictionary `left: 128px; top: 84px; width: 820px; height: 580px`,
+Media `left: 162px; top: 114px; width: 1080px; height: 700px`. Only `z-index` moved (419→424,
+421→428), which focus explains and `toggleMax`'s `++zTop.current` predicts.
+
+**The default table above re-ran identically this session**, on a fresh app instance with both
+windows reopened from the Start menu: all 14 default-size figures reproduced to the decimal.
+That is the reason to trust the maximized row, which has no prior to compare against.
+
+## Category 4 verdict: neither surface is a 10
+
+All three sizes now measured. **Dictionary** — clean at compact and default, **fails maximized**
+on dead region (22.0%). **Media** — fails compact on clipping (49 boxes), and fails dead region
+at **both** default (22.1%) and maximized (34.8%). Per the rubric a sub-10 is fixed and
+re-measured, not reported; both are L4's repair list. `LIQUID_SCORECARD.md` stays empty — one
+scored category out of eight is not a scorecard.

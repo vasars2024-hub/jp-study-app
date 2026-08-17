@@ -468,8 +468,18 @@ mechanically decidable; Video 3 of 3 eligible regions Liquid-treated, Dictionary
 work on translucent material **0** on both) and `.coordination/liquid-workplace/L1_USE_OF_SPACE.md`
 (category 4 — clean at default; **Video clips 49 boxes at 260×170**, reproducing
 `ALL_APPS_BASELINE.md`'s figure through a second instrument, so its category 4 is not a 10).
-Still open for L1: maximized geometry, categories 1, 2, 5–8, and the layout studies themselves.
-`LIQUID_SCORECARD.md` is deliberately still empty — two categories are not a score.
+
+**Category 4 is now measured at all three sizes and NEITHER app is a 10** (2026-08-17,
+maximized added). Both maximize to 1264×765 with 0 clipped / 0 overlap / 0 horizontal scroll,
+but the dead region *grows*: Dictionary 8.9% → **22.0%** of viewport, Media 22.1% → **34.8%**,
+against the rubric's 15% bar — so Dictionary loses the clean sheet the default table gave it.
+Canvas-vs-chrome moves the right way (Media 58.3 → **62.4%** canvas, into §4.1's band; chrome
+48.1 → 44.5), so the layout does spend new width on the canvas and then fails to fill it.
+Control: an injected must-clip box at maximized took Media 0 → **1** and left Dictionary at 0;
+round trip byte-identical on `left/top/width/height`. All 14 default-size figures reproduced
+to the decimal on a fresh instance, which is what licenses the new row.
+Still open for L1: categories 1, 2, 5–8, and the layout studies themselves.
+`LIQUID_SCORECARD.md` is deliberately still empty — one scored category is not a score.
 
 ### L2 — Semantic tokens and shared primitives
 
