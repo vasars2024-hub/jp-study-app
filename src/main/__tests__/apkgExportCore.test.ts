@@ -13,7 +13,11 @@ import {
   fieldChecksum,
   ExportRefusal,
 } from '../anki/apkgExportCore';
-import { ANKI_FIELD_SEP as SEP, splitNoteFields } from '../../shared/ankiDraft';
+import type { AnkiDraft } from '../../shared/ankiDraft';
+import { ANKI_FIELD_SEP as SEP, buildAnkiDraft, splitNoteFields } from '../../shared/ankiDraft';
+import { planChangeTray } from '../../shared/ankiChangeTray';
+import { createEditJournal } from '../../shared/ankiDraftEdit';
+import { buildApkgExportChanges, exportChangesEmpty } from '../../shared/ankiApkgExport';
 import { stripFieldHtml } from '../../shared/apkgParse';
 
 const nodeRequire = createRequire(import.meta.url);
@@ -1046,5 +1050,145 @@ describe('applyExportChanges — gate 5 card state', () => {
     const verdict = verifyExportChanges(db, changes);
     expect(verdict.ok).toBe(false);
     expect(verdict.mismatches).toEqual(['card 5002: ease differs']);
+  });
+});
+
+/**
+ * Gate 5's whole pipeline in one test — the seam the two suites either side of
+ * it do not cross. `ankiCardStateTray` stops at the journal; the cases above
+ * start at a hand-written change set. Between them sits
+ * `buildApkgExportChanges`, and a `cardFlags` array it forgot to fold is
+ * exactly the shape of the defect `67512897` was written to fix: three
+ * capabilities that were unwritable while every unit test either side stayed
+ * green. So this runs one queued action all the way to stored columns and
+ * reads them back through the reader an import would use.
+ */
+describe('gate 5 end to end: tray action → change set → package → re-read', () => {
+  /** The subject: a graduated review card carrying reserved bits in `flags`. */
+  function withReviewCard(db: Database): void {
+    db.run(
+      'INSERT INTO cards (id, nid, did, ord, mod, usn, type, queue, due, ivl, factor, reps, lapses, left, odue, odid, flags) '
+        + 'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      [5002, 1002, 1, 0, 1_500_000_100, 0, 2, 2, 300, 10, 2300, 4, 1, 0, 0, 0, 0b1011_0000],
+    );
+  }
+
+  /** A second review card, on its own note, deliberately left out of the selection. */
+  function withControlCard(db: Database): void {
+    db.run(
+      'INSERT INTO notes (id, guid, mid, mod, usn, tags, flds, sfld, csum, flags, data) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+      [1003, 'guid-c', 100, 1_500_000_100, 0, '', ['犬', 'いぬ'].join(SEP), 'いぬ', 0, 0, ''],
+    );
+    db.run(
+      'INSERT INTO cards (id, nid, did, ord, mod, usn, type, queue, due, ivl, factor, reps, lapses, left, odue, odid, flags) '
+        + 'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      [5003, 1003, 1, 0, 1_500_000_100, 0, 2, 2, 300, 10, 2300, 4, 1, 0, 0, 0, 0],
+    );
+  }
+
+  const draftOf = (db: Database): AnkiDraft =>
+    buildAnkiDraft(readRawCollection(db), {
+      source: { kind: 'apkg', label: 'fixture.apkg', createdAtSec: 1_500_000_000 },
+      normalize: stripFieldHtml,
+    });
+
+  const cardIn = (draft: AnkiDraft, id: string) => {
+    const card = draft.cards.find((c) => c.id === id);
+    if (!card) throw new Error(`no card ${id} in draft`);
+    return [card.flag, card.queue, card.interval, card.easeFactor];
+  };
+
+  it('writes flag, suspension and interval/ease from one queued action', () => {
+    const db = fixtureDb();
+    withReviewCard(db);
+    withControlCard(db);
+    const before = draftOf(db);
+    expect(cardIn(before, '5002')).toEqual(['none', 'review', 10, 2300]);
+
+    const plan = planChangeTray(before, createEditJournal(), ['1002'], [
+      {
+        id: 'g5',
+        kind: 'set-card-state',
+        enabled: true,
+        flag: 'orange',
+        suspended: true,
+        scheduling: { interval: 42, easeFactor: 1900 },
+      },
+    ]);
+    expect(plan.blocked).toBe(false);
+    expect(plan.changedCards).toBe(1);
+
+    // The half neither neighbouring suite exercises: the journal folded into a
+    // change set. All three arrays have to be there or the write is a no-op.
+    const changes = buildApkgExportChanges(plan.draft, plan.journal);
+    expect(exportChangesEmpty(changes)).toBe(false);
+    expect([
+      changes.cardFlags?.length ?? 0,
+      changes.cardQueues?.length ?? 0,
+      changes.cardScheduling?.length ?? 0,
+    ]).toEqual([1, 1, 1]);
+
+    const result = applyExportChanges(db, changes, { nowMs: NOW_MS, normalize: stripFieldHtml });
+    expect(result.cardsUpdated).toBe(1);
+
+    // The claim is the re-read, never the UPDATE.
+    const after = draftOf(db);
+    expect(cardIn(after, '5002')).toEqual(['orange', 'suspended', 42, 1900]);
+    // The reserved bits the flag column carries are still there — the same
+    // guard as above, but now through the tray rather than a literal change set.
+    expect(Number(db.exec('SELECT flags FROM cards WHERE id = 5002')[0]!.values[0][0]) & ~0b111)
+      .toBe(0b1011_0000);
+  });
+
+  it('NEGATIVE CONTROL: a card outside the selection comes out untouched on all four columns', () => {
+    const db = fixtureDb();
+    withReviewCard(db);
+    withControlCard(db);
+    const before = draftOf(db);
+    expect(cardIn(before, '5003')).toEqual(['none', 'review', 10, 2300]);
+
+    const plan = planChangeTray(before, createEditJournal(), ['1002'], [
+      {
+        id: 'g5',
+        kind: 'set-card-state',
+        enabled: true,
+        flag: 'orange',
+        suspended: true,
+        scheduling: { interval: 42, easeFactor: 1900 },
+      },
+    ]);
+    applyExportChanges(db, buildApkgExportChanges(plan.draft, plan.journal), {
+      nowMs: NOW_MS,
+      normalize: stripFieldHtml,
+    });
+
+    const after = draftOf(db);
+    expect(cardIn(after, '5003')).toEqual(['none', 'review', 10, 2300]);
+    // `mod` too: a batch that rewrote every row would still pass the four
+    // columns above while telling Anki's sync that every card changed.
+    expect(Number(db.exec('SELECT mod FROM cards WHERE id = 5003')[0]!.values[0][0]))
+      .toBe(1_500_000_100);
+    expect(after.cards).toHaveLength(before.cards.length);
+  });
+
+  it('refuses an empty action and an out-of-range ease before any change set exists', () => {
+    const db = fixtureDb();
+    withReviewCard(db);
+    const draft = draftOf(db);
+
+    const empty = planChangeTray(draft, createEditJournal(), ['1002'], [
+      { id: 'e', kind: 'set-card-state', enabled: true },
+    ]);
+    expect(empty.blocked).toBe(true);
+    expect(empty.problems.map((p) => p.code)).toEqual(['card-state-empty']);
+    expect(exportChangesEmpty(buildApkgExportChanges(empty.draft, empty.journal))).toBe(true);
+
+    const clamped = planChangeTray(draft, createEditJournal(), ['1002'], [
+      { id: 'c', kind: 'set-card-state', enabled: true, scheduling: { interval: 42, easeFactor: 900 } },
+    ]);
+    expect(clamped.blocked).toBe(true);
+    expect(clamped.problems.map((p) => p.code)).toEqual(['card-state-invalid']);
+    // Refused, not clamped to MIN_EASE_FACTOR: the stored ease is untouched.
+    expect(Number(db.exec('SELECT factor FROM cards WHERE id = 5002')[0]!.values[0][0])).toBe(2300);
   });
 });

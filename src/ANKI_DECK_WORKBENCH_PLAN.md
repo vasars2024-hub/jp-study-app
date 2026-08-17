@@ -383,11 +383,31 @@ This slice is complete only when all of these can be shown with real data and no
     nothing. `ANKI_CARD_FLAGS` is exported from the decoder so the form cannot
     label a colour `decodeCardFlag` never returns, and both honest limits are said
     before Add. 8 renderer tests; 140 green across the five affected suites.
-    **What the gate still weighs is one thing: nothing has been re-read from the
-    real 3,221-note deck.** That deck is the **local** source, not an `.apkg`.
-    Batch flag + suspension + interval/ease on it, export, re-read through the real
-    path, prove the resulting flag/queue/`ivl`/`factor`. Do not report this gate as
-    passing on the tags/deck/due thirds, nor on these tests.
+    **Closed 2026-08-17** (`1e35e5b7`) — but **not on the local deck**, and the
+    earlier instruction to run it there was impossible by construction: a
+    `local-deck` draft is neither `isPackage` nor `isLive`, so step 7 renders
+    `ankiWorkbench.apply.noFile` and offers no destination at all
+    (`DeckWorkbenchApply.tsx:185`). That copy is honest and already names the way
+    out, so it is not a defect — the gate's own words are "then reread **Anki**",
+    and the package is the only destination that can carry all six (`card-flag`
+    is `blocked` live). Run on the real `5y56454w54.apkg`: **608 notes / 608
+    cards**, page of 500, 0 blocking diagnostics. One `set-card-state` action
+    carrying all three parts over 5 review cards → `changedCards` **5**,
+    `matched 5 / changed 5 / skipped 0`, **15 journal ops** folding to a change
+    set of **5 cardFlags + 5 cardQueues + 5 cardScheduling**. Exported dialog-free
+    through the real `apkg:export` (`sourcePath`/`outPath`): `cardsUpdated` **5**,
+    `verified: true`, new fingerprint `sha1:3b937629…`. **Re-read through the same
+    main-process reader**, all four columns on 5 of 5: flag `none`→`orange`,
+    queue `review`→`suspended`, interval `3/1/1/1/1`→**42**, ease
+    `2500/2500/2500/2300/2500`→**1900**. Three negative controls: card
+    `1779655102544`, same shape and deliberately outside the selection, came back
+    `['none','review',3,2500]` **identical**; an action with none of the three set
+    is refused `card-state-empty`; ease 900 is refused `card-state-invalid`
+    rather than clamped. Total cards 500→500. The pipeline seam
+    (`planChangeTray` → `buildApkgExportChanges` → `applyExportChanges` →
+    re-read) is now pinned by 3 cases in `apkgExportCore.test.ts`; deleting the
+    `cardFlags` fold reddens exactly one of them and none of the older
+    literal-change-set cases, which is why the seam needed its own coverage.
 6. Safely edit a multi-template and cloze note without confusing fields with generated cards or breaking sibling renders.
 7. Interrupt a large import, translation, dry run, and live commit; recover without a false success state or an ambiguous partial result.
 8. Undo a draft action, reverse a supported committed action, and clearly explain any adapter operation that cannot be reversed.

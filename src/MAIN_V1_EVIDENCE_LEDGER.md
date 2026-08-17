@@ -24647,3 +24647,43 @@ Gates this turn: `npx vitest run` **709 files passed / 1 skipped, 9,717 passed, 
   `node tools/architecture-audit.cjs` exit 0, "Nothing new", 6 pending · `npx eslint` on all 8
   touched paths **0 errors** (81 warnings, all pre-existing `no-non-null-assertion` in the test
   files, the idiom those files already use throughout).
+
+## 2026-08-17 — Track 7 / gate 5 CLOSES, and the local deck it could never have run on (`primary`)
+
+- `1e35e5b7`. The remaining half was the live round trip. It ran, on a package, and passed.
+- **The instruction to "batch it on the real 3,221-note LOCAL deck" was impossible by
+  construction, and that is the finding.** A `local-deck` draft is neither `isPackage` nor
+  `isLive`, so step 7 falls through to `ankiWorkbench.apply.noFile`
+  (`DeckWorkbenchApply.tsx:185`) — the local source has **no destination at all**. Not a
+  defect: the string already says so and names the way out ("Export the deck from Anki as a
+  package and edit that copy instead"), and the gate's own words are "then reread **Anki**".
+  The package is also the only destination that can carry all six capabilities, since
+  `card-flag` is `blocked` on connect. Two turns carried the wrong premise forward; it came
+  from the ledger, not from the code.
+- **LIVE, bridge pid 40236, `debug/g5-batch.cjs`.** Source `5y56454w54.apkg`: **608 notes /
+  608 cards**, page of 500, 0 blocking diagnostics, 54 review cards with real `ivl`/`factor`.
+  One `set-card-state` action carrying **all three** parts (`flag:'orange'`, `suspended:true`,
+  `scheduling:{42,1900}`) over 5 review cards → `blocked:false`, `changedCards` **5**,
+  outcome `matched 5 / changed 5 / skipped 0`, **15 journal ops** folding to
+  **5 cardFlags + 5 cardQueues + 5 cardScheduling** (`cardMoves` 0, `notes` 0 — this action
+  writes cards, not notes). Export dialog-free through the real `apkg:export` handler
+  (`sourcePath` + `outPath`, both honoured at `apkgExport.ts:88`/`:131`): `cardsUpdated` **5**,
+  `verified: true`, fingerprint `sha1:5a558da3…` → `sha1:3b937629…`.
+- **The proof is the re-read, through the same main-process reader.** 5 of 5 cards:
+  flag `none`→`orange`, queue `review`→`suspended`, interval `3/1/1/1/1`→**42**, ease
+  `2500/2500/2500/2300/2500`→**1900**. Total cards **500 → 500**.
+- **Three negative controls, all red for the intended reason.** (1) Card `1779655102544` —
+  same shape, same deck, deliberately outside the selection — read back
+  `['none','review',3,2500]`, identical on all four. (2) An action with none of the three set
+  is refused `card-state-empty`, `changedCards` 0, not run to a reassuring zero. (3) Ease 900
+  is refused `card-state-invalid`, **not clamped** to `MIN_EASE_FACTOR`.
+- **The seam had no test and that is where the last defect lived.** `ankiCardStateTray` stops
+  at the journal; `apkgExportCore`'s gate-5 cases start at a hand-written change set.
+  `buildApkgExportChanges` sits between them — a `cardFlags` array it forgot to fold is the
+  exact shape of what `67512897` fixed. 3 new cases run one queued action to stored columns
+  and back. **Mutation control:** deleting the `cardFlags.push` line reddens **1** of them and
+  **0** of the six older literal-change-set cases; restored and `git status` clean.
+- **Traps.** `apkgExportCore.test.ts` scopes `withReviewCard` inside its own `describe`, so a
+  new block needs its own copy. `planChangeTray` is reachable from the running renderer via
+  `import('/src/shared/ankiChangeTray.ts')` — the Vite dev graph serves shared modules, which
+  is what let the live run use the product's real planner rather than a re-implementation.
