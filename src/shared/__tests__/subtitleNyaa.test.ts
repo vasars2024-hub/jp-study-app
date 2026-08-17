@@ -569,7 +569,10 @@ describe('looksJapaneseSubtitle / subtitleKanaCount', () => {
   });
 
   it('ignores override blocks, so karaoke timing tags cannot carry a file', () => {
-    const tagged = ass(['{\k21}ka{\k18}ra{\k30}o{\k25}ke', '{\pos(100,200)\fadeこんにちは}Hello there.']);
+    const tagged = ass([
+      String.raw`{\k21}ka{\k18}ra{\k30}o{\k25}ke`,
+      String.raw`{\pos(100,200)\fadeこんにちは}Hello there.`,
+    ]);
     expect(subtitleKanaCount(tagged)).toBe(0);
   });
 
