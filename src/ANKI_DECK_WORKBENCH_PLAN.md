@@ -367,7 +367,26 @@ This slice is complete only when all of these can be shown with real data and no
 8. Undo a draft action, reverse a supported committed action, and clearly explain any adapter operation that cannot be reversed.
 9. Filter and preview the 100,000-note fixture without freezing window dragging or Electron's main event loop.
 10. Complete the primary workflows using keyboard only and verify focus, contrast, reduced motion, EN/JA/ZH/RU strings, and compact/default/maximized layouts.
+
+    **Closed 2026-08-17** (`cd7472b6`). Everything unattended passed on 2026-08-16; the one
+    remainder was step 7's PACKAGE branch, which renders only over an `.apkg` draft and so was
+    unreachable without the OS file dialog. Reopen removed that dependency. Measured on the real
+    `gate11-provenance.apkg` draft at panel width **694 px**: **8 text leaves, 0 clipped** on
+    either axis, **0 overlapping pairs**. Facts line *"1 notes will be written with their new
+    content"*, button *"Export a new package…"*. Negative control, both directions: zero changes
+    renders *"The session adds up to no changes — there is nothing to export."* with the button
+    **disabled**, one edit enables it, undo returns to the zero sentence. **Not** measured live:
+    the refusal/error line — `DeckWorkbenchApply` deliberately ships no `outPath` so export runs
+    through the OS save dialog, and the refusal codes remain test-covered only.
 11. Follow the numbered flow to enrich a mixed deck from configured dictionaries, add new fields, resolve conflicting senses, update the template, and prove field-level provenance after export/reimport.
+
+    **Closed 2026-08-17** (`cd7472b6`). The round trip and the inspector's *"Written from:"* line
+    were each proven separately on 2026-08-16; what no agent could stage was both halves in the
+    **same window**, because reaching the inspector on a reimported package needed the native file
+    picker. Reopen is that missing entry. Live on the reimported package: note **2002 (猫)** shows
+    **"Written from: JMdict (EN), Jitendex"** on its `Reading` field — **1** provenance line —
+    while notes **2001** and **2003** show **0**. That asymmetry is the fixture's own control: a
+    field this app enriched says so, a hand-typed one says nothing.
 12. Generate several AI example sentences and learning aids, approve only selected variants, preview difficult and edge-case cards across layouts, cancel one batch, retry only failures, and verify that rejected/generated data is represented honestly.
 13. Customize Browser columns separately from note fields, create a reverse/optional-reverse card design, and prove that the representative preview catches blank, duplicate, cloze, sibling, media, and dark/mobile rendering failures before Apply. The media lens is *flagged, not rendered*: the preview frame is an opaque-origin `srcdoc` whose CSP allows `data:` images only, and Anki references media by bare file name, so a card that references media the package holds must say so explicitly (`media-not-rendered`) rather than show a blank box that reads as clean. Loosening the CSP does not satisfy this gate.
 

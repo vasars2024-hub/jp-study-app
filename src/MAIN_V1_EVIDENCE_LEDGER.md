@@ -24484,3 +24484,42 @@ Gates this turn: `npx vitest run` **709 files passed / 1 skipped, 9,717 passed, 
   at **10,471** (+24). The 4 catalogs were foreign-dirty and were staged as reconstructed HEAD+edit
   blobs, each verified mechanically — inserted bytes sliced back out leave a remainder
   byte-identical to HEAD, byte delta matches, diffstat **146 insertions / 0 deletions**.
+
+## 2026-08-17 — Track 7 / Phase 6: the dialog-free door, and gates 10 + 11 close live (`primary`)
+
+- `cd7472b6` reopen (main refusal + surface + 4 catalogs + 4 tests). The relay's standing note
+  that "draft sessions are list/discard only — there is no resume handler" is **STALE**: resume
+  shipped and works. The real gap was narrower and worse. `planResume` answers
+  `already-complete` for a session that covered every note, so `resumable` is false and the row
+  had **only Discard**. Measured on this machine's live store: **11 of 24** retained sessions are
+  `complete` — 11 real packages whose only door back was the OS file picker.
+- **Reopen is not a resume variant.** Offset 0, by `sessionId`, no path across IPC — the session
+  names its own source, as resume does. `isReopenable` is package kinds only: a csv session is
+  file-backed but has a different reader, and Connect/local-deck name no file at all.
+- **One honest refusal added in main.** A path that came from the store rather than a picker can
+  be stale, and adm-zip reports that as a corrupt package. `source-missing` fires on absence
+  only — it is not a catch-all for every read failure.
+- **LIVE, restarted main (pid 43292; main does not hot-reload).** Missing path → `source-missing`.
+  `gate11-provenance.apkg` → **3 notes / 2 cards / 1 deck / 1 note type / 1 media ref**, listed as
+  `Complete · 3 of 3 notes read` with **"Open again" and no Resume**; the click adopted the draft
+  with **no dialog**. Heading now reads "Recent reads" — it listed Complete rows under
+  "Unfinished reads" before.
+- **GATE 11 CLOSES — the two halves finally in one window.** Inspector on the reimported package:
+  note **2002 (猫)** field `Reading` → **"Written from: JMdict (EN), Jitendex"**, 1 provenance
+  line. Notes **2001 and 2003 → 0** lines. The fixture's own negative control, live.
+- **GATE 10's last sliver CLOSES.** Step 7's PACKAGE branch, panel 694 px wide: **8 text leaves,
+  0 clipped** (`scrollWidth === clientWidth` and `scrollHeight === clientHeight` on all 8),
+  **0 overlapping pairs** (pairwise box intersection > 1 px on both axes). Facts line
+  **"1 notes will be written with their new content"**; button **"Export a new package…"**.
+- **Its negative control is the zero-change state, and both directions were driven.** With no
+  edits: **"The session adds up to no changes — there is nothing to export."** and the export
+  button **disabled**. One field edit → facts line appears, button **enabled**. Undo → back to the
+  zero sentence and `Undo (0)`. Not measured live: the refusal/error line, because
+  `DeckWorkbenchApply` ships no `outPath` on purpose so export runs through the OS save dialog —
+  the refusal codes stay covered by tests only, and that is stated rather than claimed.
+- **TRAPS.** (1) The inspector opens from a **cell button** inside `.wb-browser-row`, not from the
+  row element — clicking the row returns "no inspector" and reads like a missing panel.
+  (2) `.wb-inspector-input` commits **onBlur**, so `input`+`change` events alone leave `Undo (0)`
+  and step 7 correctly says "no changes" — the wrong instrument, not a defect.
+  (3) Probe sessions were discarded afterwards (2 removed, 22 remain); the store was already at
+  its `MAX_RETAINED_SESSIONS` cap of 24, so seeding trimmed the 2 oldest rows — bookkeeping only.
