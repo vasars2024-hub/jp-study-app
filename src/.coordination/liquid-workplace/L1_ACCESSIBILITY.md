@@ -181,6 +181,36 @@ slice: tokenize those rules and re-measure all three palettes in the fixing comm
 "fix" `body` — the desktop background behind windows is a different question from a window's
 own content, and only the second one is white-on-white.
 
+## 2026-08-18 — the palette run is now one command, and it exonerates the tokens
+
+`probes/l1-palette-contrast{,-load}.js` does the whole §0 check in two calls: park the live
+engine, then switch / measure / restore across three palettes. Two files because /eval is
+synchronous and a promise serialises to `{}`. It **refuses** unless `listThemes()` reports 13 —
+an `import()` that returns a duplicate copy has an empty registry, `applyTheme` then falls back
+to the default, every palette measures identically, and the run reads as "contrast does not
+depend on the palette". That refusal is the guard against the most convincing false pass here.
+
+Liquid Dictionary, 8 results, 169 text runs, 0 unmeasurable, restored to `forest-night` with
+`jp-os-theme` unchanged:
+
+| palette | min | failing | of those, inside a Liquid region |
+| --- | --- | --- | --- |
+| forest-night | 4.92:1 | **0** | 0 |
+| classic-light | **1.05:1** | **52** | **3** |
+| high-contrast | 6.12:1 | **0** | 0 |
+
+**The Liquid tokens are not the defect, and the probe now proves it rather than asserting it.**
+It dumps the chain per palette: on `classic-light` `--glass-tint` is
+`color-mix(in srgb, #ffffff 72%, transparent)` and `--lq-liquid-text` is `#1e1e1e` — white glass,
+dark text, exactly right. `high-contrast` collapses it to `#000000` with `#ffff00` text. The
+material tracks the palette; the 52 failures are consuming rules that never read a token. Even
+the 3 inside a Liquid region are that: the lens-picker buttons paint their own light colour over
+the now-white glass.
+
+**So the fix is in `styles.css`, and it was NOT done here on purpose.** That file carries another
+track's live hunks; committing it would take the HEAD+edit blob route on a mega-file at the end
+of a turn. Left for a turn that owns it, now scoped to a list rather than a symptom.
+
 ## Category 1 verdict: neither surface is a 10
 
 Contrast, keyboard and reduced motion pass on both. **The 32 px hit-target bar fails on both** —
