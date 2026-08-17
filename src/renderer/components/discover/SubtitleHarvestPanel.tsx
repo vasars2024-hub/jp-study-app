@@ -272,6 +272,10 @@ export default function SubtitleHarvestPanel({
       const result = await window.api.subtitleHarvestNyaaList({
         title,
         titles: altTitles ?? [],
+        // Sent so main can add the synced library row's own names. The
+        // catalogue's aliases arrive as `titles` and come first; MAL's stored
+        // synonyms are the fallback, and `HARVEST_ALIAS_LIMIT` bounds the walk.
+        malId: malId ?? null,
         acquisition: acquisitionConfigFrom(getActiveScraperSettings()),
       });
       setNyaaCandidates(result.candidates);
@@ -282,7 +286,7 @@ export default function SubtitleHarvestPanel({
       setMessage(errorText(error));
       setPhase('error');
     }
-  }, [title, altTitles]);
+  }, [title, altTitles, malId]);
 
   /**
    * Acquire one release and study whatever of the requested range it holds.

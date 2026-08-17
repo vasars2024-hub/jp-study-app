@@ -179,6 +179,16 @@ export interface HarvestNyaaListInput {
    * searched too, and the release filter runs against whichever name found it.
    */
   titles?: readonly string[];
+  /**
+   * The MAL id of the work, when the caller knows it.
+   *
+   * Main uses it to read the stored library row's own `altTitles` and search
+   * those too. The names MAL publishes reach disk during a sync and nothing in
+   * the renderer can see them — `mal-library.json` is 806 KB and pulling it
+   * across IPC to read one row is the wrong trade — so the lookup happens on
+   * the side that already holds the file.
+   */
+  malId?: number | null;
   /** Narrows the query for a multi-season show. Null asks about the title. */
   season?: number | null;
   /** The active profile's acquisition settings — see `SubtitleHarvestListInput`. */
@@ -202,19 +212,38 @@ export interface HarvestNyaaListResult {
 }
 
 /**
+ * How many names one listing may search with, primary included.
+ *
+ * A cap rather than "every name MAL knows", for two measured reasons. The walk
+ * is sequential with 400 ms of pacing between requests and stops only on a hit,
+ * so the *miss* — the case the aliases exist for — is the expensive one: the
+ * user's own library has 154 rows carrying more than five names and one
+ * carrying ten, which at ~2.8 s a search is a half-minute listing with no abort
+ * path. And MAL's `synonyms` are not all names for the same work: row 17-26
+ * (`Fujimoto Tatsuki`) lists ten, which are the titles of ten *different*
+ * one-shots, so an uncapped first-hit walk returns another work's releases.
+ * Four keeps the romaji/English/native trio plus one synonym.
+ */
+export const HARVEST_ALIAS_LIMIT = 4;
+
+/**
  * The distinct names to search an index with, primary first.
  *
  * Case- and space-insensitive dedup, because a catalogue that publishes
  * `titleEn` and `titleRomaji` identically would otherwise spend a second
- * request to ask the same question.
+ * request to ask the same question. Truncation is by caller order, so the
+ * names a caller lists first are the ones that survive the cap.
  */
 export function harvestSearchAliases(
   title: string,
   aliases: readonly string[] | undefined,
+  limit: number = HARVEST_ALIAS_LIMIT,
 ): string[] {
+  const cap = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : HARVEST_ALIAS_LIMIT;
   const out: string[] = [];
   const seen = new Set<string>();
   for (const candidate of [title, ...(aliases ?? [])]) {
+    if (out.length >= cap) break;
     const trimmed = (candidate ?? '').trim();
     if (!trimmed) continue;
     const key = trimmed.toLowerCase().replace(/\s+/g, ' ');

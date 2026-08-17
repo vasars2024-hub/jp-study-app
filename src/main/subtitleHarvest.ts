@@ -38,6 +38,8 @@ import {
 } from './subtitleNyaaSource';
 import { asNyaaAcquisitionConfig } from '../shared/subtitleNyaa';
 import { harvestSearchAliases } from '../shared/subtitleHarvest';
+import { readMalLibrary } from './malLibrary';
+import { malLibraryKey } from '../shared/malLibrary';
 import type {
   HarvestNyaaFetchResult,
   HarvestNyaaListInput,
@@ -295,6 +297,34 @@ export async function fetchSubtitleHarvest(ids: readonly string[]): Promise<Subt
 // `nyaaFetchAll` never sees one.
 
 /**
+ * The names a synced MAL row carries, or none.
+ *
+ * The sync writes `altTitles` for 1,373 of the user's 1,429 rows and, until
+ * this call existed, nothing read them back — 41 % of `mal-library.json` was a
+ * field with no reader, and the case it was added for still failed from the UI:
+ * MAL 2596's `Ghost Hound` reached disk and stopped there.
+ *
+ * Anime only, because a nyaa subtitle harvest is about episodes and the library
+ * keys manga separately under the same numbers.
+ *
+ * Never throws: an absent, corrupt or newer-versioned library is an empty alias
+ * list, and a listing that searches one name is still a listing.
+ */
+function storedMalAliases(malId: number | null | undefined): string[] {
+  if (typeof malId !== 'number' || !Number.isFinite(malId) || malId <= 0) return [];
+  try {
+    const wanted = malLibraryKey('anime', malId);
+    for (const entry of readMalLibrary().entries) {
+      if (malLibraryKey(entry.media, entry.malId) !== wanted) continue;
+      return (entry.altTitles ?? []).filter((name) => typeof name === 'string' && !!name.trim());
+    }
+  } catch {
+    return [];
+  }
+  return [];
+}
+
+/**
  * Ranked nyaa releases for a title.
  *
  * Searched with `episode: null` on purpose: a harvest asks for a range, and the
@@ -305,7 +335,10 @@ export async function fetchSubtitleHarvest(ids: readonly string[]): Promise<Subt
 export async function listNyaaHarvest(
   input: HarvestNyaaListInput,
 ): Promise<HarvestNyaaListResult> {
-  const aliases = harvestSearchAliases(input?.title ?? '', input?.titles);
+  const aliases = harvestSearchAliases(input?.title ?? '', [
+    ...(input?.titles ?? []),
+    ...storedMalAliases(input?.malId),
+  ]);
   if (!aliases.length) {
     return { ok: false, candidates: [], message: 'No title to search the index with.', searchedAs: null };
   }

@@ -10,9 +10,18 @@
 // search is asked with `episode: null`, that a fetch can only ever name a
 // candidate main itself listed, and that every file in a pack survives the trip.
 
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('electron', () => ({ ipcMain: { handle: () => undefined } }));
+// `app` is here because the harvest now reads the MAL library, which resolves
+// `<userData>/mal-library.json` at call time. Every library case below overrides
+// the path outright, so this only has to exist, not to be right.
+vi.mock('electron', () => ({
+  ipcMain: { handle: () => undefined },
+  app: { getPath: () => os.tmpdir() },
+}));
 
 /** What the provider is currently pretending to be. Reset per test. */
 let availability: { ok: true } | { ok: false; reason: string; detail: string } = { ok: true };
@@ -62,6 +71,31 @@ vi.mock('../subtitleProviderClients', () => ({
 }));
 
 const { listNyaaHarvest, fetchNyaaHarvest, listSubtitleHarvest } = await import('../subtitleHarvest');
+const { __setMalLibraryPathForTests } = await import('../malLibrary');
+const { HARVEST_ALIAS_LIMIT } = await import('../../shared/subtitleHarvest');
+
+/**
+ * A real `mal-library.json` on disk, because the point of these cases is that
+ * the field the sync writes is the field the harvest reads. Stubbing the reader
+ * would prove the wiring against a shape rather than against the document.
+ */
+function writeLibrary(entries: Record<string, unknown>[]): string {
+  const file = path.join(
+    fs.mkdtempSync(path.join(os.tmpdir(), 'jp-mal-lib-')),
+    'mal-library.json',
+  );
+  fs.writeFileSync(file, JSON.stringify({ version: 1, entries, lastSyncAt: 1 }), 'utf-8');
+  __setMalLibraryPathForTests(() => file);
+  return file;
+}
+
+/** One synced row, shaped as `parseMalLibraryDocument` requires it. */
+function libraryRow(malId: number, title: string, altTitles: string[]) {
+  return {
+    malId, media: 'anime', title, altTitles,
+    episodesWatched: 0, score: 0, rewatching: false, origin: 'list',
+  };
+}
 
 /** A profile shaped enough for `asNyaaAcquisitionConfig` to accept it. */
 function acquisition() {
@@ -105,6 +139,7 @@ beforeEach(() => {
   remembered.clear();
   jimakuMatch = { candidates: [], entry: null, basis: 'title', down: false, downStatus: 0 };
   jimakuKey = false;
+  __setMalLibraryPathForTests(null);
 });
 
 describe('listNyaaHarvest', () => {
@@ -219,6 +254,90 @@ describe('listNyaaHarvest', () => {
     expect(result.searchedAs).toBeNull();
     expect(result.message).toMatch(/looks like it carries subtitles/i);
     expect(searchCalls).toHaveLength(2);
+  });
+
+  // The synced library is where MAL's own names for a show live. Before this,
+  // `altTitles` was written by the whole sync pipeline and read by nothing:
+  // 1,373 of the user's 1,429 rows carried aliases, 41 % of the file, and the
+  // motivating case still failed from the UI because the panel cannot see disk.
+  it('searches the names the synced MAL row carries, not only the ones passed in', async () => {
+    writeLibrary([libraryRow(2596, 'Shinreigari', ['Ghost Hound', '心霊狩り'])]);
+    searchByTitle.set('Ghost Hound', [candidateRow('nyaa:ghost')]);
+
+    const result = await listNyaaHarvest({
+      title: 'Shinreigari',
+      titles: [],
+      malId: 2596,
+      acquisition: acquisition(),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.candidates.map((row) => row.id)).toEqual(['nyaa:ghost']);
+    expect(result.searchedAs).toBe('Ghost Hound');
+    expect(searchCalls.map((call) => call.title)).toEqual(['Shinreigari', 'Ghost Hound']);
+  });
+
+  // The negative control for the case above: same library, same title, no id.
+  // Without it, a passing test proves only that `Ghost Hound` was reachable
+  // somehow — this is what pins it to the id lookup.
+  it('does not read the library when the caller names no MAL id', async () => {
+    writeLibrary([libraryRow(2596, 'Shinreigari', ['Ghost Hound'])]);
+    searchByTitle.set('Ghost Hound', [candidateRow('nyaa:ghost')]);
+
+    const result = await listNyaaHarvest({
+      title: 'Shinreigari', titles: [], acquisition: acquisition(),
+    });
+
+    expect(searchCalls.map((call) => call.title)).toEqual(['Shinreigari']);
+    expect(result.candidates).toHaveLength(0);
+  });
+
+  it('ignores a MAL id the library has never seen', async () => {
+    writeLibrary([libraryRow(2596, 'Shinreigari', ['Ghost Hound'])]);
+    const result = await listNyaaHarvest({
+      title: 'Shinreigari', titles: [], malId: 999_999, acquisition: acquisition(),
+    });
+    expect(result.ok).toBe(true);
+    expect(searchCalls.map((call) => call.title)).toEqual(['Shinreigari']);
+  });
+
+  // `Fujimoto Tatsuki 17-26` really carries ten synonyms and they are the titles
+  // of ten different one-shots, so an uncapped first-hit walk returns another
+  // work's releases — and a miss costs ten sequential requests at 400 ms of
+  // pacing each, with no abort path.
+  it('caps the alias walk rather than searching every name MAL knows', async () => {
+    writeLibrary([libraryRow(17_26, 'Fujimoto Tatsuki 17-26', [
+      'Ningyo Rhapsody', 'Yogen no Nayuta', 'Sasaki to Miyano', 'Mermaid Rhapsody',
+      'Koi wa Ameagari', 'Shikaku', 'Kyuuketsuki', 'Imouto no Ane', 'Boku no Kokoro',
+    ])]);
+
+    const result = await listNyaaHarvest({
+      title: 'Fujimoto Tatsuki 17-26', titles: [], malId: 17_26, acquisition: acquisition(),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(searchCalls).toHaveLength(HARVEST_ALIAS_LIMIT);
+    expect(searchCalls.map((call) => call.title)).toEqual([
+      'Fujimoto Tatsuki 17-26', 'Ningyo Rhapsody', 'Yogen no Nayuta', 'Sasaki to Miyano',
+    ]);
+  });
+
+  it('spends the cap on the catalogue’s names before the library’s synonyms', async () => {
+    // Order matters and is not cosmetic: the caller's `titles` are the names the
+    // catalogue publishes for *this* work, while MAL's tail is free-text
+    // synonyms. Whichever the cap drops should be the less trustworthy one.
+    writeLibrary([libraryRow(2596, 'Shinreigari', ['stored-a', 'stored-b'])]);
+
+    await listNyaaHarvest({
+      title: 'Shinreigari',
+      titles: ['Ghost Hound', '心霊狩り'],
+      malId: 2596,
+      acquisition: acquisition(),
+    });
+
+    expect(searchCalls.map((call) => call.title)).toEqual([
+      'Shinreigari', 'Ghost Hound', '心霊狩り', 'stored-a',
+    ]);
   });
 
   it('reports a thrown search rather than rejecting across IPC', async () => {
