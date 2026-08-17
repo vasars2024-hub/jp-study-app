@@ -28,6 +28,7 @@ import type {
   AnkiDraft,
   AnkiDraftCard,
   AnkiDraftDeck,
+  AnkiDraftFieldDef,
   AnkiDraftMediaRef,
   AnkiDraftNote,
   AnkiDraftSource,
@@ -242,6 +243,44 @@ export type AnkiDraftEditOp =
        * cards. Empty when the removed template was last in the list.
        */
       renumbered: { from: number; to: number }[];
+      group?: string;
+    }
+  | {
+      /**
+       * One added card template — the card designer's reverse and
+       * optional-reverse. The exact mirror of `template-remove` above, and it
+       * exists for the reason that gate 14's matrix made visible:
+       * `buildApkgExportChanges` folds `journal.done` and nothing else, so a
+       * design with no op here is a preview no destination can ship. Gate 13
+       * added 3,180 cards to a real deck and not one of them was exportable.
+       *
+       * Like the removal it carries its effects verbatim rather than
+       * recomputing them, because the inverse must undo exactly what this
+       * design did and not what a later edit introduced. It appends, so it
+       * never renumbers anything: the new template takes the next free ord and
+       * every existing ord is untouched. That is why there is no `renumbered`
+       * here and why undo is a filter rather than a re-sort.
+       *
+       * The third op with no `noteId`: a design spans every note of the note
+       * type, and the notes it did NOT give a card to (an empty question side,
+       * or an unset optional-reverse flag) are part of its result too.
+       */
+      kind: 'template-add';
+      noteTypeId: string;
+      /** The added template exactly as it was written, at its own ord. */
+      template: AnkiDraftTemplate;
+      /**
+       * The field the design added to the note type, or null when it reused one
+       * the note type already had. Carried because undo has to take it back off
+       * every note of the type, not just off the note type's own field list.
+       */
+      addedField: AnkiDraftFieldDef | null;
+      /**
+       * Every card row the design created, verbatim. They were appended, so
+       * undo is `filter` by id and redo is `concat` — no index is needed, unlike
+       * `template-remove`, whose rows came out of the middle of the array.
+       */
+      cards: AnkiDraftCard[];
       group?: string;
     };
 
@@ -750,7 +789,7 @@ function applyInverseInto(
   // through the positional index this function writes through. Returning rather
   // than falling into the note branch below, which would read a `noteId` this op
   // deliberately does not have.
-  if (op.kind === 'template-remove') return;
+  if (op.kind === 'template-remove' || op.kind === 'template-add') return;
   const at = index.position.get(op.noteId);
   if (at === undefined) return;
   const note = notes[at];
@@ -792,11 +831,72 @@ function applyTemplateRemovalOps(
   draft: AnkiDraft,
   ops: readonly AnkiDraftEditOp[],
   direction: 'before' | 'after',
-): { noteTypes: AnkiDraft['noteTypes']; cards: AnkiDraftCard[] } {
+): { noteTypes: AnkiDraft['noteTypes']; notes: AnkiDraftNote[]; cards: AnkiDraftCard[] } {
   let noteTypes = draft.noteTypes;
+  let notes = draft.notes;
   let cards = draft.cards;
 
   for (const op of ops) {
+    if (op.kind === 'template-add') {
+      // The mirror of the removal below, and simpler for one reason: a design
+      // APPENDS, so no ord ever moves. `before` (undo) drops what it made,
+      // `after` (redo) puts it back — both keyed on the op's own ids, so a card
+      // the user added afterwards by some other route survives an undo.
+      const undo = direction === 'before';
+      const madeIds = new Set(op.cards.map((c) => c.id));
+      const field = op.addedField;
+
+      noteTypes = noteTypes.map((noteType) => {
+        if (noteType.id !== op.noteTypeId) return noteType;
+        return {
+          ...noteType,
+          fields: !field
+            ? noteType.fields
+            : undo
+              ? noteType.fields.filter((f) => f.name !== field.name)
+              : [...noteType.fields.filter((f) => f.name !== field.name), field],
+          templates: undo
+            ? noteType.templates.filter((t) => t.ord !== op.template.ord)
+            : [...noteType.templates.filter((t) => t.ord !== op.template.ord), op.template].sort(
+                (a, b) => a.ord - b.ord,
+              ),
+        };
+      });
+
+      // The note half. `applyCardDesign` writes two things into a note — the
+      // added field's empty value and the new card's id — so an undo that took
+      // back only the note type and the card rows would leave every note one
+      // field longer than its own note type says it is.
+      const cardsByNote = new Map<string, string[]>();
+      for (const card of op.cards) {
+        const list = cardsByNote.get(card.noteId);
+        if (list) list.push(card.id);
+        else cardsByNote.set(card.noteId, [card.id]);
+      }
+      notes = notes.map((note) => {
+        if (note.noteTypeId !== op.noteTypeId) return note;
+        const mine = cardsByNote.get(note.id);
+        const nextFields = !field
+          ? note.fields
+          : undo
+            ? note.fields.filter((f) => f.name !== field.name)
+            : [
+                ...note.fields.filter((f) => f.name !== field.name),
+                { ord: field.ord, name: field.name, raw: '', normalized: '' },
+              ];
+        const nextCardIds = !mine
+          ? note.cardIds
+          : undo
+            ? note.cardIds.filter((id) => !madeIds.has(id))
+            : [...note.cardIds.filter((id) => !madeIds.has(id)), ...mine];
+        return { ...note, fields: nextFields, cardIds: nextCardIds };
+      });
+
+      cards = undo
+        ? cards.filter((c) => !madeIds.has(c.id))
+        : [...cards.filter((c) => !madeIds.has(c.id)), ...op.cards];
+      continue;
+    }
     if (op.kind !== 'template-remove') continue;
     // `from` is always the SOURCE ord, so undo reads the map backwards.
     const ordMap = new Map(
@@ -847,7 +947,7 @@ function applyTemplateRemovalOps(
     }
   }
 
-  return { noteTypes, cards };
+  return { noteTypes, notes, cards };
 }
 
 /**
@@ -885,7 +985,7 @@ export function undoLastEdit(
   // Structural first, and the index is built from its result: re-inserting card
   // rows moves every position after the insert, so an index built before this
   // would address the wrong rows for the rest of the step.
-  const structural = step.some((op) => op.kind === 'template-remove')
+  const structural = step.some((op) => op.kind === 'template-remove' || op.kind === 'template-add')
     ? applyTemplateRemovalOps(draft, [...step].reverse(), 'before')
     : null;
   const base = structural ? { ...draft, ...structural } : draft;
@@ -917,7 +1017,7 @@ export function redoLastEdit(
   // Structural first, for `undoLastEdit`'s reason — here the deletes shorten the
   // array instead of lengthening it, which invalidates a prebuilt index just as
   // thoroughly. Forwards, since a redo replays the step in applied order.
-  const structural = step.some((op) => op.kind === 'template-remove')
+  const structural = step.some((op) => op.kind === 'template-remove' || op.kind === 'template-add')
     ? applyTemplateRemovalOps(draft, step, 'after')
     : null;
   const base = structural ? { ...draft, ...structural } : draft;
@@ -943,7 +1043,13 @@ export function editedNoteIds(journal: AnkiDraftEditJournal): string[] {
   // false about the rest — and badging thousands of notes as edited would be
   // worse than badging none.
   for (const op of journal.done) {
-    if (op.kind === 'deck-name' || op.kind === 'template-remove') continue;
+    if (
+      op.kind === 'deck-name'
+      || op.kind === 'template-remove'
+      || op.kind === 'template-add'
+    ) {
+      continue;
+    }
     if (!out.includes(op.noteId)) out.push(op.noteId);
   }
   return out;
@@ -951,6 +1057,10 @@ export function editedNoteIds(journal: AnkiDraftEditJournal): string[] {
 
 export function noteIsEdited(journal: AnkiDraftEditJournal, noteId: string): boolean {
   return journal.done.some(
-    (op) => op.kind !== 'deck-name' && op.kind !== 'template-remove' && op.noteId === noteId,
+    (op) =>
+      op.kind !== 'deck-name'
+      && op.kind !== 'template-remove'
+      && op.kind !== 'template-add'
+      && op.noteId === noteId,
   );
 }

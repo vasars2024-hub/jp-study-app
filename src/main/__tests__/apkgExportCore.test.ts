@@ -18,6 +18,8 @@ import { ANKI_FIELD_SEP as SEP, buildAnkiDraft, splitNoteFields } from '../../sh
 import { planChangeTray } from '../../shared/ankiChangeTray';
 import { createEditJournal } from '../../shared/ankiDraftEdit';
 import { buildApkgExportChanges, exportChangesEmpty } from '../../shared/ankiApkgExport';
+import type { ApkgExportChangeSet, ApkgExportTemplateAdd } from '../../shared/ankiApkgExport';
+import { decodeTemplateConfig } from '../anki/ankiProtoConfig';
 import { stripFieldHtml } from '../../shared/apkgParse';
 
 const nodeRequire = createRequire(import.meta.url);
@@ -121,7 +123,7 @@ describe('applyExportChanges', () => {
       { notes: [{ noteId: '1001', fields: ['<b>食べた</b>', 'たべた'] }], cardMoves: [] },
       { nowMs: NOW_MS, normalize: stripFieldHtml },
     );
-    expect(result).toEqual({ notesUpdated: 1, cardsUpdated: 0, decksUpdated: 0, templatesRemoved: 0, cardsDeleted: 0 });
+    expect(result).toEqual({ notesUpdated: 1, cardsUpdated: 0, decksUpdated: 0, templatesRemoved: 0, templatesAdded: 0, cardsCreated: 0, cardsDeleted: 0 });
 
     const raw = readRawCollection(db);
     const noteRow = raw.notes.find((n) => String(n.id) === '1001')!;
@@ -160,7 +162,7 @@ describe('applyExportChanges', () => {
       { notes: [], cardMoves: [{ cardId: '5001', noteId: '1001', due: 3 }] },
       { nowMs: NOW_MS, normalize: stripFieldHtml },
     );
-    expect(result).toEqual({ notesUpdated: 0, cardsUpdated: 1, decksUpdated: 0, templatesRemoved: 0, cardsDeleted: 0 });
+    expect(result).toEqual({ notesUpdated: 0, cardsUpdated: 1, decksUpdated: 0, templatesRemoved: 0, templatesAdded: 0, cardsCreated: 0, cardsDeleted: 0 });
     const row = db.exec('SELECT due, usn, mod FROM cards WHERE id = 5001')[0]!.values[0]!;
     expect(row).toEqual([3, -1, Math.floor(NOW_MS / 1000)]);
   });
@@ -225,7 +227,7 @@ describe('applyExportChanges', () => {
       },
       { nowMs: NOW_MS, normalize: stripFieldHtml },
     );
-    expect(result).toEqual({ notesUpdated: 0, cardsUpdated: 0, decksUpdated: 1, templatesRemoved: 0, cardsDeleted: 0 });
+    expect(result).toEqual({ notesUpdated: 0, cardsUpdated: 0, decksUpdated: 1, templatesRemoved: 0, templatesAdded: 0, cardsCreated: 0, cardsDeleted: 0 });
     // Read back through the reader an import would use, not through the UPDATE.
     const decks = readRawCollection(db).decks;
     expect(decks).toEqual([{ id: '1', name: 'Japanese::Core', dyn: 0, conf: '1' }]);
@@ -362,7 +364,7 @@ describe('applyExportChanges — recipe 13 deck moves', () => {
       nowMs: NOW_MS,
       normalize: stripFieldHtml,
     });
-    expect(result).toEqual({ notesUpdated: 0, cardsUpdated: 1, decksUpdated: 1, templatesRemoved: 0, cardsDeleted: 0 });
+    expect(result).toEqual({ notesUpdated: 0, cardsUpdated: 1, decksUpdated: 1, templatesRemoved: 0, templatesAdded: 0, cardsCreated: 0, cardsDeleted: 0 });
 
     // Read back through the reader an import would use, not through the INSERT.
     const decks = readRawCollection(db).decks;
@@ -405,7 +407,7 @@ describe('applyExportChanges — recipe 13 deck moves', () => {
       cardsUpdated: 1,
       decksUpdated: 1,
       templatesRemoved: 0,
-      cardsDeleted: 0,
+      templatesAdded: 0, cardsCreated: 0, cardsDeleted: 0,
     });
     // `dyn: 0` here is the reader deciding from the kind blob's first byte, so it
     // is a real assertion about the bytes written and not about the column.
@@ -447,7 +449,7 @@ describe('applyExportChanges — recipe 13 deck moves', () => {
       },
       { nowMs: NOW_MS, normalize: stripFieldHtml },
     );
-    expect(result).toEqual({ notesUpdated: 0, cardsUpdated: 2, decksUpdated: 2, templatesRemoved: 0, cardsDeleted: 0 });
+    expect(result).toEqual({ notesUpdated: 0, cardsUpdated: 2, decksUpdated: 2, templatesRemoved: 0, templatesAdded: 0, cardsCreated: 0, cardsDeleted: 0 });
     const decks = readRawCollection(db).decks;
     const n5 = decks.find((d) => d.name === 'Default::N5')!;
     const n4 = decks.find((d) => d.name === 'Default::N4')!;
@@ -475,7 +477,7 @@ describe('applyExportChanges — recipe 13 deck moves', () => {
       },
       { nowMs: NOW_MS, normalize: stripFieldHtml },
     );
-    expect(result).toEqual({ notesUpdated: 0, cardsUpdated: 1, decksUpdated: 0, templatesRemoved: 0, cardsDeleted: 0 });
+    expect(result).toEqual({ notesUpdated: 0, cardsUpdated: 1, decksUpdated: 0, templatesRemoved: 0, templatesAdded: 0, cardsCreated: 0, cardsDeleted: 0 });
     expect(db.exec('SELECT count(*) FROM decks')[0]!.values[0]![0]).toBe(before);
     expect(db.exec('SELECT did FROM cards WHERE id = 5001')[0]!.values[0]![0]).toBe(3);
   });
@@ -632,7 +634,7 @@ describe('applyExportChanges — recipe 13 deck moves', () => {
         },
         { nowMs: NOW_MS, normalize: stripFieldHtml },
       ),
-    ).toEqual({ notesUpdated: 0, cardsUpdated: 1, decksUpdated: 0, templatesRemoved: 0, cardsDeleted: 0 });
+    ).toEqual({ notesUpdated: 0, cardsUpdated: 1, decksUpdated: 0, templatesRemoved: 0, templatesAdded: 0, cardsCreated: 0, cardsDeleted: 0 });
     expect(db.exec('SELECT did FROM cards WHERE id = 5001')[0]!.values[0]![0]).toBe(3);
   });
 });
@@ -1190,5 +1192,179 @@ describe('gate 5 end to end: tray action → change set → package → re-read'
     expect(clamped.problems.map((p) => p.code)).toEqual(['card-state-invalid']);
     // Refused, not clamped to MIN_EASE_FACTOR: the stored ease is untouched.
     expect(Number(db.exec('SELECT factor FROM cards WHERE id = 5002')[0]!.values[0][0])).toBe(2300);
+  });
+});
+
+// ----- the card designer's destination ------------------------------------------
+//
+// Gate 14 found `template-add` read-only on both destinations: `applyCardDesign`
+// returned a new draft and never touched the journal, and the journal is all
+// `buildApkgExportChanges` folds — so gate 13 added 3,180 cards to a real deck
+// and not one of them could be exported. These cover the writer half of the fix.
+// Every claim is read back out of the collection, never off the return value.
+
+function addOnly(over: Partial<ApkgExportTemplateAdd> = {}): ApkgExportChangeSet {
+  return {
+    notes: [],
+    cardMoves: [],
+    deckRenames: [],
+    templateAdds: [
+      {
+        noteTypeId: '100',
+        ord: 3,
+        name: 'Reverse',
+        qfmt: '{{Reading}}',
+        afmt: '{{FrontSide}}<hr id=answer>{{Expression}}',
+        bqfmt: '',
+        bafmt: '',
+        cards: [{ noteId: '1001', deckId: '1', due: 0 }],
+        ...over,
+      },
+    ],
+  };
+}
+
+describe('the card designer writes into a package', () => {
+  it('schema 18: inserts the template row and one card, and the config decodes back', () => {
+    const db = normalizedTemplateDb();
+    const changes = addOnly();
+    const result = applyExportChanges(db, changes, { nowMs: NOW_MS, normalize: stripFieldHtml });
+    expect(result.templatesAdded).toBe(1);
+    expect(result.cardsCreated).toBe(1);
+    // Not counted as an update: a created row is not an edited one.
+    expect(result.cardsUpdated).toBe(0);
+
+    // Read back, never off the result. Four templates now, the new one last.
+    const templates = db.exec('SELECT ord, name FROM templates WHERE ntid = 100 ORDER BY ord')[0]!
+      .values;
+    expect(templates.map((r) => [Number(r[0]), String(r[1])])).toEqual([
+      [0, 'Card 1'],
+      [1, 'Card 1 copy'],
+      [2, 'Card 2'],
+      [3, 'Reverse'],
+    ]);
+    // The formats survive the protobuf round trip — the encoder is new, so this
+    // is the assertion that it and `decodeTemplateConfig` agree.
+    const config = db.exec('SELECT config FROM templates WHERE ntid = 100 AND ord = 3')[0]!
+      .values[0][0];
+    expect(decodeTemplateConfig(config)).toEqual({
+      qfmt: '{{Reading}}',
+      afmt: '{{FrontSide}}<hr id=answer>{{Expression}}',
+      bqfmt: undefined,
+      bafmt: undefined,
+    });
+    expect(cardOrds(db)).toEqual([0, 1, 2, 3]);
+    // The note type's freshness moved with it, as the removal path does.
+    expect(db.exec('SELECT mtime_secs, usn FROM notetypes WHERE id = 100')[0]!.values[0]).toEqual([
+      Math.floor(NOW_MS / 1000),
+      -1,
+    ]);
+    expect(verifyExportChanges(db, changes)).toEqual({ ok: true, mismatches: [] });
+  });
+
+  it('mints a card id past the collection own maximum, not off the clock', () => {
+    // Two designs in one export would collide on a millisecond-derived id, and
+    // an id already in `cards` would fail the primary key outright.
+    const db = normalizedTemplateDb();
+    const before = Number(db.exec('SELECT MAX(id) FROM cards')[0]!.values[0][0]);
+    applyExportChanges(db, addOnly(), { nowMs: NOW_MS, normalize: stripFieldHtml });
+    const created = db.exec(
+      'SELECT id, nid, did, ord, type, queue, ivl, factor, data FROM cards WHERE ord = 3',
+    )[0]!.values[0];
+    expect(Number(created[0])).toBe(before + 1);
+    expect([Number(created[1]), Number(created[2]), Number(created[3])]).toEqual([1001, 1, 3]);
+    // A brand-new card's own zero state, and `data` is `{}` — an empty string
+    // there makes newer Anki builds throw on open.
+    expect([Number(created[4]), Number(created[5]), Number(created[6]), Number(created[7])]).toEqual(
+      [0, 0, 0, 0],
+    );
+    expect(String(created[8])).toBe('{}');
+  });
+
+  it('schema 11: appends to col.models with the legacy keys', () => {
+    const db = fixtureDb();
+    const changes = addOnly({ ord: 1 });
+    const result = applyExportChanges(db, changes, { nowMs: NOW_MS, normalize: stripFieldHtml });
+    expect(result.templatesAdded).toBe(1);
+    expect(result.cardsCreated).toBe(1);
+    const models = JSON.parse(String(db.exec('SELECT models FROM col')[0]!.values[0][0])) as Record<
+      string,
+      { tmpls: Array<Record<string, unknown>> }
+    >;
+    expect(models['100'].tmpls.map((t) => t.ord)).toEqual([0, 1]);
+    expect(models['100'].tmpls[1]).toMatchObject({
+      name: 'Reverse',
+      ord: 1,
+      qfmt: '{{Reading}}',
+      did: null,
+    });
+    expect(verifyExportChanges(db, changes)).toEqual({ ok: true, mismatches: [] });
+  });
+
+  it('refuses a design that also adds a FIELD, by name and before any write', () => {
+    const db = normalizedTemplateDb();
+    const templatesBefore = db.exec('SELECT COUNT(*) FROM templates')[0]!.values[0][0];
+    let code = '';
+    try {
+      applyExportChanges(db, addOnly({ addedFieldName: 'Add Reverse' }), {
+        nowMs: NOW_MS,
+        normalize: stripFieldHtml,
+      });
+    } catch (err) {
+      code = err instanceof ExportRefusal ? err.code : 'not-a-refusal';
+    }
+    expect(code).toBe('template-field-unsupported');
+    // The negative control the refusal is worth nothing without: nothing landed.
+    expect(db.exec('SELECT COUNT(*) FROM templates')[0]!.values[0][0]).toEqual(templatesBefore);
+    expect(cardOrds(db)).toEqual([0, 1, 2]);
+  });
+
+  it('refuses an ord the source note type already holds', () => {
+    const db = normalizedTemplateDb();
+    expect(() =>
+      applyExportChanges(db, addOnly({ ord: 2 }), { nowMs: NOW_MS, normalize: stripFieldHtml }),
+    ).toThrow(ExportRefusal);
+    expect(cardOrds(db)).toEqual([0, 1, 2]);
+  });
+
+  it('refuses a note the source package does not hold', () => {
+    const db = normalizedTemplateDb();
+    let code = '';
+    try {
+      applyExportChanges(db, addOnly({ cards: [{ noteId: '9999', deckId: '1', due: 0 }] }), {
+        nowMs: NOW_MS,
+        normalize: stripFieldHtml,
+      });
+    } catch (err) {
+      code = err instanceof ExportRefusal ? err.code : 'not-a-refusal';
+    }
+    expect(code).toBe('note-missing');
+    expect(cardOrds(db)).toEqual([0, 1, 2]);
+  });
+
+  it('verification fails when the card row is missing, and when there are two', () => {
+    // The read-back is only worth something if it can fail. Both directions:
+    // no card at the new ord, and the duplicate a writer run twice would leave.
+    const db = normalizedTemplateDb();
+    const changes = addOnly();
+    applyExportChanges(db, changes, { nowMs: NOW_MS, normalize: stripFieldHtml });
+    db.run('DELETE FROM cards WHERE ord = 3');
+    expect(verifyExportChanges(db, changes).mismatches).toEqual([
+      'note 1001: 0 cards at template 3, expected 1',
+    ]);
+
+    const twice = normalizedTemplateDb();
+    applyExportChanges(twice, changes, { nowMs: NOW_MS, normalize: stripFieldHtml });
+    twice.run(
+      'INSERT INTO cards (id, nid, did, ord, mod, usn, type, queue, due, ivl, factor, reps, '
+        + 'lapses, left, odue, odid, flags) VALUES (9999,1001,1,3,0,0,0,0,0,0,0,0,0,0,0,0,0)',
+    );
+    expect(verifyExportChanges(twice, changes).mismatches).toEqual([
+      'note 1001: 2 cards at template 3, expected 1',
+    ]);
+  });
+
+  it('a design-only change set is not `nothing-to-export`', () => {
+    expect(exportChangesEmpty(addOnly())).toBe(false);
   });
 });

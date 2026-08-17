@@ -94,6 +94,42 @@ export interface ApkgExportDeckCreate {
  * derives both from the collection it is about to write, so the two cannot
  * disagree.
  */
+/**
+ * The card designer's reverse / optional-reverse, on its way to a package.
+ *
+ * It carries the CARDS, not just the template, and that is the whole point:
+ * adding a template to a note type does not by itself create a row in `cards`,
+ * and the draft has already decided — per note — which ones get one. An
+ * optional-reverse whose flag field is empty on 400 notes must add 400 fewer
+ * cards than the note type has notes, and only the draft knows that. A writer
+ * that generated cards from the template itself would silently disagree with
+ * the count the panel showed before Apply.
+ */
+export interface ApkgExportTemplateAdd {
+  /** The note type's id in the SOURCE package (Anki's `mid` / `notetypes.id`). */
+  noteTypeId: string;
+  /** The new template's ord in the SOURCE numbering — a design only ever appends. */
+  ord: number;
+  name: string;
+  qfmt: string;
+  afmt: string;
+  bqfmt: string;
+  bafmt: string;
+  /** `did` override for the cards this template generates, when the design set one. */
+  deckOverrideId?: string;
+  /**
+   * Set when the design ALSO added a field to the note type. The package writer
+   * refuses these by name (`template-field-unsupported`) rather than writing
+   * half of them: a new field means rewriting every note's `flds` in the source
+   * collection, which is a different and much larger change than adding a
+   * template, and one the draft's own field ords do not pin down for notes it
+   * never paged in.
+   */
+  addedFieldName?: string;
+  /** The rows to insert, one per note the design gave a card to. */
+  cards: Array<{ noteId: string; deckId: string; due: number }>;
+}
+
 export interface ApkgExportTemplateRemoval {
   /** The note type's id in the SOURCE package (Anki's `mid` / `notetypes.id`). */
   noteTypeId: string;
@@ -142,6 +178,8 @@ export interface ApkgExportChangeSet {
   deckCreates?: ApkgExportDeckCreate[];
   /** Absent on a payload written before recipe 17's remove half. */
   templateRemovals?: ApkgExportTemplateRemoval[];
+  /** Absent on a payload written before the card designer gained a destination. */
+  templateAdds?: ApkgExportTemplateAdd[];
   /**
    * The three gate-5 card-state lists, each absent on a payload written before
    * gate 5. Three fields rather than one `cardState` row per card, because the
@@ -193,6 +231,16 @@ export type ApkgExportErrorCode =
   | 'card-filtered'
   /** A template removal names a note type the source package does not hold. */
   | 'note-type-missing'
+  /**
+   * The design also added a FIELD to the note type. Adding a template is a
+   * write to the note type and one INSERT per card; adding a field additionally
+   * rewrites every note's `flds` in the source collection — including notes a
+   * paged draft never held — so it is refused by name instead of half-written.
+   * Reuse an existing field as the optional-reverse flag and the design exports.
+   */
+  | 'template-field-unsupported'
+  /** A template add names an ord the source note type already holds. */
+  | 'template-ord-taken'
   /** A template removal names an ord that note type has no template at. */
   | 'template-missing'
   /**
@@ -244,6 +292,10 @@ export interface ApkgExportResult {
    * two would report a deletion as an edit.
    */
   cardsDeleted?: number;
+  /** The card designer: card templates added to their note types. */
+  templatesAdded?: number;
+  /** Cards those adds created. Apart from `cardsUpdated` for `cardsDeleted`'s reason. */
+  cardsCreated?: number;
   /** The written file was re-read FROM DISK and every change was found in it. */
   verified?: boolean;
   /** Fingerprint of the new package's collection, for a later commit against it. */
@@ -288,7 +340,29 @@ export function buildApkgExportChanges(
   // numbering the ops are written in. See `sourceOrdMaps` below.
   const removedOrds = new Map<string, Set<number>>();
   const sourceOrdMaps = new Map<string, Map<number, number>>();
+  // Designs still standing, keyed by note type AND ord: two designs on one note
+  // type are two templates, not one folded into the other.
+  const added = new Map<string, ApkgExportTemplateAdd>();
   for (const op of journal.done) {
+    if (op.kind === 'template-add') {
+      // A design applied twice at the same ord cannot happen — `applyCardDesign`
+      // always appends past the last template — so this is an insert, not a fold.
+      // What DOES need care is a design later removed: `template-remove` below
+      // records the ord, and the two are reconciled after the loop.
+      added.set(`${op.noteTypeId}:${op.template.ord}`, {
+        noteTypeId: op.noteTypeId,
+        ord: op.template.ord,
+        name: op.template.name,
+        qfmt: op.template.qfmt,
+        afmt: op.template.afmt,
+        bqfmt: op.template.bqfmt,
+        bafmt: op.template.bafmt,
+        deckOverrideId: op.template.deckOverrideId,
+        addedFieldName: op.addedField?.name,
+        cards: op.cards.map((c) => ({ noteId: c.noteId, deckId: c.deckId, due: c.due })),
+      });
+      continue;
+    }
     if (op.kind === 'deck-name') {
       // Folded like every other op: a deck renamed twice exports once, and one
       // renamed back to its source name exports not at all.
@@ -442,11 +516,31 @@ export function buildApkgExportChanges(
   // to re-read against — a removed template is gone from the draft, so its
   // absence cannot distinguish "removed" from "undone"; an undone removal is
   // instead already absent from `journal.done`, which is what folds it away.
+  // A design the user then removed must cancel, and it cannot be left to the
+  // removal alone: the added template has no ord in the SOURCE package, so
+  // exporting the removal would refuse `template-missing` against a template the
+  // source never had. Re-read against the draft, exactly as a deck rename is —
+  // if the note type no longer holds this template, the design is gone.
+  const templateAdds: ApkgExportTemplateAdd[] = [];
+  const cancelled = new Set<string>();
+  for (const [key, add] of added) {
+    const noteType = draft.noteTypes.find((nt) => nt.id === add.noteTypeId);
+    const still = noteType?.templates.find((t) => t.ord === add.ord && t.name === add.name);
+    if (!noteType || !still) {
+      cancelled.add(key);
+      continue;
+    }
+    templateAdds.push(add);
+  }
+
   const templateRemovals: ApkgExportTemplateRemoval[] = [];
   for (const [noteTypeId, ords] of removedOrds) {
-    if (ords.size === 0) continue;
+    // Ords that only ever existed because a design created them: removing one is
+    // the cancel above and nothing needs to reach the package.
+    const real = [...ords].filter((ord) => !cancelled.has(`${noteTypeId}:${ord}`));
+    if (real.length === 0) continue;
     if (!draft.noteTypes.some((nt) => nt.id === noteTypeId)) continue;
-    templateRemovals.push({ noteTypeId, removedOrds: [...ords].sort((a, b) => a - b) });
+    templateRemovals.push({ noteTypeId, removedOrds: real.sort((a, b) => a - b) });
   }
 
   return {
@@ -456,6 +550,7 @@ export function buildApkgExportChanges(
     cardDeckMoves,
     deckCreates,
     templateRemovals,
+    templateAdds,
     cardFlags,
     cardQueues,
     cardScheduling,
@@ -476,6 +571,9 @@ export function exportChangesEmpty(changes: ApkgExportChangeSet): boolean {
     // fields describe, so leaving it out here would report `nothing-to-export`
     // about a package that has a template to drop.
     (changes.templateRemovals ?? []).length === 0 &&
+    // And the add, which is the same shape pointed the other way: a session
+    // whose only edit was a reverse-card design writes no note and no `due`.
+    (changes.templateAdds ?? []).length === 0 &&
     // Gate 5's three, for the same reason: a session that only suspended cards
     // writes no note and no `due`, and would otherwise export as nothing.
     (changes.cardFlags ?? []).length === 0 &&

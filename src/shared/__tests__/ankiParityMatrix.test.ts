@@ -140,9 +140,10 @@ describe('a read-only row has no write path, and that is proved not asserted', (
     const readOnly = ANKI_PARITY_ROWS.filter(
       (row) => row.package.support === 'read-only' && row.connect.support === 'read-only',
     );
-    // Eight since gate 5 moved flags, suspension and interval/ease out of this
-    // set; `card-review-counters` is what stayed behind of the old scheduling row.
-    expect(readOnly.length).toBe(8);
+    // Seven since the card designer's `template-add` gained a journal op and a
+    // package writer; `card-review-counters` is what stayed behind of the old
+    // scheduling row.
+    expect(readOnly.length).toBe(7);
     expect(readOnly.map((row) => row.id)).toContain('card-review-counters');
     for (const row of readOnly) {
       // This is the whole argument: `buildApkgExportChanges` folds the journal
@@ -225,9 +226,10 @@ describe('every row a destination will not write has an honest explanation', () 
         explained += 1;
       }
     }
-    // Both destinations refuse the eight read-only rows; connect also blocks
-    // three — the deck rename, the template removal, and gate 5's card flag.
-    expect(explained).toBe(19);
+    // Both destinations refuse the seven read-only rows; connect also blocks
+    // four — the deck rename, the template removal, the designer's template
+    // add, and gate 5's card flag. 7 × 2 + 4 = 18.
+    expect(explained).toBe(18);
   });
 
   it('offers no explanation it does not need — a supported cell has no why key', () => {
@@ -255,19 +257,26 @@ describe('the one surface whose Apply reaches neither destination says so', () =
     'DeckWorkbenchCardDesign.tsx',
   );
 
-  it('renders the draft-only line, and the matrix agrees that it must', () => {
-    // Tied to the row rather than standing alone: if `template-add` ever gains
-    // a journal op, this assertion fails and the panel's warning is revisited
-    // instead of quietly contradicting a button that now works.
+  it('renders the package-only line, and the matrix agrees that it must', () => {
+    // Tied to the row rather than standing alone, exactly as the draft-only
+    // version of this assertion was: it fired when `template-add` gained its
+    // journal op, which is what made the panel's warning get rewritten instead
+    // of quietly contradicting a button that now works. It still fires if the
+    // live cell ever changes, because the sentence names live specifically.
     const row = parityRow('template-add')!;
-    expect(row.journalOp).toBeNull();
-    expect(row.package.support).toBe('read-only');
-    expect(row.connect.support).toBe('read-only');
+    expect(row.journalOp).toBe('template-add');
+    expect(row.changeSetField).toBe('templateAdds');
+    expect(row.package.support).toBe('supported');
+    expect(row.connect.support).toBe('blocked');
+    expect(row.connect.refusal).toBe('template-add-unsupported');
 
     const source = readFileSync(PANEL, 'utf8');
-    expect(source).toContain("t('ankiWorkbench.design.draftOnly')");
+    expect(source).toContain("t('ankiWorkbench.design.packageOnly')");
+    // And no longer the sentence it replaced: leaving both rendered would say
+    // the package cannot add a template two lines above one saying it does.
+    expect(source).not.toContain("t('ankiWorkbench.design.draftOnly')");
     for (const lang of ['en', 'ja', 'zh', 'ru']) {
-      expect(catalogKeys(lang).has('ankiWorkbench.design.draftOnly'), lang).toBe(true);
+      expect(catalogKeys(lang).has('ankiWorkbench.design.packageOnly'), lang).toBe(true);
     }
   });
 
@@ -279,11 +288,11 @@ describe('the one surface whose Apply reaches neither destination says so', () =
     // the user reaches after deciding.
     const source = readFileSync(PANEL, 'utf8');
     const effect = source.indexOf("t('ankiWorkbench.design.effect'");
-    const draftOnly = source.indexOf("t('ankiWorkbench.design.draftOnly')");
+    const packageOnly = source.indexOf("t('ankiWorkbench.design.packageOnly')");
     const apply = source.indexOf("t('ankiWorkbench.design.apply')");
     expect(effect).toBeGreaterThan(-1);
-    expect(draftOnly).toBeGreaterThan(effect);
-    expect(draftOnly).toBeLessThan(apply);
+    expect(packageOnly).toBeGreaterThan(effect);
+    expect(packageOnly).toBeLessThan(apply);
   });
 });
 
@@ -427,7 +436,7 @@ describe('the blocked cells refuse for real, before any write', () => {
  * and the fix is to re-run the live score and update both numbers together.
  */
 describe('gate 14 canary: the partition the live score was recorded against', () => {
-  it('is 17 rows: connect 6 / 8 / 3 and package 9 / 8 / 0', () => {
+  it('is 17 rows: connect 6 / 7 / 4 and package 10 / 7 / 0', () => {
     const tally = (destination: AnkiParityDestination) =>
       ANKI_PARITY_ROWS.reduce(
         (acc, row) => {
@@ -438,11 +447,11 @@ describe('gate 14 canary: the partition the live score was recorded against', ()
       );
 
     expect(ANKI_PARITY_ROWS).toHaveLength(17);
-    expect(tally('connect')).toEqual({ supported: 6, 'read-only': 8, blocked: 3 });
-    expect(tally('package')).toEqual({ supported: 9, 'read-only': 8, blocked: 0 });
+    expect(tally('connect')).toEqual({ supported: 6, 'read-only': 7, blocked: 4 });
+    expect(tally('package')).toEqual({ supported: 10, 'read-only': 7, blocked: 0 });
   });
 
-  it('the three connect refuses are exactly what package supports and connect does not', () => {
+  it('the four connect refuses are exactly what package supports and connect does not', () => {
     // The live inverse control, mechanically: the panel's own delta between the
     // two destinations. Measured 2026-08-17 as 9 - 6 = 3 on the real component.
     const delta = ANKI_PARITY_ROWS.filter(
@@ -450,7 +459,7 @@ describe('gate 14 canary: the partition the live score was recorded against', ()
         parityCell(row, 'package').support === 'supported' &&
         parityCell(row, 'connect').support !== 'supported',
     ).map((row) => row.id);
-    expect(delta).toEqual(['card-flag', 'deck-name', 'template-remove']);
+    expect(delta).toEqual(['card-flag', 'deck-name', 'template-remove', 'template-add']);
     // Every one of them is `blocked` rather than read-only: a capability the
     // package writes and live Anki merely lacks a row for would be a gap, not a
     // refusal, and would render no code beside it. `parityRefusedRows` is the

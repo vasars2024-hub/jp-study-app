@@ -10211,6 +10211,8 @@ export const en: Catalog = {
     'You rejected every suggestion on {count} notes, so nothing is written to them.',
 
 
+  'ankiWorkbench.design.packageOnly':
+    'Exporting a package adds this card template and its cards for real. Writing to a live Anki collection does not: Anki would generate the cards itself, so the count above would stop being this workbench’s to guarantee.',
   'ankiWorkbench.design.draftOnly':
     'This changes the draft only. Neither exporting a package nor writing to Anki adds a card template, so the note type in your collection is left exactly as it is.',
 
@@ -10247,8 +10249,6 @@ export const en: Catalog = {
   'ankiWorkbench.parity.row.note-type-css': 'Note type styling',
   'ankiWorkbench.parity.row.deck-config': 'Deck options presets',
 
-  'ankiWorkbench.parity.why.package.template-add':
-    'A design changes this draft so you can check the cards it would generate. The export ships your edit history, which has no add-template step, so a new package carries the note type exactly as the source had it.',
   'ankiWorkbench.parity.why.package.note-marked':
     'The new package carries each note as marked or unmarked exactly as the source had it. No edit here changes that.',
   'ankiWorkbench.parity.why.package.card-review-counters':

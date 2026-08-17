@@ -74,6 +74,20 @@ export type ConnectCommitErrorCode =
    */
   | 'template-remove-unsupported'
   /**
+   * The card designer's add, live. AnkiConnect does have `modelTemplateAdd`, so
+   * this is refused for a reason the two above do not share: it would probably
+   * WORK, and that is the problem. Anki generates the cards itself from the new
+   * template's own front-side render, so which notes get a card is Anki's
+   * decision — while the draft has already told the user a number
+   * ("adds 3,180 cards") computed from its own paged view of the collection,
+   * which for an optional-reverse is a different rule applied to a different set
+   * of notes. Committing that live would make the panel's count a claim this
+   * workbench did not control and could not verify afterwards. Refused by name;
+   * exporting a package writes the template AND the exact card rows the draft
+   * counted, and reads them back.
+   */
+  | 'template-add-unsupported'
+  /**
    * Gate 5's flag third, live. AnkiConnect has no flag action; the only route is
    * `setSpecificValueOfCard` on `flags`, and that assigns the WHOLE column while
    * Anki keeps the colour in its low three bits and reserves the rest. The draft
@@ -460,6 +474,20 @@ export function planConnectCommit(
       removedOrds === 1
         ? 'Removing a card template cannot be committed to a live collection. Export a package instead.'
         : `Removing ${removedOrds} card templates cannot be committed to a live collection. Export a package instead.`,
+    );
+  }
+
+  // The designer's add, refused in the same place and for the same structural
+  // reason: before write #1, so a tray that also edits fields cannot land the
+  // field half and report the design as committed.
+  const adds = changes.templateAdds ?? [];
+  if (adds.length > 0) {
+    const cards = adds.reduce((sum, a) => sum + a.cards.length, 0);
+    throw new ConnectCommitRefusal(
+      'template-add-unsupported',
+      `Adding a card template cannot be committed to a live collection: Anki would generate the `
+        + `cards itself, so the ${cards} this design counted is not a number this workbench could `
+        + 'guarantee live. Export a package instead.',
     );
   }
 

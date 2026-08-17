@@ -23,6 +23,7 @@ import {
   planCardDesign,
   removeCardDesign,
   type AppliedCardDesign,
+  type CardDesignOp,
   type CardDesignKind,
   type CardDesignProblem,
 } from '../../../shared/ankiCardDesign';
@@ -33,9 +34,24 @@ import { ProblemLine } from './DeckWorkbenchPreview';
 export default function DeckWorkbenchCardDesign({
   draft,
   onDraft,
+  onDesignApplied,
+  onDesignRemoved,
 }: {
   draft: AnkiDraft;
   onDraft: (next: AnkiDraft) => void;
+  /**
+   * The design's journal op. Without it the panel's Apply reaches the draft and
+   * stops there — `buildApkgExportChanges` folds `journal.done` and nothing
+   * else, so an unjournalled design is a preview no destination can ship.
+   */
+  onDesignApplied: (op: CardDesignOp) => void;
+  /**
+   * The panel's own Remove. It takes the op back out of the journal rather than
+   * appending an inverse: there is no removal op for a template the SOURCE
+   * package never had, and a journal still carrying an add whose template is
+   * gone from the draft would claim an edit the user can see is not there.
+   */
+  onDesignRemoved: (noteTypeId: string, templateOrd: number) => void;
 }) {
   const { t } = useT();
   const standardTypes = useMemo(
@@ -163,13 +179,15 @@ export default function DeckWorkbenchCardDesign({
               </p>
 
               {/* The other half of the consequence, and the one the number above
-                  reads as a promise about. `applyCardDesign` returns a new draft
-                  and never touches the edit journal, and the journal is the only
-                  thing either destination receives — so these cards exist here
-                  and nowhere else. Row `template-add` in `ankiParityMatrix.ts`
-                  is the matching claim, read-only on both destinations, and a
-                  test ties this sentence to it so the two cannot drift. */}
-              <p className="muted wb-design-draft-only">{t('ankiWorkbench.design.draftOnly')}</p>
+                  reads as a promise about. It used to say "draft only", which was
+                  true and is not any more: `applyCardDesign` now returns a
+                  journal op, so the package writes the template and these exact
+                  card rows. Live is still refused, and the sentence says which is
+                  which rather than a single "may not apply". Row `template-add`
+                  in `ankiParityMatrix.ts` is the matching claim — supported on
+                  the package, blocked on connect — and a test ties this sentence
+                  to it so the two cannot drift. */}
+              <p className="muted wb-design-draft-only">{t('ankiWorkbench.design.packageOnly')}</p>
 
               {plan.problems.length > 0 && (
                 <ul className="wb-design-problems" aria-label={t('ankiWorkbench.design.problems')}>
@@ -222,6 +240,7 @@ export default function DeckWorkbenchCardDesign({
                   const result = applyCardDesign(draft, plan);
                   setApplied((prev) => [...prev, result.applied]);
                   onDraft(result.draft);
+                  onDesignApplied(result.op);
                 }}
               >
                 {t('ankiWorkbench.design.apply')}
@@ -246,6 +265,7 @@ export default function DeckWorkbenchCardDesign({
                 className="btn"
                 onClick={() => {
                   onDraft(removeCardDesign(draft, a));
+                  onDesignRemoved(a.noteTypeId, a.templateOrd);
                   setApplied((prev) => prev.filter((x) => x !== a));
                 }}
               >

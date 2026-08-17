@@ -8,6 +8,8 @@ import {
   removeCardDesign,
   type CardDesignRequest,
 } from '../ankiCardDesign';
+import { buildApkgExportChanges, exportChangesEmpty } from '../ankiApkgExport';
+import { redoLastEdit, undoLastEdit } from '../ankiDraftEdit';
 import { renderAnkiCard } from '../ankiTemplateRender';
 
 function field(ord: number, name: string, raw: string) {
@@ -358,5 +360,83 @@ describe('the conditional card that Anki never generates', () => {
     const rendered = renderAnkiCard(draftOf([blank]), blank, 0);
     expect(rendered.problems.map((p) => p.code)).toContain('empty-question');
     expect(rendered.problems.map((p) => p.code)).not.toContain('conditional-card-not-generated');
+  });
+});
+
+describe('the design reaches a destination — the journal op', () => {
+    it('returns an op carrying the template and the exact rows it created', () => {
+    const draft = draftOf([note({ id: 'n1' }), note({ id: 'n2' })]);
+    const { applied, op } = applyCardDesign(draft, planCardDesign(draft, reverse));
+    expect(op.kind).toBe('template-add');
+    expect(op.noteTypeId).toBe('basic');
+    expect(op.template.ord).toBe(applied.templateOrd);
+    expect(op.addedField).toBeNull();
+    // The rows verbatim, and the same ones the panel counted — not a promise
+    // that the writer will generate one per note.
+    expect(op.cards.map((c) => c.id)).toEqual(applied.cardIds);
+    expect(op.cards.every((c) => c.ord === op.template.ord)).toBe(true);
+  });
+
+  it('exports as `templateAdds`, with the cards the draft chose', () => {
+    const draft = draftOf([note({ id: 'n1' }), note({ id: 'n2' })]);
+    const { draft: next, op } = applyCardDesign(draft, planCardDesign(draft, reverse));
+    const changes = buildApkgExportChanges(next, { done: [op], undone: [] });
+    expect(changes.templateAdds).toHaveLength(1);
+    const add = changes.templateAdds![0];
+    expect(add.noteTypeId).toBe('basic');
+    expect(add.ord).toBe(op.template.ord);
+    expect(add.qfmt).toBe(op.template.qfmt);
+    expect(add.cards.map((c) => c.noteId)).toEqual(op.cards.map((c) => c.noteId));
+    expect(exportChangesEmpty(changes)).toBe(false);
+  });
+
+  it('cancels when the design is removed again — the export carries nothing', () => {
+    // The panel's Remove takes the op out of the journal, but the fold must not
+    // depend on that: it re-reads the draft, exactly as a deck rename does.
+    const draft = draftOf([note({ id: 'n1' }), note({ id: 'n2' })]);
+    const { draft: next, applied, op } = applyCardDesign(draft, planCardDesign(draft, reverse));
+    const back = removeCardDesign(next, applied);
+    const changes = buildApkgExportChanges(back, { done: [op], undone: [] });
+    expect(changes.templateAdds).toEqual([]);
+    expect(exportChangesEmpty(changes)).toBe(true);
+  });
+
+  it('undo takes back the template, the cards and the note ids; redo restores them', () => {
+    const draft = draftOf([note({ id: 'n1' }), note({ id: 'n2' })]);
+    const { draft: next, op } = applyCardDesign(draft, planCardDesign(draft, reverse));
+    const journal = { done: [op], undone: [] };
+    const undone = undoLastEdit(next, journal, (s) => s);
+    expect(undone.changed).toBe(true);
+    expect(undone.draft.noteTypes[0].templates.map((t) => t.ord)).toEqual(
+      draft.noteTypes[0].templates.map((t) => t.ord),
+    );
+    expect(undone.draft.cards).toEqual(draft.cards);
+    expect(undone.draft.notes.map((n) => n.cardIds)).toEqual(draft.notes.map((n) => n.cardIds));
+
+    const redone = redoLastEdit(undone.draft, undone.journal, (s) => s);
+    expect(redone.draft.cards.map((c) => c.id)).toEqual(next.cards.map((c) => c.id));
+    expect(redone.draft.noteTypes[0].templates.map((t) => t.ord)).toEqual(
+      next.noteTypes[0].templates.map((t) => t.ord),
+    );
+    expect(redone.draft.notes.map((n) => n.cardIds)).toEqual(next.notes.map((n) => n.cardIds));
+  });
+
+  it('an optional-reverse that adds a field takes that field back on undo too', () => {
+    // The half a card-and-template-only inverse would leave behind: every note
+    // of the type would stay one field longer than its own note type says.
+    const draft = draftOf([note({ id: 'n1' }), note({ id: 'n2' })]);
+    const optional: CardDesignRequest = { ...reverse, kind: 'optional-reverse' };
+    const { draft: next, op } = applyCardDesign(draft, planCardDesign(draft, optional));
+    expect(op.addedField).not.toBeNull();
+    const fieldName = op.addedField!.name;
+    expect(next.noteTypes[0].fields.some((f) => f.name === fieldName)).toBe(true);
+    expect(next.notes.every((n) => n.fields.some((f) => f.name === fieldName))).toBe(true);
+
+    const undone = undoLastEdit(next, { done: [op], undone: [] }, (s) => s);
+    expect(undone.draft.noteTypes[0].fields.some((f) => f.name === fieldName)).toBe(false);
+    expect(undone.draft.notes.some((n) => n.fields.some((f) => f.name === fieldName))).toBe(false);
+    expect(undone.draft.notes.map((n) => n.fields.length)).toEqual(
+      draft.notes.map((n) => n.fields.length),
+    );
   });
 });

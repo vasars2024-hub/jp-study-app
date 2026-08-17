@@ -9690,6 +9690,8 @@ export const zh: Catalog = {
     '你拒绝了 {count} 条笔记的全部建议，因此不会向它们写入任何内容。',
 
 
+  'ankiWorkbench.design.packageOnly':
+    '导出软件包会真正添加这个卡片模板及其卡片。写入正在运行的 Anki 收藏则不会：Anki 会自己生成卡片，因此上面的数量将不再是这个工作台能保证的。',
   'ankiWorkbench.design.draftOnly':
     '这只会修改草稿。导出软件包和写入 Anki 都不会添加卡片模板，因此你收藏中的笔记类型保持原样。',
 
@@ -9724,8 +9726,6 @@ export const zh: Catalog = {
   'ankiWorkbench.parity.row.note-type-css': '笔记类型的样式',
   'ankiWorkbench.parity.row.deck-config': '牌组选项预设',
 
-  'ankiWorkbench.parity.why.package.template-add':
-    '设计会修改当前草稿，让你查看它将生成哪些卡片。导出发送的是你的编辑历史，其中没有“添加模板”这一步，因此新软件包中的笔记类型与源文件完全一致。',
   'ankiWorkbench.parity.why.package.note-marked':
     '每条笔记是否被标记，都会按源文件原样写入新软件包。这里的编辑不会改变它。',
   'ankiWorkbench.parity.why.package.card-review-counters':

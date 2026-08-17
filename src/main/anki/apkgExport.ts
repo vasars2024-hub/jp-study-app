@@ -193,6 +193,8 @@ export async function exportApkg(request: ApkgExportRequest): Promise<ApkgExport
       decksUpdated: applied.decksUpdated,
       templatesRemoved: applied.templatesRemoved,
       cardsDeleted: applied.cardsDeleted,
+      templatesAdded: applied.templatesAdded,
+      cardsCreated: applied.cardsCreated,
       verified: true,
       fingerprint: newFingerprint,
     };

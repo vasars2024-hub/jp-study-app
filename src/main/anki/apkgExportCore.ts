@@ -19,7 +19,12 @@ import {
   encodeCardQueue,
   splitNoteFields,
 } from '../../shared/ankiDraft';
-import type { ApkgExportChangeSet, ApkgExportErrorCode } from '../../shared/ankiApkgExport';
+import type {
+  ApkgExportChangeSet,
+  ApkgExportErrorCode,
+  ApkgExportTemplateAdd,
+} from '../../shared/ankiApkgExport';
+import { encodeTemplateConfig } from './ankiProtoConfig';
 import { readRawCollection, type SqlReadable } from './apkgDraftRead';
 
 /** What sql.js will bind: its own `SqlValue`, minus BigInt which Anki never needs. */
@@ -94,6 +99,14 @@ export interface ApplyExportResult {
   decksUpdated: number;
   /** Recipe 17's remove half: card templates dropped from their note types. */
   templatesRemoved: number;
+  /** The card designer's add: card templates written into their note types. */
+  templatesAdded: number;
+  /**
+   * Cards those adds INSERTED. Reported separately from `cardsUpdated` for
+   * `cardsDeleted`'s reason pointed the other way — a created row is not an
+   * updated one, and one total would hide which of the two happened.
+   */
+  cardsCreated: number;
   /**
    * Cards those removals DELETED. Reported separately from `cardsUpdated`
    * because it is the only number in this result that describes destruction, and
@@ -570,12 +583,20 @@ export function applyExportChanges(
     renumber: Array<{ from: number; to: number }>;
   }
   const templateRemovals = changes.templateRemovals ?? [];
+  const templateAdds = changes.templateAdds ?? [];
   const removalPlans: TemplateRemovalPlan[] = [];
-  const templates = templateRemovals.length > 0 ? templateStorage(db) : 'none';
+  const templates =
+    templateRemovals.length > 0 || templateAdds.length > 0 ? templateStorage(db) : 'none';
   if (templateRemovals.length > 0 && templates === 'none') {
     throw new ExportRefusal(
       'template-storage-unsupported',
       'This package stores no readable note-type list, so a card template cannot be removed from it.',
+    );
+  }
+  if (templateAdds.length > 0 && templates === 'none') {
+    throw new ExportRefusal(
+      'template-storage-unsupported',
+      'This package stores no readable note-type list, so a card template cannot be added to it.',
     );
   }
   for (const removal of templateRemovals) {
@@ -612,6 +633,63 @@ export function applyExportChanges(
       if (ord !== index) renumber.push({ from: ord, to: index });
     });
     removalPlans.push({ noteTypeId: removal.noteTypeId, removedOrds: removed, renumber });
+  }
+
+  // The card designer's destination. The change set carries the cards the DRAFT
+  // decided on rather than letting this writer generate one per note, because an
+  // optional-reverse gives a card only to the notes whose flag field is set —
+  // and only the draft knows which those are. Generating here would silently
+  // disagree with the count the design panel showed before Apply.
+  interface TemplateAddPlan {
+    noteTypeId: string;
+    add: ApkgExportTemplateAdd;
+    /** `{ id, nid, did }` per row, ids minted here and unique in this package. */
+    cards: Array<{ id: number | string; nid: number | string; did: number | string; due: number }>;
+  }
+  const addPlans: TemplateAddPlan[] = [];
+  // Minted from the collection's own maximum, not from the clock: a package
+  // written twice in one millisecond would otherwise collide with itself, and an
+  // id already in `cards` would make the INSERT fail on the primary key.
+  let nextCardId = Number(firstRow(db, 'SELECT COALESCE(MAX(id), 0) FROM cards', [])?.[0] ?? 0);
+  for (const add of templateAdds) {
+    if (templates === 'none') break; // unreachable — refused above
+    if (add.addedFieldName) {
+      throw new ExportRefusal(
+        'template-field-unsupported',
+        `This design also adds the field “${add.addedFieldName}” to note type ${add.noteTypeId}. `
+          + 'Adding a field rewrites every note in the collection, including notes this draft never '
+          + 'loaded, so it is refused rather than half-written. Choose an existing field as the '
+          + 'reverse flag and the design exports.',
+      );
+    }
+    const present = templateOrdsOf(db, templates, add.noteTypeId);
+    if (!present) {
+      throw new ExportRefusal(
+        'note-type-missing',
+        `Note type ${add.noteTypeId} is not in the source package.`,
+      );
+    }
+    if (present.includes(add.ord)) {
+      throw new ExportRefusal(
+        'template-ord-taken',
+        `Note type ${add.noteTypeId} already has a card template at position ${add.ord + 1}, so `
+          + 'this design was computed against a different version of the package.',
+      );
+    }
+    const rows: TemplateAddPlan['cards'] = [];
+    for (const card of add.cards) {
+      const note = firstRow(db, 'SELECT id FROM notes WHERE id = ?', [idParam(card.noteId)]);
+      if (!note) {
+        throw new ExportRefusal(
+          'note-missing',
+          `Note ${card.noteId} is not in the source package.`,
+        );
+      }
+      nextCardId += 1;
+      const target = realDeckId.get(card.deckId) ?? card.deckId;
+      rows.push({ id: nextCardId, nid: idParam(card.noteId), did: idParam(target), due: card.due });
+    }
+    addPlans.push({ noteTypeId: add.noteTypeId, add, cards: rows });
   }
 
   // --- write
@@ -772,11 +850,87 @@ export function applyExportChanges(
     db.run('UPDATE col SET models = ?', [JSON.stringify(parsed)]);
   }
 
+  // The designer's add, after the removals: a session that removed one template
+  // and designed another must not have its new template land on an ord the
+  // removal is about to vacate and renumber into.
+  let templatesAdded = 0;
+  let cardsCreated = 0;
+  for (const plan of addPlans) {
+    const mid = idParam(plan.noteTypeId);
+    const { add } = plan;
+    if (templates === 'table') {
+      db.run(
+        'INSERT INTO templates (ntid, ord, name, mtime_secs, usn, config) VALUES (?, ?, ?, ?, -1, ?)',
+        [
+          mid,
+          add.ord,
+          add.name,
+          modSec,
+          encodeTemplateConfig({
+            qfmt: add.qfmt,
+            afmt: add.afmt,
+            bqfmt: add.bqfmt || undefined,
+            bafmt: add.bafmt || undefined,
+          }),
+        ],
+      );
+      db.run('UPDATE notetypes SET mtime_secs = ?, usn = -1 WHERE id = ?', [modSec, mid]);
+    }
+    for (const row of plan.cards) {
+      // Every column written explicitly, with a new card's own zero state. `data`
+      // is the empty JSON object Anki writes for a card with no custom data —
+      // an empty STRING there makes newer Anki builds throw on open.
+      db.run(
+        'INSERT INTO cards (id, nid, did, ord, mod, usn, type, queue, due, ivl, factor, reps, '
+          + "lapses, left, odue, odid, flags, data) VALUES (?, ?, ?, ?, ?, -1, 0, 0, ?, 0, 0, 0, 0, 0, 0, 0, 0, '{}')",
+        [row.id, row.nid, row.did, add.ord, modSec, row.due],
+      );
+      cardsCreated += 1;
+    }
+    templatesAdded += 1;
+  }
+  if (templates === 'models' && addPlans.length > 0) {
+    const raw = firstRow(db, 'SELECT models FROM col LIMIT 1', [])?.[0];
+    const parsed = JSON.parse(String(raw)) as Record<
+      string,
+      { tmpls?: Array<Record<string, unknown>>; mod?: number; usn?: number }
+    >;
+    for (const plan of addPlans) {
+      const model = parsed[plan.noteTypeId];
+      if (!model) continue; // unreachable — validated above
+      const { add } = plan;
+      parsed[plan.noteTypeId] = {
+        ...model,
+        tmpls: [
+          ...(model.tmpls ?? []),
+          {
+            name: add.name,
+            ord: add.ord,
+            qfmt: add.qfmt,
+            afmt: add.afmt,
+            bqfmt: add.bqfmt,
+            bafmt: add.bafmt,
+            // Schema-11's own key for a template deck override, `null` when there
+            // is none — which is what Anki writes, not an absent key.
+            did: add.deckOverrideId ? Number(add.deckOverrideId) : null,
+            bfont: '',
+            bsize: 0,
+          },
+        ],
+        mod: modSec,
+        usn: -1,
+      };
+    }
+    db.run('UPDATE col SET models = ?', [JSON.stringify(parsed)]);
+  }
+
   // `col.mod` is epoch milliseconds in both schemas.
   db.run('UPDATE col SET mod = ?', [options.nowMs]);
 
   return {
     templatesRemoved,
+    templatesAdded,
+    cardsCreated,
     cardsDeleted,
     notesUpdated: notePlans.length,
     // Distinct card ROWS written. A card both repositioned and refiled counts
@@ -899,6 +1053,31 @@ export function verifyExportChanges(
       const row = firstRow(db, 'SELECT did FROM cards WHERE id = ?', [idParam(move.cardId)]);
       if (!row) mismatches.push(`card ${move.cardId}: missing`);
       else if (String(row[0]) !== expected) mismatches.push(`card ${move.cardId}: deck differs`);
+    }
+  }
+  // The designer's add, checked WRITER-INDEPENDENTLY: the card is found by its
+  // note and the template's ord, never by the id `applyExportChanges` minted.
+  // That makes this a real read-back — it confirms the row Anki itself would
+  // pair with the new template exists, which is the whole claim the design made.
+  for (const add of changes.templateAdds ?? []) {
+    const storage = templateStorage(db);
+    const ords = storage === 'none' ? undefined : templateOrdsOf(db, storage, add.noteTypeId);
+    if (!ords?.includes(add.ord)) {
+      mismatches.push(`note type ${add.noteTypeId}: template at ${add.ord} missing`);
+      continue;
+    }
+    for (const card of add.cards) {
+      const row = firstRow(db, 'SELECT COUNT(*) FROM cards WHERE nid = ? AND ord = ?', [
+        idParam(card.noteId),
+        add.ord,
+      ]);
+      const count = Number(row?.[0] ?? 0);
+      // Exactly one, not "at least one": two rows at the same `nid`/`ord` is the
+      // duplicate Anki reports as a corrupt collection, and a writer that ran
+      // twice would otherwise verify clean.
+      if (count !== 1) {
+        mismatches.push(`note ${card.noteId}: ${count} cards at template ${add.ord}, expected 1`);
+      }
     }
   }
   return { ok: mismatches.length === 0, mismatches };

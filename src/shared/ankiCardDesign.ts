@@ -36,6 +36,7 @@ import type {
   AnkiDraftNoteType,
   AnkiDraftTemplate,
 } from './ankiDraft';
+import type { AnkiDraftEditOp } from './ankiDraftEdit';
 import { fieldIsEmpty } from './ankiTemplateRender';
 
 export type CardDesignKind = 'reverse' | 'optional-reverse';
@@ -295,9 +296,21 @@ export interface AppliedCardDesign {
   cardIds: string[];
 }
 
+/** The `template-add` member of the op union, named so callers need not narrow. */
+export type CardDesignOp = Extract<AnkiDraftEditOp, { kind: 'template-add' }>;
+
 export interface CardDesignApplyResult {
   draft: AnkiDraft;
   applied: AppliedCardDesign;
+  /**
+   * The journal op this design *is*. Returned rather than appended here, because
+   * this module owns no journal — the workbench does — but without it the design
+   * reaches no destination at all: `buildApkgExportChanges` folds `journal.done`
+   * and nothing else, so before this existed a designed reverse card was a
+   * preview that could never be exported (gate 14's finding, 3,180 unexportable
+   * cards on a real deck).
+   */
+  op: CardDesignOp;
 }
 
 /** A card id no other card in the draft holds. */
@@ -389,6 +402,16 @@ export function applyCardDesign(draft: AnkiDraft, plan: CardDesignPlan): CardDes
       templateName: template.name,
       addedFieldName: addedField?.name ?? null,
       cardIds,
+    },
+    op: {
+      kind: 'template-add',
+      noteTypeId: plan.request.noteTypeId,
+      template,
+      addedField: addedField ?? null,
+      // The rows verbatim, exactly as `template-remove` carries the rows it
+      // deleted: the inverse must take back what THIS design made and not what
+      // a later edit added at the same ord.
+      cards: newCards,
     },
   };
 }

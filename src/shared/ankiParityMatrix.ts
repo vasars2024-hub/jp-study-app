@@ -175,14 +175,16 @@ export const ANKI_PARITY_ROWS: readonly AnkiParityRow[] = [
     connect: { support: 'blocked', refusal: 'template-remove-unsupported' },
   },
   {
-    // The card designer applies into the DRAFT (`applyCardDesign` returns a new
-    // draft), never into the journal, so a designed reverse card is a preview
-    // the export cannot ship. Read-only on both sides, and the panel says so.
+    // The card designer. Read-only on both sides until `applyCardDesign` gained
+    // a journal op; the package now writes the template AND the exact card rows
+    // the draft counted, and reads them back. Live stays blocked — not for want
+    // of an AnkiConnect action but because Anki would generate the cards itself,
+    // so the panel's count would stop being this workbench's to guarantee.
     id: 'template-add',
-    journalOp: null,
-    changeSetField: null,
-    package: READ_ONLY,
-    connect: READ_ONLY,
+    journalOp: 'template-add',
+    changeSetField: 'templateAdds',
+    package: { support: 'supported', refusal: null, conditional: 'template-storage-unsupported' },
+    connect: { support: 'blocked', refusal: 'template-add-unsupported' },
   },
   { id: 'note-marked', journalOp: null, changeSetField: null, package: READ_ONLY, connect: READ_ONLY },
   {
@@ -221,6 +223,7 @@ export const JOURNAL_OP_COVERAGE: Record<AnkiDraftEditOp['kind'], string> = {
   'card-flag': 'card-flag',
   'deck-name': 'deck-name',
   'template-remove': 'template-remove',
+  'template-add': 'template-add',
 };
 
 /**
@@ -239,6 +242,7 @@ export const CHANGE_SET_COVERAGE: Record<keyof Required<ApkgExportChangeSet>, st
   cardDeckMoves: 'card-deck',
   deckCreates: 'card-deck',
   templateRemovals: 'template-remove',
+  templateAdds: 'template-add',
   cardFlags: 'card-flag',
   cardQueues: 'card-queue',
   cardScheduling: 'card-scheduling',

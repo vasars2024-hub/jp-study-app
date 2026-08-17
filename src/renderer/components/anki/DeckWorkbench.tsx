@@ -798,7 +798,34 @@ export default function DeckWorkbench() {
             {/* A card design changes the note type, not the selected notes, so
                 it sits beside the tray rather than inside it, reads no selection
                 and is offered even when the tray cannot be. */}
-            {flow.current === 'fields' && <DeckWorkbenchCardDesign draft={draft} onDraft={setDraft} />}
+            {flow.current === 'fields' && (
+              <DeckWorkbenchCardDesign
+                draft={draft}
+                onDraft={setDraft}
+                // Appended like any other edit, and it forks the redo history
+                // for the same reason every edit does: a design applied after an
+                // undo makes the undone ops unreachable.
+                onDesignApplied={(op) =>
+                  setJournal((prev) => ({ done: [...prev.done, op], undone: [] }))
+                }
+                // Taken back out rather than inverted. There is no removal op for
+                // a template the source package never had, and the fold in
+                // `buildApkgExportChanges` cancels it either way by re-reading
+                // the draft — this keeps the journal from claiming an edit the
+                // user can see is gone.
+                onDesignRemoved={(noteTypeId, templateOrd) =>
+                  setJournal((prev) => ({
+                    done: prev.done.filter(
+                      (op) =>
+                        op.kind !== 'template-add'
+                        || op.noteTypeId !== noteTypeId
+                        || op.template.ord !== templateOrd,
+                    ),
+                    undone: prev.undone,
+                  }))
+                }
+              />
+            )}
             {selectedIds.length === 0 ? (
               // Step 2 will not pass on an empty selection, so this is the paged
               // case: a selection that stands for notes none of which are

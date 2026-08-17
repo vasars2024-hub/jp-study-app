@@ -9776,6 +9776,8 @@ export const ja: Catalog = {
     '{count} 件のノートではすべての候補を却下したため、何も書き込まれません。',
 
 
+  'ankiWorkbench.design.packageOnly':
+    'パッケージを書き出すとこのカードテンプレートとカードが実際に追加されます。稼働中の Anki コレクションへの書き込みでは追加されません。Anki 自身がカードを生成するため、上の件数をこのワークベンチが保証できなくなるからです。',
   'ankiWorkbench.design.draftOnly':
     'これはドラフトだけを変更します。パッケージの書き出しでも Anki への書き込みでもカードテンプレートは追加されないため、コレクションのノートタイプはそのまま残ります。',
 
@@ -9811,8 +9813,6 @@ export const ja: Catalog = {
   'ankiWorkbench.parity.row.note-type-css': 'ノートタイプのスタイル',
   'ankiWorkbench.parity.row.deck-config': 'デッキオプションのプリセット',
 
-  'ankiWorkbench.parity.why.package.template-add':
-    'デザインはこのドラフトを変更し、生成されるカードを確認できるようにします。書き出しには編集履歴が反映されますが、テンプレートを追加する操作は履歴にないため、新しいパッケージには元のノートタイプがそのまま入ります。',
   'ankiWorkbench.parity.why.package.note-marked':
     '各ノートのマークの有無は、元のまま新しいパッケージに書き込まれます。ここでの編集では変わりません。',
   'ankiWorkbench.parity.why.package.card-review-counters':

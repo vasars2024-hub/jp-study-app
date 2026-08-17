@@ -173,6 +173,41 @@ export function decodeTemplateConfig(value: unknown): AnkiTemplateConfig | null 
   };
 }
 
+/**
+ * Encode `templates.config` for a template this export ADDS.
+ *
+ * The inverse of `decodeTemplateConfig` and deliberately only that: it writes
+ * fields 1-4 and nothing else. A schema-18 template config can carry more (a
+ * deck override, browser font and size), but every one of those is optional in
+ * the wire format and absent on most real templates — the survey at the top of
+ * this file measured `bqfmt` on 6 of 187. Writing only what the workbench models
+ * means a template it adds cannot claim a setting the draft never held, and Anki
+ * fills the rest with its own defaults on open.
+ *
+ * Round-tripped by the test suite through `decodeTemplateConfig`, so the two
+ * halves cannot drift.
+ */
+export function encodeTemplateConfig(config: AnkiTemplateConfig): Uint8Array {
+  const out: number[] = [];
+  const put = (field: number, value: string | undefined): void => {
+    if (!value) return; // An empty format is absent, which is how Anki writes it.
+    const bytes = new TextEncoder().encode(value);
+    out.push((field << 3) | 2); // wire type 2, length-delimited
+    let n = bytes.length;
+    do {
+      const byte = n & 0x7f;
+      n >>>= 7;
+      out.push(n > 0 ? byte | 0x80 : byte);
+    } while (n > 0);
+    for (const b of bytes) out.push(b);
+  };
+  put(1, config.qfmt);
+  put(2, config.afmt);
+  put(3, config.bqfmt);
+  put(4, config.bafmt);
+  return new Uint8Array(out);
+}
+
 /** A cloze note type is the one whose template asks for a cloze deletion. */
 export function templatesLookCloze(templates: readonly { qfmt?: string }[]): boolean {
   return templates.some((t) => (t.qfmt ?? '').includes('{{cloze:'));
