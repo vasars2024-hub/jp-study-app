@@ -9279,7 +9279,13 @@ export const en: Catalog = {
   'ankiWorkbench.apply.error.last-template':
     'That would remove every card template of a note type, leaving its notes generating no cards at all. Nothing was written — keep at least one template.',
   'ankiWorkbench.apply.error.template-storage-unsupported':
-    'This package stores no readable note-type list, so a card template cannot be removed from it. Nothing was written — every other edit exports from this package normally.',
+    'This package stores no readable note-type list, so a card template cannot be added to it or removed from it. Nothing was written — every other edit exports from this package normally.',
+  'ankiWorkbench.apply.error.template-ord-taken':
+    'This card design was worked out against a different version of the package: the note type already has a template at that position. Nothing was written — re-read the source and design it again.',
+  'ankiWorkbench.apply.error.template-name-taken':
+    'That note type already has a card template with this name. Anki compares template names without regard to case, so the two would collide. Nothing was written — give the design a different name.',
+  'ankiWorkbench.apply.error.template-field-unsupported':
+    'This card design also adds a new field to the note type, which would rewrite every note in the collection — including notes this session never loaded — so it is refused rather than half-written. Nothing was written. Choose a field the note type already has as the reverse flag and the design exports.',
   'ankiWorkbench.apply.error.compressed-unsupported':
     'This package uses a newer compressed format that cannot be written yet. Nothing was written.',
   'ankiWorkbench.apply.error.verify-failed':

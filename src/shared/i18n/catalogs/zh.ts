@@ -8803,7 +8803,13 @@ export const zh: Catalog = {
   'ankiWorkbench.apply.error.last-template':
     '这会删除某个笔记类型的全部卡片模板，使其笔记再也无法生成任何卡片。未写入任何内容 — 请至少保留一个模板。',
   'ankiWorkbench.apply.error.template-storage-unsupported':
-    '此牌组包没有保存可读取的笔记类型列表，因此无法从中删除卡片模板。未写入任何内容 — 其他编辑仍可从此包正常导出。',
+    '此牌组包没有保存可读取的笔记类型列表，因此无法向其中添加或从中删除卡片模板。未写入任何内容 — 其他编辑仍可从此包正常导出。',
+  'ankiWorkbench.apply.error.template-ord-taken':
+    '此卡片设计是基于该包的另一个版本得出的：该笔记类型在那个位置上已经有模板了。未写入任何内容 — 请重新读取源文件后再设计一次。',
+  'ankiWorkbench.apply.error.template-name-taken':
+    '该笔记类型已经有同名的卡片模板。Anki 比较模板名称时不区分大小写，因此两者会冲突。未写入任何内容 — 请为该设计另取一个名称。',
+  'ankiWorkbench.apply.error.template-field-unsupported':
+    '此卡片设计还会向笔记类型添加一个新字段，这将重写集合中的每一条笔记 — 包括本次会话从未加载的笔记 — 因此它被拒绝，而不是只写入一半。未写入任何内容。请选择该笔记类型已有的字段作为反向标记字段，这样设计就能导出。',
   'ankiWorkbench.apply.error.compressed-unsupported':
     '此包使用了尚不支持写入的较新压缩格式。未写入任何内容。',
   'ankiWorkbench.apply.error.verify-failed': '写入的文件未通过回读校验，不可信任。请删除后重试。',

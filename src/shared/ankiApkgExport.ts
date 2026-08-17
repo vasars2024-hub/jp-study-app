@@ -241,6 +241,14 @@ export type ApkgExportErrorCode =
   | 'template-field-unsupported'
   /** A template add names an ord the source note type already holds. */
   | 'template-ord-taken'
+  /**
+   * A template add names a template name that note type already has, comparing
+   * without case. Anki's `templates.name` carries its own `unicase` collation,
+   * which sql.js cannot evaluate — so this uniqueness is checked here instead of
+   * being left to the UNIQUE index the write runs without. See
+   * `withoutMissingCollation` in `apkgExportCore.ts`.
+   */
+  | 'template-name-taken'
   /** A template removal names an ord that note type has no template at. */
   | 'template-missing'
   /**

@@ -1367,4 +1367,121 @@ describe('the card designer writes into a package', () => {
   it('a design-only change set is not `nothing-to-export`', () => {
     expect(exportChangesEmpty(addOnly())).toBe(false);
   });
+
+  // ----- Anki's own `unicase` collation ------------------------------------
+  //
+  // The live run on the user's real 2,991-note ver-18 package is what put these
+  // here: `INSERT INTO templates` threw "no such collation sequence: unicase",
+  // because schema 18 declares `templates.name COLLATE unicase` and puts a
+  // UNIQUE index over `(name, ntid)` that the insert has to maintain. Every
+  // package current Anki writes is shaped that way, so refusing would have made
+  // the designer unusable on real data.
+  //
+  // sql.js rejects the collation in a CREATE TABLE, so — exactly as the deck
+  // fixture above does — a real package can only ever arrive with it already in
+  // the stored schema, and the fixture puts it there through `writable_schema`.
+  function unicaseTemplateDb(): Database {
+    const db = normalizedTemplateDb();
+    // The index is what makes the collation load-bearing: a `COLLATE unicase`
+    // column with nothing comparing it inserts fine. Real ver-18 packages carry
+    // `CREATE UNIQUE INDEX idx_templates_name_ntid ON templates (name, ntid)`,
+    // and the collation it uses comes from the COLUMN, not from this DDL — which
+    // is why the index is created first, while the column is still plain.
+    db.run('CREATE UNIQUE INDEX idx_templates_name_ntid ON templates (name, ntid)');
+    db.run('PRAGMA writable_schema = ON');
+    db.run(
+      "UPDATE sqlite_master SET sql = replace(sql, 'name text', 'name text COLLATE unicase') "
+        + "WHERE type = 'table' AND name = 'templates'",
+    );
+    db.run('PRAGMA writable_schema = RESET');
+    return db;
+  }
+  const templateDdl = (db: Database): string =>
+    String(
+      db.exec("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'templates'")[0]!
+        .values[0]![0],
+    );
+
+  it('writes into a package declaring `unicase`, and puts the schema back verbatim', () => {
+    const db = unicaseTemplateDb();
+    const before = templateDdl(db);
+    // The control that makes the rest of this test mean something: without the
+    // swap, this exact INSERT is impossible on this exact collection.
+    expect(before).toMatch(/collate\s+unicase/i);
+    expect(() =>
+      db.run('INSERT INTO templates (ntid, ord, name, mtime_secs, usn, config) VALUES (100,9,?,0,0,?)', [
+        'Direct',
+        new Uint8Array(0),
+      ]),
+    ).toThrow(/no such collation sequence/i);
+
+    const result = applyExportChanges(db, addOnly(), { nowMs: NOW_MS, normalize: stripFieldHtml });
+    expect(result.templatesAdded).toBe(1);
+    expect(result.cardsCreated).toBe(1);
+    // Read back out of the collection, not off the result.
+    expect(
+      db.exec('SELECT name FROM templates WHERE ntid = 100 AND ord = 3')[0]!.values[0]![0],
+    ).toBe('Reverse');
+    // And the collection still declares the collation it arrived with, byte for
+    // byte — a package that quietly lost `unicase` would be a different file
+    // than the one Anki wrote.
+    expect(templateDdl(db)).toBe(before);
+  });
+
+  it('restores the schema even when the write refuses partway', () => {
+    // The `finally`, and the reason it is one: a refusal thrown between the swap
+    // and the restore would otherwise leave the collection declaring BINARY.
+    const db = unicaseTemplateDb();
+    const before = templateDdl(db);
+    const changes = addOnly();
+    changes.templateAdds = [
+      { ...changes.templateAdds![0]!, cards: [{ noteId: '9999', deckId: '1', due: 0 }] },
+    ];
+    expect(() =>
+      applyExportChanges(db, changes, { nowMs: NOW_MS, normalize: stripFieldHtml }),
+    ).toThrow();
+    expect(templateDdl(db)).toBe(before);
+    // All-or-nothing still holds: nothing was inserted.
+    expect(db.exec('SELECT ord FROM templates WHERE ntid = 100 AND ord = 3')[0]).toBeUndefined();
+  });
+
+  it('refuses a name that collides only by case, which `unicase` would have caught', () => {
+    // The uniqueness the swapped-out index can no longer enforce. `Card 2` is
+    // already on this note type; `card 2` is the same name to Anki, and a
+    // package carrying both would fail Anki's own check-database.
+    const db = unicaseTemplateDb();
+    try {
+      applyExportChanges(db, addOnly({ name: 'card 2' }), {
+        nowMs: NOW_MS,
+        normalize: stripFieldHtml,
+      });
+      expect.unreachable('should have refused');
+    } catch (err) {
+      expect((err as ExportRefusal).code).toBe('template-name-taken');
+    }
+    expect(db.exec('SELECT ord FROM templates WHERE ntid = 100 AND ord = 3')[0]).toBeUndefined();
+
+    // The control: a name that does not collide writes on the same collection.
+    expect(
+      applyExportChanges(db, addOnly({ name: 'Card 3' }), {
+        nowMs: NOW_MS,
+        normalize: stripFieldHtml,
+      }).templatesAdded,
+    ).toBe(1);
+  });
+
+  it('legacy `col.models` refuses the same collision, with no collation involved', () => {
+    // The guard is on the NAME, not on the storage: the legacy blob has no index
+    // and no collation, and Anki still treats the two names as one.
+    const db = threeTemplateDb();
+    try {
+      applyExportChanges(db, addOnly({ noteTypeId: '100', ord: 3, name: 'CARD 2' }), {
+        nowMs: NOW_MS,
+        normalize: stripFieldHtml,
+      });
+      expect.unreachable('should have refused');
+    } catch (err) {
+      expect((err as ExportRefusal).code).toBe('template-name-taken');
+    }
+  });
 });

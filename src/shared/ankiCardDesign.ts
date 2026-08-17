@@ -191,7 +191,11 @@ export function planCardDesign(draft: AnkiDraft, request: CardDesignRequest): Ca
 
   const ord = nextTemplateOrd(noteType);
   const name = request.templateName?.trim() || `Card ${ord + 1}`;
-  if (noteType.templates.some((tpl) => tpl.name === name)) {
+  // Case-insensitively, because Anki stores template names under its own
+  // `unicase` collation with a UNIQUE index over them: `card 2` and `Card 2` are
+  // the same name to Anki, and letting the plan through means the user hears
+  // about it from the exporter (`template-name-taken`) rather than before Apply.
+  if (noteType.templates.some((tpl) => tpl.name.toLowerCase() === name.toLowerCase())) {
     return blocked(request, [{ code: 'duplicate-template-name', detail: name }]);
   }
 

@@ -180,6 +180,75 @@ function templateOrdsOf(
   return (model.tmpls ?? []).map((t, index) => (t.ord == null ? index : Number(t.ord)));
 }
 
+/** Template names a note type currently holds, in whichever place it keeps them. */
+function templateNamesOf(
+  db: SqlWritable,
+  storage: 'table' | 'models',
+  noteTypeId: string,
+): string[] {
+  if (storage === 'table') {
+    const values = db.exec('SELECT name FROM templates WHERE ntid = ?', [idParam(noteTypeId)])[0]
+      ?.values;
+    return (values ?? []).map((row) => String(row[0] ?? ''));
+  }
+  const raw = firstRow(db, 'SELECT models FROM col LIMIT 1', [])?.[0];
+  if (typeof raw !== 'string') return [];
+  const parsed = JSON.parse(raw) as Record<string, { tmpls?: Array<{ name?: unknown }> }>;
+  return (parsed[noteTypeId]?.tmpls ?? []).map((t) => String(t.name ?? ''));
+}
+
+/**
+ * Run `fn` with Anki's `unicase` collation swapped out of the named schema
+ * objects, then put their DDL back **verbatim** — not by replacing back, which
+ * would rewrite a `COLLATE BINARY` the source genuinely had.
+ *
+ * Why this exists at all: schema 18 declares `templates.name` as
+ * `text NOT NULL COLLATE unicase` and puts a UNIQUE index on `(name, ntid)`, so
+ * an INSERT has to maintain an index sql.js cannot compare — the same
+ * "no such collation sequence: unicase" wall `decks.name` hits, measured on the
+ * user's real 2,991-note ver-18 package.
+ *
+ * A deck RENAME could only be refused, because the name is the thing being
+ * changed and the collation is what decides whether the new one collides. An
+ * INSERT is a different question: the collation is needed only to prove the new
+ * name is unique, and that is answerable here in JavaScript before the write —
+ * which is exactly what `template-name-taken` above does. So the insert is
+ * allowed to proceed under BINARY rather than the feature being unusable on
+ * every package current Anki writes.
+ *
+ * Two things were measured rather than assumed on that real package: the DDL
+ * comes back byte-identical and the reopened file reads both templates; and
+ * `PRAGMA integrity_check` throws `no such collation sequence` on the
+ * **untouched** source too, so it is not a check this write could have broken.
+ *
+ * `PRAGMA writable_schema=RESET` (SQLite 3.32+, sql.js ships 3.45.2) is what
+ * forces the schema to be re-read — `=OFF` alone leaves the old parse cached.
+ */
+function withoutMissingCollation<T>(db: SqlWritable, objects: readonly string[], fn: () => T): T {
+  const originals = new Map<string, string>();
+  for (const name of objects) {
+    const row = firstRow(db, 'SELECT sql FROM sqlite_master WHERE name = ?', [name]);
+    const sql = row?.[0];
+    if (typeof sql === 'string' && /collate\s+unicase/i.test(sql)) originals.set(name, sql);
+  }
+  if (originals.size === 0) return fn();
+  const write = (name: string, sql: string): void => {
+    db.run('PRAGMA writable_schema=ON');
+    db.run('UPDATE sqlite_master SET sql = ? WHERE name = ?', [sql, name]);
+    db.run('PRAGMA writable_schema=RESET');
+  };
+  for (const [name, sql] of originals) {
+    write(name, sql.replace(/collate\s+unicase/gi, 'COLLATE BINARY'));
+  }
+  try {
+    return fn();
+  } finally {
+    // Verbatim, and in a `finally`, so a refusal thrown mid-write cannot leave
+    // the collection declaring a collation it does not have.
+    for (const [name, sql] of originals) write(name, sql);
+  }
+}
+
 /** The legacy blob, parsed, or `undefined` when it is not the JSON Anki writes. */
 function readDeckBlob(db: SqlWritable): Record<string, Record<string, unknown>> | undefined {
   const raw = firstRow(db, 'SELECT decks FROM col LIMIT 1', [])?.[0];
@@ -676,6 +745,20 @@ export function applyExportChanges(
           + 'this design was computed against a different version of the package.',
       );
     }
+    // The uniqueness Anki's own `unicase` index enforces, enforced here instead,
+    // because the INSERT below runs with that collation swapped out. Two names
+    // differing only by case ARE a collision to Anki, and a package carrying an
+    // index entry its own check-database rejects is worse than a refusal.
+    const taken = templateNamesOf(db, templates, add.noteTypeId);
+    const clash = taken.find((n) => n.toLowerCase() === add.name.toLowerCase());
+    if (clash !== undefined) {
+      throw new ExportRefusal(
+        'template-name-taken',
+        `Note type ${add.noteTypeId} already has a card template called “${clash}”. Anki compares `
+          + 'template names without regard to case, so this design would collide with it. Give the '
+          + 'design a different name.',
+      );
+    }
     const rows: TemplateAddPlan['cards'] = [];
     for (const card of add.cards) {
       const note = firstRow(db, 'SELECT id FROM notes WHERE id = ?', [idParam(card.noteId)]);
@@ -859,21 +942,26 @@ export function applyExportChanges(
     const mid = idParam(plan.noteTypeId);
     const { add } = plan;
     if (templates === 'table') {
-      db.run(
-        'INSERT INTO templates (ntid, ord, name, mtime_secs, usn, config) VALUES (?, ?, ?, ?, -1, ?)',
-        [
-          mid,
-          add.ord,
-          add.name,
-          modSec,
-          encodeTemplateConfig({
-            qfmt: add.qfmt,
-            afmt: add.afmt,
-            bqfmt: add.bqfmt || undefined,
-            bafmt: add.bafmt || undefined,
-          }),
-        ],
-      );
+      // Only the INSERT is inside the swap. `notetypes` is left alone because
+      // this write does not touch `notetypes.name`, and the narrower the window
+      // the fewer statements can observe a schema Anki never wrote.
+      withoutMissingCollation(db, ['templates', 'idx_templates_name_ntid'], () => {
+        db.run(
+          'INSERT INTO templates (ntid, ord, name, mtime_secs, usn, config) VALUES (?, ?, ?, ?, -1, ?)',
+          [
+            mid,
+            add.ord,
+            add.name,
+            modSec,
+            encodeTemplateConfig({
+              qfmt: add.qfmt,
+              afmt: add.afmt,
+              bqfmt: add.bqfmt || undefined,
+              bafmt: add.bafmt || undefined,
+            }),
+          ],
+        );
+      });
       db.run('UPDATE notetypes SET mtime_secs = ?, usn = -1 WHERE id = ?', [modSec, mid]);
     }
     for (const row of plan.cards) {
