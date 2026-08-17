@@ -162,6 +162,15 @@ export default function DeckWorkbenchCardDesign({
                   ` ${t('ankiWorkbench.design.skippedEmpty', { count: plan.notesWithEmptyQuestion })}`}
               </p>
 
+              {/* The other half of the consequence, and the one the number above
+                  reads as a promise about. `applyCardDesign` returns a new draft
+                  and never touches the edit journal, and the journal is the only
+                  thing either destination receives — so these cards exist here
+                  and nowhere else. Row `template-add` in `ankiParityMatrix.ts`
+                  is the matching claim, read-only on both destinations, and a
+                  test ties this sentence to it so the two cannot drift. */}
+              <p className="muted wb-design-draft-only">{t('ankiWorkbench.design.draftOnly')}</p>
+
               {plan.problems.length > 0 && (
                 <ul className="wb-design-problems" aria-label={t('ankiWorkbench.design.problems')}>
                   {plan.problems.map((p: CardDesignProblem) => (

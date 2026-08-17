@@ -9588,6 +9588,9 @@ export const zh: Catalog = {
     '你拒绝了 {count} 条笔记的全部建议，因此不会向它们写入任何内容。',
 
 
+  'ankiWorkbench.design.draftOnly':
+    '这只会修改草稿。导出软件包和写入 Anki 都不会添加卡片模板，因此你收藏中的笔记类型保持原样。',
+
   'ankiWorkbench.parity.title': '这个工作台能改什么、不能改什么',
   'ankiWorkbench.parity.intro':
     '读入牌组时，你收藏中的所有内容都会被保留。下表说明工作台会把哪些部分写回去，以及写到哪里。',

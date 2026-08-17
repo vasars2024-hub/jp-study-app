@@ -9671,6 +9671,9 @@ export const ja: Catalog = {
     '{count} 件のノートではすべての候補を却下したため、何も書き込まれません。',
 
 
+  'ankiWorkbench.design.draftOnly':
+    'これはドラフトだけを変更します。パッケージの書き出しでも Anki への書き込みでもカードテンプレートは追加されないため、コレクションのノートタイプはそのまま残ります。',
+
   'ankiWorkbench.parity.title': 'このワークベンチで変更できるもの・できないもの',
   'ankiWorkbench.parity.intro':
     'デッキを読み込むと、コレクションの内容はすべて保持されます。この表は、どの部分をどこへ書き戻せるかを示します。',

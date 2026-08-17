@@ -217,6 +217,48 @@ describe('every row a destination will not write has an honest explanation', () 
   });
 });
 
+describe('the one surface whose Apply reaches neither destination says so', () => {
+  const PANEL = join(
+    SHARED,
+    '..',
+    'renderer',
+    'components',
+    'anki',
+    'DeckWorkbenchCardDesign.tsx',
+  );
+
+  it('renders the draft-only line, and the matrix agrees that it must', () => {
+    // Tied to the row rather than standing alone: if `template-add` ever gains
+    // a journal op, this assertion fails and the panel's warning is revisited
+    // instead of quietly contradicting a button that now works.
+    const row = parityRow('template-add')!;
+    expect(row.journalOp).toBeNull();
+    expect(row.package.support).toBe('read-only');
+    expect(row.connect.support).toBe('read-only');
+
+    const source = readFileSync(PANEL, 'utf8');
+    expect(source).toContain("t('ankiWorkbench.design.draftOnly')");
+    for (const lang of ['en', 'ja', 'zh', 'ru']) {
+      expect(catalogKeys(lang).has('ankiWorkbench.design.draftOnly'), lang).toBe(true);
+    }
+  });
+
+  it('puts it beside the card count, not below the Apply button', () => {
+    // Placement is the finding. The panel already stated its draft-space
+    // consequence as a number ("adds 3,180 cards"); what made that number read
+    // as a promise about the collection was that nothing beside it said
+    // otherwise. A warning further down the panel than the Apply control is one
+    // the user reaches after deciding.
+    const source = readFileSync(PANEL, 'utf8');
+    const effect = source.indexOf("t('ankiWorkbench.design.effect'");
+    const draftOnly = source.indexOf("t('ankiWorkbench.design.draftOnly')");
+    const apply = source.indexOf("t('ankiWorkbench.design.apply')");
+    expect(effect).toBeGreaterThan(-1);
+    expect(draftOnly).toBeGreaterThan(effect);
+    expect(draftOnly).toBeLessThan(apply);
+  });
+});
+
 // ----- the live half: the two blocked cells, from the real planner ---------------
 
 function note(over: Partial<AnkiDraftNote> & { id: string }): AnkiDraftNote {

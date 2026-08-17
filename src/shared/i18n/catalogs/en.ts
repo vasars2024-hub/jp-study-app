@@ -10106,6 +10106,9 @@ export const en: Catalog = {
     'You rejected every suggestion on {count} notes, so nothing is written to them.',
 
 
+  'ankiWorkbench.design.draftOnly':
+    'This changes the draft only. Neither exporting a package nor writing to Anki adds a card template, so the note type in your collection is left exactly as it is.',
+
   // ----- the Anki parity matrix (acceptance gate 14) -----------------------------
   'ankiWorkbench.parity.title': 'What this workbench can and cannot change',
   'ankiWorkbench.parity.intro':
