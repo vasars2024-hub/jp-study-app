@@ -9490,8 +9490,13 @@ export const ru: Catalog = {
   'ankiWorkbench.diagnostics.blocking': 'Экспорту мешают элементы ({count}): {codes}',
   'ankiWorkbench.diagnostics.warning': 'Требуют внимания ({count}): {codes}',
   'ankiWorkbench.diagnostics.clean': 'Неподдерживаемых данных в этом источнике не найдено.',
-  'ankiWorkbench.sessions.title': 'Незавершённые чтения',
-  'ankiWorkbench.sessions.none': 'Незавершённых чтений нет.',
+  'ankiWorkbench.sessions.title': 'Недавние чтения',
+  'ankiWorkbench.sessions.none': 'Недавних чтений нет.',
+  'ankiWorkbench.sessions.reopen': 'Открыть снова',
+  'ankiWorkbench.sessions.reopenRefused.source-missing':
+    'Файл, который использовало это чтение, больше не находится на прежнем месте. Выберите пакет заново.',
+  'ankiWorkbench.sessions.reopenRefused.session-source-unknown':
+    'Это чтение больше не хранит расположение своего файла.',
   'ankiWorkbench.sessions.covered': 'Прочитано заметок: {covered} из {total}',
   'ankiWorkbench.sessions.discard': 'Отбросить',
   'ankiWorkbench.sessions.resume': 'Продолжить с заметки {offset}',

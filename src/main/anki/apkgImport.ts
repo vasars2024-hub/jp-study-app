@@ -438,6 +438,11 @@ async function readApkgDraft(request: ApkgDraftRequest = {}): Promise<ApkgDraftR
     requested = getDraftSession(request.sessionId)?.request.filePath;
     if (!requested) return { ok: false, error: 'session-source-unknown' };
   }
+  // A path nobody picked in this moment can have gone stale — the session store
+  // outlives the file it names. Say which failure that is: the zip reader would
+  // otherwise surface a raw ENOENT that reads like a corrupt package, and the
+  // one recovery it needs (pick the file again) would not be obvious.
+  if (requested && !fs.existsSync(requested)) return { ok: false, error: 'source-missing' };
   const file = await pickDeckFile(requested);
   if (!file) return { ok: false, error: 'cancelled' };
 

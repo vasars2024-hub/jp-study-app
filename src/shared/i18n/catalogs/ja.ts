@@ -8682,8 +8682,13 @@ export const ja: Catalog = {
   'ankiWorkbench.diagnostics.blocking': '{count} 件が書き出しを妨げています: {codes}',
   'ankiWorkbench.diagnostics.warning': '{count} 件に確認が必要です: {codes}',
   'ankiWorkbench.diagnostics.clean': 'このソースに未対応のデータはありませんでした。',
-  'ankiWorkbench.sessions.title': '未完了の読み込み',
-  'ankiWorkbench.sessions.none': '未完了の読み込みはありません。',
+  'ankiWorkbench.sessions.title': '最近の読み込み',
+  'ankiWorkbench.sessions.none': '最近の読み込みはありません。',
+  'ankiWorkbench.sessions.reopen': 'もう一度開く',
+  'ankiWorkbench.sessions.reopenRefused.source-missing':
+    'この読み込みが使ったファイルは見つかりません。パッケージを選び直してください。',
+  'ankiWorkbench.sessions.reopenRefused.session-source-unknown':
+    'この読み込みはファイルの場所を記録していません。',
   'ankiWorkbench.sessions.covered': '{total} 件中 {covered} 件を読み込み済み',
   'ankiWorkbench.sessions.discard': '破棄',
   'ankiWorkbench.sessions.resume': 'ノート {offset} から再開',

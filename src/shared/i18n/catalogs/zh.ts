@@ -8644,8 +8644,13 @@ export const zh: Catalog = {
   'ankiWorkbench.diagnostics.blocking': '{count} 项会阻止导出：{codes}',
   'ankiWorkbench.diagnostics.warning': '{count} 项需要查看：{codes}',
   'ankiWorkbench.diagnostics.clean': '该来源中没有发现不受支持的数据。',
-  'ankiWorkbench.sessions.title': '未完成的读取',
-  'ankiWorkbench.sessions.none': '没有未完成的读取。',
+  'ankiWorkbench.sessions.title': '最近的读取',
+  'ankiWorkbench.sessions.none': '没有最近的读取。',
+  'ankiWorkbench.sessions.reopen': '重新打开',
+  'ankiWorkbench.sessions.reopenRefused.source-missing':
+    '此次读取使用的文件已不在原处。请重新选择卡组包。',
+  'ankiWorkbench.sessions.reopenRefused.session-source-unknown':
+    '此次读取未记录文件所在位置。',
   'ankiWorkbench.sessions.covered': '已读取 {covered} / {total} 条笔记',
   'ankiWorkbench.sessions.discard': '丢弃',
   'ankiWorkbench.sessions.resume': '从第 {offset} 条笔记继续',

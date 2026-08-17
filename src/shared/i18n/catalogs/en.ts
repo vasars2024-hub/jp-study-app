@@ -9109,8 +9109,13 @@ export const en: Catalog = {
   'ankiWorkbench.diagnostics.blocking': '{count} items block an export: {codes}',
   'ankiWorkbench.diagnostics.warning': '{count} items need a look: {codes}',
   'ankiWorkbench.diagnostics.clean': 'Nothing unsupported was found in this source.',
-  'ankiWorkbench.sessions.title': 'Unfinished reads',
-  'ankiWorkbench.sessions.none': 'No unfinished reads.',
+  'ankiWorkbench.sessions.title': 'Recent reads',
+  'ankiWorkbench.sessions.none': 'No recent reads.',
+  'ankiWorkbench.sessions.reopen': 'Open again',
+  'ankiWorkbench.sessions.reopenRefused.source-missing':
+    'That file is no longer where this read found it. Choose the package again.',
+  'ankiWorkbench.sessions.reopenRefused.session-source-unknown':
+    'This read no longer records where its file was.',
   'ankiWorkbench.sessions.covered': '{covered} of {total} notes read',
   'ankiWorkbench.sessions.discard': 'Discard',
   'ankiWorkbench.sessions.resume': 'Resume from note {offset}',

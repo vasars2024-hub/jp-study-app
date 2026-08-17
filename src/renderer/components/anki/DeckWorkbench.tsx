@@ -17,7 +17,7 @@
  * much has actually been read; either number alone is a lie for a paged source.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { AnkiDraft } from '../../../shared/ankiDraft';
+import type { AnkiDraft, AnkiDraftSourceKind } from '../../../shared/ankiDraft';
 import { ANKI_DRAFT_PAGE_SIZE } from '../../../shared/ankiDraft';
 import {
   WORKBENCH_STEP_IDS,
@@ -121,6 +121,17 @@ const EMPTY_MASTERY_HISTORY: MasteryHistory = { undo: [], redo: [] };
  */
 function writeMasteryLevel(write: MasteryWrite): void {
   setLevel(write.term, (write.level ?? 0) as WkLevel, true);
+}
+
+/**
+ * Which recorded sessions can be opened again without the OS file dialog.
+ *
+ * Package kinds only. A `csv` session is file-backed too, but its reader is
+ * `anki:readCsvDraft` and pointing the package reader at a .csv would fail as a
+ * corrupt zip; a `ankiconnect` or `local-deck` session names no file at all.
+ */
+export function isReopenable(kind: AnkiDraftSourceKind): boolean {
+  return kind === 'apkg' || kind === 'colpkg';
 }
 
 /** The worst severity present, which is what decides the step's validation. */
@@ -486,6 +497,43 @@ export default function DeckWorkbench() {
    * splice two collections into one draft with nothing recording that it
    * happened. No path is involved — the session names its own source to main.
    */
+  /**
+   * Open a package this app already knows the path of, from the top.
+   *
+   * Distinct from resume, and not a variant of it: resume exists to continue an
+   * interrupted read at its next unread note, so a session that covered every
+   * note is `already-complete` and offers nothing. That left the only route back
+   * to a finished package running through the OS file dialog every single time,
+   * even though main has held the path since the first read. This asks for
+   * offset 0 and lets the session name its own source, so no path crosses IPC.
+   */
+  const reopenSession = useCallback(
+    async (id: string) => {
+      setBusy('apkg');
+      setError(null);
+      try {
+        const res = await window.api.readApkgDraft({
+          sessionId: id,
+          noteOffset: 0,
+          noteLimit: ANKI_DRAFT_PAGE_SIZE,
+        });
+        if (!res.ok || !res.draft) {
+          // The file can be gone or moved since the session was recorded; that
+          // is a named state, not a cancelled dialog and not a broken package.
+          if (res.error === 'source-missing' || res.error === 'session-source-unknown') {
+            setError(t(`ankiWorkbench.sessions.reopenRefused.${res.error}`));
+          } else if (res.error && res.error !== 'cancelled') setError(res.error);
+        } else adoptDraft(res.draft, res.totalNotes);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setBusy(null);
+        void refreshSessions();
+      }
+    },
+    [adoptDraft, refreshSessions, t],
+  );
+
   const resumeSession = useCallback(
     async (id: string) => {
       setBusy('apkg');
@@ -699,6 +747,20 @@ export default function DeckWorkbench() {
                           {t('ankiWorkbench.sessions.resume', {
                             offset: p.resumeOffset ?? 0,
                           })}
+                        </button>
+                      )}
+                      {/* Only a file-backed source can be reopened from its own
+                          record: a Connect or local-deck session names a query,
+                          not a path, and re-reading those is what the source
+                          buttons above already do. */}
+                      {isReopenable(session.sourceKind) && (
+                        <button
+                          type="button"
+                          className="btn"
+                          disabled={busy !== null}
+                          onClick={() => void reopenSession(session.id)}
+                        >
+                          {t('ankiWorkbench.sessions.reopen')}
                         </button>
                       )}
                       <button

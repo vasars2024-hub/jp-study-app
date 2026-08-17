@@ -568,16 +568,74 @@ describe('DeckWorkbench', () => {
     expect(host.textContent).toContain('ankiWorkbench.sessions.resumeRefused.source-changed');
   });
 
-  it('offers no resume for a session that cannot be continued', async () => {
+  it('offers no resume for a session that cannot be continued, but still offers to reopen it', async () => {
     ankiDraftSessionList.mockResolvedValue([
       {
-        session: { id: 's1', label: 'Live collection', status: 'complete' },
+        session: { id: 's1', label: 'Live collection', status: 'complete', sourceKind: 'apkg' },
         progress: { status: 'complete', covered: 7992, totalNotes: 7992, resumable: false, resumeOffset: null },
       },
     ]);
     await mount();
     expect(host.textContent).toContain('ankiWorkbench.sessions.status.complete');
     expect(host.textContent).not.toContain('ankiWorkbench.sessions.resume');
+    // The point of the reopen half: a package that was read to the end used to
+    // have nothing but Discard, so the only way back into it was the OS dialog.
+    expect(host.textContent).toContain('ankiWorkbench.sessions.reopen');
+  });
+
+  it('reopens a finished package from note 0 by id, without resuming and without a path', async () => {
+    ankiDraftSessionList.mockResolvedValue([
+      {
+        session: { id: 's1', label: 'Core 2k.apkg', status: 'complete', sourceKind: 'apkg' },
+        progress: { status: 'complete', covered: 2000, totalNotes: 2000, resumable: false, resumeOffset: null },
+      },
+    ]);
+    readApkgDraft.mockResolvedValue({ ok: true, draft: browsable(), totalNotes: 2000, sessionId: 's1' });
+    await mount();
+
+    await click(buttonBy('ankiWorkbench.sessions.reopen'));
+    // Offset 0, because this is not a continuation: the whole package is on
+    // offer again. And no resume plan is consulted — `already-complete` would
+    // refuse one, which is exactly the state this button exists for.
+    expect(readApkgDraft).toHaveBeenCalledWith({ sessionId: 's1', noteOffset: 0, noteLimit: 500 });
+    expect(ankiDraftSessionResume).not.toHaveBeenCalled();
+    expect(readApkgDraft).not.toHaveBeenCalledWith(
+      expect.objectContaining({ filePath: expect.anything() }),
+    );
+    expect(host.textContent).toContain('ankiWorkbench.step.source.outcome');
+  });
+
+  it('says the recorded file is gone rather than blaming the package', async () => {
+    // The negative control for reopen: main resolves the path from the session
+    // store, which outlives the file. A raw ENOENT here reads as a corrupt
+    // package and hides the one recovery that works.
+    ankiDraftSessionList.mockResolvedValue([
+      {
+        session: { id: 's1', label: 'Core 2k.apkg', status: 'complete', sourceKind: 'apkg' },
+        progress: { status: 'complete', covered: 2000, totalNotes: 2000, resumable: false, resumeOffset: null },
+      },
+    ]);
+    readApkgDraft.mockResolvedValue({ ok: false, error: 'source-missing' });
+    await mount();
+
+    await click(buttonBy('ankiWorkbench.sessions.reopen'));
+    expect(host.textContent).toContain('ankiWorkbench.sessions.reopenRefused.source-missing');
+    // Nothing was adopted: the step-1 outcome sentence never appears.
+    expect(host.textContent).not.toContain('ankiWorkbench.step.source.outcome:');
+  });
+
+  it('offers no reopen for a session whose source is not a file', async () => {
+    ankiDraftSessionList.mockResolvedValue([
+      {
+        session: { id: 's1', label: 'Live collection', status: 'complete', sourceKind: 'ankiconnect' },
+        progress: { status: 'complete', covered: 7992, totalNotes: 7992, resumable: false, resumeOffset: null },
+      },
+    ]);
+    await mount();
+    expect(host.textContent).toContain('ankiWorkbench.sessions.status.complete');
+    // Pointing the package reader at a Connect session would fail as a corrupt
+    // zip; re-reading Connect is what the source button above already does.
+    expect(host.textContent).not.toContain('ankiWorkbench.sessions.reopen');
   });
 
   it('shows the draft as Browser rows and records the selection on step 2', async () => {
