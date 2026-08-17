@@ -276,6 +276,38 @@ describe('rankSubtitleCandidates', () => {
     expect(looksLikeSameTitle('[SubsPlease] Some Show (01-04) (480p) [Batch]', 'Some Show')).toBe(true);
   });
 
+  it('refuses a longer work that merely contains a one-word title', () => {
+    // Both measured live 2026-08-17 against the user's own completed list. MAL
+    // 16528 `Hal` is ハル, so the alias walk searched `Haru` — one common romaji
+    // word — and `listNyaaHarvest` returned 4 rows of an unrelated show, the
+    // cheapest 2,969.60 MB with 52 seeders.
+    expect(looksLikeSameTitle('[Trix] Agents of the Four Seasons S01 (Batch) [WEBRip 1080p AV1 Opus] (Multi Subs, VOSTFR) | Shunkashuutou Daikousha: Haru no Mai', 'Haru')).toBe(false);
+    expect(looksLikeSameTitle('[DKB] Shunkashuutou Daikousha: Haru no Mai - (Season 01) [1080p][HEVC x265 10bit][Dual-Audio]', 'Haru')).toBe(false);
+    // MAL 7024 `Heya` is one episode; this is a 12-episode Yuru Camp spin-off
+    // that happens to open with the same word.
+    expect(looksLikeSameTitle('[Erai-raws] Heya Camp - 01 ~ 12 [1080p][Multiple Subtitle]', 'Heya')).toBe(false);
+    // Two words are just as degenerate: one hit out of two still clears the
+    // half-the-tokens bar outright.
+    expect(looksLikeSameTitle('[Group] Big Windup - 01-25 [BD]', 'Big O')).toBe(false);
+  });
+
+  it('still matches a short title the release really carries', () => {
+    // The false-negative controls. Every extra word here is the release talking
+    // about itself, which is exactly what `RELEASE_VOCABULARY` and
+    // `RELEASE_MARKER` exist to forgive.
+    expect(looksLikeSameTitle('[Group] Haru [1080p][HEVC][Multi Sub]', 'Haru')).toBe(true);
+    expect(looksLikeSameTitle('[Group] Haru (2013) [BDRip 1080p x264 AAC]', 'Haru')).toBe(true);
+    expect(looksLikeSameTitle('[Group] Monster - Complete Series 01-74 [BD 1080p]', 'Monster')).toBe(true);
+    expect(looksLikeSameTitle('Akira 1988 Remastered 4K UHD Dual Audio', 'Akira')).toBe(true);
+    expect(looksLikeSameTitle('[Group] Some Show S1 01-25', 'Some Show')).toBe(true);
+    // A name that is nothing but tags carries no counter-evidence, only the
+    // absence of any, so the digits rule above stays the one that judges it.
+    expect(looksLikeSameTitle('[SomeGroup] 001 (2010) [BDRip 1080p]', '001')).toBe(true);
+    // Three significant words are enough ratio to score on, and this row is a
+    // real one the pool would lose if the rule reached further.
+    expect(looksLikeSameTitle('[Erai-raws] Nanatsu no Taizai - Seisen no Shirushi - 01 ~ 04', 'Nanatsu no Taizai: Seisen no Shirushi')).toBe(true);
+  });
+
   it('drops rows advertising only unwanted languages', () => {
     const ru = row({ id: 'ru', name: 'Show Subtitles', sizeBytes: MB, subtitleLanguages: ['ru'] });
     expect(rankSubtitleCandidates([ru], { languages: ['ja'] })).toEqual([]);

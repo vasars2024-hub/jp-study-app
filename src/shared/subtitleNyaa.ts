@@ -457,6 +457,48 @@ function onlyInEpisodeRange(rowName: string, token: string): boolean {
 }
 
 /**
+ * Words a release name spends on itself rather than on the work it carries.
+ *
+ * Derived from the untagged part of the 32 distinct release names the
+ * 2026-08-17 survey returned (`debug/g31n-routeb-54.json`), not from
+ * imagination: `complete`, `season`, `s01`, `x264`, `1080p` and `v2` are the
+ * only ones that actually escape the brackets there. The rest are the universal
+ * scene words, kept because the cost of missing one is a legitimate release
+ * refused, and this file's standing posture is that accepting someone else's
+ * show into the user's torrent client is the worse failure.
+ */
+const RELEASE_VOCABULARY = new Set([
+  'batch', 'collection', 'complete', 'ep', 'episode', 'episodes', 'eps', 'season', 'seasons', 'series',
+  'bd', 'bdmv', 'bdrip', 'blu', 'bluray', 'dvd', 'dvdrip', 'hdtv', 'ray', 'raw', 'raws', 'remaster',
+  'remastered', 'remux', 'repack', 'uncensored', 'uncut', 'web', 'webdl', 'webrip',
+  'audio', 'dual', 'dub', 'dubbed', 'multi', 'multiple', 'only', 'sub', 'subbed', 'subs', 'subtitle',
+  'subtitles',
+  'aac', 'av', 'avc', 'flac', 'fhd', 'fin', 'h', 'hd', 'hdr', 'hevc', 'opus', 'sd', 'uhd', 'x264', 'x265',
+]);
+
+/** `s01`, `720p`, `10bit`, `2nd`, `v2`, `4k` — a marker, never a title word. */
+const RELEASE_MARKER = /^(?:[sv]\d{1,2}|\d{3,4}p|\d{1,2}bit|\d{1,2}(?:st|nd|rd|th)|\d{1,2}k|[hx]\d{3})$/;
+
+/**
+ * What a release name claims to carry, with its own vocabulary taken out.
+ *
+ * Deliberately over-strips: a word wrongly called vocabulary only widens what
+ * the short-title rule below will accept, and that rule is the conservative
+ * one.
+ */
+function claimWords(rowName: string): string[] {
+  return titleTokens(untaggedPart(rowName)).filter(
+    (word) => !RELEASE_VOCABULARY.has(word) && !RELEASE_MARKER.test(word) && !DIGITS_ONLY.test(word),
+  );
+}
+
+/**
+ * At or below this, the half-the-tokens ratio has nothing left to measure with:
+ * one token out of one is a perfect score for a single incidental word.
+ */
+const SHORT_TITLE_MAX_TOKENS = 2;
+
+/**
  * Whether a release name plausibly belongs to the title that was searched for.
  *
  * The index decides what a query matches and it matches generously; nothing
@@ -490,7 +532,21 @@ export function looksLikeSameTitle(rowName: string, title: string): boolean {
   }
   const haystack = ` ${String(rowName ?? '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ')} `;
   const hits = tokens.filter((token) => haystack.includes(` ${token} `)).length;
-  return hits * 2 >= tokens.length;
+  if (hits * 2 < tokens.length) return false;
+  // A one- or two-word title scores a perfect ratio on a single incidental word,
+  // so it is held to a second, opposite question: does the release claim any
+  // *other* work's words as well? Measured live 2026-08-17 — MAL 16528 `Hal` is
+  // ハル, whose romaji alias `Haru` is one common word, and the listing offered
+  // `[Trix] Agents of the Four Seasons S01 … Shunkashuutou Daikousha: Haru no
+  // Mai`, 2,969.60 MB of an unrelated show, on that token alone. `Heya` (MAL
+  // 7024, one episode) took a 12-episode `[Erai-raws] Heya Camp` batch the same
+  // way. A release whose own claim is nothing but tags keeps passing: there is
+  // no counter-evidence in it, only the absence of any.
+  if (tokens.length <= SHORT_TITLE_MAX_TOKENS) {
+    const wanted = new Set(tokens);
+    if (claimWords(rowName).some((word) => !wanted.has(word))) return false;
+  }
+  return true;
 }
 
 export interface NyaaSubtitleCandidate {
