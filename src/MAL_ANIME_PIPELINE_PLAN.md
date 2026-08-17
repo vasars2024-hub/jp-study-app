@@ -1309,3 +1309,48 @@ seen, and prefer a later alias's `sub-pack`.**
 
 **Still unsurveyed: 946 titles** (1,105 pool − 99 asc − 60 desc). Continue with
 `node debug/g31h-alias-routes.cjs 60 60 2 1 desc`.
+
+## 2026-08-17 — the first Route A transfer is spent, and the 404 that would not say where
+
+Worker `primary`. Two commits. The previous entry's named next slice, then the defect that slice
+made reachable.
+
+**`0b79c87c` — the alias walk no longer stops at a 43 GB batch.** It broke on the first alias that
+found *anything*; a `sub-pack` and a `batch-sidecar` are not interchangeable answers to a harvest.
+`Eureka Seven`'s primary name returns 21 rows, two of them *Hi-Evolution movie* batches at 21 GB and
+43 GB — not even the TV series — so the walk stopped there and never asked `Psalms of Planets Eureka
+Seven`, the only name carrying the 39.20 MB 50-episode pack. Now: continue while only sidecars have
+been seen, break on the first pack, earliest name wins among equals so the Route B fallback is
+byte-for-byte what the old condition returned. **Tradeoff, stated:** a sidecar-only hit now walks to
+the cap (4) instead of stopping at 1, so a Route B title — the common case, 53 of 60 surveyed —
+spends up to 3 more paced requests, ~6 s. A pack hit still costs one request. Trading 6 s for the
+difference between a 39 MB and a 43 GB download is what this feature is.
+Gate: 28/28 (24 before). **Negative control in a throwaway worktree at HEAD, not the shared tree:**
+the new file against the old implementation fails 3 of 4 for the intended reasons. The 4th passes
+both ways *by design* — it is the control proving the break is the route and not exhaustion.
+
+**GATE 31: THE FIRST TRANSFER WAS ACTUALLY SPENT, AND IT FAILED. Gate 31 stays OPEN.**
+Instrument `debug/g31m-acquire.cjs`, the first g31 probe that goes past the listing. Live, through
+the running app, on the user's authorised smallest-healthy title — named before starting, as
+required: **MAL 92 `Kidou Shinseiki Gundam X`**, release `After War Gundam X / Kidou Shin Seiki
+Gundam X Official Subtitles`, **20.10 MB, 7 seeders**, route `sub-pack`.
+- LIST: `ok true`, **n 1**, `searchedAs "After War Gundam X"`, **38,716 ms**, at the profile's own
+  `minSeeders` (3) with **nothing relaxed** — the survey port's `minSeeders 0` was not used.
+- FETCH: `ok false`, **0 files, 0 bytes, 21,702 ms**, message **`qBittorrent answered 404.`**
+
+**`ac649de8` — that message is the real defect, and it is the one this plan forbids.** The client
+speaks eight WebUI endpoints and the string names none, so the failure cannot be acted on. P6's
+constraint is a distinct honest state, never a generic failure — this was the generic failure,
+shipped. `failureReason` now takes the endpoint; all 8 sites pass theirs; `qbitStop`/`qbitStart`
+track it **across their 5.x fallback**, so a refusal names the endpoint that actually answered.
+Not hypothetical: 5.x renamed `pause`/`resume` to `stop`/`start`, so a 404 there means "your build
+dropped the alias" while a 404 from `files` means "the torrent is gone" — opposite problems, one
+string. Gates: `subtitleNyaaFetch` 27/27 (+2, driving the real stand-in server, one asserting the
+*fallback* name), `scraperQbittorrent` + `subtitleHarvestNyaa` 86/86.
+
+**TRAP — the endpoint is still unknown, and only a restart will say.** Main does not hot-reload and
+the running app (pid 47592, started 05:27) predates both commits, so re-running the probe against it
+reproduces the old message. **Next slice: restart the app, then
+`node debug/g31m-acquire.cjs "Kidou Shinseiki Gundam X" 92`.** The 21.7 s before the 404 says the add
+and the metadata wait likely succeeded and it failed later — `files`, `filePrio` or `start` — but
+that is an inference from a duration, not a measurement, and must not be recorded as one.
