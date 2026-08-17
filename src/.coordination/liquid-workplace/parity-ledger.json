@@ -101,12 +101,64 @@
       "_note": "pending here still means no Liquid destination; the standard half of every dictionary row above is driven and observed.",
       "observed": "pop out created a SECOND real BrowserWindow at 900×640 (`/health` went 1 -> 2 windows, url `?popout=dictionary`) and removed the in-desk `.fwin`. The popped window rendered the app's INITIAL state — the active 食べる search did not carry across. Closing the popped window left NEITHER window: the desk returned to Scraper+Anki with no Dictionary. L3's reversibility requirement has to decide whether that last part is intended",
       "status": "pending"
+    },
+    {
+      "app": "mediaWorkspace",
+      "feature": "Open a study-ready file into the player",
+      "currentRoute": "Media workspace > Readiness > Ready (1) > `Open`",
+      "standardDestination": "the player, inside the Library pane",
+      "liquidDestination": "",
+      "keyboardRoute": "real button; keyboard activation NOT driven this turn",
+      "dataStateOwner": "adopted Seanime library + directstream; the row comes from the study orchestrator document",
+      "automatedProof": "src/renderer/__tests__/mediaWorkspaceHostReview.test.ts (4 cases, both mutation controls fire)",
+      "visualProof": "live bridge drive + debug/shots/win1-1786983850116.png, 2026-08-17",
+      "observed": "video box 0x0 -> 1264x821 and the segment moved Readiness -> Library (aria-pressed Readiness=true -> Library=true); 437.103 s clip, 550 controls inside `.study-player-slice`. BEFORE 27d584a8 the same click left the pane at `display:none` while the clip played unmuted at volume 1.0, currentTime 315 -> 359.96 s unattended — reproduced twice",
+      "status": "pending"
+    },
+    {
+      "app": "mediaWorkspace",
+      "feature": "Segment navigation (Library / Readiness / Review) without losing the player",
+      "currentRoute": "Media workspace > `.seanime-host-btn` segment buttons",
+      "standardDestination": "one pane shown, the library pane hidden but never unmounted",
+      "liquidDestination": "",
+      "keyboardRoute": "three real buttons carrying aria-pressed; keyboard activation NOT driven",
+      "dataStateOwner": "MediaWorkspaceHost `view` state; the sidecar websocket lives in the library pane",
+      "automatedProof": "mediaWorkspaceHostReview.test.ts 'keeps the library pane MOUNTED but hidden'",
+      "visualProof": "live bridge drive, 2026-08-17",
+      "observed": "Library -> Readiness hid the pane (computed `display:none`) with its 559 controls still mounted and the video element still present, paused at t=395.878722; returning to Library restored box 1264x821 at t=395.878722 EXACTLY, still paused — a byte-identical round trip, which is the reversibility L3 requires",
+      "status": "pending"
+    },
+    {
+      "app": "mediaWorkspace",
+      "feature": "Readiness category filters over the whole library",
+      "currentRoute": "Media workspace > Readiness > `Needs work` | `Not analysed` | `Out of date` | `No Japanese subtitles` | `Not imported` | `Ready`",
+      "standardDestination": "the same list, narrowed in place",
+      "liquidDestination": "",
+      "keyboardRoute": "six real buttons; not driven by keyboard",
+      "dataStateOwner": "study orchestrator document joined to the adopted library",
+      "automatedProof": "",
+      "visualProof": "live bridge drive, 2026-08-17",
+      "observed": "clicking `Ready 1` narrowed the pane from 138 buttons to 14, leaving exactly one row — THE Big O Episode 1 · N1 · 0% known · 1 card mined, 'Ready — Nothing to do — open it and study.' Header states '77 files · 76 need work · 1 ready to study' and 'Anki is connected · 84 decks'. The counts are honest: 76+1 = 77, and the one Ready row is the one that opens",
+      "status": "pending"
+    },
+    {
+      "app": "mediaWorkspace",
+      "feature": "Transcript rail: cue list, active-cue follow, per-cue translate, card preview",
+      "currentRoute": "player > right transcript rail + `Card preview`",
+      "standardDestination": "in-player rail, scrolled to the active cue",
+      "liquidDestination": "",
+      "keyboardRoute": "`Search transcript` is a text input; `Follow` is a checkbox; not driven",
+      "dataStateOwner": "the episode's subtitle track (`The Big O - 01 [BDRip 1440x1080 x265 FLAC],ja`)",
+      "automatedProof": "",
+      "visualProof": "debug/shots/win1-1786983850116.png, 2026-08-17",
+      "observed": "real Japanese cues with timestamps and a per-cue `Translate` (0:41 私の名はロジャー・スミス, 1:36 これは取引だ 違うか？). At t=395.878 the highlighted row was 6:35 過去の歴史など無くとも文化とやらは装える with furigana beneath and the Russian subtitle line rendered over the canvas; the card preview names 'Cue 72 · track 0 · 395,617-398,083 ms', which matches the video clock rather than restating it",
+      "status": "pending"
     }
   ],
   "notWritten": {
     "reason": "§5.3 says the ledger is created per app BEFORE that app is redesigned. Dictionary is written here because it is one of L1's two representative apps and because a ledger no one has driven is a template, not a ledger.",
     "apps": [
-      "MediaCenterView (video/player/music) — the 'needs a real clip' blocker is CLOSED as of 2026-08-17 (L4_MEDIA_SHELL.md): Library > The Big O > Play mounted a real 437 s / 960x720 clip with a 285-cue transcript rail. Rows are now writable and §6.4 is their row list; they are not written yet.",
+      "mediaWorkspace — FOUR rows are now written and driven (2026-08-17, L4.2). What of §6.4 is still NOT driven, stated so no one reads four rows as the inventory: speed, volume, fullscreen, frame stepping, subtitle track/version choice, dual subtitles, offset and styling, transcript search/jump, dictionary/grammar/AI handoff, the mining write path itself, shadowing/dictation, block library reorder/detach, multi-monitor placement, and every degraded state. The mining and asset rows write to the user's collection, so they need a reversible target chosen before they are driven, not a click.",
       "the other 19 root components — written in their own waves, against ALL_APPS_BASELINE.md",
       "note / visualizer / musicwidget — no baseline yet, see ALL_APPS_BASELINE.md 'Not captured'"
     ]
