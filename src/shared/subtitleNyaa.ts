@@ -416,11 +416,18 @@ export function sequelOrdinal(name: string): number {
   let best = 0;
   const note = (value: number) => { if (value >= 2 && value <= 9) best = Math.max(best, value); };
 
-  // The explicit forms need none of the reasoning below: they say the word.
+  // The explicit forms need none of the reasoning below: they say the word, so
+  // they are read from the WHOLE name rather than the untagged claim. Release
+  // groups put the season inside the tags, and stripping those hid it: measured
+  // 2026-08-17 in the survey at `debug/g31n-routeb-54.json`, the 1-episode movie
+  // `Jujutsu Kaisen 0 Movie` was offered `[Judas] Jujutsu Kaisen (Season 03)`,
+  // 4,300.80 MB, because `untaggedPart` deletes `(Season 03)` along with the
+  // codec tags and leaves a name that claims nothing.
   // `S1` and `1st Season` are deliberately in range and score 1, i.e. no
   // sequel, so `Gundam 00 S1` still matches a search for `Gundam 00`.
-  for (const match of claim.matchAll(/\b(?:s|season)\s?(\d{1,2})\b/giu)) note(Number(match[1]));
-  for (const match of claim.matchAll(/\b(\d{1,2})(?:st|nd|rd|th)\s+season\b/giu)) note(Number(match[1]));
+  const whole = String(name ?? '');
+  for (const match of whole.matchAll(/\b(?:s|season)\s?(\d{1,2})\b/giu)) note(Number(match[1]));
+  for (const match of whole.matchAll(/\b(\d{1,2})(?:st|nd|rd|th)\s+season\b/giu)) note(Number(match[1]));
   for (const match of claim.matchAll(/\b([ivx]{2,4})\b/giu)) {
     note(ROMAN_SEQUEL[match[1].toLowerCase()] ?? 0);
   }

@@ -262,6 +262,20 @@ describe('rankSubtitleCandidates', () => {
     expect(looksLikeSameTitle('[Group] Some Show 1st Season', 'Some Show')).toBe(true);
   });
 
+  it('reads a season out of the tags, where release groups actually put it', () => {
+    // Measured 2026-08-17 in the survey at `debug/g31n-routeb-54.json`: the
+    // 1-episode movie `Jujutsu Kaisen 0 Movie` was offered a 4,300.80 MB
+    // `(Season 03)` batch with 392 seeders. `untaggedPart` deletes parenthesised
+    // tags along with the codec ones, so the release's own season claim was
+    // thrown away before anything could read it.
+    expect(looksLikeSameTitle('[Judas] Jujutsu Kaisen (Season 03) [1080p][HEVC x265 10bit][Dual-Audio][Multi-Subs] (Batch)', 'Jujutsu Kaisen 0 Movie')).toBe(false);
+    // The control, on the same shape: a first season in the tags is not a
+    // sequel, so this stays a match.
+    expect(looksLikeSameTitle('[Trix] Some Show S01 (Batch) [WEBRip 1080p AV1 Opus]', 'Some Show')).toBe(true);
+    // And a group whose name merely starts with an S is not a season marker.
+    expect(looksLikeSameTitle('[SubsPlease] Some Show (01-04) (480p) [Batch]', 'Some Show')).toBe(true);
+  });
+
   it('drops rows advertising only unwanted languages', () => {
     const ru = row({ id: 'ru', name: 'Show Subtitles', sizeBytes: MB, subtitleLanguages: ['ru'] });
     expect(rankSubtitleCandidates([ru], { languages: ['ja'] })).toEqual([]);
