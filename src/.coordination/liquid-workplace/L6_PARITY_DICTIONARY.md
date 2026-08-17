@@ -29,7 +29,7 @@ made `active` → `sourceSwitch:ja.active=true zh.active=true`; `aria-pressed` s
 Liquid toggle → `windowLifecycle:liquidAriaPressed=null`. A control that flipped two rows would
 mean the rows are not independent observations, so that was asserted too.
 
-## The defect this found, and the fix — commit `<PENDING>`
+## The defect this found, and the fix — commit `aaef2a84`
 
 Category 6 scored **9/10** on the first pass and is 10/10 only after the fix, per the rubric's
 "re-score after the fix, not before". The single failure: the round trip was not byte-for-byte.
