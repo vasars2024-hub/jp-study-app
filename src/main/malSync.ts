@@ -767,7 +767,10 @@ export class MalSyncClient {
    */
   async fetchAnimeList(options: { status?: MalListStatus } = {}): Promise<MalListSyncResult> {
     const query = new URLSearchParams({
-      fields: 'list_status,num_episodes',
+      // `alternative_titles` is what makes a title findable on a release index
+      // under the name that index actually uses — see `parseAlternativeTitles`.
+      // It rides the pages already being walked, so it costs no extra request.
+      fields: 'list_status,num_episodes,alternative_titles',
       limit: String(PAGE_SIZE),
       nsfw: 'true',
     });

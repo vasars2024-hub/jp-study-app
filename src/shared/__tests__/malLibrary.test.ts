@@ -58,6 +58,43 @@ describe('mergeMalListEntries', () => {
     expect(second.updated).toBe(0);
   });
 
+  it('stores MALs other names, and a re-sync of them is still unchanged', () => {
+    // The trap this pins: `MERGEABLE_FIELDS` was compared with `===`, and two
+    // arrays with identical contents are different objects. Without the array
+    // case in `sameFieldValue`, every one of the user's 1,426 rows reports as
+    // *updated* on every re-sync — which is the exact count gate 11 reads.
+    const withAliases = listEntry({ altTitles: ['Ghost Hound', '心霊狩り'] });
+    const first = mergeMalListEntries(emptyMalLibrary(), [withAliases], 1000);
+    expect(first.document.entries[0].altTitles).toEqual(['Ghost Hound', '心霊狩り']);
+
+    const second = mergeMalListEntries(first.document, [listEntry({
+      altTitles: ['Ghost Hound', '心霊狩り'],
+    })], 2000);
+    expect(second.unchanged).toBe(1);
+    expect(second.updated).toBe(0);
+  });
+
+  it('treats a genuinely different alias list as a change', () => {
+    // The positive control for the comparison above: an array check that always
+    // said "same" would be just as wrong, and would silently pin the aliases at
+    // whatever the first sync happened to see.
+    const first = mergeMalListEntries(emptyMalLibrary(), [listEntry({ altTitles: ['Ghost Hound'] })], 1000);
+    const second = mergeMalListEntries(first.document, [listEntry({
+      altTitles: ['Ghost Hound', 'Shinreigari: Ghost Hound'],
+    })], 2000);
+    expect(second.updated).toBe(1);
+    expect(second.document.entries[0].altTitles).toEqual(['Ghost Hound', 'Shinreigari: Ghost Hound']);
+  });
+
+  it('round-trips a row with no aliases to the same bytes', () => {
+    // Absent, not `[]` — otherwise the first sync after this change rewrites
+    // every row in a 641 KB file for no fact that changed.
+    const merged = mergeMalListEntries(emptyMalLibrary(), [listEntry()], 1000);
+    expect('altTitles' in merged.document.entries[0]).toBe(false);
+    const reparsed = parseMalLibraryDocument(JSON.parse(JSON.stringify(merged.document)));
+    expect(JSON.stringify(reparsed)).toBe(JSON.stringify(merged.document));
+  });
+
   it('keeps addedAt from the first sync and moves syncedAt', () => {
     const first = mergeMalListEntries(emptyMalLibrary(), [listEntry()], 1000);
     const second = mergeMalListEntries(first.document, [listEntry()], 2000);

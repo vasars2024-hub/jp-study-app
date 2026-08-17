@@ -98,6 +98,35 @@ describe('applyMalLibrarySync', () => {
     expect(second.summary.lastSyncAt).toBe(2000);
   });
 
+  // The seam a merge-level test cannot see. `sanitizeListEntries` copies field
+  // by name, so a field added to `MalListEntry` and not added there is dropped
+  // in silence — measured live 2026-08-17 as 1,373 rows carrying aliases and 0
+  // stored, with every merge test green.
+  it('carries MALs other titles across the IPC sanitiser and onto disk', () => {
+    applyMalLibrarySync(
+      { entries: [{ ...entry, altTitles: ['Ghost Hound', '神霊狩／GHOST HOUND'] }] },
+      1000,
+    );
+    const stored = JSON.parse(fs.readFileSync(file, 'utf-8'));
+    expect(stored.entries[0].altTitles).toEqual(['Ghost Hound', '神霊狩／GHOST HOUND']);
+  });
+
+  it('re-syncing the same aliases is unchanged, not a rewrite of every row', () => {
+    // The live form of the array comparison: through the sanitiser the two
+    // arrays are always distinct objects, so an identity check would report
+    // every row as updated on every sync.
+    const withAliases = { ...entry, altTitles: ['Ghost Hound'] };
+    applyMalLibrarySync({ entries: [withAliases] }, 1000);
+    const second = applyMalLibrarySync({ entries: [withAliases] }, 2000);
+    expect(second).toMatchObject({ added: 0, updated: 0, unchanged: 1 });
+  });
+
+  it('stores no alias key at all when MAL published none', () => {
+    applyMalLibrarySync({ entries: [entry] }, 1000);
+    const stored = JSON.parse(fs.readFileSync(file, 'utf-8'));
+    expect('altTitles' in stored.entries[0]).toBe(false);
+  });
+
   it('counts a row it had to drop instead of silently shrinking the sync', () => {
     const report = applyMalLibrarySync(
       { entries: [entry, { animeId: 'not-a-number', title: 'bad' }, { title: 'no id' }] },

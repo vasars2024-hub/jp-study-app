@@ -109,9 +109,18 @@ function sanitizeListEntries(value: unknown): MalListEntry[] {
     const record = asRecord(row);
     const animeId = record.animeId;
     if (typeof animeId !== 'number' || !Number.isFinite(animeId)) continue;
+    // Every field is copied by name, so a field added upstream and *not* added
+    // here is dropped in silence. Measured 2026-08-17: `malFetchList` carried
+    // aliases for 1,373 of 1,426 rows and the library stored 0, with every unit
+    // test green — they call `mergeMalListEntries` directly and never cross this
+    // seam. If you add a field to `MalListEntry`, add it here too.
+    const altTitles = Array.isArray(record.altTitles)
+      ? record.altTitles.filter((name): name is string => typeof name === 'string' && !!name)
+      : [];
     out.push({
       animeId: Math.trunc(animeId),
       title: typeof record.title === 'string' ? record.title : '',
+      ...(altTitles.length ? { altTitles } : {}),
       posterUrl: typeof record.posterUrl === 'string' ? record.posterUrl : undefined,
       totalEpisodes: typeof record.totalEpisodes === 'number' ? record.totalEpisodes : undefined,
       status: isMalListStatus(record.status) ? record.status : undefined,

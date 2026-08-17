@@ -464,7 +464,42 @@ describe('reading the list', () => {
     const url = new URL(rec.apiCalls()[0].url);
     expect(url.origin + url.pathname).toBe('https://api.myanimelist.net/v2/users/@me/animelist');
     expect(url.searchParams.get('fields')).toContain('list_status');
+    // A field the parser reads but the query never asks for is a field that is
+    // always absent — and `alternative_titles` is the one that decides whether a
+    // show can be found on a release index at all.
+    expect(url.searchParams.get('fields')).toContain('alternative_titles');
     expect(url.searchParams.get('limit')).toBe('100');
+  });
+
+  it('keeps MALs other names for the title, primary excluded', () => {
+    // MAL 2596 is filed `Shinreigari`; nyaa carries the show only as
+    // `Ghost Hound`. One name is not enough to find it.
+    const page = parseMalAnimeListPage(JSON.parse(listPage({
+      data: [{
+        node: {
+          id: 2596,
+          title: 'Shinreigari',
+          alternative_titles: {
+            en: 'Ghost Hound',
+            ja: '心霊狩り',
+            synonyms: ['Shinreigari: Ghost Hound', 'Shinreigari'],
+          },
+        },
+        list_status: { status: 'completed', score: 5, num_episodes_watched: 22 },
+      }],
+    })));
+
+    expect(page.entries[0].altTitles).toEqual([
+      'Ghost Hound', '心霊狩り', 'Shinreigari: Ghost Hound',
+    ]);
+  });
+
+  it('omits the field entirely when MAL offers no other name', () => {
+    // The negative control for the shape: `[]` and absent are different bytes
+    // on disk, and an always-present empty array would rewrite every stored row.
+    const page = parseMalAnimeListPage(JSON.parse(listPage()));
+    expect(page.entries[0].altTitles).toBeUndefined();
+    expect('altTitles' in page.entries[0]).toBe(false);
   });
 
   it('follows MALs paging cursor', async () => {

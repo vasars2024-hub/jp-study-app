@@ -45,6 +45,14 @@ export interface MalLibraryEntry {
   malId: number;
   media: MalLibraryMedia;
   title: string;
+  /**
+   * MAL's other names for the same work — its English title, native title and
+   * synonyms. Absent, never `[]`, when MAL offers none.
+   *
+   * Stored because one name does not find a show on a release index: MAL 2596
+   * is `Shinreigari` and nyaa carries it only as `Ghost Hound`.
+   */
+  altTitles?: string[];
   posterUrl?: string;
   /** What MAL says the series has; 0 for a still-airing show, absent for a derivative. */
   totalEpisodes?: number;
@@ -108,6 +116,7 @@ function isLibraryMedia(value: unknown): value is MalLibraryMedia {
  */
 const MERGEABLE_FIELDS = [
   'title',
+  'altTitles',
   'posterUrl',
   'totalEpisodes',
   'status',
@@ -122,8 +131,22 @@ const MERGEABLE_FIELDS = [
   'depth',
 ] as const satisfies readonly (keyof MalLibraryEntry)[];
 
+/**
+ * `===` is wrong for `altTitles` and silently so: two arrays with identical
+ * contents are different objects, so a plain identity check would report every
+ * one of the user's 1,426 rows as *updated* on every re-sync, which is exactly
+ * the count gate 11 reads to prove a re-sync duplicates nothing.
+ */
+function sameFieldValue(a: unknown, b: unknown): boolean {
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    return a.every((value, index) => value === b[index]);
+  }
+  return a === b;
+}
+
 function sameStoredFields(a: MalLibraryEntry, b: MalLibraryEntry): boolean {
-  return MERGEABLE_FIELDS.every((field) => a[field] === b[field]);
+  return MERGEABLE_FIELDS.every((field) => sameFieldValue(a[field], b[field]));
 }
 
 /** Drops `undefined` keys so a round-trip through JSON compares equal. */
@@ -186,6 +209,7 @@ function fromListEntry(entry: MalListEntry, media: MalLibraryMedia): MalLibraryE
     malId: entry.animeId,
     media,
     title: entry.title,
+    altTitles: entry.altTitles,
     posterUrl: entry.posterUrl,
     totalEpisodes: entry.totalEpisodes,
     status: entry.status,
@@ -286,6 +310,16 @@ function optionalString(value: unknown): string | undefined {
   return typeof value === 'string' && value ? value : undefined;
 }
 
+/**
+ * A stored string list, or absent. An empty list reads as absent so a row MAL
+ * has no aliases for round-trips to the same bytes it was written with.
+ */
+function optionalStringList(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const out = value.filter((item): item is string => typeof item === 'string' && !!item);
+  return out.length ? out : undefined;
+}
+
 function optionalNumber(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
@@ -318,6 +352,7 @@ export function parseMalLibraryDocument(value: unknown): MalLibraryDocument {
       malId: Math.trunc(malId),
       media: record.media,
       title: typeof record.title === 'string' ? record.title : '',
+      altTitles: optionalStringList(record.altTitles),
       posterUrl: optionalString(record.posterUrl),
       totalEpisodes: optionalNumber(record.totalEpisodes),
       status: optionalString(record.status) as MalListStatus | undefined,

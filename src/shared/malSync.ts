@@ -52,6 +52,17 @@ export function isMalListStatus(value: unknown): value is MalListStatus {
 export interface MalListEntry {
   animeId: number;
   title: string;
+  /**
+   * MAL's `alternative_titles` — its English name, its native one, and the
+   * synonyms it files — with the primary title itself removed.
+   *
+   * Requested because one name is not enough to find a show on a release index.
+   * Measured live 2026-08-17: MAL 2596 is `Shinreigari`, nyaa carries it only as
+   * `Ghost Hound`, and a one-name search reported the index as empty for a
+   * release with 4 seeders. Absent rather than `[]` when MAL offers none, so an
+   * old stored row and a title with no aliases stay identical.
+   */
+  altTitles?: string[];
   posterUrl?: string;
   /** What MAL says the series has, which is 0 for a still-airing show. */
   totalEpisodes?: number;
@@ -167,6 +178,35 @@ function asFiniteNumber(value: unknown, fallback: number): number {
  * than thrown over, because one malformed entry in a 400-title list should cost
  * the user that row, not the sync.
  */
+/**
+ * MAL's `alternative_titles` object, flattened to the names worth searching by.
+ *
+ * `{ en, ja, synonyms[] }`. The primary title is dropped because it is already
+ * `entry.title` and searching it twice costs a request for nothing, and the
+ * comparison is case- and whitespace-insensitive because MAL's `en` is
+ * routinely the same string in different case.
+ */
+function parseAlternativeTitles(value: unknown, primary: string): string[] {
+  const source = asRecord(value);
+  const raw = [
+    source.en,
+    source.ja,
+    ...(Array.isArray(source.synonyms) ? source.synonyms : []),
+  ];
+  const out: string[] = [];
+  const seen = new Set([primary.trim().toLowerCase().replace(/\s+/g, ' ')]);
+  for (const candidate of raw) {
+    if (typeof candidate !== 'string') continue;
+    const trimmed = candidate.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase().replace(/\s+/g, ' ');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(trimmed);
+  }
+  return out;
+}
+
 export function parseMalAnimeListPage(payload: unknown): MalListPage {
   const root = asRecord(payload);
   const data = Array.isArray(root.data) ? root.data : [];
@@ -184,9 +224,13 @@ export function parseMalAnimeListPage(payload: unknown): MalListPage {
       ? picture.large
       : typeof picture.medium === 'string' ? picture.medium : undefined;
 
+    const title = typeof node.title === 'string' ? node.title : '';
+    const altTitles = parseAlternativeTitles(node.alternative_titles, title);
+
     entries.push({
       animeId: Math.trunc(animeId),
-      title: typeof node.title === 'string' ? node.title : '',
+      title,
+      ...(altTitles.length ? { altTitles } : {}),
       posterUrl,
       totalEpisodes: typeof node.num_episodes === 'number' ? node.num_episodes : undefined,
       status: isMalListStatus(status) ? status : undefined,
