@@ -464,6 +464,20 @@ This slice is complete only when all of these can be shown with real data and no
     Live on the running app: connect **16 rows / 4 changeable / 10 kept / 2 refused**,
     package **16 / 6 / 10 / 0**, the delta exactly `deck-name` + `template-remove`; **0** raw
     i18n keys, contrast **6.08–16.02** at **≥12.8 px**, **0** clipped rows at 760 and 420 px.
+
+    **Re-scored 2026-08-17** (`0d2d9d61`) — gate 5 widened the matrix and the numbers above
+    went stale within a day. Same probe, same real component, same real catalog: connect
+    **17 rows / 6 changeable / 8 kept / 3 refused** with **11** why-sentences and 3 codes
+    verbatim (`card-flag-unsupported`, `deck-rename-unsupported`, `template-remove-unsupported`),
+    package **17 / 9 / 8 / 0** with **8** why-sentences and 0 codes. Both partitions sum to 17
+    exactly and each destination's why-count is exactly its non-supported rows. The delta is now
+    `card-flag` + `deck-name` + `template-remove` — the live inverse control, carrying a row the
+    first score could not have seen. **0** raw i18n keys, contrast **6.08–16.02** at **≥12.8 px**,
+    **0** clipped rows. Instrument control: mounting with a destination the catalogs hold no key
+    for makes the same probe report **12** raw keys, so `0` is a measurement rather than a
+    counter that cannot fire. A canary in `ankiParityMatrix.test.ts` now hardcodes both
+    partitions — deliberately the only hardcoded numbers there, since every other test
+    re-derives from `ANKI_PARITY_ROWS` and is blind to it changing.
     **Its finding:** `template-add` is read-only on *both* destinations — `applyCardDesign`
     returns a draft and never touches the journal, so gate 13's 3,180 added cards were never
     exportable. The designer now says so between its card count and Apply.

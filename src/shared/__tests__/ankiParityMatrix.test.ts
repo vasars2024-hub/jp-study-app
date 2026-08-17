@@ -413,3 +413,54 @@ describe('the blocked cells refuse for real, before any write', () => {
     expect(plan.noteWrites[0].fields).toEqual({ Front: 'いぬ', Back: 'dog' });
   });
 });
+
+/**
+ * A deliberate canary, and the only hardcoded numbers in this file.
+ *
+ * Gate 14 is scored by driving the real panel and recording what it renders.
+ * That score went stale silently once already: gate 5 widened the matrix from
+ * 16 rows to 17 and moved connect from 4 supported / 2 blocked to 6 / 3, while
+ * every derived test here stayed green — because they all re-derive from
+ * `ANKI_PARITY_ROWS`, which is exactly what makes them blind to it changing.
+ *
+ * So this one does not re-derive. Widening the matrix is supposed to break it,
+ * and the fix is to re-run the live score and update both numbers together.
+ */
+describe('gate 14 canary: the partition the live score was recorded against', () => {
+  it('is 17 rows: connect 6 / 8 / 3 and package 9 / 8 / 0', () => {
+    const tally = (destination: AnkiParityDestination) =>
+      ANKI_PARITY_ROWS.reduce(
+        (acc, row) => {
+          acc[parityCell(row, destination).support] += 1;
+          return acc;
+        },
+        { supported: 0, 'read-only': 0, blocked: 0 } as Record<string, number>,
+      );
+
+    expect(ANKI_PARITY_ROWS).toHaveLength(17);
+    expect(tally('connect')).toEqual({ supported: 6, 'read-only': 8, blocked: 3 });
+    expect(tally('package')).toEqual({ supported: 9, 'read-only': 8, blocked: 0 });
+  });
+
+  it('the three connect refuses are exactly what package supports and connect does not', () => {
+    // The live inverse control, mechanically: the panel's own delta between the
+    // two destinations. Measured 2026-08-17 as 9 - 6 = 3 on the real component.
+    const delta = ANKI_PARITY_ROWS.filter(
+      (row) =>
+        parityCell(row, 'package').support === 'supported' &&
+        parityCell(row, 'connect').support !== 'supported',
+    ).map((row) => row.id);
+    expect(delta).toEqual(['card-flag', 'deck-name', 'template-remove']);
+    // Every one of them is `blocked` rather than read-only: a capability the
+    // package writes and live Anki merely lacks a row for would be a gap, not a
+    // refusal, and would render no code beside it. `parityRefusedRows` is the
+    // wider set — read-only included — so it is asserted as a superset, not as
+    // this list.
+    const blocked = ANKI_PARITY_ROWS.filter((row) => parityCell(row, 'connect').support === 'blocked');
+    expect(blocked.map((row) => row.id)).toEqual(delta);
+    expect(blocked.every((row) => parityCell(row, 'connect').refusal !== null)).toBe(true);
+    expect(parityRefusedRows('connect').map((row) => row.id)).toEqual(
+      expect.arrayContaining(delta),
+    );
+  });
+});

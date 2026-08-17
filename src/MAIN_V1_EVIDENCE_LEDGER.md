@@ -24687,3 +24687,43 @@ Gates this turn: `npx vitest run` **709 files passed / 1 skipped, 9,717 passed, 
   new block needs its own copy. `planChangeTray` is reachable from the running renderer via
   `import('/src/shared/ankiChangeTray.ts')` — the Vite dev graph serves shared modules, which
   is what let the live run use the product's real planner rather than a re-implementation.
+
+## 2026-08-17 — Track 7 / gate 14 re-scored: my own gate 5 slice made it stale in a day (`primary`)
+
+- `0d2d9d61`. Gate 14 was scored live on **16 rows** on 2026-08-17. Gate 5 (`67512897`,
+  `7c66293d`) added `card-flag`/`card-queue`/`card-scheduling` and split
+  `card-review-counters` out — **17 rows**, and connect moved 4→6 supported and 2→3 blocked.
+  Every derived test in `ankiParityMatrix.test.ts` stayed green, which is exactly what made
+  them blind: they all re-derive from `ANKI_PARITY_ROWS`.
+- **LIVE, same probe (`debug/parity-probe-kick.js`), real component on the app's own React
+  `?v=318a685f`, real catalog, 1 host asserted, bridge pid 40236.** connect @760 px:
+  **17 rows · 6 changeable / 8 kept / 3 refused**, **11** why-sentences, codes verbatim
+  (`card-flag-unsupported`, `deck-rename-unsupported`, `template-remove-unsupported`).
+  package @420 px: **17 · 9 / 8 / 0**, **8** why-sentences, **0** codes. Both partitions sum to
+  17; each why-count is exactly that destination's non-supported rows (17−6=11, 17−9=8).
+  Contrast **6.08–16.02** at **≥12.8 px**, **0** clipped rows, **0** raw i18n keys, hosts
+  removed and re-counted 0.
+- **The delta is the live inverse control and it grew.** package-supported minus
+  connect-supported is now `card-flag` + `deck-name` + `template-remove` — 9−6=3. The first
+  score's delta was 2; it could not have seen `card-flag`, which did not exist.
+- **INSTRUMENT CONTROL for `rawKeys: 0`, and it is the point of this entry.** A counter that
+  can never be non-zero proves nothing. Mounting the same component with
+  `destination: 'bogus-destination'` — no `why.<dest>.<row>` key exists — makes the same probe
+  report **12** raw keys, sampled verbatim
+  (`ankiWorkbench.parity.why.bogus-destination.card-flag`). So the zero is a measurement.
+- **DECISION: a hardcoded canary, the only hardcoded numbers in that file.** Two cases assert
+  17 rows / connect 6-8-3 / package 9-8-0 and that the 3 blocked cells are exactly the delta
+  and each names a refusal. Tradeoff: widening the matrix now breaks a test on purpose, which
+  is the whole intent — the fix is to re-run the live score and move both together. Mutation
+  control: flipping `template-add`'s package cell to `WRITES` reddens **both** canary cases
+  (plus 4 pre-existing derived ones); restored via `git checkout --` and re-verified clean.
+- **Checked and found sound, so not changed.** All 17 rows resolve exact `parity.row.*` keys in
+  en/ja/zh/ru; the 15 "missing" `why.*` keys per language are exactly the `supported` cells,
+  which render no sentence (`debug/g14-keys.cjs`, exact key equality — a substring match on a
+  key prefix is not a key check).
+- **TRAP.** `parityRefusedRows(dest)` is "rows this destination will not write" — read-only
+  **and** blocked, 11 on connect — not the blocked subset. Asserting the 3-row delta against it
+  fails with 8 extra ids; filter on `parityCell(row, dest).support === 'blocked'` instead.
+- **TRAP.** Restoring a mutated `src/shared/*.ts` with `cp` was refused **Permission denied**
+  while the dev app held it; `git checkout -- <path>` from PowerShell restored it. Verify with
+  `git status --short -- <path>`, not by re-reading the file.
