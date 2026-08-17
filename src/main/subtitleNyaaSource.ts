@@ -45,9 +45,11 @@ import {
   rankSubtitleCandidates,
   selectSubtitleFiles,
   type NyaaAcquisitionConfig,
+  type NyaaArchiveFile,
   type NyaaSelectionReason,
   type NyaaSubtitleCandidate,
 } from '../shared/subtitleNyaa';
+import { VIDEO_EXT } from '../shared/mediaKind';
 
 export type { NyaaAcquisitionConfig };
 import { searchTorrents } from './scraper/torrents';
@@ -408,6 +410,33 @@ const SELECTION_MESSAGES: Record<NyaaSelectionReason, string> = {
   'wrong-language': 'This release only has subtitles in another language.',
 };
 
+/**
+ * The same refusal, carrying the file list that justifies it.
+ *
+ * Same reasoning as `notJapaneseReason` above, and measured the same way: on
+ * 2026-08-17 eleven consecutive `batch-sidecar` candidates refused here and the
+ * bare sentence reported no number, so nothing downstream — not the user, not
+ * the next audit — could say whether Route B is data-blocked or code-blocked.
+ *
+ * The counts also answer the user's actual next question. A batch that is all
+ * video has its subtitles inside the video, so Route B is the wrong route for
+ * it and no other release by that group will help; a list with neither video
+ * nor subtitles is a mislabelled release and the ranker picked wrong.
+ *
+ * An *empty* list cannot arrive here, which was verified rather than assumed:
+ * `qbitAwaitMetadata` refuses it first, with its own "no peer sent its file
+ * list" wording, so the one failure this count would otherwise hide is already
+ * a distinct state upstream.
+ */
+function noSubtitlesReason(files: readonly NyaaArchiveFile[]): string {
+  const total = files.length;
+  const video = files.filter((file) => VIDEO_EXT.has(path.extname(file.name).toLowerCase())).length;
+  if (video) {
+    return `${SELECTION_MESSAGES['no-subtitles']} ${total} file(s), ${video} of them video — any subtitles it carries are inside the video.`;
+  }
+  return `${SELECTION_MESSAGES['no-subtitles']} ${total} file(s), none of them video or subtitles.`;
+}
+
 async function readSubtitleFile(savePath: string, torrentName: string, fileName: string): Promise<string | null> {
   // qBittorrent reports the save path of the torrent and file names relative to
   // it. With `contentLayout=Original` a multi-file torrent nests under its own
@@ -531,7 +560,13 @@ async function acquireAll(
     languages: token.languages,
   });
   if (selection.reason !== 'ok' || !selection.format) {
-    return { ok: false, reason: SELECTION_MESSAGES[selection.reason] };
+    return {
+      ok: false,
+      reason:
+        selection.reason === 'no-subtitles'
+          ? noSubtitlesReason(files.value)
+          : SELECTION_MESSAGES[selection.reason],
+    };
   }
   const wanted = selection.files.map((file) => file.index);
 

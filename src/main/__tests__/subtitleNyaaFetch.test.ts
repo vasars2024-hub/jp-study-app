@@ -621,6 +621,41 @@ describe('nyaaFetch — route B, selected files out of a batch', () => {
     expect(result.ok === false && result.reason).toMatch(/no subtitle files/i);
     expect(calls.some((call) => call.startsWith('prio:'))).toBe(false);
   });
+
+  it('says how many files it looked at, and how many were video', async () => {
+    // Eleven consecutive Route B candidates refused with the bare sentence on
+    // 2026-08-17 and nothing downstream could tell an honest muxed batch from a
+    // metadata read that returned nothing. Both now state their counts.
+    files = [
+      { name: 'Show/Show - 01.mkv', size: 1_400_000_000, progress: 0, priority: 1 },
+      { name: 'Show/Show - 02.mkv', size: 1_400_000_000, progress: 0, priority: 1 },
+      { name: 'Show/readme.nfo', size: 900, progress: 0, priority: 1 },
+    ];
+    const result = await nyaaFetch(candidate('batch-sidecar'), config(), { timeoutMs: 5_000 });
+    expect(result.ok === false && result.reason).toBe(
+      'This release contains no subtitle files. 3 file(s), 2 of them video — any subtitles it carries are inside the video.',
+    );
+  });
+
+  it('never reaches the count with an empty list, because metadata refuses first', async () => {
+    // The control for the test above, and the reason `noSubtitlesReason` has no
+    // zero-file branch: a list that never arrived is the one failure a count
+    // could hide behind "no subtitle files", and it is already its own state one
+    // step earlier. Written as an assertion so that stops being true loudly.
+    files = [];
+    const result = await nyaaFetch(candidate('batch-sidecar'), config(), { timeoutMs: 5_000 });
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.reason).toMatch(/no peer sent its file list/i);
+    expect(result.ok === false && result.reason).not.toMatch(/no subtitle files/i);
+  });
+
+  it('names a release that is neither video nor subtitles', async () => {
+    files = [{ name: 'Show/readme.nfo', size: 900, progress: 0, priority: 1 }];
+    const result = await nyaaFetch(candidate('batch-sidecar'), config(), { timeoutMs: 5_000 });
+    expect(result.ok === false && result.reason).toBe(
+      'This release contains no subtitle files. 1 file(s), none of them video or subtitles.',
+    );
+  });
 });
 
 describe('nyaaFetch — a torrent the user already has', () => {
