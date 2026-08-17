@@ -478,8 +478,20 @@ Canvas-vs-chrome moves the right way (Media 58.3 → **62.4%** canvas, into §4.
 Control: an injected must-clip box at maximized took Media 0 → **1** and left Dictionary at 0;
 round trip byte-identical on `left/top/width/height`. All 14 default-size figures reproduced
 to the decimal on a fresh instance, which is what licenses the new row.
-Still open for L1: categories 1, 2, 5–8, and the layout studies themselves.
-`LIQUID_SCORECARD.md` is deliberately still empty — one scored category is not a score.
+**Category 1 (accessibility) measured 2026-08-17 — also not a 10, on one bar only.**
+`.coordination/liquid-workplace/L1_ACCESSIBILITY.md`. Contrast passes (min **5.30:1** Dictionary
+over 141 runs, **5.13:1** Media over 37, **0** below bar, **0** unmeasurable); keyboard passes
+(**0** unreachable of 54 and 31, tested by real `focus()`); reduced motion passes at **0.001 ms**
+via `theme/a11y.css:36-46`+`:50-55` (live 8→0, 30→0). **Hit targets fail the rubric's 32 px bar —
+Dictionary 45 of 54, Media 19 of 31 — while WCAG 2.5.8 with its spacing exception is clean at 0
+on both.** Decision recorded: do NOT inflate compact chrome (that rule generated 98 false
+failures before, and growing it would worsen category 4's dead region); L4 gets a targeted
+hit-AREA fix and a re-score in the fixing commit. Two traps banked: the `data-theme` attribute
+swap is a HALF-APPLIED palette that manufactures ~1.01 ratios (39 fake failures — `--accent` is
+inline on `<html>`), so the §0 two-palette check is **not** done and category 1 is one-palette;
+and reading `styles.css` alone says reduced motion FAILS, which the live diff disproved.
+Still open for L1: categories 2, 5–8, and the layout studies themselves.
+`LIQUID_SCORECARD.md` is deliberately still empty — two scored categories are not a score.
 
 ### L2 — Semantic tokens and shared primitives
 
