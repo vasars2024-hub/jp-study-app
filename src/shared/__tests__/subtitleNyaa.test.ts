@@ -6,7 +6,9 @@ import {
   couldCarrySidecarSubtitles,
   episodeFromFileName,
   isBitmapSubtitleFile,
+  JAPANESE_KANA_FLOOR,
   languageFromFileName,
+  looksJapaneseSubtitle,
   looksLikeSameTitle,
   looksLikeSubtitleOnly,
   packCoversEpisodeCount,
@@ -14,6 +16,7 @@ import {
   SUBTITLE_PACK_BYTES_PER_EPISODE,
   selectSubtitleFiles,
   subtitleFormatFor,
+  subtitleKanaCount,
   subtitlePackSignals,
   SUBTITLE_SIZE_CEILING_BYTES,
 } from '../subtitleNyaa';
@@ -476,4 +479,103 @@ describe('asNyaaAcquisitionConfig', () => {
     // time — the same failure one step later and much harder to read.
     expect(asNyaaAcquisitionConfig(input)).toBeUndefined();
   });
+});
+
+describe('looksJapaneseSubtitle / subtitleKanaCount', () => {
+  /** An ASS header shaped like the real acquired files: styles, then dialogue. */
+  const ass = (lines: string[]): string => [
+    '[Script Info]',
+    'Title: Default Aegisub file',
+    'ScriptType: v4.00+',
+    '',
+    '[V4+ Styles]',
+    'Format: Name, Fontname, Fontsize',
+    'Style: Default,Open Sans SemiBold,70',
+    '',
+    '[Events]',
+    ...lines.map((text) => `Dialogue: 0,0:00:06.27,0:00:09.19,Default,,0,0,0,,${text}`),
+  ].join('\n');
+
+  it('refuses the English pack that was actually acquired', () => {
+    // Not a hypothetical: MAL 92's Route A release is `After War Gundam X …
+    // Official Subtitles`, and all 47 files measured 0 kana against 292,568
+    // Latin letters. It reached the miner and produced 11,136 cues and 0 words.
+    const english = ass([
+      'There once was a war.',
+      "A conflict that arose from a single colony's independence movement...",
+      '...grew into an all-out war that engulfed the entire Earth.',
+    ]);
+    expect(subtitleKanaCount(english)).toBe(0);
+    expect(looksJapaneseSubtitle(english)).toBe(false);
+  });
+
+  it('accepts a Japanese file', () => {
+    const japanese = ass([
+      'かつて、戦争があった。',
+      'ひとつのコロニーの独立運動から始まった戦いは',
+      '地球全体を巻き込む全面戦争へと発展した。',
+    ]);
+    expect(subtitleKanaCount(japanese)).toBeGreaterThanOrEqual(JAPANESE_KANA_FLOOR);
+    expect(looksJapaneseSubtitle(japanese)).toBe(true);
+  });
+
+  it('refuses a Chinese release, which is the reason kanji is not counted', () => {
+    // nyaa carries a great many of these — `[GM-Team][国漫][神印王座]` is one this
+    // plan already had to guard the title matcher against. Every character is a
+    // han ideograph, so a kanji-inclusive test would call it Japanese.
+    const chinese = ass(['曾经有过一场战争。', '一个殖民地的独立运动引发的冲突', '发展成了席卷整个地球的全面战争。']);
+    expect(subtitleKanaCount(chinese)).toBe(0);
+    expect(looksJapaneseSubtitle(chinese)).toBe(false);
+  });
+
+  it('does not count kana outside the dialogue — a Japanese font name is not a Japanese subtitle', () => {
+    // The control for the measurement itself. Style blocks are where an English
+    // release legitimately carries kana, and a whole-file count would read this
+    // as language. 24 kana of font names, still English dialogue.
+    const styled = [
+      '[V4+ Styles]',
+      'Style: Default,ヒラギノ角ゴシックプロダブル,70',
+      'Style: Sign,モトヤシーダウンロード用フォント,60',
+      '',
+      '[Events]',
+      'Dialogue: 0,0:00:06.27,0:00:09.19,Default,,0,0,0,,There once was a war.',
+    ].join('\n');
+    expect(subtitleKanaCount(styled)).toBe(0);
+    expect(looksJapaneseSubtitle(styled)).toBe(false);
+  });
+
+  it('ignores override blocks, so karaoke timing tags cannot carry a file', () => {
+    const tagged = ass(['{\k21}ka{\k18}ra{\k30}o{\k25}ke', '{\pos(100,200)\fadeこんにちは}Hello there.']);
+    expect(subtitleKanaCount(tagged)).toBe(0);
+  });
+
+  it('measures every line when nothing is an ASS dialogue line, so srt and vtt still count', () => {
+    const srt = [
+      '1\n00:00:01,000 --> 00:00:02,000\nこんにちは、みなさん。\n',
+      '2\n00:00:03,000 --> 00:00:05,000\nおはようございます。\n',
+      '3\n00:00:06,000 --> 00:00:08,000\n今日はいい天気ですね。\n',
+    ].join('\n');
+    expect(subtitleKanaCount(srt)).toBeGreaterThanOrEqual(JAPANESE_KANA_FLOOR);
+    expect(looksJapaneseSubtitle(srt)).toBe(true);
+
+    // The floor is not decorative: a single cue of the same dialogue is 18 kana
+    // and does not clear it. Three lines of a real file do.
+    expect(subtitleKanaCount('1\n00:00:01,000 --> 00:00:02,000\nこんにちは、みなさん。おはようございます。\n')).toBe(18);
+  });
+
+  it('treats a title card as the incidental Japanese it is', () => {
+    // A single Japanese line in an otherwise English file is below the floor,
+    // which is the whole point of having one rather than testing for `> 0`.
+    const credit = ass(['字幕', 'Translated by a fan group.', 'There once was a war.']);
+    expect(subtitleKanaCount(credit)).toBeLessThan(JAPANESE_KANA_FLOOR);
+    expect(looksJapaneseSubtitle(credit)).toBe(false);
+  });
+
+  it.each([['empty', ''], ['whitespace', '   \n  '], ['absent', undefined as unknown as string]])(
+    'treats %s text as no Japanese rather than throwing',
+    (_label, input) => {
+      expect(subtitleKanaCount(input)).toBe(0);
+      expect(looksJapaneseSubtitle(input)).toBe(false);
+    },
+  );
 });

@@ -40,6 +40,8 @@ import type { SubtitleRecordFormat } from '../shared/subtitleRecord';
 import {
   buildSubtitleQuery,
   episodeFromFileName,
+  languageFromFileName,
+  looksJapaneseSubtitle,
   rankSubtitleCandidates,
   selectSubtitleFiles,
   type NyaaAcquisitionConfig,
@@ -374,6 +376,16 @@ export type NyaaFetchAllOutcome =
 /** Shared by both fetch shapes, so they cannot drift into two wordings. */
 const NOTHING_READABLE = 'The subtitle files finished downloading but could not be read from disk.';
 
+/**
+ * The release turned out to be in another language.
+ *
+ * Its own state rather than an empty result, because the two are acted on
+ * differently: "nothing readable" means retry, and this means pick a different
+ * release. It carries the count so the user can see the download was real.
+ */
+const notJapaneseReason = (files: number): string =>
+  `This release's subtitles are not Japanese — ${files} file(s) downloaded and none carry Japanese text.`;
+
 const SELECTION_MESSAGES: Record<NyaaSelectionReason, string> = {
   'ok': '',
   'bitmap-only': 'This release only has image-based subtitles, which cannot be read as text.',
@@ -545,23 +557,46 @@ async function acquireAll(
   if (!info.ok) return { ok: false, reason: info.reason };
   if (!info.value?.savePath) return { ok: false, reason: 'qBittorrent reported no save path.' };
 
+  // `selectSubtitleFiles` already dropped any file whose *name* states a
+  // language we did not ask for, and keeps the ones stating nothing. That is
+  // the right policy for a name and the wrong answer for a pack that labels
+  // nothing at all: MAL 92's Route A release is the official *English*
+  // subtitles under names that say only the episode number, so a `ja` harvest
+  // took all 47 of them. Only the text can settle it, and only once it is here.
+  const wantsJapanese = (token.languages ?? []).some((lang) => lang.slice(0, 2).toLowerCase() === 'ja');
   const read: NyaaFetchedFile[] = [];
+  let otherLanguage = 0;
   for (const file of selection.files) {
     const text = await readSubtitleFile(info.value.savePath, info.value.name, file.name);
     // An unreadable file is skipped rather than failing the release: a pack
     // where one of twenty-six episodes is truncated still carries twenty-five,
     // and the caller reports which episodes it got.
-    if (text && text.trim()) {
-      read.push({
-        text,
-        format: selection.format,
-        fileName: path.basename(file.name),
-        episode: episodeFromFileName(file.name),
-      });
+    if (!text || !text.trim()) continue;
+    // Per file, not per release, for the same reason: a pack shipping a
+    // Japanese and an English track of each episode should yield the Japanese
+    // ones rather than be refused whole.
+    //
+    // Only unlabelled names are read. A name that states a language is an
+    // explicit claim, and `selectSubtitleFiles` already trusts exactly that
+    // claim to *exclude* files — having the next step overrule the same label
+    // to *include* them would leave two functions disagreeing about what a name
+    // is worth. The measured hole is entirely in the other branch: all 47 files
+    // of MAL 92's English pack state nothing but an episode number.
+    if (wantsJapanese && languageFromFileName(file.name) === null && !looksJapaneseSubtitle(text)) {
+      otherLanguage += 1;
+      continue;
     }
+    read.push({
+      text,
+      format: selection.format,
+      fileName: path.basename(file.name),
+      episode: episodeFromFileName(file.name),
+    });
   }
 
-  if (!read.length) return { ok: false, reason: NOTHING_READABLE };
+  if (!read.length) {
+    return { ok: false, reason: otherLanguage ? notJapaneseReason(otherLanguage) : NOTHING_READABLE };
+  }
   scraperLog(
     'info',
     'torrents',

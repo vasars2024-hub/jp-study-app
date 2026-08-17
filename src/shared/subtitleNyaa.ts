@@ -164,6 +164,71 @@ export function isBitmapSubtitleFile(fileName: string): boolean {
   return BITMAP_SUBTITLE_EXTENSIONS.has(extensionOf(fileName));
 }
 
+/**
+ * Hiragana and katakana.
+ *
+ * Kanji is deliberately **not** counted. It is the one script a Japanese and a
+ * Chinese release share, and nyaa carries a great many of the latter, so a
+ * kanji-inclusive test would accept `[GM-Team][国漫]` packs as Japanese. Kana
+ * appears in no other language, which makes it the only cheap signal that is
+ * also unambiguous.
+ */
+const KANA = /[぀-ゟ゠-ヿ]/gu;
+
+/** `Dialogue: 0,0:00:06.27,…,,There once was a war.` */
+const ASS_DIALOGUE_LINE = /^Dialogue\s*:/i;
+
+/**
+ * Kana in a subtitle file's dialogue, ignoring everything around it.
+ *
+ * Dialogue only, and override blocks stripped, because the number has to mean
+ * what it says. A real acquired `.ass` here is **501,684 bytes with 262
+ * dialogue lines** — the rest is styles and embedded font data — so a ratio
+ * over the raw text measures the typesetting, not the language. Style blocks
+ * are also where a Japanese *font name* lives, which is exactly the handful of
+ * kana an English release can legitimately carry.
+ *
+ * Falls back to every line when nothing looks like an ASS dialogue line, so
+ * `.srt` and `.vtt` are measured whole.
+ */
+export function subtitleKanaCount(text: string): number {
+  const lines = String(text ?? '').split(/\r?\n/);
+  const dialogue = lines.filter((line) => ASS_DIALOGUE_LINE.test(line));
+  const body = dialogue.length ? dialogue : lines;
+  let count = 0;
+  for (const line of body) {
+    count += (line.replace(/\{[^}]*\}/g, '').match(KANA) ?? []).length;
+  }
+  return count;
+}
+
+/**
+ * Enough kana that the file is written in Japanese rather than merely
+ * mentioning it.
+ *
+ * One line of Japanese dialogue runs roughly 10–20 kana, so this floor asks for
+ * more than a title card or a translator credit while sitting far below any
+ * real subtitle file: the smallest episode of the acquired Gundam X pack would
+ * clear it in its first two lines if it were Japanese at all.
+ */
+export const JAPANESE_KANA_FLOOR = 20;
+
+/**
+ * Whether a subtitle file's own text is Japanese.
+ *
+ * `languageFromFileName` can only answer when a name states a language, and its
+ * documented policy is that a file stating nothing is kept — single-language
+ * packs routinely label nothing. That hole was measured, not theorised: the
+ * Route A pack for MAL 92 `Kidou Shinseiki Gundam X` acquired **47 files /
+ * 11,285 dialogue lines / 0 kana / 292,568 Latin letters** — the official
+ * *English* subtitles — and every name in it stated nothing, so a harvest that
+ * had asked for `ja` mined 11,136 cues into 0 words and called it a success.
+ * The file name cannot answer this; the text can.
+ */
+export function looksJapaneseSubtitle(text: string): boolean {
+  return subtitleKanaCount(text) >= JAPANESE_KANA_FLOOR;
+}
+
 // ------------------------------------------------------------- name signals ---
 
 /**

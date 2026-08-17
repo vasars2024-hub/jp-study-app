@@ -455,7 +455,15 @@ describe('nyaaFetch — route A, a subtitle-only pack', () => {
     // record kept that guess a `.srt` release would be written with the wrong
     // extension and parse as nothing.
     files = [{ name: 'Show - 07.srt', size: 20_000, progress: 0, priority: 1 }];
-    await writeOnDisk('Show - 07.srt', '1\n00:00:01,000 --> 00:00:02,000\nhi');
+    // Japanese, because the name states no language and the candidate asks for
+    // `ja` — an English body here is a release this fetch now refuses outright,
+    // and the format correction would never be reached to be asserted.
+    await writeOnDisk(
+      'Show - 07.srt',
+      '1\n00:00:01,000 --> 00:00:02,000\nこんにちは、みなさん。\n\n'
+      + '2\n00:00:03,000 --> 00:00:05,000\nおはようございます。\n\n'
+      + '3\n00:00:06,000 --> 00:00:08,000\n今日はいい天気ですね。\n',
+    );
 
     const result = await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 5_000 });
     expect(candidate('sub-pack').format).toBe('ass');
@@ -752,5 +760,89 @@ describe('a refused WebUI call names the endpoint that refused', () => {
     // The fallback really was reached, rather than the name being cosmetic.
     expect(calls).toContain('/api/v2/torrents/resume');
     expect(calls).toContain('/api/v2/torrents/start');
+  });
+});
+
+describe('nyaaFetchAll — a release in another language is its own refusal', () => {
+  /** Verbatim shape of the pack MAL 92's Route A acquisition actually landed. */
+  const ENGLISH = [
+    '[Script Info]',
+    'Title: Default Aegisub file',
+    '',
+    '[Events]',
+    'Dialogue: 0,0:00:06.27,0:00:09.19,Default,,0,0,0,,There once was a war.',
+    'Dialogue: 0,0:00:16.20,0:00:19.91,Default,,0,0,0,,A conflict that arose from a colony.',
+  ].join('\n');
+  const JAPANESE = [
+    '[Script Info]',
+    '',
+    '[Events]',
+    'Dialogue: 0,0:00:06.27,0:00:09.19,Default,,0,0,0,,かつて、戦争があった。',
+    'Dialogue: 0,0:00:16.20,0:00:19.91,Default,,0,0,0,,ひとつのコロニーの独立運動から始まった。',
+  ].join('\n');
+
+  it('refuses an all-English pack instead of handing 0 words to the miner', async () => {
+    // The defect this exists for, at the size it happened: names stating only
+    // an episode number, so `selectSubtitleFiles` kept every one of them, and a
+    // `ja` harvest mined 11,136 English cues into 0 vocabulary and reported
+    // success. The download is real by then — the refusal has to say why.
+    files = [
+      { name: '[Group][01][BDRIP].ass', size: 500_000, progress: 0, priority: 1 },
+      { name: '[Group][02][BDRIP].ass', size: 500_000, progress: 0, priority: 1 },
+    ];
+    await writeOnDisk('[Group][01][BDRIP].ass', ENGLISH);
+    await writeOnDisk('[Group][02][BDRIP].ass', ENGLISH);
+
+    const all = await nyaaFetchAll(candidate('sub-pack', null), config(), { timeoutMs: 5_000 });
+    expect(all.ok).toBe(false);
+    expect(all.ok === false && all.reason).toBe(
+      "This release's subtitles are not Japanese — 2 file(s) downloaded and none carry Japanese text.",
+    );
+    // Distinct from the empty-result state, which means retry rather than
+    // pick another release.
+    expect(all.ok === false && all.reason).not.toContain('could not be read');
+  });
+
+  it('keeps the Japanese files of a mixed pack rather than refusing it whole', async () => {
+    files = [
+      { name: '[Group][01][BDRIP].ass', size: 500_000, progress: 0, priority: 1 },
+      { name: '[Group][02][BDRIP].ass', size: 500_000, progress: 0, priority: 1 },
+    ];
+    await writeOnDisk('[Group][01][BDRIP].ass', JAPANESE);
+    await writeOnDisk('[Group][02][BDRIP].ass', ENGLISH);
+
+    const all = await nyaaFetchAll(candidate('sub-pack', null), config(), { timeoutMs: 5_000 });
+    expect(all.ok).toBe(true);
+    expect(all.ok && all.files.map((file) => file.episode)).toEqual([1]);
+  });
+
+  it('leaves a name that states its language alone, even when the text disagrees', async () => {
+    // `selectSubtitleFiles` already trusts a stated language to *exclude*
+    // files. Overruling the same label here would leave two functions
+    // disagreeing about what a name is worth, so the content check reads only
+    // the names that state nothing.
+    files = [{ name: 'Show - 07.ja.srt', size: 40_000, progress: 0, priority: 1 }];
+    await writeOnDisk('Show - 07.ja.srt', '1\n00:00:01,000 --> 00:00:02,000\nhi\n');
+
+    const one = await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 5_000 });
+    expect(one.ok).toBe(true);
+  });
+
+  it('INVERSE CONTROL: a request that did not ask for Japanese is not filtered', async () => {
+    // Discovery downloads whatever `autoDownloadLanguages` says, and English is
+    // a legitimate answer there. If this ever fails, the guard has escaped the
+    // harvest and is deciding for a user who asked for something else.
+    const english = {
+      ...candidate('sub-pack', null),
+      fetchToken: JSON.stringify({
+        infoHash: HASH, magnet: MAGNET, route: 'sub-pack', episode: null, languages: ['en'],
+      }),
+    };
+    files = [{ name: '[Group][01][BDRIP].ass', size: 500_000, progress: 0, priority: 1 }];
+    await writeOnDisk('[Group][01][BDRIP].ass', ENGLISH);
+
+    const all = await nyaaFetchAll(english, config(), { timeoutMs: 5_000 });
+    expect(all.ok).toBe(true);
+    expect(all.ok && all.files).toHaveLength(1);
   });
 });
