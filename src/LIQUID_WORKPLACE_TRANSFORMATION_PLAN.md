@@ -490,8 +490,18 @@ hit-AREA fix and a re-score in the fixing commit. Two traps banked: the `data-th
 swap is a HALF-APPLIED palette that manufactures ~1.01 ratios (39 fake failures — `--accent` is
 inline on `<html>`), so the §0 two-palette check is **not** done and category 1 is one-palette;
 and reading `styles.css` alone says reduced motion FAILS, which the live diff disproved.
-Still open for L1: categories 2, 5–8, and the layout studies themselves.
-`LIQUID_SCORECARD.md` is deliberately still empty — two scored categories are not a score.
+**Category 8 (honest states) attempted 2026-08-17 and is VOID, not scored** —
+`.coordination/liquid-workplace/L1_HONEST_STATES.md`. Empty state is `LIVE` and names the query
+("No dictionary match for …"); loading is `LIVE` ("Translating sentence…" → "Adding…" → "Added");
+raw i18n keys **0** on `lang=en`. But **both induced failures SUCCEEDED** — AnkiConnect is up and
+an AI provider is configured — so error/offline were never observed and the rubric's "control did
+not fail ⇒ VOID, not 10" applies. Next slice's first job: a genuinely unreachable dependency.
+Trap banked: the probe first reported `loading: 0` while the surface was visibly loading, because
+Dictionary renders that state as the **button's own label**, not in a `[class*="loading"]`
+container — the D-calibration error, reproduced exactly. Also note the Anki click really wrote one
+食べる note to the live collection.
+Still open for L1: categories 2, 5–7, category 8's real control, and the layout studies.
+`LIQUID_SCORECARD.md` is deliberately still empty — three driven categories, none scoring 10.
 
 ### L2 — Semantic tokens and shared primitives
 
