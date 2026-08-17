@@ -98,6 +98,14 @@
     "test-only-module:src/renderer/components/liquid/LiquidAppScaffold.tsx": {
       "status": "pending",
       "note": "Same L2 boundary as LiquidSurface.tsx: the scaffold spine exists so a migrating app has a destination, and no app has migrated yet. Closes when L4 migrates the Video player."
+    },
+    "test-only-module:src/renderer/components/liquid/LiquidDock.tsx": {
+      "status": "pending",
+      "note": "Same L2 boundary as LiquidAppScaffold.tsx. The dock is the compact-width home for the rail's routes, which the scaffold drops below its `medium` breakpoint; it and AdaptiveRail/ContextToolbar (reachable through it) complete §5.2's primitive list. No app has migrated, so nothing imports it yet. Closes when L4 migrates the Video player."
+    },
+    "test-only-module:src/renderer/components/liquid/LiquidInspector.tsx": {
+      "status": "pending",
+      "note": "Same L2 boundary as LiquidAppScaffold.tsx. Fills the scaffold's inspector slot and carries the required close path (control, Escape, caller state) plus focus return. No app has migrated, so nothing imports it yet. Closes when L4 migrates the Video player."
     }
   }
 }
