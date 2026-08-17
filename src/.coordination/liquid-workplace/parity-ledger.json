@@ -98,6 +98,7 @@
       "dataStateOwner": "DesktopShell window state + main-process popOut",
       "automatedProof": "/health window list",
       "visualProof": "live bridge drive, 2026-08-16",
+      "_note": "pending here still means no Liquid destination; the standard half of every dictionary row above is driven and observed.",
       "observed": "pop out created a SECOND real BrowserWindow at 900×640 (`/health` went 1 -> 2 windows, url `?popout=dictionary`) and removed the in-desk `.fwin`. The popped window rendered the app's INITIAL state — the active 食べる search did not carry across. Closing the popped window left NEITHER window: the desk returned to Scraper+Anki with no Dictionary. L3's reversibility requirement has to decide whether that last part is intended",
       "status": "pending"
     }
@@ -105,7 +106,7 @@
   "notWritten": {
     "reason": "§5.3 says the ledger is created per app BEFORE that app is redesigned. Dictionary is written here because it is one of L1's two representative apps and because a ledger no one has driven is a template, not a ledger.",
     "apps": [
-      "MediaCenterView (video/player/music) — rows need a real clip loaded; the surface currently renders the honest degraded state 'Video playback needs the media server' (VIDEO_BASELINE.md finding 2)",
+      "MediaCenterView (video/player/music) — the 'needs a real clip' blocker is CLOSED as of 2026-08-17 (L4_MEDIA_SHELL.md): Library > The Big O > Play mounted a real 437 s / 960x720 clip with a 285-cue transcript rail. Rows are now writable and §6.4 is their row list; they are not written yet.",
       "the other 19 root components — written in their own waves, against ALL_APPS_BASELINE.md",
       "note / visualizer / musicwidget — no baseline yet, see ALL_APPS_BASELINE.md 'Not captured'"
     ]
