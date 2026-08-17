@@ -97,6 +97,21 @@ with a literal `observed`. All four are `pending` — the status means *no Liqui
 which is still true of this surface. The `notWritten` block now lists what of §6.4 is
 deliberately undriven rather than letting four rows read as the inventory.
 
+## Correction · the directstream's mount-time metadata is not the file's
+
+Both L4 entries above call this clip **"437 s / 960×720"**. Re-measured at the end of the same
+session, on the same element, same file, position untouched at `t=395.878722`: **`duration`
+1421.020**, `readyState` 4, `buffered` 456.45, `videoWidth/Height` **320×240** — and the
+player's own clock reads **`6:35 / 23:41`**. 23:41 = 1421 s, so **1421.020 is the episode and
+437.103 was a progressive estimate** taken while the stream was still being indexed; the
+resolution moved too, because the stream adapts.
+
+Neither number was wrong when read — both were what the element reported — but "a 437 s clip"
+states it as a property of the file, and it is not. **Read media metadata from the player's own
+clock, or after `readyState` 4, and never treat a mount-time `duration` or `videoWidth` as a
+fixed fact.** The `27d584a8` gate is unaffected: it turns on box `0×0 → 1264×821` and the
+segment moving, neither of which is media metadata.
+
 ## Open, in order
 
 1. §6.5 acceptance views 1–10 and the first `LIQUID_SCORECARD.md` entry. None exists yet.
@@ -105,3 +120,17 @@ deliberately undriven rather than letting four rows read as the inventory.
    nothing**, so `MediaWorkspaceSectionView` is unreachable product code. Not deleted here:
    deletion is a separate decision with its own tests, and CLAUDE.md forbids removing a feature
    as a side effect. Recorded so the next worker does not measure a surface no route reaches.
+
+   **Re-derived 2026-08-17, two things that change how it should be picked up.** First, the
+   retirement is *deliberate and pinned*: `mediaCenterIntegration.test.ts:19` asserts
+   `AppSection.tsx` does **not** contain `<MediaWorkspaceSectionView`, and all three media
+   sections route to `<MediaCenterView initialTab=…>` (`:76`, `:82`, `:88`). So this is a
+   leftover lazy export, not a route someone forgot to wire. Second, **L4.1 is not affected** —
+   the worry that `videoStageFor()` fixed dead copy does not hold: its only consumer is
+   `MediaCenterView.tsx:661`, which is the reachable surface. Deleting is still not a one-liner:
+   **three** cases in `mediaCenterIntegration.test.ts` (`:34-44`, `:75-83`, `:96-117`) read that
+   file's source and would have to move to the live surface first — and `:34-44` is the
+   `SEANIME_SIDECAR=0` rollback guarantee, which is now delivered by `videoStageFor`'s
+   `unavailable → needs-server` branch but is still asserted only on the retired file. That
+   re-target is the honest first step, and it was NOT taken here: the test file is ` M` with
+   another track's uncommitted edits.
