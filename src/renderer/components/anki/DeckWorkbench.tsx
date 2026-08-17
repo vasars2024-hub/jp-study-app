@@ -64,7 +64,7 @@ import { buildWorkbenchReview } from '../../../shared/ankiWorkbenchReview';
 import type { ApkgExportResult } from '../../../shared/ankiApkgExport';
 import './deckWorkbench.css';
 
-type SourceKey = 'apkg' | 'connect' | 'localDeck';
+type SourceKey = 'apkg' | 'connect' | 'localDeck' | 'text';
 
 /**
  * Which of the numbered steps owns which tray action kinds. The three sets
@@ -132,6 +132,15 @@ function writeMasteryLevel(write: MasteryWrite): void {
  */
 export function isReopenable(kind: AnkiDraftSourceKind): boolean {
   return kind === 'apkg' || kind === 'colpkg';
+}
+
+/**
+ * Bytes as whole megabytes for the size-ceiling refusal. Returned as a string
+ * rather than a number so `t()` does not locale-format it a second time — the
+ * unit is spelled out in the sentence, and MB is not a translated word here.
+ */
+function megabytes(bytes: number): string {
+  return String(Math.round((bytes / (1024 * 1024)) * 10) / 10);
 }
 
 /** The worst severity present, which is what decides the step's validation. */
@@ -242,6 +251,23 @@ export default function DeckWorkbench() {
             // A cancelled file dialog is not a failure and must not shout.
             if (res.error && res.error !== 'cancelled') setError(res.error);
           } else adoptDraft(res.draft, res.totalNotes);
+        } else if (key === 'text') {
+          const res = await window.api.readAnkiCsvDraft({ noteLimit: ANKI_DRAFT_PAGE_SIZE });
+          if (!res.ok || !res.draft) {
+            // The one refusal this reader has that a user can act on arrives as
+            // `file-too-large:<bytes>:<ceiling>`. Both numbers are in it because
+            // the reader refuses rather than truncating, and a truncated deck
+            // would look like a deck that really is that short.
+            const tooLarge = /^file-too-large:(\d+):(\d+)$/.exec(res.error ?? '');
+            if (tooLarge) {
+              setError(
+                t('ankiWorkbench.source.tooLarge', {
+                  size: megabytes(Number(tooLarge[1])),
+                  max: megabytes(Number(tooLarge[2])),
+                }),
+              );
+            } else if (res.error && res.error !== 'cancelled') setError(res.error);
+          } else adoptDraft(res.draft, res.totalNotes);
         } else {
           const res = await window.api.readAnkiConnectDraft({ noteLimit: ANKI_DRAFT_PAGE_SIZE });
           if (!res.ok || !res.draft) setError(res.error ?? 'unknown');
@@ -254,7 +280,7 @@ export default function DeckWorkbench() {
         void refreshSessions();
       }
     },
-    [adoptDraft, refreshSessions],
+    [adoptDraft, refreshSessions, t],
   );
 
   const move = useCallback((to: WorkbenchStepId | 'next' | 'back') => {
@@ -649,7 +675,7 @@ export default function DeckWorkbench() {
           <>
             <div className="deck-workbench-rail">
               <h3>{t('ankiWorkbench.source.title')}</h3>
-              {(['apkg', 'connect', 'localDeck'] as const).map((key) => (
+              {(['apkg', 'text', 'connect', 'localDeck'] as const).map((key) => (
                 <button
                   key={key}
                   type="button"

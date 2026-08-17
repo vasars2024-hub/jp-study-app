@@ -2725,6 +2725,7 @@ export const ja: Catalog = {
   'dialog.exportAnkiDeck.pickSource': '元のデッキファイルを選択',
   'dialog.exportAnkiText.title': '編集したデッキをテキストファイルとして書き出す',
   'dialog.exportAnkiText.pickSource': '元のテキストファイルを選択',
+  'dialog.importAnkiText.title': 'Anki のテキスト書き出しを開く',
   'dialog.filter.ankiDeck': 'Ankiデッキ',
 
   'search.theme': 'テーマ',
@@ -8681,6 +8682,10 @@ export const ja: Catalog = {
   'ankiWorkbench.source.connect.hint': 'AnkiConnect 経由で現在のコレクションを読み取ります。読み取り専用です。',
   'ankiWorkbench.source.localDeck': 'ローカルデッキを開く',
   'ankiWorkbench.source.localDeck.hint': 'このアプリが保持しているカード。Anki は不要です。',
+  'ankiWorkbench.source.text': 'テキスト書き出しを開く',
+  'ankiWorkbench.source.text.hint': 'Anki からノートとして書き出した .txt / .csv / .tsv ファイル。',
+  'ankiWorkbench.source.tooLarge':
+    'このテキストファイルは {size} MB で、このリーダーが扱える {max} MB を超えています。途中まで読むとその長さのデッキに見えてしまうため、開いていません。',
   'ankiWorkbench.source.reading': '読み込み中…',
   'ankiWorkbench.source.failed': 'そのソースを読み取れませんでした: {error}',
   'ankiWorkbench.source.empty': 'まだソースを読み込んでいません。',

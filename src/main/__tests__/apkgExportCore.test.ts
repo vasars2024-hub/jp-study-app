@@ -1368,6 +1368,26 @@ describe('the card designer writes into a package', () => {
     expect(exportChangesEmpty(addOnly())).toBe(false);
   });
 
+  /**
+   * Found live, through `anki:exportCsvDraft` with `{ notes: [] }`: two of the
+   * nine fields were read strictly while seven were read tolerantly, so a
+   * partial payload came back as `TypeError: Cannot read properties of
+   * undefined (reading 'length')` instead of the `nothing-to-export` refusal
+   * this guard exists to produce. All three destinations share the guard.
+   */
+  it('reads a partial IPC payload as empty rather than throwing on it', () => {
+    const partial = (over: Record<string, unknown>) =>
+      exportChangesEmpty(over as unknown as Parameters<typeof exportChangesEmpty>[0]);
+
+    expect(partial({ notes: [] })).toBe(true);
+    expect(partial({ cardMoves: [] })).toBe(true);
+    expect(partial({})).toBe(true);
+    // The control that keeps the line above from being vacuous: tolerance must
+    // not swallow a field that IS carrying work.
+    expect(partial({ notes: [{ noteId: '1001', fields: ['a'] }] })).toBe(false);
+    expect(partial({ cardMoves: [{ noteId: '1001', cardId: '5001', due: 3 }] })).toBe(false);
+  });
+
   // ----- Anki's own `unicase` collation ------------------------------------
   //
   // The live run on the user's real 2,991-note ver-18 package is what put these

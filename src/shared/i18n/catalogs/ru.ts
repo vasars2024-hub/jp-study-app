@@ -2920,6 +2920,7 @@ export const ru: Catalog = {
   'dialog.exportAnkiDeck.pickSource': 'Укажите исходный файл колоды',
   'dialog.exportAnkiText.title': 'Экспорт изменённой колоды в текстовый файл',
   'dialog.exportAnkiText.pickSource': 'Укажите исходный текстовый файл',
+  'dialog.importAnkiText.title': 'Открыть текстовый экспорт Anki',
   'dialog.filter.ankiDeck': 'Колода Anki',
 
   'search.theme': 'Тема',
@@ -9489,6 +9490,10 @@ export const ru: Catalog = {
   'ankiWorkbench.source.connect.hint': 'Чтение текущей коллекции через AnkiConnect. Только чтение.',
   'ankiWorkbench.source.localDeck': 'Открыть локальную колоду',
   'ankiWorkbench.source.localDeck.hint': 'Карточки, которые уже хранит это приложение. Anki не нужен.',
+  'ankiWorkbench.source.text': 'Открыть текстовый экспорт',
+  'ankiWorkbench.source.text.hint': 'Файл .txt, .csv или .tsv, выгруженный из Anki как заметки.',
+  'ankiWorkbench.source.tooLarge':
+    'Этот текстовый файл занимает {size} МБ, что больше {max} МБ, которые принимает этот читатель. Он не открыт: прочитанная наполовину колода выглядела бы именно такой короткой.',
   'ankiWorkbench.source.reading': 'Чтение…',
   'ankiWorkbench.source.failed': 'Не удалось прочитать источник: {error}',
   'ankiWorkbench.source.empty': 'Источник ещё не прочитан.',

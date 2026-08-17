@@ -2883,6 +2883,7 @@ export const en: Catalog = {
   'dialog.exportAnkiDeck.pickSource': 'Locate the original deck file',
   'dialog.exportAnkiText.title': 'Export the edited deck as a text file',
   'dialog.exportAnkiText.pickSource': 'Locate the original text file',
+  'dialog.importAnkiText.title': 'Open an Anki text export',
   'dialog.filter.ankiDeck': 'Anki deck',
 
   // Settings search index (settingsRegistry.ts SETTINGS_REGISTRY). Keywords
@@ -9108,6 +9109,10 @@ export const en: Catalog = {
   'ankiWorkbench.source.connect.hint': 'Read the running collection through AnkiConnect. Read-only.',
   'ankiWorkbench.source.localDeck': 'Open the local deck',
   'ankiWorkbench.source.localDeck.hint': 'The cards this app already stores, with no Anki needed.',
+  'ankiWorkbench.source.text': 'Open a text export',
+  'ankiWorkbench.source.text.hint': 'A .txt, .csv or .tsv file exported from Anki as notes.',
+  'ankiWorkbench.source.tooLarge':
+    'That text file is {size} MB, over the {max} MB this reader accepts. It was not opened, because a partly read deck would look like a deck that short.',
   'ankiWorkbench.source.reading': 'Reading…',
   'ankiWorkbench.source.failed': 'That source could not be read: {error}',
   'ankiWorkbench.source.empty': 'No source read yet.',

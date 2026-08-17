@@ -66,6 +66,29 @@ async function pickDeckFile(filePath?: string): Promise<string | null> {
   return picked.filePaths[0];
 }
 
+/**
+ * The text-export open dialog — the door to the `csv` source.
+ *
+ * It lives here rather than in `csvDraftRead.ts` on purpose: that module's
+ * stated property is that it imports no Electron, which is what makes the
+ * encoding and size-ceiling paths testable against a real temp file. So the
+ * handler resolves the path and the reader still only ever receives one.
+ * `filePath` short-circuits it exactly as `pickDeckFile` does, which is what
+ * keeps the whole flow drivable without an OS dialog.
+ */
+async function pickAnkiTextFile(filePath?: string): Promise<string | null> {
+  if (filePath) return filePath;
+  const win = focusedWindow();
+  const opts = {
+    title: mt('dialog.importAnkiText.title'),
+    filters: [{ name: mt('dialog.filter.csvTsv'), extensions: ['txt', 'csv', 'tsv'] }],
+    properties: ['openFile' as const],
+  };
+  const picked = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts);
+  if (picked.canceled || !picked.filePaths[0]) return null;
+  return picked.filePaths[0];
+}
+
 // ----- sql.js (cached across imports) ----------------------------------------
 
 // The forge main build emits ESM, so __filename/require are unavailable —
@@ -355,7 +378,13 @@ export function registerApkgIpc(): void {
   ipcMain.handle('apkg:importCards', (_e, filePath?: string) => importApkgCards(filePath));
   ipcMain.handle('apkg:readDraft', (_e, request?: ApkgDraftRequest) => readApkgDraft(request));
   ipcMain.handle('apkg:export', (_e, request: ApkgExportRequest) => exportApkg(request));
-  ipcMain.handle('anki:readCsvDraft', (_e, request?: CsvDraftRequest) => readCsvDraft(request));
+  ipcMain.handle('anki:readCsvDraft', async (_e, request?: CsvDraftRequest) => {
+    const file = await pickAnkiTextFile(request?.filePath);
+    // Same shape the package reader uses: a dismissed dialog is a named state,
+    // not a read that failed, so the shell can stay quiet about it.
+    if (!file) return { ok: false, error: 'cancelled' };
+    return readCsvDraft({ ...request, filePath: file });
+  });
   ipcMain.handle('anki:exportCsvDraft', (_e, request: AnkiCsvExportRequest) =>
     exportAnkiCsv(request),
   );

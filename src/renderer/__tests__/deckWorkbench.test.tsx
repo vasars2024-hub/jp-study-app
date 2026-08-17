@@ -57,6 +57,7 @@ const ankiDraftSessionResume = vi.fn();
 const ankiDraftSessionDelete = vi.fn();
 const exportApkgDraft = vi.fn();
 const commitAnkiConnectDraft = vi.fn();
+const readAnkiCsvDraft = vi.fn();
 
 function draft(over: Partial<AnkiDraft> = {}): AnkiDraft {
   return {
@@ -196,12 +197,12 @@ beforeAll(() => {
 
 beforeEach(() => {
   installLayout(900, 400);
-  for (const m of [readApkgDraft, readAnkiConnectDraft, ankiDraftSessionList, ankiDraftSessionResume, ankiDraftSessionDelete, loadDeckAsAnkiDraft, exportApkgDraft, commitAnkiConnectDraft]) m.mockReset();
+  for (const m of [readApkgDraft, readAnkiConnectDraft, ankiDraftSessionList, ankiDraftSessionResume, ankiDraftSessionDelete, loadDeckAsAnkiDraft, exportApkgDraft, commitAnkiConnectDraft, readAnkiCsvDraft]) m.mockReset();
   ankiDraftSessionList.mockResolvedValue([]);
   ankiDraftSessionDelete.mockResolvedValue(true);
   Object.defineProperty(window, 'api', {
     configurable: true,
-    value: { readApkgDraft, readAnkiConnectDraft, ankiDraftSessionList, ankiDraftSessionResume, ankiDraftSessionDelete, exportApkgDraft, commitAnkiConnectDraft },
+    value: { readApkgDraft, readAnkiConnectDraft, ankiDraftSessionList, ankiDraftSessionResume, ankiDraftSessionDelete, exportApkgDraft, commitAnkiConnectDraft, readAnkiCsvDraft },
   });
 });
 
@@ -270,6 +271,54 @@ describe('DeckWorkbench', () => {
     await mount();
     await click(buttonBy('ankiWorkbench.source.apkg'));
     expect(host.querySelector('[role="alert"]')).toBeNull();
+    expect(host.textContent).toContain('ankiWorkbench.source.empty');
+  });
+
+  /**
+   * The text export had a destination (`anki:exportCsvDraft`) and no door: at
+   * `067cd735` the `csv` branch of step 7 was reachable only by a draft nothing
+   * in the renderer could create, because `readAnkiCsvDraft` had zero call
+   * sites. These three pin the entry, not the reader.
+   */
+  it('opens a text export through its own channel, not the package reader', async () => {
+    readAnkiCsvDraft.mockResolvedValue({
+      ok: true,
+      draft: draft({
+        source: { kind: 'csv', label: 'love-japanese.txt', fingerprint: 'sha1:aa' },
+        counts: { notes: 2000, cards: 2000, decks: 1, noteTypes: 1, reviews: 0, mediaReferences: 0 },
+      }),
+      totalNotes: 3209,
+    });
+    await mount();
+    await click(buttonBy('ankiWorkbench.source.text'));
+
+    expect(readAnkiCsvDraft).toHaveBeenCalledTimes(1);
+    expect(readAnkiCsvDraft.mock.calls[0]![0]).toMatchObject({ noteLimit: expect.any(Number) });
+    // Pointing the package reader at a .txt fails as a corrupt zip, so the two
+    // must not share a channel.
+    expect(readApkgDraft).not.toHaveBeenCalled();
+    expect(host.textContent).toContain('ankiWorkbench.step.source.outcome:love-japanese.txt,3209');
+    expect(host.textContent).toContain('ankiWorkbench.progress:1,7');
+  });
+
+  it('stays silent when the text dialog is cancelled', async () => {
+    readAnkiCsvDraft.mockResolvedValue({ ok: false, error: 'cancelled' });
+    await mount();
+    await click(buttonBy('ankiWorkbench.source.text'));
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+    expect(host.textContent).toContain('ankiWorkbench.source.empty');
+  });
+
+  it('says the size ceiling in megabytes rather than showing the raw refusal code', async () => {
+    readAnkiCsvDraft.mockResolvedValue({ ok: false, error: 'file-too-large:20971520:16777216' });
+    await mount();
+    await click(buttonBy('ankiWorkbench.source.text'));
+
+    const alert = host.querySelector('[role="alert"]')?.textContent ?? '';
+    expect(alert).toContain('ankiWorkbench.source.tooLarge:20,16');
+    // The control that makes the line above a measurement: the raw code, which
+    // is what `ankiWorkbench.source.failed` would have rendered, is absent.
+    expect(alert).not.toContain('file-too-large');
     expect(host.textContent).toContain('ankiWorkbench.source.empty');
   });
 
@@ -946,7 +995,7 @@ describe('DeckWorkbench', () => {
     ankiDraftSessionList.mockRejectedValue(new Error('no store'));
     await mount();
     expect(host.textContent).toContain('ankiWorkbench.sessions.none');
-    expect(host.querySelectorAll('.deck-workbench-source')).toHaveLength(3);
+    expect(host.querySelectorAll('.deck-workbench-source')).toHaveLength(4);
   });
 });
 

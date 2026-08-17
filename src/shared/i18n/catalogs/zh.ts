@@ -2715,6 +2715,7 @@ export const zh: Catalog = {
   'dialog.exportAnkiDeck.pickSource': '找到原始卡组文件',
   'dialog.exportAnkiText.title': '将编辑后的卡组导出为文本文件',
   'dialog.exportAnkiText.pickSource': '找到原始文本文件',
+  'dialog.importAnkiText.title': '打开 Anki 导出的文本文件',
   'dialog.filter.ankiDeck': 'Anki 卡组',
 
   'search.theme': '主题',
@@ -8643,6 +8644,10 @@ export const zh: Catalog = {
   'ankiWorkbench.source.connect.hint': '通过 AnkiConnect 读取当前收藏，只读。',
   'ankiWorkbench.source.localDeck': '打开本地牌组',
   'ankiWorkbench.source.localDeck.hint': '本应用已保存的卡片，无需 Anki。',
+  'ankiWorkbench.source.text': '打开文本导出',
+  'ankiWorkbench.source.text.hint': '从 Anki 导出为笔记的 .txt、.csv 或 .tsv 文件。',
+  'ankiWorkbench.source.tooLarge':
+    '该文本文件为 {size} MB，超过此读取器接受的 {max} MB。未打开它，因为只读一部分会让牌组看起来就只有那么长。',
   'ankiWorkbench.source.reading': '正在读取…',
   'ankiWorkbench.source.failed': '无法读取该来源：{error}',
   'ankiWorkbench.source.empty': '尚未读取任何来源。',

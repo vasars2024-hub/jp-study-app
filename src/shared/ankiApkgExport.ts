@@ -567,12 +567,20 @@ export function buildApkgExportChanges(
 
 /** True when the change set carries nothing to write. */
 export function exportChangesEmpty(changes: ApkgExportChangeSet): boolean {
-  // `deckRenames` is read tolerantly: this runs on a payload that crossed IPC,
-  // and a request written before the field existed must read as "no renames"
+  // Every field is read tolerantly: this runs on a payload that crossed IPC,
+  // and a request written before a field existed must read as "none of those"
   // rather than throw on the way to the writer.
+  //
+  // `notes` and `cardMoves` were the two exceptions until a live run through
+  // `anki:exportCsvDraft` sent `{ notes: [] }` and got
+  // `TypeError: Cannot read properties of undefined (reading 'length')` back
+  // across IPC instead of the `nothing-to-export` refusal this guard exists to
+  // return. A raw TypeError arriving at a user as an export failure is exactly
+  // the dishonest state the refusal codes are for, and the split was never
+  // deliberate — these two are simply the oldest fields.
   return (
-    changes.notes.length === 0 &&
-    changes.cardMoves.length === 0 &&
+    (changes.notes ?? []).length === 0 &&
+    (changes.cardMoves ?? []).length === 0 &&
     (changes.deckRenames ?? []).length === 0 &&
     (changes.cardDeckMoves ?? []).length === 0 &&
     // A removal-only change set touches no note and no card row the other four
