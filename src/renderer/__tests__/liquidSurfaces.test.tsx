@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   AmbientSurface,
   AnchorSurface,
+  ContextualSurface,
   LIQUID_SURFACE_ROLES,
   LiquidSurface,
   WorkSurface,
@@ -167,6 +168,7 @@ describe('liquid surface primitives — rendered behaviour', () => {
         <WorkSurface data-testid="w">work</WorkSurface>
         <LiquidSurface data-testid="l">liquid</LiquidSurface>
         <AmbientSurface data-testid="m" />
+        <ContextualSurface data-testid="c">contextual</ContextualSurface>
       </>,
     );
     for (const role of LIQUID_SURFACE_ROLES) {
@@ -211,5 +213,59 @@ describe('liquid surface primitives — rendered behaviour', () => {
     expect(container.querySelector('.lq-anchor')!.hasAttribute('data-measure')).toBe(false);
     expect(container.querySelector('.lq-liquid')!.hasAttribute('data-entering')).toBe(false);
     expect(container.querySelector('.lq-work')!.hasAttribute('data-raised')).toBe(false);
+  });
+});
+
+/**
+ * L5 — the contextual role. It exists so an EXISTING conventional window can
+ * declare which of its regions are navigation/transport/tools without becoming
+ * glass, and §2's first non-negotiable ("conventional windows remain the default")
+ * is enforceable only if this class paints nothing here.
+ */
+describe('liquid surface primitives — the contextual role is inert until a window opts in', () => {
+  /** Every property that would put a pixel on screen. */
+  const PAINT = /(^|;|\s)(background|border|box-shadow|backdrop-filter|-webkit-backdrop-filter|opacity|filter|color)\s*:/;
+
+  it('declares .lq-contextual with layout only — no paint property anywhere in this sheet', () => {
+    const owning = blocks.filter((b) =>
+      splitSelectorList(b.selector).some((s) => s === '.lq-contextual'),
+    );
+    // The rule must exist: an absent class would make the component a no-op and
+    // this suite would pass by measuring nothing.
+    expect(owning.length).toBeGreaterThan(0);
+    for (const block of owning) {
+      expect(block.declarations).not.toMatch(PAINT);
+    }
+  });
+
+  it('gives the contextual role the same hit floor and focus ring as the painted roles', () => {
+    // Category 1 is scored on the migrated region, so it inherits the floor even
+    // while it is invisible — otherwise adopting the primitive would silently
+    // regress hit targets in conventional presentation.
+    const floor = blocks.find((b) => /min-height:\s*var\(--lq-hit-target\)/.test(b.declarations));
+    expect(floor).toBeDefined();
+    expect(floor!.selector).toMatch(/\.lq-contextual :where\(/);
+    const focus = blocks.find((b) => /outline:\s*2px solid var\(--focus-ring\)/.test(b.declarations));
+    expect(focus).toBeDefined();
+    expect(focus!.selector).toMatch(/\.lq-contextual :focus-visible/);
+  });
+
+  it('renders the class and role marker, and is NOT the liquid class', () => {
+    const container = render(
+      <ContextualSurface className="lexicon-lens-picker" aria-label="Lens">
+        picker
+      </ContextualSurface>,
+    );
+    const el = container.querySelector('[aria-label="Lens"]')!;
+    expect(el.classList.contains('lq-contextual')).toBe(true);
+    // NEGATIVE: if it also carried `lq-liquid` it would paint unconditionally and
+    // every conventional window hosting a migrated region would go glass.
+    expect(el.classList.contains('lq-liquid')).toBe(false);
+    expect(el.getAttribute('data-lq-role')).toBe('contextual');
+    expect(el.classList.contains('lexicon-lens-picker')).toBe(true);
+  });
+
+  it('is one of the declared roles, so a consumer mapping data to a surface can reach it', () => {
+    expect(LIQUID_SURFACE_ROLES).toContain('contextual');
   });
 });

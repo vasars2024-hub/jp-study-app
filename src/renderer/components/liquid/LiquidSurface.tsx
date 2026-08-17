@@ -89,6 +89,26 @@ export const LiquidSurface = forwardRef<
 });
 
 /**
+ * The same role as `LiquidSurface`, but for a region that already exists inside a
+ * conventional window — and therefore must NOT paint until that window is put in
+ * Liquid presentation.
+ *
+ * §2 non-negotiable 1 is that conventional windows stay the default and Liquid is
+ * explicit per window. `LiquidSurface` paints unconditionally, which is right for a
+ * surface built new in the language and wrong for migrating an existing one: marking
+ * a dictionary's lens picker `lq-liquid` would make it glass in every conventional
+ * window in the app. So this primitive is inert by construction — layout, hit floor
+ * and focus only — and `theme/liquid-window.css` hands it the material solely under
+ * `.fwin-liquid`. Reversibility then costs nothing: dropping the class off the window
+ * restores the conventional pixels in cascade order, with no component state involved.
+ *
+ * Use it wherever an existing app's navigation, transport, contextual tools or
+ * temporary inspectors live. Dense work — reading, editing, forms, tables, logs,
+ * calendars, review cards — takes `AnchorSurface` instead and never this.
+ */
+export const ContextualSurface = makeSurface('contextual', 'lq-contextual');
+
+/**
  * Atmosphere behind everything. Decorative only: hidden from assistive tech and
  * inert to the pointer, so it cannot become a surface someone puts text on.
  */
@@ -100,5 +120,5 @@ export const AmbientSurface = forwardRef<HTMLElement, SurfaceProps>(function Amb
 });
 
 /** The role names, for a consumer that maps data to a surface. */
-export const LIQUID_SURFACE_ROLES = ['anchor', 'work', 'liquid', 'ambient'] as const;
+export const LIQUID_SURFACE_ROLES = ['anchor', 'work', 'liquid', 'ambient', 'contextual'] as const;
 export type LiquidSurfaceRole = (typeof LIQUID_SURFACE_ROLES)[number];

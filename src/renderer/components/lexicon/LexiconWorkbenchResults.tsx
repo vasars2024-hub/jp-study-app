@@ -36,6 +36,7 @@ import {
 import { resolveLexiconInput, type LexiconLensOverride } from '../../../shared/lexiconWorkbench';
 import { explainSensesFromMatch, hasExplainGrounding } from '../../../shared/lexiconExplainView';
 import EntryExplain from './EntryExplain';
+import { ContextualSurface } from '../liquid/LiquidSurface';
 import DictionaryResults, { type DictLang } from '../DictionaryResults';
 import { translateTo } from '../../translator';
 import { useT } from '../../i18n';
@@ -470,7 +471,11 @@ export default function LexiconWorkbenchResults({
   return (
     <section className="lexicon-workbench" aria-label={t('lexicon.workbench.interlinear')}>
       {lens === 'auto' && (
-        <div className="lexicon-lens-picker" role="group" aria-label={t('lexicon.lens.group')}>
+        <ContextualSurface
+          className="lexicon-lens-picker"
+          role="group"
+          aria-label={t('lexicon.lens.group')}
+        >
           {LENS_OPTIONS.map((option) => (
             <button
               className={selectedLens === option ? 'active' : undefined}
@@ -482,7 +487,7 @@ export default function LexiconWorkbenchResults({
               {t(LENS_LABEL_KEYS[option])}
             </button>
           ))}
-        </div>
+        </ContextualSurface>
       )}
       {!interlinear ? (
         <DictionaryResults key={lookupAttempt} query={query} variant="page" lang={lang} onLookup={onLookup} />

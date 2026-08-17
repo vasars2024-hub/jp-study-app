@@ -67,6 +67,37 @@
   background: transparent;
 }
 
+/*
+ * L5 — the interior half of rule 1, and the only place `.lq-contextual` is ever
+ * painted.
+ *
+ * Rule 1 above pins `.fwin-body` opaque so dense work never goes translucent. That
+ * is necessary and not sufficient: measured on the Liquid Dictionary window,
+ * `denseWorkOnTranslucent` was 0 but so was `liquidTreatedEligible` — 0 of 9
+ * navigation/contextual regions had the material, so §2.3's "Liquid is FOR
+ * navigation, transport, contextual tools and temporary inspectors" was satisfied
+ * only by the frame. A region opts in by rendering `ContextualSurface`; it stays
+ * inert everywhere else, so conventional presentation is unchanged and the toggle
+ * back is still pure cascade with no state to restore.
+ *
+ * The blur is deliberately absent. Rule 2 above: `.fwin` carries
+ * `transform: translateZ(0)`, which makes it a backdrop root for its descendants, so
+ * a `backdrop-filter` here would sample the window's own opaque body and paint
+ * nothing — inert glass that measures as a pass. The translucency that reads as
+ * material comes from the frame behind it; this layer contributes tint, edge and
+ * depth over it, all from `--lq-*` tokens so a shell remap still owns the palette.
+ */
+.fwin.fwin-liquid .lq-contextual {
+  background: var(--lq-liquid-bg);
+  border: 1px solid var(--lq-liquid-border);
+  border-radius: var(--lq-liquid-radius);
+  box-shadow: var(--lq-liquid-shadow);
+  padding: var(--lq-space-3);
+  transition:
+    opacity var(--lq-motion-enter) var(--lq-ease-enter),
+    transform var(--lq-motion-move) var(--lq-ease-move);
+}
+
 /* The toggle itself. `aria-pressed` carries the state for assistive tech; this
    is the matching visible affordance, not a decoration. */
 .fwin-b-liquid.is-liquid {

@@ -242,6 +242,24 @@ describe('liquid-window.css', () => {
     expect(rules).not.toMatch(/\.fwin\.fwin-liquid \.fwin-body\s*\{[^}]*\bcolor\s*:/);
   });
 
+  it('paints .lq-contextual, and only under an opted-in window', () => {
+    // L5. The measured gap this closes: on the Liquid Dictionary window
+    // `denseWorkOnTranslucent` was 0 but `liquidTreatedEligible` was 0 of 9 — the
+    // frame was Liquid and every navigation/contextual region inside it was not.
+    const owning = rules
+      .split('}')
+      .map((block) => ({ selector: block.split('{')[0]?.trim() ?? '', body: block.split('{')[1] ?? '' }))
+      .filter((b) => b.selector.includes('.lq-contextual'));
+    expect(owning.length).toBe(1);
+    expect(owning[0].selector).toBe('.fwin.fwin-liquid .lq-contextual');
+    expect(owning[0].body).toMatch(/background:\s*var\(--lq-liquid-bg\)/);
+    // NEGATIVE, and the reason the rule looks under-specified: `.fwin` carries
+    // `transform: translateZ(0)`, so it is a backdrop root for its descendants and a
+    // backdrop-filter here would sample the window's own opaque body — inert glass
+    // that still measures as translucent. The frame behind it supplies the blur.
+    expect(owning[0].body).not.toMatch(/backdrop-filter/);
+  });
+
   it('uses only --lq-* tokens for material, never a shell color literal', () => {
     for (const decl of rules.matchAll(/(background|border-color|box-shadow|color)\s*:\s*([^;]+);/g)) {
       const value = decl[2].trim();

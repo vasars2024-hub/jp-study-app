@@ -1,13 +1,15 @@
 /* =============================================================================
    Liquid Workplace — L2 surface primitives
    -----------------------------------------------------------------------------
-   The four roles of `liquid-tokens.css`, given a paintable class each. Unlike
-   that sheet this one DOES paint — but only through selectors in the `lq-`
-   namespace, which nothing in the app used before this commit, so importing it
-   still cannot change an existing pixel. `liquidSurfaces.test.ts` pins both
-   halves: every selector namespaced, every value a `--lq-*` token.
+   The four roles of `liquid-tokens.css`, given a paintable class each — plus a
+   fifth, `contextual`, which is the liquid role DECLARED but deliberately not
+   painted here (see its own block). Unlike the token sheet this one DOES paint —
+   but only through selectors in the `lq-` namespace, which nothing in the app used
+   before this commit, so importing it still cannot change an existing pixel.
+   `liquidSurfaces.test.ts` pins both halves: every selector namespaced, every value
+   a `--lq-*` token.
 
-   Why four classes and not one `.lq-surface[data-role]`: plan §2.3 makes the
+   Why separate classes and not one `.lq-surface[data-role]`: plan §2.3 makes the
    roles semantically different, not stylistically graded. An anchor is not a
    less-blurred liquid; it is the surface that must NEVER blur. Separate
    selectors let the test assert that mechanically per role.
@@ -16,12 +18,22 @@
 .lq-anchor,
 .lq-work,
 .lq-liquid,
-.lq-ambient {
+.lq-ambient,
+.lq-contextual {
   box-sizing: border-box;
   position: relative;
   min-width: 0;
   min-height: 0;
 }
+
+/* ---- contextual — the liquid role, declared but not yet painted ----------
+   For a region inside an EXISTING conventional window. It carries no background,
+   border, radius, shadow or backdrop here on purpose: §2's first non-negotiable is
+   that conventional windows stay the default, so a migrated region must render the
+   same pixels it did before until its window is explicitly put in Liquid
+   presentation. `theme/liquid-window.css` is the only sheet that paints it, and only
+   under `.fwin-liquid`. `liquidSurfaces.test.ts` pins that emptiness — a paint
+   property added here would make every conventional window glass at once. */
 
 /* ---- anchor — reading, editing, forms, tables, logs, calendars ------------
    Opaque in every variant. There is deliberately no `backdrop-filter` here and
@@ -108,7 +120,8 @@
    floor instead of each surface re-deciding it. */
 .lq-anchor :where(button, [role='button'], a[href], input, select, summary),
 .lq-work :where(button, [role='button'], a[href], input, select, summary),
-.lq-liquid :where(button, [role='button'], a[href], input, select, summary) {
+.lq-liquid :where(button, [role='button'], a[href], input, select, summary),
+.lq-contextual :where(button, [role='button'], a[href], input, select, summary) {
   min-height: var(--lq-hit-target);
 }
 
@@ -116,7 +129,8 @@
    first thing lost. Uses the shell's own focus token, not a colour. */
 .lq-anchor :focus-visible,
 .lq-work :focus-visible,
-.lq-liquid :focus-visible {
+.lq-liquid :focus-visible,
+.lq-contextual :focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
