@@ -32,7 +32,7 @@ vi.mock('electron', () => ({
 
 let encryptionAvailable = true;
 
-const { addFailureReason, awaitFilesStallReason, buildAddForm, magnetInfoHash, mapQbitState, mapTransfer, normalizeQbitInput, parseAddOutcome, qbitAwaitFiles, qbitBaseUrl, qbitSend, qbitTest, qbitTransfers, resetQbitSessions } =
+const { addFailureReason, awaitFilesStallReason, buildAddForm, magnetInfoHash, mapQbitState, mapTransfer, normalizeQbitInput, parseAddOutcome, qbitAwaitFiles, qbitBaseUrl, qbitSend, qbitTest, qbitTransfers, resetQbitSessions, swarmKnownCount } =
   await import('../scraper/qbittorrent');
 type StallInput = Parameters<typeof awaitFilesStallReason>[0];
 
@@ -1023,6 +1023,24 @@ describe('awaitFilesStallReason', () => {
     );
   });
 
+  it('refuses to call a release dead when no tracker ever answered', () => {
+    // `-1` is qBittorrent's "not scraped yet", which is what a torrent added
+    // seconds ago reports. Reading it as zero would convict a live release.
+    const reason = awaitFilesStallReason(stall({
+      done: 0,
+      last: { connected: 0, known: null, speedBps: 0 },
+      peakConnected: 0,
+    }));
+    expect(reason).toContain('never learned how many');
+    expect(reason).not.toContain('dead, not slow');
+    expect(reason).not.toContain('connection problem');
+  });
+
+  it('says the same when torrents/info was unreadable for the whole wait', () => {
+    const reason = awaitFilesStallReason(stall({ done: 0, last: null, peakConnected: 0 }));
+    expect(reason).toContain('never learned how many');
+  });
+
   it('never reports a zero-minute wait', () => {
     const reason = awaitFilesStallReason(stall({
       waitedMs: 900,
@@ -1031,6 +1049,26 @@ describe('awaitFilesStallReason', () => {
     }));
     expect(reason).toContain('1 minute,');
     expect(reason).not.toContain('0 minute');
+  });
+});
+
+describe('swarmKnownCount', () => {
+  it('reads a tracker that has not answered as unknown, not as empty', () => {
+    // qBittorrent's own value for an unscraped tracker. Summing it raw is how
+    // a message ends up claiming "the swarm lists -2".
+    expect(swarmKnownCount(-1, -1)).toBeNull();
+  });
+
+  it('keeps the half that did answer', () => {
+    expect(swarmKnownCount(-1, 61)).toBe(61);
+    expect(swarmKnownCount(9, -1)).toBe(9);
+  });
+
+  it('reads a real zero as a real zero', () => {
+    // Measured live on qBittorrent 5.2.3, on a torrent added seconds earlier:
+    // `num_complete` 0 and `num_incomplete` 61. Zero here is a fact, not a gap.
+    expect(swarmKnownCount(0, 0)).toBe(0);
+    expect(swarmKnownCount(0, 61)).toBe(61);
   });
 });
 
@@ -1086,6 +1124,16 @@ describe('qbitAwaitFiles reads the swarm off the live torrent', () => {
     const out = await qbitAwaitFiles({ config }, HASH_AWAIT, [0, 1], options);
     expect(out.ok === false && out.reason).toContain('Timed out with 1/2 subtitle file(s) complete.');
     expect(out.ok === false && out.reason).toContain('Still connected to 6 peer(s) at 51 KB/s');
+  });
+
+  it('does not convict a release whose tracker answered -1', async () => {
+    fileListResponse = SUBS;
+    torrentInfoExtra = [torrent({ num_complete: -1, num_incomplete: -1 })];
+    const out = await qbitAwaitFiles({ config }, HASH_AWAIT, [0, 1], options);
+    expect(out.ok === false && out.reason).toContain('never learned how many');
+    // NEGATIVE CONTROL: the sentence a raw sum would have produced.
+    expect(out.ok === false && out.reason).not.toContain('-2');
+    expect(out.ok === false && out.reason).not.toContain('dead, not slow');
   });
 
   it('notices a swarm that dies under it, which one final sample could not', async () => {

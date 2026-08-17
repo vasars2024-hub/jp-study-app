@@ -1300,10 +1300,33 @@ export async function qbitAwaitMetadata(
 export interface QbitSwarmSample {
   /** Seeds + peers qBittorrent is actually connected to right now. */
   connected: number;
-  /** Seeds + peers the tracker/DHT says exist, connected or not. */
-  known: number;
+  /**
+   * Seeds + peers the tracker says exist, or **null** when it has not said.
+   *
+   * Null is not zero and the difference decides whether a release gets called
+   * dead. `num_complete` / `num_incomplete` are the tracker *scrape*, and
+   * qBittorrent answers `-1` for a tracker it has not scraped yet — which is
+   * precisely the state a torrent added seconds ago is in, and precisely when
+   * this wait runs. `mapTransfer`'s `?? 0` only defends against the field being
+   * absent, so a raw sum would read "-1 + -1 = -2 peers exist" as a confident
+   * fact and the sentence built from it would be visibly nonsense.
+   */
+  known: number | null;
   /** Bytes per second arriving right now. */
   speedBps: number;
+}
+
+/**
+ * The tracker's swarm size, with "it has not answered" kept distinct from zero.
+ *
+ * Each half is dropped independently: a scrape can return the seed count and
+ * not the leecher count, and discarding the half that did arrive would throw
+ * away the only real number on offer.
+ */
+export function swarmKnownCount(seedsTotal: number, peersTotal: number): number | null {
+  const answered = [seedsTotal, peersTotal].filter((n) => Number.isFinite(n) && n >= 0);
+  if (!answered.length) return null;
+  return answered.reduce((sum, n) => sum + n, 0);
 }
 
 /** Everything the give-up message is allowed to be derived from. */
@@ -1346,7 +1369,14 @@ export function awaitFilesStallReason(input: QbitStallInput): string {
   if (input.peakConnected === 0) {
     // Never reached anyone, so `done` is whatever arrived before this wait
     // began and saying "timed out" about it would be the misleading half.
-    const known = input.last?.known ?? 0;
+    const known = input.last ? input.last.known : null;
+    if (known === null) {
+      // Two ways to land here — `torrents/info` unreadable all wait, or the
+      // tracker never scraped — and neither licenses calling a release dead.
+      return `No seed or peer answered in ${forMinutes}, and qBittorrent never learned how many `
+        + 'exist: no tracker answered its scrape. Nothing here says the release is alive, and '
+        + 'nothing says it is dead either.';
+    }
     if (known === 0) {
       return `No seed or peer answered in ${forMinutes}, and qBittorrent found nobody at all in this `
         + 'swarm: this release is dead, not slow. Pick another release.';
@@ -1434,7 +1464,7 @@ export async function qbitAwaitFiles(
       // look after the timeout, and those two deserve different sentences.
       lastSwarm = {
         connected: info.value.seedsConnected + info.value.peersConnected,
-        known: info.value.seedsTotal + info.value.peersTotal,
+        known: swarmKnownCount(info.value.seedsTotal, info.value.peersTotal),
         speedBps: info.value.downloadSpeedBps,
       };
       peakConnected = Math.max(peakConnected, lastSwarm.connected);
