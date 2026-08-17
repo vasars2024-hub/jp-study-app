@@ -13,7 +13,9 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
+import { parsePresentation } from '../../shared/liquidWindowState';
 import {
+  canPresentLiquid,
   isWinLiquid,
   presentationFromSnapshot,
   presentationToSnapshot,
@@ -134,6 +136,49 @@ describe('liquid window presentation — loading a persisted blob', () => {
     expect(presentationFromSnapshot(blob)).toBeUndefined();
     // And the shell then writes NO key at all, so corruption is not persisted forward.
     expect(Object.keys(presentationToSnapshot({ presentation: presentationFromSnapshot(blob) }))).toEqual([]);
+  });
+});
+
+/**
+ * Boss audit 2026-08-17, finding 2. The shell carried two hand-written section
+ * lists for "renders liquid" and "can leave liquid" and they differed by
+ * `visualizer`: that window rendered `.fwin-liquid` with no control to leave it.
+ * Both now derive from `canPresentLiquid`, and the converter is gated on it too,
+ * so a blob on a non-presentable section is dropped rather than written back.
+ */
+describe('presentability and reversibility are the same predicate', () => {
+  const LIQUID = { v: 1 as const, mode: 'liquid' as const, standardRect: { x: 1, y: 2, w: 3, h: 4 } };
+
+  it.each(['note', 'city', 'visualizer'])('%s can never present liquid', (section) => {
+    expect(canPresentLiquid(section)).toBe(false);
+    // The state the audit found reachable from a hand-edited layout file: a
+    // well-formed blob that `parsePresentation` accepts. The gate is the
+    // converter, so it cannot survive one save cycle.
+    expect(parsePresentation(LIQUID)).toBeDefined();
+    expect(Object.keys(presentationToSnapshot({ section, presentation: LIQUID }))).toEqual([]);
+  });
+
+  it.each(['dictionary', 'video', 'settings', 'musicwidget', 'agent'])(
+    '%s presents liquid and keeps its key',
+    (section) => {
+      expect(canPresentLiquid(section)).toBe(true);
+      expect(presentationToSnapshot({ section, presentation: LIQUID })).toEqual({ presentation: LIQUID });
+    },
+  );
+
+  it('a window with no section at all is presentable, not silently stripped', () => {
+    // Pop-outs and fixtures use `PresentableWin` structurally, without a
+    // section. Defaulting those to NOT presentable would delete the field for
+    // every such caller — the L3.2 defect over again, in the other direction.
+    expect(canPresentLiquid(undefined)).toBe(true);
+    expect(presentationToSnapshot({ presentation: LIQUID })).toEqual({ presentation: LIQUID });
+  });
+
+  it('the musicwidget stays presentable — this is not a widget blanket', () => {
+    // `DesktopShell` treats the music widget as a real app for pop-out too.
+    // The excluded three are excluded for having no conventional chrome to
+    // swap, not for being small.
+    expect(canPresentLiquid('musicwidget')).toBe(true);
   });
 });
 

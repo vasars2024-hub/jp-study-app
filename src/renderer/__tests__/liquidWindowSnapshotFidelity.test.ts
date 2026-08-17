@@ -174,6 +174,22 @@ describe('DesktopShell actually routes every rebuild through the converters', ()
     // key and appears in this file legitimately.)
     expect(SHELL).not.toMatch(/\b(makeLiquid|returnToStandard)\s*\(/);
   });
+
+  it('one predicate decides both rendering liquid and offering the way out', () => {
+    // Boss audit 2026-08-17 finding 2: these were two hand-written section
+    // lists differing by `visualizer`, so a visualizer window could render
+    // `.fwin-liquid` with the toggle button not rendered at all. The guard is
+    // that `liquid` is derived FROM `canGoLiquid` — any re-expansion into a
+    // second `!isNote && ...` chain fails here.
+    expect(SHELL).toMatch(/const canGoLiquid = canPresentLiquid\(win\.section\);/);
+    expect(SHELL).toMatch(/const liquid = isWinLiquid\(win\) && canGoLiquid;/);
+    expect(SHELL.match(/canPresentLiquid\(/g) ?? []).toHaveLength(1);
+    // And the load-side converter is handed the section, or a blob on a
+    // non-presentable window survives in memory and is written straight back.
+    expect(SHELL).toMatch(
+      /function winFromSnapshot[\s\S]{0,900}?presentationToSnapshot\(\{\s*section: win\.section,/,
+    );
+  });
 });
 
 describe('liquid and maximize are independent, and both reverse', () => {

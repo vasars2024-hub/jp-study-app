@@ -24,6 +24,7 @@ import { DESKTOP_STUDY } from '../../shared/desktop';
 import { clampLayoutToViewport, layoutGeometrySignature, resolveAuthoredViewport } from '../desktopLayoutFit';
 import { collectForeignWindows } from '../foreignWindows';
 import {
+  canPresentLiquid,
   isWinLiquid,
   presentationFromSnapshot,
   presentationToSnapshot,
@@ -466,8 +467,13 @@ function winFromSnapshot(win: WindowSnapshot): Win {
     pin: win.pinned,
     rect: win.restoreRect,
     // Validated, not trusted: a corrupt or future-versioned blob loads as a
-    // conventional window rather than as a Liquid one with no way back.
-    ...presentationToSnapshot({ presentation: presentationFromSnapshot(win.presentation) }),
+    // conventional window rather than as a Liquid one with no way back. The
+    // section goes in too — a blob on a section that cannot present Liquid is
+    // dropped here rather than carried in memory and written back out.
+    ...presentationToSnapshot({
+      section: win.section,
+      presentation: presentationFromSnapshot(win.presentation),
+    }),
   };
 }
 
@@ -3182,11 +3188,13 @@ const FloatingWindow = memo(function FloatingWindow({
   const isMusicWidget = win.section === 'musicwidget';
   const isGarden = win.section === 'city';
   const isMaximized = Boolean(win.max) && !isGarden;
-  // Liquid presentation is opt-in per window and reversible. Notes and the
-  // frameless garden have no conventional chrome to swap, so they do not offer
-  // it — their absence of the control is not a disabled feature.
-  const liquid = isWinLiquid(win) && !isNote && !isGarden;
-  const canGoLiquid = !isNote && !isGarden && !isVisualizer;
+  // Liquid presentation is opt-in per window and reversible. Notes, the
+  // frameless garden and the visualizer have no conventional chrome to swap, so
+  // they do not offer it — their absence of the control is not a disabled
+  // feature. ONE predicate, so "renders liquid" and "can leave liquid" cannot
+  // disagree (boss audit 2026-08-17 finding 2).
+  const canGoLiquid = canPresentLiquid(win.section);
+  const liquid = isWinLiquid(win) && canGoLiquid;
   // Real apps (including Mooncap Garden and the music widget) can detach into their own OS window;
   // desktop-only trinkets (notes, the viz widget) cannot.
   const canPopOut = !isNote && !isVisualizer;

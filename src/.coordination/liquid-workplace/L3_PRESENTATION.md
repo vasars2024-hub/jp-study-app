@@ -135,3 +135,45 @@ touched paths (the one `_dropped` warning is the same shape `shared/liquidWindow
 **Next slice (L3.4 or L4):** L3's gate is met and its infrastructure is covered. The remaining L3 work
 is `parity-ledger.json`, still **0 of 7** — and it stays 0 until an APP migrates, which is L4 (Media
 shell repair and the Video pilot). Recommend going to L4 rather than widening L3.
+
+## 2026-08-17 · primary · boss-audit finding 2: two lists that disagreed by one section
+
+| Slice | Commit | What landed |
+| --- | --- | --- |
+| audit F2 | (this commit) | `canPresentLiquid()` — one predicate for render, control and converter |
+
+Picked up as INTERRUPTED WORK: `backup` started this after `c50f9814` and died on a usage limit at
+16:22 with it uncommitted. Re-derived against the audit text rather than inherited, finished, gated.
+
+The defect (`docs/audit/RELAY_BOSS_AUDIT.md`, 16:15 MSK, finding 2, P3): `DesktopShell:3188-3189`
+carried **two hand-written section lists**. `liquid` omitted `isVisualizer`, `canGoLiquid` included
+it — so a `visualizer` window with a valid persisted blob rendered `.fwin-liquid` with **no control
+to leave it**. An enable flow with no disable path, at the seam L3 exists to guarantee.
+
+Both now derive from `canPresentLiquid(section)` in `renderer/liquidWindowPresentation.ts`, and the
+**converter is gated on it too** — `presentationToSnapshot` returns `{}` for a non-presentable
+section, so such a blob is dropped on load instead of being re-persisted forever. `winFromSnapshot`
+was passing no section and is now handed `win.section`. Decision, reversible: an **absent** section
+is presentable, because `PresentableWin` is used structurally by pop-outs and fixtures and defaulting
+those to false would strip the field for every one of them — the L3.2 defect pointed the other way.
+
+**LIVE, restarted renderer, forest-night.** Seeded a `visualizer` AND a `dictionary` window on the
+active desktop, both carrying the *same* well-formed blob (the only reachable path the audit names:
+a hand-edited layout file). Visualizer: `data-presentation="standard"`, no `fwin-liquid`, liquid
+button **null** — consistent, where before it was liquid with no way out. Dictionary, the positive
+control that proves the gate is not over-broad: `"liquid"`, `blur(8px) saturate(1.25)`, control
+labelled *Return to standard window*, `aria-pressed="true"`. After one save cycle the visualizer row
+read back from main with **`presentation` ABSENT** and the dictionary row **with it intact**.
+User layout restored: window arrays byte-identical to capture, `globalZTop` 10802 → 10802.
+
+**Negative controls, 2 of 2 red for the intended reason**, each anchor asserted unique and each file
+asserted changed before the run (CRLF trap): (1) re-expand the two lists in `DesktopShell.tsx` →
+`one predicate decides both rendering liquid and offering the way out` fails; (2) delete the
+`canPresentLiquid` guard from `presentationToSnapshot` → **3** fail, all three non-presentable
+sections. Positive: **79/79** across `liquidWindowPresentation` (33), `liquidWindowSnapshotFidelity`
+(11), `liquidWindowState` (24), `main/desktop` (12). Both files restored byte-identical (`===`).
+
+**TRAP for the next worker:** restoring a captured layout with `desktopCommitLayout` *then* reloading
+does NOT restore it — the live renderer writes its in-memory windows back over the commit. Close the
+probe windows through their real `.fwin-close` controls and let the renderer persist; only that came
+back identical.

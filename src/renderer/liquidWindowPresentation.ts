@@ -40,12 +40,33 @@ import {
  * full `Win`, and the shell's z-order, pin and visibility stay out of reach.
  */
 export interface PresentableWin {
+  section?: string;
   x: number;
   y: number;
   w: number;
   h: number;
   max?: boolean;
   presentation?: LiquidPresentationState;
+}
+
+/**
+ * The ONE predicate for "this section can be presented as Liquid at all".
+ *
+ * Sticky notes and the frameless garden and visualizer trinkets have no
+ * conventional chrome to swap, so they never offer the toggle. Before this was
+ * one function the shell carried two hand-written lists that differed by
+ * `visualizer` (boss audit 2026-08-17, finding 2): a visualizer window whose
+ * persisted blob validated rendered Liquid while the button that leaves Liquid
+ * was not rendered at all — an enable flow with no disable path, at the exact
+ * seam L3 exists to guarantee. Presentability and reversibility are now the
+ * same expression, so they cannot disagree again.
+ *
+ * It gates the SNAPSHOT converters too, not just the render: a non-presentable
+ * section drops the key on load instead of re-persisting a blob nothing can
+ * act on.
+ */
+export function canPresentLiquid(section?: string): boolean {
+  return section !== 'note' && section !== 'city' && section !== 'visualizer';
 }
 
 /** The snapshot fields the presentation round trip reads and writes. */
@@ -108,7 +129,8 @@ export function presentationFromSnapshot(raw: unknown): LiquidPresentationState 
  * than a value.
  */
 export function presentationToSnapshot(
-  win: Pick<PresentableWin, 'presentation'>,
+  win: Pick<PresentableWin, 'presentation' | 'section'>,
 ): { presentation?: LiquidPresentationState } {
+  if (!canPresentLiquid(win.section)) return {};
   return win.presentation ? { presentation: win.presentation } : {};
 }
