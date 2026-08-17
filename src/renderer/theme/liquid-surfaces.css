@@ -1,0 +1,130 @@
+/* =============================================================================
+   Liquid Workplace — L2 surface primitives
+   -----------------------------------------------------------------------------
+   The four roles of `liquid-tokens.css`, given a paintable class each. Unlike
+   that sheet this one DOES paint — but only through selectors in the `lq-`
+   namespace, which nothing in the app used before this commit, so importing it
+   still cannot change an existing pixel. `liquidSurfaces.test.ts` pins both
+   halves: every selector namespaced, every value a `--lq-*` token.
+
+   Why four classes and not one `.lq-surface[data-role]`: plan §2.3 makes the
+   roles semantically different, not stylistically graded. An anchor is not a
+   less-blurred liquid; it is the surface that must NEVER blur. Separate
+   selectors let the test assert that mechanically per role.
+   ============================================================================= */
+
+.lq-anchor,
+.lq-work,
+.lq-liquid,
+.lq-ambient {
+  box-sizing: border-box;
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* ---- anchor — reading, editing, forms, tables, logs, calendars ------------
+   Opaque in every variant. There is deliberately no `backdrop-filter` here and
+   the test forbids one being added: §2.3's failure mode is a reader that goes
+   translucent in one theme and is never looked at again. */
+.lq-anchor {
+  background: var(--lq-anchor-bg);
+  color: var(--lq-anchor-text);
+  border: 1px solid var(--lq-anchor-border);
+  border-radius: var(--lq-anchor-radius);
+  box-shadow: var(--lq-anchor-shadow);
+  padding: var(--lq-space-5);
+}
+
+.lq-anchor[data-raised='true'] {
+  background: var(--lq-anchor-bg-raised);
+}
+
+/* Content-first hierarchy (§4.1): an anchor's prose caps at a reading measure
+   rather than running the full width of a 1920px window. Opt-in, because a
+   table or a log inside an anchor must NOT be capped. */
+.lq-anchor[data-measure='true'] > * {
+  max-width: var(--lq-measure);
+}
+
+/* ---- work — the primary canvas the app fills ----------------------------- */
+.lq-work {
+  background: var(--lq-work-bg);
+  color: var(--lq-work-text);
+  border-radius: var(--lq-work-radius);
+  box-shadow: var(--lq-work-shadow);
+  padding: var(--lq-gutter);
+}
+
+.lq-work[data-raised='true'] {
+  background: var(--lq-work-bg-raised);
+  border: 1px solid var(--lq-work-border);
+}
+
+/* ---- liquid — navigation, transport, contextual tools, inspectors --------
+   The only translucent role. Every property that makes it translucent reads a
+   token, so high-contrast and the battery perf tier flatten it to an opaque
+   panel without this sheet knowing those themes exist. */
+.lq-liquid {
+  background: var(--lq-liquid-bg);
+  color: var(--lq-liquid-text);
+  border: 1px solid var(--lq-liquid-border);
+  border-radius: var(--lq-liquid-radius);
+  box-shadow: var(--lq-liquid-shadow);
+  padding: var(--lq-space-4);
+  backdrop-filter: blur(var(--lq-liquid-blur)) saturate(var(--lq-liquid-saturate));
+  -webkit-backdrop-filter: blur(var(--lq-liquid-blur)) saturate(var(--lq-liquid-saturate));
+  transition:
+    opacity var(--lq-motion-enter) var(--lq-ease-enter),
+    transform var(--lq-motion-move) var(--lq-ease-move);
+}
+
+/* The specular top edge that reads as a material rather than a tinted box.
+   Decorative and inert, so it can never eat a click meant for a control. */
+.lq-liquid[data-highlight='true']::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: var(--lq-liquid-highlight);
+}
+
+/* ---- ambient — atmosphere behind everything ------------------------------
+   Decorative by construction: inert to the pointer here, and the component
+   marks it `aria-hidden`. §2.3 — never the sole carrier of anything. */
+.lq-ambient {
+  background: var(--lq-ambient-bg);
+  border: 1px solid var(--lq-ambient-border);
+  border-radius: var(--lq-ambient-radius);
+  box-shadow: var(--lq-ambient-shadow);
+  backdrop-filter: blur(var(--lq-ambient-blur)) saturate(var(--lq-ambient-saturate));
+  -webkit-backdrop-filter: blur(var(--lq-ambient-blur)) saturate(var(--lq-ambient-saturate));
+  pointer-events: none;
+}
+
+/* ---- interaction floor ----------------------------------------------------
+   Rubric category 1 scores hit targets. A primitive-hosted control inherits the
+   floor instead of each surface re-deciding it. */
+.lq-anchor :where(button, [role='button'], a[href], input, select, summary),
+.lq-work :where(button, [role='button'], a[href], input, select, summary),
+.lq-liquid :where(button, [role='button'], a[href], input, select, summary) {
+  min-height: var(--lq-hit-target);
+}
+
+/* Focus must stay visible on a translucent surface, where a subtle ring is the
+   first thing lost. Uses the shell's own focus token, not a colour. */
+.lq-anchor :focus-visible,
+.lq-work :focus-visible,
+.lq-liquid :focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* ---- motion: displacement is a token, not a media query here -------------
+   `--lq-motion-scale` is already 0 under reduced motion and the battery tier,
+   so one multiplier turns every primitive's displacement off at once. */
+.lq-liquid[data-entering='true'] {
+  transform: translateY(calc(8px * var(--lq-motion-scale)));
+  opacity: 0;
+}

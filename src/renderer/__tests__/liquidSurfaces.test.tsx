@@ -1,0 +1,215 @@
+// @vitest-environment jsdom
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { act, type ReactNode } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { afterEach, describe, expect, it } from 'vitest';
+import {
+  AmbientSurface,
+  AnchorSurface,
+  LIQUID_SURFACE_ROLES,
+  LiquidSurface,
+  WorkSurface,
+} from '../components/liquid/LiquidSurface';
+
+/**
+ * L2's second gate. `liquidTokens.test.ts` proved the token sheet cannot paint;
+ * this sheet CAN, so the equivalent guarantee has to be argued differently:
+ * every selector lives in the `lq-` namespace nothing else in the app uses, and
+ * every value it paints with comes from a `--lq-*` token rather than a literal.
+ *
+ * Then the role invariants that a stylesheet alone cannot hold — an anchor that
+ * never blurs, an ambient surface that is never a carrier.
+ */
+
+const CSS = readFileSync(
+  resolve(__dirname, '..', 'theme', 'liquid-surfaces.css'),
+  'utf8',
+).replace(/\/\*[\s\S]*?\*\//g, '');
+
+type Block = { selector: string; declarations: string };
+function parseBlocks(source: string): Block[] {
+  const out: Block[] = [];
+  const re = /([^{}]+)\{([^{}]*)\}/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(source))) {
+    const selector = m[1].trim().replace(/\s+/g, ' ');
+    if (!selector || selector.startsWith('@')) continue;
+    out.push({ selector, declarations: m[2] });
+  }
+  return out;
+}
+const blocks = parseBlocks(CSS);
+
+/**
+ * Split a selector list on TOP-LEVEL commas only. `:where(button, a[href])` is
+ * one selector; a naive `split(',')` reports `a[href]` as an unnamespaced rule
+ * and the invariant below fails on correct CSS.
+ */
+function splitSelectorList(selector: string): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let current = '';
+  for (const ch of selector) {
+    if (ch === '(') depth += 1;
+    else if (ch === ')') depth -= 1;
+    if (ch === ',' && depth === 0) {
+      out.push(current.trim());
+      current = '';
+      continue;
+    }
+    current += ch;
+  }
+  if (current.trim()) out.push(current.trim());
+  return out;
+}
+
+/** Minimal render harness — this repo's renderer tests use createRoot directly. */
+let host: HTMLDivElement | null = null;
+let root: Root | null = null;
+function render(node: ReactNode): HTMLDivElement {
+  host = document.createElement('div');
+  document.body.appendChild(host);
+  root = createRoot(host);
+  act(() => {
+    root!.render(node);
+  });
+  return host;
+}
+afterEach(() => {
+  if (root) act(() => root!.unmount());
+  host?.remove();
+  root = null;
+  host = null;
+});
+
+describe('liquid surface primitives — the sheet stays inside its namespace', () => {
+  it('read a sheet that actually declares the four roles', () => {
+    expect(blocks.length).toBeGreaterThan(5);
+    for (const role of LIQUID_SURFACE_ROLES) {
+      expect(CSS, `role ${role} has no rule`).toContain(`.lq-${role}`);
+    }
+  });
+
+  it('anchors every selector on an .lq- class', () => {
+    // A compound like `.lq-anchor :focus-visible` is fine — it is still scoped
+    // inside a primitive. A bare `button` or `.panel` is not.
+    const foreign = blocks
+      .flatMap((b) => splitSelectorList(b.selector))
+      .filter((s) => !s.startsWith('.lq-'));
+    // Sanity: the splitter did not collapse the list to nothing.
+    expect(blocks.flatMap((b) => splitSelectorList(b.selector)).length).toBeGreaterThan(8);
+    expect(
+      foreign,
+      `these would restyle elements outside a Liquid primitive:\n${foreign.join('\n')}`,
+    ).toEqual([]);
+  });
+
+  it('paints only through --lq-* tokens and shell vars, never a literal colour', () => {
+    const literals = [...CSS.matchAll(/#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|oklch|lab)\s*\(/gi)].map(
+      (m) => m[0],
+    );
+    expect(
+      literals,
+      `plan §8 — never hardcode one shell's palette:\n${literals.join('\n')}`,
+    ).toEqual([]);
+  });
+
+  it('reads no token that liquid-tokens.css does not declare', () => {
+    const tokens = readFileSync(resolve(__dirname, '..', 'theme', 'liquid-tokens.css'), 'utf8');
+    const declared = new Set([...tokens.matchAll(/(--lq-[a-z0-9-]+)\s*:/g)].map((m) => m[1]));
+    expect(declared.size).toBeGreaterThan(40);
+    const unresolved = [...CSS.matchAll(/var\(\s*(--lq-[a-z0-9-]+)/g)]
+      .map((m) => m[1])
+      .filter((name) => !declared.has(name));
+    expect(
+      [...new Set(unresolved)],
+      `a var() nothing declares renders empty — invisible until it ships:\n${unresolved.join('\n')}`,
+    ).toEqual([]);
+  });
+});
+
+describe('liquid surface primitives — the role invariants', () => {
+  it('never gives anchor or work a backdrop-filter', () => {
+    const offenders = blocks
+      .filter((b) => /\.lq-(anchor|work)\b/.test(b.selector))
+      .filter((b) => /backdrop-filter\s*:/i.test(b.declarations))
+      .map((b) => b.selector);
+    expect(
+      offenders,
+      `plan §2.3 — reading, editing, forms, tables and logs stay opaque:\n${offenders.join('\n')}`,
+    ).toEqual([]);
+  });
+
+  it('keeps the liquid role translucent through tokens, not a fixed blur', () => {
+    const liquidRule = blocks.find((b) => b.selector === '.lq-liquid');
+    expect(liquidRule).toBeDefined();
+    expect(liquidRule!.declarations).toMatch(/backdrop-filter\s*:[^;]*var\(--lq-liquid-blur\)/);
+    // A literal px blur here is how high-contrast and the battery tier lose
+    // their flattening: the token is overridden and the rule ignores it.
+    expect(liquidRule!.declarations).not.toMatch(/backdrop-filter\s*:\s*blur\(\s*\d/);
+  });
+
+  it('drives every animated displacement through --lq-motion-scale', () => {
+    const transforms = [...CSS.matchAll(/transform\s*:\s*([^;]+)/g)].map((m) => m[1].trim());
+    expect(transforms.length).toBeGreaterThan(0);
+    for (const value of transforms) {
+      expect(value, `reduced motion cannot switch off "${value}"`).toContain('--lq-motion-scale');
+    }
+  });
+});
+
+describe('liquid surface primitives — rendered behaviour', () => {
+  it('renders each role with its class and role marker', () => {
+    const container = render(
+      <>
+        <AnchorSurface data-testid="a">anchor</AnchorSurface>
+        <WorkSurface data-testid="w">work</WorkSurface>
+        <LiquidSurface data-testid="l">liquid</LiquidSurface>
+        <AmbientSurface data-testid="m" />
+      </>,
+    );
+    for (const role of LIQUID_SURFACE_ROLES) {
+      const el = container.querySelector(`[data-lq-role="${role}"]`);
+      expect(el, `no element for role ${role}`).not.toBeNull();
+      expect(el!.classList.contains(`lq-${role}`)).toBe(true);
+    }
+  });
+
+  it('hides the ambient surface from assistive tech', () => {
+    const container = render(<AmbientSurface>should not be a carrier</AmbientSurface>);
+    const el = container.querySelector('.lq-ambient')!;
+    expect(el.getAttribute('aria-hidden')).toBe('true');
+    // ...and the sheet makes it inert, so it cannot swallow a click either.
+    const ambientRule = blocks.find((b) => b.selector === '.lq-ambient');
+    expect(ambientRule!.declarations).toMatch(/pointer-events\s*:\s*none/);
+  });
+
+  it('keeps caller className, semantic element and passthrough props', () => {
+    const container = render(
+      <AnchorSurface as="section" className="reader" aria-label="Reader" measure>
+        text
+      </AnchorSurface>,
+    );
+    const el = container.querySelector('[aria-label="Reader"]')!;
+    expect(el.tagName).toBe('SECTION');
+    expect(el.classList.contains('lq-anchor')).toBe(true);
+    expect(el.classList.contains('reader')).toBe(true);
+    expect(el.getAttribute('data-measure')).toBe('true');
+  });
+
+  it('leaves the optional switches off rather than defaulting them on', () => {
+    // A surface that silently caps its own width or animates on every mount is
+    // the "Liquid chaos" §3.3 rules out.
+    const container = render(
+      <>
+        <AnchorSurface>a</AnchorSurface>
+        <LiquidSurface>l</LiquidSurface>
+        <WorkSurface>w</WorkSurface>
+      </>,
+    );
+    expect(container.querySelector('.lq-anchor')!.hasAttribute('data-measure')).toBe(false);
+    expect(container.querySelector('.lq-liquid')!.hasAttribute('data-entering')).toBe(false);
+    expect(container.querySelector('.lq-work')!.hasAttribute('data-raised')).toBe(false);
+  });
+});
