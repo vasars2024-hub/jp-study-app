@@ -1701,3 +1701,55 @@ called anything. i18n exit 0 at **10,554** (no new strings this turn). architect
 `Fate/strange Fake: Whispers of Dawn` (1,002.10 MB, 3 seeders) — a Route B miss costs only the
 metadata handshake, so the pool is walkable. The first release that carries real `.ass`/`.srt`
 sidecars is gate 31's Route B leg. Gate 31 remains **32 of 34**.
+
+## 2026-08-17 — the alias walk was offering other people's shows, and Route B's refusal now proves itself
+
+Worker `primary`. Commits `f0936a7e`, `b1c495c6`. App restarted for both (main pid **29564**);
+the pre-restart numbers below are labelled as such.
+
+**`f0936a7e` — the false match the last entry recorded and left open, diagnosed and closed.**
+`looksLikeSameTitle` asks whether half a title's words appear in the release name. For a
+**one-word** title that is one hit out of one — a perfect score for a single incidental token.
+Measured live: MAL 16528 `Hal` is ハル, so the alias walk searched **`Haru`**, and the listing
+returned 4 rows of *Shunkashuutou Daikousha: Haru no Mai*. A one- or two-word title is now also
+asked the opposite question — does the release's own untagged claim carry any **other** work's
+words? — with `RELEASE_VOCABULARY`/`RELEASE_MARKER` forgiving what a release says about itself.
+The vocabulary is derived from the 32 real names in `debug/g31n-routeb-54.json`, not imagined:
+`complete`, `season`, `s01`, `x264`, `1080p`, `v2` are the only ones escaping the brackets there.
+
+**LIVE, after restart. 3 titles cleared, 8 rows and 57,344 MB of someone else's show.** `Hal`
+4→**0**, `Heya` 3→**0**, `Jumping` 1→**0**, each now honestly *"No release on the index looks like
+it carries subtitles for this title."* The rows that went: 4 *Haru no Mai* batches to 5,529.60 MB;
+for `Heya`, `[Erai-raws] Heya Camp` 2,457.60 MB and two **Yuru Camp** batches at 12,083.20 and
+**15,872 MB**. **Control that must not move: `Kaguya-sama … First Kiss` 7 rows → 7 rows.**
+All 74 pre-existing matcher cases unchanged; mutation control → 1 failure, the intended one.
+**One arguable loss, recorded rather than hidden:** `Jumping`'s single row was a 10,240 MB *Osamu
+Tezuka Experimental Films* BDRip that really does contain a short called Jumping — in a
+parenthesised list `untaggedPart` strips. A 10 GB collection is a poor Route B answer, so the
+refusal stands, but it is a judgement and not a clean win.
+
+**`b1c495c6` — eleven Route B refusals in a row reported no number, so nothing could audit them.**
+"This release contains no subtitle files." is honest and unfalsifiable: it cannot distinguish a
+real muxed batch from a file list this app read wrong. It now carries the counts, the way
+`notJapaneseReason` beside it already did. **Verified rather than assumed, and it changed the
+design:** the empty-list branch I started with is unreachable — `qbitAwaitMetadata` refuses an
+empty list first, with its own *"no peer sent its file list"* — so the branch is gone and the test
+that found it stayed, rewritten as the control asserting that upstream state. Mutation control → 2
+failures, the 2 intended.
+
+**GATE 31 ROUTE B: DATA-BLOCKED, and now that is a measurement.** The live walk over all 7
+Kaguya candidates (each named with size and seeders first; zero content bytes, metadata only,
+6.0–46.8 s each): **79 files across 7 torrents, 79 of them video, 0 subtitle files** — 4/4, 6/6,
+4/4, 4/4, 4/4, 4/4, 53/53. **Across 4 titles, 10 distinct batch-sidecar candidates have now
+reached a subtitle verdict and none carries sidecars.** Kill the standing assumption that
+`[Erai-raws] … [Multiple Subtitle]` ships a `Subs/` folder: candidate 4, 2,662.40 MB, is **4 files,
+4 video**. Erai-raws muxes. Gate 31 stays **32 of 34**.
+
+**Open, pre-restart, not chased:** `Fate/strange Fake` refused in **49 ms** with *"no longer in
+qBittorrent"* — that is `6cdd874d`'s notFound path answering instantly, i.e. the add never took.
+A candidate retired in 49 ms has not been asked the question. Re-run it first next turn.
+
+**Next slice:** the batch-sidecar route classifier is 0-for-10 on real data, so it is ranking on a
+name signal that does not predict sidecars. Either find the name signal that does (survey indices
+134+ for releases whose names state a subs folder) or make the route's own listing honest about
+its hit rate — do not walk more Kaguya-shaped batches expecting a different answer.
