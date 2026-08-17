@@ -1079,3 +1079,55 @@ fetch`) needs `import('/src/…?probe=' + Date.now())` for any module you just e
 specifier resolves to the renderer graph's pre-edit copy and reads as "not a function".
 (3) `subtitleHarvestNyaa.test.ts` mocks `jimakuSearchDetailed`, so nothing in it can ever catch a
 defect inside the Jimaku client.
+
+## 2026-08-17 — P4: one title string was the wrong question, and the library only had one
+
+Worker `primary`. Commits `58e348a5`, `462e1c37`. Not a new gate pass — a false negative in
+the route P4 gate 16 offers, plus the data half that makes the fix reach real titles.
+
+**The defect, measured live through the app's own handler, same index, same minute.** MAL 2596
+is filed `Shinreigari`; nyaa carries the show only as `Ghost Hound`.
+`subtitleHarvestNyaaList({title: 'Shinreigari'})` → **0 candidates** and *"No release on the
+index looks like it carries subtitles for this title"*. Under `Ghost Hound` → **1 release,
+4 seeders**, `[DeadFish] Ghost Hound - Batch`. The refusal read exactly like a true one.
+
+**`58e348a5` — `listNyaaHarvest` walks aliases**, primary first, stopping at the first that
+finds anything (not a union: `nyaaSearch` filters each result against the name it was asked
+about, so a union ranks releases scored under different titles against each other). Live after:
+n **0 → 1**, `searchedAs: "Ghost Hound"`, 2,775 ms. Negative control: alias
+`Zzqq Nonexistent Show 91827` → n **0**, `searchedAs` null, the index's own empty sentence.
+**The trust boundary, measured rather than assumed:** `Shinreigari` + alias `Dororo` returns
+**4 Dororo releases**. That is why `searchedAs` is a result field and is rendered — a wrong
+alias is visible, not silent.
+
+**`462e1c37` — the library only ever held one name.** `fetchAnimeList` asked for
+`list_status,num_episodes`. Now `+alternative_titles`, which rides the pages already walked.
+Live, read-only on the user's account: **1,426** completed in 9,028 ms, `truncated:false` (P2/P3's
+number, so nothing else moved), **1,373 of 1,426 carry aliases, 53 do not**. MAL 2596 →
+`["Ghost Hound", "神霊狩／GHOST HOUND", "Shinreigari: Ghost Hound"]`.
+
+**Two traps, one of which only the live run could see.**
+1. `sanitizeListEntries` (`main/malLibrary.ts`) re-validates IPC rows **by copying field by
+   name**, so a new field is dropped in silence. First live sync: 1,373 in, **`storedWithAltTitles:
+   0`** out, with every unit test green — they call `mergeMalListEntries` directly and never cross
+   that seam. After the fix: **1,373** stored. If you add a field to `MalListEntry`, add it there.
+2. `MERGEABLE_FIELDS` is compared with `===`. Equal arrays are different objects, so an identity
+   check reports all 1,426 rows as *updated* every re-sync — the exact count **gate 11** reads.
+   `sameFieldValue` compares element-wise. Live both ways: first sync `{added 0, updated 1376,
+   unchanged 50}`, second `{added 0, updated 0, unchanged 1426}`. MAL 2596 kept
+   `episodesWatched 22, score 5, origin list`; total stayed **1,429**.
+
+**Gate 31 stays open**, unchanged. Its blockers are still 2026-08-16's: 1 Route A candidate in 99
+titles and it is bitmap-only, 0 of 6 Route B batches carry sidecars. New this turn: the harvest
+route's first real acquisition attempt ran — `[DeadFish] Ghost Hound - Batch`, **15,261 ms**,
+refused as *"This release contains no subtitle files."* That is the honest branch, not the old
+1-second false negative: `no-subtitles` comes from `SELECTION_MESSAGES`, reachable only after
+`qbitAwaitMetadata` returns a file list. **Next: re-run the 99-title Route A/B survey with
+aliases** — it could not see alias-only titles, and 1,373 rows now carry them.
+
+**Traps.** (1) `window.api` is undefined if the window loads before Vite finishes building
+`preload.ts` — a probe then fails as "Cannot read properties of undefined"; check
+`typeof window.api` before believing a probe result, and restart. (2) Jikan returned **504**
+("Jikan failed to connect to MyAnimeList") all turn while MAL's own API was up (403 to an
+unauthenticated read) — so `scraperMalUnits` could not be checked and the *dialog*-level
+end-to-end for this title is unverified; the handler-level one is not.

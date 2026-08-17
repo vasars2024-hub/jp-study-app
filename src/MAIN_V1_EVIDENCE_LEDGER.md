@@ -24303,3 +24303,41 @@ errors**, 38 warnings (all the pre-existing `no-non-null-assertion` class).
 
 **Recipes still without a tray action kind: 26** (17's *remove* half is also still open, and
 must refuse by name at the live destination — AnkiConnect has no remove-template action).
+
+## 2026-08-17 — MAL pipeline P4: the alias gap, and the sanitiser that ate the fix
+
+Worker `primary`, branch `feat/nyaa-subtitles`. Full detail in
+`src/MAL_ANIME_PIPELINE_PLAN.md`'s entry of the same date; this is the ledger summary.
+
+- **`58e348a5`** — the nyaa harvest searched one title string. Live, same index same minute:
+  `Shinreigari` → **0** candidates with an honest-sounding refusal; `Ghost Hound` (the same
+  show) → **1** release, 4 seeders. `listNyaaHarvest` now walks the catalogue's other names,
+  primary first, first hit wins. After: **0 → 1**, `searchedAs: "Ghost Hound"`, 2,775 ms.
+  Aliases are caller-supplied and trusted — measured, `Shinreigari` + `Dororo` returns 4 Dororo
+  releases — so `searchedAs` is returned and rendered, making a wrong alias visible.
+  Negative control: a junk alias → 0, `searchedAs` null. **8** tests; 3 mutation controls.
+- **`462e1c37`** — `fetchAnimeList` asked MAL for `list_status,num_episodes` only, so the
+  library held one name per title. `+alternative_titles`, no extra request. Live read-only on
+  the user's account: **1,426** completed, `truncated:false`, **1,373 carry aliases, 53 do not**.
+- **The live run found what the tests could not.** First sync: 1,373 aliases in,
+  **0 stored**. `sanitizeListEntries` copies IPC rows field by name, and the merge tests bypass
+  it entirely. Fixed; after, **1,373** stored. Guarded by a test that reads the file off disk.
+- **Second trap, caught pre-ship.** `MERGEABLE_FIELDS` used `===`; equal arrays are distinct
+  objects, so every re-sync would report all 1,426 rows *updated* — the number **gate 11** reads.
+  Element-wise now. Live: first `{0, 1376, 50}`, second `{0, 0, 1426}`.
+
+**Correction to a claim made earlier this turn:** the harvest nyaa fetch route *is* exercised —
+`[DeadFish] Ghost Hound - Batch`, 15,261 ms, refused *"contains no subtitle files"*. That is the
+post-`279edba1` honest branch (`SELECTION_MESSAGES`, reachable only after metadata), not the old
+1-second empty-list false negative.
+
+**Gate 31 remains open**, blockers unchanged. The next slice it needs is the 99-title Route A/B
+survey **re-run with aliases**, which the original survey could not see.
+
+**Both commit messages say "9 new tests"; the true count is 8 each, 16 total.** The
+full-suite delta is the check: 9,701 → 9,717. Nothing else in either message is affected.
+
+Gates this turn: `npx vitest run` **709 files passed / 1 skipped, 9,717 passed, 6 skipped,
+0 failed** — baseline 9,701 plus exactly my 16; `node tools/i18n-check.cjs` **exit 0 at 10,431**
+(+1, the new `subHarvest.nyaa.searchedAs`); `node tools/architecture-audit.cjs` **"Nothing new"**,
+2 pending; `npx eslint` on all **13** touched paths — **0 errors, 0 warnings**.
