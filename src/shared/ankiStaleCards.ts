@@ -259,8 +259,14 @@ export function scanStaleCards(input: StaleScanInput): StaleScanResult {
   if (overdueDays === null || dormantDays === null) {
     return { ok: false, refusal: 'threshold-too-small' };
   }
+  // `<= 0` and not merely absent. Measured on a real package while building
+  // recipe 26: `Ginga Eiyuu Densetsu.apkg` reports `crt: 0`, which
+  // `apkgImport.ts:465` passes straight through. Zero is finite, so the
+  // isFinite test alone admitted a 1970 origin and made `todayDay` about
+  // 20,700 — every review card then reads `overdue` by twenty thousand days,
+  // which is a number, not a refusal, and the surface has no way to doubt it.
   const createdAtSec = draft.source.createdAtSec;
-  if (typeof createdAtSec !== 'number' || !Number.isFinite(createdAtSec)) {
+  if (typeof createdAtSec !== 'number' || !Number.isFinite(createdAtSec) || createdAtSec <= 0) {
     return { ok: false, refusal: 'no-collection-origin' };
   }
 

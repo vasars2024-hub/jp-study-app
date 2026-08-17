@@ -19,7 +19,10 @@ const NOW = (CRT + 1000 * 86_400) * 1000;
 
 type CardSpec = Partial<RawAnkiCardRow> & { id: string; nid: string };
 
-function draftOf(cards: CardSpec[], options: { noOrigin?: boolean } = {}): AnkiDraft {
+function draftOf(
+  cards: CardSpec[],
+  options: { noOrigin?: boolean; zeroOrigin?: boolean } = {},
+): AnkiDraft {
   const noteIds = [...new Set(cards.map((c) => c.nid))];
   const raw: RawAnkiCollection = {
     col: { ver: 11, crt: CRT, mod: 0 },
@@ -46,7 +49,7 @@ function draftOf(cards: CardSpec[], options: { noOrigin?: boolean } = {}): AnkiD
   return buildAnkiDraft(raw, {
     source: options.noOrigin
       ? { kind: 'apkg', label: 'test.apkg' }
-      : { kind: 'apkg', label: 'test.apkg', createdAtSec: CRT },
+      : { kind: 'apkg', label: 'test.apkg', createdAtSec: options.zeroOrigin ? 0 : CRT },
     normalize: (v) => v,
   });
 }
@@ -64,10 +67,10 @@ function ok(result: SchedulingImpactOutcome): SchedulingImpactResult {
 function project(
   cards: CardSpec[],
   proposal: Parameters<typeof projectSchedulingImpact>[0]['proposal'],
-  extra: { forecastDays?: number; noOrigin?: boolean } = {},
+  extra: { forecastDays?: number; noOrigin?: boolean; zeroOrigin?: boolean } = {},
 ): SchedulingImpactOutcome {
   return projectSchedulingImpact({
-    draft: draftOf(cards, { noOrigin: extra.noOrigin }),
+    draft: draftOf(cards, { noOrigin: extra.noOrigin, zeroOrigin: extra.zeroOrigin }),
     proposal,
     nowMs: NOW,
     forecastDays: extra.forecastDays,
@@ -323,6 +326,22 @@ describe('projectSchedulingImpact — refusals, each by its own name', () => {
     });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.refusal).toBe('no-collection-origin');
+  });
+
+  it('refuses a `crt` of 0, which is how a real package on disk spells "no origin"', () => {
+    // Found live, not in a fixture: `Ginga Eiyuu Densetsu.apkg` reports
+    // `crt: 0`, and `apkgImport.ts:465` passes it straight through. Zero is
+    // finite, so an isFinite guard alone dates every due day ~20,700 days early
+    // — the whole deck lands in backlog and the horizon renders 30 empty rows
+    // that read like a measurement.
+    const result = project([reviewCard('1', 10)], { kind: 'retention', from: 0.9, to: 0.8 }, {
+      zeroOrigin: true,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.refusal).toBe('no-collection-origin');
+    // The control that proves the guard is about the origin and not the deck:
+    // the identical card with a real `crt` projects.
+    expect(project([reviewCard('1', 10)], { kind: 'retention', from: 0.9, to: 0.8 }).ok).toBe(true);
   });
 
   it('checks the proposal before the draft, so a bad number is named before a bad deck', () => {

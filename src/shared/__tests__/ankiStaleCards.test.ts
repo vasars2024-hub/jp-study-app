@@ -29,7 +29,11 @@ type CardSpec = Partial<RawAnkiCardRow> & { id: string; nid: string };
 
 function draftOf(
   cards: CardSpec[],
-  options: { revlog?: RawAnkiRevlogRow[] | undefined; noOrigin?: boolean } = {},
+  options: {
+    revlog?: RawAnkiRevlogRow[] | undefined;
+    noOrigin?: boolean;
+    zeroOrigin?: boolean;
+  } = {},
 ): AnkiDraft {
   const noteIds = [...new Set(cards.map((c) => c.nid))];
   const raw: RawAnkiCollection = {
@@ -60,7 +64,7 @@ function draftOf(
     // does that at :465 — so the fixture has to carry it the same way.
     source: options.noOrigin
       ? { kind: 'apkg', label: 'test.apkg' }
-      : { kind: 'apkg', label: 'test.apkg', createdAtSec: CRT },
+      : { kind: 'apkg', label: 'test.apkg', createdAtSec: options.zeroOrigin ? 0 : CRT },
     normalize: (v) => v,
   });
 }
@@ -116,6 +120,24 @@ describe('scanStaleCards refusals', () => {
     const draft = draftOf([reviewCard('1', 400)], { noOrigin: true });
     const result = scanStaleCards({ draft, nowMs: NOW });
     expect(result).toEqual({ ok: false, refusal: 'no-collection-origin' });
+  });
+
+  it('refuses a `crt` of 0, which is how a real package actually spells it', () => {
+    // The test above says "instead of counting from zero" and then supplies an
+    // *absent* origin. A real package on this machine — `Ginga Eiyuu
+    // Densetsu.apkg` — reports `crt: 0` literally, and `apkgImport.ts:465`
+    // passes it through unchanged. Zero is finite, so it used to pass the guard
+    // and put `todayDay` at about 20,700: every review card `overdue` by twenty
+    // thousand days, reported as a number with nothing to doubt it. Measured
+    // while building recipe 26.
+    const draft = draftOf([reviewCard('1', 400)], { zeroOrigin: true });
+    expect(scanStaleCards({ draft, nowMs: NOW })).toEqual({
+      ok: false,
+      refusal: 'no-collection-origin',
+    });
+    // The control: the same card with a real origin still scans, so the guard
+    // is about the origin and not about the card.
+    expect(scanStaleCards({ draft: draftOf([reviewCard('1', 400)]), nowMs: NOW }).ok).toBe(true);
   });
 
   it('refuses a threshold under one day, because the day boundary is already fuzzy', () => {

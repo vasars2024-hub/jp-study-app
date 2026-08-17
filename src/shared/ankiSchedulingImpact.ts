@@ -238,8 +238,16 @@ export function projectSchedulingImpact(input: SchedulingImpactInput): Schedulin
   const ratio = resolveRatio(proposal);
   if (typeof ratio !== 'number') return { ok: false, refusal: ratio };
 
+  // `<= 0`, not just absent. `apkgImport.ts:465` passes `raw.col.crt` straight
+  // through, and a real package on this machine — `Ginga Eiyuu Densetsu.apkg` —
+  // reports `crt: 0`. Zero is finite, so an `isFinite` guard alone admits a
+  // 1970 origin and dates every due day about 20,700 days early: the whole deck
+  // lands in `backlogCards` and the horizon renders 30 empty rows, which reads
+  // as a measurement rather than as the missing field it is.
   const createdAtSec = draft.source.createdAtSec;
-  if (!isFiniteNumber(createdAtSec)) return { ok: false, refusal: 'no-collection-origin' };
+  if (!isFiniteNumber(createdAtSec) || createdAtSec <= 0) {
+    return { ok: false, refusal: 'no-collection-origin' };
+  }
   const todayDay = todayDueDay(createdAtSec, nowMs);
 
   const forecastDays = Math.min(
