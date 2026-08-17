@@ -56,6 +56,21 @@ export interface WorkbenchReviewSummary {
    * review as an empty one, and step 6 would tell the user nothing happened.
    */
   deckRenames: number;
+  /**
+   * Card templates recipe 17's remove half dropped. Counted apart from
+   * `changedNotes` for `deckRenames`' reason — a removal touches no note's
+   * bytes — and surfaced at all because this summary is the dry run of the
+   * export: a removal that shipped without appearing here would be the one
+   * destructive change the user approved without being shown it.
+   */
+  templatesRemoved: number;
+  /**
+   * Cards those removals delete. Reported apart from `templatesRemoved` and
+   * from every other count in this summary because it is the only number here
+   * that describes destruction — the same reason the package writer keeps
+   * `cardsDeleted` apart from `cardsUpdated`.
+   */
+  cardsDeleted: number;
   /** Field name → notes with a net change on it, in first-touched order. */
   fieldCounts: { name: string; notes: number }[];
   /** Net changes that two or more steps wrote to the same value. */
@@ -105,9 +120,20 @@ export function buildWorkbenchReview(
   const tracked = new Map<string, Tracked>();
   // Deck id → the name it held before the session's first rename of it.
   const deckFirstBefore = new Map<string, string>();
+  let templatesRemoved = 0;
+  let cardsDeleted = 0;
   journal.done.forEach((op, i) => {
     if (op.kind === 'deck-name') {
       if (!deckFirstBefore.has(op.deckId)) deckFirstBefore.set(op.deckId, op.before);
+      return;
+    }
+    if (op.kind === 'template-remove') {
+      // Not folded and not re-read against the draft, unlike a rename: two
+      // removals on one note type are two templates gone, and an undone one is
+      // already absent from `journal.done`. Both numbers come straight off the
+      // op, which is the only place the deleted rows still exist.
+      templatesRemoved += 1;
+      cardsDeleted += op.cards.length;
       return;
     }
     const key =
@@ -231,6 +257,8 @@ export function buildWorkbenchReview(
     cardMoves,
     cardDeckMoves,
     deckRenames,
+    templatesRemoved,
+    cardsDeleted,
     fieldCounts: [...fieldNotes.entries()].map(([name, ids]) => ({ name, notes: ids.size })),
     overwrites,
     diffs,

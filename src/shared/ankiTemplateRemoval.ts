@@ -30,7 +30,8 @@
 // note type and the card rows, and the live commit refuses by name because
 // AnkiConnect has no remove-template action.
 
-import type { AnkiDraft, AnkiDraftNoteType } from './ankiDraft';
+import type { AnkiDraft, AnkiDraftCard, AnkiDraftNoteType } from './ankiDraft';
+import type { AnkiDraftEditOp } from './ankiDraftEdit';
 import type { TemplateGroup } from './ankiSiblingAudit';
 
 export type TemplateRemovalRefusal =
@@ -321,6 +322,50 @@ export function applyTemplateRemoval(
     removedCards: doomedCardIds.size,
     draft: { ...draft, noteTypes, cards },
   };
+}
+
+/**
+ * The journal ops that make a removal reversible — one per removed template.
+ *
+ * Built here rather than at the tray, because everything an undo needs has to be
+ * read out of the draft the removal ran **against**: the template as it stood,
+ * the deleted card rows with their scheduling state, and where each row sat in
+ * `draft.cards`. A tray building this from its own after-state would be reading
+ * a draft those rows are already gone from.
+ *
+ * `renumbered` is filtered to the op's own note type, so undoing one removal
+ * cannot un-renumber another note type that happened to share the batch.
+ */
+export function templateRemovalOps(
+  draft: AnkiDraft,
+  plan: TemplateRemovalPlan,
+  group?: string,
+): AnkiDraftEditOp[] {
+  const cardById = new Map(draft.cards.map((card, at) => [card.id, { card, at }]));
+  const ops: AnkiDraftEditOp[] = [];
+  for (const removal of plan.removals) {
+    const noteType = draft.noteTypes.find((nt) => nt.id === removal.noteTypeId);
+    const template = noteType?.templates.find((t) => t.ord === removal.ord);
+    // A removal whose template the draft no longer holds cannot be made
+    // reversible, and an op that silently dropped it would be a removal the user
+    // could not undo. Skipped rather than approximated.
+    if (!template) continue;
+    const rows = removal.cardIds
+      .map((id) => cardById.get(id))
+      .filter((entry): entry is { card: AnkiDraftCard; at: number } => entry !== undefined);
+    ops.push({
+      kind: 'template-remove',
+      noteTypeId: removal.noteTypeId,
+      template: { ...template },
+      cards: rows.map((r) => ({ ...r.card })),
+      cardIndexes: rows.map((r) => r.at),
+      renumbered: plan.renumbered
+        .filter((r) => r.noteTypeId === removal.noteTypeId)
+        .map((r) => ({ from: r.from, to: r.to })),
+      ...(group === undefined ? {} : { group }),
+    });
+  }
+  return ops;
 }
 
 /**

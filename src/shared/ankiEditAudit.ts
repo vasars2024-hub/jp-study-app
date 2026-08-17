@@ -43,6 +43,13 @@ export interface JournalEntry {
    * reporting it as an empty step would hide the largest change in the journal.
    */
   decksRenamed: number;
+  /**
+   * Card templates the step removed. Separate from `noteCount` for
+   * `decksRenamed`' reason — a removal belongs to no single note, it spans every
+   * note of its note type — and present at all so the journal list cannot show
+   * the workbench's one destructive step as an empty row.
+   */
+  templatesRemoved: number;
   /** Ops in the step — what the batch actually cost, not what a user counts. */
   opCount: number;
   /** In the redo stack: it happened, and it has since been taken back. */
@@ -85,9 +92,14 @@ function entryFor(
   const fieldNames: string[] = [];
   let tagsChanged = false;
   let decksRenamed = 0;
+  let templatesRemoved = 0;
   for (const op of step) {
     if (op.kind === 'deck-name') {
       decksRenamed += 1;
+      continue;
+    }
+    if (op.kind === 'template-remove') {
+      templatesRemoved += 1;
       continue;
     }
     notes.add(op.noteId);
@@ -102,8 +114,16 @@ function entryFor(
     if (name && !fieldNames.includes(name)) fieldNames.push(name);
   }
   const first = step[0];
-  // A `deck-name` op has no note, so the fallback id names the deck instead.
-  const firstTarget = first === undefined ? '' : first.kind === 'deck-name' ? first.deckId : first.noteId;
+  // Neither `deck-name` nor `template-remove` has a note, so the fallback id
+  // names the deck or the note type instead.
+  const firstTarget =
+    first === undefined
+      ? ''
+      : first.kind === 'deck-name'
+        ? first.deckId
+        : first.kind === 'template-remove'
+          ? `${first.noteTypeId}:${first.template.ord}`
+          : first.noteId;
   return {
     index,
     id: first?.group ?? `${first?.kind ?? 'op'}:${firstTarget}:${index}`,
@@ -112,6 +132,7 @@ function entryFor(
     fieldNames,
     tagsChanged,
     decksRenamed,
+    templatesRemoved,
     opCount: step.length,
     undone,
   };
@@ -141,6 +162,10 @@ export function appliedStepCount(entries: readonly JournalEntry[]): number {
 /** Distinct notes the applied steps touched. A note edited twice counts once. */
 export function auditedNoteCount(journal: AnkiDraftEditJournal): number {
   const notes = new Set<string>();
-  for (const op of journal.done) if (op.kind !== 'deck-name') notes.add(op.noteId);
+  // The two note-less op kinds are skipped, matching `editedNoteIds`.
+  for (const op of journal.done) {
+    if (op.kind === 'deck-name' || op.kind === 'template-remove') continue;
+    notes.add(op.noteId);
+  }
   return notes.size;
 }

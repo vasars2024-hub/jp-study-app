@@ -239,6 +239,10 @@ export function buildApkgExportChanges(
 ): ApkgExportChangeSet {
   const tracked = new Map<string, Tracked>();
   const deckRenames = new Map<string, { deckId: string; before: string; after: string }>();
+  // Removed ords per note type, in the SOURCE numbering — which is not the
+  // numbering the ops are written in. See `sourceOrdMaps` below.
+  const removedOrds = new Map<string, Set<number>>();
+  const sourceOrdMaps = new Map<string, Map<number, number>>();
   for (const op of journal.done) {
     if (op.kind === 'deck-name') {
       // Folded like every other op: a deck renamed twice exports once, and one
@@ -246,6 +250,37 @@ export function buildApkgExportChanges(
       const first = deckRenames.get(op.deckId);
       if (first) first.after = op.after;
       else deckRenames.set(op.deckId, { deckId: op.deckId, before: op.before, after: op.after });
+      continue;
+    }
+    if (op.kind === 'template-remove') {
+      // **A second removal on the same note type names an ord the FIRST removal
+      // renumbered.** Source [0,1,2], drop ord 1 → survivors renumber to [0,1],
+      // and a later op removing "ord 1" means source ord 2. Exporting the op's
+      // own number would delete the wrong template — the one the user kept.
+      // So each note type carries a current→source map, rebuilt after every
+      // removal from that op's own `renumbered` pairs. Absent key = identity,
+      // which is exactly right for the first removal, when the two numberings
+      // are the same.
+      const mapped = sourceOrdMaps.get(op.noteTypeId) ?? new Map<number, number>();
+      const sourceOrd = (ord: number): number => mapped.get(ord) ?? ord;
+
+      let ords = removedOrds.get(op.noteTypeId);
+      if (!ords) {
+        ords = new Set<number>();
+        removedOrds.set(op.noteTypeId, ords);
+      }
+      ords.add(sourceOrd(op.template.ord));
+
+      const next = new Map<number, number>();
+      // Survivors that moved carry their source ord to the new position.
+      for (const r of op.renumbered) next.set(r.to, sourceOrd(r.from));
+      // Survivors that did not move keep whatever they already had.
+      const moved = new Set(op.renumbered.map((r) => r.from));
+      for (const [current, source] of mapped) {
+        if (current === op.template.ord || moved.has(current)) continue;
+        next.set(current, source);
+      }
+      sourceOrdMaps.set(op.noteTypeId, next);
       continue;
     }
     // The kind is part of the key: `card-due` and `card-deck` both name a card,
@@ -332,7 +367,25 @@ export function buildApkgExportChanges(
     deckCreates.push({ deckId: deck.id, name: deck.name, configId: deck.configId });
   }
 
-  return { notes, cardMoves, deckRenames: deckRenamed, cardDeckMoves, deckCreates };
+  // Only note types the draft still holds. Unlike a deck rename there is nothing
+  // to re-read against — a removed template is gone from the draft, so its
+  // absence cannot distinguish "removed" from "undone"; an undone removal is
+  // instead already absent from `journal.done`, which is what folds it away.
+  const templateRemovals: ApkgExportTemplateRemoval[] = [];
+  for (const [noteTypeId, ords] of removedOrds) {
+    if (ords.size === 0) continue;
+    if (!draft.noteTypes.some((nt) => nt.id === noteTypeId)) continue;
+    templateRemovals.push({ noteTypeId, removedOrds: [...ords].sort((a, b) => a - b) });
+  }
+
+  return {
+    notes,
+    cardMoves,
+    deckRenames: deckRenamed,
+    cardDeckMoves,
+    deckCreates,
+    templateRemovals,
+  };
 }
 
 /** True when the change set carries nothing to write. */
