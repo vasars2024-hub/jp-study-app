@@ -535,9 +535,26 @@ Category 8 is still not a 10: the **offline** state (a timeout, distinct from a 
 raw-key counting is `lang=en` only where the rubric wants all four, and dead-control/fabricated-value
 counts remain unclaimed.
 
-Still open for L1: categories 5–7, category 8's offline half and its ja/zh/ru raw-key sweep, and the
-layout studies. `LIQUID_SCORECARD.md` is deliberately still empty — five driven categories, none
-scoring 10.
+**Category 8's four-language half closed 2026-08-17 — 0 raw i18n keys in all four languages.**
+`.coordination/liquid-workplace/L1_RAW_KEYS_FOUR_LANGUAGES.md`. **2,248 rendered text runs per
+language, 5 windows + whole document, 0 refused, 8 `dict-entry` results live in every pass, 0 raw
+keys** at en/ja/zh/ru. The switch is proven to reach the *rendered* surface (titles read
+`Scraper / スクレイパー / 抓取器 / Скрапер`), driven through Settings → Appearance rather than a
+storage write + reload, and `ui-lang` restored to `en` equal to the captured baseline. Not
+redundant with `tools/i18n-check.cjs`: that gate compares catalogs against each other, so a key no
+catalog has passes it — and that is exactly when `core.ts:94` renders the dotted key at the user.
+Control fired twice (planted text key **found**, planted `placeholder` key **found**, planted
+`display:none` key **silent**), re-run after the probe rewrite below.
+**Trap banked, and it is the important half of this slice:** the probe first addressed windows by
+English title text, so switching the language made 4 of 5 lookups refuse and it printed
+`candidates=0` **on four windows it never read** — a zero byte-identical to a clean pass, caught
+only by the run-count dropping 2,248 → 1,205. Windows are now addressed by **DOM index**, and
+`refusedWindows`/`dictEntriesLive` sit at the top level of every result. Generally: *a probe keyed
+on any user-visible English string cannot be used in a sweep that changes the language.*
+
+Still open for L1: categories 5–7, category 8's **offline** half (a timeout, distinct from the
+refusal already driven), its dead-control and fabricated-value counts, and the layout studies.
+`LIQUID_SCORECARD.md` is deliberately still empty — five driven categories, none scoring 10.
 
 ### L2 — Semantic tokens and shared primitives
 
