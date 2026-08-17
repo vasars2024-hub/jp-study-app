@@ -121,7 +121,7 @@ that recipe was run on 2026-08-16 and produced the stated number.
 | Window dragging | Shell/window mgr | Pointer-drag the `.fwin-bar` by a known delta and read back **committed** `style.left/top` (state, not a transform). Observed: `128px,84px` → `168px,114px` for a +40/+30 drag — exact | **YES** |
 | Pop-outs | Shell/window mgr | Click the pop-out `.fwin-b` and count windows in `/health`. Observed: **1 → 2 windows**, the new one 900×640 at `?popout=dictionary`, in-desk `.fwin` removed | **YES** — plus the state-loss note above |
 | Desktop shortcut grid | Study OS shell | Dispatch the shell's own `desktop:add-shortcut` event, count `.os-desk-icon`, then remove via the icon's own `×` and re-count. Observed **0 → 1 → 0**, the icon carrying its label `L0ParityProbe`. A break = the count does not move, or the removal leaves a residue | **YES** — 0→1→0, layout restored |
-| Display assignments | Shell/window mgr | Move a window to a second display and confirm the assignment survives a restart | no — **one display on this machine**, so the negative control is impossible here |
+| Display assignments | Shell/window mgr | **Rewritten 2026-08-17** — run `probes/display-assignments-parity.ps1`. Drive `deskwinSetOptions({displayKey, enabled})` (the channel `MonitorsPage.tsx:60` uses), **restart the process**, and count windows whose `bounds.x >= 1920`. Observed on the real second display `vdd-by-mtt\|1920x1080\|1`: enabled → **1** window at x=1920, y=0, 1920×1080, url `?desk=2&displayKey=…`; after restart (pid 47592 → 32212) → still **1**; disabled → **0**; after restart (→ 55184) → **0**. The two shells are distinct, not a clone: `desk=2` / 1 `.fwin` / 0 desk icons vs main / 4 `.fwin` | **YES** — control inverted across two real restarts, assignments blob restored `-ceq` at 370 chars |
 | Secret Aero discovery and exit | Aero shell | **Rewritten 2026-08-17** — do NOT perform the gesture. Run `probes/aero-materials-parity.js`: assert the trigger is present *and hit-testable* (`elementFromPoint` at its centre returns it, a point 200px away does not), then force `data-materials='aero'` and assert the Aero material layer paints, then restore and assert every number returns. Observed: `.fwin` backdrop `none` → `blur(14px) saturate(1.38)` → `none`, radius `20px` → `8px` → `20px`, taskbar background `none` → the Aero blue gradient → `none`; window set `2` (Anki, Scraper) unchanged across all 5 legs | **YES** — control inverted, store byte-intact. **Material layer only**, see scope limit below |
 | Aero safe mode | Aero shell | **Rewritten 2026-08-17** — force `data-aero-safe-mode='on'` on top of `data-materials='aero'` (attribute, never `setAeroSafeMode()`), assert the reduced shell renders and the exit route survives. Observed: living-layer displayed `3 → 0 → 3`, `.fwin` backdrop `blur(14px) saturate(1.38)` → `none` → `blur(14px) saturate(1.38)`, transition-duration `0s` → `1e-06s` → `0s`; exit route intact in all 5 legs (trigger present, restore-theme `study-os`) | **YES** — reversible both ways, store byte-intact |
 | Wired lifecycle | Wired shell | **Rewritten 2026-08-17** — no environment switch needed. Run `probes/wired-lifecycle-parity.js` then `probes/wired-lifecycle-release.js`: set `data-materials='wired'` (which alone satisfies `isWiredTheme()`), dispatch the product's own `shell:wiredRestart`, record every published phase, then restore. Observed: all five phases in order — `preboot → boot → warning → reveal → active` — with `.fwin` **2 → 2** (Anki, Scraper, same titles) and taskbar entries **2 → 2** across the restart | **YES** — desktopSurvived true, 7 of 7 restore assertions true |
@@ -133,10 +133,11 @@ Present and populated: **all-app baseline (22 surfaces × 3 sizes)**, **Video ba
 **performance baselines incl. the restart leg**, **census**, **this ledger** with 7 driven
 Dictionary rows, and **this matrix** with 9 rows each carrying a runnable recipe.
 
-**The unobserved set is now 1 of 9** — the two Aero rows and the Wired lifecycle row were
+**The unobserved set is now 0 of 9.** The two Aero rows and the Wired lifecycle row were
 rewritten and driven live on 2026-08-17 (see their rows), after the desktop shortcut grid and
-Blanc cold-open boundary on 2026-08-16. The single remaining row is **display assignments**, and
-it is blocked on hardware this machine does not have, not on effort.
+Blanc cold-open boundary on 2026-08-16. **Display assignments closed the same day**, once a
+virtual display driver was installed on user instruction and gave this machine a second
+display — see its own section below.
 
 **All three of 2026-08-17's rows came unblocked the same way**, and the pattern is worth carrying
 forward: each was recorded as needing a persisted write, and in each case the shell's material
@@ -147,8 +148,8 @@ an attribute check.
 ### Verdict: L0's gate is CLOSED as of 2026-08-17
 
 The gate's own wording is *"no Liquid product code until the baseline and parity ledger exist."*
-Both exist and are committed, and the matrix that guards them now stands at **8 of 9 rows
-observed**, the ninth blocked on a second display this machine does not have. **L1 may begin.**
+Both exist and are committed, and the matrix that guards them now stands at **9 of 9 rows
+observed** (was 8 of 9 until display assignments closed on 2026-08-17). **L1 may begin.**
 
 Read this as what it is. The gate says the freeze map exists and has been driven — it does **not**
 say every frozen system is fully covered. Of the three coverage holes first recorded here, **two
@@ -229,10 +230,41 @@ They are kept here because the corrections are the reusable part.
   result for that run, and reporting it as a pass on the strength of `desktopSurvived: true` would
   have been exactly the false pass this matrix exists to prevent.
 
-The one that remains:
+### The display-assignments row — closed 2026-08-17, and what it cost to read
 
-- **Display assignments** — unchanged hardware blocker: one display on this machine, so the
-  negative control cannot exist here at all.
+The blocker was real and is now gone: a **virtual display driver** was installed on explicit user
+instruction, and `displayList()` reports two entries, **both `virtual:false`** —
+`display|1920x1080|1` (primary, x=0) and `vdd-by-mtt|1920x1080|1` (x=1920). This is *not*
+`setVirtualDisplayCount`: simulated keys are deliberately stripped on load
+(`shared/displayIdentity.ts:43`, `desktop.ts:310`), so a simulation could never have proven
+persistence. Electron hot-detected it — the app session under measurement started at 05:27, two
+hours before the driver existed, and still enumerated it.
+
+Numbers are in the row. Three things the next worker should not re-derive:
+
+- **`desktopSetAssignment` is the wrong instrument and reads as a product defect.** It writes the
+  store and stops; only `deskwin:setOptions` / `deskwin:assign` / `deskwin:sync` call
+  `syncDesktopWindows()` (`desktopWindows.ts:410`, `:420`, `:456`). The first probe flipped
+  `enabled` to true through it, saw **1** window instead of 2, and the honest reading is
+  "store-only back door", not "assignments do nothing". `MonitorsPage.tsx:60` uses the right one.
+- **A second desktop window stalls the first window's JS.** Both shells are same-origin, so
+  Chromium reuses one renderer process and mounting a whole second Study OS blocks window 1.
+  Measured: `/eval` to `main` **timed out at 30 s twice, then answered in 12,072 ms**, then went
+  normal; window 2 answered in **464 ms**. `/health` stayed responsive throughout, which is how
+  you tell this from a dead app. `deskwinSync()` in the steady state is **8 ms**. Do not read the
+  30 s as a hang and do not read it as main-loop blocking — main was answering.
+- **The store persists synchronously and correctly** (`atomicWriteJson`, `desktop.ts:50`). An
+  apparent "the file never updated" was a misread clock on the measuring side, not the product.
+
+**DEFECT FOUND BY HAVING A SECOND DISPLAY — a display's identity does not survive a resolution
+change.** The live store carries **three** assignments for **two** panels: `vdd-by-mtt|800x600|1`
+*and* `vdd-by-mtt|1920x1080|1`. `baseDisplayKey()` is `label|WxH|scale`, and its own doc says
+`bounds.x/y` are excluded so that rearranging monitors does not orphan an assignment — but
+**resolution is in the key**, so changing it does. The user's per-monitor configuration is
+silently reset to the `enabled: false` default and the dead row keeps holding a desktop index.
+Not hypothetical: it happened on this machine, inside one session, when the new display was set
+from 800×600 to 1920×1080. Tracked and fixed separately; the orphan row is **left in place**
+because `resolveDisplayKey`'s contract is that an absent display *keeps* its assignment.
 
 **Instrumentation limit found while closing the grid row, so the next worker does not re-derive
 it:** the desk icon's `×` is `display:none` until `.os-desk-icon:hover` (`styles.css:13806`,
