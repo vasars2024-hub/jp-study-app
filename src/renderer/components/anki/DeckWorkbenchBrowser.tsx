@@ -320,7 +320,18 @@ export default function DeckWorkbenchBrowser({
   const shownIds = useMemo(() => shown.map((row) => row.noteId), [shown]);
   const shownCols = useMemo(() => visibleBrowserColumns(columns), [columns]);
 
-  const partial = draft.counts.notes < totalNotes;
+  /**
+   * How many notes are actually in memory. `draft.counts` describes the whole
+   * COLLECTION and `draft.notes` is the window (`ankiDraft.ts:1023` says so), so
+   * `draft.counts.notes < totalNotes` compared the collection total against
+   * itself and was false for every paged source — the one condition it exists to
+   * detect. Measured live on the 100,000-note fixture at a page of 500: the
+   * "only one page is loaded" notice never rendered, the row line read "1 of
+   * 100,000 loaded notes shown", and `canSelectWholeSource` stayed true under an
+   * active filter, so a one-row result offered a button that selects all 100,000.
+   */
+  const loadedNotes = draft.notes.length;
+  const partial = loadedNotes < totalNotes;
   // With a filter on a paged source, "everything matching" is a claim nobody
   // computed. See the file comment. A query that failed to parse is not a
   // filter at all, so it cannot license a whole-source claim either.
@@ -505,7 +516,7 @@ export default function DeckWorkbenchBrowser({
           onChange={(e) => setQuery(e.target.value)}
         />
         <span className="muted">
-          {t('ankiWorkbench.browser.rows', { shown: shown.length, loaded: draft.counts.notes })}
+          {t('ankiWorkbench.browser.rows', { shown: shown.length, loaded: loadedNotes })}
         </span>
         {/* Only shown once a deck actually has words to rank: on a deck whose
             note types declare no word field, `known:` can never resolve a
@@ -734,7 +745,7 @@ export default function DeckWorkbenchBrowser({
 
       {partial && (
         <p className="muted wb-browser-partial">
-          {t('ankiWorkbench.browser.pageOnly', { loaded: draft.counts.notes, total: totalNotes })}
+          {t('ankiWorkbench.browser.pageOnly', { loaded: loadedNotes, total: totalNotes })}
         </p>
       )}
 
