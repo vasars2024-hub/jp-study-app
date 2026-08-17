@@ -369,6 +369,35 @@ describe('rankSubtitleCandidates', () => {
     expect(looksLikeSameTitle('[Erai-raws] Nanatsu no Taizai - Seisen no Shirushi - 01 ~ 04', 'Nanatsu no Taizai: Seisen no Shirushi')).toBe(true);
   });
 
+  it('reads a native title as the same work, not as another work', () => {
+    // This is the single release name in the 2,685 this repo has recorded that
+    // advertises external subtitles, i.e. the one Route B candidate the whole
+    // survey found — and the short-title rule refused it in BOTH directions:
+    // the romaji search tripped on `銀魂`, the native-alias search on `gintama`.
+    // `ep001` was a second refusal on the same row: the range `ep001-201` splits
+    // into a bare `201`, which is dropped as digits, and an `ep001` that was not.
+    const gintama = '[Yousei-raws] Gintama 銀魂 (2006-2010) ep001-201 [DVDrip 760x576 x264 FLAC] + Subs';
+    expect(looksLikeSameTitle(gintama, 'Gintama')).toBe(true);
+    expect(looksLikeSameTitle(gintama, '銀魂')).toBe(true);
+    // NEGATIVE CONTROL: unreadable is not the same as forgiven. A release naming
+    // a genuinely different work in the SAME script is still refused, because
+    // the half-the-tokens ratio judges it before this rule is asked.
+    expect(looksLikeSameTitle('[SubsPlease] Shingeki no Kyojin 進撃の巨人 - 01-25 [1080p]', '銀魂')).toBe(false);
+    expect(looksLikeSameTitle('[Group] 進撃の巨人 Attack on Titan 01-25', 'Gintama')).toBe(false);
+  });
+
+  it('counts a repeated title word once, not twice', () => {
+    // Measured 2026-08-17 in the survey: the 2018 film `Mirai no Mirai` reads as
+    // three tokens, so it escaped the short-title rule entirely and was offered
+    // two releases of a 2025 show that shares one word and a particle.
+    expect(looksLikeSameTitle('[EMBER] Miru: Watashi no Mirai (2025) [1080p]', 'Mirai no Mirai')).toBe(false);
+    expect(looksLikeSameTitle('[SubsPlease] Miru - Watashi no Mirai - 01 (1080p)', 'Mirai no Mirai')).toBe(false);
+    // The control the rule must not break: the work's own releases still match,
+    // whichever way the name is written.
+    expect(looksLikeSameTitle('[Group] Mirai no Mirai (2018) [BDRip 1080p x264]', 'Mirai no Mirai')).toBe(true);
+    expect(looksLikeSameTitle('[Group] Mirai [1080p][Dual Audio]', 'Mirai no Mirai')).toBe(true);
+  });
+
   it('drops rows advertising only unwanted languages', () => {
     const ru = row({ id: 'ru', name: 'Show Subtitles', sizeBytes: MB, subtitleLanguages: ['ru'] });
     expect(rankSubtitleCandidates([ru], { languages: ['ja'] })).toEqual([]);

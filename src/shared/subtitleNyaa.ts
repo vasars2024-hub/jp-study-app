@@ -520,8 +520,31 @@ const RELEASE_VOCABULARY = new Set([
   'aac', 'av', 'avc', 'flac', 'fhd', 'fin', 'h', 'hd', 'hdr', 'hevc', 'opus', 'sd', 'uhd', 'x264', 'x265',
 ]);
 
-/** `s01`, `720p`, `10bit`, `2nd`, `v2`, `4k` — a marker, never a title word. */
-const RELEASE_MARKER = /^(?:[sv]\d{1,2}|\d{3,4}p|\d{1,2}bit|\d{1,2}(?:st|nd|rd|th)|\d{1,2}k|[hx]\d{3})$/;
+/**
+ * `s01`, `720p`, `10bit`, `2nd`, `v2`, `4k`, `ep001` — a marker, never a title word.
+ *
+ * `ep001` earns its place from the one release in this repo's whole corpus that
+ * advertises external subtitles: `[Yousei-raws] Gintama 銀魂 (2006-2010)
+ * ep001-201 [DVDrip …] + Subs`. Its range splits into `ep001` and `201`; the
+ * bare `201` is dropped as digits, but `ep001` was read as another work's word
+ * and refused the row outright.
+ */
+const RELEASE_MARKER =
+  /^(?:[sv]\d{1,2}|e\d{1,4}|ep\d{1,4}|\d{3,4}p|\d{1,2}bit|\d{1,2}(?:st|nd|rd|th)|\d{1,2}k|[hx]\d{3})$/;
+
+/** Kana, CJK ideographs and the Hangul a release name might carry. */
+const CJK_CHAR = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
+
+/**
+ * Which alphabet a token is written in, for the one question below that needs it.
+ *
+ * A romaji title and a native title are the *same work* spelled two ways, and no
+ * token comparison can see that. So a claim word in a script the searched title
+ * does not use is not counter-evidence — it is unreadable evidence.
+ */
+function tokenScript(token: string): 'cjk' | 'latin' {
+  return CJK_CHAR.test(token) ? 'cjk' : 'latin';
+}
 
 /**
  * What a release name claims to carry, with its own vocabulary taken out.
@@ -586,9 +609,27 @@ export function looksLikeSameTitle(rowName: string, title: string): boolean {
   // 7024, one episode) took a 12-episode `[Erai-raws] Heya Camp` batch the same
   // way. A release whose own claim is nothing but tags keeps passing: there is
   // no counter-evidence in it, only the absence of any.
-  if (tokens.length <= SHORT_TITLE_MAX_TOKENS) {
-    const wanted = new Set(tokens);
-    if (claimWords(rowName).some((word) => !wanted.has(word))) return false;
+  //
+  // Counted DISTINCT, because a repeated word is one word of evidence, not two:
+  // `Mirai no Mirai` reads as three tokens and so escaped this rule entirely,
+  // which is how the 2018 film was offered `[EMBER] Miru: Watashi no Mirai
+  // (2025)` and `[SubsPlease] Miru - Watashi no Mirai` in the 2026-08-17 survey.
+  // Its actual vocabulary is `mirai` and a particle.
+  //
+  // Read only in the script the title is written in. `[Yousei-raws] Gintama 銀魂
+  // … + Subs` is the single release in a 2,685-name corpus that advertises
+  // external subtitles, and this rule refused it in **both** directions — the
+  // romaji search tripped on `銀魂`, the native-alias search tripped on
+  // `gintama`. The two names are the same work, and no set membership can know
+  // that. The half-the-tokens ratio above is unchanged and still carries the
+  // whole-name guard: a release that names a genuinely different work fails it
+  // before this rule is ever asked.
+  const distinct = new Set(tokens);
+  if (distinct.size <= SHORT_TITLE_MAX_TOKENS) {
+    const readable = new Set(tokens.map(tokenScript));
+    if (claimWords(rowName).some((word) => !distinct.has(word) && readable.has(tokenScript(word)))) {
+      return false;
+    }
   }
   return true;
 }
