@@ -500,8 +500,24 @@ Trap banked: the probe first reported `loading: 0` while the surface was visibly
 Dictionary renders that state as the **button's own label**, not in a `[class*="loading"]`
 container — the D-calibration error, reproduced exactly. Also note the Anki click really wrote one
 食べる note to the live collection.
-Still open for L1: categories 2, 5–7, category 8's real control, and the layout studies.
-`LIQUID_SCORECARD.md` is deliberately still empty — three driven categories, none scoring 10.
+**Category 2 (clunkiness) measured 2026-08-17 on Dictionary — not a 10, and not for a defect.**
+`.coordination/liquid-workplace/L1_CLUNKINESS.md`. Dominant task costs **2 clicks + 3 keystrokes**
+→ 8 results; worst input acknowledgement **49.2 ms**, **0 of 5 over the 100 ms bar**; Search click →
+8 rows painted in **161 ms** warm (2,194 ms cold); **0** modal traps, **0** scroll traps, **0**
+confirmed dead ends of 19 driven. Bait control fires: an injected handler-less button is reported
+`changed: false`. Not a 10 because two of the five numbers were not obtained — **17 of 36 driven
+controls are `(unlabelled)`** so their dead-end status is unmeasured, and the Standard-vs-Liquid
+cost delta has no second term until L3/L4 exists. Three probe false positives were killed en route
+and are worth more than the score: `rAF − ev.timeStamp` bills the app for the **main→renderer hop**
+(an inert click read 154/356/187/77/23 ms, three over bar, repainting nothing) so latency is scored
+on renderer-side receipt→paint; four `span.sr-only` counted as scroll traps, i.e. the surface
+penalised for being accessible; and a sweep that resolved all element references up front reported
+**42 dead ends of 45** because target 2 (`中文`) wiped the result list and the rest clicked detached
+nodes. Also banked: 18 controls that write real user data are skipped by name, after the first run
+moved study state on eight words before the `mark it Learning` rule existed.
+
+Still open for L1: categories 5–7, category 8's real control, and the layout studies.
+`LIQUID_SCORECARD.md` is deliberately still empty — four driven categories, none scoring 10.
 
 ### L2 — Semantic tokens and shared primitives
 
