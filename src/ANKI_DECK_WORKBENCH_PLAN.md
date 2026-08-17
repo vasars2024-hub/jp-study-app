@@ -465,7 +465,7 @@ This slice is complete only when all of these can be shown with real data and no
     package **16 / 6 / 10 / 0**, the delta exactly `deck-name` + `template-remove`; **0** raw
     i18n keys, contrast **6.08–16.02** at **≥12.8 px**, **0** clipped rows at 760 and 420 px.
 
-    **Re-scored 2026-08-17** (`0d2d9d61`) — gate 5 widened the matrix and the numbers above
+    **Re-scored 2026-08-17** (`0a51eec1`) — gate 5 widened the matrix and the numbers above
     went stale within a day. Same probe, same real component, same real catalog: connect
     **17 rows / 6 changeable / 8 kept / 3 refused** with **11** why-sentences and 3 codes
     verbatim (`card-flag-unsupported`, `deck-rename-unsupported`, `template-remove-unsupported`),

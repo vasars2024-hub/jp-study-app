@@ -24690,7 +24690,7 @@ Gates this turn: `npx vitest run` **709 files passed / 1 skipped, 9,717 passed, 
 
 ## 2026-08-17 — Track 7 / gate 14 re-scored: my own gate 5 slice made it stale in a day (`primary`)
 
-- `0d2d9d61`. Gate 14 was scored live on **16 rows** on 2026-08-17. Gate 5 (`67512897`,
+- `0a51eec1`. Gate 14 was scored live on **16 rows** on 2026-08-17. Gate 5 (`67512897`,
   `7c66293d`) added `card-flag`/`card-queue`/`card-scheduling` and split
   `card-review-counters` out — **17 rows**, and connect moved 4→6 supported and 2→3 blocked.
   Every derived test in `ankiParityMatrix.test.ts` stayed green, which is exactly what made
