@@ -9587,5 +9587,80 @@ export const zh: Catalog = {
   'ankiWorkbench.tray.problem.ai-all-rejected':
     '你拒绝了 {count} 条笔记的全部建议，因此不会向它们写入任何内容。',
 
+
+  'ankiWorkbench.parity.title': '这个工作台能改什么、不能改什么',
+  'ankiWorkbench.parity.intro':
+    '读入牌组时，你收藏中的所有内容都会被保留。下表说明工作台会把哪些部分写回去，以及写到哪里。',
+  'ankiWorkbench.parity.destination.package': '导出软件包',
+  'ankiWorkbench.parity.destination.connect': '写入 Anki',
+  'ankiWorkbench.parity.support.supported': '可以修改',
+  'ankiWorkbench.parity.support.read-only': '原样保留',
+  'ankiWorkbench.parity.support.blocked': '在这里会被拒绝',
+  'ankiWorkbench.parity.refusalCode': '拒绝代码：{code}',
+  'ankiWorkbench.parity.conditional':
+    '有些较旧的软件包无法保存这项修改；此时导出会以 {code} 拒绝，并且不写入任何内容。',
+  'ankiWorkbench.parity.counts': '可修改 {supported} 项 · 原样保留 {readOnly} 项 · 被拒绝 {blocked} 项',
+
+  'ankiWorkbench.parity.row.note-fields': '笔记字段内容',
+  'ankiWorkbench.parity.row.note-tags': '标签',
+  'ankiWorkbench.parity.row.card-due': '卡片的队列位置',
+  'ankiWorkbench.parity.row.card-deck': '卡片所在的牌组',
+  'ankiWorkbench.parity.row.deck-name': '牌组名称',
+  'ankiWorkbench.parity.row.template-remove': '删除卡片模板',
+  'ankiWorkbench.parity.row.template-add': '添加卡片模板',
+  'ankiWorkbench.parity.row.note-marked': '已标记的笔记',
+  'ankiWorkbench.parity.row.card-flag': '卡片旗标',
+  'ankiWorkbench.parity.row.card-queue': '暂停和搁置的卡片',
+  'ankiWorkbench.parity.row.card-scheduling': '间隔、简易度、复习次数和遗忘次数',
+  'ankiWorkbench.parity.row.review-history': '复习历史',
+  'ankiWorkbench.parity.row.media': '媒体文件',
+  'ankiWorkbench.parity.row.note-type-fields': '笔记类型的字段',
+  'ankiWorkbench.parity.row.note-type-css': '笔记类型的样式',
+  'ankiWorkbench.parity.row.deck-config': '牌组选项预设',
+
+  'ankiWorkbench.parity.why.package.template-add':
+    '设计会修改当前草稿，让你查看它将生成哪些卡片。导出发送的是你的编辑历史，其中没有“添加模板”这一步，因此新软件包中的笔记类型与源文件完全一致。',
+  'ankiWorkbench.parity.why.package.note-marked':
+    '每条笔记是否被标记，都会按源文件原样写入新软件包。这里的编辑不会改变它。',
+  'ankiWorkbench.parity.why.package.card-flag':
+    '旗标会原样写入新软件包。工作台没有设置旗标的编辑操作。',
+  'ankiWorkbench.parity.why.package.card-queue':
+    '暂停和搁置的卡片会在新软件包中保持该状态。工作台没有暂停或恢复卡片的编辑操作。',
+  'ankiWorkbench.parity.why.package.card-scheduling':
+    '间隔、简易度、复习次数和遗忘次数会按现状写入新软件包。对于卡片，这里只能修改它的队列位置。',
+  'ankiWorkbench.parity.why.package.review-history':
+    '每一条复习记录都会原封不动地复制到新软件包。改写它会让牌组报告出从未发生过的学习。',
+  'ankiWorkbench.parity.why.package.media':
+    '源文件中的每个媒体文件都会原样写入新软件包。工作台会报告缺失的媒体，但从不添加、替换或删除文件。',
+  'ankiWorkbench.parity.why.package.note-type-fields':
+    '字段名称、顺序和排序字段都会按源文件写入新软件包。工作台编辑的是字段中的值，而不是笔记类型。',
+  'ankiWorkbench.parity.why.package.note-type-css':
+    '每种笔记类型的样式都会原样复制到新软件包。',
+  'ankiWorkbench.parity.why.package.deck-config':
+    '每个牌组都保留原有的选项预设。拆分创建的牌组会沿用父牌组的预设；预设本身不会被修改。',
+
+  'ankiWorkbench.parity.why.connect.deck-name':
+    'Anki 的插件没有提供重命名。虽然可以通过新建牌组、把所有卡片移过去再删除旧牌组来模拟，但那会丢失牌组自身的选项和历史——远超“重命名”这个词所承诺的范围。请改为导出软件包：在那里重命名会被真正写入。',
+  'ankiWorkbench.parity.why.connect.template-remove':
+    'Anki 的插件没有提供删除卡片模板的方法。它最多只能把模板清空，而该模板生成的每张卡片仍会留在你的收藏中并显示为空白——这正是删除模板本来要解决的问题。请改为导出软件包：在那里模板及其卡片会被真正删除。',
+  'ankiWorkbench.parity.why.connect.template-add':
+    '设计只是当前草稿中的预览。写入 Anki 时发送的是你的编辑历史，其中没有“添加模板”这一步，因此你收藏中的笔记类型保持不变。',
+  'ankiWorkbench.parity.why.connect.note-marked':
+    '每条笔记是否被标记由 Anki 保留。这里的编辑不会改变它。',
+  'ankiWorkbench.parity.why.connect.card-flag':
+    '每张卡片的旗标由 Anki 保留。工作台没有设置旗标的编辑操作。',
+  'ankiWorkbench.parity.why.connect.card-queue':
+    '暂停和搁置的卡片保持 Anki 中的状态。工作台没有暂停或恢复卡片的编辑操作。',
+  'ankiWorkbench.parity.why.connect.card-scheduling':
+    '间隔、简易度、复习次数和遗忘次数保持 Anki 中的数值。对于卡片，只会写入它的队列位置。',
+  'ankiWorkbench.parity.why.connect.review-history':
+    '绝不会写入你的复习历史。改写它会让 Anki 报告出从未发生过的学习。',
+  'ankiWorkbench.parity.why.connect.media':
+    '你收藏中的媒体文件不会被触碰。工作台会报告缺失的媒体，但从不添加、替换或删除文件。',
+  'ankiWorkbench.parity.why.connect.note-type-fields':
+    '字段名称、顺序和排序字段保持 Anki 中的设置。工作台编辑的是字段中的值，而不是笔记类型。',
+  'ankiWorkbench.parity.why.connect.note-type-css': '每种笔记类型的样式保持 Anki 中的设置。',
+  'ankiWorkbench.parity.why.connect.deck-config':
+    '牌组选项预设保持 Anki 中的设置。拆分创建的牌组会沿用父牌组的预设，除此之外不做任何修改。',
 };
 

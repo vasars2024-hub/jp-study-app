@@ -10105,6 +10105,85 @@ export const en: Catalog = {
   'ankiWorkbench.tray.problem.ai-all-rejected':
     'You rejected every suggestion on {count} notes, so nothing is written to them.',
 
+
+  // ----- the Anki parity matrix (acceptance gate 14) -----------------------------
+  'ankiWorkbench.parity.title': 'What this workbench can and cannot change',
+  'ankiWorkbench.parity.intro':
+    'Everything in your collection is kept when a deck is read in. This table says which parts the workbench will write back, and to where.',
+  'ankiWorkbench.parity.destination.package': 'Exporting a package',
+  'ankiWorkbench.parity.destination.connect': 'Writing to Anki',
+  'ankiWorkbench.parity.support.supported': 'Can be changed',
+  'ankiWorkbench.parity.support.read-only': 'Kept as it is',
+  'ankiWorkbench.parity.support.blocked': 'Refused here',
+  'ankiWorkbench.parity.refusalCode': 'Refuses with: {code}',
+  'ankiWorkbench.parity.conditional':
+    'Some older packages cannot store this change; the export then refuses with {code} and writes nothing.',
+  'ankiWorkbench.parity.counts':
+    '{supported} can be changed · {readOnly} kept as they are · {blocked} refused',
+
+  'ankiWorkbench.parity.row.note-fields': 'Note field contents',
+  'ankiWorkbench.parity.row.note-tags': 'Tags',
+  'ankiWorkbench.parity.row.card-due': 'Queue position of a card',
+  'ankiWorkbench.parity.row.card-deck': 'Which deck a card is in',
+  'ankiWorkbench.parity.row.deck-name': 'Deck names',
+  'ankiWorkbench.parity.row.template-remove': 'Removing a card template',
+  'ankiWorkbench.parity.row.template-add': 'Adding a card template',
+  'ankiWorkbench.parity.row.note-marked': 'Marked notes',
+  'ankiWorkbench.parity.row.card-flag': 'Card flags',
+  'ankiWorkbench.parity.row.card-queue': 'Suspended and buried cards',
+  'ankiWorkbench.parity.row.card-scheduling': 'Interval, ease, reviews and lapses',
+  'ankiWorkbench.parity.row.review-history': 'Review history',
+  'ankiWorkbench.parity.row.media': 'Media files',
+  'ankiWorkbench.parity.row.note-type-fields': 'Note type fields',
+  'ankiWorkbench.parity.row.note-type-css': 'Note type styling',
+  'ankiWorkbench.parity.row.deck-config': 'Deck options presets',
+
+  'ankiWorkbench.parity.why.package.template-add':
+    'A design changes this draft so you can check the cards it would generate. The export ships your edit history, which has no add-template step, so a new package carries the note type exactly as the source had it.',
+  'ankiWorkbench.parity.why.package.note-marked':
+    'The new package carries each note as marked or unmarked exactly as the source had it. No edit here changes that.',
+  'ankiWorkbench.parity.why.package.card-flag':
+    'Flags are written to the new package unchanged. The workbench has no edit that sets one.',
+  'ankiWorkbench.parity.why.package.card-queue':
+    'Suspended and buried cards keep that state in the new package. The workbench has no edit that suspends or restores a card.',
+  'ankiWorkbench.parity.why.package.card-scheduling':
+    'Interval, ease, review count and lapses are written to the new package as they stand. Of a card, only its queue position can be changed here.',
+  'ankiWorkbench.parity.why.package.review-history':
+    'Every review is copied to the new package untouched. Rewriting one would make the deck report study that never happened.',
+  'ankiWorkbench.parity.why.package.media':
+    'Every media file in the source is written to the new package unchanged. The workbench reports missing media but never adds, replaces or removes a file.',
+  'ankiWorkbench.parity.why.package.note-type-fields':
+    'Field names, their order and the sort field are written to the new package as the source has them. The workbench edits the values in fields, not the note type.',
+  'ankiWorkbench.parity.why.package.note-type-css':
+    'The styling of each note type is copied to the new package unchanged.',
+  'ankiWorkbench.parity.why.package.deck-config':
+    'Every deck keeps the options preset it had. A deck created by a split is given its parent preset; no preset is edited.',
+
+  'ankiWorkbench.parity.why.connect.deck-name':
+    "The Anki add-on offers no rename. It could be imitated by creating a deck, moving every card into it and deleting the old one, but that loses the deck's own options and its history — a much larger change than the word rename promises. Export a package instead: the rename is written there for real.",
+  'ankiWorkbench.parity.why.connect.template-remove':
+    'The Anki add-on offers no way to remove a card template. The nearest thing it can do is blank one, which leaves every card that template made sitting in your collection rendering empty — the exact problem removing it was meant to fix. Export a package instead: the template and its cards are removed there for real.',
+  'ankiWorkbench.parity.why.connect.template-add':
+    'A design is a preview inside this draft. Writing to Anki sends your edit history, which has no add-template step, so the note types in your collection are left as they are.',
+  'ankiWorkbench.parity.why.connect.note-marked':
+    'Anki keeps each note as marked or unmarked. No edit here changes that.',
+  'ankiWorkbench.parity.why.connect.card-flag':
+    'Anki keeps the flag on each card. The workbench has no edit that sets one.',
+  'ankiWorkbench.parity.why.connect.card-queue':
+    'Suspended and buried cards are left as Anki has them. The workbench has no edit that suspends or restores a card.',
+  'ankiWorkbench.parity.why.connect.card-scheduling':
+    'Interval, ease, review count and lapses stay as Anki has them. Of a card, only its queue position is written.',
+  'ankiWorkbench.parity.why.connect.review-history':
+    'Your review history is never written to. Rewriting one would make Anki report study that never happened.',
+  'ankiWorkbench.parity.why.connect.media':
+    'The media files in your collection are left alone. The workbench reports missing media but never adds, replaces or removes a file.',
+  'ankiWorkbench.parity.why.connect.note-type-fields':
+    'Field names, their order and the sort field stay as Anki has them. The workbench edits the values in fields, not the note type.',
+  'ankiWorkbench.parity.why.connect.note-type-css':
+    'The styling of each note type stays as Anki has it.',
+  'ankiWorkbench.parity.why.connect.deck-config':
+    'Deck options presets stay as Anki has them. A deck created by a split is given its parent preset, and nothing else is changed.',
+
 };
 
 

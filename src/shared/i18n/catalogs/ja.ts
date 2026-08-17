@@ -9670,5 +9670,82 @@ export const ja: Catalog = {
   'ankiWorkbench.tray.problem.ai-all-rejected':
     '{count} 件のノートではすべての候補を却下したため、何も書き込まれません。',
 
+
+  'ankiWorkbench.parity.title': 'このワークベンチで変更できるもの・できないもの',
+  'ankiWorkbench.parity.intro':
+    'デッキを読み込むと、コレクションの内容はすべて保持されます。この表は、どの部分をどこへ書き戻せるかを示します。',
+  'ankiWorkbench.parity.destination.package': 'パッケージの書き出し',
+  'ankiWorkbench.parity.destination.connect': 'Anki への書き込み',
+  'ankiWorkbench.parity.support.supported': '変更できます',
+  'ankiWorkbench.parity.support.read-only': 'そのまま保持されます',
+  'ankiWorkbench.parity.support.blocked': 'ここでは拒否されます',
+  'ankiWorkbench.parity.refusalCode': '拒否コード: {code}',
+  'ankiWorkbench.parity.conditional':
+    '一部の古いパッケージはこの変更を保存できません。その場合、書き出しは {code} で拒否し、何も書き込みません。',
+  'ankiWorkbench.parity.counts':
+    '変更できる {supported} 件 · そのまま保持される {readOnly} 件 · 拒否される {blocked} 件',
+
+  'ankiWorkbench.parity.row.note-fields': 'ノートのフィールド内容',
+  'ankiWorkbench.parity.row.note-tags': 'タグ',
+  'ankiWorkbench.parity.row.card-due': 'カードの並び位置',
+  'ankiWorkbench.parity.row.card-deck': 'カードが入っているデッキ',
+  'ankiWorkbench.parity.row.deck-name': 'デッキ名',
+  'ankiWorkbench.parity.row.template-remove': 'カードテンプレートの削除',
+  'ankiWorkbench.parity.row.template-add': 'カードテンプレートの追加',
+  'ankiWorkbench.parity.row.note-marked': 'マーク付きノート',
+  'ankiWorkbench.parity.row.card-flag': 'カードのフラグ',
+  'ankiWorkbench.parity.row.card-queue': '停止中・保留中のカード',
+  'ankiWorkbench.parity.row.card-scheduling': '間隔・易しさ・復習回数・失敗回数',
+  'ankiWorkbench.parity.row.review-history': '復習履歴',
+  'ankiWorkbench.parity.row.media': 'メディアファイル',
+  'ankiWorkbench.parity.row.note-type-fields': 'ノートタイプのフィールド',
+  'ankiWorkbench.parity.row.note-type-css': 'ノートタイプのスタイル',
+  'ankiWorkbench.parity.row.deck-config': 'デッキオプションのプリセット',
+
+  'ankiWorkbench.parity.why.package.template-add':
+    'デザインはこのドラフトを変更し、生成されるカードを確認できるようにします。書き出しには編集履歴が反映されますが、テンプレートを追加する操作は履歴にないため、新しいパッケージには元のノートタイプがそのまま入ります。',
+  'ankiWorkbench.parity.why.package.note-marked':
+    '各ノートのマークの有無は、元のまま新しいパッケージに書き込まれます。ここでの編集では変わりません。',
+  'ankiWorkbench.parity.why.package.card-flag':
+    'フラグはそのまま新しいパッケージに書き込まれます。ワークベンチにフラグを設定する編集はありません。',
+  'ankiWorkbench.parity.why.package.card-queue':
+    '停止中・保留中のカードはその状態のまま新しいパッケージに入ります。ワークベンチにカードを停止・再開する編集はありません。',
+  'ankiWorkbench.parity.why.package.card-scheduling':
+    '間隔・易しさ・復習回数・失敗回数は現状のまま新しいパッケージに書き込まれます。カードについて変更できるのは並び位置だけです。',
+  'ankiWorkbench.parity.why.package.review-history':
+    '復習履歴はそのまま新しいパッケージにコピーされます。書き換えると、実際には行っていない学習をデッキが報告することになります。',
+  'ankiWorkbench.parity.why.package.media':
+    '元のメディアファイルはすべてそのまま新しいパッケージに書き込まれます。ワークベンチは不足しているメディアを報告しますが、ファイルの追加・置換・削除は行いません。',
+  'ankiWorkbench.parity.why.package.note-type-fields':
+    'フィールド名・並び順・並べ替えフィールドは、元のまま新しいパッケージに書き込まれます。ワークベンチが編集するのはフィールドの値であり、ノートタイプではありません。',
+  'ankiWorkbench.parity.why.package.note-type-css':
+    '各ノートタイプのスタイルはそのまま新しいパッケージにコピーされます。',
+  'ankiWorkbench.parity.why.package.deck-config':
+    '各デッキは元のオプションプリセットを保持します。分割で作成されたデッキには親のプリセットが設定され、プリセット自体は編集されません。',
+
+  'ankiWorkbench.parity.why.connect.deck-name':
+    'Anki のアドオンには名前の変更がありません。デッキを作成し、すべてのカードを移動して古いデッキを削除すれば似たことはできますが、デッキ固有のオプションと履歴が失われます。これは「名前の変更」が意味する範囲をはるかに超えます。代わりにパッケージを書き出してください。そちらでは名前の変更が実際に書き込まれます。',
+  'ankiWorkbench.parity.why.connect.template-remove':
+    'Anki のアドオンにはカードテンプレートを削除する手段がありません。できるのはテンプレートを空にすることだけで、そのテンプレートが生成したカードはコレクションに残り、空のまま表示されます。これは削除で解決したかった問題そのものです。代わりにパッケージを書き出してください。そちらではテンプレートとそのカードが実際に削除されます。',
+  'ankiWorkbench.parity.why.connect.template-add':
+    'デザインはこのドラフト内のプレビューです。Anki への書き込みでは編集履歴が送られますが、テンプレートを追加する操作は履歴にないため、コレクションのノートタイプはそのままです。',
+  'ankiWorkbench.parity.why.connect.note-marked':
+    '各ノートのマークの有無は Anki が保持します。ここでの編集では変わりません。',
+  'ankiWorkbench.parity.why.connect.card-flag':
+    '各カードのフラグは Anki が保持します。ワークベンチにフラグを設定する編集はありません。',
+  'ankiWorkbench.parity.why.connect.card-queue':
+    '停止中・保留中のカードは Anki のまま残ります。ワークベンチにカードを停止・再開する編集はありません。',
+  'ankiWorkbench.parity.why.connect.card-scheduling':
+    '間隔・易しさ・復習回数・失敗回数は Anki のままです。カードについて書き込まれるのは並び位置だけです。',
+  'ankiWorkbench.parity.why.connect.review-history':
+    '復習履歴に書き込むことはありません。書き換えると、実際には行っていない学習を Anki が報告することになります。',
+  'ankiWorkbench.parity.why.connect.media':
+    'コレクションのメディアファイルには触れません。ワークベンチは不足しているメディアを報告しますが、ファイルの追加・置換・削除は行いません。',
+  'ankiWorkbench.parity.why.connect.note-type-fields':
+    'フィールド名・並び順・並べ替えフィールドは Anki のままです。ワークベンチが編集するのはフィールドの値であり、ノートタイプではありません。',
+  'ankiWorkbench.parity.why.connect.note-type-css':
+    '各ノートタイプのスタイルは Anki のままです。',
+  'ankiWorkbench.parity.why.connect.deck-config':
+    'デッキオプションのプリセットは Anki のままです。分割で作成されたデッキには親のプリセットが設定され、それ以外は変更されません。',
 };
 

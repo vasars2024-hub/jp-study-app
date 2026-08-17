@@ -10494,5 +10494,82 @@ export const ru: Catalog = {
   'ankiWorkbench.tray.problem.ai-all-rejected':
     'Вы отклонили все варианты на {count} заметках, поэтому в них ничего не записывается.',
 
+
+  'ankiWorkbench.parity.title': 'Что этот верстак может изменить, а что нет',
+  'ankiWorkbench.parity.intro':
+    'При чтении колоды сохраняется всё содержимое вашей коллекции. Эта таблица показывает, какие части верстак записывает обратно и куда именно.',
+  'ankiWorkbench.parity.destination.package': 'Экспорт пакета',
+  'ankiWorkbench.parity.destination.connect': 'Запись в Anki',
+  'ankiWorkbench.parity.support.supported': 'Можно изменить',
+  'ankiWorkbench.parity.support.read-only': 'Остаётся как есть',
+  'ankiWorkbench.parity.support.blocked': 'Здесь отклоняется',
+  'ankiWorkbench.parity.refusalCode': 'Код отказа: {code}',
+  'ankiWorkbench.parity.conditional':
+    'Некоторые старые пакеты не могут сохранить это изменение; тогда экспорт отказывает с кодом {code} и не записывает ничего.',
+  'ankiWorkbench.parity.counts':
+    'Можно изменить: {supported} · остаётся как есть: {readOnly} · отклоняется: {blocked}',
+
+  'ankiWorkbench.parity.row.note-fields': 'Содержимое полей заметки',
+  'ankiWorkbench.parity.row.note-tags': 'Метки',
+  'ankiWorkbench.parity.row.card-due': 'Позиция карточки в очереди',
+  'ankiWorkbench.parity.row.card-deck': 'Колода, в которой лежит карточка',
+  'ankiWorkbench.parity.row.deck-name': 'Названия колод',
+  'ankiWorkbench.parity.row.template-remove': 'Удаление шаблона карточки',
+  'ankiWorkbench.parity.row.template-add': 'Добавление шаблона карточки',
+  'ankiWorkbench.parity.row.note-marked': 'Отмеченные заметки',
+  'ankiWorkbench.parity.row.card-flag': 'Флажки карточек',
+  'ankiWorkbench.parity.row.card-queue': 'Приостановленные и отложенные карточки',
+  'ankiWorkbench.parity.row.card-scheduling': 'Интервал, лёгкость, повторы и провалы',
+  'ankiWorkbench.parity.row.review-history': 'История повторений',
+  'ankiWorkbench.parity.row.media': 'Медиафайлы',
+  'ankiWorkbench.parity.row.note-type-fields': 'Поля типа заметки',
+  'ankiWorkbench.parity.row.note-type-css': 'Оформление типа заметки',
+  'ankiWorkbench.parity.row.deck-config': 'Наборы настроек колоды',
+
+  'ankiWorkbench.parity.why.package.template-add':
+    'Оформление меняет этот черновик, чтобы вы увидели, какие карточки оно создало бы. Экспорт отправляет вашу историю правок, в которой нет шага «добавить шаблон», поэтому в новый пакет тип заметки попадает ровно таким, каким он был в источнике.',
+  'ankiWorkbench.parity.why.package.note-marked':
+    'Отметка каждой заметки записывается в новый пакет ровно такой, какой она была в источнике. Правки здесь её не меняют.',
+  'ankiWorkbench.parity.why.package.card-flag':
+    'Флажки записываются в новый пакет без изменений. В верстаке нет правки, которая их ставит.',
+  'ankiWorkbench.parity.why.package.card-queue':
+    'Приостановленные и отложенные карточки сохраняют это состояние в новом пакете. В верстаке нет правки, которая приостанавливает или возвращает карточку.',
+  'ankiWorkbench.parity.why.package.card-scheduling':
+    'Интервал, лёгкость, число повторов и провалов записываются в новый пакет как есть. У карточки здесь можно изменить только позицию в очереди.',
+  'ankiWorkbench.parity.why.package.review-history':
+    'Каждое повторение копируется в новый пакет нетронутым. Переписать его — значит заставить колоду отчитываться об учёбе, которой не было.',
+  'ankiWorkbench.parity.why.package.media':
+    'Каждый медиафайл источника записывается в новый пакет без изменений. Верстак сообщает о недостающих медиафайлах, но никогда не добавляет, не заменяет и не удаляет их.',
+  'ankiWorkbench.parity.why.package.note-type-fields':
+    'Названия полей, их порядок и поле сортировки записываются в новый пакет такими же, как в источнике. Верстак правит значения в полях, а не тип заметки.',
+  'ankiWorkbench.parity.why.package.note-type-css':
+    'Оформление каждого типа заметки копируется в новый пакет без изменений.',
+  'ankiWorkbench.parity.why.package.deck-config':
+    'Каждая колода сохраняет свой набор настроек. Колода, созданная разделением, получает набор родительской колоды; сами наборы не правятся.',
+
+  'ankiWorkbench.parity.why.connect.deck-name':
+    'Дополнение Anki не умеет переименовывать. Это можно было бы изобразить: создать колоду, перенести все карточки и удалить старую — но тогда теряются собственные настройки колоды и её история, а это куда больше, чем обещает слово «переименовать». Экспортируйте пакет: там переименование записывается по-настоящему.',
+  'ankiWorkbench.parity.why.connect.template-remove':
+    'Дополнение Anki не умеет удалять шаблон карточки. Максимум, что оно может, — очистить его, и тогда все созданные им карточки останутся в коллекции и будут отображаться пустыми — ровно та беда, ради которой шаблон и удаляли. Экспортируйте пакет: там шаблон и его карточки удаляются по-настоящему.',
+  'ankiWorkbench.parity.why.connect.template-add':
+    'Оформление — это предпросмотр внутри черновика. При записи в Anki отправляется ваша история правок, в которой нет шага «добавить шаблон», поэтому типы заметок в коллекции остаются прежними.',
+  'ankiWorkbench.parity.why.connect.note-marked':
+    'Отметку каждой заметки хранит Anki. Правки здесь её не меняют.',
+  'ankiWorkbench.parity.why.connect.card-flag':
+    'Флажок каждой карточки хранит Anki. В верстаке нет правки, которая его ставит.',
+  'ankiWorkbench.parity.why.connect.card-queue':
+    'Приостановленные и отложенные карточки остаются такими, какими их держит Anki. В верстаке нет правки, которая приостанавливает или возвращает карточку.',
+  'ankiWorkbench.parity.why.connect.card-scheduling':
+    'Интервал, лёгкость, число повторов и провалов остаются такими, как в Anki. У карточки записывается только позиция в очереди.',
+  'ankiWorkbench.parity.why.connect.review-history':
+    'В вашу историю повторений запись не ведётся никогда. Переписать её — значит заставить Anki отчитываться об учёбе, которой не было.',
+  'ankiWorkbench.parity.why.connect.media':
+    'Медиафайлы вашей коллекции не трогаются. Верстак сообщает о недостающих медиафайлах, но никогда не добавляет, не заменяет и не удаляет их.',
+  'ankiWorkbench.parity.why.connect.note-type-fields':
+    'Названия полей, их порядок и поле сортировки остаются такими, как в Anki. Верстак правит значения в полях, а не тип заметки.',
+  'ankiWorkbench.parity.why.connect.note-type-css':
+    'Оформление каждого типа заметки остаётся таким, как в Anki.',
+  'ankiWorkbench.parity.why.connect.deck-config':
+    'Наборы настроек колод остаются такими, как в Anki. Колода, созданная разделением, получает набор родительской колоды, и больше ничего не меняется.',
 };
 
