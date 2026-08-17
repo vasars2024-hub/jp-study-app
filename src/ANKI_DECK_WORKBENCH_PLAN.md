@@ -400,6 +400,30 @@ This slice is complete only when all of these can be shown with real data and no
     blank question field still says `empty-question` — proven live as two different sentences.
 14. Exercise every `supported` row in the living Anki parity matrix and prove every `read-only` or `blocked` row has an honest explanation and no active Apply path.
 
+    **The `read-only`/`blocked` half closes 2026-08-17** (`6a295fec`, `8ce78564`, `25d30ebf`).
+    There was no matrix; `shared/ankiParityMatrix.ts` is it, and *living* is the load-bearing
+    word. Rows are keyed to `AnkiDraftEditOp['kind']` because `buildApkgExportChanges` folds
+    the journal and nothing else — so a capability with no journal op cannot reach a
+    destination **by construction**, which is what makes `read-only` a proof rather than a
+    claim. Cells are keyed to each destination's own error union, so a `blocked` cell names
+    the literal it throws. 16 rows, 6 journal-backed, 10 read-only; connect blocks the 2 the
+    package writes. `conditional` codes ride on a `supported` cell without downgrading it,
+    because they are limits of the source **file**, not of the capability.
+    Guarded by 14 tests that re-derive each side from a different file — op kinds from
+    `ankiDraftEdit.ts`, change-set fields from `ankiApkgExport.ts`, codes from both unions
+    **and** from a `Refusal(` construction, explanations from all four catalogs, and the two
+    blocked cells from `planConnectCommit` really throwing (its first direct coverage).
+    Inverse control: a `supported` cell must have **no** `why` key. Mutation control:
+    `deck-name`'s connect cell set to `supported` → 3 red including the behavioural one.
+    Live on the running app: connect **16 rows / 4 changeable / 10 kept / 2 refused**,
+    package **16 / 6 / 10 / 0**, the delta exactly `deck-name` + `template-remove`; **0** raw
+    i18n keys, contrast **6.08–16.02** at **≥12.8 px**, **0** clipped rows at 760 and 420 px.
+    **Its finding:** `template-add` is read-only on *both* destinations — `applyCardDesign`
+    returns a draft and never touches the journal, so gate 13's 3,180 added cards were never
+    exportable. The designer now says so between its card count and Apply.
+    The `supported` half is **cited, not re-run**: each of the 6 journal-backed rows has its
+    own dated live entry in the evidence ledger (recipes 2, 12, 6, 13, 12-deck, 17).
+
 ## Explicit exclusions
 
 - No direct mutation of Anki's SQLite collection.

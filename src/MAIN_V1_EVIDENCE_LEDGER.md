@@ -24523,3 +24523,44 @@ Gates this turn: `npx vitest run` **709 files passed / 1 skipped, 9,717 passed, 
   and step 7 correctly says "no changes" — the wrong instrument, not a defect.
   (3) Probe sessions were discarded afterwards (2 removed, 22 remain); the store was already at
   its `MAX_RETAINED_SESSIONS` cap of 24, so seeding trimmed the 2 oldest rows — bookkeeping only.
+
+## 2026-08-17 — Track 7 / Phase 7: gate 14's matrix, and a designer whose Apply reached nothing (`primary`)
+
+- `6a295fec` the matrix + 14 tests, `8ce78564` the finding it produced, `25d30ebf` the surface.
+  Acceptance gate 14 named a "living Anki parity matrix" that did not exist in any form.
+- **What makes it living, and why that choice.** Rows are keyed to `AnkiDraftEditOp['kind']`, not
+  written beside it. `buildApkgExportChanges` folds `journal.done` and nothing else, so a capability
+  with no journal op cannot reach a destination BY CONSTRUCTION — `journalOp: null` is the proof of
+  a read-only row, not a claim about it. Cells are keyed to each destination's own error union, so
+  a `blocked` cell names the literal its destination throws and cannot drift from the error banner.
+  16 rows: 6 journal-backed, 10 read-only. Connect blocks the 2 the package writes.
+- **`conditional` is deliberately not a fourth support level.** `deck-collation-unsupported` and
+  `template-storage-unsupported` are properties of the SOURCE FILE — a ver-11 package renames its
+  decks for real — so they ride on a `supported` cell and are rendered, rather than downgrading a
+  capability because some older packages cannot store it.
+- **THE FINDING. `template-add` is read-only on both destinations.** `applyCardDesign` returns a new
+  draft and never touches the journal, so a designed reverse card is a preview neither destination
+  can ship. Gate 13 closed on 3,180 cards added to the real 3,221-note deck and **not one of them
+  was exportable**. The panel was not silent by accident — it states its effect carefully, as a
+  number, which is exactly what made it read as a promise about the collection. One line now sits
+  **between the count and Apply**, and a test asserts that order: a warning below the button is one
+  the user reaches after deciding.
+- **LIVE, real catalog, renderer reloaded (pid 39836), real component mounted off-screen on the
+  app's own React `?v=318a685f`, 1 host asserted.** connect @760 px: **16 rows · 4 changeable / 10
+  kept / 2 refused**, 12 why-sentences, codes verbatim. package @420 px: **16 rows · 6 / 10 / 0**,
+  10 why-sentences, 0 codes. The delta is exactly `deck-name` + `template-remove` — the live
+  inverse control. Both: **0 raw i18n keys**, contrast **6.08–16.02** at **≥12.8 px**, **0 clipped
+  rows**, `/logs?level=error` **0**. Hosts removed, re-counted 0.
+- **GATE 14's read-only/blocked half CLOSES here**, mechanically and live. Its `supported` half is
+  cited, NOT re-run this turn: note-fields (recipe 2, `changedNotes: 3`), note-tags (recipe 12,
+  3,074 renamed / 3,221 undone), card-due (recipe 6, 3,079 moved), card-deck (recipe 13, 7,992
+  cards + 1 deck, 0 mismatches), deck-name (recipe 12 deck half, ver-11 package, 7,992 before and
+  after), template-remove (recipe 17, `ea8fbbd5`/`e2635c6c`). Each has its own dated entry above.
+- **TRAP, and it cost a wrong blob here.** In HEAD+edit staging, `remainder === HEAD` proves the
+  insertion is CONTIGUOUS, **not that it is NOVEL**. With the anchor one line too low the block
+  swept up a comment line HEAD already had and staged it twice — and the check still passed,
+  because removing the block restored HEAD either way. `debug/stage-catalog-insert.cjs` now also
+  compares the anchor's occurrence count. en re-staged `07544168` → `43ff6109`.
+- Also this turn, before the ladder slot: `727f70e2` — boss-audit Finding 2's self-contained half.
+  All 17 `mediaCalendar.*` keys were committed at HEAD in four languages and the only module that
+  reads them never was, so HEAD rendered a bare-English calendar with an OS-locale date.
