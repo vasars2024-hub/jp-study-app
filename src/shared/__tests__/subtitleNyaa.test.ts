@@ -380,6 +380,32 @@ describe('episodeFromFileName / languageFromFileName', () => {
     expect(episodeFromFileName('Show Movie.ass')).toBeNull();
   });
 
+  // The names below are verbatim from the first Route A pack this pipeline ever
+  // acquired (47 files, `After War Gundam X`). Under the previous patterns all
+  // 47 read null, so an episode range — the whole point of the feature —
+  // selected nothing.
+  it('reads the bracketed episode group that fansub packs use', () => {
+    expect(episodeFromFileName('[Kidou Shin Seiki Gundam X][01][BDRIP][1440x1080][H264_FLACx2].ass')).toBe(1);
+    expect(episodeFromFileName('[Kidou Shin Seiki Gundam X][21][BDRIP][1440x1080][H264_FLAC].ass')).toBe(21);
+    expect(episodeFromFileName('[Kidou Shin Seiki Gundam X][39][BDRIP][1440x1080][H264_FLACx3].ass')).toBe(39);
+  });
+
+  it('control: brackets that are not an episode number stay unparsed', () => {
+    // The specials in that same pack. If these ever parse, they collide with
+    // real episodes 1-8 and the range silently gains eight wrong files.
+    expect(episodeFromFileName('[Kidou Shin Seiki Gundam X][Vol.07][SP02][NCOP2][BDRIP][1440x1080][H264_FLAC].ass')).toBeNull();
+    expect(episodeFromFileName('[Kidou Shin Seiki Gundam X][Vol.07][SP03][NCED][BDRIP][1440x1080][H264_FLAC].ass')).toBeNull();
+    // Resolution, codec, a year and a CRC32 are all bracketed digits too.
+    expect(episodeFromFileName('[Group] Show Movie [1440x1080][H264_FLAC].ass')).toBeNull();
+    expect(episodeFromFileName('[Group] Show Movie [2011][BDRIP].ass')).toBeNull();
+    expect(episodeFromFileName('[Group] Show Movie [12345678].ass')).toBeNull();
+  });
+
+  it('still prefers an explicit episode marker over a bracket beside it', () => {
+    expect(episodeFromFileName('[Group] Show - 07 [1080p][ABC123].ass')).toBe(7);
+    expect(episodeFromFileName('[Group] Show S02E12 [10bit].ass')).toBe(12);
+  });
+
   it('reads a language from a directory, a dotted tag, or a spelled-out name', () => {
     expect(languageFromFileName('Subs/ja/Show.ass')).toBe('ja');
     expect(languageFromFileName('Show - 07.ja.ass')).toBe('ja');

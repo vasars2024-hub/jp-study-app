@@ -456,13 +456,30 @@ export interface NyaaFileSelection {
   reason: NyaaSelectionReason;
 }
 
-/** `Show - 07.ja.ass`, `[Group] Show S02E07.ass` → 7. */
+/**
+ * `Show - 07.ja.ass`, `[Group] Show S02E07.ass`, `[Group][Show][07][BDRIP].ass` → 7.
+ *
+ * The bracket form is not a nicety. The first Route A pack ever acquired — 47
+ * files of `[Kidou Shin Seiki Gundam X][21][BDRIP][1440x1080][H264_FLAC].ass` —
+ * parsed to **39 nulls**, because every other pattern here wants a separator or
+ * the end of the string and this convention puts the number in a group of its
+ * own. An episode range is the thing the user asked this pipeline for, and a
+ * pack of nulls matches no range at all.
+ *
+ * Only a bracket that is *nothing but* one to three digits counts, which is
+ * what keeps `[1440x1080]`, `[H264_FLAC]`, `[10bit]`, a `[2011]` year and an
+ * eight-digit CRC out. `[Vol.1]`, `[SP1]` and `[NCOP1]` fail it too, so the same
+ * pack's eight creditless specials stay null instead of colliding with real
+ * episodes 1-8.
+ */
 export function episodeFromFileName(name: string): number | null {
   const base = (name ?? '').split(/[\\/]/).pop() ?? '';
   const patterns = [
     /\bs\d{1,2}[\s._-]*e(\d{1,3})\b/i,
     /\b(?:episode|ep)[\s._-]*(\d{1,3})\b/i,
     /\s-\s*(\d{1,3})(?=\D|$)/,
+    // After the dash form: `[Group] Show - 07 [1080p].ass` should read 07.
+    /\[(\d{1,3})\]/,
     /\b(\d{1,3})\s*(?:\.\w+)?$/,
   ];
   for (const pattern of patterns) {
