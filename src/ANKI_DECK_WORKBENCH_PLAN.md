@@ -40,7 +40,12 @@ The capabilities named in this document are a **minimum, not a closed feature li
 2. Live Anki collection through AnkiConnect, with connection/version/capability discovery.
 3. CSV/TSV import with saved field-mapping presets.
 4. The app's local Flashcards and known-word stores.
-5. Export to a new package or a validated live-Anki commit; never overwrite the only source copy by default.
+5. Export to a new package, a new CSV/TSV text file, or a validated live-Anki commit; never overwrite the only source copy by default.
+
+    Amended 2026-08-17: this line said "a new package or a validated live-Anki commit" until the text
+    destination shipped (`067cd735`), which made it wrong — adapter 3 could read a `.txt` and had
+    nowhere to write it. The CSV/TSV destination has its own gate (**gate 27**) rather than folding
+    into gate 1: it is a different fidelity contract, not a second file format for the same one.
 
 Evaluate `.colpkg` during the capability audit. Add it only if full collection semantics, media, and recovery can be guaranteed.
 
@@ -525,6 +530,41 @@ This slice is complete only when all of these can be shown with real data and no
     exportable. The designer now says so between its card count and Apply.
     The `supported` half is **cited, not re-run**: each of the 6 journal-backed rows has its
     own dated live entry in the evidence ledger (recipes 2, 12, 6, 13, 12-deck, 17).
+
+15. **CSV/TSV text destination.** Open an Anki text export, edit it, export a NEW text file,
+    re-read the exported file through the reader that opened it, and match: the directive
+    block round-trips (separator, `#html:false`, `#columns:`, the special-column numbers),
+    unselected rows are byte-identical, and note identity is stated rather than invented.
+
+    Added 2026-08-17 as its own gate rather than folded into gate 1, on the amendment at
+    adapter 5 above. It is a **different fidelity contract**: a package's exporter copies the
+    source zip and replaces one entry, so a note the renderer never paged in survives by
+    construction; a text file is rewritten whole, so fidelity has to come from editing the
+    source's own parsed rows and re-emitting every directive the reader understood. It also
+    has an honesty obligation a package does not: an `.apkg` note carries a guid, and a text
+    export need not, so the round trip is positional and the surface must say so.
+
+    **Closed 2026-08-17** (`067cd735`), on the user's own 3,209-row export, read and re-read
+    through the app's own reader. Read: **3,209 rows / 3,209 notes / 0 blank**, 10 field
+    columns on all 3,209, separator tab from the **header** (not sniffed), `#html:false`,
+    tags column 11, **no guid column**. Edit — swap columns 1↔4 and write a value into empty
+    column 7 on 50 notes: `notesUpdated` **50**, `rowsWritten` **3,209**, `noteIdentity`
+    **`row-order`**, and after re-reading the exported file both changes verified **50/50**.
+    **Negative control: 3,159/3,159 unselected notes byte-identical**, and the file grew by
+    exactly **350 bytes = 50 × 7 characters**, so provably nothing else moved. **Refusal
+    control:** a card reposition returns `unsupported-change` naming `card-repositions:1`.
+
+    Four decisions, each of which is a trap if reversed. **Row ids include blank rows** —
+    `buildAnkiCsvCollection` mints `csv-row-N` from the position among ALL rows, so resolving
+    an id by counting non-blank rows slides every note after the first blank line by one and
+    edits the wrong row (its own test). **A card-level edit refuses the whole export by name**
+    rather than writing the note half: a text file has no cards, and a partial write reported
+    as success is the failure mode this repo keeps re-finding. **`#html:false` is not escaped
+    on the way out**, only RFC-4180 quoted, mirroring the reader's `collapsePlainText` choice.
+    **A first-column value starting with `#` is quoted**, or `parseAnkiCsvMeta` eats it as a
+    directive on re-import — the one round-trip hazard the format creates for itself.
+
+    **Still open on this gate:** the translate half. See the ledger entry for `067cd735`.
 
 ## Explicit exclusions
 

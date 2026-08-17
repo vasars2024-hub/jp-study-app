@@ -24803,3 +24803,63 @@ Gates this turn: `npx vitest run` **709 files passed / 1 skipped, 9,717 passed, 
   `\U\A` escapes and adm-zip answered "Invalid filename". Use forward slashes in generated JS/PS.
   (2) The Bash tool's overlay says a real Downloads file does not exist; `node` under PowerShell
   says it does. (3) The bridge's `/eval` field is **`js`**, not `expression`.
+
+## 2026-08-17 — Track 7 / Anki workbench: the text destination, on the user's own two decks
+
+Pinned one-turn directive: prove the workbench on decks the user actually studies, and give
+`.txt`/`.csv` decks the same operations `.apkg` decks have. **The missing half was real** —
+`shared/ankiCsv.ts` has read Anki text exports since Phase 1, but `DeckWorkbenchApply.tsx:52`
+tested only `apkg|colpkg` and `ankiconnect`, so a `csv` draft fell through to `apply.noFile`:
+import your `.txt`, edit all of it, and there is nowhere to put the result. Same shape as the
+`local-deck` finding under gate 5.
+
+- `067cd735` — **workbench gate 27 (new) CLOSES.** `shared/ankiCsvExport.ts` (pure) +
+  `main/anki/csvExport.ts` (I/O) + `csvSourceMemory.ts` + IPC `anki:exportCsvDraft` + preload +
+  a third `DeckWorkbenchApply` branch + 22 keys ×4. On the user's own **3,209-row** export:
+  read 3,209 rows / 3,209 notes / 0 blank, 10 field columns on all 3,209, separator tab from
+  the **header**, `#html:false`, tags column 11, **no guid column**. Swap columns 1↔4 + write
+  empty column 7 on 50 notes → `notesUpdated 50`, `rowsWritten 3,209`, `noteIdentity
+  row-order`, both verified **50/50** after re-reading the exported file through the same
+  reader. **Controls: 3,159/3,159 unselected notes byte-identical**, file grew by exactly
+  **350 B = 50 × 7 chars**; a card reposition returns `unsupported-change`.
+  Full decision list in `src/ANKI_DECK_WORKBENCH_PLAN.md` gate 27.
+
+**Directive part A — what the translate path does with HTML, answered from source, not run.**
+`ankiTranslate.ts:120` calls `normalizeFieldText(raw.replace(SOUND_TAG,' '), ['strip-html',
+'collapse-space'])`. So **neither** failure mode the directive named occurs: the `<div
+class="entry">` wrapper is **not** sent (no tokens paid for `class="entry"`) and nothing is
+re-wrapped on return, because recipe 2 refuses `same-field` and the answer lands in a
+*different* field. The real consequence for THIS deck is presentational and worth stating:
+the Russian destination field arrives as bare text while every sibling field carries
+`<div class="entry">…`, so the card template's CSS will not style it.
+
+**Directive part C — the missing media, measured through the app's own reader.** The manifest
+is a 9-byte zstd frame; `readMediaEntries` returns **0** entries and `draft.media` is
+`{files:0, bytes:0, unreferenced:0, sized:true}` while `counts.mediaReferences` is **3,173**
+(3,173 distinct `[sound:*.mp3]`). The app reports it correctly: one **`missing-media` warning,
+count 3,173**, non-blocking. Plan line 55's promise holds. `collection.anki21b` (11,849,728 B
+decompressed) is chosen over the 51,200-byte `collection.anki2` decoy, and **zstd works** —
+`COMPRESSED_HELP` did not fire under node 24.
+
+**Directive part B, the trap it warned about, now a number.** Over all 2,991 notes of `Word`:
+field 0 is all-kana on **436**, field 1 on **2,555**, both on **0** — a perfect partition, so
+exactly one of the two is the reading per note and the roles are **swapped on 436 of 2,991
+(14.6%)**. Any front/back or reverse operation keying on ord 0 is wrong on 436 notes. This is
+the reason gate 1's swap half is NOT claimed this turn.
+
+**Left open, honestly — and NOT as a credential blocker.** (1) The translate halves of A and D
+did not run, for time, not for want of a key: gate 2 closed on 2026-08-16 with a **live**
+provider run (3 requested / 3 answered / 3 ok in 3,461 ms), so a provider is configured. It is
+recorded here rather than in `needs-user.md`, which is for what a human physically must do.
+(2) apkg reverse-cards (gate 1's swap and
+the optional-reverse second template, 2,991 notes → 2,991 new cards) is **not started**; the
+436-note finding above is its first constraint. (3) The text destination is proven through the
+pure core and the reader; the live IPC round trip needs an app **restart** (main does not
+hot-reload) and was not run.
+
+**Traps.** (1) `src/preload.ts` at HEAD has **MIXED** line endings — mostly LF with some CRLF —
+so the usual "normalize → edit → convert back" HEAD+edit blob recipe rewrites **every line** in
+the file. Splice into the raw bytes and take each insert's EOL from the insertion point.
+(2) `git hash-object` refuses `--path` together with `--no-filters`; use `--no-filters` alone
+and match HEAD's endings yourself. (3) A multi-line anchor in such a file must be matched with
+`\r?\n`, or it silently fails to find text that is plainly there.
