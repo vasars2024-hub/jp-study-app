@@ -79,6 +79,13 @@ let seenHeaders: http.IncomingHttpHeaders[] = [];
  * `aa11`/`bb22` deliberately are not.
  */
 let torrentInfoExtra: unknown[] = [];
+/**
+ * qBittorrent's own `connection_status`, the half `app/version` cannot answer.
+ *
+ * `''` makes the stand-in 404 the route — a build that predates it, which must
+ * leave the report exactly as it was rather than inventing an outage.
+ */
+let connectionStatus = 'connected';
 
 const TORRENT_INFO = [
   {
@@ -182,6 +189,16 @@ beforeAll(async () => {
       res.end('v4.6.4');
       return;
     }
+    if (url.pathname === '/api/v2/transfer/info') {
+      if (!connectionStatus) {
+        res.writeHead(404);
+        res.end('missing');
+        return;
+      }
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ connection_status: connectionStatus, dht_nodes: 312 }));
+      return;
+    }
     if (url.pathname === '/api/v2/torrents/info') {
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify([...TORRENT_INFO, ...torrentInfoExtra]));
@@ -234,6 +251,7 @@ beforeEach(async () => {
   addResponse = { status: 200, body: 'Ok.' };
   seenHeaders = [];
   torrentInfoExtra = [];
+  connectionStatus = 'connected';
   resetQbitSessions();
   await flushScraperLogWrites();
   await fsp.rm(path.join(tempRoot, 'scraper'), { recursive: true, force: true });
@@ -428,6 +446,47 @@ describe('qbitTest', () => {
   it('reports "not-configured" when sending is switched off', async () => {
     const report = await qbitTest({ config: { ...config, enabled: false } });
     expect(report.status).toBe('not-configured');
+  });
+
+  // Reaching the WebUI and reaching a swarm are different questions, and this
+  // test reported only the first. Live on 2026-08-17 it read `connected, 1 ms`
+  // through a whole session in which no magnet on the machine ever obtained
+  // metadata — so the user was told the client was healthy and every fetch then
+  // blamed the release it was trying to read.
+  it('says so when the client reaches the WebUI but no swarm', async () => {
+    connectionStatus = 'disconnected';
+    const report = await qbitTest({ config });
+    // Still `connected`: this app's own connection to the WebUI is fine, and
+    // downgrading the status would send the user to check a host and port that
+    // are both correct — the exact defect gate 24 was.
+    expect(report.status).toBe('connected');
+    expect(report.connection).toBe('disconnected');
+    expect(report.message).toMatch(/not connected to any swarm/i);
+  });
+
+  it('says nothing extra when the client is connected or merely firewalled', async () => {
+    // Both controls in one place, because a message that names an outage for
+    // every state is the same failure as one that never does. `firewalled` is
+    // the ordinary state of a machine behind a NAT with no port mapping.
+    const healthy = await qbitTest({ config });
+    expect(healthy.connection).toBe('connected');
+    expect(healthy.message).not.toMatch(/swarm/i);
+
+    resetQbitSessions();
+    connectionStatus = 'firewalled';
+    const natted = await qbitTest({ config });
+    expect(natted.status).toBe('connected');
+    expect(natted.connection).toBe('firewalled');
+    expect(natted.message).not.toMatch(/swarm/i);
+  });
+
+  it('reports an empty connection on a build with no transfer/info route', async () => {
+    connectionStatus = '';
+    const report = await qbitTest({ config });
+    expect(report.status).toBe('connected');
+    expect(report.version).toBe('4.6.4');
+    expect(report.connection).toBe('');
+    expect(report.message).not.toMatch(/swarm/i);
   });
 
   it('reports "unauthorized" with no stored password', async () => {

@@ -93,6 +93,13 @@ let filesReads = 0;
  * and the sweep still touching only its own.
  */
 let clientTorrents: Array<{ hash: string; category: string }> = [];
+/**
+ * qBittorrent's own `connection_status`, which decides whose silence it is.
+ *
+ * `''` makes the stand-in answer 404, the build that has no `transfer/info` at
+ * all — the state the metadata timeout has to survive unchanged.
+ */
+let connectionStatus = 'connected';
 /** Bodies posted to `torrents/delete`, so the control can assert nothing went. */
 let deleteBodies: string[] = [];
 
@@ -132,6 +139,16 @@ beforeAll(async () => {
       return;
     }
 
+    if (url.pathname === '/api/v2/transfer/info') {
+      if (!connectionStatus) {
+        res.writeHead(404);
+        res.end('missing');
+        return;
+      }
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ connection_status: connectionStatus, dht_nodes: 312 }));
+      return;
+    }
     if (url.pathname === '/api/v2/torrents/info' && url.searchParams.has('category')) {
       // The sweep's query. Answers with the *whole* list on purpose, ignoring
       // the parameter the way a build that does not support it would.
@@ -256,6 +273,7 @@ beforeEach(() => {
   filesReads = 0;
   clientTorrents = [];
   deleteBodies = [];
+  connectionStatus = 'connected';
   notFound = new Set<string>();
   resetQbitSessions();
 });
@@ -435,6 +453,61 @@ describe('nyaaFetch — route A, a subtitle-only pack', () => {
     expect(result.ok === false && result.reason).toMatch(/no peer sent its file list/i);
     expect(result.ok === false && result.reason).not.toMatch(/no subtitle files/i);
     expect(calls.some((call) => call.startsWith('prio:'))).toBe(false);
+  });
+
+  it('blames the client, not the release, when the client reaches no swarm at all', async () => {
+    // Measured live 2026-08-17: four releases in a row timed out here, one of
+    // them a pack that had delivered 47 files the day before. Every one of them
+    // was reported as "no peer sent its file list", which reads as a fact about
+    // that release and sent a whole turn chasing dead swarms.
+    connectionStatus = 'disconnected';
+    metadataAfterPolls = 500;
+    files = [{ name: 'Show - 07.ja.ass', size: 40_000, progress: 0, priority: 1 }];
+
+    const result = await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 5_000 });
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.reason).toMatch(/not connected to any swarm/i);
+    expect(result.ok === false && result.reason).not.toMatch(/no peer sent its file list/i);
+    expect(calls.some((call) => call.startsWith('prio:'))).toBe(false);
+  });
+
+  it('still blames the release when the client is only firewalled', async () => {
+    // The scoping control, and the reason `firewalled` is not folded in with
+    // `disconnected`: it means no inbound port mapping, and an outbound-only
+    // client reaches swarms perfectly well. Treating it as an outage would
+    // excuse every genuinely dead release on a machine behind a NAT — which is
+    // most of them, including this one (`no router found`, logged 2026-08-17).
+    connectionStatus = 'firewalled';
+    metadataAfterPolls = 500;
+    files = [{ name: 'Show - 07.ja.ass', size: 40_000, progress: 0, priority: 1 }];
+
+    const result = await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 5_000 });
+    expect(result.ok === false && result.reason).toMatch(/no peer sent its file list/i);
+    expect(result.ok === false && result.reason).not.toMatch(/not connected to any swarm/i);
+  });
+
+  it('keeps the release wording on a build with no transfer/info endpoint', async () => {
+    // qBittorrent 4.x-era builds and anything that 404s the route. An absent
+    // answer is not evidence of an outage, so the old sentence stands.
+    connectionStatus = '';
+    metadataAfterPolls = 500;
+    files = [{ name: 'Show - 07.ja.ass', size: 40_000, progress: 0, priority: 1 }];
+
+    const result = await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 5_000 });
+    expect(result.ok === false && result.reason).toMatch(/no peer sent its file list/i);
+  });
+
+  it('does not ask about the connection when the metadata arrives', async () => {
+    // The cost control: this is one extra request on the failure path only, and
+    // a fetch that works must not pay for it.
+    files = [{ name: 'Show - 07.ja.ass', size: 40_000, progress: 0, priority: 1 }];
+    await writeOnDisk('Show - 07.ja.ass', '[Script Info]\nDialogue: hello');
+
+    const result = await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 5_000 });
+    // Asserted first, or the assertion below passes for the wrong reason: a
+    // fetch that failed early also never reaches the connection check.
+    expect(result.ok).toBe(true);
+    expect(calls).not.toContain('/api/v2/transfer/info');
   });
 
   it('never pauses a torrent the user already had', async () => {

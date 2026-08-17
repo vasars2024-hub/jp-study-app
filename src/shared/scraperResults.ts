@@ -203,6 +203,12 @@ export interface SeriesMetadata {
   provenance: Record<string, string>;
 }
 
+/** How long one stage of a run actually took, measured at its transition. */
+export interface ScrapeStageTiming {
+  stage: ScrapeStage;
+  ms: number;
+}
+
 export interface ScrapeJobSummary {
   id: string;
   seriesId: string;
@@ -218,6 +224,18 @@ export interface ScrapeJobSummary {
   failed: number;
   bytes: number;
   note: string;
+  /**
+   * Measured per-stage durations, in the order the run passed through them.
+   *
+   * Optional because jobs recorded before this existed have no timeline, and
+   * because a caller must be able to tell "not measured" from "measured as
+   * zero". History previously rendered a *fixed* weight table
+   * (0.08/0.34/0.31/0.16/0.11 × total), so a 6 s job and a 53 s job reported
+   * identical percentages and the panel presented invention as diagnosis —
+   * audit F2. Absent means the breakdown is not rendered; it is never
+   * back-filled.
+   */
+  stageTimings?: ScrapeStageTiming[];
 }
 
 export type ScrapeJobEvent =
@@ -282,6 +300,16 @@ export interface QbitStatusReport {
   version: string;
   message: string;
   latencyMs: number;
+  /**
+   * qBittorrent's own `connection_status` — `connected`, `firewalled` or
+   * `disconnected` — and `''` when it could not be read.
+   *
+   * Separate from `status` because they answer different questions: `status` is
+   * about this app reaching the WebUI, and a client can answer that in 1 ms
+   * while being unable to reach a single peer. Optional so every existing
+   * producer and stored report stays valid.
+   */
+  connection?: string;
 }
 
 export interface QbitSendReport {

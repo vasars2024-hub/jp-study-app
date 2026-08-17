@@ -485,11 +485,19 @@ export async function qbitTest(rawInput: ScraperQbitInput): Promise<QbitStatusRe
   }
   const label = version.body.trim().replace(/^v/, '');
   scraperLog('info', 'qbit', `Connected to ${config.host}:${config.port} (v${label}).`);
+  // Reached the WebUI, which is not the same as reaching a swarm. A test that
+  // stops here reports a healthy client to a user whose every fetch is about to
+  // time out, and the timeout then reads as a property of the release.
+  const swarm = await qbitConnectionStatus(input);
+  const connection = swarm.ok ? swarm.value : '';
   return {
     status: 'connected',
     version: label,
-    message: `Connected to ${config.host}:${config.port}.`,
+    message: connection === 'disconnected'
+      ? `Connected to ${config.host}:${config.port}, but qBittorrent is not connected to any swarm.`
+      : `Connected to ${config.host}:${config.port}.`,
     latencyMs,
+    connection,
   };
 }
 
@@ -862,6 +870,50 @@ export async function qbitTorrentInfo(
 }
 
 /**
+ * What the client says about its own swarm connectivity, in its own words.
+ *
+ * `connected` / `firewalled` / `disconnected` is what `transfer/info` reports,
+ * and it answers a question `scraperQbitTest` cannot: that one proves the
+ * *WebUI* is reachable, which on 2026-08-17 read `connected, 1 ms` through a
+ * whole session in which no magnet on the machine ever obtained metadata.
+ *
+ * `firewalled` is deliberately NOT treated as an outage. It means no inbound
+ * port mapping — this machine logged `could not map port using UPnP: no router
+ * found` — and an outbound-only client still reaches swarms. Only
+ * `disconnected` is the state where no release can possibly answer.
+ *
+ * Unknown values pass through rather than being coerced: a build that invents a
+ * fourth word must not be silently read as an outage.
+ */
+export async function qbitConnectionStatus(
+  input: ScraperQbitInput,
+): Promise<QbitOutcome<string>> {
+  const response = await authed(input, '/api/v2/transfer/info');
+  if ('error' in response || response.status !== 200) {
+    return { ok: false, reason: failureReason(response, 'transfer/info') };
+  }
+  try {
+    const parsed = JSON.parse(response.body) as { connection_status?: unknown };
+    const status = typeof parsed?.connection_status === 'string' ? parsed.connection_status : '';
+    if (!status) return { ok: false, reason: 'qBittorrent reported no connection status.' };
+    return { ok: true, value: status };
+  } catch {
+    return { ok: false, reason: 'The transfer info was not valid JSON.' };
+  }
+}
+
+/**
+ * Said when the client itself is offline, so no release is blamed for it.
+ *
+ * Exported because two callers need the identical sentence and a fetch that
+ * words it differently from a status check is how a user concludes they are two
+ * different problems.
+ */
+export const NOT_CONNECTED_REASON =
+  'qBittorrent is running but not connected to any swarm, so no release can report its contents. '
+  + 'Check its network connection, VPN or firewall.';
+
+/**
  * Adds a magnet so it fetches its own metadata and then stops itself.
  *
  * Deliberately does **not** use `buildAddForm`: that applies the profile's own
@@ -1156,6 +1208,16 @@ export async function qbitAwaitMetadata(
     }
 
     if (Date.now() >= deadline) {
+      // Whose fault the silence is, asked once and only on the way out. A
+      // client with no swarm connection at all cannot learn any release's file
+      // list, so blaming the release is a false finding — measured 2026-08-17,
+      // when four separate releases timed out in a row including one that had
+      // delivered 47 files the day before, while `scraperQbitTest` still read
+      // `connected, 1 ms` because the WebUI is a different question.
+      const swarm = await qbitConnectionStatus(input);
+      if (swarm.ok && swarm.value === 'disconnected') {
+        return { ok: false, reason: NOT_CONNECTED_REASON };
+      }
       return {
         ok: false,
         reason: 'qBittorrent could not read what is inside this release: no peer sent its file list in time.',
