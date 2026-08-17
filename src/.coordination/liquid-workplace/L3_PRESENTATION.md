@@ -104,3 +104,34 @@ state updater, so a click costs +2 under StrictMode — pre-existing shape, `tog
 **Next slice (L3.3):** the reverse transitions L3 has not exercised — maximize while liquid, drag
 across monitors while liquid (`beginDeskDrag` sends a `winToSnapshot`, which now carries the field),
 and pop-out, which routes through `main/desktop.ts:2296`-style snapshot rebuilds. Then L4.
+
+## 2026-08-17 · backup · L3.3 the other four rebuild sites, and a suite that proved nothing
+
+| Slice | Commit | What landed |
+| --- | --- | --- |
+| L3.3 | `68d1a65c` | `__tests__/liquidWindowSnapshotFidelity.test.ts`, 10 tests, 4/4 shell mutations red |
+
+L3.2's defect was a CLASS: an object literal keeps only what it names. `DesktopShell` rebuilds a
+`WindowSnapshot` at four more sites — desktop move `:1165`, tear-off `:2296`, cross-monitor drag
+payload `:3234`, adopt `:1244`. **No fix was needed: all four spread**, so the field already
+survives. What was missing was the guarantee. Also pinned: maximize-while-liquid returns to the
+PRE-liquid geometry, and liquid-while-maximized comes back maximized.
+
+**THE FINDING IS ABOUT THE TEST.** The first version mirrored both converters as local fixtures, so
+mutating the real `DesktopShell.tsx` moved nothing — it would have passed clean over the exact defect
+shipped an hour earlier. *A suite that reimplements the thing it covers measures its own copy.* Three
+source-level guards now bind it: both converters carry their presentation half; every `winToSnapshot`
+use is a spread or a bare `.map` (**3 and 3**, counted, not assumed); the shell never builds a
+`presentation:` literal nor calls `makeLiquid`/`returnToStandard` past the seam.
+
+**Mutations against `DesktopShell.tsx` itself, 4 of 4 red, file restored byte-identical.** A fifth is
+recorded **VOID, not passed** — its anchor missed on CRLF line endings, so the mutation never applied
+and the green run measured nothing. *Assert the patch applied before believing the test result.*
+
+**Turn gates, shared tree:** vitest **728 files / 10,036 tests / 0 failed** / 6 skipped · i18n exit 0
+at **10,544** keys (+2, mine) · architecture exit 0 "Nothing new", 6 pending · eslint clean on all
+touched paths (the one `_dropped` warning is the same shape `shared/liquidWindowState.ts` carries at HEAD).
+
+**Next slice (L3.4 or L4):** L3's gate is met and its infrastructure is covered. The remaining L3 work
+is `parity-ledger.json`, still **0 of 7** — and it stays 0 until an APP migrates, which is L4 (Media
+shell repair and the Video pilot). Recommend going to L4 rather than widening L3.
