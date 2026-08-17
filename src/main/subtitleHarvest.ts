@@ -375,12 +375,29 @@ export async function listNyaaHarvest(
 
   const season = Number.isFinite(input?.season) ? Number(input?.season) : null;
   try {
-    // First alias that finds anything wins, rather than a union of all of them.
+    // One alias's results win outright, rather than a union of all of them.
     // `nyaaSearch` filters each result against the name it was asked about, so a
     // union would rank releases scored under different titles against each
-    // other — and the aliases are names for one work, so the first hit is the
-    // same show by construction. It also stops at one request in the common
-    // case, which is what keeps a listing off the index's rate limiter.
+    // other — and the aliases are names for one work, so a hit is the same show
+    // by construction.
+    //
+    // The walk stops on the first name that finds a **`sub-pack`**, not the
+    // first that finds anything. Those are not interchangeable answers to a
+    // harvest: a `sub-pack` is subtitles alone, tens of megabytes, while a
+    // `batch-sidecar` is the video batch the subtitles are buried in — and this
+    // flow exists precisely so the user need not download the video. Measured
+    // on the user's own library: `Eureka Seven`'s primary name returns 21 rows,
+    // two of which are *Hi-Evolution movie* batches at 21 GB and 43 GB (not even
+    // the TV series), so a first-anything break stopped there and never reached
+    // `Psalms of Planets Eureka Seven`, the only name carrying the 39.20 MB
+    // 50-episode subs-only pack. `Revolutionary Girl Utena` is the same shape
+    // behind a 49-row primary.
+    //
+    // The cost is honest and bounded: a sidecar-only hit now walks to
+    // `HARVEST_ALIAS_LIMIT` (4) instead of stopping at 1, so a Route B title
+    // spends up to 3 more paced requests. A pack hit — including the ordinary
+    // case where the primary title finds one — still costs exactly one request,
+    // and a title with no aliases cannot walk at all.
     let found: Awaited<ReturnType<typeof nyaaSearch>> = [];
     let searchedAs: string | null = null;
     for (const [index, title] of aliases.entries()) {
@@ -396,9 +413,15 @@ export async function listNyaaHarvest(
         episodeCount: stored.totalEpisodes,
       });
       if (!candidates.length) continue;
-      found = candidates;
-      searchedAs = index ? title : null;
-      break;
+      const carriesPack = candidates.some((candidate) => candidate.route === 'sub-pack');
+      // Earliest name still wins among equals: a later sidecar-only hit never
+      // displaces an earlier one, so the fallback is the same release the old
+      // break condition would have returned.
+      if (!found.length || carriesPack) {
+        found = candidates;
+        searchedAs = index ? title : null;
+      }
+      if (carriesPack) break;
     }
     // The one session catalogue in `subtitleNyaaSource`, shared with discovery,
     // so an id listed by either surface is fetchable by either — and the

@@ -127,6 +127,26 @@ function candidateRow(id: string) {
   };
 }
 
+/**
+ * The other route: the whole video batch, with the subtitles inside it.
+ *
+ * Deliberately multi-gigabyte, because that is the thing this flow exists to
+ * avoid downloading — `Eureka Seven`'s primary name really returns two
+ * *Hi-Evolution* batches at 21 GB and 43 GB.
+ */
+function sidecarRow(id: string) {
+  return {
+    providerItemId: id,
+    releaseName: '[Group] Show 01-50 (BD 1080p)',
+    route: 'batch-sidecar' as const,
+    sizeBytes: 43_000_000_000,
+    seeders: 9,
+    language: 'ja',
+    score: 41,
+    reasons: ['route:batch-sidecar', 'ja'],
+  };
+}
+
 beforeEach(() => {
   availability = { ok: true };
   searchResult = [];
@@ -338,6 +358,86 @@ describe('listNyaaHarvest', () => {
     expect(searchCalls.map((call) => call.title)).toEqual([
       'Shinreigari', 'Ghost Hound', '心霊狩り', 'stored-a',
     ]);
+  });
+
+  // A `sub-pack` and a `batch-sidecar` are not interchangeable answers to a
+  // harvest: one is subtitles alone at tens of megabytes, the other is the video
+  // batch they are buried in. Measured live, `Eureka Seven`'s primary name
+  // returns 21 rows — two *Hi-Evolution movie* batches at 21 GB and 43 GB, not
+  // even the TV series — so a first-anything break stopped there and never
+  // reached the one name carrying the 39.20 MB 50-episode subs-only pack.
+  it('walks past a sidecar-only hit to a later alias’s sub-pack', async () => {
+    searchByTitle.set('Eureka Seven', [sidecarRow('nyaa:hi-evolution')]);
+    searchByTitle.set('Psalms of Planets Eureka Seven', [candidateRow('nyaa:subs-pack')]);
+
+    const result = await listNyaaHarvest({
+      title: 'Eureka Seven',
+      titles: ['Psalms of Planets Eureka Seven'],
+      acquisition: acquisition(),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.candidates.map((row) => row.id)).toEqual(['nyaa:subs-pack']);
+    expect(result.searchedAs).toBe('Psalms of Planets Eureka Seven');
+    expect(searchCalls.map((call) => call.title)).toEqual([
+      'Eureka Seven', 'Psalms of Planets Eureka Seven',
+    ]);
+  });
+
+  // The negative control for the case above. If the walk simply always ran to
+  // the cap, the test above would pass while every listing paid three extra
+  // paced requests — so this pins the break to the route rather than to
+  // exhaustion. Both names carry a pack here; only the first is ever asked.
+  it('still stops at the first name that finds a sub-pack', async () => {
+    searchByTitle.set('Eureka Seven', [candidateRow('nyaa:primary-pack')]);
+    searchByTitle.set('Psalms of Planets Eureka Seven', [candidateRow('nyaa:alias-pack')]);
+
+    const result = await listNyaaHarvest({
+      title: 'Eureka Seven',
+      titles: ['Psalms of Planets Eureka Seven'],
+      acquisition: acquisition(),
+    });
+
+    expect(result.candidates.map((row) => row.id)).toEqual(['nyaa:primary-pack']);
+    expect(result.searchedAs).toBeNull();
+    expect(searchCalls).toHaveLength(1);
+  });
+
+  it('keeps the earliest sidecar hit when no name carries a pack', async () => {
+    // Route B is the common case — 53 of the 60 surveyed titles carry a batch
+    // and only 8 a pack — so the fallback must be exactly what the old break
+    // condition returned, not the last name that happened to answer.
+    searchByTitle.set('Eureka Seven', [sidecarRow('nyaa:first-batch')]);
+    searchByTitle.set('Psalms of Planets Eureka Seven', [sidecarRow('nyaa:later-batch')]);
+
+    const result = await listNyaaHarvest({
+      title: 'Eureka Seven',
+      titles: ['Psalms of Planets Eureka Seven'],
+      acquisition: acquisition(),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.candidates.map((row) => row.id)).toEqual(['nyaa:first-batch']);
+    expect(result.searchedAs).toBeNull();
+    expect(searchCalls).toHaveLength(2);
+  });
+
+  it('reports the alias a fallback sidecar was found under, not the title', async () => {
+    // `searchedAs` has to describe the rows that were returned. The fallback
+    // survives two more searches before it is returned, so the field is written
+    // where the hit happened rather than where the walk ended.
+    searchByTitle.set('Revolutionary Girl Utena', [sidecarRow('nyaa:utena-batch')]);
+    searchByTitle.set('Shoujo Kakumei Utena Movie', [sidecarRow('nyaa:movie-batch')]);
+
+    const result = await listNyaaHarvest({
+      title: 'Shoujo Kakumei Utena',
+      titles: ['Revolutionary Girl Utena', 'Shoujo Kakumei Utena Movie'],
+      acquisition: acquisition(),
+    });
+
+    expect(result.candidates.map((row) => row.id)).toEqual(['nyaa:utena-batch']);
+    expect(result.searchedAs).toBe('Revolutionary Girl Utena');
+    expect(searchCalls).toHaveLength(3);
   });
 
   it('reports a thrown search rather than rejecting across IPC', async () => {
