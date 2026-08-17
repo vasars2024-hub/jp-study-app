@@ -90,6 +90,14 @@
     "test-only-module:src/shared/subtitleFusionEval.ts": {
       "status": "accepted",
       "note": "The EN→JA fusion plan's F7 ship gate. Its real consumer is tools/fusion-eval.cjs, which esbuild-bundles this file at run time by path — the same kind of runtime reference the static import graph cannot follow as importWorker.ts, and the same pattern tools/grammar-audit.cjs and tools/i18n-check.cjs already use. It is deliberately not imported by the app: the harness scores the pipeline from outside it, needs real media and the Whisper runtime, and must not become something product code can call. If tools/fusion-eval.cjs is ever deleted, this becomes a genuine orphan and should be deleted with it."
+    },
+    "test-only-module:src/renderer/components/liquid/LiquidSurface.tsx": {
+      "status": "pending",
+      "note": "L2 primitive layer, landed ahead of its consumer on purpose. LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md L2 ships tokens and primitives BEFORE any surface migrates, so the Files app and the Video pilot are built in the Liquid language rather than retrofitted into it. Its stylesheet IS imported by renderer/main.tsx; only the React component has no app-side caller yet. Closes when L4 migrates the Video player. src/.coordination/liquid-workplace/L2_PRIMITIVES.md records the boundary."
+    },
+    "test-only-module:src/renderer/components/liquid/LiquidAppScaffold.tsx": {
+      "status": "pending",
+      "note": "Same L2 boundary as LiquidSurface.tsx: the scaffold spine exists so a migrating app has a destination, and no app has migrated yet. Closes when L4 migrates the Video player."
     }
   }
 }
