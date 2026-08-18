@@ -25319,3 +25319,40 @@ Study Blocks and MAL tracks — `git add` absorbs both. New generic stager
 `debug/stage-head-plus-insert.cjs <path> <anchorNeedle> <lineCount>` addresses the block by
 the N lines *preceding* an anchor, because `stage-catalog-insert.cjs` needs a unique needle
 on the block's first line and a doc comment's first line is `  /**`, which never is.
+
+## 2026-08-18 — Track 7 / gate 7: the live cancel, on a deck we built to be cancelled (`primary`)
+
+Worker `primary`. Gate 7's **live leg**, which `f2825015` built and could not prove: main does
+not hot-reload, so the running app had no `anki:cancelConnectCommit` at all. Restarted (old tree
+pid 40444 → new pid 36576, `debug/bridge.json` token and pid both rotated), then drove
+`window.api` directly — the surface's own render is `210d98c4`'s tests, and what was unproven
+here is the transport.
+
+**Fixture, never the user's notes.** `debug/g7-anki-fixture.cjs create 80` built
+`JPSTUDY_G7_FIXTURE` — 80 Basic notes, `Front: G7FIX NNN`, `Back: base` — through AnkiConnect
+itself, and `delete` removed all 80 notes and the deck at the end (`deckStillPresent: false`).
+Profile `User 1`. Every number below is confirmed **twice**: once by the app's own result, once
+by a direct `notesInfo` re-read the app has no part in.
+
+| run | result | notesUpdated | unwritten | AnkiConnect re-read | ms |
+| --- | --- | --- | --- | --- | --- |
+| control, nobody cancels | `ok true`, `verified true` | 80 | **absent** | 80 × `ctrlA` | 16,656 |
+| cancel at 8,000 ms | `ok false`, `cancelled`, `verified false` | 9 | **71** | 9 × `cancelB`, 71 × `ctrlA` | 13,042 |
+
+The cancel call itself answered `true`. `unwritten 71` is the collection's own count, not
+`planned − sent`: it equals exactly the 71 notes still holding the control run's value.
+
+**The token's negative control, which is what stops `cancel` being a function that returns
+true:** an id that never ran → `false`; the SAME id again after the commit had settled →
+`false`. Both live, in the same call.
+
+Cost, measured and worth writing down: the control wrote 80 notes in ~10.4 s (~130 ms each) but
+the cancelled run managed **9 in ~4.9 s** (~540 ms each) on the identical deck. A per-write
+budget read off one run would have put the cancel past the end of the batch and "proved" nothing
+— pick the cancel delay from a fraction of the *whole* measured commit, not from a rate.
+
+**Gate 7 is now three quarters closed and still OPEN.** The dry run remains, and its blocker is
+unchanged: `planChangeTray` is a synchronous `useMemo` (`DeckWorkbenchTray.tsx:511`), so there is
+no moment at which a cancel could be observed — it needs the async chunked driver FIRST.
+
+Docs only, no product change: `src/ANKI_DECK_WORKBENCH_PLAN.md` gate 7 + this entry.

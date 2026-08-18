@@ -493,13 +493,14 @@ This slice is complete only when all of these can be shown with real data and no
     their markers from the search box. The walk selects by note type off the inspector instead.
 7. Interrupt a large import, translation, dry run, and live commit; recover without a false success state or an ambiguous partial result.
 
-    **Two of four quarters closed; the gate stays OPEN.** Import closed with `d0a09738` (a
+    **Three of four quarters closed; the gate stays OPEN on the dry run.** Import closed
+    with `d0a09738` (a
     real user cancel on the .apkg read, proven live). Translation is gate 2's, already
     measured: **30 requested → 12 answered, 18 cancelled, 0 failed** — the spend stopped and
     the paid-for work survived.
 
-    **The live-commit quarter is BUILT 2026-08-18** (`f2825015` model/main/IPC/preload/
-    surface + 6 keys ×4, `210d98c4` surface tests) **and not yet proven live.**
+    **The live-commit quarter is BUILT AND PROVEN LIVE 2026-08-18** (`f2825015` model/main/
+    IPC/preload/surface + 6 keys ×4, `210d98c4` surface tests; live evidence below).
     `commitConnectDraft` had zero cancel of any kind. The cancel is now checked BETWEEN
     writes and never inside one — AnkiConnect has no abortable request, so a write already
     sent has landed, and an abort claiming otherwise is the false success this gate names.
@@ -513,12 +514,22 @@ This slice is complete only when all of these can be shown with real data and no
     swallowed-write case); omit `commitId` → 1 red; render the landed count as `unwritten`
     → 1 red. Cases 29 → 35 (main) and 51 → 53 (renderer).
 
-    **Owed before this gate can close, both named rather than hand-waved:**
-    1. **The live leg.** AnkiConnect answers `version 6` at `127.0.0.1:8765`, but main does
-       not hot-reload, so `anki:cancelConnectCommit` is not registered in the running app.
-       Needs a restart AND a **self-made fixture deck** — never the user's own notes, and
-       deleted afterwards.
-    2. **The dry-run quarter, which is larger than it looks.** `planChangeTray` is a
+    **The live leg CLOSED 2026-08-18** on a restarted app (pid 36576) against a self-made
+    80-note fixture deck `JPSTUDY_G7_FIXTURE`, built and deleted through AnkiConnect
+    (`debug/g7-anki-fixture.cjs`) — the user's own notes were never touched. Three runs,
+    every number re-read out of Anki independently of the app:
+    - **Negative control**, same change set, nobody cancelling: `ok true`, `notesUpdated`
+      **80**, `verified true`, `unwritten` **absent**, 16,656 ms. AnkiConnect re-read:
+      **80 of 80** notes carry the new value.
+    - **The cancel**, fired at 8,000 ms through `cancelAnkiConnectCommit`: answered `true`,
+      result `ok false` / `errorCode 'cancelled'` / `verified false`, `notesUpdated` **9**,
+      `unwritten` **71**, 13,042 ms. AnkiConnect re-read: **9 new / 71 still the control's
+      value** — `unwritten` is the measured remainder, not `planned − sent`.
+    - **The token's own negative control:** cancelling an id that never ran, and the same
+      id again after the commit had settled, both answered **`false`**.
+
+    **Owed before this gate can close:**
+    1. **The dry-run quarter, which is larger than it looks.** `planChangeTray` is a
        *synchronous* `useMemo` (`DeckWorkbenchTray.tsx:511`), so there is no moment at which
        a cancel could be observed. A `shouldStop` predicate on its own would be an invisible
        module: it needs the async chunked driver first, and that changes the tray's render
