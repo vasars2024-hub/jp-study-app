@@ -4715,17 +4715,28 @@ h1 {
   padding: 2px 6px;
   border-radius: 5px;
 }
+/* Each badge carries ONE saturated hue; the chip tints with it and the label is
+   that hue mixed toward the palette's own --text. The labels used to be fixed
+   pastels (#aeb6ff / #f3a3b0 / #c9b0e8) picked against a dark panel, so on any
+   light palette they were pastel-on-near-white — 10 failing text runs measured
+   in one Dictionary window. Mixing toward --text follows the palette in both
+   directions: on a dark theme --text is near-white and the pastel is
+   reconstructed, on a light one the same rule yields a dark tint of the same
+   hue. 42% is the lowest hue share that clears 4.5:1 at 10px on classic-light. */
 .dict-badge.common {
-  background: rgba(108, 123, 255, 0.18);
-  color: #aeb6ff;
+  --dict-badge-hue: #6c7bff;
 }
 .dict-badge.jlpt {
-  background: rgba(224, 85, 106, 0.18);
-  color: #f3a3b0;
+  --dict-badge-hue: #e0556a;
 }
 .dict-badge.freq {
-  background: rgba(160, 120, 200, 0.2);
-  color: #c9b0e8;
+  --dict-badge-hue: #a078c8;
+}
+.dict-badge.common,
+.dict-badge.jlpt,
+.dict-badge.freq {
+  background: color-mix(in srgb, var(--dict-badge-hue) 18%, transparent);
+  color: color-mix(in srgb, var(--dict-badge-hue) 42%, var(--text));
 }
 /* The list that produced the rank. Truncated rather than dropped: a long list
    title must not push the entry head's controls off the row, but the number
@@ -4733,7 +4744,7 @@ h1 {
 .dict-freq-source {
   margin-left: 5px;
   padding-left: 5px;
-  border-left: 1px solid rgba(201, 176, 232, 0.4);
+  border-left: 1px solid color-mix(in srgb, currentcolor 40%, transparent);
   max-width: 14ch;
   display: inline-block;
   vertical-align: bottom;
@@ -4744,10 +4755,14 @@ h1 {
   letter-spacing: 0;
   opacity: 0.85;
 }
+/* Same rule as the three above — it is off-screen unless a bundled dictionary
+   supplied the entry, so it was not in the measured set, but it is the identical
+   pastel-on-dark-panel defect and is fixed rather than left to resurface. */
 .dict-badge.bundled {
+  --dict-badge-hue: #78b478;
   margin-left: 8px;
-  background: rgba(120, 180, 120, 0.2);
-  color: #9fd49f;
+  background: color-mix(in srgb, var(--dict-badge-hue) 20%, transparent);
+  color: color-mix(in srgb, var(--dict-badge-hue) 42%, var(--text));
   text-transform: none;
   letter-spacing: 0;
   font-size: 11px;

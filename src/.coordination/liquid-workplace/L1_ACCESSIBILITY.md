@@ -261,3 +261,42 @@ this" from a stylesheet walk; set the suspected var and watch the computed value
 truly hardcoded at `styles.css:4761-4772`; `dict-reading` x3 + `dict-ex-btn` x1 paint
 `var(--accent-2)` as text on white; the last 6 are `.fwin` chrome. `styles.css` is dirty —
 HEAD+edit blob.
+
+## 2026-08-18 — the badges follow the palette now, 20 → 10
+
+Second half of the same sitting. The 10 remaining badge failures were the genuinely hardcoded
+ones: `#aeb6ff` / `#f3a3b0` / `#c9b0e8` / `#9fd49f`, pastels picked against a dark panel, so
+legible on exactly one palette.
+
+**Shape, not four new constants.** Each variant declares one saturated
+`--dict-badge-hue`; the chip tints with it at 18–20%, the label is
+`color-mix(in srgb, var(--dict-badge-hue) 42%, var(--text))`. Mixing toward the palette's own
+text is what makes it bidirectional — near-white reconstructs the pastel, `#1e1e1e` yields a
+dark tint of the same hue. 42% is the lowest hue share clearing 4.5:1 at 10px on classic-light;
+50% measures 4.28 and fails. `.dict-freq-source`'s border became `currentcolor 40%` so it
+tracks the label it hangs off. `.dict-badge.bundled` was NOT in the failing set (it needs a
+bundled dictionary to render) and was fixed anyway — same defect, one edit away from resurfacing.
+
+**The appearance cost on the dark default, as hex rather than an adjective.** forest-night
+`common` `#aeb6ff` → `#abbced`, `freq` `#c9b0e8` → `#c0bbd6` — slightly softer, same hue,
+still 0 failing at min 4.92:1. classic-light `#3f457c` / `#554465`; high-contrast `#c1c86b` /
+`#d7c654`, which is that palette's yellow doing what it is supposed to.
+
+| palette | min | failing | inside a Liquid region |
+| --- | --- | --- | --- |
+| forest-night | 4.92:1 | 0 | 0 |
+| classic-light | 1.39:1 | **10 (was 20, was 52)** | 0 |
+| high-contrast | 6.12:1 | 0 | 0 |
+
+**Control, red:** the new test's predicate finds 4 literal badge labels at HEAD and 0 after.
+
+**Trap:** the staging script's first guard rejected the fix, correctly — the new comment quotes
+the four old pastels as documentation and a substring test read that as the defect surviving.
+Guards over a region that also contains prose must match the DECLARATION, not the value.
+
+**Remaining 10, and the tradeoff the next slice must settle:** `dict-reading` x3 +
+`dict-ex-btn` x1 paint `var(--accent-2)` — a USER-CHOSEN accent, set inline on `<html>` — as
+text on white. The same mix trick works (42% clears it) but visibly desaturates the reading on
+dark themes, where the accent is an identity element, so it is a real product decision rather
+than a mechanical repeat. The last 6 are `.fwin` chrome (`fwin-title-text` 1.55:1, `fwin-b`
+1.49:1) and belong with the window frame, not the Dictionary.
