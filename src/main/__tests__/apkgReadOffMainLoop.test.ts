@@ -69,8 +69,12 @@ describe('gate 9: the parse ladder can be loaded outside the main process', () =
   it('resolves the worker beside the main bundle, as the dictionary worker does', () => {
     const host = source('src/main/anki/apkgReadHost.ts');
     expect(host).toMatch(/path\.join\(__dirname, 'apkgReadWorker\.js'\)/);
-    // A fork failure must degrade to a slow read, never to a refused deck.
+    // A fork failure must degrade to a slow read, never to a refused deck. The
+    // synchronous `catch` alone is not that guarantee -- `fork()` does not throw
+    // on a missing module, it hands back a child that exits -- so the degraded
+    // path is now a behaviour test: `apkgReadHostOutcomes.test.ts`.
     expect(host).toMatch(/return parseApkgDraftPage\(request\)/);
+    expect(host).not.toMatch(/reject\(new Error\(`apkg-read-worker-exit/);
   });
 });
 

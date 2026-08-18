@@ -6,10 +6,14 @@
 // sql.js WASM heap sized for the last deck opened for the rest of the session.
 //
 // `parseApkgDraftPage` is imported here as well, on purpose. It is the fallback
-// when the worker cannot be forked at all (a packaging or environment fault), and
-// running it in-process is strictly better than refusing to open the deck — but
-// it is the SAME function the worker runs, so the two paths cannot drift and the
-// fallback cannot quietly become a second, differently-behaved reader.
+// whenever the worker never answers — the fork throwing, the fork succeeding on
+// a module that is not there, or a child that dies mid-parse — and running it
+// in-process is strictly better than refusing to open the deck. It is the SAME
+// function the worker runs, so the two paths cannot drift and the fallback
+// cannot quietly become a second, differently-behaved reader.
+//
+// A parse failure is NOT covered by the fallback: a corrupt package answers with
+// `{ok:false}` and that message is the user's, so it is passed straight through.
 
 import { utilityProcess } from 'electron';
 import path from 'node:path';
@@ -52,6 +56,21 @@ export function parseApkgDraftPageOffMainLoop(
 
   return new Promise<ApkgParsedPage>((resolve, reject) => {
     let settled = false;
+    /**
+     * The same in-process parse the `catch` above runs, reached from a child
+     * that started and then said nothing.
+     *
+     * Measured 2026-08-18 in an isolated Electron: `utilityProcess.fork()` on an
+     * absent module does NOT throw — it hands back a child that emits
+     * `exit` with code 1. So the synchronous `catch` is dead for the exact
+     * packaging fault it was written for, and the fallback has to live here too
+     * or a missing `apkgReadWorker.js` refuses the deck with an untranslated
+     * `apkg-read-worker-exit:1`.
+     */
+    const fallBackInProcess = (why: string): void => {
+      console.warn(`[apkg-read] worker gave no answer (${why}); parsing on the main loop`);
+      parseApkgDraftPage(request).then(resolve, reject);
+    };
     const finish = (fn: () => void): void => {
       if (settled) return;
       settled = true;
@@ -80,12 +99,18 @@ export function parseApkgDraftPageOffMainLoop(
     });
 
     // A worker that exits without answering is not a parse failure and must not
-    // be reported as a corrupt package. `code` is carried so a crash is
-    // distinguishable in a log from an orderly exit that simply said nothing.
+    // be reported as a corrupt package. `code` is carried into the log so a
+    // crash stays distinguishable from an orderly exit that simply said nothing.
     child.on('exit', (code: number) => {
-      finish(() => reject(new Error(`apkg-read-worker-exit:${code}`)));
+      finish(() => fallBackInProcess(`exit:${code}`));
     });
 
-    child.postMessage(request);
+    // A child that has already died rejects the handoff synchronously; that is
+    // the same "no worker" condition, not a caller error.
+    try {
+      child.postMessage(request);
+    } catch (err) {
+      finish(() => fallBackInProcess(err instanceof Error ? err.message : String(err)));
+    }
   });
 }
