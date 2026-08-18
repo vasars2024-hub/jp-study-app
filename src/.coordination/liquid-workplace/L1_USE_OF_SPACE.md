@@ -183,3 +183,41 @@ be greater than 772"*; `align-items: start` dropped → both selectors fail thei
 **Trap:** `styles.css` is LF in HEAD, CRLF in the worktree, and carries 9 hunks from other
 tracks. `node debug/l5b-stage-styles.cjs` rebuilds HEAD + this one edit and hashes
 `--no-filters`; `git add` would have taken all ten.
+
+## 2026-08-18 · primary · `.dict-entries` pairs up — 21.3% → 18.3%, and the band that is left
+
+`.dict-entries` was `display:flex; flex-direction:column` (`styles.css:4780`), so eight
+食べる entries were eight full-width rows in a 1216 px content box. Now
+`repeat(auto-fill, minmax(30rem, 1fr))` with `column-gap: 16px` and no row gap —
+`.dict-entry`'s `border-bottom` is the row separator and a row gap would detach it from
+the entry it divides.
+
+**Measured, maximized 1264x765, through the sheet and not an inline style** (the inline
+trial gave the identical number first, which is the check that the rule and not the probe
+moved it): dead region **379x584 → 947x201**, **21.3% → 18.3% of viewport**, 19.7% of
+window; clipped **0**, overlaps **0**, horizontal scrollers **0**, canvas 48.3%.
+
+**Default 820x580 is untouched and reproduces its own earlier row to the decimal:** 22
+regions, 0 / 0 / 0, dead **511x218 at grid 15,11 = 10.7% of viewport**, canvas 32.3%,
+chrome 5.7%. Round trip `left: 94px; top: 54px; width: 820px; height: 580px`, z-index only.
+
+**Category 4 is still NOT a 10 — 18.3% against a 15% bar — and the remainder is now
+located exactly.** The dead rectangle rotated from a tall right-hand column to a wide flat
+band at `x316..1263 y146..347`, and that band is four short full-width contextual rows
+stacked, each holding a label and one control on its left:
+
+| row | y | height |
+| --- | --- | --- |
+| `.dict-saved-searches` | 159..212 | 53 |
+| `.lexicon-notes-browser` | 226..271 | 45 |
+| `.lexicon-lens-picker` | 285..335 | 50 |
+
+**The next slice is therefore structural, not a token.** These three are *not* siblings —
+the first two are children of `.dict-view`, the third is inside `LexiconWorkbenchResults` —
+so no CSS-only rule can put them side by side at wide widths. That is a real contextual-rail
+decision for L5 and is deliberately not started at the end of a turn. Everything above it
+(`.view-head` 16..81, `.dict-search` 99..141) is already dense or full.
+
+**Instrument note:** the dead-region number is read at the current scroll offset
+(`scroller top=0/5266` here, i.e. the first screen). Every figure in this document was taken
+at top, so they are comparable; a figure taken mid-scroll is not.

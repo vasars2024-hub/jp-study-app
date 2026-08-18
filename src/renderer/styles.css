@@ -4747,9 +4747,19 @@ h1 {
   padding: 3px 6px;
   cursor: pointer;
 }
+/* Rubric category 4. Eight 食べる entries in a maximized (1264x765) window were eight
+   full-width rows: each carries one long gloss run and several short lines, so the
+   grid found 379x584 of empty cells down the right of the first screen — the single
+   largest contributor to a dead region of 21.3% of the viewport against a 15% bar.
+   Two columns took it to 18.3%, measured.
+
+   `column-gap` only, deliberately: `.dict-entry`'s `border-bottom` is the row
+   separator and a row gap would detach it from the entry it divides. */
 .dict-entries {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(30rem, 1fr));
+  align-items: start;
+  column-gap: 16px;
 }
 .dict-entry {
   padding: 12px 14px;

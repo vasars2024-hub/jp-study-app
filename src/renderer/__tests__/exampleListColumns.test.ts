@@ -26,6 +26,10 @@ import { describe, expect, it } from 'vitest';
 const SHEETS = {
   '.lexicon-examples-list': resolve(__dirname, '..', 'components', 'lexicon', 'lexiconExamples.css'),
   '.dict-ex-list': resolve(__dirname, '..', 'styles.css'),
+  // The result list itself: eight entries were eight full-width rows, and the empty
+  // right-hand column they left was the largest single contributor to the maximized
+  // dead region (21.3% of the viewport -> 18.3% once they pair up).
+  '.dict-entries': resolve(__dirname, '..', 'styles.css'),
 } as const;
 
 /** The declaration block for a top-level rule whose selector is exactly `sel`. */
@@ -38,9 +42,15 @@ function blockFor(css: string, sel: string): string {
 
 /** Content width a window of `winW` offers these lists, from the live measurements above. */
 const CONTENT_WIDTH = { default820: 772, maximized1264: 1186 };
-const GAP_PX = 8;
 
-describe('example lists use the width a wide window gives them', () => {
+/** The gap a second column has to clear, read from the rule rather than assumed. */
+function columnGapOf(block: string): number {
+  const m = /(?:^|;|\{)\s*(?:column-)?gap:\s*([\d.]+)px/.exec(block);
+  if (!m) throw new Error('no gap declared — the two-column arithmetic would be a guess');
+  return Number(m[1]);
+}
+
+describe('wide windows get columns, default windows do not', () => {
   for (const [sel, path] of Object.entries(SHEETS)) {
     const block = blockFor(readFileSync(path, 'utf8'), sel);
 
@@ -56,7 +66,7 @@ describe('example lists use the width a wide window gives them', () => {
       const m = /minmax\(\s*([\d.]+)rem\s*,/.exec(block);
       expect(m, `${sel} should declare a rem floor`).not.toBeNull();
       const floorPx = Number(m![1]) * 16;
-      const twoColumns = 2 * floorPx + GAP_PX;
+      const twoColumns = 2 * floorPx + columnGapOf(block);
       expect(twoColumns, 'a second column must not fit at the default width').toBeGreaterThan(
         CONTENT_WIDTH.default820,
       );
