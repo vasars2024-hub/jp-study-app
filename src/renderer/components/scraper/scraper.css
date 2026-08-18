@@ -3828,6 +3828,24 @@
   color: var(--status-error);
 }
 
+/* Credential presence, toned by `CREDENTIAL_PRESENCE_TONE`. `orphaned` is `bad`
+   and `unset` only `warn` on purpose: nothing configured is a to-do, while
+   configured-over-an-empty-store is a setup the user believes is finished. */
+.scr-conn--cred-good {
+  border-color: var(--status-success);
+  color: var(--status-success);
+}
+
+.scr-conn--cred-warn {
+  border-color: var(--status-warning);
+  color: var(--status-warning);
+}
+
+.scr-conn--cred-bad {
+  border-color: var(--status-error);
+  color: var(--status-error);
+}
+
 /* --------------------------------------------------------------- tags ------ */
 
 .scr-tags {

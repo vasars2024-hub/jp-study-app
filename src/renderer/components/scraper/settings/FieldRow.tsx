@@ -7,6 +7,13 @@ import { useEffect, useState } from 'react';
 import { Button, Select, Toggle } from '../../ui';
 import Icon from '../../Icons';
 import { readField, type ScraperFieldDef } from './fields';
+import {
+  CREDENTIAL_PRESENCE_TONE,
+  KEY_PRESENCE_TEXT,
+  PASSWORD_PRESENCE_TEXT,
+  resolveCredentialPresence,
+  type VaultAnswer,
+} from '../data/credentialPresence';
 import { sx } from '../strings';
 import type { ScraperSettingActionId } from './settingActions';
 import type { ScraperSettings } from '../../../../shared/scraperSettings';
@@ -56,6 +63,32 @@ export default function FieldRow({
   useEffect(() => {
     setDraft(asString(value));
   }, [value]);
+
+  /**
+   * The OS store's answer for a 'secret' row's ref. `null` until it comes back,
+   * so a user who has a credential never sees "no password" flash on mount.
+   *
+   * Only main can ask, so this is the one row kind that reaches past its props.
+   * The alternative — threading an answer per field path down from the drawer —
+   * would put vault knowledge in the one component whose whole job is that it
+   * knows nothing about any particular field.
+   */
+  const [vaultHas, setVaultHas] = useState<VaultAnswer>(null);
+  const secretRef = field.kind === 'secret' ? asString(value).trim() : '';
+  useEffect(() => {
+    if (!secretRef) return undefined;
+    let alive = true;
+    setVaultHas(null);
+    const probe = window.api?.scraperHasCredential;
+    if (typeof probe !== 'function') {
+      setVaultHas('error');
+      return undefined;
+    }
+    void probe(secretRef)
+      .then((has) => { if (alive) setVaultHas(has); })
+      .catch(() => { if (alive) setVaultHas('error'); });
+    return () => { alive = false; };
+  }, [secretRef]);
 
   const control = (() => {
     switch (field.kind) {
@@ -230,6 +263,40 @@ export default function FieldRow({
           </div>
         );
       }
+
+      case 'secret': {
+        // Never the ref, and never the secret: only whether one is there. The
+        // ref printed verbatim is what this case was split off to stop — a row
+        // labelled "Password" reading `qbit/webui` over an empty store.
+        const presence = resolveCredentialPresence({ ref: secretRef, vaultHas });
+        const text = field.path.endsWith('apiKeyRef')
+          ? KEY_PRESENCE_TEXT[presence]
+          : PASSWORD_PRESENCE_TEXT[presence];
+        return (
+          <div className="scr-field-status">
+            <span className={`scr-conn scr-conn--cred-${CREDENTIAL_PRESENCE_TONE[presence]}`}>
+              {sx(text)}
+            </span>
+            <Button
+              size="sm"
+              disabled={!field.action}
+              onClick={() => field.action && onAction(field.action, field)}
+            >
+              {presence === 'unset' ? 'Set' : 'Change'}
+            </Button>
+          </div>
+        );
+      }
+
+      case 'note':
+        // No control by design: the row exists to state a guarantee, and the
+        // hint under the label carries it. Rendering anything operable here
+        // would suggest the guarantee is negotiable.
+        return (
+          <span className="scr-field-note-mark" aria-hidden>
+            <Icon name="shield" size={14} />
+          </span>
+        );
 
       default:
         return null;
