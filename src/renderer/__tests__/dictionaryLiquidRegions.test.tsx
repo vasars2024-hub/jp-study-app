@@ -64,11 +64,18 @@ afterEach(async () => {
   document.body.replaceChildren();
 });
 
+/** Narrows without a non-null assertion, and names what was missing when it is. */
+function must<T>(value: T | null | undefined, what: string): T {
+  if (value === null || value === undefined) throw new Error(`expected ${what} to be present`);
+  return value;
+}
+
 async function mount() {
   const host = document.createElement('div');
   document.body.appendChild(host);
-  root = createRoot(host);
-  await act(async () => root!.render(<DictionaryView />));
+  const created = createRoot(host);
+  root = created;
+  await act(async () => created.render(<DictionaryView />));
   return host;
 }
 
@@ -76,10 +83,9 @@ describe('Dictionary — contextual region adoption', () => {
   it('gives the view head and the saved searches the contextual role', async () => {
     const host = await mount();
     for (const sel of ['.view-head', '.dict-saved-searches']) {
-      const el = host.querySelector(sel);
-      expect(el, `${sel} should render`).not.toBeNull();
-      expect(el!.classList.contains('lq-contextual'), `${sel} is contextual`).toBe(true);
-      expect(el!.getAttribute('data-lq-role')).toBe('contextual');
+      const el = must(host.querySelector(sel), sel);
+      expect(el.classList.contains('lq-contextual'), `${sel} is contextual`).toBe(true);
+      expect(el.getAttribute('data-lq-role')).toBe('contextual');
     }
   });
 
@@ -93,10 +99,9 @@ describe('Dictionary — contextual region adoption', () => {
 
   it('leaves the search form plain — a form is dense work, not a contextual tool', async () => {
     const host = await mount();
-    const form = host.querySelector('form.dict-search');
-    expect(form).not.toBeNull();
-    expect(form!.classList.contains('lq-contextual')).toBe(false);
-    expect(form!.closest('.lq-contextual')).toBeNull();
+    const form = must(host.querySelector('form.dict-search'), 'form.dict-search');
+    expect(form.classList.contains('lq-contextual')).toBe(false);
+    expect(form.closest('.lq-contextual')).toBeNull();
   });
 
   it('keeps the results region outside every contextual surface', async () => {
@@ -104,21 +109,26 @@ describe('Dictionary — contextual region adoption', () => {
     // Drive the dominant task the way the view does: type, submit, and the
     // workbench mounts. A results list inside a contextual surface would be dense
     // work on translucent material — the number category 3 requires to be 0.
-    const input = host.querySelector<HTMLInputElement>('form.dict-search input')!;
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+    const form = must(host.querySelector('form.dict-search'), 'form.dict-search');
+    const input = must(host.querySelector<HTMLInputElement>('form.dict-search input'), 'the search input');
+    const descriptor = must(
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value'),
+      "HTMLInputElement.prototype's 'value' descriptor",
+    );
+    // React installs its own setter on the element; assigning `.value` bypasses it
+    // and the component never learns the field changed.
+    const setter = must(descriptor.set, "the 'value' setter React installs over");
     await act(async () => {
       setter.call(input, '食べる');
       input.dispatchEvent(new Event('input', { bubbles: true }));
     });
     await act(async () => {
-      host.querySelector('form.dict-search')!.dispatchEvent(
-        new Event('submit', { bubbles: true, cancelable: true }),
-      );
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     });
-    const results = host.querySelector('[data-testid="results"]');
-    expect(results, 'the workbench should have mounted').not.toBeNull();
-    expect(results!.textContent).toBe('食べる');
-    expect(results!.closest('.lq-contextual')).toBeNull();
-    expect(host.querySelector('[data-testid="notes"]')!.closest('.lq-contextual')).toBeNull();
+    const results = must(host.querySelector('[data-testid="results"]'), 'the mounted workbench');
+    expect(results.textContent).toBe('食べる');
+    expect(results.closest('.lq-contextual')).toBeNull();
+    const notes = must(host.querySelector('[data-testid="notes"]'), 'the notes browser');
+    expect(notes.closest('.lq-contextual')).toBeNull();
   });
 });

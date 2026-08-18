@@ -64,8 +64,8 @@ describe('wide windows get columns, default windows do not', () => {
 
     it(`${sel} keeps one column at the default window width and gains one when maximized`, () => {
       const m = /minmax\(\s*([\d.]+)rem\s*,/.exec(block);
-      expect(m, `${sel} should declare a rem floor`).not.toBeNull();
-      const floorPx = Number(m![1]) * 16;
+      if (!m) throw new Error(`${sel} should declare a rem floor`);
+      const floorPx = Number(m[1]) * 16;
       const twoColumns = 2 * floorPx + columnGapOf(block);
       expect(twoColumns, 'a second column must not fit at the default width').toBeGreaterThan(
         CONTENT_WIDTH.default820,
