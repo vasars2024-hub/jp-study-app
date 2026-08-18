@@ -8793,6 +8793,7 @@ export const zh: Catalog = {
   'ankiWorkbench.apply.writing': '正在写入包…',
   'ankiWorkbench.apply.ok.file': '已写入 {path}',
   'ankiWorkbench.apply.ok.counts': '在新包中更新了 {notes} 条笔记和 {cards} 张卡片',
+  'ankiWorkbench.apply.ok.templatesFormatted': '已重写 {count} 个卡片模板的正面和背面',
   'ankiWorkbench.apply.ok.verified': '已验证：写入的文件已从磁盘重新读取，所有更改均已确认。',
   'ankiWorkbench.apply.error.nothing-to-export': '未发现可写入的更改，因此没有创建文件。',
   'ankiWorkbench.apply.error.no-source': '找不到原始包文件，没有可复制的来源。未写入任何文件。',

@@ -9654,6 +9654,8 @@ export const ru: Catalog = {
   'ankiWorkbench.apply.writing': 'Записываем пакет…',
   'ankiWorkbench.apply.ok.file': 'Записано в {path}',
   'ankiWorkbench.apply.ok.counts': 'В новом пакете обновлено заметок: {notes}, карточек: {cards}',
+  'ankiWorkbench.apply.ok.templatesFormatted':
+    'Перезаписаны лицевая и оборотная стороны шаблонов карточек: {count}',
   'ankiWorkbench.apply.ok.verified':
     'Проверено: записанный файл перечитан с диска, все изменения найдены.',
   'ankiWorkbench.apply.error.nothing-to-export':

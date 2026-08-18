@@ -18,8 +18,12 @@ import { ANKI_FIELD_SEP as SEP, buildAnkiDraft, splitNoteFields } from '../../sh
 import { planChangeTray } from '../../shared/ankiChangeTray';
 import { createEditJournal } from '../../shared/ankiDraftEdit';
 import { buildApkgExportChanges, exportChangesEmpty } from '../../shared/ankiApkgExport';
-import type { ApkgExportChangeSet, ApkgExportTemplateAdd } from '../../shared/ankiApkgExport';
-import { decodeTemplateConfig } from '../anki/ankiProtoConfig';
+import type {
+  ApkgExportChangeSet,
+  ApkgExportTemplateAdd,
+  ApkgExportTemplateFormat,
+} from '../../shared/ankiApkgExport';
+import { decodeTemplateConfig, encodeTemplateConfig } from '../anki/ankiProtoConfig';
 import { stripFieldHtml } from '../../shared/apkgParse';
 
 const nodeRequire = createRequire(import.meta.url);
@@ -1503,5 +1507,218 @@ describe('the card designer writes into a package', () => {
     } catch (err) {
       expect((err as ExportRefusal).code).toBe('template-name-taken');
     }
+  });
+});
+
+// ----- recipe 1's rendered-template swap ---------------------------------------
+
+describe('the front/back swap reaches the package, and `verified` can tell', () => {
+  const swapOnly = (over: Partial<ApkgExportTemplateFormat> = {}): ApkgExportChangeSet => ({
+    notes: [],
+    cardMoves: [],
+    deckRenames: [],
+    templateFormats: [
+      {
+        noteTypeId: '100',
+        ord: 0,
+        qfmt: '{{Reading}}',
+        afmt: '{{FrontSide}}\n\n<hr id=answer>\n\n{{Expression}}',
+        beforeQfmt: '{{Expression}}',
+        beforeAfmt: '{{Reading}}',
+        ...over,
+      },
+    ],
+  });
+
+  it('writes both formats into the schema-18 `templates` table and leaves the rest alone', () => {
+    const db = normalizedTemplateDb();
+    // Give ord 0 a config the workbench does not model, so a re-encode would be
+    // visible as a LOSS rather than as an equal-looking rewrite.
+    db.run('UPDATE templates SET config = ? WHERE ntid = 100 AND ord = 0', [
+      encodeTemplateConfig({
+        qfmt: '{{Expression}}',
+        afmt: '{{Reading}}',
+        bqfmt: '{{Expression}}',
+        bafmt: '',
+      }),
+    ]);
+    const beforeOrd1 = db.exec('SELECT config FROM templates WHERE ntid = 100 AND ord = 1')[0]!
+      .values[0]![0];
+
+    const changes = swapOnly();
+    const result = applyExportChanges(db, changes, { nowMs: NOW_MS, normalize: stripFieldHtml });
+    expect(result.templatesFormatted).toBe(1);
+    // No card row moves: the template keeps its ord, which is the whole reason
+    // this is not a remove-plus-add.
+    expect(result.cardsCreated).toBe(0);
+    expect(result.cardsDeleted).toBe(0);
+    expect(cardOrds(db)).toEqual([0, 1, 2]);
+
+    const written = decodeTemplateConfig(
+      db.exec('SELECT config FROM templates WHERE ntid = 100 AND ord = 0')[0]!.values[0]![0],
+    );
+    expect(written?.qfmt).toBe('{{Reading}}');
+    expect(written?.afmt).toBe('{{FrontSide}}\n\n<hr id=answer>\n\n{{Expression}}');
+    // The browser override the swap says nothing about survives it.
+    expect(written?.bqfmt).toBe('{{Expression}}');
+    // The control template is byte-identical.
+    expect(
+      Array.from(
+        db.exec('SELECT config FROM templates WHERE ntid = 100 AND ord = 1')[0]!
+          .values[0]![0] as Uint8Array,
+      ),
+    ).toEqual(Array.from(beforeOrd1 as Uint8Array));
+
+    expect(verifyExportChanges(db, changes)).toEqual({ ok: true, mismatches: [] });
+  });
+
+  it('writes both formats into legacy `col.models` and keeps every key it does not model', () => {
+    const db = threeTemplateDb();
+    const models = JSON.parse(String(db.exec('SELECT models FROM col')[0]!.values[0]![0])) as Record<
+      string,
+      { tmpls: Array<Record<string, unknown>> }
+    >;
+    models['100'].tmpls[0].did = 42;
+    models['100'].tmpls[0].bqfmt = '{{Expression}}';
+    db.run('UPDATE col SET models = ?', [JSON.stringify(models)]);
+
+    const changes = swapOnly();
+    expect(
+      applyExportChanges(db, changes, { nowMs: NOW_MS, normalize: stripFieldHtml })
+        .templatesFormatted,
+    ).toBe(1);
+
+    const after = JSON.parse(String(db.exec('SELECT models FROM col')[0]!.values[0]![0])) as Record<
+      string,
+      { tmpls: Array<Record<string, unknown>> }
+    >;
+    expect(after['100'].tmpls[0].qfmt).toBe('{{Reading}}');
+    expect(after['100'].tmpls[0].afmt).toBe('{{FrontSide}}\n\n<hr id=answer>\n\n{{Expression}}');
+    expect(after['100'].tmpls[0].did).toBe(42);
+    expect(after['100'].tmpls[0].bqfmt).toBe('{{Expression}}');
+    // The other two templates are untouched.
+    expect(after['100'].tmpls[1].qfmt).toBe('{{Expression}}');
+    expect(after['100'].tmpls[2].qfmt).toBe('{{Reading}}');
+
+    expect(verifyExportChanges(db, changes)).toEqual({ ok: true, mismatches: [] });
+  });
+
+  it('VERIFY CATCHES a swap that never landed — the defect gate 1 found live', () => {
+    // The exact live shape: the note rows are written, the template write is
+    // silently skipped (a main process older than the writer ignores the key),
+    // and the export used to answer `verified: true` on the note rows alone.
+    const db = normalizedTemplateDb();
+    const changes: ApkgExportChangeSet = {
+      ...swapOnly(),
+      notes: [{ noteId: '1001', fields: ['たべる', '食べる'] }],
+    };
+    // Apply ONLY the half a stale writer knows about.
+    applyExportChanges(
+      db,
+      { ...changes, templateFormats: [] },
+      { nowMs: NOW_MS, normalize: stripFieldHtml },
+    );
+    const verdict = verifyExportChanges(db, changes);
+    expect(verdict.ok).toBe(false);
+    expect(verdict.mismatches).toEqual(['note type 100: template at 0 unreadable']);
+
+    // And the positive control on the same collection: apply the whole set and
+    // the same verify passes, so the mismatch above is caused by the missing
+    // write rather than by a check that can never be satisfied.
+    applyExportChanges(db, changes, { nowMs: NOW_MS, normalize: stripFieldHtml });
+    expect(verifyExportChanges(db, changes)).toEqual({ ok: true, mismatches: [] });
+  });
+
+  it('VERIFY CATCHES one format written and the other not', () => {
+    const db = threeTemplateDb();
+    const changes = swapOnly();
+    applyExportChanges(db, changes, { nowMs: NOW_MS, normalize: stripFieldHtml });
+    const models = JSON.parse(String(db.exec('SELECT models FROM col')[0]!.values[0]![0])) as Record<
+      string,
+      { tmpls: Array<Record<string, unknown>> }
+    >;
+    models['100'].tmpls[0].afmt = '{{FrontSide}}';
+    db.run('UPDATE col SET models = ?', [JSON.stringify(models)]);
+    expect(verifyExportChanges(db, changes)).toEqual({
+      ok: false,
+      mismatches: ['note type 100: template 0 back differs'],
+    });
+  });
+
+  it('refuses a front with no field rather than writing one the reader cannot read', () => {
+    const db = normalizedTemplateDb();
+    try {
+      applyExportChanges(db, swapOnly({ qfmt: 'no field here' }), {
+        nowMs: NOW_MS,
+        normalize: stripFieldHtml,
+      });
+      expect.unreachable('should have refused');
+    } catch (err) {
+      expect((err as ExportRefusal).code).toBe('template-format-empty');
+    }
+    // All-or-nothing: the back is not written either.
+    expect(
+      decodeTemplateConfig(
+        db.exec('SELECT config FROM templates WHERE ntid = 100 AND ord = 0')[0]!.values[0]![0],
+      ),
+    ).toBeNull();
+  });
+
+  it('refuses an ord and a note type the package does not have, by name', () => {
+    const db = normalizedTemplateDb();
+    for (const [over, code] of [
+      [{ ord: 7 }, 'template-missing'],
+      [{ noteTypeId: '999' }, 'note-type-missing'],
+    ] as const) {
+      try {
+        applyExportChanges(db, swapOnly(over), { nowMs: NOW_MS, normalize: stripFieldHtml });
+        expect.unreachable(`should have refused ${code}`);
+      } catch (err) {
+        expect((err as ExportRefusal).code).toBe(code);
+      }
+    }
+  });
+
+  it('refuses a collection with no readable note-type list at all', () => {
+    const db = fixtureDb();
+    db.run('UPDATE col SET models = ?', ['']);
+    try {
+      applyExportChanges(db, swapOnly(), { nowMs: NOW_MS, normalize: stripFieldHtml });
+      expect.unreachable('should have refused');
+    } catch (err) {
+      expect((err as ExportRefusal).code).toBe('template-storage-unsupported');
+    }
+  });
+
+  it('writes through a package that declares `unicase`, schema back verbatim', () => {
+    // The same wall the ADD hits: `templates.name` carries a collation sql.js
+    // does not have, and a UNIQUE index on it makes any UPDATE to the row need
+    // it. Without the swap this write is impossible on a real ver-18 package.
+    const db = normalizedTemplateDb();
+    db.run('CREATE UNIQUE INDEX idx_templates_name_ntid ON templates (name, ntid)');
+    db.run('PRAGMA writable_schema = ON');
+    db.run(
+      "UPDATE sqlite_master SET sql = replace(sql, 'name text', 'name text COLLATE unicase') "
+        + "WHERE type = 'table' AND name = 'templates'",
+    );
+    db.run('PRAGMA writable_schema = RESET');
+    const ddl = (): string =>
+      String(
+        db.exec("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'templates'")[0]!
+          .values[0]![0],
+      );
+    const before = ddl();
+    expect(before).toMatch(/collate\s+unicase/i);
+    expect(() => db.run("UPDATE templates SET name = 'x' WHERE ntid = 100 AND ord = 0")).toThrow(
+      /no such collation sequence/i,
+    );
+
+    const changes = swapOnly();
+    expect(
+      applyExportChanges(db, changes, { nowMs: NOW_MS, normalize: stripFieldHtml })
+        .templatesFormatted,
+    ).toBe(1);
+    expect(verifyExportChanges(db, changes)).toEqual({ ok: true, mismatches: [] });
+    expect(ddl()).toBe(before);
   });
 });

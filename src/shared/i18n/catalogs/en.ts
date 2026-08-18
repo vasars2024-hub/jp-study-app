@@ -9268,6 +9268,8 @@ export const en: Catalog = {
   'ankiWorkbench.apply.writing': 'Writing the package…',
   'ankiWorkbench.apply.ok.file': 'Written to {path}',
   'ankiWorkbench.apply.ok.counts': '{notes} notes and {cards} cards updated in the new package',
+  'ankiWorkbench.apply.ok.templatesFormatted':
+    '{count} card templates had their front and back rewritten',
   'ankiWorkbench.apply.ok.verified':
     'Verified: the file was read back from disk and every change was found in it.',
   'ankiWorkbench.apply.error.nothing-to-export':

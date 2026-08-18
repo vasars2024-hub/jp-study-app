@@ -8843,6 +8843,7 @@ export const ja: Catalog = {
   'ankiWorkbench.apply.writing': 'パッケージを書き込んでいます…',
   'ankiWorkbench.apply.ok.file': '{path} に書き込みました',
   'ankiWorkbench.apply.ok.counts': '新しいパッケージ内でノート {notes} 件とカード {cards} 枚を更新しました',
+  'ankiWorkbench.apply.ok.templatesFormatted': 'カードテンプレート {count} 件の表面と裏面を書き換えました',
   'ankiWorkbench.apply.ok.verified':
     '検証済み: 書き込んだファイルをディスクから読み直し、すべての変更を確認しました。',
   'ankiWorkbench.apply.error.nothing-to-export':

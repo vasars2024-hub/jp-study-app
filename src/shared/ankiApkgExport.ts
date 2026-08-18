@@ -354,6 +354,15 @@ export interface ApkgExportResult {
   templatesAdded?: number;
   /** Cards those adds created. Apart from `cardsUpdated` for `cardsDeleted`'s reason. */
   cardsCreated?: number;
+  /**
+   * Recipe 1's swap: card templates whose two formats were rewritten. Its own
+   * count for `ApplyExportResult.templatesFormatted`'s reason — nothing was
+   * created or destroyed, so folding it into `templatesAdded` would report a
+   * swap as a new template and imply cards that were never minted. A change set
+   * of nothing but a swap otherwise reports every count as zero, which reads as
+   * an export that did nothing.
+   */
+  templatesFormatted?: number;
   /** The written file was re-read FROM DISK and every change was found in it. */
   verified?: boolean;
   /** Fingerprint of the new package's collection, for a later commit against it. */

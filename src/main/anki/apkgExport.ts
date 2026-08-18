@@ -195,6 +195,7 @@ export async function exportApkg(request: ApkgExportRequest): Promise<ApkgExport
       cardsDeleted: applied.cardsDeleted,
       templatesAdded: applied.templatesAdded,
       cardsCreated: applied.cardsCreated,
+      templatesFormatted: applied.templatesFormatted,
       verified: true,
       fingerprint: newFingerprint,
     };

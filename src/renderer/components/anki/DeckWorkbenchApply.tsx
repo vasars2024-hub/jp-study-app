@@ -639,6 +639,16 @@ export default function DeckWorkbenchApply({
                 cards: result.cardsUpdated ?? 0,
               })}
             </li>
+            {/* Rendered only when a swap was part of it. Without this line a
+                change set of nothing but a front/back swap reports "0 notes and
+                0 cards", which reads as an export that did nothing. */}
+            {(result.templatesFormatted ?? 0) > 0 && (
+              <li>
+                {t('ankiWorkbench.apply.ok.templatesFormatted', {
+                  count: result.templatesFormatted ?? 0,
+                })}
+              </li>
+            )}
             {result.verified && <li>{t('ankiWorkbench.apply.ok.verified')}</li>}
           </ul>
         </section>

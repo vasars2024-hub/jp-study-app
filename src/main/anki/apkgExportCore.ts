@@ -25,7 +25,11 @@ import type {
   ApkgExportTemplateAdd,
   ApkgExportTemplateFormat,
 } from '../../shared/ankiApkgExport';
-import { encodeTemplateConfig, replaceTemplateFormats } from './ankiProtoConfig';
+import {
+  decodeTemplateConfig,
+  encodeTemplateConfig,
+  replaceTemplateFormats,
+} from './ankiProtoConfig';
 import { readRawCollection, type SqlReadable } from './apkgDraftRead';
 
 /** What sql.js will bind: its own `SqlValue`, minus BigInt which Anki never needs. */
@@ -203,6 +207,44 @@ function templateNamesOf(
   if (typeof raw !== 'string') return [];
   const parsed = JSON.parse(raw) as Record<string, { tmpls?: Array<{ name?: unknown }> }>;
   return (parsed[noteTypeId]?.tmpls ?? []).map((t) => String(t.name ?? ''));
+}
+
+/**
+ * The two formats a template currently holds, read from whichever place the
+ * collection keeps them — the same decode the READER uses, so a verify pass
+ * cannot agree with a writer that both got wrong.
+ *
+ * `undefined` when the template is absent or its stored config cannot be read;
+ * a caller distinguishes "not there" from "different" itself.
+ */
+function templateFormatsOf(
+  db: SqlWritable,
+  storage: 'table' | 'models',
+  noteTypeId: string,
+  ord: number,
+): { qfmt: string; afmt: string } | undefined {
+  if (storage === 'table') {
+    const config = firstRow(db, 'SELECT config FROM templates WHERE ntid = ? AND ord = ?', [
+      idParam(noteTypeId),
+      ord,
+    ])?.[0];
+    const decoded = decodeTemplateConfig(config);
+    return decoded ? { qfmt: decoded.qfmt, afmt: decoded.afmt } : undefined;
+  }
+  const raw = firstRow(db, 'SELECT models FROM col LIMIT 1', [])?.[0];
+  if (typeof raw !== 'string') return undefined;
+  let parsed: Record<string, { tmpls?: Array<Record<string, unknown>> }>;
+  try {
+    parsed = JSON.parse(raw) as Record<string, { tmpls?: Array<Record<string, unknown>> }>;
+  } catch {
+    return undefined;
+  }
+  const tmpls = parsed[noteTypeId]?.tmpls ?? [];
+  // Positional fallback exactly as `templateOrdsOf` and `apkgDraftRead.ts` read
+  // it — the three must agree about what ord 2 is.
+  const tmpl = tmpls.find((t, index) => (t.ord == null ? index : Number(t.ord)) === ord);
+  if (!tmpl) return undefined;
+  return { qfmt: String(tmpl.qfmt ?? ''), afmt: String(tmpl.afmt ?? '') };
 }
 
 /**
@@ -1273,6 +1315,61 @@ export function verifyExportChanges(
       if (count !== 1) {
         mismatches.push(`note ${card.noteId}: ${count} cards at template ${add.ord}, expected 1`);
       }
+    }
+  }
+  // Recipe 1's rendered-template swap, read back out of the written file. This
+  // was the one change set entry `verified` never looked at, and the gap is not
+  // theoretical: a main process running code older than the writer ignores the
+  // key entirely, the file comes back byte-identical, and the export still
+  // answers `verified: true` on the strength of the note rows alone. A swap the
+  // user made and the package did not receive is exactly the false success this
+  // whole verify pass exists to refuse.
+  for (const format of changes.templateFormats ?? []) {
+    const storage = templateStorage(db);
+    const stored = storage === 'none'
+      ? undefined
+      : templateFormatsOf(db, storage, format.noteTypeId, format.ord);
+    if (!stored) {
+      mismatches.push(`note type ${format.noteTypeId}: template at ${format.ord} unreadable`);
+      continue;
+    }
+    if (stored.qfmt !== format.qfmt) {
+      mismatches.push(`note type ${format.noteTypeId}: template ${format.ord} front differs`);
+    }
+    if (stored.afmt !== format.afmt) {
+      mismatches.push(`note type ${format.noteTypeId}: template ${format.ord} back differs`);
+    }
+  }
+  // The remove half, checked by COUNT rather than by ord. A removal renumbers
+  // the survivors, so "ord 1 is gone" is false by construction — after removing
+  // ord 1 of [0,1,2] the old ord 2 IS ord 1. What is true writer-independently
+  // is that the note type holds exactly as many templates as it did minus the
+  // removed ones, and that no card row points past the last of them. That does
+  // not prove WHICH template went (the change set carries no name to prove it
+  // with); it does catch the failure this pass is for — the write not happening.
+  for (const removal of changes.templateRemovals ?? []) {
+    const storage = templateStorage(db);
+    const ords = storage === 'none' ? undefined : templateOrdsOf(db, storage, removal.noteTypeId);
+    if (!ords) {
+      mismatches.push(`note type ${removal.noteTypeId}: missing`);
+      continue;
+    }
+    const removed = [...new Set(removal.removedOrds)];
+    const expected = ords.length + removed.length;
+    if (expected <= removed.length) {
+      // Every template removed is refused by `applyExportChanges`, so reaching
+      // here means the collection lost more than the change set asked for.
+      mismatches.push(`note type ${removal.noteTypeId}: no template survived the removal`);
+      continue;
+    }
+    const orphan = firstRow(db, 'SELECT COUNT(*) FROM cards WHERE nid IN (SELECT id FROM notes WHERE mid = ?) AND ord >= ?', [
+      idParam(removal.noteTypeId),
+      ords.length,
+    ]);
+    if (Number(orphan?.[0] ?? 0) > 0) {
+      mismatches.push(
+        `note type ${removal.noteTypeId}: ${Number(orphan?.[0])} cards point past template ${ords.length - 1}`,
+      );
     }
   }
   return { ok: mismatches.length === 0, mismatches };
