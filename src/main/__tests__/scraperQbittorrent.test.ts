@@ -7,7 +7,9 @@ import path from 'node:path';
 import type { AddressInfo } from 'node:net';
 import {
   DEFAULT_SCRAPER_QBITTORRENT_SETTINGS,
+  validateScraperQbittorrentSettings,
   type ScraperQbittorrentSettings,
+  type ScraperSettingsIssue,
 } from '../../shared/scraperSourceSettings';
 import type { TorrentRow } from '../../shared/scraperResults';
 
@@ -43,7 +45,9 @@ const { getScraperSecret, hasScraperSecret, setScraperSecret, clearScraperSecret
   await import('../scraper/credentials');
 const { readSecret, setCredentialVaultRoot } = await import('../credentials/vault');
 const { setScraperStoreRoot } = await import('../scraper/store');
-const { flushScraperLogWrites } = await import('../scraper/logBus');
+const { flushScraperLogWrites, recentScraperLogs, resetScraperLogs, scraperLog, scraperLogFiles } =
+  await import('../scraper/logBus');
+const { redactHeaders } = await import('../scraper/http');
 
 // ---- a stand-in qBittorrent WebUI ---------------------------------------
 
@@ -72,6 +76,22 @@ let sessionValid = true;
 let loginRejectStyle: 'fails' | '401' = 'fails';
 /** Every request the app actually sent, so a header claim is measured not assumed. */
 let seenHeaders: http.IncomingHttpHeaders[] = [];
+/**
+ * The same requests as a comparable wire record, for Phase 9.1 gate 2.
+ *
+ * "Byte-identical to today's" cannot be checked against code that no longer
+ * exists, so the durable form of that gate is a pin: the password path's method,
+ * target and full header set are recorded here and asserted against a literal.
+ * Anything the key-mode work adds to a password-mode request breaks it.
+ */
+interface WireRecord {
+  method: string;
+  target: string;
+  headers: Record<string, string>;
+}
+let seenWire: WireRecord[] = [];
+/** The login form as it arrived, mirroring `addBodies`. Gate 2 pins these bytes. */
+let loginBodies: string[] = [];
 /**
  * Torrents the stand-in is already holding, on top of the two fixtures.
  *
@@ -155,6 +175,18 @@ beforeAll(async () => {
   server = http.createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://x');
     seenHeaders.push(req.headers);
+    seenWire.push({
+      method: req.method ?? '',
+      target: req.url ?? '',
+      // `host`, `connection` and `content-length` are the socket's and the
+      // payload's, not the client's choice, so they are dropped rather than
+      // pinned — otherwise the literal would encode the ephemeral test port.
+      headers: Object.fromEntries(
+        Object.entries(req.headers)
+          .filter(([key]) => !['host', 'connection', 'content-length'].includes(key))
+          .map(([key, value]) => [key, Array.isArray(value) ? value.join(', ') : String(value)]),
+      ),
+    });
     // Mirrors the contract measured against a real daemon under
     // `WebUI\LocalHostAuth=true`: Bearer authorizes, `X-Api-Key` does not. The
     // second half is enforced by simply never reading that header.
@@ -168,6 +200,7 @@ beforeAll(async () => {
         body += c;
       });
       req.on('end', () => {
+        loginBodies.push(body);
         const form = new URLSearchParams(body);
         if (form.get('username') === GOOD_USER && form.get('password') === GOOD_PASS) {
           res.writeHead(200, {
@@ -281,6 +314,8 @@ beforeEach(async () => {
   addBodies = [];
   addResponse = { status: 200, body: 'Ok.' };
   seenHeaders = [];
+  seenWire = [];
+  loginBodies = [];
   torrentInfoExtra = [];
   connectionStatus = 'connected';
   fileListResponse = null;
@@ -1527,5 +1562,263 @@ describe('qbitAwaitMetadata names the swarm too', () => {
     const out = await qbitAwaitMetadata({ config }, HASH_AWAIT, options);
     expect(out.ok).toBe(true);
     expect(out.ok === true && out.value.length).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 9.1 contract gates. Gates 1 and 5 are covered by the API-key describe
+// above ("sends the key as Authorization: Bearer and never as X-Api-Key" and
+// "refuses an unusable key before making any request"). What follows is 2, 3
+// and 4, which were unwritten.
+// ---------------------------------------------------------------------------
+
+/** Gate 2's pin, with the ephemeral test port substituted at assert time. */
+const BROWSERISH_HEADERS = {
+  'user-agent':
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
+    + 'Chrome/126.0 Safari/537.36',
+  accept: '*/*',
+  'accept-language': 'ja,en;q=0.8',
+};
+
+describe('Phase 9.1 gate 2 — the password path is byte-identical', () => {
+  /**
+   * "Byte-identical to today's" cannot be diffed against code that no longer
+   * exists, so it is pinned instead: the exact requests a password-mode
+   * `qbitTest` puts on the wire, header for header. The key-mode work must not
+   * have added an `authorization`, changed the login form, reordered the
+   * sequence or dropped the `referer` qBittorrent requires cross-origin.
+   */
+  it('sends exactly the login → version → transfer/info sequence it always did', async () => {
+    const base = qbitBaseUrl(config);
+    const report = await qbitTest({ config });
+    expect(report.status).toBe('connected');
+
+    expect(seenWire).toEqual([
+      {
+        method: 'POST',
+        target: '/api/v2/auth/login',
+        headers: {
+          ...BROWSERISH_HEADERS,
+          'content-type': 'application/x-www-form-urlencoded',
+          referer: base,
+        },
+      },
+      {
+        method: 'GET',
+        target: '/api/v2/app/version',
+        headers: { ...BROWSERISH_HEADERS, cookie: 'SID=session-token', referer: base },
+      },
+      {
+        method: 'GET',
+        target: '/api/v2/transfer/info',
+        headers: { ...BROWSERISH_HEADERS, cookie: 'SID=session-token', referer: base },
+      },
+    ]);
+    // The credential itself, form-encoded, and nothing else in the body.
+    expect(loginBodies).toEqual([`username=${GOOD_USER}&password=${GOOD_PASS}`]);
+  });
+
+  /**
+   * The control that makes the pin a measurement: the same recorder, on the
+   * same operation, produces a *different* record in key mode. Without this,
+   * a pin that had silently stopped discriminating would still read green.
+   */
+  it('records a visibly different wire in key mode, so the pin discriminates', async () => {
+    await setScraperSecret('test/qbit-key', GOOD_KEY);
+    try {
+      const report = await qbitTest({
+        config: { ...config, authMode: 'apiKey', username: '', passwordRef: '', apiKeyRef: 'test/qbit-key' },
+      });
+      expect(report.status).toBe('connected');
+      // No login at all, and every request carries the header the password path
+      // never sends.
+      expect(seenWire.map((r) => r.target)).toEqual([
+        '/api/v2/app/version',
+        '/api/v2/transfer/info',
+      ]);
+      expect(loginBodies).toEqual([]);
+      for (const record of seenWire) {
+        expect(record.headers.authorization).toBe(`Bearer ${GOOD_KEY}`);
+        expect(record.headers.cookie).toBeUndefined();
+      }
+    } finally {
+      await clearScraperSecret('test/qbit-key');
+    }
+  });
+
+  /** The send path, which is the one acquisition actually uses. */
+  it('sends the add form on the SID cookie, with no authorization header', async () => {
+    const base = qbitBaseUrl(config);
+    await qbitSend({ config, rows: [row({ magnet: 'magnet:?xt=urn:btih:' + HASH_NEW })] });
+    const add = seenWire.find((r) => r.target === '/api/v2/torrents/add');
+    expect(add).toEqual({
+      method: 'POST',
+      target: '/api/v2/torrents/add',
+      headers: {
+        ...BROWSERISH_HEADERS,
+        'content-type': 'application/x-www-form-urlencoded',
+        cookie: 'SID=session-token',
+        referer: base,
+      },
+    });
+  });
+});
+
+describe('Phase 9.1 gate 3 — the key never leaves the vault', () => {
+  /**
+   * Recognisable on sight and a legal header value, so it reaches the wire
+   * rather than being refused by `apiKeyProblem` before anything happens.
+   */
+  const SENTINEL = 'SENTINELqbitKEY7f3a2b91c4d6e8';
+
+  const keyConfig = (): ScraperQbittorrentSettings => ({
+    ...config,
+    authMode: 'apiKey',
+    username: '',
+    passwordRef: '',
+    apiKeyRef: 'test/qbit-key',
+  });
+
+  /** Every place a user or a support log could read the value back. */
+  async function everythingRendered(): Promise<string> {
+    await flushScraperLogWrites();
+    const parts: string[] = [];
+    for (const file of scraperLogFiles()) {
+      parts.push(await fsp.readFile(file, 'utf-8').catch(() => ''));
+    }
+    parts.push(JSON.stringify(recentScraperLogs(2_000)));
+    // The persisted settings document, through the validator persistence uses.
+    const issues: ScraperSettingsIssue[] = [];
+    parts.push(JSON.stringify(validateScraperQbittorrentSettings(
+      // A hand-written config or a naive import is the realistic source of a
+      // plaintext key, so the document is built from one that carries it.
+      { ...keyConfig(), apiKey: SENTINEL },
+      DEFAULT_SCRAPER_QBITTORRENT_SETTINGS,
+      issues,
+      'qbittorrent',
+    )));
+    // What the HTTP Inspector renders for the requests that actually carried it.
+    for (const headers of seenHeaders) parts.push(JSON.stringify(redactHeaders(headers)));
+    return parts.join('\n');
+  }
+
+  beforeEach(() => {
+    // The ring outlives a test; a leak planted by the control below must not be
+    // what the absence check reads.
+    resetScraperLogs();
+  });
+
+  afterEach(async () => {
+    await clearScraperSecret('test/qbit-key');
+  });
+
+  it('is absent from every log line, report, settings document and rendered header', async () => {
+    await setScraperSecret('test/qbit-key', SENTINEL);
+    // The key really is the one in play — otherwise the whole scan is vacuous.
+    expect(await getScraperSecret('test/qbit-key')).toBe(SENTINEL);
+
+    // Every outcome the client can produce with a key stored: a rejection, a
+    // transfer list, and a send that the daemon refuses with a body.
+    const rejected = await qbitTest({ config: keyConfig() });
+    expect(rejected.status).toBe('unauthorized');
+    const transfers = await qbitTransfers({ config: keyConfig() });
+    addResponse = { status: 409, body: 'Conflict' };
+    const send = await qbitSend({
+      config: keyConfig(),
+      rows: [row({ magnet: 'magnet:?xt=urn:btih:' + HASH_NEW })],
+    });
+
+    const reports = JSON.stringify({ rejected, transfers, send });
+    expect(reports).not.toContain(SENTINEL);
+    expect(await everythingRendered()).not.toContain(SENTINEL);
+    // It did reach the daemon — this is not a scan over an idle client.
+    expect(seenHeaders.some((h) => h.authorization === `Bearer ${SENTINEL}`)).toBe(true);
+  });
+
+  /**
+   * The control. A `not.toContain` over a corpus proves nothing until the same
+   * corpus is shown to detect the value when it is genuinely there — a scan
+   * over the wrong files, or a sentinel that never got stored, passes silently.
+   */
+  it('the same scan finds the sentinel when something does leak it', async () => {
+    await setScraperSecret('test/qbit-key', SENTINEL);
+    // A line built the way a careless diagnostic would build one: the value is
+    // not behind an `Authorization:` prefix, so no redaction pattern applies.
+    scraperLog('warn', 'qbit', `key was ${SENTINEL}`);
+    expect(await everythingRendered()).toContain(SENTINEL);
+    // And the validator's own guard, stated as the positive it is: the key is
+    // dropped from the document *and* the drop is reported.
+    const issues: ScraperSettingsIssue[] = [];
+    const document = validateScraperQbittorrentSettings(
+      { ...keyConfig(), apiKey: SENTINEL },
+      DEFAULT_SCRAPER_QBITTORRENT_SETTINGS,
+      issues,
+      'qbittorrent',
+    );
+    expect(document).not.toHaveProperty('apiKey');
+    expect(document.apiKeyRef).toBe('test/qbit-key');
+    expect(issues.map((i) => i.path)).toContain('qbittorrent.apiKey');
+  });
+});
+
+describe('Phase 9.1 gate 4 — switching modes clears the cached session', () => {
+  const keyConfig = (): ScraperQbittorrentSettings => ({
+    ...config,
+    authMode: 'apiKey',
+    username: '',
+    passwordRef: '',
+    apiKeyRef: 'test/qbit-key',
+  });
+
+  afterEach(async () => {
+    await clearScraperSecret('test/qbit-key');
+  });
+
+  /**
+   * The direction that was broken. Key mode never reads the session map, so it
+   * never used to clear it either: a password → key → password round trip rode
+   * the SID the *first* password minted. The credential is changed underneath
+   * to make that visible — a stale cookie still works on the daemon, so
+   * counting logins alone would not separate "re-authenticated" from "reused".
+   */
+  it('does not ride a password session after a round trip through key mode', async () => {
+    expect((await qbitTransfers({ config })).length).toBe(2);
+    expect(loginBodies).toHaveLength(1);
+
+    await setScraperSecret('test/qbit-key', GOOD_KEY);
+    expect((await qbitTransfers({ config: keyConfig() })).length).toBe(2);
+    expect(loginBodies).toHaveLength(1); // key mode does not log in
+
+    // The user changed the password in qBittorrent; the app's stored one is now
+    // wrong. A client holding the old SID would still list transfers.
+    await setScraperSecret('test/qbit', 'the-password-was-changed');
+    const after = await qbitTransfers({ config });
+    expect(after).toEqual([]);
+    expect(loginBodies).toHaveLength(2);
+    expect(loginBodies[1]).toBe('username=admin&password=the-password-was-changed');
+  });
+
+  /**
+   * The control: without a mode switch in between, the cached SID is reused and
+   * no second login happens. If this failed the test above would pass for the
+   * wrong reason — every call re-authenticating rather than the switch evicting.
+   */
+  it('reuses the session when the mode never changes', async () => {
+    expect((await qbitTransfers({ config })).length).toBe(2);
+    expect((await qbitTransfers({ config })).length).toBe(2);
+    expect((await qbitTransfers({ config })).length).toBe(2);
+    expect(loginBodies).toHaveLength(1);
+  });
+
+  /** The other direction, which `sessionCookie` already covered. */
+  it('does not let a key session authorize a password-mode call', async () => {
+    await setScraperSecret('test/qbit-key', GOOD_KEY);
+    expect((await qbitTransfers({ config: keyConfig() })).length).toBe(2);
+    // No cookie was ever minted in key mode, so password mode must log in.
+    await setScraperSecret('test/qbit', 'the-password-was-changed');
+    expect(await qbitTransfers({ config })).toEqual([]);
+    expect(loginBodies).toHaveLength(1);
+    expect(loginBodies[0]).toBe('username=admin&password=the-password-was-changed');
   });
 });

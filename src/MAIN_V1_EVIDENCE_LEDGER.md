@@ -25703,3 +25703,35 @@ Phase 9.1's five contract gates are next and need no daemon: the stand-in WebUI 
 (malformed key refused before any request). Gates 2, 3 and 4 — password-mode byte-identity, a
 sentinel key absent from every log line and report, and a mode switch clearing the cached cookie —
 are unwritten.
+
+## 2026-08-18 — Track 9 / Phase 9.1 CLOSES: the mode switch that cleared nothing (`primary`)
+
+Gates 1 and 5 were already covered; 2, 3 and 4 were not. 8 tests, suite **112 from 104**.
+
+**Gate 4 was a real defect, not a missing test.** `sessionCookie(base, mode)` evicts a session
+minted in another mode — but it is called **only** in the password branch of `authed`. Key mode
+returns before touching the map, so `password → key` left the old SID cached, and `→ password`
+rode a session minted by the credential the user had since replaced. Fix: `evictForeignSession()`
+extracted and called from **both** branches. The measurement had to change the stored password
+underneath the round trip, because a stale SID is still valid on the daemon — counting logins alone
+cannot separate "re-authenticated" from "reused". Controls: no-switch reuse is **1** login across 3
+calls; dropping the one new call turns the round-trip test red.
+
+**Gate 2's decision — pin, don't diff.** "Byte-identical to today's" has no referent once the code
+is gone, so the durable form is a literal. New `seenWire` recorder in the stand-in captures method +
+target + header set (dropping `host`/`connection`/`content-length`, which are the socket's and would
+otherwise encode the ephemeral test port). Password-mode `qbitTest` pins to exactly **3** requests;
+login body byte-exact. Tradeoff: a pin fails on a benign header change too — accepted, because the
+alternative is a gate that cannot fail. Discrimination control in-suite: key mode yields **2**
+requests, no login, no cookie. Mutation: one stray header in `authed` turns **2** red.
+
+**Gate 3 and its honest limit.** Sentinel `SENTINELqbitKEY7f3a2b91c4d6e8`, driven through three
+key-mode outcomes, scanned across on-disk log files + the ring + the validated settings document +
+`redactHeaders` of every request that carried it. Absent everywhere, and `seenHeaders` proves it
+did reach the wire so the scan is not over an idle client. The positive control is its own test —
+the same scan finds the sentinel when a careless `scraperLog` builds a line containing it. That
+control also states the limit: `redactLogText` is **pattern**-based, so a bare token behind no
+`Authorization:`/`?token=` prefix is not redacted. The guarantee is that nothing in this client
+builds such a line, not that any such line would be caught.
+
+`<commit-9.1>`. Not claimed: no real daemon was involved. Phase 9.2 (gates 6–10) needs one.

@@ -479,6 +479,36 @@ discrimination the field exists for — a rejected password and a rejected key a
 4. Switching modes clears the cached cookie/session for that host.
 5. A malformed or empty key is refused before any network call is attempted.
 
+**Phase 9.1 CLOSES 2026-08-18, all five gates, `<commit-9.1>`.** Gates 1 and 5 were already covered
+by the API-key describe block ("sends the key as Authorization: Bearer and never as X-Api-Key" —
+asserted on every recorded request, plus `x-api-key` undefined and zero login attempts; "refuses an
+unusable key before making any request" — `seenHeaders` length 0). **2, 3 and 4 were unwritten and
+are now 8 tests** in `main/__tests__/scraperQbittorrent.test.ts` (**112 pass, was 104**).
+
+- **Gate 2** could not be diffed against code that no longer exists, so it is **pinned**: a new
+  `seenWire` recorder in the stand-in captures method + target + full header set, and the
+  password-mode `qbitTest` is asserted equal to a 3-request literal (login → `app/version` →
+  `transfer/info`), login body byte-exact `username=admin&password=adminadmin`, plus the send
+  path's `torrents/add`. Discrimination control, in-suite: the same recorder on the same operation
+  in key mode yields **2** requests, no login, `authorization: Bearer …` on both, no cookie.
+  Mutation control: one stray header in `authed` turns **2** red.
+- **Gate 3** scans a real corpus for sentinel `SENTINELqbitKEY7f3a2b91c4d6e8` after driving three
+  key-mode outcomes (rejection, transfer list, 409 send): on-disk log files + the 2,000-line ring +
+  the validated settings document + `redactHeaders` of every request that actually carried it.
+  Absent from all of it, and from the three returned reports. **Positive control** in its own test:
+  the identical scan **finds** the sentinel when a careless `scraperLog` builds a line containing
+  it — which is also the honest limit, since the redaction is pattern-based and a bare token matches
+  no pattern. The guarantee is "nothing in this client builds such a line", not "any line is caught".
+- **Gate 4 needed a product fix**, and it was broken in the direction nobody tests. Key mode never
+  reads the session map, so it never cleared it either: a password → key → password round trip rode
+  the SID the *first* password minted. `evictForeignSession()` is now called from both branches of
+  `authed`. Proven by changing the stored password underneath the round trip — a stale SID would
+  still list transfers, and the daemon happily honours it. Controls: no-switch reuse (**1** login
+  across 3 calls) and the reverse direction. Mutation control: dropping the one new call turns the
+  round-trip test red.
+
+Not claimed: none of this touches a real daemon. Gates 6–10 are Phase 9.2 and still need one.
+
 ### Phase 9.2 — live daemon gates (real qBittorrent, no torrent traffic)
 
 Run with `LocalHostAuth=true` and the 403 control passing, against a real daemon.

@@ -44,15 +44,25 @@ const TIMEOUT_MS = 12_000;
  */
 const sessions = new Map<string, { mode: ScraperQbitAuthMode; cookie: string }>();
 
+/**
+ * Drops a cached session for this host that was minted in a different mode.
+ *
+ * Called from both branches of `authed`, and the key branch is the one that
+ * matters. Key mode never reads a cookie, so before this existed a
+ * password → key switch left the old SID sitting in the map: the key-mode call
+ * neither used it nor cleared it, and switching back rode a session minted by
+ * the previous credential. "Switching modes clears the cached session" only
+ * held in one direction, which is the direction nobody switches.
+ */
+function evictForeignSession(base: string, mode: ScraperQbitAuthMode): void {
+  const held = sessions.get(base);
+  if (held && held.mode !== mode) sessions.delete(base);
+}
+
 /** The cookie for this base URL, but only if it was minted in `mode`. */
 function sessionCookie(base: string, mode: ScraperQbitAuthMode): string {
-  const held = sessions.get(base);
-  if (!held) return '';
-  if (held.mode !== mode) {
-    sessions.delete(base);
-    return '';
-  }
-  return held.cookie;
+  evictForeignSession(base, mode);
+  return sessions.get(base)?.cookie ?? '';
 }
 
 /**
@@ -359,6 +369,8 @@ async function authed(
     });
 
   if (mode === 'apiKey') {
+    // Nothing here reads the map, so nothing here would otherwise clear it.
+    evictForeignSession(base, 'apiKey');
     const key = await resolveApiKey(input);
     const problem = apiKeyProblem(key);
     if (problem) {
