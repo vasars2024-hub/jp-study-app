@@ -25775,3 +25775,44 @@ Gate 9 instrument, already in the client: `07ea0e8a84626e1152a357ffab2da7be37abe
 `jp-study-subtitles` — only `qbitAddStopped` writes that, so it is the app's own torrent, paused at
 progress 1, with no user priorities to clobber. Five of gate 9's six operations are not on
 `window.api` at all; reaching them needs either a debug channel or a real Phase 9.3 acquisition.
+
+## 2026-08-18 — Track 9: the credential pill's existence half, and the availability guard that never asked (`primary`)
+
+**Slice 1 — `bd725520`.** The Torrent Manager credential pill read `passwordRef` / `apiKeyRef`:
+settings fields that *name* a secret in OS storage without proving one is there. Measured live on
+pid 31240 (bridge 39273), active profile `relay-probe`: `passwordRef: 'qbit/webui'` is set while
+`scraperHasCredential('qbit/webui')` answers **false** (`qbit/apikey` **true**) — so the old
+expression scored `Boolean(ref)` = true and painted `good` over an empty store.
+
+Live falsification, capture-patch-restore on `localStorage['jp-scraper-settings-v1']`: patched the
+active profile to `authMode: 'password'`, dispatched the app's own `jp-scraper-settings-changed`
+event, and read the DOM. Pill = **"password missing from OS storage"**, class
+`scr-pill--bad`, with the fix-it hint on `title`. Restored and verified `===` byte-identical,
+**70179** chars both sides; pill returned to "API key stored" / `good`. No vault write, no settings
+write left behind.
+
+Decision (standing auto-approval): four states, not a boolean — `checking` / `stored` / `unset` /
+`orphaned`, plus `unknown` when the probe itself fails, so no answer is invented while the IPC is in
+flight. `orphaned` tones worse (`bad`) than `unset` (`warn`): nothing configured is a to-do,
+configured-but-empty is a setup the user believes is finished. Pure resolver +
+text/tone maps in `scraper/data/credentialPresence.ts`; 8 tests including a negative control that
+every non-`true` vault answer refuses to say "stored".
+
+**Slice 2 — `8910b778`. Phase 9.4 gate 16, front half.** `nyaaAvailability` checked four conditions
+and never asked whether a credential existed, so a clean profile passed, searched an index, resolved
+a magnet, and refused only inside `qbitAddStopped` — the same failure four steps later, reading as a
+broken download. Fifth reason `qbit-no-credential`, from a pure mode-aware `qbitCredentialGap()`.
+The reason union was restated in `shared/subtitleHarvest.ts`; it now has one home.
+
+Trap for the next worker: the nyaa fetch fixture carried `passwordRef: ''` — it was a clean profile
+too. Adding the guard turned **47 of its tests red at once**; the fix is a real
+`setScraperSecret` in `beforeAll`, not a weaker guard.
+
+**Gate 20 partial measurement, re-derived this turn, not inherited.** All **14** qBittorrent API
+calls in `main/scraper/qbittorrent.ts` route through `authed()` (lines 484, 529, 754, 891, 923,
+1011, 1048, 1072, 1100, 1103, 1135, 1171, 1196, 1199). The only direct `scraperRequest` calls are
+`login()` (password mode by design) and `authed`'s own `send`. `subtitleNyaaSource.ts`,
+`subtitleDiscovery.ts`, `downloads.ts`, `torrents.ts` and `runtime.ts` contain **zero** matches for
+`passwordRef|apiKeyRef|authMode|username|password` — they pass `{ config }` and let `authed()`
+resolve the mode. No main-side consumer is on the old path. Still open: the four named surfaces, and
+gates 17-19.

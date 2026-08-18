@@ -589,6 +589,20 @@ part of an automated suite.**
     and the `TorrentManagerPage`, `MalDownloadDialog`, `NyaaSubtitleDialog`, and
     `ScraperSettingsDrawer` surfaces. A consumer left on the old auth path is an open gate.
 
+**Phase 9.4, 2026-08-18: gate 16's front half CLOSES; 20's main-side half is measured.**
+
+| gate | result |
+| --- | --- |
+| **16** clean profile, honest reason | **front half PASSES** (`8910b778`) — `nyaaAvailability` gained a fifth reason, `qbit-no-credential`, from a pure mode-aware `qbitCredentialGap()`. Before it, a profile with qBittorrent enabled and nothing ever entered passed the guard and refused four steps later inside `qbitAddStopped`. 11 tests: both modes, ref-never-set vs vault-emptied as distinct messages, whitespace refused, a pre-`authMode` config read as password, and a positive control that key mode passes with `username` and `passwordRef` both empty. Still open: the same honest reason on the three non-nyaa surfaces |
+| **20** every consumer, not just nyaa | **main side PASSES, surfaces open** — all **14** qBittorrent API calls in `scraper/qbittorrent.ts` go through `authed()`; the only direct `scraperRequest` calls are `login()` (password mode by design) and `authed`'s own `send`. `subtitleNyaaSource.ts`, `subtitleDiscovery.ts`, `downloads.ts`, `torrents.ts`, `runtime.ts`: **zero** matches for `passwordRef\|apiKeyRef\|authMode\|username\|password` — they hand over `{ config }` and let `authed()` pick the mode. `TorrentManagerPage` covered by `bd725520`. `MalDownloadDialog`, `NyaaSubtitleDialog`, `ScraperSettingsDrawer` not yet read |
+| **17**, **18**, **19** | not run |
+
+Related defect fixed the same day, `bd725520`: the Torrent Manager credential pill rendered from the
+settings **ref** rather than the vault, so a non-empty `passwordRef` over an empty store painted
+"password stored" in green. It now asks `scraperHasCredential` and carries four states plus an
+explicit `unknown` for a failed probe. Measured live: pill read "password missing from OS storage",
+`scr-pill--bad`, with `passwordRef: 'qbit/webui'` set and the vault answering false.
+
 ### Exit condition
 
 Gates 1–10 and 16–20 pass in CI or against a live daemon with the 403 control passing. Gates 11–15
