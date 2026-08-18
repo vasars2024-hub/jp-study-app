@@ -57,6 +57,7 @@ const ankiDraftSessionResume = vi.fn();
 const ankiDraftSessionDelete = vi.fn();
 const exportApkgDraft = vi.fn();
 const commitAnkiConnectDraft = vi.fn();
+const cancelAnkiConnectCommit = vi.fn();
 const readAnkiCsvDraft = vi.fn();
 
 function draft(over: Partial<AnkiDraft> = {}): AnkiDraft {
@@ -197,12 +198,12 @@ beforeAll(() => {
 
 beforeEach(() => {
   installLayout(900, 400);
-  for (const m of [readApkgDraft, readAnkiConnectDraft, ankiDraftSessionList, ankiDraftSessionResume, ankiDraftSessionDelete, loadDeckAsAnkiDraft, exportApkgDraft, commitAnkiConnectDraft, readAnkiCsvDraft]) m.mockReset();
+  for (const m of [readApkgDraft, readAnkiConnectDraft, ankiDraftSessionList, ankiDraftSessionResume, ankiDraftSessionDelete, loadDeckAsAnkiDraft, exportApkgDraft, commitAnkiConnectDraft, cancelAnkiConnectCommit, readAnkiCsvDraft]) m.mockReset();
   ankiDraftSessionList.mockResolvedValue([]);
   ankiDraftSessionDelete.mockResolvedValue(true);
   Object.defineProperty(window, 'api', {
     configurable: true,
-    value: { readApkgDraft, readAnkiConnectDraft, ankiDraftSessionList, ankiDraftSessionResume, ankiDraftSessionDelete, exportApkgDraft, commitAnkiConnectDraft, readAnkiCsvDraft },
+    value: { readApkgDraft, readAnkiConnectDraft, ankiDraftSessionList, ankiDraftSessionResume, ankiDraftSessionDelete, exportApkgDraft, commitAnkiConnectDraft, cancelAnkiConnectCommit, readAnkiCsvDraft },
   });
 });
 
@@ -1230,6 +1231,72 @@ describe('DeckWorkbench step 7 — Apply or export', () => {
     expect(request).not.toHaveProperty('read');
     expect(host.textContent).toContain('ankiWorkbench.apply.live.ok.counts:1,0,User 1');
     expect(host.textContent).toContain('ankiWorkbench.apply.live.ok.verified');
+  });
+
+  // ----- gate 7: stopping the live commit part-way
+
+  it('offers a stop only while the commit is in flight, and names its own token', async () => {
+    let settle: (result: unknown) => void = () => {
+      throw new Error('the commit promise was settled before it was created');
+    };
+    commitAnkiConnectDraft.mockReturnValue(
+      new Promise((resolve) => {
+        settle = resolve;
+      }),
+    );
+    await toLiveApply();
+    // Before the button there is nothing to stop.
+    expect(host.querySelector('.wb-apply-stop')).toBeNull();
+    await click(buttonBy('ankiWorkbench.apply.live.commit'));
+
+    const stop = host.querySelector('.wb-apply-stop') as HTMLButtonElement;
+    expect(stop).not.toBeNull();
+    // The cost is stated beside the button, not after the fact.
+    expect(host.querySelector('.wb-apply-stop-note')?.textContent).toBe(
+      'ankiWorkbench.apply.live.stopHint',
+    );
+
+    await click(stop);
+    // The token the cancel names has to be the one THIS commit was started with,
+    // or it stops nothing while the writes carry on.
+    const commitId = commitAnkiConnectDraft.mock.calls[0]?.[0]?.commitId;
+    expect(typeof commitId).toBe('string');
+    expect(cancelAnkiConnectCommit).toHaveBeenCalledWith(commitId);
+    expect(host.querySelector('.wb-apply-stop-note')?.textContent).toBe(
+      'ankiWorkbench.apply.live.stopping',
+    );
+
+    await act(async () => {
+      settle({ ok: false, errorCode: 'cancelled', notesUpdated: 1, cardsUpdated: 0, unwritten: 1 });
+    });
+    // And it is gone again once the commit has answered.
+    expect(host.querySelector('.wb-apply-stop')).toBeNull();
+  });
+
+  it('reports a stopped commit as changes that landed, never as a success', async () => {
+    commitAnkiConnectDraft.mockResolvedValue({
+      ok: false,
+      errorCode: 'cancelled',
+      error: 'You stopped the commit. 1 of 3 changes were written…',
+      notesUpdated: 1,
+      cardsUpdated: 2,
+      verified: false,
+      unwritten: 2,
+      profile: 'User 1',
+    });
+    await toLiveApply();
+    await click(buttonBy('ankiWorkbench.apply.live.commit'));
+
+    // Not the success block, whose text would read "updated in User 1".
+    expect(host.textContent).not.toContain('ankiWorkbench.apply.live.ok.counts');
+    expect(host.querySelector('.wb-apply-result [role="alert"]')?.textContent).toContain(
+      'ankiWorkbench.apply.liveError.cancelled',
+    );
+    const cancelled = host.querySelector('.wb-apply-cancelled')?.textContent ?? '';
+    expect(cancelled).toContain('ankiWorkbench.apply.live.cancelled.written:1,2,User 1');
+    // The measured remainder, off the re-read — the number that makes this a
+    // state rather than an ambiguity.
+    expect(cancelled).toContain('ankiWorkbench.apply.live.cancelled.unwritten:2');
   });
 
   it('names every change that did not commit instead of one total', async () => {
