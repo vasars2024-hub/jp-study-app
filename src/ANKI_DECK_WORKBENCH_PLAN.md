@@ -564,6 +564,35 @@ This slice is complete only when all of these can be shown with real data and no
     **GATE 7 IS CLOSED** — all four interrupts: import `d0a09738`, translation gate 2's
     30/12/18/0, live commit above, dry run by measurement.
 8. Undo a draft action, reverse a supported committed action, and clearly explain any adapter operation that cannot be reversed.
+
+    **Status re-derived from source 2026-08-18 (not measured live, and this annotation does
+    not close anything).** The gate is three clauses and they are in three different states,
+    which is why it had no annotation at all until now.
+    1. **Undo a draft action — SHIPPED.** `ankiDraftEdit.ts`'s journal plus `undoLastEdit`,
+       one tray = one undo step, the history strip on every step, and step 6 restating its
+       own sentence when an undo runs from there (`deckWorkbench.test.tsx:487`).
+    2. **Reverse a supported committed action — NOT BUILT.** Searched: there is no
+       `reverseCommit` / `undoCommitted` / rollback symbol anywhere under `shared/`,
+       `main/anki/` or `renderer/components/anki/`; the only `rollback` hits in the whole
+       tree belong to connection profiles, scraper profiles and the Seanime flag.
+       `ankiEditAudit.ts` exports exactly `summarizeJournal` / `appliedStepCount` /
+       `auditedNoteCount` and its only consumer is `DeckWorkbenchJournal.tsx`, which renders
+       it. So the audit journal the workflow list calls "sufficient to … reverse the commit"
+       is currently sufficient to *read* it.
+       **The slice this names, so the next worker does not re-derive it:** the journal
+       already keeps the FIRST before-image per value (that is how `buildWorkbenchReview`
+       computes a net), so a reversal is an inverse `ApkgExportChangeSet` built from those
+       before-images and committed through the destination that wrote it — no new transport,
+       no new verifier. What is genuinely new is honesty about scope: the live destination
+       can only reverse what it can write, so anything it refused by name (deck rename,
+       template add/remove, card flags) must stay refused on the way back, and a
+       source-changed fingerprint must block the reversal exactly as it blocks the commit.
+    3. **Explain what cannot be reversed — PARTIALLY SHIPPED,** and not yet checked against
+       this gate's wording: the four named live refusals carry their reasons
+       (`deck-rename-unsupported`, `template-remove-unsupported`, `template-add-unsupported`,
+       `card-flag-unsupported`), and gate 14's parity matrix carries the `read-only`/`blocked`
+       explanations. What is missing is the statement at the point of commit that the commit
+       itself is one-way, which is clause 2's surface.
 9. Filter and preview the 100,000-note fixture without freezing window dragging or Electron's main event loop.
 
     **The fixture EXISTS as of 2026-08-17**, and the main-event-loop half is CLOSED

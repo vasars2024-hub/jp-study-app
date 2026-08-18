@@ -25393,3 +25393,31 @@ change is a net value change of its own, so it is 3 per note, not 2).
 **GATE 7 IS CLOSED.** Import `d0a09738`; translation 30 requested → 12 answered / 18 cancelled
 / 0 failed; live commit 9 written / 71 unwritten with the control at 80/80; dry run by
 measurement. Commit: this entry + the plan + the scale test.
+
+## 2026-08-18 — Track 7 / gates 8 and 12 read rather than rebuilt (`primary`)
+
+Worker `primary`, third slice. With gate 7 closed, four gates carry no closure annotation —
+1, 4, 8, 12 — and the depth-first rule says a plan closes only when each is re-derived. Two of
+them cost minutes rather than a build, so they were read this turn. **Neither is closed by this
+entry; both are now *known* instead of blank.**
+
+**Gate 8 is three clauses in three states**, annotated in the plan. Undo-a-draft-action is
+shipped. **Reverse-a-committed-action is NOT BUILT** — no `reverseCommit`/`undoCommitted`/
+rollback symbol exists under `shared/`, `main/anki/` or `renderer/components/anki/`, and the
+only `rollback` hits in the tree are connection profiles, scraper profiles and the Seanime flag.
+`ankiEditAudit.ts` exports `summarizeJournal` / `appliedStepCount` / `auditedNoteCount` and its
+sole consumer renders them, so the journal the workflow list calls "sufficient to reverse the
+commit" is today sufficient to *read* it. The slice is named in the plan: the journal already
+keeps the first before-image per value, so a reversal is an inverse `ApkgExportChangeSet`
+committed through the destination that wrote it — no new transport, no new verifier, and the
+same refusals must hold on the way back.
+
+**Gate 12 is BUILT but never demonstrated.** Both halves are recorded "Shipped:" in the phase
+list (`:273` review, `:274` generation) and gate 2's translate mode reuses the same cancel
+registry, progress channel and `AiBatch` review. What the gate demands and no entry claims is
+the *walk*: generate, approve only some, cancel one batch, retry only the failures, and show
+rejected/generated data honestly. It needs a live provider run, which is ordinary work here —
+gate 2 closed on one (3 requested / 3 answered / 3 ok in 3,461 ms) — but it is a walk, not a
+read, so it is left for a turn that opens on it.
+
+Docs only. Gates 1 and 4 were NOT read this turn and stay blank.
