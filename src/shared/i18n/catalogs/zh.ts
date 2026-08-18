@@ -8832,6 +8832,26 @@ export const zh: Catalog = {
     '此包使用了尚不支持写入的较新压缩格式。未写入任何内容。',
   'ankiWorkbench.apply.error.verify-failed': '写入的文件未通过回读校验，不可信任。请删除后重试。',
   'ankiWorkbench.apply.error.io': '无法写入文件。',
+  'ankiWorkbench.apply.reverse.oneWay':
+    '对目标本身的写入是单向的。受支持的更改可以在本次会话中撤回，但仅限于牌组保持打开期间——关闭后该记录即消失。',
+  'ankiWorkbench.apply.reverse.title': '撤回本次写入',
+  'ankiWorkbench.apply.reverse.notes': '{count} 条笔记将恢复为本次写入前的内容',
+  'ankiWorkbench.apply.reverse.cards': '{count} 张卡片将恢复为本次写入前的状态',
+  'ankiWorkbench.apply.reverse.decks': '{count} 个牌组将恢复为原来的名称',
+  'ankiWorkbench.apply.reverse.templates':
+    '本次写入新增的 {count} 个卡片模板将被再次移除，连同它们生成的卡片',
+  'ankiWorkbench.apply.reverse.button': '撤回本次写入',
+  'ankiWorkbench.apply.reverse.working': '正在撤回…',
+  'ankiWorkbench.apply.reverse.empty': '本次写入没有可撤回的内容。',
+  'ankiWorkbench.apply.reverse.ok': '已恢复 {notes} 条笔记和 {cards} 张卡片',
+  'ankiWorkbench.apply.reverse.refused.template-restore-loses-scheduling':
+    '无法恢复卡片模板“{subject}”。随它一并删除的 {count} 张卡片带有间隔、简易度和复习次数，这里无法找回——它们只会作为新卡片回来，那段历史会再丢失一次。',
+  'ankiWorkbench.apply.reverse.refused.template-unadd-field-unsupported':
+    '无法从笔记类型中撤回字段“{subject}”。移除它需要重写目标中的每一条笔记，包括本次会话从未加载的笔记，因此予以拒绝而不是写入一半。',
+  'ankiWorkbench.apply.reverse.refused.note-not-in-commit':
+    '笔记 {subject} 不在已写入记录中，因此在不猜测该行其余内容的情况下，无法恢复它改动的 {count} 个字段值。',
+  'ankiWorkbench.apply.reverse.refused.text-export-not-reversible':
+    '文本导出写入的是新文件，从未改动原文件，导出前的状态仍以原名保存在磁盘上。没有需要撤回的内容。',
   'ankiWorkbench.apply.text.original': '导出会写入一个新的文本文件，原始文件不会被修改。',
   'ankiWorkbench.apply.text.identity.rowOrder':
     '此文件没有 guid 列，因此笔记按其在本文件中的行号匹配。导出的文件在 Anki 中会作为新笔记导入，无法并入你已有的笔记。',

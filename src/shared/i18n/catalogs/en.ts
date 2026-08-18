@@ -9311,6 +9311,28 @@ export const en: Catalog = {
   'ankiWorkbench.apply.error.verify-failed':
     'The written file failed its read-back check, so it must not be trusted. Delete it and try again.',
   'ankiWorkbench.apply.error.io': 'The file could not be written.',
+  'ankiWorkbench.apply.reverse.oneWay':
+    'A commit is one way on the destination itself. This session can put a supported change back afterwards, but only while the deck stays open — close it and that record is gone.',
+  'ankiWorkbench.apply.reverse.title': 'Put this commit back',
+  'ankiWorkbench.apply.reverse.notes':
+    '{count} notes return to the content they had before this commit',
+  'ankiWorkbench.apply.reverse.cards':
+    '{count} cards return to the state they had before this commit',
+  'ankiWorkbench.apply.reverse.decks': '{count} decks return to their previous names',
+  'ankiWorkbench.apply.reverse.templates':
+    '{count} card templates this commit added are removed again, along with the cards they created',
+  'ankiWorkbench.apply.reverse.button': 'Reverse this commit',
+  'ankiWorkbench.apply.reverse.working': 'Putting the commit back…',
+  'ankiWorkbench.apply.reverse.empty': 'Nothing in this commit can be put back.',
+  'ankiWorkbench.apply.reverse.ok': '{notes} notes and {cards} cards were put back',
+  'ankiWorkbench.apply.reverse.refused.template-restore-loses-scheduling':
+    'The card template “{subject}” cannot be restored. Its {count} cards were deleted with it, and they carried interval, ease and review counts that nothing here can bring back — they would return as new cards, losing that history a second time.',
+  'ankiWorkbench.apply.reverse.refused.template-unadd-field-unsupported':
+    'The field “{subject}” cannot be taken back off the note type. Removing it rewrites every note in the destination, including notes this session never loaded, so it is refused rather than half-written.',
+  'ankiWorkbench.apply.reverse.refused.note-not-in-commit':
+    'Note {subject} is not in the record of what was written, so the {count} field values it changed cannot be put back without guessing the rest of the row.',
+  'ankiWorkbench.apply.reverse.refused.text-export-not-reversible':
+    'A text export wrote a new file and never touched the original, so the state before this export is still on disk under its own name. There is nothing to put back.',
   'ankiWorkbench.apply.text.original':
     'Export writes a new text file. The original file is never modified.',
   'ankiWorkbench.apply.text.identity.rowOrder':

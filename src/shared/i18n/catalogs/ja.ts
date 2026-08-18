@@ -8886,6 +8886,26 @@ export const ja: Catalog = {
   'ankiWorkbench.apply.error.verify-failed':
     '書き込んだファイルが読み直し検証に失敗したため、信頼できません。削除してからやり直してください。',
   'ankiWorkbench.apply.error.io': 'ファイルを書き込めませんでした。',
+  'ankiWorkbench.apply.reverse.oneWay':
+    '書き込み先そのものへの適用は一方向です。対応している変更はこのセッション中に限り元に戻せますが、デッキを閉じるとその記録は失われます。',
+  'ankiWorkbench.apply.reverse.title': 'この適用を元に戻す',
+  'ankiWorkbench.apply.reverse.notes': '{count} 件のノートが適用前の内容に戻ります',
+  'ankiWorkbench.apply.reverse.cards': '{count} 枚のカードが適用前の状態に戻ります',
+  'ankiWorkbench.apply.reverse.decks': '{count} 個のデッキが以前の名前に戻ります',
+  'ankiWorkbench.apply.reverse.templates':
+    'この適用が追加した {count} 個のカードテンプレートが、生成されたカードとともに削除されます',
+  'ankiWorkbench.apply.reverse.button': 'この適用を元に戻す',
+  'ankiWorkbench.apply.reverse.working': '元に戻しています…',
+  'ankiWorkbench.apply.reverse.empty': 'この適用には元に戻せるものがありません。',
+  'ankiWorkbench.apply.reverse.ok': '{notes} 件のノートと {cards} 枚のカードを元に戻しました',
+  'ankiWorkbench.apply.reverse.refused.template-restore-loses-scheduling':
+    'カードテンプレート「{subject}」は復元できません。一緒に削除された {count} 枚のカードは間隔・易しさ・復習回数を保持しており、ここではそれを取り戻せません。新規カードとして戻ることになり、その履歴を二度失います。',
+  'ankiWorkbench.apply.reverse.refused.template-unadd-field-unsupported':
+    'フィールド「{subject}」はノートタイプから取り除けません。削除するには、このセッションが読み込んでいないノートも含め、書き込み先のすべてのノートを書き換える必要があるため、中途半端に書き込まずに拒否します。',
+  'ankiWorkbench.apply.reverse.refused.note-not-in-commit':
+    'ノート {subject} は書き込み記録に含まれていないため、変更された {count} 個のフィールド値を、行の残りを推測せずに戻すことはできません。',
+  'ankiWorkbench.apply.reverse.refused.text-export-not-reversible':
+    'テキスト書き出しは新しいファイルを作成し、元のファイルには一切触れていません。書き出し前の状態は元の名前のままディスクに残っているため、戻すものはありません。',
   'ankiWorkbench.apply.text.original':
     '書き出しでは新しいテキストファイルを作成します。元のファイルは変更されません。',
   'ankiWorkbench.apply.text.identity.rowOrder':

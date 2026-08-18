@@ -21,6 +21,13 @@
  * a guid column the round trip is positional, which is stated before the button
  * because it decides whether the result merges in Anki or arrives as new notes.
  * A local deck is none of the three and offers no button at all.
+ *
+ * Gate 8's second clause lives here too: once something HAS been written, the
+ * draft's undo is powerless, so a successful commit leaves a record and the
+ * panel below it offers to put that commit back. The reversal is an ordinary
+ * change set on the same IPC against the fingerprint the commit produced — the
+ * main process already remembers the file it wrote by that fingerprint, so the
+ * renderer still never holds a path.
  */
 import { useMemo, useRef, useState } from 'react';
 import type { AnkiDraft } from '../../../shared/ankiDraft';
@@ -30,10 +37,24 @@ import {
   exportChangesEmpty,
   type ApkgExportResult,
 } from '../../../shared/ankiApkgExport';
+import {
+  buildCommitRecord,
+  buildCommitReversal,
+  type AnkiCommitRecord,
+} from '../../../shared/ankiCommitReversal';
 import type { AnkiCsvExportResult } from '../../../shared/ankiCsvExport';
 import type { ConnectCommitResult } from '../../../shared/ankiConnectCommit';
 import DeckWorkbenchParity from './DeckWorkbenchParity';
 import { useT } from '../../i18n';
+
+/** What a reversal reports, from either destination's own result shape. */
+interface ReverseOutcome {
+  ok: boolean;
+  notes: number;
+  cards: number;
+  errorCode?: string;
+  error?: string;
+}
 
 export default function DeckWorkbenchApply({
   draft,
@@ -50,6 +71,14 @@ export default function DeckWorkbenchApply({
   const [result, setResult] = useState<ApkgExportResult | null>(null);
   const [commit, setCommit] = useState<ConnectCommitResult | null>(null);
   const [textResult, setTextResult] = useState<AnkiCsvExportResult | null>(null);
+  /**
+   * The last successful commit, kept for the reversal panel. Session-only and
+   * said so in `reverse.oneWay`: persisting it would promise a reversal across a
+   * restart that the destination's fingerprint can no longer honour.
+   */
+  const [record, setRecord] = useState<AnkiCommitRecord | null>(null);
+  const [reversed, setReversed] = useState<ReverseOutcome | null>(null);
+  const [reversing, setReversing] = useState(false);
 
   // Recomputed on every edit or undo, exactly as the review's numbers are: an
   // undo run from this step must change what the button claims it will write.
@@ -69,6 +98,160 @@ export default function DeckWorkbenchApply({
   const commitIdRef = useRef<string | null>(null);
   const [stopping, setStopping] = useState(false);
 
+  /**
+   * The record is built from the change set that was SENT, so it cannot describe
+   * a different commit. `fingerprint` is the destination's state AFTER the write
+   * — reversing against the pre-commit one would target the untouched original.
+   */
+  const recordOf = (
+    destination: 'package' | 'live',
+    label: string,
+    fingerprint: string | undefined,
+  ): AnkiCommitRecord | null =>
+    fingerprint
+      ? buildCommitRecord({
+          id: `commit:${Date.now()}`,
+          at: new Date().toISOString(),
+          destination,
+          label,
+          fingerprint,
+          draft,
+          journal,
+          committed: changes,
+        })
+      : null;
+
+  const reversal = useMemo(() => (record ? buildCommitReversal(record) : null), [record]);
+
+  const runReverse = async () => {
+    if (!record || !reversal || reversal.empty) return;
+    setReversing(true);
+    setReversed(null);
+    try {
+      if (record.destination === 'live') {
+        const res = await window.api.commitAnkiConnectDraft({
+          fingerprint: record.fingerprint,
+          changes: reversal.changes,
+          commitId: `connect-reverse:${record.id}`,
+        });
+        setReversed({
+          ok: res.ok,
+          notes: res.notesUpdated ?? 0,
+          cards: res.cardsUpdated ?? 0,
+          errorCode: res.errorCode,
+          error: res.error,
+        });
+      } else {
+        // No `sourcePath`: the main process remembered the file it wrote under
+        // this fingerprint, so the renderer still never names a path to write.
+        const res = await window.api.exportApkgDraft({
+          fingerprint: record.fingerprint,
+          changes: reversal.changes,
+        });
+        if (res.errorCode === 'cancelled') return;
+        setReversed({
+          ok: res.ok,
+          notes: res.notesUpdated ?? 0,
+          cards: res.cardsUpdated ?? 0,
+          errorCode: res.errorCode,
+          error: res.error,
+        });
+      }
+    } catch (err) {
+      setReversed({
+        ok: false,
+        notes: 0,
+        cards: 0,
+        errorCode: 'io',
+        error: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setReversing(false);
+    }
+  };
+
+  /**
+   * Rendered under a successful commit on both writing destinations. It states
+   * what would go back BEFORE the button, and names every committed operation
+   * that cannot — a refusal here is the gate's "clearly explain any adapter
+   * operation that cannot be reversed", not an error after the fact.
+   */
+  const reversePanel = () => {
+    if (!record || !reversal) return null;
+    const errorPrefix =
+      record.destination === 'live'
+        ? 'ankiWorkbench.apply.liveError'
+        : 'ankiWorkbench.apply.error';
+    return (
+      <section className="wb-apply-reverse" aria-label={t('ankiWorkbench.apply.reverse.title')}>
+        <p className="muted wb-apply-oneway">{t('ankiWorkbench.apply.reverse.oneWay')}</p>
+        {reversal.empty ? (
+          <p className="muted wb-apply-reverse-empty">{t('ankiWorkbench.apply.reverse.empty')}</p>
+        ) : (
+          <ul className="deck-workbench-facts wb-apply-reverse-facts">
+            {reversal.counts.notes > 0 && (
+              <li>{t('ankiWorkbench.apply.reverse.notes', { count: reversal.counts.notes })}</li>
+            )}
+            {reversal.counts.cards > 0 && (
+              <li>{t('ankiWorkbench.apply.reverse.cards', { count: reversal.counts.cards })}</li>
+            )}
+            {reversal.counts.decks > 0 && (
+              <li>{t('ankiWorkbench.apply.reverse.decks', { count: reversal.counts.decks })}</li>
+            )}
+            {reversal.counts.templates > 0 && (
+              <li>
+                {t('ankiWorkbench.apply.reverse.templates', {
+                  count: reversal.counts.templates,
+                })}
+              </li>
+            )}
+          </ul>
+        )}
+        {reversal.refusals.length > 0 && (
+          <ul className="deck-workbench-facts wb-apply-reverse-refusals">
+            {reversal.refusals.map((refusal) => (
+              <li key={`${refusal.code}-${refusal.subject}`}>
+                {t(`ankiWorkbench.apply.reverse.refused.${refusal.code}`, {
+                  subject: refusal.subject,
+                  count: refusal.count ?? 0,
+                })}
+              </li>
+            ))}
+          </ul>
+        )}
+        <button
+          type="button"
+          className="btn wb-apply-reverse"
+          disabled={reversal.empty || reversing || busy}
+          onClick={() => void runReverse()}
+        >
+          {t('ankiWorkbench.apply.reverse.button')}
+        </button>
+        {reversing && (
+          <p className="muted" role="status">
+            {t('ankiWorkbench.apply.reverse.working')}
+          </p>
+        )}
+        {reversed && reversed.ok && (
+          <p className="wb-apply-reverse-ok" role="status">
+            {t('ankiWorkbench.apply.reverse.ok', {
+              notes: reversed.notes,
+              cards: reversed.cards,
+            })}
+          </p>
+        )}
+        {reversed && !reversed.ok && (
+          <>
+            <p className="deck-workbench-error" role="alert">
+              {t(`${errorPrefix}.${reversed.errorCode ?? 'io'}`)}
+            </p>
+            {reversed.error && <p className="muted wb-apply-error-detail">{reversed.error}</p>}
+          </>
+        )}
+      </section>
+    );
+  };
+
   const runCommit = async () => {
     const commitId = `connect-commit:${Date.now()}:${Math.random().toString(36).slice(2)}`;
     commitIdRef.current = commitId;
@@ -82,6 +265,10 @@ export default function DeckWorkbenchApply({
         commitId,
       });
       setCommit(res);
+      // A cancelled commit wrote SOME of the change set, and the record folds the
+      // whole of it — reversing that would write back values the destination
+      // never received. Only a clean commit leaves a record.
+      if (res.ok) setRecord(recordOf('live', res.profile ?? draft.source.label, res.fingerprint));
     } catch (err) {
       setCommit({ ok: false, errorCode: 'io', error: err instanceof Error ? err.message : String(err) });
     } finally {
@@ -136,7 +323,12 @@ export default function DeckWorkbenchApply({
       // A cancelled save dialog is a decision, not a failure, and must not
       // shout — the same rule step 1 follows for a cancelled open dialog.
       if (res.errorCode !== 'cancelled') setResult(res);
-      if (res.ok) onExported(res);
+      if (res.ok) {
+        onExported(res);
+        // The written package, not the untouched original: `res.fingerprint` is
+        // the new file's, and main remembers the path under exactly that key.
+        setRecord(recordOf('package', res.fileName ?? '', res.fingerprint));
+      }
     } catch (err) {
       setResult({ ok: false, errorCode: 'io', error: err instanceof Error ? err.message : String(err) });
     } finally {
@@ -273,6 +465,10 @@ export default function DeckWorkbenchApply({
             {commit.error && <p className="muted wb-apply-error-detail">{commit.error}</p>}
           </div>
         )}
+
+        {/* Gated on the RECORD, not on the last result: it describes what was
+            written, and a commit that refused or stopped leaves none. */}
+        {reversePanel()}
       </div>
     );
   }
@@ -458,6 +654,10 @@ export default function DeckWorkbenchApply({
           {result.error && <p className="muted wb-apply-error-detail">{result.error}</p>}
         </div>
       )}
+
+      {/* Gated on the RECORD, not on the last result: it describes what was
+          written, and an export that refused leaves none. */}
+      {reversePanel()}
     </div>
   );
 }

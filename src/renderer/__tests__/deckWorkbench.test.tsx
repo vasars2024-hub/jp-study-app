@@ -1146,6 +1146,69 @@ describe('DeckWorkbench step 7 — Apply or export', () => {
     expect(host.textContent).toContain('ankiWorkbench.progress:7,7');
   });
 
+  // Gate 8 clause 2. The panel exists only after something has actually been
+  // written — before that, undo is the answer and this would be a second one.
+  it('offers to put a committed package back, against the NEW package’s fingerprint', async () => {
+    exportApkgDraft.mockResolvedValue({
+      ok: true,
+      filePath: 'C:\\out\\Core 2k (edited).apkg',
+      fileName: 'Core 2k (edited).apkg',
+      notesUpdated: 1,
+      cardsUpdated: 0,
+      verified: true,
+      fingerprint: 'fp-new',
+    });
+    await toBrowse(browsable());
+    await editOneField();
+    await toApply();
+
+    // The control: nothing is written yet, so there is nothing to put back.
+    expect(host.querySelector('.wb-apply-reverse')).toBeNull();
+
+    await click(buttonBy('ankiWorkbench.apply.export'));
+    expect(host.querySelector('.wb-apply-reverse')).not.toBeNull();
+    expect(host.textContent).toContain('ankiWorkbench.apply.reverse.oneWay');
+    expect(host.textContent).toContain('ankiWorkbench.apply.reverse.notes:1');
+
+    exportApkgDraft.mockResolvedValue({
+      ok: true,
+      filePath: 'C:\\out\\Core 2k (reversed).apkg',
+      fileName: 'Core 2k (reversed).apkg',
+      notesUpdated: 1,
+      cardsUpdated: 0,
+      verified: true,
+      fingerprint: 'fp-back',
+    });
+    await click(buttonBy('ankiWorkbench.apply.reverse.button'));
+
+    expect(exportApkgDraft).toHaveBeenCalledTimes(2);
+    const back = exportApkgDraft.mock.calls[1]![0];
+    // The package that was WRITTEN, not the untouched original: reversing
+    // against `fp-1` would edit the file the user still has unchanged.
+    expect(back.fingerprint).toBe('fp-new');
+    expect(back.changes.notes).toEqual([{ noteId: 'n1', fields: ['ねこ', 'ねこ-en'], tags: undefined }]);
+    expect(back).not.toHaveProperty('sourcePath');
+    expect(host.textContent).toContain('ankiWorkbench.apply.reverse.ok:1,0');
+  });
+
+  it('leaves no reversal record when the export refused', async () => {
+    // A fingerprint on a REFUSAL is the point: the `ok` guard has to be what
+    // stops the record, not the absence of something to key it on.
+    exportApkgDraft.mockResolvedValue({
+      ok: false,
+      errorCode: 'source-changed',
+      error: 'moved',
+      fingerprint: 'fp-new',
+    });
+    await toBrowse(browsable());
+    await editOneField();
+    await toApply();
+    await click(buttonBy('ankiWorkbench.apply.export'));
+
+    expect(host.querySelector('.wb-apply-reverse')).toBeNull();
+    expect(host.textContent).toContain('ankiWorkbench.apply.error.source-changed');
+  });
+
   it('reports a refusal under its own code and does not satisfy the step', async () => {
     exportApkgDraft.mockResolvedValue({
       ok: false,
@@ -1297,6 +1360,57 @@ describe('DeckWorkbench step 7 — Apply or export', () => {
     // The measured remainder, off the re-read — the number that makes this a
     // state rather than an ambiguity.
     expect(cancelled).toContain('ankiWorkbench.apply.live.cancelled.unwritten:2');
+  });
+
+  // A stopped commit wrote SOME of the change set, and a reversal folds the
+  // whole of it — offering one here would write back values Anki never received.
+  it('offers no reversal after a stopped commit', async () => {
+    commitAnkiConnectDraft.mockResolvedValue({
+      ok: false,
+      errorCode: 'cancelled',
+      notesUpdated: 1,
+      cardsUpdated: 0,
+      unwritten: 2,
+      fingerprint: 'fp-live-after',
+      profile: 'User 1',
+    });
+    await toLiveApply();
+    await click(buttonBy('ankiWorkbench.apply.live.commit'));
+
+    expect(host.querySelector('.wb-apply-reverse')).toBeNull();
+    expect(host.textContent).not.toContain('ankiWorkbench.apply.reverse.oneWay');
+  });
+
+  it('puts a clean live commit back through the same channel, against the post-commit read', async () => {
+    commitAnkiConnectDraft.mockResolvedValue({
+      ok: true,
+      notesUpdated: 1,
+      cardsUpdated: 0,
+      verified: true,
+      fingerprint: 'fp-live-after',
+      profile: 'User 1',
+    });
+    await toLiveApply();
+    await click(buttonBy('ankiWorkbench.apply.live.commit'));
+
+    expect(host.textContent).toContain('ankiWorkbench.apply.reverse.oneWay');
+    expect(host.textContent).toContain('ankiWorkbench.apply.reverse.notes:1');
+
+    commitAnkiConnectDraft.mockResolvedValue({
+      ok: true,
+      notesUpdated: 1,
+      cardsUpdated: 0,
+      verified: true,
+      fingerprint: 'fp-live-back',
+      profile: 'User 1',
+    });
+    await click(buttonBy('ankiWorkbench.apply.reverse.button'));
+
+    expect(commitAnkiConnectDraft).toHaveBeenCalledTimes(2);
+    const back = commitAnkiConnectDraft.mock.calls[1]![0];
+    expect(back.fingerprint).toBe('fp-live-after');
+    expect(back.changes.notes).toEqual([{ noteId: 'n1', fields: ['ねこ', 'ねこ-en'], tags: undefined }]);
+    expect(host.textContent).toContain('ankiWorkbench.apply.reverse.ok:1,0');
   });
 
   it('names every change that did not commit instead of one total', async () => {

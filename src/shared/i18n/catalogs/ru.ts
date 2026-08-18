@@ -9697,6 +9697,28 @@ export const ru: Catalog = {
   'ankiWorkbench.apply.error.verify-failed':
     'Записанный файл не прошёл проверку перечитыванием — ему нельзя доверять. Удалите его и повторите.',
   'ankiWorkbench.apply.error.io': 'Не удалось записать файл.',
+  'ankiWorkbench.apply.reverse.oneWay':
+    'Запись в само назначение необратима. Поддерживаемое изменение можно вернуть в этом сеансе, но только пока колода открыта — после закрытия эта запись пропадает.',
+  'ankiWorkbench.apply.reverse.title': 'Вернуть эту запись',
+  'ankiWorkbench.apply.reverse.notes':
+    '{count} заметок вернутся к содержимому, которое было до этой записи',
+  'ankiWorkbench.apply.reverse.cards':
+    '{count} карточек вернутся к состоянию, которое было до этой записи',
+  'ankiWorkbench.apply.reverse.decks': '{count} колод вернутся к прежним названиям',
+  'ankiWorkbench.apply.reverse.templates':
+    '{count} шаблонов карточек, добавленных этой записью, будут удалены вместе с созданными ими карточками',
+  'ankiWorkbench.apply.reverse.button': 'Вернуть эту запись',
+  'ankiWorkbench.apply.reverse.working': 'Возвращаем…',
+  'ankiWorkbench.apply.reverse.empty': 'В этой записи нечего возвращать.',
+  'ankiWorkbench.apply.reverse.ok': 'Возвращено заметок: {notes}, карточек: {cards}',
+  'ankiWorkbench.apply.reverse.refused.template-restore-loses-scheduling':
+    'Шаблон карточек «{subject}» восстановить нельзя. Удалённые вместе с ним {count} карточек несли интервал, лёгкость и счётчики повторений, которых здесь взять неоткуда — они вернулись бы новыми, потеряв эту историю второй раз.',
+  'ankiWorkbench.apply.reverse.refused.template-unadd-field-unsupported':
+    'Поле «{subject}» нельзя убрать из типа заметок. Его удаление переписывает каждую заметку в назначении, включая те, что этот сеанс не загружал, поэтому операция отклонена, а не выполнена наполовину.',
+  'ankiWorkbench.apply.reverse.refused.note-not-in-commit':
+    'Заметки {subject} нет в записи о том, что было записано, поэтому вернуть изменённые в ней значения полей ({count}) без догадок об остальной строке невозможно.',
+  'ankiWorkbench.apply.reverse.refused.text-export-not-reversible':
+    'Текстовый экспорт создал новый файл и не тронул исходный, поэтому состояние до экспорта всё ещё лежит на диске под своим именем. Возвращать нечего.',
   'ankiWorkbench.apply.text.original':
     'Экспорт записывает новый текстовый файл. Исходный файл не изменяется.',
   'ankiWorkbench.apply.text.identity.rowOrder':
