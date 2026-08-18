@@ -38,8 +38,9 @@ const api = vi.hoisted(() => {
   // Everything else answers as a subscription that unsubscribes to nothing. The
   // player bridge is ~200 channels wide and this suite is about four of them;
   // enumerating the rest would be a list to maintain, not a fixture.
+  const unsubscribe = (): undefined => undefined;
   const stub = new Proxy(named, {
-    get: (target, prop: string) => target[prop] ?? (() => () => {}),
+    get: (target, prop: string) => target[prop] ?? (() => unsubscribe),
     has: () => true,
   });
   Object.defineProperty(globalThis, 'api', { configurable: true, value: stub });
@@ -107,16 +108,20 @@ afterEach(() => {
 });
 
 describe('the player primary subtitle slot — a dual-language .ass is two tracks', () => {
-  let media: ReturnType<typeof mountMedia> | null = null;
+  const mounted: ReturnType<typeof mountMedia>[] = [];
+  const mount = (): ReturnType<typeof mountMedia> => {
+    const probe = mountMedia();
+    mounted.push(probe);
+    return probe;
+  };
   afterEach(() => {
-    media?.unmount();
-    media = null;
+    while (mounted.length) mounted.pop()?.unmount();
   });
 
   it('renders one line where the file offers two at the same timestamp', () => {
-    media = mountMedia();
+    const media = mount();
     act(() => {
-      media!.state().applySubtitleFile('01.tc_jp.ass', DUAL_LANGUAGE_ASS);
+      media.state().applySubtitleFile('01.tc_jp.ass', DUAL_LANGUAGE_ASS);
     });
     // What the player draws at t=2s: everything whose interval covers it.
     const onScreen = media.state().cues
@@ -127,9 +132,9 @@ describe('the player primary subtitle slot — a dual-language .ass is two track
   });
 
   it('says how many lines it hid and which track they came from', () => {
-    media = mountMedia();
+    const media = mount();
     act(() => {
-      media!.state().applySubtitleFile('01.tc_jp.ass', DUAL_LANGUAGE_ASS);
+      media.state().applySubtitleFile('01.tc_jp.ass', DUAL_LANGUAGE_ASS);
     });
     // Both halves: the count loaded AND the count hidden. A status that only
     // said "2 lines" would look identical to a single-track file.
@@ -138,9 +143,9 @@ describe('the player primary subtitle slot — a dual-language .ass is two track
   });
 
   it('is silent about hiding when there was nothing to hide', () => {
-    media = mountMedia();
+    const media = mount();
     act(() => {
-      media!.state().applySubtitleFile('episode.srt', JAPANESE_ONLY_SRT);
+      media.state().applySubtitleFile('episode.srt', JAPANESE_ONLY_SRT);
     });
     expect(media.state().cues).toHaveLength(2);
     expect(media.state().subStatus).not.toContain('JOJO5_textch');
@@ -153,9 +158,9 @@ describe('the player primary subtitle slot — a dual-language .ass is two track
     // been moved into `parseSubtitles` and dual subtitles are dead.
     api.pickSubtitle = (): Promise<{ name: string; text: string }> =>
       Promise.resolve({ name: '01.tc_jp.ass', text: DUAL_LANGUAGE_ASS });
-    media = mountMedia();
+    const media = mount();
     await act(async () => {
-      await media!.state().openSecondarySubs();
+      await media.state().openSecondarySubs();
     });
     expect(media.state().secondaryCues).toHaveLength(4);
   });
