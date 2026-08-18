@@ -25147,3 +25147,35 @@ facility this repo has; it is aria-only text.
 1 skipped file, **10,218 passed** / 6 skipped (prev turn 10,210; +8 are exactly this slice's cases);
 i18n exit 0, **10,593** keys (prev 10,590, +3 mine); architecture exit 0 "Nothing new", 5 pending;
 eslint **0 errors** on all five touched TS paths.
+
+## 2026-08-18 — boss audit Findings 1+2: the fallback that could not fire (`primary`)
+
+Worker `primary`, commit `c218b058`. Boss audit 2026-08-18 03:51's own handoff, taken before the
+ladder.
+
+**Finding 1, CONFIRMED live.** `utilityProcess.fork()` does not throw on a missing worker module —
+it returns a child that emits `exit` code 1 — so `apkgReadHost.ts`'s synchronous `catch`, which was
+the whole "a packaging fault degrades to a slow read" guarantee, was dead for exactly the fault it
+named. `readApkgDraft` answered `apkg-read-worker-exit:1`, which `DeckWorkbench.tsx:252` renders
+verbatim: the deck was **refused**, not slowly read. The fallback moves onto the exit-without-answer
+path and onto a `postMessage` a dead child refuses, behind the same `settled` latch so the reap
+after a success cannot re-parse the deck on the main loop. A parse failure is still passed straight
+through — corrupt is corrupt in both processes.
+
+**Live, on the restarted app** (`debug/apkg-fallback-probe.cjs`, 608-note deck, built worker renamed
+away and restored): control **ok / 608 / 5**, fault **ok / 608 / 5**, restored **ok / 608 / 5**, with
+**exactly one** `[apkg-read] worker gave no answer (exit:1)` in main's log — the fault run and only
+it. That single line is what distinguishes "the fallback ran" from "the fork worked anyway".
+
+**Finding 2.** `parseApkgDraftPageOffMainLoop` had no behavioural coverage: its 8 existing cases are
+5 source-text regexes and 3 calls to the *in-process* function. New `apkgReadHostOutcomes.test.ts`
+stubs `utilityProcess` and covers 9 outcomes — fork options, whole-collection total, parse failure
+passed through, unreadable response, exit-without-answer, a fallback that itself fails, dead child,
+the reap after success, fork that throws.
+
+**Mutations.** Old `reject` restored → **2 red**. The audit's own M3 (`totalNotes:
+page.notes.length`), which left the full HEAD suite at its identical 3 known failures → **1 red**,
+`expected 1 to be 100000`.
+
+**Trap.** The previous handoff's "Finding 1" was a *different* audit's finding (the i18n red at
+committed HEAD). Read the audit's **last** section, not the handoff's summary of it.
