@@ -593,9 +593,26 @@ part of an automated suite.**
 
 | gate | result |
 | --- | --- |
-| **16** clean profile, honest reason | **front half PASSES** (`8910b778`) — `nyaaAvailability` gained a fifth reason, `qbit-no-credential`, from a pure mode-aware `qbitCredentialGap()`. Before it, a profile with qBittorrent enabled and nothing ever entered passed the guard and refused four steps later inside `qbitAddStopped`. 11 tests: both modes, ref-never-set vs vault-emptied as distinct messages, whitespace refused, a pre-`authMode` config read as password, and a positive control that key mode passes with `username` and `passwordRef` both empty. Still open: the same honest reason on the three non-nyaa surfaces |
-| **20** every consumer, not just nyaa | **main side PASSES, surfaces open** — all **14** qBittorrent API calls in `scraper/qbittorrent.ts` go through `authed()`; the only direct `scraperRequest` calls are `login()` (password mode by design) and `authed`'s own `send`. `subtitleNyaaSource.ts`, `subtitleDiscovery.ts`, `downloads.ts`, `torrents.ts`, `runtime.ts`: **zero** matches for `passwordRef\|apiKeyRef\|authMode\|username\|password` — they hand over `{ config }` and let `authed()` pick the mode. `TorrentManagerPage` covered by `bd725520`. `MalDownloadDialog`, `NyaaSubtitleDialog`, `ScraperSettingsDrawer` not yet read |
+| **16** clean profile, honest reason | **CLOSED 2026-08-18.** Front half `8910b778`: `nyaaAvailability` gained a fifth reason, `qbit-no-credential`, from a pure mode-aware `qbitCredentialGap()`. Before it, a profile with qBittorrent enabled and nothing ever entered passed the guard and refused four steps later inside `qbitAddStopped`. Surface half `029ace82` / `26d2fb2c` / `70efe13b` — all three remaining surfaces, below. Live: **8 configs through `subtitleHarvestNyaaList`, 8 different sentences**, including **CONTROL real profile → `ok=true`, 5 candidates** |
+| **20** every consumer, not just nyaa | **CLOSED 2026-08-18.** Main side: all **14** qBittorrent API calls in `scraper/qbittorrent.ts` go through `authed()`; the only direct `scraperRequest` calls are `login()` (password mode by design) and `authed`'s own `send`. `subtitleNyaaSource.ts`, `subtitleDiscovery.ts`, `downloads.ts`, `torrents.ts`, `runtime.ts`: **zero** matches for `passwordRef\|apiKeyRef\|authMode\|username\|password` — they hand over `{ config }` and let `authed()` pick the mode. All four surfaces now covered: `TorrentManagerPage` `bd725520`, `MalDownloadDialog` `029ace82`, `ScraperSettingsDrawer` `26d2fb2c`, `NyaaSubtitleDialog` `70efe13b` |
 | **17**, **18**, **19** | not run |
+
+Gate 16's surface half, per surface:
+
+| surface | what was wrong | evidence |
+| --- | --- | --- |
+| `MalDownloadDialog` | offered qBittorrent from `enabled && host.trim()` alone, then refused every row of the batch | `029ace82`. 4 tests; mutation control reddens exactly the 2 negative ones |
+| `ScraperSettingsDrawer` | Password/API Key rows were `kind: 'status'`, which prints the `*Ref` verbatim — **byte-identical output for a vault answering yes and one answering no** | `26d2fb2c`. New `kind: 'secret'` reusing `credentialPresence.ts`. Live on `relay-probe`: `qbit/webui` false → "password missing from OS storage" `rgb(209,52,56)`; `qbit/apikey` true → "API key stored" `rgb(56,178,107)`, one screen, its own control. 6 tests; mutation reddens all 6 |
+| `NyaaSubtitleDialog` | **nothing** — already passed main's `message` through. Proof, not a fix | `70efe13b`. 5 tests, the first coverage this surface has had |
+
+Honest limit: `listNyaaSubtitles` is unmeasurable live here — its media-item guard fires before the
+credential check and the library holds **20 books, 4 manga, 0 video**. The shared `nyaaAvailability`
+both surfaces consume is what the 8-config table measures.
+
+**Open finding from that run, not fixed.** A structurally-valid but incomplete `torrents` block passes
+`asNyaaAcquisitionConfig` (it only checks `typeof === 'object'`) and then crashes the search with
+`Cannot read properties of undefined (reading 'filter')` — a refusal that throws. Narrow it on the
+fields `searchTorrents` actually reads.
 
 Related defect fixed the same day, `bd725520`: the Torrent Manager credential pill rendered from the
 settings **ref** rather than the vault, so a non-empty `passwordRef` over an empty store painted

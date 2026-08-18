@@ -25834,3 +25834,46 @@ no vault write, no settings write, no torrent traffic.
 
 Four distinct refusals naming four distinct missing pieces, and a guard that says yes when it should:
 without that first control a blanket refusal would have scored identically.
+
+## 2026-08-18 — Track 9 Phase 9.4: gate 16's surface half CLOSES, all three surfaces
+
+`029ace82` **MalDownloadDialog offered a client that could not log in.** It read
+`enabled && host.trim()` and nothing else, so a profile with qBittorrent on and a host typed in was
+offered as a destination, took the whole batch, and refused row by row — "Send 7 torrents" reporting
+seven failures, none saying the key was never entered. Now asks `qbitCredentialGap`/`qbitCredentialRef`
+with `scraperHasCredential`'s answer for the ref the mode reads, drops the target, and states the
+reason ahead of `noClient` — which is wrong advice here, the profile IS configured. 4 tests; mutation
+control: deleting the guard reddens exactly the 2 negative ones. Trap paid: the existing fixture was
+itself a clean profile (`{enabled, host, savePath}`, no credential fields), so 4 send tests would have
+been testing the new refusal.
+
+`26d2fb2c` **The settings drawer printed the ref where the state goes.** Password/API Key rows were
+`kind: 'status'`, which renders the bound value verbatim — and that value is a storage handle. Measured,
+not inferred: under `status` the row renders the byte-identical string for a vault answering yes and one
+answering no (`"…qbit/webuiChange"` both times). New `kind: 'secret'` reuses `credentialPresence.ts`
+from `bd725520` rather than restating the five states. **Live, on `relay-probe`, which carries its own
+control — two refs, two answers, one screen:** `passwordRef`→`qbit/webui`, vault **false** → "password
+missing from OS storage", `scr-conn--cred-bad`, `rgb(209,52,56)`; `apiKeyRef`→`qbit/apikey`, vault
+**true** → "API key stored", `scr-conn--cred-good`, `rgb(56,178,107)`. Neither pill contains its ref.
+6 tests, FieldRow's first render coverage; mutation control: restoring `status` reddens all 6.
+
+`70efe13b` **NyaaSubtitleDialog was already correct and had no coverage.** It passes main's `message`
+through rather than flattening a refusal into "nothing found", so this is proof, not a fix. 5 tests.
+**Live through `subtitleHarvestNyaaList`, 8 configs, 8 different sentences:** key/no-key, key/dead-ref,
+password/no-username, password/no-password, password/dead-ref, **CONTROL** disabled, **CONTROL**
+no-indexer, and **CONTROL real profile → `ok=true`, 5 candidates**. The last is the one that matters:
+the gate refuses *and* it passes.
+
+**Gate 16 CLOSES. Gate 20's four surfaces all covered** (`TorrentManagerPage` `bd725520`, the other
+three above); its main side closed 2026-08-18 earlier.
+
+Honest limits. `listNyaaSubtitles` is unmeasurable live on this machine: its media-item guard fires
+before the credential check and the library holds **20 books, 4 manga, 0 video**, so all configs return
+"That media item is no longer in the library." The shared `nyaaAvailability` underneath is what the
+table measures, and both surfaces consume it.
+
+**FINDING, not fixed.** A structurally-valid but incomplete `torrents` block passes
+`asNyaaAcquisitionConfig` — it only checks `typeof === 'object'` — and then crashes the search with
+`Cannot read properties of undefined (reading 'filter')`. Reproduced with a hand-built config; the real
+profile is fine. A refusal that throws instead. Next worker: narrow `asNyaaAcquisitionConfig` on the
+fields `searchTorrents` actually reads.
