@@ -25816,3 +25816,21 @@ calls in `main/scraper/qbittorrent.ts` route through `authed()` (lines 484, 529,
 `passwordRef|apiKeyRef|authMode|username|password` — they pass `{ config }` and let `authed()`
 resolve the mode. No main-side consumer is on the old path. Still open: the four named surfaces, and
 gates 17-19.
+
+**Gate 16 front half, LIVE — restarted onto `8910b778` first (pid 31240 → 40884), because main does not
+hot-reload and the running instance predated the commit.** Driven through the real
+`subtitleHarvest:list` handler via `window.api.subtitleHarvestList`, walk at `debug/gate16-walk.js`
+(gitignored). `savePath` left empty so the `qbit-remote` branch could not answer instead. Read-only:
+no vault write, no settings write, no torrent traffic.
+
+| acquisition config | `nyaa` offer |
+| --- | --- |
+| clean profile, password mode, nothing entered | `qbit-no-credential` — "…no password has been entered." **1044 ms** |
+| `passwordRef` set, vault empty | `qbit-no-credential` — "…no longer in this machine's secret store." **513 ms** |
+| key mode, no key entered | `qbit-no-credential` — "…no key has been entered." **510 ms** |
+| key mode, key ref set, vault empty | `qbit-no-credential` — "The saved qBittorrent API key is no longer…" **515 ms** |
+| **CONTROL** key mode, the real stored `qbit/apikey` | **`available: true`**, reason `null` — **1168 ms** |
+| **CONTROL** qBittorrent switched off | `qbit-disabled`, the pre-existing branch, unswallowed — **515 ms** |
+
+Four distinct refusals naming four distinct missing pieces, and a guard that says yes when it should:
+without that first control a blanket refusal would have scored identically.
