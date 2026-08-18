@@ -2024,3 +2024,44 @@ Take row 0. (2) A refused release stays in the client by design; the *next* acqu
 Gates: vitest **733 files / 10,191 passed / 0 failed** / 6 skipped (baseline 10,172; **+19 = exactly
 my new cases**); i18n exit 0 (10,590); architecture exit 0 "Nothing new", 5 pending; eslint **0
 errors** on all three touched paths. Mutations: 5 red, 1 red, 4 red, 3 red — each restored green.
+
+## 2026-08-18 — ROUTE B ACQUIRES IN FULL, 39 of 39, and the char count is not what it looks like
+
+Worker `primary`. Commit `e679199a`. App restarted for the main-process change (pid 30016, up
+04:24:31); every number below is post-restart and from the running app.
+
+**THE HEADLINE, as a comparison.** Same candidate, same code path, one constant reinterpreted:
+- 2026-08-17 / 2026-08-18 morning: **3 of 39** in 307,916 ms, then "a longer wait may finish it".
+- 2026-08-18 04:26 live: **39 of 39 episodes** in **1,683,403 ms (28.06 min)**, `ok:true`, episodes
+  1–39 each exactly once. `FETCH_TIMEOUT_MS` was a wall clock and is now a **stall** budget renewed
+  by any arrival, ceiling 30 min. The transfer took 28.1 of those 30 — under the old 5-minute clock
+  it was unreachable by a factor of five, and no amount of retrying would have changed that.
+
+**The rate is the load-bearing signal, not the bytes.** A 30 KB sidecar inside a 4.00 MB piece sits
+at its starting fraction until the piece lands, so a byte-only renewal would have called this exact
+transfer frozen. Both are read; `nothingArrived` is true only when neither moved.
+
+**THE NUMBER THAT WOULD HAVE BEEN A FALSE CLAIM.** The fetch reports `chars: 90,963,972`. On disk:
+**39 files, 92,069,272 bytes** — so the payload is ~1 byte per char, i.e. **ASCII, not Japanese**.
+Measured per file: **667,719 `Dialogue:` lines** hold **181,790 kana** (min 3,020, max 6,364, mean
+4,661 per episode — consistent with the plan's earlier "episode 06 … 3,387 kana"). Episode 31 alone
+is 5,093,684 bytes with **36,692 Dialogue lines and 5,343 kana**: karaoke/typesetting effect spam,
+one line per animation frame. There is no `[Fonts]` section; it is all tag markup. **Report 181,790
+kana across 39 episodes. Do NOT report 90,963,972 characters** — the plan's own "number, never the
+adjective" rule cuts both ways, and a number measuring the wrong thing is worse than an adjective.
+
+**GATE 31 IS NOT CLOSED, and this does not close it.** Its wording (line 413) requires Route A *and*
+Route B "ending in **cues that render in the player** through the same path a jimaku subtitle takes".
+What closed is Route B's **acquisition** half, for the first time in this plan's history. Still open:
+the render leg, and Route A's Japanese-cue status (its 2026-08-17 acquisition was English).
+
+**The trap this hands the next worker.** `SubtitleHarvestPanel.tsx:330` runs `parseSubtitles` over
+every file and hands the result to `analyse` — that is **667,719 cues** for 181,790 kana of study
+text, in the renderer. Measure it before assuming the mining path survives this release.
+
+**Cleanup.** The release stays in `jp-study-subtitles`; only the sidecars were downloaded (the rest
+is `QBIT_PRIO_SKIP`), so the disk cost is 92 MB, not 46,899 MB. `qbitReapSubtitleOrphans` sweeps it
+on the next acquisition, which is the designed path — do not reach for the user's API key.
+
+Driver: `debug/g31n-ceiling.cjs` (untracked, like all of `debug/`). It takes **row 0 of the
+product's own ranking** and does not re-sort by size the way `g31n-routeb.cjs acquire` does.
