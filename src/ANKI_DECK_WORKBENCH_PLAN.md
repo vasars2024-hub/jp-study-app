@@ -733,6 +733,45 @@ This slice is complete only when all of these can be shown with real data and no
     while notes **2001** and **2003** show **0**. That asymmetry is the fixture's own control: a
     field this app enriched says so, a hand-typed one says nothing.
 12. Generate several AI example sentences and learning aids, approve only selected variants, preview difficult and edge-case cards across layouts, cancel one batch, retry only failures, and verify that rejected/generated data is represented honestly.
+
+    **Generation + cancel closed 2026-08-16** (line 275 above: 1-note run, and 20 requested → 8
+    answered / 8 ok on cancel). **The other four clauses CLOSE 2026-08-18** on the real 3,221-note
+    local deck, `debug/g12-walk.js`, provider `gemini-2.5-flash`. The batch is genuinely mixed and
+    every outcome in it is a REAL provider outcome: 2 notes answered by gemini (4,473 ms, 3 variants
+    each) and 2 notes failed by **DeepSeek rejecting a deliberately wrong key** — "DeepSeek rejected
+    the API key…", the provider's own words, folded into the same batch by `recordAiResult` exactly
+    as a retry folds a second run in. Nothing synthesized but the sequencing.
+    *Approve only selected*: variant **index 1**, not 0, approved on note 1; all 3 rejected on note 2.
+    Applied, `changedNotes` **2 of 4**, and the written value is the chosen variant byte-for-byte on
+    2 of 2. **10 unapproved variant texts existed and 0 appear anywhere in the resulting draft.**
+    *Retry only failures*: targets `[n3, n4]` — exactly the 2 failed — with the approved note and the
+    all-rejected note both **absent** from the list; `beginAiRetry` left the two decided notes
+    JSON-identical; same batch id; 2 answered / 2 ok in 4,143 ms.
+    *Honestly represented*: partition exact at every step (1 approved + 0 undecided + 1 all-rejected
+    + 2 failed + 0 cancelled + 0 pending = 4 requested, 3 rejected variants **retained**, not
+    deleted). Both written fields carry `<span class="jp-ai-gen" data-jp-ai="gemini|gemini-2.5-flash">`
+    and read back through `readAiProvenance`; the 2 undecided-into-rejected notes got **nothing**, and
+    the apply names what it skipped (`ai-all-rejected` ×2) instead of reporting 4 of 4.
+    *Across layouts*: **8** combinations — 1 template × question/answer × light/dark × desktop/compact.
+    The frame document is 521 chars on the question side and 712 on the answer, identical across
+    viewports because `compact` is a 320 px `max-width` on the stage, not a different document. The
+    generated span is present on **4 of 8** and absent on the 4 question-side ones, which is the
+    control that the check reads the template rather than always passing: `Meaning` is answer-only.
+    The lens stayed live on the applied draft (`duplicate-first-field` on the note). Wrapper edge
+    cases round-trip: cloze `{{c1::…}}`, `<b>`+`&`+quotes, and 1,200 chars all re-read exactly;
+    empty text gets no wrapper and cannot reach a field at all — `approvedAiAdditions` drops an empty
+    variant and `recordAiResult` calls a variant-less answer `no-variants`.
+    *Blocking controls, all of which had to refuse and did*: an undecided note and a still-pending
+    note each block with `ai-not-reviewed` and `changedNotes: 0`; a superseded batch id blocks with
+    `ai-batch-mismatch`; no batch at all blocks with `no-ai-review`. Failed and all-rejected are
+    decided states and deliberately warn rather than block.
+    **Trap for the next worker:** `ai:setApiKey` **refuses an empty key** (`mining.ts:1958`,
+    "API key is empty.") even though `writeAiProviderSecret` clears on empty — so a probe that stores
+    a throwaway key cannot remove it that way and will leave it behind. `window.api.clearCredential('<bucket>')`
+    is the removal path. Verified restored: deepseek `configured: false`, gemini untouched, provider
+    back to `gemini-2.5-flash`.
+    Not committed to the user's deck: the apply is `planChangeTray`, which returns the resulting
+    draft without writing the local deck.
 13. Customize Browser columns separately from note fields, create a reverse/optional-reverse card design, and prove that the representative preview catches blank, duplicate, cloze, sibling, media, and dark/mobile rendering failures before Apply. The media lens is *flagged, not rendered*: the preview frame is an opaque-origin `srcdoc` whose CSP allows `data:` images only, and Anki references media by bare file name, so a card that references media the package holds must say so explicitly (`media-not-rendered`) rather than show a blank box that reads as clean. Loosening the CSP does not satisfy this gate.
 
     **Closed 2026-08-16** (`a99c9f27`, `70c840cf`, `65007162`). Columns: `ankiWorkbenchBrowser.ts` + the

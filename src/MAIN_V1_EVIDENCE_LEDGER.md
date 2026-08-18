@@ -25632,3 +25632,41 @@ blob's hash); `node debug/g1-run.cjs <script.js> <global>` kicks and polls any b
 across 744 files — green, and the known `scraperSources` full-run flake did not fire. i18n exit 0
 at 10,623→**10,624** (+1 = mine). architecture exit 0, "Nothing new", 5 pending. eslint **0 errors**
 on 9 touched paths (99 warnings, all `no-non-null-assertion`, the file-local idiom).
+
+## 2026-08-18 — Track 7 / gate 12's last four clauses CLOSE, on a mixed batch of real outcomes (`primary`)
+
+Gate 12 read "closed" in the previous turn's 15-of-15 count on the strength of plan line 275, which
+proves only **generation + cancel**. Its other four clauses — approve only SELECTED variants, retry
+only failures, preview edge-case cards across layouts, rejected/generated data represented honestly
+— had never been run. They have now, live, `debug/g12-walk.js`, real 3,221-note local deck.
+
+**The decision worth recording: how to get a batch that is genuinely part-succeeded, part-failed
+without touching the working credential.** A provider failure is required — `no-api-key` and
+`local-engine-unsupported` are whole-run refusals that withdraw the batch, and a cancel produces
+`cancelled`, which is explicitly *not* retryable. So the failed half was produced by storing a
+throwaway key in the **deepseek** bucket (confirmed empty first), pointing one run at it, and
+restoring both before the step returned. DeepSeek's own 401 text came back — a real provider error,
+not a stub — and folded into the gemini batch through `recordAiResult`, which is exactly what a
+retry does with a second run. Alternative rejected: mutating the gemini key, which is the user's and
+is not readable back, so a restore could not be verified.
+
+Numbers, all live: gemini 2 notes × 3 variants in **4,473 ms**; deepseek **2 failed**; approve
+variant **index 1** (not 0) on note 1 and reject all 3 on note 2; retry targets exactly the 2 failed,
+with the approved and all-rejected notes **absent**, 2 ok in **4,143 ms**; apply `changedNotes` **2
+of 4**, both values wrapped `jp-ai-gen` / `data-jp-ai="gemini|gemini-2.5-flash"`, both byte-equal to
+the approved variant; **10 unapproved texts, 0 leaked** into the resulting draft; partition exact at
+every step (1+0+1+2+0+0 = 4). Layouts: **8** combos, generated span on **4** — the answer-side ones —
+and on **0** question-side, because `Meaning` is answer-only; that zero is what makes the four a
+measurement. Controls that had to refuse and did: undecided → `ai-not-reviewed` / 0 changed, pending
+→ same, wrong batch id → `ai-batch-mismatch`, no batch → `no-ai-review`.
+
+Non-destructive by construction: the apply is `planChangeTray`, so the user's local deck was never
+written; `debug/` is gitignored, so the walk is not in this commit.
+
+**Trap, and it cost a cleanup here:** `ai:setApiKey` refuses an empty key (`main/mining.ts:1958`)
+although `writeAiProviderSecret` clears on empty — a probe that stores a throwaway key cannot remove
+it through that channel. The removal path is `window.api.clearCredential('<bucket>')`. Restored and
+verified: deepseek `configured: false`, gemini untouched, provider `gemini-2.5-flash`.
+
+Track 7's workbench sub-plan is genuinely **15 of 15** now, counted by reading each numbered gate
+body to its end. Track 7's non-workbench remainder and Tracks 8/9 stay open.
