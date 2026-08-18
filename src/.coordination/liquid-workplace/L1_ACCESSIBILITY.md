@@ -386,3 +386,49 @@ chosen. Replaced with the status quo.
 counts `pass === false`, which a refused row does not have. The only tell was `min`, because
 `Infinity` serialises to `null`. Any probe here that reports a count of failures must also
 report a count of MEASURED rows.
+
+## 2026-08-18 — category 1 reaches 0 failing on the Liquid Dictionary window (`a70cbbed`)
+
+**5 -> 0.** min **6.08** forest-night / **6.33** classic-light / **13.06** high-contrast, 16 runs
+measured, 0 unmeasurable, frozen+thawed. First time this surface has had none.
+
+**The ground was the defect, not the glyph, and that took two wrong fixes to see.**
+`.fwin-bar` is `background: transparent` in Liquid presentation, so the title glyphs sit on the
+frame material over `.os-desktop`, which paints an OPAQUE `rgb(10,10,14)` on EVERY palette. A
+light palette's 72% material is therefore white glass over black and composites to mid-grey —
+`#bababc` classic-light, `#bab7b1` soft-sepia, measured and confirmed against the hand-computed
+`0.72*255 + 0.28*10`. At share 100, i.e. `var(--text)` itself, the glyphs still measured **4.42**
+soft-sepia / **4.44** rose-pine. Nothing darker exists in those palettes, so no glyph colour
+could ever have worked.
+
+**Decision:** the light six opacify `--lq-liquid-bg` to **88%** (`liquid-tokens.css`, same shape
+as the existing high-contrast/battery variants). Blur, saturate, border, highlight and shadow
+untouched; darks stay 72% where they measured 4.92-16.74. Then `.fwin-b` derives from `--text`
+mixed toward the bar's own background at **90%** — the SMALLEST share clearing the bar on all 13
+palettes (85 leaves soft-sepia at 4.49). Bidirectional, so one declaration, no per-palette
+override. And the ◆ toggle drops `color: var(--accent)` entirely: `--accent-text` does not rescue
+it either (**4.12** soft-sepia) because that token is solved against `--panel-2` and this ground
+is darker. The accent stays the FILL, where it has no contrast duty.
+
+**Two mistakes, both corrected in the same commit, both worth more than the fix.**
+1. The first `.fwin-b` fix went in `styles.css` and was **INERT**. `shell.css:815` carries
+   `.fwin:where(...) .fwin-b`; `:where()` contributes 0, so (0,2,0) beats `styles.css`'s (0,1,0).
+   It read exactly like a fix and computed to nothing. `styles.css` now carries a
+   DO-NOT-FIX-HERE note. **Before fixing any `.fwin*` paint, check `shell.css` first.**
+2. Raising the pressed fill 16% -> 24% to compensate for the lost glyph colour put the glyph back
+   under the bar (**4.07** classic-light, **4.19** forest-night) — the fill IS that glyph's
+   ground. 16 is the largest fill holding >= 4.5 on all 13.
+
+**Controls, red:** status-quo glyph fails all six light palettes; three mutations each fail with
+their own message; all three files restored byte-identical.
+
+**TRAP — do not trust a resting read after a palette sweep.** After ~13 rapid `applyTheme` calls
+one element's computed `color` stayed stuck at the LAST palette's `--muted` (cyberpunk
+`#a78bc4`) while `data-theme` AND `--muted` read at that same element both said forest-night.
+It survived separate /eval calls minutes apart; only a renderer reload cleared it. In-loop reads
+were sound (grounds matched hand-computed values), so this invalidates resting-state reads only
+— but it looks exactly like a real defect and cost most of an hour.
+
+**What category 1 still needs before it can be SCORED 10 here:** this window only. The rubric
+scores a surface, and `l1-palette-contrast.js` measures the Dictionary window's 16 runs, not the
+whole app. `LIQUID_SCORECARD.md` stays empty until all eight categories sit on one surface.
