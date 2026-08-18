@@ -34,6 +34,7 @@ vi.mock('electron', () => ({
 const { nyaaAvailability, nyaaFetch, nyaaFetchAll, METADATA_TIMEOUT_MS } = await import('../subtitleNyaaSource');
 const { resetQbitSessions } = await import('../scraper/qbittorrent');
 const { setScraperStoreRoot } = await import('../scraper/store');
+const { setScraperSecret } = await import('../scraper/credentials');
 
 const HASH = 'b'.repeat(40);
 const MAGNET = `magnet:?xt=urn:btih:${HASH}`;
@@ -279,9 +280,13 @@ beforeAll(async () => {
     host: '127.0.0.1',
     port: (server.address() as AddressInfo).port,
     username: 'admin',
-    passwordRef: '',
+    // A real ref with a real secret behind it: `nyaaAvailability` refuses a
+    // profile that names no credential, so a fixture with an empty ref would be
+    // testing the refusal in every case rather than the acquisition.
+    passwordRef: 'qbit/nyaa-fetch-test',
     savePath,
   };
+  await setScraperSecret('qbit/nyaa-fetch-test', 'fixture-password');
 });
 
 afterAll(async () => {
@@ -377,6 +382,47 @@ describe('nyaaAvailability', () => {
   it('refuses with no configuration at all, which is what the auto sweep passes', async () => {
     const result = await nyaaAvailability(undefined);
     expect(result.ok === false && result.reason).toBe('not-configured');
+  });
+
+  // Phase 9.4 gate 16: the clean profile. Before this the check passed, the
+  // provider searched an index, resolved a magnet and only then refused —
+  // reading as a broken download rather than a missing password.
+  it('refuses a profile that names no password, before any network work', async () => {
+    const result = await nyaaAvailability({
+      ...config(),
+      qbittorrent: { ...qbitConfig, passwordRef: '' },
+    });
+    expect(result.ok === false && result.reason).toBe('qbit-no-credential');
+    expect(result.ok === false && result.detail).toMatch(/no password has been entered/);
+  });
+
+  it('refuses a password ref whose secret is gone, distinctly from one never set', async () => {
+    const result = await nyaaAvailability({
+      ...config(),
+      qbittorrent: { ...qbitConfig, passwordRef: 'qbit/never-written' },
+    });
+    expect(result.ok === false && result.reason).toBe('qbit-no-credential');
+    expect(result.ok === false && result.detail).toMatch(/no longer in this machine/);
+  });
+
+  it('refuses key mode with no key, and passes key mode once one is stored', async () => {
+    const missing = await nyaaAvailability({
+      ...config(),
+      qbittorrent: { ...qbitConfig, authMode: 'apiKey', apiKeyRef: '' },
+    });
+    expect(missing.ok === false && missing.reason).toBe('qbit-no-credential');
+    expect(missing.ok === false && missing.detail).toMatch(/no key has been entered/);
+
+    // POSITIVE CONTROL: the same profile with a key in the vault passes, and it
+    // passes with `passwordRef` still empty — key mode must not consult it.
+    await setScraperSecret('qbit/nyaa-key-test', 'fixture-key');
+    const stored = await nyaaAvailability({
+      ...config(),
+      qbittorrent: {
+        ...qbitConfig, authMode: 'apiKey', apiKeyRef: 'qbit/nyaa-key-test', passwordRef: '', username: '',
+      },
+    });
+    expect(stored.ok).toBe(true);
   });
 });
 

@@ -32,6 +32,7 @@ import { releaseCoversEpisode } from './malDownload';
 // and a second view type would be one more place for the two surfaces to start
 // disagreeing about what a release is.
 import type { NyaaSubtitleCandidateView } from './subtitleDiscoveryIpc';
+import type { NyaaUnavailableReason } from './subtitleNyaa';
 
 export type { NyaaSubtitleCandidateView };
 
@@ -106,7 +107,7 @@ export interface SubtitleHarvestListInput {
 export interface HarvestNyaaOffer {
   available: boolean;
   /** `null` when available; otherwise `nyaaAvailability`'s own reason. */
-  reason: 'not-configured' | 'no-indexer' | 'qbit-disabled' | 'qbit-remote' | null;
+  reason: NyaaUnavailableReason | null;
   detail: string;
 }
 

@@ -42,9 +42,12 @@ import {
   episodeFromFileName,
   languageFromFileName,
   looksJapaneseSubtitle,
+  qbitCredentialGap,
+  qbitCredentialRef,
   rankSubtitleCandidatesDetailed,
   selectSubtitleFiles,
   type NyaaAcquisitionConfig,
+  type NyaaUnavailableReason,
   type NyaaArchiveFile,
   type NyaaRankDrops,
   type NyaaSelectionReason,
@@ -70,6 +73,7 @@ import {
   QBIT_PRIO_NORMAL,
   QBIT_PRIO_SKIP,
 } from './scraper/qbittorrent';
+import { hasScraperSecret } from './scraper/credentials';
 import { scraperLog } from './scraper/logBus';
 import type { ProviderSubtitleCandidate } from './subtitleProviderClients';
 
@@ -167,7 +171,7 @@ export function resetNyaaSearchPacing(): void {
 
 export type NyaaAvailability =
   | { ok: true }
-  | { ok: false; reason: 'not-configured' | 'no-indexer' | 'qbit-disabled' | 'qbit-remote'; detail: string };
+  | { ok: false; reason: NyaaUnavailableReason; detail: string };
 
 /**
  * Whether this provider can do anything at all right now.
@@ -193,6 +197,19 @@ export async function nyaaAvailability(config?: NyaaAcquisitionConfig): Promise<
       detail: 'Fetching a subtitle from a torrent needs qBittorrent, which is turned off.',
     };
   }
+  // Asked before the save-path probe because it is the cheaper question and the
+  // more common misconfiguration: a user who never entered a credential is the
+  // Phase 9.4 clean-profile case, and their acquisition would otherwise refuse
+  // four steps later, inside the download, as if the torrent had failed.
+  const credentialRef = qbitCredentialRef(config.qbittorrent);
+  const gap = qbitCredentialGap({
+    qbittorrent: config.qbittorrent,
+    secretStored: credentialRef ? await hasScraperSecret(credentialRef) : false,
+  });
+  if (gap) {
+    return { ok: false, reason: 'qbit-no-credential', detail: gap.detail };
+  }
+
   const savePath = config.qbittorrent.savePath?.trim();
   if (savePath) {
     // A configured save path that this machine cannot read means qBittorrent is

@@ -43,6 +43,68 @@ export interface NyaaAcquisitionConfig {
 }
 
 /**
+ * Why the nyaa provider cannot run. One union, exported, because the same list
+ * is restated in `subtitleHarvest.ts`'s offer and the two drifted the moment a
+ * fifth reason existed.
+ */
+export type NyaaUnavailableReason =
+  | 'not-configured'
+  | 'no-indexer'
+  | 'qbit-disabled'
+  | 'qbit-remote'
+  | 'qbit-no-credential';
+
+/**
+ * Whether the qBittorrent settings can authenticate at all, for the mode in
+ * force. Pure: the caller supplies the vault's answer for the ref the mode uses,
+ * because only main can ask.
+ *
+ * Checked up front for the same reason `qbit-remote` is: without it a profile
+ * with no credential passes availability, searches an index, resolves a magnet
+ * and only then refuses — the identical failure four steps later, where it reads
+ * as "the download broke" rather than "you never entered a password".
+ */
+export function qbitCredentialGap(input: {
+  qbittorrent: Pick<ScraperQbittorrentSettings, 'authMode' | 'username' | 'passwordRef' | 'apiKeyRef'>;
+  /** `hasScraperSecret(ref)` for the ref the mode actually reads. */
+  secretStored: boolean;
+}): { mode: 'apiKey' | 'password'; detail: string } | null {
+  const config = input.qbittorrent;
+  // Anything stored before key mode existed is a password, matching main's own
+  // `authModeOf` — a config that predates the field must not be read as a key.
+  const mode = config.authMode === 'apiKey' ? 'apiKey' : 'password';
+
+  if (mode === 'apiKey') {
+    if (!config.apiKeyRef?.trim()) {
+      return { mode, detail: 'qBittorrent is set to API key authentication, but no key has been entered.' };
+    }
+    if (!input.secretStored) {
+      return { mode, detail: 'The saved qBittorrent API key is no longer in this machine’s secret store. Enter it again.' };
+    }
+    return null;
+  }
+
+  if (!config.username?.trim()) {
+    return { mode, detail: 'qBittorrent is set to username and password, but no username has been entered.' };
+  }
+  if (!config.passwordRef?.trim()) {
+    return { mode, detail: 'qBittorrent is set to username and password, but no password has been entered.' };
+  }
+  if (!input.secretStored) {
+    return { mode, detail: 'The saved qBittorrent password is no longer in this machine’s secret store. Enter it again.' };
+  }
+  return null;
+}
+
+/** The ref `qbitCredentialGap` needs the vault's answer for. Empty means "nothing to ask". */
+export function qbitCredentialRef(
+  config: Pick<ScraperQbittorrentSettings, 'authMode' | 'passwordRef' | 'apiKeyRef'>,
+): string {
+  const ref = config.authMode === 'apiKey' ? config.apiKeyRef : config.passwordRef;
+  return (ref ?? '').trim();
+}
+
+/**
  * The same config as it arrives over IPC, where it is `unknown`.
  *
  * Anything not carrying all three pieces is treated as absent, which disables

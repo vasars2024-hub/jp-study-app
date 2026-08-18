@@ -243,7 +243,7 @@ export async function listSubtitleHarvest(
 /**
  * Whether the nyaa fallback could run, in nyaa's own words.
  *
- * Reuses `nyaaAvailability` rather than re-deriving the conditions: its four
+ * Reuses `nyaaAvailability` rather than re-deriving the conditions: its five
  * refusals are measured behaviour that P6 already leans on, and a second
  * opinion here could tell the user the fallback is available while the fetch
  * path refuses it.
