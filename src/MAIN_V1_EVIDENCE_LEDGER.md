@@ -25735,3 +25735,43 @@ control also states the limit: `redactLogText` is **pattern**-based, so a bare t
 builds such a line, not that any such line would be caught.
 
 `0ff6507a`. Not claimed: no real daemon was involved. Phase 9.2 (gates 6–10) needs one.
+
+## 2026-08-18 — Track 9 / Phase 9.2: gates 6 and 8 close on the real daemon (`primary`)
+
+Restarted the dev app first (pid 43884 → **31240**): the running instance started 11:01, before
+`a3a361aa` at 11:28, so its main process had no `authMode` and every reading would have been of
+code three commits old. Main does not hot-reload; this is not optional.
+
+**Control before and after:** no-credential `GET /api/v2/app/version` → **403**, `X-Api-Key` →
+**403**. `LocalHostAuth=true` is in force, so a 200 means a credential authenticated.
+
+**Gate 6 PASSES.** Key mode with `username: ''` and `passwordRef: ''` — `connected`, v**5.2.3**,
+**185 ms**, `connection: connected`, `authMode: apiKey`. Nothing could fall back to a password
+because none was reachable from that call.
+
+**Gate 8 PASSES**, and it is the one the field exists for. Wrong key → "qBittorrent rejected the
+API key.", `apiKey`, **1 ms**, one attempt. Wrong password → "The username or password was
+rejected.", `password`, **71 ms** — a real login round-trip the daemon refused. Distinct strings,
+distinct modes, no generic failure, no false success. Run control: a nonexistent ref refused in
+**0 ms** without touching the network.
+
+**Gate 7 is BLOCKED, and that is a measurement, not a shrug.** It returned `unauthorized` / "No
+password is stored for this account." in **9 ms**. `scraperHasCredential` then asked the vault
+directly: `qbit/apikey` **true**, `qbit/webui` **false**. The WebUI password exists only in the
+user's head. Logged in `needs-user.md`.
+
+Method note worth reusing: nothing was written. Wrong credentials ride `ScraperQbitInput.password`
+/ `.apiKey`, which `resolvePassword`/`resolveApiKey` prefer over the vault, so a full wrong-
+credential matrix runs against a live daemon without touching the user's secrets. Walk kept at
+`debug/p92-walk.js` (gitignored).
+
+**Finding for the next slice.** `passwordRef: 'qbit/webui'` is set in settings while the vault holds
+nothing, and `TorrentManagerPage.tsx:256` builds the credential pill from the **ref**. In password
+mode that surface says "password stored" beside a test saying none is. Phase 9.0 fixed the *mode*
+half of this pill and left the *existence* half; `scraperHasCredential` (handler
+`scraper/index.ts:244`, preload `preload.ts:2917`) is the instrument.
+
+Gate 9 instrument, already in the client: `07ea0e8a84626e1152a357ffab2da7be37abe57a`, category
+`jp-study-subtitles` — only `qbitAddStopped` writes that, so it is the app's own torrent, paused at
+progress 1, with no user priorities to clobber. Five of gate 9's six operations are not on
+`window.api` at all; reaching them needs either a debug channel or a real Phase 9.3 acquisition.

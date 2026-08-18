@@ -525,6 +525,38 @@ Run with `LocalHostAuth=true` and the 403 control passing, against a real daemon
     refuses to start the WebUI at all when credentials are unset and logs
     `WebUI: Credentials are not set` — that state must be reported honestly, not as a timeout.
 
+**Phase 9.2, 2026-08-18: gates 6 and 8 CLOSE against the real daemon. 7, 9, 10 stay open.**
+Run through the live app (pid 31240, restarted onto `0ff6507a` first — the previous instance
+predated `a3a361aa` and its main process had no `authMode`), driving `window.api.scraperQbitTest`
+via `debug/p92-walk.js`. Non-destructive: no vault write, no settings write; wrong credentials were
+passed **on the call** (`password` / `apiKey` on `ScraperQbitInput`) rather than stored.
+**Control, verified before and after the run:** a no-credential request to
+`127.0.0.1:8080/api/v2/app/version` returns **403**, and `X-Api-Key` returns **403** —
+`LocalHostAuth=true` is genuinely in force, so a 200 means a credential actually authenticated.
+
+| gate | result |
+| --- | --- |
+| **6** key mode, no password anywhere | **PASSES** — `connected`, v**5.2.3**, **185 ms**, `connection: connected`, `authMode: apiKey`, with `username: ''` and `passwordRef: ''` so nothing could fall back to a password |
+| **7** password mode, no key anywhere | **BLOCKED, not failed** — `unauthorized` / "No password is stored for this account." in **9 ms**, never reaching the network. `scraperHasCredential` asked the vault directly: `qbit/apikey` **true**, `qbit/webui` **false**. Only the user has that password |
+| **8** wrong key vs wrong password | **PASSES** — key: "qBittorrent rejected the API key.", `apiKey`, **1 ms**, one attempt, no retry. Password: "The username or password was rejected.", `password`, **71 ms**, a real login round-trip the daemon refused. Two distinct strings, two distinct `authMode`s, neither generic, neither a false success |
+| **9** six operations, both modes | **1 of 6 in one mode** — `qbitTransfers` returned **7** real rows in key mode. The other five are not on `window.api` (they are internal to `subtitleNyaaSource`), and the password half is blocked by gate 7 |
+| **10** WebUI disabled | **not run** — the only honest instrument is disabling the WebUI on the user's own running client, which is their app, not ours |
+
+Run control: a config naming a ref that does not exist (`qbit/does-not-exist`) refused in **0 ms**
+with "No API key is stored for this connection." — the refusal path is reached, not skipped.
+
+**Finding, from the same run — the password pill claims a credential the vault does not hold.**
+`relay-probe` has `passwordRef: 'qbit/webui'` set while the vault has nothing behind it, and
+`TorrentManagerPage.tsx:256` renders the credential pill from the **ref**, not the vault. In
+password mode it would read "password stored" next to a connection test saying "No password is
+stored for this account." That is the same false-honest-state family Phase 9.0 just fixed one
+surface of, and the fix is available: `scraperHasCredential` already runs main handler
+(`scraper/index.ts:244`) → preload (`preload.ts:2917`). It is the next slice.
+
+Gate 9 has an instrument waiting: hash `07ea0e8a84626e1152a357ffab2da7be37abe57a` is in category
+`jp-study-subtitles`, which only `qbitAddStopped` ever writes — so it is the **app's own** torrent,
+paused at progress 1, and carries no user-chosen file priorities to clobber.
+
 ### Phase 9.3 — real acquisition gates (network side effects — attended runs only)
 
 These download from a public swarm on the user's connection. **Never run unattended, and never as
