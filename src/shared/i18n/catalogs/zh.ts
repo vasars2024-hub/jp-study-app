@@ -8877,6 +8877,10 @@ export const zh: Catalog = {
   'ankiWorkbench.inspector.noteType': '笔记类型：{name}',
   'ankiWorkbench.inspector.decks': '牌组：{names}',
   'ankiWorkbench.inspector.cards': '卡片：{count}',
+  'ankiWorkbench.inspector.cardsWouldGrow':
+    '这些字段现在会生成 {will} 张卡片，而笔记只有 {has} 张。应用时 Anki 会创建差额部分。',
+  'ankiWorkbench.inspector.cardsWouldShrink':
+    '这些字段现在会生成 {will} 张卡片，而笔记有 {has} 张。多出的部分会在应用时消失。',
   'ankiWorkbench.inspector.tags': '标签',
   'ankiWorkbench.inspector.tagsHint': '用空格分隔。标签本身不能包含空格。',
   'ankiWorkbench.inspector.clozeAdded': '这会新增填空 {ords}。应用时 Anki 会为它生成一张新卡片。',
@@ -8886,6 +8890,7 @@ export const zh: Catalog = {
   'ankiWorkbench.inspector.provenance': '来源：{sources}',
   'ankiWorkbench.preview.title': '卡片预览',
   'ankiWorkbench.preview.siblings': '此笔记生成的卡片',
+  'ankiWorkbench.preview.tabProblems': '{label} — {count} 个问题',
   'ankiWorkbench.preview.sideGroup': '面',
   'ankiWorkbench.preview.viewportGroup': '宽度',
   'ankiWorkbench.preview.themeGroup': '主题',

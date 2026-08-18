@@ -8932,6 +8932,10 @@ export const ja: Catalog = {
   'ankiWorkbench.inspector.noteType': 'ノートタイプ: {name}',
   'ankiWorkbench.inspector.decks': 'デッキ: {names}',
   'ankiWorkbench.inspector.cards': 'カード: {count}',
+  'ankiWorkbench.inspector.cardsWouldGrow':
+    '現在このフィールドは {will} 枚のカードを生成しますが、ノートが持つのは {has} 枚です。適用時に Anki が差分を作成します。',
+  'ankiWorkbench.inspector.cardsWouldShrink':
+    '現在このフィールドは {will} 枚のカードを生成しますが、ノートが持つのは {has} 枚です。残りは適用時に削除されます。',
   'ankiWorkbench.inspector.tags': 'タグ',
   'ankiWorkbench.inspector.tagsHint': 'スペース区切り。タグ自体にスペースは使えません。',
   'ankiWorkbench.inspector.clozeAdded':
@@ -8943,6 +8947,7 @@ export const ja: Catalog = {
   'ankiWorkbench.inspector.provenance': '出典: {sources}',
   'ankiWorkbench.preview.title': 'カードのプレビュー',
   'ankiWorkbench.preview.siblings': 'このノートが生成するカード',
+  'ankiWorkbench.preview.tabProblems': '{label} — 問題 {count} 件',
   'ankiWorkbench.preview.sideGroup': '面',
   'ankiWorkbench.preview.viewportGroup': '幅',
   'ankiWorkbench.preview.themeGroup': 'テーマ',

@@ -9743,6 +9743,10 @@ export const ru: Catalog = {
   'ankiWorkbench.inspector.noteType': 'Тип заметки: {name}',
   'ankiWorkbench.inspector.decks': 'Колоды: {names}',
   'ankiWorkbench.inspector.cards': 'Карточек: {count}',
+  'ankiWorkbench.inspector.cardsWouldGrow':
+    'Сейчас эти поля создают карточек: {will}, а в заметке их {has}. При применении Anki создаст недостающие.',
+  'ankiWorkbench.inspector.cardsWouldShrink':
+    'Сейчас эти поля создают карточек: {will}, а в заметке их {has}. Остальные исчезнут при применении.',
   'ankiWorkbench.inspector.tags': 'Метки',
   'ankiWorkbench.inspector.tagsHint': 'Разделяются пробелами. В самой метке пробела быть не может.',
   'ankiWorkbench.inspector.clozeAdded':
@@ -9754,6 +9758,7 @@ export const ru: Catalog = {
   'ankiWorkbench.inspector.provenance': 'Источник: {sources}',
   'ankiWorkbench.preview.title': 'Предпросмотр карточки',
   'ankiWorkbench.preview.siblings': 'Карточки, которые создаёт эта заметка',
+  'ankiWorkbench.preview.tabProblems': '{label} — проблем: {count}',
   'ankiWorkbench.preview.sideGroup': 'Сторона',
   'ankiWorkbench.preview.viewportGroup': 'Ширина',
   'ankiWorkbench.preview.themeGroup': 'Тема',

@@ -31,6 +31,7 @@ import {
   type AnkiDraftEditJournal,
 } from '../../../shared/ankiDraftEdit';
 import { readEnrichProvenance } from '../../../shared/ankiEnrich';
+import { noteCardCensus } from '../../../shared/ankiTemplateRender';
 import { useT } from '../../i18n';
 import DeckWorkbenchPreview from './DeckWorkbenchPreview';
 
@@ -65,6 +66,10 @@ export default function DeckWorkbenchInspector({
   }, [note.id, note.tags]);
 
   const noteType = draft.noteTypes.find((nt) => nt.id === note.noteTypeId);
+  // Recomputed on every render, like the provenance line and for the same
+  // reason: a field edit changes what the note generates without changing what
+  // it holds, and a cached count would keep claiming the pre-edit shape.
+  const census = noteCardCensus(draft, note);
   const deckNames = draft.cards
     .filter((c) => c.noteId === note.id)
     .map((c) => draft.decks.find((d) => d.id === c.deckId)?.name)
@@ -96,7 +101,17 @@ export default function DeckWorkbenchInspector({
       <ul className="wb-inspector-facts">
         <li>{t('ankiWorkbench.inspector.noteType', { name: noteType?.name ?? '—' })}</li>
         <li>{t('ankiWorkbench.inspector.decks', { names: deckNames.join(', ') || '—' })}</li>
-        <li>{t('ankiWorkbench.inspector.cards', { count: note.cardIds.length })}</li>
+        <li>{t('ankiWorkbench.inspector.cards', { count: census.existing })}</li>
+        {census.differs && (
+          <li className="wb-inspector-warning" data-generated={census.generated} role="status">
+            {t(
+              census.generated > census.existing
+                ? 'ankiWorkbench.inspector.cardsWouldGrow'
+                : 'ankiWorkbench.inspector.cardsWouldShrink',
+              { has: census.existing, will: census.generated },
+            )}
+          </li>
+        )}
       </ul>
 
       {note.fields.map((field) => {

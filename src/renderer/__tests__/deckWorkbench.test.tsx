@@ -912,6 +912,75 @@ describe('DeckWorkbench', () => {
     );
   });
 
+  it('reconciles the cards a note holds with the cards its fields now generate', async () => {
+    // Gate 6: a field edit never creates a card, so after adding a deletion the
+    // facts line and the preview's sibling strip stop agreeing. Saying only one
+    // of the two numbers is what "confusing fields with generated cards" means.
+    const d = browsable();
+    d.noteTypes[0]!.kind = 'cloze';
+    d.notes[0]!.fields[0] = { ord: 0, name: 'Expression', raw: '{{c1::ねこ}}', normalized: 'ねこ' };
+    await toBrowse(d);
+    await click(host.querySelectorAll('.wb-browser-cell')[0] as HTMLElement);
+
+    // Control: one deletion, one card, no reconciliation line at all.
+    const facts = () => host.querySelector('.wb-inspector-facts')!;
+    expect(facts().textContent).toContain('ankiWorkbench.inspector.cards:1');
+    expect(facts().querySelector('[data-generated]')).toBeNull();
+
+    // Re-queried after every commit: the textarea is keyed on `field.raw`, so
+    // a blur remounts it and a held reference writes into a detached node.
+    const box = () => host.querySelector('.wb-inspector-input') as HTMLTextAreaElement;
+    await type(box(), '{{c1::ねこ}} {{c2::猫}}');
+    await blur(box());
+    const line = facts().querySelector('[data-generated]')!;
+    expect(line.getAttribute('data-generated')).toBe('2');
+    expect(line.textContent).toContain('ankiWorkbench.inspector.cardsWouldGrow');
+    // The count of cards the note *holds* is unchanged — the two numbers are
+    // different answers, not one number the edit updated.
+    expect(facts().textContent).toContain('ankiWorkbench.inspector.cards:1');
+
+    // And back down: one deletion again, and the reconciliation line is gone.
+    await type(box(), '{{c1::ねこ}} 猫');
+    await blur(box());
+    expect(facts().querySelector('[data-generated]')).toBeNull();
+  });
+
+  it('names the sibling an edit broke, instead of an aria-hidden exclamation mark', async () => {
+    const d = browsable();
+    d.noteTypes[0]!.templates = [
+      {
+        ord: 0,
+        name: 'Card 1',
+        qfmt: '{{Expression}}',
+        afmt: '{{FrontSide}}<hr id=answer>{{Meaning}}',
+        bqfmt: '',
+        bafmt: '',
+      },
+      {
+        ord: 1,
+        name: 'Card 2',
+        qfmt: '{{Meaning}}',
+        afmt: '{{FrontSide}}<hr id=answer>{{Expression}}',
+        bqfmt: '',
+        bafmt: '',
+      },
+    ];
+    await toBrowse(d);
+    await click(host.querySelectorAll('.wb-browser-cell')[0] as HTMLElement);
+
+    const tabs = () => [...host.querySelectorAll('.wb-preview-tab')] as HTMLButtonElement[];
+    expect(tabs()).toHaveLength(2);
+    // Control: a healthy sibling carries no accessible-name override.
+    expect(tabs()[1]!.getAttribute('aria-label')).toBeNull();
+
+    // Emptying `Meaning` breaks Card 2's question while Card 1 is on screen.
+    const meaning = () => host.querySelectorAll('.wb-inspector-input')[1] as HTMLTextAreaElement;
+    await type(meaning(), '');
+    await blur(meaning());
+    expect(tabs()[1]!.getAttribute('aria-label')).toContain('ankiWorkbench.preview.tabProblems');
+    expect(tabs()[0]!.getAttribute('aria-label')).toBeNull();
+  });
+
   it('drops the edit journal when a different source replaces the draft', async () => {
     // An op names a note id; replaying it against another deck would write one
     // deck's text into a note that merely shares an id.

@@ -91,6 +91,17 @@ export default function DeckWorkbenchPreview({
               type="button"
               role="tab"
               aria-selected={i === cardIndex}
+              // The `!` is decorative, so the count it stands for has to reach
+              // the accessible name instead — an edit that breaks a sibling the
+              // user is not looking at is otherwise announced as nothing at all.
+              aria-label={
+                card.problems.length > 0
+                  ? t('ankiWorkbench.preview.tabProblems', {
+                      label: card.label,
+                      count: card.problems.length,
+                    })
+                  : undefined
+              }
               className={`wb-preview-tab${i === cardIndex ? ' active' : ''}`}
               onClick={() => setCardIndex(i)}
             >

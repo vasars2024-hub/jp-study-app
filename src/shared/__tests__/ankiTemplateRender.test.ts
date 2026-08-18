@@ -10,6 +10,7 @@ import {
   cardOrdsOfNote,
   clozeOrdinalsOfNote,
   fieldIsEmpty,
+  noteCardCensus,
   noteLevelProblems,
   parseClozeChunks,
   renderAnkiCard,
@@ -518,5 +519,106 @@ describe('buildRepresentativeSample', () => {
     expect(kept.has('empty-render') || kept.has('validation-failing')).toBe(true);
     // And it says so, rather than implying the deck had no ordinary card.
     expect(sample.absentReasons).toContain('first');
+  });
+});
+
+describe('noteCardCensus', () => {
+  // Optional reverse, in Anki's own shape: Card 2 is gated on a separate flag
+  // field, not on the content field. Gating it on `Back` would make an empty
+  // `Back` read as `empty-question`, because forcing the section open still
+  // renders nothing — which is the renderer telling the truth, and the reason
+  // this fixture needs the third field.
+  const reverseType: AnkiDraftNoteType = {
+    ...basic,
+    id: 'reverse',
+    name: 'Basic (optional reversed)',
+    fields: [...basic.fields, { ord: 2, name: 'Add Reverse', sticky: false, rtl: false }],
+    templates: [
+      ...basic.templates,
+      {
+        ord: 1,
+        name: 'Card 2',
+        qfmt: '{{#Add Reverse}}{{Back}}{{/Add Reverse}}',
+        afmt: '{{FrontSide}}<hr id=answer>{{Front}}',
+        bqfmt: '',
+        bafmt: '',
+      },
+    ],
+  };
+
+  function censusDraft(n: AnkiDraftNote, cards: AnkiDraftCard[]): AnkiDraft {
+    return draftOf([n], { noteTypes: [basic, clozeType, reverseType], cards });
+  }
+
+  it('says nothing when the cards a note holds are the cards it generates', () => {
+    const n = note({ id: 'n1', cardIds: ['c1'] });
+    const census = noteCardCensus(censusDraft(n, [card({ id: 'c1', noteId: 'n1' })]), n);
+    expect(census).toEqual({ existing: 1, generated: 1, differs: false });
+  });
+
+  it('counts the card a new cloze deletion would create, which the note does not hold yet', () => {
+    const n = note({
+      id: 'n1',
+      noteTypeId: 'cloze',
+      // Two deletions, one card: `setNoteField` never touches `cardIds`.
+      fields: [field(0, 'Text', '{{c1::ねこ}}が{{c2::すき}}'), field(1, 'Extra', '')],
+      cardIds: ['c1'],
+    });
+    const census = noteCardCensus(censusDraft(n, [card({ id: 'c1', noteId: 'n1' })]), n);
+    expect(census).toEqual({ existing: 1, generated: 2, differs: true });
+  });
+
+  it('counts the card a removed cloze deletion would orphan', () => {
+    const n = note({
+      id: 'n1',
+      noteTypeId: 'cloze',
+      fields: [field(0, 'Text', '{{c1::ねこ}}がすき'), field(1, 'Extra', '')],
+      cardIds: ['c1', 'c2'],
+    });
+    const cards = [
+      card({ id: 'c1', noteId: 'n1', ord: 0 }),
+      card({ id: 'c2', noteId: 'n1', ord: 1 }),
+    ];
+    const census = noteCardCensus(censusDraft(n, cards), n);
+    expect(census).toEqual({ existing: 2, generated: 1, differs: true });
+  });
+
+  it('does not count a card a conditional suppresses — an optional reverse is not a missing card', () => {
+    const n = note({
+      id: 'n1',
+      noteTypeId: 'reverse',
+      fields: [field(0, 'Front', 'ねこ'), field(1, 'Back', 'cat'), field(2, 'Add Reverse', '')],
+      cardIds: ['c1'],
+    });
+    const draft = censusDraft(n, [card({ id: 'c1', noteId: 'n1' })]);
+    expect(renderNoteCards(draft, n)[1]!.problems.map((p) => p.code)).toEqual([
+      'conditional-card-not-generated',
+    ]);
+    expect(noteCardCensus(draft, n)).toEqual({ existing: 1, generated: 1, differs: false });
+  });
+
+  it('reports the sibling an edit turned on, so filling a field is not a silent card', () => {
+    const n = note({
+      id: 'n1',
+      noteTypeId: 'reverse',
+      fields: [field(0, 'Front', 'ねこ'), field(1, 'Back', 'cat'), field(2, 'Add Reverse', 'y')],
+      cardIds: ['c1'],
+    });
+    const census = noteCardCensus(censusDraft(n, [card({ id: 'c1', noteId: 'n1' })]), n);
+    expect(census).toEqual({ existing: 1, generated: 2, differs: true });
+  });
+
+  it('keeps a card that renders badly in the count — broken is not absent', () => {
+    // NEGATIVE CONTROL for the `conditional-card-not-generated` rule: an empty
+    // question with no conditional behind it must NOT lower `generated`, or a
+    // broken card would quietly read as one the note was never going to make.
+    const n = note({
+      id: 'n1',
+      fields: [field(0, 'Front', ''), field(1, 'Back', 'cat')],
+      cardIds: ['c1'],
+    });
+    const draft = censusDraft(n, [card({ id: 'c1', noteId: 'n1' })]);
+    expect(renderNoteCards(draft, n)[0]!.problems.map((p) => p.code)).toContain('empty-question');
+    expect(noteCardCensus(draft, n)).toEqual({ existing: 1, generated: 1, differs: false });
   });
 });

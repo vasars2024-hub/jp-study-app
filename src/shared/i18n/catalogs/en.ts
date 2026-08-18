@@ -9357,6 +9357,10 @@ export const en: Catalog = {
   'ankiWorkbench.inspector.noteType': 'Note type: {name}',
   'ankiWorkbench.inspector.decks': 'Decks: {names}',
   'ankiWorkbench.inspector.cards': 'Cards: {count}',
+  'ankiWorkbench.inspector.cardsWouldGrow':
+    'These fields now generate {will} cards, and the note holds {has}. Anki would create the difference on commit.',
+  'ankiWorkbench.inspector.cardsWouldShrink':
+    'These fields now generate {will} cards, and the note holds {has}. The rest would go away on commit.',
   'ankiWorkbench.inspector.tags': 'Tags',
   'ankiWorkbench.inspector.tagsHint': 'Separated by spaces. A tag cannot contain a space.',
   'ankiWorkbench.inspector.clozeAdded':
@@ -9368,6 +9372,7 @@ export const en: Catalog = {
   'ankiWorkbench.inspector.provenance': 'Written from: {sources}',
   'ankiWorkbench.preview.title': 'Card preview',
   'ankiWorkbench.preview.siblings': 'Cards this note generates',
+  'ankiWorkbench.preview.tabProblems': '{label} — {count} problems',
   'ankiWorkbench.preview.sideGroup': 'Side',
   'ankiWorkbench.preview.viewportGroup': 'Width',
   'ankiWorkbench.preview.themeGroup': 'Theme',

@@ -656,6 +656,41 @@ export function renderNoteCards(draft: AnkiDraft, note: AnkiDraftNote): Rendered
   );
 }
 
+export interface NoteCardCensus {
+  /** Cards the draft holds for this note right now. */
+  existing: number;
+  /** Cards this note's current fields and templates would generate on commit. */
+  generated: number;
+  /** True when the two disagree — an edit has changed what the note generates. */
+  differs: boolean;
+}
+
+/**
+ * Reconcile the cards a note *has* with the cards its fields would *generate* —
+ * acceptance gate 6, "without confusing fields with generated cards".
+ *
+ * A field edit never creates or deletes a card: `setNoteField` rewrites the
+ * field and leaves `cardIds` alone, because the cards are Anki's to make on
+ * commit. So the moment a cloze deletion is added or a conditional stops
+ * matching, the note's own card count and the preview's sibling strip stop
+ * agreeing, and neither of them is wrong — they answer different questions. A
+ * surface that shows only one of the two numbers is telling the user a card
+ * exists that does not, or hiding one that is about to.
+ *
+ * **`conditional-card-not-generated` is the only render problem counted as "no
+ * card here".** It is the one code whose documented meaning is that Anki
+ * generates nothing at this ord. `empty-question` is a card that renders badly,
+ * not a card that is absent, and the preview already says so in its own words;
+ * folding it in here would make a broken card silently lower the count instead.
+ */
+export function noteCardCensus(draft: AnkiDraft, note: AnkiDraftNote): NoteCardCensus {
+  const existing = note.cardIds.length;
+  const generated = renderNoteCards(draft, note).filter(
+    (card) => !card.problems.some((p) => p.code === 'conditional-card-not-generated'),
+  ).length;
+  return { existing, generated, differs: existing !== generated };
+}
+
 /** Media the source actually holds, keyed by leaf name. */
 export function draftMediaPresence(draft: AnkiDraft): (fileName: string) => boolean {
   const names = new Set<string>();
