@@ -300,3 +300,42 @@ text on white. The same mix trick works (42% clears it) but visibly desaturates 
 dark themes, where the accent is an identity element, so it is a real product decision rather
 than a mechanical repeat. The last 6 are `.fwin` chrome (`fwin-title-text` 1.55:1, `fwin-b`
 1.49:1) and belong with the window frame, not the Dictionary.
+
+## 2026-08-18 — the instrument was measuring the previous palette, on every run so far
+
+The last 6 failures looked like `.fwin` chrome painting `#d8ebe0` / `#7fa08e` on a light ground.
+Those are forest-night's `--text` and `--muted`. Under classic-light the var chain reads
+`#1e1e1e` at **every** element from `<html>` down to `.fwin-title`, so no rule was hardcoding
+them — and `.fwin.fwin-liquid .fwin-title { color: var(--lq-liquid-text) }` is the winning rule
+and it was resolving correctly.
+
+**`/eval` is synchronous, so the measurement runs in the same task as `applyTheme`, before a
+transition has advanced one frame.** `.fwin-title` transitions `color` over 140ms, `.fwin-b`
+over 80ms. Both reported the OLD palette's colour against the NEW palette's background. Applied
+in one call and measured in a second, two seconds later: `rgb(30,30,30)` and `rgb(95,95,102)` —
+correct for classic-light.
+
+**Fix:** `l1-palette-contrast.js` installs a `transition: none !important` sheet before the
+first switch and removes it in the `finally`. Setting `transition: none` snaps a running
+transition to its target, which is the wanted value. The output now carries `frozen` and
+`thawed`; a run with `frozen: false` is void.
+
+**This invalidates every palette number this instrument has produced, in both directions:**
+
+| palette | before freeze | after freeze |
+| --- | --- | --- |
+| forest-night | 4.92:1, 0 failing | 4.92:1, 0 failing |
+| classic-light | 1.39:1, 10 failing | **1.92:1, 9 failing** |
+| high-contrast | 6.12:1, 0 failing | **9.89:1**, 0 failing |
+
+High-contrast's minimum was understated by 3.77 — the lag fabricates a PASS exactly as readily
+as a failure, and that is the more dangerous direction.
+
+**Control, red:** the same tree measured unfrozen gives back the 6 artefact rows —
+`fwin-title-text` at 1.55:1 with `#d8ebe0`, `fwin-b` at 1.49:1 with `#7fa08e`.
+
+**What is actually left on classic-light: 9, and only 5 are chrome.** `.fwin-b` is a real but
+modest gap — `--muted` `#5f5f66` on the title bar at **3.28:1**, not the 1.49:1 previously
+recorded; fixing it means moving a shell chrome token, which is wider than the Dictionary.
+`dict-reading` x3 + `dict-ex-btn` x1 at 1.92:1 remain the `var(--accent-2)`-as-text decision.
+`fwin-title-text` was never a defect.

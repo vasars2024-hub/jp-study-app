@@ -15,6 +15,14 @@
  *    on an empty registry silently falls back to the default theme — every palette then measures
  *    identically and the run reads as "contrast is palette-independent". `registered` below is
  *    the guard: if it is not 13, throw the run away.
+ * 3. /eval is SYNCHRONOUS, so the measurement happens in the same task as `applyTheme` — before
+ *    any CSS transition has advanced a frame. `.fwin-title` transitions `color` over 140ms and
+ *    `.fwin-b` over 80ms, so both reported the PREVIOUS palette's colour against the NEW
+ *    palette's background: 6 fabricated failures (#d8ebe0 and #7fa08e, forest-night's --text and
+ *    --muted, measured on a white ground). Settled, they are #1e1e1e and #5f5f66 and correct.
+ *    The same lag can fabricate a PASS just as easily. `freezeTransitions` below cancels every
+ *    running transition so each measurement is of the settled value; it is removed in a
+ *    `finally`, and `frozen` in the output is the proof it was actually installed.
  *
  * The probe is a two-parter because the bridge's /eval is synchronous and a promise serialises
  * to `{}`. Run `l1-palette-contrast-load.js` first; it parks the live module on
@@ -146,11 +154,25 @@
     };
   };
 
+  // Cancels in-flight transitions so every sample is the settled value. `transition: none`
+  // on a running transition snaps it to its target, which is exactly the number wanted.
+  const FREEZE_ID = 'lq-palette-freeze';
+  const freezeTransitions = () => {
+    const el = document.createElement('style');
+    el.id = FREEZE_ID;
+    el.textContent = '*, *::before, *::after { transition: none !important; animation: none !important; }';
+    document.head.appendChild(el);
+  };
+  const thawTransitions = () => document.getElementById(FREEZE_ID)?.remove();
+
   const startTheme = document.documentElement.getAttribute('data-theme') || 'study-os';
   const storedBefore = localStorage.getItem('jp-os-theme');
   const out = {};
   const tint = {};
+  let frozen = false;
   try {
+    freezeTransitions();
+    frozen = !!document.getElementById(FREEZE_ID);
     for (const id of PALETTES) {
       mod.applyTheme(id, { persist: false });
       const cs = getComputedStyle(document.documentElement);
@@ -167,11 +189,16 @@
     }
   } finally {
     mod.applyTheme(startTheme, { persist: false });
+    thawTransitions();
   }
 
   return JSON.stringify({
     registered,
     parserSelfTest: selfTest,
+    // Must be true. A run with `frozen: false` measured mid-transition and every
+    // transitioned property in it is the previous palette's value.
+    frozen,
+    thawed: !document.getElementById(FREEZE_ID),
     presentation: win.getAttribute('data-presentation'),
     box: `${Math.round(WR.width)}x${Math.round(WR.height)}`,
     restoredTo: document.documentElement.getAttribute('data-theme'),
