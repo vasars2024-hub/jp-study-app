@@ -25269,3 +25269,53 @@ control ("broken is not absent") red. One each, on the intended case.
    zstd `collection.anki21b`. Four decks read as "notes=1" before this was spotted; a builder that
    does not do zstd needs a genuinely legacy package (`Advanced.apkg`, 300 notes, ver 11).
 3. `db.exec` on a missing table **throws**; it does not return null, so `?.[0]` guards nothing.
+
+## 2026-08-18 — Track 7 / gate 7: the live commit that could only be waited out (`primary`)
+
+Worker `primary`. Gate 7 wants four interrupts. Import landed `d0a09738`; translation is
+gate 2's (30 requested → 12 answered, 18 cancelled, 0 failed). This turn takes the **live
+commit**. Re-derived: `commitConnectDraft` had **zero** cancel — no token, no registry, no
+check — so on the user's real collection the one path with no undo on our side ran to the
+end once pressed.
+
+**Decision: check the cancel BETWEEN writes, never inside one.** AnkiConnect has no
+abortable request, so a write already sent has already landed; an abort claiming otherwise
+is precisely the false success this gate exists to catch. Tradeoff: the stop is only as
+fine-grained as one write, and the button says "stop", not "cancel".
+
+**Second decision: `cancelled` is its own errorCode, not a fold into `partial`.** A partial
+is the transport failing — retryable as-is; a cancel is a decision. Never `ok`, `verified`
+is a literal `false`, and step 4 (re-read + verify) still runs so the numbers are measured.
+
+`unwritten` = `verdict.mismatches.length`, **read back out of the collection**, never
+`planned − sent`. Those two numbers genuinely differ: a call can be sent and not land.
+
+Commits: `f2825015` (model + main + IPC + preload + surface + 6 keys ×4),
+`210d98c4` (surface tests).
+
+| mutation | red | on |
+| --- | --- | --- |
+| drop the note-loop cancel check | 2 | "expected true to be false" |
+| `cancelled` branch returns `ok: true` | 1 | the stop test |
+| `unwritten` = `planned − sent` | 1 | "expected 1 to be 2" (swallowed write) |
+| request omits `commitId` | 1 | "expected 'undefined' to be 'string'" |
+| render the landed count as `unwritten` | 1 | the cancelled-result test |
+
+Numbers: connectCommit `29 → 35` cases; deckWorkbench `51 → 53`; i18n `10,595 → 10,601`
+(+6 = exactly my keys). architecture exit 0 "Nothing new", 5 pending.
+
+**Gate 7 is NOT closed and this entry does not close it.** Two things are owed and both are
+named, not hand-waved: (1) the **live leg** — AnkiConnect answers `version 6` at
+`127.0.0.1:8765` right now, but main does not hot-reload, so `anki:cancelConnectCommit` is
+not registered in the running app; it needs a restart AND a self-made fixture deck (never
+the user's own notes, and delete it after). (2) the **dry-run quarter**, which is a bigger
+slice than it looks: `planChangeTray` is a *synchronous* `useMemo`
+(`DeckWorkbenchTray.tsx:511`), so there is no point at which a cancel could be observed. A
+`shouldStop` predicate alone would be an invisible module — it needs the async chunked
+driver first, and that changes the tray's render model.
+
+**Trap for the next worker:** `preload.ts` and `renderer/window.d.ts` are dirty with the
+Study Blocks and MAL tracks — `git add` absorbs both. New generic stager
+`debug/stage-head-plus-insert.cjs <path> <anchorNeedle> <lineCount>` addresses the block by
+the N lines *preceding* an anchor, because `stage-catalog-insert.cjs` needs a unique needle
+on the block's first line and a doc comment's first line is `  /**`, which never is.

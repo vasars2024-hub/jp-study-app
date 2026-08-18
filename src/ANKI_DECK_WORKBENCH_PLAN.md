@@ -492,6 +492,37 @@ This slice is complete only when all of these can be shown with real data and no
     `abstract`, so searching `c1::` matches **0** notes. There is no way to find cloze notes by
     their markers from the search box. The walk selects by note type off the inspector instead.
 7. Interrupt a large import, translation, dry run, and live commit; recover without a false success state or an ambiguous partial result.
+
+    **Two of four quarters closed; the gate stays OPEN.** Import closed with `d0a09738` (a
+    real user cancel on the .apkg read, proven live). Translation is gate 2's, already
+    measured: **30 requested → 12 answered, 18 cancelled, 0 failed** — the spend stopped and
+    the paid-for work survived.
+
+    **The live-commit quarter is BUILT 2026-08-18** (`f2825015` model/main/IPC/preload/
+    surface + 6 keys ×4, `210d98c4` surface tests) **and not yet proven live.**
+    `commitConnectDraft` had zero cancel of any kind. The cancel is now checked BETWEEN
+    writes and never inside one — AnkiConnect has no abortable request, so a write already
+    sent has landed, and an abort claiming otherwise is the false success this gate names.
+    A stop therefore stops sending and STILL runs step 4, so the numbers are re-read out of
+    the collection. `cancelled` is its own errorCode rather than a fold into `partial` (a
+    partial is the transport failing, a cancel is a decision); it never returns `ok`,
+    `verified` is a literal `false`, and `unwritten` is `verifyConnectCommit`'s own
+    mismatch count — **measured, not `planned − sent`**, because a call can be sent and
+    still not land. Five mutations, one each on the intended case: drop the note-loop check
+    → 2 red; `ok: true` → 1 red; derive `unwritten` → 1 red ("expected 1 to be 2", the
+    swallowed-write case); omit `commitId` → 1 red; render the landed count as `unwritten`
+    → 1 red. Cases 29 → 35 (main) and 51 → 53 (renderer).
+
+    **Owed before this gate can close, both named rather than hand-waved:**
+    1. **The live leg.** AnkiConnect answers `version 6` at `127.0.0.1:8765`, but main does
+       not hot-reload, so `anki:cancelConnectCommit` is not registered in the running app.
+       Needs a restart AND a **self-made fixture deck** — never the user's own notes, and
+       deleted afterwards.
+    2. **The dry-run quarter, which is larger than it looks.** `planChangeTray` is a
+       *synchronous* `useMemo` (`DeckWorkbenchTray.tsx:511`), so there is no moment at which
+       a cancel could be observed. A `shouldStop` predicate on its own would be an invisible
+       module: it needs the async chunked driver first, and that changes the tray's render
+       model. Do not half-build it.
 8. Undo a draft action, reverse a supported committed action, and clearly explain any adapter operation that cannot be reversed.
 9. Filter and preview the 100,000-note fixture without freezing window dragging or Electron's main event loop.
 
