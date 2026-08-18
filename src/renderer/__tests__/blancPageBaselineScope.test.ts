@@ -73,8 +73,8 @@ describe('blanc.css page baseline is scoped to the Blanc document', () => {
 
   it('still declares the page baseline it owns, rather than having dropped it', () => {
     const block = BODY.match(/html\.blanc-shell body\s*\{([^}]*)\}/);
-    expect(block, 'the Blanc page baseline rule is gone entirely').not.toBeNull();
-    const decls = block![1];
+    if (!block) throw new Error('the Blanc page baseline rule is gone entirely');
+    const decls = block[1];
     for (const prop of ['background', 'color', 'font-family', 'font-size', 'overflow']) {
       expect(decls, `page baseline lost its ${prop}`).toContain(`${prop}:`);
     }
