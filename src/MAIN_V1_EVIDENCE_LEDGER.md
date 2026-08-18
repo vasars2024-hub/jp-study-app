@@ -25470,3 +25470,62 @@ tag. Only this app's two wrappers are touched; the user's own `<span class="mine
 **Probe trap for the next worker:** `AnkiDraftNote.tags` is an ARRAY, so `was.tags === now.tags`
 is false on every note and reads as a total control failure — the first run of the negative
 control reported `0 / 1,997` for exactly that reason and nothing was wrong with the code.
+
+## 2026-08-18 — Track 7 / gate 8 clause 2 BUILT AND PROVEN LIVE: reversing a commit (`primary`)
+
+`b09acf71` shared model + 16 cases, `98e4a14c` step 7's panel + 4 renderer cases + 14 keys ×4.
+
+**Decision, and it is why this is one slice rather than three.** A reversal is an ordinary
+`ApkgExportChangeSet` built from the before-images every journal op already carries, so it
+goes back out on the SAME `apkg:export` / `anki:commitConnectDraft`, the same fingerprint
+guard and the same verifier — no new transport, no new writer, no new IPC. Tradeoff: the
+inverse is only as expressive as the change set, which is exactly what makes the refusals
+below honest rather than a limitation discovered later.
+
+Second decision: the record is a **snapshot**, not a pointer at the live draft. A user who
+commits and keeps editing must still be able to reverse; by then the draft's field values
+are the wrong answer. It carries the rows that landed plus each note's ord list, because
+`ApkgExportNoteChange.fields` is positional and `ord === index` is not guaranteed.
+
+Third: `fingerprint` is the destination AFTER the commit. Main already remembers the file it
+wrote under that key (`rememberApkgSource`), so the request still carries no path and the
+renderer still never names one. Reversing against the pre-commit fingerprint would edit the
+original the user still has unchanged — see the negative control.
+
+**Live walk, `debug/g8-walk.js`, real package `5y56454w54.apkg` (608 notes, page 500),
+dialog-free through the real `apkg:export`, every number re-read through the product's own
+main-process reader.** 7 journal ops → change set 3 notes / 1 flag / 1 queue / 1 scheduling.
+Commit `ok`, notesUpdated **3**, cardsUpdated **3**, `verified true`, `sha1:5a558da3…` →
+`sha1:ac00c3a1…`. Re-read: field 0 `__G8__<id>` on 3/3, tag `g8-reversal` added, flag
+`none`→`orange`, queue `review`→`suspended`, interval `1`→**42**, ease `2500`→**1900**.
+Reversal counts `{notes 3, cards 3, decks 0, templates 0}`, **0 refusals**. Reverse commit
+`ok`, **3**/**3**, `verified true` → `sha1:124ee45c…`. Re-read of the reversed package:
+**notes restored 3 / 3** (fields AND tags byte-identical to the source), **cards restored
+3 / 3** (`none`/`review`/`3,1,1`/`2500,2500,2500`). Totals 608 / 608 / 608 throughout.
+
+**Negative controls, three.** (1) The same reversal sent against the PRE-commit fingerprint
+with the committed package as source: `ok false`, **`source-changed`** — the guard blocks a
+reversal exactly as it blocks a commit, which is the whole reason no new verifier was needed.
+(2) Note `1779655102542` and card `1779655102542`, deliberately outside every edit, came back
+byte-identical after BOTH writes (`controlUntouchedThroughCommit` and
+`…ThroughReversal` both true). (3) Mutations: field revert taking `lastAfter` → 5 red; deck
+rename `from` taking the source name → 1 red; fields mapped by position → 1 red; record
+captured on a failed/stopped commit → 3 red; reversal sent against `draft.source.fingerprint`
+→ 2 red, both round trips.
+
+**What is refused, by name, and stated BEFORE the button.** A committed **template removal**
+(`template-restore-loses-scheduling`): the template could be restored, but
+`ApkgExportTemplateAdd` carries only `{noteId, deckId, due}`, so the cards it deleted would
+return as NEW and lose interval/ease/reps a second time — refused whole, never half-written.
+A design that also added a **field** (`template-unadd-field-unsupported`). A **text** export
+(`text-export-not-reversible`): it wrote a new file and never touched the original, so the
+pre-export state is still on disk under its own name. And whatever the LIVE destination
+refuses on the way out stays refused on the way back for free — a reversal of a deck rename
+through `planConnectCommit` still throws `deck-rename-unsupported`, pinned by a test, while a
+supported reversal plans real writes in the same file so the refusal is not blanket.
+
+**Honest scope.** The three refusals are measured by test with their exact counts, not live:
+a refusal writes nothing, and the removal path needs `TemplateGroup`s off the card-health
+analysis plus a package whose note types are re-encodable (`template-storage-unsupported` is
+a real answer on protobuf-only packages). Clause 3's remaining half — the statement that a
+commit is one-way — now renders on every successful commit (`reverse.oneWay`).

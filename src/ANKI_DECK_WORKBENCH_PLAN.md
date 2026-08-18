@@ -571,28 +571,44 @@ This slice is complete only when all of these can be shown with real data and no
     1. **Undo a draft action — SHIPPED.** `ankiDraftEdit.ts`'s journal plus `undoLastEdit`,
        one tray = one undo step, the history strip on every step, and step 6 restating its
        own sentence when an undo runs from there (`deckWorkbench.test.tsx:487`).
-    2. **Reverse a supported committed action — NOT BUILT.** Searched: there is no
-       `reverseCommit` / `undoCommitted` / rollback symbol anywhere under `shared/`,
-       `main/anki/` or `renderer/components/anki/`; the only `rollback` hits in the whole
-       tree belong to connection profiles, scraper profiles and the Seanime flag.
-       `ankiEditAudit.ts` exports exactly `summarizeJournal` / `appliedStepCount` /
-       `auditedNoteCount` and its only consumer is `DeckWorkbenchJournal.tsx`, which renders
-       it. So the audit journal the workflow list calls "sufficient to … reverse the commit"
-       is currently sufficient to *read* it.
-       **The slice this names, so the next worker does not re-derive it:** the journal
-       already keeps the FIRST before-image per value (that is how `buildWorkbenchReview`
-       computes a net), so a reversal is an inverse `ApkgExportChangeSet` built from those
-       before-images and committed through the destination that wrote it — no new transport,
-       no new verifier. What is genuinely new is honesty about scope: the live destination
-       can only reverse what it can write, so anything it refused by name (deck rename,
-       template add/remove, card flags) must stay refused on the way back, and a
-       source-changed fingerprint must block the reversal exactly as it blocks the commit.
-    3. **Explain what cannot be reversed — PARTIALLY SHIPPED,** and not yet checked against
-       this gate's wording: the four named live refusals carry their reasons
-       (`deck-rename-unsupported`, `template-remove-unsupported`, `template-add-unsupported`,
-       `card-flag-unsupported`), and gate 14's parity matrix carries the `read-only`/`blocked`
-       explanations. What is missing is the statement at the point of commit that the commit
-       itself is one-way, which is clause 2's surface.
+    2. **Reverse a supported committed action — BUILT AND PROVEN LIVE 2026-08-18**
+       (`b09acf71` `shared/ankiCommitReversal.ts` + 16 cases, `98e4a14c` step 7's panel +
+       4 renderer cases + 14 keys ×4). It is an ordinary `ApkgExportChangeSet` built from
+       the before-images every journal op already carries, so it goes back out on the SAME
+       `apkg:export` / `anki:commitConnectDraft`, the same fingerprint guard and the same
+       verifier — no new transport, no new writer, no new IPC. The record is a **snapshot**
+       (the rows that landed plus each note's ord list), not a pointer at the live draft, so
+       a user who commits and keeps editing can still reverse; and its `fingerprint` is the
+       destination AFTER the commit, which main already remembers the written file under.
+       **Live on the real `5y56454w54.apkg` (608 notes, page 500), dialog-free through the
+       real `apkg:export`, every value re-read through the product's own reader:** commit
+       `ok` / **3** notes / **3** cards / `verified true`, re-read shows field 0, a new tag,
+       flag `orange`, queue `suspended`, interval **42**, ease **1900**; reversal `ok` /
+       **3** / **3** / `verified true`, re-read shows **notes restored 3 / 3** byte-identical
+       in fields AND tags and **cards restored 3 / 3**. Totals 608 / 608 / 608.
+       **Three negative controls:** the same reversal against the PRE-commit fingerprint is
+       refused **`source-changed`**; a note and card outside every edit came back
+       byte-identical after both writes; and 5 mutations redden 5 / 1 / 1 / 3 / 2 on their
+       own intended cases.
+       Refused by name, stated BEFORE the button: `template-restore-loses-scheduling` (the
+       deleted cards would return as NEW, losing interval/ease/reps a second time),
+       `template-unadd-field-unsupported`, `text-export-not-reversible`. Whatever the live
+       destination refuses on the way out stays refused on the way back for free — a deck
+       rename reversal through `planConnectCommit` still throws `deck-rename-unsupported`,
+       pinned by a test, while a supported reversal plans real writes in the same file.
+       Honest scope: those three refusals are measured by test with their exact counts, not
+       live — a refusal writes nothing, and the removal path needs `TemplateGroup`s off the
+       card-health analysis plus a package whose note types are re-encodable.
+    3. **Explain what cannot be reversed — SHIPPED 2026-08-18.** The four named live refusals
+       carry their reasons (`deck-rename-unsupported`, `template-remove-unsupported`,
+       `template-add-unsupported`, `card-flag-unsupported`), gate 14's parity matrix carries
+       the `read-only`/`blocked` explanations, the three reversal refusals above name their
+       subject and their cost, and the missing piece — the statement at the point of commit
+       that the destination itself is one-way — now renders on every successful commit as
+       `ankiWorkbench.apply.reverse.oneWay`.
+
+    **GATE 8 IS CLOSED** — all three clauses: undo shipped, reversal `b09acf71`/`98e4a14c`
+    proven live on a real 608-note package, and every unreversible operation named.
 9. Filter and preview the 100,000-note fixture without freezing window dragging or Electron's main event loop.
 
     **The fixture EXISTS as of 2026-08-17**, and the main-event-loop half is CLOSED
