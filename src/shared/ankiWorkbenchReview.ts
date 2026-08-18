@@ -18,6 +18,7 @@
 import type { AnkiDraft, AnkiDraftCard, AnkiDraftNote } from './ankiDraft';
 import {
   countJournalSteps,
+  isNoteTypeOp,
   type AnkiCardScheduling,
   type AnkiDraftEditJournal,
 } from './ankiDraftEdit';
@@ -165,6 +166,13 @@ export function buildWorkbenchReview(
       cardsDeleted += op.cards.length;
       return;
     }
+    // The other note-type ops. They carry no `noteId` and no `cardId`, so the
+    // fold below would key them `c:template-add:undefined` and enter the diff
+    // pass as a note it cannot find — `template-add` already did, which is a
+    // defect this guard closes alongside admitting `template-format`. Neither
+    // belongs in a per-note diff: an add mints whole cards and a format edit
+    // spans every note of the type, and the panel reports both by other means.
+    if (isNoteTypeOp(op)) return;
     const key =
       op.kind === 'field'
         ? `f:${op.noteId}:${op.fieldOrd}`

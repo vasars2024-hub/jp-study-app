@@ -9231,6 +9231,8 @@ export const en: Catalog = {
     'A card template cannot be removed through this connection, so nothing was written. Export a package instead — the template is removed there.',
   'ankiWorkbench.apply.liveError.template-add-unsupported':
     'A card design cannot be committed through this connection, so nothing was written. Anki would decide for itself which notes get the new card, so the number this design showed you would stop being a promise. Export a package instead — it adds the template and exactly the cards you were shown.',
+  'ankiWorkbench.apply.liveError.template-format-unsupported':
+    'The front and back of a card template cannot be changed through this connection, so nothing was written. The add-on rewrites a note type’s templates all at once and by name, so anything you changed in the open Anki window would be overwritten. Export a package instead — the new front and back are written there.',
   'ankiWorkbench.apply.liveError.card-flag-unsupported':
     'A card flag cannot be set through this connection, so nothing was written. Export a package instead — the flag is set there.',
   'ankiWorkbench.apply.liveError.deck-missing':
@@ -9300,6 +9302,10 @@ export const en: Catalog = {
     'That would remove every card template of a note type, leaving its notes generating no cards at all. Nothing was written — keep at least one template.',
   'ankiWorkbench.apply.error.template-storage-unsupported':
     'This package stores no readable note-type list, so a card template cannot be added to it or removed from it. Nothing was written — every other edit exports from this package normally.',
+  'ankiWorkbench.apply.error.template-format-empty':
+    'The new front of this card references no field, so Anki would show it blank. Nothing was written — put a field on the front and it exports.',
+  'ankiWorkbench.apply.error.template-config-unreadable':
+    'This template’s stored settings could not be read, so its front and back were not rewritten rather than replaced with a guess. Nothing was written — every other edit exports from this package normally.',
   'ankiWorkbench.apply.error.template-ord-taken':
     'This card design was worked out against a different version of the package: the note type already has a template at that position. Nothing was written — re-read the source and design it again.',
   'ankiWorkbench.apply.error.template-name-taken':
@@ -10295,6 +10301,7 @@ export const en: Catalog = {
   'ankiWorkbench.parity.row.deck-name': 'Deck names',
   'ankiWorkbench.parity.row.template-remove': 'Removing a card template',
   'ankiWorkbench.parity.row.template-add': 'Adding a card template',
+  'ankiWorkbench.parity.row.template-format': 'The front and back of a card template',
   'ankiWorkbench.parity.row.note-marked': 'Marked notes',
   'ankiWorkbench.parity.row.card-flag': 'Card flags',
   'ankiWorkbench.parity.row.card-queue': 'Whether a card is suspended',
@@ -10327,6 +10334,8 @@ export const en: Catalog = {
     'The Anki add-on offers no way to remove a card template. The nearest thing it can do is blank one, which leaves every card that template made sitting in your collection rendering empty — the exact problem removing it was meant to fix. Export a package instead: the template and its cards are removed there for real.',
   'ankiWorkbench.parity.why.connect.template-add':
     'A design is a preview inside this draft. Writing to Anki sends your edit history, which has no add-template step, so the note types in your collection are left as they are.',
+  'ankiWorkbench.parity.why.connect.template-format':
+    'The Anki add-on can change a template’s front and back, but only by rewriting all of a note type’s templates at once and addressing it by name. Anything you changed in the open Anki window would be overwritten by that rewrite. Export a package instead: the new front and back are written there, in place, and every card the template already made keeps its schedule.',
   'ankiWorkbench.parity.why.connect.note-marked':
     'Anki keeps each note as marked or unmarked. No edit here changes that.',
   'ankiWorkbench.parity.why.connect.card-flag':

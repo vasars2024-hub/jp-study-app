@@ -138,6 +138,40 @@ export interface ApkgExportTemplateRemoval {
 }
 
 /**
+ * Recipe 1's rendered-template variant: two strings rewritten on a template the
+ * source already has.
+ *
+ * It creates and deletes nothing — no card row, no ord, no schedule — which is
+ * why it is its own list rather than a degenerate add. Folding it into
+ * `templateAdds` would make the writer delete every card the template generated
+ * and mint replacements with a fresh schedule, to change two fields.
+ *
+ * `bqfmt`/`bafmt` are deliberately absent, matching the journal op: the
+ * browser-appearance overrides are a separate pair Anki renders in the card list
+ * only, and swapping a card's two sides says nothing about them.
+ */
+export interface ApkgExportTemplateFormat {
+  /** The note type's id in the SOURCE package (Anki's `mid` / `notetypes.id`). */
+  noteTypeId: string;
+  /** The template's ord in the SOURCE numbering, mapped through any removals. */
+  ord: number;
+  qfmt: string;
+  afmt: string;
+  /**
+   * What the two formats held before this session touched them, carried verbatim
+   * so a reversal is exact.
+   *
+   * Here rather than re-derived from the journal because the two numberings
+   * differ: the ops are written in the DRAFT's ord numbering and this row is in
+   * the SOURCE's, and an earlier removal makes those disagree. Matching an op
+   * back to a row after the fact would re-run that mapping backwards to recover
+   * a string the op already has.
+   */
+  beforeQfmt: string;
+  beforeAfmt: string;
+}
+
+/**
  * Gate 5's flag third. The DECODED colour, never the raw `cards.flags` column:
  * its upper bits are reserved and are not in the draft, so a writer that took a
  * whole number from here could clear state nothing ever read. The package writer
@@ -180,6 +214,8 @@ export interface ApkgExportChangeSet {
   templateRemovals?: ApkgExportTemplateRemoval[];
   /** Absent on a payload written before the card designer gained a destination. */
   templateAdds?: ApkgExportTemplateAdd[];
+  /** Absent on a payload written before recipe 1's rendered-template variant. */
+  templateFormats?: ApkgExportTemplateFormat[];
   /**
    * The three gate-5 card-state lists, each absent on a payload written before
    * gate 5. Three fields rather than one `cardState` row per card, because the
@@ -265,6 +301,20 @@ export type ApkgExportErrorCode =
    * written, and the user is told which package feature is the obstacle.
    */
   | 'template-storage-unsupported'
+  /**
+   * A rewritten question format that references no field. Anki renders such a
+   * front blank and this workbench's own reader (`decodeTemplateConfig`) returns
+   * null for it, so writing one would make the template unreadable on the next
+   * import — a silent loss. Refused with the position named.
+   */
+  | 'template-format-empty'
+  /**
+   * The template's stored settings blob could not be decoded, so its formats
+   * cannot be rewritten byte-preservingly. Refused rather than replaced with a
+   * freshly-encoded config, which would drop whatever the source held beyond the
+   * four fields this build models — a deck override or browser font.
+   */
+  | 'template-config-unreadable'
   | 'compressed-unsupported'
   | 'verify-failed'
   | 'io';
@@ -351,6 +401,9 @@ export function buildApkgExportChanges(
   // Designs still standing, keyed by note type AND ord: two designs on one note
   // type are two templates, not one folded into the other.
   const added = new Map<string, ApkgExportTemplateAdd>();
+  // Keyed by note type AND source ord: two templates reformatted on one note
+  // type are two changes, not one folded into the other.
+  const templateFormats = new Map<string, ApkgExportTemplateFormat>();
   for (const op of journal.done) {
     if (op.kind === 'template-add') {
       // A design applied twice at the same ord cannot happen — `applyCardDesign`
@@ -368,6 +421,45 @@ export function buildApkgExportChanges(
         deckOverrideId: op.template.deckOverrideId,
         addedFieldName: op.addedField?.name,
         cards: op.cards.map((c) => ({ noteId: c.noteId, deckId: c.deckId, due: c.due })),
+      });
+      continue;
+    }
+    if (op.kind === 'template-format') {
+      // A format edit on a template this same session DESIGNED is not a change
+      // to the source — the source has no such template. It belongs in the add,
+      // which already carries qfmt/afmt, or the writer would be told to rewrite
+      // an ord the package does not have. Keyed in the op's own numbering,
+      // which is the numbering `template-add` recorded too.
+      const addKey = `${op.noteTypeId}:${op.ord}`;
+      const design = added.get(addKey);
+      if (design) {
+        design.qfmt = op.after.qfmt;
+        design.afmt = op.after.afmt;
+        continue;
+      }
+      // Otherwise it names a SOURCE template, so it needs the same current→source
+      // mapping a second removal does: an earlier removal renumbers the
+      // survivors, and writing the op's own number would reformat the wrong one.
+      const mapped = sourceOrdMaps.get(op.noteTypeId);
+      const sourceOrd = mapped?.get(op.ord) ?? op.ord;
+      // Last write wins for the text, but the FIRST before-image is kept: a
+      // template formatted twice exports once, carrying the second edit's text
+      // and the state the source actually held — the intermediate value was
+      // never in the package and reverting to it would be a write with no cause.
+      const key = `${op.noteTypeId}:${sourceOrd}`;
+      const seen = templateFormats.get(key);
+      if (seen) {
+        seen.qfmt = op.after.qfmt;
+        seen.afmt = op.after.afmt;
+        continue;
+      }
+      templateFormats.set(key, {
+        noteTypeId: op.noteTypeId,
+        ord: sourceOrd,
+        qfmt: op.after.qfmt,
+        afmt: op.after.afmt,
+        beforeQfmt: op.before.qfmt,
+        beforeAfmt: op.before.afmt,
       });
       continue;
     }
@@ -551,6 +643,25 @@ export function buildApkgExportChanges(
     templateRemovals.push({ noteTypeId, removedOrds: real.sort((a, b) => a - b) });
   }
 
+  // A template formatted and then REMOVED must not reach the writer: the ord is
+  // gone from the destination, so the rewrite would refuse `template-missing`
+  // against a template the export itself deleted. Re-read against the draft for
+  // the same reason the adds are — if the note type or the ord is no longer
+  // there, the format has nothing to apply to.
+  const templateFormatted: ApkgExportTemplateFormat[] = [];
+  for (const format of templateFormats.values()) {
+    if (removedOrds.get(format.noteTypeId)?.has(format.ord)) continue;
+    if (!draft.noteTypes.some((nt) => nt.id === format.noteTypeId)) continue;
+    // Swapped and swapped back is not a change, exactly as a deck renamed to its
+    // source name exports not at all. Without this, a user who tried the swap and
+    // undid it by re-swapping would still write a package.
+    if (format.qfmt === format.beforeQfmt && format.afmt === format.beforeAfmt) continue;
+    templateFormatted.push(format);
+  }
+  templateFormatted.sort((a, b) =>
+    a.noteTypeId === b.noteTypeId ? a.ord - b.ord : a.noteTypeId.localeCompare(b.noteTypeId),
+  );
+
   return {
     notes,
     cardMoves,
@@ -559,6 +670,7 @@ export function buildApkgExportChanges(
     deckCreates,
     templateRemovals,
     templateAdds,
+    templateFormats: templateFormatted,
     cardFlags,
     cardQueues,
     cardScheduling,
@@ -590,6 +702,10 @@ export function exportChangesEmpty(changes: ApkgExportChangeSet): boolean {
     // And the add, which is the same shape pointed the other way: a session
     // whose only edit was a reverse-card design writes no note and no `due`.
     (changes.templateAdds ?? []).length === 0 &&
+    // A front/back swap is the narrowest of the three: it writes no note, no
+    // card row and no ord, so without this line a session whose only edit was
+    // the swap would report `nothing-to-export` about a real change.
+    (changes.templateFormats ?? []).length === 0 &&
     // Gate 5's three, for the same reason: a session that only suspended cards
     // writes no note and no `due`, and would otherwise export as nothing.
     (changes.cardFlags ?? []).length === 0 &&

@@ -8806,6 +8806,8 @@ export const ja: Catalog = {
     'この接続ではカードテンプレートを削除できないため、何も書き込まれませんでした。代わりにパッケージを書き出してください — そちらではテンプレートが削除されます。',
   'ankiWorkbench.apply.liveError.template-add-unsupported':
     'この接続ではカードデザインを反映できないため、何も書き込まれませんでした。どのノートに新しいカードを作るかはAnki自身が決めるため、このデザインが示した枚数が保証できなくなります。代わりにパッケージを書き出してください — そちらではテンプレートと、表示されたとおりの枚数のカードが追加されます。',
+  'ankiWorkbench.apply.liveError.template-format-unsupported':
+    'この接続ではカードテンプレートの表面と裏面を変更できないため、何も書き込まれませんでした。アドオンはノートタイプのテンプレートを名前でまとめて書き換えるため、開いている Anki の画面で変更した内容が上書きされてしまいます。代わりにパッケージを書き出してください — 新しい表面と裏面はそこに書き込まれます。',
   'ankiWorkbench.apply.liveError.card-flag-unsupported':
     'この接続ではカードのフラグを設定できないため、何も書き込まれませんでした。代わりにパッケージを書き出してください — そちらではフラグが設定されます。',
   'ankiWorkbench.apply.liveError.deck-missing':
@@ -8875,6 +8877,10 @@ export const ja: Catalog = {
     'ノートタイプのカードテンプレートをすべて削除することになり、そのノートからカードが一枚も生成されなくなります。何も書き込まれませんでした — テンプレートを少なくとも一つ残してください。',
   'ankiWorkbench.apply.error.template-storage-unsupported':
     'このパッケージには読み取れるノートタイプ一覧が保存されていないため、カードテンプレートを追加も削除もできません。何も書き込まれませんでした — 他の編集はこのパッケージから通常どおり書き出せます。',
+  'ankiWorkbench.apply.error.template-format-empty':
+    'このカードの新しい表面はどのフィールドも参照していないため、Anki では空白で表示されます。何も書き込まれませんでした — 表面にフィールドを置けば書き出せます。',
+  'ankiWorkbench.apply.error.template-config-unreadable':
+    'このテンプレートの保存された設定を読み取れなかったため、推測で置き換えずに表面と裏面を書き換えませんでした。何も書き込まれませんでした — 他の編集はこのパッケージから通常どおり書き出せます。',
   'ankiWorkbench.apply.error.template-ord-taken':
     'このカードデザインはパッケージの別のバージョンを基に作成されています。そのノートタイプには既にその位置のテンプレートがあります。何も書き込まれませんでした — ソースを読み直してからもう一度デザインしてください。',
   'ankiWorkbench.apply.error.template-name-taken':
@@ -9857,6 +9863,7 @@ export const ja: Catalog = {
   'ankiWorkbench.parity.row.deck-name': 'デッキ名',
   'ankiWorkbench.parity.row.template-remove': 'カードテンプレートの削除',
   'ankiWorkbench.parity.row.template-add': 'カードテンプレートの追加',
+  'ankiWorkbench.parity.row.template-format': 'カードテンプレートの表面と裏面',
   'ankiWorkbench.parity.row.note-marked': 'マーク付きノート',
   'ankiWorkbench.parity.row.card-flag': 'カードのフラグ',
   'ankiWorkbench.parity.row.card-queue': 'カードを停止しているかどうか',
@@ -9889,6 +9896,8 @@ export const ja: Catalog = {
     'Anki のアドオンにはカードテンプレートを削除する手段がありません。できるのはテンプレートを空にすることだけで、そのテンプレートが生成したカードはコレクションに残り、空のまま表示されます。これは削除で解決したかった問題そのものです。代わりにパッケージを書き出してください。そちらではテンプレートとそのカードが実際に削除されます。',
   'ankiWorkbench.parity.why.connect.template-add':
     'デザインはこのドラフト内のプレビューです。Anki への書き込みでは編集履歴が送られますが、テンプレートを追加する操作は履歴にないため、コレクションのノートタイプはそのままです。',
+  'ankiWorkbench.parity.why.connect.template-format':
+    'Anki のアドオンはテンプレートの表面と裏面を変更できますが、ノートタイプのテンプレートを名前でまとめて書き換える方法しかありません。開いている Anki の画面で変更した内容は、その書き換えで上書きされてしまいます。代わりにパッケージを書き出してください。新しい表面と裏面はその場で書き込まれ、そのテンプレートが既に作ったカードはスケジュールを保ったままになります。',
   'ankiWorkbench.parity.why.connect.note-marked':
     '各ノートのマークの有無は Anki が保持します。ここでの編集では変わりません。',
   'ankiWorkbench.parity.why.connect.card-flag':

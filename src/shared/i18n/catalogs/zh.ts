@@ -8759,6 +8759,8 @@ export const zh: Catalog = {
     '无法通过此连接删除卡片模板，因此未写入任何内容。请改为导出牌组包 — 模板会在那里被真正删除。',
   'ankiWorkbench.apply.liveError.template-add-unsupported':
     '无法通过此连接提交卡片设计，因此未写入任何内容。哪些笔记会生成新卡片将由 Anki 自行决定，此设计向你显示的数量便不再是承诺。请改为导出牌组包 — 它会添加模板以及你所看到的那些卡片。',
+  'ankiWorkbench.apply.liveError.template-format-unsupported':
+    '无法通过此连接更改卡片模板的正面和背面，因此未写入任何内容。该插件只能按名称一次性改写笔记类型的全部模板，你在打开的 Anki 窗口中所做的更改会被覆盖。请改为导出牌组包 — 新的正面和背面会写入其中。',
   'ankiWorkbench.apply.liveError.card-flag-unsupported':
     '无法通过此连接设置卡片旗标，因此未写入任何内容。请改为导出牌组包 — 旗标会在那里被真正设置。',
   'ankiWorkbench.apply.liveError.deck-missing':
@@ -8822,6 +8824,10 @@ export const zh: Catalog = {
     '这会删除某个笔记类型的全部卡片模板，使其笔记再也无法生成任何卡片。未写入任何内容 — 请至少保留一个模板。',
   'ankiWorkbench.apply.error.template-storage-unsupported':
     '此牌组包没有保存可读取的笔记类型列表，因此无法向其中添加或从中删除卡片模板。未写入任何内容 — 其他编辑仍可从此包正常导出。',
+  'ankiWorkbench.apply.error.template-format-empty':
+    '这张卡片的新正面没有引用任何字段，Anki 会将其显示为空白。未写入任何内容 — 在正面放上一个字段即可导出。',
+  'ankiWorkbench.apply.error.template-config-unreadable':
+    '无法读取此模板已保存的设置，因此没有用猜测的内容替换，而是未改写它的正面和背面。未写入任何内容 — 其他编辑仍可从此包正常导出。',
   'ankiWorkbench.apply.error.template-ord-taken':
     '此卡片设计是基于该包的另一个版本得出的：该笔记类型在那个位置上已经有模板了。未写入任何内容 — 请重新读取源文件后再设计一次。',
   'ankiWorkbench.apply.error.template-name-taken':
@@ -9768,6 +9774,7 @@ export const zh: Catalog = {
   'ankiWorkbench.parity.row.deck-name': '牌组名称',
   'ankiWorkbench.parity.row.template-remove': '删除卡片模板',
   'ankiWorkbench.parity.row.template-add': '添加卡片模板',
+  'ankiWorkbench.parity.row.template-format': '卡片模板的正面和背面',
   'ankiWorkbench.parity.row.note-marked': '已标记的笔记',
   'ankiWorkbench.parity.row.card-flag': '卡片旗标',
   'ankiWorkbench.parity.row.card-queue': '卡片是否处于暂停状态',
@@ -9800,6 +9807,8 @@ export const zh: Catalog = {
     'Anki 的插件没有提供删除卡片模板的方法。它最多只能把模板清空，而该模板生成的每张卡片仍会留在你的收藏中并显示为空白——这正是删除模板本来要解决的问题。请改为导出软件包：在那里模板及其卡片会被真正删除。',
   'ankiWorkbench.parity.why.connect.template-add':
     '设计只是当前草稿中的预览。写入 Anki 时发送的是你的编辑历史，其中没有“添加模板”这一步，因此你收藏中的笔记类型保持不变。',
+  'ankiWorkbench.parity.why.connect.template-format':
+    'Anki 插件可以更改模板的正面和背面，但只能按名称一次性改写笔记类型的全部模板。你在打开的 Anki 窗口中所做的更改会被这次改写覆盖。请改为导出牌组包：新的正面和背面会就地写入，而该模板已经生成的每张卡片都会保留自己的日程。',
   'ankiWorkbench.parity.why.connect.note-marked':
     '每条笔记是否被标记由 Anki 保留。这里的编辑不会改变它。',
   'ankiWorkbench.parity.why.connect.card-flag':

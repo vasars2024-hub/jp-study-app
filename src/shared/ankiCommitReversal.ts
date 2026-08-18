@@ -37,6 +37,7 @@
 
 import type { AnkiCardFlag, AnkiCardQueue, AnkiDraft } from './ankiDraft';
 import type { AnkiCardScheduling, AnkiDraftEditJournal, AnkiDraftEditOp } from './ankiDraftEdit';
+import { isNoteTypeOp } from './ankiDraftEdit';
 import type {
   ApkgExportCardDeckMove,
   ApkgExportCardFlag,
@@ -46,6 +47,7 @@ import type {
   ApkgExportChangeSet,
   ApkgExportDeckRename,
   ApkgExportNoteChange,
+  ApkgExportTemplateFormat,
   ApkgExportTemplateRemoval,
 } from './ankiApkgExport';
 
@@ -205,9 +207,7 @@ export function buildCommitRecord(params: {
 function foldOps(ops: readonly AnkiDraftEditOp[]): Map<string, Folded> {
   const tracked = new Map<string, Folded>();
   for (const op of ops) {
-    if (op.kind === 'deck-name' || op.kind === 'template-remove' || op.kind === 'template-add') {
-      continue;
-    }
+    if (op.kind === 'deck-name' || isNoteTypeOp(op)) continue;
     const key =
       op.kind === 'field'
         ? `f:${op.noteId}:${op.fieldOrd}`
@@ -388,6 +388,24 @@ export function buildCommitReversal(record: AnkiCommitRecord): CommitReversal {
     templateRemovals.push({ noteTypeId, removedOrds: [...ords].sort((a, b) => a - b) });
   }
 
+  // A swap's inverse is the swap back, and it is fully reversible — no card row
+  // was created or destroyed and no ord moved, so there is nothing to refuse.
+  // Read off the COMMITTED rows rather than `record.ops` because these ords are
+  // already in the source numbering, which is what the reversal writes against.
+  const templateFormats: ApkgExportTemplateFormat[] = [];
+  for (const format of record.committed.templateFormats ?? []) {
+    if (format.qfmt === format.beforeQfmt && format.afmt === format.beforeAfmt) continue;
+    templateFormats.push({
+      noteTypeId: format.noteTypeId,
+      ord: format.ord,
+      qfmt: format.beforeQfmt,
+      afmt: format.beforeAfmt,
+      // Pointed the other way, so reversing the reversal is the original edit.
+      beforeQfmt: format.qfmt,
+      beforeAfmt: format.afmt,
+    });
+  }
+
   // The one refusal the gate is really about. Counted per removal op rather than
   // per note type, because two removals on one note type deleted two sets of
   // cards and reporting one number would understate what cannot come back.
@@ -408,6 +426,7 @@ export function buildCommitReversal(record: AnkiCommitRecord): CommitReversal {
     deckCreates: [],
     templateRemovals,
     templateAdds: [],
+    templateFormats,
     cardFlags,
     cardQueues,
     cardScheduling,

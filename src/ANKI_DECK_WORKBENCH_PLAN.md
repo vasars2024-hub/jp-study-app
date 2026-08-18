@@ -339,6 +339,19 @@ Partial failure must identify exactly what committed, what failed, and what can 
 This slice is complete only when all of these can be shown with real data and no mock success:
 
 1. Import a representative APKG, inspect every preserved/unsupported feature, swap front/back, export a new package, reimport it, and match the approved diff.
+
+    **Rendered-template half BUILT 2026-08-18, gate NOT closed.** The swap had no route to a
+    destination: `template-format` existed as a journal op but `buildApkgExportChanges` had no
+    branch for it, so it was a preview no package could ship — gate 13's defect one op later.
+    Now a full ladder: `ApkgExportTemplateFormat` (its own list, never a degenerate add, which
+    would delete and re-mint every card the template generated to change two strings), the
+    ord-mapped fold, the package writer on both storage schemas via the new byte-preserving
+    `replaceTemplateFormats`, a named live refusal, a parity row, and the reversal. 16 cases in
+    `shared/__tests__/ankiTemplateFormat.test.ts`, mutation control 3 red.
+    **What the gate still wants:** the LIVE walk — import a representative APKG, swap, export,
+    reimport, match the diff — and the note-field variant beside this rendered-template one.
+    Trap for that walk: `applyTemplateRemoval` only drops DUPLICATE templates (`not-duplicate`
+    skip otherwise), so a fixture built from distinct renders removes nothing silently.
 2. Translate a Back field to Russian or Japanese into a selected destination field, preview individual diffs and provider implications, cancel safely, then apply and verify.
 
     **Closed 2026-08-16** (`c30a020`, `16c8990`, `fb54fff`). `shared/ankiTranslate.ts` is the request

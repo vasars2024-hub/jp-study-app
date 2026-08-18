@@ -227,9 +227,9 @@ describe('every row a destination will not write has an honest explanation', () 
       }
     }
     // Both destinations refuse the seven read-only rows; connect also blocks
-    // four — the deck rename, the template removal, the designer's template
-    // add, and gate 5's card flag. 7 × 2 + 4 = 18.
-    expect(explained).toBe(18);
+    // five — the deck rename, the template removal, the designer's template
+    // add, recipe 1's front/back swap, and gate 5's card flag. 7 × 2 + 5 = 19.
+    expect(explained).toBe(19);
   });
 
   it('offers no explanation it does not need — a supported cell has no why key', () => {
@@ -436,7 +436,7 @@ describe('the blocked cells refuse for real, before any write', () => {
  * and the fix is to re-run the live score and update both numbers together.
  */
 describe('gate 14 canary: the partition the live score was recorded against', () => {
-  it('is 17 rows: connect 6 / 7 / 4 and package 10 / 7 / 0', () => {
+  it('is 18 rows: connect 6 / 7 / 5 and package 11 / 7 / 0', () => {
     const tally = (destination: AnkiParityDestination) =>
       ANKI_PARITY_ROWS.reduce(
         (acc, row) => {
@@ -446,20 +446,27 @@ describe('gate 14 canary: the partition the live score was recorded against', ()
         { supported: 0, 'read-only': 0, blocked: 0 } as Record<string, number>,
       );
 
-    expect(ANKI_PARITY_ROWS).toHaveLength(17);
-    expect(tally('connect')).toEqual({ supported: 6, 'read-only': 7, blocked: 4 });
-    expect(tally('package')).toEqual({ supported: 10, 'read-only': 7, blocked: 0 });
+    expect(ANKI_PARITY_ROWS).toHaveLength(18);
+    expect(tally('connect')).toEqual({ supported: 6, 'read-only': 7, blocked: 5 });
+    expect(tally('package')).toEqual({ supported: 11, 'read-only': 7, blocked: 0 });
   });
 
-  it('the four connect refuses are exactly what package supports and connect does not', () => {
+  it('the five connect refuses are exactly what package supports and connect does not', () => {
     // The live inverse control, mechanically: the panel's own delta between the
     // two destinations. Measured 2026-08-17 as 9 - 6 = 3 on the real component.
+    // Re-measured 2026-08-18 after recipe 1's row widened it — see the ledger.
     const delta = ANKI_PARITY_ROWS.filter(
       (row) =>
         parityCell(row, 'package').support === 'supported' &&
         parityCell(row, 'connect').support !== 'supported',
     ).map((row) => row.id);
-    expect(delta).toEqual(['card-flag', 'deck-name', 'template-remove', 'template-add']);
+    expect(delta).toEqual([
+      'card-flag',
+      'deck-name',
+      'template-remove',
+      'template-add',
+      'template-format',
+    ]);
     // Every one of them is `blocked` rather than read-only: a capability the
     // package writes and live Anki merely lacks a row for would be a gap, not a
     // refusal, and would render no code beside it. `parityRefusedRows` is the

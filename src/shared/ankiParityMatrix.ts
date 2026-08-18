@@ -186,6 +186,24 @@ export const ANKI_PARITY_ROWS: readonly AnkiParityRow[] = [
     package: { support: 'supported', refusal: null, conditional: 'template-storage-unsupported' },
     connect: { support: 'blocked', refusal: 'template-add-unsupported' },
   },
+  {
+    // Recipe 1's rendered-template variant — the front/back swap. The package
+    // rewrites the two formats in place, byte-preservingly, so the template keeps
+    // its ord and every card it generated keeps its schedule.
+    //
+    // Live is blocked, and unlike the two rows above it is NOT for want of an
+    // action: AnkiConnect's `updateModelTemplates` does exactly this. It takes
+    // the note type by NAME and expects the whole template set, while this op
+    // carries one ord and two strings — so the adapter would have to read the
+    // model back and merge, and a name collision or a concurrent edit in the
+    // open Anki window would silently rewrite templates this session never
+    // touched. Refused by name until that read-merge is built and tested.
+    id: 'template-format',
+    journalOp: 'template-format',
+    changeSetField: 'templateFormats',
+    package: { support: 'supported', refusal: null, conditional: 'template-storage-unsupported' },
+    connect: { support: 'blocked', refusal: 'template-format-unsupported' },
+  },
   { id: 'note-marked', journalOp: null, changeSetField: null, package: READ_ONLY, connect: READ_ONLY },
   {
     // `reps`, `lapses` and `left` — what is LEFT of the old `card-scheduling`
@@ -224,6 +242,7 @@ export const JOURNAL_OP_COVERAGE: Record<AnkiDraftEditOp['kind'], string> = {
   'deck-name': 'deck-name',
   'template-remove': 'template-remove',
   'template-add': 'template-add',
+  'template-format': 'template-format',
 };
 
 /**
@@ -243,6 +262,7 @@ export const CHANGE_SET_COVERAGE: Record<keyof Required<ApkgExportChangeSet>, st
   deckCreates: 'card-deck',
   templateRemovals: 'template-remove',
   templateAdds: 'template-add',
+  templateFormats: 'template-format',
   cardFlags: 'card-flag',
   cardQueues: 'card-queue',
   cardScheduling: 'card-scheduling',

@@ -23,8 +23,9 @@ import type {
   ApkgExportChangeSet,
   ApkgExportErrorCode,
   ApkgExportTemplateAdd,
+  ApkgExportTemplateFormat,
 } from '../../shared/ankiApkgExport';
-import { encodeTemplateConfig } from './ankiProtoConfig';
+import { encodeTemplateConfig, replaceTemplateFormats } from './ankiProtoConfig';
 import { readRawCollection, type SqlReadable } from './apkgDraftRead';
 
 /** What sql.js will bind: its own `SqlValue`, minus BigInt which Anki never needs. */
@@ -101,6 +102,13 @@ export interface ApplyExportResult {
   templatesRemoved: number;
   /** The card designer's add: card templates written into their note types. */
   templatesAdded: number;
+  /**
+   * Recipe 1's rendered-template variant: templates whose two formats were
+   * rewritten. Its own number because it is the one template change that creates
+   * and destroys nothing — folding it into `templatesAdded` would report a swap
+   * as a new card template and imply cards that were never minted.
+   */
+  templatesFormatted: number;
   /**
    * Cards those adds INSERTED. Reported separately from `cardsUpdated` for
    * `cardsDeleted`'s reason pointed the other way — a created row is not an
@@ -653,9 +661,12 @@ export function applyExportChanges(
   }
   const templateRemovals = changes.templateRemovals ?? [];
   const templateAdds = changes.templateAdds ?? [];
+  const templateFormats = changes.templateFormats ?? [];
   const removalPlans: TemplateRemovalPlan[] = [];
   const templates =
-    templateRemovals.length > 0 || templateAdds.length > 0 ? templateStorage(db) : 'none';
+    templateRemovals.length > 0 || templateAdds.length > 0 || templateFormats.length > 0
+      ? templateStorage(db)
+      : 'none';
   if (templateRemovals.length > 0 && templates === 'none') {
     throw new ExportRefusal(
       'template-storage-unsupported',
@@ -666,6 +677,12 @@ export function applyExportChanges(
     throw new ExportRefusal(
       'template-storage-unsupported',
       'This package stores no readable note-type list, so a card template cannot be added to it.',
+    );
+  }
+  if (templateFormats.length > 0 && templates === 'none') {
+    throw new ExportRefusal(
+      'template-storage-unsupported',
+      'This package stores no readable note-type list, so a card template cannot be reformatted in it.',
     );
   }
   for (const removal of templateRemovals) {
@@ -773,6 +790,39 @@ export function applyExportChanges(
       rows.push({ id: nextCardId, nid: idParam(card.noteId), did: idParam(target), due: card.due });
     }
     addPlans.push({ noteTypeId: add.noteTypeId, add, cards: rows });
+  }
+
+  // Recipe 1's rendered-template variant. Validated here against the collection
+  // about to be written, exactly as the removals are, so a draft read minutes ago
+  // cannot disagree with the package about which ords exist.
+  const formatPlans: ApkgExportTemplateFormat[] = [];
+  for (const format of templateFormats) {
+    if (templates === 'none') break; // unreachable — refused above
+    const present = templateOrdsOf(db, templates, format.noteTypeId);
+    if (!present) {
+      throw new ExportRefusal(
+        'note-type-missing',
+        `Note type ${format.noteTypeId} is not in the source package.`,
+      );
+    }
+    if (!present.includes(format.ord)) {
+      throw new ExportRefusal(
+        'template-missing',
+        `Note type ${format.noteTypeId} has no card template at position ${format.ord + 1}.`,
+      );
+    }
+    // The reader's own bar, applied before the write rather than discovered
+    // after it: `decodeTemplateConfig` returns null for a qfmt with no `{{`, so
+    // a template written with one would read back as unavailable — a silent loss
+    // rather than a refusal.
+    if (!format.qfmt.includes('{{')) {
+      throw new ExportRefusal(
+        'template-format-empty',
+        `The new front of card ${format.ord + 1} on note type ${format.noteTypeId} references no `
+          + 'field, so Anki would render it blank. Put a field on the front and it exports.',
+      );
+    }
+    formatPlans.push(format);
   }
 
   // --- write
@@ -937,6 +987,7 @@ export function applyExportChanges(
   // and designed another must not have its new template land on an ord the
   // removal is about to vacate and renumber into.
   let templatesAdded = 0;
+  let templatesFormatted = 0;
   let cardsCreated = 0;
   for (const plan of addPlans) {
     const mid = idParam(plan.noteTypeId);
@@ -1012,12 +1063,68 @@ export function applyExportChanges(
     db.run('UPDATE col SET models = ?', [JSON.stringify(parsed)]);
   }
 
+  // Recipe 1's write. It touches no `cards` row and mints no id — the template
+  // keeps its ord, so every card it already generated stays pointed at it with
+  // its schedule intact. That is the whole reason this is not a remove-plus-add.
+  for (const plan of formatPlans) {
+    const mid = idParam(plan.noteTypeId);
+    if (templates === 'table') {
+      const existing = firstRow(db, 'SELECT config FROM templates WHERE ntid = ? AND ord = ?', [
+        mid,
+        plan.ord,
+      ])?.[0];
+      // Byte-preserving: the blob can carry a deck override and browser font that
+      // this workbench does not model, and a two-string edit must not delete them.
+      const next = replaceTemplateFormats(existing, plan.qfmt, plan.afmt);
+      if (!next) {
+        throw new ExportRefusal(
+          'template-config-unreadable',
+          `The stored settings for card ${plan.ord + 1} on note type ${plan.noteTypeId} could not `
+            + 'be read, so its formats are not rewritten rather than replaced with a guess.',
+        );
+      }
+      withoutMissingCollation(db, ['templates', 'idx_templates_name_ntid'], () => {
+        db.run('UPDATE templates SET config = ?, mtime_secs = ?, usn = -1 WHERE ntid = ? AND ord = ?', [
+          next,
+          modSec,
+          mid,
+          plan.ord,
+        ]);
+      });
+      db.run('UPDATE notetypes SET mtime_secs = ?, usn = -1 WHERE id = ?', [modSec, mid]);
+    }
+    templatesFormatted += 1;
+  }
+  if (templates === 'models' && formatPlans.length > 0) {
+    const raw = firstRow(db, 'SELECT models FROM col LIMIT 1', [])?.[0];
+    const parsed = JSON.parse(String(raw)) as Record<
+      string,
+      { tmpls?: Array<Record<string, unknown>>; mod?: number; usn?: number }
+    >;
+    for (const plan of formatPlans) {
+      const model = parsed[plan.noteTypeId];
+      if (!model) continue; // unreachable — validated above
+      parsed[plan.noteTypeId] = {
+        ...model,
+        // Spread the existing template so every key this workbench does not model
+        // — `did`, `bfont`, `bsize`, `bqfmt`, `bafmt` — survives the edit.
+        tmpls: (model.tmpls ?? []).map((tmpl) =>
+          Number(tmpl.ord) === plan.ord ? { ...tmpl, qfmt: plan.qfmt, afmt: plan.afmt } : tmpl,
+        ),
+        mod: modSec,
+        usn: -1,
+      };
+    }
+    db.run('UPDATE col SET models = ?', [JSON.stringify(parsed)]);
+  }
+
   // `col.mod` is epoch milliseconds in both schemas.
   db.run('UPDATE col SET mod = ?', [options.nowMs]);
 
   return {
     templatesRemoved,
     templatesAdded,
+    templatesFormatted,
     cardsCreated,
     cardsDeleted,
     notesUpdated: notePlans.length,

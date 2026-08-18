@@ -123,7 +123,7 @@ describe('applyExportChanges', () => {
       { notes: [{ noteId: '1001', fields: ['<b>食べた</b>', 'たべた'] }], cardMoves: [] },
       { nowMs: NOW_MS, normalize: stripFieldHtml },
     );
-    expect(result).toEqual({ notesUpdated: 1, cardsUpdated: 0, decksUpdated: 0, templatesRemoved: 0, templatesAdded: 0, cardsCreated: 0, cardsDeleted: 0 });
+    expect(result).toEqual({ notesUpdated: 1, cardsUpdated: 0, decksUpdated: 0, templatesRemoved: 0, templatesAdded: 0, templatesFormatted: 0, cardsCreated: 0, cardsDeleted: 0 });
 
     const raw = readRawCollection(db);
     const noteRow = raw.notes.find((n) => String(n.id) === '1001')!;
@@ -162,7 +162,7 @@ describe('applyExportChanges', () => {
       { notes: [], cardMoves: [{ cardId: '5001', noteId: '1001', due: 3 }] },
       { nowMs: NOW_MS, normalize: stripFieldHtml },
     );
-    expect(result).toEqual({ notesUpdated: 0, cardsUpdated: 1, decksUpdated: 0, templatesRemoved: 0, templatesAdded: 0, cardsCreated: 0, cardsDeleted: 0 });
+    expect(result).toEqual({ notesUpdated: 0, cardsUpdated: 1, decksUpdated: 0, templatesRemoved: 0, templatesAdded: 0, templatesFormatted: 0, cardsCreated: 0, cardsDeleted: 0 });
     const row = db.exec('SELECT due, usn, mod FROM cards WHERE id = 5001')[0]!.values[0]!;
     expect(row).toEqual([3, -1, Math.floor(NOW_MS / 1000)]);
   });
@@ -227,7 +227,7 @@ describe('applyExportChanges', () => {
       },
       { nowMs: NOW_MS, normalize: stripFieldHtml },
     );
-    expect(result).toEqual({ notesUpdated: 0, cardsUpdated: 0, decksUpdated: 1, templatesRemoved: 0, templatesAdded: 0, cardsCreated: 0, cardsDeleted: 0 });
+    expect(result).toEqual({ notesUpdated: 0, cardsUpdated: 0, decksUpdated: 1, templatesRemoved: 0, templatesAdded: 0, templatesFormatted: 0, cardsCreated: 0, cardsDeleted: 0 });
     // Read back through the reader an import would use, not through the UPDATE.
     const decks = readRawCollection(db).decks;
     expect(decks).toEqual([{ id: '1', name: 'Japanese::Core', dyn: 0, conf: '1' }]);
@@ -364,7 +364,7 @@ describe('applyExportChanges — recipe 13 deck moves', () => {
       nowMs: NOW_MS,
       normalize: stripFieldHtml,
     });
-    expect(result).toEqual({ notesUpdated: 0, cardsUpdated: 1, decksUpdated: 1, templatesRemoved: 0, templatesAdded: 0, cardsCreated: 0, cardsDeleted: 0 });
+    expect(result).toEqual({ notesUpdated: 0, cardsUpdated: 1, decksUpdated: 1, templatesRemoved: 0, templatesAdded: 0, templatesFormatted: 0, cardsCreated: 0, cardsDeleted: 0 });
 
     // Read back through the reader an import would use, not through the INSERT.
     const decks = readRawCollection(db).decks;
@@ -407,7 +407,7 @@ describe('applyExportChanges — recipe 13 deck moves', () => {
       cardsUpdated: 1,
       decksUpdated: 1,
       templatesRemoved: 0,
-      templatesAdded: 0, cardsCreated: 0, cardsDeleted: 0,
+      templatesAdded: 0, templatesFormatted: 0, cardsCreated: 0, cardsDeleted: 0,
     });
     // `dyn: 0` here is the reader deciding from the kind blob's first byte, so it
     // is a real assertion about the bytes written and not about the column.
@@ -449,7 +449,7 @@ describe('applyExportChanges — recipe 13 deck moves', () => {
       },
       { nowMs: NOW_MS, normalize: stripFieldHtml },
     );
-    expect(result).toEqual({ notesUpdated: 0, cardsUpdated: 2, decksUpdated: 2, templatesRemoved: 0, templatesAdded: 0, cardsCreated: 0, cardsDeleted: 0 });
+    expect(result).toEqual({ notesUpdated: 0, cardsUpdated: 2, decksUpdated: 2, templatesRemoved: 0, templatesAdded: 0, templatesFormatted: 0, cardsCreated: 0, cardsDeleted: 0 });
     const decks = readRawCollection(db).decks;
     const n5 = decks.find((d) => d.name === 'Default::N5')!;
     const n4 = decks.find((d) => d.name === 'Default::N4')!;
@@ -477,7 +477,7 @@ describe('applyExportChanges — recipe 13 deck moves', () => {
       },
       { nowMs: NOW_MS, normalize: stripFieldHtml },
     );
-    expect(result).toEqual({ notesUpdated: 0, cardsUpdated: 1, decksUpdated: 0, templatesRemoved: 0, templatesAdded: 0, cardsCreated: 0, cardsDeleted: 0 });
+    expect(result).toEqual({ notesUpdated: 0, cardsUpdated: 1, decksUpdated: 0, templatesRemoved: 0, templatesAdded: 0, templatesFormatted: 0, cardsCreated: 0, cardsDeleted: 0 });
     expect(db.exec('SELECT count(*) FROM decks')[0]!.values[0]![0]).toBe(before);
     expect(db.exec('SELECT did FROM cards WHERE id = 5001')[0]!.values[0]![0]).toBe(3);
   });
@@ -634,7 +634,7 @@ describe('applyExportChanges — recipe 13 deck moves', () => {
         },
         { nowMs: NOW_MS, normalize: stripFieldHtml },
       ),
-    ).toEqual({ notesUpdated: 0, cardsUpdated: 1, decksUpdated: 0, templatesRemoved: 0, templatesAdded: 0, cardsCreated: 0, cardsDeleted: 0 });
+    ).toEqual({ notesUpdated: 0, cardsUpdated: 1, decksUpdated: 0, templatesRemoved: 0, templatesAdded: 0, templatesFormatted: 0, cardsCreated: 0, cardsDeleted: 0 });
     expect(db.exec('SELECT did FROM cards WHERE id = 5001')[0]!.values[0]![0]).toBe(3);
   });
 });

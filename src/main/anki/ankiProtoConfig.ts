@@ -208,6 +208,116 @@ export function encodeTemplateConfig(config: AnkiTemplateConfig): Uint8Array {
   return new Uint8Array(out);
 }
 
+/**
+ * Rewrite ONLY the question and answer formats inside an existing
+ * `templates.config`, leaving every other byte of the blob exactly as it was.
+ *
+ * Not `encodeTemplateConfig(decodeTemplateConfig(x))`. That round trip is right
+ * for a template this export ADDS — where writing only fields 1-4 means the new
+ * template cannot claim a setting the draft never held — and wrong for one that
+ * already exists, where the same narrowness DELETES whatever the source had
+ * beyond those four: a schema-18 template config can carry a deck override,
+ * browser font and browser size, and `decodeWireFields` does not even retain the
+ * raw bytes of an I32/I64 field, so a re-encode could not restore them if it
+ * tried. Changing two strings must not cost a template its deck override.
+ *
+ * So this walks the wire format keeping each field's whole raw span, and emits
+ * the original bytes for every field except 1 and 2. Field order is preserved;
+ * a format absent from the source is appended in schema order, and one being set
+ * to empty is dropped, which is how Anki itself stores an empty format.
+ *
+ * `null` when the blob is not decodable — the caller refuses rather than writing
+ * a config it could not read.
+ */
+export function replaceTemplateFormats(
+  value: unknown,
+  qfmt: string,
+  afmt: string,
+): Uint8Array | null {
+  const bytes = asBytes(value);
+  if (!bytes) return null;
+
+  const put = (out: number[], field: number, text_: string): void => {
+    if (!text_) return; // An empty format is absent, as `encodeTemplateConfig` writes it.
+    const encoded = new TextEncoder().encode(text_);
+    out.push((field << 3) | WIRE_LEN);
+    let n = encoded.length;
+    do {
+      const byte = n & 0x7f;
+      n >>>= 7;
+      out.push(n > 0 ? byte | 0x80 : byte);
+    } while (n > 0);
+    for (const b of encoded) out.push(b);
+  };
+
+  const out: number[] = [];
+  let i = 0;
+  let wroteQ = false;
+  let wroteA = false;
+
+  const varint = (): bigint | null => {
+    let shift = 0n;
+    let acc = 0n;
+    while (i < bytes.length) {
+      const b = bytes[i++];
+      acc |= BigInt(b & 0x7f) << shift;
+      if ((b & 0x80) === 0) return acc;
+      shift += 7n;
+      if (shift > 63n) return null;
+    }
+    return null;
+  };
+
+  while (i < bytes.length) {
+    const start = i;
+    const key = varint();
+    if (key == null) return null;
+    const field = Number(key >> 3n);
+    const wire = Number(key & 7n);
+    if (field <= 0) return null;
+
+    if (wire === WIRE_VARINT) {
+      if (varint() == null) return null;
+    } else if (wire === WIRE_LEN) {
+      const len = varint();
+      if (len == null) return null;
+      const size = Number(len);
+      if (!Number.isSafeInteger(size) || size < 0 || i + size > bytes.length) return null;
+      i += size;
+    } else if (wire === WIRE_I64) {
+      if (i + 8 > bytes.length) return null;
+      i += 8;
+    } else if (wire === WIRE_I32) {
+      if (i + 4 > bytes.length) return null;
+      i += 4;
+    } else {
+      return null;
+    }
+
+    // The two this function exists to replace. Everything else is copied byte
+    // for byte from `start` to `i`, including fields this file has no name for.
+    if (field === 1 && wire === WIRE_LEN) {
+      put(out, 1, qfmt);
+      wroteQ = true;
+      continue;
+    }
+    if (field === 2 && wire === WIRE_LEN) {
+      put(out, 2, afmt);
+      wroteA = true;
+      continue;
+    }
+    for (let k = start; k < i; k += 1) out.push(bytes[k]);
+  }
+
+  // A source that stored no qfmt/afmt at all still has to receive the new ones.
+  // Appending keeps them after the fields already emitted, which protobuf allows
+  // and Anki reads; the common path above preserves the original position.
+  if (!wroteQ) put(out, 1, qfmt);
+  if (!wroteA) put(out, 2, afmt);
+
+  return new Uint8Array(out);
+}
+
 /** A cloze note type is the one whose template asks for a cloze deletion. */
 export function templatesLookCloze(templates: readonly { qfmt?: string }[]): boolean {
   return templates.some((t) => (t.qfmt ?? '').includes('{{cloze:'));

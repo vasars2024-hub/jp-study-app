@@ -88,6 +88,17 @@ export type ConnectCommitErrorCode =
    */
   | 'template-add-unsupported'
   /**
+   * Recipe 1's swap, live. The one template refusal that is not about a missing
+   * action: `updateModelTemplates` does exactly this rewrite. It is refused
+   * because of how it addresses the work — the note type by NAME, and the whole
+   * template set at once — while the journal op carries one ord and two strings.
+   * Bridging that means reading the model back and merging, which would silently
+   * overwrite any template edited in the open Anki window between the read and
+   * the write. Refused by name until that merge is built and has a test that can
+   * fail; the package route rewrites the two formats in place.
+   */
+  | 'template-format-unsupported'
+  /**
    * Gate 5's flag third, live. AnkiConnect has no flag action; the only route is
    * `setSpecificValueOfCard` on `flags`, and that assigns the WHOLE column while
    * Anki keeps the colour in its low three bits and reserves the rest. The draft
@@ -513,6 +524,26 @@ export function planConnectCommit(
       `Adding a card template cannot be committed to a live collection: Anki would generate the `
         + `cards itself, so the ${cards} this design counted is not a number this workbench could `
         + 'guarantee live. Export a package instead.',
+    );
+  }
+
+  // Recipe 1's swap, refused in the same place and for the same structural
+  // reason. Named separately from the add because the obstacle is different:
+  // AnkiConnect's `updateModelTemplates` really can rewrite these two strings,
+  // but it addresses the note type by NAME and expects the whole template set,
+  // so the adapter must read the model back and merge — and a concurrent edit in
+  // the open Anki window would then be overwritten by a merge computed before
+  // it. A silent overwrite of templates this session never touched is worse than
+  // a refusal that names the package as the route.
+  const formats = changes.templateFormats ?? [];
+  if (formats.length > 0) {
+    throw new ConnectCommitRefusal(
+      'template-format-unsupported',
+      formats.length === 1
+        ? 'Changing a card template’s front and back cannot be committed to a live collection. '
+          + 'Export a package instead.'
+        : `Changing the front and back of ${formats.length} card templates cannot be committed to a `
+          + 'live collection. Export a package instead.',
     );
   }
 

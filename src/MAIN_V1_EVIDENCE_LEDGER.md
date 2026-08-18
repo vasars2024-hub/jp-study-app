@@ -25529,3 +25529,57 @@ a refusal writes nothing, and the removal path needs `TemplateGroup`s off the ca
 analysis plus a package whose note types are re-encodable (`template-storage-unsupported` is
 a real answer on protobuf-only packages). Clause 3's remaining half — the statement that a
 commit is one-way — now renders on every successful commit (`reverse.oneWay`).
+
+## 2026-08-18 — Track 7 / gate 1's rendered-template half BUILT: a swap that can reach a package (`primary`)
+
+**Recovered an interrupted slice first.** The previous turn died at 08:55:43 with
+`shared/ankiDraftEdit.ts` written at 08:55:36 — mid-refactor, `isNoteTypeOp` called at two sites
+and never defined. The tree did not compile: `ankiDraftEdit.test.ts` **3 red**,
+`ReferenceError: isNoteTypeOp is not defined`. Also spliced into the new op's docstring were 14
+lines of `template-add`'s. Both fixed; the op itself (`template-format` + `setTemplateFormats`)
+was sound and is kept.
+
+**The defect that mattered, found by asking where the op goes.** `buildApkgExportChanges` folds
+`journal.done` and nothing else, so an op with no branch there is a preview no destination can
+ship. `template-format` had none — the swap would render in the panel and vanish on export. This
+is gate 13's defect exactly (3,180 cards added, none exportable), one op later.
+
+**Decision — its own change-set list, not a degenerate add.** Folding a swap into `templateAdds`
+would make the writer delete every card the template generated and mint replacements with a fresh
+schedule, to change two strings. `ApkgExportTemplateFormat` carries `{noteTypeId, ord, qfmt, afmt,
+beforeQfmt, beforeAfmt}`; the before-image is on the row rather than re-derived, because ops are in
+DRAFT ord numbering and rows are in SOURCE's and a removal makes those disagree.
+
+**Trap, and why the writer is not `encode(decode(x))`.** That round trip is right for an ADDED
+template and destructive for an existing one: `encodeTemplateConfig` writes wire fields 1-4 only,
+and `decodeWireFields` does not even retain raw bytes for I32/I64 — so a re-encode silently drops a
+template's deck override and browser font. New `replaceTemplateFormats` walks the blob and copies
+every field's raw span verbatim except 1 and 2. Schema-11 (`col.models`) spreads the existing tmpl
+for the same reason.
+
+**Three latent counter defects fixed, two of them PRE-EXISTING at HEAD.** `template-add` already
+fell through to `op.noteId` in `ankiWorkbenchReview.ts` and `ankiEditAudit.ts` — `undefined` into
+the note set, one more note reported than touched. `editedNoteIds`/`noteIsEdited` omitted the new
+op. All four sites now share the exported `isNoteTypeOp` guard instead of four hand-maintained
+`||` chains, which is what let them drift.
+
+**Ladder, all rungs.** contract → `buildApkgExportChanges` fold (ord-mapped, first-before kept,
+A→B→A folds out, dropped if the template is later removed, folds into a same-session `template-add`)
+→ `exportChangesEmpty` → package writer both storages + 2 refusals → `ankiConnectCommit` refusal →
+parity matrix row (compile-enforced total) → reversal → 5 i18n keys ×4 languages.
+
+**Decision — live AnkiConnect is `blocked`, by name.** `updateModelTemplates` really can do this,
+unlike the other two template rows; it addresses the note type by NAME and rewrites its whole
+template set, so the adapter must read-and-merge and would overwrite anything edited in the open
+Anki window between read and write. Refused as `template-format-unsupported` until that merge has
+a test that can fail. Reversible decision, recorded here rather than escalated.
+
+**Gates.** New `ankiTemplateFormat.test.ts` **16 cases**; mutation control — before-image taken
+from `after` → **3 red**, on the three tests that carry the fold. Full suite on the SHARED tree
+after the last slice: see the run below. i18n exit 0 at **10,623** keys (was 10,618; +5 = mine).
+architecture exit 0, "Nothing new", 5 pending. eslint **0 errors** on 13 touched paths (90
+warnings, all `no-non-null-assertion`, the file-local idiom; 2 are mine).
+
+**Gate 1 is NOT closed.** This builds and proves the mechanism by test; the gate's own wording
+needs the live walk — import a representative APKG, swap, export, reimport, match the diff — and
+the note-field variant as well as this rendered-template one. That walk is the next slice.

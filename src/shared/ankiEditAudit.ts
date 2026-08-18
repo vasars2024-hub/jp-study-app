@@ -23,6 +23,7 @@
 
 import type { AnkiDraft } from './ankiDraft';
 import type { AnkiDraftEditJournal, AnkiDraftEditOp } from './ankiDraftEdit';
+import { isNoteTypeOp } from './ankiDraftEdit';
 
 export interface JournalEntry {
   /** 1-based, oldest first, counting applied and undone steps in one sequence. */
@@ -102,6 +103,11 @@ function entryFor(
       templatesRemoved += 1;
       continue;
     }
+    // The other note-type ops carry no `noteId`. Without this guard `undefined`
+    // enters the set and the step reports one more note than it touched —
+    // `template-add` already did, and `template-format` would have joined it.
+    // Neither is counted as a removal: nothing was deleted.
+    if (isNoteTypeOp(op)) continue;
     notes.add(op.noteId);
     if (op.kind === 'tags') {
       tagsChanged = true;
@@ -114,8 +120,10 @@ function entryFor(
     if (name && !fieldNames.includes(name)) fieldNames.push(name);
   }
   const first = step[0];
-  // Neither `deck-name` nor `template-remove` has a note, so the fallback id
-  // names the deck or the note type instead.
+  // None of the note-type ops has a note, nor does `deck-name`, so the fallback
+  // id names the deck or the note type and ord instead. Each spells out its own
+  // ord rather than sharing a branch: they sit at different places on the op and
+  // a wrong one would make two distinct steps share an id.
   const firstTarget =
     first === undefined
       ? ''
@@ -123,7 +131,11 @@ function entryFor(
         ? first.deckId
         : first.kind === 'template-remove'
           ? `${first.noteTypeId}:${first.template.ord}`
-          : first.noteId;
+          : first.kind === 'template-add'
+            ? `${first.noteTypeId}:${first.template.ord}`
+            : first.kind === 'template-format'
+              ? `${first.noteTypeId}:${first.ord}`
+              : first.noteId;
   return {
     index,
     id: first?.group ?? `${first?.kind ?? 'op'}:${firstTarget}:${index}`,
@@ -162,9 +174,10 @@ export function appliedStepCount(entries: readonly JournalEntry[]): number {
 /** Distinct notes the applied steps touched. A note edited twice counts once. */
 export function auditedNoteCount(journal: AnkiDraftEditJournal): number {
   const notes = new Set<string>();
-  // The two note-less op kinds are skipped, matching `editedNoteIds`.
+  // The note-less op kinds are skipped, matching `editedNoteIds` — which is now
+  // the same predicate rather than a second hand-maintained list that drifts.
   for (const op of journal.done) {
-    if (op.kind === 'deck-name' || op.kind === 'template-remove') continue;
+    if (op.kind === 'deck-name' || isNoteTypeOp(op)) continue;
     notes.add(op.noteId);
   }
   return notes.size;

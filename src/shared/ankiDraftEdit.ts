@@ -78,6 +78,18 @@ export interface AnkiCardScheduling {
 export const MIN_EASE_FACTOR = 1300;
 export const MAX_EASE_FACTOR = 10_000;
 
+/**
+ * The two formats a card template renders from, carried as one value.
+ *
+ * A pair rather than two ops for `AnkiCardScheduling`'s reason: recipe 1 swaps
+ * them, and a journal that could hold one without the other would let an undo
+ * leave a template with both sides showing the same field.
+ */
+export interface AnkiTemplateFormats {
+  qfmt: string;
+  afmt: string;
+}
+
 export type AnkiDraftEditOp =
   | {
       kind: 'field';
@@ -247,6 +259,36 @@ export type AnkiDraftEditOp =
     }
   | {
       /**
+       * The question and answer formats of an EXISTING card template — recipe
+       * 1's rendered-template variant, which swaps them.
+       *
+       * Deliberately the narrowest template op there is: it rewrites two strings
+       * on a template that already exists, so no ord moves, no card row is
+       * created or deleted, and the inverse is writing the two strings back.
+       * That is why it is not modelled as a remove-plus-add — that pair would
+       * delete every card the template generated and mint new ones with a new
+       * schedule, to change two fields.
+       *
+       * `bqfmt`/`bafmt` are NOT here. The browser-appearance overrides are a
+       * separate pair Anki renders in the card list only, most templates leave
+       * them empty (6 of 187 in this repo's own survey), and swapping the card's
+       * two sides says nothing about what the browser column should show.
+       *
+       * The fourth op with no `noteId`: a format edit spans every note of the
+       * note type, so attributing it to one of them would be false about the
+       * rest — `template-remove` above says the same.
+       */
+      kind: 'template-format';
+      noteTypeId: string;
+      /** The template's ord, in the numbering the draft holds right now. */
+      ord: number;
+      /** Both formats verbatim, so an undo restores bytes rather than a re-render. */
+      before: AnkiTemplateFormats;
+      after: AnkiTemplateFormats;
+      group?: string;
+    }
+  | {
+      /**
        * One added card template — the card designer's reverse and
        * optional-reverse. The exact mirror of `template-remove` above, and it
        * exists for the reason that gate 14's matrix made visible:
@@ -326,7 +368,25 @@ export interface AnkiDraftEditResult {
      */
     | 'card-not-scheduled'
     /** An interval or ease outside what Anki's own scheduler can store. */
-    | 'invalid-scheduling';
+    | 'invalid-scheduling'
+    /** The draft holds no note type with that id. */
+    | 'no-such-note-type'
+    /** That note type has no card template at that ord. */
+    | 'no-such-template'
+    /**
+     * A question format that references no field at all. Anki requires the front
+     * of a card to name one, `decodeTemplateConfig` returns `null` for a `qfmt`
+     * with no `{{`, and a package written with one would read back as a template
+     * this workbench cannot see — a silent loss rather than a refusal.
+     */
+    | 'empty-question-format'
+    /**
+     * A cloze note type's formats. Anki generates a cloze card from the `{{c1::}}`
+     * markers in the FIELD, and the front side must carry the `{{cloze:…}}`
+     * replacement; moving it to the back leaves a card with no question and no
+     * cloze to hide. Refused rather than swapped into a deck that will not render.
+     */
+    | 'cloze-note-type';
   /** Media file names the edit removed the last reference to, within this note. */
   mediaDropped?: string[];
   /** Media references the edit introduced that the source does not contain. */
@@ -716,6 +776,91 @@ export function setNoteTags(
 }
 
 /**
+ * Rewrite one existing card template's question and answer formats.
+ *
+ * Recipe 1's rendered-template variant applies through here, and so does any
+ * later template editor: the op is about the two strings, not about the swap.
+ *
+ * Nothing else on the template moves — not its name, not its ord, not its
+ * browser formats, not its deck override — so the draft's card rows, their
+ * scheduling and their `ord` are untouched. This op only rewrites the two
+ * strings; deciding WHICH two strings a swap should write is the caller's, and
+ * is where a front side that generates no card has to be caught.
+ */
+export function setTemplateFormats(
+  draft: AnkiDraft,
+  journal: AnkiDraftEditJournal,
+  noteTypeId: string,
+  ord: number,
+  formats: AnkiTemplateFormats,
+): AnkiDraftEditResult {
+  const noteType = draft.noteTypes.find((nt) => nt.id === noteTypeId);
+  if (!noteType) return { draft, journal, changed: false, reason: 'no-such-note-type' };
+  if (noteType.kind === 'cloze') {
+    return { draft, journal, changed: false, reason: 'cloze-note-type' };
+  }
+  const template = noteType.templates.find((t) => t.ord === ord);
+  if (!template) return { draft, journal, changed: false, reason: 'no-such-template' };
+  const qfmt = String(formats.qfmt ?? '');
+  const afmt = String(formats.afmt ?? '');
+  // The reader's own bar, applied before the write rather than discovered after
+  // it: `decodeTemplateConfig` returns null for a qfmt with no `{{`.
+  if (!qfmt.includes('{{')) {
+    return { draft, journal, changed: false, reason: 'empty-question-format' };
+  }
+  if (qfmt === template.qfmt && afmt === template.afmt) {
+    return { draft, journal, changed: false, reason: 'unchanged' };
+  }
+  const before: AnkiTemplateFormats = { qfmt: template.qfmt, afmt: template.afmt };
+  return {
+    draft: {
+      ...draft,
+      noteTypes: draft.noteTypes.map((nt) =>
+        nt.id !== noteTypeId
+          ? nt
+          : {
+              ...nt,
+              templates: nt.templates.map((t) => (t.ord === ord ? { ...t, qfmt, afmt } : t)),
+            },
+      ),
+    },
+    journal: {
+      done: [
+        ...journal.done,
+        { kind: 'template-format', noteTypeId, ord, before, after: { qfmt, afmt } },
+      ],
+      undone: [],
+    },
+    changed: true,
+  };
+}
+
+/** An op that belongs to a note TYPE rather than to a note, so it carries no `noteId`. */
+export type AnkiNoteTypeOp = Extract<
+  AnkiDraftEditOp,
+  { kind: 'template-remove' | 'template-add' | 'template-format' }
+>;
+
+/**
+ * The one place this set is spelled out.
+ *
+ * Four call sites need exactly these ops and each used to hand-maintain its own
+ * `||` chain: `applyTemplateRemovalOps` handles them structurally,
+ * `applyInverseInto` must decline them because it writes through a positional
+ * NOTE index, and `editedNoteIds`/`noteIsEdited` must skip them because there is
+ * no `noteId` to attribute. Adding `template-format` to some chains and not
+ * others is the exact drift this predicate exists to make impossible — the
+ * counters would otherwise read `undefined` off the op and badge it as a note.
+ */
+export function isNoteTypeOp(op: AnkiDraftEditOp): op is AnkiNoteTypeOp {
+  return (
+    op.kind === 'template-remove'
+    || op.kind === 'template-add'
+    || op.kind === 'template-format'
+  );
+}
+
+/**
  * Undo one op into a working array. Mutating `notes` here is safe and is the
  * point: it is a copy the caller made for this step, and rebuilding the whole
  * array per op is what made undoing a 3,000-note batch quadratic.
@@ -789,7 +934,7 @@ function applyInverseInto(
   // through the positional index this function writes through. Returning rather
   // than falling into the note branch below, which would read a `noteId` this op
   // deliberately does not have.
-  if (op.kind === 'template-remove' || op.kind === 'template-add') return;
+  if (isNoteTypeOp(op)) return;
   const at = index.position.get(op.noteId);
   if (at === undefined) return;
   const note = notes[at];
@@ -837,6 +982,24 @@ function applyTemplateRemovalOps(
   let cards = draft.cards;
 
   for (const op of ops) {
+    if (op.kind === 'template-format') {
+      // Structural only in the sense that it belongs to a note type rather than
+      // a note — it changes no array's length, so it could not corrupt an index.
+      // It rides in this pass because `applyInverseInto` writes through the
+      // positional note index and this op has no `noteId` to look up.
+      const formats = op[direction];
+      noteTypes = noteTypes.map((noteType) =>
+        noteType.id !== op.noteTypeId
+          ? noteType
+          : {
+              ...noteType,
+              templates: noteType.templates.map((t) =>
+                t.ord === op.ord ? { ...t, qfmt: formats.qfmt, afmt: formats.afmt } : t,
+              ),
+            },
+      );
+      continue;
+    }
     if (op.kind === 'template-add') {
       // The mirror of the removal below, and simpler for one reason: a design
       // APPENDS, so no ord ever moves. `before` (undo) drops what it made,
@@ -985,7 +1148,7 @@ export function undoLastEdit(
   // Structural first, and the index is built from its result: re-inserting card
   // rows moves every position after the insert, so an index built before this
   // would address the wrong rows for the rest of the step.
-  const structural = step.some((op) => op.kind === 'template-remove' || op.kind === 'template-add')
+  const structural = step.some(isNoteTypeOp)
     ? applyTemplateRemovalOps(draft, [...step].reverse(), 'before')
     : null;
   const base = structural ? { ...draft, ...structural } : draft;
@@ -1017,7 +1180,7 @@ export function redoLastEdit(
   // Structural first, for `undoLastEdit`'s reason — here the deletes shorten the
   // array instead of lengthening it, which invalidates a prebuilt index just as
   // thoroughly. Forwards, since a redo replays the step in applied order.
-  const structural = step.some((op) => op.kind === 'template-remove' || op.kind === 'template-add')
+  const structural = step.some(isNoteTypeOp)
     ? applyTemplateRemovalOps(draft, step, 'after')
     : null;
   const base = structural ? { ...draft, ...structural } : draft;
@@ -1037,19 +1200,13 @@ export function redoLastEdit(
 /** Notes the journal has touched, for the step's affected count. */
 export function editedNoteIds(journal: AnkiDraftEditJournal): string[] {
   const out: string[] = [];
-  // `deck-name` and `template-remove` belong to no note; counting either against
-  // one would mark a note as edited that nothing wrote to. A removal in
-  // particular spans every note of its note type, so any single attribution is
-  // false about the rest — and badging thousands of notes as edited would be
-  // worse than badging none.
+  // `deck-name` and the note-type ops belong to no note; counting any of them
+  // against one would mark a note as edited that nothing wrote to. A removal or
+  // a format edit in particular spans every note of its note type, so any single
+  // attribution is false about the rest — and badging thousands of notes as
+  // edited would be worse than badging none.
   for (const op of journal.done) {
-    if (
-      op.kind === 'deck-name'
-      || op.kind === 'template-remove'
-      || op.kind === 'template-add'
-    ) {
-      continue;
-    }
+    if (op.kind === 'deck-name' || isNoteTypeOp(op)) continue;
     if (!out.includes(op.noteId)) out.push(op.noteId);
   }
   return out;
@@ -1057,10 +1214,6 @@ export function editedNoteIds(journal: AnkiDraftEditJournal): string[] {
 
 export function noteIsEdited(journal: AnkiDraftEditJournal, noteId: string): boolean {
   return journal.done.some(
-    (op) =>
-      op.kind !== 'deck-name'
-      && op.kind !== 'template-remove'
-      && op.kind !== 'template-add'
-      && op.noteId === noteId,
+    (op) => op.kind !== 'deck-name' && !isNoteTypeOp(op) && op.noteId === noteId,
   );
 }
