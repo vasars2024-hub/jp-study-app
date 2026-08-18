@@ -137,6 +137,40 @@
   --lq-anchor-shadow: var(--elevation-0);
 }
 
+/* ---------- Light palettes — the material must carry its own chrome text ----
+   The desktop under the window is `.os-desktop.wall-from-env`, and it paints an
+   OPAQUE near-black (`rgb(10,10,14)`) whatever the palette is. So on a light
+   palette the 72% material is white glass over black, and it composites to a
+   MID-GREY — `#bababc` on classic-light, `#bab7b1` on soft-sepia, measured on
+   the live Liquid Dictionary window, not derived.
+
+   A mid-grey ground is squeezed from both sides, and the consequence is not a
+   near miss: at share 100 — i.e. `var(--text)` itself, the darkest colour those
+   palettes own — the title-bar glyphs still measured 4.42:1 on soft-sepia and
+   4.44:1 on rose-pine. NO glyph colour can fix that, because there is nothing
+   darker to reach for. The ground is the defect.
+
+   88% rather than 72% on the light six. It is chosen, not guessed: 72 leaves
+   `--text` failing on two palettes, and 88 is the lowest 4-point step that
+   clears the bar on all six with the derived glyph colour on top of it. The
+   blur, saturate, border, highlight and shadow are all untouched, so the
+   material still reads as Liquid — this moves how much of a dark desktop shows
+   through a LIGHT pane, which was never the part carrying the effect.
+
+   Dark palettes are not included and must not be: white-on-dark chrome measured
+   4.92:1 to 16.74:1 at 72%, and opacifying them would cost the effect for
+   nothing. `[data-perf='battery']` below deliberately still wins at 92%; it is
+   an even more opaque downgrade, so the guarantee holds. */
+:root[data-theme='classic-light'],
+:root[data-theme='soft-sepia'],
+:root[data-theme='ocean-blue'],
+:root[data-theme='mint-green'],
+:root[data-theme='rose-pine'],
+:root[data-theme='paper'] {
+  --lq-liquid-bg: color-mix(in srgb, var(--panel) 88%, transparent);
+  --lq-liquid-bg-raised: color-mix(in srgb, var(--panel-2) 94%, transparent);
+}
+
 /* ---------- High contrast — the liquid role stops being liquid ----------
    `a11y.css` already strips `backdrop-filter` from the material classes under
    this theme. The same decision at token level, so a primitive that never

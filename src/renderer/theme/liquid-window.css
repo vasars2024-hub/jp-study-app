@@ -99,10 +99,35 @@
 }
 
 /* The toggle itself. `aria-pressed` carries the state for assistive tech; this
-   is the matching visible affordance, not a decoration. */
+   is the matching visible affordance, not a decoration.
+ *
+ * NO `color` HERE, AND THAT IS THE FIX. It used to paint `var(--accent)` — the raw
+ * accent as a 13px glyph — and on the light palettes this button sits on the frame
+ * material over the opaque near-black desktop, where it measured 3.06:1. The
+ * `--accent-text` token does not rescue it either (4.12 soft-sepia, 4.15 mint-green,
+ * 4.33 rose-pine on that ground): that token is solved against `--panel-2`, and the
+ * chrome ground is darker. Opacifying the material far enough to carry it would take
+ * the light material to ~94% and cost the effect entirely.
+ *
+ * So the accent stops being the glyph and stays the FILL, where it has no contrast
+ * duty at all. The glyph inherits `.fwin-b`'s derived colour and is legible on all
+ * thirteen palettes; the state is carried by the tint, the inset ring, and
+ * `aria-pressed`. Tradeoff, accepted deliberately: on DARK palettes the ◆ was already
+ * legible in accent (4.92-5.19), so this trades a little colour identity there for one
+ * rule that is correct everywhere.
+ *
+ * THE FILL STAYS AT 16%, AND THAT IS A MEASUREMENT, NOT THE OLD VALUE LEFT ALONE.
+ * Compensating for the lost glyph colour by strengthening the fill to 24% was tried
+ * first, and it put the glyph straight back under the bar — 4.07:1 on classic-light,
+ * 4.19 on forest-night — because the fill IS this glyph's ground. The fix for a
+ * contrast defect created the next one. Swept: 16% is the largest fill that keeps the
+ * glyph >= 4.5:1 on all thirteen palettes (18 leaves soft-sepia at 4.46). The inset
+ * ring carries the extra weight instead, because a 1px edge at 40% costs the glyph's
+ * ground nothing.
+ */
 .fwin-b-liquid.is-liquid {
-  color: var(--accent);
   background: color-mix(in srgb, var(--accent) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
 .fwin-b-liquid:focus-visible {

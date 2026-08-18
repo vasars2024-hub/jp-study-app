@@ -816,7 +816,20 @@ html.reduce-motion .os-aero-boot *::after,
   width: 30px;
   height: 24px;
   border-radius: var(--radius-sm);
-  color: var(--muted);
+  /* Was `var(--muted)`. In Liquid presentation `.fwin-bar` is transparent, so these glyphs sit
+     on the window's frame material over `.os-desktop`, which paints an OPAQUE near-black
+     whatever the palette is — not on `--sidebar`. Measured on the live Liquid Dictionary window,
+     `--muted` failed on all six light palettes (4.04-4.22:1 against 4.5) even after the material
+     was opacified. Mixing toward the bar's own background is bidirectional, so ONE declaration
+     serves all thirteen palettes with no per-palette override to forget; 90% is the SMALLEST
+     text share clearing the bar everywhere (85 leaves soft-sepia at 4.49), i.e. the quietest
+     legible glyph, which is what a quiet-until-hover control wants.
+
+     `--muted` itself is deliberately not moved: it is shared body text across the whole app and
+     this is a window-chrome problem. Consequence worth knowing: at 90% the `:hover` colour below
+     is nearly the resting colour, so the hover FILL is what actually reads as hover — a real cue
+     that was already there. */
+  color: color-mix(in srgb, var(--text) 90%, var(--sidebar));
   transition:
     background var(--dur-instant) var(--ease-standard),
     color var(--dur-instant) var(--ease-standard);

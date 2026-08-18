@@ -13914,6 +13914,12 @@ html[data-icon-size='large'] .os-desk-icon-img { width: 52px; height: 52px; }
   background: transparent;
   border: none;
   border-radius: 6px;
+  /* DO NOT FIX THE WINDOW-CONTROL GLYPH COLOUR HERE — this declaration does not win.
+     `shell.css:815` carries `:where(html:not([data-materials='aero']):not([data-materials='wired']))
+     .fwin:where(:not(.blanc-root *)) .fwin-b`. Both `:where()` groups contribute 0, so that
+     selector is (0,2,0) against this rule's (0,1,0) and it owns the colour. A fix written here
+     computes to nothing while reading exactly like a fix — the fourth instance of that shape in
+     this file (see the --accent-2, --control-edge and --focus-ring-color notes). */
   color: var(--muted);
   font-size: 13px;
   cursor: pointer;
