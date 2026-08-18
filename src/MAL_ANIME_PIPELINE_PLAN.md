@@ -2117,3 +2117,51 @@ B's 39 episodes are **usable but not clean**, and the earlier "181,790 kana" fig
 path (`subtitleFusionCore.ts` reads `cue.style` for songs and signs) has no language notion at all,
 so the render leg will show the Chinese track unless it gets the same treatment — decide that
 deliberately when gate 31's render half runs; do not assume it is covered.
+
+## 2026-08-18 — the player would have stacked the Chinese line on the Japanese one
+
+Worker `primary`. Commit `30c8cc24`. Gate 31's **render leg**, half of it closed and the other
+half now named as a product gap rather than a measurement difficulty.
+
+**The trap the last entry left was real, and here is its number.** The style filter had landed on
+the mining path only. Measured LIVE in the running renderer over the app's own module graph
+(`import('/src/shared/subtitleCues.ts')`, the acquired episode 01 served to the renderer and
+parsed by the shipped parser): **856 raw cues → 413 kept, 443 dropped across 8 styles** —
+`JOJO5_textch`, `stand-parameter`, `JOJO5_textpy`, `JOJO5-staff`, `JOJO5-tips`, `stand-name`,
+`JOJO5-next title`, `JOJO5-title`. At t=667.59 s the raw parse puts **4 cues on screen**
+(`textjp, textch, textjp, textch`); filtered, **2**, both `textjp`. And **413 of 413** Japanese
+dialogue lines had at least one other cue on screen at their own midpoint — not a sampling
+artefact, every single line.
+
+`parseStudySubtitles` (`shared/subtitleCues.ts`) is `parseSubtitles` + `keepJapaneseStyleCues`
+named once so the player and the miner cannot drift. Wired into `MediaContent.applySubtitleFile`
+— the seam a stored record reaches the player through (`applyStudyContext` → `readSubtitleRecord`
+→ here) — and deliberately **not** into `openSecondarySubs`: a translation track is asked for in
+another language by definition. That is the negative control, and it is a test.
+
+**A minimum-line floor is FORBIDDEN, and this is the evidence so nobody adds one.** A kana-free
+Japanese sign (東京駅) is dropped, and the obvious fix is "keep styles with too few lines to
+judge". Censused over all 39 acquired files: `JOJO5_textjp-an8` and `JOJO5_textch-an8` are **both
+169 lines across 35 files, one line per file each** — any floor that saves the sign puts the
+Chinese track straight back on screen. Script alone cannot separate them; the cost is bounded and
+reported. Pinned as its own test.
+
+**Mutations:** filter removed from `parseStudySubtitles` = **5 red**; the status note dropped =
+**1 red** (the hidden count never reaches the user); the filter leaked into the secondary slot =
+**1 red** (the negative control). Restored → 17 passed.
+
+**WHAT IS STILL OPEN, and it is a PRODUCT gap.** `SubtitleHarvestPanel` has exactly four bridge
+calls — `subtitleHarvest:list`, `:fetch`, `:nyaaList`, `:nyaaFetch` — and **no attach**. Harvested
+cues go to mining and stop there. The only route from a nyaa release to a `SubtitleRecord` is
+`NyaaSubtitleDialog.tsx` → `acceptNyaaSubtitle`, which starts from a **media item you already
+own**. Route B's 39 episodes are subs-only and this profile has no JoJo video, so the acquired
+cues cannot reach the player without either (a) a video in the library, or (b) a new attach action
+on the harvest panel. Rendering them over an unrelated video would be a rig, not a proof, and is
+not being done.
+
+**Not touched, deliberately:** the workspace player's own external-subtitle attach effect
+(`VideoCoreStudyOverlay.tsx:787` in the worktree) **does not exist in HEAD at all** — it is
+another track's uncommitted work, so the same filter cannot land there yet. Whoever commits that
+track owes it the `parseStudySubtitles` call.
+
+**Gate 31 stays 32 of 34.**
