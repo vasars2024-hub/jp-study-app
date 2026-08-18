@@ -48,6 +48,82 @@ export function parseAss(raw: string): Cue[] {
   }
   return cues;
 }
+/** Kana — the script no Chinese line carries and almost every Japanese one does. */
+const KANA = /[぀-ゟ゠-ヿ]/;
+
+/**
+ * A style is Japanese-bearing when most of its own lines carry kana.
+ *
+ * Majority rather than "any", and the margin is measured rather than guessed:
+ * natural Japanese dialogue reaches for a particle nearly every line, so the
+ * Japanese track of the release below runs at 98.9%, while its Chinese track and
+ * its romaji karaoke both sit at 0.3%. Anything between those is not a case this
+ * has to decide well.
+ */
+const JAPANESE_STYLE_SHARE = 0.5;
+
+export interface StyleScriptSplit {
+  cues: Cue[];
+  /** How many cues were dropped, so a caller can report the number rather than a word. */
+  dropped: number;
+  /** Which styles went, in descending size — the evidence for the number. */
+  styles: string[];
+}
+
+/**
+ * Keep only the cues whose ASS style actually carries Japanese.
+ *
+ * A dual-language `.ass` is one file with two full subtitle tracks in it, and
+ * nothing above this level can see that: the file passes a name check, it passes
+ * `looksJapaneseSubtitle`, and it parses cleanly. Measured on the Route B release
+ * this pipeline acquired on 2026-08-18 — 39 episodes of JoJo Part 5, tagged
+ * `简繁外挂字幕` — the 667,437 parsed cues break down as **348,994 Chinese OP
+ * karaoke with zero kana, 274,628 romaji karaoke with 826, 11,602 Chinese
+ * dialogue with 38, and 11,168 Japanese dialogue with 11,049**. Mining the whole
+ * file puts the Chinese half and 620k karaoke syllable-fragments into a Japanese
+ * frequency table, and every count downstream reads as a success.
+ *
+ * The rule is the per-file `looksJapaneseSubtitle` policy at one finer grain:
+ * judge a track by the script its own text uses, never by its name. `textjp` and
+ * `textch` are a lucky pair; `JOJO5-op1-ch-2` and `JOJO5-op1-jp-2` are the same
+ * lucky pair; a release that names its styles `Style1`/`Style2` is not, and that
+ * is the case a name rule silently fails.
+ *
+ * Deliberately inert in three cases, because dropping everything is worse than
+ * keeping too much: cues with no style at all (every `.srt`, `.vtt` and `.lrc`),
+ * a file whose styles are all Japanese-bearing, and a file where none of them is
+ * — the last is a file this function has no opinion about, not an empty one.
+ */
+export function keepJapaneseStyleCues(cues: Cue[]): StyleScriptSplit {
+  const stats = new Map<string, { total: number; kana: number }>();
+  for (const cue of cues) {
+    if (!cue.style) continue;
+    const row = stats.get(cue.style) ?? { total: 0, kana: 0 };
+    row.total += 1;
+    if (KANA.test(cue.text)) row.kana += 1;
+    stats.set(cue.style, row);
+  }
+  if (!stats.size) return { cues, dropped: 0, styles: [] };
+
+  const drop = new Set<string>();
+  for (const [style, row] of stats) {
+    if (row.kana / row.total < JAPANESE_STYLE_SHARE) drop.add(style);
+  }
+  // Every style failed, so the file is uniform in something that is not kana —
+  // a Japanese track written mostly in kanji, or a release we misjudged. Either
+  // way this function is the wrong place to refuse it, and `looksJapaneseSubtitle`
+  // has already had its say on the file as a whole.
+  if (drop.size === stats.size) return { cues, dropped: 0, styles: [] };
+  if (!drop.size) return { cues, dropped: 0, styles: [] };
+
+  const kept = cues.filter((cue) => !cue.style || !drop.has(cue.style));
+  return {
+    cues: kept,
+    dropped: cues.length - kept.length,
+    styles: [...drop].sort((a, b) => (stats.get(b)?.total ?? 0) - (stats.get(a)?.total ?? 0)),
+  };
+}
+
 export function parseSrtVtt(raw: string): Cue[] {
   const cues: Cue[] = [];
   for (const block of raw.split(/\n\s*\n/)) {

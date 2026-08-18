@@ -4138,6 +4138,7 @@ export const en: Catalog = {
   'subHarvest.error.empty': 'the provider returned nothing',
   'subHarvest.error.noCues': 'The subtitles downloaded but contained no readable lines.',
   'subHarvest.failures': { one: '{count} episode could not be read', other: '{count} episodes could not be read' },
+  'subHarvest.otherScript': 'Dropped {count} subtitle lines whose track carries no Japanese \u2014 a dual-language or karaoke release ({styles}). Only the Japanese track was studied.',
   'subHarvest.truncated': 'The transcript hit the analysis ceiling, so these counts cover only part of the selection. Harvest fewer episodes at a time for exact frequencies.',
   'subHarvest.stat.episodes': 'episodes',
   'subHarvest.stat.lines': 'lines',

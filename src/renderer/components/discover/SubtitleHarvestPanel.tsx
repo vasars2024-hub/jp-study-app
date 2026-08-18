@@ -32,7 +32,7 @@ import {
   type NyaaSubtitleCandidateView,
   type SubtitleHarvestListResult,
 } from '../../../shared/subtitleHarvest';
-import { parseSubtitles, type Cue } from '../../subtitles';
+import { keepJapaneseStyleCues, parseSubtitles, type Cue } from '../../subtitles';
 import {
   SEASON_STUDY_LIMITS,
   addMediaStudyFlashcards,
@@ -204,10 +204,34 @@ export default function SubtitleHarvestPanel({
    * frequency table from an eighth of the dialogue.
    */
   const analyse = useCallback(async (perEpisode: { episode: number; cues: Cue[] }[]) => {
+    // Per file, before anything is combined: a dual-language `.ass` carries two
+    // whole subtitle tracks, and the style stats that separate them only mean
+    // something inside the file they came from. Both providers go through here
+    // for the reason above — a jimaku file has one track, so this is inert on it,
+    // and putting it on one branch is how the two paths start disagreeing about
+    // what a corpus is.
+    let dropped = 0;
+    const dropStyles = new Set<string>();
+    const japanese = perEpisode.map((entry) => {
+      const split = keepJapaneseStyleCues(entry.cues);
+      dropped += split.dropped;
+      for (const style of split.styles) dropStyles.add(style);
+      return { episode: entry.episode, cues: split.cues };
+    });
+    if (dropped) {
+      const note = t('subHarvest.otherScript', {
+        count: dropped,
+        styles: [...dropStyles].slice(0, 4).join(', '),
+      });
+      // Appended, not assigned: a partial acquisition has already put its own
+      // shortfall here, and these are two independent things the user needs.
+      setMessage((prev) => (prev ? `${prev} ${note}` : note));
+    }
+
     // Combining is always run: one episode is just a season of one, and the
     // offsetting is a no-op there. What `combine` decides is only whether the
     // user is *offered* the whole thing as a single corpus below.
-    const combined = combineSeasonCues(perEpisode);
+    const combined = combineSeasonCues(japanese);
     setCues(combined.cues as Cue[]);
     setSegments(combined.segments);
 
