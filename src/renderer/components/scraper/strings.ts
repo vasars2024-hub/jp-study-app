@@ -378,10 +378,22 @@ const TEXT = {
   'torrent.connectionDesc': 'Where the client lives, and whether the scraper can reach it.',
   'torrent.test': 'Test Connection',
   'torrent.testing': 'Testing…',
+  // Four states, not two. A `*Ref` is a handle into OS storage, so a non-empty
+  // ref proves only that one was named — "orphaned" is the case where the ref
+  // survived and the secret did not, which used to render as "stored".
+  'torrent.credChecking': 'checking password…',
   'torrent.credStored': 'password stored',
   'torrent.credMissing': 'no password',
+  'torrent.credOrphaned': 'password missing from OS storage',
+  'torrent.credOrphanedHint': 'Settings name a password, but nothing is stored under it. Open qBittorrent settings and enter it again.',
+  'torrent.credUnknown': 'password unverified',
+  'torrent.keyChecking': 'checking API key…',
   'torrent.keyStored': 'API key stored',
   'torrent.keyMissing': 'no API key',
+  'torrent.keyOrphaned': 'API key missing from OS storage',
+  'torrent.keyOrphanedHint': 'Settings name an API key, but nothing is stored under it. Open qBittorrent settings and enter it again.',
+  'torrent.keyUnknown': 'API key unverified',
+  'torrent.credUnknownHint': 'The secret store could not be reached, so whether a credential exists is unknown.',
   // Which credential the test actually used. Shown on failures too: with both a
   // password and a key stored, "unauthorized" alone sends the user to change the
   // one that was never consulted.

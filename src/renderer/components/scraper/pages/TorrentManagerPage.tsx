@@ -17,6 +17,13 @@ import { useScraper } from '../ScraperContext';
 import { useScraperPort } from '../data/scraperPort';
 import { formatEtaClock } from '../data/charts';
 import { formatBytes } from '../../../../shared/assetRegistry';
+import {
+  CREDENTIAL_PRESENCE_TONE,
+  KEY_PRESENCE_TEXT,
+  PASSWORD_PRESENCE_TEXT,
+  resolveCredentialPresence,
+  type VaultAnswer,
+} from '../data/credentialPresence';
 import { sx, sxn, sxs } from '../strings';
 import {
   loadScraperSettingsDocument,
@@ -87,11 +94,43 @@ export default function TorrentManagerPage() {
   const [backendBusy, setBackendBusy] = useState(false);
   const [backendNotice, setBackendNotice] = useState<AcquisitionActionResult | null>(null);
   const [backendDestination, setBackendDestination] = useState('');
+  const [vaultHas, setVaultHas] = useState<VaultAnswer>(null);
 
   useEffect(() => onScraperSettingsChanged(setDoc), []);
 
   const settings = useMemo(() => resolveScraperSettings(doc), [doc]);
   const qbit = settings.qbittorrent;
+
+  // Only the mode in force is asked about: with a key stored and a stale
+  // password ref left behind, reporting on both is two answers to one question.
+  const credentialRef = qbit.authMode === 'apiKey' ? qbit.apiKeyRef : qbit.passwordRef;
+
+  // The settings document knows the ref; only main knows whether a secret sits
+  // behind it. Re-asked whenever the document changes, because saving or
+  // clearing a secret in the drawer can leave the ref string identical.
+  useEffect(() => {
+    const ref = credentialRef.trim();
+    if (!ref) return;
+    const probe = window.api?.scraperHasCredential;
+    if (!probe) {
+      setVaultHas('error');
+      return;
+    }
+    let cancelled = false;
+    setVaultHas(null);
+    void probe(ref)
+      .then((stored) => {
+        if (!cancelled) setVaultHas(stored);
+      })
+      .catch(() => {
+        if (!cancelled) setVaultHas('error');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [credentialRef, doc]);
+
+  const credentialPresence = resolveCredentialPresence({ ref: credentialRef, vaultHas });
 
   const search = useCallback(async () => {
     const rows = await port.searchTorrents({
@@ -247,16 +286,24 @@ export default function TorrentManagerPage() {
           {/* No secret is ever shown or stored here — only whether one exists,
               and only for the mode actually in force. Reading `passwordRef` in
               key mode told a user with a working key that they had "no
-              password", which reads as broken. */}
-          {qbit.authMode === 'apiKey' ? (
-            <Pill tone={qbit.apiKeyRef ? 'good' : 'warn'}>
-              {qbit.apiKeyRef ? sx('torrent.keyStored') : sx('torrent.keyMissing')}
-            </Pill>
-          ) : (
-            <Pill tone={qbit.passwordRef ? 'good' : 'warn'}>
-              {qbit.passwordRef ? sx('torrent.credStored') : sx('torrent.credMissing')}
-            </Pill>
-          )}
+              password", which reads as broken. The ref alone is not the answer
+              either: it said "stored" over an empty store. */}
+          <Pill
+            tone={CREDENTIAL_PRESENCE_TONE[credentialPresence]}
+            title={
+              credentialPresence === 'orphaned'
+                ? sx(qbit.authMode === 'apiKey' ? 'torrent.keyOrphanedHint' : 'torrent.credOrphanedHint')
+                : credentialPresence === 'unknown'
+                  ? sx('torrent.credUnknownHint')
+                  : undefined
+            }
+          >
+            {sx(
+              qbit.authMode === 'apiKey'
+                ? KEY_PRESENCE_TEXT[credentialPresence]
+                : PASSWORD_PRESENCE_TEXT[credentialPresence],
+            )}
+          </Pill>
         </div>
       </ScrCard>
 
