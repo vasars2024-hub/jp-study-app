@@ -1181,6 +1181,14 @@ export async function qbitStart(
 
 export interface QbitAwaitOptions {
   timeoutMs: number;
+  /**
+   * Hard ceiling on the whole wait, when `timeoutMs` should be read as a
+   * **no-progress** budget rather than a wall clock.
+   *
+   * Absent, the wait is exactly as long as `timeoutMs` no matter what arrives —
+   * the original behaviour, kept for every caller that has its own budget.
+   */
+  progressCeilingMs?: number;
   pollMs?: number;
   /** Checked between polls so a cancelled discovery stops waiting. */
   isCancelled?: () => boolean;
@@ -1379,6 +1387,18 @@ export interface QbitStallInput {
   peakConnected: number;
   /** True when qBittorrent itself reports it is on no swarm at all. */
   clientOffline: boolean;
+  /**
+   * True when nothing measurable arrived for the whole wait — no bytes on the
+   * selected files and never a nonzero download rate on the torrent.
+   *
+   * Deliberately not "the selected files gained no bytes": a subtitle inside a
+   * 4 MB piece shared with a skipped video file goes 0 → 1 in one step, so a
+   * transfer can be minutes from finishing with every wanted file still at
+   * exactly its starting fraction. Only the rate can tell those apart.
+   */
+  nothingArrived?: boolean;
+  /** True when the wait ended at its hard ceiling rather than at a no-progress stall. */
+  hitCeiling?: boolean;
 }
 
 /**
@@ -1449,6 +1469,23 @@ export function awaitFilesStallReason(input: QbitStallInput): string {
 
   const connected = input.last?.connected ?? input.peakConnected;
   const kbps = Math.round((input.last?.speedBps ?? 0) / 1_000);
+
+  // Peers connected and not a byte, at any rate, in all that time. "A longer
+  // wait may finish it" is advice with nothing behind it here, and the wait has
+  // by this point already taken its own advice for the whole stall budget.
+  if (input.nothingArrived) {
+    return `${progress} ${connected} peer(s) stayed connected for ${forMinutes} and sent nothing at `
+      + 'all. Waiting longer has already been tried for the whole of that, so pick another release.';
+  }
+
+  // The only branch where waiting longer was ever the right advice — and now
+  // the wait already did it, up to its ceiling, instead of only recommending it.
+  if (input.hitCeiling) {
+    return `${progress} Subtitles were still arriving at ${kbps} KB/s from ${connected} peer(s) when `
+      + `this fetch reached its ${forMinutes} limit. Nothing is wrong with the release; it is just `
+      + 'bigger or slower than one fetch allows.';
+  }
+
   return `${progress} Still connected to ${connected} peer(s) at ${kbps} KB/s — this swarm is slow, `
     + 'not dead, so a longer wait may finish it.';
 }
@@ -1471,12 +1508,24 @@ export async function qbitAwaitFiles(
   const pollMs = options.pollMs ?? 1_000;
   const sleep = options.sleep ?? defaultSleep;
   const startedAt = Date.now();
-  const deadline = startedAt + Math.max(0, options.timeoutMs);
+  const budgetMs = Math.max(0, options.timeoutMs);
+  // Absent a ceiling this collapses to `startedAt + budgetMs` and never moves,
+  // which is exactly the old wall clock.
+  const ceilingAt = startedAt + Math.max(budgetMs, options.progressCeilingMs ?? budgetMs);
+  let deadline = startedAt + budgetMs;
   // Carried across polls because the give-up message needs both: the peak
   // separates "never reached anyone" from "the swarm went silent", and only
   // the final sample can say which of those is true right now.
   let peakConnected = 0;
   let lastSwarm: QbitSwarmSample | null = null;
+  // Bytes of the selection present at the first poll are whatever a previous
+  // attempt left behind; only what arrives after that is this wait's evidence.
+  let baselineBytes: number | null = null;
+  let peakBytes = 0;
+  // The rate is the other half of "something is arriving", and the load-bearing
+  // half: piece alignment can hold every wanted file at its starting fraction
+  // for minutes while the transfer is in fact minutes from done.
+  let sawDownloadRate = false;
 
   for (;;) {
     if (options.isCancelled?.()) return { ok: false, reason: 'Cancelled.' };
@@ -1501,6 +1550,14 @@ export async function qbitAwaitFiles(
       return { ok: true, value: selected };
     }
 
+    // Whole-file completion is far too coarse to steer a wait by: 39 sidecars
+    // behind 4 MB piece alignment can transfer for twenty minutes and complete
+    // none of them until the end.
+    const bytes = selected.reduce((sum, file) => sum + file.sizeBytes * file.progress, 0);
+    if (baselineBytes === null) baselineBytes = bytes;
+    const gainedBytes = bytes > peakBytes;
+    if (gainedBytes) peakBytes = bytes;
+
     // Progress alone cannot tell "still downloading" from "stopped and never
     // coming". A disk that filled mid-transfer, or files deleted underneath
     // qBittorrent, leaves progress frozen below 1 — so without this the wait
@@ -1520,6 +1577,15 @@ export async function qbitAwaitFiles(
       // look after the timeout, and those two deserve different sentences.
       lastSwarm = swarmSampleOf(info.value);
       peakConnected = Math.max(peakConnected, lastSwarm.connected);
+      if (lastSwarm.speedBps > 0) sawDownloadRate = true;
+    }
+
+    // Anything arriving buys another full budget, never past the ceiling: a
+    // transfer that keeps delivering is not killed by the wall clock alone.
+    // Absent a ceiling `deadline` is already `ceilingAt`, so this is a no-op and
+    // every existing caller keeps exactly the budget it asked for.
+    if (gainedBytes || (lastSwarm && lastSwarm.speedBps > 0)) {
+      deadline = Math.min(ceilingAt, Date.now() + budgetMs);
     }
 
     if (Date.now() >= deadline) {
@@ -1537,6 +1603,8 @@ export async function qbitAwaitFiles(
           last: lastSwarm,
           peakConnected,
           clientOffline: status.ok && status.value === 'disconnected',
+          nothingArrived: !sawDownloadRate && peakBytes <= (baselineBytes ?? 0),
+          hitCeiling: Date.now() >= ceilingAt && ceilingAt > startedAt + budgetMs,
         }),
       };
     }

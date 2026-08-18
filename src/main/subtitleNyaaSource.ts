@@ -73,8 +73,27 @@ import {
 import { scraperLog } from './scraper/logBus';
 import type { ProviderSubtitleCandidate } from './subtitleProviderClients';
 
-/** How long to wait for a subtitle fetch before giving up on the swarm. */
+/**
+ * How long a subtitle fetch waits **with nothing arriving** before giving up.
+ *
+ * Read as a stall budget, not a wall clock: `qbitAwaitFiles` renews it every
+ * time subtitle bytes land, up to `FETCH_CEILING_MS`.
+ */
 const FETCH_TIMEOUT_MS = 5 * 60 * 1000;
+
+/**
+ * The hard ceiling on one fetch, however well it is going.
+ *
+ * The five minutes above were a wall clock until 2026-08-18, and the product
+ * measured itself failing on that: a 39-sidecar Route B pack timed out at
+ * `3/39` while connected to 16 peers at 121 KB/s, and the message it printed
+ * was *"this swarm is slow, not dead, so a longer wait may finish it"* — advice
+ * the product then offered no way to take. Sidecars behind 4 MB piece alignment
+ * need roughly 20 minutes at that rate, so the ceiling is 30: long enough for
+ * the measured case with margin, short enough that a discovery sweep over a
+ * season cannot be pinned by one release for an hour.
+ */
+const FETCH_CEILING_MS = 30 * 60 * 1000;
 
 /**
  * How long to wait for a magnet's file list.
@@ -618,6 +637,10 @@ async function acquireAll(
 
   const done = await qbitAwaitFiles(qbit, hash, wanted, {
     timeoutMs: options.timeoutMs ?? FETCH_TIMEOUT_MS,
+    // A caller that named its own budget gets exactly that budget: the ceiling
+    // is this module's default policy, not something imposed on a five-second
+    // probe. Only the default path is allowed to run long.
+    progressCeilingMs: options.timeoutMs === undefined ? FETCH_CEILING_MS : undefined,
     isCancelled: options.isCancelled,
   });
   if (!done.ok) return { ok: false, reason: done.reason };

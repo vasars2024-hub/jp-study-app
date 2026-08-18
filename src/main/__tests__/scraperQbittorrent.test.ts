@@ -1044,6 +1044,30 @@ describe('awaitFilesStallReason', () => {
     expect(reason).toContain('never learned how many');
   });
 
+  it('does not call a swarm that sent nothing "slow"', () => {
+    // Peers connected the whole time and not a byte at any rate. The old
+    // sentence told that user to be patient; the wait has by then already been
+    // patient for its whole stall budget, so patience is not the missing part.
+    const reason = awaitFilesStallReason(stall({ nothingArrived: true }));
+    expect(reason).toContain('sent nothing at all');
+    expect(reason).toContain('pick another release');
+    expect(reason).not.toContain('slow, not dead');
+  });
+
+  it('says the fetch ran out of ceiling, not that the release is at fault', () => {
+    const reason = awaitFilesStallReason(stall({ nothingArrived: false, hitCeiling: true }));
+    expect(reason).toContain('Subtitles were still arriving at 120 KB/s from 6 peer(s)');
+    expect(reason).toContain('Nothing is wrong with the release');
+    // NEGATIVE CONTROL: it must not still be recommending a wait it already took.
+    expect(reason).not.toContain('slow, not dead');
+  });
+
+  it('keeps the old sentence when the wait had no ceiling to reach', () => {
+    // A caller with its own budget gets the original wording, unchanged.
+    const reason = awaitFilesStallReason(stall({ nothingArrived: false, hitCeiling: false }));
+    expect(reason).toContain('slow, not dead');
+  });
+
   it('never reports a zero-minute wait', () => {
     const reason = awaitFilesStallReason(stall({
       waitedMs: 900,
@@ -1214,6 +1238,133 @@ describe('qbitAwaitFiles reads the swarm off the live torrent', () => {
     const out = await qbitAwaitFiles({ config }, HASH_AWAIT, [0, 1], options);
     expect(out.ok).toBe(true);
     expect(out.ok === true && out.value.map((f) => f.index)).toEqual([0, 1]);
+  });
+
+  // ---- the budget is a stall budget, not a wall clock ---------------------
+  //
+  // Measured 2026-08-18: a 39-sidecar Route B pack timed out at `3/39` while
+  // connected to 16 peers at 121 KB/s, and the product printed *"this swarm is
+  // slow, not dead, so a longer wait may finish it"* — advice it then offered no
+  // way to take. Whole-file completion is far too coarse to steer by; sidecars
+  // behind 4 MB piece alignment can transfer for twenty minutes and finish none.
+  //
+  // Wall-clock assertions here are one-sided on purpose: a loaded machine can
+  // make a wait longer, never shorter, so the bounds that matter are the floors
+  // for "it kept going" and the ceilings for "it did not".
+
+  /** A file list whose first file gains bytes on every poll and never completes. */
+  function trickling(step: number): void {
+    let progress = SUBS[0].progress;
+    fileListResponse = SUBS.map((f) => ({ ...f }));
+    torrentInfoHook = () => {
+      progress = Math.min(0.95, progress + step);
+      fileListResponse = [{ ...SUBS[0], progress }, SUBS[1]];
+    };
+  }
+
+  it('keeps waiting past the budget while subtitle bytes are still arriving', async () => {
+    // `dlspeed: 0` on purpose: the *bytes* are the signal being tested here, and
+    // a nonzero rate would extend the wait on its own and prove nothing.
+    torrentInfoExtra = [torrent({ num_seeds: 4, num_leechs: 2, num_complete: 9, dlspeed: 0 })];
+    // Slow enough that bytes are still arriving when the ceiling lands — so the
+    // upper bound below is the ceiling doing its job, not the trickle running out.
+    trickling(0.002);
+
+    const startedAt = Date.now();
+    const out = await qbitAwaitFiles({ config }, HASH_AWAIT, [0, 1], {
+      timeoutMs: 120,
+      pollMs: 15,
+      progressCeilingMs: 700,
+    });
+    const elapsed = Date.now() - startedAt;
+
+    // Without the renewal this returns at ~120 ms. It has to reach the ceiling.
+    expect(elapsed).toBeGreaterThan(500);
+    // And stop there: an unclamped renewal would follow this trickle for ~4 s,
+    // which in the product is a discovery sweep pinned by one release forever.
+    expect(elapsed).toBeLessThan(1_600);
+    expect(out.ok).toBe(false);
+    expect(out.ok === false && out.reason).toContain('Subtitles were still arriving');
+    // NEGATIVE CONTROL: the sentence that recommended a wait nothing could take.
+    expect(out.ok === false && out.reason).not.toContain('slow, not dead');
+  });
+
+  it('does not let a ceiling stretch a wait that nothing is arriving on', async () => {
+    // The other half, and the one a ceiling alone would break: a dead transfer
+    // must still give up on the short budget rather than hold the pipeline for
+    // the whole ceiling.
+    fileListResponse = SUBS;
+    torrentInfoExtra = [torrent({ num_seeds: 4, num_leechs: 2, num_complete: 9, dlspeed: 0 })];
+
+    const startedAt = Date.now();
+    const out = await qbitAwaitFiles({ config }, HASH_AWAIT, [0, 1], {
+      timeoutMs: 120,
+      pollMs: 15,
+      progressCeilingMs: 10_000,
+    });
+    const elapsed = Date.now() - startedAt;
+
+    expect(elapsed).toBeLessThan(2_000);
+    expect(out.ok === false && out.reason).toContain('sent nothing at all');
+    expect(out.ok === false && out.reason).not.toContain('slow, not dead');
+  });
+
+  it('waits on a rate even when no wanted file has gained a byte', async () => {
+    // The measured shape, and the one a byte-only signal gets wrong: a 30 KB
+    // sidecar inside a 4 MB piece stays at its starting fraction until the piece
+    // completes, so a real transfer looks frozen for minutes at a time.
+    fileListResponse = SUBS;
+    torrentInfoExtra = [torrent({ num_seeds: 4, num_leechs: 2, num_complete: 9, dlspeed: 121_000 })];
+
+    const startedAt = Date.now();
+    const out = await qbitAwaitFiles({ config }, HASH_AWAIT, [0, 1], {
+      timeoutMs: 120,
+      pollMs: 15,
+      progressCeilingMs: 700,
+    });
+
+    expect(Date.now() - startedAt).toBeGreaterThan(500);
+    expect(out.ok === false && out.reason).toContain('Subtitles were still arriving');
+    expect(out.ok === false && out.reason).not.toContain('sent nothing at all');
+  });
+
+  it('completes a transfer that would have been killed by the old wall clock', async () => {
+    torrentInfoExtra = [torrent({ num_seeds: 4, num_leechs: 2, num_complete: 9, dlspeed: 121_000 })];
+    let polls = 0;
+    fileListResponse = SUBS.map((f) => ({ ...f, progress: 0 }));
+    torrentInfoHook = () => {
+      polls += 1;
+      // Steady arrival for well past the 60 ms budget, then done.
+      const progress = polls >= 20 ? 1 : Math.min(0.95, polls * 0.05);
+      fileListResponse = SUBS.map((f) => ({ ...f, progress }));
+    };
+
+    const startedAt = Date.now();
+    const out = await qbitAwaitFiles({ config }, HASH_AWAIT, [0, 1], {
+      timeoutMs: 60,
+      pollMs: 15,
+      progressCeilingMs: 5_000,
+    });
+
+    expect(out.ok).toBe(true);
+    expect(Date.now() - startedAt).toBeGreaterThan(60);
+    expect(polls).toBeGreaterThanOrEqual(20);
+  });
+
+  it('is the old wall clock exactly when no ceiling is given', async () => {
+    // Every other caller keeps the budget it asked for: `progressCeilingMs`
+    // absent must not silently turn a 120 ms wait into a long one just because
+    // bytes happen to be moving.
+    torrentInfoExtra = [torrent({ num_seeds: 4, num_leechs: 2, num_complete: 9, dlspeed: 121_000 })];
+    trickling(0.02);
+
+    const startedAt = Date.now();
+    // No `progressCeilingMs`, and everything else says "still arriving".
+    const out = await qbitAwaitFiles({ config }, HASH_AWAIT, [0, 1], { timeoutMs: 120, pollMs: 15 });
+
+    expect(Date.now() - startedAt).toBeLessThan(2_000);
+    expect(out.ok).toBe(false);
+    expect(out.ok === false && out.reason).toContain('slow, not dead');
   });
 });
 

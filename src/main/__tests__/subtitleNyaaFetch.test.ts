@@ -792,8 +792,15 @@ describe('nyaaFetch — a transfer that stops and never comes back', () => {
 
   it('a stalled-but-healthy transfer is still allowed to finish waiting', async () => {
     // The control for both gates above: `stalledDL` with peers on the other end
-    // is a slow swarm, not a failure, and bailing on it would turn a working
-    // fetch into an error. It is the only branch that may invite a longer wait.
+    // is not a failure, and bailing on it would turn a working fetch into an
+    // error. The invariant is the elapsed time — it must reach the deadline
+    // rather than give up early.
+    //
+    // The sentence changed on 2026-08-18 and the fixture is why: this torrent
+    // sends zero bytes at zero rate for the entire wait, and "slow, not dead, so
+    // a longer wait may finish it" was advice the product offered no way to
+    // take. It now takes it itself whenever anything is arriving, so a wait that
+    // ends here is one where nothing arrived at all for the whole budget.
     files = [{ name: 'Show - 07.ja.ass', size: 40_000, progress: 0, priority: 1 }];
     stallOnStart = true;
     torrentState = 'stalledDL';
@@ -802,9 +809,10 @@ describe('nyaaFetch — a transfer that stops and never comes back', () => {
     const result = await nyaaFetch(candidate('sub-pack'), config(), { timeoutMs: 1_200 });
     expect(result.ok).toBe(false);
     expect(result.ok === false && result.reason).toMatch(/timed out/i);
-    expect(result.ok === false && result.reason).toMatch(/slow, not dead/i);
-    // It must reach the deadline rather than give up early — the invariant this
-    // case has always been the control for.
+    expect(result.ok === false && result.reason).toMatch(/sent nothing at all/i);
+    // Still not blamed on the client, the disk or a dead swarm: peers were there.
+    expect(result.ok === false && result.reason).not.toMatch(/dead, not slow/i);
+    expect(result.ok === false && result.reason).not.toMatch(/free space/i);
     expect(Date.now() - started).toBeGreaterThanOrEqual(1_000);
   });
 
