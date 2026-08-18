@@ -488,7 +488,11 @@ export async function fetchNyaaHarvest(
       format: file.format,
       fileName: file.fileName,
     })),
-    message: '',
+    // Empty unless the acquisition came back short. `message` is not only the
+    // failure channel: a partial season that says nothing is indistinguishable
+    // from a whole one, which is exactly the silent-success shape this flow is
+    // meant not to have.
+    message: outcome.notice ?? '',
   };
 }
 

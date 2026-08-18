@@ -820,10 +820,13 @@ export type QbitOutcome<T> =
   | { ok: true; value: T }
   /**
    * `notFound` marks a 404 specifically, because on one endpoint a 404 is not a
-   * verdict: see `qbitFiles`. Optional, so every existing failure site is
-   * unchanged and only the callers that can act on it look.
+   * verdict: see `qbitFiles`. `partial` carries whatever the operation did
+   * achieve before it gave up — a stalled wait has usually still landed
+   * something, and throwing it away is what made a 28-minute transfer worth
+   * nothing. Both optional, so every existing failure site is unchanged and
+   * only the callers that can act on them look.
    */
-  | { ok: false; reason: string; notFound?: true };
+  | { ok: false; reason: string; notFound?: true; partial?: T };
 
 /**
  * What to tell the user when a WebUI call refuses.
@@ -1589,13 +1592,18 @@ export async function qbitAwaitFiles(
     }
 
     if (Date.now() >= deadline) {
-      const done = selected.filter((file) => file.progress >= 1).length;
+      // Returned alongside the refusal rather than discarded: these files are
+      // whole on disk, and the caller decides whether a partial season is worth
+      // studying. The refusal itself is unchanged — this is still `ok: false`.
+      const finished = selected.filter((file) => file.progress >= 1);
+      const done = finished.length;
       // Asked only on the way out, like the metadata wait: one `transfer/info`
       // per poll would triple this loop's request count to answer a question
       // that only matters once.
       const status = await qbitConnectionStatus(input);
       return {
         ok: false,
+        partial: finished,
         reason: awaitFilesStallReason({
           done,
           total: selected.length,

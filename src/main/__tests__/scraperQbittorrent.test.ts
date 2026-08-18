@@ -1240,6 +1240,29 @@ describe('qbitAwaitFiles reads the swarm off the live torrent', () => {
     expect(out.ok === true && out.value.map((f) => f.index)).toEqual([0, 1]);
   });
 
+  it('hands back the files that did finish, so a stall is not all-or-nothing', async () => {
+    // `SUBS` is index 0 at 40% and index 1 whole — the measured Route B shape in
+    // miniature. The refusal is unchanged; what is new is that index 1 comes
+    // back with it instead of being discarded.
+    fileListResponse = SUBS;
+    torrentInfoExtra = [torrent({ num_seeds: 4, dlspeed: 0 })];
+    const out = await qbitAwaitFiles({ config }, HASH_AWAIT, [0, 1], options);
+    expect(out.ok).toBe(false);
+    expect(out.ok === false && out.partial?.map((f) => f.index)).toEqual([1]);
+    // NEGATIVE CONTROL: the incomplete file must not ride along. It is on disk
+    // at 40% and reading it would produce a truncated subtitle nothing can spot.
+    expect(out.ok === false && out.partial?.some((f) => f.progress < 1)).toBe(false);
+  });
+
+  it('reports an empty partial rather than a misleading one when nothing finished', async () => {
+    fileListResponse = SUBS.map((f) => ({ ...f, progress: 0.4 }));
+    torrentInfoExtra = [torrent({ num_seeds: 4, dlspeed: 0 })];
+    const out = await qbitAwaitFiles({ config }, HASH_AWAIT, [0, 1], options);
+    expect(out.ok).toBe(false);
+    expect(out.ok === false && out.partial).toEqual([]);
+    expect(out.ok === false && out.reason).toContain('0/2 subtitle file(s) complete');
+  });
+
   // ---- the budget is a stall budget, not a wall clock ---------------------
   //
   // Measured 2026-08-18: a 39-sidecar Route B pack timed out at `3/39` while

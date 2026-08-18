@@ -922,6 +922,75 @@ describe('nyaaFetchAll — a sub-pack is a season, not one file', () => {
   });
 });
 
+// Measured live, 2026-08-17: Route B reached `3/39` sidecars complete when the
+// budget expired, and the fetch returned `ok: false` — so all three whole
+// episodes, paid for over five minutes of real transfer, were discarded. The
+// 2026-08-18 ceiling fix made that particular release finish; it did nothing
+// about the shape, which is that a stall is all-or-nothing.
+describe('nyaaFetchAll — a stalled transfer keeps the episodes that did land', () => {
+  /** ep07 whole, ep08 still transferring, and the transfer never moves again. */
+  function partialPack() {
+    files = [
+      { name: 'Show - 07.ja.ass', size: 40_000, progress: 1, priority: 1 },
+      { name: 'Show - 08.ja.ass', size: 41_000, progress: 0.6, priority: 1 },
+    ];
+    stallOnStart = true;
+  }
+
+  it('returns the complete episodes with a notice that names the shortfall', async () => {
+    partialPack();
+    await writeOnDisk('Show - 07.ja.ass', 'Dialogue: seven');
+    // On disk because qBittorrent preallocates: the bytes exist, the file does
+    // not. Reading it is the defect this skip exists to prevent.
+    await writeOnDisk('Show - 08.ja.ass', 'Dialogue: half of ei');
+
+    const all = await nyaaFetchAll(candidate('sub-pack', null), config(), { timeoutMs: 1_200 });
+    expect(all.ok).toBe(true);
+    expect(all.ok && all.files.map((file) => file.episode)).toEqual([7]);
+    // The half-transferred file parses perfectly well, which is exactly why it
+    // must not be read: nothing downstream can tell a truncated episode from a
+    // short one.
+    expect(all.ok && all.files.map((file) => file.text).join('|')).not.toContain('half of ei');
+    expect(all.ok && all.notice).toMatch(/^Partial result: 1 of 2 subtitle file\(s\)/);
+    // The shortfall carries the wait's own diagnosis, not a second wording.
+    expect(all.ok && all.notice).toMatch(/1\/2 subtitle file\(s\) complete/);
+  });
+
+  it('still refuses outright when the stall landed nothing', async () => {
+    // The negative control. Same stall, same timeout, one difference — no file
+    // ever completed — and the result must be a refusal, never `ok` with an
+    // empty-but-honest notice.
+    files = [
+      { name: 'Show - 07.ja.ass', size: 40_000, progress: 0.2, priority: 1 },
+      { name: 'Show - 08.ja.ass', size: 41_000, progress: 0.6, priority: 1 },
+    ];
+    stallOnStart = true;
+    await writeOnDisk('Show - 07.ja.ass', 'Dialogue: seven');
+    await writeOnDisk('Show - 08.ja.ass', 'Dialogue: eight');
+
+    const all = await nyaaFetchAll(candidate('sub-pack', null), config(), { timeoutMs: 1_200 });
+    expect(all.ok).toBe(false);
+    expect(all.ok === false && all.reason).toMatch(/0\/2 subtitle file\(s\) complete/);
+  });
+
+  it('sets no notice at all when the whole release arrived', async () => {
+    // The other control: `notice` must stay a shortfall signal. If a complete
+    // fetch also carried one, the panel would warn on every successful harvest
+    // and the warning would stop meaning anything.
+    files = [
+      { name: 'Show - 07.ja.ass', size: 40_000, progress: 0, priority: 1 },
+      { name: 'Show - 08.ja.ass', size: 41_000, progress: 0, priority: 1 },
+    ];
+    await writeOnDisk('Show - 07.ja.ass', 'Dialogue: seven');
+    await writeOnDisk('Show - 08.ja.ass', 'Dialogue: eight');
+
+    const all = await nyaaFetchAll(candidate('sub-pack', null), config(), { timeoutMs: 5_000 });
+    expect(all.ok).toBe(true);
+    expect(all.ok && all.files).toHaveLength(2);
+    expect(all.ok && all.notice).toBeUndefined();
+  });
+});
+
 // Measured live, 2026-08-17: the first Route A acquisition this pipeline ever
 // listed correctly — `After War Gundam X`, 20.10 MB, 7 seeders — failed with the
 // whole user-facing reason being "qBittorrent answered 404.". The client speaks

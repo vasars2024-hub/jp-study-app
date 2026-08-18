@@ -312,6 +312,10 @@ export default function SubtitleHarvestPanel({
         setPhase('error');
         return;
       }
+      // Kept on the success path too. `message` is empty on a whole result and
+      // carries the shortfall on a partial one, so dropping it here is how a
+      // four-of-thirty-nine harvest would look identical to a complete season.
+      setMessage(reply.message);
       const wanted = new Set(episodes);
       // No selection upstream means "whatever this release has".
       const inRange = wanted.size

@@ -424,7 +424,14 @@ export interface NyaaFetchedFile extends NyaaFetchResult {
  * callers read from its result.
  */
 export type NyaaFetchAllOutcome =
-  | { ok: true; files: NyaaFetchedFile[] }
+  /**
+   * `notice` is set only when the result is *incomplete* — the wait gave up
+   * with some episodes whole on disk and others not. It is not decoration: a
+   * partial season returned as a bare `ok: true` is the one shape that lets a
+   * user mine four episodes believing they mined thirty-nine, so every caller
+   * that shows a result must show this too.
+   */
+  | { ok: true; files: NyaaFetchedFile[]; notice?: string }
   | { ok: false; reason: string };
 
 /** Shared by both fetch shapes, so they cannot drift into two wordings. */
@@ -643,7 +650,18 @@ async function acquireAll(
     progressCeilingMs: options.timeoutMs === undefined ? FETCH_CEILING_MS : undefined,
     isCancelled: options.isCancelled,
   });
-  if (!done.ok) return { ok: false, reason: done.reason };
+  // A wait that gives up has usually still landed something. The measured case
+  // is Route B on 2026-08-17: 3 of 39 sidecars complete when the budget expired,
+  // and all three thrown away — the user paid for the transfer and got nothing
+  // back, not even the three. Salvage the whole files and refuse only when
+  // there are none, which keeps every existing all-or-nothing failure identical.
+  const complete = done.ok ? done.value : (done.partial ?? []);
+  if (!done.ok && !complete.length) return { ok: false, reason: done.reason };
+  const stalled = done.ok ? null : done.reason;
+  // Only whole files are read. A half-transferred `.ass` still parses, and it
+  // would parse into a truncated cue list nothing downstream could tell from a
+  // short episode.
+  const completeIndexes = new Set(complete.map((file) => file.index));
 
   const info = await qbitTorrentInfo(qbit, hash);
   if (!info.ok) return { ok: false, reason: info.reason };
@@ -659,6 +677,7 @@ async function acquireAll(
   const read: NyaaFetchedFile[] = [];
   let otherLanguage = 0;
   for (const file of selection.files) {
+    if (!completeIndexes.has(file.index)) continue;
     const text = await readSubtitleFile(info.value.savePath, info.value.name, file.name);
     // An unreadable file is skipped rather than failing the release: a pack
     // where one of twenty-six episodes is truncated still carries twenty-five,
@@ -687,12 +706,27 @@ async function acquireAll(
   }
 
   if (!read.length) {
-    return { ok: false, reason: otherLanguage ? notJapaneseReason(otherLanguage) : NOTHING_READABLE };
+    // Language first even under a stall: "the episodes that did arrive are in
+    // another language" is a different instruction to the user than "the
+    // transfer stalled", and it is the one that says pick another release.
+    if (otherLanguage) return { ok: false, reason: notJapaneseReason(otherLanguage) };
+    return { ok: false, reason: stalled ?? NOTHING_READABLE };
   }
   scraperLog(
     'info',
     'torrents',
-    `Fetched ${read.length} subtitle file(s) from ${candidate.releaseName}.`,
+    stalled
+      ? `Fetched ${read.length} of ${selection.files.length} subtitle file(s) from `
+        + `${candidate.releaseName} before the transfer stalled.`
+      : `Fetched ${read.length} subtitle file(s) from ${candidate.releaseName}.`,
   );
+  if (stalled) {
+    return {
+      ok: true,
+      files: read,
+      notice: `Partial result: ${read.length} of ${selection.files.length} subtitle file(s) `
+        + `were downloaded and read. ${stalled}`,
+    };
+  }
   return { ok: true, files: read };
 }
