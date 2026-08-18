@@ -25688,7 +25688,7 @@ main-process English that the renderer does not translate. Set on every outcome 
 `unauthorized` alone sends the user to change the one that was never consulted. Optional, so every
 stored report predating the field stays valid.
 
-`3b1d…` (this commit): `authMode` on the report, 6 return sites in `qbitTest`, the mode pill and a
+`a3a361aa`: `authMode` on the report, 6 return sites in `qbitTest`, the mode pill and a
 mode-aware credential pill in `TorrentManagerPage`, the mode appended to the settings drawer's test
 note, 3 scraper strings, 5 tests. Suite **104 pass, was 99**. Mutation control: hardcode the field
 to `'password'` and **4 of 5** go red.
