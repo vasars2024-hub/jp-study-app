@@ -9322,6 +9322,8 @@ export const en: Catalog = {
   'ankiWorkbench.apply.text.ok.file': 'Written to {path}',
   'ankiWorkbench.apply.text.ok.counts': '{notes} notes rewritten across {rows} rows',
   'ankiWorkbench.apply.text.ok.tags': '{count} notes had their tags column rewritten',
+  'ankiWorkbench.apply.text.ok.provenance':
+    'This file stores plain text, so it cannot mark generated words inside a field. On {count} notes that mark was recorded as a note tag instead.',
   'ankiWorkbench.apply.text.ok.verified':
     'The written file was read back from disk and every change was found in it.',
   'ankiWorkbench.apply.textError.nothing-to-export':
@@ -9339,6 +9341,8 @@ export const en: Catalog = {
     'An edit carries a different number of fields than the row has columns. Nothing was written.',
   'ankiWorkbench.apply.textError.no-tags-column':
     'This file declares no tags column, so tags have nowhere to go. Nothing was written — export as a package instead.',
+  'ankiWorkbench.apply.textError.generated-provenance-unrepresentable':
+    'An edit adds generated or dictionary-sourced text, but this file stores plain text and declares no tags column, so there is nowhere to record where that text came from. Nothing was written — export as a package instead, or add a tags column to the source file.',
   'ankiWorkbench.apply.textError.unsupported-change':
     'A text file stores notes only: it has no cards, no scheduling and no card templates. Nothing was written — undo the edits listed below, or export as a package instead.',
   'ankiWorkbench.apply.textError.verify-failed':

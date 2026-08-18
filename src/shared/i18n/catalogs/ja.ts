@@ -8897,6 +8897,8 @@ export const ja: Catalog = {
   'ankiWorkbench.apply.text.ok.file': '{path} に書き込みました',
   'ankiWorkbench.apply.text.ok.counts': '{rows} 行のうち {notes} 件のノートを書き換えました',
   'ankiWorkbench.apply.text.ok.tags': '{count} 件のノートのタグ列を書き換えました',
+  'ankiWorkbench.apply.text.ok.provenance':
+    'このファイルはプレーンテキストのため、フィールド内に生成語の印を付けられません。{count} 件のノートでは、その印をノートのタグとして記録しました。',
   'ankiWorkbench.apply.text.ok.verified':
     '書き込んだファイルをディスクから読み直し、すべての変更を確認しました。',
   'ankiWorkbench.apply.textError.nothing-to-export':
@@ -8914,6 +8916,8 @@ export const ja: Catalog = {
     '編集のフィールド数が行の列数と一致しません。何も書き込まれていません。',
   'ankiWorkbench.apply.textError.no-tags-column':
     'このファイルにはタグ列が宣言されていないため、タグの書き込み先がありません。何も書き込まれていません — 代わりにパッケージとして書き出してください。',
+  'ankiWorkbench.apply.textError.generated-provenance-unrepresentable':
+    '編集に生成テキストまたは辞書由来のテキストが含まれていますが、このファイルはプレーンテキストでタグ列も宣言されていないため、その出所を記録する場所がありません。何も書き込まれていません。パッケージとして書き出すか、元のファイルにタグ列を追加してください。',
   'ankiWorkbench.apply.textError.unsupported-change':
     'テキストファイルはノートのみを保存します。カード、スケジュール、カードテンプレートはありません。何も書き込まれていません — 下記の編集を取り消すか、パッケージとして書き出してください。',
   'ankiWorkbench.apply.textError.verify-failed':

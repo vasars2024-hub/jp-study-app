@@ -9708,6 +9708,8 @@ export const ru: Catalog = {
   'ankiWorkbench.apply.text.ok.file': 'Записано в {path}',
   'ankiWorkbench.apply.text.ok.counts': 'Переписано заметок: {notes} в {rows} строках',
   'ankiWorkbench.apply.text.ok.tags': 'Столбец тегов переписан у {count} заметок',
+  'ankiWorkbench.apply.text.ok.provenance':
+    'Этот файл хранит обычный текст, поэтому пометить сгенерированные слова внутри поля невозможно. У {count} заметок эта пометка записана как тег заметки.',
   'ankiWorkbench.apply.text.ok.verified':
     'Записанный файл перечитан с диска, и в нём найдены все изменения.',
   'ankiWorkbench.apply.textError.nothing-to-export':
@@ -9725,6 +9727,8 @@ export const ru: Catalog = {
     'Число полей в правке не совпадает с числом столбцов строки. Ничего не записано.',
   'ankiWorkbench.apply.textError.no-tags-column':
     'В этом файле не объявлен столбец тегов, записывать теги некуда. Ничего не записано — экспортируйте как пакет.',
+  'ankiWorkbench.apply.textError.generated-provenance-unrepresentable':
+    'Правка добавляет сгенерированный или взятый из словаря текст, но этот файл хранит обычный текст и не объявляет столбец тегов, поэтому записать происхождение этого текста некуда. Ничего не записано — экспортируйте как пакет или добавьте столбец тегов в исходный файл.',
   'ankiWorkbench.apply.textError.unsupported-change':
     'Текстовый файл хранит только заметки: в нём нет карточек, расписания и шаблонов карточек. Ничего не записано — отмените перечисленные ниже правки или экспортируйте как пакет.',
   'ankiWorkbench.apply.textError.verify-failed':

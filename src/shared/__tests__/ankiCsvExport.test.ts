@@ -215,3 +215,115 @@ describe('applyCsvExportChanges', () => {
     expect(fieldsOf(out.text, 'csv-row-1')[0]).toBe('#hashtag');
   });
 });
+
+describe('applyCsvExportChanges — inline provenance on a plain-text destination', () => {
+  const AI = (text: string): string =>
+    `<span class="jp-ai-gen" data-jp-ai="gemini|gemini-2.5-flash">${text}</span>`;
+
+  it('unwraps a generated value and re-states its provenance as a note tag', () => {
+    const fields = fieldsOf(FILE, 'csv-row-1');
+    fields[2] = AI('тётя');
+    const out = applyCsvExportChanges(
+      FILE,
+      changeSet({ notes: [{ noteId: 'csv-row-1', fields }] }),
+    );
+    // The measured defect: before this, the cell read back as the markup.
+    expect(out.text).not.toContain('<span');
+    expect(fieldsOf(out.text, 'csv-row-1')[2]).toBe('тётя');
+    expect(buildAnkiCsvCollection(out.text).raw.notes[0].tags).toBe(
+      'jp-ai-gen::gemini::gemini-2.5-flash',
+    );
+    expect(out.provenanceTagged).toBe(1);
+    expect(out.tagsUpdated).toBe(1);
+    expect(out.effectiveFields.get('csv-row-1')?.[2]).toBe('тётя');
+  });
+
+  it('leaves the wrapper alone on an #html:true file, where it round-trips', () => {
+    const source = `#separator:tab\n#html:true\n#tags column:3\na\tb\t\n`;
+    const out = applyCsvExportChanges(
+      source,
+      changeSet({ notes: [{ noteId: 'csv-row-1', fields: [AI('тётя'), 'b'] }] }),
+    );
+    // Read back through the reader, not as a substring: the cell holds a `"`,
+    // so the written form is RFC-4180 quoted with the inner quotes doubled.
+    expect(fieldsOf(out.text, 'csv-row-1')[0]).toBe(AI('тётя'));
+    expect(out.provenanceTagged).toBe(0);
+    expect(out.effectiveFields.size).toBe(0);
+  });
+
+  it('adds the marker to the note’s existing tags rather than replacing them', () => {
+    const source = `#separator:tab\n#html:false\n#tags column:3\na\tb\tn1 core\n`;
+    const out = applyCsvExportChanges(
+      source,
+      changeSet({ notes: [{ noteId: 'csv-row-1', fields: [AI('x'), 'b'] }] }),
+    );
+    expect(buildAnkiCsvCollection(out.text).raw.notes[0].tags).toBe(
+      'n1 core jp-ai-gen::gemini::gemini-2.5-flash',
+    );
+  });
+
+  it('does not stack the marker when the same edit is exported twice', () => {
+    const source = `#separator:tab\n#html:false\n#tags column:3\na\tb\tjp-ai-gen::gemini::gemini-2.5-flash\n`;
+    const out = applyCsvExportChanges(
+      source,
+      changeSet({ notes: [{ noteId: 'csv-row-1', fields: [AI('x'), 'b'] }] }),
+    );
+    expect(buildAnkiCsvCollection(out.text).raw.notes[0].tags).toBe(
+      'jp-ai-gen::gemini::gemini-2.5-flash',
+    );
+  });
+
+  it('keeps the text either side of an appended generation', () => {
+    const source = `#separator:tab\n#html:false\n#tags column:3\na\tb\t\n`;
+    const out = applyCsvExportChanges(
+      source,
+      changeSet({ notes: [{ noteId: 'csv-row-1', fields: [`было; ${AI('стало')}`, 'b'] }] }),
+    );
+    // A `lastIndexOf('</span>')` unwrap would keep only the inner text.
+    expect(fieldsOf(out.text, 'csv-row-1')[0]).toBe('было; стало');
+  });
+
+  it('carries both markers when a generation sits on top of an enrichment', () => {
+    const source = `#separator:tab\n#html:false\n#tags column:3\na\tb\t\n`;
+    const nested = `<span class="jp-ai-gen" data-jp-ai="gemini|x"><span class="jp-dict-src" data-jp-dict="jmdict">猫</span></span>`;
+    const out = applyCsvExportChanges(
+      source,
+      changeSet({ notes: [{ noteId: 'csv-row-1', fields: [nested, 'b'] }] }),
+    );
+    expect(fieldsOf(out.text, 'csv-row-1')[0]).toBe('猫');
+    expect(buildAnkiCsvCollection(out.text).raw.notes[0].tags).toBe(
+      'jp-ai-gen::gemini::x jp-dict-src::jmdict',
+    );
+  });
+
+  it('marks an unattributed generation rather than dropping the marker', () => {
+    const source = `#separator:tab\n#html:false\n#tags column:3\na\tb\t\n`;
+    const out = applyCsvExportChanges(
+      source,
+      changeSet({
+        notes: [{ noteId: 'csv-row-1', fields: ['<span class="jp-ai-gen" data-jp-ai="">x</span>', 'b'] }],
+      }),
+    );
+    expect(buildAnkiCsvCollection(out.text).raw.notes[0].tags).toBe('jp-ai-gen');
+  });
+
+  it('leaves the user’s own markup alone — only this app’s wrappers are touched', () => {
+    const source = `#separator:tab\n#html:false\n#tags column:3\na\tb\t\n`;
+    const out = applyCsvExportChanges(
+      source,
+      changeSet({ notes: [{ noteId: 'csv-row-1', fields: ['<span class="mine">x</span>', 'b'] }] }),
+    );
+    expect(fieldsOf(out.text, 'csv-row-1')[0]).toBe('<span class="mine">x</span>');
+    expect(out.provenanceTagged).toBe(0);
+  });
+
+  it('refuses by its own name when the plain-text file has no tags column', () => {
+    const source = '#separator:tab\n#html:false\na\tb\n';
+    expect(() =>
+      applyCsvExportChanges(
+        source,
+        changeSet({ notes: [{ noteId: 'csv-row-1', fields: [AI('x'), 'b'] }] }),
+      ),
+    ).toThrow(expect.objectContaining({ code: 'generated-provenance-unrepresentable' }));
+  });
+});

@@ -8842,6 +8842,8 @@ export const zh: Catalog = {
   'ankiWorkbench.apply.text.ok.file': '已写入 {path}',
   'ankiWorkbench.apply.text.ok.counts': '在 {rows} 行中重写了 {notes} 条笔记',
   'ankiWorkbench.apply.text.ok.tags': '{count} 条笔记的标签列已重写',
+  'ankiWorkbench.apply.text.ok.provenance':
+    '此文件存储纯文本，无法在字段内标记生成的词语。在 {count} 条笔记上，该标记改为记录为笔记标签。',
   'ankiWorkbench.apply.text.ok.verified': '已从磁盘重新读取写入的文件，并核对到全部更改。',
   'ankiWorkbench.apply.textError.nothing-to-export': '本次会话的更改相互抵消，未写入任何文件。',
   'ankiWorkbench.apply.textError.cancelled': '未写入任何内容。',
@@ -8857,6 +8859,8 @@ export const zh: Catalog = {
     '某项编辑携带的字段数与该行的列数不一致。未写入任何内容。',
   'ankiWorkbench.apply.textError.no-tags-column':
     '此文件未声明标签列，标签无处可写。未写入任何内容 — 请改为导出为卡组包。',
+  'ankiWorkbench.apply.textError.generated-provenance-unrepresentable':
+    '某项编辑添加了生成或来自词典的文本，但此文件存储纯文本且未声明标签列，因此无处记录该文本的来源。未写入任何内容——请改为导出为软件包，或在源文件中添加标签列。',
   'ankiWorkbench.apply.textError.unsupported-change':
     '文本文件只保存笔记：没有卡片、没有排程、也没有卡片模板。未写入任何内容 — 请撤销下列编辑，或改为导出为卡组包。',
   'ankiWorkbench.apply.textError.verify-failed':

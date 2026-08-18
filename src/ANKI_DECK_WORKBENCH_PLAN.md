@@ -836,7 +836,56 @@ This slice is complete only when all of these can be shown with real data and no
     three destinations share that guard, so it was never a CSV-only defect. Fixed in the same
     commit and re-run green on a restarted main.
 
-    **Still open on this gate:** the translate half. See the ledger entry for `067cd735`.
+    **The translate half closes 2026-08-18**, and it found the defect the gate exists to
+    find: **a text destination cannot carry a field-level provenance marker, and nothing
+    noticed.** Live, on the user's own 3,209-row export, through `window.api.*` end to end:
+    read 3,209 / `html:false` / separator tab from the header / tags column 11; a REAL
+    provider run, **gemini-2.5-flash, 3 requested / 3 answered / 3 ok in 2,577 ms**
+    (おばさん→тётя, ああ→ах, 背が低い→невысокий); `planChangeTray` `changedNotes 3`,
+    **0 problems**; export `ok`, `notesUpdated 3`, `rowsWritten 3,209`, **`verified: true`**.
+    And the cell re-read through the app's own reader was
+    `<span class="jp-ai-gen" data-jp-ai="gemini|gemini-2.5-flash">тётя</span>` — the markup
+    *as the field's text*, which is what Anki shows on the card, because the file's own
+    header says these fields are not HTML. A reported success on a value the destination
+    cannot represent.
+
+    **Why it is nobody's bug and therefore everybody's.** `wrapAiProvenance` is
+    unconditional by design (an unmarked generation is indistinguishable from the user's own
+    writing) and `applyCsvExportChanges` passed fields through verbatim by design (columns
+    the draft does not model must survive). The tray cannot know the destination — a draft
+    goes to a package, to AnkiConnect, or here, and the choice is made at Apply. So the
+    fidelity contract belongs to the writer, which is exactly what this gate was split off
+    gate 1 to say.
+
+    **The decision** (`<pending>`): on `#html:false` the wrapper unwraps to its text and the
+    provenance is re-stated as a note-level tag in the file's own `#tags column:` —
+    `jp-ai-gen::gemini::gemini-2.5-flash`, reusing the wrapper's own class as the tag root so
+    one grep finds generated content in a package or a text file. It is an honest
+    **downgrade**, field-level to note-level, so it is counted (`provenanceTagged`) and said
+    on the success panel rather than done quietly. With **no** tags column there is nowhere
+    for the marker at all and the export refuses by name,
+    `generated-provenance-unrepresentable` — distinct from `no-tags-column` because the user
+    did not ask to change tags and the fix differs. `#html:true` keeps the wrapper verbatim;
+    it round-trips there and is the better answer where it is available.
+
+    **Four traps, each a test.** (1) `readAiProvenance`'s `lastIndexOf('</span>')` is right
+    for one whole-field wrapper and WRONG here — an `append` conflict writes `old; <span>new
+    </span>` and the last-close unwrap keeps only the inner text, so the scan is
+    depth-counted. (2) A generation on top of an enrichment must yield **both** tags, so the
+    body is unwrapped recursively. (3) The marker ADDS to the note's existing tags and is
+    deduped, or a second export stacks it. (4) An empty `data-jp-ai=""` still gets the bare
+    root tag — `wrapAiProvenance`'s "generated, source unrecorded" is the honest statement,
+    and dropping the tag would undo exactly that. Only these two wrappers are touched; the
+    user's own `<span class="mine">` is left alone, with its own test.
+
+    **Read-back verification had to move, narrowly.** `csvExport.ts` compares the written
+    file against the CALLER's change set on purpose — a pass-through that mangles a value
+    must not verify green against its own mangling. So the writer now declares
+    `effectiveFields` for **only** the notes it rewrote, and the caller's set stays the
+    comparison everywhere else.
+
+    Mutation control: inverting the `!meta.html` gate fails **7 of 25** tests in
+    `ankiCsvExport.test.ts`; restored byte-identical and back to 25/25.
 
 ## Explicit exclusions
 

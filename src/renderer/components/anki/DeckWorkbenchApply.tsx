@@ -348,6 +348,17 @@ export default function DeckWorkbenchApply({
                   {t('ankiWorkbench.apply.text.ok.tags', { count: textResult.tagsUpdated ?? 0 })}
                 </li>
               )}
+              {/* The field-level marker the user reviewed became a note-level
+                  one, which is a real downgrade of what they approved. It is
+                  stated on the success panel rather than left for them to
+                  notice a missing highlight on the card. */}
+              {(textResult.provenanceTagged ?? 0) > 0 && (
+                <li>
+                  {t('ankiWorkbench.apply.text.ok.provenance', {
+                    count: textResult.provenanceTagged ?? 0,
+                  })}
+                </li>
+              )}
               {textResult.verified && <li>{t('ankiWorkbench.apply.text.ok.verified')}</li>}
             </ul>
           </section>

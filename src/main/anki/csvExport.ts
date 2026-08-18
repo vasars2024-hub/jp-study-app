@@ -136,7 +136,10 @@ export async function exportAnkiCsv(request: AnkiCsvExportRequest): Promise<Anki
         continue;
       }
       const fields = String(note.flds ?? '').split(ANKI_FIELD_SEP);
-      const wanted = change.fields;
+      // The change set, except for the notes the writer declared it rewrote —
+      // the plain-text provenance unwrap. See `CsvApplyOutcome.effectiveFields`
+      // for why the caller's set stays the comparison everywhere else.
+      const wanted = applied.effectiveFields.get(change.noteId) ?? change.fields;
       if (fields.length !== wanted.length || fields.some((value, i) => value !== wanted[i])) {
         mismatches.push(`${change.noteId}: fields differ after read-back`);
       }
@@ -165,6 +168,7 @@ export async function exportAnkiCsv(request: AnkiCsvExportRequest): Promise<Anki
       fileName: path.basename(outPath),
       notesUpdated: applied.notesUpdated,
       tagsUpdated: applied.tagsUpdated,
+      provenanceTagged: applied.provenanceTagged,
       rowsWritten: applied.rowsWritten,
       noteIdentity: applied.noteIdentity,
       verified: true,

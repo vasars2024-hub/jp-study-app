@@ -37,6 +37,23 @@
 // them). Only RFC 4180 quoting is applied, which is a delimiter concern and not
 // a markup one.
 //
+// **…which is exactly why inline provenance cannot go out verbatim.** Measured
+// 2026-08-18, gate 15's translate half: a `translate-field` batch approved into
+// a `#html:false` file wrote
+// `<span class="jp-ai-gen" data-jp-ai="gemini|gemini-2.5-flash">тётя</span>`
+// into the cell, the export reported `ok`/`verified: true`, and re-reading
+// through this app's own reader gave the markup back as the field's TEXT —
+// which is what Anki shows on the card, because the file's own header says
+// these fields are not HTML. `wrapAiProvenance` is unconditional on purpose
+// (an unmarked generation is indistinguishable from the user's own writing),
+// and the tray cannot know the destination, so the fidelity contract has to be
+// honoured here: on a plain-text file the wrapper is unwrapped to its text and
+// the provenance is re-stated as a note-level `#tags column:` tag, which is
+// Anki's own plain-text-safe channel. It is an honest DOWNGRADE — field-level
+// becomes note-level — so it is counted and reported rather than done quietly.
+// With no tags column there is nowhere for the marker at all, and the export
+// refuses by name instead of laundering generated text as hand-written.
+//
 // **A cell that would re-read as a directive is quoted.** `parseAnkiCsvMeta`
 // ends the header block at the first line not starting with `#`. A first-column
 // value beginning with `#` — a hashtag in a sentence — would therefore be
@@ -49,6 +66,8 @@ import {
   parseDelimitedRows,
   type AnkiCsvMeta,
 } from './ankiCsv';
+import { AI_PROVENANCE_ATTR, AI_PROVENANCE_CLASS } from './ankiAiAdditions';
+import { ENRICH_PROVENANCE_ATTR, ENRICH_PROVENANCE_CLASS } from './ankiEnrich';
 import type { ApkgExportChangeSet } from './ankiApkgExport';
 
 /** Change kinds a text export cannot represent, in the order they are reported. */
@@ -79,6 +98,13 @@ export type AnkiCsvExportErrorCode =
   | 'field-count-mismatch'
   /** Tags changed on a file with no `#tags column:` to put them in. */
   | 'no-tags-column'
+  /**
+   * A generated/enriched value was written into a plain-text file that has no
+   * `#tags column:`, so its provenance marker has nowhere to go. Distinct from
+   * `no-tags-column`: the user did not ask to change tags, and the fix is a
+   * different one — export as a package, or add a tags column to the source.
+   */
+  | 'generated-provenance-unrepresentable'
   /** The change set carries a kind a text export has no place for. */
   | 'unsupported-change'
   | 'verify-failed'
@@ -122,6 +148,14 @@ export interface AnkiCsvExportResult {
   rowsWritten?: number;
   /** Notes whose tag cell was rewritten. Counted apart: a different column. */
   tagsUpdated?: number;
+  /**
+   * Notes whose inline provenance wrapper was unwrapped and re-stated as a tag
+   * because the file is `#html:false`. Its own count, not folded into
+   * `tagsUpdated`: it is the one number that says the marker the user reviewed
+   * at field level is on the note instead, and a surface that cannot see it
+   * would present a silent downgrade as a clean round trip.
+   */
+  provenanceTagged?: number;
   /**
    * Positional unless the source declares a `#guid column:`. Reported so the
    * surface can warn that a positional round trip re-imports as new notes.
@@ -209,6 +243,143 @@ export interface CsvApplyOutcome {
   tagsUpdated: number;
   rowsWritten: number;
   noteIdentity: AnkiCsvNoteIdentity;
+  /** See `AnkiCsvExportResult.provenanceTagged`. */
+  provenanceTagged: number;
+  /**
+   * The field values actually written, ONLY for notes this writer rewrote —
+   * today, the plain-text provenance unwrap. Read-back verification compares
+   * against the caller's change set everywhere else on purpose, because that is
+   * the stronger check: a pass-through that mangles a value must not be able to
+   * verify green against its own mangling. This is the narrow exception where
+   * the writer legitimately does not write what it was handed, so it declares
+   * exactly which notes those are.
+   */
+  effectiveFields: Map<string, string[]>;
+}
+
+// ----- inline provenance on a plain-text destination ----------------------------
+
+/**
+ * The two inline provenance wrappers this app writes, with the tag root each
+ * becomes on a plain-text destination.
+ *
+ * The roots reuse the wrappers' own class names rather than inventing a second
+ * vocabulary: someone grepping an exported deck for `jp-ai-gen` finds generated
+ * content whether the export was a package or a text file, which is the whole
+ * point of `AI_PROVENANCE_CLASS`'s "tell the two apart without knowing the
+ * attribute names".
+ */
+const PROVENANCE_WRAPPERS: ReadonlyArray<{ cls: string; attr: string; tagRoot: string }> = [
+  { cls: AI_PROVENANCE_CLASS, attr: AI_PROVENANCE_ATTR, tagRoot: AI_PROVENANCE_CLASS },
+  { cls: ENRICH_PROVENANCE_CLASS, attr: ENRICH_PROVENANCE_ATTR, tagRoot: ENRICH_PROVENANCE_CLASS },
+];
+
+const CLOSE_SPAN = '</span>';
+
+function unescapeAttr(value: string): string {
+  return value
+    .replace(/&quot;/g, '"')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+}
+
+/**
+ * An Anki tag is whitespace-delimited and `::` is its hierarchy separator, so
+ * `provider|model` becomes `jp-ai-gen::gemini::gemini-2.5-flash`. Whitespace
+ * inside a part collapses to `-` rather than splitting the tag in two.
+ *
+ * An empty attribute still produces the bare root: `wrapAiProvenance` states
+ * that an unattributed generation is still marked — "generated, source
+ * unrecorded" is the honest statement, not silence — and dropping the tag here
+ * would undo exactly that.
+ */
+function provenanceTagFor(tagRoot: string, rawAttr: string): string {
+  const parts = unescapeAttr(rawAttr)
+    .split('|')
+    .map((part) => part.trim().replace(/[\s"]+/gu, '-'))
+    .filter(Boolean);
+  return parts.length ? `${tagRoot}::${parts.join('::')}` : tagRoot;
+}
+
+/**
+ * Index of the `</span>` that closes the span whose body starts at `from`, or
+ * `-1` when the markup is unbalanced.
+ *
+ * Depth-counted rather than `lastIndexOf` (which `readAiProvenance` can use
+ * because it only ever reads the outermost wrapper of a whole field): here the
+ * value may hold several wrappers in a row — an `append` conflict writes the
+ * old value, a separator, then the new one — and taking the last close would
+ * swallow everything between them.
+ */
+function matchingSpanEnd(value: string, from: number): number {
+  let depth = 0;
+  let i = from;
+  while (i < value.length) {
+    if (value.startsWith(CLOSE_SPAN, i)) {
+      if (depth === 0) return i;
+      depth -= 1;
+      i += CLOSE_SPAN.length;
+      continue;
+    }
+    if (/^<span[\s>]/u.test(value.slice(i, i + 6))) {
+      depth += 1;
+      i += 5;
+      continue;
+    }
+    i += 1;
+  }
+  return -1;
+}
+
+/**
+ * Strip this app's provenance wrappers out of one field value, returning the
+ * plain text and the tags that now carry what the wrappers said.
+ *
+ * Only these two wrappers are touched. Any other markup the user put in the
+ * field is left exactly as it was: this module's job is to keep the app's OWN
+ * additions representable, not to sanitize a file the user typed HTML into.
+ */
+export function unwrapProvenanceForPlainText(value: string): { text: string; tags: string[] } {
+  const tags: string[] = [];
+  let out = '';
+  let i = 0;
+  outer: while (i < value.length) {
+    if (value.startsWith('<span', i)) {
+      for (const wrapper of PROVENANCE_WRAPPERS) {
+        const open = new RegExp(`^<span class="${wrapper.cls}" ${wrapper.attr}="([^"]*)">`, 'u');
+        const match = open.exec(value.slice(i));
+        if (!match) continue;
+        const bodyStart = i + match[0].length;
+        const end = matchingSpanEnd(value, bodyStart);
+        // Unbalanced markup is copied through untouched rather than guessed at.
+        if (end < 0) continue;
+        tags.push(provenanceTagFor(wrapper.tagRoot, match[1]));
+        // A generated value can sit on top of an enriched one, so the body is
+        // unwrapped too and both markers survive as two tags.
+        const inner = unwrapProvenanceForPlainText(value.slice(bodyStart, end));
+        out += inner.text;
+        tags.push(...inner.tags);
+        i = end + CLOSE_SPAN.length;
+        continue outer;
+      }
+    }
+    out += value[i];
+    i += 1;
+  }
+  return { text: out, tags };
+}
+
+/**
+ * The tag cell's own tags. Local rather than reaching into `ankiCsv.ts`'s
+ * private splitter, and deliberately the same rule the reader uses: whitespace
+ * delimited, empties dropped.
+ */
+function splitCellTags(cell: string): string[] {
+  return cell
+    .split(/\s+/u)
+    .map((tag) => tag.trim())
+    .filter(Boolean);
 }
 
 /** Zero-based indices of the columns the reader treats as special, not fields. */
@@ -269,6 +440,8 @@ export function applyCsvExportChanges(
 
   let notesUpdated = 0;
   let tagsUpdated = 0;
+  let provenanceTagged = 0;
+  const effectiveFields = new Map<string, string[]>();
 
   for (const change of changes.notes ?? []) {
     const index = rowIndexForNoteId(change.noteId);
@@ -279,6 +452,9 @@ export function applyCsvExportChanges(
       );
     }
     const cells = rows[index];
+    // Provenance markers this note's fields could not carry as markup. Collected
+    // across all its fields so one note contributes one tag-cell rewrite.
+    const provenanceTags: string[] = [];
 
     const fields = change.fields;
     if (fields) {
@@ -293,28 +469,54 @@ export function applyCsvExportChanges(
           `${change.noteId} has ${fieldPositions.length} field columns but the edit carries ${fields.length}.`,
         );
       }
+      const written = [...fields];
       fieldPositions.forEach((position, ord) => {
-        cells[position] = fields[ord];
+        // Only a plain-text file needs this. An `#html:true` export carries the
+        // wrapper verbatim and round-trips it, which is the better answer where
+        // it is available — see the module note.
+        if (!meta.html) {
+          const stripped = unwrapProvenanceForPlainText(written[ord]);
+          if (stripped.tags.length) {
+            written[ord] = stripped.text;
+            provenanceTags.push(...stripped.tags);
+          }
+        }
+        cells[position] = written[ord];
       });
       notesUpdated += 1;
+      if (provenanceTags.length) {
+        provenanceTagged += 1;
+        effectiveFields.set(change.noteId, written);
+      }
     }
 
-    if (change.tags) {
+    if (change.tags || provenanceTags.length) {
       if (meta.tagsColumn == null) {
+        if (provenanceTags.length) {
+          throw new CsvExportRefusal(
+            'generated-provenance-unrepresentable',
+            `${change.noteId} carries generated or dictionary-sourced text, but this file is plain text (\`#html:false\`) and declares no \`#tags column:\`, so there is nowhere to record where that text came from. Export as a package instead, or add a tags column to the source file.`,
+          );
+        }
         throw new CsvExportRefusal(
           'no-tags-column',
           'This file declares no `#tags column:`, so there is nowhere to write tags. Export as a package instead.',
         );
       }
+      const column = meta.tagsColumn - 1;
+      // The change set's list when the user edited tags, otherwise the row's own
+      // cell — a provenance tag ADDS to what the note already has and must never
+      // be the whole list.
+      const tags = change.tags ? [...change.tags] : splitCellTags(cells[column] ?? '');
       // `#tags:` applies to every note in the file and the reader prepends it to
       // each note's tags. Writing the full list back into the column would
       // duplicate those on the next read, so the global prefix is removed again.
-      const tags = [...change.tags];
       for (const global of meta.globalTags) {
         const at = tags.indexOf(global);
         if (at >= 0) tags.splice(at, 1);
       }
-      const column = meta.tagsColumn - 1;
+      // Deduped so exporting the same edit twice does not stack the marker.
+      for (const tag of provenanceTags) if (!tags.includes(tag)) tags.push(tag);
       while (cells.length <= column) cells.push('');
       cells[column] = tags.join(' ');
       tagsUpdated += 1;
@@ -325,6 +527,8 @@ export function applyCsvExportChanges(
     text: buildAnkiCsvHeader(meta) + serializeCsvRows(rows, meta.separator),
     notesUpdated,
     tagsUpdated,
+    provenanceTagged,
+    effectiveFields,
     rowsWritten: rows.length,
     noteIdentity: meta.guidColumn != null ? 'guid' : 'row-order',
   };
