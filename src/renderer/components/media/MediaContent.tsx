@@ -36,7 +36,7 @@ import { buildMediaHubSections, diagnoseMediaPaths, searchMediaHub, type MediaCa
 import { resolveLocalMediaIdentities } from '../../../shared/mediaFileIdentity';
 import { loadMediaHubState, saveMediaHubState } from '../../mediaHubStore';
 import { WHISPER_MODEL_SPECS, type WhisperModelTier } from '../../../shared/whisperModels';
-import { parseSubtitles, type Cue } from '../../subtitles';
+import { parseStudySubtitles, parseSubtitles, type Cue } from '../../subtitles';
 import { cuesToSrt, cuesToVtt, downloadSubtitles } from '../../subtitlesExport';
 import {
   loadWhisperDevice,
@@ -991,14 +991,29 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
   }, []);
 
   const applySubtitleFile = useCallback((name: string, text: string) => {
-    const parsed = parseSubtitles(text);
+    // The primary track is the one every study tool downstream reads, so it gets
+    // the per-style language split that a dual-language `.ass` needs: one file
+    // carrying two whole subtitle tracks, which nothing above the parser can
+    // see. Inert on `.srt`, `.vtt`, `.lrc` and any single-track `.ass`. The
+    // secondary slot deliberately does not do this — see `parseStudySubtitles`.
+    const split = parseStudySubtitles(text);
+    const parsed = split.cues;
     setCues(parsed);
     setSubName(name);
     setSubOffset(0);
+    const loaded = parsed.length
+      ? t('media.subStatus.loaded', { count: parsed.length })
+      : t('media.subStatus.noLines', { name });
+    // Appended rather than replacing: how many lines loaded and why some did not
+    // are two separate things, and hiding lines silently is the failure this
+    // whole split exists to make visible.
     setSubStatus(
-      parsed.length
-        ? t('media.subStatus.loaded', { count: parsed.length })
-        : t('media.subStatus.noLines', { name }),
+      split.dropped
+        ? `${loaded} ${t('media.subStatus.otherScript', {
+          count: split.dropped,
+          styles: split.styles.slice(0, 4).join(', '),
+        })}`
+        : loaded,
     );
     return parsed.length > 0;
   }, [t]);

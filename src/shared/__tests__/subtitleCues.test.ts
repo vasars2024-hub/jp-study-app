@@ -7,7 +7,7 @@
 // those would have gone into a Japanese frequency table.
 
 import { describe, expect, it } from 'vitest';
-import { keepJapaneseStyleCues, parseSubtitles, type Cue } from '../subtitleCues';
+import { keepJapaneseStyleCues, parseStudySubtitles, parseSubtitles, type Cue } from '../subtitleCues';
 
 const cue = (text: string, style?: string, start = 0): Cue => ({
   start,
@@ -109,5 +109,81 @@ describe('keepJapaneseStyleCues — through the real parser', () => {
     const split = keepJapaneseStyleCues(cues);
     expect(split.dropped).toBe(2);
     expect(split.cues.map((c) => c.text)).toEqual(['お客さん ここらじゃうちが一番安いよ', 'なんだと']);
+  });
+});
+
+describe('parseStudySubtitles — what the player is asked to render', () => {
+  /** The dual-language shape, with both tracks on the SAME timings. */
+  const DUAL = [
+    '[Script Info]',
+    '[Events]',
+    'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text',
+    'Dialogue: 0,0:00:01.00,0:00:03.00,JOJO5_textjp,,0,0,0,,お客さん ここらじゃうちが一番安いよ',
+    'Dialogue: 0,0:00:01.00,0:00:03.00,JOJO5_textch,,0,0,0,,這位客人 這裡就數我家最便宜了',
+    'Dialogue: 0,0:00:04.00,0:00:06.00,JOJO5_textjp,,0,0,0,,なんだと',
+    'Dialogue: 0,0:00:04.00,0:00:06.00,JOJO5_textch,,0,0,0,,你說什麼',
+  ].join('\n');
+
+  /** What a player does every frame: everything whose interval covers `t`. */
+  const activeAt = (cues: Cue[], t: number): string[] =>
+    cues.filter((c) => c.start <= t && t < c.end).map((c) => c.text);
+
+  it('leaves one line on screen where the raw parse leaves two', () => {
+    // The defect, stated as the number: two cues share every timestamp, so the
+    // player stacks a Chinese line on the Japanese one for the whole episode.
+    expect(activeAt(parseSubtitles(DUAL), 2)).toHaveLength(2);
+    expect(activeAt(parseStudySubtitles(DUAL).cues, 2)).toEqual([
+      'お客さん ここらじゃうちが一番安いよ',
+    ]);
+  });
+
+  it('reports the number and the style, so the hiding is never silent', () => {
+    const split = parseStudySubtitles(DUAL);
+    expect(split.dropped).toBe(2);
+    expect(split.styles).toEqual(['JOJO5_textch']);
+  });
+
+  it('is inert on a .srt, which has no styles to judge', () => {
+    const srt = '1\n00:00:01,000 --> 00:00:03,000\nHello there\n\n2\n00:00:04,000 --> 00:00:06,000\nSecond line\n';
+    const split = parseStudySubtitles(srt);
+    expect(split.cues).toHaveLength(2);
+    expect(split.dropped).toBe(0);
+  });
+
+  it('keeps a whole Japanese-only .ass rather than judging its styles against each other', () => {
+    // The jimaku case. Two styles, both Japanese-bearing, and the smaller one is
+    // not a "loser" merely for being smaller.
+    const single = [
+      '[Events]',
+      'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text',
+      'Dialogue: 0,0:00:01.00,0:00:03.00,Default,,0,0,0,,こんばんは',
+      'Dialogue: 0,0:00:04.00,0:00:06.00,Default,,0,0,0,,また明日',
+      'Dialogue: 0,0:00:07.00,0:00:09.00,Sign,,0,0,0,,東京駅へようこそ',
+    ].join('\n');
+    const split = parseStudySubtitles(single);
+    expect(split.cues).toHaveLength(3);
+    expect(split.dropped).toBe(0);
+  });
+
+  it('hides a kana-free sign style, and that limit is deliberate rather than an oversight', () => {
+    // 東京駅 is a valid Japanese sign AND a valid Chinese one; script alone
+    // cannot separate them, so a style with no kana is dropped whatever language
+    // wrote it. A minimum-line floor would be the obvious "fix" and the measured
+    // release forbids it: censused 2026-08-18 over all 39 acquired episodes,
+    // `JOJO5_textjp-an8` and `JOJO5_textch-an8` are BOTH 169 lines across 35
+    // files — one line per file each — so any floor that saved the Japanese sign
+    // would put the Chinese one straight back on screen. The cost is bounded and
+    // reported: the caller names the dropped styles, and the translation-track
+    // slot loads the file unfiltered.
+    const withSign = [
+      '[Events]',
+      'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text',
+      'Dialogue: 0,0:00:01.00,0:00:03.00,Default,,0,0,0,,こんばんは',
+      'Dialogue: 0,0:00:04.00,0:00:06.00,Default,,0,0,0,,また明日',
+      'Dialogue: 0,0:00:07.00,0:00:09.00,Sign,,0,0,0,,東京駅',
+    ].join('\n');
+    const split = parseStudySubtitles(withSign);
+    expect(split.dropped).toBe(1);
+    expect(split.styles).toEqual(['Sign']);
   });
 });

@@ -5462,6 +5462,7 @@ export const ru: Catalog = {
   'media.subStatus.fetchFailed': 'Не удалось загрузить субтитры с YouTube.',
   'media.subStatus.loaded': 'Загружено строк субтитров: {count}.',
   'media.subStatus.noLines': 'В файле «{name}» не найдено строк. Это точно .srt / .vtt / .ass?',
+  'media.subStatus.otherScript': 'Скрыто {count} строк из дорожек без японского текста ({styles}) — это двуязычный или караоке-релиз. Чтобы увидеть их, загрузите файл как дорожку перевода.',
   'media.conversionFailedGeneric': 'Не удалось выполнить конвертацию.',
   'media.conversionFailed': 'Не удалось выполнить конвертацию: {detail}',
   'media.playError':

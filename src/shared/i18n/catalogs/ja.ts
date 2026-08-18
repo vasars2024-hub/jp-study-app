@@ -4973,6 +4973,7 @@ export const ja: Catalog = {
   'media.subStatus.fetchFailed': 'YouTubeから字幕を取得できませんでした。',
   'media.subStatus.loaded': '字幕を{count}行読み込みました。',
   'media.subStatus.noLines': '「{name}」に字幕が見つかりません。.srt / .vtt / .ass ファイルですか？',
+  'media.subStatus.otherScript': '日本語を含まないトラックの {count} 行を非表示にしました（{styles}）。二言語版またはカラオケ版です。翻訳トラックとして読み込むと表示できます。',
   'media.conversionFailedGeneric': '変換に失敗しました。',
   'media.conversionFailed': '変換に失敗しました：{detail}',
   'media.playError':

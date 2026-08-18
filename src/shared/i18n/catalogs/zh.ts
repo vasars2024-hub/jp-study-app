@@ -4951,6 +4951,7 @@ export const zh: Catalog = {
   'media.subStatus.fetchFailed': '无法从 YouTube 获取字幕。',
   'media.subStatus.loaded': '已加载 {count} 行字幕。',
   'media.subStatus.noLines': '在"{name}"中未找到字幕行。它是 .srt / .vtt / .ass 文件吗？',
+  'media.subStatus.otherScript': '已隐藏 {count} 行不含日语的轨道（{styles}）——这是双语或卡拉OK发布。若要查看，请将该文件作为翻译轨道加载。',
   'media.conversionFailedGeneric': '转换失败。',
   'media.conversionFailed': '转换失败：{detail}',
   'media.playError': '该文件无法直接播放（通常是 MKV/AVI）。请在下方转换为 MP4 — 字幕生成仍可在原文件上使用。',

@@ -158,6 +158,25 @@ export function parseLrc(raw: string): Cue[] {
   }));
 }
 
+/**
+ * Parse a track that is about to be *studied*, not merely displayed.
+ *
+ * The composition is `parseSubtitles` + `keepJapaneseStyleCues`, in one place,
+ * because a second copy is how the player and the miner start disagreeing about
+ * what a file contains. The harvest panel does the same two steps per file for
+ * the same release; this is that pair named once for callers that hold a whole
+ * file's text at once.
+ *
+ * Deliberately NOT the default parse. A translation track is loaded on purpose
+ * and must arrive whole — `MediaContent`'s secondary-subtitle slot is exactly
+ * that, and it stays on `parseSubtitles`. The split is by role: the primary
+ * track is the Japanese one the study tools read, the secondary is the one the
+ * user asked to see in another language.
+ */
+export function parseStudySubtitles(raw: string): StyleScriptSplit {
+  return keepJapaneseStyleCues(parseSubtitles(raw));
+}
+
 export function parseSubtitles(raw: string): Cue[] {
   // eslint-disable-next-line no-irregular-whitespace -- U+FEFF is the BOM this line exists to strip from subtitle files.
   const clean = raw.replace(/^﻿/, '').replace(/\r/g, '');

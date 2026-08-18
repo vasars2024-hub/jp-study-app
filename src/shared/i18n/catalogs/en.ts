@@ -5249,6 +5249,7 @@ export const en: Catalog = {
   'media.subStatus.fetchFailed': 'Could not fetch subtitles from YouTube.',
   'media.subStatus.loaded': 'Loaded {count} subtitle lines.',
   'media.subStatus.noLines': 'No lines found in "{name}". Is it a .srt / .vtt / .ass file?',
+  'media.subStatus.otherScript': 'Hid {count} lines from tracks carrying no Japanese ({styles}) — a dual-language or karaoke release. Load the file as a translation track to see them.',
   'media.conversionFailedGeneric': 'Conversion failed.',
   'media.conversionFailed': 'Conversion failed: {detail}',
   'media.playError':
