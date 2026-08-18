@@ -857,7 +857,7 @@ This slice is complete only when all of these can be shown with real data and no
     fidelity contract belongs to the writer, which is exactly what this gate was split off
     gate 1 to say.
 
-    **The decision** (`<pending>`): on `#html:false` the wrapper unwraps to its text and the
+    **The decision** (`970494ce`): on `#html:false` the wrapper unwraps to its text and the
     provenance is re-stated as a note-level tag in the file's own `#tags column:` —
     `jp-ai-gen::gemini::gemini-2.5-flash`, reusing the wrapper's own class as the tag root so
     one grep finds generated content in a package or a text file. It is an honest

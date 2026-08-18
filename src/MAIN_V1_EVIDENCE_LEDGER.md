@@ -25421,3 +25421,52 @@ gate 2 closed on one (3 requested / 3 answered / 3 ok in 3,461 ms) — but it is
 read, so it is left for a turn that opens on it.
 
 Docs only. Gates 1 and 4 were NOT read this turn and stay blank.
+
+## 2026-08-18 — Track 7 / gate 15's translate half CLOSES, on the defect it was built to find (`primary`)
+
+- `970494ce` — **a text export cannot carry a marker made of HTML.** Gate 15's last open
+  half, run live end to end on the user's own 3,209-row export (`html:false`, tab from the
+  header, tags column 11) with a REAL provider: **gemini-2.5-flash, 3 requested / 3 answered
+  / 3 ok in 2,559 ms** (おばさん→тётя, ああ→ах, 背が低い→низкий). `planChangeTray`
+  **changedNotes 3, 0 problems**; export **ok / notesUpdated 3 / rowsWritten 3,209 /
+  `verified: true`** — and the cell re-read through the app's own reader was
+  `<span class="jp-ai-gen" data-jp-ai="gemini|gemini-2.5-flash">тётя</span>` **as the field's
+  text**, which is what Anki renders, because the file's header says these fields are not
+  HTML. A reported success on a value the destination cannot represent.
+
+**Whose bug it is, since that decided where the fix goes.** Neither side is wrong alone:
+`wrapAiProvenance` is unconditional on purpose (an unmarked generation is indistinguishable
+from the user's own writing) and `applyCsvExportChanges` passed fields through on purpose
+(columns the draft does not model must survive). The tray cannot know the destination — the
+same draft goes to a package, to AnkiConnect, or here, and Apply picks. So fidelity is the
+WRITER's, which is exactly what gate 15 was split off gate 1 to assert.
+
+**Decision.** On `#html:false`: unwrap to the text, re-state the provenance as a note-level
+tag in the file's own `#tags column:` (`jp-ai-gen::gemini::gemini-2.5-flash`, the wrapper's
+own class as the tag root so one grep finds generated content in either format). An honest
+DOWNGRADE — field-level to note-level — so it is counted (`provenanceTagged`) and stated on
+the success panel, not done quietly. No tags column → refuse by name,
+`generated-provenance-unrepresentable`, rather than launder generated text as hand-written.
+`#html:true` keeps the wrapper; it round-trips there.
+
+**Verification had to move, narrowly, and the narrowness is the point.** `csvExport.ts`
+compares the written file to the CALLER's change set so a pass-through cannot verify green
+against its own mangling. The writer now declares `effectiveFields` for **only** the notes it
+rewrote; everywhere else the caller's set is still the comparison.
+
+**After the fix, same walk:** cells `тётя`/`ах`/`низкий`, **0** with markup, the tag on
+**3 of 3**, and the negative control **1,997 of 1,997** unselected notes byte-identical in
+every field AND every tag, **0** leaked markers. App restarted first (pid 36576 → 12508):
+`csvExport.ts` is main-process and does not hot-reload. Mutation control: inverting the
+`!meta.html` gate fails **7 of 25** in `ankiCsvExport.test.ts`; restored, back to 25/25.
+
+**Traps, all now tests.** `readAiProvenance`'s `lastIndexOf('</span>')` is correct for one
+whole-field wrapper and WRONG here — an `append` conflict writes `old; <span>new</span>` and
+the last-close unwrap keeps only the inner text — so the scan is depth-counted. A generation
+over an enrichment must yield BOTH tags (recursive unwrap). The marker ADDS to existing tags
+and is deduped or a second export stacks it. An empty `data-jp-ai=""` still gets the bare root
+tag. Only this app's two wrappers are touched; the user's own `<span class="mine">` is not.
+
+**Probe trap for the next worker:** `AnkiDraftNote.tags` is an ARRAY, so `was.tags === now.tags`
+is false on every note and reads as a total control failure — the first run of the negative
+control reported `0 / 1,997` for exactly that reason and nothing was wrong with the code.
