@@ -25583,3 +25583,52 @@ warnings, all `no-non-null-assertion`, the file-local idiom; 2 are mine).
 **Gate 1 is NOT closed.** This builds and proves the mechanism by test; the gate's own wording
 needs the live walk — import a representative APKG, swap, export, reimport, match the diff — and
 the note-field variant as well as this rendered-template one. That walk is the next slice.
+
+## 2026-08-18 — Track 7 / gate 1 CLOSES on the live walk, which found a false `verified` (`primary`)
+
+**`58eab694`** the defect the walk found, **`39276b5e`** the closure. Gate 1 is the last of the
+15 workbench gates to have been open by its own annotation; **15 of 15 now carry a closure**,
+counted by splitting the numbered list under "Demonstrable acceptance gates" at each `^N. ` and
+reading each body to its end (gates 5 and 6 read "NOT CLOSED"/"Half closed" in their FIRST line
+and close later in the same body — the doc is a chronological log, so first-line sweeps undercount
+it by two).
+
+**The walk** (`debug/g1-walk.js`, driven through the debug bridge, no mouse automation).
+Fixture `Default-20260129112153.apkg`, picked for what it can disprove rather than for size:
+**80 notes / 160 cards**, note type `Kanji` with **TWO** templates so ord 1 is a control that must
+not move, and `bqfmt` = `{{Kanji}}` on ord 0, which a config re-encode would silently delete.
+Parity read first, as the gate's "inspect every preserved/unsupported feature" asks: **18 rows,
+11 supported, 7 read-only, 0 blocked** for `package`. Both swap variants in one change set —
+3 notes with fields 0↔1 (6 `field` ops) and the rendered template (1 `template-format` op).
+Export **3 notes / 1 template formatted / verified**; reimport through the same reader: swapped
+**3 / 3**, other fields and tags untouched on 3 of 3, both new formats present, `bqfmt`/`bafmt`/deck
+override preserved, control template **byte-identical**, css (3,725) / fields / `sortf` / latexPre /
+latexPost unchanged, 80 notes and 160 cards in and out. The rendered diff survives the package
+boundary: the control note's FRONT goes from `Kanji: 強硬 Hint:` to the whole answer side, and the
+re-read package renders identically to the pre-export draft.
+Four controls that had to fail and did: `empty-question-format` on a qfmt with no `{{`;
+`source-changed` on a stale fingerprint; the control note byte-identical throughout; and each half
+rendered through the OTHER's untouched half, so neither edit is proving the other.
+
+**The defect, which is why the walk was worth running.** First run: `ok: true, notesUpdated: 3,
+verified: true` — and `templates.config` came back **byte-identical**, sha1 `80d6a614…` on both
+sides. `verifyExportChanges` had branches for notes, card moves, flags, queues, scheduling, deck
+renames, deck moves and template ADDS, and **none for `templateFormats`**, so a swap that never
+reached the package verified clean on the note rows beside it and the file stayed on disk looking
+importable. Fixed with `templateFormatsOf` (the READER's own decode, both storage schemas), a
+count-based check for the remove half (a removal renumbers survivors, so "ord 1 is gone" is false
+by construction — the comment says what it does not prove), and
+`ApkgExportResult.templatesFormatted`, without which a swap-only export reported "0 notes and
+0 cards". 9 cases in `apkgExportCore.test.ts`, which had **zero** occurrences of `templateFormats`
+before; mutation control **2 red**.
+
+**Trap, and it cost 40 minutes:** main does NOT hot-reload. That first miss was a main process
+started **2h22m** before the writer was written — the renderer had the new fold, main ignored the
+key. Restart before measuring anything main-process. `node debug/g1-dump.cjs <apkg>` tells a write
+that never happened from one the reader cannot see (it dumps both template stores and the config
+blob's hash); `node debug/g1-run.cjs <script.js> <global>` kicks and polls any bridge walk.
+
+**Gates, SHARED tree, once after the last slice:** vitest **10,344 passed / 0 failed / 6 skipped**
+across 744 files — green, and the known `scraperSources` full-run flake did not fire. i18n exit 0
+at 10,623→**10,624** (+1 = mine). architecture exit 0, "Nothing new", 5 pending. eslint **0 errors**
+on 9 touched paths (99 warnings, all `no-non-null-assertion`, the file-local idiom).
