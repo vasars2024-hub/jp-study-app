@@ -3859,6 +3859,7 @@ export const zh: Catalog = {
   'malDownload.error.noProviders': '尚未安装漫画来源扩展。',
   'malDownload.error.noIndexers': '该配置未启用任何 BT 索引。请先在“来源”页面启用一个。',
   'malDownload.error.noClient': '没有可用的 BT 客户端。请配置 qBittorrent，或在启用其 BT 客户端后启动媒体服务器。',
+  'malDownload.error.qbitCredential': '无法将 qBittorrent 用作目标：{detail}',
   'subHarvest.intro': '\u83b7\u53d6\u4e0a\u65b9\u6240\u9009\u5267\u96c6\u7684\u65e5\u8bed\u5b57\u5e55\uff08\u4e0d\u4e0b\u8f7d\u89c6\u9891\uff09\uff0c\u5408\u5e76\u4e3a\u4e00\u4efd\u5b8c\u6574\u6587\u672c\uff0c\u5e76\u8fd0\u884c\u4e0e\u64ad\u653e\u5668\u5b66\u4e60\u6a21\u5f0f\u76f8\u540c\u7684\u5206\u6790\u3002',
   'subHarvest.needsKey': 'Jimaku \u9700\u8981 API \u5bc6\u94a5\u624d\u80fd\u4f7f\u7528\u3002\u8bf7\u5728\u201c\u8bbe\u7f6e \u2192 \u6293\u53d6\u5668 \u2192 \u5b57\u5e55\u63d0\u4f9b\u65b9\u201d\u4e2d\u6dfb\u52a0\u3002',
   'subHarvest.source.exact': '\u6309 ID \u5339\u914d\uff1a{name}\u3002',

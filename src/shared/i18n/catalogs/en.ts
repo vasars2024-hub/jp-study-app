@@ -4096,6 +4096,7 @@ export const en: Catalog = {
   'malDownload.error.noProviders': 'No manga provider extension is installed.',
   'malDownload.error.noIndexers': 'No torrent index is enabled in this profile. Enable one on the Sources page first.',
   'malDownload.error.noClient': 'No torrent client is reachable. Configure qBittorrent, or start the media server with its torrent client enabled.',
+  'malDownload.error.qbitCredential': 'qBittorrent cannot be used as a destination: {detail}',
   // Subtitle harvest — the words of a show, without downloading the show.
   'subHarvest.intro': 'Fetches the Japanese subtitles for the episodes selected above — no video — joins them into one transcript, and runs the same analysis the player\u2019s Study Mode uses.',
   'subHarvest.needsKey': 'Jimaku needs an API key before it will answer. Add one in Settings \u2192 Scraper \u2192 Subtitle providers.',

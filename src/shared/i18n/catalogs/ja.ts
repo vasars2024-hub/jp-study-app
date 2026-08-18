@@ -3875,6 +3875,7 @@ export const ja: Catalog = {
   'malDownload.error.noProviders': 'マンガプロバイダー拡張機能がインストールされていません。',
   'malDownload.error.noIndexers': 'このプロファイルでは torrent インデックスが有効になっていません。まず「ソース」ページで有効にしてください。',
   'malDownload.error.noClient': '利用できるトレントクライアントがありません。qBittorrent を設定するか、トレントクライアントを有効にしたうえでメディアサーバーを起動してください。',
+  'malDownload.error.qbitCredential': 'qBittorrent を送信先として使用できません: {detail}',
   'subHarvest.intro': '\u4e0a\u3067\u9078\u629e\u3057\u305f\u30a8\u30d4\u30bd\u30fc\u30c9\u306e\u65e5\u672c\u8a9e\u5b57\u5e55\u3092\u53d6\u5f97\u3057\uff08\u52d5\u753b\u306f\u30c0\u30a6\u30f3\u30ed\u30fc\u30c9\u3057\u307e\u305b\u3093\uff09\u3001\u4e00\u3064\u306e\u66f8\u304d\u8d77\u3053\u3057\u306b\u307e\u3068\u3081\u3066\u3001\u30d7\u30ec\u30fc\u30e4\u30fc\u306e\u5b66\u7fd2\u30e2\u30fc\u30c9\u3068\u540c\u3058\u89e3\u6790\u3092\u884c\u3044\u307e\u3059\u3002',
   'subHarvest.needsKey': 'Jimaku \u3092\u5229\u7528\u3059\u308b\u306b\u306f API \u30ad\u30fc\u304c\u5fc5\u8981\u3067\u3059\u3002\u8a2d\u5b9a \u2192 \u30b9\u30af\u30ec\u30a4\u30d1\u30fc \u2192 \u5b57\u5e55\u30d7\u30ed\u30d0\u30a4\u30c0\u30fc \u3067\u767b\u9332\u3057\u3066\u304f\u3060\u3055\u3044\u3002',
   'subHarvest.source.exact': 'ID \u3067\u4e00\u81f4: {name}\u3002',

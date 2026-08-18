@@ -24,8 +24,37 @@ import MalDownloadDialog from '../components/discover/MalDownloadDialog';
 
 vi.mock('../views/MangaReader', () => ({ default: () => null }));
 
-/** Mutable so a test can switch the qBittorrent target on; reset in `beforeEach`. */
-let qbitSettings = { enabled: false, host: '', savePath: '' };
+/**
+ * Mutable so a test can switch the qBittorrent target on; reset in `beforeEach`.
+ *
+ * Carries the credential fields because the dialog now asks whether a login
+ * exists before offering qBittorrent as a destination. The default is the
+ * clean-profile case on purpose — enabled with a host and nothing entered is
+ * exactly what used to be offered and then refuse every row.
+ */
+let qbitSettings: Record<string, unknown> = {
+  enabled: false,
+  host: '',
+  savePath: '',
+  authMode: 'apiKey',
+  username: '',
+  passwordRef: '',
+  apiKeyRef: '',
+};
+
+/** Reachable *and* able to log in — what every send test assumes. */
+function qbitReady(patch: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    enabled: true,
+    host: '127.0.0.1',
+    savePath: '',
+    authMode: 'apiKey',
+    username: '',
+    passwordRef: '',
+    apiKeyRef: 'qbit/apikey',
+    ...patch,
+  };
+}
 
 vi.mock('../scraperSettingsStore', () => ({
   getActiveScraperSettings: () => ({
@@ -115,6 +144,9 @@ function stubApi(overrides: Record<string, unknown> = {}): void {
     listLibrary: vi.fn(async () => []),
     scraperSearchTorrents: vi.fn(async () => []),
     scraperGetAcquisitionSnapshot: vi.fn(async () => null),
+    // The vault's answer for whichever ref the auth mode reads. `true` is the
+    // configured case; the clean-profile tests override it.
+    scraperHasCredential: vi.fn(async () => true),
     scraperRunAcquisitionAction: vi.fn(async () => ({
       ok: true, message: 'sent', accepted: 1, simulation: [],
     })),
@@ -195,7 +227,15 @@ beforeEach(() => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
-  qbitSettings = { enabled: false, host: '', savePath: '' };
+  qbitSettings = {
+    enabled: false,
+    host: '',
+    savePath: '',
+    authMode: 'apiKey',
+    username: '',
+    passwordRef: '',
+    apiKeyRef: '',
+  };
   stubApi();
 });
 
@@ -310,7 +350,7 @@ describe('MalDownloadDialog — anime', () => {
   // (it renders only when the target is not qBittorrent), so "Send 7 torrents"
   // named no destination anywhere on the dialog.
   it('names the destination when exactly one target is reachable', async () => {
-    qbitSettings = { enabled: true, host: '127.0.0.1', savePath: '' };
+    qbitSettings = qbitReady();
     stubApi({ scraperSearchTorrents: vi.fn(async () => [frierenRelease()]) });
     await open(anime);
     await act(async () => button('Find releases').click());
@@ -326,7 +366,7 @@ describe('MalDownloadDialog — anime', () => {
   // The other half of the same guard: two targets must still get the picker,
   // and must not get a static line contradicting whatever is selected.
   it('keeps the picker and drops the static line when two targets are reachable', async () => {
-    qbitSettings = { enabled: true, host: '127.0.0.1', savePath: '' };
+    qbitSettings = qbitReady();
     stubApi({
       scraperSearchTorrents: vi.fn(async () => [frierenRelease()]),
       scraperGetAcquisitionSnapshot: vi.fn(async () => ({
@@ -352,11 +392,76 @@ describe('MalDownloadDialog — anime', () => {
     expect(text()).toContain('No torrent client is reachable');
   });
 
+  // Main V1 Track 9 gate 16, the surface half. A profile with qBittorrent
+  // enabled and a host typed in used to be offered as a destination whatever
+  // the vault held, take the whole batch, and refuse row by row — the failure
+  // reads as "the transfer broke" rather than "you never entered a key".
+  it('drops qBittorrent and names the reason when the key was never entered', async () => {
+    qbitSettings = qbitReady({ apiKeyRef: '' });
+    stubApi({
+      scraperSearchTorrents: vi.fn(async () => [frierenRelease()]),
+      scraperHasCredential: vi.fn(async () => false),
+    });
+    await open(anime);
+    await act(async () => button('Find releases').click());
+    expect(document.querySelector('.mal-dl select')).toBeNull();
+    expect(text()).toContain('qBittorrent cannot be used as a destination');
+    expect(text()).toContain('no key has been entered');
+    // The generic advice is actively wrong here — this profile *is* configured.
+    expect(text()).not.toContain('No torrent client is reachable');
+  });
+
+  // The other half: a ref that names a secret the store no longer holds. A
+  // different sentence on purpose — "enter it again" is the fix, not "enter one".
+  it('separates a lost secret from one that was never entered', async () => {
+    qbitSettings = qbitReady();
+    stubApi({
+      scraperSearchTorrents: vi.fn(async () => [frierenRelease()]),
+      scraperHasCredential: vi.fn(async () => false),
+    });
+    await open(anime);
+    await act(async () => button('Find releases').click());
+    expect(text()).toContain('no longer in this machine');
+    expect(text()).not.toContain('no key has been entered');
+  });
+
+  // The negative control for both of the above: same profile, same host, the
+  // vault answering yes — qBittorrent is offered and nothing is explained away.
+  it('offers qBittorrent when the vault does hold the key', async () => {
+    qbitSettings = qbitReady();
+    stubApi({
+      scraperSearchTorrents: vi.fn(async () => [frierenRelease()]),
+      scraperHasCredential: vi.fn(async () => true),
+    });
+    await open(anime);
+    await act(async () => button('Find releases').click());
+    const only = must(document.querySelector('.mal-dl-target-only'), 'the single-target line');
+    expect(only.textContent).toContain('qBittorrent');
+    expect(text()).not.toContain('cannot be used as a destination');
+    // And it asked the right ref for the mode in force, rather than guessing.
+    expect(api().scraperHasCredential).toHaveBeenCalledWith('qbit/apikey');
+  });
+
+  // Password mode reads a different ref, and a config that predates `authMode`
+  // is a password — a key-mode-only probe would ask the wrong question here.
+  it('reads the password ref when the profile is in password mode', async () => {
+    qbitSettings = qbitReady({ authMode: 'password', username: 'admin', passwordRef: 'qbit/webui', apiKeyRef: '' });
+    stubApi({
+      scraperSearchTorrents: vi.fn(async () => [frierenRelease()]),
+      scraperHasCredential: vi.fn(async () => true),
+    });
+    await open(anime);
+    await act(async () => button('Find releases').click());
+    expect(api().scraperHasCredential).toHaveBeenCalledWith('qbit/webui');
+    expect(must(document.querySelector('.mal-dl-target-only'), 'the single-target line').textContent)
+      .toContain('qBittorrent');
+  });
+
   // A live send came back "0 accepted, 1 rejected" and that counts line was the
   // whole of what the user was told; qBittorrent's reason was in
   // `report.details` and never left this component.
   it('shows why qBittorrent refused a row, not just that it did', async () => {
-    qbitSettings = { enabled: true, host: '127.0.0.1', savePath: '' };
+    qbitSettings = qbitReady();
     stubApi({
       scraperSearchTorrents: vi.fn(async () => [frierenRelease()]),
       scraperQbitSend: vi.fn(async () => ({
@@ -380,7 +485,7 @@ describe('MalDownloadDialog — anime', () => {
   // The counts line reads as success here — one of two went — so the reason for
   // the other is the only thing that says an episode was lost.
   it('keeps the refusal visible when only part of the batch was accepted', async () => {
-    qbitSettings = { enabled: true, host: '127.0.0.1', savePath: '' };
+    qbitSettings = qbitReady();
     stubApi({
       scraperSearchTorrents: vi.fn(async () => [
         frierenRelease(),

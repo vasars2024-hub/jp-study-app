@@ -40,6 +40,7 @@ import {
   type MalSelectionMode,
 } from '../../../shared/malDownload';
 import { ipcErrorText } from '../../../shared/ipcErrorText';
+import { qbitCredentialGap, qbitCredentialRef } from '../../../shared/subtitleNyaa';
 import type { DiscoveryCandidate } from '../../../shared/mediaDiscovery';
 import type { ReadingMangaProvider } from '../../../shared/readingIpc';
 import type { TorrentRow } from '../../../shared/scraperResults';
@@ -190,6 +191,17 @@ export default function MalDownloadDialog({ candidate, onClose }: Props) {
   const [preferBatches, setPreferBatches] = useState(false);
   const [sendTarget, setSendTarget] = useState<SendTarget>('torrent-client');
   const [availableTargets, setAvailableTargets] = useState<SendTarget[]>([]);
+  /**
+   * Why qBittorrent is not among the targets, when it is enabled and addressed
+   * but cannot authenticate.
+   *
+   * Kept apart from `availableTargets` because dropping the target silently is
+   * the defect, not the fix: a profile with qBittorrent turned on and a host
+   * typed in used to be offered, take the whole batch, and refuse every row —
+   * "Send 7 torrents" reporting seven failures, none of which said the password
+   * was never entered.
+   */
+  const [qbitCredentialNote, setQbitCredentialNote] = useState('');
   /**
    * Info hashes the torrent client is already working on — the anime answer to
    * the same question the owned set answers for chapters. Sending these again
@@ -617,9 +629,21 @@ export default function MalDownloadDialog({ candidate, onClose }: Props) {
       const targets: SendTarget[] = [];
       if (snapshot?.torrentClient.state === 'ready') targets.push('torrent-client');
       if (snapshot?.debrid.state === 'ready') targets.push('debrid');
+      let credentialNote = '';
       if (settings.qbittorrent.enabled && settings.qbittorrent.host.trim()) {
-        targets.push('qbittorrent');
+        // The same question `nyaaAvailability` asks before it searches, for the
+        // same reason: only main can read the vault, and "enabled with a host"
+        // says nothing about whether anything can log in.
+        const ref = qbitCredentialRef(settings.qbittorrent);
+        const stored = ref
+          ? await (window.api?.scraperHasCredential?.(ref) ?? Promise.resolve(false)).catch(() => false)
+          : false;
+        if (!aliveRef.current) return;
+        const gap = qbitCredentialGap({ qbittorrent: settings.qbittorrent, secretStored: stored });
+        if (gap) credentialNote = gap.detail;
+        else targets.push('qbittorrent');
       }
+      setQbitCredentialNote(credentialNote);
       setAvailableTargets(targets);
       if (targets.length) setSendTarget(targets[0]);
       setQueuedHashes(new Set(
@@ -786,6 +810,11 @@ export default function MalDownloadDialog({ candidate, onClose }: Props) {
    */
   const footnote = sendMessage
     || (plan && plan.covered === 0 ? t('malDownload.hint.noMatches') : '')
+    // Ahead of `noClient`, and shown even when another target survives: it is
+    // the one reason on this list that names the exact field to fill in, and
+    // "Configure qBittorrent" is actively wrong advice for a profile that is
+    // configured and only missing its credential.
+    || (plan && qbitCredentialNote ? t('malDownload.error.qbitCredential', { detail: qbitCredentialNote }) : '')
     || (plan && !availableTargets.length ? t('malDownload.error.noClient') : '');
 
   /**
