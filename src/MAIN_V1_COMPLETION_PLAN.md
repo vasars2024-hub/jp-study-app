@@ -452,6 +452,24 @@ What follows from it:
   password.
 - `resetQbitSessions()` must clear key-mode state too, or a changed key keeps working until restart.
 
+**Phase 9.0 CLOSES 2026-08-18.** Re-derived against the tree rather than inherited: bullets 1, 2, 3
+and 5 were already built — `authMode`/`apiKeyRef` on `ScraperQbittorrentSettings`
+(`shared/scraperSourceSettings.ts:488-510`), `authorization` already in `SECRET_HEADERS`
+(`scraper/http.ts:67`) and the greedy `authorization|cookie` line pattern in `logBus.ts`, and
+`resetQbitSessions()` clearing one shared `sessions` map that both modes use. **Bullet 4 was not**:
+`QbitStatusReport` had no field naming the mode and the success message says only
+"Connected to host:port", so a user holding both a password and a key could not tell which one
+answered — and, worse, `TorrentManagerPage` read `passwordRef` unconditionally, so a working
+key-only setup was labelled **"no password"**, which reads as broken (that is Phase 9.4 gate 17's
+complaint, one surface early). Now `QbitStatusReport.authMode` is set on **every** outcome except
+`not-configured` — deliberately including the refusals, because that is where it changes what the
+user does next — and both surfaces render it: the Torrent Manager shows the mode pill plus the
+credential pill *for the mode in force*, and the settings drawer appends it to the test note.
+5 tests in `main/__tests__/scraperQbittorrent.test.ts` (104 pass, was 99), including the
+discrimination the field exists for — a rejected password and a rejected key are both
+`unauthorized` yet carry different `authMode` and different messages — and the deliberate absence on
+`not-configured`. Mutation control: hardcoding the field to `'password'` turns **4** of the 5 red.
+
 ### Phase 9.1 — contract gates (no daemon, run in CI)
 
 1. A key-mode request carries `Authorization: Bearer` and **no** `username`/`password` field.

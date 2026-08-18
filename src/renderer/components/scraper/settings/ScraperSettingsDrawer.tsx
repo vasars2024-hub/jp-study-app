@@ -112,7 +112,10 @@ export default function ScraperSettingsDrawer() {
       }));
       const timing = report.latencyMs > 0 ? ` · ${report.latencyMs} ms` : '';
       const version = report.version ? ` · v${report.version}` : '';
-      setNote(sxs('set.qbitTestResult', `${report.message}${version}${timing}`));
+      // Which credential answered. Without it, a user holding both a password
+      // and a key cannot tell which one this result is about.
+      const via = report.authMode ? ` · ${sxs('torrent.authVia', report.authMode)}` : '';
+      setNote(sxs('set.qbitTestResult', `${report.message}${version}${timing}${via}`));
     } catch {
       setNote(sx('set.qbitTestFailed'));
     }

@@ -17,7 +17,7 @@ import { useScraper } from '../ScraperContext';
 import { useScraperPort } from '../data/scraperPort';
 import { formatEtaClock } from '../data/charts';
 import { formatBytes } from '../../../../shared/assetRegistry';
-import { sx, sxn } from '../strings';
+import { sx, sxn, sxs } from '../strings';
 import {
   loadScraperSettingsDocument,
   onScraperSettingsChanged,
@@ -241,10 +241,22 @@ export default function TorrentManagerPage() {
           </span>
           {status?.version && <Pill tone="outline">v{status.version}</Pill>}
           {status && <span className="scr-muted">{status.message}</span>}
-          {/* No password is ever shown or stored here — only whether one exists. */}
-          <Pill tone={qbit.passwordRef ? 'good' : 'warn'}>
-            {qbit.passwordRef ? sx('torrent.credStored') : sx('torrent.credMissing')}
-          </Pill>
+          {status?.authMode && (
+            <Pill tone="outline">{sxs('torrent.authVia', status.authMode)}</Pill>
+          )}
+          {/* No secret is ever shown or stored here — only whether one exists,
+              and only for the mode actually in force. Reading `passwordRef` in
+              key mode told a user with a working key that they had "no
+              password", which reads as broken. */}
+          {qbit.authMode === 'apiKey' ? (
+            <Pill tone={qbit.apiKeyRef ? 'good' : 'warn'}>
+              {qbit.apiKeyRef ? sx('torrent.keyStored') : sx('torrent.keyMissing')}
+            </Pill>
+          ) : (
+            <Pill tone={qbit.passwordRef ? 'good' : 'warn'}>
+              {qbit.passwordRef ? sx('torrent.credStored') : sx('torrent.credMissing')}
+            </Pill>
+          )}
         </div>
       </ScrCard>
 

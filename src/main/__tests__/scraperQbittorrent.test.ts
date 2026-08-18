@@ -645,6 +645,74 @@ describe('qbitTest in API-key mode', () => {
   });
 });
 
+// Phase 9.0's fourth bullet: "`qbitTest()` reports *which* mode authenticated,
+// so a user can tell a working key from a working password." The field is on
+// the report rather than only in the prose message because a surface has to be
+// able to render it without parsing English.
+describe('qbitTest names the auth mode it used', () => {
+  const keyConfig = (): ScraperQbittorrentSettings => ({
+    ...config,
+    authMode: 'apiKey',
+    username: '',
+    passwordRef: '',
+    apiKeyRef: 'test/qbit-key',
+  });
+
+  afterEach(async () => {
+    await clearScraperSecret('test/qbit-key');
+  });
+
+  it('says `password` on a password-mode success and `apiKey` on a key-mode one', async () => {
+    expect((await qbitTest({ config })).authMode).toBe('password');
+    resetQbitSessions();
+    await setScraperSecret('test/qbit-key', GOOD_KEY);
+    expect((await qbitTest({ config: keyConfig() })).authMode).toBe('apiKey');
+  });
+
+  // The whole point of the field. Both of these are `unauthorized` with a
+  // rejection message, and with a password AND a key stored the status alone
+  // sends the user to change the credential that was never consulted.
+  it('distinguishes a rejected password from a rejected key', async () => {
+    await setScraperSecret('test/qbit', 'wrong-password');
+    const badPassword = await qbitTest({ config });
+    resetQbitSessions();
+    await setScraperSecret('test/qbit-key', 'a-key-the-daemon-never-issued');
+    const badKey = await qbitTest({ config: keyConfig() });
+
+    expect(badPassword.status).toBe('unauthorized');
+    expect(badKey.status).toBe('unauthorized');
+    expect(badPassword.authMode).toBe('password');
+    expect(badKey.authMode).toBe('apiKey');
+    expect(badPassword.message).not.toBe(badKey.message);
+  });
+
+  it('names the mode on the refusals that never reach the network', async () => {
+    await clearScraperSecret('test/qbit');
+    const noPassword = await qbitTest({ config });
+    const noUser = await qbitTest({ config: { ...config, username: '' } });
+    const noKey = await qbitTest({ config: keyConfig() });
+    expect(noPassword.authMode).toBe('password');
+    expect(noUser.authMode).toBe('password');
+    expect(noKey.authMode).toBe('apiKey');
+    expect(seenHeaders).toHaveLength(0);
+  });
+
+  it('names the mode on an unreachable base path, not only on success', async () => {
+    await setScraperSecret('test/qbit-key', GOOD_KEY);
+    const report = await qbitTest({ config: { ...keyConfig(), basePath: '/proxied' } });
+    expect(report.status).toBe('unreachable');
+    expect(report.authMode).toBe('apiKey');
+  });
+
+  // The deliberate absence: sending is switched off, so no credential was
+  // reached and claiming one would be an invention.
+  it('omits the mode when sending is switched off', async () => {
+    const report = await qbitTest({ config: { ...config, enabled: false } });
+    expect(report.status).toBe('not-configured');
+    expect(report.authMode).toBeUndefined();
+  });
+});
+
 describe('qbitTransfers', () => {
   it('returns mapped rows', async () => {
     const rows = await qbitTransfers({ config });

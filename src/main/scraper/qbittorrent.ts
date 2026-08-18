@@ -441,11 +441,17 @@ export async function qbitTest(rawInput: ScraperQbitInput): Promise<QbitStatusRe
   if (mode === 'apiKey') {
     const problem = apiKeyProblem(await resolveApiKey(input));
     if (problem) {
-      return { status: 'unauthorized', version: '', message: problem, latencyMs: 0 };
+      return { status: 'unauthorized', version: '', message: problem, latencyMs: 0, authMode: mode };
     }
   } else {
     if (!config.username) {
-      return { status: 'unauthorized', version: '', message: 'No username is set.', latencyMs: 0 };
+      return {
+        status: 'unauthorized',
+        version: '',
+        message: 'No username is set.',
+        latencyMs: 0,
+        authMode: mode,
+      };
     }
     const password = await resolvePassword(input);
     if (!password) {
@@ -454,6 +460,7 @@ export async function qbitTest(rawInput: ScraperQbitInput): Promise<QbitStatusRe
         version: '',
         message: 'No password is stored for this account.',
         latencyMs: 0,
+        authMode: mode,
       };
     }
   }
@@ -470,6 +477,7 @@ export async function qbitTest(rawInput: ScraperQbitInput): Promise<QbitStatusRe
       version: '',
       message: version.error.message,
       latencyMs,
+      authMode: mode,
     };
   }
   // In password mode a bad base path or port already failed at the login. Key
@@ -481,6 +489,7 @@ export async function qbitTest(rawInput: ScraperQbitInput): Promise<QbitStatusRe
       version: '',
       message: `qBittorrent answered ${version.status} to the version request.`,
       latencyMs,
+      authMode: mode,
     };
   }
   const label = version.body.trim().replace(/^v/, '');
@@ -498,6 +507,7 @@ export async function qbitTest(rawInput: ScraperQbitInput): Promise<QbitStatusRe
       : `Connected to ${config.host}:${config.port}.`,
     latencyMs,
     connection,
+    authMode: mode,
   };
 }
 

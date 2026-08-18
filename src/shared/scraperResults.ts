@@ -9,6 +9,7 @@ import type {
   AcquisitionContentType,
   AcquisitionPlayback,
 } from './acquisition';
+import type { ScraperQbitAuthMode } from './scraperSourceSettings';
 
 export type ScrapeStage =
   | 'queued'
@@ -310,6 +311,17 @@ export interface QbitStatusReport {
    * producer and stored report stays valid.
    */
   connection?: string;
+  /**
+   * Which credential the test actually used — `MAIN_V1_COMPLETION_PLAN.md`
+   * Phase 9.0, "a user can tell a working key from a working password".
+   *
+   * Present on every outcome, not only success, because the failures are where
+   * it decides what the user does next: with both a password and a key stored,
+   * "unauthorized" alone sends them to change the credential that was never
+   * consulted. Absent on `not-configured`, where no credential was reached, and
+   * optional so every stored report from before this field stays valid.
+   */
+  authMode?: ScraperQbitAuthMode;
 }
 
 export interface QbitSendReport {

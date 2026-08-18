@@ -25670,3 +25670,36 @@ verified: deepseek `configured: false`, gemini untouched, provider `gemini-2.5-f
 
 Track 7's workbench sub-plan is genuinely **15 of 15** now, counted by reading each numbered gate
 body to its end. Track 7's non-workbench remainder and Tracks 8/9 stay open.
+
+## 2026-08-18 — Track 9 / Phase 9.0 CLOSES: the test that would not say which credential answered (`primary`)
+
+Re-derived the phase against the tree instead of trusting its own bullet list. Four of five bullets
+were already built (`authMode`/`apiKeyRef` in settings, `authorization` in `SECRET_HEADERS`, the
+greedy header pattern in `logBus`, one shared `sessions` map that `resetQbitSessions()` clears for
+both modes). **The fourth was not**, and it had a second face nobody had written down:
+`TorrentManagerPage` rendered `qbit.passwordRef ? 'password stored' : 'no password'` with no regard
+for the mode, so a user who had pasted only an API key — the exact person Phase 9.4 gate 17 is
+about — saw **"no password"** next to a connection that works.
+
+Decision: put the mode on `QbitStatusReport` as a typed field rather than into the English message.
+A surface has to render it without parsing prose, and the scraper's report messages are
+main-process English that the renderer does not translate. Set on every outcome **except**
+`not-configured` — including the refusals, deliberately, because with both credentials stored
+`unauthorized` alone sends the user to change the one that was never consulted. Optional, so every
+stored report predating the field stays valid.
+
+`3b1d…` (this commit): `authMode` on the report, 6 return sites in `qbitTest`, the mode pill and a
+mode-aware credential pill in `TorrentManagerPage`, the mode appended to the settings drawer's test
+note, 3 scraper strings, 5 tests. Suite **104 pass, was 99**. Mutation control: hardcode the field
+to `'password'` and **4 of 5** go red.
+
+Trap: `renderer/components/scraper/strings.ts` carries a large block of ANOTHER track's
+de-hardcoding work (dashboard hero, stored-result reopen, export tiles). `git add` on it commits
+their text. Staged as HEAD+my 7 lines via `git hash-object -w --no-filters` + `update-index
+--cacheinfo`; `git diff --cached --stat` then reads exactly `7 +++++++`, which is the check.
+
+Phase 9.1's five contract gates are next and need no daemon: the stand-in WebUI in
+`scraperQbittorrent.test.ts` already covers gate 1 (Bearer, no username/password) and gate 5
+(malformed key refused before any request). Gates 2, 3 and 4 — password-mode byte-identity, a
+sentinel key absent from every log line and report, and a mode switch clearing the cached cookie —
+are unwritten.
