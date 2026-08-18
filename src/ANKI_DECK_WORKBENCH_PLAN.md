@@ -445,6 +445,26 @@ This slice is complete only when all of these can be shown with real data and no
     `cardFlags` fold reddens exactly one of them and none of the older
     literal-change-set cases, which is why the seam needed its own coverage.
 6. Safely edit a multi-template and cloze note without confusing fields with generated cards or breaking sibling renders.
+
+    **Half closed 2026-08-18** (`c0defb48`) — the multi-template half passes live; the cloze half
+    is model-covered only. The defect: `setNoteField` never touches `cardIds`, so `Cards: N` counts
+    what the note HOLDS while the preview's sibling strip renders what its fields GENERATE, and
+    from the first conditional flip onwards the two disagreed with nothing reconciling them.
+    `noteCardCensus` answers both; the inspector prints the second only when it differs.
+    `conditional-card-not-generated` is the only render problem counted as "no card here" — folding
+    in `empty-question` would let a broken card quietly lower the count, and that is its negative
+    control. Second fix: the sibling tabs' `!` was `aria-hidden` with no text behind it.
+    Live on `NO_ENGLISHegg_rollsJLPT_N1N5_v3.apkg` (10,147 notes, page 500 of 500, note type
+    `eggrolls-JLPT10k-v3` with **both** qfmts gated on `Alt1`), entered through the UI's own reopen
+    button: before, `Cards: 1` and **no line** — the control, since two templates alone must not
+    produce one. Filling `Alt1` → *"now generate 0 cards, and the note holds 1"*; filling `Alt2` →
+    *"now generate 2 cards, and the note holds 1"*; emptying `VocabAudio` took tab 1's accessible
+    name from `"日-中 — 1 problems"` to `null`. Every edit was put straight back and every signal
+    returned — the restore is the control.
+    **Still open:** the cloze half. The user's library holds **zero** cloze note types
+    (`r19-live.cjs`: `not-cloze` on 38,283 of 38,283), so it cannot be shown on a deck they own;
+    close it by `r19-positive.cjs`'s accepted precedent — flip `kind` to `cloze` on the renderer's
+    own copy of a real draft and drive the real inspector.
 7. Interrupt a large import, translation, dry run, and live commit; recover without a false success state or an ambiguous partial result.
 8. Undo a draft action, reverse a supported committed action, and clearly explain any adapter operation that cannot be reversed.
 9. Filter and preview the 100,000-note fixture without freezing window dragging or Electron's main event loop.

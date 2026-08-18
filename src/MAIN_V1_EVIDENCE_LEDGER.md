@@ -25085,3 +25085,65 @@ was **`{}` (2 chars)** before this run. Captured, patched, restored, and verifie
 by string comparison rather than by eye; the renderer was then reloaded so the in-memory cache could
 not keep a level the store no longer holds. Note for the next turn: that reload drops the adopted
 draft, so the workbench needs the fixture reopened again.
+
+## 2026-08-18 — Track 7 / gate 6: the card count that was answering a different question (`primary`)
+
+Gate 6's first half — "without confusing fields with generated cards". `setNoteField` rewrites the
+field and **never touches `cardIds`**; the cards are Anki's to make on commit. So the inspector's
+`Cards: N` counts what the note HOLDS while the preview's sibling strip renders what its fields
+GENERATE, and from the first cloze deletion or conditional flip onwards the two silently disagree
+with nothing reconciling them. `noteCardCensus` (`ankiTemplateRender.ts`) answers both and the
+inspector prints the second only when it differs. Commit `c0defb48`, lint follow-up `efeb82f7`.
+
+**The one design decision, and its tradeoff.** `conditional-card-not-generated` is the ONLY render
+problem counted as "no card here" — it is the one code whose documented meaning is that Anki
+generates nothing at that ord. `empty-question` is a card that renders badly, not one that is
+absent, so folding it in would let a broken card quietly lower the count instead of shouting. Its
+negative control asserts exactly that (`empty-question` present, `generated` unchanged at 1).
+
+Second fix in the same slice: the sibling tabs' `!` is `aria-hidden` with no text behind it, so an
+edit that broke a sibling the user was not looking at was announced as **nothing at all**. The
+problem count now reaches the accessible name.
+
+**LIVE, real deck, `debug/gate6-ui-walk.cjs`** — `NO_ENGLISHegg_rollsJLPT_N1N5_v3.apkg`, 10,147
+notes, page of **500 of 500**, note type `eggrolls-JLPT10k-v3`: 2 templates, **both** qfmts gated on
+`Alt1` (`{{^Alt1}}` / `{{#Alt1}}`), so 500 notes carry 500 cards. Entered through the UI's own
+reopen button, no OS dialog, no mouse automation. Each edit is made, read, then put straight back —
+the restore IS the control, and it returned `true` on all three.
+
+| edit | `Cards:` | census line | tabs |
+| --- | --- | --- | --- |
+| — (before) | 1 | **none** | 日-中!, 中-日! |
+| fill `Alt1` | 1 | **"now generate 0 cards, and the note holds 1"** | both, +`conditional…no card here` |
+| fill `Alt2` | 1 | **"now generate 2 cards, and the note holds 1"** | both |
+| empty `VocabAudio` | 1 | none | tab 1 aria `"日-中 — 1 problems"` → **`null`**, flag cleared |
+
+The before-row is the negative control the whole feature needs: a 2-template note type with one
+sibling suppressed shows **no line**, so the line is caused by the edit rather than by having two
+templates. Both directions of the reconciliation fired on real data.
+
+**Not closed, and why.** The gate also names a **cloze** note. The user's library holds **zero**
+cloze note types (`r19-live.cjs`: `not-cloze` on 38,283 of 38,283), so that half cannot be shown on
+any deck they own. It is covered by 6 model cases + the pre-existing `clozeAdded`/`clozeRemoved`
+line; the next turn should close it by `r19-positive.cjs`'s accepted precedent — flip the note
+type's `kind` to `cloze` in the renderer's own copy of a real draft and drive the real inspector.
+Second remainder: the `Default-20260129112153.apkg` walk (Kanji, 80 notes, 160 cards, 22 multi-card
+notes) could not break a sibling at all — both qfmts carry literal text, so no field edit empties a
+question. Honest, and it means that deck cannot demonstrate the aria half.
+
+**Traps.** (1) React delegates `onBlur` to native **`focusout`**; a dispatched `blur` reaches no
+handler and the field silently never commits — a whole walk read as "nothing moved". (2) The
+workbench is inside a `CollapsibleSection` that ships **closed**, so `.deck-workbench` is not in the
+DOM until its header is clicked. (3) A `.deck-workbench-step` button for a reachable step is
+enabled, reports a click, and does **not** advance; `Next` is the control that works, and an early
+Next lands before the adopt settles and is thrown back to step 1 — retry until the grid is up.
+(4) `reopenSession` is hard-coded to offset 0 / 500 notes, so a deck whose multi-template notes sit
+past note 500 (実験, `Basic (optional reversed card)+`) is unreachable in the UI.
+
+**Known nit, not fixed:** the new aria string renders "1 problems". Catalog plurals are not a
+facility this repo has; it is aria-only text.
+
+**Gates, SHARED tree, once after the last slice:** vitest **735 files / 734 passed / 0 failed**,
+1 skipped file, **10,218 passed** / 6 skipped (prev turn 10,210; +8 are exactly this slice's cases);
+i18n exit 0, **10,593** keys (prev 10,590, +3 mine); architecture exit 0 "Nothing new", 5 pending;
+eslint **0 errors** on all five touched TS paths.
