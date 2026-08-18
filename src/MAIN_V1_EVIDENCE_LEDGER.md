@@ -25229,3 +25229,43 @@ instead of rejecting → the cancel test goes red.
 copy holds **0** — a concurrent track reflowed the file. A byte-exact "is my block in the
 worktree" check therefore fails on a block that is plainly there. Compare with terminators
 normalised, stage with HEAD's own. `debug/stage-after-anchor.cjs`.
+
+## 2026-08-18 — Track 7 / gate 6 CLOSES: the cloze half, on a cloze deck that had to be built (`primary`)
+
+Worker `primary`. The previous entry left gate 6 half closed and named the route: the user's
+library holds **zero** cloze note types, so this half cannot be shown on a deck they own.
+
+**Decision: build a real cloze package, don't fake one in the renderer.** The recorded suggestion
+was to flip `kind` to `cloze` on the renderer's in-memory draft (`r19-positive.cjs`'s precedent).
+Rejected — that measures the model, and the gate says *inspector*. Instead
+`debug/gate6-make-cloze.cjs` does what `gate9-make-fixture.cjs` did: transform a REAL ver-11
+package. Clone a real model, set `type: 1` and one `{{cloze:Text}}` template, move **60** real
+notes onto it with their own text wrapped in deletions, rebuild one card per cloze number.
+Proof it is real: the app's own main-process reader answers `Cloze (gate6):cloze:1`.
+
+**LIVE** (`debug/gate6-cloze-walk.cjs`), one note, `Text` = `ab{{c1::st}}ract`, `Cards: 1`
+throughout because `setNoteField` never touches `cardIds`:
+| edit | census | tabs |
+| --- | --- | --- |
+| — (before) | **none** — the control | 0 |
+| add `c2` | "now generate **2** cards, and the note holds 1" | 2 |
+| add `c3` | "now generate **3** cards, and the note holds 1" | 3 |
+| remove every marker | "now generate **0** cards … the rest would go away on commit" | 0 |
+| restore | **none** | 0 |
+
+**The walk found a defect; the fix is in the same commit.** With every marker removed the census
+read `generated: 1` — `cardOrdsOfNote` falls back to `[0]` for a marker-less cloze note — while
+the preview beside it said *"A cloze note type with no cloze marker generates no cards."* The
+inspector claimed a card the preview denied, in the one function that exists to reconcile them.
+`cloze-without-markers` joins `conditional-card-not-generated` in the "generates nothing" set.
+Mutations: drop it → the new case red; fold `empty-question` in → the pre-existing negative
+control ("broken is not absent") red. One each, on the intended case.
+
+**Traps.**
+1. **The Browser cannot find cloze notes by their markers.** It matches **normalized** text and
+   normalization strips cloze syntax, so `c1::` returns **0** rows on a deck of 60 cloze notes.
+   Recorded in the plan; select by note type off the inspector.
+2. **`collection.anki2` in a modern .apkg is a 1-note placeholder** — the real collection is the
+   zstd `collection.anki21b`. Four decks read as "notes=1" before this was spotted; a builder that
+   does not do zstd needs a genuinely legacy package (`Advanced.apkg`, 300 notes, ver 11).
+3. `db.exec` on a missing table **throws**; it does not return null, so `?.[0]` guards nothing.

@@ -609,6 +609,25 @@ describe('noteCardCensus', () => {
     expect(census).toEqual({ existing: 1, generated: 2, differs: true });
   });
 
+  it('counts a cloze note with every marker removed as generating nothing', () => {
+    // Found by the live cloze walk, 2026-08-18. `cardOrdsOfNote` falls back to
+    // `[0]` for a marker-less cloze note, so the census read `generated: 1`
+    // while the preview beside it said the note generates no cards — the
+    // inspector claiming a card the preview denied, in the one function whose
+    // whole job is to reconcile those two numbers.
+    const n = note({
+      id: 'n1',
+      noteTypeId: 'cloze',
+      fields: [field(0, 'Text', 'ねこがすき'), field(1, 'Extra', '')],
+      cardIds: ['c1'],
+    });
+    const draft = censusDraft(n, [card({ id: 'c1', noteId: 'n1' })]);
+    expect(renderNoteCards(draft, n).flatMap((c) => c.problems.map((p) => p.code))).toContain(
+      'cloze-without-markers',
+    );
+    expect(noteCardCensus(draft, n)).toEqual({ existing: 1, generated: 0, differs: true });
+  });
+
   it('keeps a card that renders badly in the count — broken is not absent', () => {
     // NEGATIVE CONTROL for the `conditional-card-not-generated` rule: an empty
     // question with no conditional behind it must NOT lower `generated`, or a

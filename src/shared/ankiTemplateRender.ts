@@ -677,16 +677,29 @@ export interface NoteCardCensus {
  * surface that shows only one of the two numbers is telling the user a card
  * exists that does not, or hiding one that is about to.
  *
- * **`conditional-card-not-generated` is the only render problem counted as "no
- * card here".** It is the one code whose documented meaning is that Anki
- * generates nothing at this ord. `empty-question` is a card that renders badly,
- * not a card that is absent, and the preview already says so in its own words;
- * folding it in here would make a broken card silently lower the count instead.
+ * **Only a problem whose documented meaning is "Anki generates nothing here"
+ * lowers the count**, and there are exactly two. `conditional-card-not-generated`
+ * is one. The other is `cloze-without-markers`, added 2026-08-18 after the live
+ * cloze walk: `cardOrdsOfNote` falls back to `[0]` for a cloze note with no
+ * usable marker, so the census read `generated: 1` while the preview beside it
+ * said *"A cloze note type with no cloze marker generates no cards."* — the
+ * inspector claiming a card the preview denied, which is the precise confusion
+ * this function exists to end.
+ *
+ * `empty-question` is deliberately NOT in that set: it is a card that renders
+ * badly, not a card that is absent, and the preview already says so in its own
+ * words. Folding it in would let a broken card silently lower the count instead
+ * of shouting. That is this function's negative control.
  */
+const NOT_GENERATED: ReadonlySet<AnkiRenderProblemCode> = new Set([
+  'conditional-card-not-generated',
+  'cloze-without-markers',
+]);
+
 export function noteCardCensus(draft: AnkiDraft, note: AnkiDraftNote): NoteCardCensus {
   const existing = note.cardIds.length;
   const generated = renderNoteCards(draft, note).filter(
-    (card) => !card.problems.some((p) => p.code === 'conditional-card-not-generated'),
+    (card) => !card.problems.some((p) => NOT_GENERATED.has(p.code)),
   ).length;
   return { existing, generated, differs: existing !== generated };
 }

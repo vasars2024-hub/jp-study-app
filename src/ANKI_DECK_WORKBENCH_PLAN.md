@@ -461,10 +461,36 @@ This slice is complete only when all of these can be shown with real data and no
     *"now generate 2 cards, and the note holds 1"*; emptying `VocabAudio` took tab 1's accessible
     name from `"日-中 — 1 problems"` to `null`. Every edit was put straight back and every signal
     returned — the restore is the control.
-    **Still open:** the cloze half. The user's library holds **zero** cloze note types
-    (`r19-live.cjs`: `not-cloze` on 38,283 of 38,283), so it cannot be shown on a deck they own;
-    close it by `r19-positive.cjs`'s accepted precedent — flip `kind` to `cloze` on the renderer's
-    own copy of a real draft and drive the real inspector.
+    **The cloze half CLOSES 2026-08-18, and gate 6 with it.** The user's library holds **zero**
+    cloze note types (`r19-live.cjs`: `not-cloze` on 38,283 of 38,283), so it cannot be shown on a
+    deck they own. Answered the way gate 9 answered its 100,000-note fixture — transform a REAL
+    ver-11 package rather than hand-write a schema: `debug/gate6-make-cloze.cjs` clones a real
+    model, sets `type: 1` and one `{{cloze:Text}}` template, and moves **60** real notes onto it
+    with their own text wrapped in deletions, rebuilding one card per cloze number. The app's own
+    main-process reader then reports the note type as `Cloze (gate6):cloze:1` — the fixture is
+    read by the product, not by the probe that built it.
+    **Live, through the real inspector** (`debug/gate6-cloze-walk.cjs`, no OS dialog, no mouse
+    automation), one note, `Text` = `ab{{c1::st}}ract`, `Cards: 1` throughout because
+    `setNoteField` never touches `cardIds`:
+    | edit | census | preview tabs |
+    | --- | --- | --- |
+    | — (before) | **none** — the control | 0 |
+    | add `c2` | "now generate **2** cards, and the note holds 1" | 2 · Cloze 1, Cloze 2 |
+    | add `c3` | "now generate **3** cards, and the note holds 1" | 3 |
+    | remove every marker | "now generate **0** cards … the rest would go away on commit" | 0 |
+    | restore | **none** | 0 |
+    The restore is the control: a signal that does not come back was never caused by the edit.
+    **The walk found a real defect and the fix is in its own commit.** With every marker removed
+    the census read `generated: 1` — `cardOrdsOfNote` falls back to `[0]` for a marker-less cloze
+    note — while the preview beside it said *"A cloze note type with no cloze marker generates no
+    cards."* The inspector claimed a card the preview denied, inside the one function whose job is
+    reconciling those two. `cloze-without-markers` now joins `conditional-card-not-generated` as a
+    code meaning "Anki generates nothing here"; `empty-question` still does not, and that remains
+    the negative control (folding it in fails "broken is not absent").
+    **Finding, not fixed, recorded so it is not rediscovered:** the Browser matches **normalized**
+    field text, and normalization strips cloze syntax — `ab{{c1::st}}ract` normalizes to
+    `abstract`, so searching `c1::` matches **0** notes. There is no way to find cloze notes by
+    their markers from the search box. The walk selects by note type off the inspector instead.
 7. Interrupt a large import, translation, dry run, and live commit; recover without a false success state or an ambiguous partial result.
 8. Undo a draft action, reverse a supported committed action, and clearly explain any adapter operation that cannot be reversed.
 9. Filter and preview the 100,000-note fixture without freezing window dragging or Electron's main event loop.
