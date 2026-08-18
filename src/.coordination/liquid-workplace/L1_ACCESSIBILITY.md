@@ -339,3 +339,50 @@ modest gap — `--muted` `#5f5f66` on the title bar at **3.28:1**, not the 1.49:
 recorded; fixing it means moving a shell chrome token, which is wider than the Dictionary.
 `dict-reading` x3 + `dict-ex-btn` x1 at 1.92:1 remain the `var(--accent-2)`-as-text decision.
 `fwin-title-text` was never a defect.
+
+## 2026-08-18 — `--accent-text`, and why one accent is not a measurement (`27e8e313`)
+
+The `var(--accent-2)`-as-text decision left open above is settled. `--accent-2` is the accent
+mixed 28% toward WHITE (`osPersonalization.ts:226`): a highlight recipe, right on a dark panel,
+wrong by construction for a glyph on a light one. Nine rules painted it — `.dict-reading`,
+`.dict-ex-btn`, `.dict-anki-icon`, `.cs-tag`, `.novel-link-article a`, `.gram-gloss`,
+`.flash-reading`, `.flash-row-reading`, `.flash-strip-reading`.
+
+**Decision:** a NEW token, `--accent-text`. It can live in the stylesheet precisely because it
+is new — personalization writes `--accent`/`--accent-2` INLINE on `<html>`, so a light palette
+can never fix `--accent-2` itself (that is the note at `styles.css:41`, and slice 77 already
+proved it the expensive way). Dark keeps `var(--accent-2)` verbatim; the six light palettes get
+one grouped override, placed after all six blocks because the specificity is identical and
+source order decides. Tradeoff: 30% accent is visibly muted next to the raw accent — that is the
+cost of legibility on a near-white panel, and the alternative (six per-palette shares) puts the
+same number in six places to be fixed five times.
+
+**30, not 40.** The first solver measured whichever accent was selected and returned 40.
+`--accent` is user-chosen (nine presets, `osPersonalization.ts:39`, plus a free `customAccent`
+at `:201`), so a share tuned to one hue is not a measurement. Swept 9 presets x 6 light
+palettes: **40 fails on amber** (soft-sepia 3.94, rose-pine 3.88); 35 fails on the same two; 30
+is the largest share with **0 of 54** failing. Tightest cells: amber/rose-pine **4.52**,
+amber/soft-sepia **4.58**. A pure-white `customAccent` is NOT rescued (3.26 on soft-sepia) and
+no fixed share can rescue it; the presets are the contract.
+
+**Live:** Dictionary on classic-light **9 failing -> 5**, all four `--accent-2` runs gone. The
+5 left are `.fwin-b` chrome at **3.06-3.28** — a title-bar token, still not Dictionary's.
+All nine rules mounted and measured on all nine palettes: **81 of 81 cells, 0 refused, 0
+failing** (`probes/l1-accent-text-rules.js`).
+
+**Controls, red:** status quo `var(--accent-2)`-as-text fails **54 of 54** light cells and
+passes **27 of 27** dark ones — the asymmetry is what says the instrument discriminates. Inert
+mix at share 100 fails 54 of 54. `accentTextToken.test.ts` goes red on both mutations: dropping
+`paper` from the override list reports `["paper"]`, reverting `.dict-reading` names the rule.
+
+**A control that was WRONG, recorded rather than dropped:** `#ffffff` as the accent was meant to
+be the thing the fix cannot rescue. At share 30 it scores 5.54 on classic-light and passes,
+because 30% white + 70% `#1e1e1e` is `#626262`. The recipe was working; the control was badly
+chosen. Replaced with the status quo.
+
+**TRAP, and it nearly went in the ledger as a pass.** `l1-accent-text-rules.js` first reported
+"0 failing" on all six light palettes having measured NOTHING. `color-mix` computes to
+`color(srgb r g b)`; that probe's parser only handled `rgb()`; every row refused; and `failing`
+counts `pass === false`, which a refused row does not have. The only tell was `min`, because
+`Infinity` serialises to `null`. Any probe here that reports a count of failures must also
+report a count of MEASURED rows.
