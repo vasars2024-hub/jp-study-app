@@ -217,3 +217,47 @@ Contrast, keyboard and reduced motion pass on both. **The 32 px hit-target bar f
 Dictionary 45 of 54, Media 19 of 31 — with the fix deliberately deferred to L4 as a hit-area
 change rather than a visual one. Plus the one-palette limit above. `LIQUID_SCORECARD.md` stays
 empty: two scored categories out of eight is still not a scorecard.
+
+## 2026-08-18 — 32 of the 52 failures were never the Dictionary's, and never Liquid's
+
+The previous entry blamed "hardcoded dark-theme colours in the Dictionary's own rules —
+`dict-word` x8, `li` x14, `sr-only` x4". **Wrong: none of those rules declares a colour.**
+Walking each failing node out to the element carrying its computed colour lands on `body`
+every time, and `body` is painted by **`theme/blanc.css`**, which `main.tsx:78` imports —
+after `styles.css`. Its baseline was an unqualified `body { color: var(--blanc-text,#f5f5f7) }`,
+and `--blanc-text` is declared on `.blanc-root`, a **descendant** of body, so at body it is
+never set and the dark fallback wins the tie against `styles.css`'s `var(--text)`.
+
+Proof, not inference: `--blanc-text: rgb(1,2,3)` on `<html>` moved `body`'s computed colour to
+`rgb(1,2,3)`; `--text: rgb(7,8,9)` moved it **not at all**. Same for `--blanc-bg` vs `--bg`.
+
+**Fix:** scope the baseline to `html.blanc-shell`, stamped in `blanc.html` /
+`blanc-harness.html` — the two documents that boot `blancMain` — not by JS, which would leave
+the Blanc window one frame unpainted. Rejected: fallback `var(--text)`, which fixes Study OS
+but silently retunes Blanc's own baseline to the shared palette.
+
+Re-measured here, same 8-result 食べる Liquid window, 169 runs, 0 unmeasurable:
+
+| palette | min | failing | inside a Liquid region |
+| --- | --- | --- | --- |
+| forest-night | 4.92:1 | 0 (was 0) | 0 |
+| classic-light | 1.39:1 | **20 (was 52)** | **0 (was 3)** |
+| high-contrast | 6.12:1 | 0 (was 0) | 0 |
+
+**Liquid now contributes zero contrast failures on any palette** — the 3 that were inside one
+were lens-picker buttons inheriting body.
+
+**Controls, both red.** Instrument: the structural check finds 3 bare root selectors in
+`styles.css`, 1 in `blanc.css` with the fix reverted in memory, 0 at HEAD. Product: the Blanc
+window opened live measures body `rgb(245,245,247)` on `rgb(28,28,30)` — **byte-identical to
+pre-fix**. Study OS now tracks the palette (`#1e1e1e` on white; yellow on black). `html`
+geometry and `--app-zoom` unchanged, as predicted: that rule declares no paint.
+
+**Trap.** `document.styleSheets` here enumerates 51 sheets but only **296** rules and finds
+*zero* `body`-color rules — it cannot see the Vite-served CSS. Never conclude "no rule sets
+this" from a stylesheet walk; set the suspected var and watch the computed value move.
+
+**Remaining 20, next slice:** `dict-badge.freq` x6 + `dict-freq-source` x3 + `.common` x1 are
+truly hardcoded at `styles.css:4761-4772`; `dict-reading` x3 + `dict-ex-btn` x1 paint
+`var(--accent-2)` as text on white; the last 6 are `.fwin` chrome. `styles.css` is dirty —
+HEAD+edit blob.
