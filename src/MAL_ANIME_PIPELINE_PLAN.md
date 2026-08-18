@@ -2065,3 +2065,55 @@ on the next acquisition, which is the designed path — do not reach for the use
 
 Driver: `debug/g31n-ceiling.cjs` (untracked, like all of `debug/`). It takes **row 0 of the
 product's own ranking** and does not re-sort by size the way `g31n-routeb.cjs acquire` does.
+
+## 2026-08-18 — the 39 episodes are a Chinese release too, and a stall was all-or-nothing
+
+Worker `primary`. Commits `b790f175`, `90d1a2d8`. Two defects, both in the shape this plan exists
+to catch: a run that reports success while being wrong.
+
+**1. The Route B pack is DUAL-LANGUAGE, and the harvest would have mined both halves.** The
+release acquired on 2026-08-18 is tagged `简繁外挂字幕` and its files are named `.tc_jp.ass` — one
+file per episode carrying **two whole subtitle tracks**. Episode 01: **413 `JOJO5_textjp` lines
+(3,945 kana) and 413 `JOJO5_textch` lines (0 kana, 3,839 Han)**, the same lines twice. Nothing above
+the parser could see it: the name passes, `looksJapaneseSubtitle` passes because the Japanese half
+is right there, and it parses cleanly. Across 39 files, **26,412 Dialogue lines carry Han and no
+kana**.
+
+**The cue count in the previous entry was also measuring the wrong thing.** 667,719 was raw
+`Dialogue:` lines; **parsed is 667,453**, and **97.0% of those carry no kana at all**. The real
+breakdown: `JOJO5-op1-ch-2` **348,994 cues / 0 kana**, `JOJO5-op1-jp-2` **274,628 / 826** (romaji
+karaoke), `JOJO5_textch` **11,602 / 38**, `JOJO5_textjp` **11,168 / 11,049**. The study text is
+**11,168 cues**, not 667,453.
+
+`keepJapaneseStyleCues` (`shared/subtitleCues.ts`) judges each ASS style by the script its own text
+uses — the per-file `looksJapaneseSubtitle` policy one grain finer. **Majority-kana, not any-kana:**
+any-kana keeps all 274,628 romaji-karaoke cues, because 826 of them have a stray character. **Never
+by name:** `textjp`/`textch` is a lucky pair, `Style1`/`Style2` is the case a name rule fails
+silently. Applied in the panel's `analyse`, which both providers share.
+
+**MEASURED through the shipped code over all 39 real files** (`debug/g31-style-filter-real.cjs`,
+esbuild over `src/`, not a reimplementation): **667,453 cues → 18,959 (2.8% kept)** while **kana
+goes 178,801 → 177,807 (99.4% kept)**. A 35x reduction costing 0.6% of the study text. `JOJO5_textch`
+is dropped from all 39 episodes. **LIVE in the running renderer** via `/eval` over the app's own
+module graph: 144 parsed → 50 kept / 94 dropped, `JOJO5_textch` + `JOJO5-op1-ch-2` gone, only
+`JOJO5_textjp` kept. Mutations: threshold 0.5 → 0.001 = 1 red; the all-styles-failed guard removed
+= 1 red ("expected [] to have a length of 40").
+
+**2. A stalled acquisition threw away the episodes that HAD landed** (`b790f175`). `acquireAll`
+returned on `!done.ok` and the whole files already on disk went with it — that is what the
+2026-08-17 **3 of 39** actually cost. `qbitAwaitFiles` now returns `partial` alongside the refusal;
+`acquireAll` reads **only the whole files** (a half-transferred `.ass` parses fine, which is the
+trap) and returns `ok` with a `notice`. Nothing complete is still an outright refusal; a language
+mismatch still outranks the stall reason. The other half: `SubtitleHarvestPanel` **discarded**
+`reply.message` on the ok path, so a partial season looked identical to a whole one. 3 mutations,
+1–3 red each.
+
+**GATE 31 STILL NOT CLOSED**, and this narrows what is left rather than closing it: the render leg
+is untouched, and Route A's Japanese-cue status is unchanged. What this does settle is that Route
+B's 39 episodes are **usable but not clean**, and the earlier "181,790 kana" figure survives
+(177,807 of it is in the Japanese track).
+
+**Trap for the next worker.** The style filter is on the MINING path only. The **player/fusion**
+path (`subtitleFusionCore.ts` reads `cue.style` for songs and signs) has no language notion at all,
+so the render leg will show the Chinese track unless it gets the same treatment — decide that
+deliberately when gate 31's render half runs; do not assume it is covered.
