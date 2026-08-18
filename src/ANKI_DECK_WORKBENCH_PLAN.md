@@ -493,8 +493,7 @@ This slice is complete only when all of these can be shown with real data and no
     their markers from the search box. The walk selects by note type off the inspector instead.
 7. Interrupt a large import, translation, dry run, and live commit; recover without a false success state or an ambiguous partial result.
 
-    **Three of four quarters closed; the gate stays OPEN on the dry run.** Import closed
-    with `d0a09738` (a
+    **CLOSED 2026-08-18 — all four quarters.** Import closed with `d0a09738` (a
     real user cancel on the .apkg read, proven live). Translation is gate 2's, already
     measured: **30 requested → 12 answered, 18 cancelled, 0 failed** — the spend stopped and
     the paid-for work survived.
@@ -528,12 +527,42 @@ This slice is complete only when all of these can be shown with real data and no
     - **The token's own negative control:** cancelling an id that never ran, and the same
       id again after the commit had settled, both answered **`false`**.
 
-    **Owed before this gate can close:**
-    1. **The dry-run quarter, which is larger than it looks.** `planChangeTray` is a
-       *synchronous* `useMemo` (`DeckWorkbenchTray.tsx:511`), so there is no moment at which
-       a cancel could be observed. A `shouldStop` predicate on its own would be an invisible
-       module: it needs the async chunked driver first, and that changes the tray's render
-       model. Do not half-build it.
+    **The dry-run quarter CLOSED 2026-08-18, and the answer is a measurement rather than a
+    control.** First a correction to the previous entry: the dry run is **step 6's**
+    `buildWorkbenchReview` (`DeckWorkbench.tsx:450`), not `planChangeTray` — the plan's own
+    step list calls step 6 "a complete dry run". Both were timed at the largest fixture this
+    plan declares (gate 9's 100,000 notes, three ops per note = 300,000 journal ops), in Node
+    and again **live in the running renderer's own module graph** over the dev server:
+
+    | | 8,000 | 30,000 | 100,000 | 100,000 live |
+    | --- | --- | --- | --- | --- |
+    | `planChangeTray` | 119 ms | 310 ms | 937 ms | **898 ms** |
+    | `buildWorkbenchReview` | 30 ms | 113 ms | 530 ms | **367 ms** |
+
+    Linear in both, and the dry run finishes in **367 ms** on the biggest deck the product
+    claims to handle. **Decision: no interrupt control, for three reasons and the third is
+    the load-bearing one.** (1) A stop button cannot be reached inside 367 ms, so it would be
+    a control with nothing to stop. (2) There is no partial state to recover: the summary is
+    a pure recompute from draft + journal, so it either exists or it does not — the ambiguous
+    partial this gate forbids has no way to occur. (3) Interrupting it requires making it
+    async, and an async summary can be **a render behind the draft it describes** — which is
+    precisely the false-success state gate 7 exists to prevent, and is why
+    `DeckWorkbench.tsx:446` says the review "must never describe a draft other than the one
+    on screen". Building the driver would have *created* the defect. That anti-stale property
+    is pinned by `deckWorkbench.test.tsx:487`, where an undo run from step 6 restates the
+    sentence to `review.empty`.
+
+    The closure rests on a number, so the number now has a guard:
+    `shared/__tests__/ankiWorkbenchReviewScale.test.ts` folds 300,000 ops at 100k notes under
+    a loose 6,000 ms budget (measured 650 ms), asserts the net is every note once and the
+    diff list is capped at 50 while `totalDiffs` stays complete at 300,000. Mutation:
+    `BUDGET_MS = 1` → red "expected 649.6212 to be less than 1"; `totalDiffs` as `SIZE × 2`
+    → red. Honest limit: synthetic two-field notes: a deck of large HTML fields is slower per
+    note, though still linear — if a real deck ever pushes the dry run past a couple of
+    seconds this decision is the thing to revisit, and the scale test is where it fails first.
+
+    **GATE 7 IS CLOSED** — all four interrupts: import `d0a09738`, translation gate 2's
+    30/12/18/0, live commit above, dry run by measurement.
 8. Undo a draft action, reverse a supported committed action, and clearly explain any adapter operation that cannot be reversed.
 9. Filter and preview the 100,000-note fixture without freezing window dragging or Electron's main event loop.
 

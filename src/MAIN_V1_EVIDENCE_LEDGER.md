@@ -25356,3 +25356,40 @@ unchanged: `planChangeTray` is a synchronous `useMemo` (`DeckWorkbenchTray.tsx:5
 no moment at which a cancel could be observed — it needs the async chunked driver FIRST.
 
 Docs only, no product change: `src/ANKI_DECK_WORKBENCH_PLAN.md` gate 7 + this entry.
+
+## 2026-08-18 — Track 7 / gate 7 CLOSES: the dry run had nothing to interrupt (`primary`)
+
+Worker `primary`, same turn as the live-cancel entry above. **Correction first:** the previous
+entry named `planChangeTray` as the dry run. It is not — the plan's own step list calls step 6
+"a complete dry run", and step 6 is `buildWorkbenchReview` (`DeckWorkbench.tsx:450`). Both were
+measured anyway, so the correction costs nothing.
+
+100,000 notes (gate 9's declared largest), 3 ops per note = 300,000 journal ops. Node, then
+**live in the running renderer's own module graph** (`import('/src/shared/…')` over the dev
+server, so it is the app's copy of the module and V8, not a test runner's):
+
+| | 8,000 | 30,000 | 100,000 | 100,000 LIVE |
+| --- | --- | --- | --- | --- |
+| `planChangeTray` | 119 ms | 310 ms | 937 ms | **898 ms** |
+| `buildWorkbenchReview` | 30 ms | 113 ms | 530 ms | **367 ms** |
+
+**Decision: no interrupt control on the dry run, and the third reason is the load-bearing
+one.** (1) 367 ms is shorter than reaching for a stop button. (2) No partial state exists to
+recover — the summary is a pure recompute from draft + journal. (3) Interrupting it means
+making it async, and an async summary can be **a render behind the draft it describes** — the
+exact false-success gate 7 forbids, and the reason `DeckWorkbench.tsx:446` says the review
+"must never describe a draft other than the one on screen". Building the driver the previous
+entry called for would have *created* the defect it was meant to close. Tradeoff accepted: if
+a real deck of heavy HTML fields ever pushes this past a couple of seconds, this is the
+decision to revisit.
+
+The closure rests on a number, so the number is now guarded rather than asserted in prose:
+`shared/__tests__/ankiWorkbenchReviewScale.test.ts` (new) times the fold under a loose 6,000 ms
+budget and checks the net is every note once, `diffs` caps at 50, `totalDiffs` stays complete at
+300,000. Mutations: `BUDGET_MS = 1` → red "expected 649.6212 to be less than 1"; `totalDiffs`
+as `SIZE × 2` → red "expected 300000 to be 200000" (that one was a real finding — the tag
+change is a net value change of its own, so it is 3 per note, not 2).
+
+**GATE 7 IS CLOSED.** Import `d0a09738`; translation 30 requested → 12 answered / 18 cancelled
+/ 0 failed; live commit 9 written / 71 unwritten with the control at 80/80; dry run by
+measurement. Commit: this entry + the plan + the scale test.
