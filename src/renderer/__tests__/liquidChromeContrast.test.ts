@@ -96,7 +96,7 @@ describe('Liquid window chrome contrast', () => {
       /\.fwin-b-liquid\.is-liquid\s*\{[^}]*background:\s*color-mix\(in srgb,\s*var\(--accent\)\s*(\d+)%/,
     );
     expect(m, 'the pressed fill is no longer a measurable accent mix').not.toBeNull();
-    const pct = Number(m![1]);
+    const pct = m ? Number(m[1]) : Number.NaN;
     // The fill IS this glyph's background. 24% put it back under the bar at 4.07:1; the sweep
     // found 16 the largest share holding >= 4.5:1 on all thirteen palettes (18 -> soft-sepia 4.46).
     expect(pct, `pressed fill ${pct}% — above 16% the glyph drops under 4.5:1`).toBeLessThanOrEqual(16);
