@@ -591,8 +591,9 @@ describe('noteCardCensus', () => {
       cardIds: ['c1'],
     });
     const draft = censusDraft(n, [card({ id: 'c1', noteId: 'n1' })]);
-    expect(renderNoteCards(draft, n)[1]!.problems.map((p) => p.code)).toEqual([
-      'conditional-card-not-generated',
+    expect(renderNoteCards(draft, n).map((c) => c.problems.map((p) => p.code))).toEqual([
+      [],
+      ['conditional-card-not-generated'],
     ]);
     expect(noteCardCensus(draft, n)).toEqual({ existing: 1, generated: 1, differs: false });
   });
@@ -618,7 +619,9 @@ describe('noteCardCensus', () => {
       cardIds: ['c1'],
     });
     const draft = censusDraft(n, [card({ id: 'c1', noteId: 'n1' })]);
-    expect(renderNoteCards(draft, n)[0]!.problems.map((p) => p.code)).toContain('empty-question');
+    expect(renderNoteCards(draft, n).flatMap((c) => c.problems.map((p) => p.code))).toContain(
+      'empty-question',
+    );
     expect(noteCardCensus(draft, n)).toEqual({ existing: 1, generated: 1, differs: false });
   });
 });
