@@ -340,7 +340,7 @@ This slice is complete only when all of these can be shown with real data and no
 
 1. Import a representative APKG, inspect every preserved/unsupported feature, swap front/back, export a new package, reimport it, and match the approved diff.
 
-    **Rendered-template half BUILT 2026-08-18, gate NOT closed.** The swap had no route to a
+    **Rendered-template half BUILT 2026-08-18; gate CLOSED 2026-08-18 by the walk below.** The swap had no route to a
     destination: `template-format` existed as a journal op but `buildApkgExportChanges` had no
     branch for it, so it was a preview no package could ship — gate 13's defect one op later.
     Now a full ladder: `ApkgExportTemplateFormat` (its own list, never a degenerate add, which
@@ -348,10 +348,36 @@ This slice is complete only when all of these can be shown with real data and no
     ord-mapped fold, the package writer on both storage schemas via the new byte-preserving
     `replaceTemplateFormats`, a named live refusal, a parity row, and the reversal. 16 cases in
     `shared/__tests__/ankiTemplateFormat.test.ts`, mutation control 3 red.
-    **What the gate still wants:** the LIVE walk — import a representative APKG, swap, export,
-    reimport, match the diff — and the note-field variant beside this rendered-template one.
-    Trap for that walk: `applyTemplateRemoval` only drops DUPLICATE templates (`not-duplicate`
-    skip otherwise), so a fixture built from distinct renders removes nothing silently.
+    **Closed 2026-08-18 by the live walk** (`58eab694` the defect it found, `debug/g1-walk.js`).
+    Fixture `Default-20260129112153.apkg`, chosen for what it can disprove: **80 notes / 160 cards**,
+    note type `Kanji` with **TWO** templates so ord 1 is a control, and `bqfmt` = `{{Kanji}}` on ord 0,
+    which a re-encode would silently delete. Parity inventory first: **18 rows, 11 supported,
+    7 read-only, 0 blocked** for `package`; `template-format` is `supported`/`blocked` (package/connect).
+    Both swap variants in one change set — 3 notes with fields 0↔1 (6 `field` ops) and the rendered
+    template (1 `template-format` op). Export: **3 notes, 1 template formatted, verified**. Reimport
+    through the same reader: notes swapped **3 / 3**, other fields and tags untouched on 3 of 3, the
+    new qfmt/afmt both present, `bqfmt` `{{Kanji}}` still there, `bafmt` and deck override preserved,
+    control template **byte-identical**, css (3,725 chars) / fields / `sortf` / latexPre / latexPost
+    unchanged, and 80 notes / 160 cards in and out. The rendered diff survives the package boundary:
+    the control note's card FRONT goes from `Kanji: 強硬 Hint:` to the whole meanings/readings answer,
+    and the re-read package renders identically to the pre-export draft.
+    Controls, all of which had to fail and did: a qfmt with no `{{` is refused `empty-question-format`;
+    a wrong fingerprint is refused `source-changed`; the control note is byte-identical through the
+    whole walk; and each half was rendered through the OTHER's untouched half, so neither edit is
+    proving the other.
+    **The walk found a real defect, which is why it was worth running.** The first run reported
+    `ok: true, verified: true` while `templates.config` came back byte-identical (sha1 `80d6a614…`
+    both sides) — `verifyExportChanges` had no `templateFormats` branch at all, so a swap that never
+    reached the package verified clean on the note rows beside it. Fixed in `58eab694` with the
+    remove half's count check, `ApkgExportResult.templatesFormatted` (a swap-only export reported
+    "0 notes and 0 cards"), 9 cases in `apkgExportCore.test.ts` — which had **zero** occurrences of
+    `templateFormats` before — and a 2-red mutation control.
+    **Trap, and it cost 40 minutes here:** main does NOT hot-reload. The first run's miss was a main
+    process started 2h22m before the writer was written; the renderer had the new fold, main ignored
+    the key. Restart before measuring anything main-process, and `node debug/g1-dump.cjs <apkg>` tells
+    a write that never happened from one the reader cannot see.
+    Trap: `applyTemplateRemoval` only drops DUPLICATE templates (`not-duplicate` skip otherwise), so
+    a fixture built from distinct renders removes nothing silently.
 2. Translate a Back field to Russian or Japanese into a selected destination field, preview individual diffs and provider implications, cancel safely, then apply and verify.
 
     **Closed 2026-08-16** (`c30a020`, `16c8990`, `fb54fff`). `shared/ankiTranslate.ts` is the request
