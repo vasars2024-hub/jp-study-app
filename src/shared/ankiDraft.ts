@@ -1016,7 +1016,22 @@ export interface ApkgDraftRequest {
   sessionId?: string;
   noteOffset?: number;
   noteLimit?: number;
+  /**
+   * Opaque token the caller mints so it can abandon this read, named again by
+   * `apkg:cancelDraftRead`. Optional because the read is cancellable, not
+   * required to be cancelled: a caller with no control to offer omits it and
+   * gets the pre-existing behaviour.
+   */
+  readId?: string;
 }
+
+/**
+ * A read the caller abandoned. Lives on the shared contract rather than beside
+ * the reader because both sides have to recognise it: main returns it as the
+ * `error`, and the renderer has to tell it apart from a genuine failure so a
+ * read the user stopped on purpose is not reported back to them as a fault.
+ */
+export const APKG_READ_CANCELLED = 'apkg-read-cancelled';
 
 export interface ApkgDraftResult {
   ok: boolean;
@@ -1051,6 +1066,15 @@ export interface ApkgReadWorkerIn {
  * is bounded by `noteLimit` however large the deck is.
  */
 export type ApkgReadWorkerOut =
+  | {
+      /**
+       * The worker has the request in hand and the parse has begun. Sent before
+       * any parsing so the host can tell "the child never came alive" from "this
+       * deck is large" — those need opposite responses (parse it here vs. wait),
+       * and a wall-clock deadline over the whole parse cannot tell them apart.
+       */
+      phase: 'accepted';
+    }
   | {
       ok: true;
       page: AnkiDraft;

@@ -228,3 +228,109 @@ describe('the .apkg read host answers for each way a worker can end', () => {
     expect(fallbackCalls.requests).toEqual([REQUEST]);
   });
 });
+
+/**
+ * Boss audit 2026-08-18, Finding 3: a child that hangs rather than exits left the
+ * promise unsettled forever — the workbench permanently busy, with no control to
+ * get out of it. Two answers, deliberately different in kind.
+ */
+describe('a read that never ends', () => {
+  let child: FakeChild;
+
+  beforeEach(() => {
+    child = makeChild();
+    registry.next = () => child;
+    registry.forkArgs = [];
+    registry.children = [];
+    fallbackCalls.requests = [];
+    fallbackCalls.reject = null;
+  });
+
+  it('parses in-process when the child never acknowledges the request', async () => {
+    vi.useFakeTimers();
+    try {
+      const promise = parseApkgDraftPageOffMainLoop(REQUEST, { startupTimeoutMs: 5_000 });
+      // Neither `message` nor `exit`: the one ending the exit handler cannot see.
+      await vi.advanceTimersByTimeAsync(5_000);
+      const parsed = await promise;
+
+      expect(fallbackCalls.requests).toEqual([REQUEST]);
+      expect(parsed.fingerprint).toBe('sha1:fallback');
+      // The silent child is killed rather than left holding a file handle.
+      expect(child.killed).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('lets a deck parse for far longer than the startup budget once the worker acks', async () => {
+    vi.useFakeTimers();
+    try {
+      const promise = parseApkgDraftPageOffMainLoop(REQUEST, { startupTimeoutMs: 5_000 });
+      // The ack is not an answer. This is the negative control for the case
+      // above: without it a 100,000-note deck — measured at 6.2 s — would be
+      // abandoned mid-parse and re-read on the main loop, which is the exact
+      // freeze the utility process exists to prevent.
+      child.emit('message', { phase: 'accepted' });
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(fallbackCalls.requests).toEqual([]);
+
+      child.emit('message', OK_MESSAGE);
+      const parsed = await promise;
+      expect(parsed.totalNotes).toBe(100_000);
+      expect(fallbackCalls.requests).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stops on a cancel, and does not move the work to the main loop instead', async () => {
+    const controller = new AbortController();
+    const promise = parseApkgDraftPageOffMainLoop(REQUEST, { signal: controller.signal });
+    child.emit('message', { phase: 'accepted' });
+    controller.abort();
+
+    await expect(promise).rejects.toThrow('apkg-read-cancelled');
+    // The whole point of the cancel: the user asked for the read to END, not to
+    // move somewhere it holds the UI thread for the same six seconds.
+    expect(fallbackCalls.requests).toEqual([]);
+    expect(child.killed).toBe(1);
+  });
+
+  it('forks nothing at all for a read that was cancelled before it started', async () => {
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(parseApkgDraftPageOffMainLoop(REQUEST, { signal: controller.signal })).rejects.toThrow(
+      'apkg-read-cancelled',
+    );
+    expect(registry.forkArgs).toEqual([]);
+    expect(fallbackCalls.requests).toEqual([]);
+  });
+
+  it('refuses the result of an in-process fallback the user cancelled while it ran', async () => {
+    const controller = new AbortController();
+    registry.next = null; // fork throws: straight onto the uninterruptible path
+    const promise = parseApkgDraftPageOffMainLoop(REQUEST, { signal: controller.signal });
+    // The parse cannot be stopped — it owns this loop — but its result can be
+    // refused, so no draft, session or remembered source comes out of a read the
+    // user abandoned.
+    controller.abort();
+
+    await expect(promise).rejects.toThrow('apkg-read-cancelled');
+    expect(fallbackCalls.requests).toEqual([REQUEST]);
+  });
+
+  it('leaves a cancel after the answer alone', async () => {
+    const controller = new AbortController();
+    const promise = parseApkgDraftPageOffMainLoop(REQUEST, { signal: controller.signal });
+    child.emit('message', OK_MESSAGE);
+    const parsed = await promise;
+    // A button pressed a moment too late must not retract a deck already open.
+    controller.abort();
+    await Promise.resolve();
+
+    expect(parsed.totalNotes).toBe(100_000);
+    expect(child.killed).toBe(1);
+  });
+});

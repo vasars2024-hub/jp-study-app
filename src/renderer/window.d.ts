@@ -496,6 +496,8 @@ declare global {
       readApkgDraft(
         request?: import('../shared/ankiDraft').ApkgDraftRequest,
       ): Promise<import('../shared/ankiDraft').ApkgDraftResult>;
+      /** Abandon the in-flight package read started with this `readId`. */
+      cancelApkgDraftRead(readId: string): Promise<boolean>;
       exportApkgDraft(
         request: import('../shared/ankiApkgExport').ApkgExportRequest,
       ): Promise<import('../shared/ankiApkgExport').ApkgExportResult>;

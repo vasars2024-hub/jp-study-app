@@ -66,6 +66,10 @@ if (port) {
       send(port, { ok: false, error: 'apkg-read-bad-request' });
       return;
     }
+    // Answer first, parse second. This ack is the only thing that distinguishes
+    // a child that never came alive from a deck that is simply enormous, and it
+    // has to leave before `parseApkgDraftPage` takes this loop for six seconds.
+    send(port, { phase: 'accepted' });
     void handle(port, request);
   });
   port.start?.();

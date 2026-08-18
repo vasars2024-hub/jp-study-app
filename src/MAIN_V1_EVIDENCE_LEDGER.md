@@ -25179,3 +25179,53 @@ page.notes.length`), which left the full HEAD suite at its identical 3 known fai
 
 **Trap.** The previous handoff's "Finding 1" was a *different* audit's finding (the i18n red at
 committed HEAD). Read the audit's **last** section, not the handoff's summary of it.
+
+## 2026-08-18 — boss audit Finding 3: the read that could not be stopped (`primary`)
+
+Worker `primary`. Finding 3 was the last unaddressed item in the 03:51 audit (4 is cosmetic).
+It is also a CLAUDE.md invariant — "every enable flow needs a disable path" — and the enable
+flow here had none: a worker that **hangs** rather than exits left the promise unsettled, the
+workbench busy forever, and no control to leave.
+
+**The decision, and why not the obvious one.** A wall-clock deadline over the whole parse is
+wrong here and would have been a regression. It is a guess about deck size — the 100k fixture
+legitimately reads 4.6 s — and expiring it re-parses on the main loop, i.e. re-creates the exact
+freeze gate 9 closed. What CAN be bounded honestly is **startup**: the worker now acks
+`{phase:'accepted'}` before parsing, so `fork + module load` has a 10 s budget and the parse has
+none. The residual — a child alive and looping — is answered by a **cancel**, not a timer.
+Tradeoff accepted: a machine that takes >10 s merely to load the worker module gets one wasted
+in-process read. Nothing observed comes near it.
+
+**A cancel does not fall back.** Every other no-answer path degrades to the in-process parse;
+cancel rejects. The user asked for the read to END, not to move somewhere it holds the UI thread
+for the same six seconds. The in-process parse itself cannot be interrupted, so a cancel landing
+during one refuses its **result** — no draft, no session, no remembered source.
+
+**Ladder:** `ApkgDraftRequest.readId` + `APKG_READ_CANCELLED` (shared) → `AbortController`
+registry + `apkg:cancelDraftRead` (`apkgImport.ts`) → preload → `window.d.ts` → a "Stop reading"
+button on the source rail, outside the `role="status"` region, 4 catalogs. Registered **before**
+the file dialog, so the whole visible wait is cancellable.
+
+**LIVE, restarted app** (pid 40444; main does not hot-reload), `gate9-100k.apkg`:
+| run | result | ms |
+| --- | --- | --- |
+| control, no cancel | ok, **100,000** notes | 4,798 |
+| cancel at 1,500 ms | `apkg-read-cancelled`, cancel answered **true** | 2,264 |
+| cancel an unowned token | answered **false** | — |
+| control, real worker | ok, 100,000 | 4,633 |
+| **worker replaced by one that loads and never answers** | ok, **100,000** | **16,921** |
+| restored | ok, 100,000 | 4,731 |
+The control is what makes the refusal mean something: the same call, same deck, no cancel, opens
+fine. The hang row never returned at all before this slice. 16,921 ≈ 10 s watchdog + a 6.9 s
+main-loop parse — slower than the worker's 4.6 s, as an in-process fallback should be.
+`debug/apkg-cancel-probe.cjs`, `debug/apkg-hang-probe.cjs`.
+
+**Mutations, one red each, all on the intended case.** Watchdog never fires → the ack test hangs
+to its 20 s timeout, which *is* the reported defect. Ack no longer disarms → the negative control
+("a long parse survives the budget") goes red, so the ack is load-bearing. Cancel falls back
+instead of rejecting → the cancel test goes red.
+
+**Trap for the next reconstruction.** `HEAD:src/preload.ts` holds **42** CRLF lines; the worktree
+copy holds **0** — a concurrent track reflowed the file. A byte-exact "is my block in the
+worktree" check therefore fails on a block that is plainly there. Compare with terminators
+normalised, stage with HEAD's own. `debug/stage-after-anchor.cjs`.

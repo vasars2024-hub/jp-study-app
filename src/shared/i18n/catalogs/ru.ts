@@ -9495,6 +9495,7 @@ export const ru: Catalog = {
   'ankiWorkbench.source.tooLarge':
     'Этот текстовый файл занимает {size} МБ, что больше {max} МБ, которые принимает этот читатель. Он не открыт: прочитанная наполовину колода выглядела бы именно такой короткой.',
   'ankiWorkbench.source.reading': 'Чтение…',
+  'ankiWorkbench.source.cancelRead': 'Остановить чтение',
   'ankiWorkbench.source.failed': 'Не удалось прочитать источник: {error}',
   'ankiWorkbench.source.empty': 'Источник ещё не прочитан.',
   'ankiWorkbench.facts.page': 'Прочитано заметок: {loaded} из {total} (карточек: {cards})',

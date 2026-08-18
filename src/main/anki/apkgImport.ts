@@ -25,7 +25,7 @@ import type { ApkgDraftRequest, ApkgDraftResult } from '../../shared/ankiDraft';
 import type { CsvDraftRequest } from '../../shared/ankiCsv';
 import type { ConnectDraftRequest } from '../../shared/ankiConnectDraft';
 import { getSql, readCollectionBytes } from './apkgCollection';
-import { parseApkgDraftPageOffMainLoop } from './apkgReadHost';
+import { APKG_READ_CANCELLED, parseApkgDraftPageOffMainLoop } from './apkgReadHost';
 import { readCsvDraft } from './csvDraftRead';
 import { exportAnkiCsv } from './csvExport';
 import type { AnkiCsvExportRequest } from '../../shared/ankiCsvExport';
@@ -307,11 +307,51 @@ async function importApkgCards(filePath?: string): Promise<ApkgCardsResult> {
  * that only main can do honestly: the dialog, the stale-path refusal, the
  * fingerprint -> path memory the exporter reads, and the session bookkeeping.
  */
+/**
+ * Reads a caller can still abandon, keyed by the token it minted.
+ *
+ * A registry rather than a single controller because the workbench and the
+ * glossary panel can each have a read in flight, and cancelling "the read" would
+ * then stop whichever one the other surface started. An entry lives exactly as
+ * long as its read: registered before the dialog opens, so a cancel that lands
+ * while the picker is up still refuses the parse behind it, and deleted in a
+ * `finally` so a finished read leaves nothing to cancel.
+ */
+const draftReadAborts = new Map<string, AbortController>();
+
+/**
+ * Ask an in-flight read to stop. `false` means no read is running under that
+ * token — already finished, or never started — which is a true answer and not a
+ * failure, so it is reported as one rather than thrown.
+ */
+export function cancelApkgDraftRead(readId?: string): boolean {
+  if (!readId) return false;
+  const controller = draftReadAborts.get(readId);
+  if (!controller) return false;
+  controller.abort();
+  return true;
+}
+
 async function readApkgDraft(request: ApkgDraftRequest = {}): Promise<ApkgDraftResult> {
   // A resume names its session, never a path: the renderer has never been told
   // where the file is (only its label), and the session store is where the path
   // has been kept all along. Falling through to the dialog when the session is
   // gone would silently ask for a different file, so it is an explicit refusal.
+  // Registered before anything slow, so every wait the user can see — the
+  // dialog, the fork, the parse — is inside the window a cancel can reach.
+  const controller = request.readId ? new AbortController() : undefined;
+  if (request.readId && controller) draftReadAborts.set(request.readId, controller);
+  try {
+    return await readApkgDraftInner(request, controller?.signal);
+  } finally {
+    if (request.readId) draftReadAborts.delete(request.readId);
+  }
+}
+
+async function readApkgDraftInner(
+  request: ApkgDraftRequest,
+  signal: AbortSignal | undefined,
+): Promise<ApkgDraftResult> {
   let requested = request.filePath;
   if (!requested && request.sessionId) {
     requested = getDraftSession(request.sessionId)?.request.filePath;
@@ -324,13 +364,19 @@ async function readApkgDraft(request: ApkgDraftRequest = {}): Promise<ApkgDraftR
   if (requested && !fs.existsSync(requested)) return { ok: false, error: 'source-missing' };
   const file = await pickDeckFile(requested);
   if (!file) return { ok: false, error: 'cancelled' };
+  // A cancel that landed while the picker was open. Checked here rather than
+  // left to the parse so no process is forked for a read nobody is waiting on.
+  if (signal?.aborted) return { ok: false, error: APKG_READ_CANCELLED };
 
   try {
-    const parsed = await parseApkgDraftPageOffMainLoop({
-      filePath: file,
-      noteOffset: request.noteOffset,
-      noteLimit: request.noteLimit,
-    });
+    const parsed = await parseApkgDraftPageOffMainLoop(
+      {
+        filePath: file,
+        noteOffset: request.noteOffset,
+        noteLimit: request.noteLimit,
+      },
+      { signal },
+    );
     const { page, fingerprint, totalNotes, sourceKind, noteOffset: offset, noteLimit: limit } =
       parsed;
 
@@ -377,6 +423,7 @@ export function registerApkgIpc(): void {
   ipcMain.handle('apkg:import', (_e, filePath?: string) => importApkg(filePath));
   ipcMain.handle('apkg:importCards', (_e, filePath?: string) => importApkgCards(filePath));
   ipcMain.handle('apkg:readDraft', (_e, request?: ApkgDraftRequest) => readApkgDraft(request));
+  ipcMain.handle('apkg:cancelDraftRead', (_e, readId?: string) => cancelApkgDraftRead(readId));
   ipcMain.handle('apkg:export', (_e, request: ApkgExportRequest) => exportApkg(request));
   ipcMain.handle('anki:readCsvDraft', async (_e, request?: CsvDraftRequest) => {
     const file = await pickAnkiTextFile(request?.filePath);

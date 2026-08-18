@@ -196,6 +196,35 @@
   font-weight: 600;
 }
 
+.deck-workbench-source-busy {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.deck-workbench-source-busy > p {
+  margin: 0;
+}
+
+.deck-workbench-source-cancel {
+  /* Gate 10's measured floor for every control on this surface. */
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 8px);
+  background: color-mix(in srgb, var(--panel) 78%, transparent);
+  color: inherit;
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.deck-workbench-source-cancel:focus-visible {
+  outline: 2px solid var(--focus, var(--accent));
+  outline-offset: 2px;
+}
+
 .deck-workbench-detail {
   display: flex;
   flex-direction: column;

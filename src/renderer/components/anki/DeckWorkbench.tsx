@@ -16,9 +16,9 @@
  * limit. So the outcome sentence carries the total and a separate line says how
  * much has actually been read; either number alone is a lie for a paged source.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AnkiDraft, AnkiDraftSourceKind } from '../../../shared/ankiDraft';
-import { ANKI_DRAFT_PAGE_SIZE } from '../../../shared/ankiDraft';
+import { ANKI_DRAFT_PAGE_SIZE, APKG_READ_CANCELLED } from '../../../shared/ankiDraft';
 import {
   WORKBENCH_STEP_IDS,
   createWorkbenchFlow,
@@ -143,6 +143,16 @@ function megabytes(bytes: number): string {
   return String(Math.round((bytes / (1024 * 1024)) * 10) / 10);
 }
 
+/**
+ * A token main can key one in-flight read by. Unique per read, never persisted
+ * and never rendered — it exists only so a cancel names the read the user is
+ * looking at and not whatever else a second surface happens to be reading.
+ */
+function newDraftReadId(): string {
+  const uuid = globalThis.crypto?.randomUUID?.();
+  return `apkg-read-${uuid ?? `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`}`;
+}
+
 /** The worst severity present, which is what decides the step's validation. */
 function draftValidation(draft: AnkiDraft): 'ok' | 'warning' | 'blocked' {
   if (draft.diagnostics.some((d) => d.severity === 'blocking')) return 'blocked';
@@ -157,6 +167,8 @@ export default function DeckWorkbench() {
   /** Notes in the whole source. Absent for an adapter that does not page. */
   const [totalNotes, setTotalNotes] = useState<number | null>(null);
   const [busy, setBusy] = useState<SourceKey | null>(null);
+  /** The package read the cancel button would stop, or null when none is running. */
+  const apkgReadId = useRef<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [locked, setLocked] = useState<WorkbenchStepId | null>(null);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
@@ -246,10 +258,22 @@ export default function DeckWorkbench() {
         if (key === 'localDeck') {
           adoptDraft(loadDeckAsAnkiDraft().draft);
         } else if (key === 'apkg') {
-          const res = await window.api.readApkgDraft({ noteLimit: ANKI_DRAFT_PAGE_SIZE });
+          // The token the cancel button names. Minted here rather than held in
+          // state because nothing renders it, and a re-render mid-read must not
+          // change which read the button would stop.
+          const readId = newDraftReadId();
+          apkgReadId.current = readId;
+          const res = await window.api.readApkgDraft({
+            noteLimit: ANKI_DRAFT_PAGE_SIZE,
+            readId,
+          });
           if (!res.ok || !res.draft) {
-            // A cancelled file dialog is not a failure and must not shout.
-            if (res.error && res.error !== 'cancelled') setError(res.error);
+            // A cancelled file dialog is not a failure and must not shout, and
+            // neither is a read the user stopped on purpose: the source rail
+            // coming back is the acknowledgement, not an error line.
+            if (res.error && res.error !== 'cancelled' && res.error !== APKG_READ_CANCELLED) {
+              setError(res.error);
+            }
           } else adoptDraft(res.draft, res.totalNotes);
         } else if (key === 'text') {
           const res = await window.api.readAnkiCsvDraft({ noteLimit: ANKI_DRAFT_PAGE_SIZE });
@@ -276,12 +300,25 @@ export default function DeckWorkbench() {
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
       } finally {
+        apkgReadId.current = null;
         setBusy(null);
         void refreshSessions();
       }
     },
     [adoptDraft, refreshSessions, t],
   );
+
+  /**
+   * Abandon the package read in flight. Only the package source has one to
+   * abandon: the local deck is synchronous, and the text/AnkiConnect readers
+   * have no cancellable stage yet, so offering the control there would be a
+   * button that does nothing.
+   */
+  const cancelApkgRead = useCallback(() => {
+    const readId = apkgReadId.current;
+    if (!readId) return;
+    void window.api.cancelApkgDraftRead(readId);
+  }, []);
 
   const move = useCallback((to: WorkbenchStepId | 'next' | 'back') => {
     setFlow((prev) => {
@@ -689,7 +726,24 @@ export default function DeckWorkbench() {
                   <span className="muted">{t(`ankiWorkbench.source.${key}.hint`)}</span>
                 </button>
               ))}
-              {busy && <p className="muted" role="status">{t('ankiWorkbench.source.reading')}</p>}
+              {busy && (
+                <div className="deck-workbench-source-busy">
+                  {/* The button stays OUTSIDE the live region: a control is not
+                      status, and re-announcing it on every render is noise. */}
+                  <p className="muted" role="status">
+                    {t('ankiWorkbench.source.reading')}
+                  </p>
+                  {busy === 'apkg' && (
+                    <button
+                      type="button"
+                      className="deck-workbench-source-cancel"
+                      onClick={cancelApkgRead}
+                    >
+                      {t('ankiWorkbench.source.cancelRead')}
+                    </button>
+                  )}
+                </div>
+              )}
               {error && (
                 <p className="deck-workbench-error" role="alert">
                   {t('ankiWorkbench.source.failed', { error })}

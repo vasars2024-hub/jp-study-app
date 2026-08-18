@@ -18,6 +18,7 @@
 import { utilityProcess } from 'electron';
 import path from 'node:path';
 import { parseApkgDraftPage, type ApkgParsedPage } from './apkgCollection';
+import { APKG_READ_CANCELLED } from '../../shared/ankiDraft';
 import type { ApkgReadWorkerIn, ApkgReadWorkerOut } from '../../shared/ankiDraft';
 
 /**
@@ -30,6 +31,39 @@ export function apkgReadWorkerPath(): string {
 }
 
 /**
+ * How long the child gets to say it has the request, NOT how long the parse gets.
+ *
+ * A deadline over the whole parse would be a guess about deck size — the
+ * 100,000-note fixture legitimately reads for 6.2 s and a larger one takes
+ * longer — and expiring it would stall the main loop with a duplicate parse,
+ * which is exactly the freeze the utility process exists to prevent. The ack
+ * arrives after fork + module evaluation only, so this bounds a child that never
+ * came alive without ever bounding a deck that is merely big.
+ */
+export const APKG_READ_STARTUP_TIMEOUT_MS = 10_000;
+
+/** Re-exported so the reader's own callers need one import, not two. */
+export { APKG_READ_CANCELLED };
+
+/**
+ * The in-process parse, with the one thing a cancel can still do to it.
+ *
+ * It cannot be interrupted — it holds this event loop until it is done — so a
+ * cancel that lands mid-parse cannot stop the work. What it can do is refuse the
+ * result, which is what the user actually asked for: no draft, no session, no
+ * remembered source. Reporting the page anyway would ignore a decision they made.
+ */
+function parseInProcess(
+  request: ApkgReadWorkerIn,
+  signal: AbortSignal | undefined,
+): Promise<ApkgParsedPage> {
+  return parseApkgDraftPage(request).then((parsed) => {
+    if (signal?.aborted) throw new Error(APKG_READ_CANCELLED);
+    return parsed;
+  });
+}
+
+/**
  * A parse that runs somewhere other than this event loop.
  *
  * Resolves with the page, or rejects with the parse's own message. Rejection
@@ -39,7 +73,13 @@ export function apkgReadWorkerPath(): string {
  */
 export function parseApkgDraftPageOffMainLoop(
   request: ApkgReadWorkerIn,
+  opts: { signal?: AbortSignal; startupTimeoutMs?: number } = {},
 ): Promise<ApkgParsedPage> {
+  const { signal } = opts;
+  // Nothing is forked for a read that was already abandoned — cancelling before
+  // the work starts should cost a process, not save one after paying for it.
+  if (signal?.aborted) return Promise.reject(new Error(APKG_READ_CANCELLED));
+
   let child: ReturnType<typeof utilityProcess.fork>;
   try {
     child = utilityProcess.fork(apkgReadWorkerPath(), [], {
@@ -51,7 +91,7 @@ export function parseApkgDraftPageOffMainLoop(
   } catch {
     // No worker to fork. Do the work here rather than refuse the deck; the main
     // loop stalls, which is the pre-existing behaviour, not a new failure.
-    return parseApkgDraftPage(request);
+    return parseInProcess(request, signal);
   }
 
   return new Promise<ApkgParsedPage>((resolve, reject) => {
@@ -69,11 +109,23 @@ export function parseApkgDraftPageOffMainLoop(
      */
     const fallBackInProcess = (why: string): void => {
       console.warn(`[apkg-read] worker gave no answer (${why}); parsing on the main loop`);
-      parseApkgDraftPage(request).then(resolve, reject);
+      parseInProcess(request, signal).then(resolve, reject);
+    };
+    // Armed once the request is handed over and disarmed by the worker's ack, so
+    // it measures startup and never the parse. See APKG_READ_STARTUP_TIMEOUT_MS.
+    let startupTimer: ReturnType<typeof setTimeout> | undefined;
+    const disarmStartup = (): void => {
+      if (startupTimer === undefined) return;
+      clearTimeout(startupTimer);
+      startupTimer = undefined;
     };
     const finish = (fn: () => void): void => {
       if (settled) return;
       settled = true;
+      disarmStartup();
+      // Declared below: the two reference each other, so one order has to read
+      // forwards. Only ever reached from a call, long after both are bound.
+      signal?.removeEventListener('abort', onAbort);
       try {
         child.kill();
       } catch {
@@ -81,9 +133,19 @@ export function parseApkgDraftPageOffMainLoop(
       }
       fn();
     };
+    // A cancel kills the child and stops. It deliberately does NOT fall back
+    // in-process: the user asked for the read to end, not to move.
+    const onAbort = (): void => finish(() => reject(new Error(APKG_READ_CANCELLED)));
+    signal?.addEventListener('abort', onAbort);
 
     child.on('message', (value: unknown) => {
       const message = value as ApkgReadWorkerOut | undefined;
+      // The ack is not an answer: it disarms the startup watchdog and the child
+      // keeps the read. Checked before `ok`, which it deliberately does not carry.
+      if (message && (message as { phase?: string }).phase === 'accepted') {
+        disarmStartup();
+        return;
+      }
       if (!message || typeof message.ok !== 'boolean') {
         finish(() => reject(new Error('apkg-read-bad-response')));
         return;
@@ -109,6 +171,15 @@ export function parseApkgDraftPageOffMainLoop(
     // the same "no worker" condition, not a caller error.
     try {
       child.postMessage(request);
+      // Only armed once the request is genuinely in flight. A child that neither
+      // acks nor exits is the one failure the `exit` handler cannot see, and it
+      // used to leave this promise unsettled forever — the workbench busy with
+      // no way out. `unref` so a stuck read cannot hold the process open.
+      startupTimer = setTimeout(() => {
+        startupTimer = undefined;
+        finish(() => fallBackInProcess('no-ack'));
+      }, opts.startupTimeoutMs ?? APKG_READ_STARTUP_TIMEOUT_MS);
+      startupTimer.unref?.();
     } catch (err) {
       finish(() => fallBackInProcess(err instanceof Error ? err.message : String(err)));
     }

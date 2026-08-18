@@ -603,6 +603,13 @@ const api = {
   /** One page of an .apkg read as a full-fidelity workbench draft. */
   readApkgDraft: (request?: ApkgDraftRequest): Promise<ApkgDraftResult> =>
     ipcRenderer.invoke('apkg:readDraft', request),
+  /**
+   * Abandon an in-flight package read by the `readId` it was started with.
+   * Resolves `false` when no read is running under that token — already
+   * finished, or never started — which is an answer, not a failure.
+   */
+  cancelApkgDraftRead: (readId: string): Promise<boolean> =>
+    ipcRenderer.invoke('apkg:cancelDraftRead', readId),
   /** Write the workbench's net change set into a NEW .apkg beside the source. */
   exportApkgDraft: (request: ApkgExportRequest): Promise<ApkgExportResult> =>
     ipcRenderer.invoke('apkg:export', request),

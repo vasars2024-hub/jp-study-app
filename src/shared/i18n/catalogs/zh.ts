@@ -8649,6 +8649,7 @@ export const zh: Catalog = {
   'ankiWorkbench.source.tooLarge':
     '该文本文件为 {size} MB，超过此读取器接受的 {max} MB。未打开它，因为只读一部分会让牌组看起来就只有那么长。',
   'ankiWorkbench.source.reading': '正在读取…',
+  'ankiWorkbench.source.cancelRead': '停止读取',
   'ankiWorkbench.source.failed': '无法读取该来源：{error}',
   'ankiWorkbench.source.empty': '尚未读取任何来源。',
   'ankiWorkbench.facts.page': '已读取 {loaded} / {total} 条笔记（{cards} 张卡片）',

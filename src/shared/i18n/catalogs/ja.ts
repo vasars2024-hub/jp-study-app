@@ -8687,6 +8687,7 @@ export const ja: Catalog = {
   'ankiWorkbench.source.tooLarge':
     'このテキストファイルは {size} MB で、このリーダーが扱える {max} MB を超えています。途中まで読むとその長さのデッキに見えてしまうため、開いていません。',
   'ankiWorkbench.source.reading': '読み込み中…',
+  'ankiWorkbench.source.cancelRead': '読み込みを中止',
   'ankiWorkbench.source.failed': 'そのソースを読み取れませんでした: {error}',
   'ankiWorkbench.source.empty': 'まだソースを読み込んでいません。',
   'ankiWorkbench.facts.page': '{total} 件中 {loaded} 件を読み込み済み（カード {cards} 枚）',

@@ -9114,6 +9114,7 @@ export const en: Catalog = {
   'ankiWorkbench.source.tooLarge':
     'That text file is {size} MB, over the {max} MB this reader accepts. It was not opened, because a partly read deck would look like a deck that short.',
   'ankiWorkbench.source.reading': 'Reading…',
+  'ankiWorkbench.source.cancelRead': 'Stop reading',
   'ankiWorkbench.source.failed': 'That source could not be read: {error}',
   'ankiWorkbench.source.empty': 'No source read yet.',
   'ankiWorkbench.facts.page': '{loaded} of {total} notes read so far ({cards} cards)',
