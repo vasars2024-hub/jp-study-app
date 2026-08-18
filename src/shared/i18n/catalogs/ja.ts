@@ -8819,6 +8819,16 @@ export const ja: Catalog = {
     '一部の変更は書き込まれ、一部は書き込まれませんでした。失敗したものを以下に挙げます。それ以外はすでにコレクションに反映されています。',
   'ankiWorkbench.apply.liveError.verify-failed':
     'Anki は変更を受け入れましたが、読み直しでは見つかりませんでした。保存済みとして扱わないでください。続けて編集する前に Anki を確認してください。',
+  'ankiWorkbench.apply.live.stop': '書き込みを停止',
+  'ankiWorkbench.apply.live.stopHint':
+    '停止しても、すでに書き込まれた内容はコレクションに残ります。ワークベンチでここから取り消せない唯一の操作です。',
+  'ankiWorkbench.apply.live.stopping': '実行中の書き込みが終わり次第、停止します…',
+  'ankiWorkbench.apply.live.cancelled.written':
+    '停止するまでに {profile} へノート {notes} 件、カード {cards} 枚を書き込みました。',
+  'ankiWorkbench.apply.live.cancelled.unwritten':
+    'コレクションを読み直したところ、変更 {count} 件はまだ反映されていません。',
+  'ankiWorkbench.apply.liveError.cancelled':
+    'コミットを途中で停止したため、変更の一部だけが Anki に入っています。',
   'ankiWorkbench.apply.liveError.io': 'Anki に変更を書き込めませんでした。',
   'ankiWorkbench.apply.blocked':
     'このソースには書き出しを妨げる問題があります。手順1に戻って確認してください。',

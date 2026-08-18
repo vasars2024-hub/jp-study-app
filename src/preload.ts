@@ -625,6 +625,13 @@ const api = {
   /** Write the workbench's net change set into the live Anki collection. */
   commitAnkiConnectDraft: (request: ConnectCommitRequest): Promise<ConnectCommitResult> =>
     ipcRenderer.invoke('anki:commitConnectDraft', request),
+  /**
+   * Stop an in-flight live commit after its current write, by the `commitId` it
+   * was started with. Resolves `false` when nothing is running under that token.
+   * The writes already sent stay written — this transport cannot roll back.
+   */
+  cancelAnkiConnectCommit: (commitId: string): Promise<boolean> =>
+    ipcRenderer.invoke('anki:cancelConnectCommit', commitId),
   /** Resumable draft sessions. `complete` is never something a caller may set. */
   ankiDraftSessionList: (): Promise<AnkiDraftSessionSummary[]> =>
     ipcRenderer.invoke('anki:draftSessionList'),

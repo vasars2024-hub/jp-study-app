@@ -22,7 +22,7 @@ vi.mock('../anki/client', async (importOriginal) => ({
   isCollectionUnavailable: (err: unknown) => err instanceof Error && err.message === 'COLLECTION',
 }));
 
-const { commitConnectDraft } = await import('../anki/connectCommit');
+const { commitConnectDraft, cancelConnectCommit } = await import('../anki/connectCommit');
 
 const MODEL = {
   id: 1767397623232,
@@ -823,5 +823,143 @@ describe('commitConnectDraft — recipe 13 split', () => {
     expect(result.errorCode).toBe('verify-failed');
     expect(result.verified).toBe(false);
     expect(result.error).toContain(`card ${CARD_A}: deck differs`);
+  });
+
+  // --- gate 7: the user stops the batch part-way ------------------------------
+
+  /** Two independent note writes, so a cancel between them leaves exactly one. */
+  const twoNoteEdit: ApkgExportChangeSet = {
+    notes: [
+      { noteId: String(NOTE_A), fields: ['犬（いぬ）', 'dog'] },
+      { noteId: String(NOTE_B), fields: ['猫（ねこ）', 'cat'] },
+    ],
+    cardMoves: [],
+  };
+
+  /** Cancels `commitId` the moment the write for `noteId` is sent, not before. */
+  function cancelOnNoteWrite(commitId: string, noteId: number): void {
+    invoke.mockImplementation(async (action: string, params?: Record<string, unknown>) => {
+      const answer = collection.handle(action, params ?? {});
+      if (action === 'updateNoteFields') {
+        const note = (params?.note ?? {}) as { id?: number };
+        if (note.id === noteId) cancelConnectCommit(commitId);
+      }
+      return answer;
+    });
+  }
+
+  it('stops after the write in progress and reports what actually landed', async () => {
+    const fingerprint = await currentFingerprint();
+    const commitId = 'commit-cancel-1';
+    cancelOnNoteWrite(commitId, NOTE_A);
+
+    const result = await commitConnectDraft({
+      fingerprint,
+      read: READ,
+      commitId,
+      changes: twoNoteEdit,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.errorCode).toBe('cancelled');
+    // The write already sent is not un-sent, and the one after it never went.
+    expect(result.notesUpdated).toBe(1);
+    expect(callsTo('updateNoteFields')).toHaveLength(1);
+    expect(collection.note(NOTE_A)?.front).toBe('犬（いぬ）');
+    expect(collection.note(NOTE_B)?.front).toBe('猫');
+    // Re-read out of the collection, never `planned - sent`.
+    expect(result.unwritten).toBe(1);
+    // Never a success, and never a verification of a set that is not in there.
+    expect(result.verified).toBe(false);
+    expect(result.error).toContain('1 of 2');
+    expect(result.profile).toBe('User 1');
+  });
+
+  // The control. Same change set, same commitId, nobody cancels: if this went
+  // green as `cancelled` too, the test above would be measuring the fixture.
+  it('writes the whole batch when the same commit is never cancelled', async () => {
+    const fingerprint = await currentFingerprint();
+    const result = await commitConnectDraft({
+      fingerprint,
+      read: READ,
+      commitId: 'commit-cancel-1',
+      changes: twoNoteEdit,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.errorCode).toBeUndefined();
+    expect(result.notesUpdated).toBe(2);
+    expect(result.unwritten).toBeUndefined();
+    expect(result.verified).toBe(true);
+    expect(callsTo('updateNoteFields')).toHaveLength(2);
+  });
+
+  // The reason `unwritten` is read back rather than derived. Here the first
+  // write is SENT and does not land, so "how far the loop got" says 1 change is
+  // missing and the collection says 2. Only the second number is true.
+  it('counts what is missing from the collection, not what it failed to send', async () => {
+    const fingerprint = await currentFingerprint();
+    const commitId = 'commit-cancel-swallow';
+    cancelOnNoteWrite(commitId, NOTE_A);
+    collection.swallowWrites = true;
+
+    const result = await commitConnectDraft({
+      fingerprint,
+      read: READ,
+      commitId,
+      changes: twoNoteEdit,
+    });
+
+    expect(result.errorCode).toBe('cancelled');
+    expect(result.notesUpdated).toBe(1);
+    // 2 planned − 1 sent would be 1. Anki says neither is in there.
+    expect(result.unwritten).toBe(2);
+  });
+
+  it('answers false for a token with nothing running under it', () => {
+    expect(cancelConnectCommit('never-started')).toBe(false);
+    expect(cancelConnectCommit(undefined)).toBe(false);
+    expect(cancelConnectCommit('')).toBe(false);
+  });
+
+  // The registry is cleared in a `finally`, so a cancel the user clicked a beat
+  // too late cannot lie in wait and stop the NEXT commit.
+  it('does not let a late cancel poison the following commit', async () => {
+    const commitId = 'commit-reused';
+    const first = await commitConnectDraft({
+      fingerprint: await currentFingerprint(),
+      read: READ,
+      commitId,
+      changes: { notes: [{ noteId: String(NOTE_A), fields: ['犬', 'dog'] }], cardMoves: [] },
+    });
+    expect(first.ok).toBe(true);
+
+    expect(cancelConnectCommit(commitId)).toBe(false);
+
+    const second = await commitConnectDraft({
+      fingerprint: await currentFingerprint(),
+      read: READ,
+      commitId,
+      changes: twoNoteEdit,
+    });
+    expect(second.ok).toBe(true);
+    expect(second.errorCode).toBeUndefined();
+    expect(second.notesUpdated).toBe(2);
+  });
+
+  // Every caller before gate 7 omitted `commitId`, and those commits stay
+  // uninterruptible rather than picking up a stranger's cancel.
+  it('cannot be cancelled when the request carries no commitId', async () => {
+    const fingerprint = await currentFingerprint();
+    invoke.mockImplementation(async (action: string, params?: Record<string, unknown>) => {
+      const answer = collection.handle(action, params ?? {});
+      if (action === 'updateNoteFields') cancelConnectCommit('commit-cancel-1');
+      return answer;
+    });
+
+    const result = await commitConnectDraft({ fingerprint, read: READ, changes: twoNoteEdit });
+
+    expect(result.ok).toBe(true);
+    expect(result.notesUpdated).toBe(2);
   });
 });

@@ -22,7 +22,7 @@
  * because it decides whether the result merges in Anki or arrives as new notes.
  * A local deck is none of the three and offers no button at all.
  */
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { AnkiDraft } from '../../../shared/ankiDraft';
 import type { AnkiDraftEditJournal } from '../../../shared/ankiDraftEdit';
 import {
@@ -60,20 +60,47 @@ export default function DeckWorkbenchApply({
   const isLive = draft.source.kind === 'ankiconnect';
   const isText = draft.source.kind === 'csv';
 
+  /**
+   * The token the Stop button names. Held in a ref rather than state because the
+   * cancel must reach the commit that is running RIGHT NOW — a state update is a
+   * render behind, and this is the one control where being a render behind means
+   * cancelling nothing while the writes continue.
+   */
+  const commitIdRef = useRef<string | null>(null);
+  const [stopping, setStopping] = useState(false);
+
   const runCommit = async () => {
+    const commitId = `connect-commit:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+    commitIdRef.current = commitId;
     setBusy(true);
+    setStopping(false);
     setCommit(null);
     try {
       const res = await window.api.commitAnkiConnectDraft({
         fingerprint: draft.source.fingerprint,
         changes,
+        commitId,
       });
       setCommit(res);
     } catch (err) {
       setCommit({ ok: false, errorCode: 'io', error: err instanceof Error ? err.message : String(err) });
     } finally {
+      commitIdRef.current = null;
       setBusy(false);
+      setStopping(false);
     }
+  };
+
+  /**
+   * Asks the main process to stop after the write it is in. It cannot un-send
+   * one, so the button says "stop", never "cancel" — and the result that comes
+   * back reports what did land instead of pretending the batch never happened.
+   */
+  const stopCommit = () => {
+    const commitId = commitIdRef.current;
+    if (!commitId) return;
+    setStopping(true);
+    void window.api.cancelAnkiConnectCommit(commitId);
   };
 
   const runTextExport = async () => {
@@ -153,9 +180,24 @@ export default function DeckWorkbenchApply({
                 {t('ankiWorkbench.apply.live.commit')}
               </button>
               {busy && (
-                <p className="muted" role="status">
-                  {t('ankiWorkbench.apply.live.writing')}
-                </p>
+                <>
+                  <p className="muted" role="status">
+                    {t('ankiWorkbench.apply.live.writing')}
+                  </p>
+                  <button
+                    type="button"
+                    className="btn wb-apply-stop"
+                    disabled={stopping}
+                    onClick={stopCommit}
+                  >
+                    {t('ankiWorkbench.apply.live.stop')}
+                  </button>
+                  {/* Said next to the button, not after the fact: this is the
+                      one stop in the workbench that leaves writes behind. */}
+                  <p className="muted wb-apply-stop-note">
+                    {t(`ankiWorkbench.apply.live.${stopping ? 'stopping' : 'stopHint'}`)}
+                  </p>
+                </>
               )}
             </>
           )}
@@ -191,6 +233,28 @@ export default function DeckWorkbenchApply({
             <p className="deck-workbench-error" role="alert">
               {t(`ankiWorkbench.apply.liveError.${commit.errorCode ?? 'io'}`)}
             </p>
+            {/* A stopped commit's numbers are the answer, not a footnote: some
+                of the change set is in the user's collection and the rest is
+                not, and `unwritten` is what Anki's own re-read still could not
+                find — never `planned - sent`, which would be a guess. */}
+            {commit.errorCode === 'cancelled' && (
+              <ul className="deck-workbench-facts wb-apply-cancelled">
+                <li>
+                  {t('ankiWorkbench.apply.live.cancelled.written', {
+                    notes: commit.notesUpdated ?? 0,
+                    cards: commit.cardsUpdated ?? 0,
+                    profile: commit.profile ?? draft.source.label,
+                  })}
+                </li>
+                {commit.unwritten !== undefined && (
+                  <li>
+                    {t('ankiWorkbench.apply.live.cancelled.unwritten', {
+                      count: commit.unwritten,
+                    })}
+                  </li>
+                )}
+              </ul>
+            )}
             {/* A partial commit is the one state a total would hide: some
                 changes are in the user's collection and some are not, so each
                 one that failed is named with Anki's own words. */}

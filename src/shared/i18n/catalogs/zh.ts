@@ -8772,6 +8772,14 @@ export const zh: Catalog = {
     '部分更改已写入，部分没有。失败的列在下面；其余的已经在你的集合里了。',
   'ankiWorkbench.apply.liveError.verify-failed':
     'Anki 接受了这些更改，但重新读取集合时并未找到，因此不能当作已保存。继续编辑前请先检查 Anki。',
+  'ankiWorkbench.apply.live.stop': '停止写入',
+  'ankiWorkbench.apply.live.stopHint':
+    '停止后，已经写入的内容仍会留在你的集合里。这是工作台中唯一无法在此撤销的一步。',
+  'ankiWorkbench.apply.live.stopping': '将在当前这次写入完成后停止…',
+  'ankiWorkbench.apply.live.cancelled.written':
+    '停止前已向 {profile} 写入 {notes} 条笔记和 {cards} 张卡片。',
+  'ankiWorkbench.apply.live.cancelled.unwritten': '重新读取集合后，仍有 {count} 项更改不在其中。',
+  'ankiWorkbench.apply.liveError.cancelled': '你中途停止了提交，因此只有部分更改进入了 Anki。',
   'ankiWorkbench.apply.liveError.io': '无法把更改写入 Anki。',
   'ankiWorkbench.apply.blocked': '此来源存在阻止导出的问题。请回到第 1 步查看。',
   'ankiWorkbench.apply.empty': '本次会话的净更改为空 — 没有可导出的内容。',

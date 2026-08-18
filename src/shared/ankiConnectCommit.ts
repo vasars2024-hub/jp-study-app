@@ -103,6 +103,15 @@ export type ConnectCommitErrorCode =
   | 'collection-unavailable'
   /** Some writes landed and some did not; `failures` names every one. */
   | 'partial'
+  /**
+   * Gate 7's live-commit quarter. The user stopped the batch part-way, so some
+   * writes are in their collection and the rest were never sent. Deliberately
+   * NOT folded into `partial`: a partial is the transport failing, which the
+   * user did not choose and may want to retry as-is, while a cancel is a
+   * decision — and the two need different words on screen. Never `ok`, because
+   * the change set the user approved is not what the collection now holds.
+   */
+  | 'cancelled'
   /** Everything reported success but the re-read disagrees. */
   | 'verify-failed'
   | 'io';
@@ -117,6 +126,14 @@ export interface ConnectCommitRequest {
    * transport detail — the same rule the .apkg exporter's `sourcePath` follows.
    */
   read?: ConnectDraftRequest;
+  /**
+   * Token a cancel names to stop this commit part-way. Same shape as the package
+   * reader's `readId`: the renderer mints it, the main process registers it
+   * before the first write and forgets it in a `finally`, and a cancel naming an
+   * unknown token answers `false` rather than failing. Omitted means the commit
+   * cannot be interrupted — which is what every caller before gate 7 did.
+   */
+  commitId?: string;
 }
 
 export interface ConnectCommitFailure {
@@ -136,6 +153,14 @@ export interface ConnectCommitResult {
   fingerprint?: string;
   /** Profile the write landed in, echoed so the surface can name it. */
   profile?: string;
+  /**
+   * Changes the re-read could NOT find in the collection afterwards. Read back
+   * from Anki rather than derived from how far the write loop got, because after
+   * a cancel those are two different numbers: a call can be sent and still not
+   * land. Only set when the commit stopped early, which is the one case where
+   * "how much of my change set is actually in there" has no obvious answer.
+   */
+  unwritten?: number;
   failures?: ConnectCommitFailure[];
   errorCode?: ConnectCommitErrorCode;
   error?: string;

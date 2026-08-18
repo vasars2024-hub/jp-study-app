@@ -9629,6 +9629,16 @@ export const ru: Catalog = {
     'Часть изменений записана, часть — нет. Неудавшиеся перечислены ниже; остальные уже в вашей коллекции.',
   'ankiWorkbench.apply.liveError.verify-failed':
     'Anki принял изменения, но при повторном чтении коллекции их не нашлось, поэтому считать их сохранёнными нельзя. Проверьте Anki, прежде чем править дальше.',
+  'ankiWorkbench.apply.live.stop': 'Остановить запись',
+  'ankiWorkbench.apply.live.stopHint':
+    'После остановки всё уже записанное останется в коллекции. Это единственный шаг верстака, который отсюда не отменить.',
+  'ankiWorkbench.apply.live.stopping': 'Остановимся, как только завершится текущая запись…',
+  'ankiWorkbench.apply.live.cancelled.written':
+    'До остановки в профиль {profile} записано заметок: {notes}, карточек: {cards}.',
+  'ankiWorkbench.apply.live.cancelled.unwritten':
+    'После повторного чтения коллекции в ней по-прежнему нет изменений: {count}.',
+  'ankiWorkbench.apply.liveError.cancelled':
+    'Вы остановили запись на середине, поэтому в Anki попала только часть изменений.',
   'ankiWorkbench.apply.liveError.io': 'Не удалось записать изменения в Anki.',
   'ankiWorkbench.apply.blocked':
     'В этом источнике есть проблемы, блокирующие экспорт. Вернитесь к шагу 1, чтобы их посмотреть.',

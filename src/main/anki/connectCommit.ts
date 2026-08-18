@@ -15,6 +15,14 @@
 // the state the plan's gate 7 is about: the honest answer is `partial` with
 // every failing id named, not a rollback this transport cannot guarantee and
 // not a generic error that hides how far it got.
+//
+// Gate 7's other half is the user stopping the batch themselves. The cancel is
+// checked BETWEEN writes and never inside one, because AnkiConnect has no
+// abortable request and a write already sent has already landed — pretending
+// otherwise is the false success the gate exists to prevent. A cancel therefore
+// stops sending and then still runs step 4: the numbers the surface shows are
+// re-read out of the collection, so "some of it is in there" comes with exactly
+// how much rather than a shrug.
 
 import {
   planConnectCommit,
@@ -46,9 +54,48 @@ function resolveRead(request: ConnectCommitRequest): ConnectDraftRequest | undef
   return request.read ?? recallConnectRead(request.fingerprint);
 }
 
+/**
+ * Commit ids the user has asked to stop. A plain set rather than an
+ * `AbortController` because nothing here is abortable: the flag is read between
+ * writes and the in-flight request is always allowed to finish, which is the
+ * only way the count of what landed can stay true.
+ */
+const cancelledCommits = new Set<string>();
+
+/**
+ * Stop an in-flight live commit after its current write. `false` means no commit
+ * is running under that token — already finished, or never started — which is an
+ * answer and not a failure, exactly as `cancelApkgDraftRead` reports it.
+ */
+export function cancelConnectCommit(commitId?: string): boolean {
+  if (!commitId || !runningCommits.has(commitId)) return false;
+  cancelledCommits.add(commitId);
+  return true;
+}
+
+/** Tokens with a commit actually in flight, so a cancel can answer honestly. */
+const runningCommits = new Set<string>();
+
 export async function commitConnectDraft(
   request: ConnectCommitRequest,
 ): Promise<ConnectCommitResult> {
+  const commitId = request?.commitId;
+  if (commitId) runningCommits.add(commitId);
+  try {
+    return await commitConnectDraftInner(request, commitId);
+  } finally {
+    if (commitId) {
+      runningCommits.delete(commitId);
+      cancelledCommits.delete(commitId);
+    }
+  }
+}
+
+async function commitConnectDraftInner(
+  request: ConnectCommitRequest,
+  commitId: string | undefined,
+): Promise<ConnectCommitResult> {
+  const stopping = () => commitId !== undefined && cancelledCommits.has(commitId);
   if (!request?.changes || exportChangesEmpty(request.changes)) {
     return { ok: false, errorCode: 'nothing-to-commit', error: 'The change set is empty.' };
   }
@@ -94,8 +141,14 @@ export async function commitConnectDraft(
   // is one card in Anki, not two change-list entries — same rule the package
   // writer counts by, which is why this is a set and not a counter.
   const movedCardIds = new Set<string>();
+  // Latched once and read by every loop below, so a cancel that arrives during
+  // the note writes does not have to be re-noticed by the four write phases
+  // after it. The phases still run their own check, because each one can be the
+  // first to see it.
+  let stopped = false;
 
   for (const write of plan.noteWrites) {
+    if (stopping()) { stopped = true; break; }
     const id = String(write.noteId);
     try {
       if (write.fields) await invoke('updateNoteFields', { note: { id: write.noteId, fields: write.fields } });
@@ -127,6 +180,7 @@ export async function commitConnectDraft(
   // card must never be pointed at a deck that does not exist yet, and creating
   // the deck is the one step here that can fail before anything has moved.
   for (const write of plan.deckWrites) {
+    if (stopped || stopping()) { stopped = true; break; }
     const ids = write.cardIds.map(String);
     try {
       if (write.create) {
@@ -166,6 +220,7 @@ export async function commitConnectDraft(
   }
 
   for (const move of plan.cardWrites) {
+    if (stopped || stopping()) { stopped = true; break; }
     const id = String(move.cardId);
     try {
       const verdict = await invoke('setSpecificValueOfCard', {
@@ -207,6 +262,7 @@ export async function commitConnectDraft(
     ['unsuspend', plan.suspendWrites.unsuspend],
   ] as const) {
     if (ids.length === 0) continue;
+    if (stopped || stopping()) { stopped = true; break; }
     try {
       await invoke(action, { cards: ids });
       for (const id of ids) movedCardIds.add(String(id));
@@ -232,6 +288,7 @@ export async function commitConnectDraft(
   // two measured traps: numbers not strings, and a refusal that arrives inside a
   // 200 body where `invoke` cannot raise it.
   for (const write of plan.schedulingWrites) {
+    if (stopped || stopping()) { stopped = true; break; }
     const id = String(write.cardId);
     try {
       const verdict = await invoke('setSpecificValueOfCard', {
@@ -261,13 +318,30 @@ export async function commitConnectDraft(
     }
   }
 
-  // --- 4. re-read and verify what actually landed
+  // The denominator counts the split's cards individually, because that is the
+  // granularity `failures` reports them at — a batched `changeDeck` must not
+  // make the total smaller than the number of failures it can add.
+  const plannedChanges =
+    plan.noteWrites.length
+    + plan.cardWrites.length
+    + plan.schedulingWrites.length
+    + plan.suspendWrites.suspend.length
+    + plan.suspendWrites.unsuspend.length
+    + plan.deckWrites.reduce((total, write) => total + write.cardIds.length, 0);
+
+  // --- 4. re-read and verify what actually landed. Runs after a cancel too:
+  // the whole point of stopping honestly is being able to say how much is in
+  // there, and only the collection knows that.
   const after = await readConnectDraft(read);
   if (!after.ok || !after.draft) {
     return {
       ok: false,
-      errorCode: 'verify-failed',
-      error: `The writes were sent but the collection could not be re-read: ${after.error ?? 'unknown'}`,
+      // A cancel whose re-read failed is the most ambiguous state this path can
+      // reach, so it says both halves out loud instead of picking one.
+      errorCode: stopped ? 'cancelled' : 'verify-failed',
+      error: stopped
+        ? `You stopped the commit after ${notesUpdated + movedCardIds.size} of ${plannedChanges} changes, and the collection could not be re-read to confirm which landed: ${after.error ?? 'unknown'}`
+        : `The writes were sent but the collection could not be re-read: ${after.error ?? 'unknown'}`,
       notesUpdated,
       cardsUpdated: movedCardIds.size,
       failures: failures.length ? failures : undefined,
@@ -283,21 +357,35 @@ export async function commitConnectDraft(
     // could not be fetched afterwards.
   }
 
+  // Outranks `partial`, and deliberately: when the user stopped the batch, the
+  // transport failures inside it are a detail of a state they chose, not the
+  // explanation for it. They are still carried on `failures` and still named
+  // individually — nothing is hidden, only ordered.
+  if (stopped) {
+    return {
+      ok: false,
+      errorCode: 'cancelled',
+      error: `You stopped the commit. ${notesUpdated + movedCardIds.size} of ${plannedChanges} changes were written to your collection and the rest were never sent.`,
+      notesUpdated,
+      cardsUpdated: movedCardIds.size,
+      // Never `verdict.ok` dressed up: the change set as a whole is not in the
+      // collection, and that is the literal meaning of this field.
+      verified: false,
+      // The measured number, off the re-read. `plannedChanges - written` would
+      // be a guess: a call can be sent and still not land, which is exactly the
+      // gap between "how far the loop got" and "what is in there".
+      unwritten: verdict.mismatches.length,
+      fingerprint: after.draft.source.fingerprint,
+      profile,
+      failures: failures.length ? failures : undefined,
+    };
+  }
+
   if (failures.length) {
     return {
       ok: false,
       errorCode: 'partial',
-      // The denominator counts the split's cards individually, because that is
-      // the granularity `failures` reports them at — a batched `changeDeck`
-      // must not make the total smaller than the number of failures it can add.
-      error: `${failures.length} of ${
-        plan.noteWrites.length
-        + plan.cardWrites.length
-        + plan.schedulingWrites.length
-        + plan.suspendWrites.suspend.length
-        + plan.suspendWrites.unsuspend.length
-        + plan.deckWrites.reduce((total, write) => total + write.cardIds.length, 0)
-      } changes did not commit.`,
+      error: `${failures.length} of ${plannedChanges} changes did not commit.`,
       notesUpdated,
       cardsUpdated: movedCardIds.size,
       verified: verdict.ok,

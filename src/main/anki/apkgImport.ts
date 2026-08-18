@@ -30,7 +30,7 @@ import { readCsvDraft } from './csvDraftRead';
 import { exportAnkiCsv } from './csvExport';
 import type { AnkiCsvExportRequest } from '../../shared/ankiCsvExport';
 import { readConnectDraft } from './connectDraftRead';
-import { commitConnectDraft } from './connectCommit';
+import { cancelConnectCommit, commitConnectDraft } from './connectCommit';
 import type { ConnectCommitRequest } from '../../shared/ankiConnectCommit';
 import {
   beginDraftSession,
@@ -440,6 +440,9 @@ export function registerApkgIpc(): void {
   );
   ipcMain.handle('anki:commitConnectDraft', (_e, request: ConnectCommitRequest) =>
     commitConnectDraft(request),
+  );
+  ipcMain.handle('anki:cancelConnectCommit', (_e, commitId?: string) =>
+    cancelConnectCommit(commitId),
   );
 
   // Resumable draft sessions. `readApkgDraft` records its own pages — a reader

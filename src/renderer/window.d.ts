@@ -513,6 +513,7 @@ declare global {
       commitAnkiConnectDraft(
         request: import('../shared/ankiConnectCommit').ConnectCommitRequest,
       ): Promise<import('../shared/ankiConnectCommit').ConnectCommitResult>;
+      cancelAnkiConnectCommit(commitId: string): Promise<boolean>;
       ankiDraftSessionList(): Promise<
         import('../main/anki/draftSessionStore').DraftSessionSummary[]
       >;

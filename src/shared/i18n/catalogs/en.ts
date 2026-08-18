@@ -9244,6 +9244,16 @@ export const en: Catalog = {
     'Some changes were written and some were not. The ones that failed are listed below; everything else is already in your collection.',
   'ankiWorkbench.apply.liveError.verify-failed':
     'Anki accepted the changes but reading the collection back did not find them, so they must not be treated as saved. Check Anki before editing further.',
+  'ankiWorkbench.apply.live.stop': 'Stop writing',
+  'ankiWorkbench.apply.live.stopHint':
+    'Stopping leaves everything already written in your collection. This is the one step in the workbench that cannot be taken back from here.',
+  'ankiWorkbench.apply.live.stopping': 'Stopping after the write in progress…',
+  'ankiWorkbench.apply.live.cancelled.written':
+    '{notes} notes and {cards} cards were written to {profile} before you stopped.',
+  'ankiWorkbench.apply.live.cancelled.unwritten':
+    'Reading the collection back, {count} of your changes are still not in it.',
+  'ankiWorkbench.apply.liveError.cancelled':
+    'You stopped the commit part-way, so only some of your changes are in Anki.',
   'ankiWorkbench.apply.liveError.io': 'The changes could not be written to Anki.',
   'ankiWorkbench.apply.blocked':
     'Problems found in this source block an export. Go back to step 1 to see them.',
