@@ -25734,4 +25734,4 @@ control also states the limit: `redactLogText` is **pattern**-based, so a bare t
 `Authorization:`/`?token=` prefix is not redacted. The guarantee is that nothing in this client
 builds such a line, not that any such line would be caught.
 
-`<commit-9.1>`. Not claimed: no real daemon was involved. Phase 9.2 (gates 6–10) needs one.
+`0ff6507a`. Not claimed: no real daemon was involved. Phase 9.2 (gates 6–10) needs one.

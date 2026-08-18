@@ -479,7 +479,7 @@ discrimination the field exists for — a rejected password and a rejected key a
 4. Switching modes clears the cached cookie/session for that host.
 5. A malformed or empty key is refused before any network call is attempted.
 
-**Phase 9.1 CLOSES 2026-08-18, all five gates, `<commit-9.1>`.** Gates 1 and 5 were already covered
+**Phase 9.1 CLOSES 2026-08-18, all five gates, `0ff6507a`.** Gates 1 and 5 were already covered
 by the API-key describe block ("sends the key as Authorization: Bearer and never as X-Api-Key" —
 asserted on every recorded request, plus `x-api-key` undefined and zero login attempts; "refuses an
 unusable key before making any request" — `seenHeaders` length 0). **2, 3 and 4 were unwritten and
