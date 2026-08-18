@@ -9364,12 +9364,17 @@ mark.lookup-mark,
   color: inherit;
   text-decoration: underline;
 }
+/* Rubric category 4, the same finding as `.lexicon-examples-list`: measured
+   maximized this list was 1188 px wide with its longest text run at 408 px — 813 px
+   of dead width over 528 px of height. Same 30rem floor, so the default 820 px
+   window keeps the single column it has today and only the extra width is used. */
 .dict-ex-list {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(30rem, 1fr));
+  align-items: start;
   gap: 8px;
 }
 .dict-ex-list li {

@@ -133,3 +133,53 @@ on dead region (22.0%). **Media** — fails compact on clipping (49 boxes), and 
 at **both** default (22.1%) and maximized (34.8%). Per the rubric a sub-10 is fixed and
 re-measured, not reported; both are L4's repair list. `LIQUID_SCORECARD.md` stays empty — one
 scored category out of eight is not a scorecard.
+
+## 2026-08-18 · primary · Category 4 re-driven on the LIQUID window — and the fix that did not move the number
+
+The 2026-08-17 table above was measured **pre-Liquid**. Re-driven on the Liquid
+Dictionary (`data-presentation=liquid`, `.fwin-liquid`), 食べる, every lazy panel run
+(compounds 5 li, examples 8 li, neighbors 12 li, collocations 0 li — an honest empty):
+
+| | default 820x580 | maximized 1264x765 |
+| --- | --- | --- |
+| Regions / clipped / overlaps / h-scrollers | 22 / **0** / **0** / **0** | 21 / **0** / **0** / **0** |
+| Largest dead region | 23.4% of window, **10.7% of viewport** | 22.9% of window, **21.3% of viewport** |
+| Dominant canvas / chrome | 32.3% / 5.7% | 48.3% / 4.3% |
+
+**Maximized still fails**, at 21.3% against the rubric's 15%-of-viewport bar. Liquid did
+not cause it (pre-Liquid was 22.0%) and did not fix it.
+
+**What was fixed, with its number.** A text-extent walk found the two example-sentence
+lists were the largest wasters of width at maximized: `.lexicon-examples-list` 1186 px
+wide with its longest run at **269 px — 951 px dead over 1082 px of height**, and
+`.dict-ex-list` 1188 px with its run at **408 px — 813 px over 528 px**. Both now use
+`repeat(auto-fill, minmax(30rem, 1fr))`. Measured after: examples **1082 → 650 px** tall,
+waste **951 → 354**; dict-ex **528 → 260 px**, waste **813 → 215**. At the default
+820 px window both return to a single column (`cols=742px` / `744px`) at their original
+1082 px and 528 px, so the sizes that already measured clean are untouched — the 30rem
+floor needs 968 px and the default offers 772.
+
+**And the dead region did not move: 379x584 at grid 24,8, 21.3%, identical to three
+decimal places.** Recording that rather than the improvement alone, because the
+improvement is real and the *category* is not fixed. `elementFromPoint` sampled across
+that rectangle (scroller at `top=0/5266`, so this is the top of the page) hits
+`div.dict-saved-searches-head`, `div.lq-contextual.lexicon-lens-picker`, `li`,
+`div.dict-entry` and `span.dict-pos` — the right ~30% of the **first screen**, not the
+examples further down. The example lists never intersected the measured rectangle.
+
+**So the next slice is `.dict-entry`, and it is a layout change, not a token.** Eight
+entries at 1216x174–264 each, `display:flex; flex-direction:column` (`styles.css:4780`),
+each with one full-width run (`textR=1207`) and the rest short. That single long line per
+entry is why aggregate waste reads 28 px while the grid still finds 379x584 of empty
+cells between the lines.
+
+**Round trip:** the window returned to `left: 94px; top: 54px; width: 820px; height: 580px`
+byte-identical; only `z-index` moved 68 → 74, which focus explains.
+
+**Controls, both red, both files restored byte-identical** (`debug/l5b-mutate-columns.cjs`):
+floor 30rem → 20rem → *"a second column must not fit at the default width: expected 648 to
+be greater than 772"*; `align-items: start` dropped → both selectors fail their own message.
+
+**Trap:** `styles.css` is LF in HEAD, CRLF in the worktree, and carries 9 hunks from other
+tracks. `node debug/l5b-stage-styles.cjs` rebuilds HEAD + this one edit and hashes
+`--no-filters`; `git add` would have taken all ten.

@@ -39,8 +39,24 @@
   color: var(--danger, #d14343);
 }
 
+/* Rubric category 4. Measured maximized (1264x765) with 8 食べる examples loaded:
+   this list was 1186 px wide and its longest text run reached 269 px — 951 px of
+   dead width over 1082 px of height, the single largest contributor to the
+   window's 379x584 dead region (21.3% of the viewport, against a 15% bar).
+
+   `auto-fill` rather than a media query because the window is a floating box on a
+   fake desktop, so viewport media queries never fire for it (css-measure §5 — the
+   same root cause as this app's dead `@media (max-width:)` blocks).
+
+   The 30rem floor is chosen so nothing changes at the sizes that were already
+   fine: two columns need 2x480 + 8 = 968 px, and the default 820 px window offers
+   772 px of content width, so it stays single-column exactly as before. Maximized
+   offers 1186 px, so it becomes two. A sentence is read rather than scanned, and
+   480 px is still a comfortable measure for one plus its translation. */
 .lexicon-examples-list {
   display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(30rem, 1fr));
+  align-items: start;
   gap: 8px;
   margin: 12px 0 0;
   padding: 0;
