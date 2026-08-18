@@ -168,3 +168,51 @@ liquid class"*.
 `DictionaryView.tsx`, then categories 1, 2, 4, 5, 8 re-scored on the Liquid window —
 L1 measured all five pre-Liquid and they are stale by the rubric's own rule.
 `LIQUID_SCORECARD.md` stays empty until all eight sit on one surface.
+
+## 2026-08-18 · primary · L5.2 — and the denominator that was measured on a closed drawer
+
+| Slice | Commit | What landed |
+| --- | --- | --- |
+| L5.2 contextual adoption | *this commit* | `view-head` + `dict-saved-searches` adopt `ContextualSurface`; 4 new cases |
+
+**The headline, and it corrects this file's own previous entry.** The `1 of 9` that opened
+L5 was measured on **collapsed, unloaded panels**. `details.lexicon-{compounds,collocations,
+examples,neighbors}` and `div.dict-examples` each render a title, a note and one *run*
+button until someone clicks it — 45–53 px tall, `li=0`. The classifier calls that
+`Liquid-eligible` because it is small and has focusables, which is correct for what was on
+screen and wrong about what the region **is**. Driven into its real functional state (each
+run button clicked, results back: compounds **5 li**, examples **8 li**, neighbors **12
+li**, collocations **0 li** — an honest empty; `dict-examples` 53→656 px, text 17→628) all
+five reclassify **Work**. The real denominator is **4, not 9**, and it was never 9.
+
+**Category 3 on the Liquid Dictionary window, 食べる, every panel loaded:**
+`denseWorkOnTranslucent` **0**, `liquidTreatedEligible` **4 of 4** (was 1 of 9 collapsed →
+4 of 9 after this edit → 4 of 4 loaded), 24 regions, `byRole` Work 12 / eligible 4 /
+Anchor 4 / holds-work 4.
+
+**Conventional presentation cost exactly 0 px**, which is §2's first non-negotiable
+measured rather than asserted. Standard after == standard before on every property read:
+`view-head` **772x47**, transparent, `0px/0px` padding, buttons **69x33 / 56x33**;
+`dict-saved-searches` **772x35**, button **101x35**. The `--lq-hit-target` floor is free
+here because both were already ≥ 32 px. Liquid after: **772x65** and **772x53**, both
+`color(srgb … / 0.72)` + `1px … / 0.14` + `16px` + `8px`.
+
+**Negative control, live and reversible:** `classList.add('lq-contextual')` on
+`.dict-entries` + two loaded `details` → `denseWorkOnTranslucent` **0 → 3**, each named
+with its measured `alpha 0.72`; removed → back to **0**. Category 3 can produce a low
+score, so its 0 means something. **3 mutation controls**, each red with its own message and
+each file restored byte-identical (`debug/l5b-mutate-dictview.cjs`): plain `div` → *".view-head
+is contextual: expected false to be true"*; `LiquidSurface` instead → *"expected 1 to be +0"*
+on the `lq-liquid` count; the search form wrapped → *"expected true to be false"*.
+
+**Traps.**
+1. **`DictionaryView.tsx` is CRLF *and* dirty with the i18n track** (menu labels, status
+   fields, the description paragraph — all in the worktree, none in HEAD). `git add` absorbs
+   them. `node debug/l5b-stage-dictview.cjs` rebuilds HEAD + these 5 edits, prints the
+   added/removed line sets, and hashes `--no-filters`. An LF anchor matches nothing in it.
+2. **Do not score a lazy panel without clicking its run button.** The rubric's "empty state
+   caps at 0" is not only about empty *apps*; a closed drawer is an empty state, and here it
+   inflated a denominator by 125%.
+
+**Next slice:** category 3 is now scorable on this surface. Categories 2, 4, 5, 8 are still
+L1-era and pre-Liquid, so `LIQUID_SCORECARD.md` stays empty until they are re-driven here.

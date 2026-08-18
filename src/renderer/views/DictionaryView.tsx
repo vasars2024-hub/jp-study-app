@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import type { DictLang } from '../components/DictionaryResults';
 import LexiconWorkbenchResults from '../components/lexicon/LexiconWorkbenchResults';
 import NotesBrowser from '../components/lexicon/NotesBrowser';
+import { ContextualSurface } from '../components/liquid/LiquidSurface';
 import { AppChrome, StatusBarField, StatusBarSpacer, type MenuBarMenu } from '../components/ui';
 import { loadDictionarySavedSearches, removeDictionarySavedSearch, saveDictionarySearch, type DictionarySavedSearch } from '../dictionarySavedSearches';
 import { useT } from '../i18n';
@@ -140,7 +141,10 @@ export default function DictionaryView() {
   return (
     <AppChrome menus={dictMenus} status={dictStatus} className="aero-dict-chrome">
     <div className="dict-view">
-      <div className="view-head">
+      {/* L5 — contextual, not dense work: a description line and the source toggle.
+          `ContextualSurface` is inert until this window is put in Liquid presentation
+          (§2’s first non-negotiable), so conventional pixels are unchanged. */}
+      <ContextualSurface className="view-head">
         <p className="muted">
           {isZh
             ? 'Search Chinese or English — offline, powered by CC-CEDICT.'
@@ -160,7 +164,7 @@ export default function DictionaryView() {
             中文
           </button>
         </div>
-      </div>
+      </ContextualSurface>
 
       <form className="dict-search" onSubmit={submit}>
         <input
@@ -176,7 +180,8 @@ export default function DictionaryView() {
         </button>
       </form>
 
-      <div className="dict-saved-searches" aria-label={t('dict.saved.title')}>
+      {/* Saved-search chips: a navigation shortcut list, not the reading area. */}
+      <ContextualSurface className="dict-saved-searches" aria-label={t('dict.saved.title')}>
         <div className="dict-saved-searches-head">
           <span className="muted">{t('dict.saved.title')}</span>
           {query && (
@@ -195,7 +200,7 @@ export default function DictionaryView() {
             ))}
           </div>
         )}
-      </div>
+      </ContextualSurface>
 
       <NotesBrowser lang={lang} onOpen={openNotedWord} />
 
