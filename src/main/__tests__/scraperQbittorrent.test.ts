@@ -74,6 +74,14 @@ let sessionValid = true;
  * exercised, because the client has to be right on either.
  */
 let loginRejectStyle: 'fails' | '401' = 'fails';
+/**
+ * The reverse-proxy base path the stand-in answers under, `''` for the root.
+ *
+ * Gate 18's durable half. Before it, the only `basePath` coverage in this repo
+ * called `qbitBaseUrl` directly, so a refactor that built a URL any other way
+ * would have left the suite green while every reverse-proxy install broke.
+ */
+let mountPath = '';
 /** Every request the app actually sent, so a header claim is measured not assumed. */
 let seenHeaders: http.IncomingHttpHeaders[] = [];
 /**
@@ -187,6 +195,17 @@ beforeAll(async () => {
           .map(([key, value]) => [key, Array.isArray(value) ? value.join(', ') : String(value)]),
       ),
     });
+    // Gate 18: the stand-in can be mounted under a reverse-proxy base path.
+    // When it is, everything outside that mount 404s exactly as a real proxy
+    // answers — which is what makes "the client sent the base path" a
+    // measurement rather than an assumption. `''` keeps every other test at the
+    // root, so the mount is invisible unless a test asks for it.
+    if (mountPath && !url.pathname.startsWith(`${mountPath}/`)) {
+      res.writeHead(404);
+      res.end('No qBittorrent is mounted at this path.');
+      return;
+    }
+    const routed = mountPath ? url.pathname.slice(mountPath.length) : url.pathname;
     // Mirrors the contract measured against a real daemon under
     // `WebUI\LocalHostAuth=true`: Bearer authorizes, `X-Api-Key` does not. The
     // second half is enforced by simply never reading that header.
@@ -194,7 +213,7 @@ beforeAll(async () => {
     const authed =
       keyed || (sessionValid && (req.headers.cookie ?? '').includes('SID=session-token'));
 
-    if (url.pathname === '/api/v2/auth/login') {
+    if (routed === '/api/v2/auth/login') {
       let body = '';
       req.on('data', (c) => {
         body += c;
@@ -228,12 +247,12 @@ beforeAll(async () => {
       return;
     }
 
-    if (url.pathname === '/api/v2/app/version') {
+    if (routed === '/api/v2/app/version') {
       res.writeHead(200, { 'content-type': 'text/plain' });
       res.end('v4.6.4');
       return;
     }
-    if (url.pathname === '/api/v2/transfer/info') {
+    if (routed === '/api/v2/transfer/info') {
       if (!connectionStatus) {
         res.writeHead(404);
         res.end('missing');
@@ -243,7 +262,7 @@ beforeAll(async () => {
       res.end(JSON.stringify({ connection_status: connectionStatus, dht_nodes: 312 }));
       return;
     }
-    if (url.pathname === '/api/v2/torrents/info') {
+    if (routed === '/api/v2/torrents/info') {
       torrentInfoHook?.();
       const all = [...TORRENT_INFO, ...torrentInfoExtra];
       // The real daemon filters on `hashes` and answers `[]` for one it does not
@@ -258,7 +277,7 @@ beforeAll(async () => {
       res.end(JSON.stringify(rows));
       return;
     }
-    if (url.pathname === '/api/v2/torrents/files') {
+    if (routed === '/api/v2/torrents/files') {
       if (!fileListResponse) {
         res.writeHead(404);
         res.end('Torrent hash was not found');
@@ -268,7 +287,7 @@ beforeAll(async () => {
       res.end(JSON.stringify(fileListResponse));
       return;
     }
-    if (url.pathname === '/api/v2/torrents/add') {
+    if (routed === '/api/v2/torrents/add') {
       let body = '';
       req.on('data', (c) => {
         body += c;
@@ -311,6 +330,7 @@ beforeEach(async () => {
   encryptionAvailable = true;
   sessionValid = true;
   loginRejectStyle = 'fails';
+  mountPath = '';
   addBodies = [];
   addResponse = { status: 200, body: 'Ok.' };
   seenHeaders = [];
@@ -1662,6 +1682,136 @@ describe('Phase 9.1 gate 2 — the password path is byte-identical', () => {
         referer: base,
       },
     });
+  });
+});
+
+describe('Phase 9.4 gate 18 — a reverse-proxy base path, in both auth modes', () => {
+  /**
+   * Measured live on 2026-08-19 through `debug/qbit-basepath-proxy.cjs`: the app
+   * reached a real qBittorrent 5.2.3 on `127.0.0.1:8781/qb` in key mode and read
+   * back `v5.2.3`, while the same port with an empty base path answered 404.
+   * These are the same ten shapes, pinned so a refactor cannot quietly drop the
+   * base path — the only coverage before this called `qbitBaseUrl` directly,
+   * which any URL built some other way would sail straight past.
+   */
+  const MOUNT = '/qbt';
+  const mounted = (over: Partial<ScraperQbittorrentSettings> = {}): ScraperQbittorrentSettings =>
+    ({ ...config, basePath: MOUNT, ...over });
+
+  it('puts the base path on every request the password path makes', async () => {
+    mountPath = MOUNT;
+    const report = await qbitTest({ config: mounted() });
+    expect(report.status).toBe('connected');
+    expect(report.version).toBe('4.6.4');
+    // Every target, login included, carries the mount. `toEqual` on the whole
+    // list rather than a `some()` — a check that passed on one prefixed request
+    // would miss the case where only the login got it.
+    expect(seenWire.map((r) => r.target)).toEqual([
+      `${MOUNT}/api/v2/auth/login`,
+      `${MOUNT}/api/v2/app/version`,
+      `${MOUNT}/api/v2/transfer/info`,
+    ]);
+    // The Referer qBittorrent's CSRF check reads has to be the proxy's own URL,
+    // not the daemon's, or a real reverse-proxy install is refused.
+    for (const record of seenWire) {
+      expect(record.headers.referer).toBe(`http://127.0.0.1:${config.port}${MOUNT}`);
+    }
+  });
+
+  it('puts the base path on every request key mode makes', async () => {
+    mountPath = MOUNT;
+    await setScraperSecret('test/qbit-key', GOOD_KEY);
+    try {
+      const report = await qbitTest({
+        config: mounted({ authMode: 'apiKey', username: '', passwordRef: '', apiKeyRef: 'test/qbit-key' }),
+      });
+      expect(report.status).toBe('connected');
+      expect(seenWire.map((r) => r.target)).toEqual([
+        `${MOUNT}/api/v2/app/version`,
+        `${MOUNT}/api/v2/transfer/info`,
+      ]);
+    } finally {
+      await clearScraperSecret('test/qbit-key');
+    }
+  });
+
+  /**
+   * The control that makes the two above measurements. Same mounted daemon,
+   * same credential, base path left empty — the client must miss it, and say
+   * which request missed it rather than blaming the host.
+   */
+  it('fails, and names the failing request, when the base path is left off', async () => {
+    mountPath = MOUNT;
+    const report = await qbitTest({ config: { ...config, basePath: '' } });
+    expect(report.status).toBe('unreachable');
+    expect(report.message).toBe('qBittorrent answered 404 to the login.');
+    expect(seenWire.map((r) => r.target)).toEqual(['/api/v2/auth/login']);
+  });
+
+  it('fails in key mode too when the base path is left off', async () => {
+    mountPath = MOUNT;
+    await setScraperSecret('test/qbit-key', GOOD_KEY);
+    try {
+      const report = await qbitTest({
+        config: { ...config, basePath: '', authMode: 'apiKey', username: '', passwordRef: '', apiKeyRef: 'test/qbit-key' },
+      });
+      // Key mode has no login step, so the version request is where a wrong
+      // base path first shows — the one place `qbitTest` can catch it.
+      expect(report.status).toBe('unreachable');
+      expect(report.message).toBe('qBittorrent answered 404 to the version request.');
+    } finally {
+      await clearScraperSecret('test/qbit-key');
+    }
+  });
+
+  it('sends a wrong base path verbatim rather than silently correcting it', async () => {
+    mountPath = MOUNT;
+    const report = await qbitTest({ config: { ...config, basePath: '/wrong' } });
+    expect(report.status).toBe('unreachable');
+    expect(seenWire.map((r) => r.target)).toEqual(['/wrong/api/v2/auth/login']);
+  });
+
+  /**
+   * What a user actually types into the Base Path field. `qbt` and `/qbt/` are
+   * both normalized on the way into the settings document, so both have to
+   * reach the same mount as `/qbt` — through `normalizeQbitInput`, which is
+   * what the IPC entry point runs.
+   */
+  it.each([['qbt'], ['/qbt/'], ['/qbt']])('connects on a base path typed as %j', async (typed) => {
+    mountPath = MOUNT;
+    const report = await qbitTest(
+      normalizeQbitInput({ config: { ...config, basePath: typed } }),
+    );
+    expect(report.status).toBe('connected');
+    expect(seenWire[0].target).toBe(`${MOUNT}/api/v2/auth/login`);
+  });
+
+  /** The send path, since acquisition is the reason the base path matters. */
+  it('carries the base path into torrents/add', async () => {
+    mountPath = MOUNT;
+    await qbitSend({
+      config: mounted(),
+      rows: [row({ magnet: `magnet:?xt=urn:btih:${HASH_NEW}` })],
+    });
+    expect(seenWire.map((r) => r.target)).toContain(`${MOUNT}/api/v2/torrents/add`);
+    expect(addBodies.length).toBe(1);
+  });
+
+  /**
+   * Two deployments of the same daemon differing only by base path are two
+   * different sessions. The cookie map is keyed on the full base URL, so this
+   * pins that it stays that way — a key of `host:port` would hand the second
+   * deployment a cookie the first one minted.
+   */
+  it('does not reuse one base path’s session on another', async () => {
+    mountPath = MOUNT;
+    await qbitTest({ config: mounted() });
+    const loginsAfterFirst = seenWire.filter((r) => r.target.endsWith('/auth/login')).length;
+    expect(loginsAfterFirst).toBe(1);
+    await qbitTransfers({ config: mounted({ basePath: '/other' }) });
+    // The second base path is unmounted here, so it 404s — the point is that it
+    // tried to log in again instead of riding the first mount's cookie.
+    expect(seenWire.filter((r) => r.target === '/other/api/v2/auth/login').length).toBe(1);
   });
 });
 
