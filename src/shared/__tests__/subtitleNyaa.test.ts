@@ -27,6 +27,9 @@ import {
 
 const MB = 1024 * 1024;
 
+/** Every bucket at zero, so a case says which one it is exercising. */
+const emptyDrops = { titleMatched: 0, seeders: 0, title: 0, muxed: 0, shape: 0, language: 0 };
+
 function row(overrides: Partial<TorrentRow> & { name: string }): TorrentRow {
   return {
     id: overrides.name,
@@ -611,6 +614,81 @@ describe('rankSubtitleCandidatesDetailed drops / describeEmptyNyaaListing', () =
     const { dropped } = rankSubtitleCandidatesDetailed([other, muxed], want);
     expect(dropped.title).toBe(1);
     expect(dropped.titleMatched).toBe(1);
+  });
+
+  // Measured live 2026-08-19 against the user's own profile: a search for
+  // `The Big O` returned exactly one release, it matched the title, and it was
+  // dropped for `shape` — and the listing answered "No release on the index
+  // looks like it carries subtitles for this title", which reads as "the index
+  // has nothing" when the index had this exact release. Only `muxed` was ever
+  // explained; every other bucket collapsed to that one sentence.
+  it('explains a shape drop instead of blaming the index', () => {
+    const single = row({
+      id: 'bigo',
+      name: 'The Big O [BDRip 1440x1080 x265 FLAC]',
+      isBatch: false,
+      sizeBytes: 44_452 * MB,
+      seeders: 12,
+    });
+    const { candidates, dropped } = rankSubtitleCandidatesDetailed([single], {
+      languages: ['ja'],
+      title: 'The Big O',
+    });
+    expect(candidates).toEqual([]);
+    expect(dropped.titleMatched).toBe(1);
+    expect(dropped.shape).toBe(1);
+    expect(describeEmptyNyaaListing(dropped)).toBe(
+      'No release on the index carries subtitle files for this title. Of 1 release matching it, '
+        + '1 is neither a subtitle pack nor a batch with separately-fetchable files.',
+    );
+    expect(describeEmptyNyaaListing({ ...dropped, shape: 3, titleMatched: 5 })).toContain(
+      'Of 5 releases matching it, 3 are neither subtitle packs nor batches',
+    );
+  });
+
+  it('names the user’s own language filter when that is what emptied the listing', () => {
+    // The one bucket the user can act on without touching the index.
+    expect(describeEmptyNyaaListing({ ...emptyDrops, titleMatched: 4, language: 1 })).toBe(
+      'No release on the index carries subtitle files for this title. Of 4 releases matching it, '
+        + '1 advertises subtitles only in languages this search did not ask for.',
+    );
+    expect(describeEmptyNyaaListing({ ...emptyDrops, titleMatched: 4, language: 2 })).toContain(
+      '2 advertise subtitles only in languages',
+    );
+  });
+
+  it('reads as one sentence when several buckets fired at once', () => {
+    expect(
+      describeEmptyNyaaListing({ ...emptyDrops, titleMatched: 6, muxed: 2, shape: 3, language: 1 }),
+    ).toBe(
+      'No release on the index carries subtitle files for this title. Of 6 releases matching it, '
+        + '2 declare their subtitles muxed into the video, which cannot be fetched separately, '
+        + '3 are neither subtitle packs nor batches with separately-fetchable files and '
+        + '1 advertises subtitles only in languages this search did not ask for.',
+    );
+  });
+
+  it('distinguishes an index that answered with other shows from one that answered at all', () => {
+    // `title` is the only bucket that can speak when nothing reached the title
+    // gate, and "the index knows nothing about this show" is the one case worth
+    // retrying under another name.
+    expect(describeEmptyNyaaListing({ ...emptyDrops, title: 7 })).toBe(
+      'The index returned 7 releases for this search, none of which looks like this title.',
+    );
+    expect(describeEmptyNyaaListing({ ...emptyDrops, title: 1 })).toBe(
+      'The index returned 1 release for this search, none of which looks like this title.',
+    );
+    // Negative control, and it is the reason `seeders` is not explained: it is
+    // counted BEFORE the title gate, so those rows need not be this work and
+    // quoting them against `titleMatched` would invent a relationship the
+    // ranker never established. An index that returned literally nothing, and
+    // one whose every row was under the seeder floor, both fall back.
+    expect(describeEmptyNyaaListing(emptyDrops)).toBe(
+      'No release on the index looks like it carries subtitles for this title.',
+    );
+    expect(describeEmptyNyaaListing({ ...emptyDrops, seeders: 9 })).toBe(
+      'No release on the index looks like it carries subtitles for this title.',
+    );
   });
 });
 

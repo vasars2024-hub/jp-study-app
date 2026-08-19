@@ -971,19 +971,61 @@ export function rankSubtitleCandidatesDetailed(
  */
 export function describeEmptyNyaaListing(dropped: NyaaRankDrops): string {
   const base = 'No release on the index looks like it carries subtitles for this title.';
+
+  // Only the buckets *after* the title gate may be denominated by
+  // `titleMatched`: `seeders` is counted before it, so those rows need not be
+  // this work at all and quoting them against the matched count would invent a
+  // relationship the ranker never established.
+  const clauses: string[] = [];
   if (dropped.muxed > 0) {
     // Two counts, two agreements. `N of M matching release…` cannot be made to
     // read correctly for both at once — live it produced "1 of 38 matching
     // release declares" — so each number is given its own noun phrase.
-    const matched = `${dropped.titleMatched} release${dropped.titleMatched === 1 ? '' : 's'}`;
     const [verb, its] = dropped.muxed === 1 ? ['declares', 'its'] : ['declare', 'their'];
-    return (
-      'No release on the index carries subtitle files for this title. ' +
-      `Of ${matched} matching it, ${dropped.muxed} ${verb} ${its} subtitles muxed into the ` +
-      'video, which cannot be fetched separately.'
+    clauses.push(
+      `${dropped.muxed} ${verb} ${its} subtitles muxed into the video, which cannot be fetched separately`,
     );
   }
+  if (dropped.shape > 0) {
+    // Measured live 2026-08-19 on the user's own profile: `The Big O` returned
+    // exactly one release, it matched the title, and it was dropped here — and
+    // the listing said only "nothing looks like it carries subtitles", which
+    // reads as "the index has nothing" when the index had this exact release.
+    clauses.push(
+      dropped.shape === 1
+        ? '1 is neither a subtitle pack nor a batch with separately-fetchable files'
+        : `${dropped.shape} are neither subtitle packs nor batches with separately-fetchable files`,
+    );
+  }
+  if (dropped.language > 0) {
+    // The one bucket the user can act on without touching the index: their own
+    // language list is the filter that emptied the listing.
+    const verb = dropped.language === 1 ? 'advertises' : 'advertise';
+    clauses.push(`${dropped.language} ${verb} subtitles only in languages this search did not ask for`);
+  }
+
+  if (clauses.length) {
+    const matched = `${dropped.titleMatched} release${dropped.titleMatched === 1 ? '' : 's'}`;
+    return (
+      'No release on the index carries subtitle files for this title. ' +
+      `Of ${matched} matching it, ${joinClauses(clauses)}.`
+    );
+  }
+
+  // Nothing survived the title gate, but rows did come back: "the index knows
+  // nothing about this show" and "the index answered with other shows" are
+  // different problems and only the first is worth retrying under another name.
+  if (dropped.title > 0) {
+    const returned = `${dropped.title} release${dropped.title === 1 ? '' : 's'}`;
+    return `The index returned ${returned} for this search, none of which looks like this title.`;
+  }
   return base;
+}
+
+/** `a`, `a and b`, `a, b and c` — one reading whatever the ranker dropped. */
+function joinClauses(clauses: readonly string[]): string {
+  if (clauses.length === 1) return clauses[0];
+  return `${clauses.slice(0, -1).join(', ')} and ${clauses[clauses.length - 1]}`;
 }
 
 // ------------------------------------------------------------ file selection ---
