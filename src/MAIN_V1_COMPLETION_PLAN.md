@@ -526,6 +526,7 @@ Run with `LocalHostAuth=true` and the 403 control passing, against a real daemon
     `WebUI: Credentials are not set` — that state must be reported honestly, not as a timeout.
 
 **Phase 9.2, 2026-08-18: gates 6 and 8 CLOSE against the real daemon. 7, 9, 10 stay open.**
+**Amended 2026-08-19: gate 9 CLOSES. 7 and 10 stay open, both blocked on the user.**
 Run through the live app (pid 31240, restarted onto `0ff6507a` first — the previous instance
 predated `a3a361aa` and its main process had no `authMode`), driving `window.api.scraperQbitTest`
 via `debug/p92-walk.js`. Non-destructive: no vault write, no settings write; wrong credentials were
@@ -539,11 +540,22 @@ passed **on the call** (`password` / `apiKey` on `ScraperQbitInput`) rather than
 | **6** key mode, no password anywhere | **PASSES** — `connected`, v**5.2.3**, **185 ms**, `connection: connected`, `authMode: apiKey`, with `username: ''` and `passwordRef: ''` so nothing could fall back to a password |
 | **7** password mode, no key anywhere | **BLOCKED, not failed** — `unauthorized` / "No password is stored for this account." in **9 ms**, never reaching the network. `scraperHasCredential` asked the vault directly: `qbit/apikey` **true**, `qbit/webui` **false**. Only the user has that password |
 | **8** wrong key vs wrong password | **PASSES** — key: "qBittorrent rejected the API key.", `apiKey`, **1 ms**, one attempt, no retry. Password: "The username or password was rejected.", `password`, **71 ms**, a real login round-trip the daemon refused. Two distinct strings, two distinct `authMode`s, neither generic, neither a false success |
-| **9** six operations, both modes | **1 of 6 in one mode** — `qbitTransfers` returned **7** real rows in key mode. The other five are not on `window.api` (they are internal to `subtitleNyaaSource`), and the password half is blocked by gate 7 |
+| **9** six operations, both modes | **CLOSED 2026-08-19 — 6 of 6 in both modes.** Was 1 of 6 in one mode. Five of the six are not on `window.api`, so the instrument is the product's own acquisition: `debug/qbit-basepath-proxy.cjs` grew a torrent lifecycle and `subtitleHarvestNyaaFetch` was driven end to end against it. **Key mode: 4 subtitle files, 1,825 ms, 11 stub requests, every one `served-by-key`, zero logins.** **Password mode: 4 files, 1,521 ms, 13 requests — 1 login, then 12 `served-by-session`, `served-by-key` count 0.** `qbitTransfers` completes the six in each mode: **1 row** off the stub. **CONTROLS**, same acquisition with a bad credential: wrong key → "qBittorrent rejected the API key.", wrong password → "The username or password was rejected.", **0 files each**, and the wire shows 2×403 and 2×`login-401`. Durable half `be52bc63`, 3 tests; mutation routing `qbitSetFilePriorities` around `authed()` reddens all 3 |
 | **10** WebUI disabled | **not run** — the only honest instrument is disabling the WebUI on the user's own running client, which is their app, not ours |
 
 Run control: a config naming a ref that does not exist (`qbit/does-not-exist`) refused in **0 ms**
 with "No API key is stored for this connection." — the refusal path is reached, not skipped.
+
+**Gate 9's instrument, so nobody rebuilds it.** No swarm traffic is involved: the magnet is a real
+one off a real nyaa listing, but it is only ever handed to `/stub` as a string, and the stub
+fabricates the file list and writes the four Japanese `.srt` files the fetch then reads off disk.
+The one config that matters is `savePath: ''` — a non-empty one is forwarded to `torrents/add` and
+the stub reports it back, so the fetch looks for files that are not there. `takeRememberedNyaaCandidate`
+**removes** the id, so every fetch needs its own preceding listing.
+
+**Open, and it is now the only thing between Phase 9.2 and closed: gates 7 and 10.** 7 needs the
+user's own WebUI password; 10 needs the WebUI disabled on their own client. Both are recorded in
+`needs-user.md`.
 
 **Finding, from the same run — the password pill claims a credential the vault does not hold.**
 `relay-probe` has `passwordRef: 'qbit/webui'` set while the vault has nothing behind it, and
@@ -614,10 +626,15 @@ Honest limit: `listNyaaSubtitles` is unmeasurable live here — its media-item g
 credential check and the library holds **20 books, 4 manga, 0 video**. The shared `nyaaAvailability`
 both surfaces consume is what the 8-config table measures.
 
-**Open finding from that run, not fixed.** A structurally-valid but incomplete `torrents` block passes
-`asNyaaAcquisitionConfig` (it only checks `typeof === 'object'`) and then crashes the search with
-`Cannot read properties of undefined (reading 'filter')` — a refusal that throws. Narrow it on the
-fields `searchTorrents` actually reads.
+**That run's open finding is FIXED, `a6666501`, 2026-08-19.** A structurally-valid but incomplete
+`torrents` block passed `asNyaaAcquisitionConfig` (`typeof === 'object'` only) and then threw in
+`searchTorrents` at `input.torrents.extraTrackers.filter(...)`; `listNyaaHarvest` caught it and
+printed **"Cannot read properties of undefined (reading 'filter')"** as the reason the search found
+nothing — reproduced live before the fix. The guard now requires the five lists the pipeline indexes
+into plus a finite `minSeeders`. Live after: both a gutted block and one missing only `extraTrackers`
+refuse with "No scraper configuration was supplied."; **CONTROL** — the real profile still lists
+1 candidate. Both fixtures for this guard were fictional (`maxSizeBytes`, `preferredResolutions`,
+`blockedGroups`, `maxSizeGb` are not `ScraperTorrentSettings` fields), which is why it tested green.
 
 Related defect fixed the same day, `bd725520`: the Torrent Manager credential pill rendered from the
 settings **ref** rather than the vault, so a non-empty `passwordRef` over an empty store painted

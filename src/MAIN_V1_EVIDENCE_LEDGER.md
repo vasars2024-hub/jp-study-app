@@ -25931,3 +25931,44 @@ against the live daemon on a brand-new main process.
 **Open FINDING, carried forward unfixed** (from `70efe13b`, still open): an incomplete `torrents`
 block passes `asNyaaAcquisitionConfig` and then crashes the search with `undefined (reading
 'filter')` — a refusal that throws. Narrow it on what `searchTorrents` reads.
+
+## 2026-08-19 primary — Track 9 gate 9 closes, and the refusal that threw
+
+**Gate 9 was 1 of 6 in one mode. It is now 6 of 6 in both.** Five of the six operations are not on
+`window.api` — they are internal to `subtitleNyaaSource` — so the only caller that reaches them is a
+real acquisition. Rather than adding a debug IPC surface, `debug/qbit-basepath-proxy.cjs`'s `/stub`
+mount grew a torrent lifecycle (add → metadata on the 2nd `files` poll → `filePrio` → `resume` →
+complete on the next poll → `info`), and `subtitleHarvestNyaaFetch` was driven end to end against
+it. **No swarm traffic**: the magnet is real, off a real nyaa listing, but it is only ever a string
+handed to a local stand-in.
+
+| run | result |
+| --- | --- |
+| key mode | **ok, 4 subtitle files** (episodes 1–4, 592 chars), **1,825 ms**, **11** stub requests, **all `served-by-key`**, **0** logins |
+| password mode | **ok, 4 files**, **1,521 ms**, **13** requests — **1** login then **12 `served-by-session`**, `served-by-key` count **0** |
+| `qbitTransfers`, each mode | **1 row**, `Stub Subtitle Pack [gate9]`, `jp-study-subtitles`, progress 1 |
+| CONTROL wrong key | **ok: false, 0 files**, "qBittorrent rejected the API key." — wire: 2×`refused-403` |
+| CONTROL wrong password | **ok: false, 0 files**, "The username or password was rejected." — wire: 2×`login-401` |
+
+Wire order, key mode, which is the product's own sequence: `info?category` (reaper) → `info?hashes`
+→ `add` → `files`(empty) → `info?hashes` → `files`(list) → `pause` → `filePrio` → `resume` →
+`files`(progress 1) → `info?hashes`.
+
+**Durable half `be52bc63`.** The stand-in in `scraperQbittorrent.test.ts` **404'd** `filePrio`,
+`resume`, `start`, `pause`, `stop` and `delete`, so an op that authenticates and one that does not
+failed identically there. It answers them now, and 3 tests call all six ops per mode and check the
+wire. Mutation: routing `qbitSetFilePriorities` around `authed()` reddens **all 3**. 125 pass in
+that file (was 122).
+
+**`a6666501` — the carried-forward finding, fixed.** `asNyaaAcquisitionConfig` accepted any
+`torrents` object, so an incomplete one threw in `searchTorrents` and the user was told the search
+failed because of "Cannot read properties of undefined (reading 'filter')". Reproduced live first.
+Now narrowed on the five lists the pipeline indexes into plus a finite `minSeeders`. **CONTROL** —
+the real profile config still lists 1 candidate on the restarted main. Both existing fixtures for
+this guard used field names `ScraperTorrentSettings` does not have.
+
+**Traps for the next worker.** `savePath: ''` in the probe config or the stub reports back a path
+whose files do not exist. `takeRememberedNyaaCandidate` **removes** the id, so each fetch needs its
+own listing. The stub keeps state, so restart it between measured runs or the second one is handed a
+finished torrent. Shared-code changes need an app restart: `subtitleNyaa.ts` is imported by main,
+which does not hot-reload — the fix read as unchanged until the restart.
