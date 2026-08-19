@@ -1230,6 +1230,17 @@ const defaultSleep = (ms: number) => new Promise<void>((resolve) => { setTimeout
 const TORRENT_GONE_REASON = 'This torrent is no longer in qBittorrent, so the subtitle cannot arrive.';
 
 /**
+ * The one silence that is not the swarm's and is not worth waiting out.
+ *
+ * Distinct from every other give-up message here on purpose: the others end a
+ * wait, this one refuses to start one, and the action it asks for is the user's
+ * rather than a retry.
+ */
+export const STOPPED_NO_FILE_LIST_REASON =
+  'This torrent is already in qBittorrent but is stopped, so it will never receive a file list. '
+  + 'Start it there and try again.';
+
+/**
  * What a 404 from `torrents/files` means, asked of the only endpoint that knows.
  *
  * `torrents/info?hashes=` answers `200 []` for a hash the client does not have,
@@ -1304,6 +1315,22 @@ export async function qbitAwaitMetadata(
     if (sampled.ok && sampled.value) {
       lastSwarm = swarmSampleOf(sampled.value);
       peakConnected = Math.max(peakConnected, lastSwarm.connected);
+
+      // A stopped torrent talks to nobody, so no amount of waiting can produce
+      // a file list — the timeout below would spend the whole budget and then
+      // blame the swarm for a silence the client chose. Measured 2026-08-19:
+      // **7 of 7** torrents in the user's own client are `paused`, so this is
+      // the ordinary state of the thing this branch is looking at, not an edge.
+      //
+      // Only said when the caller has disclaimed ownership (`stopWhenReady`
+      // false is exactly "the user already had this torrent"), because that is
+      // the one case where the app may not simply start it — pausing or
+      // starting someone's transfer is what this whole path exists not to do.
+      // A torrent this process added is running by construction and must still
+      // wait the swarm out; that is the negative control.
+      if (!options.stopWhenReady && sampled.value.state === 'paused') {
+        return { ok: false, reason: STOPPED_NO_FILE_LIST_REASON };
+      }
     }
 
     if (Date.now() >= deadline) {

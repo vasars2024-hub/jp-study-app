@@ -1615,6 +1615,46 @@ describe('qbitAwaitMetadata names the swarm too', () => {
     expect(out.ok).toBe(true);
     expect(out.ok === true && out.value.length).toBe(1);
   });
+
+  // A stopped torrent contacts nobody, so spending the whole budget and then
+  // blaming the swarm is a silence the client chose being reported as the
+  // release's fault. Measured 2026-08-19: 7 of 7 torrents in the user's own
+  // client are `paused`, which is the ordinary state here, not an edge.
+  it('refuses at once when the torrent the user already had is stopped', async () => {
+    fileListResponse = [];
+    torrentInfoExtra = [torrent({ state: 'stoppedDL', num_complete: 9, num_seeds: 3 })];
+    const out = await qbitAwaitMetadata({ config }, HASH_AWAIT, { ...options, stopWhenReady: false });
+    expect(out.ok).toBe(false);
+    expect(out.ok === false && out.reason).toBe(
+      'This torrent is already in qBittorrent but is stopped, so it will never receive a file list. '
+        + 'Start it there and try again.',
+    );
+    // It must not be any of the four swarm verdicts: the swarm was never the
+    // question, and this one names an action rather than a wait.
+    expect(out.ok === false && out.reason).not.toContain('file list within');
+    expect(out.ok === false && out.reason).not.toContain('dead, not slow');
+  });
+
+  it('control: a torrent this process added is stopped only by us, and still waits the swarm out', async () => {
+    // The half that must keep waiting. `stopWhenReady` true is exactly "this
+    // torrent is ours" — it is running by construction, and a client that
+    // reports it paused mid-wait is the checking/queue shuffle, not a decision
+    // the app may read as final. Identical state, one flag different.
+    fileListResponse = [];
+    torrentInfoExtra = [torrent({ state: 'stoppedDL', num_complete: 9, num_seeds: 3 })];
+    const out = await qbitAwaitMetadata({ config }, HASH_AWAIT, { ...options, stopWhenReady: true });
+    expect(out.ok).toBe(false);
+    expect(out.ok === false && out.reason).toContain('peers connected but none sent');
+    expect(out.ok === false && out.reason).not.toContain('Start it there');
+  });
+
+  it('control: a running torrent with no file list is still the swarm’s silence, not a stop', async () => {
+    fileListResponse = [];
+    torrentInfoExtra = [torrent({ state: 'metaDL', num_incomplete: 1 })];
+    const out = await qbitAwaitMetadata({ config }, HASH_AWAIT, { ...options, stopWhenReady: false });
+    expect(out.ok === false && out.reason).toContain('1 peer(s) and no seed');
+    expect(out.ok === false && out.reason).not.toContain('Start it there');
+  });
 });
 
 // ---------------------------------------------------------------------------
