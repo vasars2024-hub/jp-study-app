@@ -106,6 +106,64 @@ describe('drawer field schema', () => {
   });
 });
 
+describe('Phase 9.4 gate 17 — key mode never shows a username or password field', () => {
+  const withMode = (authMode: 'password' | 'apiKey') => ({
+    ...DEFAULT_SCRAPER_SETTINGS,
+    qbittorrent: { ...DEFAULT_SCRAPER_SETTINGS.qbittorrent, authMode },
+  });
+  const paths = (settings?: unknown) =>
+    fieldsForGroup('qbittorrent', true, settings).map((f) => f.path);
+
+  it('drops Username and Password from the group in key mode', () => {
+    const shown = paths(withMode('apiKey'));
+    expect(shown).not.toContain('qbittorrent.username');
+    expect(shown).not.toContain('qbittorrent.passwordRef');
+    expect(shown).toContain('qbittorrent.apiKeyRef');
+    // The mode selector itself has to stay, or the choice is unreachable.
+    expect(shown).toContain('qbittorrent.authMode');
+  });
+
+  /**
+   * The control. Hiding is only correct if the other mode still shows them —
+   * an `onlyWhen` that always evaluated false would pass the assertion above
+   * while deleting three controls from the product.
+   */
+  it('shows them, and hides the API Key row, in password mode', () => {
+    const shown = paths(withMode('password'));
+    expect(shown).toContain('qbittorrent.username');
+    expect(shown).toContain('qbittorrent.passwordRef');
+    expect(shown).not.toContain('qbittorrent.apiKeyRef');
+  });
+
+  it('shows every row when no document is supplied, so a census still sees them all', () => {
+    const shown = paths();
+    expect(shown).toContain('qbittorrent.username');
+    expect(shown).toContain('qbittorrent.apiKeyRef');
+  });
+
+  /**
+   * Searching must not land on a row that is not on the page. That is the
+   * defect the MAL Sync registry entry has, and the drawer's own search is the
+   * one place this file can keep it from spreading.
+   */
+  it('does not return a hidden field from the search box', () => {
+    const hits = searchScraperFields('password', true, withMode('apiKey')).map((f) => f.path);
+    expect(hits).not.toContain('qbittorrent.passwordRef');
+    expect(searchScraperFields('password', true, withMode('password')).map((f) => f.path))
+      .toContain('qbittorrent.passwordRef');
+  });
+
+  it('hides nothing outside the two credential rows and the key row', () => {
+    // A guard on blast radius: `onlyWhen` is new, and the next field to take it
+    // should be a deliberate decision rather than a copied line.
+    expect(SCRAPER_FIELDS.filter((f) => f.onlyWhen).map((f) => f.path)).toEqual([
+      'qbittorrent.username',
+      'qbittorrent.passwordRef',
+      'qbittorrent.apiKeyRef',
+    ]);
+  });
+});
+
 describe('fieldPatch', () => {
   it('turns a dotted path into the shallow patch the model expects', () => {
     expect(fieldPatch('network.retryAttempts', 5)).toEqual({ network: { retryAttempts: 5 } });

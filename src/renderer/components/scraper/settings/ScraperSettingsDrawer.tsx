@@ -90,12 +90,12 @@ export default function ScraperSettingsDrawer() {
 
   const searching = query.trim().length > 0;
   const results = useMemo(
-    () => (searching ? searchScraperFields(query, ctl.advancedMode) : []),
-    [query, searching, ctl.advancedMode],
+    () => (searching ? searchScraperFields(query, ctl.advancedMode, settings) : []),
+    [query, searching, ctl.advancedMode, settings],
   );
   const fields = useMemo(
-    () => (searching ? results : fieldsForGroup(category, ctl.advancedMode)),
-    [searching, results, category, ctl.advancedMode],
+    () => (searching ? results : fieldsForGroup(category, ctl.advancedMode, settings)),
+    [searching, results, category, ctl.advancedMode, settings],
   );
 
   const change = (path: string, value: unknown) => {

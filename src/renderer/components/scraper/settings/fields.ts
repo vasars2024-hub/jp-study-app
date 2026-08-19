@@ -107,6 +107,23 @@ export interface ScraperFieldDef {
    * indistinguishable from a broken one, and a user cannot tell which.
    */
   inert?: boolean;
+  /**
+   * Render only while another field in the same document holds this value.
+   *
+   * Added 2026-08-19 for Phase 9.4 gate 17: a user who authenticates with an
+   * API key must reach a working acquisition "without ever seeing a username or
+   * password field", and this drawer showed all three at once. Two empty
+   * credential rows beside the one that is actually in use do not just add
+   * noise — they read as unfinished setup, which is the state a working
+   * key-mode profile is least able to afford.
+   *
+   * Deliberately a value match on a path rather than a predicate: a declarative
+   * drawer that starts taking callbacks stops being searchable and diffable,
+   * and every case here is "this select is set to that option". The hidden
+   * field is hidden, never cleared — switching the mode back shows the row and
+   * its stored value exactly as it was.
+   */
+  onlyWhen?: { path: string; equals: string };
 }
 
 // 2026-08-02: 'browser' was removed from this union. It offered nine
@@ -279,9 +296,9 @@ export const SCRAPER_FIELDS: ScraperFieldDef[] = [
   { path: 'qbittorrent.port', group: 'qbittorrent', kind: 'number', label: 'Port', min: 1, max: 65_535 },
   { path: 'qbittorrent.basePath', group: 'qbittorrent', kind: 'text', label: 'Base Path', placeholder: '/qbt', advanced: true },
   { path: 'qbittorrent.authMode', group: 'qbittorrent', kind: 'select', label: 'Authentication', options: opts(SCRAPER_QBIT_AUTH_MODES, { password: 'Username and password', apiKey: 'API key' }), keywords: ['api key', 'auth', 'login'], hint: 'The mode not selected here is ignored, not used as a fallback.' },
-  { path: 'qbittorrent.username', group: 'qbittorrent', kind: 'text', label: 'Username' },
-  { path: 'qbittorrent.passwordRef', group: 'qbittorrent', kind: 'secret', label: 'Password', action: 'qbit-password', hint: 'Stored by the operating system, never in this settings file.' },
-  { path: 'qbittorrent.apiKeyRef', group: 'qbittorrent', kind: 'secret', label: 'API Key', action: 'qbit-apikey', keywords: ['api key', 'token', 'bearer'], hint: 'Sent as a Bearer token, and enough on its own — no username or password is needed in this mode.' },
+  { path: 'qbittorrent.username', group: 'qbittorrent', kind: 'text', label: 'Username', onlyWhen: { path: 'qbittorrent.authMode', equals: 'password' } },
+  { path: 'qbittorrent.passwordRef', group: 'qbittorrent', kind: 'secret', label: 'Password', action: 'qbit-password', hint: 'Stored by the operating system, never in this settings file.', onlyWhen: { path: 'qbittorrent.authMode', equals: 'password' } },
+  { path: 'qbittorrent.apiKeyRef', group: 'qbittorrent', kind: 'secret', label: 'API Key', action: 'qbit-apikey', keywords: ['api key', 'token', 'bearer'], hint: 'Sent as a Bearer token, and enough on its own — no username or password is needed in this mode.', onlyWhen: { path: 'qbittorrent.authMode', equals: 'apiKey' } },
   { path: 'qbittorrent.category', group: 'qbittorrent', kind: 'text', label: 'Category', placeholder: 'anime' },
   { path: 'qbittorrent.tags', group: 'qbittorrent', kind: 'tags', label: 'Tags' },
   { path: 'qbittorrent.savePath', group: 'qbittorrent', kind: 'text', label: 'Save Path', placeholder: 'Leave empty to use qBittorrent’s default' },
@@ -445,11 +462,27 @@ export function fieldPatch(path: string, value: unknown): Record<string, unknown
   return { [group]: { [key]: value } };
 }
 
+/**
+ * Whether a field's `onlyWhen` condition holds against the live document.
+ *
+ * `settings` undefined means "no document to ask", and every field shows —
+ * that keeps callers that only index or count fields (the search ranker's
+ * tests, the field census) seeing the whole list rather than a slice that
+ * depends on a profile they never loaded.
+ */
+export function fieldApplies(field: ScraperFieldDef, settings?: unknown): boolean {
+  if (!field.onlyWhen || settings === undefined) return true;
+  return readField(settings, field.onlyWhen.path) === field.onlyWhen.equals;
+}
+
 export function fieldsForGroup(
   group: ScraperSettingsGroupId,
   advanced: boolean,
+  settings?: unknown,
 ): ScraperFieldDef[] {
-  return SCRAPER_FIELDS.filter((f) => f.group === group && (advanced || !f.advanced));
+  return SCRAPER_FIELDS.filter(
+    (f) => f.group === group && (advanced || !f.advanced) && fieldApplies(f, settings),
+  );
 }
 
 export function groupMeta(id: string): ScraperSettingsGroup | undefined {
@@ -463,6 +496,7 @@ export function groupMeta(id: string): ScraperSettingsGroup | undefined {
 export function searchScraperFields(
   query: string,
   advanced: boolean,
+  settings?: unknown,
 ): ScraperFieldDef[] {
   const q = query.trim().toLowerCase();
   if (!q) return [];
@@ -471,6 +505,9 @@ export function searchScraperFields(
 
   for (const field of SCRAPER_FIELDS) {
     if (field.advanced && !advanced) continue;
+    // Searching past the condition would land the user on a row that is not on
+    // the page — the same defect the MAL Sync registry entry has.
+    if (!fieldApplies(field, settings)) continue;
     const label = field.label.toLowerCase();
     const hay = [field.label, field.hint ?? '', field.path, field.group, ...(field.keywords ?? [])]
       .join(' ')
