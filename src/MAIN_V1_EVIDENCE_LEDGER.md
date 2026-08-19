@@ -25877,3 +25877,57 @@ table measures, and both surfaces consume it.
 `Cannot read properties of undefined (reading 'filter')`. Reproduced with a hand-built config; the real
 profile is fine. A refusal that throws instead. Next worker: narrow `asNyaaAcquisitionConfig` on the
 fields `searchTorrents` actually reads.
+
+## 2026-08-19 primary — Phase 9.4 closes: gates 17, 18, 19
+
+`e64bd6d0` gate 18 durable half · `a1455718` gate 17 product fix. Gate 19 needed no product change.
+**Phase 9.4 is 5 of 5.** Instruments (gitignored, `debug/`): `qbit-basepath-proxy.cjs`,
+`gate18-drive.cjs`, `gate19-probe.cjs`, `gate17-restore.cjs`.
+
+**Gate 18 — a deployment that is not on the defaults.** The proxy mounts `/qb/*` as a passthrough to
+the real daemon and `/stub/*` as a stand-in; everything else 404s. **10 of 10 rows as expected.**
+Row 1 real end to end: key mode, `127.0.0.1:8781/qb`, app resolved the key from the vault →
+**qBittorrent 5.2.3**. Controls: empty basePath → "answered 404 to the version request"; `/wrong` →
+the wrong prefix arrives *intact* at the proxy; password mode empty basePath → "answered 404 to the
+login"; wrong password → "rejected". Wire log reconciles at **23 requests**, curl self-tests included.
+Password mode is measured on the stub *by choice*: the real WebUI password is not available here, and
+wrong-password probes against the real daemon walk into its own ban counter.
+
+**Why the suite could not have caught this.** The only `basePath` coverage called `qbitBaseUrl` and
+asserted its return string, so any URL built another way sails past. Now the stand-in daemon mounts
+under one — `mountPath = ''` keeps every other test on the root. Mutation control: dropping
+`${config.basePath}` reddens exactly the 8 positive tests and leaves exactly the 2 empty-base-path
+controls green, which is the right discrimination.
+
+**Gate 17 — a real defect, not a walk.** `SCRAPER_FIELDS` had no way to say a field belongs to one
+auth mode, so Username, Password and API Key rendered together. `ScraperFieldDef.onlyWhen` is a value
+match on another field's path, not a predicate — a declarative drawer that takes callbacks stops
+being searchable and diffable. Applied in `searchScraperFields` too: a search box returning a row not
+on the page is the MAL Sync defect. Hiding never clears; the ref stays in document and vault.
+Live: key mode renders **API Key present, Username absent, Password absent**; **CONTROL** the same
+drawer flipped through its own select renders the exact inverse. **7 real transfer rows** off the
+user's daemon prove key-only reaches a working client, not just a green dot.
+
+**Gate 19 — the vault, measured at rest.** Sentinel through `scraperSetCredential`, app killed
+(29180 → 25036), still `true` after. **59 files** scanned, UTF-8 *and* UTF-16: the secret is in
+**NOTHING**, `credentials.dat` included. Controls that make that a measurement: the same scanner
+finds `jp-scraper-settings-v1` in 2 leveldb files, and finds the *ref* `relay/gate19` in plaintext
+inside `credentials.dat` while the secret it names stays unreadable — same file, opposite answers.
+A ref never written answers `false`. Document: **13 `passwordRef`, 13 `apiKeyRef`, 0 bare
+`password`, 0 bare `apiKey`**. Strongest row: the **real** key, entered 2026-08-15, authenticating
+against the live daemon on a brand-new main process.
+
+**Traps for the next worker.**
+- The dev app and the **qBittorrent daemon were both down** at turn start. I started qBittorrent
+  (`C:\Program Files\qBittorrent\qbittorrent.exe`, pid 14496) and left it running; the daemon's
+  no-credential control is **403** under `LocalHostAuth=true`, verified before anything else.
+- `scraperClearCredential` resolves to `undefined`. A poller that waits for a non-null value reports
+  `TIMED OUT` on a call that worked — the follow-up `hasCredential → false` is the real answer.
+- Driving the drawer's own select **grows the settings document** 70,179 → 82,847 bytes: the round
+  trip materializes the active profile's resolved settings. Capture the raw string first and write it
+  back; restored `restoredExactly: true` at 70,179 bytes, verified again after a reload.
+- The active scraper profile is `relay-probe`, not the user's own. Do not assume its values are theirs.
+
+**Open FINDING, carried forward unfixed** (from `70efe13b`, still open): an incomplete `torrents`
+block passes `asNyaaAcquisitionConfig` and then crashes the search with `undefined (reading
+'filter')` — a refusal that throws. Narrow it on what `searchTorrents` reads.
