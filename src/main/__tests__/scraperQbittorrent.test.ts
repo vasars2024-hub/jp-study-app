@@ -34,7 +34,7 @@ vi.mock('electron', () => ({
 
 let encryptionAvailable = true;
 
-const { addFailureReason, awaitFilesStallReason, buildAddForm, magnetInfoHash, mapQbitState, mapTransfer, normalizeQbitInput, parseAddOutcome, qbitAwaitFiles, qbitBaseUrl, qbitSend, qbitAwaitMetadata, qbitTest, qbitTransfers, resetQbitSessions, swarmCount, swarmSampleOf, unreachedSwarmReason } =
+const { addFailureReason, awaitFilesStallReason, buildAddForm, magnetInfoHash, mapQbitState, mapTransfer, normalizeQbitInput, parseAddOutcome, qbitAwaitFiles, qbitBaseUrl, qbitFiles, qbitSend, qbitSetFilePriorities, qbitStart, qbitAwaitMetadata, qbitTest, qbitTorrentInfo, qbitTransfers, resetQbitSessions, swarmCount, swarmSampleOf, unreachedSwarmReason } =
   await import('../scraper/qbittorrent');
 type StallInput = Parameters<typeof awaitFilesStallReason>[0];
 
@@ -125,6 +125,20 @@ let fileListResponse: unknown[] | null = null;
  * from here and the wait sees it change under itself, exactly as it would live.
  */
 let torrentInfoHook: (() => void) | null = null;
+/**
+ * The POST routes that only acknowledge, so the stand-in answers them the way a
+ * daemon does rather than 404ing an operation into a false failure.
+ */
+const COMMAND_ROUTES = [
+  '/api/v2/torrents/filePrio',
+  '/api/v2/torrents/resume',
+  '/api/v2/torrents/start',
+  '/api/v2/torrents/pause',
+  '/api/v2/torrents/stop',
+  '/api/v2/torrents/delete',
+];
+/** Their forms, so a priority or a hash list is measured rather than assumed. */
+let commandBodies: { route: string; body: string }[] = [];
 
 const TORRENT_INFO = [
   {
@@ -299,6 +313,23 @@ beforeAll(async () => {
       });
       return;
     }
+    // The write half of the acquisition — gate 9's `qbitSetFilePriorities` and
+    // `qbitStart`, plus the stop and the reaper's delete. They 404'd here until
+    // 2026-08-19, which is why nothing in this suite could tell an operation
+    // that authenticates from one that does not: an op reaching an unrouted
+    // path fails identically whether or not it sent a credential.
+    if (COMMAND_ROUTES.includes(routed)) {
+      let body = '';
+      req.on('data', (c) => {
+        body += c;
+      });
+      req.on('end', () => {
+        commandBodies.push({ route: routed, body });
+        res.writeHead(200, { 'content-type': 'text/plain' });
+        res.end('Ok.');
+      });
+      return;
+    }
     res.writeHead(404);
     res.end('missing');
   });
@@ -336,6 +367,7 @@ beforeEach(async () => {
   seenHeaders = [];
   seenWire = [];
   loginBodies = [];
+  commandBodies = [];
   torrentInfoExtra = [];
   connectionStatus = 'connected';
   fileListResponse = null;
@@ -1970,5 +2002,122 @@ describe('Phase 9.1 gate 4 — switching modes clears the cached session', () =>
     expect(await qbitTransfers({ config })).toEqual([]);
     expect(loginBodies).toHaveLength(1);
     expect(loginBodies[0]).toBe('username=admin&password=the-password-was-changed');
+  });
+});
+
+// ---- Phase 9.2 gate 9: six operations, both modes ------------------------
+
+/**
+ * Gate 9's durable half.
+ *
+ * The gate names six operations and asks that each succeed in **both** auth
+ * modes, because reaching `app/version` proves nothing about the endpoints an
+ * acquisition actually uses. Five of them are not on `window.api` at all — they
+ * are internal to `subtitleNyaaSource` — so the live measurement had to drive a
+ * whole acquisition against a stand-in daemon. This is the part of it a suite
+ * can keep: every one of the six is called directly, in each mode, and the wire
+ * is checked for the credential that mode is supposed to send.
+ *
+ * What it would catch: an operation that stops going through `authed()`. That
+ * is not hypothetical — `authed()` is the only place the mode is read, and an
+ * endpoint added with a bare `scraperRequest` would work perfectly against a
+ * daemon with `LocalHostAuth=true` off, which is the configuration the first
+ * qBittorrent auth table in this repo was wrongly measured under.
+ */
+describe('gate 9 — every acquisition operation authenticates, in both modes', () => {
+  const HASH = 'aa11';
+  const keyConfig = (): ScraperQbittorrentSettings => ({
+    ...config,
+    authMode: 'apiKey',
+    username: '',
+    passwordRef: '',
+    apiKeyRef: 'test/qbit-key',
+  });
+
+  /** The six, in the order the gate lists them. `qbitAwaitFiles` runs last. */
+  async function runSix(used: ScraperQbittorrentSettings) {
+    const input = { config: used };
+    fileListResponse = [
+      { index: 0, name: 'Episode 01.srt', size: 240, progress: 1, priority: 1 },
+      { index: 1, name: 'Episode 02.srt', size: 240, progress: 1, priority: 1 },
+    ];
+    return {
+      transfers: (await qbitTransfers(input)).length,
+      info: await qbitTorrentInfo(input, HASH),
+      files: await qbitFiles(input, HASH),
+      prio: await qbitSetFilePriorities(input, HASH, [0, 1], 1),
+      start: await qbitStart(input, HASH),
+      await: await qbitAwaitFiles(input, HASH, [0, 1], { timeoutMs: 500, pollMs: 10 }),
+    };
+  }
+
+  it('succeeds in password mode, and every request carries the session cookie', async () => {
+    const out = await runSix(config);
+
+    expect(out.transfers).toBe(2);
+    expect(out.info.ok && out.info.value?.name).toBe('[SubsPlease] Frieren - 01');
+    expect(out.files.ok && out.files.value.length).toBe(2);
+    expect(out.prio).toEqual({ ok: true, value: 2 });
+    expect(out.start).toEqual({ ok: true, value: true });
+    expect(out.await.ok && out.await.value.length).toBe(2);
+
+    // One login, then the cookie on everything after it — and no key header
+    // anywhere, which is what makes this password mode rather than a call that
+    // happened to be authorized some other way.
+    expect(loginBodies).toHaveLength(1);
+    const afterLogin = seenWire.filter((r) => r.target !== '/api/v2/auth/login');
+    expect(afterLogin.length).toBeGreaterThanOrEqual(6);
+    expect(afterLogin.every((r) => (r.headers.cookie ?? '').includes('SID=session-token'))).toBe(true);
+    expect(afterLogin.some((r) => r.headers.authorization)).toBe(false);
+    // The write half reached the daemon as a form, not as a 404 the caller
+    // reported as success.
+    expect(commandBodies.map((c) => c.route)).toEqual([
+      '/api/v2/torrents/filePrio',
+      '/api/v2/torrents/resume',
+    ]);
+    expect(commandBodies[0].body).toBe('hash=aa11&id=0%7C1&priority=1');
+  });
+
+  it('succeeds in key mode, and every request carries the bearer key', async () => {
+    await setScraperSecret('test/qbit-key', GOOD_KEY);
+    const out = await runSix(keyConfig());
+
+    expect(out.transfers).toBe(2);
+    expect(out.info.ok && out.info.value?.name).toBe('[SubsPlease] Frieren - 01');
+    expect(out.files.ok && out.files.value.length).toBe(2);
+    expect(out.prio).toEqual({ ok: true, value: 2 });
+    expect(out.start).toEqual({ ok: true, value: true });
+    expect(out.await.ok && out.await.value.length).toBe(2);
+
+    // Key mode never logs in, so a cookie appearing here would mean an
+    // operation had fallen back to the password path behind the mode switch.
+    expect(loginBodies).toHaveLength(0);
+    expect(seenWire.length).toBeGreaterThanOrEqual(6);
+    expect(seenWire.every((r) => r.headers.authorization === `Bearer ${GOOD_KEY}`)).toBe(true);
+    expect(seenWire.some((r) => r.headers.cookie)).toBe(false);
+  });
+
+  /**
+   * The negative control, and it is the point of the whole block: the same six
+   * calls against a daemon that will not authorize them must fail — all six,
+   * distinctly, and none of them reporting a value it never received.
+   */
+  it('fails all six when the credential is wrong', async () => {
+    await setScraperSecret('test/qbit-key', 'not-the-key');
+    const out = await runSix(keyConfig());
+
+    // The refusal names the credential rather than the endpoint's status, which
+    // is the honest half of gate 8 holding across every operation and not only
+    // across `qbitTest`.
+    const rejected = { ok: false, reason: 'qBittorrent rejected the API key.' };
+    expect(out.transfers).toBe(0);
+    expect(out.info).toEqual(rejected);
+    expect(out.files).toEqual(rejected);
+    expect(out.prio).toEqual(rejected);
+    expect(out.start).toEqual(rejected);
+    expect(out.await).toEqual(rejected);
+    // Nothing was written: a refused call must not leave the stand-in holding a
+    // priority change the user never authorized.
+    expect(commandBodies).toEqual([]);
   });
 });
