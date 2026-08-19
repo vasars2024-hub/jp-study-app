@@ -26016,3 +26016,30 @@ gets its own sentence for the case where nothing reached the gate.
   it, 2 declare their subtitles muxed into the video, which cannot be fetched separately and 3 are
   neither subtitle packs nor batches…"*, 2 + 3 = 5. The old sentence quoted the same 2 of 5 and left
   the other 3 unaccounted for, which is the defect in miniature.
+
+## 2026-08-19 primary — the stopped torrent that was given a minute to answer (`26bcc93d`)
+
+Same run's second finding, and it is a Phase 9.2/9.3 contingency in the family the plan says must
+never be generic. **7 of 7** torrents in the user's own client are `paused` — measured, not an edge
+case — and `qbitAwaitMetadata` treats a stopped torrent exactly like a running one: it spends the
+whole budget and then produces one of its four carefully-worded swarm verdicts. All four are false
+findings for a stopped torrent, which contacts nobody: the release is not dead, the swarm is not
+silent, the connection is not broken. The client simply chose not to ask.
+
+The state was already in hand at zero cost — the loop samples `torrents/info` every poll for the
+swarm counts and the row carries `state`. Scoped to `stopWhenReady === false`, which is exactly
+"the user already had this torrent": the one case where the app may not just start it, since
+touching someone else's transfer is what this path exists not to do. A torrent this process added
+is running by construction and must still wait the swarm out.
+
+**3 cases, 128 pass (was 125). Mutations: dropping the ownership guard reddens the control alone;
+flipping the state predicate to `downloading` reddens 5** — all four pre-existing swarm verdicts
+plus the new one, which is what proves the branch cannot fire on a running torrent as shipped.
+Not measured live: it needs the same unavailable subject gate 14 needs — a pre-existing torrent the
+listing will hand to `nyaaFetchAll`. Stated as a limit rather than dressed up.
+
+**Gates, SHARED tree, once after the last slice.** vitest **747 files passed / 1 failed / 1
+skipped**, **10,421 passed / 6 skipped**; the one failure is `mediaSurfaceImportGraph.test.ts`
+timing out at 20 s on an import-graph walk in `src/renderer/`, which no slice this turn touched —
+**8 of 8 pass on its own in 7.4 s**, the documented load-dependent flake. i18n exit 0 at **10,625**.
+architecture exit 0, "Nothing new", 5 pending. eslint **0 errors, 0 warnings** on all 4 touched paths.
