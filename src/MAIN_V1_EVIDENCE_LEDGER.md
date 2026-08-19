@@ -25972,3 +25972,47 @@ whose files do not exist. `takeRememberedNyaaCandidate` **removes** the id, so e
 own listing. The stub keeps state, so restart it between measured runs or the second one is handed a
 finished torrent. Shared-code changes need an app restart: `subtitleNyaa.ts` is imported by main,
 which does not hot-reload — the fix read as unchanged until the restart.
+
+## 2026-08-19 primary — gate 14 is blocked, measured; and the listing that blamed the index
+
+**Gate 14 was nominated as the one of 11–15 needing no swarm. It needs no swarm and is still
+blocked — 0 of 7.** `nyaaFetchAll` only ever sees a candidate the session listing stored, so the
+target hash comes from nyaa; the only honest subject is a release nyaa and the user's client both
+know. `debug/g14-live.cjs` cross-matched every real transfer against a live `scraperSearchTorrents`:
+**7 transfers, 3 with an infohash nyaa also returns.** Of those 3 the listing drops 2 before they
+are candidates — `The Big O` (1 result, title-matched, `shape`) and `Date a Live II` (5 matched, 2
+muxed) — and the survivor `07ea0e8a…` is in `jp-study-subtitles`, i.e. the **`adopted`** branch,
+the opposite of the gate. Staging one needs the WebUI credential gate 7 is already blocked on: the
+app's own add always writes `jp-study-subtitles`, and a paused magnet has no metadata so the run
+never reaches the priority check. Recorded in `needs-user.md`. Durable half needs nothing —
+`subtitleNyaaFetch.test.ts` already asserts the refusal, **0** `filePrio` calls and unchanged
+priorities, with the `adopted` case and an uncategorised control beside it.
+
+**Trap for whoever unblocks it, and it destroys data:** any real-daemon acquisition for a candidate
+other than `07ea0e8a…` **deletes that torrent and its files** — `qbitReapSubtitleOrphans` sweeps the
+app's own category minus the in-flight hash with `deleteFiles`, and those files are the MAL plan's
+gate-31 evidence. Move it out of the category first, or drive the run through a mount that refuses
+`torrents/delete`.
+
+**The side finding is the slice, `31560cc2`.** The same run had
+`subtitleHarvestNyaaList('The Big O')` answer *"No release on the index looks like it carries
+subtitles for this title."* while the index held that exact release — it matched the title and was
+dropped for `shape`. `describeEmptyNyaaListing` explained **1 of 5** buckets (`muxed`); `shape`,
+`language` and `title` all fell through to a sentence that blames the index, and `language` is the
+user's own filter, the only cause they can act on without touching the index.
+Three buckets now speak. The denominator rule is the load-bearing part: only buckets counted
+**after** the title gate may be quoted against `titleMatched`. `seeders` is counted before it, so
+those rows need not be this work — it still falls back, deliberately, with its own test. `title`
+gets its own sentence for the case where nothing reached the gate.
+**5 cases added, 101 pass (was 97)**, including the multi-bucket reading and both negative controls.
+**Mutation: removing the `shape` clause reddens exactly 2.** Live on a restarted app (pid 28876 —
+`subtitleNyaa.ts` is imported by main, which does not hot-reload), same real profile, two titles:
+- `The Big O`: was *"No release on the index looks like it carries subtitles for this title."*, now
+  *"…Of **6** releases matching it, **6** are neither subtitle packs nor batches with
+  separately-fetchable files."* Six real releases matched the user's search and the old sentence
+  mentioned none of them.
+- `Date a Live II`, the **CONTROL**, and it did better than "unchanged": the muxed clause survives
+  verbatim inside the new sentence and the buckets now **sum exactly** — *"Of 5 releases matching
+  it, 2 declare their subtitles muxed into the video, which cannot be fetched separately and 3 are
+  neither subtitle packs nor batches…"*, 2 + 3 = 5. The old sentence quoted the same 2 of 5 and left
+  the other 3 unaccounted for, which is the defect in miniature.

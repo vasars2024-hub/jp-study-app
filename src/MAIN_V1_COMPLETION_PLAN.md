@@ -585,6 +585,35 @@ part of an automated suite.**
 15. Interrupting an in-flight acquisition leaves no half-registered `SubtitleRecord` and no
     orphaned torrent in the `jp-study-subtitles` category.
 
+**Gate 14 is BLOCKED, and 2026-08-19 measured why rather than assuming it.** It was nominated as
+the one of 11–15 needing no swarm traffic. It needs no swarm — but it does need a real
+pre-existing torrent that the product's own listing will hand to `nyaaFetchAll`, and there is
+none. `nyaaFetchAll` only ever sees a candidate `rememberNyaaCandidates` stored, so the target
+hash comes from nyaa; the only honest subject is a release nyaa and the user's client both know.
+Cross-matched every real transfer against a live `scraperSearchTorrents` (`debug/g14-live.cjs`):
+**7 transfers, 3 carry an infohash nyaa also returns.** Of those 3, the listing drops 2 before
+they are candidates at all — `The Big O` (6 title-matched, all 6 dropped `shape`) and
+`Date a Live II` (5 matched, 2 muxed + 3 shape, 0 candidates) — and the 1 that survives is
+`07ea0e8a…`, which sits in `jp-study-subtitles` and is therefore the **`adopted`** branch by
+construction, the opposite of what gate 14 asserts. So **0 of 7** can drive it.
+Staging one is not available either: the app's own add always writes `jp-study-subtitles`, and
+putting a torrent anywhere else — or moving that one out — needs the WebUI credential gate 7 is
+already blocked on. A paused magnet cannot substitute: with no metadata the run never reaches the
+priority check at all.
+Also load-bearing for whoever unblocks it: **any real-daemon acquisition for a candidate other
+than `07ea0e8a…` deletes that torrent and its files**, because `qbitReapSubtitleOrphans` sweeps
+the app's own category minus the in-flight hash with `deleteFiles`. Those files are the MAL
+plan's gate-31 evidence. Move it out of the category first, or drive the run through a mount that
+refuses `torrents/delete`.
+The durable half needs nothing: `subtitleNyaaFetch.test.ts` already asserts the refusal, **zero**
+`filePrio` calls and unchanged priorities, with the `adopted` case and an identical-but-uncategorised
+control beside it.
+
+**Its side finding is FIXED, `31560cc2`** — see the ledger. The same run showed
+`describeEmptyNyaaListing` explaining only its `muxed` bucket, so a title whose one matching
+release was dropped for `shape` was told "No release on the index looks like it carries subtitles
+for this title" while the index held that exact release.
+
 ### Phase 9.4 — portability gates (the "any user, not just this machine" requirement)
 
 16. A clean profile with no vault entry, no key, and no qBittorrent configured shows an honest
