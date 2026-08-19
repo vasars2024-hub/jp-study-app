@@ -105,12 +105,38 @@ export function qbitCredentialRef(
 }
 
 /**
+ * The list fields `searchTorrents` and the ranker call array methods on.
+ *
+ * Named rather than checked in a loop over `ScraperTorrentSettings` because the
+ * point is exactly which fields the acquisition path *reads*: a settings field
+ * this pipeline never touches must not be able to disable the provider.
+ */
+const REQUIRED_TORRENT_LISTS = [
+  // `searchTorrents`: `input.torrents.extraTrackers.filter(...)`.
+  'extraTrackers',
+  // `applyTorrentPreferences`: `.map`, `.length`, `.includes`, `.indexOf`.
+  'blockedReleaseGroups',
+  'preferredReleaseGroups',
+  'subtitleLanguages',
+  'resolutionPriority',
+] as const;
+
+/**
  * The same config as it arrives over IPC, where it is `unknown`.
  *
  * Anything not carrying all three pieces is treated as absent, which disables
  * the provider rather than half-configuring it — a config missing `qbittorrent`
  * would otherwise pass the availability check and fail at fetch time, which is
  * the same failure one step later and much harder to read.
+ *
+ * The same argument applies *inside* `torrents`, and until 2026-08-19 it was
+ * not made: `typeof === 'object'` accepted a block missing every list the search
+ * reads, and the refusal then arrived as a raw `Cannot read properties of
+ * undefined (reading 'filter')` printed to the user as the listing's message —
+ * measured live on `subtitleHarvestNyaaList`. A refusal that throws is worse
+ * than one that says nothing, because it says something untrue about the
+ * release. So the lists the pipeline actually indexes into are required here,
+ * where a missing one is still "this profile is not configured".
  */
 export function asNyaaAcquisitionConfig(input: unknown): NyaaAcquisitionConfig | undefined {
   if (!input || typeof input !== 'object') return undefined;
@@ -118,6 +144,11 @@ export function asNyaaAcquisitionConfig(input: unknown): NyaaAcquisitionConfig |
   if (!Array.isArray(value.indexers)) return undefined;
   if (!value.torrents || typeof value.torrents !== 'object') return undefined;
   if (!value.qbittorrent || typeof value.qbittorrent !== 'object') return undefined;
+  const torrents = value.torrents as Partial<ScraperTorrentSettings>;
+  if (REQUIRED_TORRENT_LISTS.some((field) => !Array.isArray(torrents[field]))) return undefined;
+  // Read by the ranker as a number; `undefined` there silently drops the seeder
+  // floor rather than throwing, which is the quieter half of the same defect.
+  if (typeof torrents.minSeeders !== 'number' || !Number.isFinite(torrents.minSeeders)) return undefined;
   return value as NyaaAcquisitionConfig;
 }
 

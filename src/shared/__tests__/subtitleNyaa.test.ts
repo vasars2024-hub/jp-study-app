@@ -870,9 +870,24 @@ describe('buildSubtitleQuery', () => {
 });
 
 describe('asNyaaAcquisitionConfig', () => {
+  /**
+   * The torrent block as the pipeline reads it. The old fixture here was
+   * `{ maxSizeBytes: 1 }` — a field name `ScraperTorrentSettings` does not have
+   * — which is exactly how a config missing every list the search indexes into
+   * tested green for a year.
+   */
+  const torrents = {
+    minSeeders: 1,
+    maxSizeMb: 0,
+    extraTrackers: [],
+    blockedReleaseGroups: [],
+    preferredReleaseGroups: [],
+    subtitleLanguages: [],
+    resolutionPriority: [],
+  };
   const whole = {
     indexers: [{ id: 'nyaa', kind: 'torrent', enabled: true }],
-    torrents: { maxSizeBytes: 1 },
+    torrents,
     qbittorrent: { enabled: true, savePath: '' },
   };
 
@@ -891,6 +906,35 @@ describe('asNyaaAcquisitionConfig', () => {
     // Half-accepting would pass the availability check and then fail at fetch
     // time — the same failure one step later and much harder to read.
     expect(asNyaaAcquisitionConfig(input)).toBeUndefined();
+  });
+
+  /**
+   * The measured defect, 2026-08-19: a structurally-valid but incomplete
+   * `torrents` block passed this guard and then threw inside `searchTorrents`,
+   * so `subtitleHarvestNyaaList` reported **"Cannot read properties of
+   * undefined (reading 'filter')"** to the user as the reason the release
+   * search found nothing.
+   */
+  it.each([
+    ['extraTrackers', 'searchTorrents filters it for enabled trackers'],
+    ['blockedReleaseGroups', 'applyTorrentPreferences maps it into a Set'],
+    ['preferredReleaseGroups', 'the ranker reads it too'],
+    ['subtitleLanguages', 'applyTorrentPreferences reads its length'],
+    ['resolutionPriority', 'the resolution rank indexes into it'],
+  ])('refuses a torrents block missing %s — %s', (field) => {
+    const missing = { ...torrents } as Record<string, unknown>;
+    delete missing[field];
+    expect(asNyaaAcquisitionConfig({ ...whole, torrents: missing })).toBeUndefined();
+    // Control: the same block *with* the field is accepted, so the rejection is
+    // that field and not the reshaping.
+    expect(asNyaaAcquisitionConfig({ ...whole, torrents: { ...missing, [field]: [] } })).toBeTruthy();
+  });
+
+  it('refuses a torrents block whose minSeeders is not a finite number', () => {
+    expect(asNyaaAcquisitionConfig({ ...whole, torrents: { ...torrents, minSeeders: undefined } })).toBeUndefined();
+    expect(asNyaaAcquisitionConfig({ ...whole, torrents: { ...torrents, minSeeders: '3' } })).toBeUndefined();
+    expect(asNyaaAcquisitionConfig({ ...whole, torrents: { ...torrents, minSeeders: Number.NaN } })).toBeUndefined();
+    expect(asNyaaAcquisitionConfig({ ...whole, torrents: { ...torrents, minSeeders: 0 } })).toBeTruthy();
   });
 });
 

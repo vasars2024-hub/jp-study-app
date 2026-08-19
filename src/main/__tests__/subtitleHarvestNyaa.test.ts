@@ -120,7 +120,19 @@ function acquisition() {
       priority: 1, fallbackIds: [], verifiedSiteId: '', requiresAuth: false,
       supportsSubtitles: true, health: 'unknown', lastCheckedAt: null, notes: '',
     }],
-    torrents: { minSeeders: 1, preferredResolutions: [], blockedGroups: [], maxSizeGb: 0 },
+    // The field names `ScraperTorrentSettings` actually has. The previous
+    // fixture invented `preferredResolutions`, `blockedGroups` and `maxSizeGb`,
+    // none of which exist — so it could not have caught a guard that lets an
+    // incomplete torrents block through into `searchTorrents`.
+    torrents: {
+      minSeeders: 1,
+      maxSizeMb: 0,
+      extraTrackers: [],
+      blockedReleaseGroups: [],
+      preferredReleaseGroups: [],
+      subtitleLanguages: [],
+      resolutionPriority: [],
+    },
     qbittorrent: {
       enabled: true, scheme: 'http', host: '127.0.0.1', port: 8080, basePath: '',
       username: 'admin', passwordRef: '', category: 'jp-study', tags: [], savePath: '',
