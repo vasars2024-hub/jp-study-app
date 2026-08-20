@@ -289,9 +289,35 @@ export default function ReadingLensOverlay() {
     });
   }, []);
 
-  // Warm the tokenizer so the first scan can split words synchronously.
+  /**
+   * Warm the tokenizer so the first scan can split words synchronously — and
+   * re-stamp the capture that did not get to wait for it.
+   *
+   * `buildLines` and the clipboard branch both fall back to a single token
+   * carrying the whole line, and that fallback used to be permanent: a capture
+   * that landed before the tokenizer resolved never got its words back. The
+   * whole line stayed one hotspot, and the Read depth's vocabulary harvest —
+   * which only counts `content` tokens — stayed empty for the life of the
+   * window. Measured live on the clipboard path: 0 harvest rows, 0 ruby.
+   */
   useEffect(() => {
-    void getTokenizer().catch(() => undefined);
+    if (tokenizerReady()) return undefined;
+    let alive = true;
+    void getTokenizer()
+      .then(() => {
+        if (!alive || !tokenizerReady()) return;
+        setState((current) => {
+          if (current.kind === 'reading') return { ...current, lines: buildLines(current.lines) };
+          if (current.kind === 'passage') {
+            return { ...current, tokens: tokenizeSync(current.capture.text) };
+          }
+          return current;
+        });
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
   }, []);
 
   // Begin (or restart) a selection / auto-read when the window is (re)opened.
