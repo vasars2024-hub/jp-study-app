@@ -26725,3 +26725,59 @@ the plan's Track 5 section one at a time, not by keyword sweep.
 **Across Tracks 1/4/5/6: 19 finished / 6 partial / 4 deferred = 29** (Track 1 five, Track 4 nine,
 Track 5 two finished + six partial, Track 6 three finished + four deferred). Track 5 remains the
 only track with partials.
+
+## 2026-08-20 primary — Track 5 bullet 6 CLOSES: resize, restore bounds, pin, dock
+
+Three slices. Bullet 6 is "Pin, dock, resize, restore bounds, and work correctly across
+monitors"; across-monitors already closed with `d3408014`'s `resolveRepeatRegion`, so this
+turn closed the other four. **Track 5 is now 3 finished + 5 partial; Tracks 1/4/5/6 =
+20 finished / 5 partial / 4 deferred = 29.**
+
+- **`83d63cb0` — resize + restore bounds.** Eight grips on `.lens-frame`; a drag moves that
+  edge (or both edges of a corner) and releases into a rescan. Restore-bounds is free: the
+  rescan goes through the same `lens:ocr` handler that already remembers every rectangle, so
+  the resized rect becomes `lastRegion`. Arithmetic is pure in `shared/readingLensRegion.ts` —
+  an edge dragged past its opposite CLAMPS, it does not flip the rect and silently re-frame a
+  different piece of screen. **Live, region 640,900 400x150 over the app's own sidebar:** grip
+  `s` measured at 832,1041 16x16 (bottom-edge midpoint); mousedown alone left it 400x150
+  (control); after the move the frame previewed 400x300; after mouseup the rescan landed
+  **10 lines where the 150-tall read had 5**, the six new ones all below screen y=1050 and
+  correctly ABSENT before. `lastRegion` on disk became 400x300. **Negative control:** a
+  grab-and-release with zero travel → frame unchanged, `sameText: true`, no rescan.
+- **`c002631f` — pin.** A finished read ghosts at 1.2 s and closes at 3.6 s once the cursor
+  leaves the fragments; the Pin toggle suspends that. Persisted (`jp-study-lens-pinned`),
+  because pinning is a way of working, not a per-scan choice. **Live:** unpinned control →
+  `lens-dimmed` at t+1.5 s, `lens-idle`/0 lines at t+4.2 s; pinned → `lens-root`, never dimmed,
+  5 lines still there at **t+8.0 s**; Escape while pinned → `lens-idle`, 0 lines.
+- **`39b1777a` — dock.** The bar was hardcoded to the bottom, which is exactly where
+  subtitles and VN dialogue boxes are. `resolveLensChromeDock` moves it to the top when the
+  read reaches into the bottom band (76 DIP); an explicit preference always wins and cycles
+  auto → bottom → top (`jp-study-lens-dock`). **Live, 2560x1600:** read at 400x150 → bar
+  `lens-chrome-bottom`, top=**1539**. Dragged the south grip 1049→1549 → read 400x**650**
+  (bottom 1550, inside the 1524 band) → bar `lens-chrome-top`, top=**22**: it moved
+  **1,517 px** off the text, unprompted, and the tooltip changed from "at the bottom" to "at
+  the top". Override cycle measured: auto(top=22) → bottom(top=**1539**, beating auto) →
+  top(22) → auto(22), stored value following each step.
+
+**Traps for the next worker.**
+1. **A false negative control cost me a slice's worth of time.** The FIRST unpinned dismissal
+   run did not dim either — not a defect: lens mode was persisted as `ai`, and the AI analysis
+   panel already suspends the countdown by design. **Check `.lens-mode-btn.active` before
+   concluding anything about the auto-dismiss.**
+2. **A renderer-injected probe div is not a screen probe.** A white box of 46 px Japanese
+   appended to window 1's `documentElement` renders perfectly in `capturePage()` and was
+   **never** picked up by `lens:ocr`, which reads the composited screen. Two hours are
+   available to whoever repeats this. Use the app's own rendered chrome as the OCR subject
+   instead — `640,900 400x150` over the Settings sidebar yields 5 stable lines.
+3. `window.screenY` on window 1 reports the **window** origin, not the content origin (640,370
+   vs a measured content origin of 638,**393**). Derive the offset from a known OCR'd label,
+   never from `screenX/screenY`.
+4. jsdom has **no `elementFromPoint`**, and both of the overlay's mousemove listeners call it
+   first. Without a stub the auto-dismiss test "passes" by never arming. Both new test files
+   stub it to `null`.
+5. `debug/stage-head-plus-insert.cjs <path> <anchor> <lineCount>` counts lines **preceding the
+   anchor in the worktree**. After the first commit of a turn, HEAD already holds that turn's
+   earlier keys — pass only the NEW line count (4, not 12), or the earlier block is staged
+   twice and the remainder check still passes.
+
+**Gates, SHARED tree, once after the last slice:** see the turn's closing report.
