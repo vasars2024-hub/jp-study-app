@@ -23,6 +23,10 @@ import MangaRegionDrawLayer from '../components/manga/MangaRegionDrawLayer';
 import MangaSidebar from '../components/manga/MangaSidebar';
 import Icon from '../components/Icons';
 import { runOcr, type OcrLang } from '../ocr';
+import {
+  buildMangaCaptureTarget,
+  LENS_CAPTURE_TARGET_KEY,
+} from '../../shared/lensCaptureTarget';
 import { stripFuriganaFragments } from '../../shared/mangaOcrText';
 import { lookupWordFromMouseUp, isLookupClick, noteLookupPointerDown } from '../wordLookup';
 import { registerCommandHandler } from '../keyboardShortcuts';
@@ -350,6 +354,30 @@ export default function MangaReader({ item, onClose }: Props) {
     },
     [pages, idx, t],
   );
+
+  /**
+   * The manga half of the shared ReadingLens pipeline, parked the same way the
+   * visual-novel panel parks its own target: the lens is a separate always-on-top
+   * window owned by main, so the only channel between the two renderers is this
+   * `localStorage` slot on their shared origin.
+   *
+   * Manga parks provenance and nothing more. The novel additionally offers a
+   * save-back because its store is keyed by route/chapter/scene, all of which the
+   * panel knows; a manga line would have to land in a `MokuroBlock`, and a block
+   * needs a box in *page-image* coordinates that a screen rectangle cannot be
+   * converted into without knowing the current zoom, fit and monitor. Guessing
+   * that is the defect `fb8ee0ed` just fixed, so the region editor stays the way
+   * a manga region is created.
+   */
+  const captureWithLens = useCallback(async (): Promise<void> => {
+    localStorage.setItem(LENS_CAPTURE_TARGET_KEY, JSON.stringify(buildMangaCaptureTarget({
+      mangaId: item.id,
+      title: item.title,
+      chapter: item.readingSource?.chapterNumber ?? '',
+      page: String(idx + 1),
+    })));
+    await window.api.lensOpen('select');
+  }, [item.id, item.title, item.readingSource?.chapterNumber, idx]);
 
   const scanPage = useCallback(
     async (opts?: { force?: boolean; lang?: OcrLang }) => {
@@ -1396,6 +1424,15 @@ export default function MangaReader({ item, onClose }: Props) {
           >
             <Icon name="search" size={13} style={{ marginRight: 4, verticalAlign: '-2px' }} />
             {t('manga.ocr.scan')}
+          </button>
+          <button
+            className="btn"
+            title={t('manga.lens.captureTitle')}
+            disabled={!pages.length}
+            onClick={() => void captureWithLens()}
+          >
+            <Icon name="eye" size={13} style={{ marginRight: 4, verticalAlign: '-2px' }} />
+            {t('manga.lens.capture')}
           </button>
         </div>
       </div>

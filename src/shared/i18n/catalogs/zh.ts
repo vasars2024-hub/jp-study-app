@@ -4199,6 +4199,8 @@ export const zh: Catalog = {
   'manga.pageAlt': '第 {n} 页',
   'manga.ocr.scan': '扫描',
   'manga.ocr.scanTitle': '用 OCR 识别本页日文文本',
+  'manga.lens.capture': '阅读镜',
+  'manga.lens.captureTitle': '用阅读镜截取本页的一部分',
   'manga.ocr.panelTitle': '页面文本',
   'manga.ocr.close': '关闭',
   'manga.ocr.showSfx': '显示拟声词',

@@ -4655,6 +4655,8 @@ export const ru: Catalog = {
   'manga.pageAlt': 'Страница {n}',
   'manga.ocr.scan': 'Сканировать',
   'manga.ocr.scanTitle': 'Распознать японский текст на странице (OCR)',
+  'manga.lens.capture': 'Линза',
+  'manga.lens.captureTitle': 'Захватить часть страницы «Линзой чтения»',
   'manga.ocr.panelTitle': 'Текст страницы',
   'manga.ocr.close': 'Закрыть',
   'manga.ocr.showSfx': 'Показывать звуки',

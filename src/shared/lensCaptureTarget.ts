@@ -18,7 +18,7 @@
 export const LENS_CAPTURE_TARGET_KEY = 'jp-lens-capture-target-v1';
 export const LENS_CAPTURE_TARGET_MAX_AGE_MS = 30 * 60 * 1000;
 
-export const LENS_CAPTURE_TARGET_WORKFLOWS = ['visual-novel'] as const;
+export const LENS_CAPTURE_TARGET_WORKFLOWS = ['visual-novel', 'manga'] as const;
 export type LensCaptureTargetWorkflow = (typeof LENS_CAPTURE_TARGET_WORKFLOWS)[number];
 
 export interface VisualNovelCaptureFields {
@@ -39,8 +39,24 @@ export interface VisualNovelCaptureTarget {
   visualNovel: VisualNovelCaptureFields;
 }
 
-/** A union of one today; a second workflow adds a member and its derivation. */
-export type LensCaptureTarget = VisualNovelCaptureTarget;
+export interface MangaCaptureFields {
+  mangaId: string;
+  title: string;
+  /** Chapter number when the item came from a provider; '' for a plain import. */
+  chapter: string;
+  /** 1-based page number as shown in the reader, stringified for the ref. */
+  page: string;
+}
+
+export interface MangaCaptureTarget {
+  workflow: 'manga';
+  sourceLabel: string;
+  sourceRef: string;
+  createdAt: number;
+  manga: MangaCaptureFields;
+}
+
+export type LensCaptureTarget = VisualNovelCaptureTarget | MangaCaptureTarget;
 
 /** Both bounds match `normalizeReadingLensCapture`, which truncates past them. */
 const MAX_SOURCE_LABEL = 240;
@@ -121,6 +137,42 @@ export function buildVisualNovelCaptureTarget(
   };
 }
 
+export function mangaCaptureRef(fields: MangaCaptureFields): string {
+  let ref = `manga:${boundedEncode(fields.mangaId, MAX_SOURCE_REF - 6)}`;
+  ref = withParam(ref, 'chapter', fields.chapter);
+  ref = withParam(ref, 'page', fields.page);
+  return ref;
+}
+
+export function mangaCaptureLabel(fields: MangaCaptureFields): string {
+  // The page is what makes one manga capture distinguishable from the next, so
+  // it is a part of the label rather than only of the ref.
+  return boundedLabel([
+    fields.title,
+    fields.chapter ? `Ch. ${fields.chapter}` : '',
+    fields.page ? `p. ${fields.page}` : '',
+  ]);
+}
+
+export function buildMangaCaptureTarget(
+  fields: MangaCaptureFields,
+  createdAt = Date.now(),
+): MangaCaptureTarget {
+  const manga: MangaCaptureFields = {
+    mangaId: clean(fields.mangaId, MAX_ID),
+    title: clean(fields.title, MAX_CONTEXT),
+    chapter: clean(fields.chapter, MAX_CONTEXT),
+    page: clean(fields.page, MAX_ID),
+  };
+  return {
+    workflow: 'manga',
+    sourceLabel: mangaCaptureLabel(manga),
+    sourceRef: mangaCaptureRef(manga),
+    createdAt,
+    manga,
+  };
+}
+
 export function normalizeLensCaptureTarget(
   value: unknown,
   now = Date.now(),
@@ -137,20 +189,38 @@ export function normalizeLensCaptureTarget(
   ) {
     return null;
   }
-  if (candidate.workflow !== 'visual-novel') return null;
-  const payload = candidate.visualNovel;
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
-  const fields = payload as Record<string, unknown>;
-  const target = buildVisualNovelCaptureTarget({
-    visualNovelId: clean(fields.visualNovelId, MAX_ID),
-    title: clean(fields.title, MAX_CONTEXT),
-    routeId: clean(fields.routeId, MAX_ID),
-    chapter: clean(fields.chapter, MAX_CONTEXT),
-    scene: clean(fields.scene, MAX_CONTEXT),
-  }, createdAt);
-  // A target with no novel and no name cannot address anything.
-  if (!target.visualNovel.visualNovelId || !target.visualNovel.title) return null;
-  return target;
+  if (candidate.workflow === 'visual-novel') {
+    const payload = candidate.visualNovel;
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+    const fields = payload as Record<string, unknown>;
+    const target = buildVisualNovelCaptureTarget({
+      visualNovelId: clean(fields.visualNovelId, MAX_ID),
+      title: clean(fields.title, MAX_CONTEXT),
+      routeId: clean(fields.routeId, MAX_ID),
+      chapter: clean(fields.chapter, MAX_CONTEXT),
+      scene: clean(fields.scene, MAX_CONTEXT),
+    }, createdAt);
+    // A target with no novel and no name cannot address anything.
+    if (!target.visualNovel.visualNovelId || !target.visualNovel.title) return null;
+    return target;
+  }
+  if (candidate.workflow === 'manga') {
+    const payload = candidate.manga;
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+    const fields = payload as Record<string, unknown>;
+    const target = buildMangaCaptureTarget({
+      mangaId: clean(fields.mangaId, MAX_ID),
+      title: clean(fields.title, MAX_CONTEXT),
+      chapter: clean(fields.chapter, MAX_CONTEXT),
+      page: clean(fields.page, MAX_ID),
+    }, createdAt);
+    // Same rule as the novel: no item and no name addresses nothing. The page
+    // is allowed to be absent — a capture from an unpaginated view still points
+    // at the right book.
+    if (!target.manga.mangaId || !target.manga.title) return null;
+    return target;
+  }
+  return null;
 }
 
 export function parseLensCaptureTarget(

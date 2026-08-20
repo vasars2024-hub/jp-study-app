@@ -635,7 +635,8 @@ export default function ReadingLensOverlay() {
   };
 
   const saveToVisualNovel = async (): Promise<void> => {
-    if (state.kind !== 'reading' || !captureTarget || visualNovelSaveState === 'saving') return;
+    if (state.kind !== 'reading' || visualNovelSaveState === 'saving') return;
+    if (captureTarget?.workflow !== 'visual-novel') return;
     const { visualNovel } = captureTarget;
     const lines = state.lines
       .map((line) => line.text.trim())
@@ -783,7 +784,10 @@ export default function ReadingLensOverlay() {
             onAskAgent={() => askAgent(state.lines, state.screenshotDataUrl)}
             lookUpState={lookUpState}
             onLookUp={lexiconCapture ? () => void lookUpInLexicon(lexiconCapture) : undefined}
-            visualNovelTitle={captureTarget?.visualNovel.title}
+            originLabel={captureTarget?.sourceLabel}
+            visualNovelTitle={
+              captureTarget?.workflow === 'visual-novel' ? captureTarget.visualNovel.title : undefined
+            }
             visualNovelSaveState={visualNovelSaveState}
             onSaveToVisualNovel={() => void saveToVisualNovel()}
           />
@@ -891,6 +895,7 @@ export function LensChrome({
   onAskAgent,
   lookUpState = 'idle',
   onLookUp,
+  originLabel,
   visualNovelTitle,
   visualNovelSaveState,
   onSaveToVisualNovel,
@@ -909,6 +914,12 @@ export function LensChrome({
   lookUpState?: 'idle' | 'sending' | 'error';
   /** Absent when the capture is paragraph-scale — see `lexiconCapture` above. */
   onLookUp?: () => void;
+  /**
+   * The parked workflow's own `sourceLabel`, shown so the capture says on
+   * screen what it is about to be stamped with. Absent for a bare hotkey
+   * capture, which has no workflow behind it.
+   */
+  originLabel?: string;
   visualNovelTitle?: string;
   visualNovelSaveState: 'idle' | 'saving' | 'saved' | 'error';
   onSaveToVisualNovel: () => void;
@@ -916,6 +927,11 @@ export function LensChrome({
   return (
     <div className="lens-chrome lens-interactive">
       <span className="lens-source-badge">{t('lens.badge.source.screen')}</span>
+      {originLabel && (
+        <span className="lens-source-badge lens-origin-badge" title={originLabel}>
+          {originLabel}
+        </span>
+      )}
       <span
         className={`lens-confidence-badge lens-confidence-${confidence.level}`}
         title={t('lens.confidence.reviewLines', { count: confidence.reviewLineCount })}

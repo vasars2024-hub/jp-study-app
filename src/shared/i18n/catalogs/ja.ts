@@ -4217,6 +4217,8 @@ export const ja: Catalog = {
   'manga.pageAlt': '{n} ページ',
   'manga.ocr.scan': 'スキャン',
   'manga.ocr.scanTitle': 'このページの日本語テキストをOCRで読み取る',
+  'manga.lens.capture': 'レンズ',
+  'manga.lens.captureTitle': 'リーディングレンズでこのページの一部を取り込む',
   'manga.ocr.panelTitle': 'ページのテキスト',
   'manga.ocr.close': '閉じる',
   'manga.ocr.showSfx': '効果音を表示',

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildMangaCaptureTarget,
   buildVisualNovelCaptureTarget,
   LENS_CAPTURE_TARGET_MAX_AGE_MS,
+  LENS_CAPTURE_TARGET_WORKFLOWS,
   normalizeLensCaptureTarget,
   parseLensCaptureTarget,
 } from '../lensCaptureTarget';
@@ -111,5 +113,125 @@ describe('lens capture target', () => {
     });
     expect(capture?.sourceLabel).toBe(target.sourceLabel);
     expect(capture?.sourceRef).toBe(target.sourceRef);
+  });
+});
+
+describe('lens capture target: manga', () => {
+  const mangaFields = {
+    mangaId: ' manga-1 ',
+    title: '  よつばと！ ',
+    chapter: ' 12 ',
+    page: ' 47 ',
+  };
+
+  it('is a declared workflow beside the visual novel, not a loose string', () => {
+    expect([...LENS_CAPTURE_TARGET_WORKFLOWS]).toEqual(['visual-novel', 'manga']);
+  });
+
+  it('derives the contract provenance fields from the page the reader is on', () => {
+    const target = buildMangaCaptureTarget(mangaFields, 50_000);
+    expect(target).toEqual({
+      workflow: 'manga',
+      sourceLabel: 'よつばと！ · Ch. 12 · p. 47',
+      sourceRef: 'manga:manga-1?chapter=12&page=47',
+      createdAt: 50_000,
+      manga: { mangaId: 'manga-1', title: 'よつばと！', chapter: '12', page: '47' },
+    });
+  });
+
+  it('omits a chapter a plain import does not have, and keeps the page', () => {
+    const target = buildMangaCaptureTarget(
+      { mangaId: 'manga-2', title: 'Yotsuba', chapter: '', page: '3' },
+      1,
+    );
+    expect(target.sourceLabel).toBe('Yotsuba · p. 3');
+    expect(target.sourceRef).toBe('manga:manga-2?page=3');
+  });
+
+  it('re-derives provenance on read rather than trusting what was stored', () => {
+    const now = 1_000_000_000;
+    const target = normalizeLensCaptureTarget({
+      workflow: 'manga',
+      sourceLabel: 'A book that was never this one',
+      sourceRef: 'manga:some-other-book?page=999',
+      createdAt: now,
+      manga: { mangaId: 'manga-1', title: 'Yotsuba', chapter: '', page: '47' },
+    }, now);
+    expect(target?.sourceLabel).toBe('Yotsuba · p. 47');
+    expect(target?.sourceRef).toBe('manga:manga-1?page=47');
+  });
+
+  it('refuses a manga target whose payload cannot address a book', () => {
+    const now = 1_000_000_000;
+    const manga = { mangaId: 'manga-1', title: 'Yotsuba', chapter: '', page: '1' };
+    // No payload at all, and the payload under the *other* workflow's key.
+    expect(normalizeLensCaptureTarget({ workflow: 'manga', createdAt: now }, now)).toBeNull();
+    expect(normalizeLensCaptureTarget(
+      { workflow: 'manga', createdAt: now, visualNovel: manga },
+      now,
+    )).toBeNull();
+    expect(normalizeLensCaptureTarget(
+      { workflow: 'manga', createdAt: now, manga: { ...manga, title: '' } },
+      now,
+    )).toBeNull();
+    expect(normalizeLensCaptureTarget(
+      { workflow: 'manga', createdAt: now, manga: { ...manga, mangaId: '' } },
+      now,
+    )).toBeNull();
+    // The same expiry the novel is held to.
+    expect(normalizeLensCaptureTarget(
+      { workflow: 'manga', createdAt: now - LENS_CAPTURE_TARGET_MAX_AGE_MS - 1, manga },
+      now,
+    )).toBeNull();
+    // Control: the same shape inside the window resolves, so the refusals above
+    // are the named rules and not a dead manga branch.
+    expect(normalizeLensCaptureTarget({ workflow: 'manga', createdAt: now, manga }, now))
+      .not.toBeNull();
+  });
+
+  it('keeps a page with no number addressable, which an unpaginated view produces', () => {
+    const target = buildMangaCaptureTarget(
+      { mangaId: 'manga-3', title: 'Untitled', chapter: '', page: '' },
+      1,
+    );
+    expect(target.sourceLabel).toBe('Untitled');
+    expect(target.sourceRef).toBe('manga:manga-3');
+    expect(parseLensCaptureTarget(JSON.stringify(target), 1)).toEqual(target);
+  });
+
+  it('keeps a Japanese ref inside the capture contract budget, escapes intact', () => {
+    const long = '巻'.repeat(240);
+    const target = buildMangaCaptureTarget(
+      { mangaId: long, title: long, chapter: long, page: long },
+      1,
+    );
+    expect(target.sourceRef.length).toBeLessThanOrEqual(1_000);
+    expect(target.sourceLabel.length).toBeLessThanOrEqual(240);
+    expect(() => decodeURIComponent(target.sourceRef.slice('manga:'.length))).not.toThrow();
+  });
+
+  it('survives the capture normalizer that stores it — label NFKC-folded, ref intact', () => {
+    // TRAP for whoever adds the next workflow: `normalizeReadingLensCapture`
+    // runs every string through `NFKC` (`readingLens.ts:129`), so a full-width
+    // `！` in a title is stored as `!`. That is pre-existing and applies to the
+    // visual-novel label too — its own test simply uses a title with no
+    // full-width punctuation. The *ref* is percent-encoded and therefore ASCII,
+    // so it round-trips byte-for-byte and stays the addressable half.
+    const target = buildMangaCaptureTarget(
+      { mangaId: 'manga-1', title: 'よつばと！', chapter: '第12話', page: '47' },
+      1,
+    );
+    const capture = normalizeReadingLensCapture({
+      source: 'screen',
+      sourceLabel: target.sourceLabel,
+      sourceRef: target.sourceRef,
+      text: 'テスト',
+      lines: [],
+    });
+    expect(capture?.sourceLabel).toBe(target.sourceLabel.normalize('NFKC'));
+    expect(capture?.sourceLabel).toBe('よつばと! · Ch. 第12話 · p. 47');
+    expect(capture?.sourceRef).toBe(target.sourceRef);
+    expect(decodeURIComponent(capture!.sourceRef.slice('manga:'.length)))
+      .toBe('manga-1?chapter=第12話&page=47');
   });
 });

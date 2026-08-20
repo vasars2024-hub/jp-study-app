@@ -227,6 +227,22 @@
   padding: 3px 8px;
   border-radius: 999px;
 }
+/*
+ * The workflow's own label is user content, not chrome: a long Japanese title
+ * would otherwise push the mode switch and the actions off the chrome, so it
+ * is the one badge that truncates. Lowercase because it is a title, not a tag.
+ */
+.lens-source-badge.lens-origin-badge {
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  text-transform: none;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--lens-ink);
+}
 .lens-confidence-badge {
   padding: 3px 8px;
   border: 1px solid rgba(255, 255, 255, 0.14);
