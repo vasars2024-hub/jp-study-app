@@ -26306,3 +26306,39 @@ are `LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md`'s L4, not main-v1's to close here.
 (Track 1 provider health/caching/retry; Track 4 detail drawer; Track 6 media shell nav), 2 open and
 owned by Track 5's checkpoint**, with 5 further Track 6 bullets deferred to the Liquid plan by the
 plan's own dependency order. Nothing here needs the user.
+
+## 2026-08-20 primary — correction to the entry above: Track 1's provider lane is 8 of 9, not 6
+
+**Retracted within the same turn, before the claim could be inherited.** The entry above called
+provider **health**, **caching** and **retry** "absent from the AI lane" on the strength of
+`grep -rln 'providerHealth|healthCheck|maxRetries' src/main src/shared` returning zero hits in
+`agentProviderRouter.ts`. That is the failure mode this relay's own rules name: a keyword sweep
+over the wrong field names, in the wrong file. All three exist, in `providerRuntime.ts` — the
+router is the policy/privacy half, the runtime is the transport half, and the router calls it
+(`agentProviderRouter.ts:16-22`, `:422-425`).
+
+- **Retry: shipped.** `providerRuntime.ts:693-694` bounds `retryAttempts` to 0–5 and
+  `retryBaseDelayMs` to 0–30 s; `:721` retries only what `normalized.retriable` allows; `:725` is
+  `retryBaseDelayMs * 2 ** (attempts - 1)`, real exponential backoff; `:259` classifies HTTP 429;
+  `:14` emits a typed `retry` telemetry event carrying attempt, delay and reason.
+- **Caching: shipped, and honest about what it cannot do.** `:138` `sessionCache`, `:201`
+  `cacheKey` over request+model+maxOutputTokens, `:666-679` serves the hit and emits `cache-hit`
+  **plus** a `complete` with `cached: true` — and `:667-670` refuses `persistent` with its own code
+  `persistent-cache-unavailable` rather than silently downgrading to session.
+- **Both are policy-driven, not hardcoded:** `agentCloudRuntimeOptions` (`:170-192`) forwards
+  `policy.cache` and `policy.retryAttempts` straight through.
+
+**The gap is real but narrower: provider health is an exported function nothing calls.**
+`getAiProviderHealth` (`:151-159`) returns `{providerId, model, credentialBucket, configured}`, and
+`grep -rn getAiProviderHealth src` outside its own module returns **zero** — no IPC channel, no
+preload binding, no renderer consumer. So the centralization bullet's health clause is built and
+unwired, which is the same class as F5's inert fields: it exists, and nothing can see it.
+
+**Corrected count for the four tracks: 25 of 29 finished, 2 partial** (Track 1 provider health
+unwired; Track 4 detail drawer), 2 open under Track 5's checkpoint, 5 deferred to the Liquid plan.
+Track 6's shell-nav partial stands unchanged — that one was read from source, not swept.
+
+**Next slice, and it is ordinary cross-surface work:** wire `getAiProviderHealth` to a consumer —
+shared contract, main handler, preload, `window.d.ts`, one renderer read, four catalogs — so a
+provider with no key says so before a request fails. Its negative control is the obvious one: clear
+the bucket and the surface must report `configured: false`, not a cheerful default.

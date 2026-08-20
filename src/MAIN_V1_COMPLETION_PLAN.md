@@ -31,12 +31,14 @@ Status: canonical integration brief for the main tree. Re-derive every status fr
 - Support local Qwen as the no-key fallback and provider adapters through the managed vault.
 - Reuse one structured provider client and one permission/audit model instead of creating feature-specific clients.
 
-**Re-derived 2026-08-20 — 4 of 5 finished, 1 partial.** Open: provider **health**, response
-**caching** and **retry** are absent from the AI lane (`agentProviderRouter.ts` has zero hits;
-`healthCheck`/`maxRetries` live only in `subtitleDiscovery.ts` and `connectionProfiles.ts`).
-Everything else — vault, scraper-store migration, plaintext-downgrade refusal, Qwen fallback, the
-single client and its privacy gate — is shipped with a mechanism at a named line. See the ledger,
-"Tracks 1, 4, 5, 6 re-derived bullet-by-bullet".
+**Re-derived 2026-08-20 — 4 of 5 finished, 1 partial (8 of 9 sub-items).** Everything but one
+sub-item is shipped with a mechanism at a named line: vault, scraper-store migration,
+plaintext-downgrade refusal, Qwen fallback, the single client and its privacy gate, and — in
+`providerRuntime.ts`, not the router — caching (`:138`/`:666-679`) and retry with exponential
+backoff (`:693-727`). The one gap: **provider health is an exported function nothing calls.**
+`getAiProviderHealth` (`:151`) has zero consumers outside its own module — no IPC channel, no
+preload binding, no renderer read — so a mis-keyed provider surfaces only as a failed request.
+See the ledger, "Tracks 1, 4, 5, 6 re-derived bullet-by-bullet" and its correction.
 
 ## Track 2: professional multilingual Lexicon Workbench
 
