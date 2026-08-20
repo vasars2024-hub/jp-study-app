@@ -18,8 +18,8 @@ import type { ReadingPassageHandoff } from '../../shared/readingPassageHandoff';
 import Icon from '../components/Icons';
 import { useT } from '../i18n';
 import {
+  claimReadingPassageHandoff,
   onReadingPassageHandoffStaged,
-  takeReadingPassageHandoff,
 } from '../readingPassageHandoffClient';
 import {
   consumePendingReadingWorkspaceRoute,
@@ -112,12 +112,17 @@ export default function ReadingWorkspaceView({
    * the second capture of a session vanish. Claiming is what switches the tab,
    * because arriving at Discover with the passage silently loaded one tab over
    * is indistinguishable from the gesture having failed.
+   *
+   * `claimReadingPassageHandoff` rather than a bare take, because main's claim
+   * is single-use and StrictMode's effect replay would otherwise consume the
+   * passage into an effect that is immediately discarded. Measured live: the
+   * pop-out mounted on Discover with the slot already emptied.
    */
   const claimPassage = useCallback(() => {
     let cancelled = false;
-    void takeReadingPassageHandoff().then((result) => {
-      if (cancelled || !result.ok || !result.handoff) return;
-      setPassage(result.handoff);
+    void claimReadingPassageHandoff().then((handoff) => {
+      if (cancelled || !handoff) return;
+      setPassage(handoff);
       setSection('captures');
     });
     return () => {

@@ -14,8 +14,14 @@
  *   announcement is what fixes it, and the negative control is the same mount
  *   with nothing staged: it must stay on Discover rather than opening an empty
  *   reader.
+ *
+ * Everything here renders inside `StrictMode`, because the app does and because
+ * a version of this that did not shipped a passage lane that failed in the real
+ * window while passing here: main's claim is single-use, so the dev effect
+ * replay claimed the passage into an effect that was then thrown away and the
+ * remount found the slot empty. Measured live before the latch existed.
  */
-import { act } from 'react';
+import { StrictMode, act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -108,6 +114,8 @@ beforeEach(async () => {
   slot.staged = null;
   slot.listeners = [];
   installApiStub();
+  const client = await import('../readingPassageHandoffClient');
+  client.__resetReadingPassageHandoffLatch();
   View = (await import('../views/ReadingWorkspaceView')).default;
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -126,7 +134,11 @@ function section(): string | null {
 describe('Reading workspace passage claim', () => {
   it('stays on the opening section when nothing is staged', async () => {
     await act(async () => {
-      root.render(<View initialSection="discover" onOpenBook={() => undefined} />);
+      root.render(
+        <StrictMode>
+          <View initialSection="discover" onOpenBook={() => undefined} />
+        </StrictMode>,
+      );
     });
     await settle(() => section() === 'captures');
     expect(section()).toBe('discover');
@@ -136,7 +148,11 @@ describe('Reading workspace passage claim', () => {
   it('claims on mount, switches to Captures and renders the passage lines', async () => {
     slot.staged = passage('cap-1', 'Notepad', ['彼は図書館で', '本を読んでいた。']);
     await act(async () => {
-      root.render(<View initialSection="discover" onOpenBook={() => undefined} />);
+      root.render(
+        <StrictMode>
+          <View initialSection="discover" onOpenBook={() => undefined} />
+        </StrictMode>,
+      );
     });
     await settle(() => container.querySelectorAll('.reading-captures-passage p').length > 0);
 
@@ -150,7 +166,11 @@ describe('Reading workspace passage claim', () => {
   it('claims again on the announcement, so the second passage is not dropped', async () => {
     slot.staged = passage('cap-1', 'Notepad', ['一行目']);
     await act(async () => {
-      root.render(<View initialSection="discover" onOpenBook={() => undefined} />);
+      root.render(
+        <StrictMode>
+          <View initialSection="discover" onOpenBook={() => undefined} />
+        </StrictMode>,
+      );
     });
     await settle(() => container.querySelectorAll('.reading-captures-passage p').length > 0);
     expect(section()).toBe('captures');
