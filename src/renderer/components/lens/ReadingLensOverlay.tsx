@@ -296,7 +296,12 @@ export default function ReadingLensOverlay() {
             return;
           }
           if (!res.ok) {
-            const message = res.error === 'capture-failed' ? t('lens.error.capture') : t('lens.error.generic');
+            const message =
+              res.error === 'capture-display-ambiguous'
+                ? t('lens.error.captureDisplay')
+                : res.error === 'capture-failed'
+                  ? t('lens.error.capture')
+                  : t('lens.error.generic');
             setState({ kind: 'error', region, message, canRetry: true });
             return;
           }

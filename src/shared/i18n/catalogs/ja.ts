@@ -2928,6 +2928,7 @@ export const ja: Catalog = {
   'lens.error.manga': 'マンガOCRモデルがまだインストールされていません。',
   'lens.error.downloading': 'OCRモデルをダウンロード中です。少し待ってから再試行してください。',
   'lens.error.capture': '画面を取得できませんでした。',
+  'lens.error.captureDisplay': 'この範囲がどのモニターにあるか判別できなかったため、取得を中止しました。もう一度お試しいただくか、ウィンドウをメインディスプレイに移動してください。',
   'lens.error.generic': '読み取り中に問題が発生しました。',
   'lens.action.rescan': '再スキャン',
   'lens.action.askAgent': 'エージェントに聞く',

@@ -101,7 +101,9 @@ vi.mock('../ocrAuto', () => ({
   },
 }));
 
-const { cropCalls, resizeCalls, fakeImage, state, engines, ocr } = h;
+const { cropCalls, resizeCalls, fakeImage, displays, state, engines, ocr } = h;
+/** The two-monitor default, restored per test — the display list is mutable. */
+const DEFAULT_DISPLAYS = displays.map((d) => ({ ...d }));
 const { regionToPixels, decideZoom, scaleLines, betterPass, medianGlyphPx, meanConfidence, totalChars } =
   __screenOcrTestables;
 
@@ -137,6 +139,7 @@ beforeEach(() => {
   state.thumbnail = fakeImage(1920, 1080);
   state.sourcesThrow = null;
   state.sources = null;
+  displays.splice(0, displays.length, ...DEFAULT_DISPLAYS.map((d) => ({ ...d })));
 });
 
 // ---- regionToPixels: clamping and validation ---------------------------
@@ -244,6 +247,34 @@ describe('ocrRegion — malformed input must not throw', () => {
     expect(res.error).toBe('capture-failed');
   });
 
+  /*
+   * The wrong-monitor guard.
+   *
+   * `display_id` comes back empty on some Windows and Linux configurations. The
+   * old fallback chain then reached for the primary display and finally
+   * `sources[0]`, captured a screen the user never pointed at, and returned
+   * `ok: true` — the user reads text that was never inside the box they drew.
+   * With two displays present, an unmatchable source must refuse instead.
+   */
+  it('refuses rather than capturing a different monitor when no source matches', async () => {
+    state.sources = [
+      { display_id: '', thumbnail: state.thumbnail },
+      { display_id: '', thumbnail: state.thumbnail },
+    ];
+    const res = await ocrRegion({ x: 0, y: 0, width: 100, height: 100 }, 2);
+    expect(res.ok).toBe(false);
+    expect(res.error).toBe('capture-display-ambiguous');
+    expect(cropCalls).toEqual([]); // nothing was captured at all
+  });
+
+  it('still captures an unlabelled source when there is exactly one screen and one display', async () => {
+    displays.splice(1); // single-monitor machine
+    state.sources = [{ display_id: '', thumbnail: state.thumbnail }];
+    const res = await ocrRegion({ x: 0, y: 0, width: 100, height: 100 }, 1);
+    expect(res.ok).toBe(true);
+    expect(res.error).toBeUndefined();
+  });
+
   it('handles an empty thumbnail (screen not yet composited)', async () => {
     state.thumbnail = fakeImage(0, 0);
     const res = await ocrRegion({ x: 0, y: 0, width: 100, height: 100 }, 1);
@@ -293,7 +324,11 @@ describe('ocrRegion — engine availability', () => {
 describe('ocrRegion — DIP mapping', () => {
   it('divides crop-pixel boxes by the scale factor and emits width/height', async () => {
     ocr.impl = () => result([line([100, 40, 300, 80])]);
-    // display 2 has scaleFactor 2
+    // display 2 has scaleFactor 2. The source has to carry `display_id: '2'`:
+    // the default stub only offers display 1, and this case used to pass by
+    // riding the old fallback — i.e. it asserted display 2's scale factor while
+    // capturing display 1's pixels. That fallback is now a refusal.
+    state.sources = [{ display_id: '2', thumbnail: state.thumbnail }];
     const res = await ocrRegion({ x: 0, y: 0, width: 300, height: 200 }, 2);
     expect(res.ok).toBe(true);
     expect(res.lines[0].box).toEqual([50, 20, 100, 20]);

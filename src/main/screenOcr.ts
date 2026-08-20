@@ -118,11 +118,30 @@ async function captureRegion(
   };
 
   const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize });
-  const source =
-    sources.find((s) => s.display_id === String(display.id)) ??
-    sources.find((s) => s.display_id === String(screen.getPrimaryDisplay().id)) ??
-    sources[0];
-  if (!source || source.thumbnail.isEmpty()) return null;
+  /*
+   * Which screen we actually grabbed has to be certain, not probable.
+   *
+   * The old chain was `display_id match → primary → sources[0]`, which on a
+   * machine where Electron reports an empty `display_id` — it does on some
+   * Windows and Linux configurations — silently OCRs a *different monitor* and
+   * returns `ok: true`. The user then reads text that was never inside the box
+   * they drew, with nothing to indicate it. That is the false-success shape this
+   * track forbids, and an honest refusal is the correct behaviour.
+   *
+   * The unlabelled fallback survives only where it cannot be wrong: exactly one
+   * screen source and exactly one display, where "the screen" is unambiguous.
+   * Anything else refuses.
+   */
+  // No sources at all is a different condition — the capturer gave us nothing,
+  // which `capture-failed` already covers. Ambiguity is specifically "screens
+  // exist and we cannot tell which one is the requested display".
+  if (sources.length === 0) return null;
+  const matched = sources.find((s) => s.display_id === String(display.id));
+  const onlyScreen =
+    !matched && sources.length === 1 && screen.getAllDisplays().length === 1 ? sources[0] : null;
+  const source = matched ?? onlyScreen;
+  if (!source) throw new Error('capture-display-ambiguous');
+  if (source.thumbnail.isEmpty()) return null;
 
   const full = source.thumbnail;
   const px = regionToPixels(region, scaleFactor, full.getSize());
