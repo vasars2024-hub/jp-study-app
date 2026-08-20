@@ -411,6 +411,15 @@ function installBridge(): void {
       const request = raw as { approved: boolean };
       return request.approved ? navigationApproved : navigationReview;
     }),
+    // Both cloud providers hold a key here, so the picker's "no API key" marker
+    // stays off and every existing label assertion reads the plain name. The
+    // marker's own behaviour is covered live and in `aiProviderHealth.test.ts`;
+    // what this stub is for is that the shell now *asks* on mount.
+    aiProviderHealth: record('providerHealth', () => [
+      { providerId: 'gemini-2.5-flash', model: 'gemini-2.5-flash', credentialBucket: 'gemini', configured: true },
+      { providerId: 'deepseek-v4-flash', model: 'deepseek-v4-flash', credentialBucket: 'deepseek', configured: true },
+      { providerId: 'deepseek-v4-pro', model: 'deepseek-v4-pro', credentialBucket: 'deepseek', configured: true },
+    ]),
   };
 }
 
@@ -551,7 +560,7 @@ afterEach(() => {
 describe('Agent workspace shell', () => {
   it('loads once on mount and labels the surface for a screen reader', async () => {
     await mount();
-    expect(calls.map((call) => call.method)).toEqual(['load']);
+    expect(calls.map((call) => call.method)).toEqual(['load', 'providerHealth']);
     expect(host.querySelector('.agent-shell')?.getAttribute('aria-label'))
       .toBe('agent.shell.aria');
     expect(host.querySelector('.agent-rail')?.getAttribute('aria-label'))
@@ -607,7 +616,7 @@ describe('Agent workspace shell', () => {
 
     expect((host.querySelector('textarea') as HTMLTextAreaElement).value)
       .toBe('agent.suggestions.prompt.reading');
-    expect(calls.map((call) => call.method)).toEqual(['load']);
+    expect(calls.map((call) => call.method)).toEqual(['load', 'providerHealth']);
   });
 
   it('defaults to a clean Simple view and reveals advanced controls in Full view', async () => {
@@ -676,12 +685,12 @@ describe('Agent workspace shell', () => {
     expect(content?.hidden).toBe(true);
     expect(host.querySelector('.agent-conversation-workspace')?.classList)
       .toContain('is-inspector-collapsed');
-    expect(calls.map((call) => call.method)).toEqual(['load']);
+    expect(calls.map((call) => call.method)).toEqual(['load', 'providerHealth']);
 
     await click(toggle);
     expect(toggle.getAttribute('aria-expanded')).toBe('true');
     expect(content?.hidden).toBe(false);
-    expect(calls.map((call) => call.method)).toEqual(['load']);
+    expect(calls.map((call) => call.method)).toEqual(['load', 'providerHealth']);
   });
 
   it('switches the inspector shelf and filtered activity with the selected conversation', async () => {
@@ -752,7 +761,7 @@ describe('Agent workspace shell', () => {
     expect(document.activeElement).toBe(contextItem);
     expect(contextItem?.classList.contains('is-opened')).toBe(true);
     expect(host.querySelector('[role="alert"]')).toBeNull();
-    expect(calls.map((call) => call.method)).toEqual(['load']);
+    expect(calls.map((call) => call.method)).toEqual(['load', 'providerHealth']);
   });
 
   it('keeps navigation suggestions inert and resolves provenance from live selected context', async () => {
@@ -798,7 +807,7 @@ describe('Agent workspace shell', () => {
     expect(sources?.textContent).toContain('agent.context.source');
     expect(sources?.textContent).not.toContain('Other conversation source');
     expect(host.textContent).not.toContain('ctx-stale');
-    expect(calls.map((call) => call.method)).toEqual(['load']);
+    expect(calls.map((call) => call.method)).toEqual(['load', 'providerHealth']);
   });
 
   it('reviews a destination, opens it only on approval, and never sends one', async () => {
@@ -1240,7 +1249,7 @@ describe('Agent workspace shell', () => {
     expect(host.querySelector('[role="alert"]')?.textContent)
       .toContain('agent.error.invalid-request');
     expect(host.querySelector('.agent-context-item.is-opened')).toBeNull();
-    expect(calls.map((call) => call.method)).toEqual(['load']);
+    expect(calls.map((call) => call.method)).toEqual(['load', 'providerHealth']);
   });
 
   it('moves rail focus with the arrow keys', async () => {
