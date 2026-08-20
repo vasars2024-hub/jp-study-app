@@ -302,4 +302,92 @@ describe('buildApkgExportChanges', () => {
       { cardId: 'c-n1', noteId: 'n1', deckId: 'split:d1:N5' },
     ]);
   });
+
+  describe('a card the same journal DESIGNED', () => {
+    // Gate 14's live walk refused the whole export with `card-missing` naming
+    // `1768607213795-design2`: a split moved a card `template-add` was still
+    // creating, and the writer validates every move against the SOURCE
+    // package's `cards` table. Nine other rows' edits went down with it,
+    // because the writer is all-or-nothing.
+    function designed(deckId: string, due: number) {
+      const base = splitDraft();
+      const tpl = {
+        ord: 1,
+        name: 'Card 2',
+        qfmt: '{{Back}}',
+        afmt: '{{FrontSide}}{{Front}}',
+        bqfmt: '',
+        bafmt: '',
+      };
+      const made = card({ id: 'n1-design1', noteId: 'n1', ord: 1, deckId, due });
+      const d: AnkiDraft = {
+        ...base,
+        cards: [...base.cards, made],
+        noteTypes: base.noteTypes.map((nt) => ({ ...nt, templates: [tpl] })),
+      };
+      const j: AnkiDraftEditJournal = {
+        done: [
+          {
+            kind: 'template-add',
+            noteTypeId: 'nt1',
+            template: tpl,
+            addedField: null,
+            cards: [{ ...made, deckId: 'd1', due: 10 }],
+          },
+        ],
+        undone: [],
+      };
+      return { d, j };
+    }
+
+    it('folds its refile into the design instead of a move no source card can take', () => {
+      const { d, j } = designed('split:d1:N5', 10);
+      j.done.push({
+        kind: 'card-deck', noteId: 'n1', cardId: 'n1-design1',
+        before: 'd1', after: 'split:d1:N5',
+      });
+      const changes = buildApkgExportChanges(d, j);
+      expect(changes.cardDeckMoves).toEqual([]);
+      expect(changes.templateAdds?.[0].cards).toEqual([
+        { noteId: 'n1', deckId: 'split:d1:N5', due: 10 },
+      ]);
+    });
+
+    it('still creates the invented deck the design is now the only card in', () => {
+      const { d, j } = designed('split:d1:N5', 10);
+      j.done.push({
+        kind: 'card-deck', noteId: 'n1', cardId: 'n1-design1',
+        before: 'd1', after: 'split:d1:N5',
+      });
+      const changes = buildApkgExportChanges(d, j);
+      expect(changes.deckCreates).toEqual([
+        { deckId: 'split:d1:N5', name: 'Core::N5', configId: '7' },
+      ]);
+    });
+
+    it('folds its reposition into the design too, for the same reason', () => {
+      const { d, j } = designed('d1', 42);
+      j.done.push({ kind: 'card-due', noteId: 'n1', cardId: 'n1-design1', before: 10, after: 42 });
+      const changes = buildApkgExportChanges(d, j);
+      expect(changes.cardMoves).toEqual([]);
+      expect(changes.templateAdds?.[0].cards).toEqual([
+        { noteId: 'n1', deckId: 'd1', due: 42 },
+      ]);
+    });
+
+    it('leaves a SOURCE card alone — the fold is only for cards being created', () => {
+      const { d, j } = designed('d1', 10);
+      j.done.push({
+        kind: 'card-deck', noteId: 'n2', cardId: 'c-n2',
+        before: 'd1', after: 'split:d1:N4',
+      });
+      const changes = buildApkgExportChanges(d, j);
+      expect(changes.cardDeckMoves).toEqual([
+        { cardId: 'c-n2', noteId: 'n2', deckId: 'split:d1:N4' },
+      ]);
+      expect(changes.templateAdds?.[0].cards).toEqual([
+        { noteId: 'n1', deckId: 'd1', due: 10 },
+      ]);
+    });
+  });
 });

@@ -533,6 +533,27 @@ export function buildApkgExportChanges(
   const noteById = new Map(draft.notes.map((n) => [n.id, n]));
   const cardById = new Map(draft.cards.map((c) => [c.id, c]));
 
+  /**
+   * Cards a `template-add` in this same journal invented, keyed to the row
+   * inside the add that carries them.
+   *
+   * They are the mirror of the `template-format`-into-design fold above, and
+   * they exist for the same reason: the SOURCE package has no such card, so a
+   * change that named one would be validated against `cards` and refused
+   * `card-missing` naming a synthetic id (`<noteId>-design<ord>`) the user has
+   * never seen — while nine other rows' edits went down with it, because the
+   * writer is all-or-nothing. The add already carries `deckId` and `due` per
+   * card, so a move of a designed card is not a move at all: it is which deck
+   * and which queue position the card is CREATED in.
+   */
+  const designedCards = new Map<string, { add: ApkgExportTemplateAdd; at: number }>();
+  for (const op of journal.done) {
+    if (op.kind !== 'template-add') continue;
+    const add = added.get(`${op.noteTypeId}:${op.template.ord}`);
+    if (!add) continue;
+    op.cards.forEach((card, at) => designedCards.set(card.id, { add, at }));
+  }
+
   const fieldNotes = new Set<string>();
   const tagNotes = new Set<string>();
   const cardMoves: ApkgExportCardMove[] = [];
@@ -553,7 +574,9 @@ export function buildApkgExportChanges(
     } else if (entry.kind === 'card-deck') {
       const card = entry.cardId ? cardById.get(entry.cardId) : undefined;
       if (card && card.deckId !== entry.firstBefore) {
-        cardDeckMoves.push({ cardId: card.id, noteId: entry.noteId, deckId: card.deckId });
+        const designed = designedCards.get(card.id);
+        if (designed) designed.add.cards[designed.at].deckId = card.deckId;
+        else cardDeckMoves.push({ cardId: card.id, noteId: entry.noteId, deckId: card.deckId });
       }
     } else if (entry.kind === 'card-flag') {
       // Re-read against the draft exactly as a field is: a flag set and cleared
@@ -581,7 +604,9 @@ export function buildApkgExportChanges(
     } else {
       const card = entry.cardId ? cardById.get(entry.cardId) : undefined;
       if (card && card.due !== entry.firstBefore) {
-        cardMoves.push({ cardId: card.id, noteId: entry.noteId, due: card.due });
+        const designed = designedCards.get(card.id);
+        if (designed) designed.add.cards[designed.at].due = card.due;
+        else cardMoves.push({ cardId: card.id, noteId: entry.noteId, due: card.due });
       }
     }
   }
@@ -613,11 +638,19 @@ export function buildApkgExportChanges(
   // would write empty subdecks into the package for an edit the user took back.
   const deckCreates: ApkgExportDeckCreate[] = [];
   const creating = new Set<string>();
-  for (const move of cardDeckMoves) {
-    if (!isMintedDeckId(move.deckId) || creating.has(move.deckId)) continue;
-    const deck = draft.decks.find((d) => d.id === move.deckId);
+  // A designed card absorbed its move above rather than emitting one, so its
+  // target deck has to be collected here too — otherwise a split whose ONLY
+  // card in an invented subdeck is a designed one would ship the add pointing
+  // at a `split:` id no writer ever brought into existence.
+  const deckTargets = [
+    ...cardDeckMoves.map((m) => m.deckId),
+    ...[...designedCards.values()].map(({ add, at }) => add.cards[at].deckId),
+  ];
+  for (const deckId of deckTargets) {
+    if (!isMintedDeckId(deckId) || creating.has(deckId)) continue;
+    const deck = draft.decks.find((d) => d.id === deckId);
     if (!deck) continue; // The writer refuses the move by name; do not invent one here.
-    creating.add(move.deckId);
+    creating.add(deckId);
     deckCreates.push({ deckId: deck.id, name: deck.name, configId: deck.configId });
   }
 
