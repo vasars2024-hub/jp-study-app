@@ -386,6 +386,19 @@ silently consumed the single-use claim until the client latched the in-flight pr
 Track 5 is now **4 finished / 4 partial**; Tracks 1/4/5/6 = **21 finished / 4 partial /
 4 deferred = 29**.
 
+**Amended 2026-08-20 (same day, later) — bullet 7 now CLOSES.** It names five workflows and
+all five are in: VN and manga were already, `24266c45` added the browser, `84c7a26d` the video
+and `6553f743` the document reader (PDF and EPUB arrive at one derivation because
+`pdfLoader.ts` produces the same `LoadedEpub` shape). Each parks its own provenance in the
+shared `localStorage` slot and each was clicked in the running app, with the browser carrying
+the negative control: with no page open the click parks **nothing** and says so.
+`f918b5f9` is the finding the walk produced — the reader's item shipped inside a menu bar that
+only the aero and wired material sets render, so it moved to a toolbar that renders in every
+theme. Counted one bullet line at a time, not by keyword sweep.
+Track 5 is now **5 finished / 3 partial**; Tracks 1/4/5/6 = **22 finished / 3 partial /
+4 deferred = 29**. Remaining Track 5 partials: bullets 2 (alternate OCR candidates, mixed-panel
+order model), 3 (progressive **Read**) and 8 (privacy/retention, OCR/model defaults).
+
 ### Track 5 implementation checkpoint — 2026-08-12
 
 - **Searchable capture/session history: done.** Persistent captures, pinning, and — as of

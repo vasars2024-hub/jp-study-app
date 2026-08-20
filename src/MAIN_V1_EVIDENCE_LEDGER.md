@@ -26826,3 +26826,56 @@ it fails, which is the regression guard.
 `onRead && …` render and the scale complement are covered by unit tests.
 Track 5 is now **4 finished / 4 partial**; Tracks 1/4/5/6 = **21 finished / 4 partial /
 4 deferred = 29**. Remaining Track 5 partials: bullets 2, 3, 7, 8.
+
+## 2026-08-20 primary — Track 5 bullet 7 closes: the shared pipeline's last three workflows
+
+`24266c45` browser, `84c7a26d` video, `6553f743` document, `f918b5f9` the reachability fix,
+`ae92ecc0` the harness that stood in the way. `1abf166f` (the interrupted turn's last act,
+committed 76 s before its usage limit and never logged) had taught the **contract** all three;
+none had a producer. Bullet 7 now has five of five.
+
+**Decisions, standing auto-approval.** (1) The video id is **namespaced** — `anilist:20812`,
+because `VideoCoreMiningSource.mediaId` is an AniList id while `MediaStudyMode` speaks in
+library item ids, and one raw field holding both resolves the wrong thing later. Rejected:
+leaving it empty, which is honest and addresses nothing. (2) A document's `page` is the
+1-based ordinal of the **part**, never the screen page: `pdfLoader.ts:94-103` emits one chapter
+per PDF page, so for a PDF that ordinal *is* the page, while an EPUB's screen page is a
+function of font size and window width and would resolve elsewhere next launch. (3) All three
+park provenance and offer **no save-back** — same reason `bb165db8` gave for manga.
+
+**LIVE, real app (pid 37824, port 39273, restart needed only because the app was not running).
+`/logs?level=error` total 0 across every probe below.**
+- **Document.** Book `悪の教典 02` opened from the Library. Slot cleared → `null` (control).
+  Click → `doc:078d8fa0-…?format=epub&section=%E7%AC%AC%E4%B8%83%E7%AB%A0&page=8`, label code
+  points decode to `悪の教典 02 · 第七章 · p. 8`, `format:"epub"`. Lens window 3 came up on
+  `?readingLens=1` and reads the same slot (shared origin).
+- **Browser, with its own negative control.** Immersion popout, **no page open**: click →
+  slot stayed `"null"` and *"Open a web page first"* rendered. Then the saved NHK Easy article:
+  click → `web:https%3A%2F%2Fnews.web.nhk%2F…`, label = the real page title + `news.web.nhk`.
+- **Video.** `video-study-harness.html`, the real `VideoCoreMiningPanel` on its SHIROBAKO
+  fixture. Slot cleared → `null`. Click → `video:anilist%3A20812?episode=3&t=0`, label
+  `SHIROBAKO · Ep. 3 · 0:00`.
+
+**TRAP, and it is why the live walk mattered — a menu most themes do not render.**
+`NovelReader`'s Study items reach `AppChrome menus={…}`, and `AppChrome.tsx:62` returns bare
+children when `useAppMaterialSet()` is `null`, which it is for every theme except **aero** and
+**wired** (`:25-27`). Measured on the default theme: `.ui-menubar__btn` → **0**. The lens item
+shipped in `6553f743` was therefore invisible; `f918b5f9` moves it to the reader's own toolbar
+(now **5** buttons, the new title among them) and keeps the menu entry for the two material
+sets. **Still open, pre-existing:** `epub.askAgent` and `epub.askAgentPassage` are menu-only
+and equally unreachable on the default theme. Not fixed blind here.
+
+**Second trap.** `videoStudyHarness.tsx` assigned `window.api` at module scope; `contextBridge`
+defines it non-writable, so the page died with `#root` empty, body text length **15**, and
+`/logs?level=error` **0** — it looked like a slow build. `ae92ecc0` guards it.
+
+**Gates, SHARED tree, once after the last slice.** `npx vitest run` → **761 files: 760 passed,
+1 skipped — 0 failures, exit 0** (10,560 passed / 6 skipped; +2 files and +22 tests against the
+759/10,538 baseline, which is exactly this turn's 11 new tests plus `1abf166f`'s 11).
+i18n exit 0 at **10,672** (+6). architecture exit 0, "Nothing new", 5 pending. eslint over all
+13 touched paths: **0 new errors** — the 1 error (`react-hooks/exhaustive-deps` rule not found,
+`ImmersionContent`) is present at `1abf166f:518` and the 9 warnings are `NovelReader`'s
+pre-existing non-null assertions.
+
+Track 5 is now **5 finished / 3 partial**; Tracks 1/4/5/6 = **22 finished / 3 partial /
+4 deferred = 29**. Remaining Track 5 partials: bullets 2, 3, 8.
