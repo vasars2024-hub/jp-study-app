@@ -28,6 +28,7 @@ import {
   recordCueAudio,
   type CapturedAsset,
 } from './cueAudioCapture';
+import MediaLensCaptureButton from './MediaLensCaptureButton';
 import MediaCueAgentHandoffButton from './MediaCueAgentHandoffButton';
 
 interface Props {
@@ -622,6 +623,10 @@ export default function VideoCoreMiningPanel({
           mediaTitle={source.mediaTitle || source.localFilePath || source.playbackId}
           video={video}
         />
+        {/* Beside the other two for the same reason: a third thing to *do* when
+            the line in front of you is not the text you wanted. It reads pixels,
+            so it is the only one of the three that can reach a burned-in sign. */}
+        <MediaLensCaptureButton source={source} video={video} />
         {missingTerm && (
           <small className="study-mining-hint">{t('mediaWorkspace.mining.missingText')}</small>
         )}

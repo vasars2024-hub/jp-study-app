@@ -63,7 +63,17 @@ export interface MangaCaptureTarget {
 }
 
 export interface VideoCaptureFields {
-  /** Library id when the file is matched; '' for a loose file played directly. */
+  /**
+   * The id of the thing being played, **namespaced by the store it belongs
+   * to** — `anilist:21`, `library:<item>` — or '' for a loose file played
+   * directly, which no store knows about.
+   *
+   * The namespace is not decoration. The video-core player knows an AniList
+   * id and the media library knows its own item ids; writing either raw would
+   * make two different things indistinguishable in a stored ref, and a later
+   * reader would resolve the wrong one. The producer applies it, so this stays
+   * a plain bounded string here.
+   */
   mediaId: string;
   title: string;
   /** Episode number as the player shows it; '' for a standalone file. */
