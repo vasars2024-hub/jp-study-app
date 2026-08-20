@@ -24,6 +24,8 @@ interface Props {
   readState?: 'idle' | 'sending' | 'error';
   /** Absent when the text is word- or sentence-scale and Lexicon owns it. */
   onRead?: () => void;
+  /** Opens the Read depth over this passage. Always offered — it hands off nowhere. */
+  onOpenRead: () => void;
   onNewRegion: () => void;
   onClose: () => void;
 }
@@ -46,6 +48,7 @@ export default function LensClipboardPassage({
   onLookUp,
   readState = 'idle',
   onRead,
+  onOpenRead,
   onNewRegion,
   onClose,
 }: Props) {
@@ -95,6 +98,9 @@ export default function LensClipboardPassage({
       </div>
 
       <div className="lens-clipboard-actions">
+        <button type="button" className="lens-open-read" onClick={onOpenRead} title={t('lens.read.openHint')}>
+          {t('lens.read.open')}
+        </button>
         <button type="button" onClick={onAskAgent}>
           {t('lens.action.askAgent')}
         </button>

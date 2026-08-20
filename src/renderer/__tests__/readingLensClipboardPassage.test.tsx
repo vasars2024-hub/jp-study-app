@@ -41,6 +41,7 @@ describe('Reading Lens clipboard passage', () => {
           onModeChange={() => undefined}
           onWordClick={onWordClick}
           onAskAgent={onAskAgent}
+          onOpenRead={() => undefined}
           onNewRegion={() => undefined}
           onClose={() => undefined}
         />,
@@ -82,6 +83,7 @@ describe('Reading Lens clipboard passage', () => {
           onAskAgent={() => undefined}
           lookUpState="error"
           onLookUp={onLookUp}
+          onOpenRead={() => undefined}
           onNewRegion={() => undefined}
           onClose={() => undefined}
         />,

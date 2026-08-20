@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import LensReaderPanel from './LensReaderPanel';
 import LensAnalysisPanel from './LensAnalysisPanel';
 import LensClipboardPassage from './LensClipboardPassage';
+import LensReadPanel from './LensReadPanel';
 import { useT } from '../../i18n';
 import { handOffToAgent, readingPassageAgentContext } from '../../agentContextHandoff';
 import { getTokenizer, tokenizeSync, tokenizerReady, type JpToken } from '../../tokenizer';
@@ -38,6 +39,7 @@ import { lexiconHandoffFromCapture } from '../../../shared/lexiconHandoff';
 import { handOffCaptureToLexicon } from '../../lexiconHandoffClient';
 import { readingPassageHandoffFromCapture } from '../../../shared/readingPassageHandoff';
 import { handOffCaptureToReadingWorkspace } from '../../readingPassageHandoffClient';
+import type { ReadingLensReadSourceLine } from '../../../shared/readingLensRead';
 import './readingLens.css';
 
 /**
@@ -211,6 +213,8 @@ export default function ReadingLensOverlay() {
   /** The sentence the AI panel is currently explaining; null when it is closed. */
   const [analysisText, setAnalysisText] = useState<string | null>(null);
   const [editMode, setEditMode] = useState(false);
+  /** The Read depth — the passage sheet, opened from the chrome, not automatic. */
+  const [readOpen, setReadOpen] = useState(false);
 
   // Drag selection scratch state.
   const dragStart = useRef<{ x: number; y: number } | null>(null);
@@ -244,6 +248,7 @@ export default function ReadingLensOverlay() {
   const close = useCallback(() => {
     setPopup(null);
     setAnalysisText(null);
+    setReadOpen(false);
     setState({ kind: 'idle' });
     setInteractive(true);
     void window.api.lensClose();
@@ -486,6 +491,31 @@ export default function ReadingLensOverlay() {
   // A rescan or a correction is a new capture, and its lookup starts fresh.
   useEffect(() => setLookUpState('idle'), [readingCapture]);
   useEffect(() => setReadState('idle'), [readingCapture]);
+  // …and it is a different passage, so the Read sheet closes rather than
+  // showing the previous scan's text under the new capture's highlights.
+  useEffect(() => setReadOpen(false), [readingCapture]);
+
+  /**
+   * What the Read depth builds its passage from.
+   *
+   * A screen scan already carries per-line geometry, which is what the
+   * paragraph rule reads. A clipboard/text capture has none, so its own
+   * newlines become the lines and the synthetic boxes are stacked flush —
+   * a zero gap, so the geometric rule cannot invent a break that the text
+   * never had.
+   */
+  const readLines = useMemo<ReadingLensReadSourceLine[]>(() => {
+    if (state.kind === 'reading') return state.lines;
+    if (state.kind !== 'passage') return [];
+    const ready = tokenizerReady();
+    return state.capture.text.split('\n').map((text, index) => ({
+      text,
+      box: [0, index * 20, 400, 20] as [number, number, number, number],
+      vertical: false,
+      confidence: 1,
+      tokens: ready ? tokenizeSync(text) : [],
+    }));
+  }, [state]);
 
   // Pass-through: once we're reading (or showing a message), let clicks fall
   // through to the app below except over interactive elements.
@@ -1062,6 +1092,11 @@ export default function ReadingLensOverlay() {
             onLookUp={lexiconCapture ? () => void lookUpInLexicon(lexiconCapture) : undefined}
             readState={readState}
             onRead={passageCapture ? () => void readInWorkspace(passageCapture) : undefined}
+            onOpenRead={() => {
+              setPopup(null);
+              setAnalysisText(null);
+              setReadOpen(true);
+            }}
             originLabel={captureTarget?.sourceLabel}
             visualNovelTitle={
               captureTarget?.workflow === 'visual-novel' ? captureTarget.visualNovel.title : undefined
@@ -1088,6 +1123,11 @@ export default function ReadingLensOverlay() {
           onLookUp={lexiconCapture ? () => void lookUpInLexicon(lexiconCapture) : undefined}
           readState={readState}
           onRead={passageCapture ? () => void readInWorkspace(passageCapture) : undefined}
+          onOpenRead={() => {
+            setPopup(null);
+            setAnalysisText(null);
+            setReadOpen(true);
+          }}
           onNewRegion={() => setState({ kind: 'selecting' })}
           onClose={close}
         />
@@ -1147,6 +1187,25 @@ export default function ReadingLensOverlay() {
         />
       )}
 
+      {readOpen && readingCapture && (
+        <LensReadPanel
+          capture={readingCapture}
+          lines={readLines}
+          onLookup={(surface, context) =>
+            setPopup({
+              query: surface,
+              context,
+              tokens: tokenizerReady() ? tokenizeSync(context) : [],
+              // Anchored beside the sheet, not at the cursor: the click came
+              // from inside a scrolling panel, not from the page.
+              x: Math.max(16, window.innerWidth / 2 - 180),
+              y: Math.min(window.innerHeight - 200, 140),
+            })
+          }
+          onClose={() => setReadOpen(false)}
+        />
+      )}
+
       {popup && (
         <LensReaderPanel
           query={popup.query}
@@ -1182,6 +1241,7 @@ export function LensChrome({
   onLookUp,
   readState = 'idle',
   onRead,
+  onOpenRead,
   originLabel,
   visualNovelTitle,
   visualNovelSaveState,
@@ -1212,6 +1272,12 @@ export function LensChrome({
   readState?: 'idle' | 'sending' | 'error';
   /** Absent when the capture is word- or sentence-scale — see `passageCapture`. */
   onRead?: () => void;
+  /**
+   * Opens the Read depth in place. Unlike `onRead` this hands off nowhere: it
+   * is offered at every capture scale, because one word is still a passage of
+   * one and the sheet says so honestly rather than refusing to open.
+   */
+  onOpenRead: () => void;
   /**
    * The parked workflow's own `sourceLabel`, shown so the capture says on
    * screen what it is about to be stamped with. Absent for a bare hotkey
@@ -1247,6 +1313,9 @@ export function LensChrome({
           {editing ? t('lens.edit.done') : t('lens.edit.start')}
         </button>
       )}
+      <button type="button" className="lens-open-read" onClick={onOpenRead} title={t('lens.read.openHint')}>
+        {t('lens.read.open')}
+      </button>
       <button type="button" onClick={onAskAgent} title={t('lens.action.askAgent')}>
         {t('lens.action.askAgent')}
       </button>
