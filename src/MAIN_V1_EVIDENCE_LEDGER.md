@@ -26162,3 +26162,35 @@ with the fix named, rather than deleted, so the correction is legible.
 and the same gate reads open in one place and closed in another later in the same file — gate 9 is
 the clearest case ("7, 9, 10 stay open" is immediately followed by "Amended: gate 9 CLOSES"). Count
 from the tables, last mention wins, and confirm against the tree. A keyword sweep gets this wrong.
+
+## 2026-08-19 primary — what main-v1 cannot yet claim: Tracks 1, 4 and 5 have no closure record
+
+Track 7 closed and Track 9 came back complete-except-external, which puts the whole plan close to
+done — so the honest next question is which tracks have actually been *re-derived* rather than
+inherited. Measured on the two authority documents themselves:
+
+| track | `CLOSE/COMPLETE/PASSES` in its plan section | `##` sections in this ledger | mentions anywhere here |
+| --- | --- | --- | --- |
+| 1 credentials/provider | **0** | **0** | **0** |
+| 2 Lexicon Workbench | 2 | 63 | 231 |
+| 3 AI Agent | 8 | 3 | 29 |
+| 4 Reading workspace | **0** | **0** | 39 |
+| 5 ReadingLens | **0** | **0** | 22 |
+| 6 Media/Liquid pilot | 2 | 1 | 1 |
+| 7 remaining + workbench | — | 83 | 103 |
+
+**Track 1 is named nowhere in this 26,000-line ledger** — not once. Tracks 4 and 5 appear in body
+text but never as a slice logged under their own heading. This is a statement about the documents,
+**not** a claim that those tracks are open: Track 1's subject matter (the encrypted vault, provider
+centralisation, MAL OAuth) is demonstrably shipped and is cited all over Track 9's evidence. The
+point is narrower and it is the one the depth-first rule cares about — **no turn has re-derived
+them against source, so nobody may call main-v1 finished on their behalf.**
+
+**That is the next turn's opening slice**, and it is ordinary work needing nothing from the user:
+take Tracks 1, 4 and 5 from `MAIN_V1_COMPLETION_PLAN.md`, classify every bullet finished /
+partial / missing / stale-doc-only against the tree, and record the count that earns or corrects
+`pct`. Track 6 is one line and one mention, so sweep it in the same pass. Track 8 is the Liquid
+plan and is not main-v1's to close here.
+
+**Do not read the zeros as a keyword artefact without checking**: the same instrument returns 83
+and 103 for Track 7 on the same files, which is the control that says the counter works.
