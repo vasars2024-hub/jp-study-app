@@ -26923,8 +26923,14 @@ Route: real `lensOpen('clipboard')` on three lines written to the OS clipboard.
   1 row listed. Lens auto-dismissed; **re-captured the same text and the highlight came back
   painted** (2 runs) — the captureId-is-the-hash claim. Remove → 0 painted, 0 keys, passage
   still rendering.
-- **The finding's before/after, same route.** Before `9f649b77`: 0 words, 0 ruby, 0 rows.
-  After: the numbers above.
+- **The finding's before/after — and the honest limit on it.** The first live probe DID read
+  0 words / 0 ruby / 0 rows, but a concurrent worker had overwritten the OS clipboard with an
+  English payload before the lens read it, so that run conflates two causes and is **not** a
+  control. The clean control is `readingLensTokenizerRestamp.test.tsx`, which holds the text
+  fixed and moves only the tokenizer: **1 blob word → 3 words, 0 harvest rows → 3**, with the
+  open Read sheet surviving the re-stamp. The Japanese live route was only ever run after the
+  fix. Trap for the next worker: the clipboard is shared with the other relay workers — chain
+  the write and the open in one expression.
 
 Track 5 is now **6 finished / 2 partial**; Tracks 1/4/5/6 = **23 finished / 2 partial /
 4 deferred = 29**. Remaining Track 5 partials: bullets 2 and 8.
