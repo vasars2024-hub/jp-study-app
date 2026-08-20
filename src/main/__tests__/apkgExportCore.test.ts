@@ -982,6 +982,45 @@ describe('applyExportChanges — recipe 17 template removal (schema 18 tables)',
     ]);
   });
 
+  it('removes from a package that declares the collation this build lacks', () => {
+    // Gate 14's live walk removed a real duplicate group of 80 cards and got the
+    // raw `no such collation sequence: unicase` back as an unnamed `io`: a
+    // DELETE and an ord renumbering both maintain the UNIQUE `(name, ntid)`
+    // index schema 18 declares under that collation. Dropping rows cannot create
+    // a name collision, so unlike a deck RENAME there is nothing the collation
+    // has to decide.
+    const db = normalizedTemplateDb();
+    db.run('CREATE UNIQUE INDEX idx_templates_name_ntid ON templates (name, ntid)');
+    db.run('PRAGMA writable_schema = ON');
+    db.run(
+      "UPDATE sqlite_master SET sql = replace(sql, 'name text', 'name text NOT NULL COLLATE unicase') WHERE tbl_name = 'templates'",
+    );
+    // RESET, not OFF: OFF alone leaves the old parse cached, so the collation
+    // would be in the stored text and never actually applied to a write.
+    db.run('PRAGMA writable_schema = RESET');
+    const ddlBefore = db.exec("SELECT name, sql FROM sqlite_master WHERE tbl_name = 'templates'")[0]!
+      .values;
+
+    const result = applyExportChanges(db, removeOnly([1]), {
+      nowMs: NOW_MS,
+      normalize: stripFieldHtml,
+    });
+    expect(result.templatesRemoved).toBe(1);
+    expect(result.cardsDeleted).toBe(1);
+    expect(
+      db.exec('SELECT ord, name FROM templates WHERE ntid = 100 ORDER BY ord')[0]?.values,
+    ).toEqual([
+      [0, 'Card 1'],
+      [1, 'Card 2'],
+    ]);
+    expect(cardOrds(db)).toEqual([0, 1]);
+    // Restored verbatim, index included, or the package would ship declaring a
+    // collation it no longer has.
+    expect(
+      db.exec("SELECT name, sql FROM sqlite_master WHERE tbl_name = 'templates'")[0]!.values,
+    ).toEqual(ddlBefore);
+  });
+
   it('refuses to empty the note type here too', () => {
     const db = normalizedTemplateDb();
     let seen = '';

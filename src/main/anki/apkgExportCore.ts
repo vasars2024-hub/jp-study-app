@@ -1015,17 +1015,27 @@ export function applyExportChanges(
       );
     }
     if (templates === 'table') {
-      for (const ord of plan.removedOrds) {
-        db.run('DELETE FROM templates WHERE ntid = ? AND ord = ?', [mid, ord]);
-      }
-      for (const move of plan.renumber) {
-        db.run('UPDATE templates SET ord = ?, mtime_secs = ?, usn = -1 WHERE ntid = ? AND ord = ?', [
-          move.to,
-          modSec,
-          mid,
-          move.from,
-        ]);
-      }
+      // The same swap the INSERT below runs under. A DELETE and an ord
+      // renumbering both have to maintain the UNIQUE `(name, ntid)` index that
+      // schema 18 declares `COLLATE unicase`, and sql.js cannot compare it — so
+      // recipe 17 threw the raw `no such collation sequence: unicase` as an
+      // unnamed `io` on every package current Anki writes. Gate 14's live walk
+      // hit it after removing a real duplicate group of 80 cards.
+      //
+      // The uniqueness question the insert has to answer in JS does not even
+      // arise here: dropping rows cannot create a name collision, and `ord` is
+      // not part of that index.
+      withoutMissingCollation(db, collationObjectsOf(db, 'templates'), () => {
+        for (const ord of plan.removedOrds) {
+          db.run('DELETE FROM templates WHERE ntid = ? AND ord = ?', [mid, ord]);
+        }
+        for (const move of plan.renumber) {
+          db.run(
+            'UPDATE templates SET ord = ?, mtime_secs = ?, usn = -1 WHERE ntid = ? AND ord = ?',
+            [move.to, modSec, mid, move.from],
+          );
+        }
+      });
       // The note type itself is untouched apart from freshness: schema 18 keeps
       // the template list in its own table, so `notetypes.config` never has to
       // be decoded or re-encoded to remove one.
