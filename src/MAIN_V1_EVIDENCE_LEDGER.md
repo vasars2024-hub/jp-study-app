@@ -26560,3 +26560,54 @@ Tests: 4 in `src/renderer/__tests__/readingSiteDrawer.test.tsx` (dialog labelled
 old backdrop gone, Escape/scrim close with a non-Escape key as control, focus taken and handed
 back), raw `createRoot`+`act` per this repo's local pattern. `readingFinderModes` and
 `readingWorkspaceView` pass unchanged, 12 tests. **Track 4 is 9 of 9.**
+
+## 2026-08-20 primary — Track 6's shell bullets: the Media Center IS the shell, and it now stays visible
+
+Track 6 bullet 2 wanted one Media shell carrying sidebar, search, Library, Discover, Study,
+Readiness, Review, Music, Settings, imports, filtering, sorting, queues, details and player
+access. The previous entry read that as "`MediaSurfaceShell.tsx` has no nav". Re-derived: that
+file is the adopted provider stack and is not the shell — `AppSection.tsx:76/:82/:88` routes every
+Media entry point to `MediaCenterView.tsx`, which already had 7 of the 9 destinations. Two were
+missing and one behaviour hid the rest.
+
+**`99eb3719` — Readiness and Review join the sidebar.** Both lived only inside the adopted overlay
+(`.seanime-host`, `position: fixed; inset: 0`), so the shell that owns Media navigation could not
+reach two of its own sections. Neither panel needs the sidecar (the overlay already renders Review
+outside its own gate), so the Media Center mounts them directly. **Decision:** their labels reuse
+`mediaWorkspace.viewReadiness` / `viewReview` and their hints reuse each panel's own headline —
+**zero new i18n keys**; the tradeoff is a nav entry whose key lives in another namespace, against
+one destination being called two different things in two shells. The loader moved to
+`renderer/useStudyReadiness.ts` (one loader, two shells) keeping the orchestrator behind
+`await import()`, which is what holds the host's boot-bundle promise.
+
+**`4807b671` — a section mount no longer covers its own shell.** `os:open` with `player`/`video`
+brought the overlay forward. Correct while those sections rendered the status-only
+`MediaWorkspaceSectionView`; they render the whole Media Center now, so **one dispatch left
+`.mc-root` AND `.seanime-host` in the document together** — measured before the fix. That
+contradicted `MediaCenterView`'s own contract ("must never replace the sidebar or auto-open during
+mount") and Track 6 bullet 3.
+
+**Live, pid 38128, window reloaded first.** After: `os:open` `player` → `.mc-root` present,
+`.seanime-host` **absent**, 8 nav destinations, `mc-seanime-link` enabled at
+`data-sidecar="available"`. **Controls, both required:** clicking that link still opened the
+workspace (3 segments, 31 body nodes) and Close returned to an intact shell (8 destinations, 33
+local items) — an automatic route removed, not the route. Readiness clicked: `.study-lib`,
+breadcrumb `Readiness`, **77 files · 76 need work · 1 ready**, 76 rows, Anki 84 decks. Review:
+`.study-loop`, **1 card · 0 need a look · 1 new**. Leaving to Music unmounted both (`lib:false`,
+`loop:false`); **Ctrl+6** brought Readiness back with the same numbers, so the two new entries are
+in the keyboard order too. Library shows 7 sort options and a `Title details` drawer (The Big O,
+2 of 13 episodes).
+
+Tests: 10 new in `renderer/__tests__/mediaCenterStudyDestinations.test.tsx` — 6 drive the hook
+(deferral, all three props, a `study:changed` re-supply, subscription release, analyse with both
+ids, and the **negative control**: an unlinked row is refused instead of calling the orchestrator)
+and 4 pin the shell contract. **Mutation:** `if (!active) return` removed → 1 red, restored → 10
+green. `mediaCenterIntegration.test.ts`'s os:open assertion was inverted to pin the new property.
+
+**Trap.** Both `MediaWorkspaceHost.tsx` and `mediaCenterIntegration.test.ts` are dirty from another
+track *inside the regions I edited*, so `git apply --cached` of my hunks could not work — their
+lines are my context. `debug/stage-head-edit.cjs` (new, gitignored) rebuilds HEAD + named
+replacements, writes the blob `--no-filters` and re-reads `git show :<path>` to prove it. Verified
+mechanically both ways: staged `setMediaWorkspaceOpen` **0**, worktree **3**.
+
+**Track 6 is 3 finished, 0 partial, 5 deferred to L4.**

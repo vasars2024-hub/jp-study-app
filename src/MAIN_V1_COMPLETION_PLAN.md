@@ -397,13 +397,22 @@ The existing popup is a foundation, not completion.
 - Keep conventional windows as the default. The same complete Media/Video feature set must work in Standard and explicitly enabled Liquid presentations.
 - Do not call the player a system pattern until it has passed the full visual matrix and the user has approved it.
 
-**Re-derived 2026-08-20 — 1 finished, 1 partial, 5 deferred to the Liquid plan.** The empty-canvas
+**Re-derived 2026-08-20 — 3 finished, 0 partial, 5 deferred to the Liquid plan.** The empty-canvas
 regression is repaired (`MediaWorkspace.tsx:53-56` mounts the adopted `LibraryView` plus the
-player; `MediaWorkspaceSectionView.tsx:98-107` states `pending`/`unavailable` honestly). **Partial:**
-bullet 2's shell nav does not exist — `MediaSurfaceShell.tsx` is 169 lines of provider stack with no
-sidebar, and Discover/Music/Study remain only in the legacy `MediaCenterView.tsx`, now the fallback
-rather than the shell. The Liquid Video pilot bullets are L4 of
-`LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md` and close there, not here.
+player; `MediaWorkspaceSectionView.tsx:98-107` states `pending`/`unavailable` honestly).
+
+**Bullets 2 and 3 closed 2026-08-20** (`99eb3719`, `4807b671`). The one shell is
+`MediaCenterView.tsx`, which every Media entry point already routed to; what was missing was two
+of its own destinations and a shell that stayed visible. Readiness and Review existed only inside
+the adopted overlay, and `os:open` auto-opened that overlay over the sidebar. Measured live in one
+window: **8 sidebar destinations** (Home, Library, Video, Music, Study Mode, Readiness, Review,
+Discover, plus Settings and the availability-aware workspace link), global search, **7 sort
+options**, shelf filters carrying real counts (Recently added 33, Continue watching 2, Study queue,
+Favorites, Tracking, TV shows 29, Unsorted 4), a `Title details` drawer, File-menu imports, and
+player access through the workspace handoff — which now opens only when asked and closes back to an
+intact shell. Readiness reads **77 files · 76 need work · 1 ready**; Review reads **1 card · 0 need
+a look**. The Liquid Video pilot bullets are L4 of `LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md` and
+close there, not here.
 
 ## Track 7: remaining main-app completion
 
