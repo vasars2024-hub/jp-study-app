@@ -9294,7 +9294,7 @@ export const en: Catalog = {
   'ankiWorkbench.apply.error.deck-changed':
     'A renamed deck has a different name in the source file. Nothing was written — re-read the source before exporting.',
   'ankiWorkbench.apply.error.deck-name-taken':
-    'Another deck in the source file already uses that name, and renaming onto it would merge the two decks. Nothing was written.',
+    'Another deck in the source file already uses that name, and Anki compares deck names without regard to case, so using it would merge the two decks. Nothing was written.',
   'ankiWorkbench.apply.error.deck-collation-unsupported':
     'This package stores deck names with a text rule this build cannot apply, so nothing was written. Export the deck from Anki with “Support older Anki versions” checked and rename decks in that copy — every other edit exports from this package normally.',
   'ankiWorkbench.apply.error.note-type-missing':

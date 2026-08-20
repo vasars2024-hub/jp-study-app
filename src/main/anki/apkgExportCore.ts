@@ -597,7 +597,8 @@ export function applyExportChanges(
   // A CREATE is the different question `withoutMissingCollation` was written
   // for, and the template insert already answers it this way: the collation is
   // needed only to prove the new name is unique, and `namesAfter` answers that
-  // in JavaScript below (`deck-name-taken`) before the write. Refusing it here
+  // in JavaScript below (`deck-name-taken`) before the write — case-insensitively,
+  // the way `unicase` itself would, or the swap would be a hole. Refusing it here
   // made recipe 13's split unusable on every package current Anki writes —
   // measured on `Default-20260129112153.apkg`, where a split into 3 invented
   // subdecks refused with `deckRenames` empty. A split that only refiles into
@@ -663,12 +664,20 @@ export function applyExportChanges(
       if (create.name.trim() === '') {
         throw new ExportRefusal('deck-missing', `Deck ${mintedId} carries no name.`);
       }
-      const holder = namesAfter.get(create.name);
-      if (holder !== undefined) {
+      // The uniqueness Anki's own `unicase` index enforces, enforced here
+      // instead, because the INSERT below runs with that collation swapped out.
+      // An exact-string `Map` lookup is NOT that check: `Japanese` and
+      // `japanese` are one name to Anki, so an exact lookup lets the split mint
+      // a second deck the shipped package's own UNIQUE index rejects. The
+      // template insert answers the same question the same way (`:832`).
+      const folded = create.name.toLowerCase();
+      const clash = [...namesAfter.keys()].find((name) => name.toLowerCase() === folded);
+      if (clash !== undefined) {
         throw new ExportRefusal(
           'deck-name-taken',
-          `The source already holds a deck called "${create.name}", so the split cannot create a `
-            + 'second one. Re-read the source and run the split again.',
+          `The source already holds a deck called "${clash}". Anki compares deck names without `
+            + 'regard to case, so the split cannot create a second one. Re-read the source and run '
+            + 'the split again.',
         );
       }
       while (takenIds.has(String(nextId))) nextId += 1;

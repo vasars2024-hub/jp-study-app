@@ -693,6 +693,53 @@ describe('applyExportChanges — recipe 13 deck moves', () => {
     }
   });
 
+  it('refuses a created name that collides only by case, which `unicase` would have caught', () => {
+    // The deck twin of the template test below. `Japanese` is already in the
+    // source; `japanese` is the same name to Anki, and because the DDL is
+    // restored verbatim the shipped package would declare a UNIQUE index over
+    // `name COLLATE unicase` whose own contents violate it.
+    const db = unicaseDeckDb();
+    const decksBefore = db.exec('SELECT id, name FROM decks')[0]!.values.length;
+    try {
+      applyExportChanges(
+        db,
+        {
+          notes: [],
+          cardMoves: [],
+          deckRenames: [],
+          cardDeckMoves: [{ cardId: '5001', noteId: '1001', deckId: 'split:1:case' }],
+          deckCreates: [{ deckId: 'split:1:case', name: 'japanese', configId: '1' }],
+        },
+        { nowMs: NOW_MS, normalize: stripFieldHtml },
+      );
+      expect.unreachable('should have refused');
+    } catch (err) {
+      expect((err as ExportRefusal).code).toBe('deck-name-taken');
+    }
+    // All-or-nothing: no deck invented, and the card never moved.
+    expect(db.exec('SELECT id, name FROM decks')[0]!.values.length).toBe(decksBefore);
+    expect(db.exec('SELECT did FROM cards WHERE id = 5001')[0]!.values[0]![0]).toBe(1);
+
+    // The control: a name that collides with nothing writes on the same
+    // collection, so the refusal above is the case rule and not a dead create path.
+    expect(
+      applyExportChanges(
+        db,
+        {
+          notes: [],
+          cardMoves: [],
+          deckRenames: [],
+          cardDeckMoves: [{ cardId: '5001', noteId: '1001', deckId: 'split:1:ok' }],
+          deckCreates: [{ deckId: 'split:1:ok', name: 'Nihongo', configId: '1' }],
+        },
+        { nowMs: NOW_MS, normalize: stripFieldHtml },
+      ).decksUpdated,
+    ).toBe(1);
+    expect(
+      db.exec('SELECT id, name FROM decks')[0]!.values.some((r) => String(r[1]) === 'Nihongo'),
+    ).toBe(true);
+  });
+
   it('refiles into a deck the source already has, which touches no name at all', () => {
     const db = unicaseDeckDb();
     expect(

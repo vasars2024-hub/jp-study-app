@@ -8815,7 +8815,7 @@ export const zh: Catalog = {
   'ankiWorkbench.apply.error.deck-changed':
     '被重命名的牌组在来源文件中的名称不同。未写入任何内容 — 请先重新读取来源再导出。',
   'ankiWorkbench.apply.error.deck-name-taken':
-    '来源文件中已有另一个牌组使用该名称，重命名会把两个牌组合并。未写入任何内容。',
+    '来源文件中已有另一个牌组使用该名称，而 Anki 比较牌组名称时不区分大小写，因此使用该名称会把两个牌组合并。未写入任何内容。',
   'ankiWorkbench.apply.error.deck-collation-unsupported':
     '此软件包用本版本无法处理的文本规则保存牌组名称，因此未写入任何内容。请在 Anki 中勾选“支持旧版 Anki”后导出，并在该副本中重命名牌组 — 其他编辑仍可从此软件包正常导出。',
   'ankiWorkbench.apply.error.note-type-missing':

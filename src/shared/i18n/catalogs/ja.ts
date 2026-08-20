@@ -8868,7 +8868,7 @@ export const ja: Catalog = {
   'ankiWorkbench.apply.error.deck-changed':
     '名前を変更したデッキの名前がソースファイルでは異なっています。何も書き込まれていません — 書き出す前にソースを読み直してください。',
   'ankiWorkbench.apply.error.deck-name-taken':
-    'ソースファイル内の別のデッキが既にその名前を使っており、変更すると2つのデッキが統合されてしまいます。何も書き込まれていません。',
+    'ソースファイル内の別のデッキが既にその名前を使っています。Anki はデッキ名の大文字と小文字を区別しないため、この名前を使うと2つのデッキが統合されてしまいます。何も書き込まれていません。',
   'ankiWorkbench.apply.error.deck-collation-unsupported':
     'このパッケージはデッキ名をこのビルドでは扱えない文字規則で保存しているため、何も書き込まれていません。Ankiで「旧バージョンのAnkiをサポート」にチェックを入れて書き出し、その複製でデッキ名を変更してください。他の編集はこのパッケージから通常どおり書き出せます。',
   'ankiWorkbench.apply.error.note-type-missing':
