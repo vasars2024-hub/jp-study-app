@@ -26050,7 +26050,9 @@ Gate 14's second half — "exercise every `supported` row" — had been **cited,
 pointing at six dated entries, written when the matrix held 16 rows. Re-derived from
 `ankiParityMatrix.ts` this turn: **18 rows**, package **11 supported / 7 read-only / 0 blocked**,
 connect **6 / 5 blocked / 7**. So the citation covered 6 of 11 and its own row counts were two
-revisions stale. `debug/g14-supported.js` replaces it: one walk, every package-supported row,
+revisions stale. `debug/g14-supported.js` replaces it — **local scratch, not in the repo**
+(`git check-ignore -v` → `.gitignore:125:debug/`), so the walk's numbers below are the evidence and
+the driver is not re-runnable elsewhere; a re-run rebuilds it from this entry. One walk, every package-supported row,
 through the product's own editors → tray → `buildApkgExportChanges` → real `apkg:export` → re-read.
 
 **It found three defects, all shipped, none reachable by any fixture in the suite.**
@@ -26064,7 +26066,10 @@ through the product's own editors → tray → `buildApkgExportChanges` → real
 - `05475cf0` — **a deck the split invents is an INSERT, not a rename.** Refused
   `deck-collation-unsupported` with `deckRenames` **empty**, so recipe 13 was unusable on every
   package current Anki writes. `withoutMissingCollation`'s own doc already drew the distinction;
-  the guard hadn't. Uniqueness is decided in JS (`deck-name-taken`) before write #1. 66 cases.
+  the guard hadn't. ~~Uniqueness is decided in JS (`deck-name-taken`) before write #1.~~ **Struck
+  2026-08-20** — true only of exact-string equality, which is not the question `unicase` answers.
+  The hole and its fix are the next entry (`bc8e3186`); the create's uniqueness check case-folds
+  now, so the sentence is true again as amended. 66 cases.
 - `79722141` — **recipe 17's removal, the third site.** Removing a real duplicate group threw the
   raw `no such collation sequence: unicase` as an unnamed **`io`**. Dropping rows cannot create a
   name collision, so nothing needs deciding. 67 cases.
@@ -26194,3 +26199,41 @@ plan and is not main-v1's to close here.
 
 **Do not read the zeros as a keyword artefact without checking**: the same instrument returns 83
 and 103 for Track 7 on the same files, which is the control that says the counter works.
+
+## 2026-08-20 primary — boss-audit Finding 1: the swap that traded a collation for the wrong comparison (`bc8e3186`)
+
+The 2026-08-20 05:48 boss audit landed *after* the previous handoff was written, so it was not the
+`2026-08-18 03:51` section that handoff cleared. Result **FINDINGS**, two of them, both taken first.
+
+**Finding 1 (P1, CONFIRMED) — fixed.** `05475cf0` let a deck CREATE run under
+`withoutMissingCollation` on the grounds that `namesAfter` proves the new name unique in JS before
+the write. `apkgExportCore.ts:666` was `namesAfter.get(create.name)` — an exact-string `Map` lookup
+standing in for a **case-insensitive** collation. So a split bucket differing only in case from an
+existing deck was minted rather than refused, and the shipped package declared
+`decks.name … COLLATE unicase` plus a UNIQUE index whose own contents violate it. The audit's live
+probe on `Default-20260129112153.apkg` returned `{ok:true, verified:true, decksUpdated:1}` and the
+re-read listed `["1|Default", "1753619696269|Custom Study Session", "1787194899618|default"]`,
+while its control — the same source and target name as a RENAME — refused
+`deck-collation-unsupported`. Reachable: `ankiDeckSplit.ts:340` keys `deckIdByPath` on exact path
+strings, so a case-variant segment mints a fresh `split:` id instead of resolving to the deck.
+
+**The fix is the one the template insert already had.** `:832` case-folds
+(`taken.find((n) => n.toLowerCase() === add.name.toLowerCase())` → `template-name-taken`); the deck
+create now does the same and names the deck it collided with. **The `:605` guard was NOT touched** —
+re-widening it is what the audit's mutation M1 shows four tests exist to prevent (2 red, top failure
+`expected 'deck-collation-unsupported' to be 'deck-name-taken'`).
+
+**Negative control, the whole point of the slice.** Reverting the fold to
+`namesAfter.has(create.name)` turns the new test red **alone** — 1 failed / 67 passed, `expected
+undefined to be "deck-name-taken"` — and restoring it returns **68/68**. Suites: **85 passed** across
+`apkgExportCore` + `ankiApkgExport`, against the audit's unmutated baseline of 84.
+
+**i18n:** `ankiWorkbench.apply.error.deck-name-taken` said only "renaming onto it would merge the
+two decks" — rename-only, and now wrong about the reason. Rewritten in all four catalogs to name the
+case rule. All four are dirty from another track's de-hardcoding campaign, so each was staged as a
+**HEAD+edit blob** (`git cat-file blob HEAD:<path>` → one byte replacement → `hash-object -w
+--no-filters` → `update-index --cacheinfo`); staged diff is exactly **1 line per catalog**.
+
+**Finding 2 (P3) — closed above, not here.** Gate 14's `05475cf0` bullet closed on the clause
+Finding 1 falsifies; it is struck in place with the fix named, and the same entry now states that
+`debug/g14-supported.js` is gitignored local scratch rather than a re-runnable driver.
