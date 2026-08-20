@@ -376,6 +376,16 @@ mixed-panel order model), 3 (progressive **Read**), 4 (passage → Reading works
 (privacy/retention, OCR/model defaults). Counted one bullet line at a time, not by keyword sweep.
 Across Tracks 1/4/5/6 that is **20 finished / 5 partial / 4 deferred = 29**.
 
+**Amended 2026-08-20 — bullet 4 now CLOSES.** `0facd903` + `e3dc49e7` built the third of its
+three halves: paragraph/document captures reach a new Reading-workspace **`captures`** section
+through a main-owned single-use slot that mirrors the Lexicon lane. Word → Lexicon and
+sentence → Workbench were already done. Measured live with a negative control (a word-scale
+stage is refused and announces nothing) and both arrival paths — cold open and the `staged`
+broadcast into an already-open window. Trap recorded in the ledger: StrictMode's effect replay
+silently consumed the single-use claim until the client latched the in-flight promise.
+Track 5 is now **4 finished / 4 partial**; Tracks 1/4/5/6 = **21 finished / 4 partial /
+4 deferred = 29**.
+
 ### Track 5 implementation checkpoint — 2026-08-12
 
 - **Searchable capture/session history: done.** Persistent captures, pinning, and — as of

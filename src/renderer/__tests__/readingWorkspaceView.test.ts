@@ -96,10 +96,14 @@ describe('ReadingWorkspaceView', () => {
     }
   });
 
-  it('lands the Reading compatibility entry on Discover inside one seven-destination shell', async () => {
+  it('lands the Reading compatibility entry on Discover inside one eight-destination shell', async () => {
     await render();
 
-    expect(host.querySelectorAll('[role="tab"]')).toHaveLength(7);
+    // Eight since the lens passage lane landed: Captures is the destination
+    // `resolveReadingLensWorkflow`'s `reading` target had been routing to for
+    // its whole life with nothing there to receive it.
+    expect(host.querySelectorAll('[role="tab"]')).toHaveLength(8);
+    expect(tab('captures')).not.toBeNull();
     expect(tab('discover').getAttribute('aria-selected')).toBe('true');
     expect(host.querySelector('[data-surface="finder"]')).not.toBeNull();
   });

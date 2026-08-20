@@ -26781,3 +26781,48 @@ turn closed the other four. **Track 5 is now 3 finished + 5 partial; Tracks 1/4/
    twice and the remainder check still passes.
 
 **Gates, SHARED tree, once after the last slice:** see the turn's closing report.
+
+## 2026-08-20 primary — Track 5 bullet 4 closes: a passage finally has a destination
+
+`0facd903` + `e3dc49e7`. `resolveReadingLensWorkflow` has routed paragraph/document
+captures to `target: 'reading'` since the contract was written and **nothing consumed it** —
+`shared/lexiconHandoff.ts` says so in its own header. Bullet 4's word→Lexicon and
+sentence→Workbench halves were already done; this is the third.
+
+**Decision, standing auto-approval.** Built as the *same lane* as the Lexicon handoff —
+main-owned slot, bounded, expiring (5 min, vs 2), single-use, `staged` broadcast — rather
+than a new mechanism, because the producing surface has the identical constraint: the lens
+is its own `BrowserWindow`, destroyed when a capture lands, and `popOut` takes a section
+name and nothing else. Destination is a new **`captures`** section rendering a *reader*, not
+a fourth catalogue: Library/Finder/Novels are catalogues of *works* and an ad-hoc screen
+passage is not a work. Tradeoff considered and rejected: routing the passage into Novels
+`imports` would file it as a book the user never chose to own. The rail beside the reader is
+the existing `lens:history:list`, so the section is not blank when opened cold.
+The scale gate makes the two lanes **exact complements** — a capture Lexicon refuses is what
+this one takes — so no capture is left with neither gesture.
+
+**Live, real app, restart required (new main handler; pid 36372, bridge 39273).**
+- Handler is new: `readingPassageHandoffTake` returns `{ok:true,handoff:null}` after restart.
+- **Negative control:** staging 図書館 (word-scale) → `{ok:false,code:'not-passage-scale'}` and
+  the armed broadcast counter stayed at **0**. A refused stage announces nothing.
+- Accepted stage → `{ok:true,kind:'paragraph',captureId:'live-2'}`, counter 0→1→2.
+- **Cold open:** pop-out closed, passage staged, `popOut('reading')` → window came up on
+  `section: "captures"` (not its `initialSection` of discover), **4 lines** rendered, code
+  points verified as 彼は図書館で本を読んでいた。etc., heading `Notepad`, rail **38 rows**.
+- **Broadcast path, with its own control:** window read `discover` in its own call, a passage
+  was staged, 3 s later it read `captures` with **2 lines** and heading `Sumatra`.
+
+**TRAP, and it is why the live walk mattered.** The first live cold open landed on
+**discover with main's slot already emptied** and *no error anywhere*. Cause: React
+StrictMode's dev replay runs mount → cleanup → mount synchronously, so the first effect
+claimed the single-use passage into a closure that was then discarded. jsdom missed it
+because the test rendered without StrictMode. Fix (`e3dc49e7`): the client latches the
+in-flight **promise**, not its result — the replay's second call happens *before* the first
+take resolves, so a result-only latch is still empty at that moment. A fresh `staged`
+announcement clears the latch. The test now renders inside `StrictMode`; without the latch
+it fails, which is the regression guard.
+
+**Not driven live:** the lens toolbar button itself (needs a real OCR capture); its
+`onRead && …` render and the scale complement are covered by unit tests.
+Track 5 is now **4 finished / 4 partial**; Tracks 1/4/5/6 = **21 finished / 4 partial /
+4 deferred = 29**. Remaining Track 5 partials: bullets 2, 3, 7, 8.
