@@ -26373,3 +26373,47 @@ of the four rather than the settled one its checkpoint's confident tone implies.
 the user. The two smallest closable gaps stay as named: `getAiProviderHealth`'s missing consumer
 (Track 1) and the reading detail drawer (Track 4); the largest unknown is Track 5's three
 unmeasured bullets, which is a measurement slice, not a build slice.
+
+## 2026-08-20 primary — Track 1's last gap closes: the health read now has a consumer
+
+`687681bf`. `getAiProviderHealth` (`main/providerRuntime.ts:151`) had **zero** consumers, so the
+only way to learn a cloud provider had no key was to submit a prompt and get `missing-credential`.
+Wired shared contract → main → preload → `window.d.ts` → renderer → 4 catalogs: the type moves to
+`shared/aiProviders.ts`, `getAiProviderHealthReport()` reads all three in catalog order,
+`ai:providerHealth` binds beside the other `ai:` handlers in `main/mining.ts:2016`, and the Agent
+composer's target `<select>` marks each keyless provider and explains the consequence under it.
+
+**Decision, standing auto-approval.** Named `configured`, worded "no API key saved", never
+"offline" or "healthy" — nothing has called the provider, and a reachability claim the app never
+made is the false-success shape Track 3 forbids. Tradeoff: a live reachability ping would say more
+but costs a request, leaks the key's validity to a third party on every picker render, and would
+have to fail open; credential presence is the fact that actually decides whether the run is
+refused. No secret crosses the bridge — the boolean and the bucket name only.
+
+**Live, real profile, after a restart (pid 38128, bridge 39273).** Picker rendered
+`Local Qwen` / `Gemini 2.5 Flash` / `DeepSeek V4 Flash — no API key` / `DeepSeek V4 Pro — no API
+key`; `ai:providerHealth` returned `configured: true, false, false`. **Negative control both
+ways:** selecting `deepseek-v4-flash` produced the hint sentence, selecting `gemini-2.5-flash`
+removed it (`warn: null`). And **before** the restart the identical call returned
+`No handler registered for 'ai:providerHealth'`, which is what proves the handler is new rather
+than something that was already there.
+
+**Unit negative control:** 4 tests in `main/__tests__/aiProviderHealth.test.ts`; reverting the
+`.trim()` in `getAiProviderHealth` reds the whitespace-key test **alone** (1 failed / 3 passed),
+restored 4/4. `Boolean(' ')` is `true`, so an untrimmed read would call a whitespace bucket
+configured and stay silent to the refusal — the exact thing this moves earlier.
+
+**Contrast measured, not chosen.** `--warning-deep` reads **4.76:1** on the dark agent panel and
+`--warning` would read ~2:1 on a light one, so neither literal is right in both shells; mixed 60%
+into `--agent-text` it reads **9.68:1** at 12px. Trap for the next worker: the computed value comes
+back as `color(srgb 0.87 0.75 0.37)`, not `rgb()`, and a contrast probe that divides by 255
+unconditionally reports **1.2** for a 9.68 pair.
+
+**Trap, staging.** `src/preload.ts`, `window.d.ts` and the 4 catalogs have MIXED line endings and
+foreign hunks. Deciding CRLF-vs-LF once per file makes the needle miss; and a single-line anchor
+carries no terminator of its own, so inserting `\n` after it rewrites that line's CRLF and puts a
+`-`/`+` pair of *identical text* in the diff. Inherit the terminator that already follows the
+anchor. Driver: `debug/stage-health-blobs.cjs`, gitignored local scratch.
+
+**Track 1 is now 5 of 5.** Tracks 1/4/5/6: **15 finished / 6 partial / 3 unclassified / 5
+deferred**, still 29 bullets.
