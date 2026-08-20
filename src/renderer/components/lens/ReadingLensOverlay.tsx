@@ -36,6 +36,8 @@ import {
 } from '../../../shared/readingLensRegion';
 import { lexiconHandoffFromCapture } from '../../../shared/lexiconHandoff';
 import { handOffCaptureToLexicon } from '../../lexiconHandoffClient';
+import { readingPassageHandoffFromCapture } from '../../../shared/readingPassageHandoff';
+import { handOffCaptureToReadingWorkspace } from '../../readingPassageHandoffClient';
 import './readingLens.css';
 
 /**
@@ -195,6 +197,7 @@ export default function ReadingLensOverlay() {
   // No `sent` state, unlike the visual-novel save beside it: a successful lookup
   // closes the lens, so there is no surface left to report success on.
   const [lookUpState, setLookUpState] = useState<'idle' | 'sending' | 'error'>('idle');
+  const [readState, setReadState] = useState<'idle' | 'sending' | 'error'>('idle');
   const [popup, setPopup] = useState<{
     query: string;
     context: string;
@@ -471,8 +474,18 @@ export default function ReadingLensOverlay() {
   const lexiconCapture = readingCapture && lexiconHandoffFromCapture(readingCapture)
     ? readingCapture
     : null;
+  /**
+   * Whether this capture has a Reading-workspace destination — the exact
+   * complement of `lexiconCapture` above, resolved by the same `'auto'` scale
+   * decision, so the two gestures are never both offered and a paragraph is
+   * never left with neither.
+   */
+  const passageCapture = readingCapture && readingPassageHandoffFromCapture(readingCapture)
+    ? readingCapture
+    : null;
   // A rescan or a correction is a new capture, and its lookup starts fresh.
   useEffect(() => setLookUpState('idle'), [readingCapture]);
+  useEffect(() => setReadState('idle'), [readingCapture]);
 
   // Pass-through: once we're reading (or showing a message), let clicks fall
   // through to the app below except over interactive elements.
@@ -803,6 +816,23 @@ export default function ReadingLensOverlay() {
     setLookUpState('error');
   };
 
+  /**
+   * The passage twin of `lookUpInLexicon`, and closing the same way: the lens
+   * window is dismissed once the workspace has the text, because leaving an
+   * overlay of the same passage on top of the surface now reading it is the
+   * duplicated-state shape the lookup gesture already refuses.
+   */
+  const readInWorkspace = async (capture: ReadingLensCapture): Promise<void> => {
+    if (readState === 'sending') return;
+    setReadState('sending');
+    const outcome = await handOffCaptureToReadingWorkspace(capture);
+    if (outcome === 'handed-off') {
+      close();
+      return;
+    }
+    setReadState('error');
+  };
+
   const rescan = (engine: 'auto' | 'manga' | 'web') => {
     const region =
       state.kind === 'reading' || state.kind === 'empty' || (state.kind === 'error' && state.region)
@@ -1030,6 +1060,8 @@ export default function ReadingLensOverlay() {
             onAskAgent={() => askAgent(state.lines, state.screenshotDataUrl)}
             lookUpState={lookUpState}
             onLookUp={lexiconCapture ? () => void lookUpInLexicon(lexiconCapture) : undefined}
+            readState={readState}
+            onRead={passageCapture ? () => void readInWorkspace(passageCapture) : undefined}
             originLabel={captureTarget?.sourceLabel}
             visualNovelTitle={
               captureTarget?.workflow === 'visual-novel' ? captureTarget.visualNovel.title : undefined
@@ -1054,6 +1086,8 @@ export default function ReadingLensOverlay() {
           onAskAgent={() => askAgentCapture(state.capture)}
           lookUpState={lookUpState}
           onLookUp={lexiconCapture ? () => void lookUpInLexicon(lexiconCapture) : undefined}
+          readState={readState}
+          onRead={passageCapture ? () => void readInWorkspace(passageCapture) : undefined}
           onNewRegion={() => setState({ kind: 'selecting' })}
           onClose={close}
         />
@@ -1146,6 +1180,8 @@ export function LensChrome({
   onAskAgent,
   lookUpState = 'idle',
   onLookUp,
+  readState = 'idle',
+  onRead,
   originLabel,
   visualNovelTitle,
   visualNovelSaveState,
@@ -1173,6 +1209,9 @@ export function LensChrome({
   lookUpState?: 'idle' | 'sending' | 'error';
   /** Absent when the capture is paragraph-scale — see `lexiconCapture` above. */
   onLookUp?: () => void;
+  readState?: 'idle' | 'sending' | 'error';
+  /** Absent when the capture is word- or sentence-scale — see `passageCapture`. */
+  onRead?: () => void;
   /**
    * The parked workflow's own `sourceLabel`, shown so the capture says on
    * screen what it is about to be stamped with. Absent for a bare hotkey
@@ -1224,6 +1263,21 @@ export function LensChrome({
             : lookUpState === 'error'
               ? t('lens.action.lookUpFailed')
               : t('lens.action.lookUp')}
+        </button>
+      )}
+      {onRead && (
+        <button
+          type="button"
+          className={`lens-lookup${readState === 'error' ? ' lens-lookup-error' : ''}`}
+          onClick={onRead}
+          disabled={readState === 'sending'}
+          title={t('lens.action.readInWorkspace')}
+        >
+          {readState === 'sending'
+            ? t('lens.action.readingInWorkspace')
+            : readState === 'error'
+              ? t('lens.action.readInWorkspaceFailed')
+              : t('lens.action.readInWorkspace')}
         </button>
       )}
       <div className="lens-mode" role="radiogroup" aria-label={t('lens.mode.label')}>

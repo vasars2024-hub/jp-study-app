@@ -25,6 +25,7 @@ export const READING_WORKSPACE_SECTIONS = [
   'home',
   'discover',
   'library',
+  'captures',
   'continue',
   'plan',
   'imports',
@@ -39,12 +40,13 @@ export type ReadingWorkspaceSection = (typeof READING_WORKSPACE_SECTIONS)[number
  * desktop aliases from growing their own, contradictory navigation rules
  * while the destination-specific workspace panels converge incrementally.
  */
-export type ReadingWorkspaceSurface = 'finder' | 'library' | 'novels';
+export type ReadingWorkspaceSurface = 'finder' | 'library' | 'novels' | 'captures';
 
 export function readingWorkspaceSurfaceForSection(
   section: ReadingWorkspaceSection,
 ): ReadingWorkspaceSurface {
   if (section === 'library') return 'library';
+  if (section === 'captures') return 'captures';
   if (section === 'plan' || section === 'imports' || section === 'sources') return 'novels';
   return 'finder';
 }
@@ -130,6 +132,9 @@ const SECTION_ALIASES: Record<string, ReadingWorkspaceSection> = {
   'reading-finder': 'discover',
   readingfinder: 'discover',
   library: 'library',
+  captures: 'captures',
+  capture: 'captures',
+  lens: 'captures',
   continue: 'continue',
   'continue-reading': 'continue',
   continuereading: 'continue',

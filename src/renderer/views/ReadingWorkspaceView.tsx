@@ -14,8 +14,13 @@ import {
   type ReadingWorkspaceRoute,
   type ReadingWorkspaceSection,
 } from '../../shared/readingWorkspace';
+import type { ReadingPassageHandoff } from '../../shared/readingPassageHandoff';
 import Icon from '../components/Icons';
 import { useT } from '../i18n';
+import {
+  onReadingPassageHandoffStaged,
+  takeReadingPassageHandoff,
+} from '../readingPassageHandoffClient';
 import {
   consumePendingReadingWorkspaceRoute,
   readingWorkspaceHostForSection,
@@ -26,11 +31,13 @@ import './readingWorkspace.css';
 const ReadingFinderView = lazy(() => import('./ReadingFinderView'));
 const LibraryView = lazy(() => import('./LibraryView'));
 const NovelsView = lazy(() => import('./NovelsView'));
+const ReadingCapturesView = lazy(() => import('./ReadingCapturesView'));
 
 const SECTION_LABEL_KEYS: Record<ReadingWorkspaceSection, string> = {
   home: 'settings.nav.home',
   discover: 'palette.section.reading',
   library: 'palette.section.library',
+  captures: 'reading.captures.title',
   continue: 'reading.continue.title',
   plan: 'novelsView.plan',
   imports: 'library.aero.toolbar.import',
@@ -41,6 +48,7 @@ const SECTION_ICONS: Record<ReadingWorkspaceSection, Parameters<typeof Icon>[0][
   home: 'app',
   discover: 'search',
   library: 'library',
+  captures: 'scan',
   continue: 'bookmark',
   plan: 'calendar',
   imports: 'download',
@@ -58,6 +66,7 @@ export default function ReadingWorkspaceView({
 }: ReadingWorkspaceViewProps) {
   const { t } = useT();
   const [section, setSection] = useState(initialSection);
+  const [passage, setPassage] = useState<ReadingPassageHandoff | null>(null);
   const tabsRef = useRef<Array<HTMLButtonElement | null>>([]);
   const routeGenerationRef = useRef(0);
 
@@ -91,6 +100,41 @@ export default function ReadingWorkspaceView({
       unsubscribe();
     };
   }, [applyRoute, initialSection]);
+
+  /**
+   * Claim a lens passage waiting in main, on mount and on every announcement.
+   *
+   * Both halves are load-bearing and neither is enough alone. The mount claim
+   * serves the cold open — the lens stages, then `popOut('reading')` creates
+   * this window, and the handoff is already resident before the first render.
+   * The subscription serves every passage after that: `popOut` focuses the
+   * existing window instead of remounting it, so a mount-only claim would make
+   * the second capture of a session vanish. Claiming is what switches the tab,
+   * because arriving at Discover with the passage silently loaded one tab over
+   * is indistinguishable from the gesture having failed.
+   */
+  const claimPassage = useCallback(() => {
+    let cancelled = false;
+    void takeReadingPassageHandoff().then((result) => {
+      if (cancelled || !result.ok || !result.handoff) return;
+      setPassage(result.handoff);
+      setSection('captures');
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const cancelMount = claimPassage();
+    const unsubscribe = onReadingPassageHandoffStaged(() => {
+      claimPassage();
+    });
+    return () => {
+      cancelMount();
+      unsubscribe();
+    };
+  }, [claimPassage]);
 
   const selectByKeyboard = (
     event: KeyboardEvent<HTMLButtonElement>,
@@ -149,6 +193,7 @@ export default function ReadingWorkspaceView({
             />
           ) : null}
           {surface === 'novels' ? <NovelsView mode={section as 'plan' | 'imports' | 'sources'} /> : null}
+          {surface === 'captures' ? <ReadingCapturesView passage={passage} /> : null}
         </Suspense>
       </main>
     </div>

@@ -1,0 +1,200 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { ReadingLensHistoryEntry } from '../../shared/readingLensHistory';
+import type { ReadingPassageHandoff } from '../../shared/readingPassageHandoff';
+import Icon from '../components/Icons';
+import { useT } from '../i18n';
+import './readingCaptures.css';
+
+/**
+ * The Reading workspace's destination for a lens passage.
+ *
+ * `resolveReadingLensWorkflow` has always routed paragraph- and document-scale
+ * captures to `target: 'reading'`, and until now there was nowhere for one to
+ * land: the workspace offered Library, Finder and Novels, all of which are
+ * catalogues of *works*, and an ad-hoc screen passage is not a work. This is the
+ * missing surface, and it is deliberately a reader rather than a fourth
+ * catalogue — the gesture the user made was "read this", not "file this".
+ *
+ * The list beside it is the persisted capture history (`lens:history:list`),
+ * which already exists and is already searchable in Settings. It is here so the
+ * section is not blank when opened cold, and so a passage read yesterday is
+ * reachable without going through Settings to find it.
+ */
+
+const HISTORY_LIMIT = 60;
+
+type HistoryState =
+  | { kind: 'loading' }
+  | { kind: 'ready'; entries: ReadingLensHistoryEntry[] }
+  | { kind: 'error' };
+
+/** The just-handed-off passage, projected into the same row shape as history. */
+interface PassageRow {
+  captureId: string;
+  title: string;
+  text: string;
+  lines: string[];
+  source: string;
+  sourceLabel: string;
+  capturedAt: number;
+  /** True only for the passage this mount received from the lens. */
+  live: boolean;
+}
+
+function rowFromHandoff(handoff: ReadingPassageHandoff): PassageRow {
+  return {
+    captureId: handoff.captureId || `passage:${handoff.stagedAt}`,
+    title: handoff.sourceLabel || handoff.text.slice(0, 40),
+    text: handoff.text,
+    lines: handoff.lines,
+    source: handoff.source,
+    sourceLabel: handoff.sourceLabel,
+    capturedAt: handoff.stagedAt,
+    live: true,
+  };
+}
+
+function rowFromHistory(entry: ReadingLensHistoryEntry): PassageRow {
+  return {
+    captureId: entry.captureId,
+    title: entry.sourceLabel || entry.text.slice(0, 40),
+    text: entry.text,
+    lines: [],
+    source: entry.source,
+    sourceLabel: entry.sourceLabel,
+    capturedAt: entry.capturedAt,
+    live: false,
+  };
+}
+
+export interface ReadingCapturesViewProps {
+  /** The passage claimed from main for this mount, or null when opened cold. */
+  passage: ReadingPassageHandoff | null;
+}
+
+export default function ReadingCapturesView({ passage }: ReadingCapturesViewProps) {
+  const { t } = useT();
+  const [history, setHistory] = useState<HistoryState>({ kind: 'loading' });
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const load = useCallback(() => {
+    const list = window.api?.lensHistoryList;
+    if (typeof list !== 'function') {
+      setHistory({ kind: 'error' });
+      return () => undefined;
+    }
+    let cancelled = false;
+    setHistory({ kind: 'loading' });
+    void Promise.resolve(list({ limit: HISTORY_LIMIT }))
+      .then((entries) => {
+        if (cancelled) return;
+        setHistory({ kind: 'ready', entries: Array.isArray(entries) ? entries : [] });
+      })
+      .catch(() => {
+        if (!cancelled) setHistory({ kind: 'error' });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => load(), [load]);
+
+  // A newly arrived passage is recorded into history by the lens, so refresh
+  // rather than splicing: the stored row carries the seen-count and pinned flag
+  // the handoff does not, and a second copy of the same capture in the list
+  // would be a lie about what is on disk.
+  useEffect(() => {
+    if (!passage) return undefined;
+    setSelectedId(passage.captureId || `passage:${passage.stagedAt}`);
+    return load();
+  }, [passage, load]);
+
+  const rows = useMemo<PassageRow[]>(() => {
+    const stored = history.kind === 'ready' ? history.entries.map(rowFromHistory) : [];
+    if (!passage) return stored;
+    const live = rowFromHandoff(passage);
+    return [live, ...stored.filter((row) => row.captureId !== live.captureId)];
+  }, [history, passage]);
+
+  const selected = rows.find((row) => row.captureId === selectedId) ?? rows[0] ?? null;
+
+  const readerLines = useMemo(() => {
+    if (!selected) return [];
+    return selected.lines.length ? selected.lines : selected.text.split(/\r?\n/).filter(Boolean);
+  }, [selected]);
+
+  return (
+    <div className="reading-captures">
+      <aside className="reading-captures-list" aria-label={t('reading.captures.listLabel')}>
+        <div className="reading-captures-list-head">
+          <span>{t('reading.captures.recent')}</span>
+          <button
+            type="button"
+            className="reading-captures-refresh"
+            onClick={() => load()}
+            title={t('reading.captures.refresh')}
+          >
+            <Icon name="refresh" size={13} />
+          </button>
+        </div>
+        {history.kind === 'loading' && rows.length === 0 ? (
+          <p className="reading-captures-note muted" aria-live="polite">
+            {t('reading.captures.loading')}
+          </p>
+        ) : null}
+        {history.kind === 'error' ? (
+          <p className="reading-captures-note reading-captures-error" role="status">
+            {t('reading.captures.loadFailed')}
+          </p>
+        ) : null}
+        {history.kind !== 'loading' && rows.length === 0 ? (
+          <p className="reading-captures-note muted">{t('reading.captures.empty')}</p>
+        ) : null}
+        <ul className="reading-captures-rows">
+          {rows.map((row) => (
+            <li key={row.captureId}>
+              <button
+                type="button"
+                className="reading-captures-row"
+                aria-current={selected?.captureId === row.captureId}
+                onClick={() => setSelectedId(row.captureId)}
+              >
+                <span className="reading-captures-row-title">{row.title}</span>
+                <span className="reading-captures-row-meta">
+                  {row.live ? (
+                    <span className="reading-captures-badge">
+                      {t('reading.captures.justCaptured')}
+                    </span>
+                  ) : null}
+                  <span>{t(`settings.lens.history.source.${row.source}`)}</span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </aside>
+
+      <section className="reading-captures-reader" aria-label={t('reading.captures.readerLabel')}>
+        {selected ? (
+          <>
+            <header className="reading-captures-reader-head">
+              <Icon name="scan" size={15} />
+              <h2>{selected.sourceLabel || t('reading.captures.untitled')}</h2>
+              <span className="reading-captures-reader-meta">
+                {t('reading.captures.lineCount', { count: readerLines.length })}
+              </span>
+            </header>
+            <div className="reading-captures-passage" lang="ja">
+              {readerLines.map((line, index) => (
+                <p key={`${selected.captureId}:${index}`}>{line}</p>
+              ))}
+            </div>
+          </>
+        ) : (
+          <p className="reading-captures-note muted">{t('reading.captures.selectHint')}</p>
+        )}
+      </section>
+    </div>
+  );
+}

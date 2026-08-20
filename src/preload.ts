@@ -21,6 +21,12 @@ import {
   type LexiconHandoffStageResult,
   type LexiconHandoffTakeResult,
 } from './shared/lexiconHandoff';
+import {
+  READING_PASSAGE_HANDOFF_CHANNELS,
+  type ReadingPassageHandoffRequest,
+  type ReadingPassageHandoffStageResult,
+  type ReadingPassageHandoffTakeResult,
+} from './shared/readingPassageHandoff';
 import type { LensOcrResult, RegionRect } from './main/screenOcr';
 import type { ReverifyOutcome, AssetIntegrity } from './main/downloads';
 import {
@@ -2389,6 +2395,24 @@ const api = {
     const handler = (): void => cb();
     ipcRenderer.on(LEXICON_HANDOFF_CHANNELS.staged, handler);
     return () => ipcRenderer.removeListener(LEXICON_HANDOFF_CHANNELS.staged, handler);
+  },
+
+  /**
+   * The lens → Reading workspace passage slot
+   * (shared/readingPassageHandoff.ts). Same reasoning as the Lexicon slot above:
+   * main holds the passage because the lens window is destroyed the moment a
+   * capture lands, and the workspace is routinely a different window entirely.
+   */
+  readingPassageHandoffStage: (
+    request: ReadingPassageHandoffRequest,
+  ): Promise<ReadingPassageHandoffStageResult> =>
+    ipcRenderer.invoke(READING_PASSAGE_HANDOFF_CHANNELS.stage, request),
+  readingPassageHandoffTake: (): Promise<ReadingPassageHandoffTakeResult> =>
+    ipcRenderer.invoke(READING_PASSAGE_HANDOFF_CHANNELS.take),
+  onReadingPassageHandoffStaged: (cb: () => void): (() => void) => {
+    const handler = (): void => cb();
+    ipcRenderer.on(READING_PASSAGE_HANDOFF_CHANNELS.staged, handler);
+    return () => ipcRenderer.removeListener(READING_PASSAGE_HANDOFF_CHANNELS.staged, handler);
   },
 
   onLensOpen: (cb: (init: LensInit) => void): (() => void) => {

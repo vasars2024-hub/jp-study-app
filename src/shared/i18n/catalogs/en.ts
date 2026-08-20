@@ -3348,6 +3348,26 @@ export const en: Catalog = {
   'settings.lens.history.filter.source': 'Filter by source',
   'settings.lens.history.filter.pinnedOnly': 'Pinned only',
 
+  'lens.action.readInWorkspace': 'Read in workspace',
+  'lens.action.readingInWorkspace': 'Opening…',
+  'lens.action.readInWorkspaceFailed': 'Could not open',
+  'reading.captures.title': 'Captures',
+  'reading.captures.listLabel': 'Captured passages',
+  'reading.captures.readerLabel': 'Captured passage',
+  'reading.captures.recent': 'Recent',
+  'reading.captures.refresh': 'Refresh',
+  'reading.captures.loading': 'Loading captures…',
+  'reading.captures.loadFailed': 'Could not read the capture history.',
+  'reading.captures.empty':
+    'Nothing captured yet. Scan a passage with the Reading Lens and send it here.',
+  'reading.captures.justCaptured': 'Just sent',
+  'reading.captures.selectHint': 'Select a capture to read it.',
+  'reading.captures.untitled': 'Screen capture',
+  'reading.captures.lineCount': {
+    one: '{count} line',
+    other: '{count} lines',
+  },
+
   'search.reading': 'Reading settings',
   'search.reading.desc': 'Reader typography and layout',
   'search.whisper': 'Transcription device',

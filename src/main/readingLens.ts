@@ -39,6 +39,7 @@ import type { ReadingLensHistoryEntry } from '../shared/readingLensHistory';
 import type { ReadingLensCapture } from '../shared/readingLens';
 import { createReadingLensClipboardCapture } from './readingLensClipboard';
 import { registerLexiconHandoffIpc } from './lexiconHandoff';
+import { registerReadingPassageHandoffIpc } from './readingPassageHandoff';
 
 /**
  * The last region OCR'd, kept so `repeat` can re-scan it without a drag.
@@ -501,6 +502,10 @@ export function registerReadingLensIpc(): void {
   // already called once at boot, so the shared bootstrap another track is
   // rewriting needs no edit.
   registerLexiconHandoffIpc();
+  // The lens → Reading workspace passage slot, registered beside it for the same
+  // reason and on the same boot path. They are complementary halves of one scale
+  // decision: a capture the Lexicon lane refuses is exactly what this one takes.
+  registerReadingPassageHandoffIpc();
 }
 
 export const __readingLensTestables = {

@@ -1,0 +1,182 @@
+/*
+ * Captures: a two-pane reader inside the Reading workspace.
+ *
+ * The passage pane is a stable, opaque anchor surface on purpose — CLAUDE.md's
+ * Liquid rule keeps reading on high-contrast anchors, and this pane exists to be
+ * read. Only the list rail carries the translucent workspace material.
+ */
+
+.reading-captures {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  gap: 10px;
+  grid-template-columns: minmax(180px, 260px) minmax(0, 1fr);
+  padding: 10px;
+}
+
+.reading-captures-list {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  gap: 6px;
+  overflow: hidden auto;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--border, #5a252b) 70%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--panel, #151012) 82%, transparent);
+  scrollbar-width: thin;
+}
+
+.reading-captures-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted, #b9afb1);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.reading-captures-refresh {
+  display: inline-flex;
+  min-width: 26px;
+  min-height: 26px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+.reading-captures-refresh:hover {
+  border-color: color-mix(in srgb, var(--accent, #a9142c) 34%, transparent);
+  color: var(--text, #f5ecee);
+}
+
+.reading-captures-rows {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  gap: 3px;
+  list-style: none;
+}
+
+.reading-captures-row {
+  display: flex;
+  width: 100%;
+  min-height: 40px;
+  flex-direction: column;
+  gap: 3px;
+  padding: 7px 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: var(--text, #f5ecee);
+  background: transparent;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.reading-captures-row:hover {
+  border-color: color-mix(in srgb, var(--accent, #a9142c) 30%, transparent);
+  background: color-mix(in srgb, var(--accent, #a9142c) 10%, transparent);
+}
+
+.reading-captures-row[aria-current='true'] {
+  border-color: color-mix(in srgb, var(--accent, #a9142c) 48%, transparent);
+  background: color-mix(in srgb, var(--accent, #a9142c) 18%, transparent);
+}
+
+.reading-captures-row-title {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reading-captures-row-meta {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  color: var(--muted, #b9afb1);
+  font-size: 10.5px;
+}
+
+.reading-captures-badge {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent, #a9142c) 30%, transparent);
+  color: var(--text, #fff4f5);
+}
+
+.reading-captures-reader {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--border, #5a252b) 70%, transparent);
+  border-radius: 10px;
+  background: var(--panel, #151012);
+}
+
+.reading-captures-reader-head {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border, #5a252b) 60%, transparent);
+}
+
+.reading-captures-reader-head h2 {
+  overflow: hidden;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reading-captures-reader-meta {
+  margin-inline-start: auto;
+  color: var(--muted, #b9afb1);
+  font-size: 11px;
+}
+
+.reading-captures-passage {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 16px 20px 26px;
+  font-size: 17px;
+  line-height: 1.9;
+}
+
+.reading-captures-passage p {
+  margin: 0 0 0.55em;
+}
+
+.reading-captures-note {
+  margin: 8px 2px;
+  font-size: 12px;
+}
+
+.reading-captures-error {
+  color: var(--danger, #ff8189);
+}
+
+@media (max-width: 720px) {
+  .reading-captures {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(96px, 30%) minmax(0, 1fr);
+  }
+}

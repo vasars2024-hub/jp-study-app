@@ -21,6 +21,9 @@ interface Props {
   lookUpState?: 'idle' | 'sending' | 'error';
   /** Absent when the passage is paragraph-scale and has no Lexicon destination. */
   onLookUp?: () => void;
+  readState?: 'idle' | 'sending' | 'error';
+  /** Absent when the text is word- or sentence-scale and Lexicon owns it. */
+  onRead?: () => void;
   onNewRegion: () => void;
   onClose: () => void;
 }
@@ -41,6 +44,8 @@ export default function LensClipboardPassage({
   onAskAgent,
   lookUpState = 'idle',
   onLookUp,
+  readState = 'idle',
+  onRead,
   onNewRegion,
   onClose,
 }: Props) {
@@ -106,6 +111,21 @@ export default function LensClipboardPassage({
               : lookUpState === 'error'
                 ? t('lens.action.lookUpFailed')
                 : t('lens.action.lookUp')}
+          </button>
+        )}
+        {onRead && (
+          <button
+            type="button"
+            className={`lens-lookup${readState === 'error' ? ' lens-lookup-error' : ''}`}
+            onClick={onRead}
+            disabled={readState === 'sending'}
+            title={t('lens.action.readInWorkspace')}
+          >
+            {readState === 'sending'
+              ? t('lens.action.readingInWorkspace')
+              : readState === 'error'
+                ? t('lens.action.readInWorkspaceFailed')
+                : t('lens.action.readInWorkspace')}
           </button>
         )}
         <button type="button" onClick={onNewRegion}>
