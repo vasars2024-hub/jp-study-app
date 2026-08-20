@@ -26879,3 +26879,52 @@ pre-existing non-null assertions.
 
 Track 5 is now **5 finished / 3 partial**; Tracks 1/4/5/6 = **22 finished / 3 partial /
 4 deferred = 29**. Remaining Track 5 partials: bullets 2, 3, 8.
+
+## 2026-08-20 primary — Track 5 bullet 3 CLOSES: Read is the third depth
+
+`32d846f3` the model, `f37c0ba6` its correction, `7d227f84` the panel, `9f649b77` the live
+walk's finding. Bullet 3 names three progressive experiences; Glance and Inspect shipped
+long ago, Read did not. It names four parts and all four are in.
+
+**Decisions, standing auto-approval.** (1) Read **covers** the region it came from, unlike
+`LensAnalysisPanel`, which docks beside the sentence it explains: at Read depth there is
+nothing left to look at behind it. (2) It is offered at **every** capture scale, unlike the
+workspace handoff at `passageCapture` — Read hands off nowhere, so one word is a passage of
+one and the sheet says so. (3) Highlights reuse the reader's own `annotations.ts`, keyed
+`lens:<captureId>`; a captureId is the OCR hash, so a re-scan of the same text brings them
+back, and they reach the memory export the way a book's do. Rejected: a private lens store,
+which would have been a second annotation model to migrate later.
+
+**TRAP, and it is why the model needed `f37c0ba6`.** The harvest first keyed on lemma+reading,
+copied from `lexiconHarvest.ts:102`. Right there, wrong here: that module's reading is the
+**headword's**, from a dictionary lookup, while an IPADIC token reports the reading of the
+**surface**. 食べ (タベ) and 食べる (タベル) filed as two words — every inflected verb split
+across rows. The key is the dictionary form alone; the readings are kept on the row, which
+also keeps a real homograph visible instead of collapsing it.
+
+**THE LIVE WALK'S FINDING, `9f649b77` — a fallback that was permanent.** `buildLines:181` and
+the clipboard branch both stamp one token carrying the whole line when `tokenizerReady()` is
+false, and **nothing re-stamped it**. A capture that beat the tokenizer stayed one unclickable
+blob for the life of the window, and because that fallback carries no `content` flag the Read
+harvest counted **0** forever. Pre-existing since the clipboard path shipped; invisible until
+a surface depended on the tokens for more than hotspots.
+
+**LIVE, pid 37824, port 39273, `/logs?level=error` total 0 across every probe.**
+Route: real `lensOpen('clipboard')` on three lines written to the OS clipboard.
+- **Cleaning.** 3 clipboard lines → **2 paragraphs**: `今日は天気が` + `とてもよかった。`
+  weld (no sentence end on the first), `明日も晴れるらしい。` stays its own. Read back as code
+  points with furigana off — 14 and 10 chars. Not a newline split.
+- **The four parts.** 11 clickable words, **4** ruby, **6** harvest rows; the harvest resolved
+  `よかった`→`よい` and `晴れる` to dictionary forms. Furigana toggle → rt count **4 → 0**,
+  passage text unchanged. Typography persisted to `jp-study-lens-read`.
+- **Annotations, with the negative control first.** Swatch clicked with no selection → the
+  refusal sentence rendered, marks section **0**, annotation keys in localStorage **0**.
+  Then a real Range over two runs → stored `["green",0,3,part 0,今日は]`, **2** runs painted,
+  1 row listed. Lens auto-dismissed; **re-captured the same text and the highlight came back
+  painted** (2 runs) — the captureId-is-the-hash claim. Remove → 0 painted, 0 keys, passage
+  still rendering.
+- **The finding's before/after, same route.** Before `9f649b77`: 0 words, 0 ruby, 0 rows.
+  After: the numbers above.
+
+Track 5 is now **6 finished / 2 partial**; Tracks 1/4/5/6 = **23 finished / 2 partial /
+4 deferred = 29**. Remaining Track 5 partials: bullets 2 and 8.

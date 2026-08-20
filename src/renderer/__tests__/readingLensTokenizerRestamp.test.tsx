@@ -56,6 +56,11 @@ const CLIPBOARD_INIT = {
   },
 };
 
+/** The unsubscribe every `on…` subscription hands back. */
+function noop(): void {
+  return undefined;
+}
+
 function installApiStub(): void {
   const api: Record<string, unknown> = {
     lensGetInit: async () => CLIPBOARD_INIT,
@@ -68,7 +73,7 @@ function installApiStub(): void {
     get: (target, prop: string | symbol) => {
       if (prop === 'then') return undefined;
       if (typeof prop === 'string' && prop in target) return target[prop];
-      if (typeof prop === 'string' && prop.startsWith('on')) return () => (): void => {};
+      if (typeof prop === 'string' && prop.startsWith('on')) return () => noop;
       return async (): Promise<unknown> => ({});
     },
   });

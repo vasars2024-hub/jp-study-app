@@ -198,7 +198,7 @@ export default function LensReadPanel({ capture, lines, onLookup, onClose }: Pro
     () => (color: AnnoColor) => t(`lens.read.color.${color}`),
     // `lang`, not `t`: a memo that must re-run when the language changes has to
     // depend on what changes, and `t` is stable across a language switch.
-    [lang], // eslint-disable-line react-hooks/exhaustive-deps
+    [lang],
   );
 
   return (

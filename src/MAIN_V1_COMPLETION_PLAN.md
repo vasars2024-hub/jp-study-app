@@ -399,6 +399,24 @@ Track 5 is now **5 finished / 3 partial**; Tracks 1/4/5/6 = **22 finished / 3 pa
 4 deferred = 29**. Remaining Track 5 partials: bullets 2 (alternate OCR candidates, mixed-panel
 order model), 3 (progressive **Read**) and 8 (privacy/retention, OCR/model defaults).
 
+**Amended 2026-08-20 (same day, later still) — bullet 3 now CLOSES.** It names three
+progressive experiences and all three are in: Glance is the in-place OCR plus
+`LensReaderPanel`'s glance tier, Inspect is `LensAnalysisPanel`, and `7d227f84` added the
+missing **Read** — `LensReadPanel`, with all four parts the bullet names. The cleaned
+passage comes from a shared model (`32d846f3`, corrected by `f37c0ba6`) so what you read is
+what the harvest counted; furigana is per-run `alignFurigana`, so ruby sits over the kanji
+rather than the whole word; typography is size, leading, vertical columns and the furigana
+switch, persisted; annotations reuse the reader's own store keyed `lens:<captureId>`.
+Measured live on a real `lensOpen('clipboard')`: 3 lines → **2 paragraphs**, 11 words,
+**4** ruby, **6** harvest rows, and the negative control — a swatch clicked with no
+selection refuses, says why, and writes **0** keys.
+`9f649b77` is the finding the walk produced, and it was pre-existing: a capture that landed
+before the tokenizer stayed one unclickable blob for the life of the window, so the Read
+harvest counted 0 forever. Counted one bullet line at a time, not by keyword sweep.
+Track 5 is now **6 finished / 2 partial**; Tracks 1/4/5/6 = **23 finished / 2 partial /
+4 deferred = 29**. Remaining Track 5 partials: bullets 2 (alternate OCR candidates,
+mixed-panel order model) and 8 (privacy/retention, OCR/model defaults).
+
 ### Track 5 implementation checkpoint — 2026-08-12
 
 - **Searchable capture/session history: done.** Persistent captures, pinning, and — as of

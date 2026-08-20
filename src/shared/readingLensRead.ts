@@ -112,7 +112,7 @@ export const MAX_LENS_HARVEST_ITEMS = 120;
 export const MAX_LENS_HARVEST_SURFACES = 6;
 
 /** Japanese sentence enders, plus the closing marks that follow them. */
-const SENTENCE_END = /[。．！？!?]["'」』）\)】〉》]*$/u;
+const SENTENCE_END = /[。．！？!?]["'」』）)】〉》]*$/u;
 
 /**
  * A bare number or a stray symbol is a token but not vocabulary. One letter,
