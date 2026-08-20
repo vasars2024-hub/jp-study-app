@@ -31,6 +31,13 @@ Status: canonical integration brief for the main tree. Re-derive every status fr
 - Support local Qwen as the no-key fallback and provider adapters through the managed vault.
 - Reuse one structured provider client and one permission/audit model instead of creating feature-specific clients.
 
+**Re-derived 2026-08-20 — 4 of 5 finished, 1 partial.** Open: provider **health**, response
+**caching** and **retry** are absent from the AI lane (`agentProviderRouter.ts` has zero hits;
+`healthCheck`/`maxRetries` live only in `subtitleDiscovery.ts` and `connectionProfiles.ts`).
+Everything else — vault, scraper-store migration, plaintext-downgrade refusal, Qwen fallback, the
+single client and its privacy gate — is shipped with a mechanism at a named line. See the ledger,
+"Tracks 1, 4, 5, 6 re-derived bullet-by-bullet".
+
 ## Track 2: professional multilingual Lexicon Workbench
 
 Complete the full professional dictionary plan rather than only its committed SQLite foundation.
@@ -331,6 +338,11 @@ Take creative product-design authority; do not merely place Reader Finder beside
 - Unify planning, import/download, web extraction, comprehension analysis, Novel Reader, progress, dictionary, mining, and Jiten vocabulary actions.
 - Preserve saved plans, imports, progress, and deep links; keep the former Reading Finder route as a Discover compatibility alias.
 
+**Re-derived 2026-08-20 — 8 of 9 finished, 1 partial.** The seven sections are literally
+`READING_WORKSPACE_SECTIONS`; ranking, cover resolution with negative caching, the vaulted Jiten
+key and the Finder→Discover alias all carry mechanisms. Open: the **contextual detail drawer** half
+of the grid bullet — `readingWorkspace.css` has no `drawer` rule. See the ledger entry above.
+
 ## Track 5: ReadingLens as Capture and Read
 
 The existing popup is a foundation, not completion.
@@ -380,6 +392,14 @@ The existing popup is a foundation, not completion.
 - Use `renderer/assets/concepts/liquid-workplace-video-concept-v1.png` for hierarchy, density, and selective-material intent, not as a literal feature or data specification.
 - Keep conventional windows as the default. The same complete Media/Video feature set must work in Standard and explicitly enabled Liquid presentations.
 - Do not call the player a system pattern until it has passed the full visual matrix and the user has approved it.
+
+**Re-derived 2026-08-20 — 1 finished, 1 partial, 5 deferred to the Liquid plan.** The empty-canvas
+regression is repaired (`MediaWorkspace.tsx:53-56` mounts the adopted `LibraryView` plus the
+player; `MediaWorkspaceSectionView.tsx:98-107` states `pending`/`unavailable` honestly). **Partial:**
+bullet 2's shell nav does not exist — `MediaSurfaceShell.tsx` is 169 lines of provider stack with no
+sidebar, and Discover/Music/Study remain only in the legacy `MediaCenterView.tsx`, now the fallback
+rather than the shell. The Liquid Video pilot bullets are L4 of
+`LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md` and close there, not here.
 
 ## Track 7: remaining main-app completion
 

@@ -26237,3 +26237,72 @@ case rule. All four are dirty from another track's de-hardcoding campaign, so ea
 **Finding 2 (P3) — closed above, not here.** Gate 14's `05475cf0` bullet closed on the clause
 Finding 1 falsifies; it is struck in place with the fix named, and the same entry now states that
 `debug/g14-supported.js` is gitignored local scratch rather than a re-runnable driver.
+
+## 2026-08-20 primary — Tracks 1, 4, 5, 6 re-derived bullet-by-bullet, the first time any turn has
+
+The previous entry measured that Track 1 is named **nowhere** in this ledger and that Tracks 4 and
+5 have no `##` section of their own. That was a statement about the documents; this is the
+measurement it demanded. **29 bullets** across the four tracks, counted from the plan's own `- `
+lines (Track 1 **5**, Track 4 **9**, Track 5 **8**, Track 6 **7**). Every verdict below rests on a
+mechanism at a named line, never on a keyword hit.
+
+**Track 1 — 4 finished, 1 partial.**
+- *Vault + migrate every scattered credential incl. Jiten:* **finished.** `credentials/vault.ts:45`
+  is the single store (`credentials.dat`, safeStorage); `credentialRegistry.ts` carries 6 ids
+  including `jiten` (`:199`); and the second store is **not** a second store —
+  `scraper/credentials.ts:14-17` states, and `:22-25` implements, reads that migrate the former
+  `<scraperRoot>/credentials.json` entries into the vault's private `scraper` namespace one at a
+  time. Tests: `credentialsVault`, `jitenCredentialMigration`, `malCredentialMigration`,
+  `credentialLegacyAdapters`.
+- *Refuse plaintext downgrade:* **finished, with a shipped negative control.** `vault.ts:103`
+  `sealSecret` returns `null` when `encryptionAvailable()` is false, both writers (`:194`, `:225`)
+  treat `null` as do-not-write, and `credentialsVault.test.ts:95-96` flips the OS stub off and
+  asserts the `null`.
+- *Local Qwen no-key fallback:* **finished.** `localAgent.ts:34` enumerates the GGUF filenames and
+  `:211` is the honest empty state, not a silent degrade.
+- *One structured client + one permission/audit model:* **finished.** `agentProviderRouter.ts`
+  (480 lines) is the single execution path; `:365-379` refuses on the privacy decision **before**
+  the call with three distinct codes, and `:152` refuses a renderer-widened retention scope.
+- *Centralize provider health, model selection, usage/cost, caching, cancellation, streaming,
+  retry, privacy:* **PARTIAL — 6 of 9.** Present: model selection (`aiProviders.ts:29/59`), usage
+  and cost (`:451`, `agentProviderPricing.ts`, which refuses to guess without user pricing),
+  cancellation (`AbortSignal` at `:33/322/436`), streaming (`delivery: 'streamed'|'buffered'`,
+  `:50/318`), privacy (above). **Absent from the AI lane:** provider **health**, response
+  **caching**, **retry**. `grep -rln 'providerHealth|healthCheck|maxRetries' src/main src/shared`
+  returns only `subtitleDiscovery.ts` and `connectionProfiles.ts` — a different lane — and **zero**
+  hits in `agentProviderRouter.ts`. This is Track 1's only open work and it is ordinary agent work.
+
+**Track 4 — 8 finished, 1 partial.** The seven sections the first bullet names are literally
+`READING_WORKSPACE_SECTIONS` (`shared/readingWorkspace.ts:24-32`), in that order. Unified search
+across catalog/Jiten/sites/web/EPUB is `ReadingUnifiedDiscovery.tsx` over
+`shared/readingDiscovery.ts`; ranking by difficulty/known-vocabulary/availability/source is
+`scoreReadingDiscoveryResult` (`:192-212`) with `known-vocabulary-fit` a named factor (`:23`) and
+`buildReadingDiscoveryLearnerContext` (`:142`) supplying history. Covers resolve cached → validated
+remote → designed fallback **with negative caching**: `coverArt.ts:47 isCoverBroken` /
+`:51 markCoverBroken` / `:80 remoteCoverIsRenderable` / `:29 coverFallbackImage`. Jiten metadata is
+`main/jiten.ts` and its key is in the vault (above). The Finder route survives as a Discover alias
+(`readingWorkspaceNavigation.ts:36-43`). **Partial:** the three-pane→grid bullet — `ReadingSiteGrid`
+(`ReadingFinderContent.tsx:345`, `.res-grid`) is a grid, but `readingWorkspace.css` contains **no**
+`drawer` rule, so the *contextual detail drawer* half is unbuilt.
+
+**Track 5 — unchanged and already recorded.** Its 2026-08-12 checkpoint (plan `:347-372`) classifies
+all 8 bullets; re-checked, nothing in the tree has moved them. Open: passage → Reading workspace,
+progressive **Read** mode, privacy/retention + OCR/model defaults, alternate OCR candidates.
+
+**Track 6 — 1 finished, 1 PARTIAL and the gap is concrete, 5 belong to the Liquid plan.** The
+"giant empty canvas" regression is repaired: `MediaWorkspace.tsx:53-56` mounts the adopted
+`LibraryView` (genres, filtered collection, continue-watching, streaming ids) **plus** the player,
+and `MediaWorkspaceSectionView.tsx:98-107` gives `pending`/`unavailable` honest distinct states
+with the mature `MediaCenterView` as the fallback. **But bullet 2 is not met:** it asks for one
+shell with *sidebar, global search, Library, Discover, Study, Readiness, Review, Music, Settings*.
+`MediaSurfaceShell.tsx` is 169 lines of provider stack with **no** nav, and the workspace's children
+are exactly two — Library and player. Discover/Music/Study still live only in the legacy
+`MediaCenterView.tsx` (1,711 lines, imports `DiscoverContent` at `:31-37`, `Music*` at `:42-51`),
+which is now the *fallback* rather than the shell. So the mature shell is not hidden behind a
+stripped overlay any more — it is beside it. The remaining 5 bullets are the Liquid Video pilot and
+are `LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md`'s L4, not main-v1's to close here.
+
+**Count that earns the pct.** Across the four tracks: **24 of 29 bullets finished, 3 partial
+(Track 1 provider health/caching/retry; Track 4 detail drawer; Track 6 media shell nav), 2 open and
+owned by Track 5's checkpoint**, with 5 further Track 6 bullets deferred to the Liquid plan by the
+plan's own dependency order. Nothing here needs the user.
