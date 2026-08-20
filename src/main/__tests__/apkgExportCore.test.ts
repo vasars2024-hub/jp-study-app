@@ -599,7 +599,13 @@ describe('applyExportChanges — recipe 13 deck moves', () => {
     expect(row).toEqual([42, NOW_MS]);
   });
 
-  it('refuses a split into a package that declares the collation this build lacks', () => {
+  // A create and a rename are NOT the same question under Anki's `unicase`
+  // collation, and treating them alike made recipe 13's split unusable on every
+  // package current Anki writes — gate 14's live walk hit it with `deckRenames`
+  // empty. A rename cannot be decided without the collation, because the name is
+  // what is changing. A create only needs it to prove uniqueness, and
+  // `deck-name-taken` already decides that in JS before the write.
+  function unicaseDeckDb() {
     const db = normalizedDeckDb();
     db.run('INSERT INTO cards (id, nid, did, ord, mod, usn, type, queue, due, ivl, factor, reps, lapses, left, odue, odid, flags) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [
       5001, 1001, 1, 0, 1_500_000_100, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -609,15 +615,54 @@ describe('applyExportChanges — recipe 13 deck moves', () => {
       "UPDATE sqlite_master SET sql = replace(sql, 'name text', 'name text NOT NULL COLLATE unicase') WHERE type = 'table' AND name = 'decks'",
     );
     db.run('PRAGMA writable_schema = OFF');
+    return db;
+  }
+
+  it('splits into a package that declares the collation this build lacks', () => {
+    const db = unicaseDeckDb();
+    const before = String(
+      db.exec("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'decks'")[0]!
+        .values[0]![0],
+    );
+    const result = applyExportChanges(
+      db,
+      {
+        notes: [],
+        cardMoves: [],
+        deckRenames: [],
+        cardDeckMoves: [{ cardId: '5001', noteId: '1001', deckId: 'split:1:N5' }],
+        deckCreates: [{ deckId: 'split:1:N5', name: 'Japanese\x1fN5', configId: '1' }],
+      },
+      { nowMs: NOW_MS, normalize: stripFieldHtml },
+    );
+    expect(result.decksUpdated).toBe(1);
+    expect(result.cardsUpdated).toBe(1);
+    // Read without a collated comparison: `name = ?` would be compared under the
+    // restored `unicase` and throw here, which is its own proof the swap was put
+    // back rather than left as BINARY.
+    const decks = db.exec('SELECT id, name FROM decks')[0]!.values;
+    const made = decks.find((r) => String(r[1]) === 'Japanese\x1fN5');
+    expect(made).toBeDefined();
+    expect(db.exec('SELECT did FROM cards WHERE id = 5001')[0]!.values[0]![0]).toBe(made![0]);
+    // The DDL is restored verbatim, or the package would ship declaring a
+    // collation it no longer has.
+    expect(
+      String(
+        db.exec("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'decks'")[0]!
+          .values[0]![0],
+      ),
+    ).toBe(before);
+  });
+
+  it('still refuses a RENAME in the same package, and the same one it always did', () => {
+    const db = unicaseDeckDb();
     try {
       applyExportChanges(
         db,
         {
           notes: [],
           cardMoves: [],
-          deckRenames: [],
-          cardDeckMoves: [{ cardId: '5001', noteId: '1001', deckId: 'split:1:N5' }],
-          deckCreates: [{ deckId: 'split:1:N5', name: 'Japanese\x1fN5', configId: '1' }],
+          deckRenames: [{ deckId: '1', from: 'Japanese', to: 'Nihongo' }],
         },
         { nowMs: NOW_MS, normalize: stripFieldHtml },
       );
@@ -625,8 +670,31 @@ describe('applyExportChanges — recipe 13 deck moves', () => {
     } catch (err) {
       expect((err as ExportRefusal).code).toBe('deck-collation-unsupported');
     }
-    // The control that keeps this refusal scoped: the SAME package refiles into a
-    // deck it already has, because that write never touches `decks.name`.
+  });
+
+  it('refuses a created name the source already holds, without the collation', () => {
+    const db = unicaseDeckDb();
+    const existing = String(db.exec('SELECT name FROM decks WHERE id = 1')[0]!.values[0]![0]);
+    try {
+      applyExportChanges(
+        db,
+        {
+          notes: [],
+          cardMoves: [],
+          deckRenames: [],
+          cardDeckMoves: [{ cardId: '5001', noteId: '1001', deckId: 'split:1:dup' }],
+          deckCreates: [{ deckId: 'split:1:dup', name: existing, configId: '1' }],
+        },
+        { nowMs: NOW_MS, normalize: stripFieldHtml },
+      );
+      expect.unreachable('should have refused');
+    } catch (err) {
+      expect((err as ExportRefusal).code).toBe('deck-name-taken');
+    }
+  });
+
+  it('refiles into a deck the source already has, which touches no name at all', () => {
+    const db = unicaseDeckDb();
     expect(
       applyExportChanges(
         db,

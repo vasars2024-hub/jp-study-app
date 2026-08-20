@@ -324,6 +324,21 @@ function readDeckBlob(db: SqlWritable): Record<string, Record<string, unknown>> 
  * Detected from the stored DDL before the first write, so the refusal keeps
  * this module's all-or-nothing promise instead of failing halfway.
  */
+/**
+ * A table and every index over it, so `withoutMissingCollation` is handed the
+ * real schema objects instead of a hardcoded index name that differs by
+ * collection version. The helper ignores whichever of them do not declare the
+ * collation, so an over-broad list costs nothing and a wrong guess is
+ * impossible.
+ */
+function collationObjectsOf(db: SqlWritable, table: string): string[] {
+  const rows = db.exec('SELECT name FROM sqlite_master WHERE name = ? OR tbl_name = ?', [
+    table,
+    table,
+  ])[0]?.values ?? [];
+  return [...new Set(rows.map((row) => String(row[0] ?? '')).filter((name) => name !== ''))];
+}
+
 function deckNameNeedsMissingCollation(db: SqlWritable): boolean {
   const row = firstRow(db, "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'decks'", []);
   return /collate\s+unicase/i.test(String(row?.[0] ?? ''));
@@ -575,14 +590,19 @@ export function applyExportChanges(
   for (const move of deckMoves) {
     if (!deckIdsPresent.has(move.deckId)) createNeeded.add(move.deckId);
   }
-  // Both a rename and a create write `decks.name`, so both are impossible in a
-  // package that declares Anki's own `unicase` collation. A split that only
-  // refiles into decks the source already has writes no name and is allowed.
-  if (
-    (deckRenames.length > 0 || createNeeded.size > 0) &&
-    storage === 'table' &&
-    deckNameNeedsMissingCollation(db)
-  ) {
+  // A RENAME is impossible in a package that declares Anki's own `unicase`
+  // collation: the name is the thing being changed, and the collation is what
+  // decides whether the new one collides with an existing deck.
+  //
+  // A CREATE is the different question `withoutMissingCollation` was written
+  // for, and the template insert already answers it this way: the collation is
+  // needed only to prove the new name is unique, and `namesAfter` answers that
+  // in JavaScript below (`deck-name-taken`) before the write. Refusing it here
+  // made recipe 13's split unusable on every package current Anki writes —
+  // measured on `Default-20260129112153.apkg`, where a split into 3 invented
+  // subdecks refused with `deckRenames` empty. A split that only refiles into
+  // decks the source already has writes no name at all and never reached here.
+  if (deckRenames.length > 0 && storage === 'table' && deckNameNeedsMissingCollation(db)) {
     throw new ExportRefusal('deck-collation-unsupported', DECK_COLLATION_HELP);
   }
 
@@ -924,11 +944,22 @@ export function applyExportChanges(
         idParam(rename.deckId),
       ]);
     }
-    for (const create of creates) {
-      db.run(
-        'INSERT INTO decks (id, name, mtime_secs, usn, common, kind) VALUES (?, ?, ?, -1, ?, ?)',
-        [create.realId, create.name, modSec, new Uint8Array(0), normalDeckKindBlob(create.configId)],
-      );
+    if (creates.length > 0) {
+      // Same swap the template insert runs under, and for the identical reason:
+      // `decks.name` is `COLLATE unicase` with a UNIQUE index over it, so the
+      // INSERT has to maintain an index sql.js cannot compare. Uniqueness was
+      // already decided in JS above, so BINARY is enough to get the row in. The
+      // objects are read from `sqlite_master` rather than named, because the
+      // index this table carries differs by schema version and the helper only
+      // touches the ones that really declare the collation.
+      withoutMissingCollation(db, collationObjectsOf(db, 'decks'), () => {
+        for (const create of creates) {
+          db.run(
+            'INSERT INTO decks (id, name, mtime_secs, usn, common, kind) VALUES (?, ?, ?, -1, ?, ?)',
+            [create.realId, create.name, modSec, new Uint8Array(0), normalDeckKindBlob(create.configId)],
+          );
+        }
+      });
     }
   } else if (storage === 'blob' && (deckRenames.length > 0 || creates.length > 0)) {
     // One parse and one write for the whole batch: the blob is the entire deck
