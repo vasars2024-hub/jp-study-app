@@ -1,0 +1,115 @@
+/**
+ * The Reading Finder's contextual detail drawer.
+ *
+ * This replaces a centred `nov-modal`, which covered the grid the selection was
+ * made from and gave no way to see the card you had just clicked. A drawer docks
+ * to the trailing edge, leaves the grid readable beside it, and is dismissed
+ * without moving the page. Own file rather than `styles.css` so it travels with
+ * the component into Blanc, which renders the same detail with no view chrome.
+ */
+
+/**
+ * One fixed layer holds both halves. Measured 2026-08-20: with the scrim and
+ * the drawer each positioned `fixed` on their own, they resolved against
+ * *different* containing blocks inside a floating window and the drawer hung
+ * 16px past the window's right edge. Sharing one layer makes that impossible,
+ * and `100%` of the layer replaces `100vw`, which is the desktop's width rather
+ * than the window's.
+ */
+.rf-drawer-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.rf-drawer-scrim {
+  position: absolute;
+  inset: 0;
+  /* Deliberately faint: the grid must stay readable, because the whole point of
+     a drawer over a modal is keeping the source of the selection in view. */
+  background: rgb(0 0 0 / 0.28);
+  animation: rf-drawer-scrim-in 140ms ease-out;
+}
+
+.rf-drawer {
+  position: relative;
+  width: min(460px, 100%);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--surface-1);
+  border-left: 1px solid var(--border);
+  box-shadow: -18px 0 44px rgb(0 0 0 / 0.28);
+  animation: rf-drawer-in 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.rf-drawer:focus { outline: none; }
+
+.rf-drawer-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px 16px 12px 20px;
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--border);
+}
+
+.rf-drawer-head h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.rf-drawer-x {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  background: transparent;
+  color: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.rf-drawer-x:hover { background: var(--surface-2); }
+
+.rf-drawer-body {
+  display: flex;
+  flex-direction: column;
+  padding: 16px 20px 24px;
+}
+
+/* The fetch panel keeps its own rules from `styles.css`; only its top rule
+   would double up with the drawer's own separators. */
+.rf-drawer-body .rf-fetch-panel { margin-top: 14px; }
+
+.rf-drawer-body .rf-fetch-row { flex-wrap: wrap; }
+
+@keyframes rf-drawer-in {
+  from { transform: translateX(16px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+@keyframes rf-drawer-scrim-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rf-drawer,
+  .rf-drawer-scrim {
+    animation: none;
+  }
+}

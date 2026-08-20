@@ -26519,3 +26519,44 @@ derivation-over-storage, the ref budget with escapes intact, and a round trip th
 **Bridge correction for the next worker:** `/eval` does **not** ignore the window — the field is
 `window`, not `windowId` (`debugBridge.ts:147`), and it takes a numeric id. The previous entry's
 `localStorage` workaround is unnecessary; target window 2 directly.
+
+## 2026-08-20 primary — Track 4's last partial: the detail modal becomes a contextual drawer
+
+Track 4's one open bullet asked for a cover-first grid **plus a contextual detail drawer**. The
+grid shipped; the detail did not — `ReadingSiteDetail` rendered a centred `nov-modal-backdrop`
+that blacked out the very grid the selection was made from. Now an `rf-drawer` docked to the
+trailing edge, in a new `readingSiteDrawer.css` rather than the contended `styles.css`, so it
+travels with the component into **both** hosts (`ReadingFinderView.tsx:117` and Blanc's
+`BlancStudyPanels.tsx:351`) with **no host change** — that is why it is an overlay drawer rather
+than a third grid column, which would have required layout surgery in Blanc.
+
+**Zero new i18n keys, deliberately:** the dialog is `aria-labelledby` its own `<h2>`, so it is
+labelled by the site's name in the catalogue's own language instead of a translated constant.
+
+**Live gate, pid 38128, Reading Finder opened from the Start menu, 8 cards in the grid.**
+Clicked `Tadoku (多読)`. `role="dialog"`, `aria-labelledby` → **"Tadoku (多読)"**,
+`document.activeElement` → the `.rf-drawer` aside, `.nov-modal-backdrop` → **absent**.
+Layout: `offsetLeft 358 + offsetWidth 460 = layer clientWidth 818` — the drawer occupies the
+trailing 460 and leaves **358 px** of the 818 to the grid, which is the whole point.
+**Negative controls, both required, both pass:** a dispatched `a` keydown left the drawer mounted
+(`afterOtherKey: true`); `Escape` then removed drawer **and** layer while the grid kept its
+**8** cards, and focus returned to the card that opened it (`focusText: "Tadoku (多読)"`).
+
+**Trap — this cost 15 minutes and would cost the next worker the same.** The first
+`getBoundingClientRect` read said the drawer hung **16 px** past its window, and that reading is
+an artifact: `.fwin` carries `transform: matrix(0.98,…)`, and the entry animation was frozen at
+its own first keyframe — `animationPlayState: "running"` with `transform: matrix(1,0,0,1,16,0)`,
+unchanged across reads seconds apart, because Chromium does not advance animations in an
+**unfocused** Electron window. `prefers-reduced-motion` was `false`, so that was not the cause.
+**Measure layout with `offsetLeft`/`offsetWidth`/`clientWidth`, not `getBoundingClientRect`, when
+the surface animates and the window is driven rather than focused** — the rect includes the
+transform, the offsets do not.
+
+The restructure that reading prompted stands on its own merits: scrim and drawer now share one
+`.rf-drawer-layer`, and its `100%` replaces a `100vw` that meant the **desktop's** width, not the
+floating window's — inside a window narrower than 460 px the old rule was wider than its host.
+
+Tests: 4 in `src/renderer/__tests__/readingSiteDrawer.test.tsx` (dialog labelled by the site, the
+old backdrop gone, Escape/scrim close with a non-Escape key as control, focus taken and handed
+back), raw `createRoot`+`act` per this repo's local pattern. `readingFinderModes` and
+`readingWorkspaceView` pass unchanged, 12 tests. **Track 4 is 9 of 9.**

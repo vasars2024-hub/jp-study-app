@@ -7,8 +7,9 @@
  * the same result into Blanc fieldsets. Neither duplicates the filtering,
  * fetching, or import logic, and nothing here may import window furniture.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import Icon from '../Icons';
+import './readingSiteDrawer.css';
 import {
   READING_SITES,
   type ReadingGenre,
@@ -389,6 +390,19 @@ export function ReadingSiteDetail({
   const [error, setError] = useState('');
   const [result, setResult] = useState<FetchedChapter | null>(null);
   const [score, setScore] = useState<ComprehensibilityScore | null>(null);
+  const headingId = useId();
+  const drawerRef = useRef<HTMLElement | null>(null);
+
+  // A drawer that opens without focus is unreachable by keyboard, and one that
+  // drops focus on close strands the caret at the top of the document. Focus
+  // moves in on mount and returns to the card that opened it.
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    drawerRef.current?.focus();
+    return () => {
+      if (opener && document.contains(opener)) opener.focus();
+    };
+  }, []);
 
   const fetchChapter = async (): Promise<void> => {
     const u = url.trim();
@@ -440,13 +454,30 @@ export function ReadingSiteDetail({
   };
 
   return (
-    <div className="nov-modal-backdrop" onClick={onClose}>
-      <div className="nov-modal rf-modal" onClick={(e) => e.stopPropagation()}>
-        <button className="nov-modal-x" onClick={onClose} aria-label={t('common.close')}>
-          ×
-        </button>
-        <div className="nov-modal-body">
-          <h2 lang="ja">{site.name}</h2>
+    <div className="rf-drawer-layer">
+      <div className="rf-drawer-scrim" onClick={onClose} />
+      <aside
+        className="rf-drawer"
+        role="dialog"
+        // Labelled by the site's own name rather than a new string: the heading
+        // already says what this panel is, in the catalogue's own language.
+        aria-labelledby={headingId}
+        ref={drawerRef}
+        tabIndex={-1}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') {
+            e.stopPropagation();
+            onClose();
+          }
+        }}
+      >
+        <div className="rf-drawer-head">
+          <h2 id={headingId} lang="ja">{site.name}</h2>
+          <button className="rf-drawer-x" onClick={onClose} aria-label={t('common.close')}>
+            ×
+          </button>
+        </div>
+        <div className="rf-drawer-body">
           <p className="nov-synopsis">{site.notes}</p>
 
           <div className="nov-meta">
@@ -527,7 +558,7 @@ export function ReadingSiteDetail({
             )}
           </div>
         </div>
-      </div>
+      </aside>
     </div>
   );
 }

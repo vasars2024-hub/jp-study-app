@@ -340,10 +340,12 @@ Take creative product-design authority; do not merely place Reader Finder beside
 - Unify planning, import/download, web extraction, comprehension analysis, Novel Reader, progress, dictionary, mining, and Jiten vocabulary actions.
 - Preserve saved plans, imports, progress, and deep links; keep the former Reading Finder route as a Discover compatibility alias.
 
-**Re-derived 2026-08-20 — 8 of 9 finished, 1 partial.** The seven sections are literally
+**Re-derived 2026-08-20 — 9 of 9 finished.** The seven sections are literally
 `READING_WORKSPACE_SECTIONS`; ranking, cover resolution with negative caching, the vaulted Jiten
-key and the Finder→Discover alias all carry mechanisms. Open: the **contextual detail drawer** half
-of the grid bullet — `readingWorkspace.css` has no `drawer` rule. See the ledger entry above.
+key and the Finder→Discover alias all carry mechanisms. The last gap, the **contextual detail
+drawer** half of the grid bullet, closed 2026-08-20: the centred `nov-modal` is now a docked
+`rf-drawer`, measured live at `offsetLeft 358 + width 460 = layer 818`, so the grid it was opened
+from stays beside it. See the ledger entry of the same date.
 
 ## Track 5: ReadingLens as Capture and Read
 
