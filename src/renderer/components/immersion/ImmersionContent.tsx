@@ -810,7 +810,7 @@ export function ImmersionToolbar({ state }: { state: ImmersionState }) {
         title={t('immersion.lensCapture')}
         onClick={() => void state.captureWithLens()}
       >
-        <Icon name="eye" size={14} />
+        <Icon name="scan" size={14} />
       </button>
       <button type="button" className="btn small icon-btn" title={t('immersion.openInSystemBrowser')} onClick={state.openExternal}>
         <Icon name="external" size={14} />

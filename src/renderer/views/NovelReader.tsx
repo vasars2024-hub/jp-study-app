@@ -2614,7 +2614,7 @@ export default function NovelReader({ item, onClose }: Props) {
         {
           id: 'lens-capture',
           label: t('epub.readWithLens'),
-          icon: <Icon name="eye" size={14} />,
+          icon: <Icon name="scan" size={14} />,
           // Nothing is loaded means nothing names the page, and the contract
           // drops a target whose document has no id or title on read.
           disabled: !loaded,
@@ -2728,6 +2728,19 @@ export default function NovelReader({ item, onClose }: Props) {
               onClick={() => toggleTranslationVisibility()}
             >
               <Icon name="eye" size={14} />
+            </button>
+            {/* Also in the Study menu — but that menu only exists under the Aero
+                and Wired material sets (`AppChrome` renders bare children when
+                `useAppMaterialSet()` is null), so a menu-only control is dead in
+                the default theme. This toolbar renders in every theme. */}
+            <button
+              type="button"
+              className="btn"
+              title={t('epub.readWithLens')}
+              disabled={!loaded}
+              onClick={() => void captureWithLens()}
+            >
+              <Icon name="scan" size={14} />
             </button>
             {translateOpen && (
               <>
