@@ -3,6 +3,7 @@ import {
   MAX_LENS_HARVEST_ITEMS,
   buildReadingLensPassage,
   harvestReadingLensVocabulary,
+  readingLensParagraphRuns,
   type ReadingLensReadSourceLine,
   type ReadingLensReadToken,
 } from '../readingLensRead';
@@ -133,25 +134,74 @@ describe('buildReadingLensPassage', () => {
   });
 });
 
+describe('readingLensParagraphRuns', () => {
+  it('gives every run an offset that slices its own surface back out', () => {
+    const lines = [
+      line('今日は', [0, 0, 200, 20], {
+        tokens: [token('今日'), token('は', { content: false })],
+      }),
+      line('晴れ', [0, 22, 200, 20], { tokens: [token('晴れ', { lemma: '晴れる' })] }),
+    ];
+    const passage = buildReadingLensPassage(lines);
+    const runs = readingLensParagraphRuns(passage.paragraphs[0], lines);
+
+    expect(runs.map((run) => run.surface).join('')).toBe(passage.paragraphs[0].text);
+    for (const run of runs) {
+      expect(passage.text.slice(run.start, run.start + run.surface.length)).toBe(run.surface);
+    }
+  });
+
+  it('emits the weld separator as its own untokenized run', () => {
+    const lines = [
+      line('the quick', [0, 0, 200, 20], {
+        tokens: [token('the'), token(' ', { content: false }), token('quick')],
+      }),
+      line('fox', [0, 22, 200, 20], { tokens: [token('fox')] }),
+    ];
+    const passage = buildReadingLensPassage(lines);
+    const runs = readingLensParagraphRuns(passage.paragraphs[0], lines);
+
+    expect(runs.map((run) => run.surface).join('')).toBe('the quick fox');
+    const separators = runs.filter((run) => run.token === null);
+    expect(separators).toHaveLength(1);
+    expect(separators[0].surface).toBe(' ');
+    expect(passage.text.slice(separators[0].start, separators[0].start + 1)).toBe(' ');
+  });
+
+  it('degrades a line to one untokenized run when its tokens do not reconstruct it', () => {
+    const lines = [line('本当の文', [0, 0, 200, 20], { tokens: [token('ちがう')] })];
+    const passage = buildReadingLensPassage(lines);
+    const runs = readingLensParagraphRuns(passage.paragraphs[0], lines);
+
+    expect(runs).toHaveLength(1);
+    expect(runs[0].token).toBeNull();
+    expect(runs[0].surface).toBe('本当の文');
+    expect(harvestReadingLensVocabulary(passage, lines).items).toEqual([]);
+  });
+});
+
 describe('harvestReadingLensVocabulary', () => {
-  it('groups inflected surfaces under one dictionary form and counts them', () => {
+  it('groups inflected surfaces under one dictionary form and counts them once', () => {
     const lines = [
       line('食べた', [0, 0, 200, 20], {
         tokens: [token('食べ', { lemma: '食べる', reading: 'タベ' }), token('た', { content: false })],
       }),
       line('食べる。', [0, 22, 200, 20], {
-        tokens: [token('食べる', { lemma: '食べる', reading: 'タベル' })],
+        tokens: [token('食べる', { lemma: '食べる', reading: 'タベル' }), token('。', { content: false })],
       }),
     ];
     const harvest = harvestReadingLensVocabulary(buildReadingLensPassage(lines), lines);
 
     expect(harvest.occurrences).toBe(2);
-    expect(harvest.uniqueCount).toBe(2);
-    const forms = harvest.items.map((row) => row.text);
-    expect(forms).toContain('食べる');
+    expect(harvest.uniqueCount).toBe(1);
+    expect(harvest.items[0].text).toBe('食べる');
+    expect(harvest.items[0].count).toBe(2);
+    expect(harvest.items[0].surfaces).toEqual(['食べ', '食べる']);
+    // The analyser reads the surface, not the headword, so one verb carries two.
+    expect(harvest.items[0].readings).toEqual(['タベ', 'タベル']);
   });
 
-  it('does not merge two words that share a spelling but not a reading', () => {
+  it('keeps both readings of a homograph visible on its row instead of dropping one', () => {
     const lines = [
       line('生生', [0, 0, 200, 20], {
         tokens: [
@@ -162,8 +212,20 @@ describe('harvestReadingLensVocabulary', () => {
     ];
     const harvest = harvestReadingLensVocabulary(buildReadingLensPassage(lines), lines);
 
+    expect(harvest.uniqueCount).toBe(1);
+    expect(harvest.items[0].readings).toEqual(['ナマ', 'セイ']);
+  });
+
+  it('does not merge two words the analyser could not reduce to a dictionary form', () => {
+    const lines = [
+      line('ヷヸ', [0, 0, 200, 20], {
+        tokens: [token('ヷ', { lemma: '*' }), token('ヸ', { lemma: '*' })],
+      }),
+    ];
+    const harvest = harvestReadingLensVocabulary(buildReadingLensPassage(lines), lines);
+
     expect(harvest.uniqueCount).toBe(2);
-    expect(harvest.items.map((row) => row.reading).sort()).toEqual(['セイ', 'ナマ']);
+    expect(harvest.items.map((row) => row.text).sort()).toEqual(['ヷ', 'ヸ']);
   });
 
   it('skips particles and bare punctuation but keeps and flags a proper noun', () => {
@@ -228,7 +290,7 @@ describe('harvestReadingLensVocabulary', () => {
 
   it('caps stored surfaces without capping the count', () => {
     const tokens = Array.from({ length: 9 }, (_, i) =>
-      token(`書${i}`, { lemma: '書く', reading: 'カク' }),
+      token(`書${i}`, { lemma: '書く', reading: `カク${i}` }),
     );
     const lines = [line(tokens.map((tk) => tk.surface).join(''), [0, 0, 200, 20], { tokens })];
     const harvest = harvestReadingLensVocabulary(buildReadingLensPassage(lines), lines);

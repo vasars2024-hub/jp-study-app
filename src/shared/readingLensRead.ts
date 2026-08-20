@@ -74,7 +74,16 @@ export interface ReadingLensVocabularyRow {
   key: string;
   /** The dictionary form when the analyser gave one, else the surface. */
   text: string;
-  reading: string;
+  /**
+   * Every reading the passage gave this word, first-seen order.
+   *
+   * A list rather than one string because the analyser reports the reading of
+   * the *surface*, not of the headword: 食べ is タベ and 食べる is タベル, one
+   * verb with two. It is also where a genuine homograph shows itself — 生 read
+   * ナマ and セイ lands one row carrying both readings rather than silently
+   * collapsing to whichever came first.
+   */
+  readings: string[];
   /** Surface forms as the passage wrote them, first-seen order. */
   surfaces: string[];
   count: number;
@@ -114,21 +123,34 @@ function isVocabularyToken(text: string): boolean {
   return /\p{L}/u.test(text);
 }
 
+/**
+ * Internal whitespace is deliberately left alone: the tokenizer was handed this
+ * exact string, so its surfaces concatenate back to it, and collapsing runs here
+ * would shift every offset the Read view and the harvest agree on.
+ */
 function cleanLineText(value: string): string {
-  return typeof value === 'string' ? value.replace(/\r\n?/g, ' ').replace(/\s+/g, ' ').trim() : '';
+  return typeof value === 'string' ? value.replace(/\r\n?/g, ' ').trim() : '';
 }
 
 function isCjk(value: string): boolean {
   return /[\u3040-\u30ff\u3400-\u9fff\u3005\u30fc]/u.test(value);
 }
 
-/** The separator between two lines welded into one paragraph. */
-function weld(acc: string, next: string): string {
-  if (!acc) return next;
+/**
+ * What goes between two lines welded into one paragraph: a space keeps two
+ * Latin words apart, and nothing at all keeps CJK text from growing gaps that
+ * were never printed.
+ */
+function weldSeparator(acc: string, next: string): string {
+  if (!acc) return '';
   const tail = acc.slice(-1);
   const head = next[0] ?? '';
   const needsSpace = /[\p{Letter}\p{Number}]/u.test(tail) && /[\p{Letter}\p{Number}]/u.test(head);
-  return needsSpace && !isCjk(tail) && !isCjk(head) ? `${acc} ${next}` : acc + next;
+  return needsSpace && !isCjk(tail) && !isCjk(head) ? ' ' : '';
+}
+
+function weld(acc: string, next: string): string {
+  return acc ? acc + weldSeparator(acc, next) + next : next;
 }
 
 function median(values: number[]): number {
@@ -223,10 +245,75 @@ export function buildReadingLensPassage(
   };
 }
 
+/**
+ * The grouping identity of a harvested token.
+ *
+ * Deliberately the dictionary form ALONE, which is where this parts company
+ * with `lexiconHarvest.ts`. That module groups on headword+reading because its
+ * reading is the *headword's*, looked up in a dictionary. Here the reading
+ * comes off the analysed surface, so folding it into the key would file 食べ,
+ * 食べる and 食べれば as three different words — every inflected verb in the
+ * passage split across rows. The readings are kept on the row instead.
+ */
 function rowKey(token: ReadingLensReadToken): string {
   const lemma = token.lemma && token.lemma !== '*' ? token.lemma : '';
-  const reading = token.reading ?? '';
-  return lemma ? `l\u0000${lemma}\u0000${reading}` : `s\u0000${token.surface.toLocaleLowerCase()}`;
+  return lemma ? `l\u0000${lemma}` : `s\u0000${token.surface.toLocaleLowerCase()}`;
+}
+
+/** One rendered span of a paragraph: a tokenizer word, or the glue between two. */
+export interface ReadingLensReadRun {
+  surface: string;
+  /** Offset into `ReadingLensReadPassage.text`. */
+  start: number;
+  /** Null for a weld separator, or for a line whose tokens do not reconstruct it. */
+  token: ReadingLensReadToken | null;
+  /** Index into the source `lines` array, so a run can name where it came from. */
+  lineIndex: number;
+}
+
+/**
+ * The paragraph as a flat run of spans carrying real passage offsets.
+ *
+ * The Read view and the vocabulary harvest both need "where is this word in the
+ * passage", and two implementations of that would drift the first time the weld
+ * rule changed. This is the one implementation.
+ *
+ * A line whose token surfaces do not concatenate back to its text is emitted as
+ * a single untokenized run rather than a stream of offsets that would all be
+ * wrong: the words stop being clickable, which is visible, instead of every
+ * offset after it sliding, which is not.
+ */
+export function readingLensParagraphRuns(
+  paragraph: ReadingLensReadParagraph,
+  lines: readonly ReadingLensReadSourceLine[],
+): ReadingLensReadRun[] {
+  const runs: ReadingLensReadRun[] = [];
+  let offset = paragraph.start;
+  let accumulated = '';
+
+  for (const lineIndex of paragraph.lineIndices) {
+    const text = cleanLineText(lines[lineIndex]?.text ?? '');
+    const separator = weldSeparator(accumulated, text);
+    if (separator) {
+      runs.push({ surface: separator, start: offset, token: null, lineIndex });
+      offset += separator.length;
+      accumulated += separator;
+    }
+
+    const tokens = lines[lineIndex]?.tokens ?? [];
+    if (tokens.map((token) => token?.surface ?? '').join('') === text) {
+      for (const token of tokens) {
+        runs.push({ surface: token.surface, start: offset, token, lineIndex });
+        offset += token.surface.length;
+      }
+    } else {
+      runs.push({ surface: text, start: offset, token: null, lineIndex });
+      offset += text.length;
+    }
+    accumulated += text;
+  }
+
+  return runs;
 }
 
 /**
@@ -236,12 +323,6 @@ function rowKey(token: ReadingLensReadToken): string {
  * analyser already made that call. A proper noun IS harvested and flagged,
  * because a passage that leans on a name is telling the reader something and
  * dropping it would be a silent edit.
- *
- * Offsets are accumulated over token surfaces, which concatenate back to the
- * line text the tokenizer was given. A paragraph welded from several lines can
- * gain one separator space per weld, so an offset inside a multi-line Latin
- * paragraph can trail its true position by the number of welds before it. It is
- * used for ordering, never for slicing.
  */
 export function harvestReadingLensVocabulary(
   passage: ReadingLensReadPassage,
@@ -253,36 +334,34 @@ export function harvestReadingLensVocabulary(
   let occurrences = 0;
 
   for (const paragraph of passage.paragraphs) {
-    let offset = paragraph.start;
-    for (const lineIndex of paragraph.lineIndices) {
-      const line = lines[lineIndex];
-      for (const token of line?.tokens ?? []) {
-        const surface = token?.surface ?? '';
-        const start = offset;
-        offset += surface.length;
-        if (!token?.content || !isVocabularyToken(surface)) continue;
-        occurrences += 1;
+    for (const run of readingLensParagraphRuns(paragraph, lines)) {
+      const { token, surface } = run;
+      if (!token?.content || !isVocabularyToken(surface)) continue;
+      occurrences += 1;
 
-        const key = rowKey(token);
-        const existing = byKey.get(key);
-        if (existing) {
-          existing.count += 1;
-          if (!existing.surfaces.includes(surface) && existing.surfaces.length < MAX_LENS_HARVEST_SURFACES) {
-            existing.surfaces.push(surface);
-          }
-          continue;
+      const reading = token.reading ?? '';
+      const key = rowKey(token);
+      const existing = byKey.get(key);
+      if (existing) {
+        existing.count += 1;
+        if (!existing.surfaces.includes(surface) && existing.surfaces.length < MAX_LENS_HARVEST_SURFACES) {
+          existing.surfaces.push(surface);
         }
-        byKey.set(key, {
-          key,
-          text: token.lemma && token.lemma !== '*' ? token.lemma : surface,
-          reading: token.reading ?? '',
-          surfaces: [surface],
-          count: 1,
-          firstStart: start,
-          pos: token.pos ?? '',
-          proper: token.proper === true,
-        });
+        if (reading && !existing.readings.includes(reading) && existing.readings.length < MAX_LENS_HARVEST_SURFACES) {
+          existing.readings.push(reading);
+        }
+        continue;
       }
+      byKey.set(key, {
+        key,
+        text: token.lemma && token.lemma !== '*' ? token.lemma : surface,
+        readings: reading ? [reading] : [],
+        surfaces: [surface],
+        count: 1,
+        firstStart: run.start,
+        pos: token.pos ?? '',
+        proper: token.proper === true,
+      });
     }
   }
 
