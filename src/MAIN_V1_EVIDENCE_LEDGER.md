@@ -26616,3 +26616,47 @@ the deferred number goes 5 -> 4 and the seven still sum.) Across Tracks 1/4/5/6 
 finished / 7 partial / 4 deferred = 29** -- Track 1 five, Track 4 nine, Track 5 one finished plus
 seven partial, Track 6 three finished plus four deferred. Track 5 is now the only track with
 partials left.
+
+## 2026-08-20 primary — Track 5 bullet 7: manga is the second workflow on the shared pipeline
+
+`bb165db8`. Boss audit 2026-08-20 05:48 re-checked first: both findings were already closed by
+`bc8e3186` (the deck create's case-fold, with its own test and a 1-red negative control) and
+`9522b75e` (gate 14's clause). Nothing owed; carried on with the ladder.
+
+Bullet 7 says "VN, manga, video, PDF, and browser workflows through the same shared pipeline".
+`MangaReader.tsx` had the whole OCR pipeline and **zero** `lensOpen` calls, so a lens capture taken
+over a manga page recorded the contract's bare `screen` default. `manga` now joins
+`LENS_CAPTURE_TARGET_WORKFLOWS` with its own fields, ref (`manga:<id>?chapter=&page=`), label
+(`Title · Ch. N · p. N`) and derivation; `normalizeLensCaptureTarget` dispatches on `workflow` and
+re-derives provenance on read for both.
+
+**DECISION — manga parks provenance only, no save-back.** The novel's save-back writes to a store
+keyed by route/chapter/scene, all of which its panel knows. A manga line would have to become a
+`MokuroBlock`, which needs a box in *page-image* coordinates that a screen rectangle cannot yield
+without the zoom, fit and monitor — guessing that is the defect `fb8ee0ed` just fixed. The region
+editor stays how a manga region is made. Reversible: a save-back is additive on the same target.
+
+**Live, pid 38128, one window, `/logs?level=error` total 0 throughout.** Reader on `7138778b`
+(18 pages, restored to p. 9); toolbar reads Library, −, +, Scan, **Lens** — 5 buttons.
+**Negative control:** `jp-lens-capture-target-v1` was `null` before the click; after it,
+`{workflow:"manga", sourceRef:"manga:7138778b-…?page=9"}`. The lens window — a separate renderer on
+the same origin — parses it as `manga`. Auto capture: **36 lines**; badges `SCREEN` + `One
+Punch-Man … | Cubari · p. 9`; `.lens-vn-save` **absent**, so the novel button correctly declines a
+manga target (the unconditional `captureTarget.visualNovel` destructure would have thrown here).
+`lensHistoryList` newest row carries that label, that ref, **1,220 chars** — and the row *below* it
+is a prior hotkey capture reading label `screen`, ref `""`, the honest default. The stamp is not
+applied to everything.
+
+Tests: **15** in `lensCaptureTarget.test.ts` (7 before, +8), 57 across the three shared lens
+suites, 38 across the three renderer lens/VN suites. **Mutation:** the `manga` branch of
+`normalizeLensCaptureTarget` disarmed → **3 red**; restored → 15 green.
+
+**TRAP, recorded in the test itself.** `normalizeReadingLensCapture` runs every string through
+**NFKC** (`readingLens.ts:129`), so a full-width `！` in a title is *stored* folded to `!`. This is
+pre-existing and applies to the visual-novel label too — its own test just happens to use a title
+with no full-width punctuation. The percent-encoded ref is ASCII and round-trips byte-for-byte, so
+the **ref** is the addressable half, not the label.
+
+`MangaReader.tsx` and all four catalogs are dirty from another track; staged as HEAD+edit blobs via
+`debug/stage-head-edit.cjs`, and the staged diff was grepped for that track's `confirmDialog` hunk
+(**0** hits).
