@@ -83,15 +83,29 @@ describe('Media Center integration contract', () => {
     }
   });
 
-  it('leaves the os:open handoff to the host, and covers both sections there', () => {
+  it('opens the workspace only on an explicit request, never on a section mount', () => {
     // The host already owned `os:open` for 'video'. An earlier cut had the section
     // dispatch on mount as well, which opened `video` twice and — because the section's
     // dispatch waits on an async seanimeStatus() round trip — let a late dispatch REOPEN
     // a workspace the user had just closed. One owner, and it must cover both sections.
     const host = read('media/MediaWorkspaceHost.tsx');
-    // Slice 14 replaced the literal pair with the shared list — see the pop-out test
-    // above for why a second copy of "which sections open the workspace" was a defect.
-    expect(host).toMatch(/sectionOpensMediaWorkspace\(\(event as CustomEvent/);
+    /*
+     * That owner is now the explicit request alone. `os:open` brought the overlay forward
+     * while both sections rendered the status-only compatibility view; they render the whole
+     * Media Center now (asserted at the top of this file), so the same dispatch mounted a
+     * shell with a sidebar, a global search and eight destinations and then covered it —
+     * measured live 2026-08-20: one `os:open` with `player` left `.mc-root` AND
+     * `.seanime-host` in the document together. MediaCenterView's own contract forbids
+     * exactly that: the adopted surface "must never replace the sidebar or auto-open during
+     * mount".
+     */
+    expect(host, 'a section mount must not open the workspace')
+      .not.toMatch(/sectionOpensMediaWorkspace/);
+    expect(host, 'the explicit request is still handled')
+      .toMatch(/window\.addEventListener\(MEDIA_WORKSPACE_OPEN_EVENT, onWorkspaceOpen\)/);
+    // And the shell still offers that request, so removing the auto-open removed a route
+    // to nothing rather than a route to the workspace.
+    expect(read('renderer/views/MediaCenterView.tsx')).toContain('openMediaWorkspace(request)');
 
     const section = read('renderer/views/MediaWorkspaceSectionView.tsx');
     // The only openMediaWorkspace call left is the button's explicit onClick.

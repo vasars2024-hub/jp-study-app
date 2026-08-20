@@ -16,7 +16,6 @@ import {
   MEDIA_WORKSPACE_OPEN_EVENT,
   normalizeMediaWorkspaceOpenRequest,
   registerMediaWorkspaceHost,
-  sectionOpensMediaWorkspace,
   STUDY_REVIEW_FOCUS_EVENT,
   type MediaWorkspaceOpenRequest,
   type MediaWorkspacePlaybackRequest,
@@ -97,19 +96,26 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
     const onWorkspaceOpen = (event: Event): void => {
       bringForward((event as CustomEvent<MediaWorkspaceOpenRequest>).detail);
     };
-    // Old-player retirement, 2026-07-31: `player` joins `video` here. Both sections now
-    // render `MediaWorkspaceSectionView`, and this listener is the ONE thing that opens the
-    // workspace for them — the section deliberately does not dispatch on mount.
-    //
-    // It used to, and that was a real defect: the section's open is gated behind an async
-    // `seanimeStatus()` round trip, so closing the workspace within that window let the
-    // late dispatch reopen it. Two mechanisms opening one overlay is also two chances to
-    // disagree about when it should be open. Keep this the only one.
-    const onOsOpen = (event: Event): void => {
-      // Slice 14: the same list `AppSection` routes on and `App` mounts pop-out hosts
-      // from. This condition used to be the only one of the three that was complete.
-      if (sectionOpensMediaWorkspace((event as CustomEvent<unknown>).detail)) bringForward();
-    };
+    /*
+     * `os:open` is deliberately NOT listened for, and the removal is the point rather than
+     * an oversight.
+     *
+     * Opening the `player` or `video` section used to bring this overlay forward. That was
+     * right while both sections rendered `MediaWorkspaceSectionView` — a status-only view
+     * whose whole content was a route to here. They now render the entire Media Center
+     * (`AppSection.tsx`, and `mediaCenterIntegration.test.ts` pins it), so the same dispatch
+     * mounted a shell with a sidebar, a global search and eight destinations and then
+     * covered it with a three-button overlay: measured live 2026-08-20, one dispatch of
+     * `os:open` with `player` left `.mc-root` AND `.seanime-host` in the document together.
+     *
+     * That contradicts the shell's own contract — "opening the adopted surface is an
+     * explicit action from this shell; it must never replace the sidebar or auto-open during
+     * mount" (`MediaCenterView.tsx`) — and Track 6's "clearly integrate local and
+     * Seanime-backed libraries rather than hiding the mature shell behind a stripped
+     * overlay". Nothing is lost: `mc-seanime-link` in that sidebar and the Video
+     * destination's own action both dispatch `MEDIA_WORKSPACE_OPEN_EVENT`, which is still
+     * handled above, and a window with no Media Center still has this host's launcher.
+     */
     // A readiness row handing off to Review: switch the segment and carry the file, so
     // the count it stated lands on exactly the cards it was counting.
     //
@@ -126,12 +132,10 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
     };
     window.addEventListener(MEDIA_WORKSPACE_OPEN_EVENT, onWorkspaceOpen);
     window.addEventListener(STUDY_REVIEW_FOCUS_EVENT, onReviewFocus);
-    window.addEventListener('os:open', onOsOpen);
     return () => {
       releaseHost();
       window.removeEventListener(MEDIA_WORKSPACE_OPEN_EVENT, onWorkspaceOpen);
       window.removeEventListener(STUDY_REVIEW_FOCUS_EVENT, onReviewFocus);
-      window.removeEventListener('os:open', onOsOpen);
     };
   }, []);
 
