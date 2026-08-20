@@ -77,7 +77,7 @@
     },
     "test-only-module:src/shared/episodeProcessing.ts": {
       "status": "pending",
-      "note": "§1 episode processing: built and tested, no consumer. The settings UI edits the rules; nothing applies them, because no connector exists to apply them to. Matches the boundary §1/§2 state honestly."
+      "note": "§1 episode processing: built and tested, no consumer. The old reason — 'the settings UI edits the rules; nothing applies them, because no connector exists' — is STALE and was corrected 2026-08-19: a connector exists and all ten fields act on rows, via main/scraper/episodeProcessingRules.ts wired into both build paths (engine.ts:408, :493). Audit F5 is closed. This module stays test-only for a different and deliberate reason, stated in that file's header: it parses the DOM-extraction shape (ExtractedEpisode, with filler/recap/language and a numeric resolution), while the engine deals in EpisodeRow, which has none of those in that form. Round-tripping rows through the extraction shape to reuse it would drop real fields, so the behaviours are implemented against the shape the engine actually has. Closes when a DOM-extraction path calls it or it is deleted."
     },
     "test-only-module:src/shared/mediaProviderSyncJournal.ts": {
       "status": "pending",
