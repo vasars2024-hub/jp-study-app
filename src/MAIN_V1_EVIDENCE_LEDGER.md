@@ -26086,3 +26086,52 @@ skipped, 0 failed, exit 0** — last turn's `mediaSurfaceImportGraph` flake did 
 at **10,625**. architecture exit 0, "Nothing new", 5 pending. eslint **0 errors** on all 4 touched
 paths (111 warnings, all the `no-non-null-assertion` idiom those files already carry, 53 of them
 predating this turn). Mutation controls: 3 red for the first two fixes, 1 red for the third.
+
+## 2026-08-19 primary — Track 7's non-workbench clause: the 22-finding register, re-derived (`e44b137a`)
+
+The workbench half is 15 of 15. Track 7's *other* clause — "reconcile all still-open non-Mobile,
+non-Noctis v1 features" — names its own source list: architecture, grammar, settings/help,
+storage-hardening, scraper, subtitles, resources, VN, manga, Anki, multi-monitor, visual and
+stale-document discrepancies. Those are the register in `docs/ACTIVE/AUDIT_2026-08.md`:
+**22 rows, F1–F23 (no F18)**, counted from its own `| F<n> |` table rows.
+
+**All 22 re-derived against the tree this turn. 21 were already closed; the 22nd is closed by
+`e44b137a`.** Closure was accepted only on a mechanism, never on a keyword:
+
+- F1 F2 F3 F6 F7 F10 F11 F12 F14 F17 F19 F20 F23 — each carries a fix that names its own audit id
+  at the call site (`DataPages.tsx:438`, `:1101`, `engine.ts:245`, `DictionaryResults.tsx:1153`,
+  `apkgImport.ts`, `tourScript.ts:6`, `gameArena/en.ts`, `catalogs/en.ts:4908`,
+  `GrammarCurationPanel.tsx`, `GrammarExplorer.tsx`, `ResourcesContent.tsx`, `miningUi/en.ts`).
+- **F13** — the mechanism, not the string: `a11y.css:94-95` now carries `!important`, and
+  `osPersonalization.ts:244` emits with bare `setProperty` (no priority). An author `!important`
+  beats a normal inline declaration, so high contrast can now suppress its own shadows.
+- **F15** — `MediaWorkspaceSectionView.tsx:98/100/116` branches `pending` → null,
+  `unavailable` → `legacyFallback`, and its own comment states the four states that used to share
+  one byte-identical sentence.
+- **F16** — retired, not repaired: `catalogs/en.ts:8000` says so above the surviving key.
+- **F4** — the dead affordance is gone rather than rewired. `DashboardPage.tsx:428` renders each
+  recent job as a plain `<li>` with **no** handler, so the caller that navigated into a moved id
+  space no longer exists. Honest, but it is a removal; noted as such.
+- **F5**, the largest row — closed twice over. `episodeProcessingRules.ts` wires the four inert
+  fields into both build paths (`engine.ts:408`, `:493`), `logBus.ts` reads `logging`, and what
+  is *still* inert is **labelled** inert: **11** fields carry `inert: true` and `FieldRow.tsx:319`
+  renders a translated badge. A control that does nothing now says so.
+
+**F21 was the one genuinely open row, and only its artifact half.** `git grep -in mazii HEAD --
+src/* tools/*` → the live corpus is clean (`index.ts:85` has emitted `supplement-${level}` since
+the scrub), but tracked root `grammar-audit.json` was generated 2026-07-20 and still held **4**
+pre-de-branding names. Regenerated: **0** now, and the counts are identical either side
+(627 / 437 / 432 / 324), which is what proves a rename rather than a data change. **Negative
+control:** the same `git grep` scoped to `src/*` `tools/*` minus `.coordination/` returns **0**,
+and `git show HEAD:grammar-audit.json | grep -ci mazii` → **0**. Chose regenerate over untrack
+because nothing reads the file (`tools/grammar-audit.cjs:32` is its only mention) and untracking
+needs the `.gitignore` edit whose own comment block defers that call to the owner.
+
+Still open in F21 and NOT claimed closed: **11 document files** in HEAD still carry the name —
+`archive/`, `docs/migration/`, `docs/audit/HANDOFF_*`, `src/.coordination/`. Every one falls under
+R4's doc-corpus scope and the `.gitignore:178-187` publication list, which is an owner decision,
+not a code defect. `docs/KNOWN_ISSUES.md` is the one hit that list does not cover; it is ` D` in
+the shared tree from another track, so it is left exactly as found.
+
+**Trap:** `tools/grammar-audit.cjs` writes `grammar-audit.json` on *any* invocation — including a
+`--help` it does not implement. It rewrote the artifact under me before I had read it.

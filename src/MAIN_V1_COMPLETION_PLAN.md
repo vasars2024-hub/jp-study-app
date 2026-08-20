@@ -385,6 +385,14 @@ The existing popup is a foundation, not completion.
 
 - Reconcile and finish all still-open non-Mobile, non-Noctis v1 features after re-deriving their state.
 - Include known architecture, grammar, settings/help, storage-hardening, scraper, subtitles, resources, VN, manga, Anki, multi-monitor, visual, and stale-document discrepancies only when source/live evidence confirms they remain open.
+  **Done 2026-08-19.** That list is the register in `docs/ACTIVE/AUDIT_2026-08.md` — **22 rows,
+  F1–F23 (there is no F18)**, counted from its own `| F<n> |` table rows. All 22 were re-derived
+  against the tree; 21 were already closed and F21's artifact half closed with `e44b137a`. Each
+  closure rests on a mechanism at a named line, not a keyword match — see the ledger entry
+  "Track 7's non-workbench clause" for the per-row evidence, the negative control, and the one
+  remainder that is an owner decision (11 documents under the `.gitignore:178-187` publication
+  list) rather than a code defect. **Do not re-sweep this register**; re-derive only a row you
+  have new source evidence against.
 - Deliver the required full-fidelity Anki Deck Workbench in `ANKI_DECK_WORKBENCH_PLAN.md`. The current APKG importer, local Flashcards editor, and Anki card composer are foundations, not completion; this slice remains open until that plan's demonstrable acceptance gates pass.
 - Do not redo items merely because an old document says pending.
 
