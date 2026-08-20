@@ -7,10 +7,10 @@ import { handOffToAgent, readingPassageAgentContext } from '../../agentContextHa
 import { getTokenizer, tokenizeSync, tokenizerReady, type JpToken } from '../../tokenizer';
 import type { LensInit } from '../../../main/readingLens';
 import {
-  parseVisualNovelOcrTarget,
-  VISUAL_NOVEL_OCR_TARGET_KEY,
-  type VisualNovelOcrTarget,
-} from '../../../shared/visualNovelOcrTarget';
+  LENS_CAPTURE_TARGET_KEY,
+  parseLensCaptureTarget,
+  type LensCaptureTarget,
+} from '../../../shared/lensCaptureTarget';
 import {
   normalizeReadingLensCapture,
   READING_LENS_MODES,
@@ -138,7 +138,10 @@ function buildLines(lines: readonly ReadingLensLine[]): LensLine[] {
 export default function ReadingLensOverlay() {
   const { t } = useT();
   const [state, setState] = useState<LensState>({ kind: 'idle' });
-  const [visualNovelTarget, setVisualNovelTarget] = useState<VisualNovelOcrTarget | null>(null);
+  const [captureTarget, setCaptureTarget] = useState<LensCaptureTarget | null>(null);
+  // The OCR effect below depends on `[state, t]`, so it would read the target
+  // through a closure a render old. The ref is what the capture is stamped from.
+  const captureTargetRef = useRef<LensCaptureTarget | null>(null);
   const [visualNovelSaveState, setVisualNovelSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   // No `sent` state, unlike the visual-novel save beside it: a successful lookup
   // closes the lens, so there is no surface left to report success on.
@@ -202,14 +205,15 @@ export default function ReadingLensOverlay() {
     setDragRect(null);
     dragStart.current = null;
     setVisualNovelSaveState('idle');
-    let target: VisualNovelOcrTarget | null = null;
+    let target: LensCaptureTarget | null = null;
     try {
-      target = parseVisualNovelOcrTarget(localStorage.getItem(VISUAL_NOVEL_OCR_TARGET_KEY));
-      if (!target) localStorage.removeItem(VISUAL_NOVEL_OCR_TARGET_KEY);
+      target = parseLensCaptureTarget(localStorage.getItem(LENS_CAPTURE_TARGET_KEY));
+      if (!target) localStorage.removeItem(LENS_CAPTURE_TARGET_KEY);
     } catch {
       // A blocked storage area should not stop ordinary Reading Lens use.
     }
-    setVisualNovelTarget(target);
+    captureTargetRef.current = target;
+    setCaptureTarget(target);
     interactiveRef.current = true; // main re-enabled the mouse on open
     if (init.mode === 'clipboard') {
       const capture = normalizeReadingLensCapture(init.capture);
@@ -305,8 +309,16 @@ export default function ReadingLensOverlay() {
             setState({ kind: 'error', region, message, canRetry: true });
             return;
           }
+          // A workflow that opened the lens on its own behalf gets its
+          // provenance onto the record. A bare hotkey capture has none to give
+          // and keeps the contract's honest `screen` default; the clipboard
+          // branch keeps main's `clipboard` label for the same reason — the
+          // text came from the clipboard, not from whatever is parked here.
+          const target = captureTargetRef.current;
           const capture = normalizeReadingLensCapture({
             source: 'screen',
+            sourceLabel: target?.sourceLabel,
+            sourceRef: target?.sourceRef,
             language: res.lang,
             engine: res.engine,
             hash: res.hash,
@@ -623,7 +635,8 @@ export default function ReadingLensOverlay() {
   };
 
   const saveToVisualNovel = async (): Promise<void> => {
-    if (state.kind !== 'reading' || !visualNovelTarget || visualNovelSaveState === 'saving') return;
+    if (state.kind !== 'reading' || !captureTarget || visualNovelSaveState === 'saving') return;
+    const { visualNovel } = captureTarget;
     const lines = state.lines
       .map((line) => line.text.trim())
       .filter((text) => text && /[\u3040-\u30ff\u3400-\u9fff]/u.test(text));
@@ -632,12 +645,12 @@ export default function ReadingLensOverlay() {
     try {
       const response = await window.api.visualNovelCaptureMany(
         lines.map((japanese) => ({
-          visualNovelId: visualNovelTarget.visualNovelId,
+          visualNovelId: visualNovel.visualNovelId,
           kind: 'narration',
           japanese,
-          routeId: visualNovelTarget.routeId,
-          chapter: visualNovelTarget.chapter,
-          scene: visualNovelTarget.scene,
+          routeId: visualNovel.routeId,
+          chapter: visualNovel.chapter,
+          scene: visualNovel.scene,
           source: 'ocr',
         })),
         { screenshotDataUrl: state.screenshotDataUrl },
@@ -770,7 +783,7 @@ export default function ReadingLensOverlay() {
             onAskAgent={() => askAgent(state.lines, state.screenshotDataUrl)}
             lookUpState={lookUpState}
             onLookUp={lexiconCapture ? () => void lookUpInLexicon(lexiconCapture) : undefined}
-            visualNovelTitle={visualNovelTarget?.title}
+            visualNovelTitle={captureTarget?.visualNovel.title}
             visualNovelSaveState={visualNovelSaveState}
             onSaveToVisualNovel={() => void saveToVisualNovel()}
           />

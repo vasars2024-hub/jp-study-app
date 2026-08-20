@@ -11,7 +11,10 @@ import {
   type VisualNovelTextKind,
 } from '../../../shared/visualNovel';
 import type { VisualNovelHookState } from '../../../shared/visualNovelHook';
-import { VISUAL_NOVEL_OCR_TARGET_KEY } from '../../../shared/visualNovelOcrTarget';
+import {
+  buildVisualNovelCaptureTarget,
+  LENS_CAPTURE_TARGET_KEY,
+} from '../../../shared/lensCaptureTarget';
 import { analyzeVisualNovelCharacterSpeech } from '../../../shared/visualNovelLanguage';
 import { rankVisualNovelEntries } from '../../../shared/visualNovelRecommendations';
 import { addMediaStudySentenceFlashcard, addVisualNovelStudyFlashcards, analyzeMediaStudyCues, createMediaLanguageProfile, type MediaStudyAnalysis } from '../../mediaStudyWorkflow';
@@ -386,14 +389,13 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
 
   const captureScreenText = async (): Promise<void> => {
     if (!selected) return;
-    localStorage.setItem(VISUAL_NOVEL_OCR_TARGET_KEY, JSON.stringify({
+    localStorage.setItem(LENS_CAPTURE_TARGET_KEY, JSON.stringify(buildVisualNovelCaptureTarget({
       visualNovelId: selected.id,
       title: selected.title,
       routeId: progress.route,
       chapter: progress.chapter,
       scene: progress.scene,
-      createdAt: Date.now(),
-    }));
+    })));
     await window.api.lensOpen('select');
     reportStatus(`Select Japanese text for ${selected.title} in Reading Lens.`);
   };

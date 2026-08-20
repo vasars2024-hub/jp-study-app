@@ -26476,3 +26476,46 @@ unclassified / 5 deferred**, 29 bullets. Nothing here needs the user.
 lens opens, a probe that stashed results on the main window's `window.` reads back `{}`. Route
 results through `localStorage` — both renderers share the `localhost:5173` origin. Both scratch
 keys were removed; verified 0 `__relay*` keys remain.
+
+## 2026-08-20 primary — Track 5 bullet 7: the VN side channel becomes the contract's own provenance
+
+The previous entry measured **0 of 5** captures carrying a `sourceRef`, and named the cause: VN
+passed title/route/chapter/scene to the lens through a private `localStorage` key while the screen
+path set neither provenance field. Closed. `src/shared/visualNovelOcrTarget.ts` is replaced by
+`src/shared/lensCaptureTarget.ts` — a **workflow-keyed** handoff (`workflow: 'visual-novel'` today,
+a union member per workflow later) whose stored payload is only the workflow's own identifiers.
+
+**Decision, and its tradeoff.** `sourceLabel`/`sourceRef` are **derived on read**, not trusted from
+storage, so a parked target cannot claim a provenance its fields do not support; the cost is that
+each new workflow adds its derivation to this one module rather than inventing a ref format at the
+call site. Refs are `vn:<id>?route=&chapter=&scene=` — percent-encoded, so they survive
+`normalizeReadingLensCapture`'s NFKC pass byte-for-byte. Params are appended **only if the whole
+ref still fits 1,000**, and the id is shortened before encoding, never after: 240 Japanese
+characters encode to 2,160, and slicing the encoded form cuts an escape in half.
+
+**Scope decision:** only the **screen** path is stamped. Clipboard keeps main's honest `clipboard`
+label — that text came from the clipboard, not from whatever is parked — and a bare hotkey capture
+keeps the contract's `screen` default. Provenance is attached where a workflow directed the
+capture, never inferred from a target merely being present.
+
+**Trap avoided:** the OCR effect depends on `[state, t]`, so a `useState` target would be read a
+render late. The capture is stamped from `captureTargetRef`, set in `begin` beside the state.
+
+**Live gate, pid 38128, both windows reloaded first (`/reload` with `window: 2`).** Parked a target
+carrying **no** `sourceLabel`/`sourceRef` at all, then `lensOpen('auto')` — a whole-display
+2,560x1,600 scan, no mouse. Capture `reading-lens:f40fa067…` recorded with
+`sourceLabel: "Steins;Gate · 第二章 · Lab"` and
+`sourceRef: "vn:vn-live-probe?route=route-a&chapter=%E7%AC%AC%E4%BA%8C%E7%AB%A0&scene=Lab"`.
+Both fields absent from storage, so they were derived, not copied.
+**Negative control:** cleared the key, re-opened the same way 77 s later — capture
+`reading-lens:683a84e6…` came back `sourceLabel: "screen"`, `sourceRef: ""`. No invented
+provenance. History: 5 → 6 → 7, both probe rows then removed via `lensHistoryRemove`; re-listed at
+**5 rows, 0 with a ref** — the exact baseline — and 0 scratch keys remain.
+
+Tests: 7 new in `src/shared/__tests__/lensCaptureTarget.test.ts` (the 2 old ones ported plus
+derivation-over-storage, the ref budget with escapes intact, and a round trip through
+`normalizeReadingLensCapture`). The 5 lens/VN suites that existed pass unchanged, 74 tests.
+
+**Bridge correction for the next worker:** `/eval` does **not** ignore the window — the field is
+`window`, not `windowId` (`debugBridge.ts:147`), and it takes a numeric id. The previous entry's
+`localStorage` workaround is unnecessary; target window 2 directly.
