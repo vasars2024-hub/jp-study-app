@@ -49,7 +49,7 @@ function installApiStub(): void {
     get: (target, prop: string | symbol) => {
       if (prop === 'then') return undefined;
       if (typeof prop === 'string' && prop in target) return target[prop];
-      if (typeof prop === 'string' && prop.startsWith('on')) return () => (): void => {};
+      if (typeof prop === 'string' && prop.startsWith('on')) return () => (): void => undefined;
       return async (): Promise<unknown> => EMPTY_RESULT;
     },
   });
@@ -70,6 +70,13 @@ beforeAll(async () => {
     return 0;
   });
   vi.stubGlobal('cancelAnimationFrame', (): void => undefined);
+  // jsdom has no `elementFromPoint`; the overlay's pass-through listener calls
+  // it on every move, and an uncaught throw there is noise that hides real
+  // failures in the drags below.
+  Object.defineProperty(document, 'elementFromPoint', {
+    configurable: true,
+    value: (): Element | null => null,
+  });
   installApiStub();
   Overlay = (await import('../components/lens/ReadingLensOverlay')).default;
 });
@@ -89,16 +96,21 @@ afterEach(async () => {
   document.body.replaceChildren();
 });
 
+/** One React microtask turn: lets an effect's promise settle and re-render. */
+const flush = async (): Promise<void> => {
+  await Promise.resolve();
+};
+
 /** Mount the overlay and let the `repeat` init settle into a finished read. */
 async function mountReading(): Promise<void> {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
   await act(async () => {
-    root!.render(<Overlay />);
+    root?.render(<Overlay />);
   });
   // Two rAFs guard the screenshot, then the OCR promise and its setState.
-  for (let i = 0; i < 8; i += 1) await act(async () => {});
+  for (let i = 0; i < 8; i += 1) await act(flush);
 }
 
 function grip(handle: string): HTMLButtonElement {
@@ -138,7 +150,7 @@ async function dragGrip(handle: string, dx: number, dy: number): Promise<void> {
   await act(async () => {
     window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
   });
-  for (let i = 0; i < 8; i += 1) await act(async () => {});
+  for (let i = 0; i < 8; i += 1) await act(flush);
 }
 
 describe('Reading Lens region resize', () => {
@@ -248,7 +260,7 @@ describe('Reading Lens region resize', () => {
         new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }),
       );
     });
-    for (let i = 0; i < 8; i += 1) await act(async () => {});
+    for (let i = 0; i < 8; i += 1) await act(flush);
 
     expect(lensOcr).toHaveBeenCalledTimes(2);
     expect(lensOcr.mock.calls[1][0]).toMatchObject({ x: 400, y: 300, width: 600, height: 212 });

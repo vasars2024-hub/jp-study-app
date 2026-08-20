@@ -127,6 +127,26 @@ function loadMode(): LensMode {
   }
 }
 
+/**
+ * Whether a finished read stays on screen until it is dismissed by hand.
+ *
+ * Persisted, like the mode beside it, because pinning is a way of working
+ * rather than a per-scan choice: a reader who is looking a word up in another
+ * window wants the *next* scan to hold still too, and re-pinning after every
+ * capture is exactly the friction the pin exists to remove. Nothing is stranded
+ * by that — the chrome's own toggle and both dismissals (Escape, ×) still work
+ * while pinned, so the state is always one visible control away from off.
+ */
+const PIN_KEY = 'jp-study-lens-pinned';
+
+function loadPinned(): boolean {
+  try {
+    return localStorage.getItem(PIN_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
 function isJapaneseWord(s: string): boolean {
   return /[぀-ヿ㐀-鿿々ー]/.test(s);
 }
@@ -160,6 +180,7 @@ export default function ReadingLensOverlay() {
     y: number;
   } | null>(null);
   const [mode, setModeState] = useState<LensMode>(loadMode);
+  const [pinned, setPinnedState] = useState<boolean>(loadPinned);
   /** The sentence the AI panel is currently explaining; null when it is closed. */
   const [analysisText, setAnalysisText] = useState<string | null>(null);
   const [editMode, setEditMode] = useState(false);
@@ -211,6 +232,15 @@ export default function ReadingLensOverlay() {
     // Leaving AI mode closes the panel; entering it lets the effect below open
     // one for whatever is currently on screen.
     if (next !== 'ai') setAnalysisText(null);
+  }, []);
+
+  const setPinned = useCallback((next: boolean) => {
+    setPinnedState(next);
+    try {
+      localStorage.setItem(PIN_KEY, next ? '1' : '0');
+    } catch {
+      /* a blocked storage area only costs the preference, not the pin itself */
+    }
   }, []);
 
   // Warm the tokenizer so the first scan can split words synchronously.
@@ -442,8 +472,10 @@ export default function ReadingLensOverlay() {
   // suspends it entirely.
   useEffect(() => {
     // A resize in progress suspends the countdown the same way an open panel
-    // does: the reader is dragging an edge, not wandering off.
-    if (state.kind !== 'reading' || popup || analysisText || editMode || resizeRect) {
+    // does: the reader is dragging an edge, not wandering off. A pin suspends
+    // it outright — that is the whole point of the pin, and it is the one
+    // suspension the reader chose rather than one inferred from their cursor.
+    if (state.kind !== 'reading' || popup || analysisText || editMode || resizeRect || pinned) {
       setDimmed(false);
       return;
     }
@@ -488,7 +520,7 @@ export default function ReadingLensOverlay() {
       window.removeEventListener('mousemove', onMove);
       clear();
     };
-  }, [state, popup, analysisText, editMode, resizeRect, close]);
+  }, [state, popup, analysisText, editMode, resizeRect, pinned, close]);
 
   // ---- Region resize -----------------------------------------------------
 
@@ -949,6 +981,8 @@ export default function ReadingLensOverlay() {
                 setAnalysisText(null);
               }
             }}
+            pinned={pinned}
+            onPinnedChange={setPinned}
             onRescan={rescan}
             onNewRegion={() => setState({ kind: 'selecting' })}
             onClose={close}
@@ -1060,6 +1094,8 @@ export function LensChrome({
   onModeChange,
   editing = false,
   onEditingChange,
+  pinned = false,
+  onPinnedChange,
   onRescan,
   onNewRegion,
   onClose,
@@ -1078,6 +1114,9 @@ export function LensChrome({
   onModeChange: (mode: LensMode) => void;
   editing?: boolean;
   onEditingChange?: (editing: boolean) => void;
+  /** Suspends the auto-dismiss countdown; see `PIN_KEY`. */
+  pinned?: boolean;
+  onPinnedChange?: (pinned: boolean) => void;
   onRescan: (engine: 'auto' | 'manga' | 'web') => void;
   onNewRegion: () => void;
   onClose: () => void;
@@ -1183,6 +1222,17 @@ export function LensChrome({
       <button type="button" onClick={onNewRegion} title={t('lens.action.newRegion')}>
         {t('lens.action.newRegion')}
       </button>
+      {onPinnedChange && (
+        <button
+          type="button"
+          className={`lens-pin${pinned ? ' active' : ''}`}
+          aria-pressed={pinned}
+          onClick={() => onPinnedChange(!pinned)}
+          title={pinned ? t('lens.pin.pinnedHint') : t('lens.pin.pinHint')}
+        >
+          {pinned ? t('lens.pin.pinned') : t('lens.pin.pin')}
+        </button>
+      )}
       <button type="button" className="lens-chrome-close" onClick={onClose} title={t('lens.action.close')}>
         ×
       </button>
