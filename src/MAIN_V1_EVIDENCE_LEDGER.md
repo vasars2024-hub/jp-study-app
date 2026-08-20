@@ -26342,3 +26342,34 @@ Track 6's shell-nav partial stands unchanged — that one was read from source, 
 shared contract, main handler, preload, `window.d.ts`, one renderer read, four catalogs — so a
 provider with no key says so before a request fails. Its negative control is the obvious one: clear
 the bucket and the surface must report `configured: false`, not a cheerful default.
+
+## 2026-08-20 primary — the count above does not add up; here it is split properly
+
+Second correction in the same turn, and the reason is worth recording: "25 of 29 finished, 2
+partial, 2 open, 5 deferred" sums to **34**, not 29. The error was folding Track 5's whole
+checkpoint into "finished" instead of splitting its 8 bullets, and it inflated the finished column
+by eleven. Counted bullet by bullet against the plan's own `- ` lines:
+
+| track | bullets | finished | partial | unclassified | deferred to Liquid |
+| --- | --- | --- | --- | --- | --- |
+| 1 credentials/provider | 5 | 4 | 1 (health unwired) | 0 | 0 |
+| 4 Reading workspace | 9 | 8 | 1 (detail drawer) | 0 | 0 |
+| 5 ReadingLens | 8 | 1 | 4 | 3 | 0 |
+| 6 Media/Liquid pilot | 7 | 1 | 1 (shell nav) | 0 | 5 |
+| **total** | **29** | **14** | **7** | **3** | **5** |
+
+**Track 5, split from its own 2026-08-12 checkpoint rather than from prose.** Finished: bullet 5,
+save/history — the checkpoint proves persistent captures, pinning, source and pinned-only filters
+resolved in main against the whole history. Partial: bullet 4 (word → Lexicon done, sentence →
+Workbench done, **passage → Reading workspace open** — `ReadingWorkspaceView` routes only to
+Library, Finder and Novels); bullet 3 (Glance/Inspect exist, **Read** mode does not); bullet 2
+(**alternate OCR candidates** open); bullet 8 (**privacy/retention and OCR/model defaults** open).
+**Unclassified — the checkpoint never touches them, so no turn has ever measured them:** bullet 1
+(region / repeat-region / clipboard / pinned capture *modes*), bullet 6 (pin, dock, resize, restore
+bounds, multi-monitor), bullet 7 (VN / manga / video / PDF / browser through one pipeline).
+
+So the honest headline is **14 of 29 finished across Tracks 1/4/5/6**, and Track 5 is the weakest
+of the four rather than the settled one its checkpoint's confident tone implies. Nothing here needs
+the user. The two smallest closable gaps stay as named: `getAiProviderHealth`'s missing consumer
+(Track 1) and the reading detail drawer (Track 4); the largest unknown is Track 5's three
+unmeasured bullets, which is a measurement slice, not a build slice.
