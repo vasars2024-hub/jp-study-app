@@ -24,6 +24,12 @@ import {
   summarizeReadingLensConfidence,
 } from '../../../shared/readingLensConfidence';
 import { correctReadingLensLine } from '../../../shared/readingLensCorrection';
+import {
+  LENS_RESIZE_HANDLES,
+  lensRegionChanged,
+  resizeLensRegion,
+  type LensResizeHandle,
+} from '../../../shared/readingLensRegion';
 import { lexiconHandoffFromCapture } from '../../../shared/lexiconHandoff';
 import { handOffCaptureToLexicon } from '../../lexiconHandoffClient';
 import './readingLens.css';
@@ -161,6 +167,21 @@ export default function ReadingLensOverlay() {
   // Drag selection scratch state.
   const dragStart = useRef<{ x: number; y: number } | null>(null);
   const [dragRect, setDragRect] = useState<Rect | null>(null);
+  // Region-resize scratch state. The anchor carries the engine the current read
+  // used, so a resized rescan keeps the reader's engine choice instead of
+  // silently reverting to `auto`. `resizeLive` mirrors `resizeRect` because the
+  // window-level mouseup commits from a listener that must not be re-attached
+  // on every mousemove just to see the newest rectangle.
+  const resizeStart = useRef<{
+    handle: LensResizeHandle;
+    x: number;
+    y: number;
+    region: Rect;
+    engine: 'auto' | 'manga' | 'web';
+  } | null>(null);
+  const resizeLive = useRef<Rect | null>(null);
+  const [resizeRect, setResizeRect] = useState<Rect | null>(null);
+  const [resizing, setResizing] = useState(false);
   // Fragments ghost out once the cursor leaves the scanned region (see effect).
   const [dimmed, setDimmed] = useState(false);
   // Mirrors the main-process ignoreMouseEvents flag so we only toggle on change.
@@ -390,7 +411,13 @@ export default function ReadingLensOverlay() {
   useEffect(() => {
     const reading =
       state.kind === 'reading' || state.kind === 'passage' || state.kind === 'empty' || state.kind === 'error';
-    if (!reading) {
+    // A resize grip is 16 px wide and the cursor leaves it on the first frame of
+    // the drag. Letting this effect follow the cursor off it would hand the
+    // window back to `ignoreMouseEvents`, so the mousemove and mouseup that
+    // finish the drag would be delivered to the app underneath and the grip
+    // would stick to the pointer forever. The whole window stays interactive
+    // for the duration of the drag instead.
+    if (!reading || resizing) {
       setInteractive(true);
       return;
     }
@@ -401,7 +428,7 @@ export default function ReadingLensOverlay() {
     };
     window.addEventListener('mousemove', onMove);
     return () => window.removeEventListener('mousemove', onMove);
-  }, [state.kind, setInteractive]);
+  }, [state.kind, setInteractive, resizing]);
 
   // Auto-dismiss so a finished read never lingers on screen. The fragments
   // ghost out — then the lens closes itself — once the cursor wanders away from
@@ -414,7 +441,9 @@ export default function ReadingLensOverlay() {
   // you actually reading — never makes it vanish, and an open reader panel
   // suspends it entirely.
   useEffect(() => {
-    if (state.kind !== 'reading' || popup || analysisText || editMode) {
+    // A resize in progress suspends the countdown the same way an open panel
+    // does: the reader is dragging an edge, not wandering off.
+    if (state.kind !== 'reading' || popup || analysisText || editMode || resizeRect) {
       setDimmed(false);
       return;
     }
@@ -459,13 +488,131 @@ export default function ReadingLensOverlay() {
       window.removeEventListener('mousemove', onMove);
       clear();
     };
-  }, [state, popup, analysisText, editMode, close]);
+  }, [state, popup, analysisText, editMode, resizeRect, close]);
 
-  // Escape always dismisses.
+  // ---- Region resize -----------------------------------------------------
+
+  /** The display, in the same local DIP the region and the lines are in. */
+  const viewport = () => ({ width: window.innerWidth, height: window.innerHeight });
+
+  /** Narrow a finished read's engine back to the three a rescan can request. */
+  const scanEngineOf = (engine: string): 'auto' | 'manga' | 'web' =>
+    engine === 'manga' || engine === 'web' ? engine : 'auto';
+
+  const cancelResize = useCallback(() => {
+    resizeStart.current = null;
+    resizeLive.current = null;
+    setResizeRect(null);
+    setResizing(false);
+  }, []);
+
+  /**
+   * Finish a resize: rescan the new rectangle, or do nothing at all.
+   *
+   * `lensRegionChanged` is load-bearing rather than an optimisation. A rescan
+   * discards the corrections, the popup and the analysis panel belonging to the
+   * read on screen, so a grip that was grabbed and released — or dragged into a
+   * clamp it was already against — must leave the read exactly as it was.
+   */
+  const commitResize = useCallback(() => {
+    const anchor = resizeStart.current;
+    const next = resizeLive.current;
+    cancelResize();
+    if (!anchor || !next || !lensRegionChanged(anchor.region, next)) return;
+    setPopup(null);
+    setAnalysisText(null);
+    setEditMode(false);
+    setState({ kind: 'scanning', region: next, engine: anchor.engine });
+  }, [cancelResize]);
+
+  // Window-level listeners rather than React handlers on the grip: the pointer
+  // leaves the 16 px grip on the first frame of the drag, and `resizing` (not
+  // `resizeRect`) is the dependency so the pair is attached once per drag
+  // instead of re-attached on every mousemove.
+  useEffect(() => {
+    if (!resizing) return;
+    const onMove = (e: MouseEvent) => {
+      const anchor = resizeStart.current;
+      if (!anchor) return;
+      const next = resizeLensRegion(
+        anchor.region,
+        anchor.handle,
+        e.clientX - anchor.x,
+        e.clientY - anchor.y,
+        viewport(),
+      );
+      resizeLive.current = next;
+      setResizeRect(next);
+    };
+    const onUp = () => commitResize();
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [resizing, commitResize]);
+
+  const beginResize = (e: React.MouseEvent, handle: LensResizeHandle) => {
+    if (state.kind !== 'reading') return;
+    e.preventDefault();
+    e.stopPropagation();
+    resizeStart.current = {
+      handle,
+      x: e.clientX,
+      y: e.clientY,
+      region: state.region,
+      engine: scanEngineOf(state.engine),
+    };
+    resizeLive.current = state.region;
+    setResizeRect(state.region);
+    setResizing(true);
+  };
+
+  /**
+   * Keyboard resize on a focused grip: arrows nudge, Shift coarsens, Enter
+   * commits. Deliberately does NOT set `resizing` — that flag exists to keep
+   * the mouse listeners alive, and arming them here would let an unrelated
+   * mouseup elsewhere on screen commit a keyboard edit the reader is still
+   * making.
+   */
+  const onGripKeyDown = (e: React.KeyboardEvent, handle: LensResizeHandle) => {
+    if (state.kind !== 'reading') return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      commitResize();
+      return;
+    }
+    const step = e.shiftKey ? 16 : 4;
+    const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
+    const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;
+    if (!dx && !dy) return;
+    e.preventDefault();
+    const base = resizeLive.current ?? state.region;
+    const next = resizeLensRegion(base, handle, dx, dy, viewport());
+    // The anchor keeps the ORIGINAL region across repeated presses, so a nudge
+    // out and back cancels out and commits nothing.
+    resizeStart.current = {
+      handle,
+      x: 0,
+      y: 0,
+      region: state.region,
+      engine: scanEngineOf(state.engine),
+    };
+    resizeLive.current = next;
+    setResizeRect(next);
+  };
+
+  // Escape always dismisses — except mid-resize, where it abandons the edit and
+  // leaves the read on screen rather than throwing both away at once.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
+        if (resizeLive.current) {
+          cancelResize();
+          return;
+        }
         close();
       } else if (e.key.toLowerCase() === 'a' && state.kind === 'selecting') {
         // Auto-read the whole screen.
@@ -481,7 +628,7 @@ export default function ReadingLensOverlay() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [close, state.kind]);
+  }, [close, state.kind, cancelResize]);
 
   // ---- Selection drag ----------------------------------------------------
 
@@ -709,15 +856,34 @@ export default function ReadingLensOverlay() {
       {/* Reading — interactive text over each detected line. */}
       {state.kind === 'reading' && (
         <>
+          {/*
+            The frame previews the rectangle being resized while the fragments
+            below stay where they were actually read — they belong to the scan
+            that already happened, and sliding them with the frame would claim
+            text was found somewhere it was not.
+          */}
           <div
-            className="lens-frame"
+            className={`lens-frame${resizeRect ? ' lens-frame-resizing' : ''}`}
             style={{
-              left: state.region.x,
-              top: state.region.y,
-              width: state.region.width,
-              height: state.region.height,
+              left: (resizeRect ?? state.region).x,
+              top: (resizeRect ?? state.region).y,
+              width: (resizeRect ?? state.region).width,
+              height: (resizeRect ?? state.region).height,
             }}
-          />
+          >
+            {!editMode &&
+              LENS_RESIZE_HANDLES.map((handle) => (
+                <button
+                  key={handle}
+                  type="button"
+                  className={`lens-grip lens-grip-${handle} lens-interactive`}
+                  aria-label={t(`lens.resize.${handle}`)}
+                  title={t(`lens.resize.${handle}`)}
+                  onMouseDown={(e) => beginResize(e, handle)}
+                  onKeyDown={(e) => onGripKeyDown(e, handle)}
+                />
+              ))}
+          </div>
           {state.lines.map((line, i) => {
             const [bx, by, bw, bh] = line.box;
             const fontPx = Math.max(11, Math.min(line.vertical ? bw * 0.78 : bh * 0.78, 30));

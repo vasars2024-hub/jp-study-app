@@ -136,6 +136,98 @@
   transition: opacity 0.45s ease;
 }
 
+/* While a grip is being dragged the frame is the only feedback the reader has
+   for where the next scan will land, so it stops being a hairline. */
+.lens-frame-resizing {
+  border: 1px dashed rgba(178, 59, 71, 0.9);
+  transition: none;
+}
+
+/* Resize grips: one per edge, one per corner, centred on the frame border so
+   half of each sits outside the scanned area and does not cover the text. The
+   frame is pointer-events:none; only these catch the mouse. */
+.lens-grip {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 4px;
+  background: var(--lens-accent);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+  opacity: 0.5;
+  pointer-events: auto;
+  transition:
+    opacity 0.12s ease,
+    transform 0.12s ease;
+}
+.lens-grip:hover,
+.lens-grip:focus-visible {
+  opacity: 1;
+  transform: scale(1.15);
+}
+.lens-grip:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.lens-grip-nw,
+.lens-grip-w,
+.lens-grip-sw {
+  left: 0;
+}
+.lens-grip-n,
+.lens-grip-s {
+  left: 50%;
+}
+.lens-grip-ne,
+.lens-grip-e,
+.lens-grip-se {
+  left: 100%;
+}
+.lens-grip-nw,
+.lens-grip-n,
+.lens-grip-ne {
+  top: 0;
+}
+.lens-grip-w,
+.lens-grip-e {
+  top: 50%;
+}
+.lens-grip-sw,
+.lens-grip-s,
+.lens-grip-se {
+  top: 100%;
+}
+
+.lens-grip-nw,
+.lens-grip-se {
+  cursor: nwse-resize;
+}
+.lens-grip-ne,
+.lens-grip-sw {
+  cursor: nesw-resize;
+}
+.lens-grip-n,
+.lens-grip-s {
+  cursor: ns-resize;
+}
+.lens-grip-w,
+.lens-grip-e {
+  cursor: ew-resize;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lens-grip {
+    transition: none;
+  }
+  .lens-grip:hover,
+  .lens-grip:focus-visible {
+    transform: none;
+  }
+}
+
 .lens-line {
   position: absolute;
   display: inline-flex;
