@@ -24,14 +24,11 @@ import {
 } from '../shared/mediaWorkspace';
 import { SIDECAR_STATUS_KEY } from '../shared/mediaWorkspaceLabels';
 import { useT } from '../renderer/i18n';
+// The readiness loader, shared with the Media Center's sidebar. It keeps the orchestrator
+// behind an `await import()`, so the boot bundle is unchanged — the invariant this file's
+// header states.
+import { useStudyReadiness } from '../renderer/useStudyReadiness';
 import { useSeanimeConnection } from './useSeanimeConnection';
-// Type-only, so all three erase at build time and the boot bundle is unchanged — the
-// invariant this file's header states. The runtime halves are `await import()`ed below.
-import type { StudyOrchestratorDocument } from '../shared/mediaStudyOrchestrator';
-import type { StudyReadinessFingerprints } from '../shared/seanimeStudyLibrary';
-import type {
-  SeanimeStudyAnalyseAction,
-} from '../renderer/components/reading/SeanimeStudyLibraryPanel';
 
 const MediaWorkspace = React.lazy(() => import('./MediaWorkspace'));
 /** Phase 6. Lazy for the same reason as the workspace: it stays out of the boot path. */
@@ -57,7 +54,7 @@ function sidecarStatusLabel(
 }
 
 export default function MediaWorkspaceHost(): React.ReactElement | null {
-  const { t, lang } = useT();
+  const { t } = useT();
   const [open, setOpen] = useState(false);
   const [playbackRequest, setPlaybackRequest] =
     useState<MediaWorkspacePlaybackRequest | null>(null);
@@ -164,87 +161,17 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
   }, [open]);
 
   /* ----------------------------------------------------------------------------------- *
-   * The readiness panel's three props. See the block comment above `analyse` for why it is
-   * three and not the one the carried record claimed.
+   * The readiness panel's three props, all of which are load-bearing — the reasoning, the
+   * deferred `await import()` and the `study:changed` subscription moved to
+   * `renderer/useStudyReadiness.ts` when the Media Center's sidebar gained the same
+   * destination. One loader, two shells: a second copy would be a second opinion about
+   * when the document is fresh.
    * ----------------------------------------------------------------------------------- */
-  const [studyDocument, setStudyDocument] = useState<StudyOrchestratorDocument | null>(null);
-  const [studyFingerprints, setStudyFingerprints] =
-    useState<StudyReadinessFingerprints | null>(null);
-
-  /**
-   * Loaded when the readiness segment is actually shown, never on mount.
-   *
-   * `renderer/mediaStudyOrchestrator.ts` reaches the known-words store, the level lists and
-   * the frequency dictionaries to build the fingerprints, so a static import would put all
-   * of that in the boot path and break this file's standing promise that a build with the
-   * sidecar off starts up unchanged. `await import()` keeps it in the segment's own chunk,
-   * beside the `React.lazy` panels it feeds.
-   *
-   * The `study:changed` subscription is what makes the analyse row transition at all. The
-   * main-process `persist()` broadcasts the whole document on every write, so a successful
-   * prepare pushes a fresher document here and the row re-derives its badge from real
-   * readiness — the panel's own header says the badge can only change "once whoever supplies
-   * the document supplies a fresher one", and this is that supplier.
-   */
-  useEffect(() => {
-    if (view !== 'readiness') return;
-    let dead = false;
-    let release: (() => void) | undefined;
-    void (async () => {
-      try {
-        const { currentStudyReadinessFingerprints, initializeStudyOrchestrator } =
-          await import('../renderer/mediaStudyOrchestrator');
-        const [document, fingerprints] = await Promise.all([
-          initializeStudyOrchestrator(),
-          currentStudyReadinessFingerprints(),
-        ]);
-        if (dead) return;
-        setStudyDocument(document);
-        setStudyFingerprints(fingerprints);
-        release = window.api.onStudyChanged((next) => setStudyDocument(next));
-      } catch {
-        // A readiness document that cannot be read is a panel with no scores, which is
-        // exactly what it renders from `undefined`. It is not a reason to blank the segment.
-      }
-    })();
-    return () => {
-      dead = true;
-      release?.();
-    };
-  }, [view]);
-
-  /**
-   * The analyse row action, wired to the real `study:prepare` path.
-   *
-   * **The carried record called this "one prop". It is three, and the other two are not
-   * decoration.** `onAnalyse` alone makes the button render and fire, but readiness lives in
-   * the orchestrator document, which the panel takes as a prop and does not own: with no
-   * `orchestrator`, `joinSeanimeStudyLibrary` finds no snapshot for any file, so every linked
-   * row is pinned at `unanalyzed` forever, `ready` and `stale` are unreachable states, and a
-   * successful analyse changes nothing the user can see. `fingerprints` is what separates a
-   * current score from `stale`. Supplying only `onAnalyse` would have replaced a button that
-   * does nothing with a button that does something invisible.
-   *
-   * `unanalyzed` and `stale` are the only states that render the button, and
-   * `joinSeanimeStudyLibrary` gives both a `studyMediaId` and a `subtitleRecordId` — the two
-   * arguments `prepareStudyMediaById` takes. The guard below is therefore unreachable by
-   * construction rather than defensive-in-case; it reuses the `unlinked` row's own wording
-   * instead of inventing a string for a case that cannot arrive.
-   */
-  const analyse = useCallback<SeanimeStudyAnalyseAction>(async (entry) => {
-    if (!entry.studyMediaId) throw new Error(t('studyLibrary.action.unlinked'));
-    const { prepareStudyMediaById } = await import('../renderer/mediaStudyOrchestrator');
-    const result = await prepareStudyMediaById(entry.studyMediaId, entry.subtitleRecordId);
-    return result.status === 'queued-transcription'
-      ? { status: 'queued-transcription', stage: result.stage }
-      : {
-        status: 'prepared',
-        candidateCount: result.candidateCount,
-        readinessCategory: result.readinessCategory,
-      };
-    // `lang`, never `t` — `t`'s identity is stable by design, so depending on it goes stale
-    // after a language switch instead of erroring (CLAUDE.md i18n rule 6).
-  }, [lang]);
+  const {
+    document: studyDocument,
+    fingerprints: studyFingerprints,
+    analyse,
+  } = useStudyReadiness(view === 'readiness');
 
   const pickLocalVideo = async (): Promise<void> => {
     const opened = await window.api.pickMedia();
@@ -441,8 +368,8 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
                   }
                 >
                   <SeanimeStudyLibraryPanel
-                    orchestrator={studyDocument ?? undefined}
-                    fingerprints={studyFingerprints ?? undefined}
+                    orchestrator={studyDocument}
+                    fingerprints={studyFingerprints}
                     onAnalyse={analyse}
                   />
                 </Suspense>

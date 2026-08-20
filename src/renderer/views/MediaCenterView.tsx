@@ -19,6 +19,9 @@ import {
   malUrl,
   type MediaState,
 } from '../components/media/MediaContent';
+import SeanimeStudyLibraryPanel from '../components/reading/SeanimeStudyLibraryPanel';
+import SeanimeWatchLoopPanel from '../components/reading/SeanimeWatchLoopPanel';
+import { useStudyReadiness } from '../useStudyReadiness';
 import MediaLibraryShell from '../components/media/library/MediaLibraryShell';
 import MediaArtwork from '../components/media/library/MediaArtwork';
 import MediaStudyMode from '../components/media/MediaStudyMode';
@@ -71,6 +74,8 @@ export type MediaCenterTab =
   | 'video'
   | 'music'
   | 'study'
+  | 'readiness'
+  | 'review'
   | 'discover'
   | 'settings';
 
@@ -86,6 +91,22 @@ const NAV: Array<{ id: MediaCenterTab; labelKey: string; icon: IconName; hintKey
   { id: 'video', labelKey: 'mediaCenter.nav.video', icon: 'video', hintKey: 'mediaCenter.nav.videoHint' },
   { id: 'music', labelKey: 'mediaCenter.nav.music', icon: 'music', hintKey: 'mediaCenter.nav.musicHint' },
   { id: 'study', labelKey: 'mediaCenter.nav.study', icon: 'sparkle', hintKey: 'mediaCenter.nav.studyHint' },
+  /*
+    Readiness and Review existed only inside the adopted workspace overlay, which covers this
+    sidebar entirely — so the shell that owns Media navigation could not reach two of its own
+    destinations. They sit after Study because the three are one arc: prepare, watch, come back.
+
+    Their labels are the overlay's own keys, deliberately: the same destination reached from
+    two shells must not be called two things, and reusing them adds no key to translate. The
+    hints are each panel's own headline, for the same reason.
+
+    Neither panel needs the media server. `SeanimeStudyLibraryPanel` reads
+    `window.api.seanimeStudyLibrary()` plus the local library, and `SeanimeWatchLoopPanel`
+    reads mining history and Anki — which is why the overlay already renders Review outside
+    its own sidecar gate.
+  */
+  { id: 'readiness', labelKey: 'mediaWorkspace.viewReadiness', icon: 'check', hintKey: 'studyLibrary.title' },
+  { id: 'review', labelKey: 'mediaWorkspace.viewReview', icon: 'repeat', hintKey: 'studyLoop.eyebrow' },
   { id: 'discover', labelKey: 'mediaCenter.nav.discover', icon: 'globe', hintKey: 'mediaCenter.nav.discoverHint' },
   { id: 'settings', labelKey: 'mediaCenter.nav.settings', icon: 'settings', hintKey: 'mediaCenter.nav.settingsHint' },
 ];
@@ -1390,6 +1411,9 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
   );
   const tab = history.trail[history.at];
   const discovery = useDiscovery(tab === 'discover');
+  // Deferred exactly like `useDiscovery` above: the orchestrator read reaches the known-words
+  // store and the frequency lists, so a shell that merely offers the destination pays nothing.
+  const readiness = useStudyReadiness(tab === 'readiness');
   const workspace = useMediaWorkspaceAvailability();
   const seanimeAvailable = workspace === 'available';
   const seanimeActionTitle = workspace === 'pending'
@@ -1560,9 +1584,22 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
     );
     if (tab === 'music') return <MusicPanel state={music} />;
     if (tab === 'study') return <StudyPanel state={media} />;
+    if (tab === 'readiness') return (
+      <SeanimeStudyLibraryPanel
+        orchestrator={readiness.document}
+        fingerprints={readiness.fingerprints}
+        onAnalyse={readiness.analyse}
+      />
+    );
+    // No `focus` prop here, and that is a decision rather than an omission: the focused
+    // handoff is raised as a window event with no way to say which shell should answer it
+    // (`new CustomEvent(…, { detail })`, not cancelable), and `MediaWorkspaceHost` already
+    // answers it. Two shells answering one event would open the overlay on top of this one.
+    // So the focused route stays exactly where it is, and this is the browsable destination.
+    if (tab === 'review') return <SeanimeWatchLoopPanel />;
     if (tab === 'discover') return <DiscoverPanel state={discovery} />;
     return <SettingsPanel state={media} provenance={discovery.provenance} />;
-  }, [tab, media, music, discovery, openSeanime, seanimeActionTitle, seanimeAvailable]);
+  }, [tab, media, music, discovery, readiness, openSeanime, seanimeActionTitle, seanimeAvailable]);
 
   return (
     <AppChrome menus={mediaMenus} status={status} className="mc-app-chrome">
