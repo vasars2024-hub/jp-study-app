@@ -74,14 +74,23 @@ const noop = (): undefined => undefined;
  * own real states.
  */
 function installBridgeStub(): void {
-  const api = (window as unknown as { api?: Record<string, unknown> }).api ?? {};
+  const existing = (window as unknown as { api?: Record<string, unknown> }).api;
+  const api = existing ?? {};
   if (typeof api.sentenceGetPrefs !== 'function') {
     api.sentenceGetPrefs = () => Promise.resolve({});
   }
   if (typeof api.onSentencePrefsChanged !== 'function') {
     api.onSentencePrefsChanged = () => () => undefined;
   }
-  (window as unknown as { api: Record<string, unknown> }).api = api;
+  // Only install when there is nothing to install onto. `contextBridge` defines
+  // `window.api` non-writable, so assigning over a real preload throws
+  // "Cannot assign to read only property 'api'" — and because this runs at
+  // module scope, that took the whole page down with an empty `#root` and no
+  // visible error. The mutations above already reached the real object, which
+  // is what the panels read.
+  if (!existing) {
+    (window as unknown as { api: Record<string, unknown> }).api = api;
+  }
 }
 
 installBridgeStub();
