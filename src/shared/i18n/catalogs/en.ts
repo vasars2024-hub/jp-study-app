@@ -5367,6 +5367,8 @@ export const en: Catalog = {
   'immersion.toolAlready': 'Already in My tools',
   'immersion.exportToLibrary': 'Export to Library',
   'immersion.captureVideo': 'Capture video to Media',
+  'immersion.lensCapture': 'Read this page with the lens',
+  'immersion.lensNeedsPage': 'Open a web page first — the lens can only record a page it can address.',
   'immersion.openInSystemBrowser': 'Open in system browser',
   'immersion.hideLibrary': 'Hide library',
   'immersion.showLibrary': 'Show library',

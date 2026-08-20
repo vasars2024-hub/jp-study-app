@@ -29,6 +29,11 @@ import {
   type ImmersionSite,
   type ImmersionSitesStore,
 } from '../../../shared/immersion';
+import {
+  buildBrowserCaptureTarget,
+  browserCaptureUrl,
+  LENS_CAPTURE_TARGET_KEY,
+} from '../../../shared/lensCaptureTarget';
 import { isNhkNewsArticleUrl, nhkArticleLooksHydrated } from '../../../shared/nhkArticle';
 import { articleBodyHtml, fetchReadableArticle } from '../../wikiArticle';
 import {
@@ -634,6 +639,34 @@ export function useImmersion() {
     if (currentUrl) void window.api.openExternal(currentUrl);
   };
 
+  /**
+   * The browser half of the shared ReadingLens pipeline, parked exactly the way
+   * the manga reader and the visual-novel panel park theirs: the lens is a
+   * separate always-on-top window owned by main, so this `localStorage` slot on
+   * the shared origin is the only channel between the two renderers.
+   *
+   * This is the workflow the lens is *most* needed for. A `<webview>` guest is
+   * a different frame with its own document, so the reader-mode word lookup and
+   * the highlight layer only reach text this renderer extracted — a canvas
+   * subtitle, a manga panel served as an image, or a site whose text is
+   * inside a plugin are all invisible to it and visible to OCR.
+   *
+   * Provenance only, no save-back: a browser page is not a store this app owns.
+   */
+  const captureWithLens = async () => {
+    // Refuse before opening the lens rather than parking a target the contract
+    // will drop on read — `about:blank` and a `file:` page both land here.
+    if (!browserCaptureUrl(currentUrl)) {
+      setStatus(t('immersion.lensNeedsPage'));
+      return;
+    }
+    localStorage.setItem(LENS_CAPTURE_TARGET_KEY, JSON.stringify(buildBrowserCaptureTarget({
+      url: currentUrl,
+      title: activeTitle.current || title,
+    })));
+    await window.api.lensOpen('select');
+  };
+
   // Keyboard — rebindable via Settings → Shortcuts; Escape stays local.
   useEffect(() => {
     const offs = [
@@ -685,7 +718,8 @@ export function useImmersion() {
     showChrome, showReader, showWebview, splitView, showRail,
     readerRef, webviewRef, urlBarRef,
     navigate, goBack, goForward, reload, applyMode, cycleMode, setMode,
-    saveCurrentSite, saveCurrentAsTool, exportToLibrary, captureVideo, openExternal, refreshSites,
+    saveCurrentSite, saveCurrentAsTool, exportToLibrary, captureVideo, openExternal,
+    captureWithLens, refreshSites,
     onReaderPointerDown, onReaderMouseUp,
   };
 }
@@ -769,6 +803,14 @@ export function ImmersionToolbar({ state }: { state: ImmersionState }) {
         onClick={() => void state.captureVideo()}
       >
         <Icon name="video" size={14} />
+      </button>
+      <button
+        type="button"
+        className="btn small icon-btn"
+        title={t('immersion.lensCapture')}
+        onClick={() => void state.captureWithLens()}
+      >
+        <Icon name="eye" size={14} />
       </button>
       <button type="button" className="btn small icon-btn" title={t('immersion.openInSystemBrowser')} onClick={state.openExternal}>
         <Icon name="external" size={14} />

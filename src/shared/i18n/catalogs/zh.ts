@@ -5064,6 +5064,8 @@ export const zh: Catalog = {
   'immersion.toolAlready': '已在我的工具中',
   'immersion.exportToLibrary': '导出到书库',
   'immersion.captureVideo': '抓取视频到 Media',
+  'immersion.lensCapture': '用取词镜阅读此页',
+  'immersion.lensNeedsPage': '请先打开一个网页——取词镜只能记录可寻址的页面。',
   'immersion.openInSystemBrowser': '在系统浏览器中打开',
   'immersion.hideLibrary': '隐藏书库',
   'immersion.showLibrary': '显示书库',

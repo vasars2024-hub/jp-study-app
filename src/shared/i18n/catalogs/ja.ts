@@ -5087,6 +5087,8 @@ export const ja: Catalog = {
   'immersion.toolAlready': 'すでにマイツールにあります',
   'immersion.exportToLibrary': 'ライブラリにエクスポート',
   'immersion.captureVideo': '動画をMediaへキャプチャ',
+  'immersion.lensCapture': 'このページをレンズで読む',
+  'immersion.lensNeedsPage': '先にウェブページを開いてください。レンズが記録できるのはアドレスのあるページだけです。',
   'immersion.openInSystemBrowser': 'システムブラウザで開く',
   'immersion.hideLibrary': 'ライブラリを隠す',
   'immersion.showLibrary': 'ライブラリを表示',
