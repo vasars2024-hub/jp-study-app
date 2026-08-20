@@ -19,6 +19,7 @@ import type {
   AiPromptPreset,
   AiProviderId,
   AiProviderKeyBucket,
+  AiProviderHealth,
   EpubMiningAnalysis,
   FrequencyDictionarySummary,
   MiningCandidate,
@@ -87,6 +88,7 @@ import {
   type MainKuromojiToken as KuromojiToken,
 } from './japaneseTokenizer';
 import { readAiProviderSecret, writeAiProviderSecret } from './credentials/ai';
+import { getAiProviderHealthReport } from './providerRuntime';
 
 interface FrequencyDictionaryFile {
   summary: FrequencyDictionarySummary;
@@ -2011,6 +2013,7 @@ export function registerMiningIpc(): void {
       localModelAvailable: isTranslateAvailable(),
     };
   });
+  bind('ai:providerHealth', (): readonly AiProviderHealth[] => getAiProviderHealthReport());
   bind('ai:listPresets', (): AiPromptPreset[] => [...AI_PROMPT_PRESETS]);
   bind('ai:listFormats', (): AiMiningCardFormat[] => [...AI_MINING_FORMATS]);
   bind('ai:setLanguageOptions', (_e, payload: Partial<AiLanguageOptions>) => {

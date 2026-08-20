@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
-import type { AiProviderId, AiProviderKeyBucket } from '../shared/aiProviders';
-import { providerAcceptsImageInput, providerKeyBucket } from '../shared/aiProviders';
+import type { AiProviderHealth, AiProviderId, AiProviderKeyBucket } from '../shared/aiProviders';
+import { AI_PROVIDERS, providerAcceptsImageInput, providerKeyBucket } from '../shared/aiProviders';
 import type { AgentProviderPolicy } from '../shared/agentWorkspace';
 import type { AgentProviderPrice } from '../shared/agentProviderPricing';
 import { agentEstimatedTokens, estimateAgentProviderCostUsd } from '../shared/agentProviderPricing';
@@ -111,12 +111,7 @@ export interface AiProviderResult {
   usage: AiProviderUsage;
 }
 
-export interface AiProviderHealth {
-  providerId: AiProviderId;
-  model: string;
-  credentialBucket: AiProviderKeyBucket;
-  configured: boolean;
-}
+export type { AiProviderHealth } from '../shared/aiProviders';
 
 export type AgentCloudRuntimeOptions = Pick<
   AiProviderRequest,
@@ -156,6 +151,18 @@ export function getAiProviderHealth(providerId: AiProviderId): AiProviderHealth 
     credentialBucket,
     configured: Boolean(readAiProviderSecret(credentialBucket).trim()),
   };
+}
+
+/**
+ * Every cloud provider's credential state in one read, in table order.
+ *
+ * The renderer asks this before a run rather than after one fails, so a keyless
+ * provider is visible in the picker instead of arriving as a
+ * `missing-credential` refusal at the end of a submitted prompt. No secret
+ * crosses the bridge — only the boolean and the bucket name.
+ */
+export function getAiProviderHealthReport(): readonly AiProviderHealth[] {
+  return AI_PROVIDERS.map((provider) => getAiProviderHealth(provider.id));
 }
 
 export function clearAiProviderSessionCache(): void {

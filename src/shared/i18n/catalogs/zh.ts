@@ -2334,6 +2334,8 @@ export const zh: Catalog = {
   'agent.execute.provider.gemini': 'Gemini 2.5 Flash（云端）',
   'agent.execute.provider.deepseekFlash': 'DeepSeek V4 Flash（云端）',
   'agent.execute.provider.deepseekPro': 'DeepSeek V4 Pro（云端）',
+  'agent.execute.provider.noKey': '{provider} — 无 API 密钥',
+  'agent.execute.provider.noKeyHint': '该提供方未保存 API 密钥，请求在发送前就会被拒绝。请在 AI Studio 中添加密钥，或选择其他提供方。',
   'agent.execute.localFallback': '缺少云端密钥时使用本地 Qwen',
   'agent.execute.cloudNotice': '此提示和所选上下文将发送至 {provider}。',
   'agent.execute.localNotice': '此提示仅在本机处理。',

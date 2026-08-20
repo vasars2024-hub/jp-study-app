@@ -1300,6 +1300,24 @@
   color: var(--agent-muted);
 }
 
+/*
+ * The picker's "this provider has no key" line. Deliberately not `--agent-muted`
+ * like the notice it borrows its layout from: it is the reason a run will be
+ * refused, and muting it to the same grey as ordinary help text is how a warning
+ * stops being read.
+ *
+ * Mixed toward `--agent-text` rather than set to a warning token outright, and
+ * measured rather than guessed: raw `--warning-deep` reads 4.76:1 on the dark
+ * panel and raw `--warning` would read about 2:1 on a light one, so either
+ * literal is wrong in one of the shells this component serves. The theme's own
+ * text colour is the one value guaranteed to contrast with the theme's own
+ * surface, so the amber is carried at 60% and the rest borrows that guarantee.
+ */
+.agent-provider-no-key {
+  align-items: flex-start;
+  color: color-mix(in srgb, var(--warning, #e3a008) 60%, var(--agent-text));
+}
+
 .agent-attachment-picker {
   display: flex;
   flex-wrap: wrap;

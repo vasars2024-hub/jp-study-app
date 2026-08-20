@@ -23,6 +23,7 @@ export {
   providerKeyBucket,
   type AiApiKeysSet,
   type AiProviderDefinition,
+  type AiProviderHealth,
   type AiProviderId,
   type AiProviderKeyBucket,
 } from './aiProviders';

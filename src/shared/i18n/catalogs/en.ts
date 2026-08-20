@@ -2496,6 +2496,8 @@ export const en: Catalog = {
   'agent.execute.provider.gemini': 'Gemini 2.5 Flash',
   'agent.execute.provider.deepseekFlash': 'DeepSeek V4 Flash',
   'agent.execute.provider.deepseekPro': 'DeepSeek V4 Pro',
+  'agent.execute.provider.noKey': '{provider} — no API key',
+  'agent.execute.provider.noKeyHint': 'No API key is saved for this provider, so a run will be refused before it is sent. Add the key in AI Studio, or pick another provider.',
   'agent.execute.localFallback': 'Use local Qwen if the cloud key is missing',
   'agent.execute.cloudNotice': 'This prompt and selected context will be sent to {provider}.',
   'agent.execute.localNotice': 'This prompt stays on this device.',

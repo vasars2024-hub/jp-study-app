@@ -2344,6 +2344,8 @@ export const ja: Catalog = {
   'agent.execute.provider.gemini': 'Gemini 2.5 Flash（クラウド）',
   'agent.execute.provider.deepseekFlash': 'DeepSeek V4 Flash（クラウド）',
   'agent.execute.provider.deepseekPro': 'DeepSeek V4 Pro（クラウド）',
+  'agent.execute.provider.noKey': '{provider} — APIキーなし',
+  'agent.execute.provider.noKeyHint': 'このプロバイダーのAPIキーが保存されていないため、送信前に実行が拒否されます。AI Studioでキーを追加するか、別のプロバイダーを選択してください。',
   'agent.execute.localFallback': 'クラウドキーがない場合はローカル Qwen を使用',
   'agent.execute.cloudNotice': 'このプロンプトと選択中のコンテキストは {provider} に送信されます。',
   'agent.execute.localNotice': 'このプロンプトは端末内に留まります。',

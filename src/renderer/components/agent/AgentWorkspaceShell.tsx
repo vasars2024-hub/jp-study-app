@@ -19,7 +19,11 @@ import {
   type AgentWorkspaceMode,
   type AgentWorkspaceState,
 } from '../../../shared/agentWorkspace';
-import { providerAcceptsImageInput, type AiProviderId } from '../../../shared/aiProviders';
+import {
+  providerAcceptsImageInput,
+  type AiProviderHealth,
+  type AiProviderId,
+} from '../../../shared/aiProviders';
 import {
   AGENT_EXECUTION_DEFAULT_INPUT_BUDGET,
   AGENT_EXECUTION_DEFAULT_OUTPUT_BUDGET,
@@ -185,6 +189,20 @@ import './agent.css';
 
 const VISIBLE_MESSAGE_LIMIT = 200;
 type AgentTargetChoice = 'local' | AiProviderId;
+
+/**
+ * The cloud rows of the target picker, in the order they are offered.
+ *
+ * Translation *keys*, resolved during render — a module-level registry that
+ * stored the rendered strings would keep an English picker after a language
+ * switch. Listed here rather than derived from `AI_PROVIDERS` because the
+ * Agent's own labels are shorter than the catalog's marketing ones.
+ */
+const AGENT_CLOUD_TARGETS: readonly { providerId: AiProviderId; labelKey: string }[] = [
+  { providerId: 'gemini-2.5-flash', labelKey: 'agent.execute.provider.gemini' },
+  { providerId: 'deepseek-v4-flash', labelKey: 'agent.execute.provider.deepseekFlash' },
+  { providerId: 'deepseek-v4-pro', labelKey: 'agent.execute.provider.deepseekPro' },
+];
 
 const EXECUTION_ERROR_CODES = new Set<AgentExecutionFailureCode>([
   'invalid-request',
@@ -1561,6 +1579,41 @@ export default function AgentWorkspaceShell() {
 
   useEffect(() => onLocalAgentSettingsChanged(setAgentSettings), []);
 
+  /**
+   * Credential presence per cloud provider, so the picker can say a provider is
+   * unusable *before* a prompt is spent on it rather than after the run comes
+   * back `missing-credential`.
+   *
+   * Re-read on every target change, because the key is entered on a different
+   * surface (AI Studio) and in a different window: a "no key" cached from mount
+   * would still be showing after the user went and saved one. An empty report —
+   * the pre-answer state, and a failed read — deliberately warns about nothing,
+   * so a bridge hiccup cannot invent a missing key.
+   */
+  const [providerHealth, setProviderHealth] = useState<readonly AiProviderHealth[]>([]);
+  useEffect(() => {
+    let alive = true;
+    void window.api
+      .aiProviderHealth()
+      .then((report) => {
+        if (alive) setProviderHealth(report);
+      })
+      .catch(() => {
+        if (alive) setProviderHealth([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [target]);
+
+  const providerNeedsKey = useCallback(
+    (providerId: AiProviderId): boolean => providerHealth.some(
+      (entry) => entry.providerId === providerId && !entry.configured,
+    ),
+    [providerHealth],
+  );
+  const targetNeedsKey = target !== 'local' && providerNeedsKey(target);
+
   // A rate entered in the pop-out Agent has to reach the docked one, and the
   // reverse. Rates are the only piece of this panel that is not per-window.
   useEffect(() => onAgentProviderPricingChanged(setPricingTable), []);
@@ -2249,17 +2302,23 @@ export default function AgentWorkspaceShell() {
                       disabled={blocked}
                     >
                       <option value="local">{t('agent.execute.provider.local')}</option>
-                      <option value="gemini-2.5-flash">
-                        {t('agent.execute.provider.gemini')}
-                      </option>
-                      <option value="deepseek-v4-flash">
-                        {t('agent.execute.provider.deepseekFlash')}
-                      </option>
-                      <option value="deepseek-v4-pro">
-                        {t('agent.execute.provider.deepseekPro')}
-                      </option>
+                      {AGENT_CLOUD_TARGETS.map(({ providerId, labelKey }) => {
+                        const label = t(labelKey);
+                        return (
+                          <option key={providerId} value={providerId}>
+                            {providerNeedsKey(providerId)
+                              ? t('agent.execute.provider.noKey', { provider: label })
+                              : label}
+                          </option>
+                        );
+                      })}
                     </select>
                   </label>
+                  {targetNeedsKey ? (
+                    <p className="agent-cloud-notice agent-provider-no-key" role="status">
+                      {t('agent.execute.provider.noKeyHint')}
+                    </p>
+                  ) : null}
                   {target !== 'local' ? (
                     <label className="agent-check">
                       <input

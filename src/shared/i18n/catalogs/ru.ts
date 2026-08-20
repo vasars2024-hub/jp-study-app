@@ -2524,6 +2524,8 @@ export const ru: Catalog = {
   'agent.execute.provider.gemini': 'Gemini 2.5 Flash (облако)',
   'agent.execute.provider.deepseekFlash': 'DeepSeek V4 Flash (облако)',
   'agent.execute.provider.deepseekPro': 'DeepSeek V4 Pro (облако)',
+  'agent.execute.provider.noKey': '{provider} — нет API-ключа',
+  'agent.execute.provider.noKeyHint': 'Для этого провайдера не сохранён API-ключ, поэтому запуск будет отклонён ещё до отправки. Добавьте ключ в AI Studio или выберите другого провайдера.',
   'agent.execute.localFallback': 'Использовать локальный Qwen, если нет облачного ключа',
   'agent.execute.cloudNotice': 'Запрос и выбранный контекст будут отправлены в {provider}.',
   'agent.execute.localNotice': 'Этот запрос останется на устройстве.',

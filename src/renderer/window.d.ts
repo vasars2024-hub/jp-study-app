@@ -1210,6 +1210,12 @@ declare global {
         apiKeysSet: { gemini: boolean; deepseek: boolean };
       }>;
       aiSetEngine(engine: import('../shared/mining').AiEngineKind): Promise<AiEngineConfig & { ok: boolean }>;
+      /**
+       * Credential presence per cloud provider, read before a run rather than
+       * discovered as a `missing-credential` refusal after one. Never a
+       * reachability claim — see `AiProviderHealth`.
+       */
+      aiProviderHealth(): Promise<readonly import('../shared/aiProviders').AiProviderHealth[]>;
       aiListPresets(): Promise<AiPromptPreset[]>;
       aiListFormats(): Promise<AiMiningCardFormat[]>;
       aiSelectPreset(presetId: string): Promise<{

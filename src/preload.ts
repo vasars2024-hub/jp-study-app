@@ -89,6 +89,7 @@ import type {
   AiPromptPreset,
   AiProviderId,
   AiProviderKeyBucket,
+  AiProviderHealth,
   EpubDeckExport,
   EpubMiningAnalysis,
   FrequencyDictionarySummary,
@@ -1958,6 +1959,8 @@ const api = {
   }> => ipcRenderer.invoke('ai:setProvider', providerId),
   aiSetEngine: (engine: AiEngineKind): Promise<AiEngineConfig & { ok: boolean }> =>
     ipcRenderer.invoke('ai:setEngine', engine),
+  aiProviderHealth: (): Promise<readonly AiProviderHealth[]> =>
+    ipcRenderer.invoke('ai:providerHealth'),
   aiListPresets: (): Promise<AiPromptPreset[]> => ipcRenderer.invoke('ai:listPresets'),
   aiListFormats: (): Promise<AiMiningCardFormat[]> => ipcRenderer.invoke('ai:listFormats'),
   aiSelectPreset: (presetId: string): Promise<{

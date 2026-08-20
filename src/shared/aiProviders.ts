@@ -84,3 +84,20 @@ export type AiApiKeysSet = Record<AiProviderKeyBucket, boolean>;
 export function emptyApiKeysSet(): AiApiKeysSet {
   return { gemini: false, deepseek: false };
 }
+
+/**
+ * Whether a provider can be sent a request at all, answered before one is sent.
+ *
+ * `configured` is a credential-presence fact, not a reachability claim: it says
+ * the key bucket holds a non-empty secret, which is exactly the condition the
+ * runtime turns into a `missing-credential` refusal. A surface that shows this
+ * must not word it as "online" or "healthy" — the app has not called the
+ * provider, and saying otherwise would be the false-success shape Track 3
+ * forbids.
+ */
+export interface AiProviderHealth {
+  providerId: AiProviderId;
+  model: string;
+  credentialBucket: AiProviderKeyBucket;
+  configured: boolean;
+}
