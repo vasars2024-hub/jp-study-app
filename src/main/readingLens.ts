@@ -40,19 +40,38 @@ import type { ReadingLensCapture } from '../shared/readingLens';
 import { createReadingLensClipboardCapture } from './readingLensClipboard';
 import { registerLexiconHandoffIpc } from './lexiconHandoff';
 
+/**
+ * The last region OCR'd, kept so `repeat` can re-scan it without a drag.
+ *
+ * `displayId` is part of the memory rather than an afterthought: renderer
+ * coordinates are display-local DIP, so the same rectangle means a different
+ * place on a different monitor. A region whose display is gone is not replayed
+ * anywhere — it is dropped and the open degrades to an ordinary selection.
+ */
+export interface LensRegionMemory {
+  displayId: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface ReadingLensSettings {
   enabled: boolean;
   /** Accelerator in the app's chord format, e.g. "Ctrl+Alt+Space". */
   hotkey: string;
+  lastRegion: LensRegionMemory | null;
 }
 
 export interface ReadingLensStatus extends ReadingLensSettings {
   supported: boolean;
   registered: boolean;
   open: boolean;
+  /** True only when `lastRegion` is replayable on a display that still exists. */
+  canRepeatRegion: boolean;
 }
 
-export type LensOpenMode = 'select' | 'auto' | 'clipboard';
+export type LensOpenMode = 'select' | 'auto' | 'clipboard' | 'repeat';
 
 export interface LensInit {
   /** The window covers this display; renderer coords are display-local DIP. */
@@ -61,6 +80,12 @@ export interface LensInit {
   scaleFactor: number;
   /** Present only for an explicit clipboard open; never populated by a screen scan. */
   capture?: ReadingLensCapture;
+  /**
+   * Present only on a `repeat` that had a replayable region. A `repeat` with
+   * nothing to replay arrives as `mode: 'select'` instead, so the renderer is
+   * never asked to invent a rectangle.
+   */
+  region?: { x: number; y: number; width: number; height: number };
 }
 
 const STATE_FILE = 'reading-lens.json';
@@ -68,7 +93,9 @@ const STATE_FILE = 'reading-lens.json';
 // tends to be free (Ctrl+Alt+<key> combos are widely claimed by IMEs and vendor
 // utilities). If it is taken, the Settings section lets the user rebind and the
 // failure is surfaced rather than swallowed.
-const DEFAULTS: ReadingLensSettings = { enabled: true, hotkey: 'Ctrl+Shift+Space' };
+const DEFAULTS: ReadingLensSettings = { enabled: true, hotkey: 'Ctrl+Shift+Space', lastRegion: null };
+/** Matches the renderer's `MIN_REGION`; below it a drag is a stray click. */
+const MIN_REGION = 12;
 const DOUBLE_TAP_MS = 350;
 
 type RendererUrlFn = (query?: string) => string;
@@ -105,6 +132,32 @@ function statePath(): string {
   return path.join(app.getPath('userData'), STATE_FILE);
 }
 
+/**
+ * A stored region is re-validated on every read rather than trusted.
+ *
+ * The file is user-writable JSON and survives across app versions, so a
+ * negative, fractional or absurd rectangle would otherwise reach `ocrRegion`
+ * and be captured as a garbage screenshot. Anything that fails is dropped to
+ * `null`, which the callers read as "nothing to repeat".
+ */
+export function normalizeLensRegionMemory(value: unknown): LensRegionMemory | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const r = value as Record<string, unknown>;
+  const int = (key: string): number | null => {
+    const n = Number(r[key]);
+    return Number.isFinite(n) ? Math.round(n) : null;
+  };
+  const displayId = int('displayId');
+  const x = int('x');
+  const y = int('y');
+  const width = int('width');
+  const height = int('height');
+  if (displayId === null || x === null || y === null || width === null || height === null) return null;
+  if (displayId <= 0 || x < 0 || y < 0) return null;
+  if (width < MIN_REGION || height < MIN_REGION) return null;
+  return { displayId, x, y, width, height };
+}
+
 function loadSettings(): ReadingLensSettings {
   try {
     const parsed = JSON.parse(fs.readFileSync(statePath(), 'utf8')) as Partial<ReadingLensSettings>;
@@ -114,6 +167,7 @@ function loadSettings(): ReadingLensSettings {
         typeof parsed.hotkey === 'string' && parsed.hotkey.trim()
           ? parsed.hotkey.trim()
           : DEFAULTS.hotkey,
+      lastRegion: normalizeLensRegionMemory(parsed.lastRegion),
     };
   } catch {
     return { ...DEFAULTS };
@@ -138,8 +192,41 @@ function displayUnderCursor(): Electron.Display {
   return screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
 }
 
-function openLens(mode: LensOpenMode): void {
-  const display = displayUnderCursor();
+/**
+ * Decides what a `repeat` open can actually replay, and on which monitor.
+ *
+ * A repeat deliberately does NOT follow the cursor the way every other open
+ * does: the stored rectangle is display-local, so replaying it under the cursor
+ * would scan a different place and return text the user never pointed at. The
+ * region's own display wins; if that monitor is gone, or the rectangle no
+ * longer fits inside it (a resolution change), there is nothing honest to
+ * replay and the caller degrades to `select`.
+ */
+export function resolveRepeatRegion(
+  region: LensRegionMemory | null,
+  displays: readonly Pick<Electron.Display, 'id' | 'bounds'>[],
+): { display: Pick<Electron.Display, 'id' | 'bounds'>; region: LensRegionMemory } | null {
+  if (!region) return null;
+  const display = displays.find((d) => d.id === region.displayId);
+  if (!display) return null;
+  if (region.x + region.width > display.bounds.width) return null;
+  if (region.y + region.height > display.bounds.height) return null;
+  return { display, region };
+}
+
+function repeatTargetOf(mode: LensOpenMode): ReturnType<typeof resolveRepeatRegion> {
+  if (mode !== 'repeat') return null;
+  return resolveRepeatRegion(settings.lastRegion, screen.getAllDisplays());
+}
+
+function openLens(requestedMode: LensOpenMode): void {
+  const repeat = repeatTargetOf(requestedMode);
+  // A repeat with nothing replayable is an ordinary selection, decided here so
+  // the renderer never receives a `repeat` init it cannot honour.
+  const mode: LensOpenMode = requestedMode === 'repeat' && !repeat ? 'select' : requestedMode;
+  const display = repeat
+    ? screen.getAllDisplays().find((d) => d.id === repeat.display.id) ?? displayUnderCursor()
+    : displayUnderCursor();
   lensDisplayId = display.id;
   const bounds = display.bounds;
   let capture: ReadingLensCapture | null = null;
@@ -156,6 +243,16 @@ function openLens(mode: LensOpenMode): void {
     mode,
     scaleFactor: display.scaleFactor || 1,
     ...(capture ? { capture } : {}),
+    ...(repeat
+      ? {
+        region: {
+          x: repeat.region.x,
+          y: repeat.region.y,
+          width: repeat.region.width,
+          height: repeat.region.height,
+        },
+      }
+      : {}),
   };
 
   if (lens && !lens.isDestroyed()) {
@@ -276,6 +373,10 @@ function getStatus(): ReadingLensStatus {
     supported: process.platform === 'win32',
     registered: currentAccelerator !== null,
     open: !!(lens && !lens.isDestroyed() && lens.isVisible()),
+    // Not `!!settings.lastRegion`: a region on a monitor that has since been
+    // unplugged is stored but not replayable, and a Repeat control that is
+    // enabled for it would open the lens and then silently do something else.
+    canRepeatRegion: repeatTargetOf('repeat') !== null,
   };
 }
 
@@ -331,7 +432,9 @@ export function registerReadingLensIpc(): void {
 
   // Programmatic open (Settings button / testing) mirrors the hotkey path.
   ipcMain.handle('lens:open', (_e, mode: unknown): void => {
-    openLens(mode === 'auto' || mode === 'clipboard' ? mode : 'select');
+    openLens(
+      mode === 'auto' || mode === 'clipboard' || mode === 'repeat' ? mode : 'select',
+    );
   });
 
   ipcMain.handle('lens:getInit', (): LensInit | null => pendingInit);
@@ -347,6 +450,18 @@ export function registerReadingLensIpc(): void {
       width: Number(r.width) || 0,
       height: Number(r.height) || 0,
     };
+    // Remembered here rather than through a second IPC the renderer would have
+    // to remember to call: this handler already receives every rectangle the
+    // lens scans, from a drag, a rescan or a repeat alike, so the memory cannot
+    // drift from what was actually captured. Recorded before the OCR runs — a
+    // region that returns no text is still the region the user chose, and a
+    // repeat of it is exactly what a VN or manga reader wants next.
+    const remembered = normalizeLensRegionMemory({ ...rect, displayId: lensDisplayId });
+    if (remembered && JSON.stringify(remembered) !== JSON.stringify(settings.lastRegion)) {
+      settings = { ...settings, lastRegion: remembered };
+      saveSettings();
+      broadcastSettings();
+    }
     return ocrRegion(rect, lensDisplayId, {
       engine: r.engine ?? 'auto',
       includeScreenshot: r.includeScreenshot === true,

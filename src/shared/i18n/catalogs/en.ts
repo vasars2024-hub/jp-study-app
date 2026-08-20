@@ -3305,6 +3305,9 @@ export const en: Catalog = {
   'settings.lens.busy': 'That shortcut is in use by another app — pick another.',
   'settings.lens.unsupported': 'Screen capture for the Lens is available on Windows.',
   'settings.lens.openNow': 'Open the Lens now',
+  'settings.lens.repeatRegion': 'Repeat last region',
+  'settings.lens.repeatRegionHint': 'Scan the same rectangle again, on the display it was taken from.',
+  'settings.lens.repeatRegionNone': 'No region to repeat yet. Draw one with the Lens first.',
 
   // Reading Lens — capture history
   'settings.lens.history.title': 'Capture history',

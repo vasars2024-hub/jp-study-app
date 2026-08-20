@@ -8,9 +8,11 @@ import type { ReadingLensHistoryEntry } from '../../../../shared/readingLensHist
 const DEFAULT_STATUS: ReadingLensStatus = {
   enabled: false,
   hotkey: 'Ctrl+Shift+Space',
+  lastRegion: null,
   supported: true,
   registered: false,
   open: false,
+  canRepeatRegion: false,
 };
 
 const SOURCE_LABEL_KEYS: Record<ReadingLensSource, string> = {
@@ -300,6 +302,26 @@ export default function ReadingLensSection() {
           onClick={() => void window.api.lensOpen('select')}
         >
           {t('settings.lens.openNow')}
+        </button>
+        {/*
+          Disabled on `canRepeatRegion`, which main computes from whether the
+          stored region is still replayable — not from whether one was ever
+          stored. A region left on a monitor that has since been unplugged
+          would otherwise offer an enabled button that quietly opened an
+          ordinary selection instead.
+        */}
+        <button
+          type="button"
+          className="btn small"
+          disabled={!status.enabled || !status.canRepeatRegion}
+          title={
+            status.canRepeatRegion
+              ? t('settings.lens.repeatRegionHint')
+              : t('settings.lens.repeatRegionNone')
+          }
+          onClick={() => void window.api.lensOpen('repeat')}
+        >
+          {t('settings.lens.repeatRegion')}
         </button>
       </div>
 

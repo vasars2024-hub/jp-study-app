@@ -236,6 +236,11 @@ export default function ReadingLensOverlay() {
         region: { x: 0, y: 0, width: init.bounds.width, height: init.bounds.height },
         engine: 'auto',
       });
+    } else if (init.mode === 'repeat' && init.region) {
+      // Main only sends `repeat` when it has a region on a display that still
+      // exists and still contains it, so there is no fallback to invent here —
+      // an unreplayable repeat arrives as `select` and lands in the branch below.
+      setState({ kind: 'scanning', region: init.region, engine: 'auto' });
     } else {
       setState({ kind: 'selecting' });
     }

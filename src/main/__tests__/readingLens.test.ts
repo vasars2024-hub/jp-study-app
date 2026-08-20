@@ -36,7 +36,15 @@ const h = vi.hoisted(() => {
     handlers: new Map<string, (...a: unknown[]) => unknown>(),
     listeners: new Map<string, (...a: unknown[]) => unknown>(),
   };
-  const env = { userData: '' };
+  const env = {
+    userData: '',
+    // Mutable so a test can unplug a monitor or change its resolution, which is
+    // what `repeat` has to survive without replaying a rectangle somewhere else.
+    displays: [
+      { id: 7, bounds: { x: 0, y: 0, width: 1920, height: 1080 }, scaleFactor: 1 },
+      { id: 9, bounds: { x: 1920, y: 0, width: 2560, height: 1440 }, scaleFactor: 1 },
+    ] as Array<{ id: number; bounds: Electron.Rectangle; scaleFactor: number }>,
+  };
   const sent: Array<{ channel: string; payload: unknown }> = [];
 
   class FakeWebContents {
@@ -117,11 +125,11 @@ vi.mock('electron', () => {
     },
     screen: {
       getCursorScreenPoint: () => ({ x: 10, y: 10 }),
-      getDisplayNearestPoint: () => ({
-        id: 7,
-        bounds: { x: 0, y: 0, width: 1920, height: 1080 },
-        scaleFactor: 1,
-      }),
+      // The cursor is always on the FIRST display in these tests, so a repeat
+      // that lands on the second one proves it followed the region rather than
+      // the cursor.
+      getDisplayNearestPoint: () => h.env.displays[0],
+      getAllDisplays: () => h.env.displays,
     },
   };
 });
@@ -175,6 +183,10 @@ beforeEach(() => {
   h.sent.length = 0;
   h.FakeWindow.all.length = 0;
   ocrCalls.length = 0;
+  h.env.displays = [
+    { id: 7, bounds: { x: 0, y: 0, width: 1920, height: 1080 }, scaleFactor: 1 },
+    { id: 9, bounds: { x: 1920, y: 0, width: 2560, height: 1440 }, scaleFactor: 1 },
+  ];
   clearState();
 });
 
@@ -186,6 +198,7 @@ describe('loadSettings', () => {
     expect(m.__readingLensTestables.loadSettings()).toEqual({
       enabled: true,
       hotkey: 'Ctrl+Shift+Space',
+      lastRegion: null,
     });
   });
 
@@ -209,11 +222,12 @@ describe('loadSettings', () => {
   });
 
   it('repairs each field independently when the stored type is wrong', async () => {
-    writeState(JSON.stringify({ enabled: 'yes', hotkey: 123 }));
+    writeState(JSON.stringify({ enabled: 'yes', hotkey: 123, lastRegion: 'nope' }));
     const m = await load();
     expect(m.__readingLensTestables.loadSettings()).toEqual({
       enabled: true,
       hotkey: 'Ctrl+Shift+Space',
+      lastRegion: null,
     });
   });
 
@@ -226,7 +240,8 @@ describe('loadSettings', () => {
   it('honours a stored value that is actually valid', async () => {
     writeState(JSON.stringify({ enabled: false, hotkey: 'Ctrl+Alt+L' }));
     const m = await load();
-    expect(m.__readingLensTestables.loadSettings()).toEqual({ enabled: false, hotkey: 'Ctrl+Alt+L' });
+    expect(m.__readingLensTestables.loadSettings())
+      .toEqual({ enabled: false, hotkey: 'Ctrl+Alt+L', lastRegion: null });
   });
 
   it('trims a stored hotkey', async () => {
@@ -420,12 +435,13 @@ describe('persistence', () => {
     m.startReadingLens();
     m.registerReadingLensIpc();
     await h.ipc.handlers.get('lens:setHotkey')!({}, 'Ctrl+Alt+L');
-    expect(readState()).toEqual({ enabled: true, hotkey: 'Ctrl+Alt+L' });
+    expect(readState()).toEqual({ enabled: true, hotkey: 'Ctrl+Alt+L', lastRegion: null });
 
     const fresh = await load();
     expect(fresh.__readingLensTestables.loadSettings()).toEqual({
       enabled: true,
       hotkey: 'Ctrl+Alt+L',
+      lastRegion: null,
     });
   });
 
@@ -643,6 +659,162 @@ describe('lens:ocr region coercion', () => {
     await booted();
     await h.ipc.handlers.get('lens:ocr')!({}, { x: 1, y: 2, width: 3, height: 4, includeScreenshot: 'yes' });
     expect((ocrCalls[0][2] as { includeScreenshot: boolean }).includeScreenshot).toBe(false);
+  });
+});
+
+// ---- repeat-region ------------------------------------------------------
+
+describe('repeat region', () => {
+  async function booted() {
+    const m = await load();
+    m.startReadingLens();
+    m.registerReadingLensIpc();
+    return m;
+  }
+  const init = (): { mode: string; region?: unknown; bounds: Electron.Rectangle } =>
+    h.ipc.handlers.get('lens:getInit')!() as never;
+  const status = async (): Promise<{ canRepeatRegion: boolean; lastRegion: unknown }> =>
+    (await h.ipc.handlers.get('lens:getSettings')!()) as never;
+  /**
+   * The real sequence, and it matters: `lensDisplayId` is only set by an open,
+   * so an OCR call with no open before it records display 0 — which
+   * `normalizeLensRegionMemory` refuses. Every scan here opens first.
+   */
+  const scan = async (region: Record<string, unknown>): Promise<void> => {
+    await h.ipc.handlers.get('lens:open')!({}, 'select');
+    await h.ipc.handlers.get('lens:ocr')!({}, region);
+  };
+
+  it('remembers the rectangle the OCR handler was actually given', async () => {
+    await booted();
+    await scan({ x: 100, y: 200, width: 300, height: 80 });
+    expect((await status()).lastRegion)
+      .toEqual({ displayId: 7, x: 100, y: 200, width: 300, height: 80 });
+  });
+
+  it('records nothing when the OCR arrives with no open behind it', async () => {
+    await booted();
+    await h.ipc.handlers.get('lens:ocr')!({}, { x: 100, y: 200, width: 300, height: 80 });
+    expect((await status()).lastRegion).toBeNull();
+  });
+
+  it('replays it without a drag, and reports the region on the init', async () => {
+    await booted();
+    await scan({ x: 100, y: 200, width: 300, height: 80 });
+    await h.ipc.handlers.get('lens:open')!({}, 'repeat');
+    expect(init().mode).toBe('repeat');
+    expect(init().region).toEqual({ x: 100, y: 200, width: 300, height: 80 });
+  });
+
+  it('follows the region’s display, not the cursor’s', async () => {
+    await booted();
+    // The stub's cursor is always on displays[0]; make that display 9 for the
+    // scan, then put the cursor back on 7 for the repeat.
+    h.env.displays[0] = { id: 9, bounds: { x: 1920, y: 0, width: 2560, height: 1440 }, scaleFactor: 1 };
+    await scan({ x: 5, y: 5, width: 40, height: 40 });
+    h.env.displays[0] = { id: 7, bounds: { x: 0, y: 0, width: 1920, height: 1080 }, scaleFactor: 1 };
+    h.env.displays[1] = { id: 9, bounds: { x: 1920, y: 0, width: 2560, height: 1440 }, scaleFactor: 1 };
+    await h.ipc.handlers.get('lens:open')!({}, 'repeat');
+    expect(init().bounds).toEqual({ x: 1920, y: 0, width: 2560, height: 1440 });
+    // Control: an ordinary open on the same state follows the cursor to 7.
+    await h.ipc.handlers.get('lens:open')!({}, 'select');
+    expect(init().bounds).toEqual({ x: 0, y: 0, width: 1920, height: 1080 });
+  });
+
+  it('degrades to an ordinary selection when the region’s monitor is gone', async () => {
+    await booted();
+    h.env.displays[0] = { id: 9, bounds: { x: 1920, y: 0, width: 2560, height: 1440 }, scaleFactor: 1 };
+    await scan({ x: 5, y: 5, width: 40, height: 40 });
+    // Unplug display 9 entirely.
+    h.env.displays = [{ id: 7, bounds: { x: 0, y: 0, width: 1920, height: 1080 }, scaleFactor: 1 }];
+    await h.ipc.handlers.get('lens:open')!({}, 'repeat');
+    expect(init().mode).toBe('select');
+    expect(init().region).toBeUndefined();
+    // And the button that offers it says so, rather than staying enabled.
+    expect((await status()).canRepeatRegion).toBe(false);
+    // The memory itself is untouched — plug the monitor back in and it replays.
+    expect((await status()).lastRegion).toEqual({ displayId: 9, x: 5, y: 5, width: 40, height: 40 });
+  });
+
+  it('degrades when the display shrank out from under the region', async () => {
+    await booted();
+    await scan({ x: 1400, y: 900, width: 400, height: 150 });
+    expect((await status()).canRepeatRegion).toBe(true); // control: fits at 1920x1080
+    h.env.displays[0] = { id: 7, bounds: { x: 0, y: 0, width: 1280, height: 720 }, scaleFactor: 1 };
+    expect((await status()).canRepeatRegion).toBe(false);
+    await h.ipc.handlers.get('lens:open')!({}, 'repeat');
+    expect(init().mode).toBe('select');
+  });
+
+  it('has nothing to repeat before the first scan', async () => {
+    await booted();
+    expect((await status()).canRepeatRegion).toBe(false);
+    await h.ipc.handlers.get('lens:open')!({}, 'repeat');
+    expect(init().mode).toBe('select');
+  });
+
+  it('does not remember a stray click the renderer would have ignored', async () => {
+    await booted();
+    await scan({ x: 10, y: 10, width: 4, height: 4 });
+    expect((await status()).lastRegion).toBeNull();
+    expect((await status()).canRepeatRegion).toBe(false);
+  });
+
+  it('survives a restart — the file is what the next boot replays', async () => {
+    await booted();
+    await scan({ x: 60, y: 70, width: 80, height: 90 });
+    expect((readState() as { lastRegion: unknown }).lastRegion)
+      .toEqual({ displayId: 7, x: 60, y: 70, width: 80, height: 90 });
+    await booted();
+    expect((await status()).lastRegion)
+      .toEqual({ displayId: 7, x: 60, y: 70, width: 80, height: 90 });
+    await h.ipc.handlers.get('lens:open')!({}, 'repeat');
+    expect(init().region).toEqual({ x: 60, y: 70, width: 80, height: 90 });
+  });
+
+  it('drops a hand-edited region rather than scanning a garbage rectangle', async () => {
+    for (const bad of [
+      { displayId: 7, x: -5, y: 0, width: 50, height: 50 },
+      { displayId: 7, x: 0, y: 0, width: 50, height: Number.NaN },
+      { displayId: 0, x: 0, y: 0, width: 50, height: 50 },
+      { displayId: 7, x: 0, y: 0, width: 3, height: 50 },
+      'not an object',
+      [7, 0, 0, 50, 50],
+    ]) {
+      writeState(JSON.stringify({ enabled: true, hotkey: 'Ctrl+Shift+Space', lastRegion: bad }));
+      await booted();
+      expect((await status()).lastRegion).toBeNull();
+    }
+    // Control: the same shape, valid, does load — so the refusals above are the
+    // named rules and not a branch that rejects everything.
+    writeState(JSON.stringify({
+      enabled: true,
+      hotkey: 'Ctrl+Shift+Space',
+      lastRegion: { displayId: 7, x: 0, y: 0, width: 50, height: 50 },
+    }));
+    await booted();
+    expect((await status()).lastRegion).toEqual({ displayId: 7, x: 0, y: 0, width: 50, height: 50 });
+  });
+
+  it('broadcasts the change so an open Settings page can enable its button', async () => {
+    await booted();
+    await h.ipc.handlers.get('lens:open')!({}, 'select');
+    h.sent.length = 0;
+    await h.ipc.handlers.get('lens:ocr')!({}, { x: 1, y: 2, width: 300, height: 80 });
+    const pushed = h.sent.filter((s) => s.channel === 'lens:settings-changed');
+    expect(pushed.length).toBe(1);
+    expect((pushed[0].payload as { canRepeatRegion: boolean }).canRepeatRegion).toBe(true);
+    // Re-scanning the SAME rectangle writes and broadcasts nothing.
+    h.sent.length = 0;
+    await h.ipc.handlers.get('lens:ocr')!({}, { x: 1, y: 2, width: 300, height: 80 });
+    expect(h.sent.filter((s) => s.channel === 'lens:settings-changed').length).toBe(0);
+  });
+
+  it('still hands the OCR the rectangle it was called with', async () => {
+    await booted();
+    await scan({ x: 1, y: 2, width: 300, height: 80 });
+    expect(ocrCalls[0][0]).toEqual({ x: 1, y: 2, width: 300, height: 80 });
+    expect(ocrCalls[0][1]).toBe(7);
   });
 });
 
