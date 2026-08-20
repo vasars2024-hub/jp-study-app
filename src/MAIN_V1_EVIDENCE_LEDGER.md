@@ -26043,3 +26043,46 @@ skipped**, **10,421 passed / 6 skipped**; the one failure is `mediaSurfaceImport
 timing out at 20 s on an import-graph walk in `src/renderer/`, which no slice this turn touched —
 **8 of 8 pass on its own in 7.4 s**, the documented load-dependent flake. i18n exit 0 at **10,625**.
 architecture exit 0, "Nothing new", 5 pending. eslint **0 errors, 0 warnings** on all 4 touched paths.
+
+## 2026-08-19 primary — Track 7 / gate 14's `supported` half, and the three writes it found
+
+Gate 14's second half — "exercise every `supported` row" — had been **cited, not re-run**: prose
+pointing at six dated entries, written when the matrix held 16 rows. Re-derived from
+`ankiParityMatrix.ts` this turn: **18 rows**, package **11 supported / 7 read-only / 0 blocked**,
+connect **6 / 5 blocked / 7**. So the citation covered 6 of 11 and its own row counts were two
+revisions stale. `debug/g14-supported.js` replaces it: one walk, every package-supported row,
+through the product's own editors → tray → `buildApkgExportChanges` → real `apkg:export` → re-read.
+
+**It found three defects, all shipped, none reachable by any fixture in the suite.**
+
+- `f02a6250` — **`card-missing` naming an id the user has never seen.** `template-add` creates its
+  cards during the write; `cardDeckMoves`/`cardMoves` are validated against the SOURCE `cards`
+  table. Designing a reverse card and then splitting the deck exported **nothing** and took nine
+  other rows down with it (all-or-nothing). The `template-format` fold already handled this class;
+  the card folds now do too — a move of a designed card is which deck/position it is CREATED in.
+  Live: cardMoves 34 → 17, cardDeckMoves 148 → 111. 17 cases (was 13).
+- `05475cf0` — **a deck the split invents is an INSERT, not a rename.** Refused
+  `deck-collation-unsupported` with `deckRenames` **empty**, so recipe 13 was unusable on every
+  package current Anki writes. `withoutMissingCollation`'s own doc already drew the distinction;
+  the guard hadn't. Uniqueness is decided in JS (`deck-name-taken`) before write #1. 66 cases.
+- `79722141` — **recipe 17's removal, the third site.** Removing a real duplicate group threw the
+  raw `no such collation sequence: unicase` as an unnamed **`io`**. Dropping rows cannot create a
+  name collision, so nothing needs deciding. 67 cases.
+
+**Result, live on `Default-20260129112153.apkg` (80 notes / 160 cards), app restarted (pid 5004):**
+**10 of 11** package-supported rows exercised and verified — export `ok`, **3 notes / 114 cards /
+1 template formatted / verified true**; template-remove on a second and third pass over this walk's
+own output: duplicate group ords **[1,2]**, **80** redundant cards removed, **240 → 160** cards,
+templates back to 2, **80** notes intact, verified. The 11th, `deck-name`, is
+**`conditional-refused`** by the exact code the matrix predicts for it (`deck-collation-unsupported`)
+— a rename genuinely cannot be decided without the collation, which is the fix's own boundary.
+
+**Trap the next worker must not pay for again:** a `PRAGMA writable_schema = OFF` fixture leaves the
+old schema parse cached, so a collation written into `sqlite_master` never reaches a write — the
+mutation control for `79722141` **passed** against such a fixture. `= RESET` is what makes it live.
+
+**Gates, SHARED tree, after the last slice:** vitest **748 files / 10,430 tests passed, 1 file + 6
+skipped, 0 failed, exit 0** — last turn's `mediaSurfaceImportGraph` flake did not recur. i18n exit 0
+at **10,625**. architecture exit 0, "Nothing new", 5 pending. eslint **0 errors** on all 4 touched
+paths (111 warnings, all the `no-non-null-assertion` idiom those files already carry, 53 of them
+predating this turn). Mutation controls: 3 red for the first two fixes, 1 red for the third.

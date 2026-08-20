@@ -837,6 +837,35 @@ This slice is complete only when all of these can be shown with real data and no
     The `supported` half is **cited, not re-run**: each of the 6 journal-backed rows has its
     own dated live entry in the evidence ledger (recipes 2, 12, 6, 13, 12-deck, 17).
 
+    **THE `supported` HALF IS NOW RE-RUN, AND GATE 14 CLOSES — 2026-08-19**
+    (`debug/g14-supported.js`, one walk, `Default-20260129112153.apkg`, 80 notes / 160 cards,
+    on a restarted app). The citation above was stale in both directions: the matrix is
+    **18 rows** now, not 16 — package **11 supported / 7 read-only / 0 blocked**, connect
+    **6 / 5 blocked / 7** — so the six cited rows covered 6 of 11, and each citation was
+    written against a different file, so no run had ever put them in one change set.
+    Putting them in one change set is what found the defects.
+    **10 of 11 exercised and verified through the product's own path** — editors and the real
+    tray (`prioritize-new` → 34 `card-due` ops; `split-deck` → 148 `card-deck` moves), folded by
+    `buildApkgExportChanges`, written by the real `apkg:export`, read back by the real reader:
+    export `ok`, **3 notes / 114 cards / 1 template formatted / verified true**; then two further
+    passes over this walk's own output for `template-remove` — duplicate group ords **[1,2]**,
+    **80** redundant cards, **240 → 160** cards, templates back to `Card 1`/`Card 2`, **80** notes
+    intact, verified. The 11th is `deck-name`, **`conditional-refused`** by the exact code the
+    matrix's `conditional` field predicts (`deck-collation-unsupported`) — the honest outcome for
+    this file, and the boundary of the fix below rather than a gap in it.
+    **Three shipped defects, none reachable by any fixture in the suite**, each fixed and
+    re-measured in its own commit: `f02a6250` a split moving a card `template-add` was still
+    creating refused the WHOLE export with `card-missing` naming a synthetic `…-design2` id;
+    `05475cf0` recipe 13's invented subdecks refused `deck-collation-unsupported` with
+    `deckRenames` empty, making the split unusable on every package current Anki writes;
+    `79722141` recipe 17's removal threw the raw `no such collation sequence: unicase` as an
+    unnamed `io`. Suites 17 / 66 / 67 cases; mutation controls 3 red then 1 red.
+    **Trap, and it produced a false pass here:** a fixture that writes a collation into
+    `sqlite_master` under `PRAGMA writable_schema = OFF` leaves the old parse cached, so the
+    collation never reaches a write and removing the fix stays green. `= RESET` is what makes it
+    live. The deck test at line 301 was never exposed to this because its refusal reads the
+    stored DDL as text rather than executing against it.
+
     **That finding is FIXED 2026-08-17** (`4052d840`, `50366c26`). `template-add` is the 7th
     journal op and moves to **package `supported` / connect `blocked`**; the matrix is now 17
     rows / 10 changeable on the package. Live on the user's own `jlpt-n1-vocab.apkg`, through
