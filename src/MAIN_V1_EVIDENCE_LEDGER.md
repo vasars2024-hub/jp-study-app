@@ -26135,3 +26135,30 @@ the shared tree from another track, so it is left exactly as found.
 
 **Trap:** `tools/grammar-audit.cjs` writes `grammar-audit.json` on *any* invocation — including a
 `--help` it does not implement. It rewrote the artifact under me before I had read it.
+
+## 2026-08-19 primary — Track 9 re-derived, and a "next slice" that outlived its fix by a day
+
+Track 7 closing put Track 9 next in the dependency order, so its standing was re-derived from the
+phase tables rather than from any closing summary. **13 of 15 non-attended gates are closed** —
+1–5 (9.1), 6 / 8 / 9 (9.2), 16–20 (9.4) — counted by reading each gate's own row to its end.
+
+**The two that are not closed are 7 and 10, and neither is agent-work.** Gate 7 needs the user's
+own qBittorrent WebUI password in the vault; gate 10 needs the WebUI disabled on their own running
+client. **Blocker re-checked live rather than assumed**, per the parked-blocker rule: on pid 5004
+(bridge 39273) `window.api.scraperHasCredential('qbit/webui')` → **false**, with `qbit/apikey`
+still the credential that works. So the `needs-user.md` entries stay; nothing was cleared and
+nothing was added — 7, 10 and 14 were all already listed.
+
+Gates 11–15 are the attended set and 14's own blocker is measured in the plan. Track 9 is
+therefore **complete-except-external**: it holds no next slice for an agent.
+
+**One stale line removed, because it is the kind that gets re-implemented.** Phase 9.2's finding
+about the Torrent Manager credential pill ended "It is the next slice." It was fixed the next day
+by `bd725520` — the pill asks the vault now and carries four states plus `unknown` — and the
+sentence survived, one screen above a gate-16 table that cites that very commit. Struck in place
+with the fix named, rather than deleted, so the correction is legible.
+
+**Method note for the next worker.** Track 9's gates live in four phase tables and a prose list,
+and the same gate reads open in one place and closed in another later in the same file — gate 9 is
+the clearest case ("7, 9, 10 stay open" is immediately followed by "Amended: gate 9 CLOSES"). Count
+from the tables, last mention wins, and confirm against the tree. A keyword sweep gets this wrong.

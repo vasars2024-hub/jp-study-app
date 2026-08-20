@@ -571,7 +571,11 @@ user's own WebUI password; 10 needs the WebUI disabled on their own client. Both
 password mode it would read "password stored" next to a connection test saying "No password is
 stored for this account." That is the same false-honest-state family Phase 9.0 just fixed one
 surface of, and the fix is available: `scraperHasCredential` already runs main handler
-(`scraper/index.ts:244`) → preload (`preload.ts:2917`). It is the next slice.
+(`scraper/index.ts:244`) → preload (`preload.ts:2917`). ~~It is the next slice.~~
+**FIXED 2026-08-18, `bd725520`** — struck 2026-08-19, because "it is the next slice" outlived
+its own fix by a day and is exactly the kind of line a later turn re-implements. The pill now
+asks the vault and carries four states plus `unknown` for a failed probe; see the same commit
+in the gate 16 table below and the ledger entry "the credential pill's existence half".
 
 Gate 9 has an instrument waiting: hash `07ea0e8a84626e1152a357ffab2da7be37abe57a` is in category
 `jp-study-subtitles`, which only `qbitAddStopped` ever writes — so it is the **app's own** torrent,
@@ -684,6 +688,14 @@ explicit `unknown` for a failed probe. Measured live: pill read "password missin
 Gates 1–10 and 16–20 pass in CI or against a live daemon with the 403 control passing. Gates 11–15
 are attended and signed off once by the user. Until then the nyaa provider stays default-disabled
 and last in priority, as it ships today.
+
+**Track 9 standing, re-derived 2026-08-19 from the phase tables above, not inherited: 13 of 15
+non-attended gates closed** (1–5 in 9.1, 6/8/9 in 9.2, 16–20 in 9.4). The two that are not are
+**7** and **10**, and neither is agent-work: 7 needs the user's own WebUI password in the vault,
+10 needs the WebUI disabled on their own running client. Both are in `needs-user.md`, and gate 7's
+blocker was **re-checked live this turn and is still in force** — `scraperHasCredential('qbit/webui')`
+answers **false** on pid 5004. Gates 11–15 are the attended set; 14's own blocker is measured above.
+So Track 9 is **complete-except-external**, and nothing in it is a next slice for an agent.
 
 ## Dependency order
 
