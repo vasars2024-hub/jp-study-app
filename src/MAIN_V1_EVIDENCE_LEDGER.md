@@ -26710,6 +26710,18 @@ refused while a valid one of the same shape loads.
 four, so `onSelUp`'s closure still sees `dragRect === null` and returns. Space them with
 `setTimeout` (120 ms apart worked) so a render lands between them.
 
-**Track 5 goes 1 finished + 7 partial → 3 finished + 5 partial.** Bullets 1 and 7 close.
-Still partial: OCR candidates/order model, progressive Read, passage → Reading workspace,
-save-to-Anki/session history breadth, and pin/dock/resize/restore-bounds.
+**Track 5 goes 1 finished + 7 partial → 2 finished + 6 partial. Only bullet 1 closes.**
+Corrected in the same turn, before the count was inherited: bullet **7** names *five* workflows —
+"VN, manga, video, PDF, and browser" — and `bb165db8` added exactly one of the four that were
+missing. Two of five is not a closed bullet, so bullet 7 stays **partial** with video, PDF and
+browser named as the remainder. Bullet 1's four items ("region, repeat-region, clipboard,
+persistent pinned captures") are now all four present, so that one is genuinely finished.
+The 6 that stay partial, one per bullet: (2) alternate OCR candidates + the mixed-panel order
+model, (3) progressive passage **Read**, (4) passage → Reading workspace, (6)
+pin/dock/resize/restore-bounds, (7) video, PDF and browser, (8) privacy/retention and OCR/model
+defaults. Bullet (5) was the one already finished. Counted by reading the eight bullet lines of
+the plan's Track 5 section one at a time, not by keyword sweep.
+
+**Across Tracks 1/4/5/6: 19 finished / 6 partial / 4 deferred = 29** (Track 1 five, Track 4 nine,
+Track 5 two finished + six partial, Track 6 three finished + four deferred). Track 5 remains the
+only track with partials.

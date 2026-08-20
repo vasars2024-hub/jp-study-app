@@ -360,6 +360,15 @@ The existing popup is a foundation, not completion.
 - Support VN, manga, video, PDF, and browser workflows through the same shared pipeline.
 - Add privacy/retention, OCR/model defaults, shortcuts, keyboard-only use, and honest offline/cloud indicators.
 
+**Re-derived 2026-08-20 — 8 bullets: 2 finished, 6 partial, 0 deferred.** Bullet 1 closes
+(`d3408014` added the missing repeat-region; region, clipboard and pinned captures already
+shipped) and bullet 5 was already closed. Bullet 7 **stays partial**: it names five workflows and
+`bb165db8` made manga the second, so video, PDF and browser remain. The other five partials are
+bullets 2 (alternate OCR candidates, mixed-panel order model), 3 (progressive **Read**), 4 (passage
+→ Reading workspace), 6 (pin/dock/resize/restore-bounds) and 8 (privacy/retention, OCR/model
+defaults). Counted one bullet line at a time, not by keyword sweep. Across Tracks 1/4/5/6 that is
+**19 finished / 6 partial / 4 deferred = 29**.
+
 ### Track 5 implementation checkpoint — 2026-08-12
 
 - **Searchable capture/session history: done.** Persistent captures, pinning, and — as of
