@@ -26610,4 +26610,9 @@ lines are my context. `debug/stage-head-edit.cjs` (new, gitignored) rebuilds HEA
 replacements, writes the blob `--no-filters` and re-reads `git show :<path>` to prove it. Verified
 mechanically both ways: staged `setMediaWorkspaceOpen` **0**, worktree **3**.
 
-**Track 6 is 3 finished, 0 partial, 5 deferred to L4.**
+**Track 6 is 7 bullets: 3 finished, 0 partial, 4 deferred to L4.** (The earlier count read
+"1 finished, 1 partial, 5 deferred"; bullet 3 was in the deferred five and closing it moves it, so
+the deferred number goes 5 -> 4 and the seven still sum.) Across Tracks 1/4/5/6 that is **18
+finished / 7 partial / 4 deferred = 29** -- Track 1 five, Track 4 nine, Track 5 one finished plus
+seven partial, Track 6 three finished plus four deferred. Track 5 is now the only track with
+partials left.

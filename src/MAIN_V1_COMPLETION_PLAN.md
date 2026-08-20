@@ -397,7 +397,9 @@ The existing popup is a foundation, not completion.
 - Keep conventional windows as the default. The same complete Media/Video feature set must work in Standard and explicitly enabled Liquid presentations.
 - Do not call the player a system pattern until it has passed the full visual matrix and the user has approved it.
 
-**Re-derived 2026-08-20 — 3 finished, 0 partial, 5 deferred to the Liquid plan.** The empty-canvas
+**Re-derived 2026-08-20 — 7 bullets: 3 finished, 0 partial, 4 deferred to the Liquid plan.** (The
+earlier "1 finished, 1 partial, 5 deferred" counted bullet 3 as deferred; closing bullets 2 and 3
+moves it, so deferred goes 5 → 4 and the seven still sum.) The empty-canvas
 regression is repaired (`MediaWorkspace.tsx:53-56` mounts the adopted `LibraryView` plus the
 player; `MediaWorkspaceSectionView.tsx:98-107` states `pending`/`unavailable` honestly).
 
