@@ -26660,3 +26660,56 @@ the **ref** is the addressable half, not the label.
 `MangaReader.tsx` and all four catalogs are dirty from another track; staged as HEAD+edit blobs via
 `debug/stage-head-edit.cjs`, and the staged diff was grepped for that track's `confirmDialog` hunk
 (**0** hits).
+
+## 2026-08-20 primary — Track 5 bullet 1's last gap: repeat-region
+
+`d3408014`. Region, clipboard and pinning shipped long ago; **repeat-region did not exist.**
+`rescan` re-scanned only while the lens was still open, so closing it lost the rectangle and a VN
+or manga reader re-dragged the same box over the same textbox every time. `lastRegion`
+(`displayId` + rect) joins `ReadingLensSettings` so it survives a restart; `LensOpenMode` gains
+`repeat`.
+
+**DECISION — remembered inside the `lens:ocr` handler, not through a new IPC.** That handler
+already receives every rectangle the lens scans — drag, rescan, repeat alike — so the memory cannot
+drift from what was captured, and **neither `preload.ts` nor `window.d.ts` needed touching**
+(both are dirty from another track; this avoided the whole problem). Recorded *before* the OCR: a
+region that returns no text is still the region the user chose.
+
+**DECISION — a repeat does NOT follow the cursor.** Renderer coords are display-local DIP, so
+replaying a stored rect under the cursor scans a different place on a different monitor and returns
+text the user never pointed at. The region's own display wins. Three honest degradations, all
+decided in main so the renderer is never handed a `repeat` it cannot honour: monitor unplugged,
+display shrank under the region, nothing scanned yet — each arrives as `mode:'select'` with no
+`region`, and the memory is **kept** so re-plugging replays it. `canRepeatRegion` is computed from
+replayability, not `!!lastRegion`, so the button is disabled rather than enabled-and-lying.
+
+**Live, pid 38772 — a real restart, because main does not hot-reload.**
+- **Negative control first**, on a boot with nothing stored: status read `lastRegion:null,
+  canRepeatRegion:false`, and `lensOpen('repeat')` produced `mode:"select"` with **no** `region`.
+- Real drag in the lens window, 900,600 → 1460,860. Status then read
+  `lastRegion:{displayId:2427271505, x:900, y:600, width:560, height:260}, canRepeatRegion:true`,
+  and `%APPDATA%\jp-study-app\reading-lens.json` holds exactly that on disk.
+- Close, then `lensOpen('repeat')` → init `mode:"repeat"`, `region:{900,600,560,260}`, and the lens
+  rendered `.lens-frame` at **`left:900px; top:600px; width:560px; height:260px`** with a reading
+  state and **no selection layer**. Same rectangle, no drag.
+- Settings → Profile & dictionary → Reading Lens: **`Repeat last region`** present, enabled, tooltip
+  *"Scan the same rectangle again, on the display it was taken from."*
+- **Disabled-branch control:** `lensSetEnabled(false)` → both buttons `disabled:true` live off the
+  broadcast, no reload; re-enabled → back to false. The persisted file was captured before and
+  compared `-ceq` after: **IDENTICAL, 169 bytes.**
+- `/logs?level=error` **total 0** across the whole run.
+
+Tests: **61** in `readingLens.test.ts` (48 before, +13). The stub gained `screen.getAllDisplays`
+and a mutable two-monitor set. Four pre-existing tests updated for the new settings field — a
+contract change, not a weakened assertion. Controls inside the new tests: a `select` open on the
+same state still follows the cursor to display 7 while `repeat` goes to 9; a re-scan of the same
+rect broadcasts nothing; a 4×4 stray click is not remembered; six hand-edited rectangles are
+refused while a valid one of the same shape loads.
+
+**TRAP.** Dispatching `mousedown/mousemove/mouseup` in one `/eval` does nothing: React batches all
+four, so `onSelUp`'s closure still sees `dragRect === null` and returns. Space them with
+`setTimeout` (120 ms apart worked) so a render lands between them.
+
+**Track 5 goes 1 finished + 7 partial → 3 finished + 5 partial.** Bullets 1 and 7 close.
+Still partial: OCR candidates/order model, progressive Read, passage → Reading workspace,
+save-to-Anki/session history breadth, and pin/dock/resize/restore-bounds.
