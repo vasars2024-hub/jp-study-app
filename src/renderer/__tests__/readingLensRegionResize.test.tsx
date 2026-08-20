@@ -211,6 +211,19 @@ describe('Reading Lens region resize', () => {
     expect(frameBox()).toEqual({ left: '400px', top: '300px', width: '600px', height: '200px' });
   });
 
+  it('re-docks the chrome to the top once the resized read reaches the bottom band', async () => {
+    await mountReading();
+    // 400,300 600x200 ends at y=500 on a 1080-tall display: nowhere near the bar.
+    expect(host.querySelector('.lens-chrome')?.className).toContain('lens-chrome-bottom');
+
+    await dragGrip('s', 0, 600);
+
+    // Clamped to the display, so 300..1080 — well inside the bottom band, and
+    // the bar that was covering it moves out of the way on its own.
+    expect(lensOcr.mock.calls[1][0]).toMatchObject({ y: 300, height: 780 });
+    expect(host.querySelector('.lens-chrome')?.className).toContain('lens-chrome-top');
+  });
+
   it('clamps at the display edge instead of scanning off-screen', async () => {
     await mountReading();
     await dragGrip('se', 5000, 5000);

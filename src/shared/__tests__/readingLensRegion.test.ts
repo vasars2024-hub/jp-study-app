@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
+  LENS_CHROME_BAND,
+  LENS_DOCK_PREFERENCES,
   LENS_MIN_REGION,
   LENS_RESIZE_HANDLES,
+  isLensDockPreference,
   isLensResizeHandle,
   lensRegionChanged,
   resizeLensRegion,
+  resolveLensChromeDock,
   type LensRegionRect,
 } from '../readingLensRegion';
 
@@ -148,5 +152,54 @@ describe('lensRegionChanged', () => {
     expect(lensRegionChanged(BASE, { ...BASE, y: BASE.y + 1 })).toBe(true);
     expect(lensRegionChanged(BASE, { ...BASE, width: BASE.width + 1 })).toBe(true);
     expect(lensRegionChanged(BASE, { ...BASE, height: BASE.height + 1 })).toBe(true);
+  });
+});
+
+describe('resolveLensChromeDock', () => {
+  it('offers auto plus both explicit edges, and rejects anything else', () => {
+    expect([...LENS_DOCK_PREFERENCES]).toEqual(['auto', 'bottom', 'top']);
+    expect(isLensDockPreference('auto')).toBe(true);
+    expect(isLensDockPreference('left')).toBe(false);
+    expect(isLensDockPreference(undefined)).toBe(false);
+  });
+
+  it('keeps the historical bottom dock for a region nowhere near either edge', () => {
+    expect(resolveLensChromeDock(BASE, SCREEN, 'auto')).toBe('bottom');
+  });
+
+  it('moves to the top when the read reaches into the bottom band', () => {
+    // Subtitles, a visual novel dialogue box, the last line of a page.
+    const subtitle: LensRegionRect = { x: 300, y: 1080 - LENS_CHROME_BAND, width: 1300, height: 60 };
+    expect(resolveLensChromeDock(subtitle, SCREEN, 'auto')).toBe('top');
+  });
+
+  it('stays at the bottom when the read is up against the TOP edge instead', () => {
+    expect(resolveLensChromeDock({ x: 300, y: 0, width: 900, height: 60 }, SCREEN, 'auto')).toBe(
+      'bottom',
+    );
+  });
+
+  it('stays at the bottom for a whole-screen scan, where either edge covers text', () => {
+    expect(resolveLensChromeDock({ x: 0, y: 0, width: 1920, height: 1080 }, SCREEN, 'auto')).toBe(
+      'bottom',
+    );
+  });
+
+  it('is exactly one pixel of region away from flipping', () => {
+    // Bottom edge exactly on the band boundary (1080 - 76 = 1004) stays put;
+    // one pixel past it flips.
+    expect(resolveLensChromeDock({ x: 0, y: 200, width: 100, height: 1080 - LENS_CHROME_BAND - 200 }, SCREEN, 'auto')).toBe('bottom');
+    expect(resolveLensChromeDock({ x: 0, y: 200, width: 100, height: 1080 - LENS_CHROME_BAND - 199 }, SCREEN, 'auto')).toBe('top');
+  });
+
+  it('lets an explicit preference override the geometry in both directions', () => {
+    const subtitle: LensRegionRect = { x: 300, y: 1040, width: 1300, height: 40 };
+    expect(resolveLensChromeDock(subtitle, SCREEN, 'bottom')).toBe('bottom');
+    expect(resolveLensChromeDock(BASE, SCREEN, 'top')).toBe('top');
+  });
+
+  it('falls back to the bottom when there is no region at all', () => {
+    expect(resolveLensChromeDock(null, SCREEN, 'auto')).toBe('bottom');
+    expect(resolveLensChromeDock(null, SCREEN, 'top')).toBe('top');
   });
 });

@@ -92,3 +92,55 @@ export function resizeLensRegion(
 export function lensRegionChanged(a: LensRegionRect, b: LensRegionRect): boolean {
   return a.x !== b.x || a.y !== b.y || a.width !== b.width || a.height !== b.height;
 }
+
+// ---- Chrome dock --------------------------------------------------------
+
+/** Where the toolbar sits. `auto` keeps it off the text it belongs to. */
+export const LENS_DOCK_PREFERENCES = ['auto', 'bottom', 'top'] as const;
+
+export type LensDockPreference = (typeof LENS_DOCK_PREFERENCES)[number];
+export type LensDockSide = 'top' | 'bottom';
+
+/**
+ * Chrome height plus its offset from the screen edge, in DIP.
+ *
+ * Measured against `readingLens.css`: the bar sits 22 px off the edge and is
+ * roughly 46 px tall with its 6 px padding and 999-px pills, plus a little
+ * slack so a region that stops one pixel short of the bar still counts as
+ * colliding with it.
+ */
+export const LENS_CHROME_BAND = 76;
+
+export function isLensDockPreference(value: unknown): value is LensDockPreference {
+  return typeof value === 'string' && (LENS_DOCK_PREFERENCES as readonly string[]).includes(value);
+}
+
+/**
+ * Which edge the chrome docks to for a given read.
+ *
+ * The bar has always been pinned to the bottom, which is fine until the text
+ * being read is *also* at the bottom — subtitles, a visual novel's dialogue
+ * box, the last line of a page — and then the one control surface covers the
+ * one thing it was opened for. `auto` moves it to whichever edge the region is
+ * not touching.
+ *
+ * An explicit preference always wins: `auto` cannot know that the reader wants
+ * the bar out of the way of something the OCR never saw.
+ *
+ * A region that reaches into BOTH bands — a whole-screen auto-scan — stays at
+ * the bottom. Either edge covers text there, so the honest choice is the one
+ * that does not move the control out from under the reader's cursor for no
+ * gain; the manual override is what handles that case.
+ */
+export function resolveLensChromeDock(
+  region: LensRegionRect | null,
+  viewport: { width: number; height: number },
+  preference: LensDockPreference = 'auto',
+  band: number = LENS_CHROME_BAND,
+): LensDockSide {
+  if (preference === 'top' || preference === 'bottom') return preference;
+  if (!region) return 'bottom';
+  const hitsBottom = region.y + region.height > viewport.height - band;
+  const hitsTop = region.y < band;
+  return hitsBottom && !hitsTop ? 'top' : 'bottom';
+}

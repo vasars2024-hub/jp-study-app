@@ -25,9 +25,13 @@ import {
 } from '../../../shared/readingLensConfidence';
 import { correctReadingLensLine } from '../../../shared/readingLensCorrection';
 import {
+  LENS_DOCK_PREFERENCES,
   LENS_RESIZE_HANDLES,
+  isLensDockPreference,
   lensRegionChanged,
   resizeLensRegion,
+  resolveLensChromeDock,
+  type LensDockPreference,
   type LensResizeHandle,
 } from '../../../shared/readingLensRegion';
 import { lexiconHandoffFromCapture } from '../../../shared/lexiconHandoff';
@@ -147,6 +151,25 @@ function loadPinned(): boolean {
   }
 }
 
+/**
+ * Which edge the chrome docks to, or `auto` to keep it off the read.
+ *
+ * Stored rather than derived every time for the same reason the mode is: a
+ * reader working through subtitles has a standing preference, and `auto` is a
+ * guess made from the OCR rectangle alone — it cannot know about the thing on
+ * screen the reader actually needs to see.
+ */
+const DOCK_KEY = 'jp-study-lens-dock';
+
+function loadDock(): LensDockPreference {
+  try {
+    const stored = localStorage.getItem(DOCK_KEY);
+    return isLensDockPreference(stored) ? stored : 'auto';
+  } catch {
+    return 'auto';
+  }
+}
+
 function isJapaneseWord(s: string): boolean {
   return /[぀-ヿ㐀-鿿々ー]/.test(s);
 }
@@ -181,6 +204,7 @@ export default function ReadingLensOverlay() {
   } | null>(null);
   const [mode, setModeState] = useState<LensMode>(loadMode);
   const [pinned, setPinnedState] = useState<boolean>(loadPinned);
+  const [dock, setDockState] = useState<LensDockPreference>(loadDock);
   /** The sentence the AI panel is currently explaining; null when it is closed. */
   const [analysisText, setAnalysisText] = useState<string | null>(null);
   const [editMode, setEditMode] = useState(false);
@@ -241,6 +265,20 @@ export default function ReadingLensOverlay() {
     } catch {
       /* a blocked storage area only costs the preference, not the pin itself */
     }
+  }, []);
+
+  /** Cycles auto → bottom → top → auto, so one control reaches all three. */
+  const cycleDock = useCallback(() => {
+    setDockState((current) => {
+      const at = LENS_DOCK_PREFERENCES.indexOf(current);
+      const next = LENS_DOCK_PREFERENCES[(at + 1) % LENS_DOCK_PREFERENCES.length];
+      try {
+        localStorage.setItem(DOCK_KEY, next);
+      } catch {
+        /* a blocked storage area only costs the preference, not the move */
+      }
+      return next;
+    });
   }, []);
 
   // Warm the tokenizer so the first scan can split words synchronously.
@@ -983,6 +1021,9 @@ export default function ReadingLensOverlay() {
             }}
             pinned={pinned}
             onPinnedChange={setPinned}
+            dock={dock}
+            dockSide={resolveLensChromeDock(state.region, viewport(), dock)}
+            onCycleDock={cycleDock}
             onRescan={rescan}
             onNewRegion={() => setState({ kind: 'selecting' })}
             onClose={close}
@@ -1096,6 +1137,9 @@ export function LensChrome({
   onEditingChange,
   pinned = false,
   onPinnedChange,
+  dock = 'auto',
+  dockSide = 'bottom',
+  onCycleDock,
   onRescan,
   onNewRegion,
   onClose,
@@ -1117,6 +1161,11 @@ export function LensChrome({
   /** Suspends the auto-dismiss countdown; see `PIN_KEY`. */
   pinned?: boolean;
   onPinnedChange?: (pinned: boolean) => void;
+  /** The stored preference — what the control reports and cycles. */
+  dock?: LensDockPreference;
+  /** Where the bar actually sits, after `auto` has been resolved. */
+  dockSide?: 'top' | 'bottom';
+  onCycleDock?: () => void;
   onRescan: (engine: 'auto' | 'manga' | 'web') => void;
   onNewRegion: () => void;
   onClose: () => void;
@@ -1135,7 +1184,7 @@ export function LensChrome({
   onSaveToVisualNovel: () => void;
 }) {
   return (
-    <div className="lens-chrome lens-interactive">
+    <div className={`lens-chrome lens-chrome-${dockSide} lens-interactive`}>
       <span className="lens-source-badge">{t('lens.badge.source.screen')}</span>
       {originLabel && (
         <span className="lens-source-badge lens-origin-badge" title={originLabel}>
@@ -1222,6 +1271,16 @@ export function LensChrome({
       <button type="button" onClick={onNewRegion} title={t('lens.action.newRegion')}>
         {t('lens.action.newRegion')}
       </button>
+      {onCycleDock && (
+        <button
+          type="button"
+          className={`lens-dock lens-dock-${dock}`}
+          onClick={onCycleDock}
+          title={t('lens.dock.hint', { side: t(`lens.dock.side.${dockSide}`) })}
+        >
+          {t(`lens.dock.${dock}`)}
+        </button>
+      )}
       {onPinnedChange && (
         <button
           type="button"

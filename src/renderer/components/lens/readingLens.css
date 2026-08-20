@@ -300,7 +300,6 @@
 .lens-chrome {
   position: fixed;
   left: 50%;
-  bottom: 22px;
   transform: translateX(-50%);
   display: flex;
   align-items: center;
@@ -309,6 +308,20 @@
   border-radius: 999px;
   background: var(--lens-bg);
   box-shadow: 0 8px 26px rgba(0, 0, 0, 0.4);
+}
+
+/* The dock. `bottom` is where the bar has always been; `top` is what `auto`
+   picks when the read itself reaches into the bottom band, so the one control
+   surface stops covering the one thing it was opened for. Both offsets stay at
+   22px so moving the bar does not also resize the space around it. */
+.lens-chrome-bottom {
+  bottom: 22px;
+  top: auto;
+}
+.lens-chrome-top {
+  top: 22px;
+  bottom: auto;
+  box-shadow: 0 -8px 26px rgba(0, 0, 0, 0.4);
 }
 .lens-source-badge {
   font-size: 10px;
