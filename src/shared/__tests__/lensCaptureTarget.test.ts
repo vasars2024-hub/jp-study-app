@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildBrowserCaptureTarget,
+  buildDocumentCaptureTarget,
   buildMangaCaptureTarget,
+  buildVideoCaptureTarget,
   buildVisualNovelCaptureTarget,
+  formatCaptureTimecode,
   LENS_CAPTURE_TARGET_MAX_AGE_MS,
   LENS_CAPTURE_TARGET_WORKFLOWS,
   normalizeLensCaptureTarget,
@@ -125,7 +129,10 @@ describe('lens capture target: manga', () => {
   };
 
   it('is a declared workflow beside the visual novel, not a loose string', () => {
-    expect([...LENS_CAPTURE_TARGET_WORKFLOWS]).toEqual(['visual-novel', 'manga']);
+    // Track 5 bullet 7 names five workflows; this list is the count.
+    expect([...LENS_CAPTURE_TARGET_WORKFLOWS]).toEqual([
+      'visual-novel', 'manga', 'video', 'document', 'browser',
+    ]);
   });
 
   it('derives the contract provenance fields from the page the reader is on', () => {
@@ -233,5 +240,201 @@ describe('lens capture target: manga', () => {
     expect(capture?.sourceRef).toBe(target.sourceRef);
     expect(decodeURIComponent(capture!.sourceRef.slice('manga:'.length)))
       .toBe('manga-1?chapter=第12話&page=47');
+  });
+});
+
+describe('lens capture target — video', () => {
+  const videoFields = {
+    mediaId: ' 21519 ',
+    title: ' 君の名は。 ',
+    episode: ' 3 ',
+    positionSec: ' 3725 ',
+  };
+
+  it('carries the position, because the same episode is a different frame a second later', () => {
+    const target = buildVideoCaptureTarget(videoFields, 50_000);
+    expect(target).toEqual({
+      workflow: 'video',
+      sourceLabel: '君の名は。 · Ep. 3 · 1:02:05',
+      sourceRef: 'video:21519?episode=3&t=3725',
+      createdAt: 50_000,
+      video: { mediaId: '21519', title: '君の名は。', episode: '3', positionSec: '3725' },
+    });
+  });
+
+  it('formats a position the way a player shows it, and refuses one that is not a place', () => {
+    expect(formatCaptureTimecode('0')).toBe('0:00');
+    expect(formatCaptureTimecode('9')).toBe('0:09');
+    expect(formatCaptureTimecode('61')).toBe('1:01');
+    expect(formatCaptureTimecode('3599')).toBe('59:59');
+    expect(formatCaptureTimecode('3600')).toBe('1:00:00');
+    expect(formatCaptureTimecode('')).toBe('');
+    // A fractional or negative position is floored / dropped before it is ever
+    // formatted, so the ref never carries `t=NaN` or `t=-4`.
+    expect(buildVideoCaptureTarget({ ...videoFields, positionSec: '12.75' }, 1).sourceRef)
+      .toBe('video:21519?episode=3&t=12');
+    expect(buildVideoCaptureTarget({ ...videoFields, positionSec: '-4' }, 1).sourceRef)
+      .toBe('video:21519?episode=3');
+    expect(buildVideoCaptureTarget({ ...videoFields, positionSec: 'later' }, 1).sourceRef)
+      .toBe('video:21519?episode=3');
+  });
+
+  it('keeps a loose file addressable by its title when the library never matched it', () => {
+    const target = buildVideoCaptureTarget(
+      { mediaId: '', title: 'raw-episode.mkv', episode: '', positionSec: '90' },
+      1,
+    );
+    expect(target.sourceLabel).toBe('raw-episode.mkv · 1:30');
+    expect(target.sourceRef).toBe('video:?t=90');
+    expect(parseLensCaptureTarget(JSON.stringify(target), 1)).toEqual(target);
+  });
+
+  it('re-derives provenance on read, and refuses a video that names nothing', () => {
+    const now = 1_000_000_000;
+    const video = { mediaId: '21519', title: '君の名は。', episode: '3', positionSec: '3725' };
+    expect(normalizeLensCaptureTarget({
+      workflow: 'video',
+      sourceLabel: 'A film this capture never came from',
+      sourceRef: 'video:9999?t=1',
+      createdAt: now,
+      video,
+    }, now)?.sourceRef).toBe('video:21519?episode=3&t=3725');
+    expect(normalizeLensCaptureTarget({ workflow: 'video', createdAt: now }, now)).toBeNull();
+    expect(normalizeLensCaptureTarget(
+      { workflow: 'video', createdAt: now, video: { ...video, title: '' } },
+      now,
+    )).toBeNull();
+    expect(normalizeLensCaptureTarget(
+      { workflow: 'video', createdAt: now - LENS_CAPTURE_TARGET_MAX_AGE_MS - 1, video },
+      now,
+    )).toBeNull();
+    // Control: the same shape inside the window resolves.
+    expect(normalizeLensCaptureTarget({ workflow: 'video', createdAt: now, video }, now))
+      .not.toBeNull();
+  });
+});
+
+describe('lens capture target — document', () => {
+  const docFields = {
+    documentId: ' novel-7 ',
+    title: ' こころ ',
+    format: 'pdf' as const,
+    section: ' 上 先生と私 ',
+    page: ' 12 ',
+  };
+
+  it('records which loader produced the text in the ref, not in the label', () => {
+    const target = buildDocumentCaptureTarget(docFields, 50_000);
+    expect(target).toEqual({
+      workflow: 'document',
+      sourceLabel: 'こころ · 上 先生と私 · p. 12',
+      sourceRef: 'doc:novel-7?format=pdf&section=%E4%B8%8A%20%E5%85%88%E7%94%9F%E3%81%A8%E7%A7%81&page=12',
+      createdAt: 50_000,
+      document: {
+        documentId: 'novel-7', title: 'こころ', format: 'pdf', section: '上 先生と私', page: '12',
+      },
+    });
+    expect(target.sourceRef).toContain('format=pdf');
+  });
+
+  it('keeps an epub and a plain text file on the same contract', () => {
+    expect(buildDocumentCaptureTarget({ ...docFields, format: 'epub' }, 1).sourceRef)
+      .toContain('format=epub');
+    const plain = buildDocumentCaptureTarget(
+      { documentId: 'novel-8', title: 'Notes', format: 'text', section: '', page: '' },
+      1,
+    );
+    expect(plain.sourceLabel).toBe('Notes');
+    expect(plain.sourceRef).toBe('doc:novel-8?format=text');
+  });
+
+  it('refuses a format outside the three rather than folding it into a default', () => {
+    const now = 1_000_000_000;
+    const document = {
+      documentId: 'novel-7', title: 'こころ', format: 'pdf', section: '', page: '12',
+    };
+    expect(normalizeLensCaptureTarget(
+      { workflow: 'document', createdAt: now, document: { ...document, format: 'djvu' } },
+      now,
+    )).toBeNull();
+    expect(normalizeLensCaptureTarget(
+      { workflow: 'document', createdAt: now, document: { ...document, format: '' } },
+      now,
+    )).toBeNull();
+    expect(normalizeLensCaptureTarget(
+      { workflow: 'document', createdAt: now, document: { ...document, documentId: '' } },
+      now,
+    )).toBeNull();
+    expect(normalizeLensCaptureTarget(
+      { workflow: 'document', createdAt: now, document: { ...document, title: '' } },
+      now,
+    )).toBeNull();
+    expect(normalizeLensCaptureTarget({ workflow: 'document', createdAt: now }, now)).toBeNull();
+    // Control: the untouched shape resolves, so the four refusals above are the
+    // named rules and not a dead branch.
+    expect(normalizeLensCaptureTarget({ workflow: 'document', createdAt: now, document }, now)
+      ?.sourceRef).toBe('doc:novel-7?format=pdf&page=12');
+  });
+});
+
+describe('lens capture target — browser', () => {
+  it('addresses the page by its URL and names the host beside the title', () => {
+    const target = buildBrowserCaptureTarget(
+      { url: 'https://www3.nhk.or.jp/news/html/20260820/k100.html', title: 'ニュース' },
+      50_000,
+    );
+    expect(target.workflow).toBe('browser');
+    expect(target.sourceLabel).toBe('ニュース · www3.nhk.or.jp');
+    expect(decodeURIComponent(target.sourceRef.slice('web:'.length)))
+      .toBe('https://www3.nhk.or.jp/news/html/20260820/k100.html');
+  });
+
+  it('refuses every scheme that is not http(s)', () => {
+    const now = 1_000_000_000;
+    for (const url of [
+      'file:///C:/Users/Arseniy/secret.txt',
+      'about:blank',
+      'data:text/html,<p>x</p>',
+      'javascript:alert(1)',
+      'not a url at all',
+      '',
+    ]) {
+      expect(buildBrowserCaptureTarget({ url, title: 'x' }, now).sourceRef).toBe('');
+      expect(normalizeLensCaptureTarget(
+        { workflow: 'browser', createdAt: now, browser: { url, title: 'x' } },
+        now,
+      )).toBeNull();
+    }
+    // Control: an http URL through the identical path resolves.
+    expect(normalizeLensCaptureTarget(
+      { workflow: 'browser', createdAt: now, browser: { url: 'http://example.com/a', title: 'x' } },
+      now,
+    )?.sourceRef).toBe('web:http%3A%2F%2Fexample.com%2Fa');
+  });
+
+  it('drops embedded credentials, which are a secret the page does not need', () => {
+    const target = buildBrowserCaptureTarget(
+      { url: 'https://user:s3cret@example.com/read?page=2', title: 'Read' },
+      1,
+    );
+    expect(target.browser.url).toBe('https://example.com/read?page=2');
+    expect(target.sourceRef).not.toContain('s3cret');
+    expect(target.sourceLabel).toBe('Read · example.com');
+  });
+
+  it('survives the capture normalizer that stores it', () => {
+    const target = buildBrowserCaptureTarget(
+      { url: 'https://example.com/読む', title: 'ページ' },
+      1,
+    );
+    const capture = normalizeReadingLensCapture({
+      source: 'screen',
+      sourceLabel: target.sourceLabel,
+      sourceRef: target.sourceRef,
+      text: 'テスト',
+      lines: [],
+    });
+    expect(capture?.sourceRef).toBe(target.sourceRef);
+    expect(capture?.sourceLabel).toBe('ページ · example.com');
   });
 });

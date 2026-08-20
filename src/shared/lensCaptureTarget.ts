@@ -18,7 +18,13 @@
 export const LENS_CAPTURE_TARGET_KEY = 'jp-lens-capture-target-v1';
 export const LENS_CAPTURE_TARGET_MAX_AGE_MS = 30 * 60 * 1000;
 
-export const LENS_CAPTURE_TARGET_WORKFLOWS = ['visual-novel', 'manga'] as const;
+export const LENS_CAPTURE_TARGET_WORKFLOWS = [
+  'visual-novel',
+  'manga',
+  'video',
+  'document',
+  'browser',
+] as const;
 export type LensCaptureTargetWorkflow = (typeof LENS_CAPTURE_TARGET_WORKFLOWS)[number];
 
 export interface VisualNovelCaptureFields {
@@ -56,7 +62,70 @@ export interface MangaCaptureTarget {
   manga: MangaCaptureFields;
 }
 
-export type LensCaptureTarget = VisualNovelCaptureTarget | MangaCaptureTarget;
+export interface VideoCaptureFields {
+  /** Library id when the file is matched; '' for a loose file played directly. */
+  mediaId: string;
+  title: string;
+  /** Episode number as the player shows it; '' for a standalone file. */
+  episode: string;
+  /**
+   * Whole seconds into the file, stringified. A capture from a video is only
+   * addressable with the position — the same episode is a different frame a
+   * second later — so this is the field that does the work here.
+   */
+  positionSec: string;
+}
+
+export interface VideoCaptureTarget {
+  workflow: 'video';
+  sourceLabel: string;
+  sourceRef: string;
+  createdAt: number;
+  video: VideoCaptureFields;
+}
+
+/** Which loader produced the text on screen; the reader opens all three. */
+export const DOCUMENT_CAPTURE_FORMATS = ['pdf', 'epub', 'text'] as const;
+export type DocumentCaptureFormat = (typeof DOCUMENT_CAPTURE_FORMATS)[number];
+
+export interface DocumentCaptureFields {
+  documentId: string;
+  title: string;
+  format: DocumentCaptureFormat;
+  /** Chapter or section label as the reader shows it; '' when there is none. */
+  section: string;
+  /** 1-based ordinal of the open chapter/page; '' when unpaginated. */
+  page: string;
+}
+
+export interface DocumentCaptureTarget {
+  workflow: 'document';
+  sourceLabel: string;
+  sourceRef: string;
+  createdAt: number;
+  document: DocumentCaptureFields;
+}
+
+export interface BrowserCaptureFields {
+  /** Absolute http(s) URL. Anything else is refused — see `browserCaptureUrl`. */
+  url: string;
+  title: string;
+}
+
+export interface BrowserCaptureTarget {
+  workflow: 'browser';
+  sourceLabel: string;
+  sourceRef: string;
+  createdAt: number;
+  browser: BrowserCaptureFields;
+}
+
+export type LensCaptureTarget =
+  | VisualNovelCaptureTarget
+  | MangaCaptureTarget
+  | VideoCaptureTarget
+  | DocumentCaptureTarget
+  | BrowserCaptureTarget;
 
 /** Both bounds match `normalizeReadingLensCapture`, which truncates past them. */
 const MAX_SOURCE_LABEL = 240;
@@ -173,6 +242,158 @@ export function buildMangaCaptureTarget(
   };
 }
 
+/**
+ * Whole non-negative seconds, or '' — a fractional or negative position is not
+ * a place in a file, and `NaN` stringifies to a ref that resolves to nothing.
+ */
+function cleanSeconds(value: unknown): string {
+  const raw = typeof value === 'number' ? value : Number(clean(value, MAX_ID));
+  if (!Number.isFinite(raw) || raw < 0) return '';
+  return String(Math.floor(raw));
+}
+
+/** `h:mm:ss` past an hour, `m:ss` below it — how a player itself shows a position. */
+export function formatCaptureTimecode(positionSec: string): string {
+  if (positionSec === '') return '';
+  const total = Number(positionSec);
+  if (!Number.isFinite(total) || total < 0) return '';
+  const seconds = Math.floor(total % 60);
+  const minutes = Math.floor(total / 60) % 60;
+  const hours = Math.floor(total / 3600);
+  const mm = hours > 0 ? String(minutes).padStart(2, '0') : String(minutes);
+  return `${hours > 0 ? `${hours}:` : ''}${mm}:${String(seconds).padStart(2, '0')}`;
+}
+
+export function videoCaptureRef(fields: VideoCaptureFields): string {
+  let ref = `video:${boundedEncode(fields.mediaId, MAX_SOURCE_REF - 6)}`;
+  ref = withParam(ref, 'episode', fields.episode);
+  ref = withParam(ref, 't', fields.positionSec);
+  return ref;
+}
+
+export function videoCaptureLabel(fields: VideoCaptureFields): string {
+  // The timecode is in the label for the same reason the manga page is: it is
+  // what makes one capture from a two-hour file distinguishable from the next.
+  return boundedLabel([
+    fields.title,
+    fields.episode ? `Ep. ${fields.episode}` : '',
+    formatCaptureTimecode(fields.positionSec),
+  ]);
+}
+
+export function buildVideoCaptureTarget(
+  fields: VideoCaptureFields,
+  createdAt = Date.now(),
+): VideoCaptureTarget {
+  const video: VideoCaptureFields = {
+    mediaId: clean(fields.mediaId, MAX_ID),
+    title: clean(fields.title, MAX_CONTEXT),
+    episode: clean(fields.episode, MAX_ID),
+    positionSec: cleanSeconds(fields.positionSec),
+  };
+  return {
+    workflow: 'video',
+    sourceLabel: videoCaptureLabel(video),
+    sourceRef: videoCaptureRef(video),
+    createdAt,
+    video,
+  };
+}
+
+export function documentCaptureRef(fields: DocumentCaptureFields): string {
+  let ref = `doc:${boundedEncode(fields.documentId, MAX_SOURCE_REF - 4)}`;
+  ref = withParam(ref, 'format', fields.format);
+  ref = withParam(ref, 'section', fields.section);
+  ref = withParam(ref, 'page', fields.page);
+  return ref;
+}
+
+export function documentCaptureLabel(fields: DocumentCaptureFields): string {
+  // The format stays in the ref only. It says which loader ran, which is a fact
+  // about the pipeline rather than about the place the reader was looking at.
+  return boundedLabel([
+    fields.title,
+    fields.section,
+    fields.page ? `p. ${fields.page}` : '',
+  ]);
+}
+
+export function buildDocumentCaptureTarget(
+  fields: DocumentCaptureFields,
+  createdAt = Date.now(),
+): DocumentCaptureTarget {
+  const document: DocumentCaptureFields = {
+    documentId: clean(fields.documentId, MAX_ID),
+    title: clean(fields.title, MAX_CONTEXT),
+    format: fields.format,
+    section: clean(fields.section, MAX_CONTEXT),
+    page: clean(fields.page, MAX_ID),
+  };
+  return {
+    workflow: 'document',
+    sourceLabel: documentCaptureLabel(document),
+    sourceRef: documentCaptureRef(document),
+    createdAt,
+    document,
+  };
+}
+
+/**
+ * The absolute http(s) URL a browser capture is addressable by, or '' .
+ *
+ * Two rules, both deliberate. Only `http`/`https` resolve: a `file:`, `data:`
+ * or `about:` URL either leaks a local path into a stored record or points at
+ * nothing a later reader can open. And embedded credentials are dropped — a
+ * `https://user:token@host/…` URL is a secret, and the page it addresses is
+ * exactly as reachable without them.
+ */
+export function browserCaptureUrl(raw: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return '';
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return '';
+  parsed.username = '';
+  parsed.password = '';
+  return parsed.toString();
+}
+
+export function browserCaptureRef(fields: BrowserCaptureFields): string {
+  if (!fields.url) return '';
+  return `web:${boundedEncode(fields.url, MAX_SOURCE_REF - 4)}`;
+}
+
+export function browserCaptureLabel(fields: BrowserCaptureFields): string {
+  let host = '';
+  try {
+    host = fields.url ? new URL(fields.url).host : '';
+  } catch {
+    host = '';
+  }
+  // The host is the second part because a page title alone rarely says where
+  // the sentence came from, and the same title recurs across mirrors.
+  return boundedLabel([fields.title, host]);
+}
+
+export function buildBrowserCaptureTarget(
+  fields: BrowserCaptureFields,
+  createdAt = Date.now(),
+): BrowserCaptureTarget {
+  const browser: BrowserCaptureFields = {
+    url: browserCaptureUrl(clean(fields.url, MAX_SOURCE_REF)),
+    title: clean(fields.title, MAX_CONTEXT),
+  };
+  return {
+    workflow: 'browser',
+    sourceLabel: browserCaptureLabel(browser),
+    sourceRef: browserCaptureRef(browser),
+    createdAt,
+    browser,
+  };
+}
+
 export function normalizeLensCaptureTarget(
   value: unknown,
   now = Date.now(),
@@ -218,6 +439,54 @@ export function normalizeLensCaptureTarget(
     // is allowed to be absent — a capture from an unpaginated view still points
     // at the right book.
     if (!target.manga.mangaId || !target.manga.title) return null;
+    return target;
+  }
+  if (candidate.workflow === 'video') {
+    const payload = candidate.video;
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+    const fields = payload as Record<string, unknown>;
+    const target = buildVideoCaptureTarget({
+      mediaId: clean(fields.mediaId, MAX_ID),
+      title: clean(fields.title, MAX_CONTEXT),
+      episode: clean(fields.episode, MAX_ID),
+      positionSec: cleanSeconds(fields.positionSec),
+    }, createdAt);
+    // A loose file has no library id, so the title alone has to carry it — but
+    // a target with neither addresses nothing, the same rule the readers use.
+    if (!target.video.title) return null;
+    return target;
+  }
+  if (candidate.workflow === 'document') {
+    const payload = candidate.document;
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+    const fields = payload as Record<string, unknown>;
+    const format = DOCUMENT_CAPTURE_FORMATS
+      .find((known) => known === fields.format);
+    // A format outside the three is a corrupt record rather than a missing
+    // field: nothing in the product writes one, so it is refused instead of
+    // being folded into a default that would claim the wrong pipeline.
+    if (!format) return null;
+    const target = buildDocumentCaptureTarget({
+      documentId: clean(fields.documentId, MAX_ID),
+      title: clean(fields.title, MAX_CONTEXT),
+      format,
+      section: clean(fields.section, MAX_CONTEXT),
+      page: clean(fields.page, MAX_ID),
+    }, createdAt);
+    if (!target.document.documentId || !target.document.title) return null;
+    return target;
+  }
+  if (candidate.workflow === 'browser') {
+    const payload = candidate.browser;
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+    const fields = payload as Record<string, unknown>;
+    const target = buildBrowserCaptureTarget({
+      url: clean(fields.url, MAX_SOURCE_REF),
+      title: clean(fields.title, MAX_CONTEXT),
+    }, createdAt);
+    // The URL is the whole identity here; `browserCaptureUrl` has already
+    // rejected every scheme that is not http(s), so an empty one is a refusal.
+    if (!target.browser.url) return null;
     return target;
   }
   return null;
