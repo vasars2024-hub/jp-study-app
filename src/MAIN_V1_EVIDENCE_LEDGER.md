@@ -26417,3 +26417,62 @@ anchor. Driver: `debug/stage-health-blobs.cjs`, gitignored local scratch.
 
 **Track 1 is now 5 of 5.** Tracks 1/4/5/6: **15 finished / 6 partial / 3 unclassified / 5
 deferred**, still 29 bullets.
+
+## 2026-08-20 primary — Track 5's three never-measured bullets, measured
+
+The 2026-08-12 checkpoint never touches bullets 1, 6 and 7, so no turn had classified them. Read
+from source and driven live on pid 38128. **Result: 0 finished, 3 partial** — none is the blank
+the "unclassified" label implied, and none is done.
+
+**Bullet 1 — region / repeat-region / clipboard / pinned: 2 of 4.** `LensOpenMode` is exactly
+`'select' | 'auto' | 'clipboard'` (`main/readingLens.ts:55`). Live, all three opened and
+`lens:getInit` returned each in turn: `select` and `auto` at bounds `0,0 2560x1600 sf=1`, and
+`clipboard` with a real `ReadingLensCapture` attached — `source:"clipboard"`, `engine:"none"`,
+`lines:[]`, built by `createReadingLensClipboardCapture` from the live OS clipboard.
+**region ✓** (drag → `lens:ocr` with a `RegionRect`). **clipboard ✓.**
+**repeat-region ✗** — `auto` is a *whole-display* scan (`ReadingLensOverlay.tsx:229-234` sets the
+region to the full bounds), not a repeat of the last one, and the persisted state file is only
+`{enabled, hotkey}` (`:71`), so no region survives an invocation. `Re-scan` (`:567`) re-OCRs the
+current region with another engine **within one session** — the VN-style "read that box again as
+the dialogue advances" loop does not exist, and there is no `setInterval`/watch anywhere in the
+overlay. **pinned ✗ as a live capture** — `lens:history:pin` pins a *history row*; the window is
+`resizable:false, movable:false` and is hidden on close, so nothing stays parked on a region.
+
+**Bullet 6 — pin / dock / resize / restore bounds / multi-monitor: 1 of 5, and the one is real.**
+The lens is a full-display always-on-top overlay: `resizable:false`, `movable:false` (`:181-182`),
+bounds always `displayUnderCursor().bounds` (`:142-144`). So **resize ✗, dock ✗** (the only
+"docked panel" in the tree is a comment at `ReadingLensOverlay.tsx:839` about click routing),
+**restore bounds ✗** (nothing persists geometry). "Pin" exists only as click-through:
+`lens:setInteractive` → `setIgnoreMouseEvents` (`:361-362`). **Multi-monitor ✓** and properly
+built — `lensDisplayId` is carried into `ocrRegion`, and `screenOcr.ts:112-124` resolves the
+display by id, sizes `thumbnailSize` to *that* display's physical resolution, and matches the
+capturer source on `display_id`. **Live limit, stated rather than glossed:** this machine reports
+`screen.isExtended === true`, but all three opens landed on the same 2560x1600 display because the
+cursor never left it, and moving the cursor is mouse automation, which is forbidden here. So the
+second-display path is verified by construction, not by capture. **Latent defect worth a slice:**
+the source fallback chain at `:122-124` is `display_id match → primary → sources[0]`, so a machine
+where Electron reports an empty `display_id` OCRs the *wrong monitor* and reports success — the
+false-success shape, and it should refuse instead.
+
+**Bullet 7 — one shared pipeline for VN/manga/video/PDF/browser: the envelope is shared, the
+workflows are not.** There are **two** lookup pipelines. `wordLookup.ts` has **10** renderer
+consumers (manga reader, media, music, novel reader, immersion, VN, global overlay); ReadingLens
+has **3** entry points in the whole tree — `VisualNovelPanel.tsx:428`, the overlay's own clipboard
+button, and the Settings test button. Of the five named workflows only **VN** is wired, **manga**
+has its own Mokuro-backed `MangaOcrOverlay` that never builds a `ReadingLensCapture` (the lens can
+only *force* the manga OCR engine, `lens.action.manga`), and **video / PDF / browser** have no
+entry at all — the global hotkey works over them the way it works over any window, with no
+workflow awareness. **The concrete evidence, from real data:** `lens:history:list` returned **5**
+captures (3 clipboard, 2 screen) and **0 of 5** carry a `sourceRef`. The screen path hardcodes
+`source:'screen'` and sets neither `sourceLabel` nor `sourceRef` (`ReadingLensOverlay.tsx:304`),
+and VN — the one wired workflow — passes its title/route/chapter/scene through a **`localStorage`
+key** (`VISUAL_NOVEL_OCR_TARGET_KEY`, `VisualNovelPanel.tsx:420-428`) instead of the two
+provenance fields the shared contract defines for exactly this. That side channel is why a second
+workflow cannot reuse the first's wiring, and closing it is the smallest real slice in bullet 7.
+
+**Track 5 is 1 finished / 7 partial**, not 1/4/3. Tracks 1/4/5/6: **15 finished / 9 partial / 0
+unclassified / 5 deferred**, 29 bullets. Nothing here needs the user.
+**Bridge trap:** `/eval` targets the **newest** window and ignores a `windowId` field, so once the
+lens opens, a probe that stashed results on the main window's `window.` reads back `{}`. Route
+results through `localStorage` — both renderers share the `localhost:5173` origin. Both scratch
+keys were removed; verified 0 `__relay*` keys remain.
