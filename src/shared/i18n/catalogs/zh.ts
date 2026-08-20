@@ -5549,6 +5549,7 @@ export const zh: Catalog = {
   // EPUB mining panels (zh)
   'epub.askAgent': '就所选内容询问智能助手',
   'epub.askAgentPassage': '就本段落询问智能助手',
+  'epub.readWithLens': '用取词镜阅读此页',
   'epub.translate.title': '书籍翻译',
   'epub.translate.panelTitle': '书籍翻译设置',
   'epub.translate.target': '翻译到',

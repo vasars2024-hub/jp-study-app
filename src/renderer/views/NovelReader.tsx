@@ -37,6 +37,11 @@ import { addBookmark, loadBookmarks, removeBookmark, type Bookmark } from '../bo
 import { recordReading } from '../stats';
 import { loadEpub, type LoadedEpub } from '../epubLoader';
 import { loadPdf } from '../pdfLoader';
+import {
+  buildDocumentCaptureTarget,
+  LENS_CAPTURE_TARGET_KEY,
+} from '../../shared/lensCaptureTarget';
+import { documentCapturePage, documentCaptureSection } from '../novelLensCapture';
 import { getTokenizer, tokenizerReady } from '../tokenizer';
 import { highlightEl, recolorEl, resetHighlightRoot } from '../wordHighlight';
 import { onKnowledgeChanged } from '../knownWords';
@@ -2272,6 +2277,47 @@ export default function NovelReader({ item, onClose }: Props) {
     );
   }, [passageAroundSelection, item.id, item.title, lang]);
 
+  /**
+   * The document half of the shared ReadingLens pipeline.
+   *
+   * The lens is a separate always-on-top window main owns, so — exactly as in
+   * `MangaReader.tsx`, `VisualNovelPanel.tsx`, `ImmersionContent.tsx` and
+   * `MediaLensCaptureButton.tsx` — the only channel between the two renderers
+   * is this `localStorage` slot on their shared origin.
+   *
+   * A reader with selectable text already has a dictionary popup, so what the
+   * lens adds here is what selection cannot reach: a scanned page inside a PDF,
+   * an image of a table or a diagram, furigana drawn into the artwork, and any
+   * page a font renders without extractable text. `pdfLoader.ts` turns each PDF
+   * page into a chapter of the same `LoadedEpub` shape, so both formats arrive
+   * at one derivation.
+   *
+   * DECISION — `page` is the 1-based ordinal of the open **part**, never the
+   * screen page inside it. For a PDF that ordinal IS the page number (the
+   * loader emits one chapter per page, labelled `Page N`), which is what makes
+   * a PDF capture addressable at all. For an EPUB the screen page is a function
+   * of font size and window width, so writing it would produce a ref that
+   * resolves somewhere else on the next launch. The section label carries the
+   * finer position instead.
+   *
+   * Provenance only, no save-back: this reader's own store is annotations and
+   * bookmarks, both keyed to a text range in the DOM, and a screen rectangle
+   * cannot be converted into one — the same reason `bb165db8` gave for manga.
+   */
+  const captureWithLens = useCallback(async (): Promise<void> => {
+    localStorage.setItem(LENS_CAPTURE_TARGET_KEY, JSON.stringify(buildDocumentCaptureTarget({
+      documentId: item.id,
+      title: item.title,
+      // Only these two are reachable here: `isPdf` sniffs the bytes and
+      // everything else goes to `loadEpub`. `text` belongs to a plain-text
+      // importer, and claiming it from here would name the wrong loader.
+      format: sourceIsPdfRef.current ? 'pdf' : 'epub',
+      section: documentCaptureSection(loaded?.toc ?? [], partRef.current),
+      page: documentCapturePage(partRef.current),
+    })));
+    await window.api.lensOpen('select');
+  }, [loaded, item.id, item.title]);
+
   const openPopupFromSelection = useCallback(
     (kind: 'dict' | 'translate') => {
       const selObj = window.getSelection();
@@ -2564,6 +2610,15 @@ export default function NovelReader({ item, onClose }: Props) {
           label: t('epub.askAgentPassage'),
           icon: <Icon name="sparkle" size={14} />,
           onSelect: askAgentAboutPassage,
+        },
+        {
+          id: 'lens-capture',
+          label: t('epub.readWithLens'),
+          icon: <Icon name="eye" size={14} />,
+          // Nothing is loaded means nothing names the page, and the contract
+          // drops a target whose document has no id or title on read.
+          disabled: !loaded,
+          onSelect: () => void captureWithLens(),
         },
       ],
     },

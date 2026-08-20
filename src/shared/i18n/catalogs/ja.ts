@@ -5575,6 +5575,7 @@ export const ja: Catalog = {
   // EPUB mining panels (ja)
   'epub.askAgent': '選択範囲についてエージェントに質問',
   'epub.askAgentPassage': 'この段落についてエージェントに質問',
+  'epub.readWithLens': 'このページをレンズで読む',
   'epub.translate.title': '書籍の翻訳',
   'epub.translate.panelTitle': '書籍翻訳の設定',
   'epub.translate.target': '翻訳先',
