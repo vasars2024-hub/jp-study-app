@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-20T14:56:07.620Z",
+  "generatedAt": "2026-08-20T02:38:04.832Z",
   "totals": {
     "all": 2744,
     "ja": 2145,
@@ -419,12 +419,12 @@
       "verified": 64
     },
     "bySourceModule": {
-      "mazii-n3-dump": 627,
+      "supplement-n3": 627,
       "imported:hsk-list": 459,
-      "mazii-n2-dump": 437,
-      "mazii-n4-dump": 432,
+      "supplement-n2": 437,
+      "supplement-n4": 432,
       "authored:core": 325,
-      "mazii-n1-dump": 324,
+      "supplement-n1": 324,
       "authored:hsk-seed": 76,
       "authored:hsk-extra": 64
     }
