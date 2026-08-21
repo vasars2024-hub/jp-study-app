@@ -54,13 +54,84 @@ describe('Reading Lens line order', () => {
     expect(ids(ordered)).toEqual(['top', 'bottom', 'left-column']);
   });
 
-  it('preserves provider order for mixed-orientation layouts', () => {
+  it('preserves provider order when mixed-orientation blocks overlap', () => {
+    // A horizontal sound effect painted across a vertical bubble: no rule here
+    // can say which the eye takes first, so the provider keeps the call.
     const mixed = [
       line('horizontal-title', [10, 90, 180, 20]),
       line('vertical-dialogue', [140, 10, 20, 160], true),
     ];
 
     expect(ids(orderReadingLensLines(mixed))).toEqual(['horizontal-title', 'vertical-dialogue']);
+  });
+
+  it('keeps provider order over an overlap even when geometry would swap it', () => {
+    // Drop the separability gate and this one flips: the page runs vertically,
+    // the two blocks share a band, and the effect reaches further right. The
+    // case above stays provider-ordered either way, so it cannot catch that.
+    const overlapping = [
+      line('bubble', [140, 10, 18, 150], true),
+      line('effect', [120, 60, 90, 16]),
+    ];
+
+    expect(ids(orderReadingLensLines(overlapping))).toEqual(['bubble', 'effect']);
+  });
+
+  it('reads separable mixed blocks right-to-left when the page runs vertically', () => {
+    const panel = [
+      line('sound-effect', [10, 20, 60, 18]),
+      line('bubble-left', [130, 20, 18, 150], true),
+      line('bubble-right', [152, 20, 18, 150], true),
+    ];
+
+    // Vertical text outweighs the effect, so the bubbles come first, and within
+    // the merged bubble block the right column leads.
+    expect(ids(orderReadingLensLines(panel))).toEqual([
+      'bubble-right',
+      'bubble-left',
+      'sound-effect',
+    ]);
+  });
+
+  it('reads separable mixed blocks left-to-right when the page runs horizontally', () => {
+    const page = [
+      line('vertical-caption', [250, 20, 16, 40], true),
+      line('paragraph', [10, 20, 200, 18]),
+    ];
+
+    expect(ids(orderReadingLensLines(page))).toEqual(['paragraph', 'vertical-caption']);
+  });
+
+  it('reads mixed blocks in separate bands top-to-bottom regardless of direction', () => {
+    const page = [
+      line('lower-effect', [10, 200, 60, 18]),
+      line('upper-column', [200, 10, 18, 120], true),
+    ];
+
+    expect(ids(orderReadingLensLines(page))).toEqual(['upper-column', 'lower-effect']);
+  });
+
+  it('preserves provider order when mixed orientations run exactly the same length', () => {
+    const tied = [
+      line('horizontal', [10, 200, 100, 18]),
+      line('vertical', [200, 10, 18, 100], true),
+    ];
+
+    expect(ids(orderReadingLensLines(tied))).toEqual(['horizontal', 'vertical']);
+  });
+
+  it('does not let one square glyph turn a vertical bubble into a panel problem', () => {
+    // Both engines guess `vertical` from the box's aspect ratio, so a trailing
+    // 。 on its own comes back square and may be flagged horizontal. Let it vote
+    // and this bubble goes down the panel path, which bands the glyph below the
+    // whole block and reads it after the LEFT column instead of after the right.
+    const bubble = [
+      line('col-left', [100, 10, 18, 150], true),
+      line('col-right', [122, 10, 18, 150], true),
+      line('tail-glyph', [122, 165, 18, 18]),
+    ];
+
+    expect(ids(orderReadingLensLines(bubble))).toEqual(['col-right', 'tail-glyph', 'col-left']);
   });
 
   it('preserves provider order when any geometry is unusable', () => {
