@@ -6,6 +6,7 @@ import type { ReadingLensSource } from '../../../../shared/readingLens';
 import {
   READING_LENS_RETENTION_CHOICES,
   READING_LENS_RETENTION_DEFAULT,
+  normalizeReadingLensRetentionDays,
   type ReadingLensHistoryEntry,
   type ReadingLensRetentionDays,
 } from '../../../../shared/readingLensHistory';
@@ -118,7 +119,11 @@ function LensCaptureHistory() {
     window.api
       .lensHistoryGetRetention()
       .then((days) => {
-        if (alive) setRetention(days);
+        // Normalized on the way in, not trusted. This drives a controlled
+        // `<select value>`, and React throws outright on a non-scalar there —
+        // one unexpected IPC payload would take the whole settings page down
+        // rather than degrade. The shared normalizer is the same one main uses.
+        if (alive) setRetention(normalizeReadingLensRetentionDays(days));
       })
       .catch(() => undefined);
     return () => {
@@ -132,8 +137,8 @@ function LensCaptureHistory() {
       // renderer's own before/after would be a guess: the list on screen is a
       // filtered page of 50, not the store.
       const res = await window.api.lensHistorySetRetention(days);
-      setRetention(res.retentionDays);
-      setRetentionRemoved(res.removed);
+      setRetention(normalizeReadingLensRetentionDays(res?.retentionDays));
+      setRetentionRemoved(Number.isFinite(res?.removed) ? res.removed : 0);
       await refresh(query, source, pinnedOnly);
     },
     [query, source, pinnedOnly, refresh],
