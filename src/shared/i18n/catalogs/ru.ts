@@ -3214,6 +3214,8 @@ export const ru: Catalog = {
   'lens.read.openHint': 'Прочитать весь захват как текст — с фуриганой, пометками и списком слов.',
   'lens.read.empty': 'В этом захвате нечего читать.',
   'lens.read.typography': 'Оформление',
+  'lens.read.move': 'Перетащите, чтобы переместить панель',
+  'lens.read.resize': 'Перетащите, чтобы изменить размер панели',
   'lens.read.smaller': 'Мельче текст',
   'lens.read.larger': 'Крупнее текст',
   'lens.read.leading': 'Шире строки',

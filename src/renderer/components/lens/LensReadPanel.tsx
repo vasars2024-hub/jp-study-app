@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { useT } from '../../i18n';
 import { alignFurigana, toHiragana } from '../../../shared/furigana';
 import {
@@ -9,6 +9,17 @@ import {
   type ReadingLensReadSourceLine,
 } from '../../../shared/readingLensRead';
 import { readingLensConfidenceLevel } from '../../../shared/readingLensConfidence';
+import {
+  READ_RESIZE_HANDLES,
+  clampReadFrame,
+  defaultReadFrame,
+  moveReadFrame,
+  parseReadFrame,
+  resizeReadFrame,
+  type ReadFrame,
+  type ReadResizeHandle,
+  type ReadViewport,
+} from '../../../shared/readingLensReadFrame';
 import type { ReadingLensCapture } from '../../../shared/readingLens';
 import {
   ANNO_COLORS,
@@ -83,6 +94,37 @@ function savePrefs(prefs: ReadPrefs): void {
   }
 }
 
+/**
+ * Where the sheet was left, remembered separately from the typography above.
+ *
+ * A reader who drags Read off the subtitle it is covering has told us something
+ * about their screen, not about this capture, so the frame outlives the capture
+ * the same way the size and the furigana toggle do. The lens window is recreated
+ * per session but keeps its origin, so `localStorage` is the same store the mode
+ * and the pin already use.
+ */
+const FRAME_KEY = 'jp-study-lens-read-frame';
+
+function loadFrame(viewport: ReadViewport): ReadFrame {
+  try {
+    return parseReadFrame(localStorage.getItem(FRAME_KEY), viewport) ?? defaultReadFrame(viewport);
+  } catch {
+    return defaultReadFrame(viewport);
+  }
+}
+
+function saveFrame(frame: ReadFrame): void {
+  try {
+    localStorage.setItem(FRAME_KEY, JSON.stringify(frame));
+  } catch {
+    /* private mode */
+  }
+}
+
+function viewportNow(): ReadViewport {
+  return { width: window.innerWidth, height: window.innerHeight };
+}
+
 function isJapanese(value: string): boolean {
   return /[぀-ヿ㐀-鿿々ー]/u.test(value);
 }
@@ -118,11 +160,115 @@ export default function LensReadPanel({ capture, lines, onLookup, onClose }: Pro
   const [marks, setMarks] = useState<Annotation[]>(() => loadAnnotations(bookId));
   const [notice, setNotice] = useState<string | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
+  const [frame, setFrame] = useState<ReadFrame>(() => loadFrame(viewportNow()));
+  /**
+   * The gesture in flight. A ref rather than state because every `pointermove`
+   * reads it: re-rendering the passage — hundreds of ruby runs — to remember
+   * where a drag started is the difference between a sheet that follows the
+   * cursor and one that lurches after it.
+   */
+  const gesture = useRef<{
+    handle: ReadResizeHandle | 'move';
+    pointerId: number;
+    x: number;
+    y: number;
+    origin: ReadFrame;
+  } | null>(null);
+  const [gesturing, setGesturing] = useState<ReadResizeHandle | 'move' | null>(null);
 
   useEffect(() => {
     setMarks(loadAnnotations(bookId));
     setNotice(null);
   }, [bookId]);
+
+  // The lens is stretched over whichever display the capture came from, and this
+  // machine's two displays are different sizes, so the frame restored a moment
+  // ago can be wrong by the time the window has been resized onto the smaller
+  // one. Re-clamping on resize is what stops a remembered sheet from sitting
+  // where there are no pixels.
+  useEffect(() => {
+    const onResize = () => setFrame((current) => clampReadFrame(current, viewportNow()));
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  /**
+   * One gesture handler for the header drag and all eight grips.
+   *
+   * Pointer capture is requested but not relied on. It is the right mechanism —
+   * a 7 px grip loses the cursor on the first frame of a fast drag — but
+   * `setPointerCapture` throws `NotFoundError` for a pointer id the browser does
+   * not consider active, and a throw here would take the whole gesture with it,
+   * having already armed the state. So it is guarded, and the moves are read off
+   * `window` regardless: with capture the events still bubble there, and without
+   * it that listener is the only thing that keeps a drag alive past the edge of
+   * a grip. The lens window is held interactive for as long as Read is open (see
+   * `ReadingLensOverlay`'s pass-through effect) so the moves arrive at all.
+   *
+   * The listeners are attached here, imperatively, and NOT from an effect keyed
+   * on the gesture state. An effect runs after the render the `pointerdown`
+   * schedules, so the listener would be attached one gesture late — measured
+   * live, a drag begun on a fresh sheet moved nothing and the *next* drag moved
+   * by the first one's delta. Attaching inside the handler makes the very first
+   * `pointermove` of a drag the first one that counts.
+   */
+  const detachGesture = useRef<(() => void) | null>(null);
+
+  const beginGesture = useCallback(
+    (handle: ReadResizeHandle | 'move', event: ReactPointerEvent<HTMLElement>) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      detachGesture.current?.();
+      gesture.current = { handle, pointerId: event.pointerId, x: event.clientX, y: event.clientY, origin: frame };
+      setGesturing(handle);
+      try {
+        event.currentTarget.setPointerCapture(event.pointerId);
+      } catch {
+        /* no capture; the window listeners below carry the gesture */
+      }
+
+      const onMove = (move: PointerEvent) => {
+        const active = gesture.current;
+        if (!active) return;
+        const dx = move.clientX - active.x;
+        const dy = move.clientY - active.y;
+        const viewport = viewportNow();
+        setFrame(
+          active.handle === 'move'
+            ? moveReadFrame(active.origin, dx, dy, viewport)
+            : resizeReadFrame(active.origin, active.handle, dx, dy, viewport),
+        );
+      };
+      const detach = () => {
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onEnd);
+        window.removeEventListener('pointercancel', onEnd);
+        detachGesture.current = null;
+      };
+      function onEnd(): void {
+        detach();
+        gesture.current = null;
+        setGesturing(null);
+        // Persist from the committed frame rather than from this event: a
+        // pointerup that lands outside the viewport carries a delta the clamp
+        // already refused, and saving it would remember a position the sheet
+        // never occupied.
+        setFrame((current) => {
+          saveFrame(current);
+          return current;
+        });
+      }
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onEnd);
+      window.addEventListener('pointercancel', onEnd);
+      detachGesture.current = detach;
+    },
+    [frame],
+  );
+
+  // A sheet closed mid-drag must not leave its listeners on `window`.
+  useEffect(() => () => detachGesture.current?.(), []);
 
   const passage = useMemo(() => buildReadingLensPassage(lines), [lines]);
   const harvest = useMemo(() => harvestReadingLensVocabulary(passage, lines), [passage, lines]);
@@ -203,12 +349,33 @@ export default function LensReadPanel({ capture, lines, onLookup, onClose }: Pro
 
   return (
     <section
-      className="lens-read lens-interactive"
+      className={`lens-read lens-interactive${gesturing ? ' lens-read-gesturing' : ''}`}
       role="dialog"
       aria-label={t('lens.read.title')}
+      style={{ left: frame.x, top: frame.y, width: frame.width, height: frame.height }}
       onMouseDown={(event) => event.stopPropagation()}
     >
-      <header className="lens-read-head">
+      {READ_RESIZE_HANDLES.map((handle) => (
+        <div
+          key={handle}
+          className={`lens-read-grip lens-read-grip-${handle}`}
+          role="separator"
+          aria-label={t('lens.read.resize')}
+          data-handle={handle}
+          onPointerDown={(event) => beginGesture(handle, event)}
+        />
+      ))}
+      <header
+        className="lens-read-head"
+        title={t('lens.read.move')}
+        onPointerDown={(event) => {
+          // The header carries five typography buttons and the close button.
+          // Only the bar itself is the handle; a drag that started on a control
+          // would swallow its click.
+          if ((event.target as HTMLElement).closest('button')) return;
+          beginGesture('move', event);
+        }}
+      >
         <span className="lens-read-title">{t('lens.read.title')}</span>
         <span className="lens-read-meta">
           {t('lens.read.paragraphs', { count: passage.paragraphs.length })}

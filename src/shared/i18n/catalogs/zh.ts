@@ -2998,6 +2998,8 @@ export const zh: Catalog = {
   'lens.read.openHint': '把整段截取内容当作文章来读 — 带假名注音、高亮和词汇表。',
   'lens.read.empty': '这次截取没有可阅读的文章。',
   'lens.read.typography': '排版',
+  'lens.read.move': '拖动以移动此面板',
+  'lens.read.resize': '拖动以调整此面板大小',
   'lens.read.smaller': '缩小文字',
   'lens.read.larger': '放大文字',
   'lens.read.leading': '放宽行距',

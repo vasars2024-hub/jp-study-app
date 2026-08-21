@@ -3009,6 +3009,8 @@ export const ja: Catalog = {
   'lens.read.openHint': 'キャプチャ全体を文章として読む — ふりがな、ハイライト、語彙リスト付き。',
   'lens.read.empty': 'このキャプチャには読める文章がありません。',
   'lens.read.typography': '文字設定',
+  'lens.read.move': 'ドラッグしてこのシートを移動',
+  'lens.read.resize': 'ドラッグしてこのシートの大きさを変更',
   'lens.read.smaller': '文字を小さく',
   'lens.read.larger': '文字を大きく',
   'lens.read.leading': '行間を広く',

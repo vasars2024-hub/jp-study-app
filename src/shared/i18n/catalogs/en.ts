@@ -3177,6 +3177,8 @@ export const en: Catalog = {
   'lens.read.openHint': 'Read the whole capture as a passage — furigana, highlights and its word list.',
   'lens.read.empty': 'This capture has no passage to read.',
   'lens.read.typography': 'Typography',
+  'lens.read.move': 'Drag to move this sheet',
+  'lens.read.resize': 'Drag to resize this sheet',
   'lens.read.smaller': 'Smaller text',
   'lens.read.larger': 'Larger text',
   'lens.read.leading': 'Loose lines',

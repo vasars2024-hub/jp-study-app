@@ -770,13 +770,16 @@
    A reading surface, so it is an opaque anchor rather than glass: the passage
    has to stay legible over whatever application the lens is floating above. */
 
+/* Position and size come from the inline style the panel computes (see
+   `readingLensReadFrame.ts`); the sheet is movable and resizable, so the CSS
+   deliberately hardcodes neither. These are only the fallback a frame-less
+   render would land on. */
 .lens-read {
   position: fixed;
   top: 24px;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 24px;
   width: min(760px, calc(100vw - 48px));
+  height: calc(100vh - 48px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -794,7 +797,60 @@
   gap: 10px;
   padding: 9px 10px 8px 14px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  /* The bar is the drag handle. Its buttons opt back out below, and the body
+     stays a text cursor because it holds the selectable passage. */
+  cursor: move;
+  touch-action: none;
 }
+.lens-read-head button {
+  cursor: pointer;
+}
+
+/* A gesture in flight must not leave the passage selecting text behind the
+   sheet as the cursor sweeps across it. */
+.lens-read-gesturing,
+.lens-read-gesturing * {
+  user-select: none;
+}
+
+/* ---- Move / resize grips ----
+   Eight of them, sitting just inside the border so they never overlap the
+   header controls. `touch-action: none` is what keeps a pen or touch drag from
+   being stolen by scrolling. */
+.lens-read-grip {
+  position: absolute;
+  z-index: 2;
+  touch-action: none;
+}
+.lens-read-grip-n,
+.lens-read-grip-s {
+  left: 12px;
+  right: 12px;
+  height: 7px;
+  cursor: ns-resize;
+}
+.lens-read-grip-e,
+.lens-read-grip-w {
+  top: 12px;
+  bottom: 12px;
+  width: 7px;
+  cursor: ew-resize;
+}
+.lens-read-grip-n { top: -3px; }
+.lens-read-grip-s { bottom: -3px; }
+.lens-read-grip-w { left: -3px; }
+.lens-read-grip-e { right: -3px; }
+.lens-read-grip-ne,
+.lens-read-grip-nw,
+.lens-read-grip-se,
+.lens-read-grip-sw {
+  width: 16px;
+  height: 16px;
+}
+.lens-read-grip-nw { top: -3px; left: -3px; cursor: nwse-resize; }
+.lens-read-grip-se { bottom: -3px; right: -3px; cursor: nwse-resize; }
+.lens-read-grip-ne { top: -3px; right: -3px; cursor: nesw-resize; }
+.lens-read-grip-sw { bottom: -3px; left: -3px; cursor: nesw-resize; }
 .lens-read-title {
   font-size: 11px;
   font-weight: 700;
