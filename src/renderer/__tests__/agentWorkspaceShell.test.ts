@@ -115,6 +115,10 @@ vi.mock('../agentConversationPlanner', () => ({
 import { AGENT_WORKSPACE_SCHEMA_VERSION, type AgentWorkspaceState } from '../../shared/agentWorkspace';
 import { agentExecutionMessageIds } from '../../shared/agentExecutionBridge';
 import AgentWorkspaceShell from '../components/agent/AgentWorkspaceShell';
+import {
+  getAgentOperationHistorySnapshot,
+  resetAgentOperationalStateForTests,
+} from '../agentOperationalClient';
 
 interface BridgeCall {
   method: string;
@@ -1193,6 +1197,36 @@ describe('Agent workspace shell', () => {
     expect(text()).toContain('agent.card.undo.undone');
     expect(text()).toContain('agent.timeline.effect.undo');
     expect(text()).toContain('agent.timeline.status.succeeded');
+  });
+
+  /**
+   * The session log dies with the window; the durable history is what answers
+   * "what has this thing done to my data" after a restart. The projection is a
+   * one-way effect with no visible result inside the shell, so nothing else in
+   * this file would notice if it stopped running.
+   */
+  it('projects every completed effect into the durable history, ids only', async () => {
+    resetAgentOperationalStateForTests();
+    stored = saveWorkspace();
+    await mount();
+    await click(buttonWith('agent.card.save.review'));
+    await click(buttonWith('agent.card.save.confirm'));
+
+    const afterSave = getAgentOperationHistorySnapshot();
+    expect(afterSave.entries).toHaveLength(1);
+    expect(afterSave.entries[0]).toMatchObject({ claim: 'created', entityType: 'flashcard' });
+    // Rule 1 of the session log, made stricter on the way to disk.
+    expect('arguments' in afterSave.entries[0]).toBe(false);
+    expect('sequence' in afterSave.entries[0]).toBe(false);
+
+    // An undo is its own operation, not an edit of the entry it reverses.
+    await click(buttonWith('agent.card.undo.review'));
+    await click(buttonWith('agent.card.undo.confirm'));
+
+    const afterUndo = getAgentOperationHistorySnapshot();
+    expect(afterUndo.entries).toHaveLength(2);
+    expect(afterUndo.entries[0].id).not.toBe(afterUndo.entries[1].id);
+    expect('invertsSequence' in afterUndo.entries[0]).toBe(false);
   });
 
   it('keeps a valid Undo visible after switching away from the saved message', async () => {

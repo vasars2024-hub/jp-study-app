@@ -49,6 +49,13 @@ import {
   normalizeAgentContextSuggestionPreferences,
   type AgentContextSuggestionPreferences,
 } from '../shared/agentContextSuggestions';
+import {
+  agentOperationHistoryAppend,
+  emptyAgentOperationHistory,
+  normalizeAgentOperationHistory,
+  type AgentOperationHistory,
+  type AgentOperationHistoryEntry,
+} from '../shared/agentOperationHistory';
 
 /** The three documents the renderer used to own outright. */
 export const LEGACY_AGENT_QUEUE_KEY = 'jp-study-local-agent-task-queue-v1';
@@ -64,6 +71,12 @@ export const AGENT_QUEUE_CHANGED_EVENT = 'jp-study-local-agent-task-queue-change
 export const AGENT_MEMORY_CHANGED_EVENT = 'jp-study-local-agent-memory-changed';
 export const AGENT_AUTOMATIONS_CHANGED_EVENT = 'jp-study-local-agent-automations-changed';
 export const AGENT_SUGGESTIONS_CHANGED_EVENT = 'jp-study-agent-context-suggestions-changed';
+/**
+ * New here, because the durable operation history never had a renderer-owned
+ * store to inherit an event name from. It fires cross-window like the rest: a
+ * second window watching the history is watching the same document.
+ */
+export const AGENT_HISTORY_CHANGED_EVENT = 'jp-study-agent-operation-history-changed';
 
 interface AgentOperationalBridge {
   agentOperationalLoad(): Promise<unknown>;
@@ -173,6 +186,9 @@ function applySnapshot(incoming: AgentOperationalState): void {
     suggestions: sameSection(previous.suggestions, incoming.suggestions)
       ? previous.suggestions
       : incoming.suggestions,
+    history: sameSection(previous.history, incoming.history)
+      ? previous.history
+      : incoming.history,
   };
   snapshot = next;
   if (previous.queue !== next.queue) emit(AGENT_QUEUE_CHANGED_EVENT, next.queue);
@@ -182,6 +198,9 @@ function applySnapshot(incoming: AgentOperationalState): void {
   }
   if (previous.suggestions !== next.suggestions) {
     emit(AGENT_SUGGESTIONS_CHANGED_EVENT, next.suggestions);
+  }
+  if (previous.history !== next.history) {
+    emit(AGENT_HISTORY_CHANGED_EVENT, next.history);
   }
 }
 
@@ -322,6 +341,43 @@ export function setAgentContextSuggestionPreferencesSnapshot(
   applySnapshot({ ...snapshot, suggestions });
   schedulePersist();
   return getAgentContextSuggestionPreferencesSnapshot();
+}
+
+export function getAgentOperationHistorySnapshot(): AgentOperationHistory {
+  return normalizeAgentOperationHistory(snapshot.history);
+}
+
+/**
+ * Records one completed effect durably, and reports the history it produced.
+ *
+ * Appending against the *live* snapshot rather than a caller-supplied history is
+ * what makes concurrent producers safe: two result cards completing in the same
+ * tick each read the newest document, so neither drops the other's row. The
+ * append itself is idempotent on the entry id, so a re-projection of the same
+ * step is a no-op — including the no-op write, which returns the identical
+ * object and therefore emits nothing and schedules nothing.
+ */
+export function appendAgentOperationHistorySnapshot(
+  entry: AgentOperationHistoryEntry,
+): AgentOperationHistory {
+  const current = getAgentOperationHistorySnapshot();
+  const history = agentOperationHistoryAppend(current, entry);
+  if (history === current) return current;
+  applySnapshot({ ...snapshot, history });
+  schedulePersist();
+  return getAgentOperationHistorySnapshot();
+}
+
+/**
+ * The privacy control: deletion is exact and immediate, not a retention dial.
+ * It clears the durable record only — the session log the window is still
+ * holding is what undo runs against, and dropping the audit trail must not also
+ * disarm the user's ability to reverse what they just watched happen.
+ */
+export function clearAgentOperationHistorySnapshot(): AgentOperationHistory {
+  applySnapshot({ ...snapshot, history: emptyAgentOperationHistory() });
+  schedulePersist();
+  return getAgentOperationHistorySnapshot();
 }
 
 function readLegacyKey(key: string): unknown {

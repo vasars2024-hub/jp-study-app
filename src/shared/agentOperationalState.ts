@@ -47,6 +47,12 @@ import {
   normalizeAgentContextSuggestionPreferences,
   type AgentContextSuggestionPreferences,
 } from './agentContextSuggestions';
+import {
+  emptyAgentOperationHistory,
+  normalizeAgentOperationHistory,
+  pruneAgentOperationHistory,
+  type AgentOperationHistory,
+} from './agentOperationHistory';
 
 export const AGENT_OPERATIONAL_SCHEMA_VERSION = 1;
 
@@ -57,6 +63,17 @@ export interface AgentOperationalState {
   automations: AgentAutomation[];
   /** Main-owned, cross-window preferences for inert context suggestion chips. */
   suggestions?: AgentContextSuggestionPreferences;
+  /**
+   * The durable record of completed Agent effects — see `agentOperationHistory.ts`
+   * for why the session log stays session-only while this does not.
+   *
+   * A fifth section here rather than a fifth store, and optional for the same
+   * reason `suggestions` is: an additive field costs nothing at the schema
+   * version, while a new document would need its own channel, preload binding
+   * and window typing to answer a question this file's reader already asks. It
+   * has its own retention rule, which is the one thing a section genuinely owes.
+   */
+  history?: AgentOperationHistory;
   /**
    * When the one-way `localStorage` adoption ran, or `null` if it never has.
    *
@@ -71,8 +88,9 @@ export interface AgentOperationalState {
 }
 
 /**
- * Terminal queue rows are evidence, not work, and they are the only section that
- * grows without a user asking for it. They are pruned by age so a long-running
+ * Terminal queue rows are evidence, not work, and they grow without a user
+ * asking for it — as does `history`, which carries its own window in
+ * `agentOperationHistory.ts`. They are pruned by age so a long-running
  * profile does not carry a year of completed rows across every restart, and so
  * the 100-item cap in `normalizeAgentTaskQueue` stops being reached by history
  * alone — which would silently evict *live* queued work.
@@ -90,6 +108,7 @@ export function emptyAgentOperationalState(): AgentOperationalState {
     suggestions: normalizeAgentContextSuggestionPreferences(
       DEFAULT_AGENT_CONTEXT_SUGGESTION_PREFERENCES,
     ),
+    history: emptyAgentOperationHistory(),
     legacyMigratedAt: null,
   };
 }
@@ -113,8 +132,18 @@ export function pruneAgentOperationalState(
   const items = state.queue.items.filter((item) => (
     !TERMINAL_STATUSES.has(item.status) || item.updatedAt >= cutoff
   ));
-  if (items.length === state.queue.items.length) return state;
-  return { ...state, queue: { version: 1, items } };
+  const history = pruneAgentOperationHistory(
+    state.history ?? emptyAgentOperationHistory(),
+    now,
+  );
+  const queueChanged = items.length !== state.queue.items.length;
+  const historyChanged = history !== state.history;
+  if (!queueChanged && !historyChanged) return state;
+  return {
+    ...state,
+    ...(queueChanged ? { queue: { version: 1 as const, items } } : {}),
+    ...(historyChanged ? { history } : {}),
+  };
 }
 
 /**
@@ -137,6 +166,7 @@ export function normalizeAgentOperationalState(input: unknown): AgentOperational
     memory: normalizeAgentMemory(raw.memory),
     automations: normalizeAgentAutomations(raw.automations),
     suggestions: normalizeAgentContextSuggestionPreferences(raw.suggestions),
+    history: normalizeAgentOperationHistory(raw.history),
     legacyMigratedAt: finiteTimestamp(raw.legacyMigratedAt),
   };
 }

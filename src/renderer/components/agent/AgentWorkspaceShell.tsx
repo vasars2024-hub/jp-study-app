@@ -137,6 +137,8 @@ import {
   type AgentOperationDraft,
   type AgentOperationLog,
 } from '../../../shared/agentOperationLog';
+import { agentOperationHistoryEntryFrom } from '../../../shared/agentOperationHistory';
+import { appendAgentOperationHistorySnapshot } from '../../agentOperationalClient';
 import {
   AGENT_UNDO_IDLE,
   agentOperationWasUndone,
@@ -1392,6 +1394,37 @@ export default function AgentWorkspaceShell() {
   const appendOperation = useCallback((operation: AgentOperationDraft): void => {
     setOperationLog((previous) => agentOperationLogAppend(previous, operation, Date.now()));
   }, []);
+
+  /**
+   * Ids this window has already handed to the durable history.
+   *
+   * The projection below runs over the whole log rather than the newest entry,
+   * because a state updater is not where a side effect belongs and the effect
+   * therefore sees a log, not a delta. Without this ref that costs a full
+   * history scan per retained entry on every append; with it, an already-durable
+   * entry is skipped before the module is called at all.
+   *
+   * It is a fast path and not the correctness guarantee — that stays in
+   * `agentOperationHistoryAppend`, which is idempotent on the entry id and so
+   * still holds for a remount (the ref resets) and for a second window (the ref
+   * never saw the other window's entries).
+   */
+  const durableOperationIds = useRef<Set<string>>(new Set());
+
+  /**
+   * The durable record of what the Agent changed, projected out of the
+   * session log — see `agentOperationHistory.ts` for why the two are separate
+   * documents rather than one persisted log. Oldest first, so the stored order
+   * matches the order the operations actually ran in.
+   */
+  useEffect(() => {
+    for (let index = operationLog.entries.length - 1; index >= 0; index -= 1) {
+      const operation = operationLog.entries[index];
+      if (durableOperationIds.current.has(operation.id)) continue;
+      durableOperationIds.current.add(operation.id);
+      appendAgentOperationHistorySnapshot(agentOperationHistoryEntryFrom(operation));
+    }
+  }, [operationLog]);
 
   /**
    * The pipeline terminal's lines. Recomputed when the operation log changes,

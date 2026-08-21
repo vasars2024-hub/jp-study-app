@@ -21,8 +21,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   AGENT_AUTOMATIONS_CHANGED_EVENT,
+  AGENT_HISTORY_CHANGED_EVENT,
   AGENT_MEMORY_CHANGED_EVENT,
   AGENT_QUEUE_CHANGED_EVENT,
+  appendAgentOperationHistorySnapshot,
+  clearAgentOperationHistorySnapshot,
+  getAgentOperationHistorySnapshot,
   LEGACY_AGENT_AUTOMATIONS_KEY,
   LEGACY_AGENT_MEMORY_KEY,
   LEGACY_AGENT_QUEUE_KEY,
@@ -548,5 +552,124 @@ describe('change events', () => {
     // An unknown schema normalizes to empty; the client must not adopt that over
     // a document it already holds.
     expect(loadLocalAgentAutomations().map((entry) => entry.id)).toEqual(['a1']);
+  });
+});
+
+/**
+ * The durable operation history is the one section with no legacy
+ * `localStorage` ancestor, so it is also the only one whose reader, writer and
+ * change event all arrive at once. What matters here is that it behaves like
+ * every other section rather than like a second store: same snapshot, same
+ * single-flight save, same section-scoped event.
+ */
+describe('durable operation history', () => {
+  const historyEntry = (id: string, at = NOW) => ({
+    id,
+    operation: 'flashcard.create-deck' as const,
+    claim: 'created' as const,
+    entityType: 'deck',
+    entityIds: [`deck-${id}`],
+    at,
+  });
+
+  it('is visible to the very next synchronous read', async () => {
+    installBridge();
+    await initAgentOperationalState();
+
+    appendAgentOperationHistorySnapshot(historyEntry('call-1|0'));
+
+    expect(getAgentOperationHistorySnapshot().entries.map((row) => row.id)).toEqual(['call-1|0']);
+  });
+
+  // The producer projects a whole log in one synchronous pass, so a burst is the
+  // ordinary case here rather than a stress case. What must hold is that the
+  // last save carries every row — a save decided by which invoke resolved last
+  // would silently drop the earlier operations from the record.
+  it('ends a burst of appends on a save carrying every row, newest first', async () => {
+    const bridge = installBridge();
+    await initAgentOperationalState();
+
+    appendAgentOperationHistorySnapshot(historyEntry('call-1|0', NOW));
+    appendAgentOperationHistorySnapshot(historyEntry('call-1|1', NOW + 1));
+    await flushAgentOperationalState();
+
+    const saved = bridge.saves.at(-1) as { history: { entries: { id: string }[] } };
+    expect(saved.history.entries.map((row) => row.id)).toEqual(['call-1|1', 'call-1|0']);
+    const stored = bridge.stored as unknown as { history: { entries: { id: string }[] } };
+    expect(stored.history.entries.map((row) => row.id)).toEqual(['call-1|1', 'call-1|0']);
+  });
+
+  // The producer re-offers the same completed step by construction, so a
+  // re-append must cost nothing at all — not a save, and not an event.
+  it('neither saves nor announces a repeated id', async () => {
+    const bridge = installBridge();
+    await initAgentOperationalState();
+    appendAgentOperationHistorySnapshot(historyEntry('call-1|0'));
+    await flushAgentOperationalState();
+
+    const seen: unknown[] = [];
+    const listener = () => seen.push('history');
+    window.addEventListener(AGENT_HISTORY_CHANGED_EVENT, listener);
+    appendAgentOperationHistorySnapshot(historyEntry('call-1|0'));
+    await flushAgentOperationalState();
+    window.removeEventListener(AGENT_HISTORY_CHANGED_EVENT, listener);
+
+    expect(seen).toEqual([]);
+    expect(bridge.saves).toHaveLength(1);
+  });
+
+  it('announces the history without waking the other sections', async () => {
+    installBridge();
+    await initAgentOperationalState();
+
+    const seen: string[] = [];
+    const listener = () => seen.push('history');
+    window.addEventListener(AGENT_HISTORY_CHANGED_EVENT, listener);
+    onLocalAgentTaskQueueChanged(() => seen.push('queue'));
+    onLocalAgentMemoryChanged(() => seen.push('memory'));
+
+    appendAgentOperationHistorySnapshot(historyEntry('call-1|0'));
+    window.removeEventListener(AGENT_HISTORY_CHANGED_EVENT, listener);
+
+    expect(seen).toEqual(['history']);
+  });
+
+  it('clears exactly, and the deletion reaches main', async () => {
+    const bridge = installBridge();
+    await initAgentOperationalState();
+    appendAgentOperationHistorySnapshot(historyEntry('call-1|0'));
+    await flushAgentOperationalState();
+
+    expect(clearAgentOperationHistorySnapshot().entries).toEqual([]);
+    await flushAgentOperationalState();
+
+    const saved = bridge.saves.at(-1) as { history: { entries: unknown[] } };
+    expect(saved.history.entries).toEqual([]);
+  });
+
+  it('adopts a history pushed by another window', async () => {
+    const bridge = installBridge();
+    await initAgentOperationalState();
+
+    const seen: string[] = [];
+    const listener = () => seen.push('history');
+    window.addEventListener(AGENT_HISTORY_CHANGED_EVENT, listener);
+    bridge.push?.({
+      ...emptyDocument(),
+      history: { version: 1, entries: [historyEntry('from-other-window')] },
+    });
+    window.removeEventListener(AGENT_HISTORY_CHANGED_EVENT, listener);
+
+    expect(getAgentOperationHistorySnapshot().entries.map((row) => row.id))
+      .toEqual(['from-other-window']);
+    expect(seen).toEqual(['history']);
+  });
+
+  it('reads a stored document that predates the section as an empty history', async () => {
+    const bridge = installBridge();
+    bridge.stored = emptyDocument();
+    await initAgentOperationalState();
+
+    expect(getAgentOperationHistorySnapshot()).toEqual({ version: 1, entries: [] });
   });
 });
