@@ -17,7 +17,10 @@ import path from 'node:path';
 import {
   READING_LENS_HISTORY_LIMIT,
   READING_LENS_HISTORY_VERSION,
+  READING_LENS_RETENTION_DEFAULT,
   normalizeReadingLensHistory,
+  normalizeReadingLensRetentionDays,
+  pruneReadingLensHistory,
   readingLensHistoryEntryOf,
   recordReadingLensHistory,
   removeReadingLensHistoryEntry,
@@ -25,6 +28,7 @@ import {
   setReadingLensHistoryPinned,
   type ReadingLensHistoryEntry,
   type ReadingLensHistoryQuery,
+  type ReadingLensRetentionDays,
 } from '../shared/readingLensHistory';
 import { normalizeReadingLensCapture } from '../shared/readingLens';
 
@@ -36,19 +40,43 @@ const HISTORY_FILE = 'reading-lens-history.json';
  */
 let entries: ReadingLensHistoryEntry[] | null = null;
 
+/**
+ * The retention window, stored beside the entries it governs.
+ *
+ * It lives in this file rather than in `reading-lens.json` because it is a
+ * property of the store, not of the hotkey/region settings — a user who deletes
+ * the history file to start over should get the default window back with it,
+ * and nothing in the capture path should have to remember to pass a policy in.
+ */
+let retentionDays: ReadingLensRetentionDays = READING_LENS_RETENTION_DEFAULT;
+
 function historyPath(): string {
   return path.join(app.getPath('userData'), HISTORY_FILE);
 }
 
 function load(): ReadingLensHistoryEntry[] {
   if (entries) return entries;
+  let loaded: ReadingLensHistoryEntry[];
   try {
-    entries = normalizeReadingLensHistory(JSON.parse(fs.readFileSync(historyPath(), 'utf8')));
+    const parsed: unknown = JSON.parse(fs.readFileSync(historyPath(), 'utf8'));
+    loaded = normalizeReadingLensHistory(parsed);
+    retentionDays = normalizeReadingLensRetentionDays(
+      parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>).retentionDays
+        : undefined,
+    );
   } catch {
     // No file yet, or a corrupt one: an empty history is the correct degraded
     // state — this feature must never block a capture from being read.
-    entries = [];
+    loaded = [];
+    retentionDays = READING_LENS_RETENTION_DEFAULT;
   }
+  // Pruned on load, not only on the next capture: a window that has expired
+  // while the app was closed must be honoured by the time anything can read the
+  // history, or "keep for 7 days" would silently mean "until you next scan".
+  const pruned = pruneReadingLensHistory(loaded, retentionDays);
+  entries = pruned;
+  if (pruned !== loaded) persist();
   return entries;
 }
 
@@ -56,7 +84,11 @@ function persist(): void {
   try {
     fs.writeFileSync(
       historyPath(),
-      JSON.stringify({ schemaVersion: READING_LENS_HISTORY_VERSION, entries: entries ?? [] }, null, 2),
+      JSON.stringify(
+        { schemaVersion: READING_LENS_HISTORY_VERSION, retentionDays, entries: entries ?? [] },
+        null,
+        2,
+      ),
       'utf8',
     );
   } catch (err) {
@@ -75,9 +107,36 @@ export function recordCapture(value: unknown): ReadingLensHistoryEntry | null {
   const entry = readingLensHistoryEntryOf(capture);
   if (!entry) return null;
 
-  entries = recordReadingLensHistory(load(), entry, READING_LENS_HISTORY_LIMIT);
+  entries = pruneReadingLensHistory(
+    recordReadingLensHistory(load(), entry, READING_LENS_HISTORY_LIMIT),
+    retentionDays,
+  );
   persist();
   return entries[0] ?? null;
+}
+
+/** The current retention window in days; `0` means the rolling limit only. */
+export function getRetentionDays(): ReadingLensRetentionDays {
+  load();
+  return retentionDays;
+}
+
+/**
+ * Change the retention window and apply it immediately.
+ *
+ * Applying it now rather than at the next capture is the honest reading of the
+ * control: a user who picks "1 day" is asking for yesterday's captures to be
+ * gone, not for them to linger until something else happens to write the file.
+ * The removed count is returned so the surface can say how many rather than
+ * claiming a number it did not measure.
+ */
+export function setRetentionDays(value: unknown): { retentionDays: ReadingLensRetentionDays; removed: number } {
+  const before = load();
+  retentionDays = normalizeReadingLensRetentionDays(value);
+  const after = pruneReadingLensHistory(before, retentionDays);
+  entries = after;
+  persist();
+  return { retentionDays, removed: before.length - after.length };
 }
 
 /** Search the persisted history. An absent/garbage query returns everything. */
@@ -127,4 +186,5 @@ export function clearCaptures(): void {
 /** Test seam: drop the in-memory copy so the next call re-reads from disk. */
 export function resetReadingLensHistoryCache(): void {
   entries = null;
+  retentionDays = READING_LENS_RETENTION_DEFAULT;
 }

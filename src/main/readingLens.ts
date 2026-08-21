@@ -30,12 +30,17 @@ import path from 'node:path';
 import { ocrRegion, type LensOcrResult, type RegionRect } from './screenOcr';
 import {
   clearCaptures,
+  getRetentionDays,
   listCaptures,
   recordCapture,
   removeCapture,
   setCapturePinned,
+  setRetentionDays,
 } from './readingLensHistory';
-import type { ReadingLensHistoryEntry } from '../shared/readingLensHistory';
+import type {
+  ReadingLensHistoryEntry,
+  ReadingLensRetentionDays,
+} from '../shared/readingLensHistory';
 import type { ReadingLensCapture } from '../shared/readingLens';
 import { createReadingLensClipboardCapture } from './readingLensClipboard';
 import { registerLexiconHandoffIpc } from './lexiconHandoff';
@@ -495,6 +500,15 @@ export function registerReadingLensIpc(): void {
   );
   ipcMain.handle('lens:history:remove', (_e, captureId: unknown): number => removeCapture(captureId));
   ipcMain.handle('lens:history:clear', (): void => clearCaptures());
+  // Retention: the time bound on the store, separate from its size bound. Set
+  // returns what it actually removed rather than only the accepted value, so
+  // the settings surface can report a number it measured.
+  ipcMain.handle('lens:history:getRetention', (): ReadingLensRetentionDays => getRetentionDays());
+  ipcMain.handle(
+    'lens:history:setRetention',
+    (_e, days: unknown): { retentionDays: ReadingLensRetentionDays; removed: number } =>
+      setRetentionDays(days),
+  );
 
   // The lens → Lexicon lookup slot. Registered from here rather than from
   // `main.ts` for the reason `agentImageStaging.ts` records about its own

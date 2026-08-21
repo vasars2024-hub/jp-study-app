@@ -3427,6 +3427,23 @@ export const ru: Catalog = {
     many: 'просмотрен {count} раз',
     other: 'просмотрен {count} раза',
   },
+  'settings.lens.history.retention.label': 'Хранить захваты',
+  'settings.lens.history.retention.off': 'До предела в 200 захватов',
+  'settings.lens.history.retention.days': {
+    one: '{count} день',
+    few: '{count} дня',
+    many: '{count} дней',
+    other: '{count} дня',
+  },
+  'settings.lens.history.retention.removed': {
+    one: 'Удалён {count} устаревший захват.',
+    few: 'Удалено {count} устаревших захвата.',
+    many: 'Удалено {count} устаревших захватов.',
+    other: 'Удалено {count} устаревших захвата.',
+  },
+  'settings.lens.history.retention.none': 'Удалять было нечего.',
+  'settings.lens.history.retention.hint':
+    'Захваты старше этого срока удаляются с устройства, в том числе при следующем запуске приложения. Закреплённые захваты сохраняются всегда.',
   'settings.lens.history.hint':
     'На устройстве хранится до 200 захватов — закреплённые остаются, пока вы их не открепите; только текст и источник, никогда снимок экрана.',
   'settings.lens.history.source.screen': 'Экран',

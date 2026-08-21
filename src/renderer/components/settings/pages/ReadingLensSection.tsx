@@ -3,7 +3,12 @@ import { useT } from '../../../i18n';
 import { LANG_TAGS } from '../../../../shared/i18n/core';
 import type { ReadingLensStatus } from '../../../../main/readingLens';
 import type { ReadingLensSource } from '../../../../shared/readingLens';
-import type { ReadingLensHistoryEntry } from '../../../../shared/readingLensHistory';
+import {
+  READING_LENS_RETENTION_CHOICES,
+  READING_LENS_RETENTION_DEFAULT,
+  type ReadingLensHistoryEntry,
+  type ReadingLensRetentionDays,
+} from '../../../../shared/readingLensHistory';
 
 const DEFAULT_STATUS: ReadingLensStatus = {
   enabled: false,
@@ -57,6 +62,9 @@ function LensCaptureHistory() {
   const [source, setSource] = useState<ReadingLensSource | 'all'>('all');
   const [pinnedOnly, setPinnedOnly] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [retention, setRetention] = useState<ReadingLensRetentionDays>(READING_LENS_RETENTION_DEFAULT);
+  /** What the last retention change actually deleted; null until one is made. */
+  const [retentionRemoved, setRetentionRemoved] = useState<number | null>(null);
 
   /** True whenever the list shown is narrower than the whole history. */
   const filtered = Boolean(query) || source !== 'all' || pinnedOnly;
@@ -98,6 +106,34 @@ function LensCaptureHistory() {
   const setPinned = useCallback(
     async (captureId: string, pinned: boolean) => {
       await window.api.lensHistoryPin(captureId, pinned);
+      await refresh(query, source, pinnedOnly);
+    },
+    [query, source, pinnedOnly, refresh],
+  );
+
+  // Read once on mount; main is the authority, and the value is only changed
+  // from here, so there is nothing to subscribe to.
+  useEffect(() => {
+    let alive = true;
+    window.api
+      .lensHistoryGetRetention()
+      .then((days) => {
+        if (alive) setRetention(days);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const changeRetention = useCallback(
+    async (days: number) => {
+      // The count comes back from main, which did the deleting. Reporting the
+      // renderer's own before/after would be a guess: the list on screen is a
+      // filtered page of 50, not the store.
+      const res = await window.api.lensHistorySetRetention(days);
+      setRetention(res.retentionDays);
+      setRetentionRemoved(res.removed);
       await refresh(query, source, pinnedOnly);
     },
     [query, source, pinnedOnly, refresh],
@@ -157,6 +193,32 @@ function LensCaptureHistory() {
           {t('settings.lens.history.filter.pinnedOnly')}
         </button>
       </div>
+
+      <div className="os-viz-row" style={{ alignItems: 'center', gap: 8, marginTop: 6 }}>
+        <span className="muted">{t('settings.lens.history.retention.label')}</span>
+        <select
+          className="os-input"
+          value={retention}
+          onChange={(e) => void changeRetention(Number(e.target.value))}
+          aria-label={t('settings.lens.history.retention.label')}
+        >
+          {READING_LENS_RETENTION_CHOICES.map((days) => (
+            <option key={days} value={days}>
+              {days === 0
+                ? t('settings.lens.history.retention.off')
+                : t('settings.lens.history.retention.days', { count: days })}
+            </option>
+          ))}
+        </select>
+      </div>
+      {retentionRemoved !== null && (
+        <p className="muted os-set-hint">
+          {retentionRemoved > 0
+            ? t('settings.lens.history.retention.removed', { count: retentionRemoved })
+            : t('settings.lens.history.retention.none')}
+        </p>
+      )}
+      <p className="muted os-set-hint">{t('settings.lens.history.retention.hint')}</p>
 
       {loaded && !entries.length && (
         <p className="muted os-set-hint">

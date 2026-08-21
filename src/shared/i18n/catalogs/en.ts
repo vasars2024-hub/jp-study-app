@@ -3375,6 +3375,19 @@ export const en: Catalog = {
     one: 'seen {count} time',
     other: 'seen {count} times',
   },
+  'settings.lens.history.retention.label': 'Keep captures for',
+  'settings.lens.history.retention.off': 'Until the 200-capture limit',
+  'settings.lens.history.retention.days': {
+    one: '{count} day',
+    other: '{count} days',
+  },
+  'settings.lens.history.retention.removed': {
+    one: 'Removed {count} capture older than that.',
+    other: 'Removed {count} captures older than that.',
+  },
+  'settings.lens.history.retention.none': 'Nothing was old enough to remove.',
+  'settings.lens.history.retention.hint':
+    'Captures older than this are deleted from this device, including when the app next starts. Pinned captures are always kept.',
   'settings.lens.history.hint':
     'Up to 200 captures are kept on this device — pinned captures stay until you unpin them; text and source are kept, never the screenshot.',
   'settings.lens.history.source.screen': 'Screen',

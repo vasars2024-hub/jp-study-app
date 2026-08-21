@@ -3195,6 +3195,13 @@ export const ja: Catalog = {
   'settings.lens.history.empty': 'まだキャプチャはありません。レンズで読んだテキストがここに保存されます。',
   'settings.lens.history.noMatches': '検索に一致するキャプチャはありません。',
   'settings.lens.history.seen': '{count} 回表示',
+  'settings.lens.history.retention.label': 'キャプチャの保存期間',
+  'settings.lens.history.retention.off': '200 件の上限まで',
+  'settings.lens.history.retention.days': '{count} 日間',
+  'settings.lens.history.retention.removed': '期限を過ぎたキャプチャを {count} 件削除しました。',
+  'settings.lens.history.retention.none': '削除対象のキャプチャはありませんでした。',
+  'settings.lens.history.retention.hint':
+    'この期間より古いキャプチャは、次回の起動時を含めてこの端末から削除されます。ピン留めしたキャプチャは常に保持されます。',
   'settings.lens.history.hint':
     '最大 200 件のキャプチャをこの端末に保存します — ピン留めしたキャプチャは解除するまで残り、テキストと取得元のみでスクリーンショットは保存しません。',
   'settings.lens.history.source.screen': '画面',

@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { normalizeReadingLensCapture } from '../readingLens';
 import {
   READING_LENS_HISTORY_LIMIT,
+  READING_LENS_RETENTION_CHOICES,
+  READING_LENS_RETENTION_DEFAULT,
   normalizeReadingLensHistory,
+  normalizeReadingLensRetentionDays,
+  pruneReadingLensHistory,
   readingLensHistoryEntryOf,
   recordReadingLensHistory,
   removeReadingLensHistoryEntry,
@@ -343,5 +347,75 @@ describe('Reading Lens history — remove', () => {
 
     expect(removeReadingLensHistoryEntry(before, 'missing')).toBe(before);
     expect(removeReadingLensHistoryEntry(before, '')).toBe(before);
+  });
+});
+
+describe('Reading Lens history — retention', () => {
+  const NOW = 1_700_000_000_000;
+  const daysAgo = (n: number) => NOW - n * 86_400_000;
+
+  it('drops unpinned entries older than the window and keeps the rest', () => {
+    const list = pruneReadingLensHistory(
+      [
+        entry({ captureId: 'fresh', hash: 'h1', capturedAt: daysAgo(1) }),
+        entry({ captureId: 'stale', hash: 'h2', capturedAt: daysAgo(30) }),
+      ],
+      7,
+      NOW,
+    );
+
+    expect(list.map((item) => item.captureId)).toEqual(['fresh']);
+  });
+
+  it('exempts pinned entries at every window — pinning is the user saying "keep this one"', () => {
+    const list = pruneReadingLensHistory(
+      [
+        entry({ captureId: 'pinned-ancient', hash: 'h1', capturedAt: daysAgo(400), pinned: true }),
+        entry({ captureId: 'plain-ancient', hash: 'h2', capturedAt: daysAgo(400) }),
+      ],
+      1,
+      NOW,
+    );
+
+    expect(list.map((item) => item.captureId)).toEqual(['pinned-ancient']);
+  });
+
+  it('keeps an entry sitting exactly on the cutoff — the window is inclusive', () => {
+    const list = pruneReadingLensHistory(
+      [entry({ captureId: 'edge', hash: 'h1', capturedAt: daysAgo(7) })],
+      7,
+      NOW,
+    );
+
+    expect(list.map((item) => item.captureId)).toEqual(['edge']);
+  });
+
+  it('prunes nothing at 0, which is the default and today’s behaviour', () => {
+    const before = [entry({ captureId: 'ancient', hash: 'h1', capturedAt: daysAgo(9_000) })];
+
+    // Identity, not just equality: `0` must not cost a rewrite of the file.
+    expect(pruneReadingLensHistory(before, 0, NOW)).toBe(before);
+  });
+
+  it('returns the same reference when nothing was old enough, so a load can skip its write', () => {
+    const before = [entry({ captureId: 'fresh', hash: 'h1', capturedAt: daysAgo(1) })];
+
+    expect(pruneReadingLensHistory(before, 7, NOW)).toBe(before);
+  });
+
+  it('normalizes an unrecognised window to the default rather than the nearest choice', () => {
+    // The file is user-writable JSON. Rounding a typo’d `3` down to `1` would
+    // delete two days the user never agreed to lose, so an unknown value means
+    // "do not prune" rather than "prune as much as the closest option would".
+    expect(normalizeReadingLensRetentionDays(3)).toBe(READING_LENS_RETENTION_DEFAULT);
+    expect(normalizeReadingLensRetentionDays('7')).toBe(READING_LENS_RETENTION_DEFAULT);
+    expect(normalizeReadingLensRetentionDays(-1)).toBe(READING_LENS_RETENTION_DEFAULT);
+    expect(normalizeReadingLensRetentionDays(undefined)).toBe(READING_LENS_RETENTION_DEFAULT);
+  });
+
+  it('passes every offered choice through untouched', () => {
+    for (const days of READING_LENS_RETENTION_CHOICES) {
+      expect(normalizeReadingLensRetentionDays(days)).toBe(days);
+    }
   });
 });

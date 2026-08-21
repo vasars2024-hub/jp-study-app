@@ -3182,6 +3182,13 @@ export const zh: Catalog = {
   'settings.lens.history.empty': '还没有任何记录。用取词镜读过的文本会保存在这里。',
   'settings.lens.history.noMatches': '没有匹配该搜索的记录。',
   'settings.lens.history.seen': '已查看 {count} 次',
+  'settings.lens.history.retention.label': '记录保留时长',
+  'settings.lens.history.retention.off': '直到达到 200 条上限',
+  'settings.lens.history.retention.days': '{count} 天',
+  'settings.lens.history.retention.removed': '已删除 {count} 条超期记录。',
+  'settings.lens.history.retention.none': '没有需要删除的记录。',
+  'settings.lens.history.retention.hint':
+    '超过此时长的记录会从本设备删除，包括应用下次启动时。置顶记录始终保留。',
   'settings.lens.history.hint':
     '本设备最多保留 200 条记录——置顶记录会一直保留到取消置顶；只包含文本和来源，绝不保存屏幕截图。',
   'settings.lens.history.source.screen': '屏幕',

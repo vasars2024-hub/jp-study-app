@@ -31,6 +31,30 @@ export const READING_LENS_HISTORY_VERSION = 1 as const;
  */
 export const READING_LENS_HISTORY_LIMIT = 200;
 
+/**
+ * How long a capture may sit on disk, in days.
+ *
+ * The rolling limit above is a *size* bound, not a *time* bound, and the two
+ * answer different questions. 200 entries is a few days for someone reading a
+ * VN nightly and half a year for someone who scans a word a week — so the limit
+ * alone cannot promise anyone that what they read is gone by Friday. Retention
+ * is the time half, and it is the control a user actually reaches for.
+ *
+ * `0` means "no age bound": the rolling limit is the only thing that evicts,
+ * which is exactly today's behaviour. It is the default deliberately — turning
+ * a real bound on at upgrade would delete history the user never agreed to lose,
+ * and a privacy feature whose first act is silent deletion is not one. Pinned
+ * entries are exempt at every setting, for the same reason they are exempt from
+ * the rolling limit: pinning is the user saying "keep this one".
+ */
+export const READING_LENS_RETENTION_CHOICES = [0, 1, 7, 30, 90] as const;
+
+export type ReadingLensRetentionDays = (typeof READING_LENS_RETENTION_CHOICES)[number];
+
+export const READING_LENS_RETENTION_DEFAULT: ReadingLensRetentionDays = 0;
+
+const DAY_MS = 86_400_000;
+
 /** Longest text kept per entry; the full passage is available while reading. */
 const MAX_ENTRY_TEXT = 2_000;
 const MAX_LABEL = 240;
@@ -175,6 +199,43 @@ function trimReadingLensHistory(
     .slice(0, cap - pinned.length);
   const keepIds = new Set(keepUnpinned.map((entry) => entry.captureId));
   return entries.filter((entry) => entry.pinned || keepIds.has(entry.captureId));
+}
+
+/**
+ * Validate a retention setting read off disk or across IPC.
+ *
+ * Anything that is not one of the offered choices becomes the default rather
+ * than being clamped to the nearest one: the file is user-writable JSON, and
+ * silently rounding a typo'd `3` down to `1` would delete two days of history
+ * the user did not ask to lose. An unrecognised value means "we do not know
+ * what was intended", and the safe reading of that is "do not prune".
+ */
+export function normalizeReadingLensRetentionDays(value: unknown): ReadingLensRetentionDays {
+  return (READING_LENS_RETENTION_CHOICES as readonly number[]).includes(value as number)
+    ? (value as ReadingLensRetentionDays)
+    : READING_LENS_RETENTION_DEFAULT;
+}
+
+/**
+ * Drop unpinned entries older than the retention window.
+ *
+ * Returns the same array reference when nothing was old enough to drop, so a
+ * caller can use identity to decide whether the file needs rewriting — the
+ * common case is a load that prunes nothing, and that must not cost a write.
+ *
+ * The comparison is `capturedAt`, which a repeat sighting refreshes. That is
+ * intentional: a line re-read today is a thing the user is still reading, and
+ * expiring it on the date it was *first* seen would delete the entry mid-session.
+ */
+export function pruneReadingLensHistory(
+  entries: readonly ReadingLensHistoryEntry[],
+  retentionDays: ReadingLensRetentionDays,
+  now = Date.now(),
+): ReadingLensHistoryEntry[] {
+  if (!retentionDays) return entries as ReadingLensHistoryEntry[];
+  const cutoff = now - retentionDays * DAY_MS;
+  const next = entries.filter((entry) => entry.pinned || entry.capturedAt >= cutoff);
+  return next.length === entries.length ? (entries as ReadingLensHistoryEntry[]) : next;
 }
 
 /**

@@ -1531,6 +1531,13 @@ declare global {
       ): Promise<import('../shared/readingLensHistory').ReadingLensHistoryEntry | null>;
       lensHistoryRemove(captureId: string): Promise<number>;
       lensHistoryClear(): Promise<void>;
+      lensHistoryGetRetention(): Promise<
+        import('../shared/readingLensHistory').ReadingLensRetentionDays
+      >;
+      lensHistorySetRetention(days: number): Promise<{
+        retentionDays: import('../shared/readingLensHistory').ReadingLensRetentionDays;
+        removed: number;
+      }>;
       lexiconHandoffStage(
         request: import('../shared/lexiconHandoff').LexiconHandoffRequest,
       ): Promise<import('../shared/lexiconHandoff').LexiconHandoffStageResult>;

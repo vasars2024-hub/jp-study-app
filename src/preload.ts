@@ -13,6 +13,7 @@ import type { ReadingLensCapture } from './shared/readingLens';
 import type {
   ReadingLensHistoryEntry,
   ReadingLensHistoryQuery,
+  ReadingLensRetentionDays,
 } from './shared/readingLensHistory';
 import {
   LEXICON_HANDOFF_CHANNELS,
@@ -2381,6 +2382,12 @@ const api = {
   lensHistoryRemove: (captureId: string): Promise<number> =>
     ipcRenderer.invoke('lens:history:remove', captureId),
   lensHistoryClear: (): Promise<void> => ipcRenderer.invoke('lens:history:clear'),
+  lensHistoryGetRetention: (): Promise<ReadingLensRetentionDays> =>
+    ipcRenderer.invoke('lens:history:getRetention'),
+  lensHistorySetRetention: (
+    days: number,
+  ): Promise<{ retentionDays: ReadingLensRetentionDays; removed: number }> =>
+    ipcRenderer.invoke('lens:history:setRetention', days),
 
   /**
    * The lens → Lexicon lookup slot (shared/lexiconHandoff.ts). Main holds the
