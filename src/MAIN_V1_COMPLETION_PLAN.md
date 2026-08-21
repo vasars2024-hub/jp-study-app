@@ -895,3 +895,26 @@ to the default rather than to a neighbour, and a byte-identical store restore.
 Track 5 is now **7 finished / 1 partial**; Tracks 1/4/5/6 = **24 finished / 1 partial /
 4 deferred = 29**. The single remaining Track 5 partial is bullet **2** — alternate OCR
 candidates and the mixed-panel line-order model. Counted one bullet line at a time.
+
+### Track 5 bullet 2, first half — alternate OCR candidates (2026-08-21, `b9c4eea7`)
+
+`auto` ran BOTH recognizers whenever `shouldTryMangaOcr` fired and discarded the loser, so
+disagreeing with the pick cost a whole second OCR pass for a read that already existed. The loser
+now rides back as `alternate` (`AutoOcrResult` → `LensOcrResult`) and the Lens's existing
+engine-swap button spends it instead of re-scanning — same control, dotted underline, tooltip
+saying "already read, no re-scan". The swap parks the outgoing read as the new alternate, so it is
+its own undo, and re-records history under the same hash, which replaces the row rather than
+adding a second for the same pixels.
+
+Live, after a restart: manga fixture page-2 at 212x300 → general read 22 chars of garbage,
+`hasAlt:true altEngine:manga altText:'そうして、'`, box `[0,0,212,300]` in region-relative DIP. Two
+clean single-engine reads returned `hasAlt:false` as the negative control.
+
+The live pass also found and closed a defect in the same commit: the carry guard dropped only
+EMPTY losers, so manga-ocr's `．．．` on a 96 px `猫だ` — 0.0 Japanese, already rejected by
+`pickBetterRead` — was being offered as a one-click swap. The bar is now `mangaReadIsUsable`,
+extracted from `pickBetterRead` so the two cannot drift.
+
+Track 5 stays **7 finished / 1 partial**: bullet 2's remaining half is the mixed-orientation panel
+line-order model (`readingLensLineOrder.ts:113` fails open to provider order deliberately, and its
+header says why). Tracks 1/4/5/6 unchanged at **24 finished / 1 partial / 4 deferred = 29**.

@@ -27157,3 +27157,58 @@ at exactly **11** new `settings.lens.ocr.*` keys.
 
 **Commits:** `3ce6a412` (feature, 14 files), `2006027f` (the dead key).
 **Bullet 8 CLOSES** — all five of its things are in. Track 5's last partial is bullet 2.
+
+## 2026-08-21 backup — Track 5 bullet 2, first half: the losing OCR read stops being thrown away
+
+**RECOVERED, not started.** The previous turn died on a usage limit having landed
+`AutoOcrAlternate` in `ocrAuto.ts` as a **type with no producer and no consumer** — the shape
+architecture-audit fails. Finishing it was this turn's opening work.
+
+**THE GAP.** `ocrAuto.ts:243` ran BOTH recognizers whenever `shouldTryMangaOcr` fired and then
+discarded the loser, so a reader who disagreed with the pick paid for a whole second OCR pass to
+see a read that already existed in memory.
+
+**DECISION 1 — no fourth button.** The engine-swap control already exists (`LensChrome`); it now
+spends the alternate when one matches the target and re-scans otherwise. Same label, dotted
+underline, and the tooltip carries "already read, no re-scan". A separate control would have made
+the free path a different affordance from the paid one, for the same user intent.
+
+**DECISION 2 — swapping parks the outgoing read as the new alternate**, so the control is its own
+undo. History is re-recorded from the incoming capture: `recordReadingLensHistory` matches on
+`hash` and both reads share one, so a swap REPLACES the row instead of adding a second for the
+same pixels. The alternate goes through the same DIP mapping, line-order repair and upscale
+un-scaling as the primary — swapped in wholesale, a read left in crop-pixel space paints
+correctly right up until someone accepts it.
+
+**DEFECT THE LIVE PASS FOUND, fixed in the same commit.** The carry guard first dropped only
+EMPTY losers. Live, a 96 px vertical `猫だ` made the general read escalate (`totalChars < 4`) and
+manga-ocr answered **`．．．`** — non-empty, 0.0 Japanese, and already rejected by `pickBetterRead`.
+A one-click swap onto a read the router called junk is a dead control. The bar is now
+`mangaReadIsUsable`, **extracted from** `pickBetterRead` so the two cannot drift. Deliberately NOT
+in that bar: "much shorter than the other read" — that is a comparison, not a defect, and a short
+real Japanese read is a legitimate thing to switch to.
+
+**LIVE, after two real restarts** (main does not hot-reload; pid 25424 then 27952, port 39273,
+token rotated each time). Numbers, not adjectives:
+- Engines installed: `manga:true web:true webLangs:["ja","zh","ru"]` — the dual path is reachable.
+- **Positive:** manga fixture page-2 rendered at 212x300, general read = 22 chars of garbage
+  (`身日木当にしし王で起山 / 生王中行音式位Fü`), `hasAlt:true altEngine:manga altText:'そうして、'`
+  altLines:1, box `[0,0,212,300]` — region-relative DIP, the region's own size. This is the
+  `manga.length*2 < paddle.length` loser, i.e. exactly the read the guard deliberately keeps.
+- **The defect, before:** same `猫だ` region → `altText:'．．．'`. **After the fix, same region,
+  same pixels:** `engine:web text:'猫だ' hasAlt:false`. Re-measured after the fix, not before.
+- **NEGATIVE CONTROLS:** a clean 11-char read (`猫が窓の外を見ている`) and a clean 3-bubble page
+  read (26 chars) both returned `hasAlt:false` — one engine ran, so nothing is fabricated.
+
+**TESTS — 83 green across 4 files, and MUTATED to prove they bite.** Reverting the alternate's
+upscale un-scaling and forcing the button back to `onRescan` produced **4 failures**; both restored
+and re-run green. The renderer test's instrument is the `lensOcr` CALL COUNT, because a swap that
+looked instant while quietly firing a second IPC passes any text assertion; its negative control is
+the same click on a read with no alternate, which MUST reach `lensOcr` a second time.
+
+**STAGING.** The four catalogs carry other tracks' hunks, so each was staged as HEAD + my one line
+via `hash-object --no-filters` + `update-index`, verified at **1 +, 0 -** each. The other 8 files
+were mine-only (9 hunks in the overlay, all mine). Foreign work re-verified present afterwards.
+
+**Commit:** `b9c4eea7` (12 files). Bullet 2's other half — mixed-orientation panel order — is a
+separate slice; `readingLensLineOrder.ts:113` fails open to provider order deliberately.
