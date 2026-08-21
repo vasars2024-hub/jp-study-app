@@ -29,7 +29,9 @@ import { registerAgentNavigationIpc } from './agentNavigationIpc';
 import { registerAgentWorkspaceIpc } from './agentWorkspaceIpc';
 import { registerAgentOperationalIpc } from './agentOperationalIpc';
 import { getAgentSpendStore } from './agentSpendStore';
+import { broadcastAgentSpend, registerAgentSpendIpc } from './agentSpendIpc';
 import { setAgentSpendGuard } from './providerRuntime';
+import { errorDetail, logDiagnostic } from './errorLog';
 export { getAgentWorkspaceStore } from './agentWorkspaceStore';
 export { runAgentProviderPrompt } from './agentProviderRouter';
 
@@ -297,7 +299,24 @@ export function registerLocalAgentIpc(): void {
   // request main makes, including the ones no renderer asked for. Registering
   // it here means it is in force from the same boot that brings the Agent up,
   // instead of from whenever a window first happens to read it.
-  setAgentSpendGuard(getAgentSpendStore());
+  const spendStore = getAgentSpendStore();
+  setAgentSpendGuard({
+    verdict: (estimatedCostUsd) => spendStore.verdict(estimatedCostUsd),
+    record: (providerId, costUsd) => {
+      // The response has already arrived and the user has already been charged
+      // by the provider. An unwritable ledger is a bookkeeping loss, and
+      // throwing here would turn it into a failed request — discarding an
+      // answer that was paid for, to protect a number. Logged, not silent: the
+      // total will under-report until the write succeeds, and that is exactly
+      // the kind of thing this ledger must not hide.
+      try {
+        broadcastAgentSpend(spendStore.record(providerId, costUsd));
+      } catch (error) {
+        logDiagnostic('error', 'agent-spend', 'record', errorDetail(error));
+      }
+    },
+  });
+  registerAgentSpendIpc(() => spendStore);
   // Permission-gated navigation reads the same store the two above own, so it
   // registers beside them rather than from `src/main.ts`. Its window opener is
   // handed over separately, from the pop-out wiring that owns those windows.

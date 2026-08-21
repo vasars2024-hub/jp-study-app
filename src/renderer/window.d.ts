@@ -76,6 +76,10 @@ import type {
 } from '../shared/agentOperationalState';
 import type { AgentOperationalResult } from '../shared/agentOperationalBridge';
 import type {
+  AgentSpendResult,
+  AgentSpendSnapshotPayload,
+} from '../shared/agentSpendBridge';
+import type {
   AgentExecutionLeaseAcquireRequest,
   AgentExecutionLeaseAcquireResult,
   AgentExecutionLeaseCommitRequest,
@@ -1179,6 +1183,10 @@ declare global {
       agentOperationalMigrateLegacy(
         payload: LegacyAgentOperationalPayload,
       ): Promise<AgentOperationalResult>;
+      agentSpendLoad(): Promise<AgentSpendResult>;
+      agentSpendSetBudget(budgetUsd: number | null): Promise<AgentSpendResult>;
+      agentSpendClear(): Promise<AgentSpendResult>;
+      onAgentSpendChanged(cb: (snapshot: AgentSpendSnapshotPayload) => void): () => void;
       onAgentOperationalChanged(cb: (state: AgentOperationalState) => void): () => void;
       agentExecutionLeaseAcquire(
         request: AgentExecutionLeaseAcquireRequest,

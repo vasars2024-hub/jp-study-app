@@ -136,6 +136,10 @@ import type {
 } from './shared/agentOperationalState';
 import type { AgentOperationalResult } from './shared/agentOperationalBridge';
 import type {
+  AgentSpendResult,
+  AgentSpendSnapshotPayload,
+} from './shared/agentSpendBridge';
+import type {
   AgentExecutionLeaseAcquireRequest,
   AgentExecutionLeaseAcquireResult,
   AgentExecutionLeaseCommitRequest,
@@ -1902,6 +1906,20 @@ const api = {
     payload: LegacyAgentOperationalPayload,
   ): Promise<AgentOperationalResult> =>
     ipcRenderer.invoke('agentOperational:migrateLegacy', payload),
+  // The main-owned monthly spend ledger. Note the absence of a `save`: the
+  // renderer sets the ceiling and erases the record, and the totals themselves
+  // are main's alone. `shared/agentSpendBridge.ts` says why.
+  agentSpendLoad: (): Promise<AgentSpendResult> =>
+    ipcRenderer.invoke('agentSpend:load'),
+  agentSpendSetBudget: (budgetUsd: number | null): Promise<AgentSpendResult> =>
+    ipcRenderer.invoke('agentSpend:setBudget', { budgetUsd }),
+  agentSpendClear: (): Promise<AgentSpendResult> =>
+    ipcRenderer.invoke('agentSpend:clear'),
+  onAgentSpendChanged: (cb: (snapshot: AgentSpendSnapshotPayload) => void): (() => void) => {
+    const handler = (_event: unknown, snapshot: AgentSpendSnapshotPayload): void => cb(snapshot);
+    ipcRenderer.on('agentSpend:changed', handler);
+    return () => ipcRenderer.removeListener('agentSpend:changed', handler);
+  },
   onAgentOperationalChanged: (cb: (state: AgentOperationalState) => void): (() => void) => {
     const handler = (_event: unknown, state: AgentOperationalState): void => cb(state);
     ipcRenderer.on('agentOperational:changed', handler);
