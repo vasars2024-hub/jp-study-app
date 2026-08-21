@@ -27070,3 +27070,39 @@ and i18n-check clean at 10,542 keys.
 
 **Bullet 8 remainder:** OCR/model defaults and honest offline/cloud indicators. Privacy/retention
 and keyboard-only use are now closed.
+
+## 2026-08-21 backup — two corrections, one of them mine
+
+**CORRECTION 1 — `epub.askAgent` was never owed.** Three consecutive handoffs listed
+"`epub.askAgent` / `epub.askAgentPassage` are menu-only and dead on the default theme, the same
+defect `f918b5f9` fixed for the lens item" as small, located, still-owed work. Re-derived against
+the tree instead of inherited: **it is already fixed and always was.** `NovelReader.tsx:2938-2960`
+renders both as real toolbar buttons, with a comment giving the same reasoning `f918b5f9` gives —
+and `git log -S` puts them in **`e6403466` (2026-08-08)**, the commit that introduced the feature.
+They are in HEAD, the file is clean. The claim was reasoning by analogy with the lens item, never a
+measurement, and it survived three hops because each one copied the previous closing summary. This
+is the exact failure mode the ladder's item 7 names. Nothing to do; do not re-open it.
+
+**CORRECTION 2 — a defect I shipped four hours earlier in `80e72e51`, caught by the full suite.**
+`b47caa21`. The retention `<select>` is a controlled input and I fed it
+`lensHistoryGetRetention()`'s payload unvalidated. React does not degrade on a non-scalar `value`
+— it throws — so one unexpected payload takes the **entire** Reading Lens settings page down
+instead of falling back to a sane window. Fixed by normalizing on the way in through
+`normalizeReadingLensRetentionDays`, the same function main uses, and treating a non-finite
+`removed` as 0.
+
+**WHAT THE FAILURE LOOKED LIKE, because the next worker will misread it too.**
+`readingLensI18n.test.tsx` reported `ja renders kana/kanji: expected 0 to be greater than 10`.
+That reads like a *translation* regression — a missing catalog entry, a fallback to English. It is
+not. The section rendered **zero characters in all four languages** because it crashed, and the
+only trace of the real cause was one line of React **stderr** above the assertion:
+`Form field values (value, checked, defaultValue, or defaultChecked props) must be strings, not []`.
+Four of the five failures were the per-language render tests; the fifth was the script-switch
+assertion downstream of them. **Read the stderr above a render assertion before believing the
+assertion's own subject.** `[]` was the test stub's catch-all `EMPTY_RESULT`, which is exactly the
+kind of payload the product code must survive — so the stub was right and the product was wrong.
+
+**Targeted tests would not have caught this.** `readingLensHistory.test.ts` is 41/41 green and
+covers the pruning contract thoroughly; the crash is in a component none of it renders. This is
+the standing rule earning itself again: run the full suite once after the last slice, and never
+call a turn done on targeted tests alone.
