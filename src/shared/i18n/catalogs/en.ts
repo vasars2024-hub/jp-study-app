@@ -3179,6 +3179,7 @@ export const en: Catalog = {
   'lens.read.typography': 'Typography',
   'lens.read.move': 'Drag to move this sheet',
   'lens.read.resize': 'Drag to resize this sheet',
+  'lens.read.moveKeyboard': 'Read sheet position — drag this bar, or use the arrow keys; hold Shift to resize',
   'lens.read.smaller': 'Smaller text',
   'lens.read.larger': 'Larger text',
   'lens.read.leading': 'Loose lines',

@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import { useT } from '../../i18n';
 import { alignFurigana, toHiragana } from '../../../shared/furigana';
 import {
@@ -120,6 +128,14 @@ function saveFrame(frame: ReadFrame): void {
     /* private mode */
   }
 }
+
+/** How far one arrow key moves or grows the sheet, in CSS px. */
+const KEY_STEPS: Record<string, [number, number]> = {
+  ArrowLeft: [-24, 0],
+  ArrowRight: [24, 0],
+  ArrowUp: [0, -24],
+  ArrowDown: [0, 24],
+};
 
 function viewportNow(): ReadViewport {
   return { width: window.innerWidth, height: window.innerHeight };
@@ -270,6 +286,30 @@ export default function LensReadPanel({ capture, lines, onLookup, onClose }: Pro
   // A sheet closed mid-drag must not leave its listeners on `window`.
   useEffect(() => () => detachGesture.current?.(), []);
 
+  /**
+   * The keyboard route to the same two gestures.
+   *
+   * Arrows move the sheet, Shift+arrow resizes it from the bottom-right — the
+   * corner the mouse reaches for. Both run through the same clamped model as the
+   * drag, so the keyboard cannot put the sheet anywhere a drag could not, and
+   * each step persists: a reader who nudges it into place and closes Read should
+   * not have to nudge it again.
+   */
+  const onHeadKeyDown = useCallback((event: ReactKeyboardEvent<HTMLElement>) => {
+    const delta = KEY_STEPS[event.key];
+    if (!delta) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const viewport = viewportNow();
+    setFrame((current) => {
+      const next = event.shiftKey
+        ? resizeReadFrame(current, 'se', delta[0], delta[1], viewport)
+        : moveReadFrame(current, delta[0], delta[1], viewport);
+      saveFrame(next);
+      return next;
+    });
+  }, []);
+
   const passage = useMemo(() => buildReadingLensPassage(lines), [lines]);
   const harvest = useMemo(() => harvestReadingLensVocabulary(passage, lines), [passage, lines]);
   const runsByParagraph = useMemo(
@@ -368,6 +408,12 @@ export default function LensReadPanel({ capture, lines, onLookup, onClose }: Pro
       <header
         className="lens-read-head"
         title={t('lens.read.move')}
+        // The bar is the drag handle, so it is also the thing a keyboard has to
+        // be able to reach: a sheet that can only be moved with a mouse is not
+        // movable for anyone using this without one.
+        tabIndex={0}
+        role="group"
+        aria-label={t('lens.read.moveKeyboard')}
         onPointerDown={(event) => {
           // The header carries five typography buttons and the close button.
           // Only the bar itself is the handle; a drag that started on a control
@@ -375,6 +421,7 @@ export default function LensReadPanel({ capture, lines, onLookup, onClose }: Pro
           if ((event.target as HTMLElement).closest('button')) return;
           beginGesture('move', event);
         }}
+        onKeyDown={onHeadKeyDown}
       >
         <span className="lens-read-title">{t('lens.read.title')}</span>
         <span className="lens-read-meta">

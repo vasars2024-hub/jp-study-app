@@ -3011,6 +3011,7 @@ export const ja: Catalog = {
   'lens.read.typography': '文字設定',
   'lens.read.move': 'ドラッグしてこのシートを移動',
   'lens.read.resize': 'ドラッグしてこのシートの大きさを変更',
+  'lens.read.moveKeyboard': 'Read シートの位置 — このバーをドラッグ、または矢印キーで移動。Shift を押しながらでサイズ変更',
   'lens.read.smaller': '文字を小さく',
   'lens.read.larger': '文字を大きく',
   'lens.read.leading': '行間を広く',

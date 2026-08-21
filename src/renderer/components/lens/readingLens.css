@@ -805,6 +805,12 @@
 .lens-read-head button {
   cursor: pointer;
 }
+/* The bar is focusable so the arrow keys can move the sheet; the ring has to be
+   visible or that route is unusable for the people who need it. */
+.lens-read-head:focus-visible {
+  outline: 2px solid var(--lens-accent);
+  outline-offset: -2px;
+}
 
 /* A gesture in flight must not leave the passage selecting text behind the
    sheet as the cursor sweeps across it. */

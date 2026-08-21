@@ -3216,6 +3216,7 @@ export const ru: Catalog = {
   'lens.read.typography': 'Оформление',
   'lens.read.move': 'Перетащите, чтобы переместить панель',
   'lens.read.resize': 'Перетащите, чтобы изменить размер панели',
+  'lens.read.moveKeyboard': 'Положение панели Read — перетащите эту полосу или используйте стрелки; удерживайте Shift для изменения размера',
   'lens.read.smaller': 'Мельче текст',
   'lens.read.larger': 'Крупнее текст',
   'lens.read.leading': 'Шире строки',

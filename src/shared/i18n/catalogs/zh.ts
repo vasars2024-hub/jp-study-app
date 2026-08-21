@@ -3000,6 +3000,7 @@ export const zh: Catalog = {
   'lens.read.typography': '排版',
   'lens.read.move': '拖动以移动此面板',
   'lens.read.resize': '拖动以调整此面板大小',
+  'lens.read.moveKeyboard': 'Read 面板位置 — 拖动此栏，或使用方向键移动；按住 Shift 调整大小',
   'lens.read.smaller': '缩小文字',
   'lens.read.larger': '放大文字',
   'lens.read.leading': '放宽行距',

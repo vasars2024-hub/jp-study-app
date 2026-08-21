@@ -248,6 +248,61 @@ describe('Read sheet — move, resize, remember', () => {
     expect(rect()).toEqual({ x: 132, y: 24, width: 760, height: 720 });
   });
 
+  it('moves and resizes from the keyboard, and remembers each step', async () => {
+    localStorage.setItem(FRAME_KEY, JSON.stringify({ x: 200, y: 100, width: 600, height: 400 }));
+    await render();
+    const bar = headBar() as HTMLElement;
+    expect(bar.tabIndex).toBe(0);
+
+    const key = async (k: string, shift = false) => {
+      await act(async () => {
+        bar.dispatchEvent(new KeyboardEvent('keydown', { key: k, shiftKey: shift, bubbles: true }));
+      });
+    };
+
+    await key('ArrowRight');
+    await key('ArrowDown');
+    expect(rect()).toEqual({ x: 224, y: 124, width: 600, height: 400 });
+
+    await key('ArrowRight', true);
+    expect(rect()).toEqual({ x: 224, y: 124, width: 624, height: 400 });
+
+    // Every step persists — a reader who nudges it into place and closes Read
+    // must not have to nudge it again.
+    expect(JSON.parse(localStorage.getItem(FRAME_KEY) ?? 'null')).toEqual({
+      x: 224,
+      y: 124,
+      width: 624,
+      height: 400,
+    });
+  });
+
+  it('NEGATIVE CONTROL: a key the sheet does not own leaves the frame alone', async () => {
+    localStorage.setItem(FRAME_KEY, JSON.stringify({ x: 200, y: 100, width: 600, height: 400 }));
+    await render();
+    const before = rect();
+
+    await act(async () => {
+      headBar().dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
+    });
+
+    expect(rect()).toEqual(before);
+  });
+
+  it('the keyboard cannot push the sheet anywhere a drag could not', async () => {
+    localStorage.setItem(FRAME_KEY, JSON.stringify({ x: 0, y: 0, width: 600, height: 400 }));
+    await render();
+    const bar = headBar();
+
+    for (let i = 0; i < 10; i += 1) {
+      await act(async () => {
+        bar.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+      });
+    }
+
+    expect(rect().x).toBe(0);
+  });
+
   it('clamps a stored frame that is off-screen on this display back onto it', async () => {
     // What a sheet moved onto the second display (x=1920) and saved looks like
     // when the lens next opens on the primary one.
