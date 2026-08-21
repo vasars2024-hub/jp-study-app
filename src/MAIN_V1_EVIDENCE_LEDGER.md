@@ -27007,3 +27007,66 @@ receipt.
 Bullet 8 remains partial: privacy/retention pruning, OCR/model defaults and the offline/cloud
 indicators are untouched. `readingLensHistory.ts` has the retention store; nothing was checked
 about whether anything prunes it.
+
+## 2026-08-21 backup — Track 5 bullet 8: the capture history gets a time bound
+
+**RECOVERY, not a fresh slice.** The 2026-08-20 20:40 worker died on a usage limit three
+seconds after writing `readingLensHistory.test.ts`. Its handoff said "uncommitted: NONE" and was
+true when written at 20:35 — it then started this slice and died mid-keystroke. Five files were
+stranded ` M` with mtimes 20:37–20:40:03, and the only actual breakage was one syntax error
+(`capturedAt: daysAgo: 0`). Re-derived from the diffs, finished, and landed as `80e72e51`.
+
+**THE GAP.** `READING_LENS_HISTORY_LIMIT` is 200 — a *size* bound. It answers "how much disk"
+and never answers "when is what I read gone": at a line a week, 200 entries is half a year of
+reading sitting in userData. Retention is the time half (1/7/30/90 days, `0` = rolling limit only).
+
+**DECISION, standing auto-approval, with its tradeoff.** The default is `0`, i.e. today's
+behaviour. Turning a real bound on at upgrade would delete history nobody agreed to lose, and a
+privacy feature whose first act is silent deletion is not one — the cost is that the control does
+nothing until a user picks a window, which is the right way round. An unrecognised value on disk
+falls back to the **default**, never the nearest choice: the file is user-writable JSON and
+rounding a typo'd `3` down to `1` would delete two days. Pruning runs on **load**, not only on
+the next capture, or "keep 7 days" would quietly mean "until you next scan".
+
+**LIVE, 6/6, on the real store** (41 entries, 2 pinned, ages 0.163–1010.291 days), through the
+bridge after a real restart, every number from main's own return value or the file main wrote —
+never from the renderer list, which is a filtered page of 50, not the store:
+G1 `getRetention`=0 and load deleted nothing, 41 → 41. G2 `setRetention(7)` reported
+`removed=1`, predicted 1, 41 → 40. G3 the file carries `retentionDays: 7` (was absent).
+G4 **pin exemption on live data** — at a 1-day window the oldest pinned entry is **1010.29 days**
+old and survived, pinned 2 → 2, total 40 → 38. G5 **NEGATIVE CONTROL** `setRetention(3)` →
+`retentionDays=0, removed=0`, 38 → 38; a clamp-to-nearest would have deleted more. G6 round-trip.
+The store was captured before and restored **byte-identical after** (`cmp`, 28,153 bytes, back to
+41 entries / 2 pinned / no `retentionDays`).
+
+**THE CONTROL THAT MATTERED MOST was the pre-restart probe.** Against the app still running from
+before the edit, `lens:history:getRetention` rejected with *"No handler registered"* while the
+**preload binding already existed** — the repo's standing rule, reproduced: a `window.api` method
+is not evidence of a main handler, and main does not hot-reload.
+
+**MUTATION, because a green suite is not coverage.** Five mutations of `pruneReadingLensHistory` /
+`normalizeReadingLensRetentionDays`, each killing exactly one of the 7 new cases: drop the pinned
+exemption, `0` no longer means off, cutoff `>=` → `>`, normalize clamps to 7, identity return
+dropped. 41/41 restored.
+
+**TRAP, and it cost two of those five a re-run.** `readingLensHistory.ts` is **CRLF**. A
+`perl -0pi` pattern containing a bare `\n` matched nothing, the file was left untouched, and the
+suite stayed green — which reads exactly like "the test does not cover this". Both "surviving"
+mutants were non-mutations. Use `\r?\n`, and confirm a mutation applied (`git diff --numstat`)
+before believing a survivor. The same shape is already recorded for anchors; it applies to
+mutation testing too.
+
+**STAGING.** Six of the eleven files (`preload.ts`, `window.d.ts`, the four catalogs) are dirty
+with other tracks. `debug/rt-stage-retention.cjs` rebuilds each as HEAD-blob + only my insert and
+asserts `+N -0` against the lifted block size, so foreign work cannot ride along; it lifts the
+block from the worktree rather than retyping it. Two notes for reuse: `git hash-object` **rejects
+`--path` together with `--no-filters`**, and splitting a blob on one dominant EOL is wrong here —
+`preload.ts` is LF with a stray CRLF, which collapsed the file into a few "lines" and made every
+anchor silently miss. Keep each line's own terminator. Staged catalogs re-counted at exactly 6
+retention keys each (the duplicate-key trap from `2a75e5a9`).
+
+**Commit `80e72e51` verified standing alone** in a detached worktree at that commit: 41/41 tests
+and i18n-check clean at 10,542 keys.
+
+**Bullet 8 remainder:** OCR/model defaults and honest offline/cloud indicators. Privacy/retention
+and keyboard-only use are now closed.

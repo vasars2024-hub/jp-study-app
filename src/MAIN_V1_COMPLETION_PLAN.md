@@ -840,3 +840,30 @@ Independent Media-shell work may run alongside Dictionary/Lexicon after the audi
 - Visually inspect every primary route and every material state at compact and large desktop sizes. Check clipping, overflow, empty canvases, broken covers, density, focus, hierarchy, contrast, typography, and consistency.
 - Use only MCP/debug bridge state plus in-app Browser DOM/Playwright evidence. Record screenshots/selectors and observable state transitions.
 - A feature is not finished until its source contract, automated tests, live behavior, and visual presentation agree.
+
+### Track 5 bullet 8 — privacy/retention closes (2026-08-21, `80e72e51`)
+
+The bullet names five things: privacy/retention, OCR/model defaults, shortcuts, keyboard-only
+use, and honest offline/cloud indicators. **Keyboard-only use** closed at `4e7817ff`; **shortcuts**
+ship with it. **Privacy/retention** closes here.
+
+The capture history had a *size* bound only (`READING_LENS_HISTORY_LIMIT`, 200 entries), which
+cannot promise a user that what they read is gone by a given day. `shared/readingLensHistory.ts`
+now carries a time bound — 1/7/30/90 days, or `0` for the rolling limit alone — pruned on **load**
+as well as on capture, with pinned entries exempt at every window, surfaced in
+`ReadingLensSection.tsx` and reached over `lens:history:{get,set}Retention`.
+
+Two decisions taken under standing auto-approval, both reversible and both recorded in the
+evidence ledger with their tradeoffs: `0` is the **default**, because turning a real bound on at
+upgrade would delete history the user never agreed to lose; and an unrecognised value on disk
+falls back to that default rather than the nearest offered choice, because the file is
+user-writable JSON and rounding a typo'd `3` to `1` would delete two days.
+
+Measured live on the real store (41 entries, 2 pinned, ages 0.163–1010.291 days), 6/6 gates,
+including the pin exemption holding for a **1010-day-old** entry at a 1-day window and a negative
+control in which `setRetention(3)` removes **0** rather than clamping. The store was restored
+byte-identical afterwards.
+
+**Bullet 8 remainder: OCR/model defaults, and honest offline/cloud indicators.** Both live in
+`ReadingLensSection.tsx` and `main/screenOcr.ts`; nothing has yet checked whether the lens
+reports which engine actually ran or whether any of it leaves the device.
