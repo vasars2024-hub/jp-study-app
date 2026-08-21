@@ -26982,3 +26982,28 @@ a pointer id the browser does not consider active, and that throw took the whole
 Tests: 4 (input; 3 fail against the pre-fix guards, the 4th is the click-through control) +
 17 (frame module) + 8 (panel gestures). i18n **10,706** in four languages.
 Track 5 unchanged at **6 finished / 2 partial** — bullets 2 and 8 remain.
+
+## 2026-08-20 backup — Track 5 bullet 8, first leg: the Read sheet is keyboard-reachable
+
+`4e7817ff`. The movable sheet landed above is mouse-only as delivered, and bullet 8 names
+keyboard-only use. The header bar is the drag handle so it is also the keyboard target:
+`tabIndex=0` with a `:focus-visible` ring, arrows move by 24 px, Shift+arrow resizes from the
+south-east corner. Both routes go through the same `clampReadFrame`, so the keyboard cannot
+reach a frame a drag could not, and every step persists.
+
+Live, 2560x1600 lens, one `/eval` per read: `document.activeElement === bar` true, tabIndex 0;
+two ArrowRight → x **900 → 948**; ArrowDown → y **24 → 48**; Shift+ArrowRight → width
+**760 → 784**; saved frame equals the painted rect. Controls: an unowned key changes nothing,
+and ten ArrowLeft against the left edge leave x at **0**.
+
+**TRAP — the catalog staging helper counts lines, and HEAD moves under it.** `rp-stage-multi.cjs`
+takes the block size in lines walked back from an anchor that must exist in HEAD. The two i18n
+keys from `9b1497a2` were already in HEAD by this slice, so re-staging with the same block size
+of 3 silently produced **duplicate `lens.read.move` and `lens.read.resize` entries** — the
+`remainder === HEAD ? true` check still passed, because a duplicate insert is a valid insert.
+Only `git diff --cached` on the path caught it. Read the staged diff, not just the helper's
+receipt.
+
+Bullet 8 remains partial: privacy/retention pruning, OCR/model defaults and the offline/cloud
+indicators are untouched. `readingLensHistory.ts` has the retention store; nothing was checked
+about whether anything prunes it.
