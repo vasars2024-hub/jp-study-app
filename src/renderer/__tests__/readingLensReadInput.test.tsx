@@ -42,7 +42,7 @@ const OCR_RESULT = {
 
 const EMPTY_RESULT = new Proxy({}, { get: () => [] });
 const lensClose = vi.fn(async () => undefined);
-const lensSetInteractive = vi.fn((_on: boolean) => undefined);
+const lensSetInteractive = vi.fn((on: boolean) => void on);
 
 function installApiStub(): void {
   const api: Record<string, unknown> = {
