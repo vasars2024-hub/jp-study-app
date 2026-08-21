@@ -27313,3 +27313,76 @@ delete control, 15 keys in en/ja/zh/ru, registry + guided target + navigation in
 The four catalogs and `settingsRegistry.ts` carry another track's uncommitted work, so what landed
 is HEAD + this insert only, staged as reconstructed blobs; the commit was verified in a detached
 worktree — i18n exit 0 at 10,569 there, 52 tests green — before being trusted.
+
+## 2026-08-21 backup — Track 3: the monthly spending ceiling, and the request it refuses
+
+**RECOVERY.** The 10:34 turn died two seconds after writing `main/agentSpendStore.ts`, leaving a
+staged pure module + 20 tests and an untracked, unimported, untested store. Nothing was discarded;
+both were re-derived and finished into the two commits below.
+
+**THE GAP IT CLOSES.** `AGENT_COST_BUDGET_*` answers "is *this* request too expensive", session-only,
+per request. Nothing answered "is this *month*". Five hundred requests each under the cap added up to
+a bill the app never refused and never counted.
+
+**WHERE THE CHECK LIVES** (standing auto-approval; reversible). In `providerRuntime.ts` beside the
+per-request cap — not in `agentProviderRouter.ts` — for the reason already written above the vision
+check there: *this runtime is reachable from callers other than the router*. Registered as a
+module-level guard at Agent boot rather than passed on `AiProviderRequest`, because a ceiling each
+caller must remember to pass is bypassed by the first one that forgets, silently, which is the only
+failure mode a spending limit has. `null` in unit tests, which is what keeps `providerRuntime` free
+of its first `electron` import; the `AgentSpendGuard` seam lives in shared for the same reason.
+
+**THE TRADEOFF, stated because it is a real cost.** Preflight refuses on the worst case
+(`maxOutputTokens`), matching the existing cap's own convention exactly; recording uses the actual
+reported usage. Worst-case refusal can turn away a request that would in fact have fit near the
+boundary — visible and reversible. Approving on an optimistic guess ends the month above the number
+the user set, which is neither.
+
+**NO `save` ON THE BRIDGE, and that absence is the design.** The operational document is read, edited
+and written back wholesale by the renderer; doing that here would let a window open since Tuesday
+write back a total predating every request since, silently refunding them. The renderer sets the
+ceiling and erases the record; totals are main's alone. The boundary *refuses* a malformed budget
+rather than normalizing it — `normalizeAgentSpendBudget` answers rubbish with `null`, which is right
+for reading a corrupt file and catastrophic for a write, since it would withdraw the user's limit and
+return `ok`. `null` still passes: withdrawing it on purpose is real. Pinned over seven payloads.
+
+**`spend-budget` is its own code**, not `cost-budget`: telling someone their request was too
+expensive when their month is spent sends them to shrink a prompt that was never the problem.
+
+**MUTATION, both halves.** Refusal disabled → **exactly 1** test failed, and the negative control
+(identical request, higher ceiling) correctly still passed. Recording disabled → **exactly 3** failed.
+Cache hits and failed attempts are not charged, each with its own case.
+
+**GATES, shared tree, after the last slice.** vitest **776 files / 10,749 passed, 0 failed**, 6
+skipped — reconciles exactly against the handoff baseline 10,703 + my 46 new cases, 772 + 4 files.
+i18n exit 0 at **10,741** (= 10,740 + exactly my 1). architecture exit 0, "Nothing new", 2,140
+modules, 5 pending. eslint on all 10 touched paths: 0.
+
+**Commits:** `c77fee80` (ledger module, main store, the runtime's teeth, 3 suites), `eef593fc`
+(bridge, IPC, preload, `window.d.ts`, 11 cases). `preload.ts`, `window.d.ts` and the four catalogs
+carry another track's uncommitted work, so what landed is HEAD + my insert only, staged as
+reconstructed blobs and verified in a detached worktree — **46 tests green, i18n exit 0 at 10,570,
+architecture exit 0** there — before being trusted.
+
+**NOT DONE, and it is the next slice: there is still no control a user can reach.** The ceiling can
+only be set over IPC. `AgentWorkspaceShell.tsx` (~line 2467, beside the per-request cap and the
+per-provider rates in `agentProviderPricingStore.ts`) is where it belongs; it needs a renderer client
+over `normalizeAgentSpendResult`, the month's total shown honestly including `unpricedRequests`, the
+clear-record control, and keys in en/ja/zh/ru. **Until then this is enforcement without a dial.**
+
+**LIVE, on the real store (pid 30964), and the negative controls are what make it evidence.** All
+four preload bindings are `function`; `agentSpendSave` is **`undefined`**, which is the deliberate
+absence and the first control. `agentSpendLoad()` returned `ok:true` from the *main* handler with
+`budgetUsd:null`, `entries:[]` and `period:"2026-08"` resolved by main. `setBudget(0.25)` reached
+disk (`agent/spend-v1.json`, 56 B). Then the control that matters: `setBudget('lots')` returned
+**`invalid-request`** and the 0.25 ceiling was **still standing** on reload — the boundary refused
+rubbish instead of normalizing it to `null` and silently withdrawing the user's limit. `clear()`
+emptied the record and **kept** the ceiling. Restored: `budgetUsd` back to `null`, verified by
+reading the file. The file now exists where it did not, holding exactly the empty document that its
+absence already resolved to; no user data changed.
+
+**TRAP, cost ~8 min.** The app came up a **husk** on the first two launches — `/health` says
+`ok:true`, window `visible` and `focused`, but `url` is **empty** and `eval 1+1` stalls past 20 s
+(husk shape 3, `electron-husk-restart`). A third restart cleared it. Also: `/eval` takes **ONE
+expression** — a multi-statement `js` body returns "Script failed to execute", which reads like the
+app is broken and is not. Wrap in an IIFE, stash the promise on `window`, poll it.
