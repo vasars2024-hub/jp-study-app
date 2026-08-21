@@ -27212,3 +27212,55 @@ were mine-only (9 hunks in the overlay, all mine). Foreign work re-verified pres
 
 **Commit:** `b9c4eea7` (12 files). Bullet 2's other half — mixed-orientation panel order — is a
 separate slice; `readingLensLineOrder.ts:113` fails open to provider order deliberately.
+
+## 2026-08-21 backup — Track 5 bullet 2, second half: mixed captures get a panel rule
+
+**THE GAP.** A capture carrying both orientations had no safe axis, so it kept provider order —
+and that is exactly the shape a manga panel arrives in, so the common case was the one never
+repaired. `readingLensLineOrder.ts` now has an explicit panel rule instead of a widened heuristic.
+
+**THE RULE.** Same-orientation lines within a glyph-size merge into a block; each block is ordered
+by the existing single-axis rule; blocks read in bands top-to-bottom, right-to-left when the page
+runs vertically and left-to-right otherwise. Direction is weighted by how much text runs each way,
+not by line count, so one long dialogue column outranks two two-glyph effects.
+
+**FOUR FAIL-OPEN GUARDS**, because the alternative to provider order is not "no order" but a
+plausible rewrite of the reader's passage: blocks that overlap at all; an exact tie in direction;
+unusable geometry; and a band that is not a clique.
+
+**GUARD 4 IS THE ONE THE DESK WORK MISSED.** The band sweep merges transitively — that is what
+makes it a total order — so a tall column spanning two stacked captions pulls all three into one
+band, which is then ordered purely across the page. Live boxes: captions `[41,103,197,32]` and
+`[40,183,163,34]`, column `[501,58,80,225]`. The lower caption wins on x by **one pixel** (40 vs
+41) and the passage reads bottom-line-first. A band must now be a clique on the vertical axis.
+
+**REGRESSION CLOSED IN THE FIRST COMMIT.** Both engines derive `vertical` from the box aspect ratio
+(`paddleOcr` isVerticalBox, `mangaOcr` `y1-y0 > x1-x0`), so a trailing 。 returns square and lands
+on whichever side the comparison falls. One such glyph would have turned a plain vertical bubble
+into a panel problem and read it after the LEFT column. Square boxes are still ordered; they no
+longer vote on whether the capture is mixed. `SQUARE_ASPECT_LIMIT = 1.3`.
+
+**CORRECTION, and it is mine.** The first message on the fix commit said the live capture proved a
+behavioural regression and that provider order "was already correct for this capture". Both false.
+Re-running after the fix returned **identity-preserved** — the rule fails open on those boxes — and
+paddle *already* emits the y=183 caption ahead of the y=103 one, so provider order and the buggy
+panel order agreed and the visible result never changed. The capture supplied the geometry; it did
+not demonstrate the regression. Message corrected in the amend (`0869bd89`).
+
+**FINDING, pre-existing, not caused and not fixed here:** paddle orders a caption at y=183 ahead of
+one at y=103, and because the capture is mixed the repair fails open instead of correcting it.
+A same-orientation mis-order inside a mixed capture is currently unreachable by this rule.
+
+**LIVE, two restarts (main does not hot-reload).** Mixed fixture (vertical column + two horizontal
+captions, `%TEMP%\lens-mixed-fixture.png`) injected as a data URL at 640x420, `lensOcr` with
+`engine:'web'`: **3 lines, 2 horizontal + 1 vertical** — mixed output is reachable, the rule is not
+dead code. Post-fix re-run: same 3 boxes, fail-open confirmed by identity.
+
+**MUTATION, because a green suite is not coverage.** Each of the four guards was disabled in turn;
+each time **exactly one** test failed and the other 12 passed. The obvious spelling of the clique
+test passed against the bug — the buggy output equalled the order the lines were first written in.
+
+**Commits:** `dc760b38` (rule + ambiguity guard), `0869bd89` (clique guard, amended message).
+**Gates, SHARED tree:** vitest **770 files / 10,673 passed, 0 failed** (= baseline 10,666 + my 7
+cases, exact). i18n exit 0 at 10,725, unchanged — no new strings. architecture exit 0, "Nothing
+new", 5 pending. eslint on both touched paths: 0 errors.

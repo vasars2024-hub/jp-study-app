@@ -918,3 +918,29 @@ extracted from `pickBetterRead` so the two cannot drift.
 Track 5 stays **7 finished / 1 partial**: bullet 2's remaining half is the mixed-orientation panel
 line-order model (`readingLensLineOrder.ts:113` fails open to provider order deliberately, and its
 header says why). Tracks 1/4/5/6 unchanged at **24 finished / 1 partial / 4 deferred = 29**.
+
+### Track 5 bullet 2 CLOSES — mixed-orientation panel order (2026-08-21, `dc760b38` + `0869bd89`)
+
+A mixed capture kept provider order because no panel rule existed. There is one now: same-orientation
+lines within a glyph-size merge into a block, each block is ordered by the existing single-axis rule,
+and blocks read in bands top-to-bottom — right-to-left when the page runs vertically, left-to-right
+when it does not, weighted by how much text runs each way rather than by line count.
+
+It stays narrow. Four fail-open guards: overlapping blocks, an exact tie in direction, unusable
+geometry, and a band that is not a clique. The clique guard is the one desk work missed — the band
+sweep merges transitively, so a tall column spanning two stacked captions bands all three and orders
+them purely across the page, and the lower caption wins on x by one pixel. Live boxes are in the
+ledger and in the test. A second guard closed a regression this would otherwise have caused: both
+engines derive `vertical` from the box aspect ratio, so a lone square 。 no longer votes on whether
+the capture is mixed.
+
+Live, after two restarts: the mixed fixture returned **3 lines, 2 horizontal + 1 vertical**, so mixed
+output is reachable and the rule is not dead code. Each of the four guards was mutation-checked —
+disabling one fails exactly one test.
+
+**Open follow-up, pre-existing and not caused here:** paddle emits a caption at y=183 ahead of one at
+y=103, and a mixed capture fails open rather than correcting it, so a *same-orientation* mis-order
+inside a mixed capture is currently unreachable by this rule.
+
+Track 5 is now **8 finished / 0 partial**; Tracks 1/4/5/6 = **25 finished / 0 partial /
+4 deferred = 29**. Counted one bullet line at a time.
