@@ -867,3 +867,31 @@ byte-identical afterwards.
 **Bullet 8 remainder: OCR/model defaults, and honest offline/cloud indicators.** Both live in
 `ReadingLensSection.tsx` and `main/screenOcr.ts`; nothing has yet checked whether the lens
 reports which engine actually ran or whether any of it leaves the device.
+
+### Track 5 bullet 8 CLOSES (2026-08-21, `3ce6a412` + `2006027f`)
+
+Its remaining two things land together, because they are one question asked twice: *which*
+recognizer reads the crop, and *where* that reading happens.
+
+**OCR/model defaults.** `defaultEngine` (`auto` / manga / printed) joins the lens settings, is
+persisted in `reading-lens.json`, and rides into the overlay on `LensInit` — not over a second
+IPC, because the lens window is created and scanning in the same tick as the hotkey and an
+awaited value would leave the first capture of every session on `auto`. It replaces the four
+hardcoded `engine: 'auto'` sites in `ReadingLensOverlay.tsx`. `lens:ocrEngineStatus` reports
+which model packs are installed, read **live** on every call, so Settings warns about an engine
+that cannot run — and warns only about the **selected** one, since `auto` works whenever either
+recognizer is present.
+
+**Honest offline/cloud indicators.** `shared/readingLensEngine.ts` records a
+`processing: 'device' | 'network'` per engine and the settings claim is **derived** from that
+table, so adding a cloud recognizer withdraws the label rather than inheriting it. The claim is
+also scoped in the UI: recognition is local, and sending a capture to the Agent is named as a
+separate action that does leave the device on a cloud provider.
+
+Measured live after a restart, 7/7, including the pre-restart negative control (the preload
+binding present while main rejected `No handler registered`), three unknown values falling back
+to the default rather than to a neighbour, and a byte-identical store restore.
+
+Track 5 is now **7 finished / 1 partial**; Tracks 1/4/5/6 = **24 finished / 1 partial /
+4 deferred = 29**. The single remaining Track 5 partial is bullet **2** — alternate OCR
+candidates and the mixed-panel line-order model. Counted one bullet line at a time.

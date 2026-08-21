@@ -27106,3 +27106,54 @@ kind of payload the product code must survive — so the stub was right and the 
 covers the pruning contract thoroughly; the crash is in a component none of it renders. This is
 the standing rule earning itself again: run the full suite once after the last slice, and never
 call a turn done on targeted tests alone.
+
+## 2026-08-21 backup — Track 5 bullet 8 CLOSES: the recognizer is a choice, and the page says where it runs
+
+**THE GAP, both halves.** `ReadingLensOverlay.tsx` hardcoded `engine: 'auto'` in **four** places
+(the auto open, the repeat, the `a` whole-screen shortcut, the selection drag), so the two forced
+recognizers existed only as a per-capture rescan and **no default could be set at all**. And
+nothing anywhere in the product said whether a captured screen leaves the machine.
+
+**DECISION 1 — `defaultEngine` rides in on `LensInit`, not over a second IPC.** The lens window is
+created and scanning inside the same tick as the hotkey; a value the overlay had to `await` would
+leave the **first capture of every session** on `auto` and only settle from the second onward.
+Cost: one more field on an init that already crosses IPC. Normalized on the way out *and* in.
+
+**DECISION 2 — the processing location is a TABLE, and the privacy string is DERIVED from it.**
+`shared/readingLensEngine.ts` gives every engine a `processing: 'device' | 'network'`;
+`readingLensOcrIsFullyOnDevice()` gates the settings claim. `'network'` is representable although
+nothing uses it, so a cloud recognizer added later **withdraws** the honest label instead of
+inheriting it. Both engines are on-device today (`onnxruntime-node` over installed assets).
+
+**DECISION 3 — the claim is SCOPED, and says so.** "Recognition runs on this device" is followed
+by the line that makes it true: sending a capture to the Agent is a separate action that *does*
+leave the device on a cloud provider. An unscoped privacy promise is worse than none.
+Unknown stored values fall back to the **default**, never the nearest choice — same reasoning as
+retention, and `Manga` (wrong case) proves it.
+
+**LIVE, 7/7, after a real restart** (pid 23376, port 39273 — token rotated, re-read `bridge.json`):
+- **NEGATIVE CONTROL, pre-restart:** `typeof window.api.lensOcrEngineStatus === 'function'` while
+  the call rejected `No handler registered for 'lens:ocrEngineStatus'`. The preload binding had
+  already hot-reloaded; main had not. The repo's standing rule, reproduced exactly.
+- G1 `lens:ocrEngineStatus` → `manga:true, web:true, webLangs:["ja","zh","ru"], none:false` — this
+  machine's real installed packs, read live. G2 `defaultEngine=auto` on a store with no such field.
+- G3 `setDefaultEngine('manga')` → `manga`, and `reading-lens.json` on disk gained
+  `"defaultEngine": "manga"`. G4 after `lensOpen('select')`, `lensGetInit()` returned
+  `mode=select defaultEngine=manga bounds=0,0 2560x1600` — the choice reached the window.
+- G5 **NEGATIVE CONTROL**, each from a known-good `web`: `paddle`→`auto`, `{engine:'manga'}`→`auto`,
+  `Manga`→`auto`, and `manga`→`manga`. Unknown falls back; valid is not molested.
+- G6 store restored **byte-identical** (`cmp`, 169 bytes). G7 the block renders on the live
+  settings page: 3 options, `value=auto`, "Installed languages: ja, zh, ru", both honesty lines.
+
+**A DEAD KEY the live pass caught and the tests could not.** `settings.lens.ocr.title` shipped in
+all four catalogs with no call site. `tools/i18n-check.cjs` compares catalogs *against each other*,
+so an unused key is invisible to it — only the rendered surface showed the block opening straight
+into "Default engine" with nothing naming it. Fixed in `2006027f` with a test that names the string.
+
+**STAGING.** Six files are dirty with other tracks. `debug/eng-stage-engine.cjs` is the retention
+script re-specced (that one is **spent** — HEAD now carries the retention lines, so re-running it
+double-inserts). All six staged **+N -0** against the lifted block sizes; each catalog re-counted
+at exactly **11** new `settings.lens.ocr.*` keys.
+
+**Commits:** `3ce6a412` (feature, 14 files), `2006027f` (the dead key).
+**Bullet 8 CLOSES** — all five of its things are in. Track 5's last partial is bullet 2.
