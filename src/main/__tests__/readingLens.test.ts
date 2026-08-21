@@ -142,6 +142,19 @@ vi.mock('../screenOcr', () => ({
   },
 }));
 
+/**
+ * Installed-model state, mocked so `lens:ocrEngineStatus` is a decision this
+ * suite controls rather than a property of the machine running it. Both modules
+ * would otherwise reach the real asset directory, and the same test would then
+ * pass or fail depending on which packs a developer has downloaded.
+ */
+const installed = { manga: true, web: true, webLangs: ['ja'] as string[] };
+vi.mock('../mangaOcr', () => ({ mangaOcrAvailable: () => installed.manga }));
+vi.mock('../paddleOcr', () => ({
+  paddleOcrAvailable: () => installed.web,
+  installedPaddleLangs: () => installed.webLangs,
+}));
+
 // ---- harness ------------------------------------------------------------
 
 let tmpRoot = '';
@@ -199,6 +212,7 @@ describe('loadSettings', () => {
       enabled: true,
       hotkey: 'Ctrl+Shift+Space',
       lastRegion: null,
+      defaultEngine: 'auto',
     });
   });
 
@@ -228,6 +242,7 @@ describe('loadSettings', () => {
       enabled: true,
       hotkey: 'Ctrl+Shift+Space',
       lastRegion: null,
+      defaultEngine: 'auto',
     });
   });
 
@@ -241,7 +256,7 @@ describe('loadSettings', () => {
     writeState(JSON.stringify({ enabled: false, hotkey: 'Ctrl+Alt+L' }));
     const m = await load();
     expect(m.__readingLensTestables.loadSettings())
-      .toEqual({ enabled: false, hotkey: 'Ctrl+Alt+L', lastRegion: null });
+      .toEqual({ enabled: false, hotkey: 'Ctrl+Alt+L', lastRegion: null, defaultEngine: 'auto' });
   });
 
   it('trims a stored hotkey', async () => {
@@ -435,13 +450,15 @@ describe('persistence', () => {
     m.startReadingLens();
     m.registerReadingLensIpc();
     await h.ipc.handlers.get('lens:setHotkey')!({}, 'Ctrl+Alt+L');
-    expect(readState()).toEqual({ enabled: true, hotkey: 'Ctrl+Alt+L', lastRegion: null });
+    expect(readState())
+      .toEqual({ enabled: true, hotkey: 'Ctrl+Alt+L', lastRegion: null, defaultEngine: 'auto' });
 
     const fresh = await load();
     expect(fresh.__readingLensTestables.loadSettings()).toEqual({
       enabled: true,
       hotkey: 'Ctrl+Alt+L',
       lastRegion: null,
+      defaultEngine: 'auto',
     });
   });
 
@@ -845,5 +862,76 @@ describe('IPC registration', () => {
     const m = await load();
     m.registerReadingLensIpc();
     expect(() => h.ipc.listeners.get('lens:setInteractive')!({ sender: {} }, true)).not.toThrow();
+  });
+});
+
+// ---- OCR engine default -------------------------------------------------
+
+describe('default OCR engine', () => {
+  async function booted() {
+    const m = await load();
+    m.startReadingLens();
+    m.registerReadingLensIpc();
+    return m;
+  }
+  const init = (): { defaultEngine: string } => h.ipc.handlers.get('lens:getInit')!() as never;
+  const setEngine = async (engine: unknown): Promise<{ defaultEngine: string }> =>
+    (await h.ipc.handlers.get('lens:setDefaultEngine')!({}, engine)) as never;
+
+  it('starts on auto and reports it on the status', async () => {
+    await booted();
+    const status = (await h.ipc.handlers.get('lens:getSettings')!()) as { defaultEngine: string };
+    expect(status.defaultEngine).toBe('auto');
+  });
+
+  it('persists a choice and reads it back on the next boot', async () => {
+    await booted();
+    expect((await setEngine('manga')).defaultEngine).toBe('manga');
+    expect((readState() as { defaultEngine: string }).defaultEngine).toBe('manga');
+    const fresh = await load();
+    expect(fresh.__readingLensTestables.loadSettings().defaultEngine).toBe('manga');
+  });
+
+  it('carries the choice into the init the lens window opens with', async () => {
+    // The lens window is created and scanning in the same tick as the hotkey,
+    // so the default has to arrive *with* the open. A second IPC the overlay
+    // had to await would leave the first capture of a session on auto.
+    await booted();
+    await setEngine('web');
+    await h.ipc.handlers.get('lens:open')!({}, 'select');
+    expect(init().defaultEngine).toBe('web');
+  });
+
+  it('falls back to the default on an unknown stored value, not to a neighbour', async () => {
+    writeState(JSON.stringify({ defaultEngine: 'Manga' }));
+    const m = await load();
+    expect(m.__readingLensTestables.loadSettings().defaultEngine).toBe('auto');
+  });
+
+  it('refuses an unknown value over IPC too', async () => {
+    await booted();
+    expect((await setEngine({ engine: 'manga' })).defaultEngine).toBe('auto');
+    expect((await setEngine('paddle')).defaultEngine).toBe('auto');
+  });
+
+  it('reports which recognizers are installed, live', async () => {
+    await booted();
+    installed.manga = true;
+    installed.web = true;
+    installed.webLangs = ['ja', 'en'];
+    expect(await h.ipc.handlers.get('lens:ocrEngineStatus')!())
+      .toEqual({ manga: true, web: true, webLangs: ['ja', 'en'], none: false });
+
+    // Read live on every call, not cached at boot: a pack downloaded from the
+    // Assets surface while the app runs must change this answer without a
+    // restart, or Settings keeps warning about an engine that now works.
+    installed.manga = false;
+    installed.web = false;
+    installed.webLangs = [];
+    expect(await h.ipc.handlers.get('lens:ocrEngineStatus')!())
+      .toEqual({ manga: false, web: false, webLangs: [], none: true });
+    installed.manga = true;
+    installed.web = true;
+    installed.webLangs = ['ja'];
   });
 });

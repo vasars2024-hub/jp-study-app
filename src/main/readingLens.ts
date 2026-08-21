@@ -42,6 +42,14 @@ import type {
   ReadingLensRetentionDays,
 } from '../shared/readingLensHistory';
 import type { ReadingLensCapture } from '../shared/readingLens';
+import {
+  READING_LENS_ENGINE_DEFAULT,
+  normalizeReadingLensEngine,
+  type ReadingLensEngine,
+  type ReadingLensEngineStatus,
+} from '../shared/readingLensEngine';
+import { installedPaddleLangs, paddleOcrAvailable } from './paddleOcr';
+import { mangaOcrAvailable } from './mangaOcr';
 import { createReadingLensClipboardCapture } from './readingLensClipboard';
 import { registerLexiconHandoffIpc } from './lexiconHandoff';
 import { registerReadingPassageHandoffIpc } from './readingPassageHandoff';
@@ -67,6 +75,14 @@ export interface ReadingLensSettings {
   /** Accelerator in the app's chord format, e.g. "Ctrl+Alt+Space". */
   hotkey: string;
   lastRegion: LensRegionMemory | null;
+  /**
+   * Which recognizer a fresh scan asks for. Carried into `LensInit` rather than
+   * fetched by the overlay over a second IPC: the lens window is created and
+   * scanning within the same tick as the hotkey, so a round trip the renderer
+   * had to await would let the first capture of a session run on the wrong
+   * engine and only settle from the second one onward.
+   */
+  defaultEngine: ReadingLensEngine;
 }
 
 export interface ReadingLensStatus extends ReadingLensSettings {
@@ -84,6 +100,13 @@ export interface LensInit {
   bounds: Electron.Rectangle;
   mode: LensOpenMode;
   scaleFactor: number;
+  /**
+   * The recognizer a fresh scan in this session should ask for. Always present,
+   * always one of the three — the overlay must never have to invent a fallback,
+   * because a fallback it invented would silently disagree with what Settings
+   * says the default is.
+   */
+  defaultEngine: ReadingLensEngine;
   /** Present only for an explicit clipboard open; never populated by a screen scan. */
   capture?: ReadingLensCapture;
   /**
@@ -99,7 +122,12 @@ const STATE_FILE = 'reading-lens.json';
 // tends to be free (Ctrl+Alt+<key> combos are widely claimed by IMEs and vendor
 // utilities). If it is taken, the Settings section lets the user rebind and the
 // failure is surfaced rather than swallowed.
-const DEFAULTS: ReadingLensSettings = { enabled: true, hotkey: 'Ctrl+Shift+Space', lastRegion: null };
+const DEFAULTS: ReadingLensSettings = {
+  enabled: true,
+  hotkey: 'Ctrl+Shift+Space',
+  lastRegion: null,
+  defaultEngine: READING_LENS_ENGINE_DEFAULT,
+};
 /** Matches the renderer's `MIN_REGION`; below it a drag is a stray click. */
 const MIN_REGION = 12;
 const DOUBLE_TAP_MS = 350;
@@ -174,6 +202,7 @@ function loadSettings(): ReadingLensSettings {
           ? parsed.hotkey.trim()
           : DEFAULTS.hotkey,
       lastRegion: normalizeLensRegionMemory(parsed.lastRegion),
+      defaultEngine: normalizeReadingLensEngine(parsed.defaultEngine),
     };
   } catch {
     return { ...DEFAULTS };
@@ -248,6 +277,10 @@ function openLens(requestedMode: LensOpenMode): void {
     bounds,
     mode,
     scaleFactor: display.scaleFactor || 1,
+    // Normalized on the way out too, not only on the way in: `settings` is
+    // mutated in place elsewhere in this file, so reading the stored value
+    // through the same guard costs nothing and closes that path.
+    defaultEngine: normalizeReadingLensEngine(settings.defaultEngine),
     ...(capture ? { capture } : {}),
     ...(repeat
       ? {
@@ -435,6 +468,27 @@ export function registerReadingLensIpc(): void {
       return { ...res, status: getStatus() };
     },
   );
+
+  ipcMain.handle('lens:setDefaultEngine', (_e, engine: unknown): ReadingLensStatus => {
+    settings.defaultEngine = normalizeReadingLensEngine(engine);
+    saveSettings();
+    broadcastSettings();
+    return getStatus();
+  });
+
+  /**
+   * What the recognizers can actually do right now.
+   *
+   * Read live on every call rather than cached: model packs are installed from
+   * the Assets surface while the app runs, so a cached "manga: false" would
+   * outlive the download that fixed it and the settings page would keep warning
+   * about an engine that now works.
+   */
+  ipcMain.handle('lens:ocrEngineStatus', (): ReadingLensEngineStatus => {
+    const manga = mangaOcrAvailable();
+    const web = paddleOcrAvailable();
+    return { manga, web, webLangs: web ? installedPaddleLangs() : [], none: !manga && !web };
+  });
 
   // Programmatic open (Settings button / testing) mirrors the hotkey path.
   ipcMain.handle('lens:open', (_e, mode: unknown): void => {

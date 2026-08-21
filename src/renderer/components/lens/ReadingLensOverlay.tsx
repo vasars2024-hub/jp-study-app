@@ -40,6 +40,11 @@ import { handOffCaptureToLexicon } from '../../lexiconHandoffClient';
 import { readingPassageHandoffFromCapture } from '../../../shared/readingPassageHandoff';
 import { handOffCaptureToReadingWorkspace } from '../../readingPassageHandoffClient';
 import type { ReadingLensReadSourceLine } from '../../../shared/readingLensRead';
+import {
+  READING_LENS_ENGINE_DEFAULT,
+  normalizeReadingLensEngine,
+  type ReadingLensEngine,
+} from '../../../shared/readingLensEngine';
 import './readingLens.css';
 
 /**
@@ -238,6 +243,8 @@ export default function ReadingLensOverlay() {
   const [dimmed, setDimmed] = useState(false);
   // Mirrors the main-process ignoreMouseEvents flag so we only toggle on change.
   const interactiveRef = useRef(true);
+  /** The configured default recognizer, filled from `LensInit` on every open. */
+  const defaultEngineRef = useRef<ReadingLensEngine>(READING_LENS_ENGINE_DEFAULT);
 
   const setInteractive = useCallback((on: boolean) => {
     if (interactiveRef.current === on) return;
@@ -337,6 +344,12 @@ export default function ReadingLensOverlay() {
     }
     captureTargetRef.current = target;
     setCaptureTarget(target);
+    // The configured default recognizer, kept in a ref because the selection
+    // drag and the whole-screen shortcut both start scans from handlers that
+    // are not re-created when init changes. Normalized here rather than
+    // trusted: `init` crosses IPC, and an unknown value must scan on `auto`
+    // instead of reaching `lens:ocr` as a string no engine answers to.
+    defaultEngineRef.current = normalizeReadingLensEngine(init.defaultEngine);
     interactiveRef.current = true; // main re-enabled the mouse on open
     if (init.mode === 'clipboard') {
       const capture = normalizeReadingLensCapture(init.capture);
@@ -357,13 +370,13 @@ export default function ReadingLensOverlay() {
       setState({
         kind: 'scanning',
         region: { x: 0, y: 0, width: init.bounds.width, height: init.bounds.height },
-        engine: 'auto',
+        engine: defaultEngineRef.current,
       });
     } else if (init.mode === 'repeat' && init.region) {
       // Main only sends `repeat` when it has a region on a display that still
       // exists and still contains it, so there is no fallback to invent here —
       // an unreplayable repeat arrives as `select` and lands in the branch below.
-      setState({ kind: 'scanning', region: init.region, engine: 'auto' });
+      setState({ kind: 'scanning', region: init.region, engine: defaultEngineRef.current });
     } else {
       setState({ kind: 'selecting' });
     }
@@ -783,7 +796,9 @@ export default function ReadingLensOverlay() {
           if (init) setState({
             kind: 'scanning',
             region: { x: 0, y: 0, width: init.bounds.width, height: init.bounds.height },
-            engine: 'auto',
+            // From the freshly-pulled init, not the ref: this path already has
+            // main's answer in hand, so it uses the newer of the two.
+            engine: normalizeReadingLensEngine(init.defaultEngine),
           });
         });
       }
@@ -818,7 +833,7 @@ export default function ReadingLensOverlay() {
     setState({
       kind: 'scanning',
       region: r,
-      engine: 'auto',
+      engine: defaultEngineRef.current,
     });
   };
 

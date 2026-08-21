@@ -3364,6 +3364,24 @@ export const en: Catalog = {
   'settings.lens.repeatRegionHint': 'Scan the same rectangle again, on the display it was taken from.',
   'settings.lens.repeatRegionNone': 'No region to repeat yet. Draw one with the Lens first.',
 
+  // Reading Lens — recognition engine and where it runs
+  'settings.lens.ocr.title': 'Text recognition',
+  'settings.lens.ocr.defaultEngine': 'Default engine',
+  'settings.lens.ocr.engine.auto': 'Automatic',
+  'settings.lens.ocr.engine.manga': 'Manga and speech bubbles',
+  'settings.lens.ocr.engine.web': 'Printed and on-screen text',
+  'settings.lens.ocr.engineHint':
+    'Automatic picks per capture. A fixed engine is used for every scan until you change it here; you can still switch engines on a single capture from the Lens itself.',
+  'settings.lens.ocr.unavailable':
+    'That engine’s models are not installed, so scans will refuse until you download them under Assets.',
+  'settings.lens.ocr.noneInstalled':
+    'No recognition models are installed. Every scan will refuse until you download them under Assets.',
+  'settings.lens.ocr.onDevice':
+    'Recognition runs on this device. Captured pixels are read by the installed models locally and are never uploaded; only the models themselves are downloaded, once.',
+  'settings.lens.ocr.agentNote':
+    'Sending a capture to the Agent is a separate action, and it does leave this device when the Agent uses a cloud provider.',
+  'settings.lens.ocr.webLangs': 'Installed languages: {langs}',
+
   // Reading Lens — capture history
   'settings.lens.history.title': 'Capture history',
   'settings.lens.history.searchPlaceholder': 'Search captures',

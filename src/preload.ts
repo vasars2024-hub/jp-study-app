@@ -15,6 +15,7 @@ import type {
   ReadingLensHistoryQuery,
   ReadingLensRetentionDays,
 } from './shared/readingLensHistory';
+import type { ReadingLensEngine, ReadingLensEngineStatus } from './shared/readingLensEngine';
 import {
   LEXICON_HANDOFF_CHANNELS,
   type LexiconHandoffRequest,
@@ -2354,6 +2355,12 @@ const api = {
     hotkey: string,
   ): Promise<{ ok: boolean; error?: string; status: ReadingLensStatus }> =>
     ipcRenderer.invoke('lens:setHotkey', hotkey),
+  /** Which recognizer a fresh scan asks for; `auto` lets the pipeline decide. */
+  lensSetDefaultEngine: (engine: ReadingLensEngine): Promise<ReadingLensStatus> =>
+    ipcRenderer.invoke('lens:setDefaultEngine', engine),
+  /** Which recognizers are installed right now, read live in main on every call. */
+  lensOcrEngineStatus: (): Promise<ReadingLensEngineStatus> =>
+    ipcRenderer.invoke('lens:ocrEngineStatus'),
   /** Open the lens over the display under the cursor. */
   lensOpen: (mode: LensOpenMode = 'select'): Promise<void> => ipcRenderer.invoke('lens:open', mode),
   /** The lens renderer pulls its init (display bounds + mode) on mount. */

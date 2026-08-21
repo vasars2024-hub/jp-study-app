@@ -10,6 +10,15 @@ import {
   type ReadingLensHistoryEntry,
   type ReadingLensRetentionDays,
 } from '../../../../shared/readingLensHistory';
+import {
+  READING_LENS_ENGINE_CHOICES,
+  READING_LENS_ENGINE_DEFAULT,
+  normalizeReadingLensEngine,
+  readingLensEngineRunnable,
+  readingLensOcrIsFullyOnDevice,
+  type ReadingLensEngine,
+  type ReadingLensEngineStatus,
+} from '../../../../shared/readingLensEngine';
 
 const DEFAULT_STATUS: ReadingLensStatus = {
   enabled: false,
@@ -19,6 +28,13 @@ const DEFAULT_STATUS: ReadingLensStatus = {
   registered: false,
   open: false,
   canRepeatRegion: false,
+  defaultEngine: READING_LENS_ENGINE_DEFAULT,
+};
+
+const ENGINE_LABEL_KEYS: Record<ReadingLensEngine, string> = {
+  auto: 'settings.lens.ocr.engine.auto',
+  manga: 'settings.lens.ocr.engine.manga',
+  web: 'settings.lens.ocr.engine.web',
 };
 
 const SOURCE_LABEL_KEYS: Record<ReadingLensSource, string> = {
@@ -271,6 +287,90 @@ function LensCaptureHistory() {
 }
 
 /**
+ * Which recognizer a scan uses by default, and the honest answer to where the
+ * recognition happens.
+ *
+ * The two belong in one block because the second is only true of the first:
+ * "runs on this device" is a property of the engines offered above it, computed
+ * from `shared/readingLensEngine.ts`'s table rather than asserted here, so a
+ * cloud recognizer added later cannot inherit the claim.
+ *
+ * Availability is read live from main on mount rather than assumed: the model
+ * packs are installed from the Assets surface, so a choice this page offered
+ * without checking would look accepted and then refuse on the next scan.
+ */
+function LensRecognition({
+  engine,
+  onEngine,
+}: {
+  engine: ReadingLensEngine;
+  onEngine: (engine: ReadingLensEngine) => void;
+}) {
+  const { t } = useT();
+  const [status, setStatus] = useState<ReadingLensEngineStatus | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    window.api
+      .lensOcrEngineStatus()
+      .then((s) => {
+        // Shape-checked, not trusted. This drives warning text that makes a
+        // factual claim about the user's machine, and a malformed payload must
+        // show nothing rather than a confident wrong answer.
+        if (!alive || !s || typeof s !== 'object') return;
+        setStatus({
+          manga: s.manga === true,
+          web: s.web === true,
+          webLangs: Array.isArray(s.webLangs) ? s.webLangs.filter((l) => typeof l === 'string') : [],
+          none: s.manga !== true && s.web !== true,
+        });
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // Only ever a warning about the engine that is actually selected — listing
+  // every uninstalled engine would nag a user whose `auto` works fine.
+  const chosenBroken = status !== null && !readingLensEngineRunnable(engine, status);
+
+  return (
+    <div style={{ marginTop: 16 }}>
+      <div className="os-viz-row" style={{ alignItems: 'center', gap: 8 }}>
+        <span className="muted">{t('settings.lens.ocr.defaultEngine')}</span>
+        <select
+          className="os-input"
+          value={engine}
+          onChange={(e) => onEngine(normalizeReadingLensEngine(e.target.value))}
+          aria-label={t('settings.lens.ocr.defaultEngine')}
+        >
+          {READING_LENS_ENGINE_CHOICES.map((id) => (
+            <option key={id} value={id}>{t(ENGINE_LABEL_KEYS[id])}</option>
+          ))}
+        </select>
+      </div>
+      <p className="muted os-set-hint">{t('settings.lens.ocr.engineHint')}</p>
+
+      {status?.none && <p className="dict-add-err">{t('settings.lens.ocr.noneInstalled')}</p>}
+      {chosenBroken && !status?.none && (
+        <p className="dict-add-err">{t('settings.lens.ocr.unavailable')}</p>
+      )}
+      {status !== null && status.web && status.webLangs.length > 0 && (
+        <p className="muted os-set-hint">
+          {t('settings.lens.ocr.webLangs', { langs: status.webLangs.join(', ') })}
+        </p>
+      )}
+
+      {readingLensOcrIsFullyOnDevice() && (
+        <p className="muted os-set-hint">{t('settings.lens.ocr.onDevice')}</p>
+      )}
+      <p className="muted os-set-hint">{t('settings.lens.ocr.agentNote')}</p>
+    </div>
+  );
+}
+
+/**
  * Study → Reading Lens. Toggles the OS-wide screen-region OCR reader
  * (main/readingLens.ts), lets the user rebind its accelerator, and opens it on
  * demand. Mirrors SystemDictionarySection; the two are independent features.
@@ -306,6 +406,13 @@ export default function ReadingLensSection() {
   const toggle = useCallback(async (on: boolean) => {
     const next = await window.api.lensSetEnabled(on);
     setStatus(next);
+  }, []);
+
+  // Main answers with the whole status, so the select settles on what was
+  // actually stored rather than on what was clicked — the two differ whenever
+  // the value did not survive normalization.
+  const setDefaultEngine = useCallback(async (engine: ReadingLensEngine) => {
+    setStatus(await window.api.lensSetDefaultEngine(engine));
   }, []);
 
   useEffect(() => {
@@ -391,6 +498,11 @@ export default function ReadingLensSection() {
           {t('settings.lens.repeatRegion')}
         </button>
       </div>
+
+      <LensRecognition
+        engine={normalizeReadingLensEngine(status.defaultEngine)}
+        onEngine={(next) => void setDefaultEngine(next)}
+      />
 
       <LensCaptureHistory />
     </>

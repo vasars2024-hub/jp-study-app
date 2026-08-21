@@ -171,10 +171,15 @@ async function type(value: string): Promise<void> {
   });
 }
 
+// Addressed by its own aria-label, not by document order: the page grew a
+// recognition-engine select above this panel, and "the first select on the
+// page" silently became a different control.
 const sourceSelect = (): HTMLSelectElement => {
-  const found = host.querySelector<HTMLSelectElement>('select');
+  const found = [...host.querySelectorAll('select')].find(
+    (s) => s.getAttribute('aria-label') === 'Filter by source',
+  );
   if (!found) throw new Error('no source filter rendered');
-  return found;
+  return found as HTMLSelectElement;
 };
 
 /** Choose a capture source the way a click on the native select would. */

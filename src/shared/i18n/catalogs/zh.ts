@@ -3175,6 +3175,22 @@ export const zh: Catalog = {
   'settings.lens.repeatRegion': '重复上次区域',
   'settings.lens.repeatRegionHint': '在原显示器上再次扫描同一矩形区域。',
   'settings.lens.repeatRegionNone': '尚无可重复的区域。请先用取词镜框选一次。',
+  'settings.lens.ocr.title': '文字识别',
+  'settings.lens.ocr.defaultEngine': '默认引擎',
+  'settings.lens.ocr.engine.auto': '自动',
+  'settings.lens.ocr.engine.manga': '漫画与对话气泡',
+  'settings.lens.ocr.engine.web': '印刷体与屏幕文字',
+  'settings.lens.ocr.engineHint':
+    '“自动”会按每次取词判断。指定引擎后，每次扫描都会使用它，直到你在此更改；你仍可在取词镜中对单次取词临时切换。',
+  'settings.lens.ocr.unavailable':
+    '该引擎的模型尚未安装，在“资源”中下载之前扫描会被拒绝。',
+  'settings.lens.ocr.noneInstalled':
+    '尚未安装任何识别模型。在“资源”中下载之前，所有扫描都会被拒绝。',
+  'settings.lens.ocr.onDevice':
+    '识别在本机运行。已安装的模型在本地读取截取的像素，不会上传；只有模型本身会下载一次。',
+  'settings.lens.ocr.agentNote':
+    '把取词内容发送给智能体是另一项操作；当智能体使用云端提供方时，内容确实会离开本机。',
+  'settings.lens.ocr.webLangs': '已安装语言：{langs}',
   'settings.lens.history.title': '取词历史',
   'settings.lens.history.searchPlaceholder': '搜索取词记录',
   'settings.lens.history.clear': '全部清除',

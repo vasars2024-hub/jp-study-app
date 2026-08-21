@@ -3188,6 +3188,22 @@ export const ja: Catalog = {
   'settings.lens.repeatRegion': '前回の範囲を再取得',
   'settings.lens.repeatRegionHint': '同じ範囲を、取得したディスプレイで再度スキャンします。',
   'settings.lens.repeatRegionNone': '再取得できる範囲がまだありません。先にレンズで範囲を指定してください。',
+  'settings.lens.ocr.title': '文字認識',
+  'settings.lens.ocr.defaultEngine': '既定のエンジン',
+  'settings.lens.ocr.engine.auto': '自動',
+  'settings.lens.ocr.engine.manga': 'マンガ・吹き出し',
+  'settings.lens.ocr.engine.web': '印刷・画面上の文字',
+  'settings.lens.ocr.engineHint':
+    '「自動」は取得ごとに判断します。エンジンを指定すると変更するまで毎回それを使いますが、レンズ側で 1 回だけ切り替えることもできます。',
+  'settings.lens.ocr.unavailable':
+    'そのエンジンのモデルが未インストールのため、アセットから取得するまで読み取りは拒否されます。',
+  'settings.lens.ocr.noneInstalled':
+    '認識モデルが 1 つもインストールされていません。アセットから取得するまで、すべての読み取りが拒否されます。',
+  'settings.lens.ocr.onDevice':
+    '認識はこの端末で実行されます。取得した画素はインストール済みモデルがローカルで読み取り、送信されません。ダウンロードされるのはモデル本体のみで、一度きりです。',
+  'settings.lens.ocr.agentNote':
+    '取得内容をエージェントに送るのは別の操作です。エージェントがクラウドのプロバイダーを使う場合、その内容は端末外に出ます。',
+  'settings.lens.ocr.webLangs': 'インストール済みの言語: {langs}',
   'settings.lens.history.title': 'キャプチャ履歴',
   'settings.lens.history.searchPlaceholder': 'キャプチャを検索',
   'settings.lens.history.clear': 'すべて消去',

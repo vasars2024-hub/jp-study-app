@@ -1509,6 +1509,12 @@ declare global {
       lensSetHotkey(
         hotkey: string,
       ): Promise<{ ok: boolean; error?: string; status: ReadingLensStatus }>;
+      lensSetDefaultEngine(
+        engine: import('../shared/readingLensEngine').ReadingLensEngine,
+      ): Promise<ReadingLensStatus>;
+      lensOcrEngineStatus(): Promise<
+        import('../shared/readingLensEngine').ReadingLensEngineStatus
+      >;
       lensOpen(mode?: LensOpenMode): Promise<void>;
       lensGetInit(): Promise<LensInit | null>;
       lensOcr(
