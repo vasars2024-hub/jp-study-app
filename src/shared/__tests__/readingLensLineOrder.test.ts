@@ -134,6 +134,26 @@ describe('Reading Lens line order', () => {
     expect(ids(orderReadingLensLines(bubble))).toEqual(['col-right', 'tail-glyph', 'col-left']);
   });
 
+  it('preserves provider order when a tall block bands two stacked ones transitively', () => {
+    // The exact boxes a live `web` capture of the mixed fixture returned. The
+    // column spans both captions, so a single-band sort ordered them purely
+    // across the page and the lower caption won by one pixel of x — the page
+    // read bottom-line-first. Note the live capture did not itself change
+    // behaviour: paddle already emitted these two captions bottom-first, so its
+    // order and the buggy panel order agreed. The geometry is what is real.
+    const captured = [
+      line('upper-caption', [41, 103, 197, 32]),
+      line('lower-caption', [40, 183, 163, 34]),
+      line('column', [501, 58, 80, 225], true),
+    ];
+
+    expect(ids(orderReadingLensLines(captured))).toEqual([
+      'upper-caption',
+      'lower-caption',
+      'column',
+    ]);
+  });
+
   it('preserves provider order when any geometry is unusable', () => {
     const invalid = [
       line('valid', [10, 30, 100, 20]),

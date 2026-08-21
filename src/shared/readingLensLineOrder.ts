@@ -224,11 +224,19 @@ function pageRunsRightToLeft(lines: readonly ReadingLensPositionedLine[]): boole
  * for a horizontal one. Banding is a sweep rather than a pairwise comparator,
  * because "overlaps vertically" is not transitive and `sort` may not be handed
  * an inconsistent comparator.
+ *
+ * Returns null when a band is not a clique — that is, when the sweep pulled two
+ * blocks into one band only through a third. A tall block does exactly that: a
+ * vertical column beside two stacked captions spans both, and since a band is
+ * then ordered purely across the page, the lower caption can win on a single
+ * pixel of x and the page reads bottom-line-first. A live capture supplied that
+ * geometry (the boxes are in the test and the ledger), so a transitive band is
+ * treated as geometry this rule cannot read rather than sorted anyway.
  */
 function orderBlocks<T extends ReadingLensPositionedLine>(
   blocks: readonly OrientationBlock<T>[],
   rightToLeft: boolean,
-): OrientationBlock<T>[] {
+): OrientationBlock<T>[] | null {
   const sorted = [...blocks].sort((a, b) => a.top - b.top || a.left - b.left);
   const bands: OrientationBlock<T>[][] = [];
   let bandBottom = Number.NEGATIVE_INFINITY;
@@ -239,6 +247,14 @@ function orderBlocks<T extends ReadingLensPositionedLine>(
     } else {
       bands[bands.length - 1].push(block);
       bandBottom = Math.max(bandBottom, block.bottom);
+    }
+  }
+
+  for (const band of bands) {
+    for (let i = 0; i < band.length; i += 1) {
+      for (let j = i + 1; j < band.length; j += 1) {
+        if (band[i].top >= band[j].bottom || band[j].top >= band[i].bottom) return null;
+      }
     }
   }
 
@@ -287,7 +303,10 @@ export function orderReadingLensLines<T extends ReadingLensPositionedLine>(
     }
   }
 
-  return orderBlocks(blocks, rightToLeft).flatMap((block) =>
+  const ordered = orderBlocks(blocks, rightToLeft);
+  if (!ordered) return [...lines];
+
+  return ordered.flatMap((block) =>
     orderOnAxis(
       block.items.map((entry) => entry.item),
       block.vertical,
