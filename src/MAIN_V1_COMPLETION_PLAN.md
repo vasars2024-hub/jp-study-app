@@ -944,3 +944,26 @@ inside a mixed capture is currently unreachable by this rule.
 
 Track 5 is now **8 finished / 0 partial**; Tracks 1/4/5/6 = **25 finished / 0 partial /
 4 deferred = 29**. Counted one bullet line at a time.
+
+### Track 3 — the Agent's operation record becomes durable (2026-08-21, `422df210` + `ee28eac1`)
+
+The trust bullet asks for "controls for memory scope, retained chats, sensitive-context exclusion,
+**history deletion**, provider budgets, and automation schedules". History deletion had nothing to
+delete: `agentOperationLog.ts` is per-window and dies with it.
+
+`shared/agentOperationHistory.ts` is the durable half, carried as a fifth section of the main-owned
+operational document rather than a fifth store — additive, optional, and riding the existing
+normalize/prune path, so main needed no source change. Undo stays session-only on purpose: a log
+restored from disk cannot honestly answer the supersede question for writes made while the app was
+closed, so the persisted row deliberately is not shaped to be replayed. `arguments` are dropped on
+the way to disk. Bounds are 500 rows and 90 days, with deletion — exact and immediate — as the
+control instead of a retention dial.
+
+Surfaced as a Settings > Memory card beside the agent-memory card it is the audit twin of, with the
+delete control and its confirmation, in en/ja/zh/ru, and registered in `SETTINGS_REGISTRY`,
+`AGENT_SETTINGS_GUIDED_TARGETS` and `AGENT_NAVIGATION_INDEX` so the settings search actually reaches
+it.
+
+Track 3 remains **partial** against its full acceptance — this closes one named trust control, not
+the track. What it does not yet cover: memory scope, retained-chat controls, sensitive-context
+exclusion, and provider budgets, all from the same bullet.

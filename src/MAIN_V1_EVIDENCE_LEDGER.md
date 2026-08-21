@@ -27264,3 +27264,52 @@ test passed against the bug — the buggy output equalled the order the lines we
 **Gates, SHARED tree:** vitest **770 files / 10,673 passed, 0 failed** (= baseline 10,666 + my 7
 cases, exact). i18n exit 0 at 10,725, unchanged — no new strings. architecture exit 0, "Nothing
 new", 5 pending. eslint on both touched paths: 0 errors.
+
+## 2026-08-21 backup — Track 3: the Agent's record of what it changed survives the window
+
+**RECOVERED WORK.** The 05:52 turn died on a usage limit at 05:57 with `shared/agentOperationHistory.ts`
+untracked and `agentOperationalState.ts` / `agentOperationalClient.ts` modified — a coherent module
+and its two wirings, with no producer, no tests, no UI and no commit. Re-derived and finished here.
+
+**THE GAP.** `agentOperationLog.ts` is per-window. That is right for *undo* and wrong for
+*accountability*: "what has this thing done to my data" is an audit question, and Track 3's trust
+bullet names history deletion as a control, which presumes a record that outlives the session.
+
+**THE SPLIT, and it is deliberate.** Undo stays session-only. An inverse refuses as `superseded`
+when anything newer touched the entity it names, decided from the log alone; a log restored from
+disk never witnessed the writes made while the app was closed, so it would answer "nothing newer
+touched this" and mean "I was not running". The persisted row is therefore not shaped to be
+replayed — no `sequence`, no `invertsSequence` — and `arguments` are dropped, because free text that
+lived in one window's memory for an hour is a different privacy object from the same string sitting
+in `operational-v1.json` for ninety days.
+
+**A FIFTH SECTION, NOT A FIFTH STORE** (standing auto-approval; reversible). An additive optional
+field costs nothing at `AGENT_OPERATIONAL_SCHEMA_VERSION`, where a new document needs its own
+channel, preload binding and window typing to answer a question the existing reader already asks.
+It rides `normalize`/`prune` and therefore `rebaseSave`, so **main needed no source change**.
+Bounds: 500 rows and **90 days** — not the queue's 30, because evidence of a change to the user's
+data is what someone looks for months later. No retention dial: the control is deletion.
+
+**PRODUCER.** An effect over the session log, not a call inside the state updater, so it sees a log
+and not a delta. A ref of already-durable ids is the fast path; idempotence on the entry id stays in
+the module, which is what holds for a remount and for a second window.
+
+**LIVE, and the negative control is the whole point.** Against main running the PRE-COMMIT build,
+`agentOperationalSave` with a history section returned **`history` absent, entryCount -1** — the
+section does not accidentally pass through, so a later positive is real. The captured state was
+written back and compared **identical**; no user data was left changed.
+**LIVE AFTER RESTART (pid 32900), on the real store.** `history` is now present where it was absent
+(`priorHistory: 0`). Three rows sent, **one** survived: `relay-probe|0`. The 91-day row was pruned and
+the row naming `flashcard.invent-deck` — an operation this build does not have — was rejected, both
+by main's own normalizer. `arguments` and `sequence` were stripped even though the caller supplied
+them. It survived a re-read (`agentOperationalStore.read` is `readFileSync`, uncached), then the
+captured state was written back: restored identical, and `operational-v1.json` (4,343 bytes) contains
+no `relay-probe` and does carry an empty `history` section.
+
+**MUTATION.** Producer effect disabled → **exactly one** test failed, 56 passed.
+
+**Commits:** `422df210` (module, wiring, producer, 23 cases), `ee28eac1` (Settings > Memory card,
+delete control, 15 keys in en/ja/zh/ru, registry + guided target + navigation index, 7 cases).
+The four catalogs and `settingsRegistry.ts` carry another track's uncommitted work, so what landed
+is HEAD + this insert only, staged as reconstructed blobs; the commit was verified in a detached
+worktree — i18n exit 0 at 10,569 there, 52 tests green — before being trusted.
