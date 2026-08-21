@@ -338,6 +338,9 @@ function LensRecognition({
   return (
     <div style={{ marginTop: 16 }}>
       <div className="os-viz-row" style={{ alignItems: 'center', gap: 8 }}>
+        <span className="muted">{t('settings.lens.ocr.title')}</span>
+      </div>
+      <div className="os-viz-row" style={{ alignItems: 'center', gap: 8, marginTop: 6 }}>
         <span className="muted">{t('settings.lens.ocr.defaultEngine')}</span>
         <select
           className="os-input"

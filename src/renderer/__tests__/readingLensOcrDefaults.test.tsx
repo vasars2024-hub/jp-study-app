@@ -178,3 +178,13 @@ describe('Reading Lens recognition settings', () => {
     expect(host.textContent).not.toContain('settings.lens.ocr.');
   });
 });
+
+describe('the block names itself', () => {
+  it('renders the recognition heading, so the key is not a dead catalog entry', async () => {
+    // `settings.lens.ocr.title` shipped in all four catalogs before anything
+    // rendered it. `tools/i18n-check.cjs` compares catalogs against each other
+    // and cannot see an unused key at all.
+    await render();
+    expect(host.textContent).toContain('Text recognition');
+  });
+});
