@@ -1278,6 +1278,28 @@
   border-top: 1px solid var(--agent-line);
 }
 
+/* The monthly ceiling, separated from the per-request cap above it the same way
+   the cost block itself is separated: they answer different questions, and a
+   user reading "limit" twice in one column needs the break to see that. */
+.agent-spend-panel {
+  margin-top: var(--space-sm, 8px);
+  padding-top: var(--space-sm, 8px);
+  border-top: 1px dashed var(--agent-line);
+}
+
+.agent-spend-panel > .agent-action {
+  margin-top: var(--space-sm, 8px);
+}
+
+/* Not an error: these are honest reports of a real state — a total that does not
+   cover every request, a ceiling already reached. They read louder than a note
+   and quieter than a failure. */
+.agent-budget-warning {
+  margin: 6px 0 0;
+  color: var(--warning);
+  font-size: var(--font-size-xs, 0.75rem);
+}
+
 .agent-check {
   display: inline-flex;
   align-items: center;

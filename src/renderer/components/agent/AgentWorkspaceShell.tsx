@@ -77,6 +77,7 @@ import {
   onAgentProviderPricingChanged,
   saveAgentProviderPrice,
 } from '../../agentProviderPricingStore';
+import { AgentSpendPanel } from './AgentSpendPanel';
 import {
   AGENT_CONVERSATION_PLAN_OBJECTIVE_LIMIT,
   createAgentConversationPlan,
@@ -2486,6 +2487,13 @@ export default function AgentWorkspaceShell() {
                       ) : (
                         <p className="agent-budget-note">{t('agent.execute.costUnpriced')}</p>
                       )}
+
+                      {/* Outside the `selectedPrice` branch on purpose: the
+                          monthly ceiling is one number across every cloud
+                          provider, so it is just as real when THIS provider has
+                          no rates entered — that is precisely the case the
+                          panel's unpriced count exists to report. */}
+                      <AgentSpendPanel disabled={blocked} />
                     </div>
                   ) : null}
                 </details>
