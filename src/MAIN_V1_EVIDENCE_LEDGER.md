@@ -26934,3 +26934,51 @@ Route: real `lensOpen('clipboard')` on three lines written to the OS clipboard.
 
 Track 5 is now **6 finished / 2 partial**; Tracks 1/4/5/6 = **23 finished / 2 partial /
 4 deferred = 29**. Remaining Track 5 partials: bullets 2 and 8.
+
+## 2026-08-20 backup — Track 5 bullet 3: the Read sheet takes input, and it moves
+
+Two direct user reports on the same surface: it "just sticks in the middle of the screen", and
+"right now no buttons work either". One root cause was suspected for both; it was one cause for
+the input and a genuinely absent feature for the geometry.
+
+**`a4d1cd85` — the input path, and it was never the DOM.** Four candidates were checked in
+order, and the three cheap ones were falsified by measurement, not by reading: computed
+`pointer-events` is `auto` on every header button **and every ancestor up to `.lens-root`**;
+`document.elementFromPoint` at the centre of all six returns the button itself (`hitIsSelfOrChild`
+true, 6/6); handlers are bound. The cause is `ReadingLensOverlay.tsx:568` — the lens is one
+transparent always-on-top window, click-through by default, and interactivity is re-armed only
+by a forwarded `mousemove` landing on `.lens-interactive`. That guard knew about `resizing` and
+not about `readOpen`. **Measured at the OS layer with `WindowFromPoint`**, because that is the
+only layer that can see it: with the sheet open and the flag set, the pixel at the centre of the
+sheet's own close button belongs to **hwnd 66864, pid 14488 — another process**. After the fix,
+the same pixel is **hwnd 1968290, pid 24872, rect 0,0 2560x1600** — the lens. Negative control,
+same pixel, sheet closed: back to pid 14488, and 1280,800 falls through to the desktop shell at
+640,370 1280x860. `readOpen` also joins the auto-dismiss suspension list: the sheet covers the
+fragments that countdown measures against.
+
+**TRAP, and it cost the first probe.** `window.api` is a `contextBridge` object and is
+**frozen** — monkey-patching `lensSetInteractive` to record calls silently no-ops and the empty
+log reads exactly like "the handler never ran". `Object.isFrozen(window.api)` is `true`. Patch
+`document.elementFromPoint` instead; it proved the listener does run (1 call, at the button).
+
+**`9b1497a2` — drag, resize, persist, clamp.** Header drag (its buttons opt out), eight grips,
+`localStorage` beside the mode and the pin, all geometry in `shared/readingLensReadFrame.ts`
+where every path runs through `clampReadFrame`. Live on the 2560x1600 lens, each rect read in
+its **own** `/eval`: default `900,24 760x1552`; SE grip -200,-700 → `560x852`, origin held;
+header drag -300,+100 → `600,124` exactly; past the minimum → `360x200`; close + reopen →
+`600,124 560x852`, the same rect. Negative controls: cleared frame → `900,24 760x1552`; a frame
+seeded at `2400,1500 600x400` restores clamped to `1960,1200 600x400`, flush against both edges.
+
+**TRAP for the next live walk.** React does not re-render inside the task that dispatched the
+event, so a gesture and the rect it produced **must not be read in one `/eval`** — that reads
+the pre-gesture layout and reports "nothing moved" three times in a row. `debug/rp-step.cjs`
+runs one step per process. The same effect hid a real defect: attaching the window-level
+`pointermove` from an effect keyed on gesture state attaches it **one gesture late**, so the
+first drag on a fresh sheet moved nothing and the next moved by the first one's delta. jsdom
+cannot see it — `act()` flushes effects between dispatches — so the listeners are attached
+imperatively in the handler. `setPointerCapture` is guarded too: it throws `NotFoundError` for
+a pointer id the browser does not consider active, and that throw took the whole gesture.
+
+Tests: 4 (input; 3 fail against the pre-fix guards, the 4th is the click-through control) +
+17 (frame module) + 8 (panel gestures). i18n **10,706** in four languages.
+Track 5 unchanged at **6 finished / 2 partial** — bullets 2 and 8 remain.

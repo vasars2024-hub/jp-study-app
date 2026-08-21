@@ -417,6 +417,26 @@ Track 5 is now **6 finished / 2 partial**; Tracks 1/4/5/6 = **23 finished / 2 pa
 4 deferred = 29**. Remaining Track 5 partials: bullets 2 (alternate OCR candidates,
 mixed-panel order model) and 8 (privacy/retention, OCR/model defaults).
 
+**Amended 2026-08-20 — a direct user requirement added to bullet 3, and one defect under it.**
+The user reported the Read sheet twice from their own screen: it "just sticks in the middle of
+the screen", and then "right now no buttons work either". Both are now closed, and the
+requirement is recorded here rather than left in a relay pin that expires.
+
+*The requirement.* The Read overlay **must be draggable by its header row, resizable from its
+edges and corners with a minimum that keeps the header controls and one line of the passage
+legible, must persist its position and size across close/reopen, and must be clamped on
+screen** — this machine has two displays, so an unclamped restore can put it where there are
+no pixels. Delivered in `9b1497a2`; geometry lives in `shared/readingLensReadFrame.ts` and
+every entry point runs through `clampReadFrame`.
+
+*The defect underneath it, `a4d1cd85`.* The sheet took no input at all, and the cause was not
+in the DOM. The lens is one transparent always-on-top window that is click-through by default;
+interactivity is re-armed only by a forwarded `mousemove` landing on `.lens-interactive`. Read
+is an opaque sheet with its own controls, so it must not depend on that flip. Measured at the
+OS layer — with the sheet open and the flag set, `WindowFromPoint` at the centre of its own
+close button returned **another process's window**. `readOpen` now joins `resizing` in the
+pass-through guard and `popup` in the auto-dismiss suspension list.
+
 ### Track 5 implementation checkpoint — 2026-08-12
 
 - **Searchable capture/session history: done.** Persistent captures, pinning, and — as of
