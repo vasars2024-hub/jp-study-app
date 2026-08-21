@@ -134,7 +134,7 @@ export const AGENT_SETTINGS_GUIDED_TARGETS = {
   storage: ['storage-models'],
   memory: [
     'memory', 'system-memory', 'storage-usage', 'storage-inventory',
-    'agent-memory', 'backup', 'clear-data', 'factory-reset',
+    'agent-memory', 'agent-history', 'backup', 'clear-data', 'factory-reset',
   ],
   help: [],
 } as const satisfies Readonly<Record<string, readonly string[]>>;

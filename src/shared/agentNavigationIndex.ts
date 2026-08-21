@@ -288,6 +288,7 @@ const CONTROL_ENTRIES: readonly AgentNavigationIndexEntry[] = [
   { section: 'settings', page: 'memory', controlId: 'storage-inventory', titleKey: 'search.storageInventory', terms: ['data inventory', 'inventory', 'list', 'size', 'indexeddb', 'localstorage'] },
   // Bare `agent` still opens the Agent window: neither term below matches it.
   { section: 'settings', page: 'memory', controlId: 'agent-memory', titleKey: 'search.agentMemory', terms: ['agent memory', 'local agent memory'] },
+  { section: 'settings', page: 'memory', controlId: 'agent-history', titleKey: 'search.agentHistory', terms: ['agent history', 'operation history', 'agent operation history', 'what the agent did'] },
   { section: 'settings', page: 'memory', controlId: 'backup', titleKey: 'search.backup', terms: ['backup restore', 'backup', 'export', 'import', 'restore', 'json'] },
   { section: 'settings', page: 'memory', controlId: 'clear-data', titleKey: 'search.clearData', terms: ['clear data', 'clear', 'delete', 'decks', 'csv', 'clipboard', 'lyrics', 'calendar', 'cache'] },
   { section: 'settings', page: 'memory', controlId: 'factory-reset', titleKey: 'search.factoryReset', terms: ['factory reset', 'factory', 'reset', 'wipe', 'erase', 'fresh'] },

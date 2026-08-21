@@ -1371,6 +1371,14 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     pageId: 'memory',
     group: 'System',
   },
+  {
+    id: 'agent-history',
+    titleKey: 'search.agentHistory',
+    descKey: 'search.agentHistory.desc',
+    keywords: ['agent history', 'operation history', 'what the agent did', 'audit', 'delete history', 'activity'],
+    pageId: 'memory',
+    group: 'System',
+  },
 ];
 
 export function searchSettings(

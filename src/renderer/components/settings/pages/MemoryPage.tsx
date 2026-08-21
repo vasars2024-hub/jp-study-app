@@ -23,6 +23,13 @@ import {
   resetLocalAgentMemory,
   saveLocalAgentMemory,
 } from '../../../localAgentMemoryStore';
+import {
+  AGENT_HISTORY_CHANGED_EVENT,
+  clearAgentOperationHistorySnapshot,
+  getAgentOperationHistorySnapshot,
+} from '../../../agentOperationalClient';
+import { AGENT_OPERATION_HISTORY_RETENTION_MS } from '../../../../shared/agentOperationHistory';
+import { AGENT_TOOL_OPERATIONS } from '../../../../shared/localAgent';
 
 interface SystemMetrics {
   freemem: number;
@@ -66,6 +73,11 @@ function Meter({ label, pct, detail }: { label: string; pct: number; detail: str
 
 type TFn = (key: string, vars?: Record<string, string | number>) => string;
 
+/** Operation id to the registry's own label, built once rather than per row. */
+const operationLabels = new Map(
+  AGENT_TOOL_OPERATIONS.map((definition) => [definition.id, definition.label]),
+);
+
 function tierLabel(tier: DomainInventoryItem['tier'], t: TFn): string {
   if (tier === 'host') return t('settings.memory.tier.host');
   if (tier === 'durable') return t('settings.memory.tier.durable');
@@ -89,7 +101,20 @@ export default function MemoryPage() {
     useState<AgentMemoryCategory>('user-preference');
   const [agentMemoryKey, setAgentMemoryKey] = useState('');
   const [agentMemoryValue, setAgentMemoryValue] = useState('');
+  /**
+   * The durable record of what the Agent changed. Read from the main-owned
+   * snapshot rather than kept in sync by hand, and re-read on the section's own
+   * event so a window left open on this page while the Agent works in another
+   * one does not show a record that stopped at page load.
+   */
+  const [agentHistory, setAgentHistory] = useState(() => getAgentOperationHistorySnapshot());
   const importRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const listener = () => setAgentHistory(getAgentOperationHistorySnapshot());
+    window.addEventListener(AGENT_HISTORY_CHANGED_EVENT, listener);
+    return () => window.removeEventListener(AGENT_HISTORY_CHANGED_EVENT, listener);
+  }, []);
 
   const refreshStorage = useCallback(async () => {
     setLoadError('');
@@ -285,6 +310,26 @@ export default function MemoryPage() {
     setAgentMemory(resetLocalAgentMemory());
     clearAgentMemoryEditor();
     setStatus('Agent memory cleared.');
+  }
+
+  /**
+   * Deletion is exact and immediate, and the confirmation says what it does NOT
+   * do: dropping the record does not reverse the operations it describes, and a
+   * dialog that let a user believe otherwise would be the worse failure here.
+   */
+  async function handleClearAgentHistory(): Promise<void> {
+    if (!agentHistory.entries.length) return;
+    const ok = await confirmDialog({
+      title: t('search.agentHistory'),
+      message: t('settings.memory.agentHistory.confirm', {
+        count: agentHistory.entries.length,
+      }),
+      confirmLabel: t('settings.memory.agentHistory.clear'),
+      danger: true,
+    });
+    if (!ok) return;
+    setAgentHistory(clearAgentOperationHistorySnapshot());
+    setStatus(t('settings.memory.agentHistory.cleared'));
   }
 
   const usagePct = usage && usage.quota > 0 ? Math.min(100, (usage.used / usage.quota) * 100) : 0;
@@ -576,6 +621,75 @@ export default function MemoryPage() {
             onClick={() => void handleClearAgentMemory()}
           >
             Clear agent memory
+          </button>
+        </div>
+      </SettingsCard>
+
+      <SettingsCard
+        id="agent-history"
+        title={t('search.agentHistory')}
+        description={t('search.agentHistory.desc')}
+        highlight={focusSettingId === 'agent-history'}
+      >
+        <p className="muted os-set-hint">
+          {t('settings.memory.agentHistory.retention', {
+            count: agentHistory.entries.length,
+            days: Math.round(AGENT_OPERATION_HISTORY_RETENTION_MS / 86_400_000),
+          })}
+        </p>
+        <div className="memory-inventory-wrap" style={{ marginTop: 10 }}>
+          <table className="memory-inventory">
+            <thead>
+              <tr>
+                <th>{t('settings.memory.agentHistory.colOperation')}</th>
+                <th>{t('settings.memory.agentHistory.colClaim')}</th>
+                <th>{t('settings.memory.agentHistory.colWhen')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {!agentHistory.entries.length && (
+                <tr>
+                  <td colSpan={3} className="muted">
+                    {t('settings.memory.agentHistory.empty')}
+                  </td>
+                </tr>
+              )}
+              {agentHistory.entries.map((entry) => (
+                <tr key={entry.id}>
+                  {/*
+                    The registry's own label, not the raw id: a row that renders
+                    `flashcard.add-cards` reads as a bug rather than as a record.
+                    The id is the fallback only when this build has no definition
+                    for it, which normalization already refuses on load.
+                  */}
+                  <td><strong>{operationLabels.get(entry.operation) ?? entry.operation}</strong></td>
+                  <td className="memory-detail">
+                    {t(`settings.memory.agentHistory.claim.${entry.claim}`)}
+                    {entry.entityIds.length > 0 && (
+                      <span className="muted">
+                        {' · '}
+                        {t('settings.memory.agentHistory.entities', {
+                          count: entry.entityIds.length,
+                        })}
+                      </span>
+                    )}
+                  </td>
+                  <td className="muted">
+                    {new Date(entry.at).toLocaleString(LANG_TAGS[lang])}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="memory-actions" style={{ marginTop: 10 }}>
+          <button
+            type="button"
+            className="btn danger"
+            disabled={!agentHistory.entries.length}
+            onClick={() => void handleClearAgentHistory()}
+          >
+            {t('settings.memory.agentHistory.clear')}
           </button>
         </div>
       </SettingsCard>
