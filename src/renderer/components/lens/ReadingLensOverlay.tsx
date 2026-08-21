@@ -503,8 +503,8 @@ export default function ReadingLensOverlay() {
             : null;
           const altLines = altCapture ? buildLines(altCapture.lines) : [];
           const alternate: LensAlternateRead | undefined =
-            altCapture && altLines.length
-              ? { engine: altRead!.engine, capture: altCapture, lines: altLines }
+            altRead && altCapture && altLines.length
+              ? { engine: altRead.engine, capture: altCapture, lines: altLines }
               : undefined;
 
           const lines = capture ? buildLines(capture.lines) : [];
@@ -1533,12 +1533,13 @@ export function LensChrome({
         // stated rather than a fourth button nobody asked for.
         const target = engine === 'manga' ? 'web' : 'manga';
         const label = target === 'manga' ? t('lens.action.manga') : t('lens.action.web');
-        const instant = !!onUseAlternate && alternateEngine === target;
+        const swapIn = alternateEngine === target ? onUseAlternate : undefined;
+        const instant = !!swapIn;
         return (
           <button
             type="button"
             className={instant ? 'lens-engine-swap ready' : 'lens-engine-swap'}
-            onClick={() => (instant ? onUseAlternate!() : onRescan(target))}
+            onClick={() => (swapIn ? swapIn() : onRescan(target))}
             title={instant ? t('lens.action.alternateReady', { engine: label }) : label}
           >
             {label}
