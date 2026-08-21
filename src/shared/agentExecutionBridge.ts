@@ -27,6 +27,7 @@ export type AgentExecutionFailureCode =
   | 'sensitive-context'
   | 'input-budget'
   | 'cost-budget'
+  | 'spend-budget'
   | 'authentication'
   | 'rate-limit'
   | 'upstream'
@@ -151,6 +152,7 @@ const FAILURE_CODES = new Set<AgentExecutionFailureCode>([
   'sensitive-context',
   'input-budget',
   'cost-budget',
+  'spend-budget',
   'authentication',
   'rate-limit',
   'upstream',

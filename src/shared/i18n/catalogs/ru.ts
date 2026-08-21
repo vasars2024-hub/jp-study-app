@@ -9375,6 +9375,7 @@ export const ru: Catalog = {
   'agent.execute.sensitiveConsent': 'Отправить выбранный конфиденциальный контекст и содержимое вложений в {provider} для этого запроса.',
   'agent.execute.sensitiveExcluded': 'Конфиденциальный контекст и вложения останутся локальными, потому что постоянное исключение включено.',
   'agent.execute.error.costBudget': 'Оценка стоимости запроса выше заданного вами лимита. Повысьте лимит или сократите запрос.',
+  'agent.execute.error.spendBudget': 'Этот запрос выведет вас за месячный лимит расходов, который вы задали. Повысьте лимит в настройках или дождитесь следующего месяца.',
   'agent.card.navigate.control': 'Элемент {control}',
   'agent.card.navigate.highlight': 'Элемент будет подсвечен',
   'agent.card.approve.checking': 'Проверяем, доступен ли этот шаг…',

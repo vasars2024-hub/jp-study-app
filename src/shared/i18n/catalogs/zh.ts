@@ -8504,6 +8504,7 @@ export const zh: Catalog = {
   'agent.execute.sensitiveConsent': '为此请求将所选敏感上下文和附件内容发送至 {provider}。',
   'agent.execute.sensitiveExcluded': '由于已启用持久排除，敏感上下文和附件将保留在本地。',
   'agent.execute.error.costBudget': '本次请求的预估费用超过了你设置的费用上限。请提高上限或缩短请求。',
+  'agent.execute.error.spendBudget': '本次请求会让你超出所设置的每月支出上限。请在设置中提高上限，或等到下个月。',
   'agent.card.navigate.control': '控件 {control}',
   'agent.card.navigate.highlight': '将高亮显示该控件',
   'agent.card.approve.checking': '正在检查此步骤是否可用…',

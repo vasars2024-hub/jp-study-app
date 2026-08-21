@@ -219,6 +219,7 @@ const EXECUTION_ERROR_CODES = new Set<AgentExecutionFailureCode>([
   'sensitive-context',
   'input-budget',
   'cost-budget',
+  'spend-budget',
   'authentication',
   'rate-limit',
   'upstream',
@@ -242,6 +243,11 @@ function executionErrorKey(code: AgentExecutionFailureCode): string {
   // "privacy or budget policy" wording names no control the user can reach, and
   // this refusal has exactly one remedy.
   if (code === 'cost-budget') return 'agent.execute.error.costBudget';
+  // Separate from `costBudget` for the same reason that one was separated from
+  // `privacy`: the control is a different one, in a different place, and telling
+  // someone their request was too expensive when the truth is that their month
+  // is spent sends them to shrink a prompt that was never the problem.
+  if (code === 'spend-budget') return 'agent.execute.error.spendBudget';
   if (
     code === 'cloud-disabled'
     || code === 'sensitive-context'

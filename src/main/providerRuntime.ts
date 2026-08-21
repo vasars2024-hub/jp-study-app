@@ -4,6 +4,7 @@ import { AI_PROVIDERS, providerAcceptsImageInput, providerKeyBucket } from '../s
 import type { AgentProviderPolicy } from '../shared/agentWorkspace';
 import type { AgentProviderPrice } from '../shared/agentProviderPricing';
 import { agentEstimatedTokens, estimateAgentProviderCostUsd } from '../shared/agentProviderPricing';
+import type { AgentSpendGuard } from '../shared/agentSpendLedger';
 import { readAiProviderSecret } from './credentials/ai';
 
 export const AI_PROVIDER_TIMEOUT_MS = 120_000;
@@ -25,6 +26,14 @@ export type AiProviderErrorCode =
   | 'sensitive-context'
   | 'input-budget'
   | 'cost-budget'
+  /**
+   * The user's *cumulative* monthly ceiling would be crossed by this request.
+   * Distinct from `cost-budget`, which is about this request being individually
+   * too expensive: the remedy differs (wait for the month, or raise the
+   * ceiling — not "ask for less"), and a request well under the per-request cap
+   * is the normal way this one is hit.
+   */
+  | 'spend-budget'
   | 'authentication'
   | 'rate-limit'
   | 'upstream'
@@ -131,6 +140,26 @@ interface CachedProviderResult {
 }
 
 const sessionCache = new Map<string, CachedProviderResult>();
+
+/**
+ * The cumulative monthly ceiling, or `null` for none.
+ *
+ * A module-level registration rather than a field on `AiProviderRequest`, and
+ * the reason is the same one written above `providerAcceptsImageInput` below:
+ * this runtime is reachable from callers other than the Agent router. A ceiling
+ * that each caller had to remember to pass would be bypassed by the first one
+ * that forgot, and silently — which is the only failure mode a spending limit
+ * really has. Enforced by default, opted out of explicitly.
+ *
+ * `null` until main registers the store at startup, so every unit test that
+ * boots this module keeps its existing behaviour rather than acquiring a
+ * ceiling it never asked for.
+ */
+let spendGuard: AgentSpendGuard | null = null;
+
+export function setAgentSpendGuard(guard: AgentSpendGuard | null): void {
+  spendGuard = guard;
+}
 
 function providerModel(providerId: AiProviderId): string {
   if (providerId === 'gemini-2.5-flash') return 'gemini-2.5-flash';
@@ -667,6 +696,23 @@ export async function runCloudAiRequest(request: AiProviderRequest): Promise<AiP
   ) {
     throw new AiProviderRuntimeError('AI request exceeds the configured cost budget.', 'cost-budget');
   }
+  // Second, and after the per-request cap on purpose: "this one request is too
+  // expensive" is the more specific complaint and names the control the user
+  // most likely just set. Both are preflight, and both estimate output at
+  // `maxOutputTokens` — the worst case — because a ceiling that can be crossed
+  // by a request it approved is not a ceiling. The cost is that a request which
+  // would in fact have fit can be refused near the boundary; the remedy for
+  // that is visible and reversible, whereas the alternative is a total that
+  // quietly ends the month above the number the user set.
+  if (spendGuard) {
+    const spend = spendGuard.verdict(preflightCost);
+    if (spend.kind === 'refuse') {
+      throw new AiProviderRuntimeError(
+        'AI request would exceed the monthly spending limit.',
+        'spend-budget',
+      );
+    }
+  }
   const apiKey = credentialFor(request.providerId, request.apiKey);
   if (!apiKey) throw new AiProviderRuntimeError('AI provider credential is not configured.', 'missing-credential');
 
@@ -709,6 +755,15 @@ export async function runCloudAiRequest(request: AiProviderRequest): Promise<AiP
       if (cacheMode === 'session') {
         sessionCache.set(key, { text: result.text, usage: result.usage });
       }
+      // The *actual* cost, not the worst-case figure the preflight refused on:
+      // the ledger is a record of what was spent, and charging the user's month
+      // for output tokens the model did not produce would make the total wrong
+      // in the direction that refuses their next request.
+      //
+      // Only here, so a cache hit adds nothing — it made no request and there is
+      // no bill for it — and only on success, so a failed attempt that was
+      // retried is not counted once per attempt.
+      spendGuard?.record(request.providerId, result.usage.estimatedCostUsd);
       emit(request, { type: 'complete', providerId: request.providerId, model, attempts, cached: false });
       return {
         text: result.text,

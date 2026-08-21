@@ -8539,6 +8539,7 @@ export const ja: Catalog = {
   'agent.execute.sensitiveConsent': 'このリクエストで、選択した機密コンテキストと添付ファイルの内容を {provider} に送信します。',
   'agent.execute.sensitiveExcluded': '永続的な除外設定が有効なため、機密コンテキストと添付ファイルはローカルに残ります。',
   'agent.execute.error.costBudget': 'このリクエストの推定費用が、設定した費用の上限を超えています。上限を引き上げるか、リクエストを短くしてください。',
+  'agent.execute.error.spendBudget': 'このリクエストを実行すると、設定した月間の支出上限を超えます。設定で上限を引き上げるか、翌月までお待ちください。',
   'agent.card.navigate.control': 'コントロール {control}',
   'agent.card.navigate.highlight': '対象のコントロールを強調表示します',
   'agent.card.approve.checking': 'このステップを利用できるか確認しています…',

@@ -8962,6 +8962,7 @@ export const en: Catalog = {
   'agent.execute.sensitiveConsent': 'Send selected sensitive context and attached file contents to {provider} for this request.',
   'agent.execute.sensitiveExcluded': 'Sensitive context and attachments will stay local because persistent exclusion is on.',
   'agent.execute.error.costBudget': 'The estimated cost of this request is above the cost limit you set. Raise the limit or shorten the request.',
+  'agent.execute.error.spendBudget': 'This request would take you past the monthly spending limit you set. Raise the limit in Settings, or wait until next month.',
   'agent.card.navigate.control': 'Control {control}',
   'agent.card.navigate.highlight': 'The control will be highlighted',
   'agent.card.approve.checking': 'Checking whether this step is available…',

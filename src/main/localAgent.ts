@@ -28,6 +28,8 @@ import { registerAgentCardBatchStagingIpc } from './agentCardBatchStaging';
 import { registerAgentNavigationIpc } from './agentNavigationIpc';
 import { registerAgentWorkspaceIpc } from './agentWorkspaceIpc';
 import { registerAgentOperationalIpc } from './agentOperationalIpc';
+import { getAgentSpendStore } from './agentSpendStore';
+import { setAgentSpendGuard } from './providerRuntime';
 export { getAgentWorkspaceStore } from './agentWorkspaceStore';
 export { runAgentProviderPrompt } from './agentProviderRouter';
 
@@ -290,6 +292,12 @@ export function registerLocalAgentIpc(): void {
   // point another track is mid-rewrite on.
   registerAgentWorkspaceIpc();
   registerAgentExecutionIpc();
+  // The monthly spending ceiling is handed to the provider runtime rather than
+  // registered as a channel: it is consulted on the preflight of every cloud
+  // request main makes, including the ones no renderer asked for. Registering
+  // it here means it is in force from the same boot that brings the Agent up,
+  // instead of from whenever a window first happens to read it.
+  setAgentSpendGuard(getAgentSpendStore());
   // Permission-gated navigation reads the same store the two above own, so it
   // registers beside them rather than from `src/main.ts`. Its window opener is
   // handed over separately, from the pop-out wiring that owns those windows.

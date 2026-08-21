@@ -67,6 +67,7 @@ const PROVIDER_CODES = new Set<AiProviderErrorCode>([
   'sensitive-context',
   'input-budget',
   'cost-budget',
+  'spend-budget',
   'authentication',
   'rate-limit',
   'upstream',
