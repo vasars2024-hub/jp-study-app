@@ -27386,3 +27386,50 @@ absence already resolved to; no user data changed.
 (husk shape 3, `electron-husk-restart`). A third restart cleared it. Also: `/eval` takes **ONE
 expression** — a multi-statement `js` body returns "Script failed to execute", which reads like the
 app is broken and is not. Wrap in an IIFE, stash the promise on `window`, poll it.
+
+## 2026-08-21 — The ceiling gets a dial, and a total that admits what it misses
+
+**Track 3, provider budgets — the control half.** `c77fee80`/`eef593fc` shipped enforcement with
+no control a user could reach: the monthly ceiling existed, refused requests, and could only be set
+over IPC. `52cb568c` lands the panel; `401cd291` pins the two states the live walk cannot reach.
+
+**Placement, and it is a decision.** `AgentSpendPanel` sits in `AgentWorkspaceShell`'s cost block
+beside the per-request cap and the provider rates — not in Settings — because those are the numbers
+this ceiling is compared against and that is where a refused user is standing. Consequence:
+`agent.execute.error.spendBudget` said "Raise the limit in Settings" and now says "under Request
+limits", in all four languages. A string pointing at a page the control is not on is the same
+defect this repo keeps finding under another name.
+
+**Rendered OUTSIDE the `selectedPrice` branch, on purpose.** One ceiling covers every cloud
+provider, so it is just as real when the selected provider has no rates — which is precisely the
+case its unpriced count exists to report.
+
+**Two things it refuses to do.** It never prints the month's total as if that covered everything:
+unpriced requests contribute nothing to the sum, so their count is stated separately. And the erase
+confirmation says, in the sentence that asks, that the ceiling is untouched.
+
+**Commit on blur, not per keystroke** — each write crosses IPC and reaches disk, and typing "12"
+through "1" would persist a $1 ceiling on the way. Out-of-bounds is refused locally and the field
+reverts to what is still in force. Main's push is adopted for the snapshot but never overwrites a
+half-typed draft: main pushes on every recorded request, and a limit replaced under the cursor is a
+limit the user never typed.
+
+**LIVE, pid 30964, real store, real main handlers.** Start → Agent → provider `gemini-2.5-flash`
+(the cost block is absent at `local`, correctly). Panel read the real store: `US$0 in 2026-08,
+across 0 priced request(s)`. Tick → disk `budgetUsd: 10`, "US$10.00 left". **NEGATIVE CONTROL:**
+typed `99999` (max 10,000) → refused, field reverted to **10**, "the previous limit is still in
+force", disk unchanged. Typed `0.25` → disk `0.25`. Untick → disk `null`, number field gone, erase
+button correctly disabled at zero requests. Store left at `budgetUsd: null`, as found.
+
+**MUTATIONS.** Push normalization dropped → exactly 1 failed. `bridge-unavailable` degraded to the
+throw code → exactly 1 failed. Unpriced line made unconditional → exactly 1 failed. Erase
+confirmation counting only priced requests → exactly 1 failed. 17 new tests, green first run.
+
+**NEXT, and it is re-derived rather than guessed.** Track 3's trust bullet is now 5 of 6:
+automation schedules is the last, and the plan's "product decision" framing is **half stale**. The
+freeze is already correct at execution — `BlancReadyToolPanels.tsx:386` rides the automation's
+permission as a queue `permissionCeiling`, and `localAgentQueueRun.ts:227` narrows the live
+permission with it. What is NOT bounded is **planning**: `:371` sends live `settings` verbatim, so
+an automation created at read-only plans full-automation steps that execution then refuses. Fix is
+one expression at `:373` — `settings: {...settings, permission: narrowAgentPermission(...)}`.
+Trap: both files are foreign-dirty, so it needs HEAD+edit reconstruction, not `git add`.
