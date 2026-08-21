@@ -2932,6 +2932,7 @@ export const zh: Catalog = {
   'settings.action.askAgent': '询问助手',
   'lens.action.manga': '漫画模式',
   'lens.action.web': '文本模式',
+  'lens.action.alternateReady': '切换到{engine} — 已识别，无需重新扫描',
   'lens.action.close': '关闭取词镜',
   'lens.action.newRegion': '重新框选',
   'lens.resize.nw': '拖动左上角调整范围',

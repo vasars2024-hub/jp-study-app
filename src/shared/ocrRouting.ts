@@ -176,11 +176,31 @@ export function isDegenerate(text: string): boolean {
  * must not be drastically *less* text than PP-OCR managed, which is the shape a
  * truncated or hallucinated bubble read takes.
  */
+/**
+ * Is a manga-ocr read a plausible read at all, independent of the comparison?
+ *
+ * Split out of `pickBetterRead` because two callers need the same bar for
+ * different questions. `pickBetterRead` asks "which read wins"; the Lens asks
+ * "is the losing read worth *offering* as an alternate". Those must not drift
+ * apart — a read the router threw out as junk is exactly the read that must not
+ * come back as a one-click swap. Measured live: a 96 px `猫だ` made the general
+ * engine's short read escalate, and manga-ocr answered `．．．`, which is 0.0
+ * Japanese and would otherwise have been offered as a choice.
+ *
+ * Deliberately NOT part of this bar: "much shorter than the general read". That
+ * is a comparison, not a defect, and a short-but-real Japanese read is a
+ * legitimate thing for a reader to switch to.
+ */
+export function mangaReadIsUsable(text: string): boolean {
+  const manga = text.trim();
+  if (!manga) return false;
+  if (isDegenerate(manga)) return false;
+  return japaneseRatio(manga) >= MIN_JAPANESE_RATIO;
+}
+
 export function pickBetterRead(paddleText: string, mangaText: string): 'manga' | 'web' {
+  if (!mangaReadIsUsable(mangaText)) return 'web';
   const manga = mangaText.trim();
-  if (!manga) return 'web';
-  if (isDegenerate(manga)) return 'web';
-  if (japaneseRatio(manga) < MIN_JAPANESE_RATIO) return 'web';
   const paddle = paddleText.trim();
   if (!paddle) return 'manga';
   // A read worth less than half of what the other engine found is a failed read.

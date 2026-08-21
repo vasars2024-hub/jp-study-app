@@ -27,7 +27,12 @@ import {
   mangaOcrAvailable,
   type MangaOcrRegionLine,
 } from './mangaOcr';
-import { summarizePaddle, shouldTryMangaOcr, pickBetterRead } from '../shared/ocrRouting';
+import {
+  summarizePaddle,
+  shouldTryMangaOcr,
+  pickBetterRead,
+  mangaReadIsUsable,
+} from '../shared/ocrRouting';
 
 export type OcrEngineChoice = 'auto' | 'manga' | 'web';
 export type OcrEngineUsed = 'manga' | 'web';
@@ -40,6 +45,22 @@ export interface AutoOcrLine {
   confidence: number;
 }
 
+/**
+ * The read `pickBetterRead` rejected, kept instead of discarded.
+ *
+ * `auto` runs both engines whenever `shouldTryMangaOcr` fires and then throws
+ * the loser away, so a reader who disagrees with the choice pays for a whole
+ * second OCR pass to see a read that already exists. Carrying it costs one
+ * already-allocated array, and the caller can offer it with no engine work at
+ * all. Only ever set when both engines actually ran.
+ */
+export interface AutoOcrAlternate {
+  engine: OcrEngineUsed;
+  lang: string;
+  lines: AutoOcrLine[];
+  text: string;
+}
+
 export interface AutoOcrResult {
   engine: OcrEngineUsed;
   lang: string;
@@ -47,6 +68,8 @@ export interface AutoOcrResult {
   text: string;
   /** True when the manga engine was tried but lost the comparison. */
   mangaConsidered: boolean;
+  /** The other engine's read of the same pixels, when there was one. */
+  alternate?: AutoOcrAlternate;
 }
 
 /**
@@ -222,7 +245,21 @@ export async function ocrAuto(dataUrl: string, opts: AutoOcrOptions = {}): Promi
     return web;
   }
 
-  return pickBetterRead(web.text, manga.text) === 'manga'
-    ? manga
-    : { ...web, mangaConsidered: true };
+  // An alternate that is not a real read is not a choice. Empty is the obvious
+  // case; the one a live pass actually produced is a manga read of `．．．`,
+  // non-empty and completely useless. `mangaReadIsUsable` is the SAME bar
+  // `pickBetterRead` rejects on, reused rather than restated so the two cannot
+  // drift into offering a read the router already threw out. The general engine
+  // gets only the empty test — it is allowed to read latin text, so a Japanese
+  // ratio would be the wrong question to ask it.
+  const carry = (r: AutoOcrResult): AutoOcrAlternate | undefined => {
+    if (r.text.trim() === '') return undefined;
+    if (r.engine === 'manga' && !mangaReadIsUsable(r.text)) return undefined;
+    return { engine: r.engine, lang: r.lang, lines: r.lines, text: r.text };
+  };
+
+  if (pickBetterRead(web.text, manga.text) === 'manga') {
+    return { ...manga, alternate: carry(web) };
+  }
+  return { ...web, mangaConsidered: true, alternate: carry(manga) };
 }

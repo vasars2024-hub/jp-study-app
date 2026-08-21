@@ -401,6 +401,15 @@
 .lens-chrome .lens-vn-save.error {
   background: rgba(178, 59, 71, 0.42);
 }
+/* The engine swap is the same control whether or not the other read is already
+   in hand, so the difference is a quiet marker rather than a second button: an
+   underline says "this is instant", and the tooltip says why. Deliberately not
+   a colour change — the bar's colours already carry save and failure meaning. */
+.lens-chrome .lens-engine-swap.ready {
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+}
 /* A failed Lexicon handoff keeps the button in place to retry from, tinted like
    the visual-novel save's own failure so one lens surface has one failure look. */
 .lens-chrome .lens-lookup-error {

@@ -77,6 +77,13 @@ interface LensLine {
   tokens: JpToken[];
 }
 
+/** A finished read of the current region that is not the one on screen. */
+type LensAlternateRead = {
+  engine: string;
+  capture: ReadingLensCapture;
+  lines: LensLine[];
+};
+
 type LensState =
   | { kind: 'idle' }
   | { kind: 'selecting' }
@@ -92,6 +99,15 @@ type LensState =
     engine: string;
     capture: ReadingLensCapture;
     screenshotDataUrl?: string;
+    /**
+     * The other engine's read of these same pixels, already finished.
+     *
+     * `auto` runs both engines whenever the routing heuristic fires and main
+     * now carries the loser back instead of discarding it, so disagreeing with
+     * the pick costs a state swap rather than a whole second OCR pass. Swapping
+     * puts the outgoing read here, which is what makes the control reversible.
+     */
+    alternate?: LensAlternateRead;
   }
   | {
       kind: 'passage';
@@ -467,6 +483,30 @@ export default function ReadingLensOverlay() {
             lines: res.lines,
             screenshotDataUrl: res.screenshotDataUrl,
           });
+          // The losing engine's read, when main carried one back. It goes
+          // through the same normalizer as the primary — a read offered as a
+          // swap has to be a capture in its own right, or mining, correction
+          // and history would all see a second-class record after the swap.
+          const altRead = res.alternate;
+          const altCapture = altRead
+            ? normalizeReadingLensCapture({
+              source: 'screen',
+              sourceLabel: target?.sourceLabel,
+              sourceRef: target?.sourceRef,
+              language: altRead.lang,
+              engine: altRead.engine,
+              hash: res.hash,
+              text: altRead.text,
+              lines: altRead.lines,
+              screenshotDataUrl: res.screenshotDataUrl,
+            })
+            : null;
+          const altLines = altCapture ? buildLines(altCapture.lines) : [];
+          const alternate: LensAlternateRead | undefined =
+            altCapture && altLines.length
+              ? { engine: altRead!.engine, capture: altCapture, lines: altLines }
+              : undefined;
+
           const lines = capture ? buildLines(capture.lines) : [];
           if (!capture || !lines.length) {
             setState({ kind: 'empty', region });
@@ -482,6 +522,7 @@ export default function ReadingLensOverlay() {
               engine: res.engine,
               capture,
               screenshotDataUrl: capture.screenshotDataUrl,
+              alternate,
             });
           }
         })
@@ -942,6 +983,31 @@ export default function ReadingLensOverlay() {
     }
   };
 
+  /**
+   * Show the other engine's already-finished read of the same region.
+   *
+   * No IPC and no OCR: both reads came back from one `lens:ocr` call. The
+   * outgoing read becomes the new alternate, so the control is its own undo.
+   * History is re-recorded from the incoming capture — `recordReadingLensHistory`
+   * matches on `hash`, and both reads share one, so this replaces the entry
+   * rather than adding a second row for the same pixels.
+   */
+  const useAlternate = () => {
+    if (state.kind !== 'reading' || !state.alternate) return;
+    const incoming = state.alternate;
+    setEditMode(false);
+    setPopup(null);
+    setAnalysisText(null);
+    setState({
+      ...state,
+      engine: incoming.engine,
+      capture: incoming.capture,
+      lines: incoming.lines,
+      alternate: { engine: state.engine, capture: state.capture, lines: state.lines },
+    });
+    void window.api.lensHistoryRecord(incoming.capture).catch(() => undefined);
+  };
+
   const correctLine = (lineIndex: number, nextText: string): boolean => {
     if (state.kind !== 'reading') return false;
     const result = correctReadingLensLine(state.capture, lineIndex, nextText);
@@ -1149,6 +1215,8 @@ export default function ReadingLensOverlay() {
             dockSide={resolveLensChromeDock(state.region, viewport(), dock)}
             onCycleDock={cycleDock}
             onRescan={rescan}
+            alternateEngine={state.alternate?.engine}
+            onUseAlternate={state.alternate ? useAlternate : undefined}
             onNewRegion={() => setState({ kind: 'selecting' })}
             onClose={close}
             onAskAgent={() => askAgent(state.lines, state.screenshotDataUrl)}
@@ -1298,6 +1366,8 @@ export function LensChrome({
   dockSide = 'bottom',
   onCycleDock,
   onRescan,
+  alternateEngine,
+  onUseAlternate,
   onNewRegion,
   onClose,
   onAskAgent,
@@ -1327,6 +1397,13 @@ export function LensChrome({
   dockSide?: 'top' | 'bottom';
   onCycleDock?: () => void;
   onRescan: (engine: 'auto' | 'manga' | 'web') => void;
+  /**
+   * The engine behind the already-finished alternate read, when there is one.
+   * Present only after an `auto` scan that actually ran both engines.
+   */
+  alternateEngine?: string;
+  /** Swaps the alternate in with no second OCR pass. Absent when there is none. */
+  onUseAlternate?: () => void;
   onNewRegion: () => void;
   onClose: () => void;
   onAskAgent: () => void;
@@ -1448,13 +1525,26 @@ export function LensChrome({
       <button type="button" onClick={() => onRescan('auto')} title={t('lens.action.rescan')}>
         {t('lens.action.rescan')}
       </button>
-      <button
-        type="button"
-        onClick={() => onRescan(engine === 'manga' ? 'web' : 'manga')}
-        title={engine === 'manga' ? t('lens.action.web') : t('lens.action.manga')}
-      >
-        {engine === 'manga' ? t('lens.action.web') : t('lens.action.manga')}
-      </button>
+      {(() => {
+        // The swap already exists; what is new is that it is sometimes free.
+        // When `auto` ran both engines the loser came back with the winner, so
+        // this reaches for that read instead of paying for a second OCR pass —
+        // same control, same label, and the tooltip is where the difference is
+        // stated rather than a fourth button nobody asked for.
+        const target = engine === 'manga' ? 'web' : 'manga';
+        const label = target === 'manga' ? t('lens.action.manga') : t('lens.action.web');
+        const instant = !!onUseAlternate && alternateEngine === target;
+        return (
+          <button
+            type="button"
+            className={instant ? 'lens-engine-swap ready' : 'lens-engine-swap'}
+            onClick={() => (instant ? onUseAlternate!() : onRescan(target))}
+            title={instant ? t('lens.action.alternateReady', { engine: label }) : label}
+          >
+            {label}
+          </button>
+        );
+      })()}
       <button type="button" onClick={onNewRegion} title={t('lens.action.newRegion')}>
         {t('lens.action.newRegion')}
       </button>

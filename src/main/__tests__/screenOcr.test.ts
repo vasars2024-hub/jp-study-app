@@ -359,6 +359,56 @@ describe('ocrRegion — DIP mapping', () => {
     expect(on.screenshotDataUrl).toMatch(/^data:image\/jpeg;base64,/);
   });
 
+  it('maps the alternate through the SAME DIP division as the primary', async () => {
+    // The whole point of the alternate is that it can be swapped in wholesale,
+    // so hotspots left in crop-pixel space would paint the losing read's boxes
+    // scaleFactor× too far out the moment a reader accepted it.
+    ocr.impl = () => ({
+      ...result([line([100, 40, 300, 80], '一')]),
+      alternate: {
+        engine: 'manga' as const,
+        lang: 'ja',
+        text: '二',
+        lines: [line([100, 40, 300, 80], '二')],
+      },
+    });
+    state.sources = [{ display_id: '2', thumbnail: state.thumbnail }];
+
+    const res = await ocrRegion({ x: 0, y: 0, width: 300, height: 200 }, 2);
+
+    expect(res.lines[0].box).toEqual([50, 20, 100, 20]);
+    expect(res.alternate?.engine).toBe('manga');
+    expect(res.alternate?.lines[0].box).toEqual([50, 20, 100, 20]);
+    expect(res.alternate?.text).toBe('二');
+  });
+
+  it('repairs the alternate line order too, not only the primary', async () => {
+    ocr.impl = () => ({
+      ...result([line([10, 10, 180, 30], '一')]),
+      alternate: {
+        engine: 'manga' as const,
+        lang: 'ja',
+        text: '三\n一\n二',
+        lines: [
+          line([10, 80, 180, 100], '三'),
+          line([10, 10, 180, 30], '一'),
+          line([10, 45, 180, 65], '二'),
+        ],
+      },
+    });
+
+    const res = await ocrRegion({ x: 0, y: 0, width: 300, height: 160 }, 1);
+
+    expect(res.alternate?.lines.map((item) => item.text)).toEqual(['一', '二', '三']);
+    expect(res.alternate?.text).toBe('一\n二\n三');
+  });
+
+  it('carries no alternate when the read had none', async () => {
+    ocr.impl = () => result([line([0, 0, 20, 20])]);
+    const res = await ocrRegion({ x: 0, y: 0, width: 200, height: 200 }, 1);
+    expect(res.alternate).toBeUndefined();
+  });
+
   it('repairs provider line order in both hotspots and downstream text', async () => {
     ocr.impl = () => result([
       line([10, 80, 180, 100], '三'),
@@ -486,6 +536,33 @@ describe('ocrRegion — zoom escalation', () => {
     };
     await ocrRegion({ x: 0, y: 0, width: 1800, height: 900 }, 1);
     expect(Math.max(resizeCalls[0].width, resizeCalls[0].height)).toBeLessThanOrEqual(4096);
+  });
+
+  it('scales the winning pass\'s alternate back out of upscaled space too', async () => {
+    // The alternate was read off the same upscaled bitmap as the pass that
+    // carried it, so it carries the same factor. Scaling only `lines` and
+    // leaving `alternate.lines` alone is the silent version of this bug: the
+    // primary paints correctly and the boxes go wrong only once someone swaps.
+    let n = 0;
+    ocr.impl = () => {
+      n += 1;
+      if (n === 1) return result([line([0, 0, 100, 8], 'あ', 0.6)]);
+      return {
+        ...result([line([0, 0, 300, 24], 'あいうえお', 0.95)]),
+        alternate: {
+          engine: 'manga' as const,
+          lang: 'ja',
+          text: 'かきくけこ',
+          lines: [line([0, 0, 300, 24], 'かきくけこ', 0.9)],
+        },
+      };
+    };
+
+    const res = await ocrRegion({ x: 0, y: 0, width: 400, height: 200 }, 1);
+
+    expect(res.zoom).toBe(3);
+    expect(res.lines[0].box[2]).toBeCloseTo(100, 5);
+    expect(res.alternate?.lines[0].box[2]).toBeCloseTo(100, 5);
   });
 
   it('does not upscale for manga-ocr, whose input size is fixed', async () => {

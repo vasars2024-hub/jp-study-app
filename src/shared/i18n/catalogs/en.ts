@@ -3106,6 +3106,7 @@ export const en: Catalog = {
   'settings.action.askAgent': 'Ask the Agent',
   'lens.action.manga': 'Manga mode',
   'lens.action.web': 'Text mode',
+  'lens.action.alternateReady': 'Switch to {engine} — already read, no re-scan',
   'lens.action.close': 'Close lens',
   'lens.action.newRegion': 'New region',
   'lens.resize.nw': 'Resize from the top-left corner',

@@ -27,12 +27,29 @@ export interface LensOcrLine {
   confidence: number;
 }
 
+/**
+ * The other engine's read of the same pixels, already paid for.
+ *
+ * `auto` runs both engines whenever the routing heuristic fires, so when a
+ * reader disagrees with the pick the losing read already exists in memory.
+ * Carrying it here lets the Lens offer a swap with no second OCR pass at all.
+ * Absent whenever only one engine ran, or the loser came back empty.
+ */
+export interface LensOcrAlternate {
+  engine: 'manga' | 'web';
+  lang?: string;
+  lines: LensOcrLine[];
+  text: string;
+}
+
 export interface LensOcrResult {
   ok: boolean;
   engine: 'manga' | 'web' | 'none';
   lang?: string;
   lines: LensOcrLine[];
   text: string;
+  /** The engine that lost the comparison, offered as a no-cost swap. */
+  alternate?: LensOcrAlternate;
   /** Whether the engine's models are installed. */
   available: boolean;
   /** True when models are being fetched — caller should retry shortly. */
@@ -254,8 +271,16 @@ async function ocrAdaptive(
     quality: 'best',
   });
   const second = await ocrAuto(upscaled.toDataURL(), { engine, langHint: lang, forceLang: lang });
-  // Map the second pass back into the original crop's pixel space.
-  const secondMapped: AutoOcrResult = { ...second, lines: scaleLines(second.lines, 1 / f) };
+  // Map the second pass back into the original crop's pixel space. The
+  // alternate was read off the same upscaled bitmap, so it carries the same
+  // factor — leaving it unscaled would place its hotspots f× too far out.
+  const secondMapped: AutoOcrResult = {
+    ...second,
+    lines: scaleLines(second.lines, 1 / f),
+    alternate: second.alternate
+      ? { ...second.alternate, lines: scaleLines(second.alternate.lines, 1 / f) }
+      : undefined,
+  };
   // An upscaled pass that landed on manga-ocr wins outright: it means the first
   // pass's weak general read was a layout failure, not a resolution one.
   if (secondMapped.engine === 'manga') return { result: secondMapped, zoom: f };
@@ -310,26 +335,40 @@ export async function ocrRegion(
     });
   }
 
-  const mappedLines: LensOcrLine[] = result.lines.map((l: AutoOcrLine) => {
-    const [x0, y0, x1, y1] = l.box; // original crop-pixel coords
-    return {
-      text: l.text,
-      box: [x0 / sf, y0 / sf, Math.max(1, (x1 - x0) / sf), Math.max(1, (y1 - y0) / sf)],
-      vertical: l.vertical,
-      confidence: l.confidence,
-    };
-  });
-  const lines = orderReadingLensLines(mappedLines);
-  const orderChanged = lines.some((line, index) => line !== mappedLines[index]);
+  // Preserve an engine's own whitespace when its order was already sound.
+  // Once geometry repairs the order, the passage must follow the same array
+  // the renderer paints or downstream analysis would read a different story.
+  const toLens = (
+    src: AutoOcrLine[],
+    ownText: string,
+  ): { lines: LensOcrLine[]; text: string } => {
+    const mapped: LensOcrLine[] = src.map((l: AutoOcrLine) => {
+      const [x0, y0, x1, y1] = l.box; // original crop-pixel coords
+      return {
+        text: l.text,
+        box: [x0 / sf, y0 / sf, Math.max(1, (x1 - x0) / sf), Math.max(1, (y1 - y0) / sf)],
+        vertical: l.vertical,
+        confidence: l.confidence,
+      };
+    });
+    const ordered = orderReadingLensLines(mapped);
+    const changed = ordered.some((line, index) => line !== mapped[index]);
+    return { lines: ordered, text: changed ? ordered.map((line) => line.text).join('\n') : ownText };
+  };
+
+  const primary = toLens(result.lines, result.text);
+  // The alternate goes through the same geometry repair as the primary: it is
+  // swapped in wholesale, so a read that skipped ordering would paint hotspots
+  // in provider order while the passage claimed reading order.
+  const alt = result.alternate;
+  const alternate = alt ? { engine: alt.engine, lang: alt.lang, ...toLens(alt.lines, alt.text) } : undefined;
   return {
     ok: true,
     engine: result.engine,
     lang: result.lang,
-    lines,
-    // Preserve an engine's own whitespace when its order was already sound.
-    // Once geometry repairs the order, the passage must follow the same array
-    // the renderer paints or downstream analysis would read a different story.
-    text: orderChanged ? lines.map((line) => line.text).join('\n') : result.text,
+    lines: primary.lines,
+    alternate,
+    text: primary.text,
     available: true,
     hash,
     zoom,

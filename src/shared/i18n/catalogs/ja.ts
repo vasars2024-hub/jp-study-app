@@ -2943,6 +2943,7 @@ export const ja: Catalog = {
   'settings.action.askAgent': 'エージェントに聞く',
   'lens.action.manga': 'マンガモード',
   'lens.action.web': 'テキストモード',
+  'lens.action.alternateReady': '{engine}に切り替え — 読み取り済みのため再スキャンなし',
   'lens.action.close': 'レンズを閉じる',
   'lens.action.newRegion': '範囲を選び直す',
   'lens.resize.nw': '左上の角を動かす',

@@ -3143,6 +3143,7 @@ export const ru: Catalog = {
   'settings.action.askAgent': 'Спросить агента',
   'lens.action.manga': 'Режим манги',
   'lens.action.web': 'Текстовый режим',
+  'lens.action.alternateReady': 'Переключить на «{engine}» — уже распознано, без повторного сканирования',
   'lens.action.close': 'Закрыть линзу',
   'lens.action.newRegion': 'Новая область',
   'lens.resize.nw': 'Изменить размер от верхнего левого угла',
