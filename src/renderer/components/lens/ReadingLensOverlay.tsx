@@ -554,7 +554,18 @@ export default function ReadingLensOverlay() {
     // finish the drag would be delivered to the app underneath and the grip
     // would stick to the pointer forever. The whole window stays interactive
     // for the duration of the drag instead.
-    if (!reading || resizing) {
+    //
+    // Read joins it, and for a stronger reason than convenience. Everything else
+    // here is a hotspot a few pixels wide floating over a live application, so a
+    // click-through window that a forwarded mousemove re-arms is the right
+    // trade. Read is not: it is an opaque sheet that deliberately covers the
+    // region it came from, with its own controls, its own selection and its own
+    // Escape. Leaving it to the hover flip meant its buttons were only clickable
+    // when a mousemove had already been delivered while the window was
+    // `WS_EX_TRANSPARENT` — measured against the OS, `WindowFromPoint` over the
+    // sheet's close button returned *another process's window* in that state, so
+    // a real click went behind the lens and every control read as dead.
+    if (!reading || resizing || readOpen) {
       setInteractive(true);
       return;
     }
@@ -565,7 +576,7 @@ export default function ReadingLensOverlay() {
     };
     window.addEventListener('mousemove', onMove);
     return () => window.removeEventListener('mousemove', onMove);
-  }, [state.kind, setInteractive, resizing]);
+  }, [state.kind, setInteractive, resizing, readOpen]);
 
   // Auto-dismiss so a finished read never lingers on screen. The fragments
   // ghost out — then the lens closes itself — once the cursor wanders away from
@@ -582,7 +593,19 @@ export default function ReadingLensOverlay() {
     // does: the reader is dragging an edge, not wandering off. A pin suspends
     // it outright — that is the whole point of the pin, and it is the one
     // suspension the reader chose rather than one inferred from their cursor.
-    if (state.kind !== 'reading' || popup || analysisText || editMode || resizeRect || pinned) {
+    // `readOpen` belongs in this list for the same reason `popup` does and was
+    // missing from it: the Read sheet covers the fragments the countdown
+    // measures against, so a cursor resting on the sheet's scrollbar or beyond
+    // its edge armed a close that took the whole read away mid-sentence.
+    if (
+      state.kind !== 'reading' ||
+      popup ||
+      analysisText ||
+      editMode ||
+      resizeRect ||
+      pinned ||
+      readOpen
+    ) {
       setDimmed(false);
       return;
     }
@@ -627,7 +650,7 @@ export default function ReadingLensOverlay() {
       window.removeEventListener('mousemove', onMove);
       clear();
     };
-  }, [state, popup, analysisText, editMode, resizeRect, pinned, close]);
+  }, [state, popup, analysisText, editMode, resizeRect, pinned, readOpen, close]);
 
   // ---- Region resize -----------------------------------------------------
 
