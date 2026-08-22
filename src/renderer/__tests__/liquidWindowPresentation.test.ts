@@ -270,3 +270,51 @@ describe('liquid-window.css', () => {
     }
   });
 });
+
+describe('liquid-window.css — the Dictionary contextual band (L5.3)', () => {
+  const css = readFileSync(SHEET, 'utf8');
+  const rules = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  const block = (selector: string): string => {
+    const found = rules
+      .split('}')
+      .map((b) => ({ sel: b.split('{')[0]?.trim() ?? '', body: b.split('{')[1] ?? '' }))
+      .find((b) => b.sel === selector);
+    expect(found, `no rule for ${selector}`).toBeTruthy();
+    return found!.body;
+  };
+
+  it('pairs exactly the two contextual siblings, and nothing else', () => {
+    // Measured live, maximized 1264x765 with the disclosure panels collapsed: the
+    // largest dead rectangle was 947x201 = 18.3% of the viewport against a 15% bar,
+    // and it was three short full-width rows stacked. Pairing the two that ARE
+    // siblings took it to 379x237 = 8.7%.
+    const paired = block(
+      '.fwin.fwin-liquid .dict-view > .dict-saved-searches,\n.fwin.fwin-liquid .dict-view > .lexicon-notes-browser',
+    );
+    expect(paired).toMatch(/grid-column:\s*auto/);
+    expect(block('.fwin.fwin-liquid .dict-view > *')).toMatch(/grid-column:\s*1\s*\/\s*-1/);
+  });
+
+  it('sizes the columns by the CONTENT box, never by a viewport media query', () => {
+    // The window is not the viewport. A `@media (min-width: …)` would pair these two
+    // inside an 820px window, where 772px of content cannot hold two 28rem columns —
+    // measured: the track resolves to `772px` (one column) at the default size and
+    // `602px 602px` at maximized.
+    expect(block('.fwin.fwin-liquid .dict-view')).toMatch(
+      /grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(28rem,\s*1fr\)\)/,
+    );
+    const banded = rules
+      .split('}')
+      .filter((b) => /\.dict-view/.test(b.split('{')[0] ?? ''));
+    expect(banded.length).toBe(3);
+    expect(css.slice(css.indexOf('.fwin.fwin-liquid .dict-view'))).not.toMatch(/@media/);
+  });
+
+  it('never halves the results — dense work keeps the full measure', () => {
+    // §2.3. A two-column result list is a different feature, not a spacing fix, and
+    // `.lexicon-workbench` is the one child that must always span.
+    const spanAll = block('.fwin.fwin-liquid .dict-view > *');
+    expect(spanAll).toMatch(/grid-column:\s*1\s*\/\s*-1/);
+    expect(rules).not.toMatch(/\.lexicon-workbench\s*\{[^}]*grid-column:\s*auto/);
+  });
+});

@@ -221,3 +221,46 @@ decision for L5 and is deliberately not started at the end of a turn. Everything
 **Instrument note:** the dead-region number is read at the current scroll offset
 (`scroller top=0/5266` here, i.e. the first screen). Every figure in this document was taken
 at top, so they are comparable; a figure taken mid-scroll is not.
+
+## 2026-08-22 · backup · the band pairs — 18.3% → 8.7%, and the third row that could not join
+
+The previous entry left this located and called it structural. Two of the three rows **are**
+siblings, and pairing those two is enough: `.fwin.fwin-liquid .dict-view` becomes
+`grid-template-columns: repeat(auto-fit, minmax(28rem, 1fr))`, every child spans `1 / -1`, and
+`.dict-saved-searches` + `.lexicon-notes-browser` opt back to `auto`. `theme/liquid-window.css`,
+because that sheet was clean while `styles.css` carries nine foreign hunks — and because
+scoping to `.fwin-liquid` makes the standard window this fix's own control.
+
+**Measured, maximized 1264×765, disclosure panels collapsed** (the state the earlier 18.3% was
+taken in — reproduced to the decimal first, *before* the edit, so the two figures are comparable):
+
+| | dead region | % of viewport | canvas |
+| --- | --- | --- | --- |
+| Liquid, before | 947×201 at grid 10,8 | **18.3** | 48.3% |
+| Liquid, after | 379×237 at grid 28,19 | **8.7** | 55.0% |
+| **Standard, after** (control) | 947×164 at grid 10,7 | **15.0** | 55.1% |
+
+clipped **0**, overlaps **0**, horizontal scrollers **0** in all three. **Under the 15% bar.**
+
+**Three controls, because one number proves nothing.** (1) The standard window at the same
+1264×765 still computes `.dict-view` `display: block` with both rows full-width at 772px — the
+rule did not leak, and standard's own band is a separate 15.0%. (2) At the default 820×580 the
+track resolves to a single `772px` column and the layout is byte-identical to before, so
+`auto-fit` and not a media query is what makes the pairing width-honest. (3) Three source
+mutations, each red for its own case and restored byte-identical: pair loses `grid-column: auto`
+→ 1 red; `auto-fit` becomes a fixed `repeat(2, …)` → 1 red; results stop spanning → 2 red.
+
+**The lens picker did not join, and that is the honest remainder.** `.lexicon-lens-picker` is a
+grandchild — `section.lexicon-workbench` owns it — so reaching it needs either `display: contents`
+on a section whose layout the dense results depend on, or lifting `selectedLens` out of
+`LexiconWorkbenchResults`. Neither is a spacing fix. At 8.7% it no longer decides the category.
+
+**Expanded is a different surface, and both numbers are real.** With all eight `<details>` open
+and all five lazy loaders run, the same window before the fix read **10.7%** (1010×110). The
+collapsed figure is what a user lands on, so it is the one scored; the expanded one is recorded
+so nobody reads a lower number as a contradiction.
+
+**The trap that cost two probe runs:** an unfocused window measured `regions: 0`,
+`chromeParts: []` and a **95.3%** dead region — a refusal wearing a measurement's clothes. It also
+reported the window as `1239×750` where the focused read gives `1264×765`. `/focus` first, then
+measure; a probe that returns zeros for every region has not run.

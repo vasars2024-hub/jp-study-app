@@ -134,3 +134,49 @@
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
+
+/* ---------------------------------------------------------------------------
+ * L5.3 — the contextual band, because three short rows are not three rows of work
+ *
+ * Maximized at 1264x765 the Liquid Dictionary window's largest dead rectangle
+ * measured 947x201 — 18.3% of the viewport against the rubric's 15% bar — and the
+ * band is not empty space between features. It is three FULL-WIDTH rows stacked,
+ * each holding a label and one control at its left edge: `.dict-saved-searches`
+ * (53px), `.lexicon-notes-browser` (45px) and, inside the results section,
+ * `.lexicon-lens-picker` (50px). Each spends a 1216px row on ~300px of content.
+ *
+ * The first two are siblings, so a grid on `.dict-view` pairs them. The third is a
+ * GRANDCHILD — `.lexicon-workbench` owns it — and no rule here can reach across that
+ * boundary without `display: contents` on a section whose own layout the dense results
+ * depend on. It is deliberately left stacked and measured separately rather than
+ * papered over.
+ *
+ * `auto-fit` + `minmax(28rem, ...)` rather than a media query: the window is not the
+ * viewport, and a viewport query would pair these two inside an 820px window where
+ * they do not fit. At 1216px the track resolves to two columns; at the 772px default
+ * content width it resolves to one and the layout is byte-identical to today's.
+ *
+ * Scoped to `.fwin-liquid` on purpose. §2's first non-negotiable is that conventional
+ * windows are the default and unchanged, and confining the change here means the
+ * standard window is its own negative control: if this rule leaked, standard's band
+ * would move too.
+ * ------------------------------------------------------------------------------ */
+.fwin.fwin-liquid .dict-view {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(28rem, 1fr));
+  align-items: start;
+  column-gap: var(--lq-space-4, 16px);
+}
+
+/* Everything else keeps the full measure. Reading and dense results never get halved:
+ * §2.3 keeps work on a stable full-width anchor, and a two-column result list is a
+ * different feature, not a spacing fix. */
+.fwin.fwin-liquid .dict-view > * {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.fwin.fwin-liquid .dict-view > .dict-saved-searches,
+.fwin.fwin-liquid .dict-view > .lexicon-notes-browser {
+  grid-column: auto;
+}
