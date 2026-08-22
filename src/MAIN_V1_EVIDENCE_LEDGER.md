@@ -27523,3 +27523,54 @@ is **8**. 14 is correct. Do not quote the 13.
 main + shared only — no preload accessor, no IPC read, no UI. So a `missed` run is recorded honestly
 and then shown to no one. Worse, since only Blanc claims, in the main app **every** automation is now
 `missed` forever. Two slices follow: expose the log, then give the main app a claimant.
+
+## 2026-08-22 backup — Track 3: the run that was recorded and then quietly overwritten, and the column that shows it
+
+**THE FINDING, and it was in the feature landed 40 minutes earlier.** `d91adc35` gave a due
+automation somewhere to say "nothing was listening". It gave that record no way to survive and no
+way to be seen. The operational bridge persists the **whole** document, so a renderer sends every
+section back whenever any one changes. `automationRuns` is main-written, and the scheduler writes it
+through `store.write` — which reaches main's own subscribers and **stops there**, because the
+broadcast lives in the save handler. So every window held a run log stale by construction, and the
+next unrelated save (queue a task, edit a memory) wrote that staleness over main's record. A missed
+automation was recorded and then erased by the next thing the user did.
+
+**Decision — ownership, not merging.** `retainMainOwnedSections` (`shared/agentOperationalState.ts`)
+discards the incoming section outright and keeps the current one, so there is no ordering in which a
+renderer erases a run, including one old enough to send it as `undefined`. It runs **after**
+`rebaseSave`: that protects individual leased queue ROWS, this protects whole SECTIONS the renderer
+has no authority over. Tradeoff: a renderer can never write the section even legitimately — accepted,
+since main is by definition the only writer. The scheduler now announces what it wrote through the
+bridge's own exported push, not a second copy of the channel name.
+
+**`167486a8`** — the fix. **`142cafdc`** — the reader: a **Last run** column on the schedule table in
+Blanc's Agent panel, the only surface in the app that shows a schedule. Three states, and the middle
+one is the point: *delivered*, *missed — nothing was listening* (hover explains the panel must be
+open), *not yet*. "Not yet" deliberately does not say "never ran": retention is 14 days, so an absent
+row is only an absent row. `localAgentAutomationRunsStore.ts` has **no setter** on purpose — a write
+would be silently reverted, and a control that does nothing is worse than no control.
+
+**GATES.** Committed SHA, **detached worktree, `git status --short` = 0**: 5 files / **87 tests
+passed**; i18n exit 0 at **10,591** keys; architecture exit 0, "Nothing new", 5 pending. The 10,591
+is HEAD's — the shared tree reads 10,762 because another track holds ~171 uncommitted catalog keys.
+
+**MUTATIONS, four, each killing only its own tests by name.** Guard returns `incoming` → the 3
+retention tests fail. Guard returns `current` wholesale → **only** *"still writes the sections the
+renderer owns"* (the negative control) plus the 2 pre-existing save tests. Column reads
+`runs[0]` regardless of owner → **only** *"does not attribute one automation's run to another"*.
+Every outcome rendered as delivered → **only** the 2 missed tests.
+
+**TRAP — check line endings AND foreign dirt before trusting a catalog stat.** All four
+`i18n/catalogs/*.ts` are foreign-dirty with another track's uncommitted work (Aero safe-mode strings;
+ja/zh/ru each **732 insertions / 562 deletions** vs HEAD, en 178/10). A plain `git add` would have
+committed all of it. Staged HEAD+my-5-keys per catalog via `git hash-object --no-filters` +
+`update-index --cacheinfo`; `BlancReadyToolPanels.tsx` needed the same (its foreign hunk is still the
+`AgentContextSuggestionSettings` import + render, left untouched). Also: two pre-existing scheduler
+assertions read `expect(window.sent).toEqual([])` when they meant "received no trigger" — narrowed to
+`firedIds(window)`, because that window is now correctly told about its own missed run.
+
+**NEXT.** The main app still has **no claimant**: `localAgentClaimTriggers` is called only from
+`BlancReadyToolPanels.tsx`, so outside Blanc's agent tool every automation is now honestly recorded
+as `missed` — honest, but the feature still does not run there. Giving Study OS a claimant is the
+next slice, and it is a real product decision (which surface owns automation execution), not a
+refactor.
