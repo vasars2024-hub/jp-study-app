@@ -80,6 +80,7 @@ import {
 import {
   effectiveAgentPermission,
   getActiveAgentProfile,
+  underPermissionCeiling,
   type AgentProfileStore,
 } from '../../../shared/localAgentProfiles';
 import { recommendedLocalAgentModels } from '../../../shared/localAgentModels';
@@ -344,7 +345,17 @@ export function LocalAgentPanel() {
     setSettings(saveLocalAgentSettings(patch));
   };
 
-  const plan = async (scheduledObjective = objective): Promise<void> => {
+
+  /**
+   * `permissionCeiling` is supplied only by the scheduler path. It is the level the
+   * automation was created under, which the automation list already shows the user
+   * as that entry's permission; it rides on the queue row so it still applies when
+   * the task is run later, from another window, or after a restart.
+   */
+  const plan = async (
+    scheduledObjective = objective,
+    permissionCeiling?: LocalAgentSettings['permission'],
+  ): Promise<void> => {
     const request = scheduledObjective.trim();
     if (!request) {
       setStatus(t('blanc.agent.status.describeFirst'));
@@ -359,7 +370,10 @@ export function LocalAgentPanel() {
       const memory = loadLocalAgentMemory();
       const response = await window.api.localAgentPlan({
         objective: request,
-        settings,
+        // Bounded here and not only at execution: main builds the system prompt and
+        // the approved-operation set from these settings, so an automation created at
+        // a narrower level would otherwise plan steps its own ceiling then refuses.
+        settings: underPermissionCeiling(settings, permissionCeiling),
         profile: activeProfile,
         availableOperations,
         memories: settings.memoryEnabled
@@ -372,7 +386,7 @@ export function LocalAgentPanel() {
       }
       setSummary(response.summary ?? t('blanc.agent.status.planReady'));
       setTask(response.task ?? null);
-      if (response.task) setTaskQueue((previous) => saveLocalAgentTaskQueue(enqueueAgentTask(previous, response.task as AgentTask)));
+      if (response.task) setTaskQueue((previous) => saveLocalAgentTaskQueue(enqueueAgentTask(previous, response.task as AgentTask, 0, Date.now(), undefined, permissionCeiling)));
       setModel(response.modelFileName ?? '');
       setStatus(response.task ? t('blanc.agent.status.planReadyReview') : t('blanc.agent.status.noApprovedAction'));
     } catch (error) {
@@ -408,7 +422,7 @@ export function LocalAgentPanel() {
     }
     setObjective(entry.objective);
     setStatus(t('blanc.agent.status.runningScheduled', { name: entry.name }));
-    void plan(entry.objective);
+    void plan(entry.objective, entry.permission);
   }), [plan, settings.enabled]);
 
   useEffect(() => {

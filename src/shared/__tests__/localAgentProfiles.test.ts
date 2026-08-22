@@ -4,6 +4,7 @@ import {
   effectiveAgentPermission,
   getActiveAgentProfile,
   normalizeAgentProfiles,
+  underPermissionCeiling,
 } from '../localAgentProfiles';
 
 describe('local agent profiles', () => {
@@ -39,5 +40,38 @@ describe('local agent profiles', () => {
   it('uses the stricter of global and profile permissions', () => {
     expect(effectiveAgentPermission('full-automation', DEFAULT_AGENT_PROFILES[0])).toBe('limited-actions');
     expect(effectiveAgentPermission('read-only', DEFAULT_AGENT_PROFILES[3])).toBe('read-only');
+  });
+});
+
+describe('the settings a plan is built from carry the task ceiling', () => {
+  const live = { permission: 'full-automation' as const, memoryEnabled: true, contextSize: 4096 };
+
+  it('narrows the live permission the planner is handed', () => {
+    expect(underPermissionCeiling(live, 'read-only')).toEqual({
+      permission: 'read-only',
+      memoryEnabled: true,
+      contextSize: 4096,
+    });
+  });
+
+  it('never widens: a stored full-automation ceiling leaves a read-only setting alone', () => {
+    const readOnly = { ...live, permission: 'read-only' as const };
+    expect(underPermissionCeiling(readOnly, 'full-automation').permission).toBe('read-only');
+  });
+
+  it('returns the same object when no ceiling is stated, so an unbounded plan is unchanged', () => {
+    expect(underPermissionCeiling(live, undefined)).toBe(live);
+  });
+
+  it('returns the same object when the ceiling is already the live level', () => {
+    expect(underPermissionCeiling(live, 'full-automation')).toBe(live);
+  });
+
+  it('carries every unrelated setting through untouched', () => {
+    const narrowed = underPermissionCeiling(live, 'limited-actions');
+    expect(narrowed.permission).toBe('limited-actions');
+    expect(narrowed.memoryEnabled).toBe(true);
+    expect(narrowed.contextSize).toBe(4096);
+    expect(live.permission).toBe('full-automation');
   });
 });

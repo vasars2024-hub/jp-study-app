@@ -119,4 +119,79 @@ describe('local agent task queue', () => {
     queue = enqueueAgentTask(queue, { ...task('one'), objective: 'replacement' }, 0, 60);
     expect(queue.items[0].origin).toEqual(normalizedOrigin);
   });
+
+  it('carries a task permission ceiling across persistence and every row edit', () => {
+    // A scheduled automation's permission has to still be there when the task is
+    // run later, from another window, or after a restart — that is the whole
+    // reason it rides on the row rather than in panel state.
+    let queue = enqueueAgentTask(
+      normalizeAgentTaskQueue(null),
+      task('scheduled'),
+      0,
+      10,
+      undefined,
+      'read-only',
+    );
+    expect(queue.items[0].permissionCeiling).toBe('read-only');
+
+    queue = normalizeAgentTaskQueue(JSON.parse(JSON.stringify(queue)));
+    expect(queue.items[0].permissionCeiling).toBe('read-only');
+
+    queue = updateAgentQueueItem(queue, 'scheduled', { status: 'running' }, 15);
+    expect(queue.items[0].permissionCeiling).toBe('read-only');
+    queue = pauseAgentQueueItem(queue, 'scheduled', 20);
+    expect(queue.items[0].permissionCeiling).toBe('read-only');
+    queue = resumeAgentQueueItem(queue, 'scheduled', 30);
+    expect(queue.items[0].permissionCeiling).toBe('read-only');
+  });
+
+  it('never lets a re-enqueue widen or drop a ceiling the row already carried', () => {
+    const bounded = enqueueAgentTask(
+      normalizeAgentTaskQueue(null),
+      task('scheduled'),
+      0,
+      10,
+      undefined,
+      'read-only',
+    );
+
+    // Stating nothing must not discard the stored bound.
+    expect(
+      enqueueAgentTask(bounded, task('scheduled'), 0, 20).items[0].permissionCeiling,
+    ).toBe('read-only');
+
+    // Stating a wider one must not raise it.
+    expect(
+      enqueueAgentTask(bounded, task('scheduled'), 0, 20, undefined, 'full-automation')
+        .items[0].permissionCeiling,
+    ).toBe('read-only');
+
+    // Stating a narrower one may lower it.
+    const raised = enqueueAgentTask(
+      normalizeAgentTaskQueue(null),
+      task('scheduled'),
+      0,
+      10,
+      undefined,
+      'full-automation',
+    );
+    expect(
+      enqueueAgentTask(raised, task('scheduled'), 0, 20, undefined, 'limited-actions')
+        .items[0].permissionCeiling,
+    ).toBe('limited-actions');
+  });
+
+  it('drops an unrecognized stored ceiling instead of inventing a level', () => {
+    // Defaulting a corrupt value to `read-only` would refuse work the user did
+    // authorize; defaulting it to `full-automation` would be a grant invented by
+    // a parser. A hand-run task and a legacy row both legitimately state none.
+    const queue = normalizeAgentTaskQueue({
+      items: [
+        { id: 'junk', task: task('junk'), permissionCeiling: 'root' },
+        { id: 'legacy', task: task('legacy') },
+      ],
+    });
+    expect(queue.items[0]).not.toHaveProperty('permissionCeiling');
+    expect(queue.items[1]).not.toHaveProperty('permissionCeiling');
+  });
 });

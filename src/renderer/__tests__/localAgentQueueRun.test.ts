@@ -424,6 +424,95 @@ describe('a task restored from main-owned persistence is still re-checked', () =
 });
 
 /**
+ * A scheduled automation stores the permission level it was created under, and the
+ * automation list shows the user that level as the entry's own permission. Nothing
+ * read it: the trigger called `plan(entry.objective)` and every verb then executed
+ * at whatever `readExecutionAuthority` resolved from the LIVE setting, so the column
+ * described nothing and raising the global permission afterwards silently applied to
+ * work the user had authorized at a narrower level.
+ *
+ * The bound rides on the queue row, so it survives the restart and the other window,
+ * and it is applied here — the renderer's one execution boundary — rather than in the
+ * panel, so no future caller can reach `executeAgentTaskStep` around it.
+ */
+describe('a task ceiling narrows the live permission and never widens it', () => {
+  const scheduled = (id: string, ceiling: 'read-only' | 'limited-actions' | 'full-automation') => {
+    const task = createAgentTask(id, `scheduled ${id}`, [{
+      id: 'delete',
+      label: 'Delete the deck',
+      request: { callId: `call-${id}`, operation: 'flashcard.delete-deck', arguments: { name: 'JLPT' } },
+    }], 10);
+    return normalizeAgentTaskQueue(JSON.parse(JSON.stringify(
+      enqueueAgentTask(normalizeAgentTaskQueue(null), task, 0, 10, undefined, ceiling),
+    )));
+  };
+
+  const run = async (queue: AgentTaskQueue, id: string, permission: 'read-only' | 'limited-actions' | 'full-automation') => {
+    const selection = selectAgentQueueRun(queue, id);
+    if (!selection.ok) throw new Error(`expected a runnable selection, got ${selection.reason}`);
+    const handler = vi.fn(() => ({ deleted: true }));
+    const result = await runAgentTaskStep(queue, selection.item.task, selection.step, {
+      permission,
+      allowedOperations: undefined,
+      handlers: { 'flashcard.delete-deck': handler },
+      confirmedCallIds: new Set([`call-${id}`]),
+      leaseClient: inMemoryLeaseClient(queue),
+    });
+    return { handler, result };
+  };
+
+  it('refuses a read-only automation even while the live setting is full-automation', async () => {
+    const queue = scheduled('narrowed', 'read-only');
+    const { handler, result } = await run(queue, 'narrowed', 'full-automation');
+
+    expect(handler).not.toHaveBeenCalled();
+    // The reason, not just the code: an allow-list refusal carries the same code,
+    // so asserting the code alone would pass even if the ceiling did nothing.
+    expect(result.refusal).toMatchObject({
+      code: 'operation-denied',
+      reason: expect.stringContaining('requires full-automation permission'),
+    });
+    // A refusal is not an execution outcome; the row is returned untouched.
+    expect(result.queue).toBe(queue);
+    expect(result.task.steps[0]).toMatchObject({ status: 'pending' });
+  });
+
+  it('runs the same task once its ceiling permits it', async () => {
+    // The positive control. Without it a boundary that refused everything would
+    // pass the assertion above perfectly.
+    const queue = scheduled('permitted', 'full-automation');
+    const { handler, result } = await run(queue, 'permitted', 'full-automation');
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(result.task.status).toBe('completed');
+  });
+
+  it('does not let a stored full-automation ceiling widen a read-only live setting', async () => {
+    // The direction that matters most: the ceiling is a bound, never a grant. An
+    // automation created when the user allowed everything must not keep that
+    // authority after the user narrows the global setting.
+    const queue = scheduled('stale-grant', 'full-automation');
+    const { handler, result } = await run(queue, 'stale-grant', 'read-only');
+
+    expect(handler).not.toHaveBeenCalled();
+    expect(result.refusal).toMatchObject({
+      code: 'operation-denied',
+      reason: expect.stringContaining('requires full-automation permission'),
+    });
+  });
+
+  it('leaves a row carrying no ceiling governed by the live permission alone', async () => {
+    // Every hand-run task and every pre-existing queue row states no bound, and
+    // must behave exactly as it did before ceilings existed.
+    const queue = rehydrated(deleteDeckTask('unbounded'));
+    const { handler, result } = await run(queue, 'unbounded', 'full-automation');
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(result.task.status).toBe('completed');
+  });
+});
+
+/**
  * `applyAgentRunToQueue`'s docstring has always said Pause and Cancel "stay live
  * while a step is in flight and must not be reverted by its write-back". They
  * were: `agentQueueStatusForTask` had no branch for either, so any run that did

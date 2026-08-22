@@ -1,4 +1,5 @@
-import type { AgentTask } from './localAgent';
+import type { AgentPermissionLevel, AgentTask } from './localAgent';
+import { narrowAgentPermission } from './localAgentProfiles';
 
 export type AgentQueueStatus = 'queued' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
 
@@ -32,6 +33,20 @@ export interface AgentQueueItem {
    * an in-flight or crash-uncertain side effect.
    */
   execution?: AgentQueueExecutionClaim;
+  /**
+   * An upper bound on what this specific task may do, independent of the user's
+   * live permission and profile. A scheduled automation carries the level it was
+   * created under, which the automation list shows the user as that entry's
+   * permission; without this the column described nothing, because execution read
+   * only the live setting and a later widening silently applied to work the user
+   * had authorized at a narrower level.
+   *
+   * It is a ceiling and never a grant: `runAgentTaskStep` combines it with the
+   * live permission by taking the lower of the two, so a stale stored value can
+   * never widen a run past what the user currently permits. Absent means "no task
+   * bound", which is what every hand-run task and every legacy row is.
+   */
+  permissionCeiling?: AgentPermissionLevel;
   priority: number;
   status: AgentQueueStatus;
   createdAt: number;
@@ -96,6 +111,24 @@ function normalizeAgentQueueExecutionClaim(value: unknown): AgentQueueExecutionC
   };
 }
 
+const AGENT_PERMISSION_LEVELS = new Set<AgentPermissionLevel>([
+  'read-only',
+  'limited-actions',
+  'full-automation',
+]);
+
+/**
+ * An unrecognized stored ceiling is dropped rather than defaulted. Defaulting it
+ * to `read-only` would refuse work the user did authorize; defaulting it to
+ * `full-automation` would be a grant invented by a parser. Absent is the honest
+ * reading of "this row states no bound".
+ */
+function normalizeAgentPermissionCeiling(value: unknown): AgentPermissionLevel | null {
+  return AGENT_PERMISSION_LEVELS.has(value as AgentPermissionLevel)
+    ? value as AgentPermissionLevel
+    : null;
+}
+
 function safeTimestamp(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : fallback;
 }
@@ -117,11 +150,13 @@ export function normalizeAgentTaskQueue(input: unknown): AgentTaskQueue {
     const createdAt = safeTimestamp(item.createdAt, now);
     const origin = normalizeAgentTaskOrigin(item.origin);
     const execution = normalizeAgentQueueExecutionClaim(item.execution);
+    const permissionCeiling = normalizeAgentPermissionCeiling(item.permissionCeiling);
     return [{
       id: item.id.trim().slice(0, 120),
       task: item.task as AgentTask,
       ...(origin ? { origin } : {}),
       ...(execution ? { execution } : {}),
+      ...(permissionCeiling ? { permissionCeiling } : {}),
       priority: typeof item.priority === 'number' && Number.isFinite(item.priority) ? Math.max(-100, Math.min(100, Math.round(item.priority))) : 0,
       status: normalizeStatus(item.status),
       createdAt,
@@ -138,12 +173,21 @@ export function enqueueAgentTask(
   priority = 0,
   now = Date.now(),
   origin?: AgentTaskOrigin,
+  permissionCeiling?: AgentPermissionLevel,
 ): AgentTaskQueue {
-  const preservedOrigin = origin ?? queue.items.find((candidate) => candidate.id === task.id)?.origin;
+  const existing = queue.items.find((candidate) => candidate.id === task.id);
+  const preservedOrigin = origin ?? existing?.origin;
+  // Re-enqueuing an id that already carried a ceiling keeps the lower of the
+  // two. Dropping the stored bound because this call stated none, or replacing
+  // it with a wider one, would both let a re-plan quietly widen authorized work.
+  const bound = permissionCeiling && existing?.permissionCeiling
+    ? narrowAgentPermission(permissionCeiling, existing.permissionCeiling)
+    : permissionCeiling ?? existing?.permissionCeiling;
   const item: AgentQueueItem = {
     id: task.id,
     task,
     ...(preservedOrigin ? { origin: preservedOrigin } : {}),
+    ...(bound ? { permissionCeiling: bound } : {}),
     priority: Math.max(-100, Math.min(100, Math.round(priority))),
     status: 'queued',
     createdAt: now,

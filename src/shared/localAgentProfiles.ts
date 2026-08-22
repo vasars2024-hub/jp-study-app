@@ -353,15 +353,53 @@ export function getActiveAgentProfile(store: AgentProfileStore): AgentProfile {
     ?? normalized.profiles[0];
 }
 
+const AGENT_PERMISSION_RANK: Record<AgentPermissionLevel, number> = {
+  'read-only': 0,
+  'limited-actions': 1,
+  'full-automation': 2,
+};
+
+/**
+ * Combine two permission levels by taking the lower one.
+ *
+ * Every permission that arrives from somewhere other than the user's live
+ * setting — a profile, a stored automation, a policy crossing IPC — may only
+ * ever narrow what is allowed, never widen it. Stating that as one function
+ * keeps the rule from being re-derived (and inverted) at each new boundary.
+ */
+export function narrowAgentPermission(
+  a: AgentPermissionLevel,
+  b: AgentPermissionLevel,
+): AgentPermissionLevel {
+  return AGENT_PERMISSION_RANK[a] <= AGENT_PERMISSION_RANK[b] ? a : b;
+}
+
+/**
+ * Return `source` with its permission narrowed by `ceiling`.
+ *
+ * Enforcing a ceiling only at execution is not enough: the planner is handed the
+ * live settings and shapes both the system prompt and the approved-operation set
+ * from them, so an automation created at `read-only` would plan full-automation
+ * steps that execution then refuses one by one. Bounding the settings the plan is
+ * built from makes the level shown beside the automation describe what it will
+ * actually propose.
+ *
+ * Returns the same object when nothing narrows, so a caller with no ceiling
+ * cannot be told apart from one that never had this applied.
+ */
+export function underPermissionCeiling<T extends { permission: AgentPermissionLevel }>(
+  source: T,
+  ceiling: AgentPermissionLevel | undefined,
+): T {
+  if (!ceiling) return source;
+  const permission = narrowAgentPermission(source.permission, ceiling);
+  return permission === source.permission ? source : { ...source, permission };
+}
+
 export function effectiveAgentPermission(
   globalPermission: AgentPermissionLevel,
   profile: AgentProfile | undefined,
 ): AgentPermissionLevel {
   if (!profile) return globalPermission;
-  const rank: Record<AgentPermissionLevel, number> = {
-    'read-only': 0,
-    'limited-actions': 1,
-    'full-automation': 2,
-  };
-  return rank[globalPermission] <= rank[profile.permission] ? globalPermission : profile.permission;
+  return narrowAgentPermission(globalPermission, profile.permission);
 }

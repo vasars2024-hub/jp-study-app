@@ -47,6 +47,7 @@ import {
   type AgentQueueStatus,
   type AgentTaskQueue,
 } from '../shared/localAgentTaskQueue';
+import { narrowAgentPermission } from '../shared/localAgentProfiles';
 import type {
   AgentExecutionLeaseAction,
   AgentExecutionLeaseFailureCode,
@@ -217,7 +218,15 @@ export async function runAgentTaskStep(
   let result: Awaited<ReturnType<typeof executeAgentTaskStep>>;
   try {
     result = await executeAgentTaskStep(task, step.id, {
-      permission: options.permission,
+      // The live permission the caller resolved, narrowed by any ceiling the row
+      // itself carries. A scheduled automation stores the level it was created
+      // under; without this the level shown beside it in the automation list
+      // governed nothing, and widening the global setting afterwards would have
+      // applied to work the user had authorized at a narrower level. Narrowing
+      // only — the stored bound can never grant more than the live setting does.
+      permission: expectedItem.permissionCeiling
+        ? narrowAgentPermission(options.permission, expectedItem.permissionCeiling)
+        : options.permission,
       // Re-checked at EXECUTION, not only when the plan was built: a queued task outlives the
       // profile that authorized it, and since slice 51 such a task can genuinely be run.
       allowedOperations: options.allowedOperations,
