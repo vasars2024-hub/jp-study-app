@@ -40,6 +40,7 @@ import type {
 } from '../../../shared/localAgent';
 import { selectAgentMemoryContext } from '../../../shared/localAgentMemory';
 import { loadLocalAgentMemory } from '../../localAgentMemoryStore';
+import { registerLocalAgentTriggerHandler } from '../../localAgentTriggerRunner';
 import { loadLocalAgentSettings, saveLocalAgentSettings } from '../../localAgentSettingsStore';
 import type { LocalAgentSettings } from '../../../shared/localAgentSettings';
 import {
@@ -435,10 +436,17 @@ export function LocalAgentPanel() {
   }, []);
 
 
-  // This panel is a real automation handler, so it claims the trigger: main
-  // delivers a fire to one claimant and records a fire with none as `missed`.
-  // The claim is released on unmount, which is why leaving the tool makes the
-  // schedule honestly report "nothing was listening" rather than appear to run.
+  // This panel is a real automation handler, so it registers as one: main
+  // delivers a fire to one claiming renderer and records a fire with none as
+  // `missed`. Leaving the tool therefore makes the schedule honestly report
+  // "nothing was listening" rather than appear to run — unless the app's
+  // background host is mounted, which is the whole reason that host exists.
+  //
+  // `interactive`, not `background`: while this panel is open it is the surface
+  // the user is watching, so it outranks the headless host and the fire is shown
+  // rather than only enqueued. The registry owns the claim and the subscription
+  // and hands a fire to exactly one handler; claiming here directly would revoke
+  // the host's claim on unmount and run the same automation twice until then.
   //
   // The handler is held in a ref and the effect depends on nothing. `plan` is a
   // new function every render, so depending on it re-subscribed — and re-claimed
@@ -454,14 +462,10 @@ export function LocalAgentPanel() {
     void plan(entry.objective, entry.permission);
   };
 
-  useEffect(() => {
-    const unsubscribe = window.api.onLocalAgentTrigger((entry) => triggerHandler.current(entry));
-    void window.api.localAgentClaimTriggers().catch(() => undefined);
-    return () => {
-      unsubscribe();
-      void window.api.localAgentReleaseTriggers().catch(() => undefined);
-    };
-  }, []);
+  useEffect(() => registerLocalAgentTriggerHandler(
+    'interactive',
+    (entry) => triggerHandler.current(entry),
+  ), []);
 
   useEffect(() => {
     let active = true;
