@@ -45,15 +45,11 @@
   }
 }
 
-/* In-app reduce-motion toggle (html.reduce-motion) — global, mirrors the OS
-   behaviour above so the setting actually stops all motion. */
-html.reduce-motion *,
-html.reduce-motion *::before,
-html.reduce-motion *::after {
-  animation-duration: 0.001ms !important;
-  animation-iteration-count: 1 !important;
-  transition-duration: 0.001ms !important;
-}
+/* App Reduced/Performance is intentionally not an OS-level kill switch:
+   motionPrefs halves shared duration tokens while targeted `.reduce-motion`
+   rules stop decorative ambience. App Disabled is the kill switch and is
+   enforced by data-display-anim='none' / data-motion-mode='disabled' in the
+   shared motion layers. This distinction keeps purposeful state transitions. */
 
 /* ---------- Large-text support ------------------------------------------
    A future settings toggle sets data-text-size on <html>; the rem-based type

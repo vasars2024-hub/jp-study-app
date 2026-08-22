@@ -17,6 +17,7 @@
  */
 import {
   loadDisplayPrefs,
+  onDisplayPrefsChanged,
   saveDisplayPrefs,
   type AnimationLevelId,
 } from '../displayPrefs';
@@ -165,6 +166,18 @@ export function applyMotionPrefs(p: MotionPrefs): void {
   root.dataset.motionSnap = v === 0 ? '1' : '0';
 }
 
+let displaySyncInstalled = false;
+let writingAnimationLevel = false;
+
+function saveAnimationLevel(level: AnimationLevelId): void {
+  writingAnimationLevel = true;
+  try {
+    saveDisplayPrefs({ animationLevel: level });
+  } finally {
+    writingAnimationLevel = false;
+  }
+}
+
 export function saveMotionPrefs(partial: Partial<MotionPrefs>): MotionPrefs {
   const prev = loadMotionPrefs();
   const next = normalizeMotionPrefs({ ...prev, ...partial });
@@ -175,7 +188,7 @@ export function saveMotionPrefs(partial: Partial<MotionPrefs>): MotionPrefs {
   }
   // Keep the one underlying animation switch in sync.
   if (next.motionMode !== prev.motionMode) {
-    saveDisplayPrefs({ animationLevel: modeToAnimationLevel(next.motionMode) });
+    saveAnimationLevel(modeToAnimationLevel(next.motionMode));
   }
   applyMotionPrefs(next);
   window.dispatchEvent(new CustomEvent<MotionPrefs>(EVENT, { detail: next }));
@@ -191,11 +204,25 @@ export function bootMotionPrefs(): void {
     if (localStorage.getItem(KEY) === null) {
       localStorage.setItem(KEY, JSON.stringify(p));
       if (p.motionMode !== 'normal') {
-        saveDisplayPrefs({ animationLevel: modeToAnimationLevel(p.motionMode) });
+        saveAnimationLevel(modeToAnimationLevel(p.motionMode));
       }
     }
   } catch {
     /* ignore */
+  }
+  if (!displaySyncInstalled) {
+    displaySyncInstalled = true;
+    onDisplayPrefsChanged(() => {
+      if (writingAnimationLevel) return;
+      const next = loadMotionPrefs();
+      try {
+        localStorage.setItem(KEY, JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      applyMotionPrefs(next);
+      window.dispatchEvent(new CustomEvent<MotionPrefs>(EVENT, { detail: next }));
+    });
   }
 }
 
@@ -212,7 +239,7 @@ export function resetMotionPrefs(): MotionPrefs {
     /* ignore */
   }
   const next = { ...MOTION_DEFAULTS };
-  saveDisplayPrefs({ animationLevel: modeToAnimationLevel(next.motionMode) });
+  saveAnimationLevel(modeToAnimationLevel(next.motionMode));
   applyMotionPrefs(next);
   window.dispatchEvent(new CustomEvent<MotionPrefs>(EVENT, { detail: next }));
   return next;
