@@ -63,7 +63,11 @@ describe('wide windows get columns, default windows do not', () => {
     });
 
     it(`${sel} keeps one column at the default window width and gains one when maximized`, () => {
-      const m = /minmax\(\s*([\d.]+)rem\s*,/.exec(block);
+      // `min(<n>rem, 100%)` is the clamped form — a bare rem floor is a HARD minimum and
+      // overflowed the 260px window the product allows (2026-08-22, `L1_USE_OF_SPACE.md`).
+      // The arithmetic below is unchanged: at 772px and 1186px of content the `100%` term
+      // never wins, so the floor that decides the column count is still the rem one.
+      const m = /minmax\(\s*(?:min\(\s*)?([\d.]+)rem\s*[,)]/.exec(block);
       if (!m) throw new Error(`${sel} should declare a rem floor`);
       const floorPx = Number(m[1]) * 16;
       const twoColumns = 2 * floorPx + columnGapOf(block);
