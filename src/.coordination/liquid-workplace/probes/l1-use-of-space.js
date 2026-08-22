@@ -10,10 +10,17 @@
  * THREE DEFINITIONS THAT DECIDE THE NUMBERS, stated so a reader can disagree with them.
  *
  * 1. `clipped` = a box that extends past the window frame AND has no scrollable ancestor
- *    inside that window. Content taller than the frame inside a scroller is not clipping —
- *    Dictionary's 3,194 px of results in a 580 px window is the product working. This is the
- *    same `unreach` definition `liquid-surface-baseline.ps1` already uses; using a different
- *    one would make L1's numbers incomparable with L0's.
+ *    inside that window **on the axis it exits by**. Content taller than the frame inside a
+ *    scroller is not clipping — Dictionary's 3,194 px of results in a 580 px window is the
+ *    product working. This is the same `unreach` definition `liquid-surface-baseline.ps1`
+ *    already uses; using a different one would make L1's numbers incomparable with L0's.
+ *
+ *    THE AXIS IS PART OF THE DEFINITION, and leaving it out produced a false clean for five
+ *    days (2026-08-22). The original `scrollableAncestor` matched `overflowY + overflowX`
+ *    against one regex and asked only whether *either* dimension scrolled, so Dictionary's
+ *    `.fwin-body` — `overflow-y: auto`, `overflow-x: hidden` — exempted every descendant from
+ *    the check on BOTH axes. At 260x170 that hid `.dict-entry` boxes 480 px wide in a 258 px
+ *    body: 268 px of every entry unreachable, `clipped: 0`.
  * 2. `overlap` = two REGIONS (>=1% of the window, depth <=3, not single controls) whose rects
  *    intersect by more than 4 px in both axes and where neither contains the other. Ancestor/
  *    descendant overlap is layout, not a defect.
@@ -34,6 +41,13 @@
  * reading is a guaranteed clean bill of health (css-measure §5, same root cause as the dead
  * `@media (max-width:)` blocks).
  *
+ * `horizontalScrollers` alone is NOT the whole horizontal number, and reporting it as if it
+ * were is the second half of the same false clean. A box that overflows sideways inside
+ * `overflow-x: hidden` has no scrollbar to count — the content is simply gone, which is
+ * strictly worse than a scrollbar, and the rubric's "no horizontal body scroll" bar reads
+ * clean on it. `hiddenOverflowX` counts exactly that case: `overflow-x` computing to
+ * `hidden`/`clip` with `scrollWidth > clientWidth`. Both numbers must be 0.
+ *
  * SIZE. This probe measures whatever size the window is currently at and reports it. It does
  * NOT resize — `l1-use-of-space-sizes.js` drives the sizes, because a resize that goes through
  * the product's own commit path writes `desktop-layout.json` and must be restored the same way.
@@ -53,11 +67,14 @@
     const body = win.querySelector('.fwin-body') || win;
     const B = body.getBoundingClientRect();
 
-    const scrollableAncestor = (el) => {
+    const scrollableAncestor = (el, axis) => {
       let n = el.parentElement;
       while (n && n !== win.parentElement) {
         const cs = getComputedStyle(n);
-        if (/(auto|scroll)/.test(cs.overflowY + cs.overflowX) && (n.scrollHeight > n.clientHeight + 1 || n.scrollWidth > n.clientWidth + 1)) return true;
+        const can = axis === 'x'
+          ? /(auto|scroll)/.test(cs.overflowX) && n.scrollWidth > n.clientWidth + 1
+          : /(auto|scroll)/.test(cs.overflowY) && n.scrollHeight > n.clientHeight + 1;
+        if (can) return true;
         n = n.parentElement;
       }
       return false;
@@ -72,8 +89,9 @@
     const clipped = all.filter((e) => {
       const b = e.getBoundingClientRect();
       if (b.width < 2 || b.height < 2) return false;
-      const out = b.right > R.right + 1 || b.left < R.left - 1 || b.bottom > R.bottom + 1 || b.top < R.top - 1;
-      return out && !scrollableAncestor(e);
+      const outX = b.right > R.right + 1 || b.left < R.left - 1;
+      const outY = b.bottom > R.bottom + 1 || b.top < R.top - 1;
+      return (outX && !scrollableAncestor(e, 'x')) || (outY && !scrollableAncestor(e, 'y'));
     });
 
     // Regions, same shape as l1-surface-roles.js so the two documents compare.
@@ -108,6 +126,21 @@
     const scrollers = all.filter((e) => {
       const cs = getComputedStyle(e);
       return /(auto|scroll)/.test(cs.overflowX) && e.scrollWidth > e.clientWidth + 1;
+    });
+    // Overflow with no scrollbar: worse than a scrollbar, and invisible to `scrollers`.
+    // Two exclusions, because without them this number is 4 on a surface with no defect:
+    //   - the visually-hidden idiom (`.sr-only`: 1x1, absolute, `clip: rect(0,0,0,0)`) is
+    //     overflow ON PURPOSE and is what makes the surface accessible, not what breaks it;
+    //   - `text-overflow: ellipsis` is a designed truncation with a visible affordance —
+    //     `.fwin-title` at 260 px reads `81>76` and shows the user an ellipsis.
+    // Everything left is content pushed out of reach with nothing to say so.
+    const hiddenX = all.filter((e) => {
+      const cs = getComputedStyle(e);
+      if (!/^(hidden|clip)$/.test(cs.overflowX)) return false;
+      if (e.scrollWidth <= e.clientWidth + 1) return false;
+      if (e.clientWidth <= 1 && cs.position === 'absolute') return false;
+      if (cs.textOverflow === 'ellipsis') return false;
+      return true;
     });
 
     // Dead-region grid.
@@ -165,6 +198,8 @@
       overlapList: overlaps.slice(0, 6),
       horizontalScrollers: scrollers.length,
       horizontalScrollerList: scrollers.slice(0, 4).map((e) => `${e.tagName.toLowerCase()}.${String(e.className || '').split(' ')[0]} ${e.scrollWidth}>${e.clientWidth}`),
+      hiddenOverflowX: hiddenX.length,
+      hiddenOverflowXList: hiddenX.slice(0, 6).map((e) => `${e.tagName.toLowerCase()}.${String(e.className || '').split(' ')[0]} ${e.scrollWidth}>${e.clientWidth}`),
       deadRegionPctOfWindow: Number(((best * cellArea) / (R.width * R.height) * 100).toFixed(1)),
       deadRegionPctOfViewport: Number(((best * cellArea) / (window.innerWidth * window.innerHeight) * 100).toFixed(1)),
       deadRegionBox: bestBox ? `${Math.round(bestBox.w * cw)}x${Math.round(bestBox.h * ch)} at grid ${bestBox.x},${bestBox.y}` : null,

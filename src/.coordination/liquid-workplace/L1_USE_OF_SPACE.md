@@ -264,3 +264,58 @@ so nobody reads a lower number as a contradiction.
 `chromeParts: []` and a **95.3%** dead region — a refusal wearing a measurement's clothes. It also
 reported the window as `1239×750` where the focused read gives `1264×765`. `/focus` first, then
 measure; a probe that returns zeros for every region has not run.
+
+## 2026-08-22 · backup · the compact control that could not fail, and the two blind spots behind it
+
+Category 4 was one size short of a score, so compact was re-driven on the Liquid Dictionary
+(`data-presentation=liquid`, 食べる, 8 entries). It read **clipped 0 / overlaps 0 /
+h-scrollers 0** — and so did the sub-minimum 200×130 control, and so did **both** deliberate
+failures injected on top of it (a `position:fixed` box 300 px past the right frame edge;
+`.dict-view`'s track floor forced to a fixed `repeat(2, 28rem)` in a 260 px window). Per the
+rubric a control that does not fail **voids** the score. It voided.
+
+**Two blind spots in `probes/l1-use-of-space.js`, both now fixed.**
+
+1. `scrollableAncestor` was axis-blind — it tested `overflowY + overflowX` against one regex
+   and asked only whether *either* axis scrolled. Dictionary's `.fwin-body` is
+   `overflow-y: auto; overflow-x: hidden`, so it exempted every descendant from the clipping
+   check on **both** axes. Split into `scrollableAncestor(el, 'x'|'y')`; `clipped` now tests
+   each axis against its own ancestor.
+2. `horizontalScrollers` counts only `overflow-x: auto|scroll`. Overflow inside
+   `overflow-x: hidden` has no scrollbar to count, which is *worse* than a scrollbar — the
+   content is unreachable — and read clean. New number **`hiddenOverflowX`**, excluding the
+   two legitimate cases: the `.sr-only` visually-hidden idiom (1×1 absolute) and
+   `text-overflow: ellipsis` (`.fwin-title` reads `81>76` and shows the user an ellipsis).
+   Without those exclusions the number is **4** on a surface with no defect.
+
+**The same three sizes, before and after the instrument fix, one window, one session:**
+
+| size | clipped before | clipped after | hiddenOverflowX | dead % of viewport |
+| --- | --- | --- | --- | --- |
+| compact 260×170 | 0 | **160** | **1** (`.fwin-body 498>248`) | 0.9 |
+| sub-min 200×130 *(control)* | 0 | **178** | **1** (`498>188`) | 0.7 |
+| default 820×580 | 0 | **0** | **0** | 10.7 |
+| maximized 1264×765 | 0 | 0 | 0 | **8.7** |
+
+The control now fails and fails *further* than the size it controls (160 → 178), and default
+and maximized stay clean, so the fix is discriminating rather than merely louder.
+
+**What it was hiding is a real product defect, and it is not Liquid's.** At 260×170 every
+`div.dict-entry` measures **480×… in a 258 px body** — 268 px of each entry unreachable, with
+`.fwin-body`'s `overflow-x: hidden` swallowing 250 px of it. Driven in **standard**
+presentation at the same widths the numbers are **identical** (`display: block`, `cols: none`,
+overflow 268 / 128 / 0 at 260 / 400 / 560), so the `.fwin-liquid .dict-view` grid is not the
+cause. `styles.css:4790` `.dict-entries { repeat(auto-fill, minmax(30rem, 1fr)) }` is: 30rem is
+**480 px**, a hard track floor that overflows any container narrower than it. Landed by this
+plan's own 2026-08-18 category-4 slice, unscoped, so it regressed standard windows too.
+Three more rules carry the same shape — `styles.css:9423` `.dict-ex-list` (30rem),
+`lexiconExamples.css:58` `.lexicon-examples-list` (30rem), `liquid-window.css:166`
+`.fwin-liquid .dict-view` (28rem).
+
+**Maximized re-derived this turn on a fresh window, not inherited:** 1264×765, dead region
+`379×237 at grid 28,19` = **8.7%** of viewport, canvas 55.0%, chrome 4.3% — reproduces the
+2026-08-22 figure exactly. Round trip through the product's own `toggleMax`:
+`left: 60px; top: 24px; width: 820px; height: 580px` byte-identical, z-index 23 → 26.
+
+**Category 4 is NOT scored this turn and the score is not carried forward.** Three of its four
+numbers now fail at a size the product itself allows.
