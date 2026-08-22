@@ -111,6 +111,7 @@ interface Api {
   plan: ReturnType<typeof vi.fn>;
   claim: ReturnType<typeof vi.fn>;
   release: ReturnType<typeof vi.fn>;
+  report: ReturnType<typeof vi.fn>;
   fire: (entry?: AgentAutomation) => void;
 }
 
@@ -119,6 +120,7 @@ function installApi(planResult: unknown): Api {
   const plan = vi.fn(() => Promise.resolve(planResult));
   const claim = vi.fn(() => Promise.resolve(true));
   const release = vi.fn(() => Promise.resolve(true));
+  const report = vi.fn(() => Promise.resolve({ ok: true }));
   (globalThis as Record<string, unknown>).api = {
     localAgentPlan: plan,
     onLocalAgentTrigger: (cb: (entry: AgentAutomation) => void) => {
@@ -129,8 +131,9 @@ function installApi(planResult: unknown): Api {
     },
     localAgentClaimTriggers: claim,
     localAgentReleaseTriggers: release,
+    localAgentReportAutomationRun: report,
   };
-  return { plan, claim, release, fire: (entry = AUTOMATION) => listener?.(entry) };
+  return { plan, claim, release, report, fire: (entry = AUTOMATION) => listener?.(entry) };
 }
 
 describe('runScheduledAutomation', () => {
@@ -260,6 +263,7 @@ describe('installLocalAgentAutomationHost', () => {
     api.fire();
     await vi.waitFor(() => expect(state.saved).toHaveLength(1));
     expect(state.saved[0].items[0].id).toBe('task-1');
+    expect(api.report).not.toHaveBeenCalled();
 
     uninstall();
     expect(api.release).toHaveBeenCalledTimes(1);
@@ -312,6 +316,21 @@ describe('installLocalAgentAutomationHost', () => {
     const [item] = state.saved[0].items;
     expect(item.status).toBe('queued');
     expect(item.execution).toBeUndefined();
+    uninstall();
+  });
+
+  it('reports a bounded failure after accepting a fire', async () => {
+    api = installApi({ ok: false, error: 'C:\\models\\private.gguf missing' });
+    const uninstall = installLocalAgentAutomationHost();
+
+    api.fire();
+
+    await vi.waitFor(() => expect(api.report).toHaveBeenCalledWith({
+      automationId: 'auto-1',
+      failureCode: 'planner-unavailable',
+    }));
+    expect(state.saved).toHaveLength(0);
+    expect(JSON.stringify(api.report.mock.calls)).not.toContain('private.gguf');
     uninstall();
   });
 });

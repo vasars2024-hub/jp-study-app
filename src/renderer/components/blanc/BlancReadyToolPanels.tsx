@@ -527,7 +527,7 @@ export function LocalAgentPanel() {
   };
 
   /**
-   * The schedule table's honest state. Three answers, and the middle one is why
+   * The schedule table's honest state. Four answers, and the failure states are why
    * the column exists: a `missed` fire came due and reached nobody, which is not
    * the same as an automation that has not come due yet.
    *
@@ -543,6 +543,14 @@ export function LocalAgentPanel() {
       hour: '2-digit',
       minute: '2-digit',
     });
+    if (run.outcome === 'failed') {
+      const reason = t(`blanc.agent.run.failure.${run.failureCode ?? 'unknown'}`);
+      return (
+        <span className="blanc-note" title={reason}>
+          {t('blanc.agent.run.failed', { time, reason })}
+        </span>
+      );
+    }
     if (run.outcome === 'delivered') return t('blanc.agent.run.delivered', { time });
     return (
       <span className="blanc-note" title={t('blanc.agent.run.missedHint')}>

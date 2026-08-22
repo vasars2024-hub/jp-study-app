@@ -28,13 +28,27 @@
  * with a short useful life, not "what has this thing done to my data".
  */
 
-export type AgentAutomationRunOutcome = 'delivered' | 'missed';
+export type AgentAutomationRunOutcome = 'delivered' | 'missed' | 'failed';
+
+/**
+ * Bounded reasons a renderer may report after accepting a scheduled fire.
+ * Backend exception text is deliberately absent: it can contain local model
+ * paths, provider responses, or user-authored prompt fragments.
+ */
+export type AgentAutomationRunFailureCode =
+  | 'agent-disabled'
+  | 'planner-unavailable'
+  | 'no-approved-action'
+  | 'task-conflict'
+  | 'store-failed';
 
 export interface AgentAutomationRun {
   /** The automation's id. Resolve the display name from the live schedule. */
   automationId: string;
   at: number;
   outcome: AgentAutomationRunOutcome;
+  /** Present only when `outcome` is `failed`. Never free-form text. */
+  failureCode?: AgentAutomationRunFailureCode;
   /**
    * How many renderers claimed the trigger. `0` is exactly what `missed` means,
    * and it is kept rather than implied because a delivered run's count is the
@@ -55,7 +69,24 @@ export const AGENT_AUTOMATION_RUN_RETENTION_MS = 14 * 24 * 60 * 60 * 1000;
 const OUTCOMES: ReadonlySet<string> = new Set<AgentAutomationRunOutcome>([
   'delivered',
   'missed',
+  'failed',
 ]);
+const FAILURE_CODES: ReadonlySet<string> = new Set<AgentAutomationRunFailureCode>([
+  'agent-disabled',
+  'planner-unavailable',
+  'no-approved-action',
+  'task-conflict',
+  'store-failed',
+]);
+
+export interface AgentAutomationRunFailureReport {
+  automationId: string;
+  failureCode: AgentAutomationRunFailureCode;
+}
+
+export type AgentAutomationRunReportResult =
+  | { ok: true }
+  | { ok: false; code: 'invalid-request' | 'not-claimed' | 'run-not-found' };
 
 export function emptyAgentAutomationRunLog(): AgentAutomationRunLog {
   return { version: 1, runs: [] };
@@ -73,11 +104,31 @@ function normalizeRun(input: unknown): AgentAutomationRun | null {
   const handlers = typeof raw.handlers === 'number' && Number.isFinite(raw.handlers)
     ? Math.max(0, Math.floor(raw.handlers))
     : 0;
-  return {
+  const result: AgentAutomationRun = {
     automationId: automationId.slice(0, 120),
     at,
     outcome: outcome as AgentAutomationRunOutcome,
     handlers,
+  };
+  if (outcome === 'failed') {
+    const failureCode = typeof raw.failureCode === 'string' ? raw.failureCode : '';
+    if (!FAILURE_CODES.has(failureCode)) return null;
+    result.failureCode = failureCode as AgentAutomationRunFailureCode;
+  }
+  return result;
+}
+
+export function normalizeAgentAutomationRunFailureReport(
+  input: unknown,
+): AgentAutomationRunFailureReport | null {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+  const raw = input as Record<string, unknown>;
+  const automationId = typeof raw.automationId === 'string' ? raw.automationId.trim() : '';
+  const failureCode = typeof raw.failureCode === 'string' ? raw.failureCode : '';
+  if (!automationId || automationId.length > 120 || !FAILURE_CODES.has(failureCode)) return null;
+  return {
+    automationId,
+    failureCode: failureCode as AgentAutomationRunFailureCode,
   };
 }
 
@@ -110,6 +161,28 @@ export function appendAgentAutomationRun(
 }
 
 /**
+ * Replaces the newest delivered row for one automation with its eventual
+ * failure. A report cannot invent a run: `null` means main has no matching fire
+ * to amend, so callers can reject stale, duplicate, or fabricated reports.
+ */
+export function failLatestDeliveredAgentAutomationRun(
+  log: AgentAutomationRunLog,
+  report: AgentAutomationRunFailureReport,
+): AgentAutomationRunLog | null {
+  const index = log.runs.findIndex((run) => (
+    run.automationId === report.automationId && run.outcome === 'delivered'
+  ));
+  if (index < 0) return null;
+  const runs = [...log.runs];
+  runs[index] = {
+    ...runs[index],
+    outcome: 'failed',
+    failureCode: report.failureCode,
+  };
+  return { version: 1, runs };
+}
+
+/**
  * Drops rows past the retention window. Returns the SAME object when nothing
  * expires, so a prune that changes nothing cannot be mistaken for a write.
  */
@@ -126,8 +199,8 @@ export function pruneAgentAutomationRunLog(
 /**
  * The most recent run for one automation, or `null` if it has never fired.
  *
- * Three states, not two, and the third is the one the surface exists for:
- * *delivered*, *missed*, and *never run since the record began*. A `null` here
+ * Four states, not two: *delivered*, *failed after delivery*, *missed*, and
+ * *no retained run*. A `null` here
  * means only that — it is not evidence that the automation never came due,
  * because the log's retention window is fourteen days and a run older than that
  * is gone. A reader that renders `null` as "never" would be asserting more than

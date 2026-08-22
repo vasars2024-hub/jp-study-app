@@ -107,6 +107,10 @@ import type {
 import type { LocalAgentModelInfo, LocalAgentPlanRequest, LocalAgentPlanResponse, LocalAgentRuntimeStatus } from './shared/localAgentRuntime';
 import type { AgentAutomation } from './shared/localAgentAutomation';
 import type {
+  AgentAutomationRunFailureReport,
+  AgentAutomationRunReportResult,
+} from './shared/localAgentAutomationRuns';
+import type {
   AgentExecutionEvent,
   AgentExecutionRequest,
   AgentExecutionResult,
@@ -1853,6 +1857,10 @@ const api = {
     ipcRenderer.invoke('localAgent:claimTriggers'),
   localAgentReleaseTriggers: (): Promise<boolean> =>
     ipcRenderer.invoke('localAgent:releaseTriggers'),
+  localAgentReportAutomationRun: (
+    request: AgentAutomationRunFailureReport,
+  ): Promise<AgentAutomationRunReportResult> =>
+    ipcRenderer.invoke('localAgent:reportAutomationRun', request),
   // The main-owned Agent workspace store. Its only renderer consumer is
   // `renderer/agentWorkspaceClient.ts`; see shared/agentWorkspaceBridge.ts for
   // why failures cross as a code rather than a message.

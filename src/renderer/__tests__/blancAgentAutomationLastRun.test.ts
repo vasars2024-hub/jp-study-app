@@ -165,6 +165,24 @@ describe('the schedule table reports what actually happened', () => {
     expect(text).not.toContain(en['blanc.agent.run.missed'].split('{time}')[1].trim());
   });
 
+  it('says a delivered fire failed before a plan was queued', async () => {
+    await mountWith(
+      [automation('a1', 'Morning review')],
+      [{
+        automationId: 'a1',
+        at: NOW,
+        outcome: 'failed',
+        failureCode: 'planner-unavailable',
+        handlers: 1,
+      }],
+    );
+
+    const text = lastRunText('Morning review');
+    expect(text).toContain(en['blanc.agent.run.failed'].split('{time}')[0].trim());
+    expect(text).toContain(en['blanc.agent.run.failure.planner-unavailable']);
+    expect(text).not.toContain(en['blanc.agent.run.delivered'].split('{time}')[0].trim());
+  });
+
   /**
    * The state most easily conflated with `missed`. An automation with no run row
    * has not been shown to have failed — the log only keeps fourteen days — so the

@@ -4,7 +4,9 @@ import {
   AGENT_AUTOMATION_RUN_RETENTION_MS,
   appendAgentAutomationRun,
   emptyAgentAutomationRunLog,
+  failLatestDeliveredAgentAutomationRun,
   normalizeAgentAutomationRunLog,
+  normalizeAgentAutomationRunFailureReport,
   pruneAgentAutomationRunLog,
   type AgentAutomationRun,
 } from '../localAgentAutomationRuns';
@@ -59,6 +61,62 @@ describe('normalizeAgentAutomationRunLog', () => {
       runs: [{ ...run(), name: 'Morning review', objective: 'summarize my day' }],
     });
     expect(Object.keys(log.runs[0]).sort()).toEqual(['at', 'automationId', 'handlers', 'outcome']);
+  });
+
+  it('keeps a bounded failure code and rejects a failed row without one', () => {
+    const log = normalizeAgentAutomationRunLog({
+      version: 1,
+      runs: [
+        run({ outcome: 'failed', failureCode: 'planner-unavailable' }),
+        { ...run({ automationId: 'drop', outcome: 'failed' }), failureCode: 'C:\\secret.gguf' },
+      ],
+    });
+    expect(log.runs).toEqual([
+      run({ outcome: 'failed', failureCode: 'planner-unavailable' }),
+    ]);
+  });
+});
+
+describe('failure reports', () => {
+  it('normalizes only bounded ids and codes', () => {
+    expect(normalizeAgentAutomationRunFailureReport({
+      automationId: '  a1  ',
+      failureCode: 'store-failed',
+      message: 'C:\\models\\private.gguf',
+    })).toEqual({ automationId: 'a1', failureCode: 'store-failed' });
+    expect(normalizeAgentAutomationRunFailureReport({
+      automationId: 'a1',
+      failureCode: 'C:\\models\\private.gguf',
+    })).toBeNull();
+  });
+
+  it('amends the newest delivered fire without inventing a second run', () => {
+    const log = normalizeAgentAutomationRunLog({
+      version: 1,
+      runs: [
+        run({ at: NOW, outcome: 'delivered' }),
+        run({ at: NOW - 86_400_000, outcome: 'delivered' }),
+      ],
+    });
+    const failed = failLatestDeliveredAgentAutomationRun(log, {
+      automationId: 'a1',
+      failureCode: 'planner-unavailable',
+    });
+    expect(failed?.runs).toEqual([
+      run({ at: NOW, outcome: 'failed', failureCode: 'planner-unavailable' }),
+      run({ at: NOW - 86_400_000, outcome: 'delivered' }),
+    ]);
+  });
+
+  it('refuses to fabricate or overwrite a run that was not delivered', () => {
+    const log = normalizeAgentAutomationRunLog({
+      version: 1,
+      runs: [run({ outcome: 'missed', handlers: 0 })],
+    });
+    expect(failLatestDeliveredAgentAutomationRun(log, {
+      automationId: 'a1',
+      failureCode: 'planner-unavailable',
+    })).toBeNull();
   });
 });
 

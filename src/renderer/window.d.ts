@@ -49,6 +49,10 @@ import type {
 import type { LocalAgentModelInfo, LocalAgentPlanRequest, LocalAgentPlanResponse, LocalAgentRuntimeStatus } from '../shared/localAgentRuntime';
 import type { AgentAutomation } from '../shared/localAgentAutomation';
 import type {
+  AgentAutomationRunFailureReport,
+  AgentAutomationRunReportResult,
+} from '../shared/localAgentAutomationRuns';
+import type {
   AgentExecutionCancelResult,
   AgentExecutionEvent,
   AgentExecutionRequest,
@@ -1167,6 +1171,9 @@ declare global {
       onLocalAgentTrigger(cb: (entry: AgentAutomation) => void): () => void;
       localAgentClaimTriggers(): Promise<boolean>;
       localAgentReleaseTriggers(): Promise<boolean>;
+      localAgentReportAutomationRun(
+        request: AgentAutomationRunFailureReport,
+      ): Promise<AgentAutomationRunReportResult>;
       agentWorkspaceLoad(): Promise<AgentWorkspaceResult>;
       agentWorkspaceSave(state: AgentWorkspaceState): Promise<AgentWorkspaceResult>;
       agentWorkspaceDeleteConversation(conversationId: string): Promise<AgentWorkspaceResult>;

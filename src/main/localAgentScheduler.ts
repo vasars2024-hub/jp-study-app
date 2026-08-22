@@ -41,7 +41,10 @@ import { automationDueAt, type AgentAutomation } from '../shared/localAgentAutom
 import {
   appendAgentAutomationRun,
   emptyAgentAutomationRunLog,
+  failLatestDeliveredAgentAutomationRun,
+  normalizeAgentAutomationRunFailureReport,
   type AgentAutomationRun,
+  type AgentAutomationRunReportResult,
 } from '../shared/localAgentAutomationRuns';
 // Same-layer import, deliberately: `agentOperational:changed` is the operational
 // bridge's channel and it should have exactly one sender. A second literal here
@@ -117,6 +120,31 @@ function recordRuns(runs: AgentAutomationRun[]): void {
   announce(state);
 }
 
+/**
+ * Amends the fire main already wrote after the claiming renderer discovers that
+ * planning or the durable enqueue failed. The renderer cannot append arbitrary
+ * history: it must still own a trigger claim, the payload is a bounded shared
+ * contract, and an existing `delivered` row must be present to amend.
+ */
+function reportAutomationRunFailure(
+  senderId: number,
+  input: unknown,
+): AgentAutomationRunReportResult {
+  if (!claims.has(senderId)) return { ok: false, code: 'not-claimed' };
+  const report = normalizeAgentAutomationRunFailureReport(input);
+  if (!report) return { ok: false, code: 'invalid-request' };
+  if (!operationalStore) return { ok: false, code: 'run-not-found' };
+
+  const current = operationalStore.read();
+  const log = current.automationRuns ?? emptyAgentAutomationRunLog();
+  const amended = failLatestDeliveredAgentAutomationRun(log, report);
+  if (!amended) return { ok: false, code: 'run-not-found' };
+
+  const state = operationalStore.write({ ...current, automationRuns: amended });
+  announce(state);
+  return { ok: true };
+}
+
 function tick(): void {
   const now = new Date();
   const day = dayKey(now);
@@ -172,6 +200,7 @@ export function registerLocalAgentSchedulerIpc(
   // throwing on a duplicate channel.
   ipcMain.removeHandler('localAgent:claimTriggers');
   ipcMain.removeHandler('localAgent:releaseTriggers');
+  ipcMain.removeHandler('localAgent:reportAutomationRun');
   ipcMain.handle('localAgent:claimTriggers', (event): boolean => {
     claims.add(event.sender.id);
     return true;
@@ -180,6 +209,9 @@ export function registerLocalAgentSchedulerIpc(
     claims.delete(event.sender.id);
     return true;
   });
+  ipcMain.handle('localAgent:reportAutomationRun', (event, input: unknown) => (
+    reportAutomationRunFailure(event.sender.id, input)
+  ));
   unsubscribe?.();
   unsubscribe = store.subscribe((state) => apply(state.automations));
   apply(store.read().automations);

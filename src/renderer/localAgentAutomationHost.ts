@@ -32,14 +32,14 @@
  *   this, so a user watching the panel sees the plan happen there instead of it
  *   silently landing in the queue behind them.
  *
- * Known gap, deliberately left for its own slice: a plan that FAILS here is
- * invisible. Main records `delivered` — accurate, the fire did reach a handler —
- * and nothing anywhere distinguishes "delivered and queued" from "delivered and
- * the backend was down". Closing that needs a renderer→main report channel and a
- * third outcome in `shared/localAgentAutomationRuns.ts`.
+ * A planning or durable-write failure is reported back through the claimed
+ * scheduler channel as one bounded code. Main amends the `delivered` row to
+ * `failed`; backend text never crosses this path because it can contain a local
+ * model path or provider response.
  */
 
 import type { AgentAutomation } from '../shared/localAgentAutomation';
+import type { AgentAutomationRunFailureCode } from '../shared/localAgentAutomationRuns';
 import type { AgentTask } from '../shared/localAgent';
 import { getActiveAgentProfile, underPermissionCeiling } from '../shared/localAgentProfiles';
 import { selectAgentMemoryContext } from '../shared/localAgentMemory';
@@ -59,12 +59,7 @@ import {
 } from './localAgentTaskQueueStore';
 import { registerLocalAgentTriggerHandler } from './localAgentTriggerRunner';
 
-export type ScheduledAutomationFailureCode =
-  | 'agent-disabled'
-  | 'planner-unavailable'
-  | 'no-approved-action'
-  | 'task-conflict'
-  | 'store-failed';
+export type ScheduledAutomationFailureCode = AgentAutomationRunFailureCode;
 
 export type ScheduledAutomationResult =
   | { ok: true; taskId: string }
@@ -162,7 +157,19 @@ export function installLocalAgentAutomationHost(): () => void {
   const sync = (enabled: boolean): void => {
     if (enabled && !unregister) {
       unregister = registerLocalAgentTriggerHandler('background', (entry) => {
-        void runScheduledAutomation(entry);
+        void (async () => {
+          const result = await runScheduledAutomation(entry);
+          if (result.ok) return;
+          const report = window.api?.localAgentReportAutomationRun;
+          if (typeof report !== 'function') return;
+          try {
+            await report({ automationId: entry.id, failureCode: result.code });
+          } catch {
+            // The schedule table cannot be made honest when main is an older
+            // build or shutting down, but this background host has no UI in
+            // which to surface a second error. Never leak backend error text.
+          }
+        })();
       });
       return;
     }

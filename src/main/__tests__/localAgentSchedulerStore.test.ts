@@ -24,7 +24,11 @@ interface FakeWindow {
   sent: Array<{ channel: string; payload: unknown }>;
 }
 
-const registry = vi.hoisted(() => ({ windows: [] as FakeWindow[], nextId: 1 }));
+const registry = vi.hoisted(() => ({
+  windows: [] as FakeWindow[],
+  nextId: 1,
+  handlers: new Map<string, (event: { sender: { id: number } }, input?: unknown) => unknown>(),
+}));
 
 function asBrowserWindow(window: FakeWindow) {
   return {
@@ -40,8 +44,12 @@ function asBrowserWindow(window: FakeWindow) {
 vi.mock('electron', () => ({
   app: { getPath: (): string => os.tmpdir() },
   ipcMain: {
-    handle: () => undefined,
-    removeHandler: () => undefined,
+    handle: (channel: string, handler: (event: { sender: { id: number } }, input?: unknown) => unknown) => {
+      registry.handlers.set(channel, handler);
+    },
+    removeHandler: (channel: string) => {
+      registry.handlers.delete(channel);
+    },
   },
   BrowserWindow: {
     getAllWindows: () => registry.windows.map(asBrowserWindow),
@@ -127,10 +135,17 @@ function firedIds(window: FakeWindow): string[] {
     .map((message) => (message.payload as { id: string }).id);
 }
 
+function reportFailure(senderId: number, input: unknown): unknown {
+  const handler = registry.handlers.get('localAgent:reportAutomationRun');
+  if (!handler) throw new Error('report handler was not registered');
+  return handler({ sender: { id: senderId } }, input);
+}
+
 beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(WEDNESDAY_0900);
   registry.windows.length = 0;
+  registry.handlers.clear();
   releases.length = 0;
   root = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-scheduler-'));
   store = createAgentOperationalStore(root, () => WEDNESDAY_0900.getTime());
@@ -309,6 +324,59 @@ describe('delivery is claimed, and a fire with no claimant is recorded', () => {
         handlers: 0,
       },
     ]);
+  });
+
+  it('amends a delivered run when its claimant reports a bounded failure', () => {
+    const claimant = makeClaimingWindow();
+    writeAutomations([automation('a1')]);
+    registerLocalAgentSchedulerIpc(() => store);
+
+    expect(reportFailure(claimant.id, {
+      automationId: 'a1',
+      failureCode: 'planner-unavailable',
+      message: 'C:\\models\\private.gguf',
+    })).toEqual({ ok: true });
+    expect(runs()).toEqual([{
+      automationId: 'a1',
+      at: WEDNESDAY_0900.getTime(),
+      outcome: 'failed',
+      failureCode: 'planner-unavailable',
+      handlers: 1,
+    }]);
+  });
+
+  it('rejects a failure report from a renderer that has not claimed triggers', () => {
+    const claimant = makeClaimingWindow();
+    const silent = makeSilentWindow();
+    writeAutomations([automation('a1')]);
+    registerLocalAgentSchedulerIpc(() => store);
+
+    expect(reportFailure(silent.id, {
+      automationId: 'a1',
+      failureCode: 'planner-unavailable',
+    })).toEqual({ ok: false, code: 'not-claimed' });
+    expect(runs()[0].outcome).toBe('delivered');
+    expect(firedIds(claimant)).toEqual(['a1']);
+  });
+
+  it('rejects free-form or duplicate reports instead of inventing history', () => {
+    const claimant = makeClaimingWindow();
+    writeAutomations([automation('a1')]);
+    registerLocalAgentSchedulerIpc(() => store);
+
+    expect(reportFailure(claimant.id, {
+      automationId: 'a1',
+      failureCode: 'C:\\models\\private.gguf',
+    })).toEqual({ ok: false, code: 'invalid-request' });
+    expect(reportFailure(claimant.id, {
+      automationId: 'a1',
+      failureCode: 'store-failed',
+    })).toEqual({ ok: true });
+    expect(reportFailure(claimant.id, {
+      automationId: 'a1',
+      failureCode: 'store-failed',
+    })).toEqual({ ok: false, code: 'run-not-found' });
+    expect(runs()).toHaveLength(1);
   });
 });
 
