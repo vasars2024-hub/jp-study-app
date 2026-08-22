@@ -90,3 +90,49 @@ them. Driving those safely needs a scratch profile, which is its own slice.
 - **`.dict-entry` reads 0 while the results are plainly on screen** if the result view is on the
   Interlinear tab. Check the `Automatic`/`Dictionary`/`Interlinear` tab state before concluding a
   search failed; `/logs?level=error` was **total 0** throughout.
+
+## 2026-08-22 · backup · the second term arrives — Standard vs Liquid, on the same window
+
+The entry above records the Standard-vs-Liquid cost delta as **NOT MEASURABLE**, "structurally
+unavailable at L1 rather than failing… named here so the L4 re-score knows it is owed." L3.2
+shipped the presentation toggle, so it is owed no longer. One window, one session, one search
+(食べる), driven both ways through real bridge mouse and char events at a human pace
+(`debug/l4c-clunk1.cjs`; `l1-clunkiness.js` + `-read.js` do the counting, so the cost comes from
+capture-phase listeners rather than from the driver's intent).
+
+| Rubric number | Standard | Liquid | delta | Bar |
+| --- | --- | --- | --- | --- |
+| Dominant task cost | **2 clicks + 3 keystrokes** | **2 clicks + 3 keystrokes** | **0** | equal |
+| Results returned | 8 | 8 | 0 | — |
+| Worst input ack (`recvMs`) | **42.2 ms** | **40.8 ms** | −1.4 | ≤100 ms |
+| Inputs over the 100 ms bar | **0 of 5** | **0 of 5** | 0 | 0 |
+| Search click → 8 rows painted | **177 ms** | **155 ms** | −22 | — |
+| Scroll traps | **0** | **0** | 0 | 0 |
+| Modal traps / open dialogs | **0** | **0** | 0 | 0 |
+
+The field is emptied through the product first (click, Ctrl+A, Delete, read back `""`) so both
+runs start cold; `entriesAtArm` is reported so a run that never actually re-searched is visible.
+`stampMs` is recorded and **not scored** — on these same events it reads 49.7/75.6 ms in Standard
+and 40.8/65.1 in Liquid, which is the main→renderer hop, not the app.
+
+**The negative control fired, this session, in Liquid.** `l1-deadend.js` injected its
+handler-less `Probe control` button into the window and drove it exactly like the other 34
+targets: reported `changed: false`, then `baitRemoved: true` and re-verified absent. A 0 from a
+probe that has not failed once is void; this one has.
+
+**Dead ends in Liquid: 3 candidates of 35 driven, none a defect.** `Search` (clicked with the
+query already showing — an honest no-op), `Automatic` (the already-selected lens, the same
+no-op the 2026-08-16 entry documented), and `Play 食べる`, which also appears in `withEffect` —
+a duplicate label resolving to a different instance, i.e. the resolver, not the app. 26 controls
+skipped **by name and reported**: 5 window chrome, 2 mode switches driven in their own pass, 18
+that write real user data, 1 honestly disabled `Save note`.
+
+**Category 2 is still not a 10, and the reason has narrowed to exactly one.** The
+Standard-vs-Liquid term is now measured and equal. What remains is the same instrument gap:
+**16 of 35 targets are `(unlabelled)` and resolve to `gone`**, so their dead-end status is
+unmeasured — a 0 covering 19 controls is not a 0 covering 35. Next: resolve targets by DOM path
+instead of by label. That is a probe change, not a product change.
+
+**Left as found:** the sweep's own pass ends on the Interlinear lens with `.dict-entry` at 0,
+which reads exactly like a failed search — it is not. Restored to `Automatic`, 8 entries, bait
+absent, presentation `liquid`. No skipped control was driven, so no user data moved.
