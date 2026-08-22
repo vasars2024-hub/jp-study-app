@@ -316,7 +316,15 @@ Still required before the Track 3 acceptance can be called complete:
   that execution then refused one at a time; `underPermissionCeiling` bounds the
   settings the plan is built from. It is a ceiling at every boundary and never a
   grant — a stored `full-automation` bound leaves a `read-only` live setting
-  alone, and a re-enqueue keeps the lower of the two. Measured live against a
+  alone, and a re-enqueue keeps the lower of the two. That sentence was written
+  true of the three defined levels and **false of a fourth**, and the 2026-08-22
+  boss audit measured the exception: `narrowAgentPermission` ranked a level
+  absent from its table as `undefined`, lost the comparison, and returned the
+  *other* operand — so an unrecognized ceiling widened `read-only` to 56
+  approved operations instead of 18. Never reachable (every path normalized
+  first), and closed at the primitive in `58203d56`, which is what makes the
+  sentence unqualified now: an unrecognized level ranks as the strictest, and
+  `evaluateAgentToolAccess` refuses it outright. Measured live against a
   real Qwen3-1.7B with one objective and one operation list, varying only the
   permission: `full-automation` planned `flashcard.create-deck` in 2 of 2 runs;
   the negative control, `read-only`, produced no plan in 0 of 3 — the write the

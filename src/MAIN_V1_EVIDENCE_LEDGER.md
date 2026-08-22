@@ -27574,3 +27574,45 @@ assertions read `expect(window.sent).toEqual([])` when they meant "received no t
 as `missed` — honest, but the feature still does not run there. Giving Study OS a claimant is the
 next slice, and it is a real product decision (which surface owns automation execution), not a
 refactor.
+
+## 2026-08-22 backup — Boss audit Finding 1: the permission rank that failed open, closed at the primitive
+
+Boss audit `audit-20260822-010547-02ec2c13` (section 2026-08-22 06:06) left Finding 1 unaddressed;
+the previous handoff read a stale copy of the file and reported "nothing owed". Verified open
+against the tree before starting: `localAgentProfiles.ts:374` was still the bare table lookup.
+
+**Defect.** Three modules each kept a private `Record<AgentPermissionLevel, number>` — `localAgent.ts`,
+`localAgentProfiles.ts`, `renderer/agentCapabilityDirectory.ts` — and every comparison built on them
+failed OPEN for a level absent from the table, because `undefined` loses in both directions:
+`rank[level] < rank[minimum]` is false (→ permitted) and `rank[a] <= rank[b] ? a : b` is false
+(→ returns the *other* operand). Audit's measurement: `read-only` narrowed by an unranked ceiling
+yielded **56** approved operations instead of **18**, the whole full-automation set including
+`flashcard.delete-deck`, `media.delete-item`, `settings.reset`.
+
+**Not reachable** — every traced path normalizes first (`enumValue` for profiles, Set membership for
+queue rows). Fixed anyway for the trust asymmetry the audit named: `main/localAgent.ts:206`
+normalizes the renderer's settings and `:223` passes `request.profile` **raw**, so the only guard on
+a main-process authorization decision lived in the other process. The primitive fix closes that
+without touching main.
+
+**Decision** (standing auto-approval, reversible): fix the *ranking*, not the call sites — the audit
+asked for exactly this and the doc comment above `narrowAgentPermission` already promised it. One
+exported `agentPermissionRank` + `isAgentPermissionLevel` + `STRICTEST_AGENT_PERMISSION` in
+`localAgent.ts`; the three local tables deleted. Tradeoff taken: `evaluateAgentToolAccess` **denies**
+an unrecognized level rather than silently ranking it strict — strict-ranking is equally safe but
+says nothing, and silence is how this class survives. Cost: an unrecognized level now fails even
+`dictionary.lookup`. Accepted — no such level exists in any shipped path.
+
+**Commit** `58203d56` (5 files, +131/−21). `docs` half, Finding 2: the plan's Track 3 sentence
+"a ceiling at every boundary and never a grant" was true of three levels and false of a fourth;
+qualified in place with the measurement and the fix, rather than deleted.
+
+**Gates.** 69 tests / 5 files green across the agent modules (profiles, localAgent, capability
+directory, prompt, queue-run). Three mutation controls, each killing only its own tests by name:
+M1 naive `narrowAgentPermission` → the 2 widening tests; M2 deny-guard disabled → only "denies a
+permission level it does not recognize"; M3 fail-open `agentPermissionRank` → **nothing**.
+
+**Trap for the next worker.** M3 is the finding in miniature: with both guards in place a fail-open
+rank changes no observable decision, so the layer the other two are built on had zero coverage and a
+green suite proved it safe. It needed a test asserting the rank directly. When a fix is layered,
+mutate the *bottom* layer — the top ones will hide it.
