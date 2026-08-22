@@ -27732,3 +27732,28 @@ an empty disposable `--user-data-dir`, but foreign Electron PID **30964** owns f
 the new bridge refused with `EADDRINUSE`. That process was untouched; both process trees created by
 this hop were enumerated and stopped (**8 + 13 processes**). No real userData or product state was
 read or changed.
+
+## 2026-08-22 codexA — Track 3: Reduced is Performance, and the track closes
+
+**Decision and result — `1ac943ed`.** The product's three animation levels now keep three honest
+meanings in every renderer, including the Agent: Full is normal duration, Reduced is the shared
+half-duration Performance mode, and None is zero-duration Disabled. `.reduce-motion` remains on
+Reduced for targeted ambient/decorative opt-outs; only None, Disabled, or the OS media query may
+globally erase purposeful transitions. Tradeoff: components that truly must stop under Reduced
+must opt out explicitly instead of inheriting an indiscriminate universal rule.
+
+The missing live bridge was fixed too: a Display-page animation change now re-applies and persists
+the matching motion mode without reload, with a write guard preventing the motion writer from
+echoing through the Display subscription. Focused gate: **2 files / 14 tests passed** in the shared
+tree and isolated commit. The negative control returned early from that subscription; the Reduced
+test failed **1/1** (`normal`, expected `performance`). Restored, it passed **1/1** and the isolated
+worktree was clean.
+
+Turn gates after both slices: **783 passed files / 10,837 passed tests / 1 skipped file / 6 skipped
+tests**; i18n **10,769/10,769**; architecture **2,153 modules / Nothing new / 5 pending**. ESLint's
+only two findings are inherited adjacent-overload ordering in `window.d.ts`, reproduced unchanged
+at parent `fa7f130e`; all other touched paths are clean. Live Electron was not retried: the same
+foreign PID **30964** still owns the single debug-bridge port, and stopping it is outside this hop.
+
+Track 3 now has **6 of 6 top-level "Still required" bullets closed**, counted directly in this
+plan's Track 3 checkpoint; its five acceptance outcomes are covered by those completed slices.

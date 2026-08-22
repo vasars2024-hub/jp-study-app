@@ -351,10 +351,14 @@ Still required before the Track 3 acceptance can be called complete:
   after, with the 330 reproduced as a positive control by re-applying the
   deleted declarations inline. Twelve tests, each proved to guard by its own
   mutation (2026-08-11 — see the ledger's "The matrix that had never been run").
-  **Still open** from this bullet: animation level *Reduced* does not reach this
-  surface, believed to be the design (`motion-system.css:216` calls Performance
-  the mode "where purposeful transitions still run"), and the inconsistency that
-  makes it ambiguous lives in another track's files.
+  **Reduced-motion ambiguity resolved; Track 3 closes.** The Display preference
+  now reaches the shared motion runtime immediately: *Reduced* maps to
+  half-duration Performance while retaining `.reduce-motion` for targeted
+  decorative opt-outs, and *None*/OS reduced motion remain the global snap
+  controls. The Agent therefore keeps purposeful token-timed transitions under
+  Reduced without weakening its complete-off path. The Track 3 "Still required"
+  list is now **6 of 6 top-level bullets closed** (`1ac943ed`, 2026-08-22; see the
+  ledger's "Reduced is Performance").
 
 ## Track 4: unified Reading workspace
 
