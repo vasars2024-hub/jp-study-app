@@ -231,4 +231,71 @@ describe('agent operational IPC', () => {
       expect(other.sent).toEqual([]);
     });
   });
+
+  /**
+   * The bridge persists the whole document, so every save carries sections the
+   * renderer only ever reads. `automationRuns` is one, and the renderer is never
+   * told when main appends to it — the scheduler writes through the store, not
+   * through this handler. Its cached copy is therefore stale by construction and
+   * a plain save would write that staleness back over main's record.
+   */
+  describe('main-owned sections', () => {
+    const run = (at: number, outcome: 'delivered' | 'missed', handlers: number) => ({
+      automationId: 'a1',
+      at,
+      outcome,
+      handlers,
+    });
+
+    function withRuns(...runs: ReturnType<typeof run>[]) {
+      return { ...document(), automationRuns: { version: 1 as const, runs } };
+    }
+
+    it('keeps a recorded run when the renderer saves a document that has never seen it', () => {
+      // Main records the miss, exactly as the scheduler does.
+      store.write(withRuns(run(NOW, 'missed', 0)));
+
+      // A window that loaded before the run saves for an unrelated reason.
+      const result = invoke(AGENT_OPERATIONAL_CHANNELS.save, null, document());
+
+      expect(store.read().automationRuns?.runs).toEqual([run(NOW, 'missed', 0)]);
+      expect(result.ok).toBe(true);
+      if (result.ok) expect(result.state.automationRuns?.runs).toHaveLength(1);
+    });
+
+    it('keeps the record when a renderer sends a fabricated one', () => {
+      store.write(withRuns(run(NOW, 'missed', 0)));
+
+      invoke(AGENT_OPERATIONAL_CHANNELS.save, null, withRuns(run(NOW, 'delivered', 3)));
+
+      // Not merged, not appended — the renderer's section is discarded outright.
+      expect(store.read().automationRuns?.runs).toEqual([run(NOW, 'missed', 0)]);
+    });
+
+    it('keeps the record when the save omits the section entirely', () => {
+      store.write(withRuns(run(NOW, 'missed', 0)));
+
+      const payload: Record<string, unknown> = { ...document() };
+      expect('automationRuns' in payload).toBe(false);
+      invoke(AGENT_OPERATIONAL_CHANNELS.save, null, payload);
+
+      expect(store.read().automationRuns?.runs).toHaveLength(1);
+    });
+
+    /**
+     * NEGATIVE CONTROL. The guard must not be a blanket "ignore the payload":
+     * a section the renderer *does* own has to survive the same save, or the
+     * three tests above would pass just as well against a handler that threw the
+     * whole document away.
+     */
+    it('still writes the sections the renderer owns', () => {
+      store.write(withRuns(run(NOW, 'missed', 0)));
+
+      invoke(AGENT_OPERATIONAL_CHANNELS.save, null, document([automation('renamed')]));
+
+      const stored = store.read();
+      expect(stored.automations.map((entry) => entry.id)).toEqual(['renamed']);
+      expect(stored.automationRuns?.runs).toHaveLength(1);
+    });
+  });
 });

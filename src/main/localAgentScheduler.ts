@@ -43,6 +43,10 @@ import {
   emptyAgentAutomationRunLog,
   type AgentAutomationRun,
 } from '../shared/localAgentAutomationRuns';
+// Same-layer import, deliberately: `agentOperational:changed` is the operational
+// bridge's channel and it should have exactly one sender. A second literal here
+// would be a second definition of the push contract.
+import { broadcastAgentOperationalState as announce } from './agentOperationalIpc';
 import {
   getAgentOperationalStore,
   type AgentOperationalStore,
@@ -105,7 +109,12 @@ function recordRuns(runs: AgentAutomationRun[]): void {
   const current = store.read();
   let log = current.automationRuns ?? emptyAgentAutomationRunLog();
   for (const run of runs) log = appendAgentAutomationRun(log, run);
-  store.write({ ...current, automationRuns: log });
+  const state = store.write({ ...current, automationRuns: log });
+  // A store write reaches main's own subscribers and stops there. Without this
+  // push a window's cached document never gains the run, so the surface that has
+  // to show "nothing was listening" would keep showing the state before it — and
+  // would go on doing so until the window reloaded.
+  announce(state);
 }
 
 function tick(): void {

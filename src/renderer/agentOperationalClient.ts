@@ -46,6 +46,10 @@ import type { AgentTaskQueue } from '../shared/localAgentTaskQueue';
 import type { AgentMemoryStore } from '../shared/localAgentMemory';
 import type { AgentAutomation } from '../shared/localAgentAutomation';
 import {
+  normalizeAgentAutomationRunLog,
+  type AgentAutomationRunLog,
+} from '../shared/localAgentAutomationRuns';
+import {
   normalizeAgentContextSuggestionPreferences,
   type AgentContextSuggestionPreferences,
 } from '../shared/agentContextSuggestions';
@@ -77,6 +81,14 @@ export const AGENT_SUGGESTIONS_CHANGED_EVENT = 'jp-study-agent-context-suggestio
  * second window watching the history is watching the same document.
  */
 export const AGENT_HISTORY_CHANGED_EVENT = 'jp-study-agent-operation-history-changed';
+/**
+ * Also new, and unlike every other section this one is **read-only here**. Main
+ * writes automation runs and this window is a viewer: there is no setter, and
+ * `retainMainOwnedSections` in main discards whatever a save carries in this
+ * section — so an accidental write would be silently reverted rather than
+ * corrupting the record.
+ */
+export const AGENT_AUTOMATION_RUNS_CHANGED_EVENT = 'jp-study-agent-automation-runs-changed';
 
 interface AgentOperationalBridge {
   agentOperationalLoad(): Promise<unknown>;
@@ -189,6 +201,9 @@ function applySnapshot(incoming: AgentOperationalState): void {
     history: sameSection(previous.history, incoming.history)
       ? previous.history
       : incoming.history,
+    automationRuns: sameSection(previous.automationRuns, incoming.automationRuns)
+      ? previous.automationRuns
+      : incoming.automationRuns,
   };
   snapshot = next;
   if (previous.queue !== next.queue) emit(AGENT_QUEUE_CHANGED_EVENT, next.queue);
@@ -201,6 +216,9 @@ function applySnapshot(incoming: AgentOperationalState): void {
   }
   if (previous.history !== next.history) {
     emit(AGENT_HISTORY_CHANGED_EVENT, next.history);
+  }
+  if (previous.automationRuns !== next.automationRuns) {
+    emit(AGENT_AUTOMATION_RUNS_CHANGED_EVENT, next.automationRuns);
   }
 }
 
@@ -341,6 +359,17 @@ export function setAgentContextSuggestionPreferencesSnapshot(
   applySnapshot({ ...snapshot, suggestions });
   schedulePersist();
   return getAgentContextSuggestionPreferencesSnapshot();
+}
+
+/**
+ * What the scheduler recorded the last time each automation came due.
+ *
+ * Read-only by design — see `AGENT_AUTOMATION_RUNS_CHANGED_EVENT`. Normalized on
+ * the way out so a consumer never has to handle the section being absent, which
+ * it is for any document written before 2026-08-22.
+ */
+export function getAgentAutomationRunsSnapshot(): AgentAutomationRunLog {
+  return normalizeAgentAutomationRunLog(snapshot.automationRuns);
 }
 
 export function getAgentOperationHistorySnapshot(): AgentOperationHistory {

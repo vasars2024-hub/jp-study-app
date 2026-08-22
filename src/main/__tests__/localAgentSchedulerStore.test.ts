@@ -251,7 +251,9 @@ describe('delivery is claimed, and a fire with no claimant is recorded', () => {
     writeAutomations([automation('a1')]);
     registerLocalAgentSchedulerIpc(() => store);
 
-    expect(window.sent).toEqual([]);
+    // Narrowed to the trigger channel: this window is now correctly pushed the
+    // document carrying its own missed run, which is the point of the record.
+    expect(firedIds(window)).toEqual([]);
     expect(runs()).toEqual([
       {
         automationId: 'a1',
@@ -290,7 +292,7 @@ describe('delivery is claimed, and a fire with no claimant is recorded', () => {
     registerLocalAgentSchedulerIpc(() => store);
 
     expect(firedIds(claimant)).toEqual(['a1']);
-    expect(focusedButSilent.sent).toEqual([]);
+    expect(firedIds(focusedButSilent)).toEqual([]);
   });
 
   it('drops a claim whose window is gone rather than counting it as a handler', () => {
@@ -307,5 +309,57 @@ describe('delivery is claimed, and a fire with no claimant is recorded', () => {
         handlers: 0,
       },
     ]);
+  });
+});
+
+/**
+ * A recorded run that no window is told about is a record only a reload can
+ * reach. The scheduler writes straight through the store, so none of the save
+ * handler's broadcast runs — the push has to be made here or the surface that
+ * must show "nothing was listening" keeps showing the state before the fire.
+ */
+describe('a recorded run reaches the windows', () => {
+  const changed = (window: FakeWindow) => window.sent
+    .filter((message) => message.channel === 'agentOperational:changed')
+    .map((message) => message.payload as { automationRuns?: { runs: AgentAutomationRun[] } });
+
+  it('pushes the document carrying the run to a window that could not have known', () => {
+    const silent = makeSilentWindow();
+    writeAutomations([automation('a1')]);
+    registerLocalAgentSchedulerIpc(() => store);
+
+    const pushes = changed(silent);
+    expect(pushes).toHaveLength(1);
+    expect(pushes[0].automationRuns?.runs).toEqual([
+      {
+        automationId: 'a1',
+        at: WEDNESDAY_0900.getTime(),
+        outcome: 'missed',
+        handlers: 0,
+      },
+    ]);
+  });
+
+  it('pushes to the claimant too, which knows it was triggered but not what was written', () => {
+    const claimant = makeClaimingWindow();
+    writeAutomations([automation('a1')]);
+    registerLocalAgentSchedulerIpc(() => store);
+
+    expect(changed(claimant)).toHaveLength(1);
+    expect(firedIds(claimant)).toEqual(['a1']);
+  });
+
+  /**
+   * NEGATIVE CONTROL. A tick that records nothing must push nothing, or a window
+   * would be re-rendered every thirty seconds by a document that did not change
+   * — and the assertions above would pass against an unconditional push.
+   */
+  it('pushes nothing when no automation came due', () => {
+    const silent = makeSilentWindow();
+    writeAutomations([{ ...automation('a1'), time: '23:45' }]);
+    registerLocalAgentSchedulerIpc(() => store);
+
+    expect(runs()).toEqual([]);
+    expect(changed(silent)).toEqual([]);
   });
 });

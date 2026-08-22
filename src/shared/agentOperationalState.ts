@@ -196,6 +196,36 @@ export function normalizeAgentOperationalState(input: unknown): AgentOperational
 }
 
 /**
+ * Restores the sections a renderer may read but must never write.
+ *
+ * The bridge persists the **whole** document: a renderer holds a snapshot and
+ * sends all of it back whenever any part of it changes. That is fine for the
+ * sections the renderer owns, and it silently destroys the ones it does not.
+ * `automationRuns` is written only by main — it is main that knows whether the
+ * trigger it fired reached a handler — and no renderer is ever told when a run
+ * is appended, because the scheduler writes through the store rather than
+ * through the save handler that broadcasts. So every window holds a run log
+ * that is stale by construction, and the next unrelated save (queueing a task,
+ * editing a memory) writes that staleness back over main's record.
+ *
+ * The fix is ownership, not merging. An incoming section is discarded outright
+ * and the current one kept, so there is no ordering in which a renderer can
+ * erase a run — including the renderer that has never heard of the section at
+ * all and sends it as `undefined`.
+ *
+ * Returns `incoming` unchanged when nothing needed restoring, so a caller can
+ * use reference equality to see that no section was overridden.
+ */
+export function retainMainOwnedSections(
+  incoming: AgentOperationalState,
+  current: AgentOperationalState,
+): AgentOperationalState {
+  const automationRuns = current.automationRuns ?? emptyAgentAutomationRunLog();
+  if (incoming.automationRuns === automationRuns) return incoming;
+  return { ...incoming, automationRuns };
+}
+
+/**
  * The three legacy `localStorage` documents, as the renderer read them. Every
  * field is optional because a profile may have had any subset of the keys.
  */

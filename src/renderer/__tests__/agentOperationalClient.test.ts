@@ -20,12 +20,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  AGENT_AUTOMATION_RUNS_CHANGED_EVENT,
   AGENT_AUTOMATIONS_CHANGED_EVENT,
   AGENT_HISTORY_CHANGED_EVENT,
   AGENT_MEMORY_CHANGED_EVENT,
   AGENT_QUEUE_CHANGED_EVENT,
   appendAgentOperationHistorySnapshot,
   clearAgentOperationHistorySnapshot,
+  getAgentAutomationRunsSnapshot,
   getAgentOperationHistorySnapshot,
   LEGACY_AGENT_AUTOMATIONS_KEY,
   LEGACY_AGENT_MEMORY_KEY,
@@ -671,5 +673,71 @@ describe('durable operation history', () => {
     await initAgentOperationalState();
 
     expect(getAgentOperationHistorySnapshot()).toEqual({ version: 1, entries: [] });
+  });
+});
+
+/**
+ * The one section this window may read and never write. Main appends to it from
+ * the scheduler, outside the save path, so the only way it arrives is the push —
+ * which makes the push the whole contract here.
+ */
+describe('automation runs', () => {
+  const automationRun = (at: number, outcome: 'delivered' | 'missed', handlers: number) => ({
+    automationId: 'a1',
+    at,
+    outcome,
+    handlers,
+  });
+
+  it('adopts a run pushed by main and announces it', async () => {
+    const bridge = installBridge();
+    await initAgentOperationalState();
+
+    const seen: string[] = [];
+    const listener = () => seen.push('runs');
+    window.addEventListener(AGENT_AUTOMATION_RUNS_CHANGED_EVENT, listener);
+    bridge.push?.({
+      ...emptyDocument(),
+      automationRuns: { version: 1, runs: [automationRun(NOW, 'missed', 0)] },
+    });
+    window.removeEventListener(AGENT_AUTOMATION_RUNS_CHANGED_EVENT, listener);
+
+    expect(getAgentAutomationRunsSnapshot().runs).toEqual([automationRun(NOW, 'missed', 0)]);
+    expect(seen).toEqual(['runs']);
+  });
+
+  it('reads a stored document that predates the section as an empty log', async () => {
+    const bridge = installBridge();
+    bridge.stored = emptyDocument();
+    await initAgentOperationalState();
+
+    expect(getAgentAutomationRunsSnapshot()).toEqual({ version: 1, runs: [] });
+  });
+
+  /**
+   * NEGATIVE CONTROL for the section-diffing half. A push that leaves the runs
+   * alone must not wake a runs subscriber, or the assertion above would pass
+   * against a client that fires every event on every push.
+   */
+  it('does not announce runs when a different section changed', async () => {
+    const bridge = installBridge();
+    await initAgentOperationalState();
+    bridge.push?.({
+      ...emptyDocument(),
+      automationRuns: { version: 1, runs: [automationRun(NOW, 'missed', 0)] },
+    });
+
+    const seen: string[] = [];
+    const listener = () => seen.push('runs');
+    window.addEventListener(AGENT_AUTOMATION_RUNS_CHANGED_EVENT, listener);
+    bridge.push?.({
+      ...emptyDocument(),
+      automations: [automation('a1')],
+      automationRuns: { version: 1, runs: [automationRun(NOW, 'missed', 0)] },
+    });
+    window.removeEventListener(AGENT_AUTOMATION_RUNS_CHANGED_EVENT, listener);
+
+    expect(seen).toEqual([]);
+    expect(getAgentAutomationRunsSnapshot().runs).toHaveLength(1);
   });
 });

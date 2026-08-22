@@ -36,6 +36,7 @@ import {
 } from '../shared/agentExecutionLeaseBridge';
 import {
   normalizeAgentOperationalState,
+  retainMainOwnedSections,
   type AgentOperationalState,
 } from '../shared/agentOperationalState';
 import {
@@ -50,6 +51,19 @@ function broadcast(state: AgentOperationalState, origin: WebContents | null): vo
     if (origin && window.webContents.id === origin.id) continue;
     window.webContents.send('agentOperational:changed', state);
   }
+}
+
+/**
+ * Announces a document that main wrote on its own initiative, with no renderer
+ * save to answer.
+ *
+ * The scheduler is the caller: it appends an automation run straight through the
+ * store, so nothing on the save path runs and no window would otherwise learn
+ * that the run happened. Every window is a recipient — there is no origin to
+ * skip, because the writer was not a window.
+ */
+export function broadcastAgentOperationalState(state: AgentOperationalState): void {
+  broadcast(state, null);
 }
 
 /**
@@ -76,7 +90,14 @@ export function registerAgentOperationalIpc(
     // schedule. See `isAgentOperationalSavePayload`.
     if (!isAgentOperationalSavePayload(raw)) return agentOperationalFailure('invalid-request');
     try {
-      const state = resolveStore().write(leases.rebaseSave(normalizeAgentOperationalState(raw)));
+      const store = resolveStore();
+      // Two different protections, in order. `rebaseSave` guards individual
+      // leased queue rows against a stale full-document save; `retainMainOwnedSections`
+      // guards whole sections the renderer has no authority over at all.
+      const state = store.write(retainMainOwnedSections(
+        leases.rebaseSave(normalizeAgentOperationalState(raw)),
+        store.read(),
+      ));
       broadcast(state, event.sender);
       return agentOperationalSuccess(state);
     } catch {
