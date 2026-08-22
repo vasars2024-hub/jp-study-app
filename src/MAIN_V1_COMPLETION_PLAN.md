@@ -245,8 +245,13 @@ Still required before the Track 3 acceptance can be called complete:
   instead of a per-`entityType` resolver. See the ledger's "Undo widened from one
   inverse to four". `study.undo-filter` stays out on purpose (its inverse leaves
   the entity alive, so the removal check and the `deleted` claim both misdescribe
-  it). **Still open**: the product decision on whether the session-only
-  activity/operation history becomes durable;
+  it). **The durable-history decision: taken and shipped** (2026-08-21,
+  `422df210` + `ee28eac1`) — `shared/agentOperationHistory.ts` rides the
+  main-owned operational document as a fifth section, bounded at 500 rows and 90
+  days, with exact immediate deletion as the control and `arguments` dropped on
+  the way to disk. Undo stays session-only on purpose: a log restored from disk
+  cannot honestly answer the supersede question for writes made while the app was
+  closed. Surfaced as a Settings > Memory card in all four languages;
 - **Real provider-cost controls: done.** The composer prices a request from the
   user's own per-million-token rates — never a shipped table, which would rot
   into a confident lie the first time a provider re-priced — shows a labelled
@@ -296,10 +301,26 @@ Still required before the Track 3 acceptance can be called complete:
   `gemini-2.5-flash` by name, and the switch renders checked with **no persisted
   settings document in existence** — which is the default-on migration claim
   measured rather than reasoned (see the ledger's "Three live-acceptance debts
-  paid in one session"). **Still open**
-  from this bullet: automations, whose created entry freezes
-  `effectiveAgentPermission` at creation time, which is a product decision
-  rather than a missing writer;
+  paid in one session"). **Automations: done** (2026-08-22, `1f73d808`). The
+  freeze itself was never the open part — `BlancReadyToolPanels.tsx:474` has
+  always stored `effectiveAgentPermission(settings.permission, activeProfile)` on
+  the entry, and the automation table renders that level in its own column, so
+  the product decision was already taken. What was open is that the frozen level
+  **governed nothing that had shipped**: the ceiling's whole implementation —
+  `narrowAgentPermission`, the queue row's `permissionCeiling` and its
+  normalizer, and the execution-time narrowing — sat uncommitted in the shared
+  working tree from 2026-08-12, absent from every commit. That lane is landed
+  here, together with the half that was genuinely missing: **planning**. Main
+  builds both the system prompt and the approved-operation set from the settings
+  the renderer sends, so a `read-only` automation planned full-automation steps
+  that execution then refused one at a time; `underPermissionCeiling` bounds the
+  settings the plan is built from. It is a ceiling at every boundary and never a
+  grant — a stored `full-automation` bound leaves a `read-only` live setting
+  alone, and a re-enqueue keeps the lower of the two. Measured live against a
+  real Qwen3-1.7B with one objective and one operation list, varying only the
+  permission: `full-automation` planned `flashcard.create-deck` in 2 of 2 runs;
+  the negative control, `read-only`, produced no plan in 0 of 3 — the write the
+  ceiling forbids never appeared. See the ledger's "Track 3, last trust bullet";
 - **Final compact-width and complete keyboard/reduced-motion visual matrices:
   done.** Run for the first time — the only prior mention of this bullet in the
   ledger is one line saying it "also remains required". Measured live at fifteen
@@ -967,3 +988,11 @@ it.
 Track 3 remains **partial** against its full acceptance — this closes one named trust control, not
 the track. What it does not yet cover: memory scope, retained-chat controls, sensitive-context
 exclusion, and provider budgets, all from the same bullet.
+
+**Superseded 2026-08-22.** All four named above have since closed, and so has the sixth: memory
+scope, retained chats and sensitive-context exclusion at 2026-08-11/12, provider budgets at
+`c77fee80`/`eef593fc` (enforcement) and `52cb568c` (the dial a user can reach), automation
+schedules at `1f73d808`. The trust bullet's six controls are **6 of 6**, counted against the names
+the bullet itself lists. Track 3's only remaining "still open" note is that animation level
+*Reduced* does not reach `.agent-root`, which is believed to be the design and whose ambiguity
+lives in another track's files.
