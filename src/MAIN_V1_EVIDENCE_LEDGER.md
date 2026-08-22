@@ -27616,3 +27616,35 @@ permission level it does not recognize"; M3 fail-open `agentPermissionRank` → 
 rank changes no observable decision, so the layer the other two are built on had zero coverage and a
 green suite proved it safe. It needed a test asserting the rank directly. When a fix is layered,
 mutate the *bottom* layer — the top ones will hide it.
+
+## 2026-08-22 backup — Boss audit Finding 3: the close target, decided rather than resized
+
+Finding 3 was filed as *"arguable, not asserted — worth one deliberate decision, not a reflexive
+resize"*. Decision taken (standing auto-approval, reversible in one CSS rule): **size the target**.
+
+Audit's live measurement, not re-derived: `.lens-reader-x` renders **16x18 CSS px** (dpr 1), under
+WCAG 2.2 2.5.8's 24x24; nearest neighbour (Furigana) ends 10px away, so a 24px circle centred on it
+does not intersect and the **spacing exception probably already satisfies the criterion**. Escape
+also closes the sheet, so a keyboard route exists either way.
+
+Sized anyway, for one reason the audit could not see from a single measurement: **the 10px gap is
+not a property this stylesheet controls.** The neighbours are `lens.read.leading` / `vertical` /
+`furigana` — translated strings. A longer ru or ja label moves Furigana's right edge and can close
+that gap, so passing today by exception means passing *in English*, and nothing would catch the
+regression. Sizing the box makes the criterion hold independent of catalog content.
+
+Not a new pattern: `.lens-reader-tts`, in this same stylesheet and the same kind of header, is
+already `24px/24px`. `min-width/min-height: 24px` + inline-flex centring; the 18px glyph and every
+color/hover rule are untouched. The class is shared by **three** panels — `LensReadPanel`,
+`LensReaderPanel`, `LensAnalysisPanel` — so one rule closes it in all three.
+
+**Deliberately NOT changed:** the five typography buttons, measured 21px tall with `gap: 4px`.
+Whether the spacing exception covers *them* depends on rendered label widths at each of four
+languages, which is a live measurement, not a reading. Left as the open half rather than
+resized on a guess — a header of pill buttons is a different design question from one icon.
+
+**Commit** `<this>`. **NOT live-measured this turn** — no app was running, and launching Electron to
+confirm a `min-height` is disproportionate. The change is deterministic CSS; the next live lens pass
+should read `getBoundingClientRect` on `.lens-reader-x` and expect >= 24x24 in all three panels.
+13 tests / 2 files green (`readingLensReadInput`, `readingLensReadPanel`) — jsdom does not apply this
+stylesheet, so those prove no regression, not the size.
