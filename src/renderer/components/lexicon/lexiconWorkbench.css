@@ -237,8 +237,12 @@
   font-size: 0.78rem;
 }
 
+/* `flex-wrap: wrap`: three lens buttons are 297 px of nowrap row, and the window minimum
+   is 260 px (`DesktopShell.tsx` `MIN_W`). Without it "Interlinear" left the frame with no
+   scrollbar to reach it — `.fwin-body` is `overflow-x: hidden`. Measured 2026-08-22. */
 .lexicon-lens-picker {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   margin-bottom: 12px;
 }

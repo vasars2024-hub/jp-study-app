@@ -4754,10 +4754,15 @@ h1 {
    Two columns took it to 18.3%, measured.
 
    `column-gap` only, deliberately: `.dict-entry`'s `border-bottom` is the row
-   separator and a row gap would detach it from the entry it divides. */
+   separator and a row gap would detach it from the entry it divides.
+
+   `min(30rem, 100%)` and not a bare `30rem`: a bare rem floor is a HARD minimum. At the
+   260x170 window the product itself allows (`DesktopShell.tsx` `MIN_W`/`MIN_H`) every
+   entry stayed 480 px wide in a 258 px body — 268 px unreachable, with `.fwin-body` on
+   `overflow-x: hidden` so there was no scrollbar either. Measured 2026-08-22. */
 .dict-entries {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(30rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(30rem, 100%), 1fr));
   align-items: start;
   column-gap: 16px;
 }
@@ -5244,8 +5249,12 @@ mark.lookup-mark,
   gap: 6px;
   flex: 0 0 auto;
 }
+/* `flex-wrap: wrap`: the input plus its 71 px Search button is 324 px of nowrap row and the
+   window minimum is 260 px (`DesktopShell.tsx` `MIN_W`). Without it the button left the frame
+   with no scrollbar to reach it — `.fwin-body` is `overflow-x: hidden`. Measured 2026-08-22. */
 .dict-search {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   margin-bottom: 18px;
 }
@@ -9383,7 +9392,9 @@ mark.lookup-mark,
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(30rem, 1fr));
+  /* `min(30rem, 100%)`: a bare rem floor is a hard minimum and overflows a narrow
+     window with no scrollbar. Same fix as `.dict-entries`, same measurement. */
+  grid-template-columns: repeat(auto-fill, minmax(min(30rem, 100%), 1fr));
   align-items: start;
   gap: 8px;
 }

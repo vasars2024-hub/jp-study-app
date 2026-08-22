@@ -319,3 +319,60 @@ Three more rules carry the same shape — `styles.css:9423` `.dict-ex-list` (30r
 
 **Category 4 is NOT scored this turn and the score is not carried forward.** Three of its four
 numbers now fail at a size the product itself allows.
+
+## 2026-08-22 · backup · the hard floors clamped — compact 160 clipped → 0, and the control still fails
+
+Five rules, four sheets, one shape: `minmax(<n>rem, 1fr)` reads like "at least this wide,
+more if there is room" and is a **hard** minimum, so below it the track keeps its width and
+the row leaves the frame. `min(<n>rem, 100%)` clamps the floor to the container. Three of the
+five were landed by this plan's own earlier category-4 slices, unscoped, so they regressed
+standard windows too.
+
+| rule | file | floor |
+| --- | --- | --- |
+| `.dict-entries` | `styles.css:4790` | 30rem → `min(30rem, 100%)` |
+| `.dict-ex-list` | `styles.css:9423` | 30rem → `min(30rem, 100%)` |
+| `.lexicon-examples-list` | `lexiconExamples.css:58` | 30rem → `min(30rem, 100%)` |
+| `.fwin.fwin-liquid .dict-view` | `liquid-window.css:166` | 28rem → `min(28rem, 100%)` |
+
+Two nowrap control rows survived that fix and were measured separately: `form.dict-search`
+at **324 px** (the input plus a 71 px *Search* button) and `.lexicon-lens-picker` at
+**297 px** (three lens buttons), both in a 258 px body — the Search button and the
+*Interlinear* lens were unreachable, not merely tight. Both now `flex-wrap: wrap`.
+
+**Liquid Dictionary, 食べる, 8 entries, focused, one session** (`debug/l4c-sizes.cjs`,
+`debug/l4c-max.cjs`):
+
+| size | clipped | overlaps | h-scroll | hiddenOverflowX | dead % of viewport | canvas |
+| --- | --- | --- | --- | --- | --- | --- |
+| compact 260×170 | 160 → **0** | 0 | 0 | 1 → **0** | 1.2 | 12.3% |
+| default 820×580 | **0** | 0 | 0 | **0** | **10.7** | 32.3% |
+| maximized 1264×765 | **0** | 0 | 0 | **0** | **8.7** | **55.0%** |
+| sub-min 200×130 *(control)* | **3** | 0 | 0 | **1** (`243>188`) | 0.5 | 12.7% |
+
+**The control fails, and only below the size the product supports.** That is the shape this
+category needed: 200×130 is not reachable through the product, 260×170 is, and the instrument
+now separates them. Maximized re-measured **identical** to before the fix — `379×237 at grid
+28,19`, 8.7%, canvas 55.0% — so the clamp is width-honest and changes nothing where nothing
+was wrong.
+
+**Standard presentation, same three sizes, as the parity control:** compact **0/0/0/0** (dead
+1.4%), default **0/0/0/0** (dead 8.9%), and its 200×130 control fails identically (3, 1).
+Three of the five rules are unscoped, so standard was supposed to improve too, and it did.
+
+**Five source mutations, each red for its own case, each restored byte-identical**
+(`debug/l4c-mut2.cjs`, `gridTrackFloorsFitTheWindow.test.ts` + `liquidWindowPresentation.test.ts`,
+42 tests): `.dict-entries` unclamped → **2** red; `.dict-view` unclamped → **3**;
+`.dict-search` stops wrapping → **1**; `.lexicon-lens-picker` stops wrapping → **1**;
+`.lexicon-examples-list` unclamped → **2**.
+
+**Trap:** `styles.css` carries other tracks' hunks, so `git add` on it is wrong.
+`node debug/l4c-stage-styles.cjs` rebuilds HEAD + these three edits and hashes `--no-filters`;
+`git diff --cached HEAD` on the path shows exactly three hunks. A second trap: writing a CSS
+file while the dev Vite server holds it throws `UNKNOWN: unknown error` about one run in five,
+so the mutation driver retries the write and re-reads the bytes back rather than trusting the
+first attempt.
+
+**Category 4 is still NOT scored.** All four numbers now pass at all three sizes with a
+control that fails — but the rubric's re-score is from scratch on the fixing commit, and a
+category is not a scorecard: 2, 5, 7 and 8 have no live number on this surface yet.

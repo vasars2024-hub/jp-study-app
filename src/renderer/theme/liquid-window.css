@@ -160,10 +160,15 @@
  * windows are the default and unchanged, and confining the change here means the
  * standard window is its own negative control: if this rule leaked, standard's band
  * would move too.
+ *
+ * `min(28rem, 100%)` and not a bare `28rem`: a bare rem floor is a HARD minimum, so in a
+ * window narrower than it the track keeps its 448 px and the row leaves the frame with no
+ * scrollbar to reach it. `MIN_W` here is 260. `min(…, 100%)` clamps the floor to the
+ * container and the row simply gets narrower, which is what a floor was ever for.
  * ------------------------------------------------------------------------------ */
 .fwin.fwin-liquid .dict-view {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(28rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(28rem, 100%), 1fr));
   align-items: start;
   column-gap: var(--lq-space-4, 16px);
 }

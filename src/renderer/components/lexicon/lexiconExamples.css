@@ -52,10 +52,15 @@
    fine: two columns need 2x480 + 8 = 968 px, and the default 820 px window offers
    772 px of content width, so it stays single-column exactly as before. Maximized
    offers 1186 px, so it becomes two. A sentence is read rather than scanned, and
-   480 px is still a comfortable measure for one plus its translation. */
+   480 px is still a comfortable measure for one plus its translation.
+
+   `min(30rem, 100%)` and not a bare `30rem`: a bare rem floor is a HARD minimum, so below
+   480 px of content width the track keeps its 480 px and the list leaves the frame — with
+   `.fwin-body` on `overflow-x: hidden` there is not even a scrollbar to reach it. The
+   window minimum is 260 px (`DesktopShell.tsx` `MIN_W`), a size the product itself allows. */
 .lexicon-examples-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(30rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(30rem, 100%), 1fr));
   align-items: start;
   gap: 8px;
   margin: 12px 0 0;

@@ -301,7 +301,7 @@ describe('liquid-window.css — the Dictionary contextual band (L5.3)', () => {
     // measured: the track resolves to `772px` (one column) at the default size and
     // `602px 602px` at maximized.
     expect(block('.fwin.fwin-liquid .dict-view')).toMatch(
-      /grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(28rem,\s*1fr\)\)/,
+      /grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(min\(28rem,\s*100%\),\s*1fr\)\)/,
     );
     const banded = rules
       .split('}')
