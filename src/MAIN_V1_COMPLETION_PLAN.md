@@ -497,6 +497,14 @@ pass-through guard and `popup` in the auto-dismiss suspension list.
   OCR/model default controls. Alternate OCR candidates and the mixed-panel order model still
   need explicit provider/product decisions and have not been forced.
 
+**Final re-derivation 2026-08-22 — 8 of 8 bullets finished, counted from the eight top-level
+Track 5 requirements.** The checkpoint immediately above is chronological evidence, not current
+status. Bullet 2's alternate-reader half closed in `b9c4eea7`; its mixed-orientation panel-order
+half closed in `dc760b38`/`0869bd89`, including four explicit fail-open guards. Bullet 8 closed in
+`80e72e51`, `4e7817ff`, `3ce6a412` and `2006027f`: retention, keyboard-only use, selectable OCR
+defaults, and scoped on-device/cloud honesty are all present. The other six bullets were already
+closed by the amendments above. Track 5 has no remaining partial or deferred requirement.
+
 ## Track 6: repair Media shell, then prove the Liquid Video pilot
 
 - Treat the current workspace screenshot state as a release-blocking regression: no sidebar, search, discovery, or useful library structure and a giant empty canvas.

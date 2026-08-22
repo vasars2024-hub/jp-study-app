@@ -27757,3 +27757,12 @@ foreign PID **30964** still owns the single debug-bridge port, and stopping it i
 
 Track 3 now has **6 of 6 top-level "Still required" bullets closed**, counted directly in this
 plan's Track 3 checkpoint; its five acceptance outcomes are covered by those completed slices.
+
+## 2026-08-22 codexA — Track 5 status correction: the last two partials were already closed
+
+No product code changed. Re-counting the eight top-level ReadingLens bullets against this ledger
+found **8 finished / 0 partial / 0 deferred**, not the plan's older 6/2 checkpoint. Bullet 2 closes
+through `b9c4eea7` (alternate OCR swap) plus `dc760b38`/`0869bd89` (mixed-panel order and fail-open
+guards). Bullet 8 closes through `80e72e51`, `4e7817ff`, `3ce6a412` and `2006027f` (retention,
+keyboard access, engine defaults, and scoped processing-location honesty). The plan is corrected
+without reopening those measured slices. Main V1 therefore advances to Track 6 / Liquid.
