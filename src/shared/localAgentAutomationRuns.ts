@@ -122,3 +122,22 @@ export function pruneAgentAutomationRunLog(
   if (runs.length === log.runs.length) return log;
   return { version: 1, runs };
 }
+
+/**
+ * The most recent run for one automation, or `null` if it has never fired.
+ *
+ * Three states, not two, and the third is the one the surface exists for:
+ * *delivered*, *missed*, and *never run since the record began*. A `null` here
+ * means only that — it is not evidence that the automation never came due,
+ * because the log's retention window is fourteen days and a run older than that
+ * is gone. A reader that renders `null` as "never" would be asserting more than
+ * the data supports.
+ *
+ * `normalizeAgentAutomationRunLog` sorts newest-first, so the first match wins.
+ */
+export function latestAgentAutomationRun(
+  log: AgentAutomationRunLog,
+  automationId: string,
+): AgentAutomationRun | null {
+  return log.runs.find((run) => run.automationId === automationId) ?? null;
+}

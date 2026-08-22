@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
 import type { BookLevelEstimate } from '../../../shared/bookLevelEstimate';
 import type { DictEntry, DictResult } from '../../../shared/types';
 import type { ImmersionSite } from '../../../shared/immersion';
@@ -32,7 +32,7 @@ import { fuzzyScore } from '../../fuzzySearch';
 import { KANJI_RADICALS } from '../../../shared/kanjiRadicals';
 import { useAssets, type AssetView } from '../../assetStore';
 import { useT } from '../../i18n';
-import type { TVars } from '../../../shared/i18n/core';
+import { LANG_TAGS, type TVars } from '../../../shared/i18n/core';
 import type {
   AgentExecutionEvent,
   AgentTask,
@@ -52,6 +52,14 @@ import {
   removeLocalAgentAutomation,
   saveLocalAgentAutomation,
 } from '../../localAgentAutomationStore';
+import {
+  loadLocalAgentAutomationRuns,
+  onLocalAgentAutomationRunsChanged,
+} from '../../localAgentAutomationRunsStore';
+import {
+  latestAgentAutomationRun,
+  type AgentAutomationRunLog,
+} from '../../../shared/localAgentAutomationRuns';
 import type { AgentAutomation } from '../../../shared/localAgentAutomation';
 import type { LocalAgentModelInfo, LocalAgentRuntimeStatus } from '../../../shared/localAgentRuntime';
 import {
@@ -319,6 +327,9 @@ export function LocalAgentPanel() {
   const [busy, setBusy] = useState(false);
   const [events, setEvents] = useState<AgentExecutionEvent[]>([]);
   const [automations, setAutomations] = useState<AgentAutomation[]>(() => loadLocalAgentAutomations());
+  const [automationRuns, setAutomationRuns] = useState<AgentAutomationRunLog>(
+    () => loadLocalAgentAutomationRuns(),
+  );
   const [automationName, setAutomationName] = useState('');
   const [automationObjective, setAutomationObjective] = useState('');
   const [automationTime, setAutomationTime] = useState('09:00');
@@ -414,6 +425,15 @@ export function LocalAgentPanel() {
     return onLocalAgentTaskQueueChanged(setTaskQueue);
   }, []);
 
+  // Main-written and read-only here. Without this the schedule table could only
+  // say when an automation is *due*, never whether it actually ran — and a fire
+  // that reached nobody would be indistinguishable from one that has not come
+  // due yet.
+  useEffect(() => {
+    setAutomationRuns(loadLocalAgentAutomationRuns());
+    return onLocalAgentAutomationRunsChanged(setAutomationRuns);
+  }, []);
+
 
   // This panel is a real automation handler, so it claims the trigger: main
   // delivers a fire to one claimant and records a fire with none as `missed`.
@@ -500,6 +520,31 @@ export function LocalAgentPanel() {
   const removeAutomation = (id: string): void => {
     setAutomations(removeLocalAgentAutomation(id));
     setStatus(t('blanc.agent.status.scheduleRemoved'));
+  };
+
+  /**
+   * The schedule table's honest state. Three answers, and the middle one is why
+   * the column exists: a `missed` fire came due and reached nobody, which is not
+   * the same as an automation that has not come due yet.
+   *
+   * "Not yet" deliberately does not say "never ran": the run log keeps fourteen
+   * days, so an absent row is only an absent row.
+   */
+  const lastRunCell = (automationId: string): ReactNode => {
+    const run = latestAgentAutomationRun(automationRuns, automationId);
+    if (!run) return <span className="blanc-note">{t('blanc.agent.run.never')}</span>;
+    const time = new Date(run.at).toLocaleString(LANG_TAGS[lang], {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    if (run.outcome === 'delivered') return t('blanc.agent.run.delivered', { time });
+    return (
+      <span className="blanc-note" title={t('blanc.agent.run.missedHint')}>
+        {t('blanc.agent.run.missed', { time })}
+      </span>
+    );
   };
 
   const changeProfile = (id: string): void => {
@@ -852,7 +897,7 @@ export function LocalAgentPanel() {
         </div>
         <label>{t('blanc.agent.field.scheduledRequest')}<textarea rows={2} maxLength={500} value={automationObjective} placeholder={t('blanc.agent.placeholder.scheduledRequest')} onChange={(event) => setAutomationObjective(event.currentTarget.value)} /></label>
         <div className="blanc-row-actions"><button type="button" onClick={addAutomation} disabled={!settings.enabled}>{t('blanc.agent.action.addSchedule')}</button><span className="blanc-note">{t('blanc.agent.scheduledCount', { count: automations.length })}</span></div>
-        {automations.length > 0 && <div className="blanc-table-wrap"><table className="blanc-table"><thead><tr><th>{t('blanc.agent.table.name')}</th><th>{t('blanc.agent.table.when')}</th><th>{t('blanc.agent.field.permission')}</th><th /></tr></thead><tbody>{automations.map((entry) => <tr key={entry.id}><td>{entry.name}</td><td>{t('blanc.agent.scheduleWhen', { frequency: t(`blanc.agent.frequency.${entry.frequency}`), time: entry.time })}{entry.frequency === 'weekly' && entry.weekday != null ? ` · ${t(AGENT_WEEKDAY_KEYS[entry.weekday])}` : ''}</td><td>{t(agentPermissionLabelKey(entry.permission))}</td><td><button type="button" onClick={() => removeAutomation(entry.id)}>{t('common.remove')}</button></td></tr>)}</tbody></table></div>}
+        {automations.length > 0 && <div className="blanc-table-wrap"><table className="blanc-table"><thead><tr><th>{t('blanc.agent.table.name')}</th><th>{t('blanc.agent.table.when')}</th><th>{t('blanc.agent.field.permission')}</th><th>{t('blanc.agent.table.lastRun')}</th><th /></tr></thead><tbody>{automations.map((entry) => <tr key={entry.id}><td>{entry.name}</td><td>{t('blanc.agent.scheduleWhen', { frequency: t(`blanc.agent.frequency.${entry.frequency}`), time: entry.time })}{entry.frequency === 'weekly' && entry.weekday != null ? ` · ${t(AGENT_WEEKDAY_KEYS[entry.weekday])}` : ''}</td><td>{t(agentPermissionLabelKey(entry.permission))}</td><td>{lastRunCell(entry.id)}</td><td><button type="button" onClick={() => removeAutomation(entry.id)}>{t('common.remove')}</button></td></tr>)}</tbody></table></div>}
       </fieldset>
     </div>
   );
