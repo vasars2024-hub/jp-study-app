@@ -307,6 +307,33 @@ const PERMISSION_RANK: Record<AgentPermissionLevel, number> = {
   'full-automation': 2,
 };
 
+/** The strictest level. What an unrecognised permission is worth, everywhere. */
+export const STRICTEST_AGENT_PERMISSION: AgentPermissionLevel = 'read-only';
+
+/**
+ * Is this one of the three levels the product actually defines?
+ *
+ * The type says yes at every call site and means nothing at three of them: a profile
+ * crossing IPC, a stored automation read back off disk, and settings sent by a renderer
+ * are all `AgentPermissionLevel` by declaration and arbitrary strings in fact.
+ */
+export function isAgentPermissionLevel(value: unknown): value is AgentPermissionLevel {
+  return typeof value === 'string' && Object.prototype.hasOwnProperty.call(PERMISSION_RANK, value);
+}
+
+/**
+ * Rank a permission level, resolving anything unrecognised to the strictest.
+ *
+ * The bare `PERMISSION_RANK[level]` lookup this replaces returned `undefined` for an
+ * unknown level, and every comparison built on it then failed OPEN: `undefined < 0` is
+ * `false`, so an authorization check read "has enough permission"; `0 <= undefined` is
+ * also `false`, so a narrowing returned the *other* operand. Both inversions come from
+ * the same `undefined`, which is why the ranking — not each call site — is what is fixed.
+ */
+export function agentPermissionRank(level: AgentPermissionLevel): number {
+  return isAgentPermissionLevel(level) ? PERMISSION_RANK[level] : PERMISSION_RANK[STRICTEST_AGENT_PERMISSION];
+}
+
 export function getAgentToolOperation(
   id: AgentToolOperationId,
 ): AgentToolOperationDefinition | undefined {
@@ -366,7 +393,16 @@ export function evaluateAgentToolAccess(
       reason: `${definition.label} is not enabled for the active agent profile.`,
     };
   }
-  if (PERMISSION_RANK[permission] < PERMISSION_RANK[definition.minimumPermission]) {
+  // A level this build does not define is refused outright rather than ranked as strict.
+  // Ranking it would be safe, but it would also be silent: the caller handed us a value
+  // from outside the product's vocabulary, and saying so is the honest answer.
+  if (!isAgentPermissionLevel(permission)) {
+    return {
+      status: 'denied',
+      reason: `${definition.label} was requested at an unrecognized permission level.`,
+    };
+  }
+  if (agentPermissionRank(permission) < agentPermissionRank(definition.minimumPermission)) {
     return {
       status: 'denied',
       reason: `${definition.label} requires ${definition.minimumPermission} permission.`,

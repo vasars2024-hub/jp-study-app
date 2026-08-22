@@ -1,4 +1,10 @@
-import type { AgentPermissionLevel, AgentToolOperationId } from './localAgent';
+import {
+  agentPermissionRank,
+  isAgentPermissionLevel,
+  STRICTEST_AGENT_PERMISSION,
+  type AgentPermissionLevel,
+  type AgentToolOperationId,
+} from './localAgent';
 
 export type AgentProfileRole = 'tutor' | 'media' | 'research' | 'automation' | 'custom';
 export type AgentResponseLength = 'brief' | 'balanced' | 'detailed';
@@ -353,12 +359,6 @@ export function getActiveAgentProfile(store: AgentProfileStore): AgentProfile {
     ?? normalized.profiles[0];
 }
 
-const AGENT_PERMISSION_RANK: Record<AgentPermissionLevel, number> = {
-  'read-only': 0,
-  'limited-actions': 1,
-  'full-automation': 2,
-};
-
 /**
  * Combine two permission levels by taking the lower one.
  *
@@ -366,12 +366,21 @@ const AGENT_PERMISSION_RANK: Record<AgentPermissionLevel, number> = {
  * setting — a profile, a stored automation, a policy crossing IPC — may only
  * ever narrow what is allowed, never widen it. Stating that as one function
  * keeps the rule from being re-derived (and inverted) at each new boundary.
+ *
+ * An operand outside the three defined levels resolves to the strictest one, so the
+ * sentence above stays true for a value that is `AgentPermissionLevel` only by
+ * declaration. It used to be false for exactly that input: this function ranked an
+ * unknown level as `undefined`, `0 <= undefined` is `false`, and it returned the OTHER
+ * operand — `narrowAgentPermission('read-only', <unknown>)` widened to the unknown level,
+ * which downstream granted the whole `full-automation` operation set including the deletes.
  */
 export function narrowAgentPermission(
   a: AgentPermissionLevel,
   b: AgentPermissionLevel,
 ): AgentPermissionLevel {
-  return AGENT_PERMISSION_RANK[a] <= AGENT_PERMISSION_RANK[b] ? a : b;
+  const left = isAgentPermissionLevel(a) ? a : STRICTEST_AGENT_PERMISSION;
+  const right = isAgentPermissionLevel(b) ? b : STRICTEST_AGENT_PERMISSION;
+  return agentPermissionRank(left) <= agentPermissionRank(right) ? left : right;
 }
 
 /**

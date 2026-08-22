@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   AGENT_TOOL_OPERATIONS,
+  agentPermissionRank,
   createAgentTask,
   evaluateAgentToolAccess,
   executeAgentTaskStep,
+  isAgentPermissionLevel,
+  STRICTEST_AGENT_PERMISSION,
   updateAgentTask,
+  type AgentPermissionLevel,
   type AgentToolRequest,
 } from '../localAgent';
 
@@ -74,6 +78,32 @@ describe('local agent safety boundary', () => {
     expect(
       evaluateAgentToolAccess(request('settings.reset', true), 'full-automation'),
     ).toMatchObject({ status: 'allowed' });
+  });
+
+  it('ranks an unrecognized level as the strictest, not as undefined', () => {
+    // Tested directly because the two guards above mask it: with both in place, a
+    // fail-open rank changes no observable decision, so nothing else here would catch a
+    // revert of the primitive itself — which is the layer the other two are built on.
+    const unranked = 'wide-open' as unknown as AgentPermissionLevel;
+    expect(agentPermissionRank(unranked)).toBe(agentPermissionRank(STRICTEST_AGENT_PERMISSION));
+    expect(agentPermissionRank(unranked) < agentPermissionRank('limited-actions')).toBe(true);
+    expect(isAgentPermissionLevel(unranked)).toBe(false);
+    expect(isAgentPermissionLevel('full-automation')).toBe(true);
+  });
+
+  it('denies a permission level it does not recognize, rather than ranking it as sufficient', () => {
+    // `undefined < 0` is `false`, so the rank comparison this replaced read "permitted"
+    // for any level absent from the table — the most privileged operations included.
+    const unranked = 'wide-open' as unknown as Parameters<typeof evaluateAgentToolAccess>[1];
+    expect(evaluateAgentToolAccess(request('settings.reset', true), unranked)).toMatchObject({
+      status: 'denied',
+    });
+    expect(evaluateAgentToolAccess(request('media.delete-item', true), unranked)).toMatchObject({
+      status: 'denied',
+    });
+    // Even the operation every level may run is refused: the caller spoke a vocabulary
+    // this build does not have, which is a fact about the caller, not about the operation.
+    expect(evaluateAgentToolAccess(request('dictionary.lookup'), unranked).status).toBe('denied');
   });
 });
 

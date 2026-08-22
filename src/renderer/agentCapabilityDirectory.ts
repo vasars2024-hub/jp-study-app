@@ -1,8 +1,9 @@
-import type {
-  AgentConfirmationReason,
-  AgentPermissionLevel,
-  AgentToolId,
-  AgentToolOperationId,
+import {
+  agentPermissionRank,
+  type AgentConfirmationReason,
+  type AgentPermissionLevel,
+  type AgentToolId,
+  type AgentToolOperationId,
 } from '../shared/localAgent';
 import {
   effectiveAgentPermission,
@@ -29,12 +30,6 @@ export interface AgentCapabilityDirectoryRow {
   available: boolean;
   reason: AgentCapabilityAvailabilityReason;
 }
-
-const PERMISSION_RANK: Record<AgentPermissionLevel, number> = {
-  'read-only': 0,
-  'limited-actions': 1,
-  'full-automation': 2,
-};
 
 /**
  * Projects the three live authorities into one inspectable list. This helper
@@ -72,7 +67,7 @@ export function buildAgentCapabilityDirectory(
     if (!enabledOperations.has(capability.definition.id)) {
       return { ...base, available: false, reason: 'profile-operation-disabled' as const };
     }
-    if (PERMISSION_RANK[effectivePermission] < PERMISSION_RANK[capability.definition.minimumPermission]) {
+    if (agentPermissionRank(effectivePermission) < agentPermissionRank(capability.definition.minimumPermission)) {
       return { ...base, available: false, reason: 'permission-insufficient' as const };
     }
     return { ...base, available: true, reason: 'available' as const };
