@@ -93,6 +93,7 @@ import { bootWiredArchiveSettings } from './terminalModeSettings';
 import { installWiredArchiveLifecycle } from './wiredArchiveLifecycle';
 import { applyBlancModeClass, isBlancWindow } from './blancMode';
 import { initAgentOperationalState } from './agentOperationalClient';
+import { installLocalAgentAutomationHost } from './localAgentAutomationHost';
 
 // Hydrates this window's view of the main-owned Agent queue, memory and
 // automations, and performs the one-way localStorage adoption. The schedule
@@ -246,6 +247,12 @@ if (!isCompanionHost && !isSysDictOverlay && !isReadingLens) {
   // Reward confetti layer (Phase 4.5). Main window only — the companion host
   // is a click-through overlay and must never paint a full-screen canvas.
   installRewardBursts();
+  // The claimant for scheduled automations. Inside this guard on purpose: the
+  // overlays and the companion host are transient windows, and letting them
+  // claim would make delivery flap with whichever one happens to be open. Not
+  // deferred to idle either — the scheduler ticks every 30s and a fire that
+  // arrives before the claim is recorded `missed` for the rest of the day.
+  installLocalAgentAutomationHost();
   runWhenIdle(() => {
     bootEnvironment();
     // Per-environment ambient soundscapes are dormant until a sound pack exists.
