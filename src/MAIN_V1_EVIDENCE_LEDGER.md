@@ -27701,3 +27701,34 @@ staging recipe, not `git add`.
 **NOT live-verified this turn.** No Electron app was started; the host's effect is a queue row
 30s-granular on a scheduler tick. A live pass should create a daily automation one minute out with
 the Agent enabled and Blanc closed, then read `automationRuns` and the queue.
+
+## 2026-08-22 codexA — Track 3: a delivered schedule can now fail honestly
+
+Recovery first: HEAD was `fa7f130e`, the index was empty, and the interrupted worker's three named
+commits (`c6f895ee`, `c41036b0`, `fa7f130e`) matched the final ledger section. No partial product
+hunk existed; preload/types/catalog/Blanc dirt predated the slice and was preserved with
+HEAD-plus-edit blobs.
+
+**Decision and result — `4d925cb9`.** Main's fire row is amended, not duplicated: the newest
+matching `delivered` row becomes `failed` with one of five bounded codes. A report cannot invent
+history, carry backend/path text, or come from a renderer outside the scheduler's `claims` set.
+The background host reports planning/durable-enqueue failures; the existing schedule table now
+shows a fourth state and its reason in EN/JA/ZH/RU. Tradeoff: the row keeps the due time rather than
+adding a completion timestamp, so it stays comparable with `missed` and retention remains v1.
+
+Focused gate: **4 files / 51 tests passed**. In isolated commit `4d925cb9`, the same **51/51** pass;
+i18n is **10,598/10,598** at committed HEAD and **10,769/10,769** in the shared tree (the difference
+is foreign catalog work); architecture is **2,095 modules / Nothing new / 5 pending**. ESLint adds
+zero findings: `window.d.ts` has the same two subtitle-harvest adjacent-overload errors at parent
+`fa7f130e` and this commit, while every other owned path is clean.
+
+Negative control: deleting the claimant check made the non-claiming-renderer case fail **1/1**
+(`{ok:false,code:'not-claimed'}` became `{ok:true}`); restored, the same case passed **1/1**, and the
+isolated worktree returned clean.
+
+Live acceptance was attempted, not claimed. Clean committed Forge stops before Electron on the
+parent's `automationBuilderDirectCommand` import/export mismatch. Shared-tree Forge did boot with
+an empty disposable `--user-data-dir`, but foreign Electron PID **30964** owns fixed port 39273, so
+the new bridge refused with `EADDRINUSE`. That process was untouched; both process trees created by
+this hop were enumerated and stopped (**8 + 13 processes**). No real userData or product state was
+read or changed.
