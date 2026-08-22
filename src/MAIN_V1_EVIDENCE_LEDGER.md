@@ -27484,3 +27484,42 @@ objective with real ids is the only shape it plans reliably.
 
 **NEXT.** Track 3's trust bullet is now **6 of 6**. The next open item is Track 3's own close-out
 audit or Track 4; re-derive from the plan's Dependency order rather than trusting this line.
+
+## 2026-08-22 backup — Track 3: a due automation that reaches nobody (recovered entry for `d91adc35`)
+
+**Recovered, not re-done.** `d91adc35` committed at 01:34:51; the worker hit its usage limit at
+01:35:42 and never wrote this entry, ran the gates, or updated the handoff. The code is at HEAD and
+verified below; this section is the missing evidence, written by the next worker.
+
+**The finding.** `localAgent:trigger` was broadcast to every open window, and the only subscriber in
+the whole repository was `BlancReadyToolPanels.tsx:415`, behind Blanc's `local-agent` tool. In the
+main app a due automation therefore landed nowhere, the per-day `fired` guard suppressed it for the
+rest of the day, and nothing recorded that it had happened. Measured live before the change: one
+automation written at the current minute, one trigger delivered to the main window, queue **1 before
+and 1 after**, history **0**.
+
+**The change, both halves one mechanism.** Delivery is *claimed*: a renderer that actually plans and
+enqueues calls `localAgent:claimTriggers` and the fire goes to exactly one claimant, the focused
+window preferred, insertion order as the deterministic tie-break. That also closes a latent
+duplication — two windows on Blanc's agent tool each planned and each enqueued the same automation.
+A fire with **no** claimant is written as `missed` into a new `automationRuns` section of the
+main-owned operational store. Merely *listening* on the channel is deliberately not the claim, so a
+status line or probe cannot consume a fire.
+
+**Decision, recorded now.** The run row carries no free text — automation id, time, outcome, claimant
+count only. The name and objective already live in the schedule section of the same document and a
+copy here would outlive the automation the user deleted. The claimant count is stored rather than a
+boolean so a delivered run with count > 1 is direct evidence that some future change reintroduced
+fan-out.
+
+**GATES, re-derived this turn, not trusted from the commit message.**
+`npx vitest run src/main/__tests__/localAgentSchedulerStore.test.ts` → **14 passed / 0 failed**.
+`npx vitest run src/shared/__tests__/localAgentAutomationRuns.test.ts` → **8 passed / 0 failed**.
+Total **22**. **CORRECTION:** the commit message claims "13 more on the run log" — the real number
+is **8**. 14 is correct. Do not quote the 13.
+
+**THE GAP THIS OPENS, and it is the next slice.** `automationRuns` is written by main and read by
+**nobody**: `grep -rn "automationRuns" src --include=*.ts --include=*.tsx` outside `__tests__` returns
+main + shared only — no preload accessor, no IPC read, no UI. So a `missed` run is recorded honestly
+and then shown to no one. Worse, since only Blanc claims, in the main app **every** automation is now
+`missed` forever. Two slices follow: expose the log, then give the main app a claimant.
