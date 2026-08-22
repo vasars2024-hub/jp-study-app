@@ -53,6 +53,12 @@ import {
   pruneAgentOperationHistory,
   type AgentOperationHistory,
 } from './agentOperationHistory';
+import {
+  emptyAgentAutomationRunLog,
+  normalizeAgentAutomationRunLog,
+  pruneAgentAutomationRunLog,
+  type AgentAutomationRunLog,
+} from './localAgentAutomationRuns';
 
 export const AGENT_OPERATIONAL_SCHEMA_VERSION = 1;
 
@@ -74,6 +80,16 @@ export interface AgentOperationalState {
    * has its own retention rule, which is the one thing a section genuinely owes.
    */
   history?: AgentOperationHistory;
+  /**
+   * What happened when each scheduled automation came due — see
+   * `localAgentAutomationRuns.ts`. Main-written, because main is the only place
+   * that knows whether the trigger it fired reached a handler.
+   *
+   * A sixth optional section for the same reason `history` is one: additive at
+   * the current schema version, and the reader who asks "did my schedule run"
+   * is already holding this document.
+   */
+  automationRuns?: AgentAutomationRunLog;
   /**
    * When the one-way `localStorage` adoption ran, or `null` if it never has.
    *
@@ -109,6 +125,7 @@ export function emptyAgentOperationalState(): AgentOperationalState {
       DEFAULT_AGENT_CONTEXT_SUGGESTION_PREFERENCES,
     ),
     history: emptyAgentOperationHistory(),
+    automationRuns: emptyAgentAutomationRunLog(),
     legacyMigratedAt: null,
   };
 }
@@ -136,13 +153,19 @@ export function pruneAgentOperationalState(
     state.history ?? emptyAgentOperationHistory(),
     now,
   );
+  const automationRuns = pruneAgentAutomationRunLog(
+    state.automationRuns ?? emptyAgentAutomationRunLog(),
+    now,
+  );
   const queueChanged = items.length !== state.queue.items.length;
   const historyChanged = history !== state.history;
-  if (!queueChanged && !historyChanged) return state;
+  const runsChanged = automationRuns !== state.automationRuns;
+  if (!queueChanged && !historyChanged && !runsChanged) return state;
   return {
     ...state,
     ...(queueChanged ? { queue: { version: 1 as const, items } } : {}),
     ...(historyChanged ? { history } : {}),
+    ...(runsChanged ? { automationRuns } : {}),
   };
 }
 
@@ -167,6 +190,7 @@ export function normalizeAgentOperationalState(input: unknown): AgentOperational
     automations: normalizeAgentAutomations(raw.automations),
     suggestions: normalizeAgentContextSuggestionPreferences(raw.suggestions),
     history: normalizeAgentOperationHistory(raw.history),
+    automationRuns: normalizeAgentAutomationRunLog(raw.automationRuns),
     legacyMigratedAt: finiteTimestamp(raw.legacyMigratedAt),
   };
 }

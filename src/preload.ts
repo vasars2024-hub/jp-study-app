@@ -1844,6 +1844,15 @@ const api = {
     ipcRenderer.on('localAgent:trigger', handler);
     return () => ipcRenderer.removeListener('localAgent:trigger', handler);
   },
+  // A trigger goes to one *claiming* renderer, not to every window. Listening on
+  // the channel is not the claim: a listener that only reports the fire — a
+  // status line, a probe — must not consume it, and before the claim existed a
+  // fire reaching a window with no handler was indistinguishable from a fire
+  // that ran. Claim only where the automation is actually planned and enqueued.
+  localAgentClaimTriggers: (): Promise<boolean> =>
+    ipcRenderer.invoke('localAgent:claimTriggers'),
+  localAgentReleaseTriggers: (): Promise<boolean> =>
+    ipcRenderer.invoke('localAgent:releaseTriggers'),
   // The main-owned Agent workspace store. Its only renderer consumer is
   // `renderer/agentWorkspaceClient.ts`; see shared/agentWorkspaceBridge.ts for
   // why failures cross as a code rather than a message.

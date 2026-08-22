@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import type { BookLevelEstimate } from '../../../shared/bookLevelEstimate';
 import type { DictEntry, DictResult } from '../../../shared/types';
 import type { ImmersionSite } from '../../../shared/immersion';
@@ -415,7 +415,16 @@ export function LocalAgentPanel() {
   }, []);
 
 
-  useEffect(() => window.api.onLocalAgentTrigger((entry) => {
+  // This panel is a real automation handler, so it claims the trigger: main
+  // delivers a fire to one claimant and records a fire with none as `missed`.
+  // The claim is released on unmount, which is why leaving the tool makes the
+  // schedule honestly report "nothing was listening" rather than appear to run.
+  //
+  // The handler is held in a ref and the effect depends on nothing. `plan` is a
+  // new function every render, so depending on it re-subscribed — and re-claimed
+  // — on every keystroke in the objective box.
+  const triggerHandler = useRef<(entry: AgentAutomation) => void>(() => undefined);
+  triggerHandler.current = (entry: AgentAutomation): void => {
     if (!settings.enabled) {
       setStatus(t('blanc.agent.status.scheduledReady', { name: entry.name }));
       return;
@@ -423,7 +432,16 @@ export function LocalAgentPanel() {
     setObjective(entry.objective);
     setStatus(t('blanc.agent.status.runningScheduled', { name: entry.name }));
     void plan(entry.objective, entry.permission);
-  }), [plan, settings.enabled]);
+  };
+
+  useEffect(() => {
+    const unsubscribe = window.api.onLocalAgentTrigger((entry) => triggerHandler.current(entry));
+    void window.api.localAgentClaimTriggers().catch(() => undefined);
+    return () => {
+      unsubscribe();
+      void window.api.localAgentReleaseTriggers().catch(() => undefined);
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;

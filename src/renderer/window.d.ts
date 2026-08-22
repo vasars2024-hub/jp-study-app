@@ -1165,6 +1165,8 @@ declare global {
       localAgentStatus(): Promise<LocalAgentRuntimeStatus>;
       localAgentModels(): Promise<LocalAgentModelInfo[]>;
       onLocalAgentTrigger(cb: (entry: AgentAutomation) => void): () => void;
+      localAgentClaimTriggers(): Promise<boolean>;
+      localAgentReleaseTriggers(): Promise<boolean>;
       agentWorkspaceLoad(): Promise<AgentWorkspaceResult>;
       agentWorkspaceSave(state: AgentWorkspaceState): Promise<AgentWorkspaceResult>;
       agentWorkspaceDeleteConversation(conversationId: string): Promise<AgentWorkspaceResult>;

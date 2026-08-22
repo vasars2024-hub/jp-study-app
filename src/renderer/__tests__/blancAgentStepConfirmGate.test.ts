@@ -178,6 +178,8 @@ beforeEach(() => {
   vi.stubGlobal('api', {
     ...BOOT_API,
     onLocalAgentTrigger: () => () => undefined,
+    localAgentClaimTriggers: () => Promise.resolve(true),
+    localAgentReleaseTriggers: () => Promise.resolve(true),
     localAgentStatus: () => Promise.resolve({ loaded: false, busy: false }),
     localAgentModels: () => Promise.resolve([]),
     localAgentPlan: () => Promise.resolve({
