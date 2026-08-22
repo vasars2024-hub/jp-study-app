@@ -279,8 +279,8 @@ describe('liquid-window.css — the Dictionary contextual band (L5.3)', () => {
       .split('}')
       .map((b) => ({ sel: b.split('{')[0]?.trim() ?? '', body: b.split('{')[1] ?? '' }))
       .find((b) => b.sel === selector);
-    expect(found, `no rule for ${selector}`).toBeTruthy();
-    return found!.body;
+    if (!found) throw new Error(`no rule for ${selector}`);
+    return found.body;
   };
 
   it('pairs exactly the two contextual siblings, and nothing else', () => {
