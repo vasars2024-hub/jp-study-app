@@ -27433,3 +27433,54 @@ permission with it. What is NOT bounded is **planning**: `:371` sends live `sett
 an automation created at read-only plans full-automation steps that execution then refuses. Fix is
 one expression at `:373` — `settings: {...settings, permission: narrowAgentPermission(...)}`.
 Trap: both files are foreign-dirty, so it needs HEAD+edit reconstruction, not `git add`.
+
+## 2026-08-22 backup — Track 3, last trust bullet: the ceiling that bounds planning, and the lane it was hiding in
+
+**The finding is bigger than the slice.** The whole task-permission ceiling existed **only in the
+shared working tree**, uncommitted since 2026-08-12: `narrowAgentPermission`, the queue row's
+`permissionCeiling` + its normalizer, the execution narrowing in `runAgentTaskStep`, and 7 tests.
+**Nothing at HEAD referenced any of it** (`git show HEAD:<file> | grep narrowAgentPermission` →
+empty in all four files). The previous entry's "the freeze is already correct at execution —
+`localAgentQueueRun.ts:227` narrows" was read off the dirty tree and was **false about what had
+shipped**. `1f73d808` lands all of it plus the half that was genuinely missing.
+
+**The missing half was planning.** Main builds the system prompt AND the approved-operation set
+from the settings the renderer sends (`localAgent.ts:223-234` → `selectLocalAgentApprovedOperations`,
+which gates every operation through `evaluateAgentToolAccess(…, context.permission)` at
+`localAgentPrompt.ts:44-50`). The renderer sent live `settings` verbatim, so a `read-only`
+automation planned full-automation steps that execution then refused one at a time.
+
+**Decision.** New `underPermissionCeiling` in `localAgentProfiles.ts` rather than an inline
+expression at the call site: it is pure, unit-testable, and generic over `{permission}` so it does
+not drag `LocalAgentSettings` into the profiles module. It **returns the same object reference**
+when nothing narrows — that is what makes the no-ceiling case a real negative control instead of an
+assumption. Tradeoff: one more exported name for a two-line body; accepted, because the alternative
+is an expression inside a 750-line component that no test can reach.
+
+**LIVE, pid 30964, real main handlers, real Qwen3-1.7B.** Objective *"Create a new flashcard deck
+called Trial"*, `availableOperations` = `[dictionary.lookup, flashcard.list-decks,
+flashcard.create-deck]`, identical in every run; only `settings.permission` differed.
+- `full-automation`: **2 of 2** runs planned **`flashcard.create-deck`** (4593 ms, 3049 ms).
+- **NEGATIVE CONTROL — `read-only`: 0 of 3** runs produced a plan at all. The write the ceiling
+  forbids never appeared, because the allowlist it was offered no longer contained it.
+No user data touched: `localAgentPlan` does not write the queue, and the request carried its own
+settings object — the store's real `enabled:false` / `permission:full-automation` was never written.
+
+**MUTATION.** `underPermissionCeiling` made to return the ceiling unconditionally (widen instead of
+narrow) → **exactly 1 failed**: *"never widens: a stored full-automation ceiling leaves a read-only
+setting alone"*. Reverted → 8 passed.
+
+**GATES.** Targeted: 41 passed / 0 failed across the three ceiling suites, re-run at the committed
+SHA in a **detached worktree** (`git status --short` = 0) so the number is HEAD's, not the shared
+tree's.
+
+**TRAPS.** (i) `BlancReadyToolPanels.tsx` was the only one of the seven files with a genuinely
+foreign hunk (`AgentContextSuggestionSettings`, another track's, still dirty and untouched);
+staged as HEAD+ceiling-hunks via `git hash-object --no-filters` + `update-index --cacheinfo`. The
+other six diffs were 100% this feature, so a plain `git add` was safe — **check before assuming
+foreign-dirty**. (ii) Qwen3-1.7B returns *"invalid plan JSON"* for any two-step objective and for
+**fabricated** operation ids; the real ids are in `jp-study-local-agent-profiles-v1`. A one-step
+objective with real ids is the only shape it plans reliably.
+
+**NEXT.** Track 3's trust bullet is now **6 of 6**. The next open item is Track 3's own close-out
+audit or Track 4; re-derive from the plan's Dependency order rather than trusting this line.
