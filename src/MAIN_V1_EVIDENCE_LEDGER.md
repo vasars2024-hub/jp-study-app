@@ -27648,3 +27648,56 @@ confirm a `min-height` is disproportionate. The change is deterministic CSS; the
 should read `getBoundingClientRect` on `.lens-reader-x` and expect >= 24x24 in all three panels.
 13 tests / 2 files green (`readingLensReadInput`, `readingLensReadPanel`) — jsdom does not apply this
 stylesheet, so those prove no regression, not the size.
+
+## 2026-08-22 backup — Track 3: the main app becomes an automation claimant
+
+**The gap, re-derived not inherited.** `onLocalAgentTrigger` had exactly **one** production
+subscriber in the repository — `BlancReadyToolPanels.tsx:459`. A due automation therefore ran only
+while the user sat on Blanc's `local-agent` tool; anywhere else the fire reached nobody, main
+recorded it `missed`, and the per-day `fired` guard suppressed it until the next day.
+
+**`c6f895ee` — the renderer-side claim registry** (`renderer/localAgentTriggerRunner.ts`, +131,
+plus 189 test lines). Prerequisite, and it fixes two defects main structurally cannot see, because
+its `claims` set is keyed by `webContents.id`: (1) the claim **does not nest**, so the first of two
+surfaces in one window to unmount revokes the claim the other still needs, and every later fire is
+`missed` while a live handler waits; (2) a push is **per-window**, so both surfaces hear it and both
+plan and enqueue the same automation — the fan-out duplication removed between windows,
+reintroduced inside one. The registry owns the renderer's only subscription and only claim/release
+pair, refcounted, and dispatches to exactly one handler: `interactive` outranks `background`,
+insertion order breaks a tie. Blanc's panel migrates on as `interactive`.
+
+**`c41036b0` — the host** (`renderer/localAgentAutomationHost.ts`, +183, plus 317 test lines).
+Mounted in `main.tsx` inside the existing `!isCompanionHost && !isSysDictOverlay && !isReadingLens`
+guard — the overlays are transient and would flap the claim — and **not** deferred to idle, because
+the scheduler ticks every 30s and a fire before the claim is `missed` for the day.
+
+Three decisions, standing auto-approval, each reversible:
+- **Enqueue, never execute.** A scheduled intent is not standing consent to run tool operations
+  unattended. `permissionCeiling` rides on the queue row, so the level the automation was authored
+  under still binds when the task is run later. Tradeoff: the automation does not *complete* on its
+  own; it produces reviewable work. The alternative — unattended execution — is a promise no part of
+  this permission model makes.
+- **Registers only while `settings.enabled`**, and follows the setting live. Claiming while disabled
+  would let main record `delivered` for a fire nothing could have run.
+- **`saveLocalAgentTaskQueueDurably`, not the synchronous setter** — an unattended run has nobody to
+  notice a reverted queue, so "planned" must mean "main committed it". Also profile-narrowed
+  `allowedOperations` (the conversation planner's set, not Blanc's wider one): unattended takes the
+  stricter of the two.
+
+**Mutations, all caught, on the bottom layer as well as the top.** Registry: refcount removed → 4
+failures; fan-out to every handler → 2; kind rank inverted → 1. Host: ceiling dropped from the plan
+request → 1; dropped from the queue row → 1; claims regardless of `enabled` → 2; durable receipt
+ignored → 1; replay guard removed → 1.
+
+**Known gap — this is the next slice, not an oversight.** A plan that FAILS in the host is
+**invisible**. Main records `delivered`, which is accurate (the fire did reach a handler), and
+nothing distinguishes "delivered and queued" from "delivered and the backend was down". Closing it
+needs a renderer→main report channel (`localAgent:reportAutomationRun`, sender validated against the
+claim set), a third outcome in `shared/localAgentAutomationRuns.ts`, and the schedule table's
+Last-run column plus four catalogs. **Trap:** `src/preload.ts` (+199) and `src/renderer/window.d.ts`
+(+68) are both carrying another track's uncommitted work, so that channel needs the HEAD+your-edit
+staging recipe, not `git add`.
+
+**NOT live-verified this turn.** No Electron app was started; the host's effect is a queue row
+30s-granular on a scheduler tick. A live pass should create a daily automation one minute out with
+the Agent enabled and Blanc closed, then read `automationRuns` and the queue.
