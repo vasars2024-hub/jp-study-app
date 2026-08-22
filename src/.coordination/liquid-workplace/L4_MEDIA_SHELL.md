@@ -112,6 +112,44 @@ clock, or after `readyState` 4, and never treat a mount-time `duration` or `vide
 fixed fact.** The `27d584a8` gate is unaffected: it turns on box `0×0 → 1264×821` and the
 segment moving, neither of which is media metadata.
 
+## 2026-08-22 · backup · detach, second monitor, and the rectangle that came back
+
+§6.4's undriven list named "block library reorder/detach, multi-monitor placement". Detach and
+placement are now driven live; reorder is not. Two `parity-ledger.json` rows (11 → **13**) carry
+the literal numbers. The app under test started **2026-08-21 15:24** and all three detach sources
+(`main/studyBlockWindows.ts`, `shared/studyDetach.ts`, `main/displays.ts`) were last written
+2026-08-07, so the running main process is this exact code — checked, not assumed, because main
+does not hot-reload.
+
+**Real hardware, no simulation.** `displayGetVirtualCount()` was **0** before and after:
+`dell-up3017|2560x1600|1` primary at 0,0 and `vdd-by-mtt|800x600|1` at 2560,0. The virtual-display
+path (`displays.ts:188`) was deliberately not used — a second real monitor was already attached.
+
+| Leg | Result |
+|---|---|
+| detach `transcript` | ok:true, window id 3 at **1050,390 460×820** = dead-centre of 2560×1600 |
+| its content | real Transcript panel, honest empty states, **no fabricated cues** |
+| send to display 2 | ok:true, **1050,390 460×820 → 2730,20 460×560** |
+| close → reopen | id 4 at **2730,20 460×560** — identical in all four numbers |
+| reattach | `Return to the player` destroyed the window; host got **exactly 1** `studyblock:changed` carrying `[]` |
+
+**Four negative controls, all failing as they must** — without these the table above is worthless:
+`notes` (an app-section block, not hosted) ok:**false**; `definitelyNotABlock` ok:**false**;
+close-before-open ok:**false**; and `moveToDisplay` with `no-such-monitor|9999x9999|1` ok:**false**
+*with the bounds unmoved*, which is the one that distinguishes a real refusal from a silent no-op.
+
+Two things the next worker should not rediscover. **The 820 → 560 height is the OS, not a bug** —
+Windows clamps a window to a 600-tall monitor, and `rememberBounds` persisted the *actual* 560
+rather than the requested 820, which is why the reopen matched. **`studyBlockClose` resolves before
+the window's `closed` event**, so a same-tick `studyBlockList()` still returns the closed entry and
+only settles on the next tick; the UI is unaffected (it listens to `studyblock:changed`), but a
+close-then-list caller reads stale. Not fixed here: `studyBlockWindows.ts` is untracked and its only
+importer `src/main.ts` is ` M` with other tracks' hunks, so the module cannot land without breaking
+its own import closure.
+
+Restored: `study-block-windows.json` was **ABSENT** in userData before this run and was deleted
+after it; every `window.__l4*` probe global was removed and re-counted to 0.
+
 ## Open, in order
 
 1. §6.5 acceptance views 1–10 and the first `LIQUID_SCORECARD.md` entry. None exists yet.

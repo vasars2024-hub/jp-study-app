@@ -153,12 +153,38 @@
       "visualProof": "debug/shots/win1-1786983850116.png, 2026-08-17",
       "observed": "real Japanese cues with timestamps and a per-cue `Translate` (0:41 私の名はロジャー・スミス, 1:36 これは取引だ 違うか？). At t=395.878 the highlighted row was 6:35 過去の歴史など無くとも文化とやらは装える with furigana beneath and the Russian subtitle line rendered over the canvas; the card preview names 'Cue 72 · track 0 · 395,617-398,083 ms', which matches the video clock rather than restating it",
       "status": "pending"
+    },
+    {
+      "app": "mediaWorkspace",
+      "feature": "Detach a Study Block into its own OS window, and return it",
+      "currentRoute": "Study Block menu > Detach (contract `studyblock:open`/`close`, `shared/studyDetach.ts`)",
+      "standardDestination": "framed utility window at `/?studyBlock=<id>&surface=<surface>`, one per block per surface",
+      "liquidDestination": "",
+      "keyboardRoute": "not driven — the detached window's own `Return to the player` button was activated programmatically, not by key",
+      "dataStateOwner": "the host surface's published `StudyDetachSnapshot`; geometry in userData `study-block-windows.json`",
+      "automatedProof": "`src/shared/__tests__/studyDetach.test.ts` (26) + `src/main/__tests__/studyBlockWindows.test.ts` (22)",
+      "visualProof": "",
+      "observed": "Live, 2026-08-22, app started 2026-08-21 15:24 so main carries this exact code. Detach `transcript` returned ok:true and /health gained window id 3 at 1050,390 460x820 — dead-centre of the 2560x1600 primary work area ((2560-460)/2=1050, (1600-820)/2=390) — rendering a real Transcript panel with honest empty states (\"Waiting for the player…\", \"No subtitle track is loaded.\") and no fabricated cues. THREE negative controls all refused: `notes` (an app-section block, not hosted) ok:false, `definitelyNotABlock` ok:false, and close-before-open ok:false. Reattach: clicking the detached window's own `Return to the player` destroyed window 4 and the host received exactly 1 `studyblock:changed` broadcast carrying `[]`. TRAP: `studyBlockClose` resolves BEFORE the window's `closed` event, so a same-tick `studyBlockList()` still returned the entry and only settled to 0 on the next tick; the UI is unaffected because it listens to `studyblock:changed`, but a caller that closes-then-lists reads stale.",
+      "status": "pending"
+    },
+    {
+      "app": "mediaWorkspace",
+      "feature": "Send a detached block to another monitor, and restore its rectangle across close/reopen",
+      "currentRoute": "Study Block menu > Send to display (`studyblock:moveToDisplay`)",
+      "standardDestination": "the window centred on the target display's work area, its rectangle remembered per `${surface}:${blockId}`",
+      "liquidDestination": "",
+      "keyboardRoute": "not driven",
+      "dataStateOwner": "userData `study-block-windows.json`, sanitised against present work areas on load",
+      "automatedProof": "`src/main/__tests__/studyBlockWindows.test.ts` — display targeting and rectangle persistence",
+      "visualProof": "",
+      "observed": "Live, 2026-08-22, on REAL two-monitor hardware, no simulation used (`displayGetVirtualCount()` was 0 before and after): `dell-up3017|2560x1600|1` primary at 0,0 and `vdd-by-mtt|800x600|1` at 2560,0. Move to the second display: ok:true, /health bounds 1050,390 460x820 -> 2730,20 460x560. x=2560+(800-460)/2=2730 is the requested centring; the 820 -> 560 height is the OS clamping to a 600-tall monitor, and `rememberBounds` persisted the ACTUAL 560, not the requested 820. NEGATIVE CONTROL: `no-such-monitor|9999x9999|1` returned ok:false and the bounds did not move. Close/reopen: after close the window reopened as id 4 at 2730,20 460x560 — identical in all four numbers, still on the second monitor. Geometry file was ABSENT before the run and was deleted afterwards, restoring userData.",
+      "status": "pending"
     }
   ],
   "notWritten": {
     "reason": "§5.3 says the ledger is created per app BEFORE that app is redesigned. Dictionary is written here because it is one of L1's two representative apps and because a ledger no one has driven is a template, not a ledger.",
     "apps": [
-      "mediaWorkspace — FOUR rows are now written and driven (2026-08-17, L4.2). What of §6.4 is still NOT driven, stated so no one reads four rows as the inventory: speed, volume, fullscreen, frame stepping, subtitle track/version choice, dual subtitles, offset and styling, transcript search/jump, dictionary/grammar/AI handoff, the mining write path itself, shadowing/dictation, block library reorder/detach, multi-monitor placement, and every degraded state. The mining and asset rows write to the user's collection, so they need a reversible target chosen before they are driven, not a click.",
+      "mediaWorkspace — FOUR rows are now written and driven (2026-08-17, L4.2). What of §6.4 is still NOT driven, stated so no one reads four rows as the inventory: speed, volume, fullscreen, frame stepping, subtitle track/version choice, dual subtitles, offset and styling, transcript search/jump, dictionary/grammar/AI handoff, the mining write path itself, shadowing/dictation, block library reorder, and every degraded state. Detach and multi-monitor placement LEFT this list on 2026-08-22 (rows 12 and 13, driven live on real two-monitor hardware); block reorder has not. The mining and asset rows write to the user's collection, so they need a reversible target chosen before they are driven, not a click.",
       "the other 19 root components — written in their own waves, against ALL_APPS_BASELINE.md",
       "note / visualizer / musicwidget — no baseline yet, see ALL_APPS_BASELINE.md 'Not captured'"
     ]
