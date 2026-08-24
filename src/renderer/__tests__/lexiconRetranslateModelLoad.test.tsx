@@ -91,9 +91,9 @@ const INTERLINEAR = {
 
 describe('the retranslate button distinguishes a model load from a translation', () => {
   it('shows the load percentage, reverts on ready, and does not carry it into the next run', async () => {
-    let emit: (p: { status?: string; progress?: number }) => void = () => {};
+    let emit: (p: { status?: string; progress?: number }) => void = () => undefined;
     /** Each run is held open so assertions land while the call is genuinely in flight. */
-    let settle: (v: { ok: boolean; text: string }) => void = () => {};
+    let settle: (v: { ok: boolean; text: string }) => void = () => undefined;
     const translateRun = vi.fn(() => new Promise<{ ok: boolean; text: string }>((r) => {
       settle = r;
     }));
