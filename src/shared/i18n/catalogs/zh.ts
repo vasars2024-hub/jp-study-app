@@ -8650,6 +8650,7 @@ export const zh: Catalog = {
   'lexicon.retranslate.title': '附上你指定义项后重新翻译的结果',
   'lexicon.retranslate.applied': '已交给翻译模型的义项数：{count}',
   'lexicon.retranslate.running': '正在重新翻译…',
+  'lexicon.retranslate.loadingModel': '正在加载离线模型… {pct}%',
   'lexicon.retranslate.failed': '离线翻译无法重新翻译这段文本。',
   'lexicon.retranslate.unusable': '指定的义项在目标语言中没有释义。',
   'lexicon.roundTrip.action': '回译并对照',

@@ -51,7 +51,7 @@ import { explainSensesFromMatch, hasExplainGrounding } from '../../../shared/lex
 import EntryExplain from './EntryExplain';
 import { ContextualSurface } from '../liquid/LiquidSurface';
 import DictionaryResults, { type DictLang } from '../DictionaryResults';
-import { translateTo } from '../../translator';
+import { onModelProgress, translateTo } from '../../translator';
 import { useT } from '../../i18n';
 import { LANG_TAGS } from '../../../shared/i18n/core';
 import { parseStudySubtitles } from '../../subtitles';
@@ -170,6 +170,8 @@ export default function LexiconWorkbenchResults({
   // A model call outlives the pins it was made for. This token lets a late
   // answer from a superseded run be discarded instead of overwriting the panel.
   const retranslateRun = useRef(0);
+  // Null unless a cold GGUF load is in flight. See `retranslate()`.
+  const [retranslateModelPct, setRetranslateModelPct] = useState<number | null>(null);
   const [roundTrip, setRoundTrip] = useState<{ text: string; diff: LexiconRoundTripDiff } | null>(null);
   const [roundTripState, setRoundTripState] = useState<'idle' | 'running' | 'error'>('idle');
   const roundTripRun = useRef(0);
@@ -420,7 +422,21 @@ export default function LexiconWorkbenchResults({
     const run = ++retranslateRun.current;
     setRetranslateState('running');
     setRetranslation(null);
+    // Unconditional, and it is the ONLY clear: a run that fails mid-load never reports `ready`,
+    // so its last percentage would otherwise open the next run. A twin clear in `finally` was
+    // written first and deleted — it is guarded by `run === retranslateRun.current`, so a
+    // superseded run skips it, and no mutation control could kill it while this line existed.
+    setRetranslateModelPct(null);
     clearRoundTrip();
+    // On a cold start this call spends ~15 s loading a 1.2 GB GGUF before a single token is
+    // produced, and "Retranslating…" for all of it is the defect `1c874da9` and `45cb990d`
+    // already fixed on two other surfaces. `onModelProgress` is per-subscriber since `21836d34`,
+    // so this cannot take the percentage away from the Translate view or a reader.
+    const offModel = onModelProgress((p) => {
+      if (run !== retranslateRun.current) return;
+      if (p.status === 'ready') setRetranslateModelPct(null);
+      else if (typeof p.progress === 'number') setRetranslateModelPct(Math.round(p.progress));
+    });
     try {
       const text = await translateTo(query, lang, glossLang, undefined, senseHints);
       // A passage whose every sentence failed the translator's own validation
@@ -435,6 +451,8 @@ export default function LexiconWorkbenchResults({
       setRetranslateState('idle');
     } catch {
       if (run === retranslateRun.current) setRetranslateState('error');
+    } finally {
+      offModel();
     }
   }
 
@@ -708,9 +726,11 @@ export default function LexiconWorkbenchResults({
                   onClick={() => void retranslate()}
                   type="button"
                 >
-                  {retranslateState === 'running'
-                    ? t('lexicon.retranslate.running')
-                    : t('lexicon.retranslate.action')}
+                  {retranslateState !== 'running'
+                    ? t('lexicon.retranslate.action')
+                    : retranslateModelPct === null
+                      ? t('lexicon.retranslate.running')
+                      : t('lexicon.retranslate.loadingModel', { pct: retranslateModelPct })}
                 </button>
                 <span className="lexicon-retranslate-note muted">
                   {senseHints.length

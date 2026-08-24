@@ -9111,6 +9111,7 @@ export const en: Catalog = {
   'lexicon.retranslate.title': 'Translation re-asked with your pinned senses',
   'lexicon.retranslate.applied': 'Pinned senses given to the translator: {count}',
   'lexicon.retranslate.running': 'Retranslating…',
+  'lexicon.retranslate.loadingModel': 'Loading the offline model… {pct}%',
   'lexicon.retranslate.failed': 'The offline translator could not retranslate this passage.',
   'lexicon.retranslate.unusable': 'None of your pinned senses has a gloss in the translation language.',
   'lexicon.roundTrip.action': 'Translate it back and compare',

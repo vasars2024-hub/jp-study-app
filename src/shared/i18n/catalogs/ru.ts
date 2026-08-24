@@ -9533,6 +9533,7 @@ export const ru: Catalog = {
   'lexicon.retranslate.title': 'Перевод, запрошенный заново с вашими значениями',
   'lexicon.retranslate.applied': 'Значений передано переводчику: {count}.',
   'lexicon.retranslate.running': 'Переводим заново…',
+  'lexicon.retranslate.loadingModel': 'Загружаем офлайн-модель… {pct}%',
   'lexicon.retranslate.failed': 'Офлайн-переводчик не смог перевести этот отрывок заново.',
   'lexicon.retranslate.unusable': 'Ни у одного выбранного значения нет перевода на нужный язык.',
   'lexicon.roundTrip.action': 'Перевести обратно и сравнить',
