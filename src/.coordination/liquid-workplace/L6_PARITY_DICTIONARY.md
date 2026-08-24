@@ -68,3 +68,37 @@ one scored category out of eight is not a scorecard, and the L1 passes on catego
 and 8 were measured on the **pre-Liquid** window and are stale by the rubric's own rule. The
 keyboard route on the search input is still recorded UNPROVEN in every row (a synthetic Enter
 did not trigger a search); that belongs to category 1, not here, and was not touched.
+
+## 2026-08-24 · primary — re-driven on the current tree, in the boot every other category shares
+
+The 10/10 above was earned at `aaef2a84`; `e4de125b` and `6f86f2cc` have moved CSS since, and the
+rubric forbids carrying a score across a change. Re-measured on a cold boot of this tree — main
+pid **9932**, `npm start` → bridge **16.1 s**, `l7d-setup.cjs` asserting exactly **1** visible
+`.fwin`: Dictionary, `presentation=liquid`, 食べる → **8 entries / 5,247 chars / 346 nodes /
+75 controls**, `820x580`, `forest-night`.
+
+| Term | Measured |
+| --- | --- |
+| Parity, Liquid | **7 / 7** reachable |
+| Parity, Standard | **7 / 7** reachable, identical evidence in six rows |
+| The row that must differ | `windowLifecycle` `liquidAriaPressed` **true → false** |
+| Ledger rows `both` with non-empty `observed` | **7 / 7** (`parity-ledger.json`, `app: dictionary`) |
+| Round trip | Liquid → Standard → Liquid, **A === C byte-for-byte** by string compare |
+
+The round trip was run with the notes filter deliberately dirty (`食`, restored to `""` after), so
+it carries real state rather than an empty one: `rect 60,24,827×584`, `maximized false`,
+`focused true`, **`zIndex "118"` unchanged across both toggles** — the `aaef2a84` fix holding —
+`searchValue 食べる`, `notesFilterValue 食`, `controls 67`, `resultChars 5180`, `resultNodes 346`.
+
+**Three negative controls, 3 of 3 fired, each flipping exactly its own row and nothing else**
+(`probes/l6f-controls.cjs` asserts that as a boolean, not by eye): notes filter detached →
+6/7 `notesFilter (absent)`; both language buttons `active` → 6/7 `sourceSwitch (ja.active=true
+zh.active=true)`; `aria-pressed` stripped → 6/7 `windowLifecycle (liquidAriaPressed=null)`. Each
+restored to 7/7 before the next.
+
+Direction of the round trip differs from `aaef2a84`'s: the window is found **liquid** on this
+tree, so it is Liquid → Standard → Liquid and it is left as found. The on-disk half of that entry
+(conventional persists as the *absence* of a `presentation` key) is therefore **not** re-asserted
+here and is not folded into this score.
+
+**Category 6 = 10/10 on this tree**, commit `PENDING-C6`.

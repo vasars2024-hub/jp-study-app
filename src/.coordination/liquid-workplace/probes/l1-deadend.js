@@ -89,7 +89,15 @@
   if (!win) return JSON.stringify({ refuse: `no .fwin titled ${TITLE}` });
 
   // Controls whose effect is a write to real user data. Named, skipped, and reported.
-  const DESTRUCTIVE = /star|flashcard|anki|add|delete|remove|save|export|clear|clipboard|copy|mark it/i;
+  //
+  // `forget` was added 2026-08-24 after this sweep drove `Forget this explanation` on 食べる and
+  // deleted the user's stored AI explanation for it — there is no restore path, only a re-ask that
+  // produces different prose. It also reported the control as a DEAD END, which it is not:
+  // `l1c-forget-deadend.js` drives it alone on a fixture and gets a mutation at 4 ms, the button
+  // removed, the ask button back to `Explain this word` and the answer 206 chars → 0. The verdict
+  // was an ordinal-rebinding artifact — eight sibling entries carry a button with the identical
+  // `label|tag|type|class` key, so the node re-resolved after the click belonged to another entry.
+  const DESTRUCTIVE = /star|flashcard|anki|add|delete|remove|save|export|clear|clipboard|copy|mark it|forget/i;
   // Controls that swap the surface's whole mode. Driven separately; see the header note.
   const MODE_SWITCH = /^(日本語|中文)$/;
 
@@ -192,6 +200,15 @@
   const VIEW_SWITCH = /^(Automatic|Dictionary|Interlinear)$/;
   targets.sort((a, b) => Number(VIEW_SWITCH.test(a.name)) - Number(VIEW_SWITCH.test(b.name)));
 
+  // ...and because they go last, the sweep used to END on `Interlinear`, which renders no
+  // `.dict-entry` at all. Every probe run afterwards then reads 0 entries and looks like a search
+  // that returned nothing — that cost one wasted fixture run on 2026-08-24. Remember which mode
+  // was active at arm time and click it back when the sweep finishes.
+  const lensModeAtArm = [...win.querySelectorAll('button')].find(
+    (b) => VIEW_SWITCH.test(label(b)) && b.classList.contains('active'),
+  );
+  const lensModeName = lensModeAtArm ? label(lensModeAtArm) : null;
+
   const st = {
     surface: TITLE,
     done: false,
@@ -273,6 +290,16 @@
       st.i += 1;
     }
     st.savedStoreUntouched = localStorage.getItem(SAVED_KEY) === savedAtArm;
+    if (lensModeName) {
+      const back = [...win.querySelectorAll('button')].find((b) => label(b) === lensModeName);
+      if (back && !back.classList.contains('active')) back.click();
+      await wait(1200);
+      const nowActive = [...win.querySelectorAll('button')].find(
+        (b) => VIEW_SWITCH.test(label(b)) && b.classList.contains('active'),
+      );
+      st.lensMode = { atArm: lensModeName, restoredTo: nowActive ? label(nowActive) : null };
+      st.lensModeRestored = st.lensMode.restoredTo === lensModeName;
+    }
     st.done = true;
   };
   void run();

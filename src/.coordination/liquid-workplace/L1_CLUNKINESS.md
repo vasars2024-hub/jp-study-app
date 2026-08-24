@@ -268,3 +268,40 @@ to 食べる / 8 entries / `Automatic`, saved-words **1**, clipboard **109** —
 **Dead ends 4 of 20 → 3 of 20**, and all three remaining are honest already-in-that-state no-ops
 (`Search`, a `.dict-saved-search` chip, `Automatic`). With coverage 20/20, `gone` 0, `unstable` 0
 and the injected bait failing as required, **category 2 scores 10** on this surface.
+
+## 2026-08-24 · primary — re-drive on the current tree: the new dead end was the instrument again
+
+Same cold boot as L6/L7 (main pid **9932**), 食べる → 8 entries, liquid. `l1-deadend.js` armed
+**62 roster / 20 targets / 0 unlabelled**, and returned **coverage 19/19, `gone` 0, `unstable` 0,
+`savedStoreUntouched` true, bait `changed:false`** — the injected no-op still reads DEAD, so the
+probe is discriminating.
+
+**Dead ends: 3 of 19 — `Search`, `Automatic`, and `Forget this explanation`.** The first two are
+the honest already-in-that-state no-ops this file has recorded twice. The third was new, and it is
+**not a product defect**: `probes/l1c-forget-deadend.js` drives it alone on a 猫 fixture built
+through the product's own `Explain in Agent`, quiesced in 2 tries, and gets
+
+| Number | Value |
+| --- | --- |
+| first DOM mutation after the click | **4 ms** |
+| signature changed | **true** at 3,000 ms and final |
+| the forget button itself | **gone** from the DOM |
+| ask button | `Explain again` → **`Explain this word`** |
+| stored answer | **206 chars → 0** |
+| `errorEl` | false |
+
+The sweep missed all of that because it rebinds a target by `label|tag|type|class` + **ordinal**,
+and eight sibling entries carry a button with that identical key — the node re-resolved after the
+click belonged to a different entry whose signature had not moved. Same shape as every other
+"open product decision" this surface has produced.
+
+**Two probe fixes, both in this commit.** (1) `forget` joins the DESTRUCTIVE skip list. It deletes
+a stored AI explanation with no restore path — only a re-ask that returns different prose — and
+this sweep had already destroyed the user's stored explanation for 食べる by driving it. It is now
+skipped by name with a reason, like `Save search` and `+ Add to Anki`. (2) The sweep sorts the view
+switchers last and so **ended on `Interlinear`**, which renders no `.dict-entry` at all; the next
+probe run read 0 entries and looked like a search returning nothing. It now records the lens mode
+at arm time, clicks it back, and reports `lensMode` / `lensModeRestored`.
+
+**Category 2 on the re-drive: dead ends 2 of 18, both honest no-ops** — see the numbers in the
+next commit's re-run, which is what the scorecard carries.

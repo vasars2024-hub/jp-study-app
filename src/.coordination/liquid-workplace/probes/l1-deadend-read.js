@@ -40,6 +40,11 @@
     unstable: real.filter((r) => r.unstable).map((r) => r.name),
     // The tripwire. A run that moved user data is a finding about the probe, not about the app.
     savedStoreUntouched: st.savedStoreUntouched,
+    // The view switchers go last, so the sweep ends on one of them. `lensModeRestored: false`
+    // means the surface was left in a different lens than it was found in, and everything driven
+    // after this run is measuring that lens instead of the one under test.
+    lensMode: st.lensMode || null,
+    lensModeRestored: st.lensModeRestored ?? null,
     // Retired itself into a disabled state: the surface stopped offering it, honestly.
     retired: clicked.filter((r) => r.after && r.after.present && r.after.disabled)
       .map((r) => ({ name: r.name, became: r.after.label })),
