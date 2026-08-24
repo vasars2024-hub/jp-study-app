@@ -469,3 +469,45 @@ count is **12**, unchanged, so the rule fires on the class rather than unconditi
    from 18 px is a real visual change to a dense list, not a tail-of-turn edit.
 
 Category 1 stays **open** on this surface until both are settled.
+
+## 2026-08-24 — item (a) was not a decision, it was a broken instrument
+
+**Two runs of `l1-hit-area.js` on an unchanged surface: `belowFloorByHit` 4 then 9,
+`stolenCount` 2 then 7.** The probe is what was wrong, and every hit-target number this document
+has ever printed from it is void — the 2026-08-18 **0** and the 2026-08-24 **46 of 57** alike.
+
+**Cause, mechanical.** `el.scrollIntoView()` scrolls *every* scrollable ancestor, and
+`overflow: hidden` does not make an element unscrollable — it only removes the scrollbar. The
+first control that needed scrolling therefore also scrolled `section.fwin` itself to
+`scrollTop: 81`, lifting the window's own title bar out of the viewport. The five `fwin-b`
+buttons then hit-tested to `null`, or terminated early against `div.fwin-bar`, and were counted
+as failures. The restore missed it twice over: it snapshotted `win.querySelectorAll('*')`, which
+excludes `win`, and only elements *already* scrolled, and `.fwin` started at 0. So the leak
+survived the run and the next run started from a different geometry. Measured after the run:
+`section.fwin scrollTop 81`, restored to 0 by hand.
+
+**Fix:** write `scrollTop`/`scrollLeft` on the nearest *real* scroll region only (`auto`/`scroll`
+with something to scroll — `overflow: hidden` chrome is excluded by construction), snapshot every
+element document-wide including the ones at 0, and report `scrollLeaks`. **Two consecutive runs
+must agree; that is now the pass condition for the instrument itself.**
+
+**Deterministic baseline, forest-night, liquid, 820x580, 食べる / 8 entries, both runs identical:**
+
+| | number |
+| --- | --- |
+| measured / controls | **57** of 67 (10 occluded, not scored) |
+| below 32px **by rect** | **46** |
+| below 32px **by pointer** | **9** |
+| clicks **stolen** by a neighbour's overlay | **5** |
+| smallest hit region | **41.5x17.5** `lexicon-knowledge`, own rect 41x22 |
+| `scrollLeaks` | `div.fwin-body 0,0 -> 3195,0` only — a real scroll region, restored |
+
+**The 9 are one shape, and it is vertical.** `dict-star` x4 (32.5x**21.5**), `word-audio` x2
+(32.5x**20.5**), `lexicon-knowledge` x2 (41.5x**17.5**), `dict-add` x1 (52.5x**19.5**). Every one
+reaches the floor horizontally and fails on height, because `.dict-entry-head` rows are ~24px and
+a 32px overlay reaching into the next row is painted over by that row. Where it *does* win it
+**steals**: `lexicon-knowledge`'s blocker is `button.dict-star.lq-hit`, so a user aiming at the
+visible knowledge button hits the star. The theft is a defect; the height is the open question.
+
+`dict-add`'s blocker is `div.fwin-edge-b` — the window's bottom resize gutter covers the last
+entry's Add button when the list is scrolled to its end. Real, and separate from the row height.

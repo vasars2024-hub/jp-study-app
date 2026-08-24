@@ -37,6 +37,22 @@
  * control is scrolled to the centre of its scroll parent and re-read before it is judged, and the
  * scroll offsets are restored afterwards.
  *
+ * AND SCROLL NOTHING ELSE — the defect that made every number this probe has ever printed
+ * unreliable, found 2026-08-24 by running it twice on an unchanged surface and getting
+ * `belowFloorByHit` 4 then 9, `stolenCount` 2 then 7. `el.scrollIntoView()` scrolls EVERY
+ * scrollable ancestor, and `overflow: hidden` does not make an element unscrollable — it only
+ * removes the scrollbar. So the first control that needed scrolling also scrolled `section.fwin`
+ * itself to `scrollTop: 81`, lifting the window's own title bar out of the viewport; the five
+ * `fwin-b` buttons then hit-tested to `null` or terminated early against `div.fwin-bar`, and were
+ * counted as failures. The restore missed it twice over: it snapshotted only `win.querySelectorAll`
+ * (which excludes `win`) and only elements ALREADY scrolled (`.fwin` started at 0). The leak
+ * therefore persisted between runs, so each run measured a different geometry. The 2026-08-18
+ * "0 below floor by pointer" and the 2026-08-24 "4 below floor" are BOTH void.
+ *
+ * This version writes `scrollTop`/`scrollLeft` on the nearest real scroll region only, snapshots
+ * every element document-wide, and reports `scrollLeaks`. Two consecutive runs agreeing is the
+ * pass condition for the instrument itself, and it is cheap: run it twice, every time.
+ *
  * Run: `node debug/evfile.cjs src/.coordination/liquid-workplace/probes/l1-hit-area.js`
  */
 (() => {
@@ -97,15 +113,46 @@
   const rows = [];
   const occluded = [];
 
-  const scrollers = [...win.querySelectorAll('*')].filter((e) => e.scrollTop || e.scrollLeft);
-  const savedScroll = scrollers.map((e) => ({ e, top: e.scrollTop, left: e.scrollLeft }));
+  // Snapshot EVERY element's scroll offset, document-wide, including the ones sitting at 0 —
+  // see the scroll-leak trap in the header. Restoring only what was already scrolled, only
+  // inside the window, is what let the window's own frame stay scrolled between runs.
+  const savedScroll = [...document.querySelectorAll('*')].map((e) => ({
+    e,
+    top: e.scrollTop,
+    left: e.scrollLeft,
+  }));
+
+  // The nearest ancestor that is a REAL scroll region: an `auto`/`scroll` overflow with
+  // something to scroll. `overflow: hidden` containers are deliberately excluded — they are
+  // chrome (`.fwin`, `.os-desktop`, `body`), they are still programmatically scrollable, and
+  // scrolling them is exactly the damage this replaces.
+  const scrollParent = (el) => {
+    let p = el.parentElement;
+    while (p && p !== document.body) {
+      const cs = getComputedStyle(p);
+      const y = /(auto|scroll|overlay)/.test(cs.overflowY) && p.scrollHeight > p.clientHeight;
+      const x = /(auto|scroll|overlay)/.test(cs.overflowX) && p.scrollWidth > p.clientWidth;
+      if (y || x) return p;
+      p = p.parentElement;
+    }
+    return null;
+  };
+
+  // Centre `el` inside `sp` by writing `sp`'s own offsets. Nothing else in the document moves.
+  const centreIn = (el, sp) => {
+    const er = el.getBoundingClientRect();
+    const sr = sp.getBoundingClientRect();
+    sp.scrollTop += er.top + er.height / 2 - (sr.top + sr.height / 2);
+    sp.scrollLeft += er.left + er.width / 2 - (sr.left + sr.width / 2);
+  };
 
   for (const el of els) {
     let r = el.getBoundingClientRect();
     let cx = r.left + r.width / 2;
     let cy = r.top + r.height / 2;
     if (owns(cx, cy, el) !== true) {
-      el.scrollIntoView({ block: 'center', inline: 'center' });
+      const sp = scrollParent(el);
+      if (sp) centreIn(el, sp);
       r = el.getBoundingClientRect();
       cx = r.left + r.width / 2;
       cy = r.top + r.height / 2;
@@ -141,9 +188,16 @@
     });
   }
 
+  // Restore, and REPORT what had to be restored. A leak outside the scroll parents is the
+  // signal that this probe has started moving the app again, which is how it went
+  // non-deterministic the first time.
+  const leaked = [];
   for (const s of savedScroll) {
-    s.e.scrollTop = s.top;
-    s.e.scrollLeft = s.left;
+    if (s.e.scrollTop !== s.top || s.e.scrollLeft !== s.left) {
+      leaked.push(`${label(s.e)} ${s.top},${s.left} -> ${s.e.scrollTop},${s.e.scrollLeft}`);
+      s.e.scrollTop = s.top;
+      s.e.scrollLeft = s.left;
+    }
   }
 
   const below = rows.filter((row) => row.hitMin < FLOOR);
@@ -175,5 +229,8 @@
     stolen: group(stolen, (row) => ({ blockers: row.blockers.slice(0, 2) })),
     occludedCount: occluded.length,
     occluded: occluded.slice(0, 8),
+    // Not decoration: two consecutive runs must agree, and they only do if this stays small
+    // and names scroll REGIONS. Anything with `fwin`/`desktop`/`body` in it is the leak back.
+    scrollLeaks: leaked,
   });
 })()
