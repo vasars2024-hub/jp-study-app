@@ -26,8 +26,22 @@ import type { DictResult } from '../../shared/types';
  * would pass against the broken code, because a component that mounts straight into `showSetup`
  * never changes its hook count.
  */
+/**
+ * The stub renders the Back control only when it is actually handed one, so the second test below
+ * measures the prop rather than the real `AnkiSetup`'s markup — `onBack` being optional there is
+ * exactly what made the page variant a one-way trip.
+ */
 vi.mock('../components/AnkiSetup', () => ({
-  default: () => <div className="anki-setup-stub">setup</div>,
+  default: ({ onBack }: { onBack?: () => void }) => (
+    <div className="anki-setup-stub">
+      setup
+      {onBack && (
+        <button className="anki-setup-back-stub" onClick={onBack} type="button">
+          back
+        </button>
+      )}
+    </div>
+  ),
 }));
 vi.mock('../components/Icons', () => ({ default: () => null }));
 vi.mock('../components/lexicon/CharacterMetadataPanel', () => ({ default: () => null }));
@@ -126,5 +140,49 @@ describe('Dictionary against an unreachable AnkiConnect', () => {
     expect(hookErrors, `React reported a hooks-order violation: ${hookErrors[0] ?? ''}`).toEqual([]);
 
     spy.mockRestore();
+  });
+
+  /**
+   * Regression: the page variant had no way back off that panel.
+   *
+   * `onBack` used to be passed only for `variant === 'popup'`, so on the Dictionary window the
+   * panel's single control was Retry — which calls `ensureAnki` again and, against a refused port,
+   * sets `showSetup` straight back. Measured live at `127.0.0.1:8765` ECONNREFUSED:
+   * `backButtonPresent: false`, and after Retry `stillSetup: true, entries: 0`. The results were
+   * recoverable only by re-running the lookup, losing what was already on screen.
+   *
+   * The assertion is the ROUND TRIP, not the button's presence: the same entry has to be back
+   * without a second `lookupTerm`. A "fix" that re-queried would also end on one result and would
+   * not be a way back.
+   */
+  it('offers the way back off the setup panel on the page variant', async () => {
+    stubApi();
+    await render(<DictionaryResults query="食べる" variant="page" lang="ja" />);
+
+    const lookups = () =>
+      ((window as unknown as { api: { lookupTerm: { mock: { calls: unknown[] } } } }).api.lookupTerm
+        .mock.calls.length);
+    const lookupsBefore = lookups();
+    const entriesBefore = host.querySelectorAll('.dict-entry').length;
+    expect(entriesBefore).toBeGreaterThan(0);
+
+    const add = [...host.querySelectorAll('button')].find((b) =>
+      /dict\.results\.add|add to anki/i.test(b.textContent || ''),
+    );
+    await act(async () => {
+      add?.click();
+    });
+    expect(host.querySelector('.anki-setup-stub')).not.toBeNull();
+
+    const back = host.querySelector<HTMLButtonElement>('.anki-setup-back-stub');
+    expect(back, 'the page variant must be handed an onBack').not.toBeNull();
+
+    await act(async () => {
+      back?.click();
+    });
+
+    expect(host.querySelector('.anki-setup-stub')).toBeNull();
+    expect(host.querySelectorAll('.dict-entry').length).toBe(entriesBefore);
+    expect(lookups(), 'Back must restore the results, not re-query them').toBe(lookupsBefore);
   });
 });

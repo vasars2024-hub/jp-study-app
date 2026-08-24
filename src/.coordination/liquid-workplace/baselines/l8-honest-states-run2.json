@@ -1,0 +1,99 @@
+{
+ "at": "2026-08-24T06:33:28.716Z",
+ "term": [
+  39135,
+  12409,
+  12427
+ ],
+ "induction": {
+  "ankiConnect": {
+   "verdict": "REFUSED",
+   "detail": "ECONNREFUSED"
+  },
+  "viteControl": {
+   "verdict": "LISTENING",
+   "detail": "connect succeeded"
+  }
+ },
+ "baseline": {
+  "entries": 0,
+  "chars": 567,
+  "empty": [],
+  "loading": [],
+  "setup": [
+   "Can't reach Anki. Open Anki desktop and make sure the AnkiConnect add-on is installed.",
+   "To add cards, install the free AnkiConnect add-on (one time):"
+  ],
+  "setupSteps": 4,
+  "setupButtons": [
+   "Retry"
+  ],
+  "addLabels": [],
+  "audioStates": []
+ },
+ "dependency": {
+  "status": {
+   "connected": false,
+   "decks": [],
+   "models": [],
+   "error": "Can't reach Anki. Open Anki desktop and make sure the AnkiConnect add-on is installed."
+  },
+  "link": {
+   "state": "disconnected",
+   "consecutiveFailures": 616,
+   "error": "Can't reach Anki. Open Anki desktop and make sure the AnkiConnect add-on is installed.",
+   "lastProbeAt": 1787553203664
+  }
+ },
+ "empty": {
+  "rendered": [
+   "No dictionary match for “zzzqqqxxwv”."
+  ],
+  "entries": 0,
+  "namesTheQuery": true,
+  "rawKeys": []
+ },
+ "loading": {
+  "observed": [
+   "Looking up…"
+  ],
+  "entriesAfter": 8,
+  "rawKeys": []
+ },
+ "offline": {
+  "statusBeforeClick": {
+   "status": {
+    "connected": false,
+    "decks": [],
+    "models": [],
+    "error": "Can't reach Anki. Open Anki desktop and make sure the AnkiConnect add-on is installed."
+   },
+   "link": {
+    "state": "disconnected",
+    "consecutiveFailures": 616,
+    "error": "Can't reach Anki. Open Anki desktop and make sure the AnkiConnect add-on is installed.",
+    "lastProbeAt": 1787553203664
+   }
+  },
+  "rendered": [
+   "Can't reach Anki. Open Anki desktop and make sure the AnkiConnect add-on is installed.",
+   "To add cards, install the free AnkiConnect add-on (one time):"
+  ],
+  "steps": 4,
+  "buttons": [
+   "Retry"
+  ],
+  "entriesNowVisible": 0,
+  "rawKeys": [],
+  "namesTheDependency": true,
+  "falseSuccess": false
+ },
+ "reversibility": {
+  "backButtonPresent": false,
+  "retryLoop": {
+   "stillSetup": true,
+   "entries": 0
+  }
+ },
+ "audio": []
+}

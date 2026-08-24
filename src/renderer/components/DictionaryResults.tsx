@@ -841,13 +841,23 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
     // store after somebody else writes to it.
   }, [entries, gradable, knowledgeTick]);
 
+  /**
+   * Every variant gets the way back, not only the popup.
+   *
+   * This panel replaces the whole result list, and on the page variant its only control used to
+   * be Retry — which calls `ensureAnki` again and, against a refused port, sets `showSetup`
+   * straight back. Measured live at a refused `127.0.0.1:8765`, one click on "+ Add to Anki":
+   * `backButtonPresent: false`, and after Retry `stillSetup: true, entries: 0`. The results were
+   * never unrecoverable, because the query effect above clears `showSetup`, but getting them back
+   * meant re-running the lookup against a 697k-row database and losing what was already on screen.
+   */
   if (showSetup) {
     return (
       <div className={`dict-results ${variant}`}>
         <AnkiSetup
           status={anki}
           waitingCollection={ankiLink?.waitingCollection}
-          onBack={variant === 'popup' ? () => setShowSetup(false) : undefined}
+          onBack={() => setShowSetup(false)}
           onRetry={async () => {
             setShowSetup(false);
             await ensureAnki();
