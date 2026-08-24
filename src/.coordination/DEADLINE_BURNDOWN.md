@@ -106,3 +106,16 @@ blocks the attended run is that **qBittorrent is not running** — `unreachable`
 `connect ECONNREFUSED 127.0.0.1:8080`, 11 ms, measured through the product. That is machine state,
 not engineering, so no rate divides into it and the projection stays UNKNOWN rather than taking a
 flattering date. Gate 34 is ~15 minutes once 31 resolves. Product code landed: 9dc2b8ca.
+
+2026-08-24 | mal-pipeline | units done this turn: 0 | units left: 2 | basis: the gate tables in src/MAL_ANIME_PIPELINE_PLAN.md, re-counted this turn (open: 31, 34) | projected finish: UNKNOWN
+No gate closed, and the reason is worth more than a unit. The last four turns treated gate 31 as
+data-blocked, then as daemon-blocked. Both were wrong. qBittorrent was simply not started — started
+it, and the product answers `connected`, 5.2.3, 3 ms. What was actually missing was a PRODUCT STEP:
+the acquisition pipeline had no route from a finished transfer into the media library, so no
+acquired episode could ever carry a SubtitleRecord and gate 31's render clause was unreachable by
+construction, not by data. Landed as `45442f2f` (media:addAcquired + Add to library), verified live
+with three refusing negative controls and an idempotence check; library 33 -> 34. Gate 31 still
+needs its pair: the OVA is MAL's own "Date A Live II Episode 11" and jimaku 2823 carries E01-E10
+only, so JoJo Part 5 (39 .ass on disk) is the pair and it needs one episode's VIDEO. That is one
+named, sized transfer over a public swarm whose duration no rate divides into, so the projection
+stays UNKNOWN rather than taking a flattering date. Gate 34 is ~15 min once 31 resolves.

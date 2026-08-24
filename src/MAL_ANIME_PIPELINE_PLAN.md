@@ -2605,3 +2605,48 @@ cannot serve gate 31's *nyaa* clause; JoJo Part 5 can, and needs one episode's v
 
 **Gate 31 stays 32 of 34** (open: 31, 34), counted from this file's gate tables. Its remaining leg
 is now **one named, sized transfer** — a JoJo Part 5 episode — behind a daemon that is switched off.
+
+## 2026-08-24 — the pipeline downloaded episodes it could never open
+
+Worker `backup`. Commit `45442f2f`. **Gate 31 stays 32 of 34** (open: 31, 34), counted from this
+file's gate tables. Product code landed; the render clause did not close, and the reason is new.
+
+**qBittorrent's "blocker" was that nobody had started it.** Started it (`C:\Program Files\
+qBittorrent\qbittorrent.exe`), then measured *through the product*, not the daemon:
+`scraperQbitTest` → `connected`, version **5.2.3**, **3 ms**, `authMode apiKey`;
+`scraperQbitTransfers` → **7 rows**. Previous turn's `unreachable` / ECONNREFUSED was machine state
+and is cleared. Do not re-park it: if it reads unreachable again, start the process first.
+
+**THE DEFECT, and it is why the render clause could never have closed.**
+`MalDownloadDialog.sendReleases` (`:685-711`) hands the release to `scraperQbitSend` and stops.
+Nothing afterwards puts the finished file in the media library. `media:addPaths` — the only
+dialog-free entry — ignores anything that is not itself a media file, i.e. every multi-file
+torrent. Measured, not reasoned: the gate-33 video completed **2026-08-16** and today the library
+held **33 items and not that one**. Four turns treated gate 31 as a *data* problem; it was a
+missing product step at the end of the pipeline.
+
+`media:addAcquired` (`main/media.ts`) takes the save path a transfer already reports, walks it with
+the existing `collectMediaFilesInDir` so a directory works as well as a file, and reports `found`
+and `added` separately — "0 added" means *already there* or *no media at all*, and one number
+cannot say which. It cannot start, resume or query a transfer. Surfaced as **Add to library** on
+the Torrent Manager transfer inspector, disabled below 100%, strings in `scraper/strings.ts` per
+that file's deferred-i18n policy (so `i18n-check` stays 10,789/10,789).
+
+Live, one process, every branch with its negative control:
+
+| input | outcome | found/added |
+| --- | --- | --- |
+| non-existent path | `missing` | 0 / 0 |
+| empty string | `invalid-path` | 0 / 0 |
+| `package.json` (real file, not media) | `no-media` | 0 / 0 |
+| the OVA, 109,855,988 B | `ok` | **1 / 1** |
+| the OVA again | `ok` | 1 / **0** — idempotent |
+
+Library **33 → 34**, titled *"Date a Live II - Kurumi Star Festival OVA"*.
+
+**FINDING — this OVA cannot be gate 31's render pair, and that is measured, not assumed.** MAL
+22961's own `altTitles` are **"Date A Live II Episode 11"** / "Date A Live 2 Episode 11". The
+parent-title fallback from `9dc2b8ca` works live — jimaku entry **2823**, **10 files** — but they
+are **S02E01–E10** only. There is no episode-11 track, so attaching E01 to it would put unrelated
+cues on screen. Not done. **Next turn opens on JoJo Part 5**: MAL 37991, 39 `.tc_jp.ass` already on
+disk, needing one episode's video named and sized before the transfer.
