@@ -2738,3 +2738,55 @@ not probe residue. Both are reversible through shipped UI: the Subtitles tab's r
 far was English or delivered no metadata; `debug/g31t-jojo.cjs` and `debug/g31t-close.cjs`
 (`add|attach|render|open`, `G31_HASH`/`G31_MARK` env) now make the last three steps a three-command
 run once one exists.
+
+## 2026-08-24 — gate 31 Route A: three classifier defects, found in the surveys already on disk
+
+Worker `backup`. Commits `15b82df8`, `b74925a8`. **Gate 31 stays 32 of 34** (open: 31, 34),
+counted from this file's own gate tables. No acquisition ran; this turn widened what the pack
+route can *see*, which is Route A's measured blocker, and did it without spending a live survey.
+
+**Method, and it is the reusable part.** `debug/g31r-reclassify.cjs` re-reads the survey JSON
+already on disk — **159 title records, 984 rows previously filed as `sidecar`** — under a new
+predicate. A survey costs 4 nyaa searches per title; re-reading one costs nothing, and the rows
+kept their size, seeders and the name that found them.
+
+**Defect 1 (`15b82df8`) — the ceiling could not admit a real season pack.**
+`SUBTITLE_SIZE_CEILING_BYTES` was a flat 50 MB, documented as "a few MB of text and up to ~40 MB
+of fonts". The one pack this plan has ever rendered from falsifies it: `[DBD-Raws] JOJO 黄金之风
+[01-39] 简繁外挂字幕` is **87.80 MB of nothing but `.ass`**, and its single-language half alone is
+**71,796,171 B across 39 files**. It could only ever be `batch-sidecar`, ranked **+10** instead of
++50 — below any video batch that merely declares external subs. `subtitlePackCeilingBytes(eps)`
+now scales: **3 MB/episode** (the measured 1.84 with margin), floor the old 50 MB, cap **150 MB**
+— still 2× under the ~300 MB an episode of video starts at. Second half, or the first would cost
+bytes: `acquireAll` skipped unselected files only on `batch-sidecar`; a pack can now be 100 MB and
+the measured one is **78 files where a `ja` harvest wants 39**. The skip runs on both routes now,
+same order, and does not fire when nothing is unselected.
+
+**Defects 2 and 3 (`b74925a8`) — two real subs-only releases the name reader could not see.**
+(a) `withoutReleaseGroup` strips the leading bracket, because `[SubsPlease]`/`[HorribleSubs]` are
+the biggest false-positive source. One row in the user's own completed list puts the *payload* in
+that position: `(Subtitles only) [IIDX-RAWS] Dragon Ball GT 1-64 + Special`, **1,153,434 B over 64
+episodes, 2 seeders**. The strip ate its only signal. The bracket is now kept when its own text
+states a payload — the phrase is the discriminator, not the vocabulary. (b) `subtitlePackSignals`
+returned empty the moment `VIDEO_WITH_SUBS_RE` matched: `Maison Ikkoku Eng Subs Only [Kagura]
+Complete`, **0.7 MB, 3 seeders**, matched on `eng subs` and returned before reading the next word.
+A stated payload now outranks that phrasing; the size ceiling stays the independent second guard.
+
+**What the widening did NOT produce, said plainly.** Re-reading all 984 sidecar rows: **0** new
+Route A candidates — only **9 of 984** are under 150 MB at all, and none of those nine is a
+Japanese pack with seeders. And the live listing for **Maison Ikkoku (MAL 1453)** through the
+product returns **1 candidate, `batch-sidecar`, 165,171.20 MB, 4 seeders** — the 0.7 MB row is no
+longer on the index at ≥3 seeders. The candidate pool is live; a survey hit expires.
+
+**Fresh survey band, re-synced probe.** `debug/g31h-alias-routes.cjs` still carried the 2026-08-16
+port of the predicates (flat ceiling, no `字幕社` exclusion); it is re-synced rather than replaced.
+Run `desc 60 30 2 1`: **24 titles reached (60–83) before the run was cut, A:0 on every one of
+them**, B counts 1–29. So the widened ceiling changes nothing in this band either — an honest
+negative, not a pass.
+
+**Next slice:** finish that band (`node debug/g31h-alias-routes.cjs 84 6 2 1 desc`) and continue
+`84`→`120`. Gates this turn, **shared tree**: vitest **790 passed / 1 failed / 1 skipped (792
+files), 11,001 passed / 6 skipped** — the one red is the inherited `architectureBaseline` artefact
+naming another track's untracked `shared/externalSubtitleMount.ts`, identical to last turn.
+i18n **10,789/10,789** exit 0. architecture: the same single unclassified module. eslint on my
+four paths exit 0.
