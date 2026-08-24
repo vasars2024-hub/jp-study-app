@@ -3334,6 +3334,16 @@ const FloatingWindow = memo(function FloatingWindow({
       el.removeEventListener('pointermove', move);
       el.removeEventListener('pointerup', up);
       if (raf != null) cancelAnimationFrame(raf);
+      const node = winRef.current;
+      if (node) {
+        // Cancelling the pending rAF above leaves the DOM on whatever frame
+        // painted last, which is not necessarily the size being committed. If
+        // the gesture ends where it started, win.w/win.h do not change, React
+        // reconciles nothing, and that stale inline write survives. Write the
+        // committed size ourselves, exactly as dragStart does for left/top.
+        if (mode !== 'bottom') node.style.width = `${curW}px`;
+        if (mode !== 'right') node.style.height = `${curH}px`;
+      }
       const p: Partial<Win> = {};
       if (mode !== 'bottom') p.w = curW;
       if (mode !== 'right') p.h = curH;
