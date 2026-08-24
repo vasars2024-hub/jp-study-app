@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import { Readable } from 'node:stream';
 import { spawn } from 'node:child_process';
 import ffmpegStatic from 'ffmpeg-static';
-import type { MediaItem, MediaOpen, SubtitlePick, YouTubeDownloadOptions, YouTubeSubtitleLang } from '../shared/types';
+import type { MediaAcquiredImport, MediaItem, MediaOpen, SubtitlePick, YouTubeDownloadOptions, YouTubeSubtitleLang } from '../shared/types';
 import type { MediaBackupContract, MediaOrganizationPreview, MediaRelationship, MediaDuplicateChoice } from '../shared/mediaHub';
 import { previewMediaOrganization } from '../shared/mediaHub';
 import { inferMediaCategory, parseMediaFileName } from '../shared/mediaFileIdentity';
@@ -1243,6 +1243,57 @@ export function registerMediaIpc(): void {
       scheduleMetadataSweep();
     }
     return readDb().items;
+  });
+
+  /**
+   * Brings a finished acquisition into the library from the path it landed on.
+   *
+   * `media:addPaths` above is the drag-and-drop entry point and ignores anything
+   * that is not itself a media file — which is every multi-file torrent, whose
+   * payload is a directory. That was the end of the acquisition pipeline: the
+   * app could send a release to qBittorrent and watch it complete, and the file
+   * then sat on disk with no route into the library, so no subtitle could be
+   * attached to it and nothing ever reached the player. This is that route.
+   *
+   * It reads the path and nothing else — it cannot start, resume or query a
+   * transfer, so a caller cannot use it to reach the torrent client.
+   */
+  ipcMain.handle('media:addAcquired', (_e, target: unknown): MediaAcquiredImport => {
+    const empty = (outcome: MediaAcquiredImport['outcome']): MediaAcquiredImport =>
+      ({ items: readDb().items, found: 0, added: 0, outcome });
+    if (typeof target !== 'string' || !target.trim()) return empty('invalid-path');
+    const root = target.trim();
+    let isDirectory = false;
+    try {
+      isDirectory = fs.statSync(root).isDirectory();
+    } catch {
+      // The daemon's save path is its own truth; the file can have been moved
+      // or deleted since. Say so rather than reporting an empty success.
+      return empty('missing');
+    }
+    const files = isDirectory
+      ? collectMediaFilesInDir(root)
+      : (MEDIA_EXT.has(path.extname(root).toLowerCase()) ? [root] : []);
+    const before = new Set(readDb().items.map((i) => i.path));
+    let added = 0;
+    for (const filePath of files) {
+      try {
+        addOrGetItem(filePath, false);
+        if (!before.has(filePath)) added += 1;
+      } catch {
+        /* unreadable file — skip it, and do not count it as added */
+      }
+    }
+    if (added > 0) {
+      broadcastMedia();
+      scheduleMetadataSweep();
+    }
+    return {
+      items: readDb().items,
+      found: files.length,
+      added,
+      outcome: files.length ? 'ok' : 'no-media',
+    };
   });
 
   ipcMain.handle('media:open', (_e, id: string): MediaOpen | null => {

@@ -291,6 +291,23 @@ export interface SubtitlePick {
   text: string;
 }
 
+/**
+ * What happened when a finished acquisition was brought into the library.
+ *
+ * `found` and `added` are reported separately on purpose: "0 added" means two
+ * unrelated things — every file is already in the library, or the folder holds
+ * no media at all — and a caller with only one number has to guess which. The
+ * transfer surface says the difference out loud.
+ */
+export interface MediaAcquiredImport {
+  items: MediaItem[];
+  /** Media files discovered under the path, whether or not they were new. */
+  found: number;
+  /** Of those, how many were not already library items. */
+  added: number;
+  outcome: 'ok' | 'no-media' | 'missing' | 'invalid-path';
+}
+
 export type YouTubeSubtitleLang = 'none' | 'ja' | 'zh' | 'en' | 'ru';
 
 export interface YouTubeDownloadOptions {

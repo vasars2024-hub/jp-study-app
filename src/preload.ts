@@ -301,6 +301,9 @@ const api = {
   ): Promise<LibraryItem[]> => ipcRenderer.invoke('library:updateLevelMeta', id, patch, opts),
   addMediaPaths: (paths: string[]): Promise<MediaItem[]> =>
     ipcRenderer.invoke('media:addPaths', paths),
+  /** Bring a finished download into the library — see `media:addAcquired`. */
+  addAcquiredMedia: (target: string): Promise<import('./shared/types').MediaAcquiredImport> =>
+    ipcRenderer.invoke('media:addAcquired', target),
   getWallpaper: (): Promise<string | null> => ipcRenderer.invoke('desktop:getWallpaper'),
   pickWallpaper: (): Promise<{
     id: string;

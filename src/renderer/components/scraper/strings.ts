@@ -372,6 +372,20 @@ const TEXT = {
   // ---- Torrent Manager ----
   'page.torrents.title': 'Torrent Manager',
   'page.torrents.subtitle': 'Search indexers, and watch what qBittorrent is doing with more detail than it shows itself.',
+  // The end of the acquisition pipeline. Every other action here talks to the
+  // torrent client; this one is the only one that hands the finished files to
+  // the rest of the app, so its outcomes are spelled out rather than collapsed
+  // into one "done" — see `MediaAcquiredImport`.
+  'torrent.addToLibrary': 'Add to library',
+  'torrent.addToLibraryBusy': 'Adding…',
+  'torrent.addToLibraryIncomplete': 'This transfer has not finished downloading yet.',
+  'torrent.addedToLibrary': (added: number, found: number) =>
+    `Added ${added} of ${found} media file${found === 1 ? '' : 's'} to the library.`,
+  'torrent.alreadyInLibrary': (found: number) =>
+    `Already in the library — all ${found} media file${found === 1 ? '' : 's'} were there.`,
+  'torrent.addNoMedia': 'Nothing was added: no playable media file is at the save location.',
+  'torrent.addMissing': 'Nothing was added: the save location no longer exists on disk.',
+  'torrent.addFailed': (reason: string) => `Could not add to the library: ${reason}`,
   'torrent.settings': 'Torrent settings',
   'torrent.qbitSettings': 'qBittorrent settings',
   'torrent.connection': 'qBittorrent connection',

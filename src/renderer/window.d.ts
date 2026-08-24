@@ -227,6 +227,10 @@ declare global {
         opts?: { broadcast?: boolean },
       ): Promise<LibraryItem[]>;
       addMediaPaths(paths: string[]): Promise<MediaItem[]>;
+      /** Bring a finished download into the library — see `media:addAcquired`. */
+      addAcquiredMedia(
+        target: string,
+      ): Promise<import('../shared/types').MediaAcquiredImport>;
       getWallpaper(): Promise<string | null>;
       pickWallpaper(): Promise<{
         id: string;

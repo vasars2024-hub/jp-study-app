@@ -24,7 +24,7 @@ import {
   resolveCredentialPresence,
   type VaultAnswer,
 } from '../data/credentialPresence';
-import { sx, sxn, sxs } from '../strings';
+import { sx, sx2, sxn, sxs } from '../strings';
 import {
   loadScraperSettingsDocument,
   onScraperSettingsChanged,
@@ -90,6 +90,8 @@ export default function TorrentManagerPage() {
   const [sendReport, setSendReport] = useState<QbitSendReport | null>(null);
   const [activeTransferHash, setActiveTransferHash] = useState<string | null>(null);
   const [transferNotice, setTransferNotice] = useState('');
+  /** Which transfer is mid-import, so the button cannot be fired twice. */
+  const [addingHash, setAddingHash] = useState<string | null>(null);
   const [backend, setBackend] = useState<AcquisitionBackendSnapshot | null>(null);
   const [backendBusy, setBackendBusy] = useState(false);
   const [backendNotice, setBackendNotice] = useState<AcquisitionActionResult | null>(null);
@@ -231,6 +233,35 @@ export default function TorrentManagerPage() {
   const recheckTransfer = (transfer: QbitTransferRow) => {
     patchTransfer(transfer.hash, { state: 'checking', downloadSpeedBps: 0, uploadSpeedBps: 0 });
     setTransferNotice(`${transfer.name} queued for an integrity recheck.`);
+  };
+
+  /**
+   * The step the acquisition pipeline was missing: hand the finished files to
+   * the library, so a subtitle can be attached and the episode can be played.
+   *
+   * Reversible — the library's own remove action takes the item back out, and
+   * nothing here touches the file on disk or the transfer itself.
+   */
+  const addTransferToLibrary = async (transfer: QbitTransferRow) => {
+    if (transfer.progress < 1) {
+      setTransferNotice(sx('torrent.addToLibraryIncomplete'));
+      return;
+    }
+    setAddingHash(transfer.hash);
+    try {
+      // Forward slash on purpose: Node accepts it on Windows too, and the
+      // renderer has no `path.join` to reach for.
+      const target = `${transfer.savePath.replace(/[\\/]+$/, '')}/${transfer.name}`;
+      const report = await window.api.addAcquiredMedia(target);
+      if (report.outcome === 'missing') setTransferNotice(sx('torrent.addMissing'));
+      else if (report.outcome !== 'ok') setTransferNotice(sx('torrent.addNoMedia'));
+      else if (report.added === 0) setTransferNotice(sxn('torrent.alreadyInLibrary', report.found));
+      else setTransferNotice(sx2('torrent.addedToLibrary', report.added, report.found));
+    } catch (error) {
+      setTransferNotice(sxs('torrent.addFailed', error instanceof Error ? error.message : String(error)));
+    } finally {
+      setAddingHash(null);
+    }
   };
 
   const removeTransfer = (transfer: QbitTransferRow) => {
@@ -644,6 +675,15 @@ export default function TorrentManagerPage() {
                 {activeTransfer.state === 'paused' ? 'Resume transfer' : 'Pause transfer'}
               </Button>
               <Button size="sm" onClick={() => recheckTransfer(activeTransfer)}>Force recheck</Button>
+              <Button
+                size="sm"
+                disabled={activeTransfer.progress < 1 || addingHash === activeTransfer.hash}
+                onClick={() => void addTransferToLibrary(activeTransfer)}
+              >
+                {addingHash === activeTransfer.hash
+                  ? sx('torrent.addToLibraryBusy')
+                  : sx('torrent.addToLibrary')}
+              </Button>
               <Button
                 size="sm"
                 onClick={() => setTransferNotice(`Save location: ${activeTransfer.savePath}`)}
