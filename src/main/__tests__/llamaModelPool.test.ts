@@ -73,7 +73,7 @@ describe('llama model pool', () => {
     expect(loadModelCalls).toEqual([MODEL_A]);
     expect(agent.model).toBe(translate.model);
     expect(pool.llamaModelPoolStats()).toEqual([
-      { modelPath: MODEL_A, leases: 2, resident: true, awaitingRelease: false },
+      { modelPath: MODEL_A, leases: 2, resident: true, awaitingRelease: false, graceMs: 60_000 },
     ]);
   });
 
@@ -143,7 +143,7 @@ describe('llama model pool', () => {
       // The reacquire disarms the pending disposal rather than merely outliving it, so the pool
       // stops reporting the model as on its way out the moment someone takes it.
       expect(pool.llamaModelPoolStats()).toEqual([
-        { modelPath: MODEL_A, leases: 1, resident: true, awaitingRelease: false },
+        { modelPath: MODEL_A, leases: 1, resident: true, awaitingRelease: false, graceMs: 60_000 },
       ]);
 
       await vi.advanceTimersByTimeAsync(pool.MODEL_RELEASE_GRACE_MS * 3);
@@ -206,6 +206,73 @@ describe('llama model pool', () => {
     const retry = await pool.acquireLlamaModel(MODEL_A);
     expect(loadModelCalls).toHaveLength(2);
     expect(retry.model).toBeDefined();
+  });
+
+  /**
+   * The plain grace window cannot help the user the 7 GB plateau was actually measured on: both
+   * callers idle-unload at 5 minutes, so anyone studying with breaks longer than that reloaded the
+   * weights every time and paid ~103 MB and ~1,212 handles of unreclaimable residue per round. The
+   * grace therefore backs off per churned reload — a cycle's cost is permanent, residency's is not.
+   */
+  it('lengthens the grace each time a file is reloaded straight after being disposed', async () => {
+    vi.useFakeTimers();
+    try {
+      const graces: number[] = [];
+      for (let cycle = 0; cycle < 3; cycle += 1) {
+        const lease = await pool.acquireLlamaModel(MODEL_A);
+        graces.push(pool.llamaModelPoolStats()[0].graceMs);
+        await lease.release();
+        await vi.advanceTimersByTimeAsync(graces[cycle] + 1_000);
+      }
+
+      expect(graces).toEqual([60_000, 120_000, 240_000]);
+      expect(loadModelCalls).toHaveLength(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('caps the backoff rather than holding the weights forever', async () => {
+    vi.useFakeTimers();
+    try {
+      let last = 0;
+      for (let cycle = 0; cycle < 8; cycle += 1) {
+        const lease = await pool.acquireLlamaModel(MODEL_A);
+        last = pool.llamaModelPoolStats()[0].graceMs;
+        await lease.release();
+        await vi.advanceTimersByTimeAsync(last + 1_000);
+      }
+
+      expect(last).toBe(pool.MODEL_RELEASE_GRACE_MAX_MS);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  /**
+   * The negative control for the backoff, and the reason it is safe: a user who genuinely stops
+   * gets their memory back on the ordinary window. Without this reset, one busy morning would keep
+   * a 1.2 GB model resident for the rest of the session.
+   */
+  it('resets to the base grace after a real gap, so a finished file is not held', async () => {
+    vi.useFakeTimers();
+    try {
+      const first = await pool.acquireLlamaModel(MODEL_A);
+      await first.release();
+      await vi.advanceTimersByTimeAsync(pool.MODEL_RELEASE_GRACE_MS + 1_000);
+
+      const churned = await pool.acquireLlamaModel(MODEL_A);
+      expect(pool.llamaModelPoolStats()[0].graceMs).toBe(120_000);
+      await churned.release();
+      await vi.advanceTimersByTimeAsync(120_000 + 1_000);
+
+      // Now stay away longer than the churn window before coming back.
+      await vi.advanceTimersByTimeAsync(5 * 60_000 + 1_000);
+      await pool.acquireLlamaModel(MODEL_A);
+      expect(pool.llamaModelPoolStats()[0].graceMs).toBe(pool.MODEL_RELEASE_GRACE_MS);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('drops everything on shutdown regardless of who is holding it', async () => {

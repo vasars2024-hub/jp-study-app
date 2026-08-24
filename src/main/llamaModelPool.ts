@@ -35,6 +35,23 @@ import { getSharedLlama } from './llamaBackend';
  */
 export const MODEL_RELEASE_GRACE_MS = 60_000;
 
+/**
+ * The ceiling on the backoff below. Ten minutes, which is the point where holding 1.2 GB stops
+ * being obviously cheaper than the leak it prevents, and it is a bound rather than a target: a
+ * model only reaches it after five consecutive churned reloads.
+ */
+export const MODEL_RELEASE_GRACE_MAX_MS = 10 * 60_000;
+
+/**
+ * A reacquire this soon after a disposal is CHURN — the unload paid ~103 MB and ~1,212 handles of
+ * unreclaimable teardown residue to give back 1.2 GB for a few minutes, and then loaded it again.
+ *
+ * Five minutes because that is what both callers use as their idle deadline: a user working
+ * through a page of vocabulary with breaks longer than the deadline and shorter than this is the
+ * exact person the plain grace window cannot help, and they were the ones paying the 7 GB plateau.
+ */
+const CHURN_WINDOW_MS = 5 * 60_000;
+
 interface PoolEntry {
   /** The path as first requested, kept for diagnostics and passed to `loadModel` verbatim. */
   modelPath: string;
@@ -43,9 +60,32 @@ interface PoolEntry {
   model: LlamaModel | null;
   leases: number;
   graceTimer: ReturnType<typeof setTimeout> | null;
+  /** This entry's own grace, grown by `churnGraceMs` from how often the file has been recycled. */
+  graceMs: number;
 }
 
 const pool = new Map<string, PoolEntry>();
+/** Per-file churn history, kept across disposals. One small record per distinct GGUF ever loaded. */
+const churn = new Map<string, { disposedAt: number; count: number }>();
+
+/**
+ * How long this file should linger after its last user lets go.
+ *
+ * Doubling per churned reload, capped. The asymmetry is the point: a cycle's cost is PERMANENT and
+ * cumulative, while residency is temporary and bounded, so a file the user keeps coming back to
+ * should stop being recycled at all — and one they have genuinely finished with still frees on the
+ * first quiet window, because a gap longer than `CHURN_WINDOW_MS` resets the count to zero.
+ */
+function churnGraceMs(key: string, now: number): number {
+  const history = churn.get(key);
+  if (!history) return MODEL_RELEASE_GRACE_MS;
+  if (now - history.disposedAt > CHURN_WINDOW_MS) {
+    churn.delete(key);
+    return MODEL_RELEASE_GRACE_MS;
+  }
+  history.count += 1;
+  return Math.min(MODEL_RELEASE_GRACE_MS * 2 ** history.count, MODEL_RELEASE_GRACE_MAX_MS);
+}
 
 /**
  * Windows paths are case-insensitive, so `Models\Qwen3-1.7B.gguf` and `models\qwen3-1.7b.gguf` are
@@ -75,6 +115,9 @@ async function disposeEntry(key: string, entry: PoolEntry): Promise<void> {
   disarmGrace(entry);
   if (pool.get(key) === entry) pool.delete(key);
   const model = entry.model;
+  // Only a real disposal counts as churn. Recording the moment here rather than on release is what
+  // makes the window mean "how long the weights were actually gone".
+  if (model) churn.set(key, { disposedAt: Date.now(), count: churn.get(key)?.count ?? 0 });
   entry.model = null;
   try {
     await (model as unknown as { dispose?: () => unknown } | null)?.dispose?.();
@@ -106,6 +149,7 @@ export async function acquireLlamaModel(modelPath: string): Promise<LlamaModelLe
       model: null,
       leases: 0,
       graceTimer: null,
+      graceMs: churnGraceMs(key, Date.now()),
       loading: (async () => {
         const llama = await getSharedLlama();
         return llama.loadModel({ modelPath });
@@ -158,7 +202,7 @@ export async function acquireLlamaModel(modelPath: string): Promise<LlamaModelLe
         // line — removing it is silent today and frees a model under a live context the moment
         // anything makes `loading` slow again.
         if (claimed.leases === 0) void disposeEntry(key, claimed);
-      }, MODEL_RELEASE_GRACE_MS);
+      }, claimed.graceMs);
       // A model waiting out its grace must not keep the app alive at quit.
       claimed.graceTimer.unref?.();
     },
@@ -166,12 +210,13 @@ export async function acquireLlamaModel(modelPath: string): Promise<LlamaModelLe
 }
 
 /** What the pool is holding. Read by the tests and the perf probes; allocates nothing native. */
-export function llamaModelPoolStats(): Array<{ modelPath: string; leases: number; resident: boolean; awaitingRelease: boolean }> {
+export function llamaModelPoolStats(): Array<{ modelPath: string; leases: number; resident: boolean; awaitingRelease: boolean; graceMs: number }> {
   return [...pool.values()].map((entry) => ({
     modelPath: entry.modelPath,
     leases: entry.leases,
     resident: entry.model !== null,
     awaitingRelease: entry.graceTimer !== null,
+    graceMs: entry.graceMs,
   }));
 }
 
@@ -187,4 +232,6 @@ export async function disposeAllLlamaModels(): Promise<void> {
     entry.leases = 0;
     return disposeEntry(key, entry);
   }));
+  // Shutdown is not churn, and a test that left history behind would score the next one's backoff.
+  churn.clear();
 }
