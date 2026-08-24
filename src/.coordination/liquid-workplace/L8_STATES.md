@@ -135,6 +135,63 @@ Run 1 is run 2's negative control, and a stronger one than a planted failure: th
 that produced a wrong-provider success before the fix produces a named authentication failure
 after it.
 
-## Still open for category 8
+## 2026-08-24 · primary — fabricated values: 0, and the denominator that made the first 0 hollow
 
-- **Fabricated values**: no verdict yet. Until it has one, **no score is claimed**.
+`probes/l8-fabricated.cjs`. `honesty-probe` probe B prescribes an **empty scratch profile**,
+because on a populated one "real data and a hardcoded constant look identical". Switching the
+active profile would change the very grades and saved words this surface renders — a mutation of
+the thing under audit. So the rule is taken at its word rather than its method: what makes an
+empty profile decisive is that **a constant survives when its data is taken away**, and varying
+the *input* has the same power. Three headwords are searched through the product's own box
+(食べる / 水 / 齟齬) and every text leaf in a **data position** is compared by slot. Chrome is
+excluded structurally — by tag and by `closest()`, never by whether the string looks like a label.
+
+**The first honest run returned `invariantCount 0` over `comparableSlots` 15 — of ~55 leaves.**
+A zero over a denominator that small is the hollow-zero shape this repo has paid for three times:
+a fabrication in any of the other forty was never looked at. Only slots present at the same entry
+index in **all three** searches are comparable across words, and that intersection is thin.
+
+So a **second axis** was added, and it is what makes the zero mean something. Each pass is also
+compared against itself: a slot that repeats across the 7–8 entries of one search and renders
+identical text for eight different words is the same defect along the other axis, with every
+repeated slot as the denominator instead of a three-way intersection.
+
+| Axis | Denominator | Constant | Fabricated |
+| --- | --- | --- | --- |
+| across words (3 searches) | **15** comparable slots | **0** | **0** |
+| within pass (per search, across entries) | **42** repeated slots | **16** | **0** |
+
+**All 16 within-pass constants adjudicated, none fabricated.** `dict-pos` `verb`/`noun` and
+`dict-usage-tag` `abbreviation`/`alt-of` are JMdict tags that genuinely repeat across senses of
+one word. `sr-only` `Usage:` and `dict-pitch-label` `Pitch` are chrome the structural filter
+missed (an `sr-only` span is not a `label`). `span` `そ`/`ご` is 齟齬's own reading. The one that
+could have been a hardcode is `dict-freq-source` **`JPDB`** — it is `{entry.frequencySource}` at
+`DictionaryResults.tsx:937`, and it renders on **3 of 8** entries for 食べる, 2 of 8 for 水: a
+literal would be on all of them.
+
+**Two controls, because two axes need two plants.** A leaf planted in entry 0 only is invisible
+to a cross-entry comparison, so scoring the within-pass measure with it would score it by a
+control it cannot see. `--control` (entry 0) → across-words `0 → 1`, flagged as a status-word
+candidate. `--control-all` (every entry) → across-words `0 → 7`, within-pass constants `16 → 19`
+and status-word candidates **`0 → 3`** (`Connected` ×8/×8/×7). `controlRemoved: before 7,
+remaining 0`; surface re-driven to **8 entries**, residue **0**, still `.fwin-liquid`.
+Raw runs: `baselines/l8-fabricated-{run,control,control-all}.json`.
+
+## Category 8 on the Liquid Dictionary window: **10/10**
+
+The rubric's 10 requires 0 dead controls, 0 fabricated values, and all four states rendering a
+real message with 0 raw i18n keys in all four languages. Every input is now measured on this
+surface, in a real functional state, each with a control that fired:
+
+| Input | Number | Control that failed |
+| --- | --- | --- |
+| Dead controls | **0** of **43** probed (65 found, 22 excluded with reason) | planted no-op read DEAD, planted mutator read ALIVE |
+| Fabricated values | **0** over **57** compared slots, two axes | `Connected` flagged on both axes |
+| Four states named | empty, loading, offline-refusal, **error** | run 1's wrong-provider success is run 2's control |
+| Raw i18n keys | **0** over **2,248** text runs × 4 languages | English-title probe → 4 refused windows, caught by the denominator |
+
+**Not folded into the score, and stated rather than omitted: 7 one-way controls.** `Play <word>`
+becomes `No recording for this word` and never returns (`.word-audio`, 7 of 8 entries). The text
+is honest and the first click had an observable effect, so it is not a dead control by this
+category's definition — but a button that can never act again is a category **2** finding, and it
+is recorded here so the clunkiness re-score does not have to rediscover it.

@@ -1,0 +1,1661 @@
+{
+ "at": "2026-08-24T07:17:43.995Z",
+ "control": true,
+ "controlAll": true,
+ "passes": [
+  {
+   "word": "taberu",
+   "entries": 8,
+   "leafCount": 63,
+   "leaves": [
+    {
+     "slot": "0|dict-word|SPAN|1",
+     "key": "dict-word|SPAN|1",
+     "ei": 0,
+     "cls": "dict-word",
+     "text": "食べる"
+    },
+    {
+     "slot": "0|dict-reading|SPAN|1",
+     "key": "dict-reading|SPAN|1",
+     "ei": 0,
+     "cls": "dict-reading",
+     "text": "たべる"
+    },
+    {
+     "slot": "0|dict-badge common|SPAN|1",
+     "key": "dict-badge common|SPAN|1",
+     "ei": 0,
+     "cls": "dict-badge common",
+     "text": "common"
+    },
+    {
+     "slot": "0|dict-freq-source|SPAN|1",
+     "key": "dict-freq-source|SPAN|1",
+     "ei": 0,
+     "cls": "dict-freq-source",
+     "text": "JPDB"
+    },
+    {
+     "slot": "0|dict-pitch-label|SPAN|1",
+     "key": "dict-pitch-label|SPAN|1",
+     "ei": 0,
+     "cls": "dict-pitch-label",
+     "text": "Pitch"
+    },
+    {
+     "slot": "0|span|SPAN|1",
+     "key": "span|SPAN|1",
+     "ei": 0,
+     "cls": "span",
+     "text": "た"
+    },
+    {
+     "slot": "0|span|SPAN|2",
+     "key": "span|SPAN|2",
+     "ei": 0,
+     "cls": "span",
+     "text": "べ"
+    },
+    {
+     "slot": "0|span|SPAN|3",
+     "key": "span|SPAN|3",
+     "ei": 0,
+     "cls": "span",
+     "text": "る"
+    },
+    {
+     "slot": "0|li|LI|1",
+     "key": "li|LI|1",
+     "ei": 0,
+     "cls": "li",
+     "text": "to eat"
+    },
+    {
+     "slot": "0|li|LI|2",
+     "key": "li|LI|2",
+     "ei": 0,
+     "cls": "li",
+     "text": "to live on (e.g. a salary); to live off; to subsist on"
+    },
+    {
+     "slot": "0|li|LI|3",
+     "key": "li|LI|3",
+     "ei": 0,
+     "cls": "li",
+     "text": "1) есть; 2) (перен.) жить, существовать"
+    },
+    {
+     "slot": "0|dict-source muted|DIV|1",
+     "key": "dict-source muted|DIV|1",
+     "ei": 0,
+     "cls": "dict-source muted",
+     "text": "JMdict (Japanese–English)"
+    },
+    {
+     "slot": "0|l8-fab-control dict-status|SPAN|1",
+     "key": "l8-fab-control dict-status|SPAN|1",
+     "ei": 0,
+     "cls": "l8-fab-control dict-status",
+     "text": "Connected"
+    },
+    {
+     "slot": "1|dict-word|SPAN|1",
+     "key": "dict-word|SPAN|1",
+     "ei": 1,
+     "cls": "dict-word",
+     "text": "食べる"
+    },
+    {
+     "slot": "1|dict-pos|SPAN|1",
+     "key": "dict-pos|SPAN|1",
+     "ei": 1,
+     "cls": "dict-pos",
+     "text": "verb"
+    },
+    {
+     "slot": "1|dict-pos|SPAN|2",
+     "key": "dict-pos|SPAN|2",
+     "ei": 1,
+     "cls": "dict-pos",
+     "text": "verb"
+    },
+    {
+     "slot": "1|dict-pos|SPAN|3",
+     "key": "dict-pos|SPAN|3",
+     "ei": 1,
+     "cls": "dict-pos",
+     "text": "verb"
+    },
+    {
+     "slot": "1|sr-only|SPAN|1",
+     "key": "sr-only|SPAN|1",
+     "ei": 1,
+     "cls": "sr-only",
+     "text": "Usage:"
+    },
+    {
+     "slot": "1|dict-usage-tag|SPAN|1",
+     "key": "dict-usage-tag|SPAN|1",
+     "ei": 1,
+     "cls": "dict-usage-tag",
+     "text": "archaic"
+    },
+    {
+     "slot": "1|dict-usage-tag|SPAN|2",
+     "key": "dict-usage-tag|SPAN|2",
+     "ei": 1,
+     "cls": "dict-usage-tag",
+     "text": "humble"
+    },
+    {
+     "slot": "1|dict-source muted|DIV|1",
+     "key": "dict-source muted|DIV|1",
+     "ei": 1,
+     "cls": "dict-source muted",
+     "text": "Wiktionary (wiktextract)"
+    },
+    {
+     "slot": "1|l8-fab-control dict-status|SPAN|1",
+     "key": "l8-fab-control dict-status|SPAN|1",
+     "ei": 1,
+     "cls": "l8-fab-control dict-status",
+     "text": "Connected"
+    },
+    {
+     "slot": "2|dict-word|SPAN|1",
+     "key": "dict-word|SPAN|1",
+     "ei": 2,
+     "cls": "dict-word",
+     "text": "食べるラー油"
+    },
+    {
+     "slot": "2|dict-reading|SPAN|1",
+     "key": "dict-reading|SPAN|1",
+     "ei": 2,
+     "cls": "dict-reading",
+     "text": "たべるラーゆ"
+    },
+    {
+     "slot": "2|dict-freq-source|SPAN|1",
+     "key": "dict-freq-source|SPAN|1",
+     "ei": 2,
+     "cls": "dict-freq-source",
+     "text": "JPDB"
+    },
+    {
+     "slot": "2|li|LI|1",
+     "key": "li|LI|1",
+     "ei": 2,
+     "cls": "li",
+     "text": "chili oil mixed with chopped garlic, onions, etc."
+    },
+    {
+     "slot": "2|li|LI|2",
+     "key": "li|LI|2",
+     "ei": 2,
+     "cls": "li",
+     "text": "食べるラー油; 食べる辣油"
+    },
+    {
+     "slot": "2|dict-source muted|DIV|1",
+     "key": "dict-source muted|DIV|1",
+     "ei": 2,
+     "cls": "dict-source muted",
+     "text": "JMdict (Japanese–English)"
+    },
+    {
+     "slot": "2|l8-fab-control dict-status|SPAN|1",
+     "key": "l8-fab-control dict-status|SPAN|1",
+     "ei": 2,
+     "cls": "l8-fab-control dict-status",
+     "text": "Connected"
+    },
+    {
+     "slot": "3|dict-word|SPAN|1",
+     "key": "dict-word|SPAN|1",
+     "ei": 3,
+     "cls": "dict-word",
+     "text": "食べる辣油"
+    },
+    {
+     "slot": "3|dict-reading|SPAN|1",
+     "key": "dict-reading|SPAN|1",
+     "ei": 3,
+     "cls": "dict-reading",
+     "text": "たべるラーゆ"
+    },
+    {
+     "slot": "3|dict-freq-source|SPAN|1",
+     "key": "dict-freq-source|SPAN|1",
+     "ei": 3,
+     "cls": "dict-freq-source",
+     "text": "JPDB"
+    },
+    {
+     "slot": "3|li|LI|1",
+     "key": "li|LI|1",
+     "ei": 3,
+     "cls": "li",
+     "text": "chili oil mixed with chopped garlic, onions, etc."
+    },
+    {
+     "slot": "3|li|LI|2",
+     "key": "li|LI|2",
+     "ei": 3,
+     "cls": "li",
+     "text": "食べるラー油; 食べる辣油"
+    },
+    {
+     "slot": "3|dict-source muted|DIV|1",
+     "key": "dict-source muted|DIV|1",
+     "ei": 3,
+     "cls": "dict-source muted",
+     "text": "JMdict (Japanese–English)"
+    },
+    {
+     "slot": "3|l8-fab-control dict-status|SPAN|1",
+     "key": "l8-fab-control dict-status|SPAN|1",
+     "ei": 3,
+     "cls": "l8-fab-control dict-status",
+     "text": "Connected"
+    },
+    {
+     "slot": "4|dict-word|SPAN|1",
+     "key": "dict-word|SPAN|1",
+     "ei": 4,
+     "cls": "dict-word",
+     "text": "食べた"
+    },
+    {
+     "slot": "4|dict-pos|SPAN|1",
+     "key": "dict-pos|SPAN|1",
+     "ei": 4,
+     "cls": "dict-pos",
+     "text": "verb"
+    },
+    {
+     "slot": "4|sr-only|SPAN|1",
+     "key": "sr-only|SPAN|1",
+     "ei": 4,
+     "cls": "sr-only",
+     "text": "Usage:"
+    },
+    {
+     "slot": "4|dict-usage-tag|SPAN|1",
+     "key": "dict-usage-tag|SPAN|1",
+     "ei": 4,
+     "cls": "dict-usage-tag",
+     "text": "form-of"
+    },
+    {
+     "slot": "4|dict-usage-tag|SPAN|2",
+     "key": "dict-usage-tag|SPAN|2",
+     "ei": 4,
+     "cls": "dict-usage-tag",
+     "text": "past"
+    },
+    {
+     "slot": "4|dict-source muted|DIV|1",
+     "key": "dict-source muted|DIV|1",
+     "ei": 4,
+     "cls": "dict-source muted",
+     "text": "Wiktionary (wiktextract)"
+    },
+    {
+     "slot": "4|l8-fab-control dict-status|SPAN|1",
+     "key": "l8-fab-control dict-status|SPAN|1",
+     "ei": 4,
+     "cls": "l8-fab-control dict-status",
+     "text": "Connected"
+    },
+    {
+     "slot": "5|dict-word|SPAN|1",
+     "key": "dict-word|SPAN|1",
+     "ei": 5,
+     "cls": "dict-word",
+     "text": "食べ"
+    },
+    {
+     "slot": "5|dict-pos|SPAN|1",
+     "key": "dict-pos|SPAN|1",
+     "ei": 5,
+     "cls": "dict-pos",
+     "text": "verb"
+    },
+    {
+     "slot": "5|dict-source muted|DIV|1",
+     "key": "dict-source muted|DIV|1",
+     "ei": 5,
+     "cls": "dict-source muted",
+     "text": "Wiktionary (wiktextract)"
+    },
+    {
+     "slot": "5|l8-fab-control dict-status|SPAN|1",
+     "key": "l8-fab-control dict-status|SPAN|1",
+     "ei": 5,
+     "cls": "l8-fab-control dict-status",
+     "text": "Connected"
+    },
+    {
+     "slot": "6|dict-word|SPAN|1",
+     "key": "dict-word|SPAN|1",
+     "ei": 6,
+     "cls": "dict-word",
+     "text": "食べます"
+    },
+    {
+     "slot": "6|dict-pos|SPAN|1",
+     "key": "dict-pos|SPAN|1",
+     "ei": 6,
+     "cls": "dict-pos",
+     "text": "verb"
+    },
+    {
+     "slot": "6|sr-only|SPAN|1",
+     "key": "sr-only|SPAN|1",
+     "ei": 6,
+     "cls": "sr-only",
+     "text": "Usage:"
+    },
+    {
+     "slot": "6|dict-usage-tag|SPAN|1",
+     "key": "dict-usage-tag|SPAN|1",
+     "ei": 6,
+     "cls": "dict-usage-tag",
+     "text": "form-of"
+    },
+    {
+     "slot": "6|dict-usage-tag|SPAN|2",
+     "key": "dict-usage-tag|SPAN|2",
+     "ei": 6,
+     "cls": "dict-usage-tag",
+     "text": "formal"
+    },
+    {
+     "slot": "6|dict-usage-tag|SPAN|3",
+     "key": "dict-usage-tag|SPAN|3",
+     "ei": 6,
+     "cls": "dict-usage-tag",
+     "text": "polite"
+    },
+    {
+     "slot": "6|dict-source muted|DIV|1",
+     "key": "dict-source muted|DIV|1",
+     "ei": 6,
+     "cls": "dict-source muted",
+     "text": "Wiktionary (wiktextract)"
+    },
+    {
+     "slot": "6|l8-fab-control dict-status|SPAN|1",
+     "key": "l8-fab-control dict-status|SPAN|1",
+     "ei": 6,
+     "cls": "l8-fab-control dict-status",
+     "text": "Connected"
+    },
+    {
+     "slot": "7|dict-word|SPAN|1",
+     "key": "dict-word|SPAN|1",
+     "ei": 7,
+     "cls": "dict-word",
+     "text": "食べられない"
+    },
+    {
+     "slot": "7|dict-pos|SPAN|1",
+     "key": "dict-pos|SPAN|1",
+     "ei": 7,
+     "cls": "dict-pos",
+     "text": "verb"
+    },
+    {
+     "slot": "7|sr-only|SPAN|1",
+     "key": "sr-only|SPAN|1",
+     "ei": 7,
+     "cls": "sr-only",
+     "text": "Usage:"
+    },
+    {
+     "slot": "7|dict-usage-tag|SPAN|1",
+     "key": "dict-usage-tag|SPAN|1",
+     "ei": 7,
+     "cls": "dict-usage-tag",
+     "text": "form-of"
+    },
+    {
+     "slot": "7|dict-usage-tag|SPAN|2",
+     "key": "dict-usage-tag|SPAN|2",
+     "ei": 7,
+     "cls": "dict-usage-tag",
+     "text": "negative"
+    },
+    {
+     "slot": "7|dict-usage-tag|SPAN|3",
+     "key": "dict-usage-tag|SPAN|3",
+     "ei": 7,
+     "cls": "dict-usage-tag",
+     "text": "potential"
+    },
+    {
+     "slot": "7|dict-source muted|DIV|1",
+     "key": "dict-source muted|DIV|1",
+     "ei": 7,
+     "cls": "dict-source muted",
+     "text": "Wiktionary (wiktextract)"
+    },
+    {
+     "slot": "7|l8-fab-control dict-status|SPAN|1",
+     "key": "l8-fab-control dict-status|SPAN|1",
+     "ei": 7,
+     "cls": "l8-fab-control dict-status",
+     "text": "Connected"
+    }
+   ]
+  },
+  {
+   "word": "mizu",
+   "entries": 8,
+   "leafCount": 83,
+   "leaves": [
+    {
+     "slot": "0|dict-word|SPAN|1",
+     "key": "dict-word|SPAN|1",
+     "ei": 0,
+     "cls": "dict-word",
+     "text": "水"
+    },
+    {
+     "slot": "0|dict-reading|SPAN|1",
+     "key": "dict-reading|SPAN|1",
+     "ei": 0,
+     "cls": "dict-reading",
+     "text": "みず"
+    },
+    {
+     "slot": "0|dict-badge common|SPAN|1",
+     "key": "dict-badge common|SPAN|1",
+     "ei": 0,
+     "cls": "dict-badge common",
+     "text": "common"
+    },
+    {
+     "slot": "0|dict-freq-source|SPAN|1",
+     "key": "dict-freq-source|SPAN|1",
+     "ei": 0,
+     "cls": "dict-freq-source",
+     "text": "JPDB"
+    },
+    {
+     "slot": "0|dict-pitch-label|SPAN|1",
+     "key": "dict-pitch-label|SPAN|1",
+     "ei": 0,
+     "cls": "dict-pitch-label",
+     "text": "Pitch"
+    },
+    {
+     "slot": "0|span|SPAN|1",
+     "key": "span|SPAN|1",
+     "ei": 0,
+     "cls": "span",
+     "text": "み"
+    },
+    {
+     "slot": "0|span|SPAN|2",
+     "key": "span|SPAN|2",
+     "ei": 0,
+     "cls": "span",
+     "text": "ず"
+    },
+    {
+     "slot": "0|li|LI|1",
+     "key": "li|LI|1",
+     "ei": 0,
+     "cls": "li",
+     "text": "water (esp. cool or cold)"
+    },
+    {
+     "slot": "0|li|LI|2",
+     "key": "li|LI|2",
+     "ei": 0,
+     "cls": "li",
+     "text": "fluid (esp. in an animal tissue); liquid"
+    },
+    {
+     "slot": "0|li|LI|3",
+     "key": "li|LI|3",
+     "ei": 0,
+     "cls": "li",
+     "text": "flood; floodwaters"
+    },
+    {
+     "slot": "0|li|LI|4",
+     "key": "li|LI|4",
+     "ei": 0,
+     "cls": "li",
+     "text": "water offered to wrestlers just prior to a bout"
+    },
+    {
+     "slot": "0|li|LI|5",
+     "key": "li|LI|5",
+     "ei": 0,
+     "cls": "li",
+     "text": "break granted to wrestlers engaged in a prolonged bout"
+    },
+    {
+     "slot": "0|li|LI|6",
+     "key": "li|LI|6",
+     "ei": 0,
+     "cls": "li",
+     "text": "1) вода; холодная вода; {～の} водный; водяной; 2) жидкость"
+    },
+    {
+     "slot": "0|dict-source muted|DIV|1",
+     "key": "dict-source muted|DIV|1",
+     "ei": 0,
+     "cls": "dict-source muted",
+     "text": "JMdict (Japanese–English)"
+    },
+    {
+     "slot": "0|l8-fab-control dict-status|SPAN|1",
+     "key": "l8-fab-control dict-status|SPAN|1",
+     "ei": 0,
+     "cls": "l8-fab-control dict-status",
+     "text": "Connected"
+    },
+    {
+     "slot": "1|dict-word|SPAN|1",
+     "key": "dict-word|SPAN|1",
+     "ei": 1,
+     "cls": "dict-word",
+     "text": "水"
+    },
+    {
+     "slot": "1|dict-reading|SPAN|1",
+     "key": "dict-reading|SPAN|1",
+     "ei": 1,
+     "cls": "dict-reading",
+     "text": "みづ"
+    },
+    {
+     "slot": "1|dict-pos|SPAN|1",
+     "key": "dict-pos|SPAN|1",
+     "ei": 1,
+     "cls": "dict-pos",
+     "text": "noun"
+    },
+    {
+     "slot": "1|dict-pos|SPAN|2",
+     "key": "dict-pos|SPAN|2",
+     "ei": 1,
+     "cls": "dict-pos",
+     "text": "noun"
+    },
+    {
+     "slot": "1|dict-pos|SPAN|3",
+     "key": "dict-pos|SPAN|3",
+     "ei": 1,
+     "cls": "dict-pos",
+     "text": "noun"
+    },
+    {
+     "slot": "1|dict-pos|SPAN|4",
+     "key": "dict-pos|SPAN|4",
+     "ei": 1,
+     "cls": "dict-pos",
+     "text": "noun"
+    },
+    {
+     "slot": "1|dict-pos|SPAN|5",
+     "key": "dict-pos|SPAN|5",
+     "ei": 1,
+     "cls": "dict-pos",
+     "text": "noun"
+    },
+    {
+     "slot": "1|sr-only|SPAN|1",
+     "key": "sr-only|SPAN|1",
+     "ei": 1,
+     "cls": "sr-only",
+     "text": "Usage:"
+    },
+    {
+     "slot": "1|dict-usage-tag|SPAN|1",
+     "key": "dict-usage-tag|SPAN|1",
+     "ei": 1,
+     "cls": "dict-usage-tag",
+     "text": "abbreviation"
+    },
+    {
+     "slot": "1|dict-usage-tag|SPAN|2",
+     "key": "dict-usage-tag|SPAN|2",
+     "ei": 1,
+     "cls": "dict-usage-tag",
+     "text": "alt-of"
+    },
+    {
+     "slot": "1|dict-pos|SPAN|6",
+     "key": "dict-pos|SPAN|6",
+     "ei": 1,
+     "cls": "dict-pos",
+     "text": "noun"
+    },
+    {
+     "slot": "1|sr-only|SPAN|2",
+     "key": "sr-only|SPAN|2",
+     "ei": 1,
+     "cls": "sr-only",
+     "text": "Usage:"
+    },
+    {
+     "slot": "1|dict-usage-tag|SPAN|3",
+     "key": "dict-usage-tag|SPAN|3",
+     "ei": 1,
+     "cls": "dict-usage-tag",
+     "text": "abbreviation"
+    },
+    {
+     "slot": "1|dict-usage-tag|SPAN|4",
+     "key": "dict-usage-tag|SPAN|4",
+     "ei": 1,
+     "cls": "dict-usage-tag",
+     "text": "alt-of"
+    },
+    {
+     "slot": "1|dict-source muted|DIV|1",
+     "key": "dict-source muted|DIV|1",
+     "ei": 1,
+     "cls": "dict-source muted",
+     "text": "Wiktionary (wiktextract)"
+    },
+    {
+     "slot": "1|l8-fab-control dict-status|SPAN|1",
+     "key": "l8-fab-control dict-status|SPAN|1",
+     "ei": 1,
+     "cls": "l8-fab-control dict-status",
+     "text": "Connected"
+    },
+    {
+     "slot": "2|dict-word|SPAN|1",
+     "key": "dict-word|SPAN|1",
+     "ei": 2,
+     "cls": "dict-word",
+     "text": "水"
+    },
+    {
+     "slot": "2|dict-pos|SPAN|1",
+     "key": "dict-pos|SPAN|1",
+     "ei": 2,
+     "cls": "dict-pos",
+     "text": "affix"
+    },
+    {
+     "slot": "2|sr-only|SPAN|1",
+     "key": "sr-only|SPAN|1",
+     "ei": 2,
+     "cls": "sr-only",
+     "text": "Usage:"
+    },
+    {
+     "slot": "2|dict-usage-tag|SPAN|1",
+     "key": "dict-usage-tag|SPAN|1",
+     "ei": 2,
+     "cls": "dict-usage-tag",
+     "text": "form-of"
+    },
+    {
+     "slot": "2|dict-usage-tag|SPAN|2",
+     "key": "dict-usage-tag|SPAN|2",
+     "ei": 2,
+     "cls": "dict-usage-tag",
+     "text": "in-compounds"
+    },
+    {
+     "slot": "2|dict-pos|SPAN|2",
+     "key": "dict-pos|SPAN|2",
+     "ei": 2,
+     "cls": "dict-pos",
+     "text": "noun"
+    },
+    {
+     "slot": "2|dict-pos|SPAN|3",
+     "key": "dict-pos|SPAN|3",
+     "ei": 2,
+     "cls": "dict-pos",
+     "text": "noun"
+    },
+    {
+     "slot": "2|sr-only|SPAN|2",
+     "key": "sr-only|SPAN|2",
+     "ei": 2,
+     "cls": "sr-only",
+     "text": "Usage:"
+    },
+    {
+     "slot": "2|dict-usage-tag|SPAN|3",
+     "key": "dict-usage-tag|SPAN|3",
+     "ei": 2,
+     "cls": "dict-usage-tag",
+     "text": "abbreviation"
+    },
+    {
+     "slot": "2|dict-usage-tag|SPAN|4",
+     "key": "dict-usage-tag|SPAN|4",
+     "ei": 2,
+     "cls": "dict-usage-tag",
+     "text": "alt-of"
+    },
+    {
+     "slot": "2|dict-pos|SPAN|4",
+     "key": "dict-pos|SPAN|4",
+     "ei": 2,
+     "cls": "dict-pos",
+     "text": "noun"
+    },
+    {
+     "slot": "2|dict-pos|SPAN|5",
+     "key": "dict-pos|SPAN|5",
+     "ei": 2,
+     "cls": "dict-pos",
+     "text": "affix"
+    },
+    {
+     "slot": "2|dict-pos|SPAN|6",
+     "key": "dict-pos|SPAN|6",
+     "ei": 2,
+     "cls": "dict-pos",
+     "text": "affix"
+    },
+    {
+     "slot": "2|dict-source muted|DIV|1",
+     "key": "dict-source muted|DIV|1",
+     "ei": 2,
+     "cls": "dict-source muted",
+     "text": "Wiktionary (wiktextract)"
+    },
+    {
+     "slot": "2|l8-fab-control dict-status|SPAN|1",
+     "key": "l8-fab-control dict-status|SPAN|1",
+     "ei": 2,
+     "cls": "l8-fab-control dict-status",
+     "text": "Connected"
+    },
+    {
+     "slot": "3|dict-word|SPAN|1",
+     "key": "dict-word|SPAN|1",
+     "ei": 3,
+     "cls": "dict-word",
+     "text": "水"
+    },
+    {
+     "slot": "3|dict-reading|SPAN|1",
+     "key": "dict-reading|SPAN|1",
+     "ei": 3,
+     "cls": "dict-reading",
+     "text": "もひ"
+    },
+    {
+     "slot": "3|dict-pos|SPAN|1",
+     "key": "dict-pos|SPAN|1",
+     "ei": 3,
+     "cls": "dict-pos",
+     "text": "noun"
+    },
+    {
+     "slot": "3|sr-only|SPAN|1",
+     "key": "sr-only|SPAN|1",
+     "ei": 3,
+     "cls": "sr-only",
+     "text": "Usage:"
+    },
+    {
+     "slot": "3|dict-usage-tag|SPAN|1",
+     "key": "dict-usage-tag|SPAN|1",
+     "ei": 3,
+     "cls": "dict-usage-tag",
+     "text": "obsolete"
+    },
+    {
+     "slot": "3|dict-source muted|DIV|1",
+     "key": "dict-source muted|DIV|1",
+     "ei": 3,
+     "cls": "dict-source muted",
+     "text": "Wiktionary (wiktextract)"
+    },
+    {
+     "slot": "3|l8-fab-control dict-status|SPAN|1",
+     "key": "l8-fab-control dict-status|SPAN|1",
+     "ei": 3,
+     "cls": "l8-fab-control dict-status",
+     "text": "Connected"
+    },
+    {
+     "slot": "4|dict-word|SPAN|1",
+     "key": "dict-word|SPAN|1",
+     "ei": 4,
+     "cls": "dict-word",
+     "text": "㊌"
+    },
+    {
+     "slot": "4|dict-reading|SPAN|1",
+     "key": "dict-reading|SPAN|1",
+     "ei": 4,
+     "cls": "dict-reading",
+     "text": "すいえうび"
+    },
+    {
+     "slot": "4|dict-pos|SPAN|1",
+     "key": "dict-pos|SPAN|1",
+     "ei": 4,
+     "cls": "dict-pos",
+     "text": "noun"
+    },
+    {
+     "slot": "4|sr-only|SPAN|1",
+     "key": "sr-only|SPAN|1",
+     "ei": 4,
+     "cls": "sr-only",
+     "text": "Usage:"
+    },
+    {
+     "slot": "4|dict-usage-tag|SPAN|1",
+     "key": "dict-usage-tag|SPAN|1",
+     "ei": 4,
+     "cls": "dict-usage-tag",
+     "text": "abbreviation"
+    },
+    {
+     "slot": "4|dict-usage-tag|SPAN|2",
+     "key": "dict-usage-tag|SPAN|2",
+     "ei": 4,
+     "cls": "dict-usage-tag",
+     "text": "alt-of"
+    },
+    {
+     "slot": "4|dict-source muted|DIV|1",
+     "key": "dict-source muted|DIV|1",
+     "ei": 4,
+     "cls": "dict-source muted",
+     "text": "Wiktionary (wiktextract)"
+    },
+    {
+     "slot": "4|l8-fab-control dict-status|SPAN|1",
+     "key": "l8-fab-control dict-status|SPAN|1",
+     "ei": 4,
+     "cls": "l8-fab-control dict-status",
+     "text": "Connected"
+    },
+    {
+     "slot": "5|dict-word|SPAN|1",
+     "key": "dict-word|SPAN|1",
+     "ei": 5,
+     "cls": "dict-word",
+     "text": "水"
+    },
+    {
+     "slot": "5|dict-reading|SPAN|1",
+     "key": "dict-reading|SPAN|1",
+     "ei": 5,
+     "cls": "dict-reading",
+     "text": "すい"
+    },
+    {
+     "slot": "5|dict-freq-source|SPAN|1",
+     "key": "dict-freq-source|SPAN|1",
+     "ei": 5,
+     "cls": "dict-freq-source",
+     "text": "JPDB"
+    },
+    {
+     "slot": "5|dict-pitch-label|SPAN|1",
+     "key": "dict-pitch-label|SPAN|1",
+     "ei": 5,
+     "cls": "dict-pitch-label",
+     "text": "Pitch"
+    },
+    {
+     "slot": "5|span|SPAN|1",
+     "key": "span|SPAN|1",
+     "ei": 5,
+     "cls": "span",
+     "text": "す"
+    },
+    {
+     "slot": "5|span|SPAN|2",
+     "key": "span|SPAN|2",
+     "ei": 5,
+     "cls": "span",
+     "text": "い"
+    },
+    {
+     "slot": "5|li|LI|1",
+     "key": "li|LI|1",
+     "ei": 5,
+     "cls": "li",
+     "text": "Wednesday"
+    },
+    {
+     "slot": "5|li|LI|2",
+     "key": "li|LI|2",
+     "ei": 5,
+     "cls": "li",
+     "text": "shaved ice (served with flavored syrup)"
+    },
+    {
+     "slot": "5|li|LI|3",
+     "key": "li|LI|3",
+     "ei": 5,
+     "cls": "li",
+     "text": "water (fifth of the five elements)"
+    },
+    {
+     "slot": "5|li|LI|4",
+     "key": "li|LI|4",
+     "ei": 5,
+     "cls": "li",
+     "text": "(прост.) вода со льдом и сладким сиропом"
+    },
+    {
+     "slot": "5|dict-source muted|DIV|1",
+     "key": "dict-source muted|DIV|1",
+     "ei": 5,
+     "cls": "dict-source muted",
+     "text": "JMdict (Japanese–English)"
+    },
+    {
+     "slot": "5|l8-fab-control dict-status|SPAN|1",
+     "key": "l8-fab-control dict-status|SPAN|1",
+     "ei": 5,
+     "cls": "l8-fab-control dict-status",
+     "text": "Connected"
+    },
+    {
+     "slot": "6|dict-word|SPAN|1",
+     "key": "dict-word|SPAN|1",
+     "ei": 6,
+     "cls": "dict-word",
+     "text": "水"
+    },
+    {
+     "slot": "6|dict-reading|SPAN|1",
+     "key": "dict-reading|SPAN|1",
+     "ei": 6,
+     "cls": "dict-reading",
+     "text": "shuǐ"
+    },
+    {
+     "slot": "6|li|LI|1",
+     "key": "li|LI|1",
+     "ei": 6,
+     "cls": "li",
+     "text": "水1.一種無色無味的液體。由氫氣與氧氣化合而成。例冰水、熱水、白開水; 2.汁、液。例墨水、藥水、檸檬水; 3.海、河、江、湖的泛稱。例漢水; 4.五行之一。; 5.量詞。計算衣物刷洗次數的單位。例這件衣服洗兩水就走樣了。; 6.姓。"
+    },
+    {
+     "slot": "6|dict-source muted|DIV|1",
+     "key": "dict-source muted|DIV|1",
+     "ei": 6,
+     "cls": "dict-source muted",
+     "text": "Moedict (Chinese monolingual)"
+    },
+    {
+     "slot": "6|l8-fab-control dict-status|SPAN|1",
+     "key": "l8-fab-control dict-status|SPAN|1",
+     "ei": 6,
+     "cls": "l8-fab-control dict-status",
+     "text": "Connected"
+    },
+    {
+     "slot": "7|dict-word|SPAN|1",
+     "key": "dict-word|SPAN|1",
+     "ei": 7,
+     "cls": "dict-word",
+     "text": "川"
+    },
+    {
+     "slot": "7|dict-reading|SPAN|1",
+     "key": "dict-reading|SPAN|1",
+     "ei": 7,
+     "cls": "dict-reading",
+     "text": "かは"
+    },
+    {
+     "slot": "7|dict-pos|SPAN|1",
+     "key": "dict-pos|SPAN|1",
+     "ei": 7,
+     "cls": "dict-pos",
+     "text": "noun"
+    },
+    {
+     "slot": "7|dict-source muted|DIV|1",
+     "key": "dict-source muted|DIV|1",
+     "ei": 7,
+     "cls": "dict-source muted",
+     "text": "Wiktionary (wiktextract)"
+    },
+    {
+     "slot": "7|l8-fab-control dict-status|SPAN|1",
+     "key": "l8-fab-control dict-status|SPAN|1",
+     "ei": 7,
+     "cls": "l8-fab-control dict-status",
+     "text": "Connected"
+    }
+   ]
+  },
+  {
+   "word": "sogo",
+   "entries": 7,
+   "leafCount": 48,
+   "leaves": [
+    {
+     "slot": "0|dict-word|SPAN|1",
+     "key": "dict-word|SPAN|1",
+     "ei": 0,
+     "cls": "dict-word",
+     "text": "齟齬"
+    },
+    {
+     "slot": "0|dict-pos|SPAN|1",
+     "key": "dict-pos|SPAN|1",
+     "ei": 0,
+     "cls": "dict-pos",
+     "text": "noun"
+    },
+    {
+     "slot": "0|dict-pos|SPAN|2",
+     "key": "dict-pos|SPAN|2",
+     "ei": 0,
+     "cls": "dict-pos",
+     "text": "noun"
+    },
+    {
+     "slot": "0|dict-pos|SPAN|3",
+     "key": "dict-pos|SPAN|3",
+     "ei": 0,
+     "cls": "dict-pos",
+     "text": "verb"
+    },
+    {
+     "slot": "0|dict-pos|SPAN|4",
+     "key": "dict-pos|SPAN|4",
+     "ei": 0,
+     "cls": "dict-pos",
+     "text": "verb"
+    },
+    {
+     "slot": "0|dict-source muted|DIV|1",
+     "key": "dict-source muted|DIV|1",
+     "ei": 0,
+     "cls": "dict-source muted",
+     "text": "Wiktionary (wiktextract)"
+    },
+    {
+     "slot": "0|l8-fab-control dict-status|SPAN|1",
+     "key": "l8-fab-control dict-status|SPAN|1",
+     "ei": 0,
+     "cls": "l8-fab-control dict-status",
+     "text": "Connected"
+    },
+    {
+     "slot": "1|dict-word|SPAN|1",
+     "key": "dict-word|SPAN|1",
+     "ei": 1,
+     "cls": "dict-word",
+     "text": "齟齬"
+    },
+    {
+     "slot": "1|dict-reading|SPAN|1",
+     "key": "dict-reading|SPAN|1",
+     "ei": 1,
+     "cls": "dict-reading",
+     "text": "そご"
+    },
+    {
+     "slot": "1|dict-freq-source|SPAN|1",
+     "key": "dict-freq-source|SPAN|1",
+     "ei": 1,
+     "cls": "dict-freq-source",
+     "text": "JPDB"
+    },
+    {
+     "slot": "1|dict-pitch-label|SPAN|1",
+     "key": "dict-pitch-label|SPAN|1",
+     "ei": 1,
+     "cls": "dict-pitch-label",
+     "text": "Pitch"
+    },
+    {
+     "slot": "1|span|SPAN|1",
+     "key": "span|SPAN|1",
+     "ei": 1,
+     "cls": "span",
+     "text": "そ"
+    },
+    {
+     "slot": "1|span|SPAN|2",
+     "key": "span|SPAN|2",
+     "ei": 1,
+     "cls": "span",
+     "text": "ご"
+    },
+    {
+     "slot": "1|li|LI|1",
+     "key": "li|LI|1",
+     "ei": 1,
+     "cls": "li",
+     "text": "inconsistency; discord; conflict; discrepancy; contradiction; failure; frustration"
+    },
+    {
+     "slot": "1|li|LI|2",
+     "key": "li|LI|2",
+     "ei": 1,
+     "cls": "li",
+     "text": "齟齬; 鉏鋙（🅁）"
+    },
+    {
+     "slot": "1|li|LI|3",
+     "key": "li|LI|3",
+     "ei": 1,
+     "cls": "li",
+     "text": "(кн.); 1) несогласованность, противоречие; несовместимость, несообразность; расхождение; {～する} не совпадать, не согласоваться (с чем-л.); противоречить (чему-л.); 2) неудача; задержка с выполнением (чего-л.); расстройство (планов и т. п.); {～する} не ладиться; встречать препятствия; расстраиваться (о планах)"
+    },
+    {
+     "slot": "1|dict-source muted|DIV|1",
+     "key": "dict-source muted|DIV|1",
+     "ei": 1,
+     "cls": "dict-source muted",
+     "text": "JMdict (Japanese–English)"
+    },
+    {
+     "slot": "1|l8-fab-control dict-status|SPAN|1",
+     "key": "l8-fab-control dict-status|SPAN|1",
+     "ei": 1,
+     "cls": "l8-fab-control dict-status",
+     "text": "Connected"
+    },
+    {
+     "slot": "2|dict-word|SPAN|1",
+     "key": "dict-word|SPAN|1",
+     "ei": 2,
+     "cls": "dict-word",
+     "text": "齟齬"
+    },
+    {
+     "slot": "2|dict-reading|SPAN|1",
+     "key": "dict-reading|SPAN|1",
+     "ei": 2,
+     "cls": "dict-reading",
+     "text": "jǔ yǔ"
+    },
+    {
+     "slot": "2|li|LI|1",
+     "key": "li|LI|1",
+     "ei": 2,
+     "cls": "li",
+     "text": "齟齬龃龉似爭執; 上下排牙齒參差不齊。多用來比喻彼此意見不合。例雙方立場不同，意見相左，經常發生齟齬。"
+    },
+    {
+     "slot": "2|dict-source muted|DIV|1",
+     "key": "dict-source muted|DIV|1",
+     "ei": 2,
+     "cls": "dict-source muted",
+     "text": "Moedict (Chinese monolingual)"
+    },
+    {
+     "slot": "2|l8-fab-control dict-status|SPAN|1",
+     "key": "l8-fab-control dict-status|SPAN|1",
+     "ei": 2,
+     "cls": "l8-fab-control dict-status",
+     "text": "Connected"
+    },
+    {
+     "slot": "3|dict-word|SPAN|1",
+     "key": "dict-word|SPAN|1",
+     "ei": 3,
+     "cls": "dict-word",
+     "text": "齟齬"
+    },
+    {
+     "slot": "3|dict-reading|SPAN|1",
+     "key": "dict-reading|SPAN|1",
+     "ei": 3,
+     "cls": "dict-reading",
+     "text": "そご"
+    },
+    {
+     "slot": "3|dict-freq-source|SPAN|1",
+     "key": "dict-freq-source|SPAN|1",
+     "ei": 3,
+     "cls": "dict-freq-source",
+     "text": "JPDB"
+    },
+    {
+     "slot": "3|dict-pitch-label|SPAN|1",
+     "key": "dict-pitch-label|SPAN|1",
+     "ei": 3,
+     "cls": "dict-pitch-label",
+     "text": "Pitch"
+    },
+    {
+     "slot": "3|span|SPAN|1",
+     "key": "span|SPAN|1",
+     "ei": 3,
+     "cls": "span",
+     "text": "そ"
+    },
+    {
+     "slot": "3|span|SPAN|2",
+     "key": "span|SPAN|2",
+     "ei": 3,
+     "cls": "span",
+     "text": "ご"
+    },
+    {
+     "slot": "3|li|LI|1",
+     "key": "li|LI|1",
+     "ei": 3,
+     "cls": "li",
+     "text": "齟齬; 鉏鋙（🅁）"
+    },
+    {
+     "slot": "3|dict-source muted|DIV|1",
+     "key": "dict-source muted|DIV|1",
+     "ei": 3,
+     "cls": "dict-source muted",
+     "text": "JMdict (Japanese–English)"
+    },
+    {
+     "slot": "3|l8-fab-control dict-status|SPAN|1",
+     "key": "l8-fab-control dict-status|SPAN|1",
+     "ei": 3,
+     "cls": "l8-fab-control dict-status",
+     "text": "Connected"
+    },
+    {
+     "slot": "4|dict-word|SPAN|1",
+     "key": "dict-word|SPAN|1",
+     "ei": 4,
+     "cls": "dict-word",
+     "text": "鉏鋙"
+    },
+    {
+     "slot": "4|dict-reading|SPAN|1",
+     "key": "dict-reading|SPAN|1",
+     "ei": 4,
+     "cls": "dict-reading",
+     "text": "そご"
+    },
+    {
+     "slot": "4|dict-freq-source|SPAN|1",
+     "key": "dict-freq-source|SPAN|1",
+     "ei": 4,
+     "cls": "dict-freq-source",
+     "text": "JPDB"
+    },
+    {
+     "slot": "4|li|LI|1",
+     "key": "li|LI|1",
+     "ei": 4,
+     "cls": "li",
+     "text": "齟齬; 鉏鋙（🅁）"
+    },
+    {
+     "slot": "4|dict-source muted|DIV|1",
+     "key": "dict-source muted|DIV|1",
+     "ei": 4,
+     "cls": "dict-source muted",
+     "text": "JMdict (Japanese–English)"
+    },
+    {
+     "slot": "4|l8-fab-control dict-status|SPAN|1",
+     "key": "l8-fab-control dict-status|SPAN|1",
+     "ei": 4,
+     "cls": "l8-fab-control dict-status",
+     "text": "Connected"
+    },
+    {
+     "slot": "5|dict-word|SPAN|1",
+     "key": "dict-word|SPAN|1",
+     "ei": 5,
+     "cls": "dict-word",
+     "text": "齬"
+    },
+    {
+     "slot": "5|dict-reading|SPAN|1",
+     "key": "dict-reading|SPAN|1",
+     "ei": 5,
+     "cls": "dict-reading",
+     "text": "yǔ"
+    },
+    {
+     "slot": "5|li|LI|1",
+     "key": "li|LI|1",
+     "ei": 5,
+     "cls": "li",
+     "text": "齬龉→齟齬"
+    },
+    {
+     "slot": "5|dict-source muted|DIV|1",
+     "key": "dict-source muted|DIV|1",
+     "ei": 5,
+     "cls": "dict-source muted",
+     "text": "Moedict (Chinese monolingual)"
+    },
+    {
+     "slot": "5|l8-fab-control dict-status|SPAN|1",
+     "key": "l8-fab-control dict-status|SPAN|1",
+     "ei": 5,
+     "cls": "l8-fab-control dict-status",
+     "text": "Connected"
+    },
+    {
+     "slot": "6|dict-word|SPAN|1",
+     "key": "dict-word|SPAN|1",
+     "ei": 6,
+     "cls": "dict-word",
+     "text": "龉"
+    },
+    {
+     "slot": "6|dict-reading|SPAN|1",
+     "key": "dict-reading|SPAN|1",
+     "ei": 6,
+     "cls": "dict-reading",
+     "text": "yǔ"
+    },
+    {
+     "slot": "6|li|LI|1",
+     "key": "li|LI|1",
+     "ei": 6,
+     "cls": "li",
+     "text": "齬龉→齟齬"
+    },
+    {
+     "slot": "6|dict-source muted|DIV|1",
+     "key": "dict-source muted|DIV|1",
+     "ei": 6,
+     "cls": "dict-source muted",
+     "text": "Moedict (Chinese monolingual)"
+    },
+    {
+     "slot": "6|l8-fab-control dict-status|SPAN|1",
+     "key": "l8-fab-control dict-status|SPAN|1",
+     "ei": 6,
+     "cls": "l8-fab-control dict-status",
+     "text": "Connected"
+    }
+   ]
+  }
+ ],
+ "planted_taberu": {
+  "ok": true,
+  "planted": 8
+ },
+ "planted_mizu": {
+  "ok": true,
+  "planted": 8
+ },
+ "planted_sogo": {
+  "ok": true,
+  "planted": 7
+ },
+ "controlRemoved": {
+  "before": 7,
+  "remaining": 0
+ },
+ "summary": {
+  "entriesPerPass": [
+   "taberu:8",
+   "mizu:8",
+   "sogo:7"
+  ],
+  "leavesPerPass": [
+   "taberu:63",
+   "mizu:83",
+   "sogo:48"
+  ],
+  "acrossWords": {
+   "comparableSlots": 22,
+   "invariantCount": 7,
+   "invariant": [
+    {
+     "slot": "0|l8-fab-control dict-status|SPAN|1",
+     "cls": "l8-fab-control dict-status",
+     "text": "Connected"
+    },
+    {
+     "slot": "1|l8-fab-control dict-status|SPAN|1",
+     "cls": "l8-fab-control dict-status",
+     "text": "Connected"
+    },
+    {
+     "slot": "2|l8-fab-control dict-status|SPAN|1",
+     "cls": "l8-fab-control dict-status",
+     "text": "Connected"
+    },
+    {
+     "slot": "3|l8-fab-control dict-status|SPAN|1",
+     "cls": "l8-fab-control dict-status",
+     "text": "Connected"
+    },
+    {
+     "slot": "4|l8-fab-control dict-status|SPAN|1",
+     "cls": "l8-fab-control dict-status",
+     "text": "Connected"
+    },
+    {
+     "slot": "5|l8-fab-control dict-status|SPAN|1",
+     "cls": "l8-fab-control dict-status",
+     "text": "Connected"
+    },
+    {
+     "slot": "6|l8-fab-control dict-status|SPAN|1",
+     "cls": "l8-fab-control dict-status",
+     "text": "Connected"
+    }
+   ],
+   "statusWordCandidates": [
+    {
+     "slot": "0|l8-fab-control dict-status|SPAN|1",
+     "cls": "l8-fab-control dict-status",
+     "text": "Connected"
+    },
+    {
+     "slot": "1|l8-fab-control dict-status|SPAN|1",
+     "cls": "l8-fab-control dict-status",
+     "text": "Connected"
+    },
+    {
+     "slot": "2|l8-fab-control dict-status|SPAN|1",
+     "cls": "l8-fab-control dict-status",
+     "text": "Connected"
+    },
+    {
+     "slot": "3|l8-fab-control dict-status|SPAN|1",
+     "cls": "l8-fab-control dict-status",
+     "text": "Connected"
+    },
+    {
+     "slot": "4|l8-fab-control dict-status|SPAN|1",
+     "cls": "l8-fab-control dict-status",
+     "text": "Connected"
+    },
+    {
+     "slot": "5|l8-fab-control dict-status|SPAN|1",
+     "cls": "l8-fab-control dict-status",
+     "text": "Connected"
+    },
+    {
+     "slot": "6|l8-fab-control dict-status|SPAN|1",
+     "cls": "l8-fab-control dict-status",
+     "text": "Connected"
+    }
+   ]
+  },
+  "withinPass": [
+   {
+    "word": "taberu",
+    "entries": 8,
+    "repeatedSlots": 12,
+    "constantAcrossEntries": 4,
+    "constant": [
+     {
+      "key": "dict-freq-source|SPAN|1",
+      "cls": "dict-freq-source",
+      "text": "JPDB",
+      "acrossEntries": 3
+     },
+     {
+      "key": "l8-fab-control dict-status|SPAN|1",
+      "cls": "l8-fab-control dict-status",
+      "text": "Connected",
+      "acrossEntries": 8
+     },
+     {
+      "key": "dict-pos|SPAN|1",
+      "cls": "dict-pos",
+      "text": "verb",
+      "acrossEntries": 5
+     },
+     {
+      "key": "sr-only|SPAN|1",
+      "cls": "sr-only",
+      "text": "Usage:",
+      "acrossEntries": 4
+     }
+    ],
+    "statusWordCandidates": [
+     {
+      "key": "l8-fab-control dict-status|SPAN|1",
+      "cls": "l8-fab-control dict-status",
+      "text": "Connected",
+      "acrossEntries": 8
+     }
+    ]
+   },
+   {
+    "word": "mizu",
+    "entries": 8,
+    "repeatedSlots": 24,
+    "constantAcrossEntries": 10,
+    "constant": [
+     {
+      "key": "dict-freq-source|SPAN|1",
+      "cls": "dict-freq-source",
+      "text": "JPDB",
+      "acrossEntries": 2
+     },
+     {
+      "key": "dict-pitch-label|SPAN|1",
+      "cls": "dict-pitch-label",
+      "text": "Pitch",
+      "acrossEntries": 2
+     },
+     {
+      "key": "l8-fab-control dict-status|SPAN|1",
+      "cls": "l8-fab-control dict-status",
+      "text": "Connected",
+      "acrossEntries": 8
+     },
+     {
+      "key": "dict-pos|SPAN|2",
+      "cls": "dict-pos",
+      "text": "noun",
+      "acrossEntries": 2
+     },
+     {
+      "key": "dict-pos|SPAN|3",
+      "cls": "dict-pos",
+      "text": "noun",
+      "acrossEntries": 2
+     },
+     {
+      "key": "dict-pos|SPAN|4",
+      "cls": "dict-pos",
+      "text": "noun",
+      "acrossEntries": 2
+     },
+     {
+      "key": "sr-only|SPAN|1",
+      "cls": "sr-only",
+      "text": "Usage:",
+      "acrossEntries": 4
+     },
+     {
+      "key": "sr-only|SPAN|2",
+      "cls": "sr-only",
+      "text": "Usage:",
+      "acrossEntries": 2
+     },
+     {
+      "key": "dict-usage-tag|SPAN|3",
+      "cls": "dict-usage-tag",
+      "text": "abbreviation",
+      "acrossEntries": 2
+     },
+     {
+      "key": "dict-usage-tag|SPAN|4",
+      "cls": "dict-usage-tag",
+      "text": "alt-of",
+      "acrossEntries": 2
+     }
+    ],
+    "statusWordCandidates": [
+     {
+      "key": "l8-fab-control dict-status|SPAN|1",
+      "cls": "l8-fab-control dict-status",
+      "text": "Connected",
+      "acrossEntries": 8
+     }
+    ]
+   },
+   {
+    "word": "sogo",
+    "entries": 7,
+    "repeatedSlots": 9,
+    "constantAcrossEntries": 5,
+    "constant": [
+     {
+      "key": "l8-fab-control dict-status|SPAN|1",
+      "cls": "l8-fab-control dict-status",
+      "text": "Connected",
+      "acrossEntries": 7
+     },
+     {
+      "key": "dict-freq-source|SPAN|1",
+      "cls": "dict-freq-source",
+      "text": "JPDB",
+      "acrossEntries": 3
+     },
+     {
+      "key": "dict-pitch-label|SPAN|1",
+      "cls": "dict-pitch-label",
+      "text": "Pitch",
+      "acrossEntries": 2
+     },
+     {
+      "key": "span|SPAN|1",
+      "cls": "span",
+      "text": "そ",
+      "acrossEntries": 2
+     },
+     {
+      "key": "span|SPAN|2",
+      "cls": "span",
+      "text": "ご",
+      "acrossEntries": 2
+     }
+    ],
+    "statusWordCandidates": [
+     {
+      "key": "l8-fab-control dict-status|SPAN|1",
+      "cls": "l8-fab-control dict-status",
+      "text": "Connected",
+      "acrossEntries": 7
+     }
+    ]
+   }
+  ],
+  "withinPassTotals": {
+   "repeatedSlots": 45,
+   "constantAcrossEntries": 19,
+   "statusWordCandidates": 3
+  }
+ }
+}
