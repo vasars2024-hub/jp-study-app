@@ -24,6 +24,24 @@ import {
 
 const SHEET = resolve(__dirname, '..', 'theme', 'liquid-window.css');
 
+/**
+ * The sheet with comments removed and line endings NORMALIZED.
+ *
+ * The `\r` strip is load-bearing, not tidiness. This repo has
+ * `core.autocrlf=true` and no `.gitattributes`, so a fresh checkout writes this
+ * sheet CRLF (9,398 bytes) while a long-lived working tree holds it LF (9,211) —
+ * the same 187 lines, 187 bytes apart. Any assertion below that compares a
+ * multi-line selector against a template literal containing a bare `\n` then
+ * passes in the tree it was written in and fails in every fresh clone, CI job
+ * and new worktree, where it reads as a regression someone just caused.
+ * Normalize here; never "fix" the CSS.
+ */
+function readRules(): string {
+  return readFileSync(SHEET, 'utf8')
+    .replace(/\r\n?/g, '\n')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
+}
+
 /** A `Win` as `DesktopShell` actually holds one, including the keys this module must not touch. */
 function win(over: Record<string, unknown> = {}) {
   return {
@@ -183,8 +201,7 @@ describe('presentability and reversibility are the same predicate', () => {
 });
 
 describe('liquid-window.css', () => {
-  const css = readFileSync(SHEET, 'utf8');
-  const rules = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  const rules = readRules();
 
   it('paints nothing outside the opt-in class', () => {
     const selectors = rules
@@ -272,8 +289,7 @@ describe('liquid-window.css', () => {
 });
 
 describe('liquid-window.css — the Dictionary contextual band (L5.3)', () => {
-  const css = readFileSync(SHEET, 'utf8');
-  const rules = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  const rules = readRules();
   const block = (selector: string): string => {
     const found = rules
       .split('}')
@@ -307,7 +323,10 @@ describe('liquid-window.css — the Dictionary contextual band (L5.3)', () => {
       .split('}')
       .filter((b) => /\.dict-view/.test(b.split('{')[0] ?? ''));
     expect(banded.length).toBe(3);
-    expect(css.slice(css.indexOf('.fwin.fwin-liquid .dict-view'))).not.toMatch(/@media/);
+    // Comment-stripped on purpose: a `@media` written in prose inside a CSS
+    // comment is not a viewport media query, and matching the raw sheet would
+    // fail on one.
+    expect(rules.slice(rules.indexOf('.fwin.fwin-liquid .dict-view'))).not.toMatch(/@media/);
   });
 
   it('never halves the results — dense work keeps the full measure', () => {
