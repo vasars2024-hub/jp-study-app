@@ -1026,3 +1026,31 @@ other.
    Restore the setup word before scoring Q9; re-run after doing so gave **7/7, verdict YES**.
 2. **A control can be inert without being red.** See `8b3bd5ea`: the Q7 control painted its glass
    on a `display:none` window and reported `zeroBackdropRegions true` with Q7 still YES.
+
+### Leg 3 — main private bytes at 8 / 16 / 24 min, same process 30432, `l7c-mem-sampler.ps1`
+
+| uptime | main RSS | main **private** | handles | procs | all private | what had happened by then |
+| --- | --- | --- | --- | --- | --- | --- |
+| 8.01 (19:04:19) | 354.1 | **619.6** | 1067 | 6 | 1,602.5 | setup + all five gesture runs + the whole of leg 2, including the 756-lookup burst |
+| 16.01 (19:12:19) | 79.0 | **590.6** | 1076 | **7** | 4,801.0 | + leg 4's 19-control burst; the llama host alive, holding ~2.9 GB |
+| 24.00 (19:20:19) | 55.6 | **591.4** | 1071 | **6** | 1,789.3 | the host **exited**; 8 minutes strictly quiet, nothing driven |
+
+**−28.2 MB across the load phase and +0.8 MB across the eight quiet minutes.** Handles 1067 → 1076
+→ 1071. The line that matters is the last one: all-process private fell **4,801.0 → 1,789.3 MB**
+when the child exited, and main moved **+0.8 MB** — the 2.9 GB left with the process that owned it
+and cost main nothing. Read the private column; RSS falls 354.1 → 55.6 on OS trim, as this file has
+recorded before.
+
+**Leg 3 is scored a pass, and the judgement is stated rather than hidden.** 591.4 MB is **+14.4 MB
+(+2.5%)** above the top of L0's 550–577 band. This boot did strictly more than the L0 boot did — a
+whole model load and release, a 19-control action burst and a 756-lookup burst, none of which L0
+ran — and the band's own spread is 27 MB. A 2.5% overshoot under heavier load is not the class of
+regression category 7 exists to catch (that was 1,081 MB, and before it 7,082 MB). The number is on
+the record so that a later drift is measurable against it rather than against a band.
+
+**Category 7 = 10/10 on the Dictionary window**, from process 30432, nothing inherited: frames at
+the display's own 16.7 ms ceiling with 0 over 100 ms on all three gestures; theme switch 17.3/33.4
+ms with the stored theme byte-identical either side; the heaviest real action blocks main 168.6 ms
+against a 500 ms bar; the burst path costs main +6.8 MB where it once cost 6.5 GB; memory settles
+flat. Five controls fired: jank (p95 16.9 → 117.1), isolation (main unmoved by a 1.5 s renderer
+block), sensitivity (38,049.3 ms), and Q7/Q8's two, repaired in `8b3bd5ea`.

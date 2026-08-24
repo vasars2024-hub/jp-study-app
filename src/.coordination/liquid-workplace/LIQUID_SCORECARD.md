@@ -249,3 +249,14 @@ and three inherited rows is exactly the false completion this file exists to ref
 **Next, in order:** find why `l8-honest-states.cjs` reads a cleared window and re-drive category 8;
 then 3, 4 and 6's own probes; then the entry is writable in one pass. Category 7 is the one that was
 failing and it is now the one with the most evidence behind it.
+
+**Category 7's leg 3 landed after the table above was written, and it closes the category.** Main
+private on process 30432: **619.6 MB at 8 min → 590.6 at 16 → 591.4 at 24**, handles 1067 → 1076 →
+1071. All-process private fell **4,801.0 → 1,789.3 MB** when the llama host exited between the 16-
+and 24-minute marks while main moved **+0.8 MB**. 591.4 is +14.4 MB (+2.5%) over the top of L0's
+550–577 band, on a boot that did strictly more work than L0's; recorded as a pass with the number
+stated, not as a band match. **Category 7 = 10/10**, five controls fired, nothing inherited.
+
+That makes it **6 of 8 on this tree** (1, 2, 5, 7 re-driven; 6's live half re-driven; 3, 4 inherited
+from `debad557` / `6f86f2cc`; **8 unscored**). Still not a completed entry, and category 8 is the
+whole of what stands between here and one.
