@@ -983,6 +983,12 @@ declare global {
       convertMedia(url: string): Promise<MediaOpen | null>;
       downloadYouTube(url: string, audioOnly?: boolean, options?: YouTubeDownloadOptions): Promise<MediaOpen | { error: string }>;
       onYoutubeProgress(cb: (p: { stage: string; percent: number }) => void): () => void;
+      /**
+       * The discovered subtitle track for a local video, by path and side-effect free.
+       * The adopted workspace has only a path, and the sidecar only sees inside the
+       * container — see `media:subtitleForPath` for the measurement.
+       */
+      subtitleForPath(filePath: string): Promise<SubtitlePick | null>;
       pickSubtitle(): Promise<SubtitlePick | null>;
       fetchYoutubeSubs(
         id: string,

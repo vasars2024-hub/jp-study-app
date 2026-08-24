@@ -1311,6 +1311,60 @@ export function registerMediaIpc(): void {
     },
   );
 
+  /**
+   * The same discovered track `media:open` hands the player, addressed by PATH and with
+   * none of that handler's side effects.
+   *
+   * ## Why this exists
+   *
+   * `media:open` is the retired player's entry point: it stamps `lastPlayedAt`, increments
+   * `listenCount` and writes the database. The adopted Seanime workspace never calls it —
+   * it opens a file through the sidecar's directstream, which knows only what it can parse
+   * out of the container. So for a file whose subtitles were *downloaded* rather than
+   * embedded, the workspace had no track at all, and old-player retirement quietly took the
+   * discovered-subtitle hand-off with it.
+   *
+   * Measured 2026-08-06 against `The Big O - 13`: `ffprobe` reports exactly two streams,
+   * `hevc` and `flac` — **no subtitle stream in the file** — while a 261-cue Jimaku track
+   * for it sits in `subtitles/<mediaId>/`. The player's subtitle manager logged
+   * `Selecting default track` with an empty list and called `setNoTrack()`, which is why no
+   * cue ever rendered and the transcript stayed empty.
+   *
+   * Routing is deliberately NOT restated here: `pickPlaybackSubtitle` decides, exactly as
+   * it does above, so the workspace and the retired player can never disagree about which
+   * of several downloaded tracks is the study one.
+   *
+   * Path-addressed because that is the only identifier the workspace has — it opens a file,
+   * not a library row. Comparison is case-insensitive and separator-normalized because a
+   * path that has been through the sidecar is not byte-identical to the stored one.
+   */
+  ipcMain.handle(
+    'media:subtitleForPath',
+    (_e, filePath: string): SubtitlePick | null => {
+      if (typeof filePath !== 'string' || !filePath.trim()) return null;
+      const key = (value: string): string =>
+        value.trim().replace(/\\/g, '/').toLowerCase();
+      const wanted = key(filePath);
+      const item = readDb().items.find((i) => key(i.path ?? '') === wanted);
+
+      if (item) {
+        const record = pickPlaybackSubtitle(
+          item.subtitles,
+          loadDiscoverySettings().autoDownloadLanguages[0] ?? 'ja',
+        );
+        if (record) {
+          const text = readSubtitleRecord(record);
+          if (text) {
+            return { name: record.label ?? `${record.lang} (${record.source})`, text };
+          }
+        }
+      }
+      // A file the library has never seen still deserves the sidecar-file fallback: the
+      // workspace can open a path the media database knows nothing about.
+      return pickSubtitleBeside(filePath, item?.lang ?? 'ja') ?? null;
+    },
+  );
+
   ipcMain.handle('media:remove', (_e, id: string) => {
     const db = readDb();
     const removed = db.items.find((i) => i.id === id);

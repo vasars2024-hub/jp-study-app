@@ -1625,6 +1625,15 @@ const api = {
     ipcRenderer.on('media:youtubeProgress', handler);
     return () => ipcRenderer.removeListener('media:youtubeProgress', handler);
   },
+  /**
+   * The discovered subtitle track for a local video, by path and without side effects.
+   *
+   * The adopted workspace opens files through the sidecar, which only sees what is inside
+   * the container — so a downloaded (Jimaku/OpenSubtitles) track was invisible to it. See
+   * the handler for the measurement.
+   */
+  subtitleForPath: (filePath: string): Promise<SubtitlePick | null> =>
+    ipcRenderer.invoke('media:subtitleForPath', filePath),
   /** Open a file dialog and return the chosen subtitle file's text. */
   pickSubtitle: (): Promise<SubtitlePick | null> => ipcRenderer.invoke('media:pickSubtitle'),
   fetchYoutubeSubs: (
