@@ -417,3 +417,46 @@ permanently.
 **Category 7 stays capped at less than 10** and this is now a located product defect rather than an
 unexplained number. Repro, three commands: boot clean, `probes/l7d-setup.cjs`, then
 `debug/evfile.cjs probes/l1-deadend.js` and read `PrivateMemorySize64` before and 70 s after.
+
+## 2026-08-24 — D1 is NOT a JS leak, and no JS-side bisect would ever have found it
+
+Every instrument until now sampled main from OUTSIDE (`Get-Process`.`PrivateMemorySize64`), which
+says how much grew and never which pool. `/eval` cannot help: it runs in a renderer. So the debug
+bridge gained a bounded, read-only `/mem` route (`src/main/debugBridge.ts`) reporting main's own
+`process.memoryUsage()`, `v8.getHeapStatistics()`, heap spaces and `app.getAppMetrics()`, plus an
+explicit `{gc:true}` that borrows `--expose_gc` for one forced collection. Probe:
+`probes/l7h-memprofile.cjs <label> [--gc]`, appending to `l7h-memprofile.json`.
+
+Fresh boot, pid 19452, the documented state (liquid Dictionary, 820x580, 食べる, 8 entries):
+
+| sample | private | heapUsed | external | malloced | unattributed |
+| --- | --- | --- | --- | --- | --- |
+| settled (40 s) | 430.9 | 286.7 | 4.2 | 8 | 108.4 |
+| pre-deadend (one search) | 802.8 | 328.3 | **197.8** | 8 | 244.6 |
+| burst t+0 s | 2,212.5 | 389.7 | 93.9 | 8 | — |
+| burst t+12 s | **7,074.0** | 355.1 | 93.9 | 8 | 6,606 |
+| t+24…t+84 s | 7,073.8 flat | 355 | 93.9 | 8 | — |
+| after FORCED GC | 7,078.4 | 354.6 | 93.9 | 8 | **6,610.6** |
+
+Reproduces the prior three boots (7,071.8 / 7,082.0 / 7,075.7) within 10 MB, so this is the same
+defect, now attributed. Three hypotheses die here:
+
+1. **"A JS reference is retained in main."** FALSE. `heapUsed` is 286.7 → 355 MB across the whole
+   blow-up — it moves 68 MB while private moves 6,643. The heap limit is 4,096 MB and private is
+   7,078, so most of it *cannot* be V8 heap.
+2. **"GC never gets idle time under cadence."** FALSE, and this was the leading theory. A real
+   collection ran (`gcRan=true`, `nativeContexts` 2→3) and private went 7,074.0 → **7,078.4** — it
+   did not fall. RSS fell 7,287 → 6,185 (the OS trimmed pages), which is exactly why `WorkingSet64`
+   must never be the number reported.
+3. **"Leaked/detached contexts."** FALSE. `detachedContexts` is **0** at every sample.
+
+**6,610 MB is native memory main holds that V8 does not own** — not JS objects, not Buffers
+(`external` 93.9 MB and *falling* through the burst; `arrayBuffers` 0 throughout). It is also a
+STEP, not a ramp: 2,212 → 7,074 inside one 12 s window, then flat to the megabyte for 84 s.
+
+Consequence for the next slice: bisecting the 19 controls in JS is the wrong instrument and the
+prior exoneration pass (all 19 individually ≤8 MB net, all 8 `Play` at +0.3) is consistent with
+this rather than in tension with it. Hunt a native allocator in main reached by the *cadence* —
+candidates in order: the dictionary SQLite handle's page cache/`mmap_size`, per-call native
+allocation in the search/tokenize path, and Chromium browser-process allocation. `l7h-memprofile`'s
+`UNATTRIBUTED` line is the number to watch; if it does not move, the fix is not in JS.

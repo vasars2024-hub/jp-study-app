@@ -16,6 +16,8 @@ import http from 'node:http';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import v8 from 'node:v8';
+import vm from 'node:vm';
 import { BrowserWindow, app } from 'electron';
 
 const DEBUG_PORT = 39273;
@@ -222,6 +224,79 @@ async function handle(
     case '/clear-logs':
       ring.length = 0;
       return { code: 200, body: { ok: true } };
+
+    case '/mem': {
+      // Deliberately NOT an eval route. Defect D1 (§12.1 of the Liquid plan) is
+      // a main-process growth of 575 MB → 7,075 MB that `/eval` cannot see at
+      // all, because `/eval` runs in a renderer. This reports main's own pools
+      // so the growth can be attributed instead of guessed: `heapUsed` means
+      // retained JS objects, `external`/`arrayBuffers` means Buffers, and rss
+      // far above both means native or allocator-held memory.
+      //
+      // `detachedContexts` is the single most useful number here — a non-zero
+      // count that climbs is the classic signature of contexts kept alive by a
+      // stale reference, and it distinguishes a leak from a high-water mark.
+      const forceGc = body.gc === true;
+      let gcRan = false;
+      if (forceGc) {
+        // The app is not launched with `--expose-gc`, so borrow it for one call.
+        // This is what separates "GC never got idle time under cadence" from
+        // "the memory is genuinely still referenced": if private bytes fall
+        // after this, the allocation was collectable all along.
+        try {
+          v8.setFlagsFromString('--expose_gc');
+          (vm.runInNewContext('gc') as () => void)();
+          gcRan = true;
+        } catch {
+          /* best effort — never take the app down for a measurement */
+        } finally {
+          try {
+            v8.setFlagsFromString('--no-expose_gc');
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+      const mu = process.memoryUsage();
+      const hs = v8.getHeapStatistics();
+      const info = await process.getProcessMemoryInfo();
+      const mb = (n: number) => Math.round((n / (1024 * 1024)) * 10) / 10;
+      return {
+        code: 200,
+        body: {
+          ok: true,
+          gcRequested: forceGc,
+          gcRan,
+          pid: process.pid,
+          uptimeSec: Math.round(process.uptime()),
+          // Electron reports these in KB; normalize everything to MB.
+          privateMb: mb(info.private * 1024),
+          residentMb: mb(info.residentSet * 1024),
+          rssMb: mb(mu.rss),
+          heapTotalMb: mb(mu.heapTotal),
+          heapUsedMb: mb(mu.heapUsed),
+          externalMb: mb(mu.external),
+          arrayBuffersMb: mb(mu.arrayBuffers),
+          heapLimitMb: mb(hs.heap_size_limit),
+          mallocedMb: mb(hs.malloced_memory),
+          peakMallocedMb: mb(hs.peak_malloced_memory),
+          nativeContexts: hs.number_of_native_contexts,
+          detachedContexts: hs.number_of_detached_contexts,
+          spaces: v8.getHeapSpaceStatistics().map((s) => ({
+            name: s.space_name,
+            usedMb: mb(s.space_used_size),
+            sizeMb: mb(s.space_size),
+          })),
+          metrics: app.getAppMetrics().map((m) => ({
+            pid: m.pid,
+            type: m.type,
+            name: m.name ?? '',
+            workingSetMb: mb((m.memory?.workingSetSize ?? 0) * 1024),
+            peakWorkingSetMb: mb((m.memory?.peakWorkingSetSize ?? 0) * 1024),
+          })),
+        },
+      };
+    }
 
     case '/eval': {
       const win = resolveWindow(body.window);
