@@ -19,6 +19,7 @@ import path from 'node:path';
 import v8 from 'node:v8';
 import vm from 'node:vm';
 import { BrowserWindow, app } from 'electron';
+import { llamaModelPoolStats } from './llamaModelPool';
 
 const DEBUG_PORT = 39273;
 const LOG_RING_LIMIT = 2000;
@@ -294,6 +295,11 @@ async function handle(
             workingSetMb: mb((m.memory?.workingSetSize ?? 0) * 1024),
             peakWorkingSetMb: mb((m.memory?.peakWorkingSetSize ?? 0) * 1024),
           })),
+          // Every number above is V8's or the OS's, and neither can see a GGUF: main can sit at
+          // 7 GB with a flat JS heap because the weights are native. This is the one subsystem in
+          // the process that holds gigabytes off-heap, so it reports itself rather than leaving
+          // the next investigation to infer it from a delta. Reads a Map; allocates nothing.
+          llamaModels: llamaModelPoolStats(),
         },
       };
     }
