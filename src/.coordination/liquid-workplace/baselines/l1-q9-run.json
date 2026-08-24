@@ -1,5 +1,5 @@
 {
- "at": "2026-08-24T07:21:50.235Z",
+ "at": "2026-08-24T23:04:16.932Z",
  "control": null,
  "ledger": {
   "file": "parity-ledger.json",
@@ -26,20 +26,20 @@
    "presentation": "liquid",
    "liquidClass": true,
    "rect": {
-    "x": 60,
-    "y": 24,
+    "x": 128,
+    "y": 84,
     "w": 820,
     "h": 580
    },
    "maximized": false,
    "focused": true,
-   "zIndex": "94",
+   "zIndex": "41",
    "searchValue": "食べる",
    "notesFilterValue": "",
    "activeLang": "gram-level-btn active",
-   "resultChars": 5251,
-   "resultNodes": 350,
-   "controls": 69
+   "resultChars": 5534,
+   "resultNodes": 349,
+   "controls": 67
   }
  },
  "live": {
