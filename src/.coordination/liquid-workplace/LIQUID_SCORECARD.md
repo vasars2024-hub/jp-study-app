@@ -260,3 +260,33 @@ stated, not as a band match. **Category 7 = 10/10**, five controls fired, nothin
 That makes it **6 of 8 on this tree** (1, 2, 5, 7 re-driven; 6's live half re-driven; 3, 4 inherited
 from `debad557` / `6f86f2cc`; **8 unscored**). Still not a completed entry, and category 8 is the
 whole of what stands between here and one.
+
+## 2026-08-24 (late) · primary — three categories moved because a product defect was removed, and the entry is STILL not completed
+
+**What changed is product, not instrumentation.** `6b490fc3` removes a persisted `section: 'media'`
+window — the Start menu's media CATEGORY id, never an app — that restored on every boot as an
+820×580 frame over a `.fwin-body` with **zero child nodes**. Three separate probes had been reading
+that blank window as if it were the surface under test (`l7d-setup.cjs` worked around it last turn;
+`l8-honest-states.cjs` scored it and returned VOID; `l1-use-of-space-control.js` could not find its
+discriminating window at all). `23cc333f` points both L8 probes at the window by title.
+
+| # | Category | Re-driven | Result |
+| - | -------- | --------- | ------ |
+| 3 | Liquid utilization | yes, pid 30432 @ `6b490fc3` | **10/10**: `Work 7→12`, `eligible 9→4`, `denseWorkOnTranslucent` **0 of 12**, `liquidTreatedEligible` **4 of 4**; control 0→1→3→0, **CONTROL FAILED AS REQUIRED** after its restore check was moved from the style attribute to the computed material |
+| 4 | Use of space | yes, pid 37540 @ `6b490fc3` | **10/10** for Dictionary: clipped **0** at 820×580 / 260×170 / 200×130, overlaps 0, h-scroll 0, `hiddenOverflowX` 0, dead **10.7%** of viewport vs 15%, chrome **5.7%**, canvas **32.3%**; control red on Media (**0 → 55 clipped → 0**), `allRestoredExactly true` |
+| 8 | Honest states | yes, pid 30432 @ `6b490fc3` | **10/10**: four distinct renders, 0 raw i18n keys, 0 false successes; AnkiConnect **REFUSED** by node's own TCP with 5173 **LISTENING** as the control on the control; error carries provider code `authentication` + `role=alert`, absent-before → named-after, answer unchanged, `restored true` |
+
+**Why this is still not the first completed entry, stated plainly.** 80/80 needs all eight at 10 on
+ONE tree, and categories **1, 2, 5, 6, 7** were last measured on pid 30432 at `971987a9`+`8b3bd5ea`,
+i.e. BEFORE `6b490fc3` changed the renderer and removed a window from the desktop. The rubric
+forbids carrying a score across a change, so they are not 10 here — they are unmeasured here.
+Writing 80/80 off three fresh rows and five stale ones is exactly the false completion this file
+exists to refuse.
+
+**Category 6 additionally needs its own probe re-driven**, not only its live term; that was already
+true last turn and is unchanged.
+
+**Next, and it is now cheap.** Re-drive 1, 2, 5, 6, 7 on pid **37540** in one pass. Every instrument
+they use is repaired and the blank window that was corrupting three of them is gone, so this is one
+sitting rather than five investigations. Then the entry is writable. **Video has still never been
+scored at all**, and gate 461 needs both surfaces.

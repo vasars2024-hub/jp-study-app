@@ -421,3 +421,32 @@ the mutation was left on disk. Keep a mutation's backup inside the repo, or rest
 editor rather than a shell copy.
 
 **Category 4: 10/10.**
+
+## 2026-08-24 (late) · primary — category 4's control could not fail, and the reason was the blank window
+
+**The control returned VOID and the probe's own comment already said why.** Dictionary puts
+everything inside one vertical scroller, so by the `unreach` definition it cannot clip at any size —
+so a control run on Dictionary alone proves nothing, and **Media is the discriminating case**. Media
+refused with `no .fwin titled Media` on every run, because the only `media` row on this desktop was
+the persisted `section: 'media'` window whose body was EMPTY (see `6b490fc3`). The category was not
+failing its control; it had no control, and had not had one for as long as that row has existed.
+
+**Restarted on `6b490fc3` (pid 37540). The row loads as `player`, the window is titled `Media`, and
+its body carries 618 chars where it carried 0.** Same probe, same eval:
+
+| window | entry 820×580 | compact 260×170 | sub-min 200×130 | restored |
+| --- | --- | --- | --- | --- |
+| Dictionary | 0 clipped / 0 h-scroll | **0 / 0** | **0 / 0** | 0 / 0, `styleIdentical true` |
+| Media | 0 clipped / 0 h-scroll | **55 clipped / 1 h-scroll** | 54 / 1 | **0 / 0**, `styleIdentical true` |
+
+`brokeAtSubMinimum: ["Media"]`, `allRestoredExactly: true`,
+**`CONTROL FAILED AS REQUIRED on Media — category 4 probe is proven`**.
+
+**Dictionary's four rubric numbers on this tree, restarted:** clipped **0**, overlaps **0**,
+horizontal body scrollers **0**, `hiddenOverflowX` **0**; dead region **10.7%** of viewport against
+a 15% bar; chrome **5.7%**, dominant canvas **32.3%**. **Category 4 (Dictionary) = 10/10.**
+
+**A finding against Media, recorded not fixed.** Media clips **55 boxes at 260×170**, which is the
+product's OWN `MIN_W`/`MIN_H` and therefore a supported size, not a control size — `nav.mc-nav` and
+its buttons lead the list, and `chromePct` is **49.9%** at 820×580 against Dictionary's 5.7%. That
+is category 4 work for whenever Media is scored; it is not Dictionary's score.

@@ -128,3 +128,28 @@ rubric's "a deliberately all-glass surface must score low" control, and it fails
 **Category 3: 10/10.** The universal-glass failure mode this category exists to catch is
 absent, and the selectivity is real rather than accidental: the twelve dense-work regions are
 opaque and the four contextual ones are not.
+
+## 2026-08-24 (late) · primary — category 3 re-driven on this tree, and the control's own VOID was an artifact
+
+Process 30432, `6b490fc3` in the renderer, Dictionary liquid 820×580, 食べる / 8 entries, 23 regions.
+Drove the five reveal controls first (`Find containing words` / `Find phrases` /
+`Find example sentences` / `Find shared senses` / `Example sentences`) — measured populated, not
+assumed: compounds 542 chars / 5 li, examples 716 / 8 li, neighbors 698 / 12 li, collocations 223
+chars and an honest empty result, `dict-examples` 528 chars / 6 li / 12 focusables.
+
+`byRole` **Work 7 → 12, Liquid-eligible 9 → 4**. `denseWorkOnTranslucent` **0 of 12**.
+`liquidTreatedEligible` **4 of 4** — `view-head`, `dict-saved-searches`, `dict-saved-searches-head`,
+`lexicon-lens-picker`, all glass, three of them carrying `.lq-contextual` itself. Identical to
+`debad557`'s numbers on a tree that has moved since, which is the point of re-driving.
+
+**The control's repair, and this is the trap.** `l1-surface-roles-control.js` fired perfectly —
+`baseline []` → A `["div.dict-entries"]` → B three regions → `restored []` — and then declared
+itself **VOID**, because it verified the restore by comparing the raw `style` ATTRIBUTE STRING.
+Both elements arrive with no style attribute (`null`), and `style.removeProperty` leaves an empty
+`style=""` behind, so `null !== ""` reads as unrestored on a surface that is byte-identical. Worse,
+it is not even stable: the next run captured `""` as its before-value and the same comparison passed.
+The verdict now hangs on the COMPUTED material this control actually mutates —
+`backdrop-filter|background-color` on both elements — which came back `none|rgba(0, 0, 0, 0)` and
+`none|rgb(18, 28, 23)`, identical either side. Verdict: **CONTROL FAILED AS REQUIRED**.
+
+**Category 3 = 10/10**, re-driven, control proven.

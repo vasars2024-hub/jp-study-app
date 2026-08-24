@@ -427,3 +427,35 @@ refused to score from the cycle number — costs main **+6.8 MB and +11 handles*
 eight categories were re-driven on this boot (1, 2, 5, 7, and 6's live half); category 8's instrument
 returned an empty-harness reading and is unscored; 3 and 4 were not re-driven; Video has never been
 scored at all. The 0.333/day rate already prices turns that land real product fixes and no gate.
+
+2026-08-24 | liquid | units done this turn: 0 | units left: 10 | basis: the 13 `Gate:` lines in section 11 of src/LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md (`grep -c 'Gate:'` = 13, re-run this turn); 3 closed (L0 / L2 / L3), 10 open, and gate 461 (L1) is again the one worked | projected finish: 2026-09-23
+
+**This turn landed product code and it was the cause, not a side effect.** `6b490fc3` fixes a
+persisted `section: 'media'` window — the Start menu's media CATEGORY id, never an app — that
+restored on every boot as an 820×580 frame over a `.fwin-body` with **zero child nodes**. That
+window is why `l8-honest-states.cjs` read `entries 0 / chars 10` and category 8 was VOID: three
+probes had been reading the blank window as if it were the Dictionary. `23cc333f` points both L8
+probes at the window by TITLE and re-drives all four states.
+
+**Two categories moved, both with a control that fired.** Category 8 = **10/10** (empty names the
+query; `Looking up…` captured in-page across a lookup returning 8 entries; AnkiConnect REFUSED
+proven by node's own TCP with 5173 LISTENING as the control on the control; error carries the
+provider's `authentication` code with `role=alert`, absent-before → named-after, answer unchanged).
+Category 3 = **10/10** re-driven on THIS tree after driving the five reveal controls: `Work 7→12`,
+`Liquid-eligible 9→4`, `denseWorkOnTranslucent` **0 of 12**, `liquidTreatedEligible` **4 of 4**;
+control red at 0→1→3→0.
+
+**Category 4 is PARKED, not dropped, and the blocker is exact.** Its default size re-measured
+identical to the scored run (clipped 0, overlaps 0, h-scroll 0, hiddenOverflowX 0, dead 10.7% of
+viewport, chrome 5.7%, canvas 32.3%). Its negative control returns **VOID**: nothing broke at
+sub-minimum 200×130, and the probe's own comment says why — Dictionary puts everything in one
+vertical scroller and by the `unreach` definition cannot clip at any size, so **Media is the
+discriminating case** and the Media window would not open, because the only `media` row on this
+desktop was the blank one. `6b490fc3` repairs that row to `player` on the next load. Category 4
+stays an open unit until its control fails on a restarted app.
+
+**Rate, unchanged and stated honestly.** 3 gates in 9 days at 2 workers = **0.333/day**;
+10 ÷ 0.333 = 30 days → **2026-09-23**, which misses the 2026-09-01 target by 22 days. Dictionary
+is **7 of 8** categories (1, 2, 3, 5, 7, 8 re-driven on this tree; 6's live half re-driven;
+4 parked on its control). Gate 461 needs 80/80 on Dictionary **and** Video, and Video has still
+never been scored.

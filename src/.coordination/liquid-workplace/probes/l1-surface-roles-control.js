@@ -91,6 +91,19 @@
 
   const beforeEntries = entries.getAttribute('style');
   const beforeBody = body.getAttribute('style');
+  /**
+   * The attribute string is not the restore, and treating it as one VOIDED a control that had
+   * just fired perfectly (0 -> 1 -> 3 -> 0). Both elements arrive with NO style attribute here
+   * (`null`), and `style.removeProperty` on such an element leaves an empty `style=""` behind,
+   * so the raw comparison reads `null !== ""` and calls a byte-identical surface unrestored.
+   * What the rubric actually requires is that the MATERIAL is back, so capture the two computed
+   * properties this control mutates and compare those. The raw strings stay in the report.
+   */
+  const material = (el) => {
+    const cs = getComputedStyle(el);
+    return `${cs.backdropFilter}|${cs.backgroundColor}`;
+  };
+  const beforeMaterial = { entries: material(entries), body: material(body) };
   const result = { title: TITLE, box: `${Math.round(wr.width)}x${Math.round(wr.height)}` };
   try {
     result.baseline = count();
@@ -118,12 +131,17 @@
   result.styleAfter = { entries: entries.getAttribute('style'), body: body.getAttribute('style') };
   result.restoredStyleIdentical =
     entries.getAttribute('style') === beforeEntries && body.getAttribute('style') === beforeBody;
+  result.materialBefore = beforeMaterial;
+  result.materialAfter = { entries: material(entries), body: material(body) };
+  result.restoredMaterialIdentical =
+    result.materialAfter.entries === beforeMaterial.entries
+    && result.materialAfter.body === beforeMaterial.body;
   result.verdict =
     result.baseline.length === 0
     && result.controlA_oneRegionBlurred.length >= 1
     && result.controlB_allGlassWindow.length > result.controlA_oneRegionBlurred.length
     && result.restored.length === 0
-    && result.restoredStyleIdentical
+    && result.restoredMaterialIdentical
       ? 'CONTROL FAILED AS REQUIRED — category 3 instrument is proven'
       : 'VOID — the control did not fail, so the score means nothing';
   return JSON.stringify(result);
