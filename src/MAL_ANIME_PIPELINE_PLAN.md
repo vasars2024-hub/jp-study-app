@@ -2462,8 +2462,9 @@ the next worker: `MediaContent.tsx` carries a **foreign** track's uncommitted `m
 hunks at lines 81 and 513; `git add` on that path absorbs them — stage by filtering `git diff` to
 hunks at `-700`+ and `git apply --cached --recount`.
 
-Gates, once, after the last slice, shared tree: vitest **790 passed / 1 skipped (791), 10,976
-passed / 6 skipped, exit 0** (baseline 788/789 and 10,965 — **+2 files, +11 tests, all mine**).
+Gates, once, after the last slice, shared tree: vitest **790 passed / 1 skipped (791), 10,978
+passed / 6 skipped, exit 0** (baseline 788/789 and 10,965 — **+2 files, +13 tests, all mine**:
+`subtitleChoiceDestination` 3, `mediaOpenSubtitleRoute` 6, `subtitleDiscovery` +4).
 i18n **10,789/10,789** exit 0. architecture **"Nothing new", 5 pending** exit 0. eslint **0 new**
 on all 12 touched paths (2 pre-existing `adjacent-overload-signatures` in `window.d.ts`, present at
 HEAD). Mutation controls, both restored green: `chosenId` guard disabled → **2 red**; the
