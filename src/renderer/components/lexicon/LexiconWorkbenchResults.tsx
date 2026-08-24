@@ -53,6 +53,7 @@ import { ContextualSurface } from '../liquid/LiquidSurface';
 import DictionaryResults, { type DictLang } from '../DictionaryResults';
 import { translateTo } from '../../translator';
 import { useT } from '../../i18n';
+import { LANG_TAGS } from '../../../shared/i18n/core';
 import { parseStudySubtitles } from '../../subtitles';
 import { handOffToAgent, lexiconPassageAgentContext, routeAgentContext } from '../../agentContextHandoff';
 import { AGENT_NAVIGATION_SECTION_LABEL_KEYS } from '../../../shared/agentNavigation';
@@ -151,7 +152,10 @@ export default function LexiconWorkbenchResults({
   glossLang = 'en',
   onLookup,
 }: Props) {
-  const { t } = useT();
+  // `lang` above is the PASSAGE's language; `uiLang` is the interface's. A cache
+  // timestamp is chrome, so it formats in the interface locale — the OS locale
+  // would put a Russian reader's date on an English surface.
+  const { t, lang: uiLang } = useT();
   const [selectedLens, setSelectedLens] = useState<LexiconLensOverride>(lens);
   const resolution = resolveLexiconInput(query, selectedLens);
   const interlinear = resolution.kind !== 'empty' && resolution.lens === 'translate';
@@ -992,7 +996,9 @@ export default function LexiconWorkbenchResults({
                 <>
                   {wildCachedAt !== null && (
                     <p className="muted lexicon-wild-cached">
-                      {t('lexicon.wild.cached', { time: new Date(wildCachedAt).toLocaleString() })}
+                      {t('lexicon.wild.cached', {
+                        time: new Date(wildCachedAt).toLocaleString(LANG_TAGS[uiLang]),
+                      })}
                     </p>
                   )}
                   <p className="muted lexicon-wild-summary">
