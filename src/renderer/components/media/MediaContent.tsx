@@ -757,6 +757,34 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
     }
   }, [items, current]);
 
+  const applySubtitleFile = useCallback((name: string, text: string) => {
+    // The primary track is the one every study tool downstream reads, so it gets
+    // the per-style language split that a dual-language `.ass` needs: one file
+    // carrying two whole subtitle tracks, which nothing above the parser can
+    // see. Inert on `.srt`, `.vtt`, `.lrc` and any single-track `.ass`. The
+    // secondary slot deliberately does not do this — see `parseStudySubtitles`.
+    const split = parseStudySubtitles(text);
+    const parsed = split.cues;
+    setCues(parsed);
+    setSubName(name);
+    setSubOffset(0);
+    const loaded = parsed.length
+      ? t('media.subStatus.loaded', { count: parsed.length })
+      : t('media.subStatus.noLines', { name });
+    // Appended rather than replacing: how many lines loaded and why some did not
+    // are two separate things, and hiding lines silently is the failure this
+    // whole split exists to make visible.
+    setSubStatus(
+      split.dropped
+        ? `${loaded} ${t('media.subStatus.otherScript', {
+          count: split.dropped,
+          styles: split.styles.slice(0, 4).join(', '),
+        })}`
+        : loaded,
+    );
+    return parsed.length > 0;
+  }, [t]);
+
   const loadOpened = useCallback((r: MediaOpen) => {
     setCurrent(r.item);
     currentYoutubeIdRef.current = r.item.youtubeId;
@@ -770,6 +798,16 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
     setSecondarySubName('');
     setSecondaryActive(null);
     setSubStatus('');
+    // `media:open` already resolved which stored track belongs to this file —
+    // `pickPlaybackSubtitle` over the item's records, honouring the user's own
+    // choice. Applying it here is the last inch of that route: without it the
+    // whole discovery pipeline is write-only, exactly as `media.ts` says, and a
+    // track that was downloaded, listed in the drawer and picked by the library
+    // is discarded by the reset two lines above. Every caller of `loadOpened`
+    // wants it, so it lives here rather than in one entry point.
+    if (r.subtitle) applySubtitleFile(r.subtitle.name, r.subtitle.text);
+    // After the apply, which zeroes the offset: the item's stored offset is the
+    // one the user aligned, and it outranks a fresh track's default.
     setSubOffset(r.item.subOffsetSec ?? 0);
     setGenState('idle');
     setGenMsg('');
@@ -779,7 +817,7 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
     setAbStart(null);
     setAbEnd(null);
     setAbLoop(false);
-  }, []);
+  }, [applySubtitleFile]);
 
   // Deep-open from playlist manager / external open request.
   useEffect(() => {
@@ -962,23 +1000,16 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
       return;
     }
     setYtUrl('');
+    // `loadOpened` applies `r.subtitle` itself, with the study split. This used
+    // to re-parse it here through the bare `parseSubtitles`, which meant a
+    // dual-language YouTube track kept both languages on screen.
     loadOpened(r);
-    if (r.subtitle) {
-      const parsed = parseSubtitles(r.subtitle.text);
-      setCues(parsed);
-      setSubName(r.subtitle.name);
-      setSubOffset(0);
-      setSubStatus(
-        parsed.length
-          ? t('media.subStatus.loaded', { count: parsed.length })
-          : t('media.subStatus.noLines', { name: r.subtitle.name }),
-      );
-    } else {
+    if (!r.subtitle) {
       if (ytSubLang !== 'none')
         setSubStatus('No matching existing subtitles found. Generating subtitles instead.');
       void runGeneration(r.url);
     }
-  }, [ytUrl, ytSubLang, loadOpened, runGeneration, t]);
+  }, [ytUrl, ytSubLang, loadOpened, runGeneration]);
 
   const chooseWatchFolder = useCallback(async () => {
     const r = await window.api.setMediaWatchFolder();
@@ -989,34 +1020,6 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
     await window.api.clearMediaWatchFolder();
     setWatchFolder(null);
   }, []);
-
-  const applySubtitleFile = useCallback((name: string, text: string) => {
-    // The primary track is the one every study tool downstream reads, so it gets
-    // the per-style language split that a dual-language `.ass` needs: one file
-    // carrying two whole subtitle tracks, which nothing above the parser can
-    // see. Inert on `.srt`, `.vtt`, `.lrc` and any single-track `.ass`. The
-    // secondary slot deliberately does not do this — see `parseStudySubtitles`.
-    const split = parseStudySubtitles(text);
-    const parsed = split.cues;
-    setCues(parsed);
-    setSubName(name);
-    setSubOffset(0);
-    const loaded = parsed.length
-      ? t('media.subStatus.loaded', { count: parsed.length })
-      : t('media.subStatus.noLines', { name });
-    // Appended rather than replacing: how many lines loaded and why some did not
-    // are two separate things, and hiding lines silently is the failure this
-    // whole split exists to make visible.
-    setSubStatus(
-      split.dropped
-        ? `${loaded} ${t('media.subStatus.otherScript', {
-          count: split.dropped,
-          styles: split.styles.slice(0, 4).join(', '),
-        })}`
-        : loaded,
-    );
-    return parsed.length > 0;
-  }, [t]);
 
   const applyStudyContext = useCallback(async (context: StudyContextRef): Promise<void> => {
     const opened = await window.api.openMedia(context.mediaId);
