@@ -23,3 +23,44 @@ that 1,426-row list. Dividing 2 gates by a units-per-hour rate would produce a d
 means nothing. The turn's product rate, for whoever wants one: 2 commits, ~430 lines of
 non-test product source, in ~50 minutes.
 
+
+2026-08-24 | mal-pipeline | units done this turn: 0 | units left: 2 | basis: `src/MAL_ANIME_PIPELINE_PLAN.md` gate tables re-read this turn — 34 numbered gates, open are 31 and 34 | projected finish: UNKNOWN
+
+2026-08-24 | main-v1 | units done this turn: 0 | units left: 35 | basis: RULE 1 re-count, per-track against each track's own authority (see below) | projected finish: 2026-11-28
+
+**RULE 1 discharged — main-v1 re-counted, first time in days.** Unit = one bullet/gate/phase
+against the track's own authority, not a keyword sweep. Last mention wins, as the ledger's own
+method note requires.
+
+| track | unit | total | closed | authority |
+| --- | --- | --- | --- | --- |
+| 1 credentials/provider | plan bullet | 5 | **5** | ledger 2026-08-20 split table + `687681bf` closing the health-read gap |
+| 2 Lexicon Workbench | plan bullet | 15 | **UNMEASURED** | no turn has ever bullet-counted it; **zero** `Track 2` mentions in the ledger after line 26,000 (last is 2026-08-15) |
+| 3 AI Agent | "Still required" bullet | 6 | **6** | ledger 2026-08-22 `1ac943ed` |
+| 4 Reading workspace | plan bullet | 9 | **9** | split table (8) + 2026-08-20 detail-drawer partial |
+| 5 ReadingLens | checkpoint bullet | 8 | **8** | ledger 2026-08-22 status correction |
+| 6 Media/Liquid pilot | plan bullet | 2 own + 5 delegated | **2** | split table + 2026-08-20 shell bullets; the 5 deferred ones ARE Track 8 and are not counted twice |
+| 7 remaining | substantive bullet | 3 | **2** | plan's own "Done 2026-08-19"; open = the Anki Deck Workbench acceptance gates |
+| 8 Liquid | phase L0–L12 | 13 | **1** | `Gate:` lines in section 11 of the Liquid plan |
+| 9 qBittorrent | gate | 20 | **13** | ledger 2026-08-19 re-derivation: 13 of 15 non-attended; 7 and 10 need the user; 11–15 attended |
+
+**46 of 66 measured units closed = 70%.** Track 2's 15 bullets are excluded from both sides
+because they are unmeasured, not because they are done; counting them fully open gives **46 of
+81 = 57%**. So the honest band is **57–70** and the entire width of it is Track 2. `pct` is set
+to **57**, the reading that refuses to claim an unmeasured track — a 1-point downward correction
+from the inherited 58, which turns out to have been close by luck rather than by counting.
+
+**Ladder consequence, and it is the point of doing this.** Track 2 sits at position 2 in the
+plan's own dependency order, ahead of 3–9. Every track after it has been re-derived and Track 2
+has not. So main-v1's next depth-first slice is **measuring Track 2**, not more Track 8.
+
+**Why 2026-11-28 and not the target.** Arithmetic, per Rule 0. 20 measured-open units, of which
+**12 are Track 8's Liquid phases** and they dominate. Measured rate for that unit: liquid opened
+2026-08-16 and holds **1 of 13** phases on 2026-08-24 — 1 phase / 8 days = 0.125/day. 12 phases
+at the only rate ever observed for them is **96 days**, i.e. 2026-11-28. The other 8 units are
+faster (Tracks 1/4/5/6 closed ~21 units in the 3 days to 2026-08-22, ≈7/day at three workers)
+but they are not the constraint. Two caveats stated rather than used to shave the date: L0 was
+the heaviest phase, and much of that window went to rubric scoring inside L1 rather than to
+closing phases — so the rate may improve once L2 lands. It has not yet, and a projection may not
+borrow from a rate nobody has measured. **This misses 2026-09-01 by roughly 12 weeks, and Track 8
+is the whole reason.**
