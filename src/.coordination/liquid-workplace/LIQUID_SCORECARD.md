@@ -57,13 +57,19 @@ sit on this one surface, so this is running state, not a score:
 | # | Category                       | State | Where the number lives |
 | - | ------------------------------ | ----- | ---------------------- |
 | 1 | Accessibility                  | 0 failing; not yet scored *as this surface* | `L1_ACCESSIBILITY.md` (`a70cbbed`) |
-| 2 | Clunkiness                     | **open** — coverage now 20/20, one real dead end: `Explain again` | `L1_CLUNKINESS.md` |
+| 2 | Clunkiness                     | **10/10** — `7cdc34b4` | `L1_CLUNKINESS.md` |
 | 3 | Liquid utilization             | 4 of 4 treated, 0 dense-on-translucent; re-drive owed at this tree | `L2_PRIMITIVES.md` (L5.2) |
 | 4 | Use of space                   | four numbers pass at three sizes; re-score owed on the fixing commit | `L1_USE_OF_SPACE.md` |
 | 5 | UI clarity                     | **10/10** — `cbb3506a` | `L1_UI_CLARITY.md` |
 | 6 | Feature parity + reversibility | **10/10** — `aaef2a84` | `L6_PARITY_DICTIONARY.md` |
 | 7 | Performance under real load    | **10/10** — `752daa00` | `L7_PERF_DICTIONARY.md` |
 | 8 | Honest states                  | **10/10** — `9d9e876c` | `L8_STATES.md`, `L8_DEAD_CONTROLS.md` |
+
+**Category 2's point, unlike 5 and 8, was a product defect.** `Explain again` bypassed the
+dictionary cache but not the provider session cache, so the second ask in a session returned the
+byte-identical answer in 2 ms and the control did nothing (`7cdc34b4`). Five of eight categories
+now sit at 10 on this surface; **1, 3 and 4 remain**, each owed a re-drive *as this surface*
+rather than as the L1 reference apps they were first measured on.
 
 **Both points categories 5 and 8 gained on 2026-08-24 came from instrument defects, not from
 changes to the product** — a hardcoded Q9 verdict that reported a number nobody computed, and a

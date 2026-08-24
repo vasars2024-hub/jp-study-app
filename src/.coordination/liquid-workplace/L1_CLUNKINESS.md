@@ -234,3 +234,37 @@ declared 120 ms: more conservative than intended, so the verdicts stand.
 restart (main does not hot-reload), click `Explain again` once, and see whether `dict:explain` ever
 arrives. Then fix whichever bare `return` it is so the control reports something, and re-drive
 `l1-deadend.js` — dead ends **4 → 3**, all three honest no-ops, which is category 2's 10.
+
+## 2026-08-24 — category 2 is a 10, and the predicted cause was wrong
+
+`Explain again` was the last real dead end. The prediction above — a bare `return` at
+`EntryExplain.tsx:128/:130` — is **falsified**: `live.ok` is true (`aiGetConfig` reads
+`engine cloud / gemini-2.5-flash / apiKeysSet.gemini true`), so the call did reach main, and no
+renderer log was needed to find that out. Two caches, and `refresh` bypassed one:
+`defaultAgentExecutionPolicy` runs Explain at `cache: 'session'`, the provider runtime keys that
+on the assembled prompt (`providerRuntime.ts:727`), and the explain prompt is deterministic for a
+word. Fixed in `7cdc34b4`; the before/after IPC table is in `L8_DEAD_CONTROLS.md`.
+
+**Re-drive, targeted, on the fixing tree** (`debug/l1c-explain-deadend.js`, same protocol as
+`l1-deadend.js`: quiesce to two identical signatures, `before`, click, diff the class/title/aria/
+disabled signature). Restart confirmed — `bridge.json` `started` moved `1787548120277` →
+`1787558670463`, and the fix is main-process, which does not hot-reload.
+
+| horizon | signature changed | ask button | answer |
+| --- | --- | --- | --- |
+| 3000 ms (`--slow-settle`, the sweep's vote) | **true** | `Asking the model…` | unchanged |
+| 6009 ms (completion) | **true** | `Explain again` | **different prose** |
+
+`errorEl` false, `blockedEl` false, quiesced in 2 tries, 2 mutations observed. Both horizons are
+reported because a real cloud round trip is longer than the sweep's 3000 ms vote — the control is
+alive at the vote on its label and `disabled` alone, before the answer lands.
+
+**Driven on a self-made fixture, and that is the point.** A refresh overwrites the stored
+explanation and there is **no restore path**, so driving this control on 食べる would have
+destroyed real user data to measure it. 猫 was created by the probe through the product's own
+"Explain this word" button and cleared afterwards: `removed: 1`, re-read `null`. Surface restored
+to 食べる / 8 entries / `Automatic`, saved-words **1**, clipboard **109** — the pre-run values.
+
+**Dead ends 4 of 20 → 3 of 20**, and all three remaining are honest already-in-that-state no-ops
+(`Search`, a `.dict-saved-search` chip, `Automatic`). With coverage 20/20, `gone` 0, `unstable` 0
+and the injected bait failing as required, **category 2 scores 10** on this surface.
