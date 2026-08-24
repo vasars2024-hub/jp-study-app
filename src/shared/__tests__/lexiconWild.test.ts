@@ -122,6 +122,23 @@ describe('rankLexiconWild', () => {
     expect(ranked).toHaveLength(1);
   });
 
+  it('keeps one copy of a line four different tracks carry, and keeps the best-ranked one', () => {
+    // The live defect: an opening, two endings and the episode that shares them
+    // returned the same cue four times, from four real media ids.
+    const shared = 'もっとも あの父親の元では…';
+    const ranked = rankLexiconWild(
+      [
+        citation({ sourceId: 'op', text: shared }),
+        citation({ sourceId: 'ed1', text: `もっとも あの父親の元では…` }),
+        citation({ sourceId: 'ed2', text: `もっとも  あの父親の元では…\n` }),
+        citation({ sourceId: 'ep01', text: shared, terms: ['猫', '犬'] }),
+      ],
+    );
+    expect(ranked).toHaveLength(1);
+    // Two terms covered, so `ep01` outranks the three one-term copies.
+    expect(ranked[0].sourceId).toBe('ep01');
+  });
+
   it('keeps a subtitle locator so a citation can be played, not only read', () => {
     const ranked = rankLexiconWild([citation({ start: 12.5, end: 14 })]);
     expect(ranked[0].start).toBe(12.5);
