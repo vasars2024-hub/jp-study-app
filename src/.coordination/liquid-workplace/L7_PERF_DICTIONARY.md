@@ -831,3 +831,10 @@ sizes and holding both was a defect `cd01ffbd` would have introduced.
    because `evictOtherSizes` only fires on a size change and this probe uses one size (8,192).
 3. `/mem`'s `llamaContexts` is what separates "the cache was rebuilt" from "the weights were
    reloaded". In `privateMb` alone those two are indistinguishable.
+
+**The probe's own machine-readable verdict** (`probes/l7o-backend-cycles.json`, written after the
+final settle): `idleControlFlat: true` (−0.9 MB, 0 handles), and `loadedFromCold` reads
+**cycle 1 true / cycle 2 FALSE / cycle 3 true**. Plateau-to-plateau, cycle 2 cost **−4 handles and
+−60.5 MB** and cycle 3 cost **+1,208 handles and +86.1 MB**. The `gapMs` field records the gap that
+FOLLOWS each cycle, so it is cycle 2's 480 s that made cycle 3 cold — the one field to read before
+re-deriving the table above.
