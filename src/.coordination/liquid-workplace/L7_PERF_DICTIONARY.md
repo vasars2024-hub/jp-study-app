@@ -547,3 +547,49 @@ removed → `actually unloads once the idle deadline passes` fails alone.
 Still open, and NOT claimed: 913.9 MB is ~484 MB above the 430.3 MB boot baseline, and **which
 action in the Dictionary cadence starts a model load at all** is unidentified — `l7k` falsified
 six controls individually. Rubric category 7 leg 3 should be re-driven against these numbers.
+
+## 2026-08-24 · primary — leg 3 re-driven after the fix: D1's magnitude is gone, the TRIGGER is named, and the residual STACKS
+
+One cold boot, pid **19416**, `l7d-setup.cjs` → Dictionary, liquid, 食べる, **8 entries / 5,470
+chars / 349 nodes / 75 controls**, `820x580`, `forest-night`, `data-perf=performance`. Every number
+below is that one process. Private bytes only — RSS swung 3,798 → 535 MB while private sat flat.
+
+| point | uptime | private MB | handles |
+| --- | --- | --- | --- |
+| boot baseline (L0 band 550–577 / ~1,055) | 1.22 | **551.4** | **1,051** |
+| `l1-deadend.js`, 19 controls — model loads within ~15 s | 1.59 | 3,521.1 | 4,394 |
+| resident plateau | 3.00–6.00 | 3,453.2 | 4,391 |
+| **idle unload fires** | 6.70 | **1,080.4** | 4,382 |
+| cycle 1 settled | 8.48 | **1,082.4** | 4,378 |
+| second load (probe below) | 10.13–14.85 | 3,634.7 | **6,809** |
+| second unload fires | 15.10 | 1,412.2 | 6,801 |
+| cycle 2 settled | 16.04 | **1,256.7** | **6,803** |
+
+**D1's headline number is closed.** The same repro plateaued at 7,071.8 / 7,082.0 / 7,075.7 MB on
+three boots before `148ca3e9` and never fell; it now peaks at 3.5 GB and releases 2.4 GB on the
+5-minute deadline, twice, unprompted.
+
+**D2 — the residual stacks, and handles are the honest column.** 1,051 → 4,378 → 6,803: about
+**+2,425 handles per load/unload cycle**, never released, and private settles **+531 then +174 MB**
+above the previous floor. Cause, read from the dependency rather than guessed: `getLlama()` does not
+cache — `getLlamaForOptions` builds a new `Llama` per call, and `loadBindingModule`
+(`node_modules/node-llama-cpp/dist/bindings/getLlama.js:549`) deliberately deletes the addon from
+`require.cache` first, "each llama instance has its own settings". Deleting a require-cache entry
+does not unload a `.node`. `translate.ts` disposed the context and the model but never the `Llama`
+that owns the binding, its thread pool and its `process.once('beforeExit')` listener.
+
+**The trigger is `Example sentences`** — the one thing `148ca3e9` left explicitly unclaimed.
+`probes/l7n-load-trigger.cjs` records `translate:progress` through
+`window.api.onTranslateModelProgress` (`preload.ts:1432`), which `ensureSession()` emits as
+`status:'init'` **before** `import('node-llama-cpp')`, so attribution is a 1-second boolean instead
+of a 3 GB delta. Idle control **silent 6 s**; then `Search`, `Play 食べる`, `Find containing words`,
+`Find phrases`, `Find example sentences`, `Find shared senses` — **six silent for 8 s each** — and
+`Example sentences` emitted `init/0 progress/20 progress/45` **after 1 s**. Run stops at the first
+hit: every later candidate would meet a warm session.
+
+Why four earlier bisects missed it: they sampled private bytes at click time, and this file's own
+table records `Example sentences` at **−256.4 MB**, "exonerated". A load takes ~15 s and the
+allocation is native, so a click-time delta measures the search that the control also runs.
+
+**Leg 3 is still NOT a 10.** 1,256.7 MB against an L0 baseline of 550–577 is a 2.2× regression and
+6,803 handles against ~1,055 is 6.4×. Fix and re-drive: next section.
