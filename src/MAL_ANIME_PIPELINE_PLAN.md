@@ -2235,3 +2235,37 @@ locked or moved file leaves an orphaned cache entry rather than a half-removed t
 
 `subtitleAttachText.test.ts` **9 → 14 passed**. Refusals: a track id not on the item patches
 nothing; a ghost media id and an empty pair both refuse.
+
+## 2026-08-24 — the attach path driven live, on a real acquired file, net zero
+
+Worker `primary`, same turn. `debug/mal31-attach-roundtrip.cjs` (untracked; `debug/` is
+gitignored). App restarted twice, because both new handlers live in main and main does not
+hot-reload — and the restart is itself the finding below.
+
+**The trap, measured before and after, because this repo's rule exists for exactly it.** Before
+the restart: `typeof window.api.attachSubtitleText` → `"function"` (preload had rebuilt through
+Vite) while the same call returned **`No handler registered for 'subtitleDiscovery:attachText'`**.
+A preload binding is not evidence a main handler exists. After the restart both refusals returned
+their real sentences: `"That media item is no longer in the library."` and
+`"“zip” is not a subtitle format this app reads."`
+
+**The round trip, on `[DBD-Raws][JOJO…][01]…tc_jp.ass` from the 39 Route B acquired** — a real
+file, not a fixture. Reached the renderer as `/debug/jojo01.ass` over the Vite dev server.
+
+| step | number |
+| --- | --- |
+| file | 63,967 chars / **82,466 bytes** |
+| target | `d538c715…` "Habits 習慣…Hana #12", **3** tracks before |
+| attach | `{ok:true, lang:'ja'}`, tracks **3 → 4** |
+| record | `format:'ass'`, `lang:'ja'`, `providerId:'nyaa'`, `subtitles\d538c715…\harvest-ja-mt77bf7u-vlao4a.ass` |
+| read back | `readSubtitleRecord` → **63,967 chars, identical:true** — the player's own seam |
+| detach | `{ok:true}`, tracks **4 → 3** |
+| cache dir after | `fused-ja.meta.json`, `fused-ja.srt` only — the harvested file **unlinked**, the item's own two **untouched** |
+
+**The user's library is byte-for-byte as found**: 3 tracks before, 3 after, and the only file the
+run created is gone. That is why the control could run on a real item at all.
+
+**Gate 31 stays 32 of 34.** This proves the mechanism, not the gate: gate 31 wants an attended
+Route A *and* Route B acquisition ending in cues rendering **in the player** for the acquired
+title, and this profile still has no JoJo video. Attaching those cues to a podcast and calling it
+rendering would be the rig the plan forbids — which is why the run above detaches.
