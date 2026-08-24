@@ -376,3 +376,48 @@ first attempt.
 **Category 4 is still NOT scored.** All four numbers now pass at all three sizes with a
 control that fails — but the rubric's re-score is from scratch on the fixing commit, and a
 category is not a scorecard: 2, 5, 7 and 8 have no live number on this surface yet.
+
+## 2026-08-24 — category 4 SCORES 10, after the re-drive found the pattern back
+
+**The re-drive was not a formality.** Re-run on the current tree, compact 260x170 reported
+**26 clipped** and `div.fwin-body 273>248` where 2026-08-22 recorded 0 and 0. The same defect
+class as that slice — a hard grid floor — in `components/lexicon/conjugationTable.css`:
+`repeat(auto-fit, minmax(15rem, 1fr))` keeps its 240px track in a 248px body, and `.fwin-body`
+is `overflow-x: hidden`, so 25px of every conjugation row is unreachable rather than scrolled.
+
+**Why the guard did not catch it, which matters more than the fix.**
+`gridTrackFloorsFitTheWindow.test.ts` scanned a hand-written list of **four** sheets — the ones
+the 2026-08-22 measurement happened to name. `conjugationTable.css` was never on it, so the
+guard was green while the defect shipped. The list is replaced by a walk of every `.css` under
+`src/renderer`: **72** assertions now, from 42, and no other sheet carries a bare floor over the
+212px content minimum. A guard scoped to the files a previous defect touched cannot catch the
+next one.
+
+**Fix:** `minmax(min(15rem, 100%), 1fr)`, the same clamp the four earlier rules use.
+
+**Live, Liquid Dictionary, 食べる / 8 entries, forest-night, one session, after the fix:**
+
+| size | clipped | overlaps | h-scroll | hiddenOverflowX | dead % of viewport | chrome | canvas |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| compact 260x170 | 26 -> **0** | 0 | 0 | 1 -> **0** | 1.2 | 19.3% | 12.3% |
+| default 820x580 | **0** | 0 | 0 | **0** | **10.7** | 5.7% | 32.3% |
+| maximized 1264x765 | **0** | 0 | 0 | **0** | **8.7** | 4.3% | **55.0%** |
+| sub-min 200x130 *(control)* | **3** | 0 | 0 | **1** (`243>188`) | 0.5 | 25.1% | 12.7% |
+
+All four rubric numbers pass at all three sizes: 0 clipping and 0 overlap, no horizontal body
+scroll, no dead region over 15%, and the dominant canvas growing **12.3 -> 32.3 -> 55.0%** while
+chrome falls **19.3 -> 5.7 -> 4.3%** — content taking the extra space, not chrome.
+
+**Controls, red.** (a) 200x130, below the product's own `MIN_W`/`MIN_H`, fails **3 clipped /
+1 hiddenOverflowX** — and only below the supported size, which is the shape this category needs.
+(b) Source mutation: reverting the clamp to `minmax(15rem, 1fr)` turns the guard red in **two**
+places at once — the sweep (`bare rem floors wider than 212px: ['minmax(15rem, = 240px']`) and
+the named-rule assertion. Restored, 72 passed. The window's inline `style` printed
+**BYTE-IDENTICAL: true** on every run; maximize restored through the product's own control.
+
+**Trap, and it cost a restore:** `cp x /tmp/y` under the Bash tool and `fs.readFileSync('/tmp/y')`
+under node do **not** name the same file — node resolves it to `C:\tmp\y` and throws ENOENT, so
+the mutation was left on disk. Keep a mutation's backup inside the repo, or restore with an
+editor rather than a shell copy.
+
+**Category 4: 10/10.**

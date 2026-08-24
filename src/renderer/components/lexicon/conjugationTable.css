@@ -22,8 +22,13 @@
 .lexicon-conjugation-list {
   display: grid;
   /* Two columns where there is room, one when there is not. The rows are short
-     pairs, so a single tall column wastes most of a wide result panel. */
-  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+     pairs, so a single tall column wastes most of a wide result panel.
+     `min(15rem, 100%)` because a bare `minmax(15rem, …)` floor is HARD: in a
+     container narrower than 240px the track keeps its 240px and the row leaves
+     the frame, and `.fwin-body` is `overflow-x: hidden`, so it is unreachable
+     rather than merely scrolled. Measured at the product's own 260x170 minimum:
+     273px of content in a 248px body. */
+  grid-template-columns: repeat(auto-fit, minmax(min(15rem, 100%), 1fr));
   gap: 8px;
   margin: 12px 0 0;
   padding: 0;

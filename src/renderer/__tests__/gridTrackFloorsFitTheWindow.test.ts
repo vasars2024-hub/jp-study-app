@@ -22,16 +22,27 @@
  * category is the live one in `L1_USE_OF_SPACE.md`.
  */
 
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const SHEETS = [
-  'src/renderer/styles.css',
-  'src/renderer/theme/liquid-window.css',
-  'src/renderer/components/lexicon/lexiconExamples.css',
-  'src/renderer/components/lexicon/lexiconWorkbench.css',
-];
+/**
+ * Every stylesheet under `src/renderer`, not a hand-listed four. The list was hand-written on
+ * 2026-08-22 from the sheets that measurement happened to name, and on 2026-08-24 the same
+ * pattern was measured again in `components/lexicon/conjugationTable.css` — a sheet nobody had
+ * added, so the guard passed while the defect shipped. A guard that only covers the files a
+ * previous defect touched cannot catch the next one.
+ */
+function allSheets(dir: string, out: string[] = []): string[] {
+  for (const name of readdirSync(resolve(process.cwd(), dir))) {
+    const rel = `${dir}/${name}`;
+    if (statSync(resolve(process.cwd(), rel)).isDirectory()) allSheets(rel, out);
+    else if (name.endsWith('.css')) out.push(rel);
+  }
+  return out;
+}
+
+const SHEETS = allSheets('src/renderer');
 
 /** The narrowest content box the shell can produce: `MIN_W` 260 minus the body's padding. */
 const NARROWEST_CONTENT_PX = 212;
@@ -72,6 +83,20 @@ describe('grid track floors fit the narrowest window the product allows', () => 
     expect(read('src/renderer/theme/liquid-window.css')).toMatch(
       /\.fwin\.fwin-liquid \.dict-view\s*\{[^}]*minmax\(min\(28rem,\s*100%\),\s*1fr\)/,
     );
+  });
+
+  it('the conjugation list the 2026-08-24 re-drive named is clamped', () => {
+    // 26 clipped boxes at compact 260x170, `div.fwin-body 273>248` — the same defect class,
+    // in the one lexicon sheet the SHEETS list did not cover.
+    expect(read('src/renderer/components/lexicon/conjugationTable.css')).toMatch(
+      /\.lexicon-conjugation-list\s*\{[^}]*minmax\(min\(15rem,\s*100%\),\s*1fr\)/,
+    );
+  });
+
+  it('the sweep covers more sheets than the list it replaced', () => {
+    // The hand-written list had four entries. If this ever drops back to four, the walk broke.
+    expect(SHEETS.length).toBeGreaterThan(4);
+    expect(SHEETS).toContain('src/renderer/components/lexicon/conjugationTable.css');
   });
 
   it('the two nowrap control rows that left the frame at 260px now wrap', () => {

@@ -59,7 +59,7 @@ sit on this one surface, so this is running state, not a score:
 | 1 | Accessibility                  | **10/10** — `41ba85b7` | `L1_ACCESSIBILITY.md` |
 | 2 | Clunkiness                     | **10/10** — `7cdc34b4` | `L1_CLUNKINESS.md` |
 | 3 | Liquid utilization             | 4 of 4 treated, 0 dense-on-translucent; re-drive owed at this tree | `L2_PRIMITIVES.md` (L5.2) |
-| 4 | Use of space                   | four numbers pass at three sizes; re-score owed on the fixing commit | `L1_USE_OF_SPACE.md` |
+| 4 | Use of space                   | **10/10** — this commit | `L1_USE_OF_SPACE.md` |
 | 5 | UI clarity                     | **10/10** — `cbb3506a` | `L1_UI_CLARITY.md` |
 | 6 | Feature parity + reversibility | **10/10** — `aaef2a84` | `L6_PARITY_DICTIONARY.md` |
 | 7 | Performance under real load    | **10/10** — `752daa00` | `L7_PERF_DICTIONARY.md` |
