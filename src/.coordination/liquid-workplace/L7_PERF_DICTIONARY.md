@@ -887,3 +887,43 @@ curve rather than a plateau.** 1,081.0 MB against 550–577 is 1.96×; 4,410 han
 is 4.18×. What would earn the 10 is a boot whose post-burst settle lands inside the L0 band, and
 the only lever left for that is not loading the backend into the main process at all — a
 utility-process move, which is a slice of its own and is named as such rather than attempted here.
+
+## 2026-08-24 — leg 4: llama.cpp moved to a utility process, and the residual is gone
+
+**Slices.** `e0c47a1e` the host (`shared/llamaHostProtocol.ts`, `main/llamaHostWorker.ts`,
+`main/llamaHost.ts`, a fifth forge entry, 10 tests); `ff1c1fc4` both consumers switched off native
+objects onto a `LlamaSessionHandle`, plus `/mem` and `will-quit`.
+
+**Cold boot pid 37248 on `ff1c1fc4`**, restarted for it — main does not hot-reload. Model:
+`%APPDATA%/jp-study-app/models/Qwen3-1.7B.gguf` at 8,192 tokens, loaded through
+`window.api.translateEnsureReady()`, which resolved `{ok:true}` inside 10 s.
+
+| Moment | main private | main handles | jp-llama-host WS |
+| --- | --- | --- | --- |
+| cold, no model | 428.2 MB | 1,074 | — |
+| model + KV cache resident | 424.4 MB | 1,078 | **3,680 MB** / 3,681 handles |
+| child gone (+411 s) | **423.0 MB** | **1,072** | — |
+
+**A whole load/unload cycle now costs main −5.2 MB and −2 handles.** Leg 3, in-process on the same
+model, was 546.4 MB / 1,063 → 3,515.4 MB / 4,406 peak → 1,081.1 MB / 4,410 settled: a residual of
+**+534.6 MB / +3,349 handles**. That residual is not smaller, it is in another process, and that
+process ends. `/mem` after the exit: both pool rows `[]`, no `jp-llama-host` in `metrics`.
+
+**+411 s is the release path answering exactly as specified** — 300 s translate idle unload, then
+the context pool's 60 s grace, then the model pool's 60 s, then the child's 15 s idle tick. The
+child never exits on its own: it posts `bye`, and main kills it only when it has nothing pending
+and no live session. A child exiting the moment it went idle could do so with an `acquire` already
+on the wire.
+
+**Category 7 is NOT scored 10 on this leg, and the reason is scope rather than the number.** The
+memory criterion is now met with room — main sits BELOW the 550–577 MB L0 band across a full cycle
+— but the category's 10 also requires drag frame stability, theme-switch cost, boot cost and the
+longest main-process block, none of which were re-driven here. That is the next leg, and it is
+cheap now: the biggest main-loop block this surface could produce was a 1.2 GB GGUF load, and it no
+longer happens in main at all.
+
+**Trap for the next worker.** `architecture-audit.cjs` calls the worker an orphan because
+`utilityProcess.fork()` names it by built path; it is classified in
+`tools/architecture-baseline.json` alongside `apkgReadWorker.ts`. If that entry or the fifth
+`forge.config.ts` build target is ever lost, the fork exits 1 and `llamaHost.ts` degrades **silently**
+to loading llama.cpp into main — the exact residue this leg removed, with no error anywhere.
