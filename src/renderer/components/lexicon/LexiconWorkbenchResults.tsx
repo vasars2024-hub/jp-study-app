@@ -22,6 +22,19 @@ import {
   type LexiconConcordanceSource,
 } from '../../../shared/lexiconConcordance';
 import {
+  LEXICON_WILD_SOURCE_CLASSES,
+  lexiconWildCacheKey,
+  putLexiconWildCache,
+  readLexiconWildCache,
+  type LexiconWildResult,
+} from '../../../shared/lexiconWild';
+import {
+  READABLE_WILD_CLASSES,
+  loadLexiconWildCache,
+  saveLexiconWildCache,
+  searchLexiconWild,
+} from '../../lexiconWildSearch';
+import {
   applySensePins,
   canPinSense,
   sensePinKey,
@@ -160,6 +173,10 @@ export default function LexiconWorkbenchResults({
   const [concordanceState, setConcordanceState] = useState<ConcordanceState>('idle');
   const [concordanceScanned, setConcordanceScanned] = useState(0);
   const concordanceRun = useRef(0);
+  const [wild, setWild] = useState<LexiconWildResult | null>(null);
+  const [wildState, setWildState] = useState<ConcordanceState>('idle');
+  const [wildCachedAt, setWildCachedAt] = useState<number | null>(null);
+  const wildRun = useRef(0);
 
   useEffect(() => setSelectedLens(lens), [lens]);
 
@@ -220,6 +237,10 @@ export default function LexiconWorkbenchResults({
     setConcordance([]);
     setConcordanceState('idle');
     setConcordanceScanned(0);
+    wildRun.current += 1;
+    setWild(null);
+    setWildState('idle');
+    setWildCachedAt(null);
     clearRetranslation();
   }
 
@@ -257,6 +278,57 @@ export default function LexiconWorkbenchResults({
       setConcordanceState('done');
     } catch {
       if (run === concordanceRun.current) setConcordanceState('error');
+    }
+  }
+
+  /**
+   * The same question across every corpus this machine has, ranked.
+   *
+   * Separate from the concordance rather than replacing it: the concordance's
+   * value is that its order is library order and every row can be checked by
+   * reading it, which a ranked list gives up. This one answers "which of these
+   * should I read", and it says out loud which source types it never opened.
+   *
+   * Cached because the subtitle leg walks up to forty files. A cache hit is
+   * re-ranked in memory rather than re-read, so changing a pin is free.
+   */
+  async function searchWild(): Promise<void> {
+    if (!concordanceTerms.length || wildState === 'running') return;
+    const run = ++wildRun.current;
+    setWild(null);
+    setWildCachedAt(null);
+    setWildState('running');
+    const terms = concordanceTerms.map((item) => ({ key: item.key, text: item.text }));
+    const cacheKey = lexiconWildCacheKey(terms.map((item) => item.text), READABLE_WILD_CLASSES);
+    const cached = readLexiconWildCache(loadLexiconWildCache(), cacheKey);
+    if (cached) {
+      setWild(cached.result);
+      setWildCachedAt(cached.at);
+      setWildState('done');
+      return;
+    }
+    try {
+      // No sense is passed, and that is a measurement rather than an omission:
+      // neither installed corpus attaches a sense to a citation, so every row
+      // would come back `unknown` and a sense control here would be a knob with
+      // nothing behind it. The ranking keeps the rung — it is the bullet's own
+      // wording — and the badge lights up the day a corpus supplies one.
+      const next = await searchLexiconWild({
+        terms,
+        lang,
+        ...(difficulty?.medianRank === undefined ? {} : { medianRank: difficulty.medianRank }),
+        signal: () => run === wildRun.current,
+      });
+      if (run !== wildRun.current) return;
+      saveLexiconWildCache(putLexiconWildCache(loadLexiconWildCache(), {
+        key: cacheKey,
+        at: Date.now(),
+        result: next,
+      }));
+      setWild(next);
+      setWildState('done');
+    } catch {
+      if (run === wildRun.current) setWildState('error');
     }
   }
 
@@ -897,6 +969,87 @@ export default function LexiconWorkbenchResults({
                   <p className="muted lexicon-concordance-scope">
                     {t('lexicon.concordance.scope')}
                   </p>
+                </>
+              )}
+            </details>
+          )}
+          {concordanceTerms.length > 0 && (
+            <details className="lexicon-wild">
+              <summary>{t('lexicon.wild.title')}</summary>
+              <p className="muted lexicon-wild-note">{t('lexicon.wild.note')}</p>
+              <button
+                className="lexicon-wild-run"
+                disabled={wildState === 'running'}
+                onClick={() => void searchWild()}
+                type="button"
+              >
+                {t(wildState === 'running' ? 'lexicon.wild.running' : 'lexicon.wild.action')}
+              </button>
+              {wildState === 'error' && (
+                <p className="lexicon-wild-error" role="alert">{t('lexicon.wild.failed')}</p>
+              )}
+              {wild && (
+                <>
+                  {wildCachedAt !== null && (
+                    <p className="muted lexicon-wild-cached">
+                      {t('lexicon.wild.cached', { time: new Date(wildCachedAt).toLocaleString() })}
+                    </p>
+                  )}
+                  <p className="muted lexicon-wild-summary">
+                    {t('lexicon.wild.summary', {
+                      count: wild.citations.length,
+                      gathered: wild.gathered,
+                      sources: wild.sources.filter((source) => source.state === 'ready').length,
+                      classes: LEXICON_WILD_SOURCE_CLASSES.length,
+                    })}
+                  </p>
+                  {wild.citations.length === 0 && (
+                    <p className="muted">{t('lexicon.wild.empty')}</p>
+                  )}
+                  {wild.citations.length > 0 && (
+                    <ol className="lexicon-wild-list">
+                      {wild.citations.map((citation) => (
+                        <li key={`${citation.sourceClass}-${citation.sourceId}-${citation.rank}`}>
+                          <div className="lexicon-wild-source">
+                            <strong>{citation.title}</strong>
+                            <span className="lexicon-wild-class">
+                              {t(`lexicon.wild.class.${citation.sourceClass}`)}
+                            </span>
+                            {citation.start !== undefined && <span>{cueTimestamp(citation.start)}</span>}
+                            <span className="lexicon-wild-band">
+                              {t(`lexicon.wild.band.${citation.band}`)}
+                            </span>
+                            {citation.senseMatch !== 'unknown' && (
+                              <span className="lexicon-wild-sense">
+                                {t(`lexicon.wild.sense.${citation.senseMatch}`)}
+                              </span>
+                            )}
+                          </div>
+                          <blockquote lang={lang}>{citation.text}</blockquote>
+                          {citation.translation && (
+                            <p className="muted lexicon-wild-translation">{citation.translation}</p>
+                          )}
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                  <h5 className="lexicon-wild-sources-title">{t('lexicon.wild.sourcesTitle')}</h5>
+                  <ul className="lexicon-wild-sources">
+                    {wild.sources.map((source) => (
+                      <li key={source.sourceClass} data-state={source.state}>
+                        <span>{t(`lexicon.wild.class.${source.sourceClass}`)}</span>
+                        <span className="muted">
+                          {source.state === 'unavailable'
+                            ? t(`lexicon.wild.reason.${source.reason ?? 'no-reader'}`)
+                            : t(`lexicon.wild.state.${source.state}`, {
+                              matched: source.matched,
+                              scanned: source.scanned,
+                            })}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="muted lexicon-wild-scope">{t('lexicon.wild.scope')}</p>
                 </>
               )}
             </details>

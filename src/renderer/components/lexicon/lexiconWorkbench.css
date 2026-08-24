@@ -685,3 +685,110 @@
   background: color-mix(in srgb, var(--accent, #5588cc) 12%, transparent);
   font-size: 0.75rem;
 }
+
+.lexicon-wild {
+  margin-top: 14px;
+}
+
+.lexicon-wild-note,
+.lexicon-wild-scope,
+.lexicon-wild-cached,
+.lexicon-wild-summary {
+  margin: 8px 0;
+  font-size: 0.82rem;
+}
+
+.lexicon-wild-run {
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.35));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent, #5588cc) 10%, transparent);
+  color: inherit;
+}
+
+.lexicon-wild-run:disabled {
+  opacity: 0.65;
+}
+
+.lexicon-wild-error {
+  color: var(--danger, #c0392b);
+}
+
+.lexicon-wild-list {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lexicon-wild-list li {
+  padding: 10px 12px;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.25));
+  border-radius: 10px;
+  background: color-mix(in srgb, currentColor 3%, transparent);
+}
+
+/*
+ * Wraps rather than truncates. A citation carries up to five short facts —
+ * title, source type, timestamp, band, sense — and a narrow Workbench column is
+ * the normal case, not the compact exception.
+ */
+.lexicon-wild-source {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  font-size: 0.8rem;
+}
+
+.lexicon-wild-class,
+.lexicon-wild-band,
+.lexicon-wild-sense {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  font-size: 0.72rem;
+}
+
+.lexicon-wild-sense {
+  background: color-mix(in srgb, var(--accent, #5588cc) 16%, transparent);
+}
+
+.lexicon-wild-list blockquote {
+  margin: 8px 0;
+  font-size: 0.95rem;
+}
+
+.lexicon-wild-translation {
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.lexicon-wild-sources-title {
+  margin: 12px 0 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.lexicon-wild-sources {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8rem;
+}
+
+.lexicon-wild-sources li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+
+/* An unread source class reads as absent, not as a zero result. */
+.lexicon-wild-sources li[data-state='unavailable'] {
+  opacity: 0.75;
+}
