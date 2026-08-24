@@ -3839,6 +3839,9 @@ export const ru: Catalog = {
   'desktop.resize': 'Изменить размер',
   'desktop.makeLiquid': 'Жидкое окно',
   'desktop.returnToStandard': 'Вернуть обычное окно',
+  'desktop.sectionUnavailable.title': 'Это приложение больше недоступно',
+  'desktop.sectionUnavailable.body':
+    'Окно восстановлено из сохранённого макета, который ссылается на «{section}» — в этой версии такого приложения нет. Закройте окно, чтобы убрать его с рабочего стола.',
 
   // Grammar view
   'grammar.intro': 'Грамматика JLPT N5–N1 и HSK 1–10, конструктор практики, тесты и гайды.',

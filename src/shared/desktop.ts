@@ -15,32 +15,73 @@ export const DESKTOP_CITY: DesktopIndex = 1;
 export const MAX_DESKTOPS = 8;
 export const SLIDE_DURATION_MS = 380;
 
-export type DesktopWinSection =
-  | 'agent'
-  | 'library'
-  | 'novels'
-  | 'dictionary'
-  | 'grammar'
-  | 'notebook'
-  | 'translate'
-  | 'player'
-  | 'video'
-  | 'music'
-  | 'anki'
-  | 'flashcards'
-  | 'games'
-  | 'stats'
-  | 'resources'
-  | 'settings'
-  | 'note'
-  | 'visualizer'
-  | 'musicwidget'
-  | 'city'
-  | 'immersion'
-  | 'calendar'
-  | 'reading'
-  | 'youtube'
-  | 'scraper';
+/**
+ * The canonical section list. Declared as a value first so the type is derived
+ * from it: a section added to one and not the other is a compile error, and the
+ * persistence layer gets a runtime membership test it previously did not have.
+ */
+export const DESKTOP_WIN_SECTIONS = [
+  'agent',
+  'library',
+  'novels',
+  'dictionary',
+  'grammar',
+  'notebook',
+  'translate',
+  'player',
+  'video',
+  'music',
+  'anki',
+  'flashcards',
+  'games',
+  'stats',
+  'resources',
+  'settings',
+  'note',
+  'visualizer',
+  'musicwidget',
+  'city',
+  'immersion',
+  'calendar',
+  'reading',
+  'youtube',
+  'scraper',
+] as const;
+
+export type DesktopWinSection = (typeof DESKTOP_WIN_SECTIONS)[number];
+
+/**
+ * Section ids that were once persisted and no longer render anything.
+ *
+ * `media` is the measured one: it is the Start menu's media CATEGORY id
+ * (`DesktopShell`'s `START_GROUPS`), and a layout on disk carries a window with
+ * `section: 'media'` that restores on every boot as an 820×580 window with a
+ * COMPLETELY EMPTY body — full chrome, no content, no empty state, forever.
+ * `AppSection` has no `case 'media'`, so it fell through to `default`, and
+ * `agentNavigation` already refuses the same id with `unknown-section`. The
+ * desktop layout was the one surface accepting it silently.
+ *
+ * Every media entry point opens the same shell (see `AppSection`'s `player`
+ * case), so `player` is what `media` meant.
+ */
+export const LEGACY_WIN_SECTION_ALIASES: Readonly<Record<string, DesktopWinSection>> = {
+  media: 'player',
+};
+
+/**
+ * Resolve a persisted section string to a section that can actually render.
+ *
+ * Returns `null` for an id that is neither known nor aliased. Callers decide
+ * what to do with that — the persistence layer deliberately KEEPS it rather
+ * than dropping the window, because a drop silently deletes part of the user's
+ * layout and userData has no restore point, while an unknown section now
+ * reaches an honest, closable "unavailable" state in `AppSection`.
+ */
+export function normalizeWinSection(value: unknown): DesktopWinSection | null {
+  if (typeof value !== 'string') return null;
+  if ((DESKTOP_WIN_SECTIONS as readonly string[]).includes(value)) return value as DesktopWinSection;
+  return LEGACY_WIN_SECTION_ALIASES[value] ?? null;
+}
 
 export interface WindowSnapshot {
   id: string;

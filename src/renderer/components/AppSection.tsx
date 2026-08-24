@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import type { LibraryItem } from '../../shared/types';
 import type { DesktopWinSection } from '../../shared/desktop';
+import { useT } from '../i18n';
 import MusicWidget from './MusicWidget';
 import { useVisualizer, VizStage } from './visualizer/VisualizerContent';
 import { WALL_PRESETS } from '../environment/wallCatalog';
@@ -39,6 +40,7 @@ export default function AppSection({
   section: DesktopWinSection;
   onOpenBook: (item: LibraryItem) => void;
 }) {
+  const { t } = useT();
   let view: JSX.Element | null;
   switch (section) {
     case 'settings':
@@ -130,9 +132,23 @@ export default function AppSection({
       view = <ReadingWorkspaceView initialSection="discover" onOpenBook={onOpenBook} />;
       break;
     default:
-      view = null;
+      // NOT `null`. A section the switch does not recognise used to render an
+      // empty body inside a full window frame — measured live as an 820×580
+      // window titled `media` whose `.fwin-body` held zero nodes, restored from
+      // a layout on every boot. A blank surface is indistinguishable from a
+      // broken one, so the unrecognised id is named and the way out is stated.
+      // `shared/desktop.ts` repairs the ids it knows on the way off disk; this
+      // is what the ones it cannot repair look like.
+      view = (
+        <div className="app-section-unavailable" style={{ padding: '32px 28px', maxWidth: 560 }}>
+          <h2 style={{ margin: '0 0 8px', fontSize: 17 }}>{t('desktop.sectionUnavailable.title')}</h2>
+          <p className="muted" style={{ margin: 0, lineHeight: 1.55 }}>
+            {t('desktop.sectionUnavailable.body', { section })}
+          </p>
+        </div>
+      );
   }
-  return <Suspense fallback={<div className="app-section-loading muted">Loading...</div>}>{view}</Suspense>;
+  return <Suspense fallback={<div className="app-section-loading muted">{t('common.loading')}</div>}>{view}</Suspense>;
 }
 
 export function VisualizerWidget() {

@@ -25,6 +25,7 @@ import {
   SEED_CITY_ICONS,
   SEED_WALLPAPER,
   SLIDE_DURATION_MS,
+  normalizeWinSection,
 } from '../shared/desktop';
 import {
   PRIMARY_DISPLAY_KEY,
@@ -161,9 +162,14 @@ export function sanitizeWindow(value: unknown): WindowSnapshot | null {
     isObject(value.rect) || isObject(value.restoreRect)
       ? (value.restoreRect ?? value.rect) as Record<string, unknown>
       : null;
+  // A retired section id used to persist forever and render a blank body. The
+  // alias map repairs the ones we know; an id we cannot resolve is KEPT as-is
+  // (dropping it would delete part of the user's layout with no restore point)
+  // and `AppSection` renders an honest, closable unavailable state for it.
+  const section = normalizeWinSection(value.section) ?? (value.section as WindowSnapshot['section']);
   return {
     id: value.id,
-    section: value.section as WindowSnapshot['section'],
+    section,
     x: num('x'),
     y: num('y'),
     w: num('w'),

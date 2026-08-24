@@ -52,6 +52,32 @@ describe('sanitizeWindow', () => {
     expect(sanitizeWindow(null)).toBeNull();
   });
 
+  // Measured on a live boot: a persisted window with `section: 'media'` — the
+  // Start menu's media CATEGORY id, never an app — restored as an 820x580
+  // window whose `.fwin-body` held zero child nodes, every boot, permanently.
+  // `AppSection` has no `media` case and `agentNavigation` already refuses the
+  // same id, so this layer was the only one accepting it silently.
+  describe('retired section ids', () => {
+    it('repairs `media` to the media shell it used to mean', () => {
+      expect(sanitizeWindow({ ...base, section: 'media' })?.section).toBe('player');
+    });
+
+    it('leaves a live section alone', () => {
+      for (const section of ['dictionary', 'player', 'video', 'note', 'settings']) {
+        expect(sanitizeWindow({ ...base, section })?.section).toBe(section);
+      }
+    });
+
+    // Deliberately kept, not dropped: deleting the row would remove part of the
+    // user's layout and userData has no restore point. The renderer's honest
+    // "no longer available" state is what makes the kept row safe to keep.
+    it('keeps an id it cannot repair instead of dropping the window', () => {
+      const out = sanitizeWindow({ ...base, section: 'nonesuch' });
+      expect(out).not.toBeNull();
+      expect(out?.section).toBe('nonesuch');
+    });
+  });
+
   // Liquid presentation (L3.2) is the field the comment above predicted. Live:
   // the window went liquid at t+26ms and reverted to standard at t+630ms,
   // because this allowlist dropped `presentation` and main echoed the stripped

@@ -3556,6 +3556,9 @@ export const ja: Catalog = {
   'desktop.resize': 'サイズ変更',
   'desktop.makeLiquid': 'リキッド表示にする',
   'desktop.returnToStandard': '通常のウィンドウに戻す',
+  'desktop.sectionUnavailable.title': 'このアプリは利用できません',
+  'desktop.sectionUnavailable.body':
+    'このウィンドウは保存されたレイアウトから復元されましたが、参照先の「{section}」はこのバージョンのアプリには存在しません。ウィンドウを閉じるとデスクトップから削除されます。',
 
   // Grammar view
   'grammar.intro': 'JLPT N5〜N1 と HSK 1〜10 の文法、練習ビルダー、テスト、ガイド。',

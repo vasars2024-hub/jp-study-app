@@ -3541,6 +3541,9 @@ export const zh: Catalog = {
   'desktop.resize': '调整大小',
   'desktop.makeLiquid': '切换为液态窗口',
   'desktop.returnToStandard': '返回标准窗口',
+  'desktop.sectionUnavailable.title': '此应用已不可用',
+  'desktop.sectionUnavailable.body':
+    '此窗口是从已保存的布局中恢复的，它指向的“{section}”在当前版本中不是一个应用。关闭该窗口即可将其从桌面移除。',
 
   // Grammar view
   'grammar.intro': 'JLPT N5–N1 与 HSK 1–10 语法，含练习构建器、测试与指南。',

@@ -3752,6 +3752,9 @@ export const en: Catalog = {
   'desktop.resize': 'Resize',
   'desktop.makeLiquid': 'Make Liquid',
   'desktop.returnToStandard': 'Return to standard window',
+  'desktop.sectionUnavailable.title': 'This app is no longer available',
+  'desktop.sectionUnavailable.body':
+    'This window was restored from a saved layout that points at “{section}”, which is not an app in this version. Close the window to remove it from your desktop.',
 
   // Grammar view
   'grammar.intro':
