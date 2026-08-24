@@ -47,9 +47,7 @@ vi.mock('node-llama-cpp', () => {
   return {
     getLlama: () => Promise.resolve({ loadModel: () => Promise.resolve(model) }),
     LlamaChatSession: class {
-      constructor(_options: unknown) {
-        /* the session itself owns no native memory */
-      }
+      // The session itself owns no native memory, so the fake ignores its options entirely.
       resetChatHistory(): void {
         /* no history in this fake */
       }
