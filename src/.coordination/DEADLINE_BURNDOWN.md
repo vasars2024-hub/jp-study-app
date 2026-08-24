@@ -96,3 +96,13 @@ an acquisition for a title BOTH on the user's MAL completed list AND with a vide
 no rate divides into. Recorded for gate 34: this branch is **3 tests red at HEAD** in a clean
 worktree (another track's uncommitted i18n work), and the shared tree is **1 test red** for the
 mirror reason. Gate 34 must name the tree it ran in.
+
+2026-08-24 | mal-pipeline | units done this turn: 0 | units left: 2 | basis: the gate tables in src/MAL_ANIME_PIPELINE_PLAN.md, re-counted this turn (open: 31, 34) | projected finish: UNKNOWN
+No unit moved, and the honest reason changed shape rather than shrinking. The previous four turns
+recorded gate 31 as data-blocked; that was wrong. A MAL-listed video has been on disk since gate 33
+(Date A Live II OVA, 109,855,988 B) and the matching pair for the acquired Route B cues is JoJo
+Part 5 (MAL 37991, on the completed list, 39 episodes of .ass already fetched). What actually
+blocks the attended run is that **qBittorrent is not running** — `unreachable`,
+`connect ECONNREFUSED 127.0.0.1:8080`, 11 ms, measured through the product. That is machine state,
+not engineering, so no rate divides into it and the projection stays UNKNOWN rather than taking a
+flattering date. Gate 34 is ~15 minutes once 31 resolves. Product code landed: 9dc2b8ca.

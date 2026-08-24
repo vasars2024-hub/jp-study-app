@@ -2554,3 +2554,54 @@ architecture **"Nothing new"** exit 0, i18n **10,618/10,618** exit 0, eslint **e
 four touched paths, `tsc --noEmit` **0 errors naming any touched file**.
 
 **Gate 31 stays 32 of 34** (open: 31, 34).
+
+## 2026-08-24 — the video for a MAL title was on disk all along, and an OVA files under its season
+
+Worker `primary`. Commit `9dc2b8ca`. Opened on the previous turn's stated next slice (extend the
+Route A/B survey) and found that slice was searching the wrong end of the pool.
+
+**The survey's pool ordering is why 213 titles found nothing.** `debug/g31n-routeb.cjs` sorts the
+completed list by `totalEpisodes` ascending, and **indices 0–320 are all 1-episode rows** — movies,
+OVAs, specials. `sub-pack` and `batch-sidecar` are *series* release shapes, so the walk over 0–213
+was structurally incapable of a hit. Re-pointed at the 12-episode block (`from 506`, where eps=12
+starts): **19 titles walked, 13 carried a `batch-sidecar`**, first hit on the first title. Not a
+data drought — a sampling defect. Reused the existing probe; no new one written.
+
+**The blocker the last four turns called data-blocked is discharged.** Gate 33's own transfer left a
+real, complete, MAL-listed video on disk:
+`C:\Users\Arseniy\Downloads\jp-study\[project-gxs] Date a Live II - Kurumi Star Festival OVA
+[10bit BD 720p] [5ACBBFF2].mkv`, **109,855,988 B**, and **"Date A Live II: Kurumi Star Festival"
+(MAL 22961) is row-for-row on the completed list**. Verified independently: The Big O really is
+absent from all 1,426 rows (0 hits), and the library really does own only that one anime series
+(33 items, 29 of them The Big O). The pairing gate 31 needs is **JoJo Part 5 — MAL 37991 is on the
+completed list, and Route B's acquired cues on disk are `[DBD-Raws][JOJO的奇妙冒险 黄金之风][01-39
+全集…]`, 88 MB of `.tc_jp.ass`, episodes 01–39.** Same work, so no rig.
+
+**What still stops the attended run, and it is not effort:** qBittorrent is **not running**.
+Measured through the product, negative control included: `scraperQbitTest` → `unreachable`,
+`connect ECONNREFUSED 127.0.0.1:8080`, **11 ms**, `authMode: apiKey`; `scraperQbitTransfers` → **0
+rows**. That is gate 22's contract firing correctly, re-confirmed live.
+
+**A near-miss recorded so nobody re-files it as a defect.** `scraperQbitTest({ qbittorrent: … })`
+answers `not-configured`, *"Sending to qBittorrent is turned off."* on a profile whose `enabled` is
+`true`. That is **not** a product defect: `ScraperQbitInput`'s field is **`config`**, not
+`qbittorrent` (`shared/scraperIpc.ts:196`), so `normalizeQbitInput` validated `undefined` against
+`DEFAULT_SCRAPER_QBITTORRENT_SETTINGS` and answered truthfully about a disabled default. Pass
+`{ config }` or the probe lies to you.
+
+**The product defect this did find (`9dc2b8ca`).** Both sides measured live: MAL 22961 →
+*"Jimaku has no Japanese subtitles filed for this title"*; parent MAL 19163 → **10** Japanese
+Netflix CC `.srt` files under Jimaku entry **2823**, `matchedBy: anilist`. An OVA/special/recap is
+catalogued under its season, so the derivative dead-ends on a catalogue that covers it.
+`harvestParentTitle` (shared, pure) + a retry in `listSubtitleHarvest` that fires only when the
+primary found nothing **and** Jimaku answered. The retry passes no id, so the existing
+`basis: 'title'` warning names the parent — **no new i18n string**. 36 tests; two mutation controls,
+one red each (`': '`→`':'`; `head.length < 4`→`< 1`).
+
+**nyaa has no subtitle route for this title, said honestly with counts**: MAL 19163 → *"Of 5
+releases matching it, 2 declare their subtitles muxed into the video … and 3 are neither subtitle
+packs nor batches with separately-fetchable files"*; MAL 22961 → 2 matched, 2 neither. So the OVA
+cannot serve gate 31's *nyaa* clause; JoJo Part 5 can, and needs one episode's video.
+
+**Gate 31 stays 32 of 34** (open: 31, 34), counted from this file's gate tables. Its remaining leg
+is now **one named, sized transfer** — a JoJo Part 5 episode — behind a daemon that is switched off.
