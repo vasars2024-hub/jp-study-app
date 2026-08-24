@@ -364,6 +364,33 @@ export function storedMalFacts(malId: number | null | undefined): StoredMalFacts
   return NO_MAL_FACTS;
 }
 
+type RankedNyaaCandidates = Awaited<ReturnType<typeof nyaaSearch>>;
+
+/**
+ * Two ranked lists into one, under the ranker's own ordering rule.
+ *
+ * Score descending, then the smaller download, then the id — the same three
+ * keys `rankSubtitleCandidatesDetailed` sorts by, so a merged listing is
+ * ordered exactly as a single call would have ordered the union. Deduplicated
+ * by provider id because one release can answer two queries, and the first
+ * occurrence wins: the walk's own candidates come first and were scored against
+ * the title, which is the stronger claim.
+ */
+function mergeRankedCandidates(
+  first: RankedNyaaCandidates,
+  second: RankedNyaaCandidates,
+): RankedNyaaCandidates {
+  const byId = new Map<string, RankedNyaaCandidates[number]>();
+  for (const candidate of [...first, ...second]) {
+    if (!byId.has(candidate.providerItemId)) byId.set(candidate.providerItemId, candidate);
+  }
+  return [...byId.values()].sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    if (a.sizeBytes !== b.sizeBytes) return a.sizeBytes - b.sizeBytes;
+    return a.providerItemId.localeCompare(b.providerItemId);
+  });
+}
+
 /**
  * Ranked nyaa releases for a title.
  *
@@ -446,6 +473,48 @@ export async function listNyaaHarvest(
       }
       if (carriesPack) break;
     }
+
+    // THE ARCHIVE FALLBACK — one more query, and only when the walk failed.
+    //
+    // `rankSubtitleCandidatesDetailed` has scored a `sub-archive` since
+    // 2026-08-24, and no search could ever hand it one: every query the walk
+    // makes is `buildSubtitleQuery(title)`, and an archive's name carries the
+    // *site* rather than the work, which is exactly why it is the one shape
+    // allowed to skip the title check. So the route was reachable by ranking
+    // and unreachable by search. `buildSubtitleArchiveQuery` closes that.
+    //
+    // Fired only when the walk found no `sub-pack`, for the same reason the
+    // walk itself does not stop on a sidecar: an archive is one release for
+    // every show — a 28,748-file metadata handshake that may hold no folder for
+    // this work at all — and a named per-title pack is a small torrent already
+    // known to be about it. Its +30 sits below `sub-pack`'s +50 on purpose, so
+    // even when both are listed the pack is still offered first.
+    //
+    // Searched under `aliases[0]`, the title the media item itself knows, and
+    // that title rides the fetch token so `selectSubtitleFiles` narrows the
+    // archive to this work's folder before a byte moves. The later aliases are
+    // names the *index* files releases under; a directory inside a subtitle
+    // site's own dump is named for the work, and `looksLikeSameTitle` matches
+    // the folder on half its tokens.
+    //
+    // Cost: exactly one extra paced request, and only on a title that already
+    // has no pack — the ordinary case where the primary name finds one is
+    // untouched.
+    if (!found.some((candidate) => candidate.route === 'sub-pack')) {
+      await sleep(FETCH_PACING_MS);
+      const { candidates, dropped } = await nyaaSearchDetailed({
+        config,
+        title: aliases[0],
+        season,
+        episode: null,
+        languages: ['ja'],
+        episodeCount: stored.totalEpisodes,
+        archiveScoped: true,
+      });
+      if (dropped.titleMatched > drops.titleMatched) drops = dropped;
+      found = mergeRankedCandidates(found, candidates);
+    }
+
     // The one session catalogue in `subtitleNyaaSource`, shared with discovery,
     // so an id listed by either surface is fetchable by either — and the
     // "candidate ids do not survive a restart" trap lives in exactly one place.

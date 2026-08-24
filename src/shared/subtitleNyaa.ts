@@ -1438,3 +1438,36 @@ export function buildSubtitleQuery(input: NyaaSubtitleQueryInput): ScraperTorren
     category: input.category?.trim() || '1_0',
   };
 }
+
+/**
+ * The one word an archive-scoped search can be made of.
+ *
+ * `SUBTITLE_ARCHIVE_RE` recognises three names, and nyaa's text search ANDs the
+ * words it is given — so the three cannot be asked for in a single query, and
+ * asking three times spends three paced requests to find one release.
+ * `kitsunekko` is the name that actually exists on the index; the other two are
+ * how the same shape is named when it is not that site's dump.
+ */
+export const SUBTITLE_ARCHIVE_QUERY_TERM = 'kitsunekko';
+
+/**
+ * Builds the index query that can surface a whole-site subtitle archive.
+ *
+ * A per-title query cannot: `buildSubtitleQuery` asks the index for the work,
+ * and an archive's name carries the *site*, never the work — which is the whole
+ * reason `looksLikeSubtitleArchive` is allowed to skip the title check. So the
+ * `sub-archive` route was reachable by ranking and unreachable by search until
+ * this query existed, and the only caller that needs it is one that has already
+ * failed to find a per-title pack.
+ *
+ * The query is deliberately loose and the ranker stays strict: whatever comes
+ * back is still held to `looksLikeSubtitleArchive` (or, for the site's ordinary
+ * per-title packs, to the title check like any other row), so a broad word here
+ * cannot widen what is offered.
+ */
+export function buildSubtitleArchiveQuery(category?: string): ScraperTorrentQuery {
+  return {
+    text: SUBTITLE_ARCHIVE_QUERY_TERM,
+    category: category?.trim() || '1_0',
+  };
+}

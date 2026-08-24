@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import type { TorrentRow } from '../scraperResults';
 import {
   asNyaaAcquisitionConfig,
+  buildSubtitleArchiveQuery,
   buildSubtitleQuery,
+  SUBTITLE_ARCHIVE_QUERY_TERM,
   couldCarrySidecarSubtitles,
   declaresExternalSubtitles,
   declaresMuxedSubtitles,
@@ -1301,6 +1303,33 @@ describe('looksLikeSubtitleArchive / the sub-archive route', () => {
     const small = row({ name: '[kitsunekko.net] Some Show subtitle pack', sizeBytes: 2 * MB });
     expect(looksLikeSubtitleOnly(small)).toBe(true);
     expect(looksLikeSubtitleArchive(small)).toBe(false);
+  });
+
+  // The route was scored from 2026-08-24 and could not be reached: nothing ever
+  // asked the index a question an archive's name could answer. These pin the
+  // query that closes that, against the detector rather than against a string.
+  it('is asked for by a query its own detector recognises', () => {
+    const query = buildSubtitleArchiveQuery();
+    expect(query).toEqual({ text: SUBTITLE_ARCHIVE_QUERY_TERM, category: '1_0' });
+    // The claim, and it is the whole point: the word this query is made of is a
+    // word `looksLikeSubtitleArchive` keys on, so the live row really is in the
+    // result set the query returns.
+    expect(KITSUNEKKO.name.toLowerCase()).toContain(query.text.toLowerCase());
+    expect(looksLikeSubtitleArchive(KITSUNEKKO)).toBe(true);
+  });
+
+  it('is a question no per-title query asks — the negative control', () => {
+    // Why the extra request exists at all. Every query the harvest walk makes is
+    // the work's name, and the archive's name shares no word with it, so no
+    // amount of alias walking could ever have surfaced this row.
+    const perTitle = buildSubtitleQuery({ title: 'JoJo no Kimyou na Bouken: Ougon no Kaze' });
+    expect(perTitle.text.toLowerCase()).not.toContain(SUBTITLE_ARCHIVE_QUERY_TERM);
+    expect(looksLikeSameTitle(KITSUNEKKO.name, perTitle.text)).toBe(false);
+  });
+
+  it('takes a narrower category when one is offered, like every other query', () => {
+    expect(buildSubtitleArchiveQuery('1_3').category).toBe('1_3');
+    expect(buildSubtitleArchiveQuery('  ').category).toBe('1_0');
   });
 });
 

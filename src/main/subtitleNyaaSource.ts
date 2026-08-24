@@ -38,6 +38,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import type { SubtitleRecordFormat } from '../shared/subtitleRecord';
 import {
+  buildSubtitleArchiveQuery,
   buildSubtitleQuery,
   episodeFromFileName,
   languageFromFileName,
@@ -272,6 +273,19 @@ export interface NyaaSearchInput {
    * unset, which is what keeps a single episode's sidecar a valid answer there.
    */
   episodeCount?: number | null;
+  /**
+   * Ask the index for a whole-site subtitle archive instead of for the title.
+   *
+   * `title` is still required and still used — it is what the ranker narrows
+   * non-archive rows with, and what the fetch token carries so
+   * `selectSubtitleFiles` can pick this work's folder out of the archive before
+   * a byte is downloaded. Only the *query text* changes.
+   *
+   * Off by default, because an archive is the answer of last resort: it is one
+   * release for every show, so it can never outrank a pack that is actually
+   * about the work.
+   */
+  archiveScoped?: boolean;
 }
 
 /**
@@ -323,7 +337,9 @@ export async function nyaaSearchDetailed(
 
   await paceSearch();
   const rows = await searchTorrents({
-    query: buildSubtitleQuery({ title: input.title, episode: input.episode }),
+    query: input.archiveScoped
+      ? buildSubtitleArchiveQuery()
+      : buildSubtitleQuery({ title: input.title, episode: input.episode }),
     indexers: input.config.indexers,
     torrents: {
       ...input.config.torrents,

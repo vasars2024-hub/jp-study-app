@@ -32,6 +32,13 @@ let searchThrows: Error | null = null;
 const searchCalls: Record<string, unknown>[] = [];
 /** Per-title results, for the alias cases. Falls back to `searchResult`. */
 const searchByTitle = new Map<string, unknown[]>();
+/** `searchByTitle` key for one call — archive-scoped calls are their own leg. */
+const searchKey = (input: Record<string, unknown>) =>
+  (input.archiveScoped ? `archive:${String(input.title)}` : String(input.title));
+/** Titles the alias walk itself asked for, with the archive fallback removed. */
+const walkTitles = () => searchCalls.filter((call) => !call.archiveScoped).map((call) => call.title);
+/** Calls the archive fallback made — 0 or 1, and 0 is the interesting one. */
+const archiveCalls = () => searchCalls.filter((call) => call.archiveScoped);
 let fetchOutcome: unknown = { ok: true, files: [] };
 let fetchedWith: { candidate: unknown; config: unknown } | null = null;
 const remembered = new Map<string, unknown>();
@@ -53,7 +60,11 @@ vi.mock('../subtitleNyaaSource', () => ({
     searchInput = input;
     searchCalls.push(input);
     if (searchThrows) throw searchThrows;
-    const byTitle = searchByTitle.get(String(input.title));
+    // An archive-scoped call asks the index a different question entirely
+    // (`kitsunekko`, not the title), so it gets its own key. Without that,
+    // every existing alias case would silently answer the fallback with its own
+    // fixture and the extra leg would be untestable.
+    const byTitle = searchByTitle.get(searchKey(input));
     return {
       candidates: byTitle ?? (searchByTitle.size ? [] : searchResult),
       dropped: { ...noDrops(), ...(dropsByTitle.get(String(input.title)) ?? {}) },
@@ -171,6 +182,27 @@ function sidecarRow(id: string) {
     language: 'ja',
     score: 41,
     reasons: ['route:batch-sidecar', 'ja'],
+  };
+}
+
+/**
+ * The third route: one release holding every show a subtitle site ever filed.
+ *
+ * 5.8 GB whole, and `nyaaFetch` transfers only the selected files — JoJo Part
+ * 5's folder is 39 files / 1.25 MB out of it. Scored above a batch (+30 against
+ * +10) and below a named pack (+50), which is why it can only ever be reached
+ * when the walk found no pack.
+ */
+function archiveRow(id: string) {
+  return {
+    providerItemId: id,
+    releaseName: '[PeepoHappy] Kitsunekko Archive 16/07/2021',
+    route: 'sub-archive' as const,
+    sizeBytes: 6_120_000_000,
+    seeders: 12,
+    language: 'ja',
+    score: 74,
+    reasons: ['route:sub-archive', 'ja'],
   };
 }
 
@@ -332,7 +364,7 @@ describe('listNyaaHarvest', () => {
     expect(result.candidates).toHaveLength(0);
     expect(result.searchedAs).toBeNull();
     expect(result.message).toMatch(/looks like it carries subtitles/i);
-    expect(searchCalls).toHaveLength(2);
+    expect(walkTitles()).toEqual(['Shinreigari', 'Ghost Hound']);
   });
 
   // The synced library is where MAL's own names for a show live. Before this,
@@ -367,7 +399,7 @@ describe('listNyaaHarvest', () => {
       title: 'Shinreigari', titles: [], acquisition: acquisition(),
     });
 
-    expect(searchCalls.map((call) => call.title)).toEqual(['Shinreigari']);
+    expect(walkTitles()).toEqual(['Shinreigari']);
     expect(result.candidates).toHaveLength(0);
   });
 
@@ -377,7 +409,7 @@ describe('listNyaaHarvest', () => {
       title: 'Shinreigari', titles: [], malId: 999_999, acquisition: acquisition(),
     });
     expect(result.ok).toBe(true);
-    expect(searchCalls.map((call) => call.title)).toEqual(['Shinreigari']);
+    expect(walkTitles()).toEqual(['Shinreigari']);
   });
 
   // `Fujimoto Tatsuki 17-26` really carries ten synonyms and they are the titles
@@ -395,8 +427,8 @@ describe('listNyaaHarvest', () => {
     });
 
     expect(result.ok).toBe(true);
-    expect(searchCalls).toHaveLength(HARVEST_ALIAS_LIMIT);
-    expect(searchCalls.map((call) => call.title)).toEqual([
+    expect(walkTitles()).toHaveLength(HARVEST_ALIAS_LIMIT);
+    expect(walkTitles()).toEqual([
       'Fujimoto Tatsuki 17-26', 'Ningyo Rhapsody', 'Yogen no Nayuta', 'Sasaki to Miyano',
     ]);
   });
@@ -414,7 +446,7 @@ describe('listNyaaHarvest', () => {
       acquisition: acquisition(),
     });
 
-    expect(searchCalls.map((call) => call.title)).toEqual([
+    expect(walkTitles()).toEqual([
       'Shinreigari', 'Ghost Hound', '心霊狩り', 'stored-a',
     ]);
   });
@@ -478,7 +510,7 @@ describe('listNyaaHarvest', () => {
     expect(result.ok).toBe(true);
     expect(result.candidates.map((row) => row.id)).toEqual(['nyaa:first-batch']);
     expect(result.searchedAs).toBeNull();
-    expect(searchCalls).toHaveLength(2);
+    expect(walkTitles()).toHaveLength(2);
   });
 
   it('reports the alias a fallback sidecar was found under, not the title', async () => {
@@ -496,7 +528,85 @@ describe('listNyaaHarvest', () => {
 
     expect(result.candidates.map((row) => row.id)).toEqual(['nyaa:utena-batch']);
     expect(result.searchedAs).toBe('Revolutionary Girl Utena');
-    expect(searchCalls).toHaveLength(3);
+    expect(walkTitles()).toHaveLength(3);
+  });
+
+  // ------------------------------------------------------------ the archive ---
+  //
+  // The `sub-archive` route has been scored since 2026-08-24 and no search could
+  // hand it a row: every query the walk makes is the *title*, and an archive is
+  // named for the site. These pin the one extra query that closes that, and —
+  // more importantly — pin that it stays off in the ordinary case.
+
+  it('asks the index for a whole-site archive when no name carried a sub-pack', async () => {
+    searchByTitle.set('Eureka Seven', [sidecarRow('nyaa:hi-evolution')]);
+    searchByTitle.set('archive:Eureka Seven', [archiveRow('nyaa:kitsunekko')]);
+
+    const result = await listNyaaHarvest({
+      title: 'Eureka Seven',
+      titles: ['Psalms of Planets Eureka Seven'],
+      acquisition: acquisition(),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(archiveCalls()).toHaveLength(1);
+    // A range request, Japanese, and never one episode — the same contract the
+    // walk's own calls are held to.
+    expect(archiveCalls()[0]).toMatchObject({ episode: null, languages: ['ja'], archiveScoped: true });
+    // Both are offered, archive first: 1.25 MB of this show's cues against
+    // 43 GB of video the user did not ask for.
+    expect(result.candidates.map((row) => row.id)).toEqual(['nyaa:kitsunekko', 'nyaa:hi-evolution']);
+    expect(result.candidates[0].route).toBe('sub-archive');
+  });
+
+  it('never asks for an archive when a name already carried a sub-pack', async () => {
+    // The negative control, and the one that keeps the cost honest: an archive
+    // is a 28,748-file handshake, so a title that already has a small named pack
+    // must not spend a request finding out an archive exists.
+    searchByTitle.set('Eureka Seven', [candidateRow('nyaa:primary-pack')]);
+    searchByTitle.set('archive:Eureka Seven', [archiveRow('nyaa:kitsunekko')]);
+
+    const result = await listNyaaHarvest({ title: 'Eureka Seven', acquisition: acquisition() });
+
+    expect(result.candidates.map((row) => row.id)).toEqual(['nyaa:primary-pack']);
+    expect(archiveCalls()).toEqual([]);
+  });
+
+  it('searches the archive under the title the media item knows, not the last alias', async () => {
+    // The title rides the fetch token and is what `selectSubtitleFiles` narrows
+    // the archive's 1,871 folders with. The walk's later names are how the
+    // *index* files releases; a folder inside a subtitle site's dump is named
+    // for the work.
+    searchByTitle.set('archive:Shoujo Kakumei Utena', [archiveRow('nyaa:kitsunekko')]);
+
+    const result = await listNyaaHarvest({
+      title: 'Shoujo Kakumei Utena',
+      titles: ['Revolutionary Girl Utena'],
+      acquisition: acquisition(),
+    });
+
+    expect(walkTitles()).toEqual(['Shoujo Kakumei Utena', 'Revolutionary Girl Utena']);
+    expect(archiveCalls()[0]?.title).toBe('Shoujo Kakumei Utena');
+    expect(result.candidates.map((row) => row.id)).toEqual(['nyaa:kitsunekko']);
+  });
+
+  it('lists a release once when both queries return it', async () => {
+    searchByTitle.set('Eureka Seven', [sidecarRow('nyaa:same')]);
+    searchByTitle.set('archive:Eureka Seven', [sidecarRow('nyaa:same')]);
+    const result = await listNyaaHarvest({ title: 'Eureka Seven', acquisition: acquisition() });
+    expect(archiveCalls()).toHaveLength(1);
+    expect(result.candidates.map((row) => row.id)).toEqual(['nyaa:same']);
+  });
+
+  it('still refuses in the index’s own words when the archive query finds nothing either', async () => {
+    // The fallback must not turn a refusal into an empty success, nor swallow
+    // the walk's own count of what it saw.
+    dropsByTitle.set('The Big O', { titleMatched: 7, muxed: 4 });
+    const result = await listNyaaHarvest({ title: 'The Big O', acquisition: acquisition() });
+    expect(result.ok).toBe(true);
+    expect(result.candidates).toHaveLength(0);
+    expect(archiveCalls()).toHaveLength(1);
+    expect(result.message).toContain('Of 7 releases matching it, 4 declare their subtitles');
   });
 
   it('reports a thrown search rather than rejecting across IPC', async () => {
