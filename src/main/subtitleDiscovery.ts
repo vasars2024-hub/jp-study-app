@@ -76,7 +76,7 @@ import {
 import { harvestSearchAliases } from '../shared/subtitleHarvest';
 import { storedMalFacts } from './subtitleHarvest';
 import { asNyaaAcquisitionConfig, describeEmptyNyaaListing } from '../shared/subtitleNyaa';
-import { parseMediaFileName } from '../shared/mediaFileIdentity';
+import { providerSearchTitle } from '../shared/mediaFileIdentity';
 import { osdbHashFile } from './osdbHash';
 import { enqueueTranscription } from './transcriptionJobs';
 
@@ -301,55 +301,6 @@ function toProvidersDocument(
 interface ScoredCandidate {
   candidate: ProviderSubtitleCandidate;
   score: number;
-}
-
-/**
- * An episode range left on the end of a stored title, and only ever a *range*.
- *
- * `parseMediaFileName` cannot cut this one itself: its trailing-episode rule
- * fires only when the name still carries a leading `[Group]`, which is exactly
- * the convention that produces a bare trailing number — and a stored
- * `seriesTitle` has already had that bracket consumed. Relaxing the rule there
- * would put `Mob Psycho 100` back at risk of parsing as episode 100, which is
- * the trap that rule exists for.
- *
- * So this pattern never matches a bare number. It requires an explicit range
- * (`39-END`, `01-26`) or an `ep`/`episode` word, both of which are release
- * artefacts no series is actually named after. Being wrong here only widens a
- * search; being wrong in the parser mis-assigns an episode.
- */
-const STORED_TITLE_EPISODE_TAIL =
-  /[\s._-]+(?:(?:ep?|episodes?)[\s._-]*)?\d{1,3}[\s._-]*[-~][\s._-]*(?:\d{1,3}|end|fin(?:al)?)$|[\s._-]+(?:ep|episodes?)[\s._-]*\d{1,3}$/i;
-
-/**
- * The text to search a provider's index with, for an item whose stored title
- * still carries release noise.
- *
- * `seriesTitle` is written once, when the file enters the library, by whatever
- * parser was running at that moment. A file acquired from a torrent can
- * therefore keep an episode range in it — the case this exists for is
- * `JoJo no Kimyou na Bouken - Ougon no Kaze 39-END`, added before the parser
- * could read a `-END` tail. Searched verbatim, that matches exactly one release
- * on nyaa: the very file the item was made from. The listing then reports,
- * honestly and uselessly, that the index carries no subtitles for the title.
- *
- * Re-parsing costs nothing and cannot invent a title: the parser falls back to
- * the input when there is nothing to cut, and a shorter result is taken only
- * when it is a genuine prefix of the stored one, so a parse that rewrites
- * rather than trims is ignored. Deliberately not used by `scoreCandidates` —
- * that one matches locally against a providers document keyed on the stored
- * title, and trimming one side of a comparison is how a match is lost.
- */
-export function providerSearchTitle(storedTitle: string): string {
-  const stored = storedTitle.trim();
-  if (!stored) return stored;
-  const parsed = parseMediaFileName(stored).title.trim();
-  const fromParser =
-    parsed && parsed.length < stored.length && stored.toLowerCase().startsWith(parsed.toLowerCase())
-      ? parsed
-      : stored;
-  const trimmed = fromParser.replace(STORED_TITLE_EPISODE_TAIL, '').trim();
-  return trimmed || fromParser;
 }
 
 /**

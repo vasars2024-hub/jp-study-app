@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { providerSearchTitle } from '../subtitleDiscovery';
+import { providerSearchTitle } from '../../shared/mediaFileIdentity';
 
 /**
  * `seriesTitle` is written once, at import time, by whatever parser was running

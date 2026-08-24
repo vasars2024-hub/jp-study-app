@@ -44,6 +44,7 @@ import {
   jikanSearch,
   type ProviderWork,
 } from './mediaProviderClients';
+import { providerSearchTitle } from '../shared/mediaFileIdentity';
 
 /** Injected by `media.ts`, which owns the JSON store and the change broadcast. */
 export interface MediaMetadataHost {
@@ -94,7 +95,12 @@ function groupTitles(items: readonly MediaItem[], only?: Set<string>): TitleGrou
     if (only && !only.has(item.id)) continue;
     if (!LOOKUP_CATEGORIES.has(mediaCategory(item))) continue;
     const seriesKey = item.seriesKey?.trim();
-    const title = item.seriesTitle?.trim() || item.title?.trim();
+    // The same stored-title defect the provider searches had: `seriesTitle` is
+    // written by whatever parser ran at import, so an acquired file can carry an
+    // episode range into the one lookup that would give it a `malId` — and
+    // without a `malId` the alias walk, the episode floor and Jimaku's exact
+    // match are all dead for exactly the files this app downloads itself.
+    const title = providerSearchTitle(item.seriesTitle?.trim() || item.title?.trim() || '');
     if (!seriesKey || !title) continue;
 
     const existing = groups.get(seriesKey);
