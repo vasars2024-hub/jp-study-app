@@ -70,6 +70,15 @@ const MODEL_LOAD_TIMEOUT_MS = 180_000;
  * actually use — the longest prompt it builds is a chunk of `BATCH_SIZE` = 8 sentences.
  */
 const TRANSLATE_CONTEXT_SIZE = 8_192;
+/**
+ * Tokens held back inside `TRANSLATE_CONTEXT_SIZE` for everything `tokenize()` cannot see: the chat
+ * template's role markers, BOS/EOS, and the sampler's lookahead. Deliberately generous — the cost of
+ * over-reserving is a slightly shorter completion, the cost of under-reserving is the silent context
+ * shift described on `fitOutputBudget`.
+ */
+const CHAT_TEMPLATE_RESERVE_TOKENS = 192;
+/** Below this, a completion is not worth attempting; the request is refused rather than truncated. */
+const MIN_USABLE_OUTPUT_TOKENS = 64;
 /** Same budget the local agent uses, for the same reason: a cached model is GBs of native memory. */
 const IDLE_UNLOAD_MS = 5 * 60_000;
 
@@ -146,6 +155,49 @@ export interface RunTranslationBatchOptions {
   onProgress?: (done: number, total: number) => void;
 }
 
+/**
+ * Exact whenever the weights are loaded, because it is the same tokenizer the generation will use.
+ * The character fallback only fires if the native call is unavailable or throws, and it deliberately
+ * OVER-counts Latin text (really ~4 chars/token) while sitting close to the truth on Japanese
+ * (~1.2): over-counting shortens a completion, under-counting causes the defect below.
+ */
+function countPromptTokens(prompt: string): number {
+  const model = loadedModel?.model as unknown as { tokenize?: (text: string) => unknown } | undefined;
+  try {
+    const tokens = model?.tokenize?.(prompt);
+    if (Array.isArray(tokens)) return tokens.length;
+  } catch {
+    /* Fall through to the estimate; a tokenizer failure must not fail the request. */
+  }
+  return Math.ceil(prompt.length / 1.5);
+}
+
+/**
+ * node-llama-cpp does not REJECT a prompt whose completion cannot fit the context — it CONTEXT
+ * SHIFTS, discarding the oldest part of the chat history to make room. Every prompt in this module
+ * is single-turn, so "the oldest part" is the instruction and the source text: the model then
+ * produces a fluent answer about material it can no longer see. Nothing throws and nothing is
+ * marked; the caller gets confident prose instead of an error.
+ *
+ * It was reachable by construction, not only in theory. `sentenceAnalysis.ts:212` and
+ * `mining.ts:1408` both ask for up to `Math.min(8192, ...)` OUTPUT tokens against an 8,192-token
+ * context, leaving zero room for the prompt that asked for them.
+ *
+ * So the budget is computed rather than trusted, and a prompt with no room left is an explicit
+ * failure the user can act on.
+ */
+function fitOutputBudget(prompt: string, requested: number): number {
+  const promptTokens = countPromptTokens(prompt);
+  const room = TRANSLATE_CONTEXT_SIZE - promptTokens - CHAT_TEMPLATE_RESERVE_TOKENS;
+  if (room < MIN_USABLE_OUTPUT_TOKENS) {
+    throw new Error(
+      `This text is too long for the offline translator: it needs about ${promptTokens} of the ` +
+        `${TRANSLATE_CONTEXT_SIZE} tokens it can hold at once. Try a shorter selection.`,
+    );
+  }
+  return Math.min(requested, room);
+}
+
 /** Run one prompt with an abort-on-timeout (and batch-cancel) guard so generation can never hang. */
 async function promptWithTimeout(
   s: LlamaChatSession,
@@ -153,6 +205,9 @@ async function promptWithTimeout(
   maxTokens: number,
   timeoutMs: number,
 ): Promise<string> {
+  // Every batch, strict-retry and single-sentence prompt in this module funnels through here, so
+  // this is the one place that can hold all four of them inside the context.
+  const fitted = fitOutputBudget(prompt, maxTokens);
   const controller = new AbortController();
   activeBatchAbort = controller;
   if (batchCancelled) {
@@ -163,7 +218,7 @@ async function promptWithTimeout(
   }, 250);
 
   const promptPromise = s.prompt(prompt, {
-    maxTokens,
+    maxTokens: fitted,
     signal: controller.signal,
     stopOnAbortSignal: true,
   });
@@ -600,10 +655,13 @@ export async function runLocalQwenPrompt(
   if (!isTranslateAvailable()) {
     throw new Error(friendlyError(new Error('Qwen3 model not found')));
   }
-  const maxTokens = Math.max(64, Math.min(8192, options?.maxTokens ?? 2048));
+  const requestedTokens = Math.max(64, Math.min(8192, options?.maxTokens ?? 2048));
   const timeoutMs = Math.max(5_000, options?.timeoutMs ?? 90_000);
   return enqueue(async () => {
     const s = await ensureSession();
+    // After `ensureSession`, so the weights — and therefore the real tokenizer — are loaded. The
+    // callers of this function are the ones that could ask for a whole context of output.
+    const maxTokens = fitOutputBudget(prompt, requestedTokens);
     // Independent of EPUB batch cancel — analysis/enrichment must not abort mid-flight
     // just because a translation batch was cancelled elsewhere.
     const controller = new AbortController();
