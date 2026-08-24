@@ -381,3 +381,39 @@ is a timer and no Dictionary probe will ever find it.
 sensitivity). Leg 3 fails against its own L0 baseline by an order of magnitude, and the rubric's
 10 requires *no regression against the L0 baseline on any of them*. The 10/10 recorded in the
 entry above stands as a measurement of boot 7920 and is **not** carried forward.
+
+### The 6.5 GB is LOCATED: it is the cadence, not any one control — and the idle control settles it
+
+**Idle control, and it is what makes the rest mean something.** Boot **7132** left strictly alone
+across the identical uptime window (`probes/l7c-mem-sampler.ps1`, marks 8/11/13/15/17):
+
+| uptime | 8.00 | 11.00 | 13.01 | 15.00 | 17.01 |
+| --- | --- | --- | --- | --- | --- |
+| main private MB | 573.0 | 572.7 | 573.1 | 573.9 | **573.6** |
+| handles | 1,050 | 1,051 | 1,047 | 1,047 | **1,047** |
+
+**+0.6 MB and −3 handles over nine minutes.** There is no timer. The allocation is action-driven.
+
+**Reproduced on demand.** On that same quiet boot, at 575.8 MB / 1,053 handles, one run of
+`probes/l1-deadend.js` — 19 targets in about 70 seconds — took main to **7,075.7 MB private /
+4,404 handles**, and it stayed there. Three boots now plateau at **7,071.8 / 7,082.0 / 7,075.7 MB**,
+within 10 MB of each other, which is a ceiling being hit rather than a drift.
+
+**And every individual control is exonerated, on clean boots, sampled between clicks:**
+search (+340.2 then −227.4), `Find containing words` / `Find phrases` / `Find example sentences` /
+`Find shared senses` (worst **+7.6**), the `Example sentences` summary (**−256.4**), the
+`Dictionary` lens (−1.9), the `Interlinear` lens plus every `details` opened plus
+`Search my subtitles` (+50.4 then −32), all **8** `Play <word>` (worst +0.3), a whole AI explain
+create-and-`Forget` cycle (**+1.8** total), and **six** Liquid⇄Standard presentation toggles
+(**+1.7** over all six).
+
+**So the shape is a release failure under cadence, not a leak in any one path.** A single action
+transiently commits ~250–340 MB in main and gives it back — `searched` reads 801.1 MB and the very
+next sample reads 544.7. Nineteen of them back to back at the sweep's settle interval never give
+any of it back. Which allocation it is, is the next slice; the honest statement today is that the
+window's own controls, driven at a rate a fast user can produce, take main from 0.57 GB to 7 GB
+permanently.
+
+**Category 7 stays capped at less than 10** and this is now a located product defect rather than an
+unexplained number. Repro, three commands: boot clean, `probes/l7d-setup.cjs`, then
+`debug/evfile.cjs probes/l1-deadend.js` and read `PrivateMemorySize64` before and 70 s after.

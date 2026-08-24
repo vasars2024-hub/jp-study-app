@@ -308,3 +308,21 @@ at arm time, clicks it back, and reports `lensMode` / `lensModeRestored`.
 
 **Category 2 on the re-drive: dead ends 2 of 18, both honest no-ops** — see the numbers in the
 next commit's re-run, which is what the scorecard carries.
+
+### The number the scorecard needs — sweep re-run on boot 18212 with the fixed probe
+
+`nRoster` **62**, `nTargets` **19** (was 20; `Forget this explanation` now skipped by name),
+**coverage 18/18**, `resolvedBy` live 4 / key 14 / class 0, `worstSettleTries` 1, `gone` **0**,
+`unstable` **0**, `savedStoreUntouched` **true**, bait `changed:false` — the control still fails.
+
+**Dead ends: 2 of 18 — `Search` and `Automatic`**, both honest already-in-that-state no-ops
+(the query is already displayed; the lens is already selected). The 16 remaining targets all
+report an effect.
+
+`lensMode: {atArm: "Automatic", restoredTo: "Automatic"}`, `lensModeRestored: **true**` — the new
+restore works, so the sweep no longer leaves the surface in a lens it was not found in.
+
+**Category 2 = 10/10 on this tree.** The Liquid path costs no more input than Standard, zero modal
+traps, zero scroll traps, zero dead ends that are not honest no-ops, and every input acknowledged
+inside the sweep's settle. One thing this run also produced, and it belongs to category 7 rather
+than here: driving these 19 controls in ~70 s takes main from 575.8 MB to 7,075.7 MB private.
