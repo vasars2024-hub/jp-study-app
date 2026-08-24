@@ -194,3 +194,43 @@ The fourth is real: **`Explain again` produces nothing at all.** Driven alone, q
 to re-ask — and the control says so nowhere. `Explain this word` fills the panel in <200 ms from
 the local cache, so the surrounding feature is alive; only the re-ask is silent. That is a
 category-2 dead end and a category-8 missing state, and it is a product fix, not a probe fix.
+
+### The `Explain again` defect, narrowed to two candidate lines — and the two probes that lied
+
+Corrections to the paragraph above, both from measuring rather than reasoning. The engine is **not**
+the disabled local model: `aiGetConfig()` reads `engine: 'cloud'`, `providerId: 'gemini-2.5-flash'`,
+`apiKeysSet.gemini: true`, `localModelAvailable: true`. And the control does paint — briefly.
+
+**What it actually does, at DOM-mutation resolution.** Three mutations, whole cycle **4 ms**:
+
+| t (ms) | ask button | disabled | panel chars | error el | blocked el | provenance |
+| --- | --- | --- | --- | --- | --- | --- |
+| 9733608 | `Explain again` | false | 1761 | — | — | `From cloud:gemini-2.5-flash:default, kept since 8/24/2026.` |
+| 9733611 | `Asking the model…` | true | 1765 | — | — | unchanged |
+| 9733615 | `Explain again` | false | 1761 | — | — | unchanged |
+
+4 ms is not a cloud round trip, and `/logs?level=error` is **total 0**. So `explain(true)` returns
+before `dictExplain` resolves anything — at `EntryExplain.tsx:128` (`attempt !== run.current`) or
+`:130` (`!live.ok`). Both are bare `return`s. The main side is not the suspect: `explainRun.ts:85`
+honours `refresh` correctly, and `dictionary.ts:1074` forwards `request.refresh === true`.
+
+**Probe A lied and is recorded so nobody repeats it.** To tell those two lines apart, the obvious
+move is to wrap `window.api.dictExplain`, click once, and read what the component sent. It recorded
+**0 calls**, which reads like proof the IPC is never reached. It is not proof of anything:
+`Object.isFrozen(window.api)` is **true** — `contextBridge` deep-freezes the exposed object, the
+assignment no-ops **without throwing** in the bridge's non-strict context, and the wrapper was never
+installed. Verified directly: `patchTook: false`, `threw: null`. **Never instrument `window.api`
+from the bridge.** Instrument the main handler and restart, or log inside the component.
+
+**Probe B lied for a different reason and explains four earlier stalls.** A 25 ms `setInterval`
+sampler produced **7 samples in 6 s**, and three async probes stopped mid-run with `done:false`.
+The app window is **unfocused** (`/health` → `focused:false`), so Chromium throttles every
+sub-second timer to about **1 Hz**. Nothing hung. Use a `MutationObserver` — it fires on the real
+mutation regardless of throttling, which is the only reason the 4 ms cycle above was seen at all.
+It also means the sweep's `worstSettleTries: 1` was earned with a settle gap nearer 1 s than the
+declared 120 ms: more conservative than intended, so the verdicts stand.
+
+**Next slice, and it opens the next turn:** add a one-line main-side log at `dictionary.ts:1041`,
+restart (main does not hot-reload), click `Explain again` once, and see whether `dict:explain` ever
+arrives. Then fix whichever bare `return` it is so the control reports something, and re-drive
+`l1-deadend.js` — dead ends **4 → 3**, all three honest no-ops, which is category 2's 10.
