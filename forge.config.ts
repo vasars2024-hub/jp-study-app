@@ -196,6 +196,19 @@ const config: ForgeConfig = {
           config: 'vite.main.config.ts',
           target: 'main',
         },
+        {
+          // The local-model utility process. `llamaHostWorker.ts` carries the measurement: a
+          // load/unload cycle returns 2,434 MB on its own but leaves +534.6 MB / +3,349 handles
+          // that no disposal reclaims, because `getLlama()` loads another copy of the native addon
+          // per call and deleting a require-cache entry does not unload a DLL. A process exit does.
+          // Same shape as the two workers above — `target: 'main'` for the Node/Electron child,
+          // built with the same externals (`node-llama-cpp` stays external), and Vite names the
+          // output after the entry so `llamaHost.ts` resolves it as
+          // `<.vite/build>/llamaHostWorker.js` beside `main.js`.
+          entry: 'src/main/llamaHostWorker.ts',
+          config: 'vite.main.config.ts',
+          target: 'main',
+        },
       ],
       renderer: [
         {
