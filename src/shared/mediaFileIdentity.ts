@@ -122,6 +122,25 @@ const SEASON_X_EPISODE = /\b(\d{1,2})x(\d{1,3})\b/;
 const SEASON_ONLY = /\bs(?:eason)?[\s._-]*(\d{1,2})\b/i;
 const EPISODE_WORD = /\b(?:episode|epis[oó]dio|ep|e)[\s._-]*(\d{1,3})(?:v\d)?\b/i;
 const EPISODE_DASH = /\s-\s*(\d{1,3})(?:v\d)?(?=$|[\s([])/;
+/**
+ * The bare trailing episode number — no `E`, no `-`, just the number sitting
+ * between the title and the tag block:
+ *
+ *   `[Anime Land] JoJo no Kimyou na Bouken - Ougon no Kaze 38 (WEBRip 720p …)`
+ *
+ * Measured, and the reason this exists: without it that name parses to
+ * `episode: null` and a title of `… Ougon no Kaze 38`, so an acquired episode
+ * cannot be paired with the harvested subtitle for the same episode — the whole
+ * subs-only pipeline ends one step short of the player. It is a mainstream
+ * fansub convention, not an exotic one.
+ *
+ * The lookahead is the guard: the number must be the last token before a
+ * bracket group, and that group must not be a bare year, so
+ * `Mob Psycho 100 (2016)` is refused rather than read as episode 100. Two more
+ * conditions live at the call site, because they are properties of the whole
+ * name rather than of this position — see {@link parseMediaFileName}.
+ */
+const EPISODE_TRAILING = /\s(\d{1,3})(?:v\d)?\s*(?=[[(](?!(?:19|20)\d{2}[\])]))/;
 
 const KIND_MOVIE = /\b(movie|film|gekijouban|劇場版)\b/i;
 const KIND_OVA = /\b(ova|oad|oav)\b/i;
@@ -241,15 +260,37 @@ export function parseMediaFileName(fileName: unknown): ParsedMediaFile {
   const resolutionDimensions = RESOLUTION_DIMENSIONS.exec(name);
   const resolution = toInt(resolutionTag?.[1]) ?? toInt(resolutionDimensions?.[1]);
 
+  // Read before the episode block, not after, because an extra's trailing number
+  // is an extra index and must not be reachable by EPISODE_TRAILING below.
+  const ovaMarker = KIND_OVA.exec(name);
+  const specialMarker = ovaMarker ? null : KIND_SPECIAL.exec(name);
+
   const seasonEpisode = SEASON_EPISODE.exec(name);
   const seasonXEpisode = seasonEpisode ? null : SEASON_X_EPISODE.exec(name);
   const seasonOnly = seasonEpisode || seasonXEpisode ? null : SEASON_ONLY.exec(name);
   const episodeWord = seasonEpisode || seasonXEpisode ? null : EPISODE_WORD.exec(name);
   const episodeDash = seasonEpisode || seasonXEpisode || episodeWord ? null : EPISODE_DASH.exec(name);
+  /**
+   * Last resort, and deliberately the narrowest of the five.
+   *
+   * Two conditions beyond the pattern itself. It fires only when the name
+   * carried a leading `[Group]` — that is the convention that produces a bare
+   * trailing number at all, and requiring it keeps `Mob Psycho 100 [1080p].mkv`
+   * out. And it never fires on an OVA/creditless/special, because
+   * `The Big O - Creditless Ending 1 [BDRip …]` is not episode 1: that exact
+   * collision cost two of a 26-file harvest once already, and a `null` from
+   * this parser is the answer that prevented it.
+   */
+  const episodeTrailing =
+    seasonEpisode || seasonXEpisode || episodeWord || episodeDash
+      || !leadingGroup || ovaMarker || specialMarker
+      ? null
+      : EPISODE_TRAILING.exec(name);
 
   const season = toInt(seasonEpisode?.[1]) ?? toInt(seasonXEpisode?.[1]) ?? toInt(seasonOnly?.[1]);
   const episode =
-    toInt(seasonEpisode?.[2]) ?? toInt(seasonXEpisode?.[2]) ?? toInt(episodeWord?.[1]) ?? toInt(episodeDash?.[1]);
+    toInt(seasonEpisode?.[2]) ?? toInt(seasonXEpisode?.[2]) ?? toInt(episodeWord?.[1])
+    ?? toInt(episodeDash?.[1]) ?? toInt(episodeTrailing?.[1]);
   const episodeEnd = toInt(seasonEpisode?.[3]);
 
   // A year is trusted when bracketed, or when delimited by separators on both sides.
@@ -260,9 +301,9 @@ export function parseMediaFileName(fileName: unknown): ParsedMediaFile {
   const year = toInt(bracketedYear?.[1]) ?? toInt(delimitedYear?.[1]);
 
   const isMovie = KIND_MOVIE.test(name);
-  // Matched rather than tested so the marker's position can trim the title below.
-  const ovaMarker = KIND_OVA.exec(name);
-  const specialMarker = ovaMarker ? null : KIND_SPECIAL.exec(name);
+  // `ovaMarker` / `specialMarker` are matched rather than tested — the marker's
+  // position trims the title below — and are read above, before the episode
+  // block that now depends on them.
   const kind: MediaReleaseKind =
     ovaMarker ? 'ova'
       : specialMarker ? 'special'
@@ -293,7 +334,7 @@ export function parseMediaFileName(fileName: unknown): ParsedMediaFile {
   // series' own title key — `The Big O - Creditless Opening` has to group under
   // `The Big O`, not become a one-file series of its own.
   const title = cleanTitle(titleBefore(name, [
-    seasonEpisode, seasonXEpisode, seasonOnly, episodeWord, episodeDash,
+    seasonEpisode, seasonXEpisode, seasonOnly, episodeWord, episodeDash, episodeTrailing,
     bracketedYear, delimitedYear, resolutionTag, resolutionDimensions,
     ovaMarker, specialMarker,
   ])) || cleanTitle(name) || raw;

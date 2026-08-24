@@ -86,6 +86,37 @@ describe('parseMediaFileName', () => {
       season: 2, episode: null, kind: 'season-pack',
     });
   });
+
+  it('reads a bare trailing episode number and keeps it out of the title', () => {
+    // The real release gate 31's render leg was acquired on. Before this rule it
+    // parsed to `episode: null` with `38` welded onto the title, so the harvested
+    // subtitle for episode 38 could not be paired with it.
+    expect(parseMediaFileName(
+      '[Anime Land] JoJo no Kimyou na Bouken - Ougon no Kaze 38 (WEBRip 720p Hi444PP AAC) RAW [A95B628C].mp4',
+    )).toMatchObject({
+      title: 'JoJo no Kimyou na Bouken - Ougon no Kaze',
+      episode: 38,
+      season: null,
+      kind: 'episode',
+    });
+    expect(parseMediaFileName('[Sub] Show 07 [1080p].mkv')).toMatchObject({ title: 'Show', episode: 7 });
+  });
+
+  it('refuses the bare trailing number wherever it would be a guess', () => {
+    // A bare year in the following bracket is a year, not an episode.
+    expect(parseMediaFileName('[Grp] Mob Psycho 100 (2016) 1080p.mkv')).toMatchObject({
+      episode: null, year: 2016,
+    });
+    // No leading [Group] means the name is not following the convention this
+    // rule reads, so a number in the title stays in the title.
+    expect(parseMediaFileName('Mob Psycho 100 [1080p].mkv')).toMatchObject({ episode: null });
+    // The collision this rule must never recreate: a creditless extra's index.
+    expect(parseMediaFileName('[Grp] The Big O - Creditless Ending 1 [BDRip 1440x1080].mkv'))
+      .toMatchObject({ episode: null, kind: 'special' });
+    expect(parseMediaFileName('[Grp] Show OVA 2 [1080p].mkv')).toMatchObject({ episode: null, kind: 'ova' });
+    // A stronger marker still wins outright.
+    expect(parseMediaFileName('[Grp] Show - 05 (1080p) 12 [x265].mkv')).toMatchObject({ episode: 5 });
+  });
 });
 
 describe('inferMediaCategory', () => {
