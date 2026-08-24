@@ -67,6 +67,13 @@ const argOf = (name, dflt) => {
 const LIMIT = Number(argOf('--limit', '0')) || 0;
 const ONLY = argOf('--only', '');
 const SETTLE = Number(argOf('--settle', '450'));
+/**
+ * The slow-path settle. No control is recorded DEAD until it has been re-probed with this much
+ * time, because an effect that lands over IPC after the fast settle reads exactly like no effect
+ * at all -- `EntryExplain.forget()` awaits `dictExplanationClear` against a 697k-row database
+ * before it clears the panel, and at 450 ms it produced this probe's only DEAD.
+ */
+const SLOW_SETTLE = Number(argOf('--slow-settle', '3000'));
 const SELF_TEST = process.argv.includes('--self-test');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -106,13 +113,20 @@ const INSTALL = `(() => {
    * refuses. These are NOT counted as alive and NOT counted as dead — they are reported.
    */
   const EXCLUDE = [
-    { test: (c, l, x) => /^(×|✕|✖)$/.test(x) || /^close$/i.test(l), why: 'closes the window being measured' },
-    { test: (c, l, x) => /^(─|—|_)$/.test(x) || /^minimi[sz]e$/i.test(l), why: 'minimises the window being measured' },
-    { test: (c, l, x) => /^(▢|□|⛶)$/.test(x) || /^(maximi[sz]e|restore down)$/i.test(l), why: 'maximises — changes the geometry every other number is measured against' },
+    // A GLYPH ALONE IS NOT THE WINDOW CHROME. \`Remove saved search\` also renders a bare ×, so the
+    // glyph tests matched it first and the run reported a destructive control under the reason
+    // "closes the window being measured" — a true exclusion with a false reason, which is what an
+    // exclusion table is for getting right. The glyph now only counts when it IS the whole label.
+    { test: (c, l, x) => (l === x && /^(×|✕|✖)$/.test(x)) || /^close$/i.test(l), why: 'closes the window being measured' },
+    { test: (c, l, x) => (l === x && /^(─|—|_)$/.test(x)) || /^minimi[sz]e$/i.test(l), why: 'minimises the window being measured' },
+    { test: (c, l, x) => (l === x && /^(▢|□|⛶)$/.test(x)) || /^(maximi[sz]e|restore down)$/i.test(l), why: 'maximises — changes the geometry every other number is measured against' },
     { test: (c, l, x) => /^(⧉)$/.test(x) || /pop\\s*(it)?\\s*out/i.test(l), why: 'pops the window out into a separate BrowserWindow' },
     { test: (c) => c.classList.contains('fwin-b-liquid'), why: 'presentation toggle — measured by l1-q78-drive.cjs, not here' },
     { test: (c, l) => /anki|add card|mine/i.test(l) || /anki/i.test(String(c.className || '')), why: 'writes a real note into the user\\'s real Anki collection' },
-    { test: (c, l) => /delete|remove|clear|reset|trash/i.test(l), why: 'destructive — userData has no restore point' },
+    // \`forget\` belongs here and was missing: \`Forget this explanation\` deletes the stored model
+    // answer through \`dictExplanationClear\` and there is no undo on the control, so the
+    // 2026-08-24 run destroyed a cached explanation in order to prove the button was not dead.
+    { test: (c, l) => /delete|remove|clear|reset|trash|forget/i.test(l), why: 'destructive — userData has no restore point' },
     { test: (c, l) => /copy/i.test(l) || /copy/i.test(String(c.className || '')), why: 'overwrites the system clipboard' },
   ];
 
@@ -145,9 +159,105 @@ const INSTALL = `(() => {
     };
   });
 
+  /**
+   * A DURABLE IDENTITY for every control, because an element reference is not one.
+   *
+   * THE 2026-08-24 RUN 2 FAILURE: control 6 (中文) re-renders the whole result list, so React
+   * replaces every node from index 14 on. \`click(i)\` then found \`el.isConnected === false\` and
+   * returned NOT ACTUATED for all 35 of them — 35 controls with no verdict, reported as if the
+   * probe had refused them, when in fact the probe had lost them. The identity is
+   * label|tag|type|firstClass plus the ordinal among entries sharing it, so the twelve
+   * per-entry "Add to Anki"s stay twelve distinct rows rather than collapsing onto one.
+   */
+  const keyOf = (label, tag, type, cls) => [label, tag, type, cls].join('\\u0001');
+  const ordSeen = new Map();
+  for (const r of list) {
+    r.key = keyOf(r.label, r.tag, r.type, r.cls);
+    const n = ordSeen.get(r.key) || 0;
+    r.ord = n;
+    ordSeen.set(r.key, n + 1);
+    r.gone = false;
+  }
+
+  const activeNow = [...win.querySelectorAll('button')]
+    .filter((b) => b.getAttribute('aria-pressed') === 'true'
+      || /(^|\\s)(active|selected|current|is-on)(\\s|$)/.test(String(b.className || '')))
+    .map((b) => (b.textContent || '').trim())
+    .filter((t) => t.length > 0 && t.length < 24);
+  const queryInput = win.querySelector('input[type=text],input[type=search],input:not([type])');
+
   window.__l8 = {
     win,
     list,
+    /** The surface as found. restoreBaseline() steers back to exactly this. */
+    baseline: { active: activeNow, query: queryInput ? queryInput.value : null },
+    lsBefore: Object.fromEntries([...Array(localStorage.length).keys()]
+      .map((n) => localStorage.key(n)).filter(Boolean).map((k) => [k, localStorage.getItem(k)])),
+    /**
+     * Undo the persistence the census itself created, and only that.
+     *
+     * \`Save search\` writes \`jp-os-dictionary-saved-searches-v1\`, so the 2026-08-24 run left a
+     * key behind and the next one started from a surface with an extra chip on it. Keys the
+     * census ADDED are removed; keys it merely CHANGED are reported and left alone, because the
+     * shell writes its own geometry during a run and reverting that would be a side effect of the
+     * cleanup rather than the end of one.
+     */
+    lsSettle() {
+      const now = Object.fromEntries([...Array(localStorage.length).keys()]
+        .map((n) => localStorage.key(n)).filter(Boolean).map((k) => [k, localStorage.getItem(k)]));
+      const added = Object.keys(now).filter((k) => !(k in this.lsBefore));
+      const changed = Object.keys(now).filter((k) => k in this.lsBefore && now[k] !== this.lsBefore[k]);
+      const removed = Object.keys(this.lsBefore).filter((k) => !(k in now));
+      for (const k of added) localStorage.removeItem(k);
+      return { addedAndRemoved: added, changedLeftAlone: changed, disappeared: removed };
+    },
+    /**
+     * Re-bind every entry whose node React has replaced. Called before each control is armed, so
+     * the census measures the control it named rather than a corpse of it.
+     *
+     * A row that no longer has a live counterpart is marked \`gone\` — an honest third state. It is
+     * NOT dead (nothing was clicked) and NOT alive; it is a control the surface stopped offering
+     * after an earlier control changed the surface, and it is reported by name.
+     */
+    rematch() {
+      if (!document.contains(this.win)) {
+        const w = document.querySelector('.fwin');
+        if (w) this.win = w;
+      }
+      const detached = this.list.filter((r) => !r.el.isConnected);
+      if (!detached.length) return { detached: 0, rebound: 0, gone: 0, goneLabels: [] };
+      const byKey = new Map();
+      // A SECOND index without the label, because a cycling control's label is its state: the
+      // word-status button reads "食べる: New. Click to mark it Learning." and then "…: Learning.
+      // Click to mark it Familiar." — same control, different key. Class plus ordinal survives that.
+      const byCls = new Map();
+      for (const c of [...this.win.querySelectorAll(CTRL)].filter(painted)) {
+        const cls = String(c.className || '').split(' ')[0];
+        const tt = c.tagName.toLowerCase();
+        const ty = (c.getAttribute('type') || '').toLowerCase();
+        const push = (m, k) => { const a = m.get(k) || []; a.push(c); m.set(k, a); };
+        push(byKey, keyOf(labelOf(c), tt, ty, cls));
+        push(byCls, keyOf('', tt, ty, cls));
+      }
+      // The class-ordinal of each roster row, computed the same way, so the fallback lines up.
+      const clsOrd = new Map();
+      for (const r of this.list) {
+        const k = keyOf('', r.tag, r.type, r.cls);
+        const n = clsOrd.get(k) || 0;
+        r.clsKey = k;
+        r.clsOrd = n;
+        clsOrd.set(k, n + 1);
+      }
+      let rebound = 0;
+      let reboundByClass = 0;
+      const goneLabels = [];
+      for (const r of detached) {
+        let el = (byKey.get(r.key) || [])[r.ord];
+        if (!el) { el = (byCls.get(r.clsKey) || [])[r.clsOrd]; if (el) reboundByClass += 1; }
+        if (el) { r.el = el; r.gone = false; rebound += 1; } else { r.gone = true; goneLabels.push(r.label); }
+      }
+      return { detached: detached.length, rebound, reboundByClass, gone: goneLabels.length, goneLabels };
+    },
     fingerprint() {
       const w = this.win;
       const ae = document.activeElement;
@@ -166,6 +276,110 @@ const INSTALL = `(() => {
         focus: ae ? ae.tagName.toLowerCase() + '.' + String(ae.className || '').split(' ')[0] : null,
         lsLen: window.localStorage.length,
       };
+    },
+    /**
+     * The mutually-exclusive group control i belongs to, or null.
+     *
+     * A "group" here is a set of sibling controls of which EXACTLY ONE is active — a segmented
+     * picker. Both of this surface's are: \`.dict-lang-toggle\` marks its choice with a bare
+     * \`active\` class and no ARIA at all, \`.lexicon-lens-picker\` uses \`aria-pressed\` AND the
+     * class. Read both, because reading only ARIA misses the first one entirely.
+     */
+    groupOf(i) {
+      const c = this.list[i];
+      if (!c || !c.el.isConnected || !c.el.parentElement) return null;
+      const isActive = (s) => s.getAttribute('aria-pressed') === 'true'
+        || s.getAttribute('aria-selected') === 'true' || s.getAttribute('aria-checked') === 'true'
+        || /(^|\\s)(active|selected|current|is-on)(\\s|$)/.test(String(s.className || ''));
+      const members = [...c.el.parentElement.children].filter((s) => s.matches && s.matches(CTRL) && painted(s));
+      if (members.length < 2 || !members.includes(c.el)) return null;
+      const actives = members.filter(isActive);
+      // Exactly one active is what makes a second click on the same member a no-op rather than an
+      // undo. Zero or several means it is a toolbar, and the ordinary there-and-back applies.
+      if (actives.length !== 1) return null;
+      return { members, active: actives[0], selfActive: actives[0] === c.el };
+    },
+    /**
+     * Put control i into a state where clicking it is a real state change, and record how to put
+     * the group back afterwards. Both branches fix a verdict the 2026-08-24 run got wrong:
+     *
+     *  - i is the ACTIVE member ("Automatic"): clicking it is a no-op BY DESIGN, so it read DEAD.
+     *    Click another member first and the probe click has something to change. That probe click
+     *    is then its own restoration.
+     *  - i is an inactive member (中文): clicking it selects it and a second click does NOT undo
+     *    it. The 2026-08-24 run left the surface on Chinese glosses, 8 entries collapsed to 2, and
+     *    the 35 per-entry controls after it were honestly absent — GONE, not measurable. The
+     *    restoring actuation is a click on the member that WAS active.
+     */
+    preArm(i) {
+      this.back = null;
+      const g = this.groupOf(i);
+      if (!g) return { mode: 'plain' };
+      const lab = (e) => labelOf(e);
+      if (g.selfActive) {
+        const other = g.members.find((m) => m !== g.active && !m.disabled
+          && !EXCLUDE.some((r) => r.test(m, lab(m), (m.textContent || '').trim())));
+        if (!other) return { mode: 'group-sole-safe-member', note: 'no non-excluded sibling to move the group to' };
+        other.click();
+        return { mode: 'group-active', setupClicked: lab(other), restoreBy: 'the probe click itself' };
+      }
+      this.back = g.active;
+      return { mode: 'group-inactive', wasActive: lab(g.active), restoreBy: lab(g.active) };
+    },
+    /**
+     * Put the SURFACE back, for the controls whose own second actuation cannot.
+     *
+     * Control 10 on this surface is a saved-search chip: clicking it applies a stored search whose
+     * gloss language differs, 8 entries collapse to 2, and clicking it again re-applies the same
+     * search. There is no undo on the control. Without this, one such control silently degrades
+     * the surface and the 26 per-entry controls after it are honestly absent — the run reports 26
+     * GONE and 0 verdicts, which is exactly the shape of a census that measured nothing.
+     *
+     * It restores by re-selecting the segmented choices that were active at install and, if the
+     * result list still does not match, re-running the install-time query. Every action it takes
+     * is returned, because a census that repairs the surface silently is a census you cannot audit.
+     */
+    restoreBaseline() {
+      const w = this.win;
+      const acts = [];
+      const isActive = (s) => s.getAttribute('aria-pressed') === 'true'
+        || /(^|\\s)(active|selected|current|is-on)(\\s|$)/.test(String(s.className || ''));
+      for (const text of this.baseline.active) {
+        const b = [...w.querySelectorAll('button')].find((e) => (e.textContent || '').trim() === text);
+        if (b && !isActive(b)) { b.click(); acts.push('reselect ' + text); }
+      }
+      const q = w.querySelector('input[type=text],input[type=search],input:not([type])');
+      if (q && this.baseline.query != null && q.value !== this.baseline.query) {
+        const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+        setter.call(q, this.baseline.query);
+        q.dispatchEvent(new Event('input', { bubbles: true }));
+        q.dispatchEvent(new Event('change', { bubbles: true }));
+        acts.push('requery ' + this.baseline.query);
+      }
+      return acts;
+    },
+    /** Re-run the install-time query. Separate call so the driver can settle between the two. */
+    reSearch() {
+      const b = [...this.win.querySelectorAll('button')].find((e) => /^search$/i.test((e.textContent || '').trim()));
+      if (!b) return { clicked: false, why: 'no Search button' };
+      b.click();
+      return { clicked: true };
+    },
+    /** The label control i carries right now. A cycling control's label IS its state. */
+    labelNow(i) {
+      const c = this.list[i];
+      return c && c.el.isConnected ? labelOf(c.el) : null;
+    },
+    /** The restoring actuation: the member that was active, else a second click on i. */
+    unclick(i) {
+      if (this.back && this.back.isConnected) {
+        const to = labelOf(this.back);
+        this.back.click();
+        this.back = null;
+        return { clicked: true, how: 'group-restore', to };
+      }
+      this.back = null;
+      return this.click(i);
     },
     arm(i) {
       const rec = { adds: 0, removes: 0, attrs: 0, text: 0 };
@@ -189,7 +403,12 @@ const INSTALL = `(() => {
      */
     click(i) {
       const c = this.list[i];
-      if (!c || !c.el.isConnected) return { clicked: false, why: 'element detached' };
+      if (!c) return { clicked: false, why: 'no such control index' };
+      if (!c.el.isConnected) {
+        return c.gone
+          ? { clicked: false, gone: true, why: 'the surface no longer offers this control after an earlier control changed it' }
+          : { clicked: false, why: 'element detached and rematch was not run' };
+      }
       if (c.actuate !== 'value') { c.el.click(); return { clicked: true, how: 'click' }; }
 
       const el = c.el;
@@ -348,22 +567,82 @@ const diff = (a, b) => {
 };
 
 /** Probe one control: actuate, settle, read; actuate back, settle, read. Same path for every row. */
-async function probeOne(t) {
+async function probeOne(t, settle = SETTLE) {
+  // Re-resolve BEFORE arming, never after. Any earlier control that re-rendered the result list
+  // has replaced the nodes this roster is holding, and an armed observer on a corpse records
+  // nothing for any reason at all.
+  const rm = await ev(`JSON.stringify(window.__l8.rematch())`);
+  // The surface as this control found it. Restoration is measured against THIS, not against the
+  // post-setup state, because what the census owes the next control is the original surface.
+  const origin = await ev(`JSON.stringify(window.__l8.fingerprint())`);
+  const labelBefore = await ev(`JSON.stringify(window.__l8.labelNow(${t.i}))`);
+  const pre = await ev(`JSON.stringify(window.__l8.preArm(${t.i}))`);
+  if (pre.mode !== 'plain') await sleep(settle);
+  await ev(`JSON.stringify(window.__l8.rematch())`);
   await ev(`JSON.stringify(window.__l8.arm(${t.i}))`);
   const c1 = await ev(`JSON.stringify(window.__l8.click(${t.i}))`);
-  await sleep(SETTLE);
+  await sleep(settle);
   const r1 = await ev(`JSON.stringify(window.__l8.read())`);
 
-  // Second actuation: proof of life on the way back, and the restoration in one move.
+  // Second actuation: proof of life on the way back, and the restoration in one move. Rematch
+  // again — the FIRST actuation is the most likely one to have replaced this very node.
+  const rm2 = await ev(`JSON.stringify(window.__l8.rematch())`);
   await ev(`JSON.stringify(window.__l8.arm(${t.i}))`);
-  await ev(`JSON.stringify(window.__l8.click(${t.i}))`);
-  await sleep(SETTLE);
+  const c2 = await ev(`JSON.stringify(window.__l8.unclick(${t.i}))`);
+  await sleep(settle);
   const r2 = await ev(`JSON.stringify(window.__l8.read())`);
+  await ev(`JSON.stringify(window.__l8.rematch())`);
+
+  /**
+   * A CYCLING control is not a toggle and two clicks do not undo it. The word-status button walks
+   * New -> Learning -> Familiar -> Known -> New, so the 2026-08-24 run's there-and-back left all
+   * EIGHT looked-up words marked "Familiar" in the user's real study data and nothing noticed,
+   * because the fingerprint's `chars` moved by five and read as ordinary churn. Keep actuating
+   * until the label is the one it started with, bounded, and report the count.
+   */
+  let cycle = null;
+  if (c2.how !== 'group-restore' && labelBefore) {
+    let lab = await ev(`JSON.stringify(window.__l8.labelNow(${t.i}))`);
+    let n = 0;
+    let oneWay = false;
+    while (lab && lab !== labelBefore && n < 6) {
+      const was = lab;
+      await ev(`JSON.stringify(window.__l8.click(${t.i}))`);
+      await sleep(settle);
+      await ev(`JSON.stringify(window.__l8.rematch())`);
+      lab = await ev(`JSON.stringify(window.__l8.labelNow(${t.i}))`);
+      n += 1;
+      // A cycle moves. A label that does not move is a ONE-WAY control, and hammering it six
+      // times only re-triggers whatever it does — `Play <word>` becomes `No recording for this
+      // word` and stays there, so the extra five clicks were five more failed audio lookups.
+      if (lab === was) { oneWay = true; break; }
+    }
+    if (n) cycle = { extraActuations: n, labelBefore, labelAfter: lab, closed: lab === labelBefore, oneWay };
+  }
+
+  const final = await ev(`JSON.stringify(window.__l8.fingerprint())`);
 
   const m1 = r1.mutations || {};
   const totalMut1 = (m1.adds || 0) + (m1.removes || 0) + (m1.attrs || 0) + (m1.text || 0);
   const d1 = r1.before ? diff(r1.before, r1.after) : {};
-  const restored = r2.after && r1.before ? Object.keys(diff(r1.before, r2.after)).length === 0 : false;
+  let originResidual = diff(origin, final);
+  let repair = null;
+  if (Object.keys(originResidual).length) {
+    // One unrestorable control must not cost the census every control after it.
+    const acts = await ev(`JSON.stringify(window.__l8.restoreBaseline())`);
+    if (acts.length) {
+      await sleep(settle);
+      if (acts.some((a) => a.startsWith('requery'))) {
+        await ev(`JSON.stringify(window.__l8.reSearch())`);
+        await sleep(settle * 2);
+      }
+      await ev(`JSON.stringify(window.__l8.rematch())`);
+      const after = await ev(`JSON.stringify(window.__l8.fingerprint())`);
+      repair = { actions: acts, residualAfterRepair: diff(origin, after) };
+      originResidual = repair.residualAfterRepair;
+    }
+  }
+  const restored = Object.keys(originResidual).length === 0;
 
   return {
     i: t.i,
@@ -374,12 +653,18 @@ async function probeOne(t) {
     actuatedBy: c1.how || null,
     clicked: c1.clicked !== false,
     notActuatedWhy: c1.clicked === false ? c1.why : null,
+    rematch: rm.rebound || rm.gone ? rm : null,
+    rematchBeforeSecond: rm2.rebound || rm2.gone ? rm2 : null,
+    group: pre.mode === 'plain' ? null : pre,
+    restoredBy: c2.how || null,
+    cycleRestore: cycle,
+    surfaceRepair: repair,
     mutations: totalMut1,
     stateDelta: d1,
-    verdict: c1.clicked === false ? 'NOT ACTUATED'
+    verdict: c1.clicked === false ? (c1.gone ? 'GONE' : 'NOT ACTUATED')
       : (totalMut1 === 0 && Object.keys(d1).length === 0 ? 'DEAD' : 'ALIVE'),
     restoredAfterSecondClick: restored,
-    residual: restored ? null : (r2.after && r1.before ? diff(r1.before, r2.after) : null),
+    residual: restored ? null : originResidual,
   };
 }
 
@@ -430,12 +715,25 @@ async function probeOne(t) {
       }, null, 2));
       process.exit(4);
     }
-    const res = await probeOne(t);
+    let res = await probeOne(t);
+    // A DEAD is the one verdict this probe exists to produce, so it is the one that has to survive
+    // a second look. Re-probe it with the slow settle before recording it: an effect that lands
+    // over IPC after 450 ms is indistinguishable from no effect, and that is a probe defect
+    // wearing a product defect's clothes.
+    if (res.verdict === 'DEAD' && SLOW_SETTLE > SETTLE) {
+      const slow = await probeOne(t, SLOW_SETTLE);
+      process.stderr.write(`${t.i} [${t.actuate}] ${t.label} -> DEAD at ${SETTLE}ms, re-probed at ${SLOW_SETTLE}ms -> ${slow.verdict}\n`);
+      res = { ...slow, deadAtFastSettle: true, fastSettleMutations: res.mutations, settleMs: SLOW_SETTLE };
+    }
     results.push(res);
     process.stderr.write(`${t.i} [${t.actuate}] ${t.label} -> ${res.verdict}\n`);
   }
 
   const valueRestore = await ev(`JSON.stringify(window.__l8.restoreValues())`);
+  await ev(`JSON.stringify(window.__l8.restoreBaseline())`);
+  await sleep(SETTLE);
+  const lsSettle = await ev(`JSON.stringify(window.__l8.lsSettle())`);
+  const finalSurface = await ev(`JSON.stringify(window.__l8.fingerprint())`);
   const dead = results.filter((r) => r.verdict === 'DEAD');
   const unrestored = results.filter((r) => r.verdict === 'ALIVE' && !r.restoredAfterSecondClick);
 
@@ -448,14 +746,23 @@ async function probeOne(t) {
       click: results.filter((r) => r.actuatedBy === 'click').length,
       value: results.filter((r) => r.actuatedBy === 'value').length,
       notActuated: results.filter((r) => r.verdict === 'NOT ACTUATED').length,
+      gone: results.filter((r) => r.verdict === 'GONE').length,
     },
+    verdicts: results.reduce((a, r) => { a[r.verdict] = (a[r.verdict] || 0) + 1; return a; }, {}),
+    rebound: results.reduce((a, r) => a + ((r.rematch && r.rematch.rebound) || 0)
+      + ((r.rematchBeforeSecond && r.rematchBeforeSecond.rebound) || 0), 0),
+    goneControls: results.filter((r) => r.verdict === 'GONE').map((r) => ({ label: r.label, cls: r.cls })),
     excludedCount: setup.excluded.length,
     excluded: setup.excluded,
     disabledPresented: setup.disabled,
     dead: dead.length,
     deadControls: dead.map((r) => ({ label: r.label, cls: r.cls, box: r.box, disabled: r.disabled })),
+    oneWayControls: results.filter((r) => r.cycleRestore && r.cycleRestore.oneWay)
+      .map((r) => ({ label: r.cycleRestore.labelBefore, becomes: r.cycleRestore.labelAfter, cls: r.cls })),
     aliveNotRestored: unrestored.map((r) => ({ label: r.label, residual: r.residual })),
     valueRestore,
+    lsSettle,
+    finalSurface,
     results,
   }, null, 2));
 })().catch((e) => {
