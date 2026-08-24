@@ -240,3 +240,76 @@ and private-byte samples at 8/16/24 min — reported together.
   like a sampler that is still waiting for its first mark. Pass `@(8,12,16,20,24)`.
 - Do not run the full vitest suite while sampling. It is a separate process, but the memory
   pressure trims the working set being measured and would manufacture a clean number.
+
+## 2026-08-24 · primary — the single-boot re-measurement: all three legs in ONE process
+
+Cold start proven: `Get-Process electron` **6 → 0**, one `npm start` (01:08:25), main pid **7920**,
+6 processes, `/health` answering with `5173` in the url. `l7d-setup.cjs` asserted exactly **1
+visible `.fwin`** — Dictionary, `presentation=liquid`, 食べる → **8 entries / 5,963 chars / 349
+nodes / 75 controls**, `forest-night`, `data-perf=performance`. Every number below is that process.
+
+### Leg 1 — gestures. THIS BOOT'S DISPLAY CEILING IS 16.7 ms, NOT 10.0.
+
+| Run | frames | p50 | p95 | max | >100 | main p50 | main p95 | main max |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Ceiling | 110 | 16.7 | 16.8 | 16.9 | 0 | 2.3 | 3.5 | 13.1 |
+| Drag, liquid | 106 | 16.7 | 16.9 | 33.5 | 0 | 2.2 | 3.7 | 21.6 |
+| Resize, liquid | 108 | 16.7 | 16.8 | 33.4 | 0 | 2.5 | 3.6 | 10.0 |
+| Theme switch, liquid | 109 | 16.7 | 16.8 | 16.9 | 0 | 2.6 | 3.7 | 9.8 |
+| **JANK CONTROL**, drag | 65 | 16.7 | **117.0** | 133.7 | **12** | 1.9 | 3.0 | 7.9 |
+
+**Scoring these against 2026-08-17's 10.0 ms ceiling would report a 67% frame regression that is
+the display, not the app** — the probe re-measures the ceiling every run for exactly this reason,
+and every gesture holds p50 *at* it. Theme apply **29.0** / restore **33.3** ms = 1.74 / 1.99
+frames, against 16.1 / 19.8 at a 10 ms frame = 1.61 / 1.98 — the same frame count. `title=Dictionary`
+and `restoredTo=forest-night` on every run; drag `closedLoop=True`, resize `False` (the L0 finding,
+not new). The jank control fired: p95 16.9 → 117.0, frames >100 ms 0 → 12.
+
+### Leg 2 — `/health` under this surface's real work. Bar: no main block over 500 ms.
+
+| Run | samples | p50 | p95 | **max** | proof the work happened |
+| --- | --- | --- | --- | --- | --- |
+| Idle | 40 | 0.9 | 1.6 | **3.5** | — |
+| One real search (勉強) | 40 | 1.1 | 1.7 | **20.6** | `typed=勉強`, 8 rows, chars 5,963→2,700 |
+| `Find example sentences` | 40 | 1.0 | 1.7 | **3.0** | nodes 303→363, chars 2,700→3,215 |
+| ISOLATION CONTROL (renderer blocked 1.5 s) | 40 | 1.0 | 1.9 | **3.1** | unmoved ⇒ main-only ✔ |
+| ~~SENSITIVITY (126 `lookupTermsBatch`)~~ | 40 | 1.0 | 2.4 | **5.5** | `keys 126, withGloss 126` in **62 ms** |
+| **SENSITIVITY CONTROL** (756 `lookupTerm`) | 40 | 1.2 | 69.9 | **39,026.2** | `fired===settled===756`, 42,136 ms |
+
+**Both real loads pass the bar by three orders of magnitude, and the old control is now useless as
+a control.** `l7d-burst-control.js` still does its work and the work is simply cheap (62 ms), so it
+can no longer show the probe catching a failure — that is a product improvement and an instrument
+regression at once. `l7e-burst2.js` replaces it with `PERF_BASELINE.md`'s recorded single-term
+shape and produced **39,026.2 ms against a 0.9 ms idle p50 (~43,000×**, larger than the `7954921a`
+reference's 36,910 ms). L0's finding therefore stands unchanged: the **single-term** path saturates
+main. It is a batch path no Dictionary-window action performs, so it caps whatever surface owns it.
+
+### Leg 3 — private bytes at 8 / 16 / 24 min, same process, `l7c-mem-sampler.ps1`
+
+| uptime | main RSS | main **private** | handles | all 6 private | what had happened by then |
+| --- | --- | --- | --- | --- | --- |
+| 8.00 (01:16:37) | 239.0 | **555.6** | 1055 | 1,484.4 | setup search + all five gesture runs |
+| 16.00 (01:24:37) | 85.7 | **576.9** | 1058 | 1,513.2 | + every leg-2 load, incl. the 42 s / 756-lookup burst |
+| 24.00 (01:32:37) | 59.4 | **576.8** | 1057 | 1,519.0 | 8 minutes strictly quiet — no app driven |
+
+**+21.3 MB of private memory for the whole load phase, and −0.1 MB across the 8 quiet minutes
+after it.** Handles 1055 → 1058 → 1057. Main RSS falls 239.0 → 59.4 with private flat, which is the
+OS trim this file already recorded — read the private column. Boot: `npm start` → bridge up
+**15.3 s** (main spawned at 12.5 s); the forge/Vite cache was warm, so as in the 2026-08-17 entry
+this is **not** quoted as a boot improvement over L0's 93.84 s.
+
+### Category 7 = **10/10**. All three legs are from process 7920 and nothing is inherited.
+
+Frame stability at the display's own rate with 0 frames >100 ms; theme switch the same frame count
+as the baseline; boot no worse; the heaviest action this window performs blocks main **20.6 ms**
+against a 500 ms bar; private memory flat. Three controls fired rather than one — jank (p95
+16.9 → 117.0), isolation (main unmoved by a 1.5 s renderer block), sensitivity (39,026.2 ms).
+
+**Traps this pass adds.** (1) *The display ceiling is not a constant.* It was 10.0 ms on the
+2026-08-17 boot and 16.7 ms here; re-measure `-Interaction ceiling` every run and score against
+that run's own number. (2) *A control can decay into uselessness while staying green.*
+`l7d-burst-control.js` reports `done`, `keys 126`, `withGloss 126` — a perfectly healthy-looking
+run that no longer blocks anything. Check that a control still FAILS, not merely that it ran.
+(3) `-DuringJs` reaches the bridge with its non-ASCII intact (`typed=勉強` came back exact), but a
+`\u` escape written into a probe file by this repo's write path collapses into the character
+before the file lands — `String.fromCharCode` is the form that survives editing.
