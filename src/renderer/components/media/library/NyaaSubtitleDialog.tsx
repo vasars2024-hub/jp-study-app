@@ -156,6 +156,20 @@ export default function NyaaSubtitleDialog({
         })}
       </ul>
 
+      {/* What the size beside a `batch-sidecar` row does not say on its own.
+          The top-ranked release for a real title measured 46,899 MB here while
+          the transfer it starts is the ~88 MB of `.ass` inside it — the fetch
+          skips every unselected file on both routes. Without this the honest
+          answer to a 46 GB row is to refuse it, which is the opposite of what
+          the route does. The harvest panel has said both of these since it
+          shipped; this dialog is the same decision on the other surface. */}
+      {(candidates ?? []).some((candidate) => candidate.route === 'batch-sidecar') && (
+        <p className="muted">{t('media.subtitles.nyaa.sidecarNote')}</p>
+      )}
+      {(candidates ?? []).length > 0 && (
+        <p className="muted">{t('media.subtitles.nyaa.transferNote')}</p>
+      )}
+
       <div className="medialib-match__search">
         <Button size="sm" disabled={busy} onClick={() => void search()}>
           {t('media.subtitles.nyaa.retry')}

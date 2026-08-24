@@ -1126,6 +1126,8 @@ export const en: Catalog = {
   'media.subtitles.nyaa.attached': 'Attached a {lang} subtitle.',
   'media.subtitles.nyaa.route.sub-pack': 'Subtitles only',
   'media.subtitles.nyaa.route.batch-sidecar': 'Video batch · subtitles unconfirmed',
+  'media.subtitles.nyaa.sidecarNote': 'A video batch does not say in its name whether it carries separate subtitle files. Its file list is read before anything downloads, and if it carries none you are told so and nothing is fetched.',
+  'media.subtitles.nyaa.transferNote': 'The size above is the whole release. Only the subtitle files are downloaded; the video is skipped.',
   'media.subtitles.nyaa.seeders': {
     one: '{count} seeder',
     other: '{count} seeders',

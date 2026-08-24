@@ -1022,6 +1022,8 @@ export const zh: Catalog = {
   'media.subtitles.nyaa.attached': '已附加 {lang} 字幕。',
   'media.subtitles.nyaa.route.sub-pack': '仅字幕',
   'media.subtitles.nyaa.route.batch-sidecar': '视频合集 · 字幕未确认',
+  'media.subtitles.nyaa.sidecarNote': '视频合集的名称并不会说明它是否附带独立的字幕文件。下载前会先读取其文件列表；若不含字幕，会告知你并且不下载任何内容。',
+  'media.subtitles.nyaa.transferNote': '上面的体积是整个发布的体积。只会下载字幕文件，视频会被跳过。',
   'media.subtitles.nyaa.seeders': {
     other: '{count} 个做种',
   },

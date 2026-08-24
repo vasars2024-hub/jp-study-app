@@ -1024,6 +1024,8 @@ export const ja: Catalog = {
   'media.subtitles.nyaa.attached': '{lang} の字幕を追加しました。',
   'media.subtitles.nyaa.route.sub-pack': '字幕のみ',
   'media.subtitles.nyaa.route.batch-sidecar': '動画バッチ・字幕は未確認',
+  'media.subtitles.nyaa.sidecarNote': '動画バッチは、別ファイルの字幕を含むかどうかを名前では示しません。ダウンロード前にファイル一覧を確認し、字幕が無ければその旨をお知らせして何も取得しません。',
+  'media.subtitles.nyaa.transferNote': '上のサイズはリリース全体のものです。ダウンロードされるのは字幕ファイルのみで、動画はスキップされます。',
   'media.subtitles.nyaa.seeders': {
     other: 'シード {count}',
   },

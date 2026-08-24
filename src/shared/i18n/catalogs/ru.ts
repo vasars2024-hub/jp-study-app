@@ -1156,6 +1156,8 @@ export const ru: Catalog = {
   'media.subtitles.nyaa.attached': 'Добавлены субтитры ({lang}).',
   'media.subtitles.nyaa.route.sub-pack': 'Только субтитры',
   'media.subtitles.nyaa.route.batch-sidecar': 'Сборник видео · субтитры не подтверждены',
+  'media.subtitles.nyaa.sidecarNote': 'Название сборника видео не говорит, есть ли в нём отдельные файлы субтитров. Список файлов читается до начала загрузки, и если субтитров нет, вам об этом сообщат и ничего не скачают.',
+  'media.subtitles.nyaa.transferNote': 'Размер выше — это весь релиз. Скачиваются только файлы субтитров, видео пропускается.',
   'media.subtitles.nyaa.seeders': {
     one: '{count} сид',
     few: '{count} сида',

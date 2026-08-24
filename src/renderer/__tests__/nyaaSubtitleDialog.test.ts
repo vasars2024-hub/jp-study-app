@@ -165,6 +165,48 @@ describe('NyaaSubtitleDialog', () => {
     expect((config.qbittorrent as Record<string, unknown>).enabled).toBe(true);
   });
 
+  // What the size beside a batch row does not say. Measured live on 2026-08-24:
+  // the top-ranked release for a real title reads 46,899 MB while the transfer
+  // it starts is the ~88 MB of `.ass` inside it. Without the note the honest
+  // reading of that row is "refuse it", which is the opposite of what the route
+  // does.
+  it('says the video is skipped, and warns that a batch may carry no subtitles', async () => {
+    stubApi({
+      listNyaaSubtitles: vi.fn(async () => ({
+        ok: true,
+        candidates: [candidate({ route: 'batch-sidecar', sizeBytes: 46_899 * 1024 * 1024 })],
+        message: '',
+      })),
+    });
+    await open();
+    expect(text()).toContain('Only the subtitle files are downloaded');
+    expect(text()).toContain('does not say in its name');
+  });
+
+  // NEGATIVE CONTROL — the batch caveat is about batches. A subtitles-only pack
+  // has no video to skip and no file list to be surprised by, and printing the
+  // warning there would teach the user to ignore it.
+  it('NEGATIVE CONTROL — a subtitles-only listing carries no batch caveat', async () => {
+    stubApi({
+      listNyaaSubtitles: vi.fn(async () => ({
+        ok: true,
+        candidates: [candidate({ route: 'sub-pack' })],
+        message: '',
+      })),
+    });
+    await open();
+    expect(text()).not.toContain('does not say in its name');
+    expect(text()).toContain('Only the subtitle files are downloaded');
+  });
+
+  // And neither note appears with nothing to fetch — a refusal screen that
+  // explains how a transfer would behave is noise on top of the actual problem.
+  it('NEGATIVE CONTROL — an empty listing carries neither note', async () => {
+    await open();
+    expect(text()).not.toContain('Only the subtitle files are downloaded');
+    expect(text()).not.toContain('does not say in its name');
+  });
+
   // An IPC throw is not a search result. Reporting it as an empty list would
   // tell the user the title has no subtitles when nothing was ever asked.
   it('reports a thrown IPC error rather than an empty result', async () => {
