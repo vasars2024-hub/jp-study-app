@@ -2691,3 +2691,50 @@ Han **14,269 → 2,863**. At t=667.59 s the raw parse puts **2** cues on screen 
 are **under** the 8 MB attach cap: min 68,704 B, max 5,093,684 B (episode 31), sum 71,796,171 B.
 Route B's fetch was re-run live through the product this turn and returns episode 38 among them,
 **totalKana 181,790** — so every precondition for the attach now holds except the video itself.
+
+## 2026-08-24 — ROUTE B RENDERS. The first acquired-to-screen run in this plan's history
+
+Worker `primary`, same turn. Commit `9b0245a5` plus the two above. **Gate 31 is NOT closed and this
+does not claim it**: its wording (line 413) wants **Route A and Route B**, and what ran end to end
+is **Route B**. Route A — a standalone `sub-pack` — is still the open leg. **Gate 31 stays 32 of
+34** (open: 31, 34).
+
+**The stall, and the decision taken under standing auto-approval.** Episode 38 (541,379,789 B, the
+smallest row) reached **9.86 %** and went `stalledDL` at **0 B/s** with 2 of 13 seeds. Rather than
+hand the next turn a dead swarm, the **next-smallest** row was named and sized first, as the
+standing condition requires: `[Anime Land] JoJo no Kimyou na Bouken - Ougon no Kaze 39-END (WEBRip
+720p Hi444PP AAC) RAW [DAB47203].mp4`, **574,095,360 B**, 14 seeders, hash `49fc27ef…`.
+`scraperQbitSend` → **sent 1 / 0 / 0**; it ran at **2.29 MB/s on 5 seeds** and completed. Episode
+38 is left running — it is not abandoned, only overtaken.
+
+**Its name broke the rule written an hour earlier, and that is why it was read before it was
+sent.** `39-END` puts no bracket after the number, so `EPISODE_TRAILING` missed it and the finale
+parsed to `episode: null` exactly as 38 had. `9b0245a5` adds the optional `-END`/`-FIN`/`-FINAL`
+tail **inside** the existing lookahead, so all three refusals are untouched.
+
+**The run, every number from the product's own handlers:**
+
+| step | result |
+| --- | --- |
+| `media:addAcquired` on the transfer's own path | `ok`, found **1** added **1**, library **34 → 35** |
+| item created | `17de8a95…` "JoJo no Kimyou na Bouken - Ougon no Kaze 39-END RAW" |
+| Route B harvest through `subtitleHarvestNyaaFetch` | **39 files** |
+| `planSubtitleAttach` against the real 35-item library | **1 pair (episode 39), 38 `no-match`, 0 ambiguous, 0 no-episode** |
+| `attachSubtitleText` | `ok`, tracks **0 → 1**, `format ass`, `lang ja`, `providerId nyaa` |
+| **`media:open`** — the product's own `pickPlaybackSubtitle`, not the probe's | picked `…[39]….tc_jp.ass`, url `playfile://3716d8e1…` |
+| `applySubtitleFile` → `parseStudySubtitles` | **36,427 raw → 675 mounted**, 35,752 dropped, led by `JOJO5-op1-ch-2`, `JOJO5-op1-jp-2`, `JOJO5-op1-ch`, `JOJO5_textch` |
+| **on screen at t=667.59 s** | **one** cue, style `JOJO5_textjp`, **7 kana / 3 Han** — the Japanese line, not the Chinese one |
+
+**The negative control is the 38 `no-match`.** The library holds exactly one JoJo episode, so 38 of
+the 39 harvested files had nothing to land on and said so; a matcher that paired more than one
+would have been writing episode N's cues onto the only video present. The **series** check is what
+made that safe — the other 34 library items are The Big O, the podcasts and the OVA.
+
+**The user's library gained one item and one track, deliberately** — this is the gate's product,
+not probe residue. Both are reversible through shipped UI: the Subtitles tab's remove control
+(`detachSubtitleRecord`) and the library's own remove.
+
+**What Route A still needs:** a `sub-pack` candidate whose cues are Japanese. Every one tried so
+far was English or delivered no metadata; `debug/g31t-jojo.cjs` and `debug/g31t-close.cjs`
+(`add|attach|render|open`, `G31_HASH`/`G31_MARK` env) now make the last three steps a three-command
+run once one exists.
