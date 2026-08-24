@@ -142,3 +142,37 @@ Running state, unchanged except where re-driven this turn:
 whether it is a timer or an action), fix it, re-drive leg 3, then re-drive categories 5 and 8 and
 the category-2 sweep. The entry is written when all eight sit on one tree — which is now blocked
 on a product defect, not on bookkeeping.
+
+## 2026-08-24 (late) · primary — leg 3's mechanism is measured closed; the category is NOT yet a 10, and that is deliberate
+
+Category 7's blocker was leg 3: a load/unload cycle left unreclaimable native residue, most recently
+**+612 handles / +1,298.5 MB per cycle with the weights already resident**. `cd01ffbd` pooled the KV
+cache — the larger half — and the re-drive on a cold boot measured a whole cycle at **+1.8 MB and
+−7 handles** (`L7_PERF_DICTIONARY.md`, this turn). Its adverse control fired in the same session: at
+a 480 s gap both pools read `0 / 0`, private drops **2,371 MB**, and the next cycle costs
+**+2,457.1 MB / +1,221 handles**.
+
+**That is one leg, not the category, and the entry is still not written.** The rubric's rule cuts
+both ways: a category is scored from its own instrument on the current tree, and category 7's
+headline finding was `l1-deadend.js`'s **604.2 MB → 7,082.0 MB** over 19 Dictionary controls in
+~70 s — a burst of ACTIONS, not three cycles. The cycle path is now cheap; whether the burst path is
+has not been measured on this tree and will not be asserted from the cycle number. Reported as
+measured.
+
+Running state, unchanged except category 7:
+
+| # | Category | State | Tree it was measured on |
+| - | -------- | ----- | ----------------------- |
+| 1 | Accessibility | 10/10 `06ad1a55` | current |
+| 2 | Clunkiness | 10/10 `7cdc34b4` → re-drive in `b0232340`, one number outstanding | current |
+| 3 | Liquid utilization | 10/10 `debad557` | current |
+| 4 | Use of space | 10/10 `6f86f2cc` | current |
+| 5 | UI clarity | 10/10 `cbb3506a` | **stale — not re-driven** |
+| 6 | Feature parity + reversibility | 10/10 `b0232340` | current |
+| 7 | Performance under real load | **leg 3 mechanism closed `cd01ffbd`; leg not re-driven end to end** | current for the cycle path only |
+| 8 | Honest states | 10/10 `9d9e876c` | **stale — not re-driven** |
+
+**Next, in order:** re-drive leg 3 over `l1-deadend.js` on a restarted app carrying `4e45c5f2` —
+one boot, 19 controls, private bytes before and 70 s after, against L0's 550–577 MB baseline. If the
+burst path is now flat, category 7 is a 10 and only 5, 8 and the category-2 sweep stand between this
+surface and the first completed entry.

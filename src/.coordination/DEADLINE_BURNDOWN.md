@@ -345,3 +345,22 @@ L4/L6/L7 each require a whole phase. Category-8 defect fixes are the work those 
 of, and this turn landed three of them (`201db2d2`, `6b53d0e`, `b6f1cd6b`), but a gate only turns
 over when its last category does. The honest reading is that the 0.333/day rate already prices
 this in — it was computed over nine days that also contained work like this.
+
+2026-08-24 | liquid | units done this turn: 0 | units left: 10 | basis: the 13 `Gate:` lines in section 11 of src/LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md (`grep -c '^Gate:'` = 13), re-counted this turn AND each closure re-derived rather than inherited — L0 (plan line 464, "L0's gate having closed the same day"), L2 (`L2_PRIMITIVES.md:50`, "L2's gate is … which the above meets", plus its later "L2's primitive list closes"), L3 (`L3_PRESENTATION.md:61`, "L3's gate now PASSES on a real window") | projected finish: 2026-09-23
+
+**Re-counted, and this turn the 3 closures were verified individually rather than carried.** 13
+gates, 3 closed, 10 open — the same number as the previous turn, now with each closure's own
+evidence line above. No gate closed this turn, so the rate is unchanged: 3 gates over
+2026-08-16..2026-08-24 (9 days, 2 workers) = **0.333/day**, and 10 ÷ 0.333 = 30 days →
+**2026-09-23**, a **~22-day slip** against the 2026-09-01 target. main-v1 contributes 0
+(complete-except-external, 61 of 80, measured 2026-08-24 15:52) and mal-pipeline is 34 of 34, so
+liquid alone remains the programme's load and its date is the programme's date. Stated, not
+descoped.
+
+**Why three product commits again move the count by zero, and what would move it.** L1's gate needs
+80/80 on TWO reference surfaces and only Dictionary has ever been scored; Dictionary is blocked on
+category 7, and category 7 was blocked on a memory defect that this turn measured down from
++612 handles / +1,298.5 MB per cycle to **+1.8 MB / −7 handles**. That is the last mechanical
+blocker on the cheapest open gate. The honest reading is that L1 is now one instrument re-drive plus
+categories 5, 8 and the category-2 sweep away from half of its gate — and still a whole unscored
+Video surface away from the other half. The 0.333/day rate already prices turns like this one in.
