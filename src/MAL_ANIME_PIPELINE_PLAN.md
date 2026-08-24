@@ -2514,3 +2514,43 @@ track's version is a superset of this one; when it lands, resolve in its favour.
 **Gate 31 stays 32 of 34** (open: 31, 34), counted from this file's gate tables. What is left is
 **not** the render seam any more — it is an acquisition for a title that is on the user's MAL
 completed list and whose video they own. That is data-blocked, not effort-blocked.
+
+## 2026-08-24 — the guard that was right exactly once
+
+Worker `primary`. Commit `d16547cc`, continuing `566c6d97` in the same turn.
+
+**The defect the first commit created.** `566c6d97` guards the mount with
+`manager.getTracks().length > 0` so a muxed release keeps its own tracks. After this player
+mounts *its* track that check is permanently true, and choosing a different record in the
+library reopens the SAME file path — so the player kept showing the superseded choice.
+`3bc796d1`'s defect, arriving on the mounted player by another route.
+
+`decideExternalSubtitleMount` (`shared/`, pure, 6 tests) holds the rule both guards share:
+`container` when a track that is **not ours** exists, `unchanged` when the library resolves
+nothing or resolves what is mounted, `mount` otherwise. The effect re-asks on the library's own
+`media:changed` broadcast; selection moves only when nothing is selected or the selected track is
+the one being replaced, so upstream still outranks a first mount. The superseded track stays in
+the picker — it is a real record, and `SubtitleManager` has no removal that would not renumber
+what is playing. **Mutation control:** the guard restored to `length > 0` turns exactly **2 red**.
+
+**Two measurements that only a detached worktree can make, and both matter to gate 34.**
+
+1. **This branch is red at HEAD and the shared tree hides it.** Full `npx vitest run` at
+   `b1f4e8e6` in a clean worktree: **2 files / 3 tests failed**, 763 files / 10,631 passed —
+   `i18n.test.ts` hygiene ×2 and `novelReaderProgressGuard` ×1. The same three fail at the
+   parent `5155de41`, so they are **not** this turn's. Cause, checked rather than guessed: the
+   33 files the i18n hygiene test lists are dirty in the shared tree (`App.tsx`,
+   `NovelsContent.tsx`, `VisualNovelPanel.tsx`, `ReaderCollectionPanel.tsx` all ` M`) — another
+   track's uncommitted i18n work. Not CRLF: `App.tsx` is CRLF in *both* trees. Gate 34 must say
+   which tree it ran in or the number is meaningless.
+2. **The shared tree's one red is the mirror image, and is an artefact of HEAD+edit staging.**
+   `architectureBaseline.test.ts` reports `test-only-module: src/shared/externalSubtitleMount.ts`
+   because the *working-tree* overlay is the other track's copy and does not carry my import. At
+   `d16547cc` the audit reads **"Nothing new", 5 pending, exit 0**, and the test passes 6/6.
+
+**Turn gates.** shared tree: vitest **790 passed / 1 failed (792 files), 10,983 passed**
+(the one red is the artefact above); i18n **10,789/10,789** exit 0. detached at `d16547cc`:
+architecture **"Nothing new"** exit 0, i18n **10,618/10,618** exit 0, eslint **exit 0** on all
+four touched paths, `tsc --noEmit` **0 errors naming any touched file**.
+
+**Gate 31 stays 32 of 34** (open: 31, 34).

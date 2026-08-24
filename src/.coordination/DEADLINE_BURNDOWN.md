@@ -88,3 +88,11 @@ own — The Big O is owned but absent from all 1,426 list rows, and Route A has 
 candidate in 160 titles. That is data-blocked; no engineering rate divides into it, so the projected
 finish stays UNKNOWN rather than taking the date that would look best. Gate 34 (full gates once at
 the end) is ~15 minutes whenever 31 resolves.
+
+2026-08-24 | mal-pipeline | units done this turn: 0 | units left: 2 | basis: the gate tables in src/MAL_ANIME_PIPELINE_PLAN.md, re-counted this turn (open: 31, 34) | projected finish: UNKNOWN
+Second line this turn, same count on purpose: `d16547cc` fixed a defect `566c6d97` introduced, so
+no unit moved. The engineering half of gate 31 is now done twice over; the half that is left needs
+an acquisition for a title BOTH on the user's MAL completed list AND with a video they own, which
+no rate divides into. Recorded for gate 34: this branch is **3 tests red at HEAD** in a clean
+worktree (another track's uncommitted i18n work), and the shared tree is **1 test red** for the
+mirror reason. Gate 34 must name the tree it ran in.
