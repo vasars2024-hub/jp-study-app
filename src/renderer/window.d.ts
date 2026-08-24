@@ -925,6 +925,9 @@ declare global {
         acquisition: import('../../shared/subtitleNyaa').NyaaAcquisitionConfig,
         lang: string,
       ): Promise<import('../../shared/subtitleDiscoveryIpc').NyaaSubtitleAcceptResult>;
+      attachSubtitleText(
+        input: import('../../shared/subtitleDiscoveryIpc').SubtitleAttachTextInput,
+      ): Promise<import('../../shared/subtitleDiscoveryIpc').NyaaSubtitleAcceptResult>;
       readSubtitleRecord(mediaId: string, recordId: string): Promise<SubtitlePick | null>;
       onSubtitleDiscoveryProgress(
         cb: (p: import('../../shared/subtitleDiscoveryIpc').SubtitleDiscoveryProgress) => void,

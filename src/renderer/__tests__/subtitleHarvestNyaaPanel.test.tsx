@@ -53,6 +53,8 @@ import SubtitleHarvestPanel from '../components/discover/SubtitleHarvestPanel';
 const nyaaList = vi.fn();
 const nyaaFetch = vi.fn();
 const harvestList = vi.fn();
+const listMedia = vi.fn();
+const attachText = vi.fn();
 
 let host: HTMLDivElement;
 let root: Root;
@@ -80,12 +82,20 @@ beforeEach(() => {
   nyaaList.mockReset();
   nyaaFetch.mockReset();
   harvestList.mockReset();
+  listMedia.mockReset();
+  listMedia.mockResolvedValue([]);
+  attachText.mockReset();
   harvestList.mockResolvedValue(jimakuEmpty({ available: true, reason: null, detail: '' }));
   (window as unknown as { api: unknown }).api = {
     subtitleHarvestList: harvestList,
     subtitleHarvestFetch: vi.fn(),
     subtitleHarvestNyaaList: nyaaList,
     subtitleHarvestNyaaFetch: nyaaFetch,
+    // Read once a harvest has attachable files, for the attach picker. Empty
+    // here on purpose: these tests are about the nyaa route, and an empty
+    // library is the state where attaching is offered but has no target.
+    listMedia: listMedia,
+    attachSubtitleText: attachText,
   };
   host = document.createElement('div');
   document.body.appendChild(host);
@@ -278,5 +288,111 @@ describe('SubtitleHarvestPanel — the nyaa fallback', () => {
     // A button that would report a misconfiguration only after starting a
     // transfer is worse than no button.
     expect(button('subHarvest.nyaa.search')).toBeNull();
+  });
+});
+
+// The last link in the subs-only route (MAL pipeline gate 31): before this the
+// panel could mine a harvested season and export it, but the cues had no way to
+// reach the player, because every other path into a `SubtitleRecord` starts
+// from a media item and this panel starts from a catalogue entry.
+describe('SubtitleHarvestPanel — attaching a harvest to a library item', () => {
+  const files = [
+    { episode: 1, text: srt('いち'), format: 'srt', fileName: '01.srt' },
+    { episode: 2, text: srt('に'), format: 'ass', fileName: '02.ass' },
+  ];
+
+  /** Drive a nyaa harvest to the state where the attach control renders. */
+  async function harvestTwo(): Promise<void> {
+    nyaaList.mockResolvedValue({ ok: true, candidates: [candidate()], message: '' });
+    nyaaFetch.mockResolvedValue({ ok: true, message: '', files });
+    await mount([1, 2]);
+    await click('subHarvest.nyaa.search');
+    await click('subHarvest.nyaa.take');
+  }
+
+  function select(index: number): HTMLSelectElement {
+    return host.querySelectorAll('select')[index] as HTMLSelectElement;
+  }
+
+  async function choose(element: HTMLSelectElement, value: string): Promise<void> {
+    await act(async () => {
+      element.value = value;
+      element.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  }
+
+  it('writes the chosen file onto the chosen item, with its provenance', async () => {
+    listMedia.mockResolvedValue([
+      { id: 'm2', title: 'Zebra', path: 'C:/z.mkv', fileName: 'z.mkv', addedAt: 2 },
+      { id: 'm1', title: 'Alpha', path: 'C:/a.mkv', fileName: 'a.mkv', addedAt: 1 },
+    ]);
+    attachText.mockResolvedValue({ ok: true, message: '', lang: 'ja' });
+    await harvestTwo();
+
+    expect(host.textContent).toContain('subHarvest.attach.heading');
+    // Sorted by title, not by the library's own date-added order.
+    expect([...select(0).options].map((option) => option.textContent))
+      .toEqual(['subHarvest.attach.choose', 'Alpha', 'Zebra']);
+
+    // The button cannot fire before a target is picked — an attach with no
+    // item would be main's refusal for something the UI could have prevented.
+    expect(button('subHarvest.attach.action')?.disabled).toBe(true);
+    await choose(select(0), 'm1');
+    await choose(select(1), '1:02.ass');
+    await click('subHarvest.attach.action');
+
+    expect(attachText).toHaveBeenCalledTimes(1);
+    expect(attachText.mock.calls[0][0]).toMatchObject({
+      mediaId: 'm1',
+      // The second file's own bytes and its own format — not the combined
+      // corpus, and not the first file by default.
+      text: srt('に'),
+      format: 'ass',
+      lang: 'ja',
+      providerId: 'nyaa',
+      providerItemId: 'nyaa:aaa',
+    });
+    expect(host.textContent).toContain('subHarvest.attach.done:Alpha');
+  });
+
+  it('shows the refusal verbatim rather than a success', async () => {
+    listMedia.mockResolvedValue([
+      { id: 'm1', title: 'Alpha', path: 'C:/a.mkv', fileName: 'a.mkv', addedAt: 1 },
+    ]);
+    attachText.mockResolvedValue({ ok: false, message: 'That media item is no longer in the library.' });
+    await harvestTwo();
+    await choose(select(0), 'm1');
+    await click('subHarvest.attach.action');
+
+    expect(host.textContent).toContain('no longer in the library');
+    expect(host.textContent).not.toContain('subHarvest.attach.done');
+  });
+
+  it('says the library is empty instead of offering an empty picker', async () => {
+    listMedia.mockResolvedValue([]);
+    await harvestTwo();
+
+    expect(host.textContent).toContain('subHarvest.attach.empty');
+    expect(button('subHarvest.attach.action')).toBeNull();
+  });
+
+  // The negative control for the format filter: a harvest whose files the
+  // player cannot read must not offer an attach that main would refuse.
+  it('offers nothing to attach when no fetched file is a readable format', async () => {
+    listMedia.mockResolvedValue([
+      { id: 'm1', title: 'Alpha', path: 'C:/a.mkv', fileName: 'a.mkv', addedAt: 1 },
+    ]);
+    nyaaList.mockResolvedValue({ ok: true, candidates: [candidate()], message: '' });
+    nyaaFetch.mockResolvedValue({
+      ok: true,
+      message: '',
+      files: [{ episode: 1, text: srt('いち'), format: 'txt', fileName: '01.txt' }],
+    });
+    await mount([1]);
+    await click('subHarvest.nyaa.search');
+    await click('subHarvest.nyaa.take');
+
+    expect(host.textContent).not.toContain('subHarvest.attach.heading');
+    expect(listMedia).not.toHaveBeenCalled();
   });
 });

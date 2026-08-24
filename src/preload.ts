@@ -1554,6 +1554,18 @@ const api = {
     lang: string,
   ): Promise<import('./shared/subtitleDiscoveryIpc').NyaaSubtitleAcceptResult> =>
     ipcRenderer.invoke('subtitleDiscovery:nyaaAccept', mediaId, candidateId, acquisition, lang),
+  /**
+   * Attach cue text the renderer already holds to a library item.
+   *
+   * The inverse of every other subtitle route, which starts from a media item
+   * and goes looking for text. The harvest panel has no media item — it fetches
+   * for a catalogue entry — so without this its cues can be mined but can never
+   * reach the player. Takes no provider config and starts no transfer.
+   */
+  attachSubtitleText: (
+    input: import('./shared/subtitleDiscoveryIpc').SubtitleAttachTextInput,
+  ): Promise<import('./shared/subtitleDiscoveryIpc').NyaaSubtitleAcceptResult> =>
+    ipcRenderer.invoke('subtitleDiscovery:attachText', input),
   /** Cue text for one stored subtitle record. */
   readSubtitleRecord: (mediaId: string, recordId: string): Promise<SubtitlePick | null> =>
     ipcRenderer.invoke('subtitleDiscovery:read', mediaId, recordId),

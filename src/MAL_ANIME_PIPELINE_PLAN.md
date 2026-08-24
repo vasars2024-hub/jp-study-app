@@ -2165,3 +2165,46 @@ another track's uncommitted work, so the same filter cannot land there yet. Whoe
 track owes it the `parseStudySubtitles` call.
 
 **Gate 31 stays 32 of 34.**
+
+## 2026-08-24 — the attach the harvest panel never had, built (gate 31's product half)
+
+Worker `primary`, continuing a slice `backup` left half-written when its quota ran out mid-turn
+(`src/shared/subtitleDiscoveryIpc.ts` and `src/main/subtitleDiscovery.ts` were dirty at 07:54 with
+the contract and the main function, and nothing wired).
+
+**What was missing, restated from the previous turn's own finding:** `SubtitleHarvestPanel` had
+four bridge calls and no attach, so harvested cues reached mining and stopped. Every other route
+into a `SubtitleRecord` starts from a media item; the harvest panel starts from a *catalogue*
+entry and has no media item at all.
+
+**Built (b), the attach action** — not (a), because (a) is "acquire a JoJo video", which is a
+different gate's work and a several-GB transfer:
+
+- `shared/subtitleDiscoveryIpc.ts` — `SubtitleAttachTextInput`, `ATTACHABLE_SUBTITLE_FORMATS`,
+  `MAX_ATTACHED_SUBTITLE_BYTES` (8 MB), and the pure `normalizeSubtitleAttachText`. Shared so the
+  renderer disables for the same reasons main refuses; main still validates.
+- `main/subtitleDiscovery.ts` — `attachSubtitleText` + `subtitleDiscovery:attachText`. Reuses
+  `writeSubtitleFile`; takes no provider config, so it cannot reach the network.
+- `preload.ts` + `renderer/window.d.ts` — `attachSubtitleText`, staged HEAD+insert.
+- `SubtitleHarvestPanel.tsx` — keeps each fetched file whole (`HarvestedFile`), reads the library
+  once there is something attachable, and offers item + file pickers. 10 keys × 4 catalogs.
+
+**Decisions, standing auto-approval, both reversible.** (1) `lrc` is a `SubtitleRecordFormat` and
+is still refused: it is the lyrics container the transcription path writes, no subtitle index
+serves one, and offering it names a format no harvest can produce. (2) The original bytes are
+kept rather than re-serialised from `cues` — the combined corpus is one flattened timeline, so
+re-serialising would offset every cue by the episodes before it, and an `.ass` would lose styling.
+
+**Measured, not asserted.** New suites: `main/__tests__/subtitleAttachText.test.ts` **9 passed**,
+`renderer/__tests__/subtitleHarvestNyaaPanel.test.tsx` **10 → 14 passed**. Negative controls that
+each fail correctly: a refused format writes **0 files** to the cache and patches **0 items**; a
+harvest of only `.txt` renders no attach heading and never calls `listMedia`; an empty library
+says so instead of rendering an empty picker; `attachSubtitleText` shows main's refusal verbatim
+rather than a success. Byte-cap control: 2,796,212 characters of `あ` is under the cap in UTF-16
+length and over it in UTF-8 bytes, and is refused.
+
+**Gate 31 is NOT closed by this and this does not claim to close it.** Its wording (line 413) is
+an *attended* Route A + Route B acquisition ending in cues rendering in the player. This removes
+the structural blocker the previous turn named — the route from harvested text to a
+`SubtitleRecord` now exists — and leaves the attended run itself. **Gate 31 stays 32 of 34**
+(open: 31, 34), counted from this file's gate tables.

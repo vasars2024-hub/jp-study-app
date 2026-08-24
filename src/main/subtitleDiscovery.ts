@@ -32,6 +32,7 @@ import {
   isManualOnlySubtitleProvider,
   isNetworkSubtitleProvider,
   isRemoteSubtitleProvider,
+  normalizeSubtitleAttachText,
   normalizeSubtitleDiscoverySettings,
   orderedSubtitleProviders,
   SUBTITLE_PROVIDER_IDS,
@@ -852,6 +853,53 @@ async function acceptNyaaCandidate(
   return { ok: true, message: '', lang: language };
 }
 
+/**
+ * Writes cue text the caller already holds onto a library item as a record.
+ *
+ * The counterpart to `acceptNyaaCandidate` above, with the network half removed:
+ * that one is handed a release id and goes and fetches it, this one is handed
+ * the bytes. It exists for the harvest panel, which fetches subtitles for a
+ * *catalogue* entry and so has no media item to hang them on — before this, a
+ * harvested season could be mined and exported but could never reach the player.
+ *
+ * It cannot start a transfer, cannot name a provider URL, and cannot read
+ * anything off disk: the only thing it does is validate, write, and patch.
+ */
+export function attachSubtitleText(input: unknown): NyaaSubtitleAcceptResult {
+  const parsed = normalizeSubtitleAttachText(input);
+  if (!parsed.ok) return { ok: false, message: parsed.message };
+  const request = parsed.value;
+
+  const item = host?.listItems().find((entry) => entry.id === request.mediaId);
+  if (!item) return { ok: false, message: 'That media item is no longer in the library.' };
+
+  const stamp = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  const relative = writeSubtitleFile(
+    item.id,
+    `harvest-${request.lang}-${stamp}.${request.format}`,
+    request.text,
+  );
+  if (!relative) return { ok: false, message: 'The subtitle could not be written to disk.' };
+
+  const record: SubtitleRecord = {
+    id: crypto.randomUUID(),
+    lang: request.lang,
+    source: 'provider',
+    format: request.format,
+    path: relative,
+    providerId: request.providerId,
+    ...(request.providerItemId ? { providerItemId: request.providerItemId } : {}),
+    label: request.label,
+    addedAt: Date.now(),
+  };
+
+  host?.patchItems([item.id], {
+    subtitles: [...(item.subtitles ?? []), record],
+    subtitlesCheckedAt: Date.now(),
+  });
+  return { ok: true, message: '', lang: request.lang };
+}
+
 export function registerSubtitleDiscoveryIpc(discoveryHost: SubtitleDiscoveryHost): void {
   host = discoveryHost;
 
@@ -884,6 +932,12 @@ export function registerSubtitleDiscoveryIpc(discoveryHost: SubtitleDiscoveryHos
     (_e, mediaId: string, candidateId: string, acquisition: unknown, lang: string) =>
       acceptNyaaCandidate(mediaId, candidateId, acquisition, typeof lang === 'string' ? lang : 'ja'),
   );
+  /**
+   * Attaches cue text the renderer already holds. Sits beside `nyaaAccept` and
+   * is deliberately not folded into it: that handler is given a release id and
+   * goes to the network, this one is given the bytes and cannot reach it.
+   */
+  ipcMain.handle('subtitleDiscovery:attachText', (_e, input: unknown) => attachSubtitleText(input));
   /** Reads a stored record's cue text, for the player and the study tools. */
   ipcMain.handle('subtitleDiscovery:read', (_e, mediaId: string, recordId: string) => {
     const item = host?.listItems().find((entry) => entry.id === mediaId);

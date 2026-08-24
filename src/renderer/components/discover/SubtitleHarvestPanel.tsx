@@ -18,7 +18,7 @@
  * could disagree with them.
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Icon from '../Icons';
 import { useT } from '../../i18n';
 import { LANG_TAGS } from '../../../shared/i18n/core';
@@ -33,6 +33,8 @@ import {
   type SubtitleHarvestListResult,
 } from '../../../shared/subtitleHarvest';
 import { keepJapaneseStyleCues, parseSubtitles, type Cue } from '../../subtitles';
+import { ATTACHABLE_SUBTITLE_FORMATS } from '../../../shared/subtitleDiscoveryIpc';
+import type { MediaItem } from '../../../shared/types';
 import {
   SEASON_STUDY_LIMITS,
   addMediaStudyFlashcards,
@@ -72,6 +74,28 @@ interface Props {
 }
 
 type Phase = 'idle' | 'listing' | 'listed' | 'fetching' | 'analysing' | 'done' | 'error';
+
+/**
+ * One fetched cue file, kept whole.
+ *
+ * Everything else on this panel works on the *combined* corpus, which is one
+ * flattened timeline with the episode boundaries recorded separately — useful
+ * for a frequency table and useless as a subtitle track. Attaching needs the
+ * original bytes of one episode, so they are held here rather than rebuilt from
+ * `cues`: re-serialising an `.ass` through the SRT writer would drop styling,
+ * and re-serialising the combined timeline would offset every cue by however
+ * many episodes preceded it.
+ */
+interface HarvestedFile {
+  /** Unique within one harvest; the `<select>` value. */
+  key: string;
+  label: string;
+  text: string;
+  /** Lower-case extension without the dot, as the provider served it. */
+  format: string;
+  providerId: string;
+  providerItemId: string;
+}
 
 /** Only the first N vocabulary rows are rendered; mining is not limited to them. */
 const VISIBLE_VOCAB = 60;
@@ -137,6 +161,21 @@ export default function SubtitleHarvestPanel({
   const [nyaaSearchedAs, setNyaaSearchedAs] = useState<string | null>(null);
   /** What the acquired release actually held, against what the range asked for. */
   const [nyaaTaken, setNyaaTaken] = useState<{ files: number; used: number } | null>(null);
+  /** The fetched files themselves, for the attach control below. */
+  const [harvested, setHarvested] = useState<HarvestedFile[]>([]);
+  /**
+   * The library, loaded once a harvest has something to attach.
+   *
+   * `null` means "not asked yet" and an empty array means "asked, and there is
+   * nothing there" — a distinction the empty state depends on, since telling a
+   * user their library is empty before looking is the same lie in a friendlier
+   * shape.
+   */
+  const [library, setLibrary] = useState<MediaItem[] | null>(null);
+  const [attachTarget, setAttachTarget] = useState('');
+  const [attachKey, setAttachKey] = useState('');
+  const [attaching, setAttaching] = useState(false);
+  const [attachMessage, setAttachMessage] = useState('');
 
   const busy = phase === 'listing' || phase === 'fetching' || phase === 'analysing';
 
@@ -151,6 +190,19 @@ export default function SubtitleHarvestPanel({
     [files, episodes],
   );
 
+  /**
+   * Forget the previous harvest's files.
+   *
+   * Called at the top of every fetch. Without it a failed second run leaves the
+   * first run's cues attachable under the second run's heading, which is the
+   * one way this control could write the wrong episode onto a video.
+   */
+  const clearHarvested = useCallback(() => {
+    setHarvested([]);
+    setAttachKey('');
+    setAttachMessage('');
+  }, []);
+
   const find = useCallback(async () => {
     setPhase('listing');
     setMessage('');
@@ -158,6 +210,7 @@ export default function SubtitleHarvestPanel({
     setAnalysis(null);
     setCues([]);
     setSource(null);
+    clearHarvested();
     try {
       // The scraper profile lives here, not in main, so the nyaa fallback's
       // availability is answered against the profile the user is actually on.
@@ -191,7 +244,7 @@ export default function SubtitleHarvestPanel({
       setMessage(errorText(error));
       setPhase('error');
     }
-  }, [anilistId, malId, title, t]);
+  }, [anilistId, malId, title, t, clearHarvested]);
 
   /**
    * The half both providers share: cues in, corpus out.
@@ -257,25 +310,36 @@ export default function SubtitleHarvestPanel({
     setMessage('');
     setFailures([]);
     setNyaaTaken(null);
+    clearHarvested();
     try {
       const reply = await window.api.subtitleHarvestFetch(plan.picks.map((pick) => pick.file.id));
       const byId = new Map(reply.files.map((file) => [file.id, file]));
       const problems: string[] = [];
+      const kept: HarvestedFile[] = [];
       const perEpisode = plan.picks.map((pick) => {
         const fetched = byId.get(pick.file.id);
         if (!fetched?.text) {
           problems.push(`${pick.episode}: ${fetched?.error || t('subHarvest.error.empty')}`);
           return { episode: pick.episode, cues: [] as Cue[] };
         }
+        kept.push({
+          key: pick.file.id,
+          label: `${pick.episode} · ${pick.file.name}`,
+          text: fetched.text,
+          format: pick.file.format,
+          providerId: 'jimaku',
+          providerItemId: pick.file.id,
+        });
         return { episode: pick.episode, cues: parseSubtitles(fetched.text) };
       });
       setFailures(problems);
+      setHarvested(kept);
       await analyse(perEpisode);
     } catch (error) {
       setMessage(errorText(error));
       setPhase('error');
     }
-  }, [analyse, plan, t]);
+  }, [analyse, plan, t, clearHarvested]);
 
   /**
    * Ask the index what it has for this title.
@@ -290,6 +354,7 @@ export default function SubtitleHarvestPanel({
     setNyaaCandidates([]);
     setNyaaSearchedAs(null);
     setNyaaTaken(null);
+    clearHarvested();
     setAnalysis(null);
     setCues([]);
     try {
@@ -310,7 +375,7 @@ export default function SubtitleHarvestPanel({
       setMessage(errorText(error));
       setPhase('error');
     }
-  }, [title, altTitles, malId]);
+  }, [title, altTitles, malId, clearHarvested]);
 
   /**
    * Acquire one release and study whatever of the requested range it holds.
@@ -326,6 +391,7 @@ export default function SubtitleHarvestPanel({
     setMessage('');
     setFailures([]);
     setNyaaTaken(null);
+    clearHarvested();
     try {
       const reply = await window.api.subtitleHarvestNyaaFetch(
         candidateId,
@@ -357,6 +423,14 @@ export default function SubtitleHarvestPanel({
         return;
       }
       setNyaaTaken({ files: reply.files.length, used: inRange.length });
+      setHarvested(inRange.map((file, index) => ({
+        key: `${index}:${file.fileName}`,
+        label: file.episode === null ? file.fileName : `${file.episode} · ${file.fileName}`,
+        text: file.text,
+        format: file.format,
+        providerId: 'nyaa',
+        providerItemId: candidateId,
+      })));
       await analyse(inRange.map((file) => ({
         // A release that numbers nothing — a film, a single file — is still one
         // corpus, and 0 is the episode the segment index then reports.
@@ -367,7 +441,81 @@ export default function SubtitleHarvestPanel({
       setMessage(errorText(error));
       setPhase('error');
     }
-  }, [analyse, episodes, t]);
+  }, [analyse, episodes, t, clearHarvested]);
+
+  /**
+   * Only what this app can actually parse back off disk.
+   *
+   * A provider can serve a `.zip`, a `.txt` transcript or a `.sub` — all of
+   * which mine fine as text and none of which the player reads as a track.
+   * Filtering here rather than only in main means the picker never offers a
+   * file whose attach is guaranteed to be refused.
+   */
+  const attachable = useMemo(
+    () => harvested.filter((file) => (ATTACHABLE_SUBTITLE_FORMATS as readonly string[]).includes(file.format)),
+    [harvested],
+  );
+
+  // The library is read only once there is something to attach: this panel is
+  // reachable from the catalogue without ever fetching a cue, and listing the
+  // whole media library on mount would be an IPC round trip per browse.
+  useEffect(() => {
+    if (!attachable.length || library !== null) return;
+    let live = true;
+    void window.api.listMedia().then(
+      (items) => { if (live) setLibrary(items); },
+      () => { if (live) setLibrary([]); },
+    );
+    return () => { live = false; };
+  }, [attachable.length, library]);
+
+  /** Alphabetical, because the library's own order is by date added. */
+  const libraryOptions = useMemo(
+    () => [...(library ?? [])].sort((a, b) => a.title.localeCompare(b.title)),
+    [library],
+  );
+
+  /**
+   * Write one harvested file onto a library item as a real subtitle track.
+   *
+   * The last missing link in the subs-only route: before this, a harvest could
+   * be mined and exported but the cues could never reach the player, because
+   * every other path into a `SubtitleRecord` starts from a media item the user
+   * already owns. Main validates again and its refusal is shown verbatim — a
+   * renderer-side check is a convenience, never the gate.
+   */
+  const attach = useCallback(async () => {
+    const file = attachable.find((entry) => entry.key === attachKey) ?? attachable[0];
+    const target = libraryOptions.find((item) => item.id === attachTarget);
+    if (!file || !target) return;
+    setAttaching(true);
+    setAttachMessage('');
+    try {
+      const reply = await window.api.attachSubtitleText({
+        mediaId: target.id,
+        text: file.text,
+        format: file.format,
+        lang: 'ja',
+        label: file.label,
+        providerId: file.providerId,
+        providerItemId: file.providerItemId,
+      });
+      if (reply.ok) {
+        setAttachMessage(t('subHarvest.attach.done', { title: target.title }));
+        showToast({
+          kind: 'success',
+          title: target.title,
+          message: t('subHarvest.attach.done', { title: target.title }),
+        });
+      } else {
+        setAttachMessage(reply.message);
+      }
+    } catch (error) {
+      setAttachMessage(errorText(error));
+    } finally {
+      setAttaching(false);
+    }
+  }, [attachKey, attachTarget, attachable, libraryOptions, t]);
 
   /**
    * Words worth a card: everything the learner is not already at level 2+ on.
@@ -602,6 +750,70 @@ export default function SubtitleHarvestPanel({
           <summary>{t('subHarvest.failures', { count: failures.length })}</summary>
           <ul>{failures.map((failure) => <li key={failure}>{failure}</li>)}</ul>
         </details>
+      ) : null}
+
+      {/* The route out of "mined only". Everything above turns cues into cards;
+          this turns them into a track a video can actually show, which the
+          subs-only path had no way to reach — it starts from a catalogue entry,
+          so there was never a media item to hang a record on. */}
+      {attachable.length ? (
+        <div className="mal-dl-subs-attach">
+          <h4 className="mal-dl-subs-heading">{t('subHarvest.attach.heading')}</h4>
+          <p className="scr-muted">{t('subHarvest.attach.hint')}</p>
+          {library !== null && !libraryOptions.length ? (
+            <p className="mal-dl-note" role="status">{t('subHarvest.attach.empty')}</p>
+          ) : (
+            <div className="mal-dl-subs-actions">
+              <label className="disc-field">
+                <span>{t('subHarvest.attach.pickItem')}</span>
+                <select
+                  value={attachTarget}
+                  disabled={attaching || library === null}
+                  onChange={(event) => setAttachTarget(event.target.value)}
+                >
+                  <option value="">{t('subHarvest.attach.choose')}</option>
+                  {libraryOptions.map((item) => (
+                    <option key={item.id} value={item.id}>{item.title}</option>
+                  ))}
+                </select>
+              </label>
+              {attachable.length > 1 ? (
+                <label className="disc-field">
+                  <span>{t('subHarvest.attach.pickFile')}</span>
+                  <select
+                    value={attachKey || attachable[0].key}
+                    disabled={attaching}
+                    onChange={(event) => setAttachKey(event.target.value)}
+                  >
+                    {attachable.map((file) => (
+                      <option key={file.key} value={file.key}>{file.label}</option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+              <button
+                type="button"
+                className="disc-btn"
+                disabled={attaching || !attachTarget}
+                onClick={() => { void attach(); }}
+              >
+                <Icon name="plus" size={12} />
+                {attaching ? t('subHarvest.attach.attaching') : t('subHarvest.attach.action')}
+              </button>
+            </div>
+          )}
+          {/* Skipped files are named rather than hidden: a `.zip` or a `.sub`
+              mines fine and cannot be attached, and silently offering fewer
+              files than the harvest fetched is unexplainable from the UI. */}
+          {harvested.length > attachable.length ? (
+            <p className="scr-muted">
+              {t('subHarvest.attach.skipped', { count: harvested.length - attachable.length })}
+            </p>
+          ) : null}
+          {attachMessage ? (
+            <p className="mal-dl-message" role="status">{attachMessage}</p>
+          ) : null}
+        </div>
       ) : null}
 
       {analysis ? (

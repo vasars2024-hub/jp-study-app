@@ -24871,6 +24871,16 @@ html[data-display-focus='strong'] .reading-source-search:focus-within {
   font-size: var(--font-size-xs, 12px);
 }
 .mal-dl-subs-key { display: flex; align-items: center; gap: 6px; }
+/* The attach control sits between the harvest and the analysis, so it gets its
+   own rule rather than the surrounding grid's: it is a form, and its two
+   selects need to wrap as a pair on a narrow panel instead of splitting. */
+.mal-dl-subs-attach {
+  display: grid;
+  gap: 8px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+.mal-dl-subs-attach .disc-field select { max-width: 260px; }
 .mal-dl-subs-result { display: grid; gap: 10px; }
 /* Headline numbers first: how much dialogue this actually is decides whether
    the frequency table below is worth trusting. */
