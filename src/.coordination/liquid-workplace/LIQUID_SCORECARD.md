@@ -219,3 +219,33 @@ pool. Found by reading `/mem`'s pool rows during the release curve above, not by
 **Next, in order:** the utility-process move for category 7 (the one lever left on the residual),
 then re-drive 5 and 8. Six of eight now sit at 10 on the current tree; 5 and 8 are stale rather
 than failing, and 7 is failing rather than stale.
+
+## 2026-08-24 (night) · primary — five of eight re-driven on one boot; still not a completed entry, and the gap is category 8
+
+Process **30432**, cold boot on `971987a9`+`8b3bd5ea`, Dictionary alone visible, `presentation=liquid`,
+食べる → 8 entries. Numbers and controls in `L7_PERF_DICTIONARY.md`, `L1_UI_CLARITY.md` lineage.
+
+| # | Category | Re-driven on this boot | Result |
+| - | -------- | ---------------------- | ------ |
+| 1 | Accessibility | yes — `l1-accessibility.js` | **10/10**: 152 text nodes, min **5.30:1**, 0 failing; 57 targets, **0** WCAG 2.5.8 fails; 57 controls, **0** keyboard-unreachable, 0 focus hosts; parser self-test ok |
+| 2 | Clunkiness | yes — `l1-deadend.js` + `-read` | **10/10**: 19 targets of a 62 roster (43 skipped as user-data writers), **16 with a measured effect**, bait `Probe control` correctly inert, 2 idempotent-by-state (`Search` re-running the same query, `Automatic` already `active`), **0 dead ends**, 0 unstable, `savedStoreUntouched` / `lensModeRestored` true |
+| 3 | Liquid utilization | no | 10/10 `debad557`, **not re-driven** |
+| 4 | Use of space | no | 10/10 `6f86f2cc`, **not re-driven** |
+| 5 | UI clarity | yes — `l1-ui-clarity.js` + `q78` + `q9` | **10/10**: Q1–Q4 YES (7 collapsed disclosures, **9** scanned controls against a bar of 12), Q5 INHERIT-PASS off the fresh a11y run, Q6 YES (3 Liquid regions, 3 carrying a transition, 0 infinite), Q7/Q8 YES **with both controls now firing**, Q9 YES **7/7**, Q10 YES |
+| 6 | Feature parity + reversibility | partly | 10/10 `b0232340`; its live term re-ran clean this boot (`__L6.check()` **7/7 reachable**), the category's own probe did not |
+| 7 | Performance under real load | yes — legs 1, 2, 4 | frames at the display's own **16.7 ms** ceiling with **0** frames >100 ms on all three gestures; heaviest real action blocks main **168.6 ms** against a 500 ms bar; **the burst path now costs main +6.8 MB / +11 handles** where it once went 604.2 → 7,082.0 MB. Leg 3's 16/24-min marks pending at write time |
+| 8 | Honest states | **no — the run is VOID** | `l8-honest-states.cjs` returned `baseline.entries 0 / chars 10`, i.e. it scored an empty harness, which the rubric caps at 0. Not scored, not inherited |
+
+**Three controls fired, which is what makes the rest quotable.** Jank: p95 16.9 → **117.1**, frames
+>100 ms 0 → 13. Isolation: a 1.5 s renderer block left main at **9.0 ms** max. Sensitivity: 756
+single-term lookups → **38,049.3 ms** against a 1.0 ms idle p50. And two more that were not firing
+before: `--control q7` now flips Q7 to **NO**, `--control q8` flips Q8 to **NO**.
+
+**Why this is still not the first completed entry, stated plainly.** 80/80 needs all eight at 10 on
+one tree. Category 8's instrument produced an empty-harness reading and is therefore unscored rather
+than passed; 3 and 4 were not re-driven; 6 has only its live half. Reporting 80/80 off five re-drives
+and three inherited rows is exactly the false completion this file exists to refuse.
+
+**Next, in order:** find why `l8-honest-states.cjs` reads a cleared window and re-drive category 8;
+then 3, 4 and 6's own probes; then the entry is writable in one pass. Category 7 is the one that was
+failing and it is now the one with the most evidence behind it.

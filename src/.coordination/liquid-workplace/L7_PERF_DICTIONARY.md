@@ -962,3 +962,67 @@ Against the cold-boot 428.2 MB / 1,074 that is **−3.7 MB and −3 handles acro
 cycles and ~13 minutes**. Cycle 2 is the leg where the in-process shape doubled its debt
 (`llamaBackend.ts`: 1,052 handles at boot → 4,378 after one cycle → 6,811 after a second, with or
 without `llama.dispose()`). It no longer accumulates because the process that accumulates it ends.
+
+## 2026-08-24 (night) · primary — the burst path is measured, and the resize defect is fixed rather than logged
+
+One cold boot, pid **30432** (launch 18:56:07.165, Electron main 18:56:18.996), 6 processes,
+`l7d-setup.cjs` asserting Dictionary alone visible, `presentation=liquid`, 食べる → **8 entries /
+5,534 chars / 349 nodes / 75 controls**, `forest-night`, `data-perf=performance`. Everything below
+is that process. Display ceiling re-measured **16.7 ms** (it is not a constant — 10.0 on 08-17).
+
+**Boot.** `npm start` → bridge.json **17.56 s**, → first `/health` **17.85 s**, → renderer ready
+(`.os-taskbar`) **25.04 s**; Electron main → renderer ready **13.22 s**. The forge/Vite cache was
+warm, so as in every earlier entry this is **not** quoted as an improvement on L0's 93.84 / 106.49 s.
+
+### Leg 1 — gestures on the Dictionary window
+
+| Run | frames | p50 | p95 | max | >100 | main max |
+| --- | --- | --- | --- | --- | --- | --- |
+| Ceiling | 109 | 16.7 | 16.8 | 16.9 | 0 | 92.2 |
+| Drag | 102 | 16.7 | 16.9 | 66.8 | **0** | 5.8 |
+| Resize | 104 | 16.7 | 16.9 | 50.2 | **0** | 4.8 |
+| Theme switch | 111 | 16.7 | 16.8 | 16.9 | **0** | 3.1 |
+| **JANK CONTROL** (12 × 120 ms) | 68 | 16.7 | **117.1** | 150.4 | **13** | 4.9 |
+
+Theme apply **17.3** / restore **33.4** ms, `restoredTo=forest-night`, and `jp-os-theme` +
+`data-theme` compared `-ceq` **True** either side. `title=Dictionary` on every gesture run.
+**`closedLoop=True` for resize** — it was False on every previous boot, which is the L0 finding;
+`971987a9` fixes it, and the independent read agrees: live `.fwin` `1080x700` / rect `1080x700`
+against `desktop-layout.json` `video 1080x700` after two closed-loop gestures.
+
+### Leg 2 — `/health` under this window's real work. Bar: no main block over 500 ms.
+
+| Run | samples | p50 | p95 | **max** | proof the work happened |
+| --- | --- | --- | --- | --- | --- |
+| Idle | 40 | 1.0 | 7.5 | **10.5** | — |
+| One real search (勉強) | 40 | 1.0 | 2.9 | **12.0** | `typed=勉強`, `after=8` rows |
+| `Find example sentences` | 40 | 1.1 | 11.9 | **168.6** | nodes 303→363, chars 2,700→3,215 |
+| ISOLATION CONTROL (renderer blocked 1.5 s) | 40 | 0.9 | 3.0 | **9.0** | main unmoved ⇒ main-only ✔ |
+| **SENSITIVITY CONTROL** (756 `lookupTerm`) | 40 | 1.9 | 77.0 | **38,049.3** | `fired===settled===756`, 44,897 ms |
+
+Both real actions pass by more than a factor of three; the single-term batch path still saturates
+main, unchanged from L0, and no Dictionary-window action performs it.
+
+### Leg 4 — THE BURST PATH, which the last scorecard entry named as the one thing not measured
+
+`l1-deadend.js`, 19 controls clicked over ~70 s, sampled either side on this process:
+
+| | clock | main private | handles | electron procs | all private |
+| --- | --- | --- | --- | --- | --- |
+| before | 19:06:00 | **582.3 MB** | 1,071 | 6 | — |
+| +70 s | 19:07:25 | **589.1 MB** | 1,082 | **7** | 4,787.3 MB |
+
+**+6.8 MB and +11 handles in main, against the historical 604.2 → 7,082.0 MB.** The seventh
+process is pid **23584**, `--type=utility --utility-sub-type=node.mojom.NodeService`, forked at
+19:06:11 during the burst and holding **2,942.2 MB** — the burst still loads a model, and the model
+is now in the child. The action path and the cycle path now agree; neither is asserted from the
+other.
+
+### Traps this pass adds
+
+1. **`l1-q9-drive.cjs` hard-codes 食べる.** `l6-parity-dictionary.js:121` earns the `lookup` row
+   from `/食べる/.test(text)`, so any earlier probe that searches something else — `l7e-search.js`
+   types 勉強 — makes Q9 read **NO** (`6/7 reachable, unreachable: lookup`) on a healthy tree.
+   Restore the setup word before scoring Q9; re-run after doing so gave **7/7, verdict YES**.
+2. **A control can be inert without being red.** See `8b3bd5ea`: the Q7 control painted its glass
+   on a `display:none` window and reported `zeroBackdropRegions true` with Q7 still YES.
