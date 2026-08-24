@@ -50,3 +50,42 @@ actuating until the label returns, and those eight were put back to New by hand.
 (`.word-audio`, all 8 entries bar one). Honest text, but the control stays a button that can no
 longer act. Category 8's remaining items — fabricated values, and the four states under a real
 unreachable dependency — are unmeasured, so **no score is claimed for category 8 yet**.
+
+## 2026-08-24 — `Explain again` was the one real DEAD control, and it was two caches
+
+The census left 4 dead ends of 20 in the Liquid Dictionary window; three were honest
+already-in-that-state no-ops (`Search`, a `.dict-saved-search` chip, `Automatic`). The fourth,
+**`Explain again`**, was real: it painted `Asking the model…`, returned to idle in ~4 ms with the
+byte-identical answer, no error element, no blocked element, `/logs?level=error` total 0.
+
+**Cause, not the one the handoff predicted.** The renderer's bare returns at
+`EntryExplain.tsx:128/:130` are exonerated — `aiGetConfig` live is
+`engine cloud / gemini-2.5-flash / apiKeysSet.gemini true`, so `live.ok` is **true** and the call
+does reach main. There are **two** caches and `refresh` only bypassed one.
+`defaultAgentExecutionPolicy` runs Explain at `cache: 'session'`
+(`agentExecutionBridge.ts:456`); the provider runtime keys that on the assembled prompt
+(`providerRuntime.ts:727`), and the explain prompt is deterministic for a word. So the second ask
+in a session was answered out of process memory, re-parsed, and re-stored over itself.
+
+**Measured through the real `dict:explain` handler, 猫/ねこ/en, same policy, same session:**
+
+| call | `refresh` | before | after |
+| --- | --- | --- | --- |
+| 1 plain | false | 6823 ms, `cached:false` (real call) | **18 ms, `cached:true`** |
+| 2 `Explain again` | true | **2 ms, identical summary** | **7290 ms, different summary** |
+| 3 plain | false | 0 ms, `cached:true` | **1 ms, `cached:true`** — serving the new answer |
+
+Negative control is call 1/3 in the after column: the non-refresh path is **still cached**, so the
+fix did not just switch caching off. Second-order finding, now also gone: the 2 ms row reported
+`cached:false`, and that field's contract is "nothing was sent anywhere" — the result asserted a
+provider call that never happened.
+
+**Fix** (`explainRun.ts`, `policyForRun`): a refresh forwards the caller's policy with
+`cache: 'off'` and every other term untouched, so it cannot become a request the user did not
+authorise; a policy already at `'off'` is returned by identity. Placed in the run rather than at
+the IPC handler because `refresh` is that module's contract and both caches must fall to one
+decision. 3 tests added (11 total in `lexiconExplainRun.test.ts`).
+
+Dead ends **4 → 3**, all three remaining honest. Data left as found: 猫 had **no** stored
+explanation before the probe (`preexisting: null`) and `dictExplanationClear` removed exactly
+**1** row, re-read as `null`.

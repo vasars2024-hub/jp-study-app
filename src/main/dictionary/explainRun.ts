@@ -46,6 +46,15 @@ export interface LexiconExplainRequest {
    * The surface's "explain again" control. It bypasses the read, not the write:
    * a refresh that produces a worse answer still replaces the old one, which is
    * what the user asked for, and the old one is not recoverable either way.
+   *
+   * It bypasses *both* caches. There are two, and only one of them is this
+   * module's: `defaultAgentExecutionPolicy` runs Explain at `cache: 'session'`,
+   * and the provider runtime keys that on the assembled prompt
+   * (`providerRuntime.ts:727`). The explain prompt is deterministic for a word,
+   * so the second click inside one app session was answered from process memory
+   * in about 4 ms with the byte-identical reply, re-parsed and re-stored over
+   * itself, and nothing on screen changed — an "Explain again" that cannot
+   * produce a different answer is a dead control. See `providerCache` below.
    */
   refresh?: boolean;
 }
@@ -63,6 +72,24 @@ export interface LexiconExplainDeps {
 function providerErrorCode(error: unknown): string | undefined {
   const code = (error as { code?: unknown } | null)?.code;
   return typeof code === 'string' ? code : undefined;
+}
+
+/**
+ * The policy this run hands the provider, with the session cache off for a refresh.
+ *
+ * Narrowed here rather than at the IPC handler because `refresh` is this
+ * module's contract and the two caches have to be turned off by the same
+ * decision, or the outer one is bypassed and the inner one silently answers.
+ * Nothing else about the policy moves: the target, the budgets and the privacy
+ * flags are the ones the caller froze, so a refresh cannot become a request the
+ * user did not authorise.
+ *
+ * A policy already at `'off'` is returned unchanged — identity, not a copy — so
+ * callers that compare the forwarded policy against the one they passed still do.
+ */
+function policyForRun(policy: AgentProviderPolicy, refresh: boolean): AgentProviderPolicy {
+  if (!refresh || policy.cache === 'off') return policy;
+  return { ...policy, cache: 'off' };
 }
 
 /**
@@ -94,7 +121,11 @@ export async function runLexiconExplain(
   );
   let reply: { text: string };
   try {
-    reply = await deps.runProvider(request.policy, prompt, { allowLocalFallback: false });
+    reply = await deps.runProvider(
+      policyForRun(request.policy, request.refresh === true),
+      prompt,
+      { allowLocalFallback: false },
+    );
   } catch (error) {
     return {
       ok: false,

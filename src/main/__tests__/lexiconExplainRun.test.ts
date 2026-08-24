@@ -63,6 +63,41 @@ describe('a cache hit', () => {
   });
 });
 
+// There are two caches and only one of them belongs to this module. The live
+// Explain policy is `cache: 'session'` (`defaultAgentExecutionPolicy`), whose
+// key is the assembled prompt — deterministic for a word — so a refresh that
+// bypassed only the stored answer got the byte-identical reply back out of
+// process memory in ~4 ms and re-stored it over itself. Measured on the
+// Dictionary lens: "Explain again" changed nothing on screen, with no error,
+// no blocked state and nothing in the error log.
+describe('a refresh and the provider session cache', () => {
+  const SESSION = { ...POLICY, cache: 'session' } as AgentProviderPolicy;
+  const forwardedPolicy = (d: LexiconExplainDeps): AgentProviderPolicy =>
+    (d.runProvider as ReturnType<typeof vi.fn>).mock.calls[0][0];
+
+  it('turns the session cache off, keeping every other term of the policy', async () => {
+    const d = deps({ readCached: vi.fn(() => STORED('cached')) });
+    await runLexiconExplain(d, request({ policy: SESSION, refresh: true }));
+    const sent = forwardedPolicy(d);
+    expect(sent.cache).toBe('off');
+    expect({ ...sent, cache: 'session' }).toEqual(SESSION);
+  });
+
+  // The control: without it, a run that forwarded `'off'` unconditionally would
+  // pass the assertion above while quietly paying for every first lookup.
+  it('leaves the session cache on when nothing asked for a refresh', async () => {
+    const d = deps();
+    await runLexiconExplain(d, request({ policy: SESSION }));
+    expect(forwardedPolicy(d).cache).toBe('session');
+  });
+
+  it('forwards a policy already at off unchanged, by identity', async () => {
+    const d = deps();
+    await runLexiconExplain(d, request({ refresh: true }));
+    expect(forwardedPolicy(d)).toBe(POLICY);
+  });
+});
+
 describe('a miss', () => {
   it('asks once, stores the parsed answer, and refuses a local substitution', async () => {
     const d = deps();
