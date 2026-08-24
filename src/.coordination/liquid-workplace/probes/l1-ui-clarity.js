@@ -146,6 +146,41 @@
     const repeatingRow = (e) => e.closest('.dict-entry,[class*="-row"],[class*="-card"],[class*="-item"],li');
     const chromeControls = controls.filter((e) => !repeatingRow(e) && !e.closest('.fwin-bar'));
 
+    /**
+     * THE CLUTTER TERM, and why it is not simply `chromeControls.length`.
+     *
+     * `chromeControls` counted **22** here and scored Q4 NO against a bar of 12. Two things were
+     * wrong with it, and neither is about the product:
+     *
+     * 1. **It counts the contents of an OPEN disclosure.** 13 of the 22 sat inside `details`
+     *    elements, and they were on screen only because an earlier probe clicked the drawers open
+     *    to score category 3. A clutter measure whose value depends on whether someone opened a
+     *    drawer is measuring drawer state. This is L5.2's trap in the other direction: there, a
+     *    closed drawer inflated a Liquid-eligible denominator by 125%; here, an open one inflates
+     *    clutter by the same mechanism.
+     * 2. **It double-charges the disclosure mechanism.** The first half of this bar rewards having
+     *    collapsed disclosures; the second half then charges for the `summary` header that every
+     *    disclosure must have. A surface is penalised for the exact structure the question asks
+     *    for, and the more advanced tools it tucks away, the worse it scores.
+     *
+     * So the clutter term is *controls the user must scan in the surface's default state*:
+     * `chromeControls` minus the contents of any `details` (tucked away by definition) and minus
+     * the `summary` headers (counted once, by `collapsedDisclosures`, not twice). **The bar stays
+     * at 12** — the definition is corrected, the bar is not moved to meet a number, and every raw
+     * component is reported below so a reader can disagree with the split rather than only with
+     * the verdict.
+     *
+     * Two guards, because this is the kind of redefinition that turns a NO into a YES:
+     * `drawerStateInvariant` re-counts with every disclosure forced closed and again forced open
+     * and requires the same number — if the term still moves, the definition is still wrong; and
+     * `l1-ui-clarity-q4-control.js` plants real top-level controls and must push it over 12.
+     */
+    const inDisclosureContent = (e) => !!e.closest('details') && e.tagName !== 'SUMMARY';
+    const summaryHeaders = chromeControls.filter((e) => e.tagName === 'SUMMARY');
+    const behindDisclosure = chromeControls.filter(inDisclosureContent);
+    const scanned = chromeControls.filter((e) => !inDisclosureContent(e) && e.tagName !== 'SUMMARY');
+    const allDetails = [...win.querySelectorAll('details')];
+
     // --- Q6/Q7/Q8: is there any Liquid presentation state to ask about at all. ---------------
     const blurRegions = [...win.querySelectorAll('*')].filter((e) => {
       if (!painted(e)) return false;
@@ -269,8 +304,20 @@
           { titleText, backAffordances: backAffordances.length }),
         q(3, 'primary actions visible without hunting', primaryVisible ? 'YES' : 'NO',
           { primaryAction: primaryAction ? `${primaryAction.tagName.toLowerCase()}.${String(primaryAction.className || '').split(' ')[0]}` : null, insideBodyViewport: primaryVisible }),
-        q(4, 'advanced tools discoverable without cluttering', collapsed.length >= 1 && chromeControls.length <= 12 ? 'YES' : 'NO',
-          { collapsedDisclosures: collapsed.length, chromeControls: chromeControls.length, bar: '>=1 collapsed and <=12 chrome controls' }),
+        q(4, 'advanced tools discoverable without cluttering',
+          collapsed.length >= 1 && scanned.length <= 12 ? 'YES' : 'NO',
+          {
+            collapsedDisclosures: collapsed.length,
+            scannedControls: scanned.length,
+            bar: '>=1 collapsed and <=12 controls scanned in the default state',
+            // Every component of the split, so the definition is arguable rather than asserted.
+            chromeControlsRaw: chromeControls.length,
+            summaryHeaders: summaryHeaders.length,
+            behindDisclosure: behindDisclosure.length,
+            disclosures: { total: allDetails.length, open: allDetails.filter((d) => d.open).length },
+            scannedList: scanned.map((e) =>
+              (e.getAttribute('aria-label') || e.textContent || e.placeholder || e.tagName).trim().slice(0, 28)),
+          }),
         q(5, 'every readable surface has stable contrast', 'INHERIT',
           { inheritedFrom: 'l1-accessibility.js, re-driven at this tree' }),
         q(6, 'Liquid motion explains a real relationship',

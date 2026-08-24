@@ -1,0 +1,184 @@
+{
+ "at": "2026-08-24T07:25:20.562Z",
+ "asFound": {
+  "label": "Dictionary",
+  "verdict": "YES",
+  "collapsedDisclosures": 6,
+  "scannedControls": 11,
+  "bar": ">=1 collapsed and <=12 controls scanned in the default state",
+  "chromeControlsRaw": 22,
+  "summaryHeaders": 8,
+  "behindDisclosure": 3,
+  "disclosures": {
+   "total": 8,
+   "open": 2
+  },
+  "scannedList": [
+   "日本語",
+   "中文",
+   "Type a word, e.g. 食べる or “ea",
+   "Search",
+   "Save search",
+   "食べる",
+   "Remove saved search",
+   "Automatic",
+   "Dictionary",
+   "Interlinear",
+   "Example sentences"
+  ]
+ },
+ "drawersClosed": {
+  "n": 8,
+  "open": 0
+ },
+ "closed": {
+  "label": "Dictionary",
+  "verdict": "YES",
+  "collapsedDisclosures": 8,
+  "scannedControls": 11,
+  "bar": ">=1 collapsed and <=12 controls scanned in the default state",
+  "chromeControlsRaw": 20,
+  "summaryHeaders": 8,
+  "behindDisclosure": 1,
+  "disclosures": {
+   "total": 8,
+   "open": 0
+  },
+  "scannedList": [
+   "日本語",
+   "中文",
+   "Type a word, e.g. 食べる or “ea",
+   "Search",
+   "Save search",
+   "食べる",
+   "Remove saved search",
+   "Automatic",
+   "Dictionary",
+   "Interlinear",
+   "Example sentences"
+  ]
+ },
+ "drawersOpen": {
+  "n": 8,
+  "open": 8
+ },
+ "open": {
+  "label": "Dictionary",
+  "verdict": "NO",
+  "collapsedDisclosures": 0,
+  "scannedControls": 11,
+  "bar": ">=1 collapsed and <=12 controls scanned in the default state",
+  "chromeControlsRaw": 32,
+  "summaryHeaders": 8,
+  "behindDisclosure": 13,
+  "disclosures": {
+   "total": 8,
+   "open": 8
+  },
+  "scannedList": [
+   "日本語",
+   "中文",
+   "Type a word, e.g. 食べる or “ea",
+   "Search",
+   "Save search",
+   "食べる",
+   "Remove saved search",
+   "Automatic",
+   "Dictionary",
+   "Interlinear",
+   "Example sentences"
+  ]
+ },
+ "drawersRestored": {
+  "restored": true,
+  "open": 2,
+  "of": 8
+ },
+ "invariance": {
+  "scannedClosed": 11,
+  "scannedOpen": 11,
+  "invariant": true,
+  "oldTermClosed": 20,
+  "oldTermOpen": 32,
+  "oldTermInvariant": false
+ },
+ "planted": {
+  "planted": 2,
+  "insideDetails": 0,
+  "insideRow": 0
+ },
+ "withPlants": {
+  "label": "Dictionary",
+  "verdict": "NO",
+  "collapsedDisclosures": 6,
+  "scannedControls": 13,
+  "bar": ">=1 collapsed and <=12 controls scanned in the default state",
+  "chromeControlsRaw": 24,
+  "summaryHeaders": 8,
+  "behindDisclosure": 3,
+  "disclosures": {
+   "total": 8,
+   "open": 2
+  },
+  "scannedList": [
+   "日本語",
+   "中文",
+   "Planted tool 1",
+   "Planted tool 2",
+   "Type a word, e.g. 食べる or “ea",
+   "Search",
+   "Save search",
+   "食べる",
+   "Remove saved search",
+   "Automatic",
+   "Dictionary",
+   "Interlinear",
+   "Example sentences"
+  ]
+ },
+ "unplanted": {
+  "before": 2,
+  "remaining": 0
+ },
+ "afterUnplant": {
+  "label": "Dictionary",
+  "verdict": "YES",
+  "collapsedDisclosures": 6,
+  "scannedControls": 11,
+  "bar": ">=1 collapsed and <=12 controls scanned in the default state",
+  "chromeControlsRaw": 22,
+  "summaryHeaders": 8,
+  "behindDisclosure": 3,
+  "disclosures": {
+   "total": 8,
+   "open": 2
+  },
+  "scannedList": [
+   "日本語",
+   "中文",
+   "Type a word, e.g. 食べる or “ea",
+   "Search",
+   "Save search",
+   "食べる",
+   "Remove saved search",
+   "Automatic",
+   "Dictionary",
+   "Interlinear",
+   "Example sentences"
+  ]
+ },
+ "control": {
+  "plantedTopLevel": 2,
+  "scannedBefore": 11,
+  "scannedWithPlants": 13,
+  "verdictWithPlants": "NO",
+  "held": true,
+  "countReturned": true,
+  "verdictReturned": true
+ },
+ "q4": {
+  "verdict": "YES",
+  "valid": true,
+  "why": "scanned 11 <= 12 with 6 collapsed disclosures, invariant to drawer state, and the control flipped it to NO at 13"
+ }
+}

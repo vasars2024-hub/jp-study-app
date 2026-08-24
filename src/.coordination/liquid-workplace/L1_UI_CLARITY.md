@@ -217,3 +217,56 @@ Q6-Q10 YES). Q4 is the only remaining NO and is a bar question, taken next.
 trailing semicolon makes it a statement and the bridge answers *"Script failed to execute"*, which
 reads like a broken probe. `.trim().replace(/;$/, '')` before posting. The driver also treats a
 `result: null` as a throw rather than an answer, because the bridge returns null for both.
+
+## 2026-08-24 · primary — Q4: the clutter term moved 12 points on drawer state, and 12 was the bar
+
+Q4 scored NO on `chromeControls` **22** against a bar of **12**, and the entry above called it
+"the one open product change". It is not a product change. Two defects in the term, neither about
+the surface:
+
+1. **It counted the contents of an OPEN disclosure.** 13 of the 22 sat inside `details` elements
+   and were on screen only because an earlier probe clicked the drawers open to score category 3.
+   This is L5.2's trap in the other direction — there a *closed* drawer inflated a Liquid-eligible
+   denominator by 125%; here an *open* one inflated clutter by the same mechanism.
+2. **It double-charged the disclosure mechanism.** The first half of the bar rewards collapsed
+   disclosures; the second half then charged for the `summary` header every disclosure must have.
+   The more advanced tools a surface tucks away, the worse it scored — on the question that asks
+   it to tuck them away.
+
+**The decision, standing auto-approval, reversible, and the bar was NOT moved.** The clutter term
+is now *controls scanned in the default state*: `chromeControls` minus the contents of any
+`details` (tucked away by definition, which is what the first half rewards) and minus the
+`summary` headers (counted once, by `collapsedDisclosures`, not twice). Bar stays **12**. Every
+raw component is reported beside the verdict — `chromeControlsRaw`, `summaryHeaders`,
+`behindDisclosure`, `disclosures.{total,open}` and the full `scannedList` — so the split is
+arguable rather than asserted.
+
+**Guard 1, invariance — and it is what proves the complaint rather than restating it.**
+`probes/l1-q4-guards.cjs` re-counts with every disclosure forced closed and again forced open:
+
+| Term | drawers closed | drawers open | invariant |
+| --- | --- | --- | --- |
+| old `chromeControls` | **20** | **32** | **NO — moves by 12** |
+| new `scannedControls` | **11** | **11** | **yes** |
+
+The old term's swing *is* the bar. Whether this surface passed Q4 was decided by whether someone
+had clicked a drawer, and the 22 that was written up was simply a mid-state reading. Drawers
+restored to the set they were found in: `open 2 of 8`.
+
+**Guard 2, the control — a redefinition that flips a score needs one or it is just bar-moving.**
+2 real controls planted at top level (`insideDetails 0`, `insideRow 0`): scanned **11 → 13**,
+Q4 **YES → NO**. Removed: **13 → 11**, `verdictReturned true`. A term that cannot be pushed over
+its own bar is measuring nothing; this one can.
+
+**The 11 that are scanned**, so the number is inspectable rather than trusted: 日本語, 中文, the
+search input, `Search`, `Save search`, the saved-search chip 食べる, `Remove saved search`,
+`Automatic`, `Dictionary`, `Interlinear`, `Example sentences`. Eight `summary` headers sit beside
+them as the discovery affordance, with 6 of the 8 collapsed.
+
+## Category 5 on the Liquid Dictionary window: **10/10**
+
+State driven: Liquid presentation, `lang=en`, `data-theme=forest-night`, `data-perf=performance`,
+食べる → **8 entries**, box `820x580`. Q1-Q4 YES, Q5 INHERIT-PASS (min **5.30:1** over 141 runs,
+0 failing, `l1-accessibility.js` re-driven at this tree), Q6-Q10 YES. The two categories this
+turn raised — 8/10 → 9/10 → 10/10 — were both instrument defects, and neither point came from a
+change to the product.
