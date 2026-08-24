@@ -140,3 +140,18 @@ is 2026-08-25 -- that is the arithmetic and it is not padded. The risk it does N
 here rather than hidden in the number: gate 31 has been re-opened five times by candidates that
 did not deliver, and if this swarm stalls the same way, the projection moves out by however long
 the next candidate takes. That would be a slip to report, not a date to pre-book now.
+
+2026-08-24 | mal-pipeline | units done this turn: 0 | units left: 2 | basis: the gate tables in src/MAL_ANIME_PIPELINE_PLAN.md, re-counted this turn (open: 31, 34) | projected finish: 2026-08-25
+Supersedes the line above it, same turn, after the fallback transfer completed. Still 0 units, and
+the honesty matters more than the round number: gate 31 wants Route A AND Route B, and what ran end
+to end today is ROUTE B. Route A -- a standalone sub-pack whose cues are Japanese -- is untouched
+and is the whole remaining leg. But this is the first acquired-to-screen run the plan has ever had:
+library 34 -> 35 via media:addAcquired, 39 harvested files planned to 1 pair / 38 honest no-match,
+attach ok, and media:open's OWN pickPlaybackSubtitle choosing the attached .tc_jp.ass so the player
+mounts 675 of 36,427 cues with exactly one on screen at t=667.59 s -- JOJO5_textjp, 7 kana, not the
+Chinese track. Product code: 27564082 and 9b0245a5, both the same defect class caught before its
+bytes landed rather than after. The first transfer (episode 38, the smallest row) stalled at 9.86%
+on 0 B/s; the next-smallest (episode 39-END, 574,095,360 B, 14 seeders) was named, sized, sent and
+ran at 2.29 MB/s. Projection unchanged at 2026-08-25 by the same arithmetic -- 2 units at ~3.6
+gates/day -- and it is now better supported than when it was written, because everything gate 31
+needs except a Japanese sub-pack has been exercised live in one process.
