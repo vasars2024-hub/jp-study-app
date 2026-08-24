@@ -77,3 +77,14 @@ lines of uncommitted worktree state with no HEAD base. That is one slice, and it
 page" clause cannot, and Route A has produced no usable candidate in 160 titles surveyed. (b) is
 data-blocked, not effort-blocked, so no rate divides into it. mal-pipeline's finish is gated on (b)
 and stays UNKNOWN rather than being given the date that would look best.
+
+2026-08-24 | mal-pipeline | units done this turn: 0 | units left: 2 | basis: the gate tables in src/MAL_ANIME_PIPELINE_PLAN.md, re-counted this turn (open: 31, 34) | projected finish: UNKNOWN
+Basis note. `566c6d97` closed gate 31's LAST engineering unit — the render seam. Measured, not
+asserted: `externalStudyTrackSplit.test.ts` runs **3 failed / 6 passed at `5155de41`** and **9
+passed at `566c6d97`** in a detached worktree, and `media:subtitleForPath` live returns 267 events
+on track 1 for the user's own `The Big O - 01`. Gate 31 does not close because its remaining half
+needs an acquisition for a title that is BOTH on the user's MAL completed list AND has a video they
+own — The Big O is owned but absent from all 1,426 list rows, and Route A has found no seed-healthy
+candidate in 160 titles. That is data-blocked; no engineering rate divides into it, so the projected
+finish stays UNKNOWN rather than taking the date that would look best. Gate 34 (full gates once at
+the end) is ~15 minutes whenever 31 resolves.

@@ -2469,3 +2469,48 @@ i18n **10,789/10,789** exit 0. architecture **"Nothing new", 5 pending** exit 0.
 on all 12 touched paths (2 pre-existing `adjacent-overload-signatures` in `window.d.ts`, present at
 HEAD). Mutation controls, both restored green: `chosenId` guard disabled → **2 red**; the
 `loadOpened` apply line removed → **2 red**.
+
+## 2026-08-24 — the workspace player never mounted the subtitle it was handed
+
+Worker `primary`. Commit `566c6d97`. Probe `debug/g31z-workspace-sub.cjs` (adapted from
+`g31y-render.cjs`; `debug/` is gitignored). Renderer-only, so no restart.
+
+**A committed test was green only because vitest reads the working tree.** `4c342b6e` landed
+`src/media/__tests__/externalStudyTrackSplit.test.ts` asserting FOUR study seams read a stored
+record through `parseStudySubtitles`, and committed three. The fourth — the workspace overlay,
+which is the player that is actually *mounted* — stayed in another track's uncommitted work.
+Measured in a detached worktree, not the shared tree, which gives the wrong answer both times:
+
+| commit | `externalStudyTrackSplit.test.ts` |
+| --- | --- |
+| `5155de41` (parent) | **3 failed, 6 passed** — all four overlay markers absent from HEAD |
+| `566c6d97` | **9 passed, 0 failed** |
+
+**The product defect under it.** VideoCore learns about subtitles from the container it streams,
+so a file whose Japanese track was *fetched* — jimaku, a nyaa release, the harvest panel's attach
+— had no track at all in the only surface this profile mounts a `<video>` in. `media:subtitleForPath`
+has resolved the right record by path since `09a31e5a` (it routes through `pickPlaybackSubtitle`,
+so it honours the library's `preferredSubtitleId`); nothing in the renderer ever asked it. Now the
+overlay asks once per file, after an 800 ms grace, and **only when the container found nothing** —
+an embedded track outranks a sidecar, re-checked after the awaits because the file's own tracks can
+land while this is in flight. Track carries the record's own label; the split's dropped count reaches
+the transcript as `media.subStatus.otherScript`, keyed by track number so it cannot be shown against
+a track it does not describe.
+
+**LIVE, real library, read-only** (`The Big O - 01`, its real path, the app's own module graph):
+
+| step | number |
+| --- | --- |
+| `media:subtitleForPath` on the item's path | `…[BDRip 1440x1080 x265 FLAC].ja.srt`, **14,012 chars** |
+| `parseStudySubtitles` | **267 cues, 0 dropped**, 0 styles removed — same as the whole parse |
+| `whisperCuesToVideoCoreEvents` | **267 events on track 1**, first `ん？` at 38,133 ms for 534 ms |
+| negative control, a path the library has never seen | **`null`** — no track fabricated |
+
+**Staging trap, still live.** All three worktree copies are foreign (`VideoCoreStudyOverlay.tsx`
+alone is +430 lines: a `media:subtitleSyncOffset` leg and a transcript redesign). Staged as
+HEAD+edit blobs by `debug/stage-workspace-external-sub.cjs`, `remainder===HEAD true` on each. That
+track's version is a superset of this one; when it lands, resolve in its favour.
+
+**Gate 31 stays 32 of 34** (open: 31, 34), counted from this file's gate tables. What is left is
+**not** the render seam any more — it is an acquisition for a title that is on the user's MAL
+completed list and whose video they own. That is data-blocked, not effort-blocked.
