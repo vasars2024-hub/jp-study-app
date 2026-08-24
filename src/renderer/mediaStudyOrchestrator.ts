@@ -81,7 +81,7 @@ import {
 import { loadSaved } from './savedWords';
 import { loadMediaStudyDatabase } from './mediaStudyStore';
 import type { Cue } from './subtitles';
-import { parseSubtitles } from './subtitles';
+import { parseStudySubtitles } from './subtitles';
 
 let initialized: Promise<StudyOrchestratorDocument> | null = null;
 
@@ -294,7 +294,10 @@ export async function prepareStudyMediaById(
 
   const stored = await window.api.readSubtitleRecord(mediaId, subtitle.id);
   if (!stored) throw new Error('The selected Japanese subtitle record could not be read.');
-  const cues = parseSubtitles(stored.text);
+  // The study parser, not the bare one. Every candidate this workspace offers comes out of
+  // these cues, so a dual-language `.ass` would put Chinese dialogue and karaoke fragments
+  // into the user's study candidates and into the readiness fingerprint derived from them.
+  const cues = parseStudySubtitles(stored.text).cues;
   if (!cues.length) throw new Error('The selected Japanese subtitle track has no readable cues.');
   const prepared = await prepareStudyMedia(item, cues, subtitle);
   return {

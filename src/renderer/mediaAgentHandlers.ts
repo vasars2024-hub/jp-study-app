@@ -5,7 +5,7 @@ import type { SubtitleRecord } from '../shared/subtitleRecord';
 import type { MediaDuplicateChoice } from '../shared/mediaHub';
 import { selectJapaneseStudySubtitle } from '../shared/mediaStudyOrchestrator';
 import { analyzeMediaStudyCues, type MediaStudyAnalysis } from './mediaStudyWorkflow';
-import { parseSubtitles } from './subtitles';
+import { parseStudySubtitles } from './subtitles';
 
 export type MediaAgentTranslate = (key: string, vars?: TVars) => string;
 
@@ -53,6 +53,13 @@ export async function resolveMedia(t: MediaAgentTranslate, id: string): Promise<
 export interface SubtitleAnalysis {
   record: SubtitleRecord;
   cueCount: number;
+  /**
+   * Lines the script split removed before analysis — 0 for every ordinary track.
+   *
+   * Present so a caller can say why `cueCount` is lower than the file's own line count.
+   * A dual-language release is the only case that makes it non-zero.
+   */
+  droppedCues: number;
   analysis: MediaStudyAnalysis;
 }
 
@@ -78,10 +85,22 @@ export async function analyzeSubtitles(
 
   const stored = await window.api.readSubtitleRecord(item.id, record.id);
   if (!stored) throw new Error(t('blanc.agent.error.subtitleUnreadable'));
-  const cues = parseSubtitles(stored.text);
+  // The study parser, not the bare one: a dual-language `.ass` is one file holding two
+  // whole tracks, so the bare parse hands the level estimate a corpus that is half
+  // Chinese and reports a `cueCount` at roughly twice the truth. Inert on `.srt`, `.vtt`
+  // and any single-track `.ass`.
+  const split = parseStudySubtitles(stored.text);
+  const cues = split.cues;
   if (!cues.length) throw new Error(t('blanc.agent.error.subtitleNoCues'));
 
-  return { record, cueCount: cues.length, analysis: await analyzeMediaStudyCues(cues) };
+  return {
+    record,
+    cueCount: cues.length,
+    // Reported rather than swallowed: the agent quotes `cueCount` back to the user, and a
+    // number that silently excluded half a file is the one thing it must not do quietly.
+    droppedCues: split.dropped,
+    analysis: await analyzeMediaStudyCues(cues),
+  };
 }
 
 function levelRow(analysis: MediaStudyAnalysis) {
@@ -106,7 +125,11 @@ export function createMediaAgentHandlers(t: MediaAgentTranslate): AgentToolHandl
     'media.analyze-subtitles': async (arguments_) => {
       const item = await resolveMedia(t, textArgument(t, arguments_, 'id'));
       const limit = boundedCount(arguments_.limit, 25, 100);
-      const { record, cueCount, analysis } = await analyzeSubtitles(t, item, arguments_);
+      const { record, cueCount, droppedCues, analysis } = await analyzeSubtitles(
+        t,
+        item,
+        arguments_,
+      );
 
       return {
         id: item.id,
@@ -118,6 +141,9 @@ export function createMediaAgentHandlers(t: MediaAgentTranslate): AgentToolHandl
           ...(record.label ? { label: record.label } : {}),
         },
         cues: cueCount,
+        // Omitted entirely when nothing was dropped, so the ordinary reply is unchanged
+        // and a present key always means a real dual-language release.
+        ...(droppedCues ? { cuesDroppedOtherScript: droppedCues } : {}),
         sentences: analysis.sentences.length,
         truncated: analysis.truncated,
         distinctVocabulary: analysis.vocabulary.length,

@@ -40,7 +40,7 @@ import { ContextualSurface } from '../liquid/LiquidSurface';
 import DictionaryResults, { type DictLang } from '../DictionaryResults';
 import { translateTo } from '../../translator';
 import { useT } from '../../i18n';
-import { parseSubtitles } from '../../subtitles';
+import { parseStudySubtitles } from '../../subtitles';
 import { handOffToAgent, lexiconPassageAgentContext, routeAgentContext } from '../../agentContextHandoff';
 import { AGENT_NAVIGATION_SECTION_LABEL_KEYS } from '../../../shared/agentNavigation';
 import './lexiconWorkbench.css';
@@ -242,7 +242,10 @@ export default function LexiconWorkbenchResults({
         const subtitle = await window.api.subtitleForPath(item.path);
         if (run !== concordanceRun.current) return;
         if (!subtitle?.text) continue;
-        const cues = parseSubtitles(subtitle.text);
+        // The study parser: the concordance is evidence about the learner's own Japanese
+        // corpus, and a dual-language `.ass` would put its Chinese track's shared hanzi
+        // into the hit list as though the user had read that line in Japanese.
+        const cues = parseStudySubtitles(subtitle.text).cues;
         if (cues.length) sources.push({ mediaId: item.id, title: item.title, cues });
       }
       if (run !== concordanceRun.current) return;

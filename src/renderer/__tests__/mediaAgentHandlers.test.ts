@@ -8,11 +8,26 @@ const analyze = vi.fn();
 vi.mock('../mediaStudyWorkflow', () => ({
   analyzeMediaStudyCues: (...args: unknown[]) => analyze(...args),
 }));
+/**
+ * One line per cue, so a fixture's line count IS its cue count.
+ *
+ * `parseStudySubtitles` is the one the handler calls — the study parser, which drops the
+ * non-Japanese style tracks of a dual-language `.ass`. Here it is the same trivial parse
+ * with an empty split, because these cases are about the handler's shape rather than the
+ * splitter; `src/media/__tests__/externalStudyTrackSplit.test.ts` owns the split itself
+ * and the dual-language fixture that makes `dropped` non-zero.
+ */
+const fakeCues = (text: string) => text
+  .split('\n')
+  .filter(Boolean)
+  .map((line, index) => ({ start: index, end: index + 1, text: line }));
 vi.mock('../subtitles', () => ({
-  parseSubtitles: (text: string) => text
-    .split('\n')
-    .filter(Boolean)
-    .map((line, index) => ({ start: index, end: index + 1, text: line })),
+  parseSubtitles: (text: string) => fakeCues(text),
+  parseStudySubtitles: (text: string) => ({
+    cues: fakeCues(text),
+    dropped: 0,
+    styles: [] as string[],
+  }),
 }));
 
 import { createMediaAgentHandlers } from '../mediaAgentHandlers';

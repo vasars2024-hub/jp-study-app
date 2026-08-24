@@ -316,7 +316,7 @@ export function createAnimeAgentHandlers(t: AnimeAgentTranslate): AgentToolHandl
       // analysing the wrong episode is a silently wrong answer.
       const mediaId = optionalText(arguments_, 'mediaId', 200) ?? identity.title;
       const item = await resolveMedia(t as MediaAgentTranslate, mediaId);
-      const { record, cueCount, analysis } = await analyzeSubtitles(
+      const { record, cueCount, droppedCues, analysis } = await analyzeSubtitles(
         t as MediaAgentTranslate,
         item,
         arguments_,
@@ -329,6 +329,8 @@ export function createAnimeAgentHandlers(t: AnimeAgentTranslate): AgentToolHandl
         mediaTitle: item.title,
         subtitle: { id: record.id, lang: record.lang, source: record.source },
         cues: cueCount,
+        // Only when a dual-language release actually lost lines; see `analyzeSubtitles`.
+        ...(droppedCues ? { cuesDroppedOtherScript: droppedCues } : {}),
         distinctVocabulary: analysis.vocabulary.length,
         distinctKanji: analysis.kanji.length,
         truncated: analysis.truncated,
