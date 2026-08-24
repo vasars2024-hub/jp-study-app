@@ -33,9 +33,17 @@
  *      AND the dominant region must not be a uniform card grid — measured as the largest set of
  *      sibling boxes sharing a rounded size, over total siblings.
  *
- * Q5 (contrast) and Q9 (parity) are answered from the two instruments that already own those
- * numbers — `l1-accessibility.js` re-driven at this same tree, and `parity-ledger.json`. They are
- * marked `inheritedFrom` so no reader mistakes them for something this probe measured.
+ * Q5 (contrast) is answered from the instrument that owns that number — `l1-accessibility.js`
+ * re-driven at this same tree — and is marked `inheritedFrom` so no reader mistakes it for
+ * something this probe measured.
+ *
+ * Q9 (parity) USED TO BE inherited the same way, as the literal `'INHERIT'`. It is not any more,
+ * and the reason is a false measurement this file produced: the note beside the literal said "no
+ * migration has occurred", which stopped being true when L3.2 shipped `Make Liquid` on this
+ * window, and the 2026-08-24 run reported "0 of 7 rows both" against a ledger holding **7 of 7**.
+ * A hardcoded verdict cannot go stale gracefully — it reads as a number nobody computed.
+ * `l1-q9-drive.cjs` now requires the ledger AND a live `__L6.check()` to agree, and parks the
+ * result on `window.__q9verdict` the way `l1-q78-drive.cjs` parks Q7 and Q8.
  *
  * Run: `node debug/evfile.cjs src/.coordination/liquid-workplace/probes/l1-ui-clarity.js`
  */
@@ -80,6 +88,7 @@
    * outside `measure`, so every window in one run reports the same provenance.
    */
   const liquidVerdict = (window.__q78verdict && typeof window.__q78verdict === 'object') ? window.__q78verdict : {};
+  const q9Verdict = (window.__q9verdict && typeof window.__q9verdict === 'object') ? window.__q9verdict : {};
 
   const measure = (win, label) => {
     const R = win.getBoundingClientRect();
@@ -298,8 +307,19 @@
           liquidToggles.length === 0
             ? { liquidPresentationToggles: 0, why: 'nothing to turn off on this surface' }
             : { liquidPresentationToggles: liquidToggles.length, drivenBy: 'debug/l1-q78-drive.cjs', checks: liquidVerdict.q8 ? liquidVerdict.q8.checks : null }),
-        q(9, 'all pre-migration features reachable and functional', 'INHERIT',
-          { inheritedFrom: 'parity-ledger.json', note: 'no migration has occurred; see the document for why this earns no discriminating point' }),
+        /**
+         * Q9 was the string literal `'INHERIT'` with the note "no migration has occurred". True
+         * when written, false since L3.2 shipped `Make Liquid` here and L6 closed all seven
+         * dictionary rows to `both` — and a literal does not notice. The 2026-08-24 run reported
+         * `0 of 7 rows both` against a file holding 7 of 7, because the probe never opened it.
+         * `l1-q9-drive.cjs` now computes it from the ledger AND a live `__L6.check()`, and parks
+         * the verdict here. `MEASURE` when the driver has not run at this tree — never a guess.
+         */
+        q(9, 'all pre-migration features reachable and functional',
+          q9Verdict.verdict || 'MEASURE',
+          q9Verdict.verdict
+            ? { drivenBy: 'probes/l1-q9-drive.cjs', why: q9Verdict.why, ledger: q9Verdict.ledger, live: q9Verdict.live }
+            : { note: 'run probes/l1-q9-drive.cjs first; it needs both the ledger and a live L6 check' }),
         q(10, 'still feels like itself, not a generic card dashboard',
           identityCount >= 3 && (cardUniformity < 0.8 || cardControlSignatures <= 1) ? 'YES' : 'NO',
           { identityMarkers, identityCount, cardUniformity: Number(cardUniformity.toFixed(2)), cardControlSignatures, cardHost, cardHostDetail, bar: '>=3 markers, and (uniformity < 0.80 OR one control signature = a gallery, not a dashboard)' }),

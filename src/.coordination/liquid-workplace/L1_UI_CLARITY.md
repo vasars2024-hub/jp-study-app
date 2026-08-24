@@ -170,3 +170,50 @@ Conventional presentation is unchanged, which is §2's first non-negotiable.
 
 **Trap.** The Q8 control leaves the surface with 7 entries. Re-drive 食べる before reading anything
 else, or the next probe scores a surface the control damaged.
+
+## 2026-08-24 · primary — Q9 was a string literal, and it reported a number nobody computed
+
+The 2026-08-24 entry above scored Q9 **NOT EARNABLE** on *"`parity-ledger.json` still **0 of 7**
+rows `both`"*. The file holds **7 of 7** `both`, every one carrying an `observed` measurement, and
+has since L6 closed the category on 2026-08-17. The probe never opened it: Q9 was the hardcoded
+string `'INHERIT'` beside the note *"no migration has occurred"*, written before L3.2 shipped
+`Make Liquid` on this window.
+
+**This is the false-pass shape the rubric names, pointed at a score instead of a feature.** A
+selector that matches nothing reports a live feature as absent; a hardcoded verdict reports a
+stale belief as a measurement, and it cannot go stale gracefully — nothing about it changes when
+the product does. It is worth more than the one point it cost: **any `'INHERIT'` literal in these
+probes is a number nobody computed**, and Q5's is the other one (it is at least true — 141 runs,
+0 failing, re-driven at this tree — but it is inherited, not measured here).
+
+**The replacement, `probes/l1-q9-drive.cjs`, requires two terms that can disagree.** Reading the
+ledger alone would still be trusting a record, and the rubric forbids scoring from source. So:
+
+| Term | What it must show | Measured |
+| --- | --- | --- |
+| recorded | every `app: dictionary` row `both` **and** carrying a non-empty `observed` | **7 / 7** |
+| live | `window.__L6.check()` re-run at this tree reports every row `reachable` | **7 / 7** |
+
+A row the ledger claims and the live check denies is a REGRESSION and scores NO. That
+disagreement is exactly what the control induces. State driven: Liquid presentation, 食べる,
+**8 entries / 5,251 chars / 69 controls**, box `820x580` — not an empty harness.
+
+**Three negative controls, via L6's own `mutate()`, each flipping exactly its own row:**
+
+| Plant | Live | Ledger | Q9 |
+| --- | --- | --- | --- |
+| notes filter detached | **6/7** — `notesFilter (absent)` | still 7/7 `both` | **NO** |
+| both language buttons `active` | **6/7** — `sourceSwitch (ja.active=true zh.active=true)` | still 7/7 | **NO** |
+| `aria-pressed` stripped off the Liquid toggle | **6/7** — `windowLifecycle (liquidAriaPressed=null)` | still 7/7 | **NO** |
+
+The ledger column is the point: it stayed 7/7 through all three, so the NO came from the live
+term and not from the file. Each run reports `parked: false` and asserts it — **a control run
+never parks a verdict**, or a planted failure could reach a score. All three `restored`.
+
+**Category 5 on the Liquid Dictionary window is now 9/10** (Q1-Q3 YES, Q4 NO, Q5 INHERIT-PASS,
+Q6-Q10 YES). Q4 is the only remaining NO and is a bar question, taken next.
+
+**Trap.** `l6-parity-dictionary.js` ends `})();` and the bridge evaluates **one expression** — the
+trailing semicolon makes it a statement and the bridge answers *"Script failed to execute"*, which
+reads like a broken probe. `.trim().replace(/;$/, '')` before posting. The driver also treats a
+`result: null` as a throw rather than an answer, because the bridge returns null for both.
