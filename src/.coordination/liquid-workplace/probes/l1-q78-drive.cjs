@@ -57,8 +57,16 @@ async function ev(js) {
 /** Snapshot source, inlined into each leg so the reads are byte-identical across legs. */
 const SNAP = `
 (function snap(tag){
-  var win = document.querySelector('.fwin');
-  if (!win) return { tag: tag, refuse: 'no .fwin' };
+  // The FIRST .fwin is not the one under test. l7d-setup.cjs isolates the surface by setting
+  // display:none on the other windows rather than closing them (closing rewrites the user's
+  // desktop-layout.json, which has no restore point), so document.querySelector('.fwin') can
+  // return a 0x0 hidden window and this probe then refuses with "window is not liquid".
+  // Take the first window that actually has a box, the way l1-ui-clarity.js does.
+  var win = [].slice.call(document.querySelectorAll('.fwin')).filter(function (w) {
+    var r = w.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  })[0];
+  if (!win) return { tag: tag, refuse: 'no visible .fwin' };
   var painted = function (e) {
     return typeof e.checkVisibility === 'function'
       ? e.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true, contentVisibilityAuto: true })
@@ -149,8 +157,12 @@ const SNAP = `
 })`;
 
 const clickToggle = `(() => {
-  const b = document.querySelector('.fwin .fwin-b-liquid');
-  if (!b) return JSON.stringify({ clicked: false, why: 'no .fwin-b-liquid' });
+  const w = [...document.querySelectorAll('.fwin')].filter((n) => {
+    const r = n.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  })[0];
+  const b = w && w.querySelector('.fwin-b-liquid');
+  if (!b) return JSON.stringify({ clicked: false, why: 'no .fwin-b-liquid on the visible window' });
   const before = b.getAttribute('aria-pressed');
   b.click();
   return JSON.stringify({ clicked: true, ariaPressedBefore: before });
@@ -174,7 +186,14 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   // A standard window carrying glass is exactly what Q7 must be able to answer NO about.
   if (control === 'q7') {
     await ev(`(() => {
-      const t = document.querySelector('.fwin .fwin-body') || document.querySelector('.fwin');
+      // Same hidden-window trap as SNAP above: painting the glass into the first .fwin puts it
+      // on a display:none window, SNAP reads the visible one, and the control silently does not
+      // fire — it reported zeroBackdropRegions true and left Q7 at YES, i.e. certified nothing.
+      const w = [...document.querySelectorAll('.fwin')].filter((n) => {
+        const r = n.getBoundingClientRect();
+        return r.width > 0 && r.height > 0;
+      })[0];
+      const t = (w && w.querySelector('.fwin-body')) || w;
       const d = document.createElement('div');
       d.id = '__q78ctl';
       d.className = 'lq-contextual';
