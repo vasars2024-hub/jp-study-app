@@ -956,3 +956,9 @@ handles to main.
 control starts one from renderer events; `l7c-mem-sampler.ps1` samples memory at uptime marks and
 never touches main's loop; the l7g/l7h/l7i bisectors all read `/mem`. Adapting any of them would
 mean replacing their instrument outright, so both samplers are scratch files under `debug/lhost/`.
+
+**Cycle 2 completed on the same boot: child gone at +401 s, main at 424.5 MB / 1,071 handles.**
+Against the cold-boot 428.2 MB / 1,074 that is **−3.7 MB and −3 handles across TWO full model
+cycles and ~13 minutes**. Cycle 2 is the leg where the in-process shape doubled its debt
+(`llamaBackend.ts`: 1,052 handles at boot → 4,378 after one cycle → 6,811 after a second, with or
+without `llama.dispose()`). It no longer accumulates because the process that accumulates it ends.
