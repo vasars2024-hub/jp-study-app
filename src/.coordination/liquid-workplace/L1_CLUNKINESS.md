@@ -295,10 +295,13 @@ and eight sibling entries carry a button with that identical key — the node re
 click belonged to a different entry whose signature had not moved. Same shape as every other
 "open product decision" this surface has produced.
 
-**Two probe fixes, both in this commit.** (1) `forget` joins the DESTRUCTIVE skip list. It deletes
-a stored AI explanation with no restore path — only a re-ask that returns different prose — and
-this sweep had already destroyed the user's stored explanation for 食べる by driving it. It is now
-skipped by name with a reason, like `Save search` and `+ Add to Anki`. (2) The sweep sorts the view
+**Two probe fixes, both in this commit.** (1) `forget` joins the DESTRUCTIVE skip list. It clears a
+stored AI explanation and the only way back is a re-ask that returns different prose, so it is now
+skipped by name with a reason, like `Save search` and `+ Add to Anki`. **Correction, measured
+rather than assumed:** the sweep drove it on 食べる, and no user data was in fact lost — after the
+next cold boot 食べる's `details.lexicon-explain-entry` again offers `Explain again` /
+`Forget this explanation`, so what the click clears did not survive as a delete. The skip stands on
+intent, not on a loss that happened. (2) The sweep sorts the view
 switchers last and so **ended on `Interlinear`**, which renders no `.dict-entry` at all; the next
 probe run read 0 entries and looked like a search returning nothing. It now records the lens mode
 at arm time, clicks it back, and reports `lensMode` / `lensModeRestored`.

@@ -99,3 +99,46 @@ surface's scored categories was measured by a probe that had already produced on
 
 A first-pass 80/80 on any surface means the probe is broken, not that the surface is
 perfect.
+
+## 2026-08-24 (later) · primary — the re-drive found a category-7 failure. Still no entry, and now for a REASON rather than a rule.
+
+The five inherited categories (2, 5, 6, 7, 8) were being re-driven on one tree so an entry could
+finally be written. Two are done and they went opposite ways.
+
+| # | Category | Re-driven on this tree | Result |
+| - | -------- | ---------------------- | ------ |
+| 6 | Feature parity + reversibility | yes, `b0232340` | **10/10** — parity 7/7 both presentations, round trip byte-for-byte, 3 of 3 controls fired |
+| 2 | Clunkiness | partly, `b0232340` | dead ends 3 → the third was the probe; the sweep's own re-run is the number the entry needs |
+| 7 | Performance under real load | yes | **NOT 10** — leg 3 fails |
+
+**Category 7's leg 3 is a real finding and it is why there is still no scorecard.** Main-process
+private memory goes **604.2 MB → 7,082.0 MB and handles 1,070 → 4,421 between 11 and 17 minutes of
+uptime**, and does not come back (7,081.5 MB with the app quiet at 18.3 min). L0's baseline for
+this surface is 550–577 MB. It reproduced on the boot before it (7,071.8 MB at ~15 min — the same
+plateau to within 10 MB). Every Dictionary control was then bisected on a third boot with private
+bytes sampled between clicks, and **none costs more than 8 MB** — search, all four `Find …`
+controls, the Interlinear sections, all 8 `Play <word>`, and a whole AI explain create-and-forget
+cycle. The jump sits in an uptime window rather than after an action, so the hypothesis under test
+is time-based work in main.
+
+**This is the first category on this surface whose lost point is NOT an instrument defect**, after
+categories 1, 2, 5 and 8 each turned out to be one. The rubric's line about a first-pass 80/80
+meaning the probe is broken has been paid twice over; this is the other half of it working.
+
+Running state, unchanged except where re-driven this turn:
+
+| # | Category | State | Tree it was measured on |
+| - | -------- | ----- | ----------------------- |
+| 1 | Accessibility | 10/10 `06ad1a55` | current |
+| 2 | Clunkiness | 10/10 `7cdc34b4` → re-drive in `b0232340`, one number outstanding | current |
+| 3 | Liquid utilization | 10/10 `debad557` | current |
+| 4 | Use of space | 10/10 `6f86f2cc` | current |
+| 5 | UI clarity | 10/10 `cbb3506a` | **stale — not re-driven** |
+| 6 | Feature parity + reversibility | 10/10 `b0232340` | current |
+| 7 | Performance under real load | **capped** — leg 3 regression | current |
+| 8 | Honest states | 10/10 `9d9e876c` | **stale — not re-driven** |
+
+**Next, in order:** find what allocates the 6.5 GB (the idle-boot sampler at marks 8–20 decides
+whether it is a timer or an action), fix it, re-drive leg 3, then re-drive categories 5 and 8 and
+the category-2 sweep. The entry is written when all eight sit on one tree — which is now blocked
+on a product defect, not on bookkeeping.

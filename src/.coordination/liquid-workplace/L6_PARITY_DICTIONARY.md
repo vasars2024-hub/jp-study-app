@@ -101,4 +101,4 @@ tree, so it is Liquid → Standard → Liquid and it is left as found. The on-di
 (conventional persists as the *absence* of a `presentation` key) is therefore **not** re-asserted
 here and is not folded into this score.
 
-**Category 6 = 10/10 on this tree**, commit `PENDING-C6`.
+**Category 6 = 10/10 on this tree**, commit `b0232340`.

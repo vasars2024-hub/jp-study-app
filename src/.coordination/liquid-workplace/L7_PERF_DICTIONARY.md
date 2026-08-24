@@ -313,3 +313,71 @@ run that no longer blocks anything. Check that a control still FAILS, not merely
 (3) `-DuringJs` reaches the bridge with its non-ASCII intact (`typed=勉強` came back exact), but a
 `\u` escape written into a probe file by this repo's write path collapses into the character
 before the file lands — `String.fromCharCode` is the form that survives editing.
+
+## 2026-08-24 · primary — the re-drive: legs 1 and 2 hold, leg 3 FAILS. Category 7 is NOT a 10.
+
+Re-measured because `e4de125b` and `6f86f2cc` moved CSS after the 10/10 above, and the rubric
+forbids carrying a score across a change. Cold boot, main pid **9932**, `npm start` → bridge
+**16.1 s**; `l7d-setup.cjs` asserted 1 visible `.fwin`: Dictionary, liquid, 食べる → **8 entries /
+5,247 chars / 346 nodes / 75 controls**, `820x580`, `forest-night`, `data-perf=performance`.
+
+**Leg 1 — gestures. This boot's display ceiling is 16.7 ms, re-measured as the file requires.**
+
+| Run | frames | p50 | p95 | max | >33 | >100 | main p50 | main max |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Ceiling | — | 16.7 | 16.9 | 17.6 | 0 | 0 | 2.5 | 8.9 |
+| Drag | — | 16.7 | 17.1 | 33.4 | 3 | **0** | 2.3 | 9.4 |
+| Resize | — | 16.7 | 17.0 | 33.5 | 2 | **0** | 2.4 | 8.8 |
+| Theme switch | — | 16.7 | 16.9 | 17.1 | 0 | **0** | 2.4 | 9.9 |
+| **JANK CONTROL** | 64 | 16.7 | **117.0** | 117.0 | 13 | **12** | 2.0 | 7.8 |
+
+Every gesture sits *at* the ceiling; the control fired (p95 16.9 → 117.0, >100 ms 0 → 12),
+`title=Dictionary`, `closedLoop=True`.
+
+**Leg 2 — `/health` under this surface's real work. Bar: no main block over 500 ms.**
+
+| Run | p50 | p95 | **max** | proof the work happened |
+| --- | --- | --- | --- | --- |
+| Idle | 0.9 | 1.9 | **5.5** | — |
+| One real search (勉強) | 1.1 | 2.6 | **176.2** | `done`, `typed=勉強`, before 8 → after 8 rows |
+| `Find example sentences` | 1.0 | 1.8 | **220.9** | nodes 303 → 363, chars 2,700 → 3,215 |
+| ISOLATION CONTROL (renderer blocked 1,500 ms) | 0.8 | 1.5 | **3.2** | `ms:1500` — main unmoved ⇒ main-only ✔ |
+| **SENSITIVITY CONTROL** (756 `lookupTerm`) | 2.0 | 79.9 | **38,098.2** | `fired===settled===756`, 41,147 ms |
+
+Both real loads pass, but note they are **8.5× and 63× worse than the 2026-08-24 boot** (20.6 and
+3.0 ms) on unchanged code — quote them against the 500 ms bar, not as a trend.
+
+### Leg 3 — main-process memory. THIS IS THE FAILURE, and it reproduces across two boots.
+
+| uptime | clock | main RSS | main **private** | handles | all 6 private |
+| --- | --- | --- | --- | --- | --- |
+| 11.01 | 05:01:53 | 52.6 | **604.2** | 1,070 | 1,525.2 |
+| 17.00 | 05:07:53 | 5,453.7 | **7,082.0** | **4,421** | 8,159.7 |
+| 18.27 (quiet) | 05:09:08 | 5,456.8 | **7,081.5** | 4,421 | 8,171.6 |
+
+**+6,477.8 MB of private memory and +3,351 handles in six minutes, and none of it comes back.**
+The L0 baseline for this surface is 550–577 MB private and ~1,055 handles. It is not a one-off:
+the *previous* boot (pid 22560) measured **7,071.8 MB** private at ~15 min uptime — the same
+plateau to within 10 MB, which is itself a clue that this is a bounded allocation, not a drift.
+
+**Bisected on a third cold boot (pid 7132) and every Dictionary control is EXONERATED**
+(`probes/l7g-membisect{,2,3,4}.cjs`, private bytes sampled between every click):
+
+| Driven | Δ private | Δ handles |
+| --- | --- | --- |
+| real search 食べる → 8 entries | +340.2 then −227.4 (net ≈ 0) | +1 |
+| `Find containing words` / `Find phrases` / `Find example sentences` / `Find shared senses` | −4.3 … **+7.6** | −6 |
+| Interlinear mode switch, all `details` opened, `Search my subtitles` | +50.4 then −32 | ±2 |
+| all **8** `Play <word>` controls | −1.0 … +0.3 | **0** |
+| full AI explain cycle on a 猫 fixture: create (142 chars) → `Forget` | **+1.8** total | +9 |
+
+Nothing the window offers costs more than 8 MB. The jump on boot 9932 happened inside an
+**uptime window** (11 → 17 min) rather than after any one control, so the live hypothesis is
+time-based work in main — a scheduled job, not a user action. A sampler is running on boot 7132
+at marks 8/11/13/15/17/20 with the app otherwise idle: if it reaches ~7 GB untouched, the source
+is a timer and no Dictionary probe will ever find it.
+
+**Category 7 = capped, not 10.** Legs 1 and 2 pass with three controls fired (jank, isolation,
+sensitivity). Leg 3 fails against its own L0 baseline by an order of magnitude, and the rubric's
+10 requires *no regression against the L0 baseline on any of them*. The 10/10 recorded in the
+entry above stands as a measurement of boot 7920 and is **not** carried forward.
