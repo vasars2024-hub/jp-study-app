@@ -35,6 +35,16 @@ const OUT = path.join(__dirname, 'l7o-backend-cycles.json');
 const CYCLES = Number(process.env.L7O_CYCLES || 2);
 /** IDLE_UNLOAD_MS is 5 min in `translate.ts`; this is that plus slack for the dispose itself. */
 const UNLOAD_WAIT_MS = Number(process.env.L7O_UNLOAD_WAIT_MS || 6.5 * 60_000);
+/**
+ * The ADVERSE control for the context pool, added 2026-08-24 and the reason this probe did not
+ * need to become a new file. `cd01ffbd` keeps the KV cache resident for 60 s after the 300 s idle
+ * unload, so a gap under 360 s is free and a gap over it is not. One gap per run can only ever
+ * measure one of those, and a fix that "works" at whatever gap the probe happens to use is exactly
+ * the false pass this file's own trap 1 warns about. So the SECOND-TO-LAST cycle waits this
+ * instead, which makes the last cycle a cold load that must cost what cycle 1 cost — in the same
+ * session, on the same boot, with everything else identical.
+ */
+const CONTROL_GAP_MS = Number(process.env.L7O_CONTROL_GAP_MS || 0);
 const LOAD_WAIT_MS = Number(process.env.L7O_LOAD_WAIT_MS || 90_000);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -72,13 +82,26 @@ async function poolState() {
   // Top level, not nested — and `/mem` only runs a GC when the body says `gc:true`, so a bare GET
   // observes without perturbing the very number being sampled.
   const models = t?.llamaModels ?? null;
-  if (!Array.isArray(models)) return { poolResident: null, poolLeases: null, poolGraceMs: null, poolAwaiting: null };
+  // Two pools since `cd01ffbd`, and the second is the LARGER half of a cycle: the KV cache
+  // measured +1,298.5 MB against a 1,223 MB model file. Sampled here because `privMB` alone
+  // cannot tell "the cache was rebuilt" from "the weights were reloaded".
+  const contexts = Array.isArray(t?.llamaContexts) ? t.llamaContexts : null;
+  const ctx = contexts
+    ? {
+        ctxResident: contexts.length,
+        ctxLeased: contexts.filter((c) => c.leased).length,
+        ctxGraceMs: contexts.length ? contexts[0].graceMs : null,
+        ctxSize: contexts.length ? contexts[0].contextSize : null,
+      }
+    : { ctxResident: null, ctxLeased: null, ctxGraceMs: null, ctxSize: null };
+  if (!Array.isArray(models)) return { poolResident: null, poolLeases: null, poolGraceMs: null, poolAwaiting: null, ...ctx };
   const resident = models.filter((m) => m.resident);
   return {
     poolResident: resident.length,
     poolLeases: models.reduce((n, m) => n + (m.leases || 0), 0),
     poolGraceMs: models.length ? models[0].graceMs : null,
     poolAwaiting: models.filter((m) => m.awaitingRelease).length,
+    ...ctx,
   };
 }
 
@@ -129,7 +152,7 @@ async function mark(label, extra) {
   console.log(
     `${String(label).padEnd(34)} priv ${String(row.privMB).padStart(9)} MB (${row.dPriv >= 0 ? '+' : ''}${row.dPriv})  ` +
     `handles ${String(row.handles).padStart(6)} (${row.dHandles >= 0 ? '+' : ''}${row.dHandles})` +
-    `  poolResident=${row.poolResident} grace=${row.poolGraceMs}` +
+    `  model=${row.poolResident}/${row.poolGraceMs}  ctx=${row.ctxResident}/${row.ctxGraceMs}` +
     (extra && extra.ready !== undefined ? `  ready=${extra.ready}` : ''),
   );
   return row;
@@ -161,8 +184,9 @@ async function main() {
     const plateau = await mark(`cycle ${c} load plateau`, { ready, loadResult });
     if (!ready) throw new Error(`VOID: cycle ${c} never became ready (${loadResult})`);
 
-    console.log(`  waiting ${Math.round(UNLOAD_WAIT_MS / 1000)}s for the idle unload…`);
-    await sleep(UNLOAD_WAIT_MS);
+    const gap = CONTROL_GAP_MS && c === CYCLES - 1 ? CONTROL_GAP_MS : UNLOAD_WAIT_MS;
+    console.log(`  waiting ${Math.round(gap / 1000)}s for the idle unload…${gap === CONTROL_GAP_MS ? ' (ADVERSE control gap)' : ''}`);
+    await sleep(gap);
     const settledReady = (await status()).ready;
     const settled = await mark(`cycle ${c} settled after unload`, { ready: settledReady });
     if (settledReady) throw new Error(`VOID: cycle ${c}'s idle unload never fired`);
@@ -176,6 +200,12 @@ async function main() {
       // Without these two a settled row cannot be compared with any other settled row.
       settledPoolResident: settled.poolResident,
       settledGraceMs: settled.poolGraceMs,
+      // The context pool's own discriminator. `settledCtxResident` at cycle N decides whether
+      // cycle N+1 could possibly have been free, and it is read rather than inferred.
+      gapMs: gap,
+      settledCtxResident: settled.ctxResident,
+      settledCtxGraceMs: settled.ctxGraceMs,
+      plateauCtxResident: plateau.ctxResident,
       // Did this cycle load at all? A reacquire inside the grace window is a cache hit and costs
       // nothing — which is the fix working, not a cycle that failed to run.
       loadedFromCold: plateau.dHandles > 500,

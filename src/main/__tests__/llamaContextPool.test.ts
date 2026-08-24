@@ -184,6 +184,44 @@ describe('llama context pool', () => {
   });
 
   /**
+   * The cost of keying on the size, and it has to be paid before the next allocation rather than
+   * after: changing the agent's `contextSize` in Settings would otherwise leave the old cache warm
+   * for its whole grace window while the new one is built beside it — two multi-GB KV caches for
+   * one model, which is the shape this module exists to prevent.
+   */
+  it('frees a warm cache of another size before building one for the same file', async () => {
+    vi.useFakeTimers();
+    const big = await contextPool.acquireLlamaContext(MODEL_A, 8_192);
+    await big.release();
+    expect(contextPool.llamaContextPoolStats()).toHaveLength(1);
+
+    const small = await contextPool.acquireLlamaContext(MODEL_A, 2_048);
+    expect(disposed).toEqual(['sequence', 'context']);
+    expect(contextPool.llamaContextPoolStats()).toEqual([
+      expect.objectContaining({ contextSize: 2_048, leased: true }),
+    ]);
+    await small.release();
+  });
+
+  /**
+   * The negative control for the eviction above, and the line that makes it safe: a context
+   * somebody is prompting through is never taken. `translate.ts` at 8,192 and the agent at its own
+   * size are both live during an ordinary session.
+   */
+  it('never evicts a sibling size that is still leased', async () => {
+    const held = await contextPool.acquireLlamaContext(MODEL_A, 8_192);
+    const other = await contextPool.acquireLlamaContext(MODEL_A, 2_048);
+
+    expect(disposed).toEqual([]);
+    expect(contextPool.llamaContextPoolStats()).toEqual([
+      expect.objectContaining({ contextSize: 8_192, leased: true }),
+      expect.objectContaining({ contextSize: 2_048, leased: true }),
+    ]);
+    await held.release();
+    await other.release();
+  });
+
+  /**
    * A context has one sequence to give and carries one chat history, so it is checked out
    * exclusively. A concurrent second consumer gets its own, which is what every caller had before
    * this module — the win is across time, not across consumers.

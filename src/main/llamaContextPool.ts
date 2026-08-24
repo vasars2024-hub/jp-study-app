@@ -50,6 +50,8 @@ export const CONTEXT_RELEASE_GRACE_MAX_MS = MODEL_RELEASE_GRACE_MAX_MS;
 interface ContextEntry {
   modelPath: string;
   contextSize: number;
+  /** The key's file half, so "another size of the same GGUF" is a lookup rather than a parse. */
+  fileKey: string;
   modelLease: LlamaModelLease;
   context: LlamaContext;
   sequence: LlamaContextSequence;
@@ -69,12 +71,15 @@ const pool = new Map<string, ContextEntry>();
 /** Per-key churn history, kept across disposals, exactly as the model pool keeps its own. */
 const churn = new Map<string, { disposedAt: number; count: number }>();
 
-function contextKey(modelPath: string, contextSize: number): string {
+function fileKey(modelPath: string): string {
   // Windows paths are case-insensitive, so the same normalisation the model pool applies has to
   // apply here or one file at one size would occupy two entries and neither would ever be a hit.
   const resolved = path.resolve(modelPath);
-  const filePart = process.platform === 'win32' ? resolved.toLowerCase() : resolved;
-  return `${filePart}::${contextSize}`;
+  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+}
+
+function contextKey(modelPath: string, contextSize: number): string {
+  return `${fileKey(modelPath)}::${contextSize}`;
 }
 
 /**
@@ -180,6 +185,20 @@ function leaseFor(key: string, entry: ContextEntry, warm: boolean): LlamaContext
   };
 }
 
+/**
+ * Frees any WARM context for the same GGUF at a different size, before another one is built.
+ *
+ * Without this, changing the agent's `contextSize` in Settings left the old cache warm for its
+ * whole grace window while the new one was allocated beside it — two multi-GB KV caches for one
+ * model, which is the shape this module exists to prevent rather than to introduce. `leased` is
+ * the line: a context somebody is prompting through is never taken, so translate at 8,192 and the
+ * agent at its own size can still be live at the same time. Only the idle one goes.
+ */
+async function evictOtherSizes(file: string, keepKey: string): Promise<void> {
+  const doomed = [...pool.entries()].filter(([key, entry]) => key !== keepKey && !entry.leased && entry.fileKey === file);
+  await Promise.all(doomed.map(([key, entry]) => disposeEntry(key, entry)));
+}
+
 /** Builds a context from scratch. Releases everything it managed to allocate if any step fails. */
 async function buildEntry(modelPath: string, contextSize: number, graceMs: number): Promise<ContextEntry> {
   const modelLease = await acquireLlamaModel(modelPath);
@@ -190,6 +209,7 @@ async function buildEntry(modelPath: string, contextSize: number, graceMs: numbe
     return {
       modelPath,
       contextSize,
+      fileKey: fileKey(modelPath),
       modelLease,
       context,
       sequence,
@@ -237,6 +257,9 @@ export async function acquireLlamaContext(modelPath: string, contextSize: number
       await disposeEntry(key, resident);
     }
   }
+
+  // Before the allocation, not after, so the peak is one cache rather than two.
+  await evictOtherSizes(fileKey(modelPath), key);
 
   const entry = await buildEntry(modelPath, contextSize, churnGraceMs(key, Date.now()));
   // Not `else` on the branch above: an entry can have appeared while this load was in flight, and

@@ -20,6 +20,7 @@ import v8 from 'node:v8';
 import vm from 'node:vm';
 import { BrowserWindow, app } from 'electron';
 import { llamaModelPoolStats } from './llamaModelPool';
+import { llamaContextPoolStats } from './llamaContextPool';
 
 const DEBUG_PORT = 39273;
 const LOG_RING_LIMIT = 2000;
@@ -300,6 +301,11 @@ async function handle(
           // the process that holds gigabytes off-heap, so it reports itself rather than leaving
           // the next investigation to infer it from a delta. Reads a Map; allocates nothing.
           llamaModels: llamaModelPoolStats(),
+          // The other half of the same off-heap bill, and the larger one: an 8,192-token KV cache
+          // measured +1,298.5 MB against a 1,223 MB model file. Without this row a probe sampling
+          // between cycles cannot tell "the cache was rebuilt" from "the weights were reloaded" —
+          // the two look identical in `privateMb` and differ only in which pool was warm.
+          llamaContexts: llamaContextPoolStats(),
         },
       };
     }
