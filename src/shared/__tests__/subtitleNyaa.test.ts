@@ -1355,6 +1355,19 @@ describe('selectSubtitleFiles — the archive folder narrowing', () => {
     expect(picked.files.map((f) => f.index).sort()).toEqual([1, 2]);
   });
 
+  // The title the app really passes is the MAL row's, not a hand-typed one.
+  // Read live 2026-08-24 from `malLibraryList()`: MAL 37991 is filed as
+  // `JoJo no Kimyou na Bouken Part 5: Ougon no Kaze`, and the case above pins a
+  // shorter spelling nothing in the product produces.
+  it('narrows on the title MAL actually files the work under', () => {
+    const picked = selectSubtitleFiles(ARCHIVE, {
+      languages: ['ja'],
+      title: 'JoJo no Kimyou na Bouken Part 5: Ougon no Kaze',
+    });
+    expect(picked.reason).toBe('ok');
+    expect(picked.files.map((f) => f.index).sort()).toEqual([1, 2]);
+  });
+
   it('without a title mixes other shows in — the negative control', () => {
     // The same input, one argument removed. Episode dedup still collapses four
     // shows' "episode 1" into one file, which is exactly the damage: the picked
