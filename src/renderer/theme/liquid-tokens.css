@@ -211,7 +211,20 @@
   --lq-motion-scale: 0;
 }
 
-/* ---------- Reduced motion — displacement off, not just faster ---------- */
+/* ---------- Reduced motion — displacement off, not just faster ----------
+   Two triggers, because the app has two and only one of them was honoured. The
+   OS media query is the platform's answer; `html.reduce-motion` is the in-app
+   Settings > Display control, and a user who has no reduced-motion preference at
+   the OS level (`matchMedia` false is the common case on Windows) got no Liquid
+   reduction at all from it. Measured on the Dictionary window: with the class on,
+   `.lq-contextual` still transitioned for 0.24 s — the longest moving element on
+   the surface, and Liquid's own.
+
+   Collapsed rather than halved, unlike the shared `--motion-duration` tokens that
+   class grades down. This block's title is Liquid's stated policy: displacement is
+   the thing reduced motion is about, and a shorter slide is still a slide.
+   `data-perf='battery'` above already zeroes exactly these four for the same
+   reason. */
 @media (prefers-reduced-motion: reduce) {
   :root {
     --lq-motion-enter: 0.001ms;
@@ -219,4 +232,11 @@
     --lq-motion-move: 0.001ms;
     --lq-motion-scale: 0;
   }
+}
+
+:root.reduce-motion {
+  --lq-motion-enter: 0.001ms;
+  --lq-motion-exit: 0.001ms;
+  --lq-motion-move: 0.001ms;
+  --lq-motion-scale: 0;
 }

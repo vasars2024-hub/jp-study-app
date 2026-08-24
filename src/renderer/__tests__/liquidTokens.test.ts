@@ -50,14 +50,31 @@ describe('liquid semantic tokens — the sheet cannot change existing output', (
     expect([...BODY.matchAll(/--lq-[a-z0-9-]+\s*:/g)].length).toBeGreaterThan(40);
   });
 
+  // The invariant is "this sheet targets only the root element", not "the root
+  // selector is spelled exactly one way". `:root[data-perf='battery']` was always
+  // allowed for that reason, and `:root.reduce-motion` — the in-app Settings >
+  // Display control, which sets a class rather than an attribute — is the same
+  // shape: a qualifier on the root, matching no other element. Anything with a
+  // descendant, sibling or child combinator, or any other tag/class of its own,
+  // still fails.
   it('targets nothing but :root', () => {
     const foreign = blocks
       .flatMap((b) => b.selector.split(',').map((s) => s.trim()))
-      .filter((s) => !/^:root(\[[^\]]+\])?$/.test(s));
+      .filter((s) => !/^:root(\[[^\]]+\]|\.[A-Za-z_][\w-]*)*$/.test(s));
     expect(
       foreign,
-      `every selector must be :root or :root[attr]; these would restyle real elements:\n${foreign.join('\n')}`,
+      `every selector must be :root, optionally qualified by [attr] or .class; these would restyle real elements:\n${foreign.join('\n')}`,
     ).toEqual([]);
+  });
+
+  // The control for the rule above: the widened shape must still reject a
+  // selector that reaches past the root, or it is not a gate any more.
+  it('still rejects a selector that reaches past the root', () => {
+    const rootOnly = /^:root(\[[^\]]+\]|\.[A-Za-z_][\w-]*)*$/;
+    for (const reaching of [':root .fwin', ':root > *', '.lq-anchor', 'body', ':root, .dict-entry']) {
+      const parts = reaching.split(',').map((s) => s.trim());
+      expect(parts.some((s) => !rootOnly.test(s)), reaching).toBe(true);
+    }
   });
 
   it('declares only --lq-* custom properties', () => {

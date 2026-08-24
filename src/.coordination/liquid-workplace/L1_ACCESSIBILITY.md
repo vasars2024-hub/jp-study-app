@@ -432,3 +432,40 @@ were sound (grounds matched hand-computed values), so this invalidates resting-s
 **What category 1 still needs before it can be SCORED 10 here:** this window only. The rubric
 scores a surface, and `l1-palette-contrast.js` measures the Dictionary window's 16 runs, not the
 whole app. `LIQUID_SCORECARD.md` stays empty until all eight categories sit on one surface.
+
+## 2026-08-24 — category 1 measured AS THIS SURFACE, and it is NOT a 10
+
+All four numbers on the Liquid Dictionary window, forest-night, 820x580, driven state 食べる /
+8 entries. Restart confirmed (`bridge.json` `started` 1787548120277 → 1787558670463).
+Parser self-test passed in-run (`color(srgb …)` channels scaled, 222,125,128, 6.12 vs panel) —
+the read that has faked a clean bill of health twice.
+
+| # | number | bar | verdict |
+| - | ------ | --- | ------- |
+| contrast | min **5.30** (`span.lexicon-etymology-source`, 11.9px), 150 measured, 0 unmeasurable | >=4.5 | **pass**, 0 failing |
+| hit targets | smallest **18 px** (`button.dict-star`), **46 of 57** under 32 px | rubric >=32 px | **FAIL** |
+| keyboard | **0 of 57** unreachable, 0 focus hosts | 0 | **pass** |
+| reduced motion | **2** over 0.01 s, longest `button.btn` **0.14 s** | <=0.01 s | **FAIL** |
+
+**Fixed this turn, and it was Liquid's own** (`liquid-tokens.css`): the reduced-motion token block
+honoured `@media (prefers-reduced-motion: reduce)` only. `matchMedia` is **false** here — the
+common Windows case — so a user who set Settings > Display's in-app control got **no** Liquid
+reduction at all, and `.lq-contextual` stayed the longest moving element on the surface at
+**0.24 s**. `:root.reduce-motion` now collapses the same four tokens. Measured, class on:
+**5 → 2** over threshold, `.lq-contextual` gone. Control, same run: with the class **off** the
+count is **12**, unchanged, so the rule fires on the class rather than unconditionally.
+`liquidTokens.test.ts`'s ":root only" gate rejected `:root.reduce-motion` and was widened to
+`:root` + `[attr]`/`.class` qualifiers, with a new control case asserting `:root .fwin`,
+`:root > *`, `.lq-anchor`, `body` and `:root, .dict-entry` are all still rejected.
+
+**The two open items, and neither is a probe defect.**
+1. `button.btn` at 0.14 s is shared app chrome, not Liquid. It is behaving as `a11y.css:49-52`
+   documents — the class *halves* shared duration tokens and `data-motion-mode='disabled'` is the
+   kill switch — so the rubric's <=0.01 s bar and the app's three-tier motion design **disagree**.
+   That is a product decision, not a bug to reflexively patch.
+2. 46 of 57 controls under the rubric's 32 px, while **wcag258FailCount is 0** — every one clears
+   WCAG 2.5.8 through the spacing exception (nearest neighbour >= 37.5 px). Same disagreement the
+   boss audit's finding 3 flagged on the Read sheet's `×`. Raising `.dict-star` and its 45 peers
+   from 18 px is a real visual change to a dense list, not a tail-of-turn edit.
+
+Category 1 stays **open** on this surface until both are settled.
