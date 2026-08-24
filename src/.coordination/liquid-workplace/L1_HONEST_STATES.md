@@ -63,3 +63,41 @@ Category 8 is **VOID / not scored** for Dictionary and **not started** for Media
 categories have now been driven (3, 4, 1) and **none of them scored 10**; category 8 does not even
 reach a score. `LIQUID_SCORECARD.md` stays empty — correctly, and a first-pass 80/80 would have
 meant the probe was broken.
+
+## 2026-08-24 · primary — the dead-control census ran twice; run 1 was 45 false DEADs
+
+**Run 1 reported every one of 46 probed controls DEAD**, including `Search`, which had provably
+worked ninety seconds earlier in the L7 pass. One eval found it: `document.querySelectorAll('.fwin')`
+was **0**. The exclusion table refuses the window chrome by GLYPH (`/^⧉$/`, `/^×$/`), but `labelOf`
+prefers `title`/`aria-label`, so those rows arrived as *"Pop out into its own window"* and *"Close"*
+and matched nothing. **Control 0 popped the surface into a separate BrowserWindow** —
+`?popout=dictionary`, confirmed on `/health` — and the other 45 were measured on a detached tree.
+A detached tree mutates for nobody, so it reads DEAD for everything: the exact mirror of the
+"everything ALIVE" false pass the file's own correction 1 was written against. **The self-test
+could not catch it** — a planted dead button reads DEAD on a broken probe too.
+
+Three fixes, all in this commit: exclusions match the resolved label OR the raw glyph; an
+**aliveness control** (a planted button that genuinely mutates the window, VOID if it reads DEAD);
+and a per-control `document.contains(win)` assertion that aborts naming the last good index
+instead of manufacturing verdicts.
+
+**Run 2, after the fixes.** Both controls fired — planted-dead → DEAD, planted-alive → ALIVE
+(1 mutation, restored). **65 controls, 21 excluded with a named reason, 44 probed → 8 ALIVE,
+1 DEAD, 35 NOT ACTUATED (`element detached`).**
+
+**The dead-control number is therefore STILL NOT EARNED: this is 9 of 44 with a verdict, not
+44 of 44.** The stale-roster cause is measured, not guessed — control 6 (中文) re-renders the whole
+result list (chars **5,963 → 1,415**, entries **8 → 2**) and every stored element from index 14 on
+is a node React has since replaced. The roster has to be re-resolved after any control whose
+fingerprint delta moves the node count; addressing controls by stored element is what correction 1
+chose over CSS paths, and both fail — the fix is re-install-and-rematch, not one or the other.
+
+The single DEAD is `Automatic` (`cls=active`), the already-selected segment of the
+Automatic/Dictionary/Interlinear group. Clicking the active segment of a segmented control is a
+legitimate no-op, so it is a **candidate, not a defect**, and it is only decidable alongside the
+other two segments.
+
+Residuals this run left, stated rather than hidden: **one saved search** (`localStorage` 90 → 91;
+the app's own Save-search flow, user-removable, not deleted blind), and the gloss/mode toggles,
+which were driven back by hand — 日本語 ON, `Automatic` active, **8 entries / 5,967 chars**.
+`中文` does not turn off by re-clicking; it is a two-way radio, and 日本語 is the way back.
