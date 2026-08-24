@@ -4472,6 +4472,21 @@ export const ru: Catalog = {
     one: '{count} файл нельзя прикрепить — плеер не читает его формат.', few: '{count} файла нельзя прикрепить — плеер не читает их формат.',
     many: '{count} файлов нельзя прикрепить — плеер не читает их формат.', other: '{count} файла нельзя прикрепить — плеер не читает их формат.',
   },
+  'subHarvest.attach.all': {
+    one: 'Прикрепить {count} серию', few: 'Прикрепить {count} серии',
+    many: 'Прикрепить {count} серий', other: 'Прикрепить {count} серии',
+  },
+  'subHarvest.attach.allProgress': 'Прикрепление {done} из {total}…',
+  'subHarvest.attach.allDone': 'Прикреплено {attached} из {planned} серий.',
+  'subHarvest.attach.allFailed': {
+    one: '{count} отклонена: {reason}', few: '{count} отклонены: {reason}',
+    many: '{count} отклонено: {reason}', other: '{count} отклонены: {reason}',
+  },
+  'subHarvest.attach.allSkipped': {
+    one: 'Для {count} файла в медиатеке нет подходящей серии.', few: 'Для {count} файлов в медиатеке нет подходящей серии.',
+    many: 'Для {count} файлов в медиатеке нет подходящей серии.', other: 'Для {count} файлов в медиатеке нет подходящей серии.',
+  },
+  'subHarvest.attach.noneMatched': 'В медиатеке нет ни одной серии «{title}», поэтому прикреплять можно только по одному файлу.',
   'subHarvest.minedNone': '\u0412\u0441\u0435 \u0441\u043b\u043e\u0432\u0430 \u043e\u0442\u0441\u044e\u0434\u0430 \u0443\u0436\u0435 \u0435\u0441\u0442\u044c \u0432 \u0432\u0430\u0448\u0435\u0439 \u043a\u043e\u043b\u043e\u0434\u0435.',
   'reading.sources.download': 'Скачать и читать',
   'studyLibrary.eyebrow': 'Режим учёбы',

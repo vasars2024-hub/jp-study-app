@@ -45,6 +45,7 @@ import {
 import { getLevel } from '../../knownWords';
 import { showToast } from '../ui/Toast';
 import { acquisitionConfigFrom } from '../../../shared/subtitleNyaa';
+import { planSubtitleAttach } from '../../../shared/subtitleAttachPlan';
 import { ipcErrorText } from '../../../shared/ipcErrorText';
 import { getActiveScraperSettings } from '../../scraperSettingsStore';
 
@@ -89,6 +90,14 @@ type Phase = 'idle' | 'listing' | 'listed' | 'fetching' | 'analysing' | 'done' |
 interface HarvestedFile {
   /** Unique within one harvest; the `<select>` value. */
   key: string;
+  /**
+   * The episode this file is, carried rather than re-read off `label`.
+   *
+   * Both fetch paths already know it — jimaku from the plan's pick, nyaa from the
+   * release's own file list — and parsing it back out of a display string is how
+   * a renamed label would quietly start attaching the wrong episode.
+   */
+  episode: number | null;
   label: string;
   text: string;
   /** Lower-case extension without the dot, as the provider served it. */
@@ -176,6 +185,8 @@ export default function SubtitleHarvestPanel({
   const [attachKey, setAttachKey] = useState('');
   const [attaching, setAttaching] = useState(false);
   const [attachMessage, setAttachMessage] = useState('');
+  /** Progress of a whole-range attach, so 39 round trips are not a frozen button. */
+  const [attachAllAt, setAttachAllAt] = useState<{ done: number; total: number } | null>(null);
 
   const busy = phase === 'listing' || phase === 'fetching' || phase === 'analysing';
 
@@ -324,6 +335,7 @@ export default function SubtitleHarvestPanel({
         }
         kept.push({
           key: pick.file.id,
+          episode: pick.episode,
           label: `${pick.episode} · ${pick.file.name}`,
           text: fetched.text,
           format: pick.file.format,
@@ -425,6 +437,7 @@ export default function SubtitleHarvestPanel({
       setNyaaTaken({ files: reply.files.length, used: inRange.length });
       setHarvested(inRange.map((file, index) => ({
         key: `${index}:${file.fileName}`,
+        episode: file.episode,
         label: file.episode === null ? file.fileName : `${file.episode} · ${file.fileName}`,
         text: file.text,
         format: file.format,
@@ -516,6 +529,84 @@ export default function SubtitleHarvestPanel({
       setAttaching(false);
     }
   }, [attachKey, attachTarget, attachable, libraryOptions, t]);
+
+  /**
+   * What a whole-range attach would do, recomputed as the harvest and library change.
+   *
+   * Derived so the button can state its own number before it is pressed. A range
+   * is what this pipeline exists for — Route B fetched 39 files in one click —
+   * and "attach 12 episodes" is a promise the user can check; "Attach all" alone
+   * is not.
+   */
+  const attachAllPlan = useMemo(
+    () => planSubtitleAttach(
+      attachable.map((file) => ({ key: file.key, episode: file.episode, label: file.label })),
+      libraryOptions.map((item) => ({
+        id: item.id,
+        title: item.title,
+        fileName: item.fileName,
+        existingLabels: (item.subtitles ?? []).map((record) => record.label),
+      })),
+      title,
+    ),
+    [attachable, libraryOptions, title],
+  );
+
+  /**
+   * Land every matched episode in one action.
+   *
+   * Sequential rather than parallel: each call writes a file and rewrites the
+   * library record, and 39 concurrent writers against one JSON store is a
+   * last-write-wins race that would drop tracks. Failures are counted and the run
+   * continues — one refused episode must not strand the other 38 — and the
+   * summary reports both numbers so a partial run cannot read as a whole one.
+   */
+  const attachAll = useCallback(async () => {
+    const { pairs, skipped } = attachAllPlan;
+    if (!pairs.length) return;
+    const byKey = new Map(attachable.map((file) => [file.key, file]));
+    setAttaching(true);
+    setAttachMessage('');
+    setAttachAllAt({ done: 0, total: pairs.length });
+    let attached = 0;
+    let failed = 0;
+    let firstFailure = '';
+    for (const pair of pairs) {
+      const file = byKey.get(pair.key);
+      if (!file) continue;
+      try {
+        const reply = await window.api.attachSubtitleText({
+          mediaId: pair.mediaId,
+          text: file.text,
+          format: file.format,
+          lang: 'ja',
+          label: file.label,
+          providerId: file.providerId,
+          providerItemId: file.providerItemId,
+        });
+        if (reply.ok) attached += 1;
+        else { failed += 1; if (!firstFailure) firstFailure = reply.message; }
+      } catch (error) {
+        failed += 1;
+        if (!firstFailure) firstFailure = errorText(error);
+      }
+      setAttachAllAt((at) => (at ? { ...at, done: at.done + 1 } : at));
+    }
+    setAttachAllAt(null);
+    setAttaching(false);
+    // Re-read rather than patch: main is the authority on what actually landed,
+    // and a locally incremented track list would disagree with it after a refusal.
+    void window.api.listMedia().then((items) => setLibrary(items), () => undefined);
+    const summary = t('subHarvest.attach.allDone', { attached, planned: pairs.length });
+    const detail = [
+      failed ? t('subHarvest.attach.allFailed', { count: failed, reason: firstFailure }) : '',
+      skipped.length ? t('subHarvest.attach.allSkipped', { count: skipped.length }) : '',
+    ].filter(Boolean).join(' ');
+    setAttachMessage(detail ? `${summary} ${detail}` : summary);
+    // A run that landed nothing is a warning, not a success — the toast is the
+    // only thing a user who looked away will see.
+    showToast({ kind: attached ? 'success' : 'warning', title, message: summary });
+  }, [attachAllPlan, attachable, t, title]);
 
   /**
    * Words worth a card: everything the learner is not already at level 2+ on.
@@ -800,8 +891,31 @@ export default function SubtitleHarvestPanel({
                 <Icon name="plus" size={12} />
                 {attaching ? t('subHarvest.attach.attaching') : t('subHarvest.attach.action')}
               </button>
+              {/* The range this pipeline was asked for. Offered only once the plan
+                  has something to promise, and it states the count rather than
+                  saying "all" — the whole point is that some files will not have
+                  a home and the user should see how many before pressing it. */}
+              {attachAllPlan.pairs.length ? (
+                <button
+                  type="button"
+                  className="disc-btn"
+                  disabled={attaching}
+                  onClick={() => { void attachAll(); }}
+                >
+                  <Icon name="plus" size={12} />
+                  {attachAllAt
+                    ? t('subHarvest.attach.allProgress', { done: attachAllAt.done, total: attachAllAt.total })
+                    : t('subHarvest.attach.all', { count: attachAllPlan.pairs.length })}
+                </button>
+              ) : null}
             </div>
           )}
+          {/* Why the whole-range button is not offered, when it is not. Silence
+              here reads as "the feature is missing" rather than "nothing in your
+              library is an episode of this series", which is the actual answer. */}
+          {library !== null && libraryOptions.length > 0 && !attachAllPlan.pairs.length && attachable.length > 1 ? (
+            <p className="scr-muted">{t('subHarvest.attach.noneMatched', { title })}</p>
+          ) : null}
           {/* Skipped files are named rather than hidden: a `.zip` or a `.sub`
               mines fine and cannot be attached, and silently offering fewer
               files than the harvest fetched is unexplainable from the UI. */}

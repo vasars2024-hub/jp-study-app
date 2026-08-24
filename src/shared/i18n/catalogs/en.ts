@@ -4296,6 +4296,12 @@ export const en: Catalog = {
   'subHarvest.attach.attaching': 'Attaching…',
   'subHarvest.attach.done': 'Attached to {title}.',
   'subHarvest.attach.skipped': { one: '{count} file cannot be attached — the player does not read its format.', other: '{count} files cannot be attached — the player does not read their format.' },
+  'subHarvest.attach.all': { one: 'Attach {count} episode', other: 'Attach {count} episodes' },
+  'subHarvest.attach.allProgress': 'Attaching {done} of {total}…',
+  'subHarvest.attach.allDone': 'Attached {attached} of {planned} episodes.',
+  'subHarvest.attach.allFailed': { one: '{count} was refused: {reason}', other: '{count} were refused: {reason}' },
+  'subHarvest.attach.allSkipped': { one: '{count} file had no matching episode in your library.', other: '{count} files had no matching episode in your library.' },
+  'subHarvest.attach.noneMatched': 'Nothing in your library matches an episode of {title}, so these can only be attached one at a time.',
   'subHarvest.minedNone': 'Every word here is already in your deck.',
   // Phase 6 — Study Mode over the unified Seanime library.
   'studyLibrary.eyebrow': 'Study mode',
