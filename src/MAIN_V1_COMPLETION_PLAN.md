@@ -562,6 +562,15 @@ After the player pilot is visually approved and the remaining app contracts are 
 - Require fresh rendered baselines and after screenshots at compact/default/maximized sizes; source inspection alone is not visual proof.
 - Finish with the full visual atlas and explicit user visual approval before release hardening.
 
+**Open product defect found by this track, and it is not Liquid-specific — D1, main-process
+retention.** Ordinary Dictionary use takes main private bytes from **575.8 MB / 1,053 handles to
+7,075.7 MB / 4,404 handles** in ~70 s and it never comes back; an idle boot over the same window
+moves +0.6 MB, so it is action-driven, not a timer, and every individual control is exonerated at
+≤8 MB net. It is release failure under cadence. Full repro, sample series and the
+`PrivateMemorySize64`-not-`WorkingSet64` trap: §12.1 of
+`LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md`. This blocks rubric category 7 and is a release-blocker
+for v1 in its own right — a 12× permanent main-process blow-up during normal study.
+
 ## Track 9: qBittorrent API surface — credential contract and verification phase
 
 Every part of the app that reaches qBittorrent goes through one client

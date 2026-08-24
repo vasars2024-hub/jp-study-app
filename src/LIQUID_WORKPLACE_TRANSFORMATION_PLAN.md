@@ -701,6 +701,31 @@ The system-wide transformation is done only when:
   final system atlas included. (Was "the user has visually approved"; amended 2026-08-16 —
   see §10.4 and `src/LIQUID_UI_RUBRIC.md`.)
 
+### 12.1 Open product defects that block a rubric category
+
+Recorded here because a defect logged only in a scorecard subdirectory is invisible to every
+other track. Boss audit `audit-20260824-053717` raised exactly that as its Finding 1.
+
+**D1 — main-process private bytes grow ~12× under ordinary Dictionary use and never come back.**
+Status: OPEN. Reproduced on four boots; located, not caused, by `6695a30f` and `10f6edc0`.
+
+- Expected: main private bytes stay near the L0 baseline of 550–577 MB across a session.
+- Actual: **575.8 MB / 1,053 handles → 7,075.7 MB / 4,404 handles** after one
+  `probes/l1-deadend.js` run (19 Dictionary controls in ~70 s). Three boots plateau at
+  7,071.8 / 7,082.0 / 7,075.7 MB, within 10 MB of each other, and it stays.
+- It is **not a timer**: an idle boot left alone over the same window moved **+0.6 MB / −3
+  handles**. It is action-driven, so a fast user reaches the plateau too — not only a probe.
+- It is **not one leaking control**: all 19 are individually exonerated at ≤8 MB net. One action
+  commits ~250–340 MB transiently and gives it back (`searched` 801.1 → 544.7 on the next
+  sample); nineteen back-to-back give none back. So it is release failure under **cadence**.
+- Repro, three commands: boot clean → `probes/l7d-setup.cjs` → `debug/evfile.cjs
+  probes/l1-deadend.js`, reading `PrivateMemorySize64` before and 70 s after.
+- Measurement trap: read `PrivateMemorySize64`, **never `WorkingSet64`** — main RSS swung
+  5,453 → 59 MB while private stayed flat.
+- Blocks: rubric **category 7** leg 3, which is why category 7 is recorded NOT 10. Evidence and
+  the full sample series live in `src/.coordination/liquid-workplace/L7_PERF_DICTIONARY.md`.
+- Next action is a bisect of the allocation, and it is a slice of its own.
+
 ## 13. Explicit non-goals
 
 - Replacing Electron’s/native window behavior with physics or freeform gestures.
