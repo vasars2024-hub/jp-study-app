@@ -468,3 +468,45 @@ per action". It is a coincidence. `openDictionaryDb()` has exactly two non-test 
 (`dictionaryDb()`'s lazy singleton and the import worker), 33 call sites go through the shared
 handle, and `new Database(` appears at exactly one site in all of `src/main/`. No per-action
 connection churn exists, so this is not it. Do not re-run this check.
+
+## 2026-08-24 · backup — D1 ATTRIBUTED: it is a GGUF LLM loading in main, not a Dictionary leak
+
+Four turns hunted a leak among the 19 Dictionary controls. There is none. The chain, each step
+falsifying the last guess, every number from main's own `/mem` (never `WorkingSet64`):
+
+- **`l7i-memstep.cjs`** drove the identical 18-control cadence `l1-deadend.js` uses, sampling
+  between every step: the whole sweep moved private bytes **785.5 → 788.6 MB (Δ+3.1)**. Largest
+  single step 98.6 MB. Then, ~40 s later with **nothing clicked**, the same process read
+  **7,071 MB** — and PowerShell independently read 7,073.9 MB / 4,454 handles on that pid. So D1 is
+  **delayed, not click-synchronous**, which is exactly why the earlier isolation pass (all 19 at
+  ≤8 MB net, sampled at click time) exonerated everything.
+- **`l7j-interlinear-step.cjs`** — Interlinear was the last control driven before the step and the
+  one path that awaits `initYomitan()` + kuromoji. FALSIFIED: **Δ-2.3 MB over 90 s**, with an idle
+  control and a non-interlinear adverse control (`Find containing words`) both flat (Δ0 MB / 40 s).
+- **`l7k-candidate-bisect.cjs`** — five more candidates each clicked once and sampled 30 s:
+  `Play 食べる` +1.1, `Find phrases` -1.4, `Find example sentences` -0.4, `Find shared senses` -1.3,
+  `Explain again` +0.5. Idle control -0.4. **No candidate stepped.**
+- Then the log, not another probe: `grep -i llama debug/devapp-l7h2.log` — the 7 GB session's own
+  stdout carries `[node-llama-cpp] load: …`, and the healthy 599 MB session's log carries **no
+  llama line at all**. `userData/models/Qwen3-1.7B.gguf` is **1,223.0 MB**;
+  `src/main/localAgent.ts:159` loads it with `llama.loadModel()` + `createContext({contextSize})`
+  and caches it in a module-level `runtime` for `IDLE_UNLOAD_MS` = 5 min.
+
+**Positive control — `l7l-llama-attribution.cjs`.** One `localAgent:plan` call on a healthy process:
+
+| | private | heapUsed | external |
+| --- | --- | --- | --- |
+| idle control, 20 s | 598.1 → 598.2 (**Δ+0.1**) | 366.8 | 93.8 |
+| plan t+0 s | 617.2 | 377.8 | 93.9 |
+| plan t+10 s | **3,488.9** | 361.0 | 93.9 |
+| plan t+15…150 s | 3,448.3 flat | 355 | 93.9 |
+
+**Δ+2,831.1 MB from one call**, `localAgent:status` `loaded:false → true`,
+`Qwen_Qwen3-1.7B-Q4_K_M.gguf`, contextSize 8192. That is 2.3× the model file, native, GC-immune,
+`heapUsed` and `external` unmoved — every property l7h measured, and the fixed plateau that lands
+within 10 MB of 7,074 on four boots is a fixed model + fixed KV cache, not a leak.
+
+Open, and the next slice: **which action in the cadence starts the plan**, and why the plateau is
+7,074 rather than 3,448. Prime suspect for the second: `src/main/translate.ts:379` holds a
+**second, independent** module-level llama cache — two full models resident at once. `localAgent.ts`
+has an idle unload; check whether `translate.ts` has one.
