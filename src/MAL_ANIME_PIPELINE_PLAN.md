@@ -2324,3 +2324,58 @@ mine**. i18n **10,789/10,789** exit 0 (+6, mine). architecture **"Nothing new", 
 eslint **0 errors** on all 7 touched paths. Mutation controls, each restored green: `belongsToSeries`
 removed → **2 red**; the strict parser's null allowed to fall through → **exactly 1 red**, the
 creditless case.
+
+## 2026-08-24 — the render leg opened two defects: a 97.2% unrefereed track, and a dead bridge
+
+Worker `primary`. Commits `4c342b6e`, `8cfe2ef8`. Probes `debug/g31u-dual-census.cjs`,
+`debug/stage-subtitleforpath.cjs` (untracked; `debug/` is gitignored).
+
+**Finding 1 — the study split was applied at ONE of four seams.** Censused all eleven
+`parseSubtitles(` call sites in `src/`. Four read a stored `SubtitleRecord` as *study*
+material and had no split; only `MediaContent.applySubtitleFile` did. Measured with the
+product's own module (esbuild-bundled so node requires the TS file, not a copy) over the
+**real acquired Route B pack** — all 39 `.ass` of `[DBD-Raws] JOJO 黄金之风 … 简繁外挂字幕`:
+
+| step | number |
+| --- | --- |
+| files | **39**, and **39 of 39** drop something |
+| cues parsed whole | **667,453** |
+| cues kept by the split | **18,959** |
+| dropped | **648,494 = 97.2%** |
+| distinct non-Japanese styles | **22** (`JOJO5_textch` and `JOJO5-staff` and `JOJO5-title` in all 39) |
+| worst file, ep 31 | **36,686 whole → 672 Japanese** |
+| mildest file, ep 03 | **579 whole → 264 Japanese** |
+
+So the agent's `analyze-subtitles` would have answered **36,686 cues** for an episode whose
+Japanese dialogue is **672** — a 54× overstatement, with the level estimate computed over a
+corpus that is 97% Chinese and karaoke. Fixed at three committed seams in `4c342b6e`:
+`mediaAgentHandlers.analyzeSubtitles` (now also reports `cuesDroppedOtherScript`, omitted
+when 0), `mediaStudyOrchestrator` prepare, and the Lexicon personal concordance. 9 tests.
+Mutation controls, both restored green: the split reduced to a bare parse → **exactly 2
+red**; the overlay call site reverted → **exactly 1 red**.
+
+**Finding 2 — a committed caller, a bridge method that does not exist.**
+`LexiconWorkbenchResults.tsx` is on HEAD and calls `window.api.subtitleForPath`. Counted on
+`HEAD:` blobs: `src/main/media.ts` **0**, `src/preload.ts` **0**, `src/renderer/window.d.ts`
+**0**. The name appeared on HEAD in exactly three places, all callers or prose. So on the
+committed branch that call is `undefined`, throws, and the component's own `catch` parks the
+personal concordance in its error state — forever. It looked fine because the dev app serves
+the **worktree**, where the seam sits as another track's uncommitted work. `8cfe2ef8` lands
+the 72 lines the committed caller needs and nothing else, staged HEAD+insert
+(`remainder===HEAD` true ×3, all three files being dirty with other tracks). Live control
+through the bridge: `subtitleForPath` returned `The Big O.E01.Bandai.ja.srt`, **14,007 chars**,
+on 3 of 3 real library rows.
+
+**The fourth seam is NOT fixed on the branch.** `VideoCoreStudyOverlay`'s downloaded-track
+mount is the one that paints cues, and HEAD carries **no such effect at all** — the whole
+`subtitleForPath` mount, `media:subtitleSyncOffset` and a transcript redesign live only as
+uncommitted worktree state. The fix (`parseStudySubtitles` + a `trackNotice` on
+`VideoCoreTranscriptPanel` carrying the dropped count and its styles) is applied in the
+working tree and is deliberately uncommitted: there is no HEAD blob to base a clean edit on.
+**Trap for the next worker: `git add src/media/VideoCoreStudyOverlay.tsx` absorbs ~430 lines
+of foreign work.**
+
+**Gate 31 stays 32 of 34** (open: 31, 34), counted from this file's gate tables. Its render
+leg is now blocked on something new and concrete rather than on data alone: on the committed
+branch there is no route from a stored `SubtitleRecord` to the mounted player, so "cues render
+in the player" cannot be demonstrated against HEAD until that track commits.
