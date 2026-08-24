@@ -46,19 +46,24 @@ export type LlamaHostRequest =
   | { id: number; kind: 'release'; session: LlamaSessionId }
   | { id: number; kind: 'stats' };
 
+/**
+ * Discriminated on `kind` alone, deliberately: an `ok` flag beside it made `chunk` the one variant
+ * without the discriminant, and narrowing a union by a property that some members lack does not
+ * work — every read of `.text` or `.tokens` was then an error.
+ */
 export type LlamaHostResponse =
-  | { id: number; ok: true; kind: 'acquire'; session: LlamaSessionId; warm: boolean }
-  | { id: number; ok: true; kind: 'prompt'; text: string }
-  | { id: number; ok: true; kind: 'countTokens'; tokens: number }
-  | { id: number; ok: true; kind: 'ok' }
-  | { id: number; ok: true; kind: 'stats'; models: LlamaModelPoolRow[]; contexts: LlamaContextPoolRow[] }
+  | { id: number; kind: 'acquire'; session: LlamaSessionId; warm: boolean }
+  | { id: number; kind: 'prompt'; text: string }
+  | { id: number; kind: 'countTokens'; tokens: number }
+  | { id: number; kind: 'ok' }
+  | { id: number; kind: 'stats'; models: LlamaModelPoolRow[]; contexts: LlamaContextPoolRow[] }
   /** Streamed generation. Not a settlement: the `prompt` reply still follows. */
   | { id: number; kind: 'chunk'; text: string }
   /**
    * `name` is carried because `translate.ts` distinguishes a user cancel from a timeout by
    * `err.name === 'AbortError'`, and an Error rebuilt in main from a message alone loses that.
    */
-  | { id: number; ok: false; error: string; name?: string };
+  | { id: number; kind: 'error'; error: string; name?: string };
 
 /** Sent once, unprompted, when the child is about to exit because its pools went empty. */
 export interface LlamaHostFarewell {

@@ -83,7 +83,7 @@ function send(port: ParentPort, message: LlamaHostResponse | { kind: 'bye'; reas
 function fail(port: ParentPort, id: number, err: unknown): void {
   const error = err instanceof Error ? err.message : String(err);
   const name = err instanceof Error ? err.name : undefined;
-  send(port, { id, ok: false, error, name });
+  send(port, { id, kind: 'error', error, name });
 }
 
 /**
@@ -107,7 +107,7 @@ async function handle(port: ParentPort, request: LlamaHostRequest): Promise<void
       try {
         const id = `s${nextSessionId++}`;
         sessions.set(id, { lease, session: new LlamaChatSession({ contextSequence: lease.sequence }) });
-        send(port, { id: request.id, ok: true, kind: 'acquire', session: id, warm: lease.warm });
+        send(port, { id: request.id, kind: 'acquire', session: id, warm: lease.warm });
       } catch (err) {
         // A session that could not be built must give the context back, or the pool holds a KV
         // cache nothing can ever reach — the retention shape the pool exists to remove.
@@ -131,7 +131,7 @@ async function handle(port: ParentPort, request: LlamaHostRequest): Promise<void
             ? (chunk: string) => send(port, { id: request.id, kind: 'chunk', text: chunk })
             : undefined,
         });
-        send(port, { id: request.id, ok: true, kind: 'prompt', text });
+        send(port, { id: request.id, kind: 'prompt', text });
       } finally {
         inflight.delete(request.id);
       }
@@ -152,7 +152,7 @@ async function handle(port: ParentPort, request: LlamaHostRequest): Promise<void
       const model = entry.lease.model as unknown as { tokenize?: (text: string) => unknown };
       const tokens = model.tokenize?.(request.text);
       if (!Array.isArray(tokens)) throw new Error('llama-host: tokenizer unavailable');
-      send(port, { id: request.id, ok: true, kind: 'countTokens', tokens: tokens.length });
+      send(port, { id: request.id, kind: 'countTokens', tokens: tokens.length });
       return;
     }
 
@@ -168,7 +168,7 @@ async function handle(port: ParentPort, request: LlamaHostRequest): Promise<void
         if (typeof mutable.resetChatHistory === 'function') mutable.resetChatHistory();
         else if (typeof mutable.setChatHistory === 'function') mutable.setChatHistory([]);
       }
-      send(port, { id: request.id, ok: true, kind: 'ok' });
+      send(port, { id: request.id, kind: 'ok' });
       return;
     }
 
@@ -178,14 +178,13 @@ async function handle(port: ParentPort, request: LlamaHostRequest): Promise<void
       // RELEASED, not disposed — the pool keeps the cache warm through its grace window, which is
       // what makes a user returning inside that window pay nothing.
       if (entry) await entry.lease.release();
-      send(port, { id: request.id, ok: true, kind: 'ok' });
+      send(port, { id: request.id, kind: 'ok' });
       return;
     }
 
     case 'stats': {
       send(port, {
         id: request.id,
-        ok: true,
         kind: 'stats',
         models: llamaModelPoolStats(),
         contexts: llamaContextPoolStats(),

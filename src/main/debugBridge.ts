@@ -19,8 +19,7 @@ import path from 'node:path';
 import v8 from 'node:v8';
 import vm from 'node:vm';
 import { BrowserWindow, app } from 'electron';
-import { llamaModelPoolStats } from './llamaModelPool';
-import { llamaContextPoolStats } from './llamaContextPool';
+import { llamaHostStats } from './llamaHost';
 
 const DEBUG_PORT = 39273;
 const LOG_RING_LIMIT = 2000;
@@ -262,6 +261,9 @@ async function handle(
       const mu = process.memoryUsage();
       const hs = v8.getHeapStatistics();
       const info = await process.getProcessMemoryInfo();
+      // Asked before the body is built so a host that is mid-exit answers empty rather than
+      // stalling the route. Costs one round trip only while a host exists.
+      const llamaHost = await llamaHostStats();
       const mb = (n: number) => Math.round((n / (1024 * 1024)) * 10) / 10;
       return {
         code: 200,
@@ -296,16 +298,17 @@ async function handle(
             workingSetMb: mb((m.memory?.workingSetSize ?? 0) * 1024),
             peakWorkingSetMb: mb((m.memory?.peakWorkingSetSize ?? 0) * 1024),
           })),
-          // Every number above is V8's or the OS's, and neither can see a GGUF: main can sit at
-          // 7 GB with a flat JS heap because the weights are native. This is the one subsystem in
-          // the process that holds gigabytes off-heap, so it reports itself rather than leaving
-          // the next investigation to infer it from a delta. Reads a Map; allocates nothing.
-          llamaModels: llamaModelPoolStats(),
+          // Every number above is V8's or the OS's, and neither can see a GGUF. Since the model
+          // host moved out of this process these two rows are ANOTHER process's pools, asked over
+          // the wire — which is also why `metrics` above is the row that now carries the weights'
+          // real cost: look for the `Utility` entry named `jp-llama-host`. Both rows empty means
+          // no host is running, which is a real answer rather than a missing one.
+          llamaModels: llamaHost.models,
           // The other half of the same off-heap bill, and the larger one: an 8,192-token KV cache
           // measured +1,298.5 MB against a 1,223 MB model file. Without this row a probe sampling
           // between cycles cannot tell "the cache was rebuilt" from "the weights were reloaded" —
           // the two look identical in `privateMb` and differ only in which pool was warm.
-          llamaContexts: llamaContextPoolStats(),
+          llamaContexts: llamaHost.contexts,
         },
       };
     }

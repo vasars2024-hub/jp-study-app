@@ -14,6 +14,9 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LlamaHostRequest } from '../../shared/llamaHostProtocol';
+// After the `vi.mock` calls below in source order, but vitest hoists those above every import, so
+// the module under test still loads with electron and the pools stubbed.
+import * as host from '../llamaHost';
 
 type Listener = (...args: unknown[]) => void;
 
@@ -99,8 +102,6 @@ vi.mock('node-llama-cpp', () => ({
   },
 }));
 
-const host = await import('../llamaHost');
-
 function child(index = 0): FakeChild {
   return registry.children[index] as FakeChild;
 }
@@ -120,7 +121,7 @@ async function acquire(): Promise<Awaited<ReturnType<typeof host.acquireLlamaSes
   const pendingSession = host.acquireLlamaSession('C:\\models\\qwen.gguf', 8192);
   await Promise.resolve();
   const request = lastRequest(child(), 'acquire');
-  reply(child(), { id: request.id, ok: true, kind: 'acquire', session: 's1', warm: true });
+  reply(child(), { id: request.id, kind: 'acquire', session: 's1', warm: true });
   return pendingSession;
 }
 
@@ -164,7 +165,7 @@ describe('llamaHost — the boundary', () => {
     });
     await Promise.resolve();
     expect(settled).toBe(false);
-    reply(child(), { id: request.id, ok: true, kind: 'prompt', text: 'こんにちは' });
+    reply(child(), { id: request.id, kind: 'prompt', text: 'こんにちは' });
     await expect(pendingPrompt).resolves.toBe('こんにちは');
     expect(chunks).toEqual(['こん', 'にちは']);
   });
@@ -179,7 +180,7 @@ describe('llamaHost — the boundary', () => {
     const abort = lastRequest(child(), 'abort') as Extract<LlamaHostRequest, { kind: 'abort' }>;
     expect(abort.target).toBe(request.id);
     // The worker never answers an abort. If the handle awaited one, this prompt could not settle.
-    reply(child(), { id: request.id, ok: true, kind: 'prompt', text: 'partial' });
+    reply(child(), { id: request.id, kind: 'prompt', text: 'partial' });
     await expect(pendingPrompt).resolves.toBe('partial');
   });
 
@@ -188,7 +189,7 @@ describe('llamaHost — the boundary', () => {
     const pendingPrompt = session.prompt('x', { maxTokens: 16 });
     await Promise.resolve();
     const request = lastRequest(child(), 'prompt');
-    reply(child(), { id: request.id, ok: false, error: 'aborted', name: 'AbortError' });
+    reply(child(), { id: request.id, kind: 'error', error: 'aborted', name: 'AbortError' });
     await expect(pendingPrompt).rejects.toMatchObject({ name: 'AbortError', message: 'aborted' });
   });
 
@@ -200,7 +201,7 @@ describe('llamaHost — the boundary', () => {
 
     const pendingRelease = session.release();
     await Promise.resolve();
-    reply(child(), { id: lastRequest(child(), 'release').id, ok: true, kind: 'ok' });
+    reply(child(), { id: lastRequest(child(), 'release').id, kind: 'ok' });
     await pendingRelease;
 
     child().emit('message', { kind: 'bye', reason: 'idle' });
@@ -215,7 +216,6 @@ describe('llamaHost — the boundary', () => {
     await Promise.resolve();
     reply(child(), {
       id: lastRequest(child(), 'stats').id,
-      ok: true,
       kind: 'stats',
       models: [{ modelPath: 'q.gguf', leases: 1, resident: true, awaitingRelease: false, graceMs: 60000 }],
       contexts: [],

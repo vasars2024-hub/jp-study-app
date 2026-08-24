@@ -51,7 +51,7 @@ import { registerMangaOcrIpc } from './main/mangaOcr';
 import { registerBookOcrIpc } from './main/bookOcrJob';
 import { registerMainI18nIpc } from './main/i18n';
 import { startDebugBridge, stopDebugBridge, recordDebugLog } from './main/debugBridge';
-import { stopLlamaRuntime } from './main/llamaContextPool';
+import { stopLlamaHost } from './main/llamaHost';
 import {
   registerExtensionBridgeIpc,
   startExtensionServer,
@@ -1729,6 +1729,7 @@ app.on('will-quit', () => {
   // The local model runtime was the one subsystem here with no stop: contexts, weights and the
   // llama.cpp backend all released on idle deadlines only, so a quit inside a 5-minute idle
   // window exited holding them. Measured 2026-08-24 on one Dictionary burst — 1,270 MB of KV
-  // cache and 1,101 MB of weights still resident 8 minutes in.
-  stopLlamaRuntime();
+  // cache and 1,101 MB of weights still resident 8 minutes in. It now lives in its own process,
+  // so one kill returns all three at once and no native teardown can hang the quit.
+  stopLlamaHost();
 });

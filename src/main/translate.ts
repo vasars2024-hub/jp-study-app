@@ -3,10 +3,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import type { LlamaChatSession } from 'node-llama-cpp';
 import { isValidCrossLangTranslation } from '../shared/epubEnrichment';
 import { langSpec } from '../shared/langs';
-import { acquireLlamaContext, type LlamaContextLease } from './llamaContextPool';
+import { acquireLlamaSession, type LlamaSessionHandle } from './llamaHost';
 import {
   buildBatchPrompt,
   buildSentencePrompt,
@@ -32,21 +31,16 @@ const MODEL_FILENAMES = [
 
 const USER_MODEL = 'Qwen3-1.7B.gguf';
 
-let session: LlamaChatSession | null = null;
-let loadPromise: Promise<void> | null = null;
 /**
- * The native handles behind `session`. Kept because a `LlamaChatSession` alone cannot free
- * anything: the model weights and the KV cache belong to the model and context objects, and
- * without a reference to them nothing in this module could ever release the several GB they hold.
+ * The chat session, and — since 2026-08-24 — a handle rather than an object.
  *
- * The weights are a LEASE rather than a model now — `localAgent.ts` resolves the same GGUF from the
- * same roots, so the two modules used to hold a copy each. See `llamaModelPool.ts`.
- *
- * One lease covers both since 2026-08-24: `llamaContextPool.ts` owns the context as well as the
- * weights, because rebuilding the 8,192-token KV cache on every idle unload turned out to be the
- * larger half of the per-cycle bill (+1,298.5 MB against a 1,223 MB model file).
+ * There used to be two references here: a `LlamaChatSession` and, beside it, the `LlamaContextLease`
+ * holding the weights and the KV cache, because a session alone cannot free anything. Both now live
+ * in the local-model utility process and this is the string id that names them, so releasing is one
+ * call and nothing native is reachable from this module at all. See `llamaHost.ts`.
  */
-let loadedContext: LlamaContextLease | null = null;
+let session: LlamaSessionHandle | null = null;
+let loadPromise: Promise<void> | null = null;
 let idleUnloadTimer: ReturnType<typeof setTimeout> | null = null;
 let activeTranslations = 0;
 let translateChain: Promise<unknown> = Promise.resolve();
@@ -164,11 +158,12 @@ export interface RunTranslationBatchOptions {
  * OVER-counts Latin text (really ~4 chars/token) while sitting close to the truth on Japanese
  * (~1.2): over-counting shortens a completion, under-counting causes the defect below.
  */
-function countPromptTokens(prompt: string): number {
-  const model = loadedContext?.model as unknown as { tokenize?: (text: string) => unknown } | undefined;
+async function countPromptTokens(prompt: string): Promise<number> {
   try {
-    const tokens = model?.tokenize?.(prompt);
-    if (Array.isArray(tokens)) return tokens.length;
+    // Asynchronous only because the tokenizer now answers from the model host; it is still the
+    // exact tokenizer the generation will use, not a second copy loaded to count with.
+    const tokens = await session?.countTokens(prompt);
+    if (typeof tokens === 'number') return tokens;
   } catch {
     /* Fall through to the estimate; a tokenizer failure must not fail the request. */
   }
@@ -189,8 +184,8 @@ function countPromptTokens(prompt: string): number {
  * So the budget is computed rather than trusted, and a prompt with no room left is an explicit
  * failure the user can act on.
  */
-function fitOutputBudget(prompt: string, requested: number): number {
-  const promptTokens = countPromptTokens(prompt);
+async function fitOutputBudget(prompt: string, requested: number): Promise<number> {
+  const promptTokens = await countPromptTokens(prompt);
   const room = TRANSLATE_CONTEXT_SIZE - promptTokens - CHAT_TEMPLATE_RESERVE_TOKENS;
   if (room < MIN_USABLE_OUTPUT_TOKENS) {
     throw new Error(
@@ -203,14 +198,14 @@ function fitOutputBudget(prompt: string, requested: number): number {
 
 /** Run one prompt with an abort-on-timeout (and batch-cancel) guard so generation can never hang. */
 async function promptWithTimeout(
-  s: LlamaChatSession,
+  s: LlamaSessionHandle,
   prompt: string,
   maxTokens: number,
   timeoutMs: number,
 ): Promise<string> {
   // Every batch, strict-retry and single-sentence prompt in this module funnels through here, so
   // this is the one place that can hold all four of them inside the context.
-  const fitted = fitOutputBudget(prompt, maxTokens);
+  const fitted = await fitOutputBudget(prompt, maxTokens);
   const controller = new AbortController();
   activeBatchAbort = controller;
   if (batchCancelled) {
@@ -220,11 +215,7 @@ async function promptWithTimeout(
     if (batchCancelled) controller.abort();
   }, 250);
 
-  const promptPromise = s.prompt(prompt, {
-    maxTokens: fitted,
-    signal: controller.signal,
-    stopOnAbortSignal: true,
-  });
+  const promptPromise = s.prompt(prompt, { maxTokens: fitted, signal: controller.signal });
 
   let timer: ReturnType<typeof setTimeout> | null = null;
   const timeoutPromise = new Promise<never>((_, reject) => {
@@ -456,45 +447,40 @@ function sentences(text: string): string[] {
     .filter(Boolean);
 }
 
-function resetSessionHistory(s: LlamaChatSession): void {
-  const anySession = s as LlamaChatSession & { resetChatHistory?: () => void; setChatHistory?: (h: []) => void };
-  if (typeof anySession.resetChatHistory === 'function') {
-    anySession.resetChatHistory();
-  } else if (typeof anySession.setChatHistory === 'function') {
-    anySession.setChatHistory([]);
-  }
+/**
+ * Clears the chat history, and deliberately does NOT wait for the host to confirm it.
+ *
+ * Every call site is a `finally` whose job is to leave the session clean for the next prompt, and
+ * the ordering that guarantees still holds across the process boundary: the request is posted
+ * synchronously here, the channel is FIFO, and the host applies a reset without yielding, so any
+ * prompt posted after this call is handled after it. Awaiting would only add a round trip to the
+ * end of every translation.
+ */
+function resetSessionHistory(s: LlamaSessionHandle): void {
+  void s.resetHistory().catch(() => undefined);
 }
 
 /**
- * Releases the native model and context — the GBs. Exported for the tests and for shutdown;
+ * Gives the model and the KV cache back — the GBs. Exported for the tests and for shutdown;
  * everything else reaches it through `scheduleIdleUnload`.
  *
- * The `Llama` backend is deliberately NOT released here and that is the fix, not an omission: see
- * `llamaBackend.ts` for the handle counts that ruled out disposing it per cycle. Innermost first,
- * because the context holds the KV cache and belongs to the model. Disposing is best effort in the
- * same way `localAgent.ts`'s is — a failed native teardown must not take the module down — but the
- * module-level references are cleared either way, so the next `ensureSession()` rebuilds rather
- * than handing back a session over a disposed context.
- *
- * The model is RELEASED rather than disposed. This module no longer owns the weights: if the agent
- * still holds the same GGUF the release costs nothing, and if nobody does the pool disposes them
- * once its grace window expires. That is why the context must go first — a disposed model under a
- * live context is freed native memory, and the pool cannot see contexts it does not own.
+ * RELEASED, not disposed, and the ordering that used to matter here is no longer this module's to
+ * get right: the host owns the innermost-first teardown, keeps the cache resident through its grace
+ * window so a user whose next lookup lands just past this deadline pays nothing, and ends its own
+ * process once both pools go empty. Best effort, as before — a failed release must not take the
+ * module down — and the module-level references are cleared either way, so the next
+ * `ensureSession()` rebuilds rather than handing back a session over a released context.
  */
 export async function unloadTranslationModel(): Promise<void> {
   if (idleUnloadTimer) {
     clearTimeout(idleUnloadTimer);
     idleUnloadTimer = null;
   }
-  const lease = loadedContext;
+  const handle = session;
   session = null;
   loadPromise = null;
-  loadedContext = null;
   try {
-    // RELEASED, not disposed. The pool keeps the KV cache resident through its grace window, so a
-    // user whose next lookup lands just past this deadline pays nothing instead of rebuilding
-    // 1,298 MB of cache — the whole point of `llamaContextPool.ts`.
-    await lease?.release();
+    await handle?.release();
   } catch {
     /* Native cleanup is best effort; the next load still builds a fresh runtime. */
   }
@@ -514,7 +500,7 @@ function scheduleIdleUnload(): void {
   idleUnloadTimer.unref?.();
 }
 
-async function ensureSession(): Promise<LlamaChatSession> {
+async function ensureSession(): Promise<LlamaSessionHandle> {
   if (session) return session;
   if (!loadPromise) {
     loadPromise = (async () => {
@@ -524,22 +510,17 @@ async function ensureSession(): Promise<LlamaChatSession> {
       }
 
       broadcast('translate:progress', { status: 'init', progress: 0, file: path.basename(modelPath) });
-      const { LlamaChatSession } = await import('node-llama-cpp');
       broadcast('translate:progress', { status: 'progress', progress: 20, file: path.basename(modelPath) });
-
-      // The weights AND the KV cache are borrowed, not owned: `localAgent.ts` resolves the same
-      // GGUF from the same roots, so this is one 1.2 GB copy between the two modules rather than
-      // one each, and the pool holds both briefly after release — which turns a lookup landing
-      // just past the idle unload into a free reacquire instead of a native cycle that costs
-      // ~1,223 handles and ~2.5 GB. See `llamaContextPool.ts`.
+      // The weights AND the KV cache are borrowed, not owned, and neither is in this process:
+      // `localAgent.ts` resolves the same GGUF from the same roots, so the host holds one 1.2 GB
+      // copy between the two modules rather than one each, and its pools keep both briefly after a
+      // release — which turns a lookup landing just past the idle unload into a free reacquire
+      // instead of a native cycle costing ~1,223 handles and ~2.5 GB. See `llamaHost.ts`.
       broadcast('translate:progress', { status: 'progress', progress: 45, file: path.basename(modelPath) });
-      // The pool releases everything it allocated if any step of the build fails, so unlike the
-      // two-call version this cannot leave weights or a cache unreachable on the failure branch.
-      const lease = await acquireLlamaContext(modelPath, TRANSLATE_CONTEXT_SIZE);
-      loadedContext = lease;
+      // The host releases everything it allocated if any step of the build fails, so this cannot
+      // leave weights or a cache unreachable on the failure branch.
+      session = await acquireLlamaSession(modelPath, TRANSLATE_CONTEXT_SIZE);
       broadcast('translate:progress', { status: 'progress', progress: 80, file: path.basename(modelPath) });
-
-      session = new LlamaChatSession({ contextSequence: lease.sequence });
       broadcast('translate:progress', { status: 'ready', progress: 100, file: path.basename(modelPath) });
     })();
     // A failed load must not poison every future attempt (e.g. the user drops
@@ -661,7 +642,7 @@ export async function runLocalQwenPrompt(
     const s = await ensureSession();
     // After `ensureSession`, so the weights — and therefore the real tokenizer — are loaded. The
     // callers of this function are the ones that could ask for a whole context of output.
-    const maxTokens = fitOutputBudget(prompt, requestedTokens);
+    const maxTokens = await fitOutputBudget(prompt, requestedTokens);
     // Independent of EPUB batch cancel — analysis/enrichment must not abort mid-flight
     // just because a translation batch was cancelled elsewhere.
     const controller = new AbortController();
@@ -680,7 +661,6 @@ export async function runLocalQwenPrompt(
       const raw = await s.prompt(prompt, {
         maxTokens,
         signal: controller.signal,
-        stopOnAbortSignal: true,
         onTextChunk: options?.onTextChunk,
       });
       return extractJsonish(cleanLlmOutput(raw));

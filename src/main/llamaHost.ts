@@ -127,12 +127,12 @@ function ensureChild(): Child | null {
     const waiter = pending.get(message.id);
     if (!waiter) return;
     // A chunk is not a settlement — the `prompt` reply still follows it.
-    if ('kind' in message && message.kind === 'chunk') {
+    if (message.kind === 'chunk') {
       waiter.onChunk?.(message.text);
       return;
     }
     pending.delete(message.id);
-    if (message.ok === false) waiter.reject(rebuild(message.error, message.name));
+    if (message.kind === 'error') waiter.reject(rebuild(message.error, message.name));
     else waiter.resolve(message);
   });
   forked.on('exit', () => onChildExit(forked));
@@ -177,14 +177,14 @@ function remoteSession(id: LlamaSessionId, modelPath: string, contextSize: numbe
           { id: requestId, kind: 'prompt', session: id, prompt: text, maxTokens: opts.maxTokens, stream: Boolean(opts.onTextChunk) },
           opts.onTextChunk,
         );
-        return reply.ok === true && reply.kind === 'prompt' ? reply.text : '';
+        return reply.kind === 'prompt' ? reply.text : '';
       } finally {
         opts.signal?.removeEventListener('abort', forward);
       }
     },
     async countTokens(text) {
       const reply = await post({ id: nextRequestId++, kind: 'countTokens', session: id, text });
-      if (reply.ok === true && reply.kind === 'countTokens') return reply.tokens;
+      if (reply.kind === 'countTokens') return reply.tokens;
       throw new Error('llama-host: tokenizer unavailable');
     },
     async resetHistory() {
@@ -276,7 +276,7 @@ export async function acquireLlamaSession(modelPath: string, contextSize: number
     if (child === null && !stopped) return inProcessSession(modelPath, contextSize);
     throw err;
   }
-  if (reply.ok !== true || reply.kind !== 'acquire') throw new Error('llama-host: bad acquire reply');
+  if (reply.kind !== 'acquire') throw new Error('llama-host: bad acquire reply');
   liveSessions.add(reply.session);
   return remoteSession(reply.session, modelPath, contextSize, reply.warm);
 }
@@ -292,7 +292,7 @@ export async function llamaHostStats(): Promise<{ models: LlamaModelPoolRow[]; c
   if (!child) return { models: [], contexts: [] };
   try {
     const reply = await post({ id: nextRequestId++, kind: 'stats' });
-    if (reply.ok === true && reply.kind === 'stats') return { models: reply.models, contexts: reply.contexts };
+    if (reply.kind === 'stats') return { models: reply.models, contexts: reply.contexts };
   } catch {
     /* A host that died mid-question is holding nothing, which is what the empty answer says. */
   }

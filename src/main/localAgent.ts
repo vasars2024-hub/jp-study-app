@@ -2,7 +2,6 @@ import { app, ipcMain } from 'electron';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { LlamaChatSession } from 'node-llama-cpp';
 import {
   buildLocalAgentSystemPrompt,
   parseLocalAgentModelPlan,
@@ -22,7 +21,7 @@ import type {
   LocalAgentModelInfo,
   LocalAgentRuntimeStatus,
 } from '../shared/localAgentRuntime';
-import { acquireLlamaContext, type LlamaContextLease } from './llamaContextPool';
+import { acquireLlamaSession, type LlamaSessionHandle } from './llamaHost';
 import { registerAgentExecutionIpc } from './agentExecutionIpc';
 import { registerAgentImageStagingIpc } from './agentImageStaging';
 import { registerAgentCardBatchStagingIpc } from './agentCardBatchStaging';
@@ -52,13 +51,13 @@ const MIN_USABLE_OUTPUT_TOKENS = 256;
 interface LoadedAgentRuntime {
   modelPath: string;
   contextSize: number;
-  session: LlamaChatSession;
   /**
-   * Borrowed from `llamaContextPool.ts` — the weights, because `translate.ts` resolves the same
+   * Borrowed from the local-model host — the weights, because `translate.ts` resolves the same
    * GGUF, and the KV cache, because rebuilding it on every idle unload is the larger half of what
-   * a cycle costs. One lease covers both; releasing it lets the pool keep either resident.
+   * a cycle costs. One handle covers both; releasing it lets the host keep either resident, and
+   * nothing native is reachable from this process. See `llamaHost.ts`.
    */
-  lease: LlamaContextLease;
+  session: LlamaSessionHandle;
 }
 
 let runtime: LoadedAgentRuntime | null = null;
@@ -104,24 +103,23 @@ function resolveModelPath(settings: LocalAgentSettings, preferredModelFileName?:
   return null;
 }
 
-function resetSessionHistory(session: LlamaChatSession): void {
-  const mutable = session as LlamaChatSession & {
-    resetChatHistory?: () => void;
-    setChatHistory?: (history: []) => void;
-  };
-  if (typeof mutable.resetChatHistory === 'function') mutable.resetChatHistory();
-  else if (typeof mutable.setChatHistory === 'function') mutable.setChatHistory([]);
+/**
+ * Clears the chat history without waiting for the host to confirm it. Same reasoning as
+ * `translate.ts`'s: the request is posted synchronously, the channel is FIFO and the host applies a
+ * reset without yielding, so the next prompt is still handled after it.
+ */
+function resetSessionHistory(session: LlamaSessionHandle): void {
+  void session.resetHistory().catch(() => undefined);
 }
 
 async function disposeRuntime(value: LoadedAgentRuntime | null): Promise<void> {
   if (!value) return;
   try {
-    // RELEASED, not disposed, and that now covers the context too: `translate.ts` may still be
-    // holding the same file, and a user coming back inside the grace window should not rebuild a
-    // KV cache that is still resident. The pool owns the innermost-first teardown order, and the
-    // shared backend outlives all of it by design — `llamaBackend.ts` records the handle counts
-    // that ruled out disposing it per cycle.
-    await value.lease.release();
+    // RELEASED, not disposed, and that covers the context too: `translate.ts` may still be holding
+    // the same file, and a user coming back inside the grace window should not rebuild a KV cache
+    // that is still resident. The host owns the innermost-first teardown order, and it ends its own
+    // process once both pools go empty — which is what finally reclaims the native addon.
+    await value.session.release();
   } catch {
     // Native model cleanup is best effort; the next runtime still loads safely.
   }
@@ -174,26 +172,24 @@ async function loadRuntime(settings: LocalAgentSettings, modelPath: string): Pro
   loadPromise = (async () => {
     await disposeRuntime(runtime);
     runtime = null;
-    const { LlamaChatSession } = await import('node-llama-cpp');
     // Shared with `translate.ts` — one native addon between the two modules, one copy of the
     // weights since both resolve their GGUF from the same roots and usually land on the same file,
-    // and a KV cache that survives an idle unload. `llamaContextPool.ts` carries the measurement.
-    // A load that dies after the acquire still holds a lease, and nothing downstream would ever
+    // and a KV cache that survives an idle unload, all of it in the model host.
+    // A load that dies after the acquire still holds a session, and nothing downstream would ever
     // see it — the same shape of retention this guard exists to close.
-    let lease: LlamaContextLease | null = null;
+    let session: LlamaSessionHandle | null = null;
     try {
-      lease = await acquireLlamaContext(modelPath, settings.contextSize);
+      session = await acquireLlamaSession(modelPath, settings.contextSize);
       const loaded: LoadedAgentRuntime = {
         modelPath,
         contextSize: settings.contextSize,
-        session: new LlamaChatSession({ contextSequence: lease.sequence }),
-        lease,
+        session,
       };
       runtime = loaded;
       return loaded;
     } catch (err) {
       try {
-        await lease?.release();
+        await session?.release();
       } catch {
         // Best effort, exactly as in disposeRuntime.
       }
@@ -215,10 +211,11 @@ async function loadRuntime(settings: LocalAgentSettings, modelPath: string): Pro
  * fallback fires only if the native call is unavailable or throws; it over-counts Latin text and
  * sits near the truth on Japanese, which is the safe direction here.
  */
-function countPromptTokens(model: LlamaContextLease['model'], prompt: string): number {
+async function countPromptTokens(session: LlamaSessionHandle, prompt: string): Promise<number> {
   try {
-    const tokens = (model as unknown as { tokenize?: (text: string) => unknown }).tokenize?.(prompt);
-    if (Array.isArray(tokens)) return tokens.length;
+    // Asynchronous only because the tokenizer answers from the model host; it is still the exact
+    // tokenizer the generation will use.
+    return await session.countTokens(prompt);
   } catch {
     /* Fall through to the estimate; a tokenizer failure must not fail the plan. */
   }
@@ -238,7 +235,7 @@ function countPromptTokens(model: LlamaContextLease['model'], prompt: string): n
  * longer see. The failure is now explicit and names the setting that fixes it.
  */
 async function promptWithTimeout(current: LoadedAgentRuntime, prompt: string): Promise<string> {
-  const promptTokens = countPromptTokens(current.lease.model, prompt);
+  const promptTokens = await countPromptTokens(current.session, prompt);
   const room = current.contextSize - promptTokens - CHAT_TEMPLATE_RESERVE_TOKENS;
   if (room < MIN_USABLE_OUTPUT_TOKENS) {
     throw new Error(
@@ -253,7 +250,6 @@ async function promptWithTimeout(current: LoadedAgentRuntime, prompt: string): P
     return await current.session.prompt(prompt, {
       maxTokens: Math.min(PLAN_MAX_OUTPUT_TOKENS, room),
       signal: controller.signal,
-      stopOnAbortSignal: true,
     });
   } finally {
     clearTimeout(timer);
