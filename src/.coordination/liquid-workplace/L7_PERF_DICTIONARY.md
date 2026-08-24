@@ -460,3 +460,11 @@ this rather than in tension with it. Hunt a native allocator in main reached by 
 candidates in order: the dictionary SQLite handle's page cache/`mmap_size`, per-call native
 allocation in the search/tokenize path, and Chromium browser-process allocation. `l7h-memprofile`'s
 `UNATTRIBUTED` line is the number to watch; if it does not move, the fix is not in JS.
+
+**First native candidate checked and ELIMINATED, same turn.** `mmap_size = 268435456` in
+`src/main/dictionary/db.ts:124` is 256 MB per connection, and the measured step of 4,861.5 MB is
+18.99 × 256 MB against exactly 19 driven targets — an almost perfect fit for "a fresh connection
+per action". It is a coincidence. `openDictionaryDb()` has exactly two non-test callers
+(`dictionaryDb()`'s lazy singleton and the import worker), 33 call sites go through the shared
+handle, and `new Database(` appears at exactly one site in all of `src/main/`. No per-action
+connection churn exists, so this is not it. Do not re-run this check.
