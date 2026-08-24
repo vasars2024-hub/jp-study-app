@@ -21,6 +21,7 @@ const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'jp-translate-lifecycle-')
 
 const createContextCalls: Array<Record<string, unknown> | undefined> = [];
 const getLlamaCalls: number[] = [];
+const loadModelCalls: string[] = [];
 const disposed: string[] = [];
 /** Boxed so the hoisted `vi.mock` factory reads the live value rather than capturing `false`. */
 const createContextFails = { value: false };
@@ -55,7 +56,10 @@ vi.mock('node-llama-cpp', () => {
     getLlama: () => {
       getLlamaCalls.push(1);
       return Promise.resolve({
-        loadModel: () => Promise.resolve(model),
+        loadModel: (options: { modelPath: string }) => {
+          loadModelCalls.push(options.modelPath);
+          return Promise.resolve(model);
+        },
         dispose: () => {
           disposed.push('llama');
         },
@@ -72,13 +76,18 @@ vi.mock('node-llama-cpp', () => {
 
 const translate = await import('../translate');
 const llamaBackend = await import('../llamaBackend');
+const modelPool = await import('../llamaModelPool');
 
 beforeEach(async () => {
   // The backend is process-lifetime by design, so a test that counts `getLlama()` calls has to
-  // start from a process that has none. Only the tests reset it; the product never does.
+  // start from a process that has none. Only the tests reset it; the product never does. The same
+  // goes for the model pool, which deliberately holds the weights past the last release.
+  await translate.unloadTranslationModel();
+  await modelPool.disposeAllLlamaModels();
   await llamaBackend.disposeSharedLlama();
   createContextCalls.length = 0;
   getLlamaCalls.length = 0;
+  loadModelCalls.length = 0;
   disposed.length = 0;
   fs.mkdirSync(path.join(tmpRoot, 'models'), { recursive: true });
   fs.writeFileSync(path.join(tmpRoot, 'models', 'Qwen3-1.7B.gguf'), 'not a real model');
@@ -86,6 +95,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await translate.unloadTranslationModel();
+  await modelPool.disposeAllLlamaModels();
 });
 
 describe('translation model lifecycle', () => {
@@ -102,15 +112,29 @@ describe('translation model lifecycle', () => {
     expect(options?.contextSize as number).toBeLessThanOrEqual(8_192);
   });
 
-  it('disposes the context and the model, and deliberately not the backend', async () => {
-    await translate.ensureTranslateReady();
-    expect(disposed).toEqual([]);
+  /**
+   * Innermost first, and the model is RELEASED rather than disposed: `localAgent.ts` may still be
+   * holding the same GGUF. The pool disposes it once nobody is and its grace window expires, so
+   * this drives the timer rather than asserting on the instant after unload — a version of this
+   * test that stopped at `['context']` would pass just as well against a pool that never frees.
+   */
+  it('disposes the context, then the model once nobody holds it, and never the backend', async () => {
+    vi.useFakeTimers();
+    try {
+      await translate.ensureTranslateReady();
+      expect(disposed).toEqual([]);
 
-    await translate.unloadTranslationModel();
+      await translate.unloadTranslationModel();
+      expect(disposed).toEqual(['context']);
 
-    // Innermost first: the context holds the KV cache and belongs to the model. The backend owns
-    // only the addon and its thread pool, is shared with `localAgent.ts`, and stays.
-    expect(disposed).toEqual(['context', 'model']);
+      await vi.advanceTimersByTimeAsync(modelPool.MODEL_RELEASE_GRACE_MS + 1_000);
+      await vi.waitFor(() => expect(disposed).toEqual(['context', 'model']));
+      // The backend owns only the addon and its thread pool, is shared with `localAgent.ts`, and
+      // stays for the process lifetime.
+      expect(disposed).not.toContain('llama');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   /**
@@ -128,7 +152,46 @@ describe('translation model lifecycle', () => {
 
     expect(getLlamaCalls).toHaveLength(1);
     expect(disposed.filter((entry) => entry === 'llama')).toHaveLength(0);
-    expect(disposed).toEqual(['context', 'model', 'context', 'model']);
+  });
+
+  /**
+   * The residue the shared backend did NOT fix, and the reason `llamaModelPool.ts` exists: a second
+   * load/unload cycle still cost **+1,212 handles / +103.2 MB** with the backend already shared
+   * (`L7_PERF_DICTIONARY.md`, 2026-08-24). That is native teardown residue no JavaScript can
+   * reclaim, so the only lever left is to run fewer cycles. A lookup that lands inside the pool's
+   * grace window now re-uses the resident weights: one `loadModel`, one KV cache rebuild.
+   */
+  it('does not reload the weights when a second cycle starts inside the grace window', async () => {
+    vi.useFakeTimers();
+    try {
+      await translate.ensureTranslateReady();
+      await translate.unloadTranslationModel();
+      await vi.advanceTimersByTimeAsync(modelPool.MODEL_RELEASE_GRACE_MS / 2);
+      await translate.ensureTranslateReady();
+
+      expect(loadModelCalls).toHaveLength(1);
+      // The context is per-consumer and genuinely rebuilt; only the 1.2 GB of weights is reused.
+      expect(createContextCalls).toHaveLength(2);
+      expect(disposed).toEqual(['context']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  /** The negative control for the case above: past the window, the weights really are released. */
+  it('does reload the weights once the grace window has expired', async () => {
+    vi.useFakeTimers();
+    try {
+      await translate.ensureTranslateReady();
+      await translate.unloadTranslationModel();
+      await vi.advanceTimersByTimeAsync(modelPool.MODEL_RELEASE_GRACE_MS + 1_000);
+      await vi.waitFor(() => expect(disposed).toEqual(['context', 'model']));
+      await translate.ensureTranslateReady();
+
+      expect(loadModelCalls).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   /**
@@ -145,7 +208,11 @@ describe('translation model lifecycle', () => {
     }
 
     expect(getLlamaCalls).toHaveLength(1);
-    expect(disposed).toContain('model');
+    // The lease is given back, which is what "nothing of ours is left behind" means now: the pool
+    // reports no user, so the weights are on their way out rather than pinned by a phantom count.
+    expect(modelPool.llamaModelPoolStats()).toEqual([
+      expect.objectContaining({ leases: 0, resident: true, awaitingRelease: true }),
+    ]);
     expect(disposed).not.toContain('llama');
     expect(llamaBackend.isSharedLlamaLoaded()).toBe(true);
   });
@@ -180,8 +247,13 @@ describe('translation model lifecycle', () => {
       expect(disposed).toEqual([]);
 
       await vi.advanceTimersByTimeAsync(5 * 60_000 + 1_000);
-      await vi.waitFor(() => expect(disposed).toEqual(['context', 'model']));
+      await vi.waitFor(() => expect(disposed).toEqual(['context']));
       expect(translate.isTranslateReady()).toBe(false);
+
+      // The weights follow once the pool's grace expires — the idle deadline releases, it does not
+      // dispose, because the agent may be holding the same file.
+      await vi.advanceTimersByTimeAsync(modelPool.MODEL_RELEASE_GRACE_MS + 1_000);
+      await vi.waitFor(() => expect(disposed).toEqual(['context', 'model']));
     } finally {
       vi.useRealTimers();
     }

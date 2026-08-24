@@ -22,7 +22,7 @@ import type {
   LocalAgentModelInfo,
   LocalAgentRuntimeStatus,
 } from '../shared/localAgentRuntime';
-import { getSharedLlama } from './llamaBackend';
+import { acquireLlamaModel, type LlamaModelLease } from './llamaModelPool';
 import { registerAgentExecutionIpc } from './agentExecutionIpc';
 import { registerAgentImageStagingIpc } from './agentImageStaging';
 import { registerAgentCardBatchStagingIpc } from './agentCardBatchStaging';
@@ -44,7 +44,8 @@ interface LoadedAgentRuntime {
   modelPath: string;
   contextSize: number;
   session: LlamaChatSession;
-  model: { dispose?: () => void | Promise<void> };
+  /** Borrowed from `llamaModelPool.ts`, because `translate.ts` resolves the same GGUF. */
+  lease: LlamaModelLease;
   context: { dispose?: () => void | Promise<void> };
 }
 
@@ -105,8 +106,11 @@ async function disposeRuntime(value: LoadedAgentRuntime | null): Promise<void> {
   try {
     // Innermost first: the context belongs to the model. The shared backend outlives both, by
     // design — `llamaBackend.ts` records the handle counts that ruled out disposing it per cycle.
+    // The weights are released, not disposed: `translate.ts` may still be holding the same file,
+    // and the pool disposes only once nobody is. Order matters for the same reason as ever — a
+    // context over freed weights is freed native memory.
     await value.context.dispose?.();
-    await value.model.dispose?.();
+    await value.lease.release();
   } catch {
     // Native model cleanup is best effort; the next runtime still loads safely.
   }
@@ -160,27 +164,27 @@ async function loadRuntime(settings: LocalAgentSettings, modelPath: string): Pro
     await disposeRuntime(runtime);
     runtime = null;
     const { LlamaChatSession } = await import('node-llama-cpp');
-    // Shared with `translate.ts` and held for the process lifetime, so two model-owning modules
-    // cost one native addon rather than one per load.
-    const llama = await getSharedLlama();
-    // A load that dies at `loadModel` still allocated the weights, and nothing downstream would
+    // Shared with `translate.ts` — one native addon between the two modules, and now one copy of
+    // the weights too, since both resolve their GGUF from the same roots and usually land on the
+    // same file. `llamaModelPool.ts` carries the measurement.
+    // A load that dies after `acquireLlamaModel` still holds a lease, and nothing downstream would
     // ever see that model — the same shape of retention this guard exists to close.
-    let model: Awaited<ReturnType<typeof llama.loadModel>> | null = null;
+    let lease: LlamaModelLease | null = null;
     try {
-      model = await llama.loadModel({ modelPath });
-      const context = await model.createContext({ contextSize: settings.contextSize });
+      lease = await acquireLlamaModel(modelPath);
+      const context = await lease.model.createContext({ contextSize: settings.contextSize });
       const loaded: LoadedAgentRuntime = {
         modelPath,
         contextSize: settings.contextSize,
         session: new LlamaChatSession({ contextSequence: context.getSequence() }),
-        model,
+        lease,
         context,
       };
       runtime = loaded;
       return loaded;
     } catch (err) {
       try {
-        await model?.dispose?.();
+        await lease?.release();
       } catch {
         // Best effort, exactly as in disposeRuntime.
       }

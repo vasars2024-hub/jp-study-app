@@ -6,7 +6,7 @@ import crypto from 'node:crypto';
 import type { LlamaChatSession } from 'node-llama-cpp';
 import { isValidCrossLangTranslation } from '../shared/epubEnrichment';
 import { langSpec } from '../shared/langs';
-import { getSharedLlama } from './llamaBackend';
+import { acquireLlamaModel, type LlamaModelLease } from './llamaModelPool';
 import {
   buildBatchPrompt,
   buildSentencePrompt,
@@ -38,8 +38,11 @@ let loadPromise: Promise<void> | null = null;
  * The native handles behind `session`. Kept because a `LlamaChatSession` alone cannot free
  * anything: the model weights and the KV cache belong to the model and context objects, and
  * without a reference to them nothing in this module could ever release the several GB they hold.
+ *
+ * The weights are a LEASE rather than a model now — `localAgent.ts` resolves the same GGUF from the
+ * same roots, so the two modules used to hold a copy each. See `llamaModelPool.ts`.
  */
-let loadedModel: { dispose?: () => unknown } | null = null;
+let loadedModel: LlamaModelLease | null = null;
 let loadedContext: { dispose?: () => unknown } | null = null;
 let idleUnloadTimer: ReturnType<typeof setTimeout> | null = null;
 let activeTranslations = 0;
@@ -414,6 +417,11 @@ function resetSessionHistory(s: LlamaChatSession): void {
  * same way `localAgent.ts`'s is — a failed native teardown must not take the module down — but the
  * module-level references are cleared either way, so the next `ensureSession()` rebuilds rather
  * than handing back a session over a disposed context.
+ *
+ * The model is RELEASED rather than disposed. This module no longer owns the weights: if the agent
+ * still holds the same GGUF the release costs nothing, and if nobody does the pool disposes them
+ * once its grace window expires. That is why the context must go first — a disposed model under a
+ * live context is freed native memory, and the pool cannot see contexts it does not own.
  */
 export async function unloadTranslationModel(): Promise<void> {
   if (idleUnloadTimer) {
@@ -421,14 +429,14 @@ export async function unloadTranslationModel(): Promise<void> {
     idleUnloadTimer = null;
   }
   const context = loadedContext;
-  const model = loadedModel;
+  const lease = loadedModel;
   session = null;
   loadPromise = null;
   loadedContext = null;
   loadedModel = null;
   try {
     await context?.dispose?.();
-    await model?.dispose?.();
+    await lease?.release();
   } catch {
     /* Native cleanup is best effort; the next load still builds a fresh runtime. */
   }
@@ -461,20 +469,20 @@ async function ensureSession(): Promise<LlamaChatSession> {
       const { LlamaChatSession } = await import('node-llama-cpp');
       broadcast('translate:progress', { status: 'progress', progress: 20, file: path.basename(modelPath) });
 
-      // Shared with `localAgent.ts` and never disposed per cycle — `llamaBackend.ts` carries the
-      // measured reason. A failed load therefore leaves nothing of its own behind here.
-      const llama = await getSharedLlama();
+      // The weights are borrowed, not owned: `localAgent.ts` resolves the same GGUF from the same
+      // roots, so this is one 1.2 GB copy between the two modules rather than one each. The pool
+      // also holds it briefly after release, which turns a lookup landing just past the idle
+      // unload into a free reacquire instead of another native cycle. See `llamaModelPool.ts`.
       broadcast('translate:progress', { status: 'progress', progress: 45, file: path.basename(modelPath) });
-
-      const model = await llama.loadModel({ modelPath });
+      const lease = await acquireLlamaModel(modelPath);
       // Recorded BEFORE `createContext`, which is the biggest `await` that can still reject here
       // (`out of VRAM` on a KV cache is the ordinary case). Assigning after it left the 1.2 GB of
       // weights unreachable on that path, so the error handler's `unloadTranslationModel()` had
       // nothing to dispose — the same shape as D1 itself, on the failure branch.
-      loadedModel = model as unknown as { dispose?: () => unknown };
+      loadedModel = lease;
       broadcast('translate:progress', { status: 'progress', progress: 80, file: path.basename(modelPath) });
 
-      const context = await model.createContext({ contextSize: TRANSLATE_CONTEXT_SIZE });
+      const context = await lease.model.createContext({ contextSize: TRANSLATE_CONTEXT_SIZE });
       loadedContext = context as unknown as { dispose?: () => unknown };
       session = new LlamaChatSession({ contextSequence: context.getSequence() });
       broadcast('translate:progress', { status: 'ready', progress: 100, file: path.basename(modelPath) });
