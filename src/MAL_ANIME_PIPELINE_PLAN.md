@@ -2982,3 +2982,53 @@ into the same ranking. Then Route A is a 1.25 MB acquisition of JoJo Part 5 from
 **Trap.** `looksLikeSubtitleArchive` must refuse a pack-sized row itself — `[kitsunekko.net] …
 subtitle pack` is a per-title pack that would otherwise lose its +50. Two pre-existing rank tests
 caught it; do not move that precedence check to the call site.
+
+## 2026-08-24 — GATE 31 CLOSES. Route A acquired from the archive and rendered, 34 of 34
+
+Worker `primary`. Commits `2e07b176`, `377ba15e`. **34 of 34 gates closed**, counted from this
+file's own gate tables. Two defects stood between the archive route and Route A, both found by
+running it rather than by reading it.
+
+**1. The file list was truncated and the caller was told it was malformed.** `2e07b176`. The first
+live fetch refused with "The file list was not valid JSON." Measured against the real daemon,
+`torrents/files` for the archive is **5,375,038 B / 28,748 entries**; the scraper's 4 MiB
+`MAX_BODY_BYTES` cut it mid-object. `MAX_BODY_BYTES` stays the default; an explicit `maxBytes` is
+now honoured to a separate `MAX_BODY_BYTES_CEILING` of 32 MiB, and `qbitFiles` is the one caller
+that asks. A body still cut at the ceiling now says so with its byte count. 3 tests; reverting the
+cap turns 2 of 3 red, the third being the negative control that pins the old truncation.
+
+**2. Five JoJo folders passed, and the union came home with the wrong four.** `377ba15e`. With the
+cap fixed the fetch succeeded and downloaded **48 files / 8.29 MiB of Part 4 and Stardust
+Crusaders**, numbered 1..48 and ready to attach onto Part 5. `looksLikeSameTitle` is a
+half-the-words test and `jojo no kimyou na bouken` is 6 of the title's 9 tokens, so every sibling
+season passed; the format-majority vote then saw 48 `.ass` against the right folder's 39 `.srt` and
+discarded the `.srt`. That vote is correct for one work shipping two formats and wrong across four
+works. `folderTitleScore` now ranks the folders that passed — distinct title tokens covered, then
+fewer spare words — and only the top scorer is kept. Only `ougon` and `kaze` separate the five.
+
+**GATE 31 ROUTE A: ACQUIRED AND RENDERED, LIVE.** From the MAL page, restarted main (bridge pid
+22280), archive dropped first so nothing was residue:
+
+| step | number |
+| --- | --- |
+| `subtitleHarvestNyaaList` MAL 37991 | 5 candidates in 5 s, one `sub-archive` |
+| selection inside the archive | **39 of 28,748 files, 1,312,077 B = 1.25 MiB, ONE folder** |
+| `subtitleHarvestNyaaFetch` | **39 files, episodes 1..39 distinct, 864,375 chars, all `srt`**, 21 s |
+| `planSubtitleAttach` over the 36-item library | 2 pairs, **37 `no-match`**, 0 ambiguous |
+| `attachSubtitleText` on episode 38 | ok, `srt`/`ja`/`nyaa` |
+| **`media:open`** — the product's own `pickPlaybackSubtitle` | picked `JoJo's Bizarre Adventure.S04E38.CC.ja.srt` |
+| mounted | **486 cues, 0 dropped** |
+| on screen at t=727.393 s | **1 cue, 2 kana, 0 Han, 0 Latin** |
+
+**Negative controls.** The 37 `no-match` — 37 of 39 files had no video to land on. And run 2 versus
+run 3: identical title, archive and probe, **48 files / 8.29 MiB across 3 wrong folders** before
+`377ba15e`, **39 / 1.25 MiB in the right one** after.
+
+**Deliberate, and reversible through shipped UI.** The library gained episode 38 (35 → 36). Its
+auto-attached Route B `.ass` was removed with `detachSubtitleRecord` so the route under measurement
+was the one the player picked; episode 39 still carries its Route B record from the earlier run.
+
+**Traps.** `addAcquiredMedia` auto-attaches a matching harvested record, so a "new" item can arrive
+with a track already on it — read `item.subtitles` before concluding which route rendered. And a
+backtick inside a comment **inside** a probe's template literal terminates the literal: node reports
+"missing ) after argument list" pointing at an unrelated line.

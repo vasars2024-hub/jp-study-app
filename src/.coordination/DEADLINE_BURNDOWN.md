@@ -239,3 +239,24 @@ archive-scoped query in the harvest alias walk) plus one attended 1.25 MB acquis
 measured work landed in ~75 min this turn, but a rate over a single turn is not a rate, and gate 31
 still ends in an attended live transfer whose duration is a swarm's to decide. First real projection
 belongs to the turn that runs it.
+2026-08-24 | mal-pipeline | units done this turn: 1 | units left: 0 | basis: RE-COUNTED this turn from the gate tables in src/MAL_ANIME_PIPELINE_PLAN.md — gate 31 was the only one open after 23dc6980 closed 34; both its legs now render | projected finish: 2026-08-24 (DONE)
+Worker `primary`. Commits `2e07b176`, `377ba15e`. **THE MAL PIPELINE PLAN IS FINISHED: 34 of 34
+gates**, counted from this file's own gate tables and confirmed against the tree. Gate 31 needed
+Route A *and* Route B ending in cues on screen; Route B closed earlier today at `9b0245a5`, and
+Route A closed this turn out of the Kitsunekko archive — **39 of 28,748 files, 1.25 MiB, one
+folder, 486 cues mounted, 1 cue on screen at t=727.393 s with 2 kana and 0 Han**.
+
+Two product defects stood in the way and both were found by RUNNING the route, not by reading it:
+a 4 MiB response cap that truncated the 5,375,038 B file list and reported it as malformed
+(`2e07b176`), and a folder narrowing that kept the union of five JoJo folders and let a
+format-majority vote across four different works discard the right one (`377ba15e`). The second
+had already downloaded **48 files / 8.29 MiB of the wrong series**, numbered 1..48 and one attach
+away from being rendered over Part 5. That is the exact shape this plan's standing constraints
+call a rig, and it was caught because the run was measured file by file rather than counted.
+
+**Rate, first real one for this plan.** 2 gates in ~2 productive hours across two turns today
+(gate 34 last turn, gate 31 this turn), at 2 workers. mal-pipeline contributes **0** to the
+remaining deadline load. What is left for 2026-09-01 is main-v1 (still INHERITED at 58 %, never
+re-counted — RULE 1 remains overdue and is now the top of the ladder) and liquid. Neither has a
+measured rate, so the whole-programme projection stays **UNKNOWN** and it would be dishonest to
+write 2026-09-01 merely because it is the date that was asked for.
