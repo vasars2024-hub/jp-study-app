@@ -823,10 +823,29 @@ async function listNyaaCandidates(
    * A media item that was never matched to a MAL row has no aliases to add and
    * costs exactly one request, as before.
    */
+  const stored = storedMalFacts(item.malId);
   const names = harvestSearchAliases(
     providerSearchTitle(item.seriesTitle ?? item.title),
-    storedMalFacts(item.malId).aliases,
+    stored.aliases,
   );
+  /**
+   * The last asymmetry between this listing and `listNyaaHarvest`.
+   *
+   * `episodeCount` is documented on `NyaaRankInput` as "how many episodes the
+   * caller is asking to be answered at once", set by a caller that searches with
+   * `episode: null` and therefore cannot tell a season pack from one episode's
+   * sidecar by the query alone. That is a description of *this* call whenever
+   * `item.episode` is absent — a library row for a whole work, not for episode
+   * 7 — and it was omitted only because this path was written when every media
+   * item was assumed to be one episode.
+   *
+   * It is deliberately conditional rather than unconditional. With an episode
+   * pinned, the flat ceiling is the right one: a single episode of cues is tens
+   * of kilobytes, and a scaled ceiling would let a 39-episode pack be offered as
+   * the answer to episode 7. So a per-episode row keeps exactly its old
+   * behaviour and an item with no episode gains the pack route.
+   */
+  const episodeCount = item.episode == null ? stored.totalEpisodes : null;
   try {
     let candidates: Awaited<ReturnType<typeof nyaaSearchDetailed>>['candidates'] = [];
     // The alias that saw the most of this work, so an empty listing reports the
@@ -840,6 +859,7 @@ async function listNyaaCandidates(
         season: item.season ?? null,
         episode: item.episode ?? null,
         languages: wanted.length ? wanted : ['ja'],
+        episodeCount,
       });
       if (attempt.dropped.titleMatched > dropped.titleMatched) dropped = attempt.dropped;
       if (!attempt.candidates.length) continue;
