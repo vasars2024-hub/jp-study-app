@@ -927,3 +927,32 @@ longer happens in main at all.
 `tools/architecture-baseline.json` alongside `apkgReadWorker.ts`. If that entry or the fifth
 `forge.config.ts` build target is ever lost, the fork exits 1 and `llamaHost.ts` degrades **silently**
 to loading llama.cpp into main — the exact residue this leg removed, with no error anywhere.
+
+## 2026-08-24 — leg 4b: the main-loop block during a model load, with a control that fires
+
+Category 7's fifth number, and the one the utility-process move was supposed to change: *"the
+longest main-process block observed while the surface is doing its real work (a `/health` probe
+answers this — it touches main only)"*. Serial `/health` round trips, so the gap between
+consecutive answers IS the block; a fixed cadence would queue behind a stall and report its own
+backlog.
+
+| Window | round trips | longest gap | p95 |
+| --- | --- | --- | --- |
+| idle control, 3 s | 10,980 | 38 ms | 1 ms |
+| **during a full 1.2 GB GGUF load (10,548 ms)** | **38,234** | **24 ms** | 1 ms |
+| negative control: 5× forced full GC on main | 25 | **216 ms** | 168 ms |
+
+**24 ms against a 500 ms threshold, and the control proves the instrument can see a stall** —
+five synchronous `v8` GCs through `/mem {gc:true}` cut throughput from 3,572 answers per second to
+25 and produced a 216 ms gap, against a quiet-window maximum of 34 ms. Without that row the 24 ms
+would be indistinguishable from an insensitive probe, which is exactly what the rubric warns about.
+
+**Cycle 2, same boot, is the leg-3 comparison point.** A second load forked a NEW host (pid 37284;
+the first, 18912, had exited) holding 3,623.4 MB, with main at 424.6 MB / 1,083 handles — flat
+across two complete cycles. In the in-process shape a second cycle added roughly another 2,425
+handles to main.
+
+**No new file under `probes/`.** `l7n-load-trigger.cjs` drives the same load but scores WHICH
+control starts one from renderer events; `l7c-mem-sampler.ps1` samples memory at uptime marks and
+never touches main's loop; the l7g/l7h/l7i bisectors all read `/mem`. Adapting any of them would
+mean replacing their instrument outright, so both samplers are scratch files under `debug/lhost/`.
