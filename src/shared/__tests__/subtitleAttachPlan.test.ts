@@ -85,12 +85,69 @@ describe('planSubtitleAttach', () => {
     expect(plan.pairs.map((pair) => pair.key)).toEqual(['b']);
   });
 
+  /**
+   * Found by running the planner against the user's real library, not invented:
+   * the same folder holds three creditless extras, and reading their titles
+   * loosely made "Creditless Ending 1" a rival claimant to episode 1. It cost
+   * exactly two episodes of a 26-file harvest before the fix.
+   */
+  it('does not let a creditless extra claim an episode number', () => {
+    const withExtras: AttachTargetItem[] = [
+      ...BIG_O,
+      {
+        id: 'ncop',
+        title: 'The Big O - Creditless Opening',
+        fileName: 'The Big O - Creditless Opening [BDRip 1440x1080 x265 FLAC].mkv',
+      },
+      {
+        id: 'nced1',
+        title: 'The Big O - Creditless Ending 1',
+        fileName: 'The Big O - Creditless Ending 1 [BDRip 1440x1080 x265 FLAC].mkv',
+      },
+      {
+        id: 'nced2',
+        title: 'The Big O - Creditless Ending 2',
+        fileName: 'The Big O - Creditless Ending 2 [BDRip 1440x1080 x265 FLAC].mkv',
+      },
+    ];
+    const plan = planSubtitleAttach([file('a', 1), file('b', 2)], withExtras, 'The Big O');
+    expect(plan.skipped).toEqual([]);
+    expect(plan.pairs.map((pair) => pair.mediaId)).toEqual(['bigo-1', 'bigo-2']);
+  });
+
   it('reads the episode off the file name when the title was renamed', () => {
     const renamed: AttachTargetItem[] = [
       { id: 'x', title: 'Big O rewatch', fileName: 'The Big O - 05 [BDRip].mkv' },
     ];
     const plan = planSubtitleAttach([file('a', 5)], renamed, 'The Big O');
     expect(plan.pairs).toEqual([{ key: 'a', episode: 5, mediaId: 'x', mediaTitle: 'Big O rewatch' }]);
+  });
+
+  /**
+   * The `#N` form, which is what four of the user's real library items use and
+   * which `parseMediaFileName` has no rule for. Paired with the creditless case
+   * above it pins both sides: `#` reads, `Creditless Ending 1` does not.
+   */
+  it('reads a #-numbered episode the strict parser has no rule for', () => {
+    const podcast: AttachTargetItem[] = [
+      {
+        id: 'hana12',
+        title: 'Habits 習慣 ｜ Japanese Podcast with Hana #12',
+        fileName: 'Habits 習慣 ｜ Japanese Podcast with Hana #12 [ltbRQvkcgfY].mp4',
+      },
+      {
+        id: 'hana1',
+        title: 'Introduction ｜ Japanese Podcast with Hana #1',
+        fileName: 'Introduction ｜ Japanese Podcast with Hana #1 [yYNWwH2GlB0].mp4',
+      },
+    ];
+    const plan = planSubtitleAttach(
+      [file('a', 1), file('b', 12), file('c', 5)],
+      podcast,
+      'Japanese Podcast with Hana',
+    );
+    expect(plan.pairs.map((pair) => [pair.episode, pair.mediaId])).toEqual([[1, 'hana1'], [12, 'hana12']]);
+    expect(plan.skipped).toEqual([{ key: 'c', episode: 5, reason: 'no-match' }]);
   });
 
   it('counts skips by reason', () => {

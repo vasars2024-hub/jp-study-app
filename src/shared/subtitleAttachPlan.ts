@@ -66,18 +66,36 @@ export interface SubtitleAttachPlan {
  *
  * The file name is preferred because a library title can be user-edited into
  * anything, while the name on disk still carries the release's own numbering.
- * `episodeFromFileName` is the fallback rather than the primary for the opposite
- * reason: it is deliberately permissive (a trailing `- 07` counts), which is
- * right for a subtitle sidecar and too loose to be the first thing tried on a
- * title like "Season 2".
+ *
+ * **A `null` from the strict parser is an answer, not a gap**, and the loose
+ * `episodeFromFileName` is only reached when there is no file name at all.
+ * Measured on the user's real library: `The Big O - Creditless Ending 1/2` parse
+ * to `null` — the extras they are — while the loose reader returns **1 and 2**,
+ * colliding with real episodes 1 and 2. Falling through on null cost exactly
+ * those two episodes of a 26-file harvest (24 paired, 2 ambiguous). A creditless
+ * ending is not episode 1, and the parser that read the whole release name
+ * already said so.
  */
 function episodeOfTarget(item: AttachTargetItem): number | null {
   const name = (item.fileName ?? '').trim();
-  if (name) {
-    const parsed = parseMediaFileName(name);
-    if (parsed.episode !== null) return parsed.episode;
-  }
-  return episodeFromFileName(item.title ?? '');
+  if (!name) return episodeFromFileName(item.title ?? '');
+  const parsed = parseMediaFileName(name).episode;
+  if (parsed !== null) return parsed;
+  return hashNumbered(name);
+}
+
+/**
+ * The one numbering form the strict parser has no rule for: `… Hana #12 [id].mp4`.
+ *
+ * Added rather than reinstating a loose whole-name fallback, because `#` is the
+ * narrowest possible signal — no release convention spends it on a resolution, a
+ * CRC, a volume or a creditless extra, so it cannot recreate the collision
+ * above. Four of the user's 33 library items are `#`-numbered episodes of a
+ * podcast series, and without this they are unreachable from a range attach.
+ */
+function hashNumbered(name: string): number | null {
+  const value = Number(/#\s*(\d{1,3})(?!\d)/.exec(name)?.[1]);
+  return Number.isFinite(value) ? value : null;
 }
 
 /**
