@@ -645,10 +645,17 @@ async function acquireAll(
       };
     }
   } else {
-    if (token.route === 'batch-sidecar') {
-      // Route B. Everything off first, then the subtitles back on — done in
-      // that order so no window exists where the video files are downloading.
-      const others = files.value.map((file) => file.index).filter((index) => !wanted.includes(index));
+    // Everything off first, then the subtitles back on — done in that order so
+    // no window exists where the video files of a `batch-sidecar` are
+    // downloading. A `sub-pack` used to skip this on the premise that a pack is
+    // small enough to take whole; since the ceiling scales with the episode
+    // count (`subtitlePackCeilingBytes`) a pack can now be a hundred megabytes,
+    // and half of one measured pack is a second language nobody asked for —
+    // `[DBD-Raws] JOJO … 简繁外挂字幕` is 78 files where the harvest wants 39. So
+    // the unselected files are skipped on both routes; for a small pack with
+    // nothing unselected this is a no-op call that never fires.
+    const others = files.value.map((file) => file.index).filter((index) => !wanted.includes(index));
+    if (others.length) {
       const skipped = await qbitSetFilePriorities(qbit, hash, others, QBIT_PRIO_SKIP);
       if (!skipped.ok) return { ok: false, reason: skipped.reason };
     }

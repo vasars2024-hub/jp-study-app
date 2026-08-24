@@ -923,6 +923,49 @@ describe('nyaaFetchAll — a sub-pack is a season, not one file', () => {
     expect(one.ok && one.value.fileName).toBe('Show - 09.ja.ass');
   });
 
+  it('skips the files inside a pack that nobody asked for', async () => {
+    // A pack used to be taken whole on the premise that a pack is small. Since
+    // the ceiling scales with the episode range, a pack can be a hundred
+    // megabytes — and the measured one, `[DBD-Raws] JOJO … 简繁外挂字幕`, is 78
+    // files where a `ja` harvest wants 39: half its bytes are a second language.
+    files = [
+      { name: 'Show - 07.ja.ass', size: 40_000, progress: 0, priority: 1 },
+      { name: 'Show - 07.zh.ass', size: 40_000, progress: 0, priority: 1 },
+      { name: 'Show - 08.ja.ass', size: 41_000, progress: 0, priority: 1 },
+      { name: 'Show - 08.zh.ass', size: 41_000, progress: 0, priority: 1 },
+    ];
+    await writeOnDisk('Show - 07.ja.ass', 'Dialogue: seven');
+    await writeOnDisk('Show - 08.ja.ass', 'Dialogue: eight');
+
+    const all = await nyaaFetchAll(candidate('sub-pack', null), config(), { timeoutMs: 5_000 });
+    expect(all.ok).toBe(true);
+    expect(all.ok && all.files).toHaveLength(2);
+
+    // Order is the assertion, same as route B: the unwanted files go off before
+    // the wanted ones come on, so no window exists where they are transferring.
+    const prio = calls.filter((call) => call.startsWith('prio:'));
+    expect(prio[0]).toBe('prio:0=1|3');
+    expect(prio[1]).toBe('prio:1=2|0');
+    expect(files[1].priority).toBe(0);
+    expect(files[3].priority).toBe(0);
+  });
+
+  it('issues no skip call at all when a pack has nothing unselected', async () => {
+    // The control for the test above: the no-op path must stay a no-op, so the
+    // common small pack still makes exactly one priority call.
+    files = [
+      { name: 'Show - 07.ja.ass', size: 40_000, progress: 0, priority: 1 },
+      { name: 'Show - 08.ja.ass', size: 41_000, progress: 0, priority: 1 },
+    ];
+    await writeOnDisk('Show - 07.ja.ass', 'Dialogue: seven');
+    await writeOnDisk('Show - 08.ja.ass', 'Dialogue: eight');
+
+    const all = await nyaaFetchAll(candidate('sub-pack', null), config(), { timeoutMs: 5_000 });
+    expect(all.ok).toBe(true);
+    const prio = calls.filter((call) => call.startsWith('prio:'));
+    expect(prio).toEqual(['prio:1=1|0']);
+  });
+
   it('skips a file that is on disk but empty, and keeps the rest', async () => {
     // The negative control for the per-file skip: without it, one truncated
     // episode out of three would either fail the release or land as an empty

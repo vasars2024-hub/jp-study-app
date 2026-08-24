@@ -216,6 +216,53 @@ export function packCoversEpisodeCount(
   return sizeBytes >= episodeCount * SUBTITLE_PACK_BYTES_PER_EPISODE;
 }
 
+/**
+ * How much a subtitle-only release may weigh *per episode it answers*.
+ *
+ * The flat 50 MB ceiling above was sized for "a few MB of text and up to ~40 MB
+ * of fonts", and real data falsified that premise rather than merely stretching
+ * it. The one pack this plan has ever rendered from —
+ * `[DBD-Raws] JOJO 黄金之风 [01-39] 简繁外挂字幕` — is **87.80 MB of nothing but
+ * `.ass`** (39 episodes × two language variants, karaoke-heavy), and its
+ * single-language half alone is **71,796,171 B across 39 files**, still over the
+ * flat ceiling. So a whole class of honest whole-season packs was invisible as a
+ * pack and could only ever be reached down the batch route.
+ *
+ * 3 MB is the measured 1.84 MB/episode of that pack with margin, and it is the
+ * symmetric partner of `SUBTITLE_PACK_BYTES_PER_EPISODE`: the floor says a pack
+ * offered for N episodes cannot be too small to hold them, this says it cannot
+ * be too large to be text.
+ */
+export const SUBTITLE_PACK_CEILING_BYTES_PER_EPISODE = 3 * 1024 * 1024;
+
+/**
+ * The most any subtitle-only release may weigh, however many episodes it claims.
+ *
+ * The per-episode ceiling has to stop somewhere or a 500-episode show would
+ * authorise a 1.5 GB "subtitle" download. 150 MB keeps the ceiling's original
+ * safety property — an episode of video starts around 300 MB, so there is still
+ * a 2× margin — and a release this big must additionally name a subtitle signal
+ * and name no video container to get here at all.
+ */
+export const SUBTITLE_PACK_CEILING_MAX_BYTES = 150 * 1024 * 1024;
+
+/**
+ * The ceiling that applies to a pack offered as the answer to `episodeCount`
+ * episodes.
+ *
+ * An unknown count, or one episode, gets the flat ceiling unchanged: a single
+ * episode of cues is tens of kilobytes and nothing about it needs headroom.
+ */
+export function subtitlePackCeilingBytes(episodeCount: number | null | undefined): number {
+  if (typeof episodeCount !== 'number' || !Number.isFinite(episodeCount) || episodeCount <= 1) {
+    return SUBTITLE_SIZE_CEILING_BYTES;
+  }
+  return Math.min(
+    SUBTITLE_PACK_CEILING_MAX_BYTES,
+    Math.max(SUBTITLE_SIZE_CEILING_BYTES, episodeCount * SUBTITLE_PACK_CEILING_BYTES_PER_EPISODE),
+  );
+}
+
 /** Text cue formats the record layer can store, keyed by extension. */
 const TEXT_SUBTITLE_FORMATS: Record<string, SubtitleRecordFormat> = {
   ass: 'ass',
@@ -465,11 +512,16 @@ export function subtitlePackSignals(name: string): string[] {
  * An unparseable size (`0`) is rejected rather than trusted. `parseSizeBytes`
  * returns 0 for anything it cannot read, and "size unknown" must not be a way
  * around the ceiling.
+ *
+ * `episodeCount` is what the caller is asking this release to answer. Omitting
+ * it keeps the flat `SUBTITLE_SIZE_CEILING_BYTES`, which is what every
+ * per-episode caller wants; a range harvest passes its count and gets the
+ * scaled ceiling described on `subtitlePackCeilingBytes`.
  */
-export function looksLikeSubtitleOnly(row: TorrentRow): boolean {
+export function looksLikeSubtitleOnly(row: TorrentRow, episodeCount?: number | null): boolean {
   if (!row) return false;
   if (!(row.sizeBytes > 0)) return false;
-  if (row.sizeBytes > SUBTITLE_SIZE_CEILING_BYTES) return false;
+  if (row.sizeBytes > subtitlePackCeilingBytes(episodeCount)) return false;
   if (VIDEO_CONTAINER_RE.test(row.name ?? '')) return false;
   return subtitlePackSignals(row.name ?? '').length > 0;
 }
@@ -873,7 +925,8 @@ export function rankSubtitleCandidatesDetailed(
     // anything `looksLikeSubtitleOnly` accepts, so it cannot fall through to
     // the batch route and be offered as a multi-gigabyte download instead.
     const isPack =
-      looksLikeSubtitleOnly(row) && packCoversEpisodeCount(row.sizeBytes, want.episodeCount);
+      looksLikeSubtitleOnly(row, want.episodeCount)
+      && packCoversEpisodeCount(row.sizeBytes, want.episodeCount);
     const isBatch = !isPack && couldCarrySidecarSubtitles(row);
     if (!isPack && !isBatch) {
       // Attributed separately from `shape`, because "this release states its

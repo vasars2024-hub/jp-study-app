@@ -22,6 +22,8 @@ import {
   subtitleFormatFor,
   subtitleKanaCount,
   subtitlePackSignals,
+  SUBTITLE_PACK_CEILING_MAX_BYTES,
+  subtitlePackCeilingBytes,
   SUBTITLE_SIZE_CEILING_BYTES,
 } from '../subtitleNyaa';
 
@@ -140,6 +142,63 @@ describe('looksLikeSubtitleOnly', () => {
 
   it('rejects a small release with no subtitle signal at all', () => {
     expect(looksLikeSubtitleOnly(row({ name: 'Show OP Single [FLAC]', sizeBytes: 30 * MB }))).toBe(false);
+  });
+});
+
+describe('subtitlePackCeilingBytes', () => {
+  it('leaves the flat ceiling alone when the count is unknown or one', () => {
+    expect(subtitlePackCeilingBytes(undefined)).toBe(SUBTITLE_SIZE_CEILING_BYTES);
+    expect(subtitlePackCeilingBytes(null)).toBe(SUBTITLE_SIZE_CEILING_BYTES);
+    expect(subtitlePackCeilingBytes(1)).toBe(SUBTITLE_SIZE_CEILING_BYTES);
+    // A short season still cannot buy headroom it does not need: 12 × 3 MB is
+    // under the flat ceiling, so the flat ceiling wins.
+    expect(subtitlePackCeilingBytes(12)).toBe(SUBTITLE_SIZE_CEILING_BYTES);
+  });
+
+  it('scales with the range and stops at the absolute cap', () => {
+    expect(subtitlePackCeilingBytes(39)).toBe(39 * 3 * MB);
+    expect(subtitlePackCeilingBytes(500)).toBe(SUBTITLE_PACK_CEILING_MAX_BYTES);
+    // The cap is what keeps the original safety margin below one episode of
+    // video, which starts around 300 MB.
+    expect(SUBTITLE_PACK_CEILING_MAX_BYTES).toBeLessThan(300 * MB);
+  });
+
+  it('sees the one pack this pipeline has actually rendered from', () => {
+    // `[DBD-Raws] JOJO 黄金之风 [01-39] 简繁外挂字幕`, measured: 87.80 MB of
+    // nothing but `.ass`, over the flat ceiling and therefore invisible as a
+    // pack until the ceiling learned about the range.
+    const jojo = row({
+      name: '[DBD-Raws][JOJO的奇妙冒险 黄金之风][01-39][1080P][简繁外挂字幕]',
+      sizeBytes: 92_064_972,
+      isBatch: true,
+      fileCount: 0,
+    });
+    expect(subtitlePackSignals(jojo.name)).toContain('cjk-subtitles');
+    expect(looksLikeSubtitleOnly(jojo)).toBe(false);
+    expect(looksLikeSubtitleOnly(jojo, 39)).toBe(true);
+    const [ranked] = rankSubtitleCandidatesDetailed([jojo], {
+      languages: ['ja'],
+      episodeCount: 39,
+    }).candidates;
+    expect(ranked.route).toBe('sub-pack');
+  });
+
+  it('still refuses a video batch that merely mentions subtitles, at any range', () => {
+    // The ceiling's whole job. 39 × 3 MB is 117 MB; a real season of video is
+    // orders of magnitude past that, so no range makes this a pack.
+    const batch = row({
+      name: '[Group] Show 01-39 [BD 1080p] (Subtitles)',
+      sizeBytes: 33_894_400_000,
+      isBatch: true,
+      fileCount: 0,
+    });
+    expect(looksLikeSubtitleOnly(batch, 39)).toBe(false);
+    expect(looksLikeSubtitleOnly(batch, 5000)).toBe(false);
+    const [ranked] = rankSubtitleCandidatesDetailed([batch], {
+      languages: ['ja'],
+      episodeCount: 39,
+    }).candidates;
+    expect(ranked.route).toBe('batch-sidecar');
   });
 });
 
