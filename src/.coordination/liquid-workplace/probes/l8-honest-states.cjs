@@ -85,12 +85,38 @@ function tcpProbe(port, host = '127.0.0.1', timeoutMs = 2000) {
   });
 }
 
+/**
+ * THE WINDOW UNDER TEST, RESOLVED BY TITLE — and this is what voided the last run.
+ *
+ * Every `.fwin` selector in this probe used to be `document.querySelector('.fwin')`, i.e. the
+ * FIRST in DOM order. On the boot that produced the VOID reading that first window was a
+ * `section: 'media'` window with an EMPTY body, so the probe read `entries 0 / chars 10` and the
+ * rubric capped the category at 0 for measuring an empty harness. `8b3bd5ea` fixed the same trap
+ * in `l1-q78-drive.cjs` by taking the first `.fwin` WITH A BOX — which is not enough here, because
+ * all three restored windows have boxes and the blank one is still first.
+ *
+ * A title match is the only selection that says which surface was measured, so the report can
+ * carry it and a wrong window is a refusal rather than a silent zero.
+ */
+const WIN = `(function () {
+  var wins = [].slice.call(document.querySelectorAll('.fwin')).filter(function (w) {
+    var r = w.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  });
+  var named = wins.filter(function (w) {
+    var t = w.querySelector('.fwin-title-text');
+    return t && /dictionary/i.test(t.textContent || '');
+  });
+  return named[0] || null;
+})()`;
+
 /** Every rendered text run inside the measured window, so a state is read rather than inferred. */
 const READ = `(() => {
-  const win = document.querySelector('.fwin');
-  if (!win) return JSON.stringify({ refuse: 'no .fwin' });
+  const win = ${WIN};
+  if (!win) return JSON.stringify({ refuse: 'no visible Dictionary .fwin' });
   const txt = (sel) => [...win.querySelectorAll(sel)].map((e) => (e.textContent || '').trim()).filter(Boolean);
   return JSON.stringify({
+    measuredWindow: (win.querySelector('.fwin-title-text') || {}).textContent || null,
     entries: win.querySelectorAll('.dict-entry').length,
     chars: (win.textContent || '').length,
     empty: txt('.dict-empty'),
@@ -113,7 +139,7 @@ const rawKeysIn = (strings) => strings.filter((s) => RAW_KEY.test(s.trim()));
 
 async function search(term) {
   await ev(`(() => {
-    const win = document.querySelector('.fwin');
+    const win = ${WIN};
     const input = [...win.querySelectorAll('input[type=text]')].find((i) => (i.placeholder || '').length > 8);
     const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
     setter.call(input, ${JSON.stringify(term)});
@@ -122,7 +148,7 @@ async function search(term) {
   })()`);
   await sleep(120);
   await ev(`(() => {
-    const win = document.querySelector('.fwin');
+    const win = ${WIN};
     const btn = [...win.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === 'Search');
     btn.click();
     return 'clicked';
@@ -143,7 +169,7 @@ async function search(term) {
  */
 async function armLoadingObserver() {
   await ev(`(() => {
-    const win = document.querySelector('.fwin');
+    const win = ${WIN};
     if (window.__l8load && window.__l8load.obs) window.__l8load.obs.disconnect();
     const seen = [];
     const capture = () => {
@@ -226,7 +252,7 @@ async function main() {
   // ---- 5. offline: the dependency's own disconnected render -----------------------------------
   report.offline = { statusBeforeClick: report.dependency };
   await ev(`(() => {
-    const win = document.querySelector('.fwin');
+    const win = ${WIN};
     const btn = win.querySelector('.dict-add');
     btn.click();
     return 'clicked';
@@ -247,7 +273,7 @@ async function main() {
   const retry = setupRead.setupButtons.findIndex((b) => !/back/i.test(b));
   if (retry >= 0) {
     await ev(`(() => {
-      const win = document.querySelector('.fwin');
+      const win = ${WIN};
       [...win.querySelectorAll('.anki-setup-actions button')][${retry}].click();
       return 'retried';
     })()`);

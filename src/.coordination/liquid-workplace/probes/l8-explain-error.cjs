@@ -71,8 +71,23 @@ async function call(expr, key, settle = 3000) {
   return ev(`JSON.stringify(window.__l8e[${JSON.stringify(key)}] ?? null)`);
 }
 
+/**
+ * Same trap `l8-honest-states.cjs` was voided by, and it reads WORSE here: the first `.fwin` in
+ * DOM order was a `section: 'media'` window with an empty body, so `READ_EXPLAIN` would have
+ * reported `error: []` — an honest-looking "no error raised" off a window that contains no
+ * control at all. Resolve the Dictionary window by title, and refuse if it is not there.
+ */
+const WIN = `(function () {
+  return [].slice.call(document.querySelectorAll('.fwin')).filter(function (w) {
+    var r = w.getBoundingClientRect();
+    var t = w.querySelector('.fwin-title-text');
+    return r.width > 0 && r.height > 0 && t && /dictionary/i.test(t.textContent || '');
+  })[0] || null;
+})()`;
+
 const READ_EXPLAIN = `(() => {
-  const win = document.querySelector('.fwin');
+  const win = ${WIN};
+  if (!win) return JSON.stringify({ refuse: 'no visible Dictionary .fwin' });
   const txt = (sel) => [...win.querySelectorAll(sel)].map((e) => (e.textContent || '').trim()).filter(Boolean);
   const details = win.querySelector('.lexicon-explain-entry');
   return JSON.stringify({
@@ -111,7 +126,7 @@ async function restore() {
 
   // Open the disclosure, so the state measured is one a user would actually see painted.
   await ev(`(() => {
-    const d = document.querySelector('.fwin .lexicon-explain-entry');
+    const d = (${WIN} || document).querySelector('.lexicon-explain-entry');
     if (d && !d.open) d.open = true;
     return 'opened';
   })()`);
@@ -128,9 +143,9 @@ async function restore() {
 
   // ---- 3. drive the product's own control -------------------------------------------------------
   await ev(`(() => {
-    const d = document.querySelector('.fwin .lexicon-explain-entry');
+    const d = (${WIN} || document).querySelector('.lexicon-explain-entry');
     if (d && !d.open) d.open = true;
-    document.querySelector('.fwin .lexicon-explain-ask').click();
+    (${WIN} || document).querySelector('.lexicon-explain-ask').click();
     return 'asked';
   })()`);
   await sleep(12000);

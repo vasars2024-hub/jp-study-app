@@ -232,3 +232,44 @@ active profile writes user data and was not done for a measurement.
 two windows, so the query went to the hidden `media` window and the script refused with "0 dict
 entries after a real search" while `lookupTerm('食べる')` returned 8 through the IPC. Both blocks
 now take the first *visible* `.fwin`, exactly as its own census step already did.
+
+## 2026-08-24 (late) · primary — category 8, all four states, on a harness that is not empty
+
+The VOID reading had a cause and it was a PRODUCT DEFECT, not the instrument alone.
+`l8-honest-states.cjs` read `baseline.entries 0 / chars 10` because
+`document.querySelector('.fwin')` returned the first window in DOM order, and that window was a
+persisted `section: 'media'` — the Start menu's media CATEGORY id, never an app — restoring on
+every boot as an 820×580 frame over a `.fwin-body` with **zero child nodes**. `l7d-setup.cjs` hit
+the same window last turn and worked around it. `6b490fc3` fixes the cause; both L8 probes now
+resolve the window **by title**, so a wrong window is a refusal instead of a silent zero.
+
+| State | Instrument | Measured |
+| --- | --- | --- |
+| empty | `l8-honest-states.cjs` | `No dictionary match for “zzzqqqxxwv”.` — **names the query**, 0 entries, 0 raw keys |
+| loading | in-page MutationObserver, same probe | **`Looking up…`** captured across a lookup that then returned **8 entries** |
+| offline | same probe, AnkiConnect down | 2 messages naming Anki, **4** install steps, buttons `Back`+`Retry`, `falseSuccess false`, 0 raw keys |
+| error | `l8-explain-error.cjs` | `The AI provider did not answer. authentication`, `role="alert"`, code **`authentication`**, 0 raw keys |
+
+**Two controls fired, which is what makes the four rows quotable.**
+1. The induction is proven from OUTSIDE the app: node's own TCP connect to `127.0.0.1:8765` →
+   **REFUSED / ECONNREFUSED**, and the control on the control, `5173` → **LISTENING**. A prober
+   that returned REFUSED for everything would prove nothing.
+2. The error state is absent-before / named-after: `errorAbsentBefore true → errorNamedAfter true`,
+   with `answerBefore === answerAfter` so **no answer was manufactured out of a failed call**
+   (`falseSuccess false`), and `restored true` — the fake `deepseek` key cleared, provider back to
+   `gemini-2.5-flash`, `aiProviderHealth` byte-identical to before.
+
+**Trap for the next worker, paid for twice today.** The first clean-looking explain run reported
+`errorAbsentBefore FALSE`: an earlier run of the SAME probe had left its error on screen, so the
+control was void even though every other number looked right. **Re-run the install-time query
+first** — a fresh search clears `.lexicon-explain-error` (measured: `errors []`, 8 entries) — then
+drive the induction. The probe does not do this for you yet.
+
+**Stale doc comment, corrected.** `l8-honest-states.cjs`'s header says the setup panel's only
+control on `variant='page'` is Retry and predicts an inescapable loop. Measured: **`Back` is
+present** and Retry correctly re-probes and stays (Anki is still down), which is honest rather
+than a trap. `retryLoop.stillSetup true` is the right answer here, not a finding.
+
+**Category 8 = 10/10.** Four states, four distinct honest renders, 0 raw i18n keys anywhere,
+0 false successes, both controls fired, harness carrying 8 real entries and 8 named `idle` audio
+buttons. Surface restored: `entries 8 / chars 6019`, `+ Add to Anki` unlatched.
