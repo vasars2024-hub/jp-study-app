@@ -78,8 +78,11 @@ beforeEach(() => {
   emitModelProgress = null;
   releaseTranslate = null;
   unsubscribes = 0;
-  // The default of ['en', 'ru'] is what routes examples through the local model at all.
+  // A language beyond Tatoeba's own English is what routes examples through the local model at
+  // all — with English only, `qwenLangs` is empty and nothing loads, which is the point of
+  // `defaultExLangs` and is covered in `dictionaryExampleLangDefault.test.tsx`.
   localStorage.clear();
+  localStorage.setItem('jp-study-ex-langs', JSON.stringify(['en', 'ru']));
 });
 
 afterEach(async () => {

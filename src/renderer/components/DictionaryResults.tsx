@@ -121,7 +121,27 @@ function exampleCountsFor(profile: StudyProfile): Record<ExampleCountLang, numbe
   };
 }
 
-function loadExLangs(): TransLang[] {
+/**
+ * What an example is shown in when the user has never chosen: English, which Tatoeba ships
+ * alongside every sentence, plus the profile's own non-Japanese language when that is something
+ * else.
+ *
+ * The hardcoded `['en', 'ru']` this replaces made every profile — including an English one that
+ * has no use for the second column — start an offline Qwen3 load the first time it opened this
+ * panel: measured 2026-08-24, ~15 s and main 420.7 -> 3,323 MB, +3,339 handles, for a language
+ * the reader never asked for. A Russian profile still gets exactly the old default, which is the
+ * profile that default was written for.
+ */
+function defaultExLangs(profile: StudyProfile): TransLang[] {
+  const native = nativeLangOf(profile);
+  const langs: TransLang[] = ['en'];
+  if (native !== 'en' && native !== 'ja' && EX_LANGS.some((l) => l.code === native)) {
+    langs.push(native);
+  }
+  return langs;
+}
+
+function loadExLangs(profile: StudyProfile): TransLang[] {
   try {
     const raw = localStorage.getItem(EX_LANG_KEY);
     if (raw) {
@@ -133,7 +153,7 @@ function loadExLangs(): TransLang[] {
   } catch {
     /* ignore */
   }
-  return ['en', 'ru'];
+  return defaultExLangs(profile);
 }
 
 interface Props {
@@ -281,7 +301,7 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
   const [exError, setExError] = useState('');
   const [selectedEx, setSelectedEx] = useState<Set<number>>(() => new Set());
   const [exDisplay, setExDisplay] = useState(loadExDisplay);
-  const [exLangs, setExLangs] = useState<TransLang[]>(loadExLangs);
+  const [exLangs, setExLangs] = useState<TransLang[]>(() => loadExLangs(getActiveProfile()));
   const [exTrans, setExTrans] = useState<Record<string, Partial<Record<TransLang, string>>>>({});
   const [exTransLoading, setExTransLoading] = useState(false);
   /**
