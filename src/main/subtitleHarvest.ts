@@ -39,7 +39,7 @@ import {
   takeRememberedNyaaCandidate,
 } from './subtitleNyaaSource';
 import { asNyaaAcquisitionConfig, describeEmptyNyaaListing } from '../shared/subtitleNyaa';
-import { harvestSearchAliases } from '../shared/subtitleHarvest';
+import { harvestParentTitle, harvestSearchAliases } from '../shared/subtitleHarvest';
 import { readMalLibrary } from './malLibrary';
 import { malLibraryKey } from '../shared/malLibrary';
 import type {
@@ -192,7 +192,24 @@ export async function listSubtitleHarvest(
     // `null` episode asks for the whole entry, which is what lets one request
     // serve both "episodes 20-24" and "the whole season" — the choosing is
     // `planSubtitleHarvest`'s job, not the network's.
-    const match = await jimakuSearchDetailed(anilistId, title, null);
+    let match = await jimakuSearchDetailed(anilistId, title, null);
+
+    // An OVA/special/recap is usually filed under its season, not under its own
+    // id, so the derivative's lookup dead-ends on a title the catalogue does
+    // cover. Tried only when the primary found nothing and Jimaku answered —
+    // during an outage there is no "nothing" to fall back from — and the hit is
+    // reported through the ordinary title-match path, so the panel's existing
+    // "check this is the right show" warning names the parent it used.
+    if (!match.candidates.length && !match.down) {
+      const parent = harvestParentTitle(title);
+      if (parent) {
+        // No id is passed, so `jimakuSearchDetailed` stamps `basis: 'title'`
+        // itself — the warning path is a property of the call, not an override.
+        const viaParent = await jimakuSearchDetailed(undefined, parent, null);
+        if (viaParent.candidates.length) match = viaParent;
+      }
+    }
+
     remember(match.candidates);
     const files: HarvestFileCandidate[] = match.candidates.map((candidate) => ({
       id: candidate.providerItemId,

@@ -4,6 +4,7 @@ import {
   chooseJimakuEntry,
   combineSeasonCues,
   episodeAt,
+  harvestParentTitle,
   locateInSeason,
   planSubtitleHarvest,
   toPlainText,
@@ -235,5 +236,47 @@ describe('chooseJimakuEntry', () => {
     const forward = chooseJimakuEntry([naruto, shippuuden, boruto], 'Naruto')?.id;
     const reversed = chooseJimakuEntry([boruto, shippuuden, naruto], 'Naruto')?.id;
     expect(forward).toBe(reversed);
+  });
+});
+
+describe('harvestParentTitle', () => {
+  it('returns the season a derivative hangs off — the live 2026-08-24 case', () => {
+    // MAL 22961 is filed nowhere; MAL 19163 carries 10 Japanese files.
+    expect(harvestParentTitle('Date A Live II: Kurumi Star Festival')).toBe('Date A Live II');
+  });
+
+  it('cuts only the first colon, so a nested subtitle still names the season', () => {
+    expect(harvestParentTitle('JoJo no Kimyou na Bouken Part 3: Stardust Crusaders: Egypt-hen'))
+      .toBe('JoJo no Kimyou na Bouken Part 3');
+  });
+
+  it('refuses a title with no separator rather than guessing', () => {
+    expect(harvestParentTitle('Date A Live II')).toBeNull();
+    expect(harvestParentTitle('')).toBeNull();
+  });
+
+  it('refuses a colon that is not a subtitle separator', () => {
+    // No space after the colon: these are whole names, not derivatives.
+    // The first two are also refused by the length guards, so the case that
+    // isolates the `': '` rule is the third — a long head and a lettered tail,
+    // where only the missing space says "this is one filed name".
+    expect(harvestParentTitle('Re:Zero kara Hajimeru Isekai Seikatsu')).toBeNull();
+    expect(harvestParentTitle('Fate/Zero')).toBeNull();
+    expect(harvestParentTitle('Macross Frontier:Sayonara no Tsubasa')).toBeNull();
+  });
+
+  it('refuses when either side is not a real name', () => {
+    // `K: Return of Kings` is the case the head-length guard exists for: the
+    // parent work really is called *K*, and searching Jimaku for "K" matches
+    // anything at all, so no answer beats a one-letter query.
+    expect(harvestParentTitle('K: Return of Kings')).toBeNull();
+    expect(harvestParentTitle('Vol: 2')).toBeNull();
+    expect(harvestParentTitle('Steins;Gate: 0')).toBeNull();
+    expect(harvestParentTitle('Bleach: X')).toBeNull();
+  });
+
+  it('is trimmed on both sides and never returns the whole title back', () => {
+    expect(harvestParentTitle('  Ghost in the Shell:  Stand Alone Complex  '))
+      .toBe('Ghost in the Shell');
   });
 });

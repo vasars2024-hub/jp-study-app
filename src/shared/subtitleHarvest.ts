@@ -255,6 +255,41 @@ export function harvestSearchAliases(
   return out;
 }
 
+/**
+ * The parent work a derivative title hangs off, when the title names one.
+ *
+ * Measured 2026-08-24 on the user's own list: MAL 22961
+ * *Date A Live II: Kurumi Star Festival* is filed by Jimaku nowhere, while its
+ * parent MAL 19163 *Date A Live II* carries **10** Japanese files under entry
+ * 2823. An OVA, a special or a recap is catalogued under the season far more
+ * often than under its own id, so the derivative's own lookup dead-ends and the
+ * user is told the show has no subtitles when the season plainly does.
+ *
+ * Deliberately conservative, because a wrong parent is a *different work*
+ * whose cues would be attached to the wrong video:
+ * - only a colon splits, and only when it is followed by a space — `Fate/Zero`
+ *   and `Re:Zero`-style names carry no such separator;
+ * - the head must still be a real name (>= 4 chars, at least one letter), so
+ *   `Vol: 2` yields nothing;
+ * - the tail must be a real name too, so a trailing `Part 5:` is not a parent;
+ * - only the FIRST colon is cut, and only one candidate is returned — a walk
+ *   over several guesses is a walk over several shows.
+ *
+ * The caller is expected to surface any hit as a title match, not an id match,
+ * so the UI's existing "check this is the right show" warning fires on it.
+ */
+export function harvestParentTitle(title: string): string | null {
+  const trimmed = (title ?? '').trim();
+  const cut = trimmed.indexOf(': ');
+  if (cut < 0) return null;
+  const head = trimmed.slice(0, cut).trim();
+  const tail = trimmed.slice(cut + 1).trim();
+  if (head.length < 4 || !/\p{L}/u.test(head)) return null;
+  if (tail.length < 2 || !/\p{L}/u.test(tail)) return null;
+  if (head.toLowerCase() === trimmed.toLowerCase()) return null;
+  return head;
+}
+
 /** One subtitle file out of an acquired release. */
 export interface HarvestNyaaEpisodeText {
   /** `null` when the file name states no episode — a movie, or a single file. */
