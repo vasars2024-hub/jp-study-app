@@ -136,3 +136,61 @@ instead of by label. That is a probe change, not a product change.
 **Left as found:** the sweep's own pass ends on the Interlinear lens with `.dict-entry` at 0,
 which reads exactly like a failed search — it is not. Restored to `Automatic`, 8 entries, bait
 absent, presentation `liquid`. No skipped control was driven, so no user data moved.
+
+## 2026-08-24 · primary · the 16 `gone` targets were writes, and the bait that failed to fail
+
+The gap this entry closes was "16 of 35 targets are `(unlabelled)` and resolve to `gone`… a probe
+change, not a product change." It was a probe change. It was also hiding two more.
+
+**Fix 1 — identity.** Re-resolution matched `label(el) === name`, but `label()` returned `''` for an
+icon-only button while the roster stored the display fallback `'(unlabelled)'`, so those 16 could
+never match. Ported `l8-dead-controls.cjs`'s identity: `label|tag|type|firstClass` + the ordinal
+among **all** painted controls (the old occurrence index counted kept targets while indexing the
+live list, which holds the skipped ones too), with a class-only fallback. Result: `gone` **16 → 0**.
+
+**Fix 2 — `label()` never read `title`, and the 16 were destructive.** They are 8 × `Copy to
+clipboard history` and 8 × `Save to Flashcards`, both writing real user data, both invisible to the
+DESTRUCTIVE rule because they had no name. The first run with fix 1 clicked all sixteen: **6 words
+into `jp-saved-words-ja` and 8 rows into `jp-clipboard-history`** (the two 食べる entries share a
+word, so the second star toggled the first back off). Undone and verified: saved back to the single
+pre-existing `飲む`, clipboard **117 → 109**, 0 stars `on`.
+
+**Fix 3 — `signature()` was blind to exactly the effect those buttons have.** It compared text,
+control count, entry count, aria state and scroll. A star flipping `class` to `…on` and `title` to
+`Saved to Flashcards` moves none of them, so **16 real writes read `changed: false`** — they were
+reported as dead ends. Class, title and aria-label are now in the signature, plus open/expanded.
+
+**Fix 4 — quiescence, because the bait reported `changed: true`.** By the time the injected
+handler-less button was driven, `Explain again` and `Find example sentences` had async work in
+flight and the window was moving on its own. Each target now waits for two consecutive identical
+signatures before its `before` is taken; a target that never settles is `unstable`, not judged.
+
+**Tried and BACKED OUT: the paired-undo pass.** `Save to Flashcards` is a toggle, so driving it and
+clicking back looked safe. It reported **restored 2 of 8** and left four more words in the store. A
+focused re-run at undo delays 80/260/600/1200 ms showed the undo click landing before the entry
+re-renders (`title` still `Save to Flashcards`, `on` still false at undo time) — it races the render.
+Backed out; a `savedStoreUntouched` tripwire now fails the run instead of the reader.
+
+| Number | Before | After |
+| --- | --- | --- |
+| Coverage (verdicts / driven) | 19 / 35 | **20 / 20**, `gone` 0, `unstable` 0 |
+| Targets named `(unlabelled)` | 16 | **0** |
+| Roster / skipped by name with reason | 61 / 26 | **64 / 43** |
+| Negative control (injected bait) | `changed:true` — VOID | **`changed:false`** |
+| `savedStoreUntouched` | not measured | **true** |
+| Resolved by live / key / class | — | 5 / 15 / 0 |
+
+**The L8-banked one-way finding is CLOSED and it was not a defect.** All 7 `Play <word>` controls
+that become `No recording for this word` come back `disabled: true` — `WordAudio.tsx:109` disables
+`none` and `loading` deliberately, and the surface stopped offering them honestly.
+`oneWayCandidates` is **0**.
+
+**Category 2 is still not a 10, and the reason is now one measured product defect.** Dead ends
+**4 of 20**, three of which are honest already-in-that-state no-ops: `Search` (query already shown),
+`Automatic` (already-selected lens), `食べる` (a `.dict-saved-search` chip for the current query).
+The fourth is real: **`Explain again` produces nothing at all.** Driven alone, quiesced, read at
++200/+800 ms: region stays 1,761 chars, buttons unchanged, no loading state, no error, no refusal.
+`jp-study-local-agent-settings-v1` is `enabled:false` with `modelFileName:""`, so there is no model
+to re-ask — and the control says so nowhere. `Explain this word` fills the panel in <200 ms from
+the local cache, so the surrounding feature is alive; only the re-ask is silent. That is a
+category-2 dead end and a category-8 missing state, and it is a product fix, not a probe fix.

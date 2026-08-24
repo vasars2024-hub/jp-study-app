@@ -57,7 +57,7 @@ sit on this one surface, so this is running state, not a score:
 | # | Category                       | State | Where the number lives |
 | - | ------------------------------ | ----- | ---------------------- |
 | 1 | Accessibility                  | 0 failing; not yet scored *as this surface* | `L1_ACCESSIBILITY.md` (`a70cbbed`) |
-| 2 | Clunkiness                     | **open** — 16 of 35 targets `(unlabelled)` → `gone` | `L1_CLUNKINESS.md` |
+| 2 | Clunkiness                     | **open** — coverage now 20/20, one real dead end: `Explain again` | `L1_CLUNKINESS.md` |
 | 3 | Liquid utilization             | 4 of 4 treated, 0 dense-on-translucent; re-drive owed at this tree | `L2_PRIMITIVES.md` (L5.2) |
 | 4 | Use of space                   | four numbers pass at three sizes; re-score owed on the fixing commit | `L1_USE_OF_SPACE.md` |
 | 5 | UI clarity                     | **10/10** — `cbb3506a` | `L1_UI_CLARITY.md` |
