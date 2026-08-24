@@ -260,3 +260,29 @@ remaining deadline load. What is left for 2026-09-01 is main-v1 (still INHERITED
 re-counted — RULE 1 remains overdue and is now the top of the ladder) and liquid. Neither has a
 measured rate, so the whole-programme projection stays **UNKNOWN** and it would be dishonest to
 write 2026-09-01 merely because it is the date that was asked for.
+
+2026-08-24 | main-v1 | units done this turn: 1 | units left: 19 | basis: RE-COUNTED against the plan's own track bullets (T1 5/5, T2 15/15, T3 6/6, T4 9/9, T5 8/8, T6 3/7, T7 3/3, T8 0/7, T9 13/15 non-attended + 0/5 attended) = 80 units, 61 done, 76% | projected finish: 2026-08-24 for main-v1's own agent work
+
+**The 58 % was wrong and the shape of what is left is the real news.** 76 %, not 58 % — but the
+useful number is not the percentage. Of the **19 open units, exactly ZERO are now agent-work on
+this plan**. They split three ways and none of them is main-v1's to do:
+
+- **11 are plan (3)'s.** Track 6's four deferred Liquid-Video-pilot bullets and all seven of
+  Track 8 are executed by `LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md` and close there, by that
+  plan's own text at Track 6's checkpoint and Track 8's heading.
+- **7 are external-blocked.** Track 9's gates 7 and 10 need the user's WebUI password and their
+  own client's WebUI disabled; gates 11–15 are the attended set. All already in `needs-user.md`;
+  Track 9's own exit condition calls it complete-except-external.
+- **1 was Track 2's find-in-the-wild**, and it closed this turn.
+
+**So main-v1 is complete-except-external and complete-except-Liquid.** Under the ladder that means
+the next turn opens on plan (3), liquid — not because main-v1 was abandoned, but because every
+remaining unit of it is either the Liquid plan's own work or a human's.
+
+**Rate.** 1 unit in ~1.6 productive hours, but that unit was a whole product slice (4 commits,
+~880 lines, live-verified) plus the re-count itself, so it is not a rate to extrapolate from.
+main-v1 contributes **0** to the remaining deadline load. What is left for 2026-09-01 is
+**liquid alone**, which still has no measured rate — its own authority is the `Gate:` lines in
+section 11 of its plan and nobody has counted them since the pin was written. **Projected finish
+for the programme: UNKNOWN**, and it stays UNKNOWN until liquid is counted. Writing 2026-09-01
+here would be the one forbidden outcome.

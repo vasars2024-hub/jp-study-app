@@ -31,14 +31,17 @@ Status: canonical integration brief for the main tree. Re-derive every status fr
 - Support local Qwen as the no-key fallback and provider adapters through the managed vault.
 - Reuse one structured provider client and one permission/audit model instead of creating feature-specific clients.
 
-**Re-derived 2026-08-20 — 4 of 5 finished, 1 partial (8 of 9 sub-items).** Everything but one
-sub-item is shipped with a mechanism at a named line: vault, scraper-store migration,
-plaintext-downgrade refusal, Qwen fallback, the single client and its privacy gate, and — in
-`providerRuntime.ts`, not the router — caching (`:138`/`:666-679`) and retry with exponential
-backoff (`:693-727`). The one gap: **provider health is an exported function nothing calls.**
-`getAiProviderHealth` (`:151`) has zero consumers outside its own module — no IPC channel, no
-preload binding, no renderer read — so a mis-keyed provider surfaces only as a failed request.
-See the ledger, "Tracks 1, 4, 5, 6 re-derived bullet-by-bullet" and its correction.
+**Re-counted 2026-08-24 — 5 of 5 finished (9 of 9 sub-items).** Everything is shipped with a
+mechanism at a named line: vault, scraper-store migration, plaintext-downgrade refusal, Qwen
+fallback, the single client and its privacy gate, and — in `providerRuntime.ts`, not the router —
+caching (`:138`/`:666-679`) and retry with exponential backoff (`:693-727`).
+
+**Correction to the 2026-08-20 checkpoint, which called provider health "an exported function
+nothing calls".** That gap closed at `687681bf`, dated 2026-08-19 — one day BEFORE the checkpoint
+was written, so the checkpoint was stale on the day it landed. The chain, re-derived against the
+tree: `getAiProviderHealthReport` → `mining.ts:2016` binds `ai:providerHealth` → `preload.ts:2122`
+→ `AgentWorkspaceShell.tsx:1633` holds it and `:1655`/`:2357` render `targetNeedsKey`, so a
+mis-keyed provider is named before a run spends a prompt. See the ledger, "main-v1 RE-COUNTED".
 
 ## Track 2: professional multilingual Lexicon Workbench
 
@@ -65,6 +68,27 @@ Complete and visually verify the AI language features:
 - Contextual Explain with nuance, similar-word distinctions, usage/register, collocations, learner mistakes, etymology, grammar, mnemonics, and graded examples.
 - Japanese particle and grammar analysis, Chinese classifier/measure-word and aspect guidance, Russian declension/aspect/case/agreement, and formality variants.
 - Streamed and cached answers, explanation-language selection, batch explanation, cost limits, and clear labels separating sourced material from AI-generated material.
+
+**Counted for the first time 2026-08-24 — 15 bullets: 15 of 15 finished** (14 at the start of
+that turn, and the fifteenth closed in it). Counted by resolving each bullet to a named module
+rather than by keyword: the eight importers under `dictionary/importers/` plus `yomitan.ts`;
+`dictService.ts`'s `fuzzy`/`reverse`/`via` union and `service.ts`'s source priority; the sixteen
+components under `components/lexicon/`; the ladder's own `lexiconInterlinear`/`lexiconExplain*`
+modules; and B5's nine sub-items as nine `shared/lexicon*.ts` files (`SensePin`, `Retranslate`,
+`Interlinear`, `RoundTrip`, `Composition`, `Harvest`, `Difficulty`, `Concordance`, plus the
+parallel-target resolver). "Virtualized results" is satisfied by construction — `dictService.ts:503`
+caps a query at 40 rows, so there is no long list to virtualize.
+
+The one bullet that was open was **find-in-the-wild**, and it was genuinely absent: `grep -li wild`
+over `src/` matched nothing in the dictionary or lexicon tree, and `lexiconConcordance.ts` covers
+subtitles alone and says in-source that its order "does not imply a relevance score". Closed
+2026-08-24 by `0e2c850b` / `45182c2e` / `85718979` / `e60a177a` — `shared/lexiconWild.ts`,
+`renderer/lexiconWildSearch.ts` and the Workbench panel. Measured live: **16 of 56 citations from
+2 of 6 source types**, subtitles 16 in 10 sources and examples 40 in 40, with **4 of 6 classes
+reporting `unavailable` and a named reason** so an unread corpus cannot pass as an empty one.
+Sense ranking is built and deliberately not driven: neither installed corpus attaches a sense to
+a citation. Full evidence and the duplicate-cue defect the live run found: the ledger entry
+"main-v1 RE-COUNTED, and Track 2's last open bullet ships".
 
 ## Track 3: one centralized AI Agent app
 

@@ -27766,3 +27766,53 @@ through `b9c4eea7` (alternate OCR swap) plus `dc760b38`/`0869bd89` (mixed-panel 
 guards). Bullet 8 closes through `80e72e51`, `4e7817ff`, `3ce6a412` and `2006027f` (retention,
 keyboard access, engine defaults, and scoped processing-location honesty). The plan is corrected
 without reopening those measured slices. Main V1 therefore advances to Track 6 / Liquid.
+
+## 2026-08-24 primary — main-v1 RE-COUNTED, and Track 2's last open bullet ships
+
+**The re-count the pin's RULE 1 asked for. 80 units, 61 done — 76 %, not the INHERITED 58 %.**
+Counted from each track's own bullets: T1 5/5, T2 14/15, T3 6/6, T4 9/9, T5 8/8, T6 3/7,
+T7 3/3, T8 0/7, T9 13/15 non-attended + 0/5 attended. The 19 open split three ways, and only
+**one** is agent-work on this plan: T6's 4 and T8's 7 are owned by `LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md`
+(plan 3), T9's 2 + 5 attended are external-blocked and already in `needs-user.md`, and the last
+one was Track 2's find-in-the-wild bullet — closed below.
+
+**Two corrections to the plan's own checkpoints, both re-derived against the tree.**
+1. **Track 1 is 5 of 5, not "4 finished + 1 partial".** The 2026-08-20 checkpoint's one gap —
+   "provider health is an exported function nothing calls" — closed at `687681bf` (2026-08-19,
+   one day BEFORE that checkpoint was written). Full chain: `mining.ts:2016` binds
+   `ai:providerHealth` → `preload.ts:2122` → `AgentWorkspaceShell.tsx:1633` reads it and
+   `:1655`/`:2357` render `targetNeedsKey`. Checkpoint text corrected.
+2. **Track 2 is 14 of 15**, counted by resolving each bullet to a named module: the 8 importers
+   under `dictionary/importers/` + `yomitan.ts`; `dictService.ts` `fuzzy`/`reverse`/`via` and
+   `service.ts`'s source priority; the 16 components under `components/lexicon/`; and B5's nine
+   sub-items are nine `shared/lexicon*.ts` modules. Virtualized results is satisfied by
+   construction — `dictService.ts:503` caps at 40 rows. The ONE gap: **`grep -li wild` over
+   `src/` returned nothing in the dictionary or lexicon tree**, and `lexiconConcordance.ts` is
+   subtitles-only and states in-source that it "does not imply a relevance score".
+
+**Slices — `0e2c850b`, `45182c2e`, `85718979`, `e60a177a`.** `shared/lexiconWild.ts` (ranking,
+6 source classes, honest `unavailable` reasons, offline cache policy) + `renderer/lexiconWildSearch.ts`
+(the two readable corpora) + the panel. Sense ranking is BUILT and deliberately not driven:
+neither corpus attaches a sense to a citation, so a sense control would be a knob with nothing
+behind it — recorded rather than hidden.
+
+**LIVE, one Dictionary window, query `猫が好きです。犬も好きですが、猫のほうがもっと好きです。`:**
+**16 of 56 citations, from 2 of 6 source types.** Subtitles **16 found in 10 sources**, examples
+**40 found in 40**. Bands really vary and really order: Common ×2, Wider, Rare ×12, then
+`猫にかつお節。` as **"No list ranks this line"**, LAST — the unranked rung fired on real data.
+**Negative control: 4 of 6 classes report `unavailable` with a named reason** ("This app cannot
+read this source yet"), so an unread corpus cannot pass as an empty one.
+
+**The live run found a defect no test would have.** Run 1 returned 16 rows of which **4 were the
+identical cue** `もっとも あの父親の元では…` from an opening, two endings and the episode that
+shares them — 4 real media ids, so all 4 were distinct under class+source+time+text. `e60a177a`
+adds a body key applied AFTER the sort. Re-run on the identical input: **duplicate bodies 4 → 0**,
+still 16 rows, three genuinely new subtitle lines took the freed slots, controls unchanged.
+
+**Traps.** (a) `i18n.test.ts`'s `toLocaleString` ratchet is a whole-repo file census — a bare call
+in a new panel is invisible to targeted runs and only the FULL suite catches it (`85718979`).
+(b) `lang` in `LexiconWorkbenchResults` is the PASSAGE's language; the interface's needs its own
+`useT()` binding. (c) The passage panels render only when `resolveLexiconInput` picks a non-lookup
+lens — `猫が好きです` with no `。` classifies as a word and the panel is genuinely absent.
+(d) The Write tool put five raw NUL bytes where `\0` was intended, which made `grep` call the
+module binary; only PowerShell repairs it.
