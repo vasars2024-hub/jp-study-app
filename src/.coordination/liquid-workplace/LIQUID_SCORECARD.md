@@ -44,10 +44,32 @@ Lowest category: <name> — <what was wrong> — <fixed in <hash> / open>
 
 ## Scorecards
 
-*None yet.* No Liquid surface has ever been scored. Per L0's gate, no Liquid product code
-exists to score; the existing `src/media/` player is CLAUDE.md's named architectural
-reference but is **not certified**, and "the player already exists and looks Liquid" is not
-evidence that L4 passed.
+*No completed scorecard yet* — but the paragraph that stood here ("no Liquid product code
+exists to score") is **stale and is corrected**, 2026-08-24. L2 built the primitives, L3
+shipped per-window presentation state and L5 adopted the contextual role on the Dictionary
+window, so Liquid product code exists and one surface is being scored category by category.
+`src/media/` remains CLAUDE.md's named architectural reference and remains **not certified**;
+"the player already exists and looks Liquid" is still not evidence that L4 passed.
+
+**In progress — Liquid Dictionary window.** An entry is written only when all eight categories
+sit on this one surface, so this is running state, not a score:
+
+| # | Category                       | State | Where the number lives |
+| - | ------------------------------ | ----- | ---------------------- |
+| 1 | Accessibility                  | 0 failing; not yet scored *as this surface* | `L1_ACCESSIBILITY.md` (`a70cbbed`) |
+| 2 | Clunkiness                     | **open** — 16 of 35 targets `(unlabelled)` → `gone` | `L1_CLUNKINESS.md` |
+| 3 | Liquid utilization             | 4 of 4 treated, 0 dense-on-translucent; re-drive owed at this tree | `L2_PRIMITIVES.md` (L5.2) |
+| 4 | Use of space                   | four numbers pass at three sizes; re-score owed on the fixing commit | `L1_USE_OF_SPACE.md` |
+| 5 | UI clarity                     | **10/10** — `cbb3506a` | `L1_UI_CLARITY.md` |
+| 6 | Feature parity + reversibility | **10/10** — `aaef2a84` | `L6_PARITY_DICTIONARY.md` |
+| 7 | Performance under real load    | **10/10** — `752daa00` | `L7_PERF_DICTIONARY.md` |
+| 8 | Honest states                  | **10/10** — `9d9e876c` | `L8_STATES.md`, `L8_DEAD_CONTROLS.md` |
+
+**Both points categories 5 and 8 gained on 2026-08-24 came from instrument defects, not from
+changes to the product** — a hardcoded Q9 verdict that reported a number nobody computed, and a
+clutter term that moved 12 points depending on whether a drawer happened to be open. That is
+the expected shape at this stage, and it is the argument for the rules above: each of this
+surface's scored categories was measured by a probe that had already produced one false answer.
 
 A first-pass 80/80 on any surface means the probe is broken, not that the surface is
 perfect.
