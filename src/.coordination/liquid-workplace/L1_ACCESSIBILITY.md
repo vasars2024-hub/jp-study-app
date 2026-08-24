@@ -561,3 +561,36 @@ Token restored to computed `32px` with no inline override, verified after each r
 **Hit targets: PASS.** Item (a) needed no product decision — nothing about the dense list has to
 change, and the 2026-08-22 boss-audit finding 3 (`×` at 16x18) should be re-measured with this
 probe before it is treated as a defect.
+
+## 2026-08-24 — reduced motion: the rubric names a tier the probe never measured
+
+**Item (b) is not a disagreement between the rubric and the app's design. It is the wrong tier.**
+The rubric's words are *"motion duration under `prefers-reduced-motion`"* — the OS query. The
+`0.14 s` figure came from toggling `html.reduce-motion`, which is the in-app Settings > Display
+*Reduced* control, a different tier that **halves** shared duration tokens by design
+(`theme/a11y.css:49-52`). Three tiers ship and only one of them is the one being scored:
+
+| tier | how it is reached | elements over 0.01 s on this surface |
+| ---- | ----------------- | ----------------------------------- |
+| none | as-shipped | **12**, longest `div.lq-contextual` **0.24 s** |
+| (b) `html.reduce-motion` | Settings > Display, *Reduced* | **2**, longest `button.btn` **0.14 s** |
+| (c) `[data-motion-mode='disabled']` | Settings > Display, *Disabled* | **0** |
+| **(a) `prefers-reduced-motion: reduce`** | **the OS** | **0** |
+
+**Tier (a) measured for the first time, and it needed a relaunch.** `matchMedia` is read-only and
+the previous probe said outright that emulating the OS setting "needs CDP". It does not: Chromium
+takes `--force-prefers-reduced-motion`, and electron-forge passes it through —
+`npx electron-forge start -- --force-prefers-reduced-motion`. Restart confirmed (`bridge.json`
+`started` 1787558670463 → 1787560357647, pid 7820 → 10564), flag confirmed by the probe's own
+`mqMatches: true`, and the surface re-driven to the same real state it was measured in before
+(食べる, **8 entries, 67 controls** — the identical population).
+
+**Control, red, on the same surface in the same state:** the same probe with `mqMatches: false`
+reports **12** over the bar with a `0.24 s` longest. 12 → 0 on the flag alone is the discrimination.
+Capture-patch-restore verified on all three axes (`classMatches`, `modeMatches`,
+`countMatchesBaseline`), so the two in-app tiers were toggled without being left behind.
+
+`button.btn` at `0.14 s` under tier (b) is `0.28 s` halved — the Reduced tier working exactly as
+documented, not an unhalved outlier. **Nothing was changed in the product for this.** New
+instrument: `probes/l1-motion-tiers.js`; `l1-reduced-motion.js` measures tier (b) only and its
+header now understates what is reachable.
