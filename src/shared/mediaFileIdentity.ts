@@ -134,13 +134,17 @@ const EPISODE_DASH = /\s-\s*(\d{1,3})(?:v\d)?(?=$|[\s([])/;
  * subs-only pipeline ends one step short of the player. It is a mainstream
  * fansub convention, not an exotic one.
  *
+ * The `-END` tail is the same convention's last episode — `… Ougon no Kaze
+ * 39-END (WEBRip …)` is how that uploader names episode 39, and without it the
+ * final episode of a season is the one file the rule cannot read.
+ *
  * The lookahead is the guard: the number must be the last token before a
  * bracket group, and that group must not be a bare year, so
  * `Mob Psycho 100 (2016)` is refused rather than read as episode 100. Two more
  * conditions live at the call site, because they are properties of the whole
  * name rather than of this position — see {@link parseMediaFileName}.
  */
-const EPISODE_TRAILING = /\s(\d{1,3})(?:v\d)?\s*(?=[[(](?!(?:19|20)\d{2}[\])]))/;
+const EPISODE_TRAILING = /\s(\d{1,3})(?:v\d)?(?:\s*-\s*(?:end|fin|final))?\s*(?=[[(](?!(?:19|20)\d{2}[\])]))/i;
 
 const KIND_MOVIE = /\b(movie|film|gekijouban|劇場版)\b/i;
 const KIND_OVA = /\b(ova|oad|oav)\b/i;

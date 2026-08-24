@@ -100,6 +100,11 @@ describe('parseMediaFileName', () => {
       kind: 'episode',
     });
     expect(parseMediaFileName('[Sub] Show 07 [1080p].mkv')).toMatchObject({ title: 'Show', episode: 7 });
+    // Same convention's last episode — without the `-END` tail the season finale
+    // is the one file in the batch the rule cannot read.
+    expect(parseMediaFileName(
+      '[Anime Land] JoJo no Kimyou na Bouken - Ougon no Kaze 39-END (WEBRip 720p Hi444PP AAC) RAW [DAB47203].mp4',
+    )).toMatchObject({ title: 'JoJo no Kimyou na Bouken - Ougon no Kaze', episode: 39 });
   });
 
   it('refuses the bare trailing number wherever it would be a guess', () => {
