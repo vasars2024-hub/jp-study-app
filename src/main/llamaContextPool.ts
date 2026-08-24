@@ -1,7 +1,9 @@
 import path from 'path';
 import type { LlamaContext, LlamaContextSequence, LlamaModel } from 'node-llama-cpp';
+import { disposeSharedLlama } from './llamaBackend';
 import {
   acquireLlamaModel,
+  disposeAllLlamaModels,
   MODEL_RELEASE_GRACE_MAX_MS,
   MODEL_RELEASE_GRACE_MS,
   type LlamaModelLease,
@@ -299,4 +301,42 @@ export async function disposeAllLlamaContexts(): Promise<void> {
   }));
   // Shutdown is not churn, and a test that left history behind would score the next one's backoff.
   churn.clear();
+}
+
+/**
+ * Tears the whole local-model runtime down at quit: contexts, then weights, then the backend.
+ *
+ * Measured 2026-08-24 (`L7_PERF_DICTIONARY.md`, leg 3, pid 3668): one burst of Dictionary controls
+ * takes main to 3,515.4 MB / 4,406 handles, and the idle path gives the KV cache and the weights
+ * back on its own deadlines. Quit does not wait for those deadlines, so before this the app could
+ * exit holding a 1,270 MB cache, 1,101 MB of weights and llama.cpp's thread pool, and relied
+ * entirely on process teardown to reclaim them. All three disposals existed and were documented
+ * "shutdown and tests only" — nothing in `src/main` had ever called them.
+ *
+ * Order is innermost-first and is load-bearing: a context outliving its model, or a model
+ * outliving the backend, reads freed native memory. Each step is awaited for that reason and each
+ * is individually fault-tolerant, so one native throw cannot strand the two after it.
+ *
+ * Synchronous by signature, like every other `stop*` in `main.ts`'s `will-quit`, and deliberately
+ * NOT awaited there: `will-quit` would have to `preventDefault()` to wait, and a native teardown
+ * that hangs would then hang the quit. Idempotent, so a second quit signal is free.
+ */
+let runtimeStopped = false;
+export function stopLlamaRuntime(): void {
+  if (runtimeStopped) return;
+  runtimeStopped = true;
+  void (async () => {
+    for (const step of [disposeAllLlamaContexts, disposeAllLlamaModels, disposeSharedLlama]) {
+      try {
+        await step();
+      } catch {
+        /* Best effort, as everywhere else that touches llama.cpp — and the next step still runs. */
+      }
+    }
+  })();
+}
+
+/** Test seam only: lets a suite drive `stopLlamaRuntime` more than once. */
+export function resetLlamaRuntimeStopForTests(): void {
+  runtimeStopped = false;
 }

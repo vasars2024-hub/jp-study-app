@@ -311,3 +311,63 @@ describe('llama context pool', () => {
     ]);
   });
 });
+
+/**
+ * `stopLlamaRuntime` — the quit path. All three disposals existed and were documented "shutdown
+ * and tests only", and nothing in `src/main` called any of them, so a quit inside either caller's
+ * 5-minute idle window exited holding the KV cache, the weights and llama.cpp's thread pool.
+ * Measured 2026-08-24, leg 3: 1,270 MB and 1,101 MB respectively, still resident 8 minutes in.
+ */
+describe('stopLlamaRuntime', () => {
+  beforeEach(() => {
+    contextPool.resetLlamaRuntimeStopForTests();
+  });
+
+  it('frees the cache, the weights and the backend, innermost first', async () => {
+    const lease = await contextPool.acquireLlamaContext(MODEL_A, 8_192);
+    expect(backend.isSharedLlamaLoaded()).toBe(true);
+
+    contextPool.stopLlamaRuntime();
+    await vi.waitFor(() => expect(backend.isSharedLlamaLoaded()).toBe(false));
+
+    // Order is the assertion, not just the membership: a context outliving its model, or a model
+    // outliving the backend, reads freed native memory.
+    expect(disposed).toEqual(['sequence', 'context', 'model']);
+    expect(contextPool.llamaContextPoolStats()).toEqual([]);
+    expect(modelPool.llamaModelPoolStats()).toEqual([]);
+
+    // The holder is still out there. Its release must not double-free — the same rule the
+    // shutdown-eviction case above proves for `disposeAllLlamaContexts`.
+    await lease.release();
+    expect(disposed).toEqual(['sequence', 'context', 'model']);
+  });
+
+  it('is idempotent, so a second quit signal disposes nothing twice', async () => {
+    await (await contextPool.acquireLlamaContext(MODEL_A, 8_192)).release();
+
+    contextPool.stopLlamaRuntime();
+    contextPool.stopLlamaRuntime();
+    await vi.waitFor(() => expect(backend.isSharedLlamaLoaded()).toBe(false));
+
+    expect(disposed).toEqual(['sequence', 'context', 'model']);
+  });
+
+  /**
+   * MUTATION CONTROL. The two tests above pass against a `stopLlamaRuntime` that stops at the
+   * first step, because `disposeAllLlamaContexts` already releases the model lease and the model
+   * pool then arms its own grace timer. Only the backend distinguishes them, and only when a
+   * step before it throws — which is exactly the case the per-step `catch` exists for.
+   */
+  it('still reaches the backend when an earlier step throws', async () => {
+    await contextPool.acquireLlamaContext(MODEL_A, 8_192);
+    const boom = vi
+      .spyOn(modelPool, 'disposeAllLlamaModels')
+      .mockRejectedValueOnce(new Error('native teardown refused'));
+
+    contextPool.stopLlamaRuntime();
+    await vi.waitFor(() => expect(backend.isSharedLlamaLoaded()).toBe(false));
+
+    expect(boom).toHaveBeenCalledTimes(1);
+    boom.mockRestore();
+  });
+});
