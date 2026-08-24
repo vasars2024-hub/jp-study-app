@@ -129,6 +129,7 @@ export default function ReaderCollectionPanel({
   const [txStatus, setTxStatus] = useState<TxStatus>('idle');
   const [txMsg, setTxMsg] = useState('');
   const txReqRef = useRef(0);
+  const offModelRef = useRef<(() => void) | null>(null);
   const addSeqRef = useRef(0);
   const listRef = useRef<HTMLUListElement>(null);
   const [flashId, setFlashId] = useState<string | null>(null);
@@ -169,7 +170,10 @@ export default function ReaderCollectionPanel({
     const id = ++txReqRef.current;
     setTxStatus('loading');
     setTxMsg('Loading translator…');
-    onModelProgress((p) => {
+    // Per-subscription, so a Translate view or a sentence popup loading the same model at the
+    // same time keeps its own progress. This used to be one global slot.
+    offModelRef.current?.();
+    offModelRef.current = onModelProgress((p) => {
       if (id !== txReqRef.current) return;
       if (p.status === 'progress' && typeof p.progress === 'number') {
         setTxMsg(`Loading model… ${Math.round(p.progress)}%`);
@@ -191,7 +195,10 @@ export default function ReaderCollectionPanel({
       setTxMsg(e instanceof Error ? e.message : String(e));
       return '';
     } finally {
-      if (id === txReqRef.current) onModelProgress(null);
+      if (id === txReqRef.current) {
+        offModelRef.current?.();
+        offModelRef.current = null;
+      }
     }
   }, []);
 
@@ -474,7 +481,8 @@ export default function ReaderCollectionPanel({
 
   const closeEdit = useCallback(() => {
     txReqRef.current++;
-    onModelProgress(null);
+    offModelRef.current?.();
+    offModelRef.current = null;
     setEdit(null);
     setTxStatus('idle');
     setTxMsg('');

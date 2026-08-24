@@ -53,6 +53,35 @@ async function ev(js) {
   }
 }
 
+/**
+ * The pool's own answer to "are the weights still in this process right now".
+ *
+ * Added 2026-08-24 after the first run's headline number was uninterpretable. `translate:status`
+ * reports the TRANSLATE MODULE's readiness, which goes false the moment its 5-minute idle timer
+ * fires — but the weights outlive that by the pool's grace window, and the grace now doubles per
+ * churned reload. So cycle 1 (grace 60 s, disposed at +360 s) and cycle 2 (grace 120 s, disposed
+ * at +420 s) are sampled at the same +390 s and are in OPPOSITE residency states. Subtracting them
+ * measures the sampling point, not the fix. `/mem` reports `llamaModelPoolStats()` since
+ * `b4e4113b`; reading it here is what turns each row into a fact.
+ */
+async function poolState() {
+  const r = await fetch(`http://127.0.0.1:${cfg.port}/mem`, {
+    headers: { Authorization: `Bearer ${cfg.token}` },
+  });
+  const t = await r.json();
+  // Top level, not nested — and `/mem` only runs a GC when the body says `gc:true`, so a bare GET
+  // observes without perturbing the very number being sampled.
+  const models = t?.llamaModels ?? null;
+  if (!Array.isArray(models)) return { poolResident: null, poolLeases: null, poolGraceMs: null, poolAwaiting: null };
+  const resident = models.filter((m) => m.resident);
+  return {
+    poolResident: resident.length,
+    poolLeases: models.reduce((n, m) => n + (m.leases || 0), 0),
+    poolGraceMs: models.length ? models[0].graceMs : null,
+    poolAwaiting: models.filter((m) => m.awaitingRelease).length,
+  };
+}
+
 /** Verbatim from `l7g-membisect2.cjs` — private bytes and handles off the live process. */
 function sample() {
   const out = execFileSync('powershell', [
@@ -85,10 +114,12 @@ async function status() {
 const rows = [];
 async function mark(label, extra) {
   const m = sample();
+  const pool = await poolState();
   const prev = rows.length ? rows[rows.length - 1] : null;
   const row = {
     label,
     ...m,
+    ...pool,
     dPriv: prev ? Number((m.privMB - prev.privMB).toFixed(1)) : 0,
     dHandles: prev ? m.handles - prev.handles : 0,
     at: new Date().toISOString(),
@@ -98,6 +129,7 @@ async function mark(label, extra) {
   console.log(
     `${String(label).padEnd(34)} priv ${String(row.privMB).padStart(9)} MB (${row.dPriv >= 0 ? '+' : ''}${row.dPriv})  ` +
     `handles ${String(row.handles).padStart(6)} (${row.dHandles >= 0 ? '+' : ''}${row.dHandles})` +
+    `  poolResident=${row.poolResident} grace=${row.poolGraceMs}` +
     (extra && extra.ready !== undefined ? `  ready=${extra.ready}` : ''),
   );
   return row;
@@ -141,6 +173,12 @@ async function main() {
       plateauHandles: plateau.handles,
       settledPrivMB: settled.privMB,
       settledHandles: settled.handles,
+      // Without these two a settled row cannot be compared with any other settled row.
+      settledPoolResident: settled.poolResident,
+      settledGraceMs: settled.poolGraceMs,
+      // Did this cycle load at all? A reacquire inside the grace window is a cache hit and costs
+      // nothing — which is the fix working, not a cycle that failed to run.
+      loadedFromCold: plateau.dHandles > 500,
     });
   }
 
@@ -158,12 +196,27 @@ async function main() {
     privAddedByCycle2MB: cycles.length > 1
       ? Number((cycles[1].settledPrivMB - cycles[0].settledPrivMB).toFixed(1))
       : null,
+    /**
+     * The comparison that is actually sound: handles added at each cycle's PLATEAU, which is the
+     * same residency state every time (weights in, lease held). `handlesAddedByCycle2` above
+     * compares settled rows in different residency states and is retained only because the
+     * pre-fix table it is scored against was collected that way.
+     */
+    plateauDeltas: cycles.slice(1).map((cy, i) => ({
+      cycle: cy.cycle,
+      vsPrevPlateauHandles: cy.plateauHandles - cycles[i].plateauHandles,
+      vsPrevPlateauPrivMB: Number((cy.plateauPrivMB - cycles[i].plateauPrivMB).toFixed(1)),
+      loadedFromCold: cy.loadedFromCold,
+    })),
     beforeFix: { bootHandles: 1052, cycle1Handles: 4378, cycle2Handles: 6811, perCycle: 2425 },
     rows,
   };
   fs.writeFileSync(OUT, JSON.stringify(verdict, null, 2));
   console.log(`\nidle control flat: ${verdict.idleControlFlat} (Δpriv ${verdict.idleDeltaPrivMB} MB, Δhandles ${verdict.idleDeltaHandles})`);
   console.log(`cycle 2 added: ${verdict.handlesAddedByCycle2} handles, ${verdict.privAddedByCycle2MB} MB (before the fix: +2,433)`);
+  for (const d of verdict.plateauDeltas) {
+    console.log(`plateau ${d.cycle} vs ${d.cycle - 1}: ${d.vsPrevPlateauHandles >= 0 ? '+' : ''}${d.vsPrevPlateauHandles} handles, ${d.vsPrevPlateauPrivMB} MB, loadedFromCold=${d.loadedFromCold}`);
+  }
   console.log(`wrote ${OUT}`);
 }
 

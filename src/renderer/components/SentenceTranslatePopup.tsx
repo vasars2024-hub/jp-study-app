@@ -25,6 +25,7 @@ export default function SentenceTranslatePopup({ text, onClose }: Props) {
   const [error, setError] = useState('');
   const [targetLang, setTargetLangState] = useState(getTargetLang);
   const reqRef = useRef(0);
+  const offModelRef = useRef<(() => void) | null>(null);
 
   // Docked at the bottom-center of the window so it is always fully visible.
   // Anchoring to the selection was unreliable inside the zoomable, vertical
@@ -45,7 +46,11 @@ export default function SentenceTranslatePopup({ text, onClose }: Props) {
     setError('');
     setOutput('');
     setMsg('Preparing translator…');
-    onModelProgress((p) => {
+    // Unsubscribes only this popup. It used to clear the one global slot, which stopped the
+    // Translate view's and the reader's progress mid-load.
+    offModelRef.current?.();
+    offModelRef.current = onModelProgress((p) => {
+      if (id !== reqRef.current) return;
       if (p.status === 'progress' && typeof p.progress === 'number') {
         setMsg(`Loading model… ${Math.round(p.progress)}%`);
       }
@@ -67,14 +72,18 @@ export default function SentenceTranslatePopup({ text, onClose }: Props) {
         setError(e instanceof Error ? e.message : String(e));
         setState('error');
       })
-      .finally(() => onModelProgress(null));
+      .finally(() => {
+        offModelRef.current?.();
+        offModelRef.current = null;
+      });
   }
 
   useEffect(() => {
     run();
     return () => {
       reqRef.current++; // ignore any in-flight result after unmount
-      onModelProgress(null);
+      offModelRef.current?.();
+      offModelRef.current = null;
     };
   }, [text, targetLang]);
 

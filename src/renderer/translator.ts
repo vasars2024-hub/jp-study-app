@@ -15,23 +15,46 @@ export type TranslateLang = 'ja' | 'zh';
 export type TransLang = string;
 
 let nextId = 1;
-let modelProgressCb: ((p: ModelProgress) => void) | null = null;
 let modelProgressHooked = false;
+const modelProgressListeners = new Set<(p: ModelProgress) => void>();
 const partialListeners = new Set<(p: { id: number; progress: number }) => void>();
 
 function ensureIpcHooks(): void {
   if (modelProgressHooked) return;
   modelProgressHooked = true;
-  window.api.onTranslateModelProgress((p) => modelProgressCb?.(p));
+  window.api.onTranslateModelProgress((p) => {
+    // Copied before iterating: a listener that unsubscribes itself on `ready` mutates this set
+    // mid-broadcast, and the next listener would be skipped.
+    for (const cb of [...modelProgressListeners]) cb(p);
+  });
   window.api.onTranslatePartial((p) => {
     for (const cb of partialListeners) cb(p);
   });
 }
 
-/** Register a callback for model-load progress (first use only). */
-export function onModelProgress(cb: ((p: ModelProgress) => void) | null): void {
+/**
+ * Subscribe to model-load progress. Returns the unsubscribe.
+ *
+ * This was ONE global slot until 2026-08-24, and the single slot was a real defect on a surface
+ * where two consumers coexist: the Translate view, `SentenceTranslatePopup` and
+ * `ReaderCollectionPanel` all register while a 15 s Qwen3 load is in flight. Whoever registered
+ * last took the progress away from the others, and the first one to finish called
+ * `onModelProgress(null)` and took it away from everyone — including a load still running, which
+ * then sat at a frozen "Loading model…" with no percentage. `DictionaryResults.tsx` had already
+ * routed around it by subscribing to the preload binding directly, with a comment naming this
+ * exact hazard; the fix belongs here instead, so no further caller has to know.
+ *
+ * Same shape as `partialListeners` two lines up, which was always a Set.
+ */
+export function onModelProgress(cb: (p: ModelProgress) => void): () => void {
   ensureIpcHooks();
-  modelProgressCb = cb;
+  modelProgressListeners.add(cb);
+  let off = false;
+  return () => {
+    if (off) return;
+    off = true;
+    modelProgressListeners.delete(cb);
+  };
 }
 
 /** Translate Japanese/Chinese → English offline. `onProgress` reports 0..1 per sentence. */

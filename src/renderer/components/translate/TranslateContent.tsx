@@ -89,8 +89,12 @@ export function useTranslate(): TranslateController {
   const [error, setError] = useState('');
   const [history, setHistory] = useState<TranslationHistoryEntry[]>(() => loadTranslationHistory());
   const startedRef = useRef(false);
+  const offModelRef = useRef<(() => void) | null>(null);
 
-  useEffect(() => () => onModelProgress(null), []);
+  useEffect(() => () => {
+    offModelRef.current?.();
+    offModelRef.current = null;
+  }, []);
   useEffect(() => onTranslationHistoryChanged(() => setHistory(loadTranslationHistory())), []);
 
   useEffect(() => {
@@ -133,7 +137,9 @@ export function useTranslate(): TranslateController {
     setMsg(t('translate.msg.loadingModel'));
     startedRef.current = false;
 
-    onModelProgress((p) => {
+    // Drops only this view's subscription, not the popup's or the reader's.
+    offModelRef.current?.();
+    offModelRef.current = onModelProgress((p) => {
       if (p.status === 'progress' && typeof p.progress === 'number') {
         const f = typeof p.file === 'string' ? p.file.split('/').pop() : 'model';
         setMsg(t('translate.msg.loadingFile', { file: f, pct: Math.round(p.progress) }));
@@ -169,7 +175,8 @@ export function useTranslate(): TranslateController {
       setError(e instanceof Error ? e.message : String(e));
       setState('error');
     } finally {
-      onModelProgress(null);
+      offModelRef.current?.();
+      offModelRef.current = null;
     }
   }, [input, source, target, t]);
 
