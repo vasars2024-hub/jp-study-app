@@ -381,3 +381,24 @@ gate needs 80/80 on TWO surfaces. Dictionary went from "5 categories stale, 1 fa
 a product fix (`424eb46f`), and it is still zero gates. The remaining lever on category 7 is a
 utility-process move for llama.cpp; until that lands, Dictionary cannot reach 80/80, and Video has
 never been scored at all. The 0.333/day rate already prices turns like this one in.
+
+2026-08-24 | liquid | units done this turn: 0 | units left: 10 | basis: the 13 `Gate:` lines in section 11 of src/LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md (`grep -c 'Gate:'` = 13 this turn), 3 closed (L0/L2/L3) re-derived last turn and unchanged in the tree since; L1's gate at line 461 is the one this turn worked and it is still open | projected finish: 2026-09-23
+
+**Zero gates again, and the honest reading is that the rate is now three turns old rather than
+wrong.** 0.333 gates/day over 2 workers, 10 left, is 30 days → **2026-09-23**, a ~22-day slip
+against the 2026-09-01 target. Stated, not descoped. main-v1 contributes 0
+(complete-except-external, 61 of 80) and mal-pipeline is 34 of 34, so liquid alone is the
+programme's date.
+
+**What moved inside gate 461.** Category 7's blocker is GONE as a product matter, not deferred:
+llama.cpp now runs in a `jp-llama-host` utility process (`e0c47a1e`, `ff1c1fc4`), and a whole
+load/unload cycle costs main **−5.2 MB and −2 handles** where leg 3 left **+534.6 MB / +3,349**.
+Main sits at 423–425 MB across two complete cycles, BELOW the 550–577 MB L0 band, and answered
+**38,234 `/health` probes during a 10.5 s GGUF load with a 24 ms longest gap** against a 500 ms
+threshold — with a negative control (5 forced GCs → 216 ms) proving the sampler can see a stall.
+
+**Why that is still 0 gates, and it is a real remainder rather than bookkeeping.** Category 7's 10
+needs five numbers and this turn re-drove two. Drag frame stability, resize, theme-switch cost and
+boot cost were NOT re-measured on this boot, so the category is scored on what was measured and no
+more. Video has never been scored at all, and L1's gate needs both surfaces. The 0.333/day rate
+already prices turns like this one.
