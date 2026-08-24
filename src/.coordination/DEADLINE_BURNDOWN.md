@@ -305,3 +305,27 @@ Why zero gates closed this turn despite three product commits: L1's gate is 80/8
 reference apps and the Dictionary surface's category 7 is capped by a real defect. This turn
 halved that defect (D2: +2,433 handles/cycle → +1,212) rather than closing it, so the gate did
 not move. Product landed: `fb4d59aa`, `1c874da9`, `ebc88b40`.
+
+2026-08-24 | liquid | units done this turn: 0 | units left: INHERITED 10 | basis: the 13 `Gate:` lines in section 11 of src/LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md re-grepped this turn and still 13; WHICH three are closed (L0, L2, L3) is inherited from the 2026-08-24 backup turn and was NOT re-derived here | projected finish: 2026-09-23
+
+**Zero gates again, and the honest reason.** L1's gate is 80/80 on Video *and* Dictionary, and
+Dictionary is capped by category 7 leg 3. This turn landed four product commits at that cap
+(`3729e45c`, `7af7f8db`, `b4e4113b`, `45cb990d`) and re-drove the measurement — and the headline
+number **did not move**: cycle 2 cost +1,221 handles against the pre-fix +1,212. That is reported
+as a non-improvement rather than dressed up. `L7_PERF_DICTIONARY.md` carries the arithmetic for
+why (the probe's 390 s inter-cycle gap is longer than the 60 s base grace, so it measures the
+unfixed path by construction) and the falsifiable prediction that cycle 3 costs ≈0.
+
+**Rate, recomputed rather than carried.** Liquid's three closures all landed 2026-08-17. Over its
+whole life — 2026-08-16 to 2026-08-24, 9 days, 2 workers — that is **3 gates, 0.333/day**. Ten
+gates ÷ 0.333 = **30 days → 2026-09-23**, a one-day slip on the previous turn's 09-20 because
+this turn added a day and no gate. main-v1 contributes 0 (complete-except-external /
+complete-except-Liquid, re-counted 61 of 80 units at 15:52) and mal-pipeline is 34 of 34, so
+**liquid alone is the programme's remaining load and 2026-09-23 is the programme's projected
+finish** against the 2026-09-01 target — a **~22-day slip**. Stated, not descoped.
+
+**The rate is being dragged by one structural fact worth naming for whoever reads this next:**
+L1's gate needs 80/80 on *two* reference apps and only one has ever been scored, so the single
+open gate nearest to closing is worth roughly two surfaces of work. Nothing here proposes cutting
+it — but a burn-down that counts L1 as one unit is understating it, and that is why the projection
+should be read as a floor.

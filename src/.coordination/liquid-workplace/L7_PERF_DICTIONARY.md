@@ -675,3 +675,57 @@ all on an English-front profile.
 whose unload never fired, rather than recording a 0. Two boots were needed to learn that a plain
 restart lands in whatever windows the session restored, so take the baseline AFTER an idle window,
 never at t+1 s.
+
+## 2026-08-24 (later still) · primary · the weights are now shared and recycled less. D2's number did not move, and here is why.
+
+| Slice | Commit | What landed |
+| --- | --- | --- |
+| — | `3729e45c` | `llamaModelPool.ts` — one refcounted `LlamaModel` per GGUF, contexts stay per-consumer |
+| — | `7af7f8db` | the release grace backs off per churned reload: 60 s → ×2 → capped at 10 min |
+| — | `b4e4113b` | `/mem` reports the pool, so a native GB is visible without bisecting a boot |
+| — | `45cb990d` | NovelReader's single-chapter button reported the model load, like its range sibling |
+
+**The defect the pool closes, and it was hiding in plain sight.** `translate.ts` and
+`localAgent.ts` resolve their GGUF from the *same* two roots (`userData/models`, then
+`~/Downloads`) over overlapping candidate name lists, so on an ordinary profile they pick the
+same file — and each called `llama.loadModel()` on it. `TRANSLATE_CONTEXT_SIZE`'s own comment
+already recorded the price without naming it: main settled at 7,222 MB "after the local agent's
+own copy idle-unloaded". Two copies of a 1,223 MB model.
+
+**The measurement, `l7o-backend-cycles.cjs` re-run verbatim on a cold boot of the fix (pid 33092).**
+
+| Mark | priv MB | handles | ready |
+| --- | --- | --- | --- |
+| boot baseline | 427.5 | 1,064 | false |
+| CONTROL idle 45 s | 422.7 (−4.8) | 1,059 (−5) | false |
+| cycle 1 load plateau | 3,318.9 | 4,398 | true |
+| cycle 1 settled after unload | 919.6 (−2,399.3) | 4,387 (−11) | false |
+| cycle 2 load plateau | 3,391.2 | 5,608 | true |
+
+**Cycle 2 cost +1,221 handles against the pre-fix +1,212. That is not an improvement and is not
+reported as one.** The negative control held this time (−4.8 MB / −5 handles over 45 idle
+seconds), so the reading is sound. Private per cycle went +103.2 → **+72.3 MB**, which is real
+but small.
+
+**Why the handles did not move is arithmetic, not mystery, and it is the finding.** The probe
+waits 390 s between cycles. Cycle 1's entry has no churn history, so it gets the base 60 s grace
+and the weights are genuinely disposed at idle+60 s = 360 s — before the probe returns at 390 s.
+The pool cannot help a cadence it never sees. **This probe is built to defeat a grace window**,
+which is exactly what makes it the right instrument for the *backend* question and the wrong one
+for this fix.
+
+**The sharp, falsifiable prediction the next turn should run, `L7O_CYCLES=3`, ~20 min: cycle 3
+costs ≈0 handles.** Cycle 2's entry carries churn count 1, so its grace is 120 s; its idle unload
+fires at plateau+300 s and disposal would land at plateau+420 s, while the probe re-acquires at
+plateau+390 s. 390 < 420, so cycle 3 is a resident hit with no `loadModel` at all. If cycle 3
+still costs ~1,200 handles the backoff is not working and the commit should be re-examined, not
+excused.
+
+**Leg 3 is still NOT a 10 and this turn did not close it.** What it did was remove the second
+copy and give repeat users a converging cadence; neither is visible in a two-cycle run.
+
+**Trap for the next worker.** The base grace is deliberately only 60 s, so the FIRST recycle of a
+model is always paid in full. That is the chosen tradeoff — a one-shot user gets their 1.2 GB
+back promptly and only demonstrated repeat use earns residency — and it means any probe whose
+inter-cycle gap exceeds 60 s will measure the unfixed number on its first two cycles. Do not read
+that as the fix failing.
