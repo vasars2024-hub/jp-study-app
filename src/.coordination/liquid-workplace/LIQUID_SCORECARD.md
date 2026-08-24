@@ -51,14 +51,27 @@ window, so Liquid product code exists and one surface is being scored category b
 `src/media/` remains CLAUDE.md's named architectural reference and remains **not certified**;
 "the player already exists and looks Liquid" is still not evidence that L4 passed.
 
+**All eight categories now hold a 10 on the Liquid Dictionary window — and there is still no
+completed entry, deliberately.** The rubric's own rule decides it: *"Re-score after the fix, not
+before. The commit that fixes a category carries the new measurement; a score inherited across a
+change is stale by definition."* Categories **2, 5, 6, 7 and 8** were each measured on an earlier
+tree, and the tree has moved since — `e4de125b` changed `liquid-tokens.css`, this turn's
+category-4 slice changed `conjugationTable.css`. A scorecard assembled from five inherited
+scores and three fresh ones is exactly the false pass the rules exist to prevent.
+
+**What the completed entry needs, and it is the next slice:** re-drive **2, 5, 6, 7, 8** on the
+current tree, each with its own control failing in that session, then write one entry carrying
+all eight numbers and the commit. Category 7 is the cheap one — its restart requirement is
+already satisfied (`bridge.json` `started` 1787560481897, pid 22560, this turn).
+
 **In progress — Liquid Dictionary window.** An entry is written only when all eight categories
-sit on this one surface, so this is running state, not a score:
+sit on this one surface *at one tree*, so this is running state, not a score:
 
 | # | Category                       | State | Where the number lives |
 | - | ------------------------------ | ----- | ---------------------- |
 | 1 | Accessibility                  | **10/10** — `41ba85b7` | `L1_ACCESSIBILITY.md` |
 | 2 | Clunkiness                     | **10/10** — `7cdc34b4` | `L1_CLUNKINESS.md` |
-| 3 | Liquid utilization             | 4 of 4 treated, 0 dense-on-translucent; re-drive owed at this tree | `L2_PRIMITIVES.md` (L5.2) |
+| 3 | Liquid utilization             | **10/10** — this commit | `L1_SURFACE_ROLES.md` |
 | 4 | Use of space                   | **10/10** — this commit | `L1_USE_OF_SPACE.md` |
 | 5 | UI clarity                     | **10/10** — `cbb3506a` | `L1_UI_CLARITY.md` |
 | 6 | Feature parity + reversibility | **10/10** — `aaef2a84` | `L6_PARITY_DICTIONARY.md` |

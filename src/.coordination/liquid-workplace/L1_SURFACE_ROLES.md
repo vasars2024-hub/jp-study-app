@@ -85,3 +85,46 @@ opaque under the grid.
 **Not settled, and not to be inferred from this.** This is one of eight categories. No surface
 is scored here and `LIQUID_SCORECARD.md` stays empty — a category measured in isolation is not a
 score, and the rubric's `80/80` is not reachable until categories 1, 2, 4–8 are driven too.
+
+## 2026-08-24 — category 3 SCORES 10, once the sections were actually populated
+
+**The 4-of-9 that stood here was an empty-harness reading**, and the rubric caps such a
+category at 0 rather than scoring it. `details.lexicon-{compounds,collocations,examples,
+neighbors}` and `div.dict-examples` each hold nothing until their own Run/reveal control is
+used, so the classifier saw a small header with one focusable and called them
+Liquid-eligible. `dictionaryLiquidRegions.test.tsx` already recorded the right decision —
+they are disclosure containers holding dense reading content, so they stay opaque — but as
+an inference from collapsed geometry. This measures it.
+
+**Driven, not assumed.** Clicked all four Run buttons (`window.api.dictCompounds` and
+siblings — local index scans, read-only, transient state) and the *Example sentences*
+reveal, on 食べる / 8 entries:
+
+| region | before | after |
+| ------ | ------ | ----- |
+| `details.lexicon-compounds` | eligible | **Work** (5 li) |
+| `details.lexicon-examples` | eligible | **Work** (8 li) |
+| `details.lexicon-neighbors` | eligible | **Work** (12 li) |
+| `details.lexicon-collocations` | eligible | **Work** (honest empty result) |
+| `div.dict-examples` | eligible, `text=17` | **Work**, `text=566`, 6 li, 12 focusables |
+
+`byRole` moved `Work` **7 → 12**, `Liquid-eligible` **9 → 4**.
+
+**The three rubric numbers, live, forest-night, liquid, 820x580:**
+
+| number | value | bar |
+| ------ | ----- | --- |
+| dense-work regions on translucent material | **0** of 12 Work regions | must be 0 |
+| contextual regions Liquid-treated | **4 of 4** eligible | — |
+| shared primitive vs local re-implementation | 3 of 4 carry `.lq-contextual` itself; `div.dict-saved-searches-head` inherits its material from its `.lq-contextual` parent — **0** local re-implementations | 0 |
+| Liquid motion that decorates | **0** infinite animations, **0** non-spatial transitions across the whole surface; the three `.lq-contextual` regions animate `opacity, transform` only (0.24 s / 0.14 s) | 0 |
+
+**Control, red:** `.lq-contextual` forced onto five dense-work regions
+(`dict-entries`, `lexicon-conjugation`, `lexicon-etymology`, `dict-examples`,
+`lexicon-notes-controls`) took `denseWorkOnTranslucent` **0 → 5**, each named with its own
+backing chain (`alpha 0.72 on …`). Removed; back to **0**, `[data-ctl3]` count 0. That is the
+rubric's "a deliberately all-glass surface must score low" control, and it fails as required.
+
+**Category 3: 10/10.** The universal-glass failure mode this category exists to catch is
+absent, and the selectivity is real rather than accidental: the twelve dense-work regions are
+opaque and the four contextual ones are not.
