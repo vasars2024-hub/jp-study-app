@@ -119,3 +119,24 @@ needs its pair: the OVA is MAL's own "Date A Live II Episode 11" and jimaku 2823
 only, so JoJo Part 5 (39 .ass on disk) is the pair and it needs one episode's VIDEO. That is one
 named, sized transfer over a public swarm whose duration no rate divides into, so the projection
 stays UNKNOWN rather than taking a flattering date. Gate 34 is ~15 min once 31 resolves.
+
+2026-08-24 | mal-pipeline | units done this turn: 0 | units left: 2 | basis: the gate tables in src/MAL_ANIME_PIPELINE_PLAN.md, re-counted this turn (open: 31, 34; gate 29's HALF OPEN table row is stale prose — its own 2026-08-16 "GATE 29 CLOSES" entry closes it) | projected finish: 2026-08-25
+No gate closed, and for the first time the reason is a stopwatch rather than an unknown. Gate 31's
+transfer is NAMED, SIZED and RUNNING: [Anime Land] JoJo no Kimyou na Bouken - Ougon no Kaze 38
+(WEBRip 720p Hi444PP AAC) RAW [A95B628C].mp4, 541,379,789 B, 13 seeders, the smallest of 11 rows
+(the other four candidates are 12-64 GB batches). scraperQbitSend -> sent 1 / skipped 0 / failed 0.
+At turn end 8.9%, 2 of 13 seeds connected, ETA ~85 min; qBittorrent keeps downloading between
+turns, so this costs wall clock and not agent hours. Product code landed: 27564082, and it is the
+reason this turn was not wasted waiting. parseMediaFileName read that exact release as
+episode: null with 38 welded onto the title, so planSubtitleAttach would have skipped the
+harvested episode-38 cues as no-match -- the pipeline would have downloaded an episode it could
+not pair. Fixed and measured live: 0 pairs -> 1 pair. Also measured, on the file the player will
+actually mount rather than on episode 01: 36,543 raw cues -> 712 kept, JOJO5_textch gone,
+JOJO5_textjp kept, 99.2% of the kana retained, 1 cue on screen at t=667.59 s instead of 2.
+Rate for the projection: this plan has closed 32 gates since 2026-08-15 across ~9 productive days
+at 2 workers, i.e. ~3.6 gates/day, but the two that remain are not average gates -- 31 is one
+swarm plus ~15 agent-minutes and 34 is ~15 agent-minutes. 2 / 3.6 = under a day, so the field above
+is 2026-08-25 -- that is the arithmetic and it is not padded. The risk it does NOT price, stated
+here rather than hidden in the number: gate 31 has been re-opened five times by candidates that
+did not deliver, and if this swarm stalls the same way, the projection moves out by however long
+the next candidate takes. That would be a slip to report, not a date to pre-book now.

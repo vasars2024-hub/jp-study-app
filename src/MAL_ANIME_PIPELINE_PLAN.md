@@ -2650,3 +2650,44 @@ parent-title fallback from `9dc2b8ca` works live — jimaku entry **2823**, **10
 are **S02E01–E10** only. There is no episode-11 track, so attaching E01 to it would put unrelated
 cues on screen. Not done. **Next turn opens on JoJo Part 5**: MAL 37991, 39 `.tc_jp.ass` already on
 disk, needing one episode's video named and sized before the transfer.
+
+## 2026-08-24 — the transfer is named and running, and the episode it will land had no episode number
+
+Worker `primary`. Commit `27564082`. Probes `debug/g31t-jojo.cjs`, `debug/g31t-pairdry.cjs`,
+`debug/g31t-ep38filter.cjs` (untracked; `debug/` is gitignored). **Gate 31 stays 32 of 34**
+(open: 31, 34), counted from this file's gate tables plus gate 29's own closing entry at the
+2026-08-16 "GATE 29 CLOSES" heading — the P6 table row still reads HALF OPEN and is stale prose.
+
+**The transfer, named and sized before it started, as the standing user condition requires.**
+`scraperSearchTorrents` on MAL 37991 → **11 rows**, `minSeeders 3`, indexer `nyaa`. Seven are
+single episodes; the other four are batches of **12,083 / 18,944 / 50,074 / 64,307 MB**. Smallest
+healthy candidate, which is the condition: **`[Anime Land] JoJo no Kimyou na Bouken - Ougon no
+Kaze 38 (WEBRip 720p Hi444PP AAC) RAW [A95B628C].mp4`, 541,379,789 B, 13 seeders**, hash
+`b2a01c2e…`. `scraperQbitSend` → **sent 1, skipped 0, failed 0**; the daemon has it `downloading`
+in category `jp-study`. At turn end: **7.8 %, 42,205,184 B, 2 of 13 seeds connected, ETA ~85 min.**
+The swarm is the whole cost — it keeps running between turns.
+
+**THE DEFECT, found before the bytes landed rather than after.** `parseMediaFileName` read that
+release as **`episode: null`** with `38` welded onto the title, so `planSubtitleAttach` skipped the
+harvested episode-38 cues as **`no-match`** — the series check passed on all three forms and the
+subtitle's own episode parsed as 38, but the *target* had no episode at all. The pipeline would
+have downloaded an episode it could not pair, one step past last turn's "could never open".
+`EPISODE_TRAILING` reads the bare number between title and tag block, and refuses three ways: the
+following bracket must not be a bare year (`Mob Psycho 100 (2016)`), a leading `[Group]` is
+required, and an OVA/creditless/special never reaches it — that last is the collision that already
+cost two files of a 26-file harvest. Live through the app's own module graph, before → after:
+`null` → **38**, title `… Ougon no Kaze 38` → `… Ougon no Kaze`, plan **0 pairs / 1 no-match** →
+**1 pair / 0 skipped**. Suites 39 + 25 passed.
+
+**The render leg's filter, measured on the file it will actually mount, not on episode 01.**
+Episode 38 is 61× episode 01 on disk (5,062,445 B, 36,714 lines). `parseStudySubtitles`:
+**36,543 raw → 712 kept, 35,831 dropped across 14 styles**; `JOJO5_textch` (300) gone,
+`JOJO5_textjp` (300) and `JOJO5-op1-jp` (408) kept. Kana **5,681 of 5,729 = 99.2 %** retained;
+Han **14,269 → 2,863**. At t=667.59 s the raw parse puts **2** cues on screen (`textch`,
+`textjp`), filtered **1**, `textjp`. Parse 104.5 ms + filter 87.7 ms.
+
+**Two corrections to earlier entries.** (1) The acquired pack is **39 `.ass` = 34 `.tc_jp` + 5
+`.sc_jp`**, not "39 `.tc_jp`" — episode 38 is a `.tc_jp`, so nothing downstream changes. (2) All 39
+are **under** the 8 MB attach cap: min 68,704 B, max 5,093,684 B (episode 31), sum 71,796,171 B.
+Route B's fetch was re-run live through the product this turn and returns episode 38 among them,
+**totalKana 181,790** — so every precondition for the attach now holds except the video itself.
