@@ -1,0 +1,174 @@
+/**
+ * L7-O — does the shared backend stop the per-cycle handle stack? (defect D2)
+ *
+ * Adaptation note, per the relay's reuse rule. The probe closest to this is
+ * `l7l-llama-attribution.cjs` — the only one that drives a real model load and samples main. It
+ * cannot be adapted: it drives ONE load through `localAgent:plan` and stops at the plateau, and
+ * the number D2 needs is a DIFFERENCE BETWEEN TWO CYCLES, each separated by the 5-minute idle
+ * unload. `l7g-membisect*.cjs` own the private-bytes+handles sampler used verbatim below, but they
+ * bisect a control cadence and never wait for an unload. So this is a new driver over a reused
+ * sampler and a reused IPC entry point (`translateEnsureReady`, l7n's positive control).
+ *
+ * The claim under test, from `L7_PERF_DICTIONARY.md`: before the fix, handles went
+ * 1,052 boot -> 4,378 cycle 1 -> 6,811 cycle 2, i.e. ~+2,425 PER CYCLE, with `llama.dispose()`
+ * called every cycle. If one process-lifetime backend is the right answer, cycle 2 must cost
+ * roughly nothing on top of cycle 1.
+ *
+ * CONTROLS, both required:
+ *  - NEGATIVE: an idle window before anything is driven. Private and handles must be flat, or a
+ *    later delta cannot be attributed to a load.
+ *  - POSITIVE per cycle: the load must actually happen — `translate:status` reports `ready: true`
+ *    at the plateau, and the unload must actually fire — `ready: false` at the settle point. A
+ *    cycle whose load never became ready, or whose unload never fired, is VOID rather than 0.
+ *
+ * Requires a cold boot on a build that contains the fix. Main does not hot-reload.
+ *
+ *   node src/.coordination/liquid-workplace/probes/l7o-backend-cycles.cjs
+ */
+'use strict';
+const fs = require('node:fs');
+const path = require('node:path');
+const { execFileSync } = require('node:child_process');
+
+const cfg = JSON.parse(fs.readFileSync('debug/bridge.json', 'utf8'));
+const OUT = path.join(__dirname, 'l7o-backend-cycles.json');
+const CYCLES = Number(process.env.L7O_CYCLES || 2);
+/** IDLE_UNLOAD_MS is 5 min in `translate.ts`; this is that plus slack for the dispose itself. */
+const UNLOAD_WAIT_MS = Number(process.env.L7O_UNLOAD_WAIT_MS || 6.5 * 60_000);
+const LOAD_WAIT_MS = Number(process.env.L7O_LOAD_WAIT_MS || 90_000);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function ev(js) {
+  const r = await fetch(`http://127.0.0.1:${cfg.port}/eval`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${cfg.token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ js }),
+  });
+  const t = await r.json();
+  if (!t.ok) throw new Error(`eval failed: ${JSON.stringify(t).slice(0, 300)}`);
+  try {
+    return JSON.parse(t.result);
+  } catch {
+    return t.result;
+  }
+}
+
+/** Verbatim from `l7g-membisect2.cjs` — private bytes and handles off the live process. */
+function sample() {
+  const out = execFileSync('powershell', [
+    '-NoProfile', '-Command',
+    `$p=Get-Process -Id ${cfg.pid}; $p.Refresh(); '{0}|{1}|{2}' -f [math]::Round($p.PrivateMemorySize64/1MB,1), $p.HandleCount, [math]::Round($p.WorkingSet64/1MB,1)`,
+  ], { encoding: 'utf8' }).trim().split('|');
+  return { privMB: Number(out[0]), handles: Number(out[1]), rssMB: Number(out[2]) };
+}
+
+/**
+ * `translate:status` is the product's own readiness answer, so "the model is resident" is read
+ * from the module that owns it rather than inferred from a memory delta.
+ */
+const STATUS = `(window.api.translateStatus().then(s => { window.__l7o = JSON.stringify(s); }), 'sent')`;
+const READ_STATUS = `window.__l7o || 'pending'`;
+const START_LOAD = `(window.api.translateEnsureReady().then(r => { window.__l7oLoad = JSON.stringify(r); }), 'sent')`;
+const READ_LOAD = `window.__l7oLoad || 'pending'`;
+
+async function status() {
+  await ev(`(delete window.__l7o, 'cleared')`);
+  await ev(STATUS);
+  for (let i = 0; i < 20; i += 1) {
+    await sleep(250);
+    const raw = await ev(READ_STATUS);
+    if (raw !== 'pending') return typeof raw === 'string' ? JSON.parse(raw) : raw;
+  }
+  throw new Error('translate:status never answered');
+}
+
+const rows = [];
+async function mark(label, extra) {
+  const m = sample();
+  const prev = rows.length ? rows[rows.length - 1] : null;
+  const row = {
+    label,
+    ...m,
+    dPriv: prev ? Number((m.privMB - prev.privMB).toFixed(1)) : 0,
+    dHandles: prev ? m.handles - prev.handles : 0,
+    at: new Date().toISOString(),
+    ...(extra || {}),
+  };
+  rows.push(row);
+  console.log(
+    `${String(label).padEnd(34)} priv ${String(row.privMB).padStart(9)} MB (${row.dPriv >= 0 ? '+' : ''}${row.dPriv})  ` +
+    `handles ${String(row.handles).padStart(6)} (${row.dHandles >= 0 ? '+' : ''}${row.dHandles})` +
+    (extra && extra.ready !== undefined ? `  ready=${extra.ready}` : ''),
+  );
+  return row;
+}
+
+async function main() {
+  const boot = await status();
+  console.log(`pid ${cfg.pid}, modelFound=${boot.modelFound}, ready=${boot.ready}`);
+  if (!boot.modelFound) throw new Error('VOID: no GGUF installed, so no cycle can load one');
+  if (boot.ready) throw new Error('VOID: the model is already resident — this needs a cold boot');
+
+  await mark('boot baseline', { ready: boot.ready });
+  // NEGATIVE CONTROL — 45 s with nothing driven.
+  await sleep(45_000);
+  const idle = await mark('CONTROL idle 45s (nothing driven)', { ready: (await status()).ready });
+
+  const cycles = [];
+  for (let c = 1; c <= CYCLES; c += 1) {
+    await ev(`(delete window.__l7oLoad, 'cleared')`);
+    await ev(START_LOAD);
+    let loadResult = 'pending';
+    const loadDeadline = Date.now() + LOAD_WAIT_MS;
+    while (Date.now() < loadDeadline) {
+      await sleep(2_000);
+      loadResult = await ev(READ_LOAD);
+      if (loadResult !== 'pending') break;
+    }
+    const ready = (await status()).ready;
+    const plateau = await mark(`cycle ${c} load plateau`, { ready, loadResult });
+    if (!ready) throw new Error(`VOID: cycle ${c} never became ready (${loadResult})`);
+
+    console.log(`  waiting ${Math.round(UNLOAD_WAIT_MS / 1000)}s for the idle unload…`);
+    await sleep(UNLOAD_WAIT_MS);
+    const settledReady = (await status()).ready;
+    const settled = await mark(`cycle ${c} settled after unload`, { ready: settledReady });
+    if (settledReady) throw new Error(`VOID: cycle ${c}'s idle unload never fired`);
+
+    cycles.push({
+      cycle: c,
+      plateauPrivMB: plateau.privMB,
+      plateauHandles: plateau.handles,
+      settledPrivMB: settled.privMB,
+      settledHandles: settled.handles,
+    });
+  }
+
+  const base = rows[0];
+  const verdict = {
+    pid: cfg.pid,
+    bootPrivMB: base.privMB,
+    bootHandles: base.handles,
+    idleControlFlat: Math.abs(idle.dPriv) < 25 && Math.abs(idle.dHandles) < 100,
+    idleDeltaPrivMB: idle.dPriv,
+    idleDeltaHandles: idle.dHandles,
+    cycles,
+    // The headline: what a SECOND cycle costs on top of the first.
+    handlesAddedByCycle2: cycles.length > 1 ? cycles[1].settledHandles - cycles[0].settledHandles : null,
+    privAddedByCycle2MB: cycles.length > 1
+      ? Number((cycles[1].settledPrivMB - cycles[0].settledPrivMB).toFixed(1))
+      : null,
+    beforeFix: { bootHandles: 1052, cycle1Handles: 4378, cycle2Handles: 6811, perCycle: 2425 },
+    rows,
+  };
+  fs.writeFileSync(OUT, JSON.stringify(verdict, null, 2));
+  console.log(`\nidle control flat: ${verdict.idleControlFlat} (Δpriv ${verdict.idleDeltaPrivMB} MB, Δhandles ${verdict.idleDeltaHandles})`);
+  console.log(`cycle 2 added: ${verdict.handlesAddedByCycle2} handles, ${verdict.privAddedByCycle2MB} MB (before the fix: +2,433)`);
+  console.log(`wrote ${OUT}`);
+}
+
+main().catch((err) => {
+  console.error(err.message);
+  fs.writeFileSync(OUT, JSON.stringify({ error: err.message, rows }, null, 2));
+  process.exit(1);
+});

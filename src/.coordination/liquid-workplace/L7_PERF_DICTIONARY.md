@@ -633,3 +633,45 @@ disposing harder.
 way plus an error-path dispose. **Not measured live**: that path was not exercised in this session
 and the change landed after this boot started, so it rides on the translate path's evidence and on
 7/7 unit tests, and is recorded here as unverified rather than as verified.
+
+## 2026-08-24 · backup — D2 halved and quantified: the addon was half of it, the model cycle is the other half
+
+Cold boot, pid **9532**, on the build carrying `fb4d59aa` (one process-lifetime `Llama` shared by
+`translate.ts` and `localAgent.ts`; the context and model are still disposed per cycle). Two full
+cycles driven through the product's own `translate:ensureReady`, each unload the module's real
+5-minute idle deadline. `probes/l7o-backend-cycles.cjs`, output in its `.json`.
+
+| point | private MB | handles | before the fix (pid 22796) |
+| --- | --- | --- | --- |
+| boot, first reading | 866.9 | 1,076 | — |
+| after 45 s idle (the settled baseline) | **420.7** | **1,070** | 556.9 / 1,052 |
+| cycle 1 load plateau | 3,323.0 | 4,409 | 3,529.5 / 4,384 |
+| cycle 1 settled after unload | 923.5 | 4,401 | 1,157.7 / 4,378 |
+| cycle 2 load plateau | 3,387.4 | 5,622 | 3,677.7 / **6,811** |
+| cycle 2 settled after unload | **1,026.7** | **5,613** | — |
+
+**The number this slice was for: a second cycle now costs +1,212 handles and +103.2 MB, against
++2,433 and +174 MB before.** So the re-`require`d native addon was about **half** of D2, and the
+other half is the model/context cycle itself — `model.dispose()` + `context.dispose()` return the
+2.4 GB (measured twice: −2,399.5 and −2,360.7) and do not return ~1,200 handles.
+
+**Leg 3 is still NOT a 10, and the gap is smaller: 1,026.7 MB against L0's 550–577 band is 1.8×
+(was 2.2×) and 5,613 handles against ~1,055 is 5.3× (was 6.4×).**
+
+**The negative control did not hold and is reported rather than dressed up.** The 45-second idle
+window was supposed to be flat; private *fell* **446.2 MB** as the process finished booting. It
+cannot manufacture the increases attributed to loads — every delta above is an increase measured
+from the post-idle 420.7 MB reading, not from the early 866.9 — but by the rubric's own rule this
+run does not earn a category-7 score on its own. The first reading was simply taken too early.
+
+**Next candidate, and it is a measurement, not a guess:** count threads alongside handles across
+one cycle. ~1,200 handles per cycle for a 1.2 GB mmap'd GGUF still smells like a thread pool or
+file mapping that `model.dispose()` leaves behind, which would put the remainder in
+node-llama-cpp rather than in this repo. If it is, the product answer is to stop repeating the
+cycle — which the same day's `ebc88b40` already does for most users by not loading the model at
+all on an English-front profile.
+
+**Trap:** `l7o-backend-cycles.cjs` VOIDs a cycle whose `translate:status` never reported ready, or
+whose unload never fired, rather than recording a 0. Two boots were needed to learn that a plain
+restart lands in whatever windows the session restored, so take the baseline AFTER an idle window,
+never at t+1 s.

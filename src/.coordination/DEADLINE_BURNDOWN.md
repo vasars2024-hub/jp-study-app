@@ -286,3 +286,22 @@ main-v1 contributes **0** to the remaining deadline load. What is left for 2026-
 section 11 of its plan and nobody has counted them since the pin was written. **Projected finish
 for the programme: UNKNOWN**, and it stays UNKNOWN until liquid is counted. Writing 2026-09-01
 here would be the one forbidden outcome.
+
+2026-08-24 | liquid | units done this turn: 0 | units left: 10 | basis: RE-COUNTED this turn — 13 `Gate:` lines in section 11 of src/LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md (L0–L12); CLOSED are L0 (baseline + parity ledger exist, its own progress note), L2 (primitives measured in isolation, L2_PRIMITIVES.md's two entries) and L3 (byte-for-byte round trip driven live, 79/79, L3_PRESENTATION.md); L1 and L4–L12 are open | projected finish: 2026-09-20
+
+**RULE 1 for liquid is discharged: 3 of 13 gates, counted from the plan's own `Gate:` lines.**
+The rate that projection uses, and it is arithmetic rather than ambition: all three closures
+landed on **2026-08-17**, and the seven days since have closed **zero**. Over liquid's whole life
+(2026-08-16 → 08-24, 8 days, 2 workers) that is **0.375 gates/day**; 10 gates ÷ 0.375 = **26.7
+days → 2026-09-20**. Using only the last seven days' rate the projection is infinite, so 09-20 is
+the generous reading, not the pessimistic one.
+
+**Against the 2026-09-01 target that is a ~19-day slip, and the pin says to say so rather than
+descope.** main-v1 contributes 0 (complete-except-external / complete-except-Liquid) and
+mal-pipeline is 34 of 34, so **liquid alone is the programme's remaining load and 2026-09-20 is
+the programme's projected finish.**
+
+Why zero gates closed this turn despite three product commits: L1's gate is 80/80 on **two**
+reference apps and the Dictionary surface's category 7 is capped by a real defect. This turn
+halved that defect (D2: +2,433 handles/cycle → +1,212) rather than closing it, so the gate did
+not move. Product landed: `fb4d59aa`, `1c874da9`, `ebc88b40`.
