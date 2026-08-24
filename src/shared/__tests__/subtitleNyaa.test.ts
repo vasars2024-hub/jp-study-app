@@ -107,6 +107,48 @@ describe('subtitlePackSignals', () => {
     expect(subtitlePackSignals('Cassiopeia Dossier')).toEqual([]);
     expect(subtitlePackSignals('Subaru Chronicles')).toEqual([]);
   });
+
+  it('reads a leading bracket that states the payload instead of naming a group', () => {
+    // Real, from the user's own completed list: 1.1 MB over 64 episodes at 2
+    // seeders, subtitles and nothing else — and invisible, because the group
+    // strip removed the one bracket that was not a group.
+    expect(subtitlePackSignals(
+      '(Subtitles only) [IIDX-RAWS] Dragon Ball GT 1-64 + Special (Animax 2011)',
+    )).toContain('subs-only');
+    expect(subtitlePackSignals('[Subtitle Pack] Show 01-24')).toContain('sub-pack');
+  });
+
+  it('NEGATIVE CONTROL: a leading group tag is still stripped, phrase or not', () => {
+    // The exemption is the phrase, not the vocabulary. If it leaked, every
+    // `[SubsPlease]` episode on the index would read as a subtitle pack.
+    expect(subtitlePackSignals('[SubsPlease] Show - 01 (1080p) [ABCD1234].mkv')).toEqual([]);
+    expect(subtitlePackSignals('[HorribleSubs] Show - 12 [720p]')).toEqual([]);
+    expect(subtitlePackSignals('[Anime Time] Show - 01 [1080p]')).toEqual([]);
+  });
+
+  it('lets a stated payload outrank the video-carries-subtitles phrasings', () => {
+    // `Maison Ikkoku Eng Subs Only [Kagura] … Complete`, 0.7 MB at 3 seeders:
+    // `eng subs` matched the video phrasing and returned before reading the
+    // very next word.
+    expect(subtitlePackSignals('Maison Ikkoku Eng Subs Only [Kagura] Complete'))
+      .toContain('subs-only');
+    expect(subtitlePackSignals('Show 01-12 English Subs Only')).toContain('subs-only');
+  });
+
+  it('NEGATIVE CONTROL: a video release that merely has subtitles is still refused', () => {
+    // The half of the guard that does the work. None of these state a payload,
+    // so the early return is untouched for them.
+    expect(subtitlePackSignals('Show - 05 [English Subbed]')).toEqual([]);
+    expect(subtitlePackSignals('Show 01-12 [Multi-Sub]')).toEqual([]);
+    expect(subtitlePackSignals('Show S01 [Dual Audio][Softsub]')).toEqual([]);
+    // And the size ceiling is the second, independent guard: a video batch that
+    // does say "sub only" is still hundreds of megabytes.
+    expect(looksLikeSubtitleOnly(row({
+      name: 'Show 01-12 [BD 1080p] Sub Only',
+      sizeBytes: 12_000 * MB,
+      isBatch: true,
+    }), 12)).toBe(false);
+  });
 });
 
 describe('looksLikeSubtitleOnly', () => {

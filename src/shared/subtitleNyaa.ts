@@ -380,8 +380,29 @@ export function looksJapaneseSubtitle(text: string): boolean {
  * all carry subtitle vocabulary in the group tag while shipping video.
  */
 function withoutReleaseGroup(name: string): string {
-  return (name ?? '').replace(/^\s*[[(][^\])]{1,40}[\])]\s*/, '');
+  const text = name ?? '';
+  const lead = /^\s*[[(]([^\])]{1,40})[\])]\s*/.exec(text);
+  if (!lead) return text;
+  // The leading bracket is a group tag *unless* it states the payload, and one
+  // real release in the user's own library does exactly that:
+  // `(Subtitles only) [IIDX-RAWS] Dragon Ball GT 1-64 + Special`, 1.1 MB over
+  // 64 episodes, 2 seeders — subtitles and nothing else, and invisible to the
+  // pack route because the strip ate its only signal. No release group is
+  // called "X only" or "X pack", so the phrase is the discriminator, not the
+  // vocabulary: `[HorribleSubs]` and `[SubsPlease]` are still removed.
+  if (STATED_PAYLOAD_RE.test(lead[1])) return text;
+  return text.slice(lead[0].length);
 }
+
+/**
+ * A phrase that states the release *is* subtitles, as opposed to one that says
+ * a video release has them.
+ *
+ * Kept as its own constant because it is consulted from two directions: it
+ * protects a leading bracket from the group strip above, and it outranks
+ * `VIDEO_WITH_SUBS_RE` inside `subtitlePackSignals`.
+ */
+const STATED_PAYLOAD_RE = /\b(?:sub(?:title)?s?\s*only|sub(?:title)?\s*pack)\b/i;
 
 /**
  * Phrases that describe *a video release that has subtitles*, not a subtitle
@@ -480,10 +501,18 @@ const VIDEO_CONTAINER_RE = /\.(mkv|mp4|avi|m2ts|ts|webm|mov)\b/i;
 export function subtitlePackSignals(name: string): string[] {
   const text = withoutReleaseGroup(name);
   const found: string[] = [];
-  if (VIDEO_WITH_SUBS_RE.test(text)) return found;
+  // A release that says what it *is* outranks one that says what it *has*.
+  // `Maison Ikkoku Eng Subs Only [Kagura] … Complete` — 0.7 MB, 3 seeders, 96
+  // episodes — was refused outright because `eng subs` matched the video
+  // phrasing, even though the very next word is `Only`. The size ceiling is
+  // what keeps this safe: a video release stating "sub only" is still hundreds
+  // of megabytes and never reaches `looksLikeSubtitleOnly`.
+  if (!STATED_PAYLOAD_RE.test(text) && VIDEO_WITH_SUBS_RE.test(text)) return found;
 
   if (/\bsub(?:title)?\s*pack\b/i.test(text)) found.push('sub-pack');
-  if (/\bsubs?\s*only\b/i.test(text)) found.push('subs-only');
+  // `subtitles only` spelled out, not just `subs only` — same claim, and the
+  // longer form is what the one real release in this library uses.
+  if (/\bsub(?:title)?s?\s*only\b/i.test(text)) found.push('subs-only');
   // Bare "subtitles" survives only because the video-release phrasings above
   // were already excluded.
   if (/\bsubtitles?\b/i.test(text)) found.push('subtitles');
