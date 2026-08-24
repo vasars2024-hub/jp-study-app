@@ -56,6 +56,7 @@ import {
 import { useT } from '../i18n';
 import { openMediaWorkspace } from '../mediaWorkspaceBridge';
 import {
+  subtitleChoiceDestination,
   useMediaWorkspaceAvailability,
   videoStageFor,
   type MediaWorkspaceAvailability,
@@ -612,12 +613,18 @@ function LibraryPanel({
   state,
   music,
   onNavigate,
+  onOpenSeanime,
+  workspace,
 }: {
   state: MediaState;
   music: MusicState;
   onNavigate: (tab: MediaCenterTab) => void;
+  onOpenSeanime: OpenSeanimeWorkspace;
+  workspace: MediaWorkspaceAvailability;
 }) {
   const { t } = useT();
+  // Where a chosen track has to be delivered. See `subtitleChoiceDestination`.
+  const destination = subtitleChoiceDestination(workspace);
   return (
     <div className="mc-page mc-library-page">
       <MediaLibraryShell
@@ -646,6 +653,24 @@ function LibraryPanel({
         onUseSubtitle={async (mediaId, recordId) => {
           const pick = await window.api.readSubtitleRecord(mediaId, recordId);
           if (!pick) throw new Error(t('mediaCenter.library.subtitleMissing'));
+          // Recorded before either branch runs, and for both of them: the choice is the
+          // user's answer to "which of these tracks", and the player that renders it is
+          // resolved separately (`pickPlaybackSubtitle` honours this id). Without it the
+          // workspace re-picks by its own ranking and opens a different track than the
+          // one just clicked.
+          const stored = await window.api.setMediaItemState(mediaId, {
+            preferredSubtitleId: recordId,
+          });
+          if (!stored) throw new Error(t('mediaCenter.library.itemMissing'));
+          state.setItems(state.items.map((item) => (
+            item.id === mediaId ? { ...item, preferredSubtitleId: recordId } : item
+          )));
+          if (destination === 'workspace') {
+            const item = state.items.find((entry) => entry.id === mediaId);
+            if (!item?.path) throw new Error(t('mediaCenter.library.itemMissing'));
+            onOpenSeanime({ localFilePath: item.path });
+            return;
+          }
           // Make sure the player holds the episode the track belongs to, or the
           // cues would be laid over whatever happened to be open.
           if (state.current?.id !== mediaId) await state.playItem(mediaId);
@@ -1572,7 +1597,15 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
 
   const body = useMemo(() => {
     if (tab === 'home') return <HomePanel state={media} music={music} onNavigate={navigate} />;
-    if (tab === 'library') return <LibraryPanel state={media} music={music} onNavigate={navigate} />;
+    if (tab === 'library') return (
+      <LibraryPanel
+        state={media}
+        music={music}
+        onNavigate={navigate}
+        onOpenSeanime={openSeanime}
+        workspace={workspace}
+      />
+    );
     if (tab === 'video') return (
       <VideoPanel
         state={media}
@@ -1599,7 +1632,12 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
     if (tab === 'review') return <SeanimeWatchLoopPanel />;
     if (tab === 'discover') return <DiscoverPanel state={discovery} />;
     return <SettingsPanel state={media} provenance={discovery.provenance} />;
-  }, [tab, media, music, discovery, readiness, openSeanime, seanimeActionTitle, seanimeAvailable]);
+  }, [
+    tab, media, music, discovery, readiness, openSeanime, seanimeActionTitle, seanimeAvailable,
+    // `seanimeAvailable` collapses three availability states into two, so on its own it
+    // holds a stale panel across `pending` → `unavailable`.
+    workspace,
+  ]);
 
   return (
     <AppChrome menus={mediaMenus} status={status} className="mc-app-chrome">

@@ -177,12 +177,23 @@ export function readSubtitleRecord(record: SubtitleRecord): string | null {
  * sidecar track beats a download because it is timed against this exact file, and
  * a machine transcript comes last because it is the only one that can be wrong
  * about the words themselves.
+ *
+ * `chosenId` is the one thing that outranks all of it: the user picked that track in
+ * the library, and a ranking that overrides an explicit choice is the ranking being
+ * wrong. A `chosenId` naming a record that is no longer here falls through to the
+ * ranking rather than returning nothing — a deleted track must not leave the item
+ * with no subtitle at all.
  */
 export function pickPlaybackSubtitle(
   records: readonly SubtitleRecord[] | undefined,
   preferredLang = 'ja',
+  chosenId?: string,
 ): SubtitleRecord | null {
   if (!records?.length) return null;
+  if (chosenId) {
+    const chosen = records.find((record) => record.id === chosenId);
+    if (chosen) return chosen;
+  }
   const base = preferredLang.slice(0, 2).toLowerCase();
   const sourceRank: Record<SubtitleRecord['source'], number> = {
     embedded: 0,

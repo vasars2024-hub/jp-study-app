@@ -444,7 +444,12 @@ export default function MediaDetailPanel({
               <ul className="medialib-tracks">
                 {tracks.map((track) => {
                   const label = track.label ?? track.path;
-                  const active = activeSubtitleName != null && activeSubtitleName === label;
+                  // Two ways to be the active track, because there are two players.
+                  // `activeSubtitleName` is the inline player's live state; the stored
+                  // id is the choice itself, and it is the only one the media workspace
+                  // — a separate player that never sees this shell's state — acts on.
+                  const active = (activeSubtitleName != null && activeSubtitleName === label)
+                    || entry.primary.preferredSubtitleId === track.id;
                   // What the fusion pipeline itself thinks of the track it wrote.
                   // Only ever present for a fused track that has its F6 sidecar.
                   const meta = fusionMeta[track.id];

@@ -263,6 +263,17 @@ export interface ExampleResult {
   note?: string;
   /** Free-form collection names the user has filed this item under. */
   collections?: string[];
+  /**
+   * The subtitle record the user chose for this item in the library, by id.
+   *
+   * Persisted rather than held in the player: the library and the player are
+   * different windows (and, with the media workspace present, different players
+   * entirely), so a choice that lives in one player's state is a choice the
+   * surface that actually renders never hears about. `pickPlaybackSubtitle`
+   * honours this over its own ranking; an id whose record has since been removed
+   * falls back to the ranking.
+   */
+  preferredSubtitleId?: string;
   }
 
 /** Returned when a media file is opened: the library item + a playable URL. */

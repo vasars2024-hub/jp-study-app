@@ -261,6 +261,42 @@ describe('pickPlaybackSubtitle', () => {
     pickPlaybackSubtitle(records);
     expect(records.map((r) => r.id)).toEqual(order);
   });
+
+  /*
+    The user's own choice. Everything above is a ranking over tracks nobody has ruled on;
+    once the library says "this one", a ranking that overrules it is the ranking being
+    wrong — and the symptom is the player opening a different track than the row that was
+    just clicked.
+  */
+  it('an explicit choice outranks the study language', () => {
+    const records = [
+      rec({ id: 'ja', lang: 'ja', source: 'embedded' }),
+      rec({ id: 'en', lang: 'en', source: 'provider' }),
+    ];
+    expect(pickPlaybackSubtitle(records)?.id).toBe('ja');
+    expect(pickPlaybackSubtitle(records, 'ja', 'en')?.id).toBe('en');
+  });
+
+  it('an explicit choice outranks source rank inside a language', () => {
+    const records = [
+      rec({ id: 'emb', lang: 'ja', source: 'embedded' }),
+      rec({ id: 'gen', lang: 'ja', source: 'generated', machineGenerated: true }),
+    ];
+    expect(pickPlaybackSubtitle(records)?.id).toBe('emb');
+    expect(pickPlaybackSubtitle(records, 'ja', 'gen')?.id).toBe('gen');
+  });
+
+  it('falls back to the ranking when the chosen track is gone, rather than to nothing', () => {
+    const records = [rec({ id: 'ja', lang: 'ja', source: 'sidecar' })];
+    // A removed track must not leave the item with no subtitle at all.
+    expect(pickPlaybackSubtitle(records, 'ja', 'deleted-id')?.id).toBe('ja');
+    expect(pickPlaybackSubtitle([], 'ja', 'deleted-id')).toBeNull();
+  });
+
+  it('ignores an empty choice instead of treating it as a track id', () => {
+    const records = [rec({ id: 'ja', lang: 'ja' }), rec({ id: 'en', lang: 'en' })];
+    expect(pickPlaybackSubtitle(records, 'ja', '')?.id).toBe('ja');
+  });
 });
 
 describe('retainedOnForce', () => {

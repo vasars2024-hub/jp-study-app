@@ -1071,11 +1071,30 @@ export function registerMediaIpc(): void {
    */
   ipcMain.handle(
     'media:setItemState',
-    (_e, id: string, patch: Partial<Pick<MediaItem, 'favorite' | 'studyQueue' | 'note' | 'collections'>>) => {
+    (
+      _e,
+      id: string,
+      patch: Partial<Pick<
+        MediaItem,
+        'favorite' | 'studyQueue' | 'note' | 'collections' | 'preferredSubtitleId'
+      >>,
+    ) => {
       const db = readDb();
       const item = db.items.find((entry) => entry.id === id);
       if (!item || !patch || typeof patch !== 'object') return null;
 
+      if (typeof patch.preferredSubtitleId === 'string') {
+        // Only an id this item actually holds is stored. A caller naming a track
+        // from another item — or one that has just been removed — would otherwise
+        // leave a pointer that `pickPlaybackSubtitle` silently ignores forever,
+        // with the library still drawing it as the active choice.
+        const chosen = patch.preferredSubtitleId.trim();
+        if (chosen && item.subtitles?.some((record) => record.id === chosen)) {
+          item.preferredSubtitleId = chosen;
+        } else {
+          delete item.preferredSubtitleId;
+        }
+      }
       if (typeof patch.favorite === 'boolean') item.favorite = patch.favorite;
       if (typeof patch.studyQueue === 'boolean') item.studyQueue = patch.studyQueue;
       if (typeof patch.note === 'string') {
@@ -1241,7 +1260,11 @@ export function registerMediaIpc(): void {
     // whole discovery pipeline is write-only: tracks are downloaded, listed in the
     // drawer, and never actually shown while watching.
     let subtitle: SubtitlePick | undefined;
-    const record = pickPlaybackSubtitle(item.subtitles, loadDiscoverySettings().autoDownloadLanguages[0] ?? 'ja');
+    const record = pickPlaybackSubtitle(
+      item.subtitles,
+      loadDiscoverySettings().autoDownloadLanguages[0] ?? 'ja',
+      item.preferredSubtitleId,
+    );
     if (record) {
       const text = readSubtitleRecord(record);
       if (text) subtitle = { name: record.label ?? `${record.lang} (${record.source})`, text };
@@ -1351,6 +1374,7 @@ export function registerMediaIpc(): void {
         const record = pickPlaybackSubtitle(
           item.subtitles,
           loadDiscoverySettings().autoDownloadLanguages[0] ?? 'ja',
+          item.preferredSubtitleId,
         );
         if (record) {
           const text = readSubtitleRecord(record);

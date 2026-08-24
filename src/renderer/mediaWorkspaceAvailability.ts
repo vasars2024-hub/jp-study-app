@@ -60,6 +60,27 @@ export function videoStageFor(availability: MediaWorkspaceAvailability): MediaVi
 }
 
 /**
+ * Where a subtitle track chosen in the library has to be delivered.
+ *
+ * Derived from the stage rather than restated, because the two answers must agree: only
+ * `needs-server` renders an inline `<video>`, and the other two render a hand-off card.
+ * Applying cues to this shell's `MediaState` on a stage with no player parses them into
+ * a surface nothing draws — measured on the real library, where the track row reported
+ * "Loaded 267 subtitle lines." underneath "Video plays in the media workspace" and the
+ * cues never reached the screen.
+ *
+ * `connecting` routes to the workspace on purpose: the sidecar's status is still
+ * resolving, and the inline player is the surface that is *known* not to be the
+ * destination once it resolves. Opening the workspace on a server that then reports
+ * `stopped` is a state the host says out loud; painting cues nobody can see is not.
+ */
+export function subtitleChoiceDestination(
+  availability: MediaWorkspaceAvailability,
+): 'workspace' | 'inline' {
+  return videoStageFor(availability) === 'needs-server' ? 'inline' : 'workspace';
+}
+
+/**
  * `pending` is a real state and callers must handle it. Guessing `available` flashes the
  * workspace chrome on a machine that has none; guessing `unavailable` flashes the very
  * player this migration exists to retire.

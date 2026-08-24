@@ -1590,10 +1590,16 @@ const api = {
     return () => ipcRenderer.removeListener('subtitleDiscovery:progress', handler);
   },
 
-  /** Persist per-item user state (favorite / study queue / note / collections). */
+  /**
+   * Persist per-item user state (favorite / study queue / note / collections /
+   * the chosen subtitle track).
+   */
   setMediaItemState: (
     id: string,
-    patch: Partial<Pick<MediaItem, 'favorite' | 'studyQueue' | 'note' | 'collections'>>,
+    patch: Partial<Pick<
+      MediaItem,
+      'favorite' | 'studyQueue' | 'note' | 'collections' | 'preferredSubtitleId'
+    >>,
   ): Promise<MediaItem | null> => ipcRenderer.invoke('media:setItemState', id, patch),
   /** Open a file dialog; chosen file(s) are saved to the media library. */
   pickMedia: (): Promise<MediaOpen | null> => ipcRenderer.invoke('media:pick'),

@@ -873,7 +873,10 @@ declare global {
       mediaArtwork(id: string, variant?: 'poster' | 'banner' | 'still'): Promise<string | null>;
       setMediaItemState(
         id: string,
-        patch: Partial<Pick<MediaItem, 'favorite' | 'studyQueue' | 'note' | 'collections'>>,
+        patch: Partial<Pick<
+          MediaItem,
+          'favorite' | 'studyQueue' | 'note' | 'collections' | 'preferredSubtitleId'
+        >>,
       ): Promise<MediaItem | null>;
       runSubtitleDiscovery(
         request?: import('../../shared/subtitleDiscoveryIpc').SubtitleDiscoveryRequest,
