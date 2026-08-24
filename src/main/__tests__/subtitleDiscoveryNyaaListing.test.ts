@@ -83,8 +83,8 @@ async function listFor(item: MediaItem): Promise<unknown> {
     patchItems: () => undefined,
   });
   const handler = handlers.get('subtitleDiscovery:nyaaList');
-  expect(handler).toBeTypeOf('function');
-  return handler!({}, item.id, ACQUISITION, ['ja']);
+  if (typeof handler !== 'function') throw new Error('subtitleDiscovery:nyaaList was never registered');
+  return handler({}, item.id, ACQUISITION, ['ja']);
 }
 
 beforeEach(() => {
