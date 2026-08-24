@@ -39,6 +39,15 @@ export { runAgentProviderPrompt } from './agentProviderRouter';
 const KNOWN_MODEL_FILENAMES = ['Qwen3-1.7B.gguf', 'Qwen_Qwen3-1.7B-Q4_K_M.gguf', 'Qwen3-1.7B-Q4_K_M.gguf', 'Qwen3-8B.gguf', 'Qwen3-14B.gguf', 'Qwen3-32B.gguf'];
 const PLAN_TIMEOUT_MS = 90_000;
 const IDLE_UNLOAD_MS = 5 * 60_000;
+/** What a plan is allowed to spend, when the context has room for it. */
+const PLAN_MAX_OUTPUT_TOKENS = 1_500;
+/**
+ * Held back inside the context for what `tokenize()` cannot see — chat-template role markers,
+ * BOS/EOS, sampler lookahead. Same value and same reasoning as `translate.ts`.
+ */
+const CHAT_TEMPLATE_RESERVE_TOKENS = 192;
+/** A plan shorter than this is not a plan, so the request is refused rather than truncated. */
+const MIN_USABLE_OUTPUT_TOKENS = 256;
 
 interface LoadedAgentRuntime {
   modelPath: string;
@@ -201,18 +210,54 @@ async function loadRuntime(settings: LocalAgentSettings, modelPath: string): Pro
   }
 }
 
-async function promptWithTimeout(session: LlamaChatSession, prompt: string): Promise<string> {
+/**
+ * Exact when the weights are loaded — the same tokenizer the generation uses. The character
+ * fallback fires only if the native call is unavailable or throws; it over-counts Latin text and
+ * sits near the truth on Japanese, which is the safe direction here.
+ */
+function countPromptTokens(model: LlamaModelLease['model'], prompt: string): number {
+  try {
+    const tokens = (model as unknown as { tokenize?: (text: string) => unknown }).tokenize?.(prompt);
+    if (Array.isArray(tokens)) return tokens.length;
+  } catch {
+    /* Fall through to the estimate; a tokenizer failure must not fail the plan. */
+  }
+  return Math.ceil(prompt.length / 1.5);
+}
+
+/**
+ * `maxTokens` used to be the literal 1,500 and knew nothing about `contextSize`, which the user
+ * sets in Settings and which `localAgentSettings.ts:153` bounds at a LOW END of 2,048. A plan
+ * prompt is a whole system prompt plus the profile, the permitted operations, the memories in
+ * scope, the application state and the objective — thousands of tokens routinely. At 2,048 there
+ * was no arrangement in which prompt + 1,500 could fit.
+ *
+ * node-llama-cpp does not reject that: it CONTEXT SHIFTS, dropping the oldest part of the
+ * conversation. `resetSessionHistory` below makes every plan single-turn, so the oldest part is
+ * the system prompt and the objective — the agent would plan confidently against text it could no
+ * longer see. The failure is now explicit and names the setting that fixes it.
+ */
+async function promptWithTimeout(current: LoadedAgentRuntime, prompt: string): Promise<string> {
+  const promptTokens = countPromptTokens(current.lease.model, prompt);
+  const room = current.contextSize - promptTokens - CHAT_TEMPLATE_RESERVE_TOKENS;
+  if (room < MIN_USABLE_OUTPUT_TOKENS) {
+    throw new Error(
+      `This request does not fit the local agent's context: the prompt alone is about ` +
+        `${promptTokens} of the ${current.contextSize} tokens available. Raise the context size in ` +
+        `Settings, or shorten the request and the context attached to it.`,
+    );
+  }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PLAN_TIMEOUT_MS);
   try {
-    return await session.prompt(prompt, {
-      maxTokens: 1_500,
+    return await current.session.prompt(prompt, {
+      maxTokens: Math.min(PLAN_MAX_OUTPUT_TOKENS, room),
       signal: controller.signal,
       stopOnAbortSignal: true,
     });
   } finally {
     clearTimeout(timer);
-    resetSessionHistory(session);
+    resetSessionHistory(current.session);
   }
 }
 
@@ -254,7 +299,7 @@ async function plan(request: LocalAgentPlanRequest): Promise<LocalAgentPlanRespo
       const approvedOperations = selectLocalAgentApprovedOperations(promptContext);
       const system = buildLocalAgentSystemPrompt(promptContext);
       const prompt = `${system}\n\nUser request:\n${objective}`;
-      const response = await promptWithTimeout(current.session, prompt);
+      const response = await promptWithTimeout(current, prompt);
       return parseLocalAgentModelPlan(
         response,
         `agent-${startedAt}`,
