@@ -329,3 +329,19 @@ L1's gate needs 80/80 on *two* reference apps and only one has ever been scored,
 open gate nearest to closing is worth roughly two surfaces of work. Nothing here proposes cutting
 it — but a burn-down that counts L1 as one unit is understating it, and that is why the projection
 should be read as a floor.
+
+2026-08-24 | liquid | units done this turn: 0 | units left: 10 | basis: the 13 `Gate:` lines in section 11 of src/LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md, re-counted this turn (`grep -c '^Gate:'` = 13, 3 closed 2026-08-17) | projected finish: 2026-09-23
+
+**Re-counted, not inherited: 13 gates, 3 closed, 10 open.** No gate closed this turn, so the rate
+is unchanged — 3 gates over 2026-08-16..2026-08-24 (9 days, 2 workers) = **0.333/day**, and
+10 ÷ 0.333 = 30 days → **2026-09-23**, a **~22-day slip** against the 2026-09-01 target. main-v1
+contributes 0 (complete-except-external, 61 of 80, last measured 2026-08-24 15:52) and
+mal-pipeline is 34 of 34, so liquid alone remains the programme's load and its date is the
+programme's date. Stated, not descoped.
+
+**Why a turn with three landed commits moves the gate count by zero, since that reads oddly.**
+Liquid's gates are per-PHASE, not per-defect: L1's requires 80/80 on two reference surfaces and
+L4/L6/L7 each require a whole phase. Category-8 defect fixes are the work those gates are made
+of, and this turn landed three of them (`201db2d2`, `6b53d0e`, `b6f1cd6b`), but a gate only turns
+over when its last category does. The honest reading is that the 0.333/day rate already prices
+this in — it was computed over nine days that also contained work like this.

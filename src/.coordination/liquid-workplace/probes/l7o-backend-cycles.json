@@ -1,28 +1,28 @@
 {
-  "pid": 9532,
-  "bootPrivMB": 866.9,
-  "bootHandles": 1076,
-  "idleControlFlat": false,
-  "idleDeltaPrivMB": -446.2,
-  "idleDeltaHandles": -6,
+  "pid": 33092,
+  "bootPrivMB": 427.5,
+  "bootHandles": 1064,
+  "idleControlFlat": true,
+  "idleDeltaPrivMB": -4.8,
+  "idleDeltaHandles": -5,
   "cycles": [
     {
       "cycle": 1,
-      "plateauPrivMB": 3323,
-      "plateauHandles": 4409,
-      "settledPrivMB": 923.5,
-      "settledHandles": 4401
+      "plateauPrivMB": 3318.9,
+      "plateauHandles": 4398,
+      "settledPrivMB": 919.6,
+      "settledHandles": 4387
     },
     {
       "cycle": 2,
-      "plateauPrivMB": 3387.4,
-      "plateauHandles": 5622,
-      "settledPrivMB": 1026.7,
-      "settledHandles": 5613
+      "plateauPrivMB": 3391.2,
+      "plateauHandles": 5608,
+      "settledPrivMB": 2132.4,
+      "settledHandles": 5600
     }
   ],
-  "handlesAddedByCycle2": 1212,
-  "privAddedByCycle2MB": 103.2,
+  "handlesAddedByCycle2": 1213,
+  "privAddedByCycle2MB": 1212.8,
   "beforeFix": {
     "bootHandles": 1052,
     "cycle1Handles": 4378,
@@ -32,32 +32,32 @@
   "rows": [
     {
       "label": "boot baseline",
-      "privMB": 866.9,
-      "handles": 1076,
-      "rssMB": 897.4,
+      "privMB": 427.5,
+      "handles": 1064,
+      "rssMB": 466.9,
       "dPriv": 0,
       "dHandles": 0,
-      "at": "2026-08-24T19:54:03.612Z",
+      "at": "2026-08-24T20:27:03.316Z",
       "ready": false
     },
     {
       "label": "CONTROL idle 45s (nothing driven)",
-      "privMB": 420.7,
-      "handles": 1070,
-      "rssMB": 459.7,
-      "dPriv": -446.2,
-      "dHandles": -6,
-      "at": "2026-08-24T19:54:49.916Z",
+      "privMB": 422.7,
+      "handles": 1059,
+      "rssMB": 461.4,
+      "dPriv": -4.8,
+      "dHandles": -5,
+      "at": "2026-08-24T20:27:49.650Z",
       "ready": false
     },
     {
       "label": "cycle 1 load plateau",
-      "privMB": 3323,
-      "handles": 4409,
-      "rssMB": 3936.7,
-      "dPriv": 2902.3,
+      "privMB": 3318.9,
+      "handles": 4398,
+      "rssMB": 3933,
+      "dPriv": 2896.2,
       "dHandles": 3339,
-      "at": "2026-08-24T19:55:11.684Z",
+      "at": "2026-08-24T20:28:06.818Z",
       "ready": true,
       "loadResult": {
         "ok": true
@@ -65,22 +65,22 @@
     },
     {
       "label": "cycle 1 settled after unload",
-      "privMB": 923.5,
-      "handles": 4401,
+      "privMB": 919.6,
+      "handles": 4387,
       "rssMB": 348.7,
-      "dPriv": -2399.5,
-      "dHandles": -8,
-      "at": "2026-08-24T20:01:43.187Z",
+      "dPriv": -2399.3,
+      "dHandles": -11,
+      "at": "2026-08-24T20:34:38.146Z",
       "ready": false
     },
     {
       "label": "cycle 2 load plateau",
-      "privMB": 3387.4,
-      "handles": 5622,
-      "rssMB": 3728.1,
-      "dPriv": 2463.9,
+      "privMB": 3391.2,
+      "handles": 5608,
+      "rssMB": 3729.6,
+      "dPriv": 2471.6,
       "dHandles": 1221,
-      "at": "2026-08-24T20:01:52.691Z",
+      "at": "2026-08-24T20:34:45.557Z",
       "ready": true,
       "loadResult": {
         "ok": true
@@ -88,12 +88,12 @@
     },
     {
       "label": "cycle 2 settled after unload",
-      "privMB": 1026.7,
-      "handles": 5613,
-      "rssMB": 363.4,
-      "dPriv": -2360.7,
-      "dHandles": -9,
-      "at": "2026-08-24T20:08:24.253Z",
+      "privMB": 2132.4,
+      "handles": 5600,
+      "rssMB": 978.5,
+      "dPriv": -1258.8,
+      "dHandles": -8,
+      "at": "2026-08-24T20:41:17.095Z",
       "ready": false
     }
   ]

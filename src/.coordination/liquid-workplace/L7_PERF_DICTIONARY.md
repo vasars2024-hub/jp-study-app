@@ -729,3 +729,57 @@ model is always paid in full. That is the chosen tradeoff — a one-shot user ge
 back promptly and only demonstrated repeat use earns residency — and it means any probe whose
 inter-cycle gap exceeds 60 s will measure the unfixed number on its first two cycles. Do not read
 that as the fix failing.
+
+## 2026-08-24 (evening) · primary · the 3-cycle prediction was HALF right, and the half that failed names the next lever
+
+| Slice | Commit | What landed |
+| --- | --- | --- |
+| — | `6b53d0e` | `translate.ts` — prompt + completion are budgeted against the context, not assumed to fit |
+| — | `b6f1cd6b` | `localAgent.ts` — the same, against the user's own `contextSize` setting |
+| — | `201db2d2` | the Workbench's retranslate button reports the model load (4th surface; `backup`'s interrupted slice, finished here) |
+
+**`L7O_CYCLES=3` on a cold boot of `7af7f8db` (pid 2476, `debug/l7o-3cycle-backup.log`).** The run
+was cut off by a usage limit during cycle 3's wait, so the cycle-3 unload line is missing; every
+line below landed.
+
+| Mark | priv MB | handles | poolResident / grace | ready |
+| --- | --- | --- | --- | --- |
+| boot baseline | 427.2 | 1,076 | 0 / null | false |
+| CONTROL idle 45 s | 421.0 (−6.2) | 1,070 (−6) | 0 / null | false |
+| cycle 1 plateau | 3,353.2 | 4,409 (+3,339) | 1 / 60 s | true |
+| cycle 1 settled | 922.7 | 4,397 (−12) | **0 / null** | false |
+| cycle 2 plateau | 3,386.4 | 5,620 (**+1,223**) | 1 / 120 s | true |
+| cycle 2 settled | 2,088.6 | 5,610 (−10) | **1 / 120 s** | false |
+| cycle 3 plateau | 3,387.1 | 6,222 (**+612**) | 1 / 120 s | true |
+
+**The backoff works and the prediction's mechanism is confirmed: cycle 2's entry survived the
+390 s gap that cycle 1's did not** (`poolResident` 1 vs 0 at the identical sampling point — the
+same reading, in opposite states, one cycle apart). **The predicted ≈0 handles did not happen:
+cycle 3 cost +612, exactly half of cycle 2's +1,223.** Reported as measured, not as the number
+that was asked for.
+
+**What the halving decomposes, and it is the finding.** With the weights RESIDENT, a cycle still
+costs **612 handles and +1,298.5 MB**. That is the CONTEXT, not the model: `translate.ts` disposes
+its context on every idle unload and `createContext({ contextSize: 8_192 })` rebuilds the KV
+cache from nothing. So the per-cycle bill is ~611 handles of weights (which the pool now removes
+for a repeat user) and ~612 handles of KV cache (which it cannot touch). **The KV cache is now the
+larger half of D2 at 1,298 MB against a 1,223 MB model file** — 8,192 tokens × ~112 KB/token for
+Qwen3-1.7B's 28 layers × 8 KV heads × 128 dims × 2 × f16, which is arithmetic that matches the
+measurement rather than a story fitted to it.
+
+**Why the next lever is NOT simply shrinking `TRANSLATE_CONTEXT_SIZE`, decided and recorded so it
+is not re-litigated.** Two callers legitimately ask for up to 8,192 OUTPUT tokens
+(`sentenceAnalysis.ts:212`, `mining.ts:1408`); a smaller context clamps real work. What the two
+commits above did instead is make the relationship EXPLICIT — which is what a later size change
+needs in order to be safe, and which fixed a live category-8 defect on the way: an over-long
+request was never rejected, it was context-SHIFTED, so the model answered fluently about source
+text it had already dropped. Pooling a context per `contextSize` is the obvious follow-up and is
+deliberately not started here.
+
+**Traps.**
+1. **The probe cannot see the fix on its first two cycles by construction.** The base grace is
+   60 s and its gap is 390 s, so cycle 1→2 always measures the unfixed number. Only cycle 3
+   onwards is evidence. A two-cycle run reporting "no improvement" is measuring its own schedule.
+2. **`poolResident` at the settled mark is the discriminator, not the handle delta.** Cycles 2 and
+   3 have identical grace and identical plateau memory; what separates them is whether the entry
+   was still there when the next cycle began.
