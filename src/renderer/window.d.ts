@@ -943,12 +943,6 @@ declare global {
       onSubtitleDiscoveryProgress(
         cb: (p: import('../../shared/subtitleDiscoveryIpc').SubtitleDiscoveryProgress) => void,
       ): () => void;
-      subtitleHarvestList(
-        input: import('../shared/subtitleHarvest').SubtitleHarvestListInput,
-      ): Promise<import('../shared/subtitleHarvest').SubtitleHarvestListResult>;
-      subtitleHarvestFetch(
-        ids: string[],
-      ): Promise<import('../shared/subtitleHarvest').SubtitleHarvestFetchResult>;
       runMediaMetadata(
         request?: import('../../shared/mediaMetadataIpc').MediaMetadataRequest,
       ): Promise<import('../../shared/mediaMetadataIpc').MediaMetadataResult>;
