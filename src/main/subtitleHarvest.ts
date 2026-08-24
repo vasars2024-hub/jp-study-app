@@ -343,7 +343,7 @@ const NO_MAL_FACTS: StoredMalFacts = { aliases: [], totalEpisodes: null };
  * Never throws: an absent, corrupt or newer-versioned library is no facts at
  * all, and a listing that searches one name is still a listing.
  */
-function storedMalFacts(malId: number | null | undefined): StoredMalFacts {
+export function storedMalFacts(malId: number | null | undefined): StoredMalFacts {
   if (typeof malId !== 'number' || !Number.isFinite(malId) || malId <= 0) return NO_MAL_FACTS;
   try {
     const wanted = malLibraryKey('anime', malId);

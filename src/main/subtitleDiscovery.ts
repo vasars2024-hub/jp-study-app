@@ -64,6 +64,7 @@ import {
   type ProviderSubtitleCandidate,
 } from './subtitleProviderClients';
 import {
+  emptyRankDrops,
   nyaaAvailability,
   nyaaFetch,
   nyaaSearch,
@@ -72,6 +73,8 @@ import {
   takeRememberedNyaaCandidate,
   type NyaaAcquisitionConfig,
 } from './subtitleNyaaSource';
+import { harvestSearchAliases } from '../shared/subtitleHarvest';
+import { storedMalFacts } from './subtitleHarvest';
 import { asNyaaAcquisitionConfig, describeEmptyNyaaListing } from '../shared/subtitleNyaa';
 import { parseMediaFileName } from '../shared/mediaFileIdentity';
 import { osdbHashFile } from './osdbHash';
@@ -837,6 +840,14 @@ function credentialStates(): SubtitleProviderCredentialState[] {
 // made rather than a step in a sweep.
 // ---------------------------------------------------------------------------
 
+/**
+ * Between alias searches, matching `subtitleHarvest.ts`. One index, one
+ * courtesy: a walk that fires four requests back to back is the behaviour that
+ * gets a client rate-limited, and the user is waiting on a dialog either way.
+ */
+const NYAA_ALIAS_PACING_MS = 400;
+const sleep = (ms: number) => new Promise<void>((done) => { setTimeout(done, ms); });
+
 async function listNyaaCandidates(
   mediaId: string,
   acquisition: unknown,
@@ -850,14 +861,46 @@ async function listNyaaCandidates(
   if (!available.ok) return { ok: false, candidates: [], message: available.detail };
 
   const wanted = languages?.length ? languages : loadDiscoverySettings().autoDownloadLanguages;
+  /**
+   * The same alias reach the harvest listing has had since `58e348a5`.
+   *
+   * Without it this surface asks the index exactly one question — the name the
+   * library happens to store — while `listNyaaHarvest`, over the same index and
+   * the same predicates, asks up to four. That asymmetry is not a preference:
+   * MAL 2596 is stored as `Shinreigari` and nyaa files it as `Ghost Hound`, so
+   * the one-name listing reported an index that plainly has releases as empty.
+   * A media item that was never matched to a MAL row has no aliases to add and
+   * costs exactly one request, as before.
+   */
+  const names = harvestSearchAliases(
+    providerSearchTitle(item.seriesTitle ?? item.title),
+    storedMalFacts(item.malId).aliases,
+  );
   try {
-    const { candidates, dropped } = await nyaaSearchDetailed({
-      config: config as NyaaAcquisitionConfig,
-      title: providerSearchTitle(item.seriesTitle ?? item.title),
-      season: item.season ?? null,
-      episode: item.episode ?? null,
-      languages: wanted.length ? wanted : ['ja'],
-    });
+    let candidates: Awaited<ReturnType<typeof nyaaSearchDetailed>>['candidates'] = [];
+    // The alias that saw the most of this work, so an empty listing reports the
+    // richest refusal the walk found rather than the last alias's silence.
+    let dropped = emptyRankDrops();
+    for (const [index, title] of names.entries()) {
+      if (index) await sleep(NYAA_ALIAS_PACING_MS);
+      const attempt = await nyaaSearchDetailed({
+        config: config as NyaaAcquisitionConfig,
+        title,
+        season: item.season ?? null,
+        episode: item.episode ?? null,
+        languages: wanted.length ? wanted : ['ja'],
+      });
+      if (attempt.dropped.titleMatched > dropped.titleMatched) dropped = attempt.dropped;
+      if (!attempt.candidates.length) continue;
+      // Same rule as the harvest walk, for the same reason: a `sub-pack` and a
+      // `batch-sidecar` are not interchangeable answers, and stopping at the
+      // first name that found *anything* is how a 39 MB subs-only pack loses to
+      // a 21 GB video batch that a different name for the same work turned up.
+      // Earliest name still wins among equals.
+      const carriesPack = attempt.candidates.some((entry) => entry.route === 'sub-pack');
+      if (!candidates.length || carriesPack) candidates = attempt.candidates;
+      if (carriesPack) break;
+    }
     rememberNyaaCandidates(candidates);
     return {
       ok: true,
