@@ -2379,3 +2379,45 @@ of foreign work.**
 leg is now blocked on something new and concrete rather than on data alone: on the committed
 branch there is no route from a stored `SubtitleRecord` to the mounted player, so "cues render
 in the player" cannot be demonstrated against HEAD until that track commits.
+
+## 2026-08-24 — a creditless opening was carrying episode 1's dialogue, in the real library
+
+Worker `primary`. Commit `39ea4250`. Probes `debug/g31v-concordance-live.cjs`,
+`debug/g31w-perpath.cjs`, `debug/g31x-records.cjs`.
+
+**The live acceptance for `8cfe2ef8` came first, and it found this.** Ran the personal
+concordance's own composition through the app — `listMedia` → `subtitleForPath` →
+`parseStudySubtitles` → `findLexiconConcordance` — over the real library:
+
+| step | number |
+| --- | --- |
+| media items | **33** |
+| items yielding a readable Japanese track | **8** |
+| cues in the corpus | **1,493** |
+| `名前` | **1 citation**, `私の名前はHanaです。日本生まれ、日本育ちの日本人で` |
+| control `齟齬齟齬齟齬` | **0** |
+
+One hit for a common word looked wrong, so the corpus was censused per item. **Three
+different videos claim the same subtitle file**: `The Big O - Creditless Opening`,
+`… Ending 1` and `… Ending 2` each hold one jimaku record labelled
+`The Big O.E01.Bandai.ja.srt`, `source: 'provider'`, added within **one second** of each
+other on 2026-08-13. Episode 1's dialogue on three videos that are not episode 1.
+
+**Mechanism, at the line.** `evaluateSignal`'s episode case returns `'unknown'` when
+`target.episode` is null (`shared/subtitleMatching.ts:160`) — right, because a target with no
+episode has nothing to disagree with. `parseMediaFileName` returns null for a creditless
+extra — also right, and it is the same null `fa7a7e43` had to stop reading back out loosely.
+Together the episode signal goes inert, language and title decide alone, every episode of the
+series looks acceptable, and `autoDownloadLanguages` attaches the first. The guard is in
+`scoreCandidates`, **not** in the matcher: only automatic attachment may turn "we cannot tell"
+into "do not", because a manual pick must still be offered a numbered track for a file whose
+name merely failed to parse. A track declaring no episode still attaches — the right track for
+a film or a one-shot. Both halves pinned; the guard deleted → **exactly 1 red**, restored 31/31.
+
+**Not cleaned up, deliberately:** the three records already written. That is a write to user
+data with no restore point and it was not asked for — logged in `needs-user.md` with the ids.
+
+**Gate 31 stays 32 of 34.** Turn gates, once, shared tree: vitest **788 passed / 1 skipped
+(789), 10,965 passed / 6 skipped, exit 0** (baseline 787/788 and 10,955; +1 file, +10 tests,
+all mine). i18n **10,789/10,789** exit 0. architecture **"Nothing new", 5 pending** exit 0.
+eslint **0 errors** on all 11 touched paths.
