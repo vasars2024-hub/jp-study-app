@@ -71,8 +71,12 @@ vi.mock('node-llama-cpp', () => {
 });
 
 const translate = await import('../translate');
+const llamaBackend = await import('../llamaBackend');
 
-beforeEach(() => {
+beforeEach(async () => {
+  // The backend is process-lifetime by design, so a test that counts `getLlama()` calls has to
+  // start from a process that has none. Only the tests reset it; the product never does.
+  await llamaBackend.disposeSharedLlama();
   createContextCalls.length = 0;
   getLlamaCalls.length = 0;
   disposed.length = 0;
@@ -98,40 +102,40 @@ describe('translation model lifecycle', () => {
     expect(options?.contextSize as number).toBeLessThanOrEqual(8_192);
   });
 
-  it('disposes the context, the model AND the backend, not just the session', async () => {
+  it('disposes the context and the model, and deliberately not the backend', async () => {
     await translate.ensureTranslateReady();
     expect(disposed).toEqual([]);
 
     await translate.unloadTranslationModel();
 
-    // Innermost first: the context holds the KV cache and belongs to the model, and both belong to
-    // the `Llama` backend, which owns the freshly-required native addon and its thread pool.
-    expect(disposed).toEqual(['context', 'model', 'llama']);
+    // Innermost first: the context holds the KV cache and belongs to the model. The backend owns
+    // only the addon and its thread pool, is shared with `localAgent.ts`, and stays.
+    expect(disposed).toEqual(['context', 'model']);
   });
 
   /**
    * The half of D1 the first fix left behind, and it only shows up over MORE THAN ONE cycle.
    * `getLlama()` builds a new backend each call and `loadBindingModule` re-`require`s the `.node`
-   * with its cache entry deleted, so an undisposed backend is a whole native addon retained per
-   * load. Measured live before this: boot 551.4 MB / 1,051 handles -> after one load+unload cycle
-   * 1,082.4 MB / 4,378 handles -> a second load 3,634.9 MB / 6,809 handles. Handles never fell.
+   * with its cache entry deleted. Measured live: boot 1,051 handles -> 4,378 after one load+unload
+   * cycle -> 6,809 after a second, and `llama.dispose()` on every cycle moved that to 4,378 ->
+   * 6,811, i.e. nothing. So the backend is created ONCE and the cycles stop.
    */
-  it('disposes one backend per load, so cycles do not stack them', async () => {
+  it('creates one backend for the process, however many load cycles run', async () => {
     await translate.ensureTranslateReady();
     await translate.unloadTranslationModel();
     await translate.ensureTranslateReady();
     await translate.unloadTranslationModel();
 
-    expect(getLlamaCalls).toHaveLength(2);
-    expect(disposed.filter((d) => d === 'llama')).toHaveLength(2);
+    expect(getLlamaCalls).toHaveLength(1);
+    expect(disposed.filter((entry) => entry === 'llama')).toHaveLength(0);
+    expect(disposed).toEqual(['context', 'model', 'context', 'model']);
   });
 
   /**
-   * A load that fails after `getLlama()` but before the session exists still created a backend.
-   * If that one is unreachable, the retention this fix closes comes straight back on the error
-   * path — which is the shape the whole of D1 had.
+   * A load that fails after `getLlama()` but before the session exists must not leave the module
+   * holding a model, and must not tear down a backend the agent path may be using.
    */
-  it('releases the backend when the load fails after it was created', async () => {
+  it('releases the model but keeps the shared backend when the load fails', async () => {
     createContextFails.value = true;
     try {
       const result = await translate.ensureTranslateReady();
@@ -141,7 +145,9 @@ describe('translation model lifecycle', () => {
     }
 
     expect(getLlamaCalls).toHaveLength(1);
-    expect(disposed).toContain('llama');
+    expect(disposed).toContain('model');
+    expect(disposed).not.toContain('llama');
+    expect(llamaBackend.isSharedLlamaLoaded()).toBe(true);
   });
 
   it('reloads after an unload rather than handing back a disposed runtime', async () => {
@@ -174,7 +180,7 @@ describe('translation model lifecycle', () => {
       expect(disposed).toEqual([]);
 
       await vi.advanceTimersByTimeAsync(5 * 60_000 + 1_000);
-      await vi.waitFor(() => expect(disposed).toEqual(['context', 'model', 'llama']));
+      await vi.waitFor(() => expect(disposed).toEqual(['context', 'model']));
       expect(translate.isTranslateReady()).toBe(false);
     } finally {
       vi.useRealTimers();

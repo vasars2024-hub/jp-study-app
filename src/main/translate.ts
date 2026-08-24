@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import type { LlamaChatSession } from 'node-llama-cpp';
 import { isValidCrossLangTranslation } from '../shared/epubEnrichment';
 import { langSpec } from '../shared/langs';
+import { getSharedLlama } from './llamaBackend';
 import {
   buildBatchPrompt,
   buildSentencePrompt,
@@ -40,17 +41,6 @@ let loadPromise: Promise<void> | null = null;
  */
 let loadedModel: { dispose?: () => unknown } | null = null;
 let loadedContext: { dispose?: () => unknown } | null = null;
-/**
- * The `Llama` backend instance, and it has to be released too. `getLlama()` does not cache:
- * `getLlamaForOptions` builds a new `Llama` every call, and `loadBindingModule` deliberately
- * `delete`s the addon from `require.cache` first so each instance gets its own copy of the native
- * binding. Deleting a require-cache entry does not unload a `.node`, so the DLL, its thread pool
- * and its handles stay in the process; only `llama.dispose()` (which calls `_bindings.dispose()`)
- * releases them, and it also removes the `process.once('beforeExit')` listener each instance adds.
- * Measured on the live app: without this, one load/unload cycle left main **531 MB and 3,330
- * handles** above its boot baseline, and a second cycle took handles to 6,809.
- */
-let loadedLlama: { dispose?: () => unknown } | null = null;
 let idleUnloadTimer: ReturnType<typeof setTimeout> | null = null;
 let activeTranslations = 0;
 let translateChain: Promise<unknown> = Promise.resolve();
@@ -415,14 +405,15 @@ function resetSessionHistory(s: LlamaChatSession): void {
 }
 
 /**
- * Releases the native model, context and backend. Exported for the tests and for shutdown;
+ * Releases the native model and context — the GBs. Exported for the tests and for shutdown;
  * everything else reaches it through `scheduleIdleUnload`.
  *
- * Order matters: the context and the model are owned by the backend, so they are disposed first
- * and the `Llama` instance last. Disposing is best effort in the same way `localAgent.ts`'s is — a
- * failed native teardown must not take the module down — but the module-level references are
- * cleared either way, so the next `ensureSession()` rebuilds rather than handing back a session
- * over a disposed context.
+ * The `Llama` backend is deliberately NOT released here and that is the fix, not an omission: see
+ * `llamaBackend.ts` for the handle counts that ruled out disposing it per cycle. Innermost first,
+ * because the context holds the KV cache and belongs to the model. Disposing is best effort in the
+ * same way `localAgent.ts`'s is — a failed native teardown must not take the module down — but the
+ * module-level references are cleared either way, so the next `ensureSession()` rebuilds rather
+ * than handing back a session over a disposed context.
  */
 export async function unloadTranslationModel(): Promise<void> {
   if (idleUnloadTimer) {
@@ -431,16 +422,13 @@ export async function unloadTranslationModel(): Promise<void> {
   }
   const context = loadedContext;
   const model = loadedModel;
-  const llama = loadedLlama;
   session = null;
   loadPromise = null;
   loadedContext = null;
   loadedModel = null;
-  loadedLlama = null;
   try {
     await context?.dispose?.();
     await model?.dispose?.();
-    await llama?.dispose?.();
   } catch {
     /* Native cleanup is best effort; the next load still builds a fresh runtime. */
   }
@@ -470,20 +458,23 @@ async function ensureSession(): Promise<LlamaChatSession> {
       }
 
       broadcast('translate:progress', { status: 'init', progress: 0, file: path.basename(modelPath) });
-      const { getLlama, LlamaChatSession } = await import('node-llama-cpp');
+      const { LlamaChatSession } = await import('node-llama-cpp');
       broadcast('translate:progress', { status: 'progress', progress: 20, file: path.basename(modelPath) });
 
-      const llama = await getLlama();
-      // Recorded before the first `await` that could reject, so a load that dies between here and
-      // `createContext` still leaves the backend reachable for `unloadTranslationModel`'s cleanup.
-      loadedLlama = llama as unknown as { dispose?: () => unknown };
+      // Shared with `localAgent.ts` and never disposed per cycle — `llamaBackend.ts` carries the
+      // measured reason. A failed load therefore leaves nothing of its own behind here.
+      const llama = await getSharedLlama();
       broadcast('translate:progress', { status: 'progress', progress: 45, file: path.basename(modelPath) });
 
       const model = await llama.loadModel({ modelPath });
+      // Recorded BEFORE `createContext`, which is the biggest `await` that can still reject here
+      // (`out of VRAM` on a KV cache is the ordinary case). Assigning after it left the 1.2 GB of
+      // weights unreachable on that path, so the error handler's `unloadTranslationModel()` had
+      // nothing to dispose — the same shape as D1 itself, on the failure branch.
+      loadedModel = model as unknown as { dispose?: () => unknown };
       broadcast('translate:progress', { status: 'progress', progress: 80, file: path.basename(modelPath) });
 
       const context = await model.createContext({ contextSize: TRANSLATE_CONTEXT_SIZE });
-      loadedModel = model as unknown as { dispose?: () => unknown };
       loadedContext = context as unknown as { dispose?: () => unknown };
       session = new LlamaChatSession({ contextSequence: context.getSequence() });
       broadcast('translate:progress', { status: 'ready', progress: 100, file: path.basename(modelPath) });

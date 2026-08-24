@@ -22,6 +22,7 @@ import type {
   LocalAgentModelInfo,
   LocalAgentRuntimeStatus,
 } from '../shared/localAgentRuntime';
+import { getSharedLlama } from './llamaBackend';
 import { registerAgentExecutionIpc } from './agentExecutionIpc';
 import { registerAgentImageStagingIpc } from './agentImageStaging';
 import { registerAgentCardBatchStagingIpc } from './agentCardBatchStaging';
@@ -45,14 +46,6 @@ interface LoadedAgentRuntime {
   session: LlamaChatSession;
   model: { dispose?: () => void | Promise<void> };
   context: { dispose?: () => void | Promise<void> };
-  /**
-   * The backend, and it has to be released with the rest. `getLlama()` does not cache — it builds a
-   * new `Llama` per call and re-`require`s the native addon with its `require.cache` entry deleted
-   * first, so an undisposed one retains a whole loaded `.node`, its thread pool and a
-   * `process.once('beforeExit')` listener. Measured on the live app through the translation path,
-   * which had the identical hole: ~+2,425 handles per load/unload cycle, never released.
-   */
-  llama: { dispose?: () => void | Promise<void> };
 }
 
 let runtime: LoadedAgentRuntime | null = null;
@@ -110,10 +103,10 @@ function resetSessionHistory(session: LlamaChatSession): void {
 async function disposeRuntime(value: LoadedAgentRuntime | null): Promise<void> {
   if (!value) return;
   try {
-    // Innermost first: the context belongs to the model and both belong to the backend.
+    // Innermost first: the context belongs to the model. The shared backend outlives both, by
+    // design — `llamaBackend.ts` records the handle counts that ruled out disposing it per cycle.
     await value.context.dispose?.();
     await value.model.dispose?.();
-    await value.llama.dispose?.();
   } catch {
     // Native model cleanup is best effort; the next runtime still loads safely.
   }
@@ -166,10 +159,12 @@ async function loadRuntime(settings: LocalAgentSettings, modelPath: string): Pro
   loadPromise = (async () => {
     await disposeRuntime(runtime);
     runtime = null;
-    const { getLlama, LlamaChatSession } = await import('node-llama-cpp');
-    const llama = await getLlama();
-    // A load that dies at `loadModel` or `createContext` still created a backend, and nothing
-    // downstream would ever see it — the same shape of retention this whole guard exists to close.
+    const { LlamaChatSession } = await import('node-llama-cpp');
+    // Shared with `translate.ts` and held for the process lifetime, so two model-owning modules
+    // cost one native addon rather than one per load.
+    const llama = await getSharedLlama();
+    // A load that dies at `loadModel` still allocated the weights, and nothing downstream would
+    // ever see that model — the same shape of retention this guard exists to close.
     let model: Awaited<ReturnType<typeof llama.loadModel>> | null = null;
     try {
       model = await llama.loadModel({ modelPath });
@@ -180,14 +175,12 @@ async function loadRuntime(settings: LocalAgentSettings, modelPath: string): Pro
         session: new LlamaChatSession({ contextSequence: context.getSequence() }),
         model,
         context,
-        llama,
       };
       runtime = loaded;
       return loaded;
     } catch (err) {
       try {
         await model?.dispose?.();
-        await llama.dispose?.();
       } catch {
         // Best effort, exactly as in disposeRuntime.
       }
