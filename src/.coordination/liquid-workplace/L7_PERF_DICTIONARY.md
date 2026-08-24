@@ -510,3 +510,40 @@ Open, and the next slice: **which action in the cadence starts the plan**, and w
 7,074 rather than 3,448. Prime suspect for the second: `src/main/translate.ts:379` holds a
 **second, independent** module-level llama cache — two full models resident at once. `localAgent.ts`
 has an idle unload; check whether `translate.ts` has one.
+
+## 2026-08-24 · backup — D1 FIXED, and the fix shipped half-broken until the live run caught it
+
+Two defects in `src/main/translate.ts`, both about the same GGUF:
+
+1. `model.createContext()` with **no size** — node-llama-cpp then sizes the KV cache to Qwen3-1.7B's
+   full 32,768-token context. Now `contextSize: 8_192`, matching
+   `DEFAULT_LOCAL_AGENT_SETTINGS.contextSize`; the longest prompt this module builds is a chunk of
+   `BATCH_SIZE` = 8 sentences, so the old size was never usable.
+2. The module kept only the `LlamaChatSession`. The model and context that own the weights and the
+   cache had **no reachable reference**, so nothing could dispose them — no idle unload, no
+   `dispose()`, resident for the process lifetime. `localAgent.ts` already had both guards.
+   Added: `loadedModel`/`loadedContext`, `unloadTranslationModel()`, and a `scheduleIdleUnload()`
+   armed from `promptWithTimeout`'s `finally` (the one choke point every inference passes) and from
+   `ensureSession` (for a caller that loads and never prompts).
+
+**The fix's own defect, and it only failed live.** `loadPromise` was cleared on failure but never on
+success, so `scheduleIdleUnload`'s `!loadPromise` guard was permanently false: the timer fired,
+found the guard false, and did nothing. First live run — model still resident at **3,290 MB, 460 s
+after a 300 s deadline**. Four green unit tests did not see it, because asserting on
+`unloadTranslationModel()` directly never drives the timer. Now cleared in `ensureSession`'s
+`finally`, and a fifth test drives the deadline with fake timers.
+
+| run | baseline | peak | after the idle deadline |
+| --- | --- | --- | --- |
+| before the fix (pid 25936) | 3,447.7 (agent already resident) | 9,618.8 | **7,222** — never falls |
+| bounded context only (pid 15132) | 432.2 | 3,290.4 | 3,290 at t+460 s — **unload never fired** |
+| both halves (pid 25420) | 430.3 | 3,287.7 | **913.9** at t+304 s; RSS 1,901 → 340 |
+
+Tests: `src/main/__tests__/translateModelLifecycle.test.ts`, 5 passed. Three mutation controls, each
+one failure, each restored and re-run green: `createContext()` unsized → `expected undefined to be
+defined`; disposal removed → `expected [] to deeply equal ['context','model']`; `loadPromise = null`
+removed → `actually unloads once the idle deadline passes` fails alone.
+
+Still open, and NOT claimed: 913.9 MB is ~484 MB above the 430.3 MB boot baseline, and **which
+action in the Dictionary cadence starts a model load at all** is unidentified — `l7k` falsified
+six controls individually. Rubric category 7 leg 3 should be re-driven against these numbers.

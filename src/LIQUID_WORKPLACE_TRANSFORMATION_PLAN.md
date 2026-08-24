@@ -707,7 +707,23 @@ Recorded here because a defect logged only in a scorecard subdirectory is invisi
 other track. Boss audit `audit-20260824-053717` raised exactly that as its Finding 1.
 
 **D1 — main-process private bytes grow ~12× under ordinary Dictionary use and never come back.**
-Status: OPEN. Reproduced on four boots; located, not caused, by `6695a30f` and `10f6edc0`.
+Status: **FIXED 2026-08-24** in `src/main/translate.ts`. Everything below is the record of the
+hunt and stays because the premise it corrects is the expensive part — the header said "under
+ordinary Dictionary use" and the cause was in neither the Dictionary nor the renderer.
+
+It was never a leak. `translate.ts` called `model.createContext()` with no size, so
+node-llama-cpp allocated a KV cache for Qwen3-1.7B's full 32,768-token context, and the module
+kept only the `LlamaChatSession` — the model and context that own the weights and that cache had
+no reachable reference, so nothing could ever release them. Attribution and its positive control:
+`probes/l7l-llama-attribution.cjs`, then a translate load that took main **3,447.7 → 9,618.8 MB**
+and settled at **7,222 MB**, which is the plateau below. Fix: a bounded `contextSize`, an idle
+unload that disposes context and model, and `loadPromise` cleared on success (leaving it set made
+the unload's own guard permanently false — caught live, not by the tests). Measured after, one
+process: 430.3 → peak 3,288 → **913.9 MB** when the 5-minute deadline fired at t+304 s, RSS
+1,901 → 340 MB. Pinned by `src/main/__tests__/translateModelLifecycle.test.ts`, three mutation
+controls. Remaining open question, recorded rather than assumed: 913.9 is ~484 MB above the
+430.3 MB boot baseline, and which action in the Dictionary cadence starts a model load at all is
+still unidentified.
 
 - Expected: main private bytes stay near the L0 baseline of 550–577 MB across a session.
 - Actual: **575.8 MB / 1,053 handles → 7,075.7 MB / 4,404 handles** after one

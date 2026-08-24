@@ -33,6 +33,15 @@ const USER_MODEL = 'Qwen3-1.7B.gguf';
 
 let session: LlamaChatSession | null = null;
 let loadPromise: Promise<void> | null = null;
+/**
+ * The native handles behind `session`. Kept because a `LlamaChatSession` alone cannot free
+ * anything: the model weights and the KV cache belong to the model and context objects, and
+ * without a reference to them nothing in this module could ever release the several GB they hold.
+ */
+let loadedModel: { dispose?: () => unknown } | null = null;
+let loadedContext: { dispose?: () => unknown } | null = null;
+let idleUnloadTimer: ReturnType<typeof setTimeout> | null = null;
+let activeTranslations = 0;
 let translateChain: Promise<unknown> = Promise.resolve();
 /** Set by `cancelTranslationBatch` so long EPUB/manga runs can stop between chunks. */
 let batchCancelled = false;
@@ -46,6 +55,19 @@ const BATCH_PROMPT_TIMEOUT_MS = 90_000;
 const STRICT_PROMPT_TIMEOUT_MS = 45_000;
 const SENTENCE_PROMPT_TIMEOUT_MS = 60_000;
 const MODEL_LOAD_TIMEOUT_MS = 180_000;
+/**
+ * Measured 2026-08-24, and the reason this constant exists at all. `createContext()` with no
+ * size asks node-llama-cpp for the model's full trained context — 32,768 tokens for Qwen3-1.7B —
+ * and the KV cache for that is several times the 1,223 MB model file. Loading it took main's
+ * private bytes 3,447.7 -> 9,618.8 MB in 15 s, and after the local agent's own copy idle-unloaded
+ * the process settled at 7,222 MB and stayed there: defect D1's plateau, exactly.
+ *
+ * 8,192 matches `DEFAULT_LOCAL_AGENT_SETTINGS.contextSize` and is far above what this module can
+ * actually use — the longest prompt it builds is a chunk of `BATCH_SIZE` = 8 sentences.
+ */
+const TRANSLATE_CONTEXT_SIZE = 8_192;
+/** Same budget the local agent uses, for the same reason: a cached model is GBs of native memory. */
+const IDLE_UNLOAD_MS = 5 * 60_000;
 
 interface TranslationCacheFile {
   entries: Record<string, string>;
@@ -150,6 +172,7 @@ async function promptWithTimeout(
     }, timeoutMs);
   });
 
+  activeTranslations += 1;
   try {
     return await Promise.race([promptPromise, timeoutPromise]);
   } finally {
@@ -159,6 +182,11 @@ async function promptWithTimeout(
     // Best-effort: don't leave a late prompt resolution touching session state.
     void promptPromise.catch(() => undefined);
     resetSessionHistory(s);
+    activeTranslations -= 1;
+    // Every inference in this module goes through here, so this is the one place that knows the
+    // model has just stopped being needed. Re-arming on each completion means a long EPUB run
+    // keeps pushing the deadline out instead of unloading between chapters.
+    scheduleIdleUnload();
   }
 }
 
@@ -338,6 +366,15 @@ export function isTranslateAvailable(): boolean {
   return resolveModelPath() !== null;
 }
 
+/**
+ * Whether the model is loaded right now. Distinct from `isTranslateAvailable`, which only asks
+ * whether the file is on disk: since the runtime idle-unloads, "available" and "resident" are no
+ * longer the same question.
+ */
+export function isTranslateReady(): boolean {
+  return session !== null;
+}
+
 function friendlyError(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err);
   if (/model not found|ENOENT|no such file/i.test(msg)) {
@@ -366,6 +403,47 @@ function resetSessionHistory(s: LlamaChatSession): void {
   }
 }
 
+/**
+ * Releases the native model and context. Exported for the tests and for shutdown; everything else
+ * reaches it through `scheduleIdleUnload`.
+ *
+ * Disposing is best effort in the same way `localAgent.ts`'s is — a failed native teardown must
+ * not take the module down — but the module-level references are cleared either way, so the next
+ * `ensureSession()` rebuilds rather than handing back a session over a disposed context.
+ */
+export async function unloadTranslationModel(): Promise<void> {
+  if (idleUnloadTimer) {
+    clearTimeout(idleUnloadTimer);
+    idleUnloadTimer = null;
+  }
+  const context = loadedContext;
+  const model = loadedModel;
+  session = null;
+  loadPromise = null;
+  loadedContext = null;
+  loadedModel = null;
+  try {
+    await context?.dispose?.();
+    await model?.dispose?.();
+  } catch {
+    /* Native cleanup is best effort; the next load still builds a fresh runtime. */
+  }
+}
+
+/**
+ * Arms the unload. Called after every translation rather than on a timer, so an idle process never
+ * holds the model and a busy one never has it pulled out from under a batch.
+ */
+function scheduleIdleUnload(): void {
+  if (idleUnloadTimer) clearTimeout(idleUnloadTimer);
+  idleUnloadTimer = setTimeout(() => {
+    idleUnloadTimer = null;
+    if (activeTranslations === 0 && !loadPromise && session) void unloadTranslationModel();
+  }, IDLE_UNLOAD_MS);
+  // A pending unload must not keep the app alive at quit.
+  idleUnloadTimer.unref?.();
+}
+
 async function ensureSession(): Promise<LlamaChatSession> {
   if (session) return session;
   if (!loadPromise) {
@@ -385,7 +463,9 @@ async function ensureSession(): Promise<LlamaChatSession> {
       const model = await llama.loadModel({ modelPath });
       broadcast('translate:progress', { status: 'progress', progress: 80, file: path.basename(modelPath) });
 
-      const context = await model.createContext();
+      const context = await model.createContext({ contextSize: TRANSLATE_CONTEXT_SIZE });
+      loadedModel = model as unknown as { dispose?: () => unknown };
+      loadedContext = context as unknown as { dispose?: () => unknown };
       session = new LlamaChatSession({ contextSequence: context.getSequence() });
       broadcast('translate:progress', { status: 'ready', progress: 100, file: path.basename(modelPath) });
     })();
@@ -407,12 +487,23 @@ async function ensureSession(): Promise<LlamaChatSession> {
       }),
     ]);
   } catch (err) {
-    loadPromise = null;
-    session = null;
+    // The load may have got as far as the model or the context before failing or timing out. Both
+    // are GBs of native memory, so this releases them rather than only dropping the reference —
+    // `unloadTranslationModel` clears `loadPromise` and `session` on the way through.
+    await unloadTranslationModel();
     throw err;
   } finally {
     if (loadTimer) clearTimeout(loadTimer);
+    // Cleared on SUCCESS too, which it never used to be. `loadPromise` exists only to dedupe
+    // concurrent loads, and `session` is already assigned by the time this runs, so a caller
+    // arriving now takes the `if (session)` early return rather than starting a second load.
+    // Leaving it set made `scheduleIdleUnload`'s `!loadPromise` guard permanently false: measured
+    // on the live app, the model was still resident at 3,290 MB 460 s after a 300 s deadline.
+    loadPromise = null;
   }
+  // A caller that loads and then never prompts (`ensureTranslateReady`, or a batch the user
+  // cancels before the first chunk) would otherwise pin the model forever.
+  scheduleIdleUnload();
   return session!;
 }
 
@@ -612,7 +703,7 @@ export function registerTranslateIpc(): void {
   ipcMain.handle('translate:status', () => {
     const modelPath = resolveModelPath();
     return {
-      ready: session !== null,
+      ready: isTranslateReady(),
       modelFound: modelPath !== null,
       modelPath,
     };
