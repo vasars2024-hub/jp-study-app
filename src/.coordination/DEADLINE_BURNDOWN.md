@@ -155,3 +155,21 @@ on 0 B/s; the next-smallest (episode 39-END, 574,095,360 B, 14 seeders) was name
 ran at 2.29 MB/s. Projection unchanged at 2026-08-25 by the same arithmetic -- 2 units at ~3.6
 gates/day -- and it is now better supported than when it was written, because everything gate 31
 needs except a Japanese sub-pack has been exercised live in one process.
+
+2026-08-24 | mal-pipeline | units done this turn: 0 | units left: 2 | basis: the gate tables in src/MAL_ANIME_PIPELINE_PLAN.md, re-counted this turn (open: 31, 34) | projected finish: UNKNOWN
+Worker `backup`. Zero units, and the projection is deliberately UNKNOWN rather than the 2026-08-25
+the last two lines carried. That date divided 2 remaining gates by this plan's lifetime average of
+~3.6 gates/day. Gate 31 is not an average gate and the arithmetic has now been wrong for two
+turns: its Route A leg needs a *standalone Japanese subtitle pack with live seeders* to exist on
+nyaa for a title in this user's library, and that is not a rate this relay controls. Measured
+against it today: 984 previously-surveyed sidecar rows re-read under a widened ceiling produced
+**0** new candidates (only 9 of 984 are under 150 MB at all); a fresh band of 24 titles produced
+**A:0** on every one; and the one row the earlier survey did record at 3 seeders (Maison Ikkoku,
+0.7 MB) is no longer on the live index at that seeder floor. Gate 34 is ~15 min once 31 closes.
+So the honest statement is: gate 34 is a day's work and gate 31 is blocked on external swarm data
+that six turns of hunting have not turned up. If the next two bands (84-120, ~36 titles) also
+return A:0, this plan should say so as a *finding* — the pipeline works and this library has no
+Route A release — rather than keep pre-booking a date. Product code landed either way, which is
+what makes the turn not a waste: 15b82df8 (a season pack of subtitles could not be classified as
+a pack, measured on the 87.80 MB pack the plan itself renders from) and b74925a8 (two real
+subs-only releases the name reader could not see, both from the user's own completed list).
