@@ -85,6 +85,7 @@ import {
   type VideoCoreStudyPreferences,
   type VideoCoreTimingSignal,
 } from '../shared/videoCoreStudy';
+import { parseStudySubtitles } from '../shared/subtitleCues';
 import type { VideoCoreMiningSource } from '../shared/videoCoreMining';
 import {
   mediaCaptionCues,
@@ -94,6 +95,15 @@ import VideoCoreMiningPanel from './VideoCoreMiningPanel';
 import VideoCoreGrammarPanel from './VideoCoreGrammarPanel';
 import VideoCoreTranscriptPanel from './VideoCoreTranscriptPanel';
 import { useCueAnalysis } from './useCueAnalysis';
+
+/**
+ * How long to let the container's own tracks arrive before offering a downloaded one.
+ *
+ * The manager is constructed before the stream is parsed, so `getTracks()` is empty for
+ * a moment on every file — including files that do carry embedded subtitles. Asking
+ * immediately would mount a sidecar over a muxed track that was about to appear.
+ */
+const EXTERNAL_SUBTITLE_GRACE_MS = 800;
 
 const RATE_PRESETS = [0.7, 0.75, 0.85, 0.9, 1, 1.25, 1.5] as const;
 
@@ -238,6 +248,18 @@ export default function VideoCoreStudyOverlay({
   const [allCues, setAllCues] = React.useState<VideoCoreActiveCue[]>([]);
   const [tracks, setTracks] = React.useState<NormalizedTrackInfo[]>([]);
   const [selectedTrack, setSelectedTrack] = React.useState<number | null>(null);
+  /**
+   * What the script split removed from the downloaded track, and from which track.
+   *
+   * Kept as state rather than discarded because a hidden line is a *number the user is
+   * owed*: the split is right far more often than not, but "the transcript is short and
+   * nobody said why" is the failure mode the whole split exists to make visible. Keyed by
+   * track number so it can never be shown against a different track than the one it
+   * describes — the file's own embedded tracks are unsplit and must stay unannotated.
+   */
+  const [externalTrackSplit, setExternalTrackSplit] = React.useState<
+    { trackNumber: number; dropped: number; styles: string[] } | null
+  >(null);
   const [secondaryTrack, setSecondaryTrack] = React.useState<number | null>(null);
   const [secondaryCues, setSecondaryCues] = React.useState<VideoCoreActiveCue[]>([]);
   const [activeSecondaryCues, setActiveSecondaryCues] =
@@ -360,6 +382,15 @@ export default function VideoCoreStudyOverlay({
   const selectedTrackLabel = selectedTrackEntry
     ? trackLabel(selectedTrackEntry, t)
     : t('mediaWorkspace.study.transcriptNoTrack');
+  // Only for the track the split actually ran on. An embedded track selected afterwards
+  // has had nothing hidden from it, and carrying the notice across would be a lie.
+  const transcriptTrackNotice = externalTrackSplit
+    && externalTrackSplit.trackNumber === selectedTrack
+    ? t('media.subStatus.otherScript', {
+      count: externalTrackSplit.dropped,
+      styles: externalTrackSplit.styles.slice(0, 4).join(', '),
+    })
+    : '';
 
   /*
     Grammar highlight. `auto` is the pause state, not the toggle: the toggle says
@@ -512,6 +543,112 @@ export default function VideoCoreStudyOverlay({
     subtitleDelaySec,
     video,
   ]);
+
+  /**
+   * The downloaded track, mounted — the workspace player's half of a subtitle the
+   * library already chose.
+   *
+   * VideoCore learns about subtitles from the container it streams, so a file whose
+   * Japanese track was *fetched* rather than muxed (Jimaku, a nyaa release, the harvest
+   * panel's attach) has no subtitle stream at all: the manager picks a default from an
+   * empty list and calls `setNoTrack()`. Measured on `The Big O - 01`, where `ffprobe`
+   * reports exactly `hevc` + `flac` while a 267-cue Jimaku track for it sits in
+   * `subtitles/<mediaId>/`. This is the player that is actually mounted — `media:open`
+   * belongs to the retired one — so without this the download reaches nothing.
+   *
+   * WHICH record is not decided here. `media:subtitleForPath` routes through
+   * `pickPlaybackSubtitle` and honours the library's `preferredSubtitleId`, exactly as
+   * `media:open` does, so the two players cannot disagree about which of several
+   * downloaded tracks is the study one.
+   *
+   * Only when the container found nothing: an embedded track is the file's own and
+   * outranks a sidecar. Re-checked after the awaits as well, because the file's own
+   * tracks can land while this is in flight.
+   */
+  const externalSubtitleForRef = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    const localPath = playbackInfo?.localFile?.path;
+    if (!manager || !localPath) return undefined;
+    // One attempt per file. Re-running on a re-render would re-add the track, and the
+    // track numbers would climb for one unchanging file.
+    if (externalSubtitleForRef.current === localPath) return undefined;
+
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        if (cancelled) return;
+        if (manager.getTracks().length > 0) return;
+        externalSubtitleForRef.current = localPath;
+        let pick: { name: string; text: string } | null = null;
+        try {
+          pick = await window.api.subtitleForPath(localPath);
+        } catch {
+          return;
+        }
+        if (cancelled || !pick?.text) return;
+
+        // `parseStudySubtitles`, not `parseSubtitles`: this is the PRIMARY study track —
+        // the one the transcript, the analyser and every mined card read — so it takes the
+        // per-style script split, exactly as `MediaContent.applySubtitleFile` does. A
+        // dual-language `.ass` is one file holding two whole tracks, and nothing above the
+        // parser can see that; without the split a `简繁外挂字幕` release paints its Chinese
+        // half on screen and feeds it to mining. Inert on `.srt`, `.vtt` and any
+        // single-script `.ass`, which is every case this path handled before.
+        const split = parseStudySubtitles(pick.text);
+        if (!split.cues.length) return;
+
+        const trackNumber = nextVideoCoreWhisperTrackNumber(
+          manager.getTracks().map((track) => track.number),
+        );
+        const events = whisperCuesToVideoCoreEvents(
+          split.cues,
+          trackNumber,
+        ) as MKVParser_SubtitleEvent[];
+        if (!events.length) return;
+
+        const track: MKVParser_TrackInfo = {
+          number: trackNumber,
+          uid: trackNumber,
+          type: 'subtitle',
+          codecID: 'S_TEXT/ASS',
+          // The record's own label — provenance the user can read in the track picker,
+          // and study content rather than chrome, so it is deliberately not translated.
+          name: pick.name,
+          language: getStudyLang(),
+          languageIETF: getStudyLang(),
+          default: false,
+          forced: false,
+          enabled: true,
+        };
+        try {
+          await manager.addEventTrack(track);
+          await manager.onSubtitleEvents(events);
+          // Still nothing selected? Then this is the only track there is. Re-checked
+          // after the awaits rather than before them: the file's own tracks can land
+          // while this is in flight, and upstream's choice must outrank ours.
+          if (manager.getSelectedTrackNumberOrNull() === null) {
+            await manager.selectTrack(trackNumber);
+          }
+          if (cancelled) return;
+          setExternalTrackSplit(
+            split.dropped ? { trackNumber, dropped: split.dropped, styles: split.styles } : null,
+          );
+          setTracks(manager.getTracks());
+          setSelectedTrack(manager.getSelectedTrackNumberOrNull());
+          setAllCues(manager.getCues());
+          setActiveCues(manager.getActiveCues());
+        } catch {
+          // A mount failure is not worth breaking playback over — the video plays, and
+          // the track picker simply has one fewer entry than it might have had.
+        }
+      })();
+    }, EXTERNAL_SUBTITLE_GRACE_MS);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [manager, playbackInfo?.localFile?.path]);
 
   React.useEffect(() => {
     if (manager || !mediaCaptionsManager) return;
@@ -2076,6 +2213,7 @@ export default function VideoCoreStudyOverlay({
             activeIndex={activeCue?.index ?? null}
             lang={studyLang}
             trackLabel={selectedTrackLabel}
+            trackNotice={transcriptTrackNotice}
             onSeek={seekTranscriptCue}
             onClose={() => updatePreference('transcriptPanel', false)}
           />

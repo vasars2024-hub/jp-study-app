@@ -922,6 +922,24 @@
   background: rgb(var(--color-gray-800) / 0.9);
 }
 
+/*
+  Why the transcript is shorter than its file. Amber rather than the destination row's
+  brand blue because this is a *withheld* result, not a routing fact, and it sits above
+  the destination for the same reason: what the transcript contains outranks where it
+  goes. Gray-50 on gray-900 keeps it readable at 0.72rem rather than styling it as a
+  muted footnote — a number the user is owed is not decoration.
+*/
+#media-workspace .study-transcript-notice {
+  margin: 0;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid rgb(var(--color-amber-400, 251 191 36) / 0.32);
+  border-radius: 0.5rem;
+  background: rgb(var(--color-gray-900) / 0.6);
+  color: rgb(var(--color-gray-50) / 1);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
 #media-workspace .study-transcript-destination {
   display: flex;
   flex-wrap: wrap;

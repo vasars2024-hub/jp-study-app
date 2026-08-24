@@ -87,6 +87,15 @@ interface Props {
   onClose: () => void;
   /** Name of the track being shown, so it is obvious whose transcript this is. */
   trackLabel: string;
+  /**
+   * Why this transcript is shorter than the file it came from, when it is.
+   *
+   * Empty for every ordinary track. Set only when the script split removed cues from a
+   * dual-language release, because a transcript that silently loses half a file is
+   * indistinguishable from a bad download — the number and the style names are the
+   * evidence that turns it back into a decision the user can check.
+   */
+  trackNotice?: string;
 }
 
 /** Rows tokenized per frame. Small enough that no single frame is felt. */
@@ -198,6 +207,7 @@ export default function VideoCoreTranscriptPanel({
   onSeek,
   onClose,
   trackLabel,
+  trackNotice = '',
 }: Props) {
   const { t } = useT();
   const [query, setQuery] = React.useState('');
@@ -301,6 +311,10 @@ export default function VideoCoreTranscriptPanel({
           ×
         </button>
       </header>
+
+      {trackNotice && (
+        <p className="study-transcript-notice" role="status">{trackNotice}</p>
+      )}
 
       {destination && (
         <p className="study-transcript-destination">
