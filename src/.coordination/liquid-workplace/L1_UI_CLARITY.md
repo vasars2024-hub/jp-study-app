@@ -91,3 +91,82 @@ settle before reading it, or a control will look like it failed to fire.
 
 L3's per-window presentation state and L4's Video pilot. Until then Q6–Q8 have no second term, and
 the honest ceiling is 7 answerable questions of 10.
+
+## 2026-08-24 · backup — category 5 re-driven on the LIQUID Dictionary: **8/10**
+
+The disposition above ("NOT SCORED, and it cannot be scored before L3") was correct when it was
+written and is now **superseded**. L3 landed `button.fwin-b-liquid` and L5 landed the painted
+`.lq-contextual` regions, so Q6, Q7 and Q8 have a subject on an opted-in window and the honest
+thing is to measure them rather than keep recording an absence.
+
+State driven: Dictionary window in **Liquid** presentation, `lang=en`, `data-theme=forest-night`,
+`data-perf=performance`, 食べる → **8 `dict-entry` results / 5,963 chars / 349 nodes / 67 controls**,
+box `820x580`. Not an empty harness.
+
+| Q | Verdict | The number |
+| - | ------- | ---------- |
+| 1 | YES | `entryPoints` **3** (1 input + 2 accent), bar 1..3 |
+| 2 | YES | title `Dictionary`, back affordances **1** |
+| 3 | YES | `button.btn` primary, inside body viewport at `scrollTop 0` |
+| 4 | **NO** | **20** chrome controls, **6** collapsed disclosures — bar is `<=12` chrome |
+| 5 | INHERIT-PASS | min **5.30:1** over 141 runs, 0 failing (`l1-accessibility.js`) |
+| 6 | YES | **3** Liquid-treated regions, **3** carrying a transition, **0** infinite animations |
+| 7 | YES | contextual painting **3 → 0 → 3**; control set equal; geometry equal to 1 px |
+| 8 | YES | round trip: entries 8/8/8, chars 5963/5963/5963, scroll, focus, search value all equal |
+| 9 | NOT EARNABLE | `parity-ledger.json` still **0 of 7 rows `both`** — no post-migration term |
+| 10 | YES | 4 of 4 identity markers; card uniformity 0.75, **1** control signature = a gallery |
+
+**Score 8/10.** Q4 is a real product finding; Q9 cannot be earned by this surface at all until the
+parity ledger closes. Nothing here is rounded up.
+
+### Two instrument defects, both of which had already produced a false answer
+
+1. **Q6 read `NO-SUBJECT` on a window that was visibly in Liquid presentation.** It counted
+   regions with a `backdrop-filter`, and this surface has **0** of them — by design.
+   `theme/liquid-window.css` states the reason at the rule: `.fwin` carries
+   `transform: translateZ(0)` and is therefore a backdrop root, so a `backdrop-filter` inside it
+   would sample the window's own opaque body. Liquid is spelled here as translucency + border +
+   radius + shadow on `.lq-contextual`, painted only under `.fwin-liquid`. **A probe that knows one
+   spelling of a material reports the absence of the other as the absence of the feature** — the
+   same class of error as the `.desktop` selector that matched nothing and read as "the app has no
+   desktop". Q6 now takes the union of both spellings: **0 by backdrop-filter, 3 by contextual paint**.
+2. **Q7 scored NO for the toggle working correctly.** The control-label set differs across the
+   round trip because the presentation toggle's own `aria-label` changes — measured:
+   `Return to standard window` ↔ `Make Liquid`. That is the affordance doing its job, not a lost
+   feature. The toggle is now excluded from the parity set, and the parity set is 64 controls.
+
+Also replaced: Q7's `zeroBackdropRegions` check was structurally `true` on this surface and so
+discriminated nothing. The check that does the work is `liquidWasPainting` **AND**
+`zeroLiquidTreatmentInStandard` — liquid must have been painting in the first place, or "0 in
+standard" passes for a surface that has no Liquid treatment at all.
+
+### The negative controls fired, both of them
+
+`l1-q78-drive.cjs --control q7|q8`. Neither control run parks its verdicts, so a planted failure
+can never reach a score — the driver asserts that in its own output.
+
+| Plant | Expected | Observed |
+| ----- | -------- | -------- |
+| a `.lq-contextual` painted **inline** (cascade cannot remove it) | Q7 NO | **NO** — standard painting **1**, `zeroLiquidTreatmentInStandard: false`, `zeroBackdropRegions: false` |
+| remove one `.dict-entry` while standard | Q8 NO | **NO** — entries **8 → 7**, chars **5963 → 5843**, `sameResults/sameTextLength/sameControlSet` all false |
+
+Surface restored after: re-driven to **8 entries / 5,963 chars**, and a clean run re-parked
+`q7 YES / q8 YES` before the clarity probe was read.
+
+### Measured contextual treatment, both presentations
+
+`view-head` **772x65 → 772x47**, `dict-saved-searches` **772x53 → 772x35**,
+`lexicon-lens-picker` **772x50 → 772x32**. In liquid all three read
+`color(srgb 0.0706 0.1098 0.0902 / 0.72)` + `1px` border + `16px` radius + shadow set + `8px`
+padding; in standard all three read `rgba(0, 0, 0, 0)` + `0px` + `0px` + `none` + `0px`.
+Conventional presentation is unchanged, which is §2's first non-negotiable.
+
+### What category 5 needs to reach 10
+
+- **Q4** — 20 chrome controls against a bar of 12. This is the one open product change, and the bar
+  is this probe's own choice and stated so it can be argued with. Decide it deliberately; do not
+  reflexively hide six controls behind a disclosure.
+- **Q9** — `parity-ledger.json` at 0 of 7. Not fixable from this surface; it closes with L6.
+
+**Trap.** The Q8 control leaves the surface with 7 entries. Re-drive 食べる before reading anything
+else, or the next probe scores a surface the control damaged.

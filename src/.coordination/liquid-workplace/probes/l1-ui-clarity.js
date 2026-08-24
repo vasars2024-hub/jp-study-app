@@ -8,12 +8,18 @@
  *
  * `NO-SUBJECT` IS THE POINT OF THIS PROBE, not an evasion. Three of the ten questions ask about
  * Liquid presentation state — motion that explains a relationship, standard mode staying normal,
- * and Liquid turning off without state loss. L3 (per-window presentation state) and L4 (the Video
- * pilot) are unbuilt, so there is no Liquid mode to enter, no toggle to find, and no second term
- * to compare against. A probe that answered those "yes" because nothing was broken would be
- * scoring the ABSENCE of the feature as the presence of its quality. So the probe proves the
- * absence observably — it counts Liquid-presentation toggles on the surface and requires that
- * count to be 0 — and refuses to score them.
+ * and Liquid turning off without state loss. When this probe first ran, L3 (per-window
+ * presentation state) was unbuilt: there were **0** Liquid-presentation toggles on all five
+ * windows, so there was no Liquid mode to enter, no toggle to find, and no second term to compare
+ * against. A probe that answered those "yes" because nothing was broken would be scoring the
+ * ABSENCE of the feature as the presence of its quality. So the probe proves the absence
+ * observably — it counts the toggles — and refuses to score a question with no subject.
+ *
+ * L3 has since landed `button.fwin-b-liquid`, so on an opted-in window Q6, Q7 and Q8 now HAVE a
+ * subject and are measured rather than skipped. Q6 is answerable from one snapshot (regions
+ * carrying a `backdrop-filter`, and whether any of them animate infinitely). Q7 and Q8 are not —
+ * they need a round trip — so `debug/l1-q78-drive.cjs` drives it and parks its verdicts here.
+ * A surface with no toggle still reports `NO-SUBJECT`, which stays the honest answer for it.
  *
  * WHY THE BARS ARE WHERE THEY ARE, since arbitrary bars are how a self-scored 10 goes wrong:
  *   Q1 `entryPoints` in the top third of the body, 1..3. One obvious way in, not a wall. A
@@ -68,6 +74,12 @@
     }
     return [0, 0, 0];
   };
+
+  /**
+   * Verdicts the round-trip driver parked, or `{}` if it has not run at this tree. Read once,
+   * outside `measure`, so every window in one run reports the same provenance.
+   */
+  const liquidVerdict = (window.__q78verdict && typeof window.__q78verdict === 'object') ? window.__q78verdict : {};
 
   const measure = (win, label) => {
     const R = win.getBoundingClientRect();
@@ -126,11 +138,35 @@
     const chromeControls = controls.filter((e) => !repeatingRow(e) && !e.closest('.fwin-bar'));
 
     // --- Q6/Q7/Q8: is there any Liquid presentation state to ask about at all. ---------------
-    const liquidRegions = [...win.querySelectorAll('*')].filter((e) => {
+    const blurRegions = [...win.querySelectorAll('*')].filter((e) => {
       if (!painted(e)) return false;
       const cs = getComputedStyle(e);
       return (cs.backdropFilter && cs.backdropFilter !== 'none')
         || (cs.webkitBackdropFilter && cs.webkitBackdropFilter !== 'none');
+    });
+    /**
+     * LIQUID IS NOT SPELLED `backdrop-filter` ON THIS SURFACE, and counting only blur reported
+     * Q6 as NO-SUBJECT on a window that was visibly in Liquid presentation with three painted
+     * regions. `theme/liquid-window.css` says why in its own comment: `.fwin` carries
+     * `transform: translateZ(0)` and is therefore a backdrop root, so a `backdrop-filter` inside
+     * it would sample the window's own opaque body. The interior Liquid treatment is
+     * translucency + border + radius + shadow on `.lq-contextual`, painted ONLY under
+     * `.fwin-liquid`. A probe that recognises one spelling of a material reports the absence of
+     * the other as the absence of the feature — the same class of error as the `.desktop`
+     * selector below, which matched nothing and read as "the app has no desktop".
+     */
+    const alphaOfBg = (e) => alphaOf(getComputedStyle(e).backgroundColor);
+    const contextualPainted = [...win.querySelectorAll('.lq-contextual')].filter((e) => {
+      if (!painted(e)) return false;
+      const cs = getComputedStyle(e);
+      return alphaOfBg(e) > 0.02 || parseFloat(cs.borderTopWidth) > 0 || (cs.boxShadow && cs.boxShadow !== 'none');
+    });
+    const liquidRegions = [...new Set([...blurRegions, ...contextualPainted])];
+    // "Motion that EXPLAINS a relationship" is a transition bound to entering or moving, i.e.
+    // motion caused by a state change. A looping animation explains nothing and is the failure.
+    const withTransition = liquidRegions.filter((e) => {
+      const t = getComputedStyle(e).transitionDuration;
+      return t && t.split(',').some((v) => parseFloat(v) > 0);
     });
     const liquidToggles = controls.filter((e) => {
       const l = (e.getAttribute('aria-label') || e.title || e.textContent || '').trim();
@@ -229,12 +265,39 @@
         q(5, 'every readable surface has stable contrast', 'INHERIT',
           { inheritedFrom: 'l1-accessibility.js, re-driven at this tree' }),
         q(6, 'Liquid motion explains a real relationship',
-          liquidRegions.length === 0 ? 'NO-SUBJECT' : (infiniteOnLiquid.length === 0 ? 'YES' : 'NO'),
-          { liquidRegions: liquidRegions.length, infiniteAnimationsOnLiquid: infiniteOnLiquid.length }),
-        q(7, 'standard mode remains fully normal', liquidToggles.length === 0 ? 'NO-SUBJECT' : 'MEASURE',
-          { liquidPresentationToggles: liquidToggles.length, why: 'no Liquid mode to leave — L3 unbuilt' }),
-        q(8, 'Liquid can be turned off without losing state', liquidToggles.length === 0 ? 'NO-SUBJECT' : 'MEASURE',
-          { liquidPresentationToggles: liquidToggles.length, why: 'nothing to turn off — L3 unbuilt' }),
+          liquidRegions.length === 0
+            ? 'NO-SUBJECT'
+            : (infiniteOnLiquid.length === 0 && withTransition.length === liquidRegions.length ? 'YES' : 'NO'),
+          {
+            liquidRegions: liquidRegions.length,
+            byBackdropFilter: blurRegions.length,
+            byContextualPaint: contextualPainted.length,
+            carryingATransition: withTransition.length,
+            infiniteAnimationsOnLiquid: infiniteOnLiquid.length,
+            bar: 'every Liquid-treated region carries a state-change transition and none loops forever',
+          }),
+        /**
+         * Q7/Q8 need a ROUND TRIP — liquid → standard → liquid — and a single `/eval` cannot
+         * drive one, because the bridge never awaits and React needs a paint between the click
+         * and the read. `debug/l1-q78-drive.cjs` drives it and parks its verdicts and numbers on
+         * `window.__q78verdict`. This probe reads them and marks them `drivenBy` so no reader
+         * mistakes them for something a single snapshot produced.
+         *
+         * The three states are all different and all honest: `NO-SUBJECT` when the surface has no
+         * presentation toggle at all (L1's original finding — 0 on all five windows); `MEASURE`
+         * when a toggle exists but the round trip has not been driven at this tree; and the
+         * driver's own YES/NO once it has.
+         */
+        q(7, 'standard mode remains fully normal',
+          liquidToggles.length === 0 ? 'NO-SUBJECT' : (liquidVerdict.q7 ? liquidVerdict.q7.verdict : 'MEASURE'),
+          liquidToggles.length === 0
+            ? { liquidPresentationToggles: 0, why: 'no Liquid mode to leave on this surface' }
+            : { liquidPresentationToggles: liquidToggles.length, drivenBy: 'debug/l1-q78-drive.cjs', checks: liquidVerdict.q7 ? liquidVerdict.q7.checks : null }),
+        q(8, 'Liquid can be turned off without losing state',
+          liquidToggles.length === 0 ? 'NO-SUBJECT' : (liquidVerdict.q8 ? liquidVerdict.q8.verdict : 'MEASURE'),
+          liquidToggles.length === 0
+            ? { liquidPresentationToggles: 0, why: 'nothing to turn off on this surface' }
+            : { liquidPresentationToggles: liquidToggles.length, drivenBy: 'debug/l1-q78-drive.cjs', checks: liquidVerdict.q8 ? liquidVerdict.q8.checks : null }),
         q(9, 'all pre-migration features reachable and functional', 'INHERIT',
           { inheritedFrom: 'parity-ledger.json', note: 'no migration has occurred; see the document for why this earns no discriminating point' }),
         q(10, 'still feels like itself, not a generic card dashboard',
