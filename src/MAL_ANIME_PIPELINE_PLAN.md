@@ -2269,3 +2269,58 @@ run created is gone. That is why the control could run on a real item at all.
 Route A *and* Route B acquisition ending in cues rendering **in the player** for the acquired
 title, and this profile still has no JoJo video. Attaching those cues to a podcast and calling it
 rendering would be the rig the plan forbids — which is why the run above detaches.
+
+## 2026-08-24 — a range lands on a season, and the render seam runs on a series the user owns
+
+Worker `primary`. Commits `7778a59a`, `fa7a7e43`. Probes `debug/g31-libcensus.cjs`,
+`debug/g31-attachplan-live.cjs`, `debug/g31-bigo-e2e.cjs` (untracked; `debug/` is gitignored).
+No main-process change, so no restart was needed — renderer + shared only.
+
+**The library census nobody had run, and the finding in it.** 33 items: 26 episodes of
+**The Big O** plus 3 creditless extras, 3 Hana podcasts, 1 other. **The Big O is NOT on the
+user's MAL completed list** — 1,426 rows, and `"Big O"` / `ビッグオー` appear **0 times** in the
+whole serialised list. So the only anime series this profile owns cannot serve gate 31's
+"from a MAL page" clause, and gate 31's render leg is not merely waiting on a video: it is
+waiting on a video *for a title on the list*. Do not re-derive this.
+
+**The product gap that was actually closeable.** The panel attached one file to one item, chosen
+by hand. Route B fetched **39** files in one click. `planSubtitleAttach` (`shared/`, pure) pairs a
+whole harvest with the library items that ARE those episodes; every rule narrows and nothing
+guesses — `no-episode`, `no-match`, `ambiguous` (a tie is refused, not broken), `already-attached`,
+and one item takes at most one file per plan. The gate that makes it safe is the **series** check,
+not the number: an episode-number lookup alone would write JoJo's episode 1 onto The Big O's.
+
+**Measured live on the real 33-item library, not a fixture** (`import()` over the app's own module
+graph). First run: 26-file harvest as The Big O → **24 paired, 2 ambiguous**. The two lost were
+episodes 1 and 2, claimed by `The Big O - Creditless Ending 1` and `… Ending 2`. Cause was one line
+of the new module: `parseMediaFileName` returns **null** for all three creditless extras — correctly
+— and the loose `episodeFromFileName` fallback read **1 and 2** back out of their titles. A null
+from the strict parser is an answer, not a gap. Fixed, plus `hashNumbered` for the one form the
+strict parser has no rule for (`… Hana #12 [id].mp4`, 4 real items). After: **26 of 26 paired, 0
+skipped**; podcast **3 paired**; cross-series control **0 paired, 26 no-match**.
+
+**THE RENDER SEAM, DRIVEN END TO END ON REAL DATA — and jimaku has this series.**
+`subtitleHarvestList('The Big O')` → **13 Japanese files**, `needsKey:false`. Episodes 1–3:
+
+| step | number |
+| --- | --- |
+| fetched | 14,007 / 14,432 / 15,047 chars |
+| planned | 3 pairs, **0 skipped** |
+| attached | 3 of 3 `ok:true`; tracks 1→2, 0→1, 0→1 |
+| read back through `readSubtitleRecord` + `parseStudySubtitles` | **267 / 278 / 299 cues, 0 dropped** |
+| first cue | `ん？` · `私の名前はロジャー・スミス` · `Big Big Big-O` |
+| detached | tracks 2→1, 1→0, 1→0 — **library net zero** |
+
+**Gate 31 stays 32 of 34** (open: 31, 34), counted from this file's gate tables. What is now proven
+is the whole no-torrent route from a catalogue title to parsed Japanese cues on the user's own
+video, at real counts. What is still missing is the last inch — cues painting in the player's own
+surface (`MediaContent.applySubtitleFile`) — and an acquisition for a title that is on the MAL list.
+**Next slice: open `The Big O - 01` in the player with a jimaku track attached and read the rendered
+cue element**; the attach/detach harness above is the setup, and it already leaves net zero.
+
+Gates, once, after the last slice, on the shared tree: vitest **787 passed / 1 skipped (788),
+10,955 passed / 6 skipped, exit 0** — baseline 786/787 and 10,944, so **+1 file and +11 tests, all
+mine**. i18n **10,789/10,789** exit 0 (+6, mine). architecture **"Nothing new", 5 pending**, exit 0.
+eslint **0 errors** on all 7 touched paths. Mutation controls, each restored green: `belongsToSeries`
+removed → **2 red**; the strict parser's null allowed to fall through → **exactly 1 red**, the
+creditless case.
