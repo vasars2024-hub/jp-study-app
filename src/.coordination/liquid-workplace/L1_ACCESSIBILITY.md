@@ -594,3 +594,34 @@ Capture-patch-restore verified on all three axes (`classMatches`, `modeMatches`,
 documented, not an unhalved outlier. **Nothing was changed in the product for this.** New
 instrument: `probes/l1-motion-tiers.js`; `l1-reduced-motion.js` measures tier (b) only and its
 header now understates what is reachable.
+
+## 2026-08-24 — category 1 SCORES 10 on the Liquid Dictionary window
+
+All four numbers on one tree, one state, after a real restart back to the **unflagged** app
+(`started` 1787560357647 → 1787560481897, pid 22560, `mqMatches: false` confirmed), surface
+re-driven to 食べる / **8 entries / 67 controls**, forest-night, liquid, 820x580.
+
+| # | number | bar | verdict |
+| - | ------ | --- | ------- |
+| contrast | min **5.30** (`span.lexicon-etymology-source`, 11.9px), **150** measured, **0** unmeasurable, **0** failing; parser self-test ok in-run | >=4.5 | **pass** |
+| keyboard | **0 of 57** unreachable, **0** focus hosts | 0 | **pass** |
+| hit targets | **0 of 67** below 32px by pointer, **0** stolen, smallest **32x32.5**; by rect 46, `wcag258FailCount` **0** | >=32 px | **pass** |
+| reduced motion | tier (a) **0** over 0.01 s | <=0.01 s | **pass** |
+
+**Four negative controls, all red in this session** — the rubric's rule is that a probe which has
+not failed this session is unproven, and this document has been wrong in both directions before.
+
+| control | forced | probe reported |
+| ------- | ------ | -------------- |
+| contrast | `.dict-word` colour → `#2a2a2c` | failing **0 → 1**, min **5.30 → 1.22** |
+| keyboard | `button.dict-star` `tabindex="-1"` | unreachable **0 → 1**, named the element |
+| hit area | `--lq-hit-target: 0px` | below-by-pointer **0 → 46**, landing on the by-rect count |
+| hit area (theft) | `--lq-hit-target: 52px` | stolen **0 → 4** |
+| motion | flag absent (`mqMatches: false`) | over-bar **0 → 12**, longest **0.24 s** |
+
+All restored and re-measured: failing 0, unreachable 0, min 5.30, `[data-ctl]` count 0, token
+computed `32px` with no inline override.
+
+**Neither open item needed a product change, and that is the finding.** Item (a) was three
+instrument defects; item (b) was the wrong tier. Two turns had them written up as product
+decisions awaiting a call. **Category 1: 10/10.**

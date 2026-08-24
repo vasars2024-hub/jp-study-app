@@ -56,7 +56,7 @@ sit on this one surface, so this is running state, not a score:
 
 | # | Category                       | State | Where the number lives |
 | - | ------------------------------ | ----- | ---------------------- |
-| 1 | Accessibility                  | 0 failing; not yet scored *as this surface* | `L1_ACCESSIBILITY.md` (`a70cbbed`) |
+| 1 | Accessibility                  | **10/10** — `41ba85b7` | `L1_ACCESSIBILITY.md` |
 | 2 | Clunkiness                     | **10/10** — `7cdc34b4` | `L1_CLUNKINESS.md` |
 | 3 | Liquid utilization             | 4 of 4 treated, 0 dense-on-translucent; re-drive owed at this tree | `L2_PRIMITIVES.md` (L5.2) |
 | 4 | Use of space                   | four numbers pass at three sizes; re-score owed on the fixing commit | `L1_USE_OF_SPACE.md` |
@@ -67,9 +67,16 @@ sit on this one surface, so this is running state, not a score:
 
 **Category 2's point, unlike 5 and 8, was a product defect.** `Explain again` bypassed the
 dictionary cache but not the provider session cache, so the second ask in a session returned the
-byte-identical answer in 2 ms and the control did nothing (`7cdc34b4`). Five of eight categories
-now sit at 10 on this surface; **1, 3 and 4 remain**, each owed a re-drive *as this surface*
-rather than as the L1 reference apps they were first measured on.
+byte-identical answer in 2 ms and the control did nothing (`7cdc34b4`). **Six** of eight
+categories now sit at 10 on this surface; **3 and 4 remain**, each owed a re-drive *as this
+surface* rather than as the L1 reference apps they were first measured on.
+
+**Category 1 cost four commits and changed nothing in the product**, which is the most useful
+thing this surface has produced. Its two "open product decisions" — 46 of 57 controls under 32 px,
+and 0.14 s under reduced motion — were an instrument that scrolled the window it was measuring,
+a population that included controls inside closed `<details>`, a checkbox measured without its
+142 px label, and a motion bar scored against the in-app *Reduced* tier instead of the OS query
+the rubric names. Every one read as a product defect and none was.
 
 **Both points categories 5 and 8 gained on 2026-08-24 came from instrument defects, not from
 changes to the product** — a hardcoded Q9 verdict that reported a number nobody computed, and a
