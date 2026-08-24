@@ -564,11 +564,33 @@ export default function NovelReader({ item, onClose }: Props) {
     if (!loaded) return;
     setTranslateBusy(true);
     setTranslateStatus(t('epub.translate.status.current'));
+
+    // The single-chapter path used to skip everything the range path does about loading, so a cold
+    // model meant "Translating current chapter…" sitting still for the 15 s a 1,223 MB GGUF takes
+    // — the same dishonest state the Dictionary example panel shipped and had fixed. It also meant
+    // a failed load surfaced as whatever `translateChapter` happened to throw, instead of the
+    // reason. Same three steps as `translateChapterRange`, and the listener is detached in the
+    // `finally` below so a later load cannot write over this surface's status.
+    const offModel = window.api.onTranslateModelProgress((p) => {
+      if (p.status === 'ready') return;
+      const pct = typeof p.progress === 'number' ? Math.round(p.progress) : 0;
+      setTranslateStatus(t('epub.translate.status.loadingModelPct', { pct }));
+    });
+
     try {
       const status = await window.api.translateStatus();
       if (!status.modelFound) {
         setTranslateStatus(t('epub.translate.modelMissing'));
         return;
+      }
+      if (!status.ready) {
+        setTranslateStatus(t('epub.translate.status.loadingModel'));
+        const ready = await window.api.translateEnsureReady();
+        if (!ready.ok) {
+          setTranslateStatus(ready.error || t('epub.translate.failed'));
+          return;
+        }
+        setTranslateStatus(t('epub.translate.status.current'));
       }
       const count = await translateChapter(partRef.current);
       if (count === 'cancelled') {
@@ -584,6 +606,7 @@ export default function NovelReader({ item, onClose }: Props) {
     } catch (err) {
       setTranslateStatus(err instanceof Error ? err.message : t('epub.translate.failed'));
     } finally {
+      offModel();
       setTranslateBusy(false);
     }
   }, [loaded, translateChapter, translateMode, t, lang]);
