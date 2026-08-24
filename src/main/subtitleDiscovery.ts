@@ -320,10 +320,27 @@ function scoreCandidates(
     normalizeSubtitleIdentityId(candidate.providerItemId),
     candidate,
   ]));
+  // An item the library cannot number — a creditless opening, an OVA, a special, a movie —
+  // makes the episode signal `unknown` rather than a mismatch, because a target with no
+  // episode has nothing to disagree with (`shared/subtitleMatching.ts:160`). That is right
+  // for a track that declares no episode either. It is wrong for one that declares a
+  // number: episode 1's dialogue is not the creditless opening's, and on this path there is
+  // no user to catch it, only `autoDownloadLanguages`.
+  //
+  // Measured 2026-08-24 on the real library: `The Big O - Creditless Opening`, `… Ending 1`
+  // and `… Ending 2` each carry an auto-attached jimaku record labelled
+  // `The Big O.E01.Bandai.ja.srt`, added within one second of each other. Three items, one
+  // episode's dialogue, none of them that episode.
+  //
+  // Narrow on purpose: the matcher itself keeps returning `unknown`, because a MANUAL pick
+  // must not be refused merely because a badly named file did not parse. Only automatic
+  // attachment turns "we cannot tell" into "do not."
+  const targetIsUnnumbered = item.episode === undefined || item.episode === null;
   const accepted: ScoredCandidate[] = [];
   for (const match of result.candidates) {
     const candidate = byId.get(match.trackId);
     if (!candidate) continue;
+    if (targetIsUnnumbered && typeof candidate.episode === 'number') continue;
     const score = candidate.hashMatch ? Math.max(match.score, minConfidence) : match.score;
     if (score < minConfidence) continue;
     accepted.push({ candidate, score });

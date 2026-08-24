@@ -92,6 +92,37 @@ describe('scoreCandidates', () => {
     expect(accepted).toEqual([]);
   });
 
+  it('refuses a numbered track for an item the library cannot number', () => {
+    // A creditless opening is not episode 1, and the matcher alone cannot say so: a null
+    // target episode makes that signal `unknown`, so language and title carry the whole
+    // decision and every episode of the series looks acceptable. Three items in the real
+    // library were auto-attached `The Big O.E01.Bandai.ja.srt` exactly this way, within one
+    // second of each other — found 2026-08-24.
+    const extra = {
+      ...item,
+      title: 'The Big O - Creditless Opening',
+      fileName: 'The Big O - Creditless Opening.mkv',
+      episode: null,
+    } as typeof item;
+    const numbered = scoreCandidates(
+      [candidate({ episode: 1, releaseName: 'The Big O.E01.Bandai.ja.srt' })],
+      extra,
+      'ja',
+      0,
+    );
+    expect(numbered).toEqual([]);
+
+    // Not a blanket refusal of unnumbered items: a track that declares no episode either is
+    // exactly the right track for a film or a one-shot, and still attaches.
+    const unnumbered = scoreCandidates(
+      [candidate({ episode: null, releaseName: 'The Big O - Creditless Opening.ja.srt' })],
+      extra,
+      'ja',
+      0,
+    );
+    expect(unnumbered).toHaveLength(1);
+  });
+
   it('does not let a hash match rescue the wrong episode', () => {
     const accepted = scoreCandidates(
       [candidate({ episode: 3, hashMatch: true })],
