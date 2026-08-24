@@ -77,8 +77,64 @@ Recorded as a category 6 reversibility defect on this surface.
 that silently re-ran the lookup would also show 8 entries and would not be a way back. Nothing was
 re-queried — `showSetup` is the only state that changed.
 
+## The error state, and the defect the induction found on the way
+
+The error branch is unreachable from the Anki path while the port is refused: `ensureAnki`
+short-circuits ahead of `ankiMineNote`, so `res.error` never renders. It needs a dependency that
+*accepts* the request and then fails it. `probes/l8-explain-error.cjs` configures the `deepseek`
+bucket with a key that is shaped like one and is not a credential, switches to `deepseek-v4-pro`,
+and clicks `Explain this word`.
+
+**Reversible, which is the only reason it is allowed.** `deepseek` was UNCONFIGURED
+(`aiProviderHealth`: `configured:false`), so nothing of the user's is overwritten, and it is
+`store: 'vault'` (`credentialRegistry.ts:135`), so `credentials:clear` removes it. `ai:setApiKey`
+cannot — it refuses an empty key at `mining.ts:1959` *before* `writeAiProviderSecret` would have
+cleared it, so the restore goes through `clearCredential`. Both runs end `restored: true`:
+`aiGetConfig()` and `aiProviderHealth()` byte-identical to the captures. The real Gemini key is
+never read, written or sent.
+
+### Run 1 — the control did not fail, and that was the finding
+
+Provider `deepseek-v4-pro`, `apiKeysSet.deepseek: true` (the fabricated one) — and the click
+returned **a real grounded answer about 食べる**. Its own provenance line said why:
+
+> From cloud:**gemini-2.5-flash**:default, kept since 8/24/2026.
+
+`EntryExplain` resolves the policy in an effect whose deps are `[word, reading, lang, glossLang]`
+— the word, not the configuration. Nothing re-runs it when the user changes their AI provider, and
+`explain()` sent `engine.policy` from mount. **A user who switches provider keeps calling the old
+one, and is billed there, until the panel remounts.** The app was honest about which model wrote
+the answer; the request had simply gone somewhere the user had stopped choosing.
+
+Fixed in the same commit: `explain()` resolves `explainPolicyFromEngine(await aiGetConfig())` at
+click time, and a resolution that has become unusable renders the blocked message rather than
+calling a provider whose key is gone.
+
+Cost, stated rather than omitted: run 1 spent one real Gemini call and stored an explanation for
+食べる in userData. It is the app's own flow and removable by `Forget this explanation`; it was not
+what the run intended.
+
+### Run 2 — the same induction, after the fix
+
+| | |
+| --- | --- |
+| `duringConfig.providerId` | `deepseek-v4-pro`, `apiKeysSet.deepseek: true` |
+| Rendered | **`The AI provider did not answer. authentication`** |
+| `role` | `alert` |
+| Provider code | **`authentication`** — DeepSeek's own rejection, so the request left the machine |
+| Raw i18n keys | **0** |
+| `falseSuccess` | **false** |
+| `restored` | **true** |
+
+`falseSuccess` is measured as *the answer changed*, not *an answer is present*: `EntryExplain`
+deliberately leaves the stored answer on screen beside the error, because a failed refresh leaves
+the database row untouched and replacing it would claim the stored answer was gone. Before and
+after are the same string, so nothing was manufactured.
+
+Run 1 is run 2's negative control, and a stronger one than a planted failure: the same induction
+that produced a wrong-provider success before the fix produces a named authentication failure
+after it.
+
 ## Still open for category 8
 
-- **Error**: not reachable from the Anki path while the port is refused — `ensureAnki`
-  short-circuits ahead of `ankiMineNote`, so `res.error` never renders. Driven separately.
-- **Fabricated values**: no verdict yet.
+- **Fabricated values**: no verdict yet. Until it has one, **no score is claimed**.

@@ -201,6 +201,52 @@ describe('EntryExplain', () => {
     expect(dictExplanationGet).not.toHaveBeenCalled();
   });
 
+  /**
+   * Regression: the ask used to send the provider that was selected when the panel MOUNTED.
+   *
+   * The effect that resolves the policy has the word in its deps, not the configuration, and
+   * nothing re-runs it when the user changes their AI provider. Measured live: the app was
+   * switched to `deepseek-v4-pro` with a key set for it (`aiGetConfig` confirmed
+   * `providerId: 'deepseek-v4-pro'`), one click on the button answered, and the answer's own
+   * provenance line read `From cloud:gemini-2.5-flash:default`. The request went to a provider the
+   * user had stopped choosing, and was billed there.
+   */
+  it('sends the provider configured now, not the one configured at mount', async () => {
+    await render(word);
+    expect(aiGetConfig).toHaveBeenCalledTimes(1);
+
+    aiGetConfig.mockResolvedValue({
+      engine: 'cloud',
+      providerId: 'deepseek-v4-pro',
+      apiKeysSet: { gemini: true, deepseek: true },
+    });
+
+    await click(askButton());
+    expect(dictExplain).toHaveBeenCalledTimes(1);
+    expect(dictExplain.mock.calls[0][0].policy.target).toEqual({
+      kind: 'cloud',
+      providerId: 'deepseek-v4-pro',
+    });
+  });
+
+  /**
+   * The other half of reading it live: a configuration that has become unusable since mount must
+   * render the blocked message rather than call a provider whose key is gone.
+   */
+  it('blocks instead of asking when the key disappeared after mount', async () => {
+    await render(word);
+    aiGetConfig.mockResolvedValue({
+      engine: 'cloud',
+      providerId: 'gemini-2.5-flash',
+      apiKeysSet: { gemini: false, deepseek: false },
+    });
+
+    await click(askButton());
+    expect(dictExplain).not.toHaveBeenCalled();
+    expect(host.querySelector('.lexicon-explain-blocked')?.textContent)
+      .toBe('lexicon.wordExplain.blockedKey');
+  });
+
   it('stays absent when the preload cannot explain at all', async () => {
     (window as unknown as { api: Record<string, unknown> }).api = { aiGetConfig };
     await render(word);

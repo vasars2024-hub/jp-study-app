@@ -109,10 +109,32 @@ export default function EntryExplain({ word, reading, lang, senses }: Props) {
     setState('running');
     setFailure(null);
     try {
+      /**
+       * The policy is resolved HERE, from the live configuration, not carried from mount.
+       *
+       * The effect above reads `aiGetConfig()` once per word and its deps are the word, not the
+       * configuration — nothing re-runs it when the user changes their AI provider. So the button
+       * kept sending the provider that was selected when the panel mounted. Measured live: the
+       * provider was switched to `deepseek-v4-pro` with a key set for it (`aiGetConfig` confirmed
+       * `providerId: 'deepseek-v4-pro'`), one click on "Explain this word" answered, and the
+       * answer's own provenance line read `From cloud:gemini-2.5-flash:default`. The app told the
+       * truth about which model wrote it — the request had simply gone somewhere the user had
+       * stopped choosing, and been billed there.
+       *
+       * A stale resolution that has since become unusable renders the blocked message instead of
+       * calling a provider whose key is gone, which is the same honest state the mount path shows.
+       */
+      const live = explainPolicyFromEngine(await window.api.aiGetConfig());
+      if (attempt !== run.current) return;
+      setEngine(live);
+      if (!live.ok) {
+        setState('idle');
+        return;
+      }
       const result = await window.api.dictExplain({
         key: { lang, text: word, reading, glossLang },
         grounding: explainGroundingFromSenses(senses),
-        policy: engine.policy,
+        policy: live.policy,
         refresh,
       });
       if (attempt !== run.current) return;

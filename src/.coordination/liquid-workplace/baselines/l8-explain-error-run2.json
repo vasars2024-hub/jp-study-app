@@ -1,0 +1,230 @@
+{
+ "at": "2026-08-24T06:42:51.726Z",
+ "configBefore": {
+  "apiKeysSet": {
+   "gemini": true,
+   "deepseek": false
+  },
+  "apiKeySet": true,
+  "engine": "cloud",
+  "providerId": "gemini-2.5-flash",
+  "selectedPresetId": "city-toponym",
+  "selectedFormatId": "toponym-location",
+  "cardCount": 1,
+  "outputFormat": "anki",
+  "localModelAvailable": true,
+  "frontLang": "ja",
+  "backLang": "en",
+  "reverse": false,
+  "backGlossLangs": []
+ },
+ "healthBefore": [
+  {
+   "providerId": "gemini-2.5-flash",
+   "model": "gemini-2.5-flash",
+   "credentialBucket": "gemini",
+   "configured": true
+  },
+  {
+   "providerId": "deepseek-v4-flash",
+   "model": "deepseek-v4-flash",
+   "credentialBucket": "deepseek",
+   "configured": false
+  },
+  {
+   "providerId": "deepseek-v4-pro",
+   "model": "deepseek-v4-pro",
+   "credentialBucket": "deepseek",
+   "configured": false
+  }
+ ],
+ "before": {
+  "detailsOpen": true,
+  "error": [],
+  "errorRole": [],
+  "code": [],
+  "blocked": [],
+  "answer": [
+   "食べる primarily means 'to eat' food, but it also extends metaphorically to 'to make a living' or 'to subsist,' implying the consumption or utilization of resources for one's survival."
+  ],
+  "askLabel": [
+   "Explain again"
+  ],
+  "askDisabled": [
+   false
+  ]
+ },
+ "keySet": {
+  "ok": true,
+  "apiKeysSet": {
+   "gemini": true,
+   "deepseek": true
+  },
+  "apiKeySet": true,
+  "savedBucket": "deepseek"
+ },
+ "providerSet": {
+  "ok": true,
+  "providerId": "deepseek-v4-pro",
+  "apiKeySet": true,
+  "apiKeysSet": {
+   "gemini": true,
+   "deepseek": true
+  }
+ },
+ "duringConfig": {
+  "apiKeysSet": {
+   "gemini": true,
+   "deepseek": true
+  },
+  "apiKeySet": true,
+  "engine": "cloud",
+  "providerId": "deepseek-v4-pro",
+  "selectedPresetId": "city-toponym",
+  "selectedFormatId": "toponym-location",
+  "cardCount": 1,
+  "outputFormat": "anki",
+  "localModelAvailable": true,
+  "frontLang": "ja",
+  "backLang": "en",
+  "reverse": false,
+  "backGlossLangs": []
+ },
+ "after": {
+  "detailsOpen": true,
+  "error": [
+   "The AI provider did not answer. authentication"
+  ],
+  "errorRole": [
+   "alert"
+  ],
+  "code": [
+   "authentication"
+  ],
+  "blocked": [],
+  "answer": [
+   "食べる primarily means 'to eat' food, but it also extends metaphorically to 'to make a living' or 'to subsist,' implying the consumption or utilization of resources for one's survival."
+  ],
+  "askLabel": [
+   "Explain again"
+  ],
+  "askDisabled": [
+   false
+  ]
+ },
+ "verdict": {
+  "errorAbsentBefore": true,
+  "errorNamedAfter": true,
+  "rawKeys": [],
+  "roleAlert": [
+   "alert"
+  ],
+  "providerCode": [
+   "authentication"
+  ],
+  "answerBefore": [
+   "食べる primarily means 'to eat' food, but it also extends metaphorically to 'to make a living' or 'to subsist,' implying the consumption or utilization of resources for one's survival."
+  ],
+  "answerAfter": [
+   "食べる primarily means 'to eat' food, but it also extends metaphorically to 'to make a living' or 'to subsist,' implying the consumption or utilization of resources for one's survival."
+  ],
+  "falseSuccess": false
+ },
+ "restore": {
+  "cleared": {
+   "statuses": [
+    {
+     "id": "gemini",
+     "configured": true,
+     "lastTestedAt": 0,
+     "lastError": "",
+     "fromEnv": false
+    },
+    {
+     "id": "deepseek",
+     "configured": false,
+     "lastTestedAt": 0,
+     "lastError": "",
+     "fromEnv": false
+    },
+    {
+     "id": "jimaku",
+     "configured": true,
+     "lastTestedAt": 0,
+     "lastError": "",
+     "fromEnv": false
+    },
+    {
+     "id": "opensubtitles",
+     "configured": false,
+     "lastTestedAt": 0,
+     "lastError": "",
+     "fromEnv": false
+    },
+    {
+     "id": "jiten",
+     "configured": false,
+     "lastTestedAt": 0,
+     "lastError": "",
+     "fromEnv": false
+    },
+    {
+     "id": "mal",
+     "configured": true,
+     "lastTestedAt": 0,
+     "lastError": "",
+     "fromEnv": false
+    }
+   ],
+   "canStore": true
+  },
+  "back": {
+   "ok": true,
+   "providerId": "gemini-2.5-flash",
+   "apiKeySet": true,
+   "apiKeysSet": {
+    "gemini": true,
+    "deepseek": false
+   }
+  },
+  "config": {
+   "apiKeysSet": {
+    "gemini": true,
+    "deepseek": false
+   },
+   "apiKeySet": true,
+   "engine": "cloud",
+   "providerId": "gemini-2.5-flash",
+   "selectedPresetId": "city-toponym",
+   "selectedFormatId": "toponym-location",
+   "cardCount": 1,
+   "outputFormat": "anki",
+   "localModelAvailable": true,
+   "frontLang": "ja",
+   "backLang": "en",
+   "reverse": false,
+   "backGlossLangs": []
+  }
+ },
+ "healthAfter": [
+  {
+   "providerId": "gemini-2.5-flash",
+   "model": "gemini-2.5-flash",
+   "credentialBucket": "gemini",
+   "configured": true
+  },
+  {
+   "providerId": "deepseek-v4-flash",
+   "model": "deepseek-v4-flash",
+   "credentialBucket": "deepseek",
+   "configured": false
+  },
+  {
+   "providerId": "deepseek-v4-pro",
+   "model": "deepseek-v4-pro",
+   "credentialBucket": "deepseek",
+   "configured": false
+  }
+ ],
+ "restored": true
+}
