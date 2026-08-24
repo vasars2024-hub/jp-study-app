@@ -173,3 +173,20 @@ Route A release — rather than keep pre-booking a date. Product code landed eit
 what makes the turn not a waste: 15b82df8 (a season pack of subtitles could not be classified as
 a pack, measured on the 87.80 MB pack the plan itself renders from) and b74925a8 (two real
 subs-only releases the name reader could not see, both from the user's own completed list).
+
+2026-08-24 | mal-pipeline | units done this turn: 0 | units left: INHERITED 2 | basis: last turn's count of the gate tables in src/MAL_ANIME_PIPELINE_PLAN.md (open: 31, 34); this turn re-derived only that 31 is open, from its wording at line 413 | projected finish: UNKNOWN
+Worker `primary`. Zero gates, two product defects, and the projection stays UNKNOWN for the same
+reason it was set there last turn: gate 31 Route A waits on a standalone Japanese subtitle pack
+with live seeders existing on nyaa for a title in this library, which is not a rate this relay
+controls. What changed today is *why* that is not yet a data-blocked finding. Pointing the manual
+dialog at the item this plan itself created found the surface asking the wrong question twice:
+a stored episode range narrowed the query to one release (1 -> 9 releases matched after
+`b7207748`), and the dialog searched a single name while the harvest panel has walked four since
+February (1 -> 4 names after `ad142237`, measured on MAL 22961; still 1 on an item with no MAL
+row, the control). The interrupted survey band did finish -- titles 84-91, A:1, and that one hit
+is a *movie's* storyboard subtitles for a work this library owns no video of, so the usable total
+across every surveyed title is still 0. The next slice is product code, not a seventh band:
+`media:addAcquired` writes `malId: null`, so the alias walk just built cannot reach the JoJo
+`黄金之风` pack -- the one Japanese sub-pack this library is known to have. Fixing that is a
+cheaper shot at Route A than surveying 36 more titles, and it is worth exactly one turn before
+this plan writes Route A up as data-blocked.

@@ -2790,3 +2790,46 @@ files), 11,001 passed / 6 skipped** — the one red is the inherited `architectu
 naming another track's untracked `shared/externalSubtitleMount.ts`, identical to last turn.
 i18n **10,789/10,789** exit 0. architecture: the same single unclassified module. eslint on my
 four paths exit 0.
+
+## 2026-08-24 — gate 31 Route A: the listing surface was asking the wrong question twice
+
+Worker `primary`. Commits `b7207748`, `ad142237`. **Gate 31 stays 32 of 34** (open: 31, 34) —
+inherited from last turn's table count, not re-derived here; what *was* re-derived is that Route A
+is open, from the gate's own wording at line 413. No acquisition ran. Two product defects were
+found by pointing the manual dialog at the library item this plan itself created, and both are
+fixed and measured live.
+
+**Defect 1 (`b7207748`) — a stored episode range narrowed every provider search to one release.**
+`listNyaaCandidates` and the automatic loop search jimaku, nyaa and OpenSubtitles with
+`item.seriesTitle ?? item.title` verbatim. That field is written once, at import, by whatever
+parser was running then — so `media:addAcquired` on a torrent filename can leave a range in it.
+Live, before: `listNyaaSubtitles` on `JoJo … Ougon no Kaze 39-END` → ok, **0 candidates**,
+*"Of **1** release matching it, 1 is neither a subtitle pack nor a batch…"*. That one release was
+the item's own source file. After: *"Of **9** releases matching it…"* — same handler, same index,
+same minute. `parseMediaFileName` cannot cut this itself (its trailing-episode rule fires only
+while a leading `[Group]` survives, and relaxing it re-arms the `Mob Psycho 100` trap), so
+`providerSearchTitle` strips an explicit **range** only, never a bare number. Controls asserted:
+`The Big O`, `Cowboy Bebop`, `鬼滅の刃`, `Ghost in the Shell: Stand Alone Complex` byte-identical;
+`Mob Psycho 100`, `Steins;Gate 0`, `Kingdom 3`, `Gundam 0079-0080` keep their number. 8 tests.
+
+**Defect 2 (`ad142237`) — the dialog asked one name, the harvest panel asks four.** Same index,
+same predicates, same session catalogue, since `58e348a5` — and the dialog never got the aliases.
+`storedMalFacts` is now exported rather than copied, and the walk is the harvest rule verbatim
+(continue while only non-pack hits, earliest name wins among equals, break on `sub-pack`).
+Live: **Date A Live II: Kurumi Star Festival** (MAL 22961, on the completed list) → 4 `altTitles`
+→ **4 names, 4 s**, was 1. **The Big O** (MAL 567, *not* on the list) → row not found → 0 aliases
+→ **1 name, 1 s**. The second is the negative control: an unmatched item cannot be taxed.
+
+**The finding the next worker must not re-hunt.** The interrupted band completed:
+`g31h-alias-routes-desc-84.json`, titles **84–91**, **A:1** — and the one hit is
+`Ghost in the Shell STAND ALONE COMPLEX Solid State Society - Storyboard subtitles`, 5,033,165 B,
+5 seeders: a **movie's** storyboard text for a work whose video this library does not own. So the
+running total across surveyed titles is still **0 usable Route A candidates**, and the JoJo item —
+the one video this pipeline acquired — carries **`malId: null`**, because `media:addAcquired`
+never matches a MAL row. Every route keyed on `malId` (aliases, the episode-count floor) is
+therefore dead for exactly the items this pipeline creates.
+
+**Next slice, and it is product code rather than a seventh survey band:** give `media:addAcquired`
+a MAL identity — the acquisition already knows which MAL title it was started from — so the alias
+walk `ad142237` just built actually reaches the JoJo pack (`黄金之风`), which is where this
+library's one known Japanese sub-pack lives.
