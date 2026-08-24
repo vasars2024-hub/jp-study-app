@@ -2873,3 +2873,60 @@ under different constraints.
 difference is in the *search text* rather than the ranking, and that is a two-command comparison
 (`subtitleHarvest:nyaaList` vs `subtitleDiscovery:nyaaList` on the same title, same minute) rather
 than another survey band.
+
+## 2026-08-24 — the asymmetry is closed, and the pack the last two turns chased is not a torrent
+
+Worker `primary`. Commits `f009c2cb`, `6ced09cc`. **Gate 31 stays open on Route A** (32 of 34;
+open: 31, 34) — but the hypothesis the last three entries were built on is **retracted**, with the
+retraction measured rather than argued.
+
+**The asymmetry was real and is now gone.** `listNyaaCandidates` omitted `episodeCount`, so
+`looksLikeSubtitleOnly` judged every row against the flat 50 MB ceiling while `listNyaaHarvest`,
+over the same index with the same predicates, passed its count and got the scaled one. Passed now,
+and only when the library row names no episode — `NyaaRankInput.episodeCount`'s own documented
+condition. With an episode pinned the flat ceiling stays, or a 39-episode pack becomes a legal
+answer to episode 7; that is the negative control in the 5 new tests.
+
+**Live on a restarted app, both surfaces, same title, same minute:**
+
+| surface | candidates | top row |
+| --- | --- | --- |
+| `subtitleDiscovery:nyaaList` on `17de8a95…` | **4**, all `batch-sidecar` | DBD-Raws, 46,899.2 MB, 11 seeders, score 41 |
+| `subtitleHarvest:nyaaList`, MAL 37991 | **4**, all `batch-sidecar` | identical row, identical score |
+
+Identical listings. So the two surfaces now ask the index the same question, and **the difference
+was never the reason Route A is empty.**
+
+**THE RETRACTION.** "The standalone 87.80 MB subtitle-only pack this plan renders from" does not
+exist as a torrent. Asked directly: `JOJO 黄金之风 外挂字幕` returns **2 rows, 46,899.2 MB and
+51,097.6 MB, both batches**. The 87.80 MB is the `简繁外挂字幕` **subfolder inside** the DBD-Raws
+batch — which is exactly why the 2026-08-18 acquisition is recorded as Route B: a selective file
+fetch out of a video batch. Three entries treated a subfolder as a missing torrent.
+
+**Route A is data-blocked on the index, and that is now a number rather than a shrug.** Across the
+two alias surveys already on disk (`g31h-alias-routes-desc-60/84.json`, ~160 titles) there are
+exactly **2** `sub-pack` hits: `Cowboy Bebop [BD] (Arabic Subtitles)` (721,818 B, 1 seeder) and
+`Ghost in the Shell STAND ALONE COMPLEX Solid State Society - Storyboard subtitles` (5,033,165 B,
+5 seeders, a *movie*). Neither is Japanese TV dialogue. Three untargeted index queries this turn
+say the same thing about the index as a whole: `日本語字幕` → 49 rows, one subs-only, 0.012 MB at
+**0 seeders**; `subtitle pack` → 10 rows, every seedable one English; `Japanese subtitles` → 75
+rows, the only subs-only ones a 2024 fansub's `.ass` files at **0 seeders**. What does exist is
+whole-site archives — `Big torrent of Japanese subtitles (Kitsunekko archive)` 4,403.2 MB / 2
+seeders, `[PeepoHappy] Kitsunekko Archive 16/07/2021` 5,836.8 MB / 8 seeders — which are 29× and
+39× the 150 MB `SUBTITLE_PACK_CEILING_MAX_BYTES` and are not per-title. **Do not survey a seventh
+band for this.** A Japanese-dialogue `sub-pack` with seeders is not a thing this index carries.
+
+**Product this turn, both from what the run showed:**
+- `f009c2cb` — the `episodeCount` fix above. 5 tests; mutations always-null → 1 red, unconditional
+  → 1 red.
+- `6ced09cc` — **the library's chooser showed 46,899 MB and never said the video is skipped.**
+  `nyaaFetch` skips every unselected file on both routes, so that row's real transfer is the ~88 MB
+  of `.ass` inside it; the honest reading of the screen was to refuse it. The two notes the harvest
+  panel has carried since it shipped, now on the surface Route B is driven from. 3 tests, 2 of them
+  negative controls.
+
+**What would close Route A, in order of cost.** (1) A title the user finishes later whose index row
+carries a real Japanese pack — free, and outside anyone's control. (2) Accepting a Kitsunekko-class
+archive as Route A, which needs the ceiling raised roughly 40× and spends ~5.8 GB of the user's
+connection on a whole-site dump — a resource commitment, not a routine choice, so it is written
+here rather than taken. Nothing else found in ~160 titles plus three untargeted queries.
