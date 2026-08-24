@@ -13,6 +13,7 @@ import {
   languageFromFileName,
   looksJapaneseSubtitle,
   looksLikeSameTitle,
+  looksLikeSubtitleArchive,
   looksLikeSubtitleOnly,
   packCoversEpisodeCount,
   rankSubtitleCandidates,
@@ -1217,4 +1218,145 @@ describe('looksJapaneseSubtitle / subtitleKanaCount', () => {
       expect(looksJapaneseSubtitle(input)).toBe(false);
     },
   );
+});
+
+describe('looksLikeSubtitleArchive / the sub-archive route', () => {
+  /**
+   * The live row, field for field, as `scraperSearchTorrents` returned it on
+   * 2026-08-24. Its metadata handshake took 10 s and produced 28,748 files
+   * across 1,871 title folders with 0 bytes downloaded.
+   */
+  const KITSUNEKKO = row({
+    name: '[PeepoHappy] Kitsunekko Archive 16/07/2021',
+    infoHash: '539c0886ab62f6ffb25affe7c96b28340cadd8b4',
+    sizeBytes: 6_120_328_397,
+    seeders: 8,
+    fileCount: 1,
+  });
+
+  it('is not gated by the pack ceiling, because the ceiling means "no video"', () => {
+    // 39x over it, and correctly so — the ceiling is a proxy for a video
+    // payload, and an archive has none. Both readings recorded here so the two
+    // functions are never conflated again.
+    expect(KITSUNEKKO.sizeBytes).toBeGreaterThan(SUBTITLE_PACK_CEILING_MAX_BYTES * 30);
+    expect(looksLikeSubtitleOnly(KITSUNEKKO)).toBe(false);
+    expect(looksLikeSubtitleArchive(KITSUNEKKO)).toBe(true);
+  });
+
+  it('survives a title check its name cannot possibly pass', () => {
+    const title = 'JoJo no Kimyou na Bouken: Ougon no Kaze';
+    // The control that makes the exemption meaningful: the archive's name
+    // shares no word with the work, so every per-title search has dropped it.
+    expect(looksLikeSameTitle(KITSUNEKKO.name, title)).toBe(false);
+
+    const { candidates, dropped } = rankSubtitleCandidatesDetailed([KITSUNEKKO], {
+      languages: ['ja'],
+      title,
+      episodeCount: 39,
+    });
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].route).toBe('sub-archive');
+    expect(candidates[0].reasons).toContain('route:sub-archive');
+    expect(dropped.title).toBe(0);
+  });
+
+  it('ranks below a real per-title pack and above a video batch', () => {
+    const pack = row({
+      name: 'Psalms of Planets Eureka Seven - Subtitle Pack',
+      sizeBytes: 39 * MB,
+      seeders: 8,
+    });
+    const batch = row({ name: '[DBD-Raws] Eureka Seven [1-50]', isBatch: true, sizeBytes: 21_000 * MB, seeders: 8, fileCount: 0 });
+    const ranked = rankSubtitleCandidates([KITSUNEKKO, batch, pack], {
+      languages: ['ja'],
+      title: 'Psalms of Planets Eureka Seven',
+    });
+    // The archive passes the title check the batch and pack must pass on merit,
+    // so all three are present and only the ORDER is the claim.
+    expect(ranked.map((c) => c.route)).toEqual(['sub-pack', 'sub-archive', 'batch-sidecar']);
+  });
+
+  it('refuses a video release that merely mentions the site — the negative control', () => {
+    // Without this, `SUBTITLE_ARCHIVE_RE` would be a way to hand any 21 GB batch
+    // an exemption from both the ceiling and the title check at once.
+    const disguised = row({
+      name: '[Group] Some Show 01-12 [BD 1080p] (kitsunekko subs).mkv',
+      sizeBytes: 21_000 * MB,
+      isBatch: true,
+    });
+    expect(looksLikeSubtitleArchive(disguised)).toBe(false);
+    const { candidates, dropped } = rankSubtitleCandidatesDetailed([disguised], {
+      languages: ['ja'],
+      title: 'JoJo no Kimyou na Bouken: Ougon no Kaze',
+    });
+    expect(candidates).toHaveLength(0);
+    expect(dropped.title).toBe(1);
+  });
+
+  it('leaves a pack-sized release from the same site a pack', () => {
+    // Precedence, and the reason it is enforced inside `looksLikeSubtitleArchive`
+    // rather than at the call site: two pre-existing rank cases went red when it
+    // was not. A per-title pack is already about this work and needs no folder
+    // narrowing, so it keeps the +50 and never becomes an archive.
+    const small = row({ name: '[kitsunekko.net] Some Show subtitle pack', sizeBytes: 2 * MB });
+    expect(looksLikeSubtitleOnly(small)).toBe(true);
+    expect(looksLikeSubtitleArchive(small)).toBe(false);
+  });
+});
+
+describe('selectSubtitleFiles — the archive folder narrowing', () => {
+  /** Real paths from the 2026-08-24 handshake, one per folder. */
+  const ARCHIVE = [
+    { index: 0, name: 'kitsunekko_backup/100-man no Inochi no Ue ni Ore wa Tatteiru/I\'m Standing on a Million Lives.S01E01.CC.ja.srt', sizeBytes: 30_000, progress: 1 },
+    { index: 1, name: 'kitsunekko_backup/JoJo no Kimyou na Bouken  Ougon no Kaze (Golden Wind)/JoJo\'s Bizarre Adventure.S04E01.JA.srt', sizeBytes: 42_025, progress: 1 },
+    { index: 2, name: 'kitsunekko_backup/JoJo no Kimyou na Bouken  Ougon no Kaze (Golden Wind)/JoJo\'s Bizarre Adventure.S04E02.JA.srt', sizeBytes: 36_846, progress: 1 },
+    { index: 3, name: 'kitsunekko_backup/JoJo no Kimyou na Bouken  Stardust Crusaders/JoJo\'s Bizarre Adventure.S02E01.JA.srt', sizeBytes: 31_000, progress: 1 },
+    // Deliberately the biggest episode-1 file in the fixture. Episode dedup
+    // keeps the largest of each number, so without the folder narrowing THIS is
+    // what a JoJo harvest would come home with.
+    { index: 4, name: 'kitsunekko_backup/Shingeki no Kyojin/Attack on Titan.S01E01.ja.srt', sizeBytes: 60_000, progress: 1 },
+  ];
+
+  it('takes only the wanted title\'s folder', () => {
+    const picked = selectSubtitleFiles(ARCHIVE, {
+      languages: ['ja'],
+      title: 'JoJo no Kimyou na Bouken: Ougon no Kaze',
+    });
+    expect(picked.reason).toBe('ok');
+    expect(picked.files.map((f) => f.index).sort()).toEqual([1, 2]);
+  });
+
+  it('without a title mixes other shows in — the negative control', () => {
+    // The same input, one argument removed. Episode dedup still collapses four
+    // shows' "episode 1" into one file, which is exactly the damage: the picked
+    // set is now two files from two DIFFERENT works. If this returned the same
+    // two indexes as the narrowed call, the narrowing would prove nothing.
+    const picked = selectSubtitleFiles(ARCHIVE, { languages: ['ja'] });
+    expect(picked.reason).toBe('ok');
+    const jojo = new Set([1, 2]);
+    expect(picked.files.some((f) => !jojo.has(f.index))).toBe(true);
+    expect(picked.files.map((f) => f.index).sort()).not.toEqual([1, 2]);
+  });
+
+  it('says no-title-match rather than no-subtitles when the archive lacks the work', () => {
+    const picked = selectSubtitleFiles(ARCHIVE, { languages: ['ja'], title: 'Cyber City Oedo 808' });
+    expect(picked.files).toEqual([]);
+    // The distinction is the point: the archive is full of subtitles, so
+    // `no-subtitles` would send the user to look for a different release when
+    // the honest answer is that this work is not filed in it.
+    expect(picked.reason).toBe('no-title-match');
+  });
+
+  it('leaves a flat per-title pack exactly as it was', () => {
+    // No directory anywhere, so there is nothing for the title to narrow and
+    // every pre-existing caller must be unaffected even if a title leaks in.
+    const flat = [
+      { index: 0, name: 'Show - 01.ja.ass', sizeBytes: 40_000, progress: 1 },
+      { index: 1, name: 'Show - 02.ja.ass', sizeBytes: 41_000, progress: 1 },
+    ];
+    const withTitle = selectSubtitleFiles(flat, { languages: ['ja'], title: 'Something Else Entirely' });
+    const without = selectSubtitleFiles(flat, { languages: ['ja'] });
+    expect(withTitle.reason).toBe('ok');
+    expect(withTitle.files.map((f) => f.index)).toEqual(without.files.map((f) => f.index));
+  });
 });

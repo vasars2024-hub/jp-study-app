@@ -556,6 +556,58 @@ export function looksLikeSubtitleOnly(row: TorrentRow, episodeCount?: number | n
 }
 
 /**
+ * Names that mean "every title's subtitles", not "this title's subtitles".
+ *
+ * These are whole-site backups. `kitsunekko` is the one that actually exists on
+ * the index; the other two are how the same thing is named when it is not that
+ * site's dump. Kept narrow on purpose — a generic `archive` or `collection`
+ * would swallow batch video releases, and this list is the one thing that lets
+ * a row skip the title check.
+ */
+const SUBTITLE_ARCHIVE_RE = /\b(?:kitsunekko|jimaku[\s._-]*archive|subtitle[\s._-]*archive)\b/i;
+
+/**
+ * Whether a row is a cross-title subtitle archive.
+ *
+ * Measured 2026-08-24, which is why this exists: `[PeepoHappy] Kitsunekko
+ * Archive 16/07/2021` is **28,748 files across 1,871 title folders** —
+ * 20,707 `.srt`, 4,598 `.ass`, 18 `.ssa` under `kitsunekko_backup/<title>/` —
+ * and its metadata arrives in **10 s with 0 bytes downloaded**. The plan had it
+ * recorded as "not per-title" and 39× over the pack ceiling, and both readings
+ * came from the name and the total size rather than from the file list.
+ *
+ * Neither of the two gates a per-title release passes can be applied to it:
+ *
+ *   - the **title check** cannot, because the archive's name is the archive's,
+ *     not the work's. That is precisely why a per-title search has never
+ *     surfaced one, and why an archive is the only shape allowed to skip it;
+ *   - the **size ceiling** cannot, because it is a proxy for "this release
+ *     contains video". An archive contains no video at all, and the transfer is
+ *     the selected files alone — for `JoJo no Kimyou na Bouken  Ougon no Kaze
+ *     (Golden Wind)` that is 39 files / **1.25 MB** out of 5,836.8 MB.
+ *
+ * What replaces them is stricter, not looser: the payload must be subtitles by
+ * `subtitlePackSignals`, the release must not name a video container, and the
+ * caller must narrow to a matching title folder in `selectSubtitleFiles` before
+ * a byte is fetched. An archive with no folder for the wanted title selects
+ * nothing and reports `no-title-match`.
+ */
+export function looksLikeSubtitleArchive(row: TorrentRow): boolean {
+  if (!row) return false;
+  if (!SUBTITLE_ARCHIVE_RE.test(row.name ?? '')) return false;
+  // A pack wins on precedence, and this is where that is decided rather than in
+  // the caller. `[kitsunekko.net] english_subtitles` is one site's dump; the
+  // site also lends its name to ordinary per-title packs, and one of those is
+  // already about this work, needs no folder narrowing, and must keep the
+  // `sub-pack` +50. Measured by two existing rank tests going red when this
+  // line was absent.
+  if (looksLikeSubtitleOnly(row)) return false;
+  if (VIDEO_CONTAINER_RE.test(row.name ?? '')) return false;
+  if (declaresMuxedSubtitles(row.name ?? '')) return false;
+  return subtitlePackSignals(row.name ?? '').length > 0;
+}
+
+/**
  * Whether a row is a plausible target for selective file download.
  *
  * A multi-file release can have its subtitle files fetched on their own
@@ -595,6 +647,11 @@ export function couldCarrySidecarSubtitles(row: TorrentRow): boolean {
 export type NyaaCandidateRoute =
   /** The whole torrent is subtitles and is small enough to take entirely. */
   | 'sub-pack'
+  /**
+   * A whole-site subtitle backup: subtitles only, but covering every title, so
+   * the wanted work is a folder inside it rather than the release itself.
+   */
+  | 'sub-archive'
   /** A batch whose sidecar subtitle files are fetched by per-file priority. */
   | 'batch-sidecar';
 
@@ -943,7 +1000,12 @@ export function rankSubtitleCandidatesDetailed(
       dropped.seeders += 1;
       continue;
     }
-    if (want.title && !looksLikeSameTitle(row.name, want.title)) {
+    // The one row shape allowed past the title check, because its name is the
+    // archive's and never the work's — see `looksLikeSubtitleArchive`. Asked
+    // before the check rather than inside it so the drop counters keep meaning
+    // what they say.
+    const isArchive = looksLikeSubtitleArchive(row);
+    if (!isArchive && want.title && !looksLikeSameTitle(row.name, want.title)) {
       dropped.title += 1;
       continue;
     }
@@ -954,10 +1016,11 @@ export function rankSubtitleCandidatesDetailed(
     // anything `looksLikeSubtitleOnly` accepts, so it cannot fall through to
     // the batch route and be offered as a multi-gigabyte download instead.
     const isPack =
-      looksLikeSubtitleOnly(row, want.episodeCount)
+      !isArchive
+      && looksLikeSubtitleOnly(row, want.episodeCount)
       && packCoversEpisodeCount(row.sizeBytes, want.episodeCount);
-    const isBatch = !isPack && couldCarrySidecarSubtitles(row);
-    if (!isPack && !isBatch) {
+    const isBatch = !isPack && !isArchive && couldCarrySidecarSubtitles(row);
+    if (!isPack && !isBatch && !isArchive) {
       // Attributed separately from `shape`, because "this release states its
       // subtitles are inside the video" is a verdict the listing can explain
       // and "nothing here is fetchable" is not. A pack can never reach this
@@ -1006,6 +1069,16 @@ export function rankSubtitleCandidatesDetailed(
         score += 5;
         reasons.push('batch');
       }
+    } else if (isArchive) {
+      // Between the two: every file in an archive is a subtitle, which a
+      // `batch-sidecar` only ever *might* carry (0 of 10 did), but a named
+      // per-title pack is one small torrent that is already known to be about
+      // this work, while an archive is a 28,748-file handshake that may hold no
+      // folder for it at all. Below `sub-pack` (+50), above `batch-sidecar`
+      // (+10), so a real pack is still taken first whenever one exists.
+      score += 30;
+      reasons.push('route:sub-archive');
+      for (const signal of subtitlePackSignals(row.name)) reasons.push(`signal:${signal}`);
     } else {
       score += 10;
       reasons.push('route:batch-sidecar');
@@ -1032,7 +1105,8 @@ export function rankSubtitleCandidatesDetailed(
       reasons.push(`preferred-group:${row.releaseGroup}`);
     }
 
-    candidates.push({ row, route: isPack ? 'sub-pack' : 'batch-sidecar', score, languages: matched, reasons });
+    const route: NyaaCandidateRoute = isPack ? 'sub-pack' : isArchive ? 'sub-archive' : 'batch-sidecar';
+    candidates.push({ row, route, score, languages: matched, reasons });
   }
 
   candidates.sort((a, b) => {
@@ -1130,7 +1204,13 @@ export type NyaaSelectionReason =
   /** Subtitles exist, but none for the episode asked for. */
   | 'no-episode-match'
   /** Every subtitle states a language, and none of them is one we asked for. */
-  | 'wrong-language';
+  | 'wrong-language'
+  /**
+   * A foldered release — a `sub-archive` — has no folder for the wanted title.
+   * Distinct from `no-subtitles`: the archive is full of them, just not this
+   * work's, and the honest answer is "not in this archive" rather than "empty".
+   */
+  | 'no-title-match';
 
 export interface NyaaFileSelection {
   files: NyaaArchiveFile[];
@@ -1201,9 +1281,33 @@ export function languageFromFileName(name: string): string | null {
  */
 export function selectSubtitleFiles(
   files: readonly NyaaArchiveFile[],
-  want: { episode?: number | null; languages?: string[] },
+  want: { episode?: number | null; languages?: string[]; title?: string | null },
 ): NyaaFileSelection {
-  const all = files ?? [];
+  let all = files ?? [];
+
+  // A `sub-archive` is the whole index of a subtitle site, so the release the
+  // caller picked is not the work — the *folder* is. Narrow to it before
+  // anything else looks at a file name, or episode matching runs against 1,871
+  // shows at once and `S04E01` means four different things.
+  //
+  // Matched with `looksLikeSameTitle` on the directory segments alone, so the
+  // same alias/sequel rules a listing is held to decide this too, and a file
+  // whose own name happens to carry the title cannot drag in a folder that is
+  // some other work. Callers that pass no title (every route but this one) are
+  // unaffected.
+  if (want.title) {
+    const scoped = all.filter((file) => {
+      const segments = String(file.name ?? '').split(/[\\/]/).slice(0, -1);
+      return segments.some((segment) => segment && looksLikeSameTitle(segment, want.title as string));
+    });
+    // Only narrowing, never emptying: a flat per-title pack has no directory to
+    // match and must keep behaving exactly as it did before this existed.
+    if (scoped.length) all = scoped;
+    else if (all.some((file) => String(file.name ?? '').includes('/') || String(file.name ?? '').includes('\\'))) {
+      return { files: [], format: null, reason: 'no-title-match' };
+    }
+  }
+
   const text = all.filter((file) => subtitleFormatFor(file.name) !== null);
 
   if (text.length === 0) {

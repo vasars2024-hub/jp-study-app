@@ -236,6 +236,13 @@ interface NyaaFetchToken {
   route: NyaaSubtitleCandidate['route'];
   episode: number | null;
   languages: string[];
+  /**
+   * The work the search was for, carried only so a `sub-archive` can be narrowed
+   * to its folder before any file is fetched. Every other route already IS one
+   * title, and `selectSubtitleFiles` ignores the field when nothing is foldered.
+   * Optional so a token written before this field existed still decodes.
+   */
+  title?: string;
 }
 
 function encodeToken(token: NyaaFetchToken): string {
@@ -366,6 +373,7 @@ export async function nyaaSearchDetailed(
       route: candidate.route,
       episode: input.episode,
       languages: input.languages,
+      title: input.title,
     }),
     route: candidate.route,
     sizeBytes: candidate.row.sizeBytes,
@@ -470,6 +478,7 @@ const SELECTION_MESSAGES: Record<NyaaSelectionReason, string> = {
   'no-subtitles': 'This release contains no subtitle files.',
   'no-episode-match': 'This release has subtitles, but none for the episode requested.',
   'wrong-language': 'This release only has subtitles in another language.',
+  'no-title-match': 'This subtitle archive has no folder for this title.',
 };
 
 /**
@@ -620,6 +629,10 @@ async function acquireAll(
   const selection = selectSubtitleFiles(files.value, {
     episode: token.episode,
     languages: token.languages,
+    // Only a `sub-archive` is foldered by title. Passing it on every route would
+    // let one work's pack be narrowed away by its own directory naming, which is
+    // a way to turn a working fetch into `no-title-match` for nothing.
+    title: token.route === 'sub-archive' ? (token.title ?? null) : null,
   });
   if (selection.reason !== 'ok' || !selection.format) {
     return {

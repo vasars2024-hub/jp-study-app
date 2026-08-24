@@ -197,8 +197,12 @@ export interface SubtitleDiscoveryResult {
 export interface NyaaSubtitleCandidateView {
   id: string;
   releaseName: string;
-  /** `sub-pack` takes the whole torrent; `batch-sidecar` takes selected files. */
-  route: 'sub-pack' | 'batch-sidecar';
+  /**
+   * `sub-pack` takes the whole torrent; `batch-sidecar` and `sub-archive` take
+   * selected files — the difference being that an archive holds every title's
+   * subtitles and none of the video, so the wanted work is a folder inside it.
+   */
+  route: 'sub-pack' | 'sub-archive' | 'batch-sidecar';
   sizeBytes: number;
   seeders: number;
   languages: string[];
