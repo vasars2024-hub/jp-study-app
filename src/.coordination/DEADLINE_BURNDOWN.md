@@ -402,3 +402,28 @@ needs five numbers and this turn re-drove two. Drag frame stability, resize, the
 boot cost were NOT re-measured on this boot, so the category is scored on what was measured and no
 more. Video has never been scored at all, and L1's gate needs both surfaces. The 0.333/day rate
 already prices turns like this one.
+
+2026-08-24 | liquid | units done this turn: 0 | units left: 10 | basis: the 13 `Gate:` lines in section 11 of src/LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md (`grep -c 'Gate:'` = 13, re-run this turn); 3 closed (L0 line 452 / L2 line 591 / L3 line 600), the other 10 open, and gate 461 (L1) is the one this turn worked | projected finish: 2026-09-23
+
+**Fourth zero-gate turn, same arithmetic, and it is still the honest one.** 3 gates in the 9 days
+since liquid opened (08-16) is 0.333/day across 2 workers; 10 left is 30 days → **2026-09-23**, a
+~22-day slip against the 2026-09-01 target. main-v1 contributes 0 (complete-except-external, 61 of
+80) and mal-pipeline is 34 of 34, so liquid alone is the programme's date. Stated, not descoped.
+
+**What moved inside gate 461, and one of it is product.** `971987a9` fixes the L0 finding that a
+resize ending where it started leaves the window the wrong size — `resizeStart`'s `up` cancelled the
+pending rAF and left the DOM on the frame before the one being committed. Verified three ways on a
+live boot: the probe's `closedLoop` for resize is **True** for the first time; the `.fwin` inline
+style and its rect both read **1080x700** against `desktop-layout.json`'s `video 1080x700`; and the
+same holds for all three windows once focused. `8b3bd5ea` repairs the Q7 control, which had been
+painting its glass on a `display:none` window and certifying nothing.
+
+**And category 7's last open claim is measured, not inferred.** `l1-deadend.js`'s 19-control burst
+— the path that once took main 604.2 MB → 7,082.0 MB, and which the previous entry explicitly
+refused to score from the cycle number — costs main **+6.8 MB and +11 handles** over 70 s
+(582.3 → 589.1). The 2,942.2 MB it loads sits in a NodeService utility process forked mid-burst.
+
+**Why that is still 0 gates.** Gate 461 needs 80/80 on Dictionary **and** Video. Five of Dictionary's
+eight categories were re-driven on this boot (1, 2, 5, 7, and 6's live half); category 8's instrument
+returned an empty-harness reading and is unscored; 3 and 4 were not re-driven; Video has never been
+scored at all. The 0.333/day rate already prices turns that land real product fixes and no gate.
