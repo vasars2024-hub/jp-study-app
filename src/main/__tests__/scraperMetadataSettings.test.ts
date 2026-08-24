@@ -30,6 +30,7 @@ let throwingProvider: 'jikan' | 'anilist' | null = null;
 
 vi.mock('../scraper/http', () => ({
   MAX_BODY_BYTES: 4 * 1024 * 1024,
+  MAX_BODY_BYTES_CEILING: 32 * 1024 * 1024,
   SCRAPER_USER_AGENT: 'test',
   redactHeaders: (h: Record<string, string>) => h,
   charsetOf: () => 'utf-8',

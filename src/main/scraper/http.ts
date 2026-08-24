@@ -55,6 +55,17 @@ import { cookieHeaderFor, mergeCookieHeaders, rememberSetCookie, userAgentForReq
 
 /** Bodies beyond this are truncated; the UI says so rather than silently lying. */
 export const MAX_BODY_BYTES = 4 * 1024 * 1024;
+/**
+ * The most a caller may ask for by naming `maxBytes` explicitly.
+ *
+ * `MAX_BODY_BYTES` stays the default for every caller that says nothing, because
+ * it is a defence against a hostile remote page. A first-party local API is a
+ * different case: qBittorrent's `torrents/files` for the Kitsunekko archive is
+ * **5,375,038 bytes / 28,748 entries**, measured 2026-08-24, so the 4 MiB clamp
+ * cut the body mid-object and `JSON.parse` reported it as malformed. Only an
+ * explicit larger request is honoured, and never past this ceiling.
+ */
+export const MAX_BODY_BYTES_CEILING = 32 * 1024 * 1024;
 /** Matches the upper bound `validateScraperSettings` clamps the setting to. */
 const MAX_TIMEOUT_MS = 300_000;
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -317,7 +328,7 @@ export function resolveRequestOptions(
     headers: base,
     body: options.body,
     timeoutMs: Math.min(MAX_TIMEOUT_MS, Math.max(1_000, timeout)),
-    maxBytes: Math.min(MAX_BODY_BYTES, Math.max(1_024, options.maxBytes ?? MAX_BODY_BYTES)),
+    maxBytes: Math.min(MAX_BODY_BYTES_CEILING, Math.max(1_024, options.maxBytes ?? MAX_BODY_BYTES)),
     followRedirects: options.followRedirects ?? policy?.followRedirects ?? true,
     verifySsl: options.verifySsl ?? policy?.verifySsl ?? true,
     proxyUrl: options.proxyUrl ?? (policy ? proxyForAttempt(policy.proxies, attempt) : ''),

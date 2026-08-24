@@ -47,7 +47,7 @@ const { readSecret, setCredentialVaultRoot } = await import('../credentials/vaul
 const { setScraperStoreRoot } = await import('../scraper/store');
 const { flushScraperLogWrites, recentScraperLogs, resetScraperLogs, scraperLog, scraperLogFiles } =
   await import('../scraper/logBus');
-const { redactHeaders } = await import('../scraper/http');
+const { redactHeaders, scraperRequest } = await import('../scraper/http');
 
 // ---- a stand-in qBittorrent WebUI ---------------------------------------
 
@@ -117,6 +117,15 @@ let torrentInfoExtra: unknown[] = [];
 let connectionStatus = 'connected';
 /** What `torrents/files` answers next. `null` makes the stand-in 404 the route. */
 let fileListResponse: unknown[] | null = null;
+/**
+ * When > 0, `torrents/files` streams this many bytes of an opening JSON array
+ * instead of answering `fileListResponse`.
+ *
+ * A body is only truncated by the bytes that actually arrive, so the one honest
+ * way to reach the truncation branch is to send more of them than the reader
+ * will take. Streaming avoids holding tens of MiB in the test's own heap.
+ */
+let fileListOverflowBytes = 0;
 /**
  * Run on every `torrents/info` request, before it answers.
  *
@@ -292,6 +301,17 @@ beforeAll(async () => {
       return;
     }
     if (routed === '/api/v2/torrents/files') {
+      if (fileListOverflowBytes > 0) {
+        res.writeHead(200, { 'content-type': 'application/json' });
+        const chunk = `${'{"index":0,"name":"pad","size":1,"progress":0,"priority":1},'.repeat(16_000)}`;
+        let sent = res.write('[');
+        for (let written = 1; written < fileListOverflowBytes; written += chunk.length) {
+          sent = res.write(chunk);
+        }
+        void sent;
+        res.end();
+        return;
+      }
       if (!fileListResponse) {
         res.writeHead(404);
         res.end('Torrent hash was not found');
@@ -371,6 +391,7 @@ beforeEach(async () => {
   torrentInfoExtra = [];
   connectionStatus = 'connected';
   fileListResponse = null;
+  fileListOverflowBytes = 0;
   torrentInfoHook = null;
   resetQbitSessions();
   await flushScraperLogWrites();
@@ -1543,6 +1564,67 @@ describe('qbitAwaitFiles reads the swarm off the live torrent', () => {
     expect(Date.now() - startedAt).toBeLessThan(2_000);
     expect(out.ok).toBe(false);
     expect(out.ok === false && out.reason).toContain('slow, not dead');
+  });
+});
+
+// ---- a big file list, and the truncation that wore a parse error's face ----
+//
+// Measured live 2026-08-24 against the real daemon: `torrents/files` for
+// `[PeepoHappy] Kitsunekko Archive 16/07/2021` is **5,375,038 bytes / 28,748
+// entries**. The scraper's 4 MiB `MAX_BODY_BYTES` cut it mid-object, and the
+// only thing gate 31's Route A saw was "The file list was not valid JSON" —
+// which sent the previous turn looking for a parser bug that does not exist.
+
+describe('qbitFiles reads a file list larger than the scraper body cap', () => {
+  /** The real archive's shape and count, so the body crosses 4 MiB the way it does live. */
+  function archiveFiles(count: number) {
+    return Array.from({ length: count }, (_, index) => ({
+      availability: 0,
+      index,
+      is_seed: false,
+      name: `kitsunekko_backup/Title Folder ${String(index).padStart(6, '0')}/`
+        + `Episode ${String(index % 40).padStart(2, '0')} [subtitle track].ja.ass`,
+      piece_range: [index, index + 1],
+      priority: 1,
+      progress: 0,
+      size: 40_000 + index,
+    }));
+  }
+
+  it('parses all 28,748 entries of a 5 MiB list', async () => {
+    fileListResponse = archiveFiles(28_748);
+    const bytes = JSON.stringify(fileListResponse).length;
+    expect(bytes).toBeGreaterThan(4 * 1024 * 1024);
+
+    const out = await qbitFiles({ config }, HASH_PRESENT);
+    expect(out.ok).toBe(true);
+    expect(out.ok === true && out.value.length).toBe(28_748);
+    // The indexes are what the priority call later addresses, so an off-by-one
+    // here would set priorities on the wrong files and be invisible.
+    expect(out.ok === true && out.value[28_747].index).toBe(28_747);
+  });
+
+  it('NEGATIVE CONTROL: the identical body is truncated and unparseable at the default cap', async () => {
+    fileListResponse = archiveFiles(28_748);
+    const base = qbitBaseUrl(config);
+    // No `maxBytes`, so this is exactly what `qbitFiles` did before the fix.
+    const capped = await scraperRequest(`${base}/api/v2/torrents/files?hash=${HASH_PRESENT}`, {
+      headers: { authorization: `Bearer ${GOOD_KEY}`, referer: base },
+    });
+    expect(capped.truncated).toBe(true);
+    expect(capped.body.length).toBe(4 * 1024 * 1024);
+    expect(() => JSON.parse(capped.body)).toThrow();
+  });
+
+  it('says a list is too large rather than calling it malformed', async () => {
+    // Past the 32 MiB ceiling an explicit caller may ask for, so the reader
+    // still stops — but the reason names the truncation and its byte count.
+    fileListOverflowBytes = 34 * 1024 * 1024;
+    const out = await qbitFiles({ config }, HASH_PRESENT);
+    expect(out.ok).toBe(false);
+    expect(out.ok === false && out.reason).toContain('too large to read');
+    expect(out.ok === false && out.reason).toContain(String(32 * 1024 * 1024));
+    expect(out.ok === false && out.reason).not.toContain('not valid JSON');
   });
 });
 

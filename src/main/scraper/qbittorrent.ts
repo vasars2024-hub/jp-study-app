@@ -29,7 +29,7 @@ import {
 } from '../../shared/scraperSourceSettings';
 import type { ScraperQbitInput, ScraperQbitSendInput } from '../../shared/scraperIpc';
 import { getScraperSecret } from './credentials';
-import { scraperRequest } from './http';
+import { MAX_BODY_BYTES_CEILING, scraperRequest } from './http';
 import { scraperLog } from './logBus';
 
 const TIMEOUT_MS = 12_000;
@@ -354,8 +354,14 @@ export function apiKeyHeaders(key: string): Record<string, string> {
 async function authed(
   input: ScraperQbitInput,
   path: string,
-  init: { method?: string; body?: string; headers?: Record<string, string> } = {},
-): Promise<{ status: number; body: string } | { error: LoginResult }> {
+  init: {
+    method?: string;
+    body?: string;
+    headers?: Record<string, string>;
+    /** Raises the response cap past the 4 MiB scraper default. See `qbitFiles`. */
+    maxBytes?: number;
+  } = {},
+): Promise<{ status: number; body: string; truncated: boolean } | { error: LoginResult }> {
   const base = qbitBaseUrl(input.config);
   const mode = authModeOf(input.config);
 
@@ -365,6 +371,7 @@ async function authed(
       headers: { ...auth, referer: base, ...init.headers },
       body: init.body,
       timeoutMs: TIMEOUT_MS,
+      maxBytes: init.maxBytes,
       correlationId: 'qbit',
     });
 
@@ -389,7 +396,7 @@ async function authed(
           },
         };
       }
-      return { status: response.status, body: response.body };
+      return { status: response.status, body: response.body, truncated: response.truncated };
     } catch (error) {
       return {
         error: {
@@ -420,7 +427,7 @@ async function authed(
       if (!result.ok) return { error: result };
       response = await send({ cookie: result.cookie });
     }
-    return { status: response.status, body: response.body };
+    return { status: response.status, body: response.body, truncated: response.truncated };
   } catch (error) {
     return {
       error: {
@@ -1125,6 +1132,14 @@ export async function qbitStop(
  * fetch reached selection in 14 ms. So the client can decline to open a file
  * list it will open shortly afterwards, and only `torrents/info` can say
  * whether the torrent is actually still there.
+ *
+ * The body cap is raised past the 4 MiB scraper default because a whole-site
+ * subtitle archive is legitimately larger: measured 2026-08-24 against a real
+ * daemon, `[PeepoHappy] Kitsunekko Archive 16/07/2021` answers **5,375,038
+ * bytes / 28,748 entries**. At the default the body was cut mid-object and the
+ * only thing the caller saw was "not valid JSON" — a truncation wearing a parse
+ * error's clothes, which is exactly the dishonest failure this repo forbids. A
+ * body that is still truncated at the ceiling now says so, with the byte count.
  */
 export async function qbitFiles(
   input: ScraperQbitInput,
@@ -1132,11 +1147,19 @@ export async function qbitFiles(
 ): Promise<QbitOutcome<QbitFileEntry[]>> {
   const wanted = hash.trim().toLowerCase();
   if (!wanted) return { ok: false, reason: 'No info hash.' };
-  const response = await authed(input, `/api/v2/torrents/files?hash=${encodeURIComponent(wanted)}`);
+  const response = await authed(input, `/api/v2/torrents/files?hash=${encodeURIComponent(wanted)}`, {
+    maxBytes: MAX_BODY_BYTES_CEILING,
+  });
   if ('error' in response || response.status !== 200) {
     const reason = failureReason(response, 'torrents/files');
     if (!('error' in response) && response.status === 404) return { ok: false, reason, notFound: true };
     return { ok: false, reason };
+  }
+  if (response.truncated) {
+    return {
+      ok: false,
+      reason: `The file list was too large to read (cut off at ${response.body.length} bytes).`,
+    };
   }
   try {
     const parsed = JSON.parse(response.body) as QbitRawFile[];
