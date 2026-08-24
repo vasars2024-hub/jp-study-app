@@ -83,7 +83,10 @@ async function main() {
   if (visible[0].entries === 0) {
     console.log('no entries — driving a real search (食べる) so nothing is measured on an empty harness');
     await ev(`(function(){
-      var win = document.querySelector('.fwin');
+      // The VISIBLE one. A plain querySelector('.fwin') takes the first in DOM order, and this
+      // script has just hidden the others — measured 2026-08-24, it typed the search into the
+      // hidden media window and then refused with "0 dict entries after a real search".
+      var win = [].slice.call(document.querySelectorAll('.fwin')).filter(function(w){ return w.style.display !== 'none'; })[0];
       var input = win.querySelector('input[type="text"], input:not([type]), input[type="search"]');
       var set = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
       set.call(input, '\\u98df\\u3079\\u308b');
@@ -92,7 +95,10 @@ async function main() {
     })()`);
     await sleep(400);
     await ev(`(function(){
-      var win = document.querySelector('.fwin');
+      // The VISIBLE one. A plain querySelector('.fwin') takes the first in DOM order, and this
+      // script has just hidden the others — measured 2026-08-24, it typed the search into the
+      // hidden media window and then refused with "0 dict entries after a real search".
+      var win = [].slice.call(document.querySelectorAll('.fwin')).filter(function(w){ return w.style.display !== 'none'; })[0];
       var b = [].slice.call(win.querySelectorAll('button')).filter(function(x){
         return /^(Search|\\u691c\\u7d22)/.test((x.textContent||'').trim());
       })[0];

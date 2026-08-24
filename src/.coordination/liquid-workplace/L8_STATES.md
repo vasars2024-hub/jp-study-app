@@ -195,3 +195,40 @@ becomes `No recording for this word` and never returns (`.word-audio`, 7 of 8 en
 is honest and the first click had an observable effect, so it is not a dead control by this
 category's definition — but a button that can never act again is a category **2** finding, and it
 is recorded here so the clunkiness re-score does not have to rediscover it.
+
+## 2026-08-24 · backup — the panel that reported a translation while it loaded a model, driven live
+
+`Example sentences` is this surface's one action that starts a 1.2 GB GGUF load (l7n named it;
+today's `l7o` measured it at ~15 s and +2.9 GB). For those seconds the panel rendered
+*"Translating examples…"* — a state the app could already contradict from its own event stream,
+since `ensureSession()` broadcasts `translate:progress` **before** it imports node-llama-cpp.
+
+**LIVE, pid 9532, Dictionary 820x580, 食べる, 8 entries / 5,669 chars / 349 nodes / 75 controls**
+(`l7d-setup.cjs` after the repair below), one click of `Example sentences`, `debug/l8b-live-ex.cjs`:
+
+| t | events | last | `.dict-ex-status` |
+| --- | --- | --- | --- |
+| idle 6 s, nothing clicked | **0** | — | — |
+| +1 s | 3 | `progress/45` | **"Loading translation model… 45%"** |
+| +5 s | 4 | `progress/80` | "Loading translation model… 80%" |
+| +6 s | 5 | `ready/100` | **"Translating examples…"** |
+| +8 s | 5 | `ready/100` | *(gone — translations rendered)* |
+
+Rows came back real, not empty: `食べる？ / English Do you want to eat? / 中文 吃？`.
+
+**The negative control is the idle window and it held: 0 events in 6 s before the click**, so the
+percentages are the load's and not an event that fires on its own. `1c874da9` shipped this.
+
+**The language default, same run.** `jp-study-ex-langs` is **null** on this profile and the panel
+still lit exactly **English + 中文** — `defaultExLangs` read the profile's own non-Japanese card
+language rather than the old hardcoded `['en', 'ru']` (`ebc88b40`). Worth recording: `nativeLangOf`
+is typed `'en' | 'ru' | 'ja'` and this profile returns **`'zh'`** at runtime, which the
+`EX_LANGS.some(...)` guard handles — the type is narrower than the data. **Not claimed live:** the
+English-front case that loads *no* model is covered by unit test and mutation only; switching the
+active profile writes user data and was not done for a measurement.
+
+**Probe repair (one attempt, and it worked).** `l7d-setup.cjs` typed its search into
+`document.querySelector('.fwin')` — the first in DOM order — after having just hidden the other
+two windows, so the query went to the hidden `media` window and the script refused with "0 dict
+entries after a real search" while `lookupTerm('食べる')` returned 8 through the IPC. Both blocks
+now take the first *visible* `.fwin`, exactly as its own census step already did.
