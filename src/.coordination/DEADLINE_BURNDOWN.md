@@ -190,3 +190,15 @@ across every surveyed title is still 0. The next slice is product code, not a se
 `黄金之风` pack -- the one Japanese sub-pack this library is known to have. Fixing that is a
 cheaper shot at Route A than surveying 36 more titles, and it is worth exactly one turn before
 this plan writes Route A up as data-blocked.
+
+2026-08-24 | mal-pipeline | units done this turn: 0 | units left: INHERITED 2 | basis: last turn's count of the gate tables in src/MAL_ANIME_PIPELINE_PLAN.md (open: 31, 34) | projected finish: UNKNOWN
+Worker `primary`, same turn, superseding the line above with what the third slice measured. Three
+commits, one defect class, three sites: the provider searches (`b7207748`), the alias reach
+(`ad142237`) and the metadata lookup that writes `malId` (`f7c118c1`). The chain is what matters
+-- a file this app downloads itself was `metadataSource: unmatched`, so it had no `malId`, so it
+had no aliases, so its listing asked one narrowed question and returned nothing. After: matched 1,
+malId 37991, 4 altTitles, and `listNyaaSubtitles` on that item goes **0 -> 4 candidates**. Route A
+is still open and still has **0 sub-packs**; the projection stays UNKNOWN for the same honest
+reason as the last three lines. What changed is that "no Route A candidate exists" is now a
+statement about the index rather than about three defects in the surface asking it, which is the
+precondition for ever writing Route A up as data-blocked.

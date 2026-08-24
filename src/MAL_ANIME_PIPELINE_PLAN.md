@@ -2833,3 +2833,43 @@ therefore dead for exactly the items this pipeline creates.
 a MAL identity — the acquisition already knows which MAL title it was started from — so the alias
 walk `ad142237` just built actually reaches the JoJo pack (`黄金之风`), which is where this
 library's one known Japanese sub-pack lives.
+
+## 2026-08-24 — the third site of the same defect, and Route A's listing goes 0 → 4
+
+Worker `primary`, same turn. Commit `f7c118c1`. **Gate 31 stays 32 of 34** (open: 31, 34). Route A
+still has **no `sub-pack`**, and this does not claim otherwise — but the surface that reports that
+is now telling the truth for the first time, which the two entries above were not.
+
+**The defect.** `groupTitles` (`main/mediaMetadata.ts:97`) looked a series up with
+`item.seriesTitle || item.title` — the same unnormalised string the provider searches used until
+`b7207748`. That is the *only* lookup that writes `malId`, so a file this app downloads itself
+could never earn one, and three things stayed dead for exactly those files: the alias walk
+`ad142237` had just built, the episode-count floor a range listing is judged against, and Jimaku's
+exact AniList match. `providerSearchTitle` moved to `shared/mediaFileIdentity.ts`, beside the
+`parseMediaFileName` it wraps, so both passes normalise identically instead of growing a copy.
+
+**Measured live, restarted app, on the item this plan itself acquired:**
+
+| step | before | after |
+| --- | --- | --- |
+| `runMediaMetadata({ mediaIds: [17de8a95…], force: true })` | `metadataSource: unmatched`, confidence **0** | **matched 1**, review 0, unmatched 0, in **4 s** |
+| `malId` / `anilistId` | **null / null** | **37991 / 102883**, confidence **1**, source `anilist` |
+| `seriesTitle` | `JoJo … Ougon no Kaze 39-END` | `JoJo's Bizarre Adventure: Golden Wind` |
+| MAL row 37991 `altTitles` | unreachable | **4**, incl. `ジョジョの奇妙な冒険 黄金の風`; `totalEpisodes` 39 |
+| `listNyaaSubtitles` on the item | **0 candidates** | **4 candidates**, 4 names walked, 4 s |
+
+The app's own `unmatched` is the control: it recorded the failure itself before the fix, over the
+same providers, the same item and the same forced sweep.
+
+**What the 4 candidates are, and why Route A is still open.** All four are `batch-sidecar` —
+top is the DBD-Raws **video** batch, `46,899.2 MB`, 11 seeders, the 1080p BDRip whose `简繁外挂字幕`
+belong to it. The standalone **87.80 MB** subtitle-only pack this plan renders from is *not* in
+this listing, though the harvest route finds it. One asymmetry remains between the two surfaces
+and it is the next thing to look at: `listNyaaHarvest` passes `episodeCount: stored.totalEpisodes`
+(now readable here, 39) and `listNyaaCandidates` does not, so the two are ranking the same index
+under different constraints.
+
+**Next slice:** close that last asymmetry, then re-list. If the pack still does not appear, the
+difference is in the *search text* rather than the ranking, and that is a two-command comparison
+(`subtitleHarvest:nyaaList` vs `subtitleDiscovery:nyaaList` on the same title, same minute) rather
+than another survey band.
