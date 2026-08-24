@@ -284,6 +284,13 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
   const [exLangs, setExLangs] = useState<TransLang[]>(loadExLangs);
   const [exTrans, setExTrans] = useState<Record<string, Partial<Record<TransLang, string>>>>({});
   const [exTransLoading, setExTransLoading] = useState(false);
+  /**
+   * Percent, while the offline translation model is loading — `null` once it is ready or was
+   * already resident. Measured 2026-08-24: this control is the one Dictionary action that starts
+   * a Qwen3 load, and that load takes ~15 s and 2.9 GB of main-process memory. Reporting only
+   * "Translating examples…" for those 15 s is a state the app knows to be wrong about itself.
+   */
+  const [exModelPct, setExModelPct] = useState<number | null>(null);
   const recordedLookupRef = useRef('');
 
   // (Re)look up whenever the query changes.
@@ -749,6 +756,15 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
       return;
     }
 
+    // Subscribed through the preload binding rather than through `translator.ts`'s
+    // `onModelProgress`, which holds ONE global callback: registering there would silently take
+    // the Translate view's or a reader's progress away. This one unsubscribes.
+    const offModel = window.api.onTranslateModelProgress((p) => {
+      if (!alive) return;
+      if (p.status === 'ready') setExModelPct(null);
+      else setExModelPct(typeof p.progress === 'number' ? Math.round(p.progress) : 0);
+    });
+
     (async () => {
       setExTransLoading(true);
       const next = seedEnglish();
@@ -767,11 +783,14 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
       if (alive) {
         setExTrans(next);
         setExTransLoading(false);
+        setExModelPct(null);
       }
     })();
 
     return () => {
       alive = false;
+      offModel?.();
+      setExModelPct(null);
     };
     // NOTE: no eslint-disable here. `react-hooks/exhaustive-deps` is not loaded
     // in this config, so a disable comment for it is itself an eslint error
@@ -1122,7 +1141,11 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
                 </div>
               </div>
               {exTransLoading && (
-                <div className="dict-ex-status muted">{t('dict.results.translatingExamples')}</div>
+                <div className="dict-ex-status muted">
+                  {exModelPct === null
+                    ? t('dict.results.translatingExamples')
+                    : t('dict.results.loadingModelPct', { pct: exModelPct })}
+                </div>
               )}
               <p className="dict-ex-hint muted">{t('dict.results.exHint')}</p>
               <ul className="dict-ex-list">

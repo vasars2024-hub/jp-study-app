@@ -2114,6 +2114,7 @@ export const zh: Catalog = {
   'dict.results.searchingTatoeba': '正在搜索 Tatoeba…',
   'dict.results.noExamples': '未找到例句。',
   'dict.results.show': '显示',
+  'dict.results.loadingModelPct': '正在加载翻译模型… {pct}%',
   'dict.results.translatingExamples': '正在翻译例句…',
   'dict.results.exHint': '手动：点击例句精确选择写入卡片的内容（所选全部使用）。自动：不选即可挖词 — 使用字段映射中各语言前 N 条 Tatoeba。阅读上下文保留在 {sentence}。',
   'dict.results.selectedManual': '已选 {count} 条（手动）— 全部将挖取',

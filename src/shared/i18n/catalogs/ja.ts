@@ -2123,6 +2123,7 @@ export const ja: Catalog = {
   'dict.results.searchingTatoeba': 'Tatoeba を検索中…',
   'dict.results.noExamples': '例文が見つかりませんでした。',
   'dict.results.show': '表示',
+  'dict.results.loadingModelPct': '翻訳モデルを読み込み中… {pct}%',
   'dict.results.translatingExamples': '例文を翻訳中…',
   'dict.results.exHint': '手動：例文をクリックしてカードに入れるものを選びます（選んだものがすべて使われます）。自動：選ばずにマイニング — フィールドマッピングの言語ごとの先頭 N 件の Tatoeba が使われます。リーダー文脈は {sentence} に残ります。',
   'dict.results.selectedManual': '{count} 件選択（手動）— すべてマイニングされます',

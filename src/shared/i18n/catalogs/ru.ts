@@ -2286,6 +2286,7 @@ export const ru: Catalog = {
   'dict.results.searchingTatoeba': 'Поиск в Tatoeba…',
   'dict.results.noExamples': 'Примеры предложений не найдены.',
   'dict.results.show': 'Показать',
+  'dict.results.loadingModelPct': 'Загрузка модели перевода… {pct}%',
   'dict.results.translatingExamples': 'Перевод примеров…',
   'dict.results.exHint': 'Вручную: нажмите примеры, чтобы точно выбрать, что попадёт на карточку (используются все выбранные). Авто: майните без выбора — берутся первые N попаданий Tatoeba по языкам из сопоставления полей. Контекст читалки остаётся в {sentence}.',
   'dict.results.selectedManual': 'Выбрано: {count} (вручную) — всё будет смайнено',

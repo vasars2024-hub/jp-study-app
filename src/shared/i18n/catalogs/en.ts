@@ -2250,6 +2250,7 @@ export const en: Catalog = {
   'dict.results.searchingTatoeba': 'Searching Tatoeba…',
   'dict.results.noExamples': 'No example sentences found.',
   'dict.results.show': 'Show',
+  'dict.results.loadingModelPct': 'Loading translation model… {pct}%',
   'dict.results.translatingExamples': 'Translating examples…',
   'dict.results.exHint': 'Manual: click examples to choose exactly which ones go on the card (all selected are used). Auto: mine without selecting — the first N Tatoeba hits per language from field mapping are used. Reader context stays in {sentence}.',
   'dict.results.selectedManual': '{count} selected (manual) — all will be mined',
