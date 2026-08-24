@@ -40,6 +40,17 @@ let loadPromise: Promise<void> | null = null;
  */
 let loadedModel: { dispose?: () => unknown } | null = null;
 let loadedContext: { dispose?: () => unknown } | null = null;
+/**
+ * The `Llama` backend instance, and it has to be released too. `getLlama()` does not cache:
+ * `getLlamaForOptions` builds a new `Llama` every call, and `loadBindingModule` deliberately
+ * `delete`s the addon from `require.cache` first so each instance gets its own copy of the native
+ * binding. Deleting a require-cache entry does not unload a `.node`, so the DLL, its thread pool
+ * and its handles stay in the process; only `llama.dispose()` (which calls `_bindings.dispose()`)
+ * releases them, and it also removes the `process.once('beforeExit')` listener each instance adds.
+ * Measured on the live app: without this, one load/unload cycle left main **531 MB and 3,330
+ * handles** above its boot baseline, and a second cycle took handles to 6,809.
+ */
+let loadedLlama: { dispose?: () => unknown } | null = null;
 let idleUnloadTimer: ReturnType<typeof setTimeout> | null = null;
 let activeTranslations = 0;
 let translateChain: Promise<unknown> = Promise.resolve();
@@ -404,12 +415,14 @@ function resetSessionHistory(s: LlamaChatSession): void {
 }
 
 /**
- * Releases the native model and context. Exported for the tests and for shutdown; everything else
- * reaches it through `scheduleIdleUnload`.
+ * Releases the native model, context and backend. Exported for the tests and for shutdown;
+ * everything else reaches it through `scheduleIdleUnload`.
  *
- * Disposing is best effort in the same way `localAgent.ts`'s is — a failed native teardown must
- * not take the module down — but the module-level references are cleared either way, so the next
- * `ensureSession()` rebuilds rather than handing back a session over a disposed context.
+ * Order matters: the context and the model are owned by the backend, so they are disposed first
+ * and the `Llama` instance last. Disposing is best effort in the same way `localAgent.ts`'s is — a
+ * failed native teardown must not take the module down — but the module-level references are
+ * cleared either way, so the next `ensureSession()` rebuilds rather than handing back a session
+ * over a disposed context.
  */
 export async function unloadTranslationModel(): Promise<void> {
   if (idleUnloadTimer) {
@@ -418,13 +431,16 @@ export async function unloadTranslationModel(): Promise<void> {
   }
   const context = loadedContext;
   const model = loadedModel;
+  const llama = loadedLlama;
   session = null;
   loadPromise = null;
   loadedContext = null;
   loadedModel = null;
+  loadedLlama = null;
   try {
     await context?.dispose?.();
     await model?.dispose?.();
+    await llama?.dispose?.();
   } catch {
     /* Native cleanup is best effort; the next load still builds a fresh runtime. */
   }
@@ -458,6 +474,9 @@ async function ensureSession(): Promise<LlamaChatSession> {
       broadcast('translate:progress', { status: 'progress', progress: 20, file: path.basename(modelPath) });
 
       const llama = await getLlama();
+      // Recorded before the first `await` that could reject, so a load that dies between here and
+      // `createContext` still leaves the backend reachable for `unloadTranslationModel`'s cleanup.
+      loadedLlama = llama as unknown as { dispose?: () => unknown };
       broadcast('translate:progress', { status: 'progress', progress: 45, file: path.basename(modelPath) });
 
       const model = await llama.loadModel({ modelPath });

@@ -593,3 +593,43 @@ allocation is native, so a click-time delta measures the search that the control
 
 **Leg 3 is still NOT a 10.** 1,256.7 MB against an L0 baseline of 550–577 is a 2.2× regression and
 6,803 handles against ~1,055 is 6.4×. Fix and re-drive: next section.
+
+## 2026-08-24 · primary — D2: the backend IS undisposed, the fix is real, and it does NOT move the number
+
+Second cold boot, pid **22796**, same `l7d-setup.cjs` state (8 entries / 5,669 chars / 349 nodes /
+75 controls). `Example sentences` drove each cycle, so this is the same path measured twice.
+Baseline **556.9 MB / 1,052 handles** against the previous boot's 551.4 / 1,051 — 6 MB and 1 handle
+apart, which is what makes the comparison below a comparison.
+
+| cycle | point | before (pid 19416) | with the dispose (pid 22796) |
+| --- | --- | --- | --- |
+| — | boot baseline | 551.4 MB / 1,051 h | **556.9 MB / 1,052 h** |
+| 1 | load plateau | 3,453.2 / 4,391 | 3,529.5 / **4,384** |
+| 1 | settled after unload | 1,082.4 / 4,378 | 1,157.7 / **4,378** |
+| 2 | load plateau | 3,634.7 / 6,809 | 3,677.7 / **6,811** |
+
+**The handle stack is unchanged: 4,378 then 6,811, against 4,378 then 6,809.** Reported as the
+number rather than as an intention — `llama.dispose()` is called and the handles do not come back.
+Either `_bindings.dispose()` does not release them on Windows, or its
+`_backendDisposeGuard.acquireDisposeLock()` never resolves while the just-disposed model still holds
+a reference; the `try` swallows both identically. Not distinguished here, and not claimed.
+
+**What the change does earn, and it is smaller than it looked.** `getLlama()` genuinely builds a new
+`Llama` per call over a freshly re-`require`d addon, and each one registers a
+`process.once('beforeExit')` listener that only `dispose()` removes, so leaving it unreferenced is a
+leak on its own terms. And the one thing that could have gone wrong does not: **a load after a
+disposed backend works** — cycle 2 loaded normally to 3,677.7 MB on the fixed build, so
+dispose-then-`getLlama()` is a supported sequence rather than a one-shot teardown.
+
+**D2 stays OPEN with its number.** Next candidate, and it is a measurement not a guess: count
+threads alongside handles across one cycle. ~2,425 handles per cycle at a 1.2 GB mmap'd GGUF smells
+like a thread pool or file mapping that `model.dispose()` leaves behind, which would put the defect
+in node-llama-cpp rather than in this repo — in which case the product answer is to stop cycling the
+backend at all (one process-lifetime `Llama`, reloading only model and context), not to keep
+disposing harder.
+
+**`localAgent.ts` had the identical hole** — `disposeRuntime` disposed context and model only, and
+`loadRuntime` leaked the backend outright on a `loadModel`/`createContext` failure. Fixed the same
+way plus an error-path dispose. **Not measured live**: that path was not exercised in this session
+and the change landed after this boot started, so it rides on the translate path's evidence and on
+7/7 unit tests, and is recorded here as unverified rather than as verified.

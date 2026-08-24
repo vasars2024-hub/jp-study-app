@@ -45,6 +45,14 @@ interface LoadedAgentRuntime {
   session: LlamaChatSession;
   model: { dispose?: () => void | Promise<void> };
   context: { dispose?: () => void | Promise<void> };
+  /**
+   * The backend, and it has to be released with the rest. `getLlama()` does not cache — it builds a
+   * new `Llama` per call and re-`require`s the native addon with its `require.cache` entry deleted
+   * first, so an undisposed one retains a whole loaded `.node`, its thread pool and a
+   * `process.once('beforeExit')` listener. Measured on the live app through the translation path,
+   * which had the identical hole: ~+2,425 handles per load/unload cycle, never released.
+   */
+  llama: { dispose?: () => void | Promise<void> };
 }
 
 let runtime: LoadedAgentRuntime | null = null;
@@ -102,8 +110,10 @@ function resetSessionHistory(session: LlamaChatSession): void {
 async function disposeRuntime(value: LoadedAgentRuntime | null): Promise<void> {
   if (!value) return;
   try {
+    // Innermost first: the context belongs to the model and both belong to the backend.
     await value.context.dispose?.();
     await value.model.dispose?.();
+    await value.llama.dispose?.();
   } catch {
     // Native model cleanup is best effort; the next runtime still loads safely.
   }
@@ -158,17 +168,31 @@ async function loadRuntime(settings: LocalAgentSettings, modelPath: string): Pro
     runtime = null;
     const { getLlama, LlamaChatSession } = await import('node-llama-cpp');
     const llama = await getLlama();
-    const model = await llama.loadModel({ modelPath });
-    const context = await model.createContext({ contextSize: settings.contextSize });
-    const loaded: LoadedAgentRuntime = {
-      modelPath,
-      contextSize: settings.contextSize,
-      session: new LlamaChatSession({ contextSequence: context.getSequence() }),
-      model,
-      context,
-    };
-    runtime = loaded;
-    return loaded;
+    // A load that dies at `loadModel` or `createContext` still created a backend, and nothing
+    // downstream would ever see it — the same shape of retention this whole guard exists to close.
+    let model: Awaited<ReturnType<typeof llama.loadModel>> | null = null;
+    try {
+      model = await llama.loadModel({ modelPath });
+      const context = await model.createContext({ contextSize: settings.contextSize });
+      const loaded: LoadedAgentRuntime = {
+        modelPath,
+        contextSize: settings.contextSize,
+        session: new LlamaChatSession({ contextSequence: context.getSequence() }),
+        model,
+        context,
+        llama,
+      };
+      runtime = loaded;
+      return loaded;
+    } catch (err) {
+      try {
+        await model?.dispose?.();
+        await llama.dispose?.();
+      } catch {
+        // Best effort, exactly as in disposeRuntime.
+      }
+      throw err;
+    }
   })();
   loadPromise.catch(() => {
     loadPromise = null;
