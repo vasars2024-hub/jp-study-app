@@ -147,3 +147,96 @@ theme apply **15.1** / restore **19.5**, `restoredTo=forest-night`, `title=Dicti
 every run. **Frame health does not fall out of main RSS** — reporting one as evidence for
 the other is how a 3 GB process reads as fine. The jank control fired: p95 **10.1 → 110.0**,
 frames >100 ms **0 → 10**.
+
+## 2026-08-24 · backup — the memory experiment this file prescribed, run: the objection closes, and RSS is not the number
+
+The entry above capped category 7 at 9/10 on memory and named exactly one experiment:
+*"sample RSS at 3, 8, 16 and 24 min on a boot with **no reload**, and separately reload once at a
+settled point and sample either side."* That ran.
+
+**Cold start proven.** 0 `electron` pids before (`Get-Process electron` returned none), one
+`npm start`, bridge pid **2912**, 6 processes. Readiness taken from the bridge, then husk-probed
+(`eval 1+1` gives **2**) before any number was trusted. Real functional state, set up once and then
+left strictly alone: Dictionary window restored **already in Liquid presentation**, 食べる gives
+**8 `dict-entry` / 5,963 chars / 349 nodes / 67 controls**, `forest-night`, `data-perf=performance`.
+
+### Leg 1 — no reload, no probe work, 16 minutes of silence
+
+| uptime | main RSS | main **private** | handles | all 6 |
+| --- | --- | --- | --- | --- |
+| 4.20 | 592.2 | — | — | — |
+| 6.26 | 472.2 | 551.7 | 1085 | 919.5 |
+| 8.01 | 332.7 | **550.9** | 1079 | 729.6 |
+| 12.00 | 68.2 | 550.8 | 1078 | 420.9 |
+| 16.00 | 55.3 | 551.8 | 1076 | 406.2 |
+| 20.00 | 55.3 | 553.2 | 1076 | 405.1 |
+| 24.00 | 56.2 | **554.2** | 1075 | 408.5 |
+
+**+3.4 MB of private memory across 16 quiet minutes, handles 1,079 down to 1,075.** There is no
+steady-state leak on this surface.
+
+### THE CORRECTION THIS RUN FORCES: main RSS on an idle Windows process is not a memory measurement
+
+Between 8 and 12 minutes main RSS fell **332.7 to 68.2 MB** while private moved **550.9 to 550.8**.
+Nothing was released. That is the OS trimming the working set of a process that stopped touching
+its pages. Every earlier number in this file that reads as *"a real allocation genuinely
+released"* — L0's 3,174 to ~375, and this file's own 2,979 to 436.6 — was scored on `WorkingSet64`,
+and **the 373–379 MB L0 baseline the 9/10 cap was written against is an RSS figure**. On that
+metric this boot reads **56.2 MB**, far under the baseline, which would "lift the cap" for the
+wrong reason. The number that carries information is **private bytes**, and it is flat.
+Prior RSS figures are **not** restated or corrected here; what changes is which column is read.
+
+### Leg 2 — one reload at a settled point, sampled either side, nothing else driven
+
+| point | main RSS | main private | handles | all 6 |
+| --- | --- | --- | --- | --- |
+| pre-reload (24.27 min) | 56.1 | 554.3 | 1077 | 408.9 |
+| reload + 45 s | 105.8 | 557.2 | 1081 | 862.5 |
+| reload + 150 s | 88.0 | **559.1** | 1079 | 658.3 |
+
+**A bare reload costs main +4.8 MB private and does not re-spike.** This retracts the previous
+entry's third finding, which read *"after the window settled to 436.6 MB, a renderer reload plus
+probe work put it back to 2,278.1 MB"* and named the reload path as the likely owner. Separated,
+the reload is not the owner — **the probe work was**. The window came back liquid and re-armed to
+the identical state (8 entries / 5,963 chars / 349 nodes / 67 controls), so nothing was lost.
+
+### The control fired — and the instrument it was supposed to use is BROKEN
+
+`debug/l7b-search-bisect.cjs`, named at the end of the previous entry as re-runnable, **throws on
+this tree**: every step returns `THREW: Cannot read properties of undefined (reading 'search')`
+and `(reading 'snapshot')`. It reported memory **flat at 560.1 MB private for five words while
+performing no searches at all** — a broken probe whose output is indistinguishable from a clean
+pass. Do not quote it again without checking it clicked something.
+
+Re-run through the search path that is known to work (type, click `Search`, read `.dict-entry`),
+five distinct words, each returning real results — 勉強 **8**, 図書館 **8**, 新聞 **8**,
+冷蔵庫 **3** (a real narrower result, not an empty), 自転車 **8**:
+
+**private 560.1 to 571.0 (+10.9 MB) and RSS 75.0 to 126.7 (+51.7 MB) in about 20 seconds** — three
+times the movement that 16 quiet minutes produced. The sampler sees a rise when there is one, so
+the flat quiet reading means something.
+
+### Disposition: the memory objection is CLOSED. Category 7 is still NOT re-scored to 10.
+
+The cap's stated premise is gone — no steady-state leak, no reload-owned re-spike, and the
+instrument is shown sensitive. But the rubric forbids inheriting a score across a change, and the
+gesture and main-availability halves of category 7 were measured **on a different boot** (the
+2026-08-17 pass). Scoring 10 now would mean carrying frame and `/health` numbers from a process
+that no longer exists onto a process where only memory was measured — which is precisely the
+"frame health does not fall out of main RSS" trap this file already recorded, run in reverse.
+
+**Exact re-measurement that earns the 10, and it is now the only thing open:** one cold boot that
+does all three legs in a single process — drag/resize/theme frame deltas with the jank control,
+`/health` under one real search and `Find example sentences` with the burst sensitivity control,
+and private-byte samples at 8/16/24 min — reported together.
+
+### Traps
+
+- **Read `PrivateMemorySize64`, not `WorkingSet64`.** An idle Electron main trims to ~55 MB RSS
+  while holding ~551 MB private.
+- `debug/l7b-rss-sampler.ps1` takes `-Marks` as a `[double[]]`. Passing `"5,8,12,16,20,24"` as one
+  quoted string through `Start-Process -ArgumentList` fails the parameter bind and the script
+  produces **no output file at all** while its `pwsh` process stays alive — which reads exactly
+  like a sampler that is still waiting for its first mark. Pass `@(8,12,16,20,24)`.
+- Do not run the full vitest suite while sampling. It is a separate process, but the memory
+  pressure trims the working set being measured and would manufacture a clean number.
