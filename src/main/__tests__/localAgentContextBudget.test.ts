@@ -42,7 +42,10 @@ vi.mock('electron', () => ({
 }));
 
 vi.mock('node-llama-cpp', () => {
-  const context = { getSequence: () => ({}), dispose: () => undefined };
+  const context = {
+    getSequence: () => ({ clearHistory: () => Promise.resolve(), dispose: () => undefined }),
+    dispose: () => undefined,
+  };
   const model = {
     createContext: () => Promise.resolve(context),
     dispose: () => undefined,
@@ -66,6 +69,7 @@ vi.mock('node-llama-cpp', () => {
 
 const localAgent = await import('../localAgent');
 const modelPool = await import('../llamaModelPool');
+const contextPool = await import('../llamaContextPool');
 
 /** `CHAT_TEMPLATE_RESERVE_TOKENS`, mirrored so the sums below are visible. */
 const RESERVE = 192;
@@ -93,6 +97,9 @@ beforeEach(() => {
 
 afterEach(async () => {
   localAgent.stopLocalAgentRuntime();
+  // The context pool holds a warm cache past the last release by design, so a test that leaves one
+  // behind would hand the next test a reused sequence and a stale entry in the stats.
+  await contextPool.disposeAllLlamaContexts();
   await modelPool.disposeAllLlamaModels();
 });
 

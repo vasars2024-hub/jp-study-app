@@ -22,7 +22,7 @@ import type {
   LocalAgentModelInfo,
   LocalAgentRuntimeStatus,
 } from '../shared/localAgentRuntime';
-import { acquireLlamaModel, type LlamaModelLease } from './llamaModelPool';
+import { acquireLlamaContext, type LlamaContextLease } from './llamaContextPool';
 import { registerAgentExecutionIpc } from './agentExecutionIpc';
 import { registerAgentImageStagingIpc } from './agentImageStaging';
 import { registerAgentCardBatchStagingIpc } from './agentCardBatchStaging';
@@ -53,9 +53,12 @@ interface LoadedAgentRuntime {
   modelPath: string;
   contextSize: number;
   session: LlamaChatSession;
-  /** Borrowed from `llamaModelPool.ts`, because `translate.ts` resolves the same GGUF. */
-  lease: LlamaModelLease;
-  context: { dispose?: () => void | Promise<void> };
+  /**
+   * Borrowed from `llamaContextPool.ts` — the weights, because `translate.ts` resolves the same
+   * GGUF, and the KV cache, because rebuilding it on every idle unload is the larger half of what
+   * a cycle costs. One lease covers both; releasing it lets the pool keep either resident.
+   */
+  lease: LlamaContextLease;
 }
 
 let runtime: LoadedAgentRuntime | null = null;
@@ -113,12 +116,11 @@ function resetSessionHistory(session: LlamaChatSession): void {
 async function disposeRuntime(value: LoadedAgentRuntime | null): Promise<void> {
   if (!value) return;
   try {
-    // Innermost first: the context belongs to the model. The shared backend outlives both, by
-    // design — `llamaBackend.ts` records the handle counts that ruled out disposing it per cycle.
-    // The weights are released, not disposed: `translate.ts` may still be holding the same file,
-    // and the pool disposes only once nobody is. Order matters for the same reason as ever — a
-    // context over freed weights is freed native memory.
-    await value.context.dispose?.();
+    // RELEASED, not disposed, and that now covers the context too: `translate.ts` may still be
+    // holding the same file, and a user coming back inside the grace window should not rebuild a
+    // KV cache that is still resident. The pool owns the innermost-first teardown order, and the
+    // shared backend outlives all of it by design — `llamaBackend.ts` records the handle counts
+    // that ruled out disposing it per cycle.
     await value.lease.release();
   } catch {
     // Native model cleanup is best effort; the next runtime still loads safely.
@@ -173,21 +175,19 @@ async function loadRuntime(settings: LocalAgentSettings, modelPath: string): Pro
     await disposeRuntime(runtime);
     runtime = null;
     const { LlamaChatSession } = await import('node-llama-cpp');
-    // Shared with `translate.ts` — one native addon between the two modules, and now one copy of
-    // the weights too, since both resolve their GGUF from the same roots and usually land on the
-    // same file. `llamaModelPool.ts` carries the measurement.
-    // A load that dies after `acquireLlamaModel` still holds a lease, and nothing downstream would
-    // ever see that model — the same shape of retention this guard exists to close.
-    let lease: LlamaModelLease | null = null;
+    // Shared with `translate.ts` — one native addon between the two modules, one copy of the
+    // weights since both resolve their GGUF from the same roots and usually land on the same file,
+    // and a KV cache that survives an idle unload. `llamaContextPool.ts` carries the measurement.
+    // A load that dies after the acquire still holds a lease, and nothing downstream would ever
+    // see it — the same shape of retention this guard exists to close.
+    let lease: LlamaContextLease | null = null;
     try {
-      lease = await acquireLlamaModel(modelPath);
-      const context = await lease.model.createContext({ contextSize: settings.contextSize });
+      lease = await acquireLlamaContext(modelPath, settings.contextSize);
       const loaded: LoadedAgentRuntime = {
         modelPath,
         contextSize: settings.contextSize,
-        session: new LlamaChatSession({ contextSequence: context.getSequence() }),
+        session: new LlamaChatSession({ contextSequence: lease.sequence }),
         lease,
-        context,
       };
       runtime = loaded;
       return loaded;
@@ -215,7 +215,7 @@ async function loadRuntime(settings: LocalAgentSettings, modelPath: string): Pro
  * fallback fires only if the native call is unavailable or throws; it over-counts Latin text and
  * sits near the truth on Japanese, which is the safe direction here.
  */
-function countPromptTokens(model: LlamaModelLease['model'], prompt: string): number {
+function countPromptTokens(model: LlamaContextLease['model'], prompt: string): number {
   try {
     const tokens = (model as unknown as { tokenize?: (text: string) => unknown }).tokenize?.(prompt);
     if (Array.isArray(tokens)) return tokens.length;

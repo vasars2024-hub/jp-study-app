@@ -34,7 +34,12 @@ vi.mock('electron', () => ({
 
 vi.mock('node-llama-cpp', () => {
   const context = {
-    getSequence: () => ({}),
+    getSequence: () => ({
+      clearHistory: () => Promise.resolve(),
+      dispose: () => {
+        disposed.push('sequence');
+      },
+    }),
     dispose: () => {
       disposed.push('context');
     },
@@ -77,12 +82,16 @@ vi.mock('node-llama-cpp', () => {
 const translate = await import('../translate');
 const llamaBackend = await import('../llamaBackend');
 const modelPool = await import('../llamaModelPool');
+const contextPool = await import('../llamaContextPool');
 
 beforeEach(async () => {
   // The backend is process-lifetime by design, so a test that counts `getLlama()` calls has to
   // start from a process that has none. Only the tests reset it; the product never does. The same
-  // goes for the model pool, which deliberately holds the weights past the last release.
+  // goes for both pools, which deliberately hold the weights and the KV cache past the last
+  // release — a context left warm here would fire its grace timer inside the NEXT test and push a
+  // disposal into an array that test is asserting on.
   await translate.unloadTranslationModel();
+  await contextPool.disposeAllLlamaContexts();
   await modelPool.disposeAllLlamaModels();
   await llamaBackend.disposeSharedLlama();
   createContextCalls.length = 0;
@@ -95,6 +104,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await translate.unloadTranslationModel();
+  await contextPool.disposeAllLlamaContexts();
   await modelPool.disposeAllLlamaModels();
 });
 
@@ -113,22 +123,27 @@ describe('translation model lifecycle', () => {
   });
 
   /**
-   * Innermost first, and the model is RELEASED rather than disposed: `localAgent.ts` may still be
-   * holding the same GGUF. The pool disposes it once nobody is and its grace window expires, so
-   * this drives the timer rather than asserting on the instant after unload — a version of this
-   * test that stopped at `['context']` would pass just as well against a pool that never frees.
+   * Everything is RELEASED rather than disposed now, the KV cache included: `localAgent.ts` may
+   * still be holding the same GGUF, and a user coming back inside the grace window should not
+   * rebuild a cache that is still resident. So the unload itself frees NOTHING, and the two graces
+   * run in series — innermost first, because a context over freed weights is freed native memory.
+   * This drives both timers rather than asserting on the instant after unload; a version that
+   * stopped at the unload would pass just as well against a pool that never frees anything.
    */
-  it('disposes the context, then the model once nobody holds it, and never the backend', async () => {
+  it('releases on unload and frees innermost-first as the two graces expire, never the backend', async () => {
     vi.useFakeTimers();
     try {
       await translate.ensureTranslateReady();
       expect(disposed).toEqual([]);
 
       await translate.unloadTranslationModel();
-      expect(disposed).toEqual(['context']);
+      expect(disposed).toEqual([]);
+
+      await vi.advanceTimersByTimeAsync(contextPool.CONTEXT_RELEASE_GRACE_MS + 1_000);
+      await vi.waitFor(() => expect(disposed).toEqual(['sequence', 'context']));
 
       await vi.advanceTimersByTimeAsync(modelPool.MODEL_RELEASE_GRACE_MS + 1_000);
-      await vi.waitFor(() => expect(disposed).toEqual(['context', 'model']));
+      await vi.waitFor(() => expect(disposed).toEqual(['sequence', 'context', 'model']));
       // The backend owns only the addon and its thread pool, is shared with `localAgent.ts`, and
       // stays for the process lifetime.
       expect(disposed).not.toContain('llama');
@@ -158,10 +173,12 @@ describe('translation model lifecycle', () => {
    * The residue the shared backend did NOT fix, and the reason `llamaModelPool.ts` exists: a second
    * load/unload cycle still cost **+1,212 handles / +103.2 MB** with the backend already shared
    * (`L7_PERF_DICTIONARY.md`, 2026-08-24). That is native teardown residue no JavaScript can
-   * reclaim, so the only lever left is to run fewer cycles. A lookup that lands inside the pool's
-   * grace window now re-uses the resident weights: one `loadModel`, one KV cache rebuild.
+   * reclaim, so the only lever left is to run fewer cycles. Three cycles later the residue was
+   * decomposed: with the weights resident a cycle still cost 612 handles and +1,298.5 MB, and that
+   * is the KV CACHE — the larger half, 1,298 MB against a 1,223 MB model file. So a lookup landing
+   * inside the grace window now rebuilds NEITHER: no `loadModel`, no `createContext`.
    */
-  it('does not reload the weights when a second cycle starts inside the grace window', async () => {
+  it('rebuilds neither the weights nor the cache when a second cycle starts inside the grace window', async () => {
     vi.useFakeTimers();
     try {
       await translate.ensureTranslateReady();
@@ -170,25 +187,26 @@ describe('translation model lifecycle', () => {
       await translate.ensureTranslateReady();
 
       expect(loadModelCalls).toHaveLength(1);
-      // The context is per-consumer and genuinely rebuilt; only the 1.2 GB of weights is reused.
-      expect(createContextCalls).toHaveLength(2);
-      expect(disposed).toEqual(['context']);
+      expect(createContextCalls).toHaveLength(1);
+      expect(disposed).toEqual([]);
     } finally {
       vi.useRealTimers();
     }
   });
 
-  /** The negative control for the case above: past the window, the weights really are released. */
-  it('does reload the weights once the grace window has expired', async () => {
+  /** The negative control for the case above: past the window, both really are released. */
+  it('does rebuild both once the grace windows have expired', async () => {
     vi.useFakeTimers();
     try {
       await translate.ensureTranslateReady();
       await translate.unloadTranslationModel();
+      await vi.advanceTimersByTimeAsync(contextPool.CONTEXT_RELEASE_GRACE_MS + 1_000);
       await vi.advanceTimersByTimeAsync(modelPool.MODEL_RELEASE_GRACE_MS + 1_000);
-      await vi.waitFor(() => expect(disposed).toEqual(['context', 'model']));
+      await vi.waitFor(() => expect(disposed).toEqual(['sequence', 'context', 'model']));
       await translate.ensureTranslateReady();
 
       expect(loadModelCalls).toHaveLength(2);
+      expect(createContextCalls).toHaveLength(2);
     } finally {
       vi.useRealTimers();
     }
@@ -222,7 +240,11 @@ describe('translation model lifecycle', () => {
     await translate.unloadTranslationModel();
     await expect(translate.ensureTranslateReady()).resolves.toEqual({ ok: true });
 
-    expect(createContextCalls).toHaveLength(2);
+    // Real timers, so this reacquire is inside the grace window: the cache is reused rather than
+    // rebuilt, and the session is built fresh on top of it. What must NOT happen is the module
+    // handing back the session it just tore down — `isTranslateReady` is the check for that.
+    expect(createContextCalls).toHaveLength(1);
+    expect(translate.isTranslateReady()).toBe(true);
   });
 
   it('reports the model as not ready once it has been unloaded', async () => {
@@ -247,13 +269,16 @@ describe('translation model lifecycle', () => {
       expect(disposed).toEqual([]);
 
       await vi.advanceTimersByTimeAsync(5 * 60_000 + 1_000);
-      await vi.waitFor(() => expect(disposed).toEqual(['context']));
+      // The deadline RELEASES; it disposes nothing, because the agent may be holding the same file
+      // and the user may come straight back. What it must do is drop the session, and that is what
+      // `isTranslateReady` reports — an unload that silently did nothing is the defect above.
       expect(translate.isTranslateReady()).toBe(false);
+      expect(disposed).toEqual([]);
 
-      // The weights follow once the pool's grace expires — the idle deadline releases, it does not
-      // dispose, because the agent may be holding the same file.
+      // The cache follows once its grace expires, then the weights once theirs does.
+      await vi.advanceTimersByTimeAsync(contextPool.CONTEXT_RELEASE_GRACE_MS + 1_000);
       await vi.advanceTimersByTimeAsync(modelPool.MODEL_RELEASE_GRACE_MS + 1_000);
-      await vi.waitFor(() => expect(disposed).toEqual(['context', 'model']));
+      await vi.waitFor(() => expect(disposed).toEqual(['sequence', 'context', 'model']));
     } finally {
       vi.useRealTimers();
     }

@@ -34,7 +34,10 @@ vi.mock('electron', () => ({
 }));
 
 vi.mock('node-llama-cpp', () => {
-  const context = { getSequence: () => ({}), dispose: () => undefined };
+  const context = {
+    getSequence: () => ({ clearHistory: () => Promise.resolve(), dispose: () => undefined }),
+    dispose: () => undefined,
+  };
   const model = {
     createContext: () => Promise.resolve(context),
     dispose: () => undefined,
@@ -66,6 +69,7 @@ vi.mock('node-llama-cpp', () => {
 
 const translate = await import('../translate');
 const modelPool = await import('../llamaModelPool');
+const contextPool = await import('../llamaContextPool');
 
 /** `TRANSLATE_CONTEXT_SIZE` and `CHAT_TEMPLATE_RESERVE_TOKENS`, mirrored so the sums are visible. */
 const CONTEXT = 8_192;
@@ -73,6 +77,7 @@ const RESERVE = 192;
 
 beforeEach(async () => {
   await translate.unloadTranslationModel();
+  await contextPool.disposeAllLlamaContexts();
   await modelPool.disposeAllLlamaModels();
   promptCalls.length = 0;
   tokenizerThrows.value = false;
@@ -82,6 +87,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await translate.unloadTranslationModel();
+  await contextPool.disposeAllLlamaContexts();
   await modelPool.disposeAllLlamaModels();
 });
 

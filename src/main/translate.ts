@@ -6,7 +6,7 @@ import crypto from 'node:crypto';
 import type { LlamaChatSession } from 'node-llama-cpp';
 import { isValidCrossLangTranslation } from '../shared/epubEnrichment';
 import { langSpec } from '../shared/langs';
-import { acquireLlamaModel, type LlamaModelLease } from './llamaModelPool';
+import { acquireLlamaContext, type LlamaContextLease } from './llamaContextPool';
 import {
   buildBatchPrompt,
   buildSentencePrompt,
@@ -41,9 +41,12 @@ let loadPromise: Promise<void> | null = null;
  *
  * The weights are a LEASE rather than a model now — `localAgent.ts` resolves the same GGUF from the
  * same roots, so the two modules used to hold a copy each. See `llamaModelPool.ts`.
+ *
+ * One lease covers both since 2026-08-24: `llamaContextPool.ts` owns the context as well as the
+ * weights, because rebuilding the 8,192-token KV cache on every idle unload turned out to be the
+ * larger half of the per-cycle bill (+1,298.5 MB against a 1,223 MB model file).
  */
-let loadedModel: LlamaModelLease | null = null;
-let loadedContext: { dispose?: () => unknown } | null = null;
+let loadedContext: LlamaContextLease | null = null;
 let idleUnloadTimer: ReturnType<typeof setTimeout> | null = null;
 let activeTranslations = 0;
 let translateChain: Promise<unknown> = Promise.resolve();
@@ -162,7 +165,7 @@ export interface RunTranslationBatchOptions {
  * (~1.2): over-counting shortens a completion, under-counting causes the defect below.
  */
 function countPromptTokens(prompt: string): number {
-  const model = loadedModel?.model as unknown as { tokenize?: (text: string) => unknown } | undefined;
+  const model = loadedContext?.model as unknown as { tokenize?: (text: string) => unknown } | undefined;
   try {
     const tokens = model?.tokenize?.(prompt);
     if (Array.isArray(tokens)) return tokens.length;
@@ -483,14 +486,14 @@ export async function unloadTranslationModel(): Promise<void> {
     clearTimeout(idleUnloadTimer);
     idleUnloadTimer = null;
   }
-  const context = loadedContext;
-  const lease = loadedModel;
+  const lease = loadedContext;
   session = null;
   loadPromise = null;
   loadedContext = null;
-  loadedModel = null;
   try {
-    await context?.dispose?.();
+    // RELEASED, not disposed. The pool keeps the KV cache resident through its grace window, so a
+    // user whose next lookup lands just past this deadline pays nothing instead of rebuilding
+    // 1,298 MB of cache — the whole point of `llamaContextPool.ts`.
     await lease?.release();
   } catch {
     /* Native cleanup is best effort; the next load still builds a fresh runtime. */
@@ -524,22 +527,19 @@ async function ensureSession(): Promise<LlamaChatSession> {
       const { LlamaChatSession } = await import('node-llama-cpp');
       broadcast('translate:progress', { status: 'progress', progress: 20, file: path.basename(modelPath) });
 
-      // The weights are borrowed, not owned: `localAgent.ts` resolves the same GGUF from the same
-      // roots, so this is one 1.2 GB copy between the two modules rather than one each. The pool
-      // also holds it briefly after release, which turns a lookup landing just past the idle
-      // unload into a free reacquire instead of another native cycle. See `llamaModelPool.ts`.
+      // The weights AND the KV cache are borrowed, not owned: `localAgent.ts` resolves the same
+      // GGUF from the same roots, so this is one 1.2 GB copy between the two modules rather than
+      // one each, and the pool holds both briefly after release — which turns a lookup landing
+      // just past the idle unload into a free reacquire instead of a native cycle that costs
+      // ~1,223 handles and ~2.5 GB. See `llamaContextPool.ts`.
       broadcast('translate:progress', { status: 'progress', progress: 45, file: path.basename(modelPath) });
-      const lease = await acquireLlamaModel(modelPath);
-      // Recorded BEFORE `createContext`, which is the biggest `await` that can still reject here
-      // (`out of VRAM` on a KV cache is the ordinary case). Assigning after it left the 1.2 GB of
-      // weights unreachable on that path, so the error handler's `unloadTranslationModel()` had
-      // nothing to dispose — the same shape as D1 itself, on the failure branch.
-      loadedModel = lease;
+      // The pool releases everything it allocated if any step of the build fails, so unlike the
+      // two-call version this cannot leave weights or a cache unreachable on the failure branch.
+      const lease = await acquireLlamaContext(modelPath, TRANSLATE_CONTEXT_SIZE);
+      loadedContext = lease;
       broadcast('translate:progress', { status: 'progress', progress: 80, file: path.basename(modelPath) });
 
-      const context = await lease.model.createContext({ contextSize: TRANSLATE_CONTEXT_SIZE });
-      loadedContext = context as unknown as { dispose?: () => unknown };
-      session = new LlamaChatSession({ contextSequence: context.getSequence() });
+      session = new LlamaChatSession({ contextSequence: lease.sequence });
       broadcast('translate:progress', { status: 'ready', progress: 100, file: path.basename(modelPath) });
     })();
     // A failed load must not poison every future attempt (e.g. the user drops
