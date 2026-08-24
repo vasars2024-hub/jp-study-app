@@ -1267,6 +1267,37 @@ export function languageFromFileName(name: string): string | null {
   return null;
 }
 
+/** The directory segments of a path, i.e. everything but the file's own name. */
+function folderSegmentsOf(name: string): string[] {
+  return String(name ?? '').split(/[\\/]/).slice(0, -1).filter(Boolean);
+}
+
+/**
+ * How well one folder name covers a title, for choosing between folders that
+ * all already passed `looksLikeSameTitle`.
+ *
+ * Distinct tokens covered, then fewer words the title does not account for.
+ * The first is what separates a season from its siblings — every JoJo folder
+ * carries `jojo no kimyou na bouken`, and only one of them also carries `ougon`
+ * and `kaze`. The second breaks a tie towards the plainer name, so a search for
+ * `Gintama` prefers the `Gintama` folder over `Gintama Season 2` rather than
+ * whichever the file list happened to mention first.
+ *
+ * Never a substitute for `looksLikeSameTitle`: this ranks folders already known
+ * to be plausible, it does not decide plausibility.
+ */
+function folderTitleScore(segment: string, title: string): number {
+  const wanted = new Set(titleTokens(title));
+  const have = new Set(titleTokens(segment));
+  let covered = 0;
+  for (const token of wanted) if (have.has(token)) covered += 1;
+  let extra = 0;
+  for (const token of have) if (!wanted.has(token)) extra += 1;
+  // Coverage dominates: one more matched title word always outranks any number
+  // of spare words, and the spare-word term only ever separates equals.
+  return covered * 1_000 - Math.min(999, extra);
+}
+
 /**
  * Picks the subtitle files worth downloading out of a torrent's file list.
  *
@@ -1296,10 +1327,31 @@ export function selectSubtitleFiles(
   // some other work. Callers that pass no title (every route but this one) are
   // unaffected.
   if (want.title) {
-    const scoped = all.filter((file) => {
-      const segments = String(file.name ?? '').split(/[\\/]/).slice(0, -1);
-      return segments.some((segment) => segment && looksLikeSameTitle(segment, want.title as string));
-    });
+    const wanted = want.title;
+    // ONE folder, not every folder that passes. `looksLikeSameTitle` is a
+    // half-the-words test, so every sibling season of a long-running show
+    // passes it: measured live 2026-08-24, `JoJo no Kimyou na Bouken Part 5:
+    // Ougon no Kaze` accepted **5** folders in the Kitsunekko archive, and the
+    // union it produced is what made the run wrong. The right folder holds 39
+    // `.srt`; three wrong ones hold 48 `.ass` between them, so the
+    // format-majority vote below picked `.ass` 48-to-39 and discarded the
+    // correct work entirely — 8.29 MiB of Part 4 and Stardust Crusaders,
+    // numbered 1..48, ready to attach onto Part 5. A work lives in one folder
+    // of a per-site index, so the union was never the right set.
+    const scored = new Map<string, number>();
+    for (const file of all) {
+      for (const segment of folderSegmentsOf(file.name)) {
+        if (scored.has(segment)) continue;
+        scored.set(segment, looksLikeSameTitle(segment, wanted) ? folderTitleScore(segment, wanted) : -1);
+      }
+    }
+    const best = Math.max(-1, ...scored.values());
+    const keep = best < 0
+      ? new Set<string>()
+      : new Set([...scored].filter(([, score]) => score === best).map(([segment]) => segment));
+    const scoped = best < 0
+      ? []
+      : all.filter((file) => folderSegmentsOf(file.name).some((segment) => keep.has(segment)));
     // Only narrowing, never emptying: a flat per-title pack has no directory to
     // match and must keep behaving exactly as it did before this existed.
     if (scoped.length) all = scoped;

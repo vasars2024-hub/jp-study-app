@@ -1380,6 +1380,88 @@ describe('selectSubtitleFiles — the archive folder narrowing', () => {
     expect(picked.files.map((f) => f.index).sort()).not.toEqual([1, 2]);
   });
 
+  /**
+   * The five JoJo folders the live archive really holds, with the real file
+   * shapes and counts — measured 2026-08-24 off the 28,748-entry handshake.
+   * The wrong folders hold `.ass` and outnumber the right folder's `.srt`,
+   * which is the whole mechanism of the defect.
+   */
+  const JOJO_ARCHIVE = [
+    ...Array.from({ length: 39 }, (_, i) => ({
+      index: i,
+      name: 'kitsunekko_backup/JoJo no Kimyou na Bouken  Ougon no Kaze (Golden Wind)/'
+        + `JoJo's Bizarre Adventure.S04E${String(i + 1).padStart(2, '0')}.CC.ja.srt`,
+      sizeBytes: 30_000 + i,
+      progress: 1,
+    })),
+    ...Array.from({ length: 23 }, (_, i) => ({
+      index: 100 + i,
+      name: 'kitsunekko_backup/JoJo no Kimyou na Bouken  Diamond wa Kudakenai/'
+        + `[JOJO&UHA-WING&HKACG&Kamigami][JoJo's Bizarre Adventure - Diamond is Unbreakable][${String(i + 2).padStart(2, '0')}][x264_AAC][1080p].ass`,
+      sizeBytes: 400_000 + i,
+      progress: 1,
+    })),
+    ...Array.from({ length: 21 }, (_, i) => ({
+      index: 200 + i,
+      name: 'kitsunekko_backup/JoJo no Kimyou na Bouken  Stardust Crusaders - Egypt Hen/'
+        + `[Kamigami] JoJo no Kimyou na Bouken - Stardust Crusaders - ${25 + i} [1280x720 x264 AAC Sub(Chs,Cht,Jap)].ass`,
+      sizeBytes: 150_000 + i,
+      progress: 1,
+    })),
+    ...Array.from({ length: 4 }, (_, i) => ({
+      index: 300 + i,
+      name: 'kitsunekko_backup/JoJo no Kimyou na Bouken  Stardust Crusaders/'
+        + `[Kamigami] JoJo no Kimyou na Bouken - Stardust Crusaders - ${String(i + 1).padStart(2, '0')} [1280x720 x264 AAC Sub(Cht,Chs,Jap)].ass`,
+      sizeBytes: 50_000 + i,
+      progress: 1,
+    })),
+    ...Array.from({ length: 3 }, (_, i) => ({
+      index: 400 + i,
+      name: 'kitsunekko_backup/JoJo no Kimyou na Bouken/'
+        + `JoJo no Kimyou na Bouken ${String(i + 1).padStart(2, '0')} (BD 720p Eng Subs).ass`,
+      sizeBytes: 60_000 + i,
+      progress: 1,
+    })),
+  ];
+
+  // Measured live 2026-08-24 BEFORE this narrowing was made exclusive: the
+  // archive fetch for MAL 37991 came home with **48 files, 8.29 MiB**, all of
+  // it Part 4 and Stardust Crusaders, numbered 1..48 and ready to attach onto
+  // Part 5. Not one file of the 39 the right folder holds was selected.
+  it('picks ONE folder when five siblings all pass the title test', () => {
+    const picked = selectSubtitleFiles(JOJO_ARCHIVE, {
+      languages: ['ja'],
+      title: 'JoJo no Kimyou na Bouken Part 5: Ougon no Kaze',
+    });
+    expect(picked.reason).toBe('ok');
+    expect(picked.format).toBe('srt');
+    expect(picked.files).toHaveLength(39);
+    const folders = new Set(picked.files.map((f) => f.name.split('/')[1]));
+    expect([...folders]).toEqual(['JoJo no Kimyou na Bouken  Ougon no Kaze (Golden Wind)']);
+  });
+
+  it('NEGATIVE CONTROL: every one of the five folders does pass looksLikeSameTitle', () => {
+    // If they did not, the fix above would be measuring the title test rather
+    // than the folder choice, and the 48-file run could not have happened.
+    const folders = [...new Set(JOJO_ARCHIVE.map((f) => f.name.split('/')[1]))];
+    expect(folders).toHaveLength(5);
+    for (const folder of folders) {
+      expect(looksLikeSameTitle(folder, 'JoJo no Kimyou na Bouken Part 5: Ougon no Kaze')).toBe(true);
+    }
+  });
+
+  it('still takes a sibling season when that season is the one asked for', () => {
+    // The rule must choose the best folder, not hard-code a preference for the
+    // plainest name: asking for Part 4 has to land in Part 4's folder.
+    const picked = selectSubtitleFiles(JOJO_ARCHIVE, {
+      languages: ['ja'],
+      title: 'JoJo no Kimyou na Bouken Part 4: Diamond wa Kudakenai',
+    });
+    expect(picked.reason).toBe('ok');
+    const folders = new Set(picked.files.map((f) => f.name.split('/')[1]));
+    expect([...folders]).toEqual(['JoJo no Kimyou na Bouken  Diamond wa Kudakenai']);
+  });
+
   it('says no-title-match rather than no-subtitles when the archive lacks the work', () => {
     const picked = selectSubtitleFiles(ARCHIVE, { languages: ['ja'], title: 'Cyber City Oedo 808' });
     expect(picked.files).toEqual([]);
