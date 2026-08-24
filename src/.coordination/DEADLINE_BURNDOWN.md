@@ -64,3 +64,16 @@ the heaviest phase, and much of that window went to rubric scoring inside L1 rat
 closing phases — so the rate may improve once L2 lands. It has not yet, and a projection may not
 borrow from a rate nobody has measured. **This misses 2026-09-01 by roughly 12 weeks, and Track 8
 is the whole reason.**
+
+2026-08-24 | mal-pipeline | units done this turn: 0 | units left: 2 | basis: `src/MAL_ANIME_PIPELINE_PLAN.md` gate tables re-read this turn — 34 numbered gates, open are 31 and 34; two product commits (`09a31e5a`, `3bc796d1`) closed gate 31's stored-record-to-player-state leg but not the gate | projected finish: UNKNOWN
+
+Gate 31's remaining work is now located, so the UNKNOWN is narrower than it was. Two things are
+left in it and only one is agent work. (a) The painted overlay: this profile's Media Center video
+stage reads `workspace`, mounts no `<video>`, and says so on screen, so the surface that must paint
+cues is `src/media/`'s VideoCoreStudyOverlay — whose downloaded-track mount effect is still ~430
+lines of uncommitted worktree state with no HEAD base. That is one slice, and it is the next one.
+(b) An acquisition for a title that is **on the user's MAL completed list**: The Big O is not on it
+(1,426 rows, 0 matches), so the render leg can be shown on owned media but gate 31's "from a MAL
+page" clause cannot, and Route A has produced no usable candidate in 160 titles surveyed. (b) is
+data-blocked, not effort-blocked, so no rate divides into it. mal-pipeline's finish is gated on (b)
+and stays UNKNOWN rather than being given the date that would look best.

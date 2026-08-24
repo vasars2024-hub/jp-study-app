@@ -2421,3 +2421,50 @@ data with no restore point and it was not asked for — logged in `needs-user.md
 (789), 10,965 passed / 6 skipped, exit 0** (baseline 787/788 and 10,955; +1 file, +10 tests,
 all mine). i18n **10,789/10,789** exit 0. architecture **"Nothing new", 5 pending** exit 0.
 eslint **0 errors** on all 11 touched paths.
+
+## 2026-08-24 — the last inch: main resolved a track and the player threw it away
+
+Worker `primary`. Commits `09a31e5a`, `3bc796d1`. Probe `debug/g31y-render.cjs` (adapted from
+`g31-bigo-e2e.cjs`; `debug/` is gitignored). Dev app **restarted** first — both commits change main.
+
+**Recovered work first.** The previous turn died mid-slice with a `preferredSubtitleId` leg staged
+but incomplete: three HEAD+insert blobs in the index (`main/media.ts`, `preload.ts`,
+`renderer/window.d.ts`) whose dependencies — the `MediaItem` field and
+`pickPlaybackSubtitle`'s third argument — were unstaged. Finished and landed as `09a31e5a`.
+
+**The defect `3bc796d1` fixes.** `media:open` resolves a stored record on every open and returns
+`MediaOpen.subtitle`. Only two renderer paths ever read it: the YouTube download branch and an
+explicit study-context record id. The ordinary library open runs `loadOpened`, which resets
+`setCues([])` / `setSubName('')` / `setSubStatus('')` and never looks at `r.subtitle`. So the
+track was discarded two lines after main handed it over — `media.ts:1258` already called its own
+pipeline "write-only" and this was the reason. Now `loadOpened` applies it via the existing
+`applySubtitleFile` (study split included), after the reset and before the item's stored offset
+is restored. `applySubtitleFile` moved above `loadOpened` because a dependency array is evaluated
+every render and a later `const` is a TDZ throw. `downloadYouTube`'s duplicate branch is gone —
+it re-parsed with the bare `parseSubtitles`, undoing the split for dual-language YouTube tracks.
+
+**Measured live on `The Big O - 01`, real library, net zero.**
+
+| step | number |
+| --- | --- |
+| attached ep 1 from jimaku | 14,007 chars, tracks **1 → 2** |
+| control, no choice stored | `media:open` → the sidecar, `…[BDRip 1440x1080 x265 FLAC].ja.srt`, **14,012** chars |
+| with the choice stored | the jimaku track, **14,007** chars — both **267 cues, 0 dropped** |
+| negative control, `preferredSubtitleId: 'not-a-real-record-id'` | **refused**, field deleted, open fell back to the ranking |
+| player DOM after opening the item | **`Loaded 267 subtitle lines.`** — a status `loadOpened` could only leave empty before |
+| detached | tracks **2 → 1**, preference cleared |
+
+**Gate 31 stays 32 of 34** (open: 31, 34), counted from this file's gate tables. What is still
+unshown is the painted overlay: this profile mounts **no `<video>`** in the Media Center's video
+stage — it reads `workspace` and says "Video plays in the media workspace", a different player
+(`src/media/`). So the remaining render work is on the workspace surface, not this one. Trap for
+the next worker: `MediaContent.tsx` carries a **foreign** track's uncommitted `mergeStoredPlayerPreferences`
+hunks at lines 81 and 513; `git add` on that path absorbs them — stage by filtering `git diff` to
+hunks at `-700`+ and `git apply --cached --recount`.
+
+Gates, once, after the last slice, shared tree: vitest **790 passed / 1 skipped (791), 10,976
+passed / 6 skipped, exit 0** (baseline 788/789 and 10,965 — **+2 files, +11 tests, all mine**).
+i18n **10,789/10,789** exit 0. architecture **"Nothing new", 5 pending** exit 0. eslint **0 new**
+on all 12 touched paths (2 pre-existing `adjacent-overload-signatures` in `window.d.ts`, present at
+HEAD). Mutation controls, both restored green: `chosenId` guard disabled → **2 red**; the
+`loadOpened` apply line removed → **2 red**.
