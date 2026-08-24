@@ -202,3 +202,19 @@ is still open and still has **0 sub-packs**; the projection stays UNKNOWN for th
 reason as the last three lines. What changed is that "no Route A candidate exists" is now a
 statement about the index rather than about three defects in the surface asking it, which is the
 precondition for ever writing Route A up as data-blocked.
+
+2026-08-24 | mal-pipeline | units done this turn: 0 | units left: 2 | basis: RE-COUNTED this turn from the gate tables in src/MAL_ANIME_PIPELINE_PLAN.md (open: 31, 34) | projected finish: UNKNOWN
+Worker `primary`. Two product commits (`f009c2cb`, `6ced09cc`) and a retraction. Neither gate
+closed, and the honest reason is worth more than the zero: **gate 31 Route A is blocked by the
+public index, not by this codebase.** The last three entries chased "the standalone 87.80 MB
+sub-pack"; asked directly, `JOJO 黄金之风 外挂字幕` returns 2 rows, both multi-gigabyte batches —
+the 87.80 MB is a subfolder INSIDE the DBD-Raws batch, which is why 2026-08-18 is recorded as Route
+B. The asymmetry that was supposed to reveal it is now closed and both surfaces return byte-
+identical listings (4 candidates, all `batch-sidecar`, top row 46,899.2 MB / 11 seeders / score 41).
+Across ~160 surveyed titles plus three untargeted index queries there are 2 `sub-pack` hits total,
+one Arabic and one a movie's storyboards; the only real Japanese sub sources on the index are
+Kitsunekko whole-site archives at 4,403.2 MB / 2 seeders and 5,836.8 MB / 8 seeders, 29-39x the
+150 MB pack ceiling. `projected finish: UNKNOWN` is arithmetic, not pessimism: 1 of the 2 open
+units has no agent-reachable rate at all, because no amount of agent time makes a torrent exist.
+Gate 34 (the four full gates) is the other open unit and is a one-turn close the moment the shared
+tree's inherited red clears — see the handoff.
