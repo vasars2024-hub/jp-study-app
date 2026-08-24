@@ -2930,3 +2930,55 @@ carries a real Japanese pack — free, and outside anyone's control. (2) Accepti
 archive as Route A, which needs the ceiling raised roughly 40× and spends ~5.8 GB of the user's
 connection on a whole-site dump — a resource commitment, not a routine choice, so it is written
 here rather than taken. Nothing else found in ~160 titles plus three untargeted queries.
+
+## 2026-08-24 — GATE 34 CLOSES, and the archive that was "not per-title" has 1,871 title folders
+
+Worker `primary`. Commits `e4955e3d`, `f74e22e5`. **33 of 34** (open: **31**).
+
+**Gate 34 — the four gates, run once, at committed HEAD `410d3376` in a detached worktree**
+(`%TEMP%\jp-g34-410d3376`, `node_modules` junction), because the shared tree's 418 dirty paths
+make its green meaningless. Every number, with its attribution:
+
+| gate | result | attribution |
+| --- | --- | --- |
+| `npx vitest run` | 769 files, **2 failed / 766 passed / 1 skipped**; 10,680 tests, **3 failed** | see below |
+| `node tools/i18n-check.cjs` | **EXIT 0**, 10,620 keys ja/zh/ru | — |
+| `node tools/architecture-audit.cjs` | **EXIT 0**, "Nothing new", 5 known pending | — |
+| `npx eslint` over the **31** non-test source paths any `mal-pipeline` commit ever touched | **2 errors, 8 warnings** → **0 problems** | ours, fixed `e4955e3d` |
+
+The 3 vitest failures, each attributed rather than waved at. (1) `novelReaderProgressGuard` —
+`Error: Denied ID …/node_modules/pdfjs-dist/build/pdf.worker.min.mjs?url`, a vite `fs.allow`
+artefact of the junction, not of the code. (2)+(3) `i18n.test.ts` hardcoded-string and
+`toLocaleString` ratchets: red at committed HEAD because another track's i18n adoption is
+**uncommitted** (`ScraperPage.tsx` alone is 744 lines dirty). Attributed by date, not by claim —
+the offender files were last committed 2026-07-13, 2026-07-21, 2026-08-03 and 2026-08-11, all
+before this plan existed. The one failure that WAS ours was eslint's, and it is fixed.
+
+`e4955e3d` — `window.d.ts` declared `subtitleHarvestList`/`subtitleHarvestFetch` **twice** in one
+`api` type; `adjacent-overload-signatures` errored on both. Staged HEAD+edit (`remainder===HEAD`).
+
+**THE RETRACTION, measured.** `[PeepoHappy] Kitsunekko Archive 16/07/2021` — recorded here as
+"whole-site archives … are not per-title" and 39× over the ceiling. A metadata handshake
+(`stopCondition=MetadataReceived`, **10 s, 0 bytes downloaded**) says it is **28,748 files across
+1,871 title folders** — 20,707 `.srt`, 4,598 `.ass`, 18 `.ssa` under `kitsunekko_backup/<title>/`.
+It is per-title by construction. `JoJo no Kimyou na Bouken  Ougon no Kaze (Golden Wind)` is a
+folder in it: **39 Japanese files, 1,312,077 B = 1.25 MB**. Both prior readings came from a NAME
+and a total size; neither had ever asked the file list. Option (2)'s "spends ~5.8 GB" is false for
+the same reason `6ced09cc` was written — `nyaaFetch` skips every unselected file.
+
+`f74e22e5` — the `sub-archive` route: exempt from the title check (the archive's name is the
+archive's) and from the size ceiling (a proxy for "contains video"; an archive has none), and from
+nothing else. `selectSubtitleFiles` gains an optional `title` that narrows to matching directory
+segments via `looksLikeSameTitle` before a priority is set; a missing folder returns the new
+`no-title-match`, not `no-subtitles`. Scored +30 — above `batch-sidecar` (+10, 0 for 10 on real
+data), below `sub-pack` (+50). 9 tests, 2 mutation controls red at exactly 2 each, adverse control
+a 21 GB `.mkv` naming the site and correctly dropped on title. 28 subtitle files, 610 passed.
+
+**NOT reachable yet and not claimed to be:** `buildSubtitleQuery` asks the index for the title and
+no title query returns an archive. **Next slice, the one this turn opens on:** one archive-scoped
+query in the `subtitleHarvest.ts` alias walk, fired only when the walk found no `sub-pack`, merged
+into the same ranking. Then Route A is a 1.25 MB acquisition of JoJo Part 5 from a MAL page.
+
+**Trap.** `looksLikeSubtitleArchive` must refuse a pack-sized row itself — `[kitsunekko.net] …
+subtitle pack` is a per-title pack that would otherwise lose its +50. Two pre-existing rank tests
+caught it; do not move that precedence check to the call site.

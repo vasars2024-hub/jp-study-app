@@ -218,3 +218,24 @@ Kitsunekko whole-site archives at 4,403.2 MB / 2 seeders and 5,836.8 MB / 8 seed
 units has no agent-reachable rate at all, because no amount of agent time makes a torrent exist.
 Gate 34 (the four full gates) is the other open unit and is a one-turn close the moment the shared
 tree's inherited red clears — see the handoff.
+
+2026-08-24 | mal-pipeline | units done this turn: 1 | units left: 1 | basis: RE-COUNTED this turn from the gate tables in src/MAL_ANIME_PIPELINE_PLAN.md (gate 34 closed this turn; open: 31 only) | projected finish: UNKNOWN
+Worker `primary`. Commits `e4955e3d`, `f74e22e5`. **Gate 34 CLOSED**: the four gates run once at
+committed HEAD `410d3376` in a detached worktree — vitest 769 files / 2 failed / 3 tests failed,
+i18n EXIT 0 (10,620), architecture EXIT 0 "Nothing new", eslint over the 31 non-test paths any
+mal-pipeline commit ever touched **2 errors → 0** after `e4955e3d`. All 3 vitest reds attributed and
+none ours: 1 junction `fs.allow` artefact, 2 inherited i18n ratchets whose offender files were last
+committed 2026-07-13 … 2026-08-11, before this plan existed.
+
+Gate 31 is the last unit and its Route A leg **moved for the first time in seven turns**. The
+recorded blocker — "whole-site archives … are not per-title", 39× the ceiling, ~5.8 GB — was two
+inferences from a release NAME. A metadata handshake (10 s, **0 bytes downloaded**) says the
+Kitsunekko archive is **28,748 files across 1,871 title folders**, and JoJo Part 5's folder is **39
+files / 1.25 MB**. `f74e22e5` lands the `sub-archive` route that can address it.
+
+`projected finish: UNKNOWN` stays honest but for a different reason than the last four lines: gate
+31 is no longer "no amount of agent time makes a torrent exist". It is now one wiring slice (an
+archive-scoped query in the harvest alias walk) plus one attended 1.25 MB acquisition. Two units of
+measured work landed in ~75 min this turn, but a rate over a single turn is not a rate, and gate 31
+still ends in an attended live transfer whose duration is a swarm's to decide. First real projection
+belongs to the turn that runs it.
