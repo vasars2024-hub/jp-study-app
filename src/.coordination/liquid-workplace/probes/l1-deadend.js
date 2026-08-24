@@ -171,6 +171,14 @@
     return { el, name: label(el) || '(unlabelled)', key, ord, clsKey, clsOrd, cls: clsOf(el) };
   });
 
+  /** Every field a form holds, in document order — the input a submit control acts on. */
+  const formValues = (f) =>
+    [...f.querySelectorAll('input,textarea,select')]
+      .map((i) => `${i.name || i.type || i.tagName}=${i.value}`)
+      .join('');
+  const formAtArm = new Map();
+  for (const f of win.querySelectorAll('form')) formAtArm.set(f, formValues(f));
+
   const targets = [];
   const skipped = [];
   for (const t of roster) {
@@ -266,6 +274,21 @@
       const isBait = el.id === '__liq-deadend-bait';
       const quiet = await settle();
       const before = quiet.sig;
+      // Two ways a control can correctly do nothing, both decidable BEFORE the click, both
+      // measured on 2026-08-24 when the sweep reported `Search` and `Automatic` as dead ends
+      // and neither was. Recorded here as facts; `-read.js` does the bucketing.
+      //   activeAtClick — the already-selected member of a segmented group. `Automatic` carried
+      //     `aria-pressed="true"` and `class="active"`; clicking the option that is already on
+      //     is required to be a no-op, and calling it a dead end scores correct behaviour.
+      //   formUnchanged — a submit whose form holds byte-identical values to arm time, i.e. the
+      //     sweep never gave it anything new to do. Verified live the other way: setting the
+      //     query 食べる → 水 and clicking the same `Search` re-rendered 8 different entries.
+      const activeAtClick =
+        el.getAttribute('aria-pressed') === 'true' ||
+        el.getAttribute('aria-selected') === 'true' ||
+        el.classList.contains('active');
+      const form = el.closest('form');
+      const formUnchanged = form ? formValues(form) === formAtArm.get(form) : false;
       el.click();
       await wait(STEP_MS);
       const after = signature();
@@ -275,6 +298,8 @@
         isBait,
         resolvedBy: by,
         changed: before !== after,
+        activeAtClick,
+        formUnchanged,
         settleTries: quiet.tries,
         unstable: !quiet.stable,
         // What the control became: a control that retired itself into a DISABLED state stopped

@@ -364,3 +364,20 @@ category 7, and category 7 was blocked on a memory defect that this turn measure
 blocker on the cheapest open gate. The honest reading is that L1 is now one instrument re-drive plus
 categories 5, 8 and the category-2 sweep away from half of its gate — and still a whole unscored
 Video surface away from the other half. The 0.333/day rate already prices turns like this one in.
+
+2026-08-24 | liquid | units done this turn: 0 | units left: 10 | basis: the 13 `Gate:` lines in section 11 of src/LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md (`grep -c '^Gate:'` = 13 this turn), 3 closed (L0/L2/L3) re-derived last turn and unchanged in the tree since | projected finish: 2026-09-23
+
+**Re-counted the denominator, inherited the three closures.** 13 gates, 3 closed, **10 open** — no
+gate closed this turn, so the rate is unchanged at 3 gates over 2026-08-16..2026-08-24 (9 days,
+2 workers) = **0.333/day**; 10 ÷ 0.333 = 30 days → **2026-09-23**, a **~22-day slip** against the
+2026-09-01 target. main-v1 contributes 0 (complete-except-external, 61 of 80) and mal-pipeline is
+34 of 34, so liquid alone is the programme's date. Stated, not descoped.
+
+**Why the count did not move, and it is the honest answer rather than the flattering one.** L1's
+gate needs 80/80 on TWO surfaces. Dictionary went from "5 categories stale, 1 failing" to
+**6 of 8 at 10 on the current tree**, with category 2's outstanding number landed at 0 dead ends of
+18. But category 7 was measured END TO END for the first time and it is a **measured NOT 10**:
+1,081.0 MB / 4,410 handles settled against L0's 550–577 / ~1,055. That is progress in knowledge and
+a product fix (`424eb46f`), and it is still zero gates. The remaining lever on category 7 is a
+utility-process move for llama.cpp; until that lands, Dictionary cannot reach 80/80, and Video has
+never been scored at all. The 0.333/day rate already prices turns like this one in.

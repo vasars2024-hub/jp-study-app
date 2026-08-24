@@ -326,3 +326,47 @@ restore works, so the sweep no longer leaves the surface in a lens it was not fo
 traps, zero scroll traps, zero dead ends that are not honest no-ops, and every input acknowledged
 inside the sweep's settle. One thing this run also produced, and it belongs to category 7 rather
 than here: driving these 19 controls in ~70 s takes main from 575.8 MB to 7,075.7 MB private.
+
+## 2026-08-24 (evening) · primary — the dead-end sweep's outstanding number, and the probe defect that was holding it
+
+The scorecard has carried "dead ends 3 → the third was the probe; the sweep's own re-run is the
+number the entry needs" since `b0232340`. Re-run today on pid 3668 (liquid Dictionary, 食べる,
+8 entries, 61 controls, 820x580) it first reported **2 dead ends: `Search` and `Automatic`**.
+
+**Neither is a product defect, and both were the same probe defect in two shapes** — a control that
+correctly does nothing was being scored as a control that leads nowhere.
+
+- `Automatic` is the **already-selected** member of the lens group: `aria-pressed="true"`,
+  `class="active"` at click time. Clicking the option that is already on is required to be a no-op.
+  Its two siblings `Dictionary` and `Interlinear` both landed in `withEffect` in the same run,
+  which is what proves the group is live.
+- `Search` was driven with the query the sweep had already searched, so it re-rendered the same
+  8 entries and the signature did not move. Verified the other way **live, in the same session**:
+  setting the input 食べる → 水 through the native value setter and clicking the *same* button
+  re-rendered 8 different entries (`水みず common #30766`). It acts; it was given nothing to do.
+
+**The repair, in `l1-deadend.js` + `-read.js`, is two facts recorded BEFORE the click** — a verdict
+computed after the fact could not tell these apart from a real dead end. `activeAtClick`
+(`aria-pressed`/`aria-selected`/`.active`) and `formUnchanged` (the target's `form` serialises
+byte-identical to arm time). `-read.js` then reports three buckets instead of one.
+
+**Re-run after the repair, same session, same surface:**
+
+| term | value |
+| --- | --- |
+| progress / coverage | **19/19** / **18/18** |
+| dead ends | **0** |
+| alreadyActive | 1 — `Automatic` |
+| sameInputResubmit | 1 — `Search` |
+| with effect | **16** |
+| gone / unstable | **0** / **0** |
+| bait control | `changed: false` — **fired** |
+| savedStoreUntouched / lensModeRestored | **true** / **true** |
+
+**The limitation, stated rather than hidden:** `formUnchanged` would also excuse a genuinely dead
+submit sitting in an untouched form. That is why `Search` was checked live with a varied input
+rather than argued from the flag. The bait is unaffected — it carries neither fact, is reported in
+its own `baitReported` row outside both buckets, and a run whose bait moves is still void.
+
+**Category 2's remaining number is now in hand: 0 confirmed dead ends of 18 driven, control fired.**
+No new probe file was created; `l1-deadend.js` and `l1-deadend-read.js` were adapted (one repair).

@@ -176,3 +176,46 @@ Running state, unchanged except category 7:
 one boot, 19 controls, private bytes before and 70 s after, against L0's 550–577 MB baseline. If the
 burst path is now flat, category 7 is a 10 and only 5, 8 and the category-2 sweep stand between this
 surface and the first completed entry.
+
+## 2026-08-24 (evening) · primary — leg 3 re-driven end to end. Category 2's number landed; category 7 is measurably NOT a 10
+
+Two of the four outstanding items closed and the third produced a number that decides the surface.
+
+| # | Category | Re-driven on this tree (pid 3668, `67918c19`) | Result |
+| - | -------- | --------------------------------------------- | ------ |
+| 2 | Clunkiness | yes — `l1-deadend.js` repaired and re-run | **0 dead ends of 18**, bait `changed:false` fired, 16 with effect, 0 gone, 0 unstable, coverage 18/18 |
+| 7 | Performance under real load | yes — full release curve, not a plateau | **NOT 10** — settles **1,081.0 MB / 4,410 handles** against L0's 550–577 / ~1,055 |
+
+**Category 7's leg 3, measured end to end for the first time.** 546.4 MB / 1,063 handles at boot →
+**3,515.4 MB / 4,406** at the burst peak → KV cache freed at 8.55 min → weights freed at 9.55 min →
+**1,081.1 MB with both pools reporting empty**. The 7,082 MB plateau that three earlier boots hit
+and never left is gone; **2,434 MB now comes back unprompted**. What remains is **+534.6 MB and
++3,349 handles**, one-time rather than per-cycle (a whole cycle measures +1.8 MB / −7 handles), and
+`llamaBackend.ts` already banks the measurement that it has no lever: disposing the backend costs
++2,425 handles per cycle either way.
+
+**So this surface does not hold 80/80, and the reason is a product number, not bookkeeping.**
+The only remaining lever on the residual is to stop loading llama.cpp into the main process at all
+— a utility-process move. That is the next product slice for category 7 and it is named here
+rather than attempted, because it is a whole slice and half-doing it would leave the surface worse.
+
+Running state, unchanged except 2 and 7:
+
+| # | Category | State | Tree it was measured on |
+| - | -------- | ----- | ----------------------- |
+| 1 | Accessibility | 10/10 `06ad1a55` | current |
+| 2 | Clunkiness | **10/10 — this turn**, 0 dead ends of 18, control fired | **current** |
+| 3 | Liquid utilization | 10/10 `debad557` | current |
+| 4 | Use of space | 10/10 `6f86f2cc` | current |
+| 5 | UI clarity | 10/10 `cbb3506a` | **stale — not re-driven** |
+| 6 | Feature parity + reversibility | 10/10 `b0232340` | current |
+| 7 | Performance under real load | **NOT 10 — 1,081.0 MB / 4,410 h settled** | **current, end to end** |
+| 8 | Honest states | 10/10 `9d9e876c` | **stale — not re-driven** |
+
+**Product code this turn: `424eb46f`** — the local model runtime had three shutdown disposals and
+no caller, so a quit inside a 5-minute idle window exited holding 2.4 GB and llama.cpp's thread
+pool. Found by reading `/mem`'s pool rows during the release curve above, not by a code sweep.
+
+**Next, in order:** the utility-process move for category 7 (the one lever left on the residual),
+then re-drive 5 and 8. Six of eight now sit at 10 on the current tree; 5 and 8 are stale rather
+than failing, and 7 is failing rather than stale.

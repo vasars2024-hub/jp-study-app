@@ -838,3 +838,52 @@ final settle): `idleControlFlat: true` (−0.9 MB, 0 handles), and `loadedFromCo
 −60.5 MB** and cycle 3 cost **+1,208 handles and +86.1 MB**. The `gapMs` field records the gap that
 FOLLOWS each cycle, so it is cycle 2's 480 s that made cycle 3 cold — the one field to read before
 re-deriving the table above.
+
+## 2026-08-24 (evening) · primary — leg 3 re-driven end to end. The magnitude is closed; the RESIDUAL is not, and it is one-time
+
+One cold boot, pid **3668**, restarted onto `67918c19` so `4e45c5f2` is in main (main does not
+hot-reload). `l7d-setup.cjs` → Dictionary, then `Make Liquid` through the window's own
+`.fwin-b-liquid`: **liquid / 8 entries / 61 controls / 820x580 / forest-night / perf=performance**.
+Instrument `probes/l1-deadend.js` — 19 targets, ~70 s — sampled from outside every 10–15 s.
+
+| point | uptime | private MB | handles |
+| --- | --- | --- | --- |
+| boot baseline (L0 band 550–577 / ~1,055) | 2.15–2.32 | **546.4 → 553.3** | **1,063 → 1,061** |
+| burst peak, model load inside the sweep | 2.65 | **3,515.4** | **4,406** |
+| resident plateau | 2.8–8.3 | 3,450–3,454 | 4,406–4,429 |
+| KV cache freed (context grace fires) | 8.55–8.80 | **2,310.1 → 2,182.1** | 4,422 |
+| weights freed (model grace fires) | 9.55–9.80 | **1,236.2 → 1,081.0** | 4,412 |
+| both pools empty, `/mem` `models:[] ctx:[]` | 9.85 | **1,081.1** | 4,410 |
+
+**The headline is closed and the number is not an adjective.** The same repro plateaued at
+7,071.8 / 7,082.0 / 7,075.7 MB on three boots and never fell. It now peaks at **3,515.4 MB** and
+releases **2,434 MB** unprompted, in two steps, on the two pools' own deadlines.
+
+**The residual is +534.6 MB and +3,349 handles over baseline with both pools EMPTY**, and that is
+what keeps leg 3 off a 10. It is one-time, not per-cycle — the previous turn measured a whole
+load/unload cycle at +1.8 MB / −7 handles — and `llamaBackend.ts` already records why: disposing
+the backend was tried and measured not to work (+2,425 handles per cycle either way), so this is
+native residue of ever having loaded llama.cpp in this process, not a leak with a lever.
+
+**The full release path is 420 s, not the 360 s the previous handoff banked**: 300 s caller idle +
+60 s context grace + 60 s model grace, the last two SERIALISED because the context pool releases
+the model lease only from `teardown`. Measured here as 162 s (last use) → 513 s (cache) → 573 s
+(weights). A probe sampling at 390 s reads the unfixed number by construction; one sampling at
+400 s reads the cache freed and the weights still resident.
+
+**A `leases: 1` on the model with the app quiet is NOT a leaked lease** — it is the context still
+holding it through its own grace. Read `awaitingRelease` on both rows before calling it one; the
+model's read `false` at 488 s for exactly this reason and it disposed 85 s later.
+
+**Product finding, fixed in `424eb46f`.** `/mem`'s pool rows made it visible: the whole runtime
+releases on idle deadlines and had **no quit path**. `disposeAllLlamaContexts`,
+`disposeAllLlamaModels` and `disposeSharedLlama` all existed, all documented "shutdown and tests
+only", **zero callers in `src/main` or `src/main.ts`**. A quit inside either caller's 5-minute idle
+window exited holding 2.4 GB and the thread pool. `stopLlamaRuntime()` now runs the three
+innermost-first from `will-quit`; 3 tests, mutation control 3 of 15 red.
+
+**Category 7 verdict: NOT a 10, and this is the first leg-3 statement backed by a full release
+curve rather than a plateau.** 1,081.0 MB against 550–577 is 1.96×; 4,410 handles against ~1,055
+is 4.18×. What would earn the 10 is a boot whose post-burst settle lands inside the L0 band, and
+the only lever left for that is not loading the backend into the main process at all — a
+utility-process move, which is a slice of its own and is named as such rather than attempted here.

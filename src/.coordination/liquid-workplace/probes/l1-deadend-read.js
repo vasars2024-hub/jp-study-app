@@ -33,7 +33,13 @@
     worstSettleTries: real.reduce((a, r) => Math.max(a, r.settleTries || 0), 0),
     // The control. `changed:false` means the probe caught the handler-less button.
     baitReported: st.results.filter((r) => r.isBait).map((r) => ({ changed: r.changed, settleTries: r.settleTries, unstable: r.unstable })),
-    deadEnds: clicked.filter((r) => !r.changed).map((r) => r.name),
+    // A no-change verdict is only a dead end when the control HAD something to do. Two
+    // pre-click facts, recorded by the sweep, carve out the two correct no-ops — see the
+    // `activeAtClick` / `formUnchanged` note there. The bait carries neither, so the control
+    // still lands in `deadEnds` and a run whose bait moves is still void.
+    deadEnds: clicked.filter((r) => !r.changed && !r.activeAtClick && !r.formUnchanged).map((r) => r.name),
+    alreadyActive: clicked.filter((r) => !r.changed && r.activeAtClick).map((r) => r.name),
+    sameInputResubmit: clicked.filter((r) => !r.changed && !r.activeAtClick && r.formUnchanged).map((r) => r.name),
     withEffect: clicked.filter((r) => r.changed).map((r) => r.name),
     // Not findings about the app — see the header notes.
     gone: real.filter((r) => r.gone).map((r) => ({ name: r.name, cls: r.cls })),
