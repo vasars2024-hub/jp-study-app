@@ -85,6 +85,7 @@ import {
   type VideoCoreStudyPreferences,
   type VideoCoreTimingSignal,
 } from '../shared/videoCoreStudy';
+import { decideExternalSubtitleMount } from '../shared/externalSubtitleMount';
 import { parseStudySubtitles } from '../shared/subtitleCues';
 import type { VideoCoreMiningSource } from '../shared/videoCoreMining';
 import {
@@ -565,27 +566,52 @@ export default function VideoCoreStudyOverlay({
    * outranks a sidecar. Re-checked after the awaits as well, because the file's own
    * tracks can land while this is in flight.
    */
-  const externalSubtitleForRef = React.useRef<string | null>(null);
+  const externalSubtitleRef = React.useRef<
+    { path: string; name: string; trackNumber: number } | null
+  >(null);
+  /**
+   * Bumped by the media library's own broadcast, so the effect below re-asks.
+   *
+   * Choosing a different track in the library reopens the SAME file path, so a player
+   * keyed on the path alone keeps showing the previous choice — the defect `3bc796d1`
+   * fixed on the retired player, arriving here by the same route. `decideExternalSubtitleMount`
+   * holds the rule that keeps the re-ask from fighting the first guard.
+   */
+  const [mediaRevision, setMediaRevision] = React.useState(0);
+  React.useEffect(
+    () => window.api.onMediaChanged(() => setMediaRevision((revision) => revision + 1)),
+    [],
+  );
   React.useEffect(() => {
     const localPath = playbackInfo?.localFile?.path;
     if (!manager || !localPath) return undefined;
-    // One attempt per file. Re-running on a re-render would re-add the track, and the
-    // track numbers would climb for one unchanging file.
-    if (externalSubtitleForRef.current === localPath) return undefined;
 
     let cancelled = false;
     const timer = window.setTimeout(() => {
       void (async () => {
         if (cancelled) return;
-        if (manager.getTracks().length > 0) return;
-        externalSubtitleForRef.current = localPath;
+        const mounted = externalSubtitleRef.current?.path === localPath
+          ? externalSubtitleRef.current
+          : null;
+        // The cheap half of the rule, before the IPC: a muxed release brought its own
+        // tracks and this player has nothing to add.
+        if (manager.getTracks().some((entry) => entry.number !== (mounted?.trackNumber ?? null))) {
+          return;
+        }
         let pick: { name: string; text: string } | null = null;
         try {
           pick = await window.api.subtitleForPath(localPath);
         } catch {
           return;
         }
-        if (cancelled || !pick?.text) return;
+        if (cancelled) return;
+        const decision = decideExternalSubtitleMount({
+          trackNumbers: manager.getTracks().map((entry) => entry.number),
+          mountedTrackNumber: mounted?.trackNumber ?? null,
+          mountedName: mounted?.name ?? null,
+          resolvedName: pick?.name ?? null,
+        });
+        if (decision !== 'mount' || !pick?.text) return;
 
         // `parseStudySubtitles`, not `parseSubtitles`: this is the PRIMARY study track —
         // the one the transcript, the analyser and every mined card read — so it takes the
@@ -623,13 +649,21 @@ export default function VideoCoreStudyOverlay({
         try {
           await manager.addEventTrack(track);
           await manager.onSubtitleEvents(events);
-          // Still nothing selected? Then this is the only track there is. Re-checked
-          // after the awaits rather than before them: the file's own tracks can land
-          // while this is in flight, and upstream's choice must outrank ours.
-          if (manager.getSelectedTrackNumberOrNull() === null) {
+          // Nothing selected? Then this is the only track there is. Re-checked after
+          // the awaits rather than before them: the file's own tracks can land while this
+          // is in flight, and upstream's choice must outrank ours. The second case is a
+          // library choice replacing OUR previous one — the user has just answered "which
+          // of these tracks", so their answer has to become the selected one.
+          //
+          // The superseded track is left in the picker rather than removed: it is a real
+          // record the library still holds, and `SubtitleManager` exposes no removal that
+          // would not also renumber what is playing.
+          const selected = manager.getSelectedTrackNumberOrNull();
+          if (selected === null || selected === mounted?.trackNumber) {
             await manager.selectTrack(trackNumber);
           }
           if (cancelled) return;
+          externalSubtitleRef.current = { path: localPath, name: pick.name, trackNumber };
           setExternalTrackSplit(
             split.dropped ? { trackNumber, dropped: split.dropped, styles: split.styles } : null,
           );
@@ -648,7 +682,7 @@ export default function VideoCoreStudyOverlay({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [manager, playbackInfo?.localFile?.path]);
+  }, [manager, mediaRevision, playbackInfo?.localFile?.path]);
 
   React.useEffect(() => {
     if (manager || !mediaCaptionsManager) return;
