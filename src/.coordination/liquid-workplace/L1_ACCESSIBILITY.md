@@ -511,3 +511,53 @@ visible knowledge button hits the star. The theft is a defect; the height is the
 
 `dict-add`'s blocker is `div.fwin-edge-b` — the window's bottom resize gutter covers the last
 entry's Add button when the list is scrolled to its end. Real, and separate from the row height.
+
+## 2026-08-24 — hit targets pass, and the "9 below floor" above is superseded (`a176a54f`+)
+
+**The 9 were three more instrument defects, all found by asking who the blocker actually was.**
+Deterministic is not the same as correct: the run above reproduced, and was still measuring the
+wrong thing.
+
+1. **`if (owns(centre)) skip the scroll`.** A control that happened to be visible was measured
+   where it sat, which near a scroller's clip edge means the walk terminates against the clip.
+   That made the result depend on iteration order — each control's centring moved the scroller
+   for the next one. Centre **every** control, and the number becomes a property of the control.
+   The 8 `dict-star`/`word-audio`/`lexicon-knowledge` failures were all this: re-measured centred,
+   every one reaches 32. **9 -> 2.**
+2. **A closed `<details>` reports a live rect.** Chromium hides disclosure content with
+   `content-visibility`, which skips painting and hit-testing but *not* layout, so 6 controls
+   entered the population with `156x32` and `visibility: visible`, failed every hit test, and
+   were filed `occluded` "by summary". 10 of 67 unscored, and an unscored control is not a
+   passing one. The probe now opens every disclosure, measures, and restores
+   (`disclosuresRestored: true`) — safe here because `LexiconCompounds.tsx:62` and its three
+   siblings carry no `onToggle`. **occluded 10 -> 0, measured 57 -> 67.**
+3. **A `<label>` is the control's hit target.** The last 2 were the notes-scope checkboxes at
+   `13x13`. Their labels are `142x32` and `100x32` and wrap them. Proven, not cited: a synthesized
+   click at the label's far edge — `129px` from the box, landing on a `<span>` — flipped
+   `input.checked` `false -> true` on both, and the same route restored it. Measurement now
+   starts from the largest host. **2 -> 0.**
+
+**Live, forest-night, liquid, 820x580, 食べる / 8 entries, two consecutive runs identical:**
+
+| | number |
+| --- | --- |
+| measured | **67 of 67**, 0 occluded |
+| below 32px by pointer | **0** |
+| clicks stolen | **0** |
+| smallest hit region | **32x32.5** `button.fwin-b` |
+| below 32px **by rect** | 46 — unchanged and by design, the box does not move |
+| `scrollLeaks` | `div.fwin-body` only, restored |
+
+**Controls, red.** (a) `--lq-hit-target: 0px` (overlay collapses to the box) -> below-by-pointer
+**0 -> 46**, landing exactly on the by-rect count, which is what proves the probe reads the
+overlay and not something else. (b) `--lq-hit-target: 52px` -> **stolen 0 -> 4**, the title-bar
+buttons cutting each other down to `31.5` wide. (b) only fired after the guard was fixed: it
+compared whole axes and dropped an axis if *either* side ran out of REACH, so a control visibly
+cutting 9px off `lexicon-knowledge` reported `stolen: 0`. It is now judged per side against the
+distance from the centre to that edge. At `96px` the guard does **not** fire — the centres
+themselves get covered, so those rows go to `occluded` instead; that value is the wrong control.
+Token restored to computed `32px` with no inline override, verified after each run.
+
+**Hit targets: PASS.** Item (a) needed no product decision — nothing about the dense list has to
+change, and the 2026-08-22 boss-audit finding 3 (`×` at 16x18) should be re-measured with this
+probe before it is treated as a defect.

@@ -79,25 +79,43 @@
           ? '.' + e.className.trim().split(/\s+/).join('.')
           : '');
 
+  // DISCLOSE FIRST. A control inside a closed `<details>` still reports a non-zero rect and
+  // `visibility: visible` — Chromium hides the content with `content-visibility`, which skips
+  // painting and hit-testing but not layout. So it landed in the population, failed every hit
+  // test, and was filed as `occluded` "by summary": 10 of 67 controls unscored, and an unscored
+  // control is not a passing one. Open every disclosure, measure, then put them all back.
+  // Verified safe on this surface: `LexiconCompounds.tsx:62` and its three siblings carry no
+  // `onToggle`, and `EntryNote.tsx:176`'s only sets its own `open` state, so the round trip is
+  // presentational. Re-check that before reusing this probe on another surface.
+  const details = [...win.querySelectorAll('details')].map((d) => ({ d, open: d.open }));
+  for (const s of details) s.d.open = true;
+
   const els = [...win.querySelectorAll(INTERACTIVE)].filter((e) => {
     const r = e.getBoundingClientRect();
     return r.width > 0 && r.height > 0 && getComputedStyle(e).visibility !== 'hidden';
   });
 
+  // A form control's pointer target is the control PLUS its `<label>`s: clicking a label
+  // activates the control it labels, so measuring the 13x13 checkbox glyph alone reports a
+  // failure the user cannot experience. Proven live rather than cited — a synthesized click at
+  // the far edge of `label.lexicon-notes-scope` (129px from the box, on a `<span>`) flipped
+  // `input.checked` false -> true and back, on both scope checkboxes.
+  const hostsOf = (el) => (el.labels && el.labels.length ? [el, ...el.labels] : [el]);
+
   // `null` = off-viewport (unmeasurable), `false` = someone else owns the point.
-  const owns = (x, y, el) => {
+  const owns = (x, y, el, hosts) => {
     if (x < 0 || y < 0 || x > innerWidth - 1 || y > innerHeight - 1) return null;
     const got = document.elementFromPoint(x, y);
     if (!got) return null;
-    return got === el || el.contains(got) ? true : got;
+    return (hosts || hostsOf(el)).some((h) => got === h || h.contains(got)) ? true : got;
   };
 
   // Walk outward until the control stops owning the point. Returns the reach and the blocker.
-  const walk = (cx, cy, dx, dy, el) => {
+  const walk = (cx, cy, dx, dy, el, hosts) => {
     let last = 0;
     let blocker = null;
     for (let d = STEP; d <= REACH; d += STEP) {
-      const o = owns(cx + dx * d, cy + dy * d, el);
+      const o = owns(cx + dx * d, cy + dy * d, el, hosts);
       if (o === null) return { reach: last, blocker: 'viewport', capped: false };
       if (o !== true) {
         blocker = label(o);
@@ -109,6 +127,10 @@
     // every control wider than 52px into a false "stolen" row on this probe's first run.
     return { reach: last, blocker, capped: !blocker && last >= REACH };
   };
+
+  // One side of the control's own box is intact if the walk reached its edge, or ran out of
+  // REACH still owning the point.
+  const sideOk = (w, need) => w.capped || w.reach >= need - STEP;
 
   const rows = [];
   const occluded = [];
@@ -147,17 +169,26 @@
   };
 
   for (const el of els) {
-    let r = el.getBoundingClientRect();
+    // ALWAYS centre, never "only if the centre is not already owned". That shortcut is what
+    // made the result depend on iteration order: a control that happened to be visible was
+    // measured where it sat, which near a scroller's clip edge means its walk terminates
+    // against the clip — a property of the scroll position, not of the control. Centring
+    // every control makes the number a property of the control, which is what is being scored.
+    // Measure from the biggest host, not always from the control: a 13x13 checkbox inside a
+    // 142x32 label is aimed at as a 142x32 target, and the walk has to START inside that box
+    // or it reports the glyph.
+    const hosts = hostsOf(el);
+    const area = (e) => {
+      const b = e.getBoundingClientRect();
+      return b.width * b.height;
+    };
+    const target = hosts.reduce((a, b) => (area(b) > area(a) ? b : a));
+    const sp = scrollParent(target);
+    if (sp) centreIn(target, sp);
+    let r = target.getBoundingClientRect();
     let cx = r.left + r.width / 2;
     let cy = r.top + r.height / 2;
-    if (owns(cx, cy, el) !== true) {
-      const sp = scrollParent(el);
-      if (sp) centreIn(el, sp);
-      r = el.getBoundingClientRect();
-      cx = r.left + r.width / 2;
-      cy = r.top + r.height / 2;
-    }
-    const centre = owns(cx, cy, el);
+    const centre = owns(cx, cy, el, hosts);
     if (centre !== true) {
       occluded.push({
         el: label(el),
@@ -166,27 +197,35 @@
       });
       continue;
     }
-    const left = walk(cx, cy, -1, 0, el);
-    const right = walk(cx, cy, 1, 0, el);
-    const up = walk(cx, cy, 0, -1, el);
-    const down = walk(cx, cy, 0, 1, el);
+    const left = walk(cx, cy, -1, 0, el, hosts);
+    const right = walk(cx, cy, 1, 0, el, hosts);
+    const up = walk(cx, cy, 0, -1, el, hosts);
+    const down = walk(cx, cy, 0, 1, el, hosts);
     const hitW = left.reach + right.reach + STEP;
     const hitH = up.reach + down.reach + STEP;
     rows.push({
-      el: label(el),
+      el: label(el) + (target === el ? '' : ` via ${label(target)}`),
       rect: `${Math.round(r.width)}x${Math.round(r.height)}`,
       rectMin: Math.round(Math.min(r.width, r.height) * 10) / 10,
       hit: `${hitW}x${hitH}`,
       hitMin: Math.min(hitW, hitH),
-      // The theft signal: a control whose reachable region is narrower than its own rendered
-      // box has had part of itself covered by something painted later. A capped axis is not
-      // evidence of anything, so it never contributes.
-      shrunk:
-        (!left.capped && !right.capped && hitW + 0.5 < r.width) ||
-        (!up.capped && !down.capped && hitH + 0.5 < r.height),
+      // The theft signal: a control whose reachable region does not cover its own rendered box
+      // has had part of itself covered by something painted later. Judged PER SIDE against the
+      // distance from the centre to that edge — the earlier version compared whole axes and
+      // dropped an axis entirely if either side ran out of REACH, which is why a 52px
+      // `--lq-hit-target` control that visibly cut 9px off `lexicon-knowledge` reported
+      // `stolen: 0`. A capped side still contributes: capped means "reached at least REACH".
+      shrunk: !(
+        sideOk(left, cx - r.left) &&
+        sideOk(right, r.right - cx) &&
+        sideOk(up, cy - r.top) &&
+        sideOk(down, r.bottom - cy)
+      ),
       blockers: [left, right, up, down].map((w) => w.blocker).filter(Boolean),
     });
   }
+
+  for (const s of details) s.d.open = s.open;
 
   // Restore, and REPORT what had to be restored. A leak outside the scroll parents is the
   // signal that this probe has started moving the app again, which is how it went
@@ -229,6 +268,8 @@
     stolen: group(stolen, (row) => ({ blockers: row.blockers.slice(0, 2) })),
     occludedCount: occluded.length,
     occluded: occluded.slice(0, 8),
+    disclosedForRun: details.filter((s) => !s.open).length,
+    disclosuresRestored: details.every((s) => s.d.open === s.open),
     // Not decoration: two consecutive runs must agree, and they only do if this stays small
     // and names scroll REGIONS. Anything with `fwin`/`desktop`/`body` in it is the leak back.
     scrollLeaks: leaked,
