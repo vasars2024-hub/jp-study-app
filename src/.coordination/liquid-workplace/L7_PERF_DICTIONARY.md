@@ -783,3 +783,51 @@ deliberately not started here.
 2. **`poolResident` at the settled mark is the discriminator, not the handle delta.** Cycles 2 and
    3 have identical grace and identical plateau memory; what separates them is whether the entry
    was still there when the next cycle began.
+
+## 2026-08-24 (late) · primary · the KV cache was the other half, and pooling it makes a cycle cost +1.8 MB
+
+| Slice | Commit | What landed |
+| --- | --- | --- |
+| L7 leg 3 | `cd01ffbd` | `llamaContextPool.ts` — the KV cache gets the weights' refcount + grace + churn backoff |
+| L7 leg 3b | `4e45c5f2` | eviction of a warm sibling size; `/mem` reports `llamaContexts`; the probe adapted |
+
+**`L7O_CYCLES=3 L7O_UNLOAD_WAIT_MS=330000 L7O_CONTROL_GAP_MS=480000` on a cold boot of `cd01ffbd`
+(pid 26592, `debug/l7p-ctxpool-3cycle.log`).** No new probe: `l7o-backend-cycles.cjs` already took
+the gap as an env var and was extended with the context row and an adverse gap.
+
+| Mark | priv MB | handles | model / ctx | ready |
+| --- | --- | --- | --- | --- |
+| boot baseline | 423.7 | 1,068 | 0 / 0 | false |
+| CONTROL idle 45 s | 422.8 (−0.9) | 1,068 (0) | 0 / 0 | false |
+| cycle 1 plateau (cold) | 3,351.2 | 4,405 (**+3,337**) | 1@60s / 1@60s | true |
+| cycle 1 settled, 330 s gap | 3,288.9 | 4,408 (+3) | **1@60s / 1@60s** | false |
+| cycle 2 plateau (warm) | 3,290.7 | 4,401 (**−7**) | 1 / 1 | true |
+| cycle 2 settled, **480 s ADVERSE gap** | 919.7 (**−2,371**) | 4,388 (−13) | **0 / 0** | false |
+| cycle 3 plateau (cold again) | 3,376.8 | 5,609 (**+1,221**) | 1@120s / 1@120s | true |
+
+**A whole cycle now costs +1.8 MB and −7 handles.** Cycle 2 is a load, a plateau and an idle unload
+with nothing rebuilt: `translateEnsureReady` returned ready with both pools warm. Against the
+previous turn's best number on this defect — **+612 handles / +1,298.5 MB with the weights already
+resident** — that is the KV-cache half of D2 closed for a user who returns inside the window.
+
+**The adverse control fired, which is what makes the row above a measurement.** Same boot, same
+session, everything identical except the gap: 480 s puts both pools past their grace, `model` and
+`ctx` read **0 / 0**, private drops **2,371 MB**, and the next cycle costs **+2,457.1 MB / +1,221
+handles**. A fix that "works" at whatever gap the probe happens to use is exactly this file's own
+trap 1; one run now measures both sides of the 360 s boundary.
+
+**Decided and recorded so it is not re-litigated.** The cross-FILE case is deliberately not evicted:
+switching the model file in Settings leaves the old file's cache and weights warm for their grace.
+That is the model pool's existing, deliberate tradeoff (a bounded, temporary hold), the 7 GB plateau
+came from cycles rather than from graces, and there is no evidence a file switch is frequent. Only
+the same-file/different-size case is evicted, because there the two caches are the SAME work at two
+sizes and holding both was a defect `cd01ffbd` would have introduced.
+
+**Traps.**
+1. **The boundary is 360 s, not 300 s.** The idle unload fires at 300 s and the base grace adds 60.
+   A probe at 390 s measures the unfixed number by construction and always will.
+2. **The app under measurement predates `4e45c5f2`** — main does not hot-reload and the pid did not
+   change (26592, created 17:34:35, `started` unchanged). It is a valid measurement of `cd01ffbd`
+   because `evictOtherSizes` only fires on a size change and this probe uses one size (8,192).
+3. `/mem`'s `llamaContexts` is what separates "the cache was rebuilt" from "the weights were
+   reloaded". In `privateMb` alone those two are indistinguishable.
