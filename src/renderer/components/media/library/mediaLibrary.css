@@ -1026,6 +1026,20 @@
   gap: var(--space-xs);
 }
 
+/* The row is the track plus its remove control. The track itself keeps its own
+   box so the active/hover treatment stays on the part that loads it, and the
+   remove button sits outside that box rather than inside a <button>. */
+.medialib-track-row {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-xs);
+}
+
+.medialib-track-row > .medialib-track {
+  flex: 1;
+  min-width: 0;
+}
+
 .medialib-track {
   display: flex;
   align-items: flex-start;

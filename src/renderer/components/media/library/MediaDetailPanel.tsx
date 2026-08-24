@@ -77,6 +77,9 @@ export default function MediaDetailPanel({
   const [matching, setMatching] = useState(false);
   const [searching, setSearching] = useState(false);
   const [nyaaOpen, setNyaaOpen] = useState(false);
+  /** Which track has been armed for removal, and which one is in flight. */
+  const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
+  const [removing, setRemoving] = useState<string | null>(null);
   // Provenance sidecars for fused tracks, by record id. A track with no entry has
   // no sidecar to show — fusion before F6, or a file that is not one.
   const [fusionMeta, setFusionMeta] = useState<Record<string, FusionTrackMeta>>({});
@@ -91,11 +94,34 @@ export default function MediaDetailPanel({
     setPendingQueue(null);
     setMatching(false);
     setNyaaOpen(false);
+    setConfirmRemove(null);
     setNote(entry?.primary.note ?? '');
   }, [entryId, entry?.primary.note]);
 
   const seasons = useMemo(() => (entry ? episodesBySeason(entry) : []), [entry]);
   const tracks = entry?.primary.subtitles ?? [];
+
+  /**
+   * Drop one track from the item.
+   *
+   * The list refreshes through the library's own `media:changed` broadcast, so
+   * nothing is mirrored locally: an optimistic removal here would disagree with
+   * disk the moment main refused.
+   */
+  const removeTrack = useCallback(async (mediaId: string, track: { id: string; label?: string; lang: string }) => {
+    setRemoving(track.id);
+    try {
+      const result = await window.api.detachSubtitleRecord(mediaId, track.id);
+      showToast(result.ok
+        ? { message: t('media.subtitles.removed', { name: track.label ?? track.lang }), kind: 'success' }
+        : { message: result.message, kind: 'error' });
+    } catch (error) {
+      showToast({ message: error instanceof Error ? error.message : String(error), kind: 'error' });
+    } finally {
+      setRemoving(null);
+      setConfirmRemove(null);
+    }
+  }, [t]);
   const episodeLabel = entry ? (providerEpisodeTitle(entry.primary) ?? entry.primary.title) : '';
 
   /**
@@ -487,27 +513,52 @@ export default function MediaDetailPanel({
 
                   // Without a player attached the row is still worth listing —
                   // it just is not worth pretending it can be clicked.
-                  return onUseSubtitle ? (
-                    <li key={track.id}>
-                      <button
-                        type="button"
-                        className="medialib-track medialib-track--action"
-                        data-active={active || undefined}
-                        aria-pressed={active}
-                        onClick={() => {
-                          void Promise.resolve(onUseSubtitle(entry.primary.id, track.id)).catch((error: unknown) => {
-                            showToast({
-                              message: error instanceof Error ? error.message : String(error),
-                              kind: 'error',
+                  return (
+                    <li key={track.id} className="medialib-track-row">
+                      {onUseSubtitle ? (
+                        <button
+                          type="button"
+                          className="medialib-track medialib-track--action"
+                          data-active={active || undefined}
+                          aria-pressed={active}
+                          onClick={() => {
+                            void Promise.resolve(onUseSubtitle(entry.primary.id, track.id)).catch((error: unknown) => {
+                              showToast({
+                                message: error instanceof Error ? error.message : String(error),
+                                kind: 'error',
+                              });
                             });
-                          });
-                        }}
-                      >
-                        {body}
-                      </button>
+                          }}
+                        >
+                          {body}
+                        </button>
+                      ) : (
+                        <div className="medialib-track">{body}</div>
+                      )}
+                      {/* The reverse of every add above it. Two clicks rather
+                          than one: this deletes the cue file the app wrote, and
+                          a corrected transcript is user work with no undo. */}
+                      {confirmRemove === track.id ? (
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          disabled={removing === track.id}
+                          onClick={() => { void removeTrack(entry.primary.id, track); }}
+                        >
+                          {removing === track.id
+                            ? t('media.subtitles.removing')
+                            : t('media.subtitles.removeConfirm')}
+                        </Button>
+                      ) : (
+                        <IconButton
+                          size="sm"
+                          label={t('media.subtitles.remove')}
+                          onClick={() => setConfirmRemove(track.id)}
+                        >
+                          <Icon name="trash" size={13} />
+                        </IconButton>
+                      )}
                     </li>
-                  ) : (
-                    <li key={track.id} className="medialib-track">{body}</li>
                   );
                 })}
               </ul>

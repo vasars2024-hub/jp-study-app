@@ -1566,6 +1566,16 @@ const api = {
     input: import('./shared/subtitleDiscoveryIpc').SubtitleAttachTextInput,
   ): Promise<import('./shared/subtitleDiscoveryIpc').NyaaSubtitleAcceptResult> =>
     ipcRenderer.invoke('subtitleDiscovery:attachText', input),
+  /**
+   * Remove one subtitle track from an item. The reverse of every add on this
+   * surface, none of which had one — a wrong track could only be got rid of by
+   * removing the media item. Deletes the cached file, never a sidecar in place.
+   */
+  detachSubtitleRecord: (
+    mediaId: string,
+    recordId: string,
+  ): Promise<import('./shared/subtitleDiscoveryIpc').NyaaSubtitleAcceptResult> =>
+    ipcRenderer.invoke('subtitleDiscovery:detach', mediaId, recordId),
   /** Cue text for one stored subtitle record. */
   readSubtitleRecord: (mediaId: string, recordId: string): Promise<SubtitlePick | null> =>
     ipcRenderer.invoke('subtitleDiscovery:read', mediaId, recordId),

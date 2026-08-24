@@ -2208,3 +2208,30 @@ an *attended* Route A + Route B acquisition ending in cues rendering in the play
 the structural blocker the previous turn named — the route from harvested text to a
 `SubtitleRecord` now exists — and leaves the attended run itself. **Gate 31 stays 32 of 34**
 (open: 31, 34), counted from this file's gate tables.
+
+## 2026-08-24 — the reverse transition every subtitle add was missing
+
+Same turn, worker `primary`, following `ab4603c3`. Not a gate in this plan's tables; it is the
+invariant `CLAUDE.md` states ("every enable/open/add flow needs an intentional disable/close/remove
+or recovery path") and the attach above made it load-bearing.
+
+**Measured absence, before building.** `grep` over `src/preload.ts` and `src/main/*.ts` for
+`removeSubtitle|deleteSubtitle|subtitle.*remove` → **zero matches**; over `src/renderer`,
+`src/main`, `src/media` for `subtitles.filter|subtitles.splice` → one hit, in
+`main/scraper/episodeProcessingRules.ts`, unrelated. So **five** ways to add a track existed —
+discovery, nyaa accept, transcribe, fuse, attach — and **none** to remove one. The only recovery
+was removing the media item.
+
+`detachSubtitleRecord` (`main/subtitleDiscovery.ts`) + `subtitleDiscovery:detach`, preload and
+`window.d.ts` bindings, and a remove control on each row of `MediaDetailPanel`'s Subtitles tab.
+Two clicks, not one: the row arms, then confirms. 4 keys × 4 catalogs.
+
+**The control that makes it safe to ship, and it is a test:** an `external` record points at a
+sidecar next to the user's own video, so the unlink runs **only** when `!record.external`. The
+row is dropped either way. Pinned as `never deletes a sidecar that lives outside the app`.
+
+**Order inside the function is deliberate:** the row is patched away *before* the unlink, so a
+locked or moved file leaves an orphaned cache entry rather than a half-removed track.
+
+`subtitleAttachText.test.ts` **9 → 14 passed**. Refusals: a track id not on the item patches
+nothing; a ghost media id and an empty pair both refuse.

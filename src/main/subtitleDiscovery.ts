@@ -900,6 +900,44 @@ export function attachSubtitleText(input: unknown): NyaaSubtitleAcceptResult {
   return { ok: true, message: '', lang: request.lang };
 }
 
+/**
+ * Removes one subtitle track from an item, and its cached file with it.
+ *
+ * The reverse of every add on this surface — discovery, nyaa accept, transcribe,
+ * fuse, attach — none of which had one. Tracks accumulate: an item that has been
+ * searched twice and transcribed once carries three, and until now the only way
+ * to be rid of a wrong one was to remove the media item itself.
+ *
+ * The file is deleted only when the app wrote it. An `external` record points at
+ * a sidecar sitting next to the user's own video, and deleting that would turn a
+ * list-tidying click into data loss.
+ */
+export function detachSubtitleRecord(mediaId: unknown, recordId: unknown): NyaaSubtitleAcceptResult {
+  const id = typeof mediaId === 'string' ? mediaId.trim() : '';
+  const record = typeof recordId === 'string' ? recordId.trim() : '';
+  if (!id || !record) return { ok: false, message: 'No subtitle track was chosen.' };
+
+  const item = host?.listItems().find((entry) => entry.id === id);
+  if (!item) return { ok: false, message: 'That media item is no longer in the library.' };
+  const existing = item.subtitles ?? [];
+  const target = existing.find((entry) => entry.id === record);
+  if (!target) return { ok: false, message: 'That subtitle track is no longer on this item.' };
+
+  // The row goes first. If the unlink below fails — a locked file, a path the
+  // user moved — the track is still gone from the item, which is what was asked
+  // for; a stale file in the cache is recoverable and a half-removed track is
+  // the confusing state.
+  host?.patchItems([item.id], { subtitles: existing.filter((entry) => entry.id !== record) });
+  if (!target.external) {
+    try {
+      fs.unlinkSync(path.join(app.getPath('userData'), target.path));
+    } catch {
+      /* the record is already gone; an orphaned cache file is not worth failing for */
+    }
+  }
+  return { ok: true, message: '', lang: target.lang };
+}
+
 export function registerSubtitleDiscoveryIpc(discoveryHost: SubtitleDiscoveryHost): void {
   host = discoveryHost;
 
@@ -938,6 +976,9 @@ export function registerSubtitleDiscoveryIpc(discoveryHost: SubtitleDiscoveryHos
    * goes to the network, this one is given the bytes and cannot reach it.
    */
   ipcMain.handle('subtitleDiscovery:attachText', (_e, input: unknown) => attachSubtitleText(input));
+  /** The reverse of every add on this surface. See `detachSubtitleRecord`. */
+  ipcMain.handle('subtitleDiscovery:detach', (_e, mediaId: unknown, recordId: unknown) =>
+    detachSubtitleRecord(mediaId, recordId));
   /** Reads a stored record's cue text, for the player and the study tools. */
   ipcMain.handle('subtitleDiscovery:read', (_e, mediaId: string, recordId: string) => {
     const item = host?.listItems().find((entry) => entry.id === mediaId);

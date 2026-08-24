@@ -30,7 +30,7 @@ vi.mock('electron', () => ({
   safeStorage: { isEncryptionAvailable: () => false },
 }));
 
-const { attachSubtitleText, registerSubtitleDiscoveryIpc } = await import('../subtitleDiscovery');
+const { attachSubtitleText, detachSubtitleRecord, registerSubtitleDiscoveryIpc } = await import('../subtitleDiscovery');
 
 const CUES = '1\n00:00:01,000 --> 00:00:03,000\nこんにちは、世界。\n';
 
@@ -185,5 +185,72 @@ describe('attachSubtitleText', () => {
     // track the user may still be using.
     expect(cachedFiles('m1')).toHaveLength(2);
     expect(patches[1].patch.subtitles?.[0].id).not.toBe(patches[0].patch.subtitles?.[0].id);
+  });
+});
+
+// The reverse transition. Every add on this surface — discovery, nyaa accept,
+// transcribe, fuse, and now attach — wrote a track and none could remove one,
+// so a wrong track could only be got rid of by removing the media item.
+describe('detachSubtitleRecord', () => {
+  /** Attach one track and hand back its id and the file it wrote. */
+  function attached(): { id: string; file: string } {
+    expect(attachSubtitleText({ mediaId: 'm1', text: CUES, format: 'srt' }).ok).toBe(true);
+    const record = patches[0].patch.subtitles?.[0];
+    if (!record) throw new Error('the attach wrote no record');
+    items = [mediaItem({ subtitles: patches[0].patch.subtitles })];
+    patches = [];
+    return { id: record.id, file: path.join(tmpRoot, record.path) };
+  }
+
+  it('drops the record and deletes the file the app wrote', () => {
+    const { id, file } = attached();
+    expect(fs.existsSync(file)).toBe(true);
+
+    const result = detachSubtitleRecord('m1', id);
+    expect(result.ok).toBe(true);
+    expect(result.lang).toBe('ja');
+    expect(patches[0].patch.subtitles).toEqual([]);
+    expect(fs.existsSync(file)).toBe(false);
+  });
+
+  it('keeps every other track on the item', () => {
+    const { id } = attached();
+    const keep = { id: 'keep', lang: 'en', source: 'embedded' as const, format: 'srt' as const, path: 'x.srt', addedAt: 1 };
+    items = [mediaItem({ subtitles: [keep, ...(items[0].subtitles ?? [])] })];
+
+    expect(detachSubtitleRecord('m1', id).ok).toBe(true);
+    expect(patches[0].patch.subtitles).toEqual([keep]);
+  });
+
+  // The control that makes this safe to ship: an external record points at a
+  // sidecar sitting next to the user's own video. Removing the row must not
+  // reach outside the app's own cache.
+  it('never deletes a sidecar that lives outside the app', () => {
+    const sidecar = path.join(tmpRoot, 'users-own-video.ja.srt');
+    fs.writeFileSync(sidecar, CUES, 'utf-8');
+    items = [mediaItem({
+      subtitles: [{
+        id: 'ext', lang: 'ja', source: 'sidecar', format: 'srt', path: sidecar, external: true, addedAt: 1,
+      }],
+    })];
+
+    expect(detachSubtitleRecord('m1', 'ext').ok).toBe(true);
+    expect(patches[0].patch.subtitles).toEqual([]);
+    expect(fs.existsSync(sidecar)).toBe(true);
+    fs.rmSync(sidecar);
+  });
+
+  it('refuses a track that is not there, and patches nothing', () => {
+    attached();
+    const result = detachSubtitleRecord('m1', 'never-existed');
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain('no longer on this item');
+    expect(patches).toHaveLength(0);
+  });
+
+  it('refuses an item the library does not hold', () => {
+    expect(detachSubtitleRecord('ghost', 'anything').ok).toBe(false);
+    expect(detachSubtitleRecord('', '').ok).toBe(false);
+    expect(patches).toHaveLength(0);
   });
 });
