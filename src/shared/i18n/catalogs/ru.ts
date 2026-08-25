@@ -2534,6 +2534,8 @@ export const ru: Catalog = {
   'agent.mode.automate.hint': 'Составляет нумерованный план для вас. Агент не может его выполнить.',
   'agent.message.role.user': 'Вы',
   'agent.message.role.assistant': 'Агент',
+  'agent.message.branch': 'Продолжить в новом разговоре',
+  'agent.conversation.fromMessage': 'Продолжение: {label}',
   'agent.message.role.tool': 'Инструмент',
   'agent.message.role.system': 'Система',
   'agent.message.status.pending': 'Ожидает',

@@ -2344,6 +2344,8 @@ export const zh: Catalog = {
   'agent.mode.automate.hint': '产出供你执行的编号步骤。智能体无法代你执行。',
   'agent.message.role.user': '你',
   'agent.message.role.assistant': '智能体',
+  'agent.message.branch': '在新对话中继续',
+  'agent.conversation.fromMessage': '后续：{label}',
   'agent.message.role.tool': '工具',
   'agent.message.role.system': '系统',
   'agent.message.status.pending': '待处理',

@@ -694,4 +694,81 @@ export function translateSpanAgentContext(
     };
 }
 
+/**
+ * The Agent's own end of the selection contract — the fourth app, and the last
+ * `LiquidSelectionKind` that had no producer.
+ *
+ * A message is a `span` of the user's own conversation, so it takes the same
+ * `selected-text` floor as Translate's: session memory, never written to disk.
+ * `entityId` is the message id, so the same reply pinned twice is one shelf item.
+ */
+export function agentMessageAgentContext(
+  messageId: string,
+  roleLabel: string,
+  text: string,
+  now = Date.now(),
+): AgentContextInput {
+  const body = text.trim().replace(/\s+/g, ' ');
+  // Joined from the parts that exist rather than interpolated: `${''}: ${''}`
+  // trims to ":", which `createLiquidSelection` accepts as a label and which then
+  // reaches the shelf as a row that names nothing. Both parts empty must reach
+  // `createAgentContextItem` as an empty label, which is where it is refused.
+  const label = [roleLabel.trim(), body.slice(0, 60)].filter(Boolean).join(': ');
+  const selection = createLiquidSelection({
+    app: 'agent',
+    kind: 'message',
+    label,
+    preview: body,
+    entityId: messageId,
+    route: '#/agent',
+  });
+  return selection
+    ? agentContextInputFromSelection(selection, now)
+    : {
+      kind: 'selected-text',
+      label,
+      preview: body,
+      source: { app: 'agent' },
+      identity: `agent/message/${messageId}`,
+      now,
+    };
+}
+
+/**
+ * Branch: carry one message into a **new** conversation as its context.
+ *
+ * Why not `attachAgentContextFromSurface`: that one attaches to whichever
+ * conversation is active, and the active conversation here is the one the
+ * message already lives in — pinning a reply next to itself changes nothing a
+ * user can see. Following up on a reply means a fresh thread that starts from it.
+ *
+ * The forcing mechanism is deliberate rather than a trick: passing a
+ * `conversationId` that does not exist yet makes
+ * `agentWorkspaceWithContextAttached` take its create-then-attach branch, and
+ * passing the SAME id as `newConversation.id` is what makes the two agree. A
+ * `null` would not do it — `null ?? activeConversationId` is the active one.
+ *
+ * Returns the new conversation's id, or `null` when nothing was written, so the
+ * caller can report an honest failure instead of a silent one.
+ */
+export async function branchAgentConversationFromMessage(
+  input: AgentContextInput,
+  conversationTitle: string,
+): Promise<string | null> {
+  const item = createAgentContextItem(input);
+  if (!item) return null;
+  const loaded = await loadAgentWorkspace();
+  if (!loaded.ok) return null;
+  const id = newConversationId();
+  const saved = await updateAgentWorkspace(loaded.state, (current) => (
+    agentWorkspaceWithContextAttached(current, item, {
+      conversationId: id,
+      newConversation: { id, title: conversationTitle },
+      now: input.now ?? Date.now(),
+    })
+  ));
+  if (!saved.ok) return null;
+  return saved.state.activeConversationId === id ? id : null;
+}
+
 export type { AgentContextItem };

@@ -770,6 +770,25 @@
   white-space: nowrap;
 }
 
+/*
+ * The one chip in this row that is a CONTROL rather than a label.
+ *
+ * `.agent-chip` alone measured 172x19 live, and 19 is under the 24 px WCAG 2.2
+ * target minimum — fine for a status chip nobody clicks, not fine for a button.
+ * It keeps the chip's shape so the row still reads as one band, and gains the
+ * height, the cursor and the interactive colour that say it is pressable.
+ */
+.agent-message-branch {
+  min-height: 24px;
+  margin-left: auto;
+  background: transparent;
+  color: var(--agent-accent, var(--accent-2));
+  cursor: pointer;
+}
+.agent-message-branch:hover {
+  border-color: var(--agent-accent, var(--accent-2));
+}
+
 .agent-chip-cloud,
 .agent-chip-provider {
   border-color: color-mix(in srgb, var(--agent-accent) 35%, var(--agent-line));

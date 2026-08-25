@@ -64,7 +64,12 @@ function TranslateAskAgent({
       onClick={() => {
         void handOffToAgent(
           translateSpanAgentContext(span, source),
-          t('agent.conversation.fromTranslate', { label: span.slice(0, 60) }),
+          // 40, matching the media-cue and visual-novel producers rather than
+          // inventing a third bound. A conversation TITLE is persisted even when
+          // its context item is refused retention, so this slice is the one part
+          // of a `personal` span that does reach disk — it stays as short as the
+          // neighbouring producers already settled on.
+          t('agent.conversation.fromTranslate', { label: span.slice(0, 40) }),
           routeAgentContext('translate', t(AGENT_NAVIGATION_SECTION_LABEL_KEYS.translate)),
         );
       }}

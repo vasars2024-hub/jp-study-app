@@ -52,7 +52,9 @@ vi.mock('../agentImageStagingClient', () => ({
 }));
 
 import {
+  agentMessageAgentContext,
   attachAgentContextFromSurface,
+  branchAgentConversationFromMessage,
   dictionaryAgentContext,
   handOffToAgent,
   lexiconPassageAgentContext,
@@ -938,5 +940,102 @@ describe('a captured visual-novel line', () => {
     expect(source).toContain('visualNovelReadCaptureImage');
     expect(source).toMatch(/handOffToAgent\(/);
     expect(source).not.toMatch(/dataUrl:\s*capture\./);
+  });
+});
+
+/**
+ * L5 bullet 1's fourth producer — the Agent's own message, and the one selection
+ * kind the contract declared and nothing built on.
+ *
+ * The branch is the behaviour worth pinning, because `attachAgentContextFromSurface`
+ * would look identical from the outside and do nothing useful: the active
+ * conversation is where the message already is.
+ */
+describe('agent message — branch into a new conversation', () => {
+  const existing = {
+    version: 1,
+    revision: 4,
+    activeConversationId: 'agent-here',
+    conversations: [{
+      id: 'agent-here',
+      title: 'Where the message lives',
+      createdAt: NOW,
+      updatedAt: NOW,
+      context: [] as AgentContextItem[],
+      messages: [],
+    }],
+  };
+
+  it('creates a conversation instead of attaching to the active one', async () => {
+    workspace.state = structuredClone(existing) as typeof workspace.state;
+    const id = await branchAgentConversationFromMessage(
+      agentMessageAgentContext('msg-7', 'Agent', '  て-form   marks   the request. ', NOW),
+      'Follow-up: て-form',
+    );
+
+    expect(id, 'the new conversation id is returned, not a boolean').not.toBeNull();
+    expect(id).not.toBe('agent-here');
+    const saved = workspace.saves.at(-1) as typeof workspace.state;
+    expect(saved.conversations.length, 'one added, none replaced').toBe(2);
+    // The ORIGINAL keeps its empty shelf: a branch must not mutate what it came
+    // from, which is the difference between branching and pinning in place.
+    const source = saved.conversations.find((c) => (c as { id: string }).id === 'agent-here');
+    expect((source as { context: unknown[] }).context).toEqual([]);
+
+    const branched = saved.conversations.find((c) => (c as { id: string }).id === id);
+    const context = (branched as { context: AgentContextItem[] }).context;
+    expect(context.length).toBe(1);
+    expect(context[0].kind).toBe('selected-text');
+    // Personal floor, so the store refuses to write it to disk — the same
+    // classification Translate's span gets, from the one mapping table.
+    expect(context[0].sensitivity).toBe('personal');
+    expect(context[0].retained).toBe(false);
+    expect(context[0].source?.entityId).toBe('msg-7');
+    // Whitespace collapsed by the contract, not by the caller.
+    expect(context[0].preview).toBe('て-form marks the request.');
+    expect(saved.activeConversationId).toBe(id);
+  });
+
+  it('keys on the message id, so branching twice is two threads off one item', async () => {
+    workspace.state = structuredClone(existing) as typeof workspace.state;
+    const first = await branchAgentConversationFromMessage(
+      agentMessageAgentContext('msg-7', 'Agent', 'first read', NOW),
+      'Follow-up: one',
+    );
+    workspace.state = workspace.saves.at(-1) as typeof workspace.state;
+    const second = await branchAgentConversationFromMessage(
+      agentMessageAgentContext('msg-7', 'Agent', 'first read', NOW),
+      'Follow-up: two',
+    );
+    expect(first).not.toBe(second);
+    const saved = workspace.saves.at(-1) as typeof workspace.state;
+    expect(saved.conversations.length, 'the original plus two branches').toBe(3);
+    // Same id in both, because identity is the message — the shelf slot is the
+    // same slot in two different threads rather than two slots in one.
+    const ids = saved.conversations
+      .flatMap((c) => (c as { context: AgentContextItem[] }).context.map((i) => i.id));
+    expect(new Set(ids).size).toBe(1);
+  });
+
+  it('reports null rather than a silent failure when the write is refused', async () => {
+    workspace.state = structuredClone(existing) as typeof workspace.state;
+    workspace.saveResult = { ok: false, code: 'write-failed' };
+    const id = await branchAgentConversationFromMessage(
+      agentMessageAgentContext('msg-7', 'Agent', 'text', NOW),
+      'Follow-up',
+    );
+    // The negative control: a refused save must not return an id the caller
+    // would then navigate to.
+    expect(id).toBeNull();
+  });
+
+  it('refuses a message with no text at all', async () => {
+    workspace.state = structuredClone(existing) as typeof workspace.state;
+    const id = await branchAgentConversationFromMessage(
+      agentMessageAgentContext('msg-8', '', '   ', NOW),
+      'Follow-up',
+    );
+    expect(id, 'nothing to follow up on is not a conversation').toBeNull();
+    expect(workspace.saves.length).toBe(0);
   });
 });

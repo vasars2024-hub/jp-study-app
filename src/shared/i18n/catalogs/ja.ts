@@ -2354,6 +2354,8 @@ export const ja: Catalog = {
   'agent.mode.automate.hint': '実行用の番号付き手順を作成します。エージェントが代わりに実行することはできません。',
   'agent.message.role.user': 'あなた',
   'agent.message.role.assistant': 'エージェント',
+  'agent.message.branch': '新しい会話で続ける',
+  'agent.conversation.fromMessage': '続き: {label}',
   'agent.message.role.tool': 'ツール',
   'agent.message.role.system': 'システム',
   'agent.message.status.pending': '待機中',

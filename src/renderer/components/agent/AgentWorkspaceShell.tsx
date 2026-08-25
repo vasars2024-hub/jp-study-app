@@ -50,6 +50,10 @@ import {
   updateAgentWorkspace,
 } from '../../agentWorkspaceClient';
 import {
+  agentMessageAgentContext,
+  branchAgentConversationFromMessage,
+} from '../../agentContextHandoff';
+import {
   cancelAgentPrompt,
   executeAgentPrompt,
 } from '../../agentExecutionClient';
@@ -709,6 +713,31 @@ function MessageRow({
               amount: formatAgentCostUsd(provider.estimatedCostUsd),
             })}
           </span>
+        ) : null}
+        {/*
+          L5 bullet 1's fourth producer. Branch, not pin: the active conversation
+          is the one this message already lives in, so attaching it there would
+          change nothing a user can see. Absent when there is no text, because a
+          failed or still-running message has nothing to follow up on — an
+          enabled control over an empty body is the dead-control shape §2.3 names.
+        */}
+        {message.text ? (
+          <button
+            type="button"
+            className="agent-chip agent-message-branch"
+            onClick={() => {
+              void branchAgentConversationFromMessage(
+                agentMessageAgentContext(
+                  message.id,
+                  t(`agent.message.role.${message.role}`),
+                  message.text,
+                ),
+                t('agent.conversation.fromMessage', { label: message.text.slice(0, 40) }),
+              );
+            }}
+          >
+            {t('agent.message.branch')}
+          </button>
         ) : null}
       </div>
       {message.text ? <p className="agent-message-text">{message.text}</p> : null}

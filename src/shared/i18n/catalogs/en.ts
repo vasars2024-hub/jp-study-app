@@ -2506,6 +2506,8 @@ export const en: Catalog = {
   'agent.mode.automate.hint': 'Produces a numbered plan for you to carry out. The Agent cannot run it for you.',
   'agent.message.role.user': 'You',
   'agent.message.role.assistant': 'Agent',
+  'agent.message.branch': 'Follow up in a new conversation',
+  'agent.conversation.fromMessage': 'Follow-up: {label}',
   'agent.message.role.tool': 'Tool',
   'agent.message.role.system': 'System',
   'agent.message.status.pending': 'Pending',
