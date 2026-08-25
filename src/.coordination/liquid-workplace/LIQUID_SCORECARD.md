@@ -610,3 +610,45 @@ reading the consumers of the two constants rather than by re-running a sweep.
 **Order for the next boot, and it is forced rather than preferred:** leg 2 FIRST (its number exists
 only in a boot's first seconds), per-IPC timing installed before the first click, then start the
 leg-3 sampler on that same boot. Doing it the other way round is what cost this turn its 10.
+
+## 2026-08-25 (later) · primary — leg 2 reproduced on a real restart; Dictionary stays 7 of 8 and the earlier exoneration is withdrawn
+
+Main pid **36020**, a real restart, product tree `855789ca`. Dictionary **liquid** 820×580 driven to
+**8 entries / 5,476 chars / 349 nodes** before anything queried examples. Numbers, both controls and
+the harness defect: `L7_PERF_DICTIONARY.md`, this turn.
+
+| # | Category | Re-driven | Result |
+| - | -------- | --------- | ------ |
+| 7 | Performance under real load | leg 2 yes, on the boot's first call | **NOT 10 — leg 2**, 6,590.8 ms against a 500 ms bar |
+
+**The open leg is unchanged in name and changed in kind.** Leg 2 was carrying one over-bar sample
+the last boot could not settle; it is now reproduced at **13× the bar**, with a second word (痛い,
+never queried) also over it at 641.6 ms, and a control that fires — the identical five words re-run
+on the same boot cost 20–39 ms, 食べる collapsing **186×** with the same 8-row result.
+
+**Two claims from the previous entry are withdrawn, both measured wrong rather than reasoned wrong.**
+"Once per boot, not per word" came from four words timed *after* the boot's first call, i.e. on the
+warm path — this turn reproduces those exact numbers as pass 2. And `findExampleSentences` is not the
+"uncapped-index scan" the hypothesis named: it is capped at 400 rows and says so. The cap bounds the
+result, not the scan.
+
+**Category 7's lost point is a product number for the second time on this surface**, and it now has
+a mechanism and a reproduction rather than a single unexplained sample. Not scored as a 10, not
+scored as a 9 — the rubric has no such thing.
+
+Running state, unchanged except the detail behind 7:
+
+| # | Category | State |
+| - | -------- | ----- |
+| 1 | Accessibility | 10/10 |
+| 2 | Clunkiness | 10/10 |
+| 3 | Liquid utilization | 10/10 |
+| 4 | Use of space | 10/10 |
+| 5 | UI clarity | 10/10 |
+| 6 | Feature parity + reversibility | 10/10 |
+| 7 | Performance under real load | **NOT 10 — leg 2 reproduced**; leg 3 must be re-driven anyway, `855789ca` changed main |
+| 8 | Honest states | 10/10 |
+
+**Video is 8 of 8. Dictionary is 7 of 8. Gate 461 stays OPEN on Dictionary**, and the next slice is
+the product fix rather than another measurement — the surface has now been measured twice and the
+second measurement only made the number worse.

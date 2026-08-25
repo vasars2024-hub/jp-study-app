@@ -1297,3 +1297,53 @@ loaded state, run `liquid-perf-probe.ps1` across the boot's **first** `dict:exam
 `l7d-examples-attrib.js`-style per-IPC timing already installed, then start the leg-3 sampler on
 that same boot. Order matters: leg 2's number exists only in the first few seconds of a boot's use
 of this feature, and leg 3's needs 16 uninterrupted minutes after it.
+
+## 2026-08-25 (later) · primary — leg 2 REPRODUCES at 6,590.8 ms, and "once per boot, not per word" is CORRECTED
+
+Real restart: forge tree stopped, `npm start`, main pid **36020** (was 1324), fresh bridge token,
+`llamaHostWorker.ts` rebuilt in the boot. Desk restored to four windows, Dictionary **liquid**
+820×580, driven to **8 entries / 5,476 chars / 349 nodes / 75 controls** before anything queried
+examples — an empty harness caps this category at 0. Probe: `probes/l7f-first-examples.js`, the
+boot's first `dictExamples` call, five words, per-IPC timing.
+
+| pass | 食べる | 海 | 痛い | 窓 | 話す |
+| --- | --- | --- | --- | --- | --- |
+| 1 — cold | **6,590.8 ms** | 50.0 | **641.6 ms** | 60.0 | 49.6 |
+| 2 — same words, same boot | 35.5 | 20.3 | 38.8 | 35.1 | 26.2 |
+
+All ten calls returned **8 examples**, so the work is real in both passes and pass 2 is not an
+empty short-circuit. **Two of five words are over the 500 ms bar on a cold boot**, the worst by
+13×. Pass 2 is the control on the mechanism and it fired: 食べる collapses **186×**, same word,
+same query, same row count — so the cost is cache residency, not the query.
+
+**The correction, and it matters more than the number.** The previous entry concluded "once per
+boot, not per word" from four never-queried words at 48/21/164/47 ms. Those were measured *after*
+the boot had already spent its first call, i.e. on the warm path — pass 2 above reproduces them
+almost exactly (20–39 ms). The warm path was measured and reported as the cold one. 痛い at
+**641.6 ms** is the disproof: it is not the first call, it is never-queried, and it is over the bar.
+The cost is paid per cold *region of the corpus*, so several early lookups pay it, not just one.
+
+**Also corrected: the standing hypothesis is wrong on its face.** The previous entry calls
+`findExampleSentences` an "uncapped-index `instr` scan". It is capped — `limit EXAMPLE_SCAN_ROWS`
+(400, `shared/lexiconExamples.ts:8`), and `dictService.ts:1716` documents the cap and why there is
+no `ORDER BY`. What the cap bounds is the RESULT, not the scan: a word whose matches are sparse
+still visits the corpus before it can return fewer than 400 rows. `examples` has an index on
+`dict_id` only (`schema.ts:621`) — none on `lang` — and `instr` cannot use one regardless.
+
+**Leg 2 FAILS. Category 7 is NOT a 10, Dictionary stays 7 of 8, gate 461 stays OPEN on Dictionary.**
+Video remains 8 of 8.
+
+**Instrument defect fixed in the same turn, because it had already bought one false pass here.**
+`-DuringJs` took JS *text*, and every probe in `probes/` is a *path* — which is also what this
+file's own "next slice" told the next worker to pass. A path is not an expression, /eval throws,
+nothing reads the throw, and the run reports a clean distribution: this turn it read **max 5.9 ms**
+across the call that actually cost 6,590.8 ms, and `window.__l7fEx` did not exist. It now loads a
+path when the argument resolves to a file. Delivery control: the parked `startedAt` re-arms after
+the run (`1787657506267` → `1787657567896`) where before the fix the global was absent entirely.
+Believe `window.__l7fEx.done`, never the harness's exit code.
+
+**Next slice, in order.** (1) Fix the cold-lookup cost — it is a main-thread scan of a 234,982-row
+table and the two levers are moving `dict:examples` off the main event loop or making the scan
+resident-bounded; decide from measurement, not from this paragraph. (2) Re-drive leg 2 on a fresh
+boot with the repaired harness. (3) Leg 3's 16-minute curve on that same boot — it must be
+re-driven regardless, since `855789ca` changed main-process code (`llamaHost`, `translate`).

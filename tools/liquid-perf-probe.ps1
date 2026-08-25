@@ -64,7 +64,18 @@ if ($Control -or $DuringJs) {
   Add-Type -AssemblyName System.Net.Http
   $client = [System.Net.Http.HttpClient]::new()
   $client.DefaultRequestHeaders.Add('Authorization', "Bearer $($b.token)")
-  $duringExpr = if ($DuringJs) { $DuringJs } else { "(() => { const t = Date.now(); while (Date.now() - t < 1500) {} return 'blocked'; })()" }
+  # -DuringJs is JS TEXT *or* a path to a probe file. It used to be text only, and handing it a
+  # path -- which is what every probe in `probes/` is, and what this repo's own handoffs told
+  # workers to pass -- sent the literal string "probes/l7f-first-examples.js" to /eval. That is not
+  # an expression, /eval throws, the throw is never read, and the run reports a clean distribution
+  # indistinguishable from a fast surface. It bought a false exoneration on 2026-08-25 (max 5.9 ms
+  # on a call that actually cost 6,590.8 ms) and, before that, one on the leg it was written for.
+  $duringExpr = if ($DuringJs) {
+    $asPath = if ([System.IO.Path]::IsPathRooted($DuringJs)) { $DuringJs } else { Join-Path $repo $DuringJs }
+    if (Test-Path -LiteralPath $asPath -PathType Leaf) { Get-Content -LiteralPath $asPath -Raw } else { $DuringJs }
+  } else {
+    "(() => { const t = Date.now(); while (Date.now() - t < 1500) {} return 'blocked'; })()"
+  }
   $json = @{ js = $duringExpr } | ConvertTo-Json -Compress
   $content = [System.Net.Http.StringContent]::new($json, [System.Text.Encoding]::UTF8, 'application/json')
   $controlTask = $client.PostAsync($evalUri, $content)
