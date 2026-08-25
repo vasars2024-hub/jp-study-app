@@ -450,3 +450,30 @@ a 15% bar; chrome **5.7%**, dominant canvas **32.3%**. **Category 4 (Dictionary)
 product's OWN `MIN_W`/`MIN_H` and therefore a supported size, not a control size — `nav.mc-nav` and
 its buttons lead the list, and `chromePct` is **49.9%** at 820×580 against Dictionary's 5.7%. That
 is category 4 work for whenever Media is scored; it is not Dictionary's score.
+
+## 2026-08-25 · backup — Video's category 4, first measurement: FAILS the dead-region bar at DEFAULT size
+
+`TITLES` now reads `window.__lqScoreTitles` with `['Dictionary', 'Media']` kept as the default, so
+every run already recorded above reproduces. Gate 461 names **Video and Dictionary**, and `Media`
+is a third window — the Video one had never been in this probe's population. No new probe file.
+
+Live, pid 32344, viewport 1264x821, Video at **1080x700** (`standard`, `forest-night`), library
+holding **36 items** with the current browser view rendering **2 cards** — a real populated state,
+not an empty harness:
+
+| number | Video | rubric bar |
+| --- | --- | --- |
+| clipped | **0** | 0 at every size |
+| overlaps | **0** | 0 at every size |
+| horizontal scrollers / hidden `overflow-x` | **0 / 0** | absent |
+| largest contiguous dead region | **431x532 = 22.1% of viewport** (30.3% of the window) | **≤ 15%** |
+| chrome share | 48.1% (`fwin-bar`, `mc-sidebar`, `mc-topbar`, `medialib-rail`, `medialib-browser__head`) | content grows, not chrome |
+| dominant canvas | 58.3% | — |
+
+**Category 4 on Video: NOT 10**, and it fails on the one number that is not zero. The dead region
+is the media-library grid: five chrome bands take 48.1% of the window, and what is left renders two
+cards against a 431x532 void. Compact and maximized are two further measurements that have not been
+taken, so this is a floor on the finding, not the whole of it.
+
+**Next slice, named rather than half-started:** the grid's sparse-result layout. It needs the same
+treatment at all three sizes plus the below-minimum negative control, which is a leg of its own.

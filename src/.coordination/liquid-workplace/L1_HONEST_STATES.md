@@ -101,3 +101,19 @@ Residuals this run left, stated rather than hidden: **one saved search** (`local
 the app's own Save-search flow, user-removable, not deleted blind), and the gloss/mode toggles,
 which were driven back by hand — 日本語 ON, `Automatic` active, **8 entries / 5,967 chars**.
 `中文` does not turn off by re-clicking; it is a two-way radio, and 日本語 is the way back.
+
+## 2026-08-25 · backup — Video, category 8 leg 1 only: 0 raw i18n keys, and NO state was reachable
+
+`TITLE` now reads `window.__lqScoreTitle` with `'Dictionary'` kept as the default; every run above
+reproduces. No new probe file.
+
+Video (Media Center hub), live at pid 32344, `en`, `forest-night`, library 36 items / 2 cards
+rendered: `rawI18nKeyCount` **0**. Every state bucket is **0** — empty 0, loading 0, error 0,
+offline 0 — and `statusCandidatesNeedingEmptyProfile` is **[]**.
+
+**That is a coverage gap, not a pass, and it is written down as one.** The rubric's category 8
+needs 0 dead controls, 0 fabricated values, and *all four states rendering a real message*. A
+populated profile renders none of the four, so this run cannot say whether they exist; it says only
+that nothing dishonest is on screen right now. The two legs that decide the category —
+`l8-dead-controls.cjs` (drive every control) and `l8-fabricated.cjs` (needs an empty scratch
+profile) — have not been run against Video. **Category 8 on Video: unscored, which is not 10.**

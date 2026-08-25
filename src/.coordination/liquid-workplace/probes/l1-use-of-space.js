@@ -55,7 +55,10 @@
  * Run: `node debug/evfile.cjs src/.coordination/liquid-workplace/probes/l1-use-of-space.js`
  */
 (() => {
-  const TITLES = ['Dictionary', 'Media'];
+  // Set `window.__lqScoreTitles = ['Video']` before evaluating to score another set. The two
+  // defaults stay so every run already recorded in L1_USE_OF_SPACE.md reproduces; gate 461 names
+  // Video and Dictionary, and `Media` is a THIRD window, not the Video one.
+  const TITLES = (typeof window !== 'undefined' && window.__lqScoreTitles) || ['Dictionary', 'Media'];
 
   const measure = (title) => {
     const win = [...document.querySelectorAll('.fwin')].find(

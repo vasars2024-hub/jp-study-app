@@ -32,7 +32,9 @@
  * Run: `node debug/evfile.cjs src/.coordination/liquid-workplace/probes/l1-honest-states.js`
  */
 (() => {
-  const TITLE = 'Dictionary';
+  // Set `window.__lqScoreTitle = 'Video'` before evaluating to score another surface. Dictionary
+  // stays the default so every run recorded in L1_HONEST_STATES.md reproduces.
+  const TITLE = (typeof window !== 'undefined' && window.__lqScoreTitle) || 'Dictionary';
 
   const win = [...document.querySelectorAll('.fwin')].find(
     (w) => (w.querySelector('.fwin-title-text')?.textContent || '').includes(TITLE),
