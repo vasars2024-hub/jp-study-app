@@ -1093,3 +1093,41 @@ drag is exactly what this category exists to notice.
 refused with *"window is not liquid at the start"* (it had Media), `l7e-examples.js` refused with
 *"no Find example sentences button"* (same), and the gesture probe silently scored Video. All three
 now resolve by title. A refusal that names a product state is the shape to distrust.
+
+## 2026-08-24 (late) — the drag hitch located to the gesture BOUNDARIES, two product fixes, still not a 10
+
+**Where the long frames actually are.** The frame recorder was re-run with marks at
+`pointerdown` and `pointerup`. One drag, 112 frames, over-33 at indices `25:83.6`, `56:66.9`,
+`84:100.4`, `98:66.9`; marks `predown@25 postdown@25 preup@85 postup@85`. **The two worst frames
+sit exactly on the two boundaries**, not spread through the 60 moves. So this is per-gesture
+setup/teardown cost, and the per-move path was already clean.
+
+**Negative result, recorded so nobody re-derives it: `os-interacting` is NOT the cost.** The class
+`perfSetInteracting` toggles on `<html>` drops `backdrop-filter` from every `.fwin`
+(`styles.css:12819`), which looks exactly like a compositor-layer teardown. Six full toggles with
+no drag at all: **131 frames, max 16.8 ms, 0 over 33**. Free. The rule can stay.
+
+**Fix 1 — `deskDrag.ts` cached the desk rect.** `moveDeskDrag` ran `getBoundingClientRect()` on the
+desk element on EVERY `pointermove`, before `dragStart`'s rAF throttle and interleaved with the
+rAF's `style.transform` write — a forced layout flush per pointer event at up to the pointer's full
+report rate. Cached for the gesture, invalidated on `resize` and at begin/end/cancel. 4 new tests
+pin it (200 moves ⇒ 0 extra reads; a mid-drag resize still re-measures, because a stale rect would
+hand the window to the wrong monitor).
+
+**Fix 2 — `DesktopShell.focus()` no longer re-renders a window that is already on top.**
+`dragStart` calls it on every `pointerdown`, so dragging the window you are already using rebuilt
+the whole `wins` array and re-rendered every mounted window inside the pointerdown handler. Guarded
+with `!w.min && w.z === zTop.current → return ws` (identity preserved, React re-renders nothing).
+
+**Measured, 6 runs each, same boot, same three-window desktop, `closedLoop=True` throughout:**
+
+| | frames delivered | over 33 ms | over 100 ms | worst |
+| --- | --- | --- | --- | --- |
+| before | 92, 93, 93, 95, 95, 92 | 4,4,4,5,4,4 | 2,0,0,0,2,2 | 100.4 |
+| after both fixes | 92, 100, 102, 98, **101**, **101** | **2–3** (one 4) | 1,1,1,2,**0**,**0** | 100.3 |
+
+**Frames delivered rise ~93 → ~101 and over-33 halves. Category 7 is still NOT a 10.** One ~100.2 ms
+frame remains, at `pointerup`, where `onPatch({x,y})` commits the position — a React re-render plus
+the layout persist. That commit has to happen; removing its cost is a separate slice (commit off
+the gesture frame, e.g. in a `requestIdleCallback` or after a rAF), and it is named here rather
+than half-attempted. Reported as measured: two real improvements, bar still missed.

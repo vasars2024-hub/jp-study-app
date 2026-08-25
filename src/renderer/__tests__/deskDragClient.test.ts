@@ -300,3 +300,85 @@ describe('screenToDeskPoint', () => {
     expect(screenToDeskPoint(400, 250, null, 1)).toEqual({ x: 40, y: 40 });
   });
 });
+
+/**
+ * `DesktopShell.dragStart` calls `moveDeskDrag` on EVERY `pointermove`, before
+ * its own rAF throttle, while the rAF writes `style.transform` on the dragged
+ * window. A `getBoundingClientRect()` per move is therefore a forced layout
+ * flush per pointer event interleaved with a write — measured 2026-08-24 as an
+ * occasional ~100 ms frame that missed rubric category 7's "0 frames over
+ * 100 ms" bar in 4 of 8 drag runs, in both presentations.
+ *
+ * These pin the fix in both directions: the rect is read once per gesture, and
+ * a mid-drag window resize still invalidates it — a stale rect would hand the
+ * window to the wrong monitor, which is the only way this cache can be wrong.
+ */
+describe('the desk rect is measured once per drag, not once per move', () => {
+  function countingDesk(): { el: HTMLElement; reads: () => number } {
+    const el = makeDeskEl();
+    const real = el.getBoundingClientRect.bind(el);
+    let n = 0;
+    el.getBoundingClientRect = (() => {
+      n += 1;
+      return real();
+    }) as HTMLElement['getBoundingClientRect'];
+    return { el, reads: () => n };
+  }
+
+  it('reads the rect once for a whole gesture however many moves it takes', () => {
+    const { el, reads } = countingDesk();
+    unregister = registerDeskContext({ displayKey: 'display|1920x1080|1', deskEl: () => el });
+
+    beginDeskDrag('window', 'w1', { kind: 'window', snapshot: SNAPSHOT });
+    const afterBegin = reads();
+    for (let i = 0; i < 200; i += 1) expect(moveDeskDrag(pointer(200 + (i % 400), 300))).toBe(false);
+
+    // 200 moves, zero extra layout flushes.
+    expect(reads()).toBe(afterBegin);
+    expect(afterBegin).toBeLessThanOrEqual(1);
+
+    endDeskDrag(pointer(500, 400));
+  });
+
+  it('re-measures after a resize, so a mid-drag geometry change is not missed', () => {
+    const { el, reads } = countingDesk();
+    unregister = registerDeskContext({ displayKey: 'display|1920x1080|1', deskEl: () => el });
+
+    beginDeskDrag('window', 'w1', { kind: 'window', snapshot: SNAPSHOT });
+    moveDeskDrag(pointer(300, 300));
+    const before = reads();
+
+    window.dispatchEvent(new Event('resize'));
+    moveDeskDrag(pointer(300, 300));
+    expect(reads()).toBe(before + 1);
+
+    endDeskDrag(pointer(300, 300));
+  });
+
+  it('drops the cache at the end, so the next gesture measures again', () => {
+    const { el, reads } = countingDesk();
+    unregister = registerDeskContext({ displayKey: 'display|1920x1080|1', deskEl: () => el });
+
+    beginDeskDrag('window', 'w1', { kind: 'window', snapshot: SNAPSHOT });
+    moveDeskDrag(pointer(300, 300));
+    endDeskDrag(pointer(300, 300));
+    const afterFirst = reads();
+
+    beginDeskDrag('window', 'w1', { kind: 'window', snapshot: SNAPSHOT });
+    moveDeskDrag(pointer(300, 300));
+    expect(reads()).toBeGreaterThan(afterFirst);
+    endDeskDrag(pointer(300, 300));
+  });
+
+  it('still decides the monitor correctly from the cached rect', () => {
+    const { el } = countingDesk();
+    unregister = registerDeskContext({ displayKey: 'display|1920x1080|1', deskEl: () => el });
+
+    beginDeskDrag('window', 'w1', { kind: 'window', snapshot: SNAPSHOT });
+    expect(moveDeskDrag(pointer(500, 400))).toBe(false);
+    // Outside DESK_RECT (100,50)-(900,650) — must still be detected as escaped.
+    expect(moveDeskDrag(pointer(1400, 400, 1400, 400))).toBe(true);
+    expect(api.deskDragMove).toHaveBeenCalledWith(1400, 400);
+    expect(endDeskDrag(pointer(1400, 400, 1400, 400))).toBe(true);
+  });
+});
