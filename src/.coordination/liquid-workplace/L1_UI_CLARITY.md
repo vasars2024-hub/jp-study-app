@@ -429,3 +429,43 @@ is **< 1** (or it carries a border/radius/shadow it lacks in standard). That fli
 so it needs its own controls exactly as Q6's did this turn: suppress the real difference and the
 verdict must go back to NO. **Category 5 on Video: Q1 Q2 Q3 Q6 Q8 Q10 YES, Q4 NO, Q7 unscored,
 Q5 INHERIT, Q9 MEASURE — still not a 10.**
+
+## 2026-08-25 · primary — Q7's two terms repaired as differences; Q7 on Video passes under four controls
+
+| Slice | Commit | What landed |
+| --- | --- | --- |
+| Q7 stated as a difference between the legs, with guards | *this commit* | `l1-q78-drive.cjs`, `+probes/l1-q7-guards.cjs` |
+
+**Both terms that failed were absolutes asking a question Q7 does not ask.** `zeroBackdropRegions`
+required 0 `backdrop-filter` regions in standard; Video ships **3 of its own** — `aside.mc-sidebar`,
+`header.mc-topbar` (`mediaCenter.css:199`/`:470`), `span.medialib-card__badge`
+(`mediaLibrary.css:502`) — declared unconditionally, so they read **3 in liquid and 3 in standard**
+and the presentation moves them by 0. `contextualPainting` tested `alpha > 0.02`, which **alpha 1.0
+passes**, so it could not tell the shipped rail's liquid `color(srgb … / 0.72)` from its standard
+opaque `rgb(8, 15, 12)`. Dictionary passed only by luck — alpha **0** in standard.
+
+Now: `noBackdropGainedInStandard` — standard may not carry a backdrop key liquid did not already
+have, compared as a **multiset** (losing one of N identical badges is not a failure, gaining one is);
+and `noTranslucencyInStandard` — a region counts as Liquid material when `0.02 < alpha < 0.98`.
+`contextualPainting` is still reported, **unscored**, so the earlier runs above stay comparable.
+
+**Q7 on Video: YES, 7 of 7.** `presentationIsStandard`, `liquidWasTranslucent` (1: `medialib-rail`),
+`noTranslucencyInStandard` (1 → **0**), `noBackdropGainedInStandard` (3 → 3, **0 gained**),
+`sameControlSet`, `sameResults`, `geometryWithin1px`.
+
+**Four controls, all fired** (`l1-q7-guards.cjs`, five driver runs — as-found, four controls, re-read):
+
+| guard | what it does | result |
+| --- | --- | --- |
+| `plant` | translucent + blurred region into the **standard leg only** | Q7 **YES → NO**, and the two failing terms are exactly the two repaired ones; gained `div.lq-contextual#__q78ctl` |
+| `opaque` | the same node, same moment, **opaque and unblurred** | Q7 stays **YES**, translucentStandard **0** |
+| `owned` | a blurred region planted **before** the first snapshot, so it is in both legs | Q7 stays **YES**, backdrops **3 → 4 in both legs**, **0 gained** |
+| `suppressReal` | the **shipped** `nav.lq-contextual.medialib-rail` forced to keep 0.72 across the toggle | Q7 **NO** on `noTranslucencyInStandard`, naming `medialib-rail` |
+| `restored` | the as-found run repeated last | every number `== asFound`, byte-identical |
+
+`plant` alone would pass for a term that fails on any planted node; `opaque` and `owned` alone for
+one that never fails. **Regression: Dictionary re-run under the repaired terms is still Q7 YES 7/7
+and Q8 YES 8/8** (3 translucent regions → 0, 0 backdrops both legs, 8 entries all three legs).
+
+**Category 5 on Video: Q1 Q2 Q3 Q6 Q7 Q8 Q10 YES, Q4 NO, Q5 INHERIT, Q9 MEASURE.** Q4 is the open
+unit — 19 scanned controls against a bar of 12.
