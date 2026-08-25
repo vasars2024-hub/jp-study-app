@@ -26,6 +26,51 @@ export interface ContextMenuProps {
 
 export function ContextMenu({ open, x, y, items, onClose }: ContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const returnFocusTo = useRef<HTMLElement | null>(null);
+
+  /**
+   * Give the keyboard back what the menu borrowed.
+   *
+   * The open effect below moves focus INTO the menu, and nothing ever moved it out:
+   * measured live 2026-08-25 on the Liquid Video window, opening a media card's
+   * overflow menu and pressing Escape left `document.activeElement` as `BODY`, so a
+   * keyboard user lands back at the top of the window with no way to resume where
+   * they were. This runs BEFORE the positioning effect on purpose — declaration
+   * order is effect order, so `document.activeElement` here is still the trigger
+   * and not the menu's first item.
+   *
+   * The cleanup has to accept BOTH teardown shapes, because React sequences them
+   * differently and only one of them leaves focus on `<body>`. On `open` → false
+   * the component re-renders to `null`, so the DOM is already gone by the time the
+   * cleanup runs; on a real unmount the cleanup runs FIRST and the focused menu
+   * item is still attached. Testing only for `<body>` silently did nothing in the
+   * second case.
+   *
+   * Deps are `[open]` alone: the positioning effect re-runs on every (x, y), and
+   * capturing there would overwrite the trigger with a menu item on the first
+   * reposition.
+   */
+  useLayoutEffect(() => {
+    if (!open) return undefined;
+    const active = document.activeElement;
+    returnFocusTo.current =
+      active && active !== document.body && active !== document.documentElement
+        ? (active as HTMLElement)
+        : null;
+    const menuEl = ref.current;
+    return () => {
+      const prev = returnFocusTo.current;
+      returnFocusTo.current = null;
+      if (!prev?.isConnected || typeof prev.focus !== 'function') return;
+      // Only reclaim focus the menu still owns. A selection that deliberately moved
+      // it somewhere — a dialog it opened, a field it put into rename — keeps it.
+      const now = document.activeElement;
+      const menuOwnsIt = !now || now === document.body || now === document.documentElement
+        || !!menuEl?.contains(now);
+      if (!menuOwnsIt) return;
+      prev.focus({ preventScroll: true });
+    };
+  }, [open]);
 
   // Position (correct for zoom, clamp into the viewport) after layout.
   useLayoutEffect(() => {
