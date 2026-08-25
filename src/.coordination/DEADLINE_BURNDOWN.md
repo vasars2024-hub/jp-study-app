@@ -653,3 +653,21 @@ and the turn after that should show a ratio far under 1:1 for this category. **I
 category-6 surface costs more than a SPEC, RULE 1 is not working and the next worker should
 say so here rather than let it drift.** The 101 files in `probes/` remain the standing debt;
 this turn removed the need for three of them without deleting any.
+
+2026-08-25 | liquid | units done this turn: **0 bullets** — L6 bullet 1 OPENED, not closed (the contract exists and 1 of its 5 surfaces uses it) | units left: 30 of 46 | ratio: 253:712 = **0.36:1** measurement to product source this turn | basis: the `^- ` bullets under the `### L` headings of section 11, lines 440-685 — L0 5, L1 4, L2 4, L3 4, L4 4, L5 3, L6 2, L7 2, L8 2, L9 4, L10 4, L11 4, L12 4 = **46**; closed = 16 (L0 5 + L2 4 + L3 4 INHERITED + L5 3), re-counted this turn | projected finish: 30 left / (16 closed / 10 active days since L0 opened 2026-08-16 = 1.60 per active day) = 18.8 days = **2026-09-13**
+
+**The date is unchanged from the previous line and was recomputed, not copied.** Same numerator
+(16 closed), same denominator (10 active days — the previous turn already counted today), because
+this turn closed no bullet. If it had been copied it would still read 2026-09-13; the difference is
+that the division above is the one that produced it. Next turn adds an active day whether or not it
+closes a bullet, so 16/11 = 1.45 would move this to 2026-09-15 with nothing closed.
+
+**RULE 1 is working and here is the number that shows it: 0.36:1, down from 28:1 last turn.**
+Product source outweighed measurement by nearly three to one for the first time in this plan. The
+cause is exactly what RULE 1 predicted: scoring L6's first surface for category 6 cost ONE SPEC
+(120 lines in `l6-parity.js`) and 54 lines in the existing, idempotent ledger writer. **Zero new
+probe files.** The honest caveat is that the SPEC was 110 lines rather than the ~40 the handoff
+predicted, because two of its six rows are new L6 geometry (`canvasPlacement`, `measureClamp`) that
+no L5 app had — a category harness pays once per *rubric row shape*, not only once per category.
+The next reading surface should cost the ~40 the handoff named, since those two rows now exist.
+Counterfactual for scale: another copy of `l6-parity-dictionary.js` was 683 lines.

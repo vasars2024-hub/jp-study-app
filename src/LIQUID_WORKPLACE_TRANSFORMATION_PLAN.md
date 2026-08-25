@@ -628,6 +628,26 @@ Order: Reading → Novels → Library → Immersion → manga/PDF/EPUB/VN suites
 
 Gate: content remains legible and stable at all sizes; no tool obscures the document.
 
+**Progress (2026-08-25). Bullet 1 OPENED, not closed** — the contract exists and 1 of its 5
+surfaces uses it. Log: `.coordination/liquid-workplace/L6_READING_ECOSYSTEM.md`.
+`shared/liquidReadingCanvas.ts` + `components/liquid/ReadingCanvas.tsx` (`edb01bfa`) give a reading
+side tool exactly two placements — `docked` beside the document or `sheet` over the whole canvas —
+so **a partial cover cannot be expressed** and the Gate's second sentence is an invariant rather
+than a review note. The measure clamp lives in the same module because the Gate's two halves
+interact: unclamped, a docking tool reflows every line; clamped, it takes slack margin and
+`readingCanvasReflows` returns **false** at 1600 px.
+First surface, Captures (`efb18eba`): its `minmax(180px, 260px)` grid and `@media (max-width:
+720px)` stack are deleted. Negative control — the media query could not fire for the case it
+existed to handle: pane **562 px**, `window.innerWidth` **1264**, `matches` **false**, so the old
+grid left the passage **292 px** (~17 characters a line at 17 px) while reporting a responsive
+layout. Live round trip: 820 px window → canvas 762 → docked 260 → document 490 → 42 real rows;
+narrowed → sheet 562, document 562, `inert` + `aria-hidden`; dismissed → 562 with its 69 characters
+intact; restored → 490, 42 rows. Category 6 scored **6/6 in both presentations** (`65a24365`),
+round trip identical on every field, three negative controls each failing exactly one row.
+**Still open in bullet 1: Novels, Library, Immersion, and the manga/PDF/EPUB/VN suites.** The
+headline case is NovelReader's three `.settings-anchor` popovers — `.settings-panel` is
+`position: absolute; right: 0; width: 264px`, which covers 41% of the text at a 640 px pop-out.
+
 ### L7 — Review and learning loop
 
 Order: Flashcards → Anki → Notebook → Statistics → Calendar → Games.
