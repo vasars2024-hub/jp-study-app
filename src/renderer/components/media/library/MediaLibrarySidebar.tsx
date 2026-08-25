@@ -21,6 +21,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ContextualSurface } from '../../liquid/LiquidSurface';
 import { Sidebar, type SidebarItem } from '../../ui';
 import Icon, { type IconName } from '../../Icons';
 import { useT } from '../../../i18n';
@@ -248,12 +249,22 @@ export default function MediaLibrarySidebar({ items, value, onSelect, footer }: 
   );
 
   return (
-    <nav className="medialib-rail" aria-label={t('media.rail.label')}>
+    /*
+     * `ContextualSurface`, not a bare `<nav>`, and it is a role declaration rather
+     * than a paint. This rail is navigation — the Liquid role §2.3 names first —
+     * and it was the ONE Liquid-eligible region of the Video window still painting
+     * its own opaque fill: category 3 measured `liquidTreatedEligible` 3 of 4 with
+     * `nav.medialib-rail` the miss. The primitive is inert in a conventional
+     * window by construction (`liquid-surfaces.css` paints nothing there), so the
+     * standard Media Center renders the pixels it always did and only a window
+     * explicitly put in Liquid presentation picks up the shared material.
+     */
+    <ContextualSurface as="nav" className="medialib-rail" aria-label={t('media.rail.label')}>
       {group('library', 'media.rail.library', shelfItems)}
       {categoryItems.length > 0 && group('mediaType', 'media.rail.mediaType', categoryItems)}
       {collectionItems.length > 0 && group('collections', 'media.rail.collections', collectionItems)}
 
       {footer && <div className="medialib-rail__foot">{footer}</div>}
-    </nav>
+    </ContextualSurface>
   );
 }

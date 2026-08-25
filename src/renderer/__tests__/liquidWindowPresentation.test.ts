@@ -267,14 +267,38 @@ describe('liquid-window.css', () => {
       .split('}')
       .map((block) => ({ selector: block.split('{')[0]?.trim() ?? '', body: block.split('{')[1] ?? '' }))
       .filter((b) => b.selector.includes('.lq-contextual'));
-    expect(owning.length).toBe(1);
-    expect(owning[0].selector).toBe('.fwin.fwin-liquid .lq-contextual');
-    expect(owning[0].body).toMatch(/background:\s*var\(--lq-liquid-bg\)/);
+    const base = owning.filter((b) => b.selector === '.fwin.fwin-liquid .lq-contextual');
+    expect(base.length).toBe(1);
+    expect(base[0].body).toMatch(/background:\s*var\(--lq-liquid-bg\)/);
     // NEGATIVE, and the reason the rule looks under-specified: `.fwin` carries
     // `transform: translateZ(0)`, so it is a backdrop root for its descendants and a
     // backdrop-filter here would sample the window's own opaque body — inert glass
     // that still measures as translucent. The frame behind it supplies the blur.
-    expect(owning[0].body).not.toMatch(/backdrop-filter/);
+    expect(base[0].body).not.toMatch(/backdrop-filter/);
+
+    // Any OTHER `.lq-contextual` rule is a per-region geometry exception (a flush column
+    // is not a floating card), and it may adjust the box but must never restate the
+    // material: a second `background`/`backdrop-filter` here is how one region quietly
+    // stops sharing the language the primitive exists to carry.
+    for (const exception of owning.filter((b) => b.selector !== '.fwin.fwin-liquid .lq-contextual')) {
+      expect(exception.selector, exception.selector).toMatch(/^\.fwin\.fwin-liquid\b/);
+      expect(exception.body, exception.selector).not.toMatch(/background\s*:/);
+      expect(exception.body, exception.selector).not.toMatch(/backdrop-filter/);
+    }
+  });
+
+  it('keeps the media library rail flush rather than a floating card', () => {
+    // `nav.medialib-rail` spans the full height of the Media workspace (measured 224x585 in
+    // an 1080x700 Video window), so the shared card geometry would round it against three
+    // edges it meets and re-pad a column that already sets its own. It keeps the material.
+    const block = rules
+      .split('}')
+      .map((b) => ({ selector: b.split('{')[0]?.trim() ?? '', body: b.split('{')[1] ?? '' }))
+      .find((b) => b.selector === '.fwin.fwin-liquid .medialib-rail.lq-contextual');
+    expect(block, 'no flush-rail rule in liquid-window.css').toBeTruthy();
+    expect(block?.body).toMatch(/border-radius:\s*0/);
+    expect(block?.body).toMatch(/box-shadow:\s*none/);
+    expect(block?.body).toMatch(/padding:\s*var\(--lq-space-4\)\s+var\(--lq-space-3\)/);
   });
 
   it('uses only --lq-* tokens for material, never a shell color literal', () => {

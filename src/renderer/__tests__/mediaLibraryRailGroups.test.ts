@@ -106,3 +106,30 @@ describe('media library rail groups', () => {
     expect(rule).toContain('outline:');
   });
 });
+
+/**
+ * The rail is the Video window's navigation region, and rubric category 3 asks that every
+ * contextual-navigation region use the SHARED primitive rather than a local re-implementation.
+ * Measured on the live Liquid Video window before this landed: `liquidTreatedEligible` 3 of 4,
+ * with `nav.medialib-rail` the one miss, painting its own opaque `rgb(8, 15, 12)`.
+ */
+describe('media library rail — the Liquid role is declared, not re-implemented', () => {
+  it('renders the rail through ContextualSurface as a nav', () => {
+    const source = read(COMPONENT);
+    expect(source).toContain("import { ContextualSurface } from '../../liquid/LiquidSurface';");
+    expect(source).toContain('<ContextualSurface as="nav" className="medialib-rail"');
+    expect(source).toContain('</ContextualSurface>');
+    // The bare element it replaced. If it comes back the rail silently stops carrying the
+    // material in Liquid presentation and category 3 drops to 3 of 4 with no test failing.
+    expect(source).not.toContain('<nav className="medialib-rail"');
+  });
+
+  it('never hardcodes the material on the rail itself', () => {
+    const css = read(STYLES);
+    const rule = css.slice(css.indexOf('.medialib-rail {'), css.indexOf('.medialib-rail__group'));
+    // §2 non-negotiable 1: a conventional window is unchanged, so the Liquid material may only
+    // ever arrive from `liquid-window.css` under `.fwin-liquid` — never from this sheet.
+    expect(rule).not.toMatch(/backdrop-filter/);
+    expect(rule).not.toMatch(/--lq-liquid-/);
+  });
+});

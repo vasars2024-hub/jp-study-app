@@ -197,3 +197,53 @@ control (`l1-surface-roles-control.js`) has not been re-run against Video.
 CLASS; the token is `--mc-nav-ink`. And a `sed`/python patch of `mediaCenter.css` must be CRLF-aware
 — the worktree is CRLF, HEAD is LF, and a `\n`-only pattern silently matches nothing and reports
 success.
+
+## 2026-08-25 · primary — category 3 CLOSES on Video at 10/10, with the control proven on both surfaces
+
+**Video was driven in LIQUID presentation for the first time.** Every category ever scored on it
+was scored in `standard`; the chrome still offered `Make Liquid`. Clicked it: `data-presentation`
+standard → liquid, rect unchanged at 92,40 1080x700, and it survived a renderer reload — L3's
+persistence, observed rather than inherited.
+
+**The product change.** `nav.medialib-rail` was the ONE Liquid-eligible region of that window still
+painting its own opaque fill (`rgb(8, 15, 12)`), which is what held category 3 at 9. It now renders
+through the shared primitive — `<ContextualSurface as="nav" className="medialib-rail">` — and
+`liquid-window.css` gains ONE scoped rule keeping it flush (radius 0, no shadow, its own
+`12px 8px`), because a 224x585 full-height column that meets three edges is not a floating card.
+The same exception `.fwin-body-flush` already takes. Decision recorded under standing auto-approval.
+
+| `l1-surface-roles.js`, depth 6, forest-night, 1264x821 | regions | denseWorkOnTranslucent | liquidTreatedEligible |
+| --- | --- | --- | --- |
+| Video 1080x700 **liquid**, before | 12 | 0 | **3 of 4** |
+| Video 1080x700 **liquid**, after | 13 | 0 | **4 of 4** |
+| Media 820x580 **standard**, after | 11 | 0 | **3 of 4** |
+
+**Media is the negative control and it is the same DOM node.** `nav.lq-contextual.medialib-rail`
+reads `ownAlpha 1, opaque` in the standard window and `ownAlpha 0.72, translucent` in the liquid
+one, in the SAME run — §2 non-negotiable 1 (a conventional window is unchanged) measured rather
+than argued. `.medialib-rail`'s own sheet is asserted to carry no `backdrop-filter` and no
+`--lq-liquid-*`, so the material can only ever arrive from `.fwin-liquid`.
+
+**The control now runs on both surfaces, and its BAR was wrong twice.** `l1-surface-roles-control.js`
+was hardcoded to `TITLE = 'Dictionary'` / `.dict-entries` / depth 3 — the same defect that cost the
+dead-end sweep four turns. Adapted (no new probe): `__lqControlTitle`, `__lqControlDenseSel`,
+`__lqControlGlassSel`, `__lqControlDepth`, defaults unchanged.
+- `controlB > controlA` encoded an accident of Dictionary. The Media shell holds exactly ONE dense
+  region, so B can never exceed A and a perfectly-firing control read VOID.
+- `controlB === workTotal` ("every Work region flags", the rubric's own wording) is ALSO wrong,
+  measured: Dictionary's `workTotal` is **7** and B reaches **2**, because five of the seven paint
+  their own opaque fills and nothing done to an ancestor can reach them.
+- The bar is now B ⊇ A and (B > A or workTotal === 1), with `workTotal`/`workList` reported.
+
+Verdicts: **Video CONTROL FAILED AS REQUIRED** (workTotal 1, [] → A `[section.medialib-browser]` →
+B same → restored [], material identical) and **Dictionary CONTROL FAILED AS REQUIRED** (workTotal 7,
+[] → A `[div.dict-entries]` → B `[form.dict-search, div.dict-entries]` → restored []). Both restores
+verified on the COMPUTED material and, this time, on the style attribute too.
+
+**Video category 3 = 10/10.** 4 tests; the flush-rail guard fails exactly 1 when `border-radius: 0`
+becomes `4px`, and the sheet came back byte-identical.
+
+**Traps.** (1) Japanese cannot reach `/eval` — the input took `???` and a `/^(Search|検索)/` regex
+became `/^(Search|??)/`, a SyntaxError that reads as a dead probe. `String.fromCharCode(0x98df,
+0x3079, 0x308b)` is the way. (2) `.fwin-body` is not the backing on every shell: `div.mc-root` is an
+opaque plate between it and every region, so glassing the body reaches nothing.
