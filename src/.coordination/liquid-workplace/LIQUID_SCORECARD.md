@@ -343,3 +343,51 @@ passes six fresh inline arrows and a fresh `children` tree every render, so the 
 `pointerup` re-renders every window and every `AppSection` under it — 349 nodes for Dictionary
 alone. Stabilising the callbacks is not enough on its own because `children` is also a prop. Next
 slice, named rather than half-started.
+
+## 2026-08-25 · primary — the VIDEO window gets its category 6, at 10, and the surface it is actually made of
+
+Gate 461 (`L1`) needs **both** reference surfaces at 80/80, and Video is the one with no entry.
+Process **32344**, product tree `89c11473`, the real three-window desktop — `Media` 820×580
+`standard` / `Video` 1080×700 **`liquid`** / `Dictionary` 820×580 `liquid`, both media windows on
+`Recently added` (36 items, 8 titles / 36 files), `forest-night`, `en`.
+
+**What the Video window's surface IS, settled here so it is not re-litigated.** It hosts the
+**Media Center** (`.mc-root`). The parity ledger's six `mediaWorkspace` rows are a DIFFERENT
+surface: the Media workspace is a full-screen overlay at `body > div > .seanime-host`, outside
+every `.fwin`, with no window chrome, no `Make Liquid` and no `data-presentation`. Their blank
+`liquidDestination` now carries that measured reason. They stay `pending` — that is a fact about
+that surface and L4's job, not a gap in this score.
+
+| # | Category | State | Presentation it was measured in |
+| - | -------- | ----- | ------------------------------- |
+| 1 | Accessibility | 10/10 `4a7fa118` — min **5.13:1**, 0 failing of 53 | **liquid**, control fired (0→1, ratio 1.03) |
+| 2 | Clunkiness | not measured on Video | — |
+| 3 | Liquid utilization | 10/10 `bde1b435` — `liquidTreatedEligible` **4 of 4**, `denseWorkOnTranslucent` **0** | **liquid**, Media/standard as the same-DOM control |
+| 4 | Use of space | default 5.8% and compact 260×170 re-derived in liquid; **maximized leg not re-run** | liquid, incomplete |
+| 5 | UI clarity | first number only (`e3cb00ca`) | standard |
+| 6 | Feature parity + reversibility | **10/10 — this turn** | **both**, in one run |
+| 7 | Performance under real load | not measured on Video | — |
+| 8 | Honest states | not measured on Video | — |
+
+**Category 6 = 10/10.** Parity **8 of 8 reachable in liquid and 8 of 8 in standard**, read off the
+same component in ONE run (two Media Center windows exist, one in each presentation, so no toggle
+sits between the two readings). Round trip Liquid → Standard → Liquid, title-anchored and driven
+**dirty** (search `big`, Grid view, `Recently added`): **`diffKeys: []`** — rect 92,40 1080×700,
+maximized false, focused true, zIndex 153, activeRail, activeShelf, searchValue, sortValue,
+viewMode, cardCount 1, chars 686, nodes 242, controls 35 all identical, **byte-for-byte true**.
+Three controls fired, each flipping **exactly one** row 8 → 7 → 8. Ledger: 8 of 8
+`mediaCenter` rows `both`, each with a non-empty `observed`. Numbers and traps in
+`PARITY_LEDGER.md`.
+
+**The point it cost was a real product defect, not an instrument defect** — the third on this
+surface in a row, after category 1's muted count and category 3's untreated rail.
+`librarySearch` scored `false`: the Media Center's search box wrote to `state.query` and nothing
+read it (`89c11473`). That is now three of Video's categories whose lost point was product, where
+Dictionary's first four were all instrumentation.
+
+**Next on Video, in order:** category 4's maximized leg in liquid (the only third of an otherwise
+finished category), then 2, 5, 7, 8. **Dictionary is still 7 of 8** with category 7 the open one —
+its remaining ~100.2 ms frame is the `FloatingWindow` memo/`children` refactor, which `9c4a38e5`
+landed and `af7fd609` then measured at the compositor ceiling (0 frames over 100 ms in 6 of 6
+runs, worst frame **16.9 ms** = the display's own ceiling). Dictionary's entry is therefore one
+re-drive pass away, not one refactor away.

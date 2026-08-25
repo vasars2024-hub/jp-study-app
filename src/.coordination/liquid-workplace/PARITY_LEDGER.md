@@ -295,3 +295,58 @@ comparison passes, so compare the string and then explain the delta.
 
 Also still outstanding for §10.1: `note`, `visualizer` and `musicwidget` have no baseline
 (`ALL_APPS_BASELINE.md`, "Not captured"), and MediaCenter's rows need a real clip.
+
+## 2026-08-25 · primary — category 6 on the VIDEO window: 8 of 8 in both presentations, and the search box that was dead
+
+The Video window's surface is the **Media Center** (`.mc-root`), and that is a different surface
+from the ledger's six `mediaWorkspace` rows. Measured, not assumed: the Media workspace is a
+full-screen overlay at `body > div > .seanime-host`, **outside every `.fwin`** — no window chrome,
+no `Make Liquid`, no `data-presentation`. Its rows keep `status: pending` and their
+`liquidDestination` now carries that reason instead of the blank that read as unfinished work.
+L4 gives that surface a presentation, or nothing does.
+
+**Parity, measured on the same component in both presentations in ONE run.** The desktop carries
+two Media Center windows — `Video` 1080×700 `liquid` and `Media` 820×580 `standard` — so no toggle
+is needed and nothing else can have moved between the two readings. Both on `Recently added` (36
+items, 8 titles / 36 files), `en`, `forest-night`.
+
+| | liquid | standard |
+| - | - | - |
+| rows reachable | **8 / 8** | **8 / 8** |
+| railNav | railButtons=8 active=1 | railButtons=8 active=1 |
+| shelfFilter | shelves=9 current=1 | shelves=9 current=1 |
+| librarySearch | cards 5 → 0 → 5 | cards 5 → 0 → 5 |
+| sortAndView | sortOptions=7 viewButtons=2 pressed=1 | same |
+| itemActions | menu items 0 → 4 → 0 | 0 → 4 → 0 |
+| history | back=false forward=true | back=true forward=true |
+| workspaceRoute | `.seanime-host` 0 → 1 → 0 | 0 → 1 → 0 |
+| windowLifecycle | chrome=5 ariaPressed=**true** | chrome=5 ariaPressed=**false** |
+
+**The product defect this category found: `89c11473`.** `librarySearch` is the row that was
+`false` before the fix. `MediaCenterView` wrote every keystroke into `state.query`, and the only
+other reader of that value in the file was the input's own `value` prop — `LibraryPanel` handed
+the shell `state.items`. After: "big" → 1 title / 29 files; a term no title carries → 0 cards,
+"Nothing here matches the current filter.", **0 import buttons**; cleared → 8 / 36 exactly. The
+narrowing is on the SCOPE, never on `items`: the rail footer stayed "36 items" and the shelf
+counts 36/2/3/29/4 throughout, because a filtered `items` would make an unmatched search claim
+the library is empty — a worse defect than the dead control.
+
+**Round trip, Liquid → Standard → Liquid on the Video window, title-anchored** (during the middle
+phase `data-presentation` names two windows). Driven **dirty**: search `big`, Grid view,
+`Recently added`. A === C on **every** key, `diffKeys: []` — rect 92,40 1080×700, maximized false,
+focused true, zIndex 153, activeRail, activeShelf, searchValue `big`, sortValue `series`,
+viewMode `Grid view`, cardCount 1, chars 686, nodes 242, controls 35. **byteForByte true.**
+
+**Three negative controls, each fired and each flipped EXACTLY ONE row 8 → 7 → 8**: a second rail
+entry made active (`railNav`), both view buttons pressed (`sortAndView`), `aria-pressed` stripped
+off the Liquid toggle (`windowLifecycle`). `exactlyOne: true` on all three, `restoredEqual: true`.
+
+**Video category 6 = 10/10.**
+
+**Two traps paid for here.** (1) `debug/evfile.cjs` sent probe files verbatim and `/eval` takes ONE
+EXPRESSION, so every probe ending `})();` failed with the generic "Script failed to execute" — it
+reads exactly like a probe with a bug. `l6-parity-dictionary.js` at HEAD failed and succeeded
+byte-identical with the trailing `;` stripped; the loader strips it now. That is why this
+category's own probe kept going un-re-driven. (2) `ContextMenu` closes on **mousedown** captured
+on `window`, not on `pointerdown` or `.click()`; the first pass reported the menu as never closing
+and the count accumulating 4 → 8 across the two windows. Product was fine; the probe was not.

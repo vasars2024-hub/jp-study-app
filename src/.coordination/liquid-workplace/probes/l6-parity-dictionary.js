@@ -324,6 +324,16 @@
       w.querySelector('.mc-root'),
     );
     if (!wins.length) return { win: null, matchedBy: null };
+    // `title:<text>` — the ONE case presentation cannot address. During a round
+    // trip the window under test spends a phase sharing its presentation with the
+    // other media window, and `data-presentation` then names two windows.
+    if (typeof pres === 'string' && pres.indexOf('title:') === 0) {
+      const want = pres.slice(6);
+      const hit = wins.find(
+        (w) => ((w.querySelector('.fwin-title-text') || {}).textContent || '').trim() === want,
+      );
+      return hit ? { win: hit, matchedBy: `mc-root + title=${want}` } : { win: null, matchedBy: null };
+    }
     if (!pres) return { win: wins[0], matchedBy: 'mc-root' };
     const hit = wins.find((w) => (w.getAttribute('data-presentation') || 'standard') === pres);
     return hit
@@ -331,7 +341,10 @@
       : { win: null, matchedBy: null };
   };
 
-  const cards = (win) => qa(win, '.medialib-card');
+  // `.medialib-spotlight-wrap` counts: a single result in GRID view renders as a
+  // spotlight rather than a card (`MediaLibraryBrowser.tsx`, the entries.length===1
+  // branch), so counting only `.medialib-card` reports a found item as 0 found.
+  const cards = (win) => qa(win, '.medialib-card, .medialib-spotlight-wrap');
   const railBtns = (win) => qa(win, '.mc-nav button');
   const shelfBtns = (win) => qa(win, '.ui-sidebar__item[aria-current]');
   const searchInput = (win) => q(win, '.mc-global-search input');
