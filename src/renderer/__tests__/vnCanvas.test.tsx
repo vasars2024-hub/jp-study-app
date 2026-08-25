@@ -32,6 +32,7 @@ import {
   createReadingSurfaceHarness,
   expectDismissRestoresDocument,
   expectPlacement,
+  expectToolSurvivesPlacementChange,
   installReadingSurfaceApi,
   installResizeObserver,
   type ReadingSurfaceHarness,
@@ -187,9 +188,14 @@ describe('the visual novel panel through the L6 reading canvas', () => {
     expect(window.innerWidth).toBeGreaterThan(760);
     const h = await mountPanel(600);
     expectPlacement(h, 'library', { placement: 'sheet', contentWidth: 600 });
-    // A sheet has no side to report and sits after the document it covers.
+    // A sheet has no side to REPORT — `data-side` is dropped, because there is
+    // no edge it took. It stays in the leading GROUP all the same: crossing to
+    // the trailing one is a different children array and so a remount, which is
+    // the defect the subtree test below pins. Neither is observable here — the
+    // sheet is `position: absolute; inset: 0` over an `inert` document — so this
+    // assertion is about the DOM fact, not about anything the user can see.
     expect(h.tool('library')!.dataset.side).toBe(undefined);
-    expect(precedesTheDocument(h, 'library')).toBe(false);
+    expect(precedesTheDocument(h, 'library')).toBe(true);
     await expectDismissRestoresDocument(h, 'library');
   });
 
@@ -223,6 +229,14 @@ describe('the visual novel panel through the L6 reading canvas', () => {
     await h.resize(1200);
     expectPlacement(h, 'library', { placement: 'docked', contentWidth: 898, toolWidth: 290 });
     expect(h.doc().querySelector('.visual-novel-workspace')).toBe(workspace);
+  });
+
+  it('keeps the LIBRARY subtree too, when the leading dock becomes a sheet', async () => {
+    // L6 bullet 2 on the tool side. The library is the surface where the user
+    // scrolls a long list and then narrows the pane; a remount puts them back at
+    // the top of it with the entry they were reaching for gone.
+    const h = await mountPanel(1200);
+    await expectToolSurvivesPlacementChange(h, 'library', { docked: 1200, sheet: 600 });
   });
 
   it('NEGATIVE CONTROL — the stylesheet no longer decides this layout', async () => {

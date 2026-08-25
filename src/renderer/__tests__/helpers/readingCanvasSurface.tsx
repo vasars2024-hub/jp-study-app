@@ -242,6 +242,58 @@ export function expectPlacement(
 }
 
 /**
+ * The root of a tool's own content — what the surface handed to `content`, not
+ * the canvas chrome around it. Throws rather than returning null: an open tool
+ * that rendered nothing is a bug, and a soft null turns bullet 2's assertion
+ * into a comparison of two nulls that passes for the wrong reason.
+ */
+export function toolContentRoot(harness: ReadingSurfaceHarness, id: string): HTMLElement {
+  const tool = harness.tool(id);
+  expect(tool, `tool "${id}" is not rendered`).not.toBe(null);
+  const body = tool!.querySelector<HTMLElement>('.lq-reading-tool-body');
+  if (!body) throw new Error(`tool "${id}" has no body — the canvas chrome changed`);
+  const root = body.firstElementChild;
+  if (!(root instanceof HTMLElement)) throw new Error(`tool "${id}" rendered no content`);
+  return root;
+}
+
+/**
+ * L6 bullet 2, on the TOOL side: a tool's own state survives its placement
+ * changing under it.
+ *
+ * `expectDismissRestoresDocument` asserts the document is never torn down. The
+ * mirror question went unasked for six surfaces: when the canvas narrows and a
+ * docked tool becomes a sheet, does the tool keep its subtree? Bullet 2's list —
+ * progress, capture, dictionary, mining, source, deep-link — is mostly state
+ * that lives INSIDE these tools: the capture list's scroll offset, a lookup
+ * mid-flight, a mining draft half-filled, the library row the user scrolled to.
+ * All of it is thrown away by a remount, and a remount is invisible to every
+ * width assertion.
+ *
+ * Node identity is the instrument rather than a scroll offset, and deliberately:
+ * jsdom lays nothing out, so `scrollTop` there is a value a test wrote to itself.
+ * If the subtree is the same subtree then every piece of DOM and React state on
+ * it survived by construction; if it is not, none of it did.
+ */
+export async function expectToolSurvivesPlacementChange(
+  harness: ReadingSurfaceHarness,
+  id: string,
+  widths: { docked: number; sheet: number },
+): Promise<void> {
+  await harness.resize(widths.docked);
+  expect(harness.tool(id)!.dataset.placement, 'the docked width does not dock').toBe('docked');
+  const before = toolContentRoot(harness, id);
+
+  await harness.resize(widths.sheet);
+  expect(harness.tool(id)!.dataset.placement, 'the sheet width does not cover').toBe('sheet');
+  expect(toolContentRoot(harness, id), 'docked → sheet remounted the tool').toBe(before);
+
+  await harness.resize(widths.docked);
+  expect(harness.tool(id)!.dataset.placement).toBe('docked');
+  expect(toolContentRoot(harness, id), 'sheet → docked remounted the tool').toBe(before);
+}
+
+/**
  * Dismissal is the half of the contract that makes a sheet honest, so it is
  * asserted the same way everywhere: the tool goes, the document comes back at
  * the SAME width, and the node is the same node — not a remount that threw away

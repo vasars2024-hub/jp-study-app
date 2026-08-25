@@ -25,6 +25,7 @@ import {
   createReadingSurfaceHarness,
   expectDismissRestoresDocument,
   expectPlacement,
+  expectToolSurvivesPlacementChange,
   installReadingSurfaceApi,
   installResizeObserver,
   type ReadingSurfaceHarness,
@@ -174,6 +175,19 @@ describe('NovelReader through the L6 reading canvas', () => {
     // Same node throughout: an epub rendition, the scroll offset and any
     // in-flight capture live on it, and a remount silently drops all three.
     expect(h.doc().querySelector('.novel-scroller')).toBe(scroller);
+  });
+
+  it('keeps the BOOKMARKS subtree across the same transition — the trailing control', async () => {
+    /*
+     * The control for the leading case in `vnCanvas.test.tsx`. A trailing tool
+     * and a leading one are rendered from two different arrays either side of
+     * the document, and only one of those two groups can hold a sheet — so a
+     * pass here with a red there localises the defect to the crossing rather
+     * than to placement changes in general. This one has always passed.
+     */
+    const h = await mountReader(1200);
+    await h.click(TRIGGER, BOOKMARKS);
+    await expectToolSurvivesPlacementChange(h, 'bookmarks', { docked: 1200, sheet: 500 });
   });
 
   it('leaves the toolbar with no popover left to reintroduce the bug', async () => {

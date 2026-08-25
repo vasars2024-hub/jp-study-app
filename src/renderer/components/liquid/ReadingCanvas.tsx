@@ -223,16 +223,25 @@ export function ReadingCanvas({
    * afterwards — reading order and visual order pointing opposite ways, which is
    * WCAG 1.3.2 and the one failure a "it looks right" check cannot see.
    *
-   * Sheets are always in the trailing group. Not a normalisation of their
-   * `side` — the resolver still reports what the caller declared — but a render
-   * fact: a sheet is `position: absolute; inset: 0`, so its flex position is not
-   * observable, and keeping it last leaves the modal after the document it
-   * covers, which is where a dialog belongs.
+   * THE GROUP IS THE TOOL'S DECLARED SIDE, NOT ITS RESOLVED PLACEMENT, and that
+   * is L6 bullet 2 rather than a tidiness preference. These are two separate
+   * children arrays either side of the document, so React reconciles by key
+   * WITHIN one of them and a tool that moves between them is unmounted and
+   * rebuilt. Grouping by placement made exactly that crossing happen every time
+   * a leading tool narrowed into a sheet: measured in `vnCanvas.test.tsx`, the
+   * library's `.visual-novel-library` was a different node afterwards with
+   * identical markup — "serializes to the same string", which is why no width,
+   * class or attribute assertion on any of the six surfaces could see it. Every
+   * piece of state bullet 2 names that lives inside a tool — a scrolled capture
+   * list, a lookup in flight, a half-filled mining draft, the row a deep link
+   * selected — went with it.
+   *
+   * Nothing is lost by keeping a leading sheet in the leading group: a sheet is
+   * `position: absolute; inset: 0; z-index: 2`, so its flex position is not
+   * observable, and the document it covers is `inert` + `aria-hidden`, so it is
+   * not in the reading order to come before or after in the first place.
    */
-  const isLeading = (tool: ReadingCanvasTool) => {
-    const resolved = byId.get(tool.id);
-    return resolved?.placement === 'docked' && resolved.side === 'leading';
-  };
+  const isLeading = (tool: ReadingCanvasTool) => tool.side === 'leading';
 
   return (
     <div

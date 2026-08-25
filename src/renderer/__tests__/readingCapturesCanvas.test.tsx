@@ -28,6 +28,7 @@ import {
   createReadingSurfaceHarness,
   expectDismissRestoresDocument,
   expectPlacement,
+  expectToolSurvivesPlacementChange,
   installReadingSurfaceApi,
   installResizeObserver,
   type ReadingSurfaceHarness,
@@ -103,6 +104,17 @@ describe('Captures through the L6 reading canvas', () => {
     expect(toggle.getAttribute('aria-pressed')).toBe('false');
     await h.click(TOGGLE);
     expect(h.tool('captures')!.dataset.placement).toBe('docked');
+    expect(h.container.querySelectorAll('.reading-captures-row').length).toBe(2);
+  });
+
+  it('keeps the capture list itself across a placement change', async () => {
+    // Bullet 2's "capture" on the surface that owns it. This list is a scrolled
+    // history; before `ReadingCanvas` grouped by declared side, narrowing the
+    // pane rebuilt it and put the user back at the newest row.
+    const h = await mountAt(1200);
+    await expectToolSurvivesPlacementChange(h, 'captures', { docked: 1200, sheet: 500 });
+    // And the rows are still the same two — a subtree that survived but emptied
+    // would satisfy node identity and nothing a reader cares about.
     expect(h.container.querySelectorAll('.reading-captures-row').length).toBe(2);
   });
 
