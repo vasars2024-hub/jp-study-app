@@ -548,6 +548,64 @@ describe('ReadingCanvas leading tools', () => {
     ).toBe('622');
   });
 
+  /**
+   * L6 bullet 2, and the hole the 2026-08-25 NovelReader drive measured: a sheet
+   * covers the DOCUMENT, and a surface's document-anchored overlays are not
+   * inside it. The reader's word/sentence popup is `position: fixed; z-index:
+   * 160` and a sibling of the canvas — with the Bookmarks sheet up at a 380 px
+   * canvas it overlapped the sheet 28x97 px, `elementFromPoint` in that region
+   * returned the popup and not the sheet, and it held two focusable controls
+   * outside any `inert` subtree while the sheet was `aria-modal="true"`.
+   *
+   * The canvas reports the transition; it does not reach for the caller's
+   * overlays. So what is asserted here is the transition itself, which is the
+   * part a caller cannot get right on its own.
+   */
+  describe('onDocumentCoveredChange', () => {
+    it('fires on the way in and on the way out, and only on the transition', () => {
+      const seen: boolean[] = [];
+      const cb = (covered: boolean) => seen.push(covered);
+      const at = (width: number, tools: ReadingCanvasTool[]) => (
+        <ReadingCanvas widthOverride={width} closeLabel="Close" tools={tools} onDocumentCoveredChange={cb}>
+          <p>document</p>
+        </ReadingCanvas>
+      );
+
+      // Docked: 1200 − 12 − 264 = 924 for the document, well over the 384 floor.
+      render(at(1200, [tool()]));
+      expect(seen).toEqual([]);
+
+      // 600 − 12 − 264 = 324 < 384, so the tool can only be a sheet.
+      rerender(at(600, [tool()]));
+      expect(seen).toEqual([true]);
+
+      // A re-render at the same width must not fire again, or a caller that
+      // dismisses a popup here could never open one while a sheet is up.
+      rerender(at(600, [tool()]));
+      rerender(at(560, [tool()]));
+      expect(seen).toEqual([true]);
+
+      rerender(at(1200, [tool()]));
+      expect(seen).toEqual([true, false]);
+    });
+
+    it('is optional — a caller that does not pass it renders identically', () => {
+      const withCb = render(
+        <ReadingCanvas widthOverride={600} closeLabel="Close" tools={[tool()]} onDocumentCoveredChange={() => undefined}>
+          <p>document</p>
+        </ReadingCanvas>,
+      ).innerHTML;
+      act(() => root!.unmount());
+      host!.remove();
+      const without = render(
+        <ReadingCanvas widthOverride={600} closeLabel="Close" tools={[tool()]}>
+          <p>document</p>
+        </ReadingCanvas>,
+      ).innerHTML;
+      expect(without).toBe(withCb);
+    });
+  });
+
   it('does not reach for CSS `order` — the stylesheet declares none at all', () => {
     // The trap this test exists for: `order` moves the painted box and leaves
     // the DOM alone, so it would satisfy a screenshot and fail a screen reader.

@@ -3090,6 +3090,15 @@ export default function NovelReader({ item, onClose }: Props) {
           tools={readingTools}
           closeLabel={t('common.close')}
           policy={READING_CANVAS_FILL_POLICY}
+          /* The word/sentence popup is a sibling of the canvas and `position:
+             fixed`, so a sheet cannot cover it — it stayed visible, clickable
+             and tabbable over an `aria-modal` sheet and an `inert` document.
+             Dismissed on the way IN only; coming back out leaves the reader
+             where it was rather than resurrecting a lookup the user has since
+             stopped caring about. */
+          onDocumentCoveredChange={(covered) => {
+            if (covered) setPopup(null);
+          }}
         >
           {linkView ? (
             <div

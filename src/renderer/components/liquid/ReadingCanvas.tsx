@@ -85,6 +85,24 @@ type ReadingCanvasProps = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
    * the placement invariant is untouched; a partial cover remains inexpressible.
    */
   scroll?: 'contained' | 'page';
+  /**
+   * Fired when the document goes under a sheet, and again when it comes back.
+   *
+   * L6 bullet 2, and additive because every one of the six surfaces has the same
+   * hole: things anchored to the DOCUMENT that are not rendered INSIDE it. The
+   * reader's word/sentence popup is `position: fixed; z-index: 160` and a sibling
+   * of the canvas, so a sheet cannot cover it — measured 2026-08-25 with the
+   * Bookmarks sheet open at a 380 px canvas: 28x97 px of overlap, hit-testing in
+   * that region returning the popup and not the sheet, `aria-modal="true"` on the
+   * sheet, `inert` on the document, and two focusable controls in the popup
+   * outside any inert subtree. A visible, clickable, tabbable panel outside an
+   * `aria-modal` region describing a word in a document that has been set aside.
+   *
+   * The canvas reports rather than reaches: it does not own those overlays and
+   * guessing at their selectors would be worse than the defect. The caller
+   * dismisses what belongs to the document it just handed over.
+   */
+  onDocumentCoveredChange?: (covered: boolean) => void;
 };
 
 /**
@@ -120,6 +138,7 @@ export function ReadingCanvas({
   widthOverride,
   scroll = 'contained',
   className,
+  onDocumentCoveredChange,
   ...rest
 }: ReadingCanvasProps) {
   const ref = useRef<HTMLDivElement | null>(null);
@@ -155,6 +174,20 @@ export function ReadingCanvas({
     }
     lastSheetRef.current = sheetId;
   }, [sheetId]);
+
+  /**
+   * Reported on the transition, not on every render: a caller that dismisses a
+   * popup here would otherwise be unable to open one while a sheet is up, and
+   * "you may not look a word up in the tool you just opened" is a worse product
+   * than the leak. The ref is what makes it a transition — `covered` is derived
+   * from the resolver and recomputed on every resize frame.
+   */
+  const lastCoveredRef = useRef(covered);
+  useEffect(() => {
+    if (lastCoveredRef.current === covered) return;
+    lastCoveredRef.current = covered;
+    onDocumentCoveredChange?.(covered);
+  }, [covered, onDocumentCoveredChange]);
 
   /**
    * Escape closes the tool the user is actually in.
