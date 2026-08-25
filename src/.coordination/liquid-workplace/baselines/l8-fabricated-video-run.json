@@ -1,0 +1,483 @@
+{
+ "at": "2026-08-25T09:03:53.629Z",
+ "surface": "video",
+ "title": "Video",
+ "entrySelector": ".medialib-card",
+ "control": false,
+ "controlAll": false,
+ "drove": [
+  {
+   "clicked": "Recently added36"
+  },
+  {
+   "clicked": "Anime3"
+  },
+  {
+   "clicked": "Unsorted4"
+  }
+ ],
+ "passes": [
+  {
+   "word": "recentlyAdded",
+   "entries": 8,
+   "leafCount": 27,
+   "leaves": [
+    {
+     "slot": "0|medialib-card__title|SPAN|1",
+     "key": "medialib-card__title|SPAN|1",
+     "ei": 0,
+     "cls": "medialib-card__title",
+     "text": "「パラッ」と「パラリ」はどう違う？オノマトペを部品で分析する【オノマトペ1】#284"
+    },
+    {
+     "slot": "0|medialib-card__sub|SPAN|1",
+     "key": "medialib-card__sub|SPAN|1",
+     "ei": 0,
+     "cls": "medialib-card__sub",
+     "text": "Unsorted"
+    },
+    {
+     "slot": "1|medialib-card__badge|SPAN|1",
+     "key": "medialib-card__badge|SPAN|1",
+     "ei": 1,
+     "cls": "medialib-card__badge",
+     "text": "0 / 1"
+    },
+    {
+     "slot": "1|medialib-card__title|SPAN|1",
+     "key": "medialib-card__title|SPAN|1",
+     "ei": 1,
+     "cls": "medialib-card__title",
+     "text": "Date A Live II: Kurumi Star Festival"
+    },
+    {
+     "slot": "1|medialib-card__sub|SPAN|1",
+     "key": "medialib-card__sub|SPAN|1",
+     "ei": 1,
+     "cls": "medialib-card__sub",
+     "text": "Anime · 2014"
+    },
+    {
+     "slot": "1|span|SPAN|1",
+     "key": "span|SPAN|1",
+     "ei": 1,
+     "cls": "span",
+     "text": "No subtitles found"
+    },
+    {
+     "slot": "2|medialib-card__title|SPAN|1",
+     "key": "medialib-card__title|SPAN|1",
+     "ei": 2,
+     "cls": "medialib-card__title",
+     "text": "Emotion 感情表現 ｜ Japanese Podcast with Hana #13"
+    },
+    {
+     "slot": "2|medialib-card__sub|SPAN|1",
+     "key": "medialib-card__sub|SPAN|1",
+     "ei": 2,
+     "cls": "medialib-card__sub",
+     "text": "Unsorted"
+    },
+    {
+     "slot": "2|span|SPAN|1",
+     "key": "span|SPAN|1",
+     "ei": 2,
+     "cls": "span",
+     "text": "Japanese subtitles ready"
+    },
+    {
+     "slot": "3|medialib-card__title|SPAN|1",
+     "key": "medialib-card__title|SPAN|1",
+     "ei": 3,
+     "cls": "medialib-card__title",
+     "text": "Habits 習慣🏃‍♀️📚 ｜ Japanese Podcast with Hana #12"
+    },
+    {
+     "slot": "3|medialib-card__sub|SPAN|1",
+     "key": "medialib-card__sub|SPAN|1",
+     "ei": 3,
+     "cls": "medialib-card__sub",
+     "text": "Unsorted"
+    },
+    {
+     "slot": "3|span|SPAN|1",
+     "key": "span|SPAN|1",
+     "ei": 3,
+     "cls": "span",
+     "text": "Japanese subtitles ready"
+    },
+    {
+     "slot": "4|medialib-card__title|SPAN|1",
+     "key": "medialib-card__title|SPAN|1",
+     "ei": 4,
+     "cls": "medialib-card__title",
+     "text": "Introduction and why I start this podcast ｜ Japanese Podcast with Hana #1"
+    },
+    {
+     "slot": "4|medialib-card__sub|SPAN|1",
+     "key": "medialib-card__sub|SPAN|1",
+     "ei": 4,
+     "cls": "medialib-card__sub",
+     "text": "Unsorted"
+    },
+    {
+     "slot": "4|span|SPAN|1",
+     "key": "span|SPAN|1",
+     "ei": 4,
+     "cls": "span",
+     "text": "Japanese subtitles ready"
+    },
+    {
+     "slot": "5|medialib-card__badge|SPAN|1",
+     "key": "medialib-card__badge|SPAN|1",
+     "ei": 5,
+     "cls": "medialib-card__badge",
+     "text": "0 / 1"
+    },
+    {
+     "slot": "5|medialib-card__title|SPAN|1",
+     "key": "medialib-card__title|SPAN|1",
+     "ei": 5,
+     "cls": "medialib-card__title",
+     "text": "JoJo's Bizarre Adventure: Golden Wind"
+    },
+    {
+     "slot": "5|medialib-card__sub|SPAN|1",
+     "key": "medialib-card__sub|SPAN|1",
+     "ei": 5,
+     "cls": "medialib-card__sub",
+     "text": "Anime · 2018"
+    },
+    {
+     "slot": "5|span|SPAN|1",
+     "key": "span|SPAN|1",
+     "ei": 5,
+     "cls": "span",
+     "text": "Japanese subtitles ready"
+    },
+    {
+     "slot": "6|medialib-card__badge|SPAN|1",
+     "key": "medialib-card__badge|SPAN|1",
+     "ei": 6,
+     "cls": "medialib-card__badge",
+     "text": "0 / 1"
+    },
+    {
+     "slot": "6|medialib-card__title|SPAN|1",
+     "key": "medialib-card__title|SPAN|1",
+     "ei": 6,
+     "cls": "medialib-card__title",
+     "text": "JoJo's Bizarre Adventure: Golden Wind"
+    },
+    {
+     "slot": "6|medialib-card__sub|SPAN|1",
+     "key": "medialib-card__sub|SPAN|1",
+     "ei": 6,
+     "cls": "medialib-card__sub",
+     "text": "Anime · 2018"
+    },
+    {
+     "slot": "6|span|SPAN|1",
+     "key": "span|SPAN|1",
+     "ei": 6,
+     "cls": "span",
+     "text": "Japanese subtitles ready"
+    },
+    {
+     "slot": "7|medialib-card__badge|SPAN|1",
+     "key": "medialib-card__badge|SPAN|1",
+     "ei": 7,
+     "cls": "medialib-card__badge",
+     "text": "0 / 26"
+    },
+    {
+     "slot": "7|medialib-card__title|SPAN|1",
+     "key": "medialib-card__title|SPAN|1",
+     "ei": 7,
+     "cls": "medialib-card__title",
+     "text": "The Big O"
+    },
+    {
+     "slot": "7|medialib-card__sub|SPAN|1",
+     "key": "medialib-card__sub|SPAN|1",
+     "ei": 7,
+     "cls": "medialib-card__sub",
+     "text": "TV shows · 1999"
+    },
+    {
+     "slot": "7|span|SPAN|1",
+     "key": "span|SPAN|1",
+     "ei": 7,
+     "cls": "span",
+     "text": "Japanese subtitles ready"
+    }
+   ]
+  },
+  {
+   "word": "anime",
+   "entries": 3,
+   "leafCount": 12,
+   "leaves": [
+    {
+     "slot": "0|medialib-card__badge|SPAN|1",
+     "key": "medialib-card__badge|SPAN|1",
+     "ei": 0,
+     "cls": "medialib-card__badge",
+     "text": "0 / 1"
+    },
+    {
+     "slot": "0|medialib-card__title|SPAN|1",
+     "key": "medialib-card__title|SPAN|1",
+     "ei": 0,
+     "cls": "medialib-card__title",
+     "text": "Date A Live II: Kurumi Star Festival"
+    },
+    {
+     "slot": "0|medialib-card__sub|SPAN|1",
+     "key": "medialib-card__sub|SPAN|1",
+     "ei": 0,
+     "cls": "medialib-card__sub",
+     "text": "Anime · 2014"
+    },
+    {
+     "slot": "0|span|SPAN|1",
+     "key": "span|SPAN|1",
+     "ei": 0,
+     "cls": "span",
+     "text": "No subtitles found"
+    },
+    {
+     "slot": "1|medialib-card__badge|SPAN|1",
+     "key": "medialib-card__badge|SPAN|1",
+     "ei": 1,
+     "cls": "medialib-card__badge",
+     "text": "0 / 1"
+    },
+    {
+     "slot": "1|medialib-card__title|SPAN|1",
+     "key": "medialib-card__title|SPAN|1",
+     "ei": 1,
+     "cls": "medialib-card__title",
+     "text": "JoJo's Bizarre Adventure: Golden Wind"
+    },
+    {
+     "slot": "1|medialib-card__sub|SPAN|1",
+     "key": "medialib-card__sub|SPAN|1",
+     "ei": 1,
+     "cls": "medialib-card__sub",
+     "text": "Anime · 2018"
+    },
+    {
+     "slot": "1|span|SPAN|1",
+     "key": "span|SPAN|1",
+     "ei": 1,
+     "cls": "span",
+     "text": "Japanese subtitles ready"
+    },
+    {
+     "slot": "2|medialib-card__badge|SPAN|1",
+     "key": "medialib-card__badge|SPAN|1",
+     "ei": 2,
+     "cls": "medialib-card__badge",
+     "text": "0 / 1"
+    },
+    {
+     "slot": "2|medialib-card__title|SPAN|1",
+     "key": "medialib-card__title|SPAN|1",
+     "ei": 2,
+     "cls": "medialib-card__title",
+     "text": "JoJo's Bizarre Adventure: Golden Wind"
+    },
+    {
+     "slot": "2|medialib-card__sub|SPAN|1",
+     "key": "medialib-card__sub|SPAN|1",
+     "ei": 2,
+     "cls": "medialib-card__sub",
+     "text": "Anime · 2018"
+    },
+    {
+     "slot": "2|span|SPAN|1",
+     "key": "span|SPAN|1",
+     "ei": 2,
+     "cls": "span",
+     "text": "Japanese subtitles ready"
+    }
+   ]
+  },
+  {
+   "word": "unsorted",
+   "entries": 4,
+   "leafCount": 11,
+   "leaves": [
+    {
+     "slot": "0|medialib-card__title|SPAN|1",
+     "key": "medialib-card__title|SPAN|1",
+     "ei": 0,
+     "cls": "medialib-card__title",
+     "text": "Habits 習慣🏃‍♀️📚 ｜ Japanese Podcast with Hana #12"
+    },
+    {
+     "slot": "0|medialib-card__sub|SPAN|1",
+     "key": "medialib-card__sub|SPAN|1",
+     "ei": 0,
+     "cls": "medialib-card__sub",
+     "text": "Unsorted"
+    },
+    {
+     "slot": "0|span|SPAN|1",
+     "key": "span|SPAN|1",
+     "ei": 0,
+     "cls": "span",
+     "text": "Japanese subtitles ready"
+    },
+    {
+     "slot": "1|medialib-card__title|SPAN|1",
+     "key": "medialib-card__title|SPAN|1",
+     "ei": 1,
+     "cls": "medialib-card__title",
+     "text": "Emotion 感情表現 ｜ Japanese Podcast with Hana #13"
+    },
+    {
+     "slot": "1|medialib-card__sub|SPAN|1",
+     "key": "medialib-card__sub|SPAN|1",
+     "ei": 1,
+     "cls": "medialib-card__sub",
+     "text": "Unsorted"
+    },
+    {
+     "slot": "1|span|SPAN|1",
+     "key": "span|SPAN|1",
+     "ei": 1,
+     "cls": "span",
+     "text": "Japanese subtitles ready"
+    },
+    {
+     "slot": "2|medialib-card__title|SPAN|1",
+     "key": "medialib-card__title|SPAN|1",
+     "ei": 2,
+     "cls": "medialib-card__title",
+     "text": "Introduction and why I start this podcast ｜ Japanese Podcast with Hana #1"
+    },
+    {
+     "slot": "2|medialib-card__sub|SPAN|1",
+     "key": "medialib-card__sub|SPAN|1",
+     "ei": 2,
+     "cls": "medialib-card__sub",
+     "text": "Unsorted"
+    },
+    {
+     "slot": "2|span|SPAN|1",
+     "key": "span|SPAN|1",
+     "ei": 2,
+     "cls": "span",
+     "text": "Japanese subtitles ready"
+    },
+    {
+     "slot": "3|medialib-card__title|SPAN|1",
+     "key": "medialib-card__title|SPAN|1",
+     "ei": 3,
+     "cls": "medialib-card__title",
+     "text": "「パラッ」と「パラリ」はどう違う？オノマトペを部品で分析する【オノマトペ1】#284"
+    },
+    {
+     "slot": "3|medialib-card__sub|SPAN|1",
+     "key": "medialib-card__sub|SPAN|1",
+     "ei": 3,
+     "cls": "medialib-card__sub",
+     "text": "Unsorted"
+    }
+   ]
+  }
+ ],
+ "restored": {
+  "clicked": "Recently added36"
+ },
+ "summary": {
+  "surface": "video",
+  "measuredWindow": "Video",
+  "drove": [
+   {
+    "clicked": "Recently added36"
+   },
+   {
+    "clicked": "Anime3"
+   },
+   {
+    "clicked": "Unsorted4"
+   }
+  ],
+  "entriesPerPass": [
+   "recentlyAdded:8",
+   "anime:3",
+   "unsorted:4"
+  ],
+  "leavesPerPass": [
+   "recentlyAdded:27",
+   "anime:12",
+   "unsorted:11"
+  ],
+  "acrossWords": {
+   "comparableSlots": 8,
+   "invariantCount": 1,
+   "invariant": [
+    {
+     "slot": "2|span|SPAN|1",
+     "cls": "span",
+     "text": "Japanese subtitles ready"
+    }
+   ],
+   "statusWordCandidates": []
+  },
+  "withinPass": [
+   {
+    "word": "recentlyAdded",
+    "entries": 8,
+    "repeatedSlots": 4,
+    "constantAcrossEntries": 0,
+    "constant": [],
+    "statusWordCandidates": []
+   },
+   {
+    "word": "anime",
+    "entries": 3,
+    "repeatedSlots": 4,
+    "constantAcrossEntries": 1,
+    "constant": [
+     {
+      "key": "medialib-card__badge|SPAN|1",
+      "cls": "medialib-card__badge",
+      "text": "0 / 1",
+      "acrossEntries": 3
+     }
+    ],
+    "statusWordCandidates": []
+   },
+   {
+    "word": "unsorted",
+    "entries": 4,
+    "repeatedSlots": 3,
+    "constantAcrossEntries": 2,
+    "constant": [
+     {
+      "key": "medialib-card__sub|SPAN|1",
+      "cls": "medialib-card__sub",
+      "text": "Unsorted",
+      "acrossEntries": 4
+     },
+     {
+      "key": "span|SPAN|1",
+      "cls": "span",
+      "text": "Japanese subtitles ready",
+      "acrossEntries": 3
+     }
+    ],
+    "statusWordCandidates": []
+   }
+  ],
+  "withinPassTotals": {
+   "repeatedSlots": 11,
+   "constantAcrossEntries": 3,
+   "statusWordCandidates": 0
+  }
+ }
+}

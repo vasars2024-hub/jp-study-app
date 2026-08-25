@@ -28,7 +28,21 @@
  * must bring the count back. A probe that returns 0 candidates without that is returning 0 because
  * it cannot see, and this repo has paid for that shape three times.
  *
- * Run: node src/.coordination/liquid-workplace/probes/l8-fabricated.cjs [--control]
+ * TWO SURFACES, ONE INSTRUMENT (2026-08-25). Category 8 has to produce this number on the Video
+ * window too, and the Video window is the **Media Center** — no `.dict-entry`, no headword, no
+ * Search button. What ports is the METHOD, not the selectors: vary the input, compare each data
+ * leaf against ITSELF at the same slot. On the Media Center the varying input is the SHELF, and
+ * the repeated unit is the card. `--surface video` swaps the entry selector and the driver and
+ * changes nothing else, so both surfaces are scored by the same comparison.
+ *
+ * AND THE WINDOW IS NOW PICKED BY TITLE. Every selector here used to be
+ * `document.querySelector('.fwin')` — the first in DOM order. On this desk that is the Media
+ * window, so a run labelled Dictionary would have captured leaves from a different surface
+ * entirely and never refused. Same defect, same fix, as `l8-dead-controls.cjs` and
+ * `l8-honest-states.cjs`; a no-match is a refusal, not a fallback.
+ *
+ * Run: node src/.coordination/liquid-workplace/probes/l8-fabricated.cjs
+ *      [--surface dictionary|video] [--title <window>] [--control|--control-all]
  */
 'use strict';
 const fs = require('node:fs');
@@ -36,6 +50,11 @@ const fs = require('node:fs');
 const cfg = JSON.parse(fs.readFileSync('debug/bridge.json', 'utf8'));
 const CONTROL_ALL = process.argv.includes('--control-all');
 const CONTROL = CONTROL_ALL || process.argv.includes('--control');
+const argOf = (name, dflt) => {
+  const i = process.argv.indexOf(name);
+  return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : dflt;
+};
+const SURFACE = argOf('--surface', 'dictionary');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
@@ -48,6 +67,44 @@ const WORDS = [
   { name: 'sogo', chars: [0x9f5f, 0x9f6c] }, // 齟齬
 ];
 const textOf = (w) => String.fromCharCode(...w.chars);
+
+/**
+ * Three SHELVES for the Media Center, which is this surface's equivalent of three headwords: each
+ * renders a different set of titles into the same card slots, so a leaf that traces to the item
+ * changes and a constant does not. Chosen to differ in category, era and episode counts rather
+ * than to be convenient — `Anime` and `TV shows` disagree on almost every badge a card can draw.
+ */
+const SHELVES = [
+  { name: 'recentlyAdded', label: 'Recently added' },
+  { name: 'anime', label: 'Anime' },
+  { name: 'unsorted', label: 'Unsorted' },
+];
+/**
+ * `TV shows` and `Continue watching` are NOT usable here and the reason is a real product fact
+ * rather than a bad pick: measured on this profile they hold 29 files and 2 files but **one grouped
+ * entry each**, and a one-entry shelf renders `.medialib-spotlight-wrap`, not a card
+ * (`MediaLibraryBrowser.tsx:270`). Zero cards is an empty harness, which the rubric caps at 0, so
+ * the probe refuses such a pass rather than averaging it in.
+ */
+const SHELF_RESTORE = 'Recently added';
+
+/** The window under test, by TITLE. A no-match refuses by name rather than taking window one. */
+const TITLE = argOf('--title', SURFACE === 'video' ? 'Video' : 'Dictionary');
+const WIN = `(() => {
+  const wanted = ${JSON.stringify(TITLE)};
+  const painted = [...document.querySelectorAll('.fwin')].filter((w) => {
+    const r = w.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  });
+  return painted.find((w) => {
+    const t = w.querySelector('.fwin-title-text, .fwin-title');
+    return !!t && (t.textContent || '').includes(wanted);
+  }) || null;
+})()`;
+
+/** Per-surface: what an "entry" is, and how the input is varied. Nothing else differs. */
+const ENTRY_SEL = SURFACE === 'video' ? '.medialib-card' : '.dict-entry';
+const PASSES = SURFACE === 'video' ? SHELVES : WORDS;
 
 async function ev(js) {
   const r = await fetch(`http://127.0.0.1:${cfg.port}/eval`, {
@@ -66,7 +123,8 @@ async function ev(js) {
 
 async function search(term) {
   await ev(`(() => {
-    const win = document.querySelector('.fwin');
+    const win = ${WIN};
+    if (!win) return 'REFUSED';
     const input = [...win.querySelectorAll('input[type=text]')].find((i) => (i.placeholder || '').length > 8);
     const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
     setter.call(input, ${JSON.stringify(term)});
@@ -75,11 +133,32 @@ async function search(term) {
   })()`);
   await sleep(120);
   await ev(`(() => {
-    const win = document.querySelector('.fwin');
+    const win = ${WIN};
     [...win.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === 'Search').click();
     return 'clicked';
   })()`);
   await sleep(2200);
+}
+
+/**
+ * The Media Center's equivalent of a search: select a shelf on the library rail. The rail row is
+ * matched on the shelf NAME as a prefix, because each row appends its own count ("TV shows29") and
+ * that count is exactly the sort of derived value this probe is here to check — matching on the
+ * whole string would make the driver depend on the number under test.
+ */
+async function selectShelf(label) {
+  const picked = await ev(`(() => {
+    const win = ${WIN};
+    if (!win) return JSON.stringify({ refuse: 'no painted .fwin titled ' + ${JSON.stringify(TITLE)} });
+    const row = [...win.querySelectorAll('.ui-sidebar__item')]
+      .find((b) => (b.textContent || '').trim().startsWith(${JSON.stringify(label)}));
+    if (!row) return JSON.stringify({ refuse: 'no rail row starting ' + ${JSON.stringify(label)} });
+    row.click();
+    return JSON.stringify({ clicked: (row.textContent || '').trim() });
+  })()`);
+  if (picked.refuse) throw new Error(picked.refuse);
+  await sleep(1600);
+  return picked;
 }
 
 /**
@@ -88,10 +167,10 @@ async function search(term) {
  * compared against itself — comparing by text alone would call every repeated gloss a constant.
  */
 const CAPTURE = `(() => {
-  const win = document.querySelector('.fwin');
-  if (!win) return JSON.stringify({ refuse: 'no .fwin' });
+  const win = ${WIN};
+  if (!win) return JSON.stringify({ refuse: 'no painted .fwin titled ' + ${JSON.stringify(TITLE)} });
   const CHROME = new Set(['BUTTON', 'SUMMARY', 'LABEL', 'TH', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LEGEND', 'OPTION']);
-  const entries = [...win.querySelectorAll('.dict-entry')];
+  const entries = [...win.querySelectorAll(${JSON.stringify(ENTRY_SEL)})];
   const leaves = [];
   entries.forEach((entry, ei) => {
     const seen = Object.create(null);
@@ -121,8 +200,10 @@ const STATUS = /^(connected|ready|available|configured|active|enabled|online|ok|
  */
 async function plantControl(all) {
   return ev(`(() => {
-    const entries = [...document.querySelectorAll('.fwin .dict-entry')];
-    if (!entries.length) return JSON.stringify({ ok: false, why: 'no .dict-entry' });
+    const win = ${WIN};
+    if (!win) return JSON.stringify({ ok: false, why: 'no painted .fwin titled ' + ${JSON.stringify(TITLE)} });
+    const entries = [...win.querySelectorAll(${JSON.stringify(ENTRY_SEL)})];
+    if (!entries.length) return JSON.stringify({ ok: false, why: 'no ' + ${JSON.stringify(ENTRY_SEL)} });
     document.querySelectorAll('.l8-fab-control').forEach((n) => n.remove());
     for (const entry of (${all ? 'entries' : 'entries.slice(0, 1)'})) {
       const span = document.createElement('span');
@@ -143,16 +224,27 @@ async function removeControl() {
 }
 
 (async () => {
-  const out = { at: new Date().toISOString(), control: CONTROL, controlAll: CONTROL_ALL, passes: [] };
+  const out = {
+    at: new Date().toISOString(), surface: SURFACE, title: TITLE, entrySelector: ENTRY_SEL,
+    control: CONTROL, controlAll: CONTROL_ALL, drove: [], passes: [],
+  };
 
-  for (const w of WORDS) {
-    await search(textOf(w));
-    if (CONTROL) out[`planted_${w.name}`] = await plantControl(CONTROL_ALL);
+  for (const p of PASSES) {
+    // The only per-surface branch in the run: what "vary the input" means here.
+    out.drove.push(SURFACE === 'video' ? await selectShelf(p.label) : { search: textOf(p) });
+    if (SURFACE !== 'video') await search(textOf(p));
+    if (CONTROL) out[`planted_${p.name}`] = await plantControl(CONTROL_ALL);
     const cap = await ev(CAPTURE);
-    out.passes.push({ word: w.name, entries: cap.entries, leafCount: cap.leaves.length, leaves: cap.leaves });
+    if (cap.refuse) throw new Error(cap.refuse);
+    // An empty pass caps this category at 0 per the rubric, so it is a refusal and not a zero.
+    if (!cap.entries) throw new Error(`pass ${p.name} rendered 0 ${ENTRY_SEL} — an empty harness is not a measurement`);
+    out.passes.push({ word: p.name, entries: cap.entries, leafCount: cap.leaves.length, leaves: cap.leaves });
   }
 
   if (CONTROL) out.controlRemoved = await removeControl();
+  // The census owes the next probe the surface it borrowed. Three shelf changes leave the library
+  // on `Unsorted`, and the next instrument would then score a four-card shelf as this window.
+  if (SURFACE === 'video') out.restored = await selectShelf(SHELF_RESTORE);
 
   // A leaf is invariant when the SAME slot renders the SAME text in all three passes.
   const [a, b, c] = out.passes;
@@ -193,6 +285,9 @@ async function removeControl() {
   });
 
   out.summary = {
+    surface: SURFACE,
+    measuredWindow: TITLE,
+    drove: out.drove,
     entriesPerPass: out.passes.map((p) => `${p.word}:${p.entries}`),
     leavesPerPass: out.passes.map((p) => `${p.word}:${p.leafCount}`),
     acrossWords: {
@@ -211,7 +306,7 @@ async function removeControl() {
 
   console.log(JSON.stringify(out.summary, null, 1));
   fs.writeFileSync(
-    'src/.coordination/liquid-workplace/baselines/l8-fabricated-' +
+    'src/.coordination/liquid-workplace/baselines/l8-fabricated-' + SURFACE + '-' +
       (CONTROL_ALL ? 'control-all' : CONTROL ? 'control' : 'run') +
       '.json',
     JSON.stringify(out, null, 1),

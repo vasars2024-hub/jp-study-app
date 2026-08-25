@@ -273,3 +273,46 @@ than a trap. `retryLoop.stillSetup true` is the right answer here, not a finding
 **Category 8 = 10/10.** Four states, four distinct honest renders, 0 raw i18n keys anywhere,
 0 false successes, both controls fired, harness carrying 8 real entries and 8 named `idle` audio
 buttons. Surface restored: `entries 8 / chars 6019`, `+ Add to Anki` unlatched.
+
+## 2026-08-25 · primary — fabricated values on the VIDEO window: **0**, with both controls firing
+
+Category 8's second number, ported to the Media Center. `l8-fabricated.cjs --surface video`, pid
+1324, `Video` 1080×700 `presentation=liquid`. Raw: `baselines/l8-fabricated-video-*.json`.
+
+**The method ported; the selectors did not.** There is no headword and no Search button here, so the
+varying input is the SHELF and the repeated unit is the card: `Recently added` **8**, `Anime` **3**,
+`Unsorted` **4** cards, 27 / 12 / 11 data leaves. Two shelves were rejected for a product reason
+worth recording — `TV shows` (29 files) and `Continue watching` (2) each hold **one grouped entry**,
+and a one-entry shelf renders `.medialib-spotlight-wrap` rather than a card, so both read **0 cards**.
+The probe refuses such a pass by name instead of averaging a zero in.
+
+**The probe also picked the wrong window until this turn.** Every selector in it was
+`document.querySelector('.fwin')` — first in DOM order, which on this desk is `Media`. A run
+labelled Dictionary would have captured a different surface's leaves and never refused. Now
+`--title`, no-match refuses.
+
+**Result: `statusWordCandidates` 0 in both measures.** Across shelves: 9 comparable slots, 1
+invariant. Within a pass: 11 repeated slots, 3 constant across entries. All four adjudicated by
+measuring whether the value varies anywhere in the real library — a constant is only a fabrication
+if the code, not the data, makes it constant:
+
+| candidate | constant over | distinct values measured library-wide |
+| --- | --- | --- |
+| `.medialib-card__badge` `0 / 1` | 3 Anime entries | **3** — `""` ×12 (standalone), `0 / 1` ×9, `0 / 26` ×2 |
+| `.medialib-card__sub` `Unsorted` | 4 Unsorted entries | **4** — `Unsorted` ×12, `Anime · 2014` ×3, `Anime · 2018` ×6, `TV shows · 1999` ×2 |
+| subtitle status `Japanese subtitles ready` | 3 entries | **3** — `""` ×3, `No subtitles found` ×3, `Japanese subtitles ready` ×17 |
+
+Each traces to per-item data (`MediaLibraryBrowser.tsx:308` badge, `:305` subtitle, `:315`
+`mediaSubtitleStatus`), and each takes a different value on other items in the same library. The
+constancy is a property of the shelf, not of the render.
+
+**Both controls FIRED, in their own runs.** `--control` (plant into the first entry only, which is
+what the cross-shelf measure can see): invariant 1 → **2**, `statusWordCandidates` 0 → **1**, the
+planted `Connected` named by slot. `--control-all` (plant into every entry, which is what the
+within-pass measure can see): `constantAcrossEntries` 3 → **6**, `statusWordCandidates` 0 → **3**,
+flagged in all three passes at ×8, ×3 and ×4. Two measures need two plants or one of them is scored
+by a control it cannot see.
+
+**Surface left as found**: 0 plants remaining, 1,234 chars, 8 cards, `Recently added36` current,
+0 dialogs — the probe re-selects the install shelf, because three shelf changes would otherwise hand
+the next instrument a four-card library.
