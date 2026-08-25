@@ -393,3 +393,45 @@ its remaining ~100.2 ms frame is the `FloatingWindow` memo/`children` refactor, 
 landed and `af7fd609` then measured at the compositor ceiling (0 frames over 100 ms in 6 of 6
 runs, worst frame **16.9 ms** = the display's own ceiling). Dictionary's entry is therefore one
 re-drive pass away, not one refactor away.
+
+## 2026-08-25 · primary — Video category 5, at 10, and the point it cost was product again
+
+Process **32344**, product tree `9b07971c`, the same three-window desktop — `Media` 820×580
+`standard` / `Video` 1080×700 **`liquid`** / `Dictionary` 820×580 `liquid`, `forest-night`, `en`.
+
+| # | Category | State | Presentation it was measured in |
+| - | -------- | ----- | ------------------------------- |
+| 5 | UI clarity | **10/10 — this turn.** All ten §10.4 questions YES, every one measured at this tree | **liquid**, both themes and both disclosure states |
+
+**Q5 was the literal `'INHERIT'`, and it was pointing at a one-cell number.** Category 1 scored
+Video min **5.13:1**, 0 failing of 53 — in ONE cell (forest-night, liquid, disclosures closed).
+Q5 does not ask whether contrast passes, it asks whether it is STABLE. Re-driven across
+**theme × disclosure-state** the same window scored **NO: 4 failing, min 1.07:1** on
+`classic-light`, WITH the light theme remap already in force — `#fff`, `#ececf1`, `#c9ccd6` and
+`--success` written straight into text that the surface remap could never reach. Fixed as three
+`--mc-*-ink` tokens and a `--success-text`/`--warning-text`/`--danger-text` family, dark palettes
+byte-identical. **Q5 = YES: 0 failing of 240 measured across 4 cells**, worst **5.30:1**, theme
+delta **0.41**, disclosure axis **+24** rows. Controls: a planted 1.07:1 span → **NO**; the second
+theme run as the same theme → **VOID**, not YES. `f2c4a3bd`.
+
+**Q4 was a coin flip on the shelf and is now invariant.** The kind-filter chip row renders only
+when a shelf holds ≥2 kinds, so Q4 read 11/YES on `Continue watching` and **14/NO** on
+`Recently added`. Behind `details.medialib-kind` it is **11/YES** on the wide shelf, and `scanned`
+excludes `SUMMARY` so the count no longer grows with `CHIP_KINDS`. Six live gates on the moved
+control, including the closed summary naming the active kind. `be3c9887`.
+
+**Q7 8 9 re-parked at this tree** — Q7 7/7, Q8 8/8 (driven twice: 1 spotlight entry, then 8
+cards), Q9 8/8 ledger + 8/8 live. `9b07971c` also repaired the driver's row selector, which
+refused *"0 .dict-entry rows"* on the Media Center because a one-title shelf renders a spotlight.
+
+**Three consumer-side false-pass channels closed.** `l1-ui-clarity.js` read `__q9verdict` and
+`__q78verdict` once for ALL windows, so a dictionary run scored the Video row; both now resolve
+per surface, and Q7/Q8 read `MEASURE` with `measuredOnWindow` when the parked verdict came from
+another window. Demonstrated in the same sweep: Video Q7=YES, Media/Dictionary Q7=MEASURE
+`crossSurface: true`.
+
+**Video is 5 of 8 in this table** — 1, 3, 4 (liquid), 6 (both), 5 (this turn). **Category 2's
+numbers exist and its row does not:** `L1_CLUNKINESS.md`'s 2026-08-25 run reports targets 31,
+coverage 30/30, `deadEnds` **0**, `unstable` 0, control fired on both passes. That is a scorecard
+row away, not a measurement away — transcribe and re-derive it rather than re-running the sweep.
+7 and 8 have never been measured on this surface. **Dictionary is still 7 of 8.**
