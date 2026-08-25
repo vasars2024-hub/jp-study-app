@@ -74,3 +74,26 @@ export interface LlamaHostFarewell {
 export function isLlamaHostFarewell(value: unknown): value is LlamaHostFarewell {
   return Boolean(value) && (value as LlamaHostFarewell).kind === 'bye';
 }
+
+/**
+ * The rejection a generation that was aborted mid-flight settles with.
+ *
+ * Both prompt paths pass `stopOnAbortSignal: true`, and node-llama-cpp documents what that means:
+ * "when a response already started being generated and then the signal is aborted, the generation
+ * will stop and **the response will be returned as is instead of throwing an error**". Kept,
+ * because stopping cleanly is what leaves the sequence and its KV cache in the consistent state
+ * `llamaContextPool` hands back warm — a thrown-through generation does not.
+ *
+ * But the value must not reach a caller as an answer. Every consumer of `LlamaSessionHandle.prompt`
+ * treats what it resolves with as the COMPLETE output: `translate.ts` runs it through
+ * `extractJsonish`, and `localAgent.ts` parses it as a plan. Resolving with partial text turns a
+ * user cancel or a 90 s timeout into a truncated translation presented as a finished one, which is
+ * the dishonest-failure shape CLAUDE.md forbids. Streaming callers still receive everything that
+ * was generated through `onTextChunk`; only the return value is refused.
+ */
+export function llamaAbortedError(): Error {
+  const err = new Error('The generation was aborted before it finished.');
+  // `name`, not the message, is what `translate.ts` and the host protocol both key on.
+  err.name = 'AbortError';
+  return err;
+}

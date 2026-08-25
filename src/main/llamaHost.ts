@@ -18,7 +18,7 @@ import type {
   LlamaModelPoolRow,
   LlamaSessionId,
 } from '../shared/llamaHostProtocol';
-import { isLlamaHostFarewell } from '../shared/llamaHostProtocol';
+import { isLlamaHostFarewell, llamaAbortedError } from '../shared/llamaHostProtocol';
 import { acquireLlamaContext, llamaContextPoolStats } from './llamaContextPool';
 import { llamaModelPoolStats } from './llamaModelPool';
 
@@ -37,7 +37,15 @@ export interface LlamaSessionHandle {
   readonly contextSize: number;
   /** True when this session was built over a KV cache that was still resident. */
   readonly warm: boolean;
-  /** Rejects with the generation's own error, `name` preserved so `AbortError` stays recognisable. */
+  /**
+   * Resolves only with a generation that ran to completion.
+   *
+   * Rejects with the generation's own error, `name` preserved so `AbortError` stays recognisable —
+   * and rejects with an `AbortError` when `signal` fired mid-generation, which the library itself
+   * does NOT do under `stopOnAbortSignal` (it resolves with the partial response). `llamaAbortedError`
+   * carries the reasoning. Partial output is still delivered through `onTextChunk` as it arrives;
+   * it is only refused as a return value.
+   */
   prompt(text: string, opts: { maxTokens: number; signal?: AbortSignal; onTextChunk?: (chunk: string) => void }): Promise<string>;
   /** The real tokenizer's count. Rejects if the weights cannot answer; callers estimate instead. */
   countTokens(text: string): Promise<number>;
@@ -232,12 +240,17 @@ async function inProcessSession(modelPath: string, contextSize: number): Promise
     contextSize,
     warm: lease.warm,
     async prompt(text, opts) {
-      return session.prompt(text, {
+      const generated = await session.prompt(text, {
         maxTokens: opts.maxTokens,
         signal: opts.signal,
         stopOnAbortSignal: true,
         onTextChunk: opts.onTextChunk,
       });
+      // See `llamaAbortedError`. `stopOnAbortSignal` resolves with the partial response rather than
+      // throwing, so this is the only place the in-process path can tell a finished generation from
+      // an interrupted one — and every caller reads the resolved value as the whole answer.
+      if (opts.signal?.aborted) throw llamaAbortedError();
+      return generated;
     },
     async countTokens(text) {
       const model = lease.model as unknown as { tokenize?: (text: string) => unknown };

@@ -245,12 +245,25 @@ async function promptWithTimeout(current: LoadedAgentRuntime, prompt: string): P
     );
   }
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), PLAN_TIMEOUT_MS);
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, PLAN_TIMEOUT_MS);
   try {
     return await current.session.prompt(prompt, {
       maxTokens: Math.min(PLAN_MAX_OUTPUT_TOKENS, room),
       signal: controller.signal,
     });
+  } catch (err) {
+    // Reachable only since the handle stopped resolving aborted generations with their partial
+    // text: this function is named after a deadline that, until then, could not produce a message
+    // saying so — the truncated plan went to `parseLocalAgentModelPlan` and failed there instead.
+    // `lastError` is surfaced verbatim to the user, so it names the deadline rather than the abort.
+    if (timedOut && err instanceof Error && err.name === 'AbortError') {
+      throw new Error(`The local agent timed out after ${Math.round(PLAN_TIMEOUT_MS / 1000)}s.`);
+    }
+    throw err;
   } finally {
     clearTimeout(timer);
     resetSessionHistory(current.session);

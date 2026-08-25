@@ -37,12 +37,13 @@ import type { LlamaChatSession } from 'node-llama-cpp';
 import { acquireLlamaContext, llamaContextPoolStats, type LlamaContextLease } from './llamaContextPool';
 import { llamaModelPoolStats } from './llamaModelPool';
 import type { LlamaHostRequest, LlamaHostResponse, LlamaSessionId } from '../shared/llamaHostProtocol';
+import { llamaAbortedError } from '../shared/llamaHostProtocol';
 
 /**
  * `process.parentPort` is Electron's utility-process channel. Typed locally because this module is
  * also loadable under plain Node, where it is absent — the same reason `apkgReadWorker.ts` does it.
  */
-interface ParentPort {
+export interface ParentPort {
   postMessage(message: unknown): void;
   on(event: 'message', listener: (event: { data: unknown }) => void): void;
   start?(): void;
@@ -99,7 +100,12 @@ function idle(): boolean {
     && llamaModelPoolStats().length === 0;
 }
 
-async function handle(port: ParentPort, request: LlamaHostRequest): Promise<void> {
+/**
+ * Exported for tests only — nothing else imports it, because in production the sole caller is the
+ * `port.on('message')` wiring at the bottom of this file. Without the export the abort guard in the
+ * `prompt` case is unreachable from a test, and an unreachable guard is one nobody notices deleting.
+ */
+export async function handle(port: ParentPort, request: LlamaHostRequest): Promise<void> {
   switch (request.kind) {
     case 'acquire': {
       const { LlamaChatSession } = await import('node-llama-cpp');
@@ -131,6 +137,11 @@ async function handle(port: ParentPort, request: LlamaHostRequest): Promise<void
             ? (chunk: string) => send(port, { id: request.id, kind: 'chunk', text: chunk })
             : undefined,
         });
+        // `stopOnAbortSignal` RESOLVES with whatever had been generated, so reaching here is not
+        // proof the generation finished. Without this the abort below settles the caller with a
+        // truncated answer it cannot tell from a complete one. `fail` carries `name`, so the
+        // consumer's `err.name === 'AbortError'` branch still fires across the process boundary.
+        if (controller.signal.aborted) throw llamaAbortedError();
         send(port, { id: request.id, kind: 'prompt', text });
       } finally {
         inflight.delete(request.id);
@@ -139,9 +150,9 @@ async function handle(port: ParentPort, request: LlamaHostRequest): Promise<void
     }
 
     case 'abort': {
-      // Never answered: the `prompt` it targets settles on its own, either with the partial text
-      // `stopOnAbortSignal` returns or with the abort error it throws. Answering here as well would
-      // settle the caller's promise twice.
+      // Never answered: the `prompt` it targets settles on its own, and since the aborted check
+      // above it always settles as an `AbortError` rather than as partial text. Answering here as
+      // well would settle the caller's promise twice.
       inflight.get(request.target)?.abort();
       return;
     }
