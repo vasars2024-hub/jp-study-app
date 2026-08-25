@@ -45,8 +45,13 @@ export function cardRowHeight(variant: MediaCardVariant, gap: number) {
     Math.round(colWidth * CARD_METRICS[variant].ratio) + CAPTION_HEIGHT + gap;
 }
 
-/** Exported so the one-title spotlight states a runtime the same way a card does. */
-export function formatDuration(seconds: number | undefined): string | null {
+/**
+ * Exported so the one-title spotlight states a runtime the same way a card does.
+ * Named for the card and not `formatDuration`: `stats.ts` already exports that name,
+ * and two unrelated exports sharing one is what the architecture audit calls a
+ * duplicate-export finding.
+ */
+export function formatCardDuration(seconds: number | undefined): string | null {
   if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds <= 0) return null;
   const total = Math.round(seconds);
   const h = Math.floor(total / 3600);
@@ -92,7 +97,7 @@ export default function MediaPosterCard({
   onMenu,
 }: MediaPosterCardProps) {
   const { t } = useT();
-  const chip = badge ?? formatDuration(durationSec) ?? undefined;
+  const chip = badge ?? formatCardDuration(durationSec) ?? undefined;
   const percent = progress !== null && Number.isFinite(progress)
     ? Math.min(100, Math.max(0, Math.round(progress * 100)))
     : null;

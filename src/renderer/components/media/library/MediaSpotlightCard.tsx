@@ -23,7 +23,7 @@ import Icon from '../../Icons';
 import { useT } from '../../../i18n';
 import MediaArtwork from './MediaArtwork';
 import MediaStatusPill from './MediaStatusPill';
-import { CARD_METRICS, formatDuration, type MediaCardVariant } from './MediaPosterCard';
+import { CARD_METRICS, formatCardDuration, type MediaCardVariant } from './MediaPosterCard';
 import { mediaSubtitleStatus } from '../../../../shared/mediaSubtitleStatus';
 import type { LibraryEntry } from '../../../../shared/mediaLibraryEntries';
 
@@ -48,7 +48,7 @@ export default function MediaSpotlightCard({
     ? Math.min(100, Math.max(0, Math.round(entry.progress * 100)))
     : null;
 
-  const duration = formatDuration(entry.primary.durationSec);
+  const duration = formatCardDuration(entry.primary.durationSec);
   const languages = entry.subtitleLanguages.map((code) => code.toUpperCase()).join(' · ');
 
   // Only rows that have something to say. An empty row is a worse use of the
