@@ -556,3 +556,20 @@ Category 6 is newly UNBLOCKED — `parity-ledger.json`'s 0-of-7 reason was "no L
 exists" and Video is now one.
 main-v1: complete-except-external, unchanged, **INHERITED** — RULE 1's re-count is still owed and
 was not done this turn. mal-pipeline: 34 of 34, closed.
+
+2026-08-25 | liquid | units done this turn: 0 | units left: 10 | basis: the 13 `Gate:` lines in src/LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md (`grep -c '^Gate:'` = 13, re-run this turn); the 3 closed (L0 452 / L2 591 / L3 600) are INHERITED, gate 461 was re-derived directly and is OPEN — it needs 80/80 on Video AND Dictionary. Video moved from **3 of 8 categories at 10 to 4 of 8**: category 6 CLOSED at 10 (parity **8/8 in liquid and 8/8 in standard**, read off the same component in one run because two Media Center windows exist one per presentation; round trip Liquid→Standard→Liquid title-anchored and driven dirty gave **`diffKeys: []`**, byte-for-byte on geometry/focus/z-index/app data; **3 of 3 controls fired**, each flipping exactly one row 8→7→8; 8 of 8 `mediaCenter` ledger rows now `both`), and category 4 was RE-CONFIRMED in liquid including the maximized third it had been carrying from a standard run (maximized 1264x765: clipped 0 / overlaps 0 / h-scroll 0 / hiddenOverflowX 0, dead **7.0%** of viewport, chrome **49.8→45.8%** and canvas **64.7→68.6%** as the window grows; control 0→1→0 on Video with Dictionary unchanged at 0; `restoredExactly: true`). Dictionary unchanged at 7 of 8, category 7 the open one. The six `mediaWorkspace` ledger rows are re-derived as genuinely un-Liquid-able rather than unfinished: the Media workspace mounts at `body > div > .seanime-host`, outside every `.fwin`, with no window chrome and no `data-presentation` for L3 to reach | projected finish: 2026-09-27
+
+**How 2026-09-27 is arithmetic rather than the date that was asked for.** Measured THIS turn, not
+inherited: **1 rubric category closed + 1 re-confirmed per ~80-minute turn** on the surface under
+test. Gate 461 needs 5 more category-closures (Video's 2, 5, 7, 8 — 5 has one number and 2 has its
+dead-end half — plus Dictionary's category 7 re-drive, which `af7fd609` already measured at the
+compositor ceiling and so is a pass, not a refactor). At the relay's measured ~3 turns/day across
+two workers that is **~2 days: gate 461 ≈ 2026-08-27**.
+
+The other **9** gates are the whole projection and none of them has started. There is no closure
+rate for L4–L12 at all, so they are projected at the only gate cost this plan has actually
+observed: **L1 has taken 10 days and is not finished**. Charging each of the nine at L1's cost
+discounted for two workers running one plan depth-first (~3.5 days each) gives **31.5 days from
+08-27 → 2026-09-27**. Both halves of that are stated so the next worker can attack either: the
+461 half is measured, the L4–L12 half is an extrapolation from ONE gate's cost and is the number
+to distrust. It is 26 days past the 2026-09-01 target, and the scope is not being cut to hide that.
