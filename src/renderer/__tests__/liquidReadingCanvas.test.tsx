@@ -296,6 +296,21 @@ describe('readingCanvas.css', () => {
     expect(CSS).toMatch(/\.lq-reading\s*\{[^}]*position:\s*relative/);
   });
 
+  it('makes the document region its own containing block', () => {
+    /*
+     * Found migrating Novels, and it is not cosmetic. Every real reader in this
+     * app scrolls from an absolutely positioned box — `.novel-scroller` is
+     * `position: absolute; inset: 0`, and so are the manga and PDF stages.
+     * Without a containing block on the document region such a child resolves
+     * `inset: 0` against `.lq-reading`, which spans the docked tools too, and
+     * paints the page straight over the tool just docked beside it. That is the
+     * partial cover the whole contract exists to forbid, reintroduced through
+     * CSS while `readingCanvasViolations` still returns `[]` — the resolver
+     * cannot see a stylesheet.
+     */
+    expect(CSS).toMatch(/\.lq-reading-doc\s*\{[^}]*position:\s*relative/);
+  });
+
   it('paints nothing outside its own namespace', () => {
     const selectors = CSS.split('}')
       .map((block) => block.split('{')[0].trim())

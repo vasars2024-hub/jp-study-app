@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 /**
- * L6's Gate on its first real surface.
+ * L6's Gate on its first real surface — now expressed through the shared
+ * harness rather than its own copy of the plumbing.
  *
  * The defect this migration fixes is not "the panel looked wrong". Captures was
  * a CSS grid with a `minmax(180px, 260px)` list column and a
@@ -13,13 +14,24 @@
  * narrow one being the case the old stylesheet got wrong. The stylesheet check
  * at the end is the regression latch — a future worker re-adding a window media
  * query to this surface reintroduces exactly this bug.
+ *
+ * Everything about mounting a reading surface at a chosen width now lives in
+ * `helpers/readingCanvasSurface`, shared with Novels: this file was 140 lines and
+ * about 90 of them were plumbing that the next four L6 surfaces would each have
+ * paid again.
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { act } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import ReadingCapturesView from '../views/ReadingCapturesView';
+import {
+  createReadingSurfaceHarness,
+  expectDismissRestoresDocument,
+  expectPlacement,
+  installReadingSurfaceApi,
+  installResizeObserver,
+  type ReadingSurfaceHarness,
+} from './helpers/readingCanvasSurface';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -40,99 +52,58 @@ const HISTORY = [
   },
 ];
 
-/**
- * jsdom lays nothing out, so `ReadingCanvas` would measure 0 and — correctly —
- * place no tool at all. Give it a width the way the real renderer does, through
- * the element's own box, so the measurement path under test is the shipped one
- * rather than a prop that only tests use.
- */
-let canvasWidth = 1200;
-const realRect = HTMLElement.prototype.getBoundingClientRect;
+let harness: ReadingSurfaceHarness | null = null;
 
-let container: HTMLDivElement;
-let root: Root;
+async function mountAt(width: number): Promise<ReadingSurfaceHarness> {
+  harness = createReadingSurfaceHarness({
+    render: () => <ReadingCapturesView passage={null} />,
+    ready: (container) => container.querySelector('.reading-captures-row') !== null,
+  });
+  await harness.mount(width);
+  return harness;
+}
 
 beforeEach(() => {
-  (window as unknown as { api: unknown }).api = {
-    lensHistoryList: async () => HISTORY,
-  };
-  HTMLElement.prototype.getBoundingClientRect = function rect(this: HTMLElement) {
-    if (this.classList.contains('lq-reading')) {
-      return { ...realRect.call(this), width: canvasWidth, height: 800 } as DOMRect;
-    }
-    return realRect.call(this);
-  };
-  container = document.createElement('div');
-  document.body.appendChild(container);
-  root = createRoot(container);
+  installResizeObserver();
+  installReadingSurfaceApi({ lensHistoryList: async () => HISTORY });
 });
 
 afterEach(() => {
-  act(() => root.unmount());
-  container.remove();
-  HTMLElement.prototype.getBoundingClientRect = realRect;
+  harness?.teardown();
+  harness = null;
   vi.restoreAllMocks();
 });
 
-async function mountAt(width: number): Promise<void> {
-  canvasWidth = width;
-  await act(async () => {
-    root.render(<ReadingCapturesView passage={null} />);
-  });
-  for (let index = 0; index < 20; index += 1) {
-    await act(async () => {
-      await new Promise((done) => setTimeout(done, 5));
-    });
-    if (container.querySelector('.reading-captures-row')) break;
-  }
-}
-
-function tool(): HTMLElement | null {
-  return container.querySelector('[data-reading-tool="captures"]');
-}
+const TOGGLE = '.reading-captures-list-toggle';
 
 describe('Captures through the L6 reading canvas', () => {
   it('docks the capture list beside the passage on a wide canvas', async () => {
-    await mountAt(1200);
-    expect(tool()!.dataset.placement).toBe('docked');
-    expect(tool()!.style.width).toBe('260px');
-    const doc = container.querySelector('[data-reading-role="document"]') as HTMLElement;
-    expect(doc.hasAttribute('inert')).toBe(false);
+    const h = await mountAt(1200);
     // 1200 - 260 - 12 gutter. The passage keeps far more than its 384 floor.
-    expect(doc.dataset.contentWidth).toBe('928');
-    expect(container.querySelectorAll('.reading-captures-row').length).toBe(2);
+    expectPlacement(h, 'captures', { placement: 'docked', contentWidth: 928, toolWidth: 260 });
+    expect(h.container.querySelectorAll('.reading-captures-row').length).toBe(2);
   });
 
   it('gives the passage the whole pane at the width the old media query missed', async () => {
-    await mountAt(500);
+    const h = await mountAt(500);
     // The case the `@media (max-width: 720px)` stack never saw: a 500px pane
     // inside a wider window. The list is now a sheet, not a 260px column.
-    expect(tool()!.dataset.placement).toBe('sheet');
-    expect(tool()!.getAttribute('role')).toBe('dialog');
-    const doc = container.querySelector('[data-reading-role="document"]') as HTMLElement;
-    expect(doc.dataset.contentWidth).toBe('500');
-    // Covered, so inert — and dismissible, which is the difference from being
-    // squeezed: one click returns the reader at the same 500px.
-    expect(doc.hasAttribute('inert')).toBe(true);
-    const close = tool()!.querySelector('.lq-reading-tool-close') as HTMLButtonElement;
-    await act(async () => close.click());
-    expect(tool()).toBe(null);
-    expect(
-      (container.querySelector('[data-reading-role="document"]') as HTMLElement).dataset
-        .contentWidth,
-    ).toBe('500');
+    expectPlacement(h, 'captures', { placement: 'sheet', contentWidth: 500 });
+    // Dismissible, which is the difference from being squeezed: one click
+    // returns the reader at the same 500px, on the same node.
+    await expectDismissRestoresDocument(h, 'captures');
   });
 
   it('keeps a route back to the list after it is dismissed', async () => {
-    await mountAt(1200);
-    const toggle = container.querySelector('.reading-captures-list-toggle') as HTMLButtonElement;
+    const h = await mountAt(1200);
+    const toggle = h.container.querySelector(TOGGLE) as HTMLButtonElement;
     expect(toggle.getAttribute('aria-pressed')).toBe('true');
-    await act(async () => toggle.click());
-    expect(tool()).toBe(null);
+    await h.click(TOGGLE);
+    expect(h.tool('captures')).toBe(null);
     expect(toggle.getAttribute('aria-pressed')).toBe('false');
-    await act(async () => toggle.click());
-    expect(tool()!.dataset.placement).toBe('docked');
-    expect(container.querySelectorAll('.reading-captures-row').length).toBe(2);
+    await h.click(TOGGLE);
+    expect(h.tool('captures')!.dataset.placement).toBe('docked');
+    expect(h.container.querySelectorAll('.reading-captures-row').length).toBe(2);
   });
 
   it('has no window-width media query left to reintroduce the bug', () => {

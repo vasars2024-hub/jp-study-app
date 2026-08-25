@@ -14,6 +14,11 @@ import {
   readingLocatorFromProgress,
 } from '../../shared/readingLibraryAdapter';
 import ReaderSettingsPanel from '../components/ReaderSettingsPanel';
+import {
+  ReadingCanvas,
+  type ReadingCanvasTool,
+} from '../components/liquid/ReadingCanvas';
+import { READING_CANVAS_FILL_POLICY } from '../../shared/liquidReadingCanvas';
 import DictionaryPopup from '../components/DictionaryPopup';
 import Icon from '../components/Icons';
 import SentenceTranslatePopup from '../components/SentenceTranslatePopup';
@@ -2657,6 +2662,260 @@ export default function NovelReader({ item, onClose }: Props) {
     </>
   );
 
+  /**
+   * L6's reading canvas decides where this reader's side tools go — the reader
+   * no longer does.
+   *
+   * Bookmarks, book translation and reading settings were all `.settings-panel`
+   * popovers: `position: absolute; right: 0; width: 264px`, hung off the toolbar
+   * and floating over the page. At a wide window that clips a strip of margin.
+   * At the 640px pop-out this reader is routinely opened in it covers 264 of
+   * 640px — 41% of the text being read — and nothing in the old markup could
+   * know that, because nothing measured anything. `ReadingCanvas` docks a tool
+   * beside the page while the page can still keep `minContentWidth`, and turns
+   * it into a dismissible full-canvas sheet when it cannot. A partial cover is
+   * no longer expressible.
+   *
+   * THE FILL POLICY IS DELIBERATE. This reader already owns its own measure:
+   * `settings.contentWidth` is a persisted rem value the user sets in the very
+   * panel being migrated, applied by `contentStyle`. A second 760px clamp from
+   * the canvas would silently override a setting the user changed on purpose.
+   * So the canvas places tools and leaves the column to the reader.
+   */
+  const openToolIds = [
+    bookmarksOpen ? 'bookmarks' : null,
+    translateOpen ? 'translate' : null,
+    settingsOpen ? 'reader-settings' : null,
+  ].filter((id): id is string => id !== null);
+
+  /*
+   * Open order, because `resolveReadingCanvas` docks first-come and that is what
+   * stops a newly opened panel from taking the dock away from one the user is
+   * already working in. Recorded in a ref during render rather than in state:
+   * the value is a pure, idempotent function of which booleans are true and
+   * React re-renders whenever one changes, so there is nothing to fall out of
+   * sync — while an effect would rank the first frame after an open by source
+   * order and visibly re-seat a panel one frame later. Source order is not a
+   * usable substitute: these three are also toggled from the AppChrome Study
+   * menu, so nothing here observes the click.
+   */
+  const toolOrderRef = useRef<string[]>([]);
+  toolOrderRef.current = [
+    ...toolOrderRef.current.filter((id) => openToolIds.includes(id)),
+    ...openToolIds.filter((id) => !toolOrderRef.current.includes(id)),
+  ];
+  const toolOrder = toolOrderRef.current;
+
+  const readingTools: ReadingCanvasTool[] = [];
+  if (bookmarksOpen) {
+    readingTools.push({
+      id: 'bookmarks',
+      label: t('novel.tool.bookmarks'),
+      minWidth: 200,
+      preferredWidth: 264,
+      onClose: () => setBookmarksOpen(false),
+      // The old panel's `.bm-head` is gone rather than nested: the canvas head
+      // already renders the title, and keeping both would stack two headings —
+      // the commonest way a migration adds chrome while claiming to remove it.
+      actions: (
+        <button className="btn small primary" onClick={addCurrent}>
+          {t('novel.tool.addBookmark')}
+        </button>
+      ),
+      content:
+        bookmarks.length === 0 ? (
+          <div className="bm-empty">{t('novel.tool.noBookmarks')}</div>
+        ) : (
+          <ul className="bm-list">
+            {bookmarks.map((b) => (
+              <li key={b.cfi} className="bm-row">
+                <button className="bm-jump" title={t('novel.tool.jumpHere')} onClick={() => jumpTo(b.cfi)}>
+                  <span className="bm-pct">{Math.round(b.percent * 100)}%</span>
+                  <span className="bm-label">{b.label}</span>
+                </button>
+                <button className="bm-del" title={t('novel.tool.removeBookmark')} onClick={() => removeAt(b.cfi)}>
+                  <Icon name="close" size={12} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        ),
+    });
+  }
+  if (translateOpen) {
+    readingTools.push({
+      id: 'translate',
+      label: t('epub.translate.title'),
+      // Wider floor than the other two: the chapter/page range rows put two
+      // number inputs and a button on one line, and below this they wrap into a
+      // column that reads as a different control.
+      minWidth: 240,
+      preferredWidth: 300,
+      onClose: () => setTranslateOpen(false),
+      actions: (
+        <span className="muted">{sourceLang.toUpperCase()} → {targetLang.toUpperCase()}</span>
+      ),
+      content: (
+        <div className="epub-translate-panel-body">
+          <label>
+            {t('epub.translate.target')}
+            <select
+              value={targetLang}
+              onChange={(event) => setTranslateTarget(event.target.value)}
+            >
+              {KNOWN_LANGS.filter((l) => l.code !== sourceLang).map((l) => (
+                <option key={l.code} value={l.code}>
+                  {l.nativeLabel}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            {t('epub.translate.view')}
+            <select
+              value={translateMode}
+              onChange={(event) => onTranslateModeChange(event.target.value as EpubTranslateMode)}
+            >
+              <option value="original">{t('epub.translate.view.original')}</option>
+              <option value="translation">{t('epub.translate.view.translation')}</option>
+              <option value="bilingual">{t('epub.translate.view.bilingual')}</option>
+            </select>
+          </label>
+          <button
+            className="btn small"
+            type="button"
+            onClick={() => toggleTranslationVisibility()}
+          >
+            {translateMode === 'original'
+              ? t('epub.translate.show')
+              : t('epub.translate.hide')}
+          </button>
+          <label className="epub-translate-check">
+            <input
+              type="checkbox"
+              checked={autoTranslate}
+              onChange={(event) => setAutoTranslate(event.target.checked)}
+            />
+            {t('epub.translate.auto')}
+          </label>
+          <button className="btn small" disabled={translateBusy || !loaded} onClick={() => void translateCurrentChapter()}>
+            {t('epub.translate.currentChapter')}
+          </button>
+          <button
+            className="btn small"
+            disabled={translateBusy || !loaded || part >= (loaded?.chapters.length ?? 1) - 1}
+            onClick={() => void translateAhead()}
+          >
+            {t('epub.translate.ahead')}
+          </button>
+          {bookTranslateProgress ? (
+            <button className="btn small" onClick={stopBookTranslate}>
+              {t('epub.translate.stop', {
+                done: bookTranslateProgress.done,
+                total: bookTranslateProgress.total,
+              })}
+              {bookTranslateProgress.blockTotal
+                ? ` · ${bookTranslateProgress.blockDone ?? 0}/${bookTranslateProgress.blockTotal}`
+                : ''}
+            </button>
+          ) : (
+            <button className="btn small primary" disabled={translateBusy || !loaded} onClick={() => void translateWholeBook()}>
+              {t('epub.translate.fullBook')}
+            </button>
+          )}
+          <div className="epub-translate-range">
+            <span className="epub-translate-range-label">{t('epub.translate.chapterRange')}</span>
+            <div className="epub-translate-range-row">
+              <input
+                type="number"
+                min={1}
+                max={Math.max(1, loaded?.toc.length || loaded?.chapters.length || 1)}
+                value={chapterRangeFrom}
+                disabled={translateBusy || !loaded}
+                onChange={(e) => setChapterRangeFrom(Number(e.target.value) || 1)}
+                aria-label={t('epub.translate.rangeFrom')}
+              />
+              <span className="muted">–</span>
+              <input
+                type="number"
+                min={1}
+                max={Math.max(1, loaded?.toc.length || loaded?.chapters.length || 1)}
+                value={chapterRangeTo}
+                disabled={translateBusy || !loaded}
+                onChange={(e) => setChapterRangeTo(Number(e.target.value) || 1)}
+                aria-label={t('epub.translate.rangeTo')}
+              />
+              <button
+                className="btn small"
+                disabled={translateBusy || !loaded}
+                onClick={() => void translateSelectedChapters()}
+              >
+                {t('epub.translate.runRange')}
+              </button>
+            </div>
+            <p className="muted epub-translate-range-hint">
+              {t('epub.translate.chapterRange.hint', {
+                max: Math.max(1, loaded?.toc.length || loaded?.chapters.length || 1),
+              })}
+            </p>
+          </div>
+          <div className="epub-translate-range">
+            <span className="epub-translate-range-label">{t('epub.translate.pageRange')}</span>
+            <div className="epub-translate-range-row">
+              <input
+                type="number"
+                min={1}
+                max={Math.max(1, loaded?.chapters.length || 1)}
+                value={pageRangeFrom}
+                disabled={translateBusy || !loaded}
+                onChange={(e) => setPageRangeFrom(Number(e.target.value) || 1)}
+                aria-label={t('epub.translate.rangeFrom')}
+              />
+              <span className="muted">–</span>
+              <input
+                type="number"
+                min={1}
+                max={Math.max(1, loaded?.chapters.length || 1)}
+                value={pageRangeTo}
+                disabled={translateBusy || !loaded}
+                onChange={(e) => setPageRangeTo(Number(e.target.value) || 1)}
+                aria-label={t('epub.translate.rangeTo')}
+              />
+              <button
+                className="btn small"
+                disabled={translateBusy || !loaded}
+                onClick={() => void translateSelectedPages()}
+              >
+                {t('epub.translate.runRange')}
+              </button>
+            </div>
+            <p className="muted epub-translate-range-hint">
+              {t('epub.translate.pageRange.hint', {
+                max: Math.max(1, loaded?.chapters.length || 1),
+                current: part + 1,
+              })}
+            </p>
+          </div>
+          {translateStatus && <p className="muted epub-translate-status">{translateStatus}</p>}
+        </div>
+      ),
+    });
+  }
+  if (settingsOpen) {
+    readingTools.push({
+      id: 'reader-settings',
+      label: t('novel.tool.readerSettings'),
+      minWidth: 240,
+      preferredWidth: 280,
+      onClose: () => setSettingsOpen(false),
+      // `embedded` drops the panel's own popover box — `position: static`,
+      // full width, no border or shadow — so the canvas tool is one surface
+      // instead of a card inside a card. The same variant Settings already uses.
+      content: <ReaderSettingsPanel settings={settings} onChange={setSettings} embedded />,
+    });
+  }
+  readingTools.sort((a, b) => toolOrder.indexOf(a.id) - toolOrder.indexOf(b.id));
+
   return (
     <AppChrome menus={readerMenus} status={readerStatus} className="aero-reader-chrome">
     <div className={`reader${aero ? ' aero-reader' : ''}`}>
@@ -2697,49 +2956,21 @@ export default function NovelReader({ item, onClose }: Props) {
           <div className="settings-anchor">
             <button
               className={`btn ${bookmarksOpen ? 'active' : ''}`}
-              title="Bookmarks"
+              title={t('novel.tool.bookmarks')}
+              aria-label={t('novel.tool.bookmarks')}
+              aria-pressed={bookmarksOpen}
               onClick={() => setBookmarksOpen((o) => !o)}
             >
               <Icon name="bookmark" size={14} />
             </button>
-            {bookmarksOpen && (
-              <>
-                <div className="panel-backdrop" onClick={() => setBookmarksOpen(false)} />
-                <div className="settings-panel bookmarks-panel">
-                  <div className="bm-head">
-                    <span>Bookmarks</span>
-                    <button className="btn small primary" onClick={addCurrent}>
-                      + Add here
-                    </button>
-                  </div>
-                  {bookmarks.length === 0 ? (
-                    <div className="bm-empty">
-                      No bookmarks yet. “+ Add here” saves your spot so you can jump back later.
-                    </div>
-                  ) : (
-                    <ul className="bm-list">
-                      {bookmarks.map((b) => (
-                        <li key={b.cfi} className="bm-row">
-                          <button className="bm-jump" title="Jump here" onClick={() => jumpTo(b.cfi)}>
-                            <span className="bm-pct">{Math.round(b.percent * 100)}%</span>
-                            <span className="bm-label">{b.label}</span>
-                          </button>
-                          <button className="bm-del" title="Remove" onClick={() => removeAt(b.cfi)}>
-                            <Icon name="close" size={12} />
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </>
-            )}
           </div>
           <div className="settings-anchor">
             <button
               type="button"
               className={`btn ${translateOpen ? 'active' : ''}`}
               title={t('epub.translate.panelTitle')}
+              aria-label={t('epub.translate.panelTitle')}
+              aria-pressed={translateOpen}
               onClick={() => setTranslateOpen((open) => !open)}
             >
               <Icon name="translate" size={14} />
@@ -2765,172 +2996,17 @@ export default function NovelReader({ item, onClose }: Props) {
             >
               <Icon name="scan" size={14} />
             </button>
-            {translateOpen && (
-              <>
-                <div className="panel-backdrop" onClick={() => setTranslateOpen(false)} />
-                <div className="settings-panel epub-translate-panel">
-                  <div className="epub-translate-head">
-                    <strong>{t('epub.translate.title')}</strong>
-                    <span className="muted">{sourceLang.toUpperCase()} → {targetLang.toUpperCase()}</span>
-                  </div>
-                  <label>
-                    {t('epub.translate.target')}
-                    <select
-                      value={targetLang}
-                      onChange={(event) => setTranslateTarget(event.target.value)}
-                    >
-                      {KNOWN_LANGS.filter((l) => l.code !== sourceLang).map((l) => (
-                        <option key={l.code} value={l.code}>
-                          {l.nativeLabel}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    {t('epub.translate.view')}
-                    <select
-                      value={translateMode}
-                      onChange={(event) => onTranslateModeChange(event.target.value as EpubTranslateMode)}
-                    >
-                      <option value="original">{t('epub.translate.view.original')}</option>
-                      <option value="translation">{t('epub.translate.view.translation')}</option>
-                      <option value="bilingual">{t('epub.translate.view.bilingual')}</option>
-                    </select>
-                  </label>
-                  <button
-                    className="btn small"
-                    type="button"
-                    onClick={() => toggleTranslationVisibility()}
-                  >
-                    {translateMode === 'original'
-                      ? t('epub.translate.show')
-                      : t('epub.translate.hide')}
-                  </button>
-                  <label className="epub-translate-check">
-                    <input
-                      type="checkbox"
-                      checked={autoTranslate}
-                      onChange={(event) => setAutoTranslate(event.target.checked)}
-                    />
-                    {t('epub.translate.auto')}
-                  </label>
-                  <button className="btn small" disabled={translateBusy || !loaded} onClick={() => void translateCurrentChapter()}>
-                    {t('epub.translate.currentChapter')}
-                  </button>
-                  <button
-                    className="btn small"
-                    disabled={translateBusy || !loaded || part >= (loaded?.chapters.length ?? 1) - 1}
-                    onClick={() => void translateAhead()}
-                  >
-                    {t('epub.translate.ahead')}
-                  </button>
-                  {bookTranslateProgress ? (
-                    <button className="btn small" onClick={stopBookTranslate}>
-                      {t('epub.translate.stop', {
-                        done: bookTranslateProgress.done,
-                        total: bookTranslateProgress.total,
-                      })}
-                      {bookTranslateProgress.blockTotal
-                        ? ` · ${bookTranslateProgress.blockDone ?? 0}/${bookTranslateProgress.blockTotal}`
-                        : ''}
-                    </button>
-                  ) : (
-                    <button className="btn small primary" disabled={translateBusy || !loaded} onClick={() => void translateWholeBook()}>
-                      {t('epub.translate.fullBook')}
-                    </button>
-                  )}
-                  <div className="epub-translate-range">
-                    <span className="epub-translate-range-label">{t('epub.translate.chapterRange')}</span>
-                    <div className="epub-translate-range-row">
-                      <input
-                        type="number"
-                        min={1}
-                        max={Math.max(1, loaded?.toc.length || loaded?.chapters.length || 1)}
-                        value={chapterRangeFrom}
-                        disabled={translateBusy || !loaded}
-                        onChange={(e) => setChapterRangeFrom(Number(e.target.value) || 1)}
-                        aria-label={t('epub.translate.rangeFrom')}
-                      />
-                      <span className="muted">–</span>
-                      <input
-                        type="number"
-                        min={1}
-                        max={Math.max(1, loaded?.toc.length || loaded?.chapters.length || 1)}
-                        value={chapterRangeTo}
-                        disabled={translateBusy || !loaded}
-                        onChange={(e) => setChapterRangeTo(Number(e.target.value) || 1)}
-                        aria-label={t('epub.translate.rangeTo')}
-                      />
-                      <button
-                        className="btn small"
-                        disabled={translateBusy || !loaded}
-                        onClick={() => void translateSelectedChapters()}
-                      >
-                        {t('epub.translate.runRange')}
-                      </button>
-                    </div>
-                    <p className="muted epub-translate-range-hint">
-                      {t('epub.translate.chapterRange.hint', {
-                        max: Math.max(1, loaded?.toc.length || loaded?.chapters.length || 1),
-                      })}
-                    </p>
-                  </div>
-                  <div className="epub-translate-range">
-                    <span className="epub-translate-range-label">{t('epub.translate.pageRange')}</span>
-                    <div className="epub-translate-range-row">
-                      <input
-                        type="number"
-                        min={1}
-                        max={Math.max(1, loaded?.chapters.length || 1)}
-                        value={pageRangeFrom}
-                        disabled={translateBusy || !loaded}
-                        onChange={(e) => setPageRangeFrom(Number(e.target.value) || 1)}
-                        aria-label={t('epub.translate.rangeFrom')}
-                      />
-                      <span className="muted">–</span>
-                      <input
-                        type="number"
-                        min={1}
-                        max={Math.max(1, loaded?.chapters.length || 1)}
-                        value={pageRangeTo}
-                        disabled={translateBusy || !loaded}
-                        onChange={(e) => setPageRangeTo(Number(e.target.value) || 1)}
-                        aria-label={t('epub.translate.rangeTo')}
-                      />
-                      <button
-                        className="btn small"
-                        disabled={translateBusy || !loaded}
-                        onClick={() => void translateSelectedPages()}
-                      >
-                        {t('epub.translate.runRange')}
-                      </button>
-                    </div>
-                    <p className="muted epub-translate-range-hint">
-                      {t('epub.translate.pageRange.hint', {
-                        max: Math.max(1, loaded?.chapters.length || 1),
-                        current: part + 1,
-                      })}
-                    </p>
-                  </div>
-                  {translateStatus && <p className="muted epub-translate-status">{translateStatus}</p>}
-                </div>
-              </>
-            )}
           </div>
           <div className="settings-anchor">
             <button
               className={`btn ${settingsOpen ? 'active' : ''}`}
-              title="Reading settings"
+              title={t('novel.tool.readerSettings')}
+              aria-label={t('novel.tool.readerSettings')}
+              aria-pressed={settingsOpen}
               onClick={() => setSettingsOpen((o) => !o)}
             >
               Aa
             </button>
-            {settingsOpen && (
-              <>
-                <div className="panel-backdrop" onClick={() => setSettingsOpen(false)} />
-                <ReaderSettingsPanel settings={settings} onChange={setSettings} />
-              </>
-            )}
           </div>
           <div className="reader-anno-swatches" title="Personal highlight color — press H on a word or selection">
             {ANNO_COLORS.map((c) => (
@@ -3009,71 +3085,78 @@ export default function NovelReader({ item, onClose }: Props) {
           </div>
         )}
 
-        {linkView ? (
-          <div
-            className="novel-scroller novel-link-view"
-            onClick={onContentClick}
-            onMouseDown={(e) => {
-              popupOpenOnDownRef.current = !!popupRef.current;
-              noteLookupPointerDown(e);
-              lastPointerRef.current = { x: e.clientX, y: e.clientY };
-            }}
-            data-dict-owner=""
-            onMouseUp={onMouseUp}
-          >
+        <ReadingCanvas
+          className="reader-canvas"
+          tools={readingTools}
+          closeLabel={t('common.close')}
+          policy={READING_CANVAS_FILL_POLICY}
+        >
+          {linkView ? (
             <div
-              className={`novel-content novel-link-article ${wkClass}`}
-              style={contentStyle}
-              lang="ja"
-              dangerouslySetInnerHTML={{ __html: linkView.bodyHtml }}
-            />
-          </div>
-        ) : (
-          <div
-            ref={scrollerRef}
-            className="novel-scroller"
-            style={scrollerStyle}
-            onClick={onContentClick}
-            onMouseDown={(e) => {
-              popupOpenOnDownRef.current = !!popupRef.current;
-              noteLookupPointerDown(e);
-              lastPointerRef.current = { x: e.clientX, y: e.clientY };
-            }}
-            onMouseMove={(e) => {
-              lastPointerRef.current = { x: e.clientX, y: e.clientY };
-            }}
-            data-dict-owner=""
-            onMouseUp={onMouseUp}
-          >
-            {paged ? (
+              className="novel-scroller novel-link-view"
+              onClick={onContentClick}
+              onMouseDown={(e) => {
+                popupOpenOnDownRef.current = !!popupRef.current;
+                noteLookupPointerDown(e);
+                lastPointerRef.current = { x: e.clientX, y: e.clientY };
+              }}
+              data-dict-owner=""
+              onMouseUp={onMouseUp}
+            >
               <div
-                key={`p${part}`}
-                ref={contentRef}
-                className={`novel-content novel-translate-${translateMode} ${wkClass}${settings.hyperlinksEnabled ? '' : ' links-off'}`}
+                className={`novel-content novel-link-article ${wkClass}`}
                 style={contentStyle}
                 lang="ja"
-                dangerouslySetInnerHTML={chapterHtml[part] ?? EMPTY_HTML}
+                dangerouslySetInnerHTML={{ __html: linkView.bodyHtml }}
               />
-            ) : (
-              <div
-                key="scrollwin"
-                ref={contentRef}
-                className={`novel-content novel-translate-${translateMode} ${wkClass}${settings.hyperlinksEnabled ? '' : ' links-off'}`}
-                style={contentStyle}
-                lang="ja"
-              >
-                {winParts.map((i) => (
-                  <div
-                    key={i}
-                    className="novel-part"
-                    data-pi={i}
-                    dangerouslySetInnerHTML={chapterHtml[i] ?? EMPTY_HTML}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+            </div>
+          ) : (
+            <div
+              ref={scrollerRef}
+              className="novel-scroller"
+              style={scrollerStyle}
+              onClick={onContentClick}
+              onMouseDown={(e) => {
+                popupOpenOnDownRef.current = !!popupRef.current;
+                noteLookupPointerDown(e);
+                lastPointerRef.current = { x: e.clientX, y: e.clientY };
+              }}
+              onMouseMove={(e) => {
+                lastPointerRef.current = { x: e.clientX, y: e.clientY };
+              }}
+              data-dict-owner=""
+              onMouseUp={onMouseUp}
+            >
+              {paged ? (
+                <div
+                  key={`p${part}`}
+                  ref={contentRef}
+                  className={`novel-content novel-translate-${translateMode} ${wkClass}${settings.hyperlinksEnabled ? '' : ' links-off'}`}
+                  style={contentStyle}
+                  lang="ja"
+                  dangerouslySetInnerHTML={chapterHtml[part] ?? EMPTY_HTML}
+                />
+              ) : (
+                <div
+                  key="scrollwin"
+                  ref={contentRef}
+                  className={`novel-content novel-translate-${translateMode} ${wkClass}${settings.hyperlinksEnabled ? '' : ' links-off'}`}
+                  style={contentStyle}
+                  lang="ja"
+                >
+                  {winParts.map((i) => (
+                    <div
+                      key={i}
+                      className="novel-part"
+                      data-pi={i}
+                      dangerouslySetInnerHTML={chapterHtml[i] ?? EMPTY_HTML}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </ReadingCanvas>
 
         <ReaderCollectionPanel
           bookId={item.id}

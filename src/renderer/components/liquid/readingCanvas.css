@@ -30,7 +30,18 @@
   min-height: 0;
 }
 
+/* `position: relative` is load-bearing, and it was missing for the first
+   surface because that surface's document is static flow.
+   EVERY REAL READER IN THIS APP SCROLLS FROM AN ABSOLUTELY POSITIONED BOX:
+   `.novel-scroller` is `position: absolute; inset: 0`, and so are the manga and
+   PDF stages. Without a containing block here, such a child resolves `inset: 0`
+   against `.lq-reading` — the whole canvas, docked tools included — and paints
+   the page straight over the tool that was just docked beside it. That is the
+   partial cover the contract exists to forbid, reintroduced through CSS while
+   `readingCanvasViolations` still returns `[]`. The document region owns its own
+   overlays; the canvas owns the sheet. */
 .lq-reading-doc {
+  position: relative;
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
