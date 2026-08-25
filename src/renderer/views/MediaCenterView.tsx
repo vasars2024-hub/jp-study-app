@@ -113,6 +113,35 @@ const NAV: Array<{ id: MediaCenterTab; labelKey: string; icon: IconName; hintKey
 ];
 
 /**
+ * The sidebar renders `NAV` in two groups: the five media modes always visible, and the
+ * secondary destinations behind one collapsed disclosure. `settings` is in neither — it has
+ * its own control at the foot of the sidebar.
+ *
+ * This is Q4's answer on this surface ("advanced tools discoverable without cluttering"),
+ * and it is disclosure rather than removal: `Ctrl+6..8` still reach the secondary three with
+ * the group closed, because the shortcut is a root `keydown` handler that indexes `NAV`
+ * directly and never touches these buttons.
+ */
+const PRIMARY_NAV: MediaCenterTab[] = ['home', 'library', 'video', 'music', 'study'];
+const SECONDARY_NAV: MediaCenterTab[] = ['readiness', 'review', 'discover'];
+
+/**
+ * Open/closed is a preference, so it survives a reload. Stored as one boolean rather than
+ * merged over a defaults map, because there is exactly one group — if a second is ever added,
+ * copy `readRailGroupState`'s per-key merge instead of widening this.
+ */
+const NAV_TOOLS_KEY = 'jp-mc-nav-tools-open';
+
+function readNavToolsOpen(): boolean {
+  try {
+    return localStorage.getItem(NAV_TOOLS_KEY) === 'true';
+  } catch {
+    // A corrupt or unavailable store must not cost the user their navigation.
+    return false;
+  }
+}
+
+/**
  * The apps downstream of the Media Center — the ones that receive what mining
  * an episode produces. Module-level, so the labels are i18n *keys* resolved at
  * render time rather than strings frozen at module evaluation.
@@ -1484,6 +1513,21 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
     [t, lang],
   );
 
+  const [navToolsOpen, setNavToolsOpen] = useState<boolean>(readNavToolsOpen);
+  useEffect(() => {
+    try {
+      localStorage.setItem(NAV_TOOLS_KEY, String(navToolsOpen));
+    } catch {
+      // Preference only; a full or blocked store must not break navigation.
+    }
+  }, [navToolsOpen]);
+  /**
+   * A collapsed group must never be the thing hiding the current destination. Forced open
+   * for the render rather than written back to the preference, so arriving at Discover via
+   * `Ctrl+8` does not silently re-open a group the user closed once they leave again.
+   */
+  const toolsOpen = navToolsOpen || SECONDARY_NAV.includes(tab);
+
   /** Jump to a tab, truncating any forward trail — the browser convention. */
   const setTab = (next: MediaCenterTab): void => {
     setHistory((current) => {
@@ -1503,6 +1547,29 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
 
   const navigate = (next: MediaCenterTab): void => {
     setTab(next);
+  };
+
+  /**
+   * One destination button, rendered identically whichever group it lands in — the primary
+   * list or the collapsed disclosure. The `Ctrl+N` hint is derived from the item's index in
+   * `NAV`, never from its index within a group, because the shortcut handler indexes `NAV`.
+   */
+  const navLink = (item: typeof nav[number]) => {
+    const shortcut = NAV.findIndex((entry) => entry.id === item.id) + 1;
+    const queued = item.id === 'study' ? media.items.filter((entry) => entry.studyQueue).length : 0;
+    return (
+      <button
+        type="button"
+        key={item.id}
+        className={tab === item.id ? 'is-active' : ''}
+        onClick={() => navigate(item.id)}
+        title={`${item.hint} (Ctrl+${shortcut})`}
+      >
+        <Icon name={item.icon} size={15} />
+        <span><strong>{item.label}</strong><small>{item.hint}</small></span>
+        {queued > 0 && <em>{queued}</em>}
+      </button>
+    );
   };
 
   useEffect(() => {
@@ -1678,43 +1745,59 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
             <span><strong>Media Center</strong><small>日本語 immersion</small></span>
           </div>
 
+          {/*
+            Filtered by id, not `slice(0, 6)`. That count silently meant "everything
+            except Settings", which has its own control below — so the moment retirement
+            hid Video and Library the slice stopped excluding anything and Settings
+            rendered twice.
+
+            `index` is the position in the FULL `nav` array, not in whichever group the
+            item renders into, because the `Ctrl+N` hint has to keep naming the shortcut
+            `NAV[index]` actually binds (`onKey` above indexes `NAV`, not this list).
+          */}
           <nav className="mc-nav" aria-label={t('mediaCenter.nav.label')}>
             <span className="mc-nav-label">{t('mediaCenter.shell.browse')}</span>
+            {nav.filter((item) => PRIMARY_NAV.includes(item.id)).map((item) => navLink(item))}
+
             {/*
-              Filtered by id, not `slice(0, 6)`. That count silently meant "everything
-              except Settings", which has its own control below — so the moment retirement
-              hid Video and Library the slice stopped excluding anything and Settings
-              rendered twice.
+              PROGRESSIVE DISCLOSURE, not deletion. Readiness, Review, Discover and the
+              workspace launcher are the shell's secondary destinations: each is still one
+              click and one Enter away, `Ctrl+6..8` still reach them with the group closed
+              because the shortcut is a root keydown handler rather than a click on these
+              buttons, and a group holding the ACTIVE destination is forced open below —
+              the same three rules `MediaLibrarySidebar` already established for its rail.
             */}
-            {nav.filter((item) => item.id !== 'settings').map((item, index) => (
+            <details
+              className="mc-nav-group"
+              open={toolsOpen}
+              onToggle={(event) => setNavToolsOpen((event.currentTarget as HTMLDetailsElement).open)}
+            >
+              {/*
+                NOT `.mc-nav-label`, even though it looks like one. The ≤820px container rule
+                sets `.mc-nav-label { display: none }` to collapse the sidebar to a 58px icon
+                rail — which would delete the only control that opens this group and strand
+                three destinations behind it. Its own class keeps the chevron at every width
+                and drops just the wordmark.
+              */}
+              <summary className="mc-nav-group__heading" title={t('mediaCenter.shell.studyTools')}>
+                <Icon name="chevron" size={11} />
+                <span>{t('mediaCenter.shell.studyTools')}</span>
+              </summary>
+              {nav.filter((item) => SECONDARY_NAV.includes(item.id)).map((item) => navLink(item))}
               <button
                 type="button"
-                key={item.id}
-                className={tab === item.id ? 'is-active' : ''}
-                onClick={() => navigate(item.id)}
-                title={`${item.hint} (Ctrl+${index + 1})`}
+                className="mc-seanime-link"
+                data-media-source="seanime"
+                data-sidecar={workspace}
+                disabled={!seanimeAvailable}
+                title={seanimeActionTitle}
+                onClick={() => openSeanime()}
               >
-                <Icon name={item.icon} size={15} />
-                <span><strong>{item.label}</strong><small>{item.hint}</small></span>
-                {item.id === 'study' && media.items.filter((entry) => entry.studyQueue).length > 0 && (
-                  <em>{media.items.filter((entry) => entry.studyQueue).length}</em>
-                )}
+                <Icon name="globe" size={15} />
+                <span><strong>{t('mediaWorkspace.launcher')}</strong><small>{t('mediaWorkspace.viewLibrary')}</small></span>
               </button>
-            ))}
+            </details>
           </nav>
-
-          <button
-            type="button"
-            className="mc-seanime-link"
-            data-media-source="seanime"
-            data-sidecar={workspace}
-            disabled={!seanimeAvailable}
-            title={seanimeActionTitle}
-            onClick={() => openSeanime()}
-          >
-            <Icon name="globe" size={15} />
-            <span><strong>{t('mediaWorkspace.launcher')}</strong><small>{t('mediaWorkspace.viewLibrary')}</small></span>
-          </button>
 
           <div className="mc-sidebar-spacer" />
 
@@ -1773,8 +1856,16 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
                 aria-label={searchPlaceholder}
               />
             </label>
-            <button type="button" className="mc-top-action" title={t('mediaCenter.action.openMedia')} onClick={() => void media.openFile()}><Icon name="plus" size={14} /></button>
-            <button type="button" className="mc-top-action" title={t('mediaCenter.nav.settings')} onClick={() => setTab('settings')}><Icon name="settings" size={14} /></button>
+            {/*
+              `Open media` keeps its topbar slot because it is the only visible way to add a
+              file from Home, Music, Study, Readiness, Review and Discover — the library
+              toolbar's `Add` exists only on Library. A settings button stood beside it and
+              ran the identical `setTab('settings')` as `.mc-settings-link` in the sidebar,
+              which is present at every width (the ≤820px rule hides its `> span`, not the
+              button). Two persistent controls, one destination; the sidebar owns it, because
+              that is the one carrying the active state.
+            */}
+            <button type="button" className="mc-top-action" title={t('mediaCenter.action.openMedia')} aria-label={t('mediaCenter.action.openMedia')} onClick={() => void media.openFile()}><Icon name="plus" size={14} /></button>
           </header>
 
           <main className="mc-content">{body}</main>

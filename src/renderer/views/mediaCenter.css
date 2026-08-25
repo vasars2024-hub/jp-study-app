@@ -300,6 +300,57 @@
   text-transform: uppercase;
 }
 
+/*
+  The secondary-destination disclosure. `.mc-nav` is a flex column with `gap: 3px`, so the
+  `<details>` is a single flex child and has to re-establish that gap for the buttons inside
+  it — without this they stack flush and read as one block.
+*/
+.mc-nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 10px;
+}
+
+.mc-nav-group__heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 9px 6px;
+  color: var(--mc-dim, #7f8598);
+  font-size: var(--mc-fs-micro, 11px);
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  cursor: pointer;
+  list-style: none;
+}
+
+.mc-nav-group__heading::-webkit-details-marker {
+  display: none;
+}
+
+.mc-nav-group__heading:hover {
+  color: var(--mc-text, #e9ecf5);
+}
+
+/* The chevron is the open/closed state, so it must not be a transitionless jump. */
+.mc-nav-group__heading > svg {
+  flex: none;
+  transform: rotate(90deg);
+  transition: transform 140ms ease;
+}
+
+.mc-nav-group[open] > .mc-nav-group__heading > svg {
+  transform: rotate(-90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mc-nav-group__heading > svg {
+    transition: none;
+  }
+}
+
 .mc-nav button,
 .mc-settings-link,
 .mc-seanime-link {
@@ -2786,8 +2837,16 @@
   .mc-nav button > span,
   .mc-nav button em,
   .mc-settings-link > span,
-  .mc-seanime-link > span {
+  .mc-seanime-link > span,
+  /* The wordmark only. The chevron stays, or the collapsed rail has no way to open
+     the group and three destinations become unreachable by pointer. */
+  .mc-nav-group__heading > span {
     display: none;
+  }
+
+  .mc-nav-group__heading {
+    justify-content: center;
+    padding-inline: 0;
   }
 
   .mc-nav button,

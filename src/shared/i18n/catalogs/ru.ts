@@ -8426,6 +8426,7 @@ export const ru: Catalog = {
   'mediaCenter.player.pause': 'Пауза',
   'mediaCenter.player.next': 'Далее',
   'mediaCenter.shell.browse': 'Разделы',
+  'mediaCenter.shell.studyTools': 'Учебные инструменты',
   'mediaCenter.shell.back': 'Назад',
   'mediaCenter.shell.forward': 'Вперёд',
   'mediaCenter.shell.libraryStatus': 'Состояние медиатеки',

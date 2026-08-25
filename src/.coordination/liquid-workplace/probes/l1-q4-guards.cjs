@@ -45,17 +45,37 @@ async function ev(js) {
   }
 }
 
+/**
+ * WHICH WINDOW, AND WHY IT IS AN ARGUMENT (2026-08-25 repair). Every selector below took
+ * `document.querySelector('.fwin')` or "the first scored window" — DOM order, not the surface
+ * under test, and not even necessarily a VISIBLE one. On a desktop carrying Media, Video and
+ * Dictionary it read and planted into **Media** while reporting a Video score, which is the
+ * `probe-picks-first-visible-fwin` failure `l1-q78-drive.cjs` and `l1-q6-guards.cjs` were both
+ * already repaired for. It went unnoticed because Media and Video render the same surface, so
+ * the numbers agreed; they would not on any other pair.
+ */
+const TITLE = process.argv[2] || 'Video';
+
+const WIN = `([].slice.call(document.querySelectorAll('.fwin')).filter(function (w) {
+  var r = w.getBoundingClientRect();
+  if (!(r.width > 0 && r.height > 0)) return false;
+  var t = w.querySelector('.fwin-title-text, .fwin-title');
+  return !!t && (t.textContent || '').indexOf(${JSON.stringify(TITLE)}) >= 0;
+})[0])`;
+
 /** Q4's numbers only, read through the real clarity probe so the guard scores what the score does. */
 async function readQ4() {
   const src = fs.readFileSync(CLARITY, 'utf8').trim().replace(/;$/, '');
   const out = await ev(src);
-  const win = (out.windows || []).find((w) => (w.questions || []).length);
+  const scored = (out.windows || []).filter((w) => (w.questions || []).length);
+  const win = scored.find((w) => String(w.label).includes(TITLE));
+  if (!win) throw new Error(`no scored .fwin titled ${TITLE}; saw ${scored.map((w) => w.label).join(', ') || 'none'}`);
   const q4 = win.questions.find((q) => q.id === 4);
   return { label: win.label, verdict: q4.verdict, ...q4.numbers };
 }
 
 const SET_DRAWERS = (open) => `(() => {
-  const win = document.querySelector('.fwin');
+  const win = ${WIN};
   const ds = [...win.querySelectorAll('details')];
   if (!window.__q4drawers) window.__q4drawers = ds.map((d) => d.open);
   ds.forEach((d) => { d.open = ${open}; });
@@ -63,7 +83,7 @@ const SET_DRAWERS = (open) => `(() => {
 })()`;
 
 const RESTORE_DRAWERS = `(() => {
-  const win = document.querySelector('.fwin');
+  const win = ${WIN};
   const ds = [...win.querySelectorAll('details')];
   const was = window.__q4drawers;
   if (!was) return JSON.stringify({ restored: false, why: 'nothing captured' });
@@ -74,7 +94,7 @@ const RESTORE_DRAWERS = `(() => {
 
 /** Plant N real top-level controls: outside every `details`, outside the result rows. */
 const PLANT = (n) => `(() => {
-  const win = document.querySelector('.fwin');
+  const win = ${WIN};
   const head = win.querySelector('.view-head') || win.querySelector('.fwin-body');
   document.querySelectorAll('.l1-q4-plant').forEach((x) => x.remove());
   for (let i = 0; i < ${n}; i += 1) {

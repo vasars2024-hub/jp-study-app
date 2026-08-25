@@ -7694,6 +7694,7 @@ export const ja: Catalog = {
   'mediaCenter.player.pause': '一時停止',
   'mediaCenter.player.next': '次へ',
   'mediaCenter.shell.browse': 'ブラウズ',
+  'mediaCenter.shell.studyTools': '学習ツール',
   'mediaCenter.shell.back': '戻る',
   'mediaCenter.shell.forward': '進む',
   'mediaCenter.shell.libraryStatus': 'ライブラリ状態',

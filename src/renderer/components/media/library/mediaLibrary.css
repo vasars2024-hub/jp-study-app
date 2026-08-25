@@ -279,6 +279,94 @@
 }
 
 /*
+ * The `View` disclosure: sort order + grid/list density, which are one concept, behind one
+ * control. `position: relative` on the `<details>` and absolute on the body so opening it
+ * does not reflow the header — a toolbar that grows by 90px when you touch it is the
+ * clunkiness this surface is scored on. The summary keeps the current sort visible while
+ * closed, so the group hides controls, not state.
+ */
+.medialib-view {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.medialib-view__head {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: var(--lq-hit-target);
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+  white-space: nowrap;
+  transition: background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
+}
+
+.medialib-view__head::-webkit-details-marker {
+  display: none;
+}
+
+.medialib-view__head:hover {
+  background: var(--accent-weak);
+  color: var(--text);
+}
+
+.medialib-view__head small {
+  color: var(--muted);
+  font-size: var(--font-size-sm);
+  max-width: 13ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.medialib-view__head > svg:last-child {
+  transform: rotate(90deg);
+  transition: transform var(--dur-fast) var(--ease-standard);
+}
+
+.medialib-view[open] > .medialib-view__head > svg:last-child {
+  transform: rotate(-90deg);
+}
+
+.medialib-view__body {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1, var(--panel));
+  box-shadow: 0 14px 34px rgb(0 0 0 / 0.38);
+}
+
+.medialib-view__field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.medialib-view__field > span {
+  color: var(--muted);
+  font-size: var(--font-size-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .medialib-view__head,
+  .medialib-view__head > svg:last-child {
+    transition: none;
+  }
+}
+
+/*
  * `flex: 0 0 auto` is load-bearing, not cosmetic. As a shrinkable flex item the
  * toggle was collapsing from its natural 60px to 34px inside
  * `.medialib-browser__tools`, and because it also clips (`overflow: hidden`)

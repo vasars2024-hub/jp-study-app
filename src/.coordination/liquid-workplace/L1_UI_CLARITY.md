@@ -469,3 +469,48 @@ and Q8 YES 8/8** (3 translucent regions → 0, 0 backdrops both legs, 8 entries 
 
 **Category 5 on Video: Q1 Q2 Q3 Q6 Q7 Q8 Q10 YES, Q4 NO, Q5 INHERIT, Q9 MEASURE.** Q4 is the open
 unit — 19 scanned controls against a bar of 12.
+
+## 2026-08-25 · primary — Q4 closes on Video by two product changes: 19 scanned → 11
+
+| Slice | Commit | What landed |
+| --- | --- | --- |
+| Progressive disclosure in the Media Center shell and library toolbar | *this commit* | `MediaCenterView.tsx`, `mediaCenter.css`, `MediaLibraryBrowser.tsx`, `mediaLibrary.css`, 4 catalogs, `+probes/l1-q4-mc-walk.cjs`, `l1-q4-guards.cjs` |
+
+**The bar was NOT moved.** Q4 had already been redefined once (chrome 27 → scanned 19) and a
+third redefinition would be indistinguishable from moving it until the surface passed. The 19
+were located by name first: **10 sidebar destinations, 5 topbar, 4 library toolbar**. Two of
+them were a real defect, not a metric artifact — `.mc-settings-link` and a `.mc-top-action`
+both ran the identical `setTab('settings')`, two persistent controls on one destination.
+
+Three changes, each defensible without the score. (1) The topbar settings duplicate is **gone**;
+the sidebar owns it because it carries the active state and survives the ≤820px rule, which
+hides its `> span`, not the button. (2) `Readiness`, `Review`, `Discover` and the workspace
+launcher moved into one collapsed `details.mc-nav-group`. (3) Sort order and grid/list density —
+one concept, three persistent controls — moved into one `details.medialib-view` popover, with
+the **current sort named on the closed summary** so the group hides controls, not state. The
+approved concept image is the authority for the shape: one collapsed mode dropdown, three icon
+buttons, and panel tools behind an overflow.
+
+**Q4 on Video: YES — scanned 11 ≤ 12, 3 collapsed disclosures**, under `l1-q4-guards.cjs`:
+invariant to drawer state (**11 closed / 11 open**, while the old `chromeControlsRaw` term
+swings **15 → 31**), and the plant control pushed it to **13 → NO** and returned to 11/YES.
+
+**That guard was reading the wrong window and is repaired in this commit.** Every selector was
+`document.querySelector('.fwin')` / "the first scored window" — it read and planted into
+**Media** while its argument said Video. It went unnoticed because both render the same surface.
+Now title-resolved like `l1-q78-drive.cjs`; `asFound.label` is `Video`.
+
+**Counting right is not working — `l1-q4-mc-walk.cjs`, 18 of 18 gates.** Closed, the four are
+absent from the visible set; open, all four are there; `Discover` behind the disclosure
+navigates; **Ctrl+8 reaches Discover with the group closed** (the shortcut is a root keydown
+that indexes `NAV`); the active destination force-opens the group; sort **reorders the shelf**
+(first card 「パラッ」… → `The Big O`); density flips `aria-pressed` false/true; Escape and an
+outside `pointerdown` both close the popover; settings still in the sidebar; the topbar is down
+to **1** action; scope restored to `Continue watching2`.
+
+**Three probe defects paid for here.** A 14-char label slice is SHORTER than the needle
+`Media workspace`, so the test read a working disclosure as broken. A 1-title shelf cannot show
+a reorder — the walk widens to `Recently added` (36) and restores. And the rail marks its scope
+with **`aria-current`**, not `aria-pressed`, so the restore gate was passing on `null === null`;
+`scopeWasActuallyRead` now guards it. **Category 5 on Video: Q1 Q2 Q3 Q4 Q6 Q7 Q8 Q10 YES,
+Q5 INHERIT, Q9 MEASURE.**

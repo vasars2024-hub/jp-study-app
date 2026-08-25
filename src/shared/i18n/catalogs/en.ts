@@ -8074,6 +8074,7 @@ export const en: Catalog = {
   'mediaCenter.player.pause': 'Pause',
   'mediaCenter.player.next': 'Next',
   'mediaCenter.shell.browse': 'Browse',
+  'mediaCenter.shell.studyTools': 'Study tools',
   'mediaCenter.shell.back': 'Back',
   'mediaCenter.shell.forward': 'Forward',
   'mediaCenter.shell.libraryStatus': 'Library status',

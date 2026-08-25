@@ -7659,6 +7659,7 @@ export const zh: Catalog = {
   'mediaCenter.player.pause': '暂停',
   'mediaCenter.player.next': '下一首',
   'mediaCenter.shell.browse': '浏览',
+  'mediaCenter.shell.studyTools': '学习工具',
   'mediaCenter.shell.back': '后退',
   'mediaCenter.shell.forward': '前进',
   'mediaCenter.shell.libraryStatus': '媒体库状态',

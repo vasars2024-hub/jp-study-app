@@ -7,7 +7,7 @@
  * is the reason the old `height: 60vh; max-height: 640px` grid box is gone.
  */
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import VirtualGrid from '../../VirtualGrid';
 import { Button, Select } from '../../ui';
 import Icon from '../../Icons';
@@ -87,6 +87,38 @@ export default function MediaLibraryBrowser({
     [category, lang],
   );
 
+  /**
+   * The current sort, named on the closed `View` summary. Without it the disclosure hides
+   * state as well as controls, and the user has to open it just to read how the shelf is
+   * ordered — which is the difference between grouping controls and burying them.
+   */
+  const activeSortLabel = sortOptions.find((option) => option.value === sort)?.label ?? '';
+
+  const viewRef = useRef<HTMLDetailsElement>(null);
+  const [viewOpen, setViewOpen] = useState(false);
+  useEffect(() => {
+    if (!viewOpen) return undefined;
+    const close = () => { if (viewRef.current) viewRef.current.open = false; };
+    // `pointerdown`, not `click`: a click that starts outside and ends inside a re-rendered
+    // popover never fires as one `click` on the document, so the panel stays open.
+    const onDown = (event: PointerEvent) => {
+      const node = viewRef.current;
+      if (node && !node.contains(event.target as Node)) close();
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      close();
+      // Escape must leave focus somewhere real, or the next Tab restarts at the document.
+      viewRef.current?.querySelector('summary')?.focus();
+    };
+    document.addEventListener('pointerdown', onDown, true);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onDown, true);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [viewOpen]);
+
   const totals = useMemo(() => ({
     entries: entries.length,
     files: entries.reduce((sum, entry) => sum + entry.episodeCount + entry.extras.length, 0),
@@ -109,30 +141,59 @@ export default function MediaLibraryBrowser({
         </div>
 
         <div className="medialib-browser__tools">
-          <Select
-            aria-label={t('media.browser.sort')}
-            value={sort}
-            options={sortOptions}
-            onChange={(e) => onSortChange(e.target.value as MediaSortId)}
-          />
-          <div className="medialib-view-toggle" role="group" aria-label={t('media.browser.view')}>
-            <button
-              type="button"
-              aria-pressed={view === 'grid'}
-              aria-label={t('media.browser.viewGrid')}
-              onClick={() => onViewChange('grid')}
-            >
-              <Icon name="widgets" size={14} />
-            </button>
-            <button
-              type="button"
-              aria-pressed={view === 'list'}
-              aria-label={t('media.browser.viewList')}
-              onClick={() => onViewChange('list')}
-            >
-              <Icon name="note" size={14} />
-            </button>
-          </div>
+          {/*
+            Sort order and grid/list density are ONE concept — how this library is displayed —
+            that was spread across three persistently visible controls. Grouped behind a single
+            `View` disclosure they are still one click and one Enter away, the current sort is
+            still named on the summary so nothing has to be opened to read the state, and the
+            toolbar keeps a visible primary action. This is the toolbar half of Q4 on this
+            surface; the sidebar half is `mc-nav-group` in `MediaCenterView`.
+
+            A native `<details>` rather than a custom popover: it is keyboard-operable and
+            screen-reader-announced for free, and `onToggle` is the only state this needs.
+            `viewRef` closes it on an outside pointerdown and on Escape — a toolbar disclosure
+            that stays open after you have used it is the clunkiness this surface is scored on.
+          */}
+          <details className="medialib-view" ref={viewRef} onToggle={(e) => setViewOpen((e.currentTarget as HTMLDetailsElement).open)}>
+            <summary className="medialib-view__head">
+              <Icon name="eye" size={14} />
+              <span>{t('media.browser.view')}</span>
+              <small>{activeSortLabel}</small>
+              <Icon name="chevron" size={11} />
+            </summary>
+            <div className="medialib-view__body">
+              <label className="medialib-view__field">
+                <span>{t('media.browser.sort')}</span>
+                <Select
+                  aria-label={t('media.browser.sort')}
+                  value={sort}
+                  options={sortOptions}
+                  onChange={(e) => onSortChange(e.target.value as MediaSortId)}
+                />
+              </label>
+              <div className="medialib-view__field">
+                <span>{t('media.browser.view')}</span>
+                <div className="medialib-view-toggle" role="group" aria-label={t('media.browser.view')}>
+                  <button
+                    type="button"
+                    aria-pressed={view === 'grid'}
+                    aria-label={t('media.browser.viewGrid')}
+                    onClick={() => onViewChange('grid')}
+                  >
+                    <Icon name="widgets" size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={view === 'list'}
+                    aria-label={t('media.browser.viewList')}
+                    onClick={() => onViewChange('list')}
+                  >
+                    <Icon name="note" size={14} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </details>
           <Button variant="primary" leftIcon={<Icon name="plus" size={14} />} onClick={onAdd}>
             {t('media.browser.add')}
           </Button>
