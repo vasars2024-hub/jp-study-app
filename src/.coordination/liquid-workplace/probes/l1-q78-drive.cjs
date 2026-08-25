@@ -54,6 +54,26 @@ const WIN = `([].slice.call(document.querySelectorAll('.fwin')).filter(function(
   var t = w.querySelector('.fwin-title-text, .fwin-title');
   return !!t && (t.textContent || '').indexOf(${JSON.stringify(TITLE)}) >= 0;
 })[0])`;
+/**
+ * WHAT A "RESULT ROW" IS ON THIS SURFACE. Q8's whole question is whether the round trip loses
+ * state, and the row count is the load-bearing half of that; the empty-harness refusal below is
+ * what stops a clean score being read off a window with nothing in it. Both were hardcoded to
+ * `.dict-entry`, which is the Dictionary's row and nothing else — so pointing the driver at Video
+ * refused with *"0 dict-entry rows"*, a refusal that reads like a finding about the Media Center
+ * and is an instrument bug, the same shape as the "first visible .fwin" walk this file already
+ * repaired. The selector is now a list tried in order, the first non-empty one wins, and the
+ * winner is reported as `rowSelector` so no reader has to guess which population was counted.
+ * `--rows <css>` overrides it for a surface not listed here.
+ */
+const rowsIdx = process.argv.indexOf('--rows');
+const ROWS = (process.argv.find((a) => a.startsWith('--rows=')) || '').split('=')[1]
+  || (rowsIdx >= 0 ? process.argv[rowsIdx + 1] : '')
+  || '.dict-entry,.medialib-card,.medialib-ep';
+const ROW_SEL = `(function(w){
+  var list = ${JSON.stringify(ROWS)}.split(',');
+  for (var i = 0; i < list.length; i += 1) { if (w.querySelectorAll(list[i]).length) return list[i]; }
+  return list[0];
+})`;
 const ctlIdx = process.argv.indexOf('--control');
 const ctlEq = (process.argv.find((a) => a.startsWith('--control=')) || '').split('=')[1];
 // `indexOf` returns -1 when the flag is absent, and `argv[-1 + 1]` is argv[0] — the node
@@ -157,7 +177,8 @@ const SNAP = `
     rect: [Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height)],
     zIndex: getComputedStyle(win).zIndex,
     focusedClass: win.classList.contains('focused'),
-    entries: win.querySelectorAll('.dict-entry').length,
+    rowSelector: ${ROW_SEL}(win),
+    entries: win.querySelectorAll(${ROW_SEL}(win)).length,
     chars: (win.textContent || '').length,
     nodes: win.querySelectorAll('*').length,
     controls: controls.length,
@@ -195,7 +216,7 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
     throw new Error('window is not liquid at the start — arm it first, this probe measures the round trip out of liquid');
   }
   if (out.legs.liquidBefore.entries === 0) {
-    throw new Error('0 dict-entry rows — the rubric caps an empty harness at 0; drive a real search first');
+    throw new Error(`0 ${out.legs.liquidBefore.rowSelector} rows — the rubric caps an empty harness at 0; load the surface first`);
   }
 
   // --- CONTROL Q7: paint a backdrop-filter that will SURVIVE into standard mode. -------------
@@ -228,10 +249,11 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
     await ev(`(() => {
       const w = ${WIN};
       if (!w) return JSON.stringify({ removed: 0, why: 'window not found' });
-      const rows = w.querySelectorAll('.dict-entry');
+      const sel = ${ROW_SEL}(w);
+      const rows = w.querySelectorAll(sel);
       const n = rows.length;
       if (n) rows[n - 1].remove();
-      return JSON.stringify({ removed: n - w.querySelectorAll('.dict-entry').length });
+      return JSON.stringify({ sel: sel, removed: n - w.querySelectorAll(sel).length });
     })()`);
   }
 

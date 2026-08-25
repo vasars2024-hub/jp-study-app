@@ -385,3 +385,47 @@ had it closed. Closed it back; both windows now read `Library=true, Media type=f
 created `jp-medialib-rail-groups` (previously **absent**) holding
 `{"library":true,"mediaType":false,"collections":false}` — byte-identical to the defaults the
 component merges over, so it changes no first render.
+
+## 2026-08-25 · primary — Q8 on Video passes; Q7's NO is the probe, located to one comparison
+
+| Slice | Commit | What landed |
+| --- | --- | --- |
+| Q7/Q8 driver pointed at a non-Dictionary surface | *this commit* | `l1-q78-drive.cjs` row selector |
+
+**The driver could not be pointed at Video at all.** It refused *"0 dict-entry rows — the rubric
+caps an empty harness at 0"*, which reads like a finding about the Media Center and is an
+instrument bug: `.dict-entry` is the Dictionary's row and nothing else, hardcoded in the snapshot,
+in the empty-harness refusal and in Q8's own control. The selector is now a list tried in order
+(`.dict-entry,.medialib-card,.medialib-ep`, `--rows` overrides), first non-empty wins, and the
+winner is reported as `rowSelector`. On Video it resolved to **`.medialib-card`**.
+
+**Q8 on Video: YES.** Round trip liquid → standard → liquid, run three times identically:
+`returnedToLiquid`, `sameResults` (1/1/1), `sameTextLength` (628/628/628), `sameScrollTop`,
+`sameFocus`, `sameControlSet` (33/33/33), `sameSearchValue`, `geometryWithin1px`
+(`92,40,1080,700` all three legs) — **8 of 8 checks true**.
+
+**Q7 on Video reads NO, and it is NOT SCORED, because both failing terms are the probe.** The two
+that fail are `zeroBackdropRegions` and `zeroLiquidTreatmentInStandard`; the other five pass.
+
+1. `zeroBackdropRegions` counts **3** in standard — `.mc-sidebar`, `.mc-topbar` and
+   `.medialib-card__badge`. All three are the Media Center's OWN material, declared unconditionally
+   in `mediaCenter.css` (`:199`, `:470` via `--mc-glass-*-blur`) and `mediaLibrary.css:502`, not by
+   `liquid-window.css` under `.fwin-liquid`. The count is **3 in liquid and 3 in standard** — the
+   presentation moves it by 0. Q7 asks whether the WINDOW's Liquid treatment is gone, which is a
+   difference between the legs; an absolute count of a component's own glass answers a different
+   question. The bar happened to work on Dictionary only because that interior ships no
+   `backdrop-filter` at all.
+2. `contextualPainting` reads **1 in standard** and the product is correct. Measured on
+   `nav.lq-contextual.medialib-rail`: **liquid `color(srgb … / 0.72)`**, **standard
+   `rgb(8, 15, 12)`** — opaque, exactly the pre-Liquid look. The test is
+   `alphaOf(bg) > 0.02 || borderTop > 0 || shadow`, and an alpha of **1.0** passes it. It cannot
+   tell 0.72 from opaque. Dictionary passed only because its two contextual regions are
+   `rgba(0,0,0,0)` in standard, i.e. alpha 0, which the same loose test happens to reject.
+
+**Next slice, and the turn opens on it: repair Q7's term, with guards.** Both fixes are the same
+idea — Q7 is a DIFFERENCE, not an absolute: `backdropRegions(standard) === backdropRegions(liquid)`
+for regions the window does not own, and a contextual region is "painted" when its background alpha
+is **< 1** (or it carries a border/radius/shadow it lacks in standard). That flips a NO to a YES,
+so it needs its own controls exactly as Q6's did this turn: suppress the real difference and the
+verdict must go back to NO. **Category 5 on Video: Q1 Q2 Q3 Q6 Q8 Q10 YES, Q4 NO, Q7 unscored,
+Q5 INHERIT, Q9 MEASURE — still not a 10.**
