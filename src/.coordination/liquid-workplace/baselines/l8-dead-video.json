@@ -1,0 +1,2031 @@
+{
+  "surface": "Video",
+  "selfTest": {
+    "planted": {
+      "i": 42,
+      "painted": true,
+      "box": "120x24"
+    },
+    "verdict": "DEAD",
+    "mutations": 0,
+    "stateDelta": {},
+    "removed": {
+      "gone": true
+    },
+    "aliveness": {
+      "planted": {
+        "i": 42,
+        "box": "120x24"
+      },
+      "verdict": "ALIVE",
+      "mutations": 1,
+      "restored": true,
+      "removed": {
+        "gone": true,
+        "markerGone": true
+      }
+    }
+  },
+  "controlsTotal": 42,
+  "probed": 29,
+  "byActuation": {
+    "click": 28,
+    "value": 1,
+    "notActuated": 0,
+    "gone": 0
+  },
+  "verdicts": {
+    "ALIVE": 29
+  },
+  "rebound": 47,
+  "recycled": 0,
+  "recycledRows": [],
+  "identityMatched": 29,
+  "identityMismatched": [],
+  "goneControls": [],
+  "excludedCount": 13,
+  "excluded": [
+    {
+      "label": "Pop out into its own window",
+      "cls": "fwin-b",
+      "why": "pops the window out into a separate BrowserWindow"
+    },
+    {
+      "label": "Return to standard window",
+      "cls": "fwin-b",
+      "why": "presentation toggle — measured by l1-q78-drive.cjs, not here"
+    },
+    {
+      "label": "Minimize",
+      "cls": "fwin-b",
+      "why": "minimises the window being measured"
+    },
+    {
+      "label": "Maximize",
+      "cls": "fwin-b",
+      "why": "maximises — changes the geometry every other number is measured against"
+    },
+    {
+      "label": "Close",
+      "cls": "fwin-b",
+      "why": "closes the window being measured"
+    },
+    {
+      "label": "Mine and review (Ctrl+5)",
+      "cls": "",
+      "why": "writes a real note into the user's real Anki collection"
+    },
+    {
+      "label": "Media workspaceLibrary",
+      "cls": "mc-seanime-link",
+      "why": "spawns a separate window — invalidates the resolver mid-run"
+    },
+    {
+      "label": "Open media",
+      "cls": "mc-top-action",
+      "why": "opens an OS-modal file dialog — it would block the renderer, not produce a verdict"
+    },
+    {
+      "label": "Add",
+      "cls": "ui-btn",
+      "why": "opens an OS-modal file dialog — it would block the renderer, not produce a verdict"
+    },
+    {
+      "label": "「パラッ」と「パラリ」はどう違う？オノマトペを部品で分析する【オノマトペ1】#284",
+      "cls": "medialib-card",
+      "why": "starts playback of a real file — writes watch progress, and there is no product-side undo"
+    },
+    {
+      "label": "Emotion 感情表現 ｜ Japanese Podcast with Hana #13",
+      "cls": "medialib-card",
+      "why": "starts playback of a real file — writes watch progress, and there is no product-side undo"
+    },
+    {
+      "label": "Habits 習慣🏃‍♀️📚 ｜ Japanese Podcast with Hana #1",
+      "cls": "medialib-card",
+      "why": "starts playback of a real file — writes watch progress, and there is no product-side undo"
+    },
+    {
+      "label": "Introduction and why I start this podcast ｜ Japa",
+      "cls": "medialib-card",
+      "why": "starts playback of a real file — writes watch progress, and there is no product-side undo"
+    }
+  ],
+  "disabledPresented": [
+    "Forward"
+  ],
+  "dead": 0,
+  "deadControls": [],
+  "oneWayControls": [],
+  "aliveNotRestored": [],
+  "valueRestore": [
+    {
+      "i": 18,
+      "restored": true,
+      "value": ""
+    }
+  ],
+  "lsSettle": {
+    "addedAndRemoved": [],
+    "changedLeftAlone": [
+      "jp-os-environment-v1"
+    ],
+    "disappeared": []
+  },
+  "finalSurface": {
+    "chars": 1234,
+    "nodes": 350,
+    "entries": 8,
+    "openDetails": 3,
+    "currents": "Recently added36",
+    "expanded": 0,
+    "pressed": 3,
+    "checked": 0,
+    "selects": "series",
+    "inputs": "",
+    "dialogs": 0,
+    "winCount": 3,
+    "focus": "button.seanime-host-launcher",
+    "lsLen": 95
+  },
+  "results": [
+    {
+      "i": 5,
+      "label": "Your media at a glance (Ctrl+1)",
+      "cls": "",
+      "box": "175x40",
+      "disabled": false,
+      "identityAtClick": {
+        "roster": "Your media at a glance (Ctrl+1)",
+        "wore": "Your media at a glance (Ctrl+1)",
+        "match": true
+      },
+      "actuatedBy": "click",
+      "clicked": true,
+      "notActuatedWhy": null,
+      "rematch": null,
+      "rematchBeforeSecond": {
+        "detached": 22,
+        "rebound": 0,
+        "reboundByClass": 0,
+        "recycled": 0,
+        "recycledRows": [],
+        "gone": 22,
+        "goneLabels": [
+          "Library",
+          "Home",
+          "Recently added36",
+          "Continue watching2",
+          "Study queue",
+          "Favorites",
+          "Tracking",
+          "Media type",
+          "Anime3",
+          "TV shows29",
+          "Unsorted4",
+          "Filter by typeAll",
+          "ViewSeries",
+          "Add",
+          "「パラッ」と「パラリ」はどう違う？オノマトペを部品で分析する【オノマトペ1】#284",
+          "Date A Live II: Kurumi Star Festival",
+          "Emotion 感情表現 ｜ Japanese Podcast with Hana #13",
+          "Habits 習慣🏃‍♀️📚 ｜ Japanese Podcast with Hana #1",
+          "Introduction and why I start this podcast ｜ Japa",
+          "JoJo's Bizarre Adventure: Golden Wind",
+          "JoJo's Bizarre Adventure: Golden Wind",
+          "The Big O"
+        ]
+      },
+      "group": {
+        "mode": "group-inactive",
+        "wasActive": "All local media (Ctrl+2)",
+        "restoreBy": "All local media (Ctrl+2)"
+      },
+      "restoredBy": "group-restore",
+      "cycleRestore": null,
+      "surfaceRepair": null,
+      "mutations": 16,
+      "stateDelta": {
+        "chars": [
+          1234,
+          1460
+        ],
+        "nodes": [
+          350,
+          311
+        ],
+        "entries": [
+          8,
+          0
+        ],
+        "openDetails": [
+          3,
+          1
+        ],
+        "currents": [
+          "Recently added36",
+          ""
+        ],
+        "pressed": [
+          3,
+          1
+        ],
+        "selects": [
+          "series",
+          ""
+        ]
+      },
+      "verdict": "ALIVE",
+      "restoredAfterSecondClick": true,
+      "residual": null
+    },
+    {
+      "i": 6,
+      "label": "All local media (Ctrl+2)",
+      "cls": "is-active",
+      "box": "175x40",
+      "disabled": false,
+      "identityAtClick": {
+        "roster": "All local media (Ctrl+2)",
+        "wore": "All local media (Ctrl+2)",
+        "match": true
+      },
+      "actuatedBy": "click",
+      "clicked": true,
+      "notActuatedWhy": null,
+      "rematch": null,
+      "rematchBeforeSecond": {
+        "detached": 22,
+        "rebound": 22,
+        "reboundByClass": 0,
+        "recycled": 0,
+        "recycledRows": [],
+        "gone": 0,
+        "goneLabels": []
+      },
+      "group": {
+        "mode": "group-active",
+        "setupClicked": "Your media at a glance (Ctrl+1)",
+        "restoreBy": "the probe click itself"
+      },
+      "restoredBy": "click",
+      "cycleRestore": null,
+      "surfaceRepair": null,
+      "mutations": 46,
+      "stateDelta": {
+        "chars": [
+          1460,
+          1234
+        ],
+        "nodes": [
+          311,
+          350
+        ],
+        "entries": [
+          0,
+          8
+        ],
+        "openDetails": [
+          1,
+          3
+        ],
+        "currents": [
+          "",
+          "Recently added36"
+        ],
+        "pressed": [
+          1,
+          3
+        ],
+        "selects": [
+          "",
+          "series"
+        ]
+      },
+      "verdict": "ALIVE",
+      "restoredAfterSecondClick": true,
+      "residual": null
+    },
+    {
+      "i": 7,
+      "label": "Immersion player (Ctrl+3)",
+      "cls": "",
+      "box": "175x40",
+      "disabled": false,
+      "identityAtClick": {
+        "roster": "Immersion player (Ctrl+3)",
+        "wore": "Immersion player (Ctrl+3)",
+        "match": true
+      },
+      "actuatedBy": "click",
+      "clicked": true,
+      "notActuatedWhy": null,
+      "rematch": null,
+      "rematchBeforeSecond": {
+        "detached": 22,
+        "rebound": 0,
+        "reboundByClass": 0,
+        "recycled": 0,
+        "recycledRows": [],
+        "gone": 22,
+        "goneLabels": [
+          "Library",
+          "Home",
+          "Recently added36",
+          "Continue watching2",
+          "Study queue",
+          "Favorites",
+          "Tracking",
+          "Media type",
+          "Anime3",
+          "TV shows29",
+          "Unsorted4",
+          "Filter by typeAll",
+          "ViewSeries",
+          "Add",
+          "「パラッ」と「パラリ」はどう違う？オノマトペを部品で分析する【オノマトペ1】#284",
+          "Date A Live II: Kurumi Star Festival",
+          "Emotion 感情表現 ｜ Japanese Podcast with Hana #13",
+          "Habits 習慣🏃‍♀️📚 ｜ Japanese Podcast with Hana #1",
+          "Introduction and why I start this podcast ｜ Japa",
+          "JoJo's Bizarre Adventure: Golden Wind",
+          "JoJo's Bizarre Adventure: Golden Wind",
+          "The Big O"
+        ]
+      },
+      "group": {
+        "mode": "group-inactive",
+        "wasActive": "All local media (Ctrl+2)",
+        "restoreBy": "All local media (Ctrl+2)"
+      },
+      "restoredBy": "group-restore",
+      "cycleRestore": null,
+      "surfaceRepair": null,
+      "mutations": 15,
+      "stateDelta": {
+        "chars": [
+          1234,
+          1547
+        ],
+        "nodes": [
+          350,
+          314
+        ],
+        "entries": [
+          8,
+          0
+        ],
+        "openDetails": [
+          3,
+          1
+        ],
+        "currents": [
+          "Recently added36",
+          ""
+        ],
+        "pressed": [
+          3,
+          1
+        ],
+        "checked": [
+          0,
+          1
+        ],
+        "selects": [
+          "series",
+          "kotoba-whisper|none"
+        ],
+        "inputs": [
+          "",
+          "|"
+        ]
+      },
+      "verdict": "ALIVE",
+      "restoredAfterSecondClick": true,
+      "residual": null
+    },
+    {
+      "i": 8,
+      "label": "Listening room (Ctrl+4)",
+      "cls": "",
+      "box": "175x40",
+      "disabled": false,
+      "identityAtClick": {
+        "roster": "Listening room (Ctrl+4)",
+        "wore": "Listening room (Ctrl+4)",
+        "match": true
+      },
+      "actuatedBy": "click",
+      "clicked": true,
+      "notActuatedWhy": null,
+      "rematch": null,
+      "rematchBeforeSecond": {
+        "detached": 22,
+        "rebound": 0,
+        "reboundByClass": 0,
+        "recycled": 0,
+        "recycledRows": [],
+        "gone": 22,
+        "goneLabels": [
+          "Library",
+          "Home",
+          "Recently added36",
+          "Continue watching2",
+          "Study queue",
+          "Favorites",
+          "Tracking",
+          "Media type",
+          "Anime3",
+          "TV shows29",
+          "Unsorted4",
+          "Filter by typeAll",
+          "ViewSeries",
+          "Add",
+          "「パラッ」と「パラリ」はどう違う？オノマトペを部品で分析する【オノマトペ1】#284",
+          "Date A Live II: Kurumi Star Festival",
+          "Emotion 感情表現 ｜ Japanese Podcast with Hana #13",
+          "Habits 習慣🏃‍♀️📚 ｜ Japanese Podcast with Hana #1",
+          "Introduction and why I start this podcast ｜ Japa",
+          "JoJo's Bizarre Adventure: Golden Wind",
+          "JoJo's Bizarre Adventure: Golden Wind",
+          "The Big O"
+        ]
+      },
+      "group": {
+        "mode": "group-inactive",
+        "wasActive": "All local media (Ctrl+2)",
+        "restoreBy": "All local media (Ctrl+2)"
+      },
+      "restoredBy": "group-restore",
+      "cycleRestore": null,
+      "surfaceRepair": null,
+      "mutations": 11,
+      "stateDelta": {
+        "chars": [
+          1234,
+          939
+        ],
+        "nodes": [
+          350,
+          263
+        ],
+        "entries": [
+          8,
+          0
+        ],
+        "openDetails": [
+          3,
+          1
+        ],
+        "currents": [
+          "Recently added36",
+          ""
+        ],
+        "pressed": [
+          3,
+          2
+        ],
+        "selects": [
+          "series",
+          "recent"
+        ],
+        "inputs": [
+          "",
+          "||"
+        ]
+      },
+      "verdict": "ALIVE",
+      "restoredAfterSecondClick": true,
+      "residual": null
+    },
+    {
+      "i": 10,
+      "label": "Study tools",
+      "cls": "mc-nav-group__heading",
+      "box": "175x21",
+      "disabled": false,
+      "identityAtClick": {
+        "roster": "Study tools",
+        "wore": "Study tools",
+        "match": true
+      },
+      "actuatedBy": "click",
+      "clicked": true,
+      "notActuatedWhy": null,
+      "rematch": null,
+      "rematchBeforeSecond": null,
+      "group": null,
+      "restoredBy": "click",
+      "cycleRestore": null,
+      "surfaceRepair": null,
+      "mutations": 4,
+      "stateDelta": {
+        "openDetails": [
+          3,
+          2
+        ]
+      },
+      "verdict": "ALIVE",
+      "restoredAfterSecondClick": true,
+      "residual": null
+    },
+    {
+      "i": 11,
+      "label": "Unified library readiness (Ctrl+6)",
+      "cls": "",
+      "box": "175x46",
+      "disabled": false,
+      "identityAtClick": {
+        "roster": "Unified library readiness (Ctrl+6)",
+        "wore": "Unified library readiness (Ctrl+6)",
+        "match": true
+      },
+      "actuatedBy": "click",
+      "clicked": true,
+      "notActuatedWhy": null,
+      "rematch": null,
+      "rematchBeforeSecond": {
+        "detached": 22,
+        "rebound": 0,
+        "reboundByClass": 0,
+        "recycled": 0,
+        "recycledRows": [],
+        "gone": 22,
+        "goneLabels": [
+          "Library",
+          "Home",
+          "Recently added36",
+          "Continue watching2",
+          "Study queue",
+          "Favorites",
+          "Tracking",
+          "Media type",
+          "Anime3",
+          "TV shows29",
+          "Unsorted4",
+          "Filter by typeAll",
+          "ViewSeries",
+          "Add",
+          "「パラッ」と「パラリ」はどう違う？オノマトペを部品で分析する【オノマトペ1】#284",
+          "Date A Live II: Kurumi Star Festival",
+          "Emotion 感情表現 ｜ Japanese Podcast with Hana #13",
+          "Habits 習慣🏃‍♀️📚 ｜ Japanese Podcast with Hana #1",
+          "Introduction and why I start this podcast ｜ Japa",
+          "JoJo's Bizarre Adventure: Golden Wind",
+          "JoJo's Bizarre Adventure: Golden Wind",
+          "The Big O"
+        ]
+      },
+      "group": null,
+      "restoredBy": "click",
+      "cycleRestore": null,
+      "surfaceRepair": {
+        "actions": [
+          "reselect LibraryAll local media"
+        ],
+        "residualAfterRepair": {}
+      },
+      "mutations": 15,
+      "stateDelta": {
+        "chars": [
+          1234,
+          20100
+        ],
+        "nodes": [
+          350,
+          968
+        ],
+        "entries": [
+          8,
+          0
+        ],
+        "openDetails": [
+          3,
+          1
+        ],
+        "currents": [
+          "Recently added36",
+          ""
+        ],
+        "pressed": [
+          3,
+          2
+        ],
+        "selects": [
+          "series",
+          ""
+        ],
+        "inputs": [
+          "",
+          "|"
+        ]
+      },
+      "verdict": "ALIVE",
+      "restoredAfterSecondClick": true,
+      "residual": null
+    },
+    {
+      "i": 12,
+      "label": "Watch to review (Ctrl+7)",
+      "cls": "",
+      "box": "175x46",
+      "disabled": false,
+      "identityAtClick": {
+        "roster": "Watch to review (Ctrl+7)",
+        "wore": "Watch to review (Ctrl+7)",
+        "match": true
+      },
+      "actuatedBy": "click",
+      "clicked": true,
+      "notActuatedWhy": null,
+      "rematch": null,
+      "rematchBeforeSecond": {
+        "detached": 22,
+        "rebound": 0,
+        "reboundByClass": 0,
+        "recycled": 0,
+        "recycledRows": [],
+        "gone": 22,
+        "goneLabels": [
+          "Library",
+          "Home",
+          "Recently added36",
+          "Continue watching2",
+          "Study queue",
+          "Favorites",
+          "Tracking",
+          "Media type",
+          "Anime3",
+          "TV shows29",
+          "Unsorted4",
+          "Filter by typeAll",
+          "ViewSeries",
+          "Add",
+          "「パラッ」と「パラリ」はどう違う？オノマトペを部品で分析する【オノマトペ1】#284",
+          "Date A Live II: Kurumi Star Festival",
+          "Emotion 感情表現 ｜ Japanese Podcast with Hana #13",
+          "Habits 習慣🏃‍♀️📚 ｜ Japanese Podcast with Hana #1",
+          "Introduction and why I start this podcast ｜ Japa",
+          "JoJo's Bizarre Adventure: Golden Wind",
+          "JoJo's Bizarre Adventure: Golden Wind",
+          "The Big O"
+        ]
+      },
+      "group": null,
+      "restoredBy": "click",
+      "cycleRestore": null,
+      "surfaceRepair": {
+        "actions": [
+          "reselect LibraryAll local media"
+        ],
+        "residualAfterRepair": {}
+      },
+      "mutations": 15,
+      "stateDelta": {
+        "chars": [
+          1234,
+          931
+        ],
+        "nodes": [
+          350,
+          151
+        ],
+        "entries": [
+          8,
+          0
+        ],
+        "openDetails": [
+          3,
+          1
+        ],
+        "currents": [
+          "Recently added36",
+          ""
+        ],
+        "pressed": [
+          3,
+          1
+        ],
+        "selects": [
+          "series",
+          ""
+        ]
+      },
+      "verdict": "ALIVE",
+      "restoredAfterSecondClick": true,
+      "residual": null
+    },
+    {
+      "i": 13,
+      "label": "MAL + AniList (Ctrl+8)",
+      "cls": "",
+      "box": "175x46",
+      "disabled": false,
+      "identityAtClick": {
+        "roster": "MAL + AniList (Ctrl+8)",
+        "wore": "MAL + AniList (Ctrl+8)",
+        "match": true
+      },
+      "actuatedBy": "click",
+      "clicked": true,
+      "notActuatedWhy": null,
+      "rematch": null,
+      "rematchBeforeSecond": {
+        "detached": 22,
+        "rebound": 0,
+        "reboundByClass": 0,
+        "recycled": 0,
+        "recycledRows": [],
+        "gone": 22,
+        "goneLabels": [
+          "Library",
+          "Home",
+          "Recently added36",
+          "Continue watching2",
+          "Study queue",
+          "Favorites",
+          "Tracking",
+          "Media type",
+          "Anime3",
+          "TV shows29",
+          "Unsorted4",
+          "Filter by typeAll",
+          "ViewSeries",
+          "Add",
+          "「パラッ」と「パラリ」はどう違う？オノマトペを部品で分析する【オノマトペ1】#284",
+          "Date A Live II: Kurumi Star Festival",
+          "Emotion 感情表現 ｜ Japanese Podcast with Hana #13",
+          "Habits 習慣🏃‍♀️📚 ｜ Japanese Podcast with Hana #1",
+          "Introduction and why I start this podcast ｜ Japa",
+          "JoJo's Bizarre Adventure: Golden Wind",
+          "JoJo's Bizarre Adventure: Golden Wind",
+          "The Big O"
+        ]
+      },
+      "group": null,
+      "restoredBy": "click",
+      "cycleRestore": null,
+      "surfaceRepair": {
+        "actions": [
+          "reselect LibraryAll local media"
+        ],
+        "residualAfterRepair": {}
+      },
+      "mutations": 66,
+      "stateDelta": {
+        "chars": [
+          1234,
+          1204
+        ],
+        "nodes": [
+          350,
+          227
+        ],
+        "entries": [
+          8,
+          0
+        ],
+        "openDetails": [
+          3,
+          1
+        ],
+        "currents": [
+          "Recently added36",
+          ""
+        ],
+        "pressed": [
+          3,
+          2
+        ],
+        "selects": [
+          "series",
+          "N4"
+        ],
+        "inputs": [
+          "",
+          "|"
+        ]
+      },
+      "verdict": "ALIVE",
+      "restoredAfterSecondClick": true,
+      "residual": null
+    },
+    {
+      "i": 15,
+      "label": "Media SettingsPlayback and sources",
+      "cls": "mc-settings-link",
+      "box": "185x40",
+      "disabled": false,
+      "identityAtClick": {
+        "roster": "Media SettingsPlayback and sources",
+        "wore": "Media SettingsPlayback and sources",
+        "match": true
+      },
+      "actuatedBy": "click",
+      "clicked": true,
+      "notActuatedWhy": null,
+      "rematch": null,
+      "rematchBeforeSecond": {
+        "detached": 22,
+        "rebound": 0,
+        "reboundByClass": 0,
+        "recycled": 0,
+        "recycledRows": [],
+        "gone": 22,
+        "goneLabels": [
+          "Library",
+          "Home",
+          "Recently added36",
+          "Continue watching2",
+          "Study queue",
+          "Favorites",
+          "Tracking",
+          "Media type",
+          "Anime3",
+          "TV shows29",
+          "Unsorted4",
+          "Filter by typeAll",
+          "ViewSeries",
+          "Add",
+          "「パラッ」と「パラリ」はどう違う？オノマトペを部品で分析する【オノマトペ1】#284",
+          "Date A Live II: Kurumi Star Festival",
+          "Emotion 感情表現 ｜ Japanese Podcast with Hana #13",
+          "Habits 習慣🏃‍♀️📚 ｜ Japanese Podcast with Hana #1",
+          "Introduction and why I start this podcast ｜ Japa",
+          "JoJo's Bizarre Adventure: Golden Wind",
+          "JoJo's Bizarre Adventure: Golden Wind",
+          "The Big O"
+        ]
+      },
+      "group": null,
+      "restoredBy": "click",
+      "cycleRestore": null,
+      "surfaceRepair": {
+        "actions": [
+          "reselect LibraryAll local media"
+        ],
+        "residualAfterRepair": {}
+      },
+      "mutations": 9,
+      "stateDelta": {
+        "chars": [
+          1234,
+          2465
+        ],
+        "nodes": [
+          350,
+          371
+        ],
+        "entries": [
+          8,
+          0
+        ],
+        "openDetails": [
+          3,
+          1
+        ],
+        "currents": [
+          "Recently added36",
+          ""
+        ],
+        "pressed": [
+          3,
+          1
+        ],
+        "checked": [
+          0,
+          3
+        ],
+        "selects": [
+          "series",
+          "1|bottom|ja|tiny"
+        ]
+      },
+      "verdict": "ALIVE",
+      "restoredAfterSecondClick": true,
+      "residual": null
+    },
+    {
+      "i": 16,
+      "label": "Back",
+      "cls": "",
+      "box": "32x32",
+      "disabled": false,
+      "identityAtClick": {
+        "roster": "Back",
+        "wore": "Back",
+        "match": true
+      },
+      "actuatedBy": "click",
+      "clicked": true,
+      "notActuatedWhy": null,
+      "rematch": null,
+      "rematchBeforeSecond": {
+        "detached": 22,
+        "rebound": 0,
+        "reboundByClass": 0,
+        "recycled": 0,
+        "recycledRows": [],
+        "gone": 22,
+        "goneLabels": [
+          "Library",
+          "Home",
+          "Recently added36",
+          "Continue watching2",
+          "Study queue",
+          "Favorites",
+          "Tracking",
+          "Media type",
+          "Anime3",
+          "TV shows29",
+          "Unsorted4",
+          "Filter by typeAll",
+          "ViewSeries",
+          "Add",
+          "「パラッ」と「パラリ」はどう違う？オノマトペを部品で分析する【オノマトペ1】#284",
+          "Date A Live II: Kurumi Star Festival",
+          "Emotion 感情表現 ｜ Japanese Podcast with Hana #13",
+          "Habits 習慣🏃‍♀️📚 ｜ Japanese Podcast with Hana #1",
+          "Introduction and why I start this podcast ｜ Japa",
+          "JoJo's Bizarre Adventure: Golden Wind",
+          "JoJo's Bizarre Adventure: Golden Wind",
+          "The Big O"
+        ]
+      },
+      "group": null,
+      "restoredBy": "click",
+      "cycleRestore": null,
+      "surfaceRepair": null,
+      "mutations": 10,
+      "stateDelta": {
+        "chars": [
+          1234,
+          2465
+        ],
+        "nodes": [
+          350,
+          371
+        ],
+        "entries": [
+          8,
+          0
+        ],
+        "openDetails": [
+          3,
+          1
+        ],
+        "currents": [
+          "Recently added36",
+          ""
+        ],
+        "pressed": [
+          3,
+          1
+        ],
+        "checked": [
+          0,
+          3
+        ],
+        "selects": [
+          "series",
+          "1|bottom|ja|tiny"
+        ]
+      },
+      "verdict": "ALIVE",
+      "restoredAfterSecondClick": true,
+      "residual": null
+    },
+    {
+      "i": 17,
+      "label": "Forward",
+      "cls": "",
+      "box": "32x32",
+      "disabled": true,
+      "identityAtClick": {
+        "roster": "Forward",
+        "wore": "Forward",
+        "match": true
+      },
+      "actuatedBy": "click",
+      "clicked": true,
+      "notActuatedWhy": null,
+      "rematch": null,
+      "rematchBeforeSecond": {
+        "detached": 22,
+        "rebound": 0,
+        "reboundByClass": 0,
+        "recycled": 0,
+        "recycledRows": [],
+        "gone": 22,
+        "goneLabels": [
+          "Library",
+          "Home",
+          "Recently added36",
+          "Continue watching2",
+          "Study queue",
+          "Favorites",
+          "Tracking",
+          "Media type",
+          "Anime3",
+          "TV shows29",
+          "Unsorted4",
+          "Filter by typeAll",
+          "ViewSeries",
+          "Add",
+          "「パラッ」と「パラリ」はどう違う？オノマトペを部品で分析する【オノマトペ1】#284",
+          "Date A Live II: Kurumi Star Festival",
+          "Emotion 感情表現 ｜ Japanese Podcast with Hana #13",
+          "Habits 習慣🏃‍♀️📚 ｜ Japanese Podcast with Hana #1",
+          "Introduction and why I start this podcast ｜ Japa",
+          "JoJo's Bizarre Adventure: Golden Wind",
+          "JoJo's Bizarre Adventure: Golden Wind",
+          "The Big O"
+        ]
+      },
+      "group": null,
+      "restoredBy": "click",
+      "cycleRestore": null,
+      "surfaceRepair": null,
+      "mutations": 42,
+      "stateDelta": {
+        "chars": [
+          1234,
+          2465
+        ],
+        "nodes": [
+          350,
+          371
+        ],
+        "entries": [
+          8,
+          0
+        ],
+        "openDetails": [
+          3,
+          1
+        ],
+        "currents": [
+          "Recently added36",
+          ""
+        ],
+        "pressed": [
+          3,
+          1
+        ],
+        "checked": [
+          0,
+          3
+        ],
+        "selects": [
+          "series",
+          "1|bottom|ja|tiny"
+        ]
+      },
+      "verdict": "ALIVE",
+      "restoredAfterSecondClick": true,
+      "residual": null
+    },
+    {
+      "i": 18,
+      "label": "Search your media library…",
+      "cls": "",
+      "box": "248x19",
+      "disabled": false,
+      "identityAtClick": {
+        "roster": "Search your media library…",
+        "wore": "Search your media library…",
+        "match": true
+      },
+      "actuatedBy": "value",
+      "clicked": true,
+      "notActuatedWhy": null,
+      "rematch": null,
+      "rematchBeforeSecond": {
+        "detached": 9,
+        "rebound": 1,
+        "reboundByClass": 1,
+        "recycled": 0,
+        "recycledRows": [],
+        "gone": 8,
+        "goneLabels": [
+          "「パラッ」と「パラリ」はどう違う？オノマトペを部品で分析する【オノマトペ1】#284",
+          "Date A Live II: Kurumi Star Festival",
+          "Emotion 感情表現 ｜ Japanese Podcast with Hana #13",
+          "Habits 習慣🏃‍♀️📚 ｜ Japanese Podcast with Hana #1",
+          "Introduction and why I start this podcast ｜ Japa",
+          "JoJo's Bizarre Adventure: Golden Wind",
+          "JoJo's Bizarre Adventure: Golden Wind",
+          "The Big O"
+        ]
+      },
+      "group": null,
+      "restoredBy": "value",
+      "cycleRestore": null,
+      "surfaceRepair": null,
+      "mutations": 14,
+      "stateDelta": {
+        "chars": [
+          1234,
+          644
+        ],
+        "nodes": [
+          350,
+          228
+        ],
+        "entries": [
+          8,
+          0
+        ],
+        "pressed": [
+          3,
+          2
+        ],
+        "inputs": [
+          "",
+          "__l8"
+        ]
+      },
+      "verdict": "ALIVE",
+      "restoredAfterSecondClick": true,
+      "residual": null
+    },
+    {
+      "i": 20,
+      "label": "Library",
+      "cls": "medialib-rail__heading",
+      "box": "207x32",
+      "disabled": false,
+      "identityAtClick": {
+        "roster": "Library",
+        "wore": "Library",
+        "match": true
+      },
+      "actuatedBy": "click",
+      "clicked": true,
+      "notActuatedWhy": null,
+      "rematch": null,
+      "rematchBeforeSecond": null,
+      "group": null,
+      "restoredBy": "click",
+      "cycleRestore": null,
+      "surfaceRepair": null,
+      "mutations": 1,
+      "stateDelta": {
+        "openDetails": [
+          3,
+          2
+        ]
+      },
+      "verdict": "ALIVE",
+      "restoredAfterSecondClick": true,
+      "residual": null
+    },
+    {
+      "i": 21,
+      "label": "Home",
+      "cls": "ui-sidebar__item",
+      "box": "207x32",
+      "disabled": false,
+      "identityAtClick": {
+        "roster": "Home",
+        "wore": "Home",
+        "match": true
+      },
+      "actuatedBy": "click",
+      "clicked": true,
+      "notActuatedWhy": null,
+      "rematch": null,
+      "rematchBeforeSecond": null,
+      "group": {
+        "mode": "group-inactive",
+        "wasActive": "Recently added36",
+        "restoreBy": "Recently added36"
+      },
+      "restoredBy": "group-restore",
+      "cycleRestore": null,
+      "surfaceRepair": null,
+      "mutations": 4,
+      "stateDelta": {
+        "chars": [
+          1234,
+          1224
+        ],
+        "currents": [
+          "Recently added36",
+          "Home"
+        ]
+      },
+      "verdict": "ALIVE",
+      "restoredAfterSecondClick": true,
+      "residual": null
+    },
+    {
+      "i": 22,
+      "label": "Recently added36",
+      "cls": "ui-sidebar__item",
+      "box": "207x32",
+      "disabled": false,
+      "identityAtClick": {
+        "roster": "Recently added36",
+        "wore": "Recently added36",
+        "match": true
+      },
+      "actuatedBy": "click",
+      "clicked": true,
+      "notActuatedWhy": null,
+      "rematch": null,
+      "rematchBeforeSecond": null,
+      "group": {
+        "mode": "group-active",
+        "setupClicked": "Home",
+        "restoreBy": "the probe click itself"
+      },
+      "restoredBy": "click",
+      "cycleRestore": null,
+      "surfaceRepair": null,
+      "mutations": 4,
+      "stateDelta": {
+        "chars": [
+          1224,
+          1234
+        ],
+        "currents": [
+          "Home",
+          "Recently added36"
+        ]
+      },
+      "verdict": "ALIVE",
+      "restoredAfterSecondClick": true,
+      "residual": null
+    },
+    {
+      "i": 23,
+      "label": "Continue watching2",
+      "cls": "ui-sidebar__item",
+      "box": "207x32",
+      "disabled": false,
+      "identityAtClick": {
+        "roster": "Continue watching2",
+        "wore": "Continue watching2",
+        "match": true
+      },
+      "actuatedBy": "click",
+      "clicked": true,
+      "notActuatedWhy": null,
+      "rematch": null,
+      "rematchBeforeSecond": {
+        "detached": 9,
+        "rebound": 1,
+        "reboundByClass": 1,
+        "recycled": 0,
+        "recycledRows": [],
+        "gone": 8,
+        "goneLabels": [
+          "「パラッ」と「パラリ」はどう違う？オノマトペを部品で分析する【オノマトペ1】#284",
+          "Date A Live II: Kurumi Star Festival",
+          "Emotion 感情表現 ｜ Japanese Podcast with Hana #13",
+          "Habits 習慣🏃‍♀️📚 ｜ Japanese Podcast with Hana #1",
+          "Introduction and why I start this podcast ｜ Japa",
+          "JoJo's Bizarre Adventure: Golden Wind",
+          "JoJo's Bizarre Adventure: Golden Wind",
+          "The Big O"
+        ]
+      },
+      "group": {
+        "mode": "group-inactive",
+        "wasActive": "Recently added36",
+        "restoreBy": "Recently added36"
+      },
+      "restoredBy": "group-restore",
+      "cycleRestore": null,
+      "surfaceRepair": null,
+      "mutations": 9,
+      "stateDelta": {
+        "chars": [
+          1234,
+          719
+        ],
+        "nodes": [
+          350,
+          257
+        ],
+        "entries": [
+          8,
+          1
+        ],
+        "currents": [
+          "Recently added36",
+          "Continue watching2"
+        ],
+        "pressed": [
+          3,
+          2
+        ]
+      },
+      "verdict": "ALIVE",
+      "restoredAfterSecondClick": true,
+      "residual": null
+    },
+    {
+      "i": 24,
+      "label": "Study queue",
+      "cls": "ui-sidebar__item",
+      "box": "207x32",
+      "disabled": false,
+      "identityAtClick": {
+        "roster": "Study queue",
+        "wore": "Study queue",
+        "match": true
+      },
+      "actuatedBy": "click",
+      "clicked": true,
+      "notActuatedWhy": null,
+      "rematch": null,
+      "rematchBeforeSecond": {
+        "detached": 9,
+        "rebound": 1,
+        "reboundByClass": 1,
+        "recycled": 0,
+        "recycledRows": [],
+        "gone": 8,
+        "goneLabels": [
+          "「パラッ」と「パラリ」はどう違う？オノマトペを部品で分析する【オノマトペ1】#284",
+          "Date A Live II: Kurumi Star Festival",
+          "Emotion 感情表現 ｜ Japanese Podcast with Hana #13",
+          "Habits 習慣🏃‍♀️📚 ｜ Japanese Podcast with Hana #1",
+          "Introduction and why I start this podcast ｜ Japa",
+          "JoJo's Bizarre Adventure: Golden Wind",
+          "JoJo's Bizarre Adventure: Golden Wind",
+          "The Big O"
+        ]
+      },
+      "group": {
+        "mode": "group-inactive",
+        "wasActive": "Recently added36",
+        "restoreBy": "Recently added36"
+      },
+      "restoredBy": "group-restore",
+      "cycleRestore": null,
+      "surfaceRepair": null,
+      "mutations": 16,
+      "stateDelta": {
+        "chars": [
+          1234,
+          613
+        ],
+        "nodes": [
+          350,
+          225
+        ],
+        "entries": [
+          8,
+          0
+        ],
+        "currents": [
+          "Recently added36",
+          "Study queue"
+        ],
+        "pressed": [
+          3,
+          2
+        ],
+        "selects": [
+          "series",
+          "recently-added"
+        ]
+      },
+      "verdict": "ALIVE",
+      "restoredAfterSecondClick": true,
+      "residual": null
+    },
+    {
+      "i": 25,
+      "label": "Favorites",
+      "cls": "ui-sidebar__item",
+      "box": "207x32",
+      "disabled": false,
+      "identityAtClick": {
+        "roster": "Favorites",
+        "wore": "Favorites",
+        "match": true
+      },
+      "actuatedBy": "click",
+      "clicked": true,
+      "notActuatedWhy": null,
+      "rematch": null,
+      "rematchBeforeSecond": {
+        "detached": 9,
+        "rebound": 1,
+        "reboundByClass": 1,
+        "recycled": 0,
+        "recycledRows": [],
+        "gone": 8,
+        "goneLabels": [
+          "「パラッ」と「パラリ」はどう違う？オノマトペを部品で分析する【オノマトペ1】#284",
+          "Date A Live II: Kurumi Star Festival",
+          "Emotion 感情表現 ｜ Japanese Podcast with Hana #13",
+          "Habits 習慣🏃‍♀️📚 ｜ Japanese Podcast with Hana #1",
+          "Introduction and why I start this podcast ｜ Japa",
+          "JoJo's Bizarre Adventure: Golden Wind",
+          "JoJo's Bizarre Adventure: Golden Wind",
+          "The Big O"
+        ]
+      },
+      "group": {
+        "mode": "group-inactive",
+        "wasActive": "Recently added36",
+        "restoreBy": "Recently added36"
+      },
+      "restoredBy": "group-restore",
+      "cycleRestore": null,
+      "surfaceRepair": null,
+      "mutations": 16,
+      "stateDelta": {
+        "chars": [
+          1234,
+          611
+        ],
+        "nodes": [
+          350,
+          225
+        ],
+        "entries": [
+          8,
+          0
+        ],
+        "currents": [
+          "Recently added36",
+          "Favorites"
+        ],
+        "pressed": [
+          3,
+          2
+        ],
+        "selects": [
+          "series",
+          "recently-added"
+        ]
+      },
+      "verdict": "ALIVE",
+      "restoredAfterSecondClick": true,
+      "residual": null
+    },
+    {
+      "i": 26,
+      "label": "Tracking",
+      "cls": "ui-sidebar__item",
+      "box": "207x32",
+      "disabled": false,
+      "identityAtClick": {
+        "roster": "Tracking",
+        "wore": "Tracking",
+        "match": true
+      },
+      "actuatedBy": "click",
+      "clicked": true,
+      "notActuatedWhy": null,
+      "rematch": null,
+      "rematchBeforeSecond": {
+        "detached": 11,
+        "rebound": 0,
+        "reboundByClass": 0,
+        "recycled": 0,
+        "recycledRows": [],
+        "gone": 11,
+        "goneLabels": [
+          "Filter by typeAll",
+          "ViewSeries",
+          "Add",
+          "「パラッ」と「パラリ」はどう違う？オノマトペを部品で分析する【オノマトペ1】#284",
+          "Date A Live II: Kurumi Star Festival",
+          "Emotion 感情表現 ｜ Japanese Podcast with Hana #13",
+          "Habits 習慣🏃‍♀️📚 ｜ Japanese Podcast with Hana #1",
+          "Introduction and why I start this podcast ｜ Japa",
+          "JoJo's Bizarre Adventure: Golden Wind",
+          "JoJo's Bizarre Adventure: Golden Wind",
+          "The Big O"
+        ]
+      },
+      "group": {
+        "mode": "group-inactive",
+        "wasActive": "Recently added36",
+        "restoreBy": "Recently added36"
+      },
+      "restoredBy": "group-restore",
+      "cycleRestore": null,
+      "surfaceRepair": null,
+      "mutations": 9,
+      "stateDelta": {
+        "chars": [
+          1234,
+          730
+        ],
+        "nodes": [
+          350,
+          213
+        ],
+        "entries": [
+          8,
+          0
+        ],
+        "currents": [
+          "Recently added36",
+          "Tracking"
+        ],
+        "pressed": [
+          3,
+          1
+        ],
+        "selects": [
+          "series",
+          "week|all"
+        ]
+      },
+      "verdict": "ALIVE",
+      "restoredAfterSecondClick": true,
+      "residual": null
+    },
+    {
+      "i": 27,
+      "label": "Media type",
+      "cls": "medialib-rail__heading",
+      "box": "207x32",
+      "disabled": false,
+      "identityAtClick": {
+        "roster": "Media type",
+        "wore": "Media type",
+        "match": true
+      },
+      "actuatedBy": "click",
+      "clicked": true,
+      "notActuatedWhy": null,
+      "rematch": null,
+      "rematchBeforeSecond": null,
+      "group": null,
+      "restoredBy": "click",
+      "cycleRestore": null,
+      "surfaceRepair": null,
+      "mutations": 1,
+      "stateDelta": {
+        "openDetails": [
+          3,
+          2
+        ]
+      },
+      "verdict": "ALIVE",
+      "restoredAfterSecondClick": true,
+      "residual": null
+    },
+    {
+      "i": 28,
+      "label": "Anime3",
+      "cls": "ui-sidebar__item",
+      "box": "207x32",
+      "disabled": false,
+      "identityAtClick": {
+        "roster": "Anime3",
+        "wore": "Anime3",
+        "match": true
+      },
+      "actuatedBy": "click",
+      "clicked": true,
+      "notActuatedWhy": null,
+      "rematch": null,
+      "rematchBeforeSecond": {
+        "detached": 7,
+        "rebound": 4,
+        "reboundByClass": 2,
+        "recycled": 0,
+        "recycledRows": [],
+        "gone": 3,
+        "goneLabels": [
+          "Habits 習慣🏃‍♀️📚 ｜ Japanese Podcast with Hana #1",
+          "Introduction and why I start this podcast ｜ Japa",
+          "The Big O"
+        ]
+      },
+      "group": null,
+      "restoredBy": "click",
+      "cycleRestore": null,
+      "surfaceRepair": {
+        "actions": [
+          "reselect Recently added36"
+        ],
+        "residualAfterRepair": {}
+      },
+      "mutations": 16,
+      "stateDelta": {
+        "chars": [
+          1234,
+          857
+        ],
+        "nodes": [
+          350,
+          284
+        ],
+        "entries": [
+          8,
+          3
+        ],
+        "currents": [
+          "Recently added36",
+          "Anime3"
+        ]
+      },
+      "verdict": "ALIVE",
+      "restoredAfterSecondClick": true,
+      "residual": null
+    },
+    {
+      "i": 29,
+      "label": "TV shows29",
+      "cls": "ui-sidebar__item",
+      "box": "207x32",
+      "disabled": false,
+      "identityAtClick": {
+        "roster": "TV shows29",
+        "wore": "TV shows29",
+        "match": true
+      },
+      "actuatedBy": "click",
+      "clicked": true,
+      "notActuatedWhy": null,
+      "rematch": null,
+      "rematchBeforeSecond": {
+        "detached": 9,
+        "rebound": 1,
+        "reboundByClass": 1,
+        "recycled": 0,
+        "recycledRows": [],
+        "gone": 8,
+        "goneLabels": [
+          "「パラッ」と「パラリ」はどう違う？オノマトペを部品で分析する【オノマトペ1】#284",
+          "Date A Live II: Kurumi Star Festival",
+          "Emotion 感情表現 ｜ Japanese Podcast with Hana #13",
+          "Habits 習慣🏃‍♀️📚 ｜ Japanese Podcast with Hana #1",
+          "Introduction and why I start this podcast ｜ Japa",
+          "JoJo's Bizarre Adventure: Golden Wind",
+          "JoJo's Bizarre Adventure: Golden Wind",
+          "The Big O"
+        ]
+      },
+      "group": null,
+      "restoredBy": "click",
+      "cycleRestore": null,
+      "surfaceRepair": {
+        "actions": [
+          "reselect Recently added36"
+        ],
+        "residualAfterRepair": {}
+      },
+      "mutations": 9,
+      "stateDelta": {
+        "chars": [
+          1234,
+          712
+        ],
+        "nodes": [
+          350,
+          257
+        ],
+        "entries": [
+          8,
+          1
+        ],
+        "currents": [
+          "Recently added36",
+          "TV shows29"
+        ],
+        "pressed": [
+          3,
+          2
+        ]
+      },
+      "verdict": "ALIVE",
+      "restoredAfterSecondClick": true,
+      "residual": null
+    },
+    {
+      "i": 30,
+      "label": "Unsorted4",
+      "cls": "ui-sidebar__item",
+      "box": "207x32",
+      "disabled": false,
+      "identityAtClick": {
+        "roster": "Unsorted4",
+        "wore": "Unsorted4",
+        "match": true
+      },
+      "actuatedBy": "click",
+      "clicked": true,
+      "notActuatedWhy": null,
+      "rematch": null,
+      "rematchBeforeSecond": {
+        "detached": 7,
+        "rebound": 4,
+        "reboundByClass": 2,
+        "recycled": 0,
+        "recycledRows": [],
+        "gone": 3,
+        "goneLabels": [
+          "JoJo's Bizarre Adventure: Golden Wind",
+          "JoJo's Bizarre Adventure: Golden Wind",
+          "The Big O"
+        ]
+      },
+      "group": null,
+      "restoredBy": "click",
+      "cycleRestore": null,
+      "surfaceRepair": {
+        "actions": [
+          "reselect Recently added36"
+        ],
+        "residualAfterRepair": {}
+      },
+      "mutations": 35,
+      "stateDelta": {
+        "chars": [
+          1234,
+          883
+        ],
+        "nodes": [
+          350,
+          277
+        ],
+        "entries": [
+          8,
+          4
+        ],
+        "currents": [
+          "Recently added36",
+          "Unsorted4"
+        ],
+        "pressed": [
+          3,
+          2
+        ],
+        "selects": [
+          "series",
+          "recently-added"
+        ]
+      },
+      "verdict": "ALIVE",
+      "restoredAfterSecondClick": true,
+      "residual": null
+    },
+    {
+      "i": 31,
+      "label": "Filter by typeAll",
+      "cls": "medialib-view__head",
+      "box": "150x32",
+      "disabled": false,
+      "identityAtClick": {
+        "roster": "Filter by typeAll",
+        "wore": "Filter by typeAll",
+        "match": true
+      },
+      "actuatedBy": "click",
+      "clicked": true,
+      "notActuatedWhy": null,
+      "rematch": null,
+      "rematchBeforeSecond": null,
+      "group": null,
+      "restoredBy": "click",
+      "cycleRestore": null,
+      "surfaceRepair": null,
+      "mutations": 1,
+      "stateDelta": {
+        "openDetails": [
+          3,
+          4
+        ]
+      },
+      "verdict": "ALIVE",
+      "restoredAfterSecondClick": true,
+      "residual": null
+    },
+    {
+      "i": 32,
+      "label": "ViewSeries",
+      "cls": "medialib-view__head",
+      "box": "118x32",
+      "disabled": false,
+      "identityAtClick": {
+        "roster": "ViewSeries",
+        "wore": "ViewSeries",
+        "match": true
+      },
+      "actuatedBy": "click",
+      "clicked": true,
+      "notActuatedWhy": null,
+      "rematch": null,
+      "rematchBeforeSecond": null,
+      "group": null,
+      "restoredBy": "click",
+      "cycleRestore": null,
+      "surfaceRepair": null,
+      "mutations": 1,
+      "stateDelta": {
+        "openDetails": [
+          3,
+          4
+        ]
+      },
+      "verdict": "ALIVE",
+      "restoredAfterSecondClick": true,
+      "residual": null
+    },
+    {
+      "i": 35,
+      "label": "Date A Live II: Kurumi Star Festival",
+      "cls": "medialib-card",
+      "box": "183x354",
+      "disabled": false,
+      "identityAtClick": {
+        "roster": "Date A Live II: Kurumi Star Festival",
+        "wore": "Date A Live II: Kurumi Star Festival",
+        "match": true
+      },
+      "actuatedBy": "click",
+      "clicked": true,
+      "notActuatedWhy": null,
+      "rematch": null,
+      "rematchBeforeSecond": {
+        "detached": 3,
+        "rebound": 3,
+        "reboundByClass": 0,
+        "recycled": 0,
+        "recycledRows": [],
+        "gone": 0,
+        "goneLabels": []
+      },
+      "group": null,
+      "restoredBy": "click",
+      "cycleRestore": null,
+      "surfaceRepair": {
+        "actions": [
+          "close .medialib-drawer"
+        ],
+        "residualAfterRepair": {}
+      },
+      "mutations": 19,
+      "stateDelta": {
+        "chars": [
+          1234,
+          2248
+        ],
+        "nodes": [
+          350,
+          398
+        ]
+      },
+      "verdict": "ALIVE",
+      "restoredAfterSecondClick": true,
+      "residual": null
+    },
+    {
+      "i": 39,
+      "label": "JoJo's Bizarre Adventure: Golden Wind",
+      "cls": "medialib-card",
+      "box": "183x354",
+      "disabled": false,
+      "identityAtClick": {
+        "roster": "JoJo's Bizarre Adventure: Golden Wind",
+        "wore": "JoJo's Bizarre Adventure: Golden Wind",
+        "match": true
+      },
+      "actuatedBy": "click",
+      "clicked": true,
+      "notActuatedWhy": null,
+      "rematch": null,
+      "rematchBeforeSecond": {
+        "detached": 3,
+        "rebound": 3,
+        "reboundByClass": 0,
+        "recycled": 0,
+        "recycledRows": [],
+        "gone": 0,
+        "goneLabels": []
+      },
+      "group": null,
+      "restoredBy": "click",
+      "cycleRestore": null,
+      "surfaceRepair": {
+        "actions": [
+          "close .medialib-drawer"
+        ],
+        "residualAfterRepair": {}
+      },
+      "mutations": 19,
+      "stateDelta": {
+        "chars": [
+          1234,
+          2088
+        ],
+        "nodes": [
+          350,
+          399
+        ]
+      },
+      "verdict": "ALIVE",
+      "restoredAfterSecondClick": true,
+      "residual": null
+    },
+    {
+      "i": 40,
+      "label": "JoJo's Bizarre Adventure: Golden Wind",
+      "cls": "medialib-card",
+      "box": "183x354",
+      "disabled": false,
+      "identityAtClick": {
+        "roster": "JoJo's Bizarre Adventure: Golden Wind",
+        "wore": "JoJo's Bizarre Adventure: Golden Wind",
+        "match": true
+      },
+      "actuatedBy": "click",
+      "clicked": true,
+      "notActuatedWhy": null,
+      "rematch": null,
+      "rematchBeforeSecond": {
+        "detached": 3,
+        "rebound": 3,
+        "reboundByClass": 0,
+        "recycled": 0,
+        "recycledRows": [],
+        "gone": 0,
+        "goneLabels": []
+      },
+      "group": null,
+      "restoredBy": "click",
+      "cycleRestore": null,
+      "surfaceRepair": {
+        "actions": [
+          "close .medialib-drawer"
+        ],
+        "residualAfterRepair": {}
+      },
+      "mutations": 19,
+      "stateDelta": {
+        "chars": [
+          1234,
+          2109
+        ],
+        "nodes": [
+          350,
+          398
+        ]
+      },
+      "verdict": "ALIVE",
+      "restoredAfterSecondClick": true,
+      "residual": null
+    },
+    {
+      "i": 41,
+      "label": "The Big O",
+      "cls": "medialib-card",
+      "box": "183x354",
+      "disabled": false,
+      "identityAtClick": {
+        "roster": "The Big O",
+        "wore": "The Big O",
+        "match": true
+      },
+      "actuatedBy": "click",
+      "clicked": true,
+      "notActuatedWhy": null,
+      "rematch": null,
+      "rematchBeforeSecond": {
+        "detached": 3,
+        "rebound": 3,
+        "reboundByClass": 0,
+        "recycled": 0,
+        "recycledRows": [],
+        "gone": 0,
+        "goneLabels": []
+      },
+      "group": null,
+      "restoredBy": "click",
+      "cycleRestore": null,
+      "surfaceRepair": {
+        "actions": [
+          "close .medialib-drawer"
+        ],
+        "residualAfterRepair": {}
+      },
+      "mutations": 36,
+      "stateDelta": {
+        "chars": [
+          1234,
+          2458
+        ],
+        "nodes": [
+          350,
+          642
+        ]
+      },
+      "verdict": "ALIVE",
+      "restoredAfterSecondClick": true,
+      "residual": null
+    }
+  ]
+}

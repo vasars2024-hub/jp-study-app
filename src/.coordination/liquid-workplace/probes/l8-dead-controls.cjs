@@ -128,6 +128,29 @@ const INSTALL = `(() => {
     || c.getAttribute('placeholder') || c.tagName.toLowerCase()).replace(/\\s+/g, ' ').slice(0, 48);
 
   /**
+   * ONE definition of "this control is the selected member", shared by groupOf and restoreBaseline.
+   *
+   * It used to be written twice, and both copies read only \`aria-pressed\` plus a bare
+   * \`active|selected|current|is-on\` CLASS word. That is the Dictionary's vocabulary. The Media
+   * Center marks its selection two ways this missed entirely:
+   *
+   *   - the shared \`Sidebar\` primitive (\`ui/Sidebar.tsx:30\`) renders \`aria-current={value === id}\`,
+   *     so the selected rail row carries \`aria-current="true"\` and NO class at all;
+   *   - the Media Center's own nav marks its row \`is-active\`, which the word-boundary regex does
+   *     not match — \`active\` there is preceded by \`-\`, not by a space.
+   *
+   * With both invisible, \`groupOf\` saw 0 actives in a 6-button rail, returned null, and every rail
+   * destination fell to the plain there-and-back: click Home, click Home again. The second click is
+   * a no-op on an already-selected destination, so the surface stays on Home and every control
+   * after it is measured on the wrong shelf. Reading only ARIA or only classes misses one of the
+   * two; this reads both, on every surface.
+   */
+  const isActiveEl = (s) => s.getAttribute('aria-pressed') === 'true'
+    || s.getAttribute('aria-selected') === 'true' || s.getAttribute('aria-checked') === 'true'
+    || s.getAttribute('aria-current') === 'true' || s.getAttribute('aria-current') === 'page'
+    || /(^|[\\s-])(active|selected|current|is-on)(\\s|$)/.test(String(s.className || ''));
+
+  /**
    * The exclusion table. Every row is a control this probe refuses to click, with the reason it
    * refuses. These are NOT counted as alive and NOT counted as dead — they are reported.
    */
@@ -147,6 +170,45 @@ const INSTALL = `(() => {
     // 2026-08-24 run destroyed a cached explanation in order to prove the button was not dead.
     { test: (c, l) => /delete|remove|clear|reset|trash|forget/i.test(l), why: 'destructive — userData has no restore point' },
     { test: (c, l) => /copy/i.test(l) || /copy/i.test(String(c.className || '')), why: 'overwrites the system clipboard' },
+    /**
+     * THE THREE ROWS BELOW ARE PORTED FROM \`l1-deadend.js\`, NOT INVENTED HERE. That probe already
+     * derived them on this exact surface with source evidence, and a second census running a
+     * DIFFERENT refusal list would be two audits disagreeing about what is safe to click.
+     *
+     * A NATIVE OS DIALOG IS A HARD STOP, not a slow control. \`Open media\` and \`Add\` both reach
+     * \`window.api.pickMedia()\` — \`MediaLibraryBrowser.tsx:259\` onAdd → \`MediaLibraryShell.tsx:396\`
+     * onImportFiles → \`MediaCenterView.tsx:687\` state.openFile → \`MediaContent.tsx:932\`. The picker
+     * is modal on the main process and \`/eval\` is synchronous, so the probe would not report a
+     * defect — it would hang the app until a human clicked. (\`Add\` is one of the two, and on the
+     * Dictionary the only \`add\` is \`+ Add to Anki\`, already excluded a row above.)
+     */
+    {
+      test: (c, l) => /^(open media|open file|open folder|import|browse|choose|add)$/i.test(l.trim()),
+      why: 'opens an OS-modal file dialog — it would block the renderer, not produce a verdict',
+    },
+    /**
+     * \`Media workspace\` calls \`window.api.popOut('player')\`. The effect is real, but it changes
+     * the \`.fwin\` set every later control is re-resolved against — the instrument would be
+     * measuring its own broken resolver from that point on.
+     */
+    { test: (c, l) => /^media workspace/i.test(l), why: 'spawns a separate window — invalidates the resolver mid-run' },
+    /**
+     * STARTS PLAYBACK, which writes \`watchedSec\` on the media item with no product-side undo —
+     * the same rule the destructive row already applies to \`Add to favorites\`. A card is TWO
+     * controls wearing one class: \`activate()\` (\`MediaLibraryShell.tsx:227\`) opens a drawer for a
+     * grouped entry and calls \`onPlay\` for \`grouping === 'none'\`. The DOM discriminates —
+     * \`MediaLibraryBrowser.tsx:308\` writes "<watched> / <episodes>" into \`.medialib-card__badge\`
+     * for a series and a formatted duration for a standalone — so series cards stay in the census
+     * and standalone ones are refused by name.
+     */
+    {
+      test: (c, l) => c.classList.contains('medialib-ep')
+        || /^play\\b/i.test(l)
+        || (!!c.closest('.medialib-spotlight__actions') && /^(open|resume)\\b/i.test(l))
+        || (c.classList.contains('medialib-card')
+          && !/^\\d+\\s*\\/\\s*\\d+$/.test(((c.querySelector('.medialib-card__badge') || {}).textContent || '').trim())),
+      why: 'starts playback of a real file — writes watch progress, and there is no product-side undo',
+    },
   ];
 
   const all = [...win.querySelectorAll(CTRL)].filter(painted);
@@ -198,18 +260,26 @@ const INSTALL = `(() => {
     r.gone = false;
   }
 
+  // The bound was 24 characters and it silently dropped this surface's selected nav row —
+  // "All local media (Ctrl+2)" is exactly 24, so the one destination restoreBaseline most needs
+  // to steer back to was the one it could not name. 64 still excludes a text blob.
   const activeNow = [...win.querySelectorAll('button')]
-    .filter((b) => b.getAttribute('aria-pressed') === 'true'
-      || /(^|\\s)(active|selected|current|is-on)(\\s|$)/.test(String(b.className || '')))
+    .filter(isActiveEl)
     .map((b) => (b.textContent || '').trim())
-    .filter((t) => t.length > 0 && t.length < 24);
+    .filter((t) => t.length > 0 && t.length < 64);
   const queryInput = win.querySelector('input[type=text],input[type=search],input:not([type])');
 
   window.__l8 = {
     win,
     list,
     /** The surface as found. restoreBaseline() steers back to exactly this. */
-    baseline: { active: activeNow, query: queryInput ? queryInput.value : null },
+    baseline: {
+      active: activeNow,
+      query: queryInput ? queryInput.value : null,
+      // Which transient panels were ALREADY open when the census started. One that was open at
+      // install is part of the surface under test and must not be closed by the cleanup.
+      panelsOpen: { '.medialib-drawer': !!win.querySelector('.medialib-drawer') },
+    },
     lsBefore: Object.fromEntries([...Array(localStorage.length).keys()]
       .map((n) => localStorage.key(n)).filter(Boolean).map((k) => [k, localStorage.getItem(k)])),
     /**
@@ -247,7 +317,6 @@ const INSTALL = `(() => {
         if (w) this.win = w;
       }
       const detached = this.list.filter((r) => !r.el.isConnected);
-      if (!detached.length) return { detached: 0, rebound: 0, gone: 0, goneLabels: [] };
       const byKey = new Map();
       // A SECOND index without the label, because a cycling control's label is its state: the
       // word-status button reads "食べる: New. Click to mark it Learning." and then "…: Learning.
@@ -278,7 +347,43 @@ const INSTALL = `(() => {
         if (!el) { el = (byCls.get(r.clsKey) || [])[r.clsOrd]; if (el) reboundByClass += 1; }
         if (el) { r.el = el; r.gone = false; rebound += 1; } else { r.gone = true; goneLabels.push(r.label); }
       }
-      return { detached: detached.length, rebound, reboundByClass, gone: goneLabels.length, goneLabels };
+
+      /**
+       * A STILL-ATTACHED NODE IS NOT PROOF OF IDENTITY, and this cost the 2026-08-25 census its
+       * only unrestored control.
+       *
+       * The library grid is a VIRTUAL list. It recycles DOM nodes onto different entries, so roster
+       * row 35 stayed isConnected while its element quietly became a different card: the roster
+       * said "Date A Live II: Kurumi Star Festival" and the live node carried aria-label
+       * "Emotion ... Japanese Podcast with Hana #13". Date A Live is a series and opens a drawer;
+       * the podcast is a standalone file and PLAYS. So the census clicked a control it had refused
+       * by name, started playback of a real file, opened the Media workspace over the desktop, and
+       * reported the residual against the wrong label. Measured, not inferred: after 25 controls
+       * the roster label and the element's own aria-label disagreed on exactly this one row and
+       * agreed on the other seven.
+       *
+       * The re-bind is deliberately narrow. A row is only moved when a live element still carries
+       * its ORIGINAL key at its ordinal — that is a recycled node, and the real control still
+       * exists. A cycling control whose label is its state ("... Click to mark it Familiar") has no
+       * element under its old key, matches nothing here, and is left exactly as before.
+       */
+      let recycled = 0;
+      const recycledRows = [];
+      for (const r of this.list) {
+        if (!r.el.isConnected || r.gone) continue;
+        const nowKey = keyOf(labelOf(r.el), r.el.tagName.toLowerCase(),
+          (r.el.getAttribute('type') || '').toLowerCase(), String(r.el.className || '').split(' ')[0]);
+        if (nowKey === r.key) continue;
+        const el = (byKey.get(r.key) || [])[r.ord];
+        if (!el || el === r.el) continue;
+        recycledRows.push({ label: r.label, wore: labelOf(r.el) });
+        r.el = el;
+        recycled += 1;
+      }
+      return {
+        detached: detached.length, rebound, reboundByClass, recycled, recycledRows,
+        gone: goneLabels.length, goneLabels,
+      };
     },
     fingerprint() {
       const w = this.win;
@@ -286,8 +391,20 @@ const INSTALL = `(() => {
       return {
         chars: (w.textContent || '').length,
         nodes: w.querySelectorAll('*').length,
-        entries: w.querySelectorAll('.dict-entry').length,
+        // The surface's own unit of content. A .dict-entry-only count reads a constant 0 on every
+        // surface that is not the Dictionary, so on the Media Center this field discriminated
+        // nothing and a control that swapped the whole shelf could only be caught by the char
+        // count. The selector is a union rather than a per-surface branch: an extra always-0 term
+        // is free, and one fingerprint means one comparison rule for every window.
+        // (No backticks in this comment -- it lives inside a template literal.)
+        entries: w.querySelectorAll(
+          '.dict-entry,.medialib-card,.medialib-row,.medialib-episode-row,.medialib-spotlight-wrap',
+        ).length,
         openDetails: w.querySelectorAll('details[open]').length,
+        // aria-current is this repo's shared Sidebar selection marker and nothing in the
+        // fingerprint read it, so a rail navigation that changed nothing else went unseen.
+        currents: [...w.querySelectorAll('[aria-current="true"],[aria-current="page"]')]
+          .map((e) => (e.textContent || '').trim().slice(0, 32)).join('|'),
         expanded: w.querySelectorAll('[aria-expanded="true"]').length,
         pressed: w.querySelectorAll('[aria-pressed="true"]').length,
         checked: [...w.querySelectorAll('input[type=checkbox],input[type=radio]')].filter((i) => i.checked).length,
@@ -310,9 +427,7 @@ const INSTALL = `(() => {
     groupOf(i) {
       const c = this.list[i];
       if (!c || !c.el.isConnected || !c.el.parentElement) return null;
-      const isActive = (s) => s.getAttribute('aria-pressed') === 'true'
-        || s.getAttribute('aria-selected') === 'true' || s.getAttribute('aria-checked') === 'true'
-        || /(^|\\s)(active|selected|current|is-on)(\\s|$)/.test(String(s.className || ''));
+      const isActive = isActiveEl;
       const members = [...c.el.parentElement.children].filter((s) => s.matches && s.matches(CTRL) && painted(s));
       if (members.length < 2 || !members.includes(c.el)) return null;
       const actives = members.filter(isActive);
@@ -364,8 +479,30 @@ const INSTALL = `(() => {
     restoreBaseline() {
       const w = this.win;
       const acts = [];
-      const isActive = (s) => s.getAttribute('aria-pressed') === 'true'
-        || /(^|\\s)(active|selected|current|is-on)(\\s|$)/.test(String(s.className || ''));
+      const isActive = isActiveEl;
+      /**
+       * TRANSIENT PANELS FIRST, because they are the residual a second click cannot undo.
+       *
+       * A Media Center series card opens the episode drawer and clicking it AGAIN re-activates the
+       * same entry rather than closing it — measured, not assumed: The Big O read ALIVE with
+       * chars 1234 -> 2458 and nodes 350 -> 642, and the residual was still 2458/642 after the
+       * second click. Four series cards in a row would each be measured against a surface the one
+       * before it had already grown, and 38 drawer controls would sit inside the window that every
+       * later fingerprint is compared against.
+       *
+       * A panel is only closed when it was NOT open at install, and only by the product's own
+       * close control. The table is per-panel so another surface adds a row rather than a branch.
+       */
+      const TRANSIENT = [{ panel: '.medialib-drawer', close: '.medialib-drawer__close' }];
+      for (const row of TRANSIENT) {
+        if (this.baseline.panelsOpen[row.panel]) continue;
+        const open = w.querySelector(row.panel);
+        if (!open) continue;
+        const btn = w.querySelector(row.close);
+        if (!btn) { acts.push('CANNOT CLOSE ' + row.panel + ' (no ' + row.close + ')'); continue; }
+        btn.click();
+        acts.push('close ' + row.panel);
+      }
       for (const text of this.baseline.active) {
         const b = [...w.querySelectorAll('button')].find((e) => (e.textContent || '').trim() === text);
         if (b && !isActive(b)) { b.click(); acts.push('reselect ' + text); }
@@ -601,6 +738,9 @@ async function probeOne(t, settle = SETTLE) {
   const pre = await ev(`JSON.stringify(window.__l8.preArm(${t.i}))`);
   if (pre.mode !== 'plain') await sleep(settle);
   await ev(`JSON.stringify(window.__l8.rematch())`);
+  // Read AFTER the last rematch and immediately before the click, so this is the identity the
+  // click actually landed on rather than the one the row had a few round trips earlier.
+  const labelAtClick = await ev(`JSON.stringify(window.__l8.labelNow(${t.i}))`);
   await ev(`JSON.stringify(window.__l8.arm(${t.i}))`);
   const c1 = await ev(`JSON.stringify(window.__l8.click(${t.i}))`);
   await sleep(settle);
@@ -672,11 +812,18 @@ async function probeOne(t, settle = SETTLE) {
     cls: t.cls,
     box: t.box,
     disabled: t.disabled,
+    /**
+     * WHAT THE ELEMENT CALLED ITSELF AT CLICK TIME, so the row proves it measured the control it
+     * names instead of asserting it. The virtual grid recycles nodes, and a recycled node stays
+     * isConnected, so "the roster row was not detached" was never evidence of identity — it is how
+     * a census clicked a standalone podcast while reporting the series card it had refused.
+     */
+    identityAtClick: { roster: t.label, wore: labelAtClick, match: labelAtClick === t.label },
     actuatedBy: c1.how || null,
     clicked: c1.clicked !== false,
     notActuatedWhy: c1.clicked === false ? c1.why : null,
-    rematch: rm.rebound || rm.gone ? rm : null,
-    rematchBeforeSecond: rm2.rebound || rm2.gone ? rm2 : null,
+    rematch: rm.rebound || rm.gone || rm.recycled ? rm : null,
+    rematchBeforeSecond: rm2.rebound || rm2.gone || rm2.recycled ? rm2 : null,
     group: pre.mode === 'plain' ? null : pre,
     restoredBy: c2.how || null,
     cycleRestore: cycle,
@@ -773,6 +920,19 @@ async function probeOne(t, settle = SETTLE) {
     verdicts: results.reduce((a, r) => { a[r.verdict] = (a[r.verdict] || 0) + 1; return a; }, {}),
     rebound: results.reduce((a, r) => a + ((r.rematch && r.rematch.rebound) || 0)
       + ((r.rematchBeforeSecond && r.rematchBeforeSecond.rebound) || 0), 0),
+    // Rows whose still-attached node had been recycled onto a different control before the click.
+    // Every one of these is a control the census would otherwise have measured under the wrong name.
+    recycled: results.reduce((a, r) => a + ((r.rematch && r.rematch.recycled) || 0)
+      + ((r.rematchBeforeSecond && r.rematchBeforeSecond.recycled) || 0), 0),
+    recycledRows: results.flatMap((r) => [
+      ...((r.rematch && r.rematch.recycledRows) || []),
+      ...((r.rematchBeforeSecond && r.rematchBeforeSecond.recycledRows) || []),
+    ]),
+    // The whole census's identity claim in one number. Anything but `probed` here means at least
+    // one verdict is filed under a control that was not the one clicked, and the run is not usable.
+    identityMatched: results.filter((r) => r.identityAtClick && r.identityAtClick.match).length,
+    identityMismatched: results.filter((r) => r.identityAtClick && !r.identityAtClick.match)
+      .map((r) => r.identityAtClick),
     goneControls: results.filter((r) => r.verdict === 'GONE').map((r) => ({ label: r.label, cls: r.cls })),
     excludedCount: setup.excluded.length,
     excluded: setup.excluded,

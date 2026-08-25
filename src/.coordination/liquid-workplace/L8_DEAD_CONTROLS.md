@@ -89,3 +89,52 @@ decision. 3 tests added (11 total in `lexiconExplainRun.test.ts`).
 Dead ends **4 → 3**, all three remaining honest. Data left as found: 猫 had **no** stored
 explanation before the probe (`preexisting: null`) and `dictExplanationClear` removed exactly
 **1** row, re-read as `null`.
+
+## 2026-08-25 · primary — the census ported to the VIDEO window, and the first number it produced was a lie
+
+Category 8's dead-control number on the Media Center (`Video`, 1080×700, `presentation=liquid`,
+Library / `Recently added`, 8 cards / 1,234 chars / 350 nodes). Instrument `l8-dead-controls.cjs`
+`--title Video --self-test`, pid 1324, `debug/bridge.json` port 39273. Raw:
+`baselines/l8-dead-video.json`.
+
+**42 controls painted, 13 excluded by name, 29 probed, 0 DEAD, 0 GONE, 0 NOT ACTUATED, 0 left
+unrestored.** Both self-test controls fired in the same run: the planted handler-less button read
+**DEAD** at 0 mutations, the planted marker button read **ALIVE** at 1 and restored itself. Surface
+returned to 1,234 chars / 350 nodes / 8 entries / `Recently added36`, `lsSettle` added-and-removed
+**0**. `Forward` is `disabled` and reported as presented-disabled, not counted either way.
+
+**THE FIRST TWO RUNS SCORED A CONTROL THEY HAD REFUSED BY NAME.** Row 35 was rostered
+`Date A Live II: Kurumi Star Festival` — a series, whose click opens a drawer. It reported ALIVE
+and `restoredAfterSecondClick:false` with `dialogs 0→2`, `entries 8→0`, `selects series →
+kotoba-whisper|none`: the Media workspace opened over the desktop and the window navigated to the
+player. Reproduced three times, and **never** when that card was probed in isolation (4 cards →
+4 ALIVE, all restored). Cause, measured directly rather than reasoned: after 25 controls the
+roster's element for row 35 was **still `isConnected`** while its own `aria-label` had become
+`Emotion 感情表現 ｜ Japanese Podcast with Hana #13` — a standalone file, which **plays**. The library
+grid is a virtual list and recycles DOM nodes onto other entries; `rematch()` only re-bound
+DETACHED rows, so a recycled-but-attached node was invisible to it. A probe defect in a product
+defect's clothes: the run started playback of a real file, wrote watch progress, and filed the
+residual under the wrong control's name.
+
+**Fixed in the instrument two ways, and both are reported per run.** `rematch()` now also re-binds
+a row whose live element no longer carries its original key, but only when a live element still
+holds that key at that ordinal — a cycling control, whose label IS its state, matches nothing here
+and is left alone. And every result row now carries `identityAtClick {roster, wore, match}`, read
+after the last rematch and immediately before the click. This run: **`identityMatched` 29 of 29,
+`identityMismatched` []**, `recycled` 0, `rebound` 47.
+
+**Control for the identity guard itself: FIRED.** Row 35's element was deliberately pointed at row
+36's, still attached — `rematch()` returned `detached: 0` but `recycled: 1`, naming both
+(`"Date A Live II…" wore "Emotion 感情表現…"`), and re-bound it; `labelNow(35)` read the wrong title
+before and the right one after.
+
+**Three exclusions ported from `l1-deadend.js` rather than re-invented**, so the two censuses agree
+about what is unsafe: `Open media` and `Add` both reach `window.api.pickMedia()`
+(`MediaLibraryBrowser.tsx:259` → `MediaLibraryShell.tsx:396` → `MediaCenterView.tsx:687` →
+`MediaContent.tsx:932`) and would hang the app on an OS-modal dialog; `Media workspace` calls
+`popOut('player')`; and 4 of 8 cards are standalone files that play — discriminated by the badge
+form, `"w / e"` for a series and a duration for a standalone (`MediaLibraryBrowser.tsx:308`).
+
+**Stated denominator.** The 38 controls inside a series drawer are NOT in this census: the roster is
+taken on the surface as found, and `rematch()` never adds controls. They are covered by category 2's
+sweep on this same surface — 41 targets, coverage 41/41, 0 dead ends (`L1_CLUNKINESS.md`, this tree).
