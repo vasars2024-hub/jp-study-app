@@ -175,3 +175,20 @@ millisecond figure across displays without dividing by the ceiling first.
 Main private over one burst: **426.7 → 430.1 (+3.4)**, **429.5 → 429.8 (+0.3)**, **429.0 → 443.1
 (+14.1, the run carrying 600 lookups)** MB. Was +97.5 / +185.3 / +152.4. Those three figures were
 main loading a 20.10 MB rank table into its heap three times per navigation.
+
+### Leg 3 re-run POST-FIX on pid 1324 — complete, and flatter than the pre-fix boot
+
+| mark | uptime | main private | handles | all-process private |
+| --- | --- | --- | --- | --- |
+| 8 | 8.00 min | 445.6 MB | 1,076 | 1,608.0 MB |
+| 16 | 16.01 min | 445.9 MB | 1,075 | 1,556.1 MB |
+| 24 | 24.01 min | 447.4 MB | 1,077 | 1,567.8 MB |
+
+**445.6 → 445.9 → 447.4 MB (+1.8) and +1 handle across 24 minutes**, 103–105 MB below the bottom
+of L0's 550–577 band, on a boot that took three 18-control bursts, a 12,000-lookup control, ten
+gesture probes and a partial dead-control sweep. So category 7's memory leg is no longer carried
+from the pre-fix boot — both runs are complete and they agree to within 1.5 MB. `main RSS` reads
+264.9 → 64.4 → 53.7 and again carries nothing but the Windows working-set trim.
+
+**Category 7 on Video: 10/10.** All four legs measured on the fix's own boot, each with a control
+that fired.

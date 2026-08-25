@@ -521,7 +521,7 @@ listing ran. After the fix: **3 ms**, cold cache, same four dictionaries and the
 | --- | --- | --- |
 | 1 gestures | drag **0/0** over 33/100 ×5; resize 1,0,2 over 33 and **0** over 100 ×3; theme 1 over 33, **0** over 100 ×2 — every count at or below L0's own 4–5 / 8 / 2 | jank FIRED: p95 16.8 → **116.9**, over 100 **0 → 12** |
 | 2 main block | MAX **3 / 50 / 53 ms** over three 18-control bursts, **none over 500** (was 3,117 / 1,910 / 2,076) | FIRED: 3,000 distinct lookups → **1,127 ms**, 12,000 → **9,030 ms**, idle MAX 12 ms |
-| 3 memory | pid 30480 flat at 8/16/24 min — **448.1 / 447.1 / 447.1 MB**, handles +4, ~102 MB *below* L0's 550–577 band; pid 1324's 8-min mark **445.6 MB / 1,076 handles** agrees | the RSS column (359.2 → 70.1 → 84.4) is the Windows trim this sampler discloses |
+| 3 memory | measured on BOTH boots and they agree to 1.5 MB. Post-fix pid 1324: **445.6 / 445.9 / 447.4 MB**, **+1.8 MB and +1 handle** across 8/16/24 min. Pre-fix pid 30480: 448.1 / 447.1 / 447.1 MB, +4 handles. Both 102–105 MB *below* L0's 550–577 band | the RSS column (264.9 → 64.4 → 53.7) is the Windows trim this sampler exists to disclose |
 | 4 burst cost | **+3.4 / +0.3 / +14.1 MB** private (was +97.5 / +185.3 / +152.4) | — |
 
 **The one open number from the previous entry is closed, and it was never a regression.** Theme
