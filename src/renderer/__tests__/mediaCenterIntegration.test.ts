@@ -178,9 +178,15 @@ describe('Media Center integration contract', () => {
     // `overflow-y` is dead code — that is the half of this fix that is easy to delete.
     expect(rule).toMatch(/min-height:\s*0/);
     expect(rule).toMatch(/overflow:\s*hidden auto/);
-    // The sidebar itself must NOT scroll: brand, library and Settings stay pinned.
+    // The sidebar has a scroller of its own too, and it is a LAST resort rather than a
+    // second opinion — this assertion used to read `.not.toMatch(/overflow/)`. The nav's
+    // `min-height: 0` absorbs a long section list, but it cannot absorb the fixed 40px
+    // rows around it: at the window's own 260x170 floor the column needs 146px of a 76px
+    // content box, and `.mc-sidebar-spacer` and `.mc-settings-link` measured 10px and 50px
+    // BELOW the frame with nothing to scroll them back. At any size that fits, no
+    // scrollbar appears and brand, library and Settings stay exactly where they were.
     const side = css.slice(css.indexOf('\n.mc-sidebar {'));
-    expect(side.slice(0, side.indexOf('}'))).not.toMatch(/overflow/);
+    expect(side.slice(0, side.indexOf('}'))).toMatch(/overflow:\s*hidden auto/);
     // The active indicator lives inside the scroll clip now. A negative inset would be
     // eaten by `overflow-x: hidden`, and at `overflow-x: visible` would open a 1px
     // horizontal scrollbar in the nav.
