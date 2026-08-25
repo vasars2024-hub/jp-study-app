@@ -157,6 +157,10 @@ export default function MediaLibraryBrowser({
             items={entries}
             className="medialib-grid"
             minColWidth={view === 'list' ? 420 : CARD_METRICS[variant].minColWidth}
+            // List rows are meant to span the pane, so they get no cap and stay on
+            // the plain auto-fill path. Cards do: a shelf holding fewer titles than
+            // it has tracks grows them into the surplus instead of leaving a void.
+            maxColWidth={view === 'list' ? undefined : CARD_METRICS[variant].maxColWidth}
             gap={GRID_GAP}
             rowHeight={cardRowHeight(variant, GRID_GAP)}
             getKey={(entry) => entry.id}

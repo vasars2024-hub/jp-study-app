@@ -9,6 +9,12 @@ import { useElementSize } from '../hooks';
 export interface VirtualGridProps<T> {
   items: T[];
   minColWidth: number;
+  /**
+   * Widest a single card may usefully get. Opt-in, and it turns on the sparse-row
+   * behaviour below; leaving it out keeps the plain `auto-fill` layout exactly as
+   * it was.
+   */
+  maxColWidth?: number;
   gap: number;
   /**
    * Fixed row height, or a function of the resolved column width. Aspect-ratio
@@ -28,6 +34,7 @@ export interface VirtualGridProps<T> {
 export default function VirtualGrid<T>({
   items,
   minColWidth,
+  maxColWidth,
   gap,
   rowHeight,
   overscan = 2,
@@ -49,13 +56,26 @@ export default function VirtualGrid<T>({
     });
   }, [containerRef]);
 
-  const columns = Math.max(1, Math.floor((size.width + gap) / (minColWidth + gap)));
+  const autoFillColumns = Math.max(1, Math.floor((size.width + gap) / (minColWidth + gap)));
+  // A view holding fewer items than there are tracks used to leave the surplus
+  // tracks empty, so the media library's "Continue watching" — one title — painted
+  // a 187px card against a 431x532 void at 1080x700: 22.1% of the viewport, against
+  // the 15% bar in rubric category 4. With a declared `maxColWidth` the sparse row
+  // drops the empty tracks instead, the cards grow into the space up to that cap,
+  // and whatever the cap leaves over is split either side so the row reads as
+  // centred rather than abandoned against the left edge. Without one, nothing here
+  // changes — an uncapped single item would otherwise stretch to the full pane.
+  const columns = maxColWidth != null && items.length > 0
+    ? Math.max(1, Math.min(autoFillColumns, items.length))
+    : autoFillColumns;
   // Mirrors the `repeat(columns, 1fr)` track below, so a callback row height sees
   // the same width the cards will actually render at. Falls back to minColWidth
   // until ResizeObserver reports a width, which keeps the first paint sane.
-  const colWidth = size.width > 0
+  const trackWidth = size.width > 0
     ? Math.max(1, (size.width - gap * (columns - 1)) / columns)
     : minColWidth;
+  const capped = maxColWidth != null && trackWidth > maxColWidth;
+  const colWidth = capped ? maxColWidth : trackWidth;
   const resolvedRowHeight = Math.max(
     1,
     typeof rowHeight === 'function' ? rowHeight(colWidth) : rowHeight,
@@ -94,7 +114,10 @@ export default function VirtualGrid<T>({
                   right: 0,
                   height: resolvedRowHeight,
                   display: 'grid',
-                  gridTemplateColumns: `repeat(${columns}, 1fr)`,
+                  gridTemplateColumns: capped
+                    ? `repeat(${columns}, ${colWidth}px)`
+                    : `repeat(${columns}, 1fr)`,
+                  justifyContent: capped ? 'center' : undefined,
                   gap,
                 }}
               >

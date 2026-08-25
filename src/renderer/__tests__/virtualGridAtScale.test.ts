@@ -75,7 +75,7 @@ afterEach(() => {
   delete (HTMLElement.prototype as Partial<HTMLElement>).clientHeight;
 });
 
-async function renderGrid(count: number): Promise<HTMLDivElement> {
+async function renderGrid(count: number, maxColWidth?: number): Promise<HTMLDivElement> {
   const items = Array.from({ length: count }, (_, index) => ({ id: index }));
   host = document.createElement('div');
   document.body.append(host);
@@ -85,6 +85,7 @@ async function renderGrid(count: number): Promise<HTMLDivElement> {
     mounted.render(createElement(VirtualGrid<{ id: number }>, {
       items,
       minColWidth: 200,
+      maxColWidth,
       gap: 10,
       rowHeight: 200,
       getKey: (item) => String(item.id),
@@ -92,6 +93,11 @@ async function renderGrid(count: number): Promise<HTMLDivElement> {
     }));
   });
   return host;
+}
+
+/** The absolutely-positioned row inside the full-height spacer. */
+function firstRow(el: HTMLDivElement): HTMLElement | null {
+  return el.firstElementChild?.firstElementChild?.firstElementChild as HTMLElement | null;
 }
 
 describe('VirtualGrid at library scale', () => {
@@ -136,5 +142,53 @@ describe('VirtualGrid at library scale', () => {
     installLayout(800, 0);
     const el = await renderGrid(300);
     expect(el.querySelectorAll('.card').length).toBe(300);
+  });
+});
+
+/**
+ * The sparse half — rubric category 4, "use of space". The media library's
+ * "Continue watching" shelf holds one title, and at 1080x700 that one 187px card
+ * sat against a 431x532 dead region: 22.1% of the viewport against a 15% bar.
+ * The empty tracks were the whole of it, so they are what these pin.
+ */
+describe('VirtualGrid on a sparse shelf', () => {
+  it('leaves the surplus tracks empty when no maxColWidth is declared', async () => {
+    // The pre-existing contract, kept for the three call sites that do not opt in:
+    // 800px at 200px columns is 3 tracks, and one item still lays out against 3.
+    installLayout(800, 600);
+    const el = await renderGrid(1);
+    expect(firstRow(el)?.style.gridTemplateColumns).toBe('repeat(3, 1fr)');
+    expect(firstRow(el)?.style.justifyContent).toBe('');
+  });
+
+  it('drops the empty tracks and centres what the cap leaves over', async () => {
+    // 3 tracks, 1 item, cap 260: one 260px track centred in 800px rather than a
+    // 260px card pinned left with 540px of nothing beside it.
+    installLayout(800, 600);
+    const el = await renderGrid(1, 260);
+    expect(firstRow(el)?.style.gridTemplateColumns).toBe('repeat(1, 260px)');
+    expect(firstRow(el)?.style.justifyContent).toBe('center');
+  });
+
+  it('grows a partial shelf up to the cap instead of stretching past it', async () => {
+    // 2 items in a 3-track pane: (800 - 10) / 2 = 395 each, which the 260 cap bites.
+    installLayout(800, 600);
+    const el = await renderGrid(2, 260);
+    expect(firstRow(el)?.style.gridTemplateColumns).toBe('repeat(2, 260px)');
+  });
+
+  it('leaves a full shelf on 1fr tracks, so the dense library is untouched', async () => {
+    // 3 items fill the 3 tracks at (800 - 20) / 3 = 260, which does not exceed the
+    // cap — the capped/centred path must not engage on a library that already fits.
+    installLayout(800, 600);
+    const el = await renderGrid(3, 260);
+    expect(firstRow(el)?.style.gridTemplateColumns).toBe('repeat(3, 1fr)');
+    expect(firstRow(el)?.style.justifyContent).toBe('');
+    const many = await (async () => {
+      act(() => { root?.unmount(); });
+      host?.remove();
+      return renderGrid(60, 260);
+    })();
+    expect(firstRow(many)?.style.gridTemplateColumns).toBe('repeat(3, 1fr)');
   });
 });

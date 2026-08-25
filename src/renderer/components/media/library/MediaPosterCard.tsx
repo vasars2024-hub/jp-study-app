@@ -21,11 +21,20 @@ import type { MediaSubtitleStatus } from '../../../../shared/mediaSubtitleStatus
 export type MediaCardVariant = 'poster' | 'still';
 
 /** Grid geometry, shared with the browser so its row height math matches. */
-export const CARD_METRICS: Record<MediaCardVariant, { minColWidth: number; ratio: number; ratioCss: string }> = {
+export const CARD_METRICS: Record<
+  MediaCardVariant,
+  { minColWidth: number; maxColWidth: number; ratio: number; ratioCss: string }
+> = {
   // 2:3 is the standard poster; 16:9 matches a video frame, so stills are never
   // letterboxed or cropped to something the source never looked like.
-  poster: { minColWidth: 168, ratio: 3 / 2, ratioCss: '2 / 3' },
-  still: { minColWidth: 260, ratio: 9 / 16, ratioCss: '16 / 9' },
+  //
+  // `maxColWidth` is what a sparse shelf may grow a card to (`VirtualGrid`), and it
+  // is bounded by the card's own height rather than by taste. A poster row is
+  // `w * 1.5 + 64 + gap` tall, and the library paints a 447px grid box at the
+  // default 1080x700 window: 252 measured 456 and handed a one-item shelf a 9px
+  // scrollbar, 240 measures 438 and fits.
+  poster: { minColWidth: 168, maxColWidth: 240, ratio: 3 / 2, ratioCss: '2 / 3' },
+  still: { minColWidth: 260, maxColWidth: 390, ratio: 9 / 16, ratioCss: '16 / 9' },
 };
 
 /** Caption block below the art: two text lines plus a status line. */
