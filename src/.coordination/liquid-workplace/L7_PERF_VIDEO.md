@@ -65,8 +65,10 @@ Dictionary surface once had.
 
 `l7c-mem-sampler.ps1` is running against pid 30480 at marks **8 / 16 / 24 min**, writing
 `%TEMP%\l7v-mem-video.jsonl`; header verified `marks:[8.0,16.0,24.0]` (the array-bind trap). At
-write time only the header record exists. L0's band for a settled main is **550–577 MB**; this boot
-reads 450.9 MB at 5.9 min, below it.
+the **8-minute mark has landed**: main RSS 359.2 MB, **private 448.1 MB, 1,121 handles**, 6
+processes, all-process private 1,510.8 MB. L0's band for a settled main is **550–577 MB**, so this
+boot sits **101.9 MB below the bottom of it** at 8 min — recorded as a number, not as a pass,
+because the Dictionary leg was scored on the 16- and 24-minute marks and those are not in yet.
 
 **Verdict: category 7 on Video is NOT 10.** Leg 1 passes with room and its control fires; leg 4 is
 clean; leg 2 fails on a reproduced product number. The next slice is `Review` and `Study Mode` —
