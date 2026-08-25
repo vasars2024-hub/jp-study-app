@@ -12,6 +12,29 @@ export const ANKI_UNREACHABLE_MSG =
 export const ANKI_COLLECTION_UNAVAILABLE_MSG =
   'Anki is open but the collection is not loaded yet. The app will retry automatically every few seconds. If this persists, close every Anki window (check Task Manager), reopen Anki, and wait until your decks appear.';
 
+/**
+ * Main authors the two constants above, and main has no locale — so they arrive at the renderer in
+ * English whatever the user's language is. Measured on the Media Center's Review panel in Japanese:
+ * `Anki に接続できないため（Can't reach Anki. Open Anki desktop and make sure the AnkiConnect add-on
+ * is installed.）、以下のカードの復習状況は不明です。` — a translated sentence wrapped around an
+ * untranslated one, in all three non-English languages.
+ *
+ * Map the two reasons WE author to catalog keys; pass every other reason through unchanged. The
+ * rest are verbatim AnkiConnect API errors and JS `Error` messages, which this app neither writes
+ * nor can translate, and replacing them with a generic translated string would throw away the
+ * detail that makes them actionable. English is unaffected: both keys are byte-identical to the
+ * constants, so `ANKI_UNREACHABLE_MSG`'s single-source-of-truth contract still holds on `en`.
+ */
+export function translateAnkiReason(
+  reason: string | undefined,
+  t: (key: string) => string,
+): string | undefined {
+  if (!reason) return reason;
+  if (reason === ANKI_UNREACHABLE_MSG) return t('anki.unreachableReason');
+  if (reason === ANKI_COLLECTION_UNAVAILABLE_MSG) return t('anki.collectionUnavailableReason');
+  return reason;
+}
+
 export const APP_TAG = 'jp-study-app';
 export const KINOMOTO_MODEL_NAME = 'jidoujisho Kinomoto';
 

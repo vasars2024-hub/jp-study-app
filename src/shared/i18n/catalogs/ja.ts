@@ -4662,6 +4662,8 @@ export const ja: Catalog = {
   'stats.level.aria': '推定レベル {level}',
 
   // Anki view
+  'anki.unreachableReason': 'Anki に接続できません。Anki デスクトップを開き、AnkiConnect アドオンがインストールされていることを確認してください。',
+  'anki.collectionUnavailableReason': 'Anki は起動していますが、コレクションがまだ読み込まれていません。数秒ごとに自動で再試行します。解決しない場合は、すべての Anki ウィンドウを閉じ（タスクマネージャーも確認）、Anki を開き直してデッキが表示されるまで待ってください。',
   'anki.intro': 'AnkiConnect経由で実際のAnkiコレクションにカードを作成します。',
   'anki.recheck': '再確認',
   'anki.checking': '確認中…',

@@ -4931,6 +4931,10 @@ export const en: Catalog = {
   'stats.level.aria': 'Estimated level {level}',
 
   // Anki view
+  // Byte-identical to ANKI_UNREACHABLE_MSG / ANKI_COLLECTION_UNAVAILABLE_MSG in shared/anki.ts:
+  // main builds those in English, translateAnkiReason() swaps them for these at the render site.
+  'anki.unreachableReason': "Can't reach Anki. Open Anki desktop and make sure the AnkiConnect add-on is installed.",
+  'anki.collectionUnavailableReason': 'Anki is open but the collection is not loaded yet. The app will retry automatically every few seconds. If this persists, close every Anki window (check Task Manager), reopen Anki, and wait until your decks appear.',
   'anki.intro': 'Create cards in your real Anki collection via AnkiConnect.',
   'anki.recheck': 'Recheck',
   'anki.checking': 'Checking…',

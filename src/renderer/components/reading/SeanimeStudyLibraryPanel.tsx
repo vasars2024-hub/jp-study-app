@@ -57,6 +57,7 @@ import {
   normalizeVideoCoreMiningHistory,
   VIDEO_CORE_MINING_HISTORY_KEY,
 } from '../../../shared/videoCoreMining';
+import { translateAnkiReason } from '../../../shared/anki';
 import type { MediaItem } from '../../../shared/types';
 import { useT } from '../../i18n';
 import Icon from '../Icons';
@@ -464,7 +465,8 @@ export default function SeanimeStudyLibraryPanel({
                         : anki.profileId ?? '',
                     })
                   : anki.problem === 'disconnected'
-                    ? `${t('studyLibrary.anki.disconnected')}${anki.reason ? ` — ${anki.reason}` : ''}`
+                    ? // Same reason as SeanimeWatchLoopPanel: main authors this in English.
+                      `${t('studyLibrary.anki.disconnected')}${anki.reason ? ` — ${translateAnkiReason(anki.reason, t)}` : ''}`
                     : anki.problem === 'no-decks'
                       ? t('studyLibrary.anki.noDecks')
                       : t('studyLibrary.anki.noProfile')}

@@ -4643,6 +4643,8 @@ export const zh: Catalog = {
   'stats.level.aria': '预估等级 {level}',
 
   // Anki view
+  'anki.unreachableReason': '无法连接 Anki。请打开 Anki 桌面版，并确认已安装 AnkiConnect 插件。',
+  'anki.collectionUnavailableReason': 'Anki 已打开，但卡片集尚未加载。应用会每隔几秒自动重试。如果一直如此，请关闭所有 Anki 窗口（也检查任务管理器），重新打开 Anki，等待卡组出现。',
   'anki.intro': '通过 AnkiConnect 在你真正的 Anki 卡组中创建卡片。',
   'anki.recheck': '重新检查',
   'anki.checking': '检查中…',

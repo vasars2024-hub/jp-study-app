@@ -316,3 +316,69 @@ by a control it cannot see.
 **Surface left as found**: 0 plants remaining, 1,234 chars, 8 cards, `Recently added36` current,
 0 dialogs — the probe re-selects the install shelf, because three shelf changes would otherwise hand
 the next instrument a four-card library.
+
+## 2026-08-25 · primary — the VIDEO window's four states in **four languages**, and the reason that never translated
+
+Category 8's third and last number on Video. `l8-states-video.cjs --langs`, pid 1324, `Video`
+1080×700 `presentation=liquid`. Raw: `baselines/l8-states-video-langs.json` (+ the single-language
+`l8-states-video.json`). Recovered slice: the previous turn wrote this probe and died at 05:15
+mid-edit, leaving one `en`-only run and the UI parked in **Japanese**.
+
+**The induction is real and proven from outside the app**, unchanged from the Dictionary run: node's
+own TCP connect to `127.0.0.1:8765` → **REFUSED / ECONNREFUSED**, control on the control `5173` →
+**LISTENING**.
+
+| language | empty | loading | error (Readiness) | offline (Review) | raw keys | falseSuccess |
+| --- | --- | --- | --- | --- | --- | --- |
+| en | `Nothing here matches the current filter.` | 3 | named | named | **0** | **false** |
+| ja | `現在の絞り込みに一致するものはありません。` | 3 | named | named | **0** | **false** |
+| zh-Hans | `没有符合当前筛选条件的内容。` | 3 | named | named | **0** | **false** |
+| ru | `Ничего не подходит под текущий фильтр.` | 3 | named | named | **0** | **false** |
+
+8 cards restored in every pass; language restored `en` → `en`, `langRestored true`.
+
+**THE FINDING, and it is fixed in this same commit.** The interpolated *reason* was English in all
+three non-English languages — `Anki に接続できないため（Can't reach Anki. Open Anki desktop and make
+sure the AnkiConnect add-on is installed.）、…`: a translated sentence wrapped around an untranslated
+one. Cause is structural, not a missing key. `ANKI_UNREACHABLE_MSG` is authored in **main**
+(`shared/anki.ts:8`, "single source of truth"), and main has no locale, so the string is already
+English before any catalog could be consulted. Fix: `translateAnkiReason()` maps the two reasons we
+author to new keys `anki.unreachableReason` / `anki.collectionUnavailableReason` and passes every
+other reason through **unchanged** — the rest are verbatim AnkiConnect API errors, and a generic
+translated string would destroy the only detail that makes them actionable. Wired at both render
+sites (`SeanimeWatchLoopPanel.tsx:290`, `SeanimeStudyLibraryPanel.tsx:468`). English is byte-identical
+to the constant, so the single-source-of-truth contract still holds. Re-measured after the fix, in
+this commit: all four reasons now translate. i18n **10,835** keys (+2), 0 in the untranslated baseline.
+
+**Why the two standard guards would NOT have caught it.** A raw-key sweep sees a real English
+sentence, not a dotted key; a key-count check sees nothing missing, because there was no key at all.
+What catches it is asserting the string **changes between languages** — `translationControl`
+reports **5 of 5 slots differ from en** for ja, zh-Hans and ru, `identicalSlots []`. The unit test's
+control fires: reverting ja's key to the English string fails **exactly 1** test, naming the language.
+
+**FALSE-SUCCESS is now measured, not argued.** `SeanimeWatchLoopPanel.tsx:316` renders one node,
+`p.study-loop-clear`, as either `attentionClear` ("Nothing is stuck") or `attentionUnknown` ("Anki
+could not be asked"). With Anki down the first is a clean bill of health from a question never asked.
+All four languages render the second → `falseSuccess false`. Discriminator is language-agnostic and
+was checked in all four catalogs: `attentionUnknown` carries `Anki` in every one, `attentionClear` in
+none.
+
+**Three probe defects fixed, each of which would have produced a false number.**
+1. `namesDependency` asked `/anki/i` against **the whole window body** — true on this surface no
+   matter what renders, because the Media Center's own nav carries the word. It would have scored
+   10/10 against a panel printing nothing. Now read off the honest render's own node
+   (`.study-lib-anki[data-ok="false"]`, `.study-loop-note[data-alert="true"]`), absent ⇒ refuse by name.
+2. The Discover measure asked `/MyAnimeList.*unreachable/i` and `/(\d+) ranked titles/` — English
+   prose, so ja/zh/ru read `malUnreachable false, aniListRanked null`. That reads like the panel
+   losing its honest state in three languages and is really the probe losing its selector. Now
+   `data-state` + the untranslated provider name: **MAL `down` and AniList `live` with 25 ranked in
+   all four**, and the two-provider control fires in each (`MyAnimeList — 接続不可` / `AniList live`).
+3. `.sp-seg-btn` is a **generic** segmented-control class. With Settings parked off Appearance, the
+   document's only matches were `MediaContent.tsx:1835/1846` — the SUBTITLE language pair, `lang="ja"`
+   and `lang="zh"` — and the sweep refused with `no .sp-seg-btn for en`. Correct refusal, wrong
+   assumption: the probe now navigates Settings to Appearance itself (nav index 1) and asserts all
+   four language tags are present before it sweeps.
+
+**Category 8 on Video = 10/10.** Four states × four languages, 0 raw keys, 0 false successes, both
+the induction control and the translation control firing, and the one defect it found repaired and
+re-measured in this commit rather than reported.

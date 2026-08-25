@@ -25,6 +25,7 @@
  *     Anki. This surface owns the one thing Anki cannot do: get you back to the video.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { translateAnkiReason } from '../../../shared/anki';
 import type { IntervalSnapshot } from '../../../shared/anki';
 import {
   MEDIA_WORKSPACE_OPEN_EVENT,
@@ -285,8 +286,10 @@ export default function SeanimeWatchLoopPanel({ focus, onClearFocus }: Props) {
               verdict on the collection rather than a missing connection. */}
           {anki && !anki.connected ? (
             <p className="study-loop-note" data-alert="true" role="status">
+              {/* The reason comes from main, which has no locale — translate the two we author,
+                  or a translated sentence ends up wrapped around an English one. */}
               {anki.reason
-                ? t('studyLoop.ankiOfflineReason', { reason: anki.reason })
+                ? t('studyLoop.ankiOfflineReason', { reason: translateAnkiReason(anki.reason, t) })
                 : t('studyLoop.ankiOffline')}
             </p>
           ) : null}

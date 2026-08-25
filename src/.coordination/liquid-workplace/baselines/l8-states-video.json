@@ -1,0 +1,148 @@
+{
+ "at": "2026-08-25T09:57:02.091Z",
+ "surface": "Video",
+ "induction": {
+  "ankiConnect": {
+   "verdict": "REFUSED",
+   "detail": "ECONNREFUSED"
+  },
+  "viteControl": {
+   "verdict": "LISTENING",
+   "detail": "connect succeeded"
+  }
+ },
+ "pinned": {
+  "pinnedTitle": "Video",
+  "presentation": "liquid",
+  "box": "1080x700"
+ },
+ "langBefore": {
+  "html": "en",
+  "stored": "en"
+ },
+ "states": {
+  "en": {
+   "emptySearch": {
+    "rendered": [
+     "Nothing here matches the current filter."
+    ],
+    "cards": 0
+   },
+   "droveFavorites": {
+    "index": 4,
+    "expected": "Favorites",
+    "wore": "Favorites"
+   },
+   "emptyShelf": {
+    "rendered": [
+     "Nothing here matches the current filter."
+    ],
+    "cards": 0
+   },
+   "droveTracking": {
+    "index": 5,
+    "expected": "Tracking",
+    "wore": "Tracking"
+   },
+   "loading": {
+    "observed": [
+     "[class] media-tracking-dashboard :: Tracking overviewLocal progress and watchlist projectionsLoa",
+     "[text] media-tracking-dashboard-count :: Loading local tracking",
+     "[text] muted :: Loading local tracking data…"
+    ]
+   },
+   "droveReview": {
+    "index": 6,
+    "expected": "Review",
+    "wore": "ReviewWatch to review"
+   },
+   "offline": {
+    "present": true,
+    "selector": ".study-loop-note[data-alert=\"true\"]",
+    "text": "Anki is not reachable (Can't reach Anki. Open Anki desktop and make sure the AnkiConnect add-on is installed.), so review state is unknown for the cards below. You can still replay any of them.",
+    "namesDependency": true,
+    "role": "status",
+    "dataOk": null,
+    "dataAlert": "true",
+    "clear": {
+     "present": true,
+     "selector": ".study-loop-clear",
+     "text": "Anki could not be asked, so nothing here can be reported as stuck either way.",
+     "namesDependency": true,
+     "role": null,
+     "dataOk": null,
+     "dataAlert": null
+    },
+    "falseSuccess": false
+   },
+   "droveReadiness": {
+    "index": 5,
+    "expected": "Readiness",
+    "wore": "ReadinessUnified library readiness"
+   },
+   "error": {
+    "present": true,
+    "selector": ".study-lib-anki[data-ok=\"false\"]",
+    "text": "Anki is not reachable, so nothing can be mined yet. — Can't reach Anki. Open Anki desktop and make sure the AnkiConnect add-on is installed.",
+    "namesDependency": true,
+    "role": null,
+    "dataOk": "false",
+    "dataAlert": null
+   },
+   "droveDiscover": {
+    "index": 7,
+    "expected": "Discover",
+    "wore": "DiscoverMAL + AniList"
+   },
+   "discover": {
+    "empty": [
+     "Select a title to see why it was recommended."
+    ],
+    "malUnreachable": true,
+    "aniListRanked": "25"
+   },
+   "restored": {
+    "cards": 8,
+    "empty": [],
+    "alerts": [],
+    "chars": 1234,
+    "body": "Video⧉◆─▢×Media Center日本語 immersionBrowseHomeYour media at a glanceLibraryAll local mediaVideoImmersion playerMusicListening roomStudy ModeMine and reviewStudy toolsReadinessUnified library readinessReviewWatch to reviewDiscoverMAL + AniListMedia workspaceLibraryLibrary status36Local itemsManual importsMedia SettingsPlayback and sourcesMedia CenterLibraryLibraryHomeRecently added36Continue watching2Study queueFavoritesTrackingMedia typeAnime3TV shows29Unsorted436 itemsRecently added8 titles · 36 filesFilter by typeAllAllSeriesOVA / ONAViewSeriesSort bySeriesSeason & episodeAir dateWatch progressRecently addedRelease yearTitleViewAdd「パラッ」と「パラリ」はどう違う？オノマトペを部品で分析する【オノマトペ1】#284Unsorted0 / 1Date A Live II: Kurumi Star FestivalAnime · 2014No subtitles foundEmotion 感情表現 ｜ Japanese Podcast with Hana #13UnsortedJapanese subtitles readyHabits 習慣🏃‍♀️📚 ｜ Japanese Podcast with Hana #12UnsortedJapanese subtitles readyIntroduction and why I start this podcast ｜ Japanese Podcast with Hana #1UnsortedJapanese subtitles ready0 / 1JoJo's Bizarre Adventure: Golden WindAnime · 2018Japanese subtitles ready0 / 1JoJo's Bizarre Adventure: Golden WindAnime · 2018Japanese subtitles ready0 / 26The Big OTV shows · 1999Japanese subtitles ready"
+   },
+   "rawKeys": [],
+   "stringCount": 9
+  }
+ },
+ "summary": {
+  "en": {
+   "drove": [
+    "ReviewWatch to review",
+    "ReadinessUnified library readiness",
+    "DiscoverMAL + AniList"
+   ],
+   "emptySearch": [
+    "Nothing here matches the current filter."
+   ],
+   "emptyShelfCards": 0,
+   "emptyShelf": [
+    "Nothing here matches the current filter."
+   ],
+   "loadingObserved": [
+    "[class] media-tracking-dashboard :: Tracking overviewLocal progress and watchlist projectionsLoa",
+    "[text] media-tracking-dashboard-count :: Loading local tracking",
+    "[text] muted :: Loading local tracking data…"
+   ],
+   "offline": "Anki is not reachable (Can't reach Anki. Open Anki desktop and make sure the AnkiConnect add-on is installed.), so review state is unknown for the cards below. You can still replay any of them.",
+   "offlineNamesDependency": true,
+   "error": "Anki is not reachable, so nothing can be mined yet. — Can't reach Anki. Open Anki desktop and make sure the AnkiConnect add-on is installed.",
+   "errorNamesDependency": true,
+   "clear": "Anki could not be asked, so nothing here can be reported as stuck either way.",
+   "falseSuccess": false,
+   "malUnreachable": true,
+   "aniListRanked": "25",
+   "strings": 9,
+   "rawKeys": [],
+   "restoredCards": 8,
+   "restoredChars": 1234
+  }
+ }
+}

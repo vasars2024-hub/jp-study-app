@@ -1,0 +1,609 @@
+{
+ "at": "2026-08-25T10:08:25.667Z",
+ "surface": "Video",
+ "induction": {
+  "ankiConnect": {
+   "verdict": "REFUSED",
+   "detail": "ECONNREFUSED"
+  },
+  "viteControl": {
+   "verdict": "LISTENING",
+   "detail": "connect succeeded"
+  }
+ },
+ "pinned": {
+  "pinnedTitle": "Video",
+  "presentation": "liquid",
+  "box": "1080x700"
+ },
+ "langBefore": {
+  "html": "en",
+  "stored": "en"
+ },
+ "settingsNav": {
+  "wore": "Appearance"
+ },
+ "langSegments": [
+  "en",
+  "ja",
+  "zh-Hans",
+  "ru",
+  null,
+  null,
+  null
+ ],
+ "states": {
+  "en": {
+   "emptySearch": {
+    "rendered": [
+     "Nothing here matches the current filter."
+    ],
+    "cards": 0
+   },
+   "droveFavorites": {
+    "index": 4,
+    "expected": "Favorites",
+    "wore": "Favorites"
+   },
+   "emptyShelf": {
+    "rendered": [
+     "Nothing here matches the current filter."
+    ],
+    "cards": 0
+   },
+   "droveTracking": {
+    "index": 5,
+    "expected": "Tracking",
+    "wore": "Tracking"
+   },
+   "loading": {
+    "observed": [
+     "[class] media-tracking-dashboard :: Tracking overviewLocal progress and watchlist projectionsLoa",
+     "[text] media-tracking-dashboard-count :: Loading local tracking",
+     "[text] muted :: Loading local tracking data…"
+    ]
+   },
+   "droveReview": {
+    "index": 6,
+    "expected": "Review",
+    "wore": "ReviewWatch to review"
+   },
+   "offline": {
+    "present": true,
+    "selector": ".study-loop-note[data-alert=\"true\"]",
+    "text": "Anki is not reachable (Can't reach Anki. Open Anki desktop and make sure the AnkiConnect add-on is installed.), so review state is unknown for the cards below. You can still replay any of them.",
+    "namesDependency": true,
+    "role": "status",
+    "dataOk": null,
+    "dataAlert": "true",
+    "clear": {
+     "present": true,
+     "selector": ".study-loop-clear",
+     "text": "Anki could not be asked, so nothing here can be reported as stuck either way.",
+     "namesDependency": true,
+     "role": null,
+     "dataOk": null,
+     "dataAlert": null
+    },
+    "falseSuccess": false
+   },
+   "droveReadiness": {
+    "index": 5,
+    "expected": "Readiness",
+    "wore": "ReadinessUnified library readiness"
+   },
+   "error": {
+    "present": true,
+    "selector": ".study-lib-anki[data-ok=\"false\"]",
+    "text": "Anki is not reachable, so nothing can be mined yet. — Can't reach Anki. Open Anki desktop and make sure the AnkiConnect add-on is installed.",
+    "namesDependency": true,
+    "role": null,
+    "dataOk": "false",
+    "dataAlert": null
+   },
+   "droveDiscover": {
+    "index": 7,
+    "expected": "Discover",
+    "wore": "DiscoverMAL + AniList"
+   },
+   "discover": {
+    "empty": [
+     "Select a title to see why it was recommended."
+    ],
+    "chips": [
+     {
+      "text": "MyAnimeList — unreachable",
+      "state": "down"
+     },
+     {
+      "text": "AniList",
+      "state": "live"
+     },
+     {
+      "text": "JLPT ranked",
+      "state": null
+     }
+    ],
+    "malUnreachable": true,
+    "aniListState": "live",
+    "aniListRanked": "25"
+   },
+   "restored": {
+    "cards": 8,
+    "empty": [],
+    "alerts": [],
+    "chars": 1234,
+    "body": "Video⧉◆─▢×Media Center日本語 immersionBrowseHomeYour media at a glanceLibraryAll local mediaVideoImmersion playerMusicListening roomStudy ModeMine and reviewStudy toolsReadinessUnified library readinessReviewWatch to reviewDiscoverMAL + AniListMedia workspaceLibraryLibrary status36Local itemsManual importsMedia SettingsPlayback and sourcesMedia CenterLibraryLibraryHomeRecently added36Continue watching2Study queueFavoritesTrackingMedia typeAnime3TV shows29Unsorted436 itemsRecently added8 titles · 36 filesFilter by typeAllAllSeriesOVA / ONAViewSeriesSort bySeriesSeason & episodeAir dateWatch progressRecently addedRelease yearTitleViewAdd「パラッ」と「パラリ」はどう違う？オノマトペを部品で分析する【オノマトペ1】#284Unsorted0 / 1Date A Live II: Kurumi Star FestivalAnime · 2014No subtitles foundEmotion 感情表現 ｜ Japanese Podcast with Hana #13UnsortedJapanese subtitles readyHabits 習慣🏃‍♀️📚 ｜ Japanese Podcast with Hana #12UnsortedJapanese subtitles readyIntroduction and why I start this podcast ｜ Japanese Podcast with Hana #1UnsortedJapanese subtitles ready0 / 1JoJo's Bizarre Adventure: Golden WindAnime · 2018Japanese subtitles ready0 / 1JoJo's Bizarre Adventure: Golden WindAnime · 2018Japanese subtitles ready0 / 26The Big OTV shows · 1999Japanese subtitles ready"
+   },
+   "rawKeys": [],
+   "stringCount": 9
+  },
+  "ja": {
+   "emptySearch": {
+    "rendered": [
+     "現在の絞り込みに一致するものはありません。"
+    ],
+    "cards": 0
+   },
+   "droveFavorites": {
+    "index": 4,
+    "expected": "Favorites",
+    "wore": "お気に入り"
+   },
+   "emptyShelf": {
+    "rendered": [
+     "現在の絞り込みに一致するものはありません。"
+    ],
+    "cards": 0
+   },
+   "droveTracking": {
+    "index": 5,
+    "expected": "Tracking",
+    "wore": "視聴記録"
+   },
+   "loading": {
+    "observed": [
+     "[class] media-tracking-dashboard :: 視聴記録の概要ローカルの進捗と視聴リストの見通しローカル記録を読み込み中ローカルの視聴記録を読み込み中…",
+     "[text] media-tracking-dashboard-count :: ローカル記録を読み込み中",
+     "[text] muted :: ローカルの視聴記録を読み込み中…"
+    ]
+   },
+   "droveReview": {
+    "index": 6,
+    "expected": "Review",
+    "wore": "復習視聴から復習へ"
+   },
+   "offline": {
+    "present": true,
+    "selector": ".study-loop-note[data-alert=\"true\"]",
+    "text": "Anki に接続できないため（Anki に接続できません。Anki デスクトップを開き、AnkiConnect アドオンがインストールされていることを確認してください。）、以下のカードの復習状況は不明です。再生は引き続き利用できます。",
+    "namesDependency": true,
+    "role": "status",
+    "dataOk": null,
+    "dataAlert": "true",
+    "clear": {
+     "present": true,
+     "selector": ".study-loop-clear",
+     "text": "Anki に問い合わせられなかったため、つまずいているかどうかは判断できません。",
+     "namesDependency": true,
+     "role": null,
+     "dataOk": null,
+     "dataAlert": null
+    },
+    "falseSuccess": false
+   },
+   "droveReadiness": {
+    "index": 5,
+    "expected": "Readiness",
+    "wore": "学習準備統合ライブラリの学習準備状況"
+   },
+   "error": {
+    "present": true,
+    "selector": ".study-lib-anki[data-ok=\"false\"]",
+    "text": "Anki に接続できないため、まだ登録できません。 — Anki に接続できません。Anki デスクトップを開き、AnkiConnect アドオンがインストールされていることを確認してください。",
+    "namesDependency": true,
+    "role": null,
+    "dataOk": "false",
+    "dataAlert": null
+   },
+   "droveDiscover": {
+    "index": 7,
+    "expected": "Discover",
+    "wore": "見つけるMAL + AniList"
+   },
+   "discover": {
+    "empty": [
+     "作品を選ぶと、おすすめの理由が表示されます。"
+    ],
+    "chips": [
+     {
+      "text": "MyAnimeList — 接続不可",
+      "state": "down"
+     },
+     {
+      "text": "AniList",
+      "state": "live"
+     },
+     {
+      "text": "JLPT順",
+      "state": null
+     }
+    ],
+    "malUnreachable": true,
+    "aniListState": "live",
+    "aniListRanked": "25"
+   },
+   "restored": {
+    "cards": 8,
+    "empty": [],
+    "alerts": [],
+    "chars": 816,
+    "body": "動画⧉◆─▢×Media Center日本語 immersionブラウズホームメディアの概要ライブラリすべてのローカルメディアビデオイマージョンプレイヤー音楽リスニングルーム学習モード採掘と復習学習ツール学習準備統合ライブラリの学習準備状況復習視聴から復習へ見つけるMAL + AniListメディアワークスペースライブラリライブラリ状態36ローカル項目手動取り込みメディア設定再生とソースMedia Centerライブラリライブラリホーム最近追加36続きから見る2学習キューお気に入り視聴記録メディアの種類アニメ3テレビ番組29未分類436 件最近追加8 作品 · 36 ファイル種類で絞り込むすべてすべてシリーズOVA / ONA表示シリーズ並べ替えシリーズシーズン・話数放送日視聴の進捗最近追加公開年タイトル表示追加「パラッ」と「パラリ」はどう違う？オノマトペを部品で分析する【オノマトペ1】#284未分類0 / 1Date A Live II: Kurumi Star Festivalアニメ · 2014字幕が見つかりませんEmotion 感情表現 ｜ Japanese Podcast with Hana #13未分類日本語字幕ありHabits 習慣🏃‍♀️📚 ｜ Japanese Podcast with Hana #12未分類日本語字幕ありIntroduction and why I start this podcast ｜ Japanese Podcast with Hana #1未分類日本語字幕あり0 / 1JoJo's Bizarre Adventure: Golden Windアニメ · 2018日本語字幕あり0 / 1JoJo's Bizarre Adventure: Golden Windアニメ · 2018日本語字幕あり0 / 26The Big Oテレビ番組 · 1999日本語字幕あり"
+   },
+   "rawKeys": [],
+   "stringCount": 9
+  },
+  "zh-Hans": {
+   "emptySearch": {
+    "rendered": [
+     "没有符合当前筛选条件的内容。"
+    ],
+    "cards": 0
+   },
+   "droveFavorites": {
+    "index": 4,
+    "expected": "Favorites",
+    "wore": "收藏"
+   },
+   "emptyShelf": {
+    "rendered": [
+     "没有符合当前筛选条件的内容。"
+    ],
+    "cards": 0
+   },
+   "droveTracking": {
+    "index": 5,
+    "expected": "Tracking",
+    "wore": "追踪"
+   },
+   "loading": {
+    "observed": [
+     "[class] media-tracking-dashboard :: 追踪概览本地进度与待看清单预测正在加载本地追踪数据正在加载本地追踪数据…",
+     "[text] media-tracking-dashboard-count :: 正在加载本地追踪数据",
+     "[text] muted :: 正在加载本地追踪数据…"
+    ]
+   },
+   "droveReview": {
+    "index": 6,
+    "expected": "Review",
+    "wore": "复习从观看到复习"
+   },
+   "offline": {
+    "present": true,
+    "selector": ".study-loop-note[data-alert=\"true\"]",
+    "text": "无法连接 Anki（无法连接 Anki。请打开 Anki 桌面版，并确认已安装 AnkiConnect 插件。），因此下列卡片的复习状态未知。你仍然可以重放它们。",
+    "namesDependency": true,
+    "role": "status",
+    "dataOk": null,
+    "dataAlert": "true",
+    "clear": {
+     "present": true,
+     "selector": ".study-loop-clear",
+     "text": "无法向 Anki 查询，因此无法判断是否有卡片卡壳。",
+     "namesDependency": true,
+     "role": null,
+     "dataOk": null,
+     "dataAlert": null
+    },
+    "falseSuccess": false
+   },
+   "droveReadiness": {
+    "index": 5,
+    "expected": "Readiness",
+    "wore": "就绪状态统一媒体库就绪状态"
+   },
+   "error": {
+    "present": true,
+    "selector": ".study-lib-anki[data-ok=\"false\"]",
+    "text": "无法连接 Anki，暂时无法挖掘卡片。 — 无法连接 Anki。请打开 Anki 桌面版，并确认已安装 AnkiConnect 插件。",
+    "namesDependency": true,
+    "role": null,
+    "dataOk": "false",
+    "dataAlert": null
+   },
+   "droveDiscover": {
+    "index": 7,
+    "expected": "Discover",
+    "wore": "发现MAL + AniList"
+   },
+   "discover": {
+    "empty": [
+     "选择一部作品，查看推荐理由。"
+    ],
+    "chips": [
+     {
+      "text": "MyAnimeList — 无法连接",
+      "state": "down"
+     },
+     {
+      "text": "AniList",
+      "state": "live"
+     },
+     {
+      "text": "按 JLPT 排序",
+      "state": null
+     }
+    ],
+    "malUnreachable": true,
+    "aniListState": "live",
+    "aniListRanked": "25"
+   },
+   "restored": {
+    "cards": 8,
+    "empty": [],
+    "alerts": [],
+    "chars": 726,
+    "body": "视频⧉◆─▢×Media Center日本語 immersion浏览首页媒体概览媒体库全部本地媒体视频沉浸式播放器音乐听力空间学习模式摘录与复习学习工具就绪状态统一媒体库就绪状态复习从观看到复习发现MAL + AniList媒体工作区媒体库媒体库状态36本地条目手动导入媒体设置播放与来源Media Center媒体库媒体库主页最近添加36继续观看2学习队列收藏追踪媒体类型动画3电视节目29未分类436 个项目最近添加8 部作品 · 36 个文件按类型筛选全部全部剧集OVA / ONA视图系列排序方式系列季与集数播出日期观看进度最近添加发行年份标题视图添加「パラッ」と「パラリ」はどう違う？オノマトペを部品で分析する【オノマトペ1】#284未分类0 / 1Date A Live II: Kurumi Star Festival动画 · 2014未找到字幕Emotion 感情表現 ｜ Japanese Podcast with Hana #13未分类日语字幕已就绪Habits 習慣🏃‍♀️📚 ｜ Japanese Podcast with Hana #12未分类日语字幕已就绪Introduction and why I start this podcast ｜ Japanese Podcast with Hana #1未分类日语字幕已就绪0 / 1JoJo's Bizarre Adventure: Golden Wind动画 · 2018日语字幕已就绪0 / 1JoJo's Bizarre Adventure: Golden Wind动画 · 2018日语字幕已就绪0 / 26The Big O电视节目 · 1999日语字幕已就绪"
+   },
+   "rawKeys": [],
+   "stringCount": 9
+  },
+  "ru": {
+   "emptySearch": {
+    "rendered": [
+     "Ничего не подходит под текущий фильтр."
+    ],
+    "cards": 0
+   },
+   "droveFavorites": {
+    "index": 4,
+    "expected": "Favorites",
+    "wore": "Избранное"
+   },
+   "emptyShelf": {
+    "rendered": [
+     "Ничего не подходит под текущий фильтр."
+    ],
+    "cards": 0
+   },
+   "droveTracking": {
+    "index": 5,
+    "expected": "Tracking",
+    "wore": "Отслеживание"
+   },
+   "loading": {
+    "observed": [
+     "[class] media-tracking-dashboard :: Обзор отслеживанияЛокальный прогресс и прогноз списка к прос",
+     "[text] media-tracking-dashboard-count :: Загрузка локального отслеживания",
+     "[text] muted :: Загрузка данных локального отслеживания…"
+    ]
+   },
+   "droveReview": {
+    "index": 6,
+    "expected": "Review",
+    "wore": "ПовторениеОт просмотра к повторению"
+   },
+   "offline": {
+    "present": true,
+    "selector": ".study-loop-note[data-alert=\"true\"]",
+    "text": "Anki недоступен (Не удаётся связаться с Anki. Откройте приложение Anki и убедитесь, что дополнение AnkiConnect установлено.), поэтому статус повторения карточек ниже неизвестен. Воспроизвести реплику всё равно можно.",
+    "namesDependency": true,
+    "role": "status",
+    "dataOk": null,
+    "dataAlert": "true",
+    "clear": {
+     "present": true,
+     "selector": ".study-loop-clear",
+     "text": "Anki недоступен, поэтому нельзя сказать, буксует ли что-то.",
+     "namesDependency": true,
+     "role": null,
+     "dataOk": null,
+     "dataAlert": null
+    },
+    "falseSuccess": false
+   },
+   "droveReadiness": {
+    "index": 5,
+    "expected": "Readiness",
+    "wore": "ГотовностьГотовность объединённой медиат"
+   },
+   "error": {
+    "present": true,
+    "selector": ".study-lib-anki[data-ok=\"false\"]",
+    "text": "Anki недоступен, пока ничего нельзя добавить. — Не удаётся связаться с Anki. Откройте приложение Anki и убедитесь, что дополнение AnkiConnect установлено.",
+    "namesDependency": true,
+    "role": null,
+    "dataOk": "false",
+    "dataAlert": null
+   },
+   "droveDiscover": {
+    "index": 7,
+    "expected": "Discover",
+    "wore": "КаталогMAL + AniList"
+   },
+   "discover": {
+    "empty": [
+     "Выберите тайтл, чтобы увидеть, почему он рекомендован."
+    ],
+    "chips": [
+     {
+      "text": "MyAnimeList — недоступен",
+      "state": "down"
+     },
+     {
+      "text": "AniList",
+      "state": "live"
+     },
+     {
+      "text": "По уровню JLPT",
+      "state": null
+     }
+    ],
+    "malUnreachable": true,
+    "aniListState": "live",
+    "aniListRanked": "25"
+   },
+   "restored": {
+    "cards": 8,
+    "empty": [],
+    "alerts": [],
+    "chars": 1390,
+    "body": "Видео⧉◆─▢×Media Center日本語 immersionРазделыГлавнаяОбзор вашей медиатекиМедиатекаВсе локальные медиаВидеоПлеер для погруженияМузыкаКомната аудированияРежим учёбыСбор и повторениеУчебные инструментыГотовностьГотовность объединённой медиатекиПовторениеОт просмотра к повторениюКаталогMAL + AniListМедиапространствоМедиатекаСостояние медиатеки36Локальные материалыРучной импортНастройки медиаВоспроизведение и источникиMedia CenterМедиатекаМедиатекаГлавнаяНедавно добавленные36Продолжить просмотр2Очередь изученияИзбранноеОтслеживаниеТип медиаАниме3Сериалы29Без категории436 элементовНедавно добавленные8 тайтлов · 36 файловФильтр по типуВсеВсеСериалыOVA / ONAВидСериалуСортировкаСериалуСезону и серииДате выходаПрогрессу просмотраНедавно добавленныеГоду выпускаНазваниюВидДобавить「パラッ」と「パラリ」はどう違う？オノマトペを部品で分析する【オノマトペ1】#284Без категории0 / 1Date A Live II: Kurumi Star FestivalАниме · 2014Субтитры не найденыEmotion 感情表現 ｜ Japanese Podcast with Hana #13Без категорииЯпонские субтитры готовыHabits 習慣🏃‍♀️📚 ｜ Japanese Podcast with Hana #12Без категорииЯпонские субтитры готовыIntroduction and why I start this podcast ｜ Japanese Podcast with Hana #1Без категорииЯпонские субтитры готовы0 / 1JoJo's Bizarre Adventure: Golden WindАниме · 2018Японские субтитры готовы0 / 1JoJo's Bizarre Adventure: Golden WindАниме · 2018Японские субтитры готовы0 / 26The Big OСериалы · 1999Японские субтитры готовы"
+   },
+   "rawKeys": [],
+   "stringCount": 9
+  }
+ },
+ "langAfter": {
+  "html": "en",
+  "stored": "en"
+ },
+ "langRestored": true,
+ "summary": {
+  "en": {
+   "drove": [
+    "ReviewWatch to review",
+    "ReadinessUnified library readiness",
+    "DiscoverMAL + AniList"
+   ],
+   "emptySearch": [
+    "Nothing here matches the current filter."
+   ],
+   "emptyShelfCards": 0,
+   "emptyShelf": [
+    "Nothing here matches the current filter."
+   ],
+   "loadingObserved": [
+    "[class] media-tracking-dashboard :: Tracking overviewLocal progress and watchlist projectionsLoa",
+    "[text] media-tracking-dashboard-count :: Loading local tracking",
+    "[text] muted :: Loading local tracking data…"
+   ],
+   "offline": "Anki is not reachable (Can't reach Anki. Open Anki desktop and make sure the AnkiConnect add-on is installed.), so review state is unknown for the cards below. You can still replay any of them.",
+   "offlineNamesDependency": true,
+   "error": "Anki is not reachable, so nothing can be mined yet. — Can't reach Anki. Open Anki desktop and make sure the AnkiConnect add-on is installed.",
+   "errorNamesDependency": true,
+   "clear": "Anki could not be asked, so nothing here can be reported as stuck either way.",
+   "falseSuccess": false,
+   "malUnreachable": true,
+   "aniListState": "live",
+   "aniListRanked": "25",
+   "strings": 9,
+   "rawKeys": [],
+   "restoredCards": 8,
+   "restoredChars": 1234
+  },
+  "ja": {
+   "drove": [
+    "復習視聴から復習へ",
+    "学習準備統合ライブラリの学習準備状況",
+    "見つけるMAL + AniList"
+   ],
+   "emptySearch": [
+    "現在の絞り込みに一致するものはありません。"
+   ],
+   "emptyShelfCards": 0,
+   "emptyShelf": [
+    "現在の絞り込みに一致するものはありません。"
+   ],
+   "loadingObserved": [
+    "[class] media-tracking-dashboard :: 視聴記録の概要ローカルの進捗と視聴リストの見通しローカル記録を読み込み中ローカルの視聴記録を読み込み中…",
+    "[text] media-tracking-dashboard-count :: ローカル記録を読み込み中",
+    "[text] muted :: ローカルの視聴記録を読み込み中…"
+   ],
+   "offline": "Anki に接続できないため（Anki に接続できません。Anki デスクトップを開き、AnkiConnect アドオンがインストールされていることを確認してください。）、以下のカードの復習状況は不明です。再生は引き続き利用できます。",
+   "offlineNamesDependency": true,
+   "error": "Anki に接続できないため、まだ登録できません。 — Anki に接続できません。Anki デスクトップを開き、AnkiConnect アドオンがインストールされていることを確認してください。",
+   "errorNamesDependency": true,
+   "clear": "Anki に問い合わせられなかったため、つまずいているかどうかは判断できません。",
+   "falseSuccess": false,
+   "malUnreachable": true,
+   "aniListState": "live",
+   "aniListRanked": "25",
+   "strings": 9,
+   "rawKeys": [],
+   "restoredCards": 8,
+   "restoredChars": 816
+  },
+  "zh-Hans": {
+   "drove": [
+    "复习从观看到复习",
+    "就绪状态统一媒体库就绪状态",
+    "发现MAL + AniList"
+   ],
+   "emptySearch": [
+    "没有符合当前筛选条件的内容。"
+   ],
+   "emptyShelfCards": 0,
+   "emptyShelf": [
+    "没有符合当前筛选条件的内容。"
+   ],
+   "loadingObserved": [
+    "[class] media-tracking-dashboard :: 追踪概览本地进度与待看清单预测正在加载本地追踪数据正在加载本地追踪数据…",
+    "[text] media-tracking-dashboard-count :: 正在加载本地追踪数据",
+    "[text] muted :: 正在加载本地追踪数据…"
+   ],
+   "offline": "无法连接 Anki（无法连接 Anki。请打开 Anki 桌面版，并确认已安装 AnkiConnect 插件。），因此下列卡片的复习状态未知。你仍然可以重放它们。",
+   "offlineNamesDependency": true,
+   "error": "无法连接 Anki，暂时无法挖掘卡片。 — 无法连接 Anki。请打开 Anki 桌面版，并确认已安装 AnkiConnect 插件。",
+   "errorNamesDependency": true,
+   "clear": "无法向 Anki 查询，因此无法判断是否有卡片卡壳。",
+   "falseSuccess": false,
+   "malUnreachable": true,
+   "aniListState": "live",
+   "aniListRanked": "25",
+   "strings": 9,
+   "rawKeys": [],
+   "restoredCards": 8,
+   "restoredChars": 726
+  },
+  "ru": {
+   "drove": [
+    "ПовторениеОт просмотра к повторению",
+    "ГотовностьГотовность объединённой медиат",
+    "КаталогMAL + AniList"
+   ],
+   "emptySearch": [
+    "Ничего не подходит под текущий фильтр."
+   ],
+   "emptyShelfCards": 0,
+   "emptyShelf": [
+    "Ничего не подходит под текущий фильтр."
+   ],
+   "loadingObserved": [
+    "[class] media-tracking-dashboard :: Обзор отслеживанияЛокальный прогресс и прогноз списка к прос",
+    "[text] media-tracking-dashboard-count :: Загрузка локального отслеживания",
+    "[text] muted :: Загрузка данных локального отслеживания…"
+   ],
+   "offline": "Anki недоступен (Не удаётся связаться с Anki. Откройте приложение Anki и убедитесь, что дополнение AnkiConnect установлено.), поэтому статус повторения карточек ниже неизвестен. Воспроизвести реплику всё равно можно.",
+   "offlineNamesDependency": true,
+   "error": "Anki недоступен, пока ничего нельзя добавить. — Не удаётся связаться с Anki. Откройте приложение Anki и убедитесь, что дополнение AnkiConnect установлено.",
+   "errorNamesDependency": true,
+   "clear": "Anki недоступен, поэтому нельзя сказать, буксует ли что-то.",
+   "falseSuccess": false,
+   "malUnreachable": true,
+   "aniListState": "live",
+   "aniListRanked": "25",
+   "strings": 9,
+   "rawKeys": [],
+   "restoredCards": 8,
+   "restoredChars": 1390
+  }
+ },
+ "translationControl": {
+  "ja": {
+   "slots": 5,
+   "differsFromEn": 5,
+   "identicalSlots": []
+  },
+  "zh-Hans": {
+   "slots": 5,
+   "differsFromEn": 5,
+   "identicalSlots": []
+  },
+  "ru": {
+   "slots": 5,
+   "differsFromEn": 5,
+   "identicalSlots": []
+  }
+ }
+}
