@@ -249,12 +249,28 @@
    * that region does not. So drive the content region first, its view switchers next, chrome last.
    * A surface with no detectable content region — Dictionary, where every control is a sibling of
    * the results — keeps the original ordering exactly, so no earlier run changes meaning.
+   *
+   * ...but "inside the content region" is not one bucket on the Media shell, and assuming it was
+   * cost this probe a run. Measured 2026-08-25, with the control that settles it:
+   *   - A media card does **not** navigate to the player. It toggles a detail drawer in place —
+   *     roster **34 → 45**, adding `Close`, `Play`, `Show more`, four `ui-tab`s and two
+   *     `medialib-ep` rows. Clicking it again closes them.
+   *   - The library rail's filter chips live at `nav.medialib-rail` INSIDE `main.mc-content`, so
+   *     they rank as ordinary content while re-listing the entire card grid. Driving `Unsorted4`
+   *     is what removed `The Big O`, and with it every drawer control the sweep had yet to reach.
+   * Control run, cards ranked as plain content (`debug/l1-deadend-control.js`): coverage
+   * **23/33 with 10 `gone`** — the card plus all nine of its drawer's controls, nothing else.
+   * So the content region has its own order: drawer contents → cards → re-listers → chrome.
    */
   const inContent = (el) => !!el.closest('main,[role="main"],[class*="-content"],[class*="__content"]');
+  /** Toggles a detail region open/closed in place: everything that region holds goes first. */
+  const EXPANDER = (el) => !!el.closest('.medialib-card');
+  /** Changes WHICH items the content region enumerates: goes after the items themselves. */
+  const RELISTS = (el, name) => VIEW_SWITCH.test(name) || !!el.closest('.medialib-rail');
   const anyContent = targets.some((t) => inContent(t.el));
   const rank = (t) => (!anyContent
     ? Number(VIEW_SWITCH.test(t.name))
-    : (inContent(t.el) ? (VIEW_SWITCH.test(t.name) ? 1 : 0) : 2));
+    : (!inContent(t.el) ? 3 : RELISTS(t.el, t.name) ? 2 : EXPANDER(t.el) ? 1 : 0));
   targets.sort((a, b) => rank(a) - rank(b));
 
   // ...and because they go last, the sweep used to END on `Interlinear`, which renders no

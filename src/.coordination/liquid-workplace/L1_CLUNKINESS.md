@@ -516,3 +516,44 @@ diff is the whole file.
 Windows account name, on 0 cards — matched **36 of 36** items; "users" and "downloads" likewise, and
 "jp-study" 7. Live after the fix: 0 cards in Video and 0 in Media, 1 each when cleared. 4 tests,
 mutation control fails 1.
+
+## 2026-08-25 · primary · Video category 2 — the sweep-order model was wrong twice, and the census closes
+
+| Slice | Commit | What landed |
+| --- | --- | --- |
+| ContextMenu focus return | `e334d7c5` | the card menu's Escape dropped the keyboard on `<body>` |
+| `rank()` re-derived | *this commit* | drawer → cards → re-listers → chrome, measured not assumed |
+
+**The previous entry's prescribed fix was wrong, and the control is what says so.** A media card
+does **not** navigate to the player. It toggles a detail drawer in place — roster **34 → 45**,
+adding `Close`, `Play`, `Show more`, four `ui-tab`s and two `medialib-ep` rows. Ranking cards
+*after* chrome (attempt 1) scored **22/24, 0 dead ends, bait `changed:false`, `resolvedBy.class` 0,
+store untouched** — but only because the drawer was shut at arm time, so nine controls were not in
+the denominator at all. Control run with cards as plain content (`debug/l1-deadend-control.js`,
+drawer open): **23/33 with 10 `gone`** — the card and every drawer control, nothing else. The real
+culprit is the library RAIL: `nav.medialib-rail` sits inside `main.mc-content`, so its nine filter
+chips rank as ordinary content while re-listing the whole grid. Driving `Unsorted4` is what removed
+`The Big O`. `rank()` now orders drawer contents → cards → re-listers → chrome.
+
+**It is still not one-pass, and that is where the repair budget stopped.** With that order the run
+opens on the drawer's own `Close`, which dismisses the eight controls behind it: **25/33**, and its
+bait read `changed:true` (the chrome navigation was still landing), so *that run's* 0 is VOID.
+Next turn's one line: a dismisser ranks last inside the region it dismisses.
+
+**Category 2's dead-end census is nevertheless COMPLETE, by hand for the remainder.** 30 controls
+carry a verdict: 22 swept (valid bait), 2 card controls hand-driven, 6 drawer controls hand-driven.
+**0 dead ends.** `Episodes` is `aria-selected="true"` at click — the honest no-op, not a dead end.
+Three are named and not driven: `Play`, `1The Big O - 01`, `2The Big O - 02` start playback of a
+real file and write watch progress with no product-side undo, the same rule the sweep applies to
+`Add to favorites`. **0 modal traps**: the card menu closes on Escape ALONE (`[role=menu]` 2 → 1).
+
+**A dead end I nearly reported, and did not.** `Show more` read `changed:false` on the hand rig,
+because that rig keyed on `text.length` and `Show more` → `Show less` is length-neutral. Re-driven
+on the probe's own full-text signature it is real: synopsis **60 → 242 px**, `data-clamped`
+true → false, label flips, and it reverses. The rail was the other near-miss: it *does* mark the
+active filter (`aria-current="true"` plus a `srgb 0.063 0.725 0.506 / 0.4` fill), so the "no active
+state" reading from an `is-active`-only query was the query's fault.
+
+**Trap.** A synthetic `el.click()` does not focus the button — Chromium only focuses on a real
+pointer press. The first live check of `e334d7c5` therefore read `BODY` *after* the fix, because
+there was no trigger to return to. Call `focus()` first; that is the keyboard path anyway.
