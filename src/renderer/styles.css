@@ -8677,18 +8677,61 @@ mark.lookup-mark,
 }
 
 /* ----- manga OCR ("scan page") panel ----- */
-.ocr-panel {
-  position: fixed;
-  top: 56px;
-  right: 0;
-  bottom: 0;
-  width: min(380px, 44vw);
-  z-index: 30;
-  background: var(--panel);
-  border-left: 1px solid var(--border);
-  box-shadow: -10px 0 28px rgba(0, 0, 0, 0.4);
+/* The OCR panel is a `ReadingCanvas` tool now, so it has no box of its own —
+   the canvas decides docked-vs-sheet and hands it a width. What is left here is
+   the column its own sections need, because `.ocr-text` and `.manga-sidebar`
+   are both `flex: 1` and would collapse without one.
+
+   WHAT WAS DELETED, quoted so a reintroduction is recognisable:
+   `position: fixed; top: 56px; right: 0; bottom: 0; width: min(380px, 44vw);
+   z-index: 30; border-left; box-shadow`. No ancestor created a containing
+   block, so `fixed` resolved against the VIEWPORT: the panel was sized and
+   placed by the screen rather than by the reader, which is wrong in Blanc's
+   pane and in a pop-out, and `.manga-stage` never inset for it, so the
+   page-fit math measured ~300px of stage that was behind the panel. Both are
+   the resolver's arithmetic now.
+
+   `min-height: 100%` and not `height: 100%`: a short panel must not be
+   stretched, while a tall one — the sidebar with forty regions — still gets a
+   definite box to scroll inside. */
+.ocr-panel-content {
   display: flex;
   flex-direction: column;
+  min-height: 100%;
+}
+
+/* Every section of this panel is edge-to-edge: each carries its own 14px inset
+   and a full-bleed bottom border, so the canvas body's uniform padding would
+   inset every rule line and leave a gutter no other reader has. Written as a
+   descendant selector — (0,3,0) — so it beats `.lq-reading-tool-body` on
+   specificity rather than on import order, which is the mistake `09bbced2`
+   fixed one level up. */
+.lq-reading [data-reading-tool='manga-ocr'] .lq-reading-tool-body {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The canvas takes the flex track `.reader-stage` used to hold: it is the
+   reader's middle row now and the stage sits one level down, inside the
+   document region. `min-height: 0` for the reason `.reader-stage` states. */
+.manga-canvas {
+  flex: 1;
+  min-height: 0;
+}
+
+/* The manga stage IS the anchor: it paints its own opaque `#0a0a0d` and the page
+   centres inside it, so the anchor role's 16px padding, border and radius would
+   inset a full-bleed reader by 32px each way and draw a frame around a black
+   rectangle. Measured live before this rule: canvas 1264, document region 952,
+   stage 918 — 34px of a reader whose whole surface is the page. Zeroed here
+   rather than by dropping `lq-anchor` from the primitive: the role is what makes
+   this region a stable opaque surface instead of glass (§2, selective Liquid),
+   and every prose reader wants the inset. */
+.manga-canvas > .lq-reading-doc {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
 }
 .ocr-head {
   display: flex;
@@ -8862,9 +8905,6 @@ mark.lookup-mark,
   writing-mode: inherit;
   padding: 2px 3px;
   box-sizing: border-box;
-}
-.ocr-panel-compact {
-  width: min(300px, 36vw);
 }
 .ocr-check {
   display: inline-flex;

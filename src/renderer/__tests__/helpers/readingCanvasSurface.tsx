@@ -86,22 +86,40 @@ export function installReadingSurfaceApi(explicit: Record<string, unknown> = {})
   });
 }
 
-/** jsdom has no ResizeObserver, and every reading surface observes something. */
+/**
+ * jsdom has no ResizeObserver, and every reading surface observes something.
+ *
+ * EACH INSTANCE OWNS ITS OWN CALLBACKS, and that is not a detail. The first
+ * version kept one module-level set and had `disconnect()` clear all of it, so
+ * ANY component tearing an observer down silently unregistered every other one —
+ * including the canvas's. The manga reader is the first surface where that
+ * fires: its stage observer's effect keys on `pages.length`, so the moment the
+ * pages resolve its cleanup ran `disconnect()` and `resize()` stopped reaching
+ * `ReadingCanvas` entirely. The canvas then kept its mount width for the rest of
+ * the test and a resize assertion read the PREVIOUS placement — passing or
+ * failing for a reason that had nothing to do with the surface.
+ */
 export function installResizeObserver(): void {
   const observers = new Set<() => void>();
   (globalThis as unknown as { ResizeObserver: unknown; __flushResize?: () => void }).ResizeObserver =
     class {
+      private readonly own = new Map<HTMLElement, () => void>();
       constructor(private readonly fire: (entries: unknown[]) => void) {}
       observe(el: HTMLElement): void {
         const notify = () =>
           this.fire([{ target: el, contentRect: el.getBoundingClientRect() }]);
+        this.own.set(el, notify);
         observers.add(notify);
       }
-      unobserve(): void {
-        observers.clear();
+      unobserve(el: HTMLElement): void {
+        const notify = this.own.get(el);
+        if (!notify) return;
+        this.own.delete(el);
+        observers.delete(notify);
       }
       disconnect(): void {
-        observers.clear();
+        for (const notify of this.own.values()) observers.delete(notify);
+        this.own.clear();
       }
     };
   (globalThis as unknown as { __flushResize: () => void }).__flushResize = () => {

@@ -21,6 +21,8 @@ import MangaCompareView from '../components/manga/MangaCompareView';
 import RegionEditorModal from '../components/manga/RegionEditorModal';
 import MangaRegionDrawLayer from '../components/manga/MangaRegionDrawLayer';
 import MangaSidebar from '../components/manga/MangaSidebar';
+import { ReadingCanvas, type ReadingCanvasTool } from '../components/liquid/ReadingCanvas';
+import { READING_CANVAS_FILL_POLICY } from '../../shared/liquidReadingCanvas';
 import Icon from '../components/Icons';
 import { runOcr, type OcrLang } from '../ocr';
 import {
@@ -1370,6 +1372,382 @@ export default function MangaReader({ item, onClose }: Props) {
     );
   }
 
+  /*
+   * L6's reading canvas decides where the OCR panel goes — this reader no longer
+   * does, and the defect that forced the change is a MEASUREMENT one rather than
+   * the cover it looks like.
+   *
+   * `.ocr-panel` was `position: fixed; right: 0; width: min(380px, 44vw)` and
+   * `.manga-stage` never inset for it, so the stage's own box stayed the full
+   * viewport while 380px of it was behind the panel. That box is not decorative
+   * here: `stageSize` is read straight off `stageRef.current.clientWidth` and fed
+   * to `mangaPageFitStyles`, so at a 1264px reader the fit math emitted
+   * `max-width: 1264px` for 964px of visible stage and centred the page at 632
+   * against a visible centre of 482 — 150px off-centre, toward the panel. A page
+   * wider than the visible strip then really is covered. Docking the panel makes
+   * the stage's clientWidth the width it actually has, and the same math is right
+   * with no change to it.
+   *
+   * `fixed` also meant the panel was sized and placed by the SCREEN: `44vw` and
+   * `right: 0` ignore the reader's own box, so in Blanc's pane or a pop-out the
+   * panel sat against the window edge rather than the reader's.
+   *
+   * FILL POLICY, deliberately. A manga page has its own aspect and the user sets
+   * its width in this reader's own settings (`maxPageWidthPct`, `pageFit`, zoom);
+   * a 760px prose measure clamp would letterbox every page and silently override
+   * a setting they changed on purpose.
+   */
+  const ocrPanelCompact = !(sidePanel || modelsMissing || !mokuroPage);
+  const readingTools: ReadingCanvasTool[] = [];
+  if (ocrOpen) {
+    readingTools.push({
+      id: 'manga-ocr',
+      label: t('manga.ocr.panelTitle'),
+      // The two widths the old stylesheet had as `min(380px, 44vw)` and
+      // `min(300px, 36vw)`; the viewport half of each is now the resolver's job.
+      minWidth: ocrPanelCompact ? 240 : 280,
+      preferredWidth: ocrPanelCompact ? 300 : 380,
+      onClose: () => {
+        setDrawRegionMode(false);
+        setOcrOpen(false);
+      },
+      // `.ocr-head` is gone rather than nested: the canvas head renders the title
+      // and the close, and keeping both would stack two headings. The fallback
+      // badge is state about the tool, so it belongs beside that title.
+      actions: ocrIsFallback ? (
+        <span className="ocr-fallback-badge" title={t('manga.ocr.fallbackHint')}>
+          {t('manga.ocr.fallbackBadge')}
+        </span>
+      ) : undefined,
+      content: (
+        <div className="ocr-panel-content" onMouseDown={() => setPopup(null)}>
+          <div className="ocr-toolbar">
+            {engineReady ? (
+              <>
+                <label className="ocr-check muted">
+                  <input type="checkbox" checked={showSfx} onChange={(e) => setShowSfx(e.target.checked)} />
+                  {t('manga.ocr.showSfx')}
+                </label>
+                <label className="ocr-check muted">
+                  <input
+                    type="checkbox"
+                    checked={sidePanel}
+                    onChange={(e) => setSidePanel(e.target.checked)}
+                  />
+                  {t('manga.ocr.sidePanel')}
+                </label>
+                <label className="ocr-check muted" title={t('manga.settings.autoTranslate.hint')}>
+                  <input
+                    type="checkbox"
+                    checked={mangaSettings.autoTranslate}
+                    onChange={(e) => updateMangaSettings({ autoTranslate: e.target.checked })}
+                  />
+                  {t('manga.ocr.autoTranslate')}
+                </label>
+                <label className="ocr-check muted manga-translate-target">
+                  <span>{t('manga.translate.target')}</span>
+                  <select
+                    value={targetLang}
+                    disabled={volumeBusy || translating}
+                    onChange={(e) => setTranslateTarget(e.target.value)}
+                    aria-label={t('manga.translate.target')}
+                  >
+                    {KNOWN_LANGS.filter((l) => l.code !== sourceLang).map((l) => (
+                      <option key={l.code} value={l.code}>
+                        {l.nativeLabel}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  className="btn small"
+                  disabled={ocrStatus === 'scanning' || !mokuroPage || translating || volumeBusy}
+                  onClick={() => void translatePage()}
+                >
+                  {translating
+                    ? t('manga.translate.working')
+                    : showTranslated
+                      ? t('manga.translate.showOriginal')
+                      : t('manga.translate.page')}
+                </button>
+                <button
+                  className={`btn small${showTranslated ? ' active' : ''}`}
+                  disabled={!mokuroPage || translating || volumeBusy}
+                  title={t('manga.translate.toggleVisibility')}
+                  onClick={() => toggleTranslationVisibility()}
+                >
+                  <Icon name="eye" size={14} />
+                  <span>
+                    {showTranslated ? t('manga.translate.hide') : t('manga.translate.show')}
+                  </span>
+                </button>
+                {volumeBusy ? (
+                  <button className="btn small" onClick={cancelVolumeAnalyze}>
+                    {t('manga.ocr.volumeCancel')}
+                  </button>
+                ) : (
+                  <button
+                    className="btn small primary"
+                    disabled={ocrStatus === 'scanning' || translating || !engineReady}
+                    title={t('manga.ocr.volumeTitle')}
+                    onClick={() => void analyzeEntireManga()}
+                  >
+                    {t('manga.ocr.volumeAnalyze')}
+                  </button>
+                )}
+                <div className="manga-translate-range">
+                  <div className="manga-translate-range-actions">
+                    <button
+                      className="btn small"
+                      disabled={
+                        volumeBusy ||
+                        translating ||
+                        !engineReady ||
+                        idx >= pages.length - 1
+                      }
+                      title={t('manga.translate.ahead.hint')}
+                      onClick={() => void translateAheadPages()}
+                    >
+                      {t('manga.translate.ahead')}
+                    </button>
+                  </div>
+                  <div className="manga-translate-range-group">
+                    <span className="manga-translate-range-label">
+                      {t('manga.translate.chapterRange')}
+                    </span>
+                    <div className="manga-translate-range-row">
+                      <input
+                        type="number"
+                        min={1}
+                        max={mangaChapterCount}
+                        value={chapterRangeFrom}
+                        disabled={volumeBusy || translating || !engineReady}
+                        onChange={(e) => setChapterRangeFrom(Number(e.target.value) || 1)}
+                        aria-label={t('manga.translate.rangeFrom')}
+                      />
+                      <span className="muted">–</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={mangaChapterCount}
+                        value={chapterRangeTo}
+                        disabled={volumeBusy || translating || !engineReady}
+                        onChange={(e) => setChapterRangeTo(Number(e.target.value) || 1)}
+                        aria-label={t('manga.translate.rangeTo')}
+                      />
+                      <button
+                        className="btn small"
+                        disabled={volumeBusy || translating || !engineReady}
+                        onClick={() => void translateChapterRange()}
+                      >
+                        {t('manga.translate.runRange')}
+                      </button>
+                    </div>
+                    <span className="muted manga-translate-range-label">
+                      {t('manga.translate.chapterRange.hint', { size: 20, max: mangaChapterCount })}
+                    </span>
+                  </div>
+                  <div className="manga-translate-range-group">
+                    <span className="manga-translate-range-label">
+                      {t('manga.translate.pageRange')}
+                    </span>
+                    <div className="manga-translate-range-row">
+                      <input
+                        type="number"
+                        min={1}
+                        max={Math.max(1, pages.length)}
+                        value={pageRangeFrom}
+                        disabled={volumeBusy || translating || !engineReady}
+                        onChange={(e) => setPageRangeFrom(Number(e.target.value) || 1)}
+                        aria-label={t('manga.translate.rangeFrom')}
+                      />
+                      <span className="muted">–</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={Math.max(1, pages.length)}
+                        value={pageRangeTo}
+                        disabled={volumeBusy || translating || !engineReady}
+                        onChange={(e) => setPageRangeTo(Number(e.target.value) || 1)}
+                        aria-label={t('manga.translate.rangeTo')}
+                      />
+                      <button
+                        className="btn small"
+                        disabled={volumeBusy || translating || !engineReady}
+                        onClick={() => void translatePageRange()}
+                      >
+                        {t('manga.translate.runRange')}
+                      </button>
+                    </div>
+                    <span className="muted manga-translate-range-label">
+                      {t('manga.translate.pageRange.hint', {
+                        max: Math.max(1, pages.length),
+                        current: idx + 1,
+                      })}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  className={`btn small${handwritingOpen ? ' active' : ''}`}
+                  onClick={() => setHandwritingOpen((v) => !v)}
+                >
+                  {t('manga.hw.open')}
+                </button>
+                <button
+                  className={`btn small${drawRegionMode ? ' active' : ''}`}
+                  title={t('manga.ocr.drawRegionTitle')}
+                  disabled={regionBusy || ocrStatus === 'scanning' || translating}
+                  onClick={() => setDrawRegionMode((v) => !v)}
+                >
+                  {t('manga.ocr.drawRegion')}
+                </button>
+                <button
+                  className="btn small"
+                  disabled={ocrStatus === 'scanning'}
+                  onClick={() => void scanPage({ force: true })}
+                >
+                  {ocrStatus === 'scanning' ? t('manga.ocr.scanning') : t('manga.ocr.rescan')}
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="sp-seg" role="group" aria-label={t('manga.ocr.direction')}>
+                  <button
+                    className={`sp-seg-btn ${ocrLang === 'jpn_vert' ? 'active' : ''}`}
+                    onClick={() => {
+                      setOcrLang('jpn_vert');
+                      void scanWithTesseract('jpn_vert');
+                    }}
+                  >
+                    {t('manga.ocr.vertical')}
+                  </button>
+                  <button
+                    className={`sp-seg-btn ${ocrLang === 'jpn' ? 'active' : ''}`}
+                    onClick={() => {
+                      setOcrLang('jpn');
+                      void scanWithTesseract('jpn');
+                    }}
+                  >
+                    {t('manga.ocr.horizontal')}
+                  </button>
+                </div>
+                <button
+                  className={`btn small${handwritingOpen ? ' active' : ''}`}
+                  onClick={() => setHandwritingOpen((v) => !v)}
+                >
+                  {t('manga.hw.open')}
+                </button>
+                <button
+                  className="btn small"
+                  disabled={ocrStatus === 'scanning'}
+                  onClick={() => void scanWithTesseract(ocrLang)}
+                >
+                  {ocrStatus === 'scanning' ? t('manga.ocr.scanning') : t('manga.ocr.rescan')}
+                </button>
+              </>
+            )}
+          </div>
+
+          {translateError && <div className="ocr-msg">{translateError}</div>}
+          {modelsMissing && (
+            <div className="ocr-msg">
+              <p className="muted">{t('manga.ocr.modelsMissing')}</p>
+              <button
+                className="btn"
+                onClick={() => {
+                  if (!mangaOcrAsset.installed) void window.api.assetsStart('manga-ocr');
+                  if (!detectorAsset.installed) void window.api.assetsStart('comic-text-detector');
+                  if (!decoderAsset.installed) void window.api.assetsStart('manga-ocr-decoder');
+                  if (!vocabAsset.installed) void window.api.assetsStart('manga-ocr-vocab');
+                }}
+              >
+                {t('manga.ocr.downloadModels', {
+                  size: formatBytes(
+                    (mangaOcrAsset.status?.totalBytes ?? 343_454_249) +
+                      (detectorAsset.status?.totalBytes ?? 94_669_756) +
+                      (decoderAsset.status?.totalBytes ?? 117_480_262) +
+                      (vocabAsset.status?.totalBytes ?? 30_216),
+                  ),
+                })}
+              </button>
+              <p className="muted ocr-hint">{t('manga.ocr.fallbackHint')}</p>
+            </div>
+          )}
+
+          {ocrStatus === 'scanning' && (
+            <div className="ocr-progress">
+              <div className="ocr-bar">
+                <div className="ocr-bar-fill" style={{ width: `${Math.round(ocrProgress * 100)}%` }} />
+              </div>
+              <span className="muted">
+                {t('manga.ocr.reading', { pct: Math.round(ocrProgress * 100) })}
+              </span>
+            </div>
+          )}
+          {volumeBusy && volumeProgress && (
+            <div className="ocr-progress">
+              <div className="ocr-bar">
+                <div
+                  className="ocr-bar-fill"
+                  style={{
+                    width: `${Math.round(
+                      (Math.min(volumeProgress.pageIndex + 1, volumeProgress.pageTotal) /
+                        Math.max(1, volumeProgress.pageTotal)) *
+                        100,
+                    )}%`,
+                  }}
+                />
+              </div>
+              <span className="muted">
+                {volumeProgress.message ||
+                  t('manga.ocr.volumeProgress', {
+                    phase: volumeProgress.phase,
+                    current: Math.min(volumeProgress.pageIndex + 1, volumeProgress.pageTotal),
+                    total: volumeProgress.pageTotal,
+                  })}
+              </span>
+            </div>
+          )}
+          {(ocrStatus === 'error' || (volumeProgress?.phase === 'error' && volumeProgress.message)) && (
+            <div className="ocr-msg muted">{ocrError || volumeProgress?.message}</div>
+          )}
+          {engineReady && drawRegionMode && (
+            <p className="ocr-hint muted">{t('manga.ocr.drawRegionHint')}</p>
+          )}
+          {engineReady && ocrStatus === 'done' && !sidePanel && !drawRegionMode && (
+            <p className="ocr-hint muted">{t('manga.ocr.overlayHint')}</p>
+          )}
+          {sidePanel && engineReady && mokuroPage && ocrStatus === 'done' && (
+            <MangaSidebar
+              page={displayPage ?? mokuroPage}
+              showSfx={showSfx}
+              activeRegionId={editingRegionId ?? hoverRegionId}
+              onSelectRegion={openRegionEditor}
+              onReorder={(order) => void saveRegionOrder(order)}
+            />
+          )}
+          {(modelsMissing || !engineReady) && ocrStatus === 'done' && (
+            <>
+              <p className="ocr-hint muted">{t('manga.ocr.selectHint')}</p>
+              <div
+                className="ocr-text"
+                lang="ja"
+                onMouseDown={(e) => {
+                  popupOpenOnDownRef.current = !!popupRef.current;
+                  noteLookupPointerDown(e);
+                }}
+                data-dict-owner=""
+                onMouseUp={onOcrSelect}
+              >
+                {ocrText}
+              </div>
+            </>
+          )}
+        </div>
+      ),
+    });
+  }
+
   return (
     <div className="reader" style={themeStyle}>
       <div className="reader-bar">
@@ -1410,7 +1788,11 @@ export default function MangaReader({ item, onClose }: Props) {
             />
           )}
           <button
-            className={`btn ${ocrOpen ? 'active' : ''}`}
+            className={`btn manga-ocr-toggle${ocrOpen ? ' active' : ''}`}
+            // A toggle, so it reports its state: without `aria-pressed` the only
+            // signal that the panel is open is a colour, and the only stable
+            // handle on this control was a localised `title`.
+            aria-pressed={ocrOpen}
             title={t('manga.ocr.scanTitle')}
             disabled={!pages.length}
             onClick={() => {
@@ -1436,433 +1818,93 @@ export default function MangaReader({ item, onClose }: Props) {
           </button>
         </div>
       </div>
-      <div className={`reader-stage manga-stage${isTtb ? ' manga-stage-ttb' : ''}`} ref={stageRef}>
-        {!isTtb && (
-          <button
-            className={`nav-zone left${mangaSettings.hoverHintsEnabled ? ' hint-enabled' : ''}`}
-            onClick={() => clickToTurnPages && go(mangaSettings.readerLayout === 'rtl' ? 1 : -1)}
-            aria-label={t('manga.prevPage')}
-          />
-        )}
-        {pages.length === 0 ? (
-          <div className="reader-msg">{t('manga.noPages')}</div>
-        ) : isTtb ? (
-          <div
-            className={`manga-ttb-scroll${mangaSettings.removeGapsVertical ? ' no-gaps' : ''}`}
-            ref={scrollContainerRef}
-          >
-            {pages.map((src, pageIdx) => (
-              <div
-                className="manga-page-wrap manga-ttb-page"
-                style={wrapStyle}
-                ref={(el) => {
-                  ttbPageRefs.current[pageIdx] = el;
-                  if (pageIdx === idx) pageWrapRef.current = el;
-                }}
-                key={pageIdx}
-              >
-                <img
-                  className="manga-page"
-                  style={imgFitStyle}
-                  src={src}
-                  alt={t('manga.pageAlt', { n: pageIdx + 1 })}
-                  draggable={false}
-                  loading="lazy"
-                  onLoad={(e) => {
-                    if (pageIdx !== idx) return;
-                    const img = e.currentTarget;
-                    if (img.naturalWidth > 0 && img.naturalHeight > 0) {
-                      setPageNatSize({ w: img.naturalWidth, h: img.naturalHeight });
-                    }
+      <ReadingCanvas
+        className="manga-canvas"
+        tools={readingTools}
+        closeLabel={t('manga.ocr.close')}
+        policy={READING_CANVAS_FILL_POLICY}
+      >
+        <div className={`reader-stage manga-stage${isTtb ? ' manga-stage-ttb' : ''}`} ref={stageRef}>
+          {!isTtb && (
+            <button
+              className={`nav-zone left${mangaSettings.hoverHintsEnabled ? ' hint-enabled' : ''}`}
+              onClick={() => clickToTurnPages && go(mangaSettings.readerLayout === 'rtl' ? 1 : -1)}
+              aria-label={t('manga.prevPage')}
+            />
+          )}
+          {pages.length === 0 ? (
+            <div className="reader-msg">{t('manga.noPages')}</div>
+          ) : isTtb ? (
+            <div
+              className={`manga-ttb-scroll${mangaSettings.removeGapsVertical ? ' no-gaps' : ''}`}
+              ref={scrollContainerRef}
+            >
+              {pages.map((src, pageIdx) => (
+                <div
+                  className="manga-page-wrap manga-ttb-page"
+                  style={wrapStyle}
+                  ref={(el) => {
+                    ttbPageRefs.current[pageIdx] = el;
+                    if (pageIdx === idx) pageWrapRef.current = el;
                   }}
-                />
-                {renderOcrLayer(pageIdx)}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className={`manga-spread${mangaSettings.readerLayout === 'rtl' ? ' rtl' : ''}`}>
-            {spreadIndicesFor(idx).map((pageIdx) => (
-              <div
-                className="manga-page-wrap"
-                style={wrapStyle}
-                ref={pageIdx === idx ? pageWrapRef : undefined}
-                key={pageIdx}
-              >
-                <img
-                  className="manga-page"
-                  style={imgFitStyle}
-                  src={pages[pageIdx]}
-                  alt={t('manga.pageAlt', { n: pageIdx + 1 })}
-                  draggable={false}
-                  onLoad={(e) => {
-                    if (pageIdx !== idx) return;
-                    const img = e.currentTarget;
-                    if (img.naturalWidth > 0 && img.naturalHeight > 0) {
-                      setPageNatSize({ w: img.naturalWidth, h: img.naturalHeight });
-                    }
-                  }}
-                />
-                {renderOcrLayer(pageIdx)}
-              </div>
-            ))}
-          </div>
-        )}
-        {!isTtb && (
-          <button
-            className={`nav-zone right${mangaSettings.hoverHintsEnabled ? ' hint-enabled' : ''}`}
-            onClick={() => clickToTurnPages && go(mangaSettings.readerLayout === 'rtl' ? -1 : 1)}
-            aria-label={t('manga.nextPage')}
-          />
-        )}
-
-        {ocrOpen && (
-          <aside className={`ocr-panel${sidePanel || modelsMissing || !mokuroPage ? '' : ' ocr-panel-compact'}`} onMouseDown={() => setPopup(null)}>
-            <div className="ocr-head">
-              <span className="ocr-head-title">
-                {t('manga.ocr.panelTitle')}
-                {ocrIsFallback && (
-                  <span className="ocr-fallback-badge" title={t('manga.ocr.fallbackHint')}>
-                    {t('manga.ocr.fallbackBadge')}
-                  </span>
-                )}
-              </span>
-              <button
-                className="dict-x"
-                onClick={() => {
-                  setDrawRegionMode(false);
-                  setOcrOpen(false);
-                }}
-                aria-label={t('manga.ocr.close')}
-              >
-                ×
-              </button>
-            </div>
-            <div className="ocr-toolbar">
-              {engineReady ? (
-                <>
-                  <label className="ocr-check muted">
-                    <input type="checkbox" checked={showSfx} onChange={(e) => setShowSfx(e.target.checked)} />
-                    {t('manga.ocr.showSfx')}
-                  </label>
-                  <label className="ocr-check muted">
-                    <input
-                      type="checkbox"
-                      checked={sidePanel}
-                      onChange={(e) => setSidePanel(e.target.checked)}
-                    />
-                    {t('manga.ocr.sidePanel')}
-                  </label>
-                  <label className="ocr-check muted" title={t('manga.settings.autoTranslate.hint')}>
-                    <input
-                      type="checkbox"
-                      checked={mangaSettings.autoTranslate}
-                      onChange={(e) => updateMangaSettings({ autoTranslate: e.target.checked })}
-                    />
-                    {t('manga.ocr.autoTranslate')}
-                  </label>
-                  <label className="ocr-check muted manga-translate-target">
-                    <span>{t('manga.translate.target')}</span>
-                    <select
-                      value={targetLang}
-                      disabled={volumeBusy || translating}
-                      onChange={(e) => setTranslateTarget(e.target.value)}
-                      aria-label={t('manga.translate.target')}
-                    >
-                      {KNOWN_LANGS.filter((l) => l.code !== sourceLang).map((l) => (
-                        <option key={l.code} value={l.code}>
-                          {l.nativeLabel}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <button
-                    className="btn small"
-                    disabled={ocrStatus === 'scanning' || !mokuroPage || translating || volumeBusy}
-                    onClick={() => void translatePage()}
-                  >
-                    {translating
-                      ? t('manga.translate.working')
-                      : showTranslated
-                        ? t('manga.translate.showOriginal')
-                        : t('manga.translate.page')}
-                  </button>
-                  <button
-                    className={`btn small${showTranslated ? ' active' : ''}`}
-                    disabled={!mokuroPage || translating || volumeBusy}
-                    title={t('manga.translate.toggleVisibility')}
-                    onClick={() => toggleTranslationVisibility()}
-                  >
-                    <Icon name="eye" size={14} />
-                    <span>
-                      {showTranslated ? t('manga.translate.hide') : t('manga.translate.show')}
-                    </span>
-                  </button>
-                  {volumeBusy ? (
-                    <button className="btn small" onClick={cancelVolumeAnalyze}>
-                      {t('manga.ocr.volumeCancel')}
-                    </button>
-                  ) : (
-                    <button
-                      className="btn small primary"
-                      disabled={ocrStatus === 'scanning' || translating || !engineReady}
-                      title={t('manga.ocr.volumeTitle')}
-                      onClick={() => void analyzeEntireManga()}
-                    >
-                      {t('manga.ocr.volumeAnalyze')}
-                    </button>
-                  )}
-                  <div className="manga-translate-range">
-                    <div className="manga-translate-range-actions">
-                      <button
-                        className="btn small"
-                        disabled={
-                          volumeBusy ||
-                          translating ||
-                          !engineReady ||
-                          idx >= pages.length - 1
-                        }
-                        title={t('manga.translate.ahead.hint')}
-                        onClick={() => void translateAheadPages()}
-                      >
-                        {t('manga.translate.ahead')}
-                      </button>
-                    </div>
-                    <div className="manga-translate-range-group">
-                      <span className="manga-translate-range-label">
-                        {t('manga.translate.chapterRange')}
-                      </span>
-                      <div className="manga-translate-range-row">
-                        <input
-                          type="number"
-                          min={1}
-                          max={mangaChapterCount}
-                          value={chapterRangeFrom}
-                          disabled={volumeBusy || translating || !engineReady}
-                          onChange={(e) => setChapterRangeFrom(Number(e.target.value) || 1)}
-                          aria-label={t('manga.translate.rangeFrom')}
-                        />
-                        <span className="muted">–</span>
-                        <input
-                          type="number"
-                          min={1}
-                          max={mangaChapterCount}
-                          value={chapterRangeTo}
-                          disabled={volumeBusy || translating || !engineReady}
-                          onChange={(e) => setChapterRangeTo(Number(e.target.value) || 1)}
-                          aria-label={t('manga.translate.rangeTo')}
-                        />
-                        <button
-                          className="btn small"
-                          disabled={volumeBusy || translating || !engineReady}
-                          onClick={() => void translateChapterRange()}
-                        >
-                          {t('manga.translate.runRange')}
-                        </button>
-                      </div>
-                      <span className="muted manga-translate-range-label">
-                        {t('manga.translate.chapterRange.hint', { size: 20, max: mangaChapterCount })}
-                      </span>
-                    </div>
-                    <div className="manga-translate-range-group">
-                      <span className="manga-translate-range-label">
-                        {t('manga.translate.pageRange')}
-                      </span>
-                      <div className="manga-translate-range-row">
-                        <input
-                          type="number"
-                          min={1}
-                          max={Math.max(1, pages.length)}
-                          value={pageRangeFrom}
-                          disabled={volumeBusy || translating || !engineReady}
-                          onChange={(e) => setPageRangeFrom(Number(e.target.value) || 1)}
-                          aria-label={t('manga.translate.rangeFrom')}
-                        />
-                        <span className="muted">–</span>
-                        <input
-                          type="number"
-                          min={1}
-                          max={Math.max(1, pages.length)}
-                          value={pageRangeTo}
-                          disabled={volumeBusy || translating || !engineReady}
-                          onChange={(e) => setPageRangeTo(Number(e.target.value) || 1)}
-                          aria-label={t('manga.translate.rangeTo')}
-                        />
-                        <button
-                          className="btn small"
-                          disabled={volumeBusy || translating || !engineReady}
-                          onClick={() => void translatePageRange()}
-                        >
-                          {t('manga.translate.runRange')}
-                        </button>
-                      </div>
-                      <span className="muted manga-translate-range-label">
-                        {t('manga.translate.pageRange.hint', {
-                          max: Math.max(1, pages.length),
-                          current: idx + 1,
-                        })}
-                      </span>
-                    </div>
-                  </div>
-                  <button
-                    className={`btn small${handwritingOpen ? ' active' : ''}`}
-                    onClick={() => setHandwritingOpen((v) => !v)}
-                  >
-                    {t('manga.hw.open')}
-                  </button>
-                  <button
-                    className={`btn small${drawRegionMode ? ' active' : ''}`}
-                    title={t('manga.ocr.drawRegionTitle')}
-                    disabled={regionBusy || ocrStatus === 'scanning' || translating}
-                    onClick={() => setDrawRegionMode((v) => !v)}
-                  >
-                    {t('manga.ocr.drawRegion')}
-                  </button>
-                  <button
-                    className="btn small"
-                    disabled={ocrStatus === 'scanning'}
-                    onClick={() => void scanPage({ force: true })}
-                  >
-                    {ocrStatus === 'scanning' ? t('manga.ocr.scanning') : t('manga.ocr.rescan')}
-                  </button>
-                </>
-              ) : (
-                <>
-                  <div className="sp-seg" role="group" aria-label={t('manga.ocr.direction')}>
-                    <button
-                      className={`sp-seg-btn ${ocrLang === 'jpn_vert' ? 'active' : ''}`}
-                      onClick={() => {
-                        setOcrLang('jpn_vert');
-                        void scanWithTesseract('jpn_vert');
-                      }}
-                    >
-                      {t('manga.ocr.vertical')}
-                    </button>
-                    <button
-                      className={`sp-seg-btn ${ocrLang === 'jpn' ? 'active' : ''}`}
-                      onClick={() => {
-                        setOcrLang('jpn');
-                        void scanWithTesseract('jpn');
-                      }}
-                    >
-                      {t('manga.ocr.horizontal')}
-                    </button>
-                  </div>
-                  <button
-                    className={`btn small${handwritingOpen ? ' active' : ''}`}
-                    onClick={() => setHandwritingOpen((v) => !v)}
-                  >
-                    {t('manga.hw.open')}
-                  </button>
-                  <button
-                    className="btn small"
-                    disabled={ocrStatus === 'scanning'}
-                    onClick={() => void scanWithTesseract(ocrLang)}
-                  >
-                    {ocrStatus === 'scanning' ? t('manga.ocr.scanning') : t('manga.ocr.rescan')}
-                  </button>
-                </>
-              )}
-            </div>
-
-            {translateError && <div className="ocr-msg">{translateError}</div>}
-            {modelsMissing && (
-              <div className="ocr-msg">
-                <p className="muted">{t('manga.ocr.modelsMissing')}</p>
-                <button
-                  className="btn"
-                  onClick={() => {
-                    if (!mangaOcrAsset.installed) void window.api.assetsStart('manga-ocr');
-                    if (!detectorAsset.installed) void window.api.assetsStart('comic-text-detector');
-                    if (!decoderAsset.installed) void window.api.assetsStart('manga-ocr-decoder');
-                    if (!vocabAsset.installed) void window.api.assetsStart('manga-ocr-vocab');
-                  }}
+                  key={pageIdx}
                 >
-                  {t('manga.ocr.downloadModels', {
-                    size: formatBytes(
-                      (mangaOcrAsset.status?.totalBytes ?? 343_454_249) +
-                        (detectorAsset.status?.totalBytes ?? 94_669_756) +
-                        (decoderAsset.status?.totalBytes ?? 117_480_262) +
-                        (vocabAsset.status?.totalBytes ?? 30_216),
-                    ),
-                  })}
-                </button>
-                <p className="muted ocr-hint">{t('manga.ocr.fallbackHint')}</p>
-              </div>
-            )}
-
-            {ocrStatus === 'scanning' && (
-              <div className="ocr-progress">
-                <div className="ocr-bar">
-                  <div className="ocr-bar-fill" style={{ width: `${Math.round(ocrProgress * 100)}%` }} />
-                </div>
-                <span className="muted">
-                  {t('manga.ocr.reading', { pct: Math.round(ocrProgress * 100) })}
-                </span>
-              </div>
-            )}
-            {volumeBusy && volumeProgress && (
-              <div className="ocr-progress">
-                <div className="ocr-bar">
-                  <div
-                    className="ocr-bar-fill"
-                    style={{
-                      width: `${Math.round(
-                        (Math.min(volumeProgress.pageIndex + 1, volumeProgress.pageTotal) /
-                          Math.max(1, volumeProgress.pageTotal)) *
-                          100,
-                      )}%`,
+                  <img
+                    className="manga-page"
+                    style={imgFitStyle}
+                    src={src}
+                    alt={t('manga.pageAlt', { n: pageIdx + 1 })}
+                    draggable={false}
+                    loading="lazy"
+                    onLoad={(e) => {
+                      if (pageIdx !== idx) return;
+                      const img = e.currentTarget;
+                      if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+                        setPageNatSize({ w: img.naturalWidth, h: img.naturalHeight });
+                      }
                     }}
                   />
+                  {renderOcrLayer(pageIdx)}
                 </div>
-                <span className="muted">
-                  {volumeProgress.message ||
-                    t('manga.ocr.volumeProgress', {
-                      phase: volumeProgress.phase,
-                      current: Math.min(volumeProgress.pageIndex + 1, volumeProgress.pageTotal),
-                      total: volumeProgress.pageTotal,
-                    })}
-                </span>
-              </div>
-            )}
-            {(ocrStatus === 'error' || (volumeProgress?.phase === 'error' && volumeProgress.message)) && (
-              <div className="ocr-msg muted">{ocrError || volumeProgress?.message}</div>
-            )}
-            {engineReady && drawRegionMode && (
-              <p className="ocr-hint muted">{t('manga.ocr.drawRegionHint')}</p>
-            )}
-            {engineReady && ocrStatus === 'done' && !sidePanel && !drawRegionMode && (
-              <p className="ocr-hint muted">{t('manga.ocr.overlayHint')}</p>
-            )}
-            {sidePanel && engineReady && mokuroPage && ocrStatus === 'done' && (
-              <MangaSidebar
-                page={displayPage ?? mokuroPage}
-                showSfx={showSfx}
-                activeRegionId={editingRegionId ?? hoverRegionId}
-                onSelectRegion={openRegionEditor}
-                onReorder={(order) => void saveRegionOrder(order)}
-              />
-            )}
-            {(modelsMissing || !engineReady) && ocrStatus === 'done' && (
-              <>
-                <p className="ocr-hint muted">{t('manga.ocr.selectHint')}</p>
+              ))}
+            </div>
+          ) : (
+            <div className={`manga-spread${mangaSettings.readerLayout === 'rtl' ? ' rtl' : ''}`}>
+              {spreadIndicesFor(idx).map((pageIdx) => (
                 <div
-                  className="ocr-text"
-                  lang="ja"
-                  onMouseDown={(e) => {
-                    popupOpenOnDownRef.current = !!popupRef.current;
-                    noteLookupPointerDown(e);
-                  }}
-                  data-dict-owner=""
-                  onMouseUp={onOcrSelect}
+                  className="manga-page-wrap"
+                  style={wrapStyle}
+                  ref={pageIdx === idx ? pageWrapRef : undefined}
+                  key={pageIdx}
                 >
-                  {ocrText}
+                  <img
+                    className="manga-page"
+                    style={imgFitStyle}
+                    src={pages[pageIdx]}
+                    alt={t('manga.pageAlt', { n: pageIdx + 1 })}
+                    draggable={false}
+                    onLoad={(e) => {
+                      if (pageIdx !== idx) return;
+                      const img = e.currentTarget;
+                      if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+                        setPageNatSize({ w: img.naturalWidth, h: img.naturalHeight });
+                      }
+                    }}
+                  />
+                  {renderOcrLayer(pageIdx)}
                 </div>
-              </>
-            )}
-          </aside>
-        )}
-      </div>
+              ))}
+            </div>
+          )}
+          {!isTtb && (
+            <button
+              className={`nav-zone right${mangaSettings.hoverHintsEnabled ? ' hint-enabled' : ''}`}
+              onClick={() => clickToTurnPages && go(mangaSettings.readerLayout === 'rtl' ? -1 : 1)}
+              aria-label={t('manga.nextPage')}
+            />
+          )}
+        </div>
+      </ReadingCanvas>
       <div
         className={`reader-footer${mangaSettings.pageSelectorPosition === 'left' ? ' reader-footer-left' : ''}${!footerVisible ? ' reader-footer-hidden' : ''}`}
       >
