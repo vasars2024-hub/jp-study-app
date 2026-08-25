@@ -483,3 +483,11 @@ rather than half-started at the end of a turn.
 2026-08-24 | liquid | units done this turn: 0 | units left: 10 | basis: the 13 `Gate:` lines in section 11 of src/LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md (`grep -c '^Gate:'` = 13, re-run this turn); 3 closed (L0 line 452 / L2 line 591 / L3 line 600), 10 open; gate 461 (L1) is the one worked and is now 7 of 8 categories at 10 on one tree | projected finish: 2026-09-23
 
 2026-08-25 | liquid | units done this turn: 0 | units left: 10 | basis: the 13 `Gate:` lines in section 11 of src/LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md (`grep -c '^Gate:'` = 13, re-run this turn); the 3 closed (L0 452 / L2 591 / L3 600) are INHERITED, but gate 461 was re-derived directly this turn and is OPEN on a measured number, not bookkeeping — Dictionary reached 8 of 8 categories (category 7 closed: drag now 0 frames over 100 ms at the 16.9 ms compositor ceiling, six runs after a real restart on a LOADED window) while Video, which gate 461 requires equally, scored for the FIRST time and FAILS category 1 with 17 of 34 controls below the 32 px hit floor and 3 hits stolen | projected finish: 2026-09-24
+
+2026-08-25 | liquid | units done this turn: 0 | units left: 10 | basis: the 13 `Gate:` lines in src/LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md (`grep -c '^Gate:'` = 13, re-run this turn); the 3 closed (L0 452 / L2 591 / L3 600) are INHERITED, gate 461 was re-derived directly and is OPEN — it needs 80/80 on Video AND Dictionary, Dictionary holds 8 of 8, and Video moved from 0 scored categories to 1 (category 1 CLOSED at 10/10 this turn: 35 of 35 controls measured, 0 below the 32px pointer floor from 17, 0 stolen from 3, contrast min 5.13:1, keyboard 0 unreachable) while category 4 got its first number and FAILS (dead region 22.1% of viewport against a 15% bar) and category 8 is recorded UNSCORED | projected finish: 2026-09-27
+
+Rate, arithmetic and not optimism: 3 of 13 gates closed in the 10 days since liquid opened
+2026-08-16 = 0.30 gates/day at 2 workers; 10 ÷ 0.30 = 33 days → **2026-09-27**, missing the
+2026-09-01 target by 26 days. The rate did not move this turn because no GATE closed — but
+gate 461's Video half went from unmeasured to 1 of 8 categories at 10 with two more located, so
+the number behind the gate moved even though the gate count did not.
