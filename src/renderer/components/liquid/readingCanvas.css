@@ -90,11 +90,19 @@
 }
 
 .lq-reading-tool-title {
+  flex: 1 1 auto;
   font-size: 13px;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.lq-reading-tool-actions {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lq-space-2);
 }
 
 .lq-reading-tool-close {

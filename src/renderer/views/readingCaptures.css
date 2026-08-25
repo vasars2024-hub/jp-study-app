@@ -1,44 +1,47 @@
 /*
- * Captures: a two-pane reader inside the Reading workspace.
+ * Captures: a reader inside the Reading workspace, and L6's first canvas caller.
  *
  * The passage pane is a stable, opaque anchor surface on purpose — CLAUDE.md's
  * Liquid rule keeps reading on high-contrast anchors, and this pane exists to be
- * read. Only the list rail carries the translucent workspace material.
+ * read. Only the list carries the translucent workspace material, and it now
+ * gets that from `.lq-reading-tool` rather than declaring its own.
+ *
+ * THE TWO-COLUMN GRID AND ITS `@media (max-width: 720px)` STACK ARE GONE, and
+ * that is the point of the migration rather than a side effect. A media query
+ * reads the WINDOW; this section is regularly a pop-out or a docked pane, so at
+ * a 500px pane inside a 1400px window the query never fired, the list kept its
+ * 180-260px column, and the passage was left ~290px — about 17 characters a line
+ * at the 17px reading type below. `ReadingCanvas` measures its own box instead.
  */
 
 .reading-captures {
-  display: grid;
+  display: flex;
+  box-sizing: border-box;
   min-width: 0;
   min-height: 0;
   height: 100%;
-  gap: 10px;
-  grid-template-columns: minmax(180px, 260px) minmax(0, 1fr);
   padding: 10px;
 }
 
-.reading-captures-list {
-  display: flex;
-  min-width: 0;
-  min-height: 0;
-  flex-direction: column;
-  gap: 6px;
-  overflow: hidden auto;
-  padding: 8px;
-  border: 1px solid color-mix(in srgb, var(--border, #5a252b) 70%, transparent);
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--panel, #151012) 82%, transparent);
-  scrollbar-width: thin;
+.reading-captures-list-toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  min-width: 26px;
+  min-height: 26px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--muted, #b9afb1);
+  background: transparent;
+  cursor: pointer;
 }
 
-.reading-captures-list-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  color: var(--muted, #b9afb1);
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+.reading-captures-list-toggle:hover,
+.reading-captures-list-toggle[aria-pressed='true'] {
+  border-color: color-mix(in srgb, var(--accent, #a9142c) 34%, transparent);
+  color: var(--text, #f5ecee);
 }
 
 .reading-captures-refresh {
@@ -174,9 +177,10 @@
   color: var(--danger, #ff8189);
 }
 
-@media (max-width: 720px) {
-  .reading-captures {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(96px, 30%) minmax(0, 1fr);
-  }
+/* The reader is the canvas's document child, so it takes the width the resolver
+   left it rather than a grid track. `.lq-reading-doc > *` also caps it at the
+   reading measure and centres it, which is where the "legible at all sizes"
+   half of L6's Gate is actually enforced. */
+.reading-captures .lq-reading-doc > .reading-captures-reader {
+  height: 100%;
 }

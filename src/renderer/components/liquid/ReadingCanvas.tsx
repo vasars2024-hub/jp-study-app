@@ -45,6 +45,13 @@ export interface ReadingCanvasTool extends ReadingToolSpec {
   /** The tool itself. */
   content: ReactNode;
   /**
+   * Controls that belong beside the tool's own title — a refresh, a count, a
+   * filter. Here rather than at the top of `content` so a migrating surface can
+   * drop its own panel header instead of ending up with two stacked headings,
+   * which is the commonest way a migration adds chrome while claiming to remove it.
+   */
+  actions?: ReactNode;
+  /**
    * Required, for the same reason `LiquidInspector` requires it: a reading tool
    * that covers the document and cannot be dismissed has eaten the app.
    */
@@ -161,6 +168,7 @@ export function ReadingCanvas({
           >
             <div className="lq-reading-tool-head">
               <span className="lq-reading-tool-title">{tool.label}</span>
+              {tool.actions ? <span className="lq-reading-tool-actions">{tool.actions}</span> : null}
               <button
                 type="button"
                 className="lq-reading-tool-close"

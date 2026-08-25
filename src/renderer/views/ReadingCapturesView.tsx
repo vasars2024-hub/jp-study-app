@@ -2,6 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReadingLensHistoryEntry } from '../../shared/readingLensHistory';
 import type { ReadingPassageHandoff } from '../../shared/readingPassageHandoff';
 import Icon from '../components/Icons';
+import {
+  ReadingCanvas,
+  type ReadingCanvasTool,
+} from '../components/liquid/ReadingCanvas';
 import { useT } from '../i18n';
 import './readingCaptures.css';
 
@@ -76,6 +80,9 @@ export default function ReadingCapturesView({ passage }: ReadingCapturesViewProp
   const { t } = useT();
   const [history, setHistory] = useState<HistoryState>({ kind: 'loading' });
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Open by default: this is the section's navigation, and a cold open with the
+  // list closed shows an empty reader and no visible way to fill it.
+  const [listOpen, setListOpen] = useState(true);
 
   const load = useCallback(() => {
     const list = window.api?.lensHistoryList;
@@ -124,11 +131,69 @@ export default function ReadingCapturesView({ passage }: ReadingCapturesViewProp
     return selected.lines.length ? selected.lines : selected.text.split(/\r?\n/).filter(Boolean);
   }, [selected]);
 
-  return (
-    <div className="reading-captures">
-      <aside className="reading-captures-list" aria-label={t('reading.captures.listLabel')}>
-        <div className="reading-captures-list-head">
-          <span>{t('reading.captures.recent')}</span>
+  const listBody = (
+    <>
+      {history.kind === 'loading' && rows.length === 0 ? (
+        <p className="reading-captures-note muted" aria-live="polite">
+          {t('reading.captures.loading')}
+        </p>
+      ) : null}
+      {history.kind === 'error' ? (
+        <p className="reading-captures-note reading-captures-error" role="status">
+          {t('reading.captures.loadFailed')}
+        </p>
+      ) : null}
+      {history.kind !== 'loading' && rows.length === 0 ? (
+        <p className="reading-captures-note muted">{t('reading.captures.empty')}</p>
+      ) : null}
+      <ul className="reading-captures-rows">
+        {rows.map((row) => (
+          <li key={row.captureId}>
+            <button
+              type="button"
+              className="reading-captures-row"
+              aria-current={selected?.captureId === row.captureId}
+              onClick={() => setSelectedId(row.captureId)}
+            >
+              <span className="reading-captures-row-title">{row.title}</span>
+              <span className="reading-captures-row-meta">
+                {row.live ? (
+                  <span className="reading-captures-badge">
+                    {t('reading.captures.justCaptured')}
+                  </span>
+                ) : null}
+                <span>{t(`settings.lens.history.source.${row.source}`)}</span>
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+
+  /**
+   * The capture list is a reading side tool, and L6's canvas decides where it
+   * goes — this surface no longer does.
+   *
+   * What that fixes is not cosmetic. The old layout was a CSS grid with a
+   * `minmax(180px, 260px)` list column and a `@media (max-width: 720px)` stack,
+   * and a media query reads the WINDOW. This section renders inside the Reading
+   * workspace, which is regularly a pop-out or a docked pane: at a 500 px pane
+   * inside a 1400 px window the media query never fires, the list keeps its
+   * column, and the passage is left ~290 px — about 17 characters a line at the
+   * 17 px reading type. `ReadingCanvas` measures its OWN box, so the same pane
+   * turns the list into a dismissible sheet and gives the passage all 500 px.
+   */
+  const tools = useMemo<ReadingCanvasTool[]>(() => {
+    if (!listOpen) return [];
+    return [
+      {
+        id: 'captures',
+        label: t('reading.captures.recent'),
+        minWidth: 200,
+        preferredWidth: 260,
+        onClose: () => setListOpen(false),
+        actions: (
           <button
             type="button"
             className="reading-captures-refresh"
@@ -137,64 +202,52 @@ export default function ReadingCapturesView({ passage }: ReadingCapturesViewProp
           >
             <Icon name="refresh" size={13} />
           </button>
-        </div>
-        {history.kind === 'loading' && rows.length === 0 ? (
-          <p className="reading-captures-note muted" aria-live="polite">
-            {t('reading.captures.loading')}
-          </p>
-        ) : null}
-        {history.kind === 'error' ? (
-          <p className="reading-captures-note reading-captures-error" role="status">
-            {t('reading.captures.loadFailed')}
-          </p>
-        ) : null}
-        {history.kind !== 'loading' && rows.length === 0 ? (
-          <p className="reading-captures-note muted">{t('reading.captures.empty')}</p>
-        ) : null}
-        <ul className="reading-captures-rows">
-          {rows.map((row) => (
-            <li key={row.captureId}>
-              <button
-                type="button"
-                className="reading-captures-row"
-                aria-current={selected?.captureId === row.captureId}
-                onClick={() => setSelectedId(row.captureId)}
-              >
-                <span className="reading-captures-row-title">{row.title}</span>
-                <span className="reading-captures-row-meta">
-                  {row.live ? (
-                    <span className="reading-captures-badge">
-                      {t('reading.captures.justCaptured')}
-                    </span>
-                  ) : null}
-                  <span>{t(`settings.lens.history.source.${row.source}`)}</span>
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </aside>
+        ),
+        content: listBody,
+      },
+    ];
+  }, [listOpen, listBody, load, t]);
 
-      <section className="reading-captures-reader" aria-label={t('reading.captures.readerLabel')}>
-        {selected ? (
-          <>
-            <header className="reading-captures-reader-head">
-              <Icon name="scan" size={15} />
-              <h2>{selected.sourceLabel || t('reading.captures.untitled')}</h2>
-              <span className="reading-captures-reader-meta">
-                {t('reading.captures.lineCount', { count: readerLines.length })}
-              </span>
-            </header>
+  return (
+    <div className="reading-captures">
+      <ReadingCanvas
+        tools={tools}
+        closeLabel={t('common.close')}
+        aria-label={t('reading.captures.title')}
+      >
+        <section className="reading-captures-reader" aria-label={t('reading.captures.readerLabel')}>
+          <header className="reading-captures-reader-head">
+            <button
+              type="button"
+              className="reading-captures-list-toggle"
+              aria-pressed={listOpen}
+              aria-label={t('reading.captures.listLabel')}
+              title={t('reading.captures.listLabel')}
+              onClick={() => setListOpen((open) => !open)}
+            >
+              <Icon name="clipboard" size={14} />
+            </button>
+            {selected ? (
+              <>
+                <Icon name="scan" size={15} />
+                <h2>{selected.sourceLabel || t('reading.captures.untitled')}</h2>
+                <span className="reading-captures-reader-meta">
+                  {t('reading.captures.lineCount', { count: readerLines.length })}
+                </span>
+              </>
+            ) : null}
+          </header>
+          {selected ? (
             <div className="reading-captures-passage" lang="ja">
               {readerLines.map((line, index) => (
                 <p key={`${selected.captureId}:${index}`}>{line}</p>
               ))}
             </div>
-          </>
-        ) : (
-          <p className="reading-captures-note muted">{t('reading.captures.selectHint')}</p>
-        )}
-      </section>
+          ) : (
+            <p className="reading-captures-note muted">{t('reading.captures.selectHint')}</p>
+          )}
+        </section>
+      </ReadingCanvas>
     </div>
   );
 }
