@@ -423,8 +423,11 @@ export function findSemanticNeighborsInDb(query: NeighborQuery): LexiconNeighbor
  * Separate from `lookupInDictionaryDb` for the same reason the neighbours read
  * is: it scans a language partition of the headword index, which is tens of
  * milliseconds a lookup nobody asked to expand must not spend.
+ *
+ * Async because that scan is walked in event-loop-sized windows — see
+ * `scanHeadwordsContaining` for why the visit cannot be capped away.
  */
-export function findLexiconCompoundsInDb(query: CompoundQuery): LexiconCompoundResult {
+export function findLexiconCompoundsInDb(query: CompoundQuery): Promise<LexiconCompoundResult> {
   return findLexiconCompounds(dictionaryDb(), query);
 }
 
@@ -436,8 +439,15 @@ export function findLexiconCompoundsInDb(query: CompoundQuery): LexiconCompoundR
  * rows in `collocations` before reading the payload back out. That is a bounded
  * delete-and-insert of at most twelve rows, not an import, so it stays on this
  * call rather than moving to the import worker.
+ *
+ * Async for the same reason as its compound sibling, and with one consequence
+ * worth naming at this seam: the write happens *after* the scan's yields, so a
+ * dictionary disabled mid-scan is reflected in the rows this call then stores.
+ * That is the self-healing behaviour the doc below already relies on, not a race.
  */
-export function findLexiconCollocationsInDb(query: CollocationQuery): LexiconCollocationResult {
+export function findLexiconCollocationsInDb(
+  query: CollocationQuery,
+): Promise<LexiconCollocationResult> {
   return findLexiconCollocations(dictionaryDb(), query);
 }
 

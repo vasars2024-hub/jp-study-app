@@ -801,7 +801,7 @@ export function registerDictionaryIpc(): void {
   );
   ipcMain.handle(
     'dict:compounds',
-    (_e, text: unknown, options?: unknown): LexiconCompoundResult => {
+    async (_e, text: unknown, options?: unknown): Promise<LexiconCompoundResult> => {
       const raw = options && typeof options === 'object' && !Array.isArray(options)
         ? options as Record<string, unknown>
         : {};
@@ -809,7 +809,10 @@ export function registerDictionaryIpc(): void {
       const empty: LexiconCompoundResult = { query, compounds: [] };
       if (!query) return empty;
       try {
-        return findLexiconCompoundsInDb({
+        // Awaited inside the try, like `dict:examples`: the scan yields the event
+        // loop between windows, so a database that goes away mid-scan rejects here
+        // rather than escaping as an unhandled rejection.
+        return await findLexiconCompoundsInDb({
           text: query,
           sourceLangs: readLangList(raw.sourceLangs),
           glossLangs: readLangList(raw.glossLangs),
@@ -826,7 +829,7 @@ export function registerDictionaryIpc(): void {
   );
   ipcMain.handle(
     'dict:collocations',
-    (_e, text: unknown, options?: unknown): LexiconCollocationResult => {
+    async (_e, text: unknown, options?: unknown): Promise<LexiconCollocationResult> => {
       const raw = options && typeof options === 'object' && !Array.isArray(options)
         ? options as Record<string, unknown>
         : {};
@@ -834,7 +837,10 @@ export function registerDictionaryIpc(): void {
       const empty: LexiconCollocationResult = { query, collocations: [] };
       if (!query) return empty;
       try {
-        return findLexiconCollocationsInDb({
+        // Awaited inside the try for the same reason as the compound handler, and
+        // one more that is specific to this one: it writes, so a rejection after a
+        // yield is the only place a locked database can still be caught.
+        return await findLexiconCollocationsInDb({
           text: query,
           sourceLangs: readLangList(raw.sourceLangs),
           glossLangs: readLangList(raw.glossLangs),

@@ -38,6 +38,7 @@ import {
 } from '../../shared/lexiconNeighbors';
 import {
   COMPOUND_SCAN_ROWS,
+  HEADWORD_SCAN_CHUNK_ROWS,
   MAX_COMPOUND_RESULTS,
   selectLexiconCompounds,
   type LexiconCompound,
@@ -887,6 +888,111 @@ export function findSemanticNeighbors(db: SqliteDb, query: NeighborQuery): Lexic
   };
 }
 
+/** One matched headword, carrying the columns the shared scan's ordering needs. */
+interface HeadwordScanRow {
+  id: number;
+  lang: string;
+  text: string;
+  reading: string | null;
+  score: number;
+  dict_id: string;
+  dict_title: string;
+  /** Code points, not UTF-16 units — SQLite's `length()` counts characters. */
+  len: number;
+}
+
+/**
+ * Every enabled headword whose written form contains `needle`, best `budget` first.
+ *
+ * Shared by `findLexiconCompounds` and `findLexiconCollocations`, which asked the
+ * same question with the same `INDEXED BY` and differed only in their cap.
+ *
+ * ## Why the cap they used to pass to SQLite could never fire
+ *
+ * `limit COMPOUND_SCAN_ROWS` sat under `order by h.score desc, ...`, and SQLite's
+ * own plan for that ends `USE TEMP B-TREE FOR ORDER BY` — the sort has to see
+ * every match before the limit can discard one, so the visit was always the whole
+ * `lang` partition of `idx_hw_norm` no matter how small the cap was. Measured on
+ * the shipped database: 猫 **1,244.1 ms** on a cold cache, as one uninterruptible
+ * main-process block, to return twelve compounds.
+ *
+ * ## Why the window is on `norm` and emphatically not on the rowid
+ *
+ * The example scan next door windows on `id`, and copying that here is the trap.
+ * `idx_hw_norm` is `(lang, norm)`: `instr(h.norm, ?)` is evaluated straight off
+ * the index and only a match pays a table seek, so the scan reads a 5,386-page
+ * index rather than the 17,792-page table. A rowid window forces the table order
+ * instead and trades the smaller structure for the larger one. So the cursor is a
+ * `norm` value, taken from a covering `limit 1 offset N` probe, and each window is
+ * the half-open range `(from, upto]` — which partitions the index exactly, with no
+ * row visited twice and none skipped, because the probe's own `norm > from` makes
+ * `upto` strictly greater than `from` even when thousands of rows share a `norm`.
+ *
+ * ## Why the ordering moved into JS rather than being dropped
+ *
+ * `findLexiconCompounds`' doc explains what the `ORDER BY` buys: without it a
+ * common character such as 日 returns 〆切日 and 日おおい instead of 祝日 and 日課.
+ * That is preserved exactly — `h.score` is selected, the same three-key order is
+ * applied here, and the list is truncated to `budget` after every window, so the
+ * result is the global top-`budget` on bounded memory rather than a per-window
+ * one. The probe `debug/l8a-compound-scan-shape.cjs` asserts the identity
+ * directly: same ids, same order, for 猫 / 日 / 腹 / 食べる.
+ */
+async function scanHeadwordsContaining(
+  db: SqliteDb,
+  langs: readonly string[],
+  needle: string,
+  budget: number,
+): Promise<HeadwordScanRow[]> {
+  const columns = `
+      select h.id, h.lang, h.text, h.reading, h.score, h.dict_id, d.title as dict_title
+      from headwords h indexed by idx_hw_norm
+      join dictionaries d on d.id = h.dict_id
+      where h.lang = ?`;
+  const window = db.prepare(`${columns}
+        and h.norm > ? and h.norm <= ?
+        and d.enabled = 1
+        and instr(h.norm, ?) > 0`);
+  // The last window has no upper bound rather than a sentinel string: there is no
+  // value guaranteed to sort above every `norm`, and a wrong guess would silently
+  // drop the tail of the index.
+  const tail = db.prepare(`${columns}
+        and h.norm > ?
+        and d.enabled = 1
+        and instr(h.norm, ?) > 0`);
+  const cursor = db.prepare(`
+    select h.norm as norm
+    from headwords h indexed by idx_hw_norm
+    where h.lang = ? and h.norm > ?
+    order by h.norm
+    limit 1 offset ?
+  `);
+
+  type RawRow = Omit<HeadwordScanRow, 'len'>;
+  const kept: HeadwordScanRow[] = [];
+  for (const lang of langs) {
+    let from = '';
+    for (;;) {
+      const next = cursor.get(lang, from, HEADWORD_SCAN_CHUNK_ROWS) as { norm: string } | undefined;
+      const rows = (next
+        ? window.all(lang, from, next.norm, needle)
+        : tail.all(lang, from, needle)) as RawRow[];
+      if (rows.length) {
+        for (const row of rows) kept.push({ ...row, len: [...row.text].length });
+        kept.sort((a, b) => (b.score - a.score) || (a.len - b.len) || (a.id - b.id));
+        if (kept.length > budget) kept.length = budget;
+      }
+      if (!next) break;
+      from = next.norm;
+      // Yielded between windows, never inside one — the same contract as the
+      // example scan: a pending IPC call, a paint or a `/health` probe gets a turn
+      // before the next few thousand index entries are faulted in.
+      await new Promise<void>((resolve) => { setImmediate(resolve); });
+    }
+  }
+  return kept;
+}
+
 export interface CompoundQuery {
   text: string;
   /** Source languages to search headwords in. The query's own languages when omitted. */
@@ -925,16 +1031,21 @@ export interface CompoundQuery {
  * that drops that index fails loudly here instead of silently reintroducing the
  * half-second.
  *
- * ## Why the ORDER BY stays, unlike in `findSemanticNeighbors`
+ * ## Why the ordering stays, unlike in `findSemanticNeighbors`
  *
- * The neighbour probe drops its ORDER BY because sorting a very common gloss's
+ * The neighbour probe drops its ordering because sorting a very common gloss's
  * matches costs seconds. Here the scan already visits every matching row whatever
  * happens — that is what `instr` over an index range means — so the sort adds only
  * ~15 ms and buys a globally correct top of the list. Without it a common
  * character such as 日 would return the first 200 matches in `norm` order, which
- * is 〆切日 and 日おおい rather than 祝日 and 日課.
+ * is 〆切日 and 日おおい rather than 祝日 and 日課. It is applied in JS now rather
+ * than by SQLite, for exactly the reason `scanHeadwordsContaining` documents, and
+ * the result is identical.
  */
-export function findLexiconCompounds(db: SqliteDb, query: CompoundQuery): LexiconCompoundResult {
+export async function findLexiconCompounds(
+  db: SqliteDb,
+  query: CompoundQuery,
+): Promise<LexiconCompoundResult> {
   const text = query.text.trim();
   const empty: LexiconCompoundResult = { query: text, compounds: [] };
   if (!text) return empty;
@@ -959,19 +1070,9 @@ export function findLexiconCompounds(db: SqliteDb, query: CompoundQuery): Lexico
 
   const langs = [...new Set(exact.map((entry) => entry.lang))];
   const glossLangs = query.glossLangs?.length ? [...new Set(query.glossLangs)] : [];
-  const rows = db.prepare(`
-    select h.id, h.lang, h.text, h.reading, h.dict_id, d.title as dict_title
-    from headwords h indexed by idx_hw_norm
-    join dictionaries d on d.id = h.dict_id
-    where h.lang in (${langs.map(() => '?').join(',')})
-      and d.enabled = 1
-      and instr(h.norm, ?) > 0
-    order by h.score desc, length(h.text) asc, h.id asc
-    limit ?
-  `).all(...langs, normalizeForLookup(text), COMPOUND_SCAN_ROWS) as Array<{
-    id: number; lang: string; text: string; reading: string | null;
-    dict_id: string; dict_title: string;
-  }>;
+  const rows = await scanHeadwordsContaining(
+    db, langs, normalizeForLookup(text), COMPOUND_SCAN_ROWS,
+  );
 
   const candidates: LexiconCompoundCandidate[] = rows.map((row) => ({
     headwordId: row.id,
@@ -1145,18 +1246,19 @@ function readCollocationPartnerGlosses(
  *
  * ## The two indexed passes, and why neither is the obvious query
  *
- * The scan is `findLexiconCompounds`' scan and needs its `INDEXED BY idx_hw_norm`
- * for the same measured reason. The attestation pass is the one worth warning
+ * The scan is `findLexiconCompounds`' scan, literally — both call
+ * `scanHeadwordsContaining`, which is where the `INDEXED BY idx_hw_norm` and the
+ * event-loop windowing live. The attestation pass is the one worth warning
  * about: the natural spelling of "is this partner a word" is
  * `where h.text = ? or h.reading = ?`, and **`headwords.text` carries no index** —
  * on the real 697,837-row database that is a full scan per partner, measured at
  * **10.5 s for 猫 and 18.1 s for 腹**. Rewritten as one batched `norm in (...)`
  * plus one `reading_norm in (...)`, both covered, the whole call is **71–82 ms**.
  */
-export function findLexiconCollocations(
+export async function findLexiconCollocations(
   db: SqliteDb,
   query: CollocationQuery,
-): LexiconCollocationResult {
+): Promise<LexiconCollocationResult> {
   const text = query.text.trim();
   const empty: LexiconCollocationResult = { query: text, collocations: [] };
   if (!text) return empty;
@@ -1176,19 +1278,9 @@ export function findLexiconCollocations(
 
   const langs = [...new Set(exact.map((entry) => entry.lang))];
   const placeholders = langs.map(() => '?').join(',');
-  const rows = db.prepare(`
-    select h.lang, h.text, h.reading, h.dict_id, d.title as dict_title
-    from headwords h indexed by idx_hw_norm
-    join dictionaries d on d.id = h.dict_id
-    where h.lang in (${placeholders})
-      and d.enabled = 1
-      and instr(h.norm, ?) > 0
-    order by h.score desc, length(h.text) asc, h.id asc
-    limit ?
-  `).all(...langs, normalizeForLookup(text), COLLOCATION_SCAN_ROWS) as Array<{
-    lang: string; text: string; reading: string | null;
-    dict_id: string; dict_title: string;
-  }>;
+  const rows = await scanHeadwordsContaining(
+    db, langs, normalizeForLookup(text), COLLOCATION_SCAN_ROWS,
+  );
 
   const drafts = draftLexiconCollocations(text, rows.map((row) => ({
     lang: row.lang,

@@ -76,21 +76,22 @@ afterEach(() => {
   fs.rmSync(tempRoot, { recursive: true, force: true });
 });
 
-const phrases = (text: string) =>
-  findLexiconCollocations(db, { text, sourceLangs: ['ja'] }).collocations.map((c) => c.phrase);
+const phrases = async (text: string) =>
+  (await findLexiconCollocations(db, { text, sourceLangs: ['ja'] }))
+    .collocations.map((c) => c.phrase);
 
 describe('findLexiconCollocations', () => {
-  it('parses head-first phrases and rejects a merely-containing headword', () => {
-    const result = findLexiconCollocations(db, { text: '猫', sourceLangs: ['ja'] });
+  it('parses head-first phrases and rejects a merely-containing headword', async () => {
+    const result = await findLexiconCollocations(db, { text: '猫', sourceLangs: ['ja'] });
     expect(result.query).toBe('猫');
-    expect(phrases('猫')).toContain('猫に小判');
-    expect(phrases('猫')).toContain('猫の目');
+    expect(await phrases('猫')).toContain('猫に小判');
+    expect(await phrases('猫')).toContain('猫の目');
     // The whole reason this is not a substring search.
-    expect(phrases('猫')).not.toContain('猫なで声');
+    expect(await phrases('猫')).not.toContain('猫なで声');
   });
 
-  it('gives the partner its own first definition, so the row says what the phrase joins', () => {
-    const result = findLexiconCollocations(db, { text: '猫', sourceLangs: ['ja'] });
+  it('gives the partner its own first definition, so the row says what the phrase joins', async () => {
+    const result = await findLexiconCollocations(db, { text: '猫', sourceLangs: ['ja'] });
     expect(result.collocations.find((c) => c.phrase === '猫に小判')?.partnerGloss)
       .toBe('koban coin');
     expect(result.collocations.find((c) => c.phrase === '猫の目')?.partnerGloss).toBe('eye');
@@ -98,7 +99,7 @@ describe('findLexiconCollocations', () => {
     expect(result.collocations.some((c) => c.partnerGloss === 'cat')).toBe(false);
   });
 
-  it('glosses a partner the dictionaries carry only as a reading', () => {
+  it('glosses a partner the dictionaries carry only as a reading', async () => {
     // かぶる is a headword nowhere; it is the reading of 被る. The attestation
     // pass already keeps such a row, and the gloss has to follow it there.
     importLegacyIndex(db, {
@@ -106,28 +107,28 @@ describe('findLexiconCollocations', () => {
       info: INFO({ id: 'extra', title: 'Extra' }),
       terms: { 猫をかぶる: term('猫をかぶる', 'ねこをかぶる', ['to feign innocence'], 500000) },
     });
-    const row = findLexiconCollocations(db, { text: '猫', sourceLangs: ['ja'] })
+    const row = (await findLexiconCollocations(db, { text: '猫', sourceLangs: ['ja'] }))
       .collocations.find((c) => c.phrase === '猫をかぶる');
     expect(row?.partner).toBe('かぶる');
     expect(row?.partnerGloss).toBe('to wear on the head');
   });
 
-  it('leaves the gloss off rather than answering in a language that was not asked for', () => {
-    const rows = findLexiconCollocations(db, {
+  it('leaves the gloss off rather than answering in a language that was not asked for', async () => {
+    const rows = (await findLexiconCollocations(db, {
       text: '猫', sourceLangs: ['ja'], glossLangs: ['ru'],
-    }).collocations;
+    })).collocations;
     // The rows themselves survive: a partner is attested by being a headword,
     // which is not a question about the language its definitions are wanted in.
     expect(rows.length).toBeGreaterThan(0);
     expect(rows.every((c) => c.partnerGloss === undefined)).toBe(true);
   });
 
-  it('drops a phrase whose other element is not a word in the same dictionaries', () => {
-    expect(phrases('猫')).not.toContain('猫に蒲鉾');
+  it('drops a phrase whose other element is not a word in the same dictionaries', async () => {
+    expect(await phrases('猫')).not.toContain('猫に蒲鉾');
   });
 
-  it('parses a phrase where the query comes after the particle', () => {
-    const result = findLexiconCollocations(db, { text: '傘', sourceLangs: ['ja'] });
+  it('parses a phrase where the query comes after the particle', async () => {
+    const result = await findLexiconCollocations(db, { text: '傘', sourceLangs: ['ja'] });
     const row = result.collocations.find((c) => c.phrase === '核の傘');
     expect(row).toBeTruthy();
     expect(row?.order).toBe('head-last');
@@ -136,18 +137,18 @@ describe('findLexiconCollocations', () => {
     expect(row?.pattern).toBe('{partner}の{head}');
   });
 
-  it('never returns the query itself and reports nothing for a word with no phrases', () => {
-    expect(phrases('犬')).toEqual([]);
-    expect(phrases('猫')).not.toContain('猫');
+  it('never returns the query itself and reports nothing for a word with no phrases', async () => {
+    expect(await phrases('犬')).toEqual([]);
+    expect(await phrases('猫')).not.toContain('猫');
   });
 
-  it('returns nothing for a query that is not a headword at all', () => {
-    expect(findLexiconCollocations(db, { text: '存在しない語', sourceLangs: ['ja'] })
+  it('returns nothing for a query that is not a headword at all', async () => {
+    expect((await findLexiconCollocations(db, { text: '存在しない語', sourceLangs: ['ja'] }))
       .collocations).toEqual([]);
   });
 
-  it('writes the rows it returns into the collocations table', () => {
-    findLexiconCollocations(db, { text: '猫', sourceLangs: ['ja'] });
+  it('writes the rows it returns into the collocations table', async () => {
+    await findLexiconCollocations(db, { text: '猫', sourceLangs: ['ja'] });
     const rows = db.prepare(
       "select head, partner, pattern, count from collocations where lang = 'ja' and head = '猫' order by partner",
     ).all() as Array<{ head: string; partner: string; pattern: string; count: number }>;
@@ -157,17 +158,17 @@ describe('findLexiconCollocations', () => {
     expect(rows.every((r) => r.count >= 1)).toBe(true);
   });
 
-  it('replaces this head rows rather than accumulating them across calls', () => {
+  it('replaces this head rows rather than accumulating them across calls', async () => {
     const count = () => (db.prepare(
       "select count(*) c from collocations where lang = 'ja' and head = '猫'",
     ).get() as { c: number }).c;
-    findLexiconCollocations(db, { text: '猫', sourceLangs: ['ja'] });
+    await findLexiconCollocations(db, { text: '猫', sourceLangs: ['ja'] });
     const first = count();
-    findLexiconCollocations(db, { text: '猫', sourceLangs: ['ja'] });
+    await findLexiconCollocations(db, { text: '猫', sourceLangs: ['ja'] });
     expect(count()).toBe(first);
   });
 
-  it('stores each row under its own language when the scan spans two', () => {
+  it('stores each row under its own language when the scan spans two', async () => {
     // A Han query resolves in both partitions of the real database, so `langs`
     // holds two entries and the call is not scoped to one. Every stored row must
     // carry the language of the headword it came from — keying the whole call on
@@ -184,7 +185,7 @@ describe('findLexiconCollocations', () => {
     });
     db.prepare("update headwords set lang = 'zh' where dict_id = 'cedict'").run();
 
-    const result = findLexiconCollocations(db, { text: '猫' });
+    const result = await findLexiconCollocations(db, { text: '猫' });
     expect(result.collocations.length).toBeGreaterThan(0);
     const rows = db.prepare(
       "select distinct lang from collocations where head = '猫'",
@@ -194,8 +195,8 @@ describe('findLexiconCollocations', () => {
     expect(result.collocations.every((c) => c.lang === 'ja')).toBe(true);
   });
 
-  it('reads its payload back out of the table, so a wiped table yields nothing', () => {
-    findLexiconCollocations(db, { text: '猫', sourceLangs: ['ja'] });
+  it('reads its payload back out of the table, so a wiped table yields nothing', async () => {
+    await findLexiconCollocations(db, { text: '猫', sourceLangs: ['ja'] });
     // A trigger that deletes the rows straight after they are inserted stands in
     // for a write that silently did not land. If the payload were assembled from
     // the local drafts instead of from the table, this would still return rows.
@@ -203,7 +204,8 @@ describe('findLexiconCollocations', () => {
       create trigger colloc_swallow after insert on collocations
       begin delete from collocations where rowid = new.rowid; end;
     `);
-    expect(findLexiconCollocations(db, { text: '猫', sourceLangs: ['ja' ] }).collocations).toEqual([]);
+    expect((await findLexiconCollocations(db, { text: '猫', sourceLangs: ['ja'] }))
+      .collocations).toEqual([]);
     db.exec('drop trigger colloc_swallow');
   });
 });

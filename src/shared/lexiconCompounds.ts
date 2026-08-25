@@ -4,6 +4,19 @@ import { normalizeNeighborText } from './lexiconNeighbors';
 export const COMPOUND_SCAN_ROWS = 200;
 export const MAX_COMPOUND_RESULTS = 12;
 /**
+ * Index entries visited per event-loop window by the headword scan that
+ * `findLexiconCompounds` and `findLexiconCollocations` share.
+ *
+ * Measured, not chosen: on the shipped 770,612-row `ja` partition the whole scan
+ * costs the same either way — it is page residency, not CPU — but the shipped
+ * single statement blocks the main process for **1,244.1 ms** on a cold cache,
+ * while 155 windows of 5,000 hold the worst single window to **47.9 ms** (猫) and
+ * **92.4 ms** (日) for ~11% more total. 20,000 was measured too and is cheaper
+ * overall (39 windows, +0%) but its worst window is 179.0 ms, which leaves too
+ * little headroom under the 500 ms bar on a colder machine than this one.
+ */
+export const HEADWORD_SCAN_CHUNK_ROWS = 5000;
+/**
  * A one-character query already matches thousands of headwords, which is the
  * useful case. A long one is a sentence someone pasted, and searching for it
  * inside other headwords cannot match anything.
