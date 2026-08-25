@@ -73,3 +73,105 @@ because the Dictionary leg was scored on the 16- and 24-minute marks and those a
 **Verdict: category 7 on Video is NOT 10.** Leg 1 passes with room and its control fires; leg 4 is
 clean; leg 2 fails on a reproduced product number. The next slice is `Review` and `Study Mode` —
 find what those two destinations run on main and move it off the loop — then re-drive leg 2.
+
+### Leg 3 — COMPLETE on this boot (pid 30480). Flat.
+
+| mark | uptime | main private | handles | all-process private |
+| --- | --- | --- | --- | --- |
+| 8 | 8.01 min | 448.1 MB | 1,121 | 1,510.8 MB |
+| 16 | 16.01 min | 447.1 MB | 1,120 | 1,555.6 MB |
+| 24 | 24.00 min | 447.1 MB | 1,125 | 1,502.5 MB |
+
+**448.1 → 447.1 → 447.1 MB, handles +4 over 24 minutes**, and every mark is 102–103 MB *below*
+the bottom of L0's 550–577 MB band. Not an idle control and better than one: ten IPC-firing
+attribution probes ran inside the 16→24 window. `main RSS` moves 359.2 → 70.1 → 84.4 and carries
+no information — that is the Windows working-set trim this sampler exists to disclose.
+
+## 2026-08-25 · primary — leg 2's block ATTRIBUTED and FIXED: `mining:listFrequencyDicts`
+
+`6620ab71`. The previous section could name two destinations and not a call. `l7v-attribute.cjs`
+drives ONE `window.api` call at a time with 2.5 s of quiet either side, sampling `/health` at
+40 ms — because the burst advances every 260 ms while a mount effect's work lands whenever it
+lands, so a block opened by `Readiness` is routinely stamped `Review`, which is exactly what
+happened.
+
+| call fired alone (pid 30480, pre-fix) | samples | p50 | MAX |
+| --- | --- | --- | --- |
+| `miningListFrequencyDicts` | 54 | 2 | **1,270 ms** |
+| `ankiStatus` | 54 | 2 | 3 ms |
+| `ankiGetIntervals` | 55 | 1 | 3 ms |
+| `ankiGetIntervalsForNotes` | 54 | 1 | 3 ms |
+| `studyGet` | 53 | 1 | 3 ms |
+| idle/quiet baseline | 183 | 1 | 13 ms |
+
+**Negative control fired**: the same schedule with every payload replaced by a same-shaped no-op
+gave MAX 3 ms on all five and `OVER 500 none`. The 1,270 ms is the product's.
+
+**The defect.** `mining:listFrequencyDicts` answers with six summary fields and read every rank
+table in full to do it, three times per call — the bundled-provisioning sync, the large-list
+preference, and the listing, whose cache `ensureAllFrequencyDictionariesReady` invalidated
+*unconditionally immediately before it ran*. `bundled-freq-ja-jpdb-v2.json` is **20.10 MB /
+550,408 ranks**, measured at 68 ms read + 269 ms parse. Both Media Center destinations reach the
+IPC on mount through `currentStudyReadinessFingerprints()` → `miningListFrequencyDicts()`.
+Tradeoff taken: a bounded 64 KB head read with brace-matching and a **full-parse fallback**, over
+a summaries sidecar — no schema, no second source of truth, and a file this module did not write
+is still listed. Ranks are untouched; `resolveCustomFrequencyRanks` still loads the whole table.
+
+### Re-measured after the fix — real restart, main pid **1324**
+
+`miningListFrequencyDicts` **1,270 ms → 3 ms**, cold cache, and the answer is unchanged: 4
+dictionaries, `entryCount` 550,408 / 486 / 321 / 390, `enabled` true/false/true/true — i.e. the
+large-list preference still holds. Nothing else moved (MAX 3–5 ms).
+
+| leg 2 run, `--title Video` | samples | p50 | p95 | MAX | over 500 ms |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 56 | 1 | 3 | **3** | none |
+| 2 | 55 | 1 | 2 | **50** | none |
+| 3 (+`--sensitivity`) | 57 | 1 | 3 | **53** | none |
+
+All 18 controls `ok` on every run; surface 8 cards / 49 controls / 350 nodes / 1,234 chars before
+and after. Was 3,117 / 1,910 / 2,076 ms.
+
+**THE DECISIVE CONTROL, and leg 2 would be VOID without it** (`l7v-control.cjs`). `--sensitivity`
+only ever reached 36–53 ms, an order of magnitude short of the bar it is meant to prove reachable
+— 600 repetitions of one word are absorbed by cache. Distinct generated terms, escalating:
+
+| planted on main | samples | p50 | MAX |
+| --- | --- | --- | --- |
+| 600 distinct `dict:lookup` | 129 | 1 | 41 ms |
+| 3,000 | 123 | 1 | **1,127 ms** |
+| 12,000 | 201 | 2 | **9,030 ms** |
+| idle/quiet | 173 | 1 | 12 ms |
+
+Monotonic, and the sampler catches a >500 ms main block on this surface in this session. Leg 2's
+"none over 500" is a measurement, not an unmeasured surface.
+
+### Leg 1 re-run on pid 1324. Display ceiling this session: **17.0 ms**.
+
+| gesture, `-Title Video` | runs | over 33 ms | over 100 ms | worst | L0's own counts |
+| --- | --- | --- | --- | --- | --- |
+| drag | 5 | **0** ×5 | **0** ×5 | 17.1 | 4 (post-boot) / 5 (settled) over 33 |
+| resize | 3 | 1, 0, 2 | **0** ×3 | 33.5 | **8** over 33, **2** over 100 |
+| theme switch | 2 | 1, 1 | **0** ×2 | 33.4 | **2** over 33, **1** over 100 |
+
+Every count is at or below L0's, which is what category 7 asks ("no regression against the L0
+baseline"). `closedLoop=True`, `title=Video` on every record. **Jank control FIRED**: p95 16.8 →
+**116.9**, frames over 100 **0 → 12**.
+
+**The theme-RESTORE number is now attributed, and it is not a regression.** It reads 50.1 / 50.1
+ms against L0's settled 23.6 ms, which the previous section left open. Two measurements close it.
+(1) **Content is exonerated**: driven to `Home` at **0 cards / 311 nodes** it reads **49.4 / 50.0
+ms** — indistinguishable from the 8-card loaded state, so it does not scale with the surface at
+all. Six readings across two turns and two content states span 49.4–50.7 ms; this is a fixed
+cost. (2) **L0's raw milliseconds are not comparable to this session's**, and this is the trap
+worth carrying: L0's ceiling was **10.0–10.3 ms/frame** and this session's is **16.4–17.0**. The
+probe measures *two frames painted*, so every frame-bound figure scales with the display —
+L0 drag p50 10.0 → 16.8 here, and restore 23.6 ms = 2.35 L0 frames vs 50.1 ms = **3.00** frames
+here. Apply is 17.7 / 25.5 / 25.9 / 17.1 ms vs L0's settled 20.0. Never compare a painted-frame
+millisecond figure across displays without dividing by the ceiling first.
+
+### Leg 4 after the fix — the burst's cost collapsed with the same defect
+
+Main private over one burst: **426.7 → 430.1 (+3.4)**, **429.5 → 429.8 (+0.3)**, **429.0 → 443.1
+(+14.1, the run carrying 600 lookups)** MB. Was +97.5 / +185.3 / +152.4. Those three figures were
+main loading a 20.10 MB rank table into its heap three times per navigation.

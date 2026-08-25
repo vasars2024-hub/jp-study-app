@@ -497,3 +497,42 @@ comes back unprompted. This is not the 604 → 7,082 MB shape the Dictionary sur
 measured and **failing** rather than unmeasured, which is the more useful state: it names two
 controls to fix. **Category 8 has still never been measured on this surface** and is the only
 unmeasured one left. Dictionary remains 7 of 8.
+
+---
+
+## 2026-08-25 · primary — Video category 7 **CLOSES at 10/10**, on a product fix
+
+`6620ab71` + this entry. Real restart, main pid **1324** (the previous boot 30480 was stopped
+and `npm start`ed fresh); Media 820×580 `standard` / `Video` 1080×700 **`liquid`** / `Dictionary`
+820×580 `liquid`, `forest-night`, `en`. Video driven to Library / `Recently added` first — **8
+cards, 49 controls, 350 nodes, 1,234 chars**, because an empty harness caps this category at 0.
+Full numbers and the instruments: `L7_PERF_VIDEO.md`.
+
+**Leg 2's block was `mining:listFrequencyDicts`, and it is fixed, not excused.** Driving one
+`window.api` call at a time (`l7v-attribute.cjs`) separated it from four innocent neighbours:
+**1,270 ms** vs 3 ms each, idle p50 1 ms, and a same-shaped no-op control at MAX 3 ms across the
+board. The listing answered with six summary fields while reading every rank table in full three
+times per call — 20.10 MB and 550,408 ranks for the JPDB list, 68 ms read + 269 ms parse — because
+`ensureAllFrequencyDictionariesReady` invalidated the cache unconditionally right before the
+listing ran. After the fix: **3 ms**, cold cache, same four dictionaries and the same
+`entryCount`/`enabled` values.
+
+| leg | result on pid 1324 | control |
+| --- | --- | --- |
+| 1 gestures | drag **0/0** over 33/100 ×5; resize 1,0,2 over 33 and **0** over 100 ×3; theme 1 over 33, **0** over 100 ×2 — every count at or below L0's own 4–5 / 8 / 2 | jank FIRED: p95 16.8 → **116.9**, over 100 **0 → 12** |
+| 2 main block | MAX **3 / 50 / 53 ms** over three 18-control bursts, **none over 500** (was 3,117 / 1,910 / 2,076) | FIRED: 3,000 distinct lookups → **1,127 ms**, 12,000 → **9,030 ms**, idle MAX 12 ms |
+| 3 memory | pid 30480 flat at 8/16/24 min — **448.1 / 447.1 / 447.1 MB**, handles +4, ~102 MB *below* L0's 550–577 band; pid 1324's 8-min mark **445.6 MB / 1,076 handles** agrees | the RSS column (359.2 → 70.1 → 84.4) is the Windows trim this sampler discloses |
+| 4 burst cost | **+3.4 / +0.3 / +14.1 MB** private (was +97.5 / +185.3 / +152.4) | — |
+
+**The one open number from the previous entry is closed, and it was never a regression.** Theme
+*restore* reads 50.1 ms against L0's 23.6. Content is exonerated — at **0 cards / 311 nodes** it
+reads **49.4 / 50.0 ms**, indistinguishable from the loaded surface, six readings spanning
+49.4–50.7 ms. And L0's raw milliseconds are not comparable: **L0's display ceiling was 10.0–10.3
+ms/frame, this session's is 16.4–17.0**, and the probe measures two frames painted. 23.6 ms =
+2.35 L0 frames; 50.1 ms = 3.00 frames here. **Never compare a painted-frame figure across
+displays without dividing by the ceiling first** — it is the same trap that would have read L0's
+drag p50 10.0 → 16.8 as a 68% regression.
+
+**Video is 7 of 8** — 1, 3, 4 (liquid), 5, 6 (both), 2, and now 7. **Category 8 is the only one
+never measured on this surface**, and it needs a new instrument: the L8 probes are all
+Dictionary-shaped (`.dict-empty` / `.dict-loading` / `.anki-setup`). Dictionary remains 7 of 8.
