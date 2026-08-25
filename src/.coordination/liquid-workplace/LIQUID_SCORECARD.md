@@ -566,3 +566,47 @@ generic class that resolved to the Media SUBTITLE language pair when Settings sa
 **Video is 8 of 8.** Dictionary remains 7 of 8 — its category 7 is the outstanding one, and it must
 be re-driven on this boot rather than transcribed, since L0's millisecond figures are not comparable
 across displays (10.0–10.3 ms/frame there, 16.4–17.0 here).
+
+## 2026-08-25 · primary — Dictionary leg 3 closes, leg 2 re-opens; the surface stays 7 of 8 and gate 461 stays open
+
+Main pid **1324**, product tree `0aeacd4b`, the real four-window desktop after
+`l7d-restore.cjs` — `Media` standard / `Video` **liquid** / `Dictionary` 820×580 **liquid** /
+`Settings` standard, 食べる → 8 entries, `forest-night`, `en`. Numbers and both attributions:
+`L7_PERF_DICTIONARY.md`, this turn.
+
+| # | Category | Re-driven | Result |
+| - | -------- | --------- | ------ |
+| 7 | Performance under real load | leg 3 yes, end to end; leg 2 yes | **NOT 10 — leg 2** |
+
+**Leg 3 PASSES and does not need re-driving.** +1.6 MB private and −4 handles across marks
+125/133/141 min (584.9 → 585.1 → 586.5 MB, 1,126 → 1,127 → 1,122 handles) on the loaded window.
+Scored as the delta; the absolute is +9.5 MB (+1.6%) over L0's band and stated rather than
+band-matched, since L0 measures a cold 8-minute boot. Control on the instrument: **main RSS
+525.1 → 67.5 → 57.9 MB over the same three marks**, a 467 MB divergence from private on one process,
+which is what makes the counter choice a measurement.
+
+**Leg 2 fails on one sample, and the honest verdict is that this boot cannot settle it.** The boot's
+first `Find example sentences` blocked main **1,034.2 ms** against a 500 ms bar with its work proven
+(nodes 349→415, 3,002 ms renderer). Both candidates were driven and both are exonerated: window
+re-mount alone **5.0 ms**, and `dictExamples` on four never-queried words **48 / 21 / 164 / 47 ms**
+with main max **99.2 ms**. So it is once-per-boot, not per-word — and it only exists in the first
+seconds of a boot's use of the feature, which this boot has spent.
+
+**Why it is not scored either way.** Reproducing it needs a restart; a restart makes leg 3's
+16-minute curve stale by this file's own rule. One over-bar observation with no second is not a
+10 and is not a finding either, and writing it as either would be the false pass this file refuses.
+
+**Dictionary is 7 of 8**, category 7 the open one — unchanged in count, but the open leg has moved
+from 3 to 2 and 3 is now closed with a number. **Video is 8 of 8.** Gate 461 (plan line 461: the L1
+studies score 80/80 against *both* Video and Dictionary) therefore stays **OPEN**, on Dictionary.
+
+**Product this turn: `0aeacd4b`**, and it is a category-8 prerequisite rather than a category-7 one.
+`AnkiSetup.tsx` rendered main's English `status?.error` verbatim in every language — and that panel
+is precisely what `l8-honest-states.cjs` measures as this surface's **offline** state. Scoring
+category 8 on Dictionary before the fix would have scored an untranslated render as an honest one.
+Same defect `e801c683` fixed on the Media Center, on the surface gate 461 still needs; found by
+reading the consumers of the two constants rather than by re-running a sweep.
+
+**Order for the next boot, and it is forced rather than preferred:** leg 2 FIRST (its number exists
+only in a boot's first seconds), per-IPC timing installed before the first click, then start the
+leg-3 sampler on that same boot. Doing it the other way round is what cost this turn its 10.
