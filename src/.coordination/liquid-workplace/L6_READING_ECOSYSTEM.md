@@ -389,3 +389,54 @@ not the tool's. Every recent handoff recorded "architecture-audit exit 0" from t
 properly (`> /dev/null; echo $?`) it is **exit 1**, and has been — caused solely by the foreign-track
 `src/shared/externalSubtitleMount.ts`, which names none of our files. The finding is unchanged; the
 *number* was never measured. Same class as everything else in this file: a value nobody computed.
+
+## 2026-08-25 — surface 5, the manga reader (`439324f5`), and what is actually left of bullet 1
+
+The panel never covered the page — my own probe refuted that last turn — it made the reader
+**measure 300px it did not have**. `stageSize` is `stageRef.current.clientWidth` fed straight to
+`mangaPageFitStyles`, and `.ocr-panel` was `position: fixed` over a stage that never inset.
+
+Live, One Punch-Man ch.229, 17 pages, same reader, before → after:
+
+| | before | after |
+| --- | --- | --- |
+| stage `clientWidth` | 1264 | **952** (= 1264 − 300 − 12 gutter, exactly) |
+| page `max-width` emitted | 1264px | **952px** |
+| page centre vs visible centre | 632 vs 482 = **150px off** | 476 vs 476 = **0** |
+| panel/page overlap | 0 | 0 — it never was the cover it looked like |
+
+Round trip, all live: dismiss → 1264 and the SAME stage node with the same page; reopen from the
+toolbar → 952. Narrowed to 620 → sheet, `role=dialog`, `aria-modal`, doc `inert` + `aria-hidden`,
+`position: absolute`, full 620. Restored, probe globals deleted.
+
+**A finding the other four surfaces hid.** `.lq-anchor` puts 16px padding, a border and a radius on
+the document region. Every prose reader wants that; a manga stage does not — measured, it cost
+**34px** of a 952px region and drew a frame round a black rectangle. `.manga-canvas >
+.lq-reading-doc` is full-bleed, and the stage's own opaque `#0a0a0d` is what makes the region a
+stable anchor in the first place.
+
+**RULE 1:** `mangaCanvas.test.tsx` is 215 lines, zero plumbing, fifth caller of
+`helpers/readingCanvasSurface`. Five suites 48/48. The harness had a defect the fifth surface
+found: ONE module-level callback set with `disconnect()` clearing all of it, so MangaReader's
+stage observer (deps `[pages.length]`) unregistered the canvas the moment pages loaded and
+`resize()` silently stopped working. Each instance owns its callbacks now.
+
+### What bullet 1 still needs, measured this turn — do not re-derive
+
+The plan's fifth item is "manga/**PDF/EPUB/VN** suites", which is not one surface.
+- **PDF and EPUB are NOT separate readers.** `renderer/pdfLoader.ts` is imported by exactly
+  `views/NovelReader.tsx` and `novelLensCapture.ts` — so both are surface 2, already migrated.
+- **VN is the one thing left.** `.visual-novel-layout` is `grid-template-columns: minmax(220px,
+  290px) minmax(0, 1fr)` with a `@media (max-width: 760px)` stack — the *exact* Captures/Library
+  defect: the query reads the WINDOW, and this panel renders inside the Immersion fwin, so in a
+  600px pane inside a 1264px window it never fires and the workspace eats the whole shortfall.
+- Two things make it a bigger slice than manga. (1) The library column is on the **leading** edge
+  and `ReadingCanvas` renders tools after the document, so it needs a `side: 'leading'` on the tool
+  spec — render leading tools BEFORE `children` rather than using CSS `order`, so DOM order and
+  visual order do not diverge. (2) The library is always visible, so the contract's required
+  `onClose` means adding a toggle with `aria-pressed` and its i18n key in four catalogs.
+- **BLOCKED ON FILE OWNERSHIP, not on a decision.** `VisualNovelPanel.tsx` carries another track's
+  large uncommitted i18n rewrite (`useT`, `SPEECH_MARKER_KEYS`, `speechSummary`, `formatDuration`
+  re-signed). Restructuring its JSX on top of that, then reverting their diff out to build a
+  HEAD+edit blob, is the fragile case. Re-check `git status --short` on that file first: if it is
+  clean, this is a ~90-minute slice and bullet 1 closes with it.

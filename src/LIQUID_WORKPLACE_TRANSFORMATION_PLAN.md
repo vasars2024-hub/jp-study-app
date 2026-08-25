@@ -669,8 +669,23 @@ Immersion was then re-measured for rubric category 7 and failed it (`5c477856`):
 `probes/cat7-collection-weight.cjs` comes from — one surface-parameterised harness for the whole
 category, per RULE 1.
 
-**Still open in bullet 1: the manga/PDF/EPUB/VN suites.** Manga is measured and ready to start;
-the finding and the migration shape are in the L6 log's last section.
+Fifth surface, **manga** (`439324f5`). The panel never covered the page — a probe refuted that —
+it made the reader MIS-MEASURE: `.ocr-panel` was `position: fixed` over a stage whose
+`clientWidth` feeds `mangaPageFitStyles`, so the fit math emitted `max-width: 1264px` for 952px of
+visible stage and put the page 150px off-centre. Docked, the stage measures **952 = 1264 − 300 −
+12** and the page centres at 476 against a visible centre of 476 — **0 off**. Sheet at 620 with
+`inert` + `aria-hidden` + `role="dialog"`; dismissal returns the SAME stage node at 1264. The
+document region is full-bleed here (`.lq-anchor`'s 16px inset cost 34px of a reader whose whole
+surface is the page). Fifth caller of the one harness, zero plumbing; five suites **48/48**.
+
+**Still open in bullet 1: the VN suite, and only that.** Re-derived 2026-08-25 rather than assumed:
+PDF and EPUB are NOT separate readers — `renderer/pdfLoader.ts` is imported by `NovelReader.tsx`
+alone, so both are surface 2. `.visual-novel-layout` has the Captures/Library defect exactly
+(`minmax(220px, 290px)` beside a `@media (max-width: 760px)` that reads the WINDOW, inside a pane).
+It needs a `side: 'leading'` on the tool spec — its library column is on the leading edge — and a
+close toggle, because the column is currently always visible. Deferred this turn on FILE
+OWNERSHIP, not on a decision: `VisualNovelPanel.tsx` carries another track's large uncommitted
+i18n rewrite. Full measurement in the L6 log's last section.
 
 ### L7 — Review and learning loop
 
