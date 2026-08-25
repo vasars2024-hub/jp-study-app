@@ -162,3 +162,52 @@ rows over dictionary (7), mediaWorkspace (6), mediaCenter (8) — **grammar, tra
 agent have none**. Per §5.3 that is the Gate's other half. RULE 1 applies: build ONE
 app-parameterised parity driver out of `probes/l6-parity-dictionary.js` (683 lines,
 dictionary-hardcoded), do not write three more.
+
+## 2026-08-25 · primary · L5's Gate closes -- three ledgers, one harness, and a dead virtualisation
+
+**`f29b5537` -- the category-6 parity harness, RULE 1 applied.** `l6-parity-dictionary.js`
+was 683 lines of two hardcoded instruments. `probes/l6-parity.js` is one engine
+(`findWin/snapshot/check/step/toggleLiquid/mutate/restore`) plus a SPEC per app, so the
+three apps L5 was missing cost ~40 lines of data each. **Calibration is what licenses the
+new numbers:** the dictionary spec is a port of `__L6.check()`, and both instruments
+returned dictionary **7/7 with per-row identical evidence strings** on the same window.
+
+| app | standard | liquid | round trip | negative controls |
+| --- | --- | --- | --- | --- |
+| grammar | 8/8 | 8/8 | rect + all 4 fields identical, diff `{}` | 3, each flipped exactly one row |
+| translate | 7/7 | 7/7 | chars 3688=3688, controls 29=29 | 3 (one couples 2 rows, correctly) |
+| agent | 8/8 | 8/8 | nodes 351=351, controls 52=52, 8/8 fields | 3, each flipped exactly one row |
+
+Real end-to-end, not smoke: 猫が好きです -> **"I like cats."** through local Qwen3-1.7B,
+with the surface honest throughout the ~50 s cold load ("Loading model: Qwen3-1.7B.gguf — 45%").
+`parity-ledger.json` 21 -> **44 rows**; every `observed` is a literal measured evidence string.
+
+**Gate's retention half, RE-DERIVED live this turn** rather than inherited: one conversation
+("What does this word mean?") holds **7 context items across 4 surfaces at once** -- 〜あとで +
+Grammar, 猫が好きです + Translate, 食べる + Dictionary, Control Center -- each with its own
+`Remove … from context` control. **L5's Gate is CLOSED.**
+
+**`4e2c46e1` -- the finding the drive produced.** Grammar rendered **2,410 rows / 19,352 DOM
+nodes** in an 820x580 window. `VirtualList` was there all along; a windowed list can only
+window what it can MEASURE, and `.gram-view` was a plain block, so `.gram-x` grew to
+139,966 px and the list's viewport measured the whole corpus. Now **18 rows / 216 nodes**,
+`.gram-view` 513 px. Control run both ways live: inline `height:auto;display:block`
+reproduced 2,410/19,352/139,966, removing it returned 18/216/513. Scroll to 60,000 px kept
+18 rows and swapped the window (〜あとで,〜か -> ひじょうに,ひとつ).
+
+**Four instrument false results killed, worth more than the scores.**
+1. `/^Translate$/` matches the TAB, not the action -- a click that translates nothing.
+2. The output pane's EMPTY state is the sentence "Translation appears here.", so "has text"
+   scores a 10 with nothing translated.
+3. `2,410 points` parsed with `/\d+/` is **2**; a working search scored FALSE.
+4. The `search` row then required `renderedRows === count` -- true ONLY because the list was
+   not windowing. **The instrument had encoded the performance bug as its pass condition.**
+
+**Traps banked.** (a) `debug/evfile.cjs` sends no `window` field, so a harness installs into
+whichever window the bridge defaults to -- with a pop-out open that is not `main`, and the
+global reads `undefined` one call after it demonstrably installed. Use `debug/lq-evfile.cjs`.
+(b) The previous turn's "focus, then keyup" is necessary but NOT sufficient: with
+`document.hasFocus() === false` React's SelectEventPlugin constructs nothing and a live
+feature reads as DEAD. **POST `/focus` first.** (c) The Agent pop-out mounts outside `.fwin`
+-- no chrome, no `Make Liquid`, no `data-presentation` -- so that host has no Liquid
+destination, the same fact already recorded for the seanime workspace.

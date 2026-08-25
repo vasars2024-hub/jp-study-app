@@ -639,3 +639,17 @@ restart is picked up. **Zero new single-use probes were written.** The 99 files 
 `src/.coordination/liquid-workplace/probes/` are still the debt; the next worker consolidates
 `l6-parity-dictionary.js` (683 lines, dictionary-hardcoded) into the app-parameterised parity
 driver that L5's Gate needs for three apps, rather than writing three more of it.
+
+2026-08-25 | liquid | units done this turn: 0 bullets, **L5's Gate CLOSED** (gates are not bullets) | units left: 30 of 46 | ratio: 1178:42 = **28:1** measurement to product source this turn -- BAD, stated plainly rather than reframed | basis: the `^- ` bullets under the `### L` headings of section 11, RE-COUNTED this turn bounded to lines 440-685 -- L0 5, L1 4, L2 4, L3 4, L4 4, L5 3, L6 2, L7 2, L8 2, L9 4, L10 4, L11 4, L12 4 = **46**. Closed = 16 (L0 5 + L2 4 + L3 4 INHERITED, L5 3 closed over the last two turns). This turn closed L5's **Gate** -- "feature ledgers complete; cross-app handoffs retain context" -- which the 46 does not count: `parity-ledger.json` 21 -> **44 rows** (grammar 8, translate 7, agent 8 added, each scored 8/8 or 7/7 in BOTH presentations with a byte-identical round trip and three negative controls that fired), and the retention half re-derived LIVE this turn rather than inherited -- one conversation holding 7 context items across 4 surfaces at once. **L5 is CLOSED; the next front is L6** | projected finish: 30 left / (16 closed / 10 active days since L0 opened 2026-08-16 = 1.60 per active day) = 18.8 days = **2026-09-13**
+
+**The 28:1 is real and here is what it does and does not mean.** The 1,178 lines are one
+surface-parameterised harness (843), the script that wrote its output into the ledger (171),
+two 16/27-line bridge callers, and 121 lines of HEAD+edit commit machinery. **Zero new
+single-use probes.** The counterfactual is the number that matters for RULE 1: three more
+copies of `l6-parity-dictionary.js` for grammar/translate/agent would have been ~2,049 lines
+and would have had to be written again for every surface after them. This harness is paid
+once for the whole category -- the next surface scored for category 6 costs ~40 lines of SPEC,
+and the turn after that should show a ratio far under 1:1 for this category. **If the NEXT
+category-6 surface costs more than a SPEC, RULE 1 is not working and the next worker should
+say so here rather than let it drift.** The 101 files in `probes/` remain the standing debt;
+this turn removed the need for three of them without deleting any.
