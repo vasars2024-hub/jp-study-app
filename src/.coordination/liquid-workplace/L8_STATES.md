@@ -382,3 +382,39 @@ none.
 **Category 8 on Video = 10/10.** Four states × four languages, 0 raw keys, 0 false successes, both
 the induction control and the translation control firing, and the one defect it found repaired and
 re-measured in this commit rather than reported.
+
+## 2026-08-25 · primary — the same untranslated-reason defect on the Dictionary surface, plus two sites CLEARED
+
+`e801c683` fixed the interpolated Anki reason on the Media Center. This is the sweep of every other
+consumer of the two constants main authors, done by reading `ANKI_UNREACHABLE_MSG` /
+`ANKI_COLLECTION_UNAVAILABLE_MSG`'s call graph rather than by re-running a probe. Two sites had it,
+two did not, and the negative half matters as much.
+
+**FIXED (`0aeacd4b`).**
+- `AnkiSetup.tsx:24` — rendered `status?.error` verbatim. This is the panel `l8-honest-states.cjs`
+  maps to Dictionary's **offline** state, and `DictionaryResults`, `LensReaderPanel` and
+  `AnkiContent` all host it. Category 8 on this surface would have scored an untranslated render.
+- `StudyOrchestratorWorkspace.tsx:3510` — `ankiPreview.error` is `previewAnkiExpressions` →
+  `toUiError()` (`main/anki/client.ts:259-261`), i.e. the same two constants.
+
+**CLEARED, and recorded so nobody re-investigates them.**
+- `LiveCaptionsPanel.tsx:192` (`status.error`) and `:188` (`actionError`) both carry text this app
+  does **not** author: `main/liveCaptions.ts` sets `lastError` from `err.message`, `msg.message`
+  and a 400-char stderr tail, and `actionError` only ever holds a caught `Error.message` from a
+  rejected `invoke`. That is precisely the pass-through case `translateAnkiReason` preserves on
+  purpose — substituting a generic translated string would delete the only actionable detail.
+- `BlancShell.tsx:897` / `ReaderCollectionPanel.tsx:313` build export failures, not Anki status.
+
+**One adjacent gap noted, NOT fixed and NOT verifiable on this machine.**
+`startLiveCaptionsCapture()` returns `{ok:false, error:'Live Captions capture is Windows-only.'}`
+(`main/liveCaptions.ts:338`) from an early return that never assigns `lastError` — and the panel's
+comment at `:99-101` says a refused start is expected to surface *through* `lastError` as
+`status.error`. So on a non-Windows host that refusal appears to render nothing at all. It cannot be
+observed from here (this host is Windows), and it is an honest-state gap on the Notebook surface
+rather than on either reference surface, so it is recorded rather than guessed at.
+
+**The generalisable rule, restated because this is its second surface:** an untranslated
+interpolation is invisible to both standard guards — a raw-key sweep sees a real English sentence
+and a key-count check sees nothing missing. Only asserting the rendered string **changes between
+languages** finds it. `ankiSetupReasonTranslated.test.tsx`'s last case is that assertion, and its
+mutation control (revert the render site) turns exactly 7 tests red, each naming its language.
