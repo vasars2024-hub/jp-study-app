@@ -2432,7 +2432,7 @@
 :root[data-materials='aero'] .aero-dict-chrome .dict-view {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  /* Column axis clamped for the same reason the rows are â€” see the note on
+  /* Column axis clamped for the same reason the rows are — see the note on
      `.aero-settings`. Guarded by `gridTrackFloorsFitTheWindow.test.ts`. */
   grid-template-columns: minmax(0, 1fr);
   height: 100%;
