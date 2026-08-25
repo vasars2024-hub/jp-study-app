@@ -11,6 +11,7 @@ import {
 import type { TransLang } from '../translator';
 import SentenceAnalysisPanel from '../components/SentenceAnalysisPanel';
 import LexiconWorkbenchResults from '../components/lexicon/LexiconWorkbenchResults';
+import { ContextualSurface } from '../components/liquid/LiquidSurface';
 import {
   LANG_LABELS,
   LANG_ORDER,
@@ -237,7 +238,14 @@ export default function TranslateView() {
   return (
     <AppChrome menus={menus} status={classicStatus} className="tr-chrome">
       <div className="tr-view">
-        <div className="view-head">
+        {/* L5 — contextual, not dense work: the intro line, the tab bar and the
+            direction toggle. The panes below stay conventional Work; a textarea
+            someone is composing in, its output, and the analysis and workbench
+            results are exactly what §2 keeps off translucent material — and so is
+            `.tr-actions`, because a translucent error line is a legibility risk,
+            not a contextual tool. `ContextualSurface` is inert until this window is
+            put in Liquid presentation, so conventional pixels are unchanged. */}
+        <ContextualSurface className="view-head">
           <p className="muted">{t('translate.intro')}</p>
           {tabBar}
           {tab === 'translate' && (
@@ -269,7 +277,7 @@ export default function TranslateView() {
               </div>
             </div>
           )}
-        </div>
+        </ContextualSurface>
 
         {tab === 'history' ? (
           historyPanel
