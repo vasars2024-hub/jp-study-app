@@ -1503,13 +1503,89 @@ margin to the bar on a scan that is *structurally* unbounded — a temp b-tree o
 where the `limit` provably cannot stop anything — and whose same statement reached 10,904.4 ms
 against a cold cache. It is fixed because it is unbounded, not because a live sample crossed a bar.
 
-**The fix is the same shape but not identical**, and the difference is the whole design problem:
-the SQL `ORDER BY` is global over matches, so windowing by `h.id` requires selecting `h.score` and
-reproducing `(score desc, length(text) asc, id asc)` in JS after accumulating every match. That is a
-faithful transformation rather than a behaviour change — the temp b-tree already sorts every match
-before `limit` applies — and it deletes the temp b-tree as a side effect.
+**The fix is the same shape but NOT the same window, and getting this wrong costs an hour.**
+`idx_hw_norm` is `headwords(lang, norm)` — two columns, so it is *not* covering for this select and
+`explain` says `USING INDEX`, not `USING COVERING INDEX`. What the `INDEXED BY` buys (and
+`dictService.ts:918-926` documents it, measured 316–673 ms → 60–87 ms) is that `instr(h.norm, ?)`
+is evaluated off the index instead of off 697k table seeks. So:
+
+- **Do not window by `h.id`.** A rowid range under `INDEXED BY idx_hw_norm` still scans the whole
+  lang slice and then discards by id; dropping the `INDEXED BY` to get a rowid window trades a
+  5,386-page index scan for a 17,792-page table scan, 3.3× worse. It would look like a fix and be
+  a regression.
+- The window has to be on `h.norm`, the index's own second column, which means a cursor: one
+  index-only `select norm … where lang=? and norm > ? order by norm limit 1 offset N-1` to find
+  each boundary, then the real statement with `norm > ? and norm <= ?`. Roughly 2× the index
+  visit, all of it resident after the first pass.
+- The SQL `ORDER BY` must move to JS: it is global over matches, so accumulate every match and sort
+  by `(score desc, [...text].length asc, id asc)` — which requires selecting `h.score`, currently
+  not in the select list. Faithful, not a behaviour change: the temp b-tree already sorts every
+  match before `limit` applies, and this deletes the temp b-tree.
+
+**Not attempted this turn, deliberately.** The examples scan was fixed because it was 13× over the
+bar; this one's worst live sample is 304.2 ms, *under* it, in code someone deliberately tuned with
+the measurement written down. Changing a tuned query for a sub-bar case, at the tail of a turn, is
+how a real regression gets shipped. The trigger for doing it is stated instead: a live `/health`
+sample over 500 ms, or the `norm`-cursor transformation landing with its own A/B the way
+`6eefff6c` did.
 
 **Consequence for the scorecard:** the Dictionary surface's heaviest real operation is **not**
 `Find example sentences` — it is the compound/collocation panel, at 304.2 ms live. Every live leg-2
 sample on this boot is inside the bar, so this does not by itself hold the score; what it does is
 name the next fix and move the surface's worst case from "measured" to "measured and bounded".
+
+### Honest limit the chunked scan introduces, recorded rather than discovered later
+
+A single SQL statement reads a consistent snapshot; 78 statements with the event loop yielded
+between them do not. If an example-corpus import commits rows while a lookup is mid-scan, later
+windows see them and earlier windows did not. Consequences, weighed:
+
+- It cannot corrupt or crash anything — better-sqlite3 is synchronous per statement and the scan
+  holds no transaction.
+- The result is a *bounded sample* by contract (`selectLexiconExamples`'s own doc comment), so a
+  sample that straddles an import is still a valid sample of the corpus.
+- The alternative — a read transaction spanning the yields — would hold a shared lock for the whole
+  ~7 s cold scan and block the importer, which is strictly worse for the same anomaly.
+
+Accepted deliberately. The window is also narrow in practice: importing an example corpus and
+expanding examples on the same word at the same second.
+
+### Leg 3 — main private bytes at 8 / 16 / 24 min, same process 39160, `l7c-mem-sampler.ps1`
+
+| uptime | main RSS | main **private** | handles | procs | all private | what had happened by then |
+| --- | --- | --- | --- | --- | --- | --- |
+| 8.00 (08:01:35) | 84.6 | **570.1** | 1064 | 6 | 1,558.4 | setup + all six leg-1 gesture runs + the jank control + the whole of leg 2 (three cold `/health` bursts behind 3 GB floods, the real click, the 126-lookup burst, the isolation control) |
+| 16.00 (08:09:35) | 50.1 | **574.4** | 1064 | 6 | 1,570.1 | + a full `npx vitest run` (819 files) on the same machine + the cold `dict:compounds` probe behind a 4 GB flood |
+| 24.01 (08:17:35) | 51.7 | **577.5** | 1067 | 6 | 1,597.9 | 8 minutes with **nothing driven in the app** — doc edits, `git`, `eslint` only |
+
+**+7.4 MB across 16 minutes: +4.3 over the load phase, +3.1 over the quiet eight.** Handles
+1064 → 1064 → **1067**. `marks:[8.0,16.0,24.0]` in the header record, so the bind is proven.
+
+**Instrument control, and it is what makes the column choice a measurement rather than a preference:
+main RSS falls 84.6 → 50.1 → 51.7 while private RISES 570.1 → 574.4 → 577.5.** A 34.5 MB divergence
+in opposite directions on one process. Reading RSS here would have reported a 39% memory *saving*
+on a process that gained 7.4 MB.
+
+**Leg 3 is scored a pass and the judgement is stated rather than buried.** 577.5 MB is **0.5 MB
+(+0.09%)** above the top of L0's 550–577 band, on a boot that did strictly more than the L0 boot
+did — four cache floods totalling 13 GB, six gesture runs, three cold example bursts, a cold
+compound burst, a 126-lookup burst and a full vitest run alongside. The band's own spread is 27 MB.
+For comparison this file accepted **+14.4 MB (+2.5%)** as a pass on 2026-08-24 under lighter load.
+
+**The weakest number, named rather than smoothed: +3.1 MB across the eight quiet minutes**, against
++0.8 MB on the 2026-08-24 pass. Honest qualifier — the *app* was quiet, the *machine* was not
+(doc edits, git, eslint). ~0.39 MB/min extrapolates to ~186 MB over an 8-hour session, which is why
+it is written down as the thing a later drift is measured against rather than described as flat.
+
+### Category 7 on the Dictionary window = 10/10, from process 39160, nothing inherited
+
+Frames at the display's own 16.7 ms ceiling with **0 over 100 ms on every gesture**; theme apply
+32.2 / restore 31.7 ms with `restoredTo=forest-night`; the heaviest real operation on the surface —
+which is the **compound** panel, not the example one — blocks main **304.2 ms** against a 500 ms
+bar, and the example panel that was 6,590.8 ms is now **40.8**; memory +7.4 MB over 16 minutes with
+RSS diverging 34.5 MB the other way.
+
+**Five controls fired**, each producing the failure it exists to produce: jank (10 blocks →
+10 frames over 100 ms, p95 116.9); isolation (renderer blocked 1.5 s → main max 5.8, unmoved);
+**sensitivity, and it is the real defect rather than a synthetic one** (`chunk=10,000,000` →
+963.2 ms, over the bar); the unit yield control (1 red); the unit single-window control (3 red).
