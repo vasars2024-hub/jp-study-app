@@ -285,7 +285,11 @@
  * clunkiness this surface is scored on. The summary keeps the current sort visible while
  * closed, so the group hides controls, not state.
  */
-.medialib-view {
+/* `.medialib-kind` is the same disclosure one concept over — the release-kind filter, which was
+   a persistent chip row until 2026-08-25. It reuses `__head` / `__body` deliberately: two
+   popovers in one toolbar that do not look identical read as two different mechanisms. */
+.medialib-view,
+.medialib-kind {
   position: relative;
   flex: 0 0 auto;
 }
@@ -327,7 +331,8 @@
   transition: transform var(--dur-fast) var(--ease-standard);
 }
 
-.medialib-view[open] > .medialib-view__head > svg:last-child {
+.medialib-view[open] > .medialib-view__head > svg:last-child,
+.medialib-kind[open] > .medialib-view__head > svg:last-child {
   transform: rotate(-90deg);
 }
 
@@ -408,6 +413,11 @@
   flex-wrap: wrap;
   gap: var(--space-xs);
   padding: 0 var(--space-lg) var(--space-md);
+}
+
+/* Inside the popover the chips ARE the panel, so the row's own page padding is wrong there. */
+.medialib-view__body > .medialib-chips {
+  padding: 0;
 }
 
 .medialib-chip {

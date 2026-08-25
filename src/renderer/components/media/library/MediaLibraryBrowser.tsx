@@ -59,6 +59,39 @@ export interface MediaLibraryBrowserProps {
   empty?: React.ReactNode;
 }
 
+/**
+ * Outside-`pointerdown` and Escape dismissal for a toolbar `<details>`.
+ *
+ * `pointerdown`, not `click`: a click that starts outside and ends inside a re-rendered popover
+ * never fires as one `click` on the document, so the panel stays open. Escape has to leave focus
+ * somewhere real, or the next Tab restarts at the document.
+ *
+ * Extracted when the toolbar grew its second disclosure. A toolbar popover that stays open after
+ * you have used it is the clunkiness this surface is scored on, and two copies of that behaviour
+ * are two chances for one of them to drift out of it.
+ */
+function useDismissableDisclosure(ref: React.RefObject<HTMLDetailsElement | null>, open: boolean): void {
+  useEffect(() => {
+    if (!open) return undefined;
+    const close = () => { if (ref.current) ref.current.open = false; };
+    const onDown = (event: PointerEvent) => {
+      const node = ref.current;
+      if (node && !node.contains(event.target as Node)) close();
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      close();
+      ref.current?.querySelector('summary')?.focus();
+    };
+    document.addEventListener('pointerdown', onDown, true);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onDown, true);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open, ref]);
+}
+
 export default function MediaLibraryBrowser({
   title,
   entries,
@@ -96,28 +129,17 @@ export default function MediaLibraryBrowser({
 
   const viewRef = useRef<HTMLDetailsElement>(null);
   const [viewOpen, setViewOpen] = useState(false);
-  useEffect(() => {
-    if (!viewOpen) return undefined;
-    const close = () => { if (viewRef.current) viewRef.current.open = false; };
-    // `pointerdown`, not `click`: a click that starts outside and ends inside a re-rendered
-    // popover never fires as one `click` on the document, so the panel stays open.
-    const onDown = (event: PointerEvent) => {
-      const node = viewRef.current;
-      if (node && !node.contains(event.target as Node)) close();
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      close();
-      // Escape must leave focus somewhere real, or the next Tab restarts at the document.
-      viewRef.current?.querySelector('summary')?.focus();
-    };
-    document.addEventListener('pointerdown', onDown, true);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('pointerdown', onDown, true);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [viewOpen]);
+  useDismissableDisclosure(viewRef, viewOpen);
+
+  const kindRef = useRef<HTMLDetailsElement>(null);
+  const [kindOpen, setKindOpen] = useState(false);
+  useDismissableDisclosure(kindRef, kindOpen);
+
+  /**
+   * The active kind, named on the closed `Filter` summary for the same reason the sort is named
+   * on `View`'s: a disclosure may hide controls, never state.
+   */
+  const activeChipLabel = chips.find((chip) => chip.id === activeChip)?.label ?? '';
 
   const totals = useMemo(() => ({
     entries: entries.length,
@@ -141,6 +163,46 @@ export default function MediaLibraryBrowser({
         </div>
 
         <div className="medialib-browser__tools">
+          {/*
+            THE KIND FILTER, which used to be a persistent chip row under the header.
+
+            Measured 2026-08-25 on the Video window: with `Continue watching` active the shelf
+            held one kind and the row did not render, so rubric Q4 scored the surface at 11
+            controls. Switching to `Recently added` rendered `All / Series / OVA / ONA` and took
+            it to 14 against a bar of 12 — the verdict depended on which shelf you happened to be
+            standing in. `CHIP_KINDS` can render more than three, so the row grows with the
+            library and nothing bounded it.
+
+            Behind a disclosure it costs the default view NOTHING regardless of how many kinds
+            exist, and the active kind stays readable on the closed summary. The chips themselves
+            are unchanged — same `aria-pressed`, same `onChipChange` — so this hides controls,
+            not the filter.
+          */}
+          {chips.length > 1 && (
+            <details className="medialib-kind" ref={kindRef} onToggle={(e) => setKindOpen((e.currentTarget as HTMLDetailsElement).open)}>
+              <summary className="medialib-view__head">
+                <Icon name="library" size={14} />
+                <span>{t('media.browser.filter')}</span>
+                <small>{activeChipLabel}</small>
+                <Icon name="chevron" size={11} />
+              </summary>
+              <div className="medialib-view__body">
+                <div className="medialib-chips" role="group" aria-label={t('media.browser.filter')}>
+                  {chips.map((chip) => (
+                    <button
+                      key={chip.id}
+                      type="button"
+                      className="medialib-chip"
+                      aria-pressed={activeChip === chip.id}
+                      onClick={() => onChipChange(chip.id)}
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </details>
+          )}
           {/*
             Sort order and grid/list density are ONE concept — how this library is displayed —
             that was spread across three persistently visible controls. Grouped behind a single
@@ -199,22 +261,6 @@ export default function MediaLibraryBrowser({
           </Button>
         </div>
       </header>
-
-      {chips.length > 1 && (
-        <div className="medialib-chips" role="group" aria-label={t('media.browser.filter')}>
-          {chips.map((chip) => (
-            <button
-              key={chip.id}
-              type="button"
-              className="medialib-chip"
-              aria-pressed={activeChip === chip.id}
-              onClick={() => onChipChange(chip.id)}
-            >
-              {chip.label}
-            </button>
-          ))}
-        </div>
-      )}
 
       <div className="medialib-browser__body">
         {entries.length === 0 ? (

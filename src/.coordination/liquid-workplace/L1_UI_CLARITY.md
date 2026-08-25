@@ -646,3 +646,36 @@ rendered only when ≥2 kinds are present) and took the scanned set **11 → 14*
 So Q4's YES was measured on the shelf that happened to have one kind in it, and `CHIP_KINDS` can
 render more than three. That is a real clutter finding, not an instrument defect: the chips are
 chrome, they are not behind a disclosure, and they grow with the library.
+
+### Same turn, later — the kind filter goes behind a disclosure, and Q4 stops depending on the shelf
+
+**The chip row was unbounded chrome.** `MediaLibraryShell.tsx:193` renders `All` plus one chip per
+release kind PRESENT, and only when there are ≥2 — so the row is invisible on a one-kind shelf and
+grows with `CHIP_KINDS` on a mixed one. That is why Q4 read 11/YES on `Continue watching` and
+14/NO on `Recently added`: the same surface, the same commit, two verdicts.
+
+**Fix: `details.medialib-kind` in the browser toolbar**, the same mechanism `e61d3179` gave sort
+and density, with the active kind named on the closed summary (`Filter by type · Series`). The
+chips are moved, not changed — same `aria-pressed`, same `onChipChange`. `scanned` excludes
+`SUMMARY`, so the disclosure costs the default view **nothing** and the count is now invariant to
+how many kinds a shelf holds. The outside-pointerdown/Escape effect was extracted to
+`useDismissableDisclosure` rather than copied: two copies of that behaviour are two chances for
+one to drift.
+
+**Re-measured on the WIDE shelf** (`Recently added`, 36 entries, 3 kinds, 8 cards) —
+**Q4 = YES, scanned 14 → 11**, disclosures 4 → 5, 6 behind. Media reads 11 in the same run.
+**Six gates on the moved control, all live:** closed → 0 of 3 chips visible; open → 3 visible,
+popover 240×55; `Series` → **8 cards → 2** (`JoJo's Biza…`, `The Big O…`); `aria-pressed` moves
+`true,false,false` → `false,true,false`; the CLOSED summary reads `Filter by typeSeries`, so the
+disclosure hides controls and not state; Escape closes it and returns focus to the summary.
+No new i18n key — `media.browser.filter` already existed in all four catalogs as the row's
+`aria-label` and is now its visible label too.
+
+**Trap paid here: an HMR rebuild of this component reset the Media Center's tab and the
+Dictionary's results.** The next clarity sweep read Video on the *Video* tab (`scanned 24`:
+`Whisper model`, `Download & transcribe`…) and Dictionary at `scanned 4`. That looks exactly like
+a Q4 regression caused by the edit. Re-drive the harness after any HMR of a media component
+before scoring anything.
+
+**Video: Q1 Q2 Q3 Q4 Q5 Q6 Q7 Q8 Q9 Q10 — 10 of 10 YES, every one measured at this tree.
+Category 5 on Video is 10/10.**
