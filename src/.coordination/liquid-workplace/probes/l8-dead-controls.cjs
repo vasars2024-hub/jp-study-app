@@ -75,6 +75,13 @@ const SETTLE = Number(argOf('--settle', '450'));
  */
 const SLOW_SETTLE = Number(argOf('--slow-settle', '3000'));
 const SELF_TEST = process.argv.includes('--self-test');
+/**
+ * WHICH window. `document.querySelector('.fwin')` returns the first one in the DOM, which is a
+ * lie the moment a second window exists — a probe on this desk has already scored the Video
+ * window as Dictionary and never refused. `--title` matches the window's own title text, and
+ * the installer REFUSES by name rather than falling back when no window matches.
+ */
+const TITLE = argOf('--title', 'Dictionary');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -98,9 +105,21 @@ async function ev(js) {
  * control by INDEX into `__l8.list`, because a CSS path re-resolved after a React re-render is
  * how a probe ends up clicking a different button than the one it measured.
  */
+const PICK_WIN = `(() => {
+    const wanted = ${JSON.stringify(TITLE)};
+    const painted = [...document.querySelectorAll('.fwin')].filter((w) => {
+      const r = w.getBoundingClientRect();
+      return r.width > 0 && r.height > 0;
+    });
+    return painted.find((w) => {
+      const t = w.querySelector('.fwin-title-text, .fwin-title');
+      return !!t && (t.textContent || '').includes(wanted);
+    }) || null;
+  })()`;
+
 const INSTALL = `(() => {
-  const win = document.querySelector('.fwin');
-  if (!win) return JSON.stringify({ refuse: 'no .fwin' });
+  const win = ${PICK_WIN};
+  if (!win) return JSON.stringify({ refuse: 'no painted .fwin titled ' + ${JSON.stringify(TITLE)} });
   const painted = (e) => (typeof e.checkVisibility === 'function'
     ? e.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true, contentVisibilityAuto: true })
     : true);
@@ -221,7 +240,10 @@ const INSTALL = `(() => {
      */
     rematch() {
       if (!document.contains(this.win)) {
-        const w = document.querySelector('.fwin');
+        // Re-pick by TITLE, never by document order: a detached window re-bound to whichever
+        // .fwin happened to be first is how a run silently finishes on a different surface.
+        // (No backticks in this comment -- it lives inside a template literal.)
+        const w = ${PICK_WIN};
         if (w) this.win = w;
       }
       const detached = this.list.filter((r) => !r.el.isConnected);
@@ -738,7 +760,7 @@ async function probeOne(t, settle = SETTLE) {
   const unrestored = results.filter((r) => r.verdict === 'ALIVE' && !r.restoredAfterSecondClick);
 
   console.log(JSON.stringify({
-    surface: 'Dictionary (liquid)',
+    surface: TITLE,
     selfTest,
     controlsTotal: setup.total,
     probed: results.length,
