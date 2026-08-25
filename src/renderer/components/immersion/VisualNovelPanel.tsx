@@ -22,6 +22,9 @@ import { addMediaStudySessionProgress, loadMediaStudyDatabase, onMediaStudyDatab
 import { isLookupClick, lookupWordFromMouseUp, noteLookupPointerDown } from '../../wordLookup';
 import DictionaryPopup from '../DictionaryPopup';
 import ReaderCollectionPanel from '../ReaderCollectionPanel';
+import { useT } from '../../i18n';
+import { READING_CANVAS_FILL_POLICY } from '../../../shared/liquidReadingCanvas';
+import { ReadingCanvas, type ReadingCanvasTool } from '../liquid/ReadingCanvas';
 import MediaLanguageProfileCard from '../media/MediaLanguageProfileCard';
 import MediaStudyAssistantPanel from '../media/MediaStudyAssistantPanel';
 import VisualNovelImportPanel from './VisualNovelImportPanel';
@@ -88,6 +91,8 @@ function formatDuration(totalSeconds: number): string {
 }
 
 export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
+  const { t } = useT();
+  const [libraryOpen, setLibraryOpen] = useState(true);
   const [database, setDatabase] = useState<VisualNovelDatabase>(createEmptyVisualNovelDatabase);
   const [studyProfiles, setStudyProfiles] = useState(() => loadMediaStudyDatabase().profiles);
   const [selectedId, setSelectedId] = useState('');
@@ -560,6 +565,64 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
     }
   };
 
+  /**
+   * The library is a LEADING reading tool, not a grid track.
+   *
+   * `.visual-novel-layout` was `minmax(220px, 290px) minmax(0, 1fr)` with a
+   * `@media (max-width: 760px)` stack, and the media query reads the WINDOW
+   * while this panel renders inside the Immersion floating window. In a 600px
+   * pane inside a 1264px window it therefore never fires, the library keeps its
+   * 220px minimum, and the workspace absorbs the entire shortfall — the same
+   * defect Captures and Library had, measured rather than assumed.
+   *
+   * `side: 'leading'` because the library navigates INTO the document rather
+   * than acting on it. 220/290 are the grid's own two numbers, kept so the
+   * docked width at a wide canvas is byte-identical to what shipped.
+   */
+  const libraryTool: ReadingCanvasTool = {
+    id: 'library',
+    label: t('vnPanel.library'),
+    side: 'leading',
+    minWidth: 220,
+    preferredWidth: 290,
+    onClose: () => setLibraryOpen(false),
+    content: (
+      <div className="visual-novel-library">
+        <div className="visual-novel-add">
+          <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="English or display title" aria-label="Visual novel title" />
+          <input value={japaneseTitle} onChange={(event) => setJapaneseTitle(event.target.value)} placeholder="Japanese title" aria-label="Japanese title" />
+          <div>
+            <input value={executablePath} onChange={(event) => setExecutablePath(event.target.value)} placeholder="Executable path" aria-label="Executable path" />
+            <button type="button" onClick={() => void chooseExecutable()}>Browse</button>
+          </div>
+          <button type="button" disabled={!title.trim()} onClick={() => void addEntry()}>Add to library</button>
+        </div>
+        <VisualNovelImportPanel
+          onImported={(next) => {
+            setDatabase(next);
+            setSelectedId(next.entries[0]?.id ?? '');
+          }}
+          onStatus={reportStatus}
+        />
+        <VisualNovelRecommendationsPanel
+          context={recommendationState.context}
+          recommendations={recommendationState.recommendations}
+          onSelect={setSelectedId}
+        />
+        <ul>
+          {database.entries.map((entry) => (
+            <li key={entry.id}>
+              <button type="button" className={entry.id === selectedId ? 'is-selected' : ''} onClick={() => setSelectedId(entry.id)}>
+                <strong>{entry.title}</strong>
+                <span>{entry.engine} · {entry.status} · {Math.round(entry.completionPct)}%</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    ),
+  };
+
   return (
     <div className="visual-novel-panel">
       <header className="visual-novel-panel-head">
@@ -567,43 +630,24 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
           <span className="media-study-mode-kicker">Immersion library</span>
           <strong>Visual Novels</strong>
         </div>
-        <button type="button" onClick={onClose}>Back to browser</button>
+        <div className="visual-novel-panel-tools">
+          <button
+            type="button"
+            aria-pressed={libraryOpen}
+            onClick={() => setLibraryOpen((open) => !open)}
+          >
+            {libraryOpen ? t('immersion.hideLibrary') : t('immersion.showLibrary')}
+          </button>
+          <button type="button" onClick={onClose}>Back to browser</button>
+        </div>
       </header>
       {(status || error) && <p className={error ? 'media-error' : 'muted'} role="status">{error || status}</p>}
-      <div className="visual-novel-layout">
-        <aside className="visual-novel-library">
-          <div className="visual-novel-add">
-            <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="English or display title" aria-label="Visual novel title" />
-            <input value={japaneseTitle} onChange={(event) => setJapaneseTitle(event.target.value)} placeholder="Japanese title" aria-label="Japanese title" />
-            <div>
-              <input value={executablePath} onChange={(event) => setExecutablePath(event.target.value)} placeholder="Executable path" aria-label="Executable path" />
-              <button type="button" onClick={() => void chooseExecutable()}>Browse</button>
-            </div>
-            <button type="button" disabled={!title.trim()} onClick={() => void addEntry()}>Add to library</button>
-          </div>
-          <VisualNovelImportPanel
-            onImported={(next) => {
-              setDatabase(next);
-              setSelectedId(next.entries[0]?.id ?? '');
-            }}
-            onStatus={reportStatus}
-          />
-          <VisualNovelRecommendationsPanel
-            context={recommendationState.context}
-            recommendations={recommendationState.recommendations}
-            onSelect={setSelectedId}
-          />
-          <ul>
-            {database.entries.map((entry) => (
-              <li key={entry.id}>
-                <button type="button" className={entry.id === selectedId ? 'is-selected' : ''} onClick={() => setSelectedId(entry.id)}>
-                  <strong>{entry.title}</strong>
-                  <span>{entry.engine} · {entry.status} · {Math.round(entry.completionPct)}%</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </aside>
+      <ReadingCanvas
+        className="visual-novel-layout"
+        closeLabel={t('immersion.hideLibrary')}
+        policy={READING_CANVAS_FILL_POLICY}
+        tools={libraryOpen ? [libraryTool] : []}
+      >
         <main className="visual-novel-workspace">
           {!selected && <p className="muted">Add a local visual novel to begin capturing Japanese dialogue.</p>}
           {selected && (
@@ -888,7 +932,7 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
             </>
           )}
         </main>
-      </div>
+      </ReadingCanvas>
       {popup && <DictionaryPopup {...popup} onClose={() => setPopup(null)} />}
       {selected && (
         <ReaderCollectionPanel

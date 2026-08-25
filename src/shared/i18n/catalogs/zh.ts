@@ -426,6 +426,7 @@ export const zh: Catalog = {
   'vnPanel.kicker': '沉浸库',
   'vnPanel.title': '视觉小说',
   'vnPanel.backToBrowser': '返回浏览器',
+  'vnPanel.library': '书库',
   'vnPanel.titlePlaceholder': '英文名或显示名',
   'vnPanel.aria.title': '视觉小说标题',
   'vnPanel.japaneseTitlePlaceholder': '日文标题',

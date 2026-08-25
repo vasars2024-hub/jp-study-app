@@ -500,9 +500,24 @@ textarea {
 .visual-novel-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .visual-novel-panel-head > div { display: grid; gap: 2px; }
 .visual-novel-panel-head > div > strong { font-size: 1rem; }
-.visual-novel-layout { display: grid; grid-template-columns: minmax(220px, 290px) minmax(0, 1fr); gap: 12px; min-height: 0; overflow: hidden; }
-.visual-novel-library, .visual-novel-workspace { min-height: 0; overflow: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-1); }
-.visual-novel-library { display: grid; align-content: start; gap: 10px; padding: 10px; }
+/* L6: this is a `ReadingCanvas` (`.lq-reading visual-novel-layout`). The row
+   layout, the 12px gutter and the sheet's containing block come from
+   `readingCanvas.css`; what stays here is its place in the panel column.
+   The two grid tracks are gone because they could not answer the only
+   question that matters at 600px — whether there is still room for the
+   document — and `minmax(220px, 290px)` kept taking 220 of a pane that had
+   none to give. */
+.visual-novel-layout { min-height: 0; overflow: hidden; }
+/* The two header buttons were bare UA buttons: measured live at 23x110 against
+   the app's own 32px `--lq-hit-target`. Adding a control beside one and leaving
+   both under the pointer floor is how a migration ships a category-1 defect it
+   introduced half of. `aria-pressed` needs a visible state too — a toggle whose
+   only pressed indication is in the accessibility tree is not a toggle. */
+.visual-novel-panel-tools { display: flex; align-items: center; gap: 8px; }
+.visual-novel-panel-tools button { min-height: var(--lq-hit-target); padding: 0 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-2); color: inherit; cursor: pointer; }
+.visual-novel-panel-tools button[aria-pressed='true'] { border-color: var(--accent, #d84b57); }
+.visual-novel-workspace { min-height: 0; overflow: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-1); }
+.visual-novel-library { display: grid; align-content: start; gap: 10px; }
 .visual-novel-add { display: grid; gap: 7px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
 .visual-novel-add > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; }
 .visual-novel-add input, .visual-novel-progress input, .visual-novel-progress select, .visual-novel-capture input, .visual-novel-capture select, .visual-novel-capture textarea, .visual-novel-route-add input, .visual-novel-route-list select, .visual-novel-import input[type="text"], .visual-novel-import-list input:not([type]), .visual-novel-metadata input, .visual-novel-metadata select, .visual-novel-metadata textarea { min-width: 0; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-2); color: inherit; padding: 7px 8px; font: inherit; }
@@ -635,8 +650,6 @@ textarea {
 @media (max-width: 760px) {
   .media-study-vocabulary li { grid-template-columns: 1fr; }
   .media-study-metrics { grid-template-columns: repeat(2, minmax(90px, 1fr)); }
-  .visual-novel-layout { grid-template-columns: 1fr; overflow: auto; }
-  .visual-novel-library, .visual-novel-workspace { overflow: visible; }
   .visual-novel-metadata-grid { grid-template-columns: 1fr; }
   .visual-novel-community-form { grid-template-columns: 1fr; }
   .visual-novel-sentence-fields { grid-template-columns: 1fr; }

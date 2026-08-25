@@ -428,6 +428,7 @@ export const ja: Catalog = {
   'vnPanel.kicker': 'イマージョンライブラリ',
   'vnPanel.title': 'ビジュアルノベル',
   'vnPanel.backToBrowser': 'ブラウザに戻る',
+  'vnPanel.library': 'ライブラリ',
   'vnPanel.titlePlaceholder': '英語名または表示名',
   'vnPanel.aria.title': 'ビジュアルノベルのタイトル',
   'vnPanel.japaneseTitlePlaceholder': '日本語タイトル',

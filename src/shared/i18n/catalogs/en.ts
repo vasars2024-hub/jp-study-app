@@ -474,6 +474,7 @@ export const en: Catalog = {
   'vnPanel.kicker': 'Immersion library',
   'vnPanel.title': 'Visual Novels',
   'vnPanel.backToBrowser': 'Back to browser',
+  'vnPanel.library': 'Library',
   'vnPanel.titlePlaceholder': 'English or display title',
   'vnPanel.aria.title': 'Visual novel title',
   'vnPanel.japaneseTitlePlaceholder': 'Japanese title',

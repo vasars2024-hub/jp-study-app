@@ -482,6 +482,7 @@ export const ru: Catalog = {
   'vnPanel.kicker': 'Библиотека погружения',
   'vnPanel.title': 'Визуальные новеллы',
   'vnPanel.backToBrowser': 'Назад к браузеру',
+  'vnPanel.library': 'Библиотека',
   'vnPanel.titlePlaceholder': 'Английское или отображаемое название',
   'vnPanel.aria.title': 'Название визуальной новеллы',
   'vnPanel.japaneseTitlePlaceholder': 'Японское название',
