@@ -270,3 +270,32 @@ State driven: Liquid presentation, `lang=en`, `data-theme=forest-night`, `data-p
 0 failing, `l1-accessibility.js` re-driven at this tree), Q6-Q10 YES. The two categories this
 turn raised — 8/10 → 9/10 → 10/10 — were both instrument defects, and neither point came from a
 change to the product.
+
+## 2026-08-25 · primary — Video scored for the first time; Q6 fixed, Q4 is a real open number
+
+`l1-ui-clarity.js` already measures EVERY `.fwin` — no adaptation and no new probe was needed,
+which is why the previous turns' "Video is unmeasured" was a reading gap, not a missing instrument.
+
+**Video, 1080x700, `forest-night`, en, 35 controls painted.** Q1 YES (3 entry points, 1 accent
+button), Q2 YES (title "Video", 3 back affordances), Q3 YES (primary action inside the body at
+`scrollTop 0`), **Q4 NO**, Q5 INHERIT (from `l1-accessibility.js`), **Q6 NO → YES** (`98bd70ea`),
+Q7/Q8 MEASURE (`l1-q78-drive.cjs` has not run at this tree), Q9 MEASURE (`l1-q9-drive.cjs`),
+Q10 YES (4 identity markers, cardUniformity 0).
+
+**Q6 is closed and re-scored in the fix's own commit.** `.mc-sidebar` (blur 24px) and
+`.mc-topbar` (blur 18px) both computed `transitionProperty: all 0s` — `carryingATransition`
+**0 of 2**. `:focus-within` now colours each region's own edge, transitioned 140ms.
+Measured in SPLIT evals, because a single eval reads the transition at t=0 and returns the
+RESTING value — the first attempt reported "no change" on a rule that was working. Sidebar
+focused: its border-right rgba(255,255,255,0.075) → rgb(255,107,132) while `.mc-topbar` stayed
+rgba(255,255,255,0.075) (the sibling does not fire). Blurred: both return. `animationName none`,
+iteration 1. Re-scored **2 of 2** on Video and on Media, which shares the rules.
+
+**Q4 is NOT closed and the number is not close.** `collapsedDisclosures 0`, `chromeControlsRaw
+30` against a bar of ">=1 collapsed and <=12". The 30 are 10 sidebar nav + 2 history + search +
+2 top actions + 9 library rail + sort + 2 view + Add + the 2 spotlight actions. Getting to 12
+means hiding ~18 controls, and 19 of the 30 are PRIMARY navigation across two persistent rails —
+hiding those would breach the plan's own "do not obscure a feature" non-negotiable. So this is a
+real design decision (a collapsible sidebar, or grouping the rail's three category rows behind a
+disclosure), not a CSS fix, and it is the open unit for category 5. **Category 5 on Video is
+currently 8 answerable of 10 with Q4 NO — not a 10, and it stays counted.**

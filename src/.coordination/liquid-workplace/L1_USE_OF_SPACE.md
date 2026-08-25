@@ -553,3 +553,41 @@ width or ~60px of its 602px height. Growing the card is nearly enough and nearly
 `maxColWidth` is height-bounded (`MediaPosterCard.tsx:36`), and at the 555px grid the ceiling is
 ~318px, which lands at 14.9%. A layout that passes by 0.1% is not a 10 either. The next worker
 should treat a sparse shelf as a presentation decision, not a column-width one.
+
+## 2026-08-25 · primary — Video's category 4 closes: the sparse shelf became a presentation
+
+`cdd431d3`. The 16.5% was real and the fix was not layout. `MediaSpotlightCard` renders when a
+shelf holds exactly ONE entry in grid view: the art on the left, and beside it the title, the
+subtitle status, four facts (type, year, watched-of-total, subtitle languages), the watch
+progress and Resume/More. `min-height: 100%` on the spotlight plus `align-content: space-evenly`
+on the facts is what removed the band under it — without those the box was 764x428 in a 555-tall
+pane and the dead region only fell 16.5% → 15.5%.
+
+**Video, `Continue watching` (1 entry), through the product's own Maximize button:**
+
+| size | clipped | overlaps | h-scroll | hiddenX | dead region | dominant canvas |
+| --- | --- | --- | --- | --- | --- | --- |
+| maximized 1264x765 | 0 | 0 | 0 | 0 | **16.5% → 7.8%** of viewport (17.7 → 8.3 of window) | 68.6% |
+| default 1080x700 | 0 | 0 | 0 | 0 | **8.3%** of viewport (11.4 of window) | 64.7% |
+| compact 260x170 | 0 | — | **0** | 0 | — | — |
+| sub-min 200x130 | 0 | — | **1** | 2 | — | — |
+
+`restoredExactly true`; verdict `CONTROL FAILED AS REQUIRED on Video`. Regression control on the
+populated shelf (`Recently added`, 8 titles): grid true, spotlight false, 8 cards, dead 3.9%.
+
+**Category 4 on Video is a 10:** all four numbers pass at every supported size, the maximized
+injected-box control fired on 2026-08-25, and the compact/sub-minimum control fails as required.
+
+**Two traps I paid for, both mine, so nobody reads them as pre-existing.** (1) `minmax(140px, 1fr)`
+is a FLOOR the track keeps when the pane is narrower than it — at the product's own 260x170 the
+facts grid gave the pane a horizontal scrollbar at 153 > 100. `min(140px, 100%)` is the idiom.
+(2) `flex-wrap: wrap` on a COLUMN flex row sizes its line to the widest item, and `align-items:
+stretch` then stretches to the LINE, not the container: the two buttons stayed 98 wide inside a
+74px track (111 > 100) with `min-width: 0` AND `white-space: normal` both already applied.
+`flex-wrap: nowrap` is what makes stretch mean the pane.
+
+**One trap that is not mine and will cost the next worker a measurement.** Creating a new module
+makes Vite do a FULL RELOAD, not an HMR patch. That reset every `window.__lq*` probe global (so
+`l1-maximize-drive.js` silently fell back to its `'Dictionary'` default and maximized the wrong
+window) and reset the Video window's Media Center page from Library back to Video. Re-set the
+globals and re-select the page after any run that adds a file.

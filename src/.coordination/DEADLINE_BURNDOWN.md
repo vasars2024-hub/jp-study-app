@@ -512,3 +512,15 @@ honest reading has not changed and is getting louder: gate 461 is ONE plan-autho
 now absorbed six turns, and the unit is too coarse to show progress — its internal count went
 Video 1 of 8 categories at 10 plus 2 parked at 9 (4 and 3), 5 unmeasured (2/5/6/7/8).
 main-v1: complete-except-external, unchanged. mal-pipeline: 34 of 34, closed.
+
+2026-08-25 | liquid | units done this turn: 0 | units left: 10 | basis: the 13 `Gate:` lines in src/LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md (`grep -c '^Gate:'` = 13, re-run this turn); the 3 closed (L0 452 / L2 591 / L3 600) are INHERITED, gate 461 was re-derived directly and is OPEN — Dictionary holds 8 of 8, Video moved from 1 category at 10 (+2 parked at 9) to **2 at 10**: category 4 CLOSED this turn (maximized dead region 16.5% -> 7.8% of viewport, all four numbers pass at maximized/default/compact, control fails as required at sub-minimum) and category 5 scored on Video for the first time at 8 of its 10 questions with Q6 fixed and re-scored in its own commit; category 3 still parked at 9, categories 2/7/8 unmeasured on Video | projected finish: 2026-10-05
+
+Rate, arithmetic and not optimism: 3 of 13 gates closed in the 13 days since liquid opened
+2026-08-16 = 0.23 gates/day at 2 workers; 10 ÷ 0.23 = 43 days → **2026-10-05**, missing the
+2026-09-01 target by 34 days. Seventh consecutive turn with no GATE closing, and the same honest
+reading: gate 461 is ONE plan-authority unit that has absorbed seven turns. Its INTERNAL count
+moved twice this turn, which is the fastest it has moved: Video 1 → 2 of 8 categories at 10.
+Category 5's remaining unit is NOT a CSS fix and should not be estimated as one — Q4 needs 18 of
+30 chrome controls to leave the Media shell's default state, and 19 of those 30 are primary
+navigation, so it is a design decision on the shell (collapsible sidebar / grouped rail).
+main-v1: complete-except-external, unchanged, INHERITED. mal-pipeline: 34 of 34, closed.
