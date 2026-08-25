@@ -1,11 +1,24 @@
 import { normalizeNeighborText } from './lexiconNeighbors';
 
 /**
- * Rows read from `examples` before selection. The scan stops here, so a common
- * word pays for a few hundred `instr` evaluations rather than for the table.
+ * Matched rows collected from `examples` before selection. This bounds the
+ * RESULT, never the visit: at real Japanese match density (measured 237-991
+ * matches in 234,982 rows) reaching 400 matches costs 41-100% of the table.
  * See `findExampleSentences`.
  */
 export const EXAMPLE_SCAN_ROWS = 400;
+/**
+ * Rows visited per turn of the main event loop.
+ *
+ * The visit above is unavoidable — `instr` cannot use an index — so the lever
+ * that is left is not doing all of it in one synchronous block. `examples`
+ * packs ~43 rows per 4 KiB page, and a cold page costs ~1.3 ms on the machine
+ * this was measured on, so 3,000 rows is ~70 pages is ~90 ms: comfortably under
+ * the 500 ms main-process bar with room for a slower disk. The window is on
+ * `id`, which is the rowid, so the chunked visit order is exactly the order the
+ * single full scan had and the chosen sentences are unchanged.
+ */
+export const EXAMPLE_SCAN_CHUNK_ROWS = 3000;
 export const MAX_EXAMPLE_RESULTS = 8;
 /**
  * A sentence search is containment, so a query longer than a long compound is a

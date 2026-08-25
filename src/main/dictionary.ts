@@ -850,7 +850,7 @@ export function registerDictionaryIpc(): void {
   );
   ipcMain.handle(
     'dict:examples',
-    (_e, text: unknown, options?: unknown): LexiconExampleResult => {
+    async (_e, text: unknown, options?: unknown): Promise<LexiconExampleResult> => {
       const raw = options && typeof options === 'object' && !Array.isArray(options)
         ? options as Record<string, unknown>
         : {};
@@ -858,7 +858,10 @@ export function registerDictionaryIpc(): void {
       const empty: LexiconExampleResult = { query, examples: [] };
       if (!query) return empty;
       try {
-        return findExampleSentencesInDb({
+        // Awaited inside the try on purpose: the scan yields the event loop
+        // between windows, so a database that goes away mid-scan rejects here
+        // rather than escaping as an unhandled rejection.
+        return await findExampleSentencesInDb({
           text: query,
           sourceLangs: readLangList(raw.sourceLangs),
           glossLangs: readLangList(raw.glossLangs),

@@ -441,8 +441,13 @@ export function findLexiconCollocationsInDb(query: CollocationQuery): LexiconCol
   return findLexiconCollocations(dictionaryDb(), query);
 }
 
-/** Sentences from an installed example corpus that contain a word. */
-export function findExampleSentencesInDb(query: ExampleQuery): LexiconExampleResult {
+/**
+ * Sentences from an installed example corpus that contain a word.
+ *
+ * Async because the scan is walked in event-loop-sized windows — see
+ * `findExampleSentences` for why the visit cannot be indexed away.
+ */
+export function findExampleSentencesInDb(query: ExampleQuery): Promise<LexiconExampleResult> {
   return findExampleSentences(dictionaryDb(), query);
 }
 

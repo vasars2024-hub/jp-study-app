@@ -13,6 +13,7 @@ import { openDictionaryDb, type SqliteDb } from '../dictionary/db';
 import { importTatoeba } from '../dictionary/importers/tatoeba';
 import { findExampleSentences, lookup } from '../dictionary/dictService';
 import { DICT_SCHEMA_VERSION, MIGRATIONS } from '../dictionary/schema';
+import { EXAMPLE_SCAN_CHUNK_ROWS, EXAMPLE_SCAN_ROWS } from '../../shared/lexiconExamples';
 
 let root = '';
 let db: SqliteDb;
@@ -49,9 +50,9 @@ afterEach(() => {
 });
 
 describe('example sentence reader', () => {
-  it('returns sentences containing the word, shortest first, with their translations', () => {
+  it('returns sentences containing the word, shortest first, with their translations', async () => {
     importCorpus();
-    const result = findExampleSentences(db, { text: '猫', sourceLangs: ['ja'] });
+    const result = await findExampleSentences(db, { text: '猫', sourceLangs: ['ja'] });
     expect(result.query).toBe('猫');
     expect(result.examples.map((example) => example.text)).toEqual([
       '猫が好きです。',
@@ -71,37 +72,123 @@ describe('example sentence reader', () => {
   });
 
   // `猫。` contains 猫 and is not an example of it.
-  it('drops a sentence that is only the word itself', () => {
+  it('drops a sentence that is only the word itself', async () => {
     importCorpus();
-    const texts = findExampleSentences(db, { text: '猫', sourceLangs: ['ja'] })
+    const texts = (await findExampleSentences(db, { text: '猫', sourceLangs: ['ja'] }))
       .examples.map((example) => example.text);
     expect(texts).not.toContain('猫。');
   });
 
-  it('filters translations to the requested languages', () => {
+  it('filters translations to the requested languages', async () => {
     importCorpus();
-    const result = findExampleSentences(db, { text: '猫', sourceLangs: ['ja'], glossLangs: ['ru'] });
+    const result = await findExampleSentences(db, { text: '猫', sourceLangs: ['ja'], glossLangs: ['ru'] });
     expect(result.examples[0].translations).toEqual([{ lang: 'ru', text: 'Я люблю кошек.' }]);
     expect(result.examples[1].translations).toEqual([]);
   });
 
-  it('reads nothing from a disabled corpus', () => {
+  it('reads nothing from a disabled corpus', async () => {
     importCorpus();
     db.prepare(`update dictionaries set enabled = 0 where id = 'tatoeba'`).run();
-    expect(findExampleSentences(db, { text: '猫', sourceLangs: ['ja'] }).examples).toEqual([]);
+    expect((await findExampleSentences(db, { text: '猫', sourceLangs: ['ja'] })).examples).toEqual([]);
   });
 
-  it('answers empty for a blank query and for a pasted sentence', () => {
+  it('answers empty for a blank query and for a pasted sentence', async () => {
     importCorpus();
-    expect(findExampleSentences(db, { text: '   ' }).examples).toEqual([]);
-    expect(findExampleSentences(db, { text: 'その大きな黒い猫はとても静かに眠っています。' }).examples).toEqual([]);
+    expect((await findExampleSentences(db, { text: '   ' })).examples).toEqual([]);
+    expect((await findExampleSentences(db, { text: 'その大きな黒い猫はとても静かに眠っています。' })).examples).toEqual([]);
   });
 
-  it('does not throw on a database that has no example corpus at all', () => {
-    expect(findExampleSentences(db, { text: '猫', sourceLangs: ['ja'] })).toEqual({
+  it('does not throw on a database that has no example corpus at all', async () => {
+    expect(await findExampleSentences(db, { text: '猫', sourceLangs: ['ja'] })).toEqual({
       query: '猫',
       examples: [],
     });
+  });
+});
+
+// The scan cannot be indexed away — `instr` over a text column is a table visit —
+// so what is under test here is that the visit is spent in event-loop-sized
+// windows rather than in one synchronous block, and that windowing it changed
+// nothing about which sentences come back.
+describe('the example scan is walked in chunks', () => {
+  const CORPUS_ROWS = EXAMPLE_SCAN_CHUNK_ROWS * 3 + 17;
+
+  // A corpus big enough to need four windows, with every match deliberately in
+  // the LAST one: an implementation that reads a single chunk and stops returns
+  // nothing here, which is the correctness half of the control.
+  function importLargeCorpus(): void {
+    db.prepare(`insert into dictionaries (id,title,source_lang,target_langs,kind,licence)
+      values ('big','Big Corpus','*','*','examples','CC BY 2.0 FR')`).run();
+    const insert = db.prepare(`insert into examples (id,lang,text,source,licence,dict_id)
+      values (?,'ja',?,?,'CC BY 2.0 FR','big')`);
+    db.transaction(() => {
+      for (let id = 1; id <= CORPUS_ROWS; id += 1) {
+        const tail = CORPUS_ROWS - id;
+        // Only the final 5 rows contain 猫, and they are ordered so shortest-first
+        // has something to do.
+        const text = tail < 5
+          ? `${'あ'.repeat(tail)}猫が好きです。`
+          : `犬が走る${id}。`;
+        insert.run(id, text, String(id));
+      }
+    })();
+  }
+
+  it('finds matches that live past the first window', async () => {
+    importLargeCorpus();
+    const result = await findExampleSentences(db, { text: '猫', sourceLangs: ['ja'] });
+    expect(db.prepare('select count(*) as count from examples').get())
+      .toEqual({ count: CORPUS_ROWS });
+    expect(result.examples).toHaveLength(5);
+    expect(result.examples[0].text).toBe('猫が好きです。');
+    expect(result.examples.at(-1)?.text).toBe('ああああ猫が好きです。');
+  });
+
+  it('returns exactly what one unwindowed scan of the same corpus returns', async () => {
+    importLargeCorpus();
+    const windowed = await findExampleSentences(db, { text: '猫', sourceLangs: ['ja'] });
+    // The statement this replaced, run verbatim as the reference.
+    const reference = db.prepare(`
+      select e.text from examples e join dictionaries d on d.id = e.dict_id
+      where d.enabled = 1 and d.kind = 'examples' and e.lang in ('ja')
+        and instr(e.text, ?) > 0
+      limit ?
+    `).all('猫', EXAMPLE_SCAN_ROWS) as { text: string }[];
+    // Both lengths asserted before the comparison: `slice(0, windowed.length)`
+    // on an empty result would otherwise make this pass vacuously, which is
+    // exactly what a scan that stops after one window produces.
+    expect(reference).toHaveLength(5);
+    expect(windowed.examples).toHaveLength(5);
+    expect(windowed.examples.map((example) => example.text)).toEqual(
+      [...reference.map((row) => row.text)].sort((a, b) => [...a].length - [...b].length),
+    );
+  });
+
+  // The load-bearing one. A ticker that only advances when the event loop turns
+  // counts the windows: chunked, it sees at least one turn per window boundary;
+  // one synchronous scan starves it completely. Delete the `await new Promise`
+  // yield in `findExampleSentences` and this goes red at 0.
+  it('gives the event loop a turn between windows', async () => {
+    importLargeCorpus();
+    let turns = 0;
+    let running = true;
+    const tick = (): void => {
+      if (!running) return;
+      turns += 1;
+      setImmediate(tick);
+    };
+    setImmediate(tick);
+    // Let the ticker arm before the scan starts, so its first turn is not the
+    // one the scan itself would have yielded.
+    await new Promise<void>((resolve) => { setImmediate(resolve); });
+    const armed = turns;
+
+    await findExampleSentences(db, { text: '猫', sourceLangs: ['ja'] });
+    running = false;
+
+    const windows = Math.ceil(CORPUS_ROWS / EXAMPLE_SCAN_CHUNK_ROWS);
+    expect(windows).toBe(4);
+    expect(turns - armed).toBeGreaterThanOrEqual(windows - 1);
   });
 });
 
