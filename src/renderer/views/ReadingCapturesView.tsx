@@ -190,6 +190,16 @@ export default function ReadingCapturesView({ passage }: ReadingCapturesViewProp
       {
         id: 'captures',
         label: t('reading.captures.recent'),
+        // LEADING, and this is a repair to the migration above rather than a new
+        // preference. Before it, the markup was `<aside
+        // className="reading-captures-list">` FIRST and `<section
+        // className="reading-captures-reader">` second, against a
+        // `minmax(180px, 260px) minmax(0, 1fr)` grid — so the list was the left
+        // column. `ReadingCanvas` renders tools after the document, so the fix
+        // for the media query quietly moved the list to the right edge: a
+        // regression nothing measured, because every assertion was about width.
+        // The list is navigation INTO the passage, which is what `leading` means.
+        side: 'leading',
         minWidth: 200,
         preferredWidth: 260,
         onClose: () => setListOpen(false),

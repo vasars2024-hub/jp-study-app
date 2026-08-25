@@ -106,6 +106,22 @@ describe('Captures through the L6 reading canvas', () => {
     expect(h.container.querySelectorAll('.reading-captures-row').length).toBe(2);
   });
 
+  it('keeps the list on the LEADING edge, where the grid column it replaced was', async () => {
+    // A regression the migration introduced and nothing caught, because every
+    // assertion about this surface was about WIDTH. Before it the markup was
+    // `<aside className="reading-captures-list">` first and `<section
+    // className="reading-captures-reader">` second against `minmax(180px, 260px)
+    // minmax(0, 1fr)`, i.e. the list was the left column; `ReadingCanvas`
+    // renders tools after the document, so the fix moved it to the right edge.
+    const h = await mountAt(1200);
+    const tool = h.tool('captures');
+    expect(tool).not.toBe(null);
+    expect(tool!.dataset.side).toBe('leading');
+    expect(
+      Boolean(h.doc().compareDocumentPosition(tool!) & Node.DOCUMENT_POSITION_PRECEDING),
+    ).toBe(true);
+  });
+
   it('has no window-width media query left to reintroduce the bug', () => {
     const css = readFileSync(
       resolve(__dirname, '..', 'views', 'readingCaptures.css'),
