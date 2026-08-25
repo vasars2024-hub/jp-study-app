@@ -295,7 +295,16 @@
     }
     const hit = (byKey.get(t.key) || [])[t.ord];
     if (hit) return { el: hit, by: 'key' };
-    const alt = (byCls.get(t.clsKey) || [])[t.clsOrd];
+    // The class-only fallback is for a control whose LABEL IS ITS OWN STATE — it has no stable
+    // name to match on, so class+ordinal is the only identity left. A target that does have a
+    // stable name must never reach it: on 2026-08-25 `Grid view` and `List view` (icon-only,
+    // `className === ''`, identified solely by `aria-label`) were rebound by class+ordinal onto
+    // whatever class-less button sat at that index on the PLAYER page, clicked, and reported as a
+    // dead end. Driven alone the toggle works — `aria-pressed` flips and the card box goes
+    // 84 px → 240 px → 84 px. `gone` is the honest verdict for a named control that is no longer
+    // on the surface; a fabricated dead end is not.
+    const named = t.name && t.name !== '(unlabelled)';
+    const alt = named ? null : (byCls.get(t.clsKey) || [])[t.clsOrd];
     if (alt) return { el: alt, by: 'class' };
     return { el: null, by: null };
   };

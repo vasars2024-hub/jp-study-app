@@ -588,3 +588,36 @@ projection stays **2026-09-27**, 26 days past the 2026-09-01 target. The scope i
 main-v1: complete-except-external, unchanged, **INHERITED** — RULE 1's re-count is STILL owed and
 was not done this turn either (fifth turn). It needs the last `##` section of
 `src/MAIN_V1_EVIDENCE_LEDGER.md` counted across Tracks 2/7/8/9. mal-pipeline: 34 of 34, closed.
+
+2026-08-25 | liquid | units done this turn: 0 | units left: 10 | basis: the 13 `Gate:` lines in src/LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md (`grep -c 'Gate:'` = 13, re-run this turn); the 3 closed (L0 452 / L2 591 / L3 600) are INHERITED, not re-verified this turn | projected finish: 2026-09-27
+
+**Gate 461 pulled in to ≈ 2026-08-28, and the reason is a retraction rather than a build.** The
+slice the last two handoffs named — debounce `MediaCenterView`'s `state.query` — does not exist as
+a defect. `useDebouncedValue(query, 80)` has been at `MediaContent.tsx:573` all along, and the
+latency it was meant to fix was already gone: re-driven with the PREVIOUS ENTRY'S OWN INSTRUMENT it
+reads 19.2 / 26.2 / 19.3 / 16.7 ms against its earlier 81.1 / 88.8 / 102.3 / 164.4 ms, because
+`492a73a7` (list rows 578×945 → 578×84) landed in the same turn that took the slow numbers. A
+second, INP-standard instrument agrees over 12 events on two instances (max 64 ms after the arming
+run) with two negative controls firing — idle 0 longtasks in 6 s, Dictionary 0 longtasks.
+
+So gate 461's remaining work is **4 category-units, not 5**: Video 5 / 7 / 8 and Dictionary 7, plus
+category 2's last term. Measured rate this turn: **0 gates, ~0.5 category-units, 1 product commit**
+in ~80 minutes. At 4.5 units and ~0.5 units/turn that is ~9 turns; at the measured 3–4 turns/day
+across two workers, **461 ≈ 2026-08-28**. The L4–L12 half is still untouched and still extrapolated
+from L1's single observed cost (~3.5 days × 9 gates at two workers ≈ 31 days), so the whole-plan
+projection is unchanged at **2026-09-27** — 26 days past the 2026-09-01 target. The scope is not
+being cut.
+
+2026-08-25 | main-v1 | units done this turn: 0 | units left: 18 | basis: the last `##` section of `src/MAIN_V1_EVIDENCE_LEDGER.md` (line 27770, `2026-08-24 primary — main-v1 RE-COUNTED`), read this turn: 80 units, 61 done at write time, T1 5/5 T2 14/15 T3 6/6 T4 9/9 T5 8/8 T6 3/7 T7 3/3 T8 0/7 T9 13/15 + 0/5 attended; T2's last bullet shipped in that same section (`0e2c850b`/`45182c2e`/`85718979`/`e60a177a`) so it is **62 of 80 = 78 %** | projected finish: complete-except-external NOW
+
+**RULE 1 IS SATISFIED AND HAS BEEN SINCE 2026-08-24 — stop writing that it is owed.** Five
+consecutive handoffs and burn-down lines, this one included until it was corrected, said "the
+re-count is STILL owed". It is not: primary did it on 2026-08-24 and wrote it into the ledger's
+last `##` section, which is the exact place the pin names. Reading it costs one `sed`. The number
+is **62 of 80 (78 %)**, not the INHERITED 58 % that was carried for days.
+
+**And the 18 open units contain ZERO agent-work on this plan.** T6's 4 and T8's 7 (11 units) are
+owned by `LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md`, i.e. plan (3), and working liquid IS working
+them. T9's 2 non-attended + 5 attended (7 units) are external-blocked and already carry entries in
+`needs-user.md`. So "complete-except-external" is now a measurement rather than an inheritance, and
+main-v1 does not gate the ladder. mal-pipeline: 34 of 34, closed.

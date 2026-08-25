@@ -458,3 +458,61 @@ not a build. (b) **Input latency straddles the bar**: the first keystroke into t
 81.1 / 88.8 / 102.3 / 164.4 ms across four runs, and the filter lands 482–562 ms after the click.
 Located, not guessed: the query lives in `MediaCenterView`'s `state.query` and every keystroke
 re-renders the whole Media Center and its library with no debounce. That is the next product slice.
+
+## 2026-08-25 · primary — the latency defect was already fixed; the dead end was the instrument
+
+**RETRACTION, and it is the useful half of this turn.** The previous entry named the next slice as
+"debounce `MediaCenterView`'s `state.query`". Two things are wrong with it and both are measured.
+(a) The debounce has been there all along — `MediaContent.tsx:573`, `useDebouncedValue(query, 80)`.
+(b) The latency it was meant to fix is gone. Re-driven with **the previous entry's own instrument**
+(`debug/lq-arm.js` + the same 4-char drive, Video liquid, OS window focused): **19.2 / 26.2 / 19.3 /
+16.7 ms**, where that instrument reported **81.1 / 88.8 / 102.3 / 164.4 ms**. Max 164.4 → 26.2 ms,
+**0 of 4 over the 100 ms bar** (was 2 of 5). The cause is `492a73a7`, landed in the same turn that
+took the slow numbers: list rows went 578×945 → 578×84, so the measurement predates its own fix.
+
+Second instrument, INP-standard, so the pass does not rest on one probe: `PerformanceObserver`
+`type:'event'`, which splits each keystroke into queue / handler / presentation. **12 input events
+over 5 runs on two Media Center instances** (Video liquid, Media standard, one of them a cold
+first-ever search): totals **32 / 40 / 40 / 40 / 48 / 48 / 48 / 48 / 56 / 56 / 64 / 128 ms**; the
+single 128 was the arming run, every later event ≤ 64. Handler time 18.8–33.5 ms throughout.
+
+**Two negative controls, both fired.** Idle: `longtask` observer armed on a still window, **0 tasks
+in 6 s** — so a longtask here is the app, not the room. Cross-surface: the same probe on
+Dictionary's `.lexicon-notes-filter`, **0 longtasks**, 32/48 ms — so a Media Center number is the
+Media Center's, not the shell's. The first run's 144/133/173 ms longtasks did **not** reproduce in
+any of the four later runs, including a deliberately cold instance; they are reported and not
+scored.
+
+**Dead ends on Video in liquid: 0.** `l1-deadend.js` pointed with `__lqDeadEndTitle='Video'`,
+30 targets, bait `changed:false` (fired), `savedStoreUntouched` true, `resolvedBy` live 20 / key 1 /
+**class 0**. Coverage **21 of 29**; the 8 `gone` are one mechanism — clicking a media card navigates
+the Media Center to the player tab and unmounts the library, so every later library control is gone.
+`Grid view`/`List view` are among them and were driven by hand instead: `aria-pressed` flips and the
+card box goes **84 → 240 → 84 px**, both directions, so they are measured, just not by the sweep.
+Effective **0 dead ends over 23 of 29**.
+
+**The one probe repair this turn, and it converted a fabricated defect into an honest hole.** The
+first run reported `Grid view` as a DEAD END. It is not: the class-only fallback rebound it — the
+toggle buttons are icon-only with `className === ''` and no `title`, identified solely by
+`aria-label` — onto whatever class-less button sat at that ordinal on the player page. `resolve()`
+now refuses the class fallback for any target that has a name; `gone` is the verdict a named control
+that left the surface earns. Re-drive: `deadEnds: []`, `resolvedBy.class: 0`.
+
+**Category 2 stays PARKED at not-a-10, and now on ONE term.** Latency passes, parity passes,
+0 modal traps, 0 scroll traps, 0 dead ends — but the dead-end sweep covers 23 of 29, and a 0 over
+23 is not a 0 over 29. The blocker is exact and is one line: `rank()` drives content controls
+before the view switchers, and a media card is a content control that replaces the content region
+just as chrome does. Rank cards with chrome (after the view switchers) and the sweep keeps the
+library alive. That is the probe's SECOND repair, so it is next turn's, not this one's.
+
+**Two traps for the next worker.** (1) `l1-deadend.js`'s `DESTRUCTIVE` regex is `/star|…/`
+unanchored, so a podcast episode titled "Introduction and why I **star**t this podcast" was skipped
+as a control that writes user data — a real coverage point lost to a substring. (2) The `Edit` tool
+rewrote `src/shared/mediaHub.ts` and its test **entirely to CRLF** (130/130 and 106/106 CR/LF
+against a HEAD of 0/124 and 0/90). Count CR bytes with node and normalise before staging, or the
+diff is the whole file.
+
+**Product landed this turn: `76d372a2`.** `searchMediaHub` searched `item.path`, so "arseniy" — the
+Windows account name, on 0 cards — matched **36 of 36** items; "users" and "downloads" likewise, and
+"jp-study" 7. Live after the fix: 0 cards in Video and 0 in Media, 1 each when cleared. 4 tests,
+mutation control fails 1.
