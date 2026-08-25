@@ -370,3 +370,46 @@ its own `baitReported` row outside both buckets, and a run whose bait moves is s
 
 **Category 2's remaining number is now in hand: 0 confirmed dead ends of 18 driven, control fired.**
 No new probe file was created; `l1-deadend.js` and `l1-deadend-read.js` were adapted (one repair).
+
+## 2026-08-25 · primary — the dead-end half measured on VIDEO for the first time; the category is NOT a 10
+
+`l1-deadend.js` could only ever score Dictionary: `TITLE` was the literal `'Dictionary'`. That one
+line is why category 2 read as "unmeasurable on Video" for four turns — the instrument was fine, it
+just could not be pointed. **No probe was created.** `window.__lqDeadEndTitle` now selects the
+window; the fallback keeps every earlier Dictionary run reproducible with no argument.
+
+**First Video run was VOID and is recorded because its failure is the useful part.** coverage
+**13/23**, 10 targets `gone`, 2 "dead ends". The sweep drove the sidebar's nine page-switchers
+early and every later target lived on the page they unmounted; the two dead ends were the
+class-only fallback rebinding onto whatever then sat at that ordinal — `Grid view` re-resolved to
+**`Forward`**, `List view` to **`Run player diagnostics`**. Neither was a product defect. The probe
+reported both as `retired` / `oneWayCandidates`, which is how it was caught.
+
+**The fix is the same mechanism one level up, and it is general.** A control in the window's
+persistent chrome replaces the content region; a control inside that region does not. Targets are
+now ranked content → in-content view switchers → chrome. A surface with no detectable content
+region (Dictionary) keeps the original ordering exactly, so no earlier run changes meaning.
+Also: `add` is anchored (`\badd\b`) because the unanchored form skipped `Recently added`, a
+read-only rail row, as "writes real user data"; and two new skip classes are named and reported —
+`Open media` opens an **OS-modal file dialog** (would have hung the run) and `Media workspace`
+calls `popOut('player')`, spawning a window that invalidates the resolver mid-run.
+
+**Video, 1080×700, Media Center on Library / Continue watching, standard presentation:**
+
+| term | value |
+| --- | --- |
+| progress / coverage | **25/25** / **22/24** |
+| dead ends | **0** |
+| with effect | **21** |
+| alreadyActive | 1 — `Grid view` (already the active view; honest, not a dead end) |
+| gone / unstable | **2** / **0** — `Open`, `More actions`, both on the spotlight card, which stops existing once a rail filter widens the shelf past one title |
+| resolvedBy | live **20** / key **2** / class **0** — no rebinding fallback used |
+| bait control | `changed: false` — **fired** |
+| savedStoreUntouched | **true** |
+
+**This is one of category 2's four terms, so the category is PARKED at not-a-10, not scored.**
+The rubric asks for dead ends AND input-cost parity against the Standard path AND modal/scroll
+traps AND every input acknowledged within 100 ms. Only dead ends are in hand. Two blockers are
+exact: the Video window is in **standard** presentation (`Make Liquid` still offered in its
+chrome), so there is no Liquid path to compare a Standard path against yet; and no instrument here
+measures input→paint latency. Both are named, both stay counted as open.

@@ -71,7 +71,11 @@
  * Run: `node debug/evfile.cjs src/.coordination/liquid-workplace/probes/l1-deadend.js`
  */
 (() => {
-  const TITLE = 'Dictionary';
+  // Which window this sweep drives. It was the literal `'Dictionary'`, which is why category 2
+  // read as "unmeasurable on Video" for four turns — the instrument was fine, it just could not
+  // be pointed. Set `window.__lqDeadEndTitle` before arming; the fallback keeps every earlier
+  // Dictionary run reproducible with no argument.
+  const TITLE = window.__lqDeadEndTitle || 'Dictionary';
   const STEP_MS = 260; // one step per ~16 frames: a React commit plus a network-free paint
   const SETTLE_MS = 120; // gap between the two signatures that have to agree
   const SETTLE_TRIES = 20; // ~2.4 s; longer than any in-flight paint, shorter than a model call
@@ -97,9 +101,23 @@
   // removed, the ask button back to `Explain this word` and the answer 206 chars → 0. The verdict
   // was an ordinal-rebinding artifact — eight sibling entries carry a button with the identical
   // `label|tag|type|class` key, so the node re-resolved after the click belonged to another entry.
-  const DESTRUCTIVE = /star|flashcard|anki|add|delete|remove|save|export|clear|clipboard|copy|mark it|forget/i;
+  // `add` is anchored because the unanchored form skipped the Media shelf's `Recently added`
+  // filter — a read-only rail row — and cost a real coverage point while reporting it as a write
+  // to user data. The other words are deliberately left unanchored: anchoring `star` would stop
+  // matching `Starred`, which would UN-skip a control that writes.
+  const DESTRUCTIVE = /star|flashcard|anki|\badd\b|delete|remove|save|export|clear|clipboard|copy|mark it|forget/i;
   // Controls that swap the surface's whole mode. Driven separately; see the header note.
   const MODE_SWITCH = /^(日本語|中文)$/;
+  // Controls whose effect is an OS-modal file dialog. `/eval` is synchronous and the dialog is
+  // modal on the main process, so driving one does not measure a dead end — it stops the sweep and
+  // the app until a human clicks. Named and reported like DESTRUCTIVE rather than silently
+  // dropped. (`Add` already matched DESTRUCTIVE; `Open media` matched nothing and would have hung
+  // the first Media-shell run.)
+  const NATIVE_DIALOG = /^(open media|open file|open folder|import|browse|choose)/i;
+  // Controls that spawn a SEPARATE window. `Media workspace` calls `window.api.popOut('player')`,
+  // which changes the `.fwin` set the sweep resolves every target against — the effect is real but
+  // it invalidates the instrument mid-run. Its own pass, not this one.
+  const SPAWNS_WINDOW = /^media workspace/i;
 
   const label = (el) =>
     (el.getAttribute('aria-label')
@@ -195,6 +213,14 @@
       skipped.push({ name: t.name, why: 'writes real user data, no product-side undo' });
       continue;
     }
+    if (el !== bait && NATIVE_DIALOG.test(t.name)) {
+      skipped.push({ name: t.name, why: 'opens an OS-modal file dialog — would block the sweep' });
+      continue;
+    }
+    if (el !== bait && SPAWNS_WINDOW.test(t.name)) {
+      skipped.push({ name: t.name, why: 'spawns a separate window — invalidates the resolver mid-run' });
+      continue;
+    }
     if (el !== bait && MODE_SWITCH.test(t.name)) {
       skipped.push({ name: t.name, why: 'mode switch — driven in its own pass, wipes the measured state' });
       continue;
@@ -205,15 +231,40 @@
   // View switchers stay in the sweep but go LAST. They re-render the result area, so anything
   // driven after one of them resolves to nothing and reports `gone` — measuring the sweep order
   // rather than the app.
-  const VIEW_SWITCH = /^(Automatic|Dictionary|Interlinear)$/;
-  targets.sort((a, b) => Number(VIEW_SWITCH.test(a.name)) - Number(VIEW_SWITCH.test(b.name)));
+  // `Grid view`/`List view` are the Media shell's equivalent and were added when this probe was
+  // first pointed at a window other than Dictionary — same mechanism, same position in the sweep.
+  const VIEW_SWITCH = /^(Automatic|Dictionary|Interlinear|Grid view|List view)$/;
+
+  /**
+   * CONTENT BEFORE CHROME, and it is the same mechanism one level up.
+   *
+   * The first Media-shell run scored **coverage 13/23** with 10 targets `gone`, because the sweep
+   * drove the sidebar's nine page-switchers early and every later target lived on the page they
+   * unmounted. The two it then called dead ends were the class-only fallback rebinding onto
+   * whatever now sat at that ordinal — `Grid view` re-resolved to `Forward`, `List view` to
+   * `Run player diagnostics`. Neither was a product defect; both were sweep order.
+   *
+   * The distinction that fixes it is the one `l1-ui-clarity.js` already draws: a control in the
+   * window's PERSISTENT CHROME (sidebar, topbar) replaces the content region, a control INSIDE
+   * that region does not. So drive the content region first, its view switchers next, chrome last.
+   * A surface with no detectable content region — Dictionary, where every control is a sibling of
+   * the results — keeps the original ordering exactly, so no earlier run changes meaning.
+   */
+  const inContent = (el) => !!el.closest('main,[role="main"],[class*="-content"],[class*="__content"]');
+  const anyContent = targets.some((t) => inContent(t.el));
+  const rank = (t) => (!anyContent
+    ? Number(VIEW_SWITCH.test(t.name))
+    : (inContent(t.el) ? (VIEW_SWITCH.test(t.name) ? 1 : 0) : 2));
+  targets.sort((a, b) => rank(a) - rank(b));
 
   // ...and because they go last, the sweep used to END on `Interlinear`, which renders no
   // `.dict-entry` at all. Every probe run afterwards then reads 0 entries and looks like a search
   // that returned nothing — that cost one wasted fixture run on 2026-08-24. Remember which mode
   // was active at arm time and click it back when the sweep finishes.
   const lensModeAtArm = [...win.querySelectorAll('button')].find(
-    (b) => VIEW_SWITCH.test(label(b)) && b.classList.contains('active'),
+    // Two spellings of "this one is on": the Dictionary lens uses `active`, the Media shell's
+    // view switch uses `is-active`. Matching only the first silently restored nothing on Media.
+    (b) => VIEW_SWITCH.test(label(b)) && (b.classList.contains('active') || b.classList.contains('is-active')),
   );
   const lensModeName = lensModeAtArm ? label(lensModeAtArm) : null;
 
