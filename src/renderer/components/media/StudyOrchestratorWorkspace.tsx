@@ -13,7 +13,7 @@ import type {
   StudyVocabularyFilters,
   StudyVocabularyWorkspace,
 } from '../../../shared/mediaStudyOrchestrator';
-import type { IntervalSnapshot } from '../../../shared/anki';
+import { translateAnkiReason, type IntervalSnapshot } from '../../../shared/anki';
 import { openGrammarPractice } from '../../extensionBridgeUi';
 import type { MediaStudyDatabase } from '../../../shared/mediaStudyDatabase';
 import {
@@ -3507,7 +3507,7 @@ export default function StudyOrchestratorWorkspace({ surface }: StudyOrchestrato
               <strong>{t('study.anki.previewHeading')}</strong>
               <p>{ankiPreview.connected
                 ? `${ankiPreview.deckName} · ${ankiPreview.modelName}`
-                : ankiPreview.error ?? t('study.anki.unavailable')}</p>
+                : translateAnkiReason(ankiPreview.error, t) ?? t('study.anki.unavailable')}</p>
               {ankiPreview.matchedRuleLabel && (
                 <p className="muted">
                   {ankiPreview.profileName

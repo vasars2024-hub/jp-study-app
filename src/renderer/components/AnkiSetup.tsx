@@ -1,4 +1,4 @@
-import { ANKI_COLLECTION_UNAVAILABLE_MSG } from '../../shared/anki';
+import { ANKI_COLLECTION_UNAVAILABLE_MSG, translateAnkiReason } from '../../shared/anki';
 import type { AnkiStatus } from '../../shared/types';
 import { useT } from '../i18n';
 
@@ -16,12 +16,16 @@ const ANKI_CONNECT_CODE = '2055492159';
 // Shown whenever AnkiConnect can't be reached or the collection isn't ready.
 export default function AnkiSetup({ status, onRetry, onBack, waitingCollection }: Props) {
   const { t } = useT();
+  // Compare the RAW reason: main authors these constants and has no locale, so the branch has to
+  // read the English identity. Translating first would flip ja/zh/ru to the install steps.
   const collectionWait =
     waitingCollection || status?.error === ANKI_COLLECTION_UNAVAILABLE_MSG;
 
   return (
     <div className="anki-setup">
-      <p className="anki-setup-msg">{status?.error ?? t('ankiSetup.cantReach')}</p>
+      <p className="anki-setup-msg">
+        {translateAnkiReason(status?.error, t) ?? t('ankiSetup.cantReach')}
+      </p>
       {collectionWait ? (
         <p className="anki-setup-sub">{t('ankiSetup.collectionWait')}</p>
       ) : (
