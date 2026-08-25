@@ -20,9 +20,8 @@ import {
 } from '../components/ui';
 import { useEffect, useRef, useState } from 'react';
 import {
+  ImmersionBody,
   ImmersionPopups,
-  ImmersionRail,
-  ImmersionStage,
   ImmersionToolbar,
   IMMERSION_MODE_CYCLE,
   IMMERSION_STARTERS,
@@ -354,10 +353,7 @@ export default function ImmersionView() {
         </button>
       )}
 
-      <div className="immersion-body">
-        <ImmersionStage state={state} stageClassName={stageFx ? `is-${stageFx}` : undefined} />
-        {showRail && <ImmersionRail state={state} />}
-      </div>
+      <ImmersionBody state={state} stageClassName={stageFx ? `is-${stageFx}` : undefined} />
 
       {/* Inject highlight CSS for reader (mirrors reader settings) */}
       <style>{WK_HIGHLIGHT_CSS}</style>

@@ -35,6 +35,8 @@ import {
   LENS_CAPTURE_TARGET_KEY,
 } from '../../../shared/lensCaptureTarget';
 import { isNhkNewsArticleUrl, nhkArticleLooksHydrated } from '../../../shared/nhkArticle';
+import { READING_CANVAS_FILL_POLICY } from '../../../shared/liquidReadingCanvas';
+import { ReadingCanvas, type ReadingCanvasTool } from '../liquid/ReadingCanvas';
 import { articleBodyHtml, fetchReadableArticle } from '../../wikiArticle';
 import {
   clearLookupHighlight,
@@ -815,9 +817,14 @@ export function ImmersionToolbar({ state }: { state: ImmersionState }) {
       <button type="button" className="btn small icon-btn" title={t('immersion.openInSystemBrowser')} onClick={state.openExternal}>
         <Icon name="external" size={14} />
       </button>
+      {/* The trigger for an L6 reading tool, so it reports the tool's state the
+          way Captures' and Novels' do: `aria-pressed` rather than a title that
+          silently flips between two localised strings. The class is what a test
+          selects on — a title is not a safe selector once it is translated. */}
       <button
         type="button"
-        className="btn small icon-btn"
+        className="btn small icon-btn immersion-sites-toggle"
+        aria-pressed={showRail}
         title={showRail ? t('immersion.hideLibrary') : t('immersion.showLibrary')}
         onClick={() => state.setRailOpen((v) => !v)}
       >
@@ -886,12 +893,17 @@ export function ImmersionStage({ state, stageClassName }: { state: ImmersionStat
   );
 }
 
-/** Classic sites rail. */
-export function ImmersionRail({ state }: { state: ImmersionState }) {
+/**
+ * The saved-sites rail, as the CONTENT of an L6 reading tool.
+ *
+ * No `<aside>` and no head of its own: `ReadingCanvas` renders both, and a
+ * migration that keeps its own panel header ends up with two stacked headings —
+ * the exact thing `ReadingCanvasTool.actions` warns about.
+ */
+export function ImmersionSiteList({ state }: { state: ImmersionState }) {
   const { t, sites } = state;
   return (
-    <aside className="immersion-rail">
-      <div className="immersion-rail-head">{t('immersion.sites')}</div>
+    <div className="immersion-rail">
       {sites.length === 0 && <p className="muted immersion-rail-empty">{t('immersion.rail.empty')}</p>}
       <ul className="immersion-site-list">
         {sites.map((s) => (
@@ -923,7 +935,77 @@ export function ImmersionRail({ state }: { state: ImmersionState }) {
           </li>
         ))}
       </ul>
-    </aside>
+    </div>
+  );
+}
+
+/**
+ * L6 — the immersion body as a reading canvas.
+ *
+ * ## The defect
+ *
+ * `.immersion-rail` was `width: 220px; flex-shrink: 0` beside a `flex: 1` stage,
+ * with NO responsive rule at all — not even a media query that could have fired.
+ * The rail is the browser's saved-sites list, so it renders in the Reading
+ * Finder's pane, in Blanc's `blanc-tool-detail`, and in pop-outs. At a 500px body
+ * the stage was left 280px, below the 384 floor the rest of L6 holds; the article
+ * inside it then reflowed to roughly 16 characters a line and nothing anywhere
+ * reported a problem. `flex-shrink: 0` is what makes it unconditional: the rail
+ * takes its 220 first and the document absorbs the whole shortfall.
+ *
+ * ## What replaces it
+ *
+ * The canvas measures its OWN box, so the rail docks while the stage can still
+ * keep 384 and becomes a dismissible sheet below that. Dismissal is not a new
+ * affordance: the sheet's close is `setRailOpen(false)`, the same state the
+ * toolbar's folder button toggles, so the reverse transition already existed and
+ * still works from either control.
+ *
+ * FILL policy, not the prose default. The document here is the STAGE, and in
+ * `live` mode the stage is a `<webview>` whose guest lays itself out; clamping it
+ * to 760px would letterbox a real browser. Reader Mode brings its own measure —
+ * `.immersion-reader` is `max-width: 42rem; margin: 0 auto` — so the prose half of
+ * the Gate is already owned one level down, by the element that renders the prose.
+ *
+ * WHAT DELIBERATELY DID NOT MOVE: the live `<webview>` stays inside
+ * `ImmersionStage`. An Electron `<webview>` that changes DOM parent is destroyed
+ * and its guest reloaded, and the live-lookup listener bound at the `ipc-message`
+ * effect below keys off `[showWebview, currentUrl, liveLookup, ...]` — none of
+ * which change on a mode switch — so it would silently stay bound to the dead
+ * element and live lookup would die without a message. The split-view pane's own
+ * geometry is a separate slice for that reason.
+ */
+export function ImmersionBody({
+  state,
+  stageClassName,
+}: {
+  state: ImmersionState;
+  stageClassName?: string;
+}) {
+  const { t, showRail } = state;
+  const tools: ReadingCanvasTool[] = showRail
+    ? [
+        {
+          id: 'sites',
+          label: t('immersion.sites'),
+          // 180 is where a site card's meta line ("12 visits · 3d streak") stops
+          // fitting on one row; 220 is the width the rail actually shipped at.
+          minWidth: 180,
+          preferredWidth: 220,
+          onClose: () => state.setRailOpen(false),
+          content: <ImmersionSiteList state={state} />,
+        },
+      ]
+    : [];
+  return (
+    <ReadingCanvas
+      className="immersion-body"
+      tools={tools}
+      closeLabel={t('immersion.hideLibrary')}
+      policy={READING_CANVAS_FILL_POLICY}
+    >
+      <ImmersionStage state={state} stageClassName={stageClassName} />
+    </ReadingCanvas>
   );
 }
 

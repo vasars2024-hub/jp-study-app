@@ -37,9 +37,8 @@ import {
 } from '../discover/DiscoverContent';
 import { useT } from '../../i18n';
 import {
+  ImmersionBody,
   ImmersionPopups,
-  ImmersionRail,
-  ImmersionStage,
   ImmersionToolbar,
   WK_HIGHLIGHT_CSS,
   useImmersion,
@@ -144,10 +143,7 @@ export function BlancImmersionPanel() {
             {state.t('immersion.exitFocus')}
           </button>
         )}
-        <div className="immersion-body">
-          <ImmersionStage state={state} />
-          {state.showRail && <ImmersionRail state={state} />}
-        </div>
+        <ImmersionBody state={state} />
         <style>{WK_HIGHLIGHT_CSS}</style>
         <ImmersionPopups state={state} />
       </div>

@@ -16733,8 +16733,10 @@ html[data-taskbar-size='large'] .os-tray-btn {
 .immersion-url:focus {
   border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
 }
+/* L6: this is a `ReadingCanvas` (`.lq-reading immersion-body`). The row layout,
+   the 12px gutter and the sheet's containing block all come from
+   `readingCanvas.css`; what stays here is only its place in the shell column. */
 .immersion-body {
-  display: flex;
   flex: 1;
   min-height: 0;
 }
@@ -16924,22 +16926,22 @@ html[data-taskbar-size='large'] .os-tray-btn {
   font-size: 12px;
   max-width: 360px;
 }
+/* L6: the rail is the CONTENT of a reading tool, so it no longer sizes itself.
+   `width: 220px; flex-shrink: 0` with no responsive rule of any kind is what let
+   it take its column out of a 500px body and leave the stage 280 — below the
+   canvas's 384 floor. The width now comes from `resolveReadingCanvas`, and the
+   tool's own border/background come from `readingCanvas.css`.
+   `.immersion-rail-head` went with it: the canvas head renders the title. */
 .immersion-rail {
-  width: 220px;
-  flex-shrink: 0;
-  border-left: 1px solid var(--border);
-  background: color-mix(in srgb, var(--sidebar) 70%, var(--panel));
   display: flex;
   flex-direction: column;
   min-height: 0;
+  height: 100%;
 }
-.immersion-rail-head {
-  padding: 10px 12px 6px;
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--muted);
-  flex-shrink: 0;
+/* The list already pads itself; the tool body must not pad it twice. */
+.immersion-body .lq-reading-tool-body,
+.immersion-body .lq-reading-sheet .lq-reading-tool-body {
+  padding: 0;
 }
 .immersion-rail-empty {
   padding: 8px 12px;
