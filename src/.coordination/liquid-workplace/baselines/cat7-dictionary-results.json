@@ -1,0 +1,22 @@
+{
+  "label": "dictionary-results",
+  "title": "Dictionary",
+  "container": ".dict-entries",
+  "row": ".dict-entry",
+  "rows": 8,
+  "rowsSource": "domRows",
+  "domRows": 8,
+  "nodes": 204,
+  "scrollHeight": 1461,
+  "clientHeight": 1461,
+  "overdraw": 1,
+  "scroller": "dict-entries",
+  "distinctRowHeights": 2,
+  "heights": {
+    "153.98": 3,
+    "182.98": 5
+  },
+  "spacerHeight": null,
+  "verdict": "FITS",
+  "at": "2026-08-25T20:40:04.659Z"
+}

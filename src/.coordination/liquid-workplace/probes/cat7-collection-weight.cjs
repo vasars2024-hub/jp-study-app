@@ -85,10 +85,13 @@ const measure = `(function(){
   if (!c) return JSON.stringify({ refuse: 'container not found: ' + ${JSON.stringify(CONTAINER)} });
   var rows = [].slice.call(c.querySelectorAll(${JSON.stringify(ROW)}));
   var scroller = ${SCROLLER ? `c.querySelector(${JSON.stringify(SCROLLER)}) || c` : `(function(){
-    var best = c, bestOver = 0, all = [c].concat([].slice.call(c.querySelectorAll('*')));
+    // Rank by overflow, but a collection's viewport cannot be 20px tall. Without
+    // the floor this picked a \`dict-star\` button overflowing by 6px over the
+    // real results region, and reported clientHeight 20 for a 545px surface.
+    var best = c, bestOver = -1, all = [c].concat([].slice.call(c.querySelectorAll('*')));
     for (var i = 0; i < all.length; i++) {
       var e = all[i];
-      if (e.clientHeight <= 0) continue;
+      if (e.clientHeight < 40) continue;
       var o = e.scrollHeight - e.clientHeight;
       if (o > bestOver) { bestOver = o; best = e; }
     }

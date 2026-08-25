@@ -346,3 +346,21 @@ Migration shape, already scouted: `MangaReader.tsx:1451` is the stage, `:1531` t
 (running to ~:1930, `MangaSidebar` at :1850). Extract the aside's children to a `content` variable
 rather than moving them, then wrap the stage in `ReadingCanvas` with one tool. Watch `stageRef`
 (page-fit math) and the two absolutely-positioned `.nav-zone`s inside the stage.
+
+### Same turn — the harness had a defect of its own, found by running it on a second surface
+
+Dictionary, loaded with a real query (8 entries, 204 elements): the auto-detected scroller came
+back as **`dict-star lq-hit`, clientHeight 20** — a star button overflowing by 6px outranked the
+545px results region, because the picker ranked purely by `scrollHeight - clientHeight`. A 20px
+element cannot be a collection's viewport. Floor added (`clientHeight >= 40`); re-run gives
+`dict-entries`, 1461/1461, overdraw **1**, verdict **FITS**. The verdict was right either way here
+(8 rows, all in the DOM, no spacer) — the numbers were not, and a number nobody can trust is the
+thing this file exists to prevent.
+
+**Dictionary is not a category-7 collection defect: it PAGES.** `.dict-results` carries a `page`
+class and returns 8 entries at a time out of 650k. That is the honest negative result — it did not
+need the fix Immersion needed, and recording it stops the next turn from re-deriving it.
+
+Also observed, and it is the guard working: re-running against Immersion after I had closed that
+window **REFUSED with `no window titled Immersion`** rather than scoring the first visible `.fwin`.
+That is the `probe-picks-first-visible-fwin` failure mode, refused by name.
