@@ -27,7 +27,10 @@
  * after setting TITLE below. It reports the style it is leaving, so the restore is checkable.
  */
 (() => {
-  const TITLE = 'Dictionary';
+  // `window.__lqScoreTitle` (singular — this probe drives ONE window per call, unlike
+  // `l1-use-of-space.js`'s plural list) selects the target; the default keeps every run
+  // already recorded in L1_USE_OF_SPACE.md reproducible.
+  const TITLE = (typeof window !== 'undefined' && window.__lqScoreTitle) || 'Dictionary';
 
   const win = [...document.querySelectorAll('.fwin')].find(
     (w) => (w.querySelector('.fwin-title-text')?.textContent || '').includes(TITLE),

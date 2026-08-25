@@ -477,3 +477,44 @@ taken, so this is a floor on the finding, not the whole of it.
 
 **Next slice, named rather than half-started:** the grid's sparse-result layout. It needs the same
 treatment at all three sizes plus the below-minimum negative control, which is a leg of its own.
+
+## 2026-08-25 · primary — Video's category 4 at all three sizes; every number now passes except one
+
+Live, pid 32344, viewport 1264x821. Three product commits: `111ed86a` (sparse shelf), `125b2e80`
+(the 260x170 floor), `06294a2f` (the test that pinned the old sidebar contract).
+
+**Default 1080x700, on the shelf the previous turn measured (Continue watching, 1 title):**
+
+| number | before | after | bar |
+| --- | --- | --- | --- |
+| clipped / overlaps | 0 / 0 | 0 / 0 | 0 |
+| h-scrollers / hiddenOverflowX | 0 / 0 | 0 / 0 | 0 |
+| largest dead region | **22.1%** of viewport | **9.7%** (13.3% of window) | ≤ 15% |
+| chrome / dominant canvas | 48.1 / 58.3 | 48.1 / 58.3 | content grows |
+
+**Compact 260x170 — the product's OWN MIN_W/MIN_H, so a supported size, not a control size:**
+clipped **30 → 0**, h-scrollers **1 → 0**, hiddenOverflowX 0, and all **9 of 9** rail buttons still
+present. `restoredExactly true`. Five distinct causes, all in `125b2e80`'s message.
+
+**Maximized 1264x765:** clipped 0, overlaps 0, h-scroll 0, hiddenX 0.
+
+**THE SHELF DECIDES THIS CATEGORY'S NUMBERS AND BOTH READINGS ARE HONEST.** On the 1-title shelf
+the maximized dead region is **16.5%** — over the bar — because one poster cannot fill a 1264px
+pane and there is no second card to put beside it. On the populated shelf (`Recently added`,
+8 titles / 36 files, 8 cards) the same probe reads **4.4%** maximized and **3.6%** at default.
+So: category 4 passes on the library's normal state and fails on its sparsest one, and the fix for
+the sparse one is real content in the space (the detail panel), not more layout.
+
+**Category 4 on Video: NOT YET SCORED 10, and the missing piece is the control, not a number.**
+`l1-use-of-space-control.js` now returns **`VOID — nothing broke below the supported minimum`** on
+Video and Dictionary: the surface degrades gracefully at 200x130 now, so shrink-to-break cannot
+fire. What DID discriminate this turn is stronger — the same probe, same surface, same size, read
+30 clipped and then 0 across `125b2e80`. The injected-box control (`l1-max-clip-control.js`,
+hardcoded to Media) is the remaining leg and is the next slice.
+
+**Two traps.** (1) `l1-use-of-space-control.js` resizes and measures in ONE eval by design, so
+ResizeObserver has not fired and `VirtualGrid` still holds the pre-resize column math — it reported
+a horizontal scroller at compact that a settled two-step read as 0. Any grid number from that probe
+is pre-settle. (2) `git cat-file blob HEAD:$f | grep -c $'\r'` nested inside `$(...)` in double
+quotes loses the ANSI-C quoting and counts lines containing the LETTER r — 133 of 138 lines, which
+reads exactly like "fully CRLF". Every blob in this repo is LF; read the buffer from node.

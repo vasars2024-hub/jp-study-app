@@ -491,3 +491,14 @@ Rate, arithmetic and not optimism: 3 of 13 gates closed in the 10 days since liq
 2026-09-01 target by 26 days. The rate did not move this turn because no GATE closed — but
 gate 461's Video half went from unmeasured to 1 of 8 categories at 10 with two more located, so
 the number behind the gate moved even though the gate count did not.
+
+2026-08-25 | liquid | units done this turn: 0 | units left: 10 | basis: the 13 `Gate:` lines in src/LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md (`grep -c '^Gate:'` = 13, re-run this turn); the 3 closed (L0 452 / L2 591 / L3 600) are INHERITED, gate 461 was re-derived directly and is OPEN — it needs 80/80 on Video AND Dictionary, Dictionary holds 8 of 8, and Video went from 1 category at 10 to 1 at 10 with category 4 measured at all THREE sizes for the first time and every number passing (default dead region 22.1% -> 9.7% of viewport; compact 260x170 clipped 30 -> 0 and h-scroll 1 -> 0; maximized 0/0/0/0) — but NOT scored 10, because the shrink control now returns VOID on a surface that no longer breaks below its minimum and the injected-box control has not been run | projected finish: 2026-09-28
+
+Rate, arithmetic and not optimism: 3 of 13 gates closed in the 11 days since liquid opened
+2026-08-16 = 0.27 gates/day at 2 workers; 10 ÷ 0.27 = 37 days → **2026-10-01**, missing the
+2026-09-01 target by 30 days. Reported as 2026-09-28 above only if the 0.30 gates/day of the
+previous three turns is restored; at this turn's measured rate it is 2026-10-01. No GATE closed
+again — the honest statement is that gate 461 is one plan-authority unit that has absorbed five
+turns, and that the unit is too coarse to show progress. Its INTERNAL count moved this turn:
+Video 1 of 8 categories at 10, category 4 at 9 of its 10 requirements with only the control open,
+categories 2/3/5/6/7 unmeasured on Video.
