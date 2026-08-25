@@ -42,6 +42,29 @@
   --mc-radius: 12px;
 
   /*
+   * Chrome materials. These were three `rgba(...)` literals written straight into
+   * `.mc-sidebar`, `.mc-topbar` and `.mc-playerbar`, which made the shell's Liquid
+   * material a fixed dark palette that no theme could reach — plan §2.3's "Liquid is
+   * a composition language, not one palette". They are tokens so the theme blocks at
+   * the bottom of this file can remap them; the values here are unchanged, so every
+   * dark palette paints exactly the pixels it did before.
+   */
+  --mc-glass-sidebar: rgba(8, 10, 16, 0.94);
+  --mc-glass-sidebar-blur: blur(24px);
+  --mc-glass-topbar: rgba(10, 12, 18, 0.72);
+  --mc-glass-topbar-blur: blur(18px);
+  --mc-glass-player: rgba(9, 11, 17, 0.94);
+  --mc-glass-player-blur: blur(22px);
+
+  /* Sidebar nav ink. `#aaaebb` was written into `.mc-nav button` directly, so the
+     eight nav rows stayed light grey in every palette: measured rgb(170, 174, 187)
+     on the light themes' rgb(255, 255, 255) sidebar, about 2.1:1, and grey instead
+     of #ffff00 under high-contrast. Same values as before for the dark palettes. */
+  --mc-nav-ink: #aaaebb;
+  --mc-nav-badge-bg: rgba(255, 255, 255, 0.08);
+  --mc-nav-badge-text: #c9cbd3;
+
+  /*
    * The one type scale for Media Center.
    *
    * The panels used to carry 22 different hardcoded font sizes, 158 of them
@@ -161,9 +184,9 @@
   scrollbar-color: rgba(255, 255, 255, 0.13) transparent;
   scrollbar-width: thin;
   padding: 15px 10px 12px;
-  background: rgba(8, 10, 16, 0.94);
+  background: var(--mc-glass-sidebar);
   border-right: 1px solid var(--mc-line);
-  backdrop-filter: blur(24px);
+  backdrop-filter: var(--mc-glass-sidebar-blur);
 }
 
 .mc-brand {
@@ -255,7 +278,7 @@
   border: 1px solid transparent;
   border-radius: 9px;
   background: transparent;
-  color: #aaaebb;
+  color: var(--mc-nav-ink);
   text-align: left;
   cursor: pointer;
   transition: color 120ms ease, background 120ms ease, border-color 120ms ease;
@@ -281,8 +304,8 @@
   place-items: center;
   margin-left: auto;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  color: #c9cbd3;
+  background: var(--mc-nav-badge-bg);
+  color: var(--mc-nav-badge-text);
   font-size: var(--mc-fs-micro, 11px);
   font-style: normal;
 }
@@ -408,8 +431,8 @@
   gap: 8px;
   padding: 0 14px;
   border-bottom: 1px solid var(--mc-line);
-  background: rgba(10, 12, 18, 0.72);
-  backdrop-filter: blur(18px);
+  background: var(--mc-glass-topbar);
+  backdrop-filter: var(--mc-glass-topbar-blur);
   z-index: 4;
 }
 
@@ -2539,8 +2562,8 @@
   gap: 10px;
   padding: 6px 12px;
   border-top: 1px solid var(--mc-line);
-  background: rgba(9, 11, 17, 0.94);
-  backdrop-filter: blur(22px);
+  background: var(--mc-glass-player);
+  backdrop-filter: var(--mc-glass-player-blur);
   z-index: 5;
 }
 
@@ -6034,5 +6057,97 @@
 
   .study-vocabulary-list button > small:last-child {
     display: none;
+  }
+}
+
+/* ---------- theme remap: the shell is not a fixed dark palette ----------------
+   Measured 2026-08-25 through the debug bridge, on the Video window at
+   `data-theme='classic-light'`: the shared `.medialib-rail` painted
+   rgb(247, 247, 247) with rgb(30, 30, 30) text — correct — while `.mc-root`,
+   `.mc-topbar` and `.mc-sidebar` in the SAME window stayed rgb(11, 13, 19),
+   rgba(10, 12, 18, 0.72) and rgba(8, 10, 16, 0.94) with rgb(243, 244, 248) text.
+   One window, half light and half dark, in all six light palettes. Under
+   `high-contrast` the rail went #000 on #ffff00 while the chrome kept a blurred
+   translucent slab and near-white body text — the one theme whose whole point is
+   that nothing is translucent.
+
+   The `--mc-*` literals above are the DEFAULT, so the dark palettes this shell was
+   drawn for are pixel-identical. These blocks re-source the surfaces from the
+   shell's own theme tokens where that default is simply wrong.
+
+   The six-palette list is the same one `styles.css` uses for `--accent-text`, and
+   `accentTextToken.test.ts` is the guard: a new palette declaring
+   `color-scheme: light` must appear in BOTH lists or it silently reinherits the
+   dark chrome. */
+:root[data-theme='classic-light'] .mc-root,
+:root[data-theme='classic-light'] .mc-app-chrome,
+:root[data-theme='soft-sepia'] .mc-root,
+:root[data-theme='soft-sepia'] .mc-app-chrome,
+:root[data-theme='ocean-blue'] .mc-root,
+:root[data-theme='ocean-blue'] .mc-app-chrome,
+:root[data-theme='mint-green'] .mc-root,
+:root[data-theme='mint-green'] .mc-app-chrome,
+:root[data-theme='rose-pine'] .mc-root,
+:root[data-theme='rose-pine'] .mc-app-chrome,
+:root[data-theme='paper'] .mc-root,
+:root[data-theme='paper'] .mc-app-chrome {
+  --mc-bg: var(--bg);
+  --mc-sidebar: var(--panel-2);
+  --mc-surface: var(--panel);
+  --mc-surface-2: var(--panel-2);
+  --mc-surface-3: var(--panel-2);
+  --mc-line: var(--border);
+  --mc-line-strong: var(--border);
+  --mc-text: var(--text);
+  --mc-muted: var(--muted);
+  --mc-dim: var(--muted);
+  --mc-accent: var(--accent);
+  --mc-accent-2: var(--accent-text);
+  --mc-accent-soft: color-mix(in srgb, var(--accent) 14%, transparent);
+  --mc-glass-sidebar: color-mix(in srgb, var(--panel-2) 94%, transparent);
+  --mc-glass-topbar: color-mix(in srgb, var(--panel) 82%, transparent);
+  --mc-glass-player: color-mix(in srgb, var(--panel-2) 94%, transparent);
+  --mc-nav-ink: var(--muted);
+  --mc-nav-badge-bg: color-mix(in srgb, var(--text) 8%, transparent);
+  --mc-nav-badge-text: var(--text);
+}
+
+/* High contrast is the one theme that must not blur or tint anything: the
+   translucency IS the defect there, so the material tokens go opaque and the
+   backdrop filters go to `none` rather than to a smaller radius. */
+:root[data-theme='high-contrast'] .mc-root,
+:root[data-theme='high-contrast'] .mc-app-chrome {
+  --mc-bg: var(--bg);
+  --mc-sidebar: var(--panel);
+  --mc-surface: var(--panel);
+  --mc-surface-2: var(--panel-2);
+  --mc-surface-3: var(--panel-2);
+  --mc-line: var(--border);
+  --mc-line-strong: var(--border);
+  --mc-text: var(--text);
+  --mc-muted: var(--text);
+  --mc-dim: var(--text);
+  --mc-accent: var(--accent);
+  --mc-accent-2: var(--accent-text);
+  --mc-accent-soft: transparent;
+  --mc-glass-sidebar: var(--panel);
+  --mc-glass-sidebar-blur: none;
+  --mc-glass-topbar: var(--panel);
+  --mc-glass-topbar-blur: none;
+  --mc-glass-player: var(--panel);
+  --mc-glass-player-blur: none;
+  --mc-nav-ink: var(--text);
+  --mc-nav-badge-bg: transparent;
+  --mc-nav-badge-text: var(--text);
+}
+
+/* A user who has asked the OS for less transparency gets the same treatment in
+   every palette: the tint stays, the blur goes. */
+@media (prefers-reduced-transparency: reduce) {
+  .mc-app-chrome,
+  .mc-root {
+    --mc-glass-sidebar-blur: none;
+    --mc-glass-topbar-blur: none;
+    --mc-glass-player-blur: none;
   }
 }

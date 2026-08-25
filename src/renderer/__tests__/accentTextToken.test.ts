@@ -125,3 +125,87 @@ describe('--accent-text', () => {
     ).toEqual([]);
   });
 });
+
+/**
+ * The same failure mode, one shell over. `mediaCenter.css` declares its whole `--mc-*` palette
+ * as dark literals, so measured live on 2026-08-25 at `data-theme='classic-light'` the shared
+ * `.medialib-rail` painted rgb(247, 247, 247) on rgb(30, 30, 30) while `.mc-root`,
+ * `.mc-topbar` and `.mc-sidebar` in the same window stayed rgb(11, 13, 19) /
+ * rgba(10, 12, 18, 0.72) / rgba(8, 10, 16, 0.94) on rgb(243, 244, 248) — and the eight sidebar
+ * nav rows measured 2.01:1 against a 4.5:1 bar. Under `high-contrast` the chrome kept a blurred
+ * translucent slab in the one theme whose point is that nothing is translucent.
+ *
+ * Guarded here rather than in `mediaCenterIntegration.test.ts` because the predicate is the
+ * SAME six-palette list as above: the two override lists must not drift, and a new light
+ * palette has to join both or it silently reinherits the dark chrome.
+ */
+const MC_RAW = readFileSync(resolve(__dirname, '..', 'views', 'mediaCenter.css'), 'utf8');
+const MC = MC_RAW.replace(/\/\*[\s\S]*?\*\//g, '');
+
+describe('Media Center chrome is a remappable material, not a fixed dark palette', () => {
+  const mcBlocks = (): Block[] => {
+    const out: Block[] = [];
+    const re = /([^{}]+)\{([^{}]*)\}/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(MC))) {
+      const selector = m[1].trim().replace(/\s+/g, ' ');
+      if (!selector || selector.startsWith('@')) continue;
+      out.push({ selector, declarations: m[2] });
+    }
+    return out;
+  };
+
+  it('remaps its surfaces for every palette that sets color-scheme: light', () => {
+    const lightThemes = new Set<string>();
+    for (const b of blocks()) {
+      if (!/color-scheme\s*:\s*light/.test(b.declarations)) continue;
+      for (const t of themesIn(b.selector)) lightThemes.add(t);
+    }
+    expect(lightThemes.size, 'no light palette found at all — the selector shape changed').toBe(6);
+
+    const remapped = new Set<string>();
+    for (const b of mcBlocks()) {
+      if (!/--mc-bg\s*:/.test(b.declarations)) continue;
+      for (const t of themesIn(b.selector)) remapped.add(t);
+    }
+    expect(
+      [...lightThemes].filter((t) => !remapped.has(t)),
+      'a light palette inheriting the dark --mc-* literals renders half the Media Center window ' +
+        'dark against a light rail. Join the override list at the foot of mediaCenter.css.',
+    ).toEqual([]);
+    expect(remapped.has('high-contrast'), 'high-contrast must remap too — it did not').toBe(true);
+  });
+
+  it('paints its chrome from tokens, so the remap can reach it', () => {
+    // Each of these selectors also appears inside a `@container` block, so keying a Map by
+    // selector keeps the LAST occurrence — the compact override, which declares no background.
+    // Take the block that actually paints.
+    const all = mcBlocks();
+    const painting = (sel: string) =>
+      all.find((b) => b.selector === sel && /(?:^|;)\s*background\s*:/.test(b.declarations))?.declarations;
+    for (const sel of ['.mc-sidebar', '.mc-topbar', '.mc-playerbar']) {
+      const decl = painting(sel);
+      expect(decl, `${sel} moved or no longer paints a background — the predicate is stale`).toBeTruthy();
+      const background = decl?.match(/(?:^|;)\s*background\s*:\s*([^;]+)/)?.[1].trim();
+      expect(background, `${sel} { background: ${background} } — a literal cannot be remapped`)
+        .toMatch(/^var\(--mc-glass-/);
+      const backdrop = decl?.match(/backdrop-filter\s*:\s*([^;]+)/)?.[1].trim();
+      expect(backdrop, `${sel} keeps a literal blur, so high-contrast cannot switch it off`)
+        .toMatch(/^var\(--mc-glass-/);
+    }
+    // The eight nav rows were `color: #aaaebb` regardless of palette: 2.01:1 on light.
+    const nav = all.find((b) => b.selector.startsWith('.mc-nav button,'));
+    expect(nav, '.mc-nav button rule moved — the predicate is stale').toBeTruthy();
+    expect(nav?.declarations.match(/(?:^|;)\s*color\s*:\s*([^;]+)/)?.[1].trim()).toBe('var(--mc-nav-ink)');
+  });
+
+  it('turns the blur off under prefers-reduced-transparency', () => {
+    expect(MC).toMatch(/@media \(prefers-reduced-transparency: reduce\)/);
+    const at = MC.indexOf('@media (prefers-reduced-transparency: reduce)');
+    const body = MC.slice(at, at + 400);
+    for (const token of ['--mc-glass-sidebar-blur', '--mc-glass-topbar-blur', '--mc-glass-player-blur']) {
+      expect(body, `${token} still blurs for a user who asked the OS for less transparency`)
+        .toMatch(new RegExp(`${token}:\\s*none`));
+    }
+  });
+});
