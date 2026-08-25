@@ -137,7 +137,10 @@ export default function MediaPosterCard({
           // opening the menu from also opening the item.
           <button
             type="button"
-            className="medialib-card__more"
+            // 26x26 by design — a poster overlay must not grow. `lq-hit-placed`
+            // is the `.lq-hit` expander without its `position: relative`, which
+            // would fight this button's own `position: absolute`.
+            className="medialib-card__more lq-hit-placed"
             aria-label={t('media.card.moreActions')}
             onClick={(e) => {
               e.stopPropagation();

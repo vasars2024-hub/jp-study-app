@@ -107,8 +107,15 @@
   border: none;
 }
 
+/* The tightened padding takes the row to 31px, which measures 31.5 by pointer —
+   half a pixel under the rubric's 32px floor, on all nine rows. The floor is
+   restored on the box rather than through a `.lq-hit` overlay because the rows
+   sit on a 1px gap: a 32px overlay on a 29-31px row overlaps its neighbour's
+   box, and the later sibling wins, so the overlay costs the row above more than
+   it gives. Nine rows gain 1px each; the rail is not dense enough to notice. */
 .medialib-rail .ui-sidebar__item {
   gap: var(--space-sm);
+  min-height: var(--lq-hit-target);
   padding: 6px var(--space-sm);
   border-radius: var(--radius-sm);
   font-size: var(--font-size-sm);
@@ -223,7 +230,13 @@
 .medialib-view-toggle button {
   display: inline-flex;
   align-items: center;
-  /* 6px + 14px icon + 6px = 26px, clear of the 24px minimum target height. */
+  justify-content: center;
+  /* Was "6px + 14px icon + 6px = 26px, clear of the 24px minimum target
+     height" — 24px is WCAG 2.5.8, and this repo's rubric asks for 32. Measured
+     30x26 rendered, 30x26.5 by pointer. The min-* pair floors both axes without
+     touching the padding, so a wider future label still fits. */
+  min-width: var(--lq-hit-target);
+  min-height: var(--lq-hit-target);
   padding: 6px var(--space-sm);
   background: transparent;
   border: none;

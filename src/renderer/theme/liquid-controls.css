@@ -35,7 +35,15 @@
   position: relative;
 }
 
-.lq-hit::after {
+/* `.lq-hit-placed` is the same expander for a control that ALREADY positions
+   itself — Media Center's poster overlay button is `position: absolute`, and
+   `.lq-hit` would have to win a `position` declaration against the component's
+   own sheet at equal specificity, which is decided by import order and would
+   drop the button back into flow. The variant declares no `position` of its
+   own, so it is only correct on a control that is already a containing block.
+   Both selectors share one `::after` so the geometry cannot drift apart. */
+.lq-hit::after,
+.lq-hit-placed::after {
   content: '';
   position: absolute;
   top: 50%;

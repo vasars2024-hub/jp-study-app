@@ -685,3 +685,45 @@ the pointer only reaches 52.5 px of that width. A rect-based instrument scores t
 missed by 17 controls with 3 more stolen. This is the same class of defect Dictionary closed on
 2026-08-24 (`a176a54f`+) by giving controls a ≥32 px hit surface through padding rather than
 visual growth, and the same remedy applies — it is a product slice, not a re-measurement.
+
+## 2026-08-25 · backup — Video category 1 CLOSES: 17 below the floor → 0, 3 stolen → 0
+
+Two agreeing runs of `l1-hit-area.js` on the live tree (pid 32344, Video 1080x700, `standard`,
+`forest-night`): **`belowFloorByHit` 17 → 0**, `smallestHit` **26.5 → 32.0**, **`stolenCount`
+3 → 0**, `worstShrunkBy` **0**, `scrollLeaks` none, `occludedCount` 1 (see the open item below).
+
+**The four product fixes, and why none of them is a `.lq-hit` overlay.** The overlay is the right
+primitive for an isolated control; it is the WRONG one for a control on a small gap, because a
+32 px overlay on a 28-31 px box reaches into the gap from both sides and the later sibling wins the
+overlap — the first control ends up at 31 px, half a pixel short of the floor it was meant to clear.
+Measured, not assumed. So:
+
+| control | was | fix | now |
+| --- | --- | --- | --- |
+| `.medialib-rail .ui-sidebar__item` ×9 | 180x31, hit 31.5, 1px gap | `min-height: var(--lq-hit-target)` | 32.5 |
+| `.mc-history-buttons button` ×2, `.mc-top-action` ×2 | 28x28, 3px gap | `width`/`height` → the token | 32.5 |
+| `input` via `label.mc-global-search` | 290x30 | `height` → the token | 32.5 |
+| `.medialib-view-toggle button` ×2 | 30x26, touching | `min-width`/`min-height` → the token | 32.5 |
+| `.medialib-card__more` | 26x26, isolated overlay | **`.lq-hit-placed`** | 32.5 |
+
+`.lq-hit-placed` is new in `theme/liquid-controls.css`: the same `::after` as `.lq-hit` (one shared
+rule, so they cannot drift) with **no `position` of its own**, for a control that already is a
+containing block. `.lq-hit` would have had to win a `position` declaration against the component's
+sheet at equal specificity — decided by import order — and would have dropped this absolutely
+positioned button back into flow.
+
+**The 3 "stolen" were the INSTRUMENT, and this is the trap to keep.** Scanned at 0.25px, Chromium's
+hit region for a sub-pixel box is the rect **shifted, not shrunk**: `.mc-nav button` rect
+185.23→230.88 hit-tests 184.48→230.73 — whole, and 0.45px high. A 0.5px walk from a fractional
+centre can land up to STEP+0.75 short of one side while the region still covers the rect, and the
+blocker named was the control's own CONTAINER, which paints below it and cannot cover anything.
+`sideOk` now allows `STEP + SNAP` (SNAP = 1px) and every row reports `shrunkBy`. **Negative control
+re-run in-session, and the guard is intact:** `--lq-hit-target: 52px` → `stolenCount` **0 → 9**,
+`worstShrunkBy` **0 → 8.5**, `belowFloorByHit` **0 → 4**; token removed afterwards and the computed
+value read back as `32px`. One probe adapted, none created.
+
+**Open, and it is a real finding, not a measurement gap:** `button.mc-settings-link` is the one
+`occluded` row — rect 185x40 at y 721.36 in a window whose bottom edge is 740, blocked by
+`div.os-desktop`. The Media Center sidebar overflows its own window, so the Settings entry is
+half-clipped and its centre is unclickable. Category 1 on Video is **not 10 until that is fixed**;
+an unscored control is not a passing one.

@@ -451,7 +451,7 @@ describe('the sheet stays a composition language, not a palette', () => {
     // The whole point of `.lq-hit`: the rendered rect is untouched and the POINTER gets 32px.
     // A future edit that reaches the floor by growing the control instead would pass a naive
     // "contains --lq-hit-target" check, so the assertions are on the shape.
-    const block = CSS.slice(CSS.indexOf('.lq-hit::after {'));
+    const block = CSS.slice(CSS.indexOf('.lq-hit::after,'));
     const rule = block.slice(0, block.indexOf('}'));
     expect(rule).toContain('position: absolute');
     expect(rule).toMatch(/width:\s*max\(100%,\s*var\(--lq-hit-target\)\)/);
@@ -465,6 +465,11 @@ describe('the sheet stays a composition language, not a palette', () => {
     // `.lq-hit` itself would be the box growth this primitive exists to avoid.
     expect(rule).not.toMatch(/background|border|box-shadow|outline/);
     expect(base.slice(0, base.indexOf('}'))).not.toMatch(/min-width|min-height|padding/);
+    // `.lq-hit-placed` shares that ::after so the two can never drift apart, and declares no
+    // `position` of its own — it is for a control that already is a containing block, and
+    // giving it one would put an absolutely positioned control back into flow.
+    expect(rule).toContain('.lq-hit-placed::after');
+    expect(CSS).not.toMatch(/\.lq-hit-placed\s*\{/);
   });
 
   it('is wired to the controls it was written for, not merely defined', () => {
@@ -477,6 +482,11 @@ describe('the sheet stays a composition language, not a palette', () => {
       ['components/lexicon/WordAudio.tsx', /word-audio lq-hit/],
       ['components/lexicon/WordKnowledge.tsx', /lexicon-knowledge lq-hit/],
       ['components/DesktopShell.tsx', /className="fwin-b lq-hit"/],
+      // Media Center's poster overlay — 26x26 and absolutely positioned, so it takes the
+      // `-placed` variant. The other 16 controls L1 measured under the floor there are boxes
+      // on a 1px or 3px gap, where an overlay costs the neighbour more than it gives, so they
+      // are floored in their own sheets instead; see `mediaLibrary.css` / `mediaCenter.css`.
+      ['components/media/library/MediaPosterCard.tsx', /medialib-card__more lq-hit-placed/],
     ];
     for (const [file, pattern] of adopters) {
       const src = readFileSync(resolve(__dirname, '..', file), 'utf8');

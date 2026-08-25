@@ -385,10 +385,17 @@
   gap: 3px;
 }
 
+/* 28x28 measured 28.5x28.5 by pointer against the rubric's 32px floor (L1
+   category 1, Video window). The icon stays 14px; only the target grows, and
+   the 48px topbar row (and the 44px one under `mc (max-width: 640px)`) has the
+   room. A `.lq-hit` overlay was the alternative and is wrong here: the history
+   pair sits on a 3px gap, so a 32px overlay on a 28px box reaches 2px into a
+   3px gap from both sides and the later sibling wins the overlap, leaving the
+   first button 31px — half a pixel short of the floor it was meant to clear. */
 .mc-history-buttons button,
 .mc-top-action {
-  width: 28px;
-  height: 28px;
+  width: var(--lq-hit-target);
+  height: var(--lq-hit-target);
   display: grid;
   place-items: center;
   border: 1px solid transparent;
@@ -435,9 +442,11 @@
   white-space: nowrap;
 }
 
+/* The `<label>` is the input's pointer target — clicking it focuses the field —
+   so the field is aimed at as 290x30, and 30 is under the 32px floor. */
 .mc-global-search {
   width: min(290px, 38%);
-  height: 30px;
+  height: var(--lq-hit-target);
   display: flex;
   align-items: center;
   gap: 7px;

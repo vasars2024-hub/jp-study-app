@@ -132,7 +132,19 @@
 
   // One side of the control's own box is intact if the walk reached its edge, or ran out of
   // REACH still owning the point.
-  const sideOk = (w, need) => w.capped || w.reach >= need - STEP;
+  //
+  // SNAP, and it is the difference between a finding and an artefact. Chromium's hit region for
+  // a sub-pixel box is the rect SHIFTED, not the rect: scanned at 0.25px on the Media Center's
+  // nav rows (rect top 185.23, bottom 230.88) the region ran 184.48 -> 230.73, so the box is
+  // whole and 0.45px higher than where it is painted. A 0.5px walk from a fractional centre can
+  // therefore land up to STEP + 0.75 short of one side while the region's total size still
+  // covers the rect. Three Media Center controls were reported `stolen` on exactly that, with
+  // the blocker naming the control's own CONTAINER — which paints below it and cannot cover it.
+  // 1px of tolerance absorbs the snap and leaves the guard intact: the case it exists for is a
+  // neighbour's 52px overlay cutting **9px** off `lexicon-knowledge`, and 9 >> 1.5.
+  const SNAP = 1;
+  const shortfall = (w, need) => (w.capped ? 0 : Math.max(0, need - STEP - SNAP - w.reach));
+  const sideOk = (w, need) => shortfall(w, need) === 0;
 
   const rows = [];
   const occluded = [];
@@ -223,6 +235,17 @@
         sideOk(up, cy - r.top) &&
         sideOk(down, r.bottom - cy)
       ),
+      // The magnitude, so a future reader never has to guess whether a `stolen` row is a real
+      // overlay or the sub-pixel snap SNAP now absorbs. Reported in px past the tolerance.
+      shrunkBy:
+        Math.round(
+          Math.max(
+            shortfall(left, cx - r.left),
+            shortfall(right, r.right - cx),
+            shortfall(up, cy - r.top),
+            shortfall(down, r.bottom - cy),
+          ) * 10,
+        ) / 10,
       blockers: [left, right, up, down].map((w) => w.blocker).filter(Boolean),
     });
   }
@@ -267,7 +290,10 @@
     belowFloor: group(below, (row) => ({ hitMin: row.hitMin, blockers: row.blockers.slice(0, 2) })),
     smallestHit: rows.slice().sort((a, b) => a.hitMin - b.hitMin)[0] || null,
     stolenCount: stolen.length,
-    stolen: group(stolen, (row) => ({ blockers: row.blockers.slice(0, 2) })),
+    stolen: group(stolen, (row) => ({ shrunkBy: row.shrunkBy, blockers: row.blockers.slice(0, 2) })),
+    // The worst shortfall across ALL rows, stolen or not. A run whose maximum sits just under
+    // the tolerance is a run to re-read, not a clean one.
+    worstShrunkBy: rows.reduce((m, row) => Math.max(m, row.shrunkBy), 0),
     occludedCount: occluded.length,
     occluded: occluded.slice(0, 8),
     disclosedForRun: details.filter((s) => !s.open).length,
