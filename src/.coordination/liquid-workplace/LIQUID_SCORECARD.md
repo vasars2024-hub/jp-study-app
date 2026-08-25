@@ -536,3 +536,33 @@ drag p50 10.0 → 16.8 as a 68% regression.
 **Video is 7 of 8** — 1, 3, 4 (liquid), 5, 6 (both), 2, and now 7. **Category 8 is the only one
 never measured on this surface**, and it needs a new instrument: the L8 probes are all
 Dictionary-shaped (`.dict-empty` / `.dict-loading` / `.anki-setup`). Dictionary remains 7 of 8.
+
+## 2026-08-25 · primary — Video **category 8 CLOSES at 10/10**, so the surface is 8 of 8 — commit `e801c683`
+
+The last unmeasured category on this surface, and the one that needed three new instruments because
+every L8 probe was Dictionary-shaped. All three now exist and all three carry a firing control.
+Detail and raw numbers: `L8_DEAD_CONTROLS.md` and `L8_STATES.md`; baselines under `baselines/l8-*`.
+
+| measure | number | its control |
+| --- | --- | --- |
+| dead controls (`4f102a04`) | 42 painted, 13 excluded by name, **29 probed, 0 DEAD / 0 GONE / 0 unrestored** | planted handler-less button **DEAD at 0 mutations**; planted marker button **ALIVE at 1**, self-restoring |
+| fabricated values (`6a077498`) | `statusWordCandidates` **0** in both measures — 9 comparable slots / 1 invariant across shelves, 11 repeated / 3 constant within a pass | two plants in two runs: invariant 1→**2** and candidates 0→**1**; constants 3→**6** and candidates 0→**3** |
+| honest states (`e801c683`) | empty / loading / error / offline × **4 languages**, **0 raw keys** and **falseSuccess false** in every one, 8 cards restored per pass | induction from OUTSIDE the app — TCP 8765 **REFUSED**, control 5173 **LISTENING**; translation control **5 of 5 slots differ from en** in ja/zh-Hans/ru |
+
+**The category cost a product fix, which is why it is a 10 and not a report.** The four-language
+sweep caught the interpolated Anki reason rendering English inside a translated sentence in all three
+non-English languages — structural, since main authors the constant and main has no locale. Fixed
+with `translateAnkiReason()` and four new catalog entries, and **re-measured after the fix in the
+fix's own commit**. Note for whoever scores category 8 elsewhere: neither a raw-key sweep nor a
+key-count check can see this defect. Only asserting that the string **changes between languages**
+does, so that assertion is now part of the instrument.
+
+**Three probe defects were fixed before any number was trusted**, each of which yields a false pass
+or a false finding: `namesDependency` matched the whole window body (true on this surface no matter
+what renders — it would have scored 10/10 against a panel printing nothing); the Discover measure
+matched English prose, so ja/zh/ru falsely read `malUnreachable false`; and `.sp-seg-btn` is a
+generic class that resolved to the Media SUBTITLE language pair when Settings sat off Appearance.
+
+**Video is 8 of 8.** Dictionary remains 7 of 8 — its category 7 is the outstanding one, and it must
+be re-driven on this boot rather than transcribed, since L0's millisecond figures are not comparable
+across displays (10.0–10.3 ms/frame there, 16.4–17.0 here).
