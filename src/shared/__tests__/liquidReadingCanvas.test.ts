@@ -23,7 +23,7 @@ describe('resolveReadingCanvas', () => {
 
   it('docks a tool when the document keeps its minimum', () => {
     const layout = resolveReadingCanvas(1200, [SETTINGS]);
-    expect(layout.tools).toEqual([{ id: 'settings', placement: 'docked', width: 264 }]);
+    expect(layout.tools).toEqual([{ id: 'settings', placement: 'docked', width: 264, side: 'trailing' }]);
     expect(layout.contentWidth).toBe(1200 - 264 - READING_CANVAS_POLICY.gutter);
     expect(layout.documentCovered).toBe(false);
     expect(readingCanvasViolations(layout, 1200)).toEqual([]);
@@ -32,7 +32,7 @@ describe('resolveReadingCanvas', () => {
   it('turns the same tool into a full-canvas sheet when the document cannot keep its minimum', () => {
     // 640 - 12 gutter - 384 floor = 244, under the tool's 264 minimum.
     const layout = resolveReadingCanvas(640, [SETTINGS]);
-    expect(layout.tools).toEqual([{ id: 'settings', placement: 'sheet', width: 640 }]);
+    expect(layout.tools).toEqual([{ id: 'settings', placement: 'sheet', width: 640, side: 'trailing' }]);
     expect(layout.contentWidth).toBe(640);
     expect(layout.activeSheetId).toBe('settings');
     expect(layout.documentCovered).toBe(true);
@@ -64,7 +64,7 @@ describe('resolveReadingCanvas', () => {
   it('keeps the first-opened tool docked when a second one no longer fits', () => {
     // 900: settings docks and leaves 624; bookmarks then needs 240 of the 228 remaining.
     const layout = resolveReadingCanvas(900, [SETTINGS, BOOKMARKS]);
-    expect(layout.tools[0]).toEqual({ id: 'settings', placement: 'docked', width: 264 });
+    expect(layout.tools[0]).toEqual({ id: 'settings', placement: 'docked', width: 264, side: 'trailing' });
     expect(layout.tools[1].placement).toBe('sheet');
     expect(layout.activeSheetId).toBe('bookmarks');
   });
@@ -72,7 +72,7 @@ describe('resolveReadingCanvas', () => {
   it('lets a narrow tool dock after a wider one became a sheet, and the sheet still spans the canvas', () => {
     const layout = resolveReadingCanvas(640, [SETTINGS, NARROW]);
     expect(layout.tools[0].placement).toBe('sheet');
-    expect(layout.tools[1]).toEqual({ id: 'narrow', placement: 'docked', width: 96 });
+    expect(layout.tools[1]).toEqual({ id: 'narrow', placement: 'docked', width: 96, side: 'trailing' });
     // The sheet's width was recomputed after the dock, not left at the pre-dock canvas.
     expect(layout.tools[0].width).toBe(layout.contentWidth);
     expect(layout.tools[0].width).toBe(640 - 96 - READING_CANVAS_POLICY.gutter);
@@ -82,7 +82,7 @@ describe('resolveReadingCanvas', () => {
   it('shrinks a tool to its minimum rather than taking the document below the floor', () => {
     // 660: room = 660 - 12 - 384 = 264 exactly, so bookmarks docks at 264, not its preferred 300.
     const layout = resolveReadingCanvas(660, [BOOKMARKS]);
-    expect(layout.tools[0]).toEqual({ id: 'bookmarks', placement: 'docked', width: 264 });
+    expect(layout.tools[0]).toEqual({ id: 'bookmarks', placement: 'docked', width: 264, side: 'trailing' });
     expect(layout.contentWidth).toBe(READING_CANVAS_POLICY.minContentWidth);
     expect(readingCanvasViolations(layout, 660)).toEqual([]);
   });
@@ -125,7 +125,7 @@ describe('readingCanvasViolations — the negative control', () => {
 
     const partial = {
       ...legal,
-      tools: [{ id: 'settings', placement: 'sheet' as const, width: 264 }],
+      tools: [{ id: 'settings', placement: 'sheet' as const, width: 264, side: 'trailing' as const }],
       activeSheetId: 'settings',
       documentCovered: true,
     };
@@ -136,7 +136,7 @@ describe('readingCanvasViolations — the negative control', () => {
     const squeezed = {
       contentWidth: 200,
       measureWidth: 200,
-      tools: [{ id: 'settings', placement: 'docked' as const, width: 988 }],
+      tools: [{ id: 'settings', placement: 'docked' as const, width: 988, side: 'trailing' as const }],
       activeSheetId: null,
       documentCovered: false,
     };
@@ -156,5 +156,56 @@ describe('readingCanvasViolations — the negative control', () => {
     expect(
       readingCanvasViolations({ ...layout, contentWidth: 600, measureWidth: 700 }, 1200),
     ).toContain('measure-exceeds-content');
+  });
+});
+
+/**
+ * L6's fifth surface, the visual novel panel, is the first reading surface whose
+ * side tool is its library — navigation INTO the document, which belongs on the
+ * leading edge. The field is deliberately inert to the arithmetic; these say so
+ * with numbers rather than with a comment.
+ */
+describe('side — which edge a docked tool takes', () => {
+  const LIBRARY = { id: 'library', minWidth: 220, preferredWidth: 290, side: 'leading' as const };
+
+  it('defaults to trailing, so every surface migrated before the field is unchanged', () => {
+    const layout = resolveReadingCanvas(1200, [SETTINGS]);
+    expect(layout.tools[0].side).toBe('trailing');
+    expect(readingCanvasViolations(layout, 1200)).toEqual([]);
+  });
+
+  it('echoes a declared leading side back', () => {
+    const layout = resolveReadingCanvas(1200, [LIBRARY]);
+    expect(layout.tools[0]).toEqual({ id: 'library', placement: 'docked', width: 290, side: 'leading' });
+  });
+
+  it('does not change the geometry at all — the same widths with the side flipped', () => {
+    const leading = resolveReadingCanvas(1200, [LIBRARY]);
+    const trailing = resolveReadingCanvas(1200, [{ ...LIBRARY, side: 'trailing' }]);
+    expect(leading.contentWidth).toBe(trailing.contentWidth);
+    expect(leading.measureWidth).toBe(trailing.measureWidth);
+    expect(leading.tools[0].width).toBe(trailing.tools[0].width);
+    // The control: something DID differ, so the three equalities above are not
+    // comparing an object with itself.
+    expect(leading.tools[0].side).not.toBe(trailing.tools[0].side);
+  });
+
+  it('keeps docking first-come rather than re-ranking a leading tool ahead of an open one', () => {
+    // 1200 − 264 − 12 = 924 left; the library asks 290 and gets it. Open order,
+    // not side order: settings is still the tool that took the first track.
+    const layout = resolveReadingCanvas(1200, [SETTINGS, LIBRARY]);
+    expect(layout.tools.map((t) => [t.id, t.width])).toEqual([['settings', 264], ['library', 290]]);
+    expect(layout.contentWidth).toBe(1200 - 264 - 12 - 290 - 12);
+    expect(readingCanvasViolations(layout, 1200)).toEqual([]);
+  });
+
+  it('carries the declared side through a sheet rather than rewriting it', () => {
+    // 600 − 12 − 384 = 204 < the library's 220 floor, so it is a sheet. `side`
+    // is then unobservable, and reporting a value the geometry never used would
+    // be a fabricated number in a module whose whole job is honest ones.
+    const layout = resolveReadingCanvas(600, [LIBRARY]);
+    expect(layout.tools[0].placement).toBe('sheet');
+    expect(layout.tools[0].side).toBe('leading');
+    expect(readingCanvasViolations(layout, 600)).toEqual([]);
   });
 });

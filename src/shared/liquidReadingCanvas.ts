@@ -48,6 +48,21 @@
 export const READING_TOOL_PLACEMENTS = ['docked', 'sheet'] as const;
 export type ReadingToolPlacement = (typeof READING_TOOL_PLACEMENTS)[number];
 
+/**
+ * Which edge a DOCKED tool takes. Only observable at `placement: 'docked'` — a
+ * sheet spans the canvas and has no edge, so its `side` is carried through
+ * unchanged rather than being rewritten to a value the geometry never used.
+ *
+ * It exists because not every reading surface puts its tools on the right. A
+ * visual-novel library, a chapter index and a table of contents are navigation
+ * INTO the document and belong on the leading edge; bookmarks, translation and
+ * settings act ON the document and belong on the trailing one. Expressing that
+ * as a side rather than as two components keeps one resolver and one violation
+ * list, which is the same argument `READING_CANVAS_FILL_POLICY` makes.
+ */
+export const READING_TOOL_SIDES = ['leading', 'trailing'] as const;
+export type ReadingToolSide = (typeof READING_TOOL_SIDES)[number];
+
 export interface ReadingToolSpec {
   id: string;
   /**
@@ -58,6 +73,17 @@ export interface ReadingToolSpec {
   minWidth: number;
   /** Width the tool takes when the canvas has room for it. */
   preferredWidth: number;
+  /**
+   * Edge to dock against. Defaults to `trailing`, which is what every surface
+   * migrated before this field existed uses, so omitting it is unchanged
+   * behaviour rather than an implicit new one.
+   *
+   * The side deliberately does NOT affect docking order. Room is still taken
+   * first-come in the caller's open order, because re-ranking by side would
+   * move a panel the user is mid-way through using the moment they open a
+   * second one — §2.4 names exactly that.
+   */
+  side?: ReadingToolSide;
 }
 
 export interface ReadingCanvasPolicy {
@@ -109,6 +135,8 @@ export interface ResolvedReadingTool {
   placement: ReadingToolPlacement;
   /** Px the tool occupies. For a sheet this is the full canvas width. */
   width: number;
+  /** The spec's `side`, normalised. Meaningless at `placement: 'sheet'`. */
+  side: ReadingToolSide;
 }
 
 export interface ReadingCanvasLayout {
@@ -156,17 +184,18 @@ export function resolveReadingCanvas(
   for (const tool of openTools) {
     const minWidth = floorAtZero(tool.minWidth);
     const preferred = Math.max(minWidth, floorAtZero(tool.preferredWidth));
+    const side: ReadingToolSide = tool.side === 'leading' ? 'leading' : 'trailing';
     const room = contentWidth - policy.gutter - policy.minContentWidth;
     if (minWidth > 0 && room >= minWidth) {
       const width = Math.min(preferred, room);
-      tools.push({ id: tool.id, placement: 'docked', width });
+      tools.push({ id: tool.id, placement: 'docked', width, side });
       contentWidth -= width + policy.gutter;
       continue;
     }
     // No room to dock: cover the canvas outright rather than squeeze either side.
     // Width is filled in below — a narrower tool opened afterwards can still
     // dock and shrink the canvas, and a sheet always spans whatever is left.
-    tools.push({ id: tool.id, placement: 'sheet', width: 0 });
+    tools.push({ id: tool.id, placement: 'sheet', width: 0, side });
     activeSheetId = tool.id;
   }
 

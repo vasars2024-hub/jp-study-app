@@ -426,3 +426,83 @@ describe('readingCanvas.css', () => {
     }
   });
 });
+
+/**
+ * The leading edge. A visual-novel library, a chapter index or a table of
+ * contents navigates INTO the document, so it sits before it — and "before" has
+ * to mean before in the DOM, not `order: -1` in the stylesheet.
+ */
+describe('ReadingCanvas leading tools', () => {
+  const library = (overrides: Partial<ReadingCanvasTool> = {}): ReadingCanvasTool =>
+    tool({ id: 'library', label: 'Library', minWidth: 220, preferredWidth: 290, side: 'leading', ...overrides });
+
+  function positionOfToolRelativeToDocument(el: HTMLElement, id: string): 'before' | 'after' {
+    const doc = el.querySelector('[data-reading-role="document"]')!;
+    const panel = el.querySelector(`[data-reading-tool="${id}"]`)!;
+    // FOLLOWING on the document means the tool comes first.
+    return doc.compareDocumentPosition(panel) & Node.DOCUMENT_POSITION_PRECEDING
+      ? 'before'
+      : 'after';
+  }
+
+  it('emits a leading docked tool before the document, so reading order matches visual order', () => {
+    const el = render(
+      <ReadingCanvas widthOverride={1200} closeLabel="Close" tools={[library()]}>
+        <p>document</p>
+      </ReadingCanvas>,
+    );
+    const panel = el.querySelector('[data-reading-tool="library"]') as HTMLElement;
+    expect(panel.dataset.side).toBe('leading');
+    expect(panel.style.width).toBe('290px');
+    expect(positionOfToolRelativeToDocument(el, 'library')).toBe('before');
+    // Still a sibling of the document, not a wrapper around it.
+    expect(panel.parentElement).toBe(el.querySelector('.lq-reading'));
+  });
+
+  it('NEGATIVE CONTROL — the same tool without a side lands after the document', () => {
+    // Without this the assertion above would pass on a canvas that renders every
+    // tool before the document, which is a different bug wearing the same result.
+    const el = render(
+      <ReadingCanvas widthOverride={1200} closeLabel="Close" tools={[library({ side: 'trailing' })]}>
+        <p>document</p>
+      </ReadingCanvas>,
+    );
+    expect((el.querySelector('[data-reading-tool="library"]') as HTMLElement).dataset.side).toBe('trailing');
+    expect(positionOfToolRelativeToDocument(el, 'library')).toBe('after');
+  });
+
+  it('puts a leading tool that became a sheet back after the document, with no side to report', () => {
+    // 600 − 12 − 384 = 204 < 220, so the library cannot dock. A sheet is
+    // `inset: 0`, so its flex position is not observable and a modal belongs
+    // after the content it covers.
+    const el = render(
+      <ReadingCanvas widthOverride={600} closeLabel="Close" tools={[library()]}>
+        <p>document</p>
+      </ReadingCanvas>,
+    );
+    const panel = el.querySelector('[data-reading-tool="library"]') as HTMLElement;
+    expect(panel.dataset.placement).toBe('sheet');
+    expect(panel.dataset.side).toBe(undefined);
+    expect(positionOfToolRelativeToDocument(el, 'library')).toBe('after');
+  });
+
+  it('orders a leading and a trailing tool around the document in one canvas', () => {
+    const el = render(
+      <ReadingCanvas widthOverride={1200} closeLabel="Close" tools={[library(), tool()]}>
+        <p>document</p>
+      </ReadingCanvas>,
+    );
+    expect(positionOfToolRelativeToDocument(el, 'library')).toBe('before');
+    expect(positionOfToolRelativeToDocument(el, 'settings')).toBe('after');
+    // 1200 − 290 − 12 − 264 − 12 = 622 for the document, both tools docked.
+    expect(
+      (el.querySelector('[data-reading-role="document"]') as HTMLElement).dataset.contentWidth,
+    ).toBe('622');
+  });
+
+  it('does not reach for CSS `order` — the stylesheet declares none at all', () => {
+    // The trap this test exists for: `order` moves the painted box and leaves
+    // the DOM alone, so it would satisfy a screenshot and fail a screen reader.
+    expect(CSS).not.toMatch(/(^|[;{\s])order\s*:/);
+  });
+});

@@ -174,6 +174,66 @@ export function ReadingCanvas({
     target.onClose();
   };
 
+  const renderTool = (tool: ReadingCanvasTool) => {
+    const resolved = byId.get(tool.id);
+    if (!resolved) return null;
+    const isSheet = resolved.placement === 'sheet';
+    // Sheets stack; only the newest is rendered. The rest stay open in the
+    // caller's state and reappear as it closes them, rather than silently
+    // being dropped — closing the top sheet must not lose the one beneath.
+    if (isSheet && tool.id !== sheetId) return null;
+    return (
+      <aside
+        key={tool.id}
+        ref={isSheet ? sheetRef : undefined}
+        tabIndex={isSheet ? -1 : undefined}
+        className={isSheet ? 'lq-reading-sheet lq-liquid' : 'lq-reading-tool lq-liquid'}
+        data-lq-role="liquid"
+        data-reading-role="tool"
+        data-reading-tool={tool.id}
+        data-placement={resolved.placement}
+        data-side={isSheet ? undefined : resolved.side}
+        aria-label={tool.label}
+        {...(isSheet ? { role: 'dialog' as const, 'aria-modal': true } : {})}
+        style={isSheet ? undefined : { width: `${resolved.width}px`, flex: `0 0 ${resolved.width}px` }}
+      >
+        <div className="lq-reading-tool-head">
+          <span className="lq-reading-tool-title">{tool.label}</span>
+          {tool.actions ? <span className="lq-reading-tool-actions">{tool.actions}</span> : null}
+          <button
+            type="button"
+            className="lq-reading-tool-close"
+            aria-label={closeLabel}
+            title={closeLabel}
+            onClick={tool.onClose}
+          >
+            ×
+          </button>
+        </div>
+        <div className="lq-reading-tool-body">{tool.content}</div>
+      </aside>
+    );
+  };
+
+  /**
+   * A leading tool is emitted BEFORE the document, not moved there with CSS
+   * `order`. The distinction is the whole reason the field exists: `order` moves
+   * the painted box and leaves the DOM alone, so Tab and a screen reader would
+   * walk the document first and reach the index that navigates INTO it
+   * afterwards — reading order and visual order pointing opposite ways, which is
+   * WCAG 1.3.2 and the one failure a "it looks right" check cannot see.
+   *
+   * Sheets are always in the trailing group. Not a normalisation of their
+   * `side` — the resolver still reports what the caller declared — but a render
+   * fact: a sheet is `position: absolute; inset: 0`, so its flex position is not
+   * observable, and keeping it last leaves the modal after the document it
+   * covers, which is where a dialog belongs.
+   */
+  const isLeading = (tool: ReadingCanvasTool) => {
+    const resolved = byId.get(tool.id);
+    return resolved?.placement === 'docked' && resolved.side === 'leading';
+  };
+
   return (
     <div
       ref={ref}
@@ -185,6 +245,8 @@ export function ReadingCanvas({
       onKeyDown={onKeyDown}
       {...rest}
     >
+      {open.filter(isLeading).map(renderTool)}
+
       <div
         className="lq-reading-doc lq-anchor"
         data-lq-role="anchor"
@@ -205,45 +267,7 @@ export function ReadingCanvas({
         {children}
       </div>
 
-      {open.map((tool) => {
-        const resolved = byId.get(tool.id);
-        if (!resolved) return null;
-        const isSheet = resolved.placement === 'sheet';
-        // Sheets stack; only the newest is rendered. The rest stay open in the
-        // caller's state and reappear as it closes them, rather than silently
-        // being dropped — closing the top sheet must not lose the one beneath.
-        if (isSheet && tool.id !== sheetId) return null;
-        return (
-          <aside
-            key={tool.id}
-            ref={isSheet ? sheetRef : undefined}
-            tabIndex={isSheet ? -1 : undefined}
-            className={isSheet ? 'lq-reading-sheet lq-liquid' : 'lq-reading-tool lq-liquid'}
-            data-lq-role="liquid"
-            data-reading-role="tool"
-            data-reading-tool={tool.id}
-            data-placement={resolved.placement}
-            aria-label={tool.label}
-            {...(isSheet ? { role: 'dialog' as const, 'aria-modal': true } : {})}
-            style={isSheet ? undefined : { width: `${resolved.width}px`, flex: `0 0 ${resolved.width}px` }}
-          >
-            <div className="lq-reading-tool-head">
-              <span className="lq-reading-tool-title">{tool.label}</span>
-              {tool.actions ? <span className="lq-reading-tool-actions">{tool.actions}</span> : null}
-              <button
-                type="button"
-                className="lq-reading-tool-close"
-                aria-label={closeLabel}
-                title={closeLabel}
-                onClick={tool.onClose}
-              >
-                ×
-              </button>
-            </div>
-            <div className="lq-reading-tool-body">{tool.content}</div>
-          </aside>
-        );
-      })}
+      {open.filter((tool) => !isLeading(tool)).map(renderTool)}
     </div>
   );
 }
