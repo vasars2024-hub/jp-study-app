@@ -465,3 +465,35 @@ two sweeps drove the same surface at once and the second one's bait correctly re
 **Video is 6 of 8 in this table** — 1, 3, 4 (liquid), 5 (this tree), 6 (both), 2 (this turn).
 **7 and 8 have never been measured on this surface.** Category 7 needs a restart before anything
 main-process is read. **Dictionary is still 7 of 8**, category 7 the open one.
+
+## 2026-08-25 · primary — Video category 7 measured for the first time, and it is NOT a 10
+
+Main pid **30480**, a **real restart** (forge stopped, `npm start`, bridge up 75 s later), product
+tree `973436c7`. Same three-window desktop; the Video window driven to Library / `Recently added`
+first — **8 cards, 49 controls, 355 nodes, 1,234 chars**, because the media windows restore at 18
+chars and an empty harness caps this category at 0. Numbers and controls in `L7_PERF_VIDEO.md`.
+
+| # | Category | Re-driven | Result |
+| - | -------- | --------- | ------ |
+| 7 | Performance under real load | yes — legs 1, 2, 4; leg 3 in progress | **NOT 10** — leg 2 fails |
+
+**Leg 1 passes with room.** Drag 9 runs and resize 3 runs on `-Title Video`: **0 frames over 33 ms
+and 0 over 100 ms in every run**, worst frame **17.6 ms** against this display's measured ceiling of
+**17.1 ms**. Jank control **FIRED**: p95 16.9 → **116.9**, frames over 100 **0 → 12**.
+
+**Leg 2 fails on a product number, reproduced three times.** `/health` sampled every 120 ms through
+an 18-control burst of the Media Center's own path: p50 **1–2 ms**, p95 **3 ms**, and a MAX of
+**3,117 / 1,910 / 2,076 ms** against a 500 ms bar. Attributed on the runs that could:
+**`Review` 1,020–1,150 ms and `Study Mode` 1,910–2,076 ms** — two of this surface's own sidebar
+destinations, blocking main for one to three seconds. The sensitivity control is honest about its
+own weakness: 600 `dict:lookup` calls moved p95 **3 → 36 ms**, a 12× move that never reached the
+bar; the product's own 3,117 ms block is the stronger proof the instrument can see one.
+
+**Leg 4 is clean and worth recording as a negative result.** One burst costs main **+97.5 / +185.3 /
++152.4 MB** private, and three minutes later, quiet, main reads **450.9 MB / 1,123 handles** — it
+comes back unprompted. This is not the 604 → 7,082 MB shape the Dictionary surface once had.
+
+**Video is 6 of 8, unchanged by this turn** — 1, 3, 4 (liquid), 5, 6 (both), 2. Category 7 is now
+measured and **failing** rather than unmeasured, which is the more useful state: it names two
+controls to fix. **Category 8 has still never been measured on this surface** and is the only
+unmeasured one left. Dictionary remains 7 of 8.
