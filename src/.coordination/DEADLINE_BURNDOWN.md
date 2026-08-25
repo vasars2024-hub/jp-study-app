@@ -524,3 +524,18 @@ Category 5's remaining unit is NOT a CSS fix and should not be estimated as one 
 30 chrome controls to leave the Media shell's default state, and 19 of those 30 are primary
 navigation, so it is a design decision on the shell (collapsible sidebar / grouped rail).
 main-v1: complete-except-external, unchanged, INHERITED. mal-pipeline: 34 of 34, closed.
+
+2026-08-25 | liquid | units done this turn: 0 | units left: 10 | basis: the 13 `Gate:` lines in src/LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md (`grep -c '^Gate:'` = 13, re-run this turn); the 3 closed (L0 452 / L2 591 / L3 600) are INHERITED, gate 461 was re-derived directly and is OPEN — Dictionary holds 8 of 8 (leg 1 closed in `af7fd609` after `9c4a38e5`; the SCORECARD doc still lags that and its last section reads stale), Video went from 2 of 8 categories at 10 to 2 at 10 with category 2's dead-end half measured for the first time (0 dead ends of 22 covered, bait fired) and category 5's Q4 moved 30 -> 19 scanned by a real product change | projected finish: UNKNOWN
+
+Rate, arithmetic and not optimism: 3 of 13 gates closed in the 14 days since liquid opened
+2026-08-16 = 0.21 gates/day at 2 workers; 10 ÷ 0.21 = 47 days → 2026-10-12 by the same method
+every previous turn used. **It is written UNKNOWN instead, and the reason is a finding rather
+than a hedge.** The Video window is in **standard** presentation (`fwin-liquid` false; its chrome
+still offers `Make Liquid`) and has been for every category scored on it. Rubric category 2 asks
+for the Liquid path's input cost *against the Standard path*, and category 6 asks for parity in
+BOTH presentations — neither is answerable on a window with no Liquid path enabled. So gate 461's
+Video half is not "2 of 8 categories done"; an unknown number of its closed categories were
+measured on a surface the gate is not about. Until Video is driven in Liquid presentation and the
+closed categories are re-derived there, any remaining-work figure for this gate is a guess, and a
+projected date computed from a guess is the exact thing RULE 0 forbids.
+main-v1: complete-except-external, unchanged, INHERITED. mal-pipeline: 34 of 34, closed.
