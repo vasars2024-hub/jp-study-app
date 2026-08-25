@@ -26,7 +26,10 @@
  * Measured 2026-08-17 on Dictionary: failingCount 0 -> 1, ratio 1.00 on the forced element.
  */
 (() => {
-  const TITLE = 'Dictionary';
+  // Same global as the category-3 control: a hardcoded title made this unrunnable against
+  // the OTHER surface gate 461 names, which is how a category closes at 10 on one window and
+  // is left VOID on the other. Default unchanged, so every recorded Dictionary run reproduces.
+  const TITLE = (typeof window !== 'undefined' && window.__lqControlTitle) || 'Dictionary';
   const win = [...document.querySelectorAll('.fwin')].find(
     (w) => (w.querySelector('.fwin-title-text')?.textContent || '').includes(TITLE),
   );

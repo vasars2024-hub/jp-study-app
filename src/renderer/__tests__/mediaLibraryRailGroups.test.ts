@@ -124,6 +124,16 @@ describe('media library rail — the Liquid role is declared, not re-implemented
     expect(source).not.toContain('<nav className="medialib-rail"');
   });
 
+  it('does not paint a muted count on the active row, where the pill is the ground', () => {
+    const css = read(STYLES);
+    // `--muted` is solved against the rail's own fill, not against `--accent-soft`. Measured
+    // #7fa08e over the composited pill: 2.83:1 in a Liquid window, 3.16:1 in a standard one,
+    // both under the 4.5 bar for 11px text. The row's own `color: var(--text)` measures 6.77.
+    expect(css).toMatch(
+      /\.medialib-rail \.ui-sidebar__item\[aria-current='true'\] \.medialib-rail__count\s*\{[^}]*color:\s*inherit/,
+    );
+  });
+
   it('never hardcodes the material on the rail itself', () => {
     const css = read(STYLES);
     const rule = css.slice(css.indexOf('.medialib-rail {'), css.indexOf('.medialib-rail__group'));

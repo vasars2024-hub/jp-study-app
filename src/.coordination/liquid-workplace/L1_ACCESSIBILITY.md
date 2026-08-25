@@ -756,3 +756,45 @@ including the collapsed-rail `-4px`: an absolutely positioned `::before` outside
 `scrollLeaks` now reports `nav.mc-nav 0,0 -> 8,0` on every run — that is the probe centring a
 control in the scroll region it just gained, and it is restored. Identical across both runs, which
 is the instrument's own pass condition. Negative control for this leg is the 52px run above.
+
+## 2026-08-25 · primary — category 1 re-derived on Video in LIQUID presentation, and it found a real failure
+
+**Why it had to be re-derived.** Video's category-1 10/10 (`35 of 35 controls, min 5.13:1`) was
+measured in **standard** presentation and, it turns out, on a page that does not render the library
+rail at all. The window is now `liquid` and on the Library page, which is the surface gate 461 is
+about. Nothing below is inherited.
+
+**The failure, and it is not Liquid's.** `span.medialib-rail__count` — the 11px tabular count on the
+**active** rail row — measured **2.83:1** against a 4.5 bar, `failingCount 1`. The ground is not the
+rail: `.ui-sidebar__item[aria-current='true']` paints `--accent-soft`
+(`color-mix(in srgb, #10b981 40%, transparent)`), and `--muted` #7fa08e is solved against the rail's
+own fill, not against an accent. Composited by hand from the live chain:
+
+| presentation | rail fill | pill composite | `--muted` on it |
+| --- | --- | --- | --- |
+| liquid | `srgb .0706 .1098 .0902 / 0.72` over `rgb(11,13,19)` | `rgb(16, 88, 65)` | **2.83:1** |
+| standard | `rgb(8, 15, 12)` | `rgb(11, 83, 59)` | **3.16:1** |
+
+So it fails in BOTH presentations. The Liquid material costs it 0.33 and did not cause it; the row
+has been failing in conventional presentation since the pill existed, and it surfaced only because
+category 1 had never been scored on this page. Reported as a pre-existing product defect, not as a
+cost of the transformation.
+
+**Fix, one rule.** The active row already carries a foreground solved against its own pill —
+`color: var(--text)`, `ui.css:552`, which the LABEL next to this count uses and which measures
+**6.77:1** on the same composite. The count inherits it instead of taking a second hand-picked
+value that all thirteen palettes would need re-sweeping for. Every other row keeps the muted step,
+where it is solved and correct.
+
+**Re-scored after the fix, in the fix's own commit.** 53 text nodes, 0 unmeasurable,
+min **5.13:1** (`small "Library"`, 11px), **failingCount 0**. Targets 32, `wcag258FailCount` **0**
+(6 under a raw 32px, all exempt by spacing — `input` 19px with 64px nearest, five 24px `button.fwin-b`
+frame controls with 32px nearest). Keyboard 32 controls, **0** unreachable, 1 focus host
+(`div.mc-root`, `tabindex=-1`).
+
+**Negative control fired on Video, which it had never been pointed at.** `l1-a11y-control.js` was
+hardcoded to `TITLE = 'Dictionary'`; adapted to `window.__lqControlTitle`, default unchanged, no new
+probe. Forced `span.fwin-title-text` to its own backdrop: failing **0 → 1**, ratio **1.03**. Cleanup
+`restored 1 / stillPresent 0`, and the re-measure came back **5.13 / 0 failing**.
+
+**Video category 1 = 10/10**, in liquid presentation, on the Library page, control proven.

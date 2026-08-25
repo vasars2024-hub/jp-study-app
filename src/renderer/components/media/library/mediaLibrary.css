@@ -194,6 +194,26 @@
   color: var(--muted);
 }
 
+/*
+ * ON THE ACTIVE ROW THE COUNT IS NOT ON THE RAIL, IT IS ON THE ACCENT PILL.
+ *
+ * `--muted` is solved against the rail's own fill. `.ui-sidebar__item[aria-current='true']`
+ * paints `--accent-soft` — `color-mix(in srgb, #10b981 40%, transparent)` on forest-night —
+ * and #7fa08e over that composite measures **2.83:1** in a Liquid window and **3.16:1** in a
+ * standard one, both against a 4.5 bar for 11px text. The Liquid material makes it worse but
+ * did not cause it: the row has failed in conventional presentation since the pill existed,
+ * and it only surfaced now because category 1 had never been scored on the Library page.
+ *
+ * The row already carries a foreground solved against its own pill — `color: var(--text)`,
+ * `ui.css:552`, which the LABEL beside this count uses and which measures 6.77:1 there. The
+ * count inherits it rather than getting a second hand-picked value that every one of the
+ * thirteen palettes would have to be re-swept for. The muted step is kept on all the other
+ * rows, where it is solved and correct.
+ */
+.medialib-rail .ui-sidebar__item[aria-current='true'] .medialib-rail__count {
+  color: inherit;
+}
+
 .medialib-rail__foot {
   margin-top: auto;
   padding: var(--space-sm);
