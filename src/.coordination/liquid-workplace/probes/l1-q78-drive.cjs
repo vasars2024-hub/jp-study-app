@@ -78,11 +78,21 @@ const WIN = `([].slice.call(document.querySelectorAll('.fwin')).filter(function(
  * repaired. The selector is now a list tried in order, the first non-empty one wins, and the
  * winner is reported as `rowSelector` so no reader has to guess which population was counted.
  * `--rows <css>` overrides it for a surface not listed here.
+ *
+ * `.medialib-spotlight` joined the list on 2026-08-25 and it is the SAME defect one shelf over.
+ * A shelf holding ONE title does not render a card — `MediaLibraryBrowser` promotes it to
+ * `section.medialib-spotlight` — so with `Continue watching` (2 entries, 1 title) active, all
+ * three selectors matched 0, the list fell back to `list[0]` and the driver refused
+ * *"0 .dict-entry rows"* on the Video window. That refusal names the DICTIONARY's row while
+ * scoring the Media Center, so it reads as a finding about a surface it never looked at. Third
+ * time the spotlight promotion has produced a false negative in this directory: it also made
+ * `l1-q4-mc-walk.cjs` score a working card menu unreachable, and made `l1-ui-clarity.js` count
+ * two content actions as chrome.
  */
 const rowsIdx = process.argv.indexOf('--rows');
 const ROWS = (process.argv.find((a) => a.startsWith('--rows=')) || '').split('=')[1]
   || (rowsIdx >= 0 ? process.argv[rowsIdx + 1] : '')
-  || '.dict-entry,.medialib-card,.medialib-ep';
+  || '.dict-entry,.medialib-card,.medialib-ep,.medialib-spotlight';
 const ROW_SEL = `(function(w){
   var list = ${JSON.stringify(ROWS)}.split(',');
   for (var i = 0; i < list.length; i += 1) { if (w.querySelectorAll(list[i]).length) return list[i]; }

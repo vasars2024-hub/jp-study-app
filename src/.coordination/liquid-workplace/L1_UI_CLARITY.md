@@ -617,3 +617,32 @@ read `#1e1e1e` and the winning rule was `color: var(--mc-nav-active-ink)`. The d
 
 **Category 5 on Video: Q1 Q2 Q3 Q4 Q5 Q6 Q10 YES — 10 of 10 measured, 7 answered live this run,
 Q7 Q8 Q9 pending a re-park at this tree.**
+
+## 2026-08-25 · primary — Q7 Q8 Q9 re-parked at this tree, and Q4 turns out to depend on the shelf
+
+**`l1-q78-drive.cjs --title Video` refused *"0 .dict-entry rows"*.** Its row selector already
+falls back through `.dict-entry,.medialib-card,.medialib-ep`, and with `Continue watching`
+(2 entries, **1 title**) active all three matched 0, so it fell back to `list[0]` and named the
+DICTIONARY's row while scoring the Media Center. Cause: a one-title shelf renders
+`section.medialib-spotlight`, not a card. **Third false negative from that promotion in this
+directory** — it also scored a working card menu unreachable in `l1-q4-mc-walk.cjs` and counted
+two content actions as chrome in `l1-ui-clarity.js`. `.medialib-spotlight` joined the list.
+
+**Q7 = YES 7/7, Q8 = YES 8/8, re-driven twice.** First on the spotlight (`rowSelector
+.medialib-spotlight`, entries **1**), then again on a real population — the shelf widened to
+`Recently added` (**36** entries, `rowSelector .medialib-card`, entries **8**) so `sameResults`
+compares 8 rows rather than 1. Identical verdicts on both. **Q9 = YES**, 8/8 ledger rows `both`
+with `observed` and **8/8 reachable live** in both presentations.
+
+**The per-surface attribution is now visible in the report, and it works.** With `__q78verdict`
+parked from a `--title Video` run, the sweep reads **Video Q7=YES Q8=YES** and **Media /
+Dictionary Q7=MEASURE Q8=MEASURE with `crossSurface: true`** — before this commit all three
+windows would have printed Video's answer. Q9 splits correctly too: YES on Media *and* Video
+(both host the Media Center, both read `__q9verdictMedia`), MEASURE on Dictionary.
+
+**Video: Q1 Q2 Q3 Q5 Q6 Q7 Q8 Q9 Q10 YES — 9 of 10 — and Q4 is now NO, honestly.** Widening the
+shelf added a kind-filter chip row (`All` / `Series` / `OVA / ONA`, `MediaLibraryShell.tsx:193`,
+rendered only when ≥2 kinds are present) and took the scanned set **11 → 14** against a bar of 12.
+So Q4's YES was measured on the shelf that happened to have one kind in it, and `CHIP_KINDS` can
+render more than three. That is a real clutter finding, not an instrument defect: the chips are
+chrome, they are not behind a disclosure, and they grow with the library.

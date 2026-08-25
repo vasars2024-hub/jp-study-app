@@ -1,5 +1,5 @@
 {
- "at": "2026-08-25T06:32:29.250Z",
+ "at": "2026-08-25T07:00:59.376Z",
  "control": null,
  "ledger": {
   "file": "parity-ledger.json",
@@ -43,12 +43,12 @@
    "maximized": false,
    "focused": false,
    "zIndex": "225",
-   "searchValue": "",
+   "searchValue": "食べる",
    "notesFilterValue": "",
    "activeLang": "gram-level-btn active",
-   "resultChars": 356,
-   "resultNodes": 39,
-   "controls": 12
+   "resultChars": 5476,
+   "resultNodes": 349,
+   "controls": 67
   },
   "mediaLiquid": {
    "matchedBy": "mc-root + data-presentation=liquid",
@@ -65,14 +65,14 @@
    "focused": true,
    "zIndex": "237",
    "activeRail": "LibraryAll local media",
-   "activeShelf": "Continue watching2",
+   "activeShelf": "Recently added36",
    "searchValue": "",
    "sortValue": "season-episode",
    "viewMode": "Grid view",
-   "cardCount": 1,
-   "chars": 729,
-   "nodes": 257,
-   "controls": 34
+   "cardCount": 8,
+   "chars": 1227,
+   "nodes": 341,
+   "controls": 51
   },
   "mediaStandard": {
    "matchedBy": "mc-root + data-presentation=standard",
@@ -116,7 +116,7 @@
    },
    "librarySearch": {
     "standard": "cards 1 -> 0 -> 1 for \"zzqqxx-no-such-title\"",
-    "liquid": "cards 1 -> 0 -> 1 for \"zzqqxx-no-such-title\""
+    "liquid": "cards 8 -> 0 -> 8 for \"zzqqxx-no-such-title\""
    },
    "sortAndView": {
     "standard": "sortOptions=7 viewButtons=2 pressed=1",
@@ -124,7 +124,7 @@
    },
    "itemActions": {
     "standard": "menuItems opened=4 afterClose=0 via=card",
-    "liquid": "menuItems opened=4 afterClose=0 via=spotlight"
+    "liquid": "menuItems opened=4 afterClose=0 via=card"
    },
    "history": {
     "standard": "back.disabled=true forward.disabled=true",
