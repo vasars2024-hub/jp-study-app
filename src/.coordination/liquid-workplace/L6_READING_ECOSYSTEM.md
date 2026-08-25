@@ -571,3 +571,58 @@ deep-link have their routes proven present and their state proven to survive, bu
 driven. That is the next slice, and progress is the one to do first — NovelReader restores by
 FRACTION not page index (`NovelReader.tsx:1088-1095`, keyed on `size.w`), so a reflow is exactly
 where it would break, and jsdom cannot see it. Suites: nine L6 files **93/93**, was 68/68.
+
+## 2026-08-25 (later 2) — bullet 2: the reader had no grid column, so it never saw the window
+
+`02c5dd92` `8aaa9216`. Two of bullet 2's five remaining behaviours driven end to end on a real
+EPUB (悪の教典 02, part 7) through the bridge: **progress** and **dictionary**. Both defects were
+found by driving, not by reading.
+
+**Defect 3 (`02c5dd92`) — `.reader` is `display: grid` with `grid-template-rows` and no
+`grid-template-columns`.** That still has a column: one implicit `auto` track, whose base size is
+its items' min-content and which only ever GROWS. `.reader-bar` is a nowrap flex row of 18
+controls measuring **860 px**, so the track sat at **860.016 px at every host width** and
+`.reader { overflow: hidden }` cut off the rest. The row axis had this exact fix already, with a
+comment explaining it; the column axis had never been considered.
+
+Measured at the **380 px Blanc allows** (`BLANC_MIN_W`, `main.ts:577` — Blanc hosts this reader at
+`BlancShell.tsx:507`): **14 of the 18 bar controls entirely past the right edge** — translation,
+lens, reader settings, all six annotation swatches, Collect, both Ask-the-Agent buttons, the
+flashcard collection. And one level down, `ReadingCanvas` resolves docked-vs-sheet from its OWN
+measured width, which was the frozen 860, **so the sheet placement was unreachable in NovelReader
+at any size.** After: track 380, canvas 380, clipped **0**, and Bookmarks resolves to a **sheet**
+over an inert document — the first sheet this reader has ever produced. Bar 85→182 px at 380,
+**unchanged 56 px at 1264**, absorbed by the `minmax(0, 1fr)` stage row. Wrap over horizontal
+scroll: every control stays reachable by pointer and Tab with no gesture.
+
+**Progress survived, which is what the bullet asked.** Head paragraph identical across
+1264/docked → 380/sheet → 1264/docked (`何だろう、この嫌な感じは。雄一郎は…`), page 1/2 → 3/4 →
+1/2 as a reflow demands, persisted value byte-identical at `p:7:1.0000` / `0.02376848187622909`
+throughout. Instrument is the paragraph nearest the reading edge (vertical-rl ⇒ rightmost), not a
+page index — a page index MUST change across a reflow, so asserting it is asserting noise.
+
+**Defect 4 (`8aaa9216`) — a sheet covers the document; a surface's document-anchored overlays are
+not in the document.** The word/sentence popup is `position: fixed; z-index: 160` and a sibling of
+the canvas. With Bookmarks as a sheet at 380: **28×97 px of overlap**, `elementFromPoint` in that
+region returning the popup and not the sheet, `aria-modal="true"`, document `inert`, **2 focusable
+controls outside any inert subtree**. `ReadingCanvas` now reports `onDocumentCoveredChange` —
+additive, optional, fired on the TRANSITION (a caller dismissing on every render could never open
+a lookup while a sheet is up). After: popup `null` at 380, not resurrected on widening.
+
+**Controls, all restored.** Reverting exactly the six CSS declarations live reproduces 860.016 px,
+the same 14 clipped controls and the tool back to `docked` at 264 inside a 380 px host. Mutating
+`.reader` to `grid-template-columns: auto` caught a weakness in the first guard — presence is not
+the property — so the sweep now requires a track that can reach zero; both new tests then go red.
+Deleting the transition guard turns the ordering test red at 24/25.
+
+**RULE 1: no new probe file, no new harness.** The guard extends `gridTrackFloorsFitTheWindow.test.ts`
+— the existing category-4 sweep over every sheet under `src/renderer` — with the column-axis case.
+It found **two more instances**, both fixed here (aero `.dict-view`, `.aero-settings`).
+
+**Bullet 2 still OPEN: 3 of 6 behaviours driven** (capture, progress, dictionary). Mining, source
+and deep-link remain. **Trap for the next worker: you cannot narrow the main shell below 940 px**
+(`main.ts:696`), so a reader reflow has to be simulated by constraining `.reader`'s width inline —
+faithful, because `size` comes from a `ResizeObserver` on the scroller and the canvas measures its
+own box. What is NOT faithful that way: anything reading `window.innerWidth`. The lookup popup is
+one (`min(560px, 100vw - 32px)`), and it read as "does not reflow" until I checked — an artefact,
+not a finding.

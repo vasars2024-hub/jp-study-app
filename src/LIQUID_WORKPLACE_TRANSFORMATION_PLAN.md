@@ -648,10 +648,25 @@ now. (2) a stacked sheet was `return null`, i.e. unmounted; now `hidden`, plus t
 rule without which the UA's `[hidden]` loses to `.lq-reading-sheet { display: flex }`. Route
 parity swept mechanically across the six migration commits: **3 handlers net-removed, all three
 the popovers' own close buttons.** Closed: the document survives 6/6, the tool subtree survives
-6/6, stacked sheets survive, no route dropped. **Demonstrated functionally: capture only, 1 of
-6.** Progress, dictionary, mining, source and deep-link are next; progress first, because
-NovelReader restores by fraction on `size.w` and a reflow is where it would break. Nine L6
-suites 93/93. Log: `.coordination/liquid-workplace/L6_READING_ECOSYSTEM.md`.
+6/6, stacked sheets survive, no route dropped. Nine L6 suites 93/93.
+Log: `.coordination/liquid-workplace/L6_READING_ECOSYSTEM.md`.
+
+**Bullet 2, 2026-08-25 (later 2): still OPEN, now 3 of 6 driven** (`02c5dd92`, `8aaa9216`).
+**Progress** and **dictionary** driven end to end on a real EPUB, and both found a defect.
+(3) `.reader` is `display: grid` with `grid-template-rows` and NO `grid-template-columns`, so its
+one implicit `auto` track floored at `.reader-bar`'s 860 px min-content at every host width and
+`overflow: hidden` cut off the rest: at the **380 px Blanc allows** (`BLANC_MIN_W`; Blanc hosts
+this reader), **14 of 18 bar controls entirely past the right edge**, and `ReadingCanvas`
+measuring the frozen 860 rather than the host — **the sheet placement was unreachable in this
+reader at any size.** Fixed on the column axis the way the row axis already was; after, 380/380,
+clipped 0, and Bookmarks becomes a sheet. Progress itself held: same head paragraph across
+1264 docked → 380 sheet → 1264 docked, persisted `p:7:1.0000` byte-identical.
+(4) the word/sentence popup is `position: fixed; z-index: 160` and a SIBLING of the canvas, so a
+sheet cannot cover it — 28×97 px over an `aria-modal` sheet, winning hit-testing, 2 focusables
+outside any inert subtree. `ReadingCanvas` now reports `onDocumentCoveredChange` (additive,
+optional, transition-only) and the reader dismisses on the way in.
+**Left: mining, source, deep-link.** Guard extends the existing category-4 sweep rather than
+adding a probe, and it found two more instances of (3) in `aero-apps.css`, both fixed.
 
 **Bullet 1 CLOSED 2026-08-25** (`b2c6e7f5`). All six surfaces are on the contract — Captures,
 Novels, Library, Immersion, manga, VN — and the fifth named item resolved to ONE surface, not
