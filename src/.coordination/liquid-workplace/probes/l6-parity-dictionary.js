@@ -1,6 +1,22 @@
 /**
- * L6 instrument — rubric category 6, "Feature parity and reversibility", on the
- * Dictionary window, driven in BOTH presentations.
+ * L6 instrument — rubric category 6, "Feature parity and reversibility", driven in
+ * BOTH presentations.
+ *
+ * SURFACES, 2026-08-25. This file was Dictionary-only and is now surface-aware; the
+ * filename is kept deliberately because `parity-ledger.json`'s `automatedProof`
+ * strings cite it by name on all seven dictionary rows. `window.__L6` is the
+ * Dictionary instrument, unchanged in every observable way; `window.__L6M` is the
+ * same instrument re-aimed at the **Media Center** surface that the window titled
+ * `Video` hosts, sharing this file's traps, its `typeInto`, and its round-trip shape.
+ *
+ * Why the Media Center and not the "Media workspace": measured 2026-08-25, the
+ * seanime host is a full-screen overlay mounted at `body > div > .seanime-host`,
+ * NOT inside any `.fwin`. It therefore has no window chrome, no `Make Liquid`
+ * control and no `data-presentation` — the parity ledger's six `mediaWorkspace`
+ * rows genuinely have no Liquid destination and stay `pending` for that reason,
+ * which is a fact about that surface rather than a gap in this probe. The Video
+ * window's own surface is the Media Center (`.mc-root`), and that is what a
+ * category-6 score for the Video window has to be measured on.
  *
  * Why this file exists. Every one of the 7 dictionary rows in `parity-ledger.json`
  * carried `status: "pending"` with the recorded reason *"no Liquid destination
@@ -291,5 +307,353 @@
   };
 
   window.__L6 = { findWin, snapshot, check, search, toggleLiquid, mutate, restore };
-  return JSON.stringify({ installed: Object.keys(window.__L6), snapshot: snapshot() });
+
+  // ==========================================================================
+  // MEDIA CENTER surface — the app the window titled `Video` hosts (`.mc-root`).
+  // ==========================================================================
+
+  /**
+   * The desktop carries TWO Media Center windows, and that is the point: one is
+   * `liquid` and one is `standard`, so parity is read off the SAME component in
+   * both presentations in ONE run rather than by toggling and hoping nothing else
+   * moved. Selection is by `data-presentation`, never by title — trap 4 applies
+   * doubly here, because `Video` and `Media` are both translated section names.
+   */
+  const findMediaWin = (pres) => {
+    const wins = Array.from(document.querySelectorAll('.fwin')).filter((w) =>
+      w.querySelector('.mc-root'),
+    );
+    if (!wins.length) return { win: null, matchedBy: null };
+    if (!pres) return { win: wins[0], matchedBy: 'mc-root' };
+    const hit = wins.find((w) => (w.getAttribute('data-presentation') || 'standard') === pres);
+    return hit
+      ? { win: hit, matchedBy: `mc-root + data-presentation=${pres}` }
+      : { win: null, matchedBy: null };
+  };
+
+  const cards = (win) => qa(win, '.medialib-card');
+  const railBtns = (win) => qa(win, '.mc-nav button');
+  const shelfBtns = (win) => qa(win, '.ui-sidebar__item[aria-current]');
+  const searchInput = (win) => q(win, '.mc-global-search input');
+  const sortSelect = (win) => q(win, '.medialib-browser__tools select');
+  const viewBtns = (win) => qa(win, '.medialib-view-toggle button[aria-pressed]');
+
+  /** Per-presentation store for rows that only a driven step can answer. */
+  const driven = () => (window.__L6M_DRIVEN = window.__L6M_DRIVEN || {});
+  const drivenFor = (pres) => {
+    const d = driven();
+    d[pres] = d[pres] || {};
+    return d[pres];
+  };
+
+  const snapshotM = (pres) => {
+    const { win, matchedBy } = findMediaWin(pres);
+    if (!win) return { refused: `no media-center window at presentation=${pres}` };
+    const r = win.getBoundingClientRect();
+    if (r.width < 40 || r.height < 40) {
+      return { refused: `degenerate box ${Math.round(r.width)}x${Math.round(r.height)}` };
+    }
+    const active = railBtns(win).find((b) => b.classList.contains('is-active'));
+    const shelf = shelfBtns(win).find((b) => b.getAttribute('aria-current') === 'true');
+    const view = viewBtns(win).find((b) => b.getAttribute('aria-pressed') === 'true');
+    const s = searchInput(win);
+    const sort = sortSelect(win);
+    return {
+      matchedBy,
+      title: ((win.querySelector('.fwin-title-text') || {}).textContent || '').trim(),
+      presentation: win.getAttribute('data-presentation'),
+      liquidClass: win.classList.contains('fwin-liquid'),
+      rect: {
+        x: Math.round(r.x),
+        y: Math.round(r.y),
+        w: Math.round(r.width),
+        h: Math.round(r.height),
+      },
+      maximized: win.classList.contains('fwin-max'),
+      focused: win.classList.contains('focused'),
+      zIndex: win.style.zIndex || '',
+      // App data that must survive the round trip byte-for-byte.
+      activeRail: active ? (active.textContent || '').trim() : null,
+      activeShelf: shelf ? (shelf.textContent || '').trim() : null,
+      searchValue: s ? s.value : null,
+      sortValue: sort ? sort.value : null,
+      viewMode: view ? view.getAttribute('aria-label') : null,
+      cardCount: cards(win).length,
+      chars: (win.textContent || '').length,
+      nodes: win.querySelectorAll('*').length,
+      controls: qa(win, 'button,input,select,textarea,[role="button"]').length,
+    };
+  };
+
+  /**
+   * One row = one observable side effect on the Media Center. Rows 3, 5 and 7
+   * cannot be answered by reading the resting DOM — a search box that renders is
+   * not a search box that filters — so they read what `stepM()` measured and
+   * report `false` with `evidence:"not driven"` when nothing has been driven in
+   * that presentation. Presence is never enough here.
+   */
+  const checkM = (pres) => {
+    const { win, matchedBy } = findMediaWin(pres);
+    if (!win) return { refused: `no media-center window at presentation=${pres}` };
+    const r = win.getBoundingClientRect();
+    if (r.width < 40 || r.height < 40) return { refused: 'degenerate box' };
+    const d = drivenFor(pres);
+
+    const rows = [];
+    const row = (id, reachable, evidence) => rows.push({ id, reachable, evidence });
+
+    // 1. Section rail. Side effect: `is-active` is exclusive across the rail.
+    const rail = railBtns(win);
+    const railActive = rail.filter((b) => b.classList.contains('is-active')).length;
+    row('railNav', rail.length >= 6 && railActive === 1, `railButtons=${rail.length} active=${railActive}`);
+
+    // 2. Library shelves. Side effect: exactly one `aria-current="true"`.
+    const shelf = shelfBtns(win);
+    const shelfActive = shelf.filter((b) => b.getAttribute('aria-current') === 'true').length;
+    row('shelfFilter', shelf.length >= 6 && shelfActive === 1, `shelves=${shelf.length} current=${shelfActive}`);
+
+    // 3. Library search — DRIVEN. Side effect: the rendered card population changes
+    //    for a term that cannot match, and comes back when the term is cleared.
+    const ls = d.librarySearch;
+    row(
+      'librarySearch',
+      !!ls && ls.before !== ls.after && ls.restored === ls.before,
+      ls ? `cards ${ls.before} -> ${ls.after} -> ${ls.restored} for "${ls.term}"` : 'not driven',
+    );
+
+    // 4. Sort + view mode. Side effect: the sort has real options and exactly one
+    //    of grid/list carries `aria-pressed="true"`.
+    const sort = sortSelect(win);
+    const views = viewBtns(win);
+    const viewOn = views.filter((b) => b.getAttribute('aria-pressed') === 'true').length;
+    row(
+      'sortAndView',
+      !!sort && sort.options.length >= 4 && views.length === 2 && viewOn === 1,
+      `sortOptions=${sort ? sort.options.length : 0} viewButtons=${views.length} pressed=${viewOn}`,
+    );
+
+    // 5. Per-item actions — DRIVEN. Side effect: the card's `More actions` opens a
+    //    menu with real entries, and closes again.
+    const im = d.itemActions;
+    row(
+      'itemActions',
+      !!im && im.opened > 0 && im.closed === 0,
+      im ? `menuItems opened=${im.opened} afterClose=${im.closed}` : 'not driven',
+    );
+
+    // 6. History. Side effect: `Back`/`Forward` reflect real depth — both disabled
+    //    on a fresh history is a truthful state, both enabled with no history is not.
+    const back = qa(win, '.mc-history-buttons button')[0];
+    const fwd = qa(win, '.mc-history-buttons button')[1];
+    row(
+      'history',
+      !!back && !!fwd && typeof back.disabled === 'boolean' && typeof fwd.disabled === 'boolean',
+      `back.disabled=${back ? back.disabled : 'absent'} forward.disabled=${fwd ? fwd.disabled : 'absent'}`,
+    );
+
+    // 7. Route to the Media workspace and back — DRIVEN. Side effect: the
+    //    full-screen `.seanime-host` mounts and un-mounts. This is the row that
+    //    makes "every enable has a disable" observable on this surface.
+    const wr = d.workspaceRoute;
+    row(
+      'workspaceRoute',
+      !!wr && wr.afterOpen === 1 && wr.afterClose === 0,
+      wr ? `seanimeHost ${wr.before} -> ${wr.afterOpen} -> ${wr.afterClose}` : 'not driven',
+    );
+
+    // 8. Window lifecycle, same rule as the dictionary surface: the Liquid toggle
+    //    must expose a real boolean pressed state or it is an enable with no disable.
+    const chrome = qa(win, '.fwin-b');
+    const liquidBtn = q(win, '.fwin-b-liquid');
+    const pressed = liquidBtn ? liquidBtn.getAttribute('aria-pressed') : null;
+    row(
+      'windowLifecycle',
+      chrome.length >= 4 && (pressed === 'true' || pressed === 'false'),
+      `chromeButtons=${chrome.length} liquidAriaPressed=${pressed}`,
+    );
+
+    return {
+      matchedBy,
+      presentation: win.getAttribute('data-presentation'),
+      reachable: rows.filter((x) => x.reachable).length,
+      total: rows.length,
+      rows,
+    };
+  };
+
+  /**
+   * The driven half. `/eval` never awaits (trap 1), so each phase is its own call
+   * and the caller sequences them: `search:type` → `search:read` → `search:clear`,
+   * `menu:open` → `menu:read` → `menu:close`, `ws:open` → `ws:read` → `ws:close`.
+   */
+  const stepM = (name, pres, arg) => {
+    const { win } = findMediaWin(pres);
+    if (!win) return { refused: `no media-center window at presentation=${pres}` };
+    const d = drivenFor(pres);
+
+    if (name === 'search:type') {
+      const input = searchInput(win);
+      if (!input) return { refused: 'no library search input' };
+      const term = arg || 'zzqqxx-no-such-title';
+      d.librarySearch = { term, before: cards(win).length, prior: input.value };
+      typeInto(input, term); // trap 2
+      return { typed: term, before: d.librarySearch.before };
+    }
+    if (name === 'search:read') {
+      if (!d.librarySearch) return { refused: 'search not typed' };
+      d.librarySearch.after = cards(win).length;
+      return { after: d.librarySearch.after };
+    }
+    if (name === 'search:clear') {
+      const input = searchInput(win);
+      if (!input || !d.librarySearch) return { refused: 'nothing to clear' };
+      typeInto(input, d.librarySearch.prior || '');
+      return { cleared: true };
+    }
+    if (name === 'search:restored') {
+      if (!d.librarySearch) return { refused: 'search not typed' };
+      d.librarySearch.restored = cards(win).length;
+      return { restored: d.librarySearch.restored };
+    }
+
+    if (name === 'menu:open') {
+      const more = q(win, '.medialib-card__more');
+      if (!more) return { refused: 'no card action control' };
+      d.itemActions = { before: document.querySelectorAll('[role="menuitem"]').length };
+      more.click();
+      return { clicked: true, before: d.itemActions.before };
+    }
+    if (name === 'menu:read') {
+      if (!d.itemActions) return { refused: 'menu not opened' };
+      d.itemActions.opened = document.querySelectorAll('[role="menuitem"]').length;
+      return { opened: d.itemActions.opened };
+    }
+    if (name === 'menu:close') {
+      // INSTRUMENT CORRECTION, 2026-08-25. The first version dispatched
+      // `pointerdown` and `.click()` and reported the menu as never closing —
+      // 4 items still in the DOM, then 8 once the second presentation opened its
+      // own. That was the probe: `ContextMenu` listens for **mousedown** on
+      // `window` in the capture phase (`ui/ContextMenu.tsx:70`), plus Escape.
+      // Neither event it was sent is that one. Exactly the shape the rubric
+      // warns about — a probe that fails to match scores the feature as broken.
+      document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      return { dispatched: 'mousedown on body (capture listener on window)' };
+    }
+    if (name === 'menu:closed') {
+      if (!d.itemActions) return { refused: 'menu not opened' };
+      d.itemActions.closed = document.querySelectorAll('[role="menuitem"]').length;
+      return { closed: d.itemActions.closed };
+    }
+
+    if (name === 'ws:open') {
+      const link = q(win, '.mc-seanime-link');
+      if (!link) return { refused: 'no Media workspace link' };
+      d.workspaceRoute = { before: document.querySelectorAll('.seanime-host').length };
+      link.click();
+      return { clicked: true, before: d.workspaceRoute.before };
+    }
+    if (name === 'ws:read') {
+      if (!d.workspaceRoute) return { refused: 'workspace not opened' };
+      d.workspaceRoute.afterOpen = document.querySelectorAll('.seanime-host').length;
+      return { afterOpen: d.workspaceRoute.afterOpen };
+    }
+    if (name === 'ws:close') {
+      const close = Array.from(document.querySelectorAll('.seanime-host-btn')).find((b) =>
+        /^(Close|閉じる|关闭|Закрыть)$/.test((b.textContent || '').trim()),
+      );
+      if (!close) return { refused: 'no Close in the workspace host bar' };
+      close.click();
+      return { clicked: true };
+    }
+    if (name === 'ws:closed') {
+      if (!d.workspaceRoute) return { refused: 'workspace not opened' };
+      d.workspaceRoute.afterClose = document.querySelectorAll('.seanime-host').length;
+      return { afterClose: d.workspaceRoute.afterClose };
+    }
+    return { refused: `unknown step ${name}` };
+  };
+
+  const toggleLiquidM = (pres) => {
+    const { win } = findMediaWin(pres);
+    if (!win) return { refused: `no media-center window at presentation=${pres}` };
+    const btn = q(win, '.fwin-b-liquid');
+    if (!btn) return { refused: 'no liquid control rendered' };
+    const before = win.getAttribute('data-presentation');
+    btn.click();
+    return { before, ariaPressed: btn.getAttribute('aria-pressed') };
+  };
+
+  /**
+   * NEGATIVE CONTROL, three variants, same rule as the dictionary half: each must
+   * flip EXACTLY ONE row to `false` and leave the rest untouched.
+   *   `railNav`         — the section rail's active state made non-exclusive;
+   *   `sortAndView`     — both view-mode buttons pressed at once;
+   *   `windowLifecycle` — `aria-pressed` stripped off the Liquid toggle.
+   */
+  const mutateM = (which, pres) => {
+    const { win } = findMediaWin(pres);
+    if (!win) return { refused: `no media-center window at presentation=${pres}` };
+    if (which === 'railNav') {
+      const off = railBtns(win).filter((b) => !b.classList.contains('is-active'));
+      if (!off.length) return { refused: 'no inactive rail button' };
+      off[0].classList.add('is-active');
+      off[0].setAttribute('data-l6m-added-active', '1');
+      return { mutated: `rail button "${(off[0].textContent || '').trim().slice(0, 18)}" also active` };
+    }
+    if (which === 'sortAndView') {
+      const off = viewBtns(win).filter((b) => b.getAttribute('aria-pressed') !== 'true');
+      if (!off.length) return { refused: 'no unpressed view button' };
+      off[0].setAttribute('data-l6m-prev-pressed', off[0].getAttribute('aria-pressed') || '');
+      off[0].setAttribute('aria-pressed', 'true');
+      return { mutated: 'both view-mode buttons pressed' };
+    }
+    if (which === 'windowLifecycle') {
+      const btn = q(win, '.fwin-b-liquid');
+      if (!btn) return { refused: 'no liquid control' };
+      btn.setAttribute('data-l6m-pressed', btn.getAttribute('aria-pressed') || '');
+      btn.removeAttribute('aria-pressed');
+      return { mutated: 'aria-pressed stripped from the liquid toggle' };
+    }
+    return { refused: `unknown variant ${which}` };
+  };
+
+  const restoreM = (pres) => {
+    const { win } = findMediaWin(pres);
+    if (!win) return { refused: `no media-center window at presentation=${pres}` };
+    const undone = [];
+    qa(win, '[data-l6m-added-active]').forEach((n) => {
+      n.classList.remove('is-active');
+      n.removeAttribute('data-l6m-added-active');
+      undone.push('railNav');
+    });
+    qa(win, '[data-l6m-prev-pressed]').forEach((n) => {
+      n.setAttribute('aria-pressed', n.getAttribute('data-l6m-prev-pressed'));
+      n.removeAttribute('data-l6m-prev-pressed');
+      undone.push('sortAndView');
+    });
+    qa(win, '[data-l6m-pressed]').forEach((n) => {
+      n.setAttribute('aria-pressed', n.getAttribute('data-l6m-pressed'));
+      n.removeAttribute('data-l6m-pressed');
+      undone.push('windowLifecycle');
+    });
+    return { restored: undone };
+  };
+
+  window.__L6M = {
+    findWin: findMediaWin,
+    snapshot: snapshotM,
+    check: checkM,
+    step: stepM,
+    toggleLiquid: toggleLiquidM,
+    mutate: mutateM,
+    restore: restoreM,
+  };
+
+  return JSON.stringify({
+    installed: Object.keys(window.__L6),
+    installedMedia: Object.keys(window.__L6M),
+    snapshot: snapshot(),
+    mediaLiquid: snapshotM('liquid'),
+    mediaStandard: snapshotM('standard'),
+  });
 })();

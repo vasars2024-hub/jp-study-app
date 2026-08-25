@@ -21,6 +21,7 @@ import MediaJobStrip from './MediaJobStrip';
 import { invalidateMediaArtwork } from './useMediaArtwork';
 import { buildLibraryEntries, isWatched, type LibraryEntry } from '../../../../shared/mediaLibraryEntries';
 import { mediaCategory, type MediaCategory } from '../../../../shared/mediaCategories';
+import { searchMediaHub } from '../../../../shared/mediaHub';
 import { resolveSortForCategory, sortMediaItems, type MediaSortId } from '../../../../shared/mediaSorting';
 import type { MediaItem } from '../../../../shared/types';
 import './mediaLibrary.css';
@@ -58,6 +59,14 @@ function chipKindOf(entry: LibraryEntry): ChipKind | null {
 
 export interface MediaLibraryShellProps {
   items: readonly MediaItem[];
+  /**
+   * Free-text narrowing for the grid, already debounced by the caller. It filters
+   * what the browser shows and deliberately does NOT filter `items`: the sidebar
+   * counts and the empty-library branch describe the library, not the search, and
+   * a search with no hits must read "no matches" rather than "import something".
+   * Omitted by hosts that have no search box of their own.
+   */
+  query?: string;
   /** Id of whatever the player currently holds, for the active states. */
   currentId: string | null;
   /** Opens an item in the player. The shell never opens a series, only a file. */
@@ -82,6 +91,7 @@ export interface MediaLibraryShellProps {
 
 export default function MediaLibraryShell({
   items,
+  query,
   currentId,
   onPlay,
   onImportFiles,
@@ -157,8 +167,20 @@ export default function MediaLibraryShell({
 
   const sort = resolveSortForCategory(sortByCategory[category], category);
 
+  /**
+   * The search narrows the scope, after the shelf and before the grouping, so a
+   * hit inside a 26-episode series still surfaces that series as one card.
+   * `category: 'all'` because the shelf above already decided the scope; letting
+   * the search re-apply a category would silently ignore the rail.
+   */
+  const searched = useMemo(() => {
+    const q = (query ?? '').trim();
+    if (!q) return scoped;
+    return searchMediaHub(scoped, { query: q, category: 'all' });
+  }, [scoped, query]);
+
   const allEntries = useMemo(() => {
-    const grouped = buildLibraryEntries(scoped);
+    const grouped = buildLibraryEntries(searched);
     // Sorting the entries means sorting by their representative file, so the
     // shared comparators apply unchanged to a grid of series.
     const order = sortMediaItems(grouped.map((entry) => entry.primary), sort);
@@ -166,7 +188,7 @@ export default function MediaLibraryShell({
     return [...grouped].sort(
       (a, b) => (rank.get(a.primary.id) ?? 0) - (rank.get(b.primary.id) ?? 0),
     );
-  }, [scoped, sort]);
+  }, [searched, sort]);
 
   const chips = useMemo(() => {
     const present = new Set<ChipKind>();

@@ -629,6 +629,19 @@ function LibraryPanel({
     <div className="mc-page mc-library-page">
       <MediaLibraryShell
         items={state.items}
+        /*
+         * The top bar's search box wrote to `state.query` and NOTHING on this
+         * page ever read it. Measured live 2026-08-25 in both presentations:
+         * a term matching no title left the shelf at the same 5 cards, so the
+         * control rendered, accepted text and did nothing.
+         *
+         * It narrows the grid, not `items`: the sidebar's shelf counts and the
+         * "your library is empty, import something" branch are both keyed off
+         * `items`, so handing the shell a filtered list would make an unmatched
+         * search claim the library is empty — a false state, and a worse defect
+         * than the dead control it replaced.
+         */
+        query={state.debouncedQuery}
         currentId={state.current?.id ?? null}
         onPlay={(id) => {
           // Loading the item is only half of it: the player lives on another tab,
