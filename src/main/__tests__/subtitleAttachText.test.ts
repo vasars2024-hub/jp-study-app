@@ -225,6 +225,13 @@ describe('detachSubtitleRecord', () => {
   // The control that makes this safe to ship: an external record points at a
   // sidecar sitting next to the user's own video. Removing the row must not
   // reach outside the app's own cache.
+  //
+  // Assert on the *call*, not on the file. A real external record carries an
+  // absolute path (`subtitleDiscovery.ts` writes `sidecar.path` verbatim), and
+  // `path.join(userData, absolute)` produces a mangled path `unlinkSync` throws
+  // on — so a survives-on-disk assertion passes with the guard deleted, and this
+  // control was green for the whole of its first life. Spying on the unlink is
+  // independent of how the path is joined, resolved, or normalised later.
   it('never deletes a sidecar that lives outside the app', () => {
     const sidecar = path.join(tmpRoot, 'users-own-video.ja.srt');
     fs.writeFileSync(sidecar, CUES, 'utf-8');
@@ -234,10 +241,40 @@ describe('detachSubtitleRecord', () => {
       }],
     })];
 
+    const unlink = vi.spyOn(fs, 'unlinkSync');
+    try {
+      expect(detachSubtitleRecord('m1', 'ext').ok).toBe(true);
+      expect(patches[0].patch.subtitles).toEqual([]);
+      expect(unlink).not.toHaveBeenCalled();
+      expect(fs.existsSync(sidecar)).toBe(true);
+    } finally {
+      unlink.mockRestore();
+      fs.rmSync(sidecar);
+    }
+  });
+
+  // The same guard, stated as data loss rather than as a call count: a record
+  // whose path the cache join *does* resolve to a real file. This is the shape
+  // the product takes the day someone "properly handles absolute paths" by
+  // swapping `path.join` for `path.resolve` — the accidental second barrier
+  // above disappears and only the `external` guard is left standing.
+  it('leaves the file alone even when the cache join resolves onto it', () => {
+    const dir = path.join(tmpRoot, 'beside-the-video');
+    fs.mkdirSync(dir, { recursive: true });
+    const relative = path.join('beside-the-video', 'users-own-video.ja.srt');
+    fs.writeFileSync(path.join(tmpRoot, relative), CUES, 'utf-8');
+    // The joined path is the real file, so an unguarded unlink would succeed.
+    expect(fs.existsSync(path.join(tmpRoot, relative))).toBe(true);
+    items = [mediaItem({
+      subtitles: [{
+        id: 'ext', lang: 'ja', source: 'sidecar', format: 'srt', path: relative, external: true, addedAt: 1,
+      }],
+    })];
+
     expect(detachSubtitleRecord('m1', 'ext').ok).toBe(true);
     expect(patches[0].patch.subtitles).toEqual([]);
-    expect(fs.existsSync(sidecar)).toBe(true);
-    fs.rmSync(sidecar);
+    expect(fs.existsSync(path.join(tmpRoot, relative))).toBe(true);
+    fs.rmSync(dir, { recursive: true, force: true });
   });
 
   it('refuses a track that is not there, and patches nothing', () => {
