@@ -299,3 +299,45 @@ hiding those would breach the plan's own "do not obscure a feature" non-negotiab
 real design decision (a collapsible sidebar, or grouping the rail's three category rows behind a
 disclosure), not a CSS fix, and it is the open unit for category 5. **Category 5 on Video is
 currently 8 answerable of 10 with Q4 NO — not a 10, and it stays counted.**
+
+## 2026-08-25 · primary — Q4's first product change on the Media shell: the rail is a disclosure now
+
+Q4's open number was **30 scanned chrome controls against a bar of 12, with 0 collapsed
+disclosures**, and the previous entry called it a design decision rather than a CSS fix. It is.
+The decision taken, under the relay's standing auto-approval, is the one with an argument that
+does not depend on the probe: **the Media Center already carries its own 174–222px shell sidebar
+of ten destinations, and the Library page put a SECOND persistent vertical column of nine rows
+beside it.** At the shell's default 820px box that is close to half the window spent on two
+stacked navigation columns — a use-of-space defect independent of Q4.
+
+`MediaLibrarySidebar.tsx`: each of the three groups is now a real `<details>` with its heading as
+the `<summary>`. Library open, Media type and Collections closed until asked for, remembered per
+group in `jp-medialib-rail-groups`, merged over the defaults so a blob written before a group
+existed cannot decide its first render. **Nothing is obscured**: every heading stays on screen
+with its own chevron, one click and one Enter away, and the group holding the ACTIVE scope is
+force-opened so the rail can never hide where you are.
+
+**Measured live, Video 1080×700 and Media 820×580, Media Center on Library / Continue watching:**
+
+| term | before | after |
+| --- | --- | --- |
+| scannedControls | **30** | **19** |
+| collapsedDisclosures | **0** | **1** |
+| chromeControlsRaw | 30 | 27 |
+| summaryHeaders / behindDisclosure | 0 / 0 | 2 / 6 |
+| Q4 verdict | NO | **NO** — first half of the bar met, 19 > 12 |
+
+Disclosure verified as a real one, not a class: closed group **20px** tall against **118px** open,
+`checkVisibility()` **false** on its nav and its first row, and the reverse transition
+(closed → open → closed) returns every number byte-identical.
+
+**Trap, and it produced a false reading in this session before it was caught:**
+`getBoundingClientRect()` on a node inside a CLOSED `<details>` still returns its last laid-out
+box — 207×98 here — because Chromium hides the subtree with `content-visibility`, not `display`.
+The first check reported the collapsed group as still painted. Only `checkVisibility()` and the
+group's own height tell the truth.
+
+**What is left of Q4, stated as a number rather than a plan:** 19 = 10 shell-sidebar destinations
++ 5 topbar (Back, Forward, search, Add, Settings) + 4 library toolbar. Reaching 12 means the shell
+sidebar itself, which is the window's primary navigation — a second design decision, not a repeat
+of this one. **Q4 stays NO and category 5 on Video stays PARKED at 9 answerable of 10.**

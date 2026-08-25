@@ -104,13 +104,45 @@
   gap: 1px;
 }
 
+/* The heading is the group's <summary>: a real control, so it carries a pointer,
+   a hover and a focus ring, and the UA's default triangle is replaced by the
+   chevron the rest of the shell uses. */
 .medialib-rail__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
   padding: 0 var(--space-sm) var(--space-xs);
   font-size: var(--font-size-2xs);
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+  border-radius: var(--radius-sm);
+}
+
+.medialib-rail__heading::-webkit-details-marker { display: none; }
+
+.medialib-rail__heading:hover { color: var(--text); }
+
+.medialib-rail__heading:focus-visible {
+  outline: 2px solid var(--focus, var(--accent));
+  outline-offset: 2px;
+}
+
+.medialib-rail__heading > svg {
+  flex: none;
+  opacity: 0.7;
+  transition: transform var(--motion-fast, 140ms) ease;
+  transform: rotate(90deg);
+}
+
+.medialib-rail__group[open] > .medialib-rail__heading > svg { transform: rotate(-90deg); }
+
+@media (prefers-reduced-motion: reduce) {
+  .medialib-rail__heading > svg { transition: none; }
 }
 
 /* The shared .ui-sidebar is a plain <nav>; these rules only tighten it for the
@@ -1028,11 +1060,20 @@
     min-width: 0;
   }
 
-  .medialib-rail__heading,
+  /* The heading itself must NOT go: it is the group's only way back open, and a
+     `display: none` summary over a closed `<details>` makes the whole group
+     unreachable at this width. Its TEXT goes; the chevron stays as a centred
+     toggle strip. */
+  .medialib-rail__heading-text,
   .medialib-rail__label,
   .medialib-rail__count,
   .medialib-rail__foot {
     display: none;
+  }
+
+  .medialib-rail__heading {
+    justify-content: center;
+    padding: var(--space-2xs) 0;
   }
 
   .medialib-rail .ui-sidebar__item {

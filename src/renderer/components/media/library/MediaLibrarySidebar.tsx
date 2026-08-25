@@ -6,9 +6,21 @@
  * focus ring, and its `label` is a ReactNode — so the grouped headings and the
  * right-aligned counts come out of composing it, with no change to a component
  * every other view depends on.
+ *
+ * THE GROUPS ARE DISCLOSURES, and the reason is spatial rather than cosmetic.
+ * The Media Center already carries its own 174–222px shell sidebar of ten
+ * destinations; on the Library page this rail put a SECOND persistent vertical
+ * column of nine rows beside it. At the shell's default 820px box that is close
+ * to half the window spent on two stacked navigation columns. Each group is now
+ * a real `<details>` with its heading as the `<summary>`: Library open, Media
+ * type and Collections closed until asked for, remembered per group.
+ *
+ * Nothing is obscured — every heading stays on screen with its own chevron, one
+ * click and one Enter away, and a group holding the ACTIVE scope is forced open
+ * so the rail can never hide where you are.
  */
 
-import { useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Sidebar, type SidebarItem } from '../../ui';
 import Icon, { type IconName } from '../../Icons';
 import { useT } from '../../../i18n';
@@ -68,6 +80,43 @@ const CATEGORY_ICONS: Record<MediaCategory, IconName> = {
 const CATEGORY_ORDER: MediaCategory[] = [
   'anime', 'drama', 'movie', 'tv', 'music', 'podcast', 'audiobook', 'learning', 'personal', 'inbox',
 ];
+
+/** The three disclosure groups, and which one a scope kind belongs to. */
+export type RailGroupId = 'library' | 'mediaType' | 'collections';
+
+const GROUP_OF: Record<LibraryScope['kind'], RailGroupId> = {
+  shelf: 'library',
+  category: 'mediaType',
+  collection: 'collections',
+};
+
+/**
+ * Open/closed is a preference, so it survives a reload — but it is stored per
+ * group and merged over the defaults rather than replacing them, so a stored
+ * blob written before a group existed cannot decide that group's first render.
+ */
+export const RAIL_GROUPS_KEY = 'jp-medialib-rail-groups';
+export const RAIL_GROUP_DEFAULTS: Record<RailGroupId, boolean> = {
+  library: true,
+  mediaType: false,
+  collections: false,
+};
+
+export function readRailGroupState(): Record<RailGroupId, boolean> {
+  try {
+    const raw = localStorage.getItem(RAIL_GROUPS_KEY);
+    if (!raw) return { ...RAIL_GROUP_DEFAULTS };
+    const parsed = JSON.parse(raw) as Partial<Record<RailGroupId, unknown>>;
+    const next = { ...RAIL_GROUP_DEFAULTS };
+    for (const id of Object.keys(RAIL_GROUP_DEFAULTS) as RailGroupId[]) {
+      if (typeof parsed?.[id] === 'boolean') next[id] = parsed[id] as boolean;
+    }
+    return next;
+  } catch {
+    // A corrupt or unavailable store must not cost the user their rail.
+    return { ...RAIL_GROUP_DEFAULTS };
+  }
+}
 
 export interface MediaLibrarySidebarProps {
   items: readonly MediaItem[];
@@ -156,26 +205,53 @@ export default function MediaLibrarySidebar({ items, value, onSelect, footer }: 
   const active = scopeKey(value);
   const select = (id: string): void => onSelect(parseScopeKey(id));
 
+  const [openGroups, setOpenGroups] = useState<Record<RailGroupId, boolean>>(readRailGroupState);
+  const activeGroup = GROUP_OF[value.kind];
+
+  // A collapsed group must never be the thing hiding the current scope. This runs
+  // on the group id rather than on the whole scope, so moving between two shelves
+  // does not re-open anything the user just closed.
+  useEffect(() => {
+    setOpenGroups((current) => (current[activeGroup] ? current : { ...current, [activeGroup]: true }));
+  }, [activeGroup]);
+
+  const setGroupOpen = useCallback((id: RailGroupId, open: boolean): void => {
+    setOpenGroups((current) => {
+      if (current[id] === open) return current;
+      const next = { ...current, [id]: open };
+      try {
+        localStorage.setItem(RAIL_GROUPS_KEY, JSON.stringify(next));
+      } catch {
+        // Preference only — a full or blocked store must not break the toggle.
+      }
+      return next;
+    });
+  }, []);
+
+  const group = (id: RailGroupId, headingKey: string, groupItems: SidebarItem[]) => (
+    <details
+      className="medialib-rail__group"
+      open={openGroups[id]}
+      /*
+       * `onToggle`, not `onClick` on the summary: `<details>` is a native control
+       * whose state also changes from the keyboard and from `find-in-page`, and a
+       * click handler would miss both and leave the stored preference lying.
+       */
+      onToggle={(event) => setGroupOpen(id, (event.currentTarget as HTMLDetailsElement).open)}
+    >
+      <summary className="medialib-rail__heading">
+        <span className="medialib-rail__heading-text">{t(headingKey)}</span>
+        <Icon name="chevron" size={11} />
+      </summary>
+      <Sidebar items={groupItems} value={active} onSelect={select} aria-label={t(headingKey)} />
+    </details>
+  );
+
   return (
     <nav className="medialib-rail" aria-label={t('media.rail.label')}>
-      <div className="medialib-rail__group">
-        <div className="medialib-rail__heading">{t('media.rail.library')}</div>
-        <Sidebar items={shelfItems} value={active} onSelect={select} aria-label={t('media.rail.library')} />
-      </div>
-
-      {categoryItems.length > 0 && (
-        <div className="medialib-rail__group">
-          <div className="medialib-rail__heading">{t('media.rail.mediaType')}</div>
-          <Sidebar items={categoryItems} value={active} onSelect={select} aria-label={t('media.rail.mediaType')} />
-        </div>
-      )}
-
-      {collectionItems.length > 0 && (
-        <div className="medialib-rail__group">
-          <div className="medialib-rail__heading">{t('media.rail.collections')}</div>
-          <Sidebar items={collectionItems} value={active} onSelect={select} aria-label={t('media.rail.collections')} />
-        </div>
-      )}
+      {group('library', 'media.rail.library', shelfItems)}
+      {categoryItems.length > 0 && group('mediaType', 'media.rail.mediaType', categoryItems)}
+      {collectionItems.length > 0 && group('collections', 'media.rail.collections', collectionItems)}
 
       {footer && <div className="medialib-rail__foot">{footer}</div>}
     </nav>
