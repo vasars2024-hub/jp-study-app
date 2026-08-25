@@ -628,6 +628,16 @@ Order: Reading → Novels → Library → Immersion → manga/PDF/EPUB/VN suites
 
 Gate: content remains legible and stable at all sizes; no tool obscures the document.
 
+**Bullet 1 CLOSED 2026-08-25** (`b2c6e7f5`). All six surfaces are on the contract — Captures,
+Novels, Library, Immersion, manga, VN — and the fifth named item resolved to ONE surface, not
+four: `renderer/pdfLoader.ts` is imported by `views/NovelReader.tsx` alone, so PDF and EPUB ARE
+surface 2. `ReadingToolSpec.side` (`132220b7`) was the last thing the contract lacked; the VN
+library is the first leading-edge tool and is emitted BEFORE the document in the DOM rather than
+moved with CSS `order`. Sweeping the six for that same defect found exactly one regression the
+migration had introduced — Captures' list had moved from the left column to the right edge, unseen
+because every assertion about it was a WIDTH (`eb9a07bf`). **Bullet 2 is now the open one**, and
+it is a parity question across those six rather than a new migration.
+
 **Progress (2026-08-25). Bullet 1 OPENED, not closed** — the contract exists and 1 of its 5
 surfaces uses it. Log: `.coordination/liquid-workplace/L6_READING_ECOSYSTEM.md`.
 `shared/liquidReadingCanvas.ts` + `components/liquid/ReadingCanvas.tsx` (`edb01bfa`) give a reading

@@ -440,3 +440,77 @@ The plan's fifth item is "manga/**PDF/EPUB/VN** suites", which is not one surfac
   re-signed). Restructuring its JSX on top of that, then reverting their diff out to build a
   HEAD+edit blob, is the fragile case. Re-check `git status --short` on that file first: if it is
   clean, this is a ~90-minute slice and bullet 1 closes with it.
+
+## 2026-08-25 — surface 6 (VN), the leading edge, and **BULLET 1 CLOSES**
+
+`ReadingCanvas` could only dock on the trailing edge, so the sixth surface needed a contract
+change first (`132220b7`): `ReadingToolSpec.side`, default `trailing`, inert to the arithmetic —
+the same spec with the side flipped returns identical `contentWidth`, `measureWidth` and tool
+width, with `side` itself as the control that something did differ. **A leading tool is EMITTED
+BEFORE `children`, never `order: -1`**: `order` repaints the box and leaves the DOM alone, so Tab
+and a screen reader would reach the document first and the index that navigates into it second.
+`readingCanvas.css` declares no `order` at all and a test asserts that. Mutation control: forcing
+`isLeading` to false → 2 red, restored 22/22.
+
+### Surface 6 — the visual novel panel (`b2c6e7f5`)
+
+Same defect as Captures and Library, third instance: `.visual-novel-layout` was `minmax(220px,
+290px) minmax(0, 1fr)` with a `@media (max-width: 760px)` stack that reads the WINDOW while the
+panel renders inside the Immersion fwin. Live, 600px pane inside a 1264px window:
+
+| | before | after |
+| --- | --- | --- |
+| canvas | 534 | 534 |
+| library | 290 | sheet, 534, `dialog`+`aria-modal`, doc `inert`+`aria-hidden` |
+| workspace | **232**, below the 384 floor | 534, restored on dismiss |
+| `matchMedia('(max-width: 760px)')` | **false** at `innerWidth` 1264 | n/a |
+
+The old grid was REBUILT LIVE at 534px to get that 232 — the negative control is that the
+responsive rule which existed for exactly this case cannot fire. At 820: canvas 754, library
+docked leading 290 (left 229 vs doc 531), workspace 452, `--lq-reading-measure: none`. Round trip
+600→820: same document NODE, 452 again.
+
+Two things it had to ADD, not move. (1) The library was always visible, so the contract's required
+`onClose` needed a real control — a header toggle with `aria-pressed` and a visible pressed state
+(accent border live, vs the plain sibling). (2) Both header buttons were **bare UA buttons at
+23x110** against the app's own 32px `--lq-hit-target`; 32x116 now. Fixing only the one I added
+would have been half a defect.
+
+**Keep the wrapper.** Every `.visual-novel-library` rule is a DESCENDANT selector (`ul`,
+`li > button`, `li span`), so rendering the tool content as a bare fragment unstyles the whole
+list while the layout still looks right in a screenshot.
+
+### The regression the migration itself introduced (`eb9a07bf`)
+
+Swept all six surfaces for it; **exactly one had it.** Before `efb18eba`, Captures rendered
+`<aside className="reading-captures-list">` FIRST against `minmax(180px, 260px) minmax(0, 1fr)` —
+the list was the left column. `ReadingCanvas` renders tools after the document, so the media-query
+fix silently moved it to the right edge, and nothing caught it because **every assertion on that
+surface was about WIDTH, and the width was right the whole time.** Live: list left 123 / passage
+left 395 now, vs list left 507 / passage left 123 before. Same widths, mirrored.
+The other five were re-derived, not assumed: Immersion `<ImmersionStage/>` then `{showRail &&
+<ImmersionRail/>}`, Library's `lib-drawer` after `<main>`, Novels' three `.settings-anchor`
+popovers, manga's `.ocr-panel` `position: fixed; right: 0`. All trailing before, all trailing now.
+
+### Traps this slice paid
+
+- **`source.includes('\r\n')` is not a CRLF test.** HEAD's `styles.css` holds 10 stray CRs in
+  26,065 lines, so that test called the whole file CRLF and the HEAD+edit blob staged as **26,068
+  added / 26,055 removed** instead of 13. Majority, not presence.
+- `git hash-object` **refuses `--path` together with `--no-filters`**. Use `--no-filters` alone
+  when the blob file already holds the exact bytes you want stored.
+- A quoted bash heredoc still ate one level of backslash here (the pinned `\`→`\` trap), which put
+  real newlines inside JS string literals. `String.fromCharCode(10)` / `(13, 10)` sidesteps it.
+
+**RULE 1: 256 lines of test, 0 of scaffolding.** `vnCanvas.test.tsx` is the SIXTH caller of
+`helpers/readingCanvasSurface` — no new probe, no new harness, and every live number came through
+the debug bridge, which leaves no files. Six canvas suites 88/88.
+
+### Bullet 1 status
+
+**CLOSED.** "Establish the common content canvas and reading-side-tool contract" — the contract is
+`shared/liquidReadingCanvas.ts` + `components/liquid/ReadingCanvas.tsx`, and all five named
+surfaces plus VN use it: Captures, Novels (PDF and EPUB are the same reader), Library, Immersion,
+manga, VN. Bullet 2 — "preserve progress, capture, dictionary, mining, source and deep-link
+behavior" — is what the next turn opens on, and it is a PARITY question across those six, not a
+new migration.
