@@ -658,7 +658,19 @@ The primitive gained `position: relative` on `.lq-reading-doc` — and **the neg
 the first explanation**: the page does not paint over the tool (`overflow: auto` clips it), it
 MIS-MEASURES, reporting `clientWidth` 1264 inside a 696 px region, which is the number
 `NovelReader.tsx:935` sizes every paged column from.
-**Still open in bullet 1: Library, Immersion, and the manga/PDF/EPUB/VN suites.**
+Third surface, **Library** (`95c91741`), and fourth, **Immersion** (`000c7c4d`) — Immersion had no
+responsive rule at all, so the stage absorbed the rail's 220px at *every* window size. Fixing it
+exposed a defect in the primitive that all four shared (`09bbced2`): `.lq-liquid` sets
+`position/padding/background` at the same (0,1,0) specificity as `.lq-reading-sheet` and loads
+later, so every sheet was a **partial cover** — 338px in flow beside a 112px document at a 462px
+canvas — the one outcome the contract calls inexpressible. Fixed by specificity, not import order.
+Immersion was then re-measured for rubric category 7 and failed it (`5c477856`): its rail held
+**883 rows / 6,182 elements** at 112x overdraw, now 20 / 163. That fix is where
+`probes/cat7-collection-weight.cjs` comes from — one surface-parameterised harness for the whole
+category, per RULE 1.
+
+**Still open in bullet 1: the manga/PDF/EPUB/VN suites.** Manga is measured and ready to start;
+the finding and the migration shape are in the L6 log's last section.
 
 ### L7 — Review and learning loop
 

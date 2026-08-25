@@ -284,3 +284,65 @@ already `nowrap` + ellipsis, so the variance is not wrapping. `completionPct > 0
 conclude the bar is dead. Give the row a deterministic height before virtualising.
 Trap to check, from `4e2c46e1`: this repo has already shipped virtualisation that was *present and
 inert*.
+
+## 2026-08-25 — the certified surface was a category-7 defect, and the harness is now reusable
+
+`5c477856`. Not a bullet: L6 bullet 1 stays at 4 of 5 surfaces. This is rubric category 7 on a
+surface L6 already passed, found by running the new harness at the surface we had just shipped.
+
+**Before → after, same script, different arguments.**
+
+| | before | after |
+| --- | --- | --- |
+| rows in the DOM | **883** | **20** |
+| elements under `.immersion-rail` | **6,182** | **163** |
+| distinct row heights | 3 (49x879, 50x1, 51x3) | **1** (49) |
+| `scrollHeight` / viewport | 46,822 / 418 = **112x** | 46,815 / 418 |
+| spacer | none | **46,799** = 883 x 53 exactly |
+| verdict | **UNWINDOWED** | **WINDOWED** |
+
+The 7px the scrollHeight lost is the whole row-height story: 883 x 53 + 4 + 12 padding = 46,815,
+and the four odd rows were exactly the missing 7. Their variance was **not** wrapping — the title
+is already `nowrap` + ellipsis. It was `line-height: normal`: `(`, `[` and `․` fall back to a font
+with a taller line box. Pinned to 16px/15px, which is what the other 879 already computed to, so
+nothing moved for them — and because wired overrides the meta's `font-size` but not its
+`line-height`, the slot is now theme-independent. The completion bar was the second source
+(`margin-top: 4 + height: 2` made a row with progress 55px against a 53px slot); it is out of flow
+in the card's existing 6px bottom padding. **0 of 883 sites here have `completionPct > 0`**, so
+that branch is held in JSDOM, not live — its absence is not evidence it is dead.
+
+Windowing costs accessibility unless declared, so `VirtualList` gained `listRole`/`itemRole`:
+each slot carries the FULL `items.length` as `aria-setsize` and its true `aria-posinset`, wrappers
+`presentation`. Without it, 883 sites announce as "1 of 20". Live at the bottom: rows 870..883,
+`aria-setsize` 883, the 883rd reachable and hit-testing to its own content.
+
+**RULE 1 — `probes/cat7-collection-weight.cjs` names no surface.** Title/container/row are
+arguments; it COMPUTES the verdict and distinguishes WINDOWED from **INERT**, because this repo
+shipped virtualisation that was present and had no effect (`4e2c46e1`). Mutation control:
+`endIdx = total` turns 3 of 6 new tests red; restored 13/13. The suite's last test is the viewport
+control — give the rail the library's full height and all 883 rows must appear.
+
+**Swept all 9 open surfaces with it: Immersion was the only UNWINDOWED one.** Grammar's 139,780px
+scroller has 146 descendants — already a spacer. Honest limit: Dictionary (39 nodes) and Translate
+(46) were EMPTY, and the rubric caps an empty harness at 0, so those two are unmeasured, not clean.
+
+### NEXT SLICE — surface 5, the manga reader. Measured, do not re-derive.
+
+`.ocr-panel` (styles.css:8717) is `position: fixed; top: 56px; right: 0; width: min(380px, 44vw)`
+and `.manga-stage` never insets for it. Live on a real volume (One Punch-Man, 18 pages, OCR panel
+open): stage **1264** = the whole viewport, panel occupies **964..1264**, containing block
+**viewport** — no ancestor creates one.
+
+**My first claim was refuted by its own measurement, so state it correctly:** the panel does NOT
+cover this page. `overlapWithPage: 0`, `pageCoveredPct: 0`, and `elementFromPoint` under the panel
+returns `IMG.manga-page`. This page is height-bound (512 wide at max-height 729). What IS wrong is
+the same defect Novels had (`38a83c03`) — it **MIS-MEASURES**: the fit math emits
+`max-width: 1264px` while only **964px** is visible, and the page centres in 1264, putting its
+centre at 632 against a visible centre of 482 — **150px off-centre**, toward the panel. Any page
+wider than 964 is then a real cover. `44vw` is a viewport unit too, so in Blanc's pane or a pop-out
+the panel is sized and placed by the screen, not the reader.
+
+Migration shape, already scouted: `MangaReader.tsx:1451` is the stage, `:1531` the `<aside>`
+(running to ~:1930, `MangaSidebar` at :1850). Extract the aside's children to a `content` variable
+rather than moving them, then wrap the stage in `ReadingCanvas` with one tool. Watch `stageRef`
+(page-fit math) and the two absolutely-positioned `.nav-zone`s inside the stage.
