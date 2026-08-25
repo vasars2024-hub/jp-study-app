@@ -1131,3 +1131,66 @@ frame remains, at `pointerup`, where `onPatch({x,y})` commits the position — a
 the layout persist. That commit has to happen; removing its cost is a separate slice (commit off
 the gesture frame, e.g. in a `requestIdleCallback` or after a rAF), and it is named here rather
 than half-attempted. Reported as measured: two real improvements, bar still missed.
+
+## 2026-08-25 — leg 1 CLOSES: FloatingWindow's memo could never hit (`9c4a38e5`)
+
+**The cause, read from source rather than profiled.** `FloatingWindow` is `memo()`-wrapped, but
+the call site handed it six freshly-allocated arrows AND a fresh `children` element on every
+render, so the shallow comparison failed on seven props at once. The wrapper cost a comparison and
+skipped nothing: one `patch()` — which `pointerup` fires to commit the position — re-rendered every
+open window and every `AppSection` under it. Stabilising the callbacks alone would not have worked;
+`children` is a prop too, and an element literal is a new object every render.
+
+Fix: `src/renderer/renderIdentityCache.ts`, a per-key identity cache (hooks cannot run in a loop,
+so `useMemo` is unavailable here). Handler bundles read the actions through a ref rather than
+closing over the current render's functions — `focus`/`close`/`patch` are plain declarations
+recreated every render, so capturing them would freeze the first render's closures. Stamped by
+section so `onPopOut` can never aim at a previous app; pruned on the `wins` effect. `note` and
+`settings` bodies are deliberately NOT cached (their children depend on live state) — the honest
+limit of the fix. 8 tests; mutation control (always rebuild) turns 6 of 8 red.
+
+**Measured after a REAL RESTART, as the rubric requires.** App stopped and `npm start`ed fresh
+(main pid 32344). Same three-window desktop (Media / Video / Dictionary), `-Title Dictionary` so
+the instrument drives the scored surface, `closedLoop=True` on every run.
+
+**The harness was loaded first, and this is not bookkeeping.** On the cold boot the Dictionary
+window restored EMPTY — 341 body chars, 12 controls. An empty body is a far cheaper re-render than
+the loaded one the "before" numbers came from, so a clean score there would have been the rubric's
+"measured only on an empty harness" cap, not a pass. Queried 食べる through the window's own input
+(React needs the native value setter, not a bare `.value` write) to reach **67 controls / 5,461
+body chars / 334 nodes** — the previous entry's loaded state was 67 / 5,385. Then re-drove.
+
+| drag, 6 runs each | frames delivered | over 33 ms | over 100 ms | worst frame |
+| --- | --- | --- | --- | --- |
+| before (last entry) | 92, 93, 93, 95, 95, 92 | 4,4,4,5,4,4 | 2,0,0,0,2,2 | **100.4** |
+| after, empty body | 109–110 | **0** ×6 | **0** ×6 | 17.5 |
+| after, loaded body | 109–111 | **0** ×6 | **0** ×6 | **16.9** |
+| after, standard presentation | 110–111 | **0** ×3 | **0** ×3 | 16.9 |
+
+Compositor ceiling on this display measured the same session: **16.9 ms**. The loaded drag's worst
+frame is *equal to the ceiling*, so the gesture is no longer distinguishable from what the display
+can do at all. Standard presentation matches, which is the control that says the fix is in the
+shell's drag path and not something presentation-specific.
+
+**Legs 2 and 3.** Leg 2: `Find example sentences` — the heaviest action this window performs —
+main `/health` **max 3.5 ms** (p50 1.0, 40 samples) against a 500 ms bar, with the work proven
+rather than assumed: nodes 349→415, chars 5,476→6,038, `done:true`, 3,002 ms of renderer work.
+Resize max **16.9** (was 83.7), theme apply **26.3** / restore **33.7** ms with
+`restoredTo=forest-night`. Leg 3 is IN PROGRESS, not claimed: main private **557.6 MB at 2.9 min**
+uptime, inside L0's 550–577 band, with the 8/16/24-minute curve still being sampled to
+`%TEMP%\l7c-mem-memofix.jsonl`.
+
+**Instrument repair, one, and it prevents a fabricated finding.** Two of ten pre-restart runs
+reported `frame_max_ms = 3927.9` — *identical to the decimal*, which no pair of independent
+gestures produces — while eight surrounding runs read 16.8–17.5. That is Chromium throttling rAF
+in a backgrounded window; the probe checked focus only BEFORE installing the recorder, and
+dropping index 0 does not catch it because the gap lands mid-recording. `liquid-interaction-probe.ps1`
+now re-checks focus after the gesture and **VOIDs** rather than reporting a throttle gap as
+renderer cost. Sensitivity control still fires: `-Jank` gives 12 blocks → **12** frames over 100 ms,
+max 117.1, so the recorder sees what it reports and the zeros above are a real result.
+
+**Trap this pass adds, paid for twice.** `l7c-mem-sampler.ps1` cannot be launched with `pwsh -File`:
+`-Marks 8 16 24` produces no file at all, and `-Marks "8,16,24"` binds as a single mark of
+**81624.0** — a sampler that stays alive, samples nothing, and reads exactly like one still
+waiting for its first mark. Use `-Command` with `@(8,16,24)` and read the header record back;
+`marks:[8.0,16.0,24.0]` is the only proof of a good bind. Written into the probe's own header.

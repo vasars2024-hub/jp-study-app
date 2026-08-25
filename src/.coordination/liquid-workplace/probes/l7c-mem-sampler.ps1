@@ -16,6 +16,19 @@
 # through Start-Process -ArgumentList fails the bind and the script produces NO output file
 # while its pwsh process stays alive -- which reads exactly like a sampler still waiting.
 # Pass @(8,16,24).
+#
+# 2026-08-25, the same trap twice more, so here is the ONE form that works. `pwsh -File`
+# cannot express an array argument at all -- every attempt binds silently wrong and the
+# header record is the only place it shows:
+#   -ArgumentList "-File",...,"-Marks","8","16","24"   -> DEAD, no file at all
+#   -ArgumentList "-File",...,"-Marks","8,16,24"       -> ALIVE, marks:[81624.0], one mark
+#                                                          ~56 days out; it samples nothing
+#                                                          and never exits
+# Use -Command and let PowerShell parse the array literal:
+#   Start-Process pwsh -ArgumentList @('-NoProfile','-Command',
+#     "& '<path>' -MainPid $pid -Marks @(8,16,24) -Out '$out'")
+# ALWAYS read the header record back before walking away: `marks` is written verbatim, so
+# [8.0,16.0,24.0] is proof of a good bind and anything else is a run that will never report.
 param(
   [Parameter(Mandatory = $true)][int]$MainPid,
   [double[]]$Marks = @(8, 16, 24),
