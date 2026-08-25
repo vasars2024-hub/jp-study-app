@@ -216,3 +216,45 @@ on the `lq-liquid` count; the search form wrapped → *"expected true to be fals
 
 **Next slice:** category 3 is now scorable on this surface. Categories 2, 4, 5, 8 are still
 L1-era and pre-Liquid, so `LIQUID_SCORECARD.md` stays empty until they are re-driven here.
+
+## 2026-08-25 · primary · L5.3 + L5.4 — Grammar and Translate, and the region that stayed plain
+
+| Slice | Commit | What landed |
+| --- | --- | --- |
+| L5.3 Grammar | `b211841f` | `GrammarView`'s `.view-head` adopts `ContextualSurface`; 3 cases |
+| L5.4 Translate | `79ad40c2` | `TranslateView`'s `.view-head` adopts it; 3 cases |
+
+L5's order is Dictionary → Grammar → Translate → Agent. Dictionary landed 2026-08-18;
+these are stops two and three. Same shape each time and deliberately so: exactly one
+region per view is a contextual tool — an intro line plus a mode/direction switch —
+and everything the switch selects is dense Work that stays on an opaque anchor.
+
+**The decision worth recording, because it is the one that could have gone either
+way: `.tr-actions` stays plain.** It carries the busy status and the error line, and
+§2.3's honest-states requirement makes a translucent error a legibility risk rather
+than a contextual tool. It is named in the same assertion as `.tr-panes`,
+`.tr-textarea` and `.tr-output` so a later worker reads a decision, not an omission.
+Grammar's four mode panels (prose, practice form, curation table, guides browser) are
+the same call and are driven through the switch one at a time rather than asserted on
+the default one.
+
+**Conventional presentation cost 0**, §2's first non-negotiable: both render
+`lq-contextual` + `data-lq-role` and never `lq-liquid`, and `.lq-contextual` paints
+nothing until an ancestor opts in with `.fwin-liquid`. Asserted as a count of 0.
+
+**Controls.** Swap each `ContextualSurface` back for a plain `div`: Grammar **2 red**,
+Translate **3 red**. Both restored; 22/22 across the three region suites plus the new
+one. The third case in each file asserts the surface COUNT first — without that,
+"every panel is outside the contextual surface" passes trivially when there is none,
+which is exactly what the control produces.
+
+**Trap paid.** `GrammarView.tsx` is dirty with another track (an extra import plus a
+~24-line block inside the component), so `git add` absorbs it.
+`debug/l8b-stage-grammarview.cjs` rebuilds HEAD + these 3 edits, prints the
+added/removed line sets and hashes `--no-filters`; it is `l5b-stage-dictview.cjs` with
+new anchors. `TranslateView.tsx` was clean and needed none of that — check with
+`git diff --stat -- <file>` before reaching for the script.
+
+**Next slice:** L5's fourth stop, Agent (`AgentView`/the agent surface), then the
+category re-drive on these three surfaces — 2/4/5/8 are still L1-era and pre-Liquid,
+so `LIQUID_SCORECARD.md` gains no row from L5 alone.

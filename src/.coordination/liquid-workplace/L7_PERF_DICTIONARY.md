@@ -1589,3 +1589,53 @@ RSS diverging 34.5 MB the other way.
 10 frames over 100 ms, p95 116.9); isolation (renderer blocked 1.5 s → main max 5.8, unmoved);
 **sensitivity, and it is the real defect rather than a synthetic one** (`chunk=10,000,000` →
 963.2 ms, over the bar); the unit yield control (1 red); the unit single-window control (3 red).
+
+## 2026-08-25 · primary · the compound scan's cap sat under an ORDER BY and could never fire
+
+`a4c11872`. The next-slice this file named last turn, closed.
+
+**The diagnosis, from SQLite's own plan rather than from timing.** Both
+`findLexiconCompounds` and `findLexiconCollocations` ran `limit COMPOUND_SCAN_ROWS`
+(200) / `COLLOCATION_SCAN_ROWS` (600) under `order by h.score desc, length(h.text)
+asc, h.id asc`. `explain query plan` ends **`USE TEMP B-TREE FOR ORDER BY`**: the sort
+must see every match before the limit can discard one, so the visit was always the
+whole `lang` partition of `idx_hw_norm` — **770,612** rows for `ja` — whatever the cap
+said. Match counts, measured: 猫 504, 日 5,147, 腹 993, 食べる 11. The cap "fires" on
+three of the four and changes nothing.
+
+**Cold A/B on the shipped 537.2 MB dict.db**, `tools/evict-file-cache.ps1` between the
+arms, each arm its own process (the other arm's reads destroy the condition):
+
+| arm | 猫 | 日 |
+| --- | --- | --- |
+| shipped, one statement | **1,244.1 ms** in ONE main-loop block | 473.4 ms |
+| windowed, 155 windows | 1,243.2 ms total / **worst window 47.9 ms** | 553.0 / **92.4** |
+
+The total is unchanged because the cost is page residency, not CPU. What changed is
+that nothing blocks main past 500 ms. `HEADWORD_SCAN_CHUNK_ROWS`=**5,000**, chosen by
+measurement: 20,000 is cheaper overall (39 windows, +0% total) and its worst window is
+**179.0 ms**, too little headroom on a colder machine than this one — 5,000 costs ~11%
+more total for 2× the margin.
+
+**The trap this file warned about, honoured.** The window is on `h.norm`, NOT the
+rowid. `idx_hw_norm` is `(lang, norm)`, `instr(h.norm, ?)` is evaluated off the index
+and only a match pays a table seek — a rowid window would trade a 5,386-page index
+scan for a 17,792-page table scan. The cursor is a **COVERING** `limit 1 offset N`
+probe (its plan says so) and each window is `(from, upto]`, which partitions the index
+exactly: `norm > from` makes `upto` strictly greater than `from` even when thousands
+of rows share a `norm`, so there is no gap, no duplicate and no infinite loop.
+
+**Identity, not approximation.** The ordering moved into JS with `h.score` selected
+and the list truncated to the cap after every window — the global top-N on bounded
+memory. `debug/l8a-compound-scan-shape.cjs` asserts it against the real database:
+**identical top-200, same ids in the same order, for 猫 / 日 / 腹 / 食べる**.
+
+**Controls.** Remove the yield → **1 red**; stop after one window → **3 red**. Tests
+8 → 11 on compounds. Both restored green.
+
+**Not done this turn, and it is the honest gap:** the fix is proven by unit tests and
+by the probe against the live database file, NOT yet re-driven through the running
+app — main pid 39160 started 07:53:35, before the edit, and main does not hot-reload.
+The next turn opens on that restart. Category 7's Dictionary score stays as scored;
+this lowers a number that was already inside the bar (304.2 ms live), so it cannot
+retroactively invalidate it.
