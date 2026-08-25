@@ -21,6 +21,7 @@ import {
   createReadingSurfaceHarness,
   expectDismissRestoresDocument,
   expectPlacement,
+  expectToolSurvivesPlacementChange,
   installReadingSurfaceApi,
   installResizeObserver,
   type ReadingSurfaceHarness,
@@ -127,5 +128,14 @@ describe('the classic Library shelf through the L6 reading canvas', () => {
     await selectFirstRow(h);
     expectPlacement(h, 'library-detail', { placement: 'sheet', contentWidth: 600 });
     await expectDismissRestoresDocument(h, 'library-detail');
+  });
+
+  it('keeps the detail drawer subtree when the shelf narrows under it', async () => {
+    // L6 bullet 2 on the tool side, the fifth surface to assert it. The drawer
+    // is where a shelf item's source, its progress and its actions live, and a
+    // remount hands the user a freshly-collapsed copy of all three.
+    const h = await mountLibrary(1200);
+    await selectFirstRow(h);
+    await expectToolSurvivesPlacementChange(h, 'library-detail', { docked: 1200, sheet: 600 });
   });
 });

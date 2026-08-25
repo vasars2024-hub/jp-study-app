@@ -28,6 +28,7 @@ import {
   createReadingSurfaceHarness,
   expectDismissRestoresDocument,
   expectPlacement,
+  expectToolSurvivesPlacementChange,
   installReadingSurfaceApi,
   installResizeObserver,
   type ReadingSurfaceHarness,
@@ -103,6 +104,13 @@ describe('the Immersion browser through the L6 reading canvas', () => {
     const h = await mountImmersion(500);
     expectPlacement(h, 'sites', { placement: 'sheet', contentWidth: 500 });
     await expectDismissRestoresDocument(h, 'sites');
+  });
+
+  it('keeps the rail subtree when the canvas narrows under it', async () => {
+    // The rail is windowed -- 20 rendered rows of 883 after 5c477856 -- so its
+    // scroll offset IS the user's place in it, and a remount is a jump to the top.
+    const h = await mountImmersion(1200);
+    await expectToolSurvivesPlacementChange(h, 'sites', { docked: 1200, sheet: 500 });
   });
 
   it('docks at exactly the width where the rail still fits, and not below it', async () => {

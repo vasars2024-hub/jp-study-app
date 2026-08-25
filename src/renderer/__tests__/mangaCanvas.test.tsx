@@ -34,6 +34,7 @@ import {
   createReadingSurfaceHarness,
   expectDismissRestoresDocument,
   expectPlacement,
+  expectToolSurvivesPlacementChange,
   installReadingSurfaceApi,
   installResizeObserver,
   type ReadingSurfaceHarness,
@@ -161,6 +162,14 @@ describe('the manga reader through the L6 reading canvas', () => {
     await openOcrPanel(h);
     expectPlacement(h, TOOL, { placement: 'sheet', contentWidth: 620 });
     await expectDismissRestoresDocument(h, TOOL);
+  });
+
+  it('keeps the OCR panel subtree when the reader narrows under it', async () => {
+    // The panel holds a scan in flight, the edited regions and the translation
+    // for the current page. A remount silently restarts all of it.
+    const h = await mountReader(1200);
+    await openOcrPanel(h);
+    await expectToolSurvivesPlacementChange(h, TOOL, { docked: 1200, sheet: 620 });
   });
 
   it('docks at exactly the width where the panel still fits, and not one pixel below', async () => {
