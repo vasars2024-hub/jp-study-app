@@ -102,3 +102,47 @@ tree, so it is Liquid → Standard → Liquid and it is left as found. The on-di
 here and is not folded into this score.
 
 **Category 6 = 10/10 on this tree**, commit `b0232340`.
+
+## 2026-08-25 · primary — the Media Center's 8 rows re-derived after their routes moved; 8/8 in both
+
+| Slice | Commit | What landed |
+| --- | --- | --- |
+| Media Center parity re-verified live, 4 rows rewritten | *this commit* | `+probes/l6m-parity-run.cjs`, `l6-parity-dictionary.js`, `parity-ledger.json` |
+
+**Why now, and not as a routine re-check.** `e61d3179` moved three of these rows' routes —
+Readiness/Review/Discover and `.mc-seanime-link` behind `details.mc-nav-group`, sort and density
+behind `details.medialib-view`. **A parity ledger whose `currentRoute` points at a path the
+product no longer has is worse than no ledger**: it reads as proof while describing a surface
+that is gone. So the four affected rows are re-derived from the running app, not edited from
+memory.
+
+**`__L6M.check()` answers only five of eight.** `librarySearch`, `itemActions` and
+`workspaceRoute` come back `not driven`, because a row whose claim is "the feature still works"
+cannot be answered by counting a control. `l6m-parity-run.cjs` drives those three with real
+sleeps between steps and reads both presentations without toggling anything — this desktop
+carries Media in **standard** and Video in **liquid**, and `findMediaWin(pres)` selects on
+`data-presentation`.
+
+**Media Center parity: 8 of 8 reachable in BOTH presentations, 0 unequal.**
+
+| row | standard | liquid |
+| --- | --- | --- |
+| railNav | railButtons=9 active=1 | railButtons=9 active=1 |
+| shelfFilter | shelves=9 current=1 | shelves=9 current=1 |
+| librarySearch | cards 1 → 0 → 1 | cards 1 → 0 → 1 |
+| sortAndView | sortOptions=7 viewButtons=2 pressed=1 | same |
+| itemActions | menuItems 0 → 4 → 0 **via=card** | menuItems 0 → 4 → 0 **via=spotlight** |
+| history | back.disabled=true forward=true | back.disabled=false forward=true |
+| workspaceRoute | `.seanime-host` 0 → 1 → 0 | 0 → 1 → 0 |
+| windowLifecycle | chromeButtons=5 liquidAriaPressed=false | =true |
+
+`railButtons` is **9, not the previous 8** — `.mc-seanime-link` now renders inside `.mc-nav`.
+
+**The one NOT-PARITY the first run reported was the probe, and it is fixed here.** `itemActions`
+read `no card action control` in the liquid leg. The Video window's shelf holds ONE entry in
+grid view, which `MediaLibraryBrowser` renders as a **spotlight** rather than a
+`.medialib-card` — and `.medialib-spotlight__actions`' last button calls the *identical*
+`onMenu`. `menu:open` matched only the card selector, so a feature that was on screen and
+working scored the row NOT reachable. It now tries both and reports which one it used. This is
+the same probe-fails-to-match error the `menu:close` note two branches above already records;
+a selector that misses a rendering reads exactly like a missing feature.

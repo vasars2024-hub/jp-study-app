@@ -183,14 +183,14 @@
     {
       "app": "mediaCenter",
       "feature": "Section rail: Home / Library / Video / Music / Study Mode / Readiness / Review / Discover",
-      "currentRoute": "Media Center window > `.mc-nav` entries",
+      "currentRoute": "Media Center window > `.mc-nav`: Home / Library / Video / Music / Study Mode always visible; Readiness / Review / Discover behind `details.mc-nav-group` (collapsed by default, forced open while one of them is the active tab), plus `Ctrl+1..8` on `.mc-root` regardless of the disclosure",
       "standardDestination": "the named page replaces `.mc-content` in-window",
       "liquidDestination": "Same in-window Media Center (`.mc-root`) on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, dense library rows kept on an opaque anchor; the nav rail is the ContextualSurface (`bde1b435`)",
       "keyboardRoute": "all eight are real buttons, focusable",
       "dataStateOwner": "view state, local to MediaCenterView",
-      "automatedProof": "probes/l6-parity-dictionary.js (`window.__L6M.check()`, 8/8 in BOTH presentations, 2026-08-25)",
+      "automatedProof": "probes/l6m-parity-run.cjs (`window.__L6M` check + driven steps, 8/8 in BOTH presentations, 2026-08-25)",
       "visualProof": "live bridge drive, 2026-08-25 (L6 category 6, Video window)",
-      "observed": "railButtons=8, active=1 — `is-active` is exclusive in liquid AND in standard. Control: making a second rail entry active flips this row 8/8 -> 7/8 and nothing else",
+      "observed": "railButtons=9, active=1 in liquid AND in standard — `is-active` is exclusive in both. 9, not the previous 8, because `.mc-seanime-link` now renders inside `.mc-nav`. Ctrl+8 reaches Discover with the group CLOSED and force-opens it (l1-q4-mc-walk.cjs, 18/18). Control: making a second rail entry active flips this row 8/8 -> 7/8 and nothing else",
       "status": "both"
     },
     {
@@ -222,14 +222,14 @@
     {
       "app": "mediaCenter",
       "feature": "Sort and view mode (grid / list)",
-      "currentRoute": "Media Center > Library > `.medialib-browser__tools`",
+      "currentRoute": "Media Center > Library > `.medialib-browser__tools > details.medialib-view` — one disclosure holding the sort `<select>` and the grid/list group; the active sort is printed on the closed summary",
       "standardDestination": "same entries, re-ordered or re-laid-out",
       "liquidDestination": "Same in-window Media Center (`.mc-root`) on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, dense library rows kept on an opaque anchor; the nav rail is the ContextualSurface (`bde1b435`)",
       "keyboardRoute": "a real `<select>` plus two `aria-pressed` buttons",
       "dataStateOwner": "per-category sort state; view persisted",
-      "automatedProof": "probes/l6-parity-dictionary.js (`window.__L6M.check()`, 8/8 in BOTH presentations, 2026-08-25)",
+      "automatedProof": "probes/l6m-parity-run.cjs (`window.__L6M` check + driven steps, 8/8 in BOTH presentations, 2026-08-25)",
       "visualProof": "live bridge drive, 2026-08-25 (L6 category 6, Video window)",
-      "observed": "sortOptions=7, viewButtons=2, pressed=1 in both presentations. Driven in the round trip: List -> Grid survived Standard->Liquid->Standard. Control: pressing both view buttons flips this row alone",
+      "observed": "sortOptions=7, viewButtons=2, pressed=1 in both presentations. Driven through the disclosure: opening it, changing the sort REORDERS the shelf (first card 「パラッ」… -> The Big O on a 36-entry shelf) and the density flips aria-pressed false/true; Escape and an outside pointerdown both close it. Control: pressing both view buttons flips this row alone",
       "status": "both"
     },
     {
@@ -240,9 +240,9 @@
       "liquidDestination": "Same in-window Media Center (`.mc-root`) on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, dense library rows kept on an opaque anchor; the nav rail is the ContextualSurface (`bde1b435`)",
       "keyboardRoute": "a real button; the menu takes Escape and arrow keys",
       "dataStateOwner": "MediaLibraryShell cardMenu state",
-      "automatedProof": "probes/l6-parity-dictionary.js (`window.__L6M.check()`, 8/8 in BOTH presentations, 2026-08-25)",
+      "automatedProof": "probes/l6m-parity-run.cjs (`window.__L6M` check + driven steps, 8/8 in BOTH presentations, 2026-08-25)",
       "visualProof": "live bridge drive, 2026-08-25 (L6 category 6, Video window)",
-      "observed": "menu items 0 -> 4 -> 0 in both presentations. INSTRUMENT NOTE: `ContextMenu` closes on **mousedown** captured on `window` (`ui/ContextMenu.tsx:70`) — a probe sending `pointerdown` or `.click()` reads the menu as never closing and the count accumulates 4 -> 8 across the two windows",
+      "observed": "menuItems 0 -> 4 -> 0 in both presentations, via=card in standard and via=SPOTLIGHT in liquid. The two are one affordance: a shelf of one entry in grid view renders `.medialib-spotlight__actions`, whose last button calls the same `onMenu` as `.medialib-card__more`. Matching only the card selector had scored this row NOT reachable in liquid while the control was on screen and working",
       "status": "both"
     },
     {
@@ -261,14 +261,14 @@
     {
       "app": "mediaCenter",
       "feature": "Route out to the Media workspace and back",
-      "currentRoute": "Media Center > `.mc-seanime-link`, then the host bar's `Close`",
+      "currentRoute": "Media Center > `.mc-nav > details.mc-nav-group > .mc-seanime-link`, then the host bar's `Close`",
       "standardDestination": "the full-screen `.seanime-host` overlay, and back to the window",
       "liquidDestination": "Same in-window Media Center (`.mc-root`) on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, dense library rows kept on an opaque anchor; the nav rail is the ContextualSurface (`bde1b435`)",
       "keyboardRoute": "both are real buttons",
       "dataStateOwner": "openMediaWorkspace / mediaWorkspaceHostExists",
-      "automatedProof": "probes/l6-parity-dictionary.js (`window.__L6M.check()`, 8/8 in BOTH presentations, 2026-08-25)",
+      "automatedProof": "probes/l6m-parity-run.cjs (`window.__L6M` check + driven steps, 8/8 in BOTH presentations, 2026-08-25)",
       "visualProof": "live bridge drive, 2026-08-25 (L6 category 6, Video window)",
-      "observed": "`.seanime-host` count 0 -> 1 -> 0 in both presentations. The enable has its disable, which is the invariant this row exists for. NOTE: the host mounts at `body > div > .seanime-host`, OUTSIDE the window that opened it",
+      "observed": "`.seanime-host` count 0 -> 1 -> 0 in both presentations, driven at this tree with the launcher inside the disclosure. The enable has its disable, which is the invariant this row exists for. NOTE: the host mounts at `body > div > .seanime-host`, OUTSIDE the window that opened it",
       "status": "both"
     },
     {

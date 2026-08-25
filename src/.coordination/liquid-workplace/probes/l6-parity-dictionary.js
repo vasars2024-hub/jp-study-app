@@ -451,7 +451,7 @@
     row(
       'itemActions',
       !!im && im.opened > 0 && im.closed === 0,
-      im ? `menuItems opened=${im.opened} afterClose=${im.closed}` : 'not driven',
+      im ? `menuItems opened=${im.opened} afterClose=${im.closed} via=${im.via || 'card'}` : 'not driven',
     );
 
     // 6. History. Side effect: `Back`/`Forward` reflect real depth — both disabled
@@ -530,11 +530,22 @@
     }
 
     if (name === 'menu:open') {
-      const more = q(win, '.medialib-card__more');
-      if (!more) return { refused: 'no card action control' };
-      d.itemActions = { before: document.querySelectorAll('[role="menuitem"]').length };
+      // TWO RENDERINGS, ONE AFFORDANCE (2026-08-25). `.medialib-card__more` is the grid/list
+      // CARD's control. A shelf holding a single entry in grid view renders a SPOTLIGHT
+      // instead (`MediaLibraryBrowser`'s `entries.length === 1` branch), whose
+      // `.medialib-spotlight__actions` last button calls the identical `onMenu`. Matching only
+      // the card selector reported `no card action control` and scored this row NOT reachable
+      // in the liquid leg while the feature was on screen and working — the same
+      // probe-fails-to-match error the `menu:close` note two branches down already records.
+      const more = q(win, '.medialib-card__more')
+        || (qa(win, '.medialib-spotlight__actions button').slice(-1)[0] || null);
+      if (!more) return { refused: 'no card action control (neither .medialib-card__more nor a spotlight action)' };
+      d.itemActions = {
+        before: document.querySelectorAll('[role="menuitem"]').length,
+        via: more.classList.contains('medialib-card__more') ? 'card' : 'spotlight',
+      };
       more.click();
-      return { clicked: true, before: d.itemActions.before };
+      return { clicked: true, via: d.itemActions.via, before: d.itemActions.before };
     }
     if (name === 'menu:read') {
       if (!d.itemActions) return { refused: 'menu not opened' };
