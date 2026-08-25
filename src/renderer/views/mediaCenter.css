@@ -189,6 +189,31 @@
   backdrop-filter: var(--mc-glass-sidebar-blur);
 }
 
+/* §10.4 Q6 — "Liquid motion explains a real relationship". These two are the
+   shell's only backdrop-filtered regions, and both were measured carrying a
+   `backdrop-filter` and NO state-change transition: translucent panels that
+   never respond to anything, which is decoration, not language.
+   The relationship they have with the user is focus. Tabbing into a floating
+   region deepens its edge and lifts it off what it floats over, so a keyboard
+   user can see which of the two they are inside; it eases rather than snapping,
+   and it does not loop — the reduced-motion block at the foot of this file
+   already flattens the duration to 0.01ms. `:focus-within` and not `:hover`,
+   because hover cannot tell a keyboard user anything. */
+.mc-sidebar,
+.mc-topbar {
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.mc-sidebar:focus-within {
+  border-right-color: var(--mc-accent-2);
+  box-shadow: 1px 0 0 rgb(255 255 255 / 0.05);
+}
+
+.mc-topbar:focus-within {
+  border-bottom-color: var(--mc-accent-2);
+  box-shadow: 0 1px 0 rgb(255 255 255 / 0.05);
+}
+
 .mc-brand {
   height: 48px;
   display: flex;
