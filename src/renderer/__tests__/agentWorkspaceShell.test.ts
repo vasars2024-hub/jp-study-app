@@ -2009,3 +2009,70 @@ describe('Agent workspace shell', () => {
     expect(planQueueActionCalls).toEqual([['chat-1', 'task-1', 'pause']]);
   });
 });
+
+/**
+ * L5 — which Agent regions adopted the contextual primitive, and which
+ * deliberately did not.
+ *
+ * Fourth and last stop on L5's order (Dictionary → Grammar → Translate → Agent).
+ * The three siblings each had exactly one contextual region because each is a
+ * single-column view; the Agent is a two-pane shell, so it has two: the
+ * conversation rail, which is navigation — the Liquid role §2.3 names first, and
+ * the same case `nav.medialib-rail` already took — and the conversation head,
+ * which is the contextual tool for whatever is selected (identity, the mode that
+ * shapes the next request, the simple/full disclosure switch, delete).
+ *
+ * The inspector is the one that could plausibly have gone either way, and it
+ * stays plain on purpose. "Temporary inspector" is a Liquid role, but this one is
+ * a fixed second column carrying `AgentPipelineTerminal` and `ActivityTimeline` —
+ * a log and a history table, which §2.3 keeps on stable opaque anchors. Pinned
+ * below alongside the messages and the composer so it reads as a decision.
+ *
+ * Written into this file rather than a new `agentLiquidRegions.test.tsx`: the
+ * shell needs the whole bridge stub above to reach `phase === 'ready'`, and a
+ * second copy of that harness would be ~400 lines to assert four class names.
+ */
+describe('Agent — contextual region adoption', () => {
+  it('gives the rail and the conversation head the contextual role', async () => {
+    stored = populated();
+    await mount();
+
+    const rail = host.querySelector('.agent-rail');
+    expect(rail, '.agent-rail').not.toBeNull();
+    expect(rail?.tagName, 'the rail is still the nav landmark').toBe('NAV');
+    expect(rail?.classList.contains('lq-contextual')).toBe(true);
+    expect(rail?.getAttribute('data-lq-role')).toBe('contextual');
+
+    const head = host.querySelector('.agent-conversation-head');
+    expect(head, '.agent-conversation-head').not.toBeNull();
+    expect(head?.tagName, 'the head is still a header element').toBe('HEADER');
+    expect(head?.classList.contains('lq-contextual')).toBe(true);
+    expect(head?.getAttribute('data-lq-role')).toBe('contextual');
+    // The mode select is what makes the head a tool rather than a caption.
+    expect(head?.querySelector('.agent-mode-select'), 'the mode picker').not.toBeNull();
+  });
+
+  it('does NOT give either one lq-liquid, which would paint in conventional windows too', async () => {
+    stored = populated();
+    await mount();
+
+    // §2 non-negotiable 1: conventional presentation is the default. `lq-liquid`
+    // paints unconditionally; `lq-contextual` is inert until `.fwin-liquid` opts in.
+    expect(host.querySelectorAll('.lq-liquid').length).toBe(0);
+    expect(host.querySelectorAll('.lq-contextual').length).toBe(2);
+  });
+
+  it('keeps the conversation, the composer and the inspector outside every contextual surface', async () => {
+    stored = populated();
+    await mount();
+
+    // Asserted first, so that removing the contextual surfaces altogether cannot
+    // make the loop below pass vacuously.
+    expect(host.querySelectorAll('.lq-contextual').length).toBe(2);
+    for (const sel of ['.agent-messages', '.agent-composer', '.agent-inspector', '.agent-scope']) {
+      const el = host.querySelector(sel);
+      expect(el, sel).not.toBeNull();
+      expect(el?.closest('.lq-contextual'), `${sel} is outside every contextual surface`).toBeNull();
+    }
+  });
+});

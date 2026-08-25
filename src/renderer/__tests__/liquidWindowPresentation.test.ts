@@ -204,7 +204,16 @@ describe('liquid-window.css', () => {
   const rules = readRules();
 
   it('paints nothing outside the opt-in class', () => {
+    // At-rule wrappers are unwrapped, not skipped, and that is the difference
+    // between a stronger guard and a hole. `split('}')` alone hands back
+    // `@container (max-width: 640px)` as if it were a selector — which fails —
+    // while the rule nested INSIDE it never becomes a token at all, so filtering
+    // `@` out would have stopped checking the very selectors the wrapper hides.
+    // Dropping the `@…{` opener promotes each nested selector to a token of its
+    // own; the orphaned closing brace only yields an empty string, which the
+    // filter below already discards.
     const selectors = rules
+      .replace(/@[a-z-]+[^{]*\{/g, '')
       .split('}')
       .map((block) => block.split('{')[0]?.trim())
       .filter((s): s is string => Boolean(s));

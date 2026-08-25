@@ -10,6 +10,7 @@ import {
   type KeyboardEvent as RKeyboardEvent,
 } from 'react';
 import Icon from '../Icons';
+import { ContextualSurface } from '../liquid/LiquidSurface';
 import { useT } from '../../i18n';
 import {
   AGENT_WORKSPACE_MODES,
@@ -1991,7 +1992,13 @@ export default function AgentWorkspaceShell() {
         aria-label={t('agent.shell.aria')}
         aria-busy={blocked || loading}
       >
-        <nav className="agent-rail" aria-label={t('agent.rail.aria')}>
+        {/* L5 — the conversation rail is navigation, the Liquid role §2.3 names
+            first, and it takes the same primitive `medialib-rail` took. A role
+            declaration, not a paint: `lq-contextual` is inert by construction
+            and only a window explicitly put in Liquid presentation picks up the
+            shared material, so the conventional shell renders the pixels it
+            always did. */}
+        <ContextualSurface as="nav" className="agent-rail" aria-label={t('agent.rail.aria')}>
           <div className="agent-rail-head">
             <h2 className="agent-rail-title">{t('agent.rail.aria')}</h2>
             <span className="agent-rail-count">
@@ -2143,7 +2150,7 @@ export default function AgentWorkspaceShell() {
               </button>
             )}
           </div>
-        </nav>
+        </ContextualSurface>
 
         <div className="agent-canvas">
           {failure ? (
@@ -2188,7 +2195,13 @@ export default function AgentWorkspaceShell() {
 
           {phase === 'ready' && selected ? (
             <article className="agent-conversation" aria-label={selected.title}>
-              <header className="agent-conversation-head">
+              {/* L5 — the contextual tool for this conversation: what it is, the
+                  mode that shapes the next request, the simple/full disclosure
+                  switch and the destructive action. Everything below stays
+                  conventional Work — the messages are conversation, the composer
+                  is a form, and the inspector carries the pipeline log and the
+                  activity timeline, which §2.3 keeps on stable anchors. */}
+              <ContextualSurface as="header" className="agent-conversation-head">
                 <div className="agent-conversation-identity">
                   <span className="agent-conversation-title">{selected.title}</span>
                   {/*
@@ -2254,7 +2267,7 @@ export default function AgentWorkspaceShell() {
                     {t('agent.conversation.delete')}
                   </button>
                 )}
-              </header>
+              </ContextualSurface>
 
               <div
                 className={`agent-conversation-workspace${inspectorExpanded

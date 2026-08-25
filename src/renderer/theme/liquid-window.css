@@ -119,6 +119,33 @@
   box-shadow: none;
 }
 
+/*
+ * L5 — the Agent conversation rail is the same shape and takes the same exception.
+ *
+ * `nav.agent-rail` is grid column 1 of `.agent-shell` and spans the full height of
+ * the workspace, so the card geometry above would round a flush column and drop a
+ * shadow into a seam. It keeps the material and its own `--agent-gap` padding.
+ *
+ * The second rule mirrors `agent.css`'s own container query rather than inventing a
+ * breakpoint: below 640px the shell stacks the rail ABOVE the conversation, so the
+ * separator has to move from the right edge to the bottom one or the two panes run
+ * together with no line between them. A container query, not a viewport one, for the
+ * same reason `agent.css` gives — this surface also runs inside a floating window,
+ * whose width has nothing to do with the viewport.
+ */
+.fwin.fwin-liquid .agent-rail.lq-contextual {
+  border-radius: 0;
+  border-width: 0 1px 0 0;
+  padding: var(--agent-gap);
+  box-shadow: none;
+}
+
+@container (max-width: 640px) {
+  .fwin.fwin-liquid .agent-rail.lq-contextual {
+    border-width: 0 0 1px;
+  }
+}
+
 /* The toggle itself. `aria-pressed` carries the state for assistive tech; this
    is the matching visible affordance, not a decoration.
  *
