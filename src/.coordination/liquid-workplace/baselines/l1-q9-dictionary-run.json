@@ -1,0 +1,116 @@
+{
+ "at": "2026-08-25T06:33:43.385Z",
+ "control": null,
+ "ledger": {
+  "file": "parity-ledger.json",
+  "app": "dictionary",
+  "rowsForApp": 7,
+  "rowsTotal": 21,
+  "both": 7,
+  "withObserved": 7,
+  "notBoth": [],
+  "ok": true
+ },
+ "install": {
+  "installed": [
+   "findWin",
+   "snapshot",
+   "check",
+   "search",
+   "toggleLiquid",
+   "mutate",
+   "restore"
+  ],
+  "installedMedia": [
+   "findWin",
+   "snapshot",
+   "check",
+   "step",
+   "toggleLiquid",
+   "mutate",
+   "restore"
+  ],
+  "snapshot": {
+   "matchedBy": "title",
+   "presentation": "liquid",
+   "liquidClass": true,
+   "rect": {
+    "x": 128,
+    "y": 84,
+    "w": 820,
+    "h": 580
+   },
+   "maximized": false,
+   "focused": false,
+   "zIndex": "225",
+   "searchValue": "食べる",
+   "notesFilterValue": "",
+   "activeLang": "gram-level-btn active",
+   "resultChars": 5476,
+   "resultNodes": 349,
+   "controls": 67
+  },
+  "mediaLiquid": {
+   "matchedBy": "mc-root + data-presentation=liquid",
+   "title": "Video",
+   "presentation": "liquid",
+   "liquidClass": true,
+   "rect": {
+    "x": 92,
+    "y": 40,
+    "w": 1080,
+    "h": 700
+   },
+   "maximized": false,
+   "focused": true,
+   "zIndex": "237",
+   "activeRail": "LibraryAll local media",
+   "activeShelf": "Continue watching2",
+   "searchValue": "",
+   "sortValue": "season-episode",
+   "viewMode": "Grid view",
+   "cardCount": 1,
+   "chars": 729,
+   "nodes": 257,
+   "controls": 34
+  },
+  "mediaStandard": {
+   "matchedBy": "mc-root + data-presentation=standard",
+   "title": "Media",
+   "presentation": "standard",
+   "liquidClass": false,
+   "rect": {
+    "x": 60,
+    "y": 24,
+    "w": 820,
+    "h": 580
+   },
+   "maximized": false,
+   "focused": false,
+   "zIndex": "211",
+   "activeRail": "LibraryAll local media",
+   "activeShelf": "Continue watching2",
+   "searchValue": "",
+   "sortValue": "series",
+   "viewMode": "List view",
+   "cardCount": 1,
+   "chars": 660,
+   "nodes": 243,
+   "controls": 34
+  }
+ },
+ "live": {
+  "refused": null,
+  "via": "window.__L6.check()",
+  "rows": 7,
+  "reachable": 7,
+  "unreachable": [],
+  "ok": true
+ },
+ "verdict": "YES",
+ "why": "7/7 ledger rows both with observed, and 7/7 reachable live",
+ "parkedOn": "__q9verdict",
+ "parked": {
+  "parked": "YES"
+ }
+}

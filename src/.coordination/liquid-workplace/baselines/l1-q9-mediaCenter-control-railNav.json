@@ -1,0 +1,157 @@
+{
+ "at": "2026-08-25T06:32:47.619Z",
+ "control": "railNav",
+ "ledger": {
+  "file": "parity-ledger.json",
+  "app": "mediaCenter",
+  "rowsForApp": 8,
+  "rowsTotal": 21,
+  "both": 8,
+  "withObserved": 8,
+  "notBoth": [],
+  "ok": true
+ },
+ "install": {
+  "installed": [
+   "findWin",
+   "snapshot",
+   "check",
+   "search",
+   "toggleLiquid",
+   "mutate",
+   "restore"
+  ],
+  "installedMedia": [
+   "findWin",
+   "snapshot",
+   "check",
+   "step",
+   "toggleLiquid",
+   "mutate",
+   "restore"
+  ],
+  "snapshot": {
+   "matchedBy": "title",
+   "presentation": "liquid",
+   "liquidClass": true,
+   "rect": {
+    "x": 128,
+    "y": 84,
+    "w": 820,
+    "h": 580
+   },
+   "maximized": false,
+   "focused": false,
+   "zIndex": "225",
+   "searchValue": "",
+   "notesFilterValue": "",
+   "activeLang": "gram-level-btn active",
+   "resultChars": 356,
+   "resultNodes": 39,
+   "controls": 12
+  },
+  "mediaLiquid": {
+   "matchedBy": "mc-root + data-presentation=liquid",
+   "title": "Video",
+   "presentation": "liquid",
+   "liquidClass": true,
+   "rect": {
+    "x": 92,
+    "y": 40,
+    "w": 1080,
+    "h": 700
+   },
+   "maximized": false,
+   "focused": true,
+   "zIndex": "237",
+   "activeRail": "LibraryAll local media",
+   "activeShelf": "Continue watching2",
+   "searchValue": "",
+   "sortValue": "season-episode",
+   "viewMode": "Grid view",
+   "cardCount": 1,
+   "chars": 729,
+   "nodes": 257,
+   "controls": 34
+  },
+  "mediaStandard": {
+   "matchedBy": "mc-root + data-presentation=standard",
+   "title": "Media",
+   "presentation": "standard",
+   "liquidClass": false,
+   "rect": {
+    "x": 60,
+    "y": 24,
+    "w": 820,
+    "h": 580
+   },
+   "maximized": false,
+   "focused": false,
+   "zIndex": "211",
+   "activeRail": "LibraryAll local media",
+   "activeShelf": "Continue watching2",
+   "searchValue": "",
+   "sortValue": "series",
+   "viewMode": "List view",
+   "cardCount": 1,
+   "chars": 660,
+   "nodes": 243,
+   "controls": 34
+  }
+ },
+ "mutated": {
+  "mutated": "rail button \"HomeYour media at \" also active"
+ },
+ "live": {
+  "refused": null,
+  "via": "l6m-parity-run.cjs (driven, both presentations)",
+  "rows": 8,
+  "reachable": 7,
+  "unreachable": [
+   "railNav (standard=false liquid=true)"
+  ],
+  "evidence": {
+   "railNav": {
+    "standard": "railButtons=9 active=2",
+    "liquid": "railButtons=9 active=1"
+   },
+   "shelfFilter": {
+    "standard": "shelves=9 current=1",
+    "liquid": "shelves=9 current=1"
+   },
+   "librarySearch": {
+    "standard": "cards 1 -> 0 -> 1 for \"zzqqxx-no-such-title\"",
+    "liquid": "cards 1 -> 0 -> 1 for \"zzqqxx-no-such-title\""
+   },
+   "sortAndView": {
+    "standard": "sortOptions=7 viewButtons=2 pressed=1",
+    "liquid": "sortOptions=7 viewButtons=2 pressed=1"
+   },
+   "itemActions": {
+    "standard": "menuItems opened=4 afterClose=0 via=card",
+    "liquid": "menuItems opened=4 afterClose=0 via=spotlight"
+   },
+   "history": {
+    "standard": "back.disabled=true forward.disabled=true",
+    "liquid": "back.disabled=false forward.disabled=true"
+   },
+   "workspaceRoute": {
+    "standard": "seanimeHost 0 -> 1 -> 0",
+    "liquid": "seanimeHost 0 -> 1 -> 0"
+   },
+   "windowLifecycle": {
+    "standard": "chromeButtons=5 liquidAriaPressed=false",
+    "liquid": "chromeButtons=5 liquidAriaPressed=true"
+   }
+  },
+  "ok": false
+ },
+ "restored": {
+  "restored": []
+ },
+ "verdict": "NO",
+ "why": "live: 1 row(s) unreachable at this tree — railNav (standard=false liquid=true)",
+ "parked": false,
+ "controlHeld": true,
+ "controlNote": "control 'railNav' made Q9 read NO while the ledger still says both — the live term is doing work"
+}

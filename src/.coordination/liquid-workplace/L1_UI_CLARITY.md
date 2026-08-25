@@ -514,3 +514,41 @@ a reorder — the walk widens to `Recently added` (36) and restores. And the rai
 with **`aria-current`**, not `aria-pressed`, so the restore gate was passing on `null === null`;
 `scopeWasActuallyRead` now guards it. **Category 5 on Video: Q1 Q2 Q3 Q4 Q6 Q7 Q8 Q10 YES,
 Q5 INHERIT, Q9 MEASURE.**
+
+## 2026-08-25 · primary — Q9 was hardcoded to one surface; it now scores both, and both pass
+
+| Slice | Commit | What landed |
+| --- | --- | --- |
+| `l1-q9-drive.cjs --app dictionary\|mediaCenter` | *this commit* | driver + three run baselines |
+
+**The driver read the Dictionary's rows no matter which surface you asked about.** `APP` was the
+constant `'dictionary'`, so scoring Q9 on Video would have reported seven dictionary rows — the
+same class of error as the `.dict-entry` hardcoding `l1-q78-drive.cjs` was repaired for, and it
+would have read as a Media Center result.
+
+**The two surfaces genuinely need different live terms.** `__L6.check()` settles all seven
+dictionary rows alone; `__L6M.check()` settles only five of eight, because `librarySearch`,
+`itemActions` and `workspaceRoute` cannot be answered by counting a control. The mediaCenter leg
+therefore delegates to `l6m-parity-run.cjs` rather than reimplementing it — a guard that
+reimplements the term certifies its copy, not the term.
+
+**Q9 = YES on both**, each requiring BOTH terms to agree:
+- **mediaCenter — 8/8 ledger rows `both` with `observed`, 8/8 reachable live** in both
+  presentations (`__q9verdictMedia`).
+- **dictionary — 7/7 and 7/7** (`__q9verdict`).
+
+**Negative control fired:** `--control railNav` made exactly one row flip
+(`railNav standard=false liquid=true`), Q9 read **NO** while the ledger still said `both`, and
+the run parked nothing. Residue re-read afterwards on all three windows: **0**, one active nav
+each, one pressed view each, presentations unchanged.
+
+**The dictionary leg first read NO on 4 rows and that was an EMPTY HARNESS, not a regression.**
+The renderer reload earlier this turn cleared the Dictionary's results — `chars=356 nodes=39`,
+`resultActions=0`. The rubric caps a category measured on an empty harness at 0 rather than
+scoring it, so the harness was reloaded (`__L6.search('食べる')` → **8 entries**) and re-run.
+A verdict taken one minute earlier would have recorded a false regression against a working
+surface.
+
+**One global per surface.** Both legs previously would have parked on `__q9verdict`, so whichever
+ran last decided Q9 for the other — a cross-surface false pass the clarity probe cannot see.
+**Category 5 on Video: Q1 Q2 Q3 Q4 Q6 Q7 Q8 Q9 Q10 YES, Q5 INHERIT — 9 of 10 measured.**
