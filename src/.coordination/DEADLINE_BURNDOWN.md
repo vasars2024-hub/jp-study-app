@@ -539,3 +539,20 @@ measured on a surface the gate is not about. Until Video is driven in Liquid pre
 closed categories are re-derived there, any remaining-work figure for this gate is a guess, and a
 projected date computed from a guess is the exact thing RULE 0 forbids.
 main-v1: complete-except-external, unchanged, INHERITED. mal-pipeline: 34 of 34, closed.
+
+2026-08-25 | liquid | units done this turn: 0 | units left: 10 | basis: the 13 `Gate:` lines in src/LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md (`grep -c '^Gate:'` = 13, re-run this turn); the 3 closed (L0 452 / L2 591 / L3 600) are INHERITED, gate 461 was re-derived directly and is OPEN — Video is now in **liquid** presentation (clicked its own `Make Liquid`, survived a renderer reload) and moved from 2 of 8 categories at 10 to **3 of 8**: category 3 CLOSED at 10 (liquidTreatedEligible 3 of 4 -> **4 of 4**, denseWorkOnTranslucent 0, control CONTROL-FAILED-AS-REQUIRED on Video AND Dictionary for the first time) and category 1 RE-DERIVED in liquid where it found a real failure and closed again after fixing it (min 2.83:1 -> **5.13:1**, failing 1 -> 0) | projected finish: 2026-09-24
+
+**The arithmetic, and the caveat is part of it.** 3 of 13 gates closed in the 9 days since liquid
+opened 2026-08-16 = **0.333 gates/day** at 2 workers; 10 ÷ 0.333 = 30 days → **2026-09-24**. That
+is the OPTIMISTIC bound and the reason is measurable rather than a hedge: all three closed in the
+plan's first two days and **zero** have closed in the seven days since, so on the trailing rate the
+projection is unbounded. It is written as 2026-09-24 rather than UNKNOWN because last turn's stated
+reason for UNKNOWN — that Video had never been driven in the presentation the gate is about — is now
+resolved: it is liquid, and two of its categories were measured there this turn.
+Still OPEN on Video: category 4's **maximized** leg (default 5.8% of viewport and compact 260x170
+both re-derived in liquid this turn, 0 clipped / 0 overlap / 0 h-scroll / restoredExactly true, but
+the maximized third was not re-run, so 4 is not re-confirmed in liquid); categories 2, 5, 6, 7, 8.
+Category 6 is newly UNBLOCKED — `parity-ledger.json`'s 0-of-7 reason was "no Liquid destination
+exists" and Video is now one.
+main-v1: complete-except-external, unchanged, **INHERITED** — RULE 1's re-count is still owed and
+was not done this turn. mal-pipeline: 34 of 34, closed.
