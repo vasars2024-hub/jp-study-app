@@ -322,3 +322,24 @@ rather than bookkeeping.** 3, 4 and 8 hold 10 from `6b490fc3`'s tree, which is t
 **Next:** the drag hitch is a shell-level defect on a multi-window desktop, present in both
 presentations, so it is `DesktopShell`'s drag path and not `liquid-window.css`. Fix it, re-drive leg 1
 with `-Title Dictionary` over at least 4 runs, and the entry is writable in one pass.
+
+### Same turn, later — two product fixes for category 7, and the root cause of what is left
+
+`579c9d73`. The drag hitch was located to the gesture BOUNDARIES with a marked frame recorder
+(`predown@25 postdown@25 preup@85 postup@85`, worst frames at 25 and 84), so it was per-gesture
+setup/teardown, never the 60 moves. Fixed: `deskDrag.ts` no longer runs `getBoundingClientRect()`
+per `pointermove` (cached for the gesture, invalidated on `resize`, 4 new tests), and
+`DesktopShell.focus()` no longer rebuilds `wins` when the window is already on top. Frames
+delivered ~93 → ~101, over-33 halved, `closedLoop=True` throughout — **but over-100 is still 1–2 in
+4 of 6 runs, so category 7 is still not a 10 and is not reported as one.**
+
+Negative result, so it is not re-derived: `os-interacting` is free. Six full toggles of the class
+with no drag measured 131 frames, max **16.8 ms**, 0 over 33, despite it dropping `backdrop-filter`
+from every `.fwin`.
+
+**The remaining ~100.2 ms frame has a located cause and it is a refactor.** `FloatingWindow` is
+`memo()`-wrapped (`DesktopShell.tsx:3191`) and the memo can never hit: the call site (`:2506`)
+passes six fresh inline arrows and a fresh `children` tree every render, so the `onPatch` commit at
+`pointerup` re-renders every window and every `AppSection` under it — 349 nodes for Dictionary
+alone. Stabilising the callbacks is not enough on its own because `children` is also a prop. Next
+slice, named rather than half-started.

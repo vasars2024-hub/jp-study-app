@@ -459,3 +459,25 @@ stays an open unit until its control fails on a restarted app.
 is **7 of 8** categories (1, 2, 3, 5, 7, 8 re-driven on this tree; 6's live half re-driven;
 4 parked on its control). Gate 461 needs 80/80 on Dictionary **and** Video, and Video has still
 never been scored.
+
+## 2026-08-24 (night 2) · primary — 4 of 8 categories re-driven fresh, 2 product fixes, gate 461 still open
+
+Four rubric categories re-measured on the current tree at pid 37540 with every negative control
+firing in-session: **1 = 10/10**, **2 = 10/10**, **5 = 10/10**, **6 = 10/10**. Combined with 3, 4
+and 8 (10/10 at `6b490fc3`, which IS this tree), that is **7 of 8 categories at 10 on one tree**.
+
+**Category 7 is the only open one and it is a measured product number, not bookkeeping.** Three
+instruments were resolving "the window under test" as the first/largest VISIBLE `.fwin`, which was
+only ever correct while `l7d-setup.cjs` hid the other windows; on the real desktop the gesture probe
+had been scoring **Video** as Dictionary. Repaired (`-Title`), re-driven, and drag misses the
+0-frames-over-100 ms bar. Two product fixes this turn — a per-pointermove forced layout in
+`deskDrag.ts` and a full re-render per pointerdown in `DesktopShell.focus()` — raise frames
+delivered ~93 → ~101 and halve over-33, but one ~100.2 ms frame remains at `pointerup`.
+
+**Root cause of the remaining frame, found and NOT yet fixed:** `FloatingWindow` is wrapped in
+`memo()` (`DesktopShell.tsx:3191`) and the memo can never hit — the call site at `:2506` passes six
+fresh inline arrows plus a fresh `children` tree on every render, so one `patch()` re-renders every
+window and every `AppSection` beneath it. That is the next slice and it is a real refactor, named
+rather than half-started at the end of a turn.
+
+2026-08-24 | liquid | units done this turn: 0 | units left: 10 | basis: the 13 `Gate:` lines in section 11 of src/LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md (`grep -c '^Gate:'` = 13, re-run this turn); 3 closed (L0 line 452 / L2 line 591 / L3 line 600), 10 open; gate 461 (L1) is the one worked and is now 7 of 8 categories at 10 on one tree | projected finish: 2026-09-23
