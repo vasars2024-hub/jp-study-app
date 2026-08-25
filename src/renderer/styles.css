@@ -16954,11 +16954,14 @@ html[data-taskbar-size='large'] .os-tray-btn {
   overflow: auto;
   flex: 1;
 }
-.immersion-site-list li {
+/* Was `.immersion-site-list li`. The list is windowed now (883 sites measured in
+   one real profile), and a windowed row lives in VirtualList's fixed slot, not
+   in a `<ul>` — the 4px that used to be `margin-bottom` is inside
+   IMMERSION_SITE_ROW_HEIGHT instead. */
+.immersion-site-row {
   display: flex;
   align-items: stretch;
   gap: 2px;
-  margin-bottom: 4px;
 }
 .immersion-site-card {
   flex: 1;
@@ -16973,6 +16976,9 @@ html[data-taskbar-size='large'] .os-tray-btn {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  /* containing block for the completion bar, which is out of flow so that a
+     site WITH progress is exactly as tall as one without */
+  position: relative;
 }
 .immersion-site-card:hover {
   background: color-mix(in srgb, var(--accent) 10%, var(--panel-2));
@@ -16980,6 +16986,11 @@ html[data-taskbar-size='large'] .os-tray-btn {
 }
 .immersion-site-title {
   font-size: 12px;
+  /* Pinned, not `normal`. 879 of 883 measured rows computed to exactly 16px;
+     the four that did not held `(`, `[` or `․`, which fall back to a font with a
+     taller line box and made the row 50 or 51. A fixed-height windowed list
+     cannot absorb that. 16px is what the 879 already were, so nothing moves. */
+  line-height: 16px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -16988,11 +16999,21 @@ html[data-taskbar-size='large'] .os-tray-btn {
   /* 41 of these render at once on the Immersion dashboard; 10px was below the
      legibility floor. Wired sets its own size, so that skin is unaffected. */
   font-size: 11px;
+  /* Pinned for the same reason, and it is also what makes the row height
+     theme-independent: wired overrides `font-size` here to 10px but not
+     `line-height`, so the slot stays valid in every skin. */
+  line-height: 15px;
 }
 .immersion-site-bar {
   display: block;
   height: 2px;
-  margin-top: 4px;
+  /* Out of flow, inside the card's existing 6px bottom padding (2px clear above
+     and below), so `completionPct > 0` costs no height. In flow it added
+     margin-top 4 + height 2 and made those rows 55px against the slot's 53. */
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 2px;
   background: var(--border);
   border-radius: 1px;
   overflow: hidden;

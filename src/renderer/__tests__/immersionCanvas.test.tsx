@@ -92,7 +92,7 @@ describe('the Immersion browser through the L6 reading canvas', () => {
     const h = await mountImmersion(1200);
     // 1200 - 220 - 12 gutter. The stage keeps 968, far above its 384 floor.
     expectPlacement(h, 'sites', { placement: 'docked', contentWidth: 968, toolWidth: 220 });
-    expect(h.container.querySelectorAll('.immersion-site-list li').length).toBe(2);
+    expect(h.container.querySelectorAll('.immersion-site-row').length).toBe(2);
   });
 
   it('gives the stage the whole pane at the width the old rule could not see', async () => {
@@ -138,7 +138,7 @@ describe('the Immersion browser through the L6 reading canvas', () => {
     expect(toggle.getAttribute('aria-pressed')).toBe('false');
     await h.click(TOGGLE);
     expect(h.tool('sites')!.dataset.placement).toBe('docked');
-    expect(h.container.querySelectorAll('.immersion-site-list li').length).toBe(2);
+    expect(h.container.querySelectorAll('.immersion-site-row').length).toBe(2);
   });
 
   it('has no fixed rail width left in the stylesheet to reintroduce the bug', () => {

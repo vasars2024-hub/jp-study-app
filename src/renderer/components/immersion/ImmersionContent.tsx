@@ -17,6 +17,7 @@ import { createElement, useCallback, useEffect, useMemo, useRef, useState } from
 import DictionaryPopup from '../DictionaryPopup';
 import SentenceTranslatePopup from '../SentenceTranslatePopup';
 import Icon from '../Icons';
+import VirtualList from '../VirtualList';
 import {
   IMMERSION_MODE_CYCLE,
   IMMERSION_STARTERS,
@@ -894,20 +895,56 @@ export function ImmersionStage({ state, stageClassName }: { state: ImmersionStat
 }
 
 /**
+ * One site row's slot, in px, gap included.
+ *
+ * `VirtualList` is FIXED-height, so this number has to be the row's height, not
+ * an estimate of it — 883 rows at one pixel out is 883px of cumulative drift.
+ * Measured live on a real profile at `.immersion-site-card`'s shipped box:
+ * 1 border + 8 padding + 16 title + 2 gap + 15 meta + 6 padding + 1 border = 49,
+ * plus the 4px the `<li>` used to contribute as `margin-bottom` and which the
+ * slot now owns (VirtualList renders each row in its own fixed slot, not as a
+ * flex child — the same note `FlashcardsContent`'s CARD_ROW_HEIGHT carries).
+ *
+ * Two things made the shipped row NON-deterministic, and both are fixed in
+ * `styles.css` rather than papered over here:
+ *   • `line-height: normal` on the title. 879 of 883 rows measured 49px; the
+ *     other four measured 50 and 51 because titles containing `(`, `[` and `․`
+ *     fall back to a font with a taller line box. Pinned to 16px/15px — exactly
+ *     what the 879 already computed to, so nothing moves for them.
+ *   • the completion bar, `margin-top: 4 + height: 2`, added 6px in flow to any
+ *     row that had progress. It is now absolutely positioned inside the card's
+ *     existing 6px bottom padding, same 4px gap below the meta line, so the row
+ *     is 49px whether the bar renders or not. NOTE: 0 of 883 sites in the
+ *     measured profile have `completionPct > 0`, so that branch was verified in
+ *     JSDOM, not live — its absence there is not evidence it is dead.
+ */
+export const IMMERSION_SITE_ROW_HEIGHT = 53;
+
+/**
  * The saved-sites rail, as the CONTENT of an L6 reading tool.
  *
  * No `<aside>` and no head of its own: `ReadingCanvas` renders both, and a
  * migration that keeps its own panel header ends up with two stacked headings —
  * the exact thing `ReadingCanvasTool.actions` warns about.
+ *
+ * Windowed since 2026-08-25: the rail is a real collection, not a shortlist.
+ * Measured 883 saved sites laying out to 46,822px inside a 418px viewport —
+ * 112x overdraw and 6,182 elements — with every row in the DOM.
  */
 export function ImmersionSiteList({ state }: { state: ImmersionState }) {
   const { t, sites } = state;
   return (
     <div className="immersion-rail">
       {sites.length === 0 && <p className="muted immersion-rail-empty">{t('immersion.rail.empty')}</p>}
-      <ul className="immersion-site-list">
-        {sites.map((s) => (
-          <li key={s.id}>
+      <VirtualList
+        items={sites}
+        itemHeight={IMMERSION_SITE_ROW_HEIGHT}
+        className="immersion-site-list"
+        listRole="list"
+        itemRole="listitem"
+        getKey={(s) => s.id}
+        renderItem={(s) => (
+          <div className="immersion-site-row">
             <button type="button" className="immersion-site-card" onClick={() => state.navigate(s.url)} title={s.url}>
               <span className="immersion-site-title">
                 {s.favorite && <Icon name="star" size={11} className="immersion-site-fav" fill />}
@@ -932,9 +969,9 @@ export function ImmersionSiteList({ state }: { state: ImmersionState }) {
             >
               <Icon name="close" size={12} />
             </button>
-          </li>
-        ))}
-      </ul>
+          </div>
+        )}
+      />
     </div>
   );
 }

@@ -1,0 +1,21 @@
+{
+  "label": "immersion-sites-after",
+  "title": "Immersion",
+  "container": ".immersion-rail",
+  "row": ".immersion-site-row",
+  "rows": 883,
+  "rowsSource": "--total",
+  "domRows": 20,
+  "nodes": 163,
+  "scrollHeight": 46815,
+  "clientHeight": 418,
+  "overdraw": 112,
+  "scroller": "immersion-site-list",
+  "distinctRowHeights": 1,
+  "heights": {
+    "49": 20
+  },
+  "spacerHeight": 46799,
+  "verdict": "WINDOWED",
+  "at": "2026-08-25T20:24:17.721Z"
+}

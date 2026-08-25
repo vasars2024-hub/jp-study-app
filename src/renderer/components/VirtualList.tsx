@@ -25,6 +25,20 @@ export interface VirtualListProps<T> {
    * nor referenced by `aria-activedescendant`.
    */
   scrollToIndex?: number;
+  /**
+   * Keep list semantics through the window. Set both together.
+   *
+   * Windowing is invisible to sighted users and catastrophic to a screen reader
+   * unless it is declared: with `<ul>/<li>` replaced by slot `div`s, a list of
+   * 883 announces as no list at all, and even with `role="listitem"` restored it
+   * announces "3 of 20" — the DOM count — rather than the real size. So each
+   * slot carries `aria-setsize` (the FULL `items.length`, never the rendered
+   * count) and its true 1-based `aria-posinset`, and the two structural wrappers
+   * between container and slot are marked `presentation` so the list still owns
+   * its items.
+   */
+  listRole?: 'list' | 'group';
+  itemRole?: 'listitem';
 }
 
 export default function VirtualList<T>({
@@ -37,6 +51,8 @@ export default function VirtualList<T>({
   renderItem,
   emptyState,
   scrollToIndex,
+  listRole,
+  itemRole,
 }: VirtualListProps<T>) {
   const [containerRef, size] = useElementSize<HTMLDivElement>();
   const [scrollTop, setScrollTop] = useState(0);
@@ -77,14 +93,20 @@ export default function VirtualList<T>({
   const visible = useMemo(() => items.slice(startIdx, endIdx), [items, startIdx, endIdx]);
 
   return (
-    <div ref={containerRef} className={className} style={{ overflowY: 'auto', position: 'relative', ...style }} onScroll={onScroll}>
+    <div ref={containerRef} className={className} style={{ overflowY: 'auto', position: 'relative', ...style }} onScroll={onScroll} role={listRole}>
       {total === 0
         ? emptyState ?? null
         : (
-          <div style={{ height: totalHeight, position: 'relative' }}>
-            <div style={{ position: 'absolute', top: offsetY, left: 0, right: 0 }}>
+          <div style={{ height: totalHeight, position: 'relative' }} role={listRole ? 'presentation' : undefined}>
+            <div style={{ position: 'absolute', top: offsetY, left: 0, right: 0 }} role={listRole ? 'presentation' : undefined}>
               {visible.map((item, i) => (
-                <div key={getKey(item, startIdx + i)} style={{ height: itemHeight }}>
+                <div
+                  key={getKey(item, startIdx + i)}
+                  style={{ height: itemHeight }}
+                  role={itemRole}
+                  aria-setsize={itemRole ? total : undefined}
+                  aria-posinset={itemRole ? startIdx + i + 1 : undefined}
+                >
                   {renderItem(item, startIdx + i)}
                 </div>
               ))}

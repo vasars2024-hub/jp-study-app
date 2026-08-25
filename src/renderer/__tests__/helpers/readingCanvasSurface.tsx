@@ -56,6 +56,12 @@ export interface ReadingSurfaceHarness {
    * differ only in their label, which is localised and so not a safe selector.
    */
   click(selector: string, index?: number): Promise<void>;
+  /**
+   * Settle React and any queued animation frame without touching the surface.
+   * A windowed list coalesces `scroll` into one rAF, so a test that dispatches
+   * a scroll and asserts immediately measures the pre-scroll window.
+   */
+  flush(): Promise<void>;
   teardown(): void;
 }
 
@@ -174,6 +180,15 @@ export function createReadingSurfaceHarness(options: HarnessOptions): ReadingSur
         node.click();
       });
       await flush();
+    },
+    async flush() {
+      // Three frames' worth: jsdom backs `requestAnimationFrame` with a ~16ms
+      // timer, so a 4ms wait settles React but never runs the coalescing frame.
+      for (let index = 0; index < 3; index += 1) {
+        await act(async () => {
+          await new Promise((done) => setTimeout(done, 20));
+        });
+      }
     },
     teardown() {
       act(() => root.unmount());
