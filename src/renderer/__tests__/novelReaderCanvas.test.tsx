@@ -28,6 +28,7 @@ import {
   expectToolSurvivesPlacementChange,
   installReadingSurfaceApi,
   installResizeObserver,
+  toolContentRoot,
   type ReadingSurfaceHarness,
 } from './helpers/readingCanvasSurface';
 
@@ -175,6 +176,32 @@ describe('NovelReader through the L6 reading canvas', () => {
     // Same node throughout: an epub rendition, the scroll offset and any
     // in-flight capture live on it, and a remount silently drops all three.
     expect(h.doc().querySelector('.novel-scroller')).toBe(scroller);
+  });
+
+  it('keeps a covered sheet alive underneath the one stacked on top of it', async () => {
+    /*
+     * The same defect one level up. At 500 every tool is a sheet, and the canvas
+     * renders only the newest — the rest "stay open in the caller's state and
+     * reappear as it closes them", which is true of the STATE and was not true
+     * of the SUBTREE: `return null` unmounted them. So opening translate over
+     * bookmarks threw bookmarks away, and closing translate built a new one.
+     */
+    const h = await mountReader(500);
+    await h.click(TRIGGER, BOOKMARKS);
+    expect(h.tool('bookmarks')!.dataset.placement).toBe('sheet');
+    const root = toolContentRoot(h, 'bookmarks');
+
+    await h.click(TRIGGER, TRANSLATE);
+    expect(h.tool('translate')!.dataset.placement).toBe('sheet');
+    // Covered, not gone: present in the DOM but `hidden`, so it is out of the
+    // tab ring and out of the accessibility tree while the newer sheet is modal.
+    expect(h.tool('bookmarks')!.hidden).toBe(true);
+    expect(h.tool('translate')!.hidden).toBe(false);
+
+    await h.click('[data-reading-tool="translate"] .lq-reading-tool-close');
+    expect(h.tool('translate')).toBe(null);
+    expect(h.tool('bookmarks')!.hidden).toBe(false);
+    expect(toolContentRoot(h, 'bookmarks'), 'the covered sheet was rebuilt').toBe(root);
   });
 
   it('keeps the BOOKMARKS subtree across the same transition — the trailing control', async () => {

@@ -178,14 +178,26 @@ export function ReadingCanvas({
     const resolved = byId.get(tool.id);
     if (!resolved) return null;
     const isSheet = resolved.placement === 'sheet';
-    // Sheets stack; only the newest is rendered. The rest stay open in the
-    // caller's state and reappear as it closes them, rather than silently
-    // being dropped — closing the top sheet must not lose the one beneath.
-    if (isSheet && tool.id !== sheetId) return null;
+    /**
+     * Sheets stack, and only the newest is SHOWN. The older ones are `hidden`
+     * rather than `return null`, and that is bullet 2 rather than a detail: a
+     * returned null is an unmount, so opening a second sheet over the first
+     * destroyed the first one's subtree and closing the second built a fresh
+     * one — the scroll offset, the lookup in flight and the half-filled mining
+     * draft all went with it. This comment used to say the covered sheets
+     * "stay open in the caller's state and reappear", which was true of the
+     * STATE and never of the tree.
+     *
+     * `hidden` and not a class: it removes the tool from the tab ring and from
+     * the accessibility tree in one attribute, which is exactly right under a
+     * newer `aria-modal` sibling.
+     */
+    const stacked = isSheet && tool.id !== sheetId;
     return (
       <aside
         key={tool.id}
-        ref={isSheet ? sheetRef : undefined}
+        ref={isSheet && !stacked ? sheetRef : undefined}
+        hidden={stacked || undefined}
         tabIndex={isSheet ? -1 : undefined}
         className={isSheet ? 'lq-reading-sheet lq-liquid' : 'lq-reading-tool lq-liquid'}
         data-lq-role="liquid"

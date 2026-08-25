@@ -168,19 +168,50 @@ describe('ReadingCanvas placement', () => {
         <p>document</p>
       </ReadingCanvas>,
     );
-    expect(el.querySelector('[data-reading-tool="settings"]')).toBe(null);
-    expect(el.querySelector('[data-reading-tool="bookmarks"]')!.getAttribute('data-placement')).toBe(
-      'sheet',
-    );
-    // Closing the top one brings the other back — the caller's state still had it.
+    // Covered, not dropped. It used to be `null` here, which is an unmount:
+    // bullet 2's state — a scroll offset, a lookup in flight, a half-filled
+    // mining draft — lived on that subtree and went with it. `hidden` keeps the
+    // tree and still takes it out of the tab ring and the accessibility tree,
+    // which is what a sibling of an `aria-modal` sheet has to do.
+    const covered = el.querySelector<HTMLElement>('[data-reading-tool="settings"]')!;
+    expect(covered.hidden).toBe(true);
+    expect(covered.getAttribute('data-placement')).toBe('sheet');
+    const bookmarks = el.querySelector<HTMLElement>('[data-reading-tool="bookmarks"]')!;
+    expect(bookmarks.getAttribute('data-placement')).toBe('sheet');
+    expect(bookmarks.hidden).toBe(false);
+    // The node identity is the assertion the old `null` made impossible.
+    const coveredBody = covered.querySelector('.lq-reading-tool-body');
+    // Closing the top one brings the other back — the same node, not a copy.
     rerender(
       <ReadingCanvas widthOverride={640} closeLabel="Close" tools={[tool()]}>
         <p>document</p>
       </ReadingCanvas>,
     );
-    expect(el.querySelector('[data-reading-tool="settings"]')!.getAttribute('data-placement')).toBe(
-      'sheet',
+    const back = el.querySelector<HTMLElement>('[data-reading-tool="settings"]')!;
+    expect(back.getAttribute('data-placement')).toBe('sheet');
+    expect(back.hidden).toBe(false);
+    expect(back.querySelector('.lq-reading-tool-body')).toBe(coveredBody);
+  });
+
+  it('makes `hidden` actually hide a sheet, which the UA rule alone does not', () => {
+    // `[hidden] { display: none }` is (0,1,0) and `.lq-reading-sheet` sets
+    // `display: flex` at (0,1,0) from a stylesheet that loads later, so the UA
+    // rule loses and a "hidden" stacked sheet would paint over the live one at
+    // full size. Latched the same way as the `.lq-liquid` cascade above: what
+    // decides, not what is merely declared.
+    const winners = [...CSS.matchAll(/([^{}]+)\{([^}]*)\}/g)].filter(
+      ([, selector, body]) =>
+        selector.includes('[hidden]') && /(^|[;\s])display\s*:\s*none/m.test(body),
     );
+    expect(winners.length, 'nothing reclaims display for a hidden reading tool').toBeGreaterThan(0);
+    for (const [, selector] of winners) {
+      for (const one of selector.split(',').map((s) => s.trim())) {
+        expect({ selector: one, classes: (one.match(/\./g) ?? []).length }).toEqual({
+          selector: one,
+          classes: 2,
+        });
+      }
+    }
   });
 
   it('publishes the measure clamp, and drops it for a fill policy', () => {
@@ -471,10 +502,22 @@ describe('ReadingCanvas leading tools', () => {
     expect(positionOfToolRelativeToDocument(el, 'library')).toBe('after');
   });
 
-  it('puts a leading tool that became a sheet back after the document, with no side to report', () => {
-    // 600 − 12 − 384 = 204 < 220, so the library cannot dock. A sheet is
-    // `inset: 0`, so its flex position is not observable and a modal belongs
-    // after the content it covers.
+  it('keeps a leading tool in the leading group when it becomes a sheet, with no side to report', () => {
+    /*
+     * 600 − 12 − 384 = 204 < 220, so the library cannot dock.
+     *
+     * This test asserted `'after'` until 2026-08-25, on the reasoning that a
+     * modal belongs after the content it covers. The reasoning was sound and the
+     * consequence was not: leading and trailing tools are two separate children
+     * arrays, React reconciles by key WITHIN an array, so a tool that crossed
+     * between them was unmounted and rebuilt with identical markup — bullet 2's
+     * whole subject, and invisible to every width, class and attribute
+     * assertion on all six surfaces. Nothing is given up by keeping it in its
+     * declared group: a sheet is `position: absolute; inset: 0`, so its flex
+     * position is not observable, and the document it covers is `inert` +
+     * `aria-hidden`, so it is not in the reading order to come before or after.
+     * `data-side` is still dropped — there is no edge it took.
+     */
     const el = render(
       <ReadingCanvas widthOverride={600} closeLabel="Close" tools={[library()]}>
         <p>document</p>
@@ -483,7 +526,12 @@ describe('ReadingCanvas leading tools', () => {
     const panel = el.querySelector('[data-reading-tool="library"]') as HTMLElement;
     expect(panel.dataset.placement).toBe('sheet');
     expect(panel.dataset.side).toBe(undefined);
-    expect(positionOfToolRelativeToDocument(el, 'library')).toBe('after');
+    expect(positionOfToolRelativeToDocument(el, 'library')).toBe('before');
+    // And the document it covers is out of the reading order either way, which
+    // is what makes the DOM position unobservable rather than merely tolerable.
+    expect(el.querySelector('[data-reading-role="document"]')!.getAttribute('aria-hidden')).toBe(
+      'true',
+    );
   });
 
   it('orders a leading and a trailing tool around the document in one canvas', () => {

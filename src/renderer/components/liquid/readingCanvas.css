@@ -169,6 +169,17 @@
   z-index: 2;
 }
 
+/* A stacked sheet stays MOUNTED and hidden, so closing the one on top hands
+   back the tree beneath it rather than a rebuilt copy. The UA's `[hidden] {
+   display: none }` is (0,1,0) and loses to `.lq-reading-sheet { display: flex }`
+   at the same specificity from a later sheet — the same "a declaration existing
+   is not a declaration winning" trap this file already carries above — so the
+   rule has to be reclaimed here, and `liquidReadingCanvas.test.tsx` latches it. */
+.lq-reading > .lq-reading-sheet[hidden],
+.lq-reading > .lq-reading-tool[hidden] {
+  display: none;
+}
+
 .lq-reading-tool-head {
   display: flex;
   align-items: center;
