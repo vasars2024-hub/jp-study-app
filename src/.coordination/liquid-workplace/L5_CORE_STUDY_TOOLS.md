@@ -107,3 +107,58 @@ the same 3 s then yields 13,682 samples. Adapted probes: `debug/l5-compound-main
 through `lookupOfflineDeinflected`, the legacy Yomitan maps, and never calls `dictionaryDb()`. Its
 31 ms said nothing about the open it was labelled as forcing. `dict:listPairs` is the cheap call
 that actually forces it.
+
+## 2026-08-25 · primary · bullet 1 gets callers, and the contract reaches all four apps
+
+`f18d1ddb` landed `shared/liquidSelection.ts` plus two producers and the turn ended
+there. **Nothing called either** — the declared-but-unwired shape this repo already
+paid for with an i18n module no surface imported. Two commits close it.
+
+**`d49d53cf` — Grammar and Translate get controls.** Grammar's sits in `GrammarDetail`,
+which Blanc composes directly, so Blanc gets it in the same edit. Translate's is in
+both the classic action row and the Aero toolbar and tracks the real highlighted range,
+falling back to the whole input, with the label naming which of the two it will send.
+
+**`3050f020` — the Agent's message, the fourth app.** BRANCH, not pin:
+`attachAgentContextFromSurface` targets the active conversation, which is where the
+message already is, so pinning changes nothing visible. `branchAgentConversationFromMessage`
+forces a new one by passing a `conversationId` that does not exist yet — `null` will not
+do it, `null ?? active` is the active one.
+
+**LIVE, and this is the Gate's retention half rather than a smoke test.** One
+conversation held three of the four tools' selections at once:
+
+| id | app | sensitivity | retained |
+| --- | --- | --- | --- |
+| `dictionary-entry:grammar/pattern/n5-ato-de` | grammar | ordinary | true |
+| `dictionary-entry:食べる` | dictionary | ordinary | true |
+| `selected-text:164854a235c908fe` | translate | personal | **false** |
+
+The false is the control: the span is the user's words, kept in session memory and
+never written to disk, while the reference data beside it persists. Revision 61 → 64
+over three handoffs. **The same span clicked twice left the count at 5 with one
+`selected-text` id — retention, not accumulation.** The Agent branch then took it 3 → 4
+conversations, new one 0 messages / 1 context item, source shelf untouched.
+
+**Two defects the tests caught, neither visible to a presence check.**
+1. `${''}: ${''}`.trim()` is `":"` — a label the contract accepts, reaching the shelf as
+   a row that names nothing. Label is now joined from the parts that exist.
+2. Translate's conversation TITLE carried `span.slice(0, 60)`. A title is persisted even
+   when its context item is refused retention (this file's own media-cue rule), so 60
+   chars of a `personal` span were the one part reaching disk. Now 40, matching the
+   media-cue and VN producers rather than inventing a third bound.
+
+**A11y measured then FIXED, not reported.** The branch control on `.agent-chip` alone was
+172×19 and 19 is under the 24 px WCAG 2.2 minimum. Now 172×24, contrast 5.99:1. Grammar's
+control: 209×31, contrast 7.9:1.
+
+**Trap, and it read as a dead feature first.** React does NOT forward the native `select`
+event — `onSelect` is synthesised by its SelectEventPlugin from focus plus
+keyup/mouseup/selectionchange and bails unless the element is the document's active one.
+A dispatched bare `select` changes nothing. Focus first, then keyup.
+
+**Still open for L5's Gate: the feature-parity ledger rows.** `parity-ledger.json` has 21
+rows over dictionary (7), mediaWorkspace (6), mediaCenter (8) — **grammar, translate and
+agent have none**. Per §5.3 that is the Gate's other half. RULE 1 applies: build ONE
+app-parameterised parity driver out of `probes/l6-parity-dictionary.js` (683 lines,
+dictionary-hardcoded), do not write three more.
