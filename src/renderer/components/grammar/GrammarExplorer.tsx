@@ -419,6 +419,8 @@ export default function GrammarExplorer({ renderDetail, className = '' }: Gramma
               getKey={(p) => p.id}
               renderItem={renderRow}
               scrollToIndex={focusedIndex}
+              listRole="list"
+              itemRole="listitem"
             />
           )}
         </div>

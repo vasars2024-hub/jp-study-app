@@ -221,6 +221,8 @@ export default function GrammarPracticePanel({
               itemHeight={52}
               overscan={8}
               className="gx-practice-virtual"
+              listRole="list"
+              itemRole="listitem"
               getKey={(p) => p.id}
               renderItem={(p) => (
                 <label className="gx-practice-row">

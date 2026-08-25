@@ -419,6 +419,8 @@ export function MusicSongList({ state }: { state: MusicState }) {
       getKey={(row) => row.key}
       renderItem={renderRow}
       className="music-vlist"
+      listRole="list"
+      itemRole="listitem"
       emptyState={<p className="muted music-empty">{state.emptyMessage}</p>}
     />
   );

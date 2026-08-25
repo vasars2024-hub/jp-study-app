@@ -1674,6 +1674,8 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
                           itemHeight={CARD_ROW_HEIGHT}
                           getKey={(card) => card.id}
                           className="flash-group-body flash-group-body-vlist"
+                          listRole="list"
+                          itemRole="listitem"
                           style={{ height: Math.min(group.cards.length * CARD_ROW_HEIGHT, CARD_LIST_MAX_HEIGHT) }}
                           renderItem={(card) => (
                             <div
@@ -1765,6 +1767,8 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
           itemHeight={SAVED_ROW_HEIGHT}
           getKey={(w) => w.word}
           className="flash-list flash-list-vlist"
+          listRole="list"
+          itemRole="listitem"
           style={{ height: Math.min(filteredSaved.length * SAVED_ROW_HEIGHT, SAVED_LIST_MAX_HEIGHT) }}
           renderItem={(w) => (
             <div className="flash-row">

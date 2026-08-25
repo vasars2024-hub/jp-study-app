@@ -493,6 +493,8 @@ export function ScriptConsolePage() {
             items={logs}
             itemHeight={34}
             getKey={(line) => line.id}
+            listRole="list"
+            itemRole="listitem"
             emptyState={<p className="scr-muted">{sx('console.waiting')}</p>}
             renderItem={(line) => (
               <div className={`scr-log scr-log--${line.level}`}>

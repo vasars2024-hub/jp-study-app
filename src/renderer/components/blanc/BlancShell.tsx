@@ -2164,6 +2164,8 @@ function FileSearchPanel() {
               overscan={8}
               getKey={(result) => result.path}
               className="blanc-file-search-vlist"
+              listRole="list"
+              itemRole="listitem"
               style={{ height: Math.min(results.length * FILE_SEARCH_ROW_HEIGHT, FILE_SEARCH_LIST_MAX_HEIGHT) }}
               renderItem={(result) => (
                 <div className="blanc-file-search-row">

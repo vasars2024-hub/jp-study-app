@@ -740,6 +740,8 @@ export function LogConsole({ logs }: { logs: LogLine[] }) {
         items={visible}
         itemHeight={24}
         getKey={(line) => line.id}
+        listRole="list"
+        itemRole="listitem"
         emptyState={<p className="scr-table-empty">{sx('result.emptyLogs')}</p>}
         renderItem={(line) => (
           <div className={`scr-log scr-log--${line.level}`}>

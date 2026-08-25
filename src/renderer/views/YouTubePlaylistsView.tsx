@@ -734,6 +734,8 @@ export default function YouTubePlaylistsView() {
                 items={displayedNews}
                 itemHeight={ROW_H}
                 getKey={(v) => v.id}
+                listRole="list"
+                itemRole="listitem"
                 emptyState={<div className="yt-empty">{t('yt.news.empty')}</div>}
                 renderItem={(v) => renderVideoRow(v, { showPlaylist: true })}
               />
@@ -953,6 +955,8 @@ export default function YouTubePlaylistsView() {
                 items={listVideos}
                 itemHeight={ROW_H}
                 getKey={(v) => v.id}
+                listRole="list"
+                itemRole="listitem"
                 emptyState={
                   <div className="yt-empty">
                     {side?.kind === 'plan' ? t('yt.plan.empty') : t('yt.list.empty')}

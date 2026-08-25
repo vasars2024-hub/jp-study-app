@@ -198,6 +198,8 @@ export default function GrammarCurationPanel() {
           itemHeight={132}
           getKey={(p) => p.id}
           renderItem={renderRow}
+          listRole="list"
+          itemRole="listitem"
         />
       )}
     </div>
