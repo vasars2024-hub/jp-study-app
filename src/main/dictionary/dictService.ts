@@ -38,8 +38,9 @@ import {
 } from '../../shared/lexiconNeighbors';
 import {
   COMPOUND_SCAN_ROWS,
-  HEADWORD_SCAN_CHUNK_ROWS,
+  HEADWORD_SCAN_MIN_CHUNK_ROWS,
   MAX_COMPOUND_RESULTS,
+  nextHeadwordScanChunk,
   selectLexiconCompounds,
   type LexiconCompound,
   type LexiconCompoundCandidate,
@@ -970,10 +971,16 @@ async function scanHeadwordsContaining(
 
   type RawRow = Omit<HeadwordScanRow, 'len'>;
   const kept: HeadwordScanRow[] = [];
+  // Sized by measured wall time, not by rows — see `HEADWORD_SCAN_WINDOW_TARGET_MS`
+  // for the three boots that proved a row budget cannot bound a block. Starts at the
+  // floor so the FIRST window of a cold scan is cheap too: it is the one that pays
+  // for every page the index needs and the one the old fixed size stalled inside.
+  let chunk = HEADWORD_SCAN_MIN_CHUNK_ROWS;
   for (const lang of langs) {
     let from = '';
     for (;;) {
-      const next = cursor.get(lang, from, HEADWORD_SCAN_CHUNK_ROWS) as { norm: string } | undefined;
+      const startedAt = Date.now();
+      const next = cursor.get(lang, from, chunk) as { norm: string } | undefined;
       const rows = (next
         ? window.all(lang, from, next.norm, needle)
         : tail.all(lang, from, needle)) as RawRow[];
@@ -982,6 +989,7 @@ async function scanHeadwordsContaining(
         kept.sort((a, b) => (b.score - a.score) || (a.len - b.len) || (a.id - b.id));
         if (kept.length > budget) kept.length = budget;
       }
+      chunk = nextHeadwordScanChunk(chunk, Date.now() - startedAt);
       if (!next) break;
       from = next.norm;
       // Yielded between windows, never inside one — the same contract as the

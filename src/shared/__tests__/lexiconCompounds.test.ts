@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   containsCompoundQuery,
   selectLexiconCompounds,
+  nextHeadwordScanChunk,
+  HEADWORD_SCAN_CHUNK_ROWS,
+  HEADWORD_SCAN_MIN_CHUNK_ROWS,
+  HEADWORD_SCAN_WINDOW_TARGET_MS,
   type LexiconCompoundCandidate,
 } from '../lexiconCompounds';
 
@@ -90,5 +94,40 @@ describe('selectLexiconCompounds', () => {
     expect(selectLexiconCompounds('猫', many, 2).map((item) => item.text)).toEqual(['子猫', '猫背']);
     expect(selectLexiconCompounds('猫', many, 0)).toHaveLength(1);
     expect(selectLexiconCompounds('猫', many, 999)).toHaveLength(4);
+  });
+});
+
+/**
+ * The headword scan's window is sized by measured wall time, not by rows, because
+ * a row budget cannot bound a block: 5,000 rows held the worst window to 47.9 ms
+ * out of process and to 2,035 / 1,912 / 1,781 ms inside the running app on three
+ * separate boots. What varies is page residency per row, which no row count holds
+ * constant.
+ */
+describe('the scan window resizes itself against its own wall clock', () => {
+  it('halves after an overrun and keeps halving, but never below the floor', () => {
+    expect(nextHeadwordScanChunk(4000, HEADWORD_SCAN_WINDOW_TARGET_MS + 1)).toBe(2000);
+    expect(nextHeadwordScanChunk(2000, 900)).toBe(1000);
+    // Six more halvings from 1000 would reach 15; the floor stops it at 250 and
+    // then holds, so a permanently slow disk cannot drive the window to nothing.
+    let chunk = 1000;
+    for (let i = 0; i < 8; i += 1) chunk = nextHeadwordScanChunk(chunk, 900);
+    expect(chunk).toBe(HEADWORD_SCAN_MIN_CHUNK_ROWS);
+  });
+
+  it('grows back on a warm cache, and stops at the measured ceiling', () => {
+    expect(nextHeadwordScanChunk(HEADWORD_SCAN_MIN_CHUNK_ROWS, 0)).toBe(500);
+    let chunk = HEADWORD_SCAN_MIN_CHUNK_ROWS;
+    for (let i = 0; i < 20; i += 1) chunk = nextHeadwordScanChunk(chunk, 1);
+    expect(chunk).toBe(HEADWORD_SCAN_CHUNK_ROWS);
+  });
+
+  it('holds still inside the dead band, which is what stops it oscillating', () => {
+    // Under target but not comfortably under: growing here is what produces a
+    // long window every other turn.
+    const justUnder = HEADWORD_SCAN_WINDOW_TARGET_MS - 1;
+    expect(justUnder * 2).toBeGreaterThan(HEADWORD_SCAN_WINDOW_TARGET_MS);
+    expect(nextHeadwordScanChunk(1000, justUnder)).toBe(1000);
+    expect(nextHeadwordScanChunk(1000, HEADWORD_SCAN_WINDOW_TARGET_MS)).toBe(1000);
   });
 });

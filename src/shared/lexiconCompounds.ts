@@ -4,18 +4,71 @@ import { normalizeNeighborText } from './lexiconNeighbors';
 export const COMPOUND_SCAN_ROWS = 200;
 export const MAX_COMPOUND_RESULTS = 12;
 /**
- * Index entries visited per event-loop window by the headword scan that
- * `findLexiconCompounds` and `findLexiconCollocations` share.
+ * The LARGEST number of index entries the shared headword scan will visit in one
+ * event-loop window. It is a ceiling, not the window size — see
+ * `HEADWORD_SCAN_WINDOW_TARGET_MS`.
  *
  * Measured, not chosen: on the shipped 770,612-row `ja` partition the whole scan
  * costs the same either way — it is page residency, not CPU — but the shipped
  * single statement blocks the main process for **1,244.1 ms** on a cold cache,
- * while 155 windows of 5,000 hold the worst single window to **47.9 ms** (猫) and
- * **92.4 ms** (日) for ~11% more total. 20,000 was measured too and is cheaper
- * overall (39 windows, +0%) but its worst window is 179.0 ms, which leaves too
- * little headroom under the 500 ms bar on a colder machine than this one.
+ * while windows of 5,000 hold the worst single window to **47.9 ms** (猫) and
+ * **92.4 ms** (日) out of process for ~11% more total. 20,000 was measured too and
+ * is cheaper overall (39 windows, +0%) but its worst window is 179.0 ms.
  */
 export const HEADWORD_SCAN_CHUNK_ROWS = 5000;
+/**
+ * How long one window is allowed to take before the next one is made smaller.
+ *
+ * A FIXED ROW BUDGET CANNOT BOUND TIME, AND THAT IS NOT A THEORETICAL POINT.
+ * 5,000 rows held the worst window to 47.9 ms in a standalone process against the
+ * same 537 MB file — but driven through the running app, the first 猫 expansion
+ * after a boot blocked Electron's main loop for **2,035 / 1,912 / 1,781 ms** on
+ * three separate boots, in ONE stretch, with p95 7-10 ms. Falsified against both
+ * rival explanations before the size was touched: `dict:listPairs` forces the
+ * SQLite open and `migrateDictionaryDb` in **9 ms**, so it is not the open; and
+ * the third boot was measured with main fully settled (idle max gap **17 ms**),
+ * so it is not contention with boot work. What varies between the two rigs is
+ * page residency per row, which no row count can hold constant.
+ *
+ * So the window is sized by its own measured wall time: over target, halve; well
+ * under, grow back. Cold pages therefore shrink it toward
+ * `HEADWORD_SCAN_MIN_CHUNK_ROWS` and a warm cache lets it climb back to the
+ * ceiling above, where the 11%-more-total measurement still applies.
+ *
+ * 24 ms is one and a half 60 Hz frames: small enough that a window landing inside
+ * a drag or an animation costs a dropped frame rather than a visible stall, large
+ * enough that the per-window `setImmediate` is a rounding error against it.
+ */
+export const HEADWORD_SCAN_WINDOW_TARGET_MS = 24;
+/**
+ * The floor the adaptive window may shrink to. Below this the fixed per-window
+ * cost — one covering `limit 1 offset N` cursor probe plus one range query — stops
+ * being small against the rows it is amortised over, and the scan spends more
+ * total time than the block it is avoiding is worth.
+ */
+export const HEADWORD_SCAN_MIN_CHUNK_ROWS = 250;
+
+/**
+ * The next window's row budget, given the one just walked and what it cost.
+ *
+ * Halve on an overrun; double only when the window came in comfortably under half
+ * the target. The asymmetric dead band is deliberate: a controller that grew again
+ * the moment it was merely *under* target would alternate between overshooting and
+ * correcting, which puts a long window on the loop every other turn — the exact
+ * behaviour being removed.
+ *
+ * Pure and exported so the sizing is testable without a database slow enough to
+ * exercise it, which is not a fixture that can be written reliably.
+ */
+export function nextHeadwordScanChunk(chunk: number, elapsedMs: number): number {
+  if (elapsedMs > HEADWORD_SCAN_WINDOW_TARGET_MS) {
+    return Math.max(HEADWORD_SCAN_MIN_CHUNK_ROWS, Math.floor(chunk / 2));
+  }
+  if (elapsedMs * 2 < HEADWORD_SCAN_WINDOW_TARGET_MS) {
+    return Math.min(HEADWORD_SCAN_CHUNK_ROWS, chunk * 2);
+  }
+  return chunk;
+}
 /**
  * A one-character query already matches thousands of headwords, which is the
  * useful case. A long one is a sentence someone pasted, and searching for it
