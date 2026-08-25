@@ -16,7 +16,13 @@ export function searchMediaHub(items: readonly MediaItem[], options: MediaHubSea
     if (options.language && item.lang !== options.language) return false;
     if (genre && !(item.genres ?? []).some((g) => g.toLocaleLowerCase() === genre)) return false;
     if (!q) return true;
-    return [item.title, item.fileName, item.path, item.artist, ...(item.genres ?? []), ...(item.actors ?? []), item.jlptLevel]
+    // `item.path` is deliberately NOT searched. It is an absolute path, so every item shares the
+    // drive, the account name and the download folder, and none of that is on the card. Measured
+    // live 2026-08-25 over the real 36-item library: "arseniy" (the Windows account name) matched
+    // 36 of 36 while appearing on 0 cards, and so did "users" and "downloads" — a search that
+    // returns the whole library for a word nothing displays reads as a broken filter. The file
+    // name is the part of the path a card does show, and it stays in the haystack.
+    return [item.title, item.fileName, item.artist, ...(item.genres ?? []), ...(item.actors ?? []), item.jlptLevel]
       .some((value) => typeof value === 'string' && value.toLocaleLowerCase().includes(q));
   });
 }

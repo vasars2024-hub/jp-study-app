@@ -83,6 +83,22 @@ describe('media hub contract', () => {
     expect(searchMediaHub(items, { query: 'artist', category: 'music' }).map((x) => x.id)).toEqual(['song']);
   });
 
+  it('does not match the directory part of a path, which is on no card', () => {
+    const items = [
+      item('frieren', 1, { title: 'Frieren', fileName: 'Frieren S01E01.mkv', path: 'C:/Users/arseniy/Downloads/jp-study/Frieren S01E01.mkv' }),
+      item('jojo', 2, { title: 'JoJo 38 RAW', fileName: 'JoJo 38 RAW.mp4', path: 'C:/Users/arseniy/Downloads/jp-study/JoJo 38 RAW.mp4' }),
+    ];
+    // Every item shares the account name and the download folder, so a hit on either returns the
+    // whole library for a word no card shows. Measured on the real 36-item library at 36 of 36.
+    for (const shared of ['arseniy', 'users', 'downloads', 'jp-study']) {
+      expect(searchMediaHub(items, { query: shared, category: 'all' })).toEqual([]);
+    }
+    // The file name is the part of the path a card does show, and it still matches.
+    expect(searchMediaHub(items, { query: 's01e01', category: 'all' }).map((x) => x.id)).toEqual(['frieren']);
+    expect(searchMediaHub(items, { query: '.mp4', category: 'all' }).map((x) => x.id)).toEqual(['jojo']);
+    expect(searchMediaHub(items, { query: 'jojo', category: 'all' }).map((x) => x.id)).toEqual(['jojo']);
+  });
+
   it('reports storage totals while retaining missing and duplicate diagnostics', () => {
     const items = [item('a', 1, { path: 'a.mp4' }), item('b', 2, { path: 'a.mp4' }), item('c', 3, { path: 'missing.mp4' })];
     expect(buildStorageDiagnostics(items, (path) => path === 'a.mp4' ? 10 : null)).toMatchObject({ totalBytes: 20, existingBytes: 20, missing: ['missing.mp4'] });
