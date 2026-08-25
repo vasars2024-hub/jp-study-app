@@ -39,6 +39,27 @@ export interface VirtualListProps<T> {
    */
   listRole?: 'list' | 'group';
   itemRole?: 'listitem';
+  /**
+   * Keep TABLE/GRID semantics through the window, for a caller whose
+   * `renderItem` already returns its own `role="row"`.
+   *
+   * This is not `listRole` under another name and the difference is the reason
+   * it exists. A `row` must be OWNED by a `table`, `grid`, `treegrid` or
+   * `rowgroup`; every scraper table in this app puts four generic `div`s between
+   * the two — its own `.scr-tbody`, this component's scroll container, and the
+   * spacer and offset boxes below — so every row was orphaned and the table
+   * exposed no rows at all. Setting this marks the container a `rowgroup` and
+   * every box under it `presentation`, which re-parents the caller's rows onto
+   * it without the caller changing a line of `renderItem`.
+   *
+   * The row's OWN slot is `presentation` too, unlike the `listitem` path: the
+   * row role is the caller's, so a role here would nest a row inside a row.
+   * The count a screen reader announces therefore cannot come from this
+   * component — it is `aria-rowcount` on the caller's table plus
+   * `aria-rowindex` on each row, both of which the caller renders. Without
+   * them a 4,000-row table windowed to 20 announces twenty rows.
+   */
+  gridRole?: 'rowgroup';
 }
 
 export default function VirtualList<T>({
@@ -53,6 +74,7 @@ export default function VirtualList<T>({
   scrollToIndex,
   listRole,
   itemRole,
+  gridRole,
 }: VirtualListProps<T>) {
   const [containerRef, size] = useElementSize<HTMLDivElement>();
   const [scrollTop, setScrollTop] = useState(0);
@@ -92,18 +114,24 @@ export default function VirtualList<T>({
 
   const visible = useMemo(() => items.slice(startIdx, endIdx), [items, startIdx, endIdx]);
 
+  // The spacer and the offset box exist for geometry only. Once the collection
+  // has declared a role — list or rowgroup — they have to be invisible to the
+  // accessibility tree, or they sit between the collection and its items and
+  // break the ownership the role just promised.
+  const structural = listRole || gridRole ? ('presentation' as const) : undefined;
+
   return (
-    <div ref={containerRef} className={className} style={{ overflowY: 'auto', position: 'relative', ...style }} onScroll={onScroll} role={listRole}>
+    <div ref={containerRef} className={className} style={{ overflowY: 'auto', position: 'relative', ...style }} onScroll={onScroll} role={listRole ?? gridRole}>
       {total === 0
         ? emptyState ?? null
         : (
-          <div style={{ height: totalHeight, position: 'relative' }} role={listRole ? 'presentation' : undefined}>
-            <div style={{ position: 'absolute', top: offsetY, left: 0, right: 0 }} role={listRole ? 'presentation' : undefined}>
+          <div style={{ height: totalHeight, position: 'relative' }} role={structural}>
+            <div style={{ position: 'absolute', top: offsetY, left: 0, right: 0 }} role={structural}>
               {visible.map((item, i) => (
                 <div
                   key={getKey(item, startIdx + i)}
                   style={{ height: itemHeight }}
-                  role={itemRole}
+                  role={itemRole ?? structural}
                   aria-setsize={itemRole ? total : undefined}
                   aria-posinset={itemRole ? startIdx + i + 1 : undefined}
                 >

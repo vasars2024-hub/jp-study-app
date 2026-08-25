@@ -120,9 +120,13 @@ export default function EpisodeTable({
 }) {
   const template = useMemo(() => gridTemplate(columns), [columns]);
 
+  // `rows.length + 1`, and the header is row 1: `aria-rowcount` counts every row
+  // the table has, header included, and it was short by one. It is also the only
+  // place the real size can come from — the body is windowed, so what is in the
+  // DOM is a couple of dozen rows out of however many there are.
   return (
-    <div className="scr-table" role="table" aria-rowcount={rows.length}>
-      <div className="scr-thead" role="row" style={{ gridTemplateColumns: template }}>
+    <div className="scr-table" role="table" aria-rowcount={rows.length + 1}>
+      <div className="scr-thead" role="row" aria-rowindex={1} style={{ gridTemplateColumns: template }}>
         {columns.map((column) => {
           const active = column.id === sortColumn;
           return (
@@ -154,12 +158,14 @@ export default function EpisodeTable({
           items={rows}
           itemHeight={ROW_HEIGHT[density]}
           getKey={(row) => row.id}
+          gridRole="rowgroup"
           emptyState={<p className="scr-table-empty">{emptyMessage}</p>}
-          renderItem={(row) => {
+          renderItem={(row, index) => {
             const isSelected = selected.has(row.id);
             return (
               <div
                 role="row"
+                aria-rowindex={index + 2}
                 className={`scr-row${isSelected ? ' is-selected' : ''}${
                   row.status === 'failed' ? ' is-failed' : ''
                 }`}

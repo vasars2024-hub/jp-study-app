@@ -125,8 +125,8 @@ export function StreamTable({
 }) {
   const template = `1fr 96px 84px 84px 108px 96px 92px 96px${onPlay ? ' 72px' : ''}`;
   return (
-    <div className="scr-table" role="table">
-      <div className="scr-thead" role="row" style={{ gridTemplateColumns: template }}>
+    <div className="scr-table" role="table" aria-rowcount={streams.length + 1}>
+      <div className="scr-thead" role="row" aria-rowindex={1} style={{ gridTemplateColumns: template }}>
         {[
           sx('result.col.source'), sx('result.col.resolution'), sx('result.col.codec'),
           sx('result.col.container'), sx('result.col.bitrate'), sx('result.col.latency'),
@@ -140,9 +140,10 @@ export function StreamTable({
           items={streams}
           itemHeight={40}
           getKey={(s) => s.id}
+          gridRole="rowgroup"
           emptyState={<p className="scr-table-empty">{sx('result.emptyStreams')}</p>}
-          renderItem={(stream) => (
-            <div role="row" className="scr-row" style={{ gridTemplateColumns: template }}>
+          renderItem={(stream, index) => (
+            <div role="row" aria-rowindex={index + 2} className="scr-row" style={{ gridTemplateColumns: template }}>
               <div role="gridcell" className="scr-td">{stream.sourceLabel}</div>
               <div role="gridcell" className="scr-td"><Pill tone="outline">{stream.resolution}</Pill></div>
               <div role="gridcell" className="scr-td"><span className="scr-t-plain">{stream.codec}</span></div>
@@ -324,8 +325,8 @@ export function TorrentTable({
   const selectable = Boolean(onToggle);
   const template = `${selectable ? '34px ' : ''}1fr 120px 92px 80px 80px 96px 96px 84px 110px`;
   return (
-    <div className="scr-table" role="table">
-      <div className="scr-thead" role="row" style={{ gridTemplateColumns: template }}>
+    <div className="scr-table" role="table" aria-rowcount={torrents.length + 1}>
+      <div className="scr-thead" role="row" aria-rowindex={1} style={{ gridTemplateColumns: template }}>
         {selectable && <div role="columnheader" className="scr-th" />}
         {[
           sx('result.col.name'), sx('result.col.group'), sx('result.col.resolution'),
@@ -340,10 +341,12 @@ export function TorrentTable({
           items={torrents}
           itemHeight={44}
           getKey={(t) => t.id}
+          gridRole="rowgroup"
           emptyState={<p className="scr-table-empty">{sx('result.emptyTorrents')}</p>}
-          renderItem={(row) => (
+          renderItem={(row, index) => (
             <div
               role="row"
+              aria-rowindex={index + 2}
               className={`scr-row${selected?.has(row.id) ? ' is-selected' : ''}`}
               style={{ gridTemplateColumns: template }}
             >

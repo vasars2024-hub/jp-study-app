@@ -912,8 +912,8 @@ export function HistoryPage() {
       </div>
 
       <ScrCard id="history-list" title={sx('history.jobs')} statusId="page.history">
-        <div className="scr-table" role="table">
-          <div className="scr-thead" role="row" style={{ gridTemplateColumns: HISTORY_TEMPLATE }}>
+        <div className="scr-table" role="table" aria-rowcount={visible.length + 1}>
+          <div className="scr-thead" role="row" aria-rowindex={1} style={{ gridTemplateColumns: HISTORY_TEMPLATE }}>
             {[
               '', sx('history.col.series'), sx('history.col.provider'), sx('history.col.profile'),
               sx('history.col.found'), sx('history.col.failed'), sx('history.col.size'),
@@ -927,9 +927,10 @@ export function HistoryPage() {
               items={visible}
               itemHeight={54}
               getKey={(j) => j.id}
+              gridRole="rowgroup"
               emptyState={<p className="scr-table-empty">{sx('history.empty')}</p>}
-              renderItem={(job) => (
-                <div role="row" className="scr-row" style={{ gridTemplateColumns: HISTORY_TEMPLATE }}>
+              renderItem={(job, index) => (
+                <div role="row" aria-rowindex={index + 2} className="scr-row" style={{ gridTemplateColumns: HISTORY_TEMPLATE }}>
                   <div role="gridcell" className="scr-td scr-td--center">
                     <span
                       className={`scr-outcome scr-outcome--${

@@ -788,6 +788,7 @@ export default function DeckWorkbenchBrowser({
             items={shown}
             itemHeight={ROW_HEIGHT}
             getKey={(row) => row.noteId}
+            gridRole="rowgroup"
             scrollToIndex={cursor >= 0 ? cursor : undefined}
             emptyState={<p className="muted">{t('ankiWorkbench.browser.empty')}</p>}
             renderItem={(row, index) => {

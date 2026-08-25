@@ -28,11 +28,15 @@ const SRC = resolve(__dirname, '..', '..');
  * file allowlist, because `ResultPanels.tsx` alone holds two grids AND a log
  * console and a per-file rule would have excused the log along with them.
  *
- * Known gap, recorded rather than quietly patched: for those grids the two
- * structural wrappers `VirtualList` puts between container and slot are only
- * marked `presentation` when `listRole` is set, so the `grid`→`row` ownership
- * chain has the same break this file exists to prevent. Closing it needs a
- * `gridRole` decision, not a copy of the list one.
+ * That gap is now CLOSED, and the shape of the fix is why it needed its own
+ * decision rather than a copy of the list one. `listRole`/`itemRole` puts the
+ * role ON the slot; a grid cannot, because the row role belongs to the caller
+ * and a row inside a row is nonsense. So `gridRole="rowgroup"` makes the
+ * container a rowgroup and every box beneath it — spacer, offset AND slot —
+ * `presentation`, which re-parents the caller's own rows onto it. The count then
+ * has nowhere to live inside the component either: it is `aria-rowcount` on the
+ * caller's table and `aria-rowindex` on each row, asserted below, because a
+ * windowed table without them announces the twenty rows in the DOM.
  */
 const OWN_ROW_ROLE = /role="(row|option|treeitem|tab|menuitem|gridcell)"/;
 
@@ -91,6 +95,49 @@ describe('every windowed list declares what it is', () => {
     }
     // Named, not counted: the message has to say which list went mute.
     expect(mute).toEqual([]);
+  });
+
+  it('gives every windowed GRID a rowgroup, so its rows are not orphaned', () => {
+    // A `row` must be owned by a table/grid/treegrid/rowgroup. Between the
+    // caller's `role="table"` and its row sat four generic divs — its own
+    // `.scr-tbody`, the scroll container, the spacer and the offset box — so
+    // the table exposed no rows at all. `gridRole` is what re-parents them.
+    const orphaned: string[] = [];
+    for (const file of files) {
+      const rel = relative(SRC, file).replace(/\\/g, '/');
+      for (const tag of virtualListTags(readFileSync(file, 'utf8'))) {
+        if (/\blistRole=/.test(tag)) continue;
+        if (!OWN_ROW_ROLE.test(tag)) continue;
+        if (!/\bgridRole=/.test(tag)) orphaned.push(`src/${rel}`);
+      }
+    }
+    expect(orphaned).toEqual([]);
+  });
+
+  it('gives every windowed grid a row COUNT and per-row index its DOM cannot supply', () => {
+    // The grid analogue of `aria-setsize`, and it cannot come from the
+    // component: both attributes live on markup the caller renders. A file that
+    // windows a table and never says how many rows there are announces the
+    // twenty in the DOM as the whole collection.
+    const silent: string[] = [];
+    for (const file of files) {
+      const rel = relative(SRC, file).replace(/\\/g, '/');
+      const source = readFileSync(file, 'utf8');
+      const grids = virtualListTags(source).filter(
+        (tag) => !/\blistRole=/.test(tag) && OWN_ROW_ROLE.test(tag),
+      );
+      if (grids.length === 0) continue;
+      // Per file rather than per tag: the count sits on the table element, which
+      // is outside the `<VirtualList` tag this sweep can see.
+      const counts = (source.match(/aria-rowcount=/g) ?? []).length;
+      const indexes = (source.match(/aria-rowindex=/g) ?? []).length;
+      if (counts < grids.length) silent.push(`src/${rel} (aria-rowcount ${counts} < ${grids.length} grids)`);
+      // At least the windowed body row, per grid. Not two: `DeckWorkbenchBrowser`
+      // keeps its column header OUTSIDE `role="grid"`, so it legitimately has no
+      // header row to index and its rows start at 1 rather than 2.
+      if (indexes < grids.length) silent.push(`src/${rel} (aria-rowindex ${indexes} < ${grids.length})`);
+    }
+    expect(silent).toEqual([]);
   });
 
   it('the two roles are set together, never one without the other', () => {

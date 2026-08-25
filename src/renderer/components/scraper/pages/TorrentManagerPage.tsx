@@ -578,10 +578,11 @@ export default function TorrentManagerPage() {
           </span>
         }
       >
-        <div className="scr-table" role="table">
+        <div className="scr-table" role="table" aria-rowcount={transfers.length + 1}>
           <div
             className="scr-thead"
             role="row"
+            aria-rowindex={1}
             style={{ gridTemplateColumns: MIRROR_TEMPLATE }}
           >
             {MIRROR_COLUMNS.map((label) => (
@@ -595,9 +596,10 @@ export default function TorrentManagerPage() {
               items={transfers}
               itemHeight={56}
               getKey={(t) => t.hash}
+              gridRole="rowgroup"
               emptyState={<p className="scr-table-empty">{sx('torrent.noTransfers')}</p>}
-              renderItem={(t) => (
-                <div role="row" className="scr-row" style={{ gridTemplateColumns: MIRROR_TEMPLATE }}>
+              renderItem={(t, index) => (
+                <div role="row" aria-rowindex={index + 2} className="scr-row" style={{ gridTemplateColumns: MIRROR_TEMPLATE }}>
                   <div role="gridcell" className="scr-td">
                     <span className="scr-t-titles">
                       <span className="scr-t-en">{t.name}</span>
