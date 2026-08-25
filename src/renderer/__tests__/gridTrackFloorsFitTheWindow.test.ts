@@ -99,6 +99,65 @@ describe('grid track floors fit the narrowest window the product allows', () => 
     expect(SHEETS).toContain('src/renderer/components/lexicon/conjugationTable.css');
   });
 
+  /**
+   * The same defect on the other axis, and the one the 2026-08-25 NovelReader drive found.
+   *
+   * A grid with `grid-template-rows` and no `grid-template-columns` still HAS a column: one
+   * implicit `auto` track. An `auto` track's base size is its items' min-content and it only
+   * ever grows to absorb free space — it never shrinks below that floor. So a full-frame
+   * shell whose widest row is a nowrap control strip is pinned to that strip's min-content
+   * at every window size, and its own `overflow: hidden` cuts the remainder off with nothing
+   * to scroll. Identical consequence to a `minmax(30rem, …)` floor; different mechanism, so
+   * the sweep above cannot see it.
+   *
+   * Measured live on `.reader` at the 380px Blanc allows (`BLANC_MIN_W`, main.ts): the column
+   * held 860.016px, `.reader-bar` with it, and fourteen of the eighteen bar controls sat
+   * entirely past the right edge — translation, the lens, reader settings, all six annotation
+   * swatches, Collect, both Ask-the-Agent buttons and the flashcard collection.
+   */
+  it('every full-frame grid shell clamps its column axis, not only its rows', () => {
+    const offenders: string[] = [];
+    for (const sheet of SHEETS) {
+      const css = strip(read(sheet));
+      const rules = /([^{}]+)\{([^{}]*)\}/g;
+      let rule = rules.exec(css);
+      while (rule) {
+        const selector = rule[1].trim().replace(/\s+/g, ' ');
+        const body = rule[2];
+        const fullFrame =
+          /display:\s*grid/.test(body) &&
+          /overflow(-x)?:\s*hidden/.test(body) &&
+          /grid-template-rows/.test(body) &&
+          /height:\s*(100%|100vh)|inset:\s*0|position:\s*absolute/.test(body);
+        // Presence is not the property. `grid-template-columns: auto` is a declaration and
+        // floors at min-content exactly like the implicit track it replaced, which a
+        // presence-only check passed — caught by mutating this rule to `auto` and watching
+        // only the named-rule test below go red. Every track has to be able to reach zero:
+        // `minmax(0, …)`, a `min(…)` clamp, or a percentage of the container.
+        const columns = /grid-template-columns:([^;}]*)/.exec(body)?.[1] ?? '';
+        const clamped = /minmax\(\s*0/.test(columns) || /min\(/.test(columns) || /%/.test(columns);
+        if (fullFrame && !clamped) {
+          offenders.push(`${sheet} ${selector} -> ${columns.trim() || '(no declaration)'}`);
+        }
+        rule = rules.exec(css);
+      }
+    }
+    expect(offenders, 'full-frame grid shells with an unclamped implicit column').toEqual([]);
+  });
+
+  it('the reader shell and its two control strips survive a 380px host', () => {
+    const styles = strip(read('src/renderer/styles.css'));
+    // The cap on the track...
+    expect(styles).toMatch(/\.reader\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)/);
+    // ...and the four automatic minimums that would otherwise overflow the capped track
+    // anyway. `min-width: 0` alone leaves the strips clipped rather than overflowing, so the
+    // wrap is half of the fix and not a nicety.
+    expect(styles).toMatch(/\.reader-bar\s*\{[^}]*min-width:\s*0[^}]*flex-wrap:\s*wrap/);
+    expect(styles).toMatch(/\.reader-controls\s*\{[^}]*min-width:\s*0[^}]*flex-wrap:\s*wrap/);
+    expect(styles).toMatch(/\.reader-footer\s*\{[^}]*min-width:\s*0[^}]*flex-wrap:\s*wrap/);
+    expect(styles).toMatch(/\.reader-stage\s*\{[^}]*min-width:\s*0/);
+  });
+
   it('the two nowrap control rows that left the frame at 260px now wrap', () => {
     // `form.dict-search` measured 324px and `.lexicon-lens-picker` 297px, both in a 258px
     // body: the Search button and the "Interlinear" lens were unreachable, not merely tight.
@@ -113,4 +172,13 @@ describe('grid track floors fit the narrowest window the product allows', () => 
 
 function read(p: string): string {
   return readFileSync(resolve(process.cwd(), p), 'utf8');
+}
+
+/**
+ * Comments out, newlines kept so a reported line number still means something. Both new
+ * assertions need this: the `.reader` rule's own comment names `grid-template-columns` while
+ * explaining why it is there, so a raw match would pass on the prose alone.
+ */
+function strip(css: string): string {
+  return css.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '));
 }

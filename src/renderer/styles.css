@@ -4065,6 +4065,22 @@ h1 {
      (A flex child with min-height:0 should do the same but proved flaky here.) */
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
+  /* The column axis needs the same `minmax(0, ...)` the row axis above already
+     documents, and for the same reason. A grid with no `grid-template-columns`
+     gets one implicit `auto` track whose base size is the items' min-content,
+     and an `auto` track only ever GROWS to fill free space - it never shrinks
+     below that. `.reader-bar` is a nowrap flex row of ~18 controls whose
+     min-content measured 860 px, so at any host narrower than that the track
+     stayed 860, every row (bar, stage, footer) overflowed, and `overflow:
+     hidden` on this rule silently cut the right-hand controls off. Blanc hosts
+     this reader and its window minimum is 380 px (`BLANC_MIN_W`), so that was
+     reachable, not theoretical: measured at 380, fourteen of the eighteen bar
+     controls sat entirely past the right edge with no way to reach them.
+     It also broke the L6 canvas contract one level down: `ReadingCanvas`
+     resolves docked-vs-sheet from its OWN measured width, and the width it
+     measured was the frozen 860 rather than the host's, so a side tool could
+     never become a sheet however narrow the window got. */
+  grid-template-columns: minmax(0, 1fr);
   /* 100% respects the root CSS `zoom` (app-wide zoom); 100vh does not and would
      push the footer + page bottom off-screen whenever app zoom is above 1. */
   height: 100%;
@@ -4081,6 +4097,14 @@ h1 {
   background: var(--sidebar);
   border-bottom: 1px solid var(--border);
   user-select: none;
+  /* Capping the track is only half of it: a grid item keeps an automatic
+     minimum of its own min-content and would overflow the capped track. Wrap
+     rather than scroll - every control stays reachable by pointer and by Tab
+     with no gesture and no hidden-overflow affordance, and the bar's extra
+     height is absorbed by the `minmax(0, 1fr)` stage row above. */
+  min-width: 0;
+  flex-wrap: wrap;
+  row-gap: 8px;
 }
 .reader-title {
   flex: 1;
@@ -4093,6 +4117,12 @@ h1 {
   display: flex;
   align-items: center;
   gap: 10px;
+  /* Same automatic-minimum story as `.reader-bar`, one level in: this cluster is
+     itself a nowrap flex item, so without these the bar wraps to a second row
+     and the cluster still overflows it as one indivisible block. */
+  min-width: 0;
+  flex-wrap: wrap;
+  row-gap: 8px;
 }
 .reader-controls select {
   background: var(--panel-2);
@@ -4284,6 +4314,10 @@ h1 {
   /* Without this, the flex item's default min-height:auto refuses to shrink
      below its content, pushing the footer (and the page's bottom) off-screen. */
   min-height: 0;
+  /* And the same on the inline axis, so the reading canvas inside is measured
+     at the host's width rather than at its own content's - that measurement is
+     what decides docked vs sheet. */
+  min-width: 0;
   position: relative;
   z-index: 0;
   overflow: hidden;
@@ -4537,6 +4571,15 @@ h1 {
   background: var(--sidebar);
   border-top: 1px solid var(--border);
   user-select: none;
+  /* See `.reader-bar`. Measured 431 px of min-content against a 380 px host, so
+     the chapter jump and the progress readout were the pieces cut off. */
+  min-width: 0;
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+.reader-footer .chapter-select {
+  min-width: 0;
+  max-width: 100%;
 }
 .reader-pagecount {
   flex-shrink: 0;

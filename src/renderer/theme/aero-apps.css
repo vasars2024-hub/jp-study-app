@@ -2432,6 +2432,9 @@
 :root[data-materials='aero'] .aero-dict-chrome .dict-view {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
+  /* Column axis clamped for the same reason the rows are â€” see the note on
+     `.aero-settings`. Guarded by `gridTrackFloorsFitTheWindow.test.ts`. */
+  grid-template-columns: minmax(0, 1fr);
   height: 100%;
   min-height: 0;
   gap: 0;
@@ -5187,6 +5190,11 @@
 :root[data-materials='aero'] .aero-settings {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
+  /* The column axis needs the same clamp the row axis has: an implicit `auto`
+     track floors at its items' min-content and only ever grows, so in a window
+     narrower than that the row overflows and `overflow: hidden` cuts it off
+     with nothing to scroll. Guarded by `gridTrackFloorsFitTheWindow.test.ts`. */
+  grid-template-columns: minmax(0, 1fr);
   height: 100%;
   min-height: 0;
   overflow: hidden;
