@@ -164,7 +164,17 @@
   font: inherit;
 }
 
-.mc-root button {
+/* `:where()` contributes no specificity, and that is the whole point. As
+   `.mc-root button` this rule scored (0,1,1) — the same as every component rule
+   of the form `.some-block button { color: … }` — and `mediaCenter.css` loads
+   after them, so source order handed the shell the win. Measured live
+   2026-08-25 in both presentations: `.medialib-view-toggle button`'s
+   `color: var(--muted)` (#7fa08e) never reached the screen and the INACTIVE
+   view button painted #d8ebe0, identical to the active one, leaving a single
+   low-contrast background fill as the only signal for which view is on. At
+   (0,0,1) this still beats the UA's `buttontext` default, which is all it was
+   ever for, and loses to any component that states its own intent. */
+:where(.mc-root) button {
   color: inherit;
 }
 
