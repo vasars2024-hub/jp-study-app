@@ -591,3 +591,36 @@ makes Vite do a FULL RELOAD, not an HMR patch. That reset every `window.__lq*` p
 `l1-maximize-drive.js` silently fell back to its `'Dictionary'` default and maximized the wrong
 window) and reset the Video window's Media Center page from Library back to Video. Re-set the
 globals and re-select the page after any run that adds a file.
+
+## 2026-08-25 · primary — Video's maximized third, measured in LIQUID at last
+
+The category was carrying two of three sizes in liquid and the maximized third from a
+standard-presentation run, which the rubric does not let stand. Process 32344, product tree
+`44bf5cca`, Video 1080×700 `liquid` on `Recently added` (8 titles / 36 files), viewport
+1264×821, `forest-night`.
+
+| Video, liquid | box | clipped | overlaps | h-scroll | hiddenOverflowX | dead % of viewport | chrome % | canvas % |
+| - | - | - | - | - | - | - | - | - |
+| default | 1080×765 → **1080×700** | **0** | **0** | **0** | **0** | **5.8** | 49.8 | 64.7 |
+| maximized | **1264×765** | **0** | **0** | **0** | **0** | **7.0** | **45.8** | **68.6** |
+
+**The content-to-chrome half is the one that needed the maximized number to mean anything.**
+The rubric asks for content growing into extra space *rather than chrome*, which is a
+comparison, not a level: from default to maximized the chrome share **falls 49.8 → 45.8%**
+while the dominant canvas **rises 64.7 → 68.6%**. The five chrome parts are the same at both
+sizes (`div.fwin-bar`, `aside.mc-sidebar`, `header.mc-topbar`, `nav.lq-contextual`,
+`header.medialib-browser__head`) — nothing new appears to eat the extra width.
+
+**Negative control, fired in this session, at this size, in this presentation.**
+`l1-max-clip-control.js` injects one 300 px box 20 px inside the right frame edge with no
+scrollable ancestor: Video clipped **0 → 1 → 0**, and Dictionary stayed **0** throughout, so
+the control is target-scoped rather than a global trip. `l1-max-clip-control-cleanup.js`
+reports `stillPresent: false`.
+
+**Restore is the product's own.** `toggleMax` stores the pre-maximize box and a second click
+restores from it: `left: 92px; top: 40px; width: 1080px; height: 700px;` before and after,
+byte-identical, `max` false, `data-presentation` still `liquid`. **`restoredExactly: true`**
+(z-index legitimately moves, 153 → 157, because restoring raises the window).
+
+**Video category 4 = 10/10**, all three sizes in liquid — compact 260×170 was re-derived in
+liquid on 2026-08-24 (`4a7fa118`'s turn, 0 clipped / 0 overlap / 0 h-scroll, restored exactly).

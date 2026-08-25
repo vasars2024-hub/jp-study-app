@@ -363,7 +363,7 @@ that surface and L4's job, not a gap in this score.
 | 1 | Accessibility | 10/10 `4a7fa118` — min **5.13:1**, 0 failing of 53 | **liquid**, control fired (0→1, ratio 1.03) |
 | 2 | Clunkiness | not measured on Video | — |
 | 3 | Liquid utilization | 10/10 `bde1b435` — `liquidTreatedEligible` **4 of 4**, `denseWorkOnTranslucent` **0** | **liquid**, Media/standard as the same-DOM control |
-| 4 | Use of space | default 5.8% and compact 260×170 re-derived in liquid; **maximized leg not re-run** | liquid, incomplete |
+| 4 | Use of space | **10/10 — this turn**, all three sizes in liquid: maximized 1264×765 clipped **0** / overlaps **0** / h-scroll **0** / hiddenOverflowX **0**, dead **7.0%** of viewport, chrome **49.8 → 45.8%** and canvas **64.7 → 68.6%** as the window grows | **liquid**, control fired at maximized (Video 0→1→0, Dictionary unchanged at 0), `restoredExactly: true` |
 | 5 | UI clarity | first number only (`e3cb00ca`) | standard |
 | 6 | Feature parity + reversibility | **10/10 — this turn** | **both**, in one run |
 | 7 | Performance under real load | not measured on Video | — |
@@ -385,8 +385,10 @@ surface in a row, after category 1's muted count and category 3's untreated rail
 read it (`89c11473`). That is now three of Video's categories whose lost point was product, where
 Dictionary's first four were all instrumentation.
 
-**Next on Video, in order:** category 4's maximized leg in liquid (the only third of an otherwise
-finished category), then 2, 5, 7, 8. **Dictionary is still 7 of 8** with category 7 the open one —
+**Next on Video, in order:** categories 2, 5, 7, 8 — 4 closed later in this same turn, above.
+**Three of eight now hold a 10 on Video measured in liquid (1, 3, 4) plus category 6 in both**,
+i.e. **4 of 8**; 2, 7 and 8 have never been measured on this surface at all and 5 has only its
+first number, taken in standard. **Dictionary is still 7 of 8** with category 7 the open one —
 its remaining ~100.2 ms frame is the `FloatingWindow` memo/`children` refactor, which `9c4a38e5`
 landed and `af7fd609` then measured at the compositor ceiling (0 frames over 100 ms in 6 of 6
 runs, worst frame **16.9 ms** = the display's own ceiling). Dictionary's entry is therefore one
