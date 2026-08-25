@@ -727,3 +727,32 @@ value read back as `32px`. One probe adapted, none created.
 `div.os-desktop`. The Media Center sidebar overflows its own window, so the Settings entry is
 half-clipped and its centre is unclickable. Category 1 on Video is **not 10 until that is fixed**;
 an unscored control is not a passing one.
+
+### Same turn, second slice — the occluded row was a layout defect, and category 1 on Video is now 10
+
+`.mc-sidebar` is a flex column with no scroll region, so its content simply ran past the window:
+eight 45.64px nav rows plus the library block put `.mc-settings-link` at y **721.36** against a
+window bottom of **740**, and `.mc-root`'s `overflow: hidden` clipped the rest. The Settings entry
+was half-drawn and its centre hit-tested to `div.os-desktop`.
+
+Fix: the nav is the sidebar's only growable region, so **it** scrolls — `min-height: 0` (without
+which a column flex item never shrinks below its content and `overflow-y` is dead code) plus
+`overflow: hidden auto`. The sidebar itself keeps brand, library and Settings pinned. `overflow-x`
+is `hidden` on purpose and the active row's 2px indicator moved from `left: -1px` to `left: 0`,
+including the collapsed-rail `-4px`: an absolutely positioned `::before` outside the box opens a
+1px horizontal scrollbar inside a scroll container. Verified `scrollWidth === clientWidth` (175).
+
+**Category 1 on Video = 10/10**, two agreeing runs, live at pid 32344, 1080x700, `standard`:
+
+| leg | number | bar |
+| --- | --- | --- |
+| controls measured | **35 of 35**, `occludedCount` **0** (was 34 of 35) | all |
+| below 32px by pointer | **0** (was 17), smallest **32.0** (was 26.5) | 0 |
+| hit stolen | **0** (was 3), `worstShrunkBy` **0** | 0 |
+| contrast | 42 text nodes, 0 unmeasurable, min **5.13:1** (`small "Library" 11px`), 0 failing | 4.5 |
+| keyboard | 35 controls, **0** unreachable, 1 focus host (`div.mc-root`, `tabindex=-1`) | 0 |
+| WCAG 2.5.8 | `wcag258FailCount` **0**; the 6 still under 32 by rect all have `nearest >= 32` | 0 |
+
+`scrollLeaks` now reports `nav.mc-nav 0,0 -> 8,0` on every run — that is the probe centring a
+control in the scroll region it just gained, and it is restored. Identical across both runs, which
+is the instrument's own pass condition. Negative control for this leg is the 52px run above.

@@ -166,6 +166,27 @@ describe('Media Center integration contract', () => {
     expect(compact).not.toMatch(/\.mc-music-library\s*\{\s*display:\s*none;/);
   });
 
+  it('scrolls the nav instead of pushing the Settings entry out of the window', () => {
+    // Measured live at 1080x700: the eight 45.64px nav rows plus the library block put
+    // `.mc-settings-link` at y 721 against a window bottom of 740, and `.mc-root` clips, so
+    // the control was half-drawn and its centre hit-tested to the desktop. jsdom has no
+    // layout, so the assertions are on the three declarations that make the fix work.
+    const css = read('renderer/views/mediaCenter.css');
+    const nav = css.slice(css.indexOf('\n.mc-nav {'));
+    const rule = nav.slice(0, nav.indexOf('}'));
+    // Without `min-height: 0` a column flex item never shrinks below its content and
+    // `overflow-y` is dead code — that is the half of this fix that is easy to delete.
+    expect(rule).toMatch(/min-height:\s*0/);
+    expect(rule).toMatch(/overflow:\s*hidden auto/);
+    // The sidebar itself must NOT scroll: brand, library and Settings stay pinned.
+    const side = css.slice(css.indexOf('\n.mc-sidebar {'));
+    expect(side.slice(0, side.indexOf('}'))).not.toMatch(/overflow/);
+    // The active indicator lives inside the scroll clip now. A negative inset would be
+    // eaten by `overflow-x: hidden`, and at `overflow-x: visible` would open a 1px
+    // horizontal scrollbar in the nav.
+    expect(css).not.toMatch(/\.mc-nav button\.is-active::before,[\s\S]{0,120}left:\s*-/);
+  });
+
   it('translates every Media Center key in all four UI catalogues', () => {
     const keys = Object.keys(en).filter((key) => key.startsWith('mediaCenter.'));
     expect(keys.length).toBeGreaterThan(225);

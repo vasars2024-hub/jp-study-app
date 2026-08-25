@@ -203,11 +203,24 @@
   line-height: 1.15;
 }
 
+/* The nav is the sidebar's only growable region, so it is the one that scrolls.
+   Measured before this rule: in a 700px-tall window the eight 45.64px rows plus
+   the library block pushed `.mc-settings-link` to y 721 against a window bottom
+   of 740 — `.mc-root` clips, so the Settings entry was half-drawn and its centre
+   hit-tested to the desktop. `min-height: 0` is what actually lets a column flex
+   item shrink below its content; without it `overflow-y` never engages.
+   `overflow-x: hidden` is deliberate: the active row's 2px indicator is an
+   absolutely positioned `::before` and would otherwise open a 1px horizontal
+   scrollbar, which is why it moved from `left: -1px` to `left: 0` below. */
 .mc-nav {
   display: flex;
   flex-direction: column;
   gap: 3px;
+  min-height: 0;
+  overflow: hidden auto;
   padding-top: 13px;
+  scrollbar-color: rgba(255, 255, 255, 0.13) transparent;
+  scrollbar-width: thin;
 }
 
 .mc-nav-label {
@@ -283,7 +296,7 @@
 .mc-settings-link.is-active::before {
   content: "";
   position: absolute;
-  left: -1px;
+  left: 0;
   top: 9px;
   bottom: 9px;
   width: 2px;
@@ -2702,9 +2715,12 @@
     padding-inline: 0;
   }
 
+  /* Was `-4px`: outside the button, which the nav's scroll clip now eats. At 0
+     it sits on the collapsed rail's own left edge, where it is still the first
+     thing the eye reaches. */
   .mc-nav button.is-active::before,
   .mc-settings-link.is-active::before {
-    left: -4px;
+    left: 0;
   }
 
   .mc-breadcrumb {
