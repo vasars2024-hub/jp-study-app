@@ -52,9 +52,18 @@
   flex-direction: column;
 }
 
+/* The rail width is a token because the drawer-hidden variant below is a class +
+   an attribute (0,2,0) and the responsive blocks are a bare class (0,1,0) — a
+   container query adds no specificity, so `@container medialib (max-width: 1000px)`
+   was losing to it and the rail stayed 224px at EVERY width whenever the detail
+   drawer was closed, which is its default state. Measured on Video at the window's
+   own 260x170 floor: rail 224px + browser 24px inside a 164px track, 14 boxes past
+   the frame. A custom property is resolved where it is used, so both variants
+   narrow from one declaration. */
 .medialib-shell {
+  --medialib-rail-w: 224px;
   display: grid;
-  grid-template-columns: 224px minmax(0, 1fr) 360px;
+  grid-template-columns: var(--medialib-rail-w) minmax(0, 1fr) 360px;
   flex: 1;
   min-width: 0;
   min-height: 0;
@@ -67,12 +76,18 @@
 }
 
 .medialib-shell[data-drawer='hidden'] {
-  grid-template-columns: 224px minmax(0, 1fr);
+  grid-template-columns: var(--medialib-rail-w) minmax(0, 1fr);
 }
 
 /* ---------------------------------------------------------------- rail ---- */
 
 .medialib-rail {
+  /* Its own query container, so "hide the labels" is a statement about the rail
+     being narrow rather than about the pane being narrow — the two stopped
+     agreeing the moment the drawer got its own breakpoint. The width comes from a
+     fixed grid track, so containment cannot feed back into it. */
+  container-type: inline-size;
+  container-name: medialibrail;
   display: flex;
   flex-direction: column;
   gap: var(--space-lg);
@@ -313,6 +328,11 @@
 .medialib-card__art {
   position: relative;
   width: 100%;
+  /* The art is a flex item of the card, so its `min-width: auto` resolved to the
+     poster's own intrinsic 127px and became the card's — and therefore the grid's
+     — minimum. `width: 100%` already says the box follows its column; this is what
+     lets it, and it is why the library grid stopped scrolling sideways at 260x170. */
+  min-width: 0;
   /* aspect-ratio reserves the box before the image resolves, so a library that
      fills in over several seconds never reflows under the pointer. */
   aspect-ratio: var(--medialib-art-ratio, 2 / 3);
@@ -430,6 +450,14 @@
   min-width: 0;
 }
 
+/* Both are flex items of `.medialib-card__body`, so `min-width: auto` made the
+   subtitle's `white-space: nowrap` run the card's minimum width — the ellipsis
+   below only truncates once something has already allowed the box to narrow. */
+.medialib-card__title,
+.medialib-card__sub {
+  min-width: 0;
+}
+
 .medialib-card__title {
   font-size: var(--font-size-sm);
   font-weight: 600;
@@ -514,6 +542,16 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* `text-overflow` truncates a box's own inline content, not a flex child's — and
+   the label IS a flex child, whose `min-width: auto` therefore set the card's
+   min-content width. That was the last horizontal scroller in the library grid at
+   the window's 260x170 floor: a 129px card min-content inside a 100px grid. */
+.medialib-pill > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .medialib-pill::before {
@@ -975,10 +1013,38 @@
 
 /* --------------------------------------------------------- responsive ---- */
 
+/* A rail too narrow to read a label in shows icons only. Keyed to the rail, not to
+   the pane, so it holds however the shell decides to size the track. */
+@container medialibrail (max-width: 120px) {
+  /* A container query cannot style its own container, so the old
+     `.medialib-rail { align-items: center }` has to become a statement about the
+     children instead — and it has to be `width` + `min-width`, not alignment: with
+     the labels gone the rows still carried a 180px min-content into a 63px rail and
+     the rail scrolled sideways (188 > 63). */
+  .medialib-rail__group,
+  .medialib-rail .ui-sidebar,
+  .medialib-rail .ui-sidebar__item {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .medialib-rail__heading,
+  .medialib-rail__label,
+  .medialib-rail__count,
+  .medialib-rail__foot {
+    display: none;
+  }
+
+  .medialib-rail .ui-sidebar__item {
+    justify-content: center;
+    padding: var(--space-sm);
+  }
+}
+
 /* The drawer stops being a column and becomes an overlay before it starts
    squeezing the grid down to two cards per row. */
 @container medialib (max-width: 1240px) {
-  .medialib-shell { grid-template-columns: 224px minmax(0, 1fr); }
+  .medialib-shell { grid-template-columns: var(--medialib-rail-w) minmax(0, 1fr); }
   .medialib-drawer {
     position: absolute;
     top: 0;
@@ -990,14 +1056,15 @@
   }
 }
 
+/* 1000px was measured against the three-pane layout. With the drawer closed there
+   is another 360px in the pane, and collapsing the rail at the same threshold put
+   an icon-only rail — nine buttons and no labels — into the 1080x700 window the
+   library opens at. The labels themselves are no longer keyed to this threshold at
+   all; they key off the RAIL's own width below, which is what they were always
+   really about. */
 @container medialib (max-width: 1000px) {
-  .medialib-shell { grid-template-columns: 64px minmax(0, 1fr); }
-  .medialib-rail { align-items: center; }
-  .medialib-rail__heading { display: none; }
-  .medialib-rail__label,
-  .medialib-rail__count,
-  .medialib-rail__foot { display: none; }
-  .medialib-rail .ui-sidebar__item { justify-content: center; padding: var(--space-sm); }
+  .medialib-shell { --medialib-rail-w: 64px; }
+  .medialib-shell[data-drawer='hidden'] { --medialib-rail-w: 224px; }
   .medialib-browser__head { padding: var(--space-md) var(--space-md) var(--space-sm); }
   .medialib-browser__title { font-size: var(--font-size-2xl); }
   .medialib-chips,
@@ -1005,8 +1072,79 @@
 }
 
 @container medialib (max-width: 720px) {
+  /* Below this the drawer-closed layout runs out of room too, so both variants
+     take the icon rail. */
+  .medialib-shell,
+  .medialib-shell[data-drawer='hidden'] { --medialib-rail-w: 64px; }
   .medialib-browser__head { flex-direction: column; align-items: stretch; }
   .medialib-browser__tools { padding-top: 0; }
+}
+
+/* Below this there is no width left for two panes at all. Measured on Video at
+   the window's own 260x170 floor: a 64px rail beside a 72px browser, whose head
+   alone stacks 132px tall inside a 76px shell — 14 boxes past the frame and two
+   horizontal scrollers. So the library becomes ONE pane: the rail lays out as a
+   wrapping strip of icons above the browser, and the browser column scrolls, so
+   its head and its grid are reachable rather than clipped. Nothing is hidden —
+   every shelf, category and collection is still a button.
+
+   Both selectors, deliberately: `.medialib-shell[data-drawer='hidden']` is (0,2,0)
+   and a container query adds no specificity, which is exactly how the 1000px rail
+   collapse came to be dead for as long as the drawer was closed. */
+@container medialib (max-width: 420px) {
+  .medialib-shell,
+  .medialib-shell[data-drawer='hidden'] {
+    grid-template-columns: minmax(0, 1fr);
+    /* A 76px shell cannot hold a nav strip AND a card grid, and crushing the grid
+       to nothing is not an improvement on clipping it. The pane scrolls instead:
+       everything stays reachable, and the grid keeps a height it can render at. */
+    grid-template-rows: auto minmax(200px, 1fr);
+    overflow: hidden auto;
+    scrollbar-width: thin;
+  }
+
+  .medialib-rail {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    overflow: visible;
+    padding: var(--space-xs);
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* Flex items default to `min-width: auto`, so the groups kept their 180px
+     min-content inside a 150px rail and wrapped nothing. */
+  .medialib-rail__group,
+  .medialib-rail .ui-sidebar {
+    min-width: 0;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+  }
+
+  .medialib-rail .ui-sidebar__item {
+    width: auto;
+    min-width: var(--lq-hit-target);
+    justify-content: center;
+  }
+
+  /* The browser gets NO scroller of its own — the shell above already scrolls, and
+     an `overflow: hidden` on a pane whose min-content exceeds it puts content out
+     of reach with nothing to say so, which is strictly worse than a scrollbar. */
+  .medialib-browser__head,
+  .medialib-chips,
+  .medialib-browser__body {
+    padding-left: var(--space-sm);
+    padding-right: var(--space-sm);
+  }
+
+  /* `flex-shrink: 0` is right while the toolbar has a row to itself; here it was
+     the pane's whole minimum width (194px in 126px). Wrapping keeps every tool. */
+  .medialib-browser__tools {
+    min-width: 0;
+    flex-wrap: wrap;
+  }
 }
 
 /* ------------------------------------------------------ reduced motion ---- */

@@ -157,7 +157,7 @@ describe('VirtualGrid on a sparse shelf', () => {
     // 800px at 200px columns is 3 tracks, and one item still lays out against 3.
     installLayout(800, 600);
     const el = await renderGrid(1);
-    expect(firstRow(el)?.style.gridTemplateColumns).toBe('repeat(3, 1fr)');
+    expect(firstRow(el)?.style.gridTemplateColumns).toBe('repeat(3, minmax(0, 1fr))');
     expect(firstRow(el)?.style.justifyContent).toBe('');
   });
 
@@ -182,13 +182,13 @@ describe('VirtualGrid on a sparse shelf', () => {
     // cap — the capped/centred path must not engage on a library that already fits.
     installLayout(800, 600);
     const el = await renderGrid(3, 260);
-    expect(firstRow(el)?.style.gridTemplateColumns).toBe('repeat(3, 1fr)');
+    expect(firstRow(el)?.style.gridTemplateColumns).toBe('repeat(3, minmax(0, 1fr))');
     expect(firstRow(el)?.style.justifyContent).toBe('');
     const many = await (async () => {
       act(() => { root?.unmount(); });
       host?.remove();
       return renderGrid(60, 260);
     })();
-    expect(firstRow(many)?.style.gridTemplateColumns).toBe('repeat(3, 1fr)');
+    expect(firstRow(many)?.style.gridTemplateColumns).toBe('repeat(3, minmax(0, 1fr))');
   });
 });

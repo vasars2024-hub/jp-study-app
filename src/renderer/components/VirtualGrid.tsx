@@ -114,9 +114,14 @@ export default function VirtualGrid<T>({
                   right: 0,
                   height: resolvedRowHeight,
                   display: 'grid',
+                  // `minmax(0, 1fr)`, not `1fr`: a `1fr` track is `minmax(auto, 1fr)`
+                  // and floors at the card's min-content, so the media library's
+                  // grid still scrolled sideways (129 > 100) in a pane narrower than
+                  // one poster. The row height is fixed by the caller either way, so
+                  // a track that follows the pane is the only correct one here.
                   gridTemplateColumns: capped
                     ? `repeat(${columns}, ${colWidth}px)`
-                    : `repeat(${columns}, 1fr)`,
+                    : `repeat(${columns}, minmax(0, 1fr))`,
                   justifyContent: capped ? 'center' : undefined,
                   gap,
                 }}

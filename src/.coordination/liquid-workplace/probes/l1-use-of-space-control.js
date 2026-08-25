@@ -84,7 +84,12 @@ const run = (TITLE) => {
 // a reason that is the surface's, not the probe's. `ALL_APPS_BASELINE.md` already records
 // media at 49 unreachable boxes at min against dictionary's 0, so Media is the discriminating
 // case, and running both is what shows the difference is real.
-const results = { Dictionary: run('Dictionary'), Media: run('Media') };
+//
+// `window.__lqScoreTitles` overrides the pair, same key `l1-use-of-space.js` reads, so gate
+// 461's other half (Video) can be driven through the identical compact/sub-minimum legs. The
+// two defaults stay, so every run already recorded in L1_USE_OF_SPACE.md reproduces.
+const TITLES = (typeof window !== 'undefined' && window.__lqScoreTitles) || ['Dictionary', 'Media'];
+const results = Object.fromEntries(TITLES.map((t) => [t, run(t)]));
 const broke = Object.entries(results).filter(([, r]) => r.broke).map(([k]) => k);
 const restored = Object.values(results).every((r) => r.refuse || r.restoredExactly);
 return JSON.stringify({

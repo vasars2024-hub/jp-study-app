@@ -145,12 +145,21 @@
   color: inherit;
 }
 
+/* The nav's own scroller (`.mc-nav`, below) absorbs a long section list, but it
+   cannot absorb the fixed 40px rows around it: at the window's own 260x170 floor
+   the column needs 146px of a 76px content box, and `.mc-sidebar-spacer` plus
+   `.mc-settings-link` were laid out 10px and 50px BELOW the window frame — off
+   screen with nothing to scroll them back. The column scrolls as a whole when it
+   genuinely cannot fit; at every size that fits, no scrollbar appears. */
 .mc-sidebar {
   width: 206px;
   flex: 0 0 206px;
   min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden auto;
+  scrollbar-color: rgba(255, 255, 255, 0.13) transparent;
+  scrollbar-width: thin;
   padding: 15px 10px 12px;
   background: rgba(8, 10, 16, 0.94);
   border-right: 1px solid var(--mc-line);
@@ -382,7 +391,12 @@
   grid-template-rows: 48px minmax(0, 1fr) 58px;
 }
 
+/* A grid item's `min-width` is `auto`, so the bar's min-content width overrode the
+   track it sits in: at a 164px workspace both the bar and `.mc-content` laid out
+   296px wide and ran 113px past the window frame. `min-width: 0` is what makes the
+   grid track, not the toolbar's contents, decide the width. */
 .mc-topbar {
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -491,6 +505,7 @@
 }
 
 .mc-content {
+  min-width: 0;
   min-height: 0;
   overflow: auto;
   scrollbar-color: rgba(255, 255, 255, 0.13) transparent;
@@ -2813,8 +2828,14 @@
     display: none;
   }
 
+  /* `width: 100%` is a floor as much as a target once the bar stops being wider
+     than its track: at 164px it demanded the full 164 next to a 67px history pair
+     and pushed the bar back out. It keeps the whole remaining row and gives it up
+     when there isn't one — the field stays present and typable, it just narrows. */
   .mc-global-search {
-    width: 100%;
+    width: auto;
+    flex: 1 1 0;
+    min-width: 0;
   }
 
   .mc-video-topbar,
