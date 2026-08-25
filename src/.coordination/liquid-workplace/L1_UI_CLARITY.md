@@ -341,3 +341,47 @@ group's own height tell the truth.
 + 5 topbar (Back, Forward, search, Add, Settings) + 4 library toolbar. Reaching 12 means the shell
 sidebar itself, which is the window's primary navigation — a second design decision, not a repeat
 of this one. **Q4 stays NO and category 5 on Video stays PARKED at 9 answerable of 10.**
+
+## 2026-08-25 · primary — Q6 on Video was NO because of one 35×34 chip, and buying the point would have been the failure
+
+| Slice | Commit | What landed |
+| --- | --- | --- |
+| Q6 term narrowed + 3 guards | *this commit* | `l1-ui-clarity.js`, new `probes/l1-q6-guards.cjs` |
+
+**The measurement.** Video (`.mc-root`, liquid, 1080×700) read Q6 **NO** on `liquidRegions` 4 /
+`carryingATransition` 3. The dissenting element, named: `span.medialib-card__badge` — **35×34**,
+the count chip on a poster, `backdrop-filter: blur(6px)` over a fixed `rgb(0 0 0 / 0.66)`,
+`transition-duration: 0s` (`mediaLibrary.css:495`). It is a static label with no state to change,
+so the only way to satisfy the old term was to give a chip decorative motion — which is the exact
+failure Q6 exists to catch. **That point would have been bought, not earned.**
+
+**The term now says what it always meant.** Motion explains a relationship only for something whose
+presence or position moves with state, i.e. a surface that HOLDS content. A Liquid region is
+therefore (a) not itself a control and (b) holds at least one painted element child. Neither
+condition mentions the badge. `liquidMaterialTotal` and `decoratedLeaves` are both reported, so the
+split is arguable rather than asserted.
+
+**A redefinition that flips a score needs its own controls** — Q4's rule, applied here. All three
+fired, and the surface came back:
+
+| guard | what it does | result |
+| --- | --- | --- |
+| `containerPlant` | plants a Liquid-material CONTAINER, `transition:none`, one painted child | regions **3 → 4**, Q6 **YES → NO**, names `div.l1-q6-plant` |
+| `leafPlant` | the identical material as a LEAF (0 element children) | material **4 → 5**, regions **flat at 3**, Q6 stays **YES** |
+| `suppressReal` | `transition: none !important` on `aside.mc-sidebar`, a region the app ships | carrying **3 → 2**, Q6 **NO**, names `.mc-sidebar` |
+| `restored` | re-read after every plant and override is undone | verdict, regions, material, carrying all **== asFound** |
+
+Guard 1 alone would pass for a term that counts everything and guard 2 alone for a term that counts
+nothing; both are required. Whole run reproduced twice, identical numbers.
+
+**Q6 on Video: YES.** 3 regions (`aside.mc-sidebar`, `header.mc-topbar`, `nav.lq-contextual`), all
+3 carrying a transition, `infiniteAnimationsOnLiquid` **0**, 1 decorated leaf refused. The current
+run also re-reads **Q4 NO at scannedControls 19** — unchanged, and still the open unit.
+**Category 5 on Video: Q1 Q2 Q3 Q6 Q10 YES, Q4 NO, Q5 INHERIT, Q7/Q8/Q9 MEASURE — still not a 10.**
+
+**Residual, disclosed.** The dead-end sweep earlier this turn drove the rail's category rows, which
+force-opens the group holding the active scope, leaving Video's `Media type` group open where Media
+had it closed. Closed it back; both windows now read `Library=true, Media type=false`. That write
+created `jp-medialib-rail-groups` (previously **absent**) holding
+`{"library":true,"mediaType":false,"collections":false}` — byte-identical to the defaults the
+component merges over, so it changes no first render.

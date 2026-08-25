@@ -205,7 +205,33 @@
       const cs = getComputedStyle(e);
       return alphaOfBg(e) > 0.02 || parseFloat(cs.borderTopWidth) > 0 || (cs.boxShadow && cs.boxShadow !== 'none');
     });
-    const liquidRegions = [...new Set([...blurRegions, ...contextualPainted])];
+    /**
+     * A REGION IS A CONTAINER. A decorated leaf is not one, and counting one cost Q6 a real NO.
+     *
+     * Measured 2026-08-25 on the Video window: `liquidRegions` 4, `carryingATransition` 3, Q6 NO.
+     * The dissenting element was `span.medialib-card__badge` — **35x34**, the episode-count chip
+     * painted on a poster, `backdrop-filter: blur(6px)` with a fixed `rgb(0 0 0 / 0.66)` and no
+     * transition (`mediaLibrary.css:495`). It is a static label with no state to change, so the
+     * only way to satisfy the old term is to give a chip decorative motion — which is precisely
+     * the failure Q6 exists to catch, not a fix for it. The score would have been bought.
+     *
+     * So the term names what it always meant: Q6 asks whether Liquid MOTION explains a
+     * relationship, and motion is only meaningful for something whose presence or position moves
+     * with state — a surface that HOLDS content. Two conditions, neither of which mentions the
+     * badge: a region contains at least one painted element child, and it is not itself a control
+     * (a control is a control, not a region).
+     *
+     * A redefinition that flips a score needs its own guards or it is indistinguishable from
+     * moving the bar — the same rule Q4's `l1-q4-guards.cjs` was written under. `l1-q6-guards.cjs`
+     * plants a Liquid-material CONTAINER with no transition (Q6 must go NO), and separately
+     * suppresses the transition on a real region (Q6 must go NO), then restores both.
+     */
+    const isControl = (e) => e.matches(CTRL);
+    const holdsContent = (e) => [...e.children].some((c) => c.nodeType === 1 && painted(c));
+    const isRegion = (e) => !isControl(e) && holdsContent(e);
+    const liquidMaterial = [...new Set([...blurRegions, ...contextualPainted])];
+    const liquidRegions = liquidMaterial.filter(isRegion);
+    const decoratedLeaves = liquidMaterial.filter((e) => !isRegion(e));
     // "Motion that EXPLAINS a relationship" is a transition bound to entering or moving, i.e.
     // motion caused by a state change. A looping animation explains nothing and is the failure.
     const withTransition = liquidRegions.filter((e) => {
@@ -331,6 +357,15 @@
             carryingATransition: withTransition.length,
             infiniteAnimationsOnLiquid: infiniteOnLiquid.length,
             bar: 'every Liquid-treated region carries a state-change transition and none loops forever',
+            // The split the redefinition rests on, reported so it is arguable rather than
+            // asserted: what carries a Liquid material, and which of those are containers.
+            liquidMaterialTotal: liquidMaterial.length,
+            decoratedLeaves: decoratedLeaves.map((e) =>
+              `${e.tagName.toLowerCase()}.${String(e.className || '').split(' ')[0]}`),
+            regionList: liquidRegions.map((e) =>
+              `${e.tagName.toLowerCase()}.${String(e.className || '').split(' ')[0]}`),
+            withoutTransition: liquidRegions.filter((e) => !withTransition.includes(e)).map((e) =>
+              `${e.tagName.toLowerCase()}.${String(e.className || '').split(' ')[0]}`),
           }),
         /**
          * Q7/Q8 need a ROUND TRIP — liquid → standard → liquid — and a single `/eval` cannot
