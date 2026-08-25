@@ -20,6 +20,7 @@ import {
   dedupeGrammarByTitle,
   type PracticeFilters,
 } from '../data/grammar/practiceFilters';
+import { ContextualSurface } from '../components/liquid/LiquidSurface';
 
 type Mode = 'grammar' | 'practice' | 'guides' | 'review';
 
@@ -78,7 +79,12 @@ export default function GrammarView() {
   return (
     <AppChrome status={classicStatus} className="gram-chrome">
     <div className="gram-view">
-      <div className="view-head">
+      {/* L5 — contextual, not dense work: one intro line and the mode switch. The
+          four mode panels below stay conventional Work; a grammar point’s prose and
+          its practice form are exactly what §2 keeps off translucent material.
+          `ContextualSurface` is inert until this window is put in Liquid
+          presentation, so conventional pixels are unchanged. */}
+      <ContextualSurface className="view-head">
         <p className="muted">{t('grammar.intro')}</p>
         <div className="gram-mode-toggle">
           <button
@@ -106,7 +112,7 @@ export default function GrammarView() {
             {t('grammar.mode.review')}
           </button>
         </div>
-      </div>
+      </ContextualSurface>
 
       {mode === 'grammar' ? (
         <GrammarExplorer
