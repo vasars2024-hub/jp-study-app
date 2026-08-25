@@ -364,3 +364,28 @@ need the fix Immersion needed, and recording it stops the next turn from re-deri
 Also observed, and it is the guard working: re-running against Immersion after I had closed that
 window **REFUSED with `no window titled Immersion`** rather than scoring the first visible `.fwin`.
 That is the `probe-picks-first-visible-fwin` failure mode, refused by name.
+
+### Same turn — the two props the rail needed were needed almost everywhere
+
+Of **11** `<VirtualList` call sites, **8 declared no role at all**. Applied `listRole`/`itemRole` to
+those 8 (GrammarExplorer, GrammarCurationPanel, GrammarPracticePanel, BlancShell file search, both
+Flashcards lists, Music, YouTube x2, and the two scraper log consoles); NOT to the 4 grids, which
+already carry `role="row"`/`gridcell` — a `row` inside a `list` is invalid ARIA. `c1d658bb`.
+
+**The latch is per-TAG, and that is the finding.** `ResultPanels.tsx` alone holds **two grids and
+one log console**, so the file-level allowlist written first would have excused the log with the
+grids and shipped it mute. The rule now reads the row role out of the tag's own `renderItem`, which
+sits inside the opening tag's braces. It also guards itself: a sweep that finds no call sites passes
+everything, so it asserts it found ≥ 6. `src/renderer/__tests__/virtualListSemantics.test.ts`.
+
+Known gap left open on purpose: for those 4 grids, VirtualList's two structural wrappers are only
+`presentation` when `listRole` is set, so their `grid`→`row` ownership chain has the same break.
+That needs a `gridRole` decision, not a copy of the list one.
+
+### A measurement trap the last several handoffs inherited
+
+`node tools/architecture-audit.cjs 2>&1 | tail -8; echo "exit=$?"` reports **`tail`'s** exit status,
+not the tool's. Every recent handoff recorded "architecture-audit exit 0" from that shape. Measured
+properly (`> /dev/null; echo $?`) it is **exit 1**, and has been — caused solely by the foreign-track
+`src/shared/externalSubtitleMount.ts`, which names none of our files. The finding is unchanged; the
+*number* was never measured. Same class as everything else in this file: a value nobody computed.
