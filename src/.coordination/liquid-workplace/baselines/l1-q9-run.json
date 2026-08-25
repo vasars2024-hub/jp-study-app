@@ -1,5 +1,5 @@
 {
- "at": "2026-08-24T23:04:16.932Z",
+ "at": "2026-08-25T00:01:50.948Z",
  "control": null,
  "ledger": {
   "file": "parity-ledger.json",
@@ -37,7 +37,7 @@
    "searchValue": "食べる",
    "notesFilterValue": "",
    "activeLang": "gram-level-btn active",
-   "resultChars": 5534,
+   "resultChars": 5476,
    "resultNodes": 349,
    "controls": 67
   }

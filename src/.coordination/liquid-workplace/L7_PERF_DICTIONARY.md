@@ -1054,3 +1054,42 @@ ms with the stored theme byte-identical either side; the heaviest real action bl
 against a 500 ms bar; the burst path costs main +6.8 MB where it once cost 6.5 GB; memory settles
 flat. Five controls fired: jank (p95 16.9 → 117.1), isolation (main unmoved by a 1.5 s renderer
 block), sensitivity (38,049.3 ms), and Q7/Q8's two, repaired in `8b3bd5ea`.
+
+## 2026-08-24 (late, pid 37540 @ `8cf1f2b8`) — leg 1 re-driven ON DICTIONARY, and it does NOT hold a 10
+
+Every earlier leg-1 table was recorded with `l7d-setup.cjs` holding the other windows at
+`display:none`, so "the largest visible `.fwin`" *was* Dictionary. This boot has the real
+three-window desktop (Media 820×580, Video 1080×700, Dictionary 820×580) and the probe drove
+**Video** — the `gesture.title` field was the only place it showed. `tools/liquid-interaction-probe.ps1`
+now takes `-Title`; the largest-area default is kept so recorded runs reproduce.
+
+**Leg 2 and leg 3 pass on this tree.** Idle `/health` p50 **1.0** / max **10.4** ms; `Find example
+sentences` max **4.2** ms against a 500 ms bar with the work proven (nodes 349→415, chars
+5476→6038); isolation control — renderer blocked 1.5 s — main max **2.9** ms, unmoved; sensitivity
+control **756/756 fired and settled**, main max **51,279.8** ms, so the probe is proven able to see
+a block. Leg 3: main private **576.7 MB** at 23.8 min uptime, **inside** L0's 550–577 band, after a
+19-control sweep, four presentation round trips, three L6 mutate/restore cycles and the 756-lookup
+burst — where the last entry read 591.4 and the one before 1,081.0.
+
+**Leg 1 is the failing leg, and it is NOT Liquid's cost.** Drag on Dictionary, 4 runs:
+
+| presentation | over 100 ms per run | worst frame |
+| --- | --- | --- |
+| liquid | 1, 0, 0, **2** | **100.3 ms** |
+| standard | 0, 1, **2**, 0 | **100.4 ms** |
+
+Same shape either side of the toggle, so the hitch is the shell's drag path on a multi-window
+desktop, not `backdrop-filter` re-sampling. Resize is clean (max 83.7, over-100 **0**); theme
+switch clean (apply 35.6 / restore 58.7 ms, `restoredTo=forest-night`); ceiling 110 frames at
+16.6–16.9. Jank control fired: p95 16.8 → **116.9**, over-100 0 → **12**.
+
+The rubric's bar is 0 frames over 100 ms and it is missed in **4 of 8** runs by one dropped frame
+slot (100.3 ≈ 6 × 16.7). **Category 7 is not scored 10 here.** Recorded as the number rather than
+argued down: a 0.3 ms overshoot is small, and an intermittent single dropped frame during a window
+drag is exactly what this category exists to notice.
+
+**Trap this pass adds.** Three instruments resolved the window as "the first/largest visible
+`.fwin`", which was correct only while the desktop was artificially isolated: `l1-q78-drive.cjs`
+refused with *"window is not liquid at the start"* (it had Media), `l7e-examples.js` refused with
+*"no Find example sentences button"* (same), and the gesture probe silently scored Video. All three
+now resolve by title. A refusal that names a product state is the shape to distrust.

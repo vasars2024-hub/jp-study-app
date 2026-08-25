@@ -24,12 +24,36 @@
  *      and the same control-label set. Text length is included because a count can survive while
  *      the rows themselves are re-fetched empty.
  *
-node src/.coordination/liquid-workplace/probes/l1-q78-drive.cjs [--control q7|q8]
+node src/.coordination/liquid-workplace/probes/l1-q78-drive.cjs [--control q7|q8] [--title Dictionary]
+ *
+ * WINDOW RESOLUTION IS BY TITLE, AND THAT IS A REPAIR, NOT A PREFERENCE (2026-08-24). Every
+ * selector below used to take the first VISIBLE `.fwin` in DOM order. That was written when
+ * `l7d-setup.cjs` hid the other windows, and it silently drove the wrong surface the moment it
+ * did not: on a desktop carrying Media (820x580) and Video (1080x700) alongside the Liquid
+ * Dictionary window, DOM order puts Media first, and this driver refused with "window is not
+ * liquid at the start" — a refusal that reads like a product finding and is an instrument bug.
+ * The two L8 probes were fixed the same way in `23cc333f` for the same reason.
  */
 'use strict';
 const fs = require('node:fs');
 
 const cfg = JSON.parse(fs.readFileSync('debug/bridge.json', 'utf8'));
+const titleIdx = process.argv.indexOf('--title');
+const TITLE =
+  (process.argv.find((a) => a.startsWith('--title=')) || '').split('=')[1] ||
+  (titleIdx >= 0 ? process.argv[titleIdx + 1] : '') ||
+  'Dictionary';
+/**
+ * One expression, inlined into every leg, so the snapshot, the toggle click and both controls
+ * cannot disagree about which window they are acting on — the way they did when each carried
+ * its own copy of the "first visible .fwin" walk.
+ */
+const WIN = `([].slice.call(document.querySelectorAll('.fwin')).filter(function(w){
+  var r = w.getBoundingClientRect();
+  if (!(r.width > 0 && r.height > 0)) return false;
+  var t = w.querySelector('.fwin-title-text, .fwin-title');
+  return !!t && (t.textContent || '').indexOf(${JSON.stringify(TITLE)}) >= 0;
+})[0])`;
 const ctlIdx = process.argv.indexOf('--control');
 const ctlEq = (process.argv.find((a) => a.startsWith('--control=')) || '').split('=')[1];
 // `indexOf` returns -1 when the flag is absent, and `argv[-1 + 1]` is argv[0] — the node
@@ -57,16 +81,11 @@ async function ev(js) {
 /** Snapshot source, inlined into each leg so the reads are byte-identical across legs. */
 const SNAP = `
 (function snap(tag){
-  // The FIRST .fwin is not the one under test. l7d-setup.cjs isolates the surface by setting
-  // display:none on the other windows rather than closing them (closing rewrites the user's
-  // desktop-layout.json, which has no restore point), so document.querySelector('.fwin') can
-  // return a 0x0 hidden window and this probe then refuses with "window is not liquid".
-  // Take the first window that actually has a box, the way l1-ui-clarity.js does.
-  var win = [].slice.call(document.querySelectorAll('.fwin')).filter(function (w) {
-    var r = w.getBoundingClientRect();
-    return r.width > 0 && r.height > 0;
-  })[0];
-  if (!win) return { tag: tag, refuse: 'no visible .fwin' };
+  // Resolved BY TITLE — see the header. Neither "the first .fwin" nor "the first VISIBLE .fwin"
+  // is the one under test: the first is hidden when l7d-setup.cjs isolates the surface, and the
+  // first visible one is whichever app happens to sit earliest in DOM order.
+  var win = ${WIN};
+  if (!win) return { tag: tag, refuse: 'no visible .fwin titled ' + ${JSON.stringify(TITLE)} };
   var painted = function (e) {
     return typeof e.checkVisibility === 'function'
       ? e.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true, contentVisibilityAuto: true })
@@ -157,12 +176,9 @@ const SNAP = `
 })`;
 
 const clickToggle = `(() => {
-  const w = [...document.querySelectorAll('.fwin')].filter((n) => {
-    const r = n.getBoundingClientRect();
-    return r.width > 0 && r.height > 0;
-  })[0];
+  const w = ${WIN};
   const b = w && w.querySelector('.fwin-b-liquid');
-  if (!b) return JSON.stringify({ clicked: false, why: 'no .fwin-b-liquid on the visible window' });
+  if (!b) return JSON.stringify({ clicked: false, why: 'no .fwin-b-liquid on the window titled ' + ${JSON.stringify(TITLE)} });
   const before = b.getAttribute('aria-pressed');
   b.click();
   return JSON.stringify({ clicked: true, ariaPressedBefore: before });
@@ -186,13 +202,10 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   // A standard window carrying glass is exactly what Q7 must be able to answer NO about.
   if (control === 'q7') {
     await ev(`(() => {
-      // Same hidden-window trap as SNAP above: painting the glass into the first .fwin puts it
-      // on a display:none window, SNAP reads the visible one, and the control silently does not
-      // fire — it reported zeroBackdropRegions true and left Q7 at YES, i.e. certified nothing.
-      const w = [...document.querySelectorAll('.fwin')].filter((n) => {
-        const r = n.getBoundingClientRect();
-        return r.width > 0 && r.height > 0;
-      })[0];
+      // Same window-resolution trap as SNAP above: planting the glass anywhere other than the
+      // window SNAP reads means the control silently does not fire — it reported
+      // zeroBackdropRegions true and left Q7 at YES, i.e. certified nothing.
+      const w = ${WIN};
       const t = (w && w.querySelector('.fwin-body')) || w;
       const d = document.createElement('div');
       d.id = '__q78ctl';
@@ -213,10 +226,12 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   // --- CONTROL Q8: destroy real state while standard, so the round trip cannot restore it. ---
   if (control === 'q8') {
     await ev(`(() => {
-      const rows = document.querySelectorAll('.fwin .dict-entry');
+      const w = ${WIN};
+      if (!w) return JSON.stringify({ removed: 0, why: 'window not found' });
+      const rows = w.querySelectorAll('.dict-entry');
       const n = rows.length;
       if (n) rows[n - 1].remove();
-      return JSON.stringify({ removed: n - document.querySelectorAll('.fwin .dict-entry').length });
+      return JSON.stringify({ removed: n - w.querySelectorAll('.dict-entry').length });
     })()`);
   }
 

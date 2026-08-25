@@ -290,3 +290,35 @@ true last turn and is unchanged.
 they use is repaired and the blank window that was corrupting three of them is gone, so this is one
 sitting rather than five investigations. Then the entry is writable. **Video has still never been
 scored at all**, and gate 461 needs both surfaces.
+
+## 2026-08-24 (night 2) · primary — 1, 2, 5, 6 re-driven on the current tree; the entry is blocked by category 7, on a number
+
+Process **37540** at `8cf1f2b8` (product tree = `6b490fc3`), the real three-window desktop —
+Media 820×580 `standard`, Video 1080×700 `standard`, Dictionary 820×580 **`liquid`**, 食べる → **8**
+entries, `forest-night`, `en`. Nothing below is inherited.
+
+| # | Category | Re-driven | Result |
+| - | -------- | --------- | ------ |
+| 1 | Accessibility | yes | **10/10**: **154** text nodes, 0 unmeasurable, min **5.30:1** (`span.lexicon-etymology-source`), **0** failing; 57 targets, **0** WCAG 2.5.8 fails; 57 controls, **0** keyboard-unreachable. Control fired: forced colour → failing **0→1**, ratio **1.03**, restored **0 / 5.30** |
+| 2 | Clunkiness | yes | **10/10**: 19 of a 62 roster, coverage **18/18**, **0 dead ends**, 16 with a measured effect, 0 gone, 0 unstable, `resolvedBy live 4 / key 14 / class 0`. Bait control fired (`changed:false`), `savedStoreUntouched` and `lensModeRestored` true |
+| 5 | UI clarity | yes | **10/10**: Q1–Q10 all YES, Q5 INHERIT-PASS off *this* a11y run (6 collapsed disclosures, **9** scanned controls against a bar of 12; 3 Liquid regions, 3 carrying a transition, 0 infinite). Q7 all 7 checks true, Q8 all 8 true (entries 8→8→8, chars **6019** identical across the round trip), Q9 **7/7**. Four controls fired: `--control q7` → NO, `--control q8` → NO, `--control notesFilter` → NO (7/7 → 6/7), clarity control → Q2/Q3/Q10 NO |
+| 6 | Feature parity + reversibility | yes, its own probe | **10/10**: **7/7** rows in liquid AND in standard, round trip A===C **byte-for-byte true** with the notes filter deliberately dirty (`食`), ledger 7 rows / 7 both / 7 with non-empty observed. Three controls each flipped **exactly one** row 7→6 and restored to 7 |
+| 7 | Performance under real load | yes, all four legs | **NOT 10** — see below |
+
+**Category 7 fails on leg 1 and the reason is worth more than the point.** Every earlier leg-1 run
+was recorded while `l7d-setup.cjs` hid the other windows, so "the largest visible `.fwin`" happened
+to be Dictionary; on the real desktop the gesture probe was driving **Video** and the score named
+Dictionary. Fixed (`-Title`), re-driven, and drag on Dictionary misses the rubric's 0-frames-over-100 ms
+bar in **4 of 8 runs** by a single dropped frame slot (**100.3 ms**). It is **not** Liquid's cost:
+standard presentation measures 0/1/2/0 over-100 against liquid's 1/0/0/2, same worst frame. Legs 2, 3
+and 4 pass with room — main max **4.2 ms** under the heaviest real action, private **576.7 MB** at
+23.8 min *inside* L0's 550–577 band, and the sensitivity control at **51,279.8 ms** proves the
+instrument can see a block. Numbers and controls in `L7_PERF_DICTIONARY.md`.
+
+**So the first completed entry is still not written, and for the second time it is a product number
+rather than bookkeeping.** 3, 4 and 8 hold 10 from `6b490fc3`'s tree, which is this tree; 1, 2, 5 and
+6 now hold 10 measured here; 7 is the only open one.
+
+**Next:** the drag hitch is a shell-level defect on a multi-window desktop, present in both
+presentations, so it is `DesktopShell`'s drag path and not `liquid-window.css`. Fix it, re-drive leg 1
+with `-Title Dictionary` over at least 4 runs, and the entry is writable in one pass.

@@ -50,9 +50,17 @@
 .PARAMETER DurationMs
   Wall-clock window over which main availability is sampled, chosen to cover the gesture.
 
+.PARAMETER Title
+  Substring of the window title to drive. WITHOUT it the probe takes the LARGEST visible
+  `.fwin`, which is only the surface under test when every other window is hidden. On a desktop
+  carrying Media (820x580), Video (1080x700) and Dictionary (820x580) the largest is Video, and
+  a run scored as "the Dictionary window" silently measured the video player instead -- the
+  `title=` field in the gesture record is the only place that showed. Pass it whenever the score
+  names a surface. The largest-area default is kept so previously recorded runs reproduce.
+
 .EXAMPLE
   pwsh tools/liquid-interaction-probe.ps1 -Interaction ceiling
-  pwsh tools/liquid-interaction-probe.ps1 -Interaction drag
+  pwsh tools/liquid-interaction-probe.ps1 -Interaction drag -Title Dictionary
   pwsh tools/liquid-interaction-probe.ps1 -Interaction drag -Jank    # must look worse
 #>
 param(
@@ -61,7 +69,8 @@ param(
   [int]$DurationMs = 1800,
   [switch]$Jank,
   [string]$Label = '',
-  [string]$ThemeId = 'oled-black'
+  [string]$ThemeId = 'oled-black',
+  [string]$Title = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -144,12 +153,19 @@ $gestureJs = switch ($Interaction) {
   }
   default {
     $sel = if ($Interaction -eq 'drag') { '.fwin-bar' } else { '.fwin-resize' }
+    $titleJs = ($Title | ConvertTo-Json -Compress)
     @"
 (() => {
-  const wins = [...document.querySelectorAll('.fwin')].filter((w) => getComputedStyle(w).display !== 'none');
+  const WANT = $titleJs;
+  const wins = [...document.querySelectorAll('.fwin')].filter((w) => getComputedStyle(w).display !== 'none')
+    .filter((w) => {
+      if (!WANT) return true;
+      const t = w.querySelector('.fwin-title-text, .fwin-title');
+      return !!t && (t.textContent || '').indexOf(WANT) >= 0;
+    });
   const target = wins.map((w) => ({ w, r: w.getBoundingClientRect() })).filter((o) => o.r.width > 0 && o.r.height > 0)
     .sort((a, b) => b.r.width * b.r.height - a.r.width * a.r.height)[0];
-  if (!target) { window.__lip = { done: true, refuse: 'no visible non-zero .fwin' }; return 'refused'; }
+  if (!target) { window.__lip = { done: true, refuse: WANT ? ('no visible non-zero .fwin titled ' + WANT) : 'no visible non-zero .fwin' }; return 'refused'; }
   const grip = target.w.querySelector('$sel');
   if (!grip) { window.__lip = { done: true, refuse: 'no $sel in the target window' }; return 'refused'; }
   const gr = grip.getBoundingClientRect();
