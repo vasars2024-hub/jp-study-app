@@ -296,6 +296,77 @@ describe('readingCanvas.css', () => {
     expect(CSS).toMatch(/\.lq-reading\s*\{[^}]*position:\s*relative/);
   });
 
+  it('out-specifies the shared role class it shares an element with', () => {
+    /*
+     * The defect the three tests around this one could not see, found live on
+     * Immersion and fixed in the same commit.
+     *
+     * Every tool carries `.lq-liquid` as well, and `theme/liquid-surfaces.css`
+     * declares `position`, `padding` and `background` on it at the SAME (0,1,0)
+     * specificity as a bare `.lq-reading-sheet` — from a stylesheet that loads
+     * later, so it won all three. Measured at a 462px canvas: the sheet computed
+     * `position: relative` and sat in flow at 338px beside a 112px document.
+     * That is a partial cover, which `shared/liquidReadingCanvas.ts` calls
+     * inexpressible — and it was, in the resolver, which reported the layout
+     * clean the whole time because it does not read stylesheets.
+     *
+     * Why the assertion is shaped like this: `toMatch(/position:\s*static/)`
+     * PASSED throughout. A declaration existing is not a declaration winning, so
+     * this reads BOTH files and compares what actually decides the cascade.
+     */
+    const shared = readFileSync(
+      resolve(__dirname, '..', 'theme', 'liquid-surfaces.css'),
+      'utf8',
+    ).replace(/\/\*[\s\S]*?\*\//g, '');
+
+    // The premise, asserted rather than assumed: if a later refactor stops
+    // `.lq-liquid` setting these, this test should be re-read, not silently pass.
+    const roleBlocks = [...shared.matchAll(/([^{}]+)\{([^}]*)\}/g)]
+      .filter(([, selector]) => selector.split(',').some((s) => s.trim() === '.lq-liquid'))
+      .map(([, , body]) => body)
+      .join('\n');
+    for (const property of ['position', 'padding', 'background']) {
+      expect(roleBlocks, `.lq-liquid no longer sets ${property}`).toMatch(
+        new RegExp(`(^|[;\\s])${property}\\s*:`, 'm'),
+      );
+    }
+
+    // So every one of those three must be reclaimed by a selector carrying at
+    // least two classes, which beats (0,1,0) regardless of import order.
+    for (const [role, property] of [
+      ['tool', 'position'],
+      ['tool', 'padding'],
+      ['tool', 'background'],
+      ['sheet', 'position'],
+      ['sheet', 'padding'],
+      ['sheet', 'background'],
+    ] as const) {
+      const winners = [...CSS.matchAll(/([^{}]+)\{([^}]*)\}/g)].filter(
+        ([, selector, body]) =>
+          selector.split(',').some((s) => s.trim().endsWith(`.lq-reading-${role}`)) &&
+          new RegExp(`(^|[;\\s])${property}\\s*:`, 'm').test(body),
+      );
+      expect(winners.length, `nothing declares ${property} for .lq-reading-${role}`).toBeGreaterThan(
+        0,
+      );
+      for (const [, selector] of winners) {
+        const own = selector
+          .split(',')
+          .map((s) => s.trim())
+          .filter((s) => s.endsWith(`.lq-reading-${role}`));
+        for (const one of own) {
+          // Reported as the selector itself, not as a bare number: a failure
+          // here has to name which rule lost, or the next worker re-measures.
+          expect({
+            selector: one,
+            property,
+            beatsRoleClass: (one.match(/\./g) ?? []).length > 1,
+          }).toEqual({ selector: one, property, beatsRoleClass: true });
+        }
+      }
+    }
+  });
+
   it('makes the document region its own containing block', () => {
     /*
      * Found migrating Novels. Every real reader in this app scrolls from an

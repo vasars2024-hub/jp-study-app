@@ -71,6 +71,11 @@
   min-width: 0;
 }
 
+/* Border, radius, shadow and colour are left at this specificity deliberately:
+   `.lq-liquid` sets them to the SAME tokens, so which one wins is not
+   observable. `background` is not among them — it is claimed below, where it can
+   actually hold — and a second, losing declaration of it here would be dead
+   weight that reads like the source of truth. */
 .lq-reading-tool,
 .lq-reading-sheet {
   box-sizing: border-box;
@@ -79,15 +84,49 @@
   min-height: 0;
   border-radius: var(--lq-liquid-radius);
   border: 1px solid var(--lq-liquid-border);
-  background: var(--lq-liquid-bg-raised);
   box-shadow: var(--lq-liquid-shadow);
   color: var(--lq-liquid-text);
+}
+
+/* -----------------------------------------------------------------------------
+   WHY THE NEXT THREE RULES ARE SCOPED TO THE CANVAS INSTEAD OF NAMED DIRECTLY.
+
+   Every tool also carries `.lq-liquid`, the shared role class, and
+   `theme/liquid-surfaces.css` declares `position: relative`, `padding:
+   var(--lq-space-4)` and `background: var(--lq-liquid-bg)` on it — at the SAME
+   (0,1,0) specificity as a bare `.lq-reading-sheet`, and from a stylesheet that
+   loads later. So it won all three, and a component-level
+   `import './readingCanvas.css'` has no way to influence that order.
+
+   Measured in the running app on Immersion at a 462px canvas, not reasoned
+   about: the sheet computed `position: relative` and sat IN FLOW at 338px beside
+   a 112px document — a partial cover, the one outcome this primitive's contract
+   calls inexpressible, and the resolver reported the layout clean throughout
+   because it does not read stylesheets. Every tool also carried 12px of padding
+   its own head and body already provide, and the material resolved to the
+   0.72-alpha `--lq-liquid-bg` rather than the 0.88-alpha raised token asked for
+   below, so a reading tool was more transparent than the text under it.
+
+   The test that was supposed to catch this asserted the CSS TEXT — that
+   `position: static` and `position: absolute` appear in this file. They did.
+   A declaration existing is not a declaration winning; `describes the cascade`
+   is the assertion that was missing, and it is now `wins-the-cascade` below.
+
+   Descendant-of-canvas selectors settle it by specificity (0,2,0) rather than by
+   import order. `padding` and `background` are restated because this file never
+   declared them on the aside at all — it relied on the head and body to pad, and
+   on nothing else claiming the surface.
+   ----------------------------------------------------------------------------- */
+.lq-reading > .lq-reading-tool,
+.lq-reading > .lq-reading-sheet {
+  padding: 0;
+  background: var(--lq-liquid-bg-raised);
 }
 
 /* Docked: a sibling of the document, never over it. `position: static` is the
    load-bearing declaration in this file — it is the difference from the
    `.settings-panel` popover this primitive replaces. */
-.lq-reading-tool {
+.lq-reading > .lq-reading-tool {
   position: static;
   overflow: hidden;
 }
@@ -124,7 +163,7 @@
 /* Sheet: the whole canvas, and only ever the whole canvas. Anchored to the
    canvas box rather than the viewport so a reader docked inside a larger
    window covers its own document and not the app around it. */
-.lq-reading-sheet {
+.lq-reading > .lq-reading-sheet {
   position: absolute;
   inset: 0;
   z-index: 2;
