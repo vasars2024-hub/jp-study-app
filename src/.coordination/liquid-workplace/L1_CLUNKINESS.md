@@ -596,3 +596,60 @@ second number is the guard on the new pass itself: a handler-less button is dead
 so a confirmation pass that could ever rescue the bait would be the broken thing. Desktop restored
 as found (Video `Continue watching` / 1 card / List view / drawer closed), globals deleted, bait
 removed.
+
+## 2026-08-25 · primary · Video category 2 RE-DRIVEN on the current tree — 41/41, and five false-result channels closed
+
+The previous section's numbers (targets 31, coverage 30/30) were taken at `651d0c38`. Three product
+commits have touched this surface since — `e61d3179` (the duplicate settings destination removed,
+eight sidebar rows changed), `be3c9887` (the kind chips moved behind `details.medialib-kind`) and
+`f2c4a3bd` (the `--mc-*-ink` token family) — so transcribing them as a scorecard row would have been
+the exact inherited score the rubric forbids. Re-driven instead.
+
+**The run, one pass, no hand-driving.** Video window, `.mc-root`, **liquid**, 1080×700,
+`Recently added` (36 files / 8 titles / 3 kinds), Grid view, **all five disclosures open**, the
+`JoJo's Bizarre Adventure: Golden Wind` drawer open at arm. Roster **60**, targets **42**,
+17 skipped each with its reason.
+
+| Term | Number |
+| --- | --- |
+| coverage | **41/41** (`gone` 0, `unstable` 0, `unconfirmed` 0) |
+| deadEnds | **0** |
+| withEffect | **38** |
+| alreadyActive | 3 — `Episodes`, `All`, `Grid view`, each the selected member of a segmented group |
+| resolvedBy | live 36 / key 5 / **class 0** |
+| worstSettleTries | 2 |
+| savedStoreUntouched | **true** |
+| control | bait `changed:false` AND `secondPassChanged:false` — **fired on both passes** |
+
+**Five channels that each produced a wrong number on this tree, all in the instrument.**
+
+1. **A box is not visibility.** `getBoundingClientRect` returns a real box for every control inside
+   a CLOSED `<details>`: **9 of 32** as found (`mc-nav-group`, both `medialib-rail__group`s,
+   `medialib-view`), all `checkVisibility → false`. Three of the nine re-list the grid. `painted()`
+   now filters on `checkVisibility({contentVisibilityAuto:true})`; the driver opens the disclosures
+   so those controls are scored while genuinely reachable.
+2. **A card is two controls wearing one class.** The previous entry's *"a media card does not
+   navigate to the player"* holds for a SERIES card only — `activate()`
+   (`MediaLibraryShell.tsx:227`) calls `onPlay` for `grouping === 'none'`. Driven blind, the first
+   card of `Recently added` was a podcast and the click left the Library tab: 49 controls → 36, arm
+   state gone. Discriminated by the badge, which is `"<watched> / <episodes>"` for a series and a
+   duration for a standalone. The spotlight's `Open` / `Resume` is the same write with a different
+   word on it and joins `STARTS_PLAYBACK` too.
+3. **A shelf switch outranks the toolbar it replaces.** Rail and toolbar both re-list, both sat in
+   band 2, DOM order put the rail first — so `Unsorted4` swapped the shelf and unmounted
+   `All` / `Series` / `OVA / ONA` / `Grid view` / `List view`: **5 `gone`**, all artifacts. Rail now
+   ranks +0.25 inside its own band. Fourth form of this defect on this surface.
+4. **A transient overlay that moves is an effect.** Every card's `More actions` opens the SAME
+   `[role="menu"]`; once open, later ones only re-anchor it, and `role="menuitem"` is not in the
+   control selector — so text, count and aria state read byte-identical and **7 of 41** came back
+   `unconfirmed`. `signature()` now carries each menu's rect and item count.
+5. **An unfocused window throttles `setTimeout` to ~1 Hz** — a 120 ms interval ticked **once in
+   2 s**. `settle()`'s 20 tries stretch 2.4 s → ~20 s and the run reads as stalled at `3/42`; worse,
+   a timed-out settle reports `unstable`, which this probe would have charged to the app. The driver
+   calls `/focus` and refuses below 6 ticks in 1.5 s.
+
+**And one that voided a whole run: deleting `window.__liqDead` is not a stop.** The async loop holds
+its own reference and kept clicking; the next arm snapshotted 91 controls (a menu the other sweep had
+opened) and armed on 35, and its bait correctly read `changed:true`. A live sweep is now flagged
+`abort` and the arm refuses; `run()` also parks a throw on the state, because `void run()` turned any
+exception into a permanent `done:false`.

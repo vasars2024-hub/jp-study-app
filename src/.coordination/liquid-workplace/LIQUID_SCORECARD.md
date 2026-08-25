@@ -435,3 +435,33 @@ numbers exist and its row does not:** `L1_CLUNKINESS.md`'s 2026-08-25 run report
 coverage 30/30, `deadEnds` **0**, `unstable` 0, control fired on both passes. That is a scorecard
 row away, not a measurement away — transcribe and re-derive it rather than re-running the sweep.
 7 and 8 have never been measured on this surface. **Dictionary is still 7 of 8.**
+
+## 2026-08-25 · primary — Video category 2, at 10, RE-DRIVEN rather than transcribed
+
+The last handoff named this row a transcription: `L1_CLUNKINESS.md` already held a Video
+category-2 run (targets 31, coverage 30/30, 0 dead ends). It was taken at `651d0c38`, and three
+product commits have touched this surface since — `e61d3179`, `be3c9887`, `f2c4a3bd`. The rubric's
+rule decides it: *a score inherited across a change is stale by definition*. Re-driven.
+
+Process **32344**, product tree `62c0e7e4`, the same three-window desktop — `Media` 820×580
+`standard` / `Video` 1080×700 **`liquid`** / `Dictionary` 820×580 `liquid`, `forest-night`, `en`.
+
+| # | Category | State | Presentation it was measured in |
+| - | -------- | ----- | ------------------------------- |
+| 2 | Clunkiness | **10/10 — this turn.** coverage **41/41**, `deadEnds` **0**, `gone` 0, `unstable` 0, `unconfirmed` 0, 38 with a measured effect, 3 `alreadyActive`, `resolvedBy.class` **0**, `worstSettleTries` 2, `savedStoreUntouched` true | **liquid**, `Recently added` (36 files / 8 titles / 3 kinds), 5 disclosures open, drawer open |
+
+**Control: FIRED, on both passes** — the injected handler-less `Probe control` read `changed:false`
+and `secondPassChanged:false`. The second number is the guard on the confirmation pass itself: a
+pass that could rescue the bait would be the broken thing.
+
+**Every point this category cost was instrument, not product — five channels, all measured on this
+tree, all detailed in `L1_CLUNKINESS.md`.** A closed `<details>` reports a real box for 9 of 32
+controls; a standalone card PLAYS where a series card opens a drawer; the rail outranked the toolbar
+it replaces and faked 5 `gone`; a re-anchored `[role="menu"]` faked 7 `unconfirmed`; and an
+unfocused window throttles `setTimeout` to ~1 Hz, which turns a settle timeout into `unstable`.
+A sixth voided a whole run outright: deleting `window.__liqDead` does not stop the async loop, so
+two sweeps drove the same surface at once and the second one's bait correctly reported `changed:true`.
+
+**Video is 6 of 8 in this table** — 1, 3, 4 (liquid), 5 (this tree), 6 (both), 2 (this turn).
+**7 and 8 have never been measured on this surface.** Category 7 needs a restart before anything
+main-process is read. **Dictionary is still 7 of 8**, category 7 the open one.

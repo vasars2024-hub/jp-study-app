@@ -36,6 +36,12 @@
   const out = {
     surface: st.surface,
     done: st.done,
+    // Stopped by a later arm rather than finished. `done` is true so the bait is cleaned up, but
+    // nothing below is a score.
+    aborted: st.aborted || false,
+    // A sweep that threw parks its error here rather than stalling silently at `done:false`.
+    error: st.error || null,
+    crashedAt: st.crashedAt ?? null,
     progress: `${st.results.length}/${st.nTargets}`,
     // What the verdicts actually cover. `gone` and `unstable` are the coverage holes.
     coverage: `${clicked.length}/${real.length}`,

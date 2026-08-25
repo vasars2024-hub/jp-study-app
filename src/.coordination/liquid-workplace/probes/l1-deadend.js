@@ -87,6 +87,29 @@
   const SAVED_KEY = 'jp-saved-words-ja';
   const savedAtArm = localStorage.getItem(SAVED_KEY);
 
+  /**
+   * ONE SWEEP AT A TIME, and this is not hygiene — an overlapping run VOIDS the new one.
+   *
+   * Measured 2026-08-25. A run left driving at ~1 Hz (see the throttle note in
+   * `l1-c2-drive.cjs`) was "cleared" by deleting `window.__liqDead` and removing the bait, but
+   * the async loop holds its own reference to the state object and kept clicking. The next arm
+   * therefore snapshotted a surface with 91 controls on it — a card context menu the OTHER sweep
+   * had just opened — and armed on 35 once it closed again, so the roster, the targets and the
+   * bait all belonged to different moments. Its bait read `changed:true`, correctly: the room was
+   * moving on its own, which is exactly what `settle()` cannot separate from a click.
+   *
+   * Deleting the global is not a stop. The flag is, because the loop reads it every target.
+   */
+  const prior = window.__liqDead;
+  if (prior && !prior.done) {
+    prior.abort = true;
+    return JSON.stringify({
+      refuse: 'a previous sweep is still running — abort flagged, re-arm once it reports aborted',
+      priorSurface: prior.surface,
+      priorProgress: `${prior.results.length}/${prior.nTargets}`,
+    });
+  }
+
   const win = [...document.querySelectorAll('.fwin')].find(
     (w) => (w.querySelector('.fwin-title-text')?.textContent || '').includes(TITLE),
   );
@@ -126,7 +149,32 @@
   // arbitrary user text (`MediaEpisodeRow.tsx:39`). That also retires the substring trap where a
   // podcast episode called "…why I start this podcast" was skipped by `DESTRUCTIVE`'s
   // unanchored `star` and lost a real coverage point to the wrong reason.
-  const STARTS_PLAYBACK = (el, name) => el.classList.contains('medialib-ep') || /^play\b/i.test(name);
+  //
+  // `Open` / `Resume` joined the rule 2026-08-25 and they were NOT covered by `^play\b`. The
+  // spotlight's primary action is `media.spotlight.open` / `.resume` (`MediaSpotlightCard.tsx:135`)
+  // and it routes to `activate()` (`MediaLibraryShell.tsx:227`), which for a standalone file
+  // (`grouping === 'none'`) calls `onPlay` — the same write with a different word on it. A shelf
+  // holding ONE title renders that spotlight instead of a card, so the moment this sweep is armed
+  // on `Continue watching` it drives playback. Anchored to `.medialib-spotlight__actions` so the
+  // topbar's `Open media` (already NATIVE_DIALOG) and any future unrelated `Open` are untouched.
+  //
+  // A CARD IS TWO DIFFERENT CONTROLS WEARING ONE CLASS, and the previous entry in
+  // `L1_CLUNKINESS.md` got this wrong in the safe-sounding direction: *"a media card does not
+  // navigate to the player, it toggles a detail drawer in place"*. That is true of a SERIES card
+  // only. `activate()` (`MediaLibraryShell.tsx:227`) opens the drawer for a grouped entry and
+  // calls `onPlay` for `grouping === 'none'` — a standalone file plays. Driven blind on
+  // 2026-08-25 the first card of `Recently added` was a podcast, and the click left the Library
+  // tab entirely: `.medialib-rail` gone, 49 controls → 36, the whole arm state lost.
+  // The DOM says which is which. `MediaLibraryBrowser.tsx:308` sets the badge to
+  // `"<watched> / <episodes>"` for a series and to a formatted DURATION for a standalone, both
+  // into `.medialib-card__badge`, so the count form is the discriminator.
+  const SERIES_CARD = (el) =>
+    /^\d+\s*\/\s*\d+$/.test((el.querySelector('.medialib-card__badge')?.textContent || '').trim());
+  const STARTS_PLAYBACK = (el, name) =>
+    el.classList.contains('medialib-ep')
+    || /^play\b/i.test(name)
+    || (!!el.closest('.medialib-spotlight__actions') && /^(open|resume)\b/i.test(name))
+    || (el.classList.contains('medialib-card') && !SERIES_CARD(el));
 
   const label = (el) =>
     (el.getAttribute('aria-label')
@@ -138,9 +186,29 @@
       .trim()
       .slice(0, 40);
 
+  /**
+   * A BOX IS NOT VISIBILITY, and on this surface that is nine controls out of thirty-two.
+   *
+   * Measured 2026-08-25 on the Video window as found: `getBoundingClientRect()` returns a real
+   * non-zero box for every control inside a CLOSED `<details>` — `mc-nav-group` (Readiness,
+   * Review, Discover, Media workspace), both `medialib-rail__group`s (Anime, TV shows, Unsorted)
+   * and `medialib-view` (Grid view, List view). `checkVisibility({contentVisibilityAuto:true})`
+   * reports false for all nine and true for the other twenty-three, so the two disagree on
+   * exactly the disclosed set.
+   *
+   * Why it matters more here than as a tidiness point: three of those nine RE-LIST the grid.
+   * A sweep that drives a control the user cannot see is not measuring the dominant-task path,
+   * and driving a hidden `Unsorted4` unmounts every card the run had yet to reach — which is the
+   * sweep-order defect this probe has already paid for three times. The population is now what
+   * is actually on screen; to score the disclosed controls, open the disclosure at arm (the
+   * driver does) so they are genuinely reachable rather than merely rectangular.
+   */
   const painted = (el) => {
     const r = el.getBoundingClientRect();
-    return r.width > 0 && r.height > 0;
+    if (!(r.width > 0 && r.height > 0)) return false;
+    return typeof el.checkVisibility === 'function'
+      ? el.checkVisibility({ contentVisibilityAuto: true })
+      : true;
   };
 
   const keyOf = (l, tag, type, cls) => [l, tag, type, cls].join('\u0001');
@@ -171,6 +239,24 @@
       ).join('|'),
       open: win.querySelectorAll('details[open]').length,
       expanded: win.querySelectorAll('[aria-expanded="true"]').length,
+      /**
+       * A TRANSIENT OVERLAY THAT MOVES IS AN EFFECT, and without this term seven of the Video
+       * window's controls were unmeasurable. Every media card carries a `More actions` button
+       * opening the SAME `[role="menu"]` with the same items (`ContextMenu.tsx:138`); once the
+       * first one has opened it, every later one only re-anchors it. Text, control count and
+       * aria state are then byte-identical — `role="menuitem"` is not in the control selector
+       * either — so the click read `changed:false` and 7 of 41 targets came back `unconfirmed`
+       * on 2026-08-25. Position and item count are what actually moved. Menus outside every
+       * `.fwin` are included because an overlay is not required to live inside the window that
+       * opened it; another window's own menu would be inside ITS `.fwin` and is excluded.
+       */
+      menus: [...document.querySelectorAll('[role="menu"],[role="dialog"],[role="listbox"]')]
+        .filter((m) => win.contains(m) || !m.closest('.fwin'))
+        .map((m) => {
+          const r = m.getBoundingClientRect();
+          return `${Math.round(r.x)},${Math.round(r.y)},${Math.round(r.width)}x${Math.round(r.height)}:${m.querySelectorAll('[role="menuitem"],button,a[href]').length}`;
+        })
+        .join('|'),
       scroll: [...win.querySelectorAll('*')].reduce((a, e) => a + e.scrollTop, 0),
     });
   };
@@ -278,8 +364,16 @@
   const inContent = (el) => !!el.closest('main,[role="main"],[class*="-content"],[class*="__content"]');
   /** Toggles a detail region open/closed in place: everything that region holds goes first. */
   const EXPANDER = (el) => !!el.closest('.medialib-card');
-  /** Changes WHICH items the content region enumerates: goes after the items themselves. */
-  const RELISTS = (el, name) => VIEW_SWITCH.test(name) || !!el.closest('.medialib-rail');
+  /**
+   * Changes WHICH items the content region enumerates: goes after the items themselves.
+   * `.medialib-kind` joined the list 2026-08-25 — `be3c9887` moved the release-kind chips behind
+   * a disclosure in `.medialib-browser__tools`, outside `.medialib-rail`, so they ranked as
+   * ordinary content while filtering the whole grid. Same mechanism as the rail, one container
+   * over.
+   */
+  const RELISTS = (el, name) => VIEW_SWITCH.test(name)
+    || !!el.closest('.medialib-rail')
+    || !!el.closest('.medialib-kind');
   /**
    * A DISMISSER RANKS LAST INSIDE THE REGION IT DISMISSES, and this is the third form of the
    * same sweep-order defect on this surface. The detail drawer's own close button is FIRST in
@@ -292,11 +386,24 @@
    */
   const DISMISSES = (el, name) => /__close(\b|$|\s)/.test(String(el.className || ''))
     || /^(Close|Dismiss|Back)$/i.test(name);
+  /**
+   * A SHELF SWITCH OUTRANKS THE TOOLBAR IT REPLACES — the fourth form of this sweep-order defect
+   * and the one the 2026-08-25 run paid for. The rail and the browser toolbar both re-list, so
+   * both sat in band 2 and DOM order put the rail first. Driving `Unsorted4` swapped the shelf,
+   * and with it the whole toolbar: `details.medialib-kind` only renders on a >=2-kind shelf
+   * (`MediaLibraryBrowser.tsx:182`), so `All` / `Series` / `OVA / ONA` unmounted, and the view
+   * disclosure remounted closed, taking `Grid view` / `List view` with it — **5 targets `gone`**,
+   * every one of them an instrument artifact. The rail changes WHICH SHELF; the toolbar filters
+   * the shelf you are standing in, so it has to run first.
+   */
+  const SWITCHES_SHELF = (el) => !!el.closest('.medialib-rail');
   const anyContent = targets.some((t) => inContent(t.el));
   const band = (t) => (!anyContent
     ? Number(VIEW_SWITCH.test(t.name))
     : (!inContent(t.el) ? 3 : RELISTS(t.el, t.name) ? 2 : EXPANDER(t.el) ? 1 : 0));
-  const rank = (t) => band(t) + (DISMISSES(t.el, t.name) ? 0.5 : 0);
+  const rank = (t) => band(t)
+    + (DISMISSES(t.el, t.name) ? 0.5 : 0)
+    + (band(t) === 2 && SWITCHES_SHELF(t.el) ? 0.25 : 0);
   targets.sort((a, b) => rank(a) - rank(b));
 
   // ...and because they go last, the sweep used to END on `Interlinear`, which renders no
@@ -367,6 +474,8 @@
 
   const run = async () => {
     for (const t of targets) {
+      // Checked every target so a later arm can stop this one; see the ONE SWEEP AT A TIME note.
+      if (st.abort) { st.aborted = true; st.done = true; return; }
       const { el, by } = resolve(t);
       if (!el) {
         st.results.push({ name: t.name, cls: t.cls, gone: true, resolvedBy: null });
@@ -478,7 +587,18 @@
     }
     st.done = true;
   };
-  void run();
+  /**
+   * A THROW USED TO LOOK EXACTLY LIKE A LONG RUN. `void run()` swallowed any exception into an
+   * unhandled rejection, so `-read.js` sat at `done:false` forever and the reader's only signal
+   * was a progress number that stopped moving — measured 2026-08-25, a run parked at `22/24` with
+   * no way to tell a stall from a slow settle. The error is now parked on the state and reported,
+   * and `done` is still only set by a run that reached the end, so a crashed sweep can never be
+   * read as a completed one.
+   */
+  run().catch((e) => {
+    st.error = String((e && e.stack) || e).slice(0, 400);
+    st.crashedAt = st.results.length;
+  });
 
   return JSON.stringify({
     armed: true,
