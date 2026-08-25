@@ -263,6 +263,20 @@ for ($i = 0; $i -lt 60; $i++) {
 }
 if (-not ($state -and $state.done)) { Write-Error "Gesture never reported done -- refusing to report frame numbers for an unfinished interaction." }
 
+# Focus is checked BEFORE the recorder is installed, but it can be lost DURING the
+# gesture -- another process taking the foreground backgrounds this window and Chromium
+# stops producing frames. The recorder cannot tell that gap apart from a renderer stall,
+# so it reports it as one huge frame. Measured 2026-08-25: two consecutive drag runs both
+# reported frame_max_ms = 3927.9 -- identical to the decimal, which no pair of independent
+# gestures produces -- while eight surrounding runs of the same gesture on the same tree
+# reported 16.8-17.5. Dropping index 0 does not catch this; the gap lands mid-recording.
+# A throttle artifact scored as a product frame is a fabricated FINDING, so refuse.
+$after = Invoke-RestMethod -Uri "$base/health" -Headers $headers
+$afterWin = $after.windows | Where-Object { $_.focused } | Select-Object -First 1
+if (-not $afterWin) {
+  Write-Error "VOID: the window lost focus during the gesture. Chromium throttles rAF in a background window, so every frame number from this run is a throttle artifact, not renderer cost. Re-run with nothing else taking the foreground."
+}
+
 $frames = Invoke-Eval @"
 (() => {
   const a = window.__lfp; a.on = false;

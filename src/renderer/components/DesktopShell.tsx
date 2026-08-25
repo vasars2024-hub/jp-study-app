@@ -23,6 +23,7 @@ import type {
 import { DESKTOP_STUDY } from '../../shared/desktop';
 import { clampLayoutToViewport, layoutGeometrySignature, resolveAuthoredViewport } from '../desktopLayoutFit';
 import { collectForeignWindows } from '../foreignWindows';
+import { createRenderIdentityCache } from '../renderIdentityCache';
 import {
   canPresentLiquid,
   isWinLiquid,
@@ -137,6 +138,20 @@ interface Win {
    * Commands live in `../liquidWindowPresentation`.
    */
   presentation?: LiquidPresentationState;
+}
+
+/**
+ * The per-window callback bundle handed to `FloatingWindow`. Cached by window id
+ * so the six handlers keep their identity across renders; see `handlersFor`.
+ */
+interface WinHandlers {
+  onFocus: () => void;
+  onClose: () => void;
+  onMinimize: () => void;
+  onMaximize: () => void;
+  onToggleLiquid: () => void;
+  onPopOut: () => void;
+  onPatch: (p: Partial<Win>) => void;
 }
 
 /**
@@ -2206,6 +2221,70 @@ export default function DesktopShell({
     window.dispatchEvent(new CustomEvent('shell:appSwitch'));
   }, [focusedWinId, wired]);
 
+  /**
+   * Stable props for `FloatingWindow`, whose `memo()` could otherwise never hit.
+   *
+   * The call site below handed it six freshly-allocated arrows AND a fresh
+   * `children` element on every render, so `memo`'s reference comparison failed
+   * on seven props at once: one `patch()` re-rendered every open window and
+   * every `AppSection` under it, however many were on the desktop. Measured at
+   * the tail of a Dictionary drag on a three-window desktop — a ~100.2 ms frame
+   * at `pointerup`, the one frame that missed rubric category 7's
+   * "0 frames over 100 ms" bar.
+   *
+   * Stabilising the callbacks alone is not enough. `children` is a prop too, and
+   * an element literal is a new object every render, so the memo stays dead
+   * until that reference is stable as well.
+   *
+   * The bundles read through a ref rather than closing over this render's
+   * functions: `focus`/`close`/`patch` and the rest are plain declarations
+   * recreated every render, so capturing them directly would freeze the first
+   * render's closures and, for example, `close` would see a stale `winAnim`.
+   */
+  const winActionsRef = useRef({ focus, close, minimize, toggleMax, toggleLiquid, patch });
+  winActionsRef.current = { focus, close, minimize, toggleMax, toggleLiquid, patch };
+  // Stamped by section: a live window's section never changes, but stamping
+  // rebuilds rather than leaving `onPopOut` aimed at the previous app if that
+  // assumption ever breaks. Everything else is read late through the ref.
+  const winHandlerCache = useRef(
+    createRenderIdentityCache<string, WinSection, WinHandlers>((id, section) => ({
+      onFocus: () => winActionsRef.current.focus(id),
+      onClose: () => winActionsRef.current.close(id),
+      onMinimize: () => winActionsRef.current.minimize(id),
+      onMaximize: () => winActionsRef.current.toggleMax(id),
+      onToggleLiquid: () => winActionsRef.current.toggleLiquid(id),
+      onPopOut: () => {
+        void window.api.popOut(section);
+        winActionsRef.current.close(id);
+      },
+      onPatch: (p: Partial<Win>) => winActionsRef.current.patch(id, p),
+    })),
+  ).current;
+  useEffect(() => {
+    winHandlerCache.prune(wins.map((w) => w.id));
+  }, [wins, winHandlerCache]);
+
+  /**
+   * One cached `<AppSection>` element per section. Its only props are the
+   * section id and a ref-stable `onOpenBook`, so the element never needs
+   * rebuilding; caching it is what makes `children` reference-stable and the
+   * memo above actually hit. `t()` is not involved — `AppSection` calls `useT()`
+   * itself, so a language change still re-renders it through context.
+   *
+   * The `note` and `settings` bodies are NOT cached: their children depend on
+   * live state (note text/colour, the whole wallpaper prop set). Those two
+   * windows still re-render on every shell render, which is the honest limit of
+   * this fix and costs one textarea or one settings pane, not an `AppSection`.
+   */
+  const openBookRef = useRef(onOpenBook);
+  openBookRef.current = onOpenBook;
+  const stableOpenBook = useRef((item: LibraryItem) => openBookRef.current(item)).current;
+  const appSectionCache = useRef(
+    createRenderIdentityCache<WinSection, null, ReactNode>((section) => (
+      <AppSection section={section} onOpenBook={stableOpenBook} />
+    )),
+  ).current;
+
   const visibleWidgets = widgets.filter((w) => !w.hidden);
   const hiddenWidgets = widgets.filter((w) => w.hidden);
   const topWidgetZ = visibleWidgets.length ? Math.max(...visibleWidgets.map((w) => w.z)) : 0;
@@ -2511,16 +2590,7 @@ export default function DesktopShell({
           hidden={!!w.min}
           deskRef={deskRef}
           noteColor={w.section === 'note' ? notes[w.id]?.color : undefined}
-          onFocus={() => focus(w.id)}
-          onClose={() => close(w.id)}
-          onMinimize={() => minimize(w.id)}
-          onMaximize={() => toggleMax(w.id)}
-          onToggleLiquid={() => toggleLiquid(w.id)}
-          onPopOut={() => {
-            void window.api.popOut(w.section);
-            close(w.id);
-          }}
-          onPatch={(p) => patch(w.id, p)}
+          {...winHandlerCache.get(w.id, w.section)}
         >
           {w.section === 'note' ? (
             <textarea
@@ -2552,7 +2622,7 @@ export default function DesktopShell({
               onOpenMusicWidget={() => open('musicwidget')}
             />
           ) : (
-            <AppSection section={w.section} onOpenBook={onOpenBook} />
+            appSectionCache.get(w.section, null)
           )}
         </FloatingWindow>
       ))}
