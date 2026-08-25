@@ -64,6 +64,20 @@
   --mc-nav-badge-bg: rgba(255, 255, 255, 0.08);
   --mc-nav-badge-text: #c9cbd3;
 
+  /* Emphasis ink on chrome — the three literals the nav-ink pass above missed,
+     found the same way and one step later. Measured 2026-08-25 on the Video
+     window at `data-theme='classic-light'`, AFTER the theme remap at the bottom
+     of this file had already lit the sidebar and topbar: the active nav row's
+     `<strong>` painted rgb(255, 255, 255) on a rgb(243, 243, 243) sidebar
+     (**1.10:1**), `.mc-storage-ring` rgb(236, 236, 241) (**1.07:1**) and the
+     breadcrumb's `<strong>` rgb(201, 204, 214) on the white topbar (**1.60:1**).
+     A token that re-sources the SURFACE does nothing for text that writes its own
+     hex — the surface went light and these three stayed light with it.
+     Values unchanged for the dark palettes, so nothing repaints there. */
+  --mc-nav-active-ink: #fff;
+  --mc-ring-ink: #ececf1;
+  --mc-crumb-ink: #c9ccd6;
+
   /*
    * The one type scale for Media Center.
    *
@@ -407,7 +421,7 @@
 .mc-settings-link.is-active {
   border-color: rgba(255, 106, 131, 0.18);
   background: linear-gradient(90deg, rgba(216, 74, 104, 0.2), rgba(216, 74, 104, 0.07));
-  color: #fff;
+  color: var(--mc-nav-active-ink);
 }
 
 .mc-nav button.is-active::before,
@@ -479,7 +493,7 @@
   border: 2px solid rgba(216, 74, 104, 0.6);
   border-right-color: rgba(255, 255, 255, 0.12);
   border-radius: 50%;
-  color: #ececf1;
+  color: var(--mc-ring-ink);
   font-size: var(--mc-fs-label, 14px);
   font-weight: 700;
 }
@@ -578,7 +592,7 @@
 
 .mc-breadcrumb strong {
   overflow: hidden;
-  color: #c9ccd6;
+  color: var(--mc-crumb-ink);
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -6204,6 +6218,9 @@
   --mc-nav-ink: var(--muted);
   --mc-nav-badge-bg: color-mix(in srgb, var(--text) 8%, transparent);
   --mc-nav-badge-text: var(--text);
+  --mc-nav-active-ink: var(--text);
+  --mc-ring-ink: var(--text);
+  --mc-crumb-ink: var(--text);
 }
 
 /* High contrast is the one theme that must not blur or tint anything: the
@@ -6233,6 +6250,9 @@
   --mc-nav-ink: var(--text);
   --mc-nav-badge-bg: transparent;
   --mc-nav-badge-text: var(--text);
+  --mc-nav-active-ink: var(--text);
+  --mc-ring-ink: var(--text);
+  --mc-crumb-ink: var(--text);
 }
 
 /* A user who has asked the OS for less transparency gets the same treatment in

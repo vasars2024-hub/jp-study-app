@@ -451,7 +451,15 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
    * parked — a planted failure must never be able to leak into a score.
    */
   if (!control) {
-    await ev(`(() => { window.__q78verdict = ${JSON.stringify({ q7: out.q7, q8: out.q8, at: new Date().toISOString() })}; return JSON.stringify({ parked: !!window.__q78verdict, q7: window.__q78verdict.q7.verdict, q8: window.__q78verdict.q8.verdict }); })()`);
+    /**
+     * `title` is parked with the verdicts, and it is a repair. `--title Video` and
+     * `--title Dictionary` park on this SAME global, so a clarity sweep printed whichever ran
+     * last against BOTH windows and called it a measurement of each. Q7 and Q8 are per-surface
+     * questions — Q7 compares a surface's own two presentations — so an unlabelled verdict is
+     * unattributable. `l1-ui-clarity.js` now reports `measuredOnWindow` beside them and marks
+     * the row `crossSurface` when it does not match the window being scored.
+     */
+    await ev(`(() => { window.__q78verdict = ${JSON.stringify({ q7: out.q7, q8: out.q8, title: TITLE, at: new Date().toISOString() })}; return JSON.stringify({ parked: !!window.__q78verdict, title: window.__q78verdict.title, q7: window.__q78verdict.q7.verdict, q8: window.__q78verdict.q8.verdict }); })()`);
     out.parkedOnWindow = '__q78verdict';
   } else {
     out.parkedOnWindow = null;

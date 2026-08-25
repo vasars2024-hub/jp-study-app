@@ -1,0 +1,193 @@
+{
+ "at": "2026-08-25T06:53:00.860Z",
+ "title": "Video",
+ "control": "plant",
+ "question": "every readable surface has stable contrast",
+ "asFound": {
+  "theme": "forest-night",
+  "presentation": "liquid",
+  "label": "Video",
+  "details": [
+   "mc-nav-group:false",
+   "medialib-rail__group:true",
+   "medialib-rail__group:false",
+   "medialib-view:false"
+  ]
+ },
+ "storeBefore": {
+  "jp-mc-nav-tools-open": "false",
+  "jp-os-theme": "forest-night",
+  "jp-os-theme-engine-v": "1"
+ },
+ "axes": {
+  "theme": [
+   "forest-night",
+   "classic-light"
+  ],
+  "disclosures": [
+   "closed",
+   "open"
+  ]
+ },
+ "planted": 1,
+ "cells": [
+  {
+   "cell": "A base/closed",
+   "theme": "forest-night",
+   "disclosuresOpen": false,
+   "box": "1080x700",
+   "parserOk": true,
+   "measured": 39,
+   "unmeasurable": 0,
+   "minRatio": 1.14,
+   "minOwner": "span \"q5 plant\" 14px",
+   "failingCount": 1,
+   "worst": [
+    {
+     "el": "span",
+     "text": "q5 plant",
+     "px": 14,
+     "large": false,
+     "ratio": 1.14,
+     "bar": 4.5
+    }
+   ]
+  },
+  {
+   "cell": "B base/open",
+   "theme": "forest-night",
+   "disclosuresOpen": true,
+   "box": "1080x700",
+   "parserOk": true,
+   "measured": 59,
+   "unmeasurable": 0,
+   "minRatio": 1.14,
+   "minOwner": "span \"q5 plant\" 14px",
+   "failingCount": 1,
+   "worst": [
+    {
+     "el": "span",
+     "text": "q5 plant",
+     "px": 14,
+     "large": false,
+     "ratio": 1.14,
+     "bar": 4.5
+    }
+   ]
+  },
+  {
+   "cell": "C alt/closed",
+   "theme": "classic-light",
+   "disclosuresOpen": false,
+   "box": "1080x700",
+   "parserOk": true,
+   "measured": 39,
+   "unmeasurable": 0,
+   "minRatio": 1.14,
+   "minOwner": "span \"q5 plant\" 14px",
+   "failingCount": 1,
+   "worst": [
+    {
+     "el": "span",
+     "text": "q5 plant",
+     "px": 14,
+     "large": false,
+     "ratio": 1.14,
+     "bar": 4.5
+    }
+   ]
+  },
+  {
+   "cell": "D alt/open",
+   "theme": "classic-light",
+   "disclosuresOpen": true,
+   "box": "1080x700",
+   "parserOk": true,
+   "measured": 59,
+   "unmeasurable": 0,
+   "minRatio": 1.14,
+   "minOwner": "span \"q5 plant\" 14px",
+   "failingCount": 1,
+   "worst": [
+    {
+     "el": "span",
+     "text": "q5 plant",
+     "px": 14,
+     "large": false,
+     "ratio": 1.14,
+     "bar": 4.5
+    }
+   ]
+  }
+ ],
+ "restored": {
+  "theme": "forest-night",
+  "presentation": "liquid",
+  "details": [
+   "mc-nav-group:false",
+   "medialib-rail__group:true",
+   "medialib-rail__group:false",
+   "medialib-view:false"
+  ],
+  "plantResidue": 0,
+  "storedTheme": "forest-night"
+ },
+ "storeAfter": {
+  "jp-mc-nav-tools-open": "false",
+  "jp-os-theme": "forest-night",
+  "jp-os-theme-engine-v": "1"
+ },
+ "storeIdentical": true,
+ "restoredExactly": true,
+ "terms": {
+  "noFailingTextInAnyCell": false,
+  "noUnmeasurableInAnyCell": true,
+  "themeMovedTheNumbers": false,
+  "disclosureAddedPopulation": true,
+  "populationFloor": true,
+  "parserSelfTestInAnyCell": true
+ },
+ "numbers": {
+  "perCell": [
+   "A base/closed theme=forest-night measured=39 min=1.14 failing=1",
+   "B base/open theme=forest-night measured=59 min=1.14 failing=1",
+   "C alt/closed theme=classic-light measured=39 min=1.14 failing=1",
+   "D alt/open theme=classic-light measured=59 min=1.14 failing=1"
+  ],
+  "minByTheme": {
+   "forest-night": 1.14,
+   "classic-light": 1.14
+  },
+  "themeDelta": 0,
+  "populationClosedVsOpen": "39 -> 59",
+  "newlyMeasuredByDisclosure": 20,
+  "totalFailing": 4,
+  "worstOverall": {
+   "cell": "A base/closed",
+   "theme": "forest-night",
+   "disclosuresOpen": false,
+   "box": "1080x700",
+   "parserOk": true,
+   "measured": 39,
+   "unmeasurable": 0,
+   "minRatio": 1.14,
+   "minOwner": "span \"q5 plant\" 14px",
+   "failingCount": 1,
+   "worst": [
+    {
+     "el": "span",
+     "text": "q5 plant",
+     "px": 14,
+     "large": false,
+     "ratio": 1.14,
+     "bar": 4.5
+    }
+   ]
+  }
+ },
+ "verdict": "NO",
+ "why": "failed terms: noFailingTextInAnyCell, themeMovedTheNumbers",
+ "parked": false,
+ "controlHeld": true,
+ "controlNote": "control 'plant' produced NO — the term is doing work"
+}

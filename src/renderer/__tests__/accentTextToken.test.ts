@@ -199,6 +199,45 @@ describe('Media Center chrome is a remappable material, not a fixed dark palette
     expect(nav?.declarations.match(/(?:^|;)\s*color\s*:\s*([^;]+)/)?.[1].trim()).toBe('var(--mc-nav-ink)');
   });
 
+  /**
+   * The remap above re-sources the SURFACES, and that is why these three survived it: text that
+   * writes its own hex does not care what the panel underneath became. Measured 2026-08-25 on
+   * the Video window at `data-theme='classic-light'`, with the surface remap already in force —
+   * the active nav row's `<strong>` `#fff` on the now-light sidebar (**1.10:1**),
+   * `.mc-storage-ring` `#ececf1` (**1.07:1**), `.mc-breadcrumb strong` `#c9ccd6` on the white
+   * topbar (**1.60:1**). Three of the four failures rubric category 5's Q5 found on that window.
+   */
+  it('paints its emphasis ink from tokens too, not from three light-on-dark literals', () => {
+    const all = mcBlocks();
+    const colorOf = (pred: (sel: string) => boolean) => {
+      const b = all.find((x) => pred(x.selector) && /(?:^|;)\s*color\s*:/.test(x.declarations));
+      return b?.declarations.match(/(?:^|;)\s*color\s*:\s*([^;]+)/)?.[1].trim();
+    };
+    const cases: Array<[string, (sel: string) => boolean, string]> = [
+      ['active nav row', (s) => s.startsWith('.mc-nav button.is-active'), 'var(--mc-nav-active-ink)'],
+      ['storage ring', (s) => s === '.mc-storage-ring', 'var(--mc-ring-ink)'],
+      ['breadcrumb', (s) => s === '.mc-breadcrumb strong', 'var(--mc-crumb-ink)'],
+    ];
+    for (const [what, pred, want] of cases) {
+      const got = colorOf(pred);
+      expect(got, `${what}: rule moved or dropped its colour — the predicate is stale`).toBeTruthy();
+      expect(got, `${what} writes a literal, so no palette can reach it`).toBe(want);
+    }
+
+    // …and the tokens have to be declared in all three places, or a `var()` with no fallback
+    // resolves to nothing and the text inherits, which is a different bug wearing the same face.
+    const declaring = (token: string) =>
+      new Set(all.filter((b) => new RegExp(`${token}\\s*:`).test(b.declarations)).flatMap((b) => [
+        ...themesIn(b.selector),
+        ...(/\.mc-root/.test(b.selector) && themesIn(b.selector).length === 0 ? ['__default'] : []),
+      ]));
+    for (const token of ['--mc-nav-active-ink', '--mc-ring-ink', '--mc-crumb-ink']) {
+      const where = declaring(token);
+      expect([...where].sort(), `${token} is not declared in the default + light + high-contrast blocks`)
+        .toEqual(['__default', 'classic-light', 'high-contrast', 'mint-green', 'ocean-blue', 'paper', 'rose-pine', 'soft-sepia']);
+    }
+  });
+
   it('turns the blur off under prefers-reduced-transparency', () => {
     expect(MC).toMatch(/@media \(prefers-reduced-transparency: reduce\)/);
     const at = MC.indexOf('@media (prefers-reduced-transparency: reduce)');
@@ -206,6 +245,110 @@ describe('Media Center chrome is a remappable material, not a fixed dark palette
     for (const token of ['--mc-glass-sidebar-blur', '--mc-glass-topbar-blur', '--mc-glass-player-blur']) {
       expect(body, `${token} still blurs for a user who asked the OS for less transparency`)
         .toMatch(new RegExp(`${token}:\\s*none`));
+    }
+  });
+});
+
+/**
+ * The status family, and the third instance of the same shape in one week.
+ *
+ * `--success`'s own comment in `styles.css` says its value was "picked to clear 4.5:1 on the
+ * --panel surfaces" — true of the DARK panels it was picked against, and never re-checked when
+ * six light palettes shipped. Measured 2026-08-25 on the Video window at
+ * `data-theme='classic-light'`: `.medialib-pill[data-tone='ready']` painted `--success`
+ * rgb(76, 175, 125) on the spotlight's rgb(243, 243, 243) — **2.45:1** at 11px against a 4.5
+ * bar. That was the fourth of rubric category 5's Q5 failures on that window.
+ *
+ * `--warning` is worse there and `--danger` is borderline, so the guard covers the family. The
+ * `-text` variants default to the base token, which is what keeps every dark palette and every
+ * `color-mix()` fill/border consumer of the base colours untouched.
+ *
+ * Newlines are normalised because the shared tree is LF and every fresh worktree here is CRLF
+ * (`core.autocrlf=true`, no `.gitattributes`) — a CSS-parsing guard that passes only where it
+ * was written has already been filed as a boss-audit finding in this repo.
+ */
+const LIB = readFileSync(
+  resolve(__dirname, '..', 'components', 'media', 'library', 'mediaLibrary.css'),
+  'utf8',
+)
+  .replace(/\r\n?/g, '\n')
+  .replace(/\/\*[\s\S]*?\*\//g, '');
+
+describe('status colours have a text variant, and it is what status TEXT paints', () => {
+  const FAMILY = ['--success-text', '--warning-text', '--danger-text'];
+
+  it('each defaults on :root to its base token, so dark palettes are unchanged', () => {
+    const root = blocks().filter((b) => /^:root$/.test(b.selector));
+    expect(root.length, 'the base :root block moved or was renamed').toBeGreaterThan(0);
+    for (const token of FAMILY) {
+      const value = root
+        .flatMap((b) => b.declarations.split(';'))
+        .map((d) => d.match(new RegExp(`^\\s*${token}\\s*:\\s*(.+)$`)))
+        .find((m): m is RegExpMatchArray => m !== null)?.[1]
+        .trim();
+      expect(value, `${token} is not declared on :root — every consumer resolves to nothing`).toBeTruthy();
+      expect(value, `${token} must default to its base colour, not a second literal`)
+        .toBe(`var(${token.replace('-text', '')})`);
+    }
+  });
+
+  it('each is overridden by every palette that sets color-scheme: light', () => {
+    const lightThemes = new Set<string>();
+    for (const b of blocks()) {
+      if (!/color-scheme\s*:\s*light/.test(b.declarations)) continue;
+      for (const t of themesIn(b.selector)) lightThemes.add(t);
+    }
+    expect(lightThemes.size, 'no light palette found at all — the selector shape changed').toBe(6);
+    for (const token of FAMILY) {
+      const overridden = new Set<string>();
+      for (const b of blocks()) {
+        if (!new RegExp(`${token}\\s*:`).test(b.declarations)) continue;
+        for (const t of themesIn(b.selector)) overridden.add(t);
+      }
+      expect(
+        [...lightThemes].filter((t) => !overridden.has(t)),
+        `a light palette inheriting ${token} paints a mid-saturation status colour on a near-white ` +
+          'panel — 2.0-2.5:1 measured. Join the override list beside --accent-text.',
+      ).toEqual([]);
+    }
+  });
+
+  it('the light override mixes toward the palette own --text, never a literal', () => {
+    for (const token of FAMILY) {
+      const values = blocks()
+        .flatMap((b) =>
+          b.declarations
+            .split(';')
+            .map((d) => d.match(new RegExp(`^\\s*${token}\\s*:\\s*(.+)$`)))
+            .filter((m): m is RegExpMatchArray => m !== null)
+            .map((m) => ({ selector: b.selector, value: m[1].trim() })),
+        )
+        .filter((v) => v.value !== `var(${token.replace('-text', '')})`);
+      expect(values.length, `${token} has no light override that declares a value`).toBeGreaterThan(0);
+      const notDerived = values.filter(
+        (v) => !v.value.includes('var(--text)') || !v.value.includes(`var(${token.replace('-text', '')})`),
+      );
+      expect(
+        notDerived.map((v) => `${v.selector} { ${token}: ${v.value} }`),
+        'a literal here is legible on exactly one palette',
+      ).toEqual([]);
+    }
+  });
+
+  it('the media library pill reads the text variants, not the base tokens', () => {
+    const want: Record<string, string> = {
+      ready: 'var(--success-text)',
+      active: 'var(--accent-text)',
+      warning: 'var(--warning-text)',
+      error: 'var(--danger-text)',
+    };
+    for (const [tone, value] of Object.entries(want)) {
+      const re = new RegExp(`\\.medialib-pill\\[data-tone='${tone}'\\]\\s*\\{([^}]*)\\}`);
+      const m = LIB.match(re);
+      expect(m, `.medialib-pill[data-tone='${tone}'] moved — the predicate is stale`).toBeTruthy();
+      const color = m?.[1].match(/(?:^|;)\s*color\s*:\s*([^;]+)/)?.[1].trim();
+      expect(color, `tone '${tone}' paints ${color}, which is the fill colour, not the glyph colour`)
+        .toBe(value);
     }
   });
 });

@@ -1,0 +1,150 @@
+{
+ "at": "2026-08-25T06:52:51.468Z",
+ "title": "Video",
+ "control": null,
+ "question": "every readable surface has stable contrast",
+ "asFound": {
+  "theme": "forest-night",
+  "presentation": "liquid",
+  "label": "Video",
+  "details": [
+   "mc-nav-group:false",
+   "medialib-rail__group:true",
+   "medialib-rail__group:false",
+   "medialib-view:false"
+  ]
+ },
+ "storeBefore": {
+  "jp-mc-nav-tools-open": "false",
+  "jp-os-theme": "forest-night",
+  "jp-os-theme-engine-v": "1"
+ },
+ "axes": {
+  "theme": [
+   "forest-night",
+   "classic-light"
+  ],
+  "disclosures": [
+   "closed",
+   "open"
+  ]
+ },
+ "cells": [
+  {
+   "cell": "A base/closed",
+   "theme": "forest-night",
+   "disclosuresOpen": false,
+   "box": "1080x700",
+   "parserOk": true,
+   "measured": 48,
+   "unmeasurable": 0,
+   "minRatio": 5.3,
+   "minOwner": "dt \"Type\" 11px",
+   "failingCount": 0,
+   "worst": []
+  },
+  {
+   "cell": "B base/open",
+   "theme": "forest-night",
+   "disclosuresOpen": true,
+   "box": "1080x700",
+   "parserOk": true,
+   "measured": 72,
+   "unmeasurable": 0,
+   "minRatio": 5.3,
+   "minOwner": "dt \"Type\" 11px",
+   "failingCount": 0,
+   "worst": []
+  },
+  {
+   "cell": "C alt/closed",
+   "theme": "classic-light",
+   "disclosuresOpen": false,
+   "box": "1080x700",
+   "parserOk": true,
+   "measured": 48,
+   "unmeasurable": 0,
+   "minRatio": 5.71,
+   "minOwner": "dt \"Type\" 11px",
+   "failingCount": 0,
+   "worst": []
+  },
+  {
+   "cell": "D alt/open",
+   "theme": "classic-light",
+   "disclosuresOpen": true,
+   "box": "1080x700",
+   "parserOk": true,
+   "measured": 72,
+   "unmeasurable": 0,
+   "minRatio": 5.71,
+   "minOwner": "dt \"Type\" 11px",
+   "failingCount": 0,
+   "worst": []
+  }
+ ],
+ "restored": {
+  "theme": "forest-night",
+  "presentation": "liquid",
+  "details": [
+   "mc-nav-group:false",
+   "medialib-rail__group:true",
+   "medialib-rail__group:false",
+   "medialib-view:false"
+  ],
+  "plantResidue": 0,
+  "storedTheme": "forest-night"
+ },
+ "storeAfter": {
+  "jp-mc-nav-tools-open": "false",
+  "jp-os-theme": "forest-night",
+  "jp-os-theme-engine-v": "1"
+ },
+ "storeIdentical": true,
+ "restoredExactly": true,
+ "terms": {
+  "noFailingTextInAnyCell": true,
+  "noUnmeasurableInAnyCell": true,
+  "themeMovedTheNumbers": true,
+  "disclosureAddedPopulation": true,
+  "populationFloor": true,
+  "parserSelfTestInAnyCell": true
+ },
+ "numbers": {
+  "perCell": [
+   "A base/closed theme=forest-night measured=48 min=5.3 failing=0",
+   "B base/open theme=forest-night measured=72 min=5.3 failing=0",
+   "C alt/closed theme=classic-light measured=48 min=5.71 failing=0",
+   "D alt/open theme=classic-light measured=72 min=5.71 failing=0"
+  ],
+  "minByTheme": {
+   "forest-night": 5.3,
+   "classic-light": 5.71
+  },
+  "themeDelta": 0.41,
+  "populationClosedVsOpen": "48 -> 72",
+  "newlyMeasuredByDisclosure": 24,
+  "totalFailing": 0,
+  "worstOverall": {
+   "cell": "A base/closed",
+   "theme": "forest-night",
+   "disclosuresOpen": false,
+   "box": "1080x700",
+   "parserOk": true,
+   "measured": 48,
+   "unmeasurable": 0,
+   "minRatio": 5.3,
+   "minOwner": "dt \"Type\" 11px",
+   "failingCount": 0,
+   "worst": []
+  }
+ },
+ "verdict": "YES",
+ "why": "4 cells across 2 themes x closed/open disclosures: 0 failing of 240 measured, worst 5.3:1 (dt \"Type\" 11px), theme delta 0.41",
+ "parkedOn": "__q5verdicts[\"Video\"]",
+ "parked": {
+  "parked": [
+   "Video"
+  ]
+ }
+}

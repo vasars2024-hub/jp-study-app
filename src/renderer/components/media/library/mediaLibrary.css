@@ -766,10 +766,15 @@
   background: currentColor;
 }
 
-.medialib-pill[data-tone='ready'] { color: var(--success); }
-.medialib-pill[data-tone='active'] { color: var(--accent); }
-.medialib-pill[data-tone='warning'] { color: var(--warning); }
-.medialib-pill[data-tone='error'] { color: var(--danger); }
+/* The `-text` variants, not the base tokens. A pill is 11px status TEXT on a panel,
+   which is the one job the base status colours were never checked for on a light
+   palette — `ready` measured 2.45:1 on the Video window under `classic-light`. The
+   dot in `::before` is `currentColor`, so it follows the label rather than needing
+   its own rule. See the --success-text note in `styles.css`. */
+.medialib-pill[data-tone='ready'] { color: var(--success-text); }
+.medialib-pill[data-tone='active'] { color: var(--accent-text); }
+.medialib-pill[data-tone='warning'] { color: var(--warning-text); }
+.medialib-pill[data-tone='error'] { color: var(--danger-text); }
 .medialib-pill[data-tone='busy']::before { animation: medialib-pulse 1.4s var(--ease-standard) infinite; }
 
 .medialib-pill__retry {

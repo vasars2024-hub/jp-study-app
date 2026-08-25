@@ -88,9 +88,49 @@
    * outside `measure`, so every window in one run reports the same provenance.
    */
   const liquidVerdict = (window.__q78verdict && typeof window.__q78verdict === 'object') ? window.__q78verdict : {};
-  const q9Verdict = (window.__q9verdict && typeof window.__q9verdict === 'object') ? window.__q9verdict : {};
+
+  /**
+   * PARKED VERDICTS ARE PER-SURFACE, AND UNTIL THIS COMMIT THIS FILE READ THEM AS GLOBAL.
+   *
+   * `q9Verdict` was read ONCE, outside `measure`, and then rendered into every window's row.
+   * `l1-q9-drive.cjs` was careful to give each surface its own slot — `__q9verdict` for the
+   * dictionary, `__q9verdictMedia` for the Media Center, with a comment saying that one global
+   * would mean "whichever ran last decided Q9 for the other" — but the CONSUMER still read one.
+   * So a `--app dictionary` run followed by a clarity sweep printed the dictionary's 7-of-7
+   * against the **Video** window, which measures a different eight rows. The driver's fix never
+   * reached the report. `l1-q78-drive.cjs` is worse: `--title Video` and `--title Dictionary`
+   * park on the SAME `__q78verdict`, so Q7 and Q8 are still cross-surface and are reported as
+   * `crossSurface: true` below rather than silently attributed.
+   *
+   * Resolution is by the window's own title, which is what every driver in this directory now
+   * takes as its argument. `MEASURE` when nothing was parked for THIS surface — never the
+   * neighbour's answer.
+   */
+  const q5Verdicts = (window.__q5verdicts && typeof window.__q5verdicts === 'object') ? window.__q5verdicts : {};
+  const forTitle = (registry, label) => {
+    if (!registry || typeof registry !== 'object') return null;
+    if (registry[label]) return registry[label];
+    const key = Object.keys(registry).find((k) => label.indexOf(k) >= 0 || k.indexOf(label) >= 0);
+    return key ? registry[key] : null;
+  };
+  /** The Media Center renders in more than one window, so its slot is keyed by app, not title. */
+  const q9For = (label) => {
+    const media = (window.__q9verdictMedia && typeof window.__q9verdictMedia === 'object') ? window.__q9verdictMedia : null;
+    const dict = (window.__q9verdict && typeof window.__q9verdict === 'object') ? window.__q9verdict : null;
+    const isDictionary = label.indexOf('Dictionary') >= 0;
+    const picked = isDictionary ? dict : media;
+    return picked || {};
+  };
 
   const measure = (win, label) => {
+    const q9Verdict = q9For(label);
+    const q5Verdict = forTitle(q5Verdicts, label) || {};
+    const q78on = typeof liquidVerdict.title === 'string' ? liquidVerdict.title : null;
+    // The driver resolves its window by CONTAINMENT (`indexOf(TITLE) >= 0`), so the attribution
+    // test has to be the same one — an exact compare would call `--title Video` foreign to a
+    // window whose title text is `Video`, plus whatever the chrome appends.
+    const q78matches = q78on !== null && label.indexOf(q78on) >= 0;
+    const q78crossSurface = !liquidVerdict.q7 ? null : (q78on === null ? 'unattributed' : !q78matches);
     const R = win.getBoundingClientRect();
     if (!R.width || !R.height) return { label, refuse: 'window is 0x0 — refusing to record zeros' };
     const body = win.querySelector('.fwin-body') || win;
@@ -143,7 +183,18 @@
     // --- Q4: advanced tools tucked away, default view not cluttered. -------------------------
     const collapsed = [...win.querySelectorAll('details:not([open]),[aria-expanded="false"]')].filter(painted);
     // Chrome = controls outside the surface's dominant repeating content (result rows, cards).
-    const repeatingRow = (e) => e.closest('.dict-entry,[class*="-row"],[class*="-card"],[class*="-item"],li');
+    /**
+     * `-spotlight` is in this list because a shelf holding ONE title does not render a card —
+     * `MediaLibraryBrowser` promotes it to `section.medialib-spotlight`, whose `Open` and
+     * `More actions` are the same two content actions the card would have carried. Nothing in
+     * `-row|-card|-item|li` matches it, so those two counted as CHROME and pushed Video's
+     * scanned set to 13 against a bar of 12 — Q4 read NO on this window while
+     * `l1-q4-guards.cjs`, which resolves the same surface, read 11 and YES. Measured
+     * 2026-08-25; the two instruments disagreed only on the spotlight's two buttons.
+     * The same shelf in a window showing >1 item renders cards and was always excluded, so the
+     * verdict depended on how many items happened to be in the active shelf.
+     */
+    const repeatingRow = (e) => e.closest('.dict-entry,[class*="-row"],[class*="-card"],[class*="-item"],[class*="-spotlight"],li');
     const chromeControls = controls.filter((e) => !repeatingRow(e) && !e.closest('.fwin-bar'));
 
     /**
@@ -344,8 +395,20 @@
             scannedList: scanned.map((e) =>
               (e.getAttribute('aria-label') || e.textContent || e.placeholder || e.tagName).trim().slice(0, 28)),
           }),
-        q(5, 'every readable surface has stable contrast', 'INHERIT',
-          { inheritedFrom: 'l1-accessibility.js, re-driven at this tree' }),
+        /**
+         * Q5 was the string literal `'INHERIT'`, pointing at category 1's number. Two things
+         * were wrong with that and only one is the staleness Q9 had. Category 1 on Video
+         * measured ONE cell — forest-night, liquid, every disclosure closed — and Q5 does not
+         * ask whether contrast passes, it asks whether it is STABLE, which a single sample
+         * cannot answer. Re-driven across theme x disclosure-state it found FOUR failing
+         * elements the inherited number could not see, worst 1.07:1. `l1-q5-drive.cjs` parks
+         * the result per surface. `MEASURE` when it has not run here — never a guess.
+         */
+        q(5, 'every readable surface has stable contrast',
+          q5Verdict.verdict || 'MEASURE',
+          q5Verdict.verdict
+            ? { drivenBy: 'probes/l1-q5-drive.cjs', why: q5Verdict.why, terms: q5Verdict.terms, numbers: q5Verdict.numbers }
+            : { note: 'run probes/l1-q5-drive.cjs --title <this window> first; it needs both themes and both disclosure states' }),
         q(6, 'Liquid motion explains a real relationship',
           liquidRegions.length === 0
             ? 'NO-SUBJECT'
@@ -379,16 +442,25 @@
          * when a toggle exists but the round trip has not been driven at this tree; and the
          * driver's own YES/NO once it has.
          */
+        /**
+         * `q78on` is the window `l1-q78-drive.cjs` was pointed at when it parked. It parks ONE
+         * global for every `--title`, so an older payload carries no title at all: that reads
+         * `crossSurface: 'unattributed'`, which is the honest state, not a pass. A verdict
+         * measured on another window is reported as `MEASURE` here — Q7 compares a surface's
+         * own two presentations, so the neighbour's answer is not evidence about this one.
+         */
         q(7, 'standard mode remains fully normal',
-          liquidToggles.length === 0 ? 'NO-SUBJECT' : (liquidVerdict.q7 ? liquidVerdict.q7.verdict : 'MEASURE'),
+          liquidToggles.length === 0 ? 'NO-SUBJECT'
+            : (liquidVerdict.q7 && q78matches ? liquidVerdict.q7.verdict : 'MEASURE'),
           liquidToggles.length === 0
             ? { liquidPresentationToggles: 0, why: 'no Liquid mode to leave on this surface' }
-            : { liquidPresentationToggles: liquidToggles.length, drivenBy: 'debug/l1-q78-drive.cjs', checks: liquidVerdict.q7 ? liquidVerdict.q7.checks : null }),
+            : { liquidPresentationToggles: liquidToggles.length, drivenBy: 'probes/l1-q78-drive.cjs', measuredOnWindow: q78on, crossSurface: q78crossSurface, checks: liquidVerdict.q7 && q78matches ? liquidVerdict.q7.checks : null }),
         q(8, 'Liquid can be turned off without losing state',
-          liquidToggles.length === 0 ? 'NO-SUBJECT' : (liquidVerdict.q8 ? liquidVerdict.q8.verdict : 'MEASURE'),
+          liquidToggles.length === 0 ? 'NO-SUBJECT'
+            : (liquidVerdict.q8 && q78matches ? liquidVerdict.q8.verdict : 'MEASURE'),
           liquidToggles.length === 0
             ? { liquidPresentationToggles: 0, why: 'nothing to turn off on this surface' }
-            : { liquidPresentationToggles: liquidToggles.length, drivenBy: 'debug/l1-q78-drive.cjs', checks: liquidVerdict.q8 ? liquidVerdict.q8.checks : null }),
+            : { liquidPresentationToggles: liquidToggles.length, drivenBy: 'probes/l1-q78-drive.cjs', measuredOnWindow: q78on, crossSurface: q78crossSurface, checks: liquidVerdict.q8 && q78matches ? liquidVerdict.q8.checks : null }),
         /**
          * Q9 was the string literal `'INHERIT'` with the note "no migration has occurred". True
          * when written, false since L3.2 shipped `Make Liquid` here and L6 closed all seven

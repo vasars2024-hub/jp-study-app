@@ -552,3 +552,68 @@ surface.
 **One global per surface.** Both legs previously would have parked on `__q9verdict`, so whichever
 ran last decided Q9 for the other — a cross-surface false pass the clarity probe cannot see.
 **Category 5 on Video: Q1 Q2 Q3 Q4 Q6 Q7 Q8 Q9 Q10 YES, Q5 INHERIT — 9 of 10 measured.**
+
+## 2026-08-25 · primary — Q5 was inherited from a one-cell number, and it was hiding four failures
+
+| Slice | Commit | What landed |
+| --- | --- | --- |
+| `l1-q5-drive.cjs` + the four contrast fixes it found | *this commit* | driver, 3 baselines, 4 CSS repairs, 2 guards |
+
+**Q5 asks whether contrast is STABLE, and `'INHERIT'` pointed at a single sample.** Category 1
+scored Video 10/10 at `4a7fa118` — min **5.13:1**, 0 failing of 53 — in ONE cell: `forest-night`,
+liquid, every disclosure closed. Re-driven across **theme × disclosure-state**, the same window
+scored **NO: 4 failing, min 1.07:1**. A number that passes cannot answer a stability question.
+
+**The two axes, and why only these two.** (1) THEME — `l1-accessibility.js`'s own governing check
+("a defect MOVES WITH THE PALETTE") had never been run on Video; it is term 3 and it **VOIDs**
+rather than passes. (2) DISCLOSURE STATE — `e61d3179` moved eight destinations behind
+`details.mc-nav-group`/`details.medialib-view`, and text inside a closed `<details>` is filtered
+out by `painted()`, so that population had never been measured on any run. Buying Q4's point by
+hiding controls and then scoring Q5 only on what is left visible is the trade the rubric exists to
+catch. **Not** an axis, recorded so nobody adds it: moving the window over a lighter wallpaper
+changes nothing measurable — `effectiveBg` composites ancestor `background-color` to `body` and
+never samples what `backdrop-filter` blurs.
+
+**The four failures were all product, and all the same shape one layer in.** The theme remap at
+the foot of `mediaCenter.css` re-sources the SURFACES; text that writes its own hex does not care
+what the panel underneath became. On `classic-light`, with that remap already in force:
+`.mc-nav button.is-active` `#fff` **1.10:1**, `.mc-storage-ring` `#ececf1` **1.07:1**,
+`.mc-breadcrumb strong` `#c9ccd6` **1.60:1**, and `.medialib-pill[data-tone='ready']` painting
+`--success` **2.45:1** at 11px. Fixed as `--mc-nav-active-ink` / `--mc-ring-ink` / `--mc-crumb-ink`
+(dark values unchanged, remapped in the light six + high-contrast) and a `--success-text` /
+`--warning-text` / `--danger-text` family beside `--accent-text`, defaulting to the base token so
+no fill, border or `color-mix()` consumer moves. Live after: all four **rgb(30,30,30)** /
+`color(srgb 0.17 0.29 0.23)`; dark unchanged at rgb(236,236,241) and rgb(76,175,125).
+
+**Q5 on Video: YES — 0 failing of 240 measured across 4 cells**, worst **5.30:1** (`dt "Type"`
+11px), theme delta **0.41** (5.30 forest-night / 5.71 classic-light), disclosure axis added
+**24** rows (48 → 72), 0 unmeasurable, parser self-test ok in all four.
+**Both controls fired.** `--control plant` (a span 1.07:1 against its own opaque background):
+verdict **NO**, 1 failing in every cell, parked nothing, residue **0**. `--control frozen` (the
+"second theme" run as the same theme): themeDelta **0**, verdict **VOID** not YES — without it a
+theme swap that silently did nothing would report two identical passing cells as extra evidence.
+Restore verified `===` both runs, including `jp-mc-nav-tools-open` (the `<details>` is controlled
+and its `onToggle` persists exactly as a user click would).
+
+**Two consumer-side false-pass channels closed in the same pass.** `l1-ui-clarity.js` read
+`__q9verdict` and `__q78verdict` ONCE, outside `measure`, and printed them into every window —
+so the driver's careful per-surface slots never reached the report, and a dictionary run scored
+the Video row. Q5 and Q9 now resolve by the window's own title; Q7/Q8 carry `measuredOnWindow`
+and read `MEASURE` when the parked verdict was taken on another surface (`l1-q78-drive.cjs` now
+parks its `--title`; an older payload reads `crossSurface: 'unattributed'`, which is honest).
+
+**And Q4 on Video read NO here while `l1-q4-guards.cjs` read YES — the clarity probe was wrong.**
+`repeatingRow` excludes `-row|-card|-item|li`, and a one-title shelf does not render a card: it
+renders `section.medialib-spotlight`, whose `Open` and `More actions` are the card's two content
+actions. They counted as CHROME and pushed the scanned set to **13** against a bar of 12. With
+`-spotlight` in the list both instruments now read **11**. The verdict had been depending on how
+many items happened to be in the active shelf.
+
+**Trap, and it looks exactly like an unlanded fix.** A theme swap is a colour TRANSITION, and
+`getComputedStyle` during one returns the OLD colour. Read synchronously after the swap,
+`.mc-nav button.is-active` reported rgb(255,255,255) while its own `--mc-nav-active-ink` already
+read `#1e1e1e` and the winning rule was `color: var(--mc-nav-active-ink)`. The driver settles
+**700 ms** (`--dur-normal` is 240 ms) before sampling.
+
+**Category 5 on Video: Q1 Q2 Q3 Q4 Q5 Q6 Q10 YES — 10 of 10 measured, 7 answered live this run,
+Q7 Q8 Q9 pending a re-park at this tree.**

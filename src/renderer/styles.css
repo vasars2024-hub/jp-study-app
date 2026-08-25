@@ -109,6 +109,22 @@
   --warning: #e3a008;
   --warning-deep: #b47a04;
 
+  /* The status family WHEN IT IS TEXT — the same split, and for the same reason,
+     as --accent-text above. The comment on --success says the values "clear 4.5:1
+     on the --panel surfaces", and they do: on the DARK panels they were picked
+     against. Measured 2026-08-25 on the Video window at
+     `data-theme='classic-light'`, `.medialib-pill[data-tone='ready']` painted
+     --success rgb(76, 175, 125) on the spotlight's rgb(243, 243, 243) — **2.45:1**
+     at 11px, against a 4.5 bar. --warning is worse (#e3a008 is ~2.0:1 there) and
+     --danger only borderline (~4.3:1), so all three move together rather than
+     leaving two known-bad tones behind the one a probe happened to catch.
+     These default to the base colour, so every dark palette is unchanged and no
+     fill, border or `color-mix()` consumer of the base tokens is touched. The
+     light remap uses the --accent-text recipe verbatim. */
+  --success-text: var(--success);
+  --warning-text: var(--warning);
+  --danger-text: var(--danger);
+
   /* Study-activity channels (Phase 6 slice 8). Reading keeps the chart colour it has
      always had; watching gets a cool blue that is far enough round the wheel from the
      brand red to be unmistakable, and is deliberately NOT --warning or --success —
@@ -991,6 +1007,9 @@ html[data-chrome='frosted'] .os-taskbar {
 :root[data-theme='rose-pine'],
 :root[data-theme='paper'] {
   --accent-text: color-mix(in srgb, var(--accent) 30%, var(--text));
+  --success-text: color-mix(in srgb, var(--success) 30%, var(--text));
+  --warning-text: color-mix(in srgb, var(--warning) 30%, var(--text));
+  --danger-text: color-mix(in srgb, var(--danger) 30%, var(--text));
 }
 
 /* ---------- Study OS boot animation ---------- */

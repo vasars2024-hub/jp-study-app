@@ -1,0 +1,146 @@
+{
+ "at": "2026-08-25T06:53:13.223Z",
+ "title": "Video",
+ "control": "frozen",
+ "question": "every readable surface has stable contrast",
+ "asFound": {
+  "theme": "forest-night",
+  "presentation": "liquid",
+  "label": "Video",
+  "details": [
+   "mc-nav-group:false",
+   "medialib-rail__group:true",
+   "medialib-rail__group:false",
+   "medialib-view:false"
+  ]
+ },
+ "storeBefore": {
+  "jp-mc-nav-tools-open": "false",
+  "jp-os-theme": "forest-night",
+  "jp-os-theme-engine-v": "1"
+ },
+ "axes": {
+  "theme": [
+   "forest-night",
+   "forest-night"
+  ],
+  "disclosures": [
+   "closed",
+   "open"
+  ]
+ },
+ "cells": [
+  {
+   "cell": "A base/closed",
+   "theme": "forest-night",
+   "disclosuresOpen": false,
+   "box": "1080x700",
+   "parserOk": true,
+   "measured": 48,
+   "unmeasurable": 0,
+   "minRatio": 5.3,
+   "minOwner": "dt \"Type\" 11px",
+   "failingCount": 0,
+   "worst": []
+  },
+  {
+   "cell": "B base/open",
+   "theme": "forest-night",
+   "disclosuresOpen": true,
+   "box": "1080x700",
+   "parserOk": true,
+   "measured": 72,
+   "unmeasurable": 0,
+   "minRatio": 5.3,
+   "minOwner": "dt \"Type\" 11px",
+   "failingCount": 0,
+   "worst": []
+  },
+  {
+   "cell": "C alt/closed",
+   "theme": "forest-night",
+   "disclosuresOpen": false,
+   "box": "1080x700",
+   "parserOk": true,
+   "measured": 48,
+   "unmeasurable": 0,
+   "minRatio": 5.3,
+   "minOwner": "dt \"Type\" 11px",
+   "failingCount": 0,
+   "worst": []
+  },
+  {
+   "cell": "D alt/open",
+   "theme": "forest-night",
+   "disclosuresOpen": true,
+   "box": "1080x700",
+   "parserOk": true,
+   "measured": 72,
+   "unmeasurable": 0,
+   "minRatio": 5.3,
+   "minOwner": "dt \"Type\" 11px",
+   "failingCount": 0,
+   "worst": []
+  }
+ ],
+ "restored": {
+  "theme": "forest-night",
+  "presentation": "liquid",
+  "details": [
+   "mc-nav-group:false",
+   "medialib-rail__group:true",
+   "medialib-rail__group:false",
+   "medialib-view:false"
+  ],
+  "plantResidue": 0,
+  "storedTheme": "forest-night"
+ },
+ "storeAfter": {
+  "jp-mc-nav-tools-open": "false",
+  "jp-os-theme": "forest-night",
+  "jp-os-theme-engine-v": "1"
+ },
+ "storeIdentical": true,
+ "restoredExactly": true,
+ "terms": {
+  "noFailingTextInAnyCell": true,
+  "noUnmeasurableInAnyCell": true,
+  "themeMovedTheNumbers": false,
+  "disclosureAddedPopulation": true,
+  "populationFloor": true,
+  "parserSelfTestInAnyCell": true
+ },
+ "numbers": {
+  "perCell": [
+   "A base/closed theme=forest-night measured=48 min=5.3 failing=0",
+   "B base/open theme=forest-night measured=72 min=5.3 failing=0",
+   "C alt/closed theme=forest-night measured=48 min=5.3 failing=0",
+   "D alt/open theme=forest-night measured=72 min=5.3 failing=0"
+  ],
+  "minByTheme": {
+   "forest-night": 5.3
+  },
+  "themeDelta": 0,
+  "populationClosedVsOpen": "48 -> 72",
+  "newlyMeasuredByDisclosure": 24,
+  "totalFailing": 0,
+  "worstOverall": {
+   "cell": "A base/closed",
+   "theme": "forest-night",
+   "disclosuresOpen": false,
+   "box": "1080x700",
+   "parserOk": true,
+   "measured": 48,
+   "unmeasurable": 0,
+   "minRatio": 5.3,
+   "minOwner": "dt \"Type\" 11px",
+   "failingCount": 0,
+   "worst": []
+  }
+ },
+ "verdict": "VOID",
+ "why": "failed terms: themeMovedTheNumbers",
+ "parked": false,
+ "controlHeld": true,
+ "controlNote": "control 'frozen' produced VOID — the term is doing work"
+}
