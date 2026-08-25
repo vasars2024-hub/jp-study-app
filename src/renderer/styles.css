@@ -6967,6 +6967,23 @@ mark.lookup-mark,
   margin: 0;
   font-size: 26px;
 }
+/* Pushed to the trailing edge so the title and level badge keep their reading
+   order; sized against the same 13px scale as `.gram-more-btn`, the card's other
+   optional action. */
+.gram-ask-agent {
+  margin-left: auto;
+  background: transparent;
+  color: var(--accent-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.gram-ask-agent:hover {
+  background: var(--panel-2);
+  border-color: var(--accent-2);
+}
 .gram-gloss {
   margin: 6px 0 18px;
   font-size: 15px;

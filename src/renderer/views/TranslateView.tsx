@@ -19,9 +19,60 @@ import {
   TranslateHistoryList,
   useTranslate,
 } from '../components/translate/TranslateContent';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useT } from '../i18n';
+import { AGENT_NAVIGATION_SECTION_LABEL_KEYS } from '../../shared/agentNavigation';
+import {
+  handOffToAgent,
+  routeAgentContext,
+  translateSpanAgentContext,
+} from '../agentContextHandoff';
 import { onLexiconHandoffStaged, takeLexiconHandoff } from '../lexiconHandoffClient';
+
+/**
+ * Translate's end of L5 bullet 1's selection contract.
+ *
+ * A `span` is the selection kind both Translate and Agent use, and here it is
+ * literally the range highlighted in the source textarea — falling back to the
+ * whole input when nothing is highlighted, because "ask about this" with no
+ * selection plainly means the text on screen. The label says which of the two
+ * happened rather than sending one silently as the other.
+ *
+ * The producer classifies it `selected-text`, so the agent store keeps it in
+ * session memory and never writes it to disk: it is the user's own material, not
+ * reference data. That decision lives in `SELECTION_AGENT_KIND`, not here.
+ */
+function TranslateAskAgent({
+  selection,
+  input,
+  source,
+  className,
+}: {
+  selection: string;
+  input: string;
+  source: TransLang;
+  className: string;
+}) {
+  const { t } = useT();
+  const span = (selection.trim() || input.trim());
+  const fromSelection = selection.trim().length > 0;
+  return (
+    <button
+      type="button"
+      className={className}
+      disabled={!span}
+      onClick={() => {
+        void handOffToAgent(
+          translateSpanAgentContext(span, source),
+          t('agent.conversation.fromTranslate', { label: span.slice(0, 60) }),
+          routeAgentContext('translate', t(AGENT_NAVIGATION_SECTION_LABEL_KEYS.translate)),
+        );
+      }}
+    >
+      {fromSelection ? t('translate.askAgent.selection') : t('translate.askAgent')}
+    </button>
+  );
+}
 
 export default function TranslateView() {
   const aero = useAeroMaterials();
@@ -29,6 +80,14 @@ export default function TranslateView() {
   const state = useTranslate();
   const { tab, source, target, input, output, msg, error, busy, run, swap } = state;
   const acceptingHandoffRef = useRef(false);
+  // Read from `onSelect` rather than from the element at click time: focusing the
+  // button is a `focusout` on the textarea in React's synthetic model, and reading
+  // the range there has already produced stale spans elsewhere in this repo.
+  const [selection, setSelection] = useState('');
+  const onSourceSelect = (e: { currentTarget: HTMLTextAreaElement }): void => {
+    const el = e.currentTarget;
+    setSelection(el.value.slice(el.selectionStart ?? 0, el.selectionEnd ?? 0));
+  };
 
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get('popout') !== 'translate') return;
@@ -163,6 +222,12 @@ export default function TranslateView() {
                 <button className="aero-translate-run" onClick={() => void run()} disabled={busy || !input.trim()}>
                   {busy ? 'Working...' : 'Translate'}
                 </button>
+                <TranslateAskAgent
+                  selection={selection}
+                  input={input}
+                  source={source}
+                  className="aero-translate-run tr-ask-agent"
+                />
               </Toolbar>
 
               <div className="aero-translate-workbench">
@@ -172,7 +237,11 @@ export default function TranslateView() {
                     className="aero-translate-textarea"
                     lang={source}
                     value={input}
-                    onChange={(e) => state.setInput(e.target.value)}
+                    onChange={(e) => {
+                      setSelection('');
+                      state.setInput(e.target.value);
+                    }}
+                    onSelect={onSourceSelect}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) void run();
                     }}
@@ -290,7 +359,11 @@ export default function TranslateView() {
                   className="tr-textarea"
                   lang={source}
                   value={input}
-                  onChange={(e) => state.setInput(e.target.value)}
+                  onChange={(e) => {
+                    setSelection('');
+                    state.setInput(e.target.value);
+                  }}
+                  onSelect={onSourceSelect}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) void run();
                   }}
@@ -316,6 +389,12 @@ export default function TranslateView() {
                   </>
                 )}
               </button>
+              <TranslateAskAgent
+                selection={selection}
+                input={input}
+                source={source}
+                className="btn tr-ask-agent"
+              />
               {busy && (
                 <div className="tr-status">
                   <span className="media-gen-dot" />

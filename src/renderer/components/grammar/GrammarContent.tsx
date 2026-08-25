@@ -20,6 +20,12 @@ import {
 } from '../../data/grammar';
 import type { PracticeFilters } from '../../data/grammar/practiceFilters';
 import type { ExampleSentence } from '../../../shared/types';
+import { AGENT_NAVIGATION_SECTION_LABEL_KEYS } from '../../../shared/agentNavigation';
+import {
+  grammarPatternAgentContext,
+  handOffToAgent,
+  routeAgentContext,
+} from '../../agentContextHandoff';
 import { useT } from '../../i18n';
 
 type ExState = 'idle' | 'loading' | 'done' | 'error';
@@ -80,11 +86,36 @@ export function GrammarDetail({ point }: { point: GrammarPoint }) {
     setExState('done');
   }
 
+  /*
+   * L5 bullet 1's Grammar end of the selection contract.
+   *
+   * `grammarPatternAgentContext` derives its shelf identity from the point id, so
+   * the same pattern arrives under one id however it is titled — which is what
+   * makes a Grammar → Dictionary → Agent round trip *retain* context rather than
+   * accumulate near-duplicates. The preview carries meaning, structure and
+   * explanation because a pattern named alone is a poor prompt; the contract
+   * clamps it, so nothing here needs a second length rule.
+   */
+  const askAgent = (): void => {
+    const summary = [point.meaning, point.structure, point.explanation]
+      .map((part) => (part ?? '').trim())
+      .filter(Boolean)
+      .join(' — ');
+    void handOffToAgent(
+      grammarPatternAgentContext(point.id, point.title, summary),
+      t('agent.conversation.fromGrammar', { label: point.title }),
+      routeAgentContext('grammar', t(AGENT_NAVIGATION_SECTION_LABEL_KEYS.grammar)),
+    );
+  };
+
   return (
     <article className="gram-card">
       <header className="gram-card-head">
         <h2 lang="ja">{point.title}</h2>
         <span className={`gram-badge lv-${point.level}`}>{point.level}</span>
+        <button type="button" className="gram-ask-agent" onClick={askAgent}>
+          {t('grammar.askAgent')}
+        </button>
       </header>
       <p className="gram-gloss">{point.meaning}</p>
 
