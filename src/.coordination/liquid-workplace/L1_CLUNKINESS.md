@@ -413,3 +413,48 @@ traps AND every input acknowledged within 100 ms. Only dead ends are in hand. Tw
 exact: the Video window is in **standard** presentation (`Make Liquid` still offered in its
 chrome), so there is no Liquid path to compare a Standard path against yet; and no instrument here
 measures input→paint latency. Both are named, both stay counted as open.
+
+## 2026-08-25 · primary — Video's category 2 gets four of its five terms, and three product fixes
+
+Video window 1080×700 **liquid**, Media 820×580 **standard** — the same Media Center component in
+both presentations, so cost is read off two live surfaces in one run with no toggle between them.
+Dominant task: **find a title by name and open it** (search box → 3 chars → click the row).
+
+| term | liquid (Video) | standard (Media) |
+| --- | --- | --- |
+| clicks / keystrokes | **2 / 3** | **2 / 3** — parity exactly equal |
+| task outcome | 8 titles·36 files → **1·29**, drawer opened | identical |
+| worst input→paint `recvMs` | **91.3 ms**, 0 over the bar | **164.4 ms, 2 of 5 over the bar** |
+| modal traps | **0** — menu focus-trapped, Escape closes 4 items → 0 | — |
+| scroll traps hiding content | **0** | **0** |
+| dead ends | not re-driven in liquid (standard run: 0 of 22) | — |
+
+**Control A fired and it is what makes the latency number scoreable.** Six bridge clicks on a
+genuinely inert `span.mc-nav-label` ("Library status") read **0.2 / 0.6 / 0.3 / 0.2 / 0.2 / 0.2 ms**
+— an instrument floor of 0.6 ms against a 100 ms bar. So the 164.4 ms keystroke is the app.
+
+**Three product defects found by driving, all fixed and committed this turn.**
+1. `492a73a7` — list view had no layout of its own: rows were 578×945 posters, **7,560 px of scroll
+   for 8 titles in a 464 px pane**, 7.1× taller than grid. Now 84 px rows, **672 px**.
+2. `ab089de5` — the row's overflow trigger went `position: static`, so `.lq-hit-placed::after` fell
+   to `VirtualGrid`'s row and the 32 px expander claimed all 588×84. `elementFromPoint` at the
+   card's centre returned the trigger and a click there opened the menu instead of the item.
+3. `3664ce59` — opening a card menu set the Liquid `.fwin`'s `scrollLeft` **0 → 186** and jumped the
+   whole window's content 186 px left (`.mc-root` 111 → −75) until it closed; `overflow: hidden`, so
+   unrecoverable. **Standard stayed at 0** — the control that makes it a real liquid difference.
+
+**Instrument repair (one, this turn): a line clamp with its own disclosure is not a scroll trap.**
+`p.medialib-drawer__synopsis` was reported at **182 unreachable px** while sitting directly above
+its own "Show more" button; `l1-clunkiness-read.js` now skips a `-webkit-line-clamp` element whose
+sibling set holds a control, and a container whose direct media children are `object-fit: cover`.
+`div.medialib-drawer__hero` (40 px) still reports and is adjudicated live rather than by source: the
+overflowing child is `.medialib-card__art` with **`textContent` empty** — a fixed-height banner
+whose picture box is 40 px taller than its frame, hiding zero characters. Not a trap; the direct-
+child media rule does not reach a grandchild `img`, and that is the next repair, not this one.
+
+**Category 2 is PARKED at not-a-10, with exactly two terms open.** (a) The dead-end sweep has never
+run on Video in **liquid** — `l1-deadend.js` takes `window.__lqDeadEndTitle`, so it is a re-drive,
+not a build. (b) **Input latency straddles the bar**: the first keystroke into the search field cost
+81.1 / 88.8 / 102.3 / 164.4 ms across four runs, and the filter lands 482–562 ms after the click.
+Located, not guessed: the query lives in `MediaCenterView`'s `state.query` and every keystroke
+re-renders the whole Media Center and its library with no debounce. That is the next product slice.

@@ -29,6 +29,23 @@
     const r = el.getBoundingClientRect();
     if (r.width <= 4 || r.height <= 4) continue;
     if (cs.clipPath !== 'none' || (cs.clip && cs.clip !== 'auto')) continue;
+    // A line clamp WITH a disclosure control beside it is a summary, not a trap:
+    // the rest of the text is one click away and the control says so. Measured
+    // 2026-08-25 on the Media Center's detail drawer, which reported
+    // `p.medialib-drawer__synopsis` with **182 unreachable px** — sitting
+    // directly above its own "Show more" button. Without this the probe scores
+    // progressive disclosure, which is the thing §2.3 asks for, as a defect.
+    const clamped = cs.webkitLineClamp && cs.webkitLineClamp !== 'none';
+    const disclosure = el.parentElement
+      && [...el.parentElement.children].some(
+        (sib) => sib !== el && (sib.tagName === 'BUTTON' || sib.querySelector?.('button')),
+      );
+    if (clamped && disclosure) continue;
+    // A fixed-size media crop is not unreachable content either: `object-fit:
+    // cover` means the picture is deliberately larger than its frame. Same run
+    // reported `div.medialib-drawer__hero` at 40px for exactly this.
+    const media = [...el.children].filter((c) => c.tagName === 'IMG' || c.tagName === 'VIDEO');
+    if (media.length > 0 && media.every((m) => getComputedStyle(m).objectFit === 'cover')) continue;
     scrollTraps.push({
       sel: el.tagName.toLowerCase() + '.' + String(el.className || '').trim().split(/\s+/)[0],
       overflowY: cs.overflowY,

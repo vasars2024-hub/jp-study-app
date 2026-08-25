@@ -573,3 +573,18 @@ discounted for two workers running one plan depth-first (~3.5 days each) gives *
 08-27 → 2026-09-27**. Both halves of that are stated so the next worker can attack either: the
 461 half is measured, the L4–L12 half is an extrapolation from ONE gate's cost and is the number
 to distrust. It is 26 days past the 2026-09-01 target, and the scope is not being cut to hide that.
+
+2026-08-25 | liquid | units done this turn: 0 | units left: 10 | basis: the 13 `Gate:` lines in src/LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md (`grep -c '^Gate:'` = 13, re-run this turn); the 3 closed (L0 452 / L2 591 / L3 600) are INHERITED, gate 461 was re-derived directly and is OPEN. Video stayed at **4 of 8 rubric categories** — category 2 gained four of its five terms and did NOT close, which is the honest reading: cost parity **2 clicks / 3 keystrokes in liquid and standard, exactly equal**, modal traps **0** (menu focus-trapped, Escape 4 items → 0), content-hiding scroll traps **0**, but input latency STRADDLES the 100 ms bar (first keystroke 81.1 / 88.8 / 102.3 / 164.4 ms over four runs, 2 of 5 events over the bar in one standard run) with control A proving an instrument floor of **0.6 ms**, so the number is the app's; and the dead-end sweep has still never run on Video in liquid. Three real product defects were found by driving and fixed: list view's 578x945 rows (7,560px of scroll for 8 titles → **672px**), the row trigger's hit expander claiming the whole 588x84 row, and a context menu scrolling the Liquid window 186px sideways with standard as the control at 0. Dictionary unchanged at 7 of 8 | projected finish: 2026-09-27
+
+**Why 2026-09-27 is unchanged rather than pulled in.** Measured this turn: **0 categories closed
+per ~80-minute turn** — the turn went into three product fixes instead, which is what the category
+was for. Gate 461 still needs Video's 2, 5, 7, 8 plus Dictionary's category 7 re-drive. Category 2
+is now one debounce slice and one probe re-drive from closing, so the previous ~2-day estimate for
+461 (≈ 08-27) holds only if the next turns close one category each; on this turn's actual rate 461
+lands ≈ **08-29**. The L4–L12 half is untouched and still extrapolated from L1's single observed
+cost (10 days and unfinished), i.e. ~3.5 days x 9 gates at two workers = **~31 days**, so the
+projection stays **2026-09-27**, 26 days past the 2026-09-01 target. The scope is not being cut.
+
+main-v1: complete-except-external, unchanged, **INHERITED** — RULE 1's re-count is STILL owed and
+was not done this turn either (fifth turn). It needs the last `##` section of
+`src/MAIN_V1_EVIDENCE_LEDGER.md` counted across Tracks 2/7/8/9. mal-pipeline: 34 of 34, closed.
