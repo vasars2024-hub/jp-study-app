@@ -1238,3 +1238,62 @@ than assigning `block` (the `.fwin` rule owns the display mode) and reports the 
 
 **Dictionary is 7 of 8 and category 7 is the only open one.** Video closed at 8 of 8 this turn
 (`c7115f56`).
+
+## 2026-08-25 (later) · primary — leg 3 CLOSES on pid 1324; leg 2 produces one over-bar sample that this boot cannot settle
+
+**Leg 3, the full curve, main pid 1324, Dictionary loaded (8 entries / 5,461 chars / 349 nodes /
+75 controls), `presentation=liquid`, `forest-night`, `en`.**
+
+| mark | uptime | main private | handles | all-process private | main RSS |
+| --- | --- | --- | --- | --- | --- |
+| 125 | 125.0 min | 584.9 MB | 1,126 | 1,852.9 MB | 525.1 |
+| 133 | 133.0 min | 585.1 MB | 1,127 | 1,862.1 MB | 67.5 |
+| 141 | 141.0 min | **586.5 MB** | **1,122** | 1,882.2 MB | 57.9 |
+
+**Delta across the window: +1.6 MB and −4 handles in 16 minutes** — the scorable quantity, and the
+same shape as Video's +1.8 MB / +1 handle. **Leg 3 PASSES.** The absolute 586.5 MB is +9.5 MB
+(+1.6%) over the top of L0's 550–577 band; stated rather than band-matched, because L0 measures a
+cold 8-minute boot and this one is 141 minutes old and has taken three four-language sweeps, a
+12,000-lookup control, ten gesture probes, two dead-control censuses and a Dictionary load.
+
+**Two disclosed confounds, neither of which moved it.** A full `npx vitest run` overlapped mark 125
+(previous turn) and two single-file `vitest run`s overlapped the 133–141 leg (this turn) — both are
+separate node processes and private bytes are not trimmed, and the curve is flat across both.
+**The RSS column is the control on the instrument**: 525.1 → 67.5 → 57.9 while private moved 1.6 MB.
+The two counters diverge by **467 MB** on the same process at the same instant, which is exactly why
+this sampler reads `PrivateMemorySize64` and never `WorkingSet64`.
+
+**Leg 2 on this boot, and it does NOT close.** `Find example sentences` — the heaviest action this
+window performs — under `liquid-perf-probe.ps1`, `/health` sampled every ~120 ms:
+
+| run | main max | driver evidence |
+| --- | --- | --- |
+| 1st of the boot | **1,034.2 ms** | `done:true`, nodes **349→415**, chars **5,476→6,038**, 3,002 ms renderer |
+| re-run | 4.0 ms | same word; node growth cannot validate a refill (415→415) |
+| re-run | 3.9 ms | — |
+| idle baseline | 9.4 ms | p50 1.0, 40 samples |
+
+**Two attributions, both run, both exonerating.** (1) The 1,034.2 ms sample was the first probe
+after `l7d-restore.cjs` un-hid Media, Video and Settings, so the re-mount is a candidate: driving
+**only** the visibility change (hide 3, 600 ms, restore 3 — `hid:3, done:true, ms:601`, all four
+windows back to a cleared `display`) reads main max **5.0 ms**. Re-mount exonerated. (2) The panel
+re-runs prove nothing because they re-query the same word, so `dictExamples` was called directly,
+one word at a time, on four the boot had never seen: 猫 **48 ms / 8 rows**, 学校 **21 ms / 8**,
+清い **164 ms / 3**, 鉃 **47 ms / 0** (an honest empty), main max **99.2 ms** across all four.
+The steady path is cheap and the cost is not per-word.
+
+**So it is a once-per-boot cost of about a second, and this boot can no longer measure it** — it
+only happens on the first `dict:examples` and there has now been one. `findExampleSentences` is an
+uncapped-index `instr` scan over `examples` (234,982 rows) on the main thread, so a cold OS page
+cache is the standing hypothesis, but **hypothesis is not attribution and it is not recorded as
+one**. Reproducing it needs a fresh boot, and a restart would make leg 3's 16-minute curve stale by
+the rubric's own rule — the two cannot be had on the same boot in this order.
+
+**Category 7 is therefore NOT a 10 and Dictionary stays 7 of 8.** Leg 3 is closed and does not need
+re-driving; leg 2 is the open one, with one over-bar observation and no second.
+
+**Next slice, and it is the opening one: restart, then take leg 2 FIRST.** Drive Dictionary to its
+loaded state, run `liquid-perf-probe.ps1` across the boot's **first** `dict:examples` with
+`l7d-examples-attrib.js`-style per-IPC timing already installed, then start the leg-3 sampler on
+that same boot. Order matters: leg 2's number exists only in the first few seconds of a boot's use
+of this feature, and leg 3's needs 16 uninterrupted minutes after it.
