@@ -46,7 +46,12 @@
  * Run: `node debug/evfile.cjs src/.coordination/liquid-workplace/probes/l1-accessibility.js`
  */
 (() => {
-  const TITLE = 'Dictionary';
+  // Which window to score. Set `window.__lqScoreTitle = 'Video'` before evaluating this
+  // file to score another surface; the Dictionary default is kept so every run already
+  // recorded in L1_ACCESSIBILITY.md reproduces byte-for-byte. Gate 461 needs BOTH Video
+  // and Dictionary at 80/80, and a hardcoded title is why only one of them was ever
+  // scored -- the probe was fine, it simply could not be pointed anywhere else.
+  const TITLE = (typeof window !== 'undefined' && window.__lqScoreTitle) || 'Dictionary';
 
   // ---- colour ------------------------------------------------------------------
   const parseColor = (s) => {

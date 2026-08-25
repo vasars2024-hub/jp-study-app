@@ -625,3 +625,63 @@ computed `32px` with no inline override.
 **Neither open item needed a product change, and that is the finding.** Item (a) was three
 instrument defects; item (b) was the wrong tier. Two turns had them written up as product
 decisions awaiting a call. **Category 1: 10/10.**
+
+## 2026-08-25 — VIDEO scored for the first time, and it fails category 1 on hit targets
+
+Gate 461 needs 80/80 on **Video and Dictionary**. Only Dictionary had ever been scored, and the
+reason was not difficulty: `l1-accessibility.js:49` and `l1-hit-area.js:59` both read
+`const TITLE = 'Dictionary'` as a literal. Both now take `window.__lqScoreTitle` with the
+Dictionary default kept, so every run already recorded above reproduces byte-for-byte. **No new
+probe file** — these two were adapted, which is the whole of the change.
+
+**What the Video window actually holds.** Not a player: the Media Center hub (`div.mc-root`,
+`header.mc-topbar`, `nav.ui-sidebar`, the media library grid) — 1,569 body chars, 296 nodes, 35
+interactive controls, `<video>` count **0**. That is a real surface with real controls, so it is
+scorable, but it is the hub and not the transport, and the transport still has to be scored
+separately before this category can close on "Video".
+
+**Contrast and keyboard PASS.** 86 text nodes measured, 0 unmeasurable, min ratio **4.96:1**
+(`p.mc-muted "Choose a file from your…" 12px`) against the 4.5 bar, 0 failing. Keyboard: 42
+controls, **0** unreachable, 1 focus host (`div.mc-root`, `tabindex=-1`). Parser self-test ok
+(`color(srgb …)` channels scaled 0..1 → 0..255, ratio 6.12 on the known value).
+
+**Hit targets FAIL, and this is the finding.** Two consecutive runs at the window's real
+1080x700, agreeing exactly — which is this probe's own pass condition for itself:
+
+| | Video (Media Center hub) | Dictionary, for comparison |
+| --- | --- | --- |
+| controls / measured | 35 / **34** (1 occluded) | 67 / 67 |
+| below 32 px **by pointer** | **17** | **0** |
+| below 32 px by rect | 22 | 46 |
+| hit **stolen** by an ancestor | **3** | 0 |
+| smallest hit | **26.5 px** (`button`, rect 30x26) | 32x32.5 |
+
+The named offenders, with their measured hit box rather than their declared size:
+`button.ui-sidebar__item` ×9 — rect **207x29** but hit only **52.5x29.5**, blocked by
+`div.medialib-rail__group`; `button` ×4 and `button.mc-top-action` ×2 in the topbar at **28x28**;
+`input via label.mc-global-search` rect 290x30, hit **52.5x30.5**; `button.medialib-card__more`
+at **26x26**, blocked by `img.medialib-card__img`. The 3 stolen are `button` ×2 at rect 185x46
+whose centre hit-tests to `nav.mc-nav`, plus one in `div.medialib-view-toggle`.
+
+Note the shape the rect column hides: the sidebar items are 207 px WIDE and still fail, because
+the pointer only reaches 52.5 px of that width. A rect-based instrument scores them as comfortable.
+
+**Trap, and it cost a real desktop change — read this before scoring any second window.**
+1. **Raise the target window or the score is a fiction.** The first run reported
+   `occludedCount: 25 of 35` with blockers named `div.dict-entry`, `div.dict-view`,
+   `div.dict-saved-searches-head` — the *Dictionary* window, stacked on top. Only 10 controls were
+   measured and an unscored control is not a passing one. `l1-hit-area.js` reports these as
+   `occluded` rather than refusing, so the partial run looks like a result.
+2. **Do NOT raise it with a synthetic `pointerdown` at `clientX:0, clientY:0`.** That is the
+   desk's top edge: the shell's own edge-snap fired, and the Video window went from `1080x700` to
+   the full desk at `0,0` — **and persisted**, because geometry is written on release. Restored
+   through the product's own grip and bar handlers (rAF-spaced moves dispatched ON the grip, not
+   on `window` — a synchronous `pointermove` on `window` does nothing here and reads as "the
+   resize didn't take"): back to **1080x700**, confirmed in `desktop-layout.json`. **Disclosed:
+   the size is the recorded baseline exactly, but x/y is now `92,40`, which is my choice — the
+   snap overwrote the original before anything read it, and no doc had ever recorded Video's x/y.**
+
+**Category 1 on Video: NOT 10.** Contrast and keyboard are clean; the 32 px hit-target floor is
+missed by 17 controls with 3 more stolen. This is the same class of defect Dictionary closed on
+2026-08-24 (`a176a54f`+) by giving controls a ≥32 px hit surface through padding rather than
+visual growth, and the same remedy applies — it is a product slice, not a re-measurement.

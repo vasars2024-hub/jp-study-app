@@ -56,7 +56,9 @@
  * Run: `node debug/evfile.cjs src/.coordination/liquid-workplace/probes/l1-hit-area.js`
  */
 (() => {
-  const TITLE = 'Dictionary';
+  // Set `window.__lqScoreTitle = 'Video'` before evaluating to score another surface.
+  // Dictionary stays the default so every run recorded in L1_ACCESSIBILITY.md reproduces.
+  const TITLE = (typeof window !== 'undefined' && window.__lqScoreTitle) || 'Dictionary';
   const FLOOR = 32;
   const STEP = 0.5;
   const REACH = 26; // px from the centre — enough to prove a 52px region, well past the floor
