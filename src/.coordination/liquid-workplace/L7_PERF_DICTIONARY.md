@@ -1347,3 +1347,69 @@ table and the two levers are moving `dict:examples` off the main event loop or m
 resident-bounded; decide from measurement, not from this paragraph. (2) Re-drive leg 2 on a fresh
 boot with the repaired harness. (3) Leg 3's 16-minute curve on that same boot — it must be
 re-driven regardless, since `855789ca` changed main-process code (`llamaHost`, `translate`).
+
+## 2026-08-25 (later 3) · primary — leg 2 CLOSES: the cap bounds the result, not the visit (`9a2bceb7`)
+
+**Root cause, measured before any code changed** (`debug/l7f-example-scan-shape.cjs`, read-only
+against the live 537.2 MB `dict.db`). `explain query plan` on the shipped statement is `SCAN e` —
+a full table visit, because `instr` over a text column cannot use an index. `examples` is 234,982
+rows / **21.4 MB / 5,473 pages** (`dbstat`), all `lang='ja'`, indexed on `dict_id` only. The
+`limit EXAMPLE_SCAN_ROWS` cap that the code documented as stopping the scan early was measured
+against real match density and it does not:
+
+| word | matches | 400th match at id | rows visited |
+| --- | --- | --- | --- |
+| 食べる | 468 | 211,627 | **90.1%** |
+| 海 | 991 | 96,066 | 40.9% |
+| 痛い | **237** (cap never reached) | — | **99.8%** |
+| 窓 | 571 | 177,450 | 75.5% |
+| 話す | 828 | 107,786 | 45.9% |
+
+Mean **70.4%** of the corpus per lookup. At a Japanese match density of 0.1–0.4% the cap is
+unreachable before the table ends. The cost is page residency, and the previous turn's two live
+samples pin the rate: 6,590.8 ms for 90.1% (≈4,930 pages = **1.34 ms/page**) and 痛い's 641.6 ms
+for the 9.7% 食べる left cold (≈533 pages = **1.20 ms/page**) — two independent samples agreeing
+within 11%, which is what makes this a model and not a story.
+
+**Fix (`9a2bceb7`): walk the same visit in `EXAMPLE_SCAN_CHUNK_ROWS` = 3,000 rowid windows with
+`setImmediate` between them.** ~70 pages per window. The window is on `id`, which is the rowid, so
+rows visited, their order and the chosen sentences are identical to the single scan. A worker was
+rejected deliberately: a second connection to dict.db re-enters `openDictionaryDb`'s
+migration-on-open path, and CLAUDE.md permits chunking as an equal alternative.
+
+**Cold is manufacturable now** — `tools/evict-file-cache.ps1` streams 3 GB of unrelated files past
+a ~1.2 GB standby list, so the pages any diagnostic just warmed go back out. Without it the second
+run of leg 2 measures the warm path and reads as a pass. Both runs below used it; standby 1218→1210
+and 1213→1213 MB, 3.00 GB pushed each time.
+
+**Leg 2, same boot conditions, same protocol, A/B on `EXAMPLE_SCAN_CHUNK_ROWS`:**
+
+| | 食べる total | max `/health` = longest main block | p95 |
+| --- | --- | --- | --- |
+| **chunked, 3,000** (pid 36964's predecessor 24368) | 1,178.7 ms | **30.9 ms** | 17.1 |
+| **CONTROL, 10,000,000** = one unwindowed scan (pid 36964) | 1,083.6 ms | **963.2 ms** | 2.0 |
+
+300 `/health` samples each; idle before/after the flood max **4.3 / 4.0 ms**. `window.__l7fEx.done`
+verified `true` on both runs and all ten calls returned **8 examples** — neither run is an empty
+short-circuit. Dictionary state identical on both: liquid 820×580, **8 entries / 5,476 chars / 349
+nodes / 75 controls**, driven before anything queried examples.
+
+**The control is the point.** Setting the chunk to 10,000,000 restores exactly the shipped
+behaviour, and it goes **31× worse and over the 500 ms bar** (963.2). The fix is **16× under** it.
+Total wall time is unchanged within 9% (1,083.6 → 1,178.7) and that overhead is real and stated:
+chunking does not make the lookup faster, it makes it not own the main thread.
+
+**Honest limit on the cold state.** The 3 GB flood produces a weaker cold than a machine that has
+been idle for hours: the same code that cost **6,590.8 ms** on the previous turn's genuine cold
+boot costs 1,083.6 ms here. So 963.2 ms is a **floor** on the control, not its worst case — the real
+defect is 6.6 s. The fixed side does not have that exposure, because its block is bounded by rows
+per window (a structural constant), not by how cold the disk is: 5,473 pages / 78 windows ≈ 70
+pages, and at the measured 1.34 ms/page the worst window is ~94 ms whatever the cache holds.
+
+**Unit control, `src/main/__tests__/dictionaryExamples.test.ts` 9 → 12 tests.** Delete the
+`await new Promise` yield → **1 red**, "expected 0 to be greater than or equal to 3". Stop after
+the first window → **3 red**. The equivalence test asserts both lengths before comparing, because
+`slice(0, windowed.length)` passed vacuously on an empty result.
+
+**Leg 2 PASSES.** Next: leg 3's 16-minute curve, which must be re-driven regardless — `855789ca`
+and `9a2bceb7` both changed main-process code and main does not hot-reload.
