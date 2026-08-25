@@ -193,6 +193,25 @@ describe('Media Center integration contract', () => {
     expect(css).not.toMatch(/\.mc-nav button\.is-active::before,[\s\S]{0,120}left:\s*-/);
   });
 
+  it('collapses the transport track when no player is rendered', () => {
+    // `PersistentPlayer` only mounts once there is a track (or on Music), but
+    // `.mc-workspace`'s third grid track was a fixed 58px, so Video, Settings,
+    // Discover and Study reserved that height for an element not in the DOM.
+    // Measured live on maximized Video 1264x765: `.mc-content` 592 -> 650 and the
+    // dominant canvas 62.4% -> 68.6%. The bar is unchanged when it exists — it
+    // declares the 58px itself instead of borrowing the track's.
+    const css = read('renderer/views/mediaCenter.css');
+    const ws = css.slice(css.indexOf('\n.mc-workspace {'));
+    expect(ws.slice(0, ws.indexOf('}'))).toMatch(/grid-template-rows:\s*48px minmax\(0, 1fr\) auto/);
+    const bar = css.slice(css.indexOf('\n.mc-playerbar {'));
+    expect(bar.slice(0, bar.indexOf('}'))).toMatch(/min-height:\s*58px/);
+    // The compact variant has to move in lockstep or 54px of the same dead track
+    // survives below 640px.
+    const compact = css.slice(css.indexOf('@container mc (max-width: 640px)'));
+    expect(compact).toMatch(/\.mc-workspace\s*\{\s*grid-template-rows:\s*44px minmax\(0, 1fr\) auto;/);
+    expect(compact).toMatch(/\.mc-playerbar\s*\{\s*min-height:\s*54px;/);
+  });
+
   it('translates every Media Center key in all four UI catalogues', () => {
     const keys = Object.keys(en).filter((key) => key.startsWith('mediaCenter.'));
     expect(keys.length).toBeGreaterThan(225);

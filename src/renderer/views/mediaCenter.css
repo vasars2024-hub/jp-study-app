@@ -383,12 +383,18 @@
   font-size: var(--mc-fs-body, 13px);
 }
 
+/* The third track is the transport. `PersistentPlayer` only renders once there is
+   a track (or on Music), so a fixed 58px row reserved that height on Video,
+   Settings, Discover and Study whenever nothing was playing — 58px of the
+   workspace paying rent for an element that is not in the DOM. `auto` collapses
+   to 0 there and still sizes to the bar when it exists, because the bar carries
+   its own `min-height` rather than borrowing the track's. */
 .mc-workspace {
   min-width: 0;
   min-height: 0;
   flex: 1;
   display: grid;
-  grid-template-rows: 48px minmax(0, 1fr) 58px;
+  grid-template-rows: 48px minmax(0, 1fr) auto;
 }
 
 /* A grid item's `min-width` is `auto`, so the bar's min-content width overrode the
@@ -2524,6 +2530,9 @@
 
 .mc-playerbar {
   min-width: 0;
+  /* Was the `.mc-workspace` track's 58px; it lives here so the track can be
+     `auto` and collapse when the bar is absent. */
+  min-height: 58px;
   display: grid;
   grid-template-columns: minmax(150px, 1fr) auto minmax(150px, 1.2fr) minmax(120px, 0.8fr);
   align-items: center;
@@ -2821,7 +2830,11 @@
 
 @container mc (max-width: 640px) {
   .mc-workspace {
-    grid-template-rows: 44px minmax(0, 1fr) 54px;
+    grid-template-rows: 44px minmax(0, 1fr) auto;
+  }
+
+  .mc-playerbar {
+    min-height: 54px;
   }
 
   .mc-top-action {
