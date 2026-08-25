@@ -202,6 +202,77 @@ describe('ReadingCanvas placement', () => {
   });
 });
 
+describe('ReadingCanvas keyboard and focus', () => {
+  function press(el: Element, key: string): void {
+    act(() => {
+      el.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+    });
+  }
+
+  it('closes the modal sheet on Escape', () => {
+    const onClose = vi.fn();
+    const el = render(
+      <ReadingCanvas widthOverride={640} closeLabel="Close" tools={[tool({ onClose })]}>
+        <p>document</p>
+      </ReadingCanvas>,
+    );
+    press(el.querySelector('[data-reading-tool="settings"]')!, 'Escape');
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes a docked tool only when focus is inside it', () => {
+    const onClose = vi.fn();
+    const el = render(
+      <ReadingCanvas widthOverride={1200} closeLabel="Close" tools={[tool({ onClose })]}>
+        <p>document</p>
+      </ReadingCanvas>,
+    );
+    // From the document: not this canvas's Escape. A reader has its own bindings
+    // (leave the link view, dismiss a popup) and swallowing them is a regression.
+    press(el.querySelector('[data-reading-role="document"]')!.querySelector('p')!, 'Escape');
+    expect(onClose).not.toHaveBeenCalled();
+    press(el.querySelector('.lq-reading-tool-body')!.querySelector('button')!, 'Escape');
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('takes focus into a sheet and gives it back to the trigger', () => {
+    const trigger = document.createElement('button');
+    document.body.appendChild(trigger);
+    trigger.focus();
+    expect(document.activeElement).toBe(trigger);
+
+    const el = render(
+      <ReadingCanvas widthOverride={640} closeLabel="Close" tools={[tool()]}>
+        <p>document</p>
+      </ReadingCanvas>,
+    );
+    // Focus must LEAVE the trigger: it is inside the inert region now, so the
+    // next Tab would otherwise restart the window from the top.
+    expect(document.activeElement).toBe(el.querySelector('[data-reading-tool="settings"]'));
+
+    rerender(
+      <ReadingCanvas widthOverride={640} closeLabel="Close">
+        <p>document</p>
+      </ReadingCanvas>,
+    );
+    expect(document.activeElement).toBe(trigger);
+    trigger.remove();
+  });
+
+  it('does not steal focus for a docked tool', () => {
+    const trigger = document.createElement('button');
+    document.body.appendChild(trigger);
+    trigger.focus();
+    render(
+      <ReadingCanvas widthOverride={1200} closeLabel="Close" tools={[tool()]}>
+        <p>document</p>
+      </ReadingCanvas>,
+    );
+    expect(document.activeElement).toBe(trigger);
+    trigger.remove();
+  });
+});
+
 describe('readingCanvas.css', () => {
   it('uses the same gutter the resolver subtracts', () => {
     // The drift this guards: the resolver reserves 12px before deciding a tool

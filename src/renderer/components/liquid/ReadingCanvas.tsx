@@ -29,7 +29,9 @@ import {
   useRef,
   useState,
   type HTMLAttributes,
+  type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
+  type RefObject,
 } from 'react';
 import {
   READING_CANVAS_POLICY,
@@ -75,7 +77,7 @@ type ReadingCanvasProps = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
  * first paint never claims a width it has not seen; a caller that renders at
  * `null` gets the document alone, which is the safe direction to be wrong in.
  */
-function useMeasuredWidth(ref: React.RefObject<HTMLElement | null>, enabled: boolean): number | null {
+function useMeasuredWidth(ref: RefObject<HTMLElement | null>, enabled: boolean): number | null {
   const [width, setWidth] = useState<number | null>(null);
   useEffect(() => {
     if (!enabled) return;
@@ -117,6 +119,45 @@ export function ReadingCanvas({
   const sheetId = layout.activeSheetId;
   const covered = layout.documentCovered;
 
+  /**
+   * A sheet is `aria-modal` over an `inert` document, so it must take focus and
+   * give it back. Without this, opening one leaves focus on the trigger — which
+   * is now inside the inert region — and the next Tab restarts the window from
+   * the top. A docked tool is NOT focused on open: it does not take the document
+   * away, and stealing focus from someone mid-sentence is its own defect.
+   */
+  const sheetRef = useRef<HTMLElement | null>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  const lastSheetRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (sheetId && lastSheetRef.current !== sheetId) {
+      if (!lastSheetRef.current) returnFocusRef.current = document.activeElement as HTMLElement | null;
+      sheetRef.current?.focus();
+    } else if (!sheetId && lastSheetRef.current) {
+      returnFocusRef.current?.focus?.();
+      returnFocusRef.current = null;
+    }
+    lastSheetRef.current = sheetId;
+  }, [sheetId]);
+
+  /**
+   * Escape closes the tool the user is actually in.
+   *
+   * Scoped rather than global: a reader has its own Escape bindings (leave the
+   * link view, dismiss a popup), and a canvas that swallowed every Escape would
+   * break them. So this fires only for the modal sheet, or when focus is inside
+   * a docked tool, and calls `stopPropagation` only in those cases.
+   */
+  const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Escape' || open.length === 0) return;
+    const node = event.target instanceof Element ? event.target.closest('[data-reading-role="tool"]') : null;
+    const id = sheetId ?? (node instanceof HTMLElement ? node.dataset.readingTool : undefined);
+    const target = open.find((tool) => tool.id === id);
+    if (!target) return;
+    event.stopPropagation();
+    target.onClose();
+  };
+
   return (
     <div
       ref={ref}
@@ -124,6 +165,7 @@ export function ReadingCanvas({
       data-covered={covered ? 'true' : undefined}
       data-measured={width === null ? undefined : 'true'}
       data-open-tools={open.length || undefined}
+      onKeyDown={onKeyDown}
       {...rest}
     >
       <div
@@ -157,6 +199,8 @@ export function ReadingCanvas({
         return (
           <aside
             key={tool.id}
+            ref={isSheet ? sheetRef : undefined}
+            tabIndex={isSheet ? -1 : undefined}
             className={isSheet ? 'lq-reading-sheet lq-liquid' : 'lq-reading-tool lq-liquid'}
             data-lq-role="liquid"
             data-reading-role="tool"
