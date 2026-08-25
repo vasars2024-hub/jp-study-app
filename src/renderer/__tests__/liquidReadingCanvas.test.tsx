@@ -298,15 +298,24 @@ describe('readingCanvas.css', () => {
 
   it('makes the document region its own containing block', () => {
     /*
-     * Found migrating Novels, and it is not cosmetic. Every real reader in this
-     * app scrolls from an absolutely positioned box — `.novel-scroller` is
-     * `position: absolute; inset: 0`, and so are the manga and PDF stages.
-     * Without a containing block on the document region such a child resolves
-     * `inset: 0` against `.lq-reading`, which spans the docked tools too, and
-     * paints the page straight over the tool just docked beside it. That is the
-     * partial cover the whole contract exists to forbid, reintroduced through
-     * CSS while `readingCanvasViolations` still returns `[]` — the resolver
-     * cannot see a stylesheet.
+     * Found migrating Novels. Every real reader in this app scrolls from an
+     * absolutely positioned box — `.novel-scroller` is `position: absolute;
+     * inset: 0`, and so are the manga and PDF stages — so without a containing
+     * block here such a child resolves `inset: 0` against `.lq-reading`, which
+     * spans the docked tools too.
+     *
+     * What that breaks was MEASURED, and the measurement refuted the first
+     * answer: it is not a paint defect. Live, with `position: static` put back,
+     * `elementFromPoint` at the docked tool's own centre still returned
+     * `.lq-reading-tool-body`, because `overflow: auto` clips the oversized
+     * scroller back to the document region. It is a measurement defect, which is
+     * worse for being invisible: with two tools docked in a 1264px canvas the
+     * document region is 696px and the scroller's `clientWidth` became 1264 —
+     * 568px outside the visible region — while `NovelReader.tsx` sizes its whole
+     * paged layout from that `clientWidth`. Columns 1264px wide inside a 696px
+     * window, the remainder clipped, unreachable, and missing from the page
+     * count. `readingCanvasViolations` cannot see any of it: the resolver does
+     * not read stylesheets.
      */
     expect(CSS).toMatch(/\.lq-reading-doc\s*\{[^}]*position:\s*relative/);
   });

@@ -97,8 +97,11 @@ describe('NovelReader through the L6 reading canvas', () => {
     expectPlacement(h, 'bookmarks', { placement: 'docked', contentWidth: 924, toolWidth: 264 });
     // The scroller is the document's child, not the canvas's: `.novel-scroller`
     // is `position: absolute; inset: 0`, so without `position: relative` on the
-    // document region it would resolve against the whole canvas and paint the
-    // page straight over the tool just docked beside it.
+    // document region it resolves against the whole canvas and reports a
+    // `clientWidth` wider than the region it is visible in — measured live at
+    // 1264 against a 696px region, which is the number the paged layout sizes
+    // its columns from. jsdom cannot see that; `liquidReadingCanvas.test.tsx`
+    // latches the declaration and the CSS comment there carries the measurement.
     expect(h.doc().querySelector('.novel-scroller')).not.toBe(null);
   });
 

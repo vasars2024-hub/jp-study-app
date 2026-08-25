@@ -644,9 +644,21 @@ layout. Live round trip: 820 px window → canvas 762 → docked 260 → documen
 narrowed → sheet 562, document 562, `inert` + `aria-hidden`; dismissed → 562 with its 69 characters
 intact; restored → 490, 42 rows. Category 6 scored **6/6 in both presentations** (`65a24365`),
 round trip identical on every field, three negative controls each failing exactly one row.
-**Still open in bullet 1: Novels, Library, Immersion, and the manga/PDF/EPUB/VN suites.** The
-headline case is NovelReader's three `.settings-anchor` popovers — `.settings-panel` is
-`position: absolute; right: 0; width: 264px`, which covers 41% of the text at a 640 px pop-out.
+Second surface, **Novels** (`b555bbb0`): NovelReader's three `.settings-anchor` popovers — bookmarks,
+book translation, reading settings — are canvas tools; the triggers stay in the toolbar and gained
+`aria-pressed`. FILL policy, because `settings.contentWidth` is a persisted rem measure the user sets
+in the very panel being migrated. **640 px turned out not to be the sheet case**: room = 640 − 12 −
+384 = 244 clears bookmarks' 200 floor, so it docks at 244 (clamped to the slack) and the page keeps
+exactly 384 — 0% covered where the popover covered 41%; the sheet arrives at 500. Live on a real
+EPUB: canvas 1264, docked document **988** with the tool at left 1000, i.e. a **12 px gap and zero
+overlap**; two docked = 696 + 280 + 264 + 24 = **1264 exactly** with the first-opened tool keeping
+its 280; a 520 px pane gives a sheet spanning the document's box exactly, `inert` + `aria-hidden` +
+`role="dialog"` + `aria-modal`, taking focus, and Escape alone returns it to the trigger at 2%.
+The primitive gained `position: relative` on `.lq-reading-doc` — and **the negative control refuted
+the first explanation**: the page does not paint over the tool (`overflow: auto` clips it), it
+MIS-MEASURES, reporting `clientWidth` 1264 inside a 696 px region, which is the number
+`NovelReader.tsx:935` sizes every paged column from.
+**Still open in bullet 1: Library, Immersion, and the manga/PDF/EPUB/VN suites.**
 
 ### L7 — Review and learning loop
 

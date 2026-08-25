@@ -35,11 +35,21 @@
    EVERY REAL READER IN THIS APP SCROLLS FROM AN ABSOLUTELY POSITIONED BOX:
    `.novel-scroller` is `position: absolute; inset: 0`, and so are the manga and
    PDF stages. Without a containing block here, such a child resolves `inset: 0`
-   against `.lq-reading` — the whole canvas, docked tools included — and paints
-   the page straight over the tool that was just docked beside it. That is the
-   partial cover the contract exists to forbid, reintroduced through CSS while
-   `readingCanvasViolations` still returns `[]`. The document region owns its own
-   overlays; the canvas owns the sheet. */
+   against `.lq-reading` — the whole canvas, docked tools included.
+
+   WHAT THAT ACTUALLY BREAKS, measured live rather than assumed. The first
+   version of this comment said the page then paints over the docked tool, and a
+   negative control REFUTED it: with `position: static` restored,
+   `elementFromPoint` at the tool's own centre still returned
+   `.lq-reading-tool-body`, because `overflow: auto` below clips the oversized
+   scroller back to the document region. The defect is a MEASUREMENT one, which
+   is worse for being invisible. With two tools docked in a 1264px canvas the
+   document region is 696px; `position: static` made the scroller's
+   `clientWidth` 1264 — 568px of it outside the visible region — and
+   `NovelReader.tsx:935` sizes the whole paged layout from exactly that
+   `clientWidth`. Columns are then built 1264px wide inside a 696px window and
+   the overflow is clipped, unreachable, and silently absent from the page count.
+   The document region owns its own overlays; the canvas owns the sheet. */
 .lq-reading-doc {
   position: relative;
   flex: 1 1 auto;

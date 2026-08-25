@@ -64,3 +64,72 @@ Turn ratio measurement:product = **253 : 712 = 0.36 : 1**.
 Blocks are lines 2705–2736 (bookmarks), 2768–2918 (translate), 2928–2933 (reader settings); the
 document is `.reader-stage`. It needs three new i18n labels in four catalogs, and all four catalog
 files are dirty from other tracks — HEAD+edit staging, `debug/lq-stage-head-edit.cjs`.
+
+---
+
+## 2026-08-25 — surface 2 of 5: NovelReader (`b555bbb0`)
+
+Bookmarks, book translation and reading settings were three `.settings-panel` popovers hung off the
+reader toolbar — `position: absolute; right: 0; width: 264px`. Now `ReadingCanvas` tools. Triggers
+stay in the toolbar and gained `aria-pressed`. FILL policy, because `settings.contentWidth` is a
+persisted rem measure the user sets in the very panel being migrated; a second 760 px clamp would
+override a setting they changed on purpose.
+
+**640 px is NOT the sheet case, and the measurement said so before the test did.** room = 640 − 12
+gutter − 384 floor = **244**, which clears bookmarks' 200 floor, so the tool docks at 244 — clamped
+to the slack, not its preferred 264 — and the page keeps exactly **384**. 0% of the text covered
+where the popover covered 41%. The sheet arrives at **500** (room 104).
+
+**Live round trip, one reader, real book (悪の教典 02, EPUB, vertical paged, 2%).**
+Canvas **1264**. Bookmarks docked: document attr **988** = box **988** = 1264−264−12; tool left
+**1000** = docRight+12, so overlap **−12 px** — a gap, not a cover. `elementFromPoint` at the tool
+centre = `.lq-reading-tool-body`, at the document centre = `.c4` (the book's own markup).
+Two docked (settings first, then bookmarks): **696 + 280 + 264 + 24 = 1264 exactly**, and settings
+**kept its 280** and its position — first-come docking, live. Narrowed to a **520 px** pane: sheet,
+document **520**, `inert` AND `aria-hidden="true"`, `role="dialog"`, `aria-modal="true"`, sheet box
+**520×724** identical to the document's box (`sheetSpansDoc: true`), and the sheet **took focus**.
+Escape alone: tools 0, `covered` absent, not inert, focus back on the trigger, `aria-pressed` false,
+position held at **2%**. Reader settings embedded in a docked tool: `position: static`, border 0,
+background transparent, **10 `.sp-row`** rows — nothing lost, one surface not a card in a card.
+
+**THE NEGATIVE CONTROL REFUTED MY OWN CLAIM, and the fix's comment was rewritten.** The commit said
+that without `position: relative` on `.lq-reading-doc` the page paints over the docked tool.
+Measured: with `position: static` restored, `elementFromPoint` at the tool's own centre still
+returned `.lq-reading-tool-body` — `overflow: auto` clips the oversized scroller back to the
+document region. The real defect is a MEASUREMENT one, which is worse for being invisible: at a
+696 px document region the scroller's `clientWidth` became **1264**, **568 px outside the visible
+region**, and `NovelReader.tsx:935` sizes the entire paged layout from exactly that `clientWidth`.
+Columns 1264 px wide inside a 696 px window, remainder clipped, unreachable, absent from the page
+count. `readingCanvasViolations` cannot see any of it — the resolver does not read stylesheets.
+
+**RULE 1: this surface was a RUN, and it made the harness real.**
+`__tests__/helpers/readingCanvasSurface.tsx` (228 lines) holds the rect stub, the `window.api`
+Proxy, the ResizeObserver + flush, `expectPlacement` and `expectDismissRestoresDocument`. Captures'
+own 140-line test was **rewritten onto it, 44 added / 73 removed**, so the harness shipped with two
+callers rather than one. Novels' whole test file is 184 lines of surface-specific numbers.
+
+Turn ratio, stated the strict way rather than the flattering one: measurement **228** (the harness)
+against **152** lines of genuinely NEW product source = **1.5 : 1**. By diff-added lines it reads
+228 : 353 = 0.65 : 1, but **215 of those 353 are the translate panel's JSX moved byte-for-byte with
+8 spaces of indent removed** — a line surgery script did it precisely so it would not be retyped —
+and counting a move as authorship is how a ratio flatters. The honest reading of the harness is that
+it is a ONE-TIME 228 amortised over five surfaces: Library, Immersion and the manga/PDF/VN suites
+each cost a `describe` block and no harness at all, so the third surface is the first turn where
+this number can legitimately fall.
+
+**Traps.**
+1. **A ResizeObserver does not deliver in an unfocused window.** The canvas read `data-content-width
+   988` while its box was **520**, twice in a row, and corrected the instant `/focus` ran. Any
+   width-driven L6 measurement must `/focus` first or it reports the previous width as current.
+2. `#root` carries `min-width: 100vw` inline from `appZoom.layoutRoot`, and **min-width beats
+   max-width**, so narrowing the pane by styling `#root` silently does nothing. Style
+   `.reader-stage` instead — it is app markup, and restoring it is one attribute.
+3. Reading `aria-pressed` in the same `/eval` that clicked always returns the pre-click value.
+   React has not re-rendered yet; use a second round trip.
+4. The reader is NOT inside an `.fwin` — it renders at viewport width with all 8 floating windows
+   hidden, so `elementFromPoint` is safe here. Do not assume that on the other L6 surfaces.
+
+**Next: Library** (L6's third surface). `ReaderCollectionPanel` is the obvious fourth tool of this
+reader and was deliberately left outside the canvas — the file is dirty from another track (the
+in-flight i18n adoption, see the boss audit's Finding 5), so migrating it now would either stage
+their work or lose it.
