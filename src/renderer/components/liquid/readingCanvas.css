@@ -1,0 +1,130 @@
+/* =============================================================================
+   Liquid Workplace — L6 reading canvas geometry
+   -----------------------------------------------------------------------------
+   Paints only under `.lq-reading*`, which nothing else in the app uses, and
+   every value is a `--lq-*` token, so no existing pixel moves and no shell's
+   palette is baked in — the same rule `liquid-scaffold.css` states.
+
+   ONE NUMBER IS SHARED WITH JAVASCRIPT AND IT MUST NOT DRIFT: the flex `gap`
+   below is `--lq-space-4` = 12px, which is `READING_CANVAS_POLICY.gutter` in
+   `shared/liquidReadingCanvas.ts`. The resolver subtracts that gutter before
+   deciding a tool fits; if the stylesheet used a different one, every docked
+   layout would be off by the difference and the document would sit below its
+   own floor while the contract reported it clean. `readingCanvasCss.test.ts`
+   asserts the two agree.
+
+   The document is a flex ITEM with `min-width: 0`, not a grid track: its width
+   is whatever the resolver left, and the docked tools carry explicit pixel
+   widths from the same resolver. Nothing here computes a size of its own.
+   ============================================================================= */
+
+.lq-reading {
+  box-sizing: border-box;
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: var(--lq-space-4);
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.lq-reading-doc {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+
+/* The measure clamp. Centred, so widening the window adds margin rather than
+   line length — §4.1's content-first hierarchy, and the half of L6's Gate that
+   says content stays legible at all sizes. `none` for a fill policy. */
+.lq-reading-doc > * {
+  max-width: var(--lq-reading-measure, none);
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+  min-width: 0;
+}
+
+.lq-reading-tool,
+.lq-reading-sheet {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-radius: var(--lq-liquid-radius);
+  border: 1px solid var(--lq-liquid-border);
+  background: var(--lq-liquid-bg-raised);
+  box-shadow: var(--lq-liquid-shadow);
+  color: var(--lq-liquid-text);
+}
+
+/* Docked: a sibling of the document, never over it. `position: static` is the
+   load-bearing declaration in this file — it is the difference from the
+   `.settings-panel` popover this primitive replaces. */
+.lq-reading-tool {
+  position: static;
+  overflow: hidden;
+}
+
+/* Sheet: the whole canvas, and only ever the whole canvas. Anchored to the
+   canvas box rather than the viewport so a reader docked inside a larger
+   window covers its own document and not the app around it. */
+.lq-reading-sheet {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+
+.lq-reading-tool-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--lq-space-3);
+  padding: var(--lq-space-3) var(--lq-space-4);
+  border-bottom: 1px solid var(--lq-liquid-border);
+}
+
+.lq-reading-tool-title {
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lq-reading-tool-close {
+  flex: 0 0 auto;
+  min-width: var(--lq-hit-target);
+  min-height: var(--lq-hit-target);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: var(--lq-anchor-radius);
+  background: transparent;
+  color: var(--lq-liquid-text);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.lq-reading-tool-close:hover {
+  background: var(--lq-liquid-highlight);
+}
+
+.lq-reading-tool-close:focus-visible {
+  outline: 2px solid var(--focus, currentColor);
+  outline-offset: 2px;
+}
+
+.lq-reading-tool-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--lq-space-4);
+}

@@ -1,0 +1,239 @@
+// @vitest-environment jsdom
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { act, type ReactNode } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  READING_CANVAS_FILL_POLICY,
+  READING_CANVAS_POLICY,
+} from '../../shared/liquidReadingCanvas';
+import { ReadingCanvas, type ReadingCanvasTool } from '../components/liquid/ReadingCanvas';
+
+/**
+ * L6's Gate rendered rather than computed. Three promises, each of which is a
+ * way "no tool obscures the document" gets lost quietly:
+ *   - a docked tool is a SIBLING of the document with `position: static`, which
+ *     is the whole difference from the `.settings-panel` popover it replaces;
+ *   - a sheet is inert-and-hidden over the document, not a partial cover;
+ *   - the document node SURVIVES both transitions, or scroll offset, an epub
+ *     rendition and any capture in flight go with it.
+ */
+
+const CSS = readFileSync(
+  resolve(__dirname, '..', 'components', 'liquid', 'readingCanvas.css'),
+  'utf8',
+).replace(/\/\*[\s\S]*?\*\//g, '');
+
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+let host: HTMLDivElement | null = null;
+let root: Root | null = null;
+function render(node: ReactNode): HTMLDivElement {
+  host = document.createElement('div');
+  document.body.appendChild(host);
+  root = createRoot(host);
+  act(() => {
+    root!.render(node);
+  });
+  return host;
+}
+function rerender(node: ReactNode) {
+  act(() => {
+    root!.render(node);
+  });
+}
+afterEach(() => {
+  if (root) act(() => root!.unmount());
+  host?.remove();
+  root = null;
+  host = null;
+});
+
+function tool(overrides: Partial<ReadingCanvasTool> = {}): ReadingCanvasTool {
+  return {
+    id: 'settings',
+    label: 'Reader settings',
+    minWidth: 264,
+    preferredWidth: 264,
+    content: <button type="button">Font size</button>,
+    onClose: () => undefined,
+    ...overrides,
+  };
+}
+
+describe('ReadingCanvas placement', () => {
+  it('docks beside the document at a width that affords it', () => {
+    const el = render(
+      <ReadingCanvas widthOverride={1200} closeLabel="Close" tools={[tool()]}>
+        <p>document</p>
+      </ReadingCanvas>,
+    );
+    const doc = el.querySelector('[data-reading-role="document"]')!;
+    const panel = el.querySelector('[data-reading-tool="settings"]') as HTMLElement;
+    expect(panel.dataset.placement).toBe('docked');
+    expect(panel.style.width).toBe('264px');
+    expect(el.querySelector('.lq-reading')!.hasAttribute('data-covered')).toBe(false);
+    expect(doc.hasAttribute('inert')).toBe(false);
+    expect(doc.getAttribute('aria-hidden')).toBe(null);
+    // Sibling, not a descendant: a tool inside the document region would be
+    // over the text however it were positioned.
+    expect(panel.parentElement).toBe(el.querySelector('.lq-reading'));
+    expect(doc.contains(panel)).toBe(false);
+  });
+
+  it('becomes a full-canvas sheet, inert and hidden, when the document cannot keep its floor', () => {
+    const el = render(
+      <ReadingCanvas widthOverride={640} closeLabel="Close" tools={[tool()]}>
+        <p>document</p>
+      </ReadingCanvas>,
+    );
+    const doc = el.querySelector('[data-reading-role="document"]') as HTMLElement;
+    const panel = el.querySelector('[data-reading-tool="settings"]') as HTMLElement;
+    expect(panel.dataset.placement).toBe('sheet');
+    expect(panel.getAttribute('role')).toBe('dialog');
+    expect(el.querySelector('.lq-reading')!.getAttribute('data-covered')).toBe('true');
+    // Both, not one. `aria-hidden` alone leaves the document in the tab ring.
+    expect(doc.hasAttribute('inert')).toBe(true);
+    expect(doc.getAttribute('aria-hidden')).toBe('true');
+    // A sheet carries no inline width — the stylesheet gives it the whole box.
+    expect(panel.style.width).toBe('');
+  });
+
+  it('keeps the document node across dock, sheet and close', () => {
+    const el = render(
+      <ReadingCanvas widthOverride={1200} closeLabel="Close">
+        <p>document</p>
+      </ReadingCanvas>,
+    );
+    const first = el.querySelector('[data-reading-role="document"]')!;
+    const paragraph = first.querySelector('p')!;
+    (paragraph as HTMLElement).dataset.scrollProbe = 'kept';
+
+    rerender(
+      <ReadingCanvas widthOverride={1200} closeLabel="Close" tools={[tool()]}>
+        <p>document</p>
+      </ReadingCanvas>,
+    );
+    rerender(
+      <ReadingCanvas widthOverride={640} closeLabel="Close" tools={[tool()]}>
+        <p>document</p>
+      </ReadingCanvas>,
+    );
+    rerender(
+      <ReadingCanvas widthOverride={640} closeLabel="Close">
+        <p>document</p>
+      </ReadingCanvas>,
+    );
+
+    const last = el.querySelector('[data-reading-role="document"]')!;
+    expect(last).toBe(first);
+    expect((last.querySelector('p') as HTMLElement).dataset.scrollProbe).toBe('kept');
+    expect(last.hasAttribute('inert')).toBe(false);
+  });
+
+  it('places nothing before it has measured itself', () => {
+    const el = render(
+      <ReadingCanvas closeLabel="Close" tools={[tool()]}>
+        <p>document</p>
+      </ReadingCanvas>,
+    );
+    // jsdom reports 0 width and provides no ResizeObserver, so the canvas never
+    // measures — and renders the document alone rather than guessing `wide`.
+    expect(el.querySelector('.lq-reading')!.hasAttribute('data-measured')).toBe(false);
+    expect(el.querySelector('[data-reading-tool="settings"]')).toBe(null);
+    expect(el.querySelector('[data-reading-role="document"]')!.textContent).toBe('document');
+  });
+
+  it('gives every tool a working close control', () => {
+    const onClose = vi.fn();
+    const el = render(
+      <ReadingCanvas widthOverride={1200} closeLabel="Close tool" tools={[tool({ onClose })]}>
+        <p>document</p>
+      </ReadingCanvas>,
+    );
+    const close = el.querySelector('.lq-reading-tool-close') as HTMLButtonElement;
+    expect(close.getAttribute('aria-label')).toBe('Close tool');
+    act(() => close.click());
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders only the newest sheet and does not drop the ones beneath it', () => {
+    const el = render(
+      <ReadingCanvas
+        widthOverride={640}
+        closeLabel="Close"
+        tools={[tool(), tool({ id: 'bookmarks', label: 'Bookmarks' })]}
+      >
+        <p>document</p>
+      </ReadingCanvas>,
+    );
+    expect(el.querySelector('[data-reading-tool="settings"]')).toBe(null);
+    expect(el.querySelector('[data-reading-tool="bookmarks"]')!.getAttribute('data-placement')).toBe(
+      'sheet',
+    );
+    // Closing the top one brings the other back — the caller's state still had it.
+    rerender(
+      <ReadingCanvas widthOverride={640} closeLabel="Close" tools={[tool()]}>
+        <p>document</p>
+      </ReadingCanvas>,
+    );
+    expect(el.querySelector('[data-reading-tool="settings"]')!.getAttribute('data-placement')).toBe(
+      'sheet',
+    );
+  });
+
+  it('publishes the measure clamp, and drops it for a fill policy', () => {
+    const el = render(
+      <ReadingCanvas widthOverride={1600} closeLabel="Close">
+        <p>document</p>
+      </ReadingCanvas>,
+    );
+    const doc = el.querySelector('[data-reading-role="document"]') as HTMLElement;
+    expect(doc.style.getPropertyValue('--lq-reading-measure')).toBe(
+      `${READING_CANVAS_POLICY.maxContentWidth}px`,
+    );
+    rerender(
+      <ReadingCanvas widthOverride={1600} closeLabel="Close" policy={READING_CANVAS_FILL_POLICY}>
+        <p>document</p>
+      </ReadingCanvas>,
+    );
+    expect(doc.style.getPropertyValue('--lq-reading-measure')).toBe('none');
+  });
+});
+
+describe('readingCanvas.css', () => {
+  it('uses the same gutter the resolver subtracts', () => {
+    // The drift this guards: the resolver reserves 12px before deciding a tool
+    // fits. A stylesheet gap of anything else silently pushes the document
+    // under its own floor while the contract still reports the layout clean.
+    expect(READING_CANVAS_POLICY.gutter).toBe(12);
+    expect(CSS).toMatch(/\.lq-reading\s*\{[^}]*gap:\s*var\(--lq-space-4\)/);
+    const tokens = readFileSync(
+      resolve(__dirname, '..', 'theme', 'liquid-tokens.css'),
+      'utf8',
+    );
+    expect(tokens).toMatch(/--lq-space-4:\s*12px/);
+  });
+
+  it('keeps a docked tool out of the positioning layer', () => {
+    expect(CSS).toMatch(/\.lq-reading-tool\s*\{[^}]*position:\s*static/);
+    expect(CSS).toMatch(/\.lq-reading-sheet\s*\{[^}]*position:\s*absolute/);
+    // Anchored to the canvas, never the viewport — a reader docked inside a
+    // larger window must cover its own document and nothing around it.
+    expect(CSS).not.toMatch(/\.lq-reading-sheet\s*\{[^}]*position:\s*fixed/);
+    expect(CSS).toMatch(/\.lq-reading\s*\{[^}]*position:\s*relative/);
+  });
+
+  it('paints nothing outside its own namespace', () => {
+    const selectors = CSS.split('}')
+      .map((block) => block.split('{')[0].trim())
+      .filter(Boolean)
+      .flatMap((group) => group.split(',').map((s) => s.trim()))
+      .filter(Boolean);
+    expect(selectors.length).toBeGreaterThan(5);
+    for (const selector of selectors) {
+      expect({ selector, ok: selector.startsWith('.lq-reading') }).toEqual({ selector, ok: true });
+    }
+  });
+});
