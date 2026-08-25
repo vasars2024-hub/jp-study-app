@@ -1194,3 +1194,47 @@ max 117.1, so the recorder sees what it reports and the zeros above are a real r
 **81624.0** — a sampler that stays alive, samples nothing, and reads exactly like one still
 waiting for its first mark. Use `-Command` with `@(8,16,24)` and read the header record back;
 `marks:[8.0,16.0,24.0]` is the only proof of a good bind. Written into the probe's own header.
+
+## 2026-08-25 · primary — leg 3 RE-OPENED on this boot and IN FLIGHT, plus the confound it must be read against
+
+Dictionary's legs 1, 2 and 4 closed on pid **32344**. Leg 3 was left "IN PROGRESS, not claimed" on
+that boot and is the surface's last open leg — so it is re-driven here on pid **1324**, the boot that
+carries the `6620ab71` frequency-listing fix, rather than transcribed across boots.
+
+**Harness loaded FIRST, because an empty Dictionary is the rubric's own cap and not a pass.**
+`l7d-setup.cjs` drove 食べる through the window's own input: **8 entries / 5,476 chars / 349 nodes /
+75 controls**, `presentation=liquid`, `forest-night`. Matches the `9c4a38e5` entry's loaded state
+(8 / 5,476 / 349) so the two boots are comparable.
+
+**Marks are relative to NOW, and that is forced.** The sampler keys off *process uptime* and pid 1324
+was already **123 min** old, so the canonical 8/16/24 marks were long past. Marks are `@(125,133,141)`
+— a 16-minute window opening at the load. Header record verified before walking away, which is the
+one guard against the array-bind trap: `marks:[125.0,133.0,141.0]`, a good bind. Output
+`%TEMP%\l7c-mem-dict.jsonl`; the sampler is detached and outlives the turn.
+
+| mark | uptime | main private | handles | all-process private |
+| --- | --- | --- | --- | --- |
+| 125 | 125.0 min | **584.9 MB** | 1,126 | 1,852.9 MB |
+| 133 | — | pending | pending | pending |
+| 141 | — | pending | pending | pending |
+
+**NOT SCORED, and here is what the next worker must not do with that first row.** 584.9 MB is above
+L0's 550–577 band, and reading that as a regression would be wrong twice over. (1) It is an ABSOLUTE
+at 125 minutes of uptime, on a boot that has since taken three full four-language state sweeps, a
+12,000-lookup control, ten gesture probes, two dead-control censuses and a Dictionary load — not a
+cold 8-minute boot, which is what L0's band measures. The scorable quantity here is the **delta
+across the three marks**, exactly as Video's +1.8 MB was. (2) A full `npx vitest run` was executing
+concurrently with mark 125. Private bytes are not trimmed the way RSS is, so the effect should be
+small, but it is a real confound and it is disclosed rather than smoothed: if the delta comes back
+ambiguous, re-drive the window on a quiet machine before scoring it either way.
+
+**Desk state this leg needs, and it is deliberately left in place.** `l7d-setup.cjs` sets inline
+`display:none` on Media, Video and Settings so the instrument cannot type into a neighbouring window.
+Restoring them mid-curve would change the harness the marks are being taken under, so they stay
+hidden until the curve completes. One command undoes it, added this turn:
+`node src/.coordination/liquid-workplace/probes/l7d-restore.cjs` — it clears the inline value rather
+than assigning `block` (the `.fwin` rule owns the display mode) and reports the resulting desk, so
+"restored" is a measurement rather than a claim.
+
+**Dictionary is 7 of 8 and category 7 is the only open one.** Video closed at 8 of 8 this turn
+(`c7115f56`).
