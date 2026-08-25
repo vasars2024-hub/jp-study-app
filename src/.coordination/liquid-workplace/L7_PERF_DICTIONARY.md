@@ -1413,3 +1413,103 @@ the first window → **3 red**. The equivalence test asserts both lengths before
 
 **Leg 2 PASSES.** Next: leg 3's 16-minute curve, which must be re-driven regardless — `855789ca`
 and `9a2bceb7` both changed main-process code and main does not hot-reload.
+
+## 2026-08-25 (later 3) · primary — category 7 re-driven end to end on ONE boot, pid 39160 @ `6eefff6c`
+
+Required by the rubric: `855789ca` and `9a2bceb7` both changed main-process code and main does not
+hot-reload, so every leg below is from the same fresh `npm start`. Dictionary state before any
+timing: liquid **820×580**, **8 entries / 5,476 chars / 349 nodes / 75 controls**.
+
+### Leg 1 — gestures on the Dictionary window, `-Title Dictionary` on every run
+
+| Run | frames | p50 | p95 | max | >33 | >100 | main max |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Ceiling | 110 | 16.7 | 16.9 | 17.1 | 0 | **0** | 7.8 |
+| Drag | 109 | 16.7 | 16.9 | 33.5 | 2 | **0** | 13.3 |
+| Drag ×3 repeat | 109 / 107 / 107 | 16.7 | 16.8–17.0 | 33.4–33.6 | 1 / 1 / 1 | **0** | 10.1–11.1 |
+| Resize | 109 | 16.7 | 16.9 | 33.4 | 1 | **0** | 12.3 |
+| Theme switch | 109 | 16.7 | 16.9 | 17.1 | 0 | **0** | 9.0 |
+| **JANK CONTROL** (10 × 120 ms) | 56 | 16.7 | **116.9** | 117.1 | 10 | **10** | 8.3 |
+
+`closedLoop=True` on both closed-loop gestures. Theme apply **32.2** / restore **31.7** ms,
+`restoredTo=forest-night`. The jank control asked for 10 blocks and the recorder reported exactly
+**10 frames over 100 ms**, so the zeros in that column are a result and not a blind spot.
+
+**Stated rather than smoothed: this boot drops one vsync per drag where the boot that closed leg 1
+(`9c4a38e5`, pid 32344) dropped none across six runs.** 33.4–33.6 ms is exactly 2 × the 16.7 ms
+display interval — one missed frame in ~108, with p95 still pinned at the ceiling. Attribution: this
+boot carries a concurrent `l7c-mem-sampler.ps1` and the leg-3 load phase, which pid 32344's leg-1
+runs did not. Scored a pass on the recorded bar (0 frames over 100 ms, p95 at the display ceiling)
+and the number is on the record so a real drift is measurable against it.
+
+### Leg 2 — `/health` under this surface's real work. Bar: no main block over 500 ms.
+
+| Run | samples | p50 | p95 | **max** | proof the work happened |
+| --- | --- | --- | --- | --- | --- |
+| Idle (before flood) | 40 | 0.9 | 2.9 | **4.3** | — |
+| Idle (after 3 GB flood) | 40 | 0.9 | 2.4 | **4.0** | — |
+| **First `dict:examples` of the boot, COLD** | 300 | 1.3 | 17.2 | **40.8** | `done:true`, 5 words × **8** examples |
+| Real click `Find example sentences` | 120 | 0.9 | 2.4 | **6.2** | nodes 349→415, chars 5,476→6,038 |
+| 126 cold headword lookups | 120 | 0.9 | 2.2 | **6.0** | `keys=126`, `withGloss=126`, 99 ms |
+| **ISOLATION CONTROL** (renderer blocked 1.5 s) | 40 | 1.1 | 3.4 | **5.8** | main unmoved ⇒ main-only ✔ |
+| **SENSITIVITY CONTROL** (`chunk=10,000,000`, previous boot) | 300 | 1.0 | 2.0 | **963.2** | over the bar ✔ |
+
+Two cold runs of the fixed build on two different boots: **30.9** and **40.8 ms**. The bar is 500.
+
+### FINDING, same class and 11× larger: the compound/collocation scan cannot stop at all
+
+Found by running the examples diagnostic across the rest of `dictService.ts`. There are exactly
+three `instr(` scans in the file; the third was fixed by `9a2bceb7`, and the other two are the
+statement `findLexiconCompounds` (`:962`) and `findLexiconCollocations` (`:1178`) share:
+
+```
+SEARCH h USING INDEX idx_hw_norm (lang=?)
+SEARCH d USING INDEX sqlite_autoindex_dictionaries_1 (id=?)
+USE TEMP B-TREE FOR ORDER BY
+```
+
+`order by h.score desc, length(h.text) asc, h.id asc` means the `limit` (`COMPOUND_SCAN_ROWS` 200 /
+`COLLOCATION_SCAN_ROWS` 600) **cannot bound anything**: SQLite must find every match and sort it in
+a temp b-tree before it can return the first row. `headwords` is **842,500 rows / 69.5 MB / 17,792
+pages** and `idx_hw_norm` a further 21.0 MB / 5,386 pages. Where the examples cap merely failed to
+fire early, this one is structurally unable to.
+
+Measured through the real statement on the real `dict.db`, read-only, cold (immediately after a
+3 GB `evict-file-cache.ps1` flood) and then warm in the same process:
+
+| word | rows returned | COLD | warm (pass 1 / 2) |
+| --- | --- | --- | --- |
+| 食べる | **11** | **10,904.4 ms** | 79.9 / 72.4 |
+| 海 | 400 | 2,029.7 ms | 84.0 / 85.9 |
+| 窓 | 265 | 389.2 ms | 77.8 / 80.2 |
+| 痛い | 50 | — | 156.5 / 70.4 |
+
+**10,904.4 ms to return eleven rows**, and it is synchronous on the main event loop exactly as the
+examples scan was. That is 1.65× the examples defect this turn fixed, and warm it is still 70–160 ms
+against examples' 20–40.
+
+**Driven live on this boot before the claim was written, and the live number is SMALLER — say so.**
+`probes/l7g-first-compounds.js` through `liquid-perf-probe.ps1`, 400 `/health` samples, after a
+4 GB flood (standby 1,355 MB after): the boot's first `dict:compounds` cost **428.1 ms** and the
+longest main-process block was **304.2 ms** — *under* the 500 ms bar. Per word 428.1 / 151.1 /
+131.5 / 124.0 / 128.9 ms returning 5 / 12 / 12 / 12 / 4 compounds, `done:true`, so no run is an
+empty short-circuit. The gap against the 10,904.4 ms statement is explained rather than waved at:
+the app's connection had already resident much of `headwords` from this boot's own word lookups,
+which a fresh `node` process does not, and the flood is a weaker cold than an idle machine.
+
+**So the honest verdict is: not a leg-2 failure on any live sample taken, and still the largest main
+block on this surface by 7.5×.** 304.2 ms against `Find example sentences`' 40.8 leaves a 1.6×
+margin to the bar on a scan that is *structurally* unbounded — a temp b-tree over 842,500 rows,
+where the `limit` provably cannot stop anything — and whose same statement reached 10,904.4 ms
+against a cold cache. It is fixed because it is unbounded, not because a live sample crossed a bar.
+
+**The fix is the same shape but not identical**, and the difference is the whole design problem:
+the SQL `ORDER BY` is global over matches, so windowing by `h.id` requires selecting `h.score` and
+reproducing `(score desc, length(text) asc, id asc)` in JS after accumulating every match. That is a
+faithful transformation rather than a behaviour change — the temp b-tree already sorts every match
+before `limit` applies — and it deletes the temp b-tree as a side effect.
+
+**Consequence for the scorecard:** the Dictionary surface's heaviest real operation is **not**
+`Find example sentences` — it is the compound/collocation panel, at 304.2 ms live. Every live leg-2
+sample on this boot is inside the bar, so this does not by itself hold the score; what it does is
+name the next fix and move the surface's worst case from "measured" to "measured and bounded".
