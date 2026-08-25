@@ -45,7 +45,8 @@ export function cardRowHeight(variant: MediaCardVariant, gap: number) {
     Math.round(colWidth * CARD_METRICS[variant].ratio) + CAPTION_HEIGHT + gap;
 }
 
-function formatDuration(seconds: number | undefined): string | null {
+/** Exported so the one-title spotlight states a runtime the same way a card does. */
+export function formatDuration(seconds: number | undefined): string | null {
   if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds <= 0) return null;
   const total = Math.round(seconds);
   const h = Math.floor(total / 3600);

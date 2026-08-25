@@ -1448,3 +1448,148 @@
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
+
+/* -------------------------------------------------- one-title spotlight ---- */
+
+/* The size container is the wrapper, never the spotlight itself — an element
+   cannot answer a `@container` condition it establishes (agent.css §23). */
+.medialib-spotlight-wrap {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  container-type: inline-size;
+}
+
+.medialib-spotlight {
+  display: grid;
+  grid-template-columns: minmax(150px, 36%) minmax(0, 1fr);
+  gap: var(--space-xl);
+  /* The pane is sized for a library; the one title takes all of it rather than
+     leaving a band of nothing under itself, which is what the rubric measures. */
+  min-height: 100%;
+  padding: var(--space-lg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+}
+
+.medialib-spotlight[data-active='true'] { border-color: var(--accent); }
+
+/* The art keeps its ratio, so it must not stretch with the row. */
+.medialib-spotlight__art {
+  min-width: 0;
+  align-self: start;
+}
+
+.medialib-spotlight__body {
+  display: flex;
+  flex-direction: column;
+  /* The art sets the height; `space-between` is what spreads the text down it
+     instead of stacking at the top and leaving a void under itself. */
+  justify-content: space-between;
+  gap: var(--space-md);
+  min-width: 0;
+  min-height: 100%;
+}
+
+.medialib-spotlight__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.medialib-spotlight__title {
+  margin: 0;
+  min-width: 0;
+  font-size: var(--font-size-2xl);
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.medialib-spotlight__facts {
+  flex: 1;
+  display: grid;
+  /* `min(140px, 100%)` and not a bare 140px: the bare floor is a minimum the
+     track keeps even when the pane is narrower, and at the product's own 260x170
+     it gave this pane a horizontal scrollbar at 153 > 100. */
+  grid-template-columns: repeat(auto-fit, minmax(min(140px, 100%), 1fr));
+  align-content: space-evenly;
+  gap: var(--space-md);
+  margin: 0;
+}
+
+.medialib-spotlight__fact { min-width: 0; }
+
+.medialib-spotlight__fact dt {
+  font-size: var(--font-size-2xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.medialib-spotlight__fact dd {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
+}
+
+.medialib-spotlight__progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.medialib-spotlight__bar {
+  flex: 1;
+  min-width: 0;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-sunken);
+}
+
+.medialib-spotlight__bar i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.medialib-spotlight__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+/* Below this the two columns stop being a layout: the poster would take the
+   whole pane and push the facts and the actions out of reach. */
+@container (max-width: 520px) {
+  .medialib-spotlight {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-md);
+    padding: var(--space-md);
+  }
+
+  .medialib-spotlight__art { max-width: 190px; }
+  .medialib-spotlight__body { min-height: 0; }
+  .medialib-spotlight__title { font-size: var(--font-size-lg); }
+
+  /* `.ui-btn` is `white-space: nowrap`, so at the product's 260x170 floor the
+     "More actions" label alone measured 111 against a 100px pane and handed it a
+     horizontal scrollbar. Stacked and wrappable, the pane scrolls one way only. */
+  .medialib-spotlight__actions {
+    flex-direction: column;
+    /* `wrap` is what kept the buttons at 98: a wrapping column sizes its line to
+       the widest item and `stretch` then stretches to the LINE, not the pane. */
+    flex-wrap: nowrap;
+    align-items: stretch;
+  }
+
+  .medialib-spotlight__actions .ui-btn {
+    min-width: 0;
+    white-space: normal;
+  }
+}

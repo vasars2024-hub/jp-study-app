@@ -13,6 +13,7 @@ import { Button, Select } from '../../ui';
 import Icon from '../../Icons';
 import { useT } from '../../../i18n';
 import MediaPosterCard, { CARD_METRICS, cardRowHeight, type MediaCardVariant } from './MediaPosterCard';
+import MediaSpotlightCard from './MediaSpotlightCard';
 import { mediaSubtitleStatus } from '../../../../shared/mediaSubtitleStatus';
 import {
   MEDIA_SORTS,
@@ -152,6 +153,20 @@ export default function MediaLibraryBrowser({
       <div className="medialib-browser__body">
         {entries.length === 0 ? (
           empty ?? <div className="medialib-empty"><span>{t('media.browser.noMatch')}</span></div>
+        ) : entries.length === 1 && view === 'grid' ? (
+          // A single card in a pane sized for a library is a void, not a layout —
+          // 284x602 of it at maximized. The surplus goes to the same title.
+          // List view already spans the pane, so it keeps its row.
+          <div className="medialib-spotlight-wrap">
+            <MediaSpotlightCard
+              entry={entries[0]}
+              variant={variant}
+              active={entries[0].id === selectedId
+                || entries[0].items.some((i) => i.id === currentId)}
+              onOpen={() => onActivate(entries[0])}
+              onMenu={(anchor) => onMenu(entries[0], anchor)}
+            />
+          </div>
         ) : (
           <VirtualGrid
             items={entries}
