@@ -185,3 +185,102 @@ and still places nothing, so a surface inventing a tool would fail.
 **Next: Immersion**, then the manga/PDF/EPUB/VN suites. `ReaderCollectionPanel` stays outside the
 canvas until its own track commits: it is dirty with the in-flight i18n adoption (boss-audit
 Finding 5), so migrating it now would stage their work or lose it.
+
+---
+
+## 2026-08-25 — surface 4 of 5: Immersion, and a defect in the primitive itself
+
+Recovered work: the previous worker's session ended mid-slice at 13:09 with the source landed
+(`ImmersionView`, `ImmersionContent`, `BlancLibraryPanels`, `styles.css` — mtimes 13:07) and no
+test, gates or commit. Re-derived and finished rather than restarted. `000c7c4d`.
+
+**A worse defect than the first three surfaces had.** Captures and Library were broken by a
+`@media` query that reads the WINDOW and so never fired inside a pane. `.immersion-rail` was
+`width: 220px; flex-shrink: 0` beside a `flex: 1` stage with **no responsive rule of any kind** —
+there was no query to fire, so the stage absorbed the whole shortfall at every window size. Both
+hosts had the same hand-rolled `.immersion-body` row and move together.
+
+FILL policy: in `live` mode the document is an Electron `<webview>` whose guest lays itself out,
+and a 760px clamp would letterbox a browser. Reader Mode owns its own measure one level down
+(`.immersion-reader` is `max-width: 42rem`).
+
+**DELIBERATELY NOT MOVED — read before migrating the split view.** The `<webview>` stays inside
+`ImmersionStage`. A webview that changes DOM parent is destroyed and its guest reloaded, and the
+live-lookup `ipc-message` effect keys off `[showWebview, currentUrl, liveLookup, ...]`, none of
+which change on a mode switch — so it would stay bound to the dead element and live lookup would
+die with no message. Aero's `.aero-immersion-rail` is a separate code path, untouched.
+
+### The finding: every L6 sheet has been a partial cover — `09bbced2`
+
+Found only by driving the live app at a narrow pane. Four JSDOM suites, a CSS-text assertion and
+the resolver all passed throughout.
+
+Every tool renders as `<aside class="lq-reading-sheet lq-liquid">`. `theme/liquid-surfaces.css`
+declares `position: relative`, `padding: var(--lq-space-4)` and `background: var(--lq-liquid-bg)`
+on `.lq-liquid` at the **same (0,1,0) specificity** as a bare `.lq-reading-sheet`, from a
+stylesheet that loads **later**. It won all three, and a component-level
+`import './readingCanvas.css'` cannot influence that order.
+
+Measured on Immersion, canvas 462:
+
+| | before | after |
+| --- | --- | --- |
+| sheet `position` | `relative` | `absolute` |
+| sheet box | **338 in flow** | **462 = full canvas** |
+| document | **112**, while `data-content-width` said 462 | 462, inert |
+| aside `padding` | 12px | 0 |
+| material | `--lq-liquid-bg`, alpha **0.72** | `--lq-liquid-bg-raised`, alpha **0.88** |
+
+338 beside 112 is a **partial cover** — the one outcome `shared/liquidReadingCanvas.ts` declares
+inexpressible. It was inexpressible in the resolver and shipping in the stylesheet. After the fix
+`elementFromPoint` at the canvas centre returns a node inside the tool: covering proven by hit
+test, not only by box arithmetic. Docked re-measured at 782: `static`, padding 0,
+220 + 12 + 550 = 782 exactly.
+
+Fix is **specificity, not order** — `.lq-reading > .lq-reading-tool` / `> .lq-reading-sheet` are
+(0,2,0) and cannot lose to a role class whatever the import order becomes. `background` was
+dropped from the old (0,1,0) combined rule rather than left as a losing duplicate that reads like
+the source of truth; border/radius/shadow/colour stay there because `.lq-liquid` sets them to the
+SAME tokens, so which wins is not observable. `[data-scroll='page']`'s sticky rule is (0,3,0) and
+never lost, which is why Library's docked drawer was correct.
+
+**Why the existing test could not see it, and what replaced it.** It asserted the CSS TEXT
+contains `position: static` / `position: absolute`. Both were true the whole time. *A declaration
+existing is not a declaration winning.* The replacement reads BOTH stylesheets, asserts
+`.lq-liquid` really does claim those three properties (so the premise fails loudly if that
+changes), then requires every rule reclaiming them to carry more than one class. It **failed on
+first run** against a real leftover — the dead `background` duplicate — which is the evidence it
+can actually see this class of defect.
+
+### Gate numbers
+
+`immersionCanvas.test.tsx`, 160 lines, **zero plumbing** — fourth caller of
+`helpers/readingCanvasSurface`, a RUN not a build. 7/7: docked 220 / content 968 at 1200; sheet /
+content 500 at 500 with dismissal restoring the same node; the boundary from **both sides** (576 →
+docked at exactly 180 with the stage at exactly its 384 floor, 575 → sheet);
+`--lq-reading-measure: none` proving the fill policy is in force; negative control — rail closed at
+1200 places no tool and returns all 1200. Five reading-canvas suites together: **40/40**.
+
+Live, default pane: canvas 782, tool 220, doc 550, gap exactly 12, `aria-pressed="true"`. The
+toolbar trigger gained `aria-pressed` and a stable class — a localised title is neither a state
+report nor a safe selector.
+
+**Not claimed as live evidence:** the classic Library shelf could not be re-driven after the
+primitive fix — it renders **0 rows** in this profile, so its drawer never opens. Covered by its
+JSDOM suite only.
+
+### NEXT SLICE, already measured so the next turn does not re-derive it
+
+**The sites rail is unvirtualised and it is now a category-7 defect on a surface we certified.**
+Measured live in this profile: **883 real saved sites**, one `<ul>`, `scrollHeight` **46,822px**
+in a **418px** viewport (112x overdraw), **6,199 DOM nodes** inside `.immersion-body`.
+`components/VirtualList.tsx` is the repo's primitive and the rail's ancestors already give it a
+definite height (`.lq-reading-tool-body` is `flex: 1 1 auto; min-height: 0`).
+
+The one thing to settle first: **row heights are 49px x879, 50px x1, 51px x3**, and `VirtualList`
+is FIXED-height, so 883 rows would drift up to ~1.7kpx cumulatively. `.immersion-site-title` is
+already `nowrap` + ellipsis, so the variance is not wrapping. `completionPct > 0` renders an extra
+6px bar and **0 of 883 sites have one here**, so this profile cannot exercise that branch — do not
+conclude the bar is dead. Give the row a deterministic height before virtualising.
+Trap to check, from `4e2c46e1`: this repo has already shipped virtualisation that was *present and
+inert*.
