@@ -7466,9 +7466,23 @@ mark.lookup-mark,
 .gx-fam-chip .gx-filters-cat-count {
   margin-left: 2px;
 }
+/* The explorer's catalogue is windowed by `VirtualList`, and a windowed list can
+   only window what it can MEASURE. Measured live 2026-08-25: `.gram-view` is a
+   plain block, so `.gram-x` grew to its own content (139,780 px) inside an
+   820x580 window, the list's viewport measured that full height, and all 2,410
+   rows rendered — the virtualisation was present and inert. `gram-view--explorer`
+   bounds the chain; these two rules make `.gram-x-list` the scroller rather than
+   letting its `overflow-y: auto` child grow to content and defeat it again. */
 .gram-x-list {
   width: 320px;
   flex: 0 0 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.gram-x-list > * {
+  flex: 1 1 auto;
   min-height: 0;
 }
 .gram-x-detail {
@@ -14026,6 +14040,14 @@ html[data-icon-size='large'] .os-desk-icon-img { width: 52px; height: 52px; }
 .fwin-body .translate-view,
 .fwin-body .novels-view {
   min-height: 0;
+}
+/* Explorer mode only — the other three Grammar modes keep the natural block flow
+   they were built for, and `height: 100%` against an indefinite host resolves to
+   `auto`, so a Blanc or pop-out host is unaffected. */
+.gram-view--explorer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 .fwin-resize {
   position: absolute;

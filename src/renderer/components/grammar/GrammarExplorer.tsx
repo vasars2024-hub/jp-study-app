@@ -134,6 +134,19 @@ export default function GrammarExplorer({ renderDetail, className = '' }: Gramma
   const focused = (focusedId && byId.get(focusedId)) || list[0] || null;
 
   /*
+   * Now that the list really is windowed, the focused row can be outside the
+   * rendered range — so a selection made from a search result, a filter change
+   * or another surface would leave the detail pane showing a pattern the list
+   * is not displaying. `VirtualList` only scrolls when this index CHANGES and
+   * only as far as it takes, so scrolling away from your own selection is still
+   * allowed; it just does not silently lose it.
+   */
+  const focusedIndex = useMemo(
+    () => (focused ? list.findIndex((p) => p.id === focused.id) : -1),
+    [list, focused],
+  );
+
+  /*
    * Selection survives filtering. Hiding a record must not silently drop it
    * from a pending bulk action — the count below tells you how many are
    * currently out of view instead.
@@ -405,6 +418,7 @@ export default function GrammarExplorer({ renderDetail, className = '' }: Gramma
               itemHeight={ROW_HEIGHT}
               getKey={(p) => p.id}
               renderItem={renderRow}
+              scrollToIndex={focusedIndex}
             />
           )}
         </div>

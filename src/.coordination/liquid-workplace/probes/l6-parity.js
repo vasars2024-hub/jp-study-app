@@ -202,18 +202,29 @@
           // Search narrows the list. Read AFTER `step('search')`: the count element
           // and the row count must agree, and the rows must contain the query.
           //
-          // INSTRUMENT CORRECTION, 2026-08-25: the first version read the count
-          // with `/\d+/` and the live label is `2,410 points`, so it matched "2"
-          // and scored a working search FALSE. Group separators are locale-
-          // dependent (`2,410` / `2 410` / `2.410`), so strip every non-digit.
+          // TWO instrument corrections, both 2026-08-25 and both worth keeping:
+          //  (a) the first version read the count with `/\d+/` and the live label
+          //      is `2,410 points`, so it matched "2" and scored a working search
+          //      FALSE. Group separators are locale-dependent — strip non-digits.
+          //  (b) the second version then required `count === renderedRows`, which
+          //      only held because the list was NOT actually windowing. Once the
+          //      catalogue really virtualised (18 rows of 2,410) that identity is
+          //      false BY DESIGN. A parity check must not encode a performance bug
+          //      as its pass condition. Scored on the count CHANGING instead, with
+          //      the rendered rows required to be a window of it, never more.
           id: 'search',
           f: (w) => {
             const i = q(w, '.gram-search');
             const rows = qa(w, '.gram-x-row');
             const label = txt(q(w, '.gram-x-count'));
-            const num = label.replace(/[^\d]/g, '');
-            const ok = !!i && rows.length > 0 && (!num || Number(num) === rows.length);
-            return { ok, ev: `query="${i ? i.value : 'no-input'}" rows=${rows.length} count="${label}"` };
+            const num = Number(label.replace(/[^\d]/g, ''));
+            const before = window.__LQP_GRAM_COUNT_BEFORE;
+            const ok =
+              !!i && rows.length > 0 && rows.length <= num && before != null && label !== before;
+            return {
+              ok,
+              ev: `query="${i ? i.value : 'no-input'}" renderedRows=${rows.length} count="${label}" countBefore="${before}"`,
+            };
           },
         },
         {
@@ -268,8 +279,9 @@
         search: (w, term) => {
           const i = q(w, '.gram-search');
           if (!i) return { refused: 'no grammar search input' };
+          window.__LQP_GRAM_COUNT_BEFORE = txt(q(w, '.gram-x-count'));
           typeInto(i, term == null ? 'あとで' : term);
-          return { typed: i.value };
+          return { typed: i.value, countBefore: window.__LQP_GRAM_COUNT_BEFORE };
         },
         pickRow: (w, idx) => {
           const rows = qa(w, '.gram-x-row-main');

@@ -78,7 +78,12 @@ export default function GrammarView() {
 
   return (
     <AppChrome status={classicStatus} className="gram-chrome">
-    <div className="gram-view">
+    {/* `gram-view--explorer` bounds the view to its host for the explorer mode
+        only. `GrammarExplorer` windows its 2,400-row catalogue, but a windowed
+        list can only window what it can measure, and on a plain block host the
+        list's own viewport measured the whole content — so every row rendered.
+        The other three modes keep the natural block flow they were built for. */}
+    <div className={`gram-view${mode === 'grammar' ? ' gram-view--explorer' : ''}`}>
       {/* L5 — contextual, not dense work: one intro line and the mode switch. The
           four mode panels below stay conventional Work; a grammar point’s prose and
           its practice form are exactly what §2 keeps off translucent material.
