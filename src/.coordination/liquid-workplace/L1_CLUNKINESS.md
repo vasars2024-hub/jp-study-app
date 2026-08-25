@@ -557,3 +557,42 @@ state" reading from an `is-active`-only query was the query's fault.
 **Trap.** A synthetic `el.click()` does not focus the button — Chromium only focuses on a real
 pointer press. The first live check of `e334d7c5` therefore read `BODY` *after* the fix, because
 there was no trigger to return to. Call `focus()` first; that is the keyboard path anyway.
+
+## 2026-08-25 · primary · Video category 2 — the sweep runs ONE PASS, and its last dead end was not one
+
+| Slice | Commit | What landed |
+| --- | --- | --- |
+| `rank()` dismisser + playback skip + second pass | *this commit* | `l1-deadend.js` / `-read.js` |
+
+**Three repairs, all in the instrument, all measured on the Video window (`.mc-root`, liquid,
+1080×700, `Continue watching` / 1 card / List view, drawer open at arm).**
+
+1. **A dismisser ranks LAST inside the region it dismisses.** The drawer's `Close` is FIRST in DOM
+   (`medialib-drawer__hero` precedes `__body`, `MediaDetailPanel.tsx:262`) and is ordinary content
+   by every other test, so the run opened on it and unmounted the eight controls behind it —
+   **25/33**. Half a band (`band + 0.5`) keeps it inside its own group and after everything that
+   group holds. Order now: drawer body → `Close` → cards → re-listers → chrome → `Back`.
+2. **`STARTS_PLAYBACK` — `Play` and any `.medialib-ep` row are skipped and reported.** They write
+   `watchedSec` with no product-side undo, the same rule `Add to favorites` already lived under;
+   last turn named all three by hand and refused to drive them. Matched by CLASS for the episode
+   rows, because their label is the episode's own title — which also retires the trap where a
+   podcast called *"…why I **star**t this podcast"* was skipped by `DESTRUCTIVE`'s unanchored `star`.
+3. **A dead end must be dead from TWO states.** The one-pass run reported `Media Settings` — and it
+   is real: the topbar gear at `MediaCenterView.tsx:1777`, `setTab('settings')`, driven immediately
+   after the sidebar row that had just set that same tab. By hand from Discover it moves the surface
+   hard: heading *"Find the right next watch."* → *"Playback, subtitles, and where your media comes
+   from."*, chars **3,085 → 2,454**, nodes **759 → 369**. `activeAtClick` cannot catch this and must
+   not be widened to try — it reads the marks a segmented OPTION carries, and a topbar shortcut to a
+   destination carries none. So every no-change candidate is re-driven from wherever the sweep
+   ended: `deadEnds` needs `changed:false` twice, `movedOnSecondPass` and `unconfirmed` are listed.
+
+**The run, one pass, no hand-driving:** targets **31**, coverage **30/30**, `gone` **0**,
+`unstable` **0**, `resolvedBy.class` **0** (live 28 / key 2), `worstSettleTries` **1**,
+**deadEnds 0**, `movedOnSecondPass` `["Media Settings"]`, `alreadyActive` `["Episodes"]`,
+`savedStoreUntouched` **true**, 14 skipped each with its reason.
+
+**The control fired, on both passes.** Bait `changed:false` and `secondPassChanged:false`. That
+second number is the guard on the new pass itself: a handler-less button is dead from every state,
+so a confirmation pass that could ever rescue the bait would be the broken thing. Desktop restored
+as found (Video `Continue watching` / 1 card / List view / drawer closed), globals deleted, bait
+removed.

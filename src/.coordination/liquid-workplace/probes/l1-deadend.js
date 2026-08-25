@@ -118,6 +118,15 @@
   // which changes the `.fwin` set the sweep resolves every target against — the effect is real but
   // it invalidates the instrument mid-run. Its own pass, not this one.
   const SPAWNS_WINDOW = /^media workspace/i;
+  // Controls that START PLAYBACK of a real file. They write watch progress — `watchedSec` on the
+  // media item — and there is no product-side undo, which is the same rule `Add to favorites`
+  // already lives under. 2026-08-25's census named all three by hand and refused to drive them
+  // (`Play`, `1The Big O - 01`, `2The Big O - 02`); this encodes that refusal so the sweep can run
+  // one-pass. An episode row is matched by CLASS, not name: its label is the episode's own title,
+  // arbitrary user text (`MediaEpisodeRow.tsx:39`). That also retires the substring trap where a
+  // podcast episode called "…why I start this podcast" was skipped by `DESTRUCTIVE`'s
+  // unanchored `star` and lost a real coverage point to the wrong reason.
+  const STARTS_PLAYBACK = (el, name) => el.classList.contains('medialib-ep') || /^play\b/i.test(name);
 
   const label = (el) =>
     (el.getAttribute('aria-label')
@@ -221,6 +230,10 @@
       skipped.push({ name: t.name, why: 'spawns a separate window — invalidates the resolver mid-run' });
       continue;
     }
+    if (el !== bait && STARTS_PLAYBACK(el, t.name)) {
+      skipped.push({ name: t.name, why: 'starts playback — writes watch progress, no product-side undo' });
+      continue;
+    }
     if (el !== bait && MODE_SWITCH.test(t.name)) {
       skipped.push({ name: t.name, why: 'mode switch — driven in its own pass, wipes the measured state' });
       continue;
@@ -267,10 +280,23 @@
   const EXPANDER = (el) => !!el.closest('.medialib-card');
   /** Changes WHICH items the content region enumerates: goes after the items themselves. */
   const RELISTS = (el, name) => VIEW_SWITCH.test(name) || !!el.closest('.medialib-rail');
+  /**
+   * A DISMISSER RANKS LAST INSIDE THE REGION IT DISMISSES, and this is the third form of the
+   * same sweep-order defect on this surface. The detail drawer's own close button is FIRST in
+   * DOM — `medialib-drawer__hero` precedes `medialib-drawer__body`
+   * (`MediaDetailPanel.tsx:262`) — and it is ordinary content by every other test here, so the
+   * run opened on it and unmounted the eight controls behind it: coverage **25/33** with the
+   * drawer's whole body `gone`. Half a band keeps it inside its own group (before the cards at
+   * 1) while putting it after everything that group holds.
+   * Window chrome close is not reached by this: `.fwin-titlebar` is skipped above.
+   */
+  const DISMISSES = (el, name) => /__close(\b|$|\s)/.test(String(el.className || ''))
+    || /^(Close|Dismiss|Back)$/i.test(name);
   const anyContent = targets.some((t) => inContent(t.el));
-  const rank = (t) => (!anyContent
+  const band = (t) => (!anyContent
     ? Number(VIEW_SWITCH.test(t.name))
     : (!inContent(t.el) ? 3 : RELISTS(t.el, t.name) ? 2 : EXPANDER(t.el) ? 1 : 0));
+  const rank = (t) => band(t) + (DISMISSES(t.el, t.name) ? 0.5 : 0);
   targets.sort((a, b) => rank(a) - rank(b));
 
   // ...and because they go last, the sweep used to END on `Interlinear`, which renders no
@@ -390,6 +416,55 @@
       st.results.push(row);
       st.i += 1;
     }
+
+    /**
+     * SECOND PASS — a dead end has to be dead from TWO different starting states.
+     *
+     * Measured 2026-08-25 on the Video window: the one-pass sweep reported `Media Settings` as a
+     * dead end. It is not. It is the topbar gear (`MediaCenterView.tsx:1777`,
+     * `onClick={() => setTab('settings')}`), and the target driven immediately before it was the
+     * sidebar's `Media SettingsPlayback and sources`, which had just set that same tab. Driven by
+     * hand from the Discover page it moves the surface hard: heading *"Find the right next
+     * watch."* → *"Playback, subtitles, and where your media comes from."*, chars 3,085 → 2,454,
+     * nodes 759 → 369.
+     *
+     * `activeAtClick` cannot catch this and should not be widened to try. It reads
+     * `aria-pressed` / `aria-selected` / `.active` — the marks a segmented OPTION carries. A
+     * topbar shortcut to a destination is not an option in a group and carries none of them, and
+     * no DOM attribute tells this probe where a click was going to go. What does settle it is
+     * re-driving the candidate from wherever the sweep ended up: any two controls aiming at one
+     * destination produce this artifact, and the second state breaks the tie without the probe
+     * having to know the app's routes.
+     *
+     * The bait goes through this pass too. A handler-less button is dead from every state, so if
+     * the confirmation pass ever "rescues" it, the pass itself is the thing that is broken.
+     */
+    st.confirm = [];
+    const candidates = targets.filter((t, n) => {
+      const r = st.results[n];
+      return r && !r.gone && !r.unstable && !r.changed && !r.activeAtClick && !r.formUnchanged;
+    });
+    for (const t of candidates) {
+      const { el, by } = resolve(t);
+      if (!el) {
+        st.confirm.push({ name: t.name, cls: t.cls, gone: true, resolvedBy: null });
+        continue;
+      }
+      const quiet = await settle();
+      const before = quiet.sig;
+      el.click();
+      await wait(STEP_MS);
+      st.confirm.push({
+        name: t.name,
+        cls: t.cls,
+        isBait: el.id === '__liq-deadend-bait',
+        resolvedBy: by,
+        changed: before !== signature(),
+        settleTries: quiet.tries,
+        unstable: !quiet.stable,
+      });
+    }
+
     st.savedStoreUntouched = localStorage.getItem(SAVED_KEY) === savedAtArm;
     if (lensModeName) {
       const back = [...win.querySelectorAll('button')].find((b) => label(b) === lensModeName);
