@@ -320,6 +320,29 @@ describe('readingCanvas.css', () => {
     expect(CSS).toMatch(/\.lq-reading-doc\s*\{[^}]*position:\s*relative/);
   });
 
+  it('keeps a page-scrolled tool in flow, sticky and never absolute', () => {
+    /*
+     * `scroll="page"` exists because a catalogue scrolls the page rather than a
+     * bounded stage: measured live on the Library shelf, the docked drawer is
+     * 365px of content beside a 1191px list, so the default stretch would have
+     * scrolled the inspector the user just selected a row to read off the top.
+     *
+     * The reason it cannot reintroduce a partial cover is this one word: a
+     * STICKY box stays in flow, so it still reserves its flex track and the
+     * resolver's arithmetic keeps holding. `absolute` or `fixed` here would take
+     * it out of flow and put the tool back over the document, which is the one
+     * thing this stylesheet is not allowed to do.
+     */
+    const page = CSS.match(
+      /\.lq-reading\[data-scroll='page'\]\s*>\s*\.lq-reading-tool\s*\{([^}]*)\}/,
+    );
+    expect(page, 'the page-scrolled docked tool needs its own rule').not.toBeNull();
+    expect(page?.[1]).toMatch(/position:\s*sticky/);
+    expect(page?.[1]).not.toMatch(/position:\s*(absolute|fixed)/);
+    // And the default is untouched: `contained` is still the plain static tool.
+    expect(CSS).toMatch(/\.lq-reading-tool\s*\{[^}]*position:\s*static/);
+  });
+
   it('paints nothing outside its own namespace', () => {
     const selectors = CSS.split('}')
       .map((block) => block.split('{')[0].trim())

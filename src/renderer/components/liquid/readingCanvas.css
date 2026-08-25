@@ -92,6 +92,35 @@
   overflow: hidden;
 }
 
+/* ---------------------------------------------------------------------------
+   `scroll="page"`: the canvas is as tall as its content and an ancestor
+   scrolls. Catalogues work this way. The default `contained` geometry would
+   stretch a docked tool to the height of a list that can be thousands of pixels
+   long, so the inspector the user selected a row to read scrolls off the top —
+   a feature loss disguised as a layout.
+
+   `sticky`, NOT `absolute` or `fixed`: a sticky box stays in flow, so it still
+   reserves its flex track and the resolver's arithmetic keeps holding. That is
+   why this cannot reintroduce a partial cover, which is the one thing this file
+   is not allowed to do. `.lq-reading-tool` keeps `position: static` in the
+   default case, and `liquidReadingCanvas.test.tsx` still asserts it there.
+   --------------------------------------------------------------------------- */
+.lq-reading[data-scroll='page'] {
+  height: auto;
+  align-items: flex-start;
+}
+
+.lq-reading[data-scroll='page'] > .lq-reading-doc {
+  overflow: visible;
+}
+
+.lq-reading[data-scroll='page'] > .lq-reading-tool {
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  max-height: 100vh;
+}
+
 /* Sheet: the whole canvas, and only ever the whole canvas. Anchored to the
    canvas box rather than the viewport so a reader docked inside a larger
    window covers its own document and not the app around it. */

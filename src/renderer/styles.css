@@ -25831,20 +25831,17 @@ html[data-seanime-dev-panel] .seanime-host-launcher {
    collection, and a drawer that details one item without the grid having to
    give up a permanent column for it. `data-drawer` is set from the same
    `drawerState()` the Aero workbench uses, so the two shells cannot drift. */
-.lib-shell {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 16px;
-  align-items: start;
-}
-.lib-shell[data-drawer='open'] {
-  grid-template-columns: minmax(0, 1fr) 262px;
-}
-@media (max-width: 900px) {
-  .lib-shell[data-drawer='open'] {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
+/* The classic shelf lays itself out through L6's reading canvas now, so every
+   declaration that used to be here has moved: `.lib-shell` IS the
+   `.lq-reading` element (see `components/liquid/readingCanvas.css`) and the
+   drawer is a tool the resolver places. What was deleted, and why it had to be:
+   `.lib-shell[data-drawer='open']` gave the drawer a flat 262px grid track and
+   a `@media (max-width: 900px)` rule was supposed to stack it — but a media
+   query reads the WINDOW. This view renders in the Reading Finder's 820px pane
+   and in pop-outs, so at a 600px pane inside a 1264px window the query never
+   fired: the drawer kept all 262px and a five-column list row was left ~322px.
+   `data-drawer` survives on the element as state for tests and themes; nothing
+   sizes anything from it. */
 
 .lib-list {
   display: flex;
@@ -25911,14 +25908,13 @@ html[data-seanime-dev-panel] .seanime-host-launcher {
   background-size: cover;
 }
 
+/* The drawer's BOX belongs to the canvas tool now — sticky, padding, border,
+   radius and panel background all come from `.lq-reading-tool` under
+   `[data-scroll='page']`, and keeping them here as well painted a card inside a
+   card. The class stays because every rule below it is a descendant selector on
+   the drawer's own contents, which are unchanged. */
 .lib-drawer {
-  position: sticky;
-  top: 0;
-  align-self: start;
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--panel, transparent);
+  min-width: 0;
 }
 .lib-drawer .aero-library-drawer-head {
   display: flex;

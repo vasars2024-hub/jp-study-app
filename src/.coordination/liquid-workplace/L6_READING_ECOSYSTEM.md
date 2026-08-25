@@ -133,3 +133,55 @@ this number can legitimately fall.
 reader and was deliberately left outside the canvas — the file is dirty from another track (the
 in-flight i18n adoption, see the boss audit's Finding 5), so migrating it now would either stage
 their work or lose it.
+
+---
+
+## 2026-08-25 — surface 3 of 5: the classic Library shelf
+
+Captures' defect, in a different stylesheet. `.lib-shell[data-drawer='open']` was
+`grid-template-columns: minmax(0, 1fr) 262px` with a `@media (max-width: 900px)` stack, and
+**a media query reads the WINDOW**. Both are deleted; `.lib-shell` IS the `.lq-reading` element
+and the detail drawer is a tool the resolver places. FILL policy — a catalogue is not prose.
+
+**The negative control, measured live and not argued.** The Library renders in the Reading
+Finder's pane: canvas **782**, `window.innerWidth` **1264**,
+`matchMedia('(max-width: 900px)').matches` **false**. The query could not fire for the case it
+existed to handle. Narrowed to a **600 px** pane the same reading holds — `matches` still
+**false**, `innerWidth` still 1264 — where the old grid would have kept all 262 px and left a
+five-column list row ~322 px.
+
+**Live round trip.** 782 pane → drawer docked **262**, list **508** = 782−262−12, gap exactly
+**12**, `elementFromPoint` at the tool = `.lq-reading-tool-title`, 4 meta rows and 3 shared
+reading actions intact, 25 list rows. 600 pane → **sheet**, list **600**, `inert` +
+`aria-hidden="true"` + `role="dialog"` + `aria-modal="true"`, sheet box identical to the
+document's, and it **took focus**. Escape alone → tools 0, `data-drawer` back to `closed`, not
+inert, 25 rows. Pane restored, `style` attribute back to `null` as found.
+
+**The primitive gained `scroll="page"`, and this surface is why.** Measured docked: the drawer is
+**365 px** of content beside a **1191 px** list. Under the default `contained` geometry the tool is
+stretched to the full list height and its contents scroll off the top — the inspector you selected
+a row to read leaves the screen. `page` makes the docked tool `position: sticky`, which is
+load-bearing in one word: **sticky stays IN FLOW**, so it still reserves its flex track and the
+resolver's arithmetic holds. `absolute` or `fixed` would put the tool back over the document.
+`.lq-reading-tool` keeps `position: static` in the default case and the test still asserts it.
+
+**RULE 1: this was a RUN.** `libraryCanvas.test.tsx` is 129 lines of surface-specific numbers and
+zero plumbing — third caller of `helpers/readingCanvasSurface`. Its own negative control is
+"places no tool until a row is selected": the canvas is measured at a width that could easily dock
+and still places nothing, so a surface inventing a tool would fail.
+
+**Traps.**
+1. **`styles.css`'s HEAD blob has 10 CRLF lines** (24932–24941, another track's earlier HEAD+edit
+   staging). Normalising EOLs before editing turns a 2-hunk commit into a **26,029-line whole-file
+   rewrite**, and it also rewrote the working copy the same way. Read HEAD with `latin1` (byte
+   round-trip), never `replace(/\r\n/g,'\n')`, and verify with
+   `git diff --cached --unified=0 | grep '^@@'` — the hunk list must be only yours.
+2. A CSS-text assertion must strip comments first. The replacement comment NAMES the deleted rule
+   so the next worker knows why it went, and `not.toMatch(/\.lib-shell\[data-drawer='open'\]/)`
+   then reads the explanation as the defect.
+3. `libraryShelfLayout.test.ts` asserted `{detailBody}` appeared **twice**. It still appears once
+   per shell — the classic one is now `content: detailBody` in `libraryTools`, not `{detailBody}`.
+
+**Next: Immersion**, then the manga/PDF/EPUB/VN suites. `ReaderCollectionPanel` stays outside the
+canvas until its own track commits: it is dirty with the in-flight i18n adoption (boss-audit
+Finding 5), so migrating it now would stage their work or lose it.

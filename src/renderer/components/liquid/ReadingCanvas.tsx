@@ -70,6 +70,21 @@ type ReadingCanvasProps = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
   policy?: ReadingCanvasPolicy;
   /** Force a width instead of measuring — tests, and callers that already observe. */
   widthOverride?: number;
+  /**
+   * Who owns the scroll.
+   *
+   * `contained` (default) — the canvas has a definite height and the document
+   * scrolls inside it. Novels and Captures: a reader in a bounded stage.
+   *
+   * `page` — the canvas is as tall as its content and an ancestor scrolls.
+   * Catalogues work this way, and the difference is not cosmetic: under
+   * `contained` a docked tool is stretched to the full height of a list that may
+   * be thousands of pixels long, so its own contents scroll off the top and the
+   * inspector you selected a row to read is no longer on screen. Under `page`
+   * the tool is `position: sticky` — still IN FLOW, so it reserves its track and
+   * the placement invariant is untouched; a partial cover remains inexpressible.
+   */
+  scroll?: 'contained' | 'page';
 };
 
 /**
@@ -103,6 +118,7 @@ export function ReadingCanvas({
   closeLabel,
   policy = READING_CANVAS_POLICY,
   widthOverride,
+  scroll = 'contained',
   className,
   ...rest
 }: ReadingCanvasProps) {
@@ -163,6 +179,7 @@ export function ReadingCanvas({
       ref={ref}
       className={['lq-reading', className].filter(Boolean).join(' ')}
       data-covered={covered ? 'true' : undefined}
+      data-scroll={scroll}
       data-measured={width === null ? undefined : 'true'}
       data-open-tools={open.length || undefined}
       onKeyDown={onKeyDown}

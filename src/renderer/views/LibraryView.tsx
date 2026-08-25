@@ -49,6 +49,11 @@ import {
   type LibraryLayout,
 } from '../utils/libraryShelf';
 import { setHandoffJson, takeHandoff } from '../pendingHandoff';
+import {
+  ReadingCanvas,
+  type ReadingCanvasTool,
+} from '../components/liquid/ReadingCanvas';
+import { READING_CANVAS_FILL_POLICY } from '../../shared/liquidReadingCanvas';
 import { readingWorkspaceEntryFromLibraryItem } from '../../shared/readingWorkspace';
 import { resolveReadingWorkspaceActions } from '../../shared/readingWorkspaceActions';
 import type { ReadingWorkspaceActionId } from '../../shared/readingWorkspaceActions';
@@ -823,6 +828,40 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
     </>
   );
 
+  /**
+   * The classic shelf's detail drawer is a reading side tool, and L6's canvas
+   * decides where it goes — this view no longer does.
+   *
+   * Same defect Captures had, in a different stylesheet:
+   * `.lib-shell[data-drawer='open']` was `grid-template-columns: minmax(0, 1fr)
+   * 262px` with a `@media (max-width: 900px)` stack, and A MEDIA QUERY READS THE
+   * WINDOW. This view renders inside the Reading Finder's 820px pane and in
+   * pop-outs, so at a 600px pane inside a 1264px window the query never fired:
+   * the drawer kept its whole 262px column and a five-column list row was left
+   * ~322px. `ReadingCanvas` measures its own box, so the same pane turns the
+   * drawer into a dismissible sheet and gives the list all 600px.
+   *
+   * FILL policy because a catalogue is not prose — a 760px clamp would letterbox
+   * a table for no reason. `scroll="page"` because the classic shelf scrolls the
+   * page rather than a bounded stage, which is what keeps the drawer sticky
+   * instead of stretching it to the height of the whole list.
+   */
+  const libraryTools: ReadingCanvasTool[] = [];
+  if (layout === 'list' && selectedItem) {
+    libraryTools.push({
+      id: 'library-detail',
+      label: t('library.inspector.details'),
+      // 220 is the narrowest the meta `<dl>` keeps its term/value pairs on one
+      // line; below it they wrap and the drawer reads as a paragraph.
+      minWidth: 220,
+      preferredWidth: 262,
+      onClose: () => setSelectedId(null),
+      // `drawerHead` deliberately not reused here: the canvas head already
+      // renders the title and the close, and the Aero workbench still needs it.
+      content: detailBody,
+    });
+  }
+
   return (
     <AppChrome menus={libMenus} status={libStatus} className="aero-library-chrome">
     <div className={`library${aero ? ' aero-library' : ''}`} onClick={() => setFileMenu(null)}>
@@ -1421,7 +1460,15 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
           <p className="muted">{t('library.emptyFolder.descClassic')}</p>
         </div>
       ) : (
-        <div className="lib-shell" data-drawer={drawerState(layout === 'list' ? selectedItem : null)}>
+        <ReadingCanvas
+          className="lib-shell"
+          data-drawer={drawerState(layout === 'list' ? selectedItem : null)}
+          tools={libraryTools}
+          closeLabel={t('common.close')}
+          policy={READING_CANVAS_FILL_POLICY}
+          scroll="page"
+          aria-label={t('library.table.aria')}
+        >
         {layout === 'list' ? (
           <div className="lib-list-groups">
             {groupedVisible.map((group) => (
@@ -1644,18 +1691,14 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
         </div>
         )}
         {/*
-          Classic shell: the drawer belongs to the compact list, where a row has
-          nowhere to put its actions. A grid card already carries its own — and
+          The drawer itself is no longer here — it is `libraryTools` above, and
+          the canvas places it. What still lives here is the rule about WHEN it
+          exists at all: the drawer belongs to the compact list, where a row has
+          nowhere to put its actions. A grid card already carries its own, and
           `selectedId` there drives the inline OCR panel, so opening a drawer on
           the same state would answer one click with two panels.
         */}
-        {layout === 'list' && selectedItem && (
-          <aside className="lib-drawer" aria-label={t('library.inspector.aria')}>
-            {drawerHead}
-            {detailBody}
-          </aside>
-        )}
-        </div>
+        </ReadingCanvas>
       )}
         </>
       )}

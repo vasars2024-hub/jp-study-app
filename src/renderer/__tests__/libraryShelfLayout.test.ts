@@ -118,8 +118,15 @@ describe('contextual detail drawer', () => {
  */
 describe('the Study OS shell gets the same shapes', () => {
   it('shares one drawer body and one layout switch between both shells', () => {
-    expect(VIEW.match(/\{detailBody\}/g)?.length).toBe(2);
-    expect(VIEW.match(/\{drawerHead\}/g)?.length).toBe(2);
+    // Still ONE `detailBody`, still consumed twice — but the classic shell now
+    // hands it to the L6 canvas as a tool's `content` rather than mounting it in
+    // its own `<aside>`, so the second reference is `content: detailBody`.
+    expect(VIEW.match(/\{detailBody\}/g)?.length).toBe(1);
+    expect(VIEW.match(/content: detailBody,/g)?.length).toBe(1);
+    // `drawerHead` is deliberately NOT reused in the canvas tool: the tool head
+    // already renders the title and the close, and two stacked heads is how a
+    // migration adds chrome while claiming to remove it.
+    expect(VIEW.match(/\{drawerHead\}/g)?.length).toBe(1);
     expect(VIEW.match(/\{layoutSwitch\}/g)?.length).toBe(2);
   });
 
@@ -132,15 +139,33 @@ describe('the Study OS shell gets the same shapes', () => {
   it('keeps the classic drawer out of grid mode, where selection means OCR', () => {
     // `selectedId` doubles as the inline BookOcrPanel toggle on a grid card;
     // mounting the drawer on it too would answer one click with two panels.
-    expect(VIEW).toContain("{layout === 'list' && selectedItem && (");
+    // The rule survived the L6 canvas migration — only its expression moved,
+    // from a conditional `<aside>` to a conditional entry in `libraryTools`.
+    expect(VIEW).toContain("if (layout === 'list' && selectedItem) {");
     expect(VIEW).toContain("drawerState(layout === 'list' ? selectedItem : null)");
   });
 
-  it('gives the classic shell the drawer column only when it is open', () => {
-    const closed = CLASSIC_CSS.match(/\n\.lib-shell\s*\{([^}]*)\}/);
-    const open = CLASSIC_CSS.match(/\n\.lib-shell\[data-drawer='open'\]\s*\{([^}]*)\}/);
-    expect(closed?.[1]).toContain('grid-template-columns: minmax(0, 1fr);');
-    expect(open?.[1]).toMatch(/grid-template-columns: minmax\(0, 1fr\) \d+px;/);
+  it('has no window-width media query left to size the drawer', () => {
+    /*
+     * Replaces "gives the classic shell the drawer column only when it is open",
+     * which asserted the defect. `.lib-shell[data-drawer='open']` was
+     * `grid-template-columns: minmax(0, 1fr) 262px` with a
+     * `@media (max-width: 900px)` stack, and a media query reads the WINDOW —
+     * this view renders in the Reading Finder's 820px pane and in pop-outs, so
+     * at a 600px pane inside a 1264px window the query never fired and a
+     * five-column list row was left ~322px. L6's canvas measures the element.
+     */
+    // Comments stripped first: the replacement comment NAMES the deleted rule
+    // so the next worker knows why it went, and a raw text match would then
+    // read the explanation as the defect.
+    const rules = CLASSIC_CSS.replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(rules).not.toMatch(/\.lib-shell\[data-drawer='open'\]/);
+    expect(rules).not.toMatch(/@media[^{]*\{\s*\.lib-shell/);
+    // `data-drawer` itself stays: it is state the Aero workbench and these
+    // tests read. What is gone is anything sizing a track from it.
+    expect(VIEW).toContain('data-drawer={drawerState(');
+    expect(VIEW).toContain('policy={READING_CANVAS_FILL_POLICY}');
+    expect(VIEW).toContain('scroll="page"');
   });
 
   it('sizes the compact-list thumbnail outside the Aero-only rule', () => {
