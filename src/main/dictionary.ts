@@ -82,6 +82,8 @@ import {
   readExplainTarget,
 } from '../shared/lexiconExplainPrompt';
 import { normalizePolicy } from '../shared/agentExecutionBridge';
+import { dictionaryDir } from './dictionary/db';
+import { warmDictionaryPages, type DictWarmResult } from './dictionary/warmup';
 import { runLexiconExplain, type LexiconExplainResult } from './dictionary/explainRun';
 import {
   notesToCsv,
@@ -701,7 +703,53 @@ export async function analyzeConjugation(word: string): Promise<ConjugationAnaly
   }
 }
 
+/**
+ * How long after registration the dictionary's pages are pulled into the OS cache.
+ *
+ * Late enough that the window's own first paint owns the disk, early enough that a
+ * reader who goes straight to Dictionary still lands on warm pages. The read is
+ * async and runs on libuv's threadpool, so this delay is about *disk* contention,
+ * not about the main loop, which it never occupies.
+ */
+export const DICT_WARMUP_DELAY_MS = 5000;
+
+let warmupTimer: NodeJS.Timeout | null = null;
+
+/**
+ * Schedules the one-shot page warm-up described in `dictionary/warmup.ts`.
+ *
+ * It lives here rather than in `main.ts` for two reasons. It belongs to the
+ * dictionary subsystem, so its lifetime is the same as the handlers'; and `main.ts`
+ * carries other work in this tree, so a wiring hunk there would have to be staged
+ * alongside it. Exported and separately callable so a test can drive it without
+ * registering forty IPC handlers.
+ */
+export function scheduleDictionaryWarmup(
+  onDone?: (result: DictWarmResult) => void,
+  delayMs = DICT_WARMUP_DELAY_MS,
+): void {
+  if (warmupTimer) return;
+  warmupTimer = setTimeout(() => {
+    warmupTimer = null;
+    void warmDictionaryPages(dictionaryDir()).then(
+      (result) => onDone?.(result),
+      // A warm-up that fails changes nothing a reader can see: the next lookup pays
+      // the cold cost it would have paid anyway. It must never surface as an error.
+      () => undefined,
+    );
+  }, delayMs);
+  // Not a reason to keep the process alive: quitting during the delay should quit.
+  warmupTimer.unref?.();
+}
+
+/** Cancels a scheduled-but-not-started warm-up. Test seam and quit path. */
+export function cancelScheduledDictionaryWarmup(): void {
+  if (warmupTimer) clearTimeout(warmupTimer);
+  warmupTimer = null;
+}
+
 export function registerDictionaryIpc(): void {
+  scheduleDictionaryWarmup();
   ipcMain.handle('dict:lookup', (_e, query: string) => lookupWord(query));
   ipcMain.handle('dict:lookupTerm', (_e, query: string) => lookupTerm(query));
   // Phase 4: the Chinese surfaces' lookup, moved out of `renderer/chineseDict.ts`.

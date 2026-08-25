@@ -742,6 +742,42 @@ still unidentified.
   the full sample series live in `src/.coordination/liquid-workplace/L7_PERF_DICTIONARY.md`.
 - Next action is a bisect of the allocation, and it is a slice of its own.
 
+**D2 — the first dictionary interaction after a cold boot blocks main for ~1.5 s.**
+Status: **FIXED 2026-08-25** by `src/main/dictionary/warmup.ts`, scheduled from
+`registerDictionaryIpc`. `8b769fa6` carried this forward as "~2 s of cold cost is NOT in the
+windowed scan" and named the SQLite open as the suspect. **The open is not it and neither is the
+scan.** Both were falsified before anything was written:
+
+- Not the open: `dict:listPairs` forces it plus `migrateDictionaryDb` in **1 ms** on an evicted
+  boot (`maxGap` 3 ms).
+- Not the scan: a standalone process over the same 537 MB file, evicted, walks the whole ja
+  partition — **158 windows, 772,750 rows, 409 ms total, worst window 13 ms, none over 100 ms**
+  (`debug/dict-scan-windows.cjs`). There is no 1.7 s window to find.
+- It is `lookup()`'s **pre-check**, the `headwordsOnly` probe `findLexiconCompounds` runs before
+  the scan. Isolated with a query that misses, so the call returns before the scan is reached:
+  cold it costs **1,552 ms in one unbroken block**; the same miss warm costs **54 ms** and a
+  *fresh* miss warm **51 ms**, so it is cold pages, not the miss.
+
+Fix: stream `dict.db` once, 5 s after registration, with async `fs` on libuv's threadpool. The
+Windows file cache is per file, not per handle, so pages faulted in there are the pages SQLite's
+mmap later finds resident — and the main loop is never occupied, which a warm-up *query* through
+the synchronous driver could not avoid. Declines by name on a missing file or one over
+`DICT_WARM_MAX_BYTES` (1.5 GB), where the read would evict more than it warms.
+
+A/B, identical procedure both sides — `tools/evict-file-cache.ps1 -TargetGb 8`, own boot,
+`debug/lq-mainloop-harness.ps1`, idle control valid both times (40 ms / 22 ms):
+
+| arm | before | after |
+| --- | --- | --- |
+| pre-check alone, cold (worst main-loop block) | **1,552 ms** | **74 ms** |
+| `dictCompounds('猫')` worst block / wall | 196 / 1,145 ms | 69 / **195 ms** |
+| `dictCompounds('犬')` wall | 218 ms | 165 ms |
+
+Same 12 compounds both sides. Elapsed idle time is not the explanation: the first cold run of the
+day sat ~60 s past boot before its query and still blocked **1,711 ms**. Pinned by
+`src/main/__tests__/dictionaryWarmup.test.ts` (7 cases incl. the too-large refusal proving nothing
+is read, and a cancel that stops mid-file).
+
 ## 13. Explicit non-goals
 
 - Replacing Electron’s/native window behavior with physics or freeform gestures.
