@@ -461,6 +461,17 @@ Gate: no Liquid product code until the baseline and parity ledger exist.
 Gate: the layout studies score 80/80 on `src/LIQUID_UI_RUBRIC.md` against Video and Dictionary
 before shared primitives are built. (Was "user approves"; amended 2026-08-16, see §10.4.)
 
+**L1 IS NOT CLOSED — settled against the tree 2026-08-25, RULE 5.** The relay pin says it is
+("gate 461, Video 8/8 and Dictionary 8/8") and the burn-down asked the next turn to settle
+whether closed is 17 or 21. It is **17**. Gate 461 names **Video AND Dictionary**;
+`.coordination/liquid-workplace/LIQUID_SCORECARD.md` contains **zero completed entries** — no
+line matches its own `## <date> — <surface> — <n>/80` header — and says so deliberately: Dictionary
+holds a 10 in all eight categories but five of them (2, 5, 6, 7, 8) were measured on an earlier
+tree, and the rubric's own rule is that a score inherited across a change is stale by definition.
+Video has never been scored at all (`L1_ACCESSIBILITY.md:631`: *"Only Dictionary had ever been
+scored"*). So L1's 4 bullets stay OPEN and units-left stays **29 of 46**. Do not adopt 21 without
+a completed scorecard entry for each of the two named surfaces.
+
 **Progress (2026-08-17, L0's gate having closed the same day).** Two of the eight rubric
 categories are now driven live on both reference apps, each with a control that failed:
 `.coordination/liquid-workplace/L1_SURFACE_ROLES.md` (category 3 — the four roles are
@@ -627,6 +638,20 @@ Order: Reading → Novels → Library → Immersion → manga/PDF/EPUB/VN suites
 - Preserve progress, capture, dictionary, mining, source, and deep-link behavior.
 
 Gate: content remains legible and stable at all sizes; no tool obscures the document.
+
+**Bullet 2, 2026-08-25 (later): OPEN, and what is left is named** (`39d2a22c`, `40cf77d5`,
+`bf5d198c`). Two remounts that no assertion on any of the six surfaces could see, because every
+one of them was a width, a class or an attribute and all three are identical across a remount.
+(1) leading and trailing tools are two children arrays, React reconciles by key WITHIN one, so a
+leading tool that narrowed into a sheet crossed arrays and was rebuilt — grouped by declared side
+now. (2) a stacked sheet was `return null`, i.e. unmounted; now `hidden`, plus the (0,2,1) CSS
+rule without which the UA's `[hidden]` loses to `.lq-reading-sheet { display: flex }`. Route
+parity swept mechanically across the six migration commits: **3 handlers net-removed, all three
+the popovers' own close buttons.** Closed: the document survives 6/6, the tool subtree survives
+6/6, stacked sheets survive, no route dropped. **Demonstrated functionally: capture only, 1 of
+6.** Progress, dictionary, mining, source and deep-link are next; progress first, because
+NovelReader restores by fraction on `size.w` and a reflow is where it would break. Nine L6
+suites 93/93. Log: `.coordination/liquid-workplace/L6_READING_ECOSYSTEM.md`.
 
 **Bullet 1 CLOSED 2026-08-25** (`b2c6e7f5`). All six surfaces are on the contract — Captures,
 Novels, Library, Immersion, manga, VN — and the fifth named item resolved to ONE surface, not

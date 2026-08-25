@@ -514,3 +514,60 @@ surfaces plus VN use it: Captures, Novels (PDF and EPUB are the same reader), Li
 manga, VN. Bullet 2 — "preserve progress, capture, dictionary, mining, source and deep-link
 behavior" — is what the next turn opens on, and it is a PARITY question across those six, not a
 new migration.
+
+## 2026-08-25 (later) — bullet 2: two remounts nothing could see, and the route sweep that found nothing
+
+`39d2a22c` `40cf77d5` `bf5d198c`. Bullet 2's list — progress, capture, dictionary, mining,
+source, deep-link — is mostly state that lives INSIDE a tool, and every assertion on all six
+surfaces was a width, a class or an attribute. All of those are identical across a remount.
+
+**Defect 1 (`39d2a22c`).** `ReadingCanvas` renders leading and trailing tools as two children
+arrays either side of the document, grouped by RESOLVED placement. React reconciles by key
+within an array, not across two, so a leading tool that narrowed into a sheet crossed arrays and
+was unmounted and rebuilt. vitest reports it as *"serializes to the same string"* — the two
+nodes are byte-identical markup. Fix: group by the tool's DECLARED side. Nothing is given up; a
+sheet is `position: absolute; inset: 0; z-index: 2` over an `inert` + `aria-hidden` document, so
+neither its flex position nor its reading order is observable. Only Captures and VN declare
+`side: 'leading'`, so only those two were affected.
+
+**Defect 2 (`40cf77d5`).** One level up: `renderTool` returned null for every sheet that was not
+the newest, under a comment saying they "stay open in the caller's state and reappear" — true of
+the STATE, never of the tree. Now `hidden`. **The attribute alone does nothing here:** UA
+`[hidden] { display: none }` is (0,1,0) and `.lq-reading-sheet { display: flex }` is (0,1,0) from
+a later sheet, so a "hidden" stacked sheet would paint over the live one at full size. Reclaimed
+at (0,2,1) in `readingCanvas.css`.
+
+**Instrument:** `expectToolSurvivesPlacementChange` in the one L6 harness. No new probe file.
+Node identity, not a scroll offset — jsdom lays nothing out, so a `scrollTop` there is a value
+the test wrote to itself.
+
+**Controls, four, all restored after.** Old `isLeading`: 3 red / 24, the two LEADING suites,
+trailing control green — localises it to the crossing. `return null`: 2 red / 33. Deleting the
+CSS rule: 1 red / 23. `key={tool.id + resolved.placement}`: 3 red / 22, which is what makes the
+four trailing surfaces' guards load-bearing rather than free passes.
+
+**Route parity, mechanically.** Set difference of `on[A-Z]…={…}` handlers removed against added,
+per migration commit (`efb18eba b555bbb0 95c91741 000c7c4d 439324f5 b2c6e7f5`). Net-removed = 3,
+all three the popovers' own close buttons, replaced by `lq-reading-tool-close`. No route to any
+named behaviour was dropped.
+
+**Live, Reading Finder / Captures, fwin 820.** (a) canvas 762 docked leading, list scrolled to
+300 of 1816 → fwin 480, canvas 422, sheet, `role=dialog`, doc inert, SAME root and scroller
+nodes, scrollTop still 300, 42 rows → back to 820, same node, still 300. `precedesDoc: true`
+while `placement: sheet` is the discriminator proving the running renderer holds the new module.
+(b) `[hidden]` computes `display: none` on a real `aside.lq-reading-sheet.lq-liquid` appended to
+the live canvas, `flex` without it — the cascade check jsdom cannot make.
+(c) **capture behaviour, both placements.** Docked: click row 7 → passage hash 1126921975 →
+1675215115 (84 → 68 chars). Sheet: click row 15 → **no change**, which I first read as a defect
+and refuted — `aria-current` DID move to 15, and rows 7/15 are two screen captures with identical
+text. Clicking row 0 (a `clipboard` capture) under the sheet: 1675215115 → 1126921975, 68 → 84,
+`aria-current` back to 0, document `inert` throughout. Dismissed: tool gone, doc not inert,
+passage hash unchanged at 1126921975. `/logs?level=error` total **0**; all live state restored.
+
+**Bullet 2 is NOT closed, and what remains is named.** Closed: no route was dropped, the document
+survives on 6 of 6, the tool subtree survives on 6 of 6, stacked sheets survive. Demonstrated
+functionally end to end: **capture only, 1 of 6.** Progress, dictionary, mining, source and
+deep-link have their routes proven present and their state proven to survive, but have not been
+driven. That is the next slice, and progress is the one to do first — NovelReader restores by
+FRACTION not page index (`NovelReader.tsx:1088-1095`, keyed on `size.w`), so a reflow is exactly
+where it would break, and jsdom cannot see it. Suites: nine L6 files **93/93**, was 68/68.
