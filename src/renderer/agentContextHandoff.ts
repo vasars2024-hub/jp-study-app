@@ -19,6 +19,10 @@ import { createAgentContextItem, type AgentContextInput } from '../shared/agentC
 import type { AgentContextItem, AgentWorkspaceState } from '../shared/agentWorkspace';
 import type { DesktopWinSection } from '../shared/desktop';
 import { splitImageDataUrl } from '../shared/agentImageStaging';
+import {
+  agentContextInputFromSelection,
+  createLiquidSelection,
+} from '../shared/liquidSelection';
 import { agentWorkspaceWithContextAttached } from './agentShellModel';
 import { stageAgentImage } from './agentImageStagingClient';
 import { loadAgentWorkspace, updateAgentWorkspace } from './agentWorkspaceClient';
@@ -607,6 +611,87 @@ export function visualNovelCaptureAgentContext(
     identity: `visual-novel\u0000${text}`,
     now,
   };
+}
+
+/**
+ * Grammar's and Translate's producers, and the first two built on L5's selection
+ * contract rather than on a hand-written shape.
+ *
+ * Every producer above predates `shared/liquidSelection.ts` and spells its own
+ * `kind`, `identity` and `source` inline. That was survivable while each one was
+ * the only producer for its app; it stops being survivable at L5, whose Gate is
+ * that a handoff between the four core tools *retains context* — four hand-written
+ * identity schemes is four chances for the same thing to arrive under two ids.
+ * These two go through `agentContextInputFromSelection`, which derives the
+ * identity as `app/kind/entityId` and picks the privacy floor from one reviewable
+ * table. The older producers are deliberately NOT rewritten here: their identities
+ * are already on users' shelves, and changing them would split every existing item
+ * into a new slot. They migrate when their own app reaches L5's ledger.
+ */
+export function grammarPatternAgentContext(
+  patternId: string,
+  title: string,
+  summary: string,
+  now = Date.now(),
+): AgentContextInput {
+  const selection = createLiquidSelection({
+    app: 'grammar',
+    kind: 'pattern',
+    label: title,
+    preview: summary,
+    entityId: patternId,
+    route: '#/grammar',
+  });
+  // A pattern with no title at all cannot name itself on the shelf. Falling back
+  // to a placeholder would put a nameless row there, so the id is used as the
+  // label — and `createAgentContextItem` still refuses the result when that is
+  // empty too, which is the correct outcome for a producer given nothing.
+  return selection
+    ? { ...agentContextInputFromSelection(selection, now), retained: true }
+    : {
+      kind: 'dictionary-entry',
+      label: patternId,
+      preview: summary,
+      source: { app: 'grammar' },
+      identity: `grammar/pattern/${patternId}`,
+      retained: true,
+      now,
+    };
+}
+
+/**
+ * A span of the text being translated.
+ *
+ * `selected-text`, not `dictionary-entry`: it is the user's own material, so the
+ * agent store keeps it in session memory and never writes it to disk. That is the
+ * mapping table's decision rather than this function's — see `SELECTION_AGENT_KIND`
+ * — which is the whole point of routing a producer through the contract.
+ */
+export function translateSpanAgentContext(
+  span: string,
+  sourceLang: string,
+  now = Date.now(),
+): AgentContextInput {
+  const text = span.trim().replace(/\s+/g, ' ');
+  const selection = createLiquidSelection({
+    app: 'translate',
+    kind: 'span',
+    label: text.slice(0, 80),
+    preview: text,
+    entityId: text,
+    route: '#/translate',
+    lang: sourceLang,
+  });
+  return selection
+    ? agentContextInputFromSelection(selection, now)
+    : {
+      kind: 'selected-text',
+      label: text.slice(0, 80),
+      preview: text,
+      source: { app: 'translate' },
+      identity: `translate/span/${text}`,
+      now,
+    };
 }
 
 export type { AgentContextItem };
