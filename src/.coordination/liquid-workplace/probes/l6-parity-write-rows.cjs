@@ -1,9 +1,11 @@
 /**
- * Append L5's three remaining apps to `parity-ledger.json` from the numbers the
- * category-6 harness actually produced. Run once; it refuses if the rows exist.
+ * Append category-6 rows to `parity-ledger.json` from the numbers the harness
+ * actually produced. Idempotent by `app|feature`, so re-running adds only what
+ * is new — which is why the L6 block below lives here rather than in a second
+ * writer. RULE 1 applies to ledger writers as much as to probes.
  *
  * Every `observed` string below is a literal copy of a `check()` row's `evidence`
- * from the 2026-08-25 live drive — no prose, no adjectives, no rounding.
+ * from a live drive — no prose, no adjectives, no rounding.
  */
 'use strict';
 const fs = require('node:fs');
@@ -14,12 +16,14 @@ const j = JSON.parse(fs.readFileSync(LEDGER, 'utf8'));
 
 const PROOF = 'probes/l6-parity.js (`__LQP.check(app)`), the surface-parameterised category-6 harness; calibrated against `probes/l6-parity-dictionary.js` — both instruments returned dictionary 7/7 with identical per-row evidence';
 const VISUAL = 'live bridge drive, 2026-08-25 (L5 gate, §5.3)';
+/** Latest milestone this file writes. Update with the newest block, not per row. */
+const MILESTONE = 'L6-reading-and-immersion';
 
 const liquidDest = (sel) =>
   `Same in-window ${sel}, on the liquid material — \`.fwin-liquid\` + \`data-presentation="liquid"\`, dense work kept on an opaque anchor (L3.2, \`20462e3a\`)`;
 
 const rows = [];
-const add = (app, feature, currentRoute, dest, keyboardRoute, owner, observed) =>
+const add = (app, feature, currentRoute, dest, keyboardRoute, owner, observed, visual) =>
   rows.push({
     app,
     feature,
@@ -29,7 +33,7 @@ const add = (app, feature, currentRoute, dest, keyboardRoute, owner, observed) =
     keyboardRoute,
     dataStateOwner: owner,
     automatedProof: PROOF,
-    visualProof: VISUAL,
+    visualProof: visual || VISUAL,
     observed,
     status: 'both',
   });
@@ -158,6 +162,50 @@ add('agent', 'Window lifecycle — Liquid on/off is reversible',
   'per-window presentation state (L3)',
   'standard -> liquid -> standard. Round trip: rect identical, all 8 field values identical, nodes 351 = 351, controls 52 = 52. NOTE: the Agent\'s POP-OUT destination (`?popout=agent`) mounts outside `.fwin` — no window chrome, no `Make Liquid`, no `data-presentation` — so that host has no Liquid destination at all, the same fact already recorded for the seanime media workspace');
 
+// --------------------------------------------------------------- captures (6)
+// L6's first surface. Same harness, one SPEC — no new probe file.
+const C = {
+  standard: 'ReadingCapturesView inside the Reading workspace (`.reading-captures` > `.lq-reading`)',
+  liquid: liquidDest('`.reading-captures`'),
+};
+const CV = 'live bridge drive, 2026-08-25 (L6 bullet 1, §5.3)';
+add('captures', 'Browse the persisted capture history with its source badge',
+  'Reading window > Captures tab > the capture list tool', C,
+  'each row is a real `<button>`; the list is reachable whether docked or a sheet',
+  'main-process lens history (`lens:history:list`)',
+  'standard: rows=42 withSource=42 || liquid: rows=42 withSource=42 || negative control `captureList` (ONE row\'s `.reading-captures-row-meta` detached) -> 5/6, this row alone false at withSource=41, restored 6/6',
+  CV);
+add('captures', 'Select a capture and read it in the passage pane',
+  'Reading window > Captures tab > click a row', C,
+  'row buttons carry `aria-current`; the heading is an `<h2>` in the reader landmark',
+  'main-process lens history + renderer selection state',
+  'standard: selected="clipboard" heading="clipboard" || liquid: identical — the selected row and the reader heading are the same capture in both',
+  CV);
+add('captures', 'The capture list never partially covers the passage',
+  'Reading window > Captures tab > `.lq-reading` resolves placement from its own width', C,
+  'placement changes nothing about tab order — DOM order is document then tool at every width',
+  'pure geometry (`shared/liquidReadingCanvas.ts`); no persisted state',
+  'standard: canvas=762 doc=490 docked=1 sheets=0 sum=762 covered=false || liquid: identical || narrowed to a 562px pane: sheet 562, doc 562, `inert` + `aria-hidden` set, role="dialog"; `window.innerWidth`=1264 and `matchMedia(\'(max-width: 720px)\')`=false, so the OLD grid would have left the passage 292px',
+  CV);
+add('captures', 'The passage stays at a legible measure at any pane width',
+  'Reading window > Captures tab > `--lq-reading-measure` on the document region', C,
+  'not a control; a rendered constraint',
+  'pure geometry (`READING_CANVAS_POLICY.maxContentWidth` = 760)',
+  'standard: measure="490px" passage=454 || liquid: measure="490px" passage=454 — the rendered passage is inside the declared clamp in both presentations',
+  CV);
+add('captures', 'Hide and restore the capture list',
+  'Reading window > Captures tab > `.reading-captures-list-toggle`', C,
+  '`aria-pressed` is a real boolean and agrees with whether the tool is mounted',
+  'renderer-local view state (ReadingCapturesView)',
+  'standard: toggle=true ariaPressed=true listOpen=true || liquid: identical || live: dismissed the sheet -> document back at 562px with its 69 characters, reopened from the toggle -> 42 rows again || negative control `listReversibility` (`aria-pressed` stripped) -> 5/6, this row alone false, restored 6/6',
+  CV);
+add('captures', 'Window lifecycle — Liquid on/off is reversible',
+  'Reading window > `.fwin-b-liquid`', C,
+  '`aria-pressed` is a real boolean on the toggle',
+  'per-window presentation state (L3)',
+  'standard -> liquid -> standard. Round trip identical on every field: rect 94/54/820x580, maximized=false, focused=true, zIndex=264, chars 843 = 843, nodes 284 = 284, controls 58 = 58 || negative control `windowLifecycle` -> 5/6, this row alone false, restored 6/6',
+  CV);
+
 const have = new Set(j.rows.map((r) => `${r.app}|${r.feature}`));
 const fresh = rows.filter((r) => !have.has(`${r.app}|${r.feature}`));
 if (!fresh.length) {
@@ -165,7 +213,7 @@ if (!fresh.length) {
   process.exit(0);
 }
 j.rows.push(...fresh);
-j.milestone = 'L5-core-study-tools';
+j.milestone = MILESTONE;
 fs.writeFileSync(LEDGER, `${JSON.stringify(j, null, 2)}\n`, 'utf8');
 const byApp = j.rows.reduce((a, r) => ((a[r.app] = (a[r.app] || 0) + 1), a), {});
 console.log(`added ${fresh.length}; total ${j.rows.length}`, JSON.stringify(byApp));

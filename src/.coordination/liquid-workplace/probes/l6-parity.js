@@ -605,6 +605,126 @@
         viewToggle: (w) => removeClassAll(qa(w, '.agent-view-toggle-button'), 'is-selected'),
       },
     },
+
+    // L6's first surface, and RULE 1's own test: this SPEC is the whole cost of
+    // scoring a new app for category 6. No new probe file, no new engine.
+    //
+    // Identity is structural, and it has to be: the window is titled "Reading
+    // Finder" whichever of its eight tabs is showing, so a title match alone
+    // would score the Captures section against the Library catalogue and report
+    // six false absences. `sec()` is the guard — every feature says "not open"
+    // rather than "absent", which is the difference between a finding and a
+    // product state (see the probe-refusal rule in `L1_HONEST_STATES.md`).
+    captures: {
+      titleRe: /Reading Finder|Captures|読書|阅读|Чтен/i,
+      rootSel: '.reading-captures',
+      features: [
+        {
+          id: 'captureList',
+          f: (w) => {
+            const r = q(w, '.reading-captures');
+            if (!r) return { ok: false, ev: 'captures section not open' };
+            const rows = qa(r, '.reading-captures-row');
+            const metaed = rows.filter((x) => q(x, '.reading-captures-row-meta')).length;
+            return { ok: rows.length > 0 && metaed === rows.length, ev: `rows=${rows.length} withSource=${metaed}` };
+          },
+        },
+        {
+          // The selected row and the reader heading must be the same capture. A
+          // heading left on the previous one is the stale-detail defect the
+          // grammar spec's `detail` row exists for, in its reading form.
+          id: 'selection',
+          f: (w) => {
+            const r = q(w, '.reading-captures');
+            if (!r) return { ok: false, ev: 'captures section not open' };
+            const cur = qa(r, '.reading-captures-row').find((x) => x.getAttribute('aria-current') === 'true');
+            const head = txt(q(r, '.reading-captures-reader-head h2'));
+            const title = txt(q(cur || r, '.reading-captures-row-title'));
+            return { ok: !!cur && !!head && !!title, ev: `selected="${title}" heading="${head}"` };
+          },
+        },
+        {
+          // L6's Gate, measured. Every open tool is docked BESIDE the document or
+          // covering it entirely, and the widths add up — a partial cover would
+          // leave `docked + doc + gutter` short of the canvas.
+          id: 'canvasPlacement',
+          f: (w) => {
+            const c = q(w, '.lq-reading');
+            if (!c) return { ok: false, ev: 'no reading canvas' };
+            const doc = q(c, '[data-reading-role="document"]');
+            const tools = qa(c, '[data-reading-role="tool"]');
+            const cw = Math.round(c.getBoundingClientRect().width);
+            const dw = Math.round(doc.getBoundingClientRect().width);
+            const docked = tools.filter((t) => t.dataset.placement === 'docked');
+            const sheets = tools.filter((t) => t.dataset.placement === 'sheet');
+            const sum = docked.reduce((n, t) => n + Math.round(t.getBoundingClientRect().width) + 12, dw);
+            const legal = tools.every((t) => /^(docked|sheet)$/.test(t.dataset.placement || ''));
+            const sheetsFull = sheets.every((t) => Math.abs(Math.round(t.getBoundingClientRect().width) - dw) <= 1);
+            const covered = c.dataset.covered === 'true';
+            return {
+              ok: c.dataset.measured === 'true' && legal && sheetsFull && Math.abs(sum - cw) <= 1 && covered === sheets.length > 0,
+              ev: `canvas=${cw} doc=${dw} docked=${docked.length} sheets=${sheets.length} sum=${sum} covered=${covered}`,
+            };
+          },
+        },
+        {
+          // "Content remains legible at all sizes" — the measure clamp is real
+          // and the rendered passage obeys it rather than the pane's full width.
+          id: 'measureClamp',
+          f: (w) => {
+            const doc = q(w, '[data-reading-role="document"]');
+            if (!doc) return { ok: false, ev: 'no reading canvas' };
+            const declared = doc.style.getPropertyValue('--lq-reading-measure');
+            const cap = declared === 'none' ? Infinity : Number(declared.replace(/[^\d.]/g, ''));
+            const p = q(w, '.reading-captures-passage');
+            const pw = p ? Math.round(p.getBoundingClientRect().width) : 0;
+            return { ok: cap <= 760 && pw > 0 && pw <= cap + 1, ev: `measure="${declared}" passage=${pw}` };
+          },
+        },
+        {
+          // Reversibility: the list is this section's navigation, so removing it
+          // needs a route back. The toggle's boolean must agree with reality.
+          id: 'listReversibility',
+          f: (w) => {
+            const tg = q(w, '.reading-captures-list-toggle');
+            const pressed = tg ? tg.getAttribute('aria-pressed') : null;
+            const open = !!q(w, '[data-reading-tool="captures"]');
+            return { ok: !!tg && (pressed === 'true' || pressed === 'false') && (pressed === 'true') === open, ev: `toggle=${!!tg} ariaPressed=${pressed} listOpen=${open}` };
+          },
+        },
+        { id: 'windowLifecycle', f: (w) => lifecycle(w) },
+      ],
+      steps: {
+        openSection: (w) => {
+          const tab = qa(w, '.reading-workspace-tab').find((b) => /Captures|キャプチャ|捕获|Захват/i.test(txt(b)));
+          if (!tab) return { refused: 'no Captures tab' };
+          tab.click();
+          return { clicked: txt(tab) };
+        },
+        select: (w, index) => {
+          const rows = qa(w, '.reading-captures-row');
+          const target = rows[Number(index) || 1];
+          if (!target) return { refused: `only ${rows.length} rows` };
+          target.click();
+          return { picked: txt(q(target, '.reading-captures-row-title')) };
+        },
+        toggleList: (w) => {
+          const tg = q(w, '.reading-captures-list-toggle');
+          if (!tg) return { refused: 'no list toggle' };
+          tg.click();
+          return { pressedWas: tg.getAttribute('aria-pressed') };
+        },
+      },
+      mutations: {
+        // One row's source meta, NOT the whole `<ul>`. Measured 2026-08-25:
+        // detaching the list took `captureList` AND `selection` false in one
+        // move, because the selected row lives inside it — a control that fails
+        // two rows proves neither. This fails exactly one.
+        captureList: (w) => detach(q(w, '.reading-captures-row-meta'), 'no capture rows'),
+        listReversibility: (w) => stripAttr(q(w, '.reading-captures-list-toggle'), 'aria-pressed', 'no list toggle'),
+        windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
+      },
+    },
   };
 
   // ------------------------------------------------------- shared feature fn

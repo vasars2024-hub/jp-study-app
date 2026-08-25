@@ -1,7 +1,7 @@
 {
   "schema": "app | feature | currentRoute | standardDestination | liquidDestination | keyboardRoute | dataStateOwner | automatedProof | visualProof | status",
   "authority": "src/LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md §5.3",
-  "milestone": "L5-core-study-tools",
+  "milestone": "L6-reading-and-immersion",
   "rule": "A row closes on an observed side effect, never on a control's presence. `observed` carries the literal before/after measurement; a row with no `observed` is explicitly not proven.",
   "statusVocabulary": {
     "pending": "no Liquid destination yet",
@@ -581,6 +581,84 @@
       "automatedProof": "probes/l6-parity.js (`__LQP.check(app)`), the surface-parameterised category-6 harness; calibrated against `probes/l6-parity-dictionary.js` — both instruments returned dictionary 7/7 with identical per-row evidence",
       "visualProof": "live bridge drive, 2026-08-25 (L5 gate, §5.3)",
       "observed": "standard -> liquid -> standard. Round trip: rect identical, all 8 field values identical, nodes 351 = 351, controls 52 = 52. NOTE: the Agent's POP-OUT destination (`?popout=agent`) mounts outside `.fwin` — no window chrome, no `Make Liquid`, no `data-presentation` — so that host has no Liquid destination at all, the same fact already recorded for the seanime media workspace",
+      "status": "both"
+    },
+    {
+      "app": "captures",
+      "feature": "Browse the persisted capture history with its source badge",
+      "currentRoute": "Reading window > Captures tab > the capture list tool",
+      "standardDestination": "ReadingCapturesView inside the Reading workspace (`.reading-captures` > `.lq-reading`)",
+      "liquidDestination": "Same in-window `.reading-captures`, on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, dense work kept on an opaque anchor (L3.2, `20462e3a`)",
+      "keyboardRoute": "each row is a real `<button>`; the list is reachable whether docked or a sheet",
+      "dataStateOwner": "main-process lens history (`lens:history:list`)",
+      "automatedProof": "probes/l6-parity.js (`__LQP.check(app)`), the surface-parameterised category-6 harness; calibrated against `probes/l6-parity-dictionary.js` — both instruments returned dictionary 7/7 with identical per-row evidence",
+      "visualProof": "live bridge drive, 2026-08-25 (L6 bullet 1, §5.3)",
+      "observed": "standard: rows=42 withSource=42 || liquid: rows=42 withSource=42 || negative control `captureList` (ONE row's `.reading-captures-row-meta` detached) -> 5/6, this row alone false at withSource=41, restored 6/6",
+      "status": "both"
+    },
+    {
+      "app": "captures",
+      "feature": "Select a capture and read it in the passage pane",
+      "currentRoute": "Reading window > Captures tab > click a row",
+      "standardDestination": "ReadingCapturesView inside the Reading workspace (`.reading-captures` > `.lq-reading`)",
+      "liquidDestination": "Same in-window `.reading-captures`, on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, dense work kept on an opaque anchor (L3.2, `20462e3a`)",
+      "keyboardRoute": "row buttons carry `aria-current`; the heading is an `<h2>` in the reader landmark",
+      "dataStateOwner": "main-process lens history + renderer selection state",
+      "automatedProof": "probes/l6-parity.js (`__LQP.check(app)`), the surface-parameterised category-6 harness; calibrated against `probes/l6-parity-dictionary.js` — both instruments returned dictionary 7/7 with identical per-row evidence",
+      "visualProof": "live bridge drive, 2026-08-25 (L6 bullet 1, §5.3)",
+      "observed": "standard: selected=\"clipboard\" heading=\"clipboard\" || liquid: identical — the selected row and the reader heading are the same capture in both",
+      "status": "both"
+    },
+    {
+      "app": "captures",
+      "feature": "The capture list never partially covers the passage",
+      "currentRoute": "Reading window > Captures tab > `.lq-reading` resolves placement from its own width",
+      "standardDestination": "ReadingCapturesView inside the Reading workspace (`.reading-captures` > `.lq-reading`)",
+      "liquidDestination": "Same in-window `.reading-captures`, on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, dense work kept on an opaque anchor (L3.2, `20462e3a`)",
+      "keyboardRoute": "placement changes nothing about tab order — DOM order is document then tool at every width",
+      "dataStateOwner": "pure geometry (`shared/liquidReadingCanvas.ts`); no persisted state",
+      "automatedProof": "probes/l6-parity.js (`__LQP.check(app)`), the surface-parameterised category-6 harness; calibrated against `probes/l6-parity-dictionary.js` — both instruments returned dictionary 7/7 with identical per-row evidence",
+      "visualProof": "live bridge drive, 2026-08-25 (L6 bullet 1, §5.3)",
+      "observed": "standard: canvas=762 doc=490 docked=1 sheets=0 sum=762 covered=false || liquid: identical || narrowed to a 562px pane: sheet 562, doc 562, `inert` + `aria-hidden` set, role=\"dialog\"; `window.innerWidth`=1264 and `matchMedia('(max-width: 720px)')`=false, so the OLD grid would have left the passage 292px",
+      "status": "both"
+    },
+    {
+      "app": "captures",
+      "feature": "The passage stays at a legible measure at any pane width",
+      "currentRoute": "Reading window > Captures tab > `--lq-reading-measure` on the document region",
+      "standardDestination": "ReadingCapturesView inside the Reading workspace (`.reading-captures` > `.lq-reading`)",
+      "liquidDestination": "Same in-window `.reading-captures`, on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, dense work kept on an opaque anchor (L3.2, `20462e3a`)",
+      "keyboardRoute": "not a control; a rendered constraint",
+      "dataStateOwner": "pure geometry (`READING_CANVAS_POLICY.maxContentWidth` = 760)",
+      "automatedProof": "probes/l6-parity.js (`__LQP.check(app)`), the surface-parameterised category-6 harness; calibrated against `probes/l6-parity-dictionary.js` — both instruments returned dictionary 7/7 with identical per-row evidence",
+      "visualProof": "live bridge drive, 2026-08-25 (L6 bullet 1, §5.3)",
+      "observed": "standard: measure=\"490px\" passage=454 || liquid: measure=\"490px\" passage=454 — the rendered passage is inside the declared clamp in both presentations",
+      "status": "both"
+    },
+    {
+      "app": "captures",
+      "feature": "Hide and restore the capture list",
+      "currentRoute": "Reading window > Captures tab > `.reading-captures-list-toggle`",
+      "standardDestination": "ReadingCapturesView inside the Reading workspace (`.reading-captures` > `.lq-reading`)",
+      "liquidDestination": "Same in-window `.reading-captures`, on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, dense work kept on an opaque anchor (L3.2, `20462e3a`)",
+      "keyboardRoute": "`aria-pressed` is a real boolean and agrees with whether the tool is mounted",
+      "dataStateOwner": "renderer-local view state (ReadingCapturesView)",
+      "automatedProof": "probes/l6-parity.js (`__LQP.check(app)`), the surface-parameterised category-6 harness; calibrated against `probes/l6-parity-dictionary.js` — both instruments returned dictionary 7/7 with identical per-row evidence",
+      "visualProof": "live bridge drive, 2026-08-25 (L6 bullet 1, §5.3)",
+      "observed": "standard: toggle=true ariaPressed=true listOpen=true || liquid: identical || live: dismissed the sheet -> document back at 562px with its 69 characters, reopened from the toggle -> 42 rows again || negative control `listReversibility` (`aria-pressed` stripped) -> 5/6, this row alone false, restored 6/6",
+      "status": "both"
+    },
+    {
+      "app": "captures",
+      "feature": "Window lifecycle — Liquid on/off is reversible",
+      "currentRoute": "Reading window > `.fwin-b-liquid`",
+      "standardDestination": "ReadingCapturesView inside the Reading workspace (`.reading-captures` > `.lq-reading`)",
+      "liquidDestination": "Same in-window `.reading-captures`, on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, dense work kept on an opaque anchor (L3.2, `20462e3a`)",
+      "keyboardRoute": "`aria-pressed` is a real boolean on the toggle",
+      "dataStateOwner": "per-window presentation state (L3)",
+      "automatedProof": "probes/l6-parity.js (`__LQP.check(app)`), the surface-parameterised category-6 harness; calibrated against `probes/l6-parity-dictionary.js` — both instruments returned dictionary 7/7 with identical per-row evidence",
+      "visualProof": "live bridge drive, 2026-08-25 (L6 bullet 1, §5.3)",
+      "observed": "standard -> liquid -> standard. Round trip identical on every field: rect 94/54/820x580, maximized=false, focused=true, zIndex=264, chars 843 = 843, nodes 284 = 284, controls 58 = 58 || negative control `windowLifecycle` -> 5/6, this row alone false, restored 6/6",
       "status": "both"
     }
   ],
