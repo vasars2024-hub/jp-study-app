@@ -18,9 +18,13 @@
  * -> `l1-max-clip-control-cleanup.js` -> `l1-use-of-space.js` again (must fall back).
  *
  * Measured 2026-08-17 on maximized Media 1264x765: clipped 0 -> 1, Dictionary unchanged at 0.
+ * Measured 2026-08-25 on maximized Video 1264x765: clipped 0 -> 1, Dictionary unchanged at 0.
  */
 (() => {
-  const TITLE = 'Media';
+  // `window.__lqScoreTitle` (singular — one target per call, same idiom as
+  // `l1-maximize-drive.js`) selects the window; the default keeps the 2026-08-17 Media run
+  // reproducible. Gate 461 names Video and Dictionary, so `Media` alone is not enough.
+  const TITLE = (typeof window !== 'undefined' && window.__lqScoreTitle) || 'Media';
 
   const win = [...document.querySelectorAll('.fwin')].find(
     (w) => (w.querySelector('.fwin-title-text')?.textContent || '').includes(TITLE),

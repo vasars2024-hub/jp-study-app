@@ -518,3 +518,38 @@ a horizontal scroller at compact that a settled two-step read as 0. Any grid num
 is pre-settle. (2) `git cat-file blob HEAD:$f | grep -c $'\r'` nested inside `$(...)` in double
 quotes loses the ANSI-C quoting and counts lines containing the LETTER r — 133 of 138 lines, which
 reads exactly like "fully CRLF". Every blob in this repo is LF; read the buffer from node.
+
+## 2026-08-25 · backup — the maximized control fires on Video, and it exposes a failing number
+
+`l1-max-clip-control.js` was hardcoded to `TITLE='Media'`; it now reads `window.__lqScoreTitle`,
+the same idiom as `l1-maximize-drive.js`. No new probe was written.
+
+Sequence, one bridge call each, Video maximized to 1264x765 through its own Maximize button:
+baseline `clipped 0` → inject → **`clipped 1`, `div.__l1_ctrl_clip`** → cleanup → **`clipped 0`**.
+Dictionary, measured in the same three calls, stayed at 0 throughout. **CONTROL FIRED AS REQUIRED** —
+the maximized zero is a real zero, not a probe that cannot see. Video restored to
+`left: 92px; top: 40px; width: 1080px; height: 700px` by a second click on the product's own button,
+byte-identical to the pre-maximize string the drive probe recorded.
+
+**Category 4 is NOT 10 on Video, and the reason is a number, not a missing control.** At maximized
+the largest dead region is **284x602 = 16.5% of the viewport** against a 15% bar
+(`deadRegionBox: 284x602 at grid 31,7`, i.e. the strip from just right of the single card to the
+frame edge, running the full height). clipped 0 / overlaps 0 / horizontalScrollers 0 /
+hiddenOverflowX 0 all pass. The cause is the one-title "Continue watching" shelf: `medialib-grid`
+is 764 wide holding one 240x438 card, centred, so ~262px is dead either side and the right one
+reaches the frame.
+
+`1a00e1bd` was landed against this and did NOT move it: `.mc-workspace`'s third grid track was a
+fixed 58px reserved for `PersistentPlayer`, which only mounts when something is playing, so Video,
+Library, Settings, Discover, Study and Readiness each paid 58px for an absent element. `auto`
+collapses it — `.mc-content` **592 → 650**, `.medialib-grid` **497 → 555**, dominant canvas
+**62.4% → 68.6%** — but the dead rect already ran to the body bottom either way, so it is unchanged
+at 284x602. Negative control on the Media window: clicking Music mounts the bar at exactly 724x58
+and `.mc-content` returns to 407, so the present-player case is byte-identical.
+
+**Category 4 is PARKED at 9 of its 10 requirements** with an exact blocker: the maximized dead
+region needs to fall below 15% of the viewport, i.e. the dead strip must lose ~26px of its 284px
+width or ~60px of its 602px height. Growing the card is nearly enough and nearly is not a 10 —
+`maxColWidth` is height-bounded (`MediaPosterCard.tsx:36`), and at the 555px grid the ceiling is
+~318px, which lands at 14.9%. A layout that passes by 0.1% is not a 10 either. The next worker
+should treat a sparse shelf as a presentation decision, not a column-width one.

@@ -502,3 +502,13 @@ again — the honest statement is that gate 461 is one plan-authority unit that 
 turns, and that the unit is too coarse to show progress. Its INTERNAL count moved this turn:
 Video 1 of 8 categories at 10, category 4 at 9 of its 10 requirements with only the control open,
 categories 2/3/5/6/7 unmeasured on Video.
+
+2026-08-25 | liquid | units done this turn: 0 | units left: 10 | basis: the 13 `Gate:` lines in src/LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md (`grep -c '^Gate:'` = 13, re-run this turn); the 3 closed (L0 452 / L2 591 / L3 600) are INHERITED, gate 461 was re-derived directly and is OPEN — it needs 80/80 on Video AND Dictionary, Dictionary holds 8 of 8, and Video moved from 1 category at 10 to 1 at 10 with TWO more parked at 9: category 4's maximized control now fires (clipped 0 -> 1 -> 0 on Video, Dictionary unchanged at 0) and exposes a real failing number, the maximized dead region at 284x602 = 16.5% of the viewport against a 15% bar; category 3 scored on Video for the first time at a walk depth that actually reaches its regions (12 regions, denseWorkOnTranslucent 0, liquidTreatedEligible 3 of 4) | projected finish: 2026-10-04
+
+Rate, arithmetic and not optimism: 3 of 13 gates closed in the 12 days since liquid opened
+2026-08-16 = 0.25 gates/day at 2 workers; 10 ÷ 0.25 = 40 days → **2026-10-04**, missing the
+2026-09-01 target by 33 days. The rate fell again because no GATE closed for a sixth turn. The
+honest reading has not changed and is getting louder: gate 461 is ONE plan-authority unit that has
+now absorbed six turns, and the unit is too coarse to show progress — its internal count went
+Video 1 of 8 categories at 10 plus 2 parked at 9 (4 and 3), 5 unmeasured (2/5/6/7/8).
+main-v1: complete-except-external, unchanged. mal-pipeline: 34 of 34, closed.

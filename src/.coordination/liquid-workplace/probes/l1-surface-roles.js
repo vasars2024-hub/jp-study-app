@@ -27,7 +27,18 @@
  * Argument is edited in at ARG below (the bridge's /eval takes one expression, no params).
  */
 (() => {
-  const ARG = { titles: ['Dictionary', 'Media'], maxDepth: 3, minAreaPct: 1.0 };
+  // `window.__lqScoreTitles` overrides the titles, same idiom as `l1-use-of-space.js`, so a
+  // second surface no longer needs the file edited between runs. The default keeps every run
+  // already recorded in the L1 documents reproducible. Gate 461 names Video and Dictionary;
+  // `Media` is a THIRD window on the same shell, not the Video one.
+  const titles = (typeof window !== 'undefined' && window.__lqScoreTitles) || ['Dictionary', 'Media'];
+  // `window.__lqRoleDepth` raises the walk. Depth 3 was enough for Dictionary, whose work
+  // surface is a direct child of the window body, and is a FALSE CLEAN on the Media shell:
+  // `.medialib-rail` (navigation) and `.medialib-browser` (the work canvas) are at depth 4-5
+  // inside `.mc-root > .mc-workspace > .mc-content > .mc-page`, so a depth-3 walk classifies
+  // the containers and never reaches the regions the category is about.
+  const maxDepth = (typeof window !== 'undefined' && window.__lqRoleDepth) || 3;
+  const ARG = { titles, maxDepth, minAreaPct: 1.0 };
 
   const alphaOf = (s) => {
     const v = String(s || '').trim();

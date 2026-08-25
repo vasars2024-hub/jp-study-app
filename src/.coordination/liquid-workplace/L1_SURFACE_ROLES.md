@@ -153,3 +153,47 @@ The verdict now hangs on the COMPUTED material this control actually mutates —
 `none|rgb(18, 28, 23)`, identical either side. Verdict: **CONTROL FAILED AS REQUIRED**.
 
 **Category 3 = 10/10**, re-driven, control proven.
+
+## 2026-08-25 · backup — category 3 scored on Video for the first time, and depth 3 was a false clean
+
+`l1-surface-roles.js` was hardcoded to `['Dictionary','Media']` at `ARG`; it now reads
+`window.__lqScoreTitles` and `window.__lqRoleDepth`. No new probe was written.
+
+**Depth 3 does not reach the Media shell's regions.** At the file's default it returned Video
+`regions 8`, `liquidTreatedEligible 3/3` — a clean sheet that had never looked at the surface the
+category is about. `.medialib-rail` (navigation) and `.medialib-browser` (the work canvas) sit at
+depth 4-5 inside `.mc-root > .mc-workspace > .mc-content > .mc-page > .medialib-root >
+.medialib-shell`. At depth 6: **Video `regions 12`, `denseWorkOnTranslucent 0`,
+`liquidTreatedEligible 3 of 4`** — `nav.medialib-rail`, 15.1% of the window, is Liquid-eligible and
+opaque. Dictionary at the same depth: **163 regions, `denseWorkOnTranslucent 0`, 4 of 23** —
+unchanged in kind from `debad557`, so the deeper walk does not invalidate its 10.
+
+**The real category-3 defect on this shell is not the rail, it is the palette.** §2.3 says Liquid is
+a composition language, not one palette. `.mc-sidebar`, `.mc-topbar` and `.mc-playerbar` painted
+three `rgba(...)` literals written straight into the rule, and the whole `--mc-*` token block is a
+fixed dark set with no theme variant. Measured live at `data-theme='classic-light'`, one window:
+
+| region | before | after `ac2330cb` |
+| --- | --- | --- |
+| `.medialib-rail` (shared token) | rgb(247,247,247) on rgb(30,30,30) | unchanged |
+| `.mc-root` | rgb(11,13,19) on rgb(243,244,248) | rgb(255,255,255) on rgb(30,30,30) |
+| `.mc-topbar` | rgba(10,12,18,0.72) | srgb 1 1 1 / 0.82 |
+| `.mc-sidebar` | rgba(8,10,16,0.94) | srgb .953 .953 .953 / 0.94 |
+| sidebar nav ink | #aaaebb — **2.01:1** | rgb(95,95,102) — **5.74:1** |
+
+`high-contrast` before: chrome near-black, blurred, rgb(243,244,248) text while the rail was #000 on
+#ffff00. After: every chrome surface #000 on #ffff00 with all three `backdrop-filter`s computing
+`none`. `paper` 4.71:1. **forest-night and study-os are byte-identical** — the literals stayed the
+default and only the six `color-scheme: light` palettes plus `high-contrast` remap.
+
+**Category 3 on Video is PARKED at 9**, not 10. What is measured and passing: 0 dense-work regions
+on translucent material, at a depth that actually reaches them. What is open: the shared-primitive
+half — `.medialib-rail` is a local re-implementation rather than `.lq-contextual`, and adopting the
+primitive is a no-op in a conventional window (`liquid-surfaces.css` deliberately paints nothing
+there), so it only becomes measurable once Video gets a Liquid presentation state. The negative
+control (`l1-surface-roles-control.js`) has not been re-run against Video.
+
+**Trap.** `--mc-nav-label` would have collided in the reader's eye with the existing `.mc-nav-label`
+CLASS; the token is `--mc-nav-ink`. And a `sed`/python patch of `mediaCenter.css` must be CRLF-aware
+— the worktree is CRLF, HEAD is LF, and a `\n`-only pattern silently matches nothing and reports
+success.
