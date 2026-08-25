@@ -417,10 +417,17 @@
   -webkit-line-clamp: 1;
 }
 
-/* The trailing control, out of the art and into the row. `static` so it sits in
-   the flex line; the overlay rules above only apply to the `card` layout. */
+/* The trailing control, out of the art and into the row.
+   `relative`, NOT `static`: `.lq-hit-placed::after` is an absolutely-positioned
+   expander that assumes the control is its own containing block, so `static`
+   hands it the nearest positioned ancestor instead — `VirtualGrid`'s row — and
+   the 32px hit target becomes the whole 588x84 row. Measured: a click at the
+   card's own centre returned `medialib-card__more` from `elementFromPoint` and
+   opened the overflow menu instead of the item. `relative` is in flow and is a
+   containing block, which is both things this needs. */
 .medialib-card[data-layout='row'] .medialib-card__more {
-  position: static;
+  position: relative;
+  inset: auto;
   flex: 0 0 auto;
   background: none;
   color: var(--muted);
