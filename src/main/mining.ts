@@ -646,30 +646,130 @@ function tokenizeSimple(text: string): Map<string, TokenCandidate> {
   return byExpression;
 }
 
-function syncBundledFrequencySummary(
-  filePath: string,
-  parsed: FrequencyDictionaryFile,
-  patch: Partial<FrequencyDictionarySummary>,
-): void {
-  const nextSummary = { ...parsed.summary, ...patch };
-  if (JSON.stringify(nextSummary) === JSON.stringify(parsed.summary)) return;
-  atomicWrite(filePath, JSON.stringify({ ...parsed, summary: nextSummary }, null, 2));
+/**
+ * How many bytes of a frequency-dict file to read when only its `summary` is wanted.
+ *
+ * Every writer in this module emits `JSON.stringify({ summary, ranks }, null, 2)` — or a
+ * spread that preserves that key order — so `summary` is always the head of the file and is
+ * about 250 bytes pretty-printed. 64 KB is two orders of magnitude of headroom and still one
+ * disk page batch; a file whose summary does not fit falls back to a full parse rather than
+ * being reported as broken.
+ */
+const FREQ_SUMMARY_HEAD_BYTES = 65536;
+
+/**
+ * Read one frequency dictionary's `summary` WITHOUT parsing its `ranks`.
+ *
+ * This is a main-event-loop fix, not a micro-optimisation. `bundled-freq-ja-jpdb-v2.json` is
+ * 20.10 MB holding 550,408 ranks, and a full `readFileSync` + `JSON.parse` of it measures
+ * 68 ms + 269 ms here. Three separate summary-only passes used to pay that on every
+ * `mining:listFrequencyDicts` call — the provisioning sync, the large-list preference, and the
+ * listing itself, because the listing's cache was invalidated immediately before it ran — and
+ * the renderer reaches that IPC from `currentStudyReadinessFingerprints()`, which the Media
+ * Center's `Readiness` and `Study Mode` destinations both call on mount. Measured through the
+ * debug bridge's `/health`, which is answered on main's own loop: one call blocked main for
+ * **1,270 ms** against an idle p50 of 1 ms.
+ *
+ * Returns `null` for a file that cannot be read or has no usable summary — the callers all
+ * treat a broken file as absent, exactly as the full-parse `catch` blocks they replace did.
+ */
+function readFrequencySummary(filePath: string): FrequencyDictionarySummary | null {
+  let head = '';
+  let fd: number | null = null;
+  try {
+    fd = fs.openSync(filePath, 'r');
+    const buf = Buffer.allocUnsafe(FREQ_SUMMARY_HEAD_BYTES);
+    const read = fs.readSync(fd, buf, 0, FREQ_SUMMARY_HEAD_BYTES, 0);
+    head = buf.subarray(0, read).toString('utf-8');
+  } catch {
+    return null;
+  } finally {
+    if (fd !== null) {
+      try { fs.closeSync(fd); } catch { /* already gone */ }
+    }
+  }
+
+  // Brace-match the `"summary": { ... }` object rather than regexing it: a label may legally
+  // contain a brace, and a truncated slice must be recognisable as truncated so the fallback
+  // below can run instead of throwing away a real file.
+  const key = head.indexOf('"summary"');
+  if (key >= 0) {
+    const start = head.indexOf('{', key);
+    if (start >= 0) {
+      let depth = 0;
+      let inString = false;
+      let escaped = false;
+      for (let i = start; i < head.length; i += 1) {
+        const ch = head[i];
+        if (escaped) { escaped = false; continue; }
+        if (inString) {
+          if (ch === '\\') escaped = true;
+          else if (ch === '"') inString = false;
+          continue;
+        }
+        if (ch === '"') { inString = true; continue; }
+        if (ch === '{') depth += 1;
+        else if (ch === '}') {
+          depth -= 1;
+          if (depth === 0) {
+            try {
+              const summary = JSON.parse(head.slice(start, i + 1)) as FrequencyDictionarySummary;
+              if (summary?.id) return summary;
+            } catch { /* fall through to the full parse */ }
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  // A file this module did not write, or one whose summary is not in the head window.
+  try {
+    const parsed = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as FrequencyDictionaryFile;
+    return parsed?.summary?.id ? parsed.summary : null;
+  } catch {
+    return null;
+  }
 }
 
-function ensureBundledFrequencyDictionaries(): void {
+/**
+ * Apply `patch` to a file's summary, and pay the full parse + rewrite ONLY when the patch
+ * actually changes something. The comparison is made against the head-read summary, so the
+ * steady state — a summary already matching its definition, which is every boot after the
+ * first — costs one 64 KB read instead of a 20 MB parse and a 20 MB stringify.
+ *
+ * Returns whether the file was rewritten, so the caller can invalidate the ranks cache only
+ * when there is a reason to.
+ */
+function syncBundledFrequencySummary(
+  filePath: string,
+  current: FrequencyDictionarySummary,
+  patch: Partial<FrequencyDictionarySummary>,
+): boolean {
+  const nextSummary = { ...current, ...patch };
+  if (JSON.stringify(nextSummary) === JSON.stringify(current)) return false;
+  try {
+    const parsed = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as FrequencyDictionaryFile;
+    atomicWrite(filePath, JSON.stringify({ ...parsed, summary: { ...parsed.summary, ...patch } }, null, 2));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function ensureBundledFrequencyDictionaries(): boolean {
   ensureMiningRoot();
+  let changed = false;
   for (const def of BUNDLED_FREQUENCY_DICTIONARIES) {
     const file = path.join(freqRoot(), `${def.id}.json`);
     if (fs.existsSync(file)) {
-      try {
-        const parsed = JSON.parse(fs.readFileSync(file, 'utf-8')) as FrequencyDictionaryFile;
-        syncBundledFrequencySummary(file, parsed, {
-          label: def.label,
-          source: 'bundled',
-          language: def.language,
-        });
-      } catch {
-        /* ignore broken files */
+      const summary = readFrequencySummary(file);
+      if (summary && syncBundledFrequencySummary(file, summary, {
+        label: def.label,
+        source: 'bundled',
+        language: def.language,
+      })) {
+        changed = true;
       }
       continue;
     }
@@ -688,7 +788,9 @@ function ensureBundledFrequencyDictionaries(): void {
       language: def.language,
     };
     atomicWrite(file, JSON.stringify({ summary, ranks }, null, 2));
+    changed = true;
   }
+  return changed;
 }
 
 async function fetchText(url: string, ms = 180000): Promise<string> {
@@ -735,15 +837,13 @@ async function ensureRemoteBundledFrequencyDictionaries(): Promise<void> {
   for (const def of REMOTE_BUNDLED_FREQUENCY_DICTIONARIES) {
     const file = path.join(freqRoot(), `${def.id}.json`);
     if (fs.existsSync(file)) {
-      try {
-        const parsed = JSON.parse(fs.readFileSync(file, 'utf-8')) as FrequencyDictionaryFile;
-        syncBundledFrequencySummary(file, parsed, {
-          label: def.label,
-          source: def.source,
-          language: def.language,
-        });
-      } catch {
-        /* ignore broken files */
+      const summary = readFrequencySummary(file);
+      if (summary && syncBundledFrequencySummary(file, summary, {
+        label: def.label,
+        source: def.source,
+        language: def.language,
+      })) {
+        changed = true;
       }
       continue;
     }
@@ -771,34 +871,30 @@ async function ensureRemoteBundledFrequencyDictionaries(): Promise<void> {
   if (changed) invalidateFreqDictCache();
 }
 
-function preferLargeJapaneseFrequencyDictionary(): void {
+function preferLargeJapaneseFrequencyDictionary(): boolean {
   const largeJaId = new Set<string>();
   for (const def of REMOTE_BUNDLED_FREQUENCY_DICTIONARIES) {
     if (def.language !== 'ja') continue;
     const file = path.join(freqRoot(), `${def.id}.json`);
     if (fs.existsSync(file)) largeJaId.add(def.id);
   }
-  if (!largeJaId.size) return;
+  if (!largeJaId.size) return false;
+  let changed = false;
   for (const fileName of fs.readdirSync(freqRoot()).filter((name) => name.endsWith('.json'))) {
     const file = path.join(freqRoot(), fileName);
-    try {
-      const parsed = JSON.parse(fs.readFileSync(file, 'utf-8')) as FrequencyDictionaryFile;
-      if (parsed.summary.language !== 'ja') continue;
-      if (largeJaId.has(parsed.summary.id)) {
-        if (!parsed.summary.enabled) {
-          parsed.summary.enabled = true;
-          atomicWrite(file, JSON.stringify(parsed, null, 2));
-        }
-        continue;
-      }
-      if (parsed.summary.id === 'bundled-freq-ja' && parsed.summary.enabled) {
-        parsed.summary.enabled = false;
-        atomicWrite(file, JSON.stringify(parsed, null, 2));
-      }
-    } catch {
-      /* ignore broken files */
+    // Summary-only: this decides which list is enabled and never looks at a rank.
+    const summary = readFrequencySummary(file);
+    if (!summary || summary.language !== 'ja') continue;
+    if (largeJaId.has(summary.id)) {
+      if (!summary.enabled && syncBundledFrequencySummary(file, summary, { enabled: true })) changed = true;
+      continue;
+    }
+    if (summary.id === 'bundled-freq-ja' && summary.enabled
+      && syncBundledFrequencySummary(file, summary, { enabled: false })) {
+      changed = true;
     }
   }
+  return changed;
 }
 
 // Parsed frequency-dict files are cached in memory: resolveCustomFrequencyRanks
@@ -812,7 +908,7 @@ function invalidateFreqDictCache(): void {
 }
 
 async function ensureAllFrequencyDictionariesReady(): Promise<void> {
-  ensureBundledFrequencyDictionaries();
+  let changed = ensureBundledFrequencyDictionaries();
   if (!ensureRemoteBundledFrequencyPromise) {
     ensureRemoteBundledFrequencyPromise = ensureRemoteBundledFrequencyDictionaries()
       .catch((error) => {
@@ -823,8 +919,12 @@ async function ensureAllFrequencyDictionariesReady(): Promise<void> {
       });
   }
   await ensureRemoteBundledFrequencyPromise;
-  preferLargeJapaneseFrequencyDictionary();
-  invalidateFreqDictCache();
+  if (preferLargeJapaneseFrequencyDictionary()) changed = true;
+  // Only when a file was actually rewritten. This used to be unconditional, which guaranteed
+  // that the very next `listFrequencyDictionaryFiles()` re-read and re-parsed every rank table
+  // on main — 20.10 MB and 550,408 ranks for the JPDB list alone — on a code path whose whole
+  // job is to answer with summaries.
+  if (changed) invalidateFreqDictCache();
 }
 
 function listFrequencyDictionaryFiles(): FrequencyDictionaryFile[] {
@@ -847,8 +947,23 @@ function listFrequencyDictionaryFiles(): FrequencyDictionaryFile[] {
   return out;
 }
 
-function listFrequencyDictionaries(): FrequencyDictionarySummary[] {
-  return listFrequencyDictionaryFiles().map((entry) => entry.summary);
+/**
+ * The listing IPC's answer, and it never loads a rank table.
+ *
+ * If the ranks cache happens to be warm — because an analysis run populated it — reuse it, so
+ * a summary just written by `setFrequencyDictionaryEnabled` is not read twice from disk.
+ * Otherwise read each file's head. Order is the same `readdirSync().sort()` the cached path
+ * uses, so the two branches answer identically.
+ */
+export function listFrequencyDictionaries(): FrequencyDictionarySummary[] {
+  if (freqDictFilesCache) return freqDictFilesCache.map((entry) => entry.summary);
+  ensureBundledFrequencyDictionaries();
+  const out: FrequencyDictionarySummary[] = [];
+  for (const name of fs.readdirSync(freqRoot()).filter((n) => n.endsWith('.json')).sort()) {
+    const summary = readFrequencySummary(path.join(freqRoot(), name));
+    if (summary) out.push(summary);
+  }
+  return out;
 }
 
 /**
