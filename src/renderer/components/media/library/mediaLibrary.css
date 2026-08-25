@@ -377,6 +377,62 @@
   transition: transform var(--dur-fast) var(--ease-standard);
 }
 
+/* --- list row ---
+   List view had no layout of its own: the browser handed the uncapped full-pane
+   width to the stacked card and the 2:3 art made each "row" 945px tall, so the
+   dense view scrolled 7.1x further than the grid for the same shelf. A row is
+   art-then-caption on one line at a fixed height, and the art follows its own
+   ratio off that height rather than off the pane's width. */
+
+.medialib-card[data-layout='row'] {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-sm) calc(var(--space-sm) - 1px);
+  border-block-end: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+/* An explicit height, not `height: 100%`. The grid cell is `min-height: auto`,
+   so a percentage height resolves cyclically: the art fell back to filling the
+   pane's width and its ratio then made it 482x723 inside an 84px row, which is
+   the same 945px defect one level down. A pixel height makes the ratio produce
+   the WIDTH instead, which is what a row wants.
+   84 (row) - 8 (padding-top) - 7 (padding-bottom) - 1 (divider) = 68. */
+.medialib-card[data-layout='row'] .medialib-card__art {
+  width: auto;
+  height: var(--medialib-row-art-h, 68px);
+  flex: 0 0 auto;
+}
+
+.medialib-card[data-layout='row'] .medialib-card__body {
+  flex: 1 1 auto;
+  gap: 2px;
+  overflow: hidden;
+}
+
+/* One line, not two: the row's height is fixed, so a clamped second line would
+   push the status pill out of the box instead of truncating. */
+.medialib-card[data-layout='row'] .medialib-card__title {
+  -webkit-line-clamp: 1;
+}
+
+/* The trailing control, out of the art and into the row. `static` so it sits in
+   the flex line; the overlay rules above only apply to the `card` layout. */
+.medialib-card[data-layout='row'] .medialib-card__more {
+  position: static;
+  flex: 0 0 auto;
+  background: none;
+  color: var(--muted);
+}
+
+.medialib-card[data-layout='row']:hover .medialib-card__more { color: var(--fg); }
+
+/* A row that lifts under the pointer separates itself from the rows above and
+   below it; a background change is the row equivalent of the poster's lift. */
+.medialib-card[data-layout='row']:hover { transform: none; background: var(--surface-2); }
+.medialib-card[data-layout='row']:active { transform: none; }
+
 .medialib-card__art {
   position: relative;
   width: 100%;

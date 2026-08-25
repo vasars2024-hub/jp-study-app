@@ -65,7 +65,8 @@
       n: allRecv.length,
     },
     resultMarks: st.resultMarks,
-    entriesNow: win.querySelectorAll('.dict-entry').length,
+    resultSel: st.resultSel || '.dict-entry',
+    entriesNow: win.querySelectorAll(st.resultSel || '.dict-entry').length,
     scrollTraps: { n: scrollTraps.length, items: scrollTraps.slice(0, 8) },
     openDialogs: { n: dialogs.length, items: dialogs },
   });

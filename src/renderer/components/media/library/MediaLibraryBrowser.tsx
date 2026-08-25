@@ -12,7 +12,12 @@ import VirtualGrid from '../../VirtualGrid';
 import { Button, Select } from '../../ui';
 import Icon from '../../Icons';
 import { useT } from '../../../i18n';
-import MediaPosterCard, { CARD_METRICS, cardRowHeight, type MediaCardVariant } from './MediaPosterCard';
+import MediaPosterCard, {
+  CARD_METRICS,
+  LIST_ROW_HEIGHT,
+  cardRowHeight,
+  type MediaCardVariant,
+} from './MediaPosterCard';
 import MediaSpotlightCard from './MediaSpotlightCard';
 import { mediaSubtitleStatus } from '../../../../shared/mediaSubtitleStatus';
 import {
@@ -177,11 +182,16 @@ export default function MediaLibraryBrowser({
             // it has tracks grows them into the surplus instead of leaving a void.
             maxColWidth={view === 'list' ? undefined : CARD_METRICS[variant].maxColWidth}
             gap={GRID_GAP}
-            rowHeight={cardRowHeight(variant, GRID_GAP)}
+            // A row's height is its own, not a function of the pane: the list
+            // path is uncapped, so the ratio-derived height grew with the pane
+            // and made each "row" a 945px poster. Grid keeps the callback,
+            // because an aspect-ratio card genuinely does depend on its column.
+            rowHeight={view === 'list' ? LIST_ROW_HEIGHT : cardRowHeight(variant, GRID_GAP)}
             getKey={(entry) => entry.id}
             renderItem={(entry) => (
               <MediaPosterCard
                 variant={variant}
+                layout={view === 'list' ? 'row' : 'card'}
                 artworkId={entry.artworkItem.id}
                 title={entry.title}
                 subtitle={[

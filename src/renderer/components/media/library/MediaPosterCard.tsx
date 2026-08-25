@@ -20,6 +20,27 @@ import type { MediaSubtitleStatus } from '../../../../shared/mediaSubtitleStatus
 
 export type MediaCardVariant = 'poster' | 'still';
 
+/**
+ * How the card lays its own parts out. `card` is the grid's stacked poster;
+ * `row` is the list view's dense horizontal row.
+ *
+ * This exists because list view had no layout of its own. The browser handed the
+ * uncapped full-pane width to the same stacked card, and the 2:3 art turned a
+ * "row" into a 578x945 poster: measured 2026-08-25 in the Video window at
+ * 1080x700, 8 titles scrolled **7,560px** in a 464px pane — 0.49 titles on
+ * screen at a time, against grid view's 1,060px for the same shelf. The dense
+ * view was 7.1x taller than the airy one.
+ */
+export type MediaCardLayout = 'card' | 'row';
+
+/**
+ * Fixed row height for `layout="row"`, in px, including the 1px divider.
+ * `ART_HEIGHT` + the card's block padding; the art's own ratio then decides its
+ * width, so a poster row and a still row are the same height and different
+ * widths rather than the other way round.
+ */
+export const LIST_ROW_HEIGHT = 84;
+
 /** Grid geometry, shared with the browser so its row height math matches. */
 export const CARD_METRICS: Record<
   MediaCardVariant,
@@ -61,6 +82,8 @@ export function formatCardDuration(seconds: number | undefined): string | null {
 
 export interface MediaPosterCardProps {
   variant?: MediaCardVariant;
+  /** `card` (default) stacks art over caption; `row` is the list view's dense row. */
+  layout?: MediaCardLayout;
   /** Media id used to resolve artwork. */
   artworkId: string | null;
   title: string;
@@ -82,6 +105,7 @@ export interface MediaPosterCardProps {
 
 export default function MediaPosterCard({
   variant = 'poster',
+  layout = 'card',
   artworkId,
   title,
   subtitle,
@@ -107,9 +131,36 @@ export default function MediaPosterCard({
     if (!inert) onOpen();
   };
 
+  // The card's only nested control. `stopPropagation` is what keeps opening the
+  // menu from also opening the item.
+  //
+  // In `card` layout it overlays the art, which is where a poster grid wants it.
+  // In `row` layout the art is ~45px wide, so the same overlay would cover most
+  // of the picture — it becomes the row's trailing control instead. Same button,
+  // same handler, same label: moved, never removed, because a control that is
+  // reachable in one view and not the other is the category 6 regression.
+  const moreButton = onMenu ? (
+    <button
+      type="button"
+      // 26x26 by design — a poster overlay must not grow. `lq-hit-placed`
+      // is the `.lq-hit` expander without its `position: relative`, which
+      // would fight this button's own `position: absolute`.
+      className="medialib-card__more lq-hit-placed"
+      aria-label={t('media.card.moreActions')}
+      onClick={(e) => {
+        e.stopPropagation();
+        onMenu(e.currentTarget);
+      }}
+      onKeyDown={(e) => e.stopPropagation()}
+    >
+      <Icon name="chevron" size={13} />
+    </button>
+  ) : null;
+
   return (
     <div
       className="medialib-card"
+      data-layout={layout}
       role="button"
       tabIndex={disabled ? -1 : 0}
       aria-label={title}
@@ -147,25 +198,7 @@ export default function MediaPosterCard({
             <i style={{ width: `${percent}%` }} />
           </div>
         )}
-        {onMenu && (
-          // The card's only nested control. stopPropagation here is what keeps
-          // opening the menu from also opening the item.
-          <button
-            type="button"
-            // 26x26 by design — a poster overlay must not grow. `lq-hit-placed`
-            // is the `.lq-hit` expander without its `position: relative`, which
-            // would fight this button's own `position: absolute`.
-            className="medialib-card__more lq-hit-placed"
-            aria-label={t('media.card.moreActions')}
-            onClick={(e) => {
-              e.stopPropagation();
-              onMenu(e.currentTarget);
-            }}
-            onKeyDown={(e) => e.stopPropagation()}
-          >
-            <Icon name="chevron" size={13} />
-          </button>
-        )}
+        {layout === 'card' && moreButton}
       </MediaArtwork>
 
       <div className="medialib-card__body">
@@ -173,6 +206,8 @@ export default function MediaPosterCard({
         {subtitle && <span className="medialib-card__sub">{subtitle}</span>}
         <MediaStatusPill status={status} onRetry={onRetryStatus} />
       </div>
+
+      {layout === 'row' && moreButton}
     </div>
   );
 }

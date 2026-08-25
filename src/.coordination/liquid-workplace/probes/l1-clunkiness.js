@@ -42,7 +42,12 @@
  * then drive, then read with `-read.js`.
  */
 (() => {
-  const TITLE = 'Dictionary';
+  // Which window this arms on, and what counts as a "result row" there. Both were the literal
+  // Dictionary values, which is the same one-line reason `l1-deadend.js` could not be pointed at
+  // Video for four turns. `__lqClunkTitle` / `__lqClunkResultSel` select them; the fallbacks keep
+  // every earlier Dictionary run reproducible with no argument.
+  const TITLE = window.__lqClunkTitle || 'Dictionary';
+  const RESULT_SEL = window.__lqClunkResultSel || '.dict-entry';
 
   const win = [...document.querySelectorAll('.fwin')].find(
     (w) => (w.querySelector('.fwin-title-text')?.textContent || '').includes(TITLE),
@@ -51,6 +56,7 @@
 
   const st = {
     surface: TITLE,
+    resultSel: RESULT_SEL,
     // Per-event input→paint latency, in ms. One entry per real user event.
     latencies: [],
     // Every click and keystroke the driver spends, so the cost is counted rather than assumed.
@@ -84,9 +90,9 @@
   win.addEventListener('input', onInput, true);
   win.addEventListener('click', onClick, true);
 
-  let lastCount = win.querySelectorAll('.dict-entry').length;
+  let lastCount = win.querySelectorAll(RESULT_SEL).length;
   const mo = new MutationObserver(() => {
-    const n = win.querySelectorAll('.dict-entry').length;
+    const n = win.querySelectorAll(RESULT_SEL).length;
     if (n !== lastCount) {
       st.resultMarks.push({
         entries: n,
@@ -104,5 +110,5 @@
   };
 
   window.__liqClunk = st;
-  return JSON.stringify({ armed: true, surface: TITLE, entriesAtArm: lastCount });
+  return JSON.stringify({ armed: true, surface: TITLE, resultSel: RESULT_SEL, entriesAtArm: lastCount });
 })()

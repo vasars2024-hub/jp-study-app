@@ -16,7 +16,7 @@
  * Arm this instead of the main probe, drive the inert click, then read with `-read.js`.
  */
 (() => {
-  const TITLE = 'Dictionary';
+  const TITLE = window.__lqClunkTitle || 'Dictionary';
   const win = [...document.querySelectorAll('.fwin')].find(
     (w) => (w.querySelector('.fwin-title-text')?.textContent || '').includes(TITLE),
   );
