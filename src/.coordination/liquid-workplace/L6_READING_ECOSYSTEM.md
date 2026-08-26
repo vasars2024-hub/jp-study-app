@@ -724,3 +724,48 @@ so it is not re-derived. Turn total: 0 new probe files, 0 new harnesses, 0 new t
 `clipped` 0, `hiddenOverflowX` 0, `horizontalScrollers` 0, dead region 6.1% of window,
 `overDocument` 0, `covered` true, `docInert` true. The other five surfaces have not been run and
 the eight rubric categories have not been scored, so no 80/80 is claimed for anything.
+
+## 2026-08-25 (later 18) — three more Gate surfaces run. Two shipped defects, two harness defects.
+
+Gate still OPEN: **3 of 6 surfaces clean** (Immersion from last turn, plus Library and Reading
+Captures here), Novels partially run, manga and VN not run, and no rubric category is scored.
+
+**`6883a59a` — the header THIRTEEN views share.** Library at the 380px Blanc allows:
+`div.fwin-body 726>368` under `overflow-x: hidden`, 358px gone with no scrollbar, `clipped` 8
+including three buttons. `.view-head` is a nowrap flex row of `p.muted` (114) and `.actions`
+(642), and `.actions` was `flex-shrink: 0`, so the row floored at 726 min-content at every host
+width. Both halves are load-bearing and the intermediate state proves it: wrapping the header
+alone left `.actions` at its 642 max-content on its own line — `clipped` 8 → 5, overflow still
+1 at `660>368`. **A wrap container only wraps when its own box is constrained.** After: 0 / 0,
+`bodySW` 368, dead region 22.4% → 9.4%. Dictionary, Grammar and Translate re-measured at 380
+after the change: 0 / 0 each, no regression.
+
+**`2ea2ac29` — the same category on the OTHER axis, and the bigger number.**
+`.reading-workspace-panel` was `overflow: hidden` with `> * { height: 100% }`, a bet that every
+section scrolls itself; five of the eight do not. `clipped` 77 at 380, **41 at the default
+820x580**, still 3 at 1100x700 — and `xCount` 0, `yCount` 77: all of it leaving downwards.
+Discover held `scrollHeight` 740 in `clientHeight` 460; the Library section 2118 in 460. The
+window's own `.fwin-body` is `overflow-y: auto` and never saw it, because the panel clamps
+first and its `scrollHeight` never propagates. `overflow-y: auto` keeps the self-scrolling
+sections at `height: 100%` with no second scrollbar. Negative control: forcing `overflow-y:
+hidden` back inline on the Library section returns **193** unreachable boxes; removing it, 0.
+All eight sections after: 0.
+
+**`138f3a26` — the harness was wrong twice, and one of the fixes nearly hid the fix above.**
+(a) Opening a book replaces the desktop shell: `.fwin` count **0**, so a title-keyed harness
+scores L6's own Novels surface as absent. Entries may now be `{ root: '<selector>', title }`.
+(b) On a real EPUB it read `clipped` **132** at 820 and 239 at 380, all x-axis, all descendants
+of `div.novel-content` **806px left of the surface** inside `div.novel-scroller` — the
+product's own pagination, invisible to both existing numbers because content at a negative
+offset never counts towards `scrollWidth`. A box entirely outside its nearest clipping ancestor
+is outside THAT viewport. **The narrowing that keeps it honest: the clipper must itself report
+no hidden content** — without it, `.reading-workspace-panel`'s 740-in-460 would have been
+exempted and `2ea2ac29` would never have been found.
+(c) `/bounds` on the debug bridge, because a full-window surface cannot be narrowed by an
+inline width mid-tree — that left `.novel-scroller` holding a page buffer sized against a
+container that had not moved. Verified live after a restart. **It measured its own trap: asking
+for 380 yields 924, the desktop's minimum**, so only the response's `contentSize` may be
+reported. Restart cost: none, 11 fwins restored, all three clean surfaces reproduced.
+
+**NEXT: manga and VN through the same driver, then Novels in a REAL narrow host** — Blanc
+(`BLANC_MIN_W` 380) or `/bounds` at 924, never an inline width on `.reader`.
