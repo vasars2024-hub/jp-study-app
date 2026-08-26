@@ -1,4 +1,13 @@
+/* The narrow-layout rules at the bottom of this sheet have to ask THIS PANE how wide it is. The
+   Reading Finder renders inside a floating window, so a viewport `@media` describes the desktop,
+   not the surface: at the shipped 820x580 inside a 1264px viewport the 680px query never fired,
+   and the tab strip scrolled sideways at the window's own default size. Same instrument error the
+   visual-novel panel carried — see `visualNovelPaneReflow.test.ts`.
+   `inline-size` and not `size`: the block axis still has to grow with content, because the nav
+   wraps. */
 .reading-workspace {
+  container-type: inline-size;
+  container-name: rfwork;
   display: flex;
   min-width: 0;
   min-height: 0;
@@ -22,11 +31,15 @@
   scrollbar-width: thin;
 }
 
+/* `flex: 0 0 auto` made the strip an all-or-nothing row: eight tabs measured 784px of content in
+   a 782px box, so the whole nav grew a horizontal scrollbar to reach two pixels. Shrinking with an
+   ellipsis absorbs that invisibly and degrades to a readable label instead of a hidden tab. */
 .reading-workspace-tab {
   position: relative;
   display: inline-flex;
+  min-width: 0;
   min-height: 32px;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   align-items: center;
   gap: 7px;
   padding: 6px 11px;
@@ -37,6 +50,19 @@
   font: inherit;
   font-size: 12px;
   cursor: pointer;
+}
+
+/* The icon keeps its size; only the label gives way, and the full text stays in the DOM so the
+   accessible name is unaffected by the truncation. */
+.reading-workspace-tab > svg {
+  flex: 0 0 auto;
+}
+
+.reading-workspace-tab > span {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .reading-workspace-tab:hover {
@@ -130,9 +156,14 @@
   min-height: 100%;
 }
 
-@media (max-width: 680px) {
+/* Was `@media (max-width: 680px)`, which asks the desktop. Below a pane this narrow eight tabs
+   cannot shrink far enough to fit one row without becoming unreadable, so the strip WRAPS rather
+   than scrolls — a tab pushed off a scrolling strip has no affordance saying it is there. */
+@container rfwork (max-width: 680px) {
   .reading-workspace-nav {
+    flex-wrap: wrap;
     padding-inline: 5px;
+    row-gap: 4px;
   }
 
   .reading-workspace-tab {
