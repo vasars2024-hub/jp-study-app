@@ -1272,3 +1272,16 @@ the whole app render, so opening a volume unmounts the desktop and all ten windo
 re-runs once per mutation. `openSection` therefore REFUSES with the reason instead of navigating —
 the open volume is the operator's precondition. Reader presentation is persisted **per `LibraryKind`
 in localStorage**, not per window, so it survives every restart: found `liquid`, left `liquid`.
+
+## 2026-08-26 (later 6) · codexA — Category 6, Novels: PASS 10/10
+
+Novels **PASS 10/10** on the live 1Q84 EPUB: parity **9/9 standard, 9/9 liquid**,
+`rowsAgree` true, and the 2/2 → 1/2 → 2/2 transport plus all three ReadingCanvas tools held
+through Liquid → Standard → Liquid with **0 diffs**. Four controls fell only their declared row
+(document removal also removes its chapter-heading evidence, an explicit cascade) and every one
+returned to 9/9. Evidence: `baselines/cat6-l6-novels.json`.
+
+The first run was VOID, not banked: seek percent could not observe a page flip and “settings”
+matched translation settings. The rule's one spec repair changed the observation to page
+content/page count and excluded translation from the reader-settings matcher. Board: category 6
+is **5 of 6**; only VN remains. No product defect was found in Novels.

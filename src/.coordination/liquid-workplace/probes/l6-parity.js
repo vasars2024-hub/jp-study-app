@@ -104,7 +104,16 @@
   const libState = specState('__LQP_LIB_ORIG');
   const immState = specState('__LQP_IMM_ORIG');
   const capState = specState('__LQP_CAP_ORIG');
+  const novelState = specState('__LQP_NOVEL_ORIG');
   const mangaState = specState('__LQP_MANGA_ORIG');
+  const novelPageSignature = (w) => `${txt(q(w, '.reader-pagecount'))}|${txt(q(w, '.novel-content')).slice(0, 160)}`;
+  const novelToolTrigger = (w, id) => qa(w, '.settings-anchor button').find((b) => {
+    const label = `${b.title} ${b.getAttribute('aria-label') || ''}`;
+    const isTranslate = /translat|翻訳|翻译|перевод/i.test(label);
+    if (id === 'bookmarks') return /Bookmark|ブックマーク|书签|Заклад/i.test(label);
+    if (id === 'translate') return isTranslate;
+    return /setting|設定|设置|настрой/i.test(label) && !isTranslate;
+  });
   // The rail's filter chips only: `+ New folder` is an action and the rename box is a
   // transient editor, and both carry the same class as a real chip.
   const folderChips = (w) => qa(w, '.lib-folders .lib-folder-chip').filter(
@@ -1266,6 +1275,160 @@
           window.__LQP_IMM_ORIG = null;
           return done.length ? `immersion:${done.join('+')}${g.navigated ? ' (NAVIGATED — remove the site row by hand)' : ''}` : null;
         },
+      },
+    },
+
+    /**
+     * NOVELS — the paged-reader half of the shared reader host. Unlike manga, its
+     * document is text and its contextual tools are the three ReadingCanvas sheets.
+     * The drive exercises a reversible next/back pair and opens all three tools;
+     * nothing writes to the book, bookmark store, translation cache or library.
+     */
+    novels: {
+      titleRe: /Novels|Book|EPUB|小説|书籍|Книг/i,
+      rootSel: '.novel-scroller',
+      features: [
+        {
+          id: 'documentRender',
+          f: (w) => {
+            const doc = q(w, '[data-reading-role="document"]');
+            const content = q(w, '.novel-content');
+            const box = content ? content.getBoundingClientRect() : null;
+            const chars = txt(content).length;
+            return {
+              ok: !!doc && !!box && box.width > 40 && box.height > 40 && chars > 0,
+              ev: `content=${box ? `${Math.round(box.width)}x${Math.round(box.height)}` : 'none'} chars=${chars}`,
+            };
+          },
+        },
+        {
+          id: 'pageTransport',
+          f: (w) => {
+            const seek = q(w, '.reader-seek');
+            const prev = btnByText(w, /Prev|前|上一|Назад/i);
+            const next = btnByText(w, /Next|次|下一|Вперёд/i);
+            const g = window.__LQP_NOVEL_ORIG || {};
+            const trip = g.transport || {};
+            const moved = !!trip.before && !!trip.afterNext && trip.afterNext !== trip.before;
+            const returned = moved && trip.afterBack === trip.before;
+            return {
+              ok: !!seek && !!prev && !!next && Number(seek.min) === 0
+                && seek.max === trip.max && Number(seek.max) > Number(seek.min) && moved && returned,
+              ev: `range=${seek ? `${seek.min}..${seek.max}` : 'none'} originalMax=${trip.max} trip=${JSON.stringify(trip.before)}->${JSON.stringify(trip.afterNext)}->${JSON.stringify(trip.afterBack)}`,
+            };
+          },
+        },
+        {
+          id: 'chapterNavigation',
+          f: (w) => {
+            const select = q(w, '.chapter-select');
+            const labels = select ? qa(select, 'option').slice(1).map(txt).filter(Boolean) : [];
+            const head = txt(q(w, '.novel-content')).slice(0, 240);
+            const matched = labels.find((label) => head.includes(label));
+            return {
+              ok: labels.length > 0 && !!matched,
+              ev: `chapters=${labels.length} renderedHeading=${JSON.stringify(matched || head.slice(0, 32))}`,
+            };
+          },
+        },
+        ...['bookmarks', 'translate', 'reader-settings'].map((id) => ({
+          id: `${id}Tool`,
+          f: (w) => {
+            const tool = q(w, `[data-reading-tool="${id}"]`);
+            const trigger = novelToolTrigger(w, id);
+            const body = tool ? q(tool, '.lq-reading-tool-body') : null;
+            return {
+              ok: !!trigger && trigger.getAttribute('aria-pressed') === 'true'
+                && !!tool && !!body && tool.classList.contains('lq-liquid'),
+              ev: `trigger=${!!trigger} tool=${!!tool} body=${!!body} placement=${tool ? tool.dataset.placement : 'none'} hidden=${tool ? tool.hidden : '?'}`,
+            };
+          },
+        })),
+        { id: 'canvasPlacement', f: (w) => canvasPlacement(w) },
+        {
+          id: 'presentationHonest',
+          f: (w) => {
+            const btn = q(w, LIQUID_BTN.reader);
+            const pressed = btn ? btn.getAttribute('aria-pressed') : null;
+            const pres = w.getAttribute('data-presentation');
+            const cls = w.classList.contains('reader-liquid');
+            return {
+              ok: !!btn && (pressed === 'true') === (pres === 'liquid') && cls === (pres === 'liquid'),
+              ev: `ariaPressed=${pressed} dataPresentation=${pres} readerLiquidClass=${cls}`,
+            };
+          },
+        },
+        { id: 'windowLifecycle', f: (w) => lifecycle(w) },
+      ],
+      steps: {
+        openSection: (w) => {
+          const content = q(w, '.novel-content');
+          if (!content) return { refused: 'no EPUB/PDF open — open one from the Library first' };
+          return { open: txt(q(w, '.reader-title')) || 'book' };
+        },
+        next: (w) => {
+          const seek = q(w, '.reader-seek');
+          const btn = btnByText(w, /Next|次|下一|Вперёд/i);
+          if (!seek || !btn) return { refused: 'no next-page transport' };
+          const g = novelState();
+          g.transport = { before: novelPageSignature(w), max: seek.max };
+          btn.click();
+          return { before: g.transport.before };
+        },
+        back: (w) => {
+          const seek = q(w, '.reader-seek');
+          const btn = btnByText(w, /Prev|前|上一|Назад/i);
+          const g = novelState();
+          if (!seek || !btn || !g.transport) return { refused: 'next-page step did not establish a baseline' };
+          g.transport.afterNext = novelPageSignature(w);
+          btn.click();
+          return { afterNext: g.transport.afterNext };
+        },
+        settle: (w) => {
+          const seek = q(w, '.reader-seek');
+          const g = novelState();
+          if (!seek || !g.transport) return { refused: 'page transport did not run' };
+          g.transport.afterBack = novelPageSignature(w);
+          return { afterBack: g.transport.afterBack };
+        },
+        tool: (w, id) => {
+          const btn = novelToolTrigger(w, id);
+          if (!btn) return { refused: `no ${id} trigger` };
+          const g = novelState();
+          g.tools = g.tools || {};
+          if (!(id in g.tools)) g.tools[id] = btn.getAttribute('aria-pressed') === 'true';
+          if (btn.getAttribute('aria-pressed') !== 'true') btn.click();
+          return { tool: id, wasOpen: g.tools[id] };
+        },
+      },
+      drive: ['openSection', 'next', 'back', 'settle', ['tool', 'bookmarks'], ['tool', 'translate'], ['tool', 'reader-settings']],
+      undo: {
+        novels: (w) => {
+          const g = window.__LQP_NOVEL_ORIG;
+          if (!g) return null;
+          const done = [];
+          Object.keys(g.tools || {}).forEach((id) => {
+            const btn = novelToolTrigger(w, id);
+            const open = btn && btn.getAttribute('aria-pressed') === 'true';
+            if (btn && open !== g.tools[id]) { btn.click(); done.push(id); }
+          });
+          window.__LQP_NOVEL_ORIG = null;
+          return done.length ? `novels:${done.join('+')}` : null;
+        },
+      },
+      mutations: {
+        documentRender: (w) => detach(q(w, '.novel-content'), 'no rendered book content'),
+        pageTransport: (w) => setAttr(q(w, '.reader-seek'), 'max', '1', 'no book seek'),
+        bookmarksTool: (w) => detach(q(w, '[data-reading-tool="bookmarks"] .lq-reading-tool-body'), 'no bookmark tool'),
+        presentationHonest: (w) => setAttr(
+          q(w, LIQUID_BTN.reader),
+          'aria-pressed',
+          q(w, LIQUID_BTN.reader) && q(w, LIQUID_BTN.reader).getAttribute('aria-pressed') === 'true' ? 'false' : 'true',
+          'no liquid control',
+        ),
+      },
+      cascades: {
+        documentRender: ['chapterNavigation'],
       },
     },
 
