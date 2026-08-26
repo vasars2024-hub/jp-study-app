@@ -332,13 +332,15 @@ declare global {
       clearWatchFolder(): Promise<null>;
       syncLibrary(): Promise<LibraryItem[]>;
       lookupWord(query: string): Promise<DictResult>;
-      lookupTerm(query: string): Promise<DictResult>;
+      /** `limit` is the page size, defaulting to eight and clamped in main. */
+      lookupTerm(query: string, limit?: number): Promise<DictResult>;
       lookupTermOffline(query: string): Promise<DictResult>;
       lookupOfflineInterlinear(
         text: string,
         options?: import('../shared/lexiconInterlinear').LexiconInterlinearOptions,
       ): Promise<import('../shared/lexiconInterlinear').LexiconInterlinearResult>;
-      lookupChinese(query: string): Promise<DictResult>;
+      /** Same page size as `lookupTerm`; a `truncated` result is reachable by asking again. */
+      lookupChinese(query: string, limit?: number): Promise<DictResult>;
       resetChineseDictCache(): Promise<void>;
       lookupTermsBatch(
         queries: Array<{ expression: string; reading?: string }>,
