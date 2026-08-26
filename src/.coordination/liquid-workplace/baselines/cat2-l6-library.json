@@ -1,0 +1,188 @@
+{
+  "label": "l6-library",
+  "surface": "Library",
+  "win": "(focused)",
+  "task": "click:.lib-folders > .lib-folder-chip:nth-child(2) >> click:.lib-inbox-filters > .lib-folder-chip:nth-child(2) >> click:.lib-folder-chip[data-library-layout=\"list\"]",
+  "presentation": "standard",
+  "raised": "raised",
+  "base": {
+    "textRuns": 184,
+    "controlCount": 41,
+    "box": "820x580",
+    "results": 24
+  },
+  "inputCost": {
+    "clicks": 3,
+    "keystrokes": 0,
+    "total": 3
+  },
+  "latencyMs": {
+    "clickRecv": [
+      37.2,
+      27.1,
+      24.2
+    ],
+    "inputRecv": [],
+    "worstRecv": 37.2,
+    "overBar100": 0,
+    "n": 3,
+    "clickStampUnscored": [
+      83.1,
+      66.6,
+      64.7
+    ],
+    "inputStampUnscored": [],
+    "worstStampUnscored": 83.1
+  },
+  "steps": [
+    {
+      "step": "click:.lib-folders > .lib-folder-chip:nth-child(2)",
+      "target": {
+        "sel": ".lib-folders > .lib-folder-chip:nth-child(2)",
+        "label": "Manga 3",
+        "disabled": false,
+        "at": "263,328"
+      },
+      "counted": true,
+      "moved": {
+        "text": true,
+        "controls": true,
+        "results": true,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": true
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "click:.lib-inbox-filters > .lib-folder-chip:nth-child(2)",
+      "target": {
+        "sel": ".lib-inbox-filters > .lib-folder-chip:nth-child(2)",
+        "label": "Japanese",
+        "disabled": false,
+        "at": "233,415"
+      },
+      "counted": true,
+      "moved": {
+        "text": true,
+        "controls": true,
+        "results": true,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": true
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "click:.lib-folder-chip[data-library-layout=\"list\"]",
+      "target": {
+        "sel": ".lib-folder-chip[data-library-layout=\"list\"]",
+        "label": "List",
+        "disabled": false,
+        "at": "560,375"
+      },
+      "counted": true,
+      "moved": {
+        "text": false,
+        "controls": true,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": true
+      },
+      "deadEnd": false
+    }
+  ],
+  "undo": {
+    "spec": "click:.lib-folder-chip[data-library-layout=\"grid\"] >> click:.lib-inbox-filters > .lib-folder-chip:nth-child(1) >> click:.lib-folders > .lib-folder-chip:nth-child(1)",
+    "steps": [
+      "click:.lib-folder-chip[data-library-layout=\"grid\"]",
+      "click:.lib-inbox-filters > .lib-folder-chip:nth-child(1)",
+      "click:.lib-folders > .lib-folder-chip:nth-child(1)"
+    ],
+    "restored": true,
+    "baseHash": "yk4dw5",
+    "afterHash": "yk4dw5"
+  },
+  "stepsDriven": 3,
+  "deadEndCount": 0,
+  "deadEnds": [],
+  "scrollTrapCount": 0,
+  "scrollTraps": [],
+  "openDialogs": [],
+  "modalTrapCount": 0,
+  "modalTraps": [],
+  "dialogsClosedByEscape": [],
+  "costParity": {
+    "first": {
+      "presentation": "standard",
+      "box": "820x580",
+      "total": 3,
+      "deadEnds": 0,
+      "worstRecv": 37.2
+    },
+    "second": {
+      "presentation": "liquid",
+      "box": "820x580",
+      "total": 3,
+      "deadEnds": 0,
+      "worstRecv": 38.1
+    },
+    "restored": true,
+    "restoredTo": {
+      "presentation": "standard",
+      "pressed": "false",
+      "box": "820x580"
+    },
+    "liquidTotal": 3,
+    "standardTotal": 3
+  },
+  "bars": {
+    "deadEnds": true,
+    "modalTraps": true,
+    "scrollTraps": true,
+    "latency": true,
+    "costParity": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "unmeasuredBars": [],
+  "notMeasuredHere": [
+    "dead controls outside the dominant-task path (honesty-probe A - every control driven)",
+    "mute-pair explanation quality (rubric category 8 harness)"
+  ],
+  "control": {
+    "moved": {
+      "deadEnd": true,
+      "modalTrap": true,
+      "scrollTrap": true
+    },
+    "backToBaseline": true,
+    "counts": {
+      "base": [
+        0,
+        0,
+        0
+      ],
+      "dirty": [
+        1,
+        1,
+        1
+      ],
+      "restored": [
+        0,
+        0,
+        0
+      ]
+    },
+    "inertClickRecvMs": [
+      0.2
+    ]
+  }
+}
