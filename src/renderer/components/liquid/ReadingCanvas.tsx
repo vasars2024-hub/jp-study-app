@@ -25,7 +25,9 @@
  * the same layout problem, exactly as `LiquidAppScaffold` argues.
  */
 import {
+  useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type HTMLAttributes,
@@ -104,6 +106,44 @@ type ReadingCanvasProps = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
    */
   onDocumentCoveredChange?: (covered: boolean) => void;
 };
+
+/**
+ * "Is the document under a sheet right now?", for callers that need the answer
+ * outside a render.
+ *
+ * `onDocumentCoveredChange` fires on the transition, which is the right shape
+ * for dismissing an overlay but the wrong shape for a deep link: something
+ * arriving from outside the surface — a lens passage, a route, a shared target —
+ * has to ask about the state it walked into, and that state was decided by a
+ * resize frame that happened long before.
+ *
+ * L6 bullet 2, and measured rather than reasoned: a passage staged through
+ * `readingPassageHandoffStage` landed in Reading Captures at a 552 px canvas
+ * with `data-covered="true"` and the document `inert` + `aria-hidden`. Section,
+ * selection and `aria-current` were all correct and the user still could not see
+ * the passage they had just asked to read. Every one of the six surfaces can
+ * take a deep link, so the ref lives here and costs one line each rather than
+ * six copies of the same `useRef`.
+ *
+ * `covered()` is a function and not a value on purpose: read at render time it
+ * would be a render behind, which is exactly the class of defect it exists to
+ * catch.
+ */
+export function useReadingDocumentCover(): {
+  covered: () => boolean;
+  onDocumentCoveredChange: (covered: boolean) => void;
+} {
+  const coveredRef = useRef(false);
+  const onDocumentCoveredChange = useCallback((next: boolean) => {
+    coveredRef.current = next;
+  }, []);
+  // Stable identity: the canvas takes `onDocumentCoveredChange` as an effect
+  // dependency, and a fresh object every render would re-run it every frame.
+  return useMemo(
+    () => ({ covered: () => coveredRef.current, onDocumentCoveredChange }),
+    [onDocumentCoveredChange],
+  );
+}
 
 /**
  * Observe the canvas's own width. `null` until something is measured, so the

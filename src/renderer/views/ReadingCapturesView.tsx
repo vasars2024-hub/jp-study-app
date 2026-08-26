@@ -4,6 +4,7 @@ import type { ReadingPassageHandoff } from '../../shared/readingPassageHandoff';
 import Icon from '../components/Icons';
 import {
   ReadingCanvas,
+  useReadingDocumentCover,
   type ReadingCanvasTool,
 } from '../components/liquid/ReadingCanvas';
 import { useT } from '../i18n';
@@ -83,6 +84,7 @@ export default function ReadingCapturesView({ passage }: ReadingCapturesViewProp
   // Open by default: this is the section's navigation, and a cold open with the
   // list closed shows an empty reader and no visible way to fill it.
   const [listOpen, setListOpen] = useState(true);
+  const cover = useReadingDocumentCover();
 
   const load = useCallback(() => {
     const list = window.api?.lensHistoryList;
@@ -114,8 +116,26 @@ export default function ReadingCapturesView({ passage }: ReadingCapturesViewProp
   useEffect(() => {
     if (!passage) return undefined;
     setSelectedId(passage.captureId || `passage:${passage.stagedAt}`);
+    /*
+     * A passage arriving IS the "read this" gesture, so the document it lands in
+     * has to be the thing on screen.
+     *
+     * At a narrow canvas the capture list is a sheet, and a sheet covers the
+     * document outright — there is no partial cover to fall back on. Measured
+     * live before this line existed: staging a 47-character paragraph put the
+     * section on `captures`, the reader head on the new `sourceLabel` and
+     * `aria-current` on the new row, all correct, while `data-covered` was
+     * `"true"` and the document was `inert` + `aria-hidden`. The user asked to
+     * read a passage and got the index of passages.
+     *
+     * Only when it actually covers: a DOCKED list is beside the document, not
+     * over it, and closing it there would throw away the navigation for nothing.
+     * The reopen control lives in the reader's own header, so this is reversible
+     * the moment the document is live again.
+     */
+    if (cover.covered()) setListOpen(false);
     return load();
-  }, [passage, load]);
+  }, [passage, load, cover]);
 
   const rows = useMemo<PassageRow[]>(() => {
     const stored = history.kind === 'ready' ? history.entries.map(rowFromHistory) : [];
@@ -224,6 +244,7 @@ export default function ReadingCapturesView({ passage }: ReadingCapturesViewProp
         tools={tools}
         closeLabel={t('common.close')}
         aria-label={t('reading.captures.title')}
+        onDocumentCoveredChange={cover.onDocumentCoveredChange}
       >
         <section className="reading-captures-reader" aria-label={t('reading.captures.readerLabel')}>
           <header className="reading-captures-reader-head">

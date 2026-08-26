@@ -23,6 +23,10 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  READING_PASSAGE_ROUTE,
+  type ReadingPassageHandoff,
+} from '../../shared/readingPassageHandoff';
 import ReadingCapturesView from '../views/ReadingCapturesView';
 import {
   createReadingSurfaceHarness,
@@ -53,15 +57,40 @@ const HISTORY = [
   },
 ];
 
+/**
+ * A staged lens passage, exactly as `readingPassageHandoffTake` hands one back.
+ * Deliberately not one of the two history rows: the deep link has to be visible
+ * as a change, not as a re-selection of what was already showing.
+ */
+const PASSAGE: ReadingPassageHandoff = {
+  route: READING_PASSAGE_ROUTE,
+  text: '検証用の文章です。これはディープリンクが届いた先を見るためだけに作られました。',
+  kind: 'paragraph',
+  lines: ['検証用の文章です。これはディープリンクが届いた先を見るためだけに作られました。'],
+  source: 'clipboard',
+  sourceLabel: 'Deep link probe',
+  captureId: 'cap-deep-link',
+  language: 'ja',
+  stagedAt: 1_700_000_002_000,
+};
+
 let harness: ReadingSurfaceHarness | null = null;
+/** Read at every render, so a re-render can deliver a passage without remounting. */
+let passage: ReadingPassageHandoff | null = null;
 
 async function mountAt(width: number): Promise<ReadingSurfaceHarness> {
   harness = createReadingSurfaceHarness({
-    render: () => <ReadingCapturesView passage={null} />,
+    render: () => <ReadingCapturesView passage={passage} />,
     ready: (container) => container.querySelector('.reading-captures-row') !== null,
   });
   await harness.mount(width);
   return harness;
+}
+
+/** Deliver a staged passage to a mounted surface, at the width it is already at. */
+async function deliverPassage(h: ReadingSurfaceHarness, width: number): Promise<void> {
+  passage = PASSAGE;
+  await h.mount(width);
 }
 
 beforeEach(() => {
@@ -72,6 +101,7 @@ beforeEach(() => {
 afterEach(() => {
   harness?.teardown();
   harness = null;
+  passage = null;
   vi.restoreAllMocks();
 });
 
@@ -132,6 +162,49 @@ describe('Captures through the L6 reading canvas', () => {
     expect(
       Boolean(h.doc().compareDocumentPosition(tool!) & Node.DOCUMENT_POSITION_PRECEDING),
     ).toBe(true);
+  });
+
+  it('uncovers the document when a deep-linked passage arrives under a sheet', async () => {
+    // L6 bullet 2's "deep-link", measured live before this existed: staging a
+    // passage through `readingPassageHandoffStage` put the section on
+    // `captures`, the reader head on the new label and `aria-current` on the new
+    // row — all correct — while the canvas read `data-covered="true"` and the
+    // document was `inert`. The user asked to read a passage and got the index.
+    const h = await mountAt(500);
+    expectPlacement(h, 'captures', { placement: 'sheet', contentWidth: 500 });
+
+    await deliverPassage(h, 500);
+
+    expect(h.tool('captures')).toBe(null);
+    expect(h.doc().hasAttribute('inert')).toBe(false);
+    expect(h.doc().getAttribute('aria-hidden')).toBe(null);
+    // The passage itself, not just an uncovered empty reader.
+    expect(h.container.querySelector('.reading-captures-reader-head h2')!.textContent).toBe(
+      PASSAGE.sourceLabel,
+    );
+    expect(h.container.querySelector('.reading-captures-passage')!.textContent).toBe(PASSAGE.text);
+    // Reversible: the reopen control is in the reader's own header, which is
+    // only reachable because the document is live again.
+    await h.click(TOGGLE);
+    expect(h.tool('captures')!.dataset.placement).toBe('sheet');
+  });
+
+  it('leaves a DOCKED list alone when the same passage arrives', async () => {
+    // The negative control the fix needs, and the one that decides whether it is
+    // a fix or a new defect: a docked list is beside the document, not over it,
+    // so closing it would throw away the navigation for nothing. Same passage,
+    // same code path, opposite outcome — driven by placement alone.
+    const h = await mountAt(1200);
+    expectPlacement(h, 'captures', { placement: 'docked', contentWidth: 928, toolWidth: 260 });
+
+    await deliverPassage(h, 1200);
+
+    expect(h.tool('captures')).not.toBe(null);
+    expect(h.tool('captures')!.dataset.placement).toBe('docked');
+    expect(h.doc().hasAttribute('inert')).toBe(false);
+    expect(h.container.querySelector('.reading-captures-reader-head h2')!.textContent).toBe(
+      PASSAGE.sourceLabel,
+    );
   });
 
   it('has no window-width media query left to reintroduce the bug', () => {
