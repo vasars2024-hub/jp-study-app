@@ -848,3 +848,46 @@ region shrinking 28.8px under a neighbour, which a scope would make worse rather
 moves on its own — Immersion read 40 then 39 with nothing injected, because a VirtualList mounts
 and unmounts rows between passes. Voiding a correct 10/10 on that is the opposite failure to the
 one the control exists to catch. Asserted on the scored counts; the drift is printed.
+
+## 2026-08-25 (later 22) · primary — category 1 goes 2 of 6 surfaces to 5 of 6, all RUNs, no new probe
+
+`d91ec643` Library · `4b1dad02` Novels · `61a89b61` manga reader · `fb9784dd` sweep follow-up.
+**RULE 1: ratio 20 : 118 = 0.17 : 1**, down from 22.8 : 1. Three surfaces scored and the only
+measurement line written was a 20-line repair to `l1-hit-area.js`. Honest split of the 118:
+**65 declaration/JSX lines, 51 comment lines** — the comments carry the traps below.
+
+| surface | contrast / failing | belowFloorByHit | stolen | occluded | measured | motion b/d/a | verdict |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Library | 3.69 → **5.30** / **0** | **50 → 0** | 0 | 0 | 41 | 65/0/65 | **10/10** |
+| Novels | 4.85 / **0** | **5 → 0** | **1 → 0** | **3 → 0** | 39 | 13/0/13 | **10/10** |
+| manga reader | 5.30 / **0** | **10 → 0** | 0 | 0 | 33 | 24/0/24 | **10/10** |
+
+Control fired on all three: five counts moved, every scored one returned to baseline.
+
+**Four findings the next worker must not re-derive.**
+
+1. **A partial ROOT reads exactly like a clean surface.** The manga reader scored **10/10** on
+   `@.manga-canvas` — L6's category-4 region — which holds 20 of the reader's 34 controls, 10
+   of them disabled, so it scored on **ten**. On `@.reader`: **10 below floor**. Category 4's
+   region and category 1's surface are not the same box. Score `@.reader`.
+2. **A scope can read as LANDED and move nothing, and there are TWO ways.** Replaced element
+   (known). New: a **CLIPPER** between scope and control — `.sp-seg` is `overflow: hidden`
+   (it rounds its segments into the rail), computed `::after` a correct 32px, region still
+   28.5. Check the chain for a clipper; where there is one, `min-height` on the control's box.
+3. **A DISABLED control is not an occluded one** — harness fix, `l1-hit-area.js`.
+   `.btn:disabled` sets `pointer-events: none`, so `elementFromPoint` returns the container and
+   both of Novels' `.jiten-actions` buttons were filed `occluded`, unscored. Occlusion is the
+   VOID trigger: a form with a dozen disabled controls would void itself while every reachable
+   control passed. Excluded and printed as `disabledCount`.
+4. **A viewport media query inside a windowed shell is dead code.** Novels' stolen region was
+   real: `.jiten-workbench`'s tracks floor at 900px, the panel is 782, `overflow-x: hidden`,
+   118px unreachable — and the `@media (max-width: 980px)` that fixes it reads the OS viewport
+   (1264). Now `@container` on `.jiten-novels`. **Stacking alone made it worse** (1 stolen → 17,
+   inspector 24px of 863) until `flex: 0 0 auto` let the panel scroll it.
+
+Cost paid, stated as a number: `.reader-seek` is a 4px range input, and a range input's box IS
+its hit area, so the floor takes the manga canvas **729 → 714px, 15px, 2.1%**. Painted track
+still 4px via `::-webkit-slider-runnable-track` — the box takes the floor, not the ink.
+
+**Left on this category: VN only.** Its blocker is file ownership, not a decision —
+`VisualNovelPanel.tsx` carries another track's uncommitted i18n rewrite.
