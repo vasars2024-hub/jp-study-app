@@ -5195,6 +5195,7 @@ export const zh: Catalog = {
   'immersion.openInSystemBrowser': '在系统浏览器中打开',
   'immersion.hideLibrary': '隐藏书库',
   'immersion.showLibrary': '显示书库',
+  'immersion.visualNovelLibrary': '视觉小说库',
   'immersion.exitFocus': '退出专注模式',
   'immersion.loading': '加载中…',
   'immersion.openPageToBegin': '打开一个页面开始沉浸式阅读。',

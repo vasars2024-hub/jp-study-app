@@ -495,7 +495,16 @@ textarea {
 .media-study-assistant-result ul { display: grid; gap: 4px; margin: 5px 0 0; padding-left: 18px; }
 .media-study-assistant-result li { color: var(--text-muted); }
 .media-study-assistant-result > button { justify-self: start; }
-.visual-novel-open { position: absolute; right: 12px; top: 46px; z-index: 4; }
+/* `.visual-novel-open` was `position: absolute; right: 12px; top: 46px; z-index: 4`
+   here and floated over the reading canvas, which is a SIBLING of it — so at a
+   550px canvas it landed on the docked Sites rail and covered the rail's close
+   control (32x19 of it, `elementFromPoint` at that control's centre returning the
+   floating button), and at a 342px canvas it landed on the sheet's header over an
+   `inert` document. It now lives in the toolbar row (`ImmersionToolbar`'s
+   `trailing` slot) and needs no positioning of its own; `.btn.small.icon-btn`
+   carries the rest. The declarations are quoted rather than deleted silently so
+   the guard in `immersionCanvas.test.tsx` reads as a regression latch and not as
+   a rule nobody can find. */
 .visual-novel-panel { display: grid; grid-template-rows: auto auto minmax(0, 1fr); gap: 10px; min-height: 0; height: 100%; padding: 14px; color: var(--text); background: var(--bg); }
 .visual-novel-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .visual-novel-panel-head > div { display: grid; gap: 2px; }

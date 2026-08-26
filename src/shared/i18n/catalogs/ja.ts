@@ -5218,6 +5218,7 @@ export const ja: Catalog = {
   'immersion.openInSystemBrowser': 'システムブラウザで開く',
   'immersion.hideLibrary': 'ライブラリを隠す',
   'immersion.showLibrary': 'ライブラリを表示',
+  'immersion.visualNovelLibrary': 'ビジュアルノベル ライブラリ',
   'immersion.exitFocus': 'フォーカスを終了',
   'immersion.loading': '読み込み中…',
   'immersion.openPageToBegin': 'ページを開いてイマージョン読書を始めましょう。',

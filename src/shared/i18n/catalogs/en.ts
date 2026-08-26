@@ -5508,6 +5508,7 @@ export const en: Catalog = {
   'immersion.openInSystemBrowser': 'Open in system browser',
   'immersion.hideLibrary': 'Hide library',
   'immersion.showLibrary': 'Show library',
+  'immersion.visualNovelLibrary': 'Visual novel library',
   'immersion.exitFocus': 'Exit focus',
   'immersion.loading': 'Loading…',
   'immersion.openPageToBegin': 'Open a page to begin immersion reading.',

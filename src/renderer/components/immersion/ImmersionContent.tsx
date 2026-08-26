@@ -13,7 +13,7 @@
 // `styles.css`, which both shells load. Nothing here imports
 // `AppChrome`/`MenuBar`/`StatusBar` or the `components/ui` barrel.
 
-import { createElement, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createElement, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import DictionaryPopup from '../DictionaryPopup';
 import SentenceTranslatePopup from '../SentenceTranslatePopup';
 import Icon from '../Icons';
@@ -730,7 +730,29 @@ export function useImmersion() {
 export type ImmersionState = ReturnType<typeof useImmersion>;
 
 /** Classic (non-aero) toolbar — reused by Study OS's plain path and Blanc. */
-export function ImmersionToolbar({ state }: { state: ImmersionState }) {
+/**
+ * `trailing` is the host's own controls, rendered INSIDE the toolbar row rather
+ * than floated over the canvas beside it.
+ *
+ * L6's Gate, and the reason it is a slot rather than a fixed button: Study OS's
+ * Visual Novel Library shipped as `position: absolute; right: 12px; top: 46px;
+ * z-index: 4` on `.immersion-root`, a SIBLING of the reading canvas, so no
+ * placement the canvas chose could get out from under it. Measured live at
+ * 2026-08-25 through the category-4 harness, both placements broken and the
+ * DOCKED one — the default — worse than the sheet:
+ *   - sheet, canvas 342 px: button 409,240 136x26 inside a sheet of 215,238
+ *     342x469, sitting on its header, `elementFromPoint` at the button's centre
+ *     returning the button while the document was `inert`;
+ *   - docked, canvas 550 px: button 849,240 136x26 over a rail of 777,238
+ *     220x469, overlapping the rail's close control (952,247 32x32) by 32x19,
+ *     and `elementFromPoint` at that control's own centre returned `button.btn`
+ *     — **the rail's × was not clickable at its centre**, a dead control in the
+ *     surface's default state.
+ * A host control in the toolbar row cannot collide with a canvas tool at any
+ * width, which is why this is a relocation and not a `z-index` or a withdrawal.
+ * Blanc passes nothing and is unchanged.
+ */
+export function ImmersionToolbar({ state, trailing }: { state: ImmersionState; trailing?: ReactNode }) {
   const { t, mode, MODE_LABELS, urlInput, setUrlInput, histIdx, history, showRail, captureBusy, liveLookup } =
     state;
   return (
@@ -831,6 +853,7 @@ export function ImmersionToolbar({ state }: { state: ImmersionState }) {
       >
         <Icon name="folder" size={14} />
       </button>
+      {trailing}
     </div>
   );
 }

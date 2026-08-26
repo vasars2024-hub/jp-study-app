@@ -232,6 +232,115 @@
           dominantCanvasPct: Number((dominant / total * 100).toFixed(1)),
         };
       })(),
+
+      // L6's Gate — "no tool obscures the document" — made mechanically decidable, and
+      // parameterised by nothing at all: every reading surface carries the SAME contract
+      // (`components/liquid/ReadingCanvas.tsx`), so this block names no surface, no
+      // per-surface selector and no size. A window with no reading canvas returns `null`,
+      // so every run already recorded in L1_USE_OF_SPACE.md reproduces unchanged.
+      //
+      // THE DEFINITION, stated so a reader can disagree with it. A sheet legitimately
+      // covers the document: the canvas then says `data-covered="true"` and makes the
+      // document `inert` + `aria-hidden`, which is an honest hand-over and not an obscured
+      // document. So an OCCLUSION is a painted `[data-reading-role="tool"]` whose rect
+      // intersects the document's by more than 4 px on BOTH axes **while the canvas is not
+      // covered**; and in the covered case the defect is the mirror image — something
+      // focusable painted ON the sheet and outside the `inert` subtree. Both shapes have
+      // already shipped in this repo (`8aaa9216`, `daf70721`), which is why both count.
+      //
+      // THE SPLIT THAT DECIDES THE NUMBER, and getting it wrong scores a clean surface as
+      // broken. The first run of this block reported **8 leaks in Reading Finder and 16 in
+      // Immersion**, which reads like a wholesale focus-containment failure. Measured by
+      // rect, 0 of Reading Finder's 8 were painted over the document — all eight are the
+      // window's own workspace tab strip, ABOVE the canvas, and a canvas-scoped sheet does
+      // not get to claim the window's navigation any more than it claims the title bar.
+      // Exactly ONE of Immersion's 16 was real: `.visual-novel-open`, `position: absolute;
+      // z-index: 4` on `.immersion-root` and a SIBLING of the canvas, box 409,240 136x26
+      // fully inside the sheet's 215,238 342x469, with `elementFromPoint` at its own centre
+      // returning the button. So `overDocument` is the gate number and must be 0;
+      // `elsewhereInWindow` is reported for context and is NOT a defect on its own.
+      readingCanvas: (() => {
+        const docs = [...win.querySelectorAll('[data-reading-role="document"]')].filter(painted);
+        if (!docs.length) return null;
+        const FOCUSABLE = 'a[href],button,input,select,textarea,[tabindex]:not([tabindex="-1"])';
+        // Scoped by the SHEET ELEMENT, never by `[aria-modal]`: the attribute is a claim
+        // the surface makes and this instrument exists to check claims, so keying the
+        // filter on it would make the probe agree with whatever the markup asserted.
+        const SHEET = '[data-reading-role="tool"][data-placement="sheet"]';
+        const leaks = (w) => [...w.querySelectorAll(FOCUSABLE)].filter(
+          (e) => painted(e) && !e.closest('[inert]') && !e.closest(SHEET) && !e.closest('.fwin-bar'),
+        );
+        const paintedOver = (e, box) => {
+          const T = e.getBoundingClientRect();
+          return Math.min(T.right, box.right) - Math.max(T.left, box.left) > 2
+            && Math.min(T.bottom, box.bottom) - Math.max(T.top, box.top) > 2;
+        };
+        const describe = (e) => `${e.tagName.toLowerCase()}.${String(e.className || '').split(' ')[0]}:${(e.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 20)}`;
+        return docs.map((doc) => {
+          const D = doc.getBoundingClientRect();
+          const canvas = doc.closest('[data-scroll]') || doc.parentElement;
+          const covered = canvas ? canvas.getAttribute('data-covered') === 'true' : false;
+          const over = [...(canvas || win).querySelectorAll('[data-reading-role="tool"]')]
+            .filter(painted)
+            .map((t) => {
+              const T = t.getBoundingClientRect();
+              return {
+                t,
+                w: Math.min(T.right, D.right) - Math.max(T.left, D.left),
+                h: Math.min(T.bottom, D.bottom) - Math.max(T.top, D.top),
+              };
+            })
+            .filter((o) => o.w > 4 && o.h > 4)
+            .map((o) => `${o.t.getAttribute('data-reading-tool')}:${o.t.getAttribute('data-placement')} ${Math.round(o.w)}x${Math.round(o.h)}`);
+          // `document.elementFromPoint` is DOCUMENT-global, so with several overlapping
+          // `.fwin` windows it answers about whichever one is on top, not about this one.
+          // Refuse rather than report a hit that belongs to a different window.
+          const hit = document.elementFromPoint(
+            Math.round(D.left + D.width / 2),
+            Math.round(D.top + Math.min(D.height / 2, 40)),
+          );
+          return {
+            docBox: `${Math.round(D.width)}x${Math.round(D.height)}`,
+            // The canvas's own belief about its width. Compare it against `docBox`: an
+            // unfocused renderer delivers no ResizeObserver notification, so a stale value
+            // here reads exactly like a frozen layout and is not one.
+            contentWidth: doc.getAttribute('data-content-width'),
+            covered,
+            docInert: doc.hasAttribute('inert') || !!doc.closest('[inert]'),
+            openTools: Number((canvas && canvas.getAttribute('data-open-tools')) || 0),
+            occlusions: over.length,
+            occlusionList: over.slice(0, 6),
+            hitAtDocTop: hit && win.contains(hit)
+              ? `${hit.tagName.toLowerCase()}.${String(hit.className || '').split(' ')[0]}`
+              : 'REFUSED — elementFromPoint landed outside this window',
+            // THE GATE NUMBER while covered: focusables painted over the document's own
+            // rect, i.e. on the sheet, outside its subtree and outside any `inert`. Must
+            // be 0. `.visual-novel-open` was 1 here on 2026-08-25.
+            overDocument: covered ? leaks(win).filter((e) => paintedOver(e, D)).length : null,
+            overDocumentList: covered
+              ? leaks(win).filter((e) => paintedOver(e, D)).slice(0, 6).map(describe)
+              : null,
+            // Context, NOT a defect: the window's own chrome outside the canvas, which
+            // stays reachable at every canvas width exactly as it does when the same tool
+            // is a dock. Reported so a reader can check the split rather than trust it.
+            elsewhereInWindow: covered ? leaks(win).filter((e) => !paintedOver(e, D)).length : null,
+            elsewhereList: covered
+              ? leaks(win).filter((e) => !paintedOver(e, D)).slice(0, 6).map(describe)
+              : null,
+            // The sheet's own ARIA, recorded so the claim can be compared against
+            // `elsewhereInWindow` rather than assumed. `aria-modal="true"` alongside a
+            // non-zero `elsewhereInWindow` is a claim the keyboard does not honour.
+            sheetRoleAria: canvas
+              ? [...canvas.querySelectorAll('[data-reading-role="tool"][data-placement="sheet"]')]
+                .map((s) => `${s.getAttribute('role') || 'none'}/${s.getAttribute('aria-modal') || 'absent'}`).join(',') || null
+              : null,
+            // The stability half of the same Gate sentence: a caller resizes and compares
+            // these two strings across the round trip. Content, not geometry.
+            head: (doc.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60),
+            docScrollTop: Math.round(doc.scrollTop),
+          };
+        });
+      })(),
     };
   };
 

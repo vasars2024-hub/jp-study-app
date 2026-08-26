@@ -5751,6 +5751,7 @@ export const ru: Catalog = {
   'immersion.openInSystemBrowser': 'Открыть в системном браузере',
   'immersion.hideLibrary': 'Скрыть библиотеку',
   'immersion.showLibrary': 'Показать библиотеку',
+  'immersion.visualNovelLibrary': 'Библиотека визуальных новелл',
   'immersion.exitFocus': 'Выйти из фокуса',
   'immersion.loading': 'Загрузка…',
   'immersion.openPageToBegin': 'Откройте страницу, чтобы начать чтение на погружении.',

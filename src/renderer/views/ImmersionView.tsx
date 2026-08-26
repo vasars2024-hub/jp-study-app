@@ -72,7 +72,7 @@ export default function ImmersionView() {
         { id: 'save-site', label: 'Save site', disabled: !currentUrl, onSelect: () => void state.saveCurrentSite() },
         { id: 'export-library', label: 'Export reader page', disabled: !currentUrl, onSelect: () => void state.exportToLibrary() },
         { id: 'capture-video', label: 'Capture video', disabled: captureBusy || !currentUrl, onSelect: () => void state.captureVideo() },
-        { id: 'visual-novels', label: 'Visual Novel Library', onSelect: () => setVisualNovelsOpen(true) },
+        { id: 'visual-novels', label: t('immersion.visualNovelLibrary'), onSelect: () => setVisualNovelsOpen(true) },
         { id: 'sep-file', separator: true, label: '' },
         { id: 'open-external', label: 'Open in system browser', disabled: !currentUrl, onSelect: state.openExternal },
       ],
@@ -340,11 +340,30 @@ export default function ImmersionView() {
 
   return (
     <div className={`immersion-root immersion-mode-${mode}`} data-mode={mode}>
-      {showChrome && <ImmersionToolbar state={state} />}
       {showChrome && (
-        <button type="button" className="btn small visual-novel-open" onClick={() => setVisualNovelsOpen(true)}>
-          Visual Novel Library
-        </button>
+        <ImmersionToolbar
+          state={state}
+          trailing={(
+            /*
+             * Was `.visual-novel-open`, floated over the canvas at `right: 12px;
+             * top: 46px; z-index: 4`. See `ImmersionToolbar`'s own comment for the
+             * two measured collisions that moved it in here — the docked one left
+             * the Sites rail's close control dead in the surface's default state.
+             * An icon button and not the old 136 px text one: the toolbar is a
+             * single non-wrapping flex row, and a text label of that width is what
+             * pushes it into overflow at the 380 px Blanc allows.
+             */
+            <button
+              type="button"
+              className="btn small icon-btn visual-novel-open"
+              title={t('immersion.visualNovelLibrary')}
+              aria-label={t('immersion.visualNovelLibrary')}
+              onClick={() => setVisualNovelsOpen(true)}
+            >
+              <Icon name="novels" size={14} />
+            </button>
+          )}
+        />
       )}
 
       {mode === 'focus' && (

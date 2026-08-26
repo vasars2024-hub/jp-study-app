@@ -149,6 +149,63 @@ describe('the Immersion browser through the L6 reading canvas', () => {
     expect(h.container.querySelectorAll('.immersion-site-row').length).toBe(2);
   });
 
+  /**
+   * L6's Gate, "no tool obscures the document", in the direction the first four
+   * surfaces could not see: not a tool over the document, but a control of the
+   * HOST floated over whatever the canvas placed there.
+   *
+   * Found by running the category-4 harness live rather than by reading, and both
+   * placements were broken. `.visual-novel-open` was `position: absolute; right:
+   * 12px; top: 46px; z-index: 4` on `.immersion-root`, a SIBLING of the canvas,
+   * so nothing the canvas did could get out from under it:
+   *   - sheet, canvas 342 px — button 409,240 136x26 inside a sheet of 215,238
+   *     342x469, on its header, `elementFromPoint` at the button's centre
+   *     returning the button while the document was `inert`;
+   *   - docked, canvas 550 px — button 849,240 136x26 over a rail of 777,238
+   *     220x469, overlapping the rail's close control (952,247 32x32) by 32x19,
+   *     and `elementFromPoint` at that control's own centre returned `button.btn`.
+   *     The rail's × was DEAD, in the surface's default state.
+   *
+   * jsdom lays nothing out, so a rect assertion here would compare two zeroes.
+   * What it can hold is the structural fact that makes the collision impossible
+   * at every width — the control is in the toolbar row, not in the overlay layer
+   * beside the canvas — and the stylesheet no longer carries the rule that put it
+   * there.
+   */
+  it('keeps the Visual Novel control in the toolbar row at every placement', async () => {
+    const h = await mountImmersion(1200);
+    const vnButton = () => h.container.querySelector('.visual-novel-open');
+    expectPlacement(h, 'sites', { placement: 'docked', contentWidth: 968, toolWidth: 220 });
+    // Present at all — the half of the assertion that stops the fix from being
+    // "delete the button".
+    expect(vnButton()).not.toBe(null);
+    // …and inside the toolbar, not a floating sibling of `.lq-reading`.
+    expect(vnButton()!.closest('.immersion-toolbar')).not.toBe(null);
+    expect(vnButton()!.closest('.lq-reading')).toBe(null);
+    // A label, not a bare glyph: it is an icon button now.
+    expect(vnButton()!.getAttribute('aria-label')).toBeTruthy();
+
+    // The placement that used to put it on a sheet header over an inert document.
+    await h.resize(500);
+    expectPlacement(h, 'sites', { placement: 'sheet', contentWidth: 500 });
+    expect(h.doc().hasAttribute('inert')).toBe(true);
+    expect(vnButton()!.closest('.immersion-toolbar')).not.toBe(null);
+    // The sheet does not contain it, and — the point of the whole slice — the
+    // toolbar it does live in is outside the canvas entirely.
+    expect(h.tool('sites')!.contains(vnButton())).toBe(false);
+    expect(h.container.querySelector('.lq-reading')!.contains(vnButton())).toBe(false);
+  });
+
+  it('has no absolute positioning left on the Visual Novel control to float it back over the canvas', () => {
+    // Comments are stripped first: the replacement comment quotes the deleted
+    // declarations verbatim, so an un-stripped read passes for the wrong reason.
+    const css = readFileSync(resolve(__dirname, '..', 'styles.css'), 'utf8').replace(
+      /\/\*[\s\S]*?\*\//g,
+      '',
+    );
+    expect(css).not.toMatch(/^\.visual-novel-open\s*\{/m);
+  });
+
   it('has no fixed rail width left in the stylesheet to reintroduce the bug', () => {
     // Comments are stripped first: the replacement comment quotes the deleted
     // declarations verbatim, so an un-stripped read passes for the wrong reason.
