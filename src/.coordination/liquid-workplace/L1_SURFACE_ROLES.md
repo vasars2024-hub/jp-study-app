@@ -350,3 +350,32 @@ untouched — pinned in the new `visualNovelLiquidRegions.test.tsx` alongside th
 
 Board: **28 of 48 cells**; category 3 is **4 of 6**. Remaining for category 3: Novels and manga,
 both `@.reader`, both needing a document open.
+
+## 2026-08-26 · primary — the shared-primitive change did not cost the two earlier cells
+
+`AnchorSurface` gained `bare` and `readingCanvas.css` reclaimed three anchor box properties;
+both are SHARED, so the two cells already banked were re-run rather than assumed. Zero new lines,
+same harness, controls on.
+
+| surface | box | dense on translucent | treated | shared | control |
+| --- | --- | --- | --- | --- | --- |
+| Library | 820x580 | 0 | 1/1 | 1/1 | FAILED AS REQUIRED |
+| Reading Finder | 820x580 | 0 | 1/1 | 1/1 | FAILED AS REQUIRED |
+
+Both still **PASS 10/10**. Also swept every `AnchorSurface` call site in `src/renderer` and
+`src/media`: there are exactly **two** (`ImmersionContent.tsx:846`, `ReadingCanvas.tsx:330`), both
+handled here, so no third site silently took the anchor box into chrome it did not want.
+
+**Category 3's remaining two cells are blocked on a product slice, not a run.** Novels and manga
+are both `@.reader`, and `App.tsx:702` returns the reader as the WHOLE app render — it is not
+inside a `.fwin`. The app has exactly two Liquid presentation hosts, `.fwin.fwin-liquid` and
+`.popout-root.popout-liquid` (`6c16653f`), and neither reaches the reader, so no region inside it
+can ever be treated and `contextualTreated` cannot pass. This is the same defect class the pop-out
+host fixed: an enable flow whose destination does not exist. The next slice is a reader
+presentation host mirroring `renderer/popoutPresentation.ts`. Do not score `@.reader` for this
+category before it lands — a PASS there today could only come from `eligibleTotal === 0`, and the
+bar reads `eligibleTotal > 0 && ...`, so it would be a FAIL that means "no host", not "no work".
+
+Trap: the Library tile opens on `onDoubleClick` (`LibraryView.tsx:1755`, `data-library-tile`) and
+a dispatched `dblclick` on `.lib-groups .grid .card` did NOT open it. Find the working open path
+before budgeting the reader run.
