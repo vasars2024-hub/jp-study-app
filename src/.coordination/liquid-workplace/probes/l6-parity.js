@@ -35,10 +35,14 @@
  *     keyups. A dispatched bare `select` reads a live feature as dead.
  *  7. WHEN TWO COPIES OF ONE APP ARE OPEN, pick by `data-presentation`, never by
  *     index — that is how a Video window got scored as Dictionary.
- *  8. A CHROMELESS HOST HAS NO LIQUID DESTINATION. The agent pop-out and the
- *     seanime host mount outside `.fwin`: no window chrome, no `Make Liquid`, no
- *     `data-presentation`. That is a fact about the surface, not a probe gap, and
- *     the engine reports it as `chromeless` rather than scoring a false absence.
+ *  8. A CHROMELESS HOST HAS NO LIQUID DESTINATION — but a POP-OUT is no longer
+ *     one. As of `6c16653f` `.popout-root` carries `data-presentation` and its
+ *     own `.popout-btn-liquid`, so the engine scores it as `host: 'popout'` and
+ *     runs the full lifecycle row against the pop-out bar's THREE controls. What
+ *     is still `chromeless` — the seanime workspace, full-screen overlays — has
+ *     genuinely no destination, and that stays a fact about the surface rather
+ *     than a false absence. Do not collapse the two: the distinction is what
+ *     turned a footnote into a fixed defect.
  *
  * Run:
  *   node debug/evfile.cjs src/.coordination/liquid-workplace/probes/l6-parity.js
@@ -732,11 +736,15 @@
   // controls exist AND the liquid toggle carries a real boolean `aria-pressed`.
   // A toggle with no pressed state is the "enable with no disable path" defect.
   function lifecycle(w) {
-    const chrome = qa(w, '.fwin-b');
-    const btn = q(w, '.fwin-b-liquid');
+    // A pop-out's chrome is `.popout-btn` in its own bar and has THREE controls,
+    // not four: it has no restore-down separate from maximize. Counting it
+    // against the `.fwin` bar's four would score a complete host as broken.
+    const popout = w.classList.contains('popout-root');
+    const chrome = qa(w, popout ? '.popout-btn' : '.fwin-b');
+    const btn = q(w, popout ? '.popout-btn-liquid' : '.fwin-b-liquid');
     const pressed = btn ? btn.getAttribute('aria-pressed') : null;
     return {
-      ok: chrome.length >= 4 && (pressed === 'true' || pressed === 'false'),
+      ok: chrome.length >= (popout ? 3 : 4) && (pressed === 'true' || pressed === 'false'),
       ev: `chromeButtons=${chrome.length} liquidAriaPressed=${pressed}`,
     };
   }
@@ -796,11 +804,21 @@
     if (byTitle) return { win: byTitle, matchedBy: 'title', host: 'fwin' };
     const byRoot = wins.find((w) => s.rootSel && q(w, s.rootSel));
     if (byRoot) return { win: byRoot, matchedBy: 'root-selector', host: 'fwin' };
-    // Trap 8: the same app may be mounted in a chromeless host (pop-out window,
-    // full-screen overlay). It is real, it just has no Liquid destination.
+    // Trap 8, REVISED 2026-08-25 (`6c16653f`). A pop-out is no longer chromeless:
+    // `.popout-root` now carries `data-presentation` and its bar carries
+    // `.popout-btn-liquid`, so it is a real Liquid host and returning the
+    // POP-OUT ROOT — not the app root — makes it the exact analogue of `.fwin`
+    // (frame + body), which is what `snapshot`'s rect and `check`'s rows assume.
+    // A host that genuinely has no destination (a full-screen overlay, the
+    // seanime workspace) still scores `chromeless`, and that distinction is the
+    // whole point: one is a fact about the surface, the other was a defect.
     const bare = s.rootSel ? q(document, s.rootSel) : null;
     if (bare && !bare.closest('.fwin')) {
-      return { win: bare, matchedBy: 'root-selector', host: 'chromeless' };
+      const pop = bare.closest('.popout-root[data-presentation]');
+      if (pop && (!pres || pop.getAttribute('data-presentation') === pres)) {
+        return { win: pop, matchedBy: 'root-selector', host: 'popout' };
+      }
+      if (!pop) return { win: bare, matchedBy: 'root-selector', host: 'chromeless' };
     }
     return { win: null, matchedBy: null, host: null };
   };
@@ -828,7 +846,7 @@
       matchedBy,
       host,
       presentation: win.getAttribute('data-presentation'),
-      liquidClass: win.classList.contains('fwin-liquid'),
+      liquidClass: win.classList.contains('fwin-liquid') || win.classList.contains('popout-liquid'),
       rect: { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) },
       maximized: win.classList.contains('fwin-max'),
       focused: win.classList.contains('focused'),
@@ -886,7 +904,8 @@
     const { win, host } = findWin(app, pres);
     if (!win) return { refused: `no ${app} surface` };
     if (host === 'chromeless') return { refused: 'chromeless host has no liquid control' };
-    const btn = q(win, '.fwin-b-liquid');
+    // The pop-out's control is the same affordance in its own bar (`6c16653f`).
+    const btn = q(win, host === 'popout' ? '.popout-btn-liquid' : '.fwin-b-liquid');
     if (!btn) return { refused: 'no liquid control rendered' };
     const before = win.getAttribute('data-presentation');
     btn.click();

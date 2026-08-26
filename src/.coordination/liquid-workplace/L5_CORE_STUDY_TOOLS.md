@@ -211,3 +211,51 @@ global reads `undefined` one call after it demonstrably installed. Use `debug/lq
 feature reads as DEAD. **POST `/focus` first.** (c) The Agent pop-out mounts outside `.fwin`
 -- no chrome, no `Make Liquid`, no `data-presentation` -- so that host has no Liquid
 destination, the same fact already recorded for the seanime workspace.
+
+## 2026-08-25 · primary · the pop-out footnote was a defect, and L5's inherited 3 are SETTLED
+
+**The doubt, closed by reading rather than re-running.** Five burn-down lines carried "if L5's
+3 bullets are not closed then closed is 15" without anyone counting. They are CLOSED: the entry
+above (`f29b5537`) records dictionary 7/7, grammar 8/8, translate 7/7, agent 8/8 with round-trip
+parity and three negative controls each, plus the retention half re-derived live (7 context items
+across 4 surfaces in one conversation). **closed = 18, left = 28 of 46.** Do not reopen this.
+
+**What was NOT closed is trap (c) above, and it is bigger than a footnote.** Every interior rule
+in `theme/liquid-window.css` was scoped to `.fwin.fwin-liquid`. So all four L5 apps — each of
+which adopted `ContextualSurface` — had that region language **permanently inert once popped
+out**. Not "the pop-out lacks chrome": an enable flow whose destination did not exist.
+
+**`6c16653f` — two hosts, one interior.** `.popout-root` now carries `data-presentation` and a
+`.popout-btn-liquid` toggle; the interior rules name both hosts through `:is()`, whose
+specificity is the max of its branches, so each still scores (0,2,0). The FRAME rules
+deliberately do not: a pop-out's frame is the OS window, opaque with the compositor behind it,
+so a `backdrop-filter` there is the inert glass the sheet already forbids on `.fwin-bar`.
+Presentation persists per SECTION (a pop-out has no durable window identity) and returning
+DELETES the key — measured live, `Object.keys(localStorage)` filtered on `lq.` went `[]` → blob
+→ `[]`, and window bounds were 518,196 900x640 before and after.
+
+**Category 6, Agent in its POP-OUT host — a RUN of `probes/l6-parity.js`, not a new probe.**
+Trap 8 was revised in place (~14 lines): a pop-out is `host: 'popout'`, the seanime workspace is
+still `chromeless`, and collapsing the two is what turned a defect into a footnote for days.
+
+| presentation | score | chars | nodes | controls | rect | fields |
+| --- | --- | --- | --- | --- | --- | --- |
+| liquid | **8/8** na=0 | 3107 | 328 | 49 | 900x640 | 8/8 identical |
+| standard | **8/8** na=0 | 3107 | 328 | 49 | 900x640 | 8/8 identical |
+
+`windowLifecycle` now SCORES here (`chromeButtons=4 liquidAriaPressed=true→false`) where it was
+`na: chromeless host`. The in-flight composer text (`textarea7 = "parity probe text"`) survived
+the presentation change, which is the reversibility gate's actual content. Controls: `mutate`
+`conversationRail` → 7/8, exactly `conversations=4 selected=0`; `contextShelf` → 6/8, exactly
+`removeControls=0`; `restore('agent')` → 8/8.
+
+**Category 4, same surface, a RUN of `debug/lq-cat4-sizes.cjs`.** Clean at both host sizes and
+in BOTH presentations: 380x580 → clipped 0, overlaps 0, hScrollers 0, dead 7.1%; 1264x821 →
+clipped 0, overlaps 0, dead 9.0% (bar 15%). Liquid costs ~1 point of `chromePct` (the
+contextual padding) and nothing else. `RESTORED contentSize IDENTICAL: true`.
+
+**Two traps banked.** (a) `__LQP.restore()` with NO app argument throws `unknown app
+"undefined"` — a worker reading that as a failed restore leaves the surface mutated; pass the
+app. (b) `lq-cat4-sizes.cjs` sent no `window` field, so `/eval`, `/focus` and `/bounds` each
+resolved the FOCUSED window independently — a surface in its own window was scored only while
+nothing stole foreground. `win:<target>` now pins all three; mandatory off the main window.
