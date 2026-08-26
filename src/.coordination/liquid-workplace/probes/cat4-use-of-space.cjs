@@ -32,11 +32,12 @@
  * synchronously, so measure-and-restore is safe) and maximized is the product's own
  * `.fwin-b[title="Maximize"]` button — never an inline width, because `.fwin-max` changes the
  * applied CSS and an inline width measures a size the product never paints.
- * A `@`-rooted surface IS the OS window (opening a book replaces the whole desktop shell:
- * `document.querySelectorAll('.fwin').length` is then 0), so there is no frame to resize and no
- * Maximize button. Its lever is the bridge's `/bounds` route against the OS window, restored from
- * the `previous` content size that route itself reports. Both levers are recorded in the output as
- * `sizeMechanism`, so nobody has to infer which one a number came from.
+ * A surface with NO `.fwin` above it IS the OS window (opening a book replaces the whole desktop
+ * shell: `document.querySelectorAll('.fwin').length` is then 0), so there is no frame to resize
+ * and no Maximize button. Its lever is the bridge's `/bounds` route against the OS window,
+ * restored from the `previous` content size that route itself reports. Which of the two a surface
+ * gets is measured from the DOM, never inferred from the `@` — see correction 14. Both levers are
+ * recorded in the output as `sizeMechanism`, so nobody has to infer which one a number came from.
  *
  * THE BARS, and 10 requires all of them at EVERY measured size:
  *   clipped            0
@@ -96,6 +97,14 @@
  *     `.fwin-body`, where `outsideItsClipper` correctly declined to call it clipped - so the
  *     control did not fire and Reading Finder and Immersion returned VOID instead of a score.
  *     It is placed absolute inside the clipper now, which is what the header always described.
+ * 14. `@` MEANS "A CSS SELECTOR", NOT "THE OS WINDOW". This file read it as the second for its
+ *     first five surfaces, because every `@`-rooted surface it had met - the manga reader, the
+ *     book reader - genuinely replaces the desktop shell. `@.visual-novel-panel` renders INSIDE
+ *     the Immersion `.fwin`. Driving `/bounds` for it resizes the desktop window while the
+ *     `.fwin` keeps its own inline 820x580, so the panel never changes size and all three legs
+ *     return the SAME numbers under three different size labels - a perfect score for a surface
+ *     that was never resized, and the one failure mode correction 4 exists to prevent. The lever
+ *     is chosen from `closest('.fwin')` now, measured once from the DOM.
  *
  * NEGATIVE CONTROL (`--control`), two legs, because the rubric names one and history says it is
  * not enough on its own:
@@ -135,7 +144,18 @@ if (!SURFACE) {
 if (OUT && fs.existsSync(OUT)) fs.unlinkSync(OUT);
 
 const LABEL = arg('label', SURFACE.replace(/^@/, '').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, ''));
-const IS_ROOT = SURFACE.startsWith('@');
+/**
+ * CORRECTION 14. `@` MEANS "A CSS SELECTOR", NOT "THE OS WINDOW", and this file read it as the
+ * second for its first five surfaces because every `@`-rooted surface it had met so far - the
+ * manga reader, the book reader - genuinely replaces the desktop shell.
+ * `@.visual-novel-panel` does not: it renders INSIDE the Immersion `.fwin`. Driving `/bounds`
+ * for it resizes the desktop window while the `.fwin` keeps its own inline 820x580, so the
+ * panel never changes size and all three legs return the SAME numbers under three different
+ * size labels - a perfect score for a surface that was never resized. Which lever a surface
+ * needs is a fact about the DOM, so it is measured once from the DOM rather than inferred from
+ * the argument's first character.
+ */
+let IS_ROOT = SURFACE.startsWith('@');
 const parseSize = (s) => {
   const m = /^(\d+)x(\d+)$/.exec(s);
   if (!m) { console.error(`REFUSE - size must be WxH, got ${s}`); process.exit(2); }
@@ -171,6 +191,16 @@ const rootExpr = (surface) => (surface.startsWith('@')
        var t = w.querySelector('.fwin-title-text, .fwin-title');
        return !!t && (t.textContent || '').indexOf(${JSON.stringify(surface)}) >= 0;
      })[0]`);
+
+/**
+ * The `.fwin` that OWNS the surface, or null when the surface is the desktop shell itself. For a
+ * title-named surface this is the surface; `closest` starts at the element, so one expression
+ * covers both forms. See correction 14 - this is what decides the lever, and it is a DOM fact.
+ */
+const hostExpr = (surface) => `(function(){
+  var e = ${rootExpr(surface)};
+  return e && e.closest ? e.closest('.fwin') : null;
+})()`;
 
 /* ------------------------------------------------------------------ in-page */
 
@@ -397,13 +427,13 @@ const READ = (surface) => `(function(){
 
 /** The `.fwin` levers. A root surface has neither, and says so rather than faking one. */
 const FWIN_STYLE_READ = (surface) => `(function(){
-  var w = ${rootExpr(surface)};
+  var w = ${hostExpr(surface)};
   if (!w) return JSON.stringify({ refuse: 'surface not found' });
   return JSON.stringify({ style: w.getAttribute('style'), max: w.classList.contains('fwin-max') });
 })()`;
 
 const FWIN_SET_SIZE = (surface, w, h) => `(function(){
-  var el = ${rootExpr(surface)};
+  var el = ${hostExpr(surface)};
   if (!el) return JSON.stringify({ refuse: 'surface not found' });
   el.style.width = ${JSON.stringify(`${w}px`)};
   el.style.height = ${JSON.stringify(`${h}px`)};
@@ -412,7 +442,7 @@ const FWIN_SET_SIZE = (surface, w, h) => `(function(){
 })()`;
 
 const FWIN_RESTORE_STYLE = (surface, style) => `(function(){
-  var el = ${rootExpr(surface)};
+  var el = ${hostExpr(surface)};
   if (!el) return JSON.stringify({ refuse: 'surface not found' });
   ${style === null ? 'el.removeAttribute("style")' : `el.setAttribute('style', ${JSON.stringify(style)})`};
   return JSON.stringify({ style: el.getAttribute('style') });
@@ -421,7 +451,7 @@ const FWIN_RESTORE_STYLE = (surface, style) => `(function(){
 // Maximize goes through the product's own button: `.fwin-max` changes the applied CSS, so an
 // inline width would measure a size the product never paints.
 const FWIN_MAX_CLICK = (surface) => `(function(){
-  var w = ${rootExpr(surface)};
+  var w = ${hostExpr(surface)};
   if (!w) return JSON.stringify({ refuse: 'surface not found' });
   var b = [].slice.call(w.querySelectorAll('.fwin-btns .fwin-b')).filter(function(x){
     return x.getAttribute('title') === 'Maximize';
@@ -616,6 +646,12 @@ const BARS_OF = (m) => ({
   const base = await read();
   if (base.refuse) { console.error(`REFUSE - ${base.refuse}`); process.exit(2); }
 
+  // CORRECTION 14. Which lever this surface needs is a DOM fact, not a fact about the argument's
+  // first character. A `@`-rooted section that lives inside a `.fwin` gets the frame's levers;
+  // only a surface with no `.fwin` above it is the desktop window and gets `/bounds`.
+  const host = JSON.parse(await ev(`JSON.stringify({ inFwin: !!${hostExpr(SURFACE)} })`));
+  IS_ROOT = !host.inFwin;
+
   const compact = await atSize('compact');
   const maximized = await atSize('maximized');
 
@@ -666,7 +702,9 @@ const BARS_OF = (m) => ({
     label: LABEL,
     surface: SURFACE,
     win: WIN || '(focused)',
-    rootKind: IS_ROOT ? 'main-window section' : 'floating window',
+    rootKind: IS_ROOT
+      ? 'desktop-window surface (no .fwin above it)'
+      : (SURFACE.startsWith('@') ? 'section inside a floating window' : 'floating window'),
     viewport: base.viewport,
     sizes: perSize,
     refusedLegs: refused.map((l) => ({ kind: l.kind, refuse: l.refuse || l.measurement.refuse })),

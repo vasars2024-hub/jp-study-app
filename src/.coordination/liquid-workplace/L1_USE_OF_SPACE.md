@@ -693,3 +693,48 @@ and the canvas share FALLING 42.9 → 35.7 as the window grows — one catalogue
 space it is given, which is likely one fix for all three. Then Immersion's compact leg
 (`div.immersion-reader` 97 wide inside 54, `div.immersion-stage` 284>178; Library holds 0 clipped
 at that same size, so it is reachable, not a floor). Then RUN VN and Novels.
+
+## 2026-08-26 (later) · primary — two surfaces close, and the harness was scoring a panel it never resized
+
+| surface | default | compact | maximized | dead % (d/c/m) | chrome→ | canvas→ | verdict |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `Reading Finder` | 820x580 | 260x170 | 1264x765 | 2.4 / 0.5 / **7.2** | 12.7→9.8 | 42.9→**50.6** | **PASS 10/10** |
+| `Immersion` | 820x580 | 260x170 | 1264x765 | 2.9 / 0.6 / 7.0 | 27.3→19.2 | 47.1→61.5 | **PASS 10/10** |
+| `@.visual-novel-panel` | 782x513 | 222x103 | 1226x698 | **16.9** / 0.3 / **47.9** | 37.3→20.9 | 17.7→**9.2** | **FAIL** |
+
+Board: **4 of 6**. Novels (`@.reader` with an EPUB) not run. Each row fired its own injected clip
+0 → 1 → 0 with removal proven.
+
+**Reading Finder, `302588d4`.** One declaration closed all three bars. `repeat(auto-fill,
+minmax(280px, 1fr))` is a hard floor AND the number that decides the column count: at the shipped
+820x580 the cards are 380px, at maximized (a 1226px pane) the SAME cards are 296px — the window
+grew and the card shrank — so the catalogue ran 4x2 and left a 1262x164 dead band. A 320px floor
+takes three ~400px columns; `min(320px, 100%)` stops the floor becoming an overflow at a 202px
+pane, where it had clipped 40 boxes. Swept repo-wide: **69 bare px floors over 212 across the 67
+tracked sheets** at HEAD, **17 in the `repeat()` shape**, all 17 clamped. The other 52 are explicit
+templates where `min()` is not the fix — that shape wants `minmax(0, …)` — so the new sweep latch
+is scoped to `repeat()` and says why.
+
+**Immersion, `efba53e4`.** `min-width: 220px` on the webview beats its own `max-width: 42%` and
+`flex-shrink: 0` never hands the pixel back, so at a 178px stage the reader beside it was 64px wide
+with a 0px text column. THE CONTAINER HAS TO BE THE STAGE: a docked tool never squeezes the
+document below `READING_CANVAS_POLICY.minContentWidth` (384), so an 820px window holds a 516px
+stage while a WIDER window with two tools docked holds a 352px one — a `@media`, or a container on
+`.immersion-body`, stacks the wrong one. A container cannot answer its own query, so `flex-flow:
+row wrap` is the stacking mechanism. **What wrap costs, and it shipped as a 64-box regression
+mid-slice:** a nowrap row sizes items to the container's cross size, a wrapping one sizes each LINE
+from content and `align-content: stretch` only grows. The reader became 1075px tall in a 434px
+stage and `clipped` went 0 → **64 at the surface's own default size**. `max-height: 100%` pays for
+wrap; 45% / 55% makes the two stacked lines add up to one stage.
+
+**CORRECTION 14 — `@` means "a CSS selector", not "the OS window".** The first five surfaces hid it
+because every `@`-rooted one so far replaces the desktop shell. `@.visual-novel-panel` renders
+INSIDE the Immersion `.fwin`: `/bounds` resized the desktop while the `.fwin` kept its inline
+820x580, so the panel never changed size and all three legs would have returned the SAME numbers
+under three different labels — correction 4's failure mode with a pulse. The lever is
+`closest('.fwin')` now, measured from the DOM. Regression control: `Reading Finder` re-run on the
+corrected harness is **byte-identical to the committed baseline**, all nine numbers.
+
+**NEXT, and it is the opening slice.** VN's three bars, all one shape: a 920x541 dead region at
+maximized (**47.9%** against a bar of 15), 16.9% at its own default, and the canvas FALLING
+17.7 → 9.2. The panel does not use the space it is given, at any size. Then RUN Novels.
