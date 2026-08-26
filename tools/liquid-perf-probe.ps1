@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Liquid rubric category 7 instrument: the longest main-process block under load.
 
@@ -18,6 +18,12 @@
 .PARAMETER Label
   Free text recorded with the run, e.g. "idle" or "during deck audit".
 
+.PARAMETER DurationMs
+  Sample for this many milliseconds of WALL CLOCK instead of for a fixed -Samples count.
+  Use it whenever -DuringJs fires work that takes time: 40 samples at an idle p50 of 1.3 ms
+  are over in ~52 ms, so a 240 ms operation is measured across its first fiftieth and a
+  clean number means nothing. `span_ms` in the record is the coverage actually achieved.
+
 .PARAMETER Control
   Negative control. Blocks the RENDERER for ~1500 ms and samples across it. The renderer
   block must NOT move these numbers -- /health touches main only. A run where -Control
@@ -32,7 +38,9 @@ param(
   [int]$Samples = 40,
   [string]$Label = 'unlabelled',
   [switch]$Control,
-  [string]$DuringJs
+  [string]$DuringJs,
+  [int]$DurationMs = 0,
+  [switch]$AsJson
 )
 
 $ErrorActionPreference = 'Stop'
@@ -82,13 +90,32 @@ if ($Control -or $DuringJs) {
   Start-Sleep -Milliseconds 120
 }
 
+# A FIXED SAMPLE COUNT DOES NOT COVER A LOAD, and that is how this probe reports a pass it
+# has not earned. At an idle p50 of 1.3 ms, 40 back-to-back /health calls are over in ~52 ms
+# -- so a surface whose heaviest operation runs for 240 ms, or for eight seconds, is sampled
+# only across its first fiftieth. The interaction probe learned this and switched to a
+# wall-clock window; this one had not. -DurationMs samples for a wall-clock span instead, and
+# `span_ms` is reported so the coverage is visible in the record rather than assumed. The
+# 15 ms gap keeps the probe from being the load it is measuring, exactly as over there.
 $times = New-Object System.Collections.Generic.List[double]
-for ($i = 0; $i -lt $Samples; $i++) {
-  $sw = [System.Diagnostics.Stopwatch]::StartNew()
-  try { $null = Invoke-RestMethod -Uri $health -Headers $headers -TimeoutSec 60 } catch { }
-  $sw.Stop()
-  $times.Add($sw.Elapsed.TotalMilliseconds)
+$span = [System.Diagnostics.Stopwatch]::StartNew()
+if ($DurationMs -gt 0) {
+  while ($span.Elapsed.TotalMilliseconds -lt $DurationMs) {
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    try { $null = Invoke-RestMethod -Uri $health -Headers $headers -TimeoutSec 60 } catch { }
+    $sw.Stop()
+    $times.Add($sw.Elapsed.TotalMilliseconds)
+    Start-Sleep -Milliseconds 15
+  }
+} else {
+  for ($i = 0; $i -lt $Samples; $i++) {
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    try { $null = Invoke-RestMethod -Uri $health -Headers $headers -TimeoutSec 60 } catch { }
+    $sw.Stop()
+    $times.Add($sw.Elapsed.TotalMilliseconds)
+  }
 }
+$span.Stop()
 
 $sorted = $times | Sort-Object
 $pct = { param($p) $sorted[[Math]::Min($sorted.Count - 1, [int][Math]::Floor($p * $sorted.Count))] }
@@ -99,11 +126,13 @@ if ($Control -or $DuringJs) {
   if ($client) { $client.Dispose() }
 }
 
-[pscustomobject]@{
+$record = [pscustomobject]@{
   label   = $Label + $(if ($Control) { ' (CONTROL: renderer blocked 1500 ms)' } elseif ($DuringJs) { ' (DURING -DuringJs)' } else { '' })
-  samples = $Samples
+  samples = $times.Count
+  span_ms = [math]::Round($span.Elapsed.TotalMilliseconds, 0)
   min_ms  = [math]::Round(($sorted | Select-Object -First 1), 1)
   p50_ms  = [math]::Round((& $pct 0.50), 1)
   p95_ms  = [math]::Round((& $pct 0.95), 1)
   max_ms  = [math]::Round(($sorted | Select-Object -Last 1), 1)
-} | Format-List
+}
+if ($AsJson) { $record | ConvertTo-Json -Compress } else { $record | Format-List }

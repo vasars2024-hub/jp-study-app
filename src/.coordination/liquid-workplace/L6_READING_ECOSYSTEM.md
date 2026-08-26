@@ -1367,3 +1367,57 @@ taskbar rendered 56px. 10/10 new tests with a negative control; adjacent suites 
 from other subsystems (display, motion, spacing, accent, wallpaper, pillarbox). Every writer has
 the same per-change cost. `pillarboxSettings.ts` and `wallpaperFit.ts` are the same shape and
 were left alone — both carry another track's uncommitted work.
+
+## 2026-08-26 — Category 7 has a RUNNER at last: `cat7-perf.cjs`, and Captures scores 10/10
+
+RULE 1, applied to the last category still being hand-run. Category 7 already had two good
+INSTRUMENTS — `tools/liquid-perf-probe.ps1` (main availability) and
+`tools/liquid-interaction-probe.ps1` (renderer frames across a real gesture) — and **no
+runner**, so every surface re-derived by hand which legs to run against which baseline and
+each hand-run produced a different subset. `probes/cat7-perf.cjs` is the missing half: the
+instruments are reused verbatim and a surface is ~10 lines of `SPECS` data. Six surfaces are
+declared already (captures, library, immersion, novels, manga, dictionary). **The next
+category-7 cell is a RUN, not a build.**
+
+**Captures — PASS 10/10.** Scene on every leg: **1 `.fwin` / 181 elements / 309 document
+elements**, `scene_stable: true` on all four gestures, `forest-night`, 1264×821, dpr 1, main
+pid 11656 at **2,818 s uptime** (settled, not post-boot).
+
+| leg | frame p50 | p95 | max | >100 ms | main max |
+| --- | --- | --- | --- | --- | --- |
+| ceiling (this session) | 16.7 | 16.8 | 16.9 | 0 | 11.8 |
+| drag | 16.7 | 16.9 | 16.9 | 0 | 10.7 |
+| resize | 16.7 | 16.8 | 16.9 | 0 | 12.0 |
+| theme | 16.7 | 16.8 | 16.9 | 0 | 11.4 |
+| **CONTROL** drag + 12×120 ms blocks | 16.7 | **116.5** | — | **12** | 12.8 |
+
+Theme switch: apply→painted **19.1 ms**, restore **33.5 ms**, `data-theme` back to
+`forest-night`. Heaviest real operation (select all 20 captures in turn): **81 samples over
+2,516 ms, main max 10.0 ms** against an idle **12.8 ms** — the 500 ms bar is not approached.
+Main RSS 80.6 → 82.8 MB. Control fired: 12 frames over 100 ms against the clean run's 0.
+
+### Three instrument defects found while building it, each of which fabricates a PASS
+
+**1. Two frame recorders shared one array and beat the display.** A run that dies after the
+recorder is installed leaves its rAF loop alive, and the loop re-reads `window.__lfp` every
+frame — so the next run's recorder shares its array and each frame is pushed twice, once as the
+real delta and once as ~0 ms. Measured: ceiling **221 frames / p50 0.0 / p95 16.8** against
+**111 / 16.7 / 16.9** clean. Exactly 2× the frames and a p50 of zero. Flipping the old object's
+`on` does not fix it, because a zombie re-reading the global is handed the new array; `__lfp` is
+now a dead decoy and each run records into a unique global. Control: with the pre-fix zombie
+still running, ceiling came back **110 / 16.7 / 16.8**. `86ed676f`.
+
+**2. `liquid-perf-probe.ps1` sampled a fixed COUNT, so it did not cover its own load.** At an
+idle p50 of 1.3 ms, 40 back-to-back `/health` calls are over in **~52 ms** — a 240 ms operation
+was measured across its first fiftieth, and an 8-second one across its first 0.6%. The first
+Captures run reported `heavy` max **3.4 ms**, *lower than idle*, which is the tell. `-DurationMs`
+now samples a wall-clock span and `span_ms` is reported; the runner VOIDs a leg whose achieved
+span is under 90% of the declared load. Re-run: 81 samples over 2,516 ms.
+
+**3. THE DISPLAY IS 60 Hz NOW, NOT L0's 100 Hz.** L0 recorded p50 **10.0 ms**; this session's
+ceiling is **16.7 ms**. Scoring today's 16.7 ms frame against L0's 10.0 ms reports a 67%
+regression that does not exist. The runner takes its own `ceiling` leg every run and scores
+frames against **that**; L0's numbers are carried as `l0Provenance` and are never the bar.
+Anything in this file quoting absolute frame ms across sessions is suspect for the same reason.
+
+Evidence: `baselines/cat7-captures-perf.json`.
