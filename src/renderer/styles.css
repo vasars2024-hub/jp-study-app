@@ -9988,6 +9988,22 @@ mark.lookup-mark,
   flex-direction: column;
   gap: 10px;
   color: var(--text);
+  /*
+   * The size container for the workbench below. `.jiten-workbench` already HAS a narrow
+   * layout — the `@media (max-width: 980px)` block near the end of this section — and inside
+   * a floating window that block can never fire: the media query reads the OS viewport
+   * (1264px here) while the panel hosting it is 782px. Measured on the live Novels window:
+   * `main.reading-workspace-panel` scrollWidth 900 against clientWidth 782 with
+   * `overflow-x: hidden`, so 118px of the inspector was clipped off with nothing to scroll,
+   * and rubric category 1 read it as a pointer region STOLEN 28.8px from a source button.
+   * An element cannot answer a `@container` condition against itself, so the container is
+   * this wrapper rather than the workbench.
+   *
+   * The `@media` block is deliberately KEPT, not converted: Blanc hosts the same workbench
+   * (`.blanc-jiten-workbench`) outside this wrapper, in a full-page shell where the viewport
+   * IS the available width. Converting it would silently drop Blanc's narrow layout.
+   */
+  container-type: inline-size;
 }
 .jiten-novels-toolbar {
   gap: 8px;
@@ -10008,6 +10024,12 @@ mark.lookup-mark,
 }
 .jiten-search-wrap input {
   width: 100%;
+  /* An input is a replaced element: `::after` generates no box on it, so `.lq-hit-scope`
+     cannot reach it and would leave it under the floor while reading as fixed. Its own box
+     IS its hit area. At the inherited 13px this measured 19.5px tall inside a 32px wrap —
+     the wrap looks like the target and is not one. The wrap is already `height: 32px` with
+     `align-items: center`, so the control fills it exactly and no box grows. */
+  min-height: var(--lq-hit-target);
   border: none;
   outline: none;
   background: transparent;
@@ -10400,6 +10422,46 @@ mark.lookup-mark,
   }
   .jiten-inspector {
     max-height: none;
+  }
+  .jiten-mining-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* The same narrow layout, asked of the HOST instead of the OS viewport. `.jiten-novels`
+   carries `container-type: inline-size` for this; see the note there for why the media
+   query above stays. 980 is the media query's own threshold, restated rather than retuned:
+   the three tracks need 220 + 360 + 300 + two 10px gaps = 900px of content box, so anything
+   at or under 980 was always going to clip. */
+@container (max-width: 980px) {
+  .jiten-workbench {
+    grid-template-columns: 1fr;
+    /*
+     * `flex: 1` is right for three side-by-side columns that each scroll themselves, and
+     * wrong the moment they stack: the grid stays clamped to the window and the three rows
+     * fight over it. Measured with only the column switch applied, at 772px: the workbench
+     * held 405px, `.jiten-table-wrap`'s own `min-height: 360px` took 360 of it, and the two
+     * asides were left 26px each — the inspector showed **24px of 863px of content** and
+     * category 1 went from 1 stolen pointer region to 17, every one of them a control taller
+     * than the scroller it now sat in. That is a worse surface than the clip it replaced.
+     *
+     * Stacked, the column grows and the PANEL scrolls it — `.reading-workspace-panel` is
+     * already `overflow-y: auto` for exactly this. The two asides drop their own scrollers
+     * with it, or each becomes a nested scroll region inside a scrolling page.
+     */
+    flex: 0 0 auto;
+  }
+  .jiten-filters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    overflow: visible;
+  }
+  .jiten-table-wrap {
+    min-height: 360px;
+  }
+  .jiten-inspector {
+    max-height: none;
+    overflow: visible;
   }
   .jiten-mining-grid {
     grid-template-columns: 1fr;

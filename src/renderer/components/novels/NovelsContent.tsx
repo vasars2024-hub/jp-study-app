@@ -945,7 +945,7 @@ export function NovelsInspector({ state }: { state: NovelsState }) {
         {selectedLinks.length === 0 ? (
           <p className="muted">Add a source template to generate links for this title.</p>
         ) : (
-          <div className="jiten-source-buttons">
+          <div className="jiten-source-buttons lq-hit-scope">
             {selectedLinks.map((link) => (
               <button
                 key={link.id}

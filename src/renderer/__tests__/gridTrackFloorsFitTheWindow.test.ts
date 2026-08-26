@@ -232,6 +232,42 @@ describe('grid track floors fit the narrowest window the product allows', () => 
     expect(css).toMatch(/\.reading-workspace-panel\s*>\s*\*\s*\{[^}]*height:\s*100%/);
   });
 
+  it('the novels workbench asks its host for the width, not the OS viewport', () => {
+    // The same family as the track floors above, arriving by a different route: the three
+    // tracks are `220px minmax(360px, 1fr) 300px` with two 10px gaps, a hard 900px floor,
+    // and the narrow layout that rescues it was written as `@media (max-width: 980px)`.
+    // Inside a floating window that media query can never fire — it reads the OS viewport
+    // (1264px) while the panel hosting the workbench is 782px. Measured live on the Novels
+    // window: `main.reading-workspace-panel` scrollWidth 900 against clientWidth 782, and it
+    // is `overflow-x: hidden`, so 118px of the inspector was unreachable.
+    const css = strip(read('src/renderer/styles.css'));
+
+    const wrapper = /\.jiten-novels\s*\{([^}]*)\}/.exec(css)?.[1] ?? '';
+    expect(wrapper, '.jiten-novels rule').not.toBe('');
+    // An element cannot answer a `@container` condition against itself, so the container has
+    // to be the wrapper. If this moves onto `.jiten-workbench` the query silently stops
+    // matching and the clip comes back looking like nothing changed.
+    expect(wrapper).toMatch(/container-type:\s*(inline-size|size)/);
+
+    const container = /@container[^{]*\(max-width:\s*980px\)\s*\{([\s\S]*?)\n\}/.exec(css)?.[1] ?? '';
+    expect(container, 'the @container narrow layout').not.toBe('');
+    expect(container).toMatch(/\.jiten-workbench\s*\{[^}]*grid-template-columns:\s*1fr/);
+    // Stacking alone is not the fix and shipping it alone made the surface worse: with
+    // `flex: 1` the grid stayed clamped to the window, `.jiten-table-wrap`'s own 360px
+    // min-height took most of it, and the two asides were left 26px each — the inspector
+    // showed 24px of 863px of content. Rubric category 1 went 1 stolen pointer region to 17.
+    expect(container).toMatch(/\.jiten-workbench\s*\{[^}]*flex:\s*0\s+0\s+auto/);
+    // …and the asides must give up their own scrollers, or each is a nested scroll region
+    // inside a page that is already scrolling.
+    expect(container).toMatch(/\.jiten-filters\s*\{[^}]*overflow:\s*visible/);
+    expect(container).toMatch(/\.jiten-inspector\s*\{[^}]*overflow:\s*visible/);
+
+    // The `@media` twin stays. Blanc hosts the same workbench outside `.jiten-novels`
+    // (`.blanc-jiten-workbench`) in a full-page shell, where the viewport IS the width —
+    // converting rather than duplicating would silently drop Blanc's narrow layout.
+    expect(css).toMatch(/@media\s*\(max-width:\s*980px\)\s*\{[^@]*\.jiten-workbench\s*\{[^}]*grid-template-columns:\s*1fr/);
+  });
+
   it('the manga OCR overlay sizes its type in the page it is drawn on, not in image pixels', () => {
     const css = strip(read('src/renderer/styles.css'));
     // Half one: the layer must be a query container, or every `cqw` below resolves against

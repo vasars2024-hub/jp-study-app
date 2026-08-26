@@ -99,9 +99,25 @@
   const details = [...win.querySelectorAll('details')].map((d) => ({ d, open: d.open }));
   for (const s of details) s.d.open = true;
 
+  // A DISABLED control is not a pointer target, and filing it as `occluded` is the same false
+  // reading as the closed-`<details>` one above. Novels' `.jiten-actions` grid ships two
+  // disabled buttons, `.btn:disabled` sets `pointer-events: none`, and `elementFromPoint`
+  // therefore returns the CONTAINER at their centres — so both landed in `occluded by
+  // div.jiten-actions`, unscored, on a surface that was otherwise clean. That number is the
+  // VOID trigger: a form with a dozen disabled controls would void its own measurement while
+  // every reachable control passed. Counted separately instead, so they stay visible without
+  // being scored against a floor they are exempt from by design. Whether disabling them is
+  // HONEST is rubric category 8's question, not this walk's.
+  const disabled = [];
   const els = [...win.querySelectorAll(INTERACTIVE)].filter((e) => {
     const r = e.getBoundingClientRect();
-    return r.width > 0 && r.height > 0 && getComputedStyle(e).visibility !== 'hidden';
+    if (!(r.width > 0 && r.height > 0) || getComputedStyle(e).visibility === 'hidden') return false;
+    // `aria-disabled` too: a `[role="button"]` cannot carry the DOM property.
+    if (e.disabled === true || e.getAttribute('aria-disabled') === 'true') {
+      disabled.push({ el: label(e), rect: `${Math.round(r.width)}x${Math.round(r.height)}` });
+      return false;
+    }
+    return true;
   });
 
   // A form control's pointer target is the control PLUS its `<label>`s: clicking a label
@@ -303,6 +319,9 @@
     worstShrunkBy: rows.reduce((m, row) => Math.max(m, row.shrunkBy), 0),
     occludedCount: occluded.length,
     occluded: occluded.slice(0, 8),
+    // Exempt, not passing. Printed so a surface cannot quietly shrink its own population.
+    disabledCount: disabled.length,
+    disabled: disabled.slice(0, 8),
     disclosedForRun: details.filter((s) => !s.open).length,
     disclosuresRestored: details.every((s) => s.d.open === s.open),
     // Not decoration: two consecutive runs must agree, and they only do if this stays small
