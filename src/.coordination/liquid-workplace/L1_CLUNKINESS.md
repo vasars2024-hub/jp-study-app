@@ -718,3 +718,54 @@ library` is disabled until the title field is non-empty, which is the enable thi
 **The undo writes real user data**: removal is `window.api.visualNovelRemove(selected.id)` behind
 `t('vnPanel.remove')` at `VisualNovelPanel.tsx:764`, and it needs the entry SELECTED first. That is
 why this was not opened in a turn's last minutes rather than left half-driven.
+
+## 2026-08-26 · primary — category 2 reaches 5 of 6, and the harness numerator falls to 37
+
+| surface | inputs | dead ends | modal traps | scroll traps | worst recv | parity | verdict |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `@.visual-novel-panel` | 1 click + 13 keys | 0 of 2 | 0 | 0 | 66.1 ms | 14 = 14 | **PASS 10/10** |
+| `Immersion` | 1 click | 0 of 1 | 0 | 0 | 18.9 ms | 1 = 1 | **PASS 10/10** |
+| `@.jiten-novels` | 1 click + 3 keys | 0 of 2 | 0 | 0 | 55.9 ms | 4 = 4 | **PASS 10/10** |
+
+Each fired its own control (0 → 1 → 0 on all three counts, `backToBaseline: true`) and drove both
+presentations in one window at one geometry. **Zero harness lines were spent on any of them** —
+the ratio for the whole turn is 37 measurement : 54 product source = **0.69 : 1**, against last
+turn's 53.1 : 1. That is RULE 1's claim tested and holding: the 902-line build is amortising.
+
+**VN was a FAIL and the harness could not score it.** `click:.visual-novel-summary-actions >
+button:last-of-type: occluded: centre resolves to div.mc-page` — `elementFromPoint` at the Remove
+button's own centre returned the window BEHIND Immersion. The group painted x=1036..1163 against a
+window ending at 1016. `.visual-novel-workspace` is a scroll container whose implicit `auto` track
+floors at min-content, and `.visual-novel-summary` is a nowrap flex row worth 602px in a 392px
+pane. Launch, Stop timer and Remove were all outside the frame; Save progress too. Fixed
+`00658d37`: `minmax(0, 1fr)`, two wraps, and `container-name: vnwork` so the five narrow-layout
+rules stop asking the VIEWPORT. Negative control — library hidden, pane 708px — the container
+query correctly does NOT fire and the shipped 5/4/3-column layouts return.
+
+**`@media` was the wrong instrument one level deeper than anyone had looked.**
+`VisualNovelPanel.tsx`'s own layout note already said why (the panel renders inside a floating
+window) and fixed only the outer grid track. The five inner rules sat in the same broken
+`@media (max-width: 760px)` the whole time. `visualNovelPaneReflow.test.ts` guards the general
+form — no `.visual-novel-*` selector inside a viewport `@media` — not the five selectors.
+
+**Correction 17, and it is paid once for every surface after this.** The undo assertion compared
+the whole surface text, so a do/undo pair that ends in a `role="status"` line was unrestorable by
+construction. `stateHash` excludes live regions and is what `undo.restored` reads; `textHash` keeps
+them, because a step whose only effect is a message did something. The live-region text is now
+reported before and after — and that report immediately found that **Remove announced nothing and
+left "Visual novel added to the local library." over an empty library**, fixed in `1bbc89f0` with
+an honest failure branch for the case where the returned database still contains the entry.
+
+**Two refusals that were the probe's fault, not the product's.** Immersion's first undo used
+`.immersion-mode-btn-reader`, which Focus mode removes — the recovery path is `.immersion-focus-exit`
+and it correctly returns to Live·Reader. Novels' first task clicked `.jiten-row` after filtering to
+a single match, but a sole match is AUTO-SELECTED, so the click was a real no-op; the harness
+reported the dead end and the control then VOIDed the score instead of passing it. `:not(.active)`.
+
+**Next surface is the manga reader, `@.reader`, the last of the six.** It is not open — cat8 scored
+it and the handoff records that its grid `.card` in Library opens it and replaces the desktop shell,
+so it is reached from Library rather than from a `.fwin`. Being outside a `.fwin` it should read
+`presentation: null` → `N/A-single-path`, which is a pass-able term, so no `--both-presentations`.
+
+**Lead for category 1, found in passing and deliberately not chased here:** Immersion's three
+`.immersion-mode-btn` toggles carry an `active` class and no `aria-pressed`.
