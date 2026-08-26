@@ -353,12 +353,24 @@ describe('liquid-window.css', () => {
     expect(base[0].body).not.toMatch(/backdrop-filter/);
 
     // Any OTHER `.lq-contextual` rule is a per-region geometry exception (a flush column
-    // is not a floating card), and it may adjust the box but must never restate the
-    // material: a second `background`/`backdrop-filter` here is how one region quietly
-    // stops sharing the language the primitive exists to carry.
+    // is not a floating card), and it may adjust the box but must never RESTATE the
+    // material: a second background value here is how one region quietly stops sharing
+    // the language the primitive exists to carry.
+    //
+    // Removing it is the one permitted move, and it is not the same thing. A contextual
+    // region nested inside another one — the manga scrubber inside the reader footer —
+    // would otherwise paint 0.72 over 0.72 and read as a darker slab, so it goes fully
+    // transparent and reads its parent's material through itself. That still measures as
+    // treated (the instrument scores `translucentBacking || ownBackdrop`), and it is the
+    // opposite of inventing a private material. `none`/`transparent` only: any concrete
+    // value is still a restatement, and `backdrop-filter` stays banned outright because
+    // no descendant may become its own backdrop root.
+    const REMOVES_MATERIAL = /^\s*(none|transparent)\s*$/;
     for (const exception of owning.filter((b) => b.selector !== `${INTERIOR_HOST} .lq-contextual`)) {
       expect(anchoredOn(exception.selector, INTERIOR_HOST), exception.selector).toBe(true);
-      expect(exception.body, exception.selector).not.toMatch(/background\s*:/);
+      for (const [, value] of exception.body.matchAll(/(?:^|;)\s*background\s*:([^;]*)/g)) {
+        expect(value, `${exception.selector} background`).toMatch(REMOVES_MATERIAL);
+      }
       expect(exception.body, exception.selector).not.toMatch(/backdrop-filter/);
     }
   });
