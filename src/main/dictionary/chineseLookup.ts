@@ -126,9 +126,15 @@ export function lookupChineseInDb(db: SqliteDb, query: string, limit = 20): Dict
   const q = (query ?? '').trim();
   if (!q) return null;
   const result = lookup(db, { text: q, sourceLangs: ['zh'], limit });
-  const zhOnly = { ...result, entries: result.entries.filter((entry) => entry.lang === 'zh') };
-  if (!zhOnly.entries.length) return null;
-  return lookupResultToDictResult(zhOnly);
+  const entries = result.entries.filter((entry) => entry.lang === 'zh');
+  if (!entries.length) return null;
+  // `truncated` is measured before this filter runs, so a dropped row means the
+  // rows the limit cut off may have been droppable too — "more matches exist"
+  // stops being provable and is therefore not claimed. Carried through only when
+  // the filter removed nothing.
+  const { truncated, ...rest } = result;
+  const keepTruncated = truncated && entries.length === result.entries.length;
+  return lookupResultToDictResult({ ...rest, entries, ...(keepTruncated ? { truncated } : {}) });
 }
 
 export interface ChineseLookupDeps {
@@ -158,13 +164,17 @@ function getIndex(deps: ChineseLookupDeps): Promise<CedictIndex> {
 }
 
 /** Look a Chinese term (or an English gloss) up: database first, CC-CEDICT second. */
-export async function lookupChineseTerm(query: string, deps: ChineseLookupDeps): Promise<DictResult> {
+export async function lookupChineseTerm(
+  query: string,
+  deps: ChineseLookupDeps,
+  limit?: number,
+): Promise<DictResult> {
   const q = (query ?? '').trim();
   if (!q) return { query: q, entries: [] };
   try {
     const db = deps.db();
     if (db) {
-      const fromDb = lookupChineseInDb(db, q);
+      const fromDb = limit === undefined ? lookupChineseInDb(db, q) : lookupChineseInDb(db, q, limit);
       if (fromDb) return fromDb;
     }
   } catch {

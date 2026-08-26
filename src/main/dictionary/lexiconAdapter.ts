@@ -86,6 +86,7 @@ export function lookupResultToDictResult(result: LookupResult): DictResult {
     ...(character ? { character } : {}),
     ...(deinflection ? { deinflection } : {}),
     ...(isApproximate(result) ? { approximate: true } : {}),
+    ...(result.truncated ? { truncated: true as const } : {}),
   };
 }
 

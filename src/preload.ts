@@ -454,14 +454,21 @@ const api = {
 
   // Dictionary + Anki
   lookupWord: (query: string): Promise<DictResult> => ipcRenderer.invoke('dict:lookup', query),
-  /** Merged Yomitan offline lookup with Jisho fallback (Japanese). */
-  lookupTerm: (query: string): Promise<DictResult> => ipcRenderer.invoke('dict:lookupTerm', query),
+  /**
+   * Merged Yomitan offline lookup with Jisho fallback (Japanese).
+   *
+   * `limit` is the page size, defaulting to eight and clamped in main. A result
+   * that carries `truncated` had more matches than that, and asking again with a
+   * larger limit is the only way to reach them.
+   */
+  lookupTerm: (query: string, limit?: number): Promise<DictResult> =>
+    ipcRenderer.invoke('dict:lookupTerm', query, limit),
   /**
    * Chinese lookup — the dictionary database first, CC-CEDICT second. Replaces
    * `renderer/chineseDict.ts`, which parsed 9.4 MB of CC-CEDICT on the UI thread.
    */
-  lookupChinese: (query: string): Promise<DictResult> =>
-    ipcRenderer.invoke('dict:lookupChinese', query),
+  lookupChinese: (query: string, limit?: number): Promise<DictResult> =>
+    ipcRenderer.invoke('dict:lookupChinese', query, limit),
   /** Drop main's cached CC-CEDICT index after a managed install finishes. */
   resetChineseDictCache: (): Promise<void> => ipcRenderer.invoke('dict:resetChineseCache'),
   /** Structured pitch-accent data (downstep positions), for the Blanc pitch panel. */

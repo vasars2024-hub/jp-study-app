@@ -39,6 +39,7 @@ import {
   searchOffline,
 } from './dictionary/tatoebaOffline';
 import { enrichLexiconResultMetadata, lookupResultToDictResult } from './dictionary/lexiconAdapter';
+import { clampLookupLimit } from '../shared/dictionaryLookup';
 import { legacyBatchToLookupResult } from './dictionary/legacyInterlinear';
 import {
   lookupChineseInDictionary,
@@ -242,15 +243,16 @@ export async function lookupWord(query: string): Promise<DictResult> {
 }
 
 /** Merged offline Yomitan + pitch/freq enrichment, with Jisho fallback. */
-export async function lookupTerm(query: string): Promise<DictResult> {
+export async function lookupTerm(query: string, limit?: number): Promise<DictResult> {
   const q = normalizeLexiconText(query ?? '');
   if (!q) return { query: q, entries: [] };
+  const pageSize = clampLookupLimit(limit);
 
   // SQLite/FTS is the canonical any-to-any path. It is additive during the
   // migration: installations whose legacy JSON stores have not been imported
   // yet still use the existing Yomitan/Jisho path below, unchanged.
   try {
-    const unified = lookupInDictionaryDb({ text: q, limit: 8 });
+    const unified = lookupInDictionaryDb({ text: q, limit: pageSize });
     if (unified.entries.length) {
       const converted = lookupResultToDictResult(unified);
       // Preserve the legacy popup's pitch/frequency contract while the unified
@@ -278,7 +280,9 @@ export async function lookupTerm(query: string): Promise<DictResult> {
   // matching, and only once every exact path has already failed, so an
   // approximate answer can never displace a real one.
   try {
-    const approximate = lookupResultToDictResult(lookupInDictionaryDb({ text: q, limit: 8, fuzzy: true }));
+    const approximate = lookupResultToDictResult(
+      lookupInDictionaryDb({ text: q, limit: pageSize, fuzzy: true }),
+    );
     if (approximate.approximate) return approximate;
   } catch {
     // A database read must never take the established dictionary fallback down.
@@ -751,9 +755,11 @@ export function cancelScheduledDictionaryWarmup(): void {
 export function registerDictionaryIpc(): void {
   scheduleDictionaryWarmup();
   ipcMain.handle('dict:lookup', (_e, query: string) => lookupWord(query));
-  ipcMain.handle('dict:lookupTerm', (_e, query: string) => lookupTerm(query));
+  ipcMain.handle('dict:lookupTerm', (_e, query: string, limit?: number) => lookupTerm(query, limit));
   // Phase 4: the Chinese surfaces' lookup, moved out of `renderer/chineseDict.ts`.
-  ipcMain.handle('dict:lookupChinese', (_e, query: string) => lookupChineseInDictionary(query));
+  // `limit` is clamped here rather than trusted: it arrives from a renderer.
+  ipcMain.handle('dict:lookupChinese', (_e, query: string, limit?: number) =>
+    lookupChineseInDictionary(query, limit === undefined ? undefined : clampLookupLimit(limit)));
   ipcMain.handle('dict:resetChineseCache', () => resetChineseDictionaryCache());
   ipcMain.handle('dict:listSources', (_e, pair?: unknown) =>
     listDictionarySources(undefined, readPair(pair)));

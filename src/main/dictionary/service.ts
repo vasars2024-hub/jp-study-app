@@ -667,8 +667,8 @@ const chineseDeps: ChineseLookupDeps = {
 };
 
 /** Look a Chinese term up. Database first, CC-CEDICT file second. */
-export function lookupChineseInDictionary(query: string): Promise<DictResult> {
-  return lookupChineseTerm(query, chineseDeps);
+export function lookupChineseInDictionary(query: string, limit?: number): Promise<DictResult> {
+  return lookupChineseTerm(query, chineseDeps, limit);
 }
 
 /** Drop the cached CC-CEDICT index after a managed install finishes. */

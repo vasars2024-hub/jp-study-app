@@ -118,6 +118,15 @@ export interface DictResult {
    * been found.
    */
   approximate?: boolean;
+  /**
+   * `entries` is a page, not the whole answer — more matches were cut off.
+   *
+   * Set only by the database path, which is the only lookup that knows it
+   * truncated; a legacy or network result leaves it absent rather than
+   * guessing. Surfaces must say so, because a truncated list rendered as a
+   * complete one is indistinguishable from "that is all this word has".
+   */
+  truncated?: true;
   /** Set when the lookup itself failed (e.g. offline). */
   error?: string;
 }

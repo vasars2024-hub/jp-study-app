@@ -26,6 +26,11 @@ import { translateTo, type TransLang } from '../translator';
 // DictionaryResults is in Blanc's boot path — going through the barrel dragged
 // the whole catalog into the entry chunk. Same reason StatsContent imports
 // `confirmDialog` from `ui/dialogService` instead of the `ui` barrel.
+import {
+  DICT_LOOKUP_LIMIT,
+  DICT_LOOKUP_MAX_LIMIT,
+  nextLookupLimit,
+} from '../../shared/dictionaryLookup';
 import { firstGlossSegment } from '../../shared/epubEnrichment';
 import { glossForLangFromEntries } from '../../shared/fieldRouter';
 import { isGroundableCharacter } from '../../shared/langs';
@@ -313,7 +318,24 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
   const [exModelPct, setExModelPct] = useState<number | null>(null);
   const recordedLookupRef = useRef('');
 
-  // (Re)look up whenever the query changes.
+  /**
+   * How many entries this lookup asks for, keyed to the query it belongs to.
+   *
+   * The key is stored *with* the page size rather than reset from an effect on
+   * purpose. A reset effect would run after the lookup effect, so a new query
+   * would first be fetched at the previous word's expanded page and then again
+   * at the default — two database reads and a visible reflow. Deriving the limit
+   * during render instead means a new query is already back at page one on the
+   * first render that sees it.
+   */
+  const [page, setPage] = useState<{ key: string; limit: number }>({
+    key: '',
+    limit: DICT_LOOKUP_LIMIT,
+  });
+  const pageKey = `${lang} ${query.trim()}`;
+  const limit = page.key === pageKey ? page.limit : DICT_LOOKUP_LIMIT;
+
+  // (Re)look up whenever the query changes, or the reader asks for more of it.
   useEffect(() => {
     let alive = true;
     setResult(null);
@@ -327,7 +349,7 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
     setExTrans({});
     if (!query.trim()) return;
     const lookup =
-      lang === 'zh' ? window.api.lookupChinese(query) : window.api.lookupTerm(query);
+      lang === 'zh' ? window.api.lookupChinese(query, limit) : window.api.lookupTerm(query, limit);
     lookup.then((r) => {
       if (!alive) return;
       setResult(r);
@@ -350,7 +372,7 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
     return () => {
       alive = false;
     };
-  }, [query, lang]);
+  }, [query, lang, limit]);
 
   // Keep the star state in sync with saves from other views.
   useEffect(() => onSavedChanged(() => setSavedSet(new Set(loadSaved().map((w) => w.word)))), []);
@@ -1048,6 +1070,37 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
           );
         })}
       </div>
+
+      {/*
+        A page of results has to say it is a page.
+
+        The database read is capped, and until this row existed the cap was
+        invisible: eight entries rendered identically whether eight was the whole
+        answer or the first eight of hundreds, and nothing on the surface could
+        reach the ninth. `truncated` is set by the lookup itself — never inferred
+        from `entries.length === limit`, which is equally true of a result that
+        is exactly complete — so this row appears only when a further match
+        provably exists. No total is claimed, because the probes behind the
+        lookup are themselves capped and any number here would be a floor
+        presented as a count.
+      */}
+      {result?.truncated && entries.length > 0 && (
+        <div className="dict-truncated">
+          <span className="muted">
+            {limit >= DICT_LOOKUP_MAX_LIMIT
+              ? t('dict.results.truncatedMax', { count: entries.length })
+              : t('dict.results.truncated', { count: entries.length })}
+          </span>
+          {limit < DICT_LOOKUP_MAX_LIMIT && (
+            <button
+              className="dict-more-btn lq-hit"
+              onClick={() => setPage({ key: pageKey, limit: nextLookupLimit(limit) })}
+            >
+              {t('dict.results.showMore')}
+            </button>
+          )}
+        </div>
+      )}
 
       {/* First of the unasked panels because it is the shortest fact about the
           word and the one that changes how the rest is read. One indexed probe,

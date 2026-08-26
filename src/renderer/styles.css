@@ -5021,6 +5021,35 @@ h1 {
   letter-spacing: 0.3px;
   color: var(--muted);
 }
+/* The "this list is a page" row, directly under the entries it qualifies. A
+   plain anchor surface rather than a translucent one: it is the statement that
+   makes the list above honest, so it must never read as decoration. */
+.dict-truncated {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+  margin: 2px 0 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  font-size: 12px;
+}
+.dict-more-btn {
+  background: transparent;
+  color: var(--accent-text);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.dict-more-btn:hover {
+  background: var(--panel);
+  border-color: var(--accent-2);
+}
 .dict-glossary-html {
   margin: 8px 0 10px;
   line-height: 1.55;

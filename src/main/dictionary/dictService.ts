@@ -178,6 +178,18 @@ export interface LookupResult {
   entries: LookupEntry[];
   /** Present only for an exact one-character query backed by an enabled source. */
   character?: CharacterLookup;
+  /**
+   * At least one further match exists that `limit` cut off.
+   *
+   * Deliberately a flag and not a total. `lookup()` gathers one row past the
+   * limit precisely so this can be answered without a second count query, which
+   * means the honest claim it supports is "there are more", not "there are N" —
+   * the probes below are themselves capped, so any number produced here would be
+   * a floor presented as a total. It is also why the flag cannot be inferred
+   * from `entries.length === limit`: that is equally true of a result which is
+   * exactly complete.
+   */
+  truncated?: true;
 }
 
 // ----- language detection ----------------------------------------------------
@@ -504,6 +516,20 @@ export function boundedEditDistance(a: string, b: string, max: number): number {
 export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
   const text = query.text.trim();
   const limit = query.limit ?? 40;
+  // Gather one row past what will be shown. That extra row is never rendered;
+  // it is the whole evidence for `truncated`, and it is why a caller asking for
+  // eight can distinguish "eight, and that is all there is" from "eight of more".
+  const gather = limit + 1;
+  /**
+   * A capped probe came back full, so the index still holds rows nobody read.
+   *
+   * Needed because the surviving entry count is NOT a proof of exhaustion: rows
+   * are dropped after they are fetched — deduplicated into a sibling entry, or
+   * discarded for having no sense in the requested language pair. Measured live
+   * on the shipped 650k-row database, 鬱 at `limit: 71` returned 52 entries while
+   * `limit: 200` returned 71, so "fewer than you asked for" was quietly untrue.
+   */
+  let saturated = false;
   const detected = query.sourceLangs?.length ? query.sourceLangs : detectQueryLangs(text);
   // User-imported formats such as StarDict do not carry a reliable language
   // code. Search their honest `und` rows after detected languages rather than
@@ -590,20 +616,20 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
       for (const row of byReading.all(pair, lang, key) as HeadwordRow[]) push(row, 'reading', []);
     }
 
-    if (result.entries.length < limit) {
+    if (result.entries.length < gather) {
       const base = normalizeForLookup(text);
       // Prefix range scan: norm > 'base' and norm < 'base' + U+FFFF. Cheaper and
       // index-friendly compared with LIKE, which cannot use the index for a
       // non-ASCII pattern.
-      for (const row of byPrefix.all(pair, lang, base, `${base}￿`, limit) as HeadwordRow[]) {
-        push(row, 'prefix', []);
-      }
+      const rows = byPrefix.all(pair, lang, base, `${base}￿`, gather) as HeadwordRow[];
+      if (rows.length >= gather) saturated = true;
+      for (const row of rows) push(row, 'prefix', []);
     }
   }
 
   // The reverse direction: the query is a gloss, not a headword. This is what the
   // old term→entries Map could not answer at all.
-  if (!query.headwordsOnly && result.entries.length < limit) {
+  if (!query.headwordsOnly && result.entries.length < gather) {
     // `sourceLangs` is a real language-pair boundary, not merely a hint for the
     // headword probes above. Without this predicate an explicit EN→ZH request can
     // leak Japanese (or any other language) entries whose gloss happens to match.
@@ -629,7 +655,8 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
         order by priority, h.id
         limit ?
       `)
-      .all(pair, ftsQuery(text), ...reverseSourceLangs, limit) as HeadwordRow[];
+      .all(pair, ftsQuery(text), ...reverseSourceLangs, gather) as HeadwordRow[];
+    if (glossRows.length >= gather) saturated = true;
     for (const row of glossRows) push(row, 'gloss', []);
   }
 
@@ -688,6 +715,10 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
   }
 
   result.entries.sort(compareLookupEntries);
+  // Either kind of evidence is enough: more entries survived than will be shown,
+  // or a probe that was capped came back full. Neither is `entries.length ===
+  // limit`, which is equally true of a result that is exactly complete.
+  if (result.entries.length > limit || saturated) result.truncated = true;
   result.entries = result.entries.slice(0, limit);
   return result;
 }

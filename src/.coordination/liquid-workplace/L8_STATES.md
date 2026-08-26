@@ -418,3 +418,48 @@ interpolation is invisible to both standard guards — a raw-key sweep sees a re
 and a key-count check sees nothing missing. Only asserting the rendered string **changes between
 languages** finds it. `ankiSetupReasonTranslated.test.tsx`'s last case is that assertion, and its
 mutation control (revert the render site) turns exactly 7 tests red, each naming its language.
+
+## 2026-08-26 · primary — Dictionary rendered 8 of 71 as if it were all of them, and the count could not be trusted
+
+**The defect, category 8 (honest states).** `lookupTerm` asked the database for `limit: 8`
+(`main/dictionary.ts:253`), `DictionaryResults.tsx` rendered `result.entries` and said nothing about
+the cap, and no control on the surface could reach the ninth row. Measured live BEFORE the fix,
+through `window.api.lookupTerm` on the shipped 650k-row database: `water` → 8, `kami` → 8, both with
+no truncation signal of any kind. A page presented as a whole answer.
+
+**Fixed, and the fix is a flag the lookup sets, never a count the surface infers.**
+`LookupResult.truncated` / `DictResult.truncated`, set in `lookup()` (`dictService.ts`). Two pieces
+of evidence, either sufficient: more entries survived than `limit` will show, or a capped probe came
+back full. `limit` is now a page size on the IPC (`lookupTerm(query, limit?)`,
+`lookupChinese(query, limit?)`), clamped in main via `shared/dictionaryLookup.ts`
+(8 → 40 → 200, ×5, `clampLookupLimit` bounding an IPC-supplied value against a synchronous read).
+Renderer gains a `.dict-truncated` row plus `.dict-more-btn`, i18n ×4.
+
+**The second branch exists because the first one lied, and the live run is what caught it.** With
+only `entries.length > limit`, 鬱 at `limit: 71` returned **52 entries and `truncated: null`** while
+`limit: 200` returned **71**. The count is not a proof of exhaustion — rows are dropped *after* they
+are fetched, by dedup and by the gloss-language filter — so a page shorter than the limit can still
+be sitting on unread rows. Hence `saturated`: a capped probe returning `>= gather` rows.
+
+**Live acceptance, after a restart (main does not hot-reload), numbers not adjectives:**
+| query | limit | entries | truncated |
+|---|---|---|---|
+| 走る | 8 | 8 | **true** |
+| 走る | 9 | 9 | **null** ← NEGATIVE CONTROL |
+| 走る | 71 | 9 | null |
+| 鬱 | 8 | 8 | true |
+| 鬱 | 71 | 52 | **true** (was `null` before `saturated`) |
+| 鬱 | 200 | 71 | null |
+
+The 走る row at `limit: 9` is the control that matters: `entries.length === limit` there exactly as
+it does at 8, and the flag is still absent. A flag inferred from length lies on every word whose
+match count equals the page size. Live UI on the Dictionary window, driven through the bridge:
+8 entries + "Showing the first 8 matches — there are more." → Show more → **37** → Show more →
+**71**, row and button both gone. 63 entries that were unreachable are now reachable.
+
+**Traps paid.** (1) `stage-head-replace` accepted a preload blob whose `/**` opener was missing —
+the byte-delta assertion is self-consistent and passes on unparseable output; only reading
+`git diff --cached` caught it. A start marker chosen from inside a doc comment must walk back to
+the opener. (2) Japanese sent as a literal through `/eval` arrives as `??`; use
+`String.fromCodePoint`. (3) The Dictionary window commits its query on the **Search** button, not
+on `input` + Enter — a native-setter type alone leaves `entries: 0` and reads as a dead surface.
