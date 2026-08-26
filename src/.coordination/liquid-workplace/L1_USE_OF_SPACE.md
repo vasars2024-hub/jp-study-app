@@ -738,3 +738,34 @@ corrected harness is **byte-identical to the committed baseline**, all nine numb
 **NEXT, and it is the opening slice.** VN's three bars, all one shape: a 920x541 dead region at
 maximized (**47.9%** against a bar of 15), 16.9% at its own default, and the canvas FALLING
 17.7 → 9.2. The panel does not use the space it is given, at any size. Then RUN Novels.
+
+### CORRECTION, same turn — VN's dead region was the EMPTY STATE, and `adae4059` said otherwise
+
+`adae4059` recorded VN at `dead 16.9 / 0.3 / 47.9` and called the 920x541 region at maximized "a
+product fix, not a measurement one". **It was neither.** `main.visual-novel-workspace` held one
+child — `p.muted` reading "Add a local visual novel to begin capturing Japanese dialogue." — and
+the rubric caps an empty harness rather than scoring it. This file's own trap 3, one entry above,
+written by the previous turn and not applied here. The baseline has been replaced with the loaded
+run; the empty numbers are recorded only in this paragraph, as the trap.
+
+**Seeded through the product's own form, no native dialog:** the three `.visual-novel-add` fields
+are typeable and `Browse` is only a convenience. Native value setter + `input`, then
+`Add to library` → the workspace goes from one `p.muted` to **ten real sections** (summary,
+metadata, sources, community, progress, routes, script import, capture, analysis actions, reading
+overlay). **Trap: `input[type=text]` is an ATTRIBUTE selector.** These inputs carry no `type`
+attribute, so `.type` reads `text` while `querySelectorAll('input[type=text]')` returns **0** — the
+first seeding attempt refused with "EXPECTED 3 INPUTS, got 0" on a form that was right there.
+Removed after scoring: `Remove` returned the library to `count: 0` and the identical empty string,
+so nothing was left in the user's library.
+
+| leg | box | clipped | h-scroll | dead % | chrome | canvas |
+| --- | --- | --- | --- | --- | --- | --- |
+| default | 782x513 | 0 | 0 | **5.8** | 37.9 | 19.2 |
+| compact | 212x103 | **7** | **2** | 0.3 | 62.4 | 28.6 |
+| maximized | 1226x698 | 0 | 0 | **12.9** | 27.4 | **13.5** |
+
+**Dead region passes at every size** — 47.9 → 12.9 at maximized, entirely from loading content.
+What is REAL and is the next slice: the compact leg (`div.lq-reading-tool-body 180>172` and
+`main.visual-novel-workspace 219>128`, 7 clipped, all inside the sheet the tool becomes at that
+width) and `contentGrowsNotChrome` (canvas **19.2 → 13.5** while chrome falls 37.9 → 27.4 — the
+workspace does not take the width the chrome gives back). Injected clip fired 0 → 1 → 0.
