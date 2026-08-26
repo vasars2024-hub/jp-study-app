@@ -379,3 +379,52 @@ bar reads `eligibleTotal > 0 && ...`, so it would be a FAIL that means "no host"
 Trap: the Library tile opens on `onDoubleClick` (`LibraryView.tsx:1755`, `data-library-tile`) and
 a dispatched `dblclick` on `.lib-groups .grid .card` did NOT open it. Find the working open path
 before budgeting the reader run.
+
+## 2026-08-26 — category 3 CLOSES at 6 of 6 (`d23b559f`, `c1fcf0d9`, `2eddc5f6`)
+
+Both `@.reader` cells scored. The block above is discharged: the host landed as `618ae3d0`, and
+these two slices supplied the thing the host had nothing to hold.
+
+| cell | regions | dense on translucent | treated | shared | verdict |
+| --- | --- | --- | --- | --- | --- |
+| l6-novels | 116 | 0 | 2/2 | 2/2 | **PASS 10/10**, control fired |
+| l6-manga | 23 | 1 → **0** | 4/4 | 4/4 | **PASS 10/10**, control fired |
+
+Board: cat 1, 2, 3, 4, 8 each 6/6 = **30 of 48 cells**.
+
+**Novels was unscoreable, not badly scored.** First run: `eligibleTotal: 0` across 94 regions —
+the bar and footer were plain `div`s, so the classifier found no landmark and the denominator was
+empty. `.reader-bar` and `.reader-footer` are transport (§2.3), so both are now
+`ContextualSurface as="header"/"footer"`. Chrome cost is neutral, measured not argued: 56+51=107px
+before, 53+54=107px after, `.reader-stage` 714px in both. `.lq-contextual`'s 32px hit floor moved
+the bar's 24–26px small buttons but not the bar, whose height a 35px sibling already set — so no
+category-4 cell to re-open.
+
+**Manga's one failing bar was a real finding.** `div.reader-seek-wrap` — a wrapper holding one
+`input[type=range]` — measured as dense Work on the footer's 0.72 material, because the
+classifier's "a single control is not a region" skip reaches the control and not a wrapper around
+it. It is the scrubber. It takes the primitive for its MEANING and, per a host-scoped exception in
+`liquid-window.css`, none of its geometry or material: 0.72 nested in 0.72 is a darker slab, and a
+card border round a slider inside a strip is the stack of cards §2 rejects.
+
+### Traps paid, so nobody re-derives them
+
+1. **`@.reader` must be SETTLED before it is scored.** Two runs returned
+   `VOID — negative control did not falsify and restore` on `oneMaterialReturned` alone with every
+   bar passing. Not a harness defect and not a material leak: the reader was still paginating and
+   `regions` moved 94 → 116 between runs while the control's runtime path resolved mid-render.
+   Re-scored on a settled reader, unchanged, the same control passes. It fails loudly rather than
+   scoring wrongly, which is the good failure mode — but budget the settle.
+2. **The harness repair was diagnosis, not a fix** (RULE 1, one repair): `restoreOne` now reports
+   `before`/`immediate`/`settled` material and reads the settled one across 450 ms because the
+   target computes `transition: all`. All three read `none|rgba(0, 0, 0, 0)` while the verdict
+   still said "did not return" — that is what ruled the material out and pointed at the render.
+3. **The reader opens without a native dialog or the Library tile.** `App.tsx:566` consumes
+   `sessionStorage['jp-mini-pending-book']` on mount, so: write a real `LibraryItem` there via
+   `window.api.listLibrary()`, then `/reload`. The `onDoubleClick` trap above is still true and no
+   longer on the critical path.
+4. **HMR on a reader file drops you back to the desktop** — `reading` is `App` state and the mount
+   effect has already consumed the sessionStorage key. Re-stage and reload after every edit to
+   `NovelReader.tsx`/`MangaReader.tsx`; a CSS-only edit keeps the reader.
+5. `MangaReader.tsx` carries another track's in-flight `confirmDialog` migration. `c1fcf0d9` is a
+   HEAD+edit blob: 7 ContextualSurface, 0 confirmDialog, 1 window.confirm, LF, 82,522 bytes.
