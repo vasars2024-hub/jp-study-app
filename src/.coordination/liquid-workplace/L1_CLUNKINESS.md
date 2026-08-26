@@ -769,3 +769,37 @@ so it is reached from Library rather than from a `.fwin`. Being outside a `.fwin
 
 **Lead for category 1, found in passing and deliberately not chased here:** Immersion's three
 `.immersion-mode-btn` toggles carry an `active` class and no `aria-pressed`.
+
+## 2026-08-26 · primary — category 2 COMPLETES at 6 of 6, and the manga reader's edges were mislabelled
+
+| surface | inputs | dead ends | modal traps | scroll traps | worst recv | parity | verdict |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `@.reader` | 2 clicks + 0 keys | 0 of 2 | 0 | 0 | 20.1 ms | N/A-single-path | **PASS 10/10** |
+
+A pure RUN — `probes/cat2-clunkiness.cjs` unmodified, **zero harness lines**. Control fired
+0,0,0 → 1,1,1 → 0,0,0 with `backToBaseline: true`; the injected inert click measured 0.1 ms recv,
+so the latency term is scoring the product and not the instrument. Undo `baseHash === afterHash`
+(`andz3x`), no live regions either side. `presentation` reads *main-window section*, so
+`costParity` is the pass-able `N/A-single-path` term as the previous section predicted — the
+reader replaces the desktop shell, there is no owning `.fwin` and no Maximize button to compare.
+`raised: root surface - no taskbar button`.
+
+**The defect the drive walked into, fixed in `c7566988`.** The nav zone's *left* edge flipped its
+page DELTA when `readerLayout === 'rtl'` but kept `aria-label={t('manga.prevPage')}` pinned to the
+SIDE. In every right-to-left volume — the natural mode for manga — the left edge advanced to the
+next page while announcing the previous one, and the right edge did the reverse. `navZoneRoles(layout)`
+in `mangaReaderSettings.ts` now derives the delta and the label KEY from one value so they cannot
+drift, and is testable without mounting the reader. Second half: with *Turn pages by clicking* OFF
+both zones stayed mounted — `position: absolute`, `cursor: pointer`, 28% of each edge — inert but
+still swallowing every click on 56% of the page and still announcing a turn. They unmount now, and
+the stage's left edge resolves to `.manga-spread`. Both negative controls gave 2 red on revert,
+7 green after a byte-identical restore (sha256 verified).
+
+**Category 2 board: 6 of 6.** Reading Finder, Library, VN, Immersion, Novels, manga reader — five
+of the six were pure RUNs and the one BUILD was 902 lines paid once. That is the third complete
+category (1, 8, 2) and **18 of 48 cells**.
+
+**Trap for the next `@`-rooted surface, paid here:** do not pass `--both-presentations` to a
+surface that is not inside a `.fwin`. `PRESENT_*` resolves through `root.closest('.fwin')`, gets
+null, and the run cannot produce a parity term at all — whereas leaving the flag off records the
+honest `N/A-single-path`, which the rubric accepts.
