@@ -52,7 +52,14 @@
    `input` and `select` are deliberately NOT in the list. They are replaced elements: `::after`
    generates no box on them, so a scope that appeared to cover them would silently leave them
    under the floor while reading as fixed. An input's own box IS its hit area, so the floor is
-   a `min-height` on the control, and that is written where the control lives. */
+   a `min-height` on the control, and that is written where the control lives.
+
+   THE OTHER WAY A SCOPE READS AS LANDED AND MOVES NOTHING: a container between the scope and
+   the control with `overflow: hidden` CLIPS this `::after` back to its own box. `.sp-seg` is
+   the recorded case — the `overflow: hidden` is what rounds its segments' corners into the
+   rail — and with the scope applied, the computed `::after` measured a correct 32px tall while
+   the manga reader's pointer region stayed at 28.5. Check the chain for a clipper before
+   believing a scope; where there is one, the control takes `min-height` on its own box. */
 .lq-hit-scope :is(button, a[href], [role='button'], [role='tab']) {
   position: relative;
 }

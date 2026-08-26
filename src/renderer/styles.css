@@ -4251,6 +4251,13 @@ h1 {
   padding: 6px 11px;
   cursor: pointer;
   font-size: 12px;
+  /* `.lq-hit-scope` on the container CANNOT reach these: `.sp-seg` is `overflow: hidden`
+     (it is what rounds the segments' corners into the rail), so it clips the expander's
+     `::after` back to its own 30px box and the pointer region stops at 28.5. Measured on
+     the manga reader with the scope applied and the `::after` confirmed 32px tall — the
+     scope reads as landed and the number does not move. The segment takes the floor on its
+     own box instead; the rail goes 30 -> 34 and still fits its 35px host bar. */
+  min-height: var(--lq-hit-target);
 }
 .sp-seg-btn:hover {
   color: var(--text);
@@ -4652,9 +4659,18 @@ h1 {
 .reader-seek {
   flex: 1;
   min-width: 80px;
+  /* A 4px page slider is a 4px pointer target, and `<input type="range">` is a replaced
+     element, so `.lq-hit-scope` on the footer generates no `::after` for it and would leave
+     it there while reading as fixed. The BOX takes the floor; the painted track keeps its
+     4px through `::-webkit-slider-runnable-track`, which Chromium centres in the box. */
   height: 4px;
+  min-height: var(--lq-hit-target);
   accent-color: var(--accent);
   cursor: pointer;
+}
+.reader-seek::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
 }
 .reader-seek:disabled {
   cursor: default;

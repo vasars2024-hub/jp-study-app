@@ -34,7 +34,7 @@ interface Props {
 export default function MangaViewModeSwitcher({ value, onChange }: Props) {
   const { t } = useT();
   return (
-    <div className="sp-seg manga-view-mode-switcher" role="group" aria-label={t('manga.viewMode.label')}>
+    <div className="sp-seg manga-view-mode-switcher lq-hit-scope" role="group" aria-label={t('manga.viewMode.label')}>
       {MODES.map((mode) => (
         <button
           key={mode}

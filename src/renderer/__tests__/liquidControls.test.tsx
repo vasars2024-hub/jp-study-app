@@ -533,6 +533,40 @@ describe('the sheet stays a composition language, not a palette', () => {
     expect(src).toMatch(/immersion-site-list lq-hit-scope/);
   });
 
+  it('floors the controls a scope provably cannot reach, and says which obstacle stopped it', () => {
+    // Two obstacles, both measured live, both of which let a scope read as LANDED while the
+    // number does not move. Each control below is floored on its own box for a stated reason,
+    // and each assertion exists so a later tidy-up cannot delete the `min-height` as redundant
+    // with the scope that is already on its container.
+    const styles = readFileSync(resolve(__dirname, '..', 'styles.css'), 'utf8');
+    const ruleOf = (sel: string) => {
+      const at = styles.indexOf(`${sel} {`);
+      expect(at, `${sel} rule`).toBeGreaterThan(-1);
+      return styles.slice(at, styles.indexOf('}', at));
+    };
+
+    // OBSTACLE 1 — a REPLACED element. `::after` generates no box on it.
+    // `.jiten-search-wrap input` measured 19.5px inside a 32px wrap: the wrap looks like the
+    // target and is not one. `.reader-seek` is `<input type="range">` at **4px** tall.
+    expect(ruleOf('.jiten-search-wrap input')).toMatch(/min-height:\s*var\(--lq-hit-target\)/);
+    const seek = ruleOf('.reader-seek');
+    expect(seek).toMatch(/min-height:\s*var\(--lq-hit-target\)/);
+    // The painted track stays 4px — the BOX takes the floor, not the ink. Growing a slider's
+    // visible bar to 32px is the "inflate the chrome" failure css-measure §2 records.
+    expect(styles).toMatch(/\.reader-seek::-webkit-slider-runnable-track\s*\{[^}]*height:\s*4px/);
+
+    // OBSTACLE 2 — a CLIPPER between the scope and the control. `.sp-seg` is
+    // `overflow: hidden` (it rounds its segments' corners into the rail), so it cuts the
+    // expander back to its own 30px box. With the scope applied and the computed `::after`
+    // confirmed 32px tall, the manga reader's pointer region still measured 28.5.
+    expect(ruleOf('.sp-seg')).toMatch(/overflow:\s*hidden/);
+    expect(ruleOf('.sp-seg-btn')).toMatch(/min-height:\s*var\(--lq-hit-target\)/);
+    // Both floors resolve the SAME token as the scope's `::after`, or the two halves of this
+    // category drift the next time the floor moves. (`CSS` here is comment-stripped, so the
+    // warning written into `liquid-controls.css` is not assertable — this is.)
+    expect(CSS).toMatch(/max\(100%,\s*var\(--lq-hit-target\)\)/);
+  });
+
   it('scales its one animation by --lq-motion-scale so reduced motion means no displacement', () => {
     const frames = CSS.slice(CSS.indexOf('@keyframes lq-toolbar-menu-in'));
     expect(frames).toContain('var(--lq-motion-scale)');

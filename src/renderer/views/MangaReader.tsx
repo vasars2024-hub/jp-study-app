@@ -1756,7 +1756,7 @@ export default function MangaReader({ item, onClose }: Props) {
           {t('manga.backLibrary')}
         </button>
         <div className="reader-title">{item.title}</div>
-        <div className="reader-controls">
+        <div className="reader-controls lq-hit-scope">
           {mangaSettings.showPageNumber && (
             <span className="muted page-count">
               {pages.length ? (scrub ?? idx) + 1 : 0} / {pages.length}
@@ -1906,7 +1906,7 @@ export default function MangaReader({ item, onClose }: Props) {
         </div>
       </ReadingCanvas>
       <div
-        className={`reader-footer${mangaSettings.pageSelectorPosition === 'left' ? ' reader-footer-left' : ''}${!footerVisible ? ' reader-footer-hidden' : ''}`}
+        className={`reader-footer lq-hit-scope${mangaSettings.pageSelectorPosition === 'left' ? ' reader-footer-left' : ''}${!footerVisible ? ' reader-footer-hidden' : ''}`}
       >
         <button
           className="btn small"
