@@ -3633,6 +3633,8 @@ export const zh: Catalog = {
   'translate.outputPlaceholder': '译文显示在这里。',
   'translate.working': '处理中…',
   'translate.askAgent': '询问智能体',
+  'translate.askAgent.needsText': '请先输入、粘贴或选择文本，才能询问智能体。',
+  'translate.run.needsText': '请先输入或粘贴需要翻译的文本。',
   'translate.askAgent.selection': '就选中内容询问智能体',
   'translate.menu.file': '文件',
   'translate.menu.clear': '清空文本',

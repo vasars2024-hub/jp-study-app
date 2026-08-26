@@ -1,0 +1,88 @@
+{
+  "label": "translate",
+  "surface": "Translate",
+  "win": "(focused)",
+  "lang": "en",
+  "storedLang": "en",
+  "theme": "forest-night",
+  "rect": "820x580",
+  "textRuns": 20,
+  "textHash": 1823464497,
+  "rawKeyCount": 0,
+  "rawKeys": [],
+  "placeholderCount": 0,
+  "placeholders": [],
+  "mutePairCount": 0,
+  "mutePairs": [],
+  "disabledTotal": 2,
+  "states": {
+    "empty": {
+      "hosts": 0,
+      "messages": []
+    },
+    "loading": {
+      "hosts": 0,
+      "messages": []
+    },
+    "error": {
+      "hosts": 0,
+      "messages": []
+    },
+    "offline": {
+      "hosts": 0,
+      "messages": []
+    }
+  },
+  "statusCandidatesNeedingEmptyProfile": [],
+  "raised": "raised",
+  "statesObservable": [],
+  "statesNotObservable": [
+    "empty",
+    "loading",
+    "error",
+    "offline"
+  ],
+  "statesNamed": "0 of 0 observable",
+  "mutePairCountWorst": 0,
+  "bars": {
+    "rawKeys": true,
+    "placeholders": true,
+    "mutePairs": true,
+    "statesNamed": "UNMEASURED",
+    "languagesDiffer": true
+  },
+  "verdict": "UNMEASURED - statesNamed; drive the surface with --drive-input or score 0, never 10",
+  "failedBars": [],
+  "unmeasuredBars": [
+    "statesNamed"
+  ],
+  "notMeasuredHere": [
+    "dead-control count (honesty-probe A - every control driven for a side effect)",
+    "fabricated-value verdict (honesty-probe B - needs an empty scratch profile)"
+  ],
+  "control": {
+    "moved": {
+      "rawKeys": true,
+      "placeholders": true,
+      "mutePairs": true
+    },
+    "backToBaseline": true,
+    "counts": {
+      "base": [
+        0,
+        0,
+        0
+      ],
+      "dirty": [
+        1,
+        1,
+        1
+      ],
+      "restored": [
+        0,
+        0,
+        0
+      ]
+    }
+  }
+}

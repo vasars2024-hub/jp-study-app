@@ -3956,6 +3956,8 @@ export const ru: Catalog = {
   'translate.outputPlaceholder': 'Перевод появится здесь.',
   'translate.working': 'Работаю…',
   'translate.askAgent': 'Спросить Агента',
+  'translate.askAgent.needsText': 'Введите, вставьте или выделите текст, чтобы спросить Агента о нём.',
+  'translate.run.needsText': 'Сначала введите или вставьте текст для перевода.',
   'translate.askAgent.selection': 'Спросить Агента о выделенном',
   'translate.menu.file': 'Файл',
   'translate.menu.clear': 'Очистить текст',

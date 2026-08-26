@@ -3648,6 +3648,8 @@ export const ja: Catalog = {
   'translate.outputPlaceholder': '翻訳結果がここに表示されます。',
   'translate.working': '処理中…',
   'translate.askAgent': 'エージェントに聞く',
+  'translate.askAgent.needsText': 'エージェントに聞くには、テキストを入力・貼り付け・選択してください。',
+  'translate.run.needsText': 'まず翻訳するテキストを入力または貼り付けてください。',
   'translate.askAgent.selection': '選択範囲についてエージェントに聞く',
   'translate.menu.file': 'ファイル',
   'translate.menu.clear': 'テキストをクリア',

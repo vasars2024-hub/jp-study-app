@@ -3864,6 +3864,8 @@ export const en: Catalog = {
   'translate.outputPlaceholder': 'Translation appears here.',
   'translate.working': 'Working…',
   'translate.askAgent': 'Ask the Agent',
+  'translate.askAgent.needsText': 'Type, paste or select some text to ask the Agent about it.',
+  'translate.run.needsText': 'Type or paste text to translate first.',
   'translate.askAgent.selection': 'Ask the Agent about the selection',
   'translate.menu.file': 'File',
   'translate.menu.clear': 'Clear text',

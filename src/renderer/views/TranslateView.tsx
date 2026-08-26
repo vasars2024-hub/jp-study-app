@@ -61,6 +61,11 @@ function TranslateAskAgent({
       type="button"
       className={className}
       disabled={!span}
+      // Disabled is honest only when the surface says what would enable it. Without this the
+      // control is a mute pair: nothing on screen explains why it cannot be pressed, because its
+      // only neighbour is a button labelled "Translate". Same shape as the Grammar filter's
+      // "Give the filter a name first." Not set when enabled, where it would just be noise.
+      title={span ? undefined : t('translate.askAgent.needsText')}
       onClick={() => {
         void handOffToAgent(
           translateSpanAgentContext(span, source),
@@ -224,7 +229,12 @@ export default function TranslateView() {
                   </select>
                 </label>
                 <ToolbarSpacer />
-                <button className="aero-translate-run" onClick={() => void run()} disabled={busy || !input.trim()}>
+                <button
+                  className="aero-translate-run"
+                  onClick={() => void run()}
+                  disabled={busy || !input.trim()}
+                  title={!busy && !input.trim() ? t('translate.run.needsText') : undefined}
+                >
                   {busy ? 'Working...' : 'Translate'}
                 </button>
                 <TranslateAskAgent
@@ -384,7 +394,14 @@ export default function TranslateView() {
             </div>
 
             <div className="tr-actions">
-              <button className="btn primary" onClick={() => void run()} disabled={busy || !input.trim()}>
+              <button
+                className="btn primary"
+                onClick={() => void run()}
+                disabled={busy || !input.trim()}
+                // `busy` already announces itself — the label becomes "Working…" and `.tr-status`
+                // renders below — so only the empty-input case needs naming.
+                title={!busy && !input.trim() ? t('translate.run.needsText') : undefined}
+              >
                 {busy ? (
                   t('translate.working')
                 ) : (

@@ -581,3 +581,42 @@ left two caps unexamined and neither is the Aero/dictionary defect shape:
 - `CommandPalette.tsx:243` `scored.slice(0, 40)` caps a **relevance-sorted fuzzy** list that
   renders no count at all and has an honest empty state (`palette.noMatches:302`). Item 41 is by
   construction a worse match than item 40.
+
+### Same turn — a nine-surface sweep of the three bars that need no drive, and one real mute pair
+
+`rawKeys`, `placeholders` and `mutePairs` are measurable at rest, so all nine open windows were
+swept in one pass. **Raw keys 0 and placeholders 0 on every one of the nine** — those two bars are
+genuinely clean across the app. Mute pairs were not:
+
+| surface | textRuns | mutePairs / disabled | the control |
+| --- | --- | --- | --- |
+| Media | 40 | **2** / 2 | two unlabelled icon buttons |
+| Video | 85 | **2** / 5 | two unlabelled icon buttons |
+| Dictionary | 13 | **1** / 1 | `button.btn "Search"` |
+| Translate | 20 | **1** / 2 | `button.btn "Ask the Agent"` — **FIXED** |
+| Agent | 118 | **1** / 2 | `button.agent-action "Create action plan"` |
+| Settings 0/0 · Grammar 0/4 · Scraper 0/6 · Immersion 0/2 | | | |
+
+**Translate fixed, following the app's own precedent.** `GrammarContent`'s filter Save already
+carries `title="Give the filter a name first."` — that is the local pattern, so
+`TranslateView.tsx` now sets a `title` on both disabled controls naming what would enable them,
+in all four languages. `busy` is deliberately NOT given a reason: the label already becomes
+"Working…" and `.tr-status` renders below, so only the silent case is named. Re-measured live:
+`disabled: 2` unchanged, **`mutePairCount` 1 → 0**, titles read back off the live DOM. Control
+`[0,0,0]` → `[1,1,1]` → `[0,0,0]`. Commit `<HASH3>`.
+
+**A harness weakness this sweep exposed, and it is NOT repaired this turn — next worker's one
+repair.** The mute detector accepts the text of a SIBLING BUTTON as an explanation, because its
+rule is `parentElement.textContent` minus the control's own text. Scraper's six disabled buttons
+score 0 purely because they sit in one row with labels like "Send selected to Seanime"; Translate
+scored 1 only because its neighbour is the short word "Translate". That is close to arbitrary.
+The repair is to subtract the text of sibling interactive elements before measuring. **Expect
+Scraper 0→6 and Grammar 0→3 when it lands** — do not read those as regressions.
+
+**Two findings left open, named so they are not lost.** (1) `AgentWorkspaceShell.tsx:2695` disables
+"Create action plan" on **six** ORed conditions (`busy`, `planning`, `attachmentReading`,
+`attachments.length > 0`, empty draft, `planObjectiveTooLong`), so an honest title has to name
+*which* one is active — a reason function, not a constant, which is why it is not folded into this
+slice. (2) `TranslateView.tsx`'s Aero toolbar renders the raw literals `'Working...'`, `'Translate'`
+and `'To'` in JSX, against the repo's own i18n policy; a raw-key sweep cannot see them because they
+are real English words.
