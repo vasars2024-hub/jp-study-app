@@ -2,7 +2,7 @@
   "surface": "Library",
   "label": "l6-library",
   "control": false,
-  "at": "2026-08-26T22:36:45.277Z",
+  "at": "2026-08-26T22:37:43.714Z",
   "category": 5,
   "question": "UI clarity and user-friendliness — the ten §10.4 questions, scored",
   "hostClass": "fwin",
@@ -33,6 +33,13 @@
   "storeBefore": {
     "jp-os-theme": "forest-night",
     "jp-os-theme-engine-v": "1"
+  },
+  "q6leg": {
+    "presentationAsFound": "standard",
+    "toggle": "clicked",
+    "reached": "liquid",
+    "measuredIn": "liquid",
+    "restoredTo": "standard"
   },
   "storeAfter": {
     "jp-os-theme": "forest-night",
@@ -169,18 +176,29 @@
     {
       "id": 6,
       "q": "Liquid motion explains a real relationship",
-      "verdict": "NO-SUBJECT",
       "bar": "every Liquid-treated region carries a state-change transition and none loops forever",
+      "verdict": "YES",
       "numbers": {
-        "liquidRegions": 0,
+        "measuredIn": "liquid",
+        "leg": {
+          "presentationAsFound": "standard",
+          "toggle": "clicked",
+          "reached": "liquid",
+          "measuredIn": "liquid",
+          "restoredTo": "standard"
+        },
+        "liquidRegions": 1,
         "byBackdropFilter": 0,
-        "byContextualPaint": 0,
-        "carryingATransition": 0,
+        "byContextualPaint": 1,
+        "carryingATransition": 1,
         "infiniteAnimationsOnLiquid": 0,
-        "liquidMaterialTotal": 0,
+        "liquidMaterialTotal": 1,
         "decoratedLeaves": [],
-        "regionList": [],
-        "withoutTransition": []
+        "regionList": [
+          "header.lq-contextual"
+        ],
+        "withoutTransition": [],
+        "inStandardPresentation": 0
       }
     },
     {
@@ -328,9 +346,7 @@
   "findings": [
     "Q4 advanced tools discoverable without cluttering"
   ],
-  "voided": [
-    "Q6 is NO-SUBJECT — the surface has no subject for this question"
-  ],
-  "score": "VOID",
-  "verdict": "VOID"
+  "voided": [],
+  "score": 9,
+  "verdict": "9/10 — 1 question(s) answer NO"
 }

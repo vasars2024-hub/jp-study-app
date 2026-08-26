@@ -633,6 +633,59 @@ function scoreSnapshot(s) {
     out.planted = planted;
   }
 
+  /**
+   * Q6 IS A QUESTION ABOUT LIQUID, SO IT HAS TO BE ASKED IN LIQUID. Library's first scored run
+   * read `liquidRegions: 0` and Q6 `NO-SUBJECT`, which was true and useless: the window was in
+   * STANDARD presentation, where by design there is no Liquid material to explain anything.
+   * Scoring the question there measures whether the surface is currently opted in, not whether
+   * its motion explains a relationship. So the run opts in, snapshots, and opts back out — and
+   * READS THE PRESENTATION BACK both times, because a toggle is a flip, not a set, and a flip
+   * that did not land would score the wrong presentation twice.
+   *
+   * A surface with no presentation control keeps `NO-SUBJECT`, which stays the honest answer
+   * for it: there is no Liquid mode on that surface to ask about.
+   */
+  const LIQUID_BTN = { fwin: '.fwin-b-liquid', popout: '.popout-btn-liquid', reader: '.reader-btn-liquid' };
+  const presRead = () => ev(`(function(){ var r = ${ROOT_EXPR}; return r ? String(r.getAttribute('data-presentation')) : 'no-root'; })()`);
+  const presToggle = () => ev(`(function(){
+    var r = ${ROOT_EXPR};
+    if (!r) return 'no-root';
+    var b = r.querySelector(${A(Object.values(LIQUID_BTN).join(','))});
+    if (!b) return 'no-control';
+    b.click();
+    return 'clicked';
+  })()`);
+
+  step('Q6: opt in to Liquid');
+  const presBefore = await presRead();
+  let q6cell = null;
+  const q6leg = { presentationAsFound: presBefore };
+  if (presBefore === 'liquid') {
+    q6leg.note = 'surface was already in Liquid presentation; measured where it was found';
+  } else {
+    const clicked = await presToggle();
+    q6leg.toggle = clicked;
+    if (clicked === 'clicked') {
+      await sleep(900);
+      const now = await presRead();
+      q6leg.reached = now;
+      if (now !== 'liquid') q6leg.refused = `toggle did not reach liquid; surface reads ${now}`;
+    } else {
+      q6leg.refused = clicked === 'no-control' ? 'surface has no Liquid presentation control' : clicked;
+    }
+  }
+  if (!q6leg.refused) {
+    const c = await evj(SNAP);
+    if (!c.refuse) { q6cell = c; q6leg.measuredIn = c.presentation; }
+  }
+  if (presBefore !== 'liquid' && !q6leg.refused) {
+    await presToggle();
+    await sleep(900);
+    q6leg.restoredTo = await presRead();
+    if (q6leg.restoredTo !== presBefore) q6leg.restoreWarning = `presentation left as ${q6leg.restoredTo}, found ${presBefore}`;
+  }
+  out.q6leg = q6leg;
+
   const cells = [];
   for (const theme of [BASE_THEME, SECOND_THEME]) {
     step(`cell theme=${theme}`);
@@ -683,7 +736,11 @@ function scoreSnapshot(s) {
     { id: 3, q: 'primary actions visible without hunting', verdict: live.q3, bar: BARS.q3, numbers: A_CELL.q3 },
     { id: 4, q: 'advanced tools discoverable without cluttering', verdict: live.q4, bar: BARS.q4, numbers: A_CELL.q4 },
     { id: 5, q: 'every readable surface has stable contrast', verdict: q5.verdict, bar: BARS.q5, numbers: q5 },
-    { id: 6, q: 'Liquid motion explains a real relationship', verdict: live.q6, bar: BARS.q6, numbers: A_CELL.q6 },
+    { id: 6, q: 'Liquid motion explains a real relationship', bar: BARS.q6,
+      verdict: q6cell ? scoreSnapshot(q6cell).q6 : (q6leg.refused ? 'NO-SUBJECT' : live.q6),
+      numbers: { measuredIn: q6cell ? q6cell.presentation : null, leg: q6leg,
+        ...(q6cell ? q6cell.q6 : A_CELL.q6),
+        inStandardPresentation: A_CELL.q6.liquidRegions } },
     { id: 7, q: 'standard mode remains fully normal', bar: BARS.q7,
       verdict: fromC6('parity', c6 && c6.parity && c6.parity.equal && (c6.parity.failing || []).length === 0),
       numbers: { drivenBy: 'probes/cat6-feature-parity.cjs', parity: c6 && c6.parity } },
@@ -715,8 +772,12 @@ function scoreSnapshot(s) {
   }
   if (out.storeIdentical === false) voided.push('persisted theme state was NOT restored byte-identical');
   if (out.restoreWarning) voided.push(out.restoreWarning);
-  // A surface whose §10.4 answers differ between themes has not answered them stably.
-  const drift = Object.keys(live).filter((k) => live[k] !== liveAlt[k]);
+  if (q6leg.restoreWarning) voided.push(q6leg.restoreWarning);
+  // A surface whose §10.4 answers differ between themes has not answered them stably. Q6 is
+  // excluded: both theme cells are taken in the presentation the surface was FOUND in, and Q6
+  // is scored from its own Liquid leg, so comparing the two cells' q6 compares two readings of
+  // a question neither of them answers.
+  const drift = Object.keys(live).filter((k) => k !== 'q6' && live[k] !== liveAlt[k]);
   if (drift.length) voided.push(`verdicts drift with the theme (${drift.join(', ')}); a §10.4 answer that depends on the palette is not an answer`);
 
   if (CONTROL) {
