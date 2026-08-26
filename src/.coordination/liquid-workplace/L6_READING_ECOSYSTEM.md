@@ -675,3 +675,52 @@ mining + source + deep-link (here). Route parity, document survival 6/6 and tool
 6/6 were already swept mechanically. Suites: `readingCapturesCanvas` **8/8** (was 6), neighbours
 36/36. Full `npx vitest run` **1 failed / 11,397 passed / 836 files** — the one red is the foreign
 `architectureBaseline` ← `externalSubtitleMount.ts`, identical to the previous turn's baseline.
+
+## 2026-08-25 (later 17) — L6's Gate, scored by RUNNING the category-4 harness. Three defects.
+
+The turn opened on an interrupted worker's uncommitted 77-line `readingCanvas` block inside
+`probes/l1-use-of-space.js` — a RUN-shaped extension, not a new probe. It was finished, run, and
+found three things no jsdom assertion on any of the six surfaces could see.
+
+**The split that decides the number, because the raw one lies.** First run: 8 focusable "leaks" in
+Reading Finder, 16 in Immersion, which reads like wholesale focus-containment failure. Measured by
+rect, **0 of Reading Finder's 8 were painted over the document** — all eight are the window's own
+workspace tab strip, above the canvas, and a canvas-scoped sheet does not claim the window's
+navigation any more than its title bar. Exactly **1 of Immersion's 16** was real. So the harness now
+reports `overDocument` (the gate number, must be 0) and `elsewhereInWindow` (context, not a defect),
+and the leak filter is keyed on the sheet ELEMENT, never on `[aria-modal]` — keying an instrument on
+the claim it exists to check makes it agree with whatever the markup asserts.
+
+**Defect 1 — `89279302`.** `.visual-novel-open`, `position: absolute; z-index: 4` on
+`.immersion-root` and a SIBLING of the canvas. Sheet, canvas 342: button 409,240 136x26 inside a
+sheet of 215,238 342x469, on its header, `elementFromPoint` at the button's centre returning the
+button over an `inert` document. Docked, canvas 550 — **the default state, and worse**: button
+849,240 136x26 over a rail of 777,238 220x469, covering 32x19 of the rail's close control (952,247
+32x32); `elementFromPoint` at that control's own centre returned `button.btn`. **The rail's × was
+dead.** Hiding it under a sheet was written first and was half a fix; it moved into the toolbar row
+via a new additive `trailing` slot instead. After: `hitIsClose` true, `btnOverRail` height −10.
+
+**Defect 2 — `c8db7642`.** `.immersion-toolbar` is nowrap with `overflow-x: visible`: `scrollWidth`
+588 in `clientWidth` 342 at the 380px Blanc allows — **246px of overflow, 7 of 14 children entirely
+past the right edge**, including `.immersion-sites-toggle`, the trigger for the tool this gate is
+about. The url form was hiding it: at `flex: 1; min-width: 0` it collapses to width 0, the row still
+does not fit, and the shortfall lands on everything after it. `flex-wrap: wrap` + a 160px form floor.
+After: overflow 0, past-edge 0, `clipped` **21 → 0**; one row at 820 (782x44), three at 380 (342x109).
+
+**Defect 3 — `16c306fd`.** The sheet claimed `aria-modal="true"` while 8/15 focusables stayed
+Tab-reachable outside it. A screen reader honours the claim and hides them; the keyboard does not.
+Containment was rejected because the same tool is a DOCK at a wider canvas — a keyboard model that
+changes with window width is its own defect — so the claim goes: `aria-modal="false"`, explicit,
+`TourOverlay` precedent. The document stays `inert` + `aria-hidden`, which was the true part.
+
+**RULE 1, and why there is no new sweep for defect 2.** A nowrap control row is NOT decidable from
+CSS: whether it overflows depends on how many children the TSX renders. A source predicate broad
+enough to catch `.immersion-toolbar` flags **29 rules** across `src/renderer`, mostly two-button
+action pairs that must never wrap. So this half of category 4 is scored by the live harness (already
+surface-parameterised) and `gridTrackFloorsFitTheWindow.test.ts` keeps named latches. Recorded there
+so it is not re-derived. Turn total: 0 new probe files, 0 new harnesses, 0 new test files.
+
+**Gate status: still OPEN.** Only Immersion has been run. Category 4 at 380 after the fixes —
+`clipped` 0, `hiddenOverflowX` 0, `horizontalScrollers` 0, dead region 6.1% of window,
+`overDocument` 0, `covered` true, `docInert` true. The other five surfaces have not been run and
+the eight rubric categories have not been scored, so no 80/80 is claimed for anything.
