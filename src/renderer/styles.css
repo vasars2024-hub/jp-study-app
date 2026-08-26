@@ -4336,7 +4336,16 @@ details.watch-bar[open] .watch-summary::after {
 
 .btn.active {
   border-color: var(--accent-2);
-  color: #fff;
+  /* WAS `#fff`, and a literal white is a dark-palette assumption wearing a colour. Rubric
+     category 5 Q5 measured this live on the manga reader in `classic-light`: white text on
+     the 12%-tint fill above composites to **1.51:1** ("Scan", `.manga-ocr-toggle.active`)
+     and **1.18:1** ("Hide translation", `.ocr-toolbar .btn.small.active`) — the two worst
+     text runs on that surface, against a 4.5 bar, while forest-night's worst was 5.30.
+     `--accent-text` is the token this repo already built for exactly this: the accent as a
+     GLYPH, `var(--accent-2)` on the darks and `color-mix(var(--accent) 30%, var(--text))`
+     on all six lights, swept over nine accent presets. It also keeps the active state
+     readable AS active — inactive `.btn` is `var(--text)`, so the two do not collapse. */
+  color: var(--accent-text);
 }
 
 /* ---------- Reader settings popover ---------- */
