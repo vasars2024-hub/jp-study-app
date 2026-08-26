@@ -10,6 +10,13 @@ import { formatBytes } from '../../shared/assetRegistry';
 import DictionaryPopup from '../components/DictionaryPopup';
 import SentenceTranslatePopup from '../components/SentenceTranslatePopup';
 import MangaOcrOverlay from '../components/MangaOcrOverlay';
+import {
+  mangaTranslateAheadReason,
+  mangaTranslatePageReason,
+  mangaTranslateRangeReason,
+  mangaTranslateTargetReason,
+  type MangaTranslateState,
+} from '../../shared/mangaTranslateReason';
 import MangaHandwritingPopup from '../components/MangaHandwritingPopup';
 import MangaViewModeSwitcher, {
   loadMangaViewMode,
@@ -761,6 +768,21 @@ export default function MangaReader({ item, onClose }: Props) {
 
   /** Manga has no native chapter map — treat chapters as equal page buckets (~20 pages). */
   const mangaChapterCount = Math.max(1, Math.ceil(pages.length / 20) || 1);
+  // Category 8: `disabled` on every translate control is DERIVED from its reason, never
+  // asserted beside it, so a control that is grey with nothing saying why cannot be written
+  // into this panel by accident. Seven of them were, and six shared one invisible cause.
+  const translateState: MangaTranslateState = {
+    volumeBusy,
+    translating,
+    engineReady,
+    ocrScanning: ocrStatus === 'scanning',
+    hasOcrPage: !!mokuroPage,
+    atLastPage: idx >= pages.length - 1,
+  };
+  const translateRangeWhy = mangaTranslateRangeReason(translateState);
+  const translateAheadWhy = mangaTranslateAheadReason(translateState);
+  const translateTargetWhy = mangaTranslateTargetReason(translateState);
+  const translatePageWhy = mangaTranslatePageReason(translateState);
   const translateChapterRange = useCallback(async () => {
     if (!pages.length) return;
     const fromCh = Math.min(mangaChapterCount, Math.max(1, chapterRangeFrom));
@@ -1448,7 +1470,8 @@ export default function MangaReader({ item, onClose }: Props) {
                   <span>{t('manga.translate.target')}</span>
                   <select
                     value={targetLang}
-                    disabled={volumeBusy || translating}
+                    disabled={!!translateTargetWhy}
+                    title={translateTargetWhy ? t(translateTargetWhy) : undefined}
                     onChange={(e) => setTranslateTarget(e.target.value)}
                     aria-label={t('manga.translate.target')}
                   >
@@ -1461,7 +1484,8 @@ export default function MangaReader({ item, onClose }: Props) {
                 </label>
                 <button
                   className="btn small"
-                  disabled={ocrStatus === 'scanning' || !mokuroPage || translating || volumeBusy}
+                  disabled={!!translatePageWhy}
+                  title={translatePageWhy ? t(translatePageWhy) : undefined}
                   onClick={() => void translatePage()}
                 >
                   {translating
@@ -1499,13 +1523,8 @@ export default function MangaReader({ item, onClose }: Props) {
                   <div className="manga-translate-range-actions">
                     <button
                       className="btn small"
-                      disabled={
-                        volumeBusy ||
-                        translating ||
-                        !engineReady ||
-                        idx >= pages.length - 1
-                      }
-                      title={t('manga.translate.ahead.hint')}
+                      disabled={!!translateAheadWhy}
+                      title={translateAheadWhy ? t(translateAheadWhy) : t('manga.translate.ahead.hint')}
                       onClick={() => void translateAheadPages()}
                     >
                       {t('manga.translate.ahead')}
@@ -1521,7 +1540,8 @@ export default function MangaReader({ item, onClose }: Props) {
                         min={1}
                         max={mangaChapterCount}
                         value={chapterRangeFrom}
-                        disabled={volumeBusy || translating || !engineReady}
+                        disabled={!!translateRangeWhy}
+                        title={translateRangeWhy ? t(translateRangeWhy) : undefined}
                         onChange={(e) => setChapterRangeFrom(Number(e.target.value) || 1)}
                         aria-label={t('manga.translate.rangeFrom')}
                       />
@@ -1531,13 +1551,15 @@ export default function MangaReader({ item, onClose }: Props) {
                         min={1}
                         max={mangaChapterCount}
                         value={chapterRangeTo}
-                        disabled={volumeBusy || translating || !engineReady}
+                        disabled={!!translateRangeWhy}
+                        title={translateRangeWhy ? t(translateRangeWhy) : undefined}
                         onChange={(e) => setChapterRangeTo(Number(e.target.value) || 1)}
                         aria-label={t('manga.translate.rangeTo')}
                       />
                       <button
                         className="btn small"
-                        disabled={volumeBusy || translating || !engineReady}
+                        disabled={!!translateRangeWhy}
+                        title={translateRangeWhy ? t(translateRangeWhy) : undefined}
                         onClick={() => void translateChapterRange()}
                       >
                         {t('manga.translate.runRange')}
@@ -1557,7 +1579,8 @@ export default function MangaReader({ item, onClose }: Props) {
                         min={1}
                         max={Math.max(1, pages.length)}
                         value={pageRangeFrom}
-                        disabled={volumeBusy || translating || !engineReady}
+                        disabled={!!translateRangeWhy}
+                        title={translateRangeWhy ? t(translateRangeWhy) : undefined}
                         onChange={(e) => setPageRangeFrom(Number(e.target.value) || 1)}
                         aria-label={t('manga.translate.rangeFrom')}
                       />
@@ -1567,13 +1590,15 @@ export default function MangaReader({ item, onClose }: Props) {
                         min={1}
                         max={Math.max(1, pages.length)}
                         value={pageRangeTo}
-                        disabled={volumeBusy || translating || !engineReady}
+                        disabled={!!translateRangeWhy}
+                        title={translateRangeWhy ? t(translateRangeWhy) : undefined}
                         onChange={(e) => setPageRangeTo(Number(e.target.value) || 1)}
                         aria-label={t('manga.translate.rangeTo')}
                       />
                       <button
                         className="btn small"
-                        disabled={volumeBusy || translating || !engineReady}
+                        disabled={!!translateRangeWhy}
+                        title={translateRangeWhy ? t(translateRangeWhy) : undefined}
                         onClick={() => void translatePageRange()}
                       >
                         {t('manga.translate.runRange')}
@@ -1684,8 +1709,12 @@ export default function MangaReader({ item, onClose }: Props) {
               </span>
             </div>
           )}
+          {/* `role`/`aria-busy` are what say this IS the running state. Without them the bar is
+              a decorated div: a whole-volume analysis is under way and nothing in the DOM
+              reports it, so a screen reader announces no progress at all and the category-8
+              state sweep reads the reader as a surface with no loading state. */}
           {volumeBusy && volumeProgress && (
-            <div className="ocr-progress">
+            <div className="ocr-progress" role="status" aria-busy>
               <div className="ocr-bar">
                 <div
                   className="ocr-bar-fill"
@@ -1708,8 +1737,10 @@ export default function MangaReader({ item, onClose }: Props) {
               </span>
             </div>
           )}
+          {/* `muted` is presentation; `ocr-error` and `role` are what say this IS the error
+              state. It read as ordinary dimmed prose to everything that looks for one. */}
           {(ocrStatus === 'error' || (volumeProgress?.phase === 'error' && volumeProgress.message)) && (
-            <div className="ocr-msg muted">{ocrError || volumeProgress?.message}</div>
+            <div className="ocr-msg muted ocr-error" role="alert">{ocrError || volumeProgress?.message}</div>
           )}
           {engineReady && drawRegionMode && (
             <p className="ocr-hint muted">{t('manga.ocr.drawRegionHint')}</p>

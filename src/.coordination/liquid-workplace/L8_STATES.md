@@ -845,3 +845,55 @@ as HEAD+edit blobs through `debug/stage-head-edit.cjs`. The community panel's HE
 nothing duplicated. And `p.querySelectorAll('input[type=text]')` matches nothing here: the
 attribute is absent and `e.type` reports the IDL default, so a probe that reads `type` and then
 selects on it finds three inputs and drives none.
+
+## 2026-08-26 · primary — the manga reader closes category 8 at **6 of 6**, and its running state was a decorated div
+
+`node …/probes/cat8-honest-states.cjs --surface "@.reader" --label manga --control`. Not
+`@.manga-canvas`: that is category 4's region and holds 20 of the reader's 34 controls, so a
+partial root reads exactly like a clean surface (`L1_ACCESSIBILITY.md`, finding 1).
+
+| bar | before | after |
+| --- | --- | --- |
+| rawKeys | 0 | 0 |
+| placeholders | 0 | 0 |
+| mutePairs | **7** | **0** |
+| statesNamed | UNMEASURED (0 of 0 observable) | **1 of 1 observable** — `loading`, "Translate 10/17" |
+
+Control `0,0,0 → 1,1,1 → 0,0,0`, `backToBaseline: true`. 11 disabled controls at measurement
+time. Evidence in `baselines/cat8-l6-manga.json`.
+
+**All seven mute pairs were one panel, and six shared one invisible cause.** The `Translate to`
+select plus both range rows — `From`, `To`, `Translate`, twice — all `title: null`. Six were
+`volumeBusy || translating || !engineReady`, and `!engineReady` means the manga OCR engine is not
+installed. Nothing in the panel mentions an engine, so the row reads as broken rather than as
+not-yet-installed. Rules in `shared/mangaTranslateReason.ts`.
+
+**Two rules deliberately do NOT read `engineReady`,** and that is a decision rather than an
+omission. The target language is a setting: it stays usable while the engine is missing so the
+choice is already made when the engine lands. The single-page button's structural condition is
+THIS page's text (`!mokuroPage`), not the installer — a page that already carries OCR text stays
+translatable.
+
+**The state finding, which is the second instance of one pattern.** The reader's running state
+renders as `<div className="ocr-progress">` and its failure as `<div className="ocr-msg muted">`.
+Both are presentation only: a whole-volume analysis was under way and NOTHING in the DOM said so,
+so a screen reader announced no progress and the sweep read the reader as a surface with no
+loading state and no error state. Now `role="status" aria-busy` and `ocr-error` + `role="alert"`.
+Same defect the VN panel had one entry above (`muted` doing an empty state's job). **Two surfaces
+in one turn**: expect it on the rest and grep `className="muted"` next to a conditional render.
+
+**How this was measured, stated exactly, because the easy moment was available.** Six of the
+seven controls are only disabled while a run is in flight or the engine is absent. On this
+profile the engine IS installed, so the run was STARTED (`Analyze all`) and the probe taken while
+it was live — 11 disabled controls, all explained. Probing at rest would have measured an enabled
+row and recorded a 0 nobody earned.
+
+**Trap for the next worker: `--drive-click` on `Analyze all` VOIDs on the restore.** It is a real
+toggle (`Analyze all` ⇄ `Cancel analyze`) and the driven pass is correct — `loading` host 1 — but
+the panel does not return to its base text hash within the harness's settle, so the leg voids.
+Passive observation of a genuinely live run is the honest route here, as it was for Video.
+
+**Also worth ninety seconds next time:** the Library card's `.card-cover-btn` opens a cover
+picker, not the item — click the `.card` itself. And the `Manga 3` chip resets on HMR, so `.card`
+silently becomes an EPUB; the EPUB reader also matches `.reader` and has an entirely different
+control set. Check `.manga-canvas` is present before believing you are on the manga reader.
