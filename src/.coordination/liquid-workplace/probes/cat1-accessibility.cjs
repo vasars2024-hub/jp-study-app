@@ -602,13 +602,19 @@ async function motionLeg() {
       wcag258: dirty.targets.wcag258FailCount > base.targets.wcag258FailCount,
       keyboard: dirty.keyboard.unreachableCount > base.keyboard.unreachableCount,
     };
+    // The restore is asserted on the counts that are SCORED. The rect under-32 count is
+    // reported but not asserted: a live surface's control set moves under the probe — a
+    // VirtualList mounts and unmounts rows between passes — and Immersion's rect count read 40
+    // then 39 with nothing injected. Voiding a correct 10/10 on that drift would be the
+    // opposite failure to the one this control exists to catch, so the drift is printed.
     const backToBaseline = restored.text.failingCount === base.text.failingCount
-      && restored.targets.under32Count === base.targets.under32Count
       && restored.targets.wcag258FailCount === base.targets.wcag258FailCount
       && restored.keyboard.unreachableCount === base.keyboard.unreachableCount;
+    const rectDrift = restored.targets.under32Count - base.targets.under32Count;
     out.control = {
       moved,
       backToBaseline,
+      rectDrift,
       // [contrast failures, rect under32, wcag2.5.8 failures, unreachable, belowFloorByHit]
       counts: {
         base: [base.text.failingCount, base.targets.under32Count, base.targets.wcag258FailCount, base.keyboard.unreachableCount, base.hit.belowFloorByHit],
