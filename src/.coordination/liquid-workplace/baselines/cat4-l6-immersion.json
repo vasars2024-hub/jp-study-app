@@ -1,0 +1,167 @@
+{
+  "label": "l6-immersion",
+  "surface": "Immersion",
+  "win": "main",
+  "rootKind": "floating window",
+  "viewport": "1264x821",
+  "sizes": [
+    {
+      "kind": "default",
+      "box": "820x580",
+      "clipped": 0,
+      "overlaps": 0,
+      "horizontalScrollers": 0,
+      "hiddenOverflowX": 0,
+      "deadPctViewport": 2.9,
+      "chromePct": 27.3,
+      "dominantCanvasPct": 47.1,
+      "bars": {
+        "clipped": true,
+        "overlaps": true,
+        "horizontal": true,
+        "deadRegion": true
+      },
+      "restored": true
+    },
+    {
+      "kind": "compact",
+      "box": "260x170",
+      "clipped": 1,
+      "overlaps": 0,
+      "horizontalScrollers": 1,
+      "hiddenOverflowX": 1,
+      "deadPctViewport": 0.6,
+      "chromePct": 20.2,
+      "dominantCanvasPct": 11.6,
+      "bars": {
+        "clipped": false,
+        "overlaps": true,
+        "horizontal": false,
+        "deadRegion": true
+      },
+      "restored": true
+    },
+    {
+      "kind": "maximized",
+      "box": "1264x765",
+      "clipped": 0,
+      "overlaps": 0,
+      "horizontalScrollers": 0,
+      "hiddenOverflowX": 0,
+      "deadPctViewport": 7,
+      "chromePct": 19.2,
+      "dominantCanvasPct": 61.5,
+      "bars": {
+        "clipped": true,
+        "overlaps": true,
+        "horizontal": true,
+        "deadRegion": true
+      },
+      "restored": true
+    }
+  ],
+  "refusedLegs": [],
+  "detail": [
+    {
+      "kind": "default",
+      "sizeMechanism": "as found",
+      "requested": null,
+      "achieved": null,
+      "clampedByOsMinimum": null,
+      "restoredFrom": null,
+      "restoredTo": null,
+      "clippedList": [],
+      "overlapList": [],
+      "horizontalScrollerList": [],
+      "hiddenOverflowXList": [],
+      "deadRegionBox": "61x491 at grid 25,4",
+      "chromeParts": [
+        "div.fwin-bar",
+        "aside.lq-reading-tool"
+      ]
+    },
+    {
+      "kind": "compact",
+      "sizeMechanism": "inline style.width/height on the .fwin (synchronous, so measure-and-restore is safe)",
+      "requested": "260x170",
+      "achieved": null,
+      "clampedByOsMinimum": null,
+      "restoredFrom": "left: 196px; top: 144px; width: 820px; height: 580px; z-index: 576;",
+      "restoredTo": "left: 196px; top: 144px; width: 820px; height: 580px; z-index: 576;",
+      "clippedList": [
+        "div.immersion-reader"
+      ],
+      "overlapList": [],
+      "horizontalScrollerList": [
+        "div.immersion-reader 97>54"
+      ],
+      "hiddenOverflowXList": [
+        "div.immersion-stage 284>178"
+      ],
+      "deadRegionBox": "116x54 at grid 10,24",
+      "chromeParts": [
+        "div.fwin-bar",
+        "aside.lq-reading-sheet"
+      ]
+    },
+    {
+      "kind": "maximized",
+      "sizeMechanism": "the product's own .fwin-b[title=\"Maximize\"] (never an inline width: .fwin-max changes the applied CSS)",
+      "requested": null,
+      "achieved": null,
+      "clampedByOsMinimum": null,
+      "restoredFrom": "left: 196px; top: 144px; width: 820px; height: 580px; z-index: 576;",
+      "restoredTo": "left: 196px; top: 144px; width: 820px; height: 580px; z-index: 580;",
+      "clippedList": [],
+      "overlapList": [],
+      "horizontalScrollerList": [],
+      "hiddenOverflowXList": [],
+      "deadRegionBox": "284x256 at grid 23,23",
+      "chromeParts": [
+        "div.fwin-bar",
+        "aside.lq-reading-tool"
+      ]
+    }
+  ],
+  "bars": {
+    "clipped": false,
+    "overlaps": true,
+    "horizontal": false,
+    "deadRegion": true,
+    "contentGrowsNotChrome": true,
+    "allThreeSizes": true,
+    "restored": true
+  },
+  "verdict": "FAIL",
+  "failedBars": [
+    "clipped",
+    "horizontal"
+  ],
+  "unmeasuredBars": [],
+  "visibleAtEveryRead": true,
+  "notMeasuredHere": [
+    "contrast and focus order (rubric category 1 harness)",
+    "input cost and dead ends (rubric category 2 harness)"
+  ],
+  "control": {
+    "injectedClip": {
+      "moved": true,
+      "backToBaseline": true,
+      "clipped": {
+        "base": 0,
+        "dirty": 1,
+        "restored": 0
+      },
+      "removalProven": true
+    },
+    "subMinimumShrink": {
+      "requested": "200x140",
+      "box": "200x140",
+      "clipped": 1,
+      "overlaps": 0,
+      "horizontalScrollers": 1,
+      "hiddenOverflowX": 2,
+      "restored": true
+    }
+  }
+}

@@ -81,6 +81,14 @@
  *     `img` in the tree, so 24 cards of 180x240 cover art counted as DEAD SPACE and the surface
  *     read 15.9 pct against a bar of 15. A `url()` is marked; a bare gradient is not, or every
  *     themed panel would mark itself covered and the detector could never find real dead space.
+ * 13. A SINGLE-LINE TEXT FIELD IS NOT A LAYOUT OVERFLOW. An `input` or `textarea` whose value is
+ *     longer than its box always reports `scrollWidth > clientWidth`; that is native caret
+ *     scrolling. Immersion's `input.immersion-url` read 210>184 at the window's own default size
+ *     and failed the horizontal bar, as every text field in the app with a long value would.
+ * 12. AN OPAQUE CONTENT HOST paints pixels this pass cannot walk. `iframe`, `webview`, `object`
+ *     and `embed` render another document, often in another process. Immersion's stage is a
+ *     950x619 `webview.immersion-webview` showing a live page; without it in the occupancy list
+ *     every one of those pixels counted as dead space. Correction 10 in a second shape.
  * 11. A `position: fixed` CONTROL IS NOT PLACED IN THE VIEWPORT when the host uses containment.
  *     Every `.fwin` carries `contain: content`, which includes `contain: layout` and makes the
  *     WINDOW the containing block for fixed descendants. The clip box written at viewport
@@ -270,11 +278,19 @@ const READ = (surface) => `(function(){
     }
   }
 
+  // CORRECTION 13. A SINGLE-LINE TEXT FIELD IS NOT A LAYOUT OVERFLOW. An input or textarea whose
+  // VALUE is longer than its box always reports scrollWidth > clientWidth - that is native caret
+  // scrolling, not content pushed out of a container. Immersion's address bar read
+  // input.immersion-url 210>184 at the window's own default size and failed the horizontal bar,
+  // and every text field in the app with a long value would have done the same.
+  var nativeTextScroller = function(e){ return e.matches('input,textarea'); };
   var scrollers = all.filter(function(e){
+    if (nativeTextScroller(e)) return false;
     var cs = getComputedStyle(e);
     return /(auto|scroll)/.test(cs.overflowX) && e.scrollWidth > e.clientWidth + 1;
   });
   var hiddenX = all.filter(function(e){
+    if (nativeTextScroller(e)) return false; // correction 13, same reason as the scroller list
     var cs = getComputedStyle(e);
     if (!/^(hidden|clip)$/.test(cs.overflowX)) return false;
     if (e.scrollWidth <= e.clientWidth + 1) return false;
@@ -308,7 +324,11 @@ const READ = (surface) => `(function(){
     t = tw.nextNode();
   }
   all.forEach(function(e){
-    if (e.matches('input,textarea,select,button,img,canvas,video,svg,[role="button"]')) return mark(e.getBoundingClientRect());
+    // iframe/webview/object/embed are correction 12, and they are correction 10 in a second shape:
+    // an OPAQUE CONTENT HOST whose pixels live in another document (or another process) that this
+    // pass cannot walk. Immersion's stage is a 950x619 webview.immersion-webview showing a live
+    // page, and without this line every one of those pixels counted as dead space.
+    if (e.matches('input,textarea,select,button,img,canvas,video,svg,iframe,webview,object,embed,[role="button"]')) return mark(e.getBoundingClientRect());
     // CORRECTION 10. A CSS background-image PAINTS CONTENT and the element-tag list cannot see it.
     // Library's covers are div.cover with background-image: url(media://.../cover.jpeg) and no img
     // anywhere, so 24 cards of 180x240 cover art scored as DEAD SPACE and the category read
