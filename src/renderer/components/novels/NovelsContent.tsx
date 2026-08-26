@@ -29,6 +29,14 @@ import {
   type JitenStore,
 } from '../../../shared/jiten';
 import {
+  novelsAnalyzeEpubReason,
+  novelsDownloadEpubReason,
+  novelsImportFileReason,
+  novelsJitenMineReason,
+  novelsOpenSourceReason,
+  novelsPlanReason,
+} from '../../../shared/novelsActionReason';
+import {
   NOVELS,
   NOVEL_TYPES,
   DIFFICULTY_ORDER,
@@ -39,6 +47,7 @@ import {
   type Genre,
 } from '../../data/novels';
 import { setHandoffJson } from '../../pendingHandoff';
+import { useT } from '../../i18n';
 
 type TypeFilter = 'All' | 'Novel' | 'WebNovel' | 'Local';
 type DiffFilter = 'All' | Difficulty | 'Unknown';
@@ -873,10 +882,26 @@ export function NovelsTable({ state }: { state: NovelsState }) {
 
 /** The inspector pane (`<aside className="jiten-inspector">` body). */
 export function NovelsInspector({ state }: { state: NovelsState }) {
+  const { t } = useT();
   const { selectedCandidate, selectedPlan, selectedLinks, selectedLink, busy, directCandidateUrl } = state;
   if (!selectedCandidate) {
     return <div className="jiten-empty">Select a title to inspect it.</div>;
   }
+  // Category 8: `disabled` is DERIVED from the reason, never asserted beside it, so a button
+  // that is grey with nothing saying why cannot be written here by accident.
+  const actionState = {
+    busy,
+    hasSelectedLink: !!selectedLink,
+    hasDirectEpubUrl: !!directCandidateUrl,
+    hasJitenDeck: !!selectedCandidate.jitenDeckId,
+    isPlanned: !!selectedPlan,
+  };
+  const planWhy = novelsPlanReason(actionState);
+  const openSourceWhy = novelsOpenSourceReason(actionState);
+  const importFileWhy = novelsImportFileReason(actionState);
+  const downloadEpubWhy = novelsDownloadEpubReason(actionState);
+  const analyzeEpubWhy = novelsAnalyzeEpubReason(actionState);
+  const jitenMineWhy = novelsJitenMineReason(actionState);
   return (
     <>
       <div className="jiten-cover" style={!selectedCandidate.coverUrl ? coverStyle(selectedCandidate.id) : undefined}>
@@ -908,33 +933,33 @@ export function NovelsInspector({ state }: { state: NovelsState }) {
 
       <div className="jiten-actions">
         {selectedPlan ? (
-          <button type="button" className="btn subtle" disabled={busy} onClick={() => void state.removeFromPlan(selectedPlan)}>
+          <button type="button" className="btn subtle" disabled={!!planWhy} title={planWhy ? t(planWhy) : undefined} onClick={() => void state.removeFromPlan(selectedPlan)}>
             <Icon name="close" size={14} />
             Remove
           </button>
         ) : (
-          <button type="button" className="btn primary" disabled={busy} onClick={() => void state.planSelected()}>
+          <button type="button" className="btn primary" disabled={!!planWhy} title={planWhy ? t(planWhy) : undefined} onClick={() => void state.planSelected()}>
             <Icon name="star" size={14} />
             Plan
           </button>
         )}
-        <button type="button" className="btn" disabled={!selectedLink} onClick={() => selectedLink && openLink(selectedLink.url)}>
+        <button type="button" className="btn" disabled={!!openSourceWhy} title={openSourceWhy ? t(openSourceWhy) : undefined} onClick={() => selectedLink && openLink(selectedLink.url)}>
           <Icon name="external" size={14} />
           Open source
         </button>
-        <button type="button" className="btn" disabled={busy} onClick={() => void state.importLocalSelected()}>
+        <button type="button" className="btn" disabled={!!importFileWhy} title={importFileWhy ? t(importFileWhy) : undefined} onClick={() => void state.importLocalSelected()}>
           <Icon name="library" size={14} />
           Import file
         </button>
-        <button type="button" className="btn" disabled={busy || !directCandidateUrl} onClick={() => void state.importDirectSelected()}>
+        <button type="button" className="btn" disabled={!!downloadEpubWhy} title={downloadEpubWhy ? t(downloadEpubWhy) : undefined} onClick={() => void state.importDirectSelected()}>
           <Icon name="download" size={14} />
           Download/import EPUB
         </button>
-        <button type="button" className="btn primary" disabled={busy} onClick={() => void state.analyzeSelected()}>
+        <button type="button" className="btn primary" disabled={!!analyzeEpubWhy} title={analyzeEpubWhy ? t(analyzeEpubWhy) : undefined} onClick={() => void state.analyzeSelected()}>
           <Icon name="scan" size={14} />
           Analyze EPUB
         </button>
-        <button type="button" className="btn" disabled={busy || !selectedCandidate.jitenDeckId} onClick={() => void state.mineJitenSelected()}>
+        <button type="button" className="btn" disabled={!!jitenMineWhy} title={jitenMineWhy ? t(jitenMineWhy) : undefined} onClick={() => void state.mineJitenSelected()}>
           <Icon name="flashcards" size={14} />
           Jiten vocab mine
         </button>
