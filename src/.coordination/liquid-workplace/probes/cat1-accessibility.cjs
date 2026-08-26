@@ -199,11 +199,26 @@ const PROBE = `(function(){
     var bold = (parseInt(cs.fontWeight, 10) || 400) >= 700;
     var large = px >= 24 || (bold && px >= 18.66);
     textRows.push({ el: label(el), text: s.slice(0,24), px: Math.round(px*10)/10, large: large,
-                    ratio: Math.round(ratio(composited, bg)*100)/100, bar: large ? 3 : 4.5 });
+                    ratio: Math.round(ratio(composited, bg)*100)/100, bar: large ? 3 : 4.5,
+                    inactive: !!el.closest(':disabled') });
   }
   var measurable = textRows.filter(function(x){ return typeof x.ratio === 'number'; });
-  var failing = measurable.filter(function(x){ return x.ratio < x.bar; }).sort(function(a,b){ return a.ratio - b.ratio; });
-  var minRow = measurable.slice().sort(function(a,b){ return a.ratio - b.ratio; })[0] || null;
+  // WCAG 1.4.3's own exemption: text that is part of an INACTIVE user interface component has
+  // no contrast requirement. The hit leg already excludes disabled controls (pointer-events is
+  // none on them, so elementFromPoint filed them occluded); the contrast leg did not, and VN's
+  // "Add to library" - disabled until the title input is non-empty, so disabled on every empty
+  // form - scored 2.69 and failed the whole surface. Every form in the app with a disabled
+  // submit fails forever that way, and the only "fix" is to paint disabled controls as though
+  // they were live. That is damage, not repair, the same conclusion this file already records
+  // for rect-vs-pointer target sizes. Skipped rows are PRINTED with their ratios, never silent.
+  // aria-disabled=true is deliberately NOT exempt: such a control stays operable, so its text
+  // is not part of an inactive component and the exemption does not reach it.
+  // No backticks and no dollar-brace in this comment: it lives inside the PROBE template
+  // literal, so either one is a parse error in THIS file, not in the browser. Both were made.
+  var inactiveRows = measurable.filter(function(x){ return x.inactive; });
+  var active = measurable.filter(function(x){ return !x.inactive; });
+  var failing = active.filter(function(x){ return x.ratio < x.bar; }).sort(function(a,b){ return a.ratio - b.ratio; });
+  var minRow = active.slice().sort(function(a,b){ return a.ratio - b.ratio; })[0] || null;
 
   // ---- 2. hit targets, WITH the 2.5.8 spacing exception -------------------------
   var CTRL = 'button,a[href],input,select,textarea,[role="button"],[role="tab"],[role="checkbox"],[tabindex]';
@@ -312,7 +327,10 @@ const PROBE = `(function(){
       minRatio: minRow ? minRow.ratio : null,
       minOwner: minRow ? (minRow.el + ' "' + minRow.text + '" ' + minRow.px + 'px') : null,
       failingCount: failing.length,
-      worst: failing.slice(0, 8)
+      worst: failing.slice(0, 8),
+      inactiveSkipped: inactiveRows.length,
+      inactiveWorst: inactiveRows.filter(function(x){ return x.ratio < x.bar; })
+        .sort(function(a,b){ return a.ratio - b.ratio; }).slice(0, 6)
     },
     targets: {
       total: boxes.length,

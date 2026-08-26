@@ -891,3 +891,49 @@ still 4px via `::-webkit-slider-runnable-track` — the box takes the floor, not
 
 **Left on this category: VN only.** Its blocker is file ownership, not a decision —
 `VisualNovelPanel.tsx` carries another track's uncommitted i18n rewrite.
+
+## 2026-08-25 (later 23) · primary — VN closes category 1: **6 of 6 surfaces**, one RUN, zero new probes
+
+`node …/probes/cat1-accessibility.cjs --surface "@.visual-novel-panel" --label vn`. Immersion raised
+first (z 312 → 320, box **820x580 unchanged** — a `pointerdown` on the `.fwin` ROOT is `onFocus`
+at `DesktopShell.tsx:3451`, not `dragStart` at `:3457`, so no edge-snap).
+
+| surface | contrast / failing | targets by hit | stolen | occluded | measured | keyboard | motion b/d/a | verdict |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| VN | **5.33** / **0** | **0** below 32 | 0 | 0 | **67** | 0 unreachable | 1/0/1 | **10/10** |
+
+Control fired: contrast 0→1, byRect 1→3, wcag258 0→2, keyboard 0→1, byHit 0→2; `backToBaseline`
+true, `rectDrift` 0, exit 0. The contrast leg still moved **with the new exemption in place** —
+that is the guard that the exemption did not blind the bar.
+
+**Two findings, and the first one nearly recorded a 10/10 on a sixth of the surface.**
+
+1. **An EMPTY library is an empty harness, and the rubric caps that at 0.** The first read scored
+   **11 controls / 13 texts**. The VN library had **0 entries**, so the whole workspace — progress,
+   capture, routes, metadata, deck — never mounts. Populated through the product's own flow (native
+   value setter + `input` event on the title field, then `Add to library`), it is **74 controls /
+   67 measured / 46 texts**. Six times the surface. **Recreate in 3 calls; remove with the
+   workspace's own `Remove` button** (`window.api.visualNovelRemove`, `VisualNovelPanel.tsx:713`) —
+   done, verified back to 0 entries / 11 controls, so the user's library is as it was found.
+2. **The contrast leg scored DISABLED controls; WCAG 1.4.3 exempts them.** VN's `Add to library` is
+   `disabled={!title.trim()}` and renders Chromium's UA disabled colour `rgba(255,255,255,.3)` =
+   **2.69**, which failed the entire surface. Six such buttons here. **Do not "fix" this in CSS**:
+   the app's own convention is `.btn:disabled { opacity: 0.5 }` (`styles.css:1489`), which composites
+   to roughly the same ratio, so matching the convention improves nothing and the only way to pass is
+   to paint disabled controls as though they were live — damage, not repair, the same conclusion this
+   harness already records for rect-vs-pointer sizes. Exempted in the harness, printed as
+   `inactiveSkipped` + `inactiveWorst` with their ratios so it is never silent. Scope is native
+   `:disabled` only — `aria-disabled="true"` stays scored, because such a control is still operable
+   and is therefore not an inactive component.
+
+Harness repairs, both one-liners, both real mis-reports: `l1-hit-area.js` printed `title: TITLE`,
+so every **selector-form** run was labelled **"Dictionary"** — this VN run reported 782x513 under
+Dictionary's name. Now `ROOT_SEL || TITLE`. And a comment written inside `PROBE`'s template literal
+must contain no backtick and no dollar-brace; both were made and both are `SyntaxError` in the
+harness, not in the browser.
+
+Not a defect, checked so nobody re-files it: the one control under 32 by rect is a **13x32 checkbox**
+wrapped in its own `<label>` ("Live clipboard capture"), nearest neighbour 63.2px — 2.5.8 clear, and
+`belowFloorByHit` 0 because the label carries the region.
+
+**Category 1 of 8 is CLOSED for L6's Gate: 6 of 6 surfaces at 10/10.** Seven categories remain.

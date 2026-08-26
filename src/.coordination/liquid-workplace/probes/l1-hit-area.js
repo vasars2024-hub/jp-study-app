@@ -300,7 +300,10 @@
   };
 
   return JSON.stringify({
-    title: TITLE,
+    // The SCORED root, not the fallback title. `TITLE` keeps its `'Dictionary'` default so the
+    // recorded title-form runs reproduce, but printing it while `ROOT_SEL` is what was measured
+    // labels every selector-form run "Dictionary" — a VN run scored 782x513 and said Dictionary.
+    title: ROOT_SEL || TITLE,
     floor: FLOOR,
     presentation: win.getAttribute('data-presentation'),
     theme: document.documentElement.getAttribute('data-theme'),
