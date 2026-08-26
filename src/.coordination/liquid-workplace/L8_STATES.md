@@ -645,4 +645,4 @@ Aero toolbar and status bar **render only under the Aero shell** and the running
 is the negative control (each locale must differ from `en`, which is the only proof available for a
 string like "Ready"). 6/6. Flipping `data-theme` to verify by eye would mean writing a persisted
 setting, which this repo's rules put behind capture-patch-restore; it was not worth it for six
-strings a test can hold. Commit `<HASH4>`.
+strings a test can hold. Commit `73539fe1`.
