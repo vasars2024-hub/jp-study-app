@@ -201,6 +201,35 @@ describe('grid track floors fit the narrowest window the product allows', () => 
   });
 
   /**
+   * The SAME category on the vertical axis, and this file's first: content below the frame
+   * with no scroller, rather than content past the right edge with no scrollbar.
+   *
+   * `.reading-workspace-panel` was `overflow: hidden` with `> * { height: 100% }` — a bet
+   * that every section scrolls itself. Measured 2026-08-25 through the category-4 harness:
+   * five of the eight sections do not. Discover at the default 820x580 held `scrollHeight`
+   * 740 in a `clientHeight` of 460, i.e. 280px painted below the frame, 41 boxes unreachable
+   * (77 at 380x580, still 3 at 1100x700); the Library section was far worse at 2118 in 460.
+   * The window's own `.fwin-body` is `overflow-y: auto` and never saw any of it, because the
+   * panel clamps first and its `scrollHeight` never propagates.
+   *
+   * Negative control, live and required: with the fix in place all eight sections report 0
+   * unreachable boxes; forcing `overflow-y: hidden` back on inline, on the Library section,
+   * returns **193**; removing the inline property returns to 0.
+   */
+  it('the reading workspace panel can reach the sections that do not scroll themselves', () => {
+    const css = strip(read('src/renderer/views/readingWorkspace.css'));
+    const rule = /\.reading-workspace-panel\s*\{([^}]*)\}/.exec(css)?.[1] ?? '';
+    expect(rule, '.reading-workspace-panel rule').not.toBe('');
+    expect(rule).toMatch(/overflow-y:\s*auto/);
+    // The shorthand is what shipped the defect: it sets BOTH axes, so a later `overflow:
+    // hidden` here silently re-clamps the y axis and this latch must see that.
+    expect(/overflow:\s*hidden/.test(rule)).toBe(false);
+    // `> * { height: 100% }` is the other half of the mechanism and stays — it is what makes
+    // the self-scrolling sections fill the frame. Asserted so its removal is a deliberate act.
+    expect(css).toMatch(/\.reading-workspace-panel\s*>\s*\*\s*\{[^}]*height:\s*100%/);
+  });
+
+  /**
    * Why this category's sweep is LIVE and not source-only, stated once so the next worker
    * does not spend a turn rediscovering it.
    *

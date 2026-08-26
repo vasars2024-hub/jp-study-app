@@ -67,11 +67,23 @@
   outline-offset: 1px;
 }
 
+/* `overflow: hidden` here was a bet that every panel scrolls itself, and three of the eight
+   sections do not. Measured 2026-08-25 at the default 820x580: `scrollHeight` 740 inside a
+   `clientHeight` of 460 — 280px of the Discover catalogue painted below the frame with
+   nothing to scroll, 41 boxes unreachable (77 at 380x580, still 3 at 1100x700). The window's
+   own `.fwin-body` is `overflow-y: auto` but never sees it, because this panel clamps first
+   and its `scrollHeight` never reaches the body.
+
+   `overflow-y: auto` rather than dropping the clamp: the panels that DO scroll internally sit
+   at `height: 100%` with their overflow contained, so their `scrollHeight` equals their
+   `clientHeight` and no second scrollbar appears. The x axis stays hidden — sideways overflow
+   here is a nowrap row to fix, not content to reach. */
 .reading-workspace-panel {
   min-width: 0;
   min-height: 0;
   flex: 1 1 auto;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .reading-workspace-panel > * {
