@@ -84,7 +84,23 @@ const measure = `(function(){
   var c = scope.querySelector(${JSON.stringify(CONTAINER)});
   if (!c) return JSON.stringify({ refuse: 'container not found: ' + ${JSON.stringify(CONTAINER)} });
   var rows = [].slice.call(c.querySelectorAll(${JSON.stringify(ROW)}));
-  var scroller = ${SCROLLER ? `c.querySelector(${JSON.stringify(SCROLLER)}) || c` : `(function(){
+  var scroller = ${SCROLLER ? `(function(){
+    // --scroller USED to be c.querySelector(sel) || c, which searches DOWN from the container
+    // only. A list that is not virtualised scrolls in an ANCESTOR - Dictionary's results live in
+    // .fwin-body - so the lookup missed, fell back to the container, and the run reported
+    // scroller "dict-entries" / overdraw 1 for a viewport that is really 2633 over 545. A silent
+    // fallback that prints a clean number is the failure mode this file exists to avoid, so an
+    // ancestor is now searched too and a --scroller that resolves to nothing REFUSES.
+    var s = c.querySelector(${JSON.stringify(SCROLLER)});
+    if (s) return s;
+    for (var p = c.parentElement; p; p = p.parentElement) {
+      if (p.matches && p.matches(${JSON.stringify(SCROLLER)})) return p;
+      if (p === scope) break;
+    }
+    var inScope = scope.querySelector(${JSON.stringify(SCROLLER)});
+    if (inScope && inScope.contains(c)) return inScope;
+    return null;
+  })()` : `(function(){
     // Rank by overflow, but a collection's viewport cannot be 20px tall. Without
     // the floor this picked a \`dict-star\` button overflowing by 6px over the
     // real results region, and reported clientHeight 20 for a 545px surface.
@@ -97,6 +113,7 @@ const measure = `(function(){
     }
     return best;
   })()`};
+  if (!scroller) return JSON.stringify({ refuse: 'scroller not found or does not contain the container: ' + ${JSON.stringify(SCROLLER || '')} });
   var hs = {};
   for (var i = 0; i < rows.length; i++) {
     var h = Math.round(rows[i].getBoundingClientRect().height * 100) / 100;
@@ -104,11 +121,21 @@ const measure = `(function(){
   }
   // A virtualiser's total-height spacer: a child taller than the scroller's own
   // client box that contains no rows of its own directly.
+  //
+  // The second half of that sentence was DESCRIBED here and never implemented, and while the
+  // scroller was always the container the subtree was too small for it to matter. Once an
+  // ancestor scroller became reachable it did: Dictionary's plain content wrapper (.dict-view,
+  // 2601px inside a 545px .fwin-body) matched on height alone, so a PAGINATED list of 8 entries
+  // was reported INERT - the harness's most serious verdict, meaning shipped virtualisation
+  // that does nothing. A real spacer is an empty sizing element; one that holds the rows is
+  // just the content. Both halves are now checked.
   var spacer = null;
   var kids = [].slice.call(scroller.querySelectorAll('div'));
   for (var k = 0; k < kids.length; k++) {
     var kh = kids[k].getBoundingClientRect().height;
-    if (kh > scroller.clientHeight * 1.5 && kh > 200) { spacer = Math.round(kh); break; }
+    if (kh <= scroller.clientHeight * 1.5 || kh <= 200) continue;
+    if (kids[k].querySelector(${JSON.stringify(ROW)})) continue;
+    spacer = Math.round(kh); break;
   }
   return JSON.stringify({
     domRows: rows.length,

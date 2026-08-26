@@ -895,3 +895,43 @@ one has live numbers.
 and stable at all sizes; no tool obscures the document". Category 4 is clean on 6 of 6; the
 `no tool obscures` half already has `overDocument` 0 everywhere it was measured. What is NOT
 done and must not be claimed: **no rubric CATEGORY is scored for L6, so there is no 80/80.**
+
+## 2026-08-25 (later 23) · primary — the two surfaces category 7 recorded as EMPTY, and a harness that agreed too easily
+
+The 2026-08-25 sweep left Dictionary and Translate **EMPTY → unmeasured** ("the rubric caps an
+empty harness at 0, so those two are unmeasured, not clean"). Populated Dictionary through its
+own search form (native value setter + `input`, then the `.dict-search` submit button) and re-ran
+`probes/cat7-collection-weight.cjs`. **Two harness defects surfaced, in series.**
+
+1. **`--scroller` searched DOWN only.** `c.querySelector(sel) || c` cannot find an ANCESTOR, and a
+   list that is not virtualised scrolls in one — Dictionary's results scroll in `.fwin-body`. The
+   lookup missed and **silently fell back to the container**, reporting `scroller "dict-entries"`,
+   `scrollHeight 1584 / clientHeight 1584`, **overdraw 1**, verdict **FITS**. The real viewport is
+   **2633 over 545 = overdraw 4.8**. Now: descendant, then ancestor chain, then in-scope-and-
+   contains; a `--scroller` that resolves to nothing **REFUSES**. Control: `--scroller
+   ".no-such-scroller"` exits non-zero with the refusal, so the fallback cannot come back silently.
+2. **The spacer rule was in the comment and not in the code.** "a child taller than the scroller's
+   own client box **that contains no rows of its own directly**" — only the height half was
+   implemented. Harmless while the scroller *was* the container; the moment an ancestor became
+   reachable, Dictionary's plain content wrapper (2601px inside a 545px `.fwin-body`) matched on
+   height alone and the run reported **INERT** — the harness's most serious verdict, meaning
+   shipped virtualisation that does nothing. Both halves are now checked.
+
+**Dictionary, measured: rows 8, domRows 8, nodes 221, scrollHeight 2633 / clientHeight 545,
+overdraw 4.8, spacerHeight null, 3 distinct row heights → UNWINDOWED.**
+
+**UNWINDOWED here is NOT a finding, and the next worker must not "fix" it.** The cap is
+`src/main/dictionary.ts:253` — `lookupInDictionaryDb({ text: q, limit: 8 })`, and `:281` for the
+fuzzy pass. Verified live rather than read: `kami` returns 8 and the deliberately broad `water`
+also returns **8**, so the collection is hard-bounded at 8 and cannot grow. Virtualising an
+8-row list would be damage. The verdict vocabulary has no BOUNDED state; this paragraph is the
+substitute, deliberately, rather than a third repair to the harness in one turn.
+
+**What that cap IS, and it belongs to category 8 rather than 7 — carried as the next slice.** The
+renderer shows 8 entries with **no "showing 8 of N"** and no way to reach the ninth: `entries =
+result?.entries ?? []` (`DictionaryResults.tsx:850`) rendered straight into `.dict-entries`
+(`:942`). A truncated result presented as a complete one is exactly what the honest-states
+category exists to catch. An honest fix needs the true match count out of the main-side lookup —
+main does not hot-reload, so it is an opening slice, not a tail-of-turn one.
+
+Translate remains **EMPTY / unmeasured**; only Dictionary was populated this turn.

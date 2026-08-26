@@ -6,17 +6,18 @@
   "rows": 8,
   "rowsSource": "domRows",
   "domRows": 8,
-  "nodes": 204,
-  "scrollHeight": 1461,
-  "clientHeight": 1461,
-  "overdraw": 1,
-  "scroller": "dict-entries",
-  "distinctRowHeights": 2,
+  "nodes": 221,
+  "scrollHeight": 2633,
+  "clientHeight": 545,
+  "overdraw": 4.8,
+  "scroller": "fwin-body   ",
+  "distinctRowHeights": 3,
   "heights": {
-    "153.98": 3,
-    "182.98": 5
+    "182.98": 4,
+    "153.98": 1,
+    "204.67": 3
   },
   "spacerHeight": null,
-  "verdict": "FITS",
-  "at": "2026-08-25T20:40:04.659Z"
+  "verdict": "UNWINDOWED",
+  "at": "2026-08-26T03:47:20.916Z"
 }
