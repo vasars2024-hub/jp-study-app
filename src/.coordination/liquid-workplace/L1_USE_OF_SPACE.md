@@ -624,3 +624,72 @@ byte-identical, `max` false, `data-presentation` still `liquid`. **`restoredExac
 
 **Video category 4 = 10/10**, all three sizes in liquid — compact 260×170 was re-derived in
 liquid on 2026-08-24 (`4a7fa118`'s turn, 0 clipped / 0 overlap / 0 h-scroll, restored exactly).
+
+## 2026-08-26 · primary — category 4 gets its one harness, and six blind spots the one-off probes never had a surface to reveal
+
+| surface | default | compact | maximized | dead % (d/c/m) | chrome→ | canvas→ | verdict |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `@.reader` (manga) | 1264x821 | 924x561 | 1600x1000 | 6.8 / 5.8 / 8.3 | 20.6→16.7 | 65.5→71.9 | **PASS 10/10** |
+| `Library` | 820x580 | 260x170 | 1264x765 | 3.1 / 0.9 / 6.7 | 21.6→10.2 | 31.8→53.9 | **PASS 10/10** |
+| `Immersion` | 820x580 | 260x170 | 1264x765 | 2.9 / 0.6 / 7.0 | 27.3→19.2 | 47.1→61.5 | **FAIL** (compact only) |
+| `Reading Finder` | 820x580 | 260x170 | 1264x765 | 2.4 / 0.5 / 20.0 | 12.7→9.8 | 42.9→35.7 | **FAIL** |
+| `@.reader` (book) | 1264x821 | 924x561 | 1600x1000 | 9.4 / 7.5 / **38.3** | 0→0 | 86.6→89.0 | **FAIL** — lead, not a cell |
+
+`probes/cat4-use-of-space.cjs`, one harness, surface as an argument. Every row above fired its own
+injected clip 0 → 1 → 0 with removal proven. Board: **2 of 6**; VN and Novels not yet run.
+
+**Every one of the five corrections this took was a FALSE NUMBER, not a preference.** They are in
+the harness header with the measurement that produced each. The pattern is the finding:
+
+- **8 — an occluded window has no ResizeObserver.** `visibilityState: hidden` is what a window
+  reads while a terminal holds the foreground. Two runs of `@.reader` at the SAME 924x561 returned
+  `overlaps: 0` and `overlaps: 2`; the 2 was 51px of stale `.manga-spread` over `.reader-footer`,
+  the 0 was luck, and the 0 had already been written to a baseline as PASS 10/10. Reads focus and
+  refuse now, and two consecutive runs are byte-identical.
+- **9 — a `.fwin`'s inline style carries its z-index.** Restoring from maximize raises the window,
+  so Library returned to an identical box at z 532 against 446 and the category scored FAIL.
+- **10 — a CSS `background-image` paints content.** Library's covers are `div.cover` with
+  `url(media://…/cover.jpeg)` and no `img`: 24 cards of 180x240 read as dead space, 15.9% against
+  a bar of 15. Marking `url()` took it to 6.7. Gradients stay uncounted or every themed panel
+  marks itself covered and the detector can never find real dead space again.
+- **11 — `position: fixed` is not the viewport under containment.** Every `.fwin` carries
+  `contain: content`, so the window is the containing block: the clip box landed 197px off on
+  Immersion (frame `left: 196`), outside `.fwin-body`, and the control silently did not fire.
+  Reading Finder and Immersion both returned VOID rather than a score.
+- **12 — an opaque content host.** `iframe`/`webview`/`object`/`embed`. Immersion's stage is a
+  950x619 `webview`; dead region 9 / 0.6 / 24.9 → 2.9 / 0.6 / 7.0.
+- **13 — a text field is not a layout overflow.** `input.immersion-url` read 210>184 at the
+  window's own default size. Every text field in the app with a long value would have failed.
+
+**Why six at once, and why this is RULE 1 paying out rather than bad luck.** The five one-off
+probes this harness replaced were only ever pointed at Dictionary, Media and Video — none of which
+has a cover grid, a webview or an address bar. A sixth bespoke probe would have found none of
+these, because it would have been written to fit what it was aimed at. Six surfaces through ONE
+instrument is what exposed them.
+
+**Product fix landed, `6e783f86`.** Reading Finder's `nav.reading-workspace-nav` measured
+`scrollWidth` 784 in `clientWidth` 782 — eight tabs at `flex: 0 0 auto` grew a horizontal scrollbar
+to reach two pixels, at the window's OWN default size, pushing a tab out of reach with no
+affordance. The narrow rules existed the whole time in a `@media (max-width: 680px)`: the same
+viewport-instrument error `00658d37` fixed in the VN panel, in a second sheet. `.reading-workspace`
+is now a named `inline-size` container, the block becomes `@container rfwork`, tabs shrink with an
+ellipsis on the label only (full text stays in the DOM, so the accessible name is untouched), and
+below 680px of pane the strip WRAPS. `horizontalScrollers` 1/1/0 → 0/0/0.
+`readingWorkspacePaneReflow.test.ts` guards the general form; revert gives 4 red of 7.
+
+**Traps for the next worker, all paid here.**
+1. **`@.reader` IS TWO SURFACES.** The first Library card is a BOOK — `div.reader-stage`, no
+   `.manga-spread`, no `.nav-zone` — and it scored under `l6-manga` before anything checked. Pick
+   by `.manga-ocr-badge` and assert `.manga-spread` before believing the number.
+2. **The desktop window has a hard minimum.** `/bounds` asked 260x170 returns 924x561, so every
+   root leg records `achieved` and `clampedByOsMinimum` beside `requested`.
+3. **A surface in its EMPTY state cannot be scored for use of space.** Immersion's first read was
+   "Open a page to begin immersion reading." — the rubric caps that rather than scoring it. Load
+   real content through the product's own starter first.
+
+**Next slice, in order.** Reading Finder's three remaining bars: 40 clipped `res-card`s at compact
+with `main.reading-workspace-panel 280>202`, a 1262x164 dead band at the bottom when maximized,
+and the canvas share FALLING 42.9 → 35.7 as the window grows — one catalogue that does not use the
+space it is given, which is likely one fix for all three. Then Immersion's compact leg
+(`div.immersion-reader` 97 wide inside 54, `div.immersion-stage` 284>178; Library holds 0 clipped
+at that same size, so it is reachable, not a floor). Then RUN VN and Novels.
