@@ -717,6 +717,25 @@ Captures/Reading Finder moved its local translucent workspace nav to `Contextual
 changing conventional pixels. Liquid: 0 dense Work on glass, 1/1 treated and shared; control
 0→1, all-glass 2/2, restored 0. Board **26 of 48**; L6 Gate remains open.
 
+**L6 Gate, category 6 — 2 of 6 surfaces, 2026-08-26** (checkpoint containing this entry).
+Library **PASS 10/10** (`d40ab3a6`) and Immersion **PASS 10/10** (`61d7d85f`), both a SPEC plus a
+RUN of the unchanged `cat6-feature-parity.cjs`. Library: parity **9/9 standard, 9/9 liquid**,
+`rowsAgree` true, 0 rows in one presentation only, round trip holding with the list scrolled to
+**240 of a 1,605 px** range, five mutations each falling exactly their own row. Immersion, driven
+on a live `ja.wikipedia.org` page with **80,394 characters** extracted by Reader mode: parity
+**7/7 / 7/7**, round trip with `.immersion-url` dirtied, **0 diffs**, five mutations. Board
+**32 of 48**; category 6 owes captures (a free RUN), manga, novels and VN, and category 7 owes all six.
+
+**L6, product — the one-way door in Immersion, 2026-08-26** (`4cda1649`). Not a cell: scoring the
+surface above surfaced a reversibility gap category 6 cannot see, because every row it has assumes
+a page is loaded. Back, Forward, Reload, the three view modes and eight page actions ALL require a
+page, so once anything had loaded the starter state was unreachable without destroying the window.
+`closePage` is the exact reverse of `navigate` (stats flushed FIRST, or the closed page's time is
+discarded), in all three hosts — the shared toolbar, the aero toolbar, and the View menu. History
+and the saved-sites rail are deliberately kept: the rail is the route back. Reload came with it —
+`reload()` opens `if (!currentUrl) return;`, so it was an enabled control that did nothing.
+Log: `.coordination/liquid-workplace/L6_READING_ECOSYSTEM.md`.
+
 **L6 Gate, category 1 — 2 of its 6 surfaces, 2026-08-25 (later 21)** (`e41a85ce`, `16e8ed1c`).
 Captures **10/10** and Immersion **10/10**, both live, raised, control fired. Immersion earned it
 with a product fix, not a re-read: **34 controls under the 32px pointer floor → 0**, via a new
