@@ -76,14 +76,25 @@ export function canPresentLiquid(section?: string): boolean {
  * MEASURED LIVE 2026-08-26, and it is why this function exists at all. The two
  * hosts that are their own OS window — the pop-out and the reader — each read
  * `screenX/screenY/outerWidth/outerHeight` and clamped the size with
- * `Math.max(1, …)`. In this Electron renderer all four of those globals read
- * **0** (`innerWidth/innerHeight` read 1264x821 in the same window), so the
- * clamp did not defend against the unmeasurable rect — it MANUFACTURED
- * `{x:0,y:0,w:1,h:1}` from it. `parseRect` rejects `w <= 0`, and 1 is the
- * smallest value that passes, so the clamp stepped over the guard rather than
- * tripping it. Confirmed on disk the same day: `lq.reader.presentation` held
- * `standardRect:{x:0,y:0,w:1,h:1}` and the reader still came back
- * `.reader.reader-liquid` after a full reload — the blob validated.
+ * `Math.max(1, …)`. These globals are INTERMITTENT in this renderer. Two
+ * readings, same window, same day:
+ *
+ *     11:55  outerWidth 0     outerHeight 0    screenX 0    screenY 0
+ *     12:09  outerWidth 1280  outerHeight 860  screenX 320  screenY 86
+ *
+ * `innerWidth`/`innerHeight` read 1264x821 in both. The mechanism was NOT
+ * established — focus was the obvious suspect and was tested and cleared, the
+ * values being identical with the window focused and blurred — so do not trust
+ * a doc that claims one. What is established is that a 0 reading happens and
+ * reaches the store: the clamp turned it into `{x:0,y:0,w:1,h:1}`, `parseRect`
+ * rejects `w <= 0` and 1 is the smallest value that passes, so the clamp
+ * stepped over the guard rather than tripping it. Confirmed on disk before the
+ * fix landed: `lq.reader.presentation` held `standardRect:{x:0,y:0,w:1,h:1}`
+ * and the reader still came back `.reader.reader-liquid` after a full reload —
+ * the blob validated.
+ *
+ * Intermittency is exactly why the answer is a fallback and a refusal rather
+ * than a repair: correctness must not depend on catching the good reading.
  *
  * What it costs is latent, not visible, and that is the trap: `standardRect` is
  * the geometry `returnToStandard` writes back, and today both of these hosts
