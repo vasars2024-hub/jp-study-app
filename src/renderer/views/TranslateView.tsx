@@ -181,18 +181,21 @@ export default function TranslateView() {
         status={
           <>
             <StatusBarField>
-              {LANG_LABELS[source]} to {LANG_LABELS[target]}
+              {t('translate.status.pair', {
+                source: LANG_LABELS[source],
+                target: LANG_LABELS[target],
+              })}
             </StatusBarField>
-            <StatusBarField>{input.length} source chars</StatusBarField>
+            <StatusBarField>{t('translate.status.sourceChars', { count: input.length })}</StatusBarField>
             <StatusBarSpacer />
             <StatusBarField live>
               {busy
-                ? msg || 'Working'
+                ? msg || t('translate.working')
                 : state.state === 'done'
-                  ? 'Complete'
+                  ? t('translate.status.complete')
                   : state.state === 'error'
-                    ? 'Error'
-                    : 'Ready'}
+                    ? t('translate.status.error')
+                    : t('translate.status.ready')}
             </StatusBarField>
           </>
         }
@@ -204,9 +207,9 @@ export default function TranslateView() {
             historyPanel
           ) : (
             <>
-              <Toolbar className="aero-translate-toolbar" aria-label="Translation commands">
+              <Toolbar className="aero-translate-toolbar" aria-label={t('translate.toolbar.label')}>
                 <label>
-                  From
+                  {t('translate.lang.from')}
                   <select value={source} onChange={(e) => state.pickSource(e.target.value as TransLang)}>
                     {LANG_ORDER.filter((l) => l !== target).map((l) => (
                       <option key={l} value={l}>
@@ -215,11 +218,16 @@ export default function TranslateView() {
                     ))}
                   </select>
                 </label>
-                <button className="aero-translate-swap" onClick={swap} aria-label="Swap languages" title="Swap languages">
+                <button
+                  className="aero-translate-swap"
+                  onClick={swap}
+                  aria-label={t('translate.menu.swap')}
+                  title={t('translate.menu.swap')}
+                >
                   <Icon name="globe" size={13} />
                 </button>
                 <label>
-                  To
+                  {t('translate.lang.to')}
                   <select value={target} onChange={(e) => state.pickTarget(e.target.value as TransLang)}>
                     {LANG_ORDER.filter((l) => l !== source).map((l) => (
                       <option key={l} value={l}>
@@ -235,7 +243,7 @@ export default function TranslateView() {
                   disabled={busy || !input.trim()}
                   title={!busy && !input.trim() ? t('translate.run.needsText') : undefined}
                 >
-                  {busy ? 'Working...' : 'Translate'}
+                  {busy ? t('translate.working') : t('translate.menu.translate')}
                 </button>
                 <TranslateAskAgent
                   selection={selection}
@@ -345,7 +353,12 @@ export default function TranslateView() {
                   </button>
                 ))}
               </div>
-              <button className="tr-swap" onClick={swap} aria-label="Swap languages" title="Swap">
+              <button
+                className="tr-swap"
+                onClick={swap}
+                aria-label={t('translate.menu.swap')}
+                title={t('translate.menu.swap')}
+              >
                 <Icon name="globe" size={14} />
               </button>
               <div className="dict-lang-toggle">

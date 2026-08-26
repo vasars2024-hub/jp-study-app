@@ -620,3 +620,29 @@ Scraper 0→6 and Grammar 0→3 when it lands** — do not read those as regress
 slice. (2) `TranslateView.tsx`'s Aero toolbar renders the raw literals `'Working...'`, `'Translate'`
 and `'To'` in JSX, against the repo's own i18n policy; a raw-key sweep cannot see them because they
 are real English words.
+
+### Same turn — the second open finding closed: eight raw English literals in Translate's Aero branch
+
+`TranslateView.tsx`'s Aero toolbar and status bar rendered `Translation commands`, `From`, `To`,
+`Working...`, `Translate`, `Swap languages` and the four status words `Working / Complete / Error /
+Ready` as literals in JSX. **Neither standard guard can see these**: a raw-key sweep looks for
+dot-separated keys and these are real English words, and a key-count check sees nothing missing
+because no key exists. The category-8 harness's own `rawKeyCount` reads 0 on them too — that is
+correction 3's defect class, one layer out.
+
+Three existing keys were reused (`translate.working`, `translate.menu.translate`,
+`translate.menu.swap` — the last one also replaces `title="Swap"` on the non-Aero `.tr-swap`, which
+said something different from its own `aria-label`) and eight added:
+`translate.toolbar.label`, `translate.lang.{from,to}`, `translate.status.{pair,sourceChars,ready,
+complete,error}`. Anchored on `translate.run.needsText` so the block sits with the rest of the
+Translate chrome.
+
+**Honest limit, stated rather than glossed:** only `.tr-swap` was verified on the live DOM
+(`aria-label` and `title` both now read "Swap languages", where the title had read "Swap"). The
+Aero toolbar and status bar **render only under the Aero shell** and the running app is on
+`forest-night`, so those six were guarded by rendered-string assertions instead of by eye —
+`translateDisabledReasons.test.ts` gained a `translate aero chrome strings` block whose third case
+is the negative control (each locale must differ from `en`, which is the only proof available for a
+string like "Ready"). 6/6. Flipping `data-theme` to verify by eye would mean writing a persisted
+setting, which this repo's rules put behind capture-patch-restore; it was not worth it for six
+strings a test can hold. Commit `<HASH4>`.
