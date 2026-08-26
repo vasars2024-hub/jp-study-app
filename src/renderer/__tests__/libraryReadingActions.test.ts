@@ -97,6 +97,13 @@ describe('what the drawer resolves to', () => {
 });
 
 describe('the drawer renders the registry, not its own buttons', () => {
+  it('declares the view header through the shared contextual surface seam', () => {
+    expect(VIEW).toContain("import { ContextualSurface } from '../components/liquid/LiquidSurface';");
+    expect(VIEW).toContain('<ContextualSurface as="header" className="view-head">');
+    expect(VIEW).toContain('</ContextualSurface>');
+    expect(VIEW).not.toContain('<header className="view-head">');
+  });
+
   it('maps the resolved set instead of hand-writing a button row', () => {
     expect(VIEW).toContain('resolveReadingWorkspaceActions(');
     expect(VIEW).toContain('readingWorkspaceEntryFromLibraryItem(selectedItem)');

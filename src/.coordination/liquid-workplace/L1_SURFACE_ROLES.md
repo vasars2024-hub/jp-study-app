@@ -247,3 +247,19 @@ becomes `4px`, and the sheet came back byte-identical.
 became `/^(Search|??)/`, a SyntaxError that reads as a dead probe. `String.fromCharCode(0x98df,
 0x3079, 0x308b)` is the way. (2) `.fwin-body` is not the backing on every shell: `div.mc-root` is an
 opaque plate between it and every region, so glassing the body reaches nothing.
+
+## 2026-08-26 · codexA — reusable category-3 harness and Library 10/10
+
+`probes/cat3-liquid-utilization.cjs` consolidates the two probes above: `--surface` accepts a title
+or `@selector`, runtime DOM paths select the dense control, and an attribute-scoped stylesheet makes
+the whole surface all-glass. No surface selector, window size, entry count or pid is embedded.
+
+The denominator defect named in the handoff is fixed: a focusable result notice is not contextual
+chrome. Runtime landmarks/shared primitives now define navigation, transport and inspectors, and
+the harness separately reports treated vs shared-primitive counts.
+
+Library initially failed **0/1 treated, 0/1 shared** on its local `header.view-head`. It now renders
+that existing header through `ContextualSurface`; conventional mode remained transparent/opaque-
+backed, while Liquid measured **0 dense Work on translucent, 1/1 treated, 1/1 shared** at 820x580.
+Control: dense **0→1**, all-glass **3/3**, restored **0** with style/material identical. **10/10.**
+Raw summary: `baselines/cat3-l6-library.json`. Board: **25 of 48 cells**; category 3 is 1/6.

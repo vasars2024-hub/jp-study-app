@@ -31,14 +31,15 @@
   // second surface no longer needs the file edited between runs. The default keeps every run
   // already recorded in the L1 documents reproducible. Gate 461 names Video and Dictionary;
   // `Media` is a THIRD window on the same shell, not the Video one.
-  const titles = (typeof window !== 'undefined' && window.__lqScoreTitles) || ['Dictionary', 'Media'];
+  const surfaces = (typeof window !== 'undefined' && (window.__lqScoreSurfaces || window.__lqScoreTitles))
+    || ['Dictionary', 'Media'];
   // `window.__lqRoleDepth` raises the walk. Depth 3 was enough for Dictionary, whose work
   // surface is a direct child of the window body, and is a FALSE CLEAN on the Media shell:
   // `.medialib-rail` (navigation) and `.medialib-browser` (the work canvas) are at depth 4-5
   // inside `.mc-root > .mc-workspace > .mc-content > .mc-page`, so a depth-3 walk classifies
   // the containers and never reaches the regions the category is about.
   const maxDepth = (typeof window !== 'undefined' && window.__lqRoleDepth) || 3;
-  const ARG = { titles, maxDepth, minAreaPct: 1.0 };
+  const ARG = { surfaces, maxDepth, minAreaPct: 1.0 };
 
   const alphaOf = (s) => {
     const v = String(s || '').trim();
@@ -105,8 +106,32 @@
   // FOR, so they are never "dense work" however many buttons or list rows they contain —
   // the first run scored `aside.mc-sidebar` and `header.mc-topbar` as dense work on that
   // basis alone, which would have been two false findings.
-  const NAV_SEL =
-    'nav,header,footer,aside,[role="tablist"],[role="toolbar"],[role="navigation"],[role="banner"],[role="menubar"]';
+  const CONTEXTUAL_SEL = [
+    'nav',
+    'header',
+    'footer',
+    'aside',
+    '[role="tablist"]',
+    '[role="toolbar"]',
+    '[role="navigation"]',
+    '[role="banner"]',
+    '[role="menubar"]',
+    '[role="dialog"]',
+    '[data-lq-role="liquid"]',
+    '.lq-contextual',
+    '.lq-dock',
+    '.lq-inspector',
+    '.lq-reading-tool',
+    '.lq-reading-sheet',
+  ].join(',');
+  const SHARED_PRIMITIVE_SEL = [
+    '[data-lq-role="liquid"]',
+    '.lq-contextual',
+    '.lq-dock',
+    '.lq-inspector',
+    '.lq-reading-tool',
+    '.lq-reading-sheet',
+  ].join(',');
 
   const classify = (el) => {
     const text = (el.textContent || '').trim().length;
@@ -117,27 +142,48 @@
       const b = n.getBoundingClientRect();
       return b.width > 0 && b.height > 0 && !n.disabled;
     }).length;
-    const isNav = el.matches(NAV_SEL);
-    const dense = !isNav && (text >= 200 || forms >= 1 || rows >= 1 || items >= 3);
+    // The denominator is the rubric's contextual chrome, not every region that happens to
+    // contain a button. The old `isNav || focusables >= 1` rule promoted result notices such as
+    // `.dict-truncated` into the Liquid denominator and made an opaque Work notice look like
+    // untreated navigation. Semantic landmarks and shared Liquid primitives are the runtime
+    // evidence for navigation / transport / inspector / transition regions.
+    const isContextual = el.matches(CONTEXTUAL_SEL);
+    const dense = !isContextual && (text >= 200 || forms >= 1 || rows >= 1 || items >= 3);
+    const sharedPrimitive = isContextual && Boolean(el.closest(SHARED_PRIMITIVE_SEL));
     let role;
     if (dense) role = 'Work';
-    else if (isNav || focusables >= 1) role = 'Liquid-eligible';
+    else if (isContextual) role = 'Liquid-eligible';
     else if (text === 0) role = 'Ambient';
     else role = 'Anchor';
-    return { role, text, forms, rows, items, focusables, isNav };
+    return { role, text, forms, rows, items, focusables, isContextual, sharedPrimitive };
   };
 
-  const measureWindow = (title) => {
-    const win = [...document.querySelectorAll('.fwin')].find(
-      (w) => (w.querySelector('.fwin-title-text')?.textContent || '').includes(title),
+  const rootFor = (surface) => surface.startsWith('@')
+    ? document.querySelector(surface.slice(1))
+    : [...document.querySelectorAll('.fwin')].find(
+      (w) => (w.querySelector('.fwin-title-text')?.textContent || '').includes(surface),
     );
-    if (!win) return { title, refuse: 'no .fwin with that title — is it open?' };
+
+  const measureWindow = (surface) => {
+    const win = rootFor(surface);
+    if (!win) return { surface, refuse: `surface not found: ${surface}` };
     const wr = win.getBoundingClientRect();
-    if (!wr.width || !wr.height) return { title, refuse: 'window is 0x0 — measurement invalid' };
+    if (!wr.width || !wr.height) return { surface, refuse: 'surface is 0x0 — measurement invalid' };
     const body = win.querySelector('.fwin-body') || win;
     const winArea = wr.width * wr.height;
     const regions = [];
     let controlsSkipped = 0;
+    const pathOf = (el) => {
+      const parts = [];
+      let node = el;
+      while (node && node !== body) {
+        const parent = node.parentElement;
+        if (!parent) return null;
+        parts.push([...parent.children].indexOf(node));
+        node = parent;
+      }
+      return node === body ? parts.reverse() : null;
+    };
     const walk = (el, d) => {
       if (d > ARG.maxDepth) return;
       for (const c of el.children) {
@@ -154,8 +200,10 @@
             box: `${Math.round(b.width)}x${Math.round(b.height)}`,
             areaPct: Number(areaPct.toFixed(1)),
             el: c,
+            path: pathOf(c),
             role: cls.role,
-            evidence: `text=${cls.text} forms=${cls.forms} rows=${cls.rows} li=${cls.items} foc=${cls.focusables} nav=${cls.isNav}`,
+            evidence: `text=${cls.text} forms=${cls.forms} rows=${cls.rows} li=${cls.items} foc=${cls.focusables} contextual=${cls.isContextual}`,
+            sharedPrimitive: cls.sharedPrimitive,
             ownAlpha: own.alpha,
             ownBackdrop: own.backdrop,
             translucentBacking: back.translucent,
@@ -179,8 +227,9 @@
     const denseOnGlass = work.filter((r) => r.translucentBacking);
     for (const r of regions) delete r.el;
     return {
-      title,
+      surface,
       box: `${Math.round(wr.width)}x${Math.round(wr.height)}`,
+      presentation: win.getAttribute('data-presentation') || '(root)',
       windowOwnPaint: paintOf(win),
       regions: regions.length,
       controlsSkipped,
@@ -194,6 +243,7 @@
       denseWorkOnTranslucent: denseOnGlass.length,
       denseWorkOnTranslucentList: denseOnGlass.map((r) => `${r.sel} (${r.backingReason})`),
       liquidTreatedEligible: eligible.filter((r) => r.translucentBacking || r.ownBackdrop).length,
+      sharedPrimitiveEligible: eligible.filter((r) => r.sharedPrimitive).length,
       eligibleTotal: eligible.length,
       detail: regions,
     };
@@ -203,6 +253,6 @@
     theme: document.documentElement.getAttribute('data-theme'),
     materials: document.documentElement.getAttribute('data-materials'),
     viewport: `${window.innerWidth}x${window.innerHeight}`,
-    windows: ARG.titles.map(measureWindow),
+    windows: ARG.surfaces.map(measureWindow),
   });
 })()

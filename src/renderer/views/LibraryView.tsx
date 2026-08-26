@@ -53,6 +53,7 @@ import {
   ReadingCanvas,
   type ReadingCanvasTool,
 } from '../components/liquid/ReadingCanvas';
+import { ContextualSurface } from '../components/liquid/LiquidSurface';
 import { READING_CANVAS_FILL_POLICY } from '../../shared/liquidReadingCanvas';
 import { readingWorkspaceEntryFromLibraryItem } from '../../shared/readingWorkspace';
 import { resolveReadingWorkspaceActions } from '../../shared/readingWorkspaceActions';
@@ -865,7 +866,7 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
   return (
     <AppChrome menus={libMenus} status={libStatus} className="aero-library-chrome">
     <div className={`library${aero ? ' aero-library' : ''}`} onClick={() => setFileMenu(null)}>
-      <header className="view-head">
+      <ContextualSurface as="header" className="view-head">
         <p className="muted">{t('library.intro')}</p>
         <div className="actions">
           <button className="btn primary" disabled={busy} onClick={importFiles}>
@@ -884,7 +885,7 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
             {t('library.btn.randomWiki')}
           </button>
         </div>
-      </header>
+      </ContextualSurface>
 
       {wikiOpen && (
         <>

@@ -706,6 +706,12 @@ Novels was driven on 1Q84 page 2/2, the adverse state that previously failed 70.
 last-page remainder: **5.0 / 10.0 / 2.6** dead, 0 loss on every other bar. Proof falsification
 moved 5.0 → 8.8 → 5.0 and restored. Board **24 of 48**; L6 Gate remains open on other categories.
 
+**L6 Gate, category 3 — 1 of 6 surfaces, 2026-08-26** (checkpoint containing this entry).
+The reusable harness now exists and accepts title/`@selector` roots; Library earned 10/10 only after
+its local `header.view-head` adopted `ContextualSurface`. Liquid: 0 dense-work regions on glass,
+1/1 contextual regions treated and 1/1 on a shared primitive; control 0→1, all-glass 3/3, restored
+0. Conventional mode stayed unpainted. Board **25 of 48**; L6 Gate remains open.
+
 **L6 Gate, category 1 — 2 of its 6 surfaces, 2026-08-25 (later 21)** (`e41a85ce`, `16e8ed1c`).
 Captures **10/10** and Immersion **10/10**, both live, raised, control fired. Immersion earned it
 with a product fix, not a re-read: **34 controls under the 32px pointer floor → 0**, via a new
