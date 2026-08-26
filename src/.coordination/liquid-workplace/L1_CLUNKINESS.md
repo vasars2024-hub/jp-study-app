@@ -653,3 +653,68 @@ its own reference and kept clicking; the next arm snapshotted 91 controls (a men
 opened) and armed on 35, and its bait correctly read `changed:true`. A live sweep is now flagged
 `abort` and the arm refuses; `run()` also parks a throw on the state, because `void run()` turned any
 exception into a permanent `done:false`.
+
+## 2026-08-26 · primary — category 2 gets its harness, and Reading Finder could not finish its own task
+
+`probes/cat2-clunkiness.cjs`, surface-parameterised, built per RULE 1 from the three one-offs that
+each hardcoded Dictionary: `l1-clunkiness.js` (arm), `-control.js` (controls), `-read.js` (read).
+Those three were arm / drive-by-hand / read — the DRIVE was the part that lived in a worker's head,
+which is why every surface cost a fresh transcript. The drive is now an argument: a step DSL of
+`click` / `type` / `clear` / `key` / `wait`, `>>`-separated, plus `click?:` for restore steps.
+
+| surface | inputs | dead ends | modal traps | scroll traps | worst recv | parity | verdict |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Reading Finder | 3 keys + 1 click | 0 of 2 | 0 | 0 | 26.2 ms | 4 = 4 | **PASS 10/10** |
+| Library | 3 clicks | 0 of 3 | 0 | 0 | 37.2 ms | 3 = 3 | **PASS 10/10** |
+
+Both with their own negative control fired, not one inherited: dead end / modal trap / scroll trap
+each moved `0 → 1` and each returned to `0`, `backToBaseline: true`. Evidence in
+`baselines/cat2-l6-{captures,library}.json`.
+
+**Reading Finder was a FAIL before the fix, and the harness could not even score it.** Its dominant
+task is filter the catalogue, open a match. Typing a query swapped `ReadingSiteGrid` out for
+`ReadingUnifiedDiscovery` wholesale — and that panel renders nothing until Search is pressed,
+because its results come from providers it has not run. "NHK" gave the count **"1 site"** above an
+idle "Press Search" prompt and **0 cards**. The harness refused: `click:.rf-card: no match in
+surface`. That is what a dead end looks like when the control is absent rather than inert.
+Fixed at `ReadingFinderView.tsx:119`; mutation control turns 2 of the 4 new tests red.
+
+**A previous fix had already patched the neighbouring half** — the comment above `catalogueNoMatch`
+is about a query with ZERO matches leaving "0 sites" beside nothing. That branch was added and this
+one left. The test therefore pins the RELATION over both cases, not a third special case.
+
+**The instrument floor, which no one-off probe here ever produced.** The control's injected
+handler-less button repaints nothing, so its click is the floor: **0.2 ms** of `recvMs`, against a
+worst `stampMs` of **83.1 ms** on the same run. So the renderer-side clock has essentially no floor
+and the rubric's 100 ms bar is genuinely measurable, while `ev.timeStamp` spends most of the bar on
+the main→renderer hop. `stampMs` stays recorded and stays unscored.
+
+**Five corrections are new, and each produced a false number during the build.** Full text in the
+harness header; the two that will bite anyone extending it:
+- **(11) a REAL click focuses its own target.** `/click` is `sendInputEvent`, not `el.click()`, so
+  Chromium moves focus exactly as it would for a human — and counting that as "the surface moved"
+  made **every dead end invisible**. Caught only because the negative control failed to falsify its
+  own injected dead end. Focus landing ON the pressed control is masked; anywhere else is real.
+- **(13/16) `/type` appends at the caret**, so a second pass typed `NHKNHKNHK` and measured a query
+  matching nothing. `type:` normalises its field first — and that normalisation must run BEFORE the
+  baseline, or the undo assertion is circular: the undo correctly empties the field and the restore
+  then reads as failed against a base that was never resting.
+
+**(12) The Standard-vs-Liquid term finally has a second half.** L1's only delta came from two
+different windows that happened to host the same component, so it carried a size difference too,
+and none of L6's six surfaces has such a twin — which is how the term stayed NOT MEASURABLE. Every
+`.fwin` carries `button.fwin-b-liquid`, so `--both-presentations` drives one window, one geometry,
+one task, both presentations, and asserts the flip and the geometry on the way back.
+
+**Disclosed side effect.** Scoring the modal bar REQUIRES pressing Escape, so a dialog open when a
+run starts and obeying Escape is left CLOSED. Reported as `dialogsClosedByEscape`, never silent.
+On Reading Finder this closed `aside.rf-drawer` — correctly, it is not a trap.
+
+**Next surface is VN, and its selectors are already derived** so the next turn drives immediately:
+root `@.visual-novel-panel` (open inside the Immersion `.fwin`, z=386, topmost). Dominant task is
+adding a visual novel — `type:.visual-novel-add > input:nth-of-type(1)=<title>` then
+`click:.visual-novel-add > button` (Browse is nested one level deeper, so `>` excludes it; `Add to
+library` is disabled until the title field is non-empty, which is the enable this task proves).
+**The undo writes real user data**: removal is `window.api.visualNovelRemove(selected.id)` behind
+`t('vnPanel.remove')` at `VisualNovelPanel.tsx:764`, and it needs the entry SELECTED first. That is
+why this was not opened in a turn's last minutes rather than left half-driven.
