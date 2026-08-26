@@ -29,15 +29,32 @@ import {
 } from '../flashcardDeck';
 import { removeSaved } from '../savedWords';
 import { useT } from '../i18n';
+import { useState } from 'react';
 
 interface FlashcardsViewProps {
   hideAiStudio?: boolean;
 }
 
+/**
+ * How many rows an expanded deck group shows before it says it is a page.
+ *
+ * This surface renders every row it shows, unlike the Study OS deck browser
+ * (`FlashcardsContent.tsx`), which hands the same `group.cards` to `VirtualList`
+ * uncapped. Virtualising here would be wrong twice over: `.aero-flash-card-row`
+ * is `min-height`, not a fixed height, and its `:nth-child(even)` striping is
+ * computed from real siblings — a windowed list has none for the rows it has not
+ * mounted. So the cap stays and becomes reachable instead, which is the same
+ * shape as the dictionary's page (`shared/dictionaryLookup.ts`).
+ */
+const AERO_DECK_PAGE = 80;
+
 export default function FlashcardsView({ hideAiStudio = false }: FlashcardsViewProps = {}) {
   const { t } = useT();
   const aero = useAeroMaterials();
   const state = useFlashcards(hideAiStudio);
+  // Keyed by group, so expanding one deck does not silently expand the others —
+  // and so collapsing a group and reopening it comes back at page one.
+  const [cardPage, setCardPage] = useState<Record<string, number>>({});
   const {
     saved,
     folders,
@@ -375,6 +392,8 @@ export default function FlashcardsView({ hideAiStudio = false }: FlashcardsViewP
                         const groupKey = `${group.bookId}::${group.bookTitle}`;
                         const collapsed = collapsedBooks[groupKey] ?? false;
                         const knownCount = group.cards.filter((card) => card.known).length;
+                        const shown = Math.min(cardPage[groupKey] ?? AERO_DECK_PAGE, group.cards.length);
+                        const hidden = group.cards.length - shown;
                         return (
                           <section key={groupKey} className="aero-flash-group">
                             <div
@@ -423,7 +442,7 @@ export default function FlashcardsView({ hideAiStudio = false }: FlashcardsViewP
                             </div>
                             {!collapsed && (
                               <div className="aero-flash-card-rows">
-                                {group.cards.slice(0, 80).map((card) => (
+                                {group.cards.slice(0, shown).map((card) => (
                                   <div
                                     key={card.id}
                                     className="aero-flash-card-row"
@@ -474,6 +493,39 @@ export default function FlashcardsView({ hideAiStudio = false }: FlashcardsViewP
                                     </span>
                                   </div>
                                 ))}
+                                {/*
+                                  The header cell beside this list has always rendered
+                                  `group.cards.length` — the TRUE total — while the list itself
+                                  stopped at 80 and said nothing. A deck of 247 showed "247" and
+                                  147 rows that did not exist, with no control that could reach
+                                  them. The count is read from the same array that is sliced, so
+                                  it cannot drift from what is rendered.
+                                */}
+                                {hidden > 0 && (
+                                  <div className="aero-flash-card-row">
+                                    <span className="muted">
+                                      {t('flash.aero.deck.showingOf', {
+                                        shown,
+                                        total: group.cards.length,
+                                      })}
+                                    </span>
+                                    <span />
+                                    <span />
+                                    <span className="aero-flash-row-actions">
+                                      <Button
+                                        size="sm"
+                                        onClick={() =>
+                                          setCardPage((prev) => ({
+                                            ...prev,
+                                            [groupKey]: shown + AERO_DECK_PAGE,
+                                          }))
+                                        }
+                                      >
+                                        {t('flash.aero.deck.showMore')}
+                                      </Button>
+                                    </span>
+                                  </div>
+                                )}
                               </div>
                             )}
                           </section>

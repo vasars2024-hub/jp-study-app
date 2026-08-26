@@ -6001,6 +6001,8 @@ export const en: Catalog = {
   'flash.aero.table.folder': 'Folder',
   'flash.aero.table.actions': 'Actions',
   'flash.aero.remove': 'Remove',
+  'flash.aero.deck.showingOf': 'Showing {shown} of {total} cards.',
+  'flash.aero.deck.showMore': 'Show more',
   'flash.aero.empty.dictionary': 'No saved words yet. Open Dictionary or highlight a word while reading to save it here.',
   'flash.aero.readyCount': '{count} ready',
   'flash.aero.import': 'Import',

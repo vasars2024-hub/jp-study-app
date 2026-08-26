@@ -5679,6 +5679,8 @@ export const ja: Catalog = {
   'flash.aero.table.folder': 'フォルダ',
   'flash.aero.table.actions': '操作',
   'flash.aero.remove': '削除',
+  'flash.aero.deck.showingOf': '{total}件中{shown}件を表示しています。',
+  'flash.aero.deck.showMore': 'もっと表示',
   'flash.aero.empty.dictionary': 'まだ保存された単語がありません。辞書を開くか、読書中に単語を選択してここに保存してください。',
   'flash.aero.readyCount': '準備完了 {count}',
   'flash.aero.import': 'インポート',

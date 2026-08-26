@@ -5653,6 +5653,8 @@ export const zh: Catalog = {
   'flash.aero.table.folder': '文件夹',
   'flash.aero.table.actions': '操作',
   'flash.aero.remove': '移除',
+  'flash.aero.deck.showingOf': '显示 {total} 张中的 {shown} 张。',
+  'flash.aero.deck.showMore': '显示更多',
   'flash.aero.empty.dictionary': '还没有保存的单词。打开词典，或在阅读时选中单词即可保存到这里。',
   'flash.aero.readyCount': '{count} 张就绪',
   'flash.aero.import': '导入',

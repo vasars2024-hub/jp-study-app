@@ -6300,6 +6300,8 @@ export const ru: Catalog = {
   'flash.aero.table.folder': 'Папка',
   'flash.aero.table.actions': 'Действия',
   'flash.aero.remove': 'Удалить',
+  'flash.aero.deck.showingOf': 'Показано {shown} из {total} карточек.',
+  'flash.aero.deck.showMore': 'Показать ещё',
   'flash.aero.empty.dictionary': 'Сохранённых слов пока нет. Откройте словарь или выделите слово при чтении, чтобы сохранить его здесь.',
   'flash.aero.readyCount': '{count} готово',
   'flash.aero.import': 'Импорт',
