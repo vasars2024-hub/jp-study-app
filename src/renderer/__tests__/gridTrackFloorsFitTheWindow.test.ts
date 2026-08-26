@@ -339,6 +339,63 @@ describe('grid track floors fit the narrowest window the product allows', () => 
    * `l1-use-of-space.js`'s `clipped` and `hiddenOverflowX`, already parameterised by
    * surface — and the assertions here are named latches that stop a fixed rule regressing.
    */
+
+  /**
+   * The px twin of the rem sweep at the top of this file, and it is NOT the same check with a
+   * different unit — the scope has to be narrower, for a reason worth writing down once.
+   *
+   * A bare px floor appears in two shapes. In an EXPLICIT template — `minmax(320px, 1fr)
+   * minmax(0, 1fr)` — the floor names one of a fixed number of columns and clamping it with
+   * `min()` is not the fix; that shape wants `minmax(0, …)` or a narrow-layout rule, decided
+   * per surface. Counted 2026-08-26 against HEAD's own blobs rather than the shared tree, which
+   * carries other tracks' edits: 69 bare px floors over 212px across the 67 tracked sheets under
+   * `src/renderer`, and only 17 of them are the `repeat()` shape. Sweeping all 69 would have
+   * demanded 52 unrelated layout decisions in one slice.
+   *
+   * In a `repeat(auto-fill | auto-fit, …)` the floor does something the rem sweep's own header
+   * describes and something extra: it is a hard minimum that leaves the frame in a narrower
+   * container, AND it is what decides the column COUNT, so a floor well under the card's
+   * comfortable width spends extra width on more, thinner columns instead of on the content.
+   * Both halves measured live on the Reading Finder through `probes/cat4-use-of-space.cjs`:
+   * at the 260x170 compact leg the 280px `.res-grid` track read `280>202` through
+   * `.reading-workspace-panel`'s `overflow-x: hidden` and clipped 40 boxes with no scrollbar
+   * to reach them; at maximized the same rule took four 296px columns in a 1226px pane — the
+   * card is NARROWER at maximized than the 380px it gets at the shipped 820x580 — leaving a
+   * 1262x164 dead band under the last row, 20% of the viewport against a bar of 15, with the
+   * dominant canvas FALLING 42.9 -> 35.7%.
+   *
+   * After: clipped 40 -> 0, hiddenOverflowX 1 -> 0, dead 20 -> 7.2%, canvas 35.7 -> 50.6%,
+   * verdict FAIL -> PASS 10/10 at all three sizes with the injected clip firing 0 -> 1 -> 0.
+   */
+  it('every auto-fill card grid clamps a track floor wider than the window minimum', () => {
+    const offenders: string[] = [];
+    for (const sheet of SHEETS) {
+      const css = strip(read(sheet));
+      // The `min(` that tells a clamped floor from a bare one sits INSIDE `minmax(`, so the
+      // two forms differ by their fourth token, not by anything the rem sweep's regex sees.
+      const re = /repeat\(\s*auto-fi(?:ll|t)\s*,\s*minmax\(\s*(\d+(?:\.\d+)?)px\s*,/g;
+      let m = re.exec(css);
+      while (m) {
+        if (Number(m[1]) > NARROWEST_CONTENT_PX) offenders.push(`${sheet} ${m[0]}`);
+        m = re.exec(css);
+      }
+    }
+    expect(
+      offenders,
+      `bare px auto-fill floors wider than ${NARROWEST_CONTENT_PX}px`,
+    ).toEqual([]);
+  });
+
+  it('the shared card grid keeps a floor the card is actually comfortable at', () => {
+    const styles = strip(read('src/renderer/styles.css'));
+    const rule = /\.res-grid\s*\{([^}]*)\}/.exec(styles)?.[1] ?? '';
+    expect(rule, '.res-grid rule').not.toBe('');
+    // Both halves, because each one alone leaves half the defect. The clamp is what stops the
+    // 40 clipped boxes at a 202px pane; the 320px floor is what stops the fourth thin column
+    // at a 1226px one. A `min(280px, 100%)` would pass a clamp-only check and still score the
+    // maximized leg FAIL on dead region and on the canvas share.
+    expect(rule).toMatch(/repeat\(auto-fill,\s*minmax\(min\(320px,\s*100%\),\s*1fr\)\)/);
+  });
 });
 
 function read(p: string): string {

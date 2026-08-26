@@ -164,7 +164,7 @@
   --aero-special-text: var(--text);
   --aero-special-muted: var(--muted);
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
   gap: 8px;
   margin-top: 12px;
 }

@@ -1033,7 +1033,7 @@
 
 .scr-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
   gap: var(--space-md);
   align-items: start;
 }
@@ -1490,7 +1490,7 @@
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
   gap: var(--space-2xs) var(--space-lg);
   max-height: 320px;
   overflow: auto;
@@ -3087,7 +3087,7 @@
 
 .scr-kv {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
   gap: var(--space-sm) var(--space-lg);
   margin: 0;
 }
@@ -3912,7 +3912,7 @@
 .scr-profile-grid,
 .scr-plugin-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
   gap: var(--space-md);
 }
 

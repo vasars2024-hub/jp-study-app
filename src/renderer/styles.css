@@ -1814,7 +1814,7 @@ h1 {
 }
 
 .mining-form-grid-wide {
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
   gap: 14px;
 }
 
@@ -8069,9 +8069,21 @@ mark.lookup-mark,
   margin: 0;
   font-size: 13px;
 }
+/* The column FLOOR is what decides how many columns `auto-fill` takes, so a floor well under the
+   card's comfortable width spends extra width on more, thinner columns instead of on the content.
+   Measured 2026-08-26 on the Reading Finder: at the shipped 820x580 the cards are 380px wide, and
+   at maximized (a 1226px pane) the same cards are **296px** — the window grew and the card shrank.
+   The catalogue then ran 4 across x 2 down and left a 1262x164 dead band under the last row, 20%
+   of the viewport against a bar of 15, with the dominant canvas FALLING 42.9 -> 35.7%.
+   A 320px floor takes three ~400px columns at that pane instead of four thin ones, and leaves the
+   two-column default untouched.
+   `min(320px, 100%)`: a fixed floor is an overflow, not a floor, once the pane is narrower than
+   one card. At the 260x170 compact leg the 280px track measured 280>202 inside
+   `.reading-workspace-panel`'s `overflow-x: hidden` and clipped 40 boxes with no scrollbar to
+   reach them. */
 .res-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
   gap: 12px;
 }
 .res-card {
@@ -8221,7 +8233,7 @@ mark.lookup-mark,
 }
 .bundles-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr));
   gap: 12px;
 }
 .bundle-card {
@@ -8466,7 +8478,7 @@ mark.lookup-mark,
 }
 .bundle-download-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
   gap: 10px;
 }
 .bundle-setup-explanation {
@@ -10648,7 +10660,7 @@ mark.lookup-mark,
 }
 .media-player-diagnostics-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
   gap: 7px;
   max-height: 330px;
   overflow: auto;
@@ -22775,7 +22787,7 @@ html.lockscreen-widget-root #root {
 
 .special-game-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(230px, 100%), 1fr));
   gap: 10px;
   margin-top: 12px;
 }
@@ -26104,7 +26116,7 @@ html[data-seanime-dev-panel] .seanime-host-launcher {
 /* v1.0 audit 4.1 — Recommended icon placements (Settings > Desktop layout). */
 .os-icon-presets {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
   gap: 8px;
   margin-top: 10px;
 }
