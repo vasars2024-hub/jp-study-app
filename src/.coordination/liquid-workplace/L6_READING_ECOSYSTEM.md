@@ -1421,3 +1421,45 @@ frames against **that**; L0's numbers are carried as `l0Provenance` and are neve
 Anything in this file quoting absolute frame ms across sessions is suspect for the same reason.
 
 Evidence: `baselines/cat7-captures-perf.json`.
+
+## 2026-08-26 — Category 7 as a RUN: Library and Immersion, and one phantom defect killed
+
+RULE 1's promise tested. Captures cost a BUILD; these two cost a spec line and a run each. The
+category-7 driver was not touched for either.
+
+| surface | scene | drag p95 | resize p95 | theme p95 | >100 ms | worst main | heavy op | score |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| captures | 1 win / 181 el | 16.9 | 16.8 | 16.8 | 0 | 12.0 | 20 captures selected, 81 samples / 2,516 ms, max 10.0 | **10/10** |
+| library | 1 win / 453 el | 16.8 | 33.4 → 16.8 | 16.8 | 0 | 12.7 | whole shelf scrolled, 82 samples / 2,512 ms, max 9.0 | **10/10** |
+| immersion | 1 win / 245 el | 16.9 | 33.4 → 16.9 | 16.8 | 0 | 11.0 | site rail scrolled, 81 samples / 2,516 ms, max 9.1 | **10/10** |
+
+Session ceiling 16.7 / 16.8 ms throughout. Theme apply→painted 19.1 / 31.5 / 26.3 ms, restore
+31.0–33.6 ms, `data-theme` back to `forest-night` every time. Control fired on all three: the
+`-Jank` drag put **12** frames over 100 ms against each clean run's **0**. Main RSS moved
+80.6→82.8, 115.7→94.0, 88.5→90.2 MB. Every leg carried `scene_stable: true`.
+
+**A single gesture reading is noise, and it nearly cost the next worker a turn.** Library's
+first scored resize returned **p95 66.9 / max 200.5 / 3 frames over 100 ms** and the runner
+reported two findings against it. It does not reproduce: three re-runs on the same mount and
+three more on a freshly closed-and-reopened window all returned **p95 16.8 / max 17.0 / 0 over
+100**. So it is not a Library defect and it is not first-mount layout cost either — a fresh
+mount's very first resize is clean. Something held the foreground for ~200 ms, and the probe's
+focus guard only catches a steal still in effect when the gesture ends. Every gesture leg now
+runs **twice**, with a third only to break a tie, and a breach is a FINDING only when the
+majority breach; a split verdict is UNSTABLE and all readings are kept. `9b2a3725`.
+
+**Novels is NOT scored and the spec now says why.** The Novels window opens on the shelf
+(`.nov-view`, four `jiten-row` books); `.novel-scroller` exists only once a volume is open, so
+the spec's old root made the runner refuse — correctly. The spec now roots at the shelf and
+carries `partial: 'reader leg (.novel-scroller) not covered'`, and the runner VOIDs any surface
+carrying `partial` however clean its numbers are. Opening a volume writes reading progress, so
+the reader leg needs a capture-restore around it. That is the next category-7 slice.
+
+**Immersion's load was changed before it ran, not after.** Clicking each site card navigates the
+embedded browser to a live site — network work on the user's own connection with real state
+behind it. The rubric's "heaviest real operation" never licenses a side effect the score does
+not need, so the load is the site rail scrolled instead.
+
+Board: rubric cells **35 → 38 of 48**. Remaining: category 5 on all six L6 surfaces (no harness
+yet — that is the eighth and last to build), category 7 on novels / manga / vn, and the VN
+category-6 cell, still PARKED on an empty VN library behind a native OS dialog.

@@ -105,21 +105,30 @@ const SPECS = {
     title: 'Immersion',
     root: '.immersion-root',
     heavy: {
-      label: 'cycle every immersion site',
-      durationMs: 3000,
-      js: `(() => { const rows = Array.from(document.querySelectorAll('.immersion-site-list li button, .immersion-site-list li')); rows.forEach((r, i) => setTimeout(() => r.click(), i * 20)); return 'clicking ' + rows.length; })()`,
+      // The rail is a scrolling collection of 20 site cards; scrolling it is the surface's
+      // real load. CLICKING each card is NOT usable here -- a card navigates the embedded
+      // browser to a live site, which is network work on the user's own connection and
+      // changes real state. The rubric's "heaviest real operation" never means "cause a
+      // side effect the score does not need".
+      label: 'scroll the whole site rail',
+      durationMs: 2500,
+      js: scrollAll('.immersion-root'),
     },
-    collection: { container: '.immersion-rail', row: '.immersion-site-list li', scroller: '.immersion-site-list' },
+    collection: { container: '.immersion-root', row: '.immersion-site-row' },
   },
   novels: {
     title: 'Novels',
-    root: '.novel-scroller',
-    heavy: {
-      label: 'scroll the rendered novel',
-      durationMs: 2500,
-      js: scrollAll('.novel-scroller'),
-    },
-    collection: { container: '.novel-scroller', row: '.novel-page, p' },
+    // The Novels window opens on the SHELF (`.nov-view`, a `jiten-table-wrap` of book rows),
+    // not on a rendered book -- `.novel-scroller` only exists once a volume is open. Rooting
+    // at `.novel-scroller` made the runner refuse, which was the runner behaving correctly on
+    // a spec that named a surface the window does not show.
+    root: '.nov-view',
+    heavy: { label: 'scroll the whole novel shelf', durationMs: 2500, js: scrollAll('.nov-view') },
+    collection: { container: '.nov-view', row: '.jiten-row' },
+    // NOT a complete category-7 cell on its own: the READER (`.novel-scroller`) is the heavy
+    // half of this surface and needs a volume open, which writes reading progress. Score the
+    // reader in the same run before calling Novels a 10.
+    partial: 'reader leg (.novel-scroller) not covered',
   },
   manga: {
     title: 'Manga',
@@ -317,6 +326,10 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
     voided.push(`CONTROL DID NOT FAIL: -Jank produced ${legs.dragJank.frames_over_100} frames over 100 ms against the clean run's ${legs.drag.frames_over_100}. The recorder is not seeing the frames it claims to and every number here is void.`);
   }
 
+  // A spec that admits it covers only part of its surface cannot score 10, however clean the
+  // numbers are. Silently scoring the reachable half is exactly the flattering-number failure
+  // the pin forbids.
+  if (spec.partial) voided.push(`PARTIAL SURFACE: ${spec.partial}`);
   const score = voided.length ? 'VOID' : findings.length === 0 ? 10 : 0;
   const out = {
     surface: SURFACE, title: spec.title, root: spec.root,
