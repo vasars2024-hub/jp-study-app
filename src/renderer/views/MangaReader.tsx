@@ -48,6 +48,7 @@ import { getZoomFactor } from '../appZoom';
 import MangaReaderSettingsPanel from '../components/manga/MangaReaderSettingsPanel';
 import {
   loadMangaReaderSettings,
+  navZoneRoles,
   saveMangaReaderSettings,
   type MangaReaderSettings,
 } from '../mangaReaderSettings';
@@ -1306,6 +1307,10 @@ export default function MangaReader({ item, onClose }: Props) {
 
   const modelsMissing = !engineReady;
   const clickToTurnPages = mangaSettings.clickToTurnPages;
+  // The side a nav zone sits on and the page it turns to are opposites in RTL, so the accessible
+  // name has to follow the DELTA and not the side. Naming by side announced the exact reverse of
+  // what the control did in every right-to-left volume.
+  const navZones = navZoneRoles(mangaSettings.readerLayout);
   const pageFit = mangaSettings.pageFit || 'limit-all';
   const displayPage = showTranslated && translatedPage ? translatedPage : mokuroPage;
   const { wrap: wrapStyle, img: imgFitStyle } = mangaPageFitStyles(
@@ -1856,11 +1861,11 @@ export default function MangaReader({ item, onClose }: Props) {
         policy={READING_CANVAS_FILL_POLICY}
       >
         <div className={`reader-stage manga-stage${isTtb ? ' manga-stage-ttb' : ''}`} ref={stageRef}>
-          {!isTtb && (
+          {!isTtb && clickToTurnPages && (
             <button
               className={`nav-zone left${mangaSettings.hoverHintsEnabled ? ' hint-enabled' : ''}`}
-              onClick={() => clickToTurnPages && go(mangaSettings.readerLayout === 'rtl' ? 1 : -1)}
-              aria-label={t('manga.prevPage')}
+              onClick={() => go(navZones.left.delta)}
+              aria-label={t(navZones.left.label)}
             />
           )}
           {pages.length === 0 ? (
@@ -1927,11 +1932,11 @@ export default function MangaReader({ item, onClose }: Props) {
               ))}
             </div>
           )}
-          {!isTtb && (
+          {!isTtb && clickToTurnPages && (
             <button
               className={`nav-zone right${mangaSettings.hoverHintsEnabled ? ' hint-enabled' : ''}`}
-              onClick={() => clickToTurnPages && go(mangaSettings.readerLayout === 'rtl' ? -1 : 1)}
-              aria-label={t('manga.nextPage')}
+              onClick={() => go(navZones.right.delta)}
+              aria-label={t(navZones.right.label)}
             />
           )}
         </div>

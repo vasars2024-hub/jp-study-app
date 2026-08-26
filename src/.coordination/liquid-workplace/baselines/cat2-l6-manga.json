@@ -1,0 +1,164 @@
+{
+  "label": "l6-manga",
+  "surface": "@.reader",
+  "win": "main",
+  "task": "click:.nav-zone.right >> wait:700 >> click:.nav-zone.right",
+  "presentation": "main-window section (no per-window presentation)",
+  "raised": "root surface - no taskbar button",
+  "base": {
+    "textRuns": 45,
+    "controlCount": 34,
+    "box": "1264x821",
+    "results": null
+  },
+  "inputCost": {
+    "clicks": 2,
+    "keystrokes": 0,
+    "total": 2
+  },
+  "latencyMs": {
+    "clickRecv": [
+      20.1,
+      17.4
+    ],
+    "inputRecv": [],
+    "worstRecv": 20.1,
+    "overBar100": 0,
+    "n": 2,
+    "clickStampUnscored": [
+      22.3,
+      18.4
+    ],
+    "inputStampUnscored": [],
+    "worstStampUnscored": 22.3
+  },
+  "steps": [
+    {
+      "step": "click:.nav-zone.right",
+      "target": {
+        "sel": ".nav-zone.right",
+        "label": "",
+        "disabled": false,
+        "at": "819,413"
+      },
+      "counted": true,
+      "moved": {
+        "text": true,
+        "controls": true,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": true
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "wait:700",
+      "target": null,
+      "counted": false,
+      "moved": {
+        "text": false,
+        "controls": false,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": false
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "click:.nav-zone.right",
+      "target": {
+        "sel": ".nav-zone.right",
+        "label": "",
+        "disabled": false,
+        "at": "819,413"
+      },
+      "counted": true,
+      "moved": {
+        "text": true,
+        "controls": true,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": true
+      },
+      "deadEnd": false
+    }
+  ],
+  "undo": {
+    "spec": "click:.nav-zone.left >> wait:700 >> click:.nav-zone.left",
+    "steps": [
+      "click:.nav-zone.left",
+      "wait:700",
+      "click:.nav-zone.left"
+    ],
+    "restored": true,
+    "baseHash": "andz3x",
+    "afterHash": "andz3x",
+    "liveRegionsBefore": [],
+    "liveRegionsAfter": [],
+    "textHashRoundTrip": {
+      "base": "andz3x",
+      "after": "andz3x"
+    }
+  },
+  "stepsDriven": 2,
+  "deadEndCount": 0,
+  "deadEnds": [],
+  "scrollTrapCount": 0,
+  "scrollTraps": [],
+  "openDialogs": [],
+  "modalTrapCount": 0,
+  "modalTraps": [],
+  "dialogsClosedByEscape": [],
+  "costParity": "N/A-single-path",
+  "bars": {
+    "deadEnds": true,
+    "modalTraps": true,
+    "scrollTraps": true,
+    "latency": true,
+    "costParity": "N/A-single-path"
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "unmeasuredBars": [],
+  "notMeasuredHere": [
+    "dead controls outside the dominant-task path (honesty-probe A - every control driven)",
+    "mute-pair explanation quality (rubric category 8 harness)"
+  ],
+  "control": {
+    "moved": {
+      "deadEnd": true,
+      "modalTrap": true,
+      "scrollTrap": true
+    },
+    "backToBaseline": true,
+    "counts": {
+      "base": [
+        0,
+        0,
+        0
+      ],
+      "dirty": [
+        1,
+        1,
+        1
+      ],
+      "restored": [
+        0,
+        0,
+        0
+      ]
+    },
+    "inertClickRecvMs": [
+      0.1
+    ]
+  }
+}

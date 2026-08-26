@@ -139,6 +139,31 @@ export function loadMangaReaderSettings(): MangaReaderSettings {
   }
 }
 
+/**
+ * Which page each side of the stage turns to, for a given layout.
+ *
+ * The side a nav zone sits on and the page it reaches are opposites in RTL, and naming the zones
+ * by side rather than by outcome shipped a reader whose left edge advanced while announcing
+ * "Previous page". The delta and the label are derived from one value here so they cannot drift
+ * apart again, and so the invariant is testable without mounting the reader.
+ *
+ * `label` is an i18n KEY, resolved by the caller — this module must not reach into the catalogs.
+ */
+export function navZoneRoles(layout: ReaderLayout): {
+  left: { delta: 1 | -1; label: 'manga.nextPage' | 'manga.prevPage' };
+  right: { delta: 1 | -1; label: 'manga.nextPage' | 'manga.prevPage' };
+} {
+  const leftAdvances = layout === 'rtl';
+  return {
+    left: leftAdvances
+      ? { delta: 1, label: 'manga.nextPage' }
+      : { delta: -1, label: 'manga.prevPage' },
+    right: leftAdvances
+      ? { delta: -1, label: 'manga.prevPage' }
+      : { delta: 1, label: 'manga.nextPage' },
+  };
+}
+
 export function saveMangaReaderSettings(s: MangaReaderSettings): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
