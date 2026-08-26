@@ -138,6 +138,29 @@
 }
 
 /*
+ * L5 — the manga scrubber is INSIDE the footer's surface, not a card on it.
+ *
+ * `.reader-seek-wrap` is one `input[type=range]` and its hover preview. It takes
+ * the contextual primitive because it is transport and was otherwise measured as
+ * a dense-work region on translucent material — the classifier skips a lone
+ * control but not a wrapper around one. What it must NOT take is the material:
+ * a second 0.72 tint over the footer's own reads as a darker slab, and a card
+ * border and shadow around a slider inside a strip is exactly the "stack of
+ * unrelated cards" §2 rejects. It is a layout wrapper that declares its role,
+ * so it stays fully transparent and boxless and reads the footer's material
+ * through itself. Same exception as the two flush rails above, for the same
+ * reason: the primitive is adopted for what it MEANS, and the geometry is the
+ * region's own.
+ */
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid) .reader-seek-wrap.lq-contextual {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+}
+
+/*
  * L5 — the Agent conversation rail is the same shape and takes the same exception.
  *
  * `nav.agent-rail` is grid column 1 of `.agent-shell` and spans the full height of

@@ -223,6 +223,35 @@ describe('the reader host is wired to the sheet', () => {
     expect(source).not.toMatch(/reader-(bar|footer)[\s\S]{0,200}backdrop-filter/);
   });
 
+  it('MangaReader routes its three transport regions through the same primitive', () => {
+    /**
+     * The manga reader has one region the novel reader does not:
+     * `.reader-seek-wrap`, a wrapper around a single `input[type=range]`. The
+     * classifier's "a single control is not a region" skip reaches the control
+     * and not its wrapper, so it measured as dense WORK (`forms >= 1`) sitting
+     * on the footer's translucent material — the one bar the surface failed.
+     * It is the scrubber, so it declares transport like the strips around it.
+     */
+    const source = src('src/renderer/views/MangaReader.tsx');
+    expect(source).toMatch(/<ContextualSurface as="header" className="reader-bar">/);
+    expect(source).toMatch(/<ContextualSurface\s+as="footer"\s+className=\{`reader-footer lq-hit-scope/);
+    expect(source).toMatch(/<ContextualSurface className="reader-seek-wrap">/);
+  });
+
+  it('the scrubber adopts the primitive for its meaning and not its geometry', () => {
+    // Without this the footer's 0.72 tint gets a second 0.72 slab inside it and
+    // a card border around a slider — the "stack of unrelated cards" §2 rejects.
+    // Same exception the two flush rails take, and it must stay host-scoped so a
+    // conventional reader is untouched.
+    const sheet = src('src/renderer/theme/liquid-window.css').replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(sheet).toContain(`${HOSTS} .reader-seek-wrap.lq-contextual`);
+    const block = sheet.slice(sheet.indexOf('.reader-seek-wrap.lq-contextual'));
+    const body = block.slice(block.indexOf('{'), block.indexOf('}'));
+    for (const off of ['background: none', 'border: 0', 'padding: 0', 'box-shadow: none']) {
+      expect(body, off).toContain(off);
+    }
+  });
+
   it('the toggle flips its own label and carries aria-pressed', () => {
     const toggle = src('src/renderer/components/liquid/ReaderLiquidToggle.tsx');
     expect(toggle).toMatch(/liquid \? t\('desktop\.returnToStandard'\) : t\('desktop\.makeLiquid'\)/);

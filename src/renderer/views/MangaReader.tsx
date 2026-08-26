@@ -30,6 +30,7 @@ import MangaRegionDrawLayer from '../components/manga/MangaRegionDrawLayer';
 import MangaSidebar from '../components/manga/MangaSidebar';
 import { ReadingCanvas, type ReadingCanvasTool } from '../components/liquid/ReadingCanvas';
 import ReaderLiquidToggle from '../components/liquid/ReaderLiquidToggle';
+import { ContextualSurface } from '../components/liquid/LiquidSurface';
 import { useReaderPresentation } from '../readerPresentation';
 import { READING_CANVAS_FILL_POLICY } from '../../shared/liquidReadingCanvas';
 import Icon from '../components/Icons';
@@ -1794,7 +1795,15 @@ export default function MangaReader({ item, onClose }: Props) {
       style={themeStyle}
       data-presentation={presentation.dataPresentation}
     >
-      <div className="reader-bar">
+      {/*
+        Same two transport strips as NovelReader, and the same reason: §2.3
+        makes navigation and transport the regions Liquid is FOR, so they take
+        the shared contextual primitive rather than a local translucent copy.
+        The manga footer keeps `lq-hit-scope` — `.lq-contextual`'s own 32px hit
+        floor only reaches its descendants, and the scope class is what the
+        scrubber's own controls were already measured against.
+      */}
+      <ContextualSurface as="header" className="reader-bar">
         <button className="btn" onClick={requestClose}>
           <Icon name="chevron" size={13} style={{ transform: 'rotate(180deg)', marginRight: 4, verticalAlign: '-2px' }} />
           {t('manga.backLibrary')}
@@ -1864,7 +1873,7 @@ export default function MangaReader({ item, onClose }: Props) {
             <ReaderLiquidToggle liquid={presentation.liquid} onToggle={presentation.toggle} />
           )}
         </div>
-      </div>
+      </ContextualSurface>
       <ReadingCanvas
         className="manga-canvas"
         tools={readingTools}
@@ -1952,7 +1961,8 @@ export default function MangaReader({ item, onClose }: Props) {
           )}
         </div>
       </ReadingCanvas>
-      <div
+      <ContextualSurface
+        as="footer"
         className={`reader-footer lq-hit-scope${mangaSettings.pageSelectorPosition === 'left' ? ' reader-footer-left' : ''}${!footerVisible ? ' reader-footer-hidden' : ''}`}
       >
         <button
@@ -1963,7 +1973,17 @@ export default function MangaReader({ item, onClose }: Props) {
         >
           <Icon name="skip-back" size={13} />
         </button>
-        <div className="reader-seek-wrap">
+        {/*
+          One `input[type=range]` and its hover preview. The classifier's own
+          rule is that a single control is not a region — but that skip only
+          reaches the control, not a wrapper around it, so this measured as a
+          dense-work region (`forms >= 1`) sitting on the footer's translucent
+          material. It is not work; it is the scrubber, which is transport, and
+          declaring that is the honest fix. `liquid-window.css` keeps it
+          boxless, because it is part of the footer's surface and not a second
+          card floating inside it.
+        */}
+        <ContextualSurface className="reader-seek-wrap">
           <input
             className="reader-seek"
             type="range"
@@ -1998,7 +2018,7 @@ export default function MangaReader({ item, onClose }: Props) {
           {mangaSettings.showPagePreviews && previewHoverIdx != null && pages[previewHoverIdx] && (
             <img className="reader-seek-preview" src={pages[previewHoverIdx]} alt="" draggable={false} />
           )}
-        </div>
+        </ContextualSurface>
         <button
           className="btn small"
           title={t('manga.lastPage')}
@@ -2010,7 +2030,7 @@ export default function MangaReader({ item, onClose }: Props) {
         <span className="reader-pct muted">
           {pages.length ? Math.round((((scrub ?? idx) + 1) / pages.length) * 100) : 0}%
         </span>
-      </div>
+      </ContextualSurface>
 
       {settingsOpen && (
         <MangaReaderSettingsPanel

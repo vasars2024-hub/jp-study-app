@@ -1,0 +1,93 @@
+{
+  "label": "l6-manga",
+  "surface": "@.reader",
+  "win": "1",
+  "depth": 12,
+  "raised": "root surface - focused OS window",
+  "box": "1264x821",
+  "presentation": "liquid",
+  "windowOwnPaint": {
+    "alpha": 1,
+    "backdrop": null,
+    "image": null,
+    "opacity": 1
+  },
+  "regions": 23,
+  "controlsSkipped": 39,
+  "byRole": {
+    "Work": 3,
+    "Liquid-eligible": 4,
+    "Anchor": 6,
+    "Anchor(holds work)": 9,
+    "Ambient": 1
+  },
+  "denseWorkOnTranslucent": 0,
+  "denseWorkOnTranslucentList": [],
+  "liquidTreatedEligible": 4,
+  "sharedPrimitiveEligible": 4,
+  "eligibleTotal": 4,
+  "theme": "forest-night",
+  "materials": null,
+  "viewport": "1264x821",
+  "bars": {
+    "denseWorkAnchored": true,
+    "contextualTreated": true,
+    "sharedPrimitives": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "control": {
+    "target": {
+      "sel": "div.manga-ocr-layer",
+      "path": [
+        1,
+        0,
+        0,
+        1,
+        0,
+        1
+      ]
+    },
+    "counts": {
+      "base": [
+        0,
+        4,
+        4,
+        4,
+        3
+      ],
+      "oneRegionGlass": [
+        1,
+        4,
+        4,
+        4,
+        3
+      ],
+      "allGlass": [
+        3,
+        4,
+        4,
+        4,
+        3
+      ],
+      "restored": [
+        0,
+        4,
+        4,
+        4,
+        3
+      ]
+    },
+    "movedOne": true,
+    "allWorkFailed": true,
+    "returned": true,
+    "oneMaterialReturned": true,
+    "oneMaterial": {
+      "before": "none|rgba(0, 0, 0, 0)",
+      "immediate": "none|rgba(0, 0, 0, 0)",
+      "settled": "none|rgba(0, 0, 0, 0)"
+    },
+    "allGlassReturned": true,
+    "verdict": "CONTROL FAILED AS REQUIRED - category 3 instrument is proven"
+  }
+}
