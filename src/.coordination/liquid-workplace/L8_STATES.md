@@ -463,3 +463,38 @@ the byte-delta assertion is self-consistent and passes on unparseable output; on
 the opener. (2) Japanese sent as a literal through `/eval` arrives as `??`; use
 `String.fromCodePoint`. (3) The Dictionary window commits its query on the **Search** button, not
 on `input` + Enter — a native-setter type alone leaves `entries: 0` and reads as a dead surface.
+
+## 2026-08-26 · primary — the Aero deck browser printed the true count beside a list that stopped at 80
+
+**The defect, category 8 (honest states), and it is the sharpest shape of it yet.**
+`FlashcardsView.tsx:426` rendered `group.cards.slice(0, 80)`; line 404, two lines above the same
+list, rendered `group.cards.length`. A deck of 247 showed **"247" next to 80 rows** — the count and
+the list disagreeing on one screen — and no control could reach row 81.
+
+**Not a general defect: only the Aero surface caps.** `FlashcardsContent.tsx:1672` (Study OS) hands
+the same `group.cards` to `VirtualList` **uncapped**. Found by sweeping `.slice(0, N)` across the
+renderer for the Dictionary defect's shape; that sweep's other hits are string truncations, not
+collection caps, with `EpubMiningPanel.tsx:185` (`filteredCandidates.slice(0, 32)`) and
+`CommandPalette.tsx:243` (`scored.slice(0, 40)`) the two left unexamined.
+
+**Fixed by making the cap reachable, NOT by virtualising, and the reason is load-bearing.**
+`.aero-flash-card-row` is `min-height: 31px` (`aero-apps.css:725`), not a fixed height, and its
+`:nth-child(even)` striping (`:734`) is computed from real siblings — a fixed-height windowed list
+gets both wrong. So: a page row stating `shown` of `total`, read from the same array that is sliced
+so the two cannot drift, plus a button raising the page by 80. Per-group state, so expanding one
+deck does not expand the others. Same shape as the dictionary's page (`shared/dictionaryLookup.ts`),
+one turn earlier. Commit `57807712`. No CSS — reuses `.aero-flash-card-row`, `muted` and `Button`,
+which also keeps the change out of `styles.css` and `aero-apps.css`, both dirty with another
+track's hunks.
+
+**Category 7 measured on Library the same turn, and it is NOT a finding.**
+`cat7-collection-weight.cjs --title Library --container .lib-groups --row .card --scroller .fwin-body`
+→ **24 rows, 24 domRows, 354 nodes, 2150/545 = overdraw 3.9, UNWINDOWED**. Before calling that a
+defect the store was checked: the "All" chip reads **24** and is the pressed one, and `visible`
+(`LibraryView.tsx:535`) applies filters but no cap, so 24 IS the data. Virtualising 24 rows would be
+damage. Recorded so the next worker does not "fix" it. `baselines/cat7-l6-library.json`.
+
+**Trap.** The test asserts the RENDERED string per language, not key presence: an untranslated
+interpolation is invisible to both standard guards — a raw-key sweep sees a real English sentence,
+a key-count check sees nothing missing. Its third case is the negative control (each locale must
+differ from `en`; deleting a locale entry makes `translate` fall back and collapses them to equal).

@@ -1,0 +1,22 @@
+{
+  "label": "l6-library",
+  "title": "Library",
+  "container": ".lib-groups",
+  "row": ".card",
+  "rows": 24,
+  "rowsSource": "domRows",
+  "domRows": 24,
+  "nodes": 354,
+  "scrollHeight": 2150,
+  "clientHeight": 545,
+  "overdraw": 3.9,
+  "scroller": "fwin-body   ",
+  "distinctRowHeights": 2,
+  "heights": {
+    "266": 16,
+    "306": 8
+  },
+  "spacerHeight": null,
+  "verdict": "UNWINDOWED",
+  "at": "2026-08-26T05:58:33.397Z"
+}
