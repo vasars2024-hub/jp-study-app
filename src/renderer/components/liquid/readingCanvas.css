@@ -236,3 +236,24 @@
   overflow: auto;
   padding: var(--lq-space-4);
 }
+
+/* The body is where a tool's dense content lives — a definition, a transcript, a
+   catalogue — so §2.3 makes it an Anchor and the component renders it as one. It must
+   NOT also take the anchor's box: the tool panel above already draws a border, a radius
+   and an elevation, and `theme/liquid-surfaces.css` loads later at the same (0,1,0), so
+   `.lq-anchor` would win all three and put a rounded bordered card inside a rounded
+   bordered card.
+
+   `bare` is not the answer here the way it is for a toolbar field: this body keeps its
+   own padding, and hosts override it (`.immersion-body .lq-reading-tool-body` zeroes it
+   because the list pads itself). So the neutralisation is a (0,2,0) descendant rule,
+   settled by specificity like the three canvas rules above — and the padding restated
+   here still LOSES to a host's own (0,2,0) rule from a later sheet, which is what keeps
+   Immersion at 0. Measured order in the running app: readingCanvas.css 0, styles.css 24,
+   liquid-surfaces.css 36. The opaque fill is the one anchor property that survives. */
+.lq-reading .lq-reading-tool-body {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: var(--lq-space-4);
+}

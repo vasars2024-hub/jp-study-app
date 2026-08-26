@@ -80,6 +80,9 @@ describe('ReadingCanvas placement', () => {
     // over the text however it were positioned.
     expect(panel.parentElement).toBe(el.querySelector('.lq-reading'));
     expect(doc.contains(panel)).toBe(false);
+    const body = panel.querySelector('.lq-reading-tool-body')!;
+    expect(body.classList.contains('lq-anchor')).toBe(true);
+    expect(body.getAttribute('data-lq-role')).toBe('anchor');
   });
 
   it('becomes a full-canvas sheet, inert and hidden, when the document cannot keep its floor', () => {
@@ -396,6 +399,57 @@ describe('readingCanvas.css', () => {
         }
       }
     }
+  });
+
+  it('takes the anchor fill for the tool body without the anchor box', () => {
+    /*
+     * The same cascade trap as the test above, one element lower. The body is a
+     * dense region, so §2.3 makes it an `AnchorSurface` — measured on Immersion,
+     * without it the URL form beside it read `alpha 0.88 on div.immersion-toolbar`
+     * and category 3 scored 1 dense-work-on-glass. But `.lq-anchor` also declares a
+     * border, a radius and an elevation, from the later sheet at (0,1,0), and the
+     * tool panel already draws all three: the body rendered a 20px rounded bordered
+     * card inside a rounded bordered card.
+     *
+     * `background` is deliberately NOT reclaimed. The opaque fill is the whole point
+     * of the role here, and a rule taking it back would put the body on glass again.
+     */
+    const shared = readFileSync(
+      resolve(__dirname, '..', 'theme', 'liquid-surfaces.css'),
+      'utf8',
+    ).replace(/\/\*[\s\S]*?\*\//g, '');
+    const anchorBlocks = [...shared.matchAll(/([^{}]+)\{([^}]*)\}/g)]
+      .filter(([, selector]) => selector.split(',').some((s) => s.trim() === '.lq-anchor'))
+      .map(([, , body]) => body)
+      .join('\n');
+    for (const property of ['border', 'border-radius', 'box-shadow', 'background']) {
+      expect(anchorBlocks, `.lq-anchor no longer sets ${property}`).toMatch(
+        new RegExp(`(^|[;\\s])${property}\\s*:`, 'm'),
+      );
+    }
+
+    const bodyRules = [...CSS.matchAll(/([^{}]+)\{([^}]*)\}/g)].filter(([, selector]) =>
+      selector.split(',').some((s) => s.trim().endsWith('.lq-reading-tool-body')),
+    );
+    for (const property of ['border', 'border-radius', 'box-shadow']) {
+      const winners = bodyRules.filter(
+        ([, selector, body]) =>
+          new RegExp(`(^|[;\\s])${property}\\s*:`, 'm').test(body) &&
+          selector
+            .split(',')
+            .map((s) => s.trim())
+            .filter((s) => s.endsWith('.lq-reading-tool-body'))
+            .every((s) => (s.match(/\./g) ?? []).length > 1),
+      );
+      expect({ property, reclaimedByATwoClassSelector: winners.length > 0 }).toEqual({
+        property,
+        reclaimedByATwoClassSelector: true,
+      });
+    }
+    expect(
+      bodyRules.some(([, , body]) => /(^|[;\s])background\s*:/m.test(body)),
+      'a background here would put the tool body back on the panel glass',
+    ).toBe(false);
   });
 
   it('makes the document region its own containing block', () => {

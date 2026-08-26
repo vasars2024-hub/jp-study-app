@@ -45,6 +45,7 @@ import {
 } from '../../../shared/immersionLoadFailure';
 import { READING_CANVAS_FILL_POLICY } from '../../../shared/liquidReadingCanvas';
 import { ReadingCanvas, type ReadingCanvasTool } from '../liquid/ReadingCanvas';
+import { AnchorSurface } from '../liquid/LiquidSurface';
 import { articleBodyHtml, fetchReadableArticle } from '../../wikiArticle';
 import {
   clearLookupHighlight,
@@ -836,7 +837,16 @@ export function ImmersionToolbar({ state, trailing }: { state: ImmersionState; t
       >
         <Icon name="refresh" size={14} />
       </button>
-      <form
+      {/* The URL entry is a form, so §2.3 makes it an Anchor: category 3 measured it live at
+          `alpha 0.88 on div.immersion-toolbar`, dense work on the toolbar's glass. `bare` keeps
+          the box the toolbar already spaces (it went 186x32 to 186x66 without it), and `raised`
+          picks `--panel-2` — the toolbar's OWN base colour — so the fill the field now sits on
+          is the colour that was behind it before. Measured conventional delta: rgb(17,28,22) to
+          rgb(19,30,23). */}
+      <AnchorSurface
+        as="form"
+        bare
+        raised
         className="immersion-url-form"
         onSubmit={(e) => {
           e.preventDefault();
@@ -852,7 +862,7 @@ export function ImmersionToolbar({ state, trailing }: { state: ImmersionState; t
           spellCheck={false}
           autoComplete="off"
         />
-      </form>
+      </AnchorSurface>
       <div className="immersion-mode-seg" role="group" aria-label={t('immersion.viewMode.ariaLabel')}>
         {IMMERSION_MODE_CYCLE.map((m) => (
           <button

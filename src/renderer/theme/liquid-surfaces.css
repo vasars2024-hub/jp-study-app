@@ -52,6 +52,20 @@
   background: var(--lq-anchor-bg-raised);
 }
 
+/* The opaque fill and nothing else. A dense region migrated INTO existing chrome —
+   a toolbar's URL field, a tool panel's body — already sits in a box someone else
+   draws, so a second border, radius and elevation inside it is the box-in-a-box §4
+   rules out. Measured on Immersion: the URL form went 186x32 to 186x66 the moment it
+   became an anchor, a 34px conventional-pixel regression in a 580px window. The role
+   still has to win, because `alpha 0.88 on div.immersion-toolbar` is exactly the
+   dense-work-on-glass category 3 scores — so the fill stays and the box goes. */
+.lq-anchor[data-bare='true'] {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+}
+
 /* Content-first hierarchy (§4.1): an anchor's prose caps at a reading measure
    rather than running the full width of a 1920px window. Opt-in, because a
    table or a log inside an anchor must NOT be capped. */

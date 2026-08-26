@@ -211,8 +211,39 @@ describe('liquid surface primitives — rendered behaviour', () => {
       </>,
     );
     expect(container.querySelector('.lq-anchor')!.hasAttribute('data-measure')).toBe(false);
+    expect(container.querySelector('.lq-anchor')!.hasAttribute('data-bare')).toBe(false);
     expect(container.querySelector('.lq-liquid')!.hasAttribute('data-entering')).toBe(false);
     expect(container.querySelector('.lq-work')!.hasAttribute('data-raised')).toBe(false);
+  });
+
+  it('lets a bare anchor keep the fill and drop the box', () => {
+    /*
+     * The switch a migration needs. Measured on Immersion: `form.immersion-url-form`
+     * went 186x32 to 186x66 the moment it became an anchor, because the role adds a
+     * border, a radius, an elevation and 16px of padding to a field the toolbar was
+     * already spacing — a 34px conventional-pixel regression in a 580px window. The
+     * role still has to win: without it the form read `alpha 0.88 on
+     * div.immersion-toolbar`, which is exactly the dense-work-on-glass category 3
+     * scores. So `bare` drops the four box properties and keeps the fill, which is
+     * why `background` must NOT appear in the rule.
+     */
+    const container = render(<AnchorSurface bare>a</AnchorSurface>);
+    expect(container.querySelector('.lq-anchor')!.getAttribute('data-bare')).toBe('true');
+
+    const bare = blocks.filter((b) =>
+      b.selector.split(',').some((s) => s.trim() === ".lq-anchor[data-bare='true']"),
+    );
+    expect(bare.length, 'the sheet declares no bare-anchor rule').toBe(1);
+    const body = bare[0].declarations;
+    for (const property of ['border', 'border-radius', 'box-shadow', 'padding']) {
+      expect(body, `bare anchor does not drop ${property}`).toMatch(
+        new RegExp(`(^|[;\\s])${property}\\s*:`, 'm'),
+      );
+    }
+    expect(
+      /(^|[;\s])background\s*:/m.test(body),
+      'a background here would let bare change the fill the role exists to guarantee',
+    ).toBe(false);
   });
 });
 

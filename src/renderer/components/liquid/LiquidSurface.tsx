@@ -57,12 +57,27 @@ const AmbientBase = makeSurface('ambient', 'lq-ambient');
  *
  * `measure` caps direct children at `--lq-measure` for prose. Leave it off for
  * tables and logs, which need the full width.
+ *
+ * `bare` keeps the opaque fill and drops the box — no border, radius, elevation
+ * or padding. It is for a dense region being migrated INTO chrome that already
+ * draws its own box: a toolbar's URL field, a panel's body. Without it the only
+ * way to keep the conventional pixels is an app-specific override at every call
+ * site, and §2's first non-negotiable is that a migrated region looks the same
+ * until its window opts into Liquid.
  */
-export const AnchorSurface = forwardRef<HTMLElement, SurfaceProps & { measure?: boolean }>(
-  function AnchorSurface({ measure, ...rest }, ref) {
-    return <AnchorBase ref={ref} data-measure={measure ? 'true' : undefined} {...rest} />;
-  },
-);
+export const AnchorSurface = forwardRef<
+  HTMLElement,
+  SurfaceProps & { measure?: boolean; bare?: boolean }
+>(function AnchorSurface({ measure, bare, ...rest }, ref) {
+  return (
+    <AnchorBase
+      ref={ref}
+      data-measure={measure ? 'true' : undefined}
+      data-bare={bare ? 'true' : undefined}
+      {...rest}
+    />
+  );
+});
 
 /** The app's primary canvas: the scrollable body a surface fills. Opaque, calmer than anchor. */
 export const WorkSurface = makeSurface('work', 'lq-work');

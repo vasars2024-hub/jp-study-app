@@ -41,6 +41,7 @@ import {
   type ReadingCanvasPolicy,
   type ReadingToolSpec,
 } from '../../../shared/liquidReadingCanvas';
+import { AnchorSurface } from './LiquidSurface';
 import './readingCanvas.css';
 
 export interface ReadingCanvasTool extends ReadingToolSpec {
@@ -326,7 +327,7 @@ export function ReadingCanvas({
             ×
           </button>
         </div>
-        <div className="lq-reading-tool-body">{tool.content}</div>
+        <AnchorSurface className="lq-reading-tool-body">{tool.content}</AnchorSurface>
       </aside>
     );
   };

@@ -275,3 +275,45 @@ Liquid at 820x580: **0 dense Work on translucent, 1/1 treated, 1/1 shared**. Con
 **0→1**, all-glass **2/2**, restored **0**, material/style identical. **10/10.** Conventional
 geometry remained 820x580 and the nav returned to its original 0.88-alpha colour. Raw summary:
 `baselines/cat3-l6-captures.json`. Board: **26 of 48 cells**; category 3 is 2/6.
+
+## 2026-08-26 · primary — Immersion category 3 is 10/10, and the anchor grew a `bare` switch
+
+Recovered from codexA's mid-turn exit (09:30:27, three files dirty, nothing staged). The
+in-progress edit was right and load-bearing, and it was also a 34px regression; both halves
+are finished here.
+
+**The finding, measured, not assumed.** Stripping `lq-anchor` off the URL form live and
+re-running the harness produced exactly one row:
+`form.immersion-url-form (alpha 0.88 on div.immersion-toolbar=0.88)` — dense work on the
+toolbar's glass. A `form` is dense by §2.3 and by the classifier (`forms >= 1`), so the fix
+is the Anchor role, not a looser denominator.
+
+**Why `bare` exists.** `.lq-anchor` also declares border, radius, elevation and 16px padding
+from a sheet that loads later at (0,1,0). Measured: the form went **186x32 → 186x66**, a 34px
+conventional-pixel regression in a 580px window, with the field inside a rounded card the
+toolbar was already spacing. `AnchorSurface bare` keeps the fill and drops the box. Adding
+`raised` then picks `--panel-2`, the toolbar's OWN base colour, so the field sits on the
+colour that was behind it: conventional composite **rgb(17,28,22) → rgb(19,30,23)**, against
+rgb(13,20,17) for the plain `--panel` fill. Stylesheet order measured in the running app:
+readingCanvas.css 0, styles.css 24, liquid-surfaces.css 36.
+
+**`ReadingCanvas` body.** Same trap one element lower — codexA's `AnchorSurface` on
+`.lq-reading-tool-body` is kept (a tool's content is dense work and must not inherit the
+panel's glass), but the panel already draws a border, radius and elevation, so a (0,2,0)
+descendant rule in `readingCanvas.css` reclaims those three and NOT `background`. Padding is
+restated there and still loses to a host's own (0,2,0) from a later sheet, which is what keeps
+`.immersion-body .lq-reading-tool-body` at 0.
+
+**Score.** Immersion **820x580, liquid, window alpha 0.72 + blur(8px)**: 58 regions,
+**0 dense Work on translucent**, **1/1 treated**, **1/1 shared primitive**. Control:
+dense **0→1** (one region glassed), all-glass **2/2 Work failed**, restored **0** with style
+and material identical. **PASS 10/10**, raw summary `baselines/cat3-l6-immersion.json`.
+Reversibility checked by hand: back to `fwin focused`, 820x580, `rgb(12,20,16)` opaque, no
+backdrop, form still 186x32.
+
+Board: **27 of 48 cells**; category 3 is **3/6**.
+
+**Trap for the next run.** `oneMaterialReturned` read false on the first control run and true
+on an identical re-run. Cause: the first run captured `before.style === null` while the second
+captured `""` — an empty `style` attribute the previous run's own restore left behind. It is a
+harness artefact, not a surface finding; if you see it once, re-run before repairing anything.
