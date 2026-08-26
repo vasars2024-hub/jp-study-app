@@ -1,0 +1,155 @@
+{
+  "label": "l6-manga",
+  "surface": "@.reader",
+  "win": "main",
+  "rootKind": "main-window section",
+  "viewport": "1264x821",
+  "sizes": [
+    {
+      "kind": "default",
+      "box": "1264x821",
+      "clipped": 0,
+      "overlaps": 0,
+      "horizontalScrollers": 0,
+      "hiddenOverflowX": 0,
+      "deadPctViewport": 4.5,
+      "chromePct": 20.6,
+      "dominantCanvasPct": 65.5,
+      "bars": {
+        "clipped": true,
+        "overlaps": true,
+        "horizontal": true,
+        "deadRegion": true
+      },
+      "restored": true
+    },
+    {
+      "kind": "compact",
+      "box": "924x561",
+      "clipped": 0,
+      "overlaps": 0,
+      "horizontalScrollers": 0,
+      "hiddenOverflowX": 0,
+      "deadPctViewport": 3.6,
+      "chromePct": 23.8,
+      "dominantCanvasPct": 48.5,
+      "bars": {
+        "clipped": true,
+        "overlaps": true,
+        "horizontal": true,
+        "deadRegion": true
+      },
+      "restored": true
+    },
+    {
+      "kind": "maximized",
+      "box": "1600x1000",
+      "clipped": 0,
+      "overlaps": 0,
+      "horizontalScrollers": 0,
+      "hiddenOverflowX": 0,
+      "deadPctViewport": 5.7,
+      "chromePct": 16.7,
+      "dominantCanvasPct": 71.9,
+      "bars": {
+        "clipped": true,
+        "overlaps": true,
+        "horizontal": true,
+        "deadRegion": true
+      },
+      "restored": true
+    }
+  ],
+  "refusedLegs": [],
+  "detail": [
+    {
+      "kind": "default",
+      "sizeMechanism": "as found",
+      "requested": null,
+      "achieved": null,
+      "clampedByOsMinimum": null,
+      "restoredFrom": null,
+      "restoredTo": null,
+      "clippedList": [],
+      "overlapList": [],
+      "horizontalScrollerList": [],
+      "hiddenOverflowXList": [],
+      "deadRegionBox": "284x164 at grid 31,30",
+      "chromeParts": [
+        "aside.lq-reading-tool"
+      ]
+    },
+    {
+      "kind": "compact",
+      "sizeMechanism": "bridge /bounds on the OS window (root surface: no frame, no Maximize button)",
+      "requested": "260x170",
+      "achieved": "924x561",
+      "clampedByOsMinimum": true,
+      "restoredFrom": "1264x821",
+      "restoredTo": "1264x821",
+      "clippedList": [],
+      "overlapList": [],
+      "horizontalScrollerList": [],
+      "hiddenOverflowXList": [],
+      "deadRegionBox": "439x42 at grid 21,0",
+      "chromeParts": [
+        "aside.lq-reading-tool"
+      ]
+    },
+    {
+      "kind": "maximized",
+      "sizeMechanism": "bridge /bounds on the OS window (root surface: no frame, no Maximize button)",
+      "requested": "display-max",
+      "achieved": "1600x1000",
+      "clampedByOsMinimum": false,
+      "restoredFrom": "1264x821",
+      "restoredTo": "1264x821",
+      "clippedList": [],
+      "overlapList": [],
+      "horizontalScrollerList": [],
+      "hiddenOverflowXList": [],
+      "deadRegionBox": "280x325 at grid 33,25",
+      "chromeParts": [
+        "aside.lq-reading-tool"
+      ]
+    }
+  ],
+  "bars": {
+    "clipped": true,
+    "overlaps": true,
+    "horizontal": true,
+    "deadRegion": true,
+    "contentGrowsNotChrome": true,
+    "allThreeSizes": true,
+    "restored": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "unmeasuredBars": [],
+  "visibleAtEveryRead": true,
+  "notMeasuredHere": [
+    "contrast and focus order (rubric category 1 harness)",
+    "input cost and dead ends (rubric category 2 harness)"
+  ],
+  "control": {
+    "injectedClip": {
+      "moved": true,
+      "backToBaseline": true,
+      "clipped": {
+        "base": 0,
+        "dirty": 1,
+        "restored": 0
+      },
+      "removalProven": true
+    },
+    "subMinimumShrink": {
+      "requested": "200x140",
+      "box": "924x561",
+      "clipped": 0,
+      "overlaps": 0,
+      "horizontalScrollers": 0,
+      "hiddenOverflowX": 0,
+      "restored": true
+    }
+  }
+}
