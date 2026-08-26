@@ -317,3 +317,36 @@ Board: **27 of 48 cells**; category 3 is **3/6**.
 on an identical re-run. Cause: the first run captured `before.style === null` while the second
 captured `""` — an empty `style` attribute the previous run's own restore left behind. It is a
 harness artefact, not a surface finding; if you see it once, re-run before repairing anything.
+
+## 2026-08-26 · primary — VN category 3 is 10/10; the fourth surface was a RUN
+
+Zero new harness lines. `node probes/cat3-liquid-utilization.cjs --surface "@.visual-novel-panel"
+--win 1 --label l6-vn --control`, host window in Liquid presentation.
+
+**Finding.** 85 regions, **0 dense Work on translucent**, but **1 of 2 eligible treated** and
+**1 of 2 shared**. The untreated one was `header.visual-novel-panel-head` — the panel's own
+title-and-tools row, a flat plate sitting beside `aside.lq-reading-tool.lq-liquid`. It is
+navigation/transport by §2.3, so it renders through `ContextualSurface as="header"`, keeping the
+element (a landmark, not just a material) and the class. Same fix as Library's `header.view-head`
+and Reading Finder's `nav.reading-workspace-nav`; third time, so it is the pattern, not a one-off.
+
+**Score after the fix.** 782x513: **0 dense Work on translucent, 2/2 treated, 2/2 shared**,
+12 Work / 55 Anchor / 16 Anchor(holds work) / 2 Liquid-eligible. Control: dense **0→1**,
+all-glass **12/12 Work failed**, restored **0**, style and material identical. **PASS 10/10**.
+Raw summary `baselines/cat3-l6-vn.json`.
+
+**Reversibility, measured on the same element in both presentations:** Liquid `754x84`,
+`srgb(0.071 0.110 0.090 / 0.72)`; standard `754x66`, `rgba(0, 0, 0, 0)`, no backdrop, window
+still 820x580. `.lq-contextual` paints only under `.fwin-liquid`, so conventional pixels are
+untouched — pinned in the new `visualNovelLiquidRegions.test.tsx` alongside the absence of
+`.lq-liquid`, which would have glassed every conventional window at once.
+
+**Two things the next run should not rediscover.**
+1. `VisualNovelPanel.tsx` carries another track's in-flight i18n pass (139+/100-). This commit is
+   a HEAD+edit blob, verified mechanically before committing: 3 `ContextualSurface` occurrences,
+   no `<header className=` left, LF, 46,198 bytes. The worktree keeps the foreign hunks.
+2. The fixture: one library entry plus six captures, seeded through the product's own controls in
+   about 40 seconds with the recipe in `L1_USE_OF_SPACE.md`. Removed again after the run.
+
+Board: **28 of 48 cells**; category 3 is **4 of 6**. Remaining for category 3: Novels and manga,
+both `@.reader`, both needing a document open.

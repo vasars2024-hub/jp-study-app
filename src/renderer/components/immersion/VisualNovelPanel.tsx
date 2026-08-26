@@ -36,6 +36,7 @@ import ReaderCollectionPanel from '../ReaderCollectionPanel';
 import { useT } from '../../i18n';
 import { READING_CANVAS_FILL_POLICY } from '../../../shared/liquidReadingCanvas';
 import { ReadingCanvas, type ReadingCanvasTool } from '../liquid/ReadingCanvas';
+import { ContextualSurface } from '../liquid/LiquidSurface';
 import MediaLanguageProfileCard from '../media/MediaLanguageProfileCard';
 import MediaStudyAssistantPanel from '../media/MediaStudyAssistantPanel';
 import VisualNovelImportPanel from './VisualNovelImportPanel';
@@ -690,7 +691,12 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="visual-novel-panel">
-      <header className="visual-novel-panel-head">
+      {/* The panel's own title-and-tools row is navigation/transport chrome, so §2.3 makes it a
+          contextual surface rather than a local header. Category 3 measured 2 eligible regions
+          here and only 1 treated: the reading tool beside it carries `.lq-liquid` and this one
+          carried nothing, so in Liquid presentation the panel's chrome stayed a flat plate. The
+          existing class keeps the conventional pixels; `.fwin-liquid` supplies the material. */}
+      <ContextualSurface as="header" className="visual-novel-panel-head">
         <div>
           <span className="media-study-mode-kicker">Immersion library</span>
           <strong>Visual Novels</strong>
@@ -705,7 +711,7 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
           </button>
           <button type="button" onClick={onClose}>Back to browser</button>
         </div>
-      </header>
+      </ContextualSurface>
       {(status || error) && <p className={error ? 'media-error' : 'muted'} role="status">{error || status}</p>}
       <ReadingCanvas
         className="visual-novel-layout"
