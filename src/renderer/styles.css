@@ -17058,7 +17058,20 @@ html[data-taskbar-size='large'] .os-tray-btn {
   flex: 1;
   min-height: 0;
 }
+/* The split below has to reflow to THE STAGE, and the stage is the only box that knows its own
+   width: it is what the reading canvas left after docking a tool, so neither the window nor the
+   canvas predicts it. Measured 2026-08-26 — a docked tool never squeezes the document below
+   `READING_CANVAS_POLICY.minContentWidth` (384), so an 820px window can hold a 516px stage while
+   a wider window with two tools docked holds a 352px one. A `@media`, or a container on
+   `.immersion-body`, would stack the wrong one of those two.
+   `inline-size` and not `size`: the stage is a `flex: 1 1 0%` item in a COLUMN flex parent, so its
+   block size comes from the flex algorithm and must stay free. Its inline size already comes from
+   the parent's `align-items: stretch`, never from its contents, so inline-size containment changes
+   no measured value here. It is already `position: relative`, so the containment adds no new
+   containing block either. */
 .immersion-stage {
+  container-type: inline-size;
+  container-name: immstage;
   flex: 1;
   min-width: 0;
   min-height: 0;
@@ -17076,9 +17089,12 @@ html[data-taskbar-size='large'] .os-tray-btn {
 .immersion-mode-focus .immersion-stage {
   box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 50%, transparent);
 }
+/* `wrap` is a no-op at every width the side-by-side layout is used at — the reader's basis is 0,
+   so the pair can never overflow a line on its own — and it is what lets the narrow rules below
+   stack the panes without a `flex-direction` a child is unable to set. */
 .immersion-split {
   display: flex;
-  flex-direction: row;
+  flex-flow: row wrap;
   overflow: hidden;
 }
 .immersion-split .immersion-webview {
@@ -17088,12 +17104,54 @@ html[data-taskbar-size='large'] .os-tray-btn {
   flex-shrink: 0;
   border-right: 1px solid var(--border);
 }
+/* `max-height` is what `wrap` costs and it is not optional. A NOWRAP flex row sizes its items to
+   the container's definite cross size; a WRAPPING one sizes each LINE from its items' content
+   first, and `align-content: stretch` only ever grows a line into leftover space, never shrinks
+   one. So the moment `wrap` was added this reader became 1075px tall inside a 434px stage and
+   `clipped` went 0 -> 64 at the surface's own default size — the article, its pages, its
+   paragraphs, all outside the window with no scroller left to reach them. Clamping the item's
+   hypothetical cross size puts the line back at the container's height, and the reader's own
+   `overflow: auto` scrolls the remainder exactly as it did before. */
 .immersion-split-reader {
   flex: 1;
   min-width: 0;
   overflow: auto;
   max-width: none;
+  max-height: 100%;
   margin: 0;
+}
+
+/* `min-width: 220px` beats `max-width: 42%` — a minimum always wins — and `flex-shrink: 0` means
+   the webview never gives the pixel back, so the reader beside it absorbs the entire shortfall.
+   Measured live at the 260x170 the shell itself allows: a 178px stage held a 220px webview and a
+   64px reader, whose text column was 0px wide with a 97px minimum, so it grew a horizontal
+   scrollbar inside a stage that is `overflow: hidden` — 106px of the split simply gone, and the
+   reader flagged clipped. Both panes are still present below; they stop competing for one row.
+   500px is 220 (the webview's own floor) + 280 (the reader's basis at the shipped 820x580, where
+   the stage is 516). */
+@container immstage (max-width: 500px) {
+  .immersion-split .immersion-webview {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    /* The two lines have to add up to the stage, and a wrapping row gives each line the cross
+       size its own items ask for. `height: 100%` on one line and an unclamped article on the
+       other is 200% of the stage; 45 + 55 is exactly one. */
+    height: 45%;
+    min-height: 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .immersion-split .immersion-split-reader {
+    flex: 1 1 100%;
+    min-width: 0;
+    min-height: 0;
+    max-height: 55%;
+    /* 32px a side is 36% of a 178px column. The measure is what is scarce here, not the margin. */
+    padding-left: 16px;
+    padding-right: 16px;
+  }
 }
 .immersion-webview {
   display: flex;

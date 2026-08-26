@@ -1,7 +1,7 @@
 {
   "label": "l6-immersion",
   "surface": "Immersion",
-  "win": "main",
+  "win": "(focused)",
   "rootKind": "floating window",
   "viewport": "1264x821",
   "sizes": [
@@ -26,17 +26,17 @@
     {
       "kind": "compact",
       "box": "260x170",
-      "clipped": 1,
+      "clipped": 0,
       "overlaps": 0,
-      "horizontalScrollers": 1,
-      "hiddenOverflowX": 1,
+      "horizontalScrollers": 0,
+      "hiddenOverflowX": 0,
       "deadPctViewport": 0.6,
       "chromePct": 20.2,
       "dominantCanvasPct": 11.6,
       "bars": {
-        "clipped": false,
+        "clipped": true,
         "overlaps": true,
-        "horizontal": false,
+        "horizontal": true,
         "deadRegion": true
       },
       "restored": true
@@ -86,19 +86,13 @@
       "requested": "260x170",
       "achieved": null,
       "clampedByOsMinimum": null,
-      "restoredFrom": "left: 196px; top: 144px; width: 820px; height: 580px; z-index: 576;",
-      "restoredTo": "left: 196px; top: 144px; width: 820px; height: 580px; z-index: 576;",
-      "clippedList": [
-        "div.immersion-reader"
-      ],
+      "restoredFrom": "left: 196px; top: 144px; width: 820px; height: 580px; z-index: 600;",
+      "restoredTo": "left: 196px; top: 144px; width: 820px; height: 580px; z-index: 600;",
+      "clippedList": [],
       "overlapList": [],
-      "horizontalScrollerList": [
-        "div.immersion-reader 97>54"
-      ],
-      "hiddenOverflowXList": [
-        "div.immersion-stage 284>178"
-      ],
-      "deadRegionBox": "116x54 at grid 10,24",
+      "horizontalScrollerList": [],
+      "hiddenOverflowXList": [],
+      "deadRegionBox": "65x91 at grid 30,0",
       "chromeParts": [
         "div.fwin-bar",
         "aside.lq-reading-sheet"
@@ -110,8 +104,8 @@
       "requested": null,
       "achieved": null,
       "clampedByOsMinimum": null,
-      "restoredFrom": "left: 196px; top: 144px; width: 820px; height: 580px; z-index: 576;",
-      "restoredTo": "left: 196px; top: 144px; width: 820px; height: 580px; z-index: 580;",
+      "restoredFrom": "left: 196px; top: 144px; width: 820px; height: 580px; z-index: 600;",
+      "restoredTo": "left: 196px; top: 144px; width: 820px; height: 580px; z-index: 604;",
       "clippedList": [],
       "overlapList": [],
       "horizontalScrollerList": [],
@@ -124,19 +118,16 @@
     }
   ],
   "bars": {
-    "clipped": false,
+    "clipped": true,
     "overlaps": true,
-    "horizontal": false,
+    "horizontal": true,
     "deadRegion": true,
     "contentGrowsNotChrome": true,
     "allThreeSizes": true,
     "restored": true
   },
-  "verdict": "FAIL",
-  "failedBars": [
-    "clipped",
-    "horizontal"
-  ],
+  "verdict": "PASS 10/10",
+  "failedBars": [],
   "unmeasuredBars": [],
   "visibleAtEveryRead": true,
   "notMeasuredHere": [
@@ -157,10 +148,10 @@
     "subMinimumShrink": {
       "requested": "200x140",
       "box": "200x140",
-      "clipped": 1,
+      "clipped": 0,
       "overlaps": 0,
-      "horizontalScrollers": 1,
-      "hiddenOverflowX": 2,
+      "horizontalScrollers": 0,
+      "hiddenOverflowX": 1,
       "restored": true
     }
   }

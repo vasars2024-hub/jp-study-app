@@ -386,6 +386,67 @@ describe('grid track floors fit the narrowest window the product allows', () => 
     ).toEqual([]);
   });
 
+  /**
+   * The Immersion split, 2026-08-26, and it is the `min-width` half of this family rather than
+   * the track-floor half: `min-width: 220px` on the webview beats its own `max-width: 42%` —
+   * a minimum always wins — and `flex-shrink: 0` means it never hands the pixel back, so the
+   * reader beside it absorbs the whole shortfall. Measured live through
+   * `probes/cat4-use-of-space.cjs` at the 260x170 the shell itself allows: a 178px stage held a
+   * 220px webview and a 64px reader whose text column was 0px wide against a 97px minimum, so
+   * the reader grew a horizontal scrollbar inside a stage that is `overflow: hidden`. 106px of
+   * the split unreachable; `clipped` 1, `horizontalScrollers` 1, `hiddenOverflowX` 1.
+   *
+   * The container has to be the STAGE. The stage's width is what the reading canvas left after
+   * docking a tool, and a docked tool never squeezes the document below
+   * `READING_CANVAS_POLICY.minContentWidth` (384) — so an 820px window can hold a 516px stage
+   * while a wider window with two tools docked holds a 352px one. Neither a viewport `@media`
+   * nor a container on `.immersion-body` can tell those two apart.
+   *
+   * `wrap` is the stacking mechanism because a container cannot answer its own query, so no
+   * rule inside `@container immstage` is able to set `flex-direction` on the stage itself.
+   * WHAT WRAP COSTS, and it shipped as a 64-box regression before it was caught: a nowrap flex
+   * row sizes its items to the container's definite cross size, a wrapping one sizes each LINE
+   * from its items' content and `align-content: stretch` only grows a line into leftover space.
+   * The reader became 1075px tall inside a 434px stage and `clipped` went 0 -> 64 at the
+   * surface's own DEFAULT size. `max-height` on the reader is the half that pays for `wrap`.
+   *
+   * After: 0 / 0 / 0 / 0 at all three sizes, dead region 2.9 / 0.6 / 7.0, chrome 27.3 -> 19.2,
+   * canvas 47.1 -> 61.5, verdict PASS 10/10. The default leg's numbers are unchanged from
+   * before the fix, which is the evidence that the wide layout did not move.
+   */
+  it('the immersion split stacks its panes instead of crushing the reader to nothing', () => {
+    const styles = strip(read('src/renderer/styles.css'));
+
+    // Half one: without the container declaration every rule in the query below is dead, and
+    // nothing about the surface looks wrong.
+    const stage = /\.immersion-stage\s*\{([^}]*)\}/.exec(styles)?.[1] ?? '';
+    expect(stage, '.immersion-stage rule').not.toBe('');
+    expect(stage).toMatch(/container-type:\s*inline-size/);
+    expect(stage).toMatch(/container-name:\s*immstage/);
+    // `size` would contain the block axis too, and the stage's height comes from its flex parent.
+    expect(/container-type:\s*size\s*;/.test(stage)).toBe(false);
+
+    // Half two: the wrap that lets a child-only rule produce a column.
+    const split = /\.immersion-split\s*\{([^}]*)\}/.exec(styles)?.[1] ?? '';
+    expect(split, '.immersion-split rule').not.toBe('');
+    expect(split).toMatch(/flex-flow:\s*row\s+wrap|flex-wrap:\s*wrap/);
+
+    // Half three: what wrap costs. Its absence is a regression at the DEFAULT size, not a
+    // narrow-only one, which is why it is asserted separately rather than assumed.
+    const reader = /\.immersion-split-reader\s*\{([^}]*)\}/.exec(styles)?.[1] ?? '';
+    expect(reader, '.immersion-split-reader rule').not.toBe('');
+    expect(reader).toMatch(/max-height:\s*100%/);
+
+    // Half four: the query itself, and the declaration that actually releases the 220px floor.
+    const narrow = /@container\s+immstage\s*\(max-width:\s*500px\)\s*\{([\s\S]*?)\n\}/.exec(styles)?.[1] ?? '';
+    expect(narrow, 'the @container immstage narrow block').not.toBe('');
+    expect(narrow).toMatch(/\.immersion-webview\s*\{[^}]*min-width:\s*0/);
+    expect(narrow).toMatch(/\.immersion-webview\s*\{[^}]*width:\s*100%/);
+    // Both lines have to add up to the stage or the stacked layout overflows its own container.
+    expect(narrow).toMatch(/\.immersion-webview\s*\{[^}]*height:\s*45%/);
+    expect(narrow).toMatch(/\.immersion-split-reader\s*\{[^}]*max-height:\s*55%/);
+  });
+
   it('the shared card grid keeps a floor the card is actually comfortable at', () => {
     const styles = strip(read('src/renderer/styles.css'));
     const rule = /\.res-grid\s*\{([^}]*)\}/.exec(styles)?.[1] ?? '';
