@@ -646,3 +646,54 @@ is the negative control (each locale must differ from `en`, which is the only pr
 string like "Ready"). 6/6. Flipping `data-theme` to verify by eye would mean writing a persisted
 setting, which this repo's rules put behind capture-patch-restore; it was not worth it for six
 strings a test can hold. Commit `73539fe1`.
+
+## 2026-08-26 · primary — the mute detector was accepting a neighbour's caption, and eight real mute pairs were hiding behind it
+
+**Correction 11 (`dc60f036`).** The explanation was `parentElement.textContent` minus the
+button's own text, so any row of disabled buttons explained each other. Text inside an
+interactive sibling is now excluded; prose beside a control still counts.
+
+**The handoff's prediction was half wrong, and the wrong half is the useful one.** It expected
+Scraper 0→6. Measured: Scraper is still 0, and not because of this bug — all six of its disabled
+buttons are `checkVisibility` **false**, in a tab the window is not showing. The 0 was always
+correct there. Real movement: Grammar 0→3, Agent 0→2, Immersion 0→2, Media 0→2, Video 0→5,
+Dictionary 0→1. Last turn's nine-surface sweep reported "one real mute pair"; with the detector
+repaired the same sweep reads **eight** across three more surfaces.
+
+**Correction 12 (`0ced9029`), found by a test rather than a run.** The `>= 12 character` bar in
+both the mute detector and `textOf` was a Latin-alphabet assumption: a complete Japanese
+sentence runs 10–12 characters and a Chinese one 9–10, so an honest ja/zh title scored MUTE.
+`grammarDisabledReasons.test.ts` at the flat bar went red on ja `noForward` (11) and zh
+`noSelection` (10). The bar is now WEIGHTED, a CJK character counting 2, so 12 still means
+"about a dozen Latin letters" and no copy is padded to satisfy a constant. Proven live rather
+than assumed — the emitted regex measures ja 22, zh 18, en 17, `Back` 4 (`debug/weigh-check.cjs`).
+
+### Four surfaces fixed, each with the harness's control fired after the fix
+
+| surface | before | after | control base→dirty→restored | commit |
+| --- | --- | --- | --- | --- |
+| Grammar | 3 | 0 | [0,0,3]→[1,1,4]→[0,0,3] | `0ced9029` |
+| Agent | 2 | 0 | — (verified by driving the composer) | `d96ca117` |
+| Immersion | 2 | 0 | [0,0,0]→[1,1,1]→[0,0,0] | `c496367f` |
+| Dictionary | 1 | 0 | [0,0,0]→[1,1,1]→[0,0,0] | `e3a252c7` |
+
+- **Grammar**: Back/Forward had no reason of any kind; the drawer TOGGLE never got
+  `selectionReason`, though the three buttons *inside* the drawer already had it. Live: all four
+  controls now return a sentence.
+- **Agent**: Send disables on **seven** ORed conditions and Create action plan on six, so a
+  constant would be wrong in almost every case. Rules extracted to
+  `shared/agentComposerReason.ts` so PRIORITY is testable — an empty draft cannot be over
+  budget, so "write a prompt" must outrank "over budget". `disabled` is derived FROM the reason,
+  so a greyed-out button with no reason is no longer expressible. Mutation control: swapping
+  those two rules turns the test red. Live: typing a draft enables both, clearing restores both.
+- **Immersion**: icon-only, so `title` WAS the accessible name; handing title to the reason
+  needed `aria-label` to hold the name. Both halves asserted, in a RUN of the existing
+  `readingCanvasSurface` harness — no new instrument.
+- **Dictionary**: staged as HEAD + this hunk alone; another track has the raw `Search` literal
+  half-converted to `t()` unstaged, so the committed blob keeps their literal. Blob
+  esbuild-parsed before committing.
+
+**Still open, measured this turn, not fixed:** Media **2** (both `button.` with empty labels)
+and Video **5** (two empty-label, plus Subtitles / Generate / Download & transcribe). Those are
+the next mute-pair slices. Category 8 remains scored on **2 of 6** L6 surfaces — mute pairs are
+one of its four numbers, and `statesNamed` still needs a drive leg per surface.
