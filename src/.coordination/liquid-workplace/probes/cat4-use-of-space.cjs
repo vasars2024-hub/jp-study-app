@@ -72,12 +72,29 @@
  *     geometry, one hour apart, returned `overlaps: 0` and `overlaps: 2`. The 2 was 51 px of
  *     `.manga-spread` over `.reader-footer` that no user can see, and the 0 was luck. Every read
  *     now focuses first, and refuses rather than record a hidden box.
+ *  9. A `.fwin`'s INLINE STYLE CARRIES ITS STACKING ORDER. Restoring from maximize RAISES the
+ *     window, so Library came back to a byte-identical box at `z-index: 532` against `446` and the
+ *     whole category scored FAIL on `restored`. Geometry is compared; `zIndexMoved` reports the
+ *     rest. The header had always said this - the comparison had not.
+ * 10. A CSS `background-image` PAINTS CONTENT that the element-tag occupancy list cannot see.
+ *     Library's covers are `div.cover` with `background-image: url(media://.../cover.jpeg)` and no
+ *     `img` in the tree, so 24 cards of 180x240 cover art counted as DEAD SPACE and the surface
+ *     read 15.9 pct against a bar of 15. A `url()` is marked; a bare gradient is not, or every
+ *     themed panel would mark itself covered and the detector could never find real dead space.
+ * 11. A `position: fixed` CONTROL IS NOT PLACED IN THE VIEWPORT when the host uses containment.
+ *     Every `.fwin` carries `contain: content`, which includes `contain: layout` and makes the
+ *     WINDOW the containing block for fixed descendants. The clip box written at viewport
+ *     `R.right - 20` landed 197 px off on Immersion (frame `left: 196`), entirely outside
+ *     `.fwin-body`, where `outsideItsClipper` correctly declined to call it clipped - so the
+ *     control did not fire and Reading Finder and Immersion returned VOID instead of a score.
+ *     It is placed absolute inside the clipper now, which is what the header always described.
  *
  * NEGATIVE CONTROL (`--control`), two legs, because the rubric names one and history says it is
  * not enough on its own:
- *   a. THE INJECTED CLIP. One 300 px box starting 20 px inside the surface's right edge, `position:
- *      fixed` so it has no scrollable ancestor and must satisfy the reader's own definition of
- *      clipping. `clipped` must RISE and then return to baseline.
+ *   a. THE INJECTED CLIP. One 300 px box starting 20 px inside the surface's right edge, placed
+ *      `position: absolute` INSIDE the clipper (see correction 11 — `position: fixed` resolves
+ *      against the `.fwin`, not the viewport) so 280 px hang out of the frame and it must satisfy
+ *      the reader's own definition of clipping. `clipped` must RISE and then return to baseline.
  *   b. THE SUB-MINIMUM SHRINK the rubric asks for by name. The surface is driven BELOW the smallest
  *      size it supports and the numbers are reported factually. This leg is recorded rather than
  *      required: the compact hard floors were clamped on 2026-08-22 and the shrink correctly
@@ -291,7 +308,15 @@ const READ = (surface) => `(function(){
     t = tw.nextNode();
   }
   all.forEach(function(e){
-    if (e.matches('input,textarea,select,button,img,canvas,video,svg,[role="button"]')) mark(e.getBoundingClientRect());
+    if (e.matches('input,textarea,select,button,img,canvas,video,svg,[role="button"]')) return mark(e.getBoundingClientRect());
+    // CORRECTION 10. A CSS background-image PAINTS CONTENT and the element-tag list cannot see it.
+    // Library's covers are div.cover with background-image: url(media://.../cover.jpeg) and no img
+    // anywhere, so 24 cards of 180x240 cover art scored as DEAD SPACE and the category read
+    // 15.9 pct against a 15 bar - a FAIL that would have sent someone to fix a grid that is full.
+    // A url() is content; a bare gradient is decoration and stays uncounted, or every themed
+    // panel would mark itself covered and the detector would never find real dead space again.
+    var bi = getComputedStyle(e).backgroundImage;
+    if (bi && bi.indexOf('url(') >= 0) mark(e.getBoundingClientRect());
   });
   var best = 0, bestBox = null;
   var heights = new Array(N).fill(0);
@@ -393,15 +418,42 @@ const CONTROL_INJECT = (surface) => `(function(){
   var R = win.getBoundingClientRect();
   if (!R.width || !R.height) return JSON.stringify({ refuse: 'surface is 0x0' });
   var body = win.querySelector('.fwin-body') || win;
+  // CORRECTION 11. THE CONTROL MUST BE PLACED IN THE CLIPPER'S OWN COORDINATE SPACE, not the
+  // viewport's. Every .fwin carries contain: content, which includes contain: layout and
+  // therefore makes the WINDOW the containing block for position:fixed descendants. A fixed box
+  // written at viewport x = R.right - 20 landed at fwinLeft + (R.right - 20) - measured 197 px off
+  // on Immersion, whose frame starts at left: 196 - i.e. entirely OUTSIDE .fwin-body. The reader's
+  // own outsideItsClipper then correctly declined to call it clipped, so the control silently
+  // did not fire and both Reading Finder and Immersion came back VOID rather than scored.
+  // Absolute-in-body puts it exactly where the header always claimed: 20 px inside the right
+  // edge, 300 px wide, so 280 px hang out and it must satisfy the reader's definition.
+  var cbPos = getComputedStyle(body).position;
+  var restorePos = cbPos === 'static' ? body.style.position : null;
+  if (cbPos === 'static') body.style.position = 'relative';
   var p = document.createElement('div');
   p.id = '__lqcat4_clip';
-  p.style.cssText = 'position:fixed;left:' + (R.right - 20) + 'px;top:' + (R.top + 120) + 'px;width:300px;height:60px;background:#f0f;z-index:9;';
+  if (restorePos !== null) p.setAttribute('data-restore-pos', restorePos);
+  p.style.cssText = 'position:absolute;left:' + (body.clientWidth - 20) + 'px;top:120px;width:300px;height:60px;background:#f0f;z-index:9;';
   body.appendChild(p);
-  return JSON.stringify({ injected: true, probeRightEdge: Math.round(R.right + 280), frameRightEdge: Math.round(R.right) });
+  var pb = p.getBoundingClientRect();
+  return JSON.stringify({
+    injected: true,
+    placedIn: body === win ? 'the surface itself (root)' : 'div.fwin-body',
+    probeRightEdge: Math.round(pb.right),
+    frameRightEdge: Math.round(R.right),
+    hangsOutBy: Math.round(pb.right - R.right)
+  });
 })()`;
 
 const CONTROL_REMOVE = `(function(){
   var p = document.getElementById('__lqcat4_clip');
+  // Correction 6 applies to the position it may have had to set as well as to the node: an
+  // inline position: relative left on .fwin-body is a control left in the DOM by another name.
+  if (p && p.hasAttribute('data-restore-pos')) {
+    var host = p.parentElement;
+    var was = p.getAttribute('data-restore-pos');
+    if (host) { if (was) host.style.position = was; else host.style.removeProperty('position'); }
+  }
   if (p) p.remove();
   return JSON.stringify({ removed: !!p, stillPresent: !!document.getElementById('__lqcat4_clip') });
 })()`;
@@ -498,8 +550,12 @@ async function atSize(kind) {
       sizeMechanism: 'the product\'s own .fwin-b[title="Maximize"] (never an inline width: .fwin-max changes the applied CSS)',
       measurement: m,
       // The product stores the pre-maximize box and restores from it, so this is its round trip,
-      // not the harness's. z-index legitimately moves because restoring raises the window.
-      restored: back.style === was.style && back.max === was.max,
+      // not the harness's. CORRECTION 9: z-index legitimately moves because restoring a window
+      // RAISES it - Library came back to an identical box at z 532 against 446 and the whole
+      // category scored FAIL on it. The header always said this; the comparison did not. Geometry
+      // is compared, the stacking order is reported beside it.
+      restored: geomOnly(back.style) === geomOnly(was.style) && back.max === was.max,
+      zIndexMoved: zOf(was.style) !== zOf(back.style) ? `${zOf(was.style)} -> ${zOf(back.style)} (raised by the restore, not a geometry change)` : false,
       restoredTo: back.style,
       restoredFrom: was.style,
     };
@@ -523,6 +579,11 @@ async function atSize(kind) {
     restoredFrom: was.style,
   };
 }
+
+// A `.fwin`'s inline style carries its stacking order alongside its box. Only the box is the
+// round trip this harness asserts - see correction 9 at the maximize leg.
+const geomOnly = (style) => String(style || '').replace(/z-index:[^;]*;?/g, '').replace(/\s+/g, ' ').trim();
+const zOf = (style) => { const m = /z-index:\s*([^;]+)/.exec(String(style || '')); return m ? m[1].trim() : null; };
 
 const BARS_OF = (m) => ({
   clipped: m.clipped === 0,

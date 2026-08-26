@@ -1,0 +1,158 @@
+{
+  "label": "l6-library",
+  "surface": "Library",
+  "win": "main",
+  "rootKind": "floating window",
+  "viewport": "1264x821",
+  "sizes": [
+    {
+      "kind": "default",
+      "box": "820x580",
+      "clipped": 0,
+      "overlaps": 0,
+      "horizontalScrollers": 0,
+      "hiddenOverflowX": 0,
+      "deadPctViewport": 3.1,
+      "chromePct": 21.6,
+      "dominantCanvasPct": 31.8,
+      "bars": {
+        "clipped": true,
+        "overlaps": true,
+        "horizontal": true,
+        "deadRegion": true
+      },
+      "restored": true
+    },
+    {
+      "kind": "compact",
+      "box": "260x170",
+      "clipped": 0,
+      "overlaps": 0,
+      "horizontalScrollers": 0,
+      "hiddenOverflowX": 0,
+      "deadPctViewport": 0.9,
+      "chromePct": 76.8,
+      "dominantCanvasPct": 18.2,
+      "bars": {
+        "clipped": true,
+        "overlaps": true,
+        "horizontal": true,
+        "deadRegion": true
+      },
+      "restored": true
+    },
+    {
+      "kind": "maximized",
+      "box": "1264x765",
+      "clipped": 0,
+      "overlaps": 0,
+      "horizontalScrollers": 0,
+      "hiddenOverflowX": 0,
+      "deadPctViewport": 6.7,
+      "chromePct": 10.2,
+      "dominantCanvasPct": 53.9,
+      "bars": {
+        "clipped": true,
+        "overlaps": true,
+        "horizontal": true,
+        "deadRegion": true
+      },
+      "restored": true
+    }
+  ],
+  "refusedLegs": [],
+  "detail": [
+    {
+      "kind": "default",
+      "sizeMechanism": "as found",
+      "requested": null,
+      "achieved": null,
+      "clampedByOsMinimum": null,
+      "restoredFrom": null,
+      "restoredTo": null,
+      "clippedList": [],
+      "overlapList": [],
+      "horizontalScrollerList": [],
+      "hiddenOverflowXList": [],
+      "deadRegionBox": "470x68 at grid 17,0",
+      "chromeParts": [
+        "div.fwin-bar",
+        "header.view-head"
+      ]
+    },
+    {
+      "kind": "compact",
+      "sizeMechanism": "inline style.width/height on the .fwin (synchronous, so measure-and-restore is safe)",
+      "requested": "260x170",
+      "achieved": null,
+      "clampedByOsMinimum": null,
+      "restoredFrom": "left: 128px; top: 84px; width: 820px; height: 580px; z-index: 544;",
+      "restoredTo": "left: 128px; top: 84px; width: 820px; height: 580px; z-index: 544;",
+      "clippedList": [],
+      "overlapList": [],
+      "horizontalScrollerList": [],
+      "hiddenOverflowXList": [],
+      "deadRegionBox": "110x84 at grid 23,15",
+      "chromeParts": [
+        "div.fwin-bar",
+        "header.view-head"
+      ]
+    },
+    {
+      "kind": "maximized",
+      "sizeMechanism": "the product's own .fwin-b[title=\"Maximize\"] (never an inline width: .fwin-max changes the applied CSS)",
+      "requested": null,
+      "achieved": null,
+      "clampedByOsMinimum": null,
+      "restoredFrom": "left: 128px; top: 84px; width: 820px; height: 580px; z-index: 544;",
+      "restoredTo": "left: 128px; top: 84px; width: 820px; height: 580px; z-index: 556;",
+      "clippedList": [],
+      "overlapList": [],
+      "horizontalScrollerList": [],
+      "hiddenOverflowXList": [],
+      "deadRegionBox": "473x146 at grid 25,7",
+      "chromeParts": [
+        "div.fwin-bar",
+        "header.view-head"
+      ]
+    }
+  ],
+  "bars": {
+    "clipped": true,
+    "overlaps": true,
+    "horizontal": true,
+    "deadRegion": true,
+    "contentGrowsNotChrome": true,
+    "allThreeSizes": true,
+    "restored": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "unmeasuredBars": [],
+  "visibleAtEveryRead": true,
+  "notMeasuredHere": [
+    "contrast and focus order (rubric category 1 harness)",
+    "input cost and dead ends (rubric category 2 harness)"
+  ],
+  "control": {
+    "injectedClip": {
+      "moved": true,
+      "backToBaseline": true,
+      "clipped": {
+        "base": 0,
+        "dirty": 1,
+        "restored": 0
+      },
+      "removalProven": true
+    },
+    "subMinimumShrink": {
+      "requested": "200x140",
+      "box": "200x140",
+      "clipped": 2,
+      "overlaps": 0,
+      "horizontalScrollers": 0,
+      "hiddenOverflowX": 1,
+      "restored": true
+    }
+  }
+}
