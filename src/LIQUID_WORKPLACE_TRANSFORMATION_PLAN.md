@@ -700,6 +700,12 @@ horizontal loss, dead region 0.4–12.9%, canvas 32.0 → 50.3 while chrome fall
 remaining surface is Novels, parked on the paged-reader dead-region correction already named in
 `L1_USE_OF_SPACE.md`; board **23 of 48**. Neither L6 Gate nor a timeline bullet closes here.
 
+**L6 Gate, category 4 CLOSED — 6 of 6 surfaces, 2026-08-26** (checkpoint containing this entry).
+Novels was driven on 1Q84 page 2/2, the adverse state that previously failed 70.1% compact and
+63.0% maximized. Correction 16 measures a proven pager's rendered buffer rather than its trailing
+last-page remainder: **5.0 / 10.0 / 2.6** dead, 0 loss on every other bar. Proof falsification
+moved 5.0 → 8.8 → 5.0 and restored. Board **24 of 48**; L6 Gate remains open on other categories.
+
 **L6 Gate, category 1 — 2 of its 6 surfaces, 2026-08-25 (later 21)** (`e41a85ce`, `16e8ed1c`).
 Captures **10/10** and Immersion **10/10**, both live, raised, control fired. Immersion earned it
 with a product fix, not a re-read: **34 controls under the 32px pointer floor → 0**, via a new

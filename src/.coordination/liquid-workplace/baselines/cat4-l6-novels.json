@@ -1,5 +1,5 @@
 {
-  "label": "l6-novels",
+  "label": "l6-novels-last-page",
   "surface": "@.reader",
   "win": "(focused)",
   "rootKind": "desktop-window surface (no .fwin above it)",
@@ -12,7 +12,8 @@
       "overlaps": 0,
       "horizontalScrollers": 0,
       "hiddenOverflowX": 0,
-      "deadPctViewport": 5.3,
+      "deadPctViewport": 5,
+      "deadRegionBasis": "union of rendered fragments across 2-page proven pager buffer(s)",
       "chromePct": 0,
       "dominantCanvasPct": 86.6,
       "bars": {
@@ -31,6 +32,7 @@
       "horizontalScrollers": 0,
       "hiddenOverflowX": 0,
       "deadPctViewport": 10,
+      "deadRegionBasis": "union of rendered fragments across 5-page proven pager buffer(s)",
       "chromePct": 0,
       "dominantCanvasPct": 80.4,
       "bars": {
@@ -48,7 +50,8 @@
       "overlaps": 0,
       "horizontalScrollers": 0,
       "hiddenOverflowX": 0,
-      "deadPctViewport": 4.5,
+      "deadPctViewport": 2.6,
+      "deadRegionBasis": "union of rendered fragments across 2-page proven pager buffer(s)",
       "chromePct": 0,
       "dominantCanvasPct": 89,
       "bars": {
@@ -74,7 +77,8 @@
       "overlapList": [],
       "horizontalScrollerList": [],
       "hiddenOverflowXList": [],
-      "deadRegionBox": "126x431 at grid 36,17",
+      "deadRegionBox": "1264x41 at grid 0,36",
+      "deadRegionBasis": "union of rendered fragments across 2-page proven pager buffer(s)",
       "chromeParts": []
     },
     {
@@ -90,6 +94,7 @@
       "horizontalScrollerList": [],
       "hiddenOverflowXList": [],
       "deadRegionBox": "924x56 at grid 0,33",
+      "deadRegionBasis": "union of rendered fragments across 5-page proven pager buffer(s)",
       "chromeParts": []
     },
     {
@@ -104,7 +109,8 @@
       "overlapList": [],
       "horizontalScrollerList": [],
       "hiddenOverflowXList": [],
-      "deadRegionBox": "120x600 at grid 37,14",
+      "deadRegionBox": "560x75 at grid 7,0",
+      "deadRegionBasis": "union of rendered fragments across 2-page proven pager buffer(s)",
       "chromeParts": []
     }
   ],
@@ -135,6 +141,17 @@
         "restored": 0
       },
       "removalProven": true
+    },
+    "provenPagerDeadRegion": {
+      "applicable": true,
+      "proofFalsifiedMovesNumber": true,
+      "backToBaseline": true,
+      "deadPctViewport": {
+        "base": 5,
+        "proofFalsified": 8.8,
+        "restored": 5
+      },
+      "restorationProven": true
     },
     "subMinimumShrink": {
       "requested": "200x140",

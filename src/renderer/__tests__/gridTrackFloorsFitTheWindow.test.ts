@@ -323,6 +323,19 @@ describe('grid track floors fit the narrowest window the product allows', () => 
     const probe = strip(read('src/.coordination/liquid-workplace/probes/l1-use-of-space.js'));
     expect(probe).toMatch(/\(pages - 1\) \* step \+ n\.clientWidth >= n\.scrollWidth - 2/);
     expect(probe).toMatch(/if \(pagerControls\(win\) < 1\) return false;/);
+
+    const category4 = strip(read('src/.coordination/liquid-workplace/probes/cat4-use-of-space.cjs'));
+    expect(category4).toMatch(/\(pages - 1\) \* step \+ n\.clientWidth >= n\.scrollWidth - 2/);
+    // A chapter's trailing remainder must not make the same reader pass on page 1 and fail on
+    // page N. The occupancy reader projects every proven page fragment into one page viewport.
+    expect(category4).toContain('var offset = ((r.left - p.left) % step + step) % step;');
+    expect(category4).toContain("mark(rects[k], pagerFor(t.parentElement))");
+    expect(category4).toContain('deadRegionBasis: deadRegionPagers.length');
+    // The exemption is not a declaration-only free pass: its own control falsifies the proof,
+    // requires the dead-region number to move, and restores the published page count.
+    expect(category4).toContain("pager.setAttribute('data-paged-pages', '1')");
+    expect(category4).toContain('proofFalsifiedMovesNumber');
+    expect(category4).toContain('PAGER_PROOF_RESTORE');
   });
 
   /**

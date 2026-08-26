@@ -919,3 +919,24 @@ dominant canvas grows 32.0 → 50.3. The first run exposed retained nested scrol
 column uses `minmax(0, 1fr)`. Re-run: all six bars pass at all sizes. Negative clip 0 → 1 → 0,
 removal proven; round trips restored. Category 4 is **5 of 6** and the board is **23 of 48**.
 Novels remains PARKED on harness correction 16; no PASS is claimed for it here.
+
+### 2026-08-26 codexA — correction 16; Novels PASS and category 4 CLOSED 6 of 6
+
+Adverse state first: 1Q84 BOOK1, 第2章, page **2/2**, `scrollLeft -1260`, 3,275 Japanese
+characters. The unchanged reader reproduced the page-dependent failure exactly: dead region
+**8.8 / 70.1 / 63.0**, with compact/maximized failing despite 0 clipped/overlap/horizontal loss.
+
+Correction 16 remains inside the one surface-parameterised harness. A pager earns buffer-wide
+occupancy only when `provenPager` already proves an enabled control and
+`(pages - 1) * step + clientWidth >= scrollWidth`; rendered page fragments are projected by the
+published step into one page viewport. This measures the content buffer, not the arbitrary page.
+
+| leg | page count after reflow | dead % | clipped / overlap / horizontal |
+| --- | --- | --- | --- |
+| default 1264x821 | 2 | 5.0 | 0 / 0 / 0 |
+| compact 924x561 | 5 | 10.0 | 0 / 0 / 0 |
+| maximized 1600x1000 | 2 | 2.6 | 0 / 0 / 0 |
+
+**PASS 10/10.** Clip control 0 → 1 → 0, removed. Pager control falsified page-count proof:
+dead region **5.0 → 8.8 → 5.0**, attribute restored. Host bounds restored. Category 4 is
+**CLOSED 6 of 6**; board **24 of 48**. No timeline bullet closes with this cell.

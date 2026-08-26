@@ -114,6 +114,13 @@
  *     because the loser is not painted at all. An element inside an opaque cover cannot collide
  *     with one outside it. A PARTIAL cover still counts, which is the outcome `readingCanvas.css`
  *     calls inexpressible, so the bar keeps the failure it exists for.
+ * 16. A PROVEN PAGER'S LAST PAGE IS NOT A DEAD LAYOUT. The same EPUB chapter scored 5.3% dead on
+ *     page 1/2 and 70.1% on page 2/2 at the compact host: the latter is the chapter's ordinary
+ *     trailing remainder, and a bigger page makes that remainder larger. For a pager that passes
+ *     the existing affordance + buffer arithmetic proof, occupancy is the UNION of its page
+ *     fragments projected into one page viewport. This measures the pager's content buffer rather
+ *     than whichever page happened to be visible. Falsifying the pager proof disables projection;
+ *     `--control` verifies the number moves and restores on a last page.
  *
  * NEGATIVE CONTROL (`--control`), two legs, because the rubric names one and history says it is
  * not enough on its own:
@@ -126,6 +133,8 @@
  *      required: the compact hard floors were clamped on 2026-08-22 and the shrink correctly
  *      stopped firing on the surfaces that were fixed — a control that cannot fail on a fixed
  *      surface is not evidence of a blind probe, which is exactly why leg (a) exists beside it.
+ *   c. THE PROVEN-PAGER PROOF, when the surface is on its last page. `data-paged-pages` is
+ *      falsified without changing content; dead-region occupancy must move, then return exactly.
  * Leg (a) failing to fire VOIDS the score rather than passing it.
  */
 'use strict';
@@ -258,6 +267,29 @@ const READ = (surface) => `(function(){
     if (!isFinite(pages) || !isFinite(step) || pages < 1 || step <= 0) return false;
     return (pages - 1) * step + n.clientWidth >= n.scrollWidth - 2;
   };
+  var pagerFor = function(e){
+    var n = e;
+    while (n && n !== win.parentElement && n !== win) {
+      if (provenPager(n)) return n;
+      n = n.parentElement;
+    }
+    return null;
+  };
+  // Project every rendered page fragment into the pager's one-page viewport. Range rects for
+  // off-screen CSS columns remain available even while clipped; modulo the published step makes
+  // page 1 and page N contribute to the same occupancy grid instead of scoring only the page the
+  // user happened to leave visible. This is horizontal because the proven-pager contract itself
+  // publishes clientWidth/scrollWidth and NovelReader pages on that axis in both writing modes.
+  var pagerRect = function(r, pager){
+    if (!pager) return r;
+    var p = pager.getBoundingClientRect();
+    var step = Number(pager.getAttribute('data-paged-step'));
+    if (!(step > 0)) return r;
+    if (r.width >= step - 2) return { left: p.left, right: p.right, top: r.top, bottom: r.bottom, width: p.width, height: r.height };
+    var offset = ((r.left - p.left) % step + step) % step;
+    var left = p.left + offset;
+    return { left: left, right: Math.min(p.right, left + r.width), top: r.top, bottom: r.bottom, width: Math.min(r.width, p.right - left), height: r.height };
+  };
   var outsideItsClipper = function(el, b){
     var n = el.parentElement;
     while (n && n !== win.parentElement && n !== win) {
@@ -282,6 +314,7 @@ const READ = (surface) => `(function(){
   var name = function(e){ return e.tagName.toLowerCase() + '.' + String(e.className || '').split(' ')[0]; };
 
   var all = [].slice.call(win.querySelectorAll('*')).filter(painted);
+  var deadRegionPagers = all.filter(provenPager);
   var clipped = all.filter(function(e){
     var b = e.getBoundingClientRect();
     if (b.width < 2 || b.height < 2) return false;
@@ -381,7 +414,8 @@ const READ = (surface) => `(function(){
   var cw = B.width / N, ch = B.height / N;
   var covered = [];
   for (var y0 = 0; y0 < N; y0 += 1) { covered.push(new Array(N).fill(false)); }
-  var mark = function(r){
+  var mark = function(r, pager){
+    r = pagerRect(r, pager);
     if (r.width < 1 || r.height < 1) return;
     var xa = Math.max(0, Math.floor((r.left - B.left) / cw));
     var xb = Math.min(N - 1, Math.ceil((r.right - B.left) / cw) - 1);
@@ -396,7 +430,7 @@ const READ = (surface) => `(function(){
       var rg = document.createRange();
       rg.selectNodeContents(t);
       var rects = rg.getClientRects();
-      for (var k = 0; k < rects.length; k += 1) mark(rects[k]);
+      for (var k = 0; k < rects.length; k += 1) mark(rects[k], pagerFor(t.parentElement));
     }
     t = tw.nextNode();
   }
@@ -405,7 +439,7 @@ const READ = (surface) => `(function(){
     // an OPAQUE CONTENT HOST whose pixels live in another document (or another process) that this
     // pass cannot walk. Immersion's stage is a 950x619 webview.immersion-webview showing a live
     // page, and without this line every one of those pixels counted as dead space.
-    if (e.matches('input,textarea,select,button,img,canvas,video,svg,iframe,webview,object,embed,[role="button"]')) return mark(e.getBoundingClientRect());
+    if (e.matches('input,textarea,select,button,img,canvas,video,svg,iframe,webview,object,embed,[role="button"]')) return mark(e.getBoundingClientRect(), pagerFor(e));
     // CORRECTION 10. A CSS background-image PAINTS CONTENT and the element-tag list cannot see it.
     // Library's covers are div.cover with background-image: url(media://.../cover.jpeg) and no img
     // anywhere, so 24 cards of 180x240 cover art scored as DEAD SPACE and the category read
@@ -413,7 +447,7 @@ const READ = (surface) => `(function(){
     // A url() is content; a bare gradient is decoration and stays uncounted, or every themed
     // panel would mark itself covered and the detector would never find real dead space again.
     var bi = getComputedStyle(e).backgroundImage;
-    if (bi && bi.indexOf('url(') >= 0) mark(e.getBoundingClientRect());
+    if (bi && bi.indexOf('url(') >= 0) mark(e.getBoundingClientRect(), pagerFor(e));
   });
   var best = 0, bestBox = null;
   var heights = new Array(N).fill(0);
@@ -466,6 +500,9 @@ const READ = (surface) => `(function(){
     deadRegionPctOfWindow: Number(((best * cellArea) / (R.width * R.height) * 100).toFixed(1)),
     deadRegionPctOfViewport: Number(((best * cellArea) / (window.innerWidth * window.innerHeight) * 100).toFixed(1)),
     deadRegionBox: bestBox ? Math.round(bestBox.w * cw) + 'x' + Math.round(bestBox.h * ch) + ' at grid ' + bestBox.x + ',' + bestBox.y : null,
+    deadRegionBasis: deadRegionPagers.length
+      ? 'union of rendered fragments across ' + deadRegionPagers.map(function(p){ return p.getAttribute('data-paged-pages'); }).join(',') + '-page proven pager buffer(s)'
+      : 'visible surface',
     chromePct: Number((chrome / total * 100).toFixed(1)),
     chromeParts: outermost.map(name),
     dominantCanvasPct: Number((dominant / total * 100).toFixed(1))
@@ -553,6 +590,34 @@ const CONTROL_REMOVE = `(function(){
   }
   if (p) p.remove();
   return JSON.stringify({ removed: !!p, stillPresent: !!document.getElementById('__lqcat4_clip') });
+})()`;
+
+const PAGER_PROOF_INVALIDATE = (surface) => `(function(){
+  var win = ${rootExpr(surface)};
+  if (!win) return JSON.stringify({ applicable: false, reason: 'surface not found' });
+  var enabled = [].slice.call(win.querySelectorAll('[data-paged-control]')).filter(function(b){
+    return !b.disabled && b.getAttribute('aria-disabled') !== 'true';
+  }).length;
+  var pager = [].slice.call(win.querySelectorAll('[data-paged="true"]')).filter(function(n){
+    var pages = Number(n.getAttribute('data-paged-pages'));
+    var step = Number(n.getAttribute('data-paged-step'));
+    var proven = enabled > 0 && pages > 1 && step > 0
+      && (pages - 1) * step + n.clientWidth >= n.scrollWidth - 2;
+    var last = proven && Math.abs(n.scrollLeft) >= (pages - 1) * step - 2;
+    return last;
+  })[0];
+  if (!pager) return JSON.stringify({ applicable: false, reason: 'no proven pager on its last page' });
+  pager.setAttribute('data-lq-dead-pages', pager.getAttribute('data-paged-pages'));
+  pager.setAttribute('data-paged-pages', '1');
+  return JSON.stringify({ applicable: true });
+})()`;
+
+const PAGER_PROOF_RESTORE = `(function(){
+  var pager = document.querySelector('[data-lq-dead-pages]');
+  if (!pager) return JSON.stringify({ restored: false, reason: 'control marker missing' });
+  pager.setAttribute('data-paged-pages', pager.getAttribute('data-lq-dead-pages'));
+  pager.removeAttribute('data-lq-dead-pages');
+  return JSON.stringify({ restored: true, pages: pager.getAttribute('data-paged-pages') });
 })()`;
 
 /* ----------------------------------------------------------------- the drive */
@@ -718,6 +783,7 @@ const BARS_OF = (m) => ({
     horizontalScrollers: l.measurement.horizontalScrollers,
     hiddenOverflowX: l.measurement.hiddenOverflowX,
     deadPctViewport: l.measurement.deadRegionPctOfViewport,
+    deadRegionBasis: l.measurement.deadRegionBasis,
     chromePct: l.measurement.chromePct,
     dominantCanvasPct: l.measurement.dominantCanvasPct,
     bars: BARS_OF(l.measurement),
@@ -768,6 +834,7 @@ const BARS_OF = (m) => ({
       horizontalScrollerList: l.measurement && l.measurement.horizontalScrollerList,
       hiddenOverflowXList: l.measurement && l.measurement.hiddenOverflowXList,
       deadRegionBox: l.measurement && l.measurement.deadRegionBox,
+      deadRegionBasis: l.measurement && l.measurement.deadRegionBasis,
       chromeParts: l.measurement && l.measurement.chromeParts,
     })),
     bars,
@@ -793,6 +860,17 @@ const BARS_OF = (m) => ({
     const rm = JSON.parse(await ev(CONTROL_REMOVE));
     await sleep(SETTLE);
     const restored = await read();
+    const pagerMutation = JSON.parse(await ev(PAGER_PROOF_INVALIDATE(SURFACE)));
+    let pagerDirty = null;
+    let pagerRestored = null;
+    let pagerRestore = null;
+    if (pagerMutation.applicable) {
+      await sleep(SETTLE);
+      pagerDirty = await read();
+      pagerRestore = JSON.parse(await ev(PAGER_PROOF_RESTORE));
+      await sleep(SETTLE);
+      pagerRestored = await read();
+    }
     const submin = await atSize('submin');
     const moved = !dirty.refuse && dirty.clipped > base.clipped;
     const backToBaseline = !restored.refuse && restored.clipped === base.clipped;
@@ -803,6 +881,17 @@ const BARS_OF = (m) => ({
         clipped: { base: base.clipped, dirty: dirty.refuse ? dirty.refuse : dirty.clipped, restored: restored.refuse ? restored.refuse : restored.clipped },
         removalProven: rm.removed === true && rm.stillPresent === false,
       },
+      provenPagerDeadRegion: pagerMutation.applicable ? {
+        applicable: true,
+        proofFalsifiedMovesNumber: pagerDirty.deadRegionPctOfViewport > pagerRestored.deadRegionPctOfViewport,
+        backToBaseline: pagerRestored.deadRegionPctOfViewport === base.deadRegionPctOfViewport,
+        deadPctViewport: {
+          base: base.deadRegionPctOfViewport,
+          proofFalsified: pagerDirty.deadRegionPctOfViewport,
+          restored: pagerRestored.deadRegionPctOfViewport,
+        },
+        restorationProven: pagerRestore && pagerRestore.restored === true,
+      } : { applicable: false, reason: pagerMutation.reason },
       // Reported, not required — see the header. A clamped surface correctly stops failing here.
       subMinimumShrink: submin.refuse ? { refuse: submin.refuse } : {
         requested: submin.requested,
@@ -816,6 +905,13 @@ const BARS_OF = (m) => ({
     };
     if (!moved || !backToBaseline || rm.stillPresent === true) {
       out.verdict = 'VOID - negative control did not falsify';
+    }
+    if (pagerMutation.applicable && (
+      !(pagerDirty.deadRegionPctOfViewport > pagerRestored.deadRegionPctOfViewport)
+      || pagerRestored.deadRegionPctOfViewport !== base.deadRegionPctOfViewport
+      || !pagerRestore || pagerRestore.restored !== true
+    )) {
+      out.verdict = 'VOID - proven-pager control did not falsify and restore dead-region occupancy';
     }
     if (!submin.refuse && submin.restored !== true) {
       out.verdict = 'VOID - the sub-minimum leg did not restore the surface';
