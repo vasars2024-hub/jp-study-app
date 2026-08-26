@@ -603,7 +603,7 @@ carries `title="Give the filter a name first."` — that is the local pattern, s
 in all four languages. `busy` is deliberately NOT given a reason: the label already becomes
 "Working…" and `.tr-status` renders below, so only the silent case is named. Re-measured live:
 `disabled: 2` unchanged, **`mutePairCount` 1 → 0**, titles read back off the live DOM. Control
-`[0,0,0]` → `[1,1,1]` → `[0,0,0]`. Commit `<HASH3>`.
+`[0,0,0]` → `[1,1,1]` → `[0,0,0]`. Commit `3de86c76`.
 
 **A harness weakness this sweep exposed, and it is NOT repaired this turn — next worker's one
 repair.** The mute detector accepts the text of a SIBLING BUTTON as an explanation, because its
