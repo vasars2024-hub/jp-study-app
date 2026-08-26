@@ -3,6 +3,8 @@
  * Geometry (icon x/y) stays in the desktop layout store; this is pure UI prefs.
  */
 
+import { flushRootVars, setRootVars } from './rootCssVars';
+
 export type IconSizeId = 'small' | 'medium' | 'large';
 export type IconLabelId = 'always' | 'hover';
 export type IconTextColorId = 'auto' | 'white' | 'black' | 'accent';
@@ -93,11 +95,15 @@ export function applyDesktopPrefs(s: DesktopPrefs): void {
   root.dataset.iconText = s.iconTextColor;
   root.dataset.taskbarSize = s.taskbarSize;
   root.dataset.startCols = String(s.startColumns);
-  root.style.setProperty('--taskbar-h', `${TASKBAR_HEIGHT[s.taskbarSize]}px`);
-  root.style.setProperty('--start-cols', String(s.startColumns));
   const m = ICON_METRICS[s.iconSize];
-  root.style.setProperty('--desk-icon-w', `${m.w}px`);
-  root.style.setProperty('--desk-icon-h', `${m.h}px`);
+  // Inherited from `:root`, so a changed one restyles the whole document. The
+  // dataset writes above are ~0.5 ms; these are ~70 ms with ten windows open.
+  setRootVars({
+    '--taskbar-h': `${TASKBAR_HEIGHT[s.taskbarSize]}px`,
+    '--start-cols': String(s.startColumns),
+    '--desk-icon-w': `${m.w}px`,
+    '--desk-icon-h': `${m.h}px`,
+  });
 }
 
 export function saveDesktopPrefs(partial: Partial<DesktopPrefs>): DesktopPrefs {
@@ -121,6 +127,9 @@ export function saveDesktopPrefs(partial: Partial<DesktopPrefs>): DesktopPrefs {
 
 export function bootDesktopPrefs(): void {
   applyDesktopPrefs(loadDesktopPrefs());
+  // `--taskbar-h` and the icon metrics are layout inputs: deferring boot by a
+  // frame would shift the taskbar and the icon grid in front of the user.
+  flushRootVars();
 }
 
 export function onDesktopPrefsChanged(cb: (s: DesktopPrefs) => void): () => void {

@@ -1,5 +1,7 @@
 // App border/window frame settings for Aero theme
-export type AppBorderStyle = 
+import { setRootVars, setRootVarsNow } from './rootCssVars';
+
+export type AppBorderStyle =
   | 'aero-glass'        // Default Vista Aero glass
   | 'blurred-wall'     // Blurred wallpaper background
   | 'solid-accent'     // Solid accent color
@@ -35,17 +37,35 @@ export function loadAppBorderSettings(): AppBorderSettings {
   }
 }
 
+function borderVars(s: AppBorderSettings): Record<string, string> {
+  return {
+    '--app-border-width': `${s.borderWidth}px`,
+    '--app-border-blur': `${s.blurAmount}px`,
+    '--app-border-radius': `${s.cornerRadius}px`,
+  };
+}
+
+/**
+ * The blur and width controls are `<input type="range">`, so this runs once per
+ * slider tick. Each of these three is inherited from `:root`, and a changed one
+ * costs a full-document style recalc — 87 ms measured with ten windows open —
+ * so writing them inside the input handler froze the desk for the whole drag.
+ * `setRootVars` coalesces the tick storm into one write per frame; see
+ * `rootCssVars.ts` for the measurements.
+ */
 export function applyAppBorderSettings(s: AppBorderSettings): void {
   if (typeof document === 'undefined') return;
-  const root = document.documentElement;
-  root.setAttribute('data-app-border', s.style);
-  root.style.setProperty('--app-border-width', `${s.borderWidth}px`);
-  root.style.setProperty('--app-border-blur', `${s.blurAmount}px`);
-  root.style.setProperty('--app-border-radius', `${s.cornerRadius}px`);
+  document.documentElement.setAttribute('data-app-border', s.style);
+  setRootVars(borderVars(s));
 }
 
 export function bootAppBorderSettings(): void {
-  applyAppBorderSettings(loadAppBorderSettings());
+  const s = loadAppBorderSettings();
+  if (typeof document !== 'undefined') {
+    document.documentElement.setAttribute('data-app-border', s.style);
+  }
+  // Boot runs before first paint; a frame's delay here shows an unstyled desk.
+  setRootVarsNow(borderVars(s));
 }
 
 export function saveAppBorderSettings(s: AppBorderSettings): AppBorderSettings {
