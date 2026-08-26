@@ -66,6 +66,10 @@ import {
   type MediaWorkspaceOpenRequest,
 } from '../../shared/mediaWorkspace';
 import * as player from '../playerBus';
+import {
+  videoGenerateDisabledReason,
+  videoSubtitlesDisabledReason,
+} from '../../shared/mediaVideoActionReason';
 import type { SubtitleProviderCredentialState } from '../../shared/subtitleDiscoveryIpc';
 import './mediaCenter.css';
 
@@ -748,6 +752,11 @@ function VideoPanel({
   const current = state.current;
   const stage = videoStageFor(workspace);
   const seanimeAvailable = stage === 'workspace';
+  const subtitlesReason = videoSubtitlesDisabledReason({ hasSource: !!state.src });
+  const generateReason = videoGenerateDisabledReason({
+    hasSource: !!state.src,
+    generating: state.generating,
+  });
   return (
     <div className="mc-page mc-video-page">
       <div className="mc-video-topbar">
@@ -768,10 +777,26 @@ function VideoPanel({
           >
             <Icon name="globe" size={13} /> {t('mediaWorkspace.launcher')}
           </button>
-          <button type="button" className="mc-button" onClick={() => void state.openSubs()} disabled={!state.src}>
+          {/* Both were greyed out with a caption and no reason — two of Video's three
+              mute pairs. `disabled` derives from the reason rather than repeating the
+              condition, so the grey and the explanation cannot disagree. The neighbour
+              above already carries `seanimeActionTitle` on the same principle. */}
+          <button
+            type="button"
+            className="mc-button"
+            onClick={() => void state.openSubs()}
+            title={subtitlesReason ? t(subtitlesReason) : undefined}
+            disabled={!!subtitlesReason}
+          >
             <Icon name="caption" size={13} /> {t('mediaCenter.video.subtitles')}
           </button>
-          <button type="button" className="mc-button" onClick={() => state.src && void state.runGeneration(state.src)} disabled={!state.src || state.generating}>
+          <button
+            type="button"
+            className="mc-button"
+            onClick={() => state.src && void state.runGeneration(state.src)}
+            title={generateReason ? t(generateReason) : undefined}
+            disabled={!!generateReason}
+          >
             <Icon name="sparkle" size={13} /> {t('mediaCenter.video.generate')}
           </button>
         </div>

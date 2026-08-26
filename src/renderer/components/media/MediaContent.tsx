@@ -76,6 +76,7 @@ import {
 } from '../../../shared/listeningTraining';
 import { openMediaWorkspace } from '../../mediaWorkspaceBridge';
 import { findSubtitleMatches, wrapSubtitleMatch } from '../../../shared/subtitleSearch';
+import { youtubeDownloadDisabledReason } from '../../../shared/mediaVideoActionReason';
 import {
   buildPlayerDiagnosticReport,
   type PlayerDiagnosticReport,
@@ -1867,6 +1868,13 @@ export function MediaWatchFolder({ state }: { state: MediaState }) {
 /** YouTube download + subtitle-language row. Player modes only. */
 export function MediaYoutubeBar({ state }: { state: MediaState }) {
   const { t } = useT();
+  // Video's third mute pair. `disabled` derives from the reason so the two cannot
+  // disagree, and the rule is shared rather than inline because its ORDER matters:
+  // the same running download that greys the button also disables the input above.
+  const downloadReason = youtubeDownloadDisabledReason({
+    url: state.ytUrl,
+    downloading: !!state.yt,
+  });
   return (
     <>
       <div className="media-yt">
@@ -1896,7 +1904,8 @@ export function MediaYoutubeBar({ state }: { state: MediaState }) {
         <button
           className="btn"
           onClick={() => void state.downloadYouTube()}
-          disabled={!state.ytUrl.trim() || !!state.yt}
+          title={downloadReason ? t(downloadReason) : undefined}
+          disabled={!!downloadReason}
         >
           <Icon name="download" size={14} style={{ marginRight: 6, verticalAlign: '-2px' }} />
           {t('media.yt.downloadTranscribe')}
