@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Liquid rubric category 7 instrument #2: frame stability during a real interaction.
 
@@ -50,6 +50,10 @@
 .PARAMETER DurationMs
   Wall-clock window over which main availability is sampled, chosen to cover the gesture.
 
+.PARAMETER AsJson
+  Emit the record as one compressed JSON line instead of a PowerShell object, so a runner
+  can consume it. -OutFile additionally writes it to a file.
+
 .PARAMETER Title
   Substring of the window title to drive. WITHOUT it the probe takes the LARGEST visible
   `.fwin`, which is only the surface under test when every other window is hidden. On a desktop
@@ -70,7 +74,9 @@ param(
   [switch]$Jank,
   [string]$Label = '',
   [string]$ThemeId = 'oled-black',
-  [string]$Title = ''
+  [string]$Title = '',
+  [switch]$AsJson,
+  [string]$OutFile = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -200,15 +206,64 @@ $gestureJs = switch ($Interaction) {
   }
 }
 
-# --- install the frame recorder -------------------------------------------------------
-$null = Invoke-Eval @"
+# --- the SCENE, without which none of these timings is comparable ----------------------
+# 2026-08-26: a worker lost a whole turn to a "theme-switch regression" that was a window
+# count. The 330-446 ms it chased was a 10-window desk measured against L0's 2-window
+# baseline; at L0's own scene the same swap costs 5.4 ms. Style/layout cost here is linear
+# in the element count of the open windows, so a category-7 number quoted without its scene
+# is not a measurement of anything. Captured before AND after -- a scene that moved during
+# the gesture (a window opened, a route swapped) invalidates the comparison just as surely.
+$sceneJs = @"
 (() => {
-  window.__lfp = { d: [], last: performance.now(), on: true };
-  const step = (now) => { if (!window.__lfp.on) return; window.__lfp.d.push(now - window.__lfp.last); window.__lfp.last = now; requestAnimationFrame(step); };
-  requestAnimationFrame(step);
-  return 'recording';
+  const wins = [].slice.call(document.querySelectorAll('.fwin')).filter((w) => {
+    const r = w.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  });
+  const t = (w) => {
+    const e = w.querySelector('.fwin-title-text, .fwin-title');
+    return e ? (e.textContent || '').trim().slice(0, 40) : '';
+  };
+  return {
+    fwins: wins.length,
+    fwinElements: wins.reduce((n, w) => n + 1 + w.querySelectorAll('*').length, 0),
+    documentElements: document.querySelectorAll('*').length,
+    titles: wins.map(t),
+    theme: document.documentElement.getAttribute('data-theme'),
+    viewport: innerWidth + 'x' + innerHeight,
+    dpr: devicePixelRatio,
+    heapMB: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null,
+  };
 })()
 "@
+$sceneBefore = Invoke-Eval $sceneJs
+
+# --- install the frame recorder -------------------------------------------------------
+# The token is load-bearing, not tidiness. A run that dies after this point (a PowerShell
+# error, a lost bridge, a Ctrl-C) leaves its rAF loop RUNNING in the renderer, and the loop
+# re-reads `window.__lfp` every frame -- so the next run's recorder shares its array with
+# the zombie and each frame is pushed TWICE: once as the real delta and once as ~0 ms.
+# Measured 2026-08-26 immediately after a crashed run: ceiling came back 221 frames /
+# p50 0.0 / p95 16.8, and the same ceiling with no zombie came back 111 / 16.7 / 16.9.
+# Exactly 2x the frames and a p50 of zero, i.e. the display beaten by a factor of infinity.
+# That is a fabricated PASS, which is the one direction a perf harness must never fail in.
+# Each loop now carries the token it was installed with and exits when it is superseded.
+# A per-run global NAME, not a per-run flag, and the difference is the whole fix: a zombie
+# that re-reads `window.__lfp` each frame writes into whatever that name currently holds, so
+# merely setting the old object's `on = false` and rebinding the name hands it the new array.
+# `__lfp` is therefore left in place as a DEAD DECOY (`on:false`) that stops any zombie which
+# re-reads it, while this run records into a name no earlier loop can know.
+$recName = "__lfp_" + [guid]::NewGuid().ToString('N').Substring(0, 8)
+$recorderInstall = Invoke-Eval @"
+(() => {
+  const stale = !!(window.__lfp && window.__lfp.on);
+  window.__lfp = { d: [], last: performance.now(), on: false, note: 'decoy: stops pre-2026-08-26 recorders' };
+  const a = window.$recName = { d: [], last: performance.now(), on: true };
+  const step = (now) => { if (!a.on) return; a.d.push(now - a.last); a.last = now; requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+  return JSON.stringify({ recording: true, staleRecorderDisarmed: stale });
+})()
+"@
+$staleRecorder = ($recorderInstall | ConvertFrom-Json).staleRecorderDisarmed
 
 # --- the sensitivity control, if asked for --------------------------------------------
 if ($Jank) {
@@ -279,7 +334,7 @@ if (-not $afterWin) {
 
 $frames = Invoke-Eval @"
 (() => {
-  const a = window.__lfp; a.on = false;
+  const a = window.$recName; a.on = false;
   const d = a.d.slice(1).sort((x, y) => x - y);
   const q = (p) => (d.length ? d[Math.min(d.length - 1, Math.floor(p * d.length))] : null);
   const r = (v) => (v === null ? null : +v.toFixed(1));
@@ -292,14 +347,21 @@ if ($Jank) {
   $jankBlocks = Invoke-Eval "(() => { const n = (window.__jank || {}).blocks ?? null; if (window.__jank) window.__jank.on = false; return n; })()"
 }
 # A stale global is the easiest way to 'confirm' a run that never happened.
-$null = Invoke-Eval "(() => { delete window.__lfp; delete window.__lip; delete window.__jank; return 'cleaned'; })()"
+$null = Invoke-Eval "(() => { delete window.$recName; delete window.__lip; delete window.__jank; return 'cleaned'; })()"
+
+$sceneAfter = Invoke-Eval $sceneJs
 
 $sorted = $times | Sort-Object
 $pct = { param($p) $sorted[[Math]::Min($sorted.Count - 1, [int][Math]::Floor($p * $sorted.Count))] }
 
-[pscustomobject]@{
+$record = [pscustomobject]@{
   interaction     = $Interaction + $(if ($Jank) { ' (CONTROL: 120 ms renderer blocks)' } else { '' })
   label           = if ($Label) { $Label } else { $Interaction }
+  title           = if ($Title) { $Title } else { $null }
+  scene_before    = $sceneBefore
+  scene_after     = $sceneAfter
+  scene_stable    = ($sceneBefore.fwins -eq $sceneAfter.fwins -and $sceneBefore.fwinElements -eq $sceneAfter.fwinElements)
+  stale_recorder  = $staleRecorder
   gesture         = $state
   jank_blocks     = $jankBlocks
   frames          = $frames.frames
@@ -316,3 +378,6 @@ $pct = { param($p) $sorted[[Math]::Min($sorted.Count - 1, [int][Math]::Floor($p 
   main_p95_ms     = [math]::Round((& $pct 0.95), 1)
   main_max_ms     = [math]::Round(($sorted | Select-Object -Last 1), 1)
 }
+
+if ($OutFile) { $record | ConvertTo-Json -Depth 8 | Set-Content -Path $OutFile -Encoding utf8 }
+if ($AsJson) { $record | ConvertTo-Json -Depth 8 -Compress } else { $record }
