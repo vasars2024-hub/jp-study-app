@@ -44,3 +44,41 @@ export function levelSortKey(
   }
   return 99;
 }
+
+export const LIBRARY_LANG_CHIPS = ['all', 'ja', 'zh', 'en', 'unknown'] as const;
+export const LIBRARY_LEVEL_CHIPS = ['all', '1', '2', '3', '4', '5', '6', '7'] as const;
+
+/**
+ * Which language / level filter chips can actually return something for a given list.
+ *
+ * Library rendered all thirteen unconditionally, so a shelf of Japanese books still offered
+ * Chinese, English and Unknown, and every level from L1 to L7 whether or not anything carried
+ * one. A filter that can only produce an empty result is a dead control, and measured on a
+ * real 24-item library it was thirteen of the twenty-five controls the user has to scan
+ * before doing anything (rubric category 5 Q4, `baselines/cat5-l6-library.json`).
+ *
+ * `all` is always kept, and so is whatever is currently selected — a filter you can apply and
+ * then neither see nor undo is worse than the clutter this removes. The caller passes the
+ * FOLDER-SCOPED list, because that is what the chips filter.
+ */
+export function availableFilterChips(
+  scoped: readonly LibraryItem[],
+  bookLevels: Readonly<Record<string, BookLevelEstimate | null | undefined>>,
+  selected: { lang: string; level: string },
+): { langs: LibraryLang[] | string[]; levels: string[] } {
+  const langs = new Set<string>();
+  const levels = new Set<string>();
+  for (const it of scoped) {
+    langs.add(effectiveLang(it));
+    const lv = levelSortKey(it, bookLevels[it.id]);
+    if (lv >= 1 && lv <= 7) levels.add(String(lv));
+  }
+  return {
+    langs: LIBRARY_LANG_CHIPS.filter(
+      (l) => l === 'all' || langs.has(l) || selected.lang === l,
+    ) as string[],
+    levels: LIBRARY_LEVEL_CHIPS.filter(
+      (lv) => lv === 'all' || levels.has(lv) || selected.level === lv,
+    ) as string[],
+  };
+}

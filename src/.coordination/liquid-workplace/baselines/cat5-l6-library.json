@@ -2,7 +2,7 @@
   "surface": "Library",
   "label": "l6-library",
   "control": false,
-  "at": "2026-08-26T22:37:43.714Z",
+  "at": "2026-08-26T22:42:03.233Z",
   "category": 5,
   "question": "UI clarity and user-friendliness — the ten §10.4 questions, scored",
   "hostClass": "fwin",
@@ -100,8 +100,8 @@
       "bar": ">=1 collapsed disclosure AND <=12 controls scanned in the default state",
       "numbers": {
         "collapsedDisclosures": 4,
-        "scannedControls": 25,
-        "chromeControlsRaw": 25,
+        "scannedControls": 17,
+        "chromeControlsRaw": 17,
         "summaryHeaders": 0,
         "behindDisclosure": 0,
         "disclosures": {
@@ -123,12 +123,9 @@
           "+ New folder",
           "All",
           "Japanese",
-          "Chinese",
-          "English",
           "Unknown",
           "All",
-          "L1",
-          "L2"
+          "L7"
         ]
       }
     },
@@ -142,7 +139,7 @@
         "cells": [
           {
             "theme": "forest-night",
-            "measured": 168,
+            "measured": 160,
             "unmeasurable": 60,
             "minRatio": 5.3,
             "failingCount": 0,
@@ -156,7 +153,7 @@
           },
           {
             "theme": "classic-light",
-            "measured": 168,
+            "measured": 160,
             "unmeasurable": 60,
             "minRatio": 5.58,
             "failingCount": 0,
@@ -273,7 +270,7 @@
   },
   "altThemeNumbers": {
     "theme": "classic-light",
-    "controlsPainted": 41,
+    "controlsPainted": 33,
     "q1": {
       "entryPoints": 1,
       "primaryInputs": 0,
@@ -285,8 +282,8 @@
     },
     "q4": {
       "collapsedDisclosures": 4,
-      "scannedControls": 25,
-      "chromeControlsRaw": 25,
+      "scannedControls": 17,
+      "chromeControlsRaw": 17,
       "summaryHeaders": 0,
       "behindDisclosure": 0,
       "disclosures": {
@@ -308,12 +305,9 @@
         "+ New folder",
         "All",
         "Japanese",
-        "Chinese",
-        "English",
         "Unknown",
         "All",
-        "L1",
-        "L2"
+        "L7"
       ]
     },
     "q6": {
@@ -342,7 +336,7 @@
       "cardHostDetail": null
     }
   },
-  "controlsPaintedA": 41,
+  "controlsPaintedA": 33,
   "findings": [
     "Q4 advanced tools discoverable without cluttering"
   ],

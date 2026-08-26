@@ -35,6 +35,7 @@ import { useT } from '../i18n';
 import { LANG_TAGS } from '../../shared/i18n/core';
 import { INBOX_FOLDER } from '../../shared/inboxMeta';
 import {
+  availableFilterChips,
   effectiveLang,
   effectiveLevelEstimate,
   levelSortKey,
@@ -597,6 +598,29 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
       ),
     [items, bookLevels],
   );
+
+  /**
+   * Only the chips that can return something. The two banks used to render all thirteen
+   * options unconditionally — five languages and L1–L7 — so a shelf of Japanese books still
+   * offered Chinese, English and Unknown, and levels nothing in the library carries. A filter
+   * that can only ever produce an empty result is both clutter and a dishonest control, and
+   * measured on this library it was thirteen of the twenty-five controls a user has to scan
+   * before doing anything (`baselines/cat5-l6-library.json`, rubric category 5 Q4).
+   *
+   * Scoped to the ACTIVE FOLDER, because that is the list the chips actually filter — offering
+   * a level that exists only in a folder you are not looking at is the same dead control one
+   * step removed. `all` is always kept, and so is whatever is currently selected: a filter you
+   * can apply and then cannot see or undo is worse than the clutter this removes.
+   */
+  const filterOptions = useMemo(() => {
+    const scoped =
+      active === 'all'
+        ? items
+        : active === 'unfiled'
+          ? items.filter((it) => !it.folder || !folders.includes(it.folder))
+          : items.filter((it) => it.folder === active);
+    return availableFilterChips(scoped, bookLevels, { lang: langFilter, level: levelFilter });
+  }, [items, folders, active, bookLevels, langFilter, levelFilter]);
   // Deliberately not backfilled with the first visible item — see
   // resolveSelection. A drawer that re-selects something the moment you close
   // it is a drawer that cannot be closed.
@@ -1126,7 +1150,7 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
             </Toolbar>
             {hasLevelFilters && (
               <div className="lib-inbox-filters lq-hit-scope" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '0 12px 8px' }}>
-                {(['all', 'ja', 'zh', 'en', 'unknown'] as const).map((lang) => (
+                {filterOptions.langs.map((lang) => (
                   <button
                     key={lang}
                     type="button"
@@ -1136,7 +1160,7 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
                     {lang === 'all' ? t('library.filter.all') : t(`library.inbox.lang.${lang}`)}
                   </button>
                 ))}
-                {(['all', '1', '2', '3', '4', '5', '6', '7'] as const).map((lv) => (
+                {filterOptions.levels.map((lv) => (
                   <button
                     key={lv}
                     type="button"
@@ -1413,7 +1437,7 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
 
       {hasLevelFilters && (
         <div className="lib-inbox-filters lq-hit-scope" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
-          {(['all', 'ja', 'zh', 'en', 'unknown'] as const).map((lang) => (
+          {filterOptions.langs.map((lang) => (
             <button
               key={lang}
               type="button"
@@ -1426,7 +1450,7 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
           <span className="muted" style={{ fontSize: 12, alignSelf: 'center', marginLeft: 4 }}>
             {t('library.inbox.levelChips')}
           </span>
-          {(['all', '1', '2', '3', '4', '5', '6', '7'] as const).map((lv) => (
+          {filterOptions.levels.map((lv) => (
             <button
               key={lv}
               type="button"
