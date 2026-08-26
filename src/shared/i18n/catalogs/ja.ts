@@ -5216,6 +5216,8 @@ export const ja: Catalog = {
   'immersion.captureFailed': 'キャプチャに失敗しました',
   'immersion.back': '戻る',
   'immersion.forward': '進む',
+  'immersion.reason.noBack': 'このセッションで戻れるページはまだありません。',
+  'immersion.reason.noForward': 'すでに最新のページを表示しています。',
   'immersion.reload': '再読み込み',
   'immersion.urlPlaceholder': 'URLを入力するか検索…',
   'immersion.viewMode.ariaLabel': '表示モード',

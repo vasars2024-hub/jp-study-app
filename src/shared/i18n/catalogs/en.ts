@@ -5510,6 +5510,8 @@ export const en: Catalog = {
   'immersion.captureFailed': 'Capture failed',
   'immersion.back': 'Back',
   'immersion.forward': 'Forward',
+  'immersion.reason.noBack': 'No page to go back to in this session yet.',
+  'immersion.reason.noForward': 'You are already on the newest page.',
   'immersion.reload': 'Reload',
   'immersion.urlPlaceholder': 'Enter URL or search…',
   'immersion.viewMode.ariaLabel': 'View mode',

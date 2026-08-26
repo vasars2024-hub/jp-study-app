@@ -755,6 +755,8 @@ export type ImmersionState = ReturnType<typeof useImmersion>;
 export function ImmersionToolbar({ state, trailing }: { state: ImmersionState; trailing?: ReactNode }) {
   const { t, mode, MODE_LABELS, urlInput, setUrlInput, histIdx, history, showRail, captureBusy, liveLookup } =
     state;
+  const noBack = histIdx <= 0;
+  const noForward = histIdx < 0 || histIdx >= history.length - 1;
   return (
     /* `lq-hit-scope`: rubric category 1 measured every button in this bar under the 32px
        pointer floor — the icon buttons at 28x24, the mode segments at 25.5. The scope gives
@@ -762,19 +764,37 @@ export function ImmersionToolbar({ state, trailing }: { state: ImmersionState; t
        is the recorded remedy; growing compact chrome is what category 4's dead-region number
        then pays for. The URL input is not covered by it and is fixed on its own box. */
     <div className="immersion-toolbar lq-hit-scope">
-      <button type="button" className="btn small icon-btn" title={t('immersion.back')} onClick={state.goBack} disabled={histIdx <= 0}>
+      {/* These three are icon-only, so their accessible name came from `title` alone. Back and
+          Forward hand `title` over to the disabled REASON — "Back" says what the button does,
+          never why it is greyed out — which would have taken the name with it. `aria-label`
+          holds the name independently, on all three so the group is consistent. */}
+      <button
+        type="button"
+        className="btn small icon-btn"
+        aria-label={t('immersion.back')}
+        title={noBack ? t('immersion.reason.noBack') : t('immersion.back')}
+        onClick={state.goBack}
+        disabled={noBack}
+      >
         <Icon name="chevron" size={14} style={{ transform: 'rotate(180deg)' }} />
       </button>
       <button
         type="button"
         className="btn small icon-btn"
-        title={t('immersion.forward')}
+        aria-label={t('immersion.forward')}
+        title={noForward ? t('immersion.reason.noForward') : t('immersion.forward')}
         onClick={state.goForward}
-        disabled={histIdx < 0 || histIdx >= history.length - 1}
+        disabled={noForward}
       >
         <Icon name="chevron" size={14} />
       </button>
-      <button type="button" className="btn small icon-btn" title={t('immersion.reload')} onClick={state.reload}>
+      <button
+        type="button"
+        className="btn small icon-btn"
+        aria-label={t('immersion.reload')}
+        title={t('immersion.reload')}
+        onClick={state.reload}
+      >
         <Icon name="refresh" size={14} />
       </button>
       <form

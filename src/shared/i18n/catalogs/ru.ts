@@ -5749,6 +5749,8 @@ export const ru: Catalog = {
   'immersion.captureFailed': 'Не удалось выполнить захват',
   'immersion.back': 'Назад',
   'immersion.forward': 'Вперёд',
+  'immersion.reason.noBack': 'В этой сессии пока нет страницы для возврата.',
+  'immersion.reason.noForward': 'Вы уже на самой новой странице.',
   'immersion.reload': 'Обновить',
   'immersion.urlPlaceholder': 'Введите URL или поисковый запрос…',
   'immersion.viewMode.ariaLabel': 'Режим просмотра',

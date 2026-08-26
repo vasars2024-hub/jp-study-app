@@ -223,3 +223,50 @@ describe('the Immersion browser through the L6 reading canvas', () => {
     expect(body![1]).not.toMatch(/display\s*:\s*flex/);
   });
 });
+
+/**
+ * The toolbar's two history buttons, which the category-8 sweep scored as MUTE
+ * PAIRS: greyed out from the moment the surface mounts, icon-only, and carrying
+ * `title="Back"` / `title="Forward"` — a name, never a reason.
+ *
+ * The fix hands `title` over to the reason while disabled, which would have
+ * taken the accessible name with it on an icon-only button, so `aria-label` now
+ * holds the name independently. Both halves are asserted here: a run that only
+ * checked the title would pass a regression that left these buttons nameless.
+ *
+ * A RUN of the harness above, not a new one — the mount, the `window.api` stub
+ * and the teardown are all shared with the Gate tests in this file.
+ */
+describe('the Immersion toolbar names why its history buttons are disabled', () => {
+  it('carries a reason in title and the label in aria-label while disabled', async () => {
+    const h = await mountImmersion(1200);
+    const nav = [...h.container.querySelectorAll('.immersion-toolbar .icon-btn')]
+      .filter((b): b is HTMLButtonElement => b instanceof HTMLButtonElement && b.disabled);
+    // History starts empty on mount, so both are disabled and Reload is not.
+    expect(nav.length, 'expected Back and Forward disabled on a fresh mount').toBe(2);
+    for (const button of nav) {
+      const title = button.getAttribute('title') ?? '';
+      const label = button.getAttribute('aria-label') ?? '';
+      expect(label, 'an icon-only button lost its accessible name').not.toBe('');
+      expect(title, 'the title is still the label, not the reason').not.toBe(label);
+      // The category-8 harness's own bar for what counts as an explanation.
+      expect(title.length, `"${title}" is too short to be an explanation`)
+        .toBeGreaterThanOrEqual(12);
+    }
+  });
+
+  it('gives Reload a name too, and no reason, because it is never disabled', async () => {
+    const h = await mountImmersion(1200);
+    // By position, not by label: the toolbar carries a dozen more `.icon-btn`
+    // further along (save, capture, lens, rail) and their labels are localised.
+    // Back, Forward and Reload are its first three direct children and are the
+    // only unconditional ones.
+    const nav = [...h.container.querySelectorAll('.immersion-toolbar > .icon-btn')];
+    expect(nav.length, 'the toolbar lost its icon buttons').toBeGreaterThanOrEqual(3);
+    const reload = nav[2] as HTMLButtonElement;
+    expect(reload.disabled, 'Reload is never disabled').toBe(false);
+    // A reason on an enabled control is noise, so title and label agree here.
+    expect(reload.getAttribute('aria-label')).not.toBe('');
+    expect(reload.getAttribute('title')).toBe(reload.getAttribute('aria-label'));
+  });
+});

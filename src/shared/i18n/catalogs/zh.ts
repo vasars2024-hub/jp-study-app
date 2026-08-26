@@ -5193,6 +5193,8 @@ export const zh: Catalog = {
   'immersion.captureFailed': '抓取失败',
   'immersion.back': '后退',
   'immersion.forward': '前进',
+  'immersion.reason.noBack': '本次会话中还没有可返回的页面。',
+  'immersion.reason.noForward': '当前已经是最新的页面。',
   'immersion.reload': '重新加载',
   'immersion.urlPlaceholder': '输入网址或搜索…',
   'immersion.viewMode.ariaLabel': '查看模式',
