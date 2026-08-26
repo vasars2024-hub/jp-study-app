@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReadingLensHistoryEntry } from '../../shared/readingLensHistory';
 import type { ReadingPassageHandoff } from '../../shared/readingPassageHandoff';
 import Icon from '../components/Icons';
+import VirtualList from '../components/VirtualList';
 import {
   ReadingCanvas,
   useReadingDocumentCover,
@@ -27,6 +28,8 @@ import './readingCaptures.css';
  */
 
 const HISTORY_LIMIT = 60;
+/** 49px measured row plus the 3px gap the old flex list contributed. */
+export const READING_CAPTURE_ROW_HEIGHT = 52;
 
 type HistoryState =
   | { kind: 'loading' }
@@ -174,9 +177,15 @@ export default function ReadingCapturesView({ passage }: ReadingCapturesViewProp
       {history.kind === 'ready' && rows.length === 0 ? (
         <p className="reading-captures-note muted">{t('reading.captures.empty')}</p>
       ) : null}
-      <ul className="reading-captures-rows">
-        {rows.map((row) => (
-          <li key={row.captureId}>
+      {rows.length > 0 ? (
+        <VirtualList
+          items={rows}
+          itemHeight={READING_CAPTURE_ROW_HEIGHT}
+          className="reading-captures-rows"
+          listRole="list"
+          itemRole="listitem"
+          getKey={(row) => row.captureId}
+          renderItem={(row) => (
             <button
               type="button"
               className="reading-captures-row"
@@ -193,9 +202,9 @@ export default function ReadingCapturesView({ passage }: ReadingCapturesViewProp
                 <span>{t(`settings.lens.history.source.${row.source}`)}</span>
               </span>
             </button>
-          </li>
-        ))}
-      </ul>
+          )}
+        />
+      ) : null}
     </>
   );
 

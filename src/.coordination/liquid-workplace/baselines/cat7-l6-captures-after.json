@@ -1,0 +1,21 @@
+{
+  "label": "l6-captures",
+  "title": "Reading Finder",
+  "container": ".reading-captures-rows",
+  "row": ".reading-captures-row",
+  "rows": 42,
+  "rowsSource": "--total",
+  "domRows": 20,
+  "nodes": 102,
+  "scrollHeight": 2184,
+  "clientHeight": 375,
+  "overdraw": 5.8,
+  "scroller": "reading-captures-rows",
+  "distinctRowHeights": 1,
+  "heights": {
+    "49": 20
+  },
+  "spacerHeight": null,
+  "verdict": "WINDOWED",
+  "at": "2026-08-26T20:40:06.480Z"
+}

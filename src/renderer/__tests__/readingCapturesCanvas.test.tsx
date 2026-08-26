@@ -57,6 +57,14 @@ const HISTORY = [
   },
 ];
 
+const LARGE_HISTORY = Array.from({ length: 60 }, (_, index) => ({
+  captureId: `cap-${index}`,
+  text: `履歴の文章 ${index}`,
+  source: 'screen',
+  sourceLabel: `Screen ${index}`,
+  capturedAt: 1_700_000_000_000 + index,
+}));
+
 /**
  * A staged lens passage, exactly as `readingPassageHandoffTake` hands one back.
  * Deliberately not one of the two history rows: the deep link has to be visible
@@ -77,6 +85,7 @@ const PASSAGE: ReadingPassageHandoff = {
 let harness: ReadingSurfaceHarness | null = null;
 /** Read at every render, so a re-render can deliver a passage without remounting. */
 let passage: ReadingPassageHandoff | null = null;
+let historyRows = HISTORY;
 
 async function mountAt(width: number): Promise<ReadingSurfaceHarness> {
   harness = createReadingSurfaceHarness({
@@ -95,7 +104,8 @@ async function deliverPassage(h: ReadingSurfaceHarness, width: number): Promise<
 
 beforeEach(() => {
   installResizeObserver();
-  installReadingSurfaceApi({ lensHistoryList: async () => HISTORY });
+  historyRows = HISTORY;
+  installReadingSurfaceApi({ lensHistoryList: async () => historyRows });
 });
 
 afterEach(() => {
@@ -146,6 +156,20 @@ describe('Captures through the L6 reading canvas', () => {
     // And the rows are still the same two — a subtree that survived but emptied
     // would satisfy node identity and nothing a reader cares about.
     expect(h.container.querySelectorAll('.reading-captures-row').length).toBe(2);
+  });
+
+  it('windows a full capture history while preserving its accessible size', async () => {
+    historyRows = LARGE_HISTORY;
+    const h = await mountAt(1200);
+    const rendered = h.container.querySelectorAll('.reading-captures-row');
+    const firstSlot = rendered[0]?.closest('[role="listitem"]');
+
+    // jsdom reports a zero-height viewport, so VirtualList renders only its 12-row
+    // overscan. Rendering all 60 is the exact regression this assertion catches.
+    expect(rendered.length).toBeGreaterThan(0);
+    expect(rendered.length).toBeLessThan(LARGE_HISTORY.length);
+    expect(firstSlot?.getAttribute('aria-setsize')).toBe(String(LARGE_HISTORY.length));
+    expect(firstSlot?.getAttribute('aria-posinset')).toBe('1');
   });
 
   it('keeps the list on the LEADING edge, where the grid column it replaced was', async () => {

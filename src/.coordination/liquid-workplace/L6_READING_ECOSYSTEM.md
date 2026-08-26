@@ -1285,3 +1285,17 @@ The first run was VOID, not banked: seek percent could not observe a page flip a
 matched translation settings. The rule's one spec repair changed the observation to page
 content/page count and excluded translation from the reader-settings matcher. Board: category 6
 is **5 of 6**; only VN remains. No product defect was found in Novels.
+
+## 2026-08-26 (later 7) · codexA — Captures windowing, category 7 progress
+
+The shared collection harness measured **42/42 DOM rows, 210 nodes, 2,205/399px = 5.5×
+overdraw, UNWINDOWED**. `ReadingCapturesView` now uses the existing fixed-height `VirtualList` at
+the measured **49px row + 3px gap**, with full `list`/`listitem`, `aria-setsize=42`, and true
+`aria-posinset` semantics. Re-run: **20/42 DOM rows, 102 nodes, WINDOWED** in a 375px viewport;
+bottom scroll rendered positions **29–42**, clicking 42 updated the reader, then top/selection
+restored. Evidence: `cat7-l6-captures-{before,after}.json`.
+
+The first post-fix run was not banked: the virtual list expanded to its 2,184px spacer and stayed
+42/42 (`INERT` in effect). Constraining its viewport to the ReadingCanvas tool body produced the
+numbers above. Focused Captures suites: **16/16**. This closes the collection-weight defect only;
+category 7's restart-dependent frame/theme/boot/main-block/memory legs remain open.
