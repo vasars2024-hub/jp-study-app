@@ -69,7 +69,7 @@ describe('what the banner says', () => {
       isMainFrame: true,
     }, 'https://previous.example/');
     expect(failure).toEqual({ url: DEAD, reason: 'ERR_CONNECTION_REFUSED' });
-    expect(immersionLoadFailureMessage(failure!)).toEqual({
+    expect(failure && immersionLoadFailureMessage(failure)).toEqual({
       key: 'immersion.pageLoadFailedAt',
       vars: { url: DEAD, reason: 'ERR_CONNECTION_REFUSED' },
     });
@@ -80,7 +80,8 @@ describe('what the banner says', () => {
       { errorCode: -2, validatedURL: DEAD, isMainFrame: true },
       '',
     );
-    expect(immersionLoadFailureMessage(failure!)).toEqual({ key: 'immersion.pageLoadFailed' });
+    expect(failure && immersionLoadFailureMessage(failure))
+      .toEqual({ key: 'immersion.pageLoadFailed' });
   });
 
   it('falls back to the current URL when the event carries none', () => {
