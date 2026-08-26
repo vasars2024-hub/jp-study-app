@@ -103,6 +103,8 @@ describe('ReadingWorkspaceView', () => {
     // `resolveReadingLensWorkflow`'s `reading` target had been routing to for
     // its whole life with nothing there to receive it.
     expect(host.querySelectorAll('[role="tab"]')).toHaveLength(8);
+    expect(host.querySelector('[role="tablist"]')?.classList.contains('lq-contextual')).toBe(true);
+    expect(host.querySelector('[role="tablist"]')?.getAttribute('data-lq-role')).toBe('contextual');
     expect(tab('captures')).not.toBeNull();
     expect(tab('discover').getAttribute('aria-selected')).toBe('true');
     expect(host.querySelector('[data-surface="finder"]')).not.toBeNull();

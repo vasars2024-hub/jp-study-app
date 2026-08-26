@@ -712,6 +712,11 @@ its local `header.view-head` adopted `ContextualSurface`. Liquid: 0 dense-work r
 1/1 contextual regions treated and 1/1 on a shared primitive; control 0→1, all-glass 3/3, restored
 0. Conventional mode stayed unpainted. Board **25 of 48**; L6 Gate remains open.
 
+**L6 Gate, category 3 — 2 of 6 surfaces, 2026-08-26** (checkpoint containing this entry).
+Captures/Reading Finder moved its local translucent workspace nav to `ContextualSurface` without
+changing conventional pixels. Liquid: 0 dense Work on glass, 1/1 treated and shared; control
+0→1, all-glass 2/2, restored 0. Board **26 of 48**; L6 Gate remains open.
+
 **L6 Gate, category 1 — 2 of its 6 surfaces, 2026-08-25 (later 21)** (`e41a85ce`, `16e8ed1c`).
 Captures **10/10** and Immersion **10/10**, both live, raised, control fired. Immersion earned it
 with a product fix, not a re-read: **34 controls under the 32px pointer floor → 0**, via a new

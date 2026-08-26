@@ -16,6 +16,7 @@ import {
 } from '../../shared/readingWorkspace';
 import type { ReadingPassageHandoff } from '../../shared/readingPassageHandoff';
 import Icon from '../components/Icons';
+import { ContextualSurface } from '../components/liquid/LiquidSurface';
 import { useT } from '../i18n';
 import {
   claimReadingPassageHandoff,
@@ -162,7 +163,12 @@ export default function ReadingWorkspaceView({
 
   return (
     <div className="reading-workspace" data-reading-section={section}>
-      <nav className="reading-workspace-nav" role="tablist" aria-label={t('reading.menu.view')}>
+      <ContextualSurface
+        as="nav"
+        className="reading-workspace-nav"
+        role="tablist"
+        aria-label={t('reading.menu.view')}
+      >
         {READING_WORKSPACE_SECTIONS.map((item, index) => (
           <button
             key={item}
@@ -181,7 +187,7 @@ export default function ReadingWorkspaceView({
             <span>{t(SECTION_LABEL_KEYS[item])}</span>
           </button>
         ))}
-      </nav>
+      </ContextualSurface>
 
       <main
         id={panelId}

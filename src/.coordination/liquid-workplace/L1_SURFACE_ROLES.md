@@ -263,3 +263,15 @@ that existing header through `ContextualSurface`; conventional mode remained tra
 backed, while Liquid measured **0 dense Work on translucent, 1/1 treated, 1/1 shared** at 820x580.
 Control: dense **0→1**, all-glass **3/3**, restored **0** with style/material identical. **10/10.**
 Raw summary: `baselines/cat3-l6-library.json`. Board: **25 of 48 cells**; category 3 is 1/6.
+
+## 2026-08-26 · codexA — Captures/Reading Finder category 3 is 10/10
+
+The second surface was a harness RUN. `nav.reading-workspace-nav` painted its own 0.88-alpha
+material in every presentation but was a local implementation: **0 dense on glass, 1/1 treated,
+0/1 shared**. It now uses `ContextualSurface as="nav"`; the existing class keeps conventional
+pixels unchanged, while `.fwin-liquid` supplies the shared material.
+
+Liquid at 820x580: **0 dense Work on translucent, 1/1 treated, 1/1 shared**. Control: dense
+**0→1**, all-glass **2/2**, restored **0**, material/style identical. **10/10.** Conventional
+geometry remained 820x580 and the nav returned to its original 0.88-alpha colour. Raw summary:
+`baselines/cat3-l6-captures.json`. Board: **26 of 48 cells**; category 3 is 2/6.
