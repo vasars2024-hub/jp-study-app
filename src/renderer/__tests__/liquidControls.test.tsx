@@ -494,6 +494,45 @@ describe('the sheet stays a composition language, not a palette', () => {
     }
   });
 
+  it('applies the hit floor by container without letting the scope and the tagged control drift apart', () => {
+    // `.lq-hit-scope` exists because category 1's failures arrive in FAMILIES — 20 identical
+    // remove buttons in Immersion's site list, 7 identical toolbar icon buttons — and tagging
+    // each call site is a dozen edits to say one thing. Two things have to stay true, and both
+    // are the kind that a later "tidy the selector list" edit silently breaks.
+    //
+    // 1. ONE `::after`. If the scope grows its own copy of the geometry, a change to the floor
+    //    lands on tagged controls and not on scoped ones, and the surfaces measured through the
+    //    scope keep reporting the old number.
+    const after = CSS.slice(CSS.indexOf('.lq-hit::after'));
+    const rule = after.slice(0, after.indexOf('}') + 1);
+    expect(rule).toContain('.lq-hit-placed::after');
+    expect(rule).toContain('.lq-hit-scope');
+    expect(rule).toMatch(/width:\s*max\(100%,\s*var\(--lq-hit-target\)\)/);
+    // Exactly one rule in the sheet sizes a hit overlay, so there is nothing to drift from.
+    expect(CSS.match(/max\(100%,\s*var\(--lq-hit-target\)\)/g)).toHaveLength(2); // width + height
+
+    // 2. NO REPLACED ELEMENTS IN THE SCOPE. `::after` generates no box on an `input` or a
+    //    `select`, so a scope that appeared to cover them would leave them under the floor
+    //    while reading as fixed — the exact false-pass shape the rubric forbids. Immersion's
+    //    URL input is floored on its own box in `styles.css` instead, and that is asserted
+    //    here too, because a scope that quietly grew an `input` would make it redundant and
+    //    the next tidy-up would delete it.
+    const scopeSelectors = CSS.match(/\.lq-hit-scope\s+:is\(([^)]*)\)/g) || [];
+    expect(scopeSelectors.length).toBeGreaterThan(0);
+    for (const sel of scopeSelectors) {
+      expect(sel, sel).not.toMatch(/\binput\b|\bselect\b|\btextarea\b/);
+    }
+    const styles = readFileSync(resolve(__dirname, '..', 'styles.css'), 'utf8');
+    const urlRule = styles.slice(styles.indexOf('.immersion-url {'));
+    expect(urlRule.slice(0, urlRule.indexOf('}'))).toMatch(/min-height:\s*var\(--lq-hit-target\)/);
+
+    // The adopters, for the same reason the tagged list above is checked: a primitive nothing
+    // uses is invisible, and a CSS-only assertion cannot tell that apart from a clean sweep.
+    const src = readFileSync(resolve(__dirname, '..', 'components/immersion/ImmersionContent.tsx'), 'utf8');
+    expect(src).toMatch(/immersion-toolbar lq-hit-scope/);
+    expect(src).toMatch(/immersion-site-list lq-hit-scope/);
+  });
+
   it('scales its one animation by --lq-motion-scale so reduced motion means no displacement', () => {
     const frames = CSS.slice(CSS.indexOf('@keyframes lq-toolbar-menu-in'));
     expect(frames).toContain('var(--lq-motion-scale)');

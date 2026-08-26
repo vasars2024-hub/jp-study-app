@@ -756,7 +756,12 @@ export function ImmersionToolbar({ state, trailing }: { state: ImmersionState; t
   const { t, mode, MODE_LABELS, urlInput, setUrlInput, histIdx, history, showRail, captureBusy, liveLookup } =
     state;
   return (
-    <div className="immersion-toolbar">
+    /* `lq-hit-scope`: rubric category 1 measured every button in this bar under the 32px
+       pointer floor — the icon buttons at 28x24, the mode segments at 25.5. The scope gives
+       each one a transparent centred hit region without changing a single rendered box, which
+       is the recorded remedy; growing compact chrome is what category 4's dead-region number
+       then pays for. The URL input is not covered by it and is fixed on its own box. */
+    <div className="immersion-toolbar lq-hit-scope">
       <button type="button" className="btn small icon-btn" title={t('immersion.back')} onClick={state.goBack} disabled={histIdx <= 0}>
         <Icon name="chevron" size={14} style={{ transform: 'rotate(180deg)' }} />
       </button>
@@ -962,7 +967,9 @@ export function ImmersionSiteList({ state }: { state: ImmersionState }) {
       <VirtualList
         items={sites}
         itemHeight={IMMERSION_SITE_ROW_HEIGHT}
-        className="immersion-site-list"
+        /* `lq-hit-scope` on the list, not on 20 identical rows: the remove button renders
+           20x49, so it is under the floor on the x axis alone and every row repeats it. */
+        className="immersion-site-list lq-hit-scope"
         listRole="list"
         itemRole="listitem"
         getKey={(s) => s.id}

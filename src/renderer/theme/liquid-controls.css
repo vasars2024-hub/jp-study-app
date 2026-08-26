@@ -42,8 +42,24 @@
    drop the button back into flow. The variant declares no `position` of its
    own, so it is only correct on a control that is already a containing block.
    Both selectors share one `::after` so the geometry cannot drift apart. */
+/* `.lq-hit-scope` is the same expander applied by CONTAINER rather than per control.
+   Rubric category 1 measured 34 controls under the floor in the Immersion window and 50 in
+   Library, and they arrive in families — 20 identical remove buttons in a list, 7 identical
+   toolbar icon buttons — where tagging each call site means a dozen edits to say one thing.
+   The container opts its interactive children in; the geometry is still the single `::after`
+   below, so a scope and a tagged control cannot drift apart.
+
+   `input` and `select` are deliberately NOT in the list. They are replaced elements: `::after`
+   generates no box on them, so a scope that appeared to cover them would silently leave them
+   under the floor while reading as fixed. An input's own box IS its hit area, so the floor is
+   a `min-height` on the control, and that is written where the control lives. */
+.lq-hit-scope :is(button, a[href], [role='button'], [role='tab']) {
+  position: relative;
+}
+
 .lq-hit::after,
-.lq-hit-placed::after {
+.lq-hit-placed::after,
+.lq-hit-scope :is(button, a[href], [role='button'], [role='tab'])::after {
   content: '';
   position: absolute;
   top: 50%;

@@ -16874,6 +16874,11 @@ html[data-taskbar-size='large'] .os-tray-btn {
 }
 .immersion-url {
   width: 100%;
+  /* An input is a replaced element: `::after` generates no box on it, so the `.lq-hit-scope`
+     overlay the rest of this toolbar uses cannot reach it. Its own box IS its hit area, and it
+     measured 29.5px against the rubric's 32px floor, so the floor goes on the box. */
+  min-height: var(--lq-hit-target);
+  box-sizing: border-box;
   border: 1px solid var(--control-border);
   background: var(--control-bg);
   color: var(--text);
