@@ -332,7 +332,7 @@ export default function DictionaryResults({ query, variant = 'popup', lang = 'ja
     key: '',
     limit: DICT_LOOKUP_LIMIT,
   });
-  const pageKey = `${lang} ${query.trim()}`;
+  const pageKey = `${lang}\0${query.trim()}`;
   const limit = page.key === pageKey ? page.limit : DICT_LOOKUP_LIMIT;
 
   // (Re)look up whenever the query changes, or the reader asks for more of it.

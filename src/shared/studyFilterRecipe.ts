@@ -287,7 +287,7 @@ export function parseStudyFilterRecipe(text: string): StudyFilterRecipeParse {
 }
 
 const valueKey = (value: StudyFilterRecipeValue): string =>
-  (Array.isArray(value) ? [...value].sort().join(' ') : String(value));
+  (Array.isArray(value) ? [...value].sort().join('\0') : String(value));
 
 /** Only the fields that would actually move, so the panel shows a real diff. */
 export function studyFilterRecipeChanges(
