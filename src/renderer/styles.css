@@ -8915,6 +8915,13 @@ mark.lookup-mark,
   inset: 0;
   pointer-events: none;
   z-index: 2;
+  /* The query container every OCR block's `cqw` font size resolves against. It is `inset: 0`
+     on the rendered page, so 1cqw is 1% of the page as drawn — which is what lets
+     `MangaOcrOverlay` express an IMAGE-pixel font size in the same space its %-sized boxes
+     already live in. Without it `cqw` falls back to the small viewport and the type detaches
+     from the art in the other direction. `inline-size`, not `size`: only the width needs to
+     be a query axis, and block-size containment would fight `inset: 0`. */
+  container-type: inline-size;
 }
 .manga-region-draw-layer {
   position: absolute;
@@ -9276,6 +9283,14 @@ mark.lookup-mark,
   line-height: 1.25;
   word-break: normal;
   overflow-wrap: anywhere;
+  /* `.manga-ocr-text` is `overflow: hidden`, which is right for the transparent Japanese
+     alignment layer and wrong here: this text is PAINTED and meant to be read. A translation
+     is routinely longer than the line it replaces, so even at the authored size a bubble can
+     come up short — measured after the `cqw` fix, one of five blocks still ran 29 px of text
+     in a 24 px box. Hiding those 5 px silently is the same class of defect as the reading
+     workspace's clamped panel: content with no scrollbar and no affordance. */
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 
 /* ----- manga view-mode switcher (Original/Regions/Overlay/Clean/Compare) ----- */

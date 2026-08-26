@@ -229,6 +229,41 @@ describe('grid track floors fit the narrowest window the product allows', () => 
     expect(css).toMatch(/\.reading-workspace-panel\s*>\s*\*\s*\{[^}]*height:\s*100%/);
   });
 
+  it('the manga OCR overlay sizes its type in the page it is drawn on, not in image pixels', () => {
+    const css = strip(read('src/renderer/styles.css'));
+    // Half one: the layer must be a query container, or every `cqw` below resolves against
+    // the viewport and the type detaches from the art in the other direction.
+    const layer = /\.manga-ocr-layer\s*\{([^}]*)\}/.exec(css)?.[1] ?? '';
+    expect(layer, '.manga-ocr-layer rule').not.toBe('');
+    expect(layer).toMatch(/container-type:\s*(inline-size|size)/);
+
+    // Half two: the emitted font size is a `cqw` fraction of `img_width`, never a raw px.
+    // Both call sites — the transparent Japanese alignment layer and the painted
+    // translation — read the same `fontSize`, so one assertion covers both.
+    const tsx = strip(read('src/renderer/components/MangaOcrOverlay.tsx'));
+    expect(tsx).toMatch(/const fontCqw = \(fontPx \/ \(page\.img_width \|\| 1\)\) \* 100;/);
+    expect(tsx).toMatch(/const fontSize = `\$\{fontCqw\.toFixed\(4\)\}cqw`;/);
+    // The defect itself: a px font against a %-sized box. Measured 2026-08-25 at a 0.214
+    // render scale, four of five bubbles lost 198/20/224/544 px of text behind
+    // `overflow: hidden`. If this comes back, it comes back exactly like this.
+    expect(/fontSize: `\$\{fontPx\}px`/.test(tsx)).toBe(false);
+  });
+
+  it('the painted manga translation can be reached when it outgrows its bubble', () => {
+    const css = strip(read('src/renderer/styles.css'));
+    const rule = /\.manga-ocr-block\.translated \.manga-ocr-text\s*\{([^}]*)\}/.exec(css)?.[1] ?? '';
+    expect(rule, '.manga-ocr-block.translated .manga-ocr-text rule').not.toBe('');
+    // `.manga-ocr-text` is `overflow: hidden` — correct for the transparent alignment layer,
+    // wrong for text meant to be read. A translation is routinely longer than the line it
+    // replaces: after the `cqw` fix one of five measured blocks still ran 32 px in a 24 px box.
+    expect(rule).toMatch(/overflow-y:\s*auto/);
+    expect(/overflow:\s*hidden/.test(rule)).toBe(false);
+    // And the base rule keeps hiding the x axis, so a long word cannot produce a sideways
+    // scrollbar inside a speech bubble.
+    const base = /\.manga-ocr-text\s*\{([^}]*)\}/.exec(css)?.[1] ?? '';
+    expect(base).toMatch(/overflow:\s*hidden/);
+  });
+
   /**
    * Why this category's sweep is LIVE and not source-only, stated once so the next worker
    * does not spend a turn rediscovering it.

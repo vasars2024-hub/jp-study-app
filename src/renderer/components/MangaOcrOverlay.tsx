@@ -86,6 +86,23 @@ export default function MangaOcrOverlay({
         const height = ((ymax - ymin) / page.img_height) * 100;
         const editing = editingRegionId === id;
         const fontPx = block.font_size ?? Math.max(12, (ymax - ymin) * 0.08);
+        /**
+         * The font size the OCR carries is in IMAGE pixels; every box above is laid out as a
+         * PERCENTAGE of the rendered page. So the boxes shrink with the stage and the type
+         * did not, and the overlay only ever fitted at 1:1 zoom — which a 2400 px scan inside
+         * a window never is. Measured 2026-08-25 on One Punch-Man ch.229, page rendered 512
+         * of 2400 natural px (scale 0.214): four of five bubbles lost text behind
+         * `overflow: hidden` with no scrollbar and no affordance — 198, 20, 224 and **544 px
+         * of a 568 px block, i.e. 4% of the translation visible**. Same arithmetic makes the
+         * transparent Japanese layer's click targets land on the wrong word.
+         *
+         * `cqw` is 1% of `.manga-ocr-layer`'s inline size, and that layer is `inset: 0` on the
+         * page, so `fontPx / img_width` expressed in `cqw` is exactly the authored size times
+         * the render scale — the same ratio the boxes already use. It reflows on zoom and on
+         * a window resize for free, with no measurement and no ResizeObserver.
+         */
+        const fontCqw = (fontPx / (page.img_width || 1)) * 100;
+        const fontSize = `${fontCqw.toFixed(4)}cqw`;
         const previewText = block.lines.filter(Boolean).join(' · ');
 
         if (highlightOnly) {
@@ -127,7 +144,7 @@ export default function MangaOcrOverlay({
                     inset: 0,
                     margin: 0,
                     writingMode: block.vertical ? 'vertical-rl' : 'horizontal-tb',
-                    fontSize: `${fontPx}px`,
+                    fontSize,
                     lineHeight: 1.1,
                     color: 'transparent',
                     cursor: 'text',
@@ -173,7 +190,7 @@ export default function MangaOcrOverlay({
               width: `${width}%`,
               height: `${height}%`,
               writingMode: 'horizontal-tb',
-              fontSize: `${fontPx}px`,
+              fontSize,
               ...(fillByRegion?.[id]
                 ? { background: fillByRegion[id], borderColor: 'transparent' }
                 : null),

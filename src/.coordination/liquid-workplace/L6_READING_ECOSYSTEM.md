@@ -769,3 +769,71 @@ reported. Restart cost: none, 11 fwins restored, all three clean surfaces reprod
 
 **NEXT: manga and VN through the same driver, then Novels in a REAL narrow host** — Blanc
 (`BLANC_MIN_W` 380) or `/bounds` at 924, never an inline width on `.reader`.
+
+## 2026-08-25 (later 19) — Gate surfaces 4 and 5: VN clean on a RUN, manga had never fitted
+
+Gate still OPEN: **5 of 6 surfaces clean** (Immersion, Library, Reading Captures, + VN, + manga);
+Novels is the one left and it is the one that needs the real narrow host. No rubric category is
+scored, so nothing here claims 80/80.
+
+**VN — a pure RUN, no new instrument, no defect.** `.visual-novel-open` in the Immersion toolbar,
+then `lq-cat4-sizes.cjs "Immersion" "380x580,820x580" who`. 820: `clipped` 0, `overlaps` 0,
+`xCount`/`yCount` 0, doc 452x344, `contentWidth` 452. 380: `clipped` 0, `xCount`/`yCount` 0, the
+library becomes a sheet (`covered` true, `docInert` true, `overDocument` **0**), and the one
+`overlaps` entry is the sheet over the doc, which is what a sheet is. `sheetRoleAria`
+**`dialog/false`** next to `elsewhereInWindow` 2 (`Hide library`, `Back to browser`) — that is
+`16c306fd` holding: the sheet does not claim a modality the keyboard does not honour. Style
+restored byte-identical.
+
+**`<commit>` — the manga OCR overlay has never fitted, at any zoom, on any page.**
+`.reader` is a full-window surface, so it needed the driver's new **`host` flag** (`/bounds`
+instead of an inline width; see below). One Punch-Man ch.229 in translate mode, page rendered
+**512 of 2400 natural px, scale 0.214**: `clipped` **2** at BOTH 924x580 and 1264x821, both `p`
+inside `div.ocr-text.manga-ocr-text`, both leaving downwards, `yCount` 2.
+
+Cause: `MangaOcrOverlay` lays every box out as a **percentage** of the rendered page and emits
+`fontSize` in **image pixels**. The boxes shrink with the stage; the type does not. A 2400 px
+scan in a window is never 1:1, so this fitted at no size the product can produce. Measured, the
+five blocks' hidden text — `scrollHeight - clientHeight`:
+
+| block | 1 | 2 | 3 | 4 | 5 |
+| --- | --- | --- | --- | --- | --- |
+| before | 198 | 20 | 0 | 224 | **544 of 568 (4% visible)** |
+| after | 0 | 0 | 0 | 0 | 8, and reachable |
+
+Negative control, run BEFORE writing the fix: multiplying each block's inline `font-size` by the
+live render scale took 198/20/0/224/544 → 0/0/0/0/**5**, which both proved the cause and showed
+that the scale fix alone is not enough — a translation is longer than the line it replaces.
+
+Fix, two halves, both needed. (a) `.manga-ocr-layer` becomes `container-type: inline-size` and
+the font is emitted as `${fontPx / img_width * 100}cqw` — exactly the authored size times the
+render scale, the same ratio the boxes already use, reflowing on zoom and resize with no
+measurement and no ResizeObserver. Live after: `containerType` `inline-size`, `1.6703cqw` →
+computed `8.55977px` at layer width 512, i.e. 40.0877 × 0.2135 to five figures. (b) the residual:
+`.manga-ocr-block.translated .manga-ocr-text` gets `overflow-y: auto`, because that text is
+PAINTED and `.manga-ocr-text`'s blanket `overflow: hidden` is only right for the transparent
+Japanese alignment layer. `clipped` 0 / `overlaps` 0 / `xCount` 0 / `yCount` 0 at both host sizes
+after; host content size restored identically.
+
+**RULE 1 — the driver grew a `host` mode instead of a sixth reader-shaped probe.**
+`lq-cat4-sizes.cjs`'s argv[4] is now a flag list, and `host` sizes the OS window through
+`POST /bounds` rather than writing an inline width mid-tree. That is what every remaining
+full-window surface needs — Novels, the Agent pop-out, Blanc, Focus — so each is now a RUN. It
+reports the size `/bounds` measured BACK, never the size asked for: **380 yields 924**, the
+desktop minimum, and a row labelled 380 would name a size nothing was measured at. Restore uses
+`contentSize`, not the outer bounds, or the window grows by the frame every round trip.
+Guards: two named latches in the existing `gridTrackFloorsFitTheWindow.test.ts`, no new test
+file. Mutation controls, both restored and re-verified green at 79/79:
+`container-type: inline-size` → `normal` = 1 red; dropping `overflow-y: auto` = 1 red.
+
+**Trap paid, and it nearly shipped.** Reverting that second mutation with a whole-file
+`String.replace('  scrollbar-width: thin;\n', …)` put `overflow-y: auto` into
+**`.media-hub-shelf-row`** — the FIRST of four matches in a 26k-line sheet — and the manga rule
+stayed broken, so the suite failed for a reason that had nothing to do with the assertion. Anchor
+a revert on the surrounding rule, never on one common declaration, and read `git diff -U0 … |
+grep '^@@'` back afterwards: mine were exactly `+8955,7` and `+9323,8`.
+
+**NEXT: Novels through `node debug/lq-cat4-sizes.cjs "@.reader" "380x580,1264x821" "who,host"`**
+with an EPUB open — the same command that scored manga, now that `host` exists. Then the Gate's
+own sentence (legible and stable at all sizes; no tool obscures the document) can be answered for
+all six.
