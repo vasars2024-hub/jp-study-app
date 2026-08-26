@@ -1229,3 +1229,46 @@ implying a live failure was observed.
 
 **Not a repo-wide class**, checked rather than assumed: `kind|status|state !== 'loading'` across
 `src/renderer` and `src/media` returns this file only.
+
+## 2026-08-26 — Category 6, manga: PASS 10/10, and the harness was quietly damaging the app
+
+**manga PASS 10/10.** Parity **7/7 standard, 7/7 liquid**, `rowsAgree` true, **0** rows in one
+presentation only. Round trip `liquid -> standard -> liquid`, **0 diffs**, fields and shell held.
+All three mutations fell **exactly their own row** and each returned to 7/7 —
+`CONTROL FAILED AS REQUIRED`. Volume: *One Punch-Man : The Koi Pond | Ch. 229*, 17 pages, OCR 17/17,
+box 1264x821. Reproduced on a second full run before being banked. Board: cat 1, 2, 3, 4, 8 each
+6/6 plus **cat 6 at 4 of 6** = **34 of 48 cells**. Evidence `baselines/cat6-l6-manga.json`.
+
+**The reader was unreachable to this category, and "chromeless" was the reason.** `findWin` knew
+`.fwin` and `.popout-root` only, so `@.reader` fell through to `host: 'chromeless'` and
+`toggleLiquid` REFUSED — category 6 could not be scored on either reader surface even though L3.2
+gave the reader a working toggle (`.reader-btn-liquid`, `data-presentation` on `.reader`). Fixed in
+the shared engine, not in a probe: a `LIQUID_BTN` table keyed by host, one reader branch in
+`findWin`, and a reader branch in `lifecycle` — the reader fills the OS window so it has no
+minimize/maximize/restore to count, and its route out (back to Library) is its whole lifecycle.
+Chromeless has to keep meaning *has no destination*, not *nobody taught this function about it*.
+
+**HARNESS DEFECT, and it is the finding of the turn: `restore` was a lie for every attribute except
+one.** `stripAttr` has always taken an arbitrary attribute name; the restore swept the literal list
+`['aria-pressed']`. Measured on the first manga run — the `pageTransport` mutation stripped `min`
+from `.reader-seek`, `restored` came back `["manga:mode+page"]` with no attribute in it, and
+`returned: true`. The harness declared the surface clean while `min` was gone from a live range
+input, which silently defaults it to **0**: a real page-0 off-by-one left in the user's running
+reader, by the instrument. Two later scoring rounds then read `range=..17` and that would have been
+filed as a **product** defect — the instrument manufacturing the bug it reports. The restore now
+sweeps the `data-lqp-was-` marker itself rather than a list somebody must remember to extend, and
+the live attribute was put back by hand (`min=1 max=17`, 0 leftovers).
+
+**Two corrections to my own spec, both false numbers.** (1) `pageTransport` read `first=false
+last=false` against a working transport: they are `<Icon>` buttons with no text node, so
+`btnByText` cannot see them — their name is in `title`/`aria-label`, which is where the rest of this
+file reads icon controls from. (2) The `presentationHonest` control stripped `aria-pressed` and felled
+`windowLifecycle` too, since both read it; a control that fails two rows proves neither. New `setAttr`
+helper falsifies by **lying** rather than deleting — a wrong-but-well-formed boolean falls only the row
+that cross-checks it, which is the defect that row exists for.
+
+**Trap for the next worker.** The drive CANNOT open this surface: `App.tsx:702` returns the reader as
+the whole app render, so opening a volume unmounts the desktop and all ten windows, and the drive
+re-runs once per mutation. `openSection` therefore REFUSES with the reason instead of navigating —
+the open volume is the operator's precondition. Reader presentation is persisted **per `LibraryKind`
+in localStorage**, not per window, so it survives every restart: found `liquid`, left `liquid`.

@@ -79,6 +79,20 @@
   // Library helpers. Kept beside the other shared helpers rather than inside the spec so
   // the spec stays what it is meant to be — data, not a runner.
   const keyOf = (el) => `${(el.className || el.tagName).toString().split(' ')[0]}`;
+  /**
+   * The Make Liquid / Return to standard control, per host. Three hosts, three
+   * class names for one affordance — the app inlines it in `.fwin-bar` and
+   * `.popout-bar` because each has a single call site, and shares it as
+   * `ReaderLiquidToggle` because the reader has two (Novels and manga). This
+   * table exists so `toggleLiquid`, `lifecycle` and every spec's
+   * `windowLifecycle` mutation read the same source; before it, the reader's
+   * name was simply absent from all three and the host scored as chromeless.
+   */
+  const LIQUID_BTN = {
+    fwin: '.fwin-b-liquid',
+    popout: '.popout-btn-liquid',
+    reader: '.reader-btn-liquid',
+  };
   // One factory rather than one function per spec. These were two identical four-line
   // copies and captures would have made a third; the global name stays per-spec so an
   // interrupted run is still inspectable from the console under a name that says whose
@@ -90,6 +104,7 @@
   const libState = specState('__LQP_LIB_ORIG');
   const immState = specState('__LQP_IMM_ORIG');
   const capState = specState('__LQP_CAP_ORIG');
+  const mangaState = specState('__LQP_MANGA_ORIG');
   // The rail's filter chips only: `+ New folder` is an action and the rename box is a
   // transient editor, and both carry the same class as a real chip.
   const folderChips = (w) => qa(w, '.lib-folders .lib-folder-chip').filter(
@@ -1253,6 +1268,224 @@
         },
       },
     },
+
+    /**
+     * MANGA — the first spec whose host is the READER rather than a floating window.
+     * `App.tsx:702` returns `MangaReader` as the whole app render, so there is no
+     * `.fwin` to find; `findWin` matches `.manga-canvas` and walks up to
+     * `.reader[data-presentation]`, which L3.2 made a real Liquid host.
+     *
+     * Three consequences the earlier specs never had to handle, all of them measured
+     * on this surface rather than assumed:
+     *
+     *  - THE DRIVE CANNOT OPEN THE SURFACE. Every other spec's first step clicks a tab
+     *    inside a window that is already mounted. Opening a manga volume unmounts the
+     *    desktop and all ten windows with it, and closing the reader unmounts the
+     *    reader. So the volume is the operator's precondition, `openSection` REFUSES
+     *    with the reason instead of navigating, and the drive only moves state that
+     *    lives inside the reader.
+     *  - THERE IS NO TEXT FIELD, so `dirtyField` finds nothing — the third L6 surface
+     *    in this file with that property, after Library and Captures. The seek input
+     *    is `type=range` and is app state rather than typed text, so the round trip's
+     *    real content is PAGE POSITION plus the OCR mode, and `page` drives both.
+     *  - PAGE COUNT IS THE VOLUME'S, NOT A CONSTANT. Every row derives its bound from
+     *    `.reader-seek`'s own `max` (17 on the volume this was written against), so a
+     *    different volume does not turn a pass into a fail.
+     */
+    manga: {
+      titleRe: /Manga|マンガ|漫画/i,
+      rootSel: '.manga-canvas',
+      features: [
+        {
+          // The page actually rendered, cross-checked against the seek's declared
+          // position. A stage that renders page 1 while the seek says 7 is the
+          // stale-detail defect in its manga form, and a count of images would
+          // miss it entirely — there is exactly one `<img>` either way.
+          id: 'pageRender',
+          f: (w) => {
+            const stage = q(w, '.manga-stage');
+            const seek = q(w, '.reader-seek');
+            const img = stage ? q(stage, 'img') : null;
+            const box = img ? img.getBoundingClientRect() : null;
+            const painted = !!box && box.width > 40 && box.height > 40;
+            const declared = seek ? Number(seek.value) : NaN;
+            return {
+              ok: painted && Number.isFinite(declared) && declared >= 1,
+              ev: `img=${box ? `${Math.round(box.width)}x${Math.round(box.height)}` : 'none'} seekPage=${declared} of ${seek ? seek.max : '?'}`,
+            };
+          },
+        },
+        {
+          // The transport's bounds must be the volume's. A seek whose max is 1 on a
+          // 17-page volume is a control that renders and cannot reach the book —
+          // the "inactive control presented as working" failure, which presence
+          // scoring passes every time.
+          id: 'pageTransport',
+          f: (w) => {
+            const seek = q(w, '.reader-seek');
+            if (!seek) return { ok: false, ev: 'no page seek' };
+            // These two are ICON buttons — `<Icon name="skip-back">`, no text node
+            // at all — so `btnByText` cannot see them and scored a live transport
+            // `first=false last=false` on the first run. Their accessible name is
+            // in `title`/`aria-label`, which is where every other spec in this
+            // file reads an icon control from.
+            const named = (re) => qa(w, 'button').filter(
+              (b) => re.test(`${b.getAttribute('aria-label') || ''} ${b.title || ''} ${txt(b)}`),
+            ).length;
+            const first = named(/First page|最初のページ|第一页|Первая страница/i);
+            const last = named(/Last page|最後のページ|最后一页|Последняя страница/i);
+            const max = Number(seek.max);
+            return {
+              ok: first > 0 && last > 0 && Number(seek.min) === 1 && max > 1,
+              ev: `range=${seek.min}..${seek.max} first=${first} last=${last}`,
+            };
+          },
+        },
+        {
+          // The five OCR presentations are a segmented control, so EXACTLY one is
+          // active. Two active (or none) means the segments and the stage disagree
+          // about what is on screen.
+          id: 'ocrModes',
+          f: (w) => {
+            const segs = qa(w, '.sp-seg-btn');
+            const active = segs.filter(
+              (b) => b.classList.contains('active') || b.getAttribute('aria-pressed') === 'true',
+            );
+            return {
+              ok: segs.length >= 5 && active.length === 1,
+              ev: `segments=${segs.length} active=${active.length}${active[0] ? ` ("${txt(active[0])}")` : ''}`,
+            };
+          },
+        },
+        {
+          // The OCR tool is the reader's Liquid region and the page is its anchor.
+          // Both must be present and correctly ROLED, or category 3's treatment on
+          // this surface is decorating something that is not a tool.
+          id: 'ocrTool',
+          f: (w) => {
+            const tool = q(w, '[data-reading-tool="manga-ocr"]');
+            const doc = q(w, '[data-reading-role="document"]');
+            const body = tool ? q(tool, '.lq-reading-tool-body') : null;
+            return {
+              ok: !!tool && !!doc && !!body && tool.classList.contains('lq-liquid') && doc.classList.contains('lq-anchor'),
+              ev: `tool=${!!tool} liquid=${!!tool && tool.classList.contains('lq-liquid')} doc=${!!doc} anchor=${!!doc && doc.classList.contains('lq-anchor')}`,
+            };
+          },
+        },
+        {
+          // L6's Gate, shared. Fourth caller.
+          id: 'canvasPlacement',
+          f: (w) => canvasPlacement(w),
+        },
+        {
+          // The reader's presentation toggle must agree with the host it is
+          // toggling. `.reader` carries `data-presentation` and the button carries
+          // `aria-pressed`; a toggle that says "liquid" over a standard reader is
+          // the declared-state-disagrees-with-reality defect, and it is the exact
+          // thing that made this host unreachable to the harness in the first place.
+          id: 'presentationHonest',
+          f: (w) => {
+            const btn = q(w, LIQUID_BTN.reader);
+            const pressed = btn ? btn.getAttribute('aria-pressed') : null;
+            const pres = w.getAttribute('data-presentation');
+            const cls = w.classList.contains('reader-liquid');
+            return {
+              ok: !!btn && (pressed === 'true') === (pres === 'liquid') && cls === (pres === 'liquid'),
+              ev: `ariaPressed=${pressed} dataPresentation=${pres} readerLiquidClass=${cls}`,
+            };
+          },
+        },
+        { id: 'windowLifecycle', f: (w) => lifecycle(w) },
+      ],
+      steps: {
+        // REFUSES rather than navigating — see the spec's header. Opening a volume
+        // from the Library unmounts the desktop, and this step runs once per
+        // mutation, so a step that opened the reader would also have to be able to
+        // close it and would churn the user's shell ten windows at a time.
+        openSection: (w) => {
+          const stage = q(w, '.manga-stage');
+          if (!stage) return { refused: 'no manga volume open — open one from the Library first' };
+          return { open: txt(q(w.closest('.reader') || w, '.reader-title')) || 'manga volume' };
+        },
+        // The round trip's real content. Captures and Library drive SCROLL because
+        // they have no text field; a manga reader has no meaningful scroll either
+        // (one page fills the stage), so page position is the state a bad trip loses.
+        page: (w, n) => {
+          const seek = q(w, '.reader-seek');
+          if (!seek) return { refused: 'no page seek' };
+          const g = mangaState();
+          if (g.page == null) g.page = seek.value;
+          const max = Number(seek.max) || 1;
+          // Clamped to the volume, so a shorter book refuses nothing and lands somewhere real.
+          const want = String(Math.min(Math.max(Number(n) || 3, 1), max));
+          seek.value = want;
+          seek.dispatchEvent(new Event('input', { bubbles: true }));
+          seek.dispatchEvent(new Event('change', { bubbles: true }));
+          return { page: seek.value, of: seek.max };
+        },
+        // Idempotent by construction — it SETS a named mode rather than cycling, so
+        // the driver re-running the drive once per mutation cannot walk the surface
+        // somewhere new. This is the lesson `captures` paid for with a `toggleList`
+        // fallback that inverted.
+        mode: (w, name) => {
+          const want = String(name || 'Regions');
+          const segs = qa(w, '.sp-seg-btn');
+          const target = segs.find((b) => txt(b) === want);
+          if (!target) return { refused: `no "${want}" segment — have ${segs.map(txt).join(', ')}` };
+          const g = mangaState();
+          if (g.mode == null) {
+            const cur = segs.find((b) => b.classList.contains('active') || b.getAttribute('aria-pressed') === 'true');
+            g.mode = cur ? txt(cur) : '';
+          }
+          if (!target.classList.contains('active')) target.click();
+          return { mode: want, wasActive: target.classList.contains('active') };
+        },
+      },
+      drive: ['openSection', ['page', '3'], ['mode', 'Regions']],
+      undo: {
+        manga: (w) => {
+          const g = window.__LQP_MANGA_ORIG;
+          if (!g) return null;
+          const done = [];
+          if (g.mode) {
+            const back = qa(w, '.sp-seg-btn').find((b) => txt(b) === g.mode);
+            if (back && !back.classList.contains('active')) { back.click(); done.push('mode'); }
+          }
+          if (g.page != null) {
+            const seek = q(w, '.reader-seek');
+            if (seek && seek.value !== g.page) {
+              seek.value = g.page;
+              seek.dispatchEvent(new Event('input', { bubbles: true }));
+              seek.dispatchEvent(new Event('change', { bubbles: true }));
+              done.push('page');
+            }
+          }
+          window.__LQP_MANGA_ORIG = null;
+          return done.length ? `manga:${done.join('+')}` : null;
+        },
+      },
+      mutations: {
+        // The `<img>` only, never `.manga-stage`: detaching the stage takes
+        // `pageRender` AND `canvasPlacement` in one move (the document region
+        // collapses), and a control that fails two rows proves neither.
+        pageRender: (w) => detach(q(w, '.manga-stage img'), 'no rendered page'),
+        // `max` and not `min`: `min` is what the harness's own broken restore left
+        // stripped on the first run, and a mutation is not allowed to be
+        // indistinguishable from the damage a previous mutation did. `max="1"` is
+        // also the truer falsification — a one-page range on a 17-page volume is a
+        // transport that renders and cannot reach the book.
+        pageTransport: (w) => setAttr(q(w, '.reader-seek'), 'max', '1', 'no page seek'),
+        // A WRONG boolean, not a missing one. Stripping `aria-pressed` also fails
+        // `windowLifecycle`, which reads the same attribute for a different reason,
+        // and a control that fails two rows proves neither.
+        presentationHonest: (w) => setAttr(
+          q(w, LIQUID_BTN.reader),
+          'aria-pressed',
+          q(w, LIQUID_BTN.reader) && q(w, LIQUID_BTN.reader).getAttribute('aria-pressed') === 'true' ? 'false' : 'true',
+          'no liquid control',
+        ),
+      },
+    },
   };
 
   // ------------------------------------------------------- shared feature fn
@@ -1263,13 +1496,26 @@
     // A pop-out's chrome is `.popout-btn` in its own bar and has THREE controls,
     // not four: it has no restore-down separate from maximize. Counting it
     // against the `.fwin` bar's four would score a complete host as broken.
+    //
+    // A READER has NEITHER, and that is a fact about the host rather than a gap:
+    // it fills the OS window, so it has no minimize, maximize or restore-down of
+    // its own to render. What it must still have is the pair this row actually
+    // exists to check — a route OUT and a presentation toggle whose declared
+    // state is real. Counting `.fwin-b` here would score a complete host 0; the
+    // honest analogue is its own back-to-Library control, which is the reader's
+    // whole lifecycle. `presentationHonest` scores the toggle's agreement with
+    // the host separately, so this row does not double-count it.
     const popout = w.classList.contains('popout-root');
-    const chrome = qa(w, popout ? '.popout-btn' : '.fwin-b');
-    const btn = q(w, popout ? '.popout-btn-liquid' : '.fwin-b-liquid');
+    const reader = w.classList.contains('reader');
+    const chrome = reader
+      ? qa(w, '.reader-bar .btn').filter((b) => /Library|ライブラリ|书库|图书|Библиотек/i.test(txt(b)))
+      : qa(w, popout ? '.popout-btn' : '.fwin-b');
+    const btn = q(w, LIQUID_BTN[reader ? 'reader' : popout ? 'popout' : 'fwin']);
     const pressed = btn ? btn.getAttribute('aria-pressed') : null;
+    const need = reader ? 1 : popout ? 3 : 4;
     return {
-      ok: chrome.length >= (popout ? 3 : 4) && (pressed === 'true' || pressed === 'false'),
-      ev: `chromeButtons=${chrome.length} liquidAriaPressed=${pressed}`,
+      ok: chrome.length >= need && (pressed === 'true' || pressed === 'false'),
+      ev: `chromeButtons=${chrome.length}/${need} liquidAriaPressed=${pressed}`,
     };
   }
 
@@ -1342,6 +1588,20 @@
     node.removeAttribute(attr);
     return { mutated: `${attr} stripped` };
   }
+  /**
+   * Falsify by LYING rather than by deleting. Removing an attribute fails every
+   * row that reads it, which on manga meant `presentationHonest` and
+   * `windowLifecycle` fell together and the control proved neither. Setting it to
+   * a wrong-but-well-formed value falls only the row that cross-checks it against
+   * something else — which is the defect that row exists for, stated exactly.
+   * Recorded under the same `data-lqp-was-` marker the generic restore sweeps.
+   */
+  function setAttr(node, attr, value, refusal) {
+    if (!node) return { refused: refusal };
+    node.setAttribute(`data-lqp-was-${attr}`, node.getAttribute(attr) || '');
+    node.setAttribute(attr, value);
+    return { mutated: `${attr} set to "${value}"` };
+  }
 
   // --------------------------------------------------------------- engine
   const spec = (app) => {
@@ -1374,7 +1634,21 @@
       if (pop && (!pres || pop.getAttribute('data-presentation') === pres)) {
         return { win: pop, matchedBy: 'root-selector', host: 'popout' };
       }
-      if (!pop) return { win: bare, matchedBy: 'root-selector', host: 'chromeless' };
+      // Trap 8, EXTENDED 2026-08-26 for the same reason it was revised for the
+      // pop-out. The full-screen reader is the app's THIRD Liquid host: since
+      // L3.2 `.reader` carries `data-presentation` and `.reader-bar` carries
+      // `.reader-btn-liquid`. `App.tsx:702` returns it as the WHOLE app render,
+      // so it is inside neither `.fwin` nor `.popout-root` and this function
+      // used to fall through and call it `chromeless` — which made
+      // `toggleLiquid` refuse and put category 6 out of reach on BOTH `@.reader`
+      // surfaces, Novels and manga, on a host that has a working toggle.
+      // "Chromeless" has to keep meaning *has no destination*, not *this
+      // function has not been taught about it*.
+      const rd = bare.closest('.reader[data-presentation]');
+      if (rd && (!pres || rd.getAttribute('data-presentation') === pres)) {
+        return { win: rd, matchedBy: 'root-selector', host: 'reader' };
+      }
+      if (!pop && !rd) return { win: bare, matchedBy: 'root-selector', host: 'chromeless' };
     }
     return { win: null, matchedBy: null, host: null };
   };
@@ -1468,8 +1742,9 @@
     const { win, host } = findWin(app, pres);
     if (!win) return { refused: `no ${app} surface` };
     if (host === 'chromeless') return { refused: 'chromeless host has no liquid control' };
-    // The pop-out's control is the same affordance in its own bar (`6c16653f`).
-    const btn = q(win, host === 'popout' ? '.popout-btn-liquid' : '.fwin-b-liquid');
+    // The pop-out's control is the same affordance in its own bar (`6c16653f`),
+    // and so is the reader's (`ReaderLiquidToggle`, shared by both readers).
+    const btn = q(win, LIQUID_BTN[host] || '.fwin-b-liquid');
     if (!btn) return { refused: 'no liquid control rendered' };
     const before = win.getAttribute('data-presentation');
     btn.click();
@@ -1507,12 +1782,34 @@
       n.removeAttribute('data-lqp-removed-class');
       undone.push('removed-class');
     });
-    ['aria-pressed'].forEach((attr) => {
-      qa(scope, `[data-lqp-was-${attr}]`).forEach((n) => {
-        n.setAttribute(attr, n.getAttribute(`data-lqp-was-${attr}`));
-        n.removeAttribute(`data-lqp-was-${attr}`);
-        undone.push(attr);
-      });
+    /*
+     * GENERIC, corrected 2026-08-26. This was the literal list `['aria-pressed']`
+     * while `stripAttr` has always taken an arbitrary attribute name, so every
+     * attribute except that one was stripped from the LIVE app and never put
+     * back. It went unseen because every spec written before manga happened to
+     * strip only `aria-pressed`.
+     *
+     * Measured, on the first manga run: the `pageTransport` mutation stripped
+     * `min` from `.reader-seek`, `restored` reported `["manga:mode+page"]` with
+     * no attribute in it, and `returned: true` — the harness declared the surface
+     * clean while `min` was gone. A range input with no `min` silently defaults
+     * to 0, so the harness had left a real page-0 off-by-one in the user's
+     * running reader and called it restored. Two rounds of scoring after that
+     * read `range=..17`, which would have been filed as a product defect.
+     *
+     * `data-lqp-was-` is the marker, so the sweep is over the marker rather than
+     * over a list somebody has to remember to extend.
+     */
+    const WAS = 'data-lqp-was-';
+    qa(scope, '*').forEach((n) => {
+      [].slice.call(n.attributes)
+        .filter((a) => a.name.indexOf(WAS) === 0)
+        .forEach((a) => {
+          const attr = a.name.slice(WAS.length);
+          n.setAttribute(attr, a.value);
+          n.removeAttribute(a.name);
+          undone.push(attr);
+        });
     });
     const s = SPECS[app];
     if (s && s.undo && win) {

@@ -1,0 +1,100 @@
+{
+  "label": "l6-manga",
+  "app": "manga",
+  "win": "(focused)",
+  "raised": "no-taskbar-button",
+  "matchedBy": "root-selector",
+  "host": "reader",
+  "presentationAsFound": "liquid",
+  "box": "1264x821",
+  "driven": [
+    {
+      "step": "openSection",
+      "result": "{\"open\":\"One Punch-Man : The Koi Pond | Chapter 229 | Cubari\"}"
+    },
+    {
+      "step": "page",
+      "result": "{\"page\":\"3\",\"of\":\"17\"}"
+    },
+    {
+      "step": "mode",
+      "result": "{\"mode\":\"Regions\",\"wasActive\":false}"
+    }
+  ],
+  "drivenRefusals": 0,
+  "parity": {
+    "liquid": "7/7",
+    "standard": "7/7",
+    "na": 0,
+    "equal": true,
+    "rowsAgree": true,
+    "failing": [],
+    "onlyInOne": []
+  },
+  "roundTrip": {
+    "trip": "liquid -> standard -> liquid",
+    "dirtiedField": null,
+    "dirtyNote": "surface has no editable text field",
+    "fieldsHeld": true,
+    "shellHeld": true,
+    "diffs": [],
+    "otherPresentationBox": "1264x821"
+  },
+  "control": {
+    "mutations": [
+      {
+        "mutation": "pageRender",
+        "declaredCascade": [],
+        "preBaseline": "7/7",
+        "applied": "element detached",
+        "reachable": "6/7",
+        "fellRows": [
+          "pageRender"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"manga:mode+page\"]",
+        "afterRestore": "7/7",
+        "returned": true
+      },
+      {
+        "mutation": "pageTransport",
+        "declaredCascade": [],
+        "preBaseline": "7/7",
+        "applied": "max set to \"1\"",
+        "reachable": "6/7",
+        "fellRows": [
+          "pageTransport"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"max\",\"manga:mode\"]",
+        "afterRestore": "7/7",
+        "returned": true
+      },
+      {
+        "mutation": "presentationHonest",
+        "declaredCascade": [],
+        "preBaseline": "7/7",
+        "applied": "aria-pressed set to \"false\"",
+        "reachable": "6/7",
+        "fellRows": [
+          "presentationHonest"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"aria-pressed\",\"manga:mode+page\"]",
+        "afterRestore": "7/7",
+        "returned": true
+      }
+    ],
+    "verdict": "CONTROL FAILED AS REQUIRED - category 6 instrument is proven"
+  },
+  "bars": {
+    "allRowsReachable": true,
+    "parityEqual": true,
+    "roundTripHeld": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": []
+}
