@@ -991,3 +991,38 @@ language and level chips, two `select`s in `.lib-sort-row`, `Covers`/`List` at
 inputs**. That last number is why `snapshot()` now records scroll offsets: on a surface with no
 editable field they are the only user state a round trip can lose, and without them Library's round
 trip would have compared chrome to chrome and held no matter what.
+
+### Same turn, continued — the open row was the instrument, and Translate closes at 10/10
+
+The `agentHandoff` question above is **SETTLED, and the answer is that the feature works.**
+Measured in four separate bridge calls: type, then `focus()` **in its own call**, then
+`setSelectionRange(1,4)` + `keyup`, then read. Label went `"Ask the Agent"` ->
+**`"Ask the Agent about the selection"`**. The same sequence with `focus()` and the select in
+ONE call leaves the label unchanged, with `document.hasFocus()` true, `activeElement === el`
+true and the range genuinely set. So trap 6 gets a third refinement: `selectRange` no longer
+focuses — it REFUSES unless the element is already active, and focusing is its own `focus` step.
+No product change was made or needed.
+
+Two more driver defects fell out of that and are fixed in the same file:
+
+4. **The dirty went AFTER the drive**, so typing into `.tr-textarea` fired React `onChange`,
+   `TranslateView.tsx:263` ran `setSelection('')`, and the scored check read `agentHandoff`
+   false — the instrument erasing the state its own drive step had just set. Dirty now runs
+   BEFORE the drive; the drive may overwrite the value and snapshot A records what is really
+   there.
+5. **A declared cascade is not a broken control.** Clearing the textarea empties the span the
+   ask-agent button would send, so that button correctly disables and its row correctly falls:
+   two rows down, one feature removed. Specs may declare `cascades`; anything a mutation takes
+   with it that is NOT declared still voids the control.
+
+**Translate, category 6: PASS 10/10** (`baselines/cat6-l5-translate.json`). Parity **7/7
+standard, 7/7 liquid**, `rowsAgree` true, **0 rows reachable in only one presentation**. Round
+trip standard -> liquid -> standard with `.tr-textarea` dirtied: `fieldsHeld` true, `shellHeld`
+true, **0 diffs**, 820x580 both. Control **fires and restores on all three mutations** —
+`direction` fell `[direction]`, `input` fell `[input, agentHandoff]` with `agentHandoff`
+declared and `unexpected []`, `windowLifecycle` fell `[windowLifecycle]`, each returning to 7/7.
+
+Translate is an **L5** surface, so this does not move the L6 board (still 30 of 48 cells). It is
+the calibration that makes the L6 cells cheap: the next five L6 surfaces need a **spec**, which
+is ~40 lines of data, not a runner. Live state left as found — every window back in its found
+presentation (only Video is liquid), Translate empty and pointed 日本語 -> English.

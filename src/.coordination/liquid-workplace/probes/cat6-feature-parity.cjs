@@ -32,7 +32,11 @@
  *    refuses if it did not land, rather than scoring the wrong presentation.
  *  - PRESENTATION IS PERSISTED STATE. Whatever this drives, it restores in `finally`.
  *  - THE ROUND TRIP MUST START AND END IN THE SAME PRESENTATION or A === C is meaningless.
- *  - A CONTROL THAT FAILS TWO ROWS PROVES NEITHER. Exactly-one is checked, not "some row moved".
+ *  - A CONTROL THAT FAILS AN UNDECLARED SECOND ROW PROVES NEITHER. The mutation's own row
+ *    must fall, and nothing beyond the cascade its spec declares — never "some row moved".
+ *  - THE DIRTY GOES BEFORE THE DRIVE. Typing fires React `onChange`, and a handler that
+ *    clears selection state erases what the drive just established (Translate does exactly
+ *    this); dirtying after the drive scored a live row dead.
  *  - `document.hasFocus()` gates React's select synthesis, so `/focus` is POSTed before any
  *    step runs (`l6-parity.js` trap 6 refuses instead of lying, and this is how it is fed).
  *
@@ -239,6 +243,14 @@ async function flip(pres, want) {
       }
       return log;
     };
+    // DIRTY BEFORE THE DRIVE, not after. Measured 2026-08-26: typing into the field fires
+    // React `onChange`, Translate's handler does `setSelection('')`, and the scored check
+    // then read `agentHandoff` false — the instrument had erased the state its own drive
+    // step had just established. The drive may overwrite the dirty value; that is fine,
+    // snapshot A records whatever is really there and C has to match it.
+    const dirty = await dirtyField();
+    await sleep(300);
+
     const driven = await drive();
     out.driven = driven;
     out.drivenRefusals = driven.filter((d) => String(d.result).startsWith('REFUSED')).length;
@@ -249,8 +261,6 @@ async function flip(pres, want) {
     // was checked first and true in the one checked second, and the driver reported a
     // parity break — `input: standard=false liquid=true` — that the instrument had caused.
     // Everything that changes the surface happens before EITHER check.
-    const dirty = await dirtyField();
-    await sleep(400);
     const snapA = await call(`window.__LQP.snapshot(${A(APP)})`);
 
     const asFound = await call(`window.__LQP.check(${A(APP)})`);
@@ -316,6 +326,10 @@ async function flip(pres, want) {
         var m = window.__LQP.__mutations(${A(APP)});
         return Object.keys(m || {});
       })()`);
+      const cascades = await call(`(function(){
+        var s = window.__LQP.__cascades(${A(APP)});
+        return s || {};
+      })()`);
       const results = [];
       for (const which of mutations) {
         // EACH MUTATION GETS ITS OWN FRESHLY DRIVEN BASELINE, and this is not optional.
@@ -345,13 +359,22 @@ async function flip(pres, want) {
         const after = await call(`window.__LQP.check(${A(APP)})`);
         const was = new Map((pre.rows || []).map((r) => [r.id, r.reachable]));
         const fell = (dirtyCheck.rows || []).filter((r) => r.reachable === false && was.get(r.id) === true);
+        // A DECLARED cascade is not a broken control. Clearing Translate's textarea empties
+        // the span the ask-agent button would send, so that button correctly disables and its
+        // row correctly falls — two rows down, one feature removed. The spec names the rows a
+        // mutation is ALLOWED to take with it; anything it does not name still voids the
+        // control, so this cannot be used to wave a real over-broad mutation through.
+        const allowed = cascades[which] || [];
+        const unexpected = fell.filter((r) => r.id !== which && !allowed.includes(r.id));
         results.push({
           mutation: which,
+          declaredCascade: allowed,
           preBaseline: pre.refused ? null : `${pre.reachable}/${pre.total}`,
           applied: applied.refused || applied.mutated || A(applied),
           reachable: dirtyCheck.refused ? null : `${dirtyCheck.reachable}/${dirtyCheck.total}`,
           fellRows: fell.map((r) => r.id),
-          exactlyOwnRow: fell.length === 1 && fell[0].id === which,
+          exactlyOwnRow: fell.some((r) => r.id === which) && unexpected.length === 0,
+          unexpectedRows: unexpected.map((r) => r.id),
           restored: A(restored.restored),
           afterRestore: after.refused ? null : `${after.reachable}/${after.total}`,
           returned: !after.refused && !pre.refused && after.reachable === pre.reachable,

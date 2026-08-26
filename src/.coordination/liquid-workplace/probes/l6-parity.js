@@ -74,11 +74,21 @@
   // live feature read as dead; POST `/focus` first and the same keyup flipped
   // Translate's label both ways. So this REFUSES rather than reporting a false
   // negative — the caller must focus the window.
+  //
+  // FURTHER REFINEMENT, 2026-08-26, and this one is measured rather than reasoned.
+  // `el.focus()` in the SAME call as `setSelectionRange` + `keyup` produces nothing:
+  // Translate's ask-agent label stayed "Ask the Agent" with `document.hasFocus()` true,
+  // `document.activeElement === el` true and the range genuinely `[0,2]`. Split into two
+  // bridge calls — focus, then select — and the identical keyup flipped the same label to
+  // "Ask the Agent about the selection" on the first try. So focusing is its own step, and
+  // this refuses rather than silently focusing and reading a live feature as dead.
   const selectRange = (el, start, end) => {
     if (!document.hasFocus()) {
       return { refused: 'window not OS-focused — POST /focus first, or React synthesises no select' };
     }
-    el.focus();
+    if (document.activeElement !== el) {
+      return { refused: 'element not focused — run the `focus` step in its OWN call first' };
+    }
     el.setSelectionRange(start, end);
     el.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'ArrowRight' }));
     return { start: el.selectionStart, end: el.selectionEnd, focused: document.activeElement === el };
@@ -430,6 +440,14 @@
           t.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'End' }));
           return { collapsedAt: t.value.length };
         },
+        // Focusing is its OWN step (2026-08-26). Same call as the select, and React
+        // synthesises nothing; separate calls, and the label flips first try.
+        focus: (w) => {
+          const t = q(w, '.tr-textarea');
+          if (!t) return { refused: 'no textarea' };
+          t.focus();
+          return { focused: document.activeElement === t, sel: [t.selectionStart, t.selectionEnd] };
+        },
         // Trap 6 lives here: React synthesises `select`, so focus then keyup.
         highlight: (w, spec) => {
           const t = q(w, '.tr-textarea');
@@ -475,12 +493,16 @@
         },
         windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
       },
+      // Clearing the textarea empties the span the ask-agent button would send, so that
+      // button correctly disables and its row correctly falls with it. Two rows down, one
+      // feature removed — a real dependency, declared rather than waved through.
+      cascades: { input: ['agentHandoff'] },
       // Declaration order is WRONG for this app and the driver would otherwise use it.
       // Measured 2026-08-26: with `highlight` third, the two steps after it re-render the
       // view, the caret collapses, and `agentHandoff` reads its label back unchanged — a
       // live feature scored dead by the order it was driven in. Whatever records a "before"
       // for a row runs LAST among the steps that can disturb it.
-      drive: [['type', '猫が好きです'], 'swap', 'run', 'collapse', ['highlight', '0,2']],
+      drive: [['type', '猫が好きです'], 'swap', 'run', 'collapse', 'focus', ['highlight', '0,2']],
       undo: {
         input: (w) => {
           const t = q(w, '.tr-textarea');
@@ -1017,6 +1039,9 @@
       const s = SPECS[app] || {};
       return s.drive || Object.keys(s.steps || {});
     },
+    // Rows a mutation is ALLOWED to take with it. Removing one feature can honestly disable
+    // another that depends on it; naming those keeps the control strict about everything else.
+    __cascades: (app) => (SPECS[app] && SPECS[app].cascades) || {},
   };
 
   return JSON.stringify({

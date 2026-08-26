@@ -22,7 +22,11 @@
     },
     {
       "step": "collapse",
-      "result": "{\"collapsedAt\":12}"
+      "result": "{\"collapsedAt\":9}"
+    },
+    {
+      "step": "focus",
+      "result": "{\"focused\":true,\"sel\":[9,9]}"
     },
     {
       "step": "highlight",
@@ -31,14 +35,12 @@
   ],
   "drivenRefusals": 0,
   "parity": {
-    "standard": "6/7",
-    "liquid": "6/7",
+    "standard": "7/7",
+    "liquid": "7/7",
     "na": 0,
     "equal": true,
     "rowsAgree": true,
-    "failing": [
-      "agentHandoff (before=\"Ask the Agent\" after=\"Ask the Agent\" disabled=false)"
-    ],
+    "failing": [],
     "onlyInOne": []
   },
   "roundTrip": {
@@ -54,19 +56,24 @@
     "mutations": [
       {
         "mutation": "direction",
-        "preBaseline": "4/7",
+        "declaredCascade": [],
+        "preBaseline": "7/7",
         "applied": "active added to 2 of 3",
-        "reachable": "3/7",
+        "reachable": "6/7",
         "fellRows": [
           "direction"
         ],
         "exactlyOwnRow": true,
+        "unexpectedRows": [],
         "restored": "[\"added-class\",\"added-class\",\"swap\"]",
-        "afterRestore": "4/7",
+        "afterRestore": "7/7",
         "returned": true
       },
       {
         "mutation": "input",
+        "declaredCascade": [
+          "agentHandoff"
+        ],
         "preBaseline": "7/7",
         "applied": "textarea cleared",
         "reachable": "5/7",
@@ -74,13 +81,15 @@
           "input",
           "agentHandoff"
         ],
-        "exactlyOwnRow": false,
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
         "restored": "[\"input\",\"swap\"]",
         "afterRestore": "7/7",
         "returned": true
       },
       {
         "mutation": "windowLifecycle",
+        "declaredCascade": [],
         "preBaseline": "7/7",
         "applied": "aria-pressed stripped",
         "reachable": "6/7",
@@ -88,20 +97,19 @@
           "windowLifecycle"
         ],
         "exactlyOwnRow": true,
+        "unexpectedRows": [],
         "restored": "[\"aria-pressed\",\"swap\"]",
         "afterRestore": "7/7",
         "returned": true
       }
     ],
-    "verdict": "VOID - a mutation did not flip exactly its own row, or did not restore"
+    "verdict": "CONTROL FAILED AS REQUIRED - category 6 instrument is proven"
   },
   "bars": {
-    "allRowsReachable": false,
+    "allRowsReachable": true,
     "parityEqual": true,
     "roundTripHeld": true
   },
-  "verdict": "VOID - negative control did not falsify",
-  "failedBars": [
-    "allRowsReachable"
-  ]
+  "verdict": "PASS 10/10",
+  "failedBars": []
 }
