@@ -1519,3 +1519,51 @@ visible and undoable in another. The remaining excess is four import actions plu
 controls in the top strip, which need a disclosure and a new label in four catalogues — and
 all four carry a large uncommitted i18n pass from another track (ja/zh/ru at 727/562 lines
 each). That half is the next turn's opening slice, stated rather than descoped.
+
+## 2026-08-26T19:15 — category 5 as RUNs: Library closes, Captures closes, Immersion 9/10
+
+Board **38 -> 40 of 48**. Category 5 goes 0 of 6 L6 surfaces to **2 of 6**.
+
+**Library PASS 10/10** (`da0b020e`). Q4's 17 scanned controls went to **11** against a bar of
+12 by putting the three secondary import routes and the three watch-bar actions behind
+collapsed `<details>`. `+ Import file(s)` stayed out — Q1 and Q3 both resolve to it and tucking
+it trades one NO for two. The watch bar keeps its STATUS in the summary and is collapsed in
+*both* states on purpose, so the scan count does not depend on whether a watch folder exists.
+All six tucked controls were already File/Library menu items, so nothing became menu-only.
+collapsedDisclosures 4 -> 6, chromeControlsRaw 17 -> 13.
+
+**Captures PASS 10/10** (`ad4b2fc1`), and it took a real feature. Three NOs (Q1 entryPoints 0,
+Q3 primaryAction null, Q4 0 disclosures) were one defect: 42 stored captures and **no index** —
+no search, no filter, no sort, while Settings searched the same store. Added a search field
+(visible) plus source chips and newest/oldest order (collapsed). Driven live before scoring:
+`screen` narrows, `zzzzqqq` gives 0 rows and *"No capture matches this filter — 42 in
+history."* with a working Clear, oldest-first flips the first row. **The reader head stayed
+`clipboard` through a filter to zero and back** — the filter is over the index, never the
+passage. Chips are `All sources / Clipboard / Screen`; `image` and `text` exist in the lens
+vocabulary and correctly do not appear. Q1 0 -> 1, Q4 0 -> 1 disclosure, scanned 11 -> 12.
+
+**Immersion 9/10** (`c898c1f2`) — Q5 fixed, Q4 open, and the run is **uncontrolled**.
+Q5's eight failing runs were all in `classic-light` and none in `forest-night`:
+`.immersion-stage` was a hardcoded `#121118` under `var(--panel)`/`var(--text)` that follow the
+theme, so a light palette gave near-black on near-black — `NHK Easy` **1.13:1**, `p.muted`
+**2.96:1**. `var(--panel-2)` cleared seven. The eighth was the same defect in the mode segment
+(fixed pale labels over palette-mixed fills, `Live·Reader` **1.23:1**); all three now mix toward
+`var(--text)`. After: 0 failing in either theme, worst 5.30 dark / **5.46** light — computed by
+hand before the re-run and matched to two decimals.
+
+**Q4 on Immersion is NO and is not being talked down: 23 controls, 0 disclosures.** 17 toolbar
++ 5 starter destinations + 1 tool close. Tucking the six page actions gets 23 -> 17; the only
+routes below 12 hide the transport or the starter destinations, both worse surfaces. Next slice.
+
+**HARNESS, one repair (RULE 1's budget) and one refusal.** Repaired: the Q3 control resolved
+its own victim — first painted control in document order — which is a *different term* from the
+one Q3 is scored on. On Library the two coincided and the control passed on that coincidence;
+on Captures the plant moved `button.reading-captures-refresh` while Q3 scored
+`input.reading-captures-search`, and the control reported DID NOT FAIL on a falsifiable
+question. The snapshot now pins the scored node on `window.__cat5primary` (a reference, not a
+DOM attribute) and reports `primaryFromPin`. Library and Captures both re-controlled: CONTROL
+FAILED AS REQUIRED on Q2, Q3, Q5, Q10. **Refused:** Immersion's control still misses Q3 — the
+plant moved the pinned mode button and the post-plant snapshot simply promoted the *next* one
+in the segment. A single-node plant cannot falsify Q3 where several interchangeable accent
+buttons exist; it must move every primary-capable control. Recorded, not fixed — one repair
+per harness per turn, and this turn spent it.
