@@ -861,3 +861,32 @@ completely normal in a screenshot.
 
 **Category 4 stands at 5 of 6 L6 surfaces**: manga `@.reader`, Library, Reading Finder, Immersion
 and Novels PASS 10/10; VN is the only FAIL and its one remaining bar is named in the section above.
+
+### CORRECTION, same turn — Novels' PASS is page-dependent, and the cell is NOT counted
+
+The PASS above was measured on **page 1 of 2** of 第2章 — a page whose text fills both columns.
+The chapter's **last page**, one `Next` click later, scores on the same instrument, same window:
+
+| leg | box | dead % | dead box |
+| --- | --- | --- | --- |
+| default | 1264x821 | 8.8 | 126x718 |
+| compact | 924x561 | **70.1** | 785x463 |
+| maximized | 1600x1000 | **63.0** | 1120x900 |
+
+**deadRegion FAIL.** Screenshot-confirmed at 1600x1000: `data-paged-pages: 2`, `scrollLeft: -1587`,
+i.e. page **2/2** correctly — the chapter's remaining text occupies the right ~30% of the page and
+the rest is the remainder. It is not a scroll-clamp bug and it is not a layout defect: a chapter
+ending mid-page is what pagination does, and a bigger window holds more text per page, so the
+remainder gets **larger**, which is why maximized is worse than default.
+
+So the honest reading, and the reason the cell is left open: **five of the six bars pass
+unconditionally at every size** (clipped 0, overlaps 0, horizontal 0, hiddenOverflowX 0, canvas
+86.6 → 89.0 rising). The sixth, deadRegion, is **not measurable on a paged reader as the instrument
+currently defines it** — it reports 5.3% or 70.1% on the same surface depending on which page is
+open. Category 4 therefore stays at **4 of 6** (board **22 of 48**), and Novels is PARKED on
+**harness correction 16**, which is specific: `provenPager` already exists in this file and already
+gates the clipped and hiddenOverflowX passes; the dead-region pass must use it too — on the last
+page of a proven pager, measure the region over the pager's own scroll buffer rather than the
+visible page, or exclude the trailing remainder. Not attempted here: one harness repair per turn
+was already spent on correction 15, and a second unverified change to the instrument in the same
+turn is how a false PASS gets committed.

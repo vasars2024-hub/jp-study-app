@@ -519,7 +519,7 @@ textarea {
    defect this surface was just cleared of, and it hides itself — anything overhanging to the
    right becomes "reachable" instead of clipped. Keeping X hidden means a future horizontal
    overflow still reports as `hiddenOverflowX` rather than being absorbed by a scrollbar. */
-.visual-novel-panel { display: grid; grid-template-rows: auto auto minmax(min(240px, 100%), 1fr); gap: 10px; min-height: 0; height: 100%; overflow: hidden auto; padding: 14px; color: var(--text); background: var(--bg); }
+.visual-novel-panel { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(min(240px, 100%), 1fr); gap: 10px; min-height: 0; height: 100%; overflow: hidden auto; padding: 14px; color: var(--text); background: var(--bg); }
 .visual-novel-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .visual-novel-panel-head > div { display: grid; gap: 2px; }
 .visual-novel-panel-head > div > strong { font-size: 1rem; }
