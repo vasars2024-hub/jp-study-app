@@ -1299,3 +1299,27 @@ The first post-fix run was not banked: the virtual list expanded to its 2,184px 
 42/42 (`INERT` in effect). Constraining its viewport to the ReadingCanvas tool body produced the
 numbers above. Focused Captures suites: **16/16**. This closes the collection-weight defect only;
 category 7's restart-dependent frame/theme/boot/main-block/memory legs remain open.
+
+## 2026-08-26 (later 8) · codexA — Captures category 7 stays OPEN on a measured theme regression
+
+Restarted after `6e339984` and exercised the populated **42-capture** surface. Main stayed below
+the rubric ceiling: idle `/health` p50/p95/max **3.1/12.3/15.7ms**; real refresh
+**2.8/3.7/18.3ms**. The 3,000-lookup sensitivity control reached **2,330ms**, while a renderer-only
+block left main at **2.9/3.7/16.2ms**, so the instrument both detects and isolates a >500ms block.
+
+Frame evidence is not a pass. Ceiling: p95/max **16.8/17.0ms**, 0 frames >33ms. Resize was
+**33.5/83.5ms**, 22 frames >33ms; settled drag improved to max **83.7ms**, 0 >100ms. Theme switches
+repeatedly cost **330–446ms** to restore with 2 frames >100ms. Moving Reading Finder from Captures
+to Home still cost **149.6/350.7ms** apply/restore, so the defect is theme-wide rather than caused
+by the new list. The jank control planted/detected **15/15** >100ms frames.
+
+Long-animation-frame attribution found **397.9ms** style/layout-only work and a **215ms** frame
+with 118ms in `CompanionLayer`'s animation callback plus 110ms forced style/layout. One bounded
+ResizeObserver-cache experiment did not improve two re-runs (**159.9/445.6ms** and
+**168.3/395.8ms**) and was fully removed; no speculative fix is banked.
+
+At 8/16/24 minutes, main private memory was **430.9/432.4/437.3MB**, handles
+**1072/1074/1077**, and RSS **371.9/179.9/108.5MB** after reclamation. That is a measured +6.4MB
+private delta, not a leak claim. Main start to debug-bridge ready was **16.58s**; the outer npm
+build leg was not instrumented comparably to L0. **Category 7 Captures remains unscored/open**;
+next work starts at the global theme style/layout cost, then re-runs the same harness.
