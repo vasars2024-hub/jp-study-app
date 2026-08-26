@@ -694,6 +694,12 @@ it fires immediately (`[652]`, believed 652, real 652). Check `data-content-widt
 box before believing any bridge-driven placement.
 Both L6 bullets are now closed; what L6 still owes is its Gate, scored.
 
+**L6 Gate, category 4 — 5 of 6 surfaces, 2026-08-26** (checkpoint containing this entry).
+VN now passes the unchanged surface-parameterised harness: three sizes, 0 clipped/overlaps/
+horizontal loss, dead region 0.4–12.9%, canvas 32.0 → 50.3 while chrome falls. Category 4's
+remaining surface is Novels, parked on the paged-reader dead-region correction already named in
+`L1_USE_OF_SPACE.md`; board **23 of 48**. Neither L6 Gate nor a timeline bullet closes here.
+
 **L6 Gate, category 1 — 2 of its 6 surfaces, 2026-08-25 (later 21)** (`e41a85ce`, `16e8ed1c`).
 Captures **10/10** and Immersion **10/10**, both live, raised, control fired. Immersion earned it
 with a product fix, not a re-read: **34 controls under the 32px pointer floor → 0**, via a new

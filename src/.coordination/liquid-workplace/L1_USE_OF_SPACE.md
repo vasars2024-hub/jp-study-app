@@ -900,3 +900,22 @@ lines took about twenty seconds. **Japanese cannot be sent through `/eval` as li
 arrives as `??`.** Write it as `\uXXXX` escapes, or escape non-ASCII in the poster before the
 request; the renderer parses them back to the same string. Both fixtures are removable through the
 product's own controls, so nothing is left in the user's library.
+
+### 2026-08-26 codexA — VN PASS 10/10; category 4 is 5 of 6
+
+`node probes/cat4-use-of-space.cjs --surface "@.visual-novel-panel" --label l6-vn --control`
+ran unchanged; zero new harness lines. The product fix split the workspace into primary-first
+reading and setup columns, with each column owning the existing `vnwork` reflow contract.
+
+| leg | box | clipped | overlaps | h-scroll | dead % | chrome | canvas |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| default | 782x513 | 0 | 0 | 0 | 5.7 | 37.9 | 32.0 |
+| compact | 222x103 | 0 | 0 | 0 | 0.4 | 60.4 | 29.4 |
+| maximized | 1226x698 | 0 | 0 | 0 | 12.9 | 27.4 | 50.3 |
+
+**PASS 10/10.** `contentGrowsNotChrome` now passes: chrome falls 37.9 → 27.4 while the
+dominant canvas grows 32.0 → 50.3. The first run exposed retained nested scroll and an implicit
+150px wrapper track; ReadingCanvas now owns the scroll, the workspace is border-box, and each
+column uses `minmax(0, 1fr)`. Re-run: all six bars pass at all sizes. Negative clip 0 → 1 → 0,
+removal proven; round trips restored. Category 4 is **5 of 6** and the board is **23 of 48**.
+Novels remains PARKED on harness correction 16; no PASS is claimed for it here.

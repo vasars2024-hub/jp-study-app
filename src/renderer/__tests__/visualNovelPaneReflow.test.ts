@@ -27,6 +27,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const CSS = readFileSync(resolve(__dirname, '../styles.css'), 'utf8');
+const PANEL = readFileSync(resolve(__dirname, '../components/immersion/VisualNovelPanel.tsx'), 'utf8');
 
 /** Body of the first at-rule whose prelude matches, brace-matched rather than regex-spanned. */
 function atRuleBody(css: string, prelude: RegExp): string | null {
@@ -58,17 +59,42 @@ function mediaBodies(css: string): string[] {
 }
 
 describe('the visual-novel workspace reflows to its own pane', () => {
-  it('establishes a named inline-size container on the workspace', () => {
+  it('establishes nested inline-size containers for the layout and each column', () => {
     // The container has to be the ANCESTOR of what it sizes: an element cannot answer a
     // `@container` condition it establishes itself (agent.css §23 records that trap).
-    const rule = /\.visual-novel-workspace \{[^}]*container-type: inline-size;[^}]*container-name: vnwork;[^}]*\}/;
-    expect(CSS).toMatch(rule);
+    expect(CSS).toMatch(/\.visual-novel-workspace \{[^}]*container-type: inline-size;[^}]*container-name: vnlayout;[^}]*\}/);
+    expect(CSS).toMatch(/\.visual-novel-column \{[^}]*container-type: inline-size;[^}]*container-name: vnwork;[^}]*\}/);
+    // The wrapper itself must shrink too; an implicit `auto` track floors at the widest child's
+    // min-content (150px live) even when the compact document only gives the column 114px.
+    expect(CSS).toMatch(/\.visual-novel-column \{[^}]*grid-template-columns: minmax\(0, 1fr\);/);
   });
 
-  it('lets the single workspace track shrink below its content min-content', () => {
-    // `minmax(0, 1fr)` rather than the implicit `auto`, which floors at min-content and is what
-    // pushed a 602px row through a 392px box.
-    expect(CSS).toMatch(/\.visual-novel-workspace \{[^}]*grid-template-columns: minmax\(0, 1fr\);/);
+  it('lets both workspace tracks shrink and stacks them from the workspace container', () => {
+    expect(CSS).toMatch(/\.visual-novel-workspace \{[^}]*grid-template-columns: minmax\(0, 3fr\) minmax\(0, 2fr\);/);
+    const stack = atRuleBody(CSS, /@container vnlayout \(max-width: 900px\) \{/);
+    expect(stack).toContain('.visual-novel-column { grid-column: 1 / -1; }');
+  });
+
+  it('leaves scrolling to the ReadingCanvas document and includes padding in its width', () => {
+    // A second scroll container retained an obsolete scrollTop when the columns reflowed, painting
+    // primary content behind the panel header. Content-box width also added the 24px padding to a
+    // 100%-wide child at the compact floor. ReadingCanvas already owns the bounded scroll region.
+    expect(CSS).toMatch(/\.visual-novel-workspace \{[^}]*box-sizing: border-box;[^}]*overflow: visible;/);
+  });
+
+  it('keeps capture and reading content before the setup column in DOM order', () => {
+    const positions = [
+      'visual-novel-column--primary',
+      'visual-novel-summary',
+      'visual-novel-capture',
+      'visual-novel-reading-overlay',
+      'visual-novel-column--setup',
+      '<VisualNovelMetadataEditor',
+      'visual-novel-progress',
+      '<VisualNovelScriptImportPanel',
+    ].map((marker) => PANEL.indexOf(marker));
+    expect(positions.every((position) => position >= 0)).toBe(true);
+    expect(positions).toEqual([...positions].sort((a, b) => a - b));
   });
 
   it('wraps the summary row instead of clipping its actions off the frame', () => {

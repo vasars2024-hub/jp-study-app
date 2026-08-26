@@ -721,6 +721,7 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
           {!selected && <p className="muted visual-novel-empty">Add a local visual novel to begin capturing Japanese dialogue.</p>}
           {selected && (
             <>
+              <div className="visual-novel-column visual-novel-column--primary">
               <div className="visual-novel-summary">
                 {selected.coverImageUrl && <img src={selected.coverImageUrl} alt="" loading="lazy" />}
                 <div className="visual-novel-summary-title">
@@ -743,6 +744,126 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
                   <button type="button" onClick={() => void removeEntry(selected.id, selected.title)}>Remove</button>
                 </div>
               </div>
+              <div className="visual-novel-capture">
+                <div>
+                  <select value={captureKind} onChange={(event) => setCaptureKind(event.target.value as VisualNovelTextKind)} aria-label="Captured text kind">
+                    <option value="dialogue">Dialogue</option><option value="narration">Narration</option><option value="choice">Choice</option><option value="character-name">Character name</option><option value="system">System text</option>
+                  </select>
+                  <input value={speaker} onChange={(event) => setSpeaker(event.target.value)} placeholder="Speaker" aria-label="Speaker" />
+                </div>
+                <textarea value={captureText} onChange={(event) => setCaptureText(event.target.value)} placeholder="Paste captured Japanese dialogue or narration" />
+                <textarea value={captureTranslation} onChange={(event) => setCaptureTranslation(event.target.value)} placeholder="Translation (optional)" />
+                <div className="visual-novel-capture-actions">
+                  <button type="button" disabled={!!addCapturedLineWhy} title={addCapturedLineWhy ? t(addCapturedLineWhy) : undefined} onClick={() => void captureLine()}>Add captured line</button>
+                  <button type="button" onClick={() => void captureScreenText()}>Capture screen text</button>
+                  <button type="button" className={hookState?.active ? 'is-active' : ''} onClick={() => void toggleHookRelay()}>
+                    {hookState?.active ? 'Stop text hook' : 'Start text hook'}
+                  </button>
+                  <label>
+                    <input type="checkbox" checked={clipboardCapture} onChange={(event) => {
+                      lastClipboardText.current = '';
+                      setClipboardCapture(event.target.checked);
+                    }} />
+                    Live clipboard capture
+                  </label>
+                  {hookState?.active && (
+                    <small title={hookState.filePath}>
+                      Hook listening · {hookState.capturedLines} new lines
+                      {hookState.lastError ? ` · ${hookState.lastError}` : ''}
+                    </small>
+                  )}
+                </div>
+              </div>
+              <div className="visual-novel-analysis-actions">
+                <select value={miningScope} onChange={(event) => setMiningScope(event.target.value as MiningScope)} aria-label="Mining scope">
+                  <option value="all">Entire visual novel</option>
+                  <option value="route" disabled={!progress.route}>Current route</option>
+                  <option value="chapter" disabled={!progress.chapter.trim()}>Current chapter</option>
+                  <option value="scenes" disabled={!sceneOptions.length}>Selected scenes</option>
+                </select>
+                <button type="button" disabled={!!analyzeWhy} title={analyzeWhy ? t(analyzeWhy) : undefined} onClick={() => void analyzeCaptures()}>{busy ? 'Analyzing…' : `Analyze ${miningScope}`}</button>
+                <button type="button" disabled={!!createCardsWhy} title={createCardsWhy ? t(createCardsWhy) : undefined} onClick={createCards}>Create study deck cards</button>
+                <button type="button" onClick={() => setCollectionOpen(true)}>Open VN study deck</button>
+              </div>
+              {miningScope === 'scenes' && (
+                <details className="visual-novel-scene-picker" open>
+                  <summary>
+                    Selected scenes · {selectedSceneKeys.size} · {scopedCaptures.length} lines
+                  </summary>
+                  <div className="visual-novel-scene-picker-actions">
+                    <button type="button" disabled={!!currentSceneWhy} title={currentSceneWhy ? t(currentSceneWhy) : undefined} onClick={selectCurrentScene}>Current scene</button>
+                    <button type="button" onClick={() => setSelectedSceneKeys(new Set(sceneOptions.map((option) => option.key)))}>All scenes</button>
+                    <button type="button" disabled={!!clearScenesWhy} title={clearScenesWhy ? t(clearScenesWhy) : undefined} onClick={() => setSelectedSceneKeys(new Set())}>Clear</button>
+                  </div>
+                  <div className="visual-novel-scene-options">
+                    {sceneOptions.map((option) => (
+                      <label key={option.key}>
+                        <input
+                          type="checkbox"
+                          checked={selectedSceneKeys.has(option.key)}
+                          onChange={() => toggleScene(option.key)}
+                        />
+                        <span>{[option.chapter, option.scene].filter(Boolean).join(' · ')}</span>
+                        <small>{option.count} lines</small>
+                      </label>
+                    ))}
+                  </div>
+                </details>
+              )}
+              <section className="visual-novel-reading-overlay" aria-label="Visual novel reading overlay">
+                <div className="visual-novel-reading-head"><strong>Reading overlay</strong><span>{captures.length} lines</span></div>
+                <div className="visual-novel-capture-list wk-on" data-dict-owner="" onPointerDown={noteLookupPointerDown} onMouseUp={onTextMouseUp}>
+                  {captures.map((capture) => (
+                    <button key={capture.id} type="button" className={capture.id === selectedCapture?.id ? 'is-selected' : ''} onClick={() => setSelectedCaptureId(capture.id)}>
+                      <small>{displayCaptureContext(capture) || capture.kind}</small>
+                      <span>{capture.japanese}</span>
+                      {capture.translation && <em>{capture.translation}</em>}
+                    </button>
+                  ))}
+                </div>
+              </section>
+              {selectedCapture && (
+                <VisualNovelSentenceAssist
+                  entry={selected}
+                  capture={selectedCapture}
+                  onDatabase={setDatabase}
+                  onStatus={reportStatus}
+                  onSaveCard={saveSelectedSentence}
+                />
+              )}
+              {analysis && (
+                <div className="visual-novel-analysis-summary">
+                  <span>{analysis.level?.label ?? 'Unrated'} difficulty</span>
+                  <span>{analysis.vocabulary.length} words</span>
+                  <span>{analysis.kanji.length} kanji</span>
+                  <span>{Math.round(analysis.comprehensibility.knownRatio * 100)}% known coverage</span>
+                </div>
+              )}
+              {characterProfiles.length > 0 && (
+                <section className="visual-novel-character-profiles" aria-label="Character speech profiles">
+                  <div className="visual-novel-reading-head"><strong>Character speech</strong><span>{characterProfiles.length} speakers</span></div>
+                  <div>
+                    {characterProfiles.map((profile) => (
+                      <article key={profile.speaker}>
+                        <div><strong>{profile.speaker}</strong><span>{profile.lineCount} lines · {profile.politeness}</span></div>
+                        <p>{profile.summary}</p>
+                        {profile.sentenceEndings.length > 0 && <small>Common signals: {profile.sentenceEndings.join(' · ')}</small>}
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              )}
+              <MediaLanguageProfileCard mediaId={`vn:${selected.id}`} />
+              {selectedCapture && (
+                <MediaStudyAssistantPanel
+                  mediaId={`vn:${selected.id}`}
+                  mediaTitle={selected.title}
+                  sentence={selectedCapture.japanese}
+                  jlptLevel={analysis?.level?.label ?? null}
+                />
+              )}
+              </div>
+              <div className="visual-novel-column visual-novel-column--setup">
               <VisualNovelMetadataEditor
                 entry={selected}
                 onSaved={setDatabase}
@@ -880,124 +1001,7 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
                 onImported={setDatabase}
                 onStatus={reportStatus}
               />
-              <div className="visual-novel-capture">
-                <div>
-                  <select value={captureKind} onChange={(event) => setCaptureKind(event.target.value as VisualNovelTextKind)} aria-label="Captured text kind">
-                    <option value="dialogue">Dialogue</option><option value="narration">Narration</option><option value="choice">Choice</option><option value="character-name">Character name</option><option value="system">System text</option>
-                  </select>
-                  <input value={speaker} onChange={(event) => setSpeaker(event.target.value)} placeholder="Speaker" aria-label="Speaker" />
-                </div>
-                <textarea value={captureText} onChange={(event) => setCaptureText(event.target.value)} placeholder="Paste captured Japanese dialogue or narration" />
-                <textarea value={captureTranslation} onChange={(event) => setCaptureTranslation(event.target.value)} placeholder="Translation (optional)" />
-                <div className="visual-novel-capture-actions">
-                  <button type="button" disabled={!!addCapturedLineWhy} title={addCapturedLineWhy ? t(addCapturedLineWhy) : undefined} onClick={() => void captureLine()}>Add captured line</button>
-                  <button type="button" onClick={() => void captureScreenText()}>Capture screen text</button>
-                  <button type="button" className={hookState?.active ? 'is-active' : ''} onClick={() => void toggleHookRelay()}>
-                    {hookState?.active ? 'Stop text hook' : 'Start text hook'}
-                  </button>
-                  <label>
-                    <input type="checkbox" checked={clipboardCapture} onChange={(event) => {
-                      lastClipboardText.current = '';
-                      setClipboardCapture(event.target.checked);
-                    }} />
-                    Live clipboard capture
-                  </label>
-                  {hookState?.active && (
-                    <small title={hookState.filePath}>
-                      Hook listening · {hookState.capturedLines} new lines
-                      {hookState.lastError ? ` · ${hookState.lastError}` : ''}
-                    </small>
-                  )}
-                </div>
               </div>
-              <div className="visual-novel-analysis-actions">
-                <select value={miningScope} onChange={(event) => setMiningScope(event.target.value as MiningScope)} aria-label="Mining scope">
-                  <option value="all">Entire visual novel</option>
-                  <option value="route" disabled={!progress.route}>Current route</option>
-                  <option value="chapter" disabled={!progress.chapter.trim()}>Current chapter</option>
-                  <option value="scenes" disabled={!sceneOptions.length}>Selected scenes</option>
-                </select>
-                <button type="button" disabled={!!analyzeWhy} title={analyzeWhy ? t(analyzeWhy) : undefined} onClick={() => void analyzeCaptures()}>{busy ? 'Analyzing…' : `Analyze ${miningScope}`}</button>
-                <button type="button" disabled={!!createCardsWhy} title={createCardsWhy ? t(createCardsWhy) : undefined} onClick={createCards}>Create study deck cards</button>
-                <button type="button" onClick={() => setCollectionOpen(true)}>Open VN study deck</button>
-              </div>
-              {miningScope === 'scenes' && (
-                <details className="visual-novel-scene-picker" open>
-                  <summary>
-                    Selected scenes · {selectedSceneKeys.size} · {scopedCaptures.length} lines
-                  </summary>
-                  <div className="visual-novel-scene-picker-actions">
-                    <button type="button" disabled={!!currentSceneWhy} title={currentSceneWhy ? t(currentSceneWhy) : undefined} onClick={selectCurrentScene}>Current scene</button>
-                    <button type="button" onClick={() => setSelectedSceneKeys(new Set(sceneOptions.map((option) => option.key)))}>All scenes</button>
-                    <button type="button" disabled={!!clearScenesWhy} title={clearScenesWhy ? t(clearScenesWhy) : undefined} onClick={() => setSelectedSceneKeys(new Set())}>Clear</button>
-                  </div>
-                  <div className="visual-novel-scene-options">
-                    {sceneOptions.map((option) => (
-                      <label key={option.key}>
-                        <input
-                          type="checkbox"
-                          checked={selectedSceneKeys.has(option.key)}
-                          onChange={() => toggleScene(option.key)}
-                        />
-                        <span>{[option.chapter, option.scene].filter(Boolean).join(' · ')}</span>
-                        <small>{option.count} lines</small>
-                      </label>
-                    ))}
-                  </div>
-                </details>
-              )}
-              <section className="visual-novel-reading-overlay" aria-label="Visual novel reading overlay">
-                <div className="visual-novel-reading-head"><strong>Reading overlay</strong><span>{captures.length} lines</span></div>
-                <div className="visual-novel-capture-list wk-on" data-dict-owner="" onPointerDown={noteLookupPointerDown} onMouseUp={onTextMouseUp}>
-                  {captures.map((capture) => (
-                    <button key={capture.id} type="button" className={capture.id === selectedCapture?.id ? 'is-selected' : ''} onClick={() => setSelectedCaptureId(capture.id)}>
-                      <small>{displayCaptureContext(capture) || capture.kind}</small>
-                      <span>{capture.japanese}</span>
-                      {capture.translation && <em>{capture.translation}</em>}
-                    </button>
-                  ))}
-                </div>
-              </section>
-              {selectedCapture && (
-                <VisualNovelSentenceAssist
-                  entry={selected}
-                  capture={selectedCapture}
-                  onDatabase={setDatabase}
-                  onStatus={reportStatus}
-                  onSaveCard={saveSelectedSentence}
-                />
-              )}
-              {analysis && (
-                <div className="visual-novel-analysis-summary">
-                  <span>{analysis.level?.label ?? 'Unrated'} difficulty</span>
-                  <span>{analysis.vocabulary.length} words</span>
-                  <span>{analysis.kanji.length} kanji</span>
-                  <span>{Math.round(analysis.comprehensibility.knownRatio * 100)}% known coverage</span>
-                </div>
-              )}
-              {characterProfiles.length > 0 && (
-                <section className="visual-novel-character-profiles" aria-label="Character speech profiles">
-                  <div className="visual-novel-reading-head"><strong>Character speech</strong><span>{characterProfiles.length} speakers</span></div>
-                  <div>
-                    {characterProfiles.map((profile) => (
-                      <article key={profile.speaker}>
-                        <div><strong>{profile.speaker}</strong><span>{profile.lineCount} lines · {profile.politeness}</span></div>
-                        <p>{profile.summary}</p>
-                        {profile.sentenceEndings.length > 0 && <small>Common signals: {profile.sentenceEndings.join(' · ')}</small>}
-                      </article>
-                    ))}
-                  </div>
-                </section>
-              )}
-              <MediaLanguageProfileCard mediaId={`vn:${selected.id}`} />
-              {selectedCapture && (
-                <MediaStudyAssistantPanel
-                  mediaId={`vn:${selected.id}`}
-                  mediaTitle={selected.title}
-                  sentence={selectedCapture.japanese}
-                  jlptLevel={analysis?.level?.label ?? null}
-                />
-              )}
             </>
           )}
         </main>

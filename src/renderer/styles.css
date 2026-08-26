@@ -539,7 +539,7 @@ textarea {
 .visual-novel-panel-tools { display: flex; align-items: center; gap: 8px; }
 .visual-novel-panel-tools button { min-height: var(--lq-hit-target); padding: 0 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-2); color: inherit; cursor: pointer; }
 .visual-novel-panel-tools button[aria-pressed='true'] { border-color: var(--accent, #d84b57); }
-.visual-novel-workspace { min-height: 0; overflow: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-1); }
+.visual-novel-workspace { box-sizing: border-box; min-height: 0; overflow: visible; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-1); }
 .visual-novel-library { display: grid; align-content: start; gap: 10px; }
 .visual-novel-add { display: grid; gap: 7px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
 .visual-novel-add > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; }
@@ -572,7 +572,8 @@ textarea {
    entry was a horizontal scrollbar on a reading pane with nothing indicating it was there.
    `minmax(0, 1fr)` is what the rest of this file uses to let a track shrink; the wraps are what
    the row does with the width once it can. */
-.visual-novel-workspace { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 12px; padding: 12px; container-type: inline-size; container-name: vnwork; }
+.visual-novel-workspace { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); align-content: start; gap: 12px; padding: 12px; container-type: inline-size; container-name: vnlayout; }
+.visual-novel-column { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; align-content: start; gap: 12px; container-type: inline-size; container-name: vnwork; }
 .visual-novel-summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
 .visual-novel-summary > img { width: 42px; height: 58px; flex: 0 0 auto; border-radius: 6px; object-fit: cover; }
 .visual-novel-summary-title { display: grid; gap: 2px; min-width: 0; }
@@ -698,7 +699,7 @@ textarea {
    applies one level down: at the shipped 820px Immersion window the workspace is a 392px content
    box inside a 1264px viewport, so the narrow rules stayed off and `.visual-novel-progress` laid
    out its 5 columns + button 602px wide in it, painting Save progress at x=1163 against a window
-   that ends at 1016. `container-name: vnwork` on the workspace answers the pane instead. 560px is
+   that ends at 1016. `container-name: vnwork` on each column answers its real width instead. 560px is
    above every one of these grids' own minimum (progress needs ~530, community-form 464), so each
    still gets its shipped wide layout the moment it genuinely fits. The container is the ANCESTOR,
    never the queried element itself — agent.css §23 records that trap. */
@@ -708,6 +709,14 @@ textarea {
   .visual-novel-sentence-fields { grid-template-columns: 1fr; }
   .visual-novel-route-add, .visual-novel-route-list article > div:first-child, .visual-novel-route-list .visual-novel-ending-row { grid-template-columns: 1fr; }
   .visual-novel-progress { grid-template-columns: repeat(2, minmax(100px, 1fr)); }
+}
+
+/* Reading work stays first in the DOM and owns the wider track. When the workspace itself no
+   longer fits two useful columns, both wrappers span the grid and retain that primary-first order.
+   The wrappers remain the `vnwork` containers, so their controls reflow to the space each COLUMN
+   actually receives rather than to the outer workspace or viewport. */
+@container vnlayout (max-width: 900px) {
+  .visual-novel-column { grid-column: 1 / -1; }
 }
 
 /* The 560px step above is not the bottom of the ladder, and below it the panel had no reflow at
@@ -722,8 +731,8 @@ textarea {
    The library sheet failed for a different reason and needs no query. `.visual-novel-library`
    declared no `grid-template-columns`, so its implicit `auto` track floors at the widest row's
    MIN-CONTENT — 167px — and at a 148px sheet every child hung 19px out of it, tool body 180>172
-   included. `minmax(0, 1fr)` is the same idiom `.visual-novel-workspace` already uses one screen
-   up. `.visual-novel-reading-head` is the row that sets that 167: a nowrap flex row's min-content
+   included. `minmax(0, 1fr)` is the same shrinking-track idiom the workspace columns use one
+   screen up. `.visual-novel-reading-head` is the row that sets that 167: a nowrap flex row's min-content
    is the SUM of its items, so the title and its count badge could never stack. */
 .visual-novel-reading-head { flex-wrap: wrap; }
 .visual-novel-library { grid-template-columns: minmax(0, 1fr); }
