@@ -39,9 +39,19 @@ const render = (key: string, lang: (typeof UI_LANGS)[number]) =>
  * and the constant stays 12 rather than dropping, because a lower one would let
  * a genuinely mute two-word English hint through.
  */
-const CJK = /[　-〿぀-ヿ㐀-䶿一-鿿豈-﫿＀-￯]/;
+// Code-point ranges rather than a regex literal: the first range starts at the
+// ideographic space, which `no-irregular-whitespace` rejects on sight even inside
+// a character class.
+const CJK_RANGES: readonly (readonly [number, number])[] = [
+  [0x3000, 0x303f], [0x3040, 0x30ff], [0x3400, 0x4dbf],
+  [0x4e00, 0x9fff], [0xf900, 0xfaff], [0xff00, 0xffef],
+];
+const isCjk = (c: string) => {
+  const point = c.codePointAt(0) ?? 0;
+  return CJK_RANGES.some(([lo, hi]) => point >= lo && point <= hi);
+};
 const weigh = (s: string) =>
-  [...s].reduce((n, c) => n + (CJK.test(c) ? 2 : 1), 0);
+  [...s].reduce((n, c) => n + (isCjk(c) ? 2 : 1), 0);
 
 describe('grammar explorer disabled reasons', () => {
   it('carries all three reasons in all four catalogs', () => {
