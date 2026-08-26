@@ -10,10 +10,20 @@
  *
  * Run:
  *   node src/.coordination/liquid-workplace/probes/cat3-liquid-utilization.cjs \
- *     --surface "Library" [--win main] [--label l6-library] [--depth 12] [--control] [--out file]
+ *     --surface "Library" [--win main] [--label l6-library] [--depth 12] [--control] [--out file] \
+ *     [--presentation liquid|standard|as-is]
  *
  * `--surface` follows the shared category-harness contract: a leading `@` is a CSS selector;
  * anything else is a floating-window title. `--win` pins bridge calls to one Electron window.
+ *
+ * `--presentation` closes a hole that produced a false FAIL on 2026-08-26: this harness used to
+ * score whatever presentation the window happened to be sitting in. Library's banked 10/10 was
+ * measured in Liquid; re-run against the same tree with the window left in Standard it returned
+ * `contextualTreated: false` — 63 regions, same roles, `liquidTreatedEligible 1 -> 0` — because
+ * Standard windows are SUPPOSED to be opaque. That is not a surface defect, it is the harness
+ * scoring the wrong thing. So: `liquid`/`standard` drive the title-bar toggle and restore it on
+ * the way out, and the `as-is` default REFUSES rather than scoring a presentable window that is
+ * currently Standard.
  *
  * The two rubric numbers are computed here rather than left for a caller to interpret:
  *   denseWorkOnTranslucent     must be 0;
@@ -41,6 +51,11 @@ const WIN = arg('win', '');
 const OUT = arg('out', '');
 const CONTROL = has('control');
 const DEPTH = Number(arg('depth', '12'));
+const PRESENTATION = arg('presentation', 'as-is');
+if (!['liquid', 'standard', 'as-is'].includes(PRESENTATION)) {
+  console.error(`REFUSE - --presentation must be liquid, standard or as-is; got ${PRESENTATION}`);
+  process.exit(2);
+}
 if (!SURFACE) {
   console.error('REFUSE - --surface is required; this harness names no surface of its own');
   process.exit(2);
@@ -106,6 +121,41 @@ async function raise() {
   await post('/focus', {});
   await new Promise((resolve) => { setTimeout(resolve, 250); });
   return r;
+}
+
+/**
+ * Read the surface's presentation without naming a surface: `data-presentation` is the
+ * contract every Liquid host writes (`.fwin`, `.popout-root`, the reader root), and
+ * `.fwin-b-liquid` is the only control that changes it. A root that carries neither is
+ * simply not presentable and is scored as it stands.
+ */
+async function readPresentation() {
+  return JSON.parse(await ev(`(function(){
+    var root = ${ROOT_EXPR};
+    if (!root) return JSON.stringify({ refuse: 'surface not found while reading presentation' });
+    return JSON.stringify({
+      attr: root.getAttribute('data-presentation'),
+      liquid: root.classList.contains('fwin-liquid') || root.classList.contains('popout-liquid')
+        || root.getAttribute('data-presentation') === 'liquid',
+      toggle: !!root.querySelector('.fwin-b-liquid')
+    });
+  })()`));
+}
+
+async function clickPresentationToggle() {
+  const clicked = JSON.parse(await ev(`(function(){
+    var root = ${ROOT_EXPR};
+    if (!root) return JSON.stringify({ refuse: 'surface disappeared before the presentation toggle' });
+    var btn = root.querySelector('.fwin-b-liquid');
+    if (!btn) return JSON.stringify({ refuse: 'surface offers no presentation toggle' });
+    btn.click();
+    return JSON.stringify({ ok: true });
+  })()`));
+  if (clicked.refuse) return clicked;
+  // The toggle animates the frame; L3 measured the class landing at t+26ms. 500ms is the
+  // same settle the control restore uses and is well past both.
+  await new Promise((resolve) => { setTimeout(resolve, 500); });
+  return readPresentation();
 }
 
 async function configure() {
@@ -241,6 +291,47 @@ const metricTuple = (row) => [
 
 (async () => {
   const raised = await raise();
+
+  const found = await readPresentation();
+  if (found.refuse) {
+    console.error(`REFUSE - ${found.refuse}`);
+    process.exitCode = 2;
+    return;
+  }
+  const foundMode = found.liquid ? 'liquid' : 'standard';
+  let restorePresentationTo = null;
+  if (PRESENTATION === 'as-is') {
+    if (foundMode === 'standard' && found.toggle) {
+      console.error('REFUSE - the surface offers a Liquid presentation and is currently standard.'
+        + ' Category 3 measures Liquid utilization, and a standard window is correctly opaque, so'
+        + ' scoring it here reports FAIL for a surface that has no defect.'
+        + ' Re-run with --presentation liquid.');
+      process.exitCode = 2;
+      return;
+    }
+  } else if (foundMode !== PRESENTATION) {
+    if (!found.toggle) {
+      console.error(`REFUSE - --presentation ${PRESENTATION} was asked for, the surface is`
+        + ` ${foundMode}, and it exposes no presentation toggle to change it.`);
+      process.exitCode = 2;
+      return;
+    }
+    const moved = await clickPresentationToggle();
+    if (moved.refuse) {
+      console.error(`REFUSE - ${moved.refuse}`);
+      process.exitCode = 2;
+      return;
+    }
+    const nowMode = moved.liquid ? 'liquid' : 'standard';
+    if (nowMode !== PRESENTATION) {
+      console.error(`REFUSE - the presentation toggle did not reach ${PRESENTATION};`
+        + ` the surface is still ${nowMode}. Nothing was scored and nothing is left changed.`);
+      process.exitCode = 2;
+      return;
+    }
+    restorePresentationTo = foundMode;
+  }
+
   await configure();
   let out;
   try {
@@ -262,6 +353,8 @@ const metricTuple = (row) => [
       win: WIN || '(focused)',
       depth: DEPTH,
       raised,
+      presentationAsFound: foundMode,
+      presentationDriven: restorePresentationTo !== null,
       ...baseReport,
       bars,
       verdict: Object.values(bars).every(Boolean) ? 'PASS 10/10' : 'FAIL',
@@ -338,6 +431,20 @@ const metricTuple = (row) => [
       })()`);
     } catch { /* the renderer may have exited; the style exits with it */ }
     try { await cleanupGlobals(); } catch { /* same */ }
+    if (restorePresentationTo) {
+      // The window's presentation is persisted state. A harness that drives it and exits owes
+      // the next worker the state it found, whether or not the score passed.
+      try {
+        const back = await clickPresentationToggle();
+        const backMode = back.liquid ? 'liquid' : 'standard';
+        if (backMode !== restorePresentationTo) {
+          console.error(`WARNING - presentation left as ${backMode}, expected`
+            + ` ${restorePresentationTo}; toggle it back by hand.`);
+        }
+      } catch {
+        console.error(`WARNING - could not restore presentation to ${restorePresentationTo}.`);
+      }
+    }
   }
 })().catch((error) => {
   console.error(String(error && error.stack ? error.stack : error));

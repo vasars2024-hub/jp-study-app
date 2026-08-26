@@ -1,9 +1,11 @@
 {
   "label": "l6-library",
   "surface": "Library",
-  "win": "(focused)",
+  "win": "main",
   "depth": 12,
   "raised": "already-on-top",
+  "presentationAsFound": "standard",
+  "presentationDriven": true,
   "box": "820x580",
   "presentation": "liquid",
   "windowOwnPaint": {
@@ -78,6 +80,11 @@
     "allWorkFailed": true,
     "returned": true,
     "oneMaterialReturned": true,
+    "oneMaterial": {
+      "before": "none|rgba(0, 0, 0, 0)",
+      "immediate": "none|rgba(0, 0, 0, 0)",
+      "settled": "none|rgba(0, 0, 0, 0)"
+    },
     "allGlassReturned": true,
     "verdict": "CONTROL FAILED AS REQUIRED - category 3 instrument is proven"
   }
