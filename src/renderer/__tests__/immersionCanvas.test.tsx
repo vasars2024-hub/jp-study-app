@@ -240,7 +240,11 @@ describe('the Immersion browser through the L6 reading canvas', () => {
 describe('the Immersion toolbar names why its history buttons are disabled', () => {
   it('carries a reason in title and the label in aria-label while disabled', async () => {
     const h = await mountImmersion(1200);
-    const nav = [...h.container.querySelectorAll('.immersion-toolbar .icon-btn')]
+    // EVERY disabled control in the row, not only the icon-only ones. The selector was
+    // `.icon-btn` until Close page moved into the toolbar's overflow disclosure, where it
+    // carries a text label and so is no longer an icon button — a real relocation that the
+    // narrower selector would have reported as "Close page stopped explaining itself".
+    const nav = [...h.container.querySelectorAll('.immersion-toolbar button')]
       .filter((b): b is HTMLButtonElement => b instanceof HTMLButtonElement && b.disabled);
     // FOUR since 2026-08-26, not two. History starts empty on mount AND no page is
     // open, so Back, Forward, Reload and Close page are all disabled — the last two
@@ -260,11 +264,12 @@ describe('the Immersion toolbar names why its history buttons are disabled', () 
 
   it('gives Reload the same reason treatment, because it is disabled with nothing to reload', async () => {
     const h = await mountImmersion(1200);
-    // By position, not by label: the toolbar carries a dozen more `.icon-btn`
-    // further along (save, capture, lens, rail) and their labels are localised.
-    // Back, Forward, Reload and Close page are its first four direct children.
+    // By position, not by label: the toolbar still carries the lookup and rail toggles
+    // as `.icon-btn` further along, and their labels are localised. Back, Forward and
+    // Reload are its first three direct children — the page actions that used to follow
+    // them now live in the overflow disclosure, which is not a direct `.icon-btn` child.
     const nav = [...h.container.querySelectorAll('.immersion-toolbar > .icon-btn')];
-    expect(nav.length, 'the toolbar lost its icon buttons').toBeGreaterThanOrEqual(4);
+    expect(nav.length, 'the toolbar lost its icon buttons').toBeGreaterThanOrEqual(3);
     const reload = nav[2] as HTMLButtonElement;
     // REVISED 2026-08-26. This used to assert `disabled === false` and read "because
     // it is never disabled" — which described the shipped code rather than a decision.

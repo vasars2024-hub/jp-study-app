@@ -344,6 +344,23 @@ const SNAP = `(function(){
    * the app once already.
    */
   window.__cat5primary = primaryAction;
+  /*
+   * AND EVERY NODE THE TERM COULD FALL BACK TO, which is the repair after the one above.
+   * Pinning the scored node fixed Captures, where the plant had been moving a different
+   * element entirely. It was still not enough on Immersion: \`primaryAction\` is
+   * \`explicitPrimary || accentButtons[0] || primaryInputs[0]\`, and Immersion's accent set is
+   * three interchangeable view-mode buttons, so translating the FIRST one merely promotes
+   * the second and Q3 stays YES. The control reported "DID NOT FAIL on Q3" on a surface
+   * whose Q3 is perfectly falsifiable.
+   *
+   * A disjunction is only attacked when every branch of it is. Moving all three terms drives
+   * \`primaryAction\` to null, which is what "no primary action is visible" actually means.
+   * Safe against re-promotion: the plant translates rather than hides, so \`filled()\` and the
+   * sibling comparison are unchanged, and the only term that moves is \`topThird\` — which can
+   * remove a candidate and never add one.
+   */
+  window.__cat5primaries = [].concat(explicitPrimary ? [explicitPrimary] : [], accentButtons, primaryInputs)
+    .filter(function(e, i, a){ return e && a.indexOf(e) === i; });
 
   // ---- Q4: advanced tools tucked away, default view not cluttered. ------------------------
   var collapsed = [].slice.call(root.querySelectorAll('details:not([open]),[aria-expanded="false"]')).filter(painted);
@@ -528,19 +545,32 @@ const PLANT_JS = `(function(){
   var savedTitle = titleEl ? titleEl.textContent : null;
   if (titleEl) { titleEl.setAttribute(${A(PLANT)}, 'title'); titleEl.textContent = ''; }
 
-  // Q3 — push the primary action far below the body's visible box.
+  // Q3 — push EVERY primary-capable control far below the body's visible box.
   var NAV = 'nav,[role="tablist"],[class*="rail"],[class*="sidebar"],[class*="-nav"],[class*="tabs"]';
-  // The node Q3 IS SCORED ON, pinned by the snapshot that ran before this plant. The
-  // document-order fallback stays only for a plant that somehow runs without a snapshot;
-  // when it fires, primaryFromPin is false and the control's claim can be discounted.
+  // The nodes Q3 IS SCORED ON, pinned by the snapshot that ran before this plant: the whole
+  // \`explicitPrimary || accentButtons[0] || primaryInputs[0]\` disjunction, not just whichever
+  // branch won this time. Moving one of three interchangeable accent buttons promotes the
+  // next and the control reads as a pass. The document-order fallback stays only for a plant
+  // that somehow runs without a snapshot; when it fires, primaryFromPin is false and the
+  // control's claim can be discounted.
+  var pinnedAll = (window.__cat5primaries || []).filter(function(e){ return e && e.isConnected; });
   var pinnedPrimary = (window.__cat5primary && window.__cat5primary.isConnected)
     ? window.__cat5primary : null;
-  var primary = pinnedPrimary
-    || [].slice.call(root.querySelectorAll('button,[role="button"],input,select,textarea')).filter(function(e){
+  var targets = pinnedAll.length ? pinnedAll : (pinnedPrimary ? [pinnedPrimary] : []);
+  if (!targets.length) {
+    targets = [].slice.call(root.querySelectorAll('button,[role="button"],input,select,textarea')).filter(function(e){
       var b = e.getBoundingClientRect();
-      return b.width > 0 && b.height > 0 && !e.closest('.fwin-bar') && !e.closest(NAV); })[0];
-  var savedTransform = primary ? primary.style.transform : null;
-  if (primary) { primary.setAttribute(${A(PLANT)}, 'moved'); primary.style.transform = 'translateY(4000px)'; }
+      return b.width > 0 && b.height > 0 && !e.closest('.fwin-bar') && !e.closest(NAV); }).slice(0, 1);
+  }
+  // The previous inline transform travels WITH each node, so the restore does not depend on
+  // an array surviving a round trip through /eval and back in the same order.
+  targets.forEach(function(e){
+    e.setAttribute(${A(PLANT)}, 'moved');
+    e.setAttribute(${A(PLANT)} + '-transform', e.style.transform || '');
+    e.style.transform = 'translateY(4000px)';
+  });
+  var primary = targets[0] || null;
+  var savedTransform = primary ? primary.getAttribute(${A(PLANT)} + '-transform') : null;
 
   // Q5 — one span whose OWN opaque background is 1.07:1 against its own text, so the planted
   // ratio is identical in every theme and the sweep cannot wash it out.
@@ -571,16 +601,29 @@ const PLANT_JS = `(function(){
   return JSON.stringify({ savedTitle: savedTitle, savedTransform: savedTransform,
     primaryFound: primary ? primary.tagName.toLowerCase() + '.' + String(primary.className||'').split(' ')[0] : null,
     primaryFromPin: !!pinnedPrimary,
+    // How many branches of the disjunction the plant actually attacked, and which. A control
+    // that moved one node on a surface with three interchangeable accents measured nothing,
+    // so the count is reported rather than assumed.
+    primariesMoved: targets.length,
+    primariesFromPin: pinnedAll.length,
+    primaryList: targets.map(function(e){ return e.tagName.toLowerCase() + '.' + String(e.className||'').split(' ')[0]; }),
     dashboardCards: kinds.length, expect: { Q2: 'NO', Q3: 'NO', Q5: 'NO', Q10: 'NO' } });
 })()`;
 
-const unplantJs = (savedTitle, savedTransform) => `(function(){
+const unplantJs = (savedTitle) => `(function(){
   var t = document.querySelector('[${PLANT}="title"]');
   if (t) { t.textContent = ${A(savedTitle === null ? '' : savedTitle)}; t.removeAttribute(${A(PLANT)}); }
-  var m = document.querySelector('[${PLANT}="moved"]');
-  if (m) { m.style.transform = ${A(savedTransform || '')}; m.removeAttribute(${A(PLANT)}); }
+  // Each moved node carries its OWN previous inline transform, so a plant that attacked
+  // three nodes restores three, and none of them is restored to another one's value.
+  var moved = [].slice.call(document.querySelectorAll('[${PLANT}="moved"]'));
+  moved.forEach(function(m){
+    m.style.transform = m.getAttribute('${PLANT}-transform') || '';
+    m.removeAttribute('${PLANT}-transform');
+    m.removeAttribute(${A(PLANT)});
+  });
   [].slice.call(document.querySelectorAll('[${PLANT}="contrast"],[${PLANT}="dashboard"]')).forEach(function(n){ n.remove(); });
-  return JSON.stringify({ residue: document.querySelectorAll('[${PLANT}]').length });
+  return JSON.stringify({ restoredMoved: moved.length,
+    residue: document.querySelectorAll('[${PLANT}],[${PLANT}-transform]').length });
 })()`;
 
 // ---------------------------------------------------------------------------- scoring
@@ -721,7 +764,7 @@ function scoreSnapshot(s) {
   // --- restore, and VERIFY it, before any verdict is computed -------------------------------
   step('restore');
   await ev(`(function(){ document.documentElement.setAttribute('data-theme', ${A(BASE_THEME)}); return 'ok'; })()`);
-  if (CONTROL) out.unplanted = await evj(unplantJs(planted && planted.savedTitle, planted && planted.savedTransform));
+  if (CONTROL) out.unplanted = await evj(unplantJs(planted && planted.savedTitle));
   await sleep(400);
   out.storeAfter = await readStore();
   out.storeIdentical = JSON.stringify(out.storeBefore) === JSON.stringify(out.storeAfter);
@@ -817,7 +860,7 @@ function scoreSnapshot(s) {
     out.verdict = out.score === 10 ? 'PASS 10/10' : out.score === 'VOID' ? 'VOID' : `${out.score}/10 — ${findings.length} question(s) answer NO`;
   }
 
-  await ev(`(function(){ ${PIN} = null; window.__cat5primary = null; return 'cleared'; })()`);
+  await ev(`(function(){ ${PIN} = null; window.__cat5primary = null; window.__cat5primaries = null; return 'cleared'; })()`);
   fs.writeFileSync(OUT, JSON.stringify(out, null, 2) + '\n');
   console.log(JSON.stringify(out, null, 2));
   console.log('\nwrote', OUT);

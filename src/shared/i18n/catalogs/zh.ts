@@ -5257,6 +5257,8 @@ export const zh: Catalog = {
   'immersion.lensCapture': '用取词镜阅读此页',
   'immersion.lensNeedsPage': '请先打开一个网页——取词镜只能记录可寻址的页面。',
   'immersion.openInSystemBrowser': '在系统浏览器中打开',
+  'immersion.moreActions': '更多',
+  'immersion.moreDestinations': '更多站点',
   'immersion.hideLibrary': '隐藏书库',
   'immersion.showLibrary': '显示书库',
   'immersion.visualNovelLibrary': '视觉小说库',

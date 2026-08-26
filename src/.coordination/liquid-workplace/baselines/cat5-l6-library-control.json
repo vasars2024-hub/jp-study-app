@@ -2,7 +2,7 @@
   "surface": "Library",
   "label": "l6-library",
   "control": true,
-  "at": "2026-08-26T23:05:07.936Z",
+  "at": "2026-08-26T23:34:06.294Z",
   "category": 5,
   "question": "UI clarity and user-friendliness — the ten §10.4 questions, scored",
   "hostClass": "fwin",
@@ -39,6 +39,12 @@
     "savedTransform": "",
     "primaryFound": "button.btn",
     "primaryFromPin": true,
+    "primariesMoved": 2,
+    "primariesFromPin": 2,
+    "primaryList": [
+      "button.btn",
+      "button.lib-folder-chip"
+    ],
     "dashboardCards": 6,
     "expect": {
       "Q2": "NO",
@@ -55,6 +61,7 @@
     "restoredTo": "standard"
   },
   "unplanted": {
+    "restoredMoved": 2,
     "residue": 0
   },
   "storeAfter": {
@@ -72,15 +79,13 @@
     {
       "id": 1,
       "q": "dominant task immediately obvious",
-      "verdict": "YES",
+      "verdict": "NO",
       "bar": "1..3 entry points in the top third — 0 offers nothing to do, many offers no dominant task",
       "numbers": {
-        "entryPoints": 1,
+        "entryPoints": 0,
         "primaryInputs": 0,
-        "accentButtons": 1,
-        "accentList": [
-          "button.lib-folder-chip::All 24"
-        ],
+        "accentButtons": 0,
+        "accentList": [],
         "inputList": []
       }
     },

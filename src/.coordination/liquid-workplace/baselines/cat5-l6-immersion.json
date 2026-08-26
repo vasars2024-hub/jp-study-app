@@ -2,7 +2,7 @@
   "surface": "Immersion",
   "label": "l6-immersion",
   "control": false,
-  "at": "2026-08-26T23:11:25.704Z",
+  "at": "2026-08-26T23:31:51.271Z",
   "category": 5,
   "question": "UI clarity and user-friendliness — the ten §10.4 questions, scored",
   "hostClass": "fwin",
@@ -78,11 +78,10 @@
       "numbers": {
         "titleText": "Immersion",
         "titleFrom": "span.fwin-title",
-        "backAffordances": 4,
+        "backAffordances": 3,
         "backList": [
           "×",
           "Back",
-          "Close page",
           "Hide library"
         ]
       }
@@ -101,39 +100,31 @@
     {
       "id": 4,
       "q": "advanced tools discoverable without cluttering",
-      "verdict": "NO",
+      "verdict": "YES",
       "bar": ">=1 collapsed disclosure AND <=12 controls scanned in the default state",
       "numbers": {
-        "collapsedDisclosures": 0,
-        "scannedControls": 23,
-        "chromeControlsRaw": 23,
-        "summaryHeaders": 0,
+        "collapsedDisclosures": 2,
+        "scannedControls": 12,
+        "chromeControlsRaw": 14,
+        "summaryHeaders": 2,
         "behindDisclosure": 0,
         "disclosures": {
-          "total": 0,
+          "total": 2,
           "open": 0
         },
         "scannedList": [
           "Back",
           "Forward",
           "Reload",
-          "Close page",
           "Enter URL or search…",
           "Live",
           "Live·Reader",
           "Focus",
           "BUTTON",
           "BUTTON",
-          "BUTTON",
-          "BUTTON",
-          "BUTTON",
-          "BUTTON",
-          "BUTTON",
-          "BUTTON",
-          "Visual novel library",
           "NHK Easy",
           "Wikipedia JP",
-          "Hacker News"
+          "Hide library"
         ]
       }
     },
@@ -147,7 +138,7 @@
         "cells": [
           {
             "theme": "forest-night",
-            "measured": 58,
+            "measured": 57,
             "unmeasurable": 0,
             "minRatio": 5.3,
             "failingCount": 0,
@@ -161,7 +152,7 @@
           },
           {
             "theme": "classic-light",
-            "measured": 58,
+            "measured": 57,
             "unmeasurable": 0,
             "minRatio": 5.46,
             "failingCount": 0,
@@ -272,13 +263,13 @@
     "q1": "YES",
     "q2": "YES",
     "q3": "YES",
-    "q4": "NO",
+    "q4": "YES",
     "q6": "YES",
     "q10": "YES"
   },
   "altThemeNumbers": {
     "theme": "classic-light",
-    "controlsPainted": 68,
+    "controlsPainted": 59,
     "q1": {
       "entryPoints": 1,
       "primaryInputs": 1,
@@ -289,36 +280,28 @@
       ]
     },
     "q4": {
-      "collapsedDisclosures": 0,
-      "scannedControls": 23,
-      "chromeControlsRaw": 23,
-      "summaryHeaders": 0,
+      "collapsedDisclosures": 2,
+      "scannedControls": 12,
+      "chromeControlsRaw": 14,
+      "summaryHeaders": 2,
       "behindDisclosure": 0,
       "disclosures": {
-        "total": 0,
+        "total": 2,
         "open": 0
       },
       "scannedList": [
         "Back",
         "Forward",
         "Reload",
-        "Close page",
         "Enter URL or search…",
         "Live",
         "Live·Reader",
         "Focus",
         "BUTTON",
         "BUTTON",
-        "BUTTON",
-        "BUTTON",
-        "BUTTON",
-        "BUTTON",
-        "BUTTON",
-        "BUTTON",
-        "Visual novel library",
         "NHK Easy",
         "Wikipedia JP",
-        "Hacker News"
+        "Hide library"
       ]
     },
     "q6": {
@@ -349,11 +332,9 @@
       "cardHostDetail": null
     }
   },
-  "controlsPaintedA": 68,
-  "findings": [
-    "Q4 advanced tools discoverable without cluttering"
-  ],
+  "controlsPaintedA": 59,
+  "findings": [],
   "voided": [],
-  "score": 9,
-  "verdict": "9/10 — 1 question(s) answer NO"
+  "score": 10,
+  "verdict": "PASS 10/10"
 }

@@ -5280,6 +5280,8 @@ export const ja: Catalog = {
   'immersion.lensCapture': 'このページをレンズで読む',
   'immersion.lensNeedsPage': '先にウェブページを開いてください。レンズが記録できるのはアドレスのあるページだけです。',
   'immersion.openInSystemBrowser': 'システムブラウザで開く',
+  'immersion.moreActions': 'その他',
+  'immersion.moreDestinations': 'その他のサイト',
   'immersion.hideLibrary': 'ライブラリを隠す',
   'immersion.showLibrary': 'ライブラリを表示',
   'immersion.visualNovelLibrary': 'ビジュアルノベル ライブラリ',

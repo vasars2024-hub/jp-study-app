@@ -5574,6 +5574,8 @@ export const en: Catalog = {
   'immersion.lensCapture': 'Read this page with the lens',
   'immersion.lensNeedsPage': 'Open a web page first — the lens can only record a page it can address.',
   'immersion.openInSystemBrowser': 'Open in system browser',
+  'immersion.moreActions': 'More',
+  'immersion.moreDestinations': 'More destinations',
   'immersion.hideLibrary': 'Hide library',
   'immersion.showLibrary': 'Show library',
   'immersion.visualNovelLibrary': 'Visual novel library',

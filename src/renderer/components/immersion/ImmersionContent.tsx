@@ -21,6 +21,7 @@ import VirtualList from '../VirtualList';
 import {
   IMMERSION_MODE_CYCLE,
   IMMERSION_STARTERS,
+  IMMERSION_SUBJECT_LANG,
   immersionStatsId,
   isRemoteMediaUrl,
   nextImmersionMode,
@@ -820,7 +821,7 @@ export type ImmersionState = ReturnType<typeof useImmersion>;
  * width, which is why this is a relocation and not a `z-index` or a withdrawal.
  * Blanc passes nothing and is unchanged.
  */
-export function ImmersionToolbar({ state, trailing }: { state: ImmersionState; trailing?: ReactNode }) {
+export function ImmersionToolbar({ state, overflow }: { state: ImmersionState; overflow?: ReactNode }) {
   const { t, mode, MODE_LABELS, urlInput, setUrlInput, histIdx, history, showRail, captureBusy, liveLookup } =
     state;
   const noBack = histIdx <= 0;
@@ -866,21 +867,6 @@ export function ImmersionToolbar({ state, trailing }: { state: ImmersionState; t
         disabled={noPage}
       >
         <Icon name="refresh" size={14} />
-      </button>
-      {/* The reverse of opening a page. Without it the starter state — the curated
-          destinations and the "open a page to begin" copy — was unreachable once anything
-          had loaded, since Back, Forward and Reload all require a page. Same disabled-reason
-          shape as its neighbours: `title` explains the greyed-out state, `aria-label` keeps
-          the accessible name. */}
-      <button
-        type="button"
-        className="btn small icon-btn immersion-close-page"
-        aria-label={t('immersion.closePage')}
-        title={noPage ? t('immersion.reason.noPage') : t('immersion.closePage')}
-        onClick={state.closePage}
-        disabled={noPage}
-      >
-        <Icon name="close" size={14} />
       </button>
       {/* The URL entry is a form, so §2.3 makes it an Anchor: category 3 measured it live at
           `alpha 0.88 on div.immersion-toolbar`, dense work on the toolbar's glass. `bare` keeps
@@ -930,39 +916,13 @@ export function ImmersionToolbar({ state, trailing }: { state: ImmersionState; t
       >
         <Icon name="dictionary" size={14} />
       </button>
-      <button type="button" className="btn small icon-btn" title={t('immersion.saveSite')} onClick={() => void state.saveCurrentSite()}>
-        <Icon name="bookmark" size={14} />
-      </button>
-      <button type="button" className="btn small icon-btn" title={t('immersion.saveAsTool')} onClick={() => void state.saveCurrentAsTool()}>
-        <Icon name="star" size={14} />
-      </button>
-      <button type="button" className="btn small icon-btn" title={t('immersion.exportToLibrary')} onClick={() => void state.exportToLibrary()}>
-        <Icon name="download" size={14} />
-      </button>
-      <button
-        type="button"
-        className="btn small icon-btn"
-        title={t('immersion.captureVideo')}
-        disabled={captureBusy}
-        onClick={() => void state.captureVideo()}
-      >
-        <Icon name="video" size={14} />
-      </button>
-      <button
-        type="button"
-        className="btn small icon-btn"
-        title={t('immersion.lensCapture')}
-        onClick={() => void state.captureWithLens()}
-      >
-        <Icon name="scan" size={14} />
-      </button>
-      <button type="button" className="btn small icon-btn" title={t('immersion.openInSystemBrowser')} onClick={state.openExternal}>
-        <Icon name="external" size={14} />
-      </button>
       {/* The trigger for an L6 reading tool, so it reports the tool's state the
           way Captures' and Novels' do: `aria-pressed` rather than a title that
           silently flips between two localised strings. The class is what a test
-          selects on — a title is not a safe selector once it is translated. */}
+          selects on — a title is not a safe selector once it is translated.
+          It stays in the open for the same reason `+ Import file(s)` did on
+          Library: a stateful toggle whose state is only visible once you open a
+          menu is a toggle you cannot read. */}
       <button
         type="button"
         className="btn small icon-btn immersion-sites-toggle"
@@ -972,7 +932,77 @@ export function ImmersionToolbar({ state, trailing }: { state: ImmersionState; t
       >
         <Icon name="folder" size={14} />
       </button>
-      {trailing}
+      {/*
+        THE OVERFLOW. Rubric category 5 Q4 scored this surface NO: 23 chrome controls to
+        scan in the default state against a bar of 12, with zero disclosures — sixteen of
+        them in this one non-wrapping row, thirteen of those icon-only. What stays in the
+        open is what a browser keeps in the open: transport, the location field, the view
+        mode, the lookup toggle and the rail toggle. What tucks away is every action that
+        operates on a page you have already opened.
+
+        Nothing is removed and nothing becomes menu-only — six of the eight are already
+        items in this app's own menu bar (`save-site`, `export-library`, `capture-video`,
+        `visual-novels`, `open-external`, `close-page` in `ImmersionView`), and the two
+        that are not (Save as tool, the lens) are reachable here in one click. That matters
+        on the default theme specifically, where `AppChrome` renders bare children and a
+        menu-only route would be invisible.
+
+        Labels, not bare glyphs: an icon-only button is legible in a toolbar row where
+        position carries meaning, and illegible in a vertical list where it does not.
+      */}
+      <details className="immersion-overflow">
+        <summary className="btn small immersion-overflow-summary" title={t('immersion.moreActions')}>
+          {t('immersion.moreActions')}
+        </summary>
+        <div className="immersion-overflow-body">
+          {/* The reverse of opening a page. Without it the starter state — the curated
+              destinations and the "open a page to begin" copy — was unreachable once
+              anything had loaded, since Back, Forward and Reload all require a page. Same
+              disabled-reason shape as its neighbours: `title` explains the greyed-out
+              state, `aria-label` keeps the accessible name. */}
+          <button
+            type="button"
+            className="btn small immersion-close-page"
+            aria-label={t('immersion.closePage')}
+            title={noPage ? t('immersion.reason.noPage') : t('immersion.closePage')}
+            onClick={state.closePage}
+            disabled={noPage}
+          >
+            <Icon name="close" size={14} />
+            <span>{t('immersion.closePage')}</span>
+          </button>
+          <button type="button" className="btn small" onClick={() => void state.saveCurrentSite()}>
+            <Icon name="bookmark" size={14} />
+            <span>{t('immersion.saveSite')}</span>
+          </button>
+          <button type="button" className="btn small" onClick={() => void state.saveCurrentAsTool()}>
+            <Icon name="star" size={14} />
+            <span>{t('immersion.saveAsTool')}</span>
+          </button>
+          <button type="button" className="btn small" onClick={() => void state.exportToLibrary()}>
+            <Icon name="download" size={14} />
+            <span>{t('immersion.exportToLibrary')}</span>
+          </button>
+          <button
+            type="button"
+            className="btn small"
+            disabled={captureBusy}
+            onClick={() => void state.captureVideo()}
+          >
+            <Icon name="video" size={14} />
+            <span>{t('immersion.captureVideo')}</span>
+          </button>
+          <button type="button" className="btn small" onClick={() => void state.captureWithLens()}>
+            <Icon name="scan" size={14} />
+            <span>{t('immersion.lensCapture')}</span>
+          </button>
+          <button type="button" className="btn small" onClick={state.openExternal}>
+            <Icon name="external" size={14} />
+            <span>{t('immersion.openInSystemBrowser')}</span>
+          </button>
+          {overflow}
+        </div>
+      </details>
     </div>
   );
 }
@@ -985,6 +1015,19 @@ export function ImmersionToolbar({ state, trailing }: { state: ImmersionState; t
  */
 export function ImmersionStage({ state, stageClassName }: { state: ImmersionState; stageClassName?: string }) {
   const { t, loading, error, status, currentUrl, splitView, readerHtmlProp } = state;
+  const starterButton = (s: (typeof IMMERSION_STARTERS)[number]) => (
+    <button
+      key={s.url}
+      type="button"
+      className="btn small"
+      onClick={() => {
+        state.setMode('reader');
+        state.navigate(s.url, { mode: 'reader' });
+      }}
+    >
+      {s.label}
+    </button>
+  );
   return (
     <div className={`immersion-stage${splitView ? ' immersion-split' : ''}${stageClassName ? ` ${stageClassName}` : ''}`}>
       {loading && <div className="immersion-banner">{t('immersion.loading')}</div>}
@@ -998,21 +1041,27 @@ export function ImmersionStage({ state, stageClassName }: { state: ImmersionStat
       {!currentUrl && !loading && (
         <div className="immersion-empty">
           <p className="muted">{t('immersion.openPageToBegin')}</p>
+          {/*
+            Five destinations in four languages, all in one flat row, was the other half of
+            category 5 Q4's 23. The split is derived from the starter data — a destination in
+            the language this app is about stays in the open, the rest are one click away —
+            so it is not a hand-picked "show these two", and adding a Japanese starter
+            surfaces it without anyone editing this component.
+
+            The tucked three are not lost: `ImmersionView`'s Sites menu lists all five, and
+            the disclosure's reverse transition is the same click that opened it.
+          */}
           <div className="immersion-starters">
-            {IMMERSION_STARTERS.map((s) => (
-              <button
-                key={s.url}
-                type="button"
-                className="btn small"
-                onClick={() => {
-                  state.setMode('reader');
-                  state.navigate(s.url, { mode: 'reader' });
-                }}
-              >
-                {s.label}
-              </button>
-            ))}
+            {IMMERSION_STARTERS.filter((s) => s.lang === IMMERSION_SUBJECT_LANG).map(starterButton)}
           </div>
+          {IMMERSION_STARTERS.some((s) => s.lang !== IMMERSION_SUBJECT_LANG) && (
+            <details className="immersion-starters-more">
+              <summary className="immersion-starters-summary">{t('immersion.moreDestinations')}</summary>
+              <div className="immersion-starters">
+                {IMMERSION_STARTERS.filter((s) => s.lang !== IMMERSION_SUBJECT_LANG).map(starterButton)}
+              </div>
+            </details>
+          )}
           <p className="muted immersion-hint">{t('immersion.hint')}</p>
         </div>
       )}

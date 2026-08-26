@@ -367,24 +367,27 @@ export default function ImmersionView() {
       {showChrome && (
         <ImmersionToolbar
           state={state}
-          trailing={(
+          overflow={(
             /*
              * Was `.visual-novel-open`, floated over the canvas at `right: 12px;
              * top: 46px; z-index: 4`. See `ImmersionToolbar`'s own comment for the
-             * two measured collisions that moved it in here — the docked one left
-             * the Sites rail's close control dead in the surface's default state.
-             * An icon button and not the old 136 px text one: the toolbar is a
-             * single non-wrapping flex row, and a text label of that width is what
-             * pushes it into overflow at the 380 px Blanc allows.
+             * two measured collisions that moved it into the toolbar row — the
+             * docked one left the Sites rail's close control dead in the surface's
+             * default state. It is still in that row, now inside the row's overflow
+             * disclosure: a second destination launcher is not transport, and the
+             * width argument that made it an icon button is what the disclosure
+             * solves properly. The label comes back with it, since a vertical list
+             * gives a glyph no position to carry meaning with.
              */
             <button
               type="button"
-              className="btn small icon-btn visual-novel-open"
+              className="btn small visual-novel-open"
               title={t('immersion.visualNovelLibrary')}
               aria-label={t('immersion.visualNovelLibrary')}
               onClick={() => setVisualNovelsOpen(true)}
             >
               <Icon name="novels" size={14} />
+              <span>{t('immersion.visualNovelLibrary')}</span>
             </button>
           )}
         />

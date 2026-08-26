@@ -109,6 +109,15 @@ export const IMMERSION_STARTERS: ReadonlyArray<{ label: string; url: string; lan
   { label: 'Russian Wikipedia', url: 'https://ru.wikipedia.org/wiki/Заглавная_страница', lang: 'ru' },
 ];
 
+/**
+ * The language this app is about. `IMMERSION_STARTERS` carries five destinations in four
+ * languages because Immersion reads any of them, but only two of them are what someone
+ * opens a Japanese study app to read. The empty state surfaces the subject-language
+ * destinations and tucks the rest behind one disclosure, so the split is derived from the
+ * starter data rather than from a hand-picked "show these two" list.
+ */
+export const IMMERSION_SUBJECT_LANG: ImmersionLang = 'ja';
+
 export const IMMERSION_MAX_TABS = 5;
 
 export function immersionDayKey(d = new Date()): string {

@@ -17161,6 +17161,72 @@ html[data-taskbar-size='large'] .os-tray-btn {
   min-width: 160px;
   display: flex;
 }
+
+/* The toolbar's overflow disclosure. The body FLOATS rather than joining the row: the
+   toolbar is a wrapping flex row and an in-flow body would push the row to two lines and
+   move the stage down every time the menu opened. `position: relative` on the details, so
+   the popover is anchored to the summary and not to the window.
+
+   No `overflow: hidden` anywhere in this chain, deliberately — `.lq-hit-scope`'s 32px
+   `::after` on each button is larger than the button's own box, and a clipping ancestor
+   cuts it back while still computing as landed. That is the recorded failure mode. */
+.immersion-overflow {
+  position: relative;
+}
+.immersion-overflow-summary {
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  /* Category 1's 32px pointer floor: `.lq-hit-scope` covers button/a/[role=button]/
+     [role=tab] and a `<summary>` is none of those, so the floor goes on the box. */
+  min-height: var(--lq-hit-target);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.immersion-overflow-summary::-webkit-details-marker {
+  display: none;
+}
+.immersion-overflow-summary::after {
+  content: '';
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid currentColor;
+  /* Token pair, not literals: `--lq-motion-move` collapses to 0.001ms under
+     `prefers-reduced-motion` and under `:root.reduce-motion`. */
+  transition: transform var(--lq-motion-move, 140ms) var(--lq-ease-move, ease);
+}
+.immersion-overflow[open] > .immersion-overflow-summary::after {
+  transform: rotate(180deg);
+}
+.immersion-overflow-body {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  min-width: 210px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  /* An opaque anchor, not glass: this is a list of discrete actions over a live page or a
+     webview, and §2.3 keeps dense work on stable fill. */
+  background: var(--panel-2);
+  box-shadow: 0 10px 28px rgb(0 0 0 / 32%);
+}
+.immersion-overflow-body > button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-start;
+  text-align: left;
+  white-space: nowrap;
+}
 .immersion-url {
   width: 100%;
   /* An input is a replaced element: `::after` generates no box on it, so the `.lq-hit-scope`
@@ -17444,6 +17510,45 @@ html[data-taskbar-size='large'] .os-tray-btn {
   gap: 8px;
   justify-content: center;
   max-width: 420px;
+}
+/* The empty state's second destination group. A plain `<details>`, like Library's, because
+   that is already the repo's disclosure idiom: no state, no focus trap, no escape handler,
+   and the reverse transition is the same click that opened it. */
+.immersion-starters-more {
+  max-width: 420px;
+}
+.immersion-starters-summary {
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  font-size: 12px;
+  color: var(--muted);
+  /* Category 1's 32px pointer floor. `.lq-hit-scope` cannot reach a `<summary>` — its
+     selector list is button/a/[role=button]/[role=tab] — so the floor goes on the box. */
+  min-height: var(--lq-hit-target);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.immersion-starters-summary::-webkit-details-marker {
+  display: none;
+}
+.immersion-starters-summary::after {
+  content: '';
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid currentColor;
+  /* Token pair, not literals: `--lq-motion-move` collapses to 0.001ms under
+     `prefers-reduced-motion` and under `:root.reduce-motion`. */
+  transition: transform var(--lq-motion-move, 140ms) var(--lq-ease-move, ease);
+}
+.immersion-starters-more[open] .immersion-starters-summary::after {
+  transform: rotate(180deg);
+}
+.immersion-starters-more .immersion-starters {
+  margin-top: 10px;
 }
 .immersion-hint {
   font-size: 12px;

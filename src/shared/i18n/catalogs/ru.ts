@@ -5813,6 +5813,8 @@ export const ru: Catalog = {
   'immersion.lensCapture': 'Прочитать эту страницу через линзу',
   'immersion.lensNeedsPage': 'Сначала откройте веб-страницу — линза записывает только адресуемую страницу.',
   'immersion.openInSystemBrowser': 'Открыть в системном браузере',
+  'immersion.moreActions': 'Ещё',
+  'immersion.moreDestinations': 'Другие сайты',
   'immersion.hideLibrary': 'Скрыть библиотеку',
   'immersion.showLibrary': 'Показать библиотеку',
   'immersion.visualNovelLibrary': 'Библиотека визуальных новелл',
