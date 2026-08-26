@@ -726,6 +726,17 @@ on a live `ja.wikipedia.org` page with **80,394 characters** extracted by Reader
 **7/7 / 7/7**, round trip with `.immersion-url` dirtied, **0 diffs**, five mutations. Board
 **32 of 48**; category 6 owes captures (a free RUN), manga, novels and VN, and category 7 owes all six.
 
+**L6 Gate, category 6 — 3 of 6 surfaces, 2026-08-26** (checkpoint containing this entry).
+Captures **PASS 10/10**: parity **6/6 standard, 6/6 liquid**, `rowsAgree` true, 0 rows in one
+presentation only, round trip `fieldsHeld`/`shellHeld` with **0 diffs** carrying a real
+**240 of 1,806 px** scroll, three mutations each falling exactly their own row and each
+returning to 6/6. The RUN was free as predicted; the **spec** was not — its declaration-order
+drive ended on `toggleList`, which INVERTS, so the list that is this section's navigation was
+left collapsed and `captureList`/`selection` scored false against **42 live captures**
+(first run: 4/6 both sides, VOID). Fixed by an explicit drive that toggles twice — exercising
+the reversibility AND idempotent, which the driver needs since it re-runs the drive per
+mutation. Board **33 of 48**; category 6 owes manga, novels and VN, category 7 owes all six.
+
 **L6, product — the one-way door in Immersion, 2026-08-26** (`4cda1649`). Not a cell: scoring the
 surface above surfaced a reversibility gap category 6 cannot see, because every row it has assumes
 a page is loaded. Back, Forward, Reload, the three view modes and eight page actions ALL require a

@@ -79,14 +79,17 @@
   // Library helpers. Kept beside the other shared helpers rather than inside the spec so
   // the spec stays what it is meant to be — data, not a runner.
   const keyOf = (el) => `${(el.className || el.tagName).toString().split(' ')[0]}`;
-  const libState = () => {
-    window.__LQP_LIB_ORIG = window.__LQP_LIB_ORIG || {};
-    return window.__LQP_LIB_ORIG;
+  // One factory rather than one function per spec. These were two identical four-line
+  // copies and captures would have made a third; the global name stays per-spec so an
+  // interrupted run is still inspectable from the console under a name that says whose
+  // it is, and so one spec's undo can never consume another's recorded original.
+  const specState = (global) => () => {
+    window[global] = window[global] || {};
+    return window[global];
   };
-  const immState = () => {
-    window.__LQP_IMM_ORIG = window.__LQP_IMM_ORIG || {};
-    return window.__LQP_IMM_ORIG;
-  };
+  const libState = specState('__LQP_LIB_ORIG');
+  const immState = specState('__LQP_IMM_ORIG');
+  const capState = specState('__LQP_CAP_ORIG');
   // The rail's filter chips only: `+ New folder` is an action and the rename box is a
   // transient editor, and both carry the same class as a real chip.
   const folderChips = (w) => qa(w, '.lib-folders .lib-folder-chip').filter(
@@ -774,6 +777,42 @@
           if (!tg) return { refused: 'no list toggle' };
           tg.click();
           return { pressedWas: tg.getAttribute('aria-pressed') };
+        },
+        // The round trip's ONLY user-entered state. Captures is the second L6 surface with
+        // no editable text field, so `dirtyField` returns null and without this the trip
+        // compares chrome to chrome and holds no matter what the presentation toggle did —
+        // vacuous, not clean. `snapshot()` records scroll offsets for exactly this reason.
+        scroll: (w, px) => {
+          const el = scroller(w);
+          if (!el) return { refused: 'nothing scrollable — the captures fit their pane' };
+          const g = capState();
+          if (g.scrollKey == null) { g.scrollKey = keyOf(el); g.scrollTop = el.scrollTop; }
+          el.scrollTop = Number(px) || 240;
+          return { scroller: keyOf(el), top: el.scrollTop, range: el.scrollHeight - el.clientHeight };
+        },
+      },
+      // EXPLICIT, because the declaration-order fallback ends on `toggleList` and that step
+      // INVERTS rather than sets. Measured 2026-08-26: the fallback drive left the list
+      // collapsed, so `captureList` read `rows=0` and `selection` read `selected=""` — two rows
+      // scored false on a surface that had 42 captures and was working perfectly. The list is
+      // this section's navigation, so collapsing it un-mounts the rows the other rows are about.
+      //
+      // Toggling TWICE is the point, not a workaround: it exercises the reversibility the row
+      // claims (closed and back) AND is idempotent, which the driver requires because it re-runs
+      // the whole sequence once per mutation. `select` goes LAST so the selection is established
+      // after the collapse, never destroyed by it.
+      drive: ['openSection', 'toggleList', 'toggleList', ['select', '1'], ['scroll', '240']],
+      undo: {
+        captures: (w) => {
+          const g = window.__LQP_CAP_ORIG;
+          if (!g) return null;
+          const done = [];
+          if (g.scrollKey != null) {
+            const el = qa(w, '*').find((e) => keyOf(e) === g.scrollKey);
+            if (el && el.scrollTop !== g.scrollTop) { el.scrollTop = g.scrollTop; done.push('scroll'); }
+          }
+          window.__LQP_CAP_ORIG = null;
+          return done.length ? `captures:${done.join('+')}` : null;
         },
       },
       mutations: {

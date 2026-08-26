@@ -1,0 +1,108 @@
+{
+  "label": "l6-captures",
+  "app": "captures",
+  "win": "(focused)",
+  "raised": "already-on-top",
+  "matchedBy": "title",
+  "host": "fwin",
+  "presentationAsFound": "standard",
+  "box": "820x580",
+  "driven": [
+    {
+      "step": "openSection",
+      "result": "{\"clicked\":\"Captures\"}"
+    },
+    {
+      "step": "toggleList",
+      "result": "{\"pressedWas\":\"true\"}"
+    },
+    {
+      "step": "toggleList",
+      "result": "{\"pressedWas\":\"false\"}"
+    },
+    {
+      "step": "select",
+      "result": "{\"picked\":\"clipboard\"}"
+    },
+    {
+      "step": "scroll",
+      "result": "{\"scroller\":\"lq-anchor\",\"top\":240,\"range\":1806}"
+    }
+  ],
+  "drivenRefusals": 0,
+  "parity": {
+    "standard": "6/6",
+    "liquid": "6/6",
+    "na": 0,
+    "equal": true,
+    "rowsAgree": true,
+    "failing": [],
+    "onlyInOne": []
+  },
+  "roundTrip": {
+    "trip": "standard -> liquid -> standard",
+    "dirtiedField": null,
+    "dirtyNote": "surface has no editable text field",
+    "fieldsHeld": true,
+    "shellHeld": true,
+    "diffs": [],
+    "otherPresentationBox": "820x580"
+  },
+  "control": {
+    "mutations": [
+      {
+        "mutation": "captureList",
+        "declaredCascade": [],
+        "preBaseline": "6/6",
+        "applied": "element detached",
+        "reachable": "5/6",
+        "fellRows": [
+          "captureList"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"captures:scroll\"]",
+        "afterRestore": "6/6",
+        "returned": true
+      },
+      {
+        "mutation": "listReversibility",
+        "declaredCascade": [],
+        "preBaseline": "6/6",
+        "applied": "aria-pressed stripped",
+        "reachable": "5/6",
+        "fellRows": [
+          "listReversibility"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"aria-pressed\",\"captures:scroll\"]",
+        "afterRestore": "6/6",
+        "returned": true
+      },
+      {
+        "mutation": "windowLifecycle",
+        "declaredCascade": [],
+        "preBaseline": "6/6",
+        "applied": "aria-pressed stripped",
+        "reachable": "5/6",
+        "fellRows": [
+          "windowLifecycle"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"aria-pressed\",\"captures:scroll\"]",
+        "afterRestore": "6/6",
+        "returned": true
+      }
+    ],
+    "verdict": "CONTROL FAILED AS REQUIRED - category 6 instrument is proven"
+  },
+  "bars": {
+    "allRowsReachable": true,
+    "parityEqual": true,
+    "roundTripHeld": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": []
+}

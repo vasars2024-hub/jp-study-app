@@ -1147,3 +1147,46 @@ this run created removed through the rail's own control; `wiki: []`).
 
 Tests: `immersionClosePage.test.tsx` (4 cases), plus `immersionCanvas` / `immersionRailWindowing` /
 `liquidSurfaces` / `liquidControls` — **66 passed**.
+
+## 2026-08-26 (later 4) · primary — Captures category 6, and a drive step that inverted
+
+**Captures, category 6: PASS 10/10** (`baselines/cat6-l6-captures.json`). Parity **6/6 standard,
+6/6 liquid**, `rowsAgree` true, **0 rows reachable in only one presentation**. Round trip
+standard → liquid → standard: `fieldsHeld` true, `shellHeld` true, **0 diffs**, 820x580 both.
+Control fires on all three declared mutations — `captureList`, `listReversibility`,
+`windowLifecycle` each fell **exactly its own row** (6/6 → 5/6), `unexpected []`, each back at
+6/6. Board **33 of 48**. Third consecutive cell that is a RUN plus a spec edit; the driver
+(`cat6-feature-parity.cjs`) was not touched.
+
+**The defect this run found is in the SPEC, and it is a new shape.** `captures` declared no
+`drive:`, so it fell back to `Object.keys(steps)` — which ended on `toggleList`. That step
+**inverts** rather than sets, so the drive left the list collapsed, the list is this section's
+navigation, and `.reading-captures-row` therefore matched **nothing**: `captureList` read
+`rows=0 withSource=0` and `selection` read `selected=""`, on a surface holding **42 captures**
+and working perfectly. First run: parity 4/6 both sides, `verdict VOID`.
+
+Fixed with an explicit `drive: ['openSection','toggleList','toggleList',['select','1'],['scroll','240']]`.
+Toggling **twice** is the point rather than a workaround — it exercises the reversibility the
+row claims (closed, and back) and is **idempotent**, which the driver requires because it
+re-runs the whole sequence once per mutation. `select` goes after the collapse so the selection
+is established rather than destroyed by it.
+
+**Not a product defect, and that was checked rather than assumed.** Collapsing and reopening the
+list restores **42 rows** with `aria-current` still on `clipboard` and the reader heading still
+`clipboard` — the two agree, so the collapse loses no place.
+
+**The round trip was vacuous until the scroll step landed.** Captures is the second L6 surface
+with **zero editable text fields**, so `dirtyField` returns `null` ("surface has no editable text
+field") and A-vs-C compared chrome to chrome. `.lq-anchor` carries a **1,806 px** range; the
+drive now scrolls to **240** and `snapshot().scroll` records `["lq-anchor:240,0"]`, which
+`stripVolatile` does **not** strip, so the offset is genuinely part of `shellHeld`.
+
+**Two traps for the next spec.**
+1. **The snapshot field is `scroll`, singular.** Reading `snapshot().scrolls` returns `undefined`,
+   which looks exactly like "this surface records no scroll" and nearly banked a vacuous trip as a
+   verified one. It cost one probe round trip here; it would cost a false 10/10 elsewhere.
+2. **`window.__LQP.step()` returns an OBJECT, not a JSON string** — `JSON.parse` on it throws
+   `"[object Object]" is not valid JSON`. Only the bridge's own `call()` wrapper stringifies.
+
+Live state to restore at end of turn: Reading Finder was **minimized** and on the **Reading
+Finder** tab as found; the run leaves it open on **Captures**.
