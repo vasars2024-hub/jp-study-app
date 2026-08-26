@@ -178,6 +178,29 @@ describe('grid track floors fit the narrowest window the product allows', () => 
   });
 
   /**
+   * `.view-head`, 2026-08-25, and this one is thirteen views wide rather than one.
+   *
+   * Measured on Library at the 380px Blanc allows: the header is a nowrap flex row holding
+   * `p.muted` (114px) and `.actions` (642px), `.actions` was `flex-shrink: 0`, so the row
+   * floored at 726px min-content inside a 368px body and `.fwin-body`'s `overflow-x: hidden`
+   * ate 358px of it — `clipped` 8, three of them buttons, `hiddenOverflowX` 1 at `726>368`.
+   * After: 0 / 0, `bodySW` 368, and the largest dead region fell 22.4% -> 9.4% of the window.
+   *
+   * Both halves are load-bearing and the intermediate state proves it: with the header
+   * wrapping but `.actions` still `flex-shrink: 0`, `.actions` moved onto its own line and
+   * stayed 642px wide — `clipped` 8 -> 5 and `hiddenOverflowX` still 1 at `660>368`. A wrap
+   * container only wraps when its own box is constrained.
+   */
+  it('the thirteen-view header and its action row both wrap at a 380px host', () => {
+    const styles = strip(read('src/renderer/styles.css'));
+    expect(styles).toMatch(/\.view-head\s*\{[^}]*flex-wrap:\s*wrap/);
+    expect(styles).toMatch(/\.view-head\s*\{[^}]*min-width:\s*0/);
+    expect(styles).toMatch(/^\.actions\s*\{[^}]*flex-wrap:\s*wrap/m);
+    // The removal is the half that made the numbers move, so it is asserted as an absence.
+    expect(/^\.actions\s*\{[^}]*flex-shrink:\s*0/m.test(styles)).toBe(false);
+  });
+
+  /**
    * Why this category's sweep is LIVE and not source-only, stated once so the next worker
    * does not spend a turn rediscovering it.
    *

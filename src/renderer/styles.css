@@ -3846,17 +3846,36 @@ h1 {
 
 /* ---------- Library ---------- */
 
+/* `.view-head` is the header of thirteen views, not only Library's, so the wrap below is
+   thirteen surfaces wide. Measured 2026-08-25 on Library at the 380px Blanc allows
+   (`BLANC_MIN_W`): the header is a nowrap flex row holding `p.muted` (114px) and
+   `.actions` (642px), `.actions` is `flex-shrink: 0`, so the row floors at 726px min-content
+   in a 368px body and `.fwin-body`'s `overflow-x: hidden` eats the remaining 358px with no
+   scrollbar to reach it — 8 clipped boxes, three of them buttons. Wrapping both axes is the
+   whole fix: the header wrap moves `.actions` onto its own line, and `.actions`' own wrap is
+   what makes that line fit, because 642px does not fit in 368px either.
+
+   `flex-shrink: 0` had to GO, and keeping it was measured as half a fix: with it, `.actions`
+   is sized at its 642px max-content, so it wrapped onto its own line and stayed 642px wide —
+   `clipped` 8 -> 5, `hiddenOverflowX` still 1 at `660>368`. A wrap container only wraps when
+   its own box is constrained. Losing it costs nothing on a wide header, because wrapping is
+   tried before shrinking: `.actions` only ever narrows when it is alone on a line and still
+   does not fit, which is exactly the case this rule is for. `.mining-ai-pane .actions` had
+   already reached the same shape independently. */
 .view-head {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 16px;
   margin-bottom: 18px;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 .actions {
   display: flex;
   gap: 10px;
-  flex-shrink: 0;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .watch-bar {
