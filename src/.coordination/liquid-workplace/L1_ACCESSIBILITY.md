@@ -798,3 +798,53 @@ probe. Forced `span.fwin-title-text` to its own backdrop: failing **0 → 1**, r
 `restored 1 / stillPresent 0`, and the re-measure came back **5.13 / 0 failing**.
 
 **Video category 1 = 10/10**, in liquid presentation, on the Library page, control proven.
+
+## 2026-08-25 (later 21) · primary — category 1 gets its ONE harness, and the leg it was scoring was the wrong mechanism
+
+`e41a85ce` (harness + `/emulate`), `16e8ed1c` (Immersion fix + guard). RULE 1: four one-off
+probes consolidated into `probes/cat1-accessibility.cjs`, surface as an argument in the same
+`@selector`-or-title form the category-4 harness uses. Every surface after this costs a RUN.
+
+**The motion leg would have passed every surface.** `prefers-reduced-motion` has no page-side
+setter, so `l1-reduced-motion.js` toggled the app's own `.reduce-motion` class instead — which
+`theme/a11y.css:48-52` says in as many words is deliberately TARGETED (shell, widgets), while
+the OS query is app-wide with `!important`. First run on Captures: 8 durations unchanged, which
+reads exactly like a surface that ignores reduced motion. New `POST /emulate` route (CDP
+`Emulation.setEmulatedMedia`) makes the real query drivable; `osQueryMatches` false→true→false
+across the three samples IS the leg's control, and a run where it does not flip is VOID.
+`/health` echoes any live override, because a leaked one looks like a product change.
+
+**Three corrections, each of which had already produced a wrong number this turn:**
+1. A ROVING TABINDEX IS NOT A DEAD CONTROL — 7 false "unreachable" on `nav.reading-workspace-nav`,
+   a correct `role=tablist` with one tab stop. Declaring the role is not evidence either, so the
+   pattern is DRIVEN. Driving it also SELECTS: the motion sample then read 9 before / 45 after on
+   a panel that had remounted underneath it. Reversed with the opposite arrow, restore asserted.
+2. SCORE THE POINTER REGION, NOT THE RECT. `.fwin-b` is 30x24 with a 32x32.5 `::after` — the rect
+   number reports 5 failures on every window in the app. Delegates to `l1-hit-area.js` rather than
+   duplicating the walk; that probe gained `__lqScoreRoot` so a shell-replacing reader is scorable.
+3. RAISE FIRST. Unraised, 68 of 73 controls came back `occluded` and the surface scored on 5 —
+   an empty measurement, which the rubric caps at 0. Now a VOID.
+
+**Scores, all live, all raised, all with the control fired:**
+
+| surface | contrast min / failing | belowFloorByHit | stolen | unreachable | motion b/d/a | verdict |
+| --- | --- | --- | --- | --- | --- | --- |
+| Captures (Reading Finder) | 6.08 / **0** | **0**, smallest 32x32.5 | 0 | **0** | 9 / 0 / 9 | **10/10** |
+| Immersion (after `16e8ed1c`) | 5.78 / **0** | **34 → 0** | 0 | **0** | 29 / 0 / 29 | **10/10** |
+| Library | **3.69** / **1** | **50** | 0 | 0 | 65 / 0 / 65 | FAIL |
+| Novels | 4.85 / 0 | **5** | **1** | 0 | 13 / 0 / 13 | FAIL |
+
+Control on both passes moved all five counts (contrast 0→1, rect +2, wcag258 0→2, unreachable
+0→1, belowFloor 0→2) and every scored one returned to baseline.
+
+**Named for the next worker, so it is not re-derived.** Library: `button.card-remove` ×24 at
+26.5, `button.lib-folder-chip` ×20 at 31.5 (half a pixel short), `button.btn.small` ×6 at 26.5 —
+all one `.lq-hit-scope` each — plus a real contrast defect, `span.manga-ocr-badge "Translated"`
+11px at **3.69:1**. Novels: `div.jiten-source-buttons` ×4 at 27.5, `input` in
+`div.jiten-search-wrap` at 19.5 (replaced element → `min-height`, not a scope), and one STOLEN
+region shrinking 28.8px under a neighbour, which a scope would make worse rather than better.
+
+**Trap.** `backToBaseline` must not assert the RECT under-32 count. It is not a scored bar and it
+moves on its own — Immersion read 40 then 39 with nothing injected, because a VirtualList mounts
+and unmounts rows between passes. Voiding a correct 10/10 on that is the opposite failure to the
+one the control exists to catch. Asserted on the scored counts; the drift is printed.

@@ -694,6 +694,18 @@ it fires immediately (`[652]`, believed 652, real 652). Check `data-content-widt
 box before believing any bridge-driven placement.
 Both L6 bullets are now closed; what L6 still owes is its Gate, scored.
 
+**L6 Gate, category 1 — 2 of its 6 surfaces, 2026-08-25 (later 21)** (`e41a85ce`, `16e8ed1c`).
+Captures **10/10** and Immersion **10/10**, both live, raised, control fired. Immersion earned it
+with a product fix, not a re-read: **34 controls under the 32px pointer floor → 0**, via a new
+`.lq-hit-scope` container variant of the existing `.lq-hit` expander (they share the one `::after`,
+and the guard asserts that). No box grew — the pointer gets 32px, the rects are unchanged.
+**Library FAILS** (50 below floor in three families, plus a real contrast defect at **3.69:1**,
+`span.manga-ocr-badge`) and **Novels FAILS** (5 below floor plus one STOLEN region, −28.8px).
+manga and VN are unscored — they replace the desktop shell, so they need the harness's `@selector`
+form, which `l1-hit-area.js` gained this turn and which has not yet been run on them.
+The harness is `probes/cat1-accessibility.cjs`; every remaining surface is a RUN, not a build.
+Log: `.coordination/liquid-workplace/L1_ACCESSIBILITY.md`.
+
 **Bullet 1 CLOSED 2026-08-25** (`b2c6e7f5`). All six surfaces are on the contract — Captures,
 Novels, Library, Immersion, manga, VN — and the fifth named item resolved to ONE surface, not
 four: `renderer/pdfLoader.ts` is imported by `views/NovelReader.tsx` alone, so PDF and EPUB ARE
