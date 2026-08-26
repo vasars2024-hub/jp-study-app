@@ -178,6 +178,35 @@ const PROBE = `(function(){
   function name(e){
     return e.tagName.toLowerCase() + '.' + String(e.className || '').split(' ')[0];
   }
+  // Correction 13: a mute pair reported as \`button.\` with an empty label is a finding NOBODY
+  // CAN ACT ON. An icon-only button has no class and no text, so two separate surfaces both
+  // reported the identical unidentifiable row and the only way to find the actual control was a
+  // bespoke second probe per surface - exactly the per-surface cost RULE 1 exists to remove.
+  // Identity here is everything that survives having no text: the ancestor chain that carries
+  // the classes, the icon's own shape, the DOM index, and the box.
+  function identify(e){
+    var chain = [];
+    for (var a = e.parentElement, n = 0; a && a !== root && n < 3; a = a.parentElement, n++) {
+      var c = String(a.className || '').split(' ').filter(Boolean)[0];
+      if (c) chain.push(a.tagName.toLowerCase() + '.' + c);
+    }
+    var svg = e.querySelector && e.querySelector('svg');
+    var r = e.getBoundingClientRect();
+    var sibs = e.parentElement ? [].slice.call(e.parentElement.children).indexOf(e) : -1;
+    return {
+      el: name(e),
+      label: (e.textContent || '').trim().slice(0, 40),
+      ariaLabel: e.getAttribute('aria-label') || null,
+      title: e.getAttribute('title') || null,
+      // The icon is often the ONLY thing that distinguishes two identical-looking buttons.
+      icon: svg ? (String(svg.getAttribute('class') || '') || (svg.querySelector('path')
+        ? 'path:' + String(svg.querySelector('path').getAttribute('d') || '').slice(0, 24)
+        : 'svg')) : null,
+      ancestors: chain,
+      childIndex: sibs,
+      box: Math.round(r.left) + ',' + Math.round(r.top) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height),
+    };
+  }
 
   // Correction 2: two dots minimum. One dot matches filenames and version strings.
   var KEY = /^[a-z][a-zA-Z0-9]*(?:\\.[a-zA-Z0-9]+){2,}$/;
@@ -259,7 +288,9 @@ const PROBE = `(function(){
     var explanation = [el.getAttribute('title') || '', describedText,
       explanatoryText(el)].join(' ').trim();
     if (weigh(explanation) < 12) {
-      mutePairs.push({ el: name(el), label: ownText.slice(0, 40) });
+      var row = identify(el);
+      row.ownText = ownText.slice(0, 40);
+      mutePairs.push(row);
     }
   }
 

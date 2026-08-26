@@ -8466,6 +8466,8 @@ export const ru: Catalog = {
   'mediaCenter.shell.studyTools': 'Учебные инструменты',
   'mediaCenter.shell.back': 'Назад',
   'mediaCenter.shell.forward': 'Вперёд',
+  'mediaCenter.shell.reason.noBack': 'Это первый открытый раздел — назад пока некуда возвращаться.',
+  'mediaCenter.shell.reason.noForward': 'Вы на самом новом разделе — вперёд идти некуда.',
   'mediaCenter.shell.libraryStatus': 'Состояние медиатеки',
   'mediaCenter.shell.localItems': 'Локальные материалы',
   'mediaCenter.shell.watchActive': 'Наблюдаемая папка активна',

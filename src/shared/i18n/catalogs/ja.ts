@@ -7734,6 +7734,8 @@ export const ja: Catalog = {
   'mediaCenter.shell.studyTools': '学習ツール',
   'mediaCenter.shell.back': '戻る',
   'mediaCenter.shell.forward': '進む',
+  'mediaCenter.shell.reason.noBack': 'これが最初に開いたセクションです。まだ戻れる場所はありません。',
+  'mediaCenter.shell.reason.noForward': 'いちばん新しいセクションを開いています。進める場所はありません。',
   'mediaCenter.shell.libraryStatus': 'ライブラリ状態',
   'mediaCenter.shell.localItems': 'ローカル項目',
   'mediaCenter.shell.watchActive': '監視フォルダー有効',

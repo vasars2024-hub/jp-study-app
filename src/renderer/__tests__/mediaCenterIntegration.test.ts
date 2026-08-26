@@ -142,6 +142,41 @@ describe('Media Center integration contract', () => {
     expect(source).toContain('SUBTITLE_PROVIDER_KEY_URLS[id]');
   });
 
+  it('tells the user why the history arrows are grey, without losing their names', () => {
+    // Both arrows are icon-only and disabled the moment the shell mounts, and
+    // `title="Back"` is a NAME, not a reason — the category-8 sweep scored them as
+    // two mute pairs on a surface that was otherwise clean, and was right to.
+    //
+    // Both halves are pinned, because either one alone passes a real regression.
+    // A check on the title only would accept the reason being hardcoded, so the
+    // enabled button would advertise "there is nothing behind it yet" while
+    // working; the conditional is what rules that out. A check on the conditional
+    // only would accept `aria-label` being dropped — and unlike the surrounding
+    // labelled buttons, these have no text, so `aria-label` is the entire
+    // accessible name and its loss would be silent to every other guard here.
+    const source = read('renderer/views/MediaCenterView.tsx');
+    expect(source).toContain("noBack ? t('mediaCenter.shell.reason.noBack') : t('mediaCenter.shell.back')");
+    expect(source).toContain("noForward ? t('mediaCenter.shell.reason.noForward') : t('mediaCenter.shell.forward')");
+    expect(source).toContain("aria-label={t('mediaCenter.shell.back')}");
+    expect(source).toContain("aria-label={t('mediaCenter.shell.forward')}");
+    // The flags feed BOTH the tooltip and `disabled`, so the stated reason and the
+    // reason the control is dead are one expression and cannot drift apart.
+    expect(source).toContain('const noBack = history.at === 0;');
+    expect(source).toContain('const noForward = history.at >= history.trail.length - 1;');
+    expect(source).toContain('disabled={noBack}');
+    expect(source).toContain('disabled={noForward}');
+
+    // A reason that renders as its own key explains nothing, and `translate()`
+    // returns the bare key on a miss — which no key-count check can see, since a
+    // key absent from every catalogue is equally absent from all of them.
+    for (const catalog of [en, ja, ru, zh]) {
+      for (const key of ['mediaCenter.shell.reason.noBack', 'mediaCenter.shell.reason.noForward'] as const) {
+        expect(catalog[key]).toBeTruthy();
+        expect(catalog[key]).not.toBe(key);
+      }
+    }
+  });
+
   it('scopes its compact rules to its own width, not the viewport', () => {
     // The Media Center renders inside a floating window on a fake desktop, so
     // `@media (max-width: …)` measured something the panels have no relationship

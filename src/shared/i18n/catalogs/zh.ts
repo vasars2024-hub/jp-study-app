@@ -7699,6 +7699,8 @@ export const zh: Catalog = {
   'mediaCenter.shell.studyTools': '学习工具',
   'mediaCenter.shell.back': '后退',
   'mediaCenter.shell.forward': '前进',
+  'mediaCenter.shell.reason.noBack': '这是你打开的第一个板块，后面还没有可以返回的内容。',
+  'mediaCenter.shell.reason.noForward': '你正处于最新的板块，前面没有可以前进的内容。',
   'mediaCenter.shell.libraryStatus': '媒体库状态',
   'mediaCenter.shell.localItems': '本地条目',
   'mediaCenter.shell.watchActive': '监视文件夹已启用',

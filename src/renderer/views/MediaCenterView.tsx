@@ -1477,6 +1477,10 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
     () => ({ trail: [initialTab], at: 0 }),
   );
   const tab = history.trail[history.at];
+  // Named here rather than inline in the arrows' `disabled=`, so the reason shown in the
+  // tooltip and the reason the button is dead are the same expression and cannot drift apart.
+  const noBack = history.at === 0;
+  const noForward = history.at >= history.trail.length - 1;
   const discovery = useDiscovery(tab === 'discover');
   // Deferred exactly like `useDiscovery` above: the orchestrator read reaches the known-words
   // store and the frequency lists, so a shell that merely offers the destination pays nothing.
@@ -1813,21 +1817,27 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
 
         <div className="mc-workspace">
           <header className="mc-topbar">
+            {/* Both are icon-only and disabled on a fresh trail, so `title="Back"` named the
+                button and never explained the grey. The title carries the REASON while
+                disabled and the label while enabled; unlike Immersion's pair these already
+                had `aria-label`, so the accessible name never rode on `title` here and does
+                not move. The trail walks Media Center SECTIONS, not web pages — the wording
+                follows the thing being navigated. */}
             <div className="mc-history-buttons">
               <button
                 type="button"
-                title={t('mediaCenter.shell.back')}
+                title={noBack ? t('mediaCenter.shell.reason.noBack') : t('mediaCenter.shell.back')}
                 aria-label={t('mediaCenter.shell.back')}
-                disabled={history.at === 0}
+                disabled={noBack}
                 onClick={() => step(-1)}
               >
                 <Icon name="chevron" size={12} style={{ transform: 'rotate(180deg)' }} />
               </button>
               <button
                 type="button"
-                title={t('mediaCenter.shell.forward')}
+                title={noForward ? t('mediaCenter.shell.reason.noForward') : t('mediaCenter.shell.forward')}
                 aria-label={t('mediaCenter.shell.forward')}
-                disabled={history.at >= history.trail.length - 1}
+                disabled={noForward}
                 onClick={() => step(1)}
               >
                 <Icon name="chevron" size={12} />

@@ -8120,6 +8120,8 @@ export const en: Catalog = {
   'mediaCenter.shell.studyTools': 'Study tools',
   'mediaCenter.shell.back': 'Back',
   'mediaCenter.shell.forward': 'Forward',
+  'mediaCenter.shell.reason.noBack': 'This is the first section you opened — there is nothing behind it yet.',
+  'mediaCenter.shell.reason.noForward': 'You are on the newest section — there is nothing ahead to go forward to.',
   'mediaCenter.shell.libraryStatus': 'Library status',
   'mediaCenter.shell.localItems': 'Local items',
   'mediaCenter.shell.watchActive': 'Watch folder active',
