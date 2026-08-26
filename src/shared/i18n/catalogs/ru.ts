@@ -4104,6 +4104,8 @@ export const ru: Catalog = {
   'grammar.explorer.reason.willSkip':
     'Без примеров и потому будут пропущены: {count}.',
   'grammar.explorer.reason.noPresetName': 'Сначала введите название фильтра.',
+  'grammar.explorer.reason.noBack': 'Пока некуда возвращаться.',
+  'grammar.explorer.reason.noForward': 'Вы уже на самом новом пункте.',
   'grammar.explorer.status.favorited': 'Добавлено в избранное: {count}.',
   'grammar.explorer.status.queued': 'Добавлено в очередь изучения: {count}.',
   'grammar.explorer.status.added': 'Добавлено в карточки: {count}.',

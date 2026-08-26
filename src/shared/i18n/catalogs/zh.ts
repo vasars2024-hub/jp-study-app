@@ -3762,6 +3762,8 @@ export const zh: Catalog = {
   'grammar.explorer.reason.noExamples': '所选的 {count} 项都没有例句，生成的卡片会是空的。',
   'grammar.explorer.reason.willSkip': '所选的 {count} 项没有例句，将被跳过。',
   'grammar.explorer.reason.noPresetName': '请先为筛选命名。',
+  'grammar.explorer.reason.noBack': '还没有可返回的项目。',
+  'grammar.explorer.reason.noForward': '已经是最新的项目了。',
   'grammar.explorer.status.favorited': '已收藏 {count} 项。',
   'grammar.explorer.status.queued': '已将 {count} 项加入学习队列。',
   'grammar.explorer.status.added': '已将 {count} 项加入抽认卡。',

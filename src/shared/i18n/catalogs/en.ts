@@ -4005,6 +4005,8 @@ export const en: Catalog = {
   'grammar.explorer.reason.willSkip':
     '{count} selected points have no example sentence and will be skipped.',
   'grammar.explorer.reason.noPresetName': 'Give the filter a name first.',
+  'grammar.explorer.reason.noBack': 'No earlier point to go back to yet.',
+  'grammar.explorer.reason.noForward': 'You are already at the newest point.',
   'grammar.explorer.status.favorited': 'Added {count} to favourites.',
   'grammar.explorer.status.queued': 'Added {count} to the study queue.',
   'grammar.explorer.status.added': 'Added {count} to flashcards.',

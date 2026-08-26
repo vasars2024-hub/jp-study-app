@@ -3777,6 +3777,8 @@ export const ja: Catalog = {
     '選択した{count}件のいずれにも例文がないため、カードが空になります。',
   'grammar.explorer.reason.willSkip': '選択した{count}件には例文がないため、スキップされます。',
   'grammar.explorer.reason.noPresetName': '先にフィルター名を入力してください。',
+  'grammar.explorer.reason.noBack': 'まだ戻れる項目がありません。',
+  'grammar.explorer.reason.noForward': 'すでに最新の項目です。',
   'grammar.explorer.status.favorited': '{count}件をお気に入りに追加しました。',
   'grammar.explorer.status.queued': '{count}件を学習キューに追加しました。',
   'grammar.explorer.status.added': '{count}件をフラッシュカードに追加しました。',

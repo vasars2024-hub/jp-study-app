@@ -222,6 +222,10 @@ export default function GrammarExplorer({ renderDetail, className = '' }: Gramma
 
   const noSelection = selectedPoints.length === 0;
   const selectionReason = noSelection ? t('grammar.explorer.reason.noSelection') : undefined;
+  // A disabled control has to say what would enable it, the way Save already does. History starts
+  // empty on every open, so Back and Forward are greyed out the moment the explorer mounts.
+  const noBack = historyIndex <= 0;
+  const noForward = historyIndex < 0 || historyIndex >= history.length - 1;
   const deckReason = noSelection
     ? selectionReason
     : deckEligible.length === 0
@@ -312,12 +316,18 @@ export default function GrammarExplorer({ renderDetail, className = '' }: Gramma
   return (
     <div className={`gram-x ${className}`}>
       <div className="gram-x-controls">
-        <Button size="sm" disabled={historyIndex <= 0} onClick={() => goHistory(-1)}>
+        <Button
+          size="sm"
+          disabled={noBack}
+          title={noBack ? t('grammar.explorer.reason.noBack') : undefined}
+          onClick={() => goHistory(-1)}
+        >
           {t('grammar.explorer.back')}
         </Button>
         <Button
           size="sm"
-          disabled={historyIndex < 0 || historyIndex >= history.length - 1}
+          disabled={noForward}
+          title={noForward ? t('grammar.explorer.reason.noForward') : undefined}
           onClick={() => goHistory(1)}
         >
           {t('grammar.explorer.forward')}
@@ -339,7 +349,12 @@ export default function GrammarExplorer({ renderDetail, className = '' }: Gramma
             {t('grammar.explorer.reset')}
           </Button>
         )}
-        <Button size="sm" onClick={() => setShowDrawer((v) => !v)} disabled={noSelection}>
+        <Button
+          size="sm"
+          onClick={() => setShowDrawer((v) => !v)}
+          disabled={noSelection}
+          title={selectionReason}
+        >
           {t('grammar.explorer.drawer', { count: selectedPoints.length })}
         </Button>
       </div>

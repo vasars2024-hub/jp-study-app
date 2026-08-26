@@ -75,6 +75,15 @@
  *     than 2 because its neighbour is the short word "Translate". The explanation now excludes text
  *     inside any interactive sibling, so prose beside a control still counts and a caption never
  *     does. Expect previously-0 surfaces to rise: that is the repair, not a regression.
+ * 12. THE >= 12-CHARACTER BAR WAS A LATIN-ALPHABET ASSUMPTION, in both the mute detector and
+ *     `textOf`. A complete Japanese sentence runs 10-12 characters and a Chinese one 9-10, so an
+ *     honest ja/zh title scored as MUTE and an honest ja/zh empty state scored as not-a-message.
+ *     Found by a test, not by a run: `grammarDisabledReasons.test.ts` applies the same bar to all
+ *     four catalogs and went red on ja `noForward` (11) and zh `noSelection` (10) for strings that
+ *     read as full sentences. The bar is now WEIGHTED - a CJK ideograph, kana or fullwidth mark
+ *     counts 2 - so 12 still means "about a dozen Latin letters" and no copy has to be padded to
+ *     satisfy an English-shaped constant. Lowering the constant instead would have let a genuinely
+ *     mute two-word English hint through.
  *  7. The FABRICATED-VALUE verdict still needs an empty scratch profile: on a populated profile
  *     real data and a hardcoded constant look identical. This harness reports status-word
  *     candidates and does NOT issue that verdict. What it DOES decide is the placeholder shapes,
@@ -176,6 +185,16 @@ const PROBE = `(function(){
   var PLACEHOLDER = /\\b(lorem ipsum|dolor sit amet|todo|tbd|fixme|placeholder text|coming soon|example\\.com|foo ?bar|xxx-xxx|sample data)\\b/i;
   var STATUS = /^(connected|ready|available|configured|active|enabled|online|ok)$/i;
 
+  // Correction 12: the length bar is WEIGHTED, because 12 Latin letters and 12 Japanese
+  // characters are not the same amount of sentence. CJK ideographs, kana and fullwidth marks
+  // count 2, so the bar keeps meaning "about a dozen Latin letters" in every language.
+  var CJK = /[\\u3000-\\u303f\\u3040-\\u30ff\\u3400-\\u4dbf\\u4e00-\\u9fff\\uf900-\\ufaff\\uff00-\\uffef]/;
+  function weigh(s){
+    var w = 0;
+    for (var c = 0; c < s.length; c++) w += CJK.test(s.charAt(c)) ? 2 : 1;
+    return w;
+  }
+
   var rawKeys = [], placeholders = [], statusCandidates = [];
   var textRuns = 0, textAcc = [];
   var tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
@@ -239,7 +258,7 @@ const PROBE = `(function(){
     var ownText = (el.textContent || '').trim();
     var explanation = [el.getAttribute('title') || '', describedText,
       explanatoryText(el)].join(' ').trim();
-    if (explanation.length < 12) {
+    if (weigh(explanation) < 12) {
       mutePairs.push({ el: name(el), label: ownText.slice(0, 40) });
     }
   }
@@ -252,7 +271,7 @@ const PROBE = `(function(){
     for (var j = 0; j < found.length; j++) {
       if (!painted(found[j])) continue;
       var v = (found[j].textContent || '').trim();
-      if (v.length >= 12 && !KEY.test(v)) out.push(v);
+      if (weigh(v) >= 12 && !KEY.test(v)) out.push(v);
     }
     return { hosts: found.length, messages: out };
   }
