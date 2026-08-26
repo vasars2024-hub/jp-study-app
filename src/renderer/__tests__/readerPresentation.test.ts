@@ -199,6 +199,30 @@ describe('the reader host is wired to the sheet', () => {
     },
   );
 
+  it('NovelReader routes both chrome strips through the shared contextual primitive', () => {
+    /**
+     * Category 3 scored `@.reader` FAIL with `eligibleTotal: 0` before this: the
+     * reader's bar and footer were plain `div`s, so the rubric's classifier saw
+     * no navigation/transport region at all and the surface could not be scored
+     * rather than scoring badly. `ContextualSurface` supplies both halves the
+     * category needs — the semantic landmark for the denominator, and
+     * `.lq-contextual` for "backed by a shared primitive, not a local copy".
+     *
+     * `as="header"` / `as="footer"` and not a bare div: the classifier's
+     * landmark list is what makes these the regions Liquid is FOR, and a
+     * `div.lq-contextual` would pass the harness while telling assistive tech
+     * nothing.
+     */
+    const source = src('src/renderer/views/NovelReader.tsx');
+    expect(source).toMatch(/<ContextualSurface as="header" className="reader-bar">/);
+    expect(source).toMatch(/<ContextualSurface as="footer" className="reader-footer">/);
+    expect(source).toMatch(/import \{ ContextualSurface \} from '\.\.\/components\/liquid\/LiquidSurface'/);
+    // The strips must not carry their own translucency: §2 non-negotiable 1 is
+    // that a conventional reader renders the conventional pixels, and
+    // `liquid-window.css` is the only sheet allowed to paint `.lq-contextual`.
+    expect(source).not.toMatch(/reader-(bar|footer)[\s\S]{0,200}backdrop-filter/);
+  });
+
   it('the toggle flips its own label and carries aria-pressed', () => {
     const toggle = src('src/renderer/components/liquid/ReaderLiquidToggle.tsx');
     expect(toggle).toMatch(/liquid \? t\('desktop\.returnToStandard'\) : t\('desktop\.makeLiquid'\)/);

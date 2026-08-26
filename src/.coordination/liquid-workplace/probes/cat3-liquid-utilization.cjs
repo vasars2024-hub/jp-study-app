@@ -155,8 +155,23 @@ async function injectOne(pathParts) {
   })()`));
 }
 
+/**
+ * Undo control A and read the node back.
+ *
+ * The read-back is SETTLED, not immediate. Measured 2026-08-26 on the reader
+ * surface: the runtime Work region there computes `transition: all`, so removing
+ * the injected inline material starts an animation and `getComputedStyle` on the
+ * next statement can return a value part-way between the injected material and
+ * the real one. That reads as "the control did not restore" on a surface that
+ * restored perfectly — `returned` (the metric tuple, re-read later) was true in
+ * the same run that `oneMaterialReturned` was false, which is the signature.
+ *
+ * Both readings are reported. A control that only settles on the second one is
+ * still a pass, but the pair is what lets the next worker tell a transition from
+ * a genuinely stuck material instead of re-deriving this.
+ */
 async function restoreOne(pathParts, before) {
-  return JSON.parse(await ev(`(function(){
+  const restored = JSON.parse(await ev(`(function(){
     var root = ${ROOT_EXPR};
     var node = root && (${RESOLVE_PATH})(root, ${JSON.stringify(pathParts)});
     if (!node) return JSON.stringify({ refuse: 'runtime Work path disappeared during control A' });
@@ -166,9 +181,20 @@ async function restoreOne(pathParts, before) {
     var cs = getComputedStyle(node);
     return JSON.stringify({
       style: node.getAttribute('style'),
-      material: cs.backdropFilter + '|' + cs.backgroundColor
+      immediateMaterial: cs.backdropFilter + '|' + cs.backgroundColor
     });
   })()`));
+  if (restored.refuse) return restored;
+  await new Promise((resolve) => { setTimeout(resolve, 450); });
+  const settled = JSON.parse(await ev(`(function(){
+    var root = ${ROOT_EXPR};
+    var node = root && (${RESOLVE_PATH})(root, ${JSON.stringify(pathParts)});
+    if (!node) return JSON.stringify({ refuse: 'runtime Work path disappeared while settling control A' });
+    var cs = getComputedStyle(node);
+    return JSON.stringify({ material: cs.backdropFilter + '|' + cs.backgroundColor });
+  })()`));
+  if (settled.refuse) return settled;
+  return { ...restored, material: settled.material };
 }
 
 async function injectAllGlass() {
@@ -279,6 +305,11 @@ const metricTuple = (row) => [
           allWorkFailed,
           returned,
           oneMaterialReturned,
+          oneMaterial: {
+            before: one.before.material,
+            immediate: oneRestored.immediateMaterial,
+            settled: oneRestored.material,
+          },
           allGlassReturned,
           verdict: movedOne && allWorkFailed && returned && oneMaterialReturned && allGlassReturned
             ? 'CONTROL FAILED AS REQUIRED - category 3 instrument is proven'

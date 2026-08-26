@@ -19,6 +19,7 @@ import {
   type ReadingCanvasTool,
 } from '../components/liquid/ReadingCanvas';
 import ReaderLiquidToggle from '../components/liquid/ReaderLiquidToggle';
+import { ContextualSurface } from '../components/liquid/LiquidSurface';
 import { useReaderPresentation } from '../readerPresentation';
 import { READING_CANVAS_FILL_POLICY } from '../../shared/liquidReadingCanvas';
 import DictionaryPopup from '../components/DictionaryPopup';
@@ -2935,7 +2936,16 @@ export default function NovelReader({ item, onClose }: Props) {
       data-presentation={presentation.dataPresentation}
     >
       <style>{injectedCss}</style>
-      <div className="reader-bar">
+      {/*
+        The reader's two chrome strips are transport, not work: the bar is
+        navigation plus contextual tools, the footer is a chapter jump and a
+        seek. §2.3 makes those the regions Liquid is FOR, so they take the
+        shared contextual primitive rather than a local translucent copy, and
+        `theme/liquid-window.css` hands them the material only under
+        `.reader.reader-liquid`. A conventional reader still renders the
+        conventional pixels — `.lq-contextual` carries no paint of its own.
+      */}
+      <ContextualSurface as="header" className="reader-bar">
         <button className="btn" onClick={onClose} title="Return to library">
           <Icon name="chevron" size={13} style={{ transform: 'rotate(180deg)', marginRight: 4, verticalAlign: '-2px' }} />
           Library
@@ -3098,7 +3108,7 @@ export default function NovelReader({ item, onClose }: Props) {
             <ReaderLiquidToggle liquid={presentation.liquid} onToggle={presentation.toggle} />
           )}
         </div>
-      </div>
+      </ContextualSurface>
 
       <div className="reader-stage" style={{ background: theme.bg }}>
         {loading && !linkView && (
@@ -3221,7 +3231,7 @@ export default function NovelReader({ item, onClose }: Props) {
         />
       </div>
 
-      <div className="reader-footer">
+      <ContextualSurface as="footer" className="reader-footer">
         <select
           className="chapter-select"
           value=""
@@ -3267,7 +3277,7 @@ export default function NovelReader({ item, onClose }: Props) {
           </span>
         )}
         <span className="reader-pct muted">{Math.round((seek ?? progress) * 100)}%</span>
-      </div>
+      </ContextualSurface>
 
       {popup &&
         (popup.kind === 'translate' ? (
