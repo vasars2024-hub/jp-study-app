@@ -14,6 +14,7 @@ export const MINING_UI_JA: Catalog = {
   'dict.view.placeholder.ja': '単語を入力（例：食べる、「eat」）…',
   'dict.view.placeholder.zh': '単語を入力（例：你好、「hello」）…',
   'dict.view.search': '検索',
+  'dict.view.reason.needsQuery': '検索する単語を入力してください。',
   'dict.view.hint.ja':
     'ヒント：本を読んでいるときは、単語を選択するとその場で辞書を引けます。検索結果の星アイコンを押すと、フラッシュカードに保存できます。',
   'dict.view.hint.zh':

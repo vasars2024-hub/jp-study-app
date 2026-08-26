@@ -14,6 +14,7 @@ export const MINING_UI_ZH: Catalog = {
   'dict.view.placeholder.ja': '输入词语，例如 食べる 或“eat”…',
   'dict.view.placeholder.zh': '输入词语，例如 你好 或“hello”…',
   'dict.view.search': '搜索',
+  'dict.view.reason.needsQuery': '请输入要搜索的词语。',
   'dict.view.hint.ja':
     '提示：读书时选中任意词语即可立即查询。点击结果上的星标，即可保存到闪卡。',
   'dict.view.hint.zh':

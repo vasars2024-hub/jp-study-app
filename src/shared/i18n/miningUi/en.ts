@@ -27,6 +27,7 @@ export const MINING_UI_EN: Catalog = {
   'dict.view.placeholder.ja': 'Type a word, e.g. 食べる or “eat”…',
   'dict.view.placeholder.zh': 'Type a word, e.g. 你好 or “hello”…',
   'dict.view.search': 'Search',
+  'dict.view.reason.needsQuery': 'Type a word to search for.',
   'dict.view.hint.ja':
     'Tip: while reading a book you can highlight any word to look it up instantly. Tap the star icon on a result to save it to Flashcards.',
   'dict.view.hint.zh':

@@ -175,7 +175,12 @@ export default function DictionaryView() {
           placeholder={isZh ? 'Type a word, e.g. 你好 or “hello”…' : 'Type a word, e.g. 食べる or “eat”…'}
           lang={lang}
         />
-        <button className="btn primary" type="submit" disabled={!input.trim()}>
+        <button
+          className="btn primary"
+          type="submit"
+          disabled={!input.trim()}
+          title={input.trim() ? undefined : t('dict.view.reason.needsQuery')}
+        >
           Search
         </button>
       </form>

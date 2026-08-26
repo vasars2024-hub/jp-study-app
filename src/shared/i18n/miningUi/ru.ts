@@ -18,6 +18,7 @@ export const MINING_UI_RU: Catalog = {
   'dict.view.placeholder.ja': 'Введите слово, например 食べる или «eat»…',
   'dict.view.placeholder.zh': 'Введите слово, например 你好 или «hello»…',
   'dict.view.search': 'Искать',
+  'dict.view.reason.needsQuery': 'Введите слово для поиска.',
   'dict.view.hint.ja':
     'Совет: во время чтения книги выделите любое слово, чтобы сразу посмотреть его в словаре. Нажмите звёздочку у результата, чтобы сохранить его в карточки.',
   'dict.view.hint.zh':
