@@ -1323,3 +1323,47 @@ At 8/16/24 minutes, main private memory was **430.9/432.4/437.3MB**, handles
 private delta, not a leak claim. Main start to debug-bridge ready was **16.58s**; the outer npm
 build leg was not instrumented comparably to L0. **Category 7 Captures remains unscored/open**;
 next work starts at the global theme style/layout cost, then re-runs the same harness.
+
+## 2026-08-26 (later 9) · primary — the theme-switch regression is not one, and the real defect it was hiding
+
+`62abb6d3`. Recovery turn: codexA died on a usage limit at 17:33 with nothing uncommitted —
+the dirty `CompanionLayer.tsx` is another track's Aug-7 companions audit, not its work.
+
+**The handoff's next slice was "fix the global theme-switch style/layout regression". There is
+no regression.** Decomposed live through `/eval`, each number a median of 8 forced
+style+layout flushes on the real desk:
+
+| operation on `<html>` | 10 windows / 3,438 el | 2 windows / 258 el |
+| --- | --- | --- |
+| class toggle matching no rule | 0.5 ms | — |
+| non-inherited property (`outline-offset`) | 0.5 ms | — |
+| `setProperty` re-writing the SAME value | 0.0 ms | — |
+| `setProperty`, ONE custom property no rule reads | **69.3 ms** | — |
+| the real `--app-border-*` triple | **87.0 ms** | — |
+| full `data-theme` swap | **92.5 ms** | **5.4 ms** |
+
+L0's recorded baseline is **20.0 ms settled**, captured with **2 `.fwin` open** by its own
+scene note. At that same window count today it is **5.4 ms — better than baseline.** codexA's
+330–446 ms came from a **10-window** desk. Hiding each window's subtree one at a time walks the
+cost down monotonically: 83.2 → 72.1 → 59.0 → 66.2 → 42.9 → 31.2 → 22.6 → 17.1 → 12.1 → 11.3 →
+**8.8 ms** at 0 elements live. The cost is linear in open-window element count, and the
+comparison was scene-mismatched.
+
+**Trap for every later category-7 number: a perf figure without its scene is not comparable.**
+Record `.fwin` count and `document.getElementsByTagName('*').length` beside every timing, or the
+next worker files another phantom regression. This one cost codexA a turn.
+
+**What the decomposition did find is a real shipped defect.** The cost is custom-property
+*inheritance*, not selector matching and not the theme — an unused property costs the same as a
+theme swap, because every element re-inherits the 249-property root map. `<input type="range">`
+fires per tick and `saveAppBorderSettings` wrote three changed `--app-border-*` values straight
+to `<html>` inside the handler. On a real 8-window desk (6,055 elements) a 20-tick drag cost
+**1,835.1 ms**, 91.8 ms a tick. Through the new `rootCssVars.ts` writer — diff against last
+value, coalesce into one rAF flush — **75.5 ms, 24.3x**. Boot uses the immediate path because
+`--taskbar-h` is a layout input; verified live after reload at `--taskbar-h: 56px` with the
+taskbar rendered 56px. 10/10 new tests with a negative control; adjacent suites 27/27.
+
+**Follow-on, measured not guessed:** `<html>`'s inline style carries **~45** custom properties
+from other subsystems (display, motion, spacing, accent, wallpaper, pillarbox). Every writer has
+the same per-change cost. `pillarboxSettings.ts` and `wallpaperFit.ts` are the same shape and
+were left alone — both carry another track's uncommitted work.
