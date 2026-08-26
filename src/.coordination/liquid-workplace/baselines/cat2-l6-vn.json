@@ -1,0 +1,214 @@
+{
+  "label": "l6-vn",
+  "surface": "Immersion",
+  "win": "main",
+  "task": "type:.visual-novel-add > input:nth-of-type(1)=Cat2 Probe VN >> wait:500 >> click:.visual-novel-add > button",
+  "presentation": "standard",
+  "raised": "already-on-top",
+  "base": {
+    "textRuns": 20,
+    "controlCount": 16,
+    "box": "820x580",
+    "results": 0
+  },
+  "inputCost": {
+    "clicks": 1,
+    "keystrokes": 13,
+    "total": 14
+  },
+  "latencyMs": {
+    "clickRecv": [
+      15.4
+    ],
+    "inputRecv": [
+      60.2,
+      55.3,
+      49.4,
+      45.3,
+      41,
+      35.9,
+      31.7,
+      26.6,
+      22.1,
+      17.4,
+      13.2,
+      9.6,
+      5.9
+    ],
+    "worstRecv": 60.2,
+    "overBar100": 0,
+    "n": 14,
+    "clickStampUnscored": [
+      55.6
+    ],
+    "inputStampUnscored": [
+      60.7,
+      55.6,
+      49.7,
+      45.4,
+      41.1,
+      36.2,
+      31.8,
+      26.8,
+      22.2,
+      17.5,
+      13.3,
+      9.7,
+      6.1
+    ],
+    "worstStampUnscored": 60.7
+  },
+  "steps": [
+    {
+      "step": "type:.visual-novel-add > input:nth-of-type(1)=Cat2 Probe VN",
+      "target": {
+        "sel": ".visual-novel-add > input:nth-of-type(1)",
+        "text": "Cat2 Probe VN",
+        "wasValue": ""
+      },
+      "counted": true,
+      "moved": {
+        "text": false,
+        "controls": true,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": true,
+        "box": false,
+        "any": true
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "wait:500",
+      "target": null,
+      "counted": false,
+      "moved": {
+        "text": false,
+        "controls": false,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": false
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "click:.visual-novel-add > button",
+      "target": {
+        "sel": ".visual-novel-add > button",
+        "label": "Add to library",
+        "disabled": false,
+        "at": "374,545"
+      },
+      "counted": true,
+      "moved": {
+        "text": true,
+        "controls": true,
+        "results": true,
+        "dialogs": false,
+        "scroll": false,
+        "focus": true,
+        "box": false,
+        "any": true
+      },
+      "deadEnd": false
+    }
+  ],
+  "undo": {
+    "spec": "click:.visual-novel-summary-actions > button:last-of-type",
+    "steps": [
+      "click:.visual-novel-summary-actions > button:last-of-type"
+    ],
+    "restored": true,
+    "baseHash": "ov1h9w",
+    "afterHash": "ov1h9w",
+    "liveRegionsBefore": [
+      "p.muted|Visual novel added to the local library."
+    ],
+    "liveRegionsAfter": [
+      "p.muted|Visual novel added to the local library."
+    ],
+    "textHashRoundTrip": {
+      "base": "ubox5t",
+      "after": "ubox5t"
+    }
+  },
+  "stepsDriven": 2,
+  "deadEndCount": 0,
+  "deadEnds": [],
+  "scrollTrapCount": 0,
+  "scrollTraps": [],
+  "openDialogs": [],
+  "modalTrapCount": 0,
+  "modalTraps": [],
+  "dialogsClosedByEscape": [],
+  "costParity": {
+    "first": {
+      "presentation": "standard",
+      "box": "820x580",
+      "total": 14,
+      "deadEnds": 0,
+      "worstRecv": 60.2
+    },
+    "second": {
+      "presentation": "liquid",
+      "box": "820x580",
+      "total": 14,
+      "deadEnds": 0,
+      "worstRecv": 57.5
+    },
+    "restored": true,
+    "restoredTo": {
+      "presentation": "standard",
+      "pressed": "false",
+      "box": "820x580"
+    },
+    "liquidTotal": 14,
+    "standardTotal": 14
+  },
+  "bars": {
+    "deadEnds": true,
+    "modalTraps": true,
+    "scrollTraps": true,
+    "latency": true,
+    "costParity": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "unmeasuredBars": [],
+  "notMeasuredHere": [
+    "dead controls outside the dominant-task path (honesty-probe A - every control driven)",
+    "mute-pair explanation quality (rubric category 8 harness)"
+  ],
+  "control": {
+    "moved": {
+      "deadEnd": true,
+      "modalTrap": true,
+      "scrollTrap": true
+    },
+    "backToBaseline": true,
+    "counts": {
+      "base": [
+        0,
+        0,
+        0
+      ],
+      "dirty": [
+        1,
+        1,
+        1
+      ],
+      "restored": [
+        0,
+        0,
+        0
+      ]
+    },
+    "inertClickRecvMs": [
+      0.2
+    ]
+  }
+}

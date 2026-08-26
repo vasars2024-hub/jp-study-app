@@ -87,6 +87,13 @@
  *     main-window section has no per-window presentation, so the term is `N/A-single-path` and is
  *     not a bar; a floating window that has one and was given no `--compare` is `UNMEASURED`, which
  *     is neither a pass nor a fail. Only a real `--compare` run produces a delta.
+ * 17. AN UNDO IS JUDGED ON THE SURFACE, NOT ON THE ANNOUNCEMENT ABOUT THE TRIP. The VN panel's
+ *     add reports "Added to library." into a `role="status"`, and its remove leaves that sentence
+ *     standing, so a do/undo round trip that genuinely restored the surface hashed differently and
+ *     VOIDed the run. Every surface with a status line has this, so it is fixed once: `stateHash`
+ *     excludes live regions and is what `undo.restored` compares, while `textHash` keeps them and
+ *     is what the change signal reads - a step whose only effect is a message did something. The
+ *     live-region contents are reported before and after rather than dropped.
  * 10. A COMMENT INSIDE THE IN-PAGE TEMPLATE LITERAL MUST CONTAIN NO BACKTICK AND NO DOLLAR-BRACE.
  *     Both are a SyntaxError in the harness rather than in the browser, so the failure names the
  *     wrong file. Same trap the category-8 harness records.
@@ -228,12 +235,31 @@ const SNAP = (surface) => `(function(){
     return h.toString(36);
   }
 
-  var textAcc = [], runs = 0;
+  // Correction 17: A LIVE REGION IS AN ANNOUNCEMENT, NOT SURFACE STATE. The undo assertion
+  // compares the surface before and after, and a round trip that ends "Added to library." is a
+  // surface that came back plus a sentence about the trip. Folding that sentence into the same
+  // hash makes every reversible do/undo pair unrestorable by construction. It is NOT dropped from
+  // the change signal, though: a step whose only effect is a message is a step that did something,
+  // so textHash keeps it and stateHash - which only the restore assertion reads - does not.
+  function liveOwner(e){
+    for (var a = e; a && a !== root.parentElement; a = a.parentElement) {
+      var role = a.getAttribute && a.getAttribute('role');
+      var live = a.getAttribute && a.getAttribute('aria-live');
+      if (role === 'status' || role === 'alert' || role === 'log') return a;
+      if (live && live !== 'off') return a;
+    }
+    return null;
+  }
+
+  var textAcc = [], stateAcc = [], liveAcc = [], runs = 0;
   var tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   for (var t = tw.nextNode(); t; t = tw.nextNode()) {
     var s = t.nodeValue && t.nodeValue.trim();
     if (!s || !t.parentElement || !painted(t.parentElement)) continue;
     runs++; textAcc.push(s);
+    var owner = liveOwner(t.parentElement);
+    if (owner) liveAcc.push(name(owner) + '|' + s.slice(0, 80));
+    else stateAcc.push(s);
   }
 
   var ctrlAcc = [], ctrlCount = 0;
@@ -291,6 +317,8 @@ const SNAP = (surface) => `(function(){
   return JSON.stringify({
     textRuns: runs,
     textHash: hash(textAcc.join('\\u0001')),
+    stateHash: hash(stateAcc.join('\\u0001')),
+    liveRegions: liveAcc,
     controlCount: ctrlCount,
     controlHash: hash(ctrlAcc.join('\\u0001')),
     results: ${RESULT_SEL ? `root.querySelectorAll(${JSON.stringify(RESULT_SEL)}).length` : 'null'},
@@ -713,9 +741,14 @@ async function measure(surface, taskSpec) {
     undo = {
       spec: UNDO,
       steps: u.refuse ? u.refuse : u.steps.map((s) => s.step),
-      restored: !u.refuse && !back.refuse && back.textHash === base.textHash,
-      baseHash: base.textHash,
-      afterHash: back.textHash,
+      // Correction 17: judged on the surface, never on the announcement about the trip.
+      restored: !u.refuse && !back.refuse && back.stateHash === base.stateHash,
+      baseHash: base.stateHash,
+      afterHash: back.stateHash,
+      // Reported rather than dropped, so an announcement that should have been cleared is visible.
+      liveRegionsBefore: base.liveRegions,
+      liveRegionsAfter: back.liveRegions,
+      textHashRoundTrip: { base: base.textHash, after: back.textHash },
     };
   }
   await ev(DISARM);

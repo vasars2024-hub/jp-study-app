@@ -548,12 +548,22 @@ textarea {
 .visual-novel-library li > button { display: grid; gap: 3px; width: 100%; padding: 8px 9px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-2); color: inherit; text-align: left; cursor: pointer; }
 .visual-novel-library li > button.is-selected { border-color: var(--accent, #d84b57); background: color-mix(in srgb, var(--surface-2) 82%, var(--accent, #d84b57) 18%); }
 .visual-novel-library li span { color: var(--text-muted); font-size: 0.72rem; }
-.visual-novel-workspace { display: grid; align-content: start; gap: 12px; padding: 12px; }
-.visual-novel-summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+/* The implicit `auto` track floors at the widest row's MIN-CONTENT, and this workspace is a
+   scroll container, so the overflow went sideways instead of reflowing. `.visual-novel-summary`
+   is a nowrap flex row, so its min-content is cover + title + meta + actions = 602px. At the
+   Immersion window's shipped 820px with the library docked the workspace is 406px wide, and the
+   whole `.visual-novel-summary-actions` group — Launch, Stop timer, Remove — painted from x=1036
+   to x=1163, past the window's own right edge at 1016. It was not merely cramped: elementFromPoint
+   at the Remove button's centre returned the window BEHIND Immersion, so the only way to delete an
+   entry was a horizontal scrollbar on a reading pane with nothing indicating it was there.
+   `minmax(0, 1fr)` is what the rest of this file uses to let a track shrink; the wraps are what
+   the row does with the width once it can. */
+.visual-novel-workspace { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 12px; padding: 12px; container-type: inline-size; container-name: vnwork; }
+.visual-novel-summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
 .visual-novel-summary > img { width: 42px; height: 58px; flex: 0 0 auto; border-radius: 6px; object-fit: cover; }
-.visual-novel-summary-title { display: grid; gap: 2px; }
+.visual-novel-summary-title { display: grid; gap: 2px; min-width: 0; }
 .visual-novel-summary-title span, .visual-novel-summary > span, .visual-novel-summary small { color: var(--text-muted); font-size: 0.74rem; }
-.visual-novel-summary-actions { display: flex; gap: 6px; }
+.visual-novel-summary-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .visual-novel-metadata { padding: 9px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
 .visual-novel-metadata summary { cursor: pointer; font-weight: 600; }
 .visual-novel-metadata-grid { display: grid; grid-template-columns: repeat(3, minmax(130px, 1fr)); gap: 8px; margin: 10px 0; }
@@ -659,6 +669,19 @@ textarea {
 @media (max-width: 760px) {
   .media-study-vocabulary li { grid-template-columns: 1fr; }
   .media-study-metrics { grid-template-columns: repeat(2, minmax(90px, 1fr)); }
+}
+
+/* These five were in the `@media (max-width: 760px)` above and never fired where they were needed.
+   `VisualNovelPanel.tsx`'s layout note already recorded WHY for the outer track — the query reads
+   the WINDOW while this panel renders inside the Immersion floating window — and the same reason
+   applies one level down: at the shipped 820px Immersion window the workspace is a 392px content
+   box inside a 1264px viewport, so the narrow rules stayed off and `.visual-novel-progress` laid
+   out its 5 columns + button 602px wide in it, painting Save progress at x=1163 against a window
+   that ends at 1016. `container-name: vnwork` on the workspace answers the pane instead. 560px is
+   above every one of these grids' own minimum (progress needs ~530, community-form 464), so each
+   still gets its shipped wide layout the moment it genuinely fits. The container is the ANCESTOR,
+   never the queried element itself — agent.css §23 records that trap. */
+@container vnwork (max-width: 560px) {
   .visual-novel-metadata-grid { grid-template-columns: 1fr; }
   .visual-novel-community-form { grid-template-columns: 1fr; }
   .visual-novel-sentence-fields { grid-template-columns: 1fr; }
