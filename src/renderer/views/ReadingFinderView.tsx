@@ -116,14 +116,29 @@ export default function ReadingFinderView({
           </div>
         )}
 
-        {mode === 'discover' && (query.trim() ? (
+        {/*
+          The count directly above names a list, so the list has to be on screen. Typing a query
+          used to swap the catalogue grid out for the unified panel wholesale — and that panel
+          renders nothing at all until Search is pressed, because its results come from providers
+          it has not run yet. So a query matching one site showed "1 site" over an idle "Press
+          Search" prompt with no site to click: the surface's dominant task, filter the catalogue
+          and open a match, had no ending. Rubric category 2, measured as a dead end by
+          `probes/cat2-clunkiness.cjs`. The two lists are different questions — this one is the
+          local catalogue, the one below reaches enabled sources — so both are shown, and a match
+          appearing in each is a duplicate the same way any local/remote split is.
+        */}
+        {mode === 'discover' && (query.trim() === '' || list.length > 0) && (
+          <ReadingSiteGrid state={state} />
+        )}
+
+        {mode === 'discover' && query.trim() !== '' && (
           <ReadingUnifiedDiscovery
             query={query}
             sites={list}
             onOpenBook={onOpenBook}
             onSelectSite={setSelected}
           />
-        ) : <ReadingSiteGrid state={state} />)}
+        )}
 
         {mode === 'discover' && selected && (
           <ReadingSiteDetail site={selected} onClose={() => setSelected(null)} onOpenBook={onOpenBook} />

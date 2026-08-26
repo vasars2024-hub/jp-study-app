@@ -1,0 +1,148 @@
+{
+  "label": "l6-captures",
+  "surface": "Reading Finder",
+  "win": "(focused)",
+  "task": "type:.gram-search=NHK >> click:.rf-card",
+  "presentation": "standard",
+  "raised": "already-on-top",
+  "base": {
+    "textRuns": 71,
+    "controlCount": 35,
+    "box": "820x580",
+    "results": 8
+  },
+  "inputCost": {
+    "clicks": 1,
+    "keystrokes": 3,
+    "total": 4
+  },
+  "latencyMs": {
+    "clickRecv": [
+      22.8
+    ],
+    "inputRecv": [
+      26.2,
+      13.4,
+      6.8
+    ],
+    "worstRecv": 26.2,
+    "overBar100": 0,
+    "n": 4,
+    "clickStampUnscored": [
+      64.5
+    ],
+    "inputStampUnscored": [
+      26.9,
+      13.6,
+      6.9
+    ],
+    "worstStampUnscored": 64.5
+  },
+  "steps": [
+    {
+      "step": "type:.gram-search=NHK",
+      "target": {
+        "sel": ".gram-search",
+        "text": "NHK",
+        "wasValue": ""
+      },
+      "counted": true,
+      "moved": {
+        "text": true,
+        "controls": true,
+        "results": true,
+        "dialogs": false,
+        "scroll": false,
+        "focus": true,
+        "box": false,
+        "any": true
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "click:.rf-card",
+      "target": {
+        "sel": ".rf-card",
+        "label": "NHK News Web EasyFreeReal news simplifie",
+        "disabled": false,
+        "at": "306,433"
+      },
+      "counted": true,
+      "moved": {
+        "text": true,
+        "controls": true,
+        "results": false,
+        "dialogs": true,
+        "scroll": false,
+        "focus": true,
+        "box": false,
+        "any": true
+      },
+      "deadEnd": false
+    }
+  ],
+  "undo": {
+    "spec": "click?:.rf-drawer-x >> clear:.gram-search",
+    "steps": [
+      "click?:.rf-drawer-x",
+      "clear:.gram-search"
+    ],
+    "restored": true,
+    "baseHash": "1epgi69",
+    "afterHash": "1epgi69"
+  },
+  "stepsDriven": 2,
+  "deadEndCount": 0,
+  "deadEnds": [],
+  "scrollTrapCount": 0,
+  "scrollTraps": [],
+  "openDialogs": [
+    {
+      "sel": "aside.rf-drawer",
+      "txt": "NHK News Web Easy×Real news simplified for learners, with fu"
+    }
+  ],
+  "modalTrapCount": 0,
+  "modalTraps": [],
+  "dialogsClosedByEscape": [
+    "aside.rf-drawer"
+  ],
+  "costParity": {
+    "first": {
+      "presentation": "standard",
+      "box": "820x580",
+      "total": 4,
+      "deadEnds": 0,
+      "worstRecv": 26.2
+    },
+    "second": {
+      "presentation": "liquid",
+      "box": "820x580",
+      "total": 4,
+      "deadEnds": 0,
+      "worstRecv": 30.8
+    },
+    "restored": true,
+    "restoredTo": {
+      "presentation": "standard",
+      "pressed": "false",
+      "box": "820x580"
+    },
+    "liquidTotal": 4,
+    "standardTotal": 4
+  },
+  "bars": {
+    "deadEnds": true,
+    "modalTraps": true,
+    "scrollTraps": true,
+    "latency": true,
+    "costParity": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "unmeasuredBars": [],
+  "notMeasuredHere": [
+    "dead controls outside the dominant-task path (honesty-probe A - every control driven)",
+    "mute-pair explanation quality (rubric category 8 harness)"
+  ]
+}
