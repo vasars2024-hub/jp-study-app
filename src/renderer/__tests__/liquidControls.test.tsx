@@ -547,7 +547,10 @@ describe('the sheet stays a composition language, not a palette', () => {
 
     // OBSTACLE 1 — a REPLACED element. `::after` generates no box on it.
     // `.jiten-search-wrap input` measured 19.5px inside a 32px wrap: the wrap looks like the
-    // target and is not one. `.reader-seek` is `<input type="range">` at **4px** tall.
+    // target and is not one. `.reader-seek` is an `input[type=range]` at **4px** tall.
+    // (Written as a selector, not as the JSX tag: `sliderAccessibleName.test.ts` scans every
+    // source file under `src/renderer` for range inputs without an accessible name, and it
+    // does not exclude `__tests__` — the tag spelled out in a comment failed that sweep.)
     expect(ruleOf('.jiten-search-wrap input')).toMatch(/min-height:\s*var\(--lq-hit-target\)/);
     const seek = ruleOf('.reader-seek');
     expect(seek).toMatch(/min-height:\s*var\(--lq-hit-target\)/);
