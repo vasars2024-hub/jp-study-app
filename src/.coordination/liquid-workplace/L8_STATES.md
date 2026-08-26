@@ -534,7 +534,7 @@ carries **121 lines of another track's uncommitted work**.
 | Captures (Reading Finder) | 820x580 | 71 / 35 | **0** | **0** | **0** | **1 of 1 observable** | **10/10** |
 
 Control fired: `[0,0,0]` → `[1,1,1]` → `[0,0,0]`, `backToBaseline: true`. Drive `surfaceChanged`
-and `restored` both true. `baselines/cat8-l6-captures.json`. Commit `<HASH>`.
+and `restored` both true. `baselines/cat8-l6-captures.json`. Commit `c002e1bf`.
 
 **Two traps, both paid this turn, both cheap to re-pay and expensive to rediscover.**
 1. **Correction 8 bit me while I was writing correction 9.** A comment inside `CONTROL_INJECT`'s
@@ -545,3 +545,39 @@ and `restored` both true. `baselines/cat8-l6-captures.json`. Commit `<HASH>`.
    the Lorem paragraph served as the disabled button's explanation — `parentText.replace(ownText)`
    is the mute detector's own rule — so `moved.mutePairs` was false on a detector that works. The
    button now gets its own wrapper.
+
+### Same turn — the harness could only type, so it could only score a third of the app
+
+`--drive-click "<css>"` / `--drive-undo "<css>"`, correction 10. Two selectors rather than one
+because these filters are SETS of chips (`all | L1 … L7`), not toggles, so the way back is a
+different control. Both legs assert the restore by text hash, which is what makes pressing a real
+control on the user's real profile safe here.
+
+Why it was needed, measured not assumed: **Library's only text input is inside its Import modal**
+(`LibraryView.tsx:938`, `:954`) — a live sweep of `input[type=text],input[type=search],
+input:not([type]),textarea` inside the Library window returned **[]**. The manga reader, the VN
+panel and Novels have none at all. Correction 9's leg alone left four of six L6 surfaces
+UNMEASURED, which is exactly the "capped at 0" the rubric warns about.
+
+Library's own chip row states the counts, so the drive is a real user path rather than a contrived
+one: `All 24 | Manga 3 | Inbox 0 | Unfiled 21`. Pressing **Inbox 0** is how a user reaches the
+empty state.
+
+| surface | rect | textRuns rest/driven | rawKeys | placeholders | mutePairs | statesNamed | verdict |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Library | 820x580 | 184 / 48 | **0** | **0** | **0** | **1 of 1 observable** | **10/10** |
+
+Driven message, quoted so nobody has to re-derive it: "This folder is empty — Use the folder button
+on any book to file it here, or switch back to All." Control `[0,0,0]` → `[1,1,1]` → `[0,0,0]`,
+`backToBaseline` true, `clicked: "Inbox 0"`, `undo: "All 24"`, `restored: true`.
+`baselines/cat8-l6-library.json`. **Category 8 is 2 of 6 surfaces.**
+
+**Two NON-findings, checked so the next worker does not re-derive them.** The `.slice(0, N)` sweep
+left two caps unexamined and neither is the Aero/dictionary defect shape:
+- `EpubMiningPanel.tsx:185` `filteredCandidates.slice(0, 32)` builds the **preview strip only**;
+  the export at `:471` passes `filteredCandidates` uncapped, the strip is labelled
+  `epub.mining.deckPreview.first` = "First {count} cards" with the true rendered count, and the
+  real total is printed below as `epub.mining.result` "Result: approx N cards".
+- `CommandPalette.tsx:243` `scored.slice(0, 40)` caps a **relevance-sorted fuzzy** list that
+  renders no count at all and has an honest empty state (`palette.noMatches:302`). Item 41 is by
+  construction a worse match than item 40.

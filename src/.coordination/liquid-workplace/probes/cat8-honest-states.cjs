@@ -16,7 +16,7 @@
  * Run:
  *   node src/.coordination/liquid-workplace/probes/cat8-honest-states.cjs \
  *     --surface "Dictionary" [--win main] [--label dictionary] [--langs] [--control] [--out <file>] \
- *     [--drive-input "<css>"] [--drive-value "<text>"]
+ *     [--drive-input "<css>" | --drive-click "<css>" [--drive-undo "<css>"]] [--drive-value "<text>"]
  *
  * --surface takes the same two forms as the category-1 and category-4 harnesses, deliberately, so
  * a surface is named identically in all three: a leading `@` is a CSS SELECTOR (a section of the
@@ -63,6 +63,12 @@
  *     adverse query into the surface's own filter, re-probes, restores, and ASSERTS the restore by
  *     text hash; a surface with no such input reports `statesNamed: 'UNMEASURED'`, which is neither
  *     a 10 nor a FAIL — it is the honest verdict and it exits 3.
+ * 10. MOST SURFACES HERE FILTER BY BUTTON, NOT BY TEXT. Library's only text input lives inside its
+ *     Import modal; the manga reader, the VN panel and Novels have none at all — so correction 9's
+ *     leg alone left four of L6's six surfaces UNMEASURED. `--drive-click` presses a filter and
+ *     `--drive-undo` presses the way back, because these are SETS of chips (`all | L1 … L7`), not
+ *     toggles. Both legs assert the restore by text hash, which is what makes pressing a real
+ *     control on a real profile safe to do here.
  *  7. The FABRICATED-VALUE verdict still needs an empty scratch profile: on a populated profile
  *     real data and a hardcoded constant look identical. This harness reports status-word
  *     candidates and does NOT issue that verdict. What it DOES decide is the placeholder shapes,
@@ -97,6 +103,11 @@ const LANGS = has('langs');
 const DRIVE_INPUT = arg('drive-input', '');
 // Nonsense on purpose: it must match nothing in ANY catalogue, in any of the four languages.
 const DRIVE_VALUE = arg('drive-value', 'zzqqxxnosuchthing');
+// Correction 10: most surfaces here filter by BUTTON, not by text. Library's only text input is
+// inside its Import modal; the manga reader, the VN panel and Novels have none at all. A harness
+// that can only type can score a third of the app.
+const DRIVE_CLICK = arg('drive-click', '');
+const DRIVE_UNDO = arg('drive-undo', '');
 if (!SURFACE) {
   console.error('REFUSE - --surface is required; this harness names no surface of its own');
   process.exit(2);
@@ -332,7 +343,52 @@ const setInput = (sel, value) => `(function(){
   return JSON.stringify({ was: was, now: el.value });
 })()`;
 
+/**
+ * Correction 10: the same leg, driven by a click.
+ *
+ * `--drive-undo` is a second selector because most of these filters are a SET of chips, not a
+ * toggle: Library's level row is `all | L1 … L7`, so the way back is the "all" chip, not a second
+ * press of L1. Omitted, it re-presses the same control, which is right for a real toggle. The
+ * restore is asserted by text hash either way, which is what makes a click safe to make here.
+ */
+const clickEl = (sel, which) => `(function(){
+  var root = ${ROOT_EXPR};
+  if (!root) return JSON.stringify({ refuse: 'surface not found for drive' });
+  var el = root.querySelector(${JSON.stringify(sel)});
+  if (!el) return JSON.stringify({ refuse: 'drive-' + ${JSON.stringify(which)} + ' target not found: ' + ${JSON.stringify(sel)} });
+  el.focus();
+  el.click();
+  return JSON.stringify({ clicked: ${JSON.stringify(sel)}, label: (el.textContent || '').trim().slice(0, 40) });
+})()`;
+
 async function driveLeg(base) {
+  if (DRIVE_CLICK) {
+    const hit = JSON.parse(await ev(clickEl(DRIVE_CLICK, 'click')));
+    if (hit.refuse) return { refuse: hit.refuse };
+    await sleep(600);
+    const driven = await run();
+    const undo = JSON.parse(await ev(clickEl(DRIVE_UNDO || DRIVE_CLICK, 'undo')));
+    await sleep(600);
+    const restored = await run();
+    if (driven.refuse) return { refuse: `driven: ${driven.refuse}` };
+    return {
+      click: DRIVE_CLICK,
+      clickedLabel: hit.label,
+      undo: DRIVE_UNDO || DRIVE_CLICK,
+      undoLabel: undo.label || null,
+      surfaceChanged: driven.textHash !== base.textHash,
+      restored: restored.textHash === base.textHash,
+      driven: {
+        textRuns: driven.textRuns,
+        states: driven.states,
+        mutePairCount: driven.mutePairCount,
+        mutePairs: driven.mutePairs,
+        rawKeyCount: driven.rawKeyCount,
+        rawKeys: driven.rawKeys,
+        placeholderCount: driven.placeholderCount,
+      },
+    };
+  }
   const set = JSON.parse(await ev(setInput(DRIVE_INPUT, DRIVE_VALUE)));
   if (set.refuse) return { refuse: set.refuse };
   await sleep(600);
@@ -445,7 +501,7 @@ async function langLeg() {
     }
   }
 
-  if (DRIVE_INPUT) {
+  if (DRIVE_INPUT || DRIVE_CLICK) {
     base.drive = await driveLeg(base);
     if (base.drive.refuse) { console.error(`VOID - drive leg: ${base.drive.refuse}`); process.exit(3); }
     if (!base.drive.restored) {
@@ -453,7 +509,7 @@ async function langLeg() {
       process.exit(3);
     }
     if (!base.drive.surfaceChanged) {
-      console.error('VOID - the drive input changed nothing; it is not this surface\'s filter');
+      console.error('VOID - the drive changed nothing; it is not this surface\'s filter');
       process.exit(3);
     }
   }

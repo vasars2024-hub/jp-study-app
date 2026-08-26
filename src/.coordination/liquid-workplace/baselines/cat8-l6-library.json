@@ -1,0 +1,123 @@
+{
+  "label": "library",
+  "surface": "Library",
+  "win": "(focused)",
+  "lang": "en",
+  "storedLang": "en",
+  "theme": "forest-night",
+  "rect": "820x580",
+  "textRuns": 184,
+  "textHash": -815975117,
+  "rawKeyCount": 0,
+  "rawKeys": [],
+  "placeholderCount": 0,
+  "placeholders": [],
+  "mutePairCount": 0,
+  "mutePairs": [],
+  "disabledTotal": 0,
+  "states": {
+    "empty": {
+      "hosts": 0,
+      "messages": []
+    },
+    "loading": {
+      "hosts": 0,
+      "messages": []
+    },
+    "error": {
+      "hosts": 0,
+      "messages": []
+    },
+    "offline": {
+      "hosts": 0,
+      "messages": []
+    }
+  },
+  "statusCandidatesNeedingEmptyProfile": [],
+  "raised": "already-on-top",
+  "drive": {
+    "click": ".lib-folders > button.lib-folder-chip:nth-of-type(3)",
+    "clickedLabel": "Inbox 0",
+    "undo": ".lib-folders > button.lib-folder-chip:nth-of-type(1)",
+    "undoLabel": "All 24",
+    "surfaceChanged": true,
+    "restored": true,
+    "driven": {
+      "textRuns": 48,
+      "states": {
+        "empty": {
+          "hosts": 2,
+          "messages": [
+            "This folder is emptyUse the folder button on any book to file it here, or switch back to All."
+          ]
+        },
+        "loading": {
+          "hosts": 0,
+          "messages": []
+        },
+        "error": {
+          "hosts": 0,
+          "messages": []
+        },
+        "offline": {
+          "hosts": 0,
+          "messages": []
+        }
+      },
+      "mutePairCount": 0,
+      "mutePairs": [],
+      "rawKeyCount": 0,
+      "rawKeys": [],
+      "placeholderCount": 0
+    }
+  },
+  "statesObservable": [
+    "empty"
+  ],
+  "statesNotObservable": [
+    "loading",
+    "error",
+    "offline"
+  ],
+  "statesNamed": "1 of 1 observable",
+  "mutePairCountWorst": 0,
+  "bars": {
+    "rawKeys": true,
+    "placeholders": true,
+    "mutePairs": true,
+    "statesNamed": true,
+    "languagesDiffer": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "unmeasuredBars": [],
+  "notMeasuredHere": [
+    "dead-control count (honesty-probe A - every control driven for a side effect)",
+    "fabricated-value verdict (honesty-probe B - needs an empty scratch profile)"
+  ],
+  "control": {
+    "moved": {
+      "rawKeys": true,
+      "placeholders": true,
+      "mutePairs": true
+    },
+    "backToBaseline": true,
+    "counts": {
+      "base": [
+        0,
+        0,
+        0
+      ],
+      "dirty": [
+        1,
+        1,
+        1
+      ],
+      "restored": [
+        0,
+        0,
+        0
+      ]
+    }
+  }
+}
