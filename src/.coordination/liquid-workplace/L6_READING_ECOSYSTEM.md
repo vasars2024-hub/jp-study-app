@@ -1567,3 +1567,44 @@ plant moved the pinned mode button and the post-plant snapshot simply promoted t
 in the segment. A single-node plant cannot falsify Q3 where several interchangeable accent
 buttons exist; it must move every primary-capable control. Recorded, not fixed — one repair
 per harness per turn, and this turn spent it.
+
+## 2026-08-26 20:05 EDT — category 5: Immersion closes, manga scores, one shared rule fixed
+
+**Immersion PASS 10/10** (`4da340a8`), controlled. Q4's arithmetic was argued before it was
+built and the bar was not bent: tucking only the six page actions gets 23 -> 17, five over, so
+the starter grid had to move too. One toolbar overflow `<details>` (Close page, Save site, Save
+as tool, Export to Library, Capture video, the lens, Open in system browser, and the Visual
+Novel launcher the `trailing` slot used to append — the slot is now named `overflow`), and one
+starter disclosure split on `IMMERSION_SUBJECT_LANG` so the visible destinations are derived
+from the data. Left in the open: transport, the URL field, the mode segment (Q1's entry point
+and Q3's primary action — tucking either trades one NO for two), and the two stateful toggles,
+because `aria-pressed` inside a closed menu reports nothing. Measured: scanned **23 -> 12**,
+collapsedDisclosures **0 -> 2**, chromeControlsRaw **23 -> 14**, identical in both theme cells.
+Q2 backAffordances 4 -> 3 against a bar of >=1. **Twelve is exactly the bar** — one more
+control in that row re-opens this finding, and that is stated rather than hidden.
+
+**Manga 8/10** (`c8019d1f`), `@.reader`, 1264x821, its first category-5 score. Q5 caught the
+turn's real defect and it was one shared rule: `.btn.active { color: #fff }`. On a dark palette
+white over the 12%-tint fill is fine; on `classic-light` it composites to **1.51:1** ("Scan")
+and **1.18:1** ("Hide translation") against 4.5, while the same surface's worst dark cell was
+5.30. `var(--accent-text)` is the token this repo already derived for the accent-as-glyph case
+(nine presets x six lights). After: classic-light min **1.18 -> 4.89**, failing **2 -> 0**;
+forest-night unchanged. `.btn.active` is app-wide, so Immersion was re-run afterwards and holds
+PASS 10/10 — a shared-rule fix is not verified on the surface that motivated it.
+
+**Two manga cells stay open, and one of them is the instrument.** Q4: 29 chrome controls, 0
+disclosures — the same shape Immersion's 23 had, and the next slice. Q10: identityCount **2**
+of a required 3, because three of the five markers are `floatingWindowChrome`, `taskbar` and
+`desktopLayer`. **No chromeless surface can ever answer Q10 YES** — that is all three of
+Novels, manga and VN. A term that is unanswerable for half the L6 set is a harness defect, not
+a product one; it is the next repair.
+
+**HARNESS, this turn's one repair: the Q3 control now attacks the whole disjunction.** Q3 is
+scored on `explicitPrimary || accentButtons[0] || primaryInputs[0]`, and moving one branch
+promotes the next — on Immersion `button.immersion-mode-btn` gave way to `input.immersion-url`
+and the control read DID NOT FAIL. The snapshot pins every primary-capable node
+(`window.__cat5primaries`) and the plant moves all of them, reporting `primariesMoved`. Each
+node carries its own previous inline transform in an attribute, so N moved nodes restore to N
+different values. Immersion 2 moved, CONTROL-OK. Library re-run as a regression: 2 moved
+(`button.btn` + `button.lib-folder-chip` — its control had the same latent hole), CONTROL-OK,
+restoredMoved 2, residue 0.
