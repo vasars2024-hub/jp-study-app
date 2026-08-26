@@ -5747,6 +5747,8 @@ export const ru: Catalog = {
   'immersion.readerExtractionFailedSwitchLive':
     'Не удалось извлечь текст. Переключитесь в прямой режим, чтобы просмотреть эту страницу.',
   'immersion.pageLoadFailed': 'Не удалось загрузить страницу. Для текстовых статей попробуйте режим чтения.',
+  'immersion.pageLoadFailedAt':
+    'Не удалось открыть {url} — браузер сообщил: {reason}. Страница не загрузилась, читать нечего. Проверьте адрес и подключение.',
   'immersion.saved': 'Сохранено в библиотеке сайтов',
   'immersion.saveFailed': 'Не удалось сохранить',
   'immersion.exported': 'Экспортировано в библиотеку',

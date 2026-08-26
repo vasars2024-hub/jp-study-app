@@ -36,6 +36,13 @@ import {
   LENS_CAPTURE_TARGET_KEY,
 } from '../../../shared/lensCaptureTarget';
 import { isNhkNewsArticleUrl, nhkArticleLooksHydrated } from '../../../shared/nhkArticle';
+import {
+  immersionLoadFailure,
+  immersionLoadFailureMessage,
+  mayRunReaderPass,
+  type ImmersionLoadFailEvent,
+  type ImmersionLoadFailure,
+} from '../../../shared/immersionLoadFailure';
 import { READING_CANVAS_FILL_POLICY } from '../../../shared/liquidReadingCanvas';
 import { ReadingCanvas, type ReadingCanvasTool } from '../liquid/ReadingCanvas';
 import { articleBodyHtml, fetchReadableArticle } from '../../wikiArticle';
@@ -137,6 +144,15 @@ export function useImmersion() {
   const activeStatsId = useRef('');
   const activeTitle = useRef('Immersion');
   const pageOpenAt = useRef(Date.now());
+  /**
+   * The main-frame load failure for the navigation currently on screen, or null.
+   *
+   * A ref rather than state because two things read it in the same tick as the webview event
+   * that writes it: `did-stop-loading` fires immediately after `did-fail-load`, and the reader
+   * pass it would otherwise schedule runs 400 ms later. Both have to see the failure, and a
+   * setState would not have committed for the first of them.
+   */
+  const loadFailure = useRef<ImmersionLoadFailure | null>(null);
   // Host-side rate limit on the guest channel. The guest limits itself too, but
   // that limiter runs in the process we are defending against — this one is the
   // enforcement. Kept in a ref so it survives re-render but resets per page.
@@ -243,6 +259,10 @@ export function useImmersion() {
 
   // ----- Navigation -----
   const loadReader = useCallback(async (url: string) => {
+    // A page that never opened has no article to extract, and saying "reader extraction failed,
+    // wait for the page to finish loading" about it is advice the user cannot act on: the load is
+    // over and it failed. Keep the real reason on screen instead of overwriting it with a symptom.
+    if (!mayRunReaderPass(loadFailure.current, url)) return;
     setLoading(true);
     setError(null);
     try {
@@ -306,6 +326,9 @@ export function useImmersion() {
       }
       flushStats();
       pageOpenAt.current = Date.now();
+      // A fresh attempt, so the previous one's failure stops speaking for it — including a retry
+      // of the same URL, where `did-start-loading` may not fire before the reader pass is due.
+      loadFailure.current = null;
       setCurrentUrl(url);
       setUrlInput(url);
       activeStatsId.current = immersionStatsId(url);
@@ -337,6 +360,9 @@ export function useImmersion() {
 
       if (nextMode === 'reader' || nextMode === 'focus') {
         setLoading(true);
+        // The previous page's failure is not this attempt's, and the reader pass that used to
+        // clear it now refuses to run when one is pending.
+        setError(null);
         setReaderHtml('');
         const wv = webviewRef.current as (HTMLElement & { loadURL?: (u: string) => void }) | null;
         if (wv) {
@@ -401,17 +427,30 @@ export function useImmersion() {
   useEffect(() => {
     const wv = webviewRef.current;
     if (!wv || (mode === 'focus' && !!readerHtml)) return;
-    const onStart = () => setLoading(true);
+    const onStart = () => {
+      loadFailure.current = null;
+      setLoading(true);
+    };
     const onStop = () => {
       setLoading(false);
+      // Chromium fires `did-stop-loading` after a failed load too. Running the reader pass over
+      // the error page is what buried the true reason under a reader-extraction message.
+      if (loadFailure.current) return;
       if ((mode === 'reader' || mode === 'focus') && currentUrl) {
         const delay = isNhkNewsArticleUrl(currentUrl) ? 1200 : 400;
         window.setTimeout(() => void loadReader(currentUrl), delay);
       }
     };
-    const onFail = () => {
+    const onFail = (e: Event) => {
+      const failure = immersionLoadFailure(e as ImmersionLoadFailEvent, currentUrl);
+      // Null means this event is not THIS page failing — a subframe, or a load the user's own
+      // next navigation aborted. Reporting either would be a fabricated error, not a missing one.
+      if (!failure) return;
+      loadFailure.current = failure;
       setLoading(false);
-      setError(t('immersion.pageLoadFailed'));
+      setReaderHtml('');
+      const msg = immersionLoadFailureMessage(failure);
+      setError(t(msg.key, msg.vars));
     };
     const onTitle = (e: Event) => {
       const tt = (e as { title?: string }).title;

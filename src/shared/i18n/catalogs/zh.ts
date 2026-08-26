@@ -5192,6 +5192,8 @@ export const zh: Catalog = {
   'immersion.nhkStillLoading': 'NHK 文章仍在浏览器面板中加载。请稍等几秒获取完整文本，然后重新加载阅读器。',
   'immersion.readerExtractionFailedSwitchLive': '阅读器提取失败。请切换到实时模式浏览此页面。',
   'immersion.pageLoadFailed': '页面加载失败。文本类文章请尝试阅读器模式。',
+  'immersion.pageLoadFailedAt':
+    '无法打开 {url}（浏览器报告：{reason}）。页面未加载，因此没有可阅读的正文。请检查地址和网络连接。',
   'immersion.saved': '已保存到站点库',
   'immersion.saveFailed': '保存失败',
   'immersion.exported': '已导出到书库',

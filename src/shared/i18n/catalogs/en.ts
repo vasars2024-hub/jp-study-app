@@ -5509,6 +5509,8 @@ export const en: Catalog = {
   'immersion.readerExtractionFailedSwitchLive':
     'Reader extraction failed. Switch to Live mode to browse this page.',
   'immersion.pageLoadFailed': 'Page failed to load. Try Reader Mode for text articles.',
+  'immersion.pageLoadFailedAt':
+    'Could not open {url} — the browser reported {reason}. Nothing loaded, so there is no article to read; check the address and your connection.',
   'immersion.saved': 'Saved to Sites Library',
   'immersion.saveFailed': 'Save failed',
   'immersion.exported': 'Exported to Library',

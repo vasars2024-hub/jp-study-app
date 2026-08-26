@@ -5215,6 +5215,8 @@ export const ja: Catalog = {
   'immersion.nhkStillLoading': 'NHKの記事はブラウザパネルでまだ読み込み中です。数秒待ってから、リーダーを再読み込みしてください。',
   'immersion.readerExtractionFailedSwitchLive': 'リーダー抽出に失敗しました。ライブモードに切り替えてこのページを閲覧してください。',
   'immersion.pageLoadFailed': 'ページの読み込みに失敗しました。テキスト記事にはリーダーモードをお試しください。',
+  'immersion.pageLoadFailedAt':
+    '{url} を開けませんでした（ブラウザの報告: {reason}）。ページが読み込まれていないため、読める本文はありません。アドレスと接続を確認してください。',
   'immersion.saved': 'サイトライブラリに保存しました',
   'immersion.saveFailed': '保存に失敗しました',
   'immersion.exported': 'ライブラリにエクスポートしました',
