@@ -25,6 +25,31 @@ import {
 const SHEET = resolve(__dirname, '..', 'theme', 'liquid-window.css');
 
 /**
+ * The two Liquid hosts, as the sheet writes them.
+ *
+ * `.fwin` is the floating desktop window; `.popout-root` is the same app in its
+ * own borderless OS window (`?popout=<section>`), which is not a `.fwin` at all.
+ * Only the INTERIOR rules name both — a pop-out's frame is the OS window and
+ * takes no material (`popoutPresentation.ts` decision 1) — so `FRAME_HOST` and
+ * `INTERIOR_HOST` are deliberately different constants rather than one.
+ */
+const FRAME_HOST = '.fwin.fwin-liquid';
+const INTERIOR_HOST = ':is(.fwin.fwin-liquid, .popout-root.popout-liquid)';
+
+/**
+ * Whether a selector is anchored on `host`.
+ *
+ * Written as a prefix test rather than a `^host\b` regex on purpose:
+ * `INTERIOR_HOST` ends in `)`, and `\b` needs a word character on one side, so
+ * the regex form silently never matched a descendant selector. The three
+ * continuations below are the only ones that keep the host's own specificity —
+ * the whole selector, a further compound (`.fwin-max`), or a descendant.
+ */
+function anchoredOn(selector: string, host: string): boolean {
+  return selector === host || selector.startsWith(`${host} `) || selector.startsWith(`${host}.`);
+}
+
+/**
  * The sheet with comments removed and line endings NORMALIZED.
  *
  * The `\r` strip is load-bearing, not tidiness. This repo has
@@ -250,13 +275,52 @@ describe('liquid-window.css', () => {
     // translucent while its title bar stayed opaque and covered it: blur that
     // is live in the computed style and invisible on screen. Every rule that
     // restyles an element the shell already styles is a compound `.fwin.fwin-liquid`.
+    //
+    // Widened for the second host and NOT loosened: `:is()` takes the
+    // specificity of its most specific branch, so `INTERIOR_HOST` still scores
+    // (0,2,0) exactly as `FRAME_HOST` does. The assertion is that a selector
+    // starts with one of these two literals — a bare `.popout-liquid` branch,
+    // or a `:where()` written by mistake, would drop to (0,1,0) and lose the
+    // same tie this test was written for.
     const overrides = rules
       .split('}')
       .map((block) => block.split('{')[0]?.trim())
       .filter((s): s is string => Boolean(s) && s.includes('.fwin-liquid'));
     expect(overrides.length).toBeGreaterThanOrEqual(6);
     for (const selector of overrides) {
-      expect(selector, selector).toMatch(/^\.fwin\.fwin-liquid\b/);
+      expect(
+        anchoredOn(selector, FRAME_HOST) || anchoredOn(selector, INTERIOR_HOST),
+        selector,
+      ).toBe(true);
+    }
+    // Vacuity guard: at least one rule really is on the widened host, or the
+    // loop above degenerates into the old single-host assertion and the pop-out
+    // could silently lose its destination again.
+    expect(overrides.filter((s) => s.startsWith(INTERIOR_HOST)).length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('gives the pop-out the INTERIOR material and never the frame', () => {
+    // The failure this pins: `.popout-root` is `frame: false` but opaque, with the
+    // desktop compositor behind it rather than anything this process paints — a
+    // `backdrop-filter` there is the inert glass rule 2 forbids on `.fwin-bar`,
+    // and it would still measure as translucent.
+    const blocks = rules
+      .split('}')
+      .map((b) => ({ selector: b.split('{')[0]?.trim() ?? '', body: b.split('{')[1] ?? '' }))
+      .filter((b) => b.selector.includes('.popout-'));
+    expect(blocks.length).toBeGreaterThanOrEqual(4);
+    for (const b of blocks) {
+      expect(b.body, b.selector).not.toMatch(/backdrop-filter/);
+    }
+    // The frame rules stay single-host: a pop-out never takes `--lq-liquid-bg`
+    // on its own root or bar.
+    const frameOnly = rules
+      .split('}')
+      .map((b) => b.split('{')[0]?.trim() ?? '')
+      .filter((s) => /\.fwin-bar|\.fwin-title|\.fwin-body|\.fwin-max/.test(s));
+    expect(frameOnly.length).toBeGreaterThanOrEqual(4);
+    for (const selector of frameOnly) {
+      expect(selector, selector).not.toMatch(/popout/);
     }
   });
 
@@ -276,7 +340,7 @@ describe('liquid-window.css', () => {
       .split('}')
       .map((block) => ({ selector: block.split('{')[0]?.trim() ?? '', body: block.split('{')[1] ?? '' }))
       .filter((b) => b.selector.includes('.lq-contextual'));
-    const base = owning.filter((b) => b.selector === '.fwin.fwin-liquid .lq-contextual');
+    const base = owning.filter((b) => b.selector === `${INTERIOR_HOST} .lq-contextual`);
     expect(base.length).toBe(1);
     expect(base[0].body).toMatch(/background:\s*var\(--lq-liquid-bg\)/);
     // NEGATIVE, and the reason the rule looks under-specified: `.fwin` carries
@@ -289,8 +353,8 @@ describe('liquid-window.css', () => {
     // is not a floating card), and it may adjust the box but must never restate the
     // material: a second `background`/`backdrop-filter` here is how one region quietly
     // stops sharing the language the primitive exists to carry.
-    for (const exception of owning.filter((b) => b.selector !== '.fwin.fwin-liquid .lq-contextual')) {
-      expect(exception.selector, exception.selector).toMatch(/^\.fwin\.fwin-liquid\b/);
+    for (const exception of owning.filter((b) => b.selector !== `${INTERIOR_HOST} .lq-contextual`)) {
+      expect(anchoredOn(exception.selector, INTERIOR_HOST), exception.selector).toBe(true);
       expect(exception.body, exception.selector).not.toMatch(/background\s*:/);
       expect(exception.body, exception.selector).not.toMatch(/backdrop-filter/);
     }
@@ -303,7 +367,7 @@ describe('liquid-window.css', () => {
     const block = rules
       .split('}')
       .map((b) => ({ selector: b.split('{')[0]?.trim() ?? '', body: b.split('{')[1] ?? '' }))
-      .find((b) => b.selector === '.fwin.fwin-liquid .medialib-rail.lq-contextual');
+      .find((b) => b.selector === `${INTERIOR_HOST} .medialib-rail.lq-contextual`);
     expect(block, 'no flush-rail rule in liquid-window.css').toBeTruthy();
     expect(block?.body).toMatch(/border-radius:\s*0/);
     expect(block?.body).toMatch(/box-shadow:\s*none/);
@@ -338,10 +402,10 @@ describe('liquid-window.css — the Dictionary contextual band (L5.3)', () => {
     // and it was three short full-width rows stacked. Pairing the two that ARE
     // siblings took it to 379x237 = 8.7%.
     const paired = block(
-      '.fwin.fwin-liquid .dict-view > .dict-saved-searches,\n.fwin.fwin-liquid .dict-view > .lexicon-notes-browser',
+      `${INTERIOR_HOST} .dict-view > .dict-saved-searches,\n${INTERIOR_HOST} .dict-view > .lexicon-notes-browser`,
     );
     expect(paired).toMatch(/grid-column:\s*auto/);
-    expect(block('.fwin.fwin-liquid .dict-view > *')).toMatch(/grid-column:\s*1\s*\/\s*-1/);
+    expect(block(`${INTERIOR_HOST} .dict-view > *`)).toMatch(/grid-column:\s*1\s*\/\s*-1/);
   });
 
   it('sizes the columns by the CONTENT box, never by a viewport media query', () => {
@@ -349,7 +413,7 @@ describe('liquid-window.css — the Dictionary contextual band (L5.3)', () => {
     // inside an 820px window, where 772px of content cannot hold two 28rem columns —
     // measured: the track resolves to `772px` (one column) at the default size and
     // `602px 602px` at maximized.
-    expect(block('.fwin.fwin-liquid .dict-view')).toMatch(
+    expect(block(`${INTERIOR_HOST} .dict-view`)).toMatch(
       /grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(min\(28rem,\s*100%\),\s*1fr\)\)/,
     );
     const banded = rules
@@ -359,13 +423,13 @@ describe('liquid-window.css — the Dictionary contextual band (L5.3)', () => {
     // Comment-stripped on purpose: a `@media` written in prose inside a CSS
     // comment is not a viewport media query, and matching the raw sheet would
     // fail on one.
-    expect(rules.slice(rules.indexOf('.fwin.fwin-liquid .dict-view'))).not.toMatch(/@media/);
+    expect(rules.slice(rules.indexOf(`${INTERIOR_HOST} .dict-view`))).not.toMatch(/@media/);
   });
 
   it('never halves the results — dense work keeps the full measure', () => {
     // §2.3. A two-column result list is a different feature, not a spacing fix, and
     // `.lexicon-workbench` is the one child that must always span.
-    const spanAll = block('.fwin.fwin-liquid .dict-view > *');
+    const spanAll = block(`${INTERIOR_HOST} .dict-view > *`);
     expect(spanAll).toMatch(/grid-column:\s*1\s*\/\s*-1/);
     expect(rules).not.toMatch(/\.lexicon-workbench\s*\{[^}]*grid-column:\s*auto/);
   });

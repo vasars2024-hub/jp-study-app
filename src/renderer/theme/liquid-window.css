@@ -24,6 +24,19 @@
  * `DesktopShell` from `shared/liquidWindowState.ts`, and removing the class
  * restores the conventional rules below it in cascade order with no geometry,
  * focus, drag, resize or taskbar behavior touched.
+ *
+ * TWO HOSTS, ONE INTERIOR. A study app is mounted in a floating `.fwin` OR in
+ * its own borderless pop-out window (`?popout=<section>`), and until L5's Gate
+ * ran only the first was a Liquid destination — so Dictionary, Grammar,
+ * Translate and Agent had their region language permanently inert once popped
+ * out (`L5_CORE_STUDY_TOOLS.md:211`). The INTERIOR rules below therefore name
+ * both hosts through `:is()`, whose specificity is the maximum of its branches,
+ * so every one of them still scores (0,2,0) and the cascade order that rule 2
+ * above depends on is unchanged. The FRAME rules deliberately do NOT: a
+ * pop-out's frame is the OS window, opaque with the desktop compositor behind
+ * it, so a `backdrop-filter` there would sample nothing this process paints —
+ * the same inert glass rule 2 forbids on `.fwin-bar`. See
+ * `renderer/popoutPresentation.ts` decision 1.
  */
 
 .fwin.fwin-liquid {
@@ -87,7 +100,7 @@
  * material comes from the frame behind it; this layer contributes tint, edge and
  * depth over it, all from `--lq-*` tokens so a shell remap still owns the palette.
  */
-.fwin.fwin-liquid .lq-contextual {
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid) .lq-contextual {
   background: var(--lq-liquid-bg);
   border: 1px solid var(--lq-liquid-border);
   border-radius: var(--lq-liquid-radius);
@@ -112,7 +125,7 @@
  * The right border stays: it is the only thing separating the rail from the browser
  * once both are translucent over the same frame.
  */
-.fwin.fwin-liquid .medialib-rail.lq-contextual {
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid) .medialib-rail.lq-contextual {
   border-radius: 0;
   border-width: 0 1px 0 0;
   padding: var(--lq-space-4) var(--lq-space-3);
@@ -133,7 +146,7 @@
  * same reason `agent.css` gives — this surface also runs inside a floating window,
  * whose width has nothing to do with the viewport.
  */
-.fwin.fwin-liquid .agent-rail.lq-contextual {
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid) .agent-rail.lq-contextual {
   border-radius: 0;
   border-width: 0 1px 0 0;
   padding: var(--agent-gap);
@@ -141,7 +154,7 @@
 }
 
 @container (max-width: 640px) {
-  .fwin.fwin-liquid .agent-rail.lq-contextual {
+  :is(.fwin.fwin-liquid, .popout-root.popout-liquid) .agent-rail.lq-contextual {
     border-width: 0 0 1px;
   }
 }
@@ -172,13 +185,21 @@
  * glyph >= 4.5:1 on all thirteen palettes (18 leaves soft-sepia at 4.46). The inset
  * ring carries the extra weight instead, because a 1px edge at 40% costs the glyph's
  * ground nothing.
+ *
+ * `.popout-btn-liquid` is the same control in the pop-out's own bar and shares
+ * the rule rather than restating it — the 16% sweep above is a property of the
+ * accent against a chrome ground, and the pop-out bar uses `var(--sidebar)`,
+ * which is the same family of ground `.fwin-bar` uses. One rule, so the two
+ * hosts cannot drift into two different measurements.
  */
-.fwin-b-liquid.is-liquid {
+.fwin-b-liquid.is-liquid,
+.popout-btn-liquid.is-liquid {
   background: color-mix(in srgb, var(--accent) 16%, transparent);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
-.fwin-b-liquid:focus-visible {
+.fwin-b-liquid:focus-visible,
+.popout-btn-liquid:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
@@ -214,7 +235,7 @@
  * scrollbar to reach it. `MIN_W` here is 260. `min(…, 100%)` clamps the floor to the
  * container and the row simply gets narrower, which is what a floor was ever for.
  * ------------------------------------------------------------------------------ */
-.fwin.fwin-liquid .dict-view {
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid) .dict-view {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(28rem, 100%), 1fr));
   align-items: start;
@@ -224,12 +245,12 @@
 /* Everything else keeps the full measure. Reading and dense results never get halved:
  * §2.3 keeps work on a stable full-width anchor, and a two-column result list is a
  * different feature, not a spacing fix. */
-.fwin.fwin-liquid .dict-view > * {
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid) .dict-view > * {
   grid-column: 1 / -1;
   min-width: 0;
 }
 
-.fwin.fwin-liquid .dict-view > .dict-saved-searches,
-.fwin.fwin-liquid .dict-view > .lexicon-notes-browser {
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid) .dict-view > .dict-saved-searches,
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid) .dict-view > .lexicon-notes-browser {
   grid-column: auto;
 }

@@ -80,8 +80,11 @@ describe('grid track floors fit the narrowest window the product allows', () => 
     expect(read('src/renderer/components/lexicon/lexiconExamples.css')).toMatch(
       /\.lexicon-examples-list\s*\{[^}]*minmax\(min\(30rem,\s*100%\),\s*1fr\)/,
     );
+    // The host list widened when the pop-out became a Liquid destination
+    // (`popoutPresentation.ts`); the CLAMP is what this asserts, so match the
+    // rule by its `.dict-view {` tail rather than pinning one host spelling.
     expect(read('src/renderer/theme/liquid-window.css')).toMatch(
-      /\.fwin\.fwin-liquid \.dict-view\s*\{[^}]*minmax\(min\(28rem,\s*100%\),\s*1fr\)/,
+      /\.fwin-liquid[^{}]*\.dict-view\s*\{[^}]*minmax\(min\(28rem,\s*100%\),\s*1fr\)/,
     );
   });
 

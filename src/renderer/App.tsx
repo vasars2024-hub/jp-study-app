@@ -39,6 +39,8 @@ import SeanimeDevPanel from './components/SeanimeDevPanel';
 import MediaWorkspaceHost from '../media/MediaWorkspaceHost';
 import GlobalDictionaryOverlay from './components/GlobalDictionaryOverlay';
 import { registerCommandHandler } from './keyboardShortcuts';
+import { canPresentLiquid } from './liquidWindowPresentation';
+import { readPopoutPresentation, togglePopoutPresentation } from './popoutPresentation';
 import { useReaderResumeHandoff } from './readerResumeHandoff';
 import { sectionOpensMediaWorkspace } from '../shared/mediaWorkspace';
 import { addDeckCards } from './flashcardDeck';
@@ -203,6 +205,18 @@ export default function App() {
   const [studyBootNonce, setStudyBootNonce] = useState(0);
   const popout = popoutSection();
   const [secondary] = useState(secondaryDesktop);
+  // L3.2 — the pop-out's own presentation state. Hoisted above every early
+  // return because hooks cannot be conditional; a window that is not a pop-out
+  // reads `undefined` and never renders the toggle.
+  const [popoutPresentation, setPopoutPresentation] = useState(() =>
+    popout ? readPopoutPresentation(popout) : undefined,
+  );
+  const popoutPresentable = popout != null && canPresentLiquid(popout);
+  const popoutLiquid = popoutPresentable && popoutPresentation?.mode === 'liquid';
+  const togglePopoutLiquid = useCallback(() => {
+    if (!popout) return;
+    setPopoutPresentation((current) => togglePopoutPresentation(popout, current));
+  }, [popout]);
   const showMainChrome =
     chromeMode === 'borderless' &&
     !locked &&
@@ -703,11 +717,22 @@ export default function App() {
     const flush = popout === 'music' || popout === 'city' || popout === 'musicwidget' || popout === 'settings' || popout === 'games';
     const mooncapWidget = popout === 'city';
     return (
-      <div className={`popout-root ${mooncapWidget ? 'popout-root-mooncap' : ''}`}>
+      <div
+        // L5/L3.2 — this host is the second Liquid destination. Until now every
+        // interior rule was scoped to `.fwin.fwin-liquid`, so the four apps that
+        // adopted Liquid regions had them permanently inert once popped out.
+        // `popout-liquid` is the pop-out's own opt-in class; the frame stays
+        // conventional on purpose (see `popoutPresentation.ts` decision 1).
+        className={`popout-root ${mooncapWidget ? 'popout-root-mooncap' : ''} ${popoutLiquid ? 'popout-liquid' : ''}`}
+        data-presentation={popoutPresentable ? (popoutLiquid ? 'liquid' : 'standard') : undefined}
+      >
         <PopoutChrome
           label={mooncapWidget ? '' : (POPOUT_LABELS[popout] ?? popout)}
           canMaximize={!mooncapWidget}
           widget={mooncapWidget}
+          liquid={popoutLiquid}
+          canGoLiquid={popoutPresentable && !mooncapWidget}
+          onToggleLiquid={togglePopoutLiquid}
         />
         <div className={`popout-body ${flush ? 'popout-body-flush' : ''}`}>
           <AppSection section={popout} onOpenBook={setReading} />
@@ -828,13 +853,43 @@ function SecondaryDesktopWindow({
 // Chrome for a borderless pop-out window: a drag strip (the OS drag itself is
 // done in CSS via -webkit-app-region: drag) and min/max/close buttons that drive
 // this very window through the main process.
-function PopoutChrome({ label, canMaximize = true, widget = false }: { label: string; canMaximize?: boolean; widget?: boolean }) {
+function PopoutChrome({
+  label,
+  canMaximize = true,
+  widget = false,
+  liquid = false,
+  canGoLiquid = false,
+  onToggleLiquid,
+}: {
+  label: string;
+  canMaximize?: boolean;
+  widget?: boolean;
+  liquid?: boolean;
+  canGoLiquid?: boolean;
+  onToggleLiquid?: () => void;
+}) {
   return (
     <div className={`popout-bar ${widget ? 'popout-bar-widget' : ''}`}>
       <div className={`popout-drag ${label ? '' : 'popout-drag-icon'}`}>
         {label}
       </div>
       <div className="popout-controls">
+        {canGoLiquid && (
+          // The same affordance `.fwin` carries, reusing its strings and its
+          // `aria-pressed` contract. Rendered here rather than only on the
+          // desktop window because this IS the enable flow's disable path: a
+          // pop-out that could enter Liquid with no button to leave it would be
+          // the exact reversibility hole `canPresentLiquid` was written for.
+          <button
+            className={`popout-btn popout-btn-liquid ${liquid ? 'is-liquid' : ''}`}
+            title={liquid ? t('desktop.returnToStandard') : t('desktop.makeLiquid')}
+            aria-label={liquid ? t('desktop.returnToStandard') : t('desktop.makeLiquid')}
+            aria-pressed={liquid}
+            onClick={onToggleLiquid}
+          >
+            {liquid ? '◆' : '◇'}
+          </button>
+        )}
         <button className="popout-btn" title="Minimize" onClick={() => void window.api.popoutControl('minimize')}>
           ─
         </button>
