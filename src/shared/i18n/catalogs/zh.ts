@@ -439,6 +439,7 @@ export const zh: Catalog = {
   'vnPanel.aria.executable': '可执行文件路径',
   'vnPanel.browse': '浏览',
   'vnPanel.addToLibrary': '添加到库',
+  'vnPanel.reason.needTitle': '请先输入显示标题。该名称将用于在库中列出这部作品。',
   'vnPanel.emptyPrompt': '添加一部本地视觉小说，即可开始采集日语台词。',
   'vnPanel.votes': '{rating}/10 · {votes} 票',
   'vnPanel.timing': '计时中',

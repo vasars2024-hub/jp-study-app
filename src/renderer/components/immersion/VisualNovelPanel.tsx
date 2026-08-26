@@ -595,7 +595,14 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
             <input value={executablePath} onChange={(event) => setExecutablePath(event.target.value)} placeholder="Executable path" aria-label="Executable path" />
             <button type="button" onClick={() => void chooseExecutable()}>Browse</button>
           </div>
-          <button type="button" disabled={!title.trim()} onClick={() => void addEntry()}>Add to library</button>
+          <button
+            type="button"
+            disabled={!title.trim()}
+            title={!title.trim() ? t('vnPanel.reason.needTitle') : undefined}
+            onClick={() => void addEntry()}
+          >
+            Add to library
+          </button>
         </div>
         <VisualNovelImportPanel
           onImported={(next) => {

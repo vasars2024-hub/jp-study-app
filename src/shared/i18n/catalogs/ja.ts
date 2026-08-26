@@ -441,6 +441,7 @@ export const ja: Catalog = {
   'vnPanel.aria.executable': '実行ファイルのパス',
   'vnPanel.browse': '参照',
   'vnPanel.addToLibrary': 'ライブラリに追加',
+  'vnPanel.reason.needTitle': 'まず表示タイトルを入力してください。ライブラリではこの名前で一覧に表示されます。',
   'vnPanel.emptyPrompt': 'ローカルのビジュアルノベルを追加すると、日本語のセリフを取り込めます。',
   'vnPanel.votes': '{rating}/10 · {votes} 票',
   'vnPanel.timing': '計測中',

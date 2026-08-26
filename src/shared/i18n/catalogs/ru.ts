@@ -495,6 +495,7 @@ export const ru: Catalog = {
   'vnPanel.aria.executable': 'Путь к исполняемому файлу',
   'vnPanel.browse': 'Обзор',
   'vnPanel.addToLibrary': 'Добавить в библиотеку',
+  'vnPanel.reason.needTitle': 'Сначала введите отображаемое название. Именно под ним произведение появится в библиотеке.',
   'vnPanel.emptyPrompt': 'Добавьте локальную визуальную новеллу, чтобы начать захват японских диалогов.',
   'vnPanel.votes': '{rating}/10 · голосов: {votes}',
   'vnPanel.timing': 'отсчёт',

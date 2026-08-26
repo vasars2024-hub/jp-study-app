@@ -487,6 +487,7 @@ export const en: Catalog = {
   'vnPanel.aria.executable': 'Executable path',
   'vnPanel.browse': 'Browse',
   'vnPanel.addToLibrary': 'Add to library',
+  'vnPanel.reason.needTitle': 'Enter a display title first. It is how this novel is listed in the library.',
   'vnPanel.emptyPrompt': 'Add a local visual novel to begin capturing Japanese dialogue.',
   'vnPanel.votes': '{rating}/10 · {votes} votes',
   'vnPanel.timing': 'timing',
