@@ -92,10 +92,19 @@ describe('Liquid window chrome contrast', () => {
   });
 
   it('keeps the pressed fill low enough not to eat its own glyph', () => {
+    // `[^{}]*` after the anchor, not `\s*`: the pop-out's toggle
+    // (`.popout-btn-liquid`, `6c16653f`) SHARES this rule rather than restating
+    // it, so the selector is a list and the 16% sweep below governs both hosts.
+    // Matching only the bare `.fwin-b-liquid.is-liquid {` form made a shared
+    // rule read as a deleted one.
     const m = WINDOW_CSS.match(
-      /\.fwin-b-liquid\.is-liquid\s*\{[^}]*background:\s*color-mix\(in srgb,\s*var\(--accent\)\s*(\d+)%/,
+      /\.fwin-b-liquid\.is-liquid[^{}]*\{[^}]*background:\s*color-mix\(in srgb,\s*var\(--accent\)\s*(\d+)%/,
     );
     expect(m, 'the pressed fill is no longer a measurable accent mix').not.toBeNull();
+    // Both hosts, or the sweep governs one button and the other drifts.
+    expect(WINDOW_CSS, 'the pop-out toggle must share this measured fill').toMatch(
+      /\.popout-btn-liquid\.is-liquid/,
+    );
     const pct = m ? Number(m[1]) : Number.NaN;
     // The fill IS this glyph's background. 24% put it back under the bar at 4.07:1; the sweep
     // found 16 the largest share holding >= 4.5:1 on all thirteen palettes (18 -> soft-sepia 4.46).
