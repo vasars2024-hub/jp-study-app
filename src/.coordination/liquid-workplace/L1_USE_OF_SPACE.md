@@ -824,3 +824,40 @@ wrappers, each `container-name: vnwork` so the existing 560px ladder answers the
 `VisualNovelPanel.tsx` change and the file carries **239 lines of another track's uncommitted i18n
 work**, so it needs a HEAD+edit reconstruction rather than a plain `git add`. Do not "fix" this by
 widening the tool to 35% of the canvas — that is tuning a number to clear a bar.
+
+### 2026-08-26 primary — Novels PASS 10/10, and the same surface scored 57% dead an hour earlier
+
+`@.reader` with an EPUB open is the **sixth** L6 surface and the second one `@.reader` names — the
+manga reader is the other, and they share nothing but the selector. **Zero new harness lines**: the
+run is `--surface "@.reader" --label l6-novels`, the same file that scored Library, Reading Finder,
+Immersion and VN.
+
+| leg | box | clipped | overlaps | h-scroll | dead % | chrome | canvas | mechanism |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| default | 1264x821 | 0 | 0 | 0 | **5.3** | 0 | 86.6 | as found |
+| compact | 924x561 | 0 | 0 | 0 | **10.0** | 0 | 80.4 | `/bounds`, OS window |
+| maximized | 1600x1000 | 0 | 0 | 0 | **4.5** | 0 | 89.0 | `/bounds`, OS window |
+
+**PASS 10/10.** Injected clip fired 0 → 1 → 0 and was proven removed. `contentGrowsNotChrome`
+passes on both halves: chrome is 0 at every size (the reader's bars are `.reader-topbar` /
+`.reader-footer`, neither of which matches the chrome selector, so the honest reading is "no
+chrome region measured", and the canvas RISES 86.6 → 89.0). Sub-minimum leg: the OS window floors
+at **924x561** and refuses to go to 200x140, recorded rather than required.
+
+**The trap, and it is the sharpest instance this category has produced.** The first run of this
+exact command on this exact surface returned **dead 56.9 / 59.8 / 58.5, FAIL** — an 822x718 dead
+box. Nothing was wrong with the instrument and nothing was wrong with the product: the reader was
+open **at the EPUB's cover page**, one right-aligned image in a paged column, `data-paged-pages: 1`
+and progress `0%`. Four `Next` clicks reached a front-matter page that is one vertical line of text
+in the top-right corner and **still** scored dead. Only `Jump to chapter…` → option 5 (第2章)
+loaded a real page: **4,129 characters, 3,408 of them Japanese, 2 pages, 4%**. Same surface, same
+harness, same window: **57% dead vs 5% dead**, decided entirely by what was on screen.
+So: **a reader is not loaded when it renders, it is loaded when it renders TEXT.** Check
+`data-paged-pages > 1` and a Japanese character count before scoring anything book-shaped —
+`(text.match(/[぀-ヿ一-鿿]/g) || []).length` is the cheap version and it separated the two runs
+instantly. This is the third distinct dress of the empty-state trap in two turns (Immersion's lost
+page, VN's empty workspace, now a cover page), and the first one where the surface looked
+completely normal in a screenshot.
+
+**Category 4 stands at 5 of 6 L6 surfaces**: manga `@.reader`, Library, Reading Finder, Immersion
+and Novels PASS 10/10; VN is the only FAIL and its one remaining bar is named in the section above.
