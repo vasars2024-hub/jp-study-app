@@ -200,7 +200,8 @@ export default function ReadingCapturesView({ passage }: ReadingCapturesViewProp
       : matched.slice().sort((a, b) => b.capturedAt - a.capturedAt);
   }, [rows, query, activeSource, order]);
 
-  const filtered = query.trim().length > 0 || activeSource !== ALL_SOURCES;
+  // No `filtered` flag: `rows.length > 0 && visibleRows.length === 0` is only
+  // reachable through a filter, because an unfiltered projection IS `rows`.
   const clearFilter = useCallback(() => {
     setQuery('');
     setSource(ALL_SOURCES);
