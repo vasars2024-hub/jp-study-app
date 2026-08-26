@@ -366,10 +366,34 @@ const CONTROL_REMOVE = `(function(){
   return JSON.stringify({ removed: !!n });
 })()`;
 
+/**
+ * Correction 14: `.sp-seg-btn[lang]` IS NOT UNIQUE, and the unscoped form clicked a real
+ * setting that has nothing to do with the UI language.
+ *
+ * `sp-seg` is the shared segmented-control class, so `.sp-seg-btn` with a `lang` attribute
+ * also matches the **Subtitle & transcription** language segment in `MediaContent.tsx`
+ * (`.sp-seg.media-modelseg`, buttons lang="ja" and lang="zh"). Measured live: with the
+ * Settings window open on any page other than Appearance, the UI-language card is not
+ * rendered at all, and `document.querySelectorAll('.sp-seg-btn')` returned ONLY those two.
+ * Asking for `ja` therefore clicked the transcription control — which calls
+ * `setStudyLang('ja')` and, when that is a real change, silently rewrites the user's
+ * `jp-study-whisper-model` to the language default.
+ *
+ * The `storedLang !== l.stored` guard below did catch the miss and VOID the run, so no
+ * false number was ever recorded — but it catches it AFTER the wrong control has already
+ * been pressed, which is too late for a setting. Scoping to the card is what makes the
+ * leg safe. Note the attribute: `SettingsCard` renders its `id` prop as `data-setting-id`,
+ * NOT as a DOM `id` (`SettingsCard.tsx:51`), so `getElementById('ui-language')` is null and
+ * would have made this refuse every time — a scoping fix that never runs is not a fix.
+ * If the card is absent the leg refuses and names the page to open, rather than falling
+ * back to whatever else on screen happens to carry the class.
+ */
 const clickLang = (tag) => `(function(){
-  var b = [].slice.call(document.querySelectorAll('.sp-seg-btn')).filter(function(x){
+  var card = document.querySelector('[data-setting-id="ui-language"]');
+  if (!card) return JSON.stringify({ refuse: 'no ui-language card on screen - open Settings > Appearance; refusing to click a bare .sp-seg-btn, which also matches the Subtitle & transcription segment' });
+  var b = [].slice.call(card.querySelectorAll('.sp-seg-btn')).filter(function(x){
     return x.getAttribute('lang') === ${JSON.stringify('TAG')}.replace('TAG', ${JSON.stringify(tag)}); })[0];
-  if (!b) return JSON.stringify({ refuse: 'no .sp-seg-btn for that lang tag' });
+  if (!b) return JSON.stringify({ refuse: 'no .sp-seg-btn for that lang tag inside #ui-language' });
   b.click();
   return JSON.stringify({ clicked: ${JSON.stringify(tag)} });
 })()`;

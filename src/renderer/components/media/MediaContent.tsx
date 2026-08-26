@@ -1892,14 +1892,20 @@ export function MediaYoutubeBar({ state }: { state: MediaState }) {
           value={state.ytSubLang}
           onChange={(e) => state.setYtSubLang(e.target.value as YouTubeSubtitleLang)}
           disabled={!!state.yt}
-          title="Download existing subtitles when available"
-          aria-label="Existing subtitle language"
+          title={t('media.yt.subLang.title')}
+          aria-label={t('media.yt.subLang.label')}
         >
-          <option value="none">No existing subs</option>
-          <option value="ja">Japanese subs</option>
-          <option value="zh">Chinese subs</option>
-          <option value="en">English subs</option>
-          <option value="ru">Russian subs</option>
+          {/* Seven raw English literals sat here, inside a block where the placeholder,
+              the button and both progress strings were already localised. No guard in
+              this repo can see that: `i18n-check` compares catalogues against each
+              other, so a string that never became a key is missing from none of them.
+              Only the sweep's four-language leg, which asserts the rendered text
+              CHANGES between languages, finds an island like this. */}
+          <option value="none">{t('media.yt.subLang.none')}</option>
+          <option value="ja">{t('media.yt.subLang.ja')}</option>
+          <option value="zh">{t('media.yt.subLang.zh')}</option>
+          <option value="en">{t('media.yt.subLang.en')}</option>
+          <option value="ru">{t('media.yt.subLang.ru')}</option>
         </select>
         <button
           className="btn"

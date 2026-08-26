@@ -79,6 +79,42 @@ describe('Video action disabled reasons', () => {
     }
   });
 
+  it('leaves no raw English in the subtitle-language select beside those buttons', () => {
+    // Seven literals sat in the middle of this block — `title`, `aria-label` and five
+    // `<option>` captions — while the placeholder, the button and both progress strings
+    // around them were already localised. No guard in this repo can see an island like
+    // that: a raw-key sweep looks for dot-separated keys and these are real English
+    // words, and `i18n-check` compares catalogues against each other, so a string that
+    // never became a key is missing from none of them.
+    const content = readFileSync(resolve(SRC, 'renderer/components/media/MediaContent.tsx'), 'utf8');
+    for (const literal of [
+      '"Download existing subtitles when available"',
+      '"Existing subtitle language"',
+      '>No existing subs<',
+      '>Japanese subs<',
+      '>Chinese subs<',
+      '>English subs<',
+      '>Russian subs<',
+    ]) {
+      expect(content).not.toContain(literal);
+    }
+
+    const keys = [
+      'media.yt.subLang.title', 'media.yt.subLang.label', 'media.yt.subLang.none',
+      'media.yt.subLang.ja', 'media.yt.subLang.zh', 'media.yt.subLang.en', 'media.yt.subLang.ru',
+    ] as const;
+    for (const key of keys) {
+      expect(en[key]).toBeTruthy();
+      // The negative control: an entry that merely EXISTS in ja/zh/ru can still be the
+      // English text copied across, which is the same defect wearing a key. Only a
+      // difference from `en` shows the string was actually translated.
+      for (const catalog of [ja, ru, zh]) {
+        expect(catalog[key]).toBeTruthy();
+        expect(catalog[key]).not.toBe(en[key]);
+      }
+    }
+  });
+
   it('is what both shells actually consult, rather than a second opinion', () => {
     // The module is only worth having if `disabled` derives from it. A component
     // that kept its own condition list would drift from the sentence it shows.
