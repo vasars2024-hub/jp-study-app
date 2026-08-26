@@ -742,3 +742,53 @@ reads `ja` with `jp-study-whisper-model` = `kotoba-whisper` = `defaultWhisperTie
 — invisible to every guard here, since a string that never became a key is missing from no
 catalogue. Now `media.yt.subLang.*` ×4 languages, verified by reading the select in ja/zh/ru
 through the fixed clicker, `ui-lang` restored to `en` and asserted (`e7e2df32`).
+
+## 2026-08-26 — three surfaces, zero harness lines, and one banner that named the wrong step
+
+**Category 8 goes 2 of 6 L6 surfaces to 4 of 6** (Captures, Library, + **Immersion**, **Novels**).
+VN was FIXED but is deliberately NOT scored — see below. Board: category 1 complete 6/6,
+category 8 at 4/6, nothing else complete = **10 of 48 cells**.
+
+| surface | before | after | control | commit |
+| --- | --- | --- | --- | --- |
+| Immersion | mutePairs 0, wrong error text | PASS 10/10 | 0,0,0 → 1,1,1 → 0,0,0 | `41163dfe` |
+| Novels | mutePairs **2**, FAIL | PASS 10/10 | 0,0,0 → 1,1,1 → 0,0,0 | `90ad3e92` |
+| VN | mutePairs 1 | 0, **unscored** | — | `14636648` |
+
+**RULE 1, measured: 0 new harness lines across three surfaces.** `cat8-honest-states.cjs` ran
+unmodified every time. Ratio **10 : 309 = 0.03 : 1** — the 10 is `debug/lq-ev.cjs`, a gitignored
+one-expression bridge caller, counted AS measurement rather than let the ignore rule flatter it.
+
+**The finding passive observation could never have made.** Immersion read PASS 10/10 with
+`statesObservable: ["empty"]` before anything was driven. Submitting a dead address gave
+*"Reader extraction failed. Wait for the page to finish loading, then try again."* — the page
+had never opened (`ERR_CONNECTION_REFUSED`), so the advice was to wait for something that would
+never happen, at a step that had not run. Chromium fires `did-stop-loading` after a FAILED load
+too, and the reader pass scheduled off it opens with `setError(null)`: the true reason was set
+and overwritten ~400 ms later by a symptom. Rules now in `shared/immersionLoadFailure.ts`.
+
+**Its control, which is the part that makes the fix a measurement.** A page that DID load and
+has no article still says "Reader extraction failed" — unchanged. Before the fix both cases said
+the same wrong thing; they are now distinguished. Driven live: `ERR_UNSAFE_PORT` and
+`ERR_NAME_NOT_RESOLVED` both named with their reason.
+
+**Two events are excluded on purpose**, because reporting them is a FABRICATED error rather than
+a missing one: a subframe failure (a blocked ad iframe on a page that rendered fine) and
+`ERR_ABORTED`, which is the user replacing their own navigation.
+
+**Novels: `busy` is why all six actions were covered, not the two the sweep caught.** Four are
+`disabled={busy}` and the sweep ran while nothing was running — scoring that moment and calling
+the row clean is measuring the easy case. Priority in `novelsActionReason.ts` is the INVERSE of
+Video's: the STRUCTURAL condition beats `busy`, because waiting cannot supply a direct EPUB and
+"wait for the run to finish" would send the user back to a button that is still dead.
+
+**VN is fixed and NOT scored, and that is the honest verdict.** Its library is empty this
+session: 8 controls against the 74 category 1 measured populated, and the rubric caps an
+empty harness at 0. A PASS here would be a number nobody earned. Repopulate with cat 1's recipe
+(native value setter + `input` on the title field, then `Add to library`) and re-run.
+
+**Trap, paid twice.** `NovelsContent.tsx` (58 foreign hunks) and `VisualNovelPanel.tsx` (65) both
+carry another track's pending i18n rewrite, so both landed as HEAD+edit blobs. Novels' HEAD had
+**no `useT` at all**, so one import and one hook line came with the fix; the worktree already had
+both, so nothing duplicated. VN's worktree copy is **CRLF against an all-LF HEAD** — a find built
+from the worktree line matches HEAD zero times and refuses loudly. Build both forms.
