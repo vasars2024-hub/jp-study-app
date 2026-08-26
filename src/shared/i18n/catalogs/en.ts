@@ -767,7 +767,11 @@ export const en: Catalog = {
   'unifiedSearch.resultsLabel': 'Per-source progress',
   'unifiedSearch.providerCount': { one: '{count} source', other: '{count} sources' },
   'unifiedSearch.resultCount': { one: '{count} result', other: '{count} results' },
-  'unifiedSearch.status.idle': 'Enter a term to search your enabled sources.',
+  // Reached in exactly one state, in both of its consumers: a term IS entered and no search has
+  // run yet. `ReadingUnifiedDiscovery` only mounts when `query.trim()` is truthy, and
+  // `UnifiedSearchPanel` short-circuits an empty query to `unifiedSearch.plan.emptyQuery` first.
+  // The old copy asked for the term the user had already typed.
+  'unifiedSearch.status.idle': 'Press Search to look for this term across your enabled sources.',
   'unifiedSearch.status.running': 'Searching enabled sources…',
   'unifiedSearch.status.completed': 'Search complete.',
   'unifiedSearch.status.cancelled': 'Search cancelled.',
@@ -4488,6 +4492,7 @@ export const en: Catalog = {
     other: '{count} sites',
   },
   'reading.noMatches': 'No sites match those filters.',
+  'reading.catalogueNoMatch': 'No catalogue site matches “{query}”. Search below looks beyond the catalogue.',
   'reading.furiganaBadge': 'Furigana',
   'reading.meta.level': 'Level',
   'reading.meta.pricing': 'Price',

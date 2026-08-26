@@ -15,7 +15,8 @@
  *
  * Run:
  *   node src/.coordination/liquid-workplace/probes/cat8-honest-states.cjs \
- *     --surface "Dictionary" [--win main] [--label dictionary] [--langs] [--control] [--out <file>]
+ *     --surface "Dictionary" [--win main] [--label dictionary] [--langs] [--control] [--out <file>] \
+ *     [--drive-input "<css>"] [--drive-value "<text>"]
  *
  * --surface takes the same two forms as the category-1 and category-4 harnesses, deliberately, so
  * a surface is named identically in all three: a leading `@` is a CSS SELECTOR (a section of the
@@ -54,6 +55,14 @@
  *     `notObservable` and EXCLUDED from the denominator — scoring it as a pass would be the same
  *     fabrication the category exists to catch, and scoring it as a fail would penalise a surface
  *     for a state it does not have.
+ *  9. PASSIVE OBSERVATION MEASURES NOTHING ON A HEALTHY SURFACE, and this one bit on the first
+ *     surface ever run: Reading Finder rendered 71 text runs, 0 raw keys, 0 placeholders and
+ *     0 mute pairs, and all four states came back `hosts: 0` — because the list had 8 results and
+ *     nothing had gone wrong. The old code scored `observable.length > 0 && …`, i.e. **FAIL**, on a
+ *     surface with no defect. A state must be DRIVEN to be measured. `--drive-input` types an
+ *     adverse query into the surface's own filter, re-probes, restores, and ASSERTS the restore by
+ *     text hash; a surface with no such input reports `statesNamed: 'UNMEASURED'`, which is neither
+ *     a 10 nor a FAIL — it is the honest verdict and it exits 3.
  *  7. The FABRICATED-VALUE verdict still needs an empty scratch profile: on a populated profile
  *     real data and a hardcoded constant look identical. This harness reports status-word
  *     candidates and does NOT issue that verdict. What it DOES decide is the placeholder shapes,
@@ -85,10 +94,16 @@ const WIN = arg('win', '');
 const OUT = arg('out', '');
 const CONTROL = has('control');
 const LANGS = has('langs');
+const DRIVE_INPUT = arg('drive-input', '');
+// Nonsense on purpose: it must match nothing in ANY catalogue, in any of the four languages.
+const DRIVE_VALUE = arg('drive-value', 'zzqqxxnosuchthing');
 if (!SURFACE) {
   console.error('REFUSE - --surface is required; this harness names no surface of its own');
   process.exit(2);
 }
+// A run that dies before it writes leaves the PREVIOUS run's file sitting there looking current.
+// That happened on this harness's second surface and a stale FAIL was nearly recorded as fresh.
+if (OUT && fs.existsSync(OUT)) fs.unlinkSync(OUT);
 const IS_SELECTOR = SURFACE.startsWith('@');
 const SELECTOR = IS_SELECTOR ? SURFACE.slice(1) : null;
 const LABEL = arg('label', (SELECTOR || SURFACE).replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, ''));
@@ -238,12 +253,17 @@ const CONTROL_INJECT = `(function(){
   key.textContent = 'dict.results.err.addFailed';
   var ph = document.createElement('p');
   ph.textContent = 'Lorem ipsum dolor sit amet, consectetur.';
+  // The three failures must be INDEPENDENT. Injected as siblings of one div they were not: the
+  // mute detector reads the control's parent text as an explanation, so the Lorem paragraph
+  // explained the disabled button and moved.mutePairs came back false on a working detector.
+  var muteHost = document.createElement('div');
   var mute = document.createElement('button');
   mute.disabled = true;
   mute.textContent = 'Go';
+  muteHost.appendChild(mute);
   host.appendChild(key);
   host.appendChild(ph);
-  host.appendChild(mute);
+  host.appendChild(muteHost);
   root.appendChild(host);
   return JSON.stringify({ injected: true });
 })()`;
@@ -289,6 +309,68 @@ async function raise() {
 }
 
 const run = async () => JSON.parse(await ev(PROBE));
+
+/**
+ * Correction 9: DRIVE the empty state rather than waiting for it.
+ *
+ * Typed through the native value setter plus a bubbling `input` event, because React listens on
+ * `input` and assigning `.value` directly leaves its state a render behind — a recorded false
+ * result in this repo. The original value is captured first and put back the same way, and the
+ * restore is asserted on the surface's own text hash rather than by eye.
+ */
+const setInput = (sel, value) => `(function(){
+  var root = ${ROOT_EXPR};
+  if (!root) return JSON.stringify({ refuse: 'surface not found for drive' });
+  var el = root.querySelector(${JSON.stringify(sel)});
+  if (!el) return JSON.stringify({ refuse: 'drive input not found: ' + ${JSON.stringify(sel)} });
+  var was = el.value;
+  var proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+  var setter = Object.getOwnPropertyDescriptor(proto, 'value').set;
+  el.focus();
+  setter.call(el, ${JSON.stringify(value)});
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  return JSON.stringify({ was: was, now: el.value });
+})()`;
+
+async function driveLeg(base) {
+  const set = JSON.parse(await ev(setInput(DRIVE_INPUT, DRIVE_VALUE)));
+  if (set.refuse) return { refuse: set.refuse };
+  await sleep(600);
+  const driven = await run();
+  if (driven.refuse) { await ev(setInput(DRIVE_INPUT, set.was)); return { refuse: `driven: ${driven.refuse}` }; }
+  const back = JSON.parse(await ev(setInput(DRIVE_INPUT, set.was)));
+  await sleep(600);
+  const restored = await run();
+  return {
+    input: DRIVE_INPUT,
+    value: DRIVE_VALUE,
+    originalValue: set.was,
+    // A drive that changed nothing has not driven anything; scoring its states would be fabrication.
+    surfaceChanged: driven.textHash !== base.textHash,
+    restored: restored.textHash === base.textHash && back.now === set.was,
+    driven: {
+      textRuns: driven.textRuns,
+      states: driven.states,
+      mutePairCount: driven.mutePairCount,
+      mutePairs: driven.mutePairs,
+      rawKeyCount: driven.rawKeyCount,
+      rawKeys: driven.rawKeys,
+      placeholderCount: driven.placeholderCount,
+    },
+  };
+}
+
+/** A state is observable if EITHER the resting surface or the driven one renders its host. */
+function mergeStates(a, b) {
+  const out = {};
+  for (const k of Object.keys(a)) {
+    out[k] = {
+      hosts: Math.max(a[k].hosts, b ? b[k].hosts : 0),
+      messages: a[k].messages.concat(b ? b[k].messages : []),
+    };
+  }
+  return out;
+}
 
 /**
  * Correction 3: run the surface in all four languages and compare RENDERED TEXT, not key counts.
@@ -363,18 +445,37 @@ async function langLeg() {
     }
   }
 
-  const observable = Object.entries(base.states).filter(([, v]) => v.hosts > 0);
+  if (DRIVE_INPUT) {
+    base.drive = await driveLeg(base);
+    if (base.drive.refuse) { console.error(`VOID - drive leg: ${base.drive.refuse}`); process.exit(3); }
+    if (!base.drive.restored) {
+      console.error(`VOID - drive did not restore the surface: ${JSON.stringify(base.drive)}`);
+      process.exit(3);
+    }
+    if (!base.drive.surfaceChanged) {
+      console.error('VOID - the drive input changed nothing; it is not this surface\'s filter');
+      process.exit(3);
+    }
+  }
+
+  // Correction 9: the driven pass contributes its states, and its mute pairs — a control that only
+  // goes disabled when the list empties is invisible to a resting probe.
+  const allStates = mergeStates(base.states, base.drive ? base.drive.driven.states : null);
+  const observable = Object.entries(allStates).filter(([, v]) => v.hosts > 0);
   const named = observable.filter(([, v]) => v.messages.length > 0);
+  const muteWorst = Math.max(base.mutePairCount, base.drive ? base.drive.driven.mutePairCount : 0);
   const bars = {
     rawKeys: LANGS ? base.languages.rawKeyCountMax === 0 : base.rawKeyCount === 0,
     placeholders: base.placeholderCount === 0,
-    mutePairs: base.mutePairCount === 0,
+    mutePairs: muteWorst === 0,
     // Correction 6: only the states this surface can be in are in the denominator.
-    statesNamed: observable.length > 0 && named.length === observable.length,
+    // Correction 9: zero observable states is UNMEASURED, not a fail and not a 10.
+    statesNamed: observable.length === 0 ? 'UNMEASURED' : named.length === observable.length,
     // Correction 3: with --langs, the surface must demonstrably differ between languages.
     languagesDiffer: !LANGS || base.languages.distinctHashes > 1,
   };
-  const pass = Object.values(bars).every(Boolean);
+  const unmeasured = Object.entries(bars).filter(([, v]) => v === 'UNMEASURED').map(([k]) => k);
+  const pass = Object.values(bars).every((v) => v === true);
 
   const out = {
     label: LABEL,
@@ -382,11 +483,17 @@ async function langLeg() {
     win: WIN || '(focused)',
     ...base,
     statesObservable: observable.map(([k]) => k),
-    statesNotObservable: Object.entries(base.states).filter(([, v]) => v.hosts === 0).map(([k]) => k),
+    statesNotObservable: Object.entries(allStates).filter(([, v]) => v.hosts === 0).map(([k]) => k),
     statesNamed: `${named.length} of ${observable.length} observable`,
+    mutePairCountWorst: muteWorst,
     bars,
-    verdict: pass ? 'PASS 10/10' : 'FAIL',
-    failedBars: Object.entries(bars).filter(([, v]) => !v).map(([k]) => k),
+    verdict: pass
+      ? 'PASS 10/10'
+      : (unmeasured.length && !Object.values(bars).some((v) => v === false)
+        ? `UNMEASURED - ${unmeasured.join(',')}; drive the surface with --drive-input or score 0, never 10`
+        : 'FAIL'),
+    failedBars: Object.entries(bars).filter(([, v]) => v === false).map(([k]) => k),
+    unmeasuredBars: unmeasured,
     notMeasuredHere: [
       'dead-control count (honesty-probe A - every control driven for a side effect)',
       'fabricated-value verdict (honesty-probe B - needs an empty scratch profile)',
@@ -424,5 +531,7 @@ async function langLeg() {
   const text = JSON.stringify(out, null, 2);
   if (OUT) fs.writeFileSync(OUT, text);
   console.log(text);
-  process.exit(out.verdict.startsWith('PASS') ? 0 : 1);
+  // 0 pass, 1 a real failure, 3 unmeasured/void — an unmeasured surface must never be filed as a
+  // clean fail, because a fail is a defect list and this one has no defects to fix.
+  process.exit(out.verdict.startsWith('PASS') ? 0 : (out.verdict.startsWith('UNMEASURED') ? 3 : 1));
 })().catch((e) => { console.error(String(e && e.message ? e.message : e)); process.exit(4); });

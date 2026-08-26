@@ -498,3 +498,50 @@ damage. Recorded so the next worker does not "fix" it. `baselines/cat7-l6-librar
 interpolation is invisible to both standard guards — a raw-key sweep sees a real English sentence,
 a key-count check sees nothing missing. Its third case is the negative control (each locale must
 differ from `en`; deleting a locale entry makes `translate` fall back and collapses them to equal).
+
+## 2026-08-26 · primary — category 8's first RUN, and a healthy surface scored FAIL
+
+**The harness's first execution ever** (`746d239e` checkpointed it NEVER RUN). Surface 1 of 6:
+Reading Finder / Captures, `--surface "Reading Finder"`.
+
+**First read: FAIL on `statesNamed`, on a surface with no defect.** 71 text runs, 0 raw keys,
+0 placeholders, 0 mute pairs — and all four states `hosts: 0`, because the list had 8 results and
+nothing had gone wrong. Passive observation measures nothing on a healthy surface. Two instrument
+changes, both recorded as corrections 9 and the `--out` guard:
+- `--drive-input "<css>"` types an adverse query through the native value setter, re-probes,
+  restores, and ASSERTS the restore by text hash. A surface with no such filter now reports
+  `statesNamed: 'UNMEASURED'` and exits **3** — neither a 10 nor a FAIL, because a FAIL is a defect
+  list and an unmeasured surface has no defects to fix.
+- `--out` is deleted at start. A run that dies before writing leaves the previous run's file
+  looking current; that happened here and a stale FAIL was nearly recorded as fresh.
+
+**The defect the drive found, and it is a real one.** `ReadingFinderView.tsx:107` swaps
+`ReadingSiteGrid` for `ReadingUnifiedDiscovery` the instant `query.trim()` is truthy, so
+`ReadingSiteGrid`'s own `reading.noMatches` **can never render for a query**. Typing
+`zzqqxxnosuchthing` left `gram-count` reading **"0 sites"** beside nothing at all, above a panel
+whose status line read **"Enter a term to search your enabled sources."** — asking for the term
+already in the box. `emptyEls: []`, `grid: false`, `cards: 0`, measured live.
+
+**`unifiedSearch.status.idle` was never true in either consumer, so it is a catalog-only fix.**
+`ReadingUnifiedDiscovery` only mounts when `query.trim()` is truthy; `UnifiedSearchPanel:106`
+short-circuits an empty query to `unifiedSearch.plan.emptyQuery` before the switch. The key renders
+in exactly one state — term entered, no search run — so the copy now names that state and the next
+action. Fixing it in the catalog also kept the change out of `ReadingUnifiedDiscovery.tsx`, which
+carries **121 lines of another track's uncommitted work**.
+
+| surface | rect | textRuns rest/driven | rawKeys | placeholders | mutePairs | statesNamed | verdict |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Captures (Reading Finder) | 820x580 | 71 / 35 | **0** | **0** | **0** | **1 of 1 observable** | **10/10** |
+
+Control fired: `[0,0,0]` → `[1,1,1]` → `[0,0,0]`, `backToBaseline: true`. Drive `surfaceChanged`
+and `restored` both true. `baselines/cat8-l6-captures.json`. Commit `<HASH>`.
+
+**Two traps, both paid this turn, both cheap to re-pay and expensive to rediscover.**
+1. **Correction 8 bit me while I was writing correction 9.** A comment inside `CONTROL_INJECT`'s
+   template literal containing backticks is a `SyntaxError` in the harness, not the browser — and
+   because I read the result from `--out` rather than stdout, the dead run's output looked like a
+   live FAIL. That is what the `--out` unlink now prevents.
+2. **The negative control's three failures must be INDEPENDENT.** Injected as siblings of one div,
+   the Lorem paragraph served as the disabled button's explanation — `parentText.replace(ownText)`
+   is the mute detector's own rule — so `moved.mutePairs` was false on a detector that works. The
+   button now gets its own wrapper.

@@ -104,6 +104,18 @@ export default function ReadingFinderView({
           <div className="gram-count muted">{t('reading.count', { count: list.length })}</div>
         )}
 
+        {/*
+          The catalogue grid unmounts the moment a term is typed — that is the ternary directly
+          below — so `ReadingSiteGrid`'s own "No sites match those filters." can never render for a
+          query, and the "0 sites" count above was left standing beside nothing at all. Says which
+          list emptied and that Search reaches past it. Rubric category 8.
+        */}
+        {mode === 'discover' && query.trim() !== '' && list.length === 0 && (
+          <div className="res-empty muted" aria-live="polite">
+            {t('reading.catalogueNoMatch', { query: query.trim() })}
+          </div>
+        )}
+
         {mode === 'discover' && (query.trim() ? (
           <ReadingUnifiedDiscovery
             query={query}
