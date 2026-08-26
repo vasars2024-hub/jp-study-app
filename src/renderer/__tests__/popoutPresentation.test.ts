@@ -123,11 +123,15 @@ describe('the pop-out host is wired to the sheet', () => {
     expect(app).toMatch(/aria-pressed=\{liquid\}/);
   });
 
-  it('the sheet paints the interior on both hosts and the frame on neither', () => {
+  it('the sheet paints the interior on every host and the frame on none of them', () => {
     const sheet = src('src/renderer/theme/liquid-window.css').replace(/\/\*[\s\S]*?\*\//g, '');
-    // The interior rules a popped-out study app depends on.
+    // The interior rules a popped-out study app depends on. Asserted against the
+    // WHOLE `:is()` list rather than a `.popout-root…)` suffix: the reader joined
+    // that list as the third host, and a suffix match would have read "the
+    // pop-out host is gone" the moment anything was appended after it.
+    const hosts = ':is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid)';
     for (const region of ['.lq-contextual', '.agent-rail.lq-contextual', '.dict-view']) {
-      expect(sheet, region).toContain(`.popout-root.popout-liquid) ${region}`);
+      expect(sheet, region).toContain(`${hosts} ${region}`);
     }
     // NEGATIVE: the pop-out's frame is the OS window and takes no material.
     // Without this the widening would have been a blanket find-and-replace, and

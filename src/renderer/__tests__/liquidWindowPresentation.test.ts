@@ -25,16 +25,19 @@ import {
 const SHEET = resolve(__dirname, '..', 'theme', 'liquid-window.css');
 
 /**
- * The two Liquid hosts, as the sheet writes them.
+ * The three Liquid hosts, as the sheet writes them.
  *
  * `.fwin` is the floating desktop window; `.popout-root` is the same app in its
- * own borderless OS window (`?popout=<section>`), which is not a `.fwin` at all.
- * Only the INTERIOR rules name both — a pop-out's frame is the OS window and
- * takes no material (`popoutPresentation.ts` decision 1) — so `FRAME_HOST` and
+ * own borderless OS window (`?popout=<section>`), which is not a `.fwin` at all;
+ * `.reader` is the full-screen reader, which `App.tsx` returns as the whole app
+ * render and which is therefore inside neither. Only the INTERIOR rules name all
+ * three — a pop-out's frame is the OS window and the reader fills that window
+ * edge to edge, so neither takes material (`popoutPresentation.ts` and
+ * `readerPresentation.ts`, decision 1 in each) — so `FRAME_HOST` and
  * `INTERIOR_HOST` are deliberately different constants rather than one.
  */
 const FRAME_HOST = '.fwin.fwin-liquid';
-const INTERIOR_HOST = ':is(.fwin.fwin-liquid, .popout-root.popout-liquid)';
+const INTERIOR_HOST = ':is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid)';
 
 /**
  * Whether a selector is anchored on `host`.

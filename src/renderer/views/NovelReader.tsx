@@ -18,6 +18,8 @@ import {
   ReadingCanvas,
   type ReadingCanvasTool,
 } from '../components/liquid/ReadingCanvas';
+import ReaderLiquidToggle from '../components/liquid/ReaderLiquidToggle';
+import { useReaderPresentation } from '../readerPresentation';
 import { READING_CANVAS_FILL_POLICY } from '../../shared/liquidReadingCanvas';
 import DictionaryPopup from '../components/DictionaryPopup';
 import Icon from '../components/Icons';
@@ -196,6 +198,8 @@ function parseLoc(loc: string | undefined): { part: number; frac: number } | nul
  */
 export default function NovelReader({ item, onClose }: Props) {
   const aero = useAeroMaterials();
+  // L3.2 — the reader is the app's third Liquid host. See `readerPresentation.ts`.
+  const presentation = useReaderPresentation('book');
   const scrollerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -2926,7 +2930,10 @@ export default function NovelReader({ item, onClose }: Props) {
 
   return (
     <AppChrome menus={readerMenus} status={readerStatus} className="aero-reader-chrome">
-    <div className={`reader${aero ? ' aero-reader' : ''}`}>
+    <div
+      className={`reader${aero ? ' aero-reader' : ''}${presentation.liquid ? ' reader-liquid' : ''}`}
+      data-presentation={presentation.dataPresentation}
+    >
       <style>{injectedCss}</style>
       <div className="reader-bar">
         <button className="btn" onClick={onClose} title="Return to library">
@@ -3081,6 +3088,15 @@ export default function NovelReader({ item, onClose }: Props) {
           >
             <Icon name="flashcards" size={14} />
           </button>
+          {/*
+            Deliberately OUTSIDE the `!linkView` fragment above. The link view is
+            reachable from inside a Liquid reader, and a presentation that can be
+            entered but not left while an article is open is the reversibility
+            hole `canPresentLiquid` exists to prevent.
+          */}
+          {presentation.presentable && (
+            <ReaderLiquidToggle liquid={presentation.liquid} onToggle={presentation.toggle} />
+          )}
         </div>
       </div>
 

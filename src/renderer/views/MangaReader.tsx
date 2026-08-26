@@ -29,6 +29,8 @@ import RegionEditorModal from '../components/manga/RegionEditorModal';
 import MangaRegionDrawLayer from '../components/manga/MangaRegionDrawLayer';
 import MangaSidebar from '../components/manga/MangaSidebar';
 import { ReadingCanvas, type ReadingCanvasTool } from '../components/liquid/ReadingCanvas';
+import ReaderLiquidToggle from '../components/liquid/ReaderLiquidToggle';
+import { useReaderPresentation } from '../readerPresentation';
 import { READING_CANVAS_FILL_POLICY } from '../../shared/liquidReadingCanvas';
 import Icon from '../components/Icons';
 import { runOcr, type OcrLang } from '../ocr';
@@ -126,6 +128,8 @@ function savedPageIndex(item: LibraryItem): number {
 
 export default function MangaReader({ item, onClose }: Props) {
   const { t } = useT();
+  // L3.2 — the reader is the app's third Liquid host. See `readerPresentation.ts`.
+  const presentation = useReaderPresentation('manga');
   const sourceLang = getActiveProfile().targetLang;
   const [targetLang, setTargetLang] = useState(() => mangaTargetLang());
   const targetLangRef = useRef(targetLang);
@@ -1785,7 +1789,11 @@ export default function MangaReader({ item, onClose }: Props) {
   }
 
   return (
-    <div className="reader" style={themeStyle}>
+    <div
+      className={`reader${presentation.liquid ? ' reader-liquid' : ''}`}
+      style={themeStyle}
+      data-presentation={presentation.dataPresentation}
+    >
       <div className="reader-bar">
         <button className="btn" onClick={requestClose}>
           <Icon name="chevron" size={13} style={{ transform: 'rotate(180deg)', marginRight: 4, verticalAlign: '-2px' }} />
@@ -1852,6 +1860,9 @@ export default function MangaReader({ item, onClose }: Props) {
             <Icon name="eye" size={13} style={{ marginRight: 4, verticalAlign: '-2px' }} />
             {t('manga.lens.capture')}
           </button>
+          {presentation.presentable && (
+            <ReaderLiquidToggle liquid={presentation.liquid} onToggle={presentation.toggle} />
+          )}
         </div>
       </div>
       <ReadingCanvas
