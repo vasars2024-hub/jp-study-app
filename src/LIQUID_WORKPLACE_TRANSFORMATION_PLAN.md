@@ -668,6 +668,32 @@ optional, transition-only) and the reader dismisses on the way in.
 **Left: mining, source, deep-link.** Guard extends the existing category-4 sweep rather than
 adding a probe, and it found two more instances of (3) in `aero-apps.css`, both fixed.
 
+**Bullet 2 CLOSED 2026-08-25 (later 3)** (`daf70721`). The last three driven end to end, each on
+the surface that owns it, each with a control that had to fail and did.
+**Mining**, Library, no defect: clicked from inside the SHEET at a 592 px canvas — handoff
+`{"bookId":"078d8fa0-…"}`, `os:open` + `flashcards:openEpubMining` both fired, Flashcards opened,
+handoff consumed, step 1 preselected that id, **1 of 21 options**. Tool node and mine button both
+kept the expando across docked 262 → sheet 592 → docked 262. Controls: a manga item offers
+`read, dictionary` and **no `mine`**; a genuine unmount/remount reads `REBUILT`.
+**Deep-link**, Captures, DEFECT (5) fixed: a passage staged through the real
+`readingPassageHandoffStage` landed with section, head and `aria-current` all correct while
+`data-covered="true"` and the document was `inert` at 552 px — the user asked to read a passage and
+was shown the index. `onDocumentCoveredChange` is transition-only, which is right for dismissing an
+overlay and wrong for something arriving from outside; `useReadingDocumentCover()` now answers "is
+it covered right now" from the canvas module, so the other five surfaces cost a line each. Only
+when it actually covers — a docked list is beside the document, and the docked control stays open.
+**Source**, Captures, no defect: row title, localised row meta ("Image", no `settings.lens` key
+leak) and reader head all identical across 1142/870 docked → 552 sheet → 1142/870, on their
+original nodes.
+**Trap that nearly became a finding: an unfocused Electron renderer does not deliver
+ResizeObserver notifications.** An inline `.fwin` width move (580 → 639 → 835) left
+`data-content-width` at **756**, survived a full `/reload`, and reads exactly like a frozen canvas.
+An independent RO on the same element logged **zero** entries and a React state change in the same
+eval did not help — React commits without a frame, RO delivery needs one. `POST /focus` first and
+it fires immediately (`[652]`, believed 652, real 652). Check `data-content-width` against the real
+box before believing any bridge-driven placement.
+Both L6 bullets are now closed; what L6 still owes is its Gate, scored.
+
 **Bullet 1 CLOSED 2026-08-25** (`b2c6e7f5`). All six surfaces are on the contract — Captures,
 Novels, Library, Immersion, manga, VN — and the fifth named item resolved to ONE surface, not
 four: `renderer/pdfLoader.ts` is imported by `views/NovelReader.tsx` alone, so PDF and EPUB ARE

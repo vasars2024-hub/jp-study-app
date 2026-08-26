@@ -626,3 +626,52 @@ faithful, because `size` comes from a `ResizeObserver` on the scroller and the c
 own box. What is NOT faithful that way: anything reading `window.innerWidth`. The lookup popup is
 one (`min(560px, 100vw - 32px)`), and it read as "does not reflow" until I checked — an artefact,
 not a finding.
+
+## 2026-08-25 (later 3) — bullet 2 CLOSES: mining, source, deep-link, and the RO trap that nearly became a finding
+
+`daf70721`. The last three of bullet 2's six behaviours, each driven end to end on the surface
+that owns it, each with a control that had to fail and did.
+
+**Mining — Library, no defect.** `runReadingAction('mine')` writes `epubMining` to
+`localStorage` and dispatches `os:open` + `flashcards:openEpubMining`. Driven from inside the
+SHEET: drawer docked 262 at canvas 772 → sheet 592 at canvas 592 → docked 262, tool node and
+`[data-reading-action="mine"]` both carrying the JS expando they were marked with, so neither was
+rebuilt. Clicked in the sheet: handoff `{"bookId":"078d8fa0-…","ui":"simple"}`, both events fired,
+the Flashcards window opened, the handoff read back `null` (consumed), and step 1's `<select>`
+resolved to that exact id — **1 of 21 options**, code points 悪の教典 02. Document `inert` +
+`aria-hidden` throughout, not inert after. Two controls: a **manga** item offers `read, dictionary`
+and **no `mine`** (`readingWorkspaceActionApplies`'s epub rule, live); and a genuine
+close-then-reselect **across two eval calls** reads `REBUILT` on both marks — batched into one call
+it does not, because React nets the two state changes into one render and never unmounts.
+
+**Deep-link — Captures, defect found and fixed.** See the commit. Staged through the real
+`readingPassageHandoffStage`: section, head, `aria-current` all correct while `data-covered="true"`
+and the document was `inert` at a 552 px canvas. `useReadingDocumentCover()` now lives in the canvas
+module so the other five surfaces cost a line each. After: covered null, tool absent, document 552
+and live, head `LQ-DEEPLINK-PROBE-2`, passage **34 chars** exact, toggle `aria-pressed="false"` and
+visible. Docked control at 1142: tool stays docked 260, document 870, head and `aria-current` on the
+arriving capture. Mutations `false &&` → sheet test red, `true ||` → docked test red, one each.
+
+**Source — Captures, no defect.** `source: 'image'`, `sourceLabel: 'LQ-SOURCE-B / poster p.3'`.
+Docked 1142/870: row title = the label, row meta = **"Image"** localised with **no `settings.lens`
+key leak**, head = the label. Narrowed to 552: **sheet**, row and head both on their original nodes
+(`row-mark-b`, `head-mark-b`), same title, same meta, head correctly inside the inert document.
+Back to 1142/870: identical, head not inert. All four `READING_LENS_SOURCES` have catalog keys.
+
+**THE TRAP, and it produced a false finding I had to retract before writing it down: an unfocused
+Electron renderer does not deliver ResizeObserver notifications.** Setting `.fwin`'s width inline
+moved the box (580 → 639 → 835, `getBoundingClientRect`) while `data-content-width` stayed at
+**756** — a canvas apparently frozen at a stale width, which reads exactly like a product bug and
+survived a full `/reload`. It is not: an **independent** RO attached from the bridge to the same
+element also logged **zero** entries, and a React state change in the same eval did not help
+either — React commits without a frame, RO delivery needs one. `POST /focus` and the same resize
+fires immediately: `fired: [652]`, believed 652, real 652. **Focus the window before any
+bridge-driven resize, and check `data-content-width` against the real box before believing a
+placement.** Every earlier resize this turn happened to be in the same eval as a click while the
+app still had focus, which is why they were real.
+
+**Bullet 2 CLOSED.** Six of six driven: capture (2026-08-25), progress + dictionary (later 2),
+mining + source + deep-link (here). Route parity, document survival 6/6 and tool-subtree survival
+6/6 were already swept mechanically. Suites: `readingCapturesCanvas` **8/8** (was 6), neighbours
+36/36. Full `npx vitest run` **1 failed / 11,397 passed / 836 files** — the one red is the foreign
+`architectureBaseline` ← `externalSubtitleMount.ts`, identical to the previous turn's baseline.
