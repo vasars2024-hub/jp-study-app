@@ -36,6 +36,8 @@ let server: http.Server | null = null;
 let token = '';
 let logStream: fs.WriteStream | null = null;
 const ring: DebugLogEntry[] = [];
+/** What `/emulate` is currently overriding, per webContents — so `/health` can say so. */
+const emulatedMedia = new Map<number, { name: string; value: string }[]>();
 
 /** Project root in dev — where `debug/` lives. */
 function debugRoot(): string {
@@ -208,7 +210,17 @@ async function handle(
 ): Promise<{ code: number; body: unknown }> {
   switch (route) {
     case '/health':
-      return { code: 200, body: { ok: true, version: 1, windows: windowSummaries() } };
+      return {
+        code: 200,
+        body: {
+          ok: true,
+          version: 1,
+          windows: windowSummaries(),
+          // A leaked media override makes every later measurement wrong in a way that looks
+          // like a product change, so it is reported where every run already looks.
+          emulated: [...emulatedMedia.entries()].map(([id, features]) => ({ webContentsId: id, features })),
+        },
+      };
 
     case '/logs': {
       const limit = Math.min(Number(url.searchParams.get('limit') ?? 200) || 200, LOG_RING_LIMIT);
@@ -327,6 +339,55 @@ async function handle(
           true,
         );
         return { code: 200, body: { ok: true, result } };
+      } catch (err) {
+        return { code: 200, body: { ok: false, error: String(err) } };
+      }
+    }
+
+    /**
+     * Emulate a CSS media feature — `prefers-reduced-motion`, `prefers-color-scheme`,
+     * `forced-colors` — for one window, through CDP.
+     *
+     * There is no page-side API for this: `matchMedia` reports the OS and cannot be forced,
+     * so a probe that wants to score "what a reduced-motion user gets" has only two options,
+     * and both were wrong. Reading the stylesheet is scoring from source, which the rubric
+     * forbids. Toggling the app's own `.reduce-motion` class answers a DIFFERENT mechanism —
+     * that class is deliberately targeted (`theme/a11y.css` says so in as many words), while
+     * the OS query is app-wide with `!important`, so the class-toggle reads 8 durations
+     * unchanged and looks exactly like a surface that ignores reduced motion.
+     *
+     * Body: `{ features: [{ name, value }] }` to set, `{ clear: true }` (or an empty
+     * `features`) to reset. The response echoes the emulated set back so a caller can prove
+     * the restore rather than assume it.
+     */
+    case '/emulate': {
+      const win = resolveWindow(body.window);
+      if (!win) return { code: 404, body: { ok: false, error: 'no matching window' } };
+      const raw = Array.isArray(body.features) ? body.features : [];
+      const clear = body.clear === true || raw.length === 0;
+      const features = raw
+        .map((f) => ({ name: String((f as { name?: unknown })?.name ?? ''), value: String((f as { value?: unknown })?.value ?? '') }))
+        .filter((f) => f.name);
+      const dbg = win.webContents.debugger;
+      try {
+        // Already attached is not an error — DevTools may own the session, or a previous
+        // /emulate call may still hold it. Only a genuinely different failure is reported.
+        if (!dbg.isAttached()) dbg.attach('1.3');
+      } catch (err) {
+        return { code: 200, body: { ok: false, error: `debugger attach failed: ${String(err)}` } };
+      }
+      try {
+        await dbg.sendCommand('Emulation.setEmulatedMedia', { media: '', features: clear ? [] : features });
+        if (clear) {
+          emulatedMedia.delete(win.webContents.id);
+          // Detaching is what makes the reset outlive this route: an attached session with an
+          // empty feature list still overrides nothing, but a leaked session shows the yellow
+          // "being debugged" banner and blocks DevTools.
+          try { dbg.detach(); } catch { /* another owner holds it; the reset above already landed */ }
+        } else {
+          emulatedMedia.set(win.webContents.id, features);
+        }
+        return { code: 200, body: { ok: true, emulated: clear ? [] : features, attached: dbg.isAttached() } };
       } catch (err) {
         return { code: 200, body: { ok: false, error: String(err) } };
       }

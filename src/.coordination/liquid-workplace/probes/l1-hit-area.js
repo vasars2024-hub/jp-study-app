@@ -59,16 +59,23 @@
   // Set `window.__lqScoreTitle = 'Video'` before evaluating to score another surface.
   // Dictionary stays the default so every run recorded in L1_ACCESSIBILITY.md reproduces.
   const TITLE = (typeof window !== 'undefined' && window.__lqScoreTitle) || 'Dictionary';
+  // A surface that is NOT a floating window — a reader that replaces the desktop shell, a
+  // pop-out, Blanc — has no `.fwin` and no title to find, so the title form silently refuses
+  // and the category reads as unmeasurable. `__lqScoreRoot` is a CSS selector for exactly
+  // those, and it is the same `@`-selector convention the category-4 harness already uses.
+  const ROOT_SEL = (typeof window !== 'undefined' && window.__lqScoreRoot) || '';
   const FLOOR = 32;
   const STEP = 0.5;
   const REACH = 26; // px from the centre — enough to prove a 52px region, well past the floor
   const INTERACTIVE =
     'button, [role="button"], a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
 
-  const win = [...document.querySelectorAll('.fwin')].find((w) =>
-    (w.querySelector('.fwin-title-text')?.textContent || '').includes(TITLE),
-  );
-  if (!win) return JSON.stringify({ refuse: `no .fwin titled ${TITLE}` });
+  const win = ROOT_SEL
+    ? document.querySelector(ROOT_SEL)
+    : [...document.querySelectorAll('.fwin')].find((w) =>
+      (w.querySelector('.fwin-title-text')?.textContent || '').includes(TITLE),
+    );
+  if (!win) return JSON.stringify({ refuse: ROOT_SEL ? `no element matching ${ROOT_SEL}` : `no .fwin titled ${TITLE}` });
   const WR = win.getBoundingClientRect();
   if (!WR.width || !WR.height)
     return JSON.stringify({ refuse: 'window is 0x0 (minimised?) — refusing to record zeros' });
