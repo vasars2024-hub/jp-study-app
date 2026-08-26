@@ -17205,7 +17205,16 @@ html[data-taskbar-size='large'] .os-tray-btn {
   min-height: 0;
   position: relative;
   overflow: auto;
-  background: #121118;
+  /* WAS `#121118`, a hardcoded near-black, and in a light theme that made the whole
+     starter screen unreadable: `.immersion-root` is `var(--panel)` and its text is
+     `var(--text)`, both of which follow the theme, while the stage under them did not.
+     Measured live in `classic-light` — `rgb(30,30,30)` labels on `rgb(18,17,24)` is
+     1.13:1 against a 4.5 bar, and `p.muted` came out 2.96:1; eight text runs failed,
+     every one of them only in the light theme. `--panel-2` keeps the stage reading as
+     a plate distinct from the root in BOTH palettes (#1a2920 dark / #f3f3f3 light)
+     instead of being a dark plate everywhere. A loaded page covers this fill entirely,
+     so the only surface this changes is the one that was broken. */
+  background: var(--panel-2);
   transition: box-shadow 0.2s ease;
 }
 .immersion-mode-live .immersion-stage {
@@ -17309,18 +17318,28 @@ html[data-taskbar-size='large'] .os-tray-btn {
   color: var(--text);
   background: color-mix(in srgb, var(--panel-2) 80%, transparent);
 }
+/* The three active-mode fills keep their hue identity — blue for Live, green for
+   Reader, the theme accent for Focus — but the LABEL is mixed toward `var(--text)`
+   rather than being a fixed pale tint. The backgrounds already mix into
+   `var(--panel-2)`, so in a light theme they resolve to a pale wash while the old
+   labels (#93c5fd, #6ee7b7, accent-toward-white) stayed pale with them: measured
+   live in `classic-light`, the active Reader label was rgb(110,231,183) on
+   rgb(209,237,227) at **1.23:1** against a 4.5 bar. Only one of the three is
+   painted at a time, which is why one instance was observable and three were
+   wrong. Mixing toward `--text` gives a deep hue in a light palette and a light
+   one in a dark palette from the same declaration — 5.5:1 and 6.8:1 for Reader. */
 .immersion-mode-btn-live.active {
-  color: #93c5fd;
+  color: color-mix(in srgb, #60a5fa 40%, var(--text));
   background: color-mix(in srgb, #60a5fa 22%, var(--panel-2));
   border-color: color-mix(in srgb, #60a5fa 45%, transparent);
 }
 .immersion-mode-btn-reader.active {
-  color: #6ee7b7;
+  color: color-mix(in srgb, #34d399 40%, var(--text));
   background: color-mix(in srgb, #34d399 18%, var(--panel-2));
   border-color: color-mix(in srgb, #34d399 40%, transparent);
 }
 .immersion-mode-btn-focus.active {
-  color: color-mix(in srgb, var(--accent) 85%, white);
+  color: color-mix(in srgb, var(--accent) 45%, var(--text));
   background: color-mix(in srgb, var(--accent) 16%, var(--panel-2));
   border-color: color-mix(in srgb, var(--accent) 42%, transparent);
 }
