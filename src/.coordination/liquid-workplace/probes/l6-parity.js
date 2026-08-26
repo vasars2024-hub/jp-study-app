@@ -83,6 +83,10 @@
     window.__LQP_LIB_ORIG = window.__LQP_LIB_ORIG || {};
     return window.__LQP_LIB_ORIG;
   };
+  const immState = () => {
+    window.__LQP_IMM_ORIG = window.__LQP_IMM_ORIG || {};
+    return window.__LQP_IMM_ORIG;
+  };
   // The rail's filter chips only: `+ New folder` is an action and the rename box is a
   // transient editor, and both carry the same class as a real chip.
   const folderChips = (w) => qa(w, '.lib-folders .lib-folder-chip').filter(
@@ -719,28 +723,10 @@
           },
         },
         {
-          // L6's Gate, measured. Every open tool is docked BESIDE the document or
-          // covering it entirely, and the widths add up — a partial cover would
-          // leave `docked + doc + gutter` short of the canvas.
+          // L6's Gate, measured. Shared with Library and Immersion since 2026-08-26; it
+          // was three identical copies and is now one function.
           id: 'canvasPlacement',
-          f: (w) => {
-            const c = q(w, '.lq-reading');
-            if (!c) return { ok: false, ev: 'no reading canvas' };
-            const doc = q(c, '[data-reading-role="document"]');
-            const tools = qa(c, '[data-reading-role="tool"]');
-            const cw = Math.round(c.getBoundingClientRect().width);
-            const dw = Math.round(doc.getBoundingClientRect().width);
-            const docked = tools.filter((t) => t.dataset.placement === 'docked');
-            const sheets = tools.filter((t) => t.dataset.placement === 'sheet');
-            const sum = docked.reduce((n, t) => n + Math.round(t.getBoundingClientRect().width) + 12, dw);
-            const legal = tools.every((t) => /^(docked|sheet)$/.test(t.dataset.placement || ''));
-            const sheetsFull = sheets.every((t) => Math.abs(Math.round(t.getBoundingClientRect().width) - dw) <= 1);
-            const covered = c.dataset.covered === 'true';
-            return {
-              ok: c.dataset.measured === 'true' && legal && sheetsFull && Math.abs(sum - cw) <= 1 && covered === sheets.length > 0,
-              ev: `canvas=${cw} doc=${dw} docked=${docked.length} sheets=${sheets.length} sum=${sum} covered=${covered}`,
-            };
-          },
+          f: (w) => canvasPlacement(w),
         },
         {
           // "Content remains legible at all sizes" — the measure clamp is real
@@ -940,31 +926,11 @@
           },
         },
         {
-          // L6's Gate, in the catalogue's form. Library runs the fill policy, so it has no
-          // measure clamp to score (`--lq-reading-measure: none` by design — a grid of
-          // covers is not a passage); what must hold is that every open tool is docked
-          // beside the grid or covering it entirely, and that the widths add up.
+          // L6's Gate, in the catalogue's form: no measure clamp to score here (Library
+          // runs the FILL policy, `--lq-reading-measure: none` by design — a grid of
+          // covers is not a passage), only the placement invariant.
           id: 'canvasPlacement',
-          f: (w) => {
-            const c = q(w, '.lq-reading');
-            if (!c) return { ok: false, ev: 'no reading canvas' };
-            const doc = q(c, '[data-reading-role="document"]');
-            if (!doc) return { ok: false, ev: 'canvas has no document region' };
-            const tools = qa(c, '[data-reading-role="tool"]');
-            const cw = Math.round(c.getBoundingClientRect().width);
-            const dw = Math.round(doc.getBoundingClientRect().width);
-            const docked = tools.filter((t) => t.dataset.placement === 'docked');
-            const sheets = tools.filter((t) => t.dataset.placement === 'sheet');
-            const sum = docked.reduce((n, t) => n + Math.round(t.getBoundingClientRect().width) + 12, dw);
-            const legal = tools.every((t) => /^(docked|sheet)$/.test(t.dataset.placement || ''));
-            const sheetsFull = sheets.every((t) => Math.abs(Math.round(t.getBoundingClientRect().width) - dw) <= 1);
-            const covered = c.dataset.covered === 'true';
-            return {
-              ok: c.dataset.measured === 'true' && legal && sheetsFull
-                && Math.abs(sum - cw) <= 1 && covered === sheets.length > 0,
-              ev: `canvas=${cw} doc=${dw} docked=${docked.length} sheets=${sheets.length} sum=${sum} covered=${covered}`,
-            };
-          },
+          f: (w) => canvasPlacement(w),
         },
         { id: 'windowLifecycle', f: (w) => lifecycle(w) },
       ],
@@ -1067,6 +1033,187 @@
         },
       },
     },
+
+    /**
+     * IMMERSION — the in-app browser. Its rows are all COMPOSITION cross-checks, because
+     * everything this surface can get wrong is a disagreement between a control's state
+     * and what the stage actually mounted: an address bar showing one page while the
+     * webview shows another, a mode segment reporting Reader while only the live guest is
+     * on screen, a rail toggle pressed with no rail.
+     *
+     * The three modes are a real branch, from `ImmersionContent.tsx:172-175`:
+     *   live   -> webview,  no reader
+     *   reader -> BOTH, split
+     *   focus  -> reader,   no webview (while an extraction exists)
+     * so `modeSwitch` scores the active button against that table rather than counting
+     * three buttons.
+     *
+     * REAL FUNCTIONAL STATE IS MANDATORY HERE and the rubric caps an empty harness at 0:
+     * with nothing loaded this surface is `.immersion-empty` plus five starter buttons and
+     * every row below is either absent or vacuous. `open` navigates if it has to and is a
+     * no-op if a page is already up, so the driver's eleven drives cost ONE page load.
+     */
+    immersion: {
+      titleRe: /Immersion|没入|イマー|浸入|Погруж/i,
+      rootSel: '.immersion-root',
+      features: [
+        {
+          // The address bar shows the page that is actually loaded. This is also what
+          // undoes the driver's `dirtyField`, which lands in this very input.
+          id: 'urlBar',
+          f: (w) => {
+            const bar = q(w, '.immersion-url');
+            const wv = q(w, '.immersion-webview');
+            const src = wv ? wv.getAttribute('src') || '' : '';
+            const ok = !!bar && !bar.disabled && /^https?:\/\//.test(bar.value) && bar.value === src;
+            return { ok, ev: `bar="${bar ? bar.value.slice(0, 46) : 'absent'}" webviewSrc="${src.slice(0, 46)}"` };
+          },
+        },
+        {
+          id: 'modeSwitch',
+          f: (w) => {
+            const btns = qa(w, '.immersion-mode-btn');
+            const active = btns.filter((b) => b.classList.contains('active'));
+            const mode = active[0] ? (active[0].className.match(/immersion-mode-btn-(\w+)/) || [])[1] : null;
+            const reader = !!q(w, '.immersion-reader');
+            const webview = !!q(w, '.immersion-webview');
+            const want = { live: [true, false], reader: [true, true], focus: [false, true] }[mode];
+            const composed = !!want && want[0] === webview && want[1] === reader;
+            return {
+              ok: btns.length >= 3 && active.length === 1 && composed,
+              ev: `modes=${btns.length} active=${active.length} mode=${mode} webview=${webview} reader=${reader} composed=${composed}`,
+            };
+          },
+        },
+        {
+          // The extraction is the feature, not the pane. An `.immersion-reader` holding the
+          // empty state's own sentence is the false pass this row exists for, so it wants
+          // real characters and no starter state anywhere on the stage.
+          id: 'readerExtraction',
+          f: (w) => {
+            const r = q(w, '.immersion-reader');
+            const chars = r ? (r.textContent || '').length : 0;
+            const empty = !!q(w, '.immersion-empty');
+            return { ok: !!r && chars > 100 && !empty, ev: `readerChars=${chars} starterStateShowing=${empty}` };
+          },
+        },
+        {
+          // The rail is a VIRTUAL list (`VirtualList` at `ImmersionContent.tsx:1041`), so
+          // rendered rows are a WINDOW of the history, never all of it — the grammar spec
+          // already paid for encoding "rendered === total" as a pass condition. Score the
+          // rendered rows being complete rows instead.
+          id: 'siteRail',
+          f: (w) => {
+            const rows = qa(w, '.immersion-site-row');
+            const whole = rows.filter(
+              (r) => q(r, '.immersion-site-title') && q(r, '.immersion-site-meta') && q(r, '.immersion-site-remove'),
+            ).length;
+            return { ok: rows.length > 0 && whole === rows.length, ev: `renderedRows=${rows.length} complete=${whole}` };
+          },
+        },
+        {
+          // Reversibility: the rail is a reading tool, so its trigger owes a real boolean
+          // that agrees with whether the tool is mounted.
+          id: 'railReversibility',
+          f: (w) => {
+            const tg = q(w, '.immersion-sites-toggle');
+            const pressed = tg ? tg.getAttribute('aria-pressed') : null;
+            const open = !!q(w, '[data-reading-tool="sites"]');
+            return {
+              ok: !!tg && (pressed === 'true' || pressed === 'false') && (pressed === 'true') === open,
+              ev: `toggle=${!!tg} ariaPressed=${pressed} railMounted=${open}`,
+            };
+          },
+        },
+        {
+          id: 'canvasPlacement',
+          f: (w) => canvasPlacement(w),
+        },
+        { id: 'windowLifecycle', f: (w) => lifecycle(w) },
+      ],
+      steps: {
+        // Idempotent by design: the driver runs the drive twice per mutation, and eleven
+        // navigations to a live public site would be both slow and rude. Navigate only
+        // from the starter state; otherwise resync the address bar to the loaded page,
+        // which is exactly what undoes `dirtyField` on this surface.
+        open: (w) => {
+          const wv = q(w, '.immersion-webview');
+          const bar = q(w, '.immersion-url');
+          if (!wv) {
+            const s = qa(w, '.immersion-starters button')[0];
+            if (!s) return { refused: 'nothing loaded and no starter to load' };
+            immState().navigated = true;
+            s.click();
+            return { navigating: txt(s), note: 'give this one a long --step-ms; a real page is loading' };
+          }
+          const src = wv.getAttribute('src') || '';
+          if (bar && bar.value !== src) typeInto(bar, src);
+          return { loaded: src.slice(0, 60), bar: bar ? bar.value.slice(0, 60) : null };
+        },
+        mode: (w, want) => {
+          const btns = qa(w, '.immersion-mode-btn');
+          if (!btns.length) return { refused: 'no mode segment' };
+          const g = immState();
+          if (g.mode == null) {
+            const cur = btns.find((b) => b.classList.contains('active'));
+            g.mode = cur ? (cur.className.match(/immersion-mode-btn-(\w+)/) || [])[1] || null : null;
+          }
+          const name = want || 'reader';
+          const target = btns.find((b) => b.classList.contains(`immersion-mode-btn-${name}`));
+          if (!target) return { refused: `no ${name} mode button` };
+          if (!target.classList.contains('active')) target.click();
+          return { was: g.mode, now: name };
+        },
+        // The round trip's user state. The address bar is overwritten by `open`, so
+        // without this the trip would compare a resynced field to itself.
+        scroll: (w, px) => {
+          const el = scroller(w);
+          if (!el) return { refused: 'nothing scrollable — the extraction fits its pane' };
+          const g = immState();
+          if (g.scrollKey == null) { g.scrollKey = keyOf(el); g.scrollTop = el.scrollTop; }
+          el.scrollTop = Number(px) || 200;
+          return { scroller: keyOf(el), top: el.scrollTop, range: el.scrollHeight - el.clientHeight };
+        },
+      },
+      mutations: {
+        urlBar: (w) => {
+          const bar = q(w, '.immersion-url');
+          if (!bar) return { refused: 'no address bar' };
+          immState().barWas = bar.value;
+          typeInto(bar, 'lqp-mutated');
+          return { mutated: 'address bar no longer shows the loaded page' };
+        },
+        modeSwitch: (w) => addClassAll(qa(w, '.immersion-mode-btn'), 'active'),
+        // ONE row's meta, not the list: detaching the list would take `siteRail` and
+        // `railReversibility` together and prove neither.
+        siteRail: (w) => detach(q(w, '.immersion-site-meta'), 'no rendered site rows'),
+        railReversibility: (w) => stripAttr(q(w, '.immersion-sites-toggle'), 'aria-pressed', 'no rail toggle'),
+        windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
+      },
+      drive: ['open', 'mode', ['scroll', '200']],
+      undo: {
+        immersion: (w) => {
+          const g = window.__LQP_IMM_ORIG;
+          if (!g) return null;
+          const done = [];
+          const bar = q(w, '.immersion-url');
+          if (bar && g.barWas != null) { typeInto(bar, g.barWas); g.barWas = null; done.push('urlBar'); }
+          if (g.mode) {
+            const target = qa(w, '.immersion-mode-btn').find((b) => b.classList.contains(`immersion-mode-btn-${g.mode}`));
+            if (target && !target.classList.contains('active')) { target.click(); done.push('mode'); }
+          }
+          if (g.scrollKey != null) {
+            const el = qa(w, '*').find((e) => keyOf(e) === g.scrollKey);
+            if (el && el.scrollTop !== g.scrollTop) { el.scrollTop = g.scrollTop; done.push('scroll'); }
+          }
+          // `navigated` is deliberately NOT undone here: a page this harness opened is a
+          // real history entry in the user's own store, and the only honest way back is
+          // the rail's own Remove control. Reported so it is never silently left behind.
+          window.__LQP_IMM_ORIG = null;
+          return done.length ? `immersion:${done.join('+')}${g.navigated ? ' (NAVIGATED — remove the site row by hand)' : ''}` : null;
+        },
+      },
+    },
   };
 
   // ------------------------------------------------------- shared feature fn
@@ -1084,6 +1231,38 @@
     return {
       ok: chrome.length >= (popout ? 3 : 4) && (pressed === 'true' || pressed === 'false'),
       ev: `chromeButtons=${chrome.length} liquidAriaPressed=${pressed}`,
+    };
+  }
+
+  /**
+   * L6's Gate, as one shared row: *no tool obscures the document.* Every open reading
+   * tool is `docked` beside the document or a `sheet` over the whole of it — a partial
+   * cover cannot be expressed — and the docked widths plus the gutter must add back up to
+   * the canvas. Third caller as of 2026-08-26, so it stopped being three copies.
+   *
+   * The MEASURE CLAMP is deliberately not scored here: Captures runs the measure policy
+   * and clamps a passage, Library and Immersion run the fill policy where
+   * `--lq-reading-measure` is `none` BY DESIGN (a grid of covers and a live browser guest
+   * are not passages). A spec that wants the clamp scores it as its own row.
+   */
+  function canvasPlacement(w) {
+    const c = q(w, '.lq-reading');
+    if (!c) return { ok: false, ev: 'no reading canvas' };
+    const doc = q(c, '[data-reading-role="document"]');
+    if (!doc) return { ok: false, ev: 'canvas has no document region' };
+    const tools = qa(c, '[data-reading-role="tool"]');
+    const cw = Math.round(c.getBoundingClientRect().width);
+    const dw = Math.round(doc.getBoundingClientRect().width);
+    const docked = tools.filter((t) => t.dataset.placement === 'docked');
+    const sheets = tools.filter((t) => t.dataset.placement === 'sheet');
+    const sum = docked.reduce((n, t) => n + Math.round(t.getBoundingClientRect().width) + 12, dw);
+    const legal = tools.every((t) => /^(docked|sheet)$/.test(t.dataset.placement || ''));
+    const sheetsFull = sheets.every((t) => Math.abs(Math.round(t.getBoundingClientRect().width) - dw) <= 1);
+    const covered = c.dataset.covered === 'true';
+    return {
+      ok: c.dataset.measured === 'true' && legal && sheetsFull
+        && Math.abs(sum - cw) <= 1 && covered === sheets.length > 0,
+      ev: `canvas=${cw} doc=${dw} docked=${docked.length} sheets=${sheets.length} sum=${sum} covered=${covered}`,
     };
   }
 

@@ -1068,3 +1068,43 @@ account for every card. Each half alone passes on a dead control.
 
 Live state left as found: presentation `standard`, sort `date-desc`, group `none`, folder `All 24`,
 24 cards, `fwin-body` scrollTop 0, `__LQP_LIB_ORIG` null.
+
+## 2026-08-26 (later 2) · primary — Immersion category 6, on a page it had to actually load
+
+**Immersion, category 6: PASS 10/10** (`baselines/cat6-l6-immersion.json`). Parity **7/7 standard,
+7/7 liquid**, `rowsAgree` true, **0 rows in only one presentation**. Round trip standard → liquid →
+standard with `.immersion-url` dirtied: `fieldsHeld` true, `shellHeld` true, **0 diffs**, 820x580
+both. Control fires on all five mutations — `urlBar`, `modeSwitch`, `siteRail`,
+`railReversibility`, `windowLifecycle` each fell **exactly its own row** (7/7 → 6/7), each back at
+7/7. Board **32 of 48**. Second consecutive cell that was a RUN plus a spec, no driver change.
+
+**The state it was driven in, because the rubric caps an empty harness at 0.** As found, Immersion
+was `.immersion-empty` — "Open a page to begin immersion reading", five starter buttons, **zero**
+loaded content — on which `urlBar`, `modeSwitch` and `readerExtraction` are all vacuous. Driven to
+`https://ja.wikipedia.org/wiki/日本語` through the product's own URL bar: live `<webview>`,
+**80,394 characters** extracted by Reader mode, scroll range **177,566 px**, 20 rendered history
+rows. Every number in the baseline is from that state.
+
+**Rows are composition cross-checks, not counts,** because everything this surface can get wrong is
+a disagreement between a control and the stage: `urlBar` requires the address bar to equal the
+webview's `src`; `modeSwitch` scores the active mode against the real branch table at
+`ImmersionContent.tsx:172-175` (live → webview only, reader → both, focus → reader only);
+`railReversibility` requires the toggle's boolean to agree with whether the tool is mounted.
+
+**Three things worth the next worker's time.**
+1. **The starter state is the only route to a page, and the reader is ASYNC.** Right after
+   navigating, `readerChars` is **0** and reader mode legitimately shows webview-only — so a strict
+   composition table scores two rows false on a surface that is merely still loading. Wait for the
+   extraction BEFORE running the harness (`fetchReadableArticle` retries 6–12 times with growing
+   delays); `open` is then a no-op on all eleven drives and the whole run costs ONE page load.
+2. **`news.web.nhk` is NOT a typo.** The first starter's host looks wrong next to
+   `readingSites.ts:121`'s `www3.nhk.or.jp`, and it is not — `shared/nhkArticle.ts:3` declares
+   `NHK_NEWS_HOSTS = {news.web.nhk, www.web.nhk}` and the page loads. It does sit behind a consent
+   gate, so its extraction is **322 chars** of consent text; Wikipedia is the better subject.
+3. **Immersion has no route from a loaded page back to the starter state** — Back/Forward/Reload
+   and actions only. Transient view state that dies with the window, so it is left loaded; the two
+   history rows the run created (NHK, Wikipedia) ARE persisted and were removed through the rail's
+   own `.immersion-site-remove`, verified back to 0 matches.
+
+Live state left as found: every window in the presentation it was found in (only Video liquid),
+Immersion mode `reader`, rail open, site history back to what it was, reader scrollTop 0.
