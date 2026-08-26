@@ -406,6 +406,34 @@ export function useImmersion() {
       wv?.reload?.();
     }
   };
+  /**
+   * The reverse of `navigate`. Opening a page was the only one-way door on this surface:
+   * Back/Forward/Reload all need a page, so once one was open the starter state — the five
+   * curated destinations and the "open a page to begin" copy — was unreachable without
+   * destroying the window. Every open flow owes a close flow.
+   *
+   * The reading stats are flushed FIRST, exactly as `navigate` does, or the time spent on
+   * the page being closed is discarded rather than banked. History and the saved-sites rail
+   * are deliberately left intact: the rail is the route back, and clearing the stack would
+   * make closing a page destroy the trail as a side effect.
+   */
+  const closePage = useCallback(() => {
+    if (!currentUrl) return;
+    flushStats();
+    activeStatsId.current = '';
+    activeTitle.current = '';
+    pageOpenAt.current = 0;
+    loadFailure.current = null;
+    setCurrentUrl('');
+    setUrlInput('');
+    setReaderHtml('');
+    setError(null);
+    setStatus(null);
+    setPopup(null);
+    setTitle('Immersion');
+    setLoading(false);
+    clearLookupHighlight();
+  }, [currentUrl, flushStats]);
 
   const applyMode = useCallback(
     (next: ImmersionMode) => {
@@ -760,7 +788,7 @@ export function useImmersion() {
     liveLookup, setLiveLookup,
     showChrome, showReader, showWebview, splitView, showRail,
     readerRef, webviewRef, urlBarRef,
-    navigate, goBack, goForward, reload, applyMode, cycleMode, setMode,
+    navigate, goBack, goForward, reload, closePage, applyMode, cycleMode, setMode,
     saveCurrentSite, saveCurrentAsTool, exportToLibrary, captureVideo, openExternal,
     captureWithLens, refreshSites,
     onReaderPointerDown, onReaderMouseUp,
@@ -797,6 +825,7 @@ export function ImmersionToolbar({ state, trailing }: { state: ImmersionState; t
     state;
   const noBack = histIdx <= 0;
   const noForward = histIdx < 0 || histIdx >= history.length - 1;
+  const noPage = !state.currentUrl;
   return (
     /* `lq-hit-scope`: rubric category 1 measured every button in this bar under the 32px
        pointer floor — the icon buttons at 28x24, the mode segments at 25.5. The scope gives
@@ -832,10 +861,26 @@ export function ImmersionToolbar({ state, trailing }: { state: ImmersionState; t
         type="button"
         className="btn small icon-btn"
         aria-label={t('immersion.reload')}
-        title={t('immersion.reload')}
+        title={noPage ? t('immersion.reason.noPage') : t('immersion.reload')}
         onClick={state.reload}
+        disabled={noPage}
       >
         <Icon name="refresh" size={14} />
+      </button>
+      {/* The reverse of opening a page. Without it the starter state — the curated
+          destinations and the "open a page to begin" copy — was unreachable once anything
+          had loaded, since Back, Forward and Reload all require a page. Same disabled-reason
+          shape as its neighbours: `title` explains the greyed-out state, `aria-label` keeps
+          the accessible name. */}
+      <button
+        type="button"
+        className="btn small icon-btn immersion-close-page"
+        aria-label={t('immersion.closePage')}
+        title={noPage ? t('immersion.reason.noPage') : t('immersion.closePage')}
+        onClick={state.closePage}
+        disabled={noPage}
+      >
+        <Icon name="close" size={14} />
       </button>
       {/* The URL entry is a form, so §2.3 makes it an Anchor: category 3 measured it live at
           `alpha 0.88 on div.immersion-toolbar`, dense work on the toolbar's glass. `bare` keeps

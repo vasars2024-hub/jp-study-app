@@ -242,8 +242,11 @@ describe('the Immersion toolbar names why its history buttons are disabled', () 
     const h = await mountImmersion(1200);
     const nav = [...h.container.querySelectorAll('.immersion-toolbar .icon-btn')]
       .filter((b): b is HTMLButtonElement => b instanceof HTMLButtonElement && b.disabled);
-    // History starts empty on mount, so both are disabled and Reload is not.
-    expect(nav.length, 'expected Back and Forward disabled on a fresh mount').toBe(2);
+    // FOUR since 2026-08-26, not two. History starts empty on mount AND no page is
+    // open, so Back, Forward, Reload and Close page are all disabled — the last two
+    // by the same absent page. The loop below is what actually matters: every one of
+    // them must explain itself and keep its name, however many there are.
+    expect(nav.length, 'expected Back, Forward, Reload and Close page disabled on a fresh mount').toBe(4);
     for (const button of nav) {
       const title = button.getAttribute('title') ?? '';
       const label = button.getAttribute('aria-label') ?? '';
@@ -255,18 +258,21 @@ describe('the Immersion toolbar names why its history buttons are disabled', () 
     }
   });
 
-  it('gives Reload a name too, and no reason, because it is never disabled', async () => {
+  it('gives Reload the same reason treatment, because it is disabled with nothing to reload', async () => {
     const h = await mountImmersion(1200);
     // By position, not by label: the toolbar carries a dozen more `.icon-btn`
     // further along (save, capture, lens, rail) and their labels are localised.
-    // Back, Forward and Reload are its first three direct children and are the
-    // only unconditional ones.
+    // Back, Forward, Reload and Close page are its first four direct children.
     const nav = [...h.container.querySelectorAll('.immersion-toolbar > .icon-btn')];
-    expect(nav.length, 'the toolbar lost its icon buttons').toBeGreaterThanOrEqual(3);
+    expect(nav.length, 'the toolbar lost its icon buttons').toBeGreaterThanOrEqual(4);
     const reload = nav[2] as HTMLButtonElement;
-    expect(reload.disabled, 'Reload is never disabled').toBe(false);
-    // A reason on an enabled control is noise, so title and label agree here.
-    expect(reload.getAttribute('aria-label')).not.toBe('');
-    expect(reload.getAttribute('title')).toBe(reload.getAttribute('aria-label'));
+    // REVISED 2026-08-26. This used to assert `disabled === false` and read "because
+    // it is never disabled" — which described the shipped code rather than a decision.
+    // `reload()` starts `if (!currentUrl) return;`, so in the starter state it was an
+    // enabled control that did nothing and said nothing: the exact category-8 defect
+    // its two neighbours had just been fixed for.
+    expect(reload.disabled, 'Reload does nothing without a page, so it says so').toBe(true);
+    expect(reload.getAttribute('aria-label')).toBe('Reload');
+    expect(reload.getAttribute('title')).not.toBe(reload.getAttribute('aria-label'));
   });
 });

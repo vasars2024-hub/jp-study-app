@@ -1108,3 +1108,42 @@ webview's `src`; `modeSwitch` scores the active mode against the real branch tab
 
 Live state left as found: every window in the presentation it was found in (only Video liquid),
 Immersion mode `reader`, rail open, site history back to what it was, reader scrollTop 0.
+
+## 2026-08-26 (later 3) · primary — the one-way door in Immersion, closed
+
+**Product slice, not a measurement.** Scoring Immersion for category 6 turned up a reversibility
+gap the category's own rows could not see, because every row it has assumes a page is loaded:
+**opening a page was a one-way door.** Back, Forward, Reload, the three view modes and eight page
+actions all require a page, so once anything had loaded the starter state — five curated
+destinations and the "open a page to begin immersion reading" copy — was **unreachable without
+destroying the window.** That is the repo's own "every enable/open flow owes a disable/close path"
+invariant, on the surface whose category-6 cell had just been banked.
+
+**What landed.** `closePage` in `useImmersion` — the exact reverse of `navigate`: `flushStats()`
+FIRST (or the time on the page being closed is discarded rather than banked), then `currentUrl`,
+`urlInput`, `readerHtml`, `error`, `status`, `popup`, `title`, `loading` and the lookup highlight.
+Rendered in **all three hosts** that own this toolbar — the shared `ImmersionToolbar` (Study OS
+classic + Blanc), the Aero toolbar in `ImmersionView.tsx`, and the View menu — because the aero bar
+does not render `ImmersionToolbar` and would otherwise have had no route back. Four i18n keys ×
+two strings; `i18n-check` **10,916**, was 10,914.
+
+**History and the saved-sites rail are deliberately NOT cleared.** The rail is the route back to
+what was just closed, and clearing the stack would make closing a page destroy the trail as a side
+effect. Asserted, not just intended.
+
+**One neighbour fixed with it.** `reload()` opens `if (!currentUrl) return;`, so in the starter
+state Reload was an **enabled control that did nothing and said nothing** — the same category-8
+defect its two neighbours had been fixed for one entry above. Now disabled with the same reason
+string. `immersionCanvas.test.tsx` asserted the old behaviour in prose ("because it is never
+disabled"), which described the shipped code rather than a decision; both its assertions were
+updated with the reasoning inline, and the disabled-button count went **2 → 4**.
+
+**Live acceptance through the bridge, numbers.** Starter state: 4 disabled nav buttons, each with
+a reason title distinct from its `aria-label`. Navigated to `ja.wikipedia.org/wiki/Main_Page`:
+Reload and Close page both enabled, titles fall back to their labels. Clicked Close page: 5
+starters back, webview **false**, reader **false**, url `""`, control disabled again, rail
+**20 rows** and still `aria-pressed="true"`. Site history returned to as-found (3 Wikipedia rows
+this run created removed through the rail's own control; `wiki: []`).
+
+Tests: `immersionClosePage.test.tsx` (4 cases), plus `immersionCanvas` / `immersionRailWindowing` /
+`liquidSurfaces` / `liquidControls` — **66 passed**.

@@ -5787,6 +5787,8 @@ export const ru: Catalog = {
   'immersion.reason.noBack': 'В этой сессии пока нет страницы для возврата.',
   'immersion.reason.noForward': 'Вы уже на самой новой странице.',
   'immersion.reload': 'Обновить',
+  'immersion.closePage': 'Закрыть страницу',
+  'immersion.reason.noPage': 'Страница не открыта — выберите, с чего начать.',
   'immersion.urlPlaceholder': 'Введите URL или поисковый запрос…',
   'immersion.viewMode.ariaLabel': 'Режим просмотра',
   'immersion.mode.titleSuffix.focus': ' (F6)',

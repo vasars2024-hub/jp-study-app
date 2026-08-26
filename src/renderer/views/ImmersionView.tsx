@@ -91,6 +91,12 @@ export default function ImmersionView() {
           onSelect: () => state.setLiveLookup((v) => !v),
         },
         { id: 'reload', label: 'Reload', disabled: !currentUrl, onSelect: state.reload },
+        {
+          id: 'close-page',
+          label: state.t('immersion.closePage'),
+          disabled: !currentUrl,
+          onSelect: state.closePage,
+        },
         { id: 'toggle-sites', label: showRail ? 'Hide Sites rail' : 'Show Sites rail', onSelect: () => state.setRailOpen((v) => !v) },
       ],
     },
@@ -151,8 +157,26 @@ export default function ImmersionView() {
             >
               <Icon name="chevron" size={14} />
             </Button>
-            <Button size="sm" className="aero-immersion-icon-btn" title="Reload" onClick={state.reload}>
+            <Button
+              size="sm"
+              className="aero-immersion-icon-btn"
+              title="Reload"
+              onClick={state.reload}
+              disabled={!currentUrl}
+            >
               <Icon name="refresh" size={14} />
+            </Button>
+            {/* This aero toolbar does not render `ImmersionToolbar`, so the reverse of
+                opening a page has to exist here too or Study OS's aero immersion surface
+                cannot get back to the starter state. */}
+            <Button
+              size="sm"
+              className="aero-immersion-icon-btn aero-immersion-close-page"
+              title={state.t('immersion.closePage')}
+              onClick={state.closePage}
+              disabled={!currentUrl}
+            >
+              <Icon name="close" size={14} />
             </Button>
             <form
               className="aero-immersion-url-form"

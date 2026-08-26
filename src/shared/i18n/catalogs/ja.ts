@@ -5254,6 +5254,8 @@ export const ja: Catalog = {
   'immersion.reason.noBack': 'このセッションで戻れるページはまだありません。',
   'immersion.reason.noForward': 'すでに最新のページを表示しています。',
   'immersion.reload': '再読み込み',
+  'immersion.closePage': 'ページを閉じる',
+  'immersion.reason.noPage': 'ページが開かれていません。まず読む先を選んでください。',
   'immersion.urlPlaceholder': 'URLを入力するか検索…',
   'immersion.viewMode.ariaLabel': '表示モード',
   'immersion.mode.titleSuffix.focus': '（F6）',

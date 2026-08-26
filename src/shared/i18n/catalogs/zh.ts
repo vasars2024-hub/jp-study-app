@@ -5231,6 +5231,8 @@ export const zh: Catalog = {
   'immersion.reason.noBack': '本次会话中还没有可返回的页面。',
   'immersion.reason.noForward': '当前已经是最新的页面。',
   'immersion.reload': '重新加载',
+  'immersion.closePage': '关闭页面',
+  'immersion.reason.noPage': '尚未打开页面 — 请先选择一个目标站点。',
   'immersion.urlPlaceholder': '输入网址或搜索…',
   'immersion.viewMode.ariaLabel': '查看模式',
   'immersion.mode.titleSuffix.focus': '（F6）',
