@@ -58,6 +58,26 @@ const { spawnSync } = require('node:child_process');
 // straight to the interaction probe's -Title. `heavy` is the surface's HEAVIEST REAL
 // operation — the rubric's words — expressed as one renderer expression, because /eval
 // is synchronous and one expression is all it takes (a trailing `;` throws).
+// A surface's "scroll the whole collection" load, written once. Picks the element inside the
+// root with the largest real overflow rather than naming a scroller per surface -- the same
+// ranking `cat7-collection-weight.cjs` uses, and for the same reason: a list that is not
+// virtualised scrolls in an ANCESTOR, so a hardcoded child selector silently misses and the
+// load never happens. Returns the element it chose so the record shows what was scrolled.
+const scrollAll = (rootSel) => `(() => {
+  const root = document.querySelector(${JSON.stringify(rootSel)});
+  if (!root) return 'REFUSE: no ' + ${JSON.stringify(rootSel)};
+  let best = null, over = 0;
+  for (const e of [root, ...root.querySelectorAll('*')]) {
+    if (e.clientHeight < 40) continue;
+    const o = e.scrollHeight - e.clientHeight;
+    if (o > over) { over = o; best = e; }
+  }
+  if (!best || over < 20) return 'REFUSE: nothing scrolls inside ' + ${JSON.stringify(rootSel)};
+  let n = 0;
+  const t = setInterval(() => { best.scrollTop = (n * 240) % Math.max(1, best.scrollHeight); if (++n > 90) clearInterval(t); }, 20);
+  return 'scrolling ' + (best.className || best.tagName) + ' over=' + over;
+})()`;
+
 const SPECS = {
   captures: {
     title: 'Reading',
@@ -75,11 +95,11 @@ const SPECS = {
     title: 'Library',
     root: '.library',
     heavy: {
-      label: 'scroll the whole library list',
+      label: 'scroll the whole library',
       durationMs: 2500,
-      js: `(() => { const s = document.querySelector('.library-list, .library'); if (!s) return 'no list'; let n = 0; const t = setInterval(() => { s.scrollTop = (n * 240) % Math.max(1, s.scrollHeight); if (++n > 40) clearInterval(t); }, 12); return 'scrolling'; })()`,
+      js: scrollAll('.library'),
     },
-    collection: { container: '.library', row: '.library-row, .library-item' },
+    collection: { container: '.library', row: '.card' },
   },
   immersion: {
     title: 'Immersion',
@@ -97,7 +117,7 @@ const SPECS = {
     heavy: {
       label: 'scroll the rendered novel',
       durationMs: 2500,
-      js: `(() => { const s = document.querySelector('.novel-scroller'); if (!s) return 'no scroller'; let n = 0; const t = setInterval(() => { s.scrollTop = (n * 300) % Math.max(1, s.scrollHeight); if (++n > 40) clearInterval(t); }, 12); return 'scrolling'; })()`,
+      js: scrollAll('.novel-scroller'),
     },
     collection: { container: '.novel-scroller', row: '.novel-page, p' },
   },
@@ -228,9 +248,32 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
   const ceilingP95 = legs.ceiling.frame_p95_ms;
 
   // --- 2-4. the three gestures, every one scoped to THIS surface's window -----------
+  // TWICE, and a third time only to break a tie. A single gesture reading is noise: Library's
+  // first scored resize came back p95 66.9 / max 200.5 / 3 frames over 100 ms, and SIX
+  // consecutive re-runs -- three on the same mount, three on a freshly reopened window -- all
+  // returned p95 16.8 / max 17.0 / 0 over 100. Something took the foreground for ~200 ms. The
+  // probe's own focus guard only catches a steal that is still in effect when the gesture ends.
+  // Reporting that one reading would have filed a phantom Library defect and cost the next
+  // worker a turn, which is precisely what the scene trap cost the last one. A breach is a
+  // FINDING only when the majority of readings breach; otherwise the leg is UNSTABLE and every
+  // reading is kept in the record.
+  const breaches = (r) => (r.frame_p50_ms > ceilingP50 * 1.5) || (r.frame_p95_ms > ceilingP95 * 2)
+    || r.frames_over_100 > 0 || r.main_max_ms > L0.mainBlockBarMs;
   for (const g of ['drag', 'resize', 'theme']) {
     step(g);
-    legs[g] = ps(IPROBE, ['-Interaction', g, '-Title', spec.title, '-AsJson']);
+    const runs = [ps(IPROBE, ['-Interaction', g, '-Title', spec.title, '-AsJson'])];
+    step(`${g} (repeat)`);
+    runs.push(ps(IPROBE, ['-Interaction', g, '-Title', spec.title, '-AsJson']));
+    if (breaches(runs[0]) !== breaches(runs[1])) {
+      step(`${g} (tie-break)`);
+      runs.push(ps(IPROBE, ['-Interaction', g, '-Title', spec.title, '-AsJson']));
+    }
+    const bad = runs.filter(breaches).length;
+    // Score the reading the majority agrees with, so the reported numbers are a real run and
+    // never an average of runs that disagree.
+    legs[g] = runs.find((r) => breaches(r) === (bad * 2 > runs.length)) || runs[0];
+    legs[g].repeats = runs.map((r) => ({ p50: r.frame_p50_ms, p95: r.frame_p95_ms, max: r.frame_max_ms, over100: r.frames_over_100, mainMax: r.main_max_ms, breached: breaches(r) }));
+    legs[g].unstable = bad > 0 && bad < runs.length;
   }
 
   // --- 5. main availability under the surface's heaviest real work ------------------
@@ -261,6 +304,7 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
     if (r.frame_p50_ms > ceilingP50 * 1.5) findings.push(`${g}: p50 ${r.frame_p50_ms} ms against a ${ceilingP50} ms ceiling`);
     if (r.frame_p95_ms > ceilingP95 * 2) findings.push(`${g}: p95 ${r.frame_p95_ms} ms against a ${ceilingP95} ms ceiling`);
     if (r.frames_over_100 > 0) findings.push(`${g}: ${r.frames_over_100} frames over 100 ms`);
+    if (r.unstable) voided.push(`${g}: readings disagree across repeats (${r.repeats.map((x) => (x.breached ? 'BREACH' : 'clean')).join(', ')}); the majority is reported and the leg is UNSTABLE`);
     if (r.main_max_ms > L0.mainBlockBarMs) findings.push(`${g}: main blocked ${r.main_max_ms} ms, over the ${L0.mainBlockBarMs} ms bar`);
   }
   if (legs.heavy.span_ms < spec.heavy.durationMs * 0.9) {
