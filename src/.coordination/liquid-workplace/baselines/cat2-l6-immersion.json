@@ -1,0 +1,146 @@
+{
+  "label": "l6-immersion",
+  "surface": "Immersion",
+  "win": "main",
+  "task": "click:.immersion-mode-btn-focus",
+  "presentation": "standard",
+  "raised": "already-on-top",
+  "base": {
+    "textRuns": 78,
+    "controlCount": 67,
+    "box": "820x580",
+    "results": 20
+  },
+  "inputCost": {
+    "clicks": 1,
+    "keystrokes": 0,
+    "total": 1
+  },
+  "latencyMs": {
+    "clickRecv": [
+      18.9
+    ],
+    "inputRecv": [],
+    "worstRecv": 18.9,
+    "overBar100": 0,
+    "n": 1,
+    "clickStampUnscored": [
+      56.4
+    ],
+    "inputStampUnscored": [],
+    "worstStampUnscored": 56.4
+  },
+  "steps": [
+    {
+      "step": "click:.immersion-mode-btn-focus",
+      "target": {
+        "sel": ".immersion-mode-btn-focus",
+        "label": "Focus",
+        "disabled": false,
+        "at": "657,216"
+      },
+      "counted": true,
+      "moved": {
+        "text": true,
+        "controls": true,
+        "results": true,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": true
+      },
+      "deadEnd": false
+    }
+  ],
+  "undo": {
+    "spec": "click:.immersion-focus-exit",
+    "steps": [
+      "click:.immersion-focus-exit"
+    ],
+    "restored": true,
+    "baseHash": "r3o3c8",
+    "afterHash": "r3o3c8",
+    "liveRegionsBefore": [],
+    "liveRegionsAfter": [],
+    "textHashRoundTrip": {
+      "base": "r3o3c8",
+      "after": "r3o3c8"
+    }
+  },
+  "stepsDriven": 1,
+  "deadEndCount": 0,
+  "deadEnds": [],
+  "scrollTrapCount": 0,
+  "scrollTraps": [],
+  "openDialogs": [],
+  "modalTrapCount": 0,
+  "modalTraps": [],
+  "dialogsClosedByEscape": [],
+  "costParity": {
+    "first": {
+      "presentation": "standard",
+      "box": "820x580",
+      "total": 1,
+      "deadEnds": 0,
+      "worstRecv": 18.9
+    },
+    "second": {
+      "presentation": "liquid",
+      "box": "820x580",
+      "total": 1,
+      "deadEnds": 0,
+      "worstRecv": 19.2
+    },
+    "restored": true,
+    "restoredTo": {
+      "presentation": "standard",
+      "pressed": "false",
+      "box": "820x580"
+    },
+    "liquidTotal": 1,
+    "standardTotal": 1
+  },
+  "bars": {
+    "deadEnds": true,
+    "modalTraps": true,
+    "scrollTraps": true,
+    "latency": true,
+    "costParity": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "unmeasuredBars": [],
+  "notMeasuredHere": [
+    "dead controls outside the dominant-task path (honesty-probe A - every control driven)",
+    "mute-pair explanation quality (rubric category 8 harness)"
+  ],
+  "control": {
+    "moved": {
+      "deadEnd": true,
+      "modalTrap": true,
+      "scrollTrap": true
+    },
+    "backToBaseline": true,
+    "counts": {
+      "base": [
+        0,
+        0,
+        0
+      ],
+      "dirty": [
+        1,
+        1,
+        1
+      ],
+      "restored": [
+        0,
+        0,
+        0
+      ]
+    },
+    "inertClickRecvMs": [
+      0.5
+    ]
+  }
+}

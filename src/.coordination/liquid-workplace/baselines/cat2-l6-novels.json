@@ -1,86 +1,66 @@
 {
-  "label": "l6-vn",
-  "surface": "@.visual-novel-panel",
+  "label": "l6-novels",
+  "surface": "@.jiten-novels",
   "win": "main",
-  "task": "type:.visual-novel-add > input:nth-of-type(1)=Cat2 Probe VN >> wait:500 >> click:.visual-novel-add > button",
+  "task": "type:input=The >> wait:600 >> click:.jiten-row:not(.active)",
   "presentation": "standard",
   "raised": "root surface - no taskbar button",
   "base": {
-    "textRuns": 14,
-    "controlCount": 11,
-    "box": "782x513",
-    "results": 0
+    "textRuns": 68,
+    "controlCount": 28,
+    "box": "772x460",
+    "results": 4
   },
   "inputCost": {
     "clicks": 1,
-    "keystrokes": 13,
-    "total": 14
+    "keystrokes": 3,
+    "total": 4
   },
   "latencyMs": {
     "clickRecv": [
-      18
+      33.5
     ],
     "inputRecv": [
-      66.1,
-      61.3,
-      55.7,
-      49.5,
-      43.3,
-      37.3,
-      32.1,
-      27.9,
-      23.6,
-      18.9,
-      14.7,
-      10.5,
-      5.7
+      55.9,
+      35.4,
+      18.6
     ],
-    "worstRecv": 66.1,
+    "worstRecv": 55.9,
     "overBar100": 0,
-    "n": 14,
+    "n": 4,
     "clickStampUnscored": [
-      71.9
+      93.7
     ],
     "inputStampUnscored": [
-      67.2,
-      61.5,
-      56,
-      49.7,
-      43.6,
-      37.5,
-      32.3,
-      28.1,
-      23.8,
-      19.1,
-      14.8,
-      10.7,
-      5.9
+      57.4,
+      35.7,
+      18.9
     ],
-    "worstStampUnscored": 71.9
+    "worstStampUnscored": 93.7
   },
   "steps": [
     {
-      "step": "type:.visual-novel-add > input:nth-of-type(1)=Cat2 Probe VN",
+      "step": "type:input=The",
       "target": {
-        "sel": ".visual-novel-add > input:nth-of-type(1)",
-        "text": "Cat2 Probe VN",
+        "sel": "input",
+        "text": "The",
         "wasValue": ""
       },
       "counted": true,
       "moved": {
-        "text": false,
+        "text": true,
         "controls": true,
-        "results": false,
+        "results": true,
         "dialogs": false,
         "scroll": false,
-        "focus": false,
+        "focus": true,
         "box": false,
         "any": true
       },
       "deadEnd": false
     },
     {
-      "step": "wait:500",
+      "step": "wait:600",
       "target": null,
       "counted": false,
       "moved": {
@@ -96,18 +76,18 @@
       "deadEnd": false
     },
     {
-      "step": "click:.visual-novel-add > button",
+      "step": "click:.jiten-row:not(.active)",
       "target": {
-        "sel": ".visual-novel-add > button",
-        "label": "Add to library",
+        "sel": ".jiten-row:not(.active)",
+        "label": "世界から猫が消えたならIf Cats Disappeared from the ",
         "disabled": false,
-        "at": "374,545"
+        "at": "499,475"
       },
       "counted": true,
       "moved": {
         "text": true,
         "controls": true,
-        "results": true,
+        "results": false,
         "dialogs": false,
         "scroll": false,
         "focus": true,
@@ -118,22 +98,19 @@
     }
   ],
   "undo": {
-    "spec": "click:.visual-novel-summary-actions > button:last-of-type",
+    "spec": "clear:input >> click:.jiten-row",
     "steps": [
-      "click:.visual-novel-summary-actions > button:last-of-type"
+      "clear:input",
+      "click:.jiten-row"
     ],
     "restored": true,
-    "baseHash": "13y6z62",
-    "afterHash": "13y6z62",
-    "liveRegionsBefore": [
-      "p.muted|Removed Remove Says Nothing from the local library."
-    ],
-    "liveRegionsAfter": [
-      "p.muted|Removed Cat2 Probe VN from the local library."
-    ],
+    "baseHash": "7a48vq",
+    "afterHash": "7a48vq",
+    "liveRegionsBefore": [],
+    "liveRegionsAfter": [],
     "textHashRoundTrip": {
-      "base": "l0kla1",
-      "after": "1vhz8r0"
+      "base": "7a48vq",
+      "after": "7a48vq"
     }
   },
   "stepsDriven": 2,
@@ -149,16 +126,16 @@
     "first": {
       "presentation": "standard",
       "box": "820x580",
-      "total": 14,
+      "total": 4,
       "deadEnds": 0,
-      "worstRecv": 66.1
+      "worstRecv": 55.9
     },
     "second": {
       "presentation": "liquid",
       "box": "820x580",
-      "total": 14,
+      "total": 4,
       "deadEnds": 0,
-      "worstRecv": 55.7
+      "worstRecv": 68.4
     },
     "restored": true,
     "restoredTo": {
@@ -166,8 +143,8 @@
       "pressed": "false",
       "box": "820x580"
     },
-    "liquidTotal": 14,
-    "standardTotal": 14
+    "liquidTotal": 4,
+    "standardTotal": 4
   },
   "bars": {
     "deadEnds": true,
@@ -208,7 +185,7 @@
       ]
     },
     "inertClickRecvMs": [
-      0.2
+      1
     ]
   }
 }

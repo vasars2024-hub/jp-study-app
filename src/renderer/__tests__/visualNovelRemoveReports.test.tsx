@@ -55,7 +55,9 @@ function installApiStub(): void {
     get: (target, prop: string | symbol) => {
       if (prop === 'then') return undefined;
       if (typeof prop === 'string' && prop in target) return target[prop];
-      if (typeof prop === 'string' && prop.startsWith('on')) return () => (): void => {};
+      // Every `on*` subscribes and hands back its own unsubscribe, so both layers return a
+      // function. `undefined` rather than an empty body: this repo lints empty functions.
+      if (typeof prop === 'string' && prop.startsWith('on')) return () => (): undefined => undefined;
       return async (): Promise<unknown> => EMPTY_RESULT;
     },
   });
@@ -81,9 +83,11 @@ afterEach(() => {
 async function mount(): Promise<void> {
   host = document.createElement('div');
   document.body.append(host);
-  root = createRoot(host);
-  await act(async () => { root!.render(<Panel onClose={() => {}} />); });
-  await act(async () => {});
+  const mounted = createRoot(host);
+  root = mounted;
+  await act(async () => { mounted.render(<Panel onClose={() => undefined} />); });
+  // Flush the effects that load the seeded database.
+  await act(async () => { await Promise.resolve(); });
 }
 
 const status = (): string => (host.querySelector('[role="status"]')?.textContent ?? '').trim();
