@@ -890,3 +890,13 @@ page of a proven pager, measure the region over the pager's own scroll buffer ra
 visible page, or exclude the trailing remainder. Not attempted here: one harness repair per turn
 was already spent on correction 15, and a second unverified change to the instrument in the same
 turn is how a false PASS gets committed.
+
+**Restoring the VN fixture (it was removed again — library back to `entries: 0`, `captures: 0`).**
+Library entry: the three `.visual-novel-add` inputs take a native value setter + an `input` event,
+then the last button in that block is `Add to library`. Captures: `.visual-novel-capture` holds
+one `input` (speaker) and two `textarea`s (Japanese, translation); fill all three, wait ~90 ms for
+React to commit, then click the FIRST button in `.visual-novel-capture-actions`, and loop. Eight
+lines took about twenty seconds. **Japanese cannot be sent through `/eval` as literal bytes — it
+arrives as `??`.** Write it as `\uXXXX` escapes, or escape non-ASCII in the poster before the
+request; the renderer parses them back to the same string. Both fixtures are removable through the
+product's own controls, so nothing is left in the user's library.
