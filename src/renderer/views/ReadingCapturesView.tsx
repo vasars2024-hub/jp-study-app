@@ -163,7 +163,15 @@ export default function ReadingCapturesView({ passage }: ReadingCapturesViewProp
           {t('reading.captures.loadFailed')}
         </p>
       ) : null}
-      {history.kind !== 'loading' && rows.length === 0 ? (
+      {/*
+        `ready`, not "not loading". A failed read is also not loading and also has
+        no rows, so the old condition rendered this note UNDER the failure note:
+        "Could not read the capture history." immediately followed by "Nothing
+        captured yet." One of those is always false, and it is this one that reads
+        like a fact about the user's data — it invites them to go and capture
+        something when sixty captures may be on disk behind a broken IPC.
+      */}
+      {history.kind === 'ready' && rows.length === 0 ? (
         <p className="reading-captures-note muted">{t('reading.captures.empty')}</p>
       ) : null}
       <ul className="reading-captures-rows">

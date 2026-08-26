@@ -1190,3 +1190,42 @@ drive now scrolls to **240** and `snapshot().scroll` records `["lq-anchor:240,0"
 
 Live state to restore at end of turn: Reading Finder was **minimized** and on the **Reading
 Finder** tab as found; the run leaves it open on **Captures**.
+
+## 2026-08-26 (later 5) · primary — Captures told the user their store was empty when the read had failed
+
+**Product slice, not a measurement**, and the same shape as the Immersion one-way door one entry
+above: scoring a surface for category 6 turns up a defect that category's rows cannot see, because
+every row it has assumes the list LOADED.
+
+`ReadingCapturesView` rendered its two notes from independent conditions — the failure note on
+`history.kind === 'error'`, the empty note on `history.kind !== 'loading' && rows.length === 0`.
+**An error satisfies both**: it is not `loading`, and a failed read produces no rows. So a store
+that could not be read rendered, verbatim and in this order:
+
+> Could not read the capture history.Nothing captured yet. Scan a passage with the Reading Lens
+> and send it here.
+
+One of those is always false, and it is the second — the one that reads like a fact about the
+user's data. It invites them to go and capture something when up to `HISTORY_LIMIT` 60 captures
+may be sitting on disk behind a broken IPC. That is CLAUDE.md's "user-visible failures must be
+honest" and the rubric's category 8, on the surface whose category-6 cell had just been banked.
+
+**Fix: one condition, `history.kind === 'ready'`.** No new strings, so no i18n work — `i18n-check`
+unchanged. The narrow fix and the WRONG fix (deleting the empty branch) are one edit apart, which
+is why the suite carries a positive control on a genuinely empty store.
+
+**`readingCapturesStates.test.tsx`, 4 cases, and it FAILED FIRST** — 2 failed / 2 passed before the
+edit, with the assertion output quoting both notes concatenated. After: **15 passed** across it and
+both existing captures suites (`readingCapturesCanvas`, `readingCapturesHandoff`). The fourth case
+covers an absent preload binding, which `load()` routes to the same `error` branch **synchronously**
+and which therefore never passes through `loading` at all — the state a renderer reload produces
+while main is still coming up.
+
+**Honest limit on the live half.** Live through the bridge, the populated path is unaffected: 42
+rows, **0** `.reading-captures-note`, no `.reading-captures-error`. The error branch was NOT forced
+live, because `window.api` is frozen and `load()` reads `window.api.lensHistoryList` directly, so it
+cannot be made to fail from `/eval`. That half rests on the suite, and this says so rather than
+implying a live failure was observed.
+
+**Not a repo-wide class**, checked rather than assumed: `kind|status|state !== 'loading'` across
+`src/renderer` and `src/media` returns this file only.
