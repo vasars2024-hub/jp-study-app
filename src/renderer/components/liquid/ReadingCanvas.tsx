@@ -96,9 +96,11 @@ type ReadingCanvasProps = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
    * of the canvas, so a sheet cannot cover it — measured 2026-08-25 with the
    * Bookmarks sheet open at a 380 px canvas: 28x97 px of overlap, hit-testing in
    * that region returning the popup and not the sheet, `aria-modal="true"` on the
-   * sheet, `inert` on the document, and two focusable controls in the popup
-   * outside any inert subtree. A visible, clickable, tabbable panel outside an
-   * `aria-modal` region describing a word in a document that has been set aside.
+   * sheet (as it then was — see `renderTool` for why it is `false` now), `inert`
+   * on the document, and two focusable controls in the popup outside any inert
+   * subtree. A visible, clickable, tabbable panel PAINTED OVER a document that
+   * had been set aside — which is the defect regardless of what the sheet claims,
+   * because it is over the document's own rect rather than beside it.
    *
    * The canvas reports rather than reaches: it does not own those overlays and
    * guessing at their selectors would be worse than the defect. The caller
@@ -195,11 +197,14 @@ export function ReadingCanvas({
   const covered = layout.documentCovered;
 
   /**
-   * A sheet is `aria-modal` over an `inert` document, so it must take focus and
-   * give it back. Without this, opening one leaves focus on the trigger — which
-   * is now inside the inert region — and the next Tab restarts the window from
-   * the top. A docked tool is NOT focused on open: it does not take the document
-   * away, and stealing focus from someone mid-sentence is its own defect.
+   * A sheet takes the document away, so it must take focus and give it back.
+   * Without this, opening one leaves focus on the trigger — which is now inside
+   * the inert region — and the next Tab restarts the window from the top. A
+   * docked tool is NOT focused on open: it does not take the document away, and
+   * stealing focus from someone mid-sentence is its own defect.
+   *
+   * Taking focus is NOT trapping it, and that distinction is the reason the sheet
+   * does not claim `aria-modal`. See `renderTool`.
    */
   const sheetRef = useRef<HTMLElement | null>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
@@ -263,7 +268,33 @@ export function ReadingCanvas({
      *
      * `hidden` and not a class: it removes the tool from the tab ring and from
      * the accessibility tree in one attribute, which is exactly right under a
-     * newer `aria-modal` sibling.
+     * newer sibling that has taken the document.
+     *
+     * A SHEET IS `aria-modal="false"`, AND THE `false` IS DELIBERATE.
+     *
+     * `aria-modal="true"` is a promise that everything outside the node is inert,
+     * and a screen reader keeps that promise by hiding it. The keyboard did not:
+     * measured 2026-08-25 with the category-4 harness, a covered canvas left
+     * **8 focusables reachable in Reading Finder** (the whole workspace tab strip)
+     * and **15 in Immersion** (the url bar, the three mode buttons, the toolbar) —
+     * every one of them painted OUTSIDE the document's rect, so none is an
+     * occlusion, and every one of them still Tab-reachable. An SR user is told
+     * those controls do not exist while a sighted keyboard user walks straight
+     * into them. `MalDownloadDialog` is the house precedent and it keeps the
+     * promise properly, with a Tab wrap (`malDownloadDialog.test.ts`).
+     *
+     * So one of the two had to give, and containment is the wrong one HERE: the
+     * same tool is a DOCK at a wider canvas, where nothing is modal and the
+     * window's chrome is plainly reachable. Trapping Tab in the sheet would make
+     * the keyboard model change with window width, which is its own clunkiness
+     * defect — and the sheet is scoped to one canvas inside a floating window
+     * whose title bar and workspace tabs are the WINDOW's navigation, not the
+     * document's. What is true and stays: the document is `inert` +
+     * `aria-hidden`, so it is out of the reading order either way.
+     *
+     * Explicit `false` rather than the attribute's absence, following
+     * `TourOverlay.tsx`, so the next reader meets a decision instead of an
+     * omission.
      */
     const stacked = isSheet && tool.id !== sheetId;
     return (
@@ -279,7 +310,7 @@ export function ReadingCanvas({
         data-placement={resolved.placement}
         data-side={isSheet ? undefined : resolved.side}
         aria-label={tool.label}
-        {...(isSheet ? { role: 'dialog' as const, 'aria-modal': true } : {})}
+        {...(isSheet ? { role: 'dialog' as const, 'aria-modal': false } : {})}
         style={isSheet ? undefined : { width: `${resolved.width}px`, flex: `0 0 ${resolved.width}px` }}
       >
         <div className="lq-reading-tool-head">

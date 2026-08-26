@@ -232,7 +232,13 @@ export function expectPlacement(
   expect(harness.doc().dataset.contentWidth).toBe(String(expected.contentWidth));
   if (expected.placement === 'sheet') {
     expect(tool!.getAttribute('role')).toBe('dialog');
-    expect(tool!.getAttribute('aria-modal')).toBe('true');
+    // `false`, not `'true'` and not absent. A sheet does not contain Tab — the
+    // window's own chrome stays reachable exactly as it does when the same tool
+    // is a dock — so claiming `aria-modal` would hide from a screen reader
+    // controls a keyboard user can still walk into. Measured: 8 such controls in
+    // Reading Finder, 15 in Immersion, 2026-08-25. `ReadingCanvas.renderTool`
+    // carries the decision; this is the latch that stops it drifting back.
+    expect(tool!.getAttribute('aria-modal')).toBe('false');
     expect(harness.doc().hasAttribute('inert')).toBe(true);
   } else {
     expect(tool!.style.width).toBe(`${expected.toolWidth}px`);
