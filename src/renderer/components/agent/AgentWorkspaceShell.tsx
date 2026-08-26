@@ -78,6 +78,11 @@ import {
   type AgentProviderPricingTable,
 } from '../../../shared/agentProviderPricing';
 import {
+  agentPlanDisabledReason,
+  agentSendDisabledReason,
+  type AgentComposerState,
+} from '../../../shared/agentComposerReason';
+import {
   loadAgentProviderPricing,
   onAgentProviderPricingChanged,
   saveAgentProviderPrice,
@@ -1624,6 +1629,41 @@ export default function AgentWorkspaceShell() {
   );
   const knownInputOverBudget = knownInputChars > maxInputChars;
   const planObjectiveTooLong = draft.trim().length > AGENT_CONVERSATION_PLAN_OBJECTIVE_LIMIT;
+  /**
+   * Why the composer's two buttons are greyed out, in the order the user should
+   * act on them.
+   *
+   * The rules live in `shared/agentComposerReason` so their PRIORITY is
+   * testable; `disabled` is derived from the reason rather than repeating the
+   * condition list, so a greyed-out button with no reason is not expressible
+   * here. Four of the conditions already render a `role="alert"` paragraph above
+   * the row, and these reuse those SAME keys rather than inventing a second
+   * wording for one state — but that paragraph is a sibling of
+   * `.agent-composer-actions`, not of the button, so nothing tied the two
+   * together for a screen reader or for a user reading the row.
+   */
+  const composerState: AgentComposerState = {
+    busy,
+    planning,
+    attachmentReading,
+    attachmentCount: attachments.length,
+    draft,
+    planObjectiveTooLong,
+    knownInputOverBudget,
+    visionUnsupported,
+    sensitiveConsentRequired,
+    cloudSensitiveConsent,
+  };
+  const planReasonKey = agentPlanDisabledReason(composerState);
+  const sendReasonKey = agentSendDisabledReason(composerState);
+  // `inputOverBudget` is the one reason that interpolates, and it takes the same
+  // limit the alert above the row already shows.
+  const planDisabledReason = planReasonKey ? t(planReasonKey) : undefined;
+  const sendDisabledReason = sendReasonKey
+    ? t(sendReasonKey, sendReasonKey === 'agent.execute.inputOverBudget'
+      ? { limit: maxInputChars }
+      : undefined)
+    : undefined;
   const selectedPrice = agentProviderPrice(pricingTable, target);
   /**
    * A floor, not a forecast, and labelled as one.
@@ -2694,14 +2734,8 @@ export default function AgentWorkspaceShell() {
                       <button
                         type="button"
                         className="agent-action agent-plan-create"
-                        disabled={
-                          busy
-                          || planning
-                          || attachmentReading
-                          || attachments.length > 0
-                          || draft.trim().length === 0
-                          || planObjectiveTooLong
-                        }
+                        disabled={planDisabledReason !== undefined}
+                        title={planDisabledReason}
                         onClick={() => void createPlan()}
                       >
                         <Icon name="sparkle" size={15} />
@@ -2710,15 +2744,8 @@ export default function AgentWorkspaceShell() {
                       <button
                         type="submit"
                         className="agent-action agent-action-primary"
-                        disabled={
-                          busy
-                          || planning
-                          || attachmentReading
-                          || draft.trim().length === 0
-                          || knownInputOverBudget
-                          || visionUnsupported
-                          || (sensitiveConsentRequired && !cloudSensitiveConsent)
-                        }
+                        disabled={sendDisabledReason !== undefined}
+                        title={sendDisabledReason}
                       >
                         <Icon name="chat" size={15} />
                         {t('agent.execute.send')}
