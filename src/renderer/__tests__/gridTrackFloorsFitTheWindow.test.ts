@@ -158,7 +158,7 @@ describe('grid track floors fit the narrowest window the product allows', () => 
     expect(styles).toMatch(/\.reader-stage\s*\{[^}]*min-width:\s*0/);
   });
 
-  it('the two nowrap control rows that left the frame at 260px now wrap', () => {
+  it('the nowrap control rows that left the frame at their host minimum now wrap', () => {
     // `form.dict-search` measured 324px and `.lexicon-lens-picker` 297px, both in a 258px
     // body: the Search button and the "Interlinear" lens were unreachable, not merely tight.
     expect(read('src/renderer/styles.css')).toMatch(
@@ -167,7 +167,30 @@ describe('grid track floors fit the narrowest window the product allows', () => 
     expect(read('src/renderer/components/lexicon/lexiconWorkbench.css')).toMatch(
       /\.lexicon-lens-picker\s*\{[^}]*flex-wrap:\s*wrap/,
     );
+    // `.immersion-toolbar`, 2026-08-25: `scrollWidth` 588 in a `clientWidth` of 342 at the
+    // 380px Blanc allows — 246px of overflow, `overflow-x: visible`, and SEVEN of fourteen
+    // children entirely past the right edge including `.immersion-sites-toggle`. The url
+    // form's floor is half the fix and not a nicety: at `min-width: 0` it collapses to width
+    // 0, the row still does not fit, and the shortfall moves onto the controls after it.
+    const styles = strip(read('src/renderer/styles.css'));
+    expect(styles).toMatch(/\.immersion-toolbar\s*\{[^}]*flex-wrap:\s*wrap/);
+    expect(styles).toMatch(/\.immersion-url-form\s*\{[^}]*min-width:\s*(?!0[^a-z])/);
   });
+
+  /**
+   * Why this category's sweep is LIVE and not source-only, stated once so the next worker
+   * does not spend a turn rediscovering it.
+   *
+   * The grid-track and column-axis checks above are real sweeps because a `minmax(30rem, …)`
+   * floor is decidable from the stylesheet alone. A nowrap control row is not: whether it
+   * overflows depends on how many children the TSX renders and how wide they are, and a
+   * source predicate broad enough to catch `.immersion-toolbar` (`display: flex`,
+   * `flex-shrink: 0`, no `flex-wrap`, no `overflow-x: auto`) flags 29 rules across
+   * `src/renderer`, most of them two-button action pairs that must never wrap. Measured
+   * 2026-08-25. So the instrument that SCORES this half of category 4 is the live one —
+   * `l1-use-of-space.js`'s `clipped` and `hiddenOverflowX`, already parameterised by
+   * surface — and the assertions here are named latches that stop a fixed rule regressing.
+   */
 });
 
 function read(p: string): string {

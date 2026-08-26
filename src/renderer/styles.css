@@ -16811,9 +16811,22 @@ html[data-taskbar-size='large'] .os-tray-btn {
   color: var(--text);
   position: relative;
 }
+/* `flex-wrap: wrap` and the url form's floor are one fix, and the same one
+   `.reader-bar` needed at `02c5dd92`. Measured live 2026-08-25 at the 380px Blanc
+   allows (`BLANC_MIN_W`): `scrollWidth` 588 in a `clientWidth` of 342 — 246px of
+   overflow with `overflow-x: visible` and nothing to scroll — and SEVEN of the
+   fourteen children sat entirely past the right edge, among them
+   `.immersion-sites-toggle`, the trigger for the reading tool this whole gate is
+   about. The url form was the reason nothing looked wrong in a narrower rule: at
+   `flex: 1; min-width: 0` it surrenders to width 0 and the row still does not
+   fit, so the shortfall lands on everything after it instead. A floor makes the
+   form the item that wraps rather than the item that vanishes. Nothing moves at
+   normal widths — one row at 820, three at 380 — and the vertical cost is only
+   paid where the alternative was unreachable controls. */
 .immersion-toolbar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
   padding: 6px 8px;
   border-bottom: 1px solid var(--border);
@@ -16822,7 +16835,7 @@ html[data-taskbar-size='large'] .os-tray-btn {
 }
 .immersion-url-form {
   flex: 1;
-  min-width: 0;
+  min-width: 160px;
   display: flex;
 }
 .immersion-url {
