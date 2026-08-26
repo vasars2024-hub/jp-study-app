@@ -377,6 +377,24 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
     setStatus('Visual novel added to the local library.');
   };
 
+  /**
+   * Remove was the one action in this panel that reported nothing. Every other one calls
+   * `setStatus`/`reportStatus`, so after deleting an entry the `role="status"` line still read
+   * "Visual novel added to the local library." over an empty library — measured by the category-2
+   * harness's live-region round trip, which is the whole reason that report exists. It also took
+   * the returned database on trust: the handler answers with one whether or not the entry went,
+   * so a silent no-op announced itself as a success.
+   */
+  const removeEntry = async (id: string, title: string): Promise<void> => {
+    const next = await window.api.visualNovelRemove(id);
+    setDatabase(next);
+    if (next.entries.some((entry) => entry.id === id)) {
+      reportStatus(t('vnPanel.msg.removeFailed', { title }), true);
+      return;
+    }
+    setStatus(t('vnPanel.msg.removed', { title }));
+  };
+
   const saveProgress = async (): Promise<void> => {
     if (!selected) return;
     const next = await window.api.visualNovelUpdateProgress(selected.id, {
@@ -722,7 +740,7 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
                 <div className="visual-novel-summary-actions">
                   <button type="button" disabled={!!launchWhy} title={launchWhy ? t(launchWhy) : undefined} onClick={() => void launchVisualNovel()}>Launch</button>
                   {sessionStartedAt && <button type="button" onClick={() => void stopReadingTimer()}>Stop timer</button>}
-                  <button type="button" onClick={() => void window.api.visualNovelRemove(selected.id)}>Remove</button>
+                  <button type="button" onClick={() => void removeEntry(selected.id, selected.title)}>Remove</button>
                 </div>
               </div>
               <VisualNovelMetadataEditor

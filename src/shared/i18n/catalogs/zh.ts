@@ -530,6 +530,8 @@ export const zh: Catalog = {
   'vnPanel.commonSignals': '常见句尾：{signals}',
   'vnPanel.msg.clipboardCaptured': '已从剪贴板采集到新的日语文本。',
   'vnPanel.msg.added': '视觉小说已添加到本地库。',
+  'vnPanel.msg.removed': '已从本地库中移除 {title}。',
+  'vnPanel.msg.removeFailed': '{title} 仍在本地库中。',
   'vnPanel.msg.progressSaved': '阅读进度已保存。',
   'vnPanel.msg.timeSaved': '阅读时长已保存。',
   'vnPanel.msg.noTimer': '未找到正在计时的阅读会话。',

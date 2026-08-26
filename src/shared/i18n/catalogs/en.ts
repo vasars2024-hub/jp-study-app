@@ -590,6 +590,8 @@ export const en: Catalog = {
   'vnPanel.commonSignals': 'Common signals: {signals}',
   'vnPanel.msg.clipboardCaptured': 'Captured new Japanese text from the clipboard.',
   'vnPanel.msg.added': 'Visual novel added to the local library.',
+  'vnPanel.msg.removed': 'Removed {title} from the local library.',
+  'vnPanel.msg.removeFailed': '{title} is still in the local library.',
   'vnPanel.msg.progressSaved': 'Reading progress saved.',
   'vnPanel.msg.timeSaved': 'Reading time saved.',
   'vnPanel.msg.noTimer': 'No active reading timer was found.',

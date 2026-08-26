@@ -532,6 +532,8 @@ export const ja: Catalog = {
   'vnPanel.commonSignals': 'よく出る語尾: {signals}',
   'vnPanel.msg.clipboardCaptured': 'クリップボードから新しい日本語を取り込みました。',
   'vnPanel.msg.added': 'ビジュアルノベルをローカルライブラリに追加しました。',
+  'vnPanel.msg.removed': '{title} をローカルライブラリから削除しました。',
+  'vnPanel.msg.removeFailed': '{title} はローカルライブラリに残っています。',
   'vnPanel.msg.progressSaved': '読書の進捗を保存しました。',
   'vnPanel.msg.timeSaved': '読書時間を保存しました。',
   'vnPanel.msg.noTimer': '計測中のタイマーは見つかりませんでした。',

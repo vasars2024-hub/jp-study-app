@@ -606,6 +606,8 @@ export const ru: Catalog = {
   'vnPanel.commonSignals': 'Частые признаки: {signals}',
   'vnPanel.msg.clipboardCaptured': 'Из буфера обмена захвачен новый японский текст.',
   'vnPanel.msg.added': 'Визуальная новелла добавлена в локальную библиотеку.',
+  'vnPanel.msg.removed': '{title} удалена из локальной библиотеки.',
+  'vnPanel.msg.removeFailed': '{title} осталась в локальной библиотеке.',
   'vnPanel.msg.progressSaved': 'Прогресс чтения сохранён.',
   'vnPanel.msg.timeSaved': 'Время чтения сохранено.',
   'vnPanel.msg.noTimer': 'Активный таймер чтения не найден.',
