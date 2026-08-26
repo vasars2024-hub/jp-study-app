@@ -58,13 +58,32 @@
   // Set `window.__lqScoreTitles = ['Video']` before evaluating to score another set. The two
   // defaults stay so every run already recorded in L1_USE_OF_SPACE.md reproduces; gate 461 names
   // Video and Dictionary, and `Media` is a THIRD window, not the Video one.
+  //
+  // AN ENTRY MAY ALSO BE `{ root: '<selector>', title: '<label>' }`, because not every surface
+  // is a floating window and a harness that can only see `.fwin` scores those as absent. Found
+  // 2026-08-25: opening a book from the Library replaces the whole desktop shell with a
+  // full-window `.reader` — `document.querySelectorAll('.fwin').length` is then **0**, and the
+  // title form would have refused on L6's own "Novels" surface. Same shape as L5's Agent
+  // pop-out, which mounts outside `.fwin` too. Everything below reads `win` as "the surface's
+  // own box", so a root selector needs no other change: `R` is that element's rect, and
+  // `clipped` then means "leaves the SURFACE", which is the question either way.
   const TITLES = (typeof window !== 'undefined' && window.__lqScoreTitles) || ['Dictionary', 'Media'];
 
-  const measure = (title) => {
-    const win = [...document.querySelectorAll('.fwin')].find(
-      (w) => (w.querySelector('.fwin-title-text')?.textContent || '').includes(title),
-    );
-    if (!win) return { title, refuse: 'no .fwin with that title' };
+  const measure = (entry) => {
+    const title = typeof entry === 'string' ? entry : entry.title || entry.root;
+    const win = typeof entry === 'string'
+      ? [...document.querySelectorAll('.fwin')].find(
+        (w) => (w.querySelector('.fwin-title-text')?.textContent || '').includes(entry),
+      )
+      : document.querySelector(entry.root);
+    if (!win) {
+      return {
+        title,
+        refuse: typeof entry === 'string'
+          ? 'no .fwin with that title'
+          : `no element matching ${entry.root}`,
+      };
+    }
     const R = win.getBoundingClientRect();
     if (!R.width || !R.height) return { title, refuse: 'window is 0x0 — refusing to record zeros' };
     const body = win.querySelector('.fwin-body') || win;
@@ -83,6 +102,53 @@
       return false;
     };
 
+    /**
+     * A PAGINATED READER IS NOT A CLIPPED ONE, and without this the harness cannot score any
+     * surface that pages, virtualises or carousels.
+     *
+     * Measured 2026-08-25 on the full-window NovelReader, a real EPUB: `clipped` **132** at
+     * 820 and **239** at 380, every one of them on the x axis, and every one of them a
+     * descendant of `div.novel-content` sitting **806 px left of the surface's left edge**
+     * inside `div.novel-scroller` — `position: absolute; overflow: hidden`, `scrollWidth`
+     * exactly equal to `clientWidth`. That is the product's own pagination: earlier pages are
+     * offset negatively and Prev/Next is the affordance. `scrollableAncestor` cannot see it
+     * (nothing scrolls) and `hiddenOverflowX` cannot either (`scrollWidth` never grows,
+     * because content at a negative offset does not count towards it). The count scaled with
+     * how much of the book was off-page, not with any layout failure.
+     *
+     * So: a box whose rect does not intersect its nearest overflow-clipping ancestor AT ALL
+     * is outside that ancestor's viewport, not outside the surface's frame. Whether the user
+     * can reach it is that ancestor's contract — a scrollbar, a page control, a virtual list —
+     * and the other three numbers here already measure exactly that. Attributing it to the
+     * window frame names the wrong cause and makes every paged reader unscorable.
+     *
+     * TWO NARROWINGS, and the second is the one that keeps this honest. It is `entirely
+     * outside`, never `partly cut` — a half-visible box is still being cut off. AND the
+     * clipper must itself report NO hidden content: `scrollWidth <= clientWidth` and
+     * `scrollHeight <= clientHeight`. That is exactly what separates the two cases this repo
+     * has now measured. `.novel-scroller` pages: 1262 == 1262 on both axes, because content
+     * at a negative offset never counts towards `scrollWidth` — nothing is lost, it is
+     * elsewhere. `.reading-workspace-panel` lost content: `scrollHeight` 740 inside a
+     * `clientHeight` of 460, 280 px overflowing forwards with nothing to scroll — and that
+     * defect shipped fixed in the commit before this one, so without the narrowing this very
+     * change would have hidden it. Written down because it nearly did.
+     */
+    const outsideItsClipper = (el, b) => {
+      let n = el.parentElement;
+      while (n && n !== win.parentElement && n !== win) {
+        const cs = getComputedStyle(n);
+        if (/^(hidden|clip|auto|scroll)$/.test(cs.overflowX) || /^(hidden|clip|auto|scroll)$/.test(cs.overflowY)) {
+          if (n.scrollWidth > n.clientWidth + 1 || n.scrollHeight > n.clientHeight + 1) return false;
+          const c = n.getBoundingClientRect();
+          const ix = Math.min(b.right, c.right) - Math.max(b.left, c.left);
+          const iy = Math.min(b.bottom, c.bottom) - Math.max(b.top, c.top);
+          return ix <= 0 || iy <= 0;
+        }
+        n = n.parentElement;
+      }
+      return false;
+    };
+
     const painted = (e) =>
       typeof e.checkVisibility === 'function'
         ? e.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true, contentVisibilityAuto: true })
@@ -92,6 +158,7 @@
     const clipped = all.filter((e) => {
       const b = e.getBoundingClientRect();
       if (b.width < 2 || b.height < 2) return false;
+      if (outsideItsClipper(e, b)) return false;
       const outX = b.right > R.right + 1 || b.left < R.left - 1;
       const outY = b.bottom > R.bottom + 1 || b.top < R.top - 1;
       return (outX && !scrollableAncestor(e, 'x')) || (outY && !scrollableAncestor(e, 'y'));

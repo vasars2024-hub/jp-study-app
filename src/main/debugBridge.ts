@@ -453,6 +453,55 @@ async function handle(
       };
     }
 
+    /**
+     * Reads, and optionally sets, an OS window's content size.
+     *
+     * Not every surface is a floating window inside the desktop shell. Opening a book replaces
+     * the shell entirely with a full-window reader, and the Agent pop-out, Blanc and Focus
+     * hosts do the same — so "does this surface hold together at 380px" cannot be asked by
+     * writing an inline width on some element mid-tree. Measured 2026-08-25: doing that to the
+     * NovelReader left `div.novel-scroller` (`position: absolute`) holding a page buffer sized
+     * against a container that had not moved, and the harness read 132 boxes as clipped that
+     * the product pages to on its own. The only faithful narrow host is a narrow window.
+     *
+     * `setContentSize` rather than `setSize` so the number means the same thing as
+     * `window.innerWidth`. The previous content size comes back in the response, which is what
+     * a caller restores — and it must restore THAT, not the outer bounds: content 1264x821 is
+     * outer 1280x860 here, so writing the outer numbers back as a content size grows the
+     * window by the frame every round trip.
+     *
+     * ALWAYS READ `contentSize` BACK; the request is a request. The desktop window has a
+     * minimum, measured 2026-08-25: asking for 380x580 yields 924x580, an outer 940. So a
+     * "does it hold at 380px" run against this host is not a narrow run at all, and reporting
+     * the requested number would be reporting a size nothing was ever measured at.
+     * Development-only, like the rest of this bridge, and never shipped.
+     */
+    case '/bounds': {
+      const win = resolveWindow(body.window);
+      if (!win) return { code: 404, body: { ok: false, error: 'no matching window' } };
+      const [wasW, wasH] = win.getContentSize();
+      const w = body.width === undefined ? null : Number(body.width);
+      const h = body.height === undefined ? null : Number(body.height);
+      if (w !== null || h !== null) {
+        if ((w !== null && !Number.isFinite(w)) || (h !== null && !Number.isFinite(h))) {
+          return { code: 400, body: { ok: false, error: 'width and height must be numbers' } };
+        }
+        if (win.isMaximized()) win.unmaximize();
+        win.setContentSize(Math.round(w ?? wasW), Math.round(h ?? wasH));
+      }
+      const [nowW, nowH] = win.getContentSize();
+      return {
+        code: 200,
+        body: {
+          ok: true,
+          id: win.id,
+          previous: { width: wasW, height: wasH },
+          contentSize: { width: nowW, height: nowH },
+          bounds: win.getBounds(),
+        },
+      };
+    }
+
     case '/reload': {
       const win = resolveWindow(body.window);
       if (!win) return { code: 404, body: { ok: false, error: 'no matching window' } };
