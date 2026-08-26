@@ -697,3 +697,48 @@ than assumed — the emitted regex measures ja 22, zh 18, en 17, `Back` 4 (`debu
 and Video **5** (two empty-label, plus Subtitles / Generate / Download & transcribe). Those are
 the next mute-pair slices. Category 8 remains scored on **2 of 6** L6 surfaces — mute pairs are
 one of its four numbers, and `statesNamed` still needs a drive leg per surface.
+
+## 2026-08-26 — Media and Video closed; the harness could not name what it found, and was pressing the wrong control
+
+**Both open surfaces fixed. Media 2→0, Video 5→0, and Video is the first surface to score
+`PASS 10/10` on this category** (rawKeys 0, placeholders 0, mutePairs 0, statesNamed 1 of 1
+observable). Media reads mutePairs 0 with `statesNamed: UNMEASURED` — it has no observable
+state to drive, which is correction 6's honest verdict, not a pass and not a fail.
+
+**The previous entry's "Video 5" reconciles to this turn's 3, and the difference is slice 1.**
+The Video floating window hosts its own Media Center topbar, so `.mc-history-buttons`
+Back/Forward were counted on BOTH surfaces — a live read returned four such buttons across the
+two workspaces. 5 = those 2 + Subtitles/Generate/Download. Fixing the arrows once closed both.
+
+| surface | before | after | control | commit |
+| --- | --- | --- | --- | --- |
+| Media | 2 | 0 | navigate → enabled Back reverts to title "Back" | `396cbe75` |
+| Video | 5 | 0 | type a URL → Download disabled false, title null | `5e82b7fa` |
+
+- **Media**: the arrows already had `aria-label`, unlike Immersion's pair — so `title` was free
+  to carry the reason and the accessible name did not move. Wording follows SECTIONS, not pages.
+- **Video**: three captioned buttons, so nothing was wrong with their NAMES. Rules in
+  `shared/mediaVideoActionReason.ts` beside `agentComposerReason.ts`, `disabled` derived FROM
+  the reason. One priority is load-bearing: the running download disables the URL input too, so
+  "paste a link" would be advice the user cannot follow about a field the app has locked.
+
+**Correction 13 — the finding nobody could act on.** Cat 8 reported both of Media's mute pairs
+as `el: "button.", label: ""`. An icon-only button has no class and no text, so the row named
+nothing and locating the control needed a bespoke per-surface probe — the exact cost RULE 1
+exists to delete. `identify()` now emits aria-label, title, icon path, ancestor chain, child
+index and box. It named Media's two in one run.
+
+**Correction 14 — `clickLang` was pressing a real setting.** `.sp-seg-btn[lang=…]` unscoped also
+matches the Subtitle & transcription segment (`.sp-seg.media-modelseg`, lang ja/zh). With
+Settings on any page but Appearance the UI-language card is not rendered and that query returns
+ONLY those two, so asking for `ja` called `setStudyLang('ja')`. The `storedLang !== stored` guard
+VOIDs the run correctly — but only after the press. Now scoped to `[data-setting-id="ui-language"]`;
+`SettingsCard` renders `id` as `data-setting-id`, so the `getElementById` form would have refused
+every time. **Disclosed:** I pressed it once at `ja` before identifying it. No pre-click snapshot
+of `jp-study-dict-lang` exists, so I cannot prove it was already `ja` and do not claim it; it now
+reads `ja` with `jp-study-whisper-model` = `kotoba-whisper` = `defaultWhisperTier('ja')`.
+
+**Seven raw English literals** in the same YouTube bar (`title`, `aria-label`, five `<option>`)
+— invisible to every guard here, since a string that never became a key is missing from no
+catalogue. Now `media.yt.subLang.*` ×4 languages, verified by reading the select in ja/zh/ru
+through the fixed clicker, `ui-lang` restored to `en` and asserted (`e7e2df32`).
