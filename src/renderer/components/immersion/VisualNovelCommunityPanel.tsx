@@ -12,6 +12,8 @@ import {
 } from '../../../shared/visualNovelCommunity';
 import { addDeckCards, loadDeck } from '../../flashcardDeck';
 import { loadMediaStudyDatabase } from '../../mediaStudyStore';
+import { useT } from '../../i18n';
+import { VN_ACTION_STATE_EMPTY, vnBundleReason, vnSaveReportReason } from '../../../shared/vnActionReason';
 
 interface ReportDraft {
   author: string;
@@ -55,6 +57,7 @@ export default function VisualNovelCommunityPanel({
   onDatabase: (database: VisualNovelDatabase) => void;
   onStatus: (message: string, error?: boolean) => void;
 }) {
+  const { t } = useT();
   const [draft, setDraft] = useState<ReportDraft>(emptyDraft);
   const [preview, setPreview] = useState<VisualNovelCommunityBundle | null>(null);
   const [busy, setBusy] = useState(false);
@@ -67,6 +70,12 @@ export default function VisualNovelCommunityPanel({
     || draft.difficultyRating
     || draft.jlptLevel,
   );
+  // Category 8: `disabled` is DERIVED from the reason, so a bundle button cannot be grey here
+  // with nothing saying why. Only the two fields these rules read are supplied; the rest of
+  // `VnActionState` belongs to the workspace around this panel.
+  const bundleState = { ...VN_ACTION_STATE_EMPTY, busy, hasReportDraft: hasDraftContent };
+  const saveReportWhy = vnSaveReportReason(bundleState);
+  const bundleWhy = vnBundleReason(bundleState);
   const reportSummary = useMemo(() => {
     const ratings = entry.communityReports.flatMap((report) => report.rating == null ? [] : [report.rating]);
     const difficulties = entry.communityReports.flatMap(
@@ -236,9 +245,9 @@ export default function VisualNovelCommunityPanel({
         <label className="is-wide">Language report<textarea value={draft.languageNotes} onChange={(event) => field('languageNotes', event.target.value)} placeholder="Vocabulary, grammar, dialect, and reading observations" /></label>
       </div>
       <div className="visual-novel-community-actions">
-        <button type="button" disabled={busy || !hasDraftContent} onClick={() => void saveReport()}>Save report</button>
-        <button type="button" disabled={busy} onClick={() => void exportBundle()}>Export study bundle</button>
-        <button type="button" disabled={busy} onClick={() => void chooseBundle()}>Import study bundle</button>
+        <button type="button" disabled={!!saveReportWhy} title={saveReportWhy ? t(saveReportWhy) : undefined} onClick={() => void saveReport()}>Save report</button>
+        <button type="button" disabled={!!bundleWhy} title={bundleWhy ? t(bundleWhy) : undefined} onClick={() => void exportBundle()}>Export study bundle</button>
+        <button type="button" disabled={!!bundleWhy} title={bundleWhy ? t(bundleWhy) : undefined} onClick={() => void chooseBundle()}>Import study bundle</button>
       </div>
       {preview && (
         <article className="visual-novel-community-preview">
@@ -252,8 +261,8 @@ export default function VisualNovelCommunityPanel({
           </p>
           {!identityMatches && <p className="media-error">The bundle title or provider ID does not match this library entry.</p>}
           <div>
-            <button type="button" disabled={busy} onClick={() => setPreview(null)}>Cancel</button>
-            <button type="button" disabled={busy} onClick={() => void applyBundle()}>
+            <button type="button" disabled={!!bundleWhy} title={bundleWhy ? t(bundleWhy) : undefined} onClick={() => setPreview(null)}>Cancel</button>
+            <button type="button" disabled={!!bundleWhy} title={bundleWhy ? t(bundleWhy) : undefined} onClick={() => void applyBundle()}>
               {!identityMatches && !mismatchConfirmed ? 'Review title mismatch' : 'Apply bundle'}
             </button>
           </div>

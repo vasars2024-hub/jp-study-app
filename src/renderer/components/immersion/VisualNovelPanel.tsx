@@ -17,6 +17,17 @@ import {
 } from '../../../shared/lensCaptureTarget';
 import { analyzeVisualNovelCharacterSpeech } from '../../../shared/visualNovelLanguage';
 import { rankVisualNovelEntries } from '../../../shared/visualNovelRecommendations';
+import {
+  vnAddCapturedLineReason,
+  vnAddEndingReason,
+  vnAddRouteReason,
+  vnAnalyzeReason,
+  vnClearScenesReason,
+  vnCreateCardsReason,
+  vnCurrentSceneReason,
+  vnLaunchReason,
+  type VnActionState,
+} from '../../../shared/vnActionReason';
 import { addMediaStudySentenceFlashcard, addVisualNovelStudyFlashcards, analyzeMediaStudyCues, createMediaLanguageProfile, type MediaStudyAnalysis } from '../../mediaStudyWorkflow';
 import { addMediaStudySessionProgress, loadMediaStudyDatabase, onMediaStudyDatabaseChanged, saveMediaLanguageProfile, startMediaStudySession } from '../../mediaStudyStore';
 import { isLookupClick, lookupWordFromMouseUp, noteLookupPointerDown } from '../../wordLookup';
@@ -208,6 +219,35 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
     () => rankVisualNovelEntries(database.entries, studyProfiles),
     [database.entries, studyProfiles],
   );
+  // Category 8: `disabled` is DERIVED from the reason, never asserted beside it, so a button
+  // that is grey with nothing saying why cannot be written here by accident. `hasEndingName`
+  // is per-route and `hasReportDraft` belongs to the community panel; both are overridden at
+  // their own call site rather than guessed here.
+  const actionState: VnActionState = {
+    busy,
+    hasExecutablePath: !!selected?.executablePath,
+    hasRouteName: !!routeName.trim(),
+    hasEndingName: false,
+    hasCaptureText: !!captureText.trim(),
+    scopedCaptureCount: scopedCaptures.length,
+    hasAnalysis: !!analysis,
+    hasCurrentScene: !!progress.scene.trim(),
+    selectedSceneCount: selectedSceneKeys.size,
+    hasReportDraft: false,
+  };
+  const launchWhy = vnLaunchReason(actionState);
+  const addRouteWhy = vnAddRouteReason(actionState);
+  const addCapturedLineWhy = vnAddCapturedLineReason(actionState);
+  const analyzeWhy = vnAnalyzeReason(actionState);
+  const createCardsWhy = vnCreateCardsReason(actionState);
+  const currentSceneWhy = vnCurrentSceneReason(actionState);
+  const clearScenesWhy = vnClearScenesReason(actionState);
+  // Spread rather than two attributes, because the ending draft is PER ROUTE: one call inside a
+  // `.map` cannot end up grey with an explanation computed from a different route's draft.
+  const endingReasonProps = (draft: string | undefined) => {
+    const why = vnAddEndingReason({ ...actionState, hasEndingName: !!draft?.trim() });
+    return { disabled: !!why, title: why ? t(why) : undefined };
+  };
 
   useEffect(() => {
     if (!selected) {
@@ -656,7 +696,11 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
         tools={libraryOpen ? [libraryTool] : []}
       >
         <main className="visual-novel-workspace">
-          {!selected && <p className="muted">Add a local visual novel to begin capturing Japanese dialogue.</p>}
+          {/* `muted` is presentation; `visual-novel-empty` is what says this IS the empty state.
+              Without it the surface's one honest empty message is invisible to every consumer
+              that looks for one - a test, a theme, the category-8 state sweep - and the panel
+              reads as a surface with no empty state at all rather than one that names it. */}
+          {!selected && <p className="muted visual-novel-empty">Add a local visual novel to begin capturing Japanese dialogue.</p>}
           {selected && (
             <>
               <div className="visual-novel-summary">
@@ -676,7 +720,7 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
                   {sessionStartedAt ? ' · timing' : ''}
                 </span>
                 <div className="visual-novel-summary-actions">
-                  <button type="button" disabled={!selected.executablePath} onClick={() => void launchVisualNovel()}>Launch</button>
+                  <button type="button" disabled={!!launchWhy} title={launchWhy ? t(launchWhy) : undefined} onClick={() => void launchVisualNovel()}>Launch</button>
                   {sessionStartedAt && <button type="button" onClick={() => void stopReadingTimer()}>Stop timer</button>}
                   <button type="button" onClick={() => void window.api.visualNovelRemove(selected.id)}>Remove</button>
                 </div>
@@ -713,7 +757,7 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
                   <input value={routeName} onChange={(event) => setRouteName(event.target.value)} placeholder="Route name" aria-label="Route name" />
                   <input value={routeCharacter} onChange={(event) => setRouteCharacter(event.target.value)} placeholder="Character" aria-label="Route character" />
                   <input value={endingName} onChange={(event) => setEndingName(event.target.value)} placeholder="First ending (optional)" aria-label="Ending name" />
-                  <button type="button" disabled={!routeName.trim()} onClick={() => void addRoute()}>Add route</button>
+                  <button type="button" disabled={!!addRouteWhy} title={addRouteWhy ? t(addRouteWhy) : undefined} onClick={() => void addRoute()}>Add route</button>
                 </div>
                 <div className="visual-novel-route-list">
                   {selected.routes.map((route) => (
@@ -807,7 +851,7 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
                           placeholder="Add ending"
                           aria-label={`Add ending to ${route.name}`}
                         />
-                        <button type="button" disabled={!endingDrafts[route.id]?.trim()} onClick={() => void addEnding(route.id)}>Add ending</button>
+                        <button type="button" {...endingReasonProps(endingDrafts[route.id])} onClick={() => void addEnding(route.id)}>Add ending</button>
                       </div>
                     </article>
                   ))}
@@ -828,7 +872,7 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
                 <textarea value={captureText} onChange={(event) => setCaptureText(event.target.value)} placeholder="Paste captured Japanese dialogue or narration" />
                 <textarea value={captureTranslation} onChange={(event) => setCaptureTranslation(event.target.value)} placeholder="Translation (optional)" />
                 <div className="visual-novel-capture-actions">
-                  <button type="button" disabled={!captureText.trim()} onClick={() => void captureLine()}>Add captured line</button>
+                  <button type="button" disabled={!!addCapturedLineWhy} title={addCapturedLineWhy ? t(addCapturedLineWhy) : undefined} onClick={() => void captureLine()}>Add captured line</button>
                   <button type="button" onClick={() => void captureScreenText()}>Capture screen text</button>
                   <button type="button" className={hookState?.active ? 'is-active' : ''} onClick={() => void toggleHookRelay()}>
                     {hookState?.active ? 'Stop text hook' : 'Start text hook'}
@@ -855,8 +899,8 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
                   <option value="chapter" disabled={!progress.chapter.trim()}>Current chapter</option>
                   <option value="scenes" disabled={!sceneOptions.length}>Selected scenes</option>
                 </select>
-                <button type="button" disabled={!scopedCaptures.length || busy} onClick={() => void analyzeCaptures()}>{busy ? 'Analyzing…' : `Analyze ${miningScope}`}</button>
-                <button type="button" disabled={!analysis} onClick={createCards}>Create study deck cards</button>
+                <button type="button" disabled={!!analyzeWhy} title={analyzeWhy ? t(analyzeWhy) : undefined} onClick={() => void analyzeCaptures()}>{busy ? 'Analyzing…' : `Analyze ${miningScope}`}</button>
+                <button type="button" disabled={!!createCardsWhy} title={createCardsWhy ? t(createCardsWhy) : undefined} onClick={createCards}>Create study deck cards</button>
                 <button type="button" onClick={() => setCollectionOpen(true)}>Open VN study deck</button>
               </div>
               {miningScope === 'scenes' && (
@@ -865,9 +909,9 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
                     Selected scenes · {selectedSceneKeys.size} · {scopedCaptures.length} lines
                   </summary>
                   <div className="visual-novel-scene-picker-actions">
-                    <button type="button" disabled={!progress.scene.trim()} onClick={selectCurrentScene}>Current scene</button>
+                    <button type="button" disabled={!!currentSceneWhy} title={currentSceneWhy ? t(currentSceneWhy) : undefined} onClick={selectCurrentScene}>Current scene</button>
                     <button type="button" onClick={() => setSelectedSceneKeys(new Set(sceneOptions.map((option) => option.key)))}>All scenes</button>
-                    <button type="button" disabled={!selectedSceneKeys.size} onClick={() => setSelectedSceneKeys(new Set())}>Clear</button>
+                    <button type="button" disabled={!!clearScenesWhy} title={clearScenesWhy ? t(clearScenesWhy) : undefined} onClick={() => setSelectedSceneKeys(new Set())}>Clear</button>
                   </div>
                   <div className="visual-novel-scene-options">
                     {sceneOptions.map((option) => (

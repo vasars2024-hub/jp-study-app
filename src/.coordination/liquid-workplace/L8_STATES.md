@@ -792,3 +792,56 @@ carry another track's pending i18n rewrite, so both landed as HEAD+edit blobs. N
 **no `useT` at all**, so one import and one hook line came with the fix; the worktree already had
 both, so nothing duplicated. VN's worktree copy is **CRLF against an all-LF HEAD** — a find built
 from the worktree line matches HEAD zero times and refuses loudly. Build both forms.
+
+## 2026-08-26 · primary — VN scored on a populated library: **PASS 10/10**, and its empty state was invisible to everything
+
+Category 8 on `@.visual-novel-panel`, the surface the previous turn fixed and deliberately left
+unscored because its library was empty. Repopulated through the product's own flow (native value
+setter + `input` on the display-title field, then `Add to library`) and the control count goes
+**8 → 74**, matching what category 1 measured on a populated panel.
+
+| bar | before | after |
+| --- | --- | --- |
+| rawKeys | 0 | 0 |
+| placeholders | 0 | 0 |
+| mutePairs | **5** | **0** |
+| statesNamed | UNMEASURED (0 of 0 observable) | **1 of 1 observable** |
+
+Control fired in the same run: `0,0,0 → 1,1,1 → 0,0,0`, `backToBaseline: true`. Evidence in
+`baselines/cat8-l6-vn.json`.
+
+**The five mute pairs, and why nine sites were fixed.** `Launch`, `Add route`, `Add captured
+line`, `Analyze …`, `Create study deck cards` — every one `aria-label: null`, `title: null`, and
+every one in a row of other buttons, so correction 11 correctly refuses a neighbour's caption as
+an explanation. Rules now in `shared/vnActionReason.ts`. Nine rather than five because `Add
+ending`, `Current scene`, `Clear` and the community panel's `Save report` only render once a
+route, a scene list or the report section is on screen; scoring the one arrangement where they
+are absent is measuring the easy moment.
+
+**Priority, twice, and it is the inverse of what reads naturally.** `Analyze` is
+`!scopedCaptures.length || busy` and `Save report` is `busy || !hasDraftContent`. Both now name
+the STRUCTURAL condition first: waiting out a run cannot put captures in a scope or text in a
+report, so leading with `busy` sends the user away and back to a dead button. Same call
+`novelsActionReason.ts` made.
+
+**The finding the drive made, and passive observation could not.** The panel's empty message —
+"Add a local visual novel to begin capturing Japanese dialogue." — renders on `className="muted"`,
+which is presentation. Nothing in the DOM said it WAS the empty state, so the surface read as one
+with no empty state at all, to the sweep and to any theme, test or a11y tool looking for one. It
+now carries `visual-novel-empty` alongside `muted`. This is a marker, not a message change.
+
+**The drive, for the next worker: this surface has no filter and no toggle.** Its only reachable
+state is the empty library, so the drive is `Remove` (`.visual-novel-summary-actions
+button:nth-child(2)`) with `Add to library` (`.visual-novel-add > button`) as the undo — a real
+round trip through the product. **Pre-fill the display-title field first**: a successful add
+clears it, so the undo's button is disabled on a second consecutive run and the leg VOIDs on
+`restored: false`. The first attempt failed exactly this way, plus a status line present after
+the drive and absent from a freshly hot-reloaded base.
+
+**Traps paid.** `VisualNovelPanel.tsx` (65 foreign hunks) and `VisualNovelCommunityPanel.tsx`
+both carry another track's pending i18n rewrite and are CRLF against an all-LF HEAD; both landed
+as HEAD+edit blobs through `debug/stage-head-edit.cjs`. The community panel's HEAD has **no
+`useT` at all**, so an import and a hook line came with the fix — the worktree already had both,
+nothing duplicated. And `p.querySelectorAll('input[type=text]')` matches nothing here: the
+attribute is absent and `e.type` reports the IDL default, so a probe that reads `type` and then
+selects on it finds three inputs and drives none.
