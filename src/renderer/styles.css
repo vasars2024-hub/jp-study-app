@@ -505,7 +505,21 @@ textarea {
    carries the rest. The declarations are quoted rather than deleted silently so
    the guard in `immersionCanvas.test.tsx` reads as a regression latch and not as
    a rule nobody can find. */
-.visual-novel-panel { display: grid; grid-template-rows: auto auto minmax(0, 1fr); gap: 10px; min-height: 0; height: 100%; padding: 14px; color: var(--text); background: var(--bg); }
+/* The third row is where this panel's content lives, and `minmax(0, …)` let it be crushed to
+   NOTHING while the rows above kept their intrinsic height. Measured in a 260x170 Immersion
+   window: rows resolved to `74px 66px 0px` in a 103px box, so the canvas — sheet, tool head,
+   close button, the whole workspace — painted from y+174, 71px BELOW the panel's own bottom edge,
+   with `overflow: visible` all the way up and nothing to scroll. Seven boxes outside the window
+   and no way to reach any of them. A floor plus `overflow: auto` turns that into an honest
+   scroll; `min(…, 100%)` keeps the canvas from ever being taller than the panel it is in, so the
+   scroll stays bounded by chrome plus one panel height. Nothing moves at any size where the
+   canvas already had room — the row is `1fr` there, which is larger.
+
+   `hidden auto`, not `auto`: a panel that scrolls SIDEWAYS is not a fix, it is the horizontal
+   defect this surface was just cleared of, and it hides itself — anything overhanging to the
+   right becomes "reachable" instead of clipped. Keeping X hidden means a future horizontal
+   overflow still reports as `hiddenOverflowX` rather than being absorbed by a scrollbar. */
+.visual-novel-panel { display: grid; grid-template-rows: auto auto minmax(min(240px, 100%), 1fr); gap: 10px; min-height: 0; height: 100%; overflow: hidden auto; padding: 14px; color: var(--text); background: var(--bg); }
 .visual-novel-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .visual-novel-panel-head > div { display: grid; gap: 2px; }
 .visual-novel-panel-head > div > strong { font-size: 1rem; }
@@ -639,7 +653,11 @@ textarea {
 .visual-novel-reading-head { display: flex; justify-content: space-between; gap: 10px; }
 .visual-novel-reading-head span { color: var(--text-muted); font-size: 0.74rem; }
 .visual-novel-capture-list { display: grid; gap: 5px; max-height: 360px; overflow: auto; }
-.visual-novel-capture-list > button { display: grid; gap: 4px; padding: 8px 9px; border: 1px solid transparent; border-radius: 7px; background: var(--surface-1); color: inherit; text-align: left; cursor: text; }
+/* Japanese wraps anywhere; the ENGLISH translation line does not, and its longest word is what
+   sets this row's minimum. At a 72px list that floor was 78px and the list scrolled sideways with
+   no way to reach the far edge of a line you are reading. `anywhere` only breaks a word that has
+   no room, so nothing moves at any width where the word fits. */
+.visual-novel-capture-list > button { display: grid; gap: 4px; min-width: 0; padding: 8px 9px; border: 1px solid transparent; border-radius: 7px; background: var(--surface-1); color: inherit; text-align: left; overflow-wrap: anywhere; cursor: text; }
 .visual-novel-capture-list > button.is-selected { border-color: var(--accent, #d84b57); }
 .visual-novel-capture-list small { color: var(--accent, #d84b57); }
 .visual-novel-capture-list span { font-size: 0.93rem; line-height: 1.55; }
@@ -661,7 +679,10 @@ textarea {
 .visual-novel-analysis-summary { display: flex; flex-wrap: wrap; gap: 6px; }
 .visual-novel-analysis-summary span { padding: 5px 8px; border: 1px solid var(--border); border-radius: 999px; color: var(--text-muted); font-size: 0.74rem; }
 .visual-novel-character-profiles { display: grid; gap: 8px; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
-.visual-novel-character-profiles > div:last-child { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 7px; }
+/* `min(190px, 100%)`, not a bare 190px: an `auto-fit` track floors at its own minimum, so in a
+   pane narrower than one card the grid stops shrinking and the workspace scrolls sideways instead
+   — measured at a 128px workspace, where this one grid alone held the row at 200px. */
+.visual-novel-character-profiles > div:last-child { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(190px, 100%), 1fr)); gap: 7px; }
 .visual-novel-character-profiles article { display: grid; gap: 5px; padding: 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-1); }
 .visual-novel-character-profiles article > div { display: flex; justify-content: space-between; gap: 8px; }
 .visual-novel-character-profiles article span, .visual-novel-character-profiles article small { color: var(--text-muted); font-size: 0.72rem; }
@@ -687,6 +708,29 @@ textarea {
   .visual-novel-sentence-fields { grid-template-columns: 1fr; }
   .visual-novel-route-add, .visual-novel-route-list article > div:first-child, .visual-novel-route-list .visual-novel-ending-row { grid-template-columns: 1fr; }
   .visual-novel-progress { grid-template-columns: repeat(2, minmax(100px, 1fr)); }
+}
+
+/* The 560px step above is not the bottom of the ladder, and below it the panel had no reflow at
+   all: measured live at a 260x170 Immersion window (panel 212x103, workspace content box 128px)
+   the workspace scrolled sideways 219>128 and seven boxes painted outside the panel entirely.
+   Three floors did it, and each is a hard pixel value the 560 step leaves standing:
+   `.visual-novel-progress` at `repeat(2, minmax(100px, 1fr))` = 207, `.visual-novel-capture`'s
+   160px transcript column = 195, and `.visual-novel-analysis-actions select`'s `min-width: 160px`.
+   360px is chosen above all three plus the 20px of padding their own sections add, so every one
+   still gets its two-column layout the moment it genuinely fits.
+
+   The library sheet failed for a different reason and needs no query. `.visual-novel-library`
+   declared no `grid-template-columns`, so its implicit `auto` track floors at the widest row's
+   MIN-CONTENT — 167px — and at a 148px sheet every child hung 19px out of it, tool body 180>172
+   included. `minmax(0, 1fr)` is the same idiom `.visual-novel-workspace` already uses one screen
+   up. `.visual-novel-reading-head` is the row that sets that 167: a nowrap flex row's min-content
+   is the SUM of its items, so the title and its count badge could never stack. */
+.visual-novel-reading-head { flex-wrap: wrap; }
+.visual-novel-library { grid-template-columns: minmax(0, 1fr); }
+@container vnwork (max-width: 360px) {
+  .visual-novel-progress { grid-template-columns: 1fr; }
+  .visual-novel-capture > div:first-child { grid-template-columns: 1fr; }
+  .visual-novel-analysis-actions select { min-width: 0; }
 }
 .media-tracking-dashboard { display: grid; gap: 14px; margin: 12px 0 18px; padding: 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-1); }
 .media-tracking-dashboard-head, .media-tracking-shelf-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }

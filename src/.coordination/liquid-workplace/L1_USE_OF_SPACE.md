@@ -769,3 +769,58 @@ What is REAL and is the next slice: the compact leg (`div.lq-reading-tool-body 1
 `main.visual-novel-workspace 219>128`, 7 clipped, all inside the sheet the tool becomes at that
 width) and `contentGrowsNotChrome` (canvas **19.2 → 13.5** while chrome falls 37.9 → 27.4 — the
 workspace does not take the width the chrome gives back). Injected clip fired 0 → 1 → 0.
+
+### 2026-08-26 primary — VN: three failed bars to one, and a sheet is not a collision
+
+Re-scored `@.visual-novel-panel` with content seeded through the product's own forms (1 library
+entry **and 8 captured Japanese lines** — the previous run had a library entry but an EMPTY reading
+overlay, which is the same trap one level down). `--control` fired 0 → 1 → 0 on every run.
+
+| leg | box | clipped | h-scroll | dead % | chrome | canvas |
+| --- | --- | --- | --- | --- | --- | --- |
+| default | 782x513 | 0 | 0 | 5.7 | 37.9 | 19.2 |
+| compact | **222x103** | **0** (was 7) | **0** (was 2) | 0.4 | 60.4 | 29.4 |
+| maximized | 1226x698 | 0 | 0 | 12.9 | 27.4 | **14.1** |
+
+**Four product defects, each measured before and after, all in `styles.css`.**
+1. **The panel crushed its own canvas to nothing.** `grid-template-rows: auto auto minmax(0, 1fr)`
+   resolved to `74px 66px 0px` in a 103px box, so the sheet, the tool head, the close button and
+   the whole workspace painted from y+174 — **71px below the panel's bottom edge, `overflow:
+   visible` all the way up, nothing to scroll.** Seven boxes outside the window, none reachable.
+   Now `minmax(min(240px, 100%), 1fr)` + `overflow: hidden auto`. **X stays hidden deliberately**:
+   a panel that scrolls sideways absorbs the horizontal defect instead of reporting it — and it
+   also silently defeats the harness's injected-clip control, which is how I found it (verdict
+   went VOID with a plain `overflow: auto`).
+2. **The library sheet's implicit `auto` track floored at min-content 167** in a 148px sheet, so
+   every child hung 19px out and `div.lq-reading-tool-body` scrolled 180>172. `minmax(0, 1fr)`,
+   the idiom `.visual-novel-workspace` already uses, plus `flex-wrap: wrap` on
+   `.visual-novel-reading-head` — a nowrap flex row's min-content is the SUM of its items.
+3. **Three hard pixel floors below the 560px container step** held `main.visual-novel-workspace`
+   at 219>128: progress `repeat(2, minmax(100px, 1fr))` = 207, capture's 160px transcript column,
+   and `.visual-novel-analysis-actions select { min-width: 160px }`. New
+   `@container vnwork (max-width: 360px)` step, chosen above all three plus their sections' 20px
+   padding. Character profiles' `minmax(190px, 1fr)` clamped to `min(190px, 100%)`.
+4. **The capture list's English translation line set a 78px row minimum in a 72px list.**
+   `overflow-wrap: anywhere` on the row: Japanese wraps anywhere already, the translation did not.
+
+**Harness correction 15 — a full cover is the contract, not an overlap.** Fixing (1) exposed 17
+overlaps that had been hidden behind it: every pair was a sheet-side box against a doc-side box
+painted **under** it, and `documentCovered` is what `liquidReadingCanvas.ts` calls that state. An
+element inside an opaque full cover cannot collide with one outside it. A **partial** cover still
+counts — that is the outcome `readingCanvas.css` calls inexpressible. The exclusion can only
+REMOVE overlaps, so it cannot invalidate a committed PASS. Trap paid: **a regex inside the reader's
+template literal needs every backslash doubled** — `\s` shipped as the letter `s` and the whole
+in-page script died with "Script failed to execute".
+
+**Still FAILING, one bar: `contentGrowsNotChrome`, canvas 19.2 → 14.1 while chrome falls 37.9 →
+27.4.** Diagnosed, not guessed: the dominant leaf region is `div.visual-novel-library` at
+**254x474 at BOTH sizes** — a docked tool pinned to `preferredWidth: 290` — while the surface area
+grows 113%. At default only ~330px of its 474 is visible (19.2%); at maximized all of it is
+(14.1%). The workspace's own biggest leaf is `section.visual-novel-routes` at 8.9%, because the
+study content — the captured lines — sits **ninth in a scrolling column, below the fold at 1226x698**.
+The fix is the workspace's DOM order, not a wider sidebar: primary (summary, capture, overlay,
+analysis) and setup (metadata, sources, community, progress, routes, script import) as two column
+wrappers, each `container-name: vnwork` so the existing 560px ladder answers the COLUMN. That is a
+`VisualNovelPanel.tsx` change and the file carries **239 lines of another track's uncommitted i18n
+work**, so it needs a HEAD+edit reconstruction rather than a plain `git add`. Do not "fix" this by
+widening the tool to 35% of the canvas — that is tuning a number to clear a bar.

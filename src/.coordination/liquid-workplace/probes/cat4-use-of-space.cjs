@@ -105,6 +105,15 @@
  *     return the SAME numbers under three different size labels - a perfect score for a surface
  *     that was never resized, and the one failure mode correction 4 exists to prevent. The lever
  *     is chosen from `closest('.fwin')` now, measured once from the DOM.
+ * 15. A SHEET COVERING THE DOCUMENT IS A CONTRACT, NOT A COLLISION. Below its dock minimum a
+ *     `ReadingCanvas` tool becomes a `.lq-reading-sheet` — `position: absolute; inset: 0`, a
+ *     0.88-alpha background, `z-index: 2` — and the document stays MOUNTED underneath it, which
+ *     is `documentCovered` in `shared/liquidReadingCanvas.ts` and the reason closing a sheet
+ *     hands back the tree rather than a rebuilt copy. The pair loop counted every sheet-side box
+ *     against every doc-side box: 17 overlaps on the VN panel at 222x103, none of them visible,
+ *     because the loser is not painted at all. An element inside an opaque cover cannot collide
+ *     with one outside it. A PARTIAL cover still counts, which is the outcome `readingCanvas.css`
+ *     calls inexpressible, so the bar keeps the failure it exists for.
  *
  * NEGATIVE CONTROL (`--control`), two legs, because the rubric names one and history says it is
  * not enough on its own:
@@ -296,11 +305,49 @@ const READ = (surface) => `(function(){
     }
   };
   walk(body, 0);
+  // CORRECTION 15. A SHEET COVERING THE DOCUMENT IS THE PRIMITIVE'S CONTRACT, NOT A COLLISION.
+  // Below its dock minimum a ReadingCanvas tool becomes a sheet - position: absolute, inset: 0,
+  // 0.88-alpha background, z-index 2 - and the document keeps rendering underneath it, mounted,
+  // exactly as liquidReadingCanvas.ts documents ("documentCovered"). Measured on the VN panel at
+  // 222x103: 17 pairs, every one of them a sheet-side box against a doc-side box it is painted
+  // over. Nothing collides; the loser is not painted at all. This fired only once the panel
+  // stopped crushing its canvas to 0px, so it had been hidden behind a worse defect rather than
+  // being absent. The exclusion is deliberately narrow - an element INSIDE an opaque full cover
+  // never collides with anything OUTSIDE it, because everything outside is behind the cover at
+  // the intersection - so a PARTIAL cover, the one outcome the canvas calls inexpressible,
+  // still reports as an overlap.
+  var alphaOf = function(color){
+    if (!color || color === 'transparent') return 0;
+    // Every backslash here is DOUBLED because this whole reader is a template literal: a lone
+    // \\s in one is an escape the literal eats, and the regex ships matching the letter s.
+    var slash = /\\/\\s*([0-9.]+)\\s*\\)/.exec(color);   // rgb(r g b / a), color(srgb r g b / a)
+    if (slash) return parseFloat(slash[1]);
+    var legacy = /rgba\\(\\s*[^)]*,\\s*([0-9.]+)\\s*\\)/.exec(color);
+    if (legacy) return parseFloat(legacy[1]);
+    return /^(rgb|color|#|[a-z]+$)/.test(color) ? 1 : 0;
+  };
+  var covers = regions.filter(function(e){
+    var cs = getComputedStyle(e);
+    if (!/^(absolute|fixed)$/.test(cs.position)) return false;
+    if (alphaOf(cs.backgroundColor) < 0.5) return false;
+    var p = e.parentElement;
+    if (!p) return false;
+    var re = e.getBoundingClientRect(), rp = p.getBoundingClientRect();
+    return re.left <= rp.left + 1 && re.top <= rp.top + 1
+      && re.right >= rp.right - 1 && re.bottom >= rp.bottom - 1;
+  });
+  var coverOf = function(e){
+    for (var k = 0; k < covers.length; k += 1) {
+      if (covers[k] === e || covers[k].contains(e)) return covers[k];
+    }
+    return null;
+  };
   var overlaps = [];
   for (var i = 0; i < regions.length; i += 1) {
     for (var j = i + 1; j < regions.length; j += 1) {
       var a = regions[i], b2 = regions[j];
       if (a.contains(b2) || b2.contains(a)) continue;
+      if (coverOf(a) !== coverOf(b2)) continue;
       var ra = a.getBoundingClientRect(), rb = b2.getBoundingClientRect();
       var ox = Math.min(ra.right, rb.right) - Math.max(ra.left, rb.left);
       var oy = Math.min(ra.bottom, rb.bottom) - Math.max(ra.top, rb.top);
