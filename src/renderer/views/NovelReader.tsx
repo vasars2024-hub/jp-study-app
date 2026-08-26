@@ -1084,6 +1084,14 @@ export default function NovelReader({ item, onClose }: Props) {
     stepRef.current = step;
     pageCountRef.current = pages;
     setPageCount(pages);
+    // Publish the grid so a reader of the DOM can CHECK the pager rather than take its word.
+    // `data-paged` alone is a claim, and the whole point of the page grid above is that it is
+    // an arithmetic one: `(pages - 1) * step + clientWidth >= scrollWidth` is exactly the
+    // statement "every pixel of the buffer lands on some page", which is why `pad` exists.
+    // Written straight onto the node, not through state — these follow `step`/`pages`, which
+    // are refs, and a re-render here would re-enter this effect.
+    el.setAttribute('data-paged-pages', String(pages));
+    el.setAttribute('data-paged-step', String(Math.round(step)));
 
     const target = pendingPosRef.current ?? localFracRef.current;
     pendingPosRef.current = null;
@@ -2945,10 +2953,17 @@ export default function NovelReader({ item, onClose }: Props) {
         <div className="reader-controls">
           {!linkView && (
             <>
-          <button className="btn" onClick={() => flip(-1)}>
+          {/*
+            `data-paged-control` is the affordance half of the `data-paged` contract on the
+            scroller below: a surface may only claim its clipped-away content is "on another
+            page" if it renders an enabled control that actually goes there. Kept on both
+            buttons rather than one, because Prev alone would leave the forward buffer
+            unreachable and still satisfy a one-sided check.
+          */}
+          <button className="btn" data-paged-control="prev" onClick={() => flip(-1)}>
             ‹ Prev
           </button>
-          <button className="btn" onClick={() => flip(1)}>
+          <button className="btn" data-paged-control="next" onClick={() => flip(1)}>
             Next ›
           </button>
             </>
@@ -3134,6 +3149,19 @@ export default function NovelReader({ item, onClose }: Props) {
                 lastPointerRef.current = { x: e.clientX, y: e.clientY };
               }}
               data-dict-owner=""
+              /*
+                This scroller is `overflow: hidden` on both axes and holds a multi-page buffer
+                the reader moves with `flip()`, so the pages that are not current sit entirely
+                outside its box. Measured 2026-08-25 on a vertical-rl EPUB at 1264x821:
+                `.novel-content` at x -2519 in a scroller at x 1, `scrollWidth` 3782 in a
+                `clientWidth` of 1262 — and `Next ›` moved it to -1259 with different
+                paragraphs visible, `Prev ‹` back to -2519. Nothing is lost; it is elsewhere.
+                A category-4 instrument cannot tell that from CSS: `.reading-workspace-panel`
+                looked identical and WAS losing 280 px with nothing to scroll. So the reader
+                says so, and `data-paged-control` on Prev/Next is the affordance that has to
+                back the claim up.
+              */
+              data-paged={paged ? 'true' : undefined}
               onMouseUp={onMouseUp}
             >
               {paged ? (

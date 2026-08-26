@@ -132,12 +132,54 @@
      * `clientHeight` of 460, 280 px overflowing forwards with nothing to scroll — and that
      * defect shipped fixed in the commit before this one, so without the narrowing this very
      * change would have hidden it. Written down because it nearly did.
+     *
+     * A THIRD, and it is why `scrollWidth <= clientWidth` alone was never the real test.
+     * Measured 2026-08-25 on a VERTICAL-RL EPUB, same `.novel-scroller`, same pager: this
+     * time `scrollWidth` **3782** in a `clientWidth` of 1262, and 645 boxes counted clipped
+     * at 1264x821 / 863 at 924x580. In `vertical-rl` the scroll origin sits at the RIGHT
+     * edge, so the pages the reader has not turned to are at NEGATIVE x but count as forward
+     * scrollable extent — the exact opposite of the horizontal case, from the identical
+     * mechanism. Driven live to be sure rather than reasoned about: `Next ›` moved
+     * `.novel-content` from x -2519 to -1259, visible paragraphs 23 -> 36, `Prev ‹` restored
+     * both. Nothing was lost. So the geometry cannot decide this, and an instrument that
+     * guesses will keep flipping between a false 645 and hiding a real 280.
+     *
+     * The surface declares it instead: `data-paged="true"` on the clipper. That is a CLAIM,
+     * and this file exists to check claims, so it is honoured only when TWO other things hold.
+     *   (a) an ENABLED `[data-paged-control]` exists in the surface — the affordance that has
+     *       to be there for "it is on another page" to mean anything at all;
+     *   (b) the pager's own grid COVERS its buffer, checked arithmetically from the numbers it
+     *       publishes: `(data-paged-pages - 1) * data-paged-step + clientWidth >= scrollWidth`.
+     *       That inequality is the whole statement "every pixel of the buffer lands on some
+     *       page". A pager that pages past its own content, or stops short of it, fails it and
+     *       scores as loss — which is what stops this exemption becoming "declare the attribute
+     *       and the category cannot see you".
+     * Measured on the vertical-rl EPUB: pages 3, step 1260, clientWidth 1262, scrollWidth 3782
+     * → 2*1260 + 1262 = 3782 >= 3782. Exactly covered, which is what `pad` in the reader's
+     * layout effect exists to make true.
+     *
+     * Inside a pager that passes both, a straddling box is not a cut: `div.novel-content`,
+     * `div.main` and any paragraph containing the page break necessarily cross the boundary,
+     * and the reader turns the page. So `entirely outside` is relaxed for a proven pager, and
+     * for a proven pager only — everywhere else it still holds, and `.reading-workspace-panel`
+     * still scores its 77.
      */
+    const pagerControls = (root) =>
+      [...root.querySelectorAll('[data-paged-control]')].filter((c) => !c.disabled).length;
+    const provenPager = (n) => {
+      if (n.getAttribute('data-paged') !== 'true') return false;
+      if (pagerControls(win) < 1) return false;
+      const pages = Number(n.getAttribute('data-paged-pages'));
+      const step = Number(n.getAttribute('data-paged-step'));
+      if (!Number.isFinite(pages) || !Number.isFinite(step) || pages < 1 || step <= 0) return false;
+      return (pages - 1) * step + n.clientWidth >= n.scrollWidth - 2;
+    };
     const outsideItsClipper = (el, b) => {
       let n = el.parentElement;
       while (n && n !== win.parentElement && n !== win) {
         const cs = getComputedStyle(n);
         if (/^(hidden|clip|auto|scroll)$/.test(cs.overflowX) || /^(hidden|clip|auto|scroll)$/.test(cs.overflowY)) {
+          if (provenPager(n)) return true;
           if (n.scrollWidth > n.clientWidth + 1 || n.scrollHeight > n.clientHeight + 1) return false;
           const c = n.getBoundingClientRect();
           const ix = Math.min(b.right, c.right) - Math.max(b.left, c.left);
@@ -203,6 +245,10 @@
     //     overflow ON PURPOSE and is what makes the surface accessible, not what breaks it;
     //   - `text-overflow: ellipsis` is a designed truncation with a visible affordance —
     //     `.fwin-title` at 260 px reads `81>76` and shows the user an ellipsis.
+    //   - a DECLARED pager backed by an enabled control, the same contract `outsideItsClipper`
+    //     honours. `.novel-scroller` on a vertical-rl EPUB reads `3782>1262` because the two
+    //     pages the reader has not turned to are laid out leftwards; `Next ›` reaches them.
+    //     Same exclusion, same reason as ellipsis: a designed offscreen with an affordance.
     // Everything left is content pushed out of reach with nothing to say so.
     const hiddenX = all.filter((e) => {
       const cs = getComputedStyle(e);
@@ -210,6 +256,7 @@
       if (e.scrollWidth <= e.clientWidth + 1) return false;
       if (e.clientWidth <= 1 && cs.position === 'absolute') return false;
       if (cs.textOverflow === 'ellipsis') return false;
+      if (provenPager(e)) return false;
       return true;
     });
 

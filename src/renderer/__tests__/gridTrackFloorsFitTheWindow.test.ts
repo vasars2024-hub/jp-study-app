@@ -264,6 +264,28 @@ describe('grid track floors fit the narrowest window the product allows', () => 
     expect(base).toMatch(/overflow:\s*hidden/);
   });
 
+  it('a paged reader that claims its content is elsewhere publishes the numbers that prove it', () => {
+    const tsx = strip(read('src/renderer/views/NovelReader.tsx'));
+    // The claim. `.novel-scroller` is `overflow: hidden` on both axes over a multi-page
+    // buffer, so its off-screen pages are indistinguishable from lost content by CSS alone.
+    expect(tsx).toMatch(/data-paged=\{paged \? 'true' : undefined\}/);
+    // The affordance, on BOTH directions — Prev alone leaves the forward buffer unreachable
+    // and would still satisfy a one-sided check.
+    expect(tsx).toMatch(/data-paged-control="prev"/);
+    expect(tsx).toMatch(/data-paged-control="next"/);
+    // The arithmetic. `(pages - 1) * step + clientWidth >= scrollWidth` is what makes the
+    // claim checkable rather than a free pass; both numbers have to be published for the
+    // category-4 probe to be able to test it, and it scores the surface as loss if they are
+    // absent, wrong, or the controls are gone. Both halves negative-controlled live
+    // 2026-08-25: each falsification took clipped 0 -> 66 and hiddenOverflowX 0 -> 1.
+    expect(tsx).toMatch(/el\.setAttribute\('data-paged-pages', String\(pages\)\);/);
+    expect(tsx).toMatch(/el\.setAttribute\('data-paged-step', String\(Math\.round\(step\)\)\);/);
+
+    const probe = strip(read('src/.coordination/liquid-workplace/probes/l1-use-of-space.js'));
+    expect(probe).toMatch(/\(pages - 1\) \* step \+ n\.clientWidth >= n\.scrollWidth - 2/);
+    expect(probe).toMatch(/if \(pagerControls\(win\) < 1\) return false;/);
+  });
+
   /**
    * Why this category's sweep is LIVE and not source-only, stated once so the next worker
    * does not spend a turn rediscovering it.

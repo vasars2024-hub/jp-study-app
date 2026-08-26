@@ -785,7 +785,7 @@ library becomes a sheet (`covered` true, `docInert` true, `overDocument` **0**),
 `16c306fd` holding: the sheet does not claim a modality the keyboard does not honour. Style
 restored byte-identical.
 
-**`<commit>` — the manga OCR overlay has never fitted, at any zoom, on any page.**
+**`76e56aff` — the manga OCR overlay has never fitted, at any zoom, on any page.**
 `.reader` is a full-window surface, so it needed the driver's new **`host` flag** (`/bounds`
 instead of an inline width; see below). One Punch-Man ch.229 in translate mode, page rendered
 **512 of 2400 natural px, scale 0.214**: `clipped` **2** at BOTH 924x580 and 1264x821, both `p`
@@ -837,3 +837,61 @@ grep '^@@'` back afterwards: mine were exactly `+8955,7` and `+9323,8`.
 with an EPUB open — the same command that scored manga, now that `host` exists. Then the Gate's
 own sentence (legible and stable at all sizes; no tool obscures the document) can be answered for
 all six.
+
+## 2026-08-25 (later 19, second slice) — Novels in a real narrow host: **6 of 6 Gate surfaces clean**
+
+`node debug/lq-cat4-sizes.cjs "@.reader" "380x580,1264x821" "who,host"` with ハサミ男 open, i.e.
+the same command that scored manga. First run: **`clipped` 645 at 1264x821, 863 at 924x580,
+`hiddenOverflowX` 1 (`div.novel-scroller 3782>1262`)**, every one on the x axis.
+
+**It was a harness false positive, and the previous narrowing could not have caught it.** That
+narrowing exempted a clipper reporting `scrollWidth <= clientWidth`, which held for a horizontal
+EPUB because its earlier pages sit at negative x and never count. This book is **`vertical-rl`**:
+the scroll origin is at the RIGHT edge, so the pages not yet turned to are at negative x and DO
+count as forward extent — the identical mechanism producing the opposite reading. Driven live
+rather than reasoned about: `Next ›` moved `.novel-content` from x **-2519 to -1259**, visible
+paragraphs **23 → 36**, `Prev ‹` restored both. Nothing was lost.
+
+Geometry cannot decide this, so the surface declares it and the probe CHECKS the declaration.
+`.novel-scroller` gains `data-paged="true"`, Prev/Next gain `data-paged-control`, and the paged
+layout effect publishes the grid it already computes as `data-paged-pages` / `data-paged-step`.
+The exemption then requires all three: the claim, an **enabled** control, and the arithmetic
+**`(pages - 1) * step + clientWidth >= scrollWidth`** — the statement "every pixel of the buffer
+lands on some page", which is exactly what `pad` in that effect exists to make true. Measured:
+3 pages, step 1260, clientWidth 1262, scrollWidth 3782 → 2×1260 + 1262 = **3782 >= 3782**.
+
+After: **`clipped` 0, `overlaps` 0, `hiddenOverflowX` 0, `horizontalScrollers` 0 at both host
+sizes**, doc 924x483 / 1264x724 with `contentWidth` tracking, dead region 8.3% / 6.2%, host
+content size restored identically.
+
+**Negative control, both halves, live and non-persistent (`debug/lq-pager-control.cjs`):**
+
+| state | clipped | hiddenOverflowX |
+| --- | --- | --- |
+| baseline | 0 | 0 |
+| `data-paged-control` removed | **66** | **1** |
+| restored | 0 | 0 |
+| `data-paged-pages` forced to 1 | **66** | **1** |
+| restored | 0 | 0 |
+
+So the exemption is not "declare the attribute and the category cannot see you" — either half
+falsified and the surface scores as loss again. `.reading-workspace-panel` still scores its 77,
+because it declares nothing.
+
+Guard: a third named latch in `gridTrackFloorsFitTheWindow.test.ts` holding all three parts of
+the contract on both sides (reader and probe). 92/92 with `novelReaderCanvas` and
+`novelsViewModes`. No new test file, no new probe file; `lq-pager-control.cjs` is gitignored
+tooling and its numbers are in the table above.
+
+**Two things the next worker should NOT re-derive.** (1) The driver's `WHO`/`AXIS` halves are
+separate inline expressions and do NOT share `outsideItsClipper`, so they still print
+`xCount` 66/83 on this surface. That is the raw split, not the gate number — the gate number is
+`clipped`. (2) The manga overlay's transparent Japanese layer (`highlightOnly`) could not be
+measured: every block on the OCR'd page is `.translated`, and Regions mode did not mount the
+outline path either. The `cqw` fix applies to both call sites identically, but only the painted
+one has live numbers.
+
+**NEXT: L6's Gate sentence can now be answered for all six surfaces** — "content remains legible
+and stable at all sizes; no tool obscures the document". Category 4 is clean on 6 of 6; the
+`no tool obscures` half already has `overDocument` 0 everywhere it was measured. What is NOT
+done and must not be claimed: **no rubric CATEGORY is scored for L6, so there is no 80/80.**
