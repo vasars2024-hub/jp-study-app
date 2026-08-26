@@ -475,6 +475,12 @@
         },
         windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
       },
+      // Declaration order is WRONG for this app and the driver would otherwise use it.
+      // Measured 2026-08-26: with `highlight` third, the two steps after it re-render the
+      // view, the caret collapses, and `agentHandoff` reads its label back unchanged — a
+      // live feature scored dead by the order it was driven in. Whatever records a "before"
+      // for a row runs LAST among the steps that can disturb it.
+      drive: [['type', '猫が好きです'], 'swap', 'run', 'collapse', ['highlight', '0,2']],
       undo: {
         input: (w) => {
           const t = q(w, '.tr-textarea');
@@ -484,6 +490,20 @@
             return 'input';
           }
           return null;
+        },
+        // `swap` is a DRIVE step, not a mutation, so `restore()` never used to undo it and
+        // the driver left the translate direction reversed on the live desktop. A harness
+        // that drives persisted UI state owes it back exactly as it found it.
+        swap: (w) => {
+          const before = window.__LQP_SWAP_BEFORE;
+          if (!before) return null;
+          const now = qa(w, '.tr-dir .dict-lang-toggle').map((g) => txt(q(g, '.gram-level-btn.active')));
+          if (now.join('|') === before.join('|')) { window.__LQP_SWAP_BEFORE = null; return null; }
+          const b = q(w, '.tr-swap');
+          if (!b) return null;
+          b.click();
+          window.__LQP_SWAP_BEFORE = null;
+          return 'swap';
         },
       },
     },
@@ -855,6 +875,14 @@
       nodes: win.querySelectorAll('*').length,
       controls: qa(win, 'button,input,select,textarea,[role="button"]').length,
       fields,
+      // Scroll offsets are app state too, and on a surface with no editable field they are
+      // the ONLY user-entered state a round trip can lose. Added 2026-08-26: Library has 86
+      // buttons and zero text inputs, so without this its round trip compared chrome to
+      // chrome and would have held no matter what the toggle did to the list.
+      scroll: qa(win, '*')
+        .filter((el) => el.scrollTop > 0 || el.scrollLeft > 0)
+        .slice(0, 8)
+        .map((el) => `${(el.className || el.tagName).toString().split(' ')[0]}:${Math.round(el.scrollTop)},${Math.round(el.scrollLeft)}`),
     };
   };
 
@@ -972,6 +1000,23 @@
     toggleLiquid,
     mutate,
     restore,
+    // Additive accessors for the node driver (`cat6-feature-parity.cjs`). They exist so the
+    // driver can stay app-agnostic: it asks the spec for its own title regex and its own
+    // mutation names instead of carrying a per-app list, which is what made the three
+    // single-use runners single-use. `__win` returns a live node and is only ever used
+    // INSIDE an injected expression — it cannot cross the bridge.
+    __win: (app, pres) => findWin(app, pres).win,
+    __titleRe: (app) => (SPECS[app] && SPECS[app].titleRe) || /$^/,
+    __mutations: (app) => (SPECS[app] && SPECS[app].mutations) || {},
+    // The ordered step sequence that has to run before `check()` can answer the rows whose
+    // claim is "the feature still WORKS" rather than "the control exists". Without it the
+    // driver has to carry a per-app list, which is exactly what made `l6m-parity-run.cjs`
+    // single-use. Entries are `"name"` or `["name", arg]`; a spec that declares no order
+    // gets its steps in declaration order, which is what the old runners did by hand.
+    __drive: (app) => {
+      const s = SPECS[app] || {};
+      return s.drive || Object.keys(s.steps || {});
+    },
   };
 
   return JSON.stringify({

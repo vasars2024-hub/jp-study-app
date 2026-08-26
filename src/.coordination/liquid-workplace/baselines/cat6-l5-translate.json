@@ -1,0 +1,107 @@
+{
+  "label": "l5-translate",
+  "app": "translate",
+  "win": "main",
+  "raised": "already-on-top",
+  "matchedBy": "title",
+  "host": "fwin",
+  "presentationAsFound": "standard",
+  "box": "820x580",
+  "driven": [
+    {
+      "step": "type",
+      "result": "{\"typed\":\"猫が好きです\"}"
+    },
+    {
+      "step": "swap",
+      "result": "{\"before\":[\"English\",\"日本語\"]}"
+    },
+    {
+      "step": "run",
+      "result": "{\"clicked\":\"Translate\",\"outputBefore\":\"猫が好きです\"}"
+    },
+    {
+      "step": "collapse",
+      "result": "{\"collapsedAt\":12}"
+    },
+    {
+      "step": "highlight",
+      "result": "{\"start\":0,\"end\":2,\"focused\":true,\"labelBefore\":\"Ask the Agent\"}"
+    }
+  ],
+  "drivenRefusals": 0,
+  "parity": {
+    "standard": "6/7",
+    "liquid": "6/7",
+    "na": 0,
+    "equal": true,
+    "rowsAgree": true,
+    "failing": [
+      "agentHandoff (before=\"Ask the Agent\" after=\"Ask the Agent\" disabled=false)"
+    ],
+    "onlyInOne": []
+  },
+  "roundTrip": {
+    "trip": "standard -> liquid -> standard",
+    "dirtiedField": "tr-textarea",
+    "dirtyNote": null,
+    "fieldsHeld": true,
+    "shellHeld": true,
+    "diffs": [],
+    "otherPresentationBox": "820x580"
+  },
+  "control": {
+    "mutations": [
+      {
+        "mutation": "direction",
+        "preBaseline": "4/7",
+        "applied": "active added to 2 of 3",
+        "reachable": "3/7",
+        "fellRows": [
+          "direction"
+        ],
+        "exactlyOwnRow": true,
+        "restored": "[\"added-class\",\"added-class\",\"swap\"]",
+        "afterRestore": "4/7",
+        "returned": true
+      },
+      {
+        "mutation": "input",
+        "preBaseline": "7/7",
+        "applied": "textarea cleared",
+        "reachable": "5/7",
+        "fellRows": [
+          "input",
+          "agentHandoff"
+        ],
+        "exactlyOwnRow": false,
+        "restored": "[\"input\",\"swap\"]",
+        "afterRestore": "7/7",
+        "returned": true
+      },
+      {
+        "mutation": "windowLifecycle",
+        "preBaseline": "7/7",
+        "applied": "aria-pressed stripped",
+        "reachable": "6/7",
+        "fellRows": [
+          "windowLifecycle"
+        ],
+        "exactlyOwnRow": true,
+        "restored": "[\"aria-pressed\",\"swap\"]",
+        "afterRestore": "7/7",
+        "returned": true
+      }
+    ],
+    "verdict": "VOID - a mutation did not flip exactly its own row, or did not restore"
+  },
+  "bars": {
+    "allRowsReachable": false,
+    "parityEqual": true,
+    "roundTripHeld": true
+  },
+  "verdict": "VOID - negative control did not falsify",
+  "failedBars": [
+    "allRowsReachable"
+  ]
+}

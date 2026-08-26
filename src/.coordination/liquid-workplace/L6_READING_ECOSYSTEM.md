@@ -935,3 +935,59 @@ category exists to catch. An honest fix needs the true match count out of the ma
 main does not hot-reload, so it is an opening slice, not a tail-of-turn one.
 
 Translate remains **EMPTY / unmeasured**; only Dictionary was populated this turn.
+
+## 2026-08-26 (later) · primary — category 6 gets its node half, and a control that was measuring its own decay
+
+RULE 1 audit before writing anything: `l6-parity.js` (982 lines) IS the category-6 harness and is
+already a consolidation of `l6-parity-dictionary.js` — 5 specs, `dictionary/grammar/translate/
+agent/captures`, 7/8/7/8/6 rows. What did **not** exist was the node half. It was three
+single-use runners, each hardcoding one app: `l6f-roundtrip.cjs` (`__L6`, "notes" placeholder),
+`l6f-controls.cjs` ("7 -> 6" as a literal), `l6m-parity-run.cjs` (`__L6M`). `cat6-feature-parity.cjs`
+is those three with every app name removed; `--app` is the only thing that varies. Three additive
+engine accessors feed it: `__titleRe`, `__mutations`, `__drive`.
+
+**Three instrument defects found and fixed in the same file, in order.**
+
+1. **The dirty happened BETWEEN the two parity checks.** First run reported
+   `input: standard=false liquid=true` — a parity break the driver had caused, because it typed
+   into the textarea after checking the first presentation. Everything that changes the surface
+   now happens before EITHER check.
+2. **Declaration order is the wrong drive order for Translate.** With `highlight` third, the two
+   steps after it re-render and collapse the caret, so `agentHandoff` read its label back
+   unchanged — a live feature scored dead by the order it was driven in. Specs may now declare
+   `drive: [...]`; Translate's is `type, swap, run, collapse, highlight`.
+3. **The control was measuring the previous mutation's cleanup.** One baseline reused across
+   three mutations gave `fell 4-5 rows` every time and VOID. Rows that pass by comparing against
+   a step-recorded `before` cannot survive `restore()`, which consumes those globals. Each
+   mutation now gets its own freshly driven baseline and `exactlyOwnRow` is measured against it.
+   Same three mutations, after: `direction` **fell exactly [direction]**, `windowLifecycle`
+   **fell exactly [windowLifecycle]**, both returning to `7/7`.
+
+Also fixed: **`swap` is a drive step, not a mutation, so `restore()` never undid it** and the
+driver left the live desktop's translate direction reversed. Added `undo.swap`; direction verified
+back at `日本語 -> English`, textarea back to empty.
+
+**Translate, measured (`baselines/cat6-l5-translate.json`):** parity **6/7 standard, 6/7 liquid,
+`rowsAgree` true, 0 rows in only one presentation**. Round trip standard -> liquid -> standard with
+`.tr-textarea` deliberately dirtied: **`fieldsHeld` true, `shellHeld` true, 0 diffs**, box 820x580
+in both. Not a PASS: `allRowsReachable` is false on the scored drive.
+
+**The one open row, and it is the opening slice — it is NOT yet shown to be a product defect.**
+`agentHandoff` reads `before="Ask the Agent" after="Ask the Agent"` on the FIRST drive, and
+**7/7 with it passing on the second and third**. The two i18n strings genuinely differ
+(`translate.askAgent` "Ask the Agent" vs `translate.askAgent.selection` "Ask the Agent about the
+selection", `en.ts:3887/3898`) and the wiring is real (`TranslateView.tsx:97` `onSourceSelect` ->
+`setSelection`, `:82` picks the label). Measured in isolation with `document.hasFocus() true`,
+`activeElement === textarea`, selection `[0,2]`: label unchanged. The likely mechanism is React's
+`SelectEventPlugin` seeding `lastSelection` at `focusin` and suppressing an identical range, which
+would make it a warm-up artefact of a synthetic `keyup` rather than a defect — **but that is a
+hypothesis, not a measurement, and the row stays FAILING until it is settled one way.** Settle it
+before scoring any category-6 cell that depends on a select-driven row.
+
+**No L6 surface has a category-6 spec yet except `captures`.** Library was inventoried for one this
+turn — `.lib-folder-chip` x20 with `All 24 / Manga 3 / Inbox 0 / Unfiled 21`, `.lib-inbox-filters`
+language and level chips, two `select`s in `.lib-sort-row`, `Covers`/`List` at
+`.aero-library-layout-switch` carrying real `aria-pressed`, 24 `.card`, **86 buttons and zero text
+inputs**. That last number is why `snapshot()` now records scroll offsets: on a surface with no
+editable field they are the only user state a round trip can lose, and without them Library's round
+trip would have compared chrome to chrome and held no matter what.
