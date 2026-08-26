@@ -27,6 +27,17 @@ const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '');
 const TOKENS = strip(read('theme', 'liquid-tokens.css'));
 const SHELL = strip(read('components', 'shell', 'shell.css'));
 const WINDOW_CSS = strip(read('theme', 'liquid-window.css'));
+const STYLES = strip(read('styles.css'));
+
+/** WCAG relative luminance, on 0..255 channels. */
+const relLum = (c: readonly [number, number, number]) => {
+  const f = (v: number) => {
+    const x = v / 255;
+    return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]);
+};
+const ratioAgainstWhite = (c: readonly [number, number, number]) => 1.05 / (relLum(c) + 0.05);
 
 const LIGHT_PALETTES = ['classic-light', 'soft-sepia', 'ocean-blue', 'mint-green', 'rose-pine', 'paper'];
 
@@ -109,5 +120,40 @@ describe('Liquid window chrome contrast', () => {
     // The fill IS this glyph's background. 24% put it back under the bar at 4.07:1; the sweep
     // found 16 the largest share holding >= 4.5:1 on all thirteen palettes (18 -> soft-sepia 4.46).
     expect(pct, `pressed fill ${pct}% — above 16% the glyph drops under 4.5:1`).toBeLessThanOrEqual(16);
+  });
+
+  it('bounds the manga OCR "done" badge against the lightest accent a user can set, not the shipped ones', () => {
+    // Category 1 scored Library at 3.69:1 on this badge, on forest-night. Sweeping the
+    // four shipped accents afterwards showed the old 82% mix failed on THREE of them
+    // (#10b981 3.69, #00a8c8 4.07, #6df1ff 2.02; only #ff2e4d passed at 5.17) — the live
+    // surface had only ever exposed whichever theme it happened to be running.
+    //
+    // So the bound is not "the shipped palettes pass". `--accent` is user-settable —
+    // Theme Studio writes it and the custom-CSS sandbox accepts `:root { --accent: … }` —
+    // and an srgb mix is linear in encoded channels, so the LIGHTEST this fill can ever
+    // be is N% of white. That is the value scored here. A percentage tuned against one
+    // palette is exactly the defect this replaced.
+    const rule = STYLES.match(
+      /\.manga-ocr-badge--done[^{}]*\{[^}]*background:\s*color-mix\(in srgb,\s*var\(--accent[^)]*\)\s*(\d+)%\s*,\s*#000\s*\)/,
+    );
+    expect(rule, 'the done-badge fill is no longer a measurable accent-over-black mix').not.toBeNull();
+
+    // The 4.5 bar is only the right bar while the glyph is white and small; if either
+    // moves, this computation is measuring the wrong thing and should be rewritten.
+    const base = STYLES.match(/\.manga-ocr-badge\s*\{([^}]*)\}/);
+    expect(base, 'the base badge rule moved').not.toBeNull();
+    expect(base?.[1], 'the badge glyph is no longer white — re-derive the bound').toMatch(/color:\s*#fff\b/);
+    expect(base?.[1], 'the badge is no longer small text — the 4.5 bar may not apply').toMatch(
+      /font-size:\s*11px/,
+    );
+
+    const pct = rule ? Number(rule[1]) / 100 : Number.NaN;
+    const lightestPossible: [number, number, number] = [255 * pct, 255 * pct, 255 * pct];
+    const worst = ratioAgainstWhite(lightestPossible);
+    expect(
+      worst,
+      `accent mixed at ${rule?.[1]}% reaches only ${worst.toFixed(2)}:1 against white text ` +
+        'when the accent itself is white; 45% is the largest share that clears 4.5',
+    ).toBeGreaterThanOrEqual(4.5);
   });
 });

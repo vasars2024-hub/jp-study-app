@@ -715,7 +715,7 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
 
   /** The layout switch, shared by both shells so the shapes stay the same two. */
   const layoutSwitch = (
-    <div className="aero-library-layout-switch" role="group" aria-label={t('library.layout.aria')}>
+    <div className="aero-library-layout-switch lq-hit-scope" role="group" aria-label={t('library.layout.aria')}>
       {LIBRARY_LAYOUTS.map((mode) => (
         <button
           key={mode}
@@ -1124,7 +1124,7 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
               <span className="aero-library-filter-label">{activeLabel}</span>
             </Toolbar>
             {hasLevelFilters && (
-              <div className="lib-inbox-filters" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '0 12px 8px' }}>
+              <div className="lib-inbox-filters lq-hit-scope" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '0 12px 8px' }}>
                 {(['all', 'ja', 'zh', 'en', 'unknown'] as const).map((lang) => (
                   <button
                     key={lang}
@@ -1254,7 +1254,7 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
         </div>
       ) : (
         <>
-      <div className="watch-bar">
+      <div className="watch-bar lq-hit-scope">
         <span className="watch-icon">
           <Icon name="refresh" size={14} />
         </span>
@@ -1284,7 +1284,7 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
       </div>
 
       {/* ----- folder chips: click to filter, drag books onto them, drag to reorder ----- */}
-      <div className="lib-folders">
+      <div className="lib-folders lq-hit-scope">
         <button
           className={`lib-folder-chip ${active === 'all' ? 'active' : ''} ${dropHover === '__all__' ? 'dragover' : ''}`}
           onClick={() => setActive('all')}
@@ -1364,7 +1364,7 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
         {folderErr && <span className="lib-folder-err">{folderErr}</span>}
       </div>
 
-      <div className="lib-sort-row" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+      <div className="lib-sort-row lq-hit-scope" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
         <label className="muted" htmlFor="lib-sort" style={{ fontSize: 12 }}>
           {t('library.sort.label')}
         </label>
@@ -1411,7 +1411,7 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
       </div>
 
       {hasLevelFilters && (
-        <div className="lib-inbox-filters" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+        <div className="lib-inbox-filters lq-hit-scope" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
           {(['all', 'ja', 'zh', 'en', 'unknown'] as const).map((lang) => (
             <button
               key={lang}
@@ -1581,14 +1581,14 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
                     </div>
                   )}
                   <button
-                    className="card-remove"
+                    className="card-remove lq-hit-placed"
                     title={t('library.card.removeTitle')}
                     onClick={(e) => remove(e, it.id)}
                   >
                     <Icon name="close" size={13} />
                   </button>
                   <button
-                    className="card-file"
+                    className="card-file lq-hit-placed"
                     title={t('library.card.fileTitle')}
                     onClick={(e) => {
                       e.stopPropagation();

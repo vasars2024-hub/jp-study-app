@@ -3988,7 +3988,26 @@ h1 {
   pointer-events: none;
 }
 .manga-ocr-badge--done {
-  background: color-mix(in srgb, var(--accent, #8b1a2b) 82%, #000);
+  /*
+   * 45%, not 82%. This badge is white 11px text, so it is scored against 4.5:1,
+   * and `--accent` is USER-SETTABLE (Theme Studio writes it, and the custom-CSS
+   * sandbox accepts `:root { --accent: ... }`) — so no percentage chosen against
+   * one palette is safe. 82% of forest-night's #10b981 measured **3.69:1**.
+   *
+   * The percentage is picked from the WORST accent that exists rather than from
+   * the shipped ones: an srgb mix is linear in encoded channels, so the lightest
+   * this fill can ever be is 45% of white, i.e. 0.45 encoded on every channel,
+   * whose relative luminance is 0.1707 and whose ratio against white text is
+   * 1.05 / 0.2207 = **4.76:1**. Every darker accent is further above the bar, so
+   * the bound holds for any value a user can set. Shipped palettes, measured at
+   * 82% -> 45%: #10b981 3.69 -> 9.07, #00a8c8 4.07 -> 9.68, #6df1ff 2.02 -> 5.93,
+   * #ff2e4d 5.17 -> 11.32. THREE of the four shipped accents failed, not one —
+   * the live surface only ever exposed the theme it happened to be running.
+   *
+   * The accent identity is carried by the border, which is unchanged and is the
+   * bright half of the pair — this is a tint plus a bright ring, not a flat chip.
+   */
+  background: color-mix(in srgb, var(--accent, #8b1a2b) 45%, #000);
   border-color: color-mix(in srgb, var(--accent, #8b1a2b) 50%, white);
 }
 .cover-level-badge {
