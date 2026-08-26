@@ -1,5 +1,5 @@
 {
-  "label": "l6-manga",
+  "label": "bookreader",
   "surface": "@.reader",
   "win": "main",
   "rootKind": "main-window section",
@@ -12,9 +12,9 @@
       "overlaps": 0,
       "horizontalScrollers": 0,
       "hiddenOverflowX": 0,
-      "deadPctViewport": 6.8,
-      "chromePct": 20.6,
-      "dominantCanvasPct": 65.5,
+      "deadPctViewport": 9.4,
+      "chromePct": 0,
+      "dominantCanvasPct": 86.6,
       "bars": {
         "clipped": true,
         "overlaps": true,
@@ -30,9 +30,9 @@
       "overlaps": 0,
       "horizontalScrollers": 0,
       "hiddenOverflowX": 0,
-      "deadPctViewport": 5.8,
-      "chromePct": 23.8,
-      "dominantCanvasPct": 48.5,
+      "deadPctViewport": 7.5,
+      "chromePct": 0,
+      "dominantCanvasPct": 80.4,
       "bars": {
         "clipped": true,
         "overlaps": true,
@@ -48,14 +48,14 @@
       "overlaps": 0,
       "horizontalScrollers": 0,
       "hiddenOverflowX": 0,
-      "deadPctViewport": 8.3,
-      "chromePct": 16.7,
-      "dominantCanvasPct": 71.9,
+      "deadPctViewport": 38.3,
+      "chromePct": 0,
+      "dominantCanvasPct": 89,
       "bars": {
         "clipped": true,
         "overlaps": true,
         "horizontal": true,
-        "deadRegion": true
+        "deadRegion": false
       },
       "restored": true
     }
@@ -74,10 +74,8 @@
       "overlapList": [],
       "horizontalScrollerList": [],
       "hiddenOverflowXList": [],
-      "deadRegionBox": "379x185 at grid 9,2",
-      "chromeParts": [
-        "aside.lq-reading-tool"
-      ]
+      "deadRegionBox": "158x616 at grid 0,8",
+      "chromeParts": []
     },
     {
       "kind": "compact",
@@ -91,10 +89,8 @@
       "overlapList": [],
       "horizontalScrollerList": [],
       "hiddenOverflowXList": [],
-      "deadRegionBox": "716x42 at grid 9,0",
-      "chromeParts": [
-        "aside.lq-reading-tool"
-      ]
+      "deadRegionBox": "924x42 at grid 0,34",
+      "chromeParts": []
     },
     {
       "kind": "maximized",
@@ -108,23 +104,23 @@
       "overlapList": [],
       "horizontalScrollerList": [],
       "hiddenOverflowXList": [],
-      "deadRegionBox": "440x300 at grid 10,0",
-      "chromeParts": [
-        "aside.lq-reading-tool"
-      ]
+      "deadRegionBox": "680x900 at grid 0,2",
+      "chromeParts": []
     }
   ],
   "bars": {
     "clipped": true,
     "overlaps": true,
     "horizontal": true,
-    "deadRegion": true,
+    "deadRegion": false,
     "contentGrowsNotChrome": true,
     "allThreeSizes": true,
     "restored": true
   },
-  "verdict": "PASS 10/10",
-  "failedBars": [],
+  "verdict": "FAIL",
+  "failedBars": [
+    "deadRegion"
+  ],
   "unmeasuredBars": [],
   "visibleAtEveryRead": true,
   "notMeasuredHere": [
@@ -151,5 +147,6 @@
       "hiddenOverflowX": 0,
       "restored": true
     }
-  }
+  },
+  "surfaceNote": "@.reader mounted with a BOOK (div.reader-stage, no .manga-spread, no .nav-zone) - NOT the manga reader, which shares the same selector"
 }
