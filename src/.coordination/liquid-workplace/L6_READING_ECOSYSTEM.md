@@ -1026,3 +1026,45 @@ Translate is an **L5** surface, so this does not move the L6 board (still 30 of 
 the calibration that makes the L6 cells cheap: the next five L6 surfaces need a **spec**, which
 is ~40 lines of data, not a runner. Live state left as found — every window back in its found
 presentation (only Video is liquid), Translate empty and pointed 日本語 -> English.
+
+## 2026-08-26 (later) · primary — Library category 6, and RULE 1 paying out for the first time
+
+**Library, category 6: PASS 10/10** (`baselines/cat6-l6-library.json`). Parity **9/9 standard,
+9/9 liquid**, `rowsAgree` true, **0 rows reachable in only one presentation**. Round trip
+standard → liquid → standard: `fieldsHeld` true, `shellHeld` true, **0 diffs**, 820x580 both.
+Control fires on **all five** mutations — `folderTree`, `layoutSwitch`, `groupBy`, `cardActions`,
+`windowLifecycle` each fell **exactly its own row** (9/9 → 8/9), `unexpected []`, each back at 9/9.
+Board **31 of 48**.
+
+**RULE 1, measured.** This cell cost **one spec plus six shared helpers, no new probe file and no
+change to `cat6-feature-parity.cjs`** — the first L6 surface to be a pure RUN of the category-6
+harness. First run, first pass; nothing was repaired.
+
+**The problem this spec had to solve, and it is new.** Library is the first L6 surface with **zero
+editable text fields** (91 buttons, 0 inputs), so the driver's `dirtyField` finds nothing and the
+round trip would have compared chrome to chrome and held no matter what the toggle did. Fixed by
+making **scroll a drive step**: `fwin-body` scrolled to **240 of a 1,605 px range** before
+snapshot A, and the trip had to bring it back — it did. On a surface with no text field, scroll is
+the only user-entered state there is; a round trip driven without one is vacuous, not clean.
+
+**Every row is a cross-check, never a count.** `sortOrder` scores the RENDERED order, per group,
+not the select's value; `layoutSwitch` requires `aria-pressed` to agree with the container that
+actually mounted; `folderFilter` requires the card count both to have CHANGED and to equal what
+the active chip advertises; `groupBy` requires every bucket to carry its heading and the buckets to
+account for every card. Each half alone passes on a dead control.
+
+**Four traps paid here, for the next spec.**
+1. **A select needs `change`, not `input`** — `pickSelect` uses the native `HTMLSelectElement`
+   setter then dispatches `change`. `typeInto`'s `input` event does nothing for a `<select>`.
+2. **The driver runs the drive TWICE PER MUTATION**, so a step that is a no-op the second time
+   round breaks its own row. `folder` alternates between the two largest chips instead of clicking
+   a fixed one, and never lands on an empty folder.
+3. **A row that compares against a step-recorded `before` is contaminated by later steps.**
+   `sortOrder` was almost written that way; the folder step narrows the list afterwards, so the
+   first title changes anyway and the row would have passed for the wrong reason. Rows that can be
+   made order-independent should be.
+4. **`.lib-folder-chip` is three different things** — the folder rail, the layout switch and the
+   inbox filters all use it. Scope by container or `folderTree` scores 20 chips with 4 actives.
+
+Live state left as found: presentation `standard`, sort `date-desc`, group `none`, folder `All 24`,
+24 cards, `fwin-body` scrollTop 0, `__LQP_LIB_ORIG` null.

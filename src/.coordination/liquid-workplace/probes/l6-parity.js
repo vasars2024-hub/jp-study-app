@@ -66,6 +66,35 @@
     return el.value;
   };
 
+  // Trap 2's `<select>` half. React's `ChangeEventPlugin` listens for `change`, not
+  // `input`, and the native setter keeps the value-tracker in step the same way it does
+  // for a text field. Setting `.value` and firing nothing at all is the version that
+  // scores a live control dead.
+  const pickSelect = (el, value) => {
+    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(el, value);
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    return el.value;
+  };
+
+  // Library helpers. Kept beside the other shared helpers rather than inside the spec so
+  // the spec stays what it is meant to be — data, not a runner.
+  const keyOf = (el) => `${(el.className || el.tagName).toString().split(' ')[0]}`;
+  const libState = () => {
+    window.__LQP_LIB_ORIG = window.__LQP_LIB_ORIG || {};
+    return window.__LQP_LIB_ORIG;
+  };
+  // The rail's filter chips only: `+ New folder` is an action and the rename box is a
+  // transient editor, and both carry the same class as a real chip.
+  const folderChips = (w) => qa(w, '.lib-folders .lib-folder-chip').filter(
+    (c) => !c.classList.contains('lib-folder-new') && !c.classList.contains('lib-folder-editor'),
+  );
+  // Group separators are locale-dependent (the grammar spec's `2,410 points` matched `2`
+  // and scored a working search false), so strip to digits before reading a count.
+  const chipCount = (c) => txt(q(c, '.lib-chip-count')).replace(/[^\d]/g, '');
+  const scroller = (w) => qa(w, '*')
+    .filter((e) => e.scrollHeight - e.clientHeight > 40)
+    .sort((a, b) => (b.scrollHeight - b.clientHeight) - (a.scrollHeight - a.clientHeight))[0];
+
   // Trap 6, refined 2026-08-25. The previous turn banked "focus, then keyup" and
   // that is necessary but NOT sufficient: React's SelectEventPlugin also produces
   // nothing while the OS window is unfocused, even though `el.focus()` succeeds
@@ -769,6 +798,273 @@
         captureList: (w) => detach(q(w, '.reading-captures-row-meta'), 'no capture rows'),
         listReversibility: (w) => stripAttr(q(w, '.reading-captures-list-toggle'), 'aria-pressed', 'no list toggle'),
         windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
+      },
+    },
+
+    /**
+     * LIBRARY — the catalogue, and the first L6 surface with NO editable text field:
+     * 91 buttons, zero inputs. The driver's `dirtyField` therefore finds nothing, so the
+     * only user-entered state a round trip can lose here is SCROLL POSITION — which is
+     * why `snapshot()` records scroll offsets and why this spec drives one deliberately
+     * rather than letting the trip compare chrome to chrome and hold no matter what.
+     *
+     * Every row is a CROSS-CHECK between a control's declared state and what the list
+     * actually rendered, because a count of controls would miss every defect this surface
+     * can really have: a sort select that changes value without reordering, a layout
+     * switch whose `aria-pressed` disagrees with the container that mounted, a folder chip
+     * whose count disagrees with the cards it filtered to, a grouping select that buckets
+     * nothing. Presence never scores.
+     */
+    library: {
+      titleRe: /Library|ライブラリ|书库|图书|Библиотек/i,
+      rootSel: '.library',
+      features: [
+        {
+          // The folder rail: every filter chip carries a real count and exactly one is
+          // active. A rail with two actives is a filter that lost its exclusivity while
+          // still rendering, which is invisible until the list stops agreeing with it.
+          id: 'folderTree',
+          f: (w) => {
+            const chips = folderChips(w);
+            const active = activeOf(chips, 'active');
+            const counted = chips.filter((c) => /^\d+$/.test(chipCount(c))).length;
+            return {
+              ok: chips.length >= 2 && active === 1 && counted === chips.length,
+              ev: `chips=${chips.length} active=${active} counted=${counted}`,
+            };
+          },
+        },
+        {
+          // The filter WORKS: the card count changed from what `step('folder')` recorded
+          // AND equals the count the active chip advertises. Either half alone passes on a
+          // dead control — the count agrees trivially when nothing filtered.
+          id: 'folderFilter',
+          f: (w) => {
+            const chip = folderChips(w).find((c) => c.classList.contains('active'));
+            const declared = chip ? Number(chipCount(chip)) : NaN;
+            const cards = qa(w, '.card').length;
+            const before = window.__LQP_LIB_CARDS_BEFORE;
+            const ok = !!chip && Number.isFinite(declared) && cards === declared
+              && before != null && cards !== before;
+            return {
+              ok,
+              ev: `activeChip="${txt(chip).replace(/\s+/g, ' ')}" declared=${declared} cards=${cards} cardsBefore=${before}`,
+            };
+          },
+        },
+        {
+          // Sorting is scored on the RENDERED ORDER, not on the select's value, and the
+          // comparison is per group because grouping buckets the list — a globally sorted
+          // check would read a correctly grouped catalogue as out of order. Deliberately
+          // order-independent of the other drive steps: a row that compares against a
+          // step-recorded `before` would be contaminated by the folder step narrowing the
+          // list afterwards, and would then pass for the wrong reason.
+          id: 'sortOrder',
+          f: (w) => {
+            const sel = q(w, '#lib-sort');
+            if (!sel) return { ok: false, ev: 'no sort select' };
+            const groups = qa(w, '.lib-group');
+            const scope = groups.length ? groups : [w];
+            let seen = 0;
+            const bad = scope.filter((g) => {
+              const t = qa(g, '.card-title').map(txt);
+              seen += t.length;
+              return JSON.stringify(t)
+                !== JSON.stringify(t.slice().sort((a, b) => a.localeCompare(b)));
+            }).length;
+            return {
+              ok: sel.value === 'title' && seen >= 2 && bad === 0,
+              ev: `sort="${sel.value}" groups=${scope.length} titles=${seen} outOfOrder=${bad}`,
+            };
+          },
+        },
+        {
+          // Grouping: every group carries its heading and the buckets account for every
+          // card. A grouping select that renders one unlabelled bucket is the "control
+          // changed, list did not" defect.
+          id: 'groupBy',
+          f: (w) => {
+            const sel = q(w, '#lib-group');
+            const groups = qa(w, '.lib-group');
+            const heads = groups.filter((g) => q(g, '.lib-group-head')).length;
+            const cards = qa(w, '.card').length;
+            const summed = groups.reduce((n, g) => n + qa(g, '.card').length, 0);
+            return {
+              ok: !!sel && sel.value !== 'none' && groups.length >= 1
+                && heads === groups.length && summed === cards,
+              ev: `group="${sel ? sel.value : 'absent'}" groups=${groups.length} heads=${heads} cards=${cards} summed=${summed}`,
+            };
+          },
+        },
+        {
+          // The layout switch's boolean must agree with the container that actually
+          // mounted. `aria-pressed="true"` on Covers while `.lib-list-groups` is rendered
+          // is a switch that lies to a screen reader about what is on screen.
+          id: 'layoutSwitch',
+          f: (w) => {
+            const btns = qa(w, '.aero-library-layout-switch button');
+            const pressed = btns.filter((b) => b.getAttribute('aria-pressed') === 'true');
+            const mode = pressed[0] ? pressed[0].getAttribute('data-library-layout') : null;
+            const mounted = mode === 'list' ? q(w, '.lib-list-groups')
+              : mode === 'grid' ? q(w, '.lib-groups') : null;
+            return {
+              ok: btns.length >= 2 && pressed.length === 1 && !!mounted,
+              ev: `modes=${btns.length} pressed=${pressed.length} mode=${mode} containerMounted=${!!mounted}`,
+            };
+          },
+        },
+        {
+          // Two chip groups — language and level — sharing one flat container, so exactly
+          // TWO actives is the invariant, one per group.
+          id: 'inboxFilters',
+          f: (w) => {
+            const box = q(w, '.lib-inbox-filters');
+            if (!box) return { ok: false, ev: 'no inbox filter rail' };
+            const chips = qa(box, '.lib-folder-chip');
+            const active = activeOf(chips, 'active');
+            return { ok: chips.length >= 6 && active === 2, ev: `chips=${chips.length} active=${active}` };
+          },
+        },
+        {
+          // Per-card affordances: every rendered card owns its remove and its folder
+          // control. A card that renders without them is a row the user cannot act on.
+          id: 'cardActions',
+          f: (w) => {
+            const cards = qa(w, '.card').length;
+            const removes = qa(w, '.card-remove').length;
+            const files = qa(w, '.card-file').length;
+            return {
+              ok: cards > 0 && removes === cards && files === cards,
+              ev: `cards=${cards} remove=${removes} folder=${files}`,
+            };
+          },
+        },
+        {
+          // L6's Gate, in the catalogue's form. Library runs the fill policy, so it has no
+          // measure clamp to score (`--lq-reading-measure: none` by design — a grid of
+          // covers is not a passage); what must hold is that every open tool is docked
+          // beside the grid or covering it entirely, and that the widths add up.
+          id: 'canvasPlacement',
+          f: (w) => {
+            const c = q(w, '.lq-reading');
+            if (!c) return { ok: false, ev: 'no reading canvas' };
+            const doc = q(c, '[data-reading-role="document"]');
+            if (!doc) return { ok: false, ev: 'canvas has no document region' };
+            const tools = qa(c, '[data-reading-role="tool"]');
+            const cw = Math.round(c.getBoundingClientRect().width);
+            const dw = Math.round(doc.getBoundingClientRect().width);
+            const docked = tools.filter((t) => t.dataset.placement === 'docked');
+            const sheets = tools.filter((t) => t.dataset.placement === 'sheet');
+            const sum = docked.reduce((n, t) => n + Math.round(t.getBoundingClientRect().width) + 12, dw);
+            const legal = tools.every((t) => /^(docked|sheet)$/.test(t.dataset.placement || ''));
+            const sheetsFull = sheets.every((t) => Math.abs(Math.round(t.getBoundingClientRect().width) - dw) <= 1);
+            const covered = c.dataset.covered === 'true';
+            return {
+              ok: c.dataset.measured === 'true' && legal && sheetsFull
+                && Math.abs(sum - cw) <= 1 && covered === sheets.length > 0,
+              ev: `canvas=${cw} doc=${dw} docked=${docked.length} sheets=${sheets.length} sum=${sum} covered=${covered}`,
+            };
+          },
+        },
+        { id: 'windowLifecycle', f: (w) => lifecycle(w) },
+      ],
+      steps: {
+        // Pick the LARGEST non-active folder rather than a fixed one: the count has to
+        // change for `folderFilter` to mean anything, and the driver runs this step many
+        // times (twice per mutation), so it must produce a real change on every run rather
+        // than being a no-op the second time round. Alternating between the two biggest
+        // chips does that without ever landing on an empty folder.
+        folder: (w) => {
+          const chips = folderChips(w);
+          if (!chips.length) return { refused: 'no folder chips' };
+          const g = libState();
+          const cur = chips.findIndex((c) => c.classList.contains('active'));
+          if (g.folder == null) g.folder = cur;
+          const target = chips
+            .map((c, i) => ({ c, i, n: Number(chipCount(c) || '0') }))
+            .filter((x) => x.i !== cur && x.n > 0)
+            .sort((a, b) => b.n - a.n)[0];
+          if (!target) return { refused: 'no other non-empty folder to filter to' };
+          window.__LQP_LIB_CARDS_BEFORE = qa(w, '.card').length;
+          target.c.click();
+          return { picked: txt(target.c).replace(/\s+/g, ' '), cardsBefore: window.__LQP_LIB_CARDS_BEFORE };
+        },
+        sort: (w) => {
+          const sel = q(w, '#lib-sort');
+          if (!sel) return { refused: 'no sort select' };
+          const g = libState();
+          if (g.sort == null) g.sort = sel.value;
+          pickSelect(sel, 'title');
+          return { was: g.sort, now: sel.value };
+        },
+        group: (w) => {
+          const sel = q(w, '#lib-group');
+          if (!sel) return { refused: 'no group select' };
+          const g = libState();
+          if (g.group == null) g.group = sel.value;
+          pickSelect(sel, 'lang');
+          return { was: g.group, now: sel.value };
+        },
+        // The stand-in for `dirtyField` on a surface with no text field. Without it the
+        // round trip has no user state to lose and holds vacuously.
+        scroll: (w, px) => {
+          const el = scroller(w);
+          if (!el) return { refused: 'nothing scrollable — the catalogue fits its window' };
+          const g = libState();
+          if (g.scrollKey == null) {
+            g.scrollKey = keyOf(el);
+            g.scrollTop = el.scrollTop;
+          }
+          el.scrollTop = Number(px) || 240;
+          return { scroller: keyOf(el), top: el.scrollTop, range: el.scrollHeight - el.clientHeight };
+        },
+      },
+      mutations: {
+        // ONE chip's count, not the rail: detaching the rail would take `folderFilter`
+        // with it, and a control that fails two rows proves neither. The active chip's own
+        // count is left alone so `folderFilter` keeps its subject.
+        folderTree: (w) => detach(
+          folderChips(w).filter((c) => !c.classList.contains('active'))
+            .map((c) => q(c, '.lib-chip-count')).filter(Boolean)[0],
+          'no inactive folder chip carries a count',
+        ),
+        layoutSwitch: (w) => stripAttr(
+          qa(w, '.aero-library-layout-switch button').find((b) => b.getAttribute('aria-pressed') === 'true'),
+          'aria-pressed',
+          'no layout button is pressed',
+        ),
+        groupBy: (w) => detach(q(w, '.lib-group-head'), 'list is not grouped'),
+        cardActions: (w) => detach(q(w, '.card-remove'), 'no cards rendered'),
+        windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
+      },
+      // Narrow FIRST so `folderFilter` records its before against the widest list, then
+      // sort, then group (grouping is what `sortOrder` compares within), then scroll last
+      // so nothing re-renders the position away before the snapshot.
+      drive: ['folder', 'sort', 'group', ['scroll', '240']],
+      undo: {
+        // One undo for the whole surface: the four drive steps all write in-memory view
+        // state that the app does not persist, so leaving any of them changed would hand
+        // the next worker a library filtered to a folder they did not choose.
+        library: (w) => {
+          const g = window.__LQP_LIB_ORIG;
+          window.__LQP_LIB_CARDS_BEFORE = null;
+          if (!g) return null;
+          const done = [];
+          const s = q(w, '#lib-sort');
+          if (s && g.sort != null && s.value !== g.sort) { pickSelect(s, g.sort); done.push('sort'); }
+          const gr = q(w, '#lib-group');
+          if (gr && g.group != null && gr.value !== g.group) { pickSelect(gr, g.group); done.push('group'); }
+          if (g.folder != null) {
+            const chip = folderChips(w)[g.folder];
+            if (chip && !chip.classList.contains('active')) { chip.click(); done.push('folder'); }
+          }
+          if (g.scrollKey != null) {
+            const el = qa(w, '*').find((e) => keyOf(e) === g.scrollKey);
+            if (el && el.scrollTop !== g.scrollTop) { el.scrollTop = g.scrollTop; done.push('scroll'); }
+          }
+          window.__LQP_LIB_ORIG = null;
+          return done.length ? `library:${done.join('+')}` : null;
+        },
       },
     },
   };
