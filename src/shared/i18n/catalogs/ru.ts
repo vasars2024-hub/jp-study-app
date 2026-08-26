@@ -4821,6 +4821,7 @@ export const ru: Catalog = {
   'yt.link.extension': 'Привязать расширение Chrome',
   'yt.link.inbox': 'Входящие Reader',
   'library.btn.importFiles': '+ Импорт файла(ов)',
+  'library.btn.moreImports': 'Другие способы добавить',
   'library.btn.importFolder': 'Импорт папки с изображениями',
   'library.btn.webPaste': 'Сеть / вставка',
   'library.btn.randomWiki': 'Случайная Википедия',

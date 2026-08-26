@@ -2,7 +2,7 @@
   "surface": "Library",
   "label": "l6-library",
   "control": false,
-  "at": "2026-08-26T22:42:03.233Z",
+  "at": "2026-08-26T22:54:08.703Z",
   "category": 5,
   "question": "UI clarity and user-friendliness — the ten §10.4 questions, scored",
   "hostClass": "fwin",
@@ -59,11 +59,12 @@
       "verdict": "YES",
       "bar": "1..3 entry points in the top third — 0 offers nothing to do, many offers no dominant task",
       "numbers": {
-        "entryPoints": 1,
+        "entryPoints": 2,
         "primaryInputs": 0,
-        "accentButtons": 1,
+        "accentButtons": 2,
         "accentList": [
-          "button.btn::+ Import file(s)"
+          "button.btn::+ Import file(s)",
+          "button.lib-folder-chip::All 24"
         ],
         "inputList": []
       }
@@ -96,26 +97,20 @@
     {
       "id": 4,
       "q": "advanced tools discoverable without cluttering",
-      "verdict": "NO",
+      "verdict": "YES",
       "bar": ">=1 collapsed disclosure AND <=12 controls scanned in the default state",
       "numbers": {
-        "collapsedDisclosures": 4,
-        "scannedControls": 17,
-        "chromeControlsRaw": 17,
-        "summaryHeaders": 0,
+        "collapsedDisclosures": 6,
+        "scannedControls": 11,
+        "chromeControlsRaw": 13,
+        "summaryHeaders": 2,
         "behindDisclosure": 0,
         "disclosures": {
-          "total": 0,
+          "total": 2,
           "open": 0
         },
         "scannedList": [
           "+ Import file(s)",
-          "Import image folder",
-          "Web / paste",
-          "Random Wikipedia",
-          "Sync now",
-          "Change",
-          "Stop",
           "All 24",
           "Manga 3",
           "Inbox 0",
@@ -139,7 +134,7 @@
         "cells": [
           {
             "theme": "forest-night",
-            "measured": 160,
+            "measured": 155,
             "unmeasurable": 60,
             "minRatio": 5.3,
             "failingCount": 0,
@@ -153,7 +148,7 @@
           },
           {
             "theme": "classic-light",
-            "measured": 160,
+            "measured": 155,
             "unmeasurable": 60,
             "minRatio": 5.58,
             "failingCount": 0,
@@ -264,13 +259,13 @@
     "q1": "YES",
     "q2": "YES",
     "q3": "YES",
-    "q4": "NO",
+    "q4": "YES",
     "q6": "NO-SUBJECT",
     "q10": "YES"
   },
   "altThemeNumbers": {
     "theme": "classic-light",
-    "controlsPainted": 33,
+    "controlsPainted": 29,
     "q1": {
       "entryPoints": 1,
       "primaryInputs": 0,
@@ -281,23 +276,17 @@
       "inputList": []
     },
     "q4": {
-      "collapsedDisclosures": 4,
-      "scannedControls": 17,
-      "chromeControlsRaw": 17,
-      "summaryHeaders": 0,
+      "collapsedDisclosures": 6,
+      "scannedControls": 11,
+      "chromeControlsRaw": 13,
+      "summaryHeaders": 2,
       "behindDisclosure": 0,
       "disclosures": {
-        "total": 0,
+        "total": 2,
         "open": 0
       },
       "scannedList": [
         "+ Import file(s)",
-        "Import image folder",
-        "Web / paste",
-        "Random Wikipedia",
-        "Sync now",
-        "Change",
-        "Stop",
         "All 24",
         "Manga 3",
         "Inbox 0",
@@ -336,11 +325,9 @@
       "cardHostDetail": null
     }
   },
-  "controlsPaintedA": 33,
-  "findings": [
-    "Q4 advanced tools discoverable without cluttering"
-  ],
+  "controlsPaintedA": 29,
+  "findings": [],
   "voided": [],
-  "score": 9,
-  "verdict": "9/10 — 1 question(s) answer NO"
+  "score": 10,
+  "verdict": "PASS 10/10"
 }

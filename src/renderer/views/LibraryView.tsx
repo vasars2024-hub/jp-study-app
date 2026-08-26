@@ -892,22 +892,34 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
     <div className={`library${aero ? ' aero-library' : ''}`} onClick={() => setFileMenu(null)}>
       <ContextualSurface as="header" className="view-head">
         <p className="muted">{t('library.intro')}</p>
+        {/*
+          Four import routes side by side made the header the largest single block of
+          controls on the surface, and only one of them is the dominant task. The other
+          three are tucked behind a disclosure: one click away, still in the File menu
+          (`import-folder` / `import-web` / `import-wiki` above), and nothing is removed.
+          Progressive disclosure, not deletion — the reverse transition is the same click.
+        */}
         <div className="actions">
           <button className="btn primary" disabled={busy} onClick={importFiles}>
             {t('library.btn.importFiles')}
           </button>
-          <button className="btn" disabled={busy} onClick={importFolder}>
-            <Icon name="folder" size={14} style={{ marginRight: 6, verticalAlign: '-2px' }} />
-            {t('library.btn.importFolder')}
-          </button>
-          <button className="btn" disabled={busy} onClick={() => setImportOpen(true)}>
-            <Icon name="globe" size={14} style={{ marginRight: 6, verticalAlign: '-2px' }} />
-            {t('library.btn.webPaste')}
-          </button>
-          <button className="btn" disabled={busy} onClick={() => setWikiOpen(true)}>
-            <Icon name="dice" size={14} style={{ marginRight: 6, verticalAlign: '-2px' }} />
-            {t('library.btn.randomWiki')}
-          </button>
+          <details className="lib-more">
+            <summary className="btn lib-more-summary">{t('library.btn.moreImports')}</summary>
+            <div className="lib-more-body">
+              <button className="btn" disabled={busy} onClick={importFolder}>
+                <Icon name="folder" size={14} style={{ marginRight: 6, verticalAlign: '-2px' }} />
+                {t('library.btn.importFolder')}
+              </button>
+              <button className="btn" disabled={busy} onClick={() => setImportOpen(true)}>
+                <Icon name="globe" size={14} style={{ marginRight: 6, verticalAlign: '-2px' }} />
+                {t('library.btn.webPaste')}
+              </button>
+              <button className="btn" disabled={busy} onClick={() => setWikiOpen(true)}>
+                <Icon name="dice" size={14} style={{ marginRight: 6, verticalAlign: '-2px' }} />
+                {t('library.btn.randomWiki')}
+              </button>
+            </div>
+          </details>
         </div>
       </ContextualSurface>
 
@@ -1279,34 +1291,46 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
         </div>
       ) : (
         <>
-      <div className="watch-bar lq-hit-scope">
-        <span className="watch-icon">
-          <Icon name="refresh" size={14} />
-        </span>
-        {watchFolder ? (
-          <>
+      {/*
+        The watch bar is STATUS first and administration second, so the status stays in
+        the summary — always readable, never a click away — and only the three actions
+        tuck away. Collapsed in both states on purpose: the control count a user has to
+        scan should not depend on whether a watch folder happens to be configured.
+        All three live in the Library menu as well (`sync` / `watch-folder` / `stop-watch`).
+      */}
+      <details className="watch-bar lq-hit-scope">
+        <summary className="watch-summary">
+          <span className="watch-icon">
+            <Icon name="refresh" size={14} />
+          </span>
+          {watchFolder ? (
             <span className="watch-label">
               {t('library.watch.autoFrom')} <code>{watchFolder}</code>
             </span>
-            <button className="btn small" disabled={busy} onClick={syncNow}>
-              {t('library.menu.syncNow')}
-            </button>
-            <button className="btn small" disabled={busy} onClick={chooseWatchFolder}>
-              {t('library.aero.change')}
-            </button>
-            <button className="btn small" disabled={busy} onClick={stopWatching}>
-              {t('common.stop')}
-            </button>
-          </>
-        ) : (
-          <>
+          ) : (
             <span className="watch-label muted">{t('library.watch.hint')}</span>
+          )}
+        </summary>
+        <div className="watch-actions">
+          {watchFolder ? (
+            <>
+              <button className="btn small" disabled={busy} onClick={syncNow}>
+                {t('library.menu.syncNow')}
+              </button>
+              <button className="btn small" disabled={busy} onClick={chooseWatchFolder}>
+                {t('library.aero.change')}
+              </button>
+              <button className="btn small" disabled={busy} onClick={stopWatching}>
+                {t('common.stop')}
+              </button>
+            </>
+          ) : (
             <button className="btn small" disabled={busy} onClick={chooseWatchFolder}>
               {t('library.watch.setFolder')}
             </button>
-          </>
-        )}
-      </div>
+          )}
+        </div>
+      </details>
 
       {/* ----- folder chips: click to filter, drag books onto them, drag to reorder ----- */}
       <div className="lib-folders lq-hit-scope">

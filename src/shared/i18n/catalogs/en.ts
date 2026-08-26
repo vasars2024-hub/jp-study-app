@@ -4609,6 +4609,7 @@ export const en: Catalog = {
   'yt.link.extension': 'Pair Chrome extension',
   'yt.link.inbox': 'Reader Inbox',
   'library.btn.importFiles': '+ Import file(s)',
+  'library.btn.moreImports': 'More ways to add',
   'library.btn.importFolder': 'Import image folder',
   'library.btn.webPaste': 'Web / paste',
   'library.btn.randomWiki': 'Random Wikipedia',

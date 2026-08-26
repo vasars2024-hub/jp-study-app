@@ -3954,6 +3954,42 @@ h1 {
   min-width: 0;
 }
 
+/* Library's two progressive disclosures. Both are plain `<details>` because that is
+   already the repo's disclosure idiom (20+ call sites) and it costs no state, no focus
+   trap and no escape handler: the reverse transition is the same click that opened it.
+   Neither hides a capability — every control inside is also a Library/File menu item. */
+.lib-more > summary {
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+.lib-more > summary::-webkit-details-marker {
+  display: none;
+}
+.lib-more > summary::after {
+  content: '';
+  display: inline-block;
+  width: 0;
+  height: 0;
+  margin-left: 7px;
+  vertical-align: 1px;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid currentColor;
+  /* Token pair, not literals: `--lq-motion-move` collapses to 0.001ms under
+     `prefers-reduced-motion` and under `:root.reduce-motion`. */
+  transition: transform var(--lq-motion-move, 140ms) var(--lq-ease-move, ease);
+}
+.lib-more[open] > summary::after {
+  transform: rotate(180deg);
+}
+.lib-more-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+
 .watch-bar {
   display: flex;
   align-items: center;
@@ -3964,6 +4000,45 @@ h1 {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 8px;
+}
+/* Element+class beats the `.watch-bar` flex rule above: a `<details>` needs block flow
+   so the summary and the body stack rather than sitting on one line. */
+details.watch-bar {
+  display: block;
+}
+.watch-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+.watch-summary::-webkit-details-marker {
+  display: none;
+}
+.watch-summary::after {
+  content: '';
+  flex: none;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid currentColor;
+  opacity: 0.7;
+  /* Token pair, not literals: `--lq-motion-move` collapses to 0.001ms under
+     `prefers-reduced-motion` and under `:root.reduce-motion`. */
+  transition: transform var(--lq-motion-move, 140ms) var(--lq-ease-move, ease);
+}
+details.watch-bar[open] .watch-summary::after {
+  transform: rotate(180deg);
+}
+.watch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
 }
 .watch-icon {
   font-size: 14px;

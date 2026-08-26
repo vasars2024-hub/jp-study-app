@@ -2,7 +2,7 @@
   "surface": "Library",
   "label": "l6-library",
   "control": true,
-  "at": "2026-08-26T22:36:38.455Z",
+  "at": "2026-08-26T22:54:27.401Z",
   "category": 5,
   "question": "UI clarity and user-friendliness — the ten §10.4 questions, scored",
   "hostClass": "fwin",
@@ -46,6 +46,13 @@
       "Q10": "NO"
     }
   },
+  "q6leg": {
+    "presentationAsFound": "standard",
+    "toggle": "clicked",
+    "reached": "liquid",
+    "measuredIn": "liquid",
+    "restoredTo": "standard"
+  },
   "unplanted": {
     "residue": 0
   },
@@ -64,13 +71,15 @@
     {
       "id": 1,
       "q": "dominant task immediately obvious",
-      "verdict": "NO",
+      "verdict": "YES",
       "bar": "1..3 entry points in the top third — 0 offers nothing to do, many offers no dominant task",
       "numbers": {
-        "entryPoints": 0,
+        "entryPoints": 1,
         "primaryInputs": 0,
-        "accentButtons": 0,
-        "accentList": [],
+        "accentButtons": 1,
+        "accentList": [
+          "button.lib-folder-chip::All 24"
+        ],
         "inputList": []
       }
     },
@@ -105,23 +114,17 @@
       "verdict": "NO",
       "bar": ">=1 collapsed disclosure AND <=12 controls scanned in the default state",
       "numbers": {
-        "collapsedDisclosures": 4,
-        "scannedControls": 30,
-        "chromeControlsRaw": 31,
-        "summaryHeaders": 1,
+        "collapsedDisclosures": 6,
+        "scannedControls": 16,
+        "chromeControlsRaw": 19,
+        "summaryHeaders": 3,
         "behindDisclosure": 0,
         "disclosures": {
-          "total": 0,
+          "total": 2,
           "open": 0
         },
         "scannedList": [
           "+ Import file(s)",
-          "Import image folder",
-          "Web / paste",
-          "Random Wikipedia",
-          "Sync now",
-          "Change",
-          "Stop",
           "All 24",
           "Manga 3",
           "Inbox 0",
@@ -129,12 +132,14 @@
           "+ New folder",
           "All",
           "Japanese",
-          "Chinese",
-          "English",
           "Unknown",
           "All",
-          "L1",
-          "L2"
+          "L7",
+          "card 0",
+          "card 1",
+          "card 2",
+          "card 3",
+          "card 4"
         ]
       }
     },
@@ -148,7 +153,7 @@
         "cells": [
           {
             "theme": "forest-night",
-            "measured": 174,
+            "measured": 161,
             "unmeasurable": 60,
             "minRatio": 1.14,
             "failingCount": 1,
@@ -162,7 +167,7 @@
           },
           {
             "theme": "classic-light",
-            "measured": 174,
+            "measured": 161,
             "unmeasurable": 60,
             "minRatio": 1.14,
             "failingCount": 3,
@@ -211,18 +216,29 @@
     {
       "id": 6,
       "q": "Liquid motion explains a real relationship",
-      "verdict": "NO-SUBJECT",
       "bar": "every Liquid-treated region carries a state-change transition and none loops forever",
+      "verdict": "YES",
       "numbers": {
-        "liquidRegions": 0,
+        "measuredIn": "liquid",
+        "leg": {
+          "presentationAsFound": "standard",
+          "toggle": "clicked",
+          "reached": "liquid",
+          "measuredIn": "liquid",
+          "restoredTo": "standard"
+        },
+        "liquidRegions": 1,
         "byBackdropFilter": 0,
-        "byContextualPaint": 0,
-        "carryingATransition": 0,
+        "byContextualPaint": 1,
+        "carryingATransition": 1,
         "infiniteAnimationsOnLiquid": 0,
-        "liquidMaterialTotal": 0,
+        "liquidMaterialTotal": 1,
         "decoratedLeaves": [],
-        "regionList": [],
-        "withoutTransition": []
+        "regionList": [
+          "header.lq-contextual"
+        ],
+        "withoutTransition": [],
+        "inStandardPresentation": 0
       }
     },
     {
@@ -297,7 +313,7 @@
   },
   "altThemeNumbers": {
     "theme": "classic-light",
-    "controlsPainted": 47,
+    "controlsPainted": 35,
     "q1": {
       "entryPoints": 0,
       "primaryInputs": 0,
@@ -306,23 +322,17 @@
       "inputList": []
     },
     "q4": {
-      "collapsedDisclosures": 4,
-      "scannedControls": 30,
-      "chromeControlsRaw": 31,
-      "summaryHeaders": 1,
+      "collapsedDisclosures": 6,
+      "scannedControls": 16,
+      "chromeControlsRaw": 19,
+      "summaryHeaders": 3,
       "behindDisclosure": 0,
       "disclosures": {
-        "total": 0,
+        "total": 2,
         "open": 0
       },
       "scannedList": [
         "+ Import file(s)",
-        "Import image folder",
-        "Web / paste",
-        "Random Wikipedia",
-        "Sync now",
-        "Change",
-        "Stop",
         "All 24",
         "Manga 3",
         "Inbox 0",
@@ -330,12 +340,14 @@
         "+ New folder",
         "All",
         "Japanese",
-        "Chinese",
-        "English",
         "Unknown",
         "All",
-        "L1",
-        "L2"
+        "L7",
+        "card 0",
+        "card 1",
+        "card 2",
+        "card 3",
+        "card 4"
       ]
     },
     "q6": {
@@ -364,7 +376,7 @@
       "cardHostDetail": "47% of body"
     }
   },
-  "controlsPaintedA": 47,
+  "controlsPaintedA": 35,
   "controlResult": {
     "Q2": true,
     "Q3": true,

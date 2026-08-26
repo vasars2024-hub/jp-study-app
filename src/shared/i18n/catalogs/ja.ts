@@ -4343,6 +4343,7 @@ export const ja: Catalog = {
   'yt.link.extension': 'Chrome 拡張をペアリング',
   'yt.link.inbox': 'Reader 受信箱',
   'library.btn.importFiles': '+ ファイルをインポート',
+  'library.btn.moreImports': '他の追加方法',
   'library.btn.importFolder': '画像フォルダをインポート',
   'library.btn.webPaste': 'Web / 貼り付け',
   'library.btn.randomWiki': 'ランダムWikipedia',

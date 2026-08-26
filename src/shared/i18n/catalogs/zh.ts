@@ -4325,6 +4325,7 @@ export const zh: Catalog = {
   'yt.link.extension': '配对 Chrome 扩展',
   'yt.link.inbox': '阅读器收件箱',
   'library.btn.importFiles': '+ 导入文件',
+  'library.btn.moreImports': '更多添加方式',
   'library.btn.importFolder': '导入图片文件夹',
   'library.btn.webPaste': '网页 / 粘贴',
   'library.btn.randomWiki': '随机维基百科',
