@@ -1463,3 +1463,59 @@ not need, so the load is the site rail scrolled instead.
 Board: rubric cells **35 → 38 of 48**. Remaining: category 5 on all six L6 surfaces (no harness
 yet — that is the eighth and last to build), category 7 on novels / manga / vn, and the VN
 category-6 cell, still PARKED on an empty VN library behind a native OS dialog.
+
+## 2026-08-26 — Category 5 has a RUNNER: `cat5-ui-clarity.cjs`, and it fabricated three defects before scoring one
+
+RULE 1's **eighth and last** harness. `probes/l1-ui-clarity.js` had every predicate and no way
+to point at a surface — it walks `.fwin` and scores whatever is open, and three of the six L6
+surfaces are root surfaces with no `.fwin` at all. Ported to a root that may be either.
+Commits `f22d4b56` (harness + control), `1b4cc525` (Liquid leg), `4780068c` (product fix).
+
+**Decision, standing auto-approval.** Q7/Q8/Q9 are READ from `baselines/cat6-<label>.json`,
+never re-driven: Q7 "standard mode remains fully normal" and Q8 "Liquid off without losing
+state" ARE cat6's `parity` and `roundTrip`, word for word, already driven live with mutation
+controls that fired. Q5 is swept HERE across two themes, because "stable contrast" is a
+stability question and every committed per-surface contrast number in this repo is one theme
+cell (`cat1-accessibility.cjs` records one; `l1-q5-drive.cjs` sweeps two but is `.fwin`-only).
+**No cat6 baseline, no score — the run is VOID.** That refusal is load-bearing: VN's cat6 cell
+is PARKED, and without it VN would score its seven live questions and read as a near-pass.
+
+**The finding worth more than the score: Library's first run produced three findings and all
+three were the instrument.** Each would have been filed as a product defect.
+
+| reported | what it actually was |
+| --- | --- |
+| `span.cover-title` **1.00:1** ×2 | fallback covers are inline `linear-gradient`; the background-COLOR walk went past them to the white panel and scored white on white. An exact 1.00 reads as a real collapse. |
+| `+ Import file(s)` **4.38:1** vs 4.5 | `.btn` fills with `color(srgb … / 0.174)`, a 17% tint, scored as if opaque. Composited it passes comfortably. |
+| Q1 **4** accents forest-night, **1** classic-light | identical 41-control scene. No threshold fixes it — a tint separates further from white than from a dark panel. The drift guard caught it and was right. |
+
+Repairs, in the harness: gradient stops are candidate backgrounds and the run is scored against
+the **worst** stop; a `url()` background is **UNMEASURABLE**, never a pass (60 such runs here);
+every layer is **composited** bottom-up; and an entry point is **declared** (a primary/accent
+marker, or the only filled button among its siblings), not inferred from pixels.
+
+Two more repairs the surface forced. **Q6 must be asked in Liquid**: the first score read
+`liquidRegions: 0` / `NO-SUBJECT` because the window was in STANDARD presentation, which
+measures whether the surface is opted in, not whether its motion explains anything. The run
+now opts in, snapshots, opts back out, reading the presentation back on both flips. And the
+**root is pinned** on first resolve: Q2's control blanks the window title, which is what a
+`.fwin` lookup resolves by, so the first `--control` run made its own surface unfindable and
+died three legs in with its plants still live.
+
+**Library — category 5: 9/10.** Q1 1 entry point (both themes), Q2 `Library` + 1 way back,
+Q3 primary inside the viewport, Q5 0 failing in both themes (worst 5.30 forest-night / 5.58
+classic-light, theme axis moved, 60 runs on cover art UNMEASURABLE), Q6 YES in liquid
+(1 region `header.lq-contextual`, transition present, 0 infinite, 0 regions in standard,
+restored to `standard` as found), Q7/Q8/Q9 from cat6's 9/9 · 9/9 · 0 diffs, Q10 5 identity
+markers / uniformity 0. **Control fired on Q2, Q3, Q5, Q10**, 0 residue, localStorage
+byte-identical.
+
+**Q4 is the one open question and is a real product finding: 17 controls scanned against a
+bar of 12.** It was 25. `4780068c` removed eleven filter chips that could only ever return
+nothing — the live library holds only Japanese and unknown at L7, so Chinese, English and
+L1–L6 were dead controls; `availableFilterChips` narrows both banks to the folder-scoped
+list and always keeps `all` plus the selected chip, so a filter applied in one folder stays
+visible and undoable in another. The remaining excess is four import actions plus three sync
+controls in the top strip, which need a disclosure and a new label in four catalogues — and
+all four carry a large uncommitted i18n pass from another track (ja/zh/ru at 727/562 lines
+each). That half is the next turn's opening slice, stated rather than descoped.
