@@ -44,7 +44,7 @@
 import { useCallback, useState } from 'react';
 import type { LibraryKind } from '../shared/types';
 import { parsePresentation, type LiquidPresentationState } from '../shared/liquidWindowState';
-import { canPresentLiquid, toggleWinPresentation } from './liquidWindowPresentation';
+import { canPresentLiquid, liveWindowRect, toggleWinPresentation } from './liquidWindowPresentation';
 
 export const READER_PRESENTATION_KEY = 'lq.reader.presentation';
 
@@ -101,38 +101,34 @@ export function writeReaderPresentation(
   }
 }
 
-/** The live main window's own rect, in the shape the pure commands take. */
-function readerRect(): { x: number; y: number; w: number; h: number; maximized: boolean } {
-  return {
-    x: Math.round(window.screenX),
-    y: Math.round(window.screenY),
-    // `outerWidth`/`outerHeight` and not `innerWidth`: the reader fills the
-    // window's content box, but what a presentation returns to is the WINDOW,
-    // which is what the shell's `w`/`h` also mean.
-    w: Math.max(1, Math.round(window.outerWidth)),
-    h: Math.max(1, Math.round(window.outerHeight)),
-    maximized: false,
-  };
-}
-
 /**
  * Flip one reader kind between conventional and Liquid presentation and persist
  * the result. Returns the new state so the caller renders from the same value it
  * stored rather than re-reading.
+ *
+ * The rect comes from the shared `liveWindowRect`, whose doc comment carries the
+ * live measurement: `outerWidth` and friends read 0 in this renderer, so a
+ * clamped fallback here stored a 1x1 geometry that `parseRect` accepts — its
+ * floor is `w <= 0`, and the clamp's 1 clears it by one. Unmeasurable now means
+ * the ENTER is refused — a no-op the user can retry — rather than entered
+ * against a rect nothing can come back to. The RETURN never needs one:
+ * `returnToStandard` restores the rect already inside the blob.
  */
 export function toggleReaderPresentation(
   kind: LibraryKind,
   current: LiquidPresentationState | undefined,
 ): LiquidPresentationState | undefined {
   if (!canPresentLiquid(kind)) return undefined;
-  const rect = readerRect();
+  const entering = current?.mode !== 'liquid';
+  const rect = liveWindowRect();
+  if (entering && !rect) return current;
   const next = toggleWinPresentation({
     section: kind,
-    x: rect.x,
-    y: rect.y,
-    w: rect.w,
-    h: rect.h,
-    max: rect.maximized,
+    x: rect?.x ?? 0,
+    y: rect?.y ?? 0,
+    w: rect?.w ?? 1,
+    h: rect?.h ?? 1,
+    max: false,
     ...(current ? { presentation: current } : {}),
   });
   writeReaderPresentation(kind, next.presentation);

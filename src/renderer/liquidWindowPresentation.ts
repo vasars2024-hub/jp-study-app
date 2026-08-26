@@ -69,6 +69,49 @@ export function canPresentLiquid(section?: string): boolean {
   return section !== 'note' && section !== 'city' && section !== 'visualizer';
 }
 
+/**
+ * The live rect of the OS window this renderer is painting into, or `undefined`
+ * when it cannot be measured — which is a refusal, not a default.
+ *
+ * MEASURED LIVE 2026-08-26, and it is why this function exists at all. The two
+ * hosts that are their own OS window — the pop-out and the reader — each read
+ * `screenX/screenY/outerWidth/outerHeight` and clamped the size with
+ * `Math.max(1, …)`. In this Electron renderer all four of those globals read
+ * **0** (`innerWidth/innerHeight` read 1264x821 in the same window), so the
+ * clamp did not defend against the unmeasurable rect — it MANUFACTURED
+ * `{x:0,y:0,w:1,h:1}` from it. `parseRect` rejects `w <= 0`, and 1 is the
+ * smallest value that passes, so the clamp stepped over the guard rather than
+ * tripping it. Confirmed on disk the same day: `lq.reader.presentation` held
+ * `standardRect:{x:0,y:0,w:1,h:1}` and the reader still came back
+ * `.reader.reader-liquid` after a full reload — the blob validated.
+ *
+ * What it costs is latent, not visible, and that is the trap: `standardRect` is
+ * the geometry `returnToStandard` writes back, and today both of these hosts
+ * keep only the `presentation` field and drop the restored `x/y/w/h`, so
+ * nothing is resized yet. The moment either host honours that rect — which is
+ * the field's entire purpose, and what the `.fwin` host already does — leaving
+ * Liquid restores a 1x1 window. Neither suite could see it: both pin
+ * `outerWidth: 980` in jsdom, so neither had ever met the live value.
+ *
+ * `innerWidth`/`innerHeight` are the fallback because they are the numbers that
+ * are actually true — and for a borderless host the content box IS the window.
+ * If even those are unusable the answer is `undefined`, so a caller stores
+ * nothing rather than a geometry nothing can come back to.
+ */
+export function liveWindowRect(): { x: number; y: number; w: number; h: number } | undefined {
+  const w = Math.round(window.outerWidth || window.innerWidth);
+  const h = Math.round(window.outerHeight || window.innerHeight);
+  if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return undefined;
+  const x = Math.round(window.screenX);
+  const y = Math.round(window.screenY);
+  return {
+    x: Number.isFinite(x) ? x : 0,
+    y: Number.isFinite(y) ? y : 0,
+    w,
+    h,
+  };
+}
+
 /** The snapshot fields the presentation round trip reads and writes. */
 export interface PresentableSnapshot {
   x: number;

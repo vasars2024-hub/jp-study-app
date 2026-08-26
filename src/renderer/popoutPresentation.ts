@@ -42,7 +42,7 @@
 
 import type { DesktopWinSection } from '../shared/desktop';
 import { parsePresentation, type LiquidPresentationState } from '../shared/liquidWindowState';
-import { canPresentLiquid, toggleWinPresentation } from './liquidWindowPresentation';
+import { canPresentLiquid, liveWindowRect, toggleWinPresentation } from './liquidWindowPresentation';
 
 export const POPOUT_PRESENTATION_KEY = 'lq.popout.presentation';
 
@@ -101,38 +101,34 @@ export function writePopoutPresentation(
   }
 }
 
-/** The live OS window's own rect, in the shape the pure commands take. */
-function popoutRect(): { x: number; y: number; w: number; h: number; maximized: boolean } {
-  return {
-    x: Math.round(window.screenX),
-    y: Math.round(window.screenY),
-    // `outerWidth`/`outerHeight` and not `innerWidth`: the frame is borderless,
-    // so these agree today — but a pop-out that ever grows chrome should record
-    // the window, which is what the shell's `w`/`h` also mean.
-    w: Math.max(1, Math.round(window.outerWidth)),
-    h: Math.max(1, Math.round(window.outerHeight)),
-    maximized: false,
-  };
-}
-
 /**
  * Flip one pop-out section between conventional and Liquid presentation and
  * persist the result. Returns the new state so the caller renders from the same
  * value it stored rather than re-reading.
+ *
+ * The rect used to be read here with a `Math.max(1, …)` clamp on
+ * `outerWidth`/`outerHeight`. Measured live 2026-08-26: those globals read **0**
+ * in this renderer, so the clamp stored `{x:0,y:0,w:1,h:1}` — one above the
+ * `w <= 0` that `parseRect` rejects, so it validated. `liveWindowRect` carries
+ * the full measurement and the latent cost; unmeasurable now refuses the ENTER
+ * instead of entering against a rect nothing can come back to. The RETURN never
+ * needs one: `returnToStandard` restores the rect already inside the blob.
  */
 export function togglePopoutPresentation(
   section: DesktopWinSection,
   current: LiquidPresentationState | undefined,
 ): LiquidPresentationState | undefined {
   if (!canPresentLiquid(section)) return undefined;
-  const rect = popoutRect();
+  const entering = current?.mode !== 'liquid';
+  const rect = liveWindowRect();
+  if (entering && !rect) return current;
   const next = toggleWinPresentation({
     section,
-    x: rect.x,
-    y: rect.y,
-    w: rect.w,
-    h: rect.h,
-    max: rect.maximized,
+    x: rect?.x ?? 0,
+    y: rect?.y ?? 0,
+    w: rect?.w ?? 1,
+    h: rect?.h ?? 1,
+    max: false,
     ...(current ? { presentation: current } : {}),
   });
   writePopoutPresentation(section, next.presentation);

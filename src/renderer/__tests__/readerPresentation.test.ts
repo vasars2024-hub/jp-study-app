@@ -116,6 +116,65 @@ describe('reader presentation state', () => {
   });
 });
 
+/**
+ * The live-rect regression, measured through the bridge on 2026-08-26 and NOT
+ * reproducible with this file's jsdom defaults above — which is exactly why it
+ * survived in the shipped pop-out host.
+ *
+ * In the real Electron renderer `screenX`, `screenY`, `outerWidth` and
+ * `outerHeight` all read 0 while `innerWidth`/`innerHeight` read 1264x821. The
+ * old `Math.max(1, Math.round(window.outerWidth))` turned that into
+ * `{x:0,y:0,w:1,h:1}` and stored it. `parseRect`'s floor is `w <= 0`, so 1
+ * clears it by one and the blob VALIDATES — confirmed on disk the same day,
+ * where `lq.reader.presentation` held exactly that rect and the reader still
+ * came back `.reader-liquid` after a full reload. The clamp stepped over the
+ * guard instead of tripping it, which is why nothing ever reported it.
+ */
+const setGeometry = (g: Partial<Record<'screenX' | 'screenY' | 'outerWidth' | 'outerHeight' | 'innerWidth' | 'innerHeight', number>>) => {
+  for (const [key, value] of Object.entries(g)) {
+    Object.defineProperty(window, key, { value, configurable: true });
+  }
+};
+
+describe('the captured rect is measured, never clamped into existence', () => {
+  it('falls back to the inner box when the outer globals read 0 — the live shape', () => {
+    setGeometry({ screenX: 0, screenY: 0, outerWidth: 0, outerHeight: 0, innerWidth: 1264, innerHeight: 821 });
+    const state = toggleReaderPresentation('book', undefined);
+    expect(state?.standardRect).toEqual({ x: 0, y: 0, w: 1264, h: 821 });
+  });
+
+  it('refuses to ENTER Liquid when no rect can be measured at all', () => {
+    // The negative control for the clamp. Before the fix this stored
+    // `{x:0,y:0,w:1,h:1}` and reported success.
+    setGeometry({ screenX: 0, screenY: 0, outerWidth: 0, outerHeight: 0, innerWidth: 0, innerHeight: 0 });
+    expect(toggleReaderPresentation('book', undefined)).toBeUndefined();
+    expect(localStorage.getItem(READER_PRESENTATION_KEY)).toBeNull();
+  });
+
+  it('still RETURNS to standard when no rect can be measured', () => {
+    // Leaving needs no measurement — the rect it goes back to is already inside
+    // the blob — so the refusal above must not become a one-way door.
+    setGeometry({ outerWidth: 900, outerHeight: 600, innerWidth: 900, innerHeight: 600 });
+    const liquid = toggleReaderPresentation('manga', undefined);
+    expect(liquid?.mode).toBe('liquid');
+    setGeometry({ outerWidth: 0, outerHeight: 0, innerWidth: 0, innerHeight: 0 });
+    expect(toggleReaderPresentation('manga', liquid)).toBeUndefined();
+    expect(localStorage.getItem(READER_PRESENTATION_KEY)).toBeNull();
+  });
+
+  it('stores the measured box and never the clamp’s 1x1, through the round trip', () => {
+    setGeometry({ screenX: 0, screenY: 0, outerWidth: 0, outerHeight: 0, innerWidth: 1264, innerHeight: 821 });
+    toggleReaderPresentation('book', undefined);
+    // Read back through the store rather than from the return value: the 1x1
+    // rect PASSED `parseRect`, so a round trip that only checks `mode` is
+    // green either way. The rect itself is the regression.
+    const stored = readReaderPresentation('book');
+    expect(stored?.mode).toBe('liquid');
+    expect(stored?.standardRect).toEqual({ x: 0, y: 0, w: 1264, h: 821 });
+    expect(stored?.standardRect).not.toEqual({ x: 0, y: 0, w: 1, h: 1 });
+  });
+});
+
 describe('the reader host is wired to the sheet', () => {
   const src = (p: string) => readFileSync(resolve(process.cwd(), p), 'utf8');
   const HOSTS = ':is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid)';

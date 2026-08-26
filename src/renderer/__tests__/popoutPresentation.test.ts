@@ -105,6 +105,46 @@ describe('pop-out presentation state', () => {
   });
 });
 
+describe('the captured rect is measured, never clamped into existence', () => {
+  /**
+   * Measured through the debug bridge on 2026-08-26, in the running app: this
+   * renderer reports `screenX`, `screenY`, `outerWidth` and `outerHeight` as
+   * **0** while `innerWidth`/`innerHeight` report the real 1264x821. The old
+   * `Math.max(1, Math.round(window.outerWidth))` therefore stored
+   * `{x:0,y:0,w:1,h:1}` — which VALIDATES, because `parseRect`'s floor is
+   * `w <= 0` and the clamp's 1 clears it by one. The `beforeEach` above never
+   * saw it either, because it pins 980x720 by hand. A green suite over a stored
+   * lie, for as long as this host has shipped.
+   */
+  const setGeometry = (g: Record<string, number>) => {
+    for (const [key, value] of Object.entries(g)) {
+      Object.defineProperty(window, key, { value, configurable: true });
+    }
+  };
+
+  it('falls back to the inner box when the outer globals read 0 — the live shape', () => {
+    setGeometry({ screenX: 0, screenY: 0, outerWidth: 0, outerHeight: 0, innerWidth: 1264, innerHeight: 821 });
+    expect(togglePopoutPresentation(SECTION, undefined)?.standardRect).toEqual({
+      x: 0,
+      y: 0,
+      w: 1264,
+      h: 821,
+    });
+  });
+
+  it('refuses to ENTER Liquid when no rect can be measured, and still leaves it', () => {
+    setGeometry({ screenX: 0, screenY: 0, outerWidth: 0, outerHeight: 0, innerWidth: 0, innerHeight: 0 });
+    expect(togglePopoutPresentation(SECTION, undefined)).toBeUndefined();
+    expect(localStorage.getItem(POPOUT_PRESENTATION_KEY)).toBeNull();
+    // Leaving needs no measurement, so the refusal must not become a one-way door.
+    setGeometry({ outerWidth: 900, outerHeight: 600, innerWidth: 900, innerHeight: 600 });
+    const liquid = togglePopoutPresentation(SECTION, undefined);
+    setGeometry({ outerWidth: 0, outerHeight: 0, innerWidth: 0, innerHeight: 0 });
+    expect(togglePopoutPresentation(SECTION, liquid)).toBeUndefined();
+    expect(localStorage.getItem(POPOUT_PRESENTATION_KEY)).toBeNull();
+  });
+});
+
 describe('the pop-out host is wired to the sheet', () => {
   const src = (p: string) => readFileSync(resolve(process.cwd(), p), 'utf8');
 
