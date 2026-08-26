@@ -69,6 +69,12 @@
  *     `--drive-undo` presses the way back, because these are SETS of chips (`all | L1 … L7`), not
  *     toggles. Both legs assert the restore by text hash, which is what makes pressing a real
  *     control on a real profile safe to do here.
+ * 11. A NEIGHBOURING CONTROL'S LABEL IS NOT AN EXPLANATION, and reading the parent's textContent
+ *     minus the button's own text made it one. Scraper's six disabled buttons scored 0 mute pairs
+ *     purely because they share a row with each other's long captions; Translate scored 1 rather
+ *     than 2 because its neighbour is the short word "Translate". The explanation now excludes text
+ *     inside any interactive sibling, so prose beside a control still counts and a caption never
+ *     does. Expect previously-0 surfaces to rise: that is the repair, not a regression.
  *  7. The FABRICATED-VALUE verdict still needs an empty scratch profile: on a populated profile
  *     real data and a hardcoded constant look identical. This harness reports status-word
  *     candidates and does NOT issue that verdict. What it DOES decide is the placeholder shapes,
@@ -190,6 +196,32 @@ const PROBE = `(function(){
   // when the surface says what would enable it, so an explanation is looked for in the control's
   // own accessible name extras, its title, its aria-describedby target, and the text of its
   // parent - a hint rendered beside the button is a real explanation and must not read as absent.
+  // Correction 11: a NEIGHBOURING CONTROL'S LABEL IS NOT AN EXPLANATION. The old reading was the
+  // parent's textContent minus the button's own text, so a row of six disabled buttons explained
+  // each other and Scraper scored 0 mute pairs on six unexplained controls, while Translate scored
+  // 1 only because its neighbour happened to be the short word "Translate". Prose beside a control
+  // is a real explanation and still counts; another button's caption never is.
+  var INTERACTIVE = 'button,a,input,select,textarea,summary,label,[role="button"],[role="link"],'
+    + '[role="tab"],[role="menuitem"],[role="checkbox"],[role="switch"],[role="radio"],[role="option"]';
+  function explanatoryText(el){
+    var p = el.parentElement;
+    if (!p) return '';
+    var out = '';
+    var w = document.createTreeWalker(p, NodeFilter.SHOW_TEXT);
+    for (var n = w.nextNode(); n; n = w.nextNode()) {
+      var host = n.parentElement;
+      if (!host || el === host || el.contains(host)) continue;
+      if (!painted(host)) continue;
+      var interactive = false;
+      for (var a = host; a && a !== p.parentElement; a = a.parentElement) {
+        if (a.matches && a.matches(INTERACTIVE)) { interactive = true; break; }
+      }
+      if (interactive) continue;
+      out += ' ' + (n.nodeValue || '');
+    }
+    return out;
+  }
+
   var mutePairs = [];
   var disabled = [].slice.call(root.querySelectorAll('[disabled],[aria-disabled="true"]'));
   for (var d = 0; d < disabled.length; d++) {
@@ -204,10 +236,9 @@ const PROBE = `(function(){
         if (host) describedText += ' ' + (host.textContent || '');
       }
     }
-    var parentText = el.parentElement ? (el.parentElement.textContent || '') : '';
     var ownText = (el.textContent || '').trim();
     var explanation = [el.getAttribute('title') || '', describedText,
-      parentText.replace(ownText, '')].join(' ').trim();
+      explanatoryText(el)].join(' ').trim();
     if (explanation.length < 12) {
       mutePairs.push({ el: name(el), label: ownText.slice(0, 40) });
     }
