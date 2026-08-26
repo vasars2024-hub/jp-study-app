@@ -1,19 +1,19 @@
 {
-  "surface": "Library",
-  "label": "l6-library",
+  "surface": "Reading Finder",
+  "label": "l6-captures",
   "control": true,
-  "at": "2026-08-26T23:05:07.936Z",
+  "at": "2026-08-26T23:04:44.919Z",
   "category": 5,
   "question": "UI clarity and user-friendliness — the ten §10.4 questions, scored",
   "hostClass": "fwin",
   "box": "820x580",
   "presentationAsFound": "standard",
   "cat6": {
-    "file": "src\\.coordination\\liquid-workplace\\baselines\\cat6-l6-library.json",
+    "file": "src\\.coordination\\liquid-workplace\\baselines\\cat6-l6-captures.json",
     "verdict": "PASS 10/10",
     "parity": {
-      "standard": "9/9",
-      "liquid": "9/9",
+      "standard": "6/6",
+      "liquid": "6/6",
       "na": 0,
       "equal": true,
       "rowsAgree": true,
@@ -35,9 +35,9 @@
     "jp-os-theme-engine-v": "1"
   },
   "planted": {
-    "savedTitle": "Library",
+    "savedTitle": "Reading Finder",
     "savedTransform": "",
-    "primaryFound": "button.btn",
+    "primaryFound": "input.reading-captures-search",
     "primaryFromPin": true,
     "dashboardCards": 6,
     "expect": {
@@ -72,15 +72,13 @@
     {
       "id": 1,
       "q": "dominant task immediately obvious",
-      "verdict": "YES",
+      "verdict": "NO",
       "bar": "1..3 entry points in the top third — 0 offers nothing to do, many offers no dominant task",
       "numbers": {
-        "entryPoints": 1,
+        "entryPoints": 0,
         "primaryInputs": 0,
-        "accentButtons": 1,
-        "accentList": [
-          "button.lib-folder-chip::All 24"
-        ],
+        "accentButtons": 0,
+        "accentList": [],
         "inputList": []
       }
     },
@@ -92,9 +90,11 @@
       "numbers": {
         "titleText": "",
         "titleFrom": "span.fwin-title",
-        "backAffordances": 1,
+        "backAffordances": 3,
         "backList": [
-          "×"
+          "×",
+          "Home",
+          "Close"
         ]
       }
     },
@@ -104,9 +104,9 @@
       "verdict": "NO",
       "bar": "the primary action is inside the body viewport at rest — \"without hunting\" means without scrolling",
       "numbers": {
-        "primaryAction": "button.btn",
+        "primaryAction": null,
         "insideBodyViewport": false,
-        "explicitlyMarked": true
+        "explicitlyMarked": false
       }
     },
     {
@@ -115,27 +115,28 @@
       "verdict": "NO",
       "bar": ">=1 collapsed disclosure AND <=12 controls scanned in the default state",
       "numbers": {
-        "collapsedDisclosures": 6,
-        "scannedControls": 16,
+        "collapsedDisclosures": 1,
+        "scannedControls": 17,
         "chromeControlsRaw": 19,
-        "summaryHeaders": 3,
+        "summaryHeaders": 2,
         "behindDisclosure": 0,
         "disclosures": {
-          "total": 2,
+          "total": 1,
           "open": 0
         },
         "scannedList": [
-          "+ Import file(s)",
-          "All 24",
-          "Manga 3",
-          "Inbox 0",
-          "Unfiled 21",
-          "+ New folder",
-          "All",
-          "Japanese",
-          "Unknown",
-          "All",
-          "L7",
+          "Home",
+          "Reading Finder",
+          "Library",
+          "Captures",
+          "Continue reading",
+          "Plan",
+          "Import",
+          "Sources",
+          "BUTTON",
+          "Close",
+          "Search captures",
+          "Captured passages",
           "card 0",
           "card 1",
           "card 2",
@@ -154,8 +155,8 @@
         "cells": [
           {
             "theme": "forest-night",
-            "measured": 161,
-            "unmeasurable": 60,
+            "measured": 66,
+            "unmeasurable": 0,
             "minRatio": 1.14,
             "failingCount": 1,
             "worst": {
@@ -168,8 +169,8 @@
           },
           {
             "theme": "classic-light",
-            "measured": 161,
-            "unmeasurable": 60,
+            "measured": 66,
+            "unmeasurable": 0,
             "minRatio": 1.14,
             "failingCount": 3,
             "worst": {
@@ -228,18 +229,19 @@
           "measuredIn": "liquid",
           "restoredTo": "standard"
         },
-        "liquidRegions": 1,
-        "byBackdropFilter": 0,
+        "liquidRegions": 2,
+        "byBackdropFilter": 1,
         "byContextualPaint": 1,
-        "carryingATransition": 1,
+        "carryingATransition": 2,
         "infiniteAnimationsOnLiquid": 0,
-        "liquidMaterialTotal": 1,
+        "liquidMaterialTotal": 2,
         "decoratedLeaves": [],
         "regionList": [
-          "header.lq-contextual"
+          "aside.lq-reading-tool",
+          "nav.lq-contextual"
         ],
         "withoutTransition": [],
-        "inStandardPresentation": 0
+        "inStandardPresentation": 2
       }
     },
     {
@@ -250,8 +252,8 @@
       "numbers": {
         "drivenBy": "probes/cat6-feature-parity.cjs",
         "parity": {
-          "standard": "9/9",
-          "liquid": "9/9",
+          "standard": "6/6",
+          "liquid": "6/6",
           "na": 0,
           "equal": true,
           "rowsAgree": true,
@@ -309,12 +311,12 @@
     "q2": "NO",
     "q3": "NO",
     "q4": "NO",
-    "q6": "NO-SUBJECT",
+    "q6": "NO",
     "q10": "NO"
   },
   "altThemeNumbers": {
     "theme": "classic-light",
-    "controlsPainted": 35,
+    "controlsPainted": 44,
     "q1": {
       "entryPoints": 0,
       "primaryInputs": 0,
@@ -323,27 +325,28 @@
       "inputList": []
     },
     "q4": {
-      "collapsedDisclosures": 6,
-      "scannedControls": 16,
+      "collapsedDisclosures": 1,
+      "scannedControls": 17,
       "chromeControlsRaw": 19,
-      "summaryHeaders": 3,
+      "summaryHeaders": 2,
       "behindDisclosure": 0,
       "disclosures": {
-        "total": 2,
+        "total": 1,
         "open": 0
       },
       "scannedList": [
-        "+ Import file(s)",
-        "All 24",
-        "Manga 3",
-        "Inbox 0",
-        "Unfiled 21",
-        "+ New folder",
-        "All",
-        "Japanese",
-        "Unknown",
-        "All",
-        "L7",
+        "Home",
+        "Reading Finder",
+        "Library",
+        "Captures",
+        "Continue reading",
+        "Plan",
+        "Import",
+        "Sources",
+        "BUTTON",
+        "Close",
+        "Search captures",
+        "Captured passages",
         "card 0",
         "card 1",
         "card 2",
@@ -352,15 +355,20 @@
       ]
     },
     "q6": {
-      "liquidRegions": 0,
-      "byBackdropFilter": 0,
-      "byContextualPaint": 0,
-      "carryingATransition": 0,
+      "liquidRegions": 2,
+      "byBackdropFilter": 1,
+      "byContextualPaint": 1,
+      "carryingATransition": 1,
       "infiniteAnimationsOnLiquid": 0,
-      "liquidMaterialTotal": 0,
+      "liquidMaterialTotal": 2,
       "decoratedLeaves": [],
-      "regionList": [],
-      "withoutTransition": []
+      "regionList": [
+        "aside.lq-reading-tool",
+        "nav.lq-contextual"
+      ],
+      "withoutTransition": [
+        "nav.lq-contextual"
+      ]
     },
     "q10": {
       "identityMarkers": {
@@ -377,7 +385,7 @@
       "cardHostDetail": "47% of body"
     }
   },
-  "controlsPaintedA": 35,
+  "controlsPaintedA": 44,
   "controlResult": {
     "Q2": true,
     "Q3": true,

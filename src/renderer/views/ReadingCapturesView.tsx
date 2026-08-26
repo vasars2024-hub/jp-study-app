@@ -31,6 +31,10 @@ const HISTORY_LIMIT = 60;
 /** 49px measured row plus the 3px gap the old flex list contributed. */
 export const READING_CAPTURE_ROW_HEIGHT = 52;
 
+/** Sentinel rather than `null`, so "every source" is a value a chip can carry. */
+export const ALL_SOURCES = 'all';
+export type CaptureOrder = 'newest' | 'oldest';
+
 type HistoryState =
   | { kind: 'loading' }
   | { kind: 'ready'; entries: ReadingLensHistoryEntry[] }
@@ -147,6 +151,61 @@ export default function ReadingCapturesView({ passage }: ReadingCapturesViewProp
     return [live, ...stored.filter((row) => row.captureId !== live.captureId)];
   }, [history, passage]);
 
+  /*
+   * The index over the history, which the surface did not have.
+   *
+   * `lensHistoryList` returns up to 60 rows and this list rendered every one of
+   * them in capture order with no way to reach a particular passage except
+   * scrolling — measured live at 42 stored captures. Settings has a search over
+   * the same store, so the capability existed; the surface that is FOR reading a
+   * captured passage was the one place without it.
+   *
+   * Three deliberate choices, each of which has cost this repo a defect before:
+   *
+   *  - the filter is over the INDEX, never the reader. `selected` still resolves
+   *    against every row, so narrowing the list cannot blank the passage you are
+   *    in the middle of reading;
+   *  - a source chip is offered only when it can return something — the same
+   *    rule the Library's eleven dead filter chips were removed under. `sources`
+   *    is derived from the rows present, not from the union of everything the
+   *    lens can produce;
+   *  - sort is real state, not a display trick: it reorders the projection and
+   *    leaves `rows` alone, so identity and selection survive a flip.
+   */
+  const [query, setQuery] = useState('');
+  const [source, setSource] = useState<string>(ALL_SOURCES);
+  const [order, setOrder] = useState<CaptureOrder>('newest');
+
+  const sources = useMemo(() => {
+    const seen: string[] = [];
+    for (const row of rows) if (row.source && !seen.includes(row.source)) seen.push(row.source);
+    return seen;
+  }, [rows]);
+
+  // A chip for a source that has since disappeared would filter to nothing and
+  // read as an empty history. Fall back rather than strand the user in it.
+  const activeSource = source !== ALL_SOURCES && !sources.includes(source) ? ALL_SOURCES : source;
+
+  const visibleRows = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    const matched = rows.filter((row) => {
+      if (activeSource !== ALL_SOURCES && row.source !== activeSource) return false;
+      if (!needle) return true;
+      return `${row.title}\n${row.sourceLabel}\n${row.text}`.toLowerCase().includes(needle);
+    });
+    // A copy: `rows` is the identity list and sorting it in place would reorder
+    // the memo every consumer downstream reads.
+    return order === 'oldest'
+      ? matched.slice().sort((a, b) => a.capturedAt - b.capturedAt)
+      : matched.slice().sort((a, b) => b.capturedAt - a.capturedAt);
+  }, [rows, query, activeSource, order]);
+
+  const filtered = query.trim().length > 0 || activeSource !== ALL_SOURCES;
+  const clearFilter = useCallback(() => {
+    setQuery('');
+    setSource(ALL_SOURCES);
+  }, []);
+
   const selected = rows.find((row) => row.captureId === selectedId) ?? rows[0] ?? null;
 
   const readerLines = useMemo(() => {
@@ -178,8 +237,77 @@ export default function ReadingCapturesView({ passage }: ReadingCapturesViewProp
         <p className="reading-captures-note muted">{t('reading.captures.empty')}</p>
       ) : null}
       {rows.length > 0 ? (
+        <div className="reading-captures-filter">
+          <input
+            type="search"
+            className="reading-captures-search"
+            value={query}
+            placeholder={t('reading.captures.searchPlaceholder')}
+            aria-label={t('reading.captures.searchPlaceholder')}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          {/*
+            Collapsed: source and order are the advanced half of this index and
+            the search field is the common one. Everything inside stays one click
+            away and the disclosure closes with the same click that opened it.
+          */}
+          <details className="reading-captures-more">
+            <summary>{t('reading.captures.moreFilters')}</summary>
+            <div className="reading-captures-more-body">
+              <div className="reading-captures-chips" role="group" aria-label={t('reading.captures.sourceLabel')}>
+                <button
+                  type="button"
+                  className={`reading-captures-chip${activeSource === ALL_SOURCES ? ' active' : ''}`}
+                  aria-pressed={activeSource === ALL_SOURCES}
+                  onClick={() => setSource(ALL_SOURCES)}
+                >
+                  {t('settings.lens.history.source.all')}
+                </button>
+                {/*
+                  Only sources actually present get a chip. The Library shipped
+                  eleven chips that could only ever return nothing; a filter that
+                  cannot match is not a filter, it is a dead control.
+                */}
+                {sources.map((id) => (
+                  <button
+                    key={id}
+                    type="button"
+                    className={`reading-captures-chip${activeSource === id ? ' active' : ''}`}
+                    aria-pressed={activeSource === id}
+                    onClick={() => setSource(id)}
+                  >
+                    {t(`settings.lens.history.source.${id}`)}
+                  </button>
+                ))}
+              </div>
+              <label className="reading-captures-order">
+                <span className="muted">{t('reading.captures.orderLabel')}</span>
+                <select value={order} onChange={(e) => setOrder(e.target.value as CaptureOrder)}>
+                  <option value="newest">{t('reading.captures.orderNewest')}</option>
+                  <option value="oldest">{t('reading.captures.orderOldest')}</option>
+                </select>
+              </label>
+            </div>
+          </details>
+        </div>
+      ) : null}
+      {/*
+        A filtered-to-nothing list is NOT an empty history, and saying so would be
+        the same lie `reading.captures.empty` used to tell under a failed read: it
+        invites the user to go and capture something while their captures sit
+        behind a filter. The way out is offered next to the sentence.
+      */}
+      {rows.length > 0 && visibleRows.length === 0 ? (
+        <p className="reading-captures-note muted" role="status">
+          {t('reading.captures.noMatch', { total: rows.length })}{' '}
+          <button type="button" className="reading-captures-clear" onClick={clearFilter}>
+            {t('reading.captures.clearFilter')}
+          </button>
+        </p>
+      ) : null}
+      {visibleRows.length > 0 ? (
         <VirtualList
-          items={rows}
+          items={visibleRows}
           itemHeight={READING_CAPTURE_ROW_HEIGHT}
           className="reading-captures-rows"
           listRole="list"

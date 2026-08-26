@@ -331,6 +331,19 @@ const SNAP = `(function(){
       && !e.closest('.fwin-bar') && !e.closest(NAV); })[0];
   var primaryAction = explicitPrimary || accentButtons[0] || primaryInputs[0] || null;
   var primaryVisible = primaryAction ? inBody(primaryAction) : false;
+  /*
+   * PINNED FOR THE CONTROL, and this is a repair, not an optimisation. The Q3 plant used to
+   * resolve its own victim — "first painted control in document order outside .fwin-bar and
+   * NAV" — which is a DIFFERENT term from the one Q3 is scored on. On Library the two happened
+   * to land on the same node (button.btn.primary is also first in document order) and the
+   * control passed for eight runs on a coincidence. On Captures they diverge: the plant moved
+   * button.reading-captures-refresh while Q3 scores input.reading-captures-search, so the
+   * control reported "DID NOT FAIL" on a question that is perfectly falsifiable. A control must
+   * attack the term under test, or it measures nothing. A reference on a global, not an
+   * attribute — writing to the live DOM during a measurement pass is how this harness damaged
+   * the app once already.
+   */
+  window.__cat5primary = primaryAction;
 
   // ---- Q4: advanced tools tucked away, default view not cluttered. ------------------------
   var collapsed = [].slice.call(root.querySelectorAll('details:not([open]),[aria-expanded="false"]')).filter(painted);
@@ -517,9 +530,15 @@ const PLANT_JS = `(function(){
 
   // Q3 — push the primary action far below the body's visible box.
   var NAV = 'nav,[role="tablist"],[class*="rail"],[class*="sidebar"],[class*="-nav"],[class*="tabs"]';
-  var primary = [].slice.call(root.querySelectorAll('button,[role="button"],input,select,textarea')).filter(function(e){
-    var b = e.getBoundingClientRect();
-    return b.width > 0 && b.height > 0 && !e.closest('.fwin-bar') && !e.closest(NAV); })[0];
+  // The node Q3 IS SCORED ON, pinned by the snapshot that ran before this plant. The
+  // document-order fallback stays only for a plant that somehow runs without a snapshot;
+  // when it fires, primaryFromPin is false and the control's claim can be discounted.
+  var pinnedPrimary = (window.__cat5primary && window.__cat5primary.isConnected)
+    ? window.__cat5primary : null;
+  var primary = pinnedPrimary
+    || [].slice.call(root.querySelectorAll('button,[role="button"],input,select,textarea')).filter(function(e){
+      var b = e.getBoundingClientRect();
+      return b.width > 0 && b.height > 0 && !e.closest('.fwin-bar') && !e.closest(NAV); })[0];
   var savedTransform = primary ? primary.style.transform : null;
   if (primary) { primary.setAttribute(${A(PLANT)}, 'moved'); primary.style.transform = 'translateY(4000px)'; }
 
@@ -551,6 +570,7 @@ const PLANT_JS = `(function(){
 
   return JSON.stringify({ savedTitle: savedTitle, savedTransform: savedTransform,
     primaryFound: primary ? primary.tagName.toLowerCase() + '.' + String(primary.className||'').split(' ')[0] : null,
+    primaryFromPin: !!pinnedPrimary,
     dashboardCards: kinds.length, expect: { Q2: 'NO', Q3: 'NO', Q5: 'NO', Q10: 'NO' } });
 })()`;
 
@@ -797,7 +817,7 @@ function scoreSnapshot(s) {
     out.verdict = out.score === 10 ? 'PASS 10/10' : out.score === 'VOID' ? 'VOID' : `${out.score}/10 — ${findings.length} question(s) answer NO`;
   }
 
-  await ev(`(function(){ ${PIN} = null; return 'cleared'; })()`);
+  await ev(`(function(){ ${PIN} = null; window.__cat5primary = null; return 'cleared'; })()`);
   fs.writeFileSync(OUT, JSON.stringify(out, null, 2) + '\n');
   console.log(JSON.stringify(out, null, 2));
   console.log('\nwrote', OUT);

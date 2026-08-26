@@ -1,19 +1,19 @@
 {
-  "surface": "Library",
-  "label": "l6-library",
-  "control": true,
-  "at": "2026-08-26T23:05:07.936Z",
+  "surface": "Reading Finder",
+  "label": "l6-captures",
+  "control": false,
+  "at": "2026-08-26T23:03:10.083Z",
   "category": 5,
   "question": "UI clarity and user-friendliness — the ten §10.4 questions, scored",
   "hostClass": "fwin",
   "box": "820x580",
   "presentationAsFound": "standard",
   "cat6": {
-    "file": "src\\.coordination\\liquid-workplace\\baselines\\cat6-l6-library.json",
+    "file": "src\\.coordination\\liquid-workplace\\baselines\\cat6-l6-captures.json",
     "verdict": "PASS 10/10",
     "parity": {
-      "standard": "9/9",
-      "liquid": "9/9",
+      "standard": "6/6",
+      "liquid": "6/6",
       "na": 0,
       "equal": true,
       "rowsAgree": true,
@@ -34,28 +34,12 @@
     "jp-os-theme": "forest-night",
     "jp-os-theme-engine-v": "1"
   },
-  "planted": {
-    "savedTitle": "Library",
-    "savedTransform": "",
-    "primaryFound": "button.btn",
-    "primaryFromPin": true,
-    "dashboardCards": 6,
-    "expect": {
-      "Q2": "NO",
-      "Q3": "NO",
-      "Q5": "NO",
-      "Q10": "NO"
-    }
-  },
   "q6leg": {
     "presentationAsFound": "standard",
     "toggle": "clicked",
     "reached": "liquid",
     "measuredIn": "liquid",
     "restoredTo": "standard"
-  },
-  "unplanted": {
-    "residue": 0
   },
   "storeAfter": {
     "jp-os-theme": "forest-night",
@@ -76,142 +60,111 @@
       "bar": "1..3 entry points in the top third — 0 offers nothing to do, many offers no dominant task",
       "numbers": {
         "entryPoints": 1,
-        "primaryInputs": 0,
-        "accentButtons": 1,
-        "accentList": [
-          "button.lib-folder-chip::All 24"
-        ],
-        "inputList": []
+        "primaryInputs": 1,
+        "accentButtons": 0,
+        "accentList": [],
+        "inputList": [
+          "input.reading-captures-search"
+        ]
       }
     },
     {
       "id": 2,
       "q": "current location and way back obvious",
-      "verdict": "NO",
+      "verdict": "YES",
       "bar": "a non-empty location label AND at least one way back",
       "numbers": {
-        "titleText": "",
+        "titleText": "Reading Finder",
         "titleFrom": "span.fwin-title",
-        "backAffordances": 1,
+        "backAffordances": 3,
         "backList": [
-          "×"
+          "×",
+          "Home",
+          "Close"
         ]
       }
     },
     {
       "id": 3,
       "q": "primary actions visible without hunting",
-      "verdict": "NO",
+      "verdict": "YES",
       "bar": "the primary action is inside the body viewport at rest — \"without hunting\" means without scrolling",
       "numbers": {
-        "primaryAction": "button.btn",
-        "insideBodyViewport": false,
-        "explicitlyMarked": true
+        "primaryAction": "input.reading-captures-search",
+        "insideBodyViewport": true,
+        "explicitlyMarked": false
       }
     },
     {
       "id": 4,
       "q": "advanced tools discoverable without cluttering",
-      "verdict": "NO",
+      "verdict": "YES",
       "bar": ">=1 collapsed disclosure AND <=12 controls scanned in the default state",
       "numbers": {
-        "collapsedDisclosures": 6,
-        "scannedControls": 16,
-        "chromeControlsRaw": 19,
-        "summaryHeaders": 3,
+        "collapsedDisclosures": 1,
+        "scannedControls": 12,
+        "chromeControlsRaw": 13,
+        "summaryHeaders": 1,
         "behindDisclosure": 0,
         "disclosures": {
-          "total": 2,
+          "total": 1,
           "open": 0
         },
         "scannedList": [
-          "+ Import file(s)",
-          "All 24",
-          "Manga 3",
-          "Inbox 0",
-          "Unfiled 21",
-          "+ New folder",
-          "All",
-          "Japanese",
-          "Unknown",
-          "All",
-          "L7",
-          "card 0",
-          "card 1",
-          "card 2",
-          "card 3",
-          "card 4"
+          "Home",
+          "Reading Finder",
+          "Library",
+          "Captures",
+          "Continue reading",
+          "Plan",
+          "Import",
+          "Sources",
+          "BUTTON",
+          "Close",
+          "Search captures",
+          "Captured passages"
         ]
       }
     },
     {
       "id": 5,
       "q": "every readable surface has stable contrast",
-      "verdict": "NO",
+      "verdict": "YES",
       "bar": "no failing text run in EITHER theme, and the two themes must not report an identical minimum",
       "numbers": {
-        "verdict": "NO",
+        "verdict": "YES",
         "cells": [
           {
             "theme": "forest-night",
-            "measured": 161,
-            "unmeasurable": 60,
-            "minRatio": 1.14,
-            "failingCount": 1,
+            "measured": 60,
+            "unmeasurable": 0,
+            "minRatio": 4.51,
+            "failingCount": 0,
             "worst": {
               "el": "span.",
-              "ratio": 1.14,
+              "ratio": 4.51,
               "bar": 4.5,
-              "bg": "span.@100%",
-              "text": "cat5 contrast plant"
+              "bg": "button.reading-captures-row@18% over div.lq-anchor@100%",
+              "text": "Clipboard"
             }
           },
           {
             "theme": "classic-light",
-            "measured": 161,
-            "unmeasurable": 60,
-            "minRatio": 1.14,
-            "failingCount": 3,
+            "measured": 60,
+            "unmeasurable": 0,
+            "minRatio": 5.33,
+            "failingCount": 0,
             "worst": {
               "el": "span.",
-              "ratio": 1.14,
+              "ratio": 5.33,
               "bar": 4.5,
-              "bg": "span.@100%",
-              "text": "cat5 contrast plant"
+              "bg": "button.reading-captures-row@18% over div.lq-anchor@100%",
+              "text": "Clipboard"
             }
           }
         ],
-        "failing": [
-          {
-            "el": "span.",
-            "ratio": 1.14,
-            "bar": 4.5,
-            "bg": "span.@100%",
-            "text": "cat5 contrast plant"
-          },
-          {
-            "el": "span.",
-            "ratio": 1.14,
-            "bar": 4.5,
-            "bg": "span.@100%",
-            "text": "cat5 contrast plant"
-          },
-          {
-            "el": "a.cat5ctl-kind-4",
-            "ratio": 1.53,
-            "bar": 4.5,
-            "bg": "div.@100%",
-            "text": "card 4"
-          },
-          {
-            "el": "summary.cat5ctl-kind-5",
-            "ratio": 1.16,
-            "bar": 4.5,
-            "bg": "div.@100%",
-            "text": "card 5"
-          }
-        ],
-        "themeAxisMoved": false
+        "failing": [],
+        "themeAxisMoved": true
       }
     },
     {
@@ -228,18 +181,19 @@
           "measuredIn": "liquid",
           "restoredTo": "standard"
         },
-        "liquidRegions": 1,
-        "byBackdropFilter": 0,
+        "liquidRegions": 2,
+        "byBackdropFilter": 1,
         "byContextualPaint": 1,
-        "carryingATransition": 1,
+        "carryingATransition": 2,
         "infiniteAnimationsOnLiquid": 0,
-        "liquidMaterialTotal": 1,
+        "liquidMaterialTotal": 2,
         "decoratedLeaves": [],
         "regionList": [
-          "header.lq-contextual"
+          "aside.lq-reading-tool",
+          "nav.lq-contextual"
         ],
         "withoutTransition": [],
-        "inStandardPresentation": 0
+        "inStandardPresentation": 2
       }
     },
     {
@@ -250,8 +204,8 @@
       "numbers": {
         "drivenBy": "probes/cat6-feature-parity.cjs",
         "parity": {
-          "standard": "9/9",
-          "liquid": "9/9",
+          "standard": "6/6",
+          "liquid": "6/6",
           "na": 0,
           "equal": true,
           "rowsAgree": true,
@@ -286,7 +240,7 @@
     {
       "id": 10,
       "q": "still feels like itself, not a generic card dashboard",
-      "verdict": "NO",
+      "verdict": "YES",
       "bar": ">=3 identity markers, and (uniformity < 0.80 OR one control signature = a gallery, not a dashboard)",
       "numbers": {
         "identityMarkers": {
@@ -297,70 +251,73 @@
           "themeToken": true
         },
         "identityCount": 5,
-        "cardUniformity": 1,
-        "cardControlSignatures": 6,
-        "cardHost": "div. cards=6",
-        "cardHostDetail": "47% of body"
+        "cardUniformity": 0,
+        "cardControlSignatures": 0,
+        "cardHost": null,
+        "cardHostDetail": null
       }
     }
   ],
   "altThemeVerdicts": {
-    "q1": "NO",
-    "q2": "NO",
-    "q3": "NO",
-    "q4": "NO",
-    "q6": "NO-SUBJECT",
-    "q10": "NO"
+    "q1": "YES",
+    "q2": "YES",
+    "q3": "YES",
+    "q4": "YES",
+    "q6": "NO",
+    "q10": "YES"
   },
   "altThemeNumbers": {
     "theme": "classic-light",
-    "controlsPainted": 35,
+    "controlsPainted": 38,
     "q1": {
-      "entryPoints": 0,
-      "primaryInputs": 0,
+      "entryPoints": 1,
+      "primaryInputs": 1,
       "accentButtons": 0,
       "accentList": [],
-      "inputList": []
+      "inputList": [
+        "input.reading-captures-search"
+      ]
     },
     "q4": {
-      "collapsedDisclosures": 6,
-      "scannedControls": 16,
-      "chromeControlsRaw": 19,
-      "summaryHeaders": 3,
+      "collapsedDisclosures": 1,
+      "scannedControls": 12,
+      "chromeControlsRaw": 13,
+      "summaryHeaders": 1,
       "behindDisclosure": 0,
       "disclosures": {
-        "total": 2,
+        "total": 1,
         "open": 0
       },
       "scannedList": [
-        "+ Import file(s)",
-        "All 24",
-        "Manga 3",
-        "Inbox 0",
-        "Unfiled 21",
-        "+ New folder",
-        "All",
-        "Japanese",
-        "Unknown",
-        "All",
-        "L7",
-        "card 0",
-        "card 1",
-        "card 2",
-        "card 3",
-        "card 4"
+        "Home",
+        "Reading Finder",
+        "Library",
+        "Captures",
+        "Continue reading",
+        "Plan",
+        "Import",
+        "Sources",
+        "BUTTON",
+        "Close",
+        "Search captures",
+        "Captured passages"
       ]
     },
     "q6": {
-      "liquidRegions": 0,
-      "byBackdropFilter": 0,
-      "byContextualPaint": 0,
-      "carryingATransition": 0,
+      "liquidRegions": 2,
+      "byBackdropFilter": 1,
+      "byContextualPaint": 1,
+      "carryingATransition": 1,
       "infiniteAnimationsOnLiquid": 0,
-      "liquidMaterialTotal": 0,
+      "liquidMaterialTotal": 2,
       "decoratedLeaves": [],
-      "regionList": [],
-      "withoutTransition": []
+      "regionList": [
+        "aside.lq-reading-tool",
+        "nav.lq-contextual"
+      ],
+      "withoutTransition": [
+        "nav.lq-contextual"
+      ]
     },
     "q10": {
       "identityMarkers": {
@@ -371,19 +328,15 @@
         "themeToken": true
       },
       "identityCount": 5,
-      "cardUniformity": 1,
-      "cardControlSignatures": 6,
-      "cardHost": "div. cards=6",
-      "cardHostDetail": "47% of body"
+      "cardUniformity": 0,
+      "cardControlSignatures": 0,
+      "cardHost": null,
+      "cardHostDetail": null
     }
   },
-  "controlsPaintedA": 35,
-  "controlResult": {
-    "Q2": true,
-    "Q3": true,
-    "Q5": true,
-    "Q10": true
-  },
-  "verdict": "CONTROL FAILED AS REQUIRED on Q2, Q3, Q5, Q10",
-  "score": "CONTROL-OK"
+  "controlsPaintedA": 38,
+  "findings": [],
+  "voided": [],
+  "score": 10,
+  "verdict": "PASS 10/10"
 }

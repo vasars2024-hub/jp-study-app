@@ -63,6 +63,129 @@
   color: var(--text, #f5ecee);
 }
 
+/* The index over the capture history. `flex: 0 0 auto` on purpose — the rows keep
+   `flex: 1 1 auto` below, so the filter takes its content height and the list
+   still absorbs every remaining pixel of a docked pane or a narrow sheet. */
+.reading-captures-filter {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.reading-captures-search {
+  width: 100%;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid var(--border, #3a2c30);
+  border-radius: 7px;
+  color: var(--text, #f5ecee);
+  background: var(--panel-2, rgba(0, 0, 0, 0.18));
+  font: inherit;
+  font-size: 12px;
+}
+
+.reading-captures-search:focus-visible {
+  border-color: color-mix(in srgb, var(--accent, #a9142c) 55%, transparent);
+  outline: 2px solid color-mix(in srgb, var(--accent, #a9142c) 45%, transparent);
+  outline-offset: 1px;
+}
+
+.reading-captures-more > summary {
+  color: var(--muted, #b9a7ab);
+  font-size: 11px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.reading-captures-more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.reading-captures-more > summary::after {
+  content: '';
+  display: inline-block;
+  width: 0;
+  height: 0;
+  margin-left: 6px;
+  vertical-align: 2px;
+  border-left: 3.5px solid transparent;
+  border-right: 3.5px solid transparent;
+  border-top: 3.5px solid currentColor;
+  /* Token, not a literal: `--lq-motion-move` is 0.001ms under reduced motion. */
+  transition: transform var(--lq-motion-move, 140ms) var(--lq-ease-move, ease);
+}
+
+.reading-captures-more[open] > summary::after {
+  transform: rotate(180deg);
+}
+
+.reading-captures-more-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.reading-captures-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.reading-captures-chip {
+  padding: 3px 8px;
+  border: 1px solid var(--border, #3a2c30);
+  border-radius: 999px;
+  color: var(--muted, #b9a7ab);
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.reading-captures-chip:hover {
+  border-color: color-mix(in srgb, var(--accent, #a9142c) 34%, transparent);
+  color: var(--text, #f5ecee);
+}
+
+.reading-captures-chip.active {
+  border-color: color-mix(in srgb, var(--accent, #a9142c) 52%, transparent);
+  color: var(--text, #f5ecee);
+  background: color-mix(in srgb, var(--accent, #a9142c) 20%, transparent);
+}
+
+.reading-captures-order {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.reading-captures-order select {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 3px 6px;
+  border: 1px solid var(--border, #3a2c30);
+  border-radius: 6px;
+  color: var(--text, #f5ecee);
+  background: var(--panel-2, rgba(0, 0, 0, 0.18));
+  font: inherit;
+  font-size: 11px;
+}
+
+.reading-captures-clear {
+  padding: 0;
+  border: 0;
+  color: var(--accent, #a9142c);
+  background: none;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .reading-captures-rows {
   height: 100%;
   max-height: 100%;
