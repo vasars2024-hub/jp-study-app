@@ -2,7 +2,7 @@
   "surface": "@.reader",
   "label": "l6-manga",
   "control": false,
-  "at": "2026-08-27T00:06:48.556Z",
+  "at": "2026-08-27T00:25:21.175Z",
   "category": 5,
   "question": "UI clarity and user-friendliness — the ten §10.4 questions, scored",
   "hostClass": "root-selector",
@@ -75,8 +75,9 @@
       "numbers": {
         "titleText": "One Punch-Man : The Koi Pond | Chapter 229 | Cubari",
         "titleFrom": "div.reader-title",
-        "backAffordances": 1,
+        "backAffordances": 2,
         "backList": [
+          "Library",
           "Close"
         ]
       }
