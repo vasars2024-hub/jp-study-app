@@ -9,6 +9,7 @@ import {
   mergeEffectiveTemplates,
 } from '../../shared/profileFields';
 import type { StudyProfile } from '../../shared/profiles';
+import { ContextualSurface } from './liquid/LiquidSurface';
 
 export type MappingPreviewState = {
   templates: Record<string, string>;
@@ -91,17 +92,21 @@ export default function AnkiCardPreview({
     return `${profile.label} — ${fl} front / ${bl} back`;
   }, [profile]);
 
+  // L7: a preview is exactly what the plan lists as a Liquid region — context beside the work,
+  // never the work itself. `ContextualSurface` is inert outside a window in Liquid presentation,
+  // so the conventional and Blanc pixels are unchanged and reversibility costs nothing. The
+  // mapping editor and the manual-card form beside it stay on their opaque anchors.
   if (!preview) {
     return (
-      <aside className="card-preview card-preview-empty">
+      <ContextualSurface as="aside" className="card-preview card-preview-empty">
         <p className="card-preview-label">Card preview</p>
         <p className="muted">Configure field mappings to see how cards will look.</p>
-      </aside>
+      </ContextualSurface>
     );
   }
 
   return (
-    <aside className="card-preview">
+    <ContextualSurface as="aside" className="card-preview">
       <div className="card-preview-head">
         <div>
           <p className="card-preview-label">Card preview</p>
@@ -137,6 +142,6 @@ export default function AnkiCardPreview({
       <p className="muted card-preview-hint">
         Sample content for this profile. Mined cards use live dictionary and Tatoeba data.
       </p>
-    </aside>
+    </ContextualSurface>
   );
 }

@@ -11,6 +11,7 @@ import {
 } from '../components/anki/AnkiContent';
 import { ProfileSettingsSection } from './SettingsView';
 import DeckWorkbench from '../components/anki/DeckWorkbench';
+import { ContextualSurface } from '../components/liquid/LiquidSurface';
 import { useT } from '../i18n';
 
 export default function AnkiView() {
@@ -40,14 +41,18 @@ export default function AnkiView() {
     <div className="anki-view">
       <ProfileSettingsSection />
 
-      <div className="view-head">
+      {/* L7: the surface's contextual chrome — an intro line and one transport action —
+          takes the shared contextual primitive, exactly as Flashcards' heads do. The
+          connection form, mapping editor, CSS editor and manual-card form below stay on
+          opaque anchors: they are dense editing work, which §2.3 protects from glass. */}
+      <ContextualSurface className="view-head">
         <p className="muted">{t('anki.intro')}</p>
         <div className="actions">
           <button className="btn" onClick={state.check} disabled={loading}>
             {loading ? t('anki.checking') : t('anki.recheck')}
           </button>
         </div>
-      </div>
+      </ContextualSurface>
 
       {/*
         Outside the connected branch on purpose: three of its four sources (a

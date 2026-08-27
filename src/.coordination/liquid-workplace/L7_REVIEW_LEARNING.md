@@ -239,3 +239,32 @@ exist for them. All four now declare `scrollProof`. Their heavy legs are very li
 mechanism was proven correct here, on the surface where the two selectors disagree — but "likely"
 is not this rubric's currency, and re-running those three legs is cheap the next time each surface
 is open.
+
+## 2026-08-27 03:35 EDT — Anki opens, second of L7's six. And its connected half is unscorable here.
+
+Migration, per L7's own two bullets: **context and preview take Liquid, the work does not.**
+`AnkiView`'s head — intro line plus the one Recheck transport action — is now
+`<ContextualSurface className="view-head">`, matching the four Flashcards heads. `AnkiCardPreview`
+is a *preview*, which L7 names explicitly, so both of its branches (populated and empty) are
+`ContextualSurface as="aside"`; the `<aside>` landmark is kept, because it is how the preview is
+reachable without sight. Everything dense stays on its opaque anchor: the deck/note-type binding,
+the field-mapping editor, the note CSS editor, the manual-card form and the deck workbench.
+`AnkiContent` is shared with Blanc and gained nothing — no shell branch, no `lq-liquid`.
+`ankiLiquidRegions.test.ts`, 4 cases, guards all of that including the two negative halves.
+
+**Live, through the bridge, on a third window opened from Start:** `.anki-view .view-head` carries
+`lq-contextual` and `data-lq-role="contextual"`. Verified as landed, not assumed.
+
+**And the honest half. The preview region was NOT verified live, and Anki's rubric cells cannot be
+scored on this machine.** The surface reports *"Not connected to Anki."*, so the entire connected
+branch — deck/note-type, field mapping, note CSS, manual card, and the preview pane, which returns
+`null` at `fields.length === 0` — never mounts. `anki-card` count on screen: **2**,
+`.anki-workspace`: **0**, `aside.card-preview`: **0**. AnkiConnect does not answer on 8765, and
+**Anki desktop is not installed** at any standard path (checked `%LOCALAPPDATA%\Programs\Anki`,
+`%ProgramFiles%\Anki`, `%ProgramFiles(x86)%\Anki`; no `anki` process). No agent can install a
+third-party desktop app and point it at the user's real collection.
+
+So the preview's two branches rest on the test and the source this turn, and say so. Recorded in
+`needs-user.md`. What IS scorable without Anki, and is the next slice: the disconnected branch plus
+`DeckWorkbench`, which `AnkiView` mounts *outside* the connected branch precisely because three of
+its four sources need no Anki running.
