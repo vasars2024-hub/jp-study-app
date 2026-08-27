@@ -1753,3 +1753,53 @@ green: drop `aria-current` → 1 failed / 10 passed; drop the `<ul>` class → 1
 **Board does NOT move: still 43 of 48.** No cell was scored — cat6 VN needs a `vn` SPEC in
 `l6-parity.js` (none exists; the file has 9 apps and VN is not one) and cat5 VN reads its Q7/Q8/Q9
 from that cat6 baseline. What changed is that both are now ordinary work rather than parked.
+
+## 2026-08-26 22:46 EDT — the VN panel closes both its cells, and the ceiling leg stalls on its own
+
+Turn opened on interrupted work: `39872497` had landed cat6 VN **PASS 10/10** at 21:12 and the
+worker died at 21:15, leaving an uncommitted `cat5-l6-vn.json` scoring **6/10, four questions NO**.
+Re-derived and finished. All four NOs were real product defects.
+
+**Q1 entryPoints 0 and Q3 primaryAction null.** Nothing in this surface's top third — everything
+above y=240 on the shipped 820x580 Immersion window — was a task: the head carried `Hide library`
+and `Back to browser`, and NO control anywhere in the panel had a primary marker. Launch sat at
+y=300 inside the workspace column. The head now carries one declared primary action, mirroring the
+summary's Launch rather than moving it (that row owes category 6 two buttons); with nothing selected
+it is the way to the first entry.
+
+**Q4 scanned 36 against a bar of 12.** Four setup forms were open at rest — add-a-novel + the JSON
+import/export/scan row (8), the manual composer with the text hook and clipboard watcher (7), the
+progress editor (6), the route add form (4) — while the four disclosures already present held none
+of them. Each new `<details>` WRAPS its existing box, so no interior layout rule moved and every
+cat6 row still resolves through the closed box: capture select 5 kinds, 2 textareas,
+`.visual-novel-capture-actions button` 3, progress select `Planned`. Live **36 → 11 scanned,
+4 → 8 collapsed**. Recommendation rows had no class handle at all and were counted as chrome.
+
+**Q5, two failing runs in classic-light, one cause.** `rgb(16,185,129)` is a FILL colour used as
+text: `.media-study-mode-kicker` **2.54:1**, the recommendation score **2.29:1**, bar 4.5.
+`--accent-text` is the token this repo already built for that; the kicker swap covers all four
+surfaces that carry one. `.visual-novel-capture-list small` moved with them — same colour, same
+bar, and it escaped only because the fixture had no captured lines yet.
+
+cat5 `l6-vn` **PASS 10/10** (`e3147684`), control **FAILED AS REQUIRED on Q2, Q3, Q5, Q10**.
+
+**Then category 7 scored the same unchanged surface three different ways in forty minutes**
+(`e6fcccfc`): 2 findings (resize p50 33.4 / p95 66.8, BOTH repeats agreeing so UNSTABLE never
+fired — eight hand readings straight after returned 16.7 / 16.8), then VOID on a single
+**7,989.5 ms** frame, then VOID on one disagreeing resize. **Eight consecutive `ceiling` readings
+settle it: seven at p50 16.7 / max ~17, and one at max 117.0 ms with 1 frame over 100 — on a leg
+that runs no product code at all.** `breaches()` fired on `frames_over_100 > 0` and a run takes 6-9
+readings, so at ~12% per-reading most runs of a HEALTHY surface void or file a phantom. That is
+Library's "p95 66.9 / max 200.5" from this morning as well. The ceiling is now the environment
+control too: 3 readings a run, over-100 scored against what the bare compositor itself produced,
+longer-than-ceiling frames REPORTED under `environment` and never scored. Second harness change,
+stated: `heavy.proof`, because `-DuringJs` refusals were invisible and read as a fast surface.
+
+cat7 `vn` **PASS 10/10** with the ceiling **clean** (noise floor 0), so the pass owes nothing to
+the change. drag p50 16.7 / p95 16.8; resize p50 16.7 / p95 33.4 — at the edge of its own 33.6 bar,
+stated not smoothed; theme painted 17.0 ms. Analyze 84 captured lines: main max **21.3 ms** across
+8,015 ms vs idle 13.6 and a 500 bar. RSS 383.5 → 378.9 MB, renderer heap 230 MB. `-Jank` **12**
+frames over 100 vs 0.
+
+**Board 43 → 46 of 48.** The two left are category 7 on manga and Novels, both chromeless: the
+gesture legs still require `.fwin-bar` / `.fwin-resize`, which neither surface has.
