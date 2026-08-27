@@ -5644,6 +5644,8 @@ export const en: Catalog = {
   'flash.overview.intro': 'Dictionary saves, EPUB deck strip, and folder explorer.',
   'flash.simpleEpubMining': 'Simple EPUB mining',
   'flash.advancedEpub': 'Advanced EPUB',
+  'flash.jitenVocab': 'Jiten vocab',
+  'flash.moreTools': 'More tools',
   'flash.csvTool': 'CSV tool',
   // AI Card Studio (en)
   'aiStudio.section.provider': 'Provider & API key',

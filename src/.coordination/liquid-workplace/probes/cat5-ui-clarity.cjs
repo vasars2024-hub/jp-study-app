@@ -516,6 +516,7 @@ const SNAP = `(function(){
         themeToken: themeToken };
   var identityCount = Object.keys(identityMarkers).filter(function(k){ return identityMarkers[k]; }).length;
   var cardUniformity = 0, cardHost = null, cardHostDetail = null, cardControlSignatures = 0;
+  var cardHosts = [];
   var bodyArea = Math.max(1, B.width * B.height);
   var hosts = [].slice.call(root.querySelectorAll('*'));
   for (var hi = 0; hi < hosts.length; hi++) {
@@ -543,10 +544,6 @@ const SNAP = `(function(){
       buckets[key] = (buckets[key] || 0) + 1;
     });
     var frac = Math.max.apply(null, Object.keys(buckets).map(function(k){ return buckets[k]; })) / kids.length;
-    if (frac <= cardUniformity) continue;
-    cardUniformity = frac;
-    cardHost = name(host) + ' cards=' + kids.length;
-    cardHostDetail = Math.round((hb.width * hb.height) / bodyArea * 100) + '% of body';
     // GALLERY vs DASHBOARD, which size uniformity alone cannot tell apart: a gallery repeats
     // ONE kind of thing (13 theme swatches, N posters) and is legitimate; a dashboard flattens
     // UNRELATED functions into identical boxes, which is what §10.4 is actually asking about.
@@ -557,7 +554,39 @@ const SNAP = `(function(){
       }).sort().join('|');
       sigs[sig] = 1;
     });
-    cardControlSignatures = Object.keys(sigs).length;
+    cardHosts.push({
+      host: name(host) + ' cards=' + kids.length,
+      uniformity: Math.round(frac * 100) / 100,
+      signatures: Object.keys(sigs).length,
+      detail: Math.round((hb.width * hb.height) / bodyArea * 100) + '% of body',
+    });
+  }
+  /*
+   * CORRECTION, 2026-08-27. This used to keep only the MOST UNIFORM host (\`frac <=
+   * cardUniformity\` -> continue), so one host answered Q10 for the whole surface and ties went
+   * to whichever came first in document order.
+   *
+   * Two things were wrong with that, and Flashcards showed both at once. As an instrument: a
+   * real dashboard sitting beside a legitimate gallery is invisible, because the gallery's
+   * 1.00 uniformity and single signature hold the slot and grant the exemption on the
+   * dashboard's behalf. As a control: the Q10 plant appends its six-signature grid to the
+   * body, \`div.flash-strip\` already carried 24 identical cards at uniformity 1.00, and the
+   * plant tied rather than beat it — so the run went CONTROL-VOID on a question that is
+   * perfectly falsifiable, for the same reason Q2 and Q3 each needed repairing.
+   *
+   * The question is "is this surface a generic card dashboard", so ANY qualifying host being
+   * a uniform grid of unrelated functions answers it. Every host is now reported, the worst
+   * one decides, and the exemption has to be earned by all of them rather than by one.
+   */
+  var dashboards = cardHosts.filter(function(h){ return h.uniformity >= 0.8 && h.signatures > 1; });
+  var deciding = dashboards[0]
+    || cardHosts.slice().sort(function(a, b){ return b.uniformity - a.uniformity; })[0]
+    || null;
+  if (deciding) {
+    cardUniformity = deciding.uniformity;
+    cardControlSignatures = deciding.signatures;
+    cardHost = deciding.host;
+    cardHostDetail = deciding.detail;
   }
 
   return JSON.stringify({
@@ -597,7 +626,8 @@ const SNAP = `(function(){
            bespokePrefixes: bespokePrefixes.map(function(p){ return p + ':' + prefixTally[p]; }),
            contentDominant: contentBest, contentFrac: contentFrac,
            cardUniformity: Math.round(cardUniformity*100)/100, cardControlSignatures: cardControlSignatures,
-           cardHost: cardHost, cardHostDetail: cardHostDetail }
+           cardHost: cardHost, cardHostDetail: cardHostDetail, cardHosts: cardHosts,
+           dashboardHosts: cardHosts.filter(function(h){ return h.uniformity >= 0.8 && h.signatures > 1; }).length }
   });
 })()`;
 

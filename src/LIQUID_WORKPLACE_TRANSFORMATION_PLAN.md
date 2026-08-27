@@ -896,6 +896,18 @@ and filters the deck to zero, so the drive must clear it before `check()` runs. 
 `L7_REVIEW_LEARNING.md` and `cat6-l7-flashcards.json`. Next is category 5, which reads this
 baseline for Q7/Q8/Q9 and could not be scored before it existed.
 
+**Progress 2026-08-27 (later) — Flashcards category 5 is 10/10; Flashcards is 60/80.** All ten
+questions YES, control `FAILED AS REQUIRED on Q2, Q3, Q5, Q10` with plant residue **0**. The
+first score was **9/10** on a real defect: Q4 measured **0 collapsed disclosures and 10 scanned
+controls**, seven of them launchers competing in one row, so the overview opened by asking which
+of seven buttons meant "start". Five specialist entries now sit behind one `<details>`; nothing
+was removed, disabled or renamed, and Q4 re-measures **1 disclosure / 5 scanned controls**.
+`Jiten vocab` shipped as a raw JSX literal and is now `flash.jitenVocab` in four catalogs.
+Instrument correction: Q10's card-host scan kept only the most uniform host, so a real dashboard
+beside a legitimate gallery was invisible and the control could not falsify — every qualifying
+host is now scored and the worst decides. Only categories **7 and 8** remain on this surface.
+Evidence: `L7_REVIEW_LEARNING.md`, `cat5-l7-flashcards.json`, `cat5-l7-flashcards-control.json`.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.

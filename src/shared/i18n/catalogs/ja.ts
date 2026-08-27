@@ -5345,6 +5345,8 @@ export const ja: Catalog = {
   'flash.overview.intro': '辞書の保存語、EPUBデッキストリップ、フォルダエクスプローラー。',
   'flash.simpleEpubMining': 'シンプルEPUBマイニング',
   'flash.advancedEpub': '詳細EPUB',
+  'flash.jitenVocab': 'Jiten 語彙',
+  'flash.moreTools': 'その他のツール',
   'flash.csvTool': 'CSVツール',
   // AI Card Studio (ja)
   'aiStudio.section.provider': 'プロバイダーと API キー',

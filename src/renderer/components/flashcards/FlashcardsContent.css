@@ -124,3 +124,49 @@
     min-width: 0;
   }
 }
+
+/* The overview's specialist launchers, folded behind one disclosure. `<details>` carries the
+   keyboard and screen-reader semantics natively, so nothing here re-implements them — the
+   marker is dropped and the summary is painted as the button it already reads as, at the same
+   32px pointer footprint every other control on this surface owns. Anchored, not glass: this
+   is a launcher list, and Liquid is selective. */
+.flash-view .flash-more-tools > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.flash-view .flash-more-tools > summary::-webkit-details-marker {
+  display: none;
+}
+
+.flash-view .flash-more-tools > summary::after {
+  content: '';
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid currentColor;
+  opacity: 0.7;
+  transition: transform 140ms ease;
+}
+
+.flash-view .flash-more-tools[open] > summary::after {
+  transform: rotate(180deg);
+}
+
+.flash-view .flash-more-tools-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flash-view .flash-more-tools > summary::after {
+    transition: none;
+  }
+}

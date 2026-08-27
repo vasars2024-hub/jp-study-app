@@ -1323,26 +1323,38 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
           <button className="btn primary" onClick={() => state.openEpubMining('simple')}>
             {t('flash.simpleEpubMining')}
           </button>
-          <button className="btn" onClick={() => state.openEpubMining('advanced')}>
-            {t('flash.advancedEpub')}
-          </button>
-          <button className="btn" onClick={() => state.openEpubMining('jiten')}>
-            Jiten vocab
-          </button>
-          <button className="btn" onClick={() => state.setMode('csv-tool')}>
-            {t('flash.csvTool')}
-          </button>
-          {!hideAiStudio && (
-            <button className="btn" onClick={() => state.setMode('ai-studio')}>
-              {t('flash.aiCardStudio')}
-            </button>
-          )}
-          <button className="btn" onClick={askAgent} disabled={saved.length === 0}>
-            {t('flash.askAgent')}
-          </button>
           <button className="btn primary" onClick={state.startReview} disabled={saved.length === 0}>
             {saved.length ? t('flash.reviewDictionaryCount', { count: saved.length }) : t('flash.reviewDictionary')}
           </button>
+          {/*
+            Five specialist entries used to sit flat beside the two the overview is
+            actually for, so the first thing this window asked of a user was to read
+            seven launchers and work out which one meant "start". Everything is still
+            here and one keystroke away; nothing is removed, disabled or renamed, and
+            the disclosure opens and closes without touching stored state.
+          */}
+          <details className="flash-more-tools">
+            <summary className="btn">{t('flash.moreTools')}</summary>
+            <div className="flash-more-tools-body">
+              <button className="btn" onClick={() => state.openEpubMining('advanced')}>
+                {t('flash.advancedEpub')}
+              </button>
+              <button className="btn" onClick={() => state.openEpubMining('jiten')}>
+                {t('flash.jitenVocab')}
+              </button>
+              <button className="btn" onClick={() => state.setMode('csv-tool')}>
+                {t('flash.csvTool')}
+              </button>
+              {!hideAiStudio && (
+                <button className="btn" onClick={() => state.setMode('ai-studio')}>
+                  {t('flash.aiCardStudio')}
+                </button>
+              )}
+              <button className="btn" onClick={askAgent} disabled={saved.length === 0}>
+                {t('flash.askAgent')}
+              </button>
+            </div>
+          </details>
         </div>
       </ContextualSurface>
 

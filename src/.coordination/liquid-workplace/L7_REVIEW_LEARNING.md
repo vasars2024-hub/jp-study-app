@@ -104,3 +104,35 @@ Row evidence at PASS: All **3,218** = Unfiled 3,218 + folders 0; group badges **
 3,218**; both bodies render **16** rows at pitch **108** over scroll ranges **15,562** and
 **332,012** against expected 15,552 / 331,992 (ratio 1.001 / 1.000). Baseline:
 `cat6-l7-flashcards.json`.
+
+## 2026-08-27 01:05 EDT — Flashcards category 5 passes 10/10, after a product fix
+
+Category 5 is **PASS 10/10** — all ten questions YES — taking Flashcards to **60/80**; both L7
+bullets remain OPEN. Only categories 7 and 8 are left. Control: `CONTROL FAILED AS REQUIRED on
+Q2, Q3, Q5, Q10`, plant residue **0**, disclosure store byte-identical before and after.
+
+**First score was 9/10 and the failing question was real.** Q4 asks for at least one collapsed
+disclosure and no more than 12 controls to scan; the overview had **0 disclosures and 10 scanned
+controls**, seven of them launchers competing in one row — Simple EPUB mining, Advanced EPUB,
+Jiten vocab, CSV tool, AI card studio, Ask the Agent, Review dictionary. The first thing the
+window asked of a user was to read seven buttons and work out which one meant "start".
+
+Fix: the two the overview is actually for stay out; the five specialist entries move behind one
+`<details className="flash-more-tools">`. Nothing removed, disabled or renamed; `<details>`
+carries the keyboard and screen-reader semantics natively so nothing re-implements them, and
+the summary keeps the 32px pointer footprint the rest of the surface owns (measured live at
+**35px**). Q4 re-measures **1 collapsed disclosure / 5 scanned controls**. `Jiten vocab` was a
+raw JSX literal and is now `flash.jitenVocab` in all four catalogs, with `flash.moreTools`.
+
+**Instrument correction — Q10 could not be falsified on this surface, and the reason was a real
+blind spot.** The card-host scan kept only the most uniform host, ties going to document order.
+`div.flash-strip` carries 24 identical cards at uniformity 1.00 with one signature, so it held
+the slot; the control's six-signature plant tied rather than beat it and the run went
+CONTROL-VOID. As an instrument that is worse than a control artefact: a real dashboard beside a
+legitimate gallery is invisible, because the gallery earns the exemption on its behalf. Every
+qualifying host is now reported and the worst one decides. Flashcards reads two hosts —
+`div.flash-view` 0.20/5 and `div.flash-strip` 1.00/1 — **dashboardHosts 0**, so the YES is now
+earned by both rather than granted by one.
+
+Q5 swept **338** text runs per theme, 0 failing, min ratio **5.02** (forest-night) and **5.71**
+(classic-light) against a 4.5 bar. Baselines: `cat5-l7-flashcards.json` and `-control.json`.

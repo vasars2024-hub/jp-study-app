@@ -5888,6 +5888,8 @@ export const ru: Catalog = {
   'flash.overview.intro': 'Сохранённые слова словаря, лента колод EPUB и обозреватель папок.',
   'flash.simpleEpubMining': 'Простая добыча из EPUB',
   'flash.advancedEpub': 'Расширенный EPUB',
+  'flash.jitenVocab': 'Лексика Jiten',
+  'flash.moreTools': 'Другие инструменты',
   'flash.csvTool': 'Инструмент CSV',
   // AI Card Studio (ru)
   'aiStudio.section.provider': 'Провайдер и API-ключ',

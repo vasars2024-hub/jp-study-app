@@ -5320,6 +5320,8 @@ export const zh: Catalog = {
   'flash.overview.intro': '词典收藏、EPUB 卡组条、文件夹浏览器。',
   'flash.simpleEpubMining': '简单 EPUB 挖掘',
   'flash.advancedEpub': '高级 EPUB',
+  'flash.jitenVocab': 'Jiten 词汇',
+  'flash.moreTools': '更多工具',
   'flash.csvTool': 'CSV 工具',
   // AI Card Studio (zh)
   'aiStudio.section.provider': '提供商与 API 密钥',

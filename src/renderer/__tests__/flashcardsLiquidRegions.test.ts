@@ -42,6 +42,33 @@ describe('Flashcards Liquid regions', () => {
     expect(REVIEW).not.toContain('lq-liquid');
   });
 
+  it('folds the specialist launchers behind one disclosure without removing any of them', () => {
+    // Rubric category 5 Q4: >=1 collapsed disclosure AND <=12 controls to scan.
+    // Measured 9/10 with 0 disclosures and 10 scanned controls, seven of them
+    // launchers competing in one row. All five are still mounted, just tucked.
+    expect(SOURCE).toContain('<details className="flash-more-tools">');
+    expect(SOURCE).toContain('<summary className="btn">{t(\'flash.moreTools\')}</summary>');
+    for (const call of [
+      "state.openEpubMining('advanced')",
+      "state.openEpubMining('jiten')",
+      "state.setMode('csv-tool')",
+      "state.setMode('ai-studio')",
+    ]) {
+      expect(SOURCE).toContain(call);
+    }
+    // The disclosure is not allowed to swallow the two actions the overview is for.
+    const head = SOURCE.slice(
+      SOURCE.indexOf('<div className="actions">'),
+      SOURCE.indexOf('<details className="flash-more-tools">'),
+    );
+    expect(head).toContain("state.openEpubMining('simple')");
+    expect(head).toContain('state.startReview');
+    // `Jiten vocab` shipped as a raw literal in JSX until this landed.
+    expect(SOURCE).not.toContain('>\n                Jiten vocab\n');
+    expect(SOURCE).toContain("{t('flash.jitenVocab')}");
+    expect(CONTROL_STYLES).toMatch(/\.flash-more-tools > summary \{[\s\S]*min-height:\s*32px/);
+  });
+
   it('leaves dense import, editing, and virtualized deck work outside the contextual regions', () => {
     expect(SOURCE).toContain('<DeckImportPanel');
     expect(SOURCE).toContain('<CsvEditorPanel');
