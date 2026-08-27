@@ -512,6 +512,7 @@ export const ru: Catalog = {
   'vnPanel.timing': 'отсчёт',
   'vnPanel.launch': 'Запустить',
   'vnPanel.stopTimer': 'Остановить таймер',
+  'vnPanel.progressHead': 'Прогресс чтения',
   'vnPanel.statusLabel': 'Статус',
   'vnPanel.status.planned': 'Запланировано',
   'vnPanel.status.reading': 'Читаю',

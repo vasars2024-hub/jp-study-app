@@ -458,7 +458,12 @@ textarea {
 .media-study-mode { display: grid; gap: 8px; margin: 10px 0 16px; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--accent, #d84b57) 45%, var(--border)); border-radius: 10px; background: var(--surface-1); }
 .media-study-mode-heading { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
 .media-study-mode-heading h3 { margin: 2px 0 0; font-size: 1rem; }
-.media-study-mode-kicker { color: var(--accent, #d84b57); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; }
+/* 11.2px uppercase in the RAW accent measured 2.54:1 against the VN panel in classic-light —
+   the accent is a FILL colour and this is the smallest text in the app painted with it.
+   `--accent-text` is the token this repo already built for exactly that difference (see its
+   note at the top of this file); every light palette remaps it, so this one swap fixes the
+   four surfaces that carry a kicker rather than one. */
+.media-study-mode-kicker { color: var(--accent-text, var(--accent, #d84b57)); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; }
 .media-study-empty { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .media-study-empty p { margin: 0; }
 .media-study-results { display: grid; gap: 10px; min-width: 0; padding-top: 4px; border-top: 1px solid var(--border); }
@@ -539,6 +544,24 @@ textarea {
 .visual-novel-panel-tools { display: flex; align-items: center; gap: 8px; }
 .visual-novel-panel-tools button { min-height: var(--lq-hit-target); padding: 0 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-2); color: inherit; cursor: pointer; }
 .visual-novel-panel-tools button[aria-pressed='true'] { border-color: var(--accent, #d84b57); }
+/* `justify-content: space-between` would strand the primary action in the middle of the head.
+   `margin-left: auto` collapses it against the tools group so the head reads title | actions,
+   and the tools keep their own 8px gutter. `.btn` supplies the face; only placement is here. */
+.visual-novel-panel-primary { margin-left: auto; min-height: var(--lq-hit-target); }
+/* THE DISCLOSURE SET. Four setup forms on this surface — add-a-novel, the manual line
+   composer, the progress editor and the route add form — are edited rarely and were open at
+   rest, which is most of the 36 controls §10.4 Q4 counted against a bar of 12. Each wraps its
+   existing box rather than replacing it, so no interior layout rule moves. */
+.visual-novel-add-disclosure { padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+.visual-novel-add-disclosure > summary,
+.visual-novel-capture-manual > summary,
+.visual-novel-progress-disclosure > summary,
+.visual-novel-route-disclosure > summary { display: flex; align-items: center; gap: 8px; min-height: var(--lq-hit-target); color: var(--text-muted); font-size: 0.76rem; cursor: pointer; }
+.visual-novel-capture-manual > summary small { color: var(--accent-text, var(--accent, #d84b57)); }
+.visual-novel-add-disclosure[open] > summary { margin-bottom: 7px; }
+.visual-novel-add-disclosure .visual-novel-add { padding-bottom: 0; border-bottom: 0; }
+.visual-novel-progress-disclosure[open] > summary,
+.visual-novel-route-disclosure[open] > summary { margin-bottom: 7px; }
 .visual-novel-workspace { box-sizing: border-box; min-height: 0; overflow: visible; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-1); }
 .visual-novel-library { display: grid; align-content: start; gap: 10px; }
 .visual-novel-add { display: grid; gap: 7px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
@@ -557,7 +580,9 @@ textarea {
 .visual-novel-recommendations button { display: flex; align-items: center; justify-content: space-between; gap: 7px; width: 100%; padding: 7px 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-2); color: inherit; text-align: left; }
 .visual-novel-recommendations button > span { display: grid; gap: 2px; min-width: 0; }
 .visual-novel-recommendations button small { overflow: hidden; color: var(--text-muted); font-size: 0.68rem; text-overflow: ellipsis; white-space: nowrap; }
-.visual-novel-recommendations button b { color: var(--accent, #d84b57); font-size: 0.76rem; }
+/* Same defect as the kicker, measured at 2.29:1 in classic-light: a 12px bold score in the raw
+   accent on `--surface-2`. Both of this surface's accent TEXT runs move to `--accent-text`. */
+.visual-novel-recommendations button b { color: var(--accent-text, var(--accent, #d84b57)); font-size: 0.76rem; }
 .visual-novel-library ul { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .visual-novel-library li > button { display: grid; gap: 3px; width: 100%; padding: 8px 9px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-2); color: inherit; text-align: left; cursor: pointer; }
 .visual-novel-library li > button.is-selected { border-color: var(--accent, #d84b57); background: color-mix(in srgb, var(--surface-2) 82%, var(--accent, #d84b57) 18%); }
@@ -644,10 +669,19 @@ textarea {
 .visual-novel-script-preview > label > span { display: grid; gap: 2px; }
 .visual-novel-script-preview small { color: var(--text-muted); font-size: 0.68rem; }
 .visual-novel-capture { display: grid; gap: 7px; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
-.visual-novel-capture > div:first-child { display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 7px; }
+/* The kind/speaker row moved inside the manual-entry disclosure, so it is no longer this box's
+   first child. Selected by name now rather than by position — the positional selector would
+   have silently re-targeted `.visual-novel-capture-actions` and turned the action row into a
+   160px two-column grid. */
+.visual-novel-capture-manual-head { display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 7px; }
 .visual-novel-capture textarea { min-height: 82px; resize: vertical; }
 .visual-novel-capture-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
 .visual-novel-capture-actions label { display: flex; align-items: center; gap: 6px; color: var(--text-muted); font-size: 0.76rem; }
+/* A flex item that must own its own line: the manual composer is a full-width form, not another
+   chip beside `Capture screen text`. */
+.visual-novel-capture-manual { flex: 1 0 100%; }
+.visual-novel-capture-manual-fields { display: grid; gap: 7px; padding-top: 7px; }
+.visual-novel-capture-manual-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
 .visual-novel-analysis-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
 .visual-novel-analysis-actions select { min-width: 160px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-2); color: inherit; padding: 7px 8px; font: inherit; }
 .visual-novel-reading-overlay { display: grid; gap: 7px; min-height: 150px; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
@@ -660,7 +694,9 @@ textarea {
    no room, so nothing moves at any width where the word fits. */
 .visual-novel-capture-list > button { display: grid; gap: 4px; min-width: 0; padding: 8px 9px; border: 1px solid transparent; border-radius: 7px; background: var(--surface-1); color: inherit; text-align: left; overflow-wrap: anywhere; cursor: text; }
 .visual-novel-capture-list > button.is-selected { border-color: var(--accent, #d84b57); }
-.visual-novel-capture-list small { color: var(--accent, #d84b57); }
+/* The third accent text run on this surface. It only escaped the contrast sweep because the
+   fixture library had no captured lines yet — same colour, same bar, so it moves with them. */
+.visual-novel-capture-list small { color: var(--accent-text, var(--accent, #d84b57)); }
 .visual-novel-capture-list span { font-size: 0.93rem; line-height: 1.55; }
 .visual-novel-capture-list em { color: var(--text-muted); font-size: 0.78rem; font-style: normal; line-height: 1.4; }
 .visual-novel-sentence-assist { display: grid; gap: 9px; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
@@ -738,7 +774,7 @@ textarea {
 .visual-novel-library { grid-template-columns: minmax(0, 1fr); }
 @container vnwork (max-width: 360px) {
   .visual-novel-progress { grid-template-columns: 1fr; }
-  .visual-novel-capture > div:first-child { grid-template-columns: 1fr; }
+  .visual-novel-capture-manual-head { grid-template-columns: 1fr; }
   .visual-novel-analysis-actions select { min-width: 0; }
 }
 .media-tracking-dashboard { display: grid; gap: 14px; margin: 12px 0 18px; padding: 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-1); }

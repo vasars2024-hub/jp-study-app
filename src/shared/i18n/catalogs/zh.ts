@@ -456,6 +456,7 @@ export const zh: Catalog = {
   'vnPanel.timing': '计时中',
   'vnPanel.launch': '启动',
   'vnPanel.stopTimer': '停止计时',
+  'vnPanel.progressHead': '阅读进度',
   'vnPanel.statusLabel': '状态',
   'vnPanel.status.planned': '计划中',
   'vnPanel.status.reading': '阅读中',

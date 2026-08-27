@@ -458,6 +458,7 @@ export const ja: Catalog = {
   'vnPanel.timing': '計測中',
   'vnPanel.launch': '起動',
   'vnPanel.stopTimer': '計測を停止',
+  'vnPanel.progressHead': '読書の進捗',
   'vnPanel.statusLabel': '状態',
   'vnPanel.status.planned': '予定',
   'vnPanel.status.reading': '読書中',

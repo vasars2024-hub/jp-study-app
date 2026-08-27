@@ -504,6 +504,7 @@ export const en: Catalog = {
   'vnPanel.timing': 'timing',
   'vnPanel.launch': 'Launch',
   'vnPanel.stopTimer': 'Stop timer',
+  'vnPanel.progressHead': 'Reading progress',
   'vnPanel.statusLabel': 'Status',
   'vnPanel.status.planned': 'Planned',
   'vnPanel.status.reading': 'Reading',
