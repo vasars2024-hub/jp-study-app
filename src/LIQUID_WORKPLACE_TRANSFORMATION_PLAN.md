@@ -847,6 +847,16 @@ Order: Flashcards → Anki → Notebook → Statistics → Calendar → Games.
 
 Gate: timing-sensitive input and study state do not shift unexpectedly.
 
+**Progress 2026-08-26 — Flashcards, first of six; both bullets remain OPEN.** The mode launcher
+and the overview/mining mode navigation now use `ContextualSurface`, which stays inert in
+conventional and Blanc hosts and paints only through the shared presentation seam. Dense import,
+CSV editing, virtualized deck rows, the review card, and grading controls remain on the opaque
+work surface. Live with a real **3,218-card** review: Liquid → Standard → Liquid preserved the
+same word, **0 / 3,218** position, card rect **724×360 at 137,360**, and action rect **724×49 at
+137,740** byte-for-byte; the review contained **0 contextual regions**. Focused guard: 3/3.
+Log: `.coordination/liquid-workplace/L7_REVIEW_LEARNING.md`. Next: Flashcards feature parity and
+the rest of its rubric cells before Anki; one migrated app does not close either system-wide bullet.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.

@@ -35,6 +35,7 @@ import {
   type DragEvent,
 } from 'react';
 import { confirmDialog, promptDialog } from '../ui/dialogService';
+import { ContextualSurface } from '../liquid/LiquidSurface';
 import Icon from '../Icons';
 import VirtualList from '../VirtualList';
 import EpubMiningPanel from '../EpubMiningPanel';
@@ -1103,7 +1104,7 @@ export function FlashcardMiningMode({ state }: { state: FlashcardsState }) {
 
   return (
     <div className="flash-view flash-view-mining">
-      <div className="view-head">
+      <ContextualSurface className="view-head">
         <p className="muted">{t('flash.mining.intro')}</p>
         <div className="actions">
           <button className="btn" onClick={() => state.setMode('overview')}>
@@ -1115,9 +1116,9 @@ export function FlashcardMiningMode({ state }: { state: FlashcardsState }) {
             </button>
           )}
         </div>
-      </div>
+      </ContextualSurface>
 
-      <div className="flash-tabs epub-mining-mode-tabs">
+      <ContextualSurface className="flash-tabs epub-mining-mode-tabs">
         <button
           type="button"
           className={`flash-tab${epubMiningUi === 'simple' ? ' active' : ''}`}
@@ -1139,7 +1140,7 @@ export function FlashcardMiningMode({ state }: { state: FlashcardsState }) {
         >
           Jiten
         </button>
-      </div>
+      </ContextualSurface>
 
       <p className="epub-mining-mode-lead muted">
         {epubMiningUi === 'simple'
@@ -1188,7 +1189,7 @@ export function FlashcardCsvMode({ state }: { state: FlashcardsState }) {
   const { t } = useT();
   return (
     <div className="flash-view flash-view-mining">
-      <div className="view-head">
+      <ContextualSurface className="view-head">
         <p className="muted">{t('flash.csv.intro')}</p>
         <div className="actions">
           <button className="btn" onClick={() => state.setMode('overview')}>
@@ -1198,7 +1199,7 @@ export function FlashcardCsvMode({ state }: { state: FlashcardsState }) {
             {t('flash.epubMining')}
           </button>
         </div>
-      </div>
+      </ContextualSurface>
       <CsvEditorPanel
         onDeckImported={() => {
           state.setMode('overview');
@@ -1215,7 +1216,7 @@ export function FlashcardAiMode({ state }: { state: FlashcardsState }) {
   if (state.hideAiStudio) return null;
   return (
     <div className="flash-view flash-view-mining">
-      <div className="view-head">
+      <ContextualSurface className="view-head">
         <p className="muted">{t('flash.aiStudio.intro')}</p>
         <div className="actions">
           <button className="btn" onClick={() => state.setMode('overview')}>
@@ -1225,7 +1226,7 @@ export function FlashcardAiMode({ state }: { state: FlashcardsState }) {
             {t('flash.epubMining')}
           </button>
         </div>
-      </div>
+      </ContextualSurface>
       <AiCardStudio
         onDeckImported={() => {
           state.setDeck(loadDeck());
@@ -1315,7 +1316,7 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
 
   return (
     <div className="flash-view flash-view-decks">
-      <div className="view-head">
+      <ContextualSurface className="view-head">
         <p className="muted">{t('flash.overview.intro')}</p>
         <div className="actions">
           <button className="btn primary" onClick={() => state.openEpubMining('simple')}>
@@ -1342,9 +1343,9 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
             {saved.length ? t('flash.reviewDictionaryCount', { count: saved.length }) : t('flash.reviewDictionary')}
           </button>
         </div>
-      </div>
+      </ContextualSurface>
 
-      <div className="flash-tabs">
+      <ContextualSurface className="flash-tabs">
         <button
           type="button"
           className={`flash-tab ${overviewTab === 'epub' ? 'active' : ''}`}
@@ -1359,7 +1360,7 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
         >
           {t('flash.tab.dictionary', { count: saved.length })}
         </button>
-      </div>
+      </ContextualSurface>
 
       <div className="flash-search">
         <Icon name="search" size={14} className="flash-search-icon" />
