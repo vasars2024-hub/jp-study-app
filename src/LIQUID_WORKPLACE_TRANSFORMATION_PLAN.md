@@ -908,6 +908,16 @@ beside a legitimate gallery was invisible and the control could not falsify — 
 host is now scored and the worst decides. Only categories **7 and 8** remain on this surface.
 Evidence: `L7_REVIEW_LEARNING.md`, `cat5-l7-flashcards.json`, `cat5-l7-flashcards-control.json`.
 
+**Progress 2026-08-27 (last) — Flashcards category 8 is UNMEASURED, not failed, and stays in
+units-left.** The run establishes raw i18n keys **0**, placeholders **0**, worst mute-pair count
+**0**, and a drive leg that passed its own `surfaceChanged` and `restored` gates. It cannot
+score `statesNamed` because **0 of 4** states are observable. The cause is product: this
+surface's deck-list empty states are a bare `<p className="muted">`, while the surface's own
+pattern — `.flash-empty`, already used by review mode — is what `cat8-honest-states.cjs:310`
+looks for. Next slice is that markup, then a re-run with `--langs --control`. Category 7 is the
+other open cell. Regression re-runs after the category-5 product change: category 4 **PASS
+10/10**, category 1 **PASS 10/10**.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.

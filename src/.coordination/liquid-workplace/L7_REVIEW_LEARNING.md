@@ -136,3 +136,31 @@ earned by both rather than granted by one.
 
 Q5 swept **338** text runs per theme, 0 failing, min ratio **5.02** (forest-night) and **5.71**
 (classic-light) against a 4.5 bar. Baselines: `cat5-l7-flashcards.json` and `-control.json`.
+
+## 2026-08-27 01:35 EDT — category 8 is UNMEASURED, and the reason is a product gap
+
+Category 8 ran and returned `UNMEASURED - statesNamed`, which is **not** a score and is counted
+in units-left, never dropped. Flashcards is **60/80**; only categories 7 and 8 are open.
+
+What the run did establish, all as numbers: raw i18n keys **0**, placeholders **0**, worst mute
+pair count **0**, and the drive leg passed its own `surfaceChanged` and `restored` gates — so
+typing into `.flash-search-input` genuinely does filter this surface. What it could not
+establish is `statesNamed`, because **0 of the four states are observable**: empty, loading,
+error and offline all report `hosts: 0`.
+
+The cause is product, not instrument. `cat8-honest-states.cjs:310` finds an empty state by
+`[class*="empty"],[class*="placeholder"],[class*="no-results"]`, and this surface's deck-list
+empty state is `FlashcardsContent.tsx` `<p className="muted">{t('flash.search.noMatches')}</p>`
+— an unmarked muted paragraph. The surface already has the right pattern and does not use it
+here: `.flash-empty` (with `.flash-empty-emoji`) is what review mode renders. So the deck list's
+two empty states — no search matches, and no cards in view — are the odd ones out.
+
+**Exact next slice**: give both deck-list empty states the surface's own `.flash-empty`
+treatment (and drop the decorative emoji per the repo's chrome rule while touching it), then
+re-run `cat8-honest-states.cjs --surface "Flashcards" --label l7-flashcards --drive-input
+".flash-search-input" --drive-value "zzqqxx"`, which should then observe `empty` and score
+`statesNamed`. Add `--langs` and `--control` for the required legs. Category 7 is the other open
+cell; carry `l0-ms-are-a-different-display` and the environment-ceiling correction into it.
+
+Regression checks after the category-5 product change, both re-run and both still clean:
+category 4 **PASS 10/10** and category 1 **PASS 10/10**.
