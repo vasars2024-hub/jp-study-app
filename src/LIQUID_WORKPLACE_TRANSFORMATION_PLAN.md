@@ -918,6 +918,13 @@ looks for. Next slice is that markup, then a re-run with `--langs --control`. Ca
 other open cell. Regression re-runs after the category-5 product change: category 4 **PASS
 10/10**, category 1 **PASS 10/10**.
 
+**Progress 2026-08-27 — Anki is hardened on the reachable branch and remains externally PARKED.**
+The disconnected screen plus Deck Workbench pass controlled categories 1–4 after target-size and
+compact-reflow fixes, but these partial results do not close whole-surface cells. The connected
+deck/card/browser branch cannot mount without Anki + AnkiConnect, so Anki remains **0 of 8 closed / 8
+PARKED** and L7 advances under the human-blocked exception. Next surface: Notebook. Evidence:
+`L7_REVIEW_LEARNING.md`, `cat{1,2,3,4}-l7-anki*.json`.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.

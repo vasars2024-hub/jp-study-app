@@ -363,3 +363,17 @@ content **93.7 -> 95.3%** as the window grows. Every size restored; injected cli
 **0 -> 1 -> 0**. **PASS 10/10.** Sub-minimum 200x140 remains a reported negative (**2** hidden
 overflow containers), outside the scored compact floor. Evidence: `baselines/cat4-l7-anki.json`;
 `ankiLiquidRegions.test.ts` **6/6**.
+
+## 2026-08-27 08:54 EDT — Anki reachable branch hardened; eight whole-surface cells remain PARKED
+
+Categories 1–4 above are controlled measurements of the disconnected screen plus the complete
+Deck Workbench, not certification of the unmounted connected branch. Anki desktop and AnkiConnect
+are absent, so the connected deck/card/browser features cannot be inventoried or exercised. The
+dashboard blocker remains the existing Anki + AnkiConnect install/run request; no duplicate was
+added.
+
+Therefore Anki remains **0 of 8 closed / 8 PARKED**. Category 5 is not run around category 6:
+feature parity cannot honestly score until the connected feature inventory exists. Per the
+human-blocked ladder exception, L7 advances to Notebook while retaining all eight Anki cells in
+units-left. Reachable product work is checkpointed through category 4; no user data or setting was
+changed.
